@@ -1,0 +1,46 @@
+dist: xenial
+os: linux
+language: python
+python: '3.6'
+cache:
+  directories:
+    - /opt/binaries
+stages:
+  - lint
+env:
+global:
+  - PARTICL_BINDIR=/opt/binaries/particl-0.18.0.12/bin/
+  - BITCOIN_BINDIR=/opt/binaries/bitcoin-0.18.0/bin/
+  - LITECOIN_BINDIR=/opt/binaries/litecoin-0.17.1/bin/
+before_script:
+  - if [ ! -d "/opt/binaries" ]; then mkdir -p "/opt/binaries" ; fi
+  - if [ ! -d "$BITCOIN_BINDIR" ]; then cd "/opt/binaries" && wget https://bitcoincore.org/bin/bitcoin-core-0.18.0/bitcoin-0.18.0-x86_64-linux-gnu.tar.gz && tar xvf bitcoin-0.18.0-x86_64-linux-gnu.tar.gz ; fi
+  - if [ ! -d "$LITECOIN_BINDIR" ]; then cd "/opt/binaries" && wget https://download.litecoin.org/litecoin-0.17.1/linux/litecoin-0.17.1-x86_64-linux-gnu.tar.gz && tar xvf litecoin-0.17.1-x86_64-linux-gnu.tar.gz ; fi
+  - if [ ! -d "$PARTICL_BINDIR" ]; then cd "/opt/binaries" && wget https://github.com/particl/particl-core/releases/download/v0.18.0.12/particl-0.18.0.12-x86_64-linux-gnu_nousb.tar.gz && tar xvf particl-0.18.0.12-x86_64-linux-gnu_nousb.tar.gz ; fi
+  - cd
+script:
+  - cd $TRAVIS_BUILD_DIR
+  - export PARTICL_BINDIR=/opt/binaries/particl-0.18.0.12/bin/
+  - export BITCOIN_BINDIR=/opt/binaries/bitcoin-0.18.0/bin/
+  - export LITECOIN_BINDIR=/opt/binaries/litecoin-0.17.1/bin/
+  - python setup.py test
+after_success:
+  - echo "End test"
+jobs:
+  include:
+    - stage: lint
+      env:
+      cache: false
+      language: python
+      python: '3.6'
+      before_install:
+        - sudo apt-get install -y wget gnupg
+      install:
+        - travis_retry pip install flake8==3.5.0
+        - travis_retry pip install codespell==1.15.0
+      before_script:
+      script:
+        - PYTHONWARNINGS="ignore" flake8 --ignore=E501,F841 --exclude=key.py,messages_pb2.py
+        - codespell --check-filenames --disable-colors --quiet-level=7 -S .git
+      after_success:
+        - echo "End lint"

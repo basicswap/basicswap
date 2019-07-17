@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package basicswap;
+
+/* Step 1, seller -> network */
+message OfferMessage {
+    uint32 coin_from = 1;
+    uint32 coin_to = 2;
+    uint64 amount_from = 3;
+    uint64 rate = 4;
+    uint64 min_bid_amount = 5;
+    uint64 time_valid = 6;
+    enum LockType {
+        NOT_SET = 0;
+        SEQUENCE_LOCK_BLOCKS = 1;
+        SEQUENCE_LOCK_TIME = 2;
+    }
+    LockType lock_type = 7;
+    uint32 lock_value = 8;
+    uint32 swap_type = 9;
+
+    /* optional */
+    string proof_address = 10;
+    string proof_signature = 11;
+    bytes pkhash_seller = 12;
+    bytes secret_hash = 13;
+}
+
+/* Step 2, buyer -> seller */
+message BidMessage {
+    bytes offer_msg_id = 1;
+    uint64 time_valid = 2;          /* seconds bid is valid for */
+    uint64 amount = 3;              /* amount of amount_from bid is for */
+
+    /* optional */
+    bytes pkhash_buyer = 4;         /* buyer's address to receive amount_from */
+    string proof_address = 5;
+    string proof_signature = 6;
+}
+
+/* Step 3, seller -> buyer */
+message BidAcceptMessage {
+    bytes bid_msg_id = 1;
+    bytes initiate_txid = 2;
+    bytes contract_script = 3;
+}

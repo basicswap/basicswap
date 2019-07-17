@@ -1,0 +1,15 @@
+version: '3'
+services:
+
+    swapclient:
+        build:
+            context: ../
+        volumes:
+            - ./coindata:/coindata
+        ports:
+            - "127.0.0.1:12700:12700"  # Expose only to localhost
+
+volumes:
+  coindata:
+    driver: local
+
