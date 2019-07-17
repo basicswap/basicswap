@@ -207,6 +207,17 @@ def run_loop(self):
         btcRpc('generatetoaddress 1 {}'.format(self.btc_addr))
 
 
+def waitForRPC(rpc_func, wallet=None):
+    for i in range(5):
+        try:
+            rpc_func('getwalletinfo')
+            return
+        except Exception as ex:
+            logging.warning('Can\'t connect to daemon RPC: %s.  Trying again in %d second/s.', str(ex), (1 + i))
+            time.sleep(1 + i)
+    raise ValueError('waitForRPC failed')
+
+
 class Test(unittest.TestCase):
 
     @classmethod
@@ -253,6 +264,7 @@ class Test(unittest.TestCase):
         cls.swap_clients[1].callrpc('getnewextaddress', ['lblExtTest'])
         cls.swap_clients[1].callrpc('rescanblockchain')
 
+        waitForRPC(ltcRpc)
         num_blocks = 500
         logging.info('Mining %d litecoin blocks', num_blocks)
         cls.ltc_addr = ltcRpc('getnewaddress mining_addr legacy')
@@ -262,6 +274,7 @@ class Test(unittest.TestCase):
         assert(ro['bip9_softforks']['csv']['status'] == 'active')
         assert(ro['bip9_softforks']['segwit']['status'] == 'active')
 
+        waitForRPC(btcRpc)
         cls.btc_addr = btcRpc('getnewaddress mining_addr bech32')
         logging.info('Mining %d bitcoin blocks to %s', num_blocks, cls.btc_addr)
         btcRpc('generatetoaddress {} {}'.format(num_blocks, cls.btc_addr))

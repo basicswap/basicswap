@@ -573,17 +573,14 @@ class BasicSwap():
         for i in range(21):
             if not self.is_running:
                 return
-            if i == 20:
-                self.log.error('Can\'t connect to daemon RPC, exiting.')
-                self.stopRunning(1)  # systemd will try restart if fail_code != 0
-                return
             try:
                 self.callrpc('getwalletinfo', [], self.wallet)
-                break
+                return
             except Exception as ex:
-                traceback.print_exc()
-                self.log.warning('Can\'t connect to daemon RPC, trying again in %d second/s.', (1 + i))
+                logging.warning('Can\'t connect to daemon RPC: %s.  Trying again in %d second/s.', str(ex), (1 + i))
                 time.sleep(1 + i)
+        self.log.error('Can\'t connect to daemon RPC, exiting.')
+        self.stopRunning(1)  # systemd will try restart if fail_code != 0
 
     def loadFromDB(self):
         self.log.info('Loading data from db')
