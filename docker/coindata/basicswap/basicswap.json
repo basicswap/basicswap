@@ -1,7 +1,7 @@
 {
     "zmqhost": "tcp://127.0.0.1",
     "zmqport": 20792,
-    "htmlhost": "localhost",
+    "htmlhost": "0.0.0.0",
     "htmlport": 12700,
     "network_key": "7sW2UEcHXvuqEjkpE5mD584zRaQYs6WXYohue4jLFZPTvMSxwvgs",
     "network_pubkey": "035758c4a22d7dd59165db02a56156e790224361eb3191f02197addcb3bde903d2",

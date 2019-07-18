@@ -165,7 +165,7 @@ def main():
     if not os.path.exists(data_dir):
         os.makedirs(data_dir)
 
-    with open(os.path.join(data_dir, 'basicswap.log'), 'w') as fp:
+    with open(os.path.join(data_dir, 'basicswap.log'), 'a') as fp:
         print(os.path.basename(sys.argv[0]) + ', version: ' + __version__ + '\n\n')
         runClient(fp, data_dir, chain)
 
