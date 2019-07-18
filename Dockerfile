@@ -21,9 +21,6 @@ RUN PARTICL_VERSION=0.18.0.12 PARTICL_VERSION_TAG= PARTICL_ARCH=x86_64-linux-gnu
     tar -xvf litecoin-0.17.1-x86_64-linux-gnu.tar.gz -C ${LITECOIN_BINDIR} --strip-components 2 litecoin-0.17.1/bin/litecoind litecoin-0.17.1/bin/litecoin-cli
 
 # TODO: move coindata dir out of src dir
-#COPY . /opt/basicswap
-#RUN ls /opt/basicswap; \
-#    cd /opt/basicswap; \
 RUN wget -O bs.zip https://github.com/tecnovert/basicswap/archive/master.zip; \
     unzip bs.zip; \
     cd basicswap-master; \
