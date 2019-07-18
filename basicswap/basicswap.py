@@ -13,7 +13,6 @@ import threading
 import traceback
 import struct
 import hashlib
-import plyvel
 import subprocess
 import logging
 import sqlalchemy as sa
@@ -54,8 +53,6 @@ DEBUG = True
 SMSG_SECONDS_IN_DAY = 86400
 
 CURRENT_DB_VERSION = 1
-
-DBT_DATA = ord('d')
 
 
 MIN_OFFER_VALID_TIME = 60 * 10
@@ -271,6 +268,18 @@ def replaceAddrPrefix(addr, coin_type, chain_name, addr_type='pubkey_address'):
 Base = declarative_base()
 
 
+class DBKVInt(Base):
+    __tablename__ = 'kv_int'
+    key = sa.Column(sa.String, primary_key=True)
+    value = sa.Column(sa.Integer)
+
+
+class DBKVString(Base):
+    __tablename__ = 'kv_string'
+    key = sa.Column(sa.String, primary_key=True)
+    value = sa.Column(sa.String)
+
+
 class Offer(Base):
     __tablename__ = 'offers'
 
@@ -436,19 +445,24 @@ class BasicSwap():
             Base.metadata.create_all(self.engine)
         self.session_factory = sessionmaker(bind=self.engine, expire_on_commit=False)
 
-        self.db_path = os.path.join(data_dir, 'db')
-        db = plyvel.DB(self.db_path, create_if_missing=True)
-        n = db.get(bytes([DBT_DATA]) + b'db_version')
-        if n is None:
+        session = scoped_session(self.session_factory)
+        try:
+            self.db_version = session.query(DBKVInt).filter_by(key='db_version').first().value
+        except Exception:
             self.log.info('First run')
             self.db_version = CURRENT_DB_VERSION
-            db.put(bytes([DBT_DATA]) + b'db_version', struct.pack('>i', self.db_version))
-        else:
-            self.db_version = struct.unpack('>i', n)[0]
+            session.add(DBKVInt(
+                key='db_version',
+                value=self.db_version
+            ))
+            session.commit()
 
-        n = db.get(bytes([DBT_DATA]) + b'contract_count')
-        self._contract_count = 0 if n is None else struct.unpack('>i', n)[0]
-        db.close()
+        try:
+            self._contract_count = session.query(DBKVInt).filter_by(key='contract_count').first().value
+        except Exception:
+            self._contract_count = 0
+        session.close()
+        session.remove()
 
         self.zmqContext = zmq.Context()
         self.zmqSubscriber = self.zmqContext.socket(zmq.SUB)
@@ -563,11 +577,7 @@ class BasicSwap():
         if db_version >= CURRENT_DB_VERSION:
             return
 
-        self.log.info('Upgrading leveldb Database from version %d to %d.', db_version, CURRENT_DB_VERSION)
-
-        db = plyvel.DB(self.db_path, create_if_missing=True)
-        db.put(bytes([DBT_DATA]) + b'db_version', struct.pack('>i', CURRENT_DB_VERSION))
-        db.close()
+        self.log.info('Upgrading Database from version %d to %d.', db_version, CURRENT_DB_VERSION)
 
     def waitForDaemonRPC(self):
         for i in range(21):
@@ -787,32 +797,63 @@ class BasicSwap():
 
     def cacheNewAddressForCoin(self, coin_type):
         self.log.debug('cacheNewAddressForCoin %s', coin_type)
-        db = plyvel.DB(self.db_path, create_if_missing=True)
-        dbkey = bytes([DBT_DATA]) + bytes('receive_addr_' + chainparams[coin_type]['name'], 'utf-8')
+        key_str = 'receive_addr_' + chainparams[coin_type]['name']
+        session = scoped_session(self.session_factory)
         addr = self.getReceiveAddressForCoin(coin_type)
-        db.put(dbkey, bytes(addr, 'utf-8'))
-        db.close()
+        self.mxDB.acquire()
+        try:
+            session = scoped_session(self.session_factory)
+            try:
+                kv = session.query(DBKVString).filter_by(key=key_str).first()
+                kv.value = addr
+            except Exception:
+                kv = DBKVString(
+                    key=key_str,
+                    value=addr
+                )
+            session.add(kv)
+            session.commit()
+            session.close()
+            session.remove()
+        finally:
+            self.mxDB.release()
         return addr
 
     def getCachedAddressForCoin(self, coin_type):
         self.log.debug('getCachedAddressForCoin %s', coin_type)
         # TODO: auto refresh after used
-        db = plyvel.DB(self.db_path, create_if_missing=True)
-        dbkey = bytes([DBT_DATA]) + bytes('receive_addr_' + chainparams[coin_type]['name'], 'utf-8')
-        dbval = db.get(dbkey)
-        if dbval is None:
-            addr = self.getReceiveAddressForCoin(coin_type)
-            db.put(dbkey, bytes(addr, 'utf-8'))
-        else:
-            addr = dbval.decode('utf-8')
-        db.close()
+
+        key_str = 'receive_addr_' + chainparams[coin_type]['name']
+        self.mxDB.acquire()
+        try:
+            session = scoped_session(self.session_factory)
+            try:
+                addr = session.query(DBKVString).filter_by(key=key_str).first().value
+            except Exception:
+                addr = self.getReceiveAddressForCoin(coin_type)
+                session.add(DBKVString(
+                    key=key_str,
+                    value=addr
+                ))
+                session.commit()
+            session.close()
+            session.remove()
+        finally:
+            self.mxDB.release()
         return addr
 
     def getNewContractId(self):
-        self._contract_count += 1
-        db = plyvel.DB(self.db_path, create_if_missing=True)
-        db.put(bytes([DBT_DATA]) + b'contract_count', struct.pack('>i', self._contract_count))
-        db.close()
+        self.mxDB.acquire()
+        try:
+            self._contract_count += 1
+            session = scoped_session(self.session_factory)
+            self.engine.execute('UPDATE kv_int SET value = {} WHERE KEY="contract_count"'.format(self._contract_count))
+            session.commit()
+            session.close()
+            session.remove()
+        finally:
+            self.mxDB.release()
+
         return self._contract_count
 
     def getProofOfFunds(self, coin_type, amount_for):

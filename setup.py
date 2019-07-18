@@ -24,7 +24,6 @@ setuptools.setup(
     ],
     install_requires=[
         "pyzmq",
-        "plyvel",
         "protobuf",
         "sqlalchemy",
     ],

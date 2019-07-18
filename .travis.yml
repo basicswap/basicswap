@@ -17,7 +17,6 @@ before_script:
   - if [ ! -d "$BITCOIN_BINDIR" ]; then cd "/opt/binaries" && wget https://bitcoincore.org/bin/bitcoin-core-0.18.0/bitcoin-0.18.0-x86_64-linux-gnu.tar.gz && tar xvf bitcoin-0.18.0-x86_64-linux-gnu.tar.gz ; fi
   - if [ ! -d "$LITECOIN_BINDIR" ]; then cd "/opt/binaries" && wget https://download.litecoin.org/litecoin-0.17.1/linux/litecoin-0.17.1-x86_64-linux-gnu.tar.gz && tar xvf litecoin-0.17.1-x86_64-linux-gnu.tar.gz ; fi
   - if [ ! -d "$PARTICL_BINDIR" ]; then cd "/opt/binaries" && wget https://github.com/particl/particl-core/releases/download/v0.18.0.12/particl-0.18.0.12-x86_64-linux-gnu_nousb.tar.gz && tar xvf particl-0.18.0.12-x86_64-linux-gnu_nousb.tar.gz ; fi
-  - cd
 script:
   - cd $TRAVIS_BUILD_DIR
   - export PARTICL_BINDIR=/opt/binaries/particl-0.18.0.12/bin/

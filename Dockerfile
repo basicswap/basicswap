@@ -20,11 +20,13 @@ RUN PARTICL_VERSION=0.18.0.12 PARTICL_VERSION_TAG= PARTICL_ARCH=x86_64-linux-gnu
     mkdir -p ${LITECOIN_BINDIR}; \
     tar -xvf litecoin-0.17.1-x86_64-linux-gnu.tar.gz -C ${LITECOIN_BINDIR} --strip-components 2 litecoin-0.17.1/bin/litecoind litecoin-0.17.1/bin/litecoin-cli
 
-# Change to git clone
-COPY . /opt/basicswap
-
-RUN ls /opt/basicswap; \
-    cd /opt/basicswap; \
+# TODO: move coindata dir out of src dir
+#COPY . /opt/basicswap
+#RUN ls /opt/basicswap; \
+#    cd /opt/basicswap; \
+RUN wget -O bs.zip https://github.com/tecnovert/basicswap/archive/master.zip; \
+    unzip bs.zip; \
+    cd basicswap-master; \
     protoc -I=basicswap --python_out=basicswap basicswap/messages.proto; \
     pip3 install .;
 
