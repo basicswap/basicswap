@@ -20,6 +20,7 @@ import json
 import traceback
 import signal
 import subprocess
+import logging
 
 import basicswap.config as cfg
 from basicswap import __version__
@@ -27,12 +28,16 @@ from basicswap.basicswap import BasicSwap
 from basicswap.http_server import HttpThread
 
 
+logger = logging.getLogger()
+logger.level = logging.DEBUG
+logger.addHandler(logging.StreamHandler(sys.stdout))
+
 ALLOW_CORS = False
 swap_client = None
 
 
 def signal_handler(sig, frame):
-    print('signal %d detected, ending program.' % (sig))
+    logger.info('Signal %d detected, ending program.' % (sig))
     if swap_client is not None:
         swap_client.stopRunning()
 
@@ -41,7 +46,7 @@ def startDaemon(node_dir, bin_dir, daemon_bin):
     daemon_bin = os.path.join(bin_dir, daemon_bin)
 
     args = [daemon_bin, '-datadir=' + node_dir]
-    print('Starting node ' + daemon_bin + ' ' + '-datadir=' + node_dir)
+    logger.info('Starting node ' + daemon_bin + ' ' + '-datadir=' + node_dir)
     return subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 
@@ -59,18 +64,18 @@ def runClient(fp, dataDir, chain):
 
     for c, v in settings['chainclients'].items():
         if v['manage_daemon'] is True:
-            print('Starting {} daemon'.format(c.capitalize()))
+            logger.info('Starting {} daemon'.format(c.capitalize()))
             if c == 'particl':
                 daemons.append(startDaemon(v['datadir'], cfg.PARTICL_BINDIR, cfg.PARTICLD))
-                print('Started {} {}'.format(cfg.PARTICLD, daemons[-1].pid))
+                logger.info('Started {} {}'.format(cfg.PARTICLD, daemons[-1].pid))
             elif c == 'bitcoin':
                 daemons.append(startDaemon(v['datadir'], cfg.BITCOIN_BINDIR, cfg.BITCOIND))
-                print('Started {} {}'.format(cfg.BITCOIND, daemons[-1].pid))
+                logger.info('Started {} {}'.format(cfg.BITCOIND, daemons[-1].pid))
             elif c == 'litecoin':
                 daemons.append(startDaemon(v['datadir'], cfg.LITECOIN_BINDIR, cfg.LITECOIND))
-                print('Started {} {}'.format(cfg.LITECOIND, daemons[-1].pid))
+                logger.info('Started {} {}'.format(cfg.LITECOIND, daemons[-1].pid))
             else:
-                print('Unknown chain', c)
+                logger.warning('Unknown chain', c)
 
     swap_client = BasicSwap(fp, dataDir, settings, chain)
 
@@ -87,7 +92,7 @@ def runClient(fp, dataDir, chain):
         tS1.start()
 
     try:
-        print('Exit with Ctrl + c.')
+        logger.info('Exit with Ctrl + c.')
         while swap_client.is_running:
             time.sleep(0.5)
             swap_client.update()
@@ -100,7 +105,7 @@ def runClient(fp, dataDir, chain):
         t.join()
 
     for d in daemons:
-        print('Terminating {}'.format(d.pid))
+        logger.info('Terminating {}'.format(d.pid))
         d.terminate()
         d.wait(timeout=120)
         if d.stdout:
@@ -112,11 +117,11 @@ def runClient(fp, dataDir, chain):
 
 
 def printVersion():
-    print('Basicswap version:', __version__)
+    logger.info('Basicswap version:', __version__)
 
 
 def printHelp():
-    print('basicswap-run.py --datadir=path -testnet')
+    logger.info('basicswap-run.py --datadir=path -testnet')
 
 
 def main():
@@ -125,7 +130,7 @@ def main():
 
     for v in sys.argv[1:]:
         if len(v) < 2 or v[0] != '-':
-            print('Unknown argument', v)
+            logger.warning('Unknown argument', v)
             continue
 
         s = v.split('=')
@@ -153,23 +158,23 @@ def main():
                 data_dir = os.path.expanduser(s[1])
                 continue
 
-        print('Unknown argument', v)
+        logger.warning('Unknown argument', v)
 
     if data_dir is None:
         data_dir = os.path.join(os.path.expanduser(os.path.join(cfg.DATADIRS)), 'particl', ('' if chain == 'mainnet' else chain), 'basicswap')
 
     print('data_dir:', data_dir)
     if chain != 'mainnet':
-        print('chain:', chain)
+        logger.info('chain:', chain)
 
     if not os.path.exists(data_dir):
         os.makedirs(data_dir)
 
     with open(os.path.join(data_dir, 'basicswap.log'), 'a') as fp:
-        print(os.path.basename(sys.argv[0]) + ', version: ' + __version__ + '\n\n')
+        logger.info(os.path.basename(sys.argv[0]) + ', version: ' + __version__ + '\n\n')
         runClient(fp, data_dir, chain)
 
-    print('Done.')
+    logger.info('Done.')
     return swap_client.fail_code if swap_client is not None else 0
 
 

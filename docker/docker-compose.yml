@@ -2,6 +2,7 @@ version: '3'
 services:
 
     swapclient:
+        stop_grace_period: 5m
         build:
             context: ../
         volumes:
