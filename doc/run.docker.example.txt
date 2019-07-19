@@ -1,3 +1,6 @@
+
+Work in progress - doesn't work reliably.
+
 Running on windows 10
 
 Install the latest docker toolbox from:
@@ -15,6 +18,9 @@ Navigate to the docker folder.
 
 If you have an existing litecoin chain, copy the contents of your datadir excluding litecoin.conf and any wallets to coindata/litecoin
 If your litecoin chain is pruned create a new wallet in the existing datadir to avoid having to resync the chain.
+
+
+Right click -> properties on the coindata folder, in the security tab make sure all users have 'Modify' rights.
 
 
 Run the script: dockerbuild.bat
