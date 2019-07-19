@@ -1416,7 +1416,7 @@ class BasicSwap():
             self.log.debug('Submitted participate txn %s to %s chain for bid %s', txid, chainparams[coin_to]['name'], bid_id.hex())
             bid.setPTXState(TxStates.TX_SENT)
 
-        self.saveBid(bid_id, bid)
+        # bid saved in checkBidState
 
     def addParticipateTxn(self, bid_id, bid, coin_type, txid_hex, vout, tx_height):
         bid.participate_txid = bytes.fromhex(txid_hex)
@@ -1452,7 +1452,7 @@ class BasicSwap():
             # TX_REDEEMED will be set when spend is detected
             # TODO: Wait for depth?
 
-        self.saveBid(bid_id, bid)
+        # bid saved in checkBidState
 
     def lookupChainHeight(self, coin_type):
         return self.callcoinrpc(coin_type, 'getblockchaininfo')['blocks']
@@ -1495,6 +1495,7 @@ class BasicSwap():
         state = BidStates(bid.state)
         self.log.debug('checkBidState %s %s', bid_id.hex(), str(state))
 
+        save_bid = False
         coin_from = Coins(offer.coin_from)
         coin_to = Coins(offer.coin_to)
         # TODO: Batch calls to scantxoutset
@@ -1504,6 +1505,7 @@ class BasicSwap():
             initiate_txnid_hex = bid.initiate_txid.hex()
             p2sh = self.getScriptAddress(coin_from, bid.initiate_script)
             index = None
+            last_initiate_txn_conf = bid.initiate_txn_conf
             if coin_from == Coins.PART:  # Has txindex
                 try:
                     initiate_txn = self.callcoinrpc(coin_from, 'getrawtransaction', [initiate_txnid_hex, True])
@@ -1525,6 +1527,9 @@ class BasicSwap():
                     bid.initiate_txn_conf = found['n_conf']
                     index = found['index']
 
+            if bid.initiate_txn_conf != last_initiate_txn_conf:
+                save_bid = True
+
             if bid.initiate_txn_conf is not None:
                 self.log.debug('initiate_txnid %s confirms %d', initiate_txnid_hex, bid.initiate_txn_conf)
 
@@ -1535,9 +1540,11 @@ class BasicSwap():
                     self.coin_clients[coin_from]['watched_outputs'].append((bid_id, initiate_txnid_hex, bid.initiate_txn_n, BidStates.SWAP_INITIATED))
                     if bid.initiate_txn_state is None or bid.initiate_txn_state < TxStates.TX_SENT:
                         bid.setITXState(TxStates.TX_SENT)
+                        save_bid = True
 
                 if bid.initiate_txn_conf >= self.coin_clients[coin_from]['blocks_confirmed']:
                     self.initiateTxnConfirmed(bid_id, bid, offer)
+                    save_bid = True
 
             # Bid times out if buyer doesn't see tx in chain within
             if bid.state_time + INITIATE_TX_TIMEOUT < int(time.time()):
@@ -1554,6 +1561,8 @@ class BasicSwap():
 
             found = self.lookupUnspentByAddress(coin_to, addr, assert_amount=bid.amount_to)
             if found:
+                if bid.participate_txn_conf != found['n_conf']:
+                    save_bid = True
                 bid.participate_txn_conf = found['n_conf']
                 index = found['index']
                 if bid.participate_txid is None:
@@ -1564,12 +1573,13 @@ class BasicSwap():
                         tx_height = self.lookupChainHeight(coin_to)
                     self.addParticipateTxn(bid_id, bid, coin_to, found['txid'], found['index'], tx_height)
                     bid.setPTXState(TxStates.TX_SENT)
-                    self.saveBid(bid_id, bid)
+                    save_bid = True
 
             if bid.participate_txn_conf is not None:
                 self.log.debug('participate_txid %s confirms %d', bid.participate_txid.hex(), bid.participate_txn_conf)
                 if bid.participate_txn_conf >= self.coin_clients[coin_to]['blocks_confirmed']:
                     self.participateTxnConfirmed(bid_id, bid, offer)
+                    save_bid = True
         elif state == BidStates.SWAP_PARTICIPATING:
             # Waiting for initiate txn spend
             pass
@@ -1584,6 +1594,9 @@ class BasicSwap():
                 bid.setState(BidStates.SWAP_COMPLETED)
                 self.saveBid(bid_id, bid)
                 return True  # Mark bid for archiving
+
+        if save_bid:
+            self.saveBid(bid_id, bid)
 
         # Try refund, keep trying until sent tx is spent
         if (bid.initiate_txn_state == TxStates.TX_SENT or bid.initiate_txn_state == TxStates.TX_CONFIRMED) \

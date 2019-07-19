@@ -1,6 +1,7 @@
 FROM ubuntu:18.10
 
-ENV PARTICL_DATADIR="/coindata/particl" \
+ENV LANG C.UTF-8 \
+    PARTICL_DATADIR="/coindata/particl" \
     PARTICL_BINDIR="/opt/particl" \
     LITECOIN_BINDIR="/opt/litecoin" \
     DATADIRS="/coindata"
@@ -36,9 +37,6 @@ WORKDIR /home/user
 # Expose html port
 EXPOSE 12700
 
-ENV LANG C.UTF-8
-
 VOLUME /coindata
 
 ENTRYPOINT ["basicswap-run", "-datadir=/coindata/basicswap"]
-CMD
