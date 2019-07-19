@@ -1,6 +1,6 @@
 FROM ubuntu:18.10
 
-ENV LANG C.UTF-8 \
+ENV LANG=C.UTF-8 \
     PARTICL_DATADIR="/coindata/particl" \
     PARTICL_BINDIR="/opt/particl" \
     LITECOIN_BINDIR="/opt/litecoin" \
