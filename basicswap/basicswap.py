@@ -121,7 +121,7 @@ SEQUENCE_LOCK_TIME = 2
 SEQUENCE_LOCKTIME_GRANULARITY = 9  # 512 seconds
 SEQUENCE_LOCKTIME_TYPE_FLAG = (1 << 22)
 SEQUENCE_LOCKTIME_MASK = 0x0000ffff
-INITIATE_TX_TIMEOUT = 10 * 60
+INITIATE_TX_TIMEOUT = 20 * 60
 
 
 def getOfferState(state):
@@ -1418,6 +1418,19 @@ class BasicSwap():
 
         # bid saved in checkBidState
 
+    def setLastHeightChecked(self, coin_type, tx_height):
+        chain_name = chainparams[coin_type]['name']
+        if tx_height < 1:
+            tx_height = self.lookupChainHeight(coin_type)
+
+        if len(self.coin_clients[coin_type]['watched_outputs']) == 0:
+            self.coin_clients[coin_type]['last_height_checked'] = tx_height
+            self.log.debug('Start checking %s chain at height %d', chain_name, tx_height)
+
+        if self.coin_clients[coin_type]['last_height_checked'] > tx_height:
+            self.coin_clients[coin_type]['last_height_checked'] = tx_height
+            self.log.debug('Rewind checking of %s chain to height %d', chain_name, tx_height)
+
     def addParticipateTxn(self, bid_id, bid, coin_type, txid_hex, vout, tx_height):
         bid.participate_txid = bytes.fromhex(txid_hex)
         bid.participate_txn_n = vout
@@ -1427,13 +1440,7 @@ class BasicSwap():
         self.log.debug('Watching %s chain for spend of output %s %d', chain_name, txid_hex, vout)
 
         # TODO: Check connection type
-        if len(self.coin_clients[coin_type]['watched_outputs']) == 0:
-            self.coin_clients[coin_type]['last_height_checked'] = tx_height
-            self.log.debug('Start checking %s chain at height %d', chain_name, tx_height)
-
-        if self.coin_clients[coin_type]['last_height_checked'] > tx_height:
-            self.coin_clients[coin_type]['last_height_checked'] = tx_height
-            self.log.debug('Rewind checking of %s chain to height %d', chain_name, tx_height)
+        self.setLastHeightChecked(coin_type, tx_height)
 
         self.log.debug('Adding watched output %s bid %s tx %s type %s', coin_type, bid_id.hex(), txid_hex, BidStates.SWAP_PARTICIPATING)
         self.coin_clients[coin_type]['watched_outputs'].append((bid_id, txid_hex, vout, BidStates.SWAP_PARTICIPATING))
@@ -1505,6 +1512,7 @@ class BasicSwap():
             initiate_txnid_hex = bid.initiate_txid.hex()
             p2sh = self.getScriptAddress(coin_from, bid.initiate_script)
             index = None
+            tx_height = None
             last_initiate_txn_conf = bid.initiate_txn_conf
             if coin_from == Coins.PART:  # Has txindex
                 try:
@@ -1514,6 +1522,10 @@ class BasicSwap():
                     assert(initiate_txn['vout'][vout]['value'] * COIN == bid.amount), 'Incorrect output amount in initiate txn.'
 
                     bid.initiate_txn_conf = initiate_txn['confirmations']
+                    try:
+                        tx_height = initiate_txn['height']
+                    except Exception:
+                        tx_height = -1
                     index = vout
                 except Exception:
                     pass
@@ -1526,6 +1538,7 @@ class BasicSwap():
                 if found:
                     bid.initiate_txn_conf = found['n_conf']
                     index = found['index']
+                    tx_height = found['height']
 
             if bid.initiate_txn_conf != last_initiate_txn_conf:
                 save_bid = True
@@ -1536,6 +1549,7 @@ class BasicSwap():
                 if bid.initiate_txn_n is None:
                     bid.initiate_txn_n = index
                     # Start checking for spends of initiate_txn before fully confirmed
+                    self.setLastHeightChecked(coin_from, tx_height)
                     self.log.debug('Adding watched output %s bid %s tx %s type %s', coin_from, bid_id.hex(), initiate_txnid_hex, BidStates.SWAP_INITIATED)
                     self.coin_clients[coin_from]['watched_outputs'].append((bid_id, initiate_txnid_hex, bid.initiate_txn_n, BidStates.SWAP_INITIATED))
                     if bid.initiate_txn_state is None or bid.initiate_txn_state < TxStates.TX_SENT:
@@ -1567,11 +1581,7 @@ class BasicSwap():
                 index = found['index']
                 if bid.participate_txid is None:
                     self.log.debug('Found bid %s participate txn %s in chain %s', bid_id.hex(), found['txid'], coin_to)
-                    if found['height'] > 1:
-                        tx_height = found['height']
-                    else:
-                        tx_height = self.lookupChainHeight(coin_to)
-                    self.addParticipateTxn(bid_id, bid, coin_to, found['txid'], found['index'], tx_height)
+                    self.addParticipateTxn(bid_id, bid, coin_to, found['txid'], found['index'], found['height'])
                     bid.setPTXState(TxStates.TX_SENT)
                     save_bid = True
 

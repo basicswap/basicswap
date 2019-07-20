@@ -338,9 +338,9 @@ class HttpHandler(BaseHTTPRequestHandler):
         content += tr.format('Expired At', time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(bid.expire_at)))
         content += tr.format('Sent', 'True' if bid.was_sent else 'False')
         content += tr.format('Received', 'True' if bid.was_received else 'False')
-        content += tr.format('Initiate Tx', 'None' if not bid.initiate_txid else bid.initiate_txid.hex())
+        content += tr.format('Initiate Tx', 'None' if not bid.initiate_txid else (bid.initiate_txid.hex() + ' ' + ticker_from))
         content += tr.format('Initiate Conf', 'None' if not bid.initiate_txn_conf else bid.initiate_txn_conf)
-        content += tr.format('Participate Tx', 'None' if not bid.participate_txid else bid.participate_txid.hex())
+        content += tr.format('Participate Tx', 'None' if not bid.participate_txid else (bid.participate_txid.hex() + ' ' + ticker_to))
         content += tr.format('Participate Conf', 'None' if not bid.participate_txn_conf else bid.participate_txn_conf)
         if show_txns:
             content += tr.format('Initiate Tx Refund', 'None' if not bid.initiate_txn_refund else bid.initiate_txn_refund.hex())
