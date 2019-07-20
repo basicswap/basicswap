@@ -601,6 +601,13 @@ class BasicSwap():
             for bid in session.query(Bid):
                 if bid.state and bid.state > BidStates.BID_RECEIVED and bid.state < BidStates.SWAP_COMPLETED:
                     self.log.debug('Loading active bid %s', bid.bid_id.hex())
+
+                    offer = session.query(Offer).filter_by(offer_id=bid.offer_id).first()
+                    assert(offer), 'Offer not found'
+                    self.swaps_in_progress[bid.bid_id] = (bid, offer)
+
+                    # TODO: load txns, must store height 1st seen
+
         finally:
             session.close()
             session.remove()
@@ -1476,7 +1483,7 @@ class BasicSwap():
                 continue
             # Verify amount
             if assert_amount:
-                assert(o['amount'] * COIN == assert_amount), 'Incorrect output amount in txn {}.'.format(assert_txid)
+                assert(int(o['amount'] * COIN) == int(assert_amount)), 'Incorrect output amount in txn {}.'.format(assert_txid)
 
             if not sum_output:
                 if o['height'] > 0:
@@ -1519,7 +1526,7 @@ class BasicSwap():
                     initiate_txn = self.callcoinrpc(coin_from, 'getrawtransaction', [initiate_txnid_hex, True])
                     # Verify amount
                     vout = getVoutByAddress(initiate_txn, p2sh)
-                    assert(initiate_txn['vout'][vout]['value'] * COIN == bid.amount), 'Incorrect output amount in initiate txn.'
+                    assert(int(initiate_txn['vout'][vout]['value'] * COIN) == int(bid.amount)), 'Incorrect output amount in initiate txn.'
 
                     bid.initiate_txn_conf = initiate_txn['confirmations']
                     try:
