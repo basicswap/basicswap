@@ -119,7 +119,8 @@ class HttpHandler(BaseHTTPRequestHandler):
                     if bytes('withdraw_' + cid, 'utf-8') in form_data:
                         value = form_data[bytes('amt_' + cid, 'utf-8')][0].decode('utf-8')
                         address = form_data[bytes('to_' + cid, 'utf-8')][0].decode('utf-8')
-                        txid = swap_client.withdrawCoin(c, value, address)
+                        subfee = True if bytes('subfee_' + cid, 'utf-8') in form_data else False
+                        txid = swap_client.withdrawCoin(c, value, address, subfee)
                         ticker = swap_client.getTicker(c)
                         content += '<p>Withdrew {} {} to address {}<br/>In txid: {}</p>'.format(value, ticker, address, txid)
 
@@ -134,7 +135,7 @@ class HttpHandler(BaseHTTPRequestHandler):
                 + '<tr><td>Blocks:</td><td>' + str(w['blocks']) + '</td></tr>' \
                 + '<tr><td>Synced:</td><td>' + str(w['synced']) + '</td></tr>' \
                 + '<tr><td><input type="submit" name="newaddr_' + cid + '" value="Deposit Address"></td><td>' + str(w['deposit_address']) + '</td></tr>' \
-                + '<tr><td><input type="submit" name="withdraw_' + cid + '" value="Withdraw"></td><td>Amount: <input type="text" name="amt_' + cid + '"></td><td>Address: <input type="text" name="to_' + cid + '"></td></tr>' \
+                + '<tr><td><input type="submit" name="withdraw_' + cid + '" value="Withdraw"></td><td>Amount: <input type="text" name="amt_' + cid + '"></td><td>Address: <input type="text" name="to_' + cid + '"></td><td>Subtract fee: <input type="checkbox" name="subfee_' + cid + '"></td></tr>' \
                 + '</table>'
 
         content += '<input type="hidden" name="formid" value="' + os.urandom(8).hex() + '"></form>'

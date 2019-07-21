@@ -802,9 +802,9 @@ class BasicSwap():
             ticker = 'rt' + ticker
         return ticker
 
-    def withdrawCoin(self, coin_type, value, addr_to):
-        self.log.info('withdrawCoin %s %s to %s', value, self.getTicker(coin_type), addr_to)
-        return self.callcoinrpc(coin_type, 'sendtoaddress', [addr_to, value])
+    def withdrawCoin(self, coin_type, value, addr_to, subfee):
+        self.log.info('withdrawCoin %s %s to %s %s', value, self.getTicker(coin_type), addr_to, ' subfee' if subfee else '')
+        return self.callcoinrpc(coin_type, 'sendtoaddress', [addr_to, value, '', '', subfee])
 
     def cacheNewAddressForCoin(self, coin_type):
         self.log.debug('cacheNewAddressForCoin %s', coin_type)
