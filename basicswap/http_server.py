@@ -177,9 +177,10 @@ class HttpHandler(BaseHTTPRequestHandler):
                 min_bid = int(value_from)
                 rate = int((value_to / value_from) * COIN)
                 autoaccept = True if b'autoaccept' in form_data else False
+                lock_seconds = int(form_data[b'lockhrs'][0]) * 60 * 60
                 # TODO: More accurate rate
                 # assert(value_to == (value_from * rate) // COIN)
-                offer_id = swap_client.postOffer(coin_from, coin_to, value_from, rate, min_bid, SwapTypes.SELLER_FIRST, auto_accept_bids=autoaccept)
+                offer_id = swap_client.postOffer(coin_from, coin_to, value_from, rate, min_bid, SwapTypes.SELLER_FIRST, auto_accept_bids=autoaccept, lock_value=lock_seconds)
                 content += '<p><a href="/offer/' + offer_id.hex() + '">Sent Offer ' + offer_id.hex() + '</a><br/>Rate: ' + format8(rate) + '</p>'
 
         coins = []
@@ -193,7 +194,9 @@ class HttpHandler(BaseHTTPRequestHandler):
         content += '<table>'
         content += '<tr><td>Coin From</td><td>' + self.make_coin_select('coin_from', coins) + '</td><td>Amount From</td><td><input type="text" name="amt_from"></td></tr>'
         content += '<tr><td>Coin To</td><td>' + self.make_coin_select('coin_to', coins) + '</td><td>Amount To</td><td><input type="text" name="amt_to"></td></tr>'
-        content += '<tr><td>Auto Accept Bids</td><td><input type="checkbox" name="autoaccept" value="aa" checked></td></tr>'
+
+        content += '<tr><td>Contract locked (hrs)</td><td><input type="number" name="lockhrs" min="2" max="96" value="48"></td><td colspan=2>Participate txn will be locked for half the time.</td></tr>'
+        content += '<tr><td>Auto Accept Bids</td><td colspan=3><input type="checkbox" name="autoaccept" value="aa" checked></td></tr>'
         content += '</table>'
 
         content += '<input type="submit" value="Submit">'

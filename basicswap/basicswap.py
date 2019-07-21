@@ -655,6 +655,14 @@ class BasicSwap():
         assert(amount_to > chainparams[coin_to][self.chain]['min_amount']), 'To amount below min value for chain'
         assert(amount_to < chainparams[coin_to][self.chain]['max_amount']), 'To amount above max value for chain'
 
+    def validateOfferLockValue(self, coin_from, coin_to, lock_type, lock_value):
+        if lock_type == OfferMessage.SEQUENCE_LOCK_TIME:
+            assert(lock_value >= 2 * 60 * 60 and lock_value <= 96 * 60 * 60), 'Invalid lock_value time'
+        elif lock_type == OfferMessage.SEQUENCE_LOCK_BLOCKS:
+            assert(lock_value >= 5 and lock_value <= 1000), 'Invalid lock_value blocks'
+        else:
+            raise ValueError('Unknown locktype')
+
     def postOffer(self, coin_from, coin_to, amount, rate, min_bid_amount, swap_type,
                   lock_type=SEQUENCE_LOCK_TIME, lock_value=48 * 60 * 60, auto_accept_bids=False):
 
@@ -671,6 +679,7 @@ class BasicSwap():
             raise ValueError('Unknown coin to type')
 
         self.validateOfferAmounts(coin_from_t, coin_to_t, amount, rate, min_bid_amount)
+        self.validateOfferLockValue(coin_from_t, coin_to_t, lock_type, lock_value)
 
         self.mxDB.acquire()
         try:
@@ -1811,13 +1820,10 @@ class BasicSwap():
         assert(offer_data.coin_from != offer_data.coin_to), 'coin_from == coin_to'
 
         self.validateOfferAmounts(coin_from, coin_to, offer_data.amount_from, offer_data.rate, offer_data.min_bid_amount)
+        self.validateOfferLockValue(coin_from, coin_to, offer_data.lock_type, offer_data.lock_value)
 
         assert(offer_data.time_valid >= MIN_OFFER_VALID_TIME and offer_data.time_valid <= MAX_OFFER_VALID_TIME), 'Invalid time_valid'
         assert(msg['sent'] + offer_data.time_valid >= now), 'Offer expired'
-
-        assert(offer_data.lock_type == OfferMessage.SEQUENCE_LOCK_TIME or
-               offer_data.lock_type == OfferMessage.SEQUENCE_LOCK_BLOCKS), 'Unknown locktype'
-        # TODO: lock value valid range
 
         if offer_data.swap_type == SwapTypes.SELLER_FIRST:
             assert(len(offer_data.proof_address) == 0)
