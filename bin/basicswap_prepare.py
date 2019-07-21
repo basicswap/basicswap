@@ -292,7 +292,7 @@ def main():
         json.dump(settings, fp, indent=4)
 
     cores = [
-        ('particl', '0.18.0.12'),
+        ('particl', '0.18.1.0'),
         ('litecoin', '0.17.1')
     ]
     for c in cores:
@@ -332,7 +332,7 @@ def main():
 
     particl_settings = settings['chainclients']['particl']
     partRpc = make_rpc_func(particl_settings['bindir'], particl_settings['datadir'], chain)
-    d = startDaemon(particl_settings['datadir'], particl_settings['bindir'], cfg.PARTICLD)
+    d = startDaemon(particl_settings['datadir'], particl_settings['bindir'], cfg.PARTICLD, ['-noconnect', '-nofindpeers', '-nostaking', '-nodnsseed', '-nolisten'])
     try:
         waitForRPC(partRpc)
 

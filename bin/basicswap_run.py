@@ -43,10 +43,10 @@ def signal_handler(sig, frame):
         swap_client.stopRunning()
 
 
-def startDaemon(node_dir, bin_dir, daemon_bin):
+def startDaemon(node_dir, bin_dir, daemon_bin, opts=[]):
     daemon_bin = os.path.join(bin_dir, daemon_bin)
 
-    args = [daemon_bin, '-datadir=' + node_dir]
+    args = [daemon_bin, '-datadir=' + node_dir] + opts
     logger.info('Starting node ' + daemon_bin + ' ' + '-datadir=' + node_dir)
     return subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 

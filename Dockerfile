@@ -17,7 +17,7 @@ RUN cd ~; \
     pip3 install .; \
     pip3 install pyzmq plyvel protobuf;
 
-RUN PARTICL_VERSION=0.18.0.12 PARTICL_VERSION_TAG= PARTICL_ARCH=x86_64-linux-gnu_nousb.tar.gz coldstakepool-prepare --update_core && \
+RUN PARTICL_VERSION=0.18.1.0 PARTICL_VERSION_TAG= PARTICL_ARCH=x86_64-linux-gnu_nousb.tar.gz coldstakepool-prepare --update_core && \
     mkdir -p ${LITECOIN_BINDIR} && cd ${LITECOIN_BINDIR} && \
     wget https://download.litecoin.org/litecoin-${LITECOIN_VERSION}/linux/litecoin-${LITECOIN_VERSION}-x86_64-linux-gnu.tar.gz && \
     wget -O build.assert https://github.com/litecoin-project/gitian.sigs.ltc/raw/master/${LITECOIN_VERSION}-linux/thrasher/litecoin-linux-0.17-build.assert && \
