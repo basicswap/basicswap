@@ -19,11 +19,16 @@ import hashlib
 import mmap
 import tarfile
 import stat
+import time
 from urllib.request import urlretrieve
 import urllib.parse
 import logging
 
 import gnupg
+
+import basicswap.config as cfg
+from basicswap.util import callrpc_cli
+from bin.basicswap_run import startDaemon
 
 BIN_ARCH = 'x86_64-linux-gnu.tar.gz'
 
@@ -163,6 +168,30 @@ def printHelp():
     logger.info('\n--particl_mnemonic=      Recovery phrase to use for the Particl wallet, default is randomly generated.')
 
 
+def make_rpc_func(bin_dir, data_dir, chain):
+    bin_dir = bin_dir
+    data_dir = data_dir
+    chain = '' if chain == 'mainnet' else chain
+
+    def rpc_func(cmd):
+        nonlocal bin_dir
+        nonlocal data_dir
+        nonlocal chain
+        return callrpc_cli(bin_dir, data_dir, chain, cmd, cfg.PARTICL_CLI)
+    return rpc_func
+
+
+def waitForRPC(rpc_func, wallet=None):
+    for i in range(5):
+        try:
+            rpc_func('getwalletinfo')
+            return
+        except Exception as ex:
+            logging.warning('Can\'t connect to daemon RPC: %s.  Trying again in %d second/s.', str(ex), (1 + i))
+            time.sleep(1 + i)
+    raise ValueError('waitForRPC failed')
+
+
 def main():
     data_dir = None
     chain = 'mainnet'
@@ -170,7 +199,7 @@ def main():
 
     for v in sys.argv[1:]:
         if len(v) < 2 or v[0] != '-':
-            logger.warning('Unknown argument', v)
+            logger.warning('Unknown argument %s', v)
             continue
 
         s = v.split('=')
@@ -203,7 +232,7 @@ def main():
                 particl_wallet_mnemonic = s[1]
                 continue
 
-        logger.warning('Unknown argument', v)
+        logger.warning('Unknown argument %s', v)
 
     if data_dir is None:
         default_datadir = '~/.basicswap'
@@ -298,6 +327,30 @@ def main():
                 fp.write('prune=1000\n')
             else:
                 logger.warning('Unknown coin %s', coin)
+
+    logger.info('Loading Particl mnemonic')
+
+    particl_settings = settings['chainclients']['particl']
+    partRpc = make_rpc_func(particl_settings['bindir'], particl_settings['datadir'], chain)
+    d = startDaemon(particl_settings['datadir'], particl_settings['bindir'], cfg.PARTICLD)
+    try:
+        waitForRPC(partRpc)
+
+        if particl_wallet_mnemonic is None:
+            particl_wallet_mnemonic = partRpc('mnemonic new')['mnemonic']
+        partRpc('extkeyimportmaster "{}"'.format(particl_wallet_mnemonic))
+    finally:
+        logger.info('Terminating {}'.format(d.pid))
+        d.terminate()
+        d.wait(timeout=120)
+        if d.stdout:
+            d.stdout.close()
+        if d.stderr:
+            d.stderr.close()
+        if d.stdin:
+            d.stdin.close()
+
+    logger.info('IMPORTANT - Save your particl wallet recovery phrase:\n{}\n'.format(particl_wallet_mnemonic))
 
     logger.info('Done.')
 

@@ -131,7 +131,7 @@ def main():
 
     for v in sys.argv[1:]:
         if len(v) < 2 or v[0] != '-':
-            logger.warning('Unknown argument', v)
+            logger.warning('Unknown argument %s', v)
             continue
 
         s = v.split('=')
@@ -159,13 +159,13 @@ def main():
                 data_dir = os.path.expanduser(s[1])
                 continue
 
-        logger.warning('Unknown argument', v)
+        logger.warning('Unknown argument %s', v)
 
     if data_dir is None:
         default_datadir = '~/.basicswap'
         data_dir = os.path.join(os.path.expanduser(default_datadir))
-    logger.info('Using datadir:', data_dir)
-    logger.info('Chain:', chain)
+    logger.info('Using datadir: %s', data_dir)
+    logger.info('Chain: %s', chain)
 
     if not os.path.exists(data_dir):
         os.makedirs(data_dir)
