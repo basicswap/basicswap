@@ -50,7 +50,8 @@ import basicswap.config as cfg
 
 logger = logging.getLogger()
 logger.level = logging.DEBUG
-logger.addHandler(logging.StreamHandler(sys.stdout))
+if not len(logger.handlers):
+    logger.addHandler(logging.StreamHandler(sys.stdout))
 
 NUM_NODES = 3
 BASE_PORT = 14792

@@ -11,8 +11,8 @@ setuptools.setup(
     name="basicswap",
     version=__version__,
     author="tecnovert",
-    author_email="hello@particl.io",
-    description="Particl atomic swap demo",
+    author_email="tecnovert@tecnovert.net",
+    description="Simple atomic swap demo",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
     url="https://github.com/tecnovert/basicswap",
@@ -31,6 +31,7 @@ setuptools.setup(
     entry_points={
         "console_scripts": [
             "basicswap-run=bin.basicswap_run:main",
+            "basicswap-prepare=bin.basicswap_prepare:main",
         ]
     },
     test_suite="tests.test_suite"

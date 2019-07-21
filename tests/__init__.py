@@ -7,8 +7,8 @@ import tests.test_run
 
 def test_suite():
     loader = unittest.TestLoader()
-    suite.addTests(loader.loadTestsFromModule(tests.test_other))
+    suite = loader.loadTestsFromModule(tests.test_other)
     suite.addTests(loader.loadTestsFromModule(tests.test_prepare))
-    suite = loader.loadTestsFromModule(tests.test_run)
+    suite.addTests(loader.loadTestsFromModule(tests.test_run))
 
     return suite

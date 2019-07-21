@@ -12,13 +12,14 @@ from unittest.mock import patch
 from io import StringIO
 import logging
 import shutil
-import importlib
 
-prepareSystem = importlib.import_module('bin.basicswap-prepare')
+import bin.basicswap_prepare as prepareSystem
 test_path = os.path.expanduser('~/test_basicswap')
 
 logger = logging.getLogger()
 logger.level = logging.DEBUG
+if not len(logger.handlers):
+    logger.addHandler(logging.StreamHandler(sys.stdout))
 
 
 class Test(unittest.TestCase):
