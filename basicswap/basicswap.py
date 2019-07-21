@@ -351,6 +351,7 @@ class Bid(Base):
     initiate_spend_txid = sa.Column(sa.LargeBinary)
     initiate_spend_n = sa.Column(sa.Integer)
 
+    initiate_txn_height = sa.Column(sa.Integer)
     initiate_txn_state = sa.Column(sa.Integer)
     initiate_txn_states = sa.Column(sa.LargeBinary)  # Packed states and times
 
@@ -364,12 +365,15 @@ class Bid(Base):
     participate_spend_txid = sa.Column(sa.LargeBinary)
     participate_spend_n = sa.Column(sa.Integer)
 
+    participate_txn_height = sa.Column(sa.Integer)
     participate_txn_state = sa.Column(sa.Integer)
     participate_txn_states = sa.Column(sa.LargeBinary)  # Packed states and times
 
     state = sa.Column(sa.Integer)
     state_time = sa.Column(sa.BigInteger)  # timestamp of last state change
     states = sa.Column(sa.LargeBinary)  # Packed states and times
+
+    state_note = sa.Column(sa.String)
 
     def setITXState(self, new_state):
         self.initiate_txn_state = new_state
@@ -1438,6 +1442,8 @@ class BasicSwap():
             self.coin_clients[coin_type]['last_height_checked'] = tx_height
             self.log.debug('Rewind checking of %s chain to height %d', chain_name, tx_height)
 
+        return tx_height
+
     def addParticipateTxn(self, bid_id, bid, coin_type, txid_hex, vout, tx_height):
         bid.participate_txid = bytes.fromhex(txid_hex)
         bid.participate_txn_n = vout
@@ -1447,7 +1453,7 @@ class BasicSwap():
         self.log.debug('Watching %s chain for spend of output %s %d', chain_name, txid_hex, vout)
 
         # TODO: Check connection type
-        self.setLastHeightChecked(coin_type, tx_height)
+        bid.participate_txn_height = self.setLastHeightChecked(coin_type, tx_height)
 
         self.log.debug('Adding watched output %s bid %s tx %s type %s', coin_type, bid_id.hex(), txid_hex, BidStates.SWAP_PARTICIPATING)
         self.coin_clients[coin_type]['watched_outputs'].append((bid_id, txid_hex, vout, BidStates.SWAP_PARTICIPATING))
@@ -1556,12 +1562,12 @@ class BasicSwap():
                 if bid.initiate_txn_n is None:
                     bid.initiate_txn_n = index
                     # Start checking for spends of initiate_txn before fully confirmed
-                    self.setLastHeightChecked(coin_from, tx_height)
+                    bid.initiate_txn_height = self.setLastHeightChecked(coin_from, tx_height)
                     self.log.debug('Adding watched output %s bid %s tx %s type %s', coin_from, bid_id.hex(), initiate_txnid_hex, BidStates.SWAP_INITIATED)
                     self.coin_clients[coin_from]['watched_outputs'].append((bid_id, initiate_txnid_hex, bid.initiate_txn_n, BidStates.SWAP_INITIATED))
                     if bid.initiate_txn_state is None or bid.initiate_txn_state < TxStates.TX_SENT:
                         bid.setITXState(TxStates.TX_SENT)
-                        save_bid = True
+                    save_bid = True
 
                 if bid.initiate_txn_conf >= self.coin_clients[coin_from]['blocks_confirmed']:
                     self.initiateTxnConfirmed(bid_id, bid, offer)
@@ -2112,7 +2118,7 @@ class BasicSwap():
             'deposit_address': self.getCachedAddressForCoin(coin),
             'name': chainparams[coin]['name'].capitalize(),
             'blocks': blockchaininfo['blocks'],
-            'balance': walletinfo.get('total_balance', walletinfo['balance']),
+            'balance': format8(walletinfo.get('total_balance', walletinfo['balance']) * COIN),
             'synced': '{0:.2f}'.format(round(blockchaininfo['verificationprogress'], 2)),
         }
         return rv

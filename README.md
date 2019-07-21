@@ -24,6 +24,7 @@ Features still required (of many):
  - Ability to swap coin-types without running nodes for all coin-types
  - More swap protocols
  - Method to load mnemonic into Particl.
+ - COIN must be defined per coin.
 
 
 ## Seller first protocol:

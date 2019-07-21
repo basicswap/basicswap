@@ -26,6 +26,7 @@ setuptools.setup(
         "pyzmq",
         "protobuf",
         "sqlalchemy",
+        "python-gnupg",
     ],
     entry_points={
         "console_scripts": [

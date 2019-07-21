@@ -130,7 +130,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             cid = str(int(k))
             content += '<h4>' + w['name'] + '</h4>' \
                 + '<table>' \
-                + '<tr><td>Balance:</td><td>' + str(w['balance']) + '</td></tr>' \
+                + '<tr><td>Balance:</td><td>' + w['balance'] + '</td></tr>' \
                 + '<tr><td>Blocks:</td><td>' + str(w['blocks']) + '</td></tr>' \
                 + '<tr><td>Synced:</td><td>' + str(w['synced']) + '</td></tr>' \
                 + '<tr><td><input type="submit" name="newaddr_' + cid + '" value="Deposit Address"></td><td>' + str(w['deposit_address']) + '</td></tr>' \
