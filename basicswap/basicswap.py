@@ -176,7 +176,7 @@ def getLockName(lock_type):
 
 
 def getExpectedSequence(lockType, lockVal, coin_type):
-    assert(lockVal >= 1)
+    assert(lockVal >= 1), 'Bad lockVal'
     if lockType == SEQUENCE_LOCK_BLOCKS:
         return lockVal
     if lockType == SEQUENCE_LOCK_TIME:
@@ -399,6 +399,14 @@ class Bid(Base):
             self.states += struct.pack('<iq', new_state, now)
 
 
+class PooledAddress(Base):
+    __tablename__ = 'addresspool'
+
+    addr_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
+    coin_type = sa.Column(sa.Integer)
+    addr = sa.Column(sa.String)
+
+
 """
 class SwapTx(Base):
     def __init__(self):
@@ -544,10 +552,15 @@ class BasicSwap():
                     with open(authcookiepath) as fp:
                         rpcauth = fp.read()
                 except Exception:
-                    self.log.warning('Unable to read authcookie for %s', str(coin))
+                    self.log.warning('Unable to read authcookie for %s, %s', str(coin), authcookiepath)
 
-        # TODO: Load from db
-        last_height_checked = 0
+        session = scoped_session(self.session_factory)
+        try:
+            last_height_checked = session.query(DBKVInt).filter_by(key='last_height_checked_' + chainparams[coin]['name']).first().value
+        except Exception:
+            last_height_checked = 0
+        session.close()
+        session.remove()
 
         return {
             'coin': coin,
@@ -596,6 +609,16 @@ class BasicSwap():
         self.log.error('Can\'t connect to daemon RPC, exiting.')
         self.stopRunning(1)  # systemd will try restart if fail_code != 0
 
+    def setIntKV(self, str_key, int_val):
+        session = scoped_session(self.session_factory)
+        kv = session.query(DBKVInt).filter_by(key=str_key).first()
+        if not kv:
+            kv = DBKVInt(key=str_key, value=int_val)
+        session.add(kv)
+        session.commit()
+        session.close()
+        session.remove()
+
     def loadFromDB(self):
         self.log.info('Loading data from db')
         self.mxDB.acquire()
@@ -631,7 +654,7 @@ class BasicSwap():
             self.log.info('Importing network key to SMSG')
             self.callrpc('smsgimportprivkey', [self.network_key, 'basicswap offers'])
             ro = self.callrpc('smsglocalkeys', ['anon', '-', self.network_addr])
-            assert(ro['result'] == 'Success.')
+            assert(ro['result'] == 'Success.'), 'smsglocalkeys failed'
 
         # TODO: Ensure smsg is enabled for the active wallet.
 
@@ -798,7 +821,7 @@ class BasicSwap():
         except Exception:
             try:
                 fee_rate = self.callcoinrpc(coin_type, 'getwalletinfo')['paytxfee']
-                assert(fee_rate > 0.0)
+                assert(fee_rate > 0.0), '0 feerate'
                 return fee_rate
             except Exception:
                 return self.callcoinrpc(coin_type, 'getnetworkinfo')['relayfee']
@@ -924,7 +947,7 @@ class BasicSwap():
         # Bid to send bid.amount * offer.rate of coin_to in exchange for bid.amount of coin_from
 
         offer = self.getOffer(offer_id)
-        assert(offer)
+        assert(offer), 'Offer not found: {}.'.format(offer_id.hex())
 
         # TODO: Assert offer still valid
 
@@ -1266,7 +1289,7 @@ class BasicSwap():
         self.log.debug('Redeem tx fee %s, rate %s', format8(tx_fee * COIN), str(fee_rate))
 
         amount_out = prev_amount - tx_fee * COIN
-        assert(amount_out > 0)
+        assert(amount_out > 0), 'Amount out <= 0'
 
         if addr_redeem_out is None:
             addr_redeem_out = self.getReceiveAddressForCoin(coin_type)
@@ -1314,7 +1337,7 @@ class BasicSwap():
             if self.coin_clients[coin_type]['connection_type'] == 'rpc':
                 redeem_txjs = self.callcoinrpc(coin_type, 'decoderawtransaction', [redeem_txn])
                 self.log.debug('vsize paid, actual vsize %d %d', tx_vsize, redeem_txjs['vsize'])
-                assert(tx_vsize >= redeem_txjs['vsize'])
+                assert(tx_vsize >= redeem_txjs['vsize']), 'Underpaid fee'
 
             redeem_txjs = self.callcoinrpc(Coins.PART, 'decoderawtransaction', [redeem_txn])
             self.log.debug('Have valid redeem txn %s for contract %s tx %s', redeem_txjs['txid'], for_txn_type, prev_txnid)
@@ -1359,11 +1382,11 @@ class BasicSwap():
         self.log.debug('Refund tx fee %s, rate %s', format8(tx_fee * COIN), str(fee_rate))
 
         amount_out = prev_amount * COIN - tx_fee * COIN
-        assert(amount_out > 0)
+        assert(amount_out > 0), 'Amount out <= 0'
 
         if addr_refund_out is None:
             addr_refund_out = self.getReceiveAddressForCoin(coin_type)
-        assert(addr_refund_out is not None)
+        assert(addr_refund_out is not None), 'addr_refund_out is null'
         if self.coin_clients[coin_type]['use_segwit']:
             # Change to btc hrp
             addr_refund_out = self.encodeSegwit(Coins.PART, self.decodeSegwit(coin_type, addr_refund_out))
@@ -1405,7 +1428,7 @@ class BasicSwap():
             if self.coin_clients[coin_type]['connection_type'] == 'rpc':
                 refund_txjs = self.callcoinrpc(coin_type, 'decoderawtransaction', [refund_txn])
                 self.log.debug('vsize paid, actual vsize %d %d', tx_vsize, refund_txjs['vsize'])
-                assert(tx_vsize >= refund_txjs['vsize'])
+                assert(tx_vsize >= refund_txjs['vsize']), 'underpaid fee'
 
             refund_txjs = self.callcoinrpc(Coins.PART, 'decoderawtransaction', [refund_txn])
             self.log.debug('Have valid refund txn %s for contract tx %s', refund_txjs['txid'], txjs['txid'])
@@ -1654,11 +1677,11 @@ class BasicSwap():
     def extractSecret(self, coin_type, bid, spend_in):
         try:
             if coin_type == Coins.PART or self.coin_clients[coin_type]['use_segwit']:
-                assert(len(spend_in['txinwitness']) == 5)
+                assert(len(spend_in['txinwitness']) == 5), 'Bad witness size'
                 return bytes.fromhex(spend_in['txinwitness'][2])
             else:
                 script_sig = spend_in['scriptSig']['asm'].split(' ')
-                assert(len(script_sig) == 5)
+                assert(len(script_sig) == 5), 'Bad witness size'
                 return bytes.fromhex(script_sig[2])
         except Exception:
             return None
@@ -1785,7 +1808,7 @@ class BasicSwap():
                 last_height_checked += 1
             if c['last_height_checked'] != last_height_checked:
                 c['last_height_checked'] = last_height_checked
-                # TODO: save to db
+                self.setIntKV('last_height_checked_' + chainparams[coin_type]['name'], last_height_checked)
 
     def expireMessages(self):
         self.mxDB.acquire()
@@ -1826,10 +1849,10 @@ class BasicSwap():
         assert(msg['sent'] + offer_data.time_valid >= now), 'Offer expired'
 
         if offer_data.swap_type == SwapTypes.SELLER_FIRST:
-            assert(len(offer_data.proof_address) == 0)
-            assert(len(offer_data.proof_signature) == 0)
-            assert(len(offer_data.pkhash_seller) == 0)
-            assert(len(offer_data.secret_hash) == 0)
+            assert(len(offer_data.proof_address) == 0), 'Unexpected data'
+            assert(len(offer_data.proof_signature) == 0), 'Unexpected data'
+            assert(len(offer_data.pkhash_seller) == 0), 'Unexpected data'
+            assert(len(offer_data.secret_hash) == 0), 'Unexpected data'
         elif offer_data.swap_type == SwapTypes.BUYER_FIRST:
             raise ValueError('TODO')
         else:
@@ -1876,7 +1899,7 @@ class BasicSwap():
         bid_data.ParseFromString(bid_bytes)
 
         # Validate data
-        assert(len(bid_data.offer_msg_id) == 28)
+        assert(len(bid_data.offer_msg_id) == 28), 'Bad offer_id length'
         assert(bid_data.time_valid >= MIN_BID_VALID_TIME and bid_data.time_valid <= MAX_BID_VALID_TIME), 'Invalid time_valid'
 
         offer_id = bid_data.offer_msg_id
