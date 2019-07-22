@@ -92,8 +92,15 @@ def prepareCore(coin, version, settings, data_dir):
     elif coin == 'litecoin':
         signing_key_name = 'thrasher'
         release_url = 'https://download.litecoin.org/litecoin-{}/{}/{}'.format(version, os_name, release_filename)
-        assert_filename = '{}-{}-0.17-build.assert'.format(coin, os_name)
+        assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, version.rsplit('.',1)[0])
         assert_url = 'https://raw.githubusercontent.com/litecoin-project/gitian.sigs.ltc/master/%s-%s/%s/%s' % (version, os_name, signing_key_name, assert_filename)
+        assert_sig_filename = assert_filename + '.sig'
+        assert_sig_url = assert_url + '.sig'
+    elif coin == 'bitcoin':
+        signing_key_name = 'laanwj'
+        release_url = 'https://bitcoincore.org/bin/bitcoin-core-{}/{}'.format(version, release_filename)
+        assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, version.rsplit('.',1)[0])
+        assert_url = 'https://raw.githubusercontent.com/bitcoin-core/gitian.sigs/master/%s-%s/%s/%s' % (version, os_name, signing_key_name, assert_filename)
         assert_sig_filename = assert_filename + '.sig'
         assert_sig_url = assert_url + '.sig'
     else:
@@ -160,12 +167,14 @@ def printVersion():
 def printHelp():
     logger.info('Usage: basicswap-prepare ')
     logger.info('\n--help, -h               Print help.')
-    logger.info('\n--version, -v            Print version.')
-    logger.info('\n--datadir=PATH           Path to basicswap data directory, default:~/.basicswap.')
-    logger.info('\n--mainnet                Run in mainnet mode.')
-    logger.info('\n--testnet                Run in testnet mode.')
-    logger.info('\n--regtest                Run in regtest mode.')
-    logger.info('\n--particl_mnemonic=      Recovery phrase to use for the Particl wallet, default is randomly generated.')
+    logger.info('--version, -v            Print version.')
+    logger.info('--datadir=PATH           Path to basicswap data directory, default:~/.basicswap.')
+    logger.info('--mainnet                Run in mainnet mode.')
+    logger.info('--testnet                Run in testnet mode.')
+    logger.info('--regtest                Run in regtest mode.')
+    logger.info('--particl_mnemonic=      Recovery phrase to use for the Particl wallet, default is randomly generated.')
+    logger.info('--withcoin=              Prepare system to run daemon for coin.')
+    logger.info('--withoutcoin=           Do not prepare system to run daemon for coin.')
 
 
 def make_rpc_func(bin_dir, data_dir, chain):
@@ -196,6 +205,8 @@ def main():
     data_dir = None
     chain = 'mainnet'
     particl_wallet_mnemonic = None
+    known_coins = {'particl', 'litecoin', 'bitcoin'}
+    with_coins = {'particl', 'litecoin'}
 
     for v in sys.argv[1:]:
         if len(v) < 2 or v[0] != '-':
@@ -231,6 +242,10 @@ def main():
             if name == 'particl_mnemonic':
                 particl_wallet_mnemonic = s[1]
                 continue
+            if name == 'withcoin':
+                with_coins.add(s[1])
+            if name == 'withoutcoin':
+                with_coins.discard(s[1])
 
         logger.warning('Unknown argument %s', v)
 
@@ -239,6 +254,7 @@ def main():
         data_dir = os.path.join(os.path.expanduser(default_datadir))
     logger.info('Using datadir: %s', data_dir)
     logger.info('Chain: %s', chain)
+    logger.info('With coins: %s', ', '.join(with_coins))
 
     if not os.path.exists(data_dir):
         os.makedirs(data_dir)
@@ -266,8 +282,8 @@ def main():
                 'blocks_confirmed': 2
             },
             'litecoin': {
-                'connection_type': 'rpc',
-                'manage_daemon': True,
+                'connection_type': 'rpc' if 'litecoin' in with_coins else 'none',
+                'manage_daemon': True if 'litecoin' in with_coins else False,
                 'rpcport': 19795,
                 'datadir': os.path.join(data_dir, 'litecoin'),
                 'bindir': os.path.join(data_dir, 'bins', 'litecoin'),
@@ -275,8 +291,8 @@ def main():
                 'blocks_confirmed': 2
             },
             'bitcoin': {
-                'connection_type': 'none',
-                'manage_daemon': False,
+                'connection_type': 'rpc' if 'bitcoin' in with_coins else 'none',
+                'manage_daemon': True if 'bitcoin' in with_coins else False,
                 'rpcport': 19796,
                 'datadir': os.path.join(data_dir, 'bitcoin'),
                 'bindir': os.path.join(data_dir, 'bins', 'bitcoin'),
@@ -293,9 +309,12 @@ def main():
 
     cores = [
         ('particl', '0.18.1.0'),
-        ('litecoin', '0.17.1')
+        ('litecoin', '0.17.1'),
+        ('bitcoin', '0.18.0'),
     ]
     for c in cores:
+        if c[0] not in with_coins:
+            continue
         prepareCore(c[0], c[1], settings, data_dir)
         coin = c[0]
 
@@ -324,6 +343,8 @@ def main():
                 fp.write('spentindex=1')
                 fp.write('txindex=1')
             elif coin == 'litecoin':
+                fp.write('prune=1000\n')
+            elif coin == 'bitcoin':
                 fp.write('prune=1000\n')
             else:
                 logger.warning('Unknown coin %s', coin)
