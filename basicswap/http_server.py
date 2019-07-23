@@ -517,7 +517,7 @@ class HttpThread(threading.Thread, HTTPServer):
         self.port_no = port_no
         self.allow_cors = allow_cors
         self.swap_client = swap_client
-        self.title = 'Simple Atomic Swap Demo'
+        self.title = 'Simple Atomic Swap Demo, ' + self.swap_client.chain
         self.last_form_id = dict()
 
         self.timeout = 60

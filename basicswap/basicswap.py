@@ -629,7 +629,6 @@ class BasicSwap():
         self.log.info('Loading data from db')
         self.mxDB.acquire()
         try:
-            self.log.debug('loadFromDB TODO')
             session = scoped_session(self.session_factory)
             for bid in session.query(Bid):
                 if bid.state and bid.state > BidStates.BID_RECEIVED and bid.state < BidStates.SWAP_COMPLETED:
@@ -639,7 +638,17 @@ class BasicSwap():
                     assert(offer), 'Offer not found'
                     self.swaps_in_progress[bid.bid_id] = (bid, offer)
 
-                    # TODO: load txns, must store height 1st seen
+                    coin_from = Coins(offer.coin_from)
+                    coin_to = Coins(offer.coin_to)
+                    if bid.initiate_txid:
+                        self.addWatchedOutput(coin_from, bid.bid_id, bid.initiate_txid.hex(), bid.initiate_txn_n, BidStates.SWAP_INITIATED)
+                    if bid.participate_txid:
+                        self.addWatchedOutput(coin_to, bid.bid_id, bid.participate_txid.hex(), bid.participate_txn_n, BidStates.SWAP_PARTICIPATING)
+
+                    if self.coin_clients[coin_from]['last_height_checked'] < 1:
+                        self.coin_clients[coin_from]['last_height_checked'] = bid.initiate_txn_height
+                    if self.coin_clients[coin_to]['last_height_checked'] < 1:
+                        self.coin_clients[coin_to]['last_height_checked'] = bid.participate_txn_height
 
         finally:
             session.close()
@@ -1493,8 +1502,7 @@ class BasicSwap():
         # TODO: Check connection type
         bid.participate_txn_height = self.setLastHeightChecked(coin_type, tx_height)
 
-        self.log.debug('Adding watched output %s bid %s tx %s type %s', coin_type, bid_id.hex(), txid_hex, BidStates.SWAP_PARTICIPATING)
-        self.coin_clients[coin_type]['watched_outputs'].append((bid_id, txid_hex, vout, BidStates.SWAP_PARTICIPATING))
+        self.addWatchedOutput(coin_type, bid_id, txid_hex, vout, BidStates.SWAP_PARTICIPATING)
 
     def participateTxnConfirmed(self, bid_id, bid, offer):
         self.log.debug('participateTxnConfirmed for bid %s', bid_id.hex())
@@ -1601,8 +1609,7 @@ class BasicSwap():
                     bid.initiate_txn_n = index
                     # Start checking for spends of initiate_txn before fully confirmed
                     bid.initiate_txn_height = self.setLastHeightChecked(coin_from, tx_height)
-                    self.log.debug('Adding watched output %s bid %s tx %s type %s', coin_from, bid_id.hex(), initiate_txnid_hex, BidStates.SWAP_INITIATED)
-                    self.coin_clients[coin_from]['watched_outputs'].append((bid_id, initiate_txnid_hex, bid.initiate_txn_n, BidStates.SWAP_INITIATED))
+                    self.addWatchedOutput(coin_from, bid_id, initiate_txnid_hex, bid.initiate_txn_n, BidStates.SWAP_INITIATED)
                     if bid.initiate_txn_state is None or bid.initiate_txn_state < TxStates.TX_SENT:
                         bid.setITXState(TxStates.TX_SENT)
                     save_bid = True
@@ -1691,6 +1698,10 @@ class BasicSwap():
                 return bytes.fromhex(script_sig[2])
         except Exception:
             return None
+
+    def addWatchedOutput(self, coin_type, bid_id, txid_hex, vout, tx_type):
+        self.log.debug('Adding watched output %s bid %s tx %s type %s', coin_type, bid_id.hex(), txid_hex, tx_type)
+        self.coin_clients[coin_type]['watched_outputs'].append((bid_id, txid_hex, vout, tx_type))
 
     def removeWatchedOutput(self, coin_type, bid_id, txid_hex):
         # Remove all for bid if txid is None

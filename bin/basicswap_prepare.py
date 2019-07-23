@@ -264,19 +264,20 @@ def main():
         sys.stderr.write('Error: {} exists, exiting.\n'.format(config_path))
         exit(1)
 
+    port_offset = 300 if chain == testnet else 0
     settings = {
         'debug': True,
         'zmqhost': 'tcp://127.0.0.1',
-        'zmqport': 20792,
+        'zmqport': 20792 + port_offset,
         'htmlhost': 'localhost',
-        'htmlport': 12700,
+        'htmlport': 12700 + port_offset,
         'network_key': '7sW2UEcHXvuqEjkpE5mD584zRaQYs6WXYohue4jLFZPTvMSxwvgs',
         'network_pubkey': '035758c4a22d7dd59165db02a56156e790224361eb3191f02197addcb3bde903d2',
         'chainclients': {
             'particl': {
                 'connection_type': 'rpc',
                 'manage_daemon': True,
-                'rpcport': 19792,
+                'rpcport': 19792 + port_offset,
                 'datadir': os.path.join(data_dir, 'particl'),
                 'bindir': os.path.join(data_dir, 'bins', 'particl'),
                 'blocks_confirmed': 2
@@ -284,7 +285,7 @@ def main():
             'litecoin': {
                 'connection_type': 'rpc' if 'litecoin' in with_coins else 'none',
                 'manage_daemon': True if 'litecoin' in with_coins else False,
-                'rpcport': 19795,
+                'rpcport': 19795 + port_offset,
                 'datadir': os.path.join(data_dir, 'litecoin'),
                 'bindir': os.path.join(data_dir, 'bins', 'litecoin'),
                 'use_segwit': True,
@@ -293,7 +294,7 @@ def main():
             'bitcoin': {
                 'connection_type': 'rpc' if 'bitcoin' in with_coins else 'none',
                 'manage_daemon': True if 'bitcoin' in with_coins else False,
-                'rpcport': 19796,
+                'rpcport': 19796 + port_offset,
                 'datadir': os.path.join(data_dir, 'bitcoin'),
                 'bindir': os.path.join(data_dir, 'bins', 'bitcoin'),
                 'use_segwit': True
