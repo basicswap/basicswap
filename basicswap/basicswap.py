@@ -531,7 +531,9 @@ class BasicSwap():
     def setDefaultConnectParams(self, coin):
         chain_client_settings = self.getChainClientSettings(coin)
 
-        datadir = chain_client_settings.get('datadir', os.path.join(cfg.DATADIRS, chainparams[coin]['name']))
+        bindir = os.path.expanduser(chain_client_settings.get('bindir', ''))
+        datadir = os.path.expanduser(chain_client_settings.get('datadir', os.path.join(cfg.DATADIRS, chainparams[coin]['name'])))
+
         blocks_confirmed = chain_client_settings.get('blocks_confirmed', 6)
         connection_type = chain_client_settings.get('connection_type', 'none')
         use_segwit = chain_client_settings.get('use_segwit', False)
@@ -543,8 +545,11 @@ class BasicSwap():
             elif 'rpcpassword' in chain_client_settings:
                 rpcauth = chain_client_settings['rpcuser'] + ':' + chain_client_settings['rpcpassword']
             if rpcauth is None:
+                testnet_name = '' if self.chain == 'mainnet' else self.chain
+                if testnet_name == 'testnet' and coin != Coins.PART:
+                    testnet_name += '4'
+                authcookiepath = os.path.join(datadir, testnet_name, '.cookie')
                 # Wait for daemon to start
-                authcookiepath = os.path.join(datadir, '' if self.chain == 'mainnet' else self.chain, '.cookie')
                 for i in range(10):
                     if not os.path.exists(authcookiepath):
                         time.sleep(0.5)
@@ -565,6 +570,7 @@ class BasicSwap():
         return {
             'coin': coin,
             'connection_type': connection_type,
+            'bindir': bindir,
             'datadir': datadir,
             'rpcport': chain_client_settings.get('rpcport', chainparams[coin][self.chain]['rpcport']),
             'rpcauth': rpcauth,
@@ -2242,8 +2248,7 @@ class BasicSwap():
         return callrpc(self.coin_clients[coin]['rpcport'], self.coin_clients[coin]['rpcauth'], method, params, wallet)
 
     def calltx(self, cmd):
-        settings = self.getChainClientSettings(Coins.PART)
-        bindir = settings.get('bindir', '')
+        bindir = self.coin_clients[Coins.PART]['bindir']
         command_cli = os.path.join(bindir, cfg.PARTICL_TX)
         chainname = '' if self.chain == 'mainnet' else (' -' + self.chain)
         args = command_cli + chainname + ' ' + cmd

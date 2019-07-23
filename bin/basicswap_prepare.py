@@ -92,14 +92,14 @@ def prepareCore(coin, version, settings, data_dir):
     elif coin == 'litecoin':
         signing_key_name = 'thrasher'
         release_url = 'https://download.litecoin.org/litecoin-{}/{}/{}'.format(version, os_name, release_filename)
-        assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, version.rsplit('.',1)[0])
+        assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, version.rsplit('.', 1)[0])
         assert_url = 'https://raw.githubusercontent.com/litecoin-project/gitian.sigs.ltc/master/%s-%s/%s/%s' % (version, os_name, signing_key_name, assert_filename)
         assert_sig_filename = assert_filename + '.sig'
         assert_sig_url = assert_url + '.sig'
     elif coin == 'bitcoin':
         signing_key_name = 'laanwj'
         release_url = 'https://bitcoincore.org/bin/bitcoin-core-{}/{}'.format(version, release_filename)
-        assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, version.rsplit('.',1)[0])
+        assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, version.rsplit('.', 1)[0])
         assert_url = 'https://raw.githubusercontent.com/bitcoin-core/gitian.sigs/master/%s-%s/%s/%s' % (version, os_name, signing_key_name, assert_filename)
         assert_sig_filename = assert_filename + '.sig'
         assert_sig_url = assert_url + '.sig'
@@ -331,7 +331,11 @@ def main():
 
         with open(core_conf_path, 'w') as fp:
             if chain != 'mainnet':
-                fp.write(chain + '=1\n\n')
+                fp.write(chain + '=1\n')
+                if chain == 'testnet':
+                    fp.write('[test]\n\n')
+                else:
+                    logger.warning('Unknown chain %s', chain)
 
             fp.write('rpcport={}\n'.format(core_settings['rpcport']))
             fp.write('printtoconsole=0\n')
