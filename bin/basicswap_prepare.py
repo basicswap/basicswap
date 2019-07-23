@@ -264,7 +264,7 @@ def main():
         sys.stderr.write('Error: {} exists, exiting.\n'.format(config_path))
         exit(1)
 
-    port_offset = 300 if chain == testnet else 0
+    port_offset = 300 if chain == 'testnet' else 0
     settings = {
         'debug': True,
         'zmqhost': 'tcp://127.0.0.1',

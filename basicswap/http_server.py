@@ -23,6 +23,8 @@ from .chainparams import (
 )
 from .basicswap import (
     SwapTypes,
+    BidStates,
+    TxStates,
     getOfferState,
     getBidState,
     getTxState,
@@ -34,10 +36,11 @@ def getCoinName(c):
     return chainparams[c]['name'].capitalize()
 
 
-def html_content_start(title, h2=None):
+def html_content_start(title, h2=None, refresh=None):
     content = '<!DOCTYPE html><html lang="en">\n<head>' \
         + '<meta charset="UTF-8">' \
-        + '<title>' + title + '</title></head>' \
+        + ('' if not refresh else '<meta http-equiv="refresh" content="{}">'.format(refresh)) \
+        + '<title>' + title + '</title></head>\n' \
         + '<body>'
     if h2 is not None:
         content += '<h2>' + h2 + '</h2>'
@@ -294,8 +297,9 @@ class HttpHandler(BaseHTTPRequestHandler):
             raise ValueError('Bad bid ID')
         swap_client = self.server.swap_client
 
-        content = html_content_start(self.server.title, self.server.title) \
-            + '<h3>Bid: ' + bid_id.hex() + '</h3>'
+        content = html_content_start(self.server.title, self.server.title, 30) \
+            + '<h3>Bid: ' + bid_id.hex() + '</h3>' \
+            + '<p>Page Refresh: 30 seconds</p>'
 
         show_txns = False
         if post_string != '':
@@ -328,11 +332,38 @@ class HttpHandler(BaseHTTPRequestHandler):
         ticker_from = swap_client.getTicker(coin_from)
         ticker_to = swap_client.getTicker(coin_to)
 
+        if bid.state == BidStates.BID_SENT:
+            state_description = 'Waiting for seller to accept.'
+        elif bid.state == BidStates.BID_RECEIVED:
+            state_description = 'Waiting for seller to accept.'
+        elif bid.state == BidStates.BID_ACCEPTED:
+            if not bid.initiate_txid:
+                state_description = 'Waiting for seller to send initiate tx.'
+            else:
+                state_description = 'Waiting for initiate tx to confirm.'
+        elif bid.state == BidStates.SWAP_INITIATED:
+            state_description = 'Waiting for participate txn to be confirmed in {} chain'.format(ticker_to)
+        elif bid.state == BidStates.SWAP_PARTICIPATING:
+            state_description = 'Waiting for initiate txn to be spent in {} chain'.format(ticker_from)
+        elif bid.state == BidStates.SWAP_COMPLETED:
+            state_description = 'Swap completed'
+            if bid.initiate_txn_state == TxStates.TX_REDEEMED and bid.participate_txn_state == TxStates.TX_REDEEMED:
+                state_description += ' successfully'
+            else:
+                state_description += ', ITX ' + getTxState(bid.initiate_txn_state + ', PTX ' + getTxState(bid.participate_txn_state))
+        elif bid.state == BidStates.SWAP_TIMEDOUT:
+            state_description = 'Timed out waiting for initiate txn'
+        elif bid.state == BidStates.BID_ABANDONED:
+            state_description = 'Bid abandoned'
+        else:
+            state_description = ''
+
         tr = '<tr><td>{}</td><td>{}</td></tr>'
         content += '<table>'
 
         content += tr.format('Swap', format8(bid.amount) + ' ' + ticker_from + ' for ' + format8((bid.amount * offer.rate) // COIN) + ' ' + ticker_to)
         content += tr.format('Bid State', getBidState(bid.state))
+        content += tr.format('State Description', state_description)
         content += tr.format('ITX State', getTxState(bid.initiate_txn_state))
         content += tr.format('PTX State', getTxState(bid.participate_txn_state))
         content += tr.format('Offer', '<a href="/offer/' + bid.offer_id.hex() + '">' + bid.offer_id.hex() + '</a>')
@@ -419,9 +450,10 @@ class HttpHandler(BaseHTTPRequestHandler):
         swap_client = self.server.swap_client
         summary = swap_client.getSummary()
 
-        content = html_content_start(self.server.title, self.server.title) \
+        content = html_content_start(self.server.title, self.server.title, 30) \
             + '<p><a href="/wallets">View Wallets</a></p>' \
             + '<p>' \
+            + 'Page Refresh: 30 seconds<br/>' \
             + 'Network: ' + str(summary['network']) + '<br/>' \
             + '<a href="/active">Swaps in progress: ' + str(summary['num_swapping']) + '</a><br/>' \
             + '<a href="/offers">Network Offers: ' + str(summary['num_network_offers']) + '</a><br/>' \

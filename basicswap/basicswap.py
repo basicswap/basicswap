@@ -116,6 +116,13 @@ class OpCodes(IntEnum):
     OP_CHECKSEQUENCEVERIFY = 0xb2,
 
 
+class TxTypes(IntEnum):  # For PooledAddress
+    ITX_REDEEM = auto()
+    ITX_REFUND = auto()
+    PTX_REDEEM = auto()
+    PTX_REFUND = auto()
+
+
 SEQUENCE_LOCK_BLOCKS = 1
 SEQUENCE_LOCK_TIME = 2
 SEQUENCE_LOCKTIME_GRANULARITY = 9  # 512 seconds
@@ -405,6 +412,8 @@ class PooledAddress(Base):
     addr_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
     coin_type = sa.Column(sa.Integer)
     addr = sa.Column(sa.String)
+    bid_id = sa.Column(sa.LargeBinary)
+    tx_type = sa.Column(sa.Integer)
 
 
 """
@@ -816,6 +825,46 @@ class BasicSwap():
 
         return hashlib.sha256(bytes(self.callcoinrpc(Coins.PART, 'extkey', ['info', evkey, path])['key_info']['result'], 'utf-8')).digest()
 
+    def getReceiveAddressFromPool(self, coin_type, bid_id, tx_type):
+        self.log.debug('Get address from pool bid_id {}, type {}, coin {}'.format(bid_id.hex(), tx_type, coin_type))
+        self.mxDB.acquire()
+        try:
+            session = scoped_session(self.session_factory)
+            try:
+                record = session.query(PooledAddress).filter(PooledAddress.coin_type == int(coin_type) and PooledAddress.bid_id == None).one()
+            except Exception:
+                address = self.getReceiveAddressForCoin(coin_type)
+                record = PooledAddress(
+                    addr=address,
+                    coin_type=int(coin_type))
+            record.bid_id = bid_id
+            record.tx_type = tx_type
+            addr = record.addr
+            session.add(record)
+            session.commit()
+            session.close()
+            session.remove()
+        finally:
+            self.mxDB.release()
+        return addr
+
+    def returnAddressToPool(self, bid_id, tx_type):
+        self.log.debug('Return address to pool bid_id {}, type {}'.format(bid_id.hex(), tx_type))
+        self.mxDB.acquire()
+        try:
+            session = scoped_session(self.session_factory)
+            try:
+                record = session.query(PooledAddress).filter(PooledAddress.bid_id == bid_id and PooledAddress.tx_type == tx_type).one()
+                self.log.debug('Returning address to pool addr {}'.format(record.addr))
+                record.bid_id = None
+                session.commit()
+            except Exception:
+                pass
+            session.close()
+            session.remove()
+        finally:
+            self.mxDB.release()
+
     def getReceiveAddressForCoin(self, coin_type):
         if coin_type == Coins.PART:
             new_addr = self.callcoinrpc(Coins.PART, 'getnewaddress')
@@ -1157,6 +1206,16 @@ class BasicSwap():
             # Remove any watched outputs
             self.removeWatchedOutput(Coins(offer.coin_from), bid_id, None)
             self.removeWatchedOutput(Coins(offer.coin_to), bid_id, None)
+
+            # Return unused addrs to pool
+            if bid.initiate_txn_state != TxStates.TX_REDEEMED:
+                self.returnAddressToPool(bid_id, TxTypes.ITX_REDEEM)
+            if bid.initiate_txn_state != TxStates.TX_REFUNDED:
+                self.returnAddressToPool(bid_id, TxTypes.ITX_REFUND)
+            if bid.participate_txn_state != TxStates.TX_REDEEMED:
+                self.returnAddressToPool(bid_id, TxTypes.PTX_REDEEM)
+            if bid.participate_txn_state != TxStates.TX_REFUNDED:
+                self.returnAddressToPool(bid_id, TxTypes.PTX_REFUND)
         finally:
             session.close()
             session.remove()
@@ -1228,7 +1287,7 @@ class BasicSwap():
 
         txn_signed = self.callcoinrpc(coin_to, 'signrawtransactionwithwallet', [txn_funded])['hex']
 
-        refund_txn = self.createRefundTxn(coin_to, txn_signed, bid, bid.participate_script)
+        refund_txn = self.createRefundTxn(coin_to, txn_signed, bid, bid.participate_script, tx_type=TxTypes.PTX_REFUND)
         bid.participate_txn_refund = bytes.fromhex(refund_txn)
 
         chain_height = self.callcoinrpc(coin_to, 'getblockchaininfo')['blocks']
@@ -1307,7 +1366,7 @@ class BasicSwap():
         assert(amount_out > 0), 'Amount out <= 0'
 
         if addr_redeem_out is None:
-            addr_redeem_out = self.getReceiveAddressForCoin(coin_type)
+            addr_redeem_out = self.getReceiveAddressFromPool(coin_type, bid.bid_id, TxTypes.PTX_REDEEM if for_txn_type == 'participate' else TxTypes.ITX_REDEEM)
         assert(addr_redeem_out is not None)
 
         if self.coin_clients[coin_type]['use_segwit']:
@@ -1359,7 +1418,7 @@ class BasicSwap():
 
         return redeem_txn
 
-    def createRefundTxn(self, coin_type, txn, bid, txn_script, addr_refund_out=None, fee_rate=None):
+    def createRefundTxn(self, coin_type, txn, bid, txn_script, addr_refund_out=None, fee_rate=None, tx_type=TxTypes.ITX_REFUND):
         self.log.debug('createRefundTxn')
         if self.coin_clients[coin_type]['connection_type'] != 'rpc':
             return None
@@ -1400,7 +1459,7 @@ class BasicSwap():
         assert(amount_out > 0), 'Amount out <= 0'
 
         if addr_refund_out is None:
-            addr_refund_out = self.getReceiveAddressForCoin(coin_type)
+            addr_refund_out = self.getReceiveAddressFromPool(coin_type, bid.bid_id, tx_type)
         assert(addr_refund_out is not None), 'addr_refund_out is null'
         if self.coin_clients[coin_type]['use_segwit']:
             # Change to btc hrp
@@ -1659,6 +1718,16 @@ class BasicSwap():
             if (bid.initiate_txn_state is None or bid.initiate_txn_state >= TxStates.TX_REDEEMED) \
                and (bid.participate_txn_state is None or bid.participate_txn_state >= TxStates.TX_REDEEMED):
                 self.log.info('Swap completed for bid %s', bid_id.hex())
+
+                if bid.initiate_txn_state == TxStates.TX_REDEEMED:
+                    self.returnAddressToPool(bid_id, TxTypes.ITX_REFUND)
+                else:
+                    self.returnAddressToPool(bid_id, TxTypes.ITX_REDEEM)
+                if bid.participate_txn_state == TxStates.TX_REDEEMED:
+                    self.returnAddressToPool(bid_id, TxTypes.PTX_REFUND)
+                else:
+                    self.returnAddressToPool(bid_id, TxTypes.PTX_REDEEM)
+
                 bid.setState(BidStates.SWAP_COMPLETED)
                 self.saveBid(bid_id, bid)
                 return True  # Mark bid for archiving
@@ -2218,9 +2287,10 @@ class BasicSwap():
             if offer_id is not None:
                 q = session.query(Bid).filter(Bid.offer_id == offer_id)
             elif sent:
-                q = session.query(Bid).filter(Bid.was_sent == True).order_by(Bid.created_at.desc())  # noqa E712
+                q = session.query(Bid).filter(Bid.was_sent == True)
             else:
-                q = session.query(Bid).filter(Bid.was_received == True).order_by(Bid.created_at.desc())  # noqa E712
+                q = session.query(Bid).filter(Bid.was_received == True)
+            q = q.order_by(Bid.created_at.desc())  # noqa E712
             for row in q:
                 rv.append(row)
             return rv
