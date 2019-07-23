@@ -1370,7 +1370,7 @@ class BasicSwap():
         prevout_s = ' in={}:{}'.format(prev_txnid, prev_n)
 
         if fee_rate is None:
-            fee_rate = self.getRelayFeeRateForCoin(coin_type)
+            fee_rate = self.getFeeRateForCoin(coin_type)
 
         tx_vsize = self.getContractSpendTxVSize(coin_type)
         tx_fee = (fee_rate * tx_vsize) / 1000
@@ -2262,7 +2262,10 @@ class BasicSwap():
         rv = {}
         for c in Coins:
             if self.coin_clients[c]['connection_type'] == 'rpc':
-                rv[c] = self.getWalletInfo(c)
+                try:
+                    rv[c] = self.getWalletInfo(c)
+                except Exception as ex:
+                    rv[c] = {'name': chainparams[c]['name'].capitalize(), 'error': str(ex)}
         return rv
 
     def countAcceptedBids(self, offer_id=None):

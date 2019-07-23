@@ -132,8 +132,12 @@ class HttpHandler(BaseHTTPRequestHandler):
         content += '<form method="post">'
         for k, w in wallets.items():
             cid = str(int(k))
-            content += '<h4>' + w['name'] + '</h4>' \
-                + '<table>' \
+            content += '<h4>' + w['name'] + '</h4>'
+
+            if 'error' in w:
+                content += '<p>Error: {}</p>'.format(w['error'])
+
+            content += '<table>' \
                 + '<tr><td>Balance:</td><td>' + w['balance'] + '</td></tr>' \
                 + '<tr><td>Blocks:</td><td>' + str(w['blocks']) + '</td></tr>' \
                 + '<tr><td>Synced:</td><td>' + str(w['synced']) + '</td></tr>' \
