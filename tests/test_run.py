@@ -535,6 +535,28 @@ class Test(unittest.TestCase):
         assert(js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
         assert(js_0['num_recv_bids'] == js_0_before['num_recv_bids'] + 1 and js_0['num_sent_bids'] == js_0_before['num_sent_bids'] + 1)
 
+    def test_07_error(self):
+        swap_clients = self.swap_clients
+
+        logging.info('---------- Test error, BTC to LTC, set fee above bid value')
+
+        js_0_before = json.loads(urlopen('http://localhost:1800/json').read())
+
+        offer_id = swap_clients[0].postOffer(Coins.LTC, Coins.BTC, 0.001 * COIN, 1.0 * COIN, 0.001 * COIN, SwapTypes.SELLER_FIRST)
+
+        self.wait_for_offer(swap_clients[0], offer_id)
+        offers = swap_clients[0].listOffers()
+        for offer in offers:
+            if offer.offer_id == offer_id:
+                bid_id = swap_clients[0].postBid(offer_id, offer.amount_from)
+
+        self.wait_for_bid(swap_clients[0], bid_id)
+        swap_clients[0].acceptBid(bid_id)
+        swap_clients[0].coin_clients[Coins.BTC]['override_feerate'] = 10.0
+        swap_clients[0].coin_clients[Coins.LTC]['override_feerate'] = 10.0
+
+        self.wait_for_bid_state(swap_clients[0], bid_id, BidStates.BID_ERROR, seconds_for=60)
+
     def pass_99_delay(self):
         global stop_test
         logging.info('Delay')

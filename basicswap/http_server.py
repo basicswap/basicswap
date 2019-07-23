@@ -288,6 +288,18 @@ class HttpHandler(BaseHTTPRequestHandler):
         content += '<p><a href="/">home</a></p></body></html>'
         return bytes(content, 'UTF-8')
 
+    def page_advance(self, url_split, post_string):
+        assert(len(url_split) > 2), 'Bid ID not specified'
+        try:
+            bid_id = bytes.fromhex(url_split[2])
+            assert(len(bid_id) == 28)
+        except Exception:
+            raise ValueError('Bad bid ID')
+        swap_client = self.server.swap_client
+
+        content = html_content_start(self.server.title, self.server.title) \
+            + '<h3>Advance: ' + bid_id.hex() + '</h3>'
+
     def page_bid(self, url_split, post_string):
         assert(len(url_split) > 2), 'Bid ID not specified'
         try:
@@ -355,6 +367,8 @@ class HttpHandler(BaseHTTPRequestHandler):
             state_description = 'Timed out waiting for initiate txn'
         elif bid.state == BidStates.BID_ABANDONED:
             state_description = 'Bid abandoned'
+        elif bid.state == BidStates.BID_ERROR:
+            state_description = bid.state_note
         else:
             state_description = ''
 
@@ -506,6 +520,8 @@ class HttpHandler(BaseHTTPRequestHandler):
                     return self.page_newoffer(url_split, post_string)
                 if url_split[1] == 'sentoffers':
                     return self.page_offers(url_split, sent=True)
+                if url_split[1] == 'advance':
+                    return self.page_advance(url_split, post_string)
                 if url_split[1] == 'bid':
                     return self.page_bid(url_split, post_string)
                 if url_split[1] == 'bids':

@@ -87,6 +87,7 @@ class BidStates(IntEnum):
     SWAP_COMPLETED = auto()         # All swap txns spent
     SWAP_TIMEDOUT = auto()
     BID_ABANDONED = auto()          # Bid will no longer be processed
+    BID_ERROR = auto()              # An error occurred
 
 
 class TxStates(IntEnum):
@@ -158,6 +159,8 @@ def getBidState(state):
         return 'Timed-out'
     if state == BidStates.BID_ABANDONED:
         return 'Abandoned'
+    if state == BidStates.BID_ERROR:
+        return 'Error'
     return 'Unknown'
 
 
@@ -591,13 +594,15 @@ class BasicSwap():
 
     def start(self):
         self.log.info('Starting BasicSwap %s\n\n', __version__)
+        self.log.info('sqlalchemy version %s', sa.__version__)
 
         self.upgradeDatabase(self.db_version)
-        self.waitForDaemonRPC()
-        core_version = self.callcoinrpc(Coins.PART, 'getnetworkinfo')['version']
-        self.log.info('Particl Core version %d', core_version)
 
-        self.log.info('sqlalchemy version %s', sa.__version__)
+        for c in Coins:
+            if self.coin_clients[c]['connection_type'] == 'rpc':
+                self.waitForDaemonRPC(c)
+                core_version = self.callcoinrpc(c, 'getnetworkinfo')['version']
+                self.log.info('%s Core version %d', chainparams[c]['name'].capitalize(), core_version)
 
         self.initialise()
 
@@ -611,17 +616,17 @@ class BasicSwap():
 
         self.log.info('Upgrading Database from version %d to %d.', db_version, CURRENT_DB_VERSION)
 
-    def waitForDaemonRPC(self):
+    def waitForDaemonRPC(self, coin_type):
         for i in range(21):
             if not self.is_running:
                 return
             try:
-                self.callrpc('getwalletinfo', [], self.wallet)
+                self.callcoinrpc(coin_type, 'getwalletinfo', [], self.wallet)
                 return
             except Exception as ex:
-                logging.warning('Can\'t connect to daemon RPC: %s.  Trying again in %d second/s.', str(ex), (1 + i))
+                logging.warning('Can\'t connect to %s RPC: %s.  Trying again in %d second/s.', coin_type, str(ex), (1 + i))
                 time.sleep(1 + i)
-        self.log.error('Can\'t connect to daemon RPC, exiting.')
+        self.log.error('Can\'t connect to %s RPC, exiting.', coin_type)
         self.stopRunning(1)  # systemd will try restart if fail_code != 0
 
     def setIntKV(self, str_key, int_val):
@@ -733,9 +738,9 @@ class BasicSwap():
             msg_buf = OfferMessage()
             msg_buf.coin_from = int(coin_from)
             msg_buf.coin_to = int(coin_to)
-            msg_buf.amount_from = amount
+            msg_buf.amount_from = int(amount)
             msg_buf.rate = int(rate)
-            msg_buf.min_bid_amount = min_bid_amount
+            msg_buf.min_bid_amount = int(min_bid_amount)
 
             msg_buf.time_valid = 60 * 60
             msg_buf.lock_type = lock_type
@@ -830,9 +835,8 @@ class BasicSwap():
         self.mxDB.acquire()
         try:
             session = scoped_session(self.session_factory)
-            try:
-                record = session.query(PooledAddress).filter(PooledAddress.coin_type == int(coin_type) and PooledAddress.bid_id == None).one()
-            except Exception:
+            record = session.query(PooledAddress).filter(sa.and_(PooledAddress.coin_type == int(coin_type), PooledAddress.bid_id == None)).first()  # noqa E712
+            if not record:
                 address = self.getReceiveAddressForCoin(coin_type)
                 record = PooledAddress(
                     addr=address,
@@ -854,11 +858,11 @@ class BasicSwap():
         try:
             session = scoped_session(self.session_factory)
             try:
-                record = session.query(PooledAddress).filter(PooledAddress.bid_id == bid_id and PooledAddress.tx_type == tx_type).one()
+                record = session.query(PooledAddress).filter(sa.and_(PooledAddress.bid_id == bid_id, PooledAddress.tx_type == tx_type)).one()
                 self.log.debug('Returning address to pool addr {}'.format(record.addr))
                 record.bid_id = None
                 session.commit()
-            except Exception:
+            except Exception as ex:
                 pass
             session.close()
             session.remove()
@@ -878,8 +882,14 @@ class BasicSwap():
         self.log.debug('Generated new receive address %s for %s', new_addr, str(coin_type))
         return new_addr
 
+    def getRelayFeeRateForCoin(self, coin_type):
+        return self.callcoinrpc(coin_type, 'getnetworkinfo')['relayfee']
+
     def getFeeRateForCoin(self, coin_type):
         # TODO: Per coin settings to override feerate
+        override_feerate = self.coin_clients[coin_type].get('override_feerate', None)
+        if override_feerate:
+            return override_feerate
         try:
             return self.callcoinrpc(coin_type, 'estimatesmartfee', [1])['feerate']
         except Exception:
@@ -1018,7 +1028,7 @@ class BasicSwap():
         msg_buf = BidMessage()
         msg_buf.offer_msg_id = offer_id
         msg_buf.time_valid = 60 * 10
-        msg_buf.amount = amount  # amount of coin_from
+        msg_buf.amount = int(amount)  # amount of coin_from
 
         coin_from = Coins(offer.coin_from)
         coin_to = Coins(offer.coin_to)
@@ -1089,7 +1099,7 @@ class BasicSwap():
         try:
             session = scoped_session(self.session_factory)
             bid = session.query(Bid).filter_by(bid_id=bid_id).first()
-            return bid, session.query(Offer).filter_by(offer_id=bid.offer_id).first()
+            return bid, session.query(Offer).filter_by(offer_id=bid.offer_id).first() if bid is not None else None
         finally:
             session.close()
             session.remove()
@@ -1233,6 +1243,11 @@ class BasicSwap():
     def getScriptAddress(self, coin_type, script):
         return pubkeyToAddress(chainparams[coin_type][self.chain]['script_address'], script)
 
+    def setBidError(self, bif_id, bid, error_str):
+        bid.setState(BidStates.BID_ERROR)
+        bid.state_note = 'error msg: ' + error_str
+        self.saveBid(bif_id, bid)
+
     def createInitiateTxn(self, coin_type, bid_id, bid):
         if self.coin_clients[coin_type]['connection_type'] != 'rpc':
             return None
@@ -1355,7 +1370,7 @@ class BasicSwap():
         prevout_s = ' in={}:{}'.format(prev_txnid, prev_n)
 
         if fee_rate is None:
-            fee_rate = self.getFeeRateForCoin(coin_type)
+            fee_rate = self.getRelayFeeRateForCoin(coin_type)
 
         tx_vsize = self.getContractSpendTxVSize(coin_type)
         tx_fee = (fee_rate * tx_vsize) / 1000
@@ -1418,7 +1433,7 @@ class BasicSwap():
 
         return redeem_txn
 
-    def createRefundTxn(self, coin_type, txn, bid, txn_script, addr_refund_out=None, fee_rate=None, tx_type=TxTypes.ITX_REFUND):
+    def createRefundTxn(self, coin_type, txn, bid, txn_script, addr_refund_out=None, tx_type=TxTypes.ITX_REFUND):
         self.log.debug('createRefundTxn')
         if self.coin_clients[coin_type]['connection_type'] != 'rpc':
             return None
@@ -1447,8 +1462,7 @@ class BasicSwap():
         sequence = DeserialiseNum(txn_script, 64)
         prevout_s = ' in={}:{}:{}'.format(txjs['txid'], vout, sequence)
 
-        if fee_rate is None:
-            fee_rate = self.getFeeRateForCoin(coin_type)
+        fee_rate = self.getFeeRateForCoin(coin_type)
 
         tx_vsize = self.getContractSpendTxVSize(coin_type, False)
         tx_fee = (fee_rate * tx_vsize) / 1000
@@ -2170,8 +2184,14 @@ class BasicSwap():
             if now - self.last_checked_progress > self.check_progress_seconds:
                 to_remove = []
                 for bid_id, v in self.swaps_in_progress.items():
-                    if self.checkBidState(bid_id, v[0], v[1]) is True:
-                        to_remove.append(bid_id)
+                    try:
+                        if self.checkBidState(bid_id, v[0], v[1]) is True:
+                            to_remove.append(bid_id)
+                    except Exception as ex:
+                        self.log.error('checkBidState %s %s', bid_id.hex(), str(ex))
+                        traceback.print_exc()
+                        self.setBidError(bid_id, v[0], str(ex))
+
                 for bid_id in to_remove:
                     self.log.debug('Removing bid from in-progress: %s', bid_id.hex())
                     del self.swaps_in_progress[bid_id]
@@ -2287,10 +2307,10 @@ class BasicSwap():
             if offer_id is not None:
                 q = session.query(Bid).filter(Bid.offer_id == offer_id)
             elif sent:
-                q = session.query(Bid).filter(Bid.was_sent == True)
+                q = session.query(Bid).filter(Bid.was_sent == True)  # noqa E712
             else:
-                q = session.query(Bid).filter(Bid.was_received == True)
-            q = q.order_by(Bid.created_at.desc())  # noqa E712
+                q = session.query(Bid).filter(Bid.was_received == True)  # noqa E712
+            q = q.order_by(Bid.created_at.desc())
             for row in q:
                 rv.append(row)
             return rv

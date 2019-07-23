@@ -280,7 +280,8 @@ def main():
                 'rpcport': 19792 + port_offset,
                 'datadir': os.path.join(data_dir, 'particl'),
                 'bindir': os.path.join(data_dir, 'bins', 'particl'),
-                'blocks_confirmed': 2
+                'blocks_confirmed': 2,
+                'override_feerate': 0.002,
             },
             'litecoin': {
                 'connection_type': 'rpc' if 'litecoin' in with_coins else 'none',
