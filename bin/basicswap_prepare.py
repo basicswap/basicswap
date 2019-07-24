@@ -32,6 +32,13 @@ from bin.basicswap_run import startDaemon
 
 BIN_ARCH = 'x86_64-linux-gnu.tar.gz'
 
+known_coins = {
+    'particl': '0.18.1.0',
+    'litecoin': '0.17.1',
+    'bitcoin': '0.18.0',
+    'namecoin': '0.18.0',
+}
+
 logger = logging.getLogger()
 logger.level = logging.DEBUG
 if not len(logger.handlers):
@@ -87,24 +94,26 @@ def prepareCore(coin, version, settings, data_dir):
         release_url = 'https://github.com/particl/particl-core/releases/download/v{}/{}'.format(version, release_filename)
         assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, version)
         assert_url = 'https://raw.githubusercontent.com/particl/gitian.sigs/master/%s-%s/%s/%s' % (version, os_name, signing_key_name, assert_filename)
-        assert_sig_filename = assert_filename + '.sig'
-        assert_sig_url = assert_url + '.sig'
     elif coin == 'litecoin':
         signing_key_name = 'thrasher'
         release_url = 'https://download.litecoin.org/litecoin-{}/{}/{}'.format(version, os_name, release_filename)
         assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, version.rsplit('.', 1)[0])
         assert_url = 'https://raw.githubusercontent.com/litecoin-project/gitian.sigs.ltc/master/%s-%s/%s/%s' % (version, os_name, signing_key_name, assert_filename)
-        assert_sig_filename = assert_filename + '.sig'
-        assert_sig_url = assert_url + '.sig'
     elif coin == 'bitcoin':
         signing_key_name = 'laanwj'
         release_url = 'https://bitcoincore.org/bin/bitcoin-core-{}/{}'.format(version, release_filename)
         assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, version.rsplit('.', 1)[0])
         assert_url = 'https://raw.githubusercontent.com/bitcoin-core/gitian.sigs/master/%s-%s/%s/%s' % (version, os_name, signing_key_name, assert_filename)
-        assert_sig_filename = assert_filename + '.sig'
-        assert_sig_url = assert_url + '.sig'
+    elif coin == 'namecoin':
+        signing_key_name = 'JeremyRand'
+        release_url = 'https://beta.namecoin.org/files/namecoin-core/namecoin-core-{}/{}'.format(version, release_filename)
+        assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, version.rsplit('.', 1)[0])
+        assert_url = 'https://raw.githubusercontent.com/namecoin/gitian.sigs/master/%s-%s/%s/%s' % (version, os_name, signing_key_name, assert_filename)
     else:
         raise ValueError('Unknown coin')
+
+    assert_sig_filename = assert_filename + '.sig'
+    assert_sig_url = assert_url + '.sig'
 
     release_path = os.path.join(bin_dir, release_filename)
     if not os.path.exists(release_path):
@@ -155,6 +164,44 @@ def prepareCore(coin, version, settings, data_dir):
             os.chmod(out_path, stat.S_IRWXU)
 
 
+def prepareDataDir(coin, settings, data_dir, chain):
+    core_settings = settings['chainclients'][coin]
+    data_dir = core_settings['datadir']
+
+    if not os.path.exists(data_dir):
+        os.makedirs(data_dir)
+
+    core_conf_path = os.path.join(data_dir, coin + '.conf')
+    if os.path.exists(core_conf_path):
+        exitWithError('{} exists'.format(core_conf_path))
+
+    with open(core_conf_path, 'w') as fp:
+        if chain != 'mainnet':
+            fp.write(chain + '=1\n')
+            if chain == 'testnet':
+                fp.write('[test]\n\n')
+            else:
+                logger.warning('Unknown chain %s', chain)
+
+        fp.write('rpcport={}\n'.format(core_settings['rpcport']))
+        fp.write('printtoconsole=0\n')
+        fp.write('daemon=0\n')
+
+        if coin == 'particl':
+            fp.write('debugexclude=libevent\n')
+            fp.write('zmqpubsmsg=tcp://127.0.0.1:{}\n'.format(settings['zmqport']))
+            fp.write('spentindex=1')
+            fp.write('txindex=1')
+        elif coin == 'litecoin':
+            fp.write('prune=1000\n')
+        elif coin == 'bitcoin':
+            fp.write('prune=1000\n')
+        elif coin == 'namecoin':
+            fp.write('prune=1000\n')
+        else:
+            logger.warning('Unknown coin %s', coin)
+
+
 def extractCore(coin, version, settings):
     logger.info('extractCore %s v%s', coin, version)
 
@@ -175,6 +222,8 @@ def printHelp():
     logger.info('--particl_mnemonic=      Recovery phrase to use for the Particl wallet, default is randomly generated.')
     logger.info('--withcoin=              Prepare system to run daemon for coin.')
     logger.info('--withoutcoin=           Do not prepare system to run daemon for coin.')
+    logger.info('--addcoin=               Add coin to existing setup.')
+    logger.info('\n' + 'Known coins: %s', ', '.join(known_coins.keys()))
 
 
 def make_rpc_func(bin_dir, data_dir, chain):
@@ -201,17 +250,21 @@ def waitForRPC(rpc_func, wallet=None):
     raise ValueError('waitForRPC failed')
 
 
+def exitWithError(error_msg):
+    sys.stderr.write('Error: {}, exiting.\n'.format(error_msg))
+    exit(1)
+
+
 def main():
     data_dir = None
     chain = 'mainnet'
     particl_wallet_mnemonic = None
-    known_coins = {'particl', 'litecoin', 'bitcoin'}
     with_coins = {'particl', 'litecoin'}
+    add_coin = ''
 
     for v in sys.argv[1:]:
         if len(v) < 2 or v[0] != '-':
-            logger.warning('Unknown argument %s', v)
-            continue
+            exitWithError('Unknown argument {}'.format(v))
 
         s = v.split('=')
         name = s[0].strip()
@@ -243,28 +296,97 @@ def main():
                 particl_wallet_mnemonic = s[1]
                 continue
             if name == 'withcoin':
+                if s[1] not in known_coins:
+                    exitWithError('Unknown coin {}'.format(s[1]))
                 with_coins.add(s[1])
+                continue
             if name == 'withoutcoin':
+                if s[1] not in known_coins:
+                    exitWithError('Unknown coin {}'.format(s[1]))
                 with_coins.discard(s[1])
+                continue
+            if name == 'addcoin':
+                if s[1] not in known_coins:
+                    exitWithError('Unknown coin {}'.format(s[1]))
+                add_coin = s[1]
+                continue
 
-        logger.warning('Unknown argument %s', v)
+        exitWithError('Unknown argument {}'.format(v))
 
     if data_dir is None:
         default_datadir = '~/.basicswap'
         data_dir = os.path.join(os.path.expanduser(default_datadir))
     logger.info('Using datadir: %s', data_dir)
     logger.info('Chain: %s', chain)
-    logger.info('With coins: %s', ', '.join(with_coins))
+    port_offset = 300 if chain == 'testnet' else 0
 
     if not os.path.exists(data_dir):
         os.makedirs(data_dir)
-
     config_path = os.path.join(data_dir, 'basicswap.json')
-    if os.path.exists(config_path):
-        sys.stderr.write('Error: {} exists, exiting.\n'.format(config_path))
-        exit(1)
 
-    port_offset = 300 if chain == 'testnet' else 0
+    chainclients = {
+        'particl': {
+            'connection_type': 'rpc',
+            'manage_daemon': True,
+            'rpcport': 19792 + port_offset,
+            'datadir': os.path.join(data_dir, 'particl'),
+            'bindir': os.path.join(data_dir, 'bins', 'particl'),
+            'blocks_confirmed': 2,
+            'override_feerate': 0.002,
+        },
+        'litecoin': {
+            'connection_type': 'rpc' if 'litecoin' in with_coins else 'none',
+            'manage_daemon': True if 'litecoin' in with_coins else False,
+            'rpcport': 19795 + port_offset,
+            'datadir': os.path.join(data_dir, 'litecoin'),
+            'bindir': os.path.join(data_dir, 'bins', 'litecoin'),
+            'use_segwit': True,
+            'blocks_confirmed': 2
+        },
+        'bitcoin': {
+            'connection_type': 'rpc' if 'bitcoin' in with_coins else 'none',
+            'manage_daemon': True if 'bitcoin' in with_coins else False,
+            'rpcport': 19796 + port_offset,
+            'datadir': os.path.join(data_dir, 'bitcoin'),
+            'bindir': os.path.join(data_dir, 'bins', 'bitcoin'),
+            'use_segwit': True
+        },
+        'namecoin': {
+            'connection_type': 'rpc' if 'namecoin' in with_coins else 'none',
+            'manage_daemon': True if 'namecoin' in with_coins else False,
+            'rpcport': 19798 + port_offset,
+            'datadir': os.path.join(data_dir, 'namecoin'),
+            'bindir': os.path.join(data_dir, 'bins', 'namecoin'),
+            'use_segwit': False,
+            'blocks_confirmed': 1
+        }
+    }
+
+    if add_coin != '':
+        logger.info('Adding coin: %s', add_coin)
+        if not os.path.exists(config_path):
+            exitWithError('{} does not exist'.format(config_path))
+        with open(config_path) as fs:
+            settings = json.load(fs)
+
+        if add_coin in settings['chainclients']:
+            exitWithError('{} is already in the settings file'.format(add_coin))
+
+        settings['chainclients'][add_coin] = chainclients[add_coin]
+
+        prepareCore(add_coin, known_coins[add_coin], settings, data_dir)
+        prepareDataDir(add_coin, settings, data_dir, chain)
+
+        with open(config_path, 'w') as fp:
+            json.dump(settings, fp, indent=4)
+
+        logger.info('Done.')
+        return 0
+
+    logger.info('With coins: %s', ', '.join(with_coins))
+    if os.path.exists(config_path):
+        exitWithError('{} exists'.format(config_path))
+
     settings = {
         'debug': True,
         'zmqhost': 'tcp://127.0.0.1',
@@ -273,87 +395,21 @@ def main():
         'htmlport': 12700 + port_offset,
         'network_key': '7sW2UEcHXvuqEjkpE5mD584zRaQYs6WXYohue4jLFZPTvMSxwvgs',
         'network_pubkey': '035758c4a22d7dd59165db02a56156e790224361eb3191f02197addcb3bde903d2',
-        'chainclients': {
-            'particl': {
-                'connection_type': 'rpc',
-                'manage_daemon': True,
-                'rpcport': 19792 + port_offset,
-                'datadir': os.path.join(data_dir, 'particl'),
-                'bindir': os.path.join(data_dir, 'bins', 'particl'),
-                'blocks_confirmed': 2,
-                'override_feerate': 0.002,
-            },
-            'litecoin': {
-                'connection_type': 'rpc' if 'litecoin' in with_coins else 'none',
-                'manage_daemon': True if 'litecoin' in with_coins else False,
-                'rpcport': 19795 + port_offset,
-                'datadir': os.path.join(data_dir, 'litecoin'),
-                'bindir': os.path.join(data_dir, 'bins', 'litecoin'),
-                'use_segwit': True,
-                'blocks_confirmed': 2
-            },
-            'bitcoin': {
-                'connection_type': 'rpc' if 'bitcoin' in with_coins else 'none',
-                'manage_daemon': True if 'bitcoin' in with_coins else False,
-                'rpcport': 19796 + port_offset,
-                'datadir': os.path.join(data_dir, 'bitcoin'),
-                'bindir': os.path.join(data_dir, 'bins', 'bitcoin'),
-                'use_segwit': True
-            }
-        },
+        'chainclients': chainclients,
         'check_progress_seconds': 60,
         'check_watched_seconds': 60,
         'check_expired_seconds': 60
     }
 
+    for c, v in known_coins.items():
+        if c not in with_coins:
+            continue
+        coin = c
+        prepareCore(coin, v, settings, data_dir)
+        prepareDataDir(coin, settings, data_dir, chain)
+
     with open(config_path, 'w') as fp:
         json.dump(settings, fp, indent=4)
-
-    cores = [
-        ('particl', '0.18.1.0'),
-        ('litecoin', '0.17.1'),
-        ('bitcoin', '0.18.0'),
-    ]
-    for c in cores:
-        if c[0] not in with_coins:
-            continue
-        prepareCore(c[0], c[1], settings, data_dir)
-        coin = c[0]
-
-        core_settings = settings['chainclients'][coin]
-        data_dir = core_settings['datadir']
-
-        if not os.path.exists(data_dir):
-            os.makedirs(data_dir)
-
-        core_conf_path = os.path.join(data_dir, coin + '.conf')
-        if os.path.exists(core_conf_path):
-            sys.stderr.write('Error: %s exists, exiting.\n' % (core_conf_path))
-            exit(1)
-
-        with open(core_conf_path, 'w') as fp:
-            if chain != 'mainnet':
-                fp.write(chain + '=1\n')
-                if chain == 'testnet':
-                    fp.write('[test]\n\n')
-                else:
-                    logger.warning('Unknown chain %s', chain)
-
-            fp.write('rpcport={}\n'.format(core_settings['rpcport']))
-            fp.write('printtoconsole=0\n')
-            fp.write('daemon=0\n')
-
-            if coin == 'particl':
-                fp.write('debugexclude=libevent\n')
-                fp.write('zmqpubsmsg=tcp://127.0.0.1:{}\n'.format(settings['zmqport']))
-                fp.write('spentindex=1')
-                fp.write('txindex=1')
-            elif coin == 'litecoin':
-                fp.write('prune=1000\n')
-            elif coin == 'bitcoin':
-                fp.write('prune=1000\n')
-            else:
-                logger.warning('Unknown coin %s', coin)
 
     logger.info('Loading Particl mnemonic')
 
