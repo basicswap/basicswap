@@ -496,9 +496,8 @@ class BasicSwap():
 
         # Defaults
         self.coin_clients = {}
-        self.coin_clients[Coins.PART] = self.setDefaultConnectParams(Coins.PART)
-        self.coin_clients[Coins.BTC] = self.setDefaultConnectParams(Coins.BTC)
-        self.coin_clients[Coins.LTC] = self.setDefaultConnectParams(Coins.LTC)
+        for c in Coins:
+            self.coin_clients[c] = self.setDefaultConnectParams(c)
 
         if self.chain == 'regtest':
             SMSG_SECONDS_IN_DAY = 600
@@ -557,9 +556,10 @@ class BasicSwap():
             elif 'rpcpassword' in chain_client_settings:
                 rpcauth = chain_client_settings['rpcuser'] + ':' + chain_client_settings['rpcpassword']
             if rpcauth is None:
-                testnet_name = '' if self.chain == 'mainnet' else self.chain
-                if testnet_name == 'testnet' and coin != Coins.PART:
-                    testnet_name += '4'
+                if self.chain == 'mainnet':
+                    testnet_name = ''
+                else:
+                    testnet_name = chainparams[coin][self.chain].get('name', self.chain)
                 authcookiepath = os.path.join(datadir, testnet_name, '.cookie')
                 # Wait for daemon to start
                 for i in range(10):
@@ -891,7 +891,7 @@ class BasicSwap():
         if override_feerate:
             return override_feerate
         try:
-            return self.callcoinrpc(coin_type, 'estimatesmartfee', [1])['feerate']
+            return self.callcoinrpc(coin_type, 'estimatesmartfee', [2])['feerate']
         except Exception:
             try:
                 fee_rate = self.callcoinrpc(coin_type, 'getwalletinfo')['paytxfee']

@@ -15,6 +15,7 @@ class Coins(IntEnum):
     BTC = 2
     LTC = 3
     # DCR = 4
+    NMC = 5
 
 
 chainparams = {
@@ -74,6 +75,7 @@ chainparams = {
             'bip44': 1,
             'min_amount': 1000,
             'max_amount': 100000 * COIN,
+            'name': 'testnet4',
         },
         'regtest': {
             'rpcport': 18443,
@@ -106,12 +108,46 @@ chainparams = {
             'bip44': 1,
             'min_amount': 1000,
             'max_amount': 100000 * COIN,
+            'name': 'testnet4',
         },
         'regtest': {
             'rpcport': 19443,
             'pubkey_address': 111,
             'script_address': 58,
             'hrp': 'rltc',
+            'bip44': 1,
+            'min_amount': 1000,
+            'max_amount': 100000 * COIN,
+        }
+    },
+    Coins.NMC: {
+        'name': 'namecoin',
+        'ticker': 'NMC',
+        'message_magic': 'Namecoin Signed Message:\n',
+        'mainnet': {
+            'rpcport': 8336,
+            'pubkey_address': 52,
+            'script_address': 13,
+            'hrp': 'nc',
+            'bip44': 7,
+            'min_amount': 1000,
+            'max_amount': 100000 * COIN,
+        },
+        'testnet': {
+            'rpcport': 18336,
+            'pubkey_address': 111,
+            'script_address': 196,
+            'hrp': 'tn',
+            'bip44': 1,
+            'min_amount': 1000,
+            'max_amount': 100000 * COIN,
+            'name': 'testnet3',
+        },
+        'regtest': {
+            'rpcport': 18443,
+            'pubkey_address': 111,
+            'script_address': 196,
+            'hrp': 'ncrt',
             'bip44': 1,
             'min_amount': 1000,
             'max_amount': 100000 * COIN,
