@@ -22,7 +22,6 @@ import signal
 import subprocess
 import logging
 
-import basicswap.config as cfg
 from basicswap import __version__
 from basicswap.basicswap import BasicSwap
 from basicswap.http_server import HttpThread
@@ -66,17 +65,10 @@ def runClient(fp, dataDir, chain):
     for c, v in settings['chainclients'].items():
         if v['manage_daemon'] is True:
             logger.info('Starting {} daemon'.format(c.capitalize()))
-            if c == 'particl':
-                daemons.append(startDaemon(v['datadir'], v['bindir'], cfg.PARTICLD))
-                logger.info('Started {} {}'.format(cfg.PARTICLD, daemons[-1].pid))
-            elif c == 'bitcoin':
-                daemons.append(startDaemon(v['datadir'], v['bindir'], cfg.BITCOIND))
-                logger.info('Started {} {}'.format(cfg.BITCOIND, daemons[-1].pid))
-            elif c == 'litecoin':
-                daemons.append(startDaemon(v['datadir'], v['bindir'], cfg.LITECOIND))
-                logger.info('Started {} {}'.format(cfg.LITECOIND, daemons[-1].pid))
-            else:
-                logger.warning('Unknown chain', c)
+
+            filename = c + 'd' + ('.exe' if os.name == 'nt' else '')
+            daemons.append(startDaemon(v['datadir'], v['bindir'], filename))
+            logger.info('Started {} {}'.format(filename, daemons[-1].pid))
 
     swap_client = BasicSwap(fp, dataDir, settings, chain)
 

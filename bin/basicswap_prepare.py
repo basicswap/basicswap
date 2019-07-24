@@ -23,6 +23,7 @@ import time
 from urllib.request import urlretrieve
 import urllib.parse
 import logging
+import platform
 
 import gnupg
 
@@ -30,7 +31,10 @@ import basicswap.config as cfg
 from basicswap.util import callrpc_cli
 from bin.basicswap_run import startDaemon
 
-BIN_ARCH = 'x86_64-linux-gnu.tar.gz'
+if platform.system() == 'Darwin':
+    BIN_ARCH = 'osx64.tar.gz'
+else:
+    BIN_ARCH = 'x86_64-linux-gnu.tar.gz'
 
 known_coins = {
     'particl': '0.18.1.0',
@@ -358,6 +362,7 @@ def main():
             'datadir': os.path.join(data_dir, 'namecoin'),
             'bindir': os.path.join(data_dir, 'bins', 'namecoin'),
             'use_segwit': False,
+            'use_csv': False,
             'blocks_confirmed': 1
         }
     }

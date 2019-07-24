@@ -126,6 +126,9 @@ class TxTypes(IntEnum):  # For PooledAddress
 
 SEQUENCE_LOCK_BLOCKS = 1
 SEQUENCE_LOCK_TIME = 2
+ABS_LOCK_BLOCKS = 3
+ABS_LOCK_TIME = 4
+
 SEQUENCE_LOCKTIME_GRANULARITY = 9  # 512 seconds
 SEQUENCE_LOCKTIME_TYPE_FLAG = (1 << 22)
 SEQUENCE_LOCKTIME_MASK = 0x0000ffff
@@ -183,6 +186,10 @@ def getLockName(lock_type):
         return 'Sequence lock, blocks'
     if lock_type == SEQUENCE_LOCK_TIME:
         return 'Sequence lock, time'
+    if lock_type == ABS_LOCK_BLOCKS:
+        return 'blocks'
+    if lock_type == ABS_LOCK_TIME:
+        return 'time'
 
 
 def getExpectedSequence(lockType, lockVal, coin_type):
@@ -206,7 +213,7 @@ def decodeSequence(lock_value):
     return lock_value & SEQUENCE_LOCKTIME_MASK
 
 
-def buildContractScriptCSV(sequence, secret_hash, pkh_redeem, pkh_refund):
+def buildContractScript(lock_val, secret_hash, pkh_redeem, pkh_refund, op_lock=OpCodes.OP_CHECKSEQUENCEVERIFY):
     script = bytearray([
         OpCodes.OP_IF,
         OpCodes.OP_SIZE,
@@ -222,9 +229,9 @@ def buildContractScriptCSV(sequence, secret_hash, pkh_redeem, pkh_refund):
             0x14]) \
         + pkh_redeem \
         + bytearray([OpCodes.OP_ELSE, ]) \
-        + SerialiseNum(sequence) \
+        + SerialiseNum(lock_val) \
         + bytearray([
-            OpCodes.OP_CHECKSEQUENCEVERIFY,
+            op_lock,
             OpCodes.OP_DROP,
             OpCodes.OP_DUP,
             OpCodes.OP_HASH160,
@@ -590,6 +597,7 @@ class BasicSwap():
             'watched_outputs': [],
             'last_height_checked': last_height_checked,
             'use_segwit': use_segwit,
+            'use_csv': chain_client_settings.get('use_csv', True),
         }
 
     def start(self):
@@ -710,8 +718,16 @@ class BasicSwap():
     def validateOfferLockValue(self, coin_from, coin_to, lock_type, lock_value):
         if lock_type == OfferMessage.SEQUENCE_LOCK_TIME:
             assert(lock_value >= 2 * 60 * 60 and lock_value <= 96 * 60 * 60), 'Invalid lock_value time'
+            assert(self.coin_clients[coin_from]['use_csv'] and self.coin_clients[coin_to]['use_csv']), 'Both coins need CSV activated.'
         elif lock_type == OfferMessage.SEQUENCE_LOCK_BLOCKS:
             assert(lock_value >= 5 and lock_value <= 1000), 'Invalid lock_value blocks'
+            assert(self.coin_clients[coin_from]['use_csv'] and self.coin_clients[coin_to]['use_csv']), 'Both coins need CSV activated.'
+        elif lock_type == ABS_LOCK_TIME:
+            # TODO: range?
+            assert(lock_value >= 4 * 60 * 60 and lock_value <= 96 * 60 * 60), 'Invalid lock_value time'
+        elif lock_type == ABS_LOCK_BLOCKS:
+            # TODO: range?
+            assert(lock_value >= 10 and lock_value <= 1000), 'Invalid lock_value blocks'
         else:
             raise ValueError('Unknown locktype')
 
@@ -872,7 +888,7 @@ class BasicSwap():
     def getReceiveAddressForCoin(self, coin_type):
         if coin_type == Coins.PART:
             new_addr = self.callcoinrpc(Coins.PART, 'getnewaddress')
-        elif coin_type == Coins.LTC or coin_type == Coins.BTC:
+        elif coin_type == Coins.LTC or coin_type == Coins.BTC or coin_type == Coins.NMC:
             args = []
             if self.coin_clients[coin_type]['use_segwit']:
                 args = ['swap_receive', 'bech32']
@@ -1123,15 +1139,22 @@ class BasicSwap():
         coin_from = Coins(offer.coin_from)
         bid_date = dt.datetime.fromtimestamp(bid.created_at).date()
 
-        # TODO: Use CLTV for coins without CSV
-        sequence = getExpectedSequence(offer.lock_type, offer.lock_value, coin_from)
         secret = self.getContractSecret(bid_date, bid.contract_count)
         secret_hash = hashlib.sha256(secret).digest()
 
         pubkey_refund = self.getContractPubkey(bid_date, bid.contract_count)
         pkhash_refund = getKeyID(pubkey_refund)
 
-        script = buildContractScriptCSV(sequence, secret_hash, bid.pkhash_buyer, pkhash_refund)
+        if offer.lock_type < ABS_LOCK_BLOCKS:
+            sequence = getExpectedSequence(offer.lock_type, offer.lock_value, coin_from)
+            script = buildContractScript(sequence, secret_hash, bid.pkhash_buyer, pkhash_refund)
+        else:
+            if offer.lock_type == ABS_LOCK_BLOCKS:
+                lock_value = self.callcoinrpc(coin_from, 'getblockchaininfo')['blocks'] + offer.lock_value
+            else:
+                lock_value = int(time.time()) + offer.lock_value
+            logging.debug('initiate %s lock_value %d %d', coin_from, offer.lock_value, lock_value)
+            script = buildContractScript(lock_value, secret_hash, bid.pkhash_buyer, pkhash_refund, OpCodes.OP_CHECKLOCKTIMEVERIFY)
 
         p2sh = self.callcoinrpc(Coins.PART, 'decodescript', [script.hex()])['p2sh']
 
@@ -1141,7 +1164,7 @@ class BasicSwap():
         txn = self.createInitiateTxn(coin_from, bid_id, bid)
 
         # Store the signed refund txn in case wallet is locked when refund is possible
-        refund_txn = self.createRefundTxn(coin_from, txn, bid, script)
+        refund_txn = self.createRefundTxn(coin_from, txn, offer, bid, script)
         bid.initiate_txn_refund = bytes.fromhex(refund_txn)
 
         txid = self.submitTxn(coin_from, txn)
@@ -1153,7 +1176,7 @@ class BasicSwap():
             txid = self.submitTxn(coin_from, bid.initiate_txn_refund.hex())
             self.log.error('Submit refund_txn unexpectedly worked: ' + txid)
         except Exception as e:
-            if 'non-BIP68-final' not in str(e):
+            if 'non-BIP68-final' not in str(e) and 'non-final' not in str(e):
                 self.log.error('Submit refund_txn unexpected error' + str(e))
 
         if txid is not None:
@@ -1269,14 +1292,22 @@ class BasicSwap():
 
         bid_date = dt.datetime.fromtimestamp(bid.created_at).date()
 
-        # Participate txn is locked for half the time of the initiate txn
-        lock_value = decodeSequence(offer.lock_value) // 2
-        sequence = getExpectedSequence(offer.lock_type, lock_value, coin_to)
-
         secret_hash = extractScriptSecretHash(bid.initiate_script)
         pkhash_seller = bid.pkhash_seller
         pkhash_buyer_refund = bid.pkhash_buyer
-        bid.participate_script = buildContractScriptCSV(sequence, secret_hash, pkhash_seller, pkhash_buyer_refund)
+
+        # Participate txn is locked for half the time of the initiate txn
+        lock_value = offer.lock_value // 2
+        if offer.lock_type < ABS_LOCK_BLOCKS:
+            sequence = getExpectedSequence(offer.lock_type, lock_value, coin_to)
+            bid.participate_script = buildContractScript(sequence, secret_hash, pkhash_seller, pkhash_buyer_refund)
+        else:
+            if offer.lock_type == ABS_LOCK_BLOCKS:
+                contract_lock_value = self.callcoinrpc(coin_to, 'getblockchaininfo')['blocks'] + lock_value
+            else:
+                contract_lock_value = int(time.time()) + lock_value
+            logging.debug('participate %s lock_value %d %d', coin_to, lock_value, contract_lock_value)
+            bid.participate_script = buildContractScript(contract_lock_value, secret_hash, pkhash_seller, pkhash_buyer_refund, OpCodes.OP_CHECKLOCKTIMEVERIFY)
 
     def createParticipateTxn(self, bid_id, bid, offer):
         self.log.debug('createParticipateTxn')
@@ -1302,7 +1333,7 @@ class BasicSwap():
 
         txn_signed = self.callcoinrpc(coin_to, 'signrawtransactionwithwallet', [txn_funded])['hex']
 
-        refund_txn = self.createRefundTxn(coin_to, txn_signed, bid, bid.participate_script, tx_type=TxTypes.PTX_REFUND)
+        refund_txn = self.createRefundTxn(coin_to, txn_signed, offer, bid, bid.participate_script, tx_type=TxTypes.PTX_REFUND)
         bid.participate_txn_refund = bytes.fromhex(refund_txn)
 
         chain_height = self.callcoinrpc(coin_to, 'getblockchaininfo')['blocks']
@@ -1433,7 +1464,7 @@ class BasicSwap():
 
         return redeem_txn
 
-    def createRefundTxn(self, coin_type, txn, bid, txn_script, addr_refund_out=None, tx_type=TxTypes.ITX_REFUND):
+    def createRefundTxn(self, coin_type, txn, offer, bid, txn_script, addr_refund_out=None, tx_type=TxTypes.ITX_REFUND):
         self.log.debug('createRefundTxn')
         if self.coin_clients[coin_type]['connection_type'] != 'rpc':
             return None
@@ -1459,7 +1490,11 @@ class BasicSwap():
             'redeemScript': txn_script.hex(),
             'amount': prev_amount}
 
-        sequence = DeserialiseNum(txn_script, 64)
+        lock_value = DeserialiseNum(txn_script, 64)
+        if offer.lock_type < ABS_LOCK_BLOCKS:
+            sequence = lock_value
+        else:
+            sequence = 1
         prevout_s = ' in={}:{}:{}'.format(txjs['txid'], vout, sequence)
 
         fee_rate = self.getFeeRateForCoin(coin_type)
@@ -1487,6 +1522,9 @@ class BasicSwap():
             refund_txn = self.calltx('-create' + prevout_s + output_to)
         else:
             refund_txn = self.calltx('-btcmode -create nversion=2' + prevout_s + output_to)
+
+        if offer.lock_type == ABS_LOCK_BLOCKS or offer.lock_type == ABS_LOCK_TIME:
+            refund_txn = self.calltx('{} locktime={}'.format(refund_txn, lock_value))
 
         options = {}
         if self.coin_clients[coin_type]['use_segwit']:
@@ -1691,7 +1729,7 @@ class BasicSwap():
                     self.initiateTxnConfirmed(bid_id, bid, offer)
                     save_bid = True
 
-            # Bid times out if buyer doesn't see tx in chain within
+            # Bid times out if buyer doesn't see tx in chain within INITIATE_TX_TIMEOUT seconds
             if bid.state_time + INITIATE_TX_TIMEOUT < int(time.time()):
                 self.log.info('Swap timed out waiting for initiate tx for bid %s', bid_id.hex())
                 bid.setState(BidStates.SWAP_TIMEDOUT)
@@ -1757,7 +1795,7 @@ class BasicSwap():
                 self.log.debug('Submitted initiate refund txn %s to %s chain for bid %s', txid, chainparams[coin_from]['name'], bid_id.hex())
                 # State will update when spend is detected
             except Exception as e:
-                if 'non-BIP68-final (code 64)' not in str(e):
+                if 'non-BIP68-final (code 64)' not in str(e) and 'non-final' not in str(e):
                     self.log.warning('Error trying to submit initiate refund txn: %s', str(e))
         if (bid.participate_txn_state == TxStates.TX_SENT or bid.participate_txn_state == TxStates.TX_CONFIRMED) \
            and bid.participate_txn_refund is not None:
@@ -1766,7 +1804,7 @@ class BasicSwap():
                 self.log.debug('Submitted participate refund txn %s to %s chain for bid %s', txid, chainparams[coin_to]['name'], bid_id.hex())
                 # State will update when spend is detected
             except Exception as e:
-                if 'non-BIP68-final (code 64)' not in str(e):
+                if 'non-BIP68-final (code 64)' not in str(e) and 'non-final' not in str(e):
                     self.log.warning('Error trying to submit participate refund txn: %s', str(e))
         return False  # Bid is still active
 
@@ -2090,19 +2128,11 @@ class BasicSwap():
 
         self.log.debug('for bid %s', bid_accept_data.bid_msg_id.hex())
 
-        decoded_script = self.callcoinrpc(Coins.PART, 'decodescript', [bid_accept_data.contract_script.hex()])
-
-        # TODO: Verify script without decoding?
-        prog = re.compile('OP_IF OP_SIZE 32 OP_EQUALVERIFY OP_SHA256 (\w+) OP_EQUALVERIFY OP_DUP OP_HASH160 (\w+) OP_ELSE (\d+) OP_CHECKSEQUENCEVERIFY OP_DROP OP_DUP OP_HASH160 (\w+) OP_ENDIF OP_EQUALVERIFY OP_CHECKSIG')
-        rr = prog.match(decoded_script['asm'])
-        if not rr:
-            raise ValueError('Bad script')
-        scriptvalues = rr.groups()
-
         bid_id = bid_accept_data.bid_msg_id
         bid, offer = self.getBidAndOffer(bid_id)
         assert(bid is not None and bid.was_sent is True), 'Unknown bidid'
         assert(offer), 'Offer not found ' + bid.offer_id.hex()
+        coin_from = Coins(offer.coin_from)
 
         # assert(bid.expire_at > now), 'Bid expired'  # How much time over to accept
 
@@ -2112,12 +2142,26 @@ class BasicSwap():
                 return
             raise ValueError('Wrong bid state: {}'.format(str(BidStates(bid.state))))
 
-        coin_from = Coins(offer.coin_from)
-        expect_sequence = getExpectedSequence(offer.lock_type, offer.lock_value, coin_from)
+        use_csv = True if offer.lock_type < ABS_LOCK_BLOCKS else False
+
+        # TODO: Verify script without decoding?
+        decoded_script = self.callcoinrpc(Coins.PART, 'decodescript', [bid_accept_data.contract_script.hex()])
+        lock_check_op = 'OP_CHECKSEQUENCEVERIFY' if use_csv else 'OP_CHECKLOCKTIMEVERIFY'
+        prog = re.compile('OP_IF OP_SIZE 32 OP_EQUALVERIFY OP_SHA256 (\w+) OP_EQUALVERIFY OP_DUP OP_HASH160 (\w+) OP_ELSE (\d+) {} OP_DROP OP_DUP OP_HASH160 (\w+) OP_ENDIF OP_EQUALVERIFY OP_CHECKSIG'.format(lock_check_op))
+        rr = prog.match(decoded_script['asm'])
+        if not rr:
+            raise ValueError('Bad script')
+        scriptvalues = rr.groups()
 
         assert(len(scriptvalues[0]) == 64), 'Bad secret_hash length'
         assert(bytes.fromhex(scriptvalues[1]) == bid.pkhash_buyer), 'pkhash_buyer mismatch'
-        assert(int(scriptvalues[2]) == expect_sequence), 'sequence mismatch'
+
+        if use_csv:
+            expect_sequence = getExpectedSequence(offer.lock_type, offer.lock_value, coin_from)
+            assert(int(scriptvalues[2]) == expect_sequence), 'sequence mismatch'
+        else:
+            self.log.warning('TODO: validate absolute lock values')
+
         assert(len(scriptvalues[3]) == 40), 'pkhash_refund bad length'
 
         assert(bid.accept_msg_id is None), 'Bid already accepted'

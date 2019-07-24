@@ -14,6 +14,8 @@ message OfferMessage {
         NOT_SET = 0;
         SEQUENCE_LOCK_BLOCKS = 1;
         SEQUENCE_LOCK_TIME = 2;
+        ABS_LOCK_BLOCKS = 3;
+        ABS_LOCK_TIME = 4;
     }
     LockType lock_type = 7;
     uint32 lock_value = 8;
