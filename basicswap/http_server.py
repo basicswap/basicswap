@@ -139,12 +139,16 @@ class HttpHandler(BaseHTTPRequestHandler):
             if 'error' in w:
                 content += '<p>Error: {}</p>'.format(w['error'])
 
+            fee_rate = swap_client.getFeeRateForCoin(k)
+            tx_vsize = swap_client.getContractSpendTxVSize(k)
+            est_fee = (fee_rate * tx_vsize) / 1000
             content += '<table>' \
                 + '<tr><td>Balance:</td><td>' + w['balance'] + '</td></tr>' \
                 + '<tr><td>Blocks:</td><td>' + str(w['blocks']) + '</td></tr>' \
                 + '<tr><td>Synced:</td><td>' + str(w['synced']) + '</td></tr>' \
                 + '<tr><td><input type="submit" name="newaddr_' + cid + '" value="Deposit Address"></td><td>' + str(w['deposit_address']) + '</td></tr>' \
                 + '<tr><td><input type="submit" name="withdraw_' + cid + '" value="Withdraw"></td><td>Amount: <input type="text" name="amt_' + cid + '"></td><td>Address: <input type="text" name="to_' + cid + '"></td><td>Subtract fee: <input type="checkbox" name="subfee_' + cid + '"></td></tr>' \
+                + '<tr><td>Fee Rate:</td><td>' + format8(fee_rate * COIN) + '</td><td>Est Fee:</td><td>' + format8(est_fee * COIN) + '</td></tr>' \
                 + '</table>'
 
         content += '<input type="hidden" name="formid" value="' + os.urandom(8).hex() + '"></form>'

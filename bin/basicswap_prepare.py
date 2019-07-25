@@ -373,7 +373,8 @@ def main():
             'rpcport': 19796 + port_offset,
             'datadir': os.path.join(data_dir, 'bitcoin'),
             'bindir': os.path.join(data_dir, 'bin', 'bitcoin'),
-            'use_segwit': True
+            'use_segwit': True,
+            'blocks_confirmed': 1
         },
         'namecoin': {
             'connection_type': 'rpc' if 'namecoin' in with_coins else 'none',
