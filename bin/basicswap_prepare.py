@@ -271,7 +271,7 @@ def waitForRPC(rpc_func, wallet=None):
 
 def exitWithError(error_msg):
     sys.stderr.write('Error: {}, exiting.\n'.format(error_msg))
-    exit(1)
+    sys.exit(1)
 
 
 def main():
@@ -332,6 +332,7 @@ def main():
                 if s[1] not in known_coins:
                     exitWithError('Unknown coin {}'.format(s[1]))
                 add_coin = s[1]
+                with_coins = [add_coin, ]
                 continue
 
         exitWithError('Unknown argument {}'.format(v))
@@ -399,10 +400,11 @@ def main():
         settings['chainclients'][add_coin] = chainclients[add_coin]
 
         prepareCore(add_coin, known_coins[add_coin], settings, data_dir)
-        prepareDataDir(add_coin, settings, data_dir, chain, particl_wallet_mnemonic)
 
-        with open(config_path, 'w') as fp:
-            json.dump(settings, fp, indent=4)
+        if not prepare_bin_only:
+            prepareDataDir(add_coin, settings, data_dir, chain, particl_wallet_mnemonic)
+            with open(config_path, 'w') as fp:
+                json.dump(settings, fp, indent=4)
 
         logger.info('Done.')
         return 0
@@ -425,20 +427,15 @@ def main():
         'check_expired_seconds': 60
     }
 
-    for c, v in known_coins.items():
-        if c not in with_coins:
-            continue
-        coin = c
-        prepareCore(coin, v, settings, data_dir)
+    for c in with_coins:
+        prepareCore(c, known_coins[c], settings, data_dir)
 
     if prepare_bin_only:
         logger.info('Done.')
         return 0
 
-    for c, v in known_coins.items():
-        if c not in with_coins:
-            continue
-        prepareDataDir(coin, settings, data_dir, chain, particl_wallet_mnemonic)
+    for c in with_coins:
+        prepareDataDir(c, settings, data_dir, chain, particl_wallet_mnemonic)
 
     with open(config_path, 'w') as fp:
         json.dump(settings, fp, indent=4)
