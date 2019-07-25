@@ -1,0 +1,16 @@
+{% include 'header.html' %}
+
+<h3>Active Swaps</h3>
+{% if refresh %}
+<p>Page Refresh: {{ refresh }} seconds</p>
+{% endif %}
+
+<table>
+<tr><th>Bid ID</th><th>Offer ID</th><th>Bid Status</th></tr>
+{% for s in active_swaps %}
+<tr><td><a href=/bid/{{ s[0] }}>{{ s[0] }}</a></td><td><a href=/offer/{{ s[1] }}>{{ s[1] }}</a></td><td>{{ s[2] }}</td></tr>
+{% endfor %}
+</table>
+
+<p><a href="/">home</a></p>
+</body></html>

@@ -91,20 +91,15 @@ class HttpHandler(BaseHTTPRequestHandler):
 
     def page_active(self, url_split, post_string):
         swap_client = self.server.swap_client
-
-        content = html_content_start(self.server.title, self.server.title) \
-            + '<h3>Active Swaps</h3>'
-
         active_swaps = swap_client.listSwapsInProgress()
 
-        content += '<table>'
-        content += '<tr><th>Bid ID</th><th>Offer ID</th><th>Bid Status</th></tr>'
-        for s in active_swaps:
-            content += '<tr><td><a href=/bid/{0}>{0}</a></td><td><a href=/offer/{1}>{1}</a></td><td>{2}</td></tr>'.format(s[0].hex(), s[1], getBidState(s[2]))
-        content += '</table>'
-
-        content += '<p><a href="/">home</a></p></body></html>'
-        return bytes(content, 'UTF-8')
+        template = env.get_template('active.html')
+        return bytes(template.render(
+            title=self.server.title,
+            refresh=30,
+            h2=self.server.title,
+            active_swaps=[(s[0].hex(), s[1], getBidState(s[2])) for s in active_swaps],
+        ), 'UTF-8')
 
     def page_wallets(self, url_split, post_string):
         swap_client = self.server.swap_client
@@ -469,19 +464,14 @@ class HttpHandler(BaseHTTPRequestHandler):
     def page_watched(self, url_split, post_string):
         swap_client = self.server.swap_client
         watched_outputs, last_scanned = swap_client.listWatchedOutputs()
-        ls_formatted = []
-        for ls in last_scanned:
-            ls_formatted.append((getCoinName(ls[0]), ls[1]))
-        wo_formatted = []
-        for wo in watched_outputs:
-            wo_formatted.append((wo[1].hex(), getCoinName(wo[0]), wo[2], wo[3], int(wo[4])))
+
         template = env.get_template('watched.html')
         return bytes(template.render(
             title=self.server.title,
             refresh=30,
             h2=self.server.title,
-            last_scanned=last_scanned,
-            watched_outputs=wo_formatted,
+            last_scanned=[(getCoinName(ls[0]), ls[1]) for ls in last_scanned],
+            watched_outputs=[(wo[1].hex(), getCoinName(wo[0]), wo[2], wo[3], int(wo[4])) for wo in watched_outputs],
         ), 'UTF-8')
 
     def page_index(self, url_split):
