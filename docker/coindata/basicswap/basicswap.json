@@ -11,7 +11,7 @@
             "manage_daemon": true,
             "rpcport": 19792,
             "datadir": "/coindata/particl",
-            "bindir": "/opt/particl",
+            "bindir": "/opt/bin/particl",
             "blocks_confirmed": 2
         },
         "litecoin": {
@@ -19,7 +19,7 @@
             "manage_daemon": true,
             "rpcport": 19795,
             "datadir": "/coindata/litecoin",
-            "bindir": "/opt/litecoin",
+            "bindir": "/opt/bin/litecoin",
             "use_segwit": true,
             "blocks_confirmed": 2
         },
@@ -28,7 +28,7 @@
             "manage_daemon": false,
             "rpcport": 19796,
             "datadir": "/coindata/bitcoin",
-            "bindir": "/opt/bitcoin",
+            "bindir": "/coindata/bin/bitcoin",
             "use_segwit": true
         }
     },

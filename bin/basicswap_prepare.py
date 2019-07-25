@@ -177,7 +177,7 @@ def prepareCore(coin, version, settings, data_dir):
             os.chmod(out_path, stat.S_IRWXU)
 
 
-def prepareDataDir(coin, settings, data_dir, chain):
+def prepareDataDir(coin, settings, data_dir, chain, particl_mnemonic):
     core_settings = settings['chainclients'][coin]
     data_dir = core_settings['datadir']
 
@@ -205,6 +205,9 @@ def prepareDataDir(coin, settings, data_dir, chain):
             fp.write('zmqpubsmsg=tcp://127.0.0.1:{}\n'.format(settings['zmqport']))
             fp.write('spentindex=1')
             fp.write('txindex=1')
+
+            if particl_mnemonic == 'none':
+                fp.write('createdefaultmasterkey=1')
         elif coin == 'litecoin':
             fp.write('prune=1000\n')
         elif coin == 'bitcoin':
@@ -232,7 +235,8 @@ def printHelp():
     logger.info('--mainnet                Run in mainnet mode.')
     logger.info('--testnet                Run in testnet mode.')
     logger.info('--regtest                Run in regtest mode.')
-    logger.info('--particl_mnemonic=      Recovery phrase to use for the Particl wallet, default is randomly generated.')
+    logger.info('--particl_mnemonic=      Recovery phrase to use for the Particl wallet, default is randomly generated,\n'
+                + '                         "none" to set autogenerate account mode.')
     logger.info('--withcoin=              Prepare system to run daemon for coin.')
     logger.info('--withoutcoin=           Do not prepare system to run daemon for coin.')
     logger.info('--addcoin=               Add coin to existing setup.')
@@ -343,7 +347,7 @@ def main():
             'manage_daemon': True,
             'rpcport': 19792 + port_offset,
             'datadir': os.path.join(data_dir, 'particl'),
-            'bindir': os.path.join(data_dir, 'bins', 'particl'),
+            'bindir': os.path.join(data_dir, 'bin', 'particl'),
             'blocks_confirmed': 2,
             'override_feerate': 0.002,
         },
@@ -352,7 +356,7 @@ def main():
             'manage_daemon': True if 'litecoin' in with_coins else False,
             'rpcport': 19795 + port_offset,
             'datadir': os.path.join(data_dir, 'litecoin'),
-            'bindir': os.path.join(data_dir, 'bins', 'litecoin'),
+            'bindir': os.path.join(data_dir, 'bin', 'litecoin'),
             'use_segwit': True,
             'blocks_confirmed': 2
         },
@@ -361,7 +365,7 @@ def main():
             'manage_daemon': True if 'bitcoin' in with_coins else False,
             'rpcport': 19796 + port_offset,
             'datadir': os.path.join(data_dir, 'bitcoin'),
-            'bindir': os.path.join(data_dir, 'bins', 'bitcoin'),
+            'bindir': os.path.join(data_dir, 'bin', 'bitcoin'),
             'use_segwit': True
         },
         'namecoin': {
@@ -369,7 +373,7 @@ def main():
             'manage_daemon': True if 'namecoin' in with_coins else False,
             'rpcport': 19798 + port_offset,
             'datadir': os.path.join(data_dir, 'namecoin'),
-            'bindir': os.path.join(data_dir, 'bins', 'namecoin'),
+            'bindir': os.path.join(data_dir, 'bin', 'namecoin'),
             'use_segwit': False,
             'use_csv': False,
             'blocks_confirmed': 1
@@ -389,7 +393,7 @@ def main():
         settings['chainclients'][add_coin] = chainclients[add_coin]
 
         prepareCore(add_coin, known_coins[add_coin], settings, data_dir)
-        prepareDataDir(add_coin, settings, data_dir, chain)
+        prepareDataDir(add_coin, settings, data_dir, chain, particl_wallet_mnemonic)
 
         with open(config_path, 'w') as fp:
             json.dump(settings, fp, indent=4)
@@ -420,10 +424,15 @@ def main():
             continue
         coin = c
         prepareCore(coin, v, settings, data_dir)
-        prepareDataDir(coin, settings, data_dir, chain)
+        prepareDataDir(coin, settings, data_dir, chain, particl_wallet_mnemonic)
 
     with open(config_path, 'w') as fp:
         json.dump(settings, fp, indent=4)
+
+
+    if particl_wallet_mnemonic == 'none':
+        logger.info('Done.')
+        return 0
 
     logger.info('Loading Particl mnemonic')
 
