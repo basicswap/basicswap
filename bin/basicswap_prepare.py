@@ -240,6 +240,7 @@ def printHelp():
     logger.info('--withcoin=              Prepare system to run daemon for coin.')
     logger.info('--withoutcoin=           Do not prepare system to run daemon for coin.')
     logger.info('--addcoin=               Add coin to existing setup.')
+    logger.info('--disablecoin=           Make coin inactive.')
     logger.info('--preparebinonly         Don\'t prepare settings or datadirs.')
 
     logger.info('\n' + 'Known coins: %s', ', '.join(known_coins.keys()))
@@ -281,6 +282,7 @@ def main():
     prepare_bin_only = False
     with_coins = {'particl', 'litecoin'}
     add_coin = ''
+    disable_coin = ''
 
     for v in sys.argv[1:]:
         if len(v) < 2 or v[0] != '-':
@@ -333,6 +335,11 @@ def main():
                     exitWithError('Unknown coin {}'.format(s[1]))
                 add_coin = s[1]
                 with_coins = [add_coin, ]
+                continue
+            if name == 'disablecoin':
+                if s[1] not in known_coins:
+                    exitWithError('Unknown coin {}'.format(s[1]))
+                disable_coin = s[1]
                 continue
 
         exitWithError('Unknown argument {}'.format(v))
@@ -388,6 +395,24 @@ def main():
         }
     }
 
+    if disable_coin != '':
+        logger.info('Disabling coin: %s', disable_coin)
+        if not os.path.exists(config_path):
+            exitWithError('{} does not exist'.format(config_path))
+        with open(config_path) as fs:
+            settings = json.load(fs)
+
+        if disable_coin not in settings['chainclients']:
+            exitWithError('{} has not been prepared'.format(disable_coin))
+        settings['chainclients'][disable_coin]['connection_type'] = 'none'
+        settings['chainclients'][disable_coin]['manage_daemon'] = False
+
+        with open(config_path, 'w') as fp:
+            json.dump(settings, fp, indent=4)
+
+        logger.info('Done.')
+        return 0
+
     if add_coin != '':
         logger.info('Adding coin: %s', add_coin)
         if not os.path.exists(config_path):
@@ -396,6 +421,15 @@ def main():
             settings = json.load(fs)
 
         if add_coin in settings['chainclients']:
+            coin_settings = settings['chainclients'][add_coin]
+            if coin_settings['connection_type'] == 'none' and coin_settings['manage_daemon'] is False:
+                logger.info('Enabling coin: %s', add_coin)
+                coin_settings['connection_type'] = 'rpc'
+                coin_settings['manage_daemon'] = True
+                with open(config_path, 'w') as fp:
+                    json.dump(settings, fp, indent=4)
+                logger.info('Done.')
+                return 0
             exitWithError('{} is already in the settings file'.format(add_coin))
 
         settings['chainclients'][add_coin] = chainclients[add_coin]

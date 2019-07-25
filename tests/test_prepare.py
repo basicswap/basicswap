@@ -12,6 +12,7 @@ from unittest.mock import patch
 from io import StringIO
 import logging
 import shutil
+import json
 
 import bin.basicswap_prepare as prepareSystem
 test_path = os.path.expanduser('~/test_basicswap')
@@ -30,13 +31,15 @@ class Test(unittest.TestCase):
         except Exception as e:
             logger.warning('tearDownClass %s', str(e))
 
-    def test_no_overwrite(self):
+    def test(self):
         testargs = ['basicswap-prepare', '-datadir=' + test_path]
         with patch.object(sys, 'argv', testargs):
             prepareSystem.main()
 
-        self.assertTrue(os.path.exists(os.path.join(test_path, 'basicswap.json')))
+        config_path = os.path.join(test_path, 'basicswap.json')
+        self.assertTrue(os.path.exists(config_path))
 
+        logger.info('Test no overwrite')
         testargs = ['basicswap-prepare', '-datadir=' + test_path]
         with patch('sys.stderr', new=StringIO()) as fake_stderr:
             with patch.object(sys, 'argv', testargs):
@@ -46,6 +49,30 @@ class Test(unittest.TestCase):
         self.assertEqual(cm.exception.code, 1)
         logger.info('fake_stderr.getvalue() %s', fake_stderr.getvalue())
         self.assertTrue('exists, exiting' in fake_stderr.getvalue())
+
+        logger.info('Test addcoin new')
+        testargs = ['basicswap-prepare', '-datadir=' + test_path, '-addcoin=namecoin']
+        with patch.object(sys, 'argv', testargs):
+            prepareSystem.main()
+        with open(config_path) as fs:
+            settings = json.load(fs)
+            self.assertTrue(settings['chainclients']['namecoin']['connection_type'] == 'rpc')
+
+        logger.info('Test disablecoin')
+        testargs = ['basicswap-prepare', '-datadir=' + test_path, '-disablecoin=namecoin']
+        with patch.object(sys, 'argv', testargs):
+            prepareSystem.main()
+        with open(config_path) as fs:
+            settings = json.load(fs)
+            self.assertTrue(settings['chainclients']['namecoin']['connection_type'] == 'none')
+
+        logger.info('Test addcoin existing')
+        testargs = ['basicswap-prepare', '-datadir=' + test_path, '-disablecoin=namecoin']
+        with patch.object(sys, 'argv', testargs):
+            prepareSystem.main()
+        with open(config_path) as fs:
+            settings = json.load(fs)
+            self.assertTrue(settings['chainclients']['namecoin']['connection_type'] == 'rpc')
 
 
 if __name__ == '__main__':
