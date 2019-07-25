@@ -29,6 +29,8 @@ from .basicswap import (
     getBidState,
     getTxState,
     getLockName,
+    SEQUENCE_LOCK_TIME,
+    ABS_LOCK_TIME,
 )
 
 

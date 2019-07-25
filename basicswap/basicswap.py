@@ -1306,8 +1306,8 @@ class BasicSwap():
         else:
             # Lock from the height or time of the block containing the initiate txn
             coin_from = Coins(offer.coin_from)
-            initiate_tx_block_hash = self.callcoinrpc(coin_from, 'getblockhash', [bid.initiate_txn_height,])
-            initiate_tx_block_time = int(self.callcoinrpc(coin_from, 'getblock', [initiate_tx_block_hash,])['time'])
+            initiate_tx_block_hash = self.callcoinrpc(coin_from, 'getblockhash', [bid.initiate_txn_height, ])
+            initiate_tx_block_time = int(self.callcoinrpc(coin_from, 'getblock', [initiate_tx_block_hash, ])['time'])
             if offer.lock_type == ABS_LOCK_BLOCKS:
                 # Walk the coin_to chain back until block time matches
                 blockchaininfo = self.callcoinrpc(coin_to, 'getblockchaininfo')
@@ -1316,7 +1316,7 @@ class BasicSwap():
                 max_tries = 1000
                 for i in range(max_tries):
                     self.log.debug('wtf %d', i)
-                    prev_block = self.callcoinrpc(coin_to, 'getblock', [cblock_hash,])
+                    prev_block = self.callcoinrpc(coin_to, 'getblock', [cblock_hash, ])
                     self.log.debug('prev_block %s', str(prev_block))
 
                     if prev_block['time'] <= initiate_tx_block_time:

@@ -235,11 +235,13 @@ def printHelp():
     logger.info('--mainnet                Run in mainnet mode.')
     logger.info('--testnet                Run in testnet mode.')
     logger.info('--regtest                Run in regtest mode.')
-    logger.info('--particl_mnemonic=      Recovery phrase to use for the Particl wallet, default is randomly generated,\n'
-                + '                         "none" to set autogenerate account mode.')
+    logger.info('--particl_mnemonic=      Recovery phrase to use for the Particl wallet, default is randomly generated,\n' +
+                '                         "none" to set autogenerate account mode.')
     logger.info('--withcoin=              Prepare system to run daemon for coin.')
     logger.info('--withoutcoin=           Do not prepare system to run daemon for coin.')
     logger.info('--addcoin=               Add coin to existing setup.')
+    logger.info('--preparebinonly         Don\'t prepare settings or datadirs.')
+
     logger.info('\n' + 'Known coins: %s', ', '.join(known_coins.keys()))
 
 
@@ -276,6 +278,7 @@ def main():
     data_dir = None
     chain = 'mainnet'
     particl_wallet_mnemonic = None
+    prepare_bin_only = False
     with_coins = {'particl', 'litecoin'}
     add_coin = ''
 
@@ -303,6 +306,9 @@ def main():
             continue
         if name == 'regtest':
             chain = 'regtest'
+            continue
+        if name == 'preparebinonly':
+            prepare_bin_only = True
             continue
 
         if len(s) == 2:
@@ -424,11 +430,18 @@ def main():
             continue
         coin = c
         prepareCore(coin, v, settings, data_dir)
+
+    if prepare_bin_only:
+        logger.info('Done.')
+        return 0
+
+    for c, v in known_coins.items():
+        if c not in with_coins:
+            continue
         prepareDataDir(coin, settings, data_dir, chain, particl_wallet_mnemonic)
 
     with open(config_path, 'w') as fp:
         json.dump(settings, fp, indent=4)
-
 
     if particl_wallet_mnemonic == 'none':
         logger.info('Done.')

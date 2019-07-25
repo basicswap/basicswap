@@ -14,7 +14,7 @@ RUN wget -O bs.zip https://github.com/tecnovert/basicswap/archive/master.zip; \
     pip3 install .;
 
 # Download binaries, these will be part of the docker image
-RUN basicswap-prepare -datadir=/opt --particl_mnemonic=none
+RUN basicswap-prepare -datadir=/opt -preparebinonly
 
 RUN useradd -ms /bin/bash user; \
     mkdir /coindata  && chown user /coindata
