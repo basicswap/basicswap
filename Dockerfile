@@ -16,8 +16,8 @@ RUN wget -O bs.zip https://github.com/tecnovert/basicswap/archive/master.zip; \
 # Download binaries, these will be part of the docker image
 RUN basicswap-prepare -datadir=/opt -preparebinonly
 
-RUN useradd -ms /bin/bash user; \
-    mkdir /coindata  && chown user /coindata
+RUN useradd -ms /bin/bash user && \
+    mkdir /coindata && chown user -R /coindata
 
 USER user
 WORKDIR /home/user

@@ -174,7 +174,7 @@ def prepareCore(coin, version, settings, data_dir):
             with open(out_path, 'wb') as fout:
                 fout.write(fi.read())
             fi.close()
-            os.chmod(out_path, stat.S_IRWXU)
+            os.chmod(out_path, stat.S_IRWXU | stat.S_IXGRP | stat.S_IXOTH)
 
 
 def prepareDataDir(coin, settings, data_dir, chain, particl_mnemonic):
