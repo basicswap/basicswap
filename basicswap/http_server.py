@@ -315,8 +315,12 @@ class HttpHandler(BaseHTTPRequestHandler):
             raise ValueError('Bad bid ID')
         swap_client = self.server.swap_client
 
-        content = html_content_start(self.server.title, self.server.title) \
-            + '<h3>Advance: ' + bid_id.hex() + '</h3>'
+        template = env.get_template('advance.html')
+        return bytes(template.render(
+            title=self.server.title,
+            h2=self.server.title,
+            bid_id=bid_id.hex(),
+        ), 'UTF-8')
 
     def page_bid(self, url_split, post_string):
         assert(len(url_split) > 2), 'Bid ID not specified'

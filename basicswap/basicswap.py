@@ -132,7 +132,7 @@ ABS_LOCK_TIME = 4
 SEQUENCE_LOCKTIME_GRANULARITY = 9  # 512 seconds
 SEQUENCE_LOCKTIME_TYPE_FLAG = (1 << 22)
 SEQUENCE_LOCKTIME_MASK = 0x0000ffff
-INITIATE_TX_TIMEOUT = 20 * 60
+INITIATE_TX_TIMEOUT = 30 * 60
 
 
 def getOfferState(state):
@@ -1756,7 +1756,8 @@ class BasicSwap():
                     save_bid = True
 
             # Bid times out if buyer doesn't see tx in chain within INITIATE_TX_TIMEOUT seconds
-            if bid.state_time + INITIATE_TX_TIMEOUT < int(time.time()):
+            if bid.initiate_txid is None and \
+               bid.state_time + INITIATE_TX_TIMEOUT < int(time.time()):
                 self.log.info('Swap timed out waiting for initiate tx for bid %s', bid_id.hex())
                 bid.setState(BidStates.SWAP_TIMEDOUT)
                 self.saveBid(bid_id, bid)
