@@ -469,21 +469,20 @@ class HttpHandler(BaseHTTPRequestHandler):
     def page_watched(self, url_split, post_string):
         swap_client = self.server.swap_client
         watched_outputs, last_scanned = swap_client.listWatchedOutputs()
-
-        content = html_content_start(self.server.title, self.server.title) \
-            + '<h3>Watched Outputs</h3>'
-
-        for c in last_scanned:
-            content += '<p>' + getCoinName(c[0]) + ' Scanned Height: ' + str(c[1]) + '</p>'
-
-        content += '<table>'
-        content += '<tr><th>Bid ID</th><th>Chain</th><th>Txid</th><th>Index</th><th>Type</th></tr>'
-        for o in watched_outputs:
-            content += '<tr><td><a href=/bid/{0}>{0}</a></td><td>{1}</td><td>{2}</td><td>{3}</td><td>{4}</td></tr>'.format(o[1].hex(), getCoinName(o[0]), o[2], o[3], int(o[4]))
-        content += '</table>'
-
-        content += '<p><a href="/">home</a></p></body></html>'
-        return bytes(content, 'UTF-8')
+        ls_formatted = []
+        for ls in last_scanned:
+            ls_formatted.append((getCoinName(ls[0]), ls[1]))
+        wo_formatted = []
+        for wo in watched_outputs:
+            wo_formatted.append((wo[1].hex(), getCoinName(wo[0]), wo[2], wo[3], int(wo[4])))
+        template = env.get_template('watched.html')
+        return bytes(template.render(
+            title=self.server.title,
+            refresh=30,
+            h2=self.server.title,
+            last_scanned=last_scanned,
+            watched_outputs=wo_formatted,
+        ), 'UTF-8')
 
     def page_index(self, url_split):
         swap_client = self.server.swap_client
@@ -491,7 +490,7 @@ class HttpHandler(BaseHTTPRequestHandler):
 
         template = env.get_template('index.html')
         return bytes(template.render(
-            titil=self.server.title,
+            title=self.server.title,
             refresh=30,
             h2=self.server.title,
             summary=summary

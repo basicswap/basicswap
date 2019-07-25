@@ -1,0 +1,25 @@
+{% include 'header.html' %}
+
+<h3>Watched Outputs</h3>
+{% if refresh %}
+<p>Page Refresh: {{ refresh }} seconds</p>
+{% endif %}
+
+<p>Last Scanned</p>
+<table>
+<tr><th>Coin</th><th>height</th></tr>
+{% for ls in last_scanned %}
+<tr><td>{{ ls[0] }}</td><td>{{ ls[1] }}</td></tr>
+{% endfor %}
+</table>
+<br/>
+
+<table>
+<tr><th>Bid ID</th><th>Chain</th><th>Txid</th><th>Index</th><th>Type</th></tr>
+{% for wo in watched_outputs %}
+<tr><td><a href=/bid/{{ wo[0] }}>{{ wo[0] }}</a></td><td>{{ wo[1] }}</td><td>{{ wo[2] }}</td><td>{{ wo[3] }}</td><td>{{ wo[4] }}</td></tr>
+{% endfor %}
+</table>
+
+<p><a href="/">home</a></p>
+</body></html>

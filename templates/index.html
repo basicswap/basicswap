@@ -3,7 +3,9 @@
 <p><a href="/wallets">View Wallets</a></p>
 
 <p>
-Page Refresh: 30 seconds<br/>
+{% if refresh %}
+Page Refresh: {{ refresh }} seconds<br/>
+{% endif %}
 <a href="/active">Swaps in progress: {{ summary.num_swapping }}</a><br/>
 <a href="/offers">Network Offers: {{ summary.num_network_offers }}</a><br/>
 <a href="/sentoffers">Sent Offers: {{ summary.num_sent_offers }}</a><br/>

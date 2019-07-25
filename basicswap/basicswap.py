@@ -2413,7 +2413,8 @@ class BasicSwap():
             rv = []
             rv_heights = []
             for c, v in self.coin_clients.items():
-                rv_heights.append((c, v['last_height_checked']))
+                if self.coin_clients[c]['connection_type'] == 'rpc':
+                    rv_heights.append((c, v['last_height_checked']))
                 for o in v['watched_outputs']:
                     rv.append((c, o[0], o[1], o[2], o[3]))
             return (rv, rv_heights)
