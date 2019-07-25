@@ -187,7 +187,13 @@ class HttpHandler(BaseHTTPRequestHandler):
                 lock_seconds = int(form_data[b'lockhrs'][0]) * 60 * 60
                 # TODO: More accurate rate
                 # assert(value_to == (value_from * rate) // COIN)
-                offer_id = swap_client.postOffer(coin_from, coin_to, value_from, rate, min_bid, SwapTypes.SELLER_FIRST, auto_accept_bids=autoaccept, lock_value=lock_seconds)
+
+                if swap_client.coin_clients[coin_from]['use_csv'] and swap_client.coin_clients[coin_to]['use_csv']:
+                    lock_type = SEQUENCE_LOCK_TIME
+                else:
+                    lock_type = ABS_LOCK_TIME
+
+                offer_id = swap_client.postOffer(coin_from, coin_to, value_from, rate, min_bid, SwapTypes.SELLER_FIRST, auto_accept_bids=autoaccept, lock_type=lock_type, lock_value=lock_seconds)
                 content += '<p><a href="/offer/' + offer_id.hex() + '">Sent Offer ' + offer_id.hex() + '</a><br/>Rate: ' + format8(rate) + '</p>'
 
         coins = []

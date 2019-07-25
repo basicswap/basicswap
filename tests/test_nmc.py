@@ -374,7 +374,7 @@ class Test(unittest.TestCase):
                and (participate_state is None or bid.participate_txn_state == participate_state):
                 return
         raise ValueError('wait_for_bid_tx_state timed out.')
-
+    """
     def test_02_part_ltc(self):
         swap_clients = self.swap_clients
 
@@ -454,16 +454,14 @@ class Test(unittest.TestCase):
 
         assert(js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
         assert(js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
-
+    """
     def test_05_refund(self):
         # Seller submits initiate txn, buyer doesn't respond
         swap_clients = self.swap_clients
 
         logging.info('---------- Test refund, NMC to BTC')
-
-        # Note the lock value is absolute.
         offer_id = swap_clients[0].postOffer(Coins.NMC, Coins.BTC, 10 * COIN, 0.1 * COIN, 10 * COIN, SwapTypes.SELLER_FIRST,
-                                             ABS_LOCK_BLOCKS, 20)
+                                             ABS_LOCK_BLOCKS, 10)
 
         self.wait_for_offer(swap_clients[1], offer_id)
         offers = swap_clients[1].listOffers()

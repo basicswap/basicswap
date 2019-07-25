@@ -23,6 +23,7 @@ chainparams = {
         'name': 'particl',
         'ticker': 'PART',
         'message_magic': 'Bitcoin Signed Message:\n',
+        'blocks_target': 60 * 2,
         'mainnet': {
             'rpcport': 51735,
             'pubkey_address': 0x38,
@@ -58,6 +59,7 @@ chainparams = {
         'name': 'bitcoin',
         'ticker': 'BTC',
         'message_magic': 'Bitcoin Signed Message:\n',
+        'blocks_target': 60 * 10,
         'mainnet': {
             'rpcport': 8332,
             'pubkey_address': 0,
@@ -91,6 +93,7 @@ chainparams = {
         'name': 'litecoin',
         'ticker': 'LTC',
         'message_magic': 'Litecoin Signed Message:\n',
+        'blocks_target': 60 * 1,
         'mainnet': {
             'rpcport': 9332,
             'pubkey_address': 48,
@@ -124,6 +127,7 @@ chainparams = {
         'name': 'namecoin',
         'ticker': 'NMC',
         'message_magic': 'Namecoin Signed Message:\n',
+        'blocks_target': 60 * 10,
         'mainnet': {
             'rpcport': 8336,
             'pubkey_address': 52,

@@ -632,7 +632,7 @@ class BasicSwap():
                 self.callcoinrpc(coin_type, 'getwalletinfo', [], self.wallet)
                 return
             except Exception as ex:
-                logging.warning('Can\'t connect to %s RPC: %s.  Trying again in %d second/s.', coin_type, str(ex), (1 + i))
+                self.log.warning('Can\'t connect to %s RPC: %s.  Trying again in %d second/s.', coin_type, str(ex), (1 + i))
                 time.sleep(1 + i)
         self.log.error('Can\'t connect to %s RPC, exiting.', coin_type)
         self.stopRunning(1)  # systemd will try restart if fail_code != 0
@@ -724,9 +724,11 @@ class BasicSwap():
             assert(self.coin_clients[coin_from]['use_csv'] and self.coin_clients[coin_to]['use_csv']), 'Both coins need CSV activated.'
         elif lock_type == ABS_LOCK_TIME:
             # TODO: range?
+            assert(not self.coin_clients[coin_from]['use_csv'] or not self.coin_clients[coin_to]['use_csv']), 'Should use CSV.'
             assert(lock_value >= 4 * 60 * 60 and lock_value <= 96 * 60 * 60), 'Invalid lock_value time'
         elif lock_type == ABS_LOCK_BLOCKS:
             # TODO: range?
+            assert(not self.coin_clients[coin_from]['use_csv'] or not self.coin_clients[coin_to]['use_csv']), 'Should use CSV.'
             assert(lock_value >= 10 and lock_value <= 1000), 'Invalid lock_value blocks'
         else:
             raise ValueError('Unknown locktype')
@@ -1153,7 +1155,7 @@ class BasicSwap():
                 lock_value = self.callcoinrpc(coin_from, 'getblockchaininfo')['blocks'] + offer.lock_value
             else:
                 lock_value = int(time.time()) + offer.lock_value
-            logging.debug('initiate %s lock_value %d %d', coin_from, offer.lock_value, lock_value)
+            self.log.debug('initiate %s lock_value %d %d', coin_from, offer.lock_value, lock_value)
             script = buildContractScript(lock_value, secret_hash, bid.pkhash_buyer, pkhash_refund, OpCodes.OP_CHECKLOCKTIMEVERIFY)
 
         p2sh = self.callcoinrpc(Coins.PART, 'decodescript', [script.hex()])['p2sh']
@@ -1302,11 +1304,35 @@ class BasicSwap():
             sequence = getExpectedSequence(offer.lock_type, lock_value, coin_to)
             bid.participate_script = buildContractScript(sequence, secret_hash, pkhash_seller, pkhash_buyer_refund)
         else:
+            # Lock from the height or time of the block containing the initiate txn
+            coin_from = Coins(offer.coin_from)
+            initiate_tx_block_hash = self.callcoinrpc(coin_from, 'getblockhash', [bid.initiate_txn_height,])
+            initiate_tx_block_time = int(self.callcoinrpc(coin_from, 'getblock', [initiate_tx_block_hash,])['time'])
             if offer.lock_type == ABS_LOCK_BLOCKS:
-                contract_lock_value = self.callcoinrpc(coin_to, 'getblockchaininfo')['blocks'] + lock_value
+                # Walk the coin_to chain back until block time matches
+                blockchaininfo = self.callcoinrpc(coin_to, 'getblockchaininfo')
+                cblock_hash = blockchaininfo['bestblockhash']
+                cblock_height = blockchaininfo['blocks']
+                max_tries = 1000
+                for i in range(max_tries):
+                    self.log.debug('wtf %d', i)
+                    prev_block = self.callcoinrpc(coin_to, 'getblock', [cblock_hash,])
+                    self.log.debug('prev_block %s', str(prev_block))
+
+                    if prev_block['time'] <= initiate_tx_block_time:
+                        break
+                    # cblock_hash and height are out of step unless loop breaks
+                    cblock_hash = prev_block['previousblockhash']
+                    cblock_height = prev_block['height']
+
+                assert(prev_block['time'] <= initiate_tx_block_time), 'Block not found for lock height'
+
+                self.log.debug('Setting lock value from height of block %s %s', coin_to, cblock_hash)
+                contract_lock_value = cblock_height + lock_value
             else:
-                contract_lock_value = int(time.time()) + lock_value
-            logging.debug('participate %s lock_value %d %d', coin_to, lock_value, contract_lock_value)
+                self.log.debug('Setting lock value from time of block %s %s', coin_from, initiate_tx_block_hash)
+                contract_lock_value = initiate_tx_block_time + lock_value
+            self.log.debug('participate %s lock_value %d %d', coin_to, lock_value, contract_lock_value)
             bid.participate_script = buildContractScript(contract_lock_value, secret_hash, pkhash_seller, pkhash_buyer_refund, OpCodes.OP_CHECKLOCKTIMEVERIFY)
 
     def createParticipateTxn(self, bid_id, bid, offer):
@@ -2156,11 +2182,16 @@ class BasicSwap():
         assert(len(scriptvalues[0]) == 64), 'Bad secret_hash length'
         assert(bytes.fromhex(scriptvalues[1]) == bid.pkhash_buyer), 'pkhash_buyer mismatch'
 
+        script_lock_value = int(scriptvalues[2])
         if use_csv:
             expect_sequence = getExpectedSequence(offer.lock_type, offer.lock_value, coin_from)
-            assert(int(scriptvalues[2]) == expect_sequence), 'sequence mismatch'
+            assert(script_lock_value == expect_sequence), 'sequence mismatch'
         else:
-            self.log.warning('TODO: validate absolute lock values')
+            if offer.lock_type == ABS_LOCK_BLOCKS:
+                self.log.warning('TODO: validate absolute lock values')
+            else:
+                assert(script_lock_value <= bid.created_at + offer.lock_value + INITIATE_TX_TIMEOUT), 'script lock time too high'
+                assert(script_lock_value >= bid.created_at + offer.lock_value), 'script lock time too low'
 
         assert(len(scriptvalues[3]) == 40), 'pkhash_refund bad length'
 
