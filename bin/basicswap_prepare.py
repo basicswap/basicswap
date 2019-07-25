@@ -155,7 +155,16 @@ def prepareCore(coin, version, settings, data_dir):
 
     if verified.username is None:
         logger.warning('Signature not verified.')
-        #  TODO raise ValueError('Signature verification failed.')
+
+        pubkeyurl = 'https://raw.githubusercontent.com/tecnovert/basicswap/master/gitianpubkeys/{}_{}.pgp'.format(coin, signing_key_name)
+        logger.info('Importing public key from url: ' + pubkeyurl)
+        gpg.import_keys(urllib.request.urlopen(pubkeyurl).read())
+
+        with open(assert_sig_path, 'rb') as fp:
+            verified = gpg.verify_file(fp, assert_path)
+
+        if verified.username is None:
+            raise ValueError('Signature verification failed.')
 
     bins = [coin + 'd', coin + '-cli', coin + '-tx']
     with tarfile.open(release_path) as ft:

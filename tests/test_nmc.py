@@ -374,7 +374,7 @@ class Test(unittest.TestCase):
                and (participate_state is None or bid.participate_txn_state == participate_state):
                 return
         raise ValueError('wait_for_bid_tx_state timed out.')
-    """
+
     def test_02_part_ltc(self):
         swap_clients = self.swap_clients
 
@@ -454,7 +454,7 @@ class Test(unittest.TestCase):
 
         assert(js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
         assert(js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
-    """
+
     def test_05_refund(self):
         # Seller submits initiate txn, buyer doesn't respond
         swap_clients = self.swap_clients
