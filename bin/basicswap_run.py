@@ -50,9 +50,10 @@ def startDaemon(node_dir, bin_dir, daemon_bin, opts=[]):
     return subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 
-def runClient(fp, dataDir, chain):
+def runClient(fp, data_dir, chain):
     global swap_client
-    settings_path = os.path.join(dataDir, 'basicswap.json')
+    settings_path = os.path.join(data_dir, 'basicswap.json')
+    pids_path = os.path.join(data_dir, '.pids')
 
     if not os.path.exists(settings_path):
         raise ValueError('Settings file not found: ' + str(settings_path))
@@ -61,6 +62,13 @@ def runClient(fp, dataDir, chain):
         settings = json.load(fs)
 
     daemons = []
+    pids = []
+
+    if os.path.exists(pids_path):
+        with open(pids_path) as fd:
+            for ln in fd:
+                # TODO: try close
+                logger.warning('Found pid for daemon {} '.format(ln.strip()))
 
     for c, v in settings['chainclients'].items():
         if v['manage_daemon'] is True:
@@ -68,9 +76,16 @@ def runClient(fp, dataDir, chain):
 
             filename = c + 'd' + ('.exe' if os.name == 'nt' else '')
             daemons.append(startDaemon(v['datadir'], v['bindir'], filename))
-            logger.info('Started {} {}'.format(filename, daemons[-1].pid))
+            pid = daemons[-1].pid
+            pids.append((c, pid))
+            logger.info('Started {} {}'.format(filename, pid))
 
-    swap_client = BasicSwap(fp, dataDir, settings, chain)
+    if len(pids) > 0:
+        with open(pids_path, 'w') as fd:
+            for p in pids:
+                fd.write('{}:{}\n'.format(*p))
+
+    swap_client = BasicSwap(fp, data_dir, settings, chain)
 
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
@@ -97,16 +112,35 @@ def runClient(fp, dataDir, chain):
         t.stop()
         t.join()
 
+    closed_pids = []
     for d in daemons:
-        logger.info('Terminating {}'.format(d.pid))
-        d.terminate()
-        d.wait(timeout=120)
-        if d.stdout:
-            d.stdout.close()
-        if d.stderr:
-            d.stderr.close()
-        if d.stdin:
-            d.stdin.close()
+        int_pid = d.pid
+        logger.info('Terminating {}'.format(int_pid))
+        try:
+            d.terminate()
+            d.wait(timeout=120)
+            if d.stdout:
+                d.stdout.close()
+            if d.stderr:
+                d.stderr.close()
+            if d.stdin:
+                d.stdin.close()
+            closed_pids.append(int_pid)
+        except Exception as ex:
+            logger.error('Error: {}'.format(ex))
+
+    if os.path.exists(pids_path):
+        with open(pids_path) as fd:
+            lines = fd.read().split('\n')
+        still_running = ''
+        for ln in lines:
+            try:
+                if not int(ln.split(':')[1]) in closed_pids:
+                    still_running += ln + '\n'
+            except Exception:
+                pass
+        with open(pids_path, 'w') as fd:
+            fd.write(still_running)
 
 
 def printVersion():
