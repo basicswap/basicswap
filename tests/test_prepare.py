@@ -67,7 +67,7 @@ class Test(unittest.TestCase):
             self.assertTrue(settings['chainclients']['namecoin']['connection_type'] == 'none')
 
         logger.info('Test addcoin existing')
-        testargs = ['basicswap-prepare', '-datadir=' + test_path, '-disablecoin=namecoin']
+        testargs = ['basicswap-prepare', '-datadir=' + test_path, '-addcoin=namecoin']
         with patch.object(sys, 'argv', testargs):
             prepareSystem.main()
         with open(config_path) as fs:

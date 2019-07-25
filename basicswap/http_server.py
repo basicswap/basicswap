@@ -13,6 +13,8 @@ import threading
 import http.client
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from jinja2 import Environment, FileSystemLoader
+
 from .util import (
     COIN,
     format8,
@@ -32,6 +34,9 @@ from .basicswap import (
     SEQUENCE_LOCK_TIME,
     ABS_LOCK_TIME,
 )
+
+file_loader = FileSystemLoader('templates')
+env = Environment(loader=file_loader)
 
 
 def getCoinName(c):
@@ -484,23 +489,13 @@ class HttpHandler(BaseHTTPRequestHandler):
         swap_client = self.server.swap_client
         summary = swap_client.getSummary()
 
-        content = html_content_start(self.server.title, self.server.title, 30) \
-            + '<p><a href="/wallets">View Wallets</a></p>' \
-            + '<p>' \
-            + 'Page Refresh: 30 seconds<br/>' \
-            + 'Network: ' + str(summary['network']) + '<br/>' \
-            + '<a href="/active">Swaps in progress: ' + str(summary['num_swapping']) + '</a><br/>' \
-            + '<a href="/offers">Network Offers: ' + str(summary['num_network_offers']) + '</a><br/>' \
-            + '<a href="/sentoffers">Sent Offers: ' + str(summary['num_sent_offers']) + '</a><br/>' \
-            + '<a href="/bids">Received Bids: ' + str(summary['num_recv_bids']) + '</a><br/>' \
-            + '<a href="/sentbids">Sent Bids: ' + str(summary['num_sent_bids']) + '</a><br/>' \
-            + '<a href="/watched">Watched Outputs: ' + str(summary['num_watched_outputs']) + '</a><br/>' \
-            + '</p>' \
-            + '<p>' \
-            + '<a href="/newoffer">New Offer</a><br/>' \
-            + '</p>'
-        content += '</body></html>'
-        return bytes(content, 'UTF-8')
+        template = env.get_template('index.html')
+        return bytes(template.render(
+            titil=self.server.title,
+            refresh=30,
+            h2=self.server.title,
+            summary=summary
+        ), 'UTF-8')
 
     def putHeaders(self, status_code, content_type):
         self.send_response(status_code)

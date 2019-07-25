@@ -1,0 +1,12 @@
+<!DOCTYPE html><html lang="en">
+<head>
+<meta charset="UTF-8">
+{% if refresh %}
+<meta http-equiv="refresh" content="{{ refresh }}">
+{% endif %}
+<title>{{ title }}</title>
+</head>
+<body>
+{% if h2 %}
+<h2>{{ h2 }}</h2>
+{% endif %}

@@ -27,6 +27,7 @@ setuptools.setup(
         "protobuf",
         "sqlalchemy",
         "python-gnupg",
+        "Jinja2",
     ],
     entry_points={
         "console_scripts": [
