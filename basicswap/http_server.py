@@ -289,12 +289,14 @@ class HttpHandler(BaseHTTPRequestHandler):
             + '<h3>' + ('Sent ' if sent else '') + 'Offers</h3>'
 
         content += '<table>'
-        content += '<tr><th>Offer ID</th><th>Coin From</th><th>Coin To</th><th>Amount From</th><th>Amount To</th><th>Rate</th></tr>'
+        content += '<tr><th>At</th><th>Offer ID</th><th>Coin From</th><th>Coin To</th><th>Amount From</th><th>Amount To</th><th>Rate</th></tr>'
         for o in offers:
             coin_from_name = getCoinName(Coins(o.coin_from))
             coin_to_name = getCoinName(Coins(o.coin_to))
             amount_to = (o.amount_from * o.rate) // COIN
-            content += '<tr><td><a href=/offer/{0}>{0}</a></td><td>{1}</td><td>{2}</td><td>{3}</td><td>{4}</td><td>{5}</td></tr>'.format(o.offer_id.hex(), coin_from_name, coin_to_name, format8(o.amount_from), format8(amount_to), format8(o.rate))
+            content += '<tr><td>{0}</td><td><a href=/offer/{1}>{1}</a></td><td>{2}</td><td>{3}</td><td>{4}</td><td>{5}</td><td>{6}</td></tr>'.format(
+                time.strftime('%Y-%m-%d %H:%M', time.localtime(o.created_at)),
+                o.offer_id.hex(), coin_from_name, coin_to_name, format8(o.amount_from), format8(amount_to), format8(o.rate))
 
         content += '</table>'
         content += '<p><a href="/">home</a></p></body></html>'
@@ -445,9 +447,11 @@ class HttpHandler(BaseHTTPRequestHandler):
             + '<h3>' + ('Sent ' if sent else '') + 'Bids</h3>'
 
         content += '<table>'
-        content += '<tr><th>Bid ID</th><th>Offer ID</th><th>Bid Status</th><th>ITX Status</th><th>PTX Status</th></tr>'
+        content += '<tr><th>At</th><th>Bid ID</th><th>Offer ID</th><th>Bid Status</th><th>ITX Status</th><th>PTX Status</th></tr>'
         for b in bids:
-            content += '<tr><td><a href=/bid/{0}>{0}</a></td><td><a href=/offer/{1}>{1}</a></td><td>{2}</td><td>{3}</td><td>{4}</td></tr>'.format(b.bid_id.hex(), b.offer_id.hex(), getBidState(b.state), getTxState(b.initiate_txn_state), getTxState(b.participate_txn_state))
+            content += '<tr><td>{0}</td><td><a href=/bid/{1}>{1}</a></td><td><a href=/offer/{2}>{2}</a></td><td>{3}</td><td>{4}</td><td>{5}</td></tr>'.format(
+                time.strftime('%Y-%m-%d %H:%M', time.localtime(b.created_at)),
+                b.bid_id.hex(), b.offer_id.hex(), getBidState(b.state), getTxState(b.initiate_txn_state), getTxState(b.participate_txn_state))
         content += '</table>'
 
         content += '<p><a href="/">home</a></p></body></html>'
