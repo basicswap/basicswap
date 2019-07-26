@@ -36,5 +36,5 @@ setuptools.setup(
             "basicswap-prepare=bin.basicswap_prepare:main",
         ]
     },
-    test_suite="tests.test_suite"
+    test_suite="tests.basicswap.test_suite"
 )

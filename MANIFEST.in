@@ -1,8 +1,4 @@
-# Include the README
-include *.md
-
-# Include the license file
-include LICENSE.txt
+include *.md LICENSE.txt
 
 recursive-include doc *
 recursive-include basicswap/templates *
