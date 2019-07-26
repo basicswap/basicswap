@@ -1,0 +1,48 @@
+{% include 'header.html' %}
+
+<h3>Offer {{ offer_id }}</h3>
+{% if refresh %}
+<p>Page Refresh: {{ refresh }} seconds</p>
+{% endif %}
+
+{% for m in messages %}
+<p>{{ m }}</p>
+{% endfor %}
+
+{% if sent_bid_id %}
+<p><a href="/bid/{{ sent_bid_id }}">Sent Bid {{ sent_bid_id }}</a></p>
+{% endif %}
+
+<table>
+<tr><td>Offer State</td><td>{{ data.state }}</td></tr>
+<tr><td>Coin From</td><td>{{ data.coin_from }}</td></tr>
+<tr><td>Coin To</td><td>{{ data.coin_to }}</td></tr>
+<tr><td>Amount From</td><td>{{ data.amt_from }} {{ data.tla_from }}</td></tr>
+<tr><td>Amount To</td><td>{{ data.amt_to }} {{ data.tla_to }}</td></tr>
+<tr><td>Rate</td><td>{{ data.rate }} {{ data.amt_from }}/{{ data.tla_from }}</td></tr>
+<tr><td>Script Lock Type</td><td>{{ data.lock_type }}</td></tr>
+<tr><td>Script Lock Value</td><td>{{ data.lock_value }}</td></tr>
+<tr><td>Address From</td><td>{{ data.addr_from }}</td></tr>
+<tr><td>Created At</td><td>{{ data.created_at | formatts }}</td></tr>
+<tr><td>Expired At</td><td>{{ data.expired_at | formatts }}</td></tr>
+<tr><td>Sent</td><td>{{ data.sent }}</td></tr>
+{% if data.sent == 'True' %}
+<tr><td>Auto Accept Bids</td><td>{{ data.auto_accept }}</td></tr>
+{% endif %}
+</table>
+
+<h4>Bids</h4>
+<table>
+<tr><th>Bid ID</th><th>Bid Amount</th><th>Bid Status</th><th>ITX Status</th><th>PTX Status</th></tr>
+{% for b in bids %}
+<tr><td><a href=/bid/{{ b[0] }}>{{ b[0] }}</a></td><td>{{ b[1] }}</td><td>{{ b[2] }}</td><td>{{ b[3] }}</td><td>{{ b[4] }}</td></tr>
+{% endfor %}
+</table>
+
+<form method="post">
+<input type="submit" value="Send Bid">
+<input type="hidden" name="formid" value="{{ form_id }}">
+</form>
+
+<p><a href="/">home</a></p>
+</body></html>

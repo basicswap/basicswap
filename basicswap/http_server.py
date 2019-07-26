@@ -161,24 +161,15 @@ class HttpHandler(BaseHTTPRequestHandler):
         content += '<p><a href="/">home</a></p></body></html>'
         return bytes(content, 'UTF-8')
 
-    def make_coin_select(self, name, coins):
-        s = '<select name="' + name + '"><option value="-1">-- Select Coin --</option>'
-        for c in coins:
-            s += '<option value="{}">{}</option>'.format(*c)
-        s += '</select>'
-        return s
-
     def page_newoffer(self, url_split, post_string):
         swap_client = self.server.swap_client
 
-        content = html_content_start(self.server.title, self.server.title) \
-            + '<h3>New Offer</h3>'
-
+        messages = []
         if post_string != '':
             form_data = urllib.parse.parse_qs(post_string)
             form_id = form_data[b'formid'][0].decode('utf-8')
             if self.server.last_form_id.get('newoffer', None) == form_id:
-                content += '<p>Prevented double submit for form {}.</p>'.format(form_id)
+                messages.append('Prevented double submit for form {}.'.format(form_id))
             else:
                 self.server.last_form_id['newoffer'] = form_id
 
@@ -206,28 +197,21 @@ class HttpHandler(BaseHTTPRequestHandler):
                     lock_type = ABS_LOCK_TIME
 
                 offer_id = swap_client.postOffer(coin_from, coin_to, value_from, rate, min_bid, SwapTypes.SELLER_FIRST, auto_accept_bids=autoaccept, lock_type=lock_type, lock_value=lock_seconds)
-                content += '<p><a href="/offer/' + offer_id.hex() + '">Sent Offer ' + offer_id.hex() + '</a><br/>Rate: ' + format8(rate) + '</p>'
+                messages.append('<a href="/offer/' + offer_id.hex() + '">Sent Offer ' + offer_id.hex() + '</a><br/>Rate: ' + format8(rate))
 
         coins = []
-
         for k, v in swap_client.coin_clients.items():
             if v['connection_type'] == 'rpc':
                 coins.append((int(k), getCoinName(k)))
 
-        content += '<form method="post">'
-
-        content += '<table>'
-        content += '<tr><td>Coin From</td><td>' + self.make_coin_select('coin_from', coins) + '</td><td>Amount From</td><td><input type="text" name="amt_from"></td></tr>'
-        content += '<tr><td>Coin To</td><td>' + self.make_coin_select('coin_to', coins) + '</td><td>Amount To</td><td><input type="text" name="amt_to"></td></tr>'
-
-        content += '<tr><td>Contract locked (hrs)</td><td><input type="number" name="lockhrs" min="2" max="96" value="48"></td><td colspan=2>Participate txn will be locked for half the time.</td></tr>'
-        content += '<tr><td>Auto Accept Bids</td><td colspan=3><input type="checkbox" name="autoaccept" value="aa" checked></td></tr>'
-        content += '</table>'
-
-        content += '<input type="submit" value="Submit">'
-        content += '<input type="hidden" name="formid" value="' + os.urandom(8).hex() + '"></form>'
-        content += '<p><a href="/">home</a></p></body></html>'
-        return bytes(content, 'UTF-8')
+        template = env.get_template('offer_new.html')
+        return bytes(template.render(
+            title=self.server.title,
+            h2=self.server.title,
+            messages=messages,
+            coins=coins,
+            form_id=os.urandom(8).hex(),
+        ), 'UTF-8')
 
     def page_offer(self, url_split, post_string):
         assert(len(url_split) > 2), 'Offer ID not specified'
@@ -240,56 +224,54 @@ class HttpHandler(BaseHTTPRequestHandler):
         offer = swap_client.getOffer(offer_id)
         assert(offer), 'Unknown offer ID'
 
-        content = html_content_start(self.server.title, self.server.title) \
-            + '<h3>Offer: ' + offer_id.hex() + '</h3>'
-
+        messages = []
+        sent_bid_id = None
         if post_string != '':
             form_data = urllib.parse.parse_qs(post_string)
             form_id = form_data[b'formid'][0].decode('utf-8')
             if self.server.last_form_id.get('offer', None) == form_id:
-                content += '<p>Prevented double submit for form {}.</p>'.format(form_id)
+                messages.append('Prevented double submit for form {}.'.format(form_id))
             else:
                 self.server.last_form_id['offer'] = form_id
-                bid_id = swap_client.postBid(offer_id, offer.amount_from)
-                content += '<p><a href="/bid/' + bid_id.hex() + '">Sent Bid ' + bid_id.hex() + '</a></p>'
+                sent_bid_id = swap_client.postBid(offer_id, offer.amount_from).hex()
 
         coin_from = Coins(offer.coin_from)
         coin_to = Coins(offer.coin_to)
         ticker_from = swap_client.getTicker(coin_from)
         ticker_to = swap_client.getTicker(coin_to)
-
-        tr = '<tr><td>{}</td><td>{}</td></tr>'
-        content += '<table>'
-        content += tr.format('Offer State', getOfferState(offer.state))
-        content += tr.format('Coin From', getCoinName(coin_from))
-        content += tr.format('Coin To', getCoinName(coin_to))
-        content += tr.format('Amount From', format8(offer.amount_from) + ' ' + ticker_from)
-        content += tr.format('Amount To', format8((offer.amount_from * offer.rate) // COIN) + ' ' + ticker_to)
-        content += tr.format('Rate', format8(offer.rate) + ' ' + ticker_from + '/' + ticker_to)
-        content += tr.format('Script Lock Type', getLockName(offer.lock_type))
-        content += tr.format('Script Lock Value', offer.lock_value)
-        content += tr.format('Address From', offer.addr_from)
-        content += tr.format('Created At', time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(offer.created_at)))
-        content += tr.format('Expired At', time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(offer.expire_at)))
-        content += tr.format('Sent', 'True' if offer.was_sent else 'False')
+        data = {
+            'tla_from': swap_client.getTicker(coin_from),
+            'tla_to': swap_client.getTicker(coin_to),
+            'state': getOfferState(offer.state),
+            'coin_from': getCoinName(coin_from),
+            'coin_to': getCoinName(coin_to),
+            'amt_from': format8(offer.amount_from),
+            'amt_to': format8((offer.amount_from * offer.rate) // COIN),
+            'rate': format8(offer.rate),
+            'lock_type': getLockName(offer.lock_type),
+            'lock_value': offer.lock_value,
+            'addr_from': offer.addr_from,
+            'created_at': offer.created_at,
+            'expired_at': offer.expire_at,
+            'sent': 'True' if offer.was_sent else 'False'
+        }
 
         if offer.was_sent:
-            content += tr.format('Auto Accept Bids', 'True' if offer.auto_accept_bids else 'False')
-        content += '</table>'
+            data['auto_accept'] = 'True' if offer.auto_accept_bids else 'False'
 
         bids = swap_client.listBids(offer_id=offer_id)
 
-        content += '<h4>Bids</h4><table>'
-        content += '<tr><th>Bid ID</th><th>Bid Amount</th><th>Bid Status</th><th>ITX Status</th><th>PTX Status</th></tr>'
-        for b in bids:
-            content += '<tr><td><a href=/bid/{0}>{0}</a></td><td>{1}</td><td>{2}</td><td>{3}</td><td>{4}</td></tr>'.format(b.bid_id.hex(), format8(b.amount), getBidState(b.state), getTxState(b.initiate_txn_state), getTxState(b.participate_txn_state))
-        content += '</table>'
-
-        content += '<form method="post">'
-        content += '<input type="submit" value="Send Bid">'
-        content += '<input type="hidden" name="formid" value="' + os.urandom(8).hex() + '"></form>'
-        content += '<p><a href="/">home</a></p></body></html>'
-        return bytes(content, 'UTF-8')
+        template = env.get_template('offer.html')
+        return bytes(template.render(
+            title=self.server.title,
+            h2=self.server.title,
+            offer_id=offer_id.hex(),
+            sent_bid_id=sent_bid_id,
+            messages=messages,
+            data=data,
+            bids=[(b.bid_id.hex(), format8(b.amount), getBidState(b.state), getTxState(b.initiate_txn_state), getTxState(b.participate_txn_state)) for b in bids],
+            form_id=os.urandom(8).hex(),
+        ), 'UTF-8')
 
     def page_offers(self, url_split, sent=False):
         swap_client = self.server.swap_client
