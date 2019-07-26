@@ -550,10 +550,7 @@ class BasicSwap():
         bindir = os.path.expanduser(chain_client_settings.get('bindir', ''))
         datadir = os.path.expanduser(chain_client_settings.get('datadir', os.path.join(cfg.DATADIRS, chainparams[coin]['name'])))
 
-        blocks_confirmed = chain_client_settings.get('blocks_confirmed', 6)
         connection_type = chain_client_settings.get('connection_type', 'none')
-        use_segwit = chain_client_settings.get('use_segwit', False)
-
         rpcauth = None
         if connection_type == 'rpc':
             if 'rpcauth' in chain_client_settings:
@@ -591,10 +588,11 @@ class BasicSwap():
             'datadir': datadir,
             'rpcport': chain_client_settings.get('rpcport', chainparams[coin][self.chain]['rpcport']),
             'rpcauth': rpcauth,
-            'blocks_confirmed': blocks_confirmed,
+            'blocks_confirmed': chain_client_settings.get('blocks_confirmed', 6),
+            'conf_target': chain_client_settings.get('conf_target', 2),
             'watched_outputs': [],
             'last_height_checked': last_height_checked,
-            'use_segwit': use_segwit,
+            'use_segwit': chain_client_settings.get('use_segwit', False),
             'use_csv': chain_client_settings.get('use_csv', True),
         }
 
@@ -926,7 +924,10 @@ class BasicSwap():
 
     def withdrawCoin(self, coin_type, value, addr_to, subfee):
         self.log.info('withdrawCoin %s %s to %s %s', value, self.getTicker(coin_type), addr_to, ' subfee' if subfee else '')
-        return self.callcoinrpc(coin_type, 'sendtoaddress', [addr_to, value, '', '', subfee])
+        params = [addr_to, value, '', '', subfee, True, self.coin_clients[coin_type]['conf_target']]
+        if coin_type == Coins.PART:
+            params.insert(5, '')  # narration
+        return self.callcoinrpc(coin_type, 'sendtoaddress', params)
 
     def cacheNewAddressForCoin(self, coin_type):
         self.log.debug('cacheNewAddressForCoin %s', coin_type)
@@ -1039,7 +1040,7 @@ class BasicSwap():
         offer = self.getOffer(offer_id)
         assert(offer), 'Offer not found: {}.'.format(offer_id.hex())
 
-        # TODO: Assert offer still valid
+        assert(offer.expire_at > int(time.time())), 'Offer has expired'
 
         msg_buf = BidMessage()
         msg_buf.offer_msg_id = offer_id
@@ -1281,7 +1282,12 @@ class BasicSwap():
             addr_to = self.getScriptAddress(coin_type, bid.initiate_script)
         self.log.debug('Create initiate txn for coin %s to %s for bid %s', str(coin_type), addr_to, bid_id.hex())
         txn = self.callcoinrpc(coin_type, 'createrawtransaction', [[], {addr_to: format8(bid.amount)}])
-        txn_funded = self.callcoinrpc(coin_type, 'fundrawtransaction', [txn, {'lockUnspents': True}])['hex']
+
+        options = {
+            'lockUnspents': True,
+            'conf_target': self.coin_clients[coin_type]['conf_target'],
+        }
+        txn_funded = self.callcoinrpc(coin_type, 'fundrawtransaction', [txn, options])['hex']
         txn_signed = self.callcoinrpc(coin_type, 'signrawtransactionwithwallet', [txn_funded])['hex']
         return txn_signed
 
@@ -1353,8 +1359,11 @@ class BasicSwap():
             addr_to = self.getScriptAddress(coin_to, bid.participate_script)
 
         txn = self.callcoinrpc(coin_to, 'createrawtransaction', [[], {addr_to: format8(amount_to)}])
-        txn_funded = self.callcoinrpc(coin_to, 'fundrawtransaction', [txn, {'lockUnspents': True}])['hex']
-
+        options = {
+            'lockUnspents': True,
+            'conf_target': self.coin_clients[coin_to]['conf_target'],
+        }
+        txn_funded = self.callcoinrpc(coin_to, 'fundrawtransaction', [txn, options])['hex']
         txn_signed = self.callcoinrpc(coin_to, 'signrawtransactionwithwallet', [txn_funded])['hex']
 
         refund_txn = self.createRefundTxn(coin_to, txn_signed, offer, bid, bid.participate_script, tx_type=TxTypes.PTX_REFUND)
@@ -2070,7 +2079,6 @@ class BasicSwap():
         assert(offer and offer.was_sent), 'Unknown offerid'
 
         assert(offer.state == OfferStates.OFFER_RECEIVED), 'Bad offer state'
-
         assert(msg['to'] == offer.addr_from), 'Received on incorrect address'
         assert(now <= offer.expire_at), 'Offer expired'
         assert(bid_data.amount >= offer.min_bid_amount), 'Bid amount below minimum'

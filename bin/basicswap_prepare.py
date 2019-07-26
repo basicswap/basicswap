@@ -364,6 +364,7 @@ def main():
             'bindir': os.path.join(data_dir, 'bin', 'particl'),
             'blocks_confirmed': 2,
             'override_feerate': 0.002,
+            'conf_target': 2,
         },
         'litecoin': {
             'connection_type': 'rpc' if 'litecoin' in with_coins else 'none',
@@ -372,7 +373,8 @@ def main():
             'datadir': os.path.join(data_dir, 'litecoin'),
             'bindir': os.path.join(data_dir, 'bin', 'litecoin'),
             'use_segwit': True,
-            'blocks_confirmed': 2
+            'blocks_confirmed': 2,
+            'conf_target': 2,
         },
         'bitcoin': {
             'connection_type': 'rpc' if 'bitcoin' in with_coins else 'none',
@@ -381,7 +383,8 @@ def main():
             'datadir': os.path.join(data_dir, 'bitcoin'),
             'bindir': os.path.join(data_dir, 'bin', 'bitcoin'),
             'use_segwit': True,
-            'blocks_confirmed': 1
+            'blocks_confirmed': 1,
+            'conf_target': 2,
         },
         'namecoin': {
             'connection_type': 'rpc' if 'namecoin' in with_coins else 'none',
@@ -391,7 +394,8 @@ def main():
             'bindir': os.path.join(data_dir, 'bin', 'namecoin'),
             'use_segwit': False,
             'use_csv': False,
-            'blocks_confirmed': 1
+            'blocks_confirmed': 1,
+            'conf_target': 2,
         }
     }
 
