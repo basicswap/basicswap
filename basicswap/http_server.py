@@ -290,22 +290,14 @@ class HttpHandler(BaseHTTPRequestHandler):
         swap_client = self.server.swap_client
         offers = swap_client.listOffers(sent)
 
-        content = html_content_start(self.server.title, self.server.title) \
-            + '<h3>' + ('Sent ' if sent else '') + 'Offers</h3>'
-
-        content += '<table>'
-        content += '<tr><th>At</th><th>Offer ID</th><th>Coin From</th><th>Coin To</th><th>Amount From</th><th>Amount To</th><th>Rate</th></tr>'
-        for o in offers:
-            coin_from_name = getCoinName(Coins(o.coin_from))
-            coin_to_name = getCoinName(Coins(o.coin_to))
-            amount_to = (o.amount_from * o.rate) // COIN
-            content += '<tr><td>{0}</td><td><a href=/offer/{1}>{1}</a></td><td>{2}</td><td>{3}</td><td>{4}</td><td>{5}</td><td>{6}</td></tr>'.format(
-                time.strftime('%Y-%m-%d %H:%M', time.localtime(o.created_at)),
-                o.offer_id.hex(), coin_from_name, coin_to_name, format8(o.amount_from), format8(amount_to), format8(o.rate))
-
-        content += '</table>'
-        content += '<p><a href="/">home</a></p></body></html>'
-        return bytes(content, 'UTF-8')
+        template = env.get_template('offers.html')
+        return bytes(template.render(
+            title=self.server.title,
+            h2=self.server.title,
+            page_type='Sent' if sent else 'Received',
+            offers=[(time.strftime('%Y-%m-%d %H:%M', time.localtime(o.created_at)),
+                     o.offer_id.hex(), getCoinName(Coins(o.coin_from)), getCoinName(Coins(o.coin_to)), format8(o.amount_from), format8((o.amount_from * o.rate) // COIN), format8(o.rate)) for o in offers],
+        ), 'UTF-8')
 
     def page_advance(self, url_split, post_string):
         assert(len(url_split) > 2), 'Bid ID not specified'
@@ -452,19 +444,14 @@ class HttpHandler(BaseHTTPRequestHandler):
         swap_client = self.server.swap_client
         bids = swap_client.listBids(sent=sent)
 
-        content = html_content_start(self.server.title, self.server.title) \
-            + '<h3>' + ('Sent ' if sent else '') + 'Bids</h3>'
-
-        content += '<table>'
-        content += '<tr><th>At</th><th>Bid ID</th><th>Offer ID</th><th>Bid Status</th><th>ITX Status</th><th>PTX Status</th></tr>'
-        for b in bids:
-            content += '<tr><td>{0}</td><td><a href=/bid/{1}>{1}</a></td><td><a href=/offer/{2}>{2}</a></td><td>{3}</td><td>{4}</td><td>{5}</td></tr>'.format(
-                time.strftime('%Y-%m-%d %H:%M', time.localtime(b.created_at)),
-                b.bid_id.hex(), b.offer_id.hex(), getBidState(b.state), getTxState(b.initiate_txn_state), getTxState(b.participate_txn_state))
-        content += '</table>'
-
-        content += '<p><a href="/">home</a></p></body></html>'
-        return bytes(content, 'UTF-8')
+        template = env.get_template('bids.html')
+        return bytes(template.render(
+            title=self.server.title,
+            h2=self.server.title,
+            page_type='Sent' if sent else 'Received',
+            bids=[(time.strftime('%Y-%m-%d %H:%M', time.localtime(b.created_at)),
+                   b.bid_id.hex(), b.offer_id.hex(), getBidState(b.state), getTxState(b.initiate_txn_state), getTxState(b.participate_txn_state)) for b in bids],
+        ), 'UTF-8')
 
     def page_watched(self, url_split, post_string):
         swap_client = self.server.swap_client
