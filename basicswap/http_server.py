@@ -113,11 +113,12 @@ class HttpHandler(BaseHTTPRequestHandler):
         content = html_content_start(self.server.title, self.server.title) \
             + '<h3>Wallets</h3>'
 
+        messages = []
         if post_string != '':
             form_data = urllib.parse.parse_qs(post_string)
             form_id = form_data[b'formid'][0].decode('utf-8')
             if self.server.last_form_id.get('wallets', None) == form_id:
-                content += '<p>Prevented double submit for form {}.</p>'.format(form_id)
+                messages.append('Prevented double submit for form {}.'.format(form_id))
             else:
                 self.server.last_form_id['wallets'] = form_id
 
@@ -133,33 +134,38 @@ class HttpHandler(BaseHTTPRequestHandler):
                         subfee = True if bytes('subfee_' + cid, 'utf-8') in form_data else False
                         txid = swap_client.withdrawCoin(c, value, address, subfee)
                         ticker = swap_client.getTicker(c)
-                        content += '<p>Withdrew {} {} to address {}<br/>In txid: {}</p>'.format(value, ticker, address, txid)
+                        messages.append('Withdrew {} {} to address {}<br/>In txid: {}'.format(value, ticker, address, txid))
 
         wallets = swap_client.getWalletsInfo()
 
-        content += '<form method="post">'
+        wallets_formatted = []
         for k, w in wallets.items():
-            cid = str(int(k))
-            content += '<h4>' + w['name'] + '</h4>'
-
             if 'error' in w:
-                content += '<p>Error: {}</p>'.format(w['error'])
-
+                wallets_formatted.append({
+                    'cid': str(int(k)),
+                    'error': w['error']
+                })
+                continue
             fee_rate = swap_client.getFeeRateForCoin(k)
             tx_vsize = swap_client.getContractSpendTxVSize(k)
             est_fee = (fee_rate * tx_vsize) / 1000
-            content += '<table>' \
-                + '<tr><td>Balance:</td><td>' + w['balance'] + '</td></tr>' \
-                + '<tr><td>Blocks:</td><td>' + str(w['blocks']) + '</td></tr>' \
-                + '<tr><td>Synced:</td><td>' + str(w['synced']) + '</td></tr>' \
-                + '<tr><td><input type="submit" name="newaddr_' + cid + '" value="Deposit Address"></td><td>' + str(w['deposit_address']) + '</td></tr>' \
-                + '<tr><td><input type="submit" name="withdraw_' + cid + '" value="Withdraw"></td><td>Amount: <input type="text" name="amt_' + cid + '"></td><td>Address: <input type="text" name="to_' + cid + '"></td><td>Subtract fee: <input type="checkbox" name="subfee_' + cid + '"></td></tr>' \
-                + '<tr><td>Fee Rate:</td><td>' + format8(fee_rate * COIN) + '</td><td>Est Fee:</td><td>' + format8(est_fee * COIN) + '</td></tr>' \
-                + '</table>'
+            wallets_formatted.append({
+                'cid': str(int(k)),
+                'fee_rate': format8(fee_rate * COIN),
+                'est_fee': format8(est_fee * COIN),
+                'balance': w['balance'],
+                'blocks': w['blocks'],
+                'synced': w['synced'],
+                'deposit_address': w['deposit_address'],
+            })
 
-        content += '<input type="hidden" name="formid" value="' + os.urandom(8).hex() + '"></form>'
-        content += '<p><a href="/">home</a></p></body></html>'
-        return bytes(content, 'UTF-8')
+        template = env.get_template('wallets.html')
+        return bytes(template.render(
+            title=self.server.title,
+            h2=self.server.title,
+            wallets=wallets_formatted,
+            form_id=os.urandom(8).hex(),
+        ), 'UTF-8')
 
     def page_newoffer(self, url_split, post_string):
         swap_client = self.server.swap_client
