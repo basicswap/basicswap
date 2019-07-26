@@ -5,3 +5,4 @@ include *.md
 include LICENSE.txt
 
 recursive-include doc *
+recursive-include basicswap/templates *

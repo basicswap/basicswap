@@ -13,7 +13,7 @@ import threading
 import http.client
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from jinja2 import Environment, FileSystemLoader
+from jinja2 import Environment, PackageLoader
 
 from . import __version__
 from .util import (
@@ -36,8 +36,8 @@ from .basicswap import (
     ABS_LOCK_TIME,
 )
 
-file_loader = FileSystemLoader('basicswap/templates')
-env = Environment(loader=file_loader)
+
+env = Environment(loader=PackageLoader('basicswap', 'templates'))
 
 
 def getCoinName(c):
