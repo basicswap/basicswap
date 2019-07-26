@@ -37,7 +37,12 @@ from .basicswap import (
 )
 
 
+def format_timestamp(value):
+    return time.strftime('%Y-%m-%d %H:%M', time.localtime(value))
+
+
 env = Environment(loader=PackageLoader('basicswap', 'templates'))
+env.filters['formatts'] = format_timestamp
 
 
 def getCoinName(c):
@@ -324,30 +329,27 @@ class HttpHandler(BaseHTTPRequestHandler):
             raise ValueError('Bad bid ID')
         swap_client = self.server.swap_client
 
-        content = html_content_start(self.server.title, self.server.title, 30) \
-            + '<h3>Bid: ' + bid_id.hex() + '</h3>' \
-            + '<p>Page Refresh: 30 seconds</p>'
-
+        messages = []
         show_txns = False
         if post_string != '':
             form_data = urllib.parse.parse_qs(post_string)
             form_id = form_data[b'formid'][0].decode('utf-8')
             if self.server.last_form_id.get('bid', None) == form_id:
-                content += '<p>Prevented double submit for form {}.</p>'.format(form_id)
+                messages.append('Prevented double submit for form {}.'.format(form_id))
             else:
                 self.server.last_form_id['bid'] = form_id
                 if b'abandon_bid' in form_data:
                     try:
                         swap_client.abandonBid(bid_id)
-                        content += '<p>Bid abandoned</p>'
+                        messages.append('Bid abandoned')
                     except Exception as e:
-                        content += '<p>Error' + str(e) + '</p>'
+                        messages.append('Error ' + str(e))
                 if b'accept_bid' in form_data:
                     try:
                         swap_client.acceptBid(bid_id)
-                        content += '<p>Bid accepted</p>'
+                        messages.append('Bid accepted')
                     except Exception as e:
-                        content += '<p>Error' + str(e) + '</p>'
+                        messages.append('Error ' + str(e))
                 if b'show_txns' in form_data:
                     show_txns = True
 
@@ -387,58 +389,63 @@ class HttpHandler(BaseHTTPRequestHandler):
         else:
             state_description = ''
 
-        tr = '<tr><td>{}</td><td>{}</td></tr>'
-        content += '<table>'
+        data = {
+            'amt_from': format8(bid.amount),
+            'amt_to': format8((bid.amount * offer.rate) // COIN),
+            'ticker_from': ticker_from,
+            'ticker_to': ticker_to,
+            'bid_state': getBidState(bid.state),
+            'state_description': state_description,
+            'itx_state': getTxState(bid.initiate_txn_state),
+            'ptx_state': getTxState(bid.participate_txn_state),
+            'offer_id': bid.offer_id.hex(),
+            'addr_from': bid.bid_addr,
+            'addr_fund_proof': bid.proof_address,
+            'created_at': time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(bid.created_at)),
+            'expired_at': time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(bid.expire_at)),
+            'was_sent': 'True' if bid.was_sent else 'False',
+            'was_received': 'True' if bid.was_received else 'False',
+            'initiate_tx': 'None' if not bid.initiate_txid else (bid.initiate_txid.hex() + ' ' + ticker_from),
+            'initiate_conf': 'None' if not bid.initiate_txn_conf else bid.initiate_txn_conf,
+            'participate_tx': 'None' if not bid.participate_txid else (bid.participate_txid.hex() + ' ' + ticker_to),
+            'participate_conf': 'None' if not bid.participate_txn_conf else bid.participate_txn_conf,
+            'show_txns': show_txns,
+        }
 
-        content += tr.format('Swap', format8(bid.amount) + ' ' + ticker_from + ' for ' + format8((bid.amount * offer.rate) // COIN) + ' ' + ticker_to)
-        content += tr.format('Bid State', getBidState(bid.state))
-        content += tr.format('State Description', state_description)
-        content += tr.format('ITX State', getTxState(bid.initiate_txn_state))
-        content += tr.format('PTX State', getTxState(bid.participate_txn_state))
-        content += tr.format('Offer', '<a href="/offer/' + bid.offer_id.hex() + '">' + bid.offer_id.hex() + '</a>')
-        content += tr.format('Address From', bid.bid_addr)
-        content += tr.format('Proof of Funds', bid.proof_address)
-        content += tr.format('Created At', time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(bid.created_at)))
-        content += tr.format('Expired At', time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(bid.expire_at)))
-        content += tr.format('Sent', 'True' if bid.was_sent else 'False')
-        content += tr.format('Received', 'True' if bid.was_received else 'False')
-        content += tr.format('Initiate Tx', 'None' if not bid.initiate_txid else (bid.initiate_txid.hex() + ' ' + ticker_from))
-        content += tr.format('Initiate Conf', 'None' if not bid.initiate_txn_conf else bid.initiate_txn_conf)
-        content += tr.format('Participate Tx', 'None' if not bid.participate_txid else (bid.participate_txid.hex() + ' ' + ticker_to))
-        content += tr.format('Participate Conf', 'None' if not bid.participate_txn_conf else bid.participate_txn_conf)
         if show_txns:
-            content += tr.format('Initiate Tx Refund', 'None' if not bid.initiate_txn_refund else bid.initiate_txn_refund.hex())
-            content += tr.format('Participate Tx Refund', 'None' if not bid.participate_txn_refund else bid.participate_txn_refund.hex())
-            content += tr.format('Initiate Spend Tx', 'None' if not bid.initiate_spend_txid else (bid.initiate_spend_txid.hex() + ' {}'.format(bid.initiate_spend_n)))
-            content += tr.format('Participate Spend Tx', 'None' if not bid.participate_spend_txid else (bid.participate_spend_txid.hex() + ' {}'.format(bid.participate_spend_n)))
-        content += '</table>'
+            data['initiate_tx_refund'] = 'None' if not bid.initiate_txn_refund else bid.initiate_txn_refund.hex()
+            data['participate_tx_refund'] = 'None' if not bid.participate_txn_refund else bid.participate_txn_refund.hex()
+            data['initiate_tx_spend'] = 'None' if not bid.initiate_spend_txid else (bid.initiate_spend_txid.hex() + ' {}'.format(bid.initiate_spend_n))
+            data['participate_tx_spend'] = 'None' if not bid.participate_spend_txid else (bid.participate_spend_txid.hex() + ' {}'.format(bid.participate_spend_n))
 
-        content += '<form method="post">'
-        if bid.was_received:
-            content += '<input name="accept_bid" type="submit" value="Accept Bid"><br/>'
-        content += '<input name="abandon_bid" type="submit" value="Abandon Bid">'
-        content += '<input name="show_txns" type="submit" value="Show More Info">'
-        content += '<input type="hidden" name="formid" value="' + os.urandom(8).hex() + '"></form>'
-
-        content += '<h4>Old States</h4><table><tr><th>State</th><th>Set At</th></tr>'
+        old_states = []
         num_states = len(bid.states) // 12
         for i in range(num_states):
             up = struct.unpack_from('<iq', bid.states[i * 12:(i + 1) * 12])
-            content += '<tr><td>Bid {}</td><td>{}</td></tr>'.format(getBidState(up[0]), time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(up[1])))
+            old_states.append((up[1], 'Bid ' + getBidState(up[0])))
         if bid.initiate_txn_states is not None:
             num_states = len(bid.initiate_txn_states) // 12
             for i in range(num_states):
                 up = struct.unpack_from('<iq', bid.initiate_txn_states[i * 12:(i + 1) * 12])
-                content += '<tr><td>ITX {}</td><td>{}</td></tr>'.format(getTxState(up[0]), time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(up[1])))
+                old_states.append((up[1], 'ITX ' + getTxState(up[0])))
         if bid.participate_txn_states is not None:
             num_states = len(bid.participate_txn_states) // 12
             for i in range(num_states):
                 up = struct.unpack_from('<iq', bid.participate_txn_states[i * 12:(i + 1) * 12])
-                content += '<tr><td>PTX {}</td><td>{}</td></tr>'.format(getTxState(up[0]), time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(up[1])))
-        content += '</table>'
+                old_states.append((up[1], 'PTX ' + getTxState(up[0])))
+        if len(old_states) > 0:
+            old_states.sort(key=lambda x: x[0])
 
-        content += '<p><a href="/">home</a></p></body></html>'
-        return bytes(content, 'UTF-8')
+        template = env.get_template('bid.html')
+        return bytes(template.render(
+            title=self.server.title,
+            h2=self.server.title,
+            bid_id=bid_id.hex(),
+            messages=messages,
+            data=data,
+            form_id=os.urandom(8).hex(),
+            old_states=old_states,
+        ), 'UTF-8')
 
     def page_bids(self, url_split, post_string, sent=False):
         swap_client = self.server.swap_client
