@@ -22,14 +22,6 @@
             "bindir": "/opt/bin/litecoin",
             "use_segwit": true,
             "blocks_confirmed": 2
-        },
-        "bitcoin": {
-            "connection_type": "none",
-            "manage_daemon": false,
-            "rpcport": 19796,
-            "datadir": "/coindata/bitcoin",
-            "bindir": "/coindata/bin/bitcoin",
-            "use_segwit": true
         }
     },
     "check_progress_seconds": 60,

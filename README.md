@@ -1,5 +1,7 @@
 
-# Particl Atomic Swap - Proof of concept
+# Simple Atomic Swap Network - Proof of Concept
+
+[![Build Status](https://travis-ci.org/tecnovert/basicswap.svg?branch=master)](https://travis-ci.org/tecnovert/basicswap)
 
 ## Overview
 

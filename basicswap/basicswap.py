@@ -19,6 +19,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.ext.declarative import declarative_base
 from enum import IntEnum, auto
+
 from . import __version__
 from .util import (
     COIN,
@@ -33,18 +34,15 @@ from .util import (
     toWIF,
     getKeyID,
 )
-
 from .chainparams import (
     chainparams,
     Coins,
 )
-
 from .messages_pb2 import (
     OfferMessage,
     BidMessage,
     BidAcceptMessage,
 )
-
 import basicswap.config as cfg
 import basicswap.segwit_addr as segwit_addr
 
@@ -132,7 +130,7 @@ ABS_LOCK_TIME = 4
 SEQUENCE_LOCKTIME_GRANULARITY = 9  # 512 seconds
 SEQUENCE_LOCKTIME_TYPE_FLAG = (1 << 22)
 SEQUENCE_LOCKTIME_MASK = 0x0000ffff
-INITIATE_TX_TIMEOUT = 30 * 60
+INITIATE_TX_TIMEOUT = 40 * 60  # TODO: make variable per coin
 
 
 def getOfferState(state):

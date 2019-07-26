@@ -15,6 +15,7 @@ import urllib.parse
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from jinja2 import Environment, FileSystemLoader
 
+from . import __version__
 from .util import (
     COIN,
     format8,
@@ -35,7 +36,7 @@ from .basicswap import (
     ABS_LOCK_TIME,
 )
 
-file_loader = FileSystemLoader('templates')
+file_loader = FileSystemLoader('basicswap/templates')
 env = Environment(loader=file_loader)
 
 
@@ -487,6 +488,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             title=self.server.title,
             refresh=30,
             h2=self.server.title,
+            version=__version__,
             summary=summary
         ), 'UTF-8')
 
