@@ -1,4 +1,4 @@
-dist: buster
+dist: bionic
 os: linux
 language: python
 python: '3.7'
@@ -10,6 +10,8 @@ global:
   - PARTICL_BINDIR=/opt/binaries/particl-0.18.0.12/bin/
   - BITCOIN_BINDIR=/opt/binaries/bitcoin-0.18.0/bin/
   - LITECOIN_BINDIR=/opt/binaries/litecoin-0.17.1/bin/
+before_install:
+  - sudo apt-get install -y wget gnupg2
 before_script:
   - if [ ! -d "/opt/binaries" ]; then mkdir -p "/opt/binaries" ; fi
   - if [ ! -d "$BITCOIN_BINDIR" ]; then cd "/opt/binaries" && wget https://bitcoincore.org/bin/bitcoin-core-0.18.0/bitcoin-0.18.0-x86_64-linux-gnu.tar.gz && tar xvf bitcoin-0.18.0-x86_64-linux-gnu.tar.gz ; fi
@@ -33,8 +35,6 @@ jobs:
       cache: false
       language: python
       python: '3.6'
-      before_install:
-        - sudo apt-get install -y wget gnupg
       install:
         - travis_retry pip install flake8==3.5.0
         - travis_retry pip install codespell==1.15.0
