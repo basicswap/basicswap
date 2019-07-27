@@ -43,14 +43,23 @@ from .messages_pb2 import (
     BidMessage,
     BidAcceptMessage,
 )
+from .db import (
+    CURRENT_DB_VERSION,
+    Base,
+    DBKVInt,
+    DBKVString,
+    Offer,
+    Bid,
+    SwapTx,
+    PooledAddress,
+    SentOffer,
+)
 import basicswap.config as cfg
 import basicswap.segwit_addr as segwit_addr
 
 
 DEBUG = True
 SMSG_SECONDS_IN_DAY = 86400
-
-CURRENT_DB_VERSION = 1
 
 
 MIN_OFFER_VALID_TIME = 60 * 10
@@ -115,7 +124,9 @@ class OpCodes(IntEnum):
     OP_CHECKSEQUENCEVERIFY = 0xb2,
 
 
-class TxTypes(IntEnum):  # For PooledAddress
+class TxTypes(IntEnum):
+    ITX = auto()
+    PTX = auto()
     ITX_REDEEM = auto()
     ITX_REFUND = auto()
     PTX_REDEEM = auto()
@@ -278,168 +289,6 @@ def getP2WSH(script):
 
 def replaceAddrPrefix(addr, coin_type, chain_name, addr_type='pubkey_address'):
     return encodeAddress(bytes((chainparams[coin_type][chain_name][addr_type],)) + decodeAddress(addr)[1:])
-
-
-Base = declarative_base()
-
-
-class DBKVInt(Base):
-    __tablename__ = 'kv_int'
-    key = sa.Column(sa.String, primary_key=True)
-    value = sa.Column(sa.Integer)
-
-
-class DBKVString(Base):
-    __tablename__ = 'kv_string'
-    key = sa.Column(sa.String, primary_key=True)
-    value = sa.Column(sa.String)
-
-
-class Offer(Base):
-    __tablename__ = 'offers'
-
-    offer_id = sa.Column(sa.LargeBinary, primary_key=True)
-
-    coin_from = sa.Column(sa.Integer)
-    coin_to = sa.Column(sa.Integer)
-    amount_from = sa.Column(sa.BigInteger)
-    rate = sa.Column(sa.BigInteger)
-    min_bid_amount = sa.Column(sa.BigInteger)
-    time_valid = sa.Column(sa.BigInteger)
-    lock_type = sa.Column(sa.Integer)
-    lock_value = sa.Column(sa.Integer)
-    swap_type = sa.Column(sa.Integer)
-
-    proof_address = sa.Column(sa.String)
-    proof_signature = sa.Column(sa.LargeBinary)
-    pkhash_seller = sa.Column(sa.LargeBinary)
-    secret_hash = sa.Column(sa.LargeBinary)
-
-    addr_from = sa.Column(sa.String)
-    created_at = sa.Column(sa.BigInteger)
-    expire_at = sa.Column(sa.BigInteger)
-    was_sent = sa.Column(sa.Boolean)
-
-    auto_accept_bids = sa.Column(sa.Boolean)
-
-    state = sa.Column(sa.Integer)
-    states = sa.Column(sa.LargeBinary)  # Packed states and times
-
-    def setState(self, new_state):
-        now = int(time.time())
-        self.state = new_state
-        if self.states is None:
-            self.states = struct.pack('<iq', new_state, now)
-        else:
-            self.states += struct.pack('<iq', new_state, now)
-
-
-class Bid(Base):
-    __tablename__ = 'bids'
-
-    bid_id = sa.Column(sa.LargeBinary, primary_key=True)
-    offer_id = sa.Column(sa.LargeBinary, sa.ForeignKey('offers.offer_id'))
-
-    was_sent = sa.Column(sa.Boolean)
-    was_received = sa.Column(sa.Boolean)
-    contract_count = sa.Column(sa.Integer)
-    created_at = sa.Column(sa.BigInteger)
-    expire_at = sa.Column(sa.BigInteger)
-    bid_addr = sa.Column(sa.String)
-    proof_address = sa.Column(sa.String)
-
-    recovered_secret = sa.Column(sa.LargeBinary)
-    amount_to = sa.Column(sa.BigInteger)  # amount * offer.rate
-
-    pkhash_buyer = sa.Column(sa.LargeBinary)
-    amount = sa.Column(sa.BigInteger)
-
-    accept_msg_id = sa.Column(sa.LargeBinary)
-    pkhash_seller = sa.Column(sa.LargeBinary)
-
-    initiate_script = sa.Column(sa.LargeBinary)  # contract_script
-    initiate_txid = sa.Column(sa.LargeBinary)
-    initiate_txn_n = sa.Column(sa.Integer)
-    initiate_txn_conf = sa.Column(sa.Integer)
-    initiate_txn_refund = sa.Column(sa.LargeBinary)
-
-    initiate_spend_txid = sa.Column(sa.LargeBinary)
-    initiate_spend_n = sa.Column(sa.Integer)
-
-    initiate_txn_height = sa.Column(sa.Integer)
-    initiate_txn_state = sa.Column(sa.Integer)
-    initiate_txn_states = sa.Column(sa.LargeBinary)  # Packed states and times
-
-    participate_script = sa.Column(sa.LargeBinary)
-    participate_txid = sa.Column(sa.LargeBinary)
-    participate_txn_n = sa.Column(sa.Integer)
-    participate_txn_conf = sa.Column(sa.Integer)
-    participate_txn_redeem = sa.Column(sa.LargeBinary)
-    participate_txn_refund = sa.Column(sa.LargeBinary)
-
-    participate_spend_txid = sa.Column(sa.LargeBinary)
-    participate_spend_n = sa.Column(sa.Integer)
-
-    participate_txn_height = sa.Column(sa.Integer)
-    participate_txn_state = sa.Column(sa.Integer)
-    participate_txn_states = sa.Column(sa.LargeBinary)  # Packed states and times
-
-    state = sa.Column(sa.Integer)
-    state_time = sa.Column(sa.BigInteger)  # timestamp of last state change
-    states = sa.Column(sa.LargeBinary)  # Packed states and times
-
-    state_note = sa.Column(sa.String)
-
-    def setITXState(self, new_state):
-        self.initiate_txn_state = new_state
-        if self.initiate_txn_states is None:
-            self.initiate_txn_states = struct.pack('<iq', new_state, int(time.time()))
-        else:
-            self.initiate_txn_states += struct.pack('<iq', new_state, int(time.time()))
-
-    def setPTXState(self, new_state):
-        self.participate_txn_state = new_state
-        if self.participate_txn_states is None:
-            self.participate_txn_states = struct.pack('<iq', new_state, int(time.time()))
-        else:
-            self.participate_txn_states += struct.pack('<iq', new_state, int(time.time()))
-
-    def setState(self, new_state):
-        now = int(time.time())
-        self.state = new_state
-        self.state_time = now
-        if self.states is None:
-            self.states = struct.pack('<iq', new_state, now)
-        else:
-            self.states += struct.pack('<iq', new_state, now)
-
-
-class PooledAddress(Base):
-    __tablename__ = 'addresspool'
-
-    addr_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
-    coin_type = sa.Column(sa.Integer)
-    addr = sa.Column(sa.String)
-    bid_id = sa.Column(sa.LargeBinary)
-    tx_type = sa.Column(sa.Integer)
-
-
-"""
-class SwapTx(Base):
-    def __init__(self):
-        self.txid = None
-        self.states = []
-        self.script = None
-        self.redeem_tx = None
-        self.refund_tx = None
-        self.p2sh = None
-"""
-
-
-class SentOffer(Base):
-    __tablename__ = 'sentoffers'
-
-    offer_id = sa.Column(sa.LargeBinary, primary_key=True)
 
 
 class BasicSwap():
@@ -654,6 +503,10 @@ class BasicSwap():
 
                     offer = session.query(Offer).filter_by(offer_id=bid.offer_id).first()
                     assert(offer), 'Offer not found'
+
+                    bid.initiate_tx = session.query(SwapTx).filter(sa.and_(SwapTx.bid_id == bid_id, SwapTx.tx_type == TxTypes.ITX)).first()
+                    bid.participate_tx = session.query(SwapTx).filter(sa.and_(SwapTx.bid_id == bid_id, SwapTx.tx_type == TxTypes.PTX)).first()
+
                     self.swaps_in_progress[bid.bid_id] = (bid, offer)
 
                     coin_from = Coins(offer.coin_from)
@@ -1026,6 +879,10 @@ class BasicSwap():
         try:
             session = scoped_session(self.session_factory)
             session.add(bid)
+            if bid.initiate_tx:
+                session.add(bid.initiate_tx)
+            if bid.participate_tx:
+                session.add(bid.participate_tx)
             session.commit()
             session.close()
             session.remove()
@@ -1105,7 +962,11 @@ class BasicSwap():
         self.mxDB.acquire()
         try:
             session = scoped_session(self.session_factory)
-            return session.query(Bid).filter_by(bid_id=bid_id).first()
+            bid = session.query(Bid).filter_by(bid_id=bid_id).first()
+            if bid:
+                bid.initiate_tx = session.query(SwapTx).filter(sa.and_(SwapTx.bid_id == bid_id, SwapTx.tx_type == TxTypes.ITX)).first()
+                bid.participate_tx = session.query(SwapTx).filter(sa.and_(SwapTx.bid_id == bid_id, SwapTx.tx_type == TxTypes.PTX)).first()
+            return bid
         finally:
             session.close()
             session.remove()
@@ -1116,6 +977,9 @@ class BasicSwap():
         try:
             session = scoped_session(self.session_factory)
             bid = session.query(Bid).filter_by(bid_id=bid_id).first()
+            if bid:
+                bid.initiate_tx = session.query(SwapTx).filter(sa.and_(SwapTx.bid_id == bid_id, SwapTx.tx_type == TxTypes.ITX)).first()
+                bid.participate_tx = session.query(SwapTx).filter(sa.and_(SwapTx.bid_id == bid_id, SwapTx.tx_type == TxTypes.PTX)).first()
             return bid, session.query(Offer).filter_by(offer_id=bid.offer_id).first() if bid is not None else None
         finally:
             session.close()
@@ -1159,10 +1023,10 @@ class BasicSwap():
 
         p2sh = self.callcoinrpc(Coins.PART, 'decodescript', [script.hex()])['p2sh']
 
-        bid.initiate_script = script
+        #bid.initiate_script = script
         bid.pkhash_seller = pkhash_refund
 
-        txn = self.createInitiateTxn(coin_from, bid_id, bid)
+        txn = self.createInitiateTxn(coin_from, bid_id, bid, script)
 
         # Store the signed refund txn in case wallet is locked when refund is possible
         refund_txn = self.createRefundTxn(coin_from, txn, offer, bid, script)
@@ -1170,6 +1034,12 @@ class BasicSwap():
 
         txid = self.submitTxn(coin_from, txn)
         self.log.debug('Submitted initiate txn %s to %s chain for bid %s', txid, chainparams[coin_from]['name'], bid_id.hex())
+        bid.initiate_tx = SwapTx(
+            bid_id=bid_id,
+            tx_type=TxTypes.ITX,
+            txid=bytes.fromhex(txid),
+            script=script,
+        )
         bid.setITXState(TxStates.TX_SENT)
 
         # Check non-bip68 final
@@ -1272,14 +1142,14 @@ class BasicSwap():
         bid.state_note = 'error msg: ' + error_str
         self.saveBid(bif_id, bid)
 
-    def createInitiateTxn(self, coin_type, bid_id, bid):
+    def createInitiateTxn(self, coin_type, bid_id, bid, initiate_script):
         if self.coin_clients[coin_type]['connection_type'] != 'rpc':
             return None
 
         if self.coin_clients[coin_type]['use_segwit']:
-            addr_to = self.encodeSegwitP2WSH(coin_type, getP2WSH(bid.initiate_script))
+            addr_to = self.encodeSegwitP2WSH(coin_type, getP2WSH(initiate_script))
         else:
-            addr_to = self.getScriptAddress(coin_type, bid.initiate_script)
+            addr_to = self.getScriptAddress(coin_type, initiate_script)
         self.log.debug('Create initiate txn for coin %s to %s for bid %s', str(coin_type), addr_to, bid_id.hex())
         txn = self.callcoinrpc(coin_type, 'createrawtransaction', [[], {addr_to: format8(bid.amount)}])
 
@@ -1298,7 +1168,7 @@ class BasicSwap():
 
         bid_date = dt.datetime.fromtimestamp(bid.created_at).date()
 
-        secret_hash = extractScriptSecretHash(bid.initiate_script)
+        secret_hash = extractScriptSecretHash(bid.initiate_tx.script)
         pkhash_seller = bid.pkhash_seller
         pkhash_buyer_refund = bid.pkhash_buyer
 
@@ -1402,7 +1272,7 @@ class BasicSwap():
         else:
             prev_txnid = bid.initiate_txid.hex()
             prev_n = bid.initiate_txn_n
-            txn_script = bid.initiate_script
+            txn_script = bid.initiate_tx.script
             prev_amount = bid.amount
 
         if self.coin_clients[coin_type]['use_segwit']:
@@ -1713,7 +1583,7 @@ class BasicSwap():
         if state == BidStates.BID_ACCEPTED:
             # Waiting for initiate txn to be confirmed in 'from' chain
             initiate_txnid_hex = bid.initiate_txid.hex()
-            p2sh = self.getScriptAddress(coin_from, bid.initiate_script)
+            p2sh = self.getScriptAddress(coin_from, bid.initiate_tx.script)
             index = None
             tx_height = None
             last_initiate_txn_conf = bid.initiate_txn_conf
@@ -1734,7 +1604,7 @@ class BasicSwap():
                     pass
             else:
                 if self.coin_clients[coin_from]['use_segwit']:
-                    addr = self.encodeSegwitP2WSH(coin_from, getP2WSH(bid.initiate_script))
+                    addr = self.encodeSegwitP2WSH(coin_from, getP2WSH(bid.initiate_tx.script))
                 else:
                     addr = p2sh
                 found = self.lookupUnspentByAddress(coin_from, addr, assert_amount=bid.amount, assert_txid=initiate_txnid_hex)
@@ -2206,7 +2076,13 @@ class BasicSwap():
 
         bid.accept_msg_id = bytes.fromhex(msg['msgid'])
         bid.initiate_txid = bid_accept_data.initiate_txid
-        bid.initiate_script = bid_accept_data.contract_script
+        #bid.initiate_script = bid_accept_data.contract_script
+        bid.initiate_tx = SwapTx(
+            bid_id=bid_id,
+            tx_type=TxTypes.ITX,
+            txid=bid_accept_data.initiate_txid,
+            script=bid_accept_data.contract_script,
+        )
         bid.pkhash_seller = bytes.fromhex(scriptvalues[3])
         bid.setState(BidStates.BID_ACCEPTED)
         bid.setITXState(TxStates.TX_NONE)
