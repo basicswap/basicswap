@@ -405,9 +405,9 @@ class Test(unittest.TestCase):
         assert(ro['validscripts'] == 1)
 
     def test_02_part_ltc(self):
+        logging.info('---------- Test PART to LTC')
         swap_clients = self.swap_clients
 
-        logging.info('---------- Test PART to LTC')
         offer_id = swap_clients[0].postOffer(Coins.PART, Coins.LTC, 100 * COIN, 0.1 * COIN, 100 * COIN, SwapTypes.SELLER_FIRST)
 
         self.wait_for_offer(swap_clients[1], offer_id)
@@ -432,9 +432,9 @@ class Test(unittest.TestCase):
         assert(js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
 
     def test_03_ltc_part(self):
+        logging.info('---------- Test LTC to PART')
         swap_clients = self.swap_clients
 
-        logging.info('---------- Test LTC to PART')
         offer_id = swap_clients[1].postOffer(Coins.LTC, Coins.PART, 10 * COIN, 9.0 * COIN, 10 * COIN, SwapTypes.SELLER_FIRST)
 
         self.wait_for_offer(swap_clients[0], offer_id)
@@ -457,9 +457,9 @@ class Test(unittest.TestCase):
         assert(js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
 
     def test_04_ltc_btc(self):
+        logging.info('---------- Test LTC to BTC')
         swap_clients = self.swap_clients
 
-        logging.info('---------- Test LTC to BTC')
         offer_id = swap_clients[0].postOffer(Coins.LTC, Coins.BTC, 10 * COIN, 0.1 * COIN, 10 * COIN, SwapTypes.SELLER_FIRST)
 
         self.wait_for_offer(swap_clients[1], offer_id)
@@ -486,9 +486,9 @@ class Test(unittest.TestCase):
 
     def test_05_refund(self):
         # Seller submits initiate txn, buyer doesn't respond
+        logging.info('---------- Test refund, LTC to BTC')
         swap_clients = self.swap_clients
 
-        logging.info('---------- Test refund, LTC to BTC')
         offer_id = swap_clients[0].postOffer(Coins.LTC, Coins.BTC, 10 * COIN, 0.1 * COIN, 10 * COIN, SwapTypes.SELLER_FIRST,
                                              SEQUENCE_LOCK_BLOCKS, 10)
 
@@ -511,13 +511,12 @@ class Test(unittest.TestCase):
         assert(js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
 
     def test_06_self_bid(self):
-        swap_clients = self.swap_clients
-
         logging.info('---------- Test same client, BTC to LTC')
+        swap_clients = self.swap_clients
 
         js_0_before = json.loads(urlopen('http://localhost:1800/json').read())
 
-        offer_id = swap_clients[0].postOffer(Coins.LTC, Coins.BTC, 10 * COIN, 10 * COIN, 10 * COIN, SwapTypes.SELLER_FIRST)
+        offer_id = swap_clients[0].postOffer(Coins.BTC, Coins.LTC, 10 * COIN, 10 * COIN, 10 * COIN, SwapTypes.SELLER_FIRST)
 
         self.wait_for_offer(swap_clients[0], offer_id)
         offers = swap_clients[0].listOffers()
@@ -536,13 +535,12 @@ class Test(unittest.TestCase):
         assert(js_0['num_recv_bids'] == js_0_before['num_recv_bids'] + 1 and js_0['num_sent_bids'] == js_0_before['num_sent_bids'] + 1)
 
     def test_07_error(self):
-        swap_clients = self.swap_clients
-
         logging.info('---------- Test error, BTC to LTC, set fee above bid value')
+        swap_clients = self.swap_clients
 
         js_0_before = json.loads(urlopen('http://localhost:1800/json').read())
 
-        offer_id = swap_clients[0].postOffer(Coins.LTC, Coins.BTC, 0.001 * COIN, 1.0 * COIN, 0.001 * COIN, SwapTypes.SELLER_FIRST)
+        offer_id = swap_clients[0].postOffer(Coins.BTC, Coins.LTC, 0.001 * COIN, 1.0 * COIN, 0.001 * COIN, SwapTypes.SELLER_FIRST)
 
         self.wait_for_offer(swap_clients[0], offer_id)
         offers = swap_clients[0].listOffers()

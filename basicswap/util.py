@@ -264,7 +264,7 @@ def callrpc(rpc_port, auth, method, params=[], wallet=None):
         v = x.json_request(method, params)
         x.close()
         r = json.loads(v.decode('utf-8'))
-    except Exception as e:
+    except Exception as ex:
         traceback.print_exc()
         raise ValueError('RPC Server Error')
 

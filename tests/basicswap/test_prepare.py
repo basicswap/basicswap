@@ -28,8 +28,9 @@ class Test(unittest.TestCase):
     def tearDownClass(self):
         try:
             shutil.rmtree(test_path)
-        except Exception as e:
-            logger.warning('tearDownClass %s', str(e))
+        except Exception as ex:
+            logger.warning('tearDownClass %s', str(ex))
+        super(Test, cls).tearDownClass()
 
     def test(self):
         testargs = ['basicswap-prepare', '-datadir=' + test_path]

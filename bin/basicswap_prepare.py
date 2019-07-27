@@ -193,6 +193,8 @@ def prepareDataDir(coin, settings, data_dir, chain, particl_mnemonic):
             fp.write(chain + '=1\n')
             if chain == 'testnet':
                 fp.write('[test]\n\n')
+            if chain == 'regtest':
+                fp.write('[regtest]\n\n')
             else:
                 logger.warning('Unknown chain %s', chain)
 
@@ -355,6 +357,7 @@ def main():
         os.makedirs(data_dir)
     config_path = os.path.join(data_dir, 'basicswap.json')
 
+    withchainclients = {}
     chainclients = {
         'particl': {
             'connection_type': 'rpc',
@@ -452,6 +455,9 @@ def main():
     if os.path.exists(config_path):
         exitWithError('{} exists'.format(config_path))
 
+    for c in with_coins:
+        withchainclients[c] = chainclients[c]
+
     settings = {
         'debug': True,
         'zmqhost': 'tcp://127.0.0.1',
@@ -460,7 +466,7 @@ def main():
         'htmlport': 12700 + port_offset,
         'network_key': '7sW2UEcHXvuqEjkpE5mD584zRaQYs6WXYohue4jLFZPTvMSxwvgs',
         'network_pubkey': '035758c4a22d7dd59165db02a56156e790224361eb3191f02197addcb3bde903d2',
-        'chainclients': chainclients,
+        'chainclients': withchainclients,
         'check_progress_seconds': 60,
         'check_watched_seconds': 60,
         'check_expired_seconds': 60

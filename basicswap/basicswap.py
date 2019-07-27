@@ -511,8 +511,8 @@ class BasicSwap():
 
                     coin_from = Coins(offer.coin_from)
                     coin_to = Coins(offer.coin_to)
-                    if bid.initiate_txid:
-                        self.addWatchedOutput(coin_from, bid.bid_id, bid.initiate_txid.hex(), bid.initiate_txn_n, BidStates.SWAP_INITIATED)
+                    if bid.initiate_tx:
+                        self.addWatchedOutput(coin_from, bid.bid_id, bid.initiate_tx.txid.hex(), bid.initiate_tx.vout, BidStates.SWAP_INITIATED)
                     if bid.participate_txid:
                         self.addWatchedOutput(coin_to, bid.bid_id, bid.participate_txid.hex(), bid.participate_txn_n, BidStates.SWAP_PARTICIPATING)
 
@@ -1046,9 +1046,9 @@ class BasicSwap():
         try:
             txid = self.submitTxn(coin_from, bid.initiate_txn_refund.hex())
             self.log.error('Submit refund_txn unexpectedly worked: ' + txid)
-        except Exception as e:
-            if 'non-BIP68-final' not in str(e) and 'non-final' not in str(e):
-                self.log.error('Submit refund_txn unexpected error' + str(e))
+        except Exception as ex:
+            if 'non-BIP68-final' not in str(ex) and 'non-final' not in str(ex):
+                self.log.error('Submit refund_txn unexpected error' + str(ex))
 
         if txid is not None:
             msg_buf = BidAcceptMessage()
@@ -1064,7 +1064,7 @@ class BasicSwap():
             accept_msg_id = bytes.fromhex(msg_id)
 
             bid.accept_msg_id = accept_msg_id
-            bid.initiate_txid = bytes.fromhex(txid)
+            #bid.initiate_txid = bytes.fromhex(txid)
             bid.setState(BidStates.BID_ACCEPTED)
 
             self.log.info('Sent BID_ACCEPT %s', accept_msg_id.hex())
@@ -1270,8 +1270,8 @@ class BasicSwap():
             txn_script = bid.participate_script
             prev_amount = bid.amount_to
         else:
-            prev_txnid = bid.initiate_txid.hex()
-            prev_n = bid.initiate_txn_n
+            prev_txnid = bid.initiate_tx.txid.hex()
+            prev_n = bid.initiate_tx.vout
             txn_script = bid.initiate_tx.script
             prev_amount = bid.amount
 
@@ -1582,11 +1582,11 @@ class BasicSwap():
         # TODO: timeouts
         if state == BidStates.BID_ACCEPTED:
             # Waiting for initiate txn to be confirmed in 'from' chain
-            initiate_txnid_hex = bid.initiate_txid.hex()
+            initiate_txnid_hex = bid.initiate_tx.txid.hex()
             p2sh = self.getScriptAddress(coin_from, bid.initiate_tx.script)
             index = None
             tx_height = None
-            last_initiate_txn_conf = bid.initiate_txn_conf
+            last_initiate_txn_conf = bid.initiate_tx.conf
             if coin_from == Coins.PART:  # Has txindex
                 try:
                     initiate_txn = self.callcoinrpc(coin_from, 'getrawtransaction', [initiate_txnid_hex, True])
@@ -1594,7 +1594,7 @@ class BasicSwap():
                     vout = getVoutByAddress(initiate_txn, p2sh)
                     assert(int(initiate_txn['vout'][vout]['value'] * COIN) == int(bid.amount)), 'Incorrect output amount in initiate txn.'
 
-                    bid.initiate_txn_conf = initiate_txn['confirmations']
+                    bid.initiate_tx.conf = initiate_txn['confirmations']
                     try:
                         tx_height = initiate_txn['height']
                     except Exception:
@@ -1609,31 +1609,31 @@ class BasicSwap():
                     addr = p2sh
                 found = self.lookupUnspentByAddress(coin_from, addr, assert_amount=bid.amount, assert_txid=initiate_txnid_hex)
                 if found:
-                    bid.initiate_txn_conf = found['n_conf']
+                    bid.initiate_tx.conf = found['n_conf']
                     index = found['index']
                     tx_height = found['height']
 
-            if bid.initiate_txn_conf != last_initiate_txn_conf:
+            if bid.initiate_tx.conf != last_initiate_txn_conf:
                 save_bid = True
 
-            if bid.initiate_txn_conf is not None:
-                self.log.debug('initiate_txnid %s confirms %d', initiate_txnid_hex, bid.initiate_txn_conf)
+            if bid.initiate_tx.conf is not None:
+                self.log.debug('initiate_txnid %s confirms %d', initiate_txnid_hex, bid.initiate_tx.conf)
 
-                if bid.initiate_txn_n is None:
-                    bid.initiate_txn_n = index
+                if bid.initiate_tx.vout is None:
+                    bid.initiate_tx.vout = index
                     # Start checking for spends of initiate_txn before fully confirmed
                     bid.initiate_txn_height = self.setLastHeightChecked(coin_from, tx_height)
-                    self.addWatchedOutput(coin_from, bid_id, initiate_txnid_hex, bid.initiate_txn_n, BidStates.SWAP_INITIATED)
+                    self.addWatchedOutput(coin_from, bid_id, initiate_txnid_hex, bid.initiate_tx.vout, BidStates.SWAP_INITIATED)
                     if bid.initiate_txn_state is None or bid.initiate_txn_state < TxStates.TX_SENT:
                         bid.setITXState(TxStates.TX_SENT)
                     save_bid = True
 
-                if bid.initiate_txn_conf >= self.coin_clients[coin_from]['blocks_confirmed']:
+                if bid.initiate_tx.conf >= self.coin_clients[coin_from]['blocks_confirmed']:
                     self.initiateTxnConfirmed(bid_id, bid, offer)
                     save_bid = True
 
             # Bid times out if buyer doesn't see tx in chain within INITIATE_TX_TIMEOUT seconds
-            if bid.initiate_txid is None and \
+            if bid.initiate_tx is None and \
                bid.state_time + INITIATE_TX_TIMEOUT < int(time.time()):
                 self.log.info('Swap timed out waiting for initiate tx for bid %s', bid_id.hex())
                 bid.setState(BidStates.SWAP_TIMEDOUT)
@@ -1698,18 +1698,18 @@ class BasicSwap():
                 txid = self.submitTxn(coin_from, bid.initiate_txn_refund.hex())
                 self.log.debug('Submitted initiate refund txn %s to %s chain for bid %s', txid, chainparams[coin_from]['name'], bid_id.hex())
                 # State will update when spend is detected
-            except Exception as e:
-                if 'non-BIP68-final (code 64)' not in str(e) and 'non-final' not in str(e):
-                    self.log.warning('Error trying to submit initiate refund txn: %s', str(e))
+            except Exception as ex:
+                if 'non-BIP68-final (code 64)' not in str(ex) and 'non-final' not in str(ex):
+                    self.log.warning('Error trying to submit initiate refund txn: %s', str(ex))
         if (bid.participate_txn_state == TxStates.TX_SENT or bid.participate_txn_state == TxStates.TX_CONFIRMED) \
            and bid.participate_txn_refund is not None:
             try:
                 txid = self.submitTxn(coin_to, bid.participate_txn_refund.hex())
                 self.log.debug('Submitted participate refund txn %s to %s chain for bid %s', txid, chainparams[coin_to]['name'], bid_id.hex())
                 # State will update when spend is detected
-            except Exception as e:
-                if 'non-BIP68-final (code 64)' not in str(e) and 'non-final' not in str(e):
-                    self.log.warning('Error trying to submit participate refund txn: %s', str(e))
+            except Exception as ex:
+                if 'non-BIP68-final (code 64)' not in str(ex) and 'non-final' not in str(ex):
+                    self.log.warning('Error trying to submit participate refund txn: %s', str(ex))
         return False  # Bid is still active
 
     def extractSecret(self, coin_type, bid, spend_in):
@@ -1762,7 +1762,7 @@ class BasicSwap():
                 # TODO: Wait for depth?
                 bid.setITXState(TxStates.TX_REDEEMED)
 
-            self.removeWatchedOutput(coin_from, bid_id, bid.initiate_txid.hex())
+            self.removeWatchedOutput(coin_from, bid_id, bid.initiate_tx.txid.hex())
             self.saveBid(bid_id, bid)
 
     def participateTxnSpent(self, bid_id, spend_txid, spend_n, spend_txn):
@@ -1813,9 +1813,9 @@ class BasicSwap():
                 found_spend = None
                 try:
                     found_spend = self.callcoinrpc(Coins.PART, 'getspentinfo', [{'txid': o[1], 'index': o[2]}])
-                except Exception as e:
-                    if 'Unable to get spent info' not in str(e):
-                        self.log.warning('getspentinfo %s', str(e))
+                except Exception as ex:
+                    if 'Unable to get spent info' not in str(ex):
+                        self.log.warning('getspentinfo %s', str(ex))
                 if found_spend is not None:
                     self.log.debug('Found spend in spentindex %s %d in %s %d', o[1], o[2], found_spend['txid'], found_spend['index'])
                     bid_id = o[0]
@@ -2075,7 +2075,7 @@ class BasicSwap():
         assert(bid.accept_msg_id is None), 'Bid already accepted'
 
         bid.accept_msg_id = bytes.fromhex(msg['msgid'])
-        bid.initiate_txid = bid_accept_data.initiate_txid
+        #bid.initiate_txid = bid_accept_data.initiate_txid
         #bid.initiate_script = bid_accept_data.contract_script
         bid.initiate_tx = SwapTx(
             bid_id=bid_id,
@@ -2129,10 +2129,10 @@ class BasicSwap():
             message = self.zmqSubscriber.recv(flags=zmq.NOBLOCK)
             if message == b'smsg':
                 self.processZmqSmsg()
-        except zmq.Again as e:
+        except zmq.Again as ex:
             pass
-        except Exception as e:
-            self.log.error('smsg zmq %s', str(e))
+        except Exception as ex:
+            self.log.error('smsg zmq %s', str(ex))
             traceback.print_exc()
 
         self.mxDB.acquire()
@@ -2165,8 +2165,8 @@ class BasicSwap():
             # Expire messages
             if int(time.time()) - self.last_checked_expired > self.check_expired_seconds:
                 self.expireMessages()
-        except Exception as e:
-            self.log.error('update %s', str(e))
+        except Exception as ex:
+            self.log.error('update %s', str(ex))
             traceback.print_exc()
         finally:
             self.mxDB.release()

@@ -90,9 +90,9 @@ class Bid(Base):
     pkhash_seller = sa.Column(sa.LargeBinary)
 
     #initiate_script = sa.Column(sa.LargeBinary)  # contract_script
-    initiate_txid = sa.Column(sa.LargeBinary)
-    initiate_txn_n = sa.Column(sa.Integer)
-    initiate_txn_conf = sa.Column(sa.Integer)
+    #initiate_txid = sa.Column(sa.LargeBinary)
+    #initiate_txn_n = sa.Column(sa.Integer)
+    #initiate_txn_conf = sa.Column(sa.Integer)
     initiate_txn_refund = sa.Column(sa.LargeBinary)
 
     initiate_spend_txid = sa.Column(sa.LargeBinary)

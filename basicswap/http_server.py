@@ -330,14 +330,14 @@ class HttpHandler(BaseHTTPRequestHandler):
                     try:
                         swap_client.abandonBid(bid_id)
                         messages.append('Bid abandoned')
-                    except Exception as e:
-                        messages.append('Error ' + str(e))
+                    except Exception as ex:
+                        messages.append('Error ' + str(ex))
                 if b'accept_bid' in form_data:
                     try:
                         swap_client.acceptBid(bid_id)
                         messages.append('Bid accepted')
-                    except Exception as e:
-                        messages.append('Error ' + str(e))
+                    except Exception as ex:
+                        messages.append('Error ' + str(ex))
                 if b'show_txns' in form_data:
                     show_txns = True
 
@@ -354,7 +354,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         elif bid.state == BidStates.BID_RECEIVED:
             state_description = 'Waiting for seller to accept.'
         elif bid.state == BidStates.BID_ACCEPTED:
-            if not bid.initiate_txid:
+            if not bid.initiate_tx:
                 state_description = 'Waiting for seller to send initiate tx.'
             else:
                 state_description = 'Waiting for initiate tx to confirm.'
@@ -393,9 +393,9 @@ class HttpHandler(BaseHTTPRequestHandler):
             'expired_at': time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(bid.expire_at)),
             'was_sent': 'True' if bid.was_sent else 'False',
             'was_received': 'True' if bid.was_received else 'False',
-            'initiate_tx': 'None' if not bid.initiate_txid else (bid.initiate_txid.hex() + ' ' + ticker_from),
-            'initiate_conf': 'None' if not bid.initiate_txn_conf else bid.initiate_txn_conf,
-            'participate_tx': 'None' if not bid.participate_txid else (bid.participate_txid.hex() + ' ' + ticker_to),
+            'initiate_tx': 'None' if not bid.initiate_tx else (bid.initiate_tx.txid.hex() + ' ' + ticker_from),
+            'initiate_conf': 'None' if (not bid.initiate_tx or not bid.initiate_tx.conf) else bid.initiate_tx.conf,
+            'participate_tx': 'None' if not bid.participate_tx else (bid.participate_tx.txid.hex() + ' ' + ticker_to),
             'participate_conf': 'None' if not bid.participate_txn_conf else bid.participate_txn_conf,
             'show_txns': show_txns,
         }
@@ -495,8 +495,8 @@ class HttpHandler(BaseHTTPRequestHandler):
                             'sentbids': self.js_sentbids,
                             }.get(url_split[2], self.js_index)
                 return func(url_split)
-            except Exception as e:
-                return self.js_error(str(e))
+            except Exception as ex:
+                return self.js_error(str(ex))
         try:
             self.putHeaders(status_code, 'text/html')
             if len(url_split) > 1:
@@ -523,9 +523,9 @@ class HttpHandler(BaseHTTPRequestHandler):
                 if url_split[1] == 'watched':
                     return self.page_watched(url_split, post_string)
             return self.page_index(url_split)
-        except Exception as e:
+        except Exception as ex:
             traceback.print_exc()  # TODO: Remove
-            return self.page_error(str(e))
+            return self.page_error(str(ex))
 
     def do_GET(self):
         response = self.handle_http(200, self.path)

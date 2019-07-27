@@ -8,9 +8,6 @@
 """
 Atomic Swap Client - Proof of Concept
 
-Dependencies:
-    $ pacman -S python-pyzmq python-plyvel protobuf
-
 """
 
 import sys
@@ -50,7 +47,7 @@ def startDaemon(node_dir, bin_dir, daemon_bin, opts=[]):
     return subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 
-def runClient(fp, data_dir, chain):
+def runClient(fp, data_dir, chain, test_mode):
     global swap_client
     settings_path = os.path.join(data_dir, 'basicswap.json')
     pids_path = os.path.join(data_dir, '.pids')
@@ -87,8 +84,10 @@ def runClient(fp, data_dir, chain):
 
     swap_client = BasicSwap(fp, data_dir, settings, chain)
 
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
+    if not test_mode:
+        # signal only works in main thread
+        signal.signal(signal.SIGINT, signal_handler)
+        signal.signal(signal.SIGTERM, signal_handler)
     swap_client.start()
 
     threads = []
@@ -148,12 +147,19 @@ def printVersion():
 
 
 def printHelp():
-    logger.info('basicswap-run --datadir=path -testnet')
+    logger.info('Usage: basicswap-run ')
+    logger.info('\n--help, -h               Print help.')
+    logger.info('--version, -v            Print version.')
+    logger.info('--datadir=PATH           Path to basicswap data directory, default:~/.basicswap.')
+    logger.info('--mainnet                Run in mainnet mode.')
+    logger.info('--testnet                Run in testnet mode.')
+    logger.info('--regtest                Run in regtest mode.')
 
 
 def main():
     data_dir = None
     chain = 'mainnet'
+    test_mode = False
 
     for v in sys.argv[1:]:
         if len(v) < 2 or v[0] != '-':
@@ -173,6 +179,10 @@ def main():
         if name == 'h' or name == 'help':
             printHelp()
             return 0
+
+        if name == 'testmode':
+            test_mode = True
+            continue
         if name == 'testnet':
             chain = 'testnet'
             continue
@@ -198,7 +208,7 @@ def main():
 
     with open(os.path.join(data_dir, 'basicswap.log'), 'a') as fp:
         logger.info(os.path.basename(sys.argv[0]) + ', version: ' + __version__ + '\n\n')
-        runClient(fp, data_dir, chain)
+        runClient(fp, data_dir, chain, test_mode)
 
     logger.info('Done.')
     return swap_client.fail_code if swap_client is not None else 0
