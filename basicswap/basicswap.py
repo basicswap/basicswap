@@ -2319,11 +2319,23 @@ class BasicSwap():
 
     def calltx(self, cmd):
         bindir = self.coin_clients[Coins.PART]['bindir']
-        command_cli = os.path.join(bindir, cfg.PARTICL_TX)
+        command_tx = os.path.join(bindir, cfg.PARTICL_TX)
         chainname = '' if self.chain == 'mainnet' else (' -' + self.chain)
-        args = command_cli + chainname + ' ' + cmd
+        args = command_tx + chainname + ' ' + cmd
         p = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
         out = p.communicate()
         if len(out[1]) > 0:
             raise ValueError('TX error ' + str(out[1]))
+        return out[0].decode('utf-8').strip()
+
+    def callcoincli(self, coin_type, params, wallet=None):
+        bindir = self.coin_clients[coin_type]['bindir']
+        datadir = self.coin_clients[coin_type]['datadir']
+        command_cli = os.path.join(bindir, chainparams[coin_type]['name'] + '-cli')
+        chainname = '' if self.chain == 'mainnet' else (' -' + self.chain)
+        args = command_cli + chainname + ' ' + '-datadir=' + datadir + ' ' + params
+        p = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+        out = p.communicate()
+        if len(out[1]) > 0:
+            raise ValueError('CLI error ' + str(out[1]))
         return out[0].decode('utf-8').strip()

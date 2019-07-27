@@ -1,0 +1,28 @@
+{% include 'header.html' %}
+
+<h3>New Offer</h3>
+{% for m in messages %}
+<p>{{ m }}</p>
+{% endfor %}
+
+<form method="post">
+<p>
+<select name="coin_type"><option value="-1">-- Select Coin --</option>
+{% for c in coins %}
+<option value="{{ c[0] }}">{{ c[1] }}</option>
+{% endfor %}
+</select><br/>
+<input type="text" name="cmd"><br/>
+<input type="submit" value="Submit">
+<input type="hidden" name="formid" value="{{ form_id }}">
+</p>
+</form>
+
+{% if result %}
+<textarea id="story" name="story" rows="40" cols="160">
+{{ result }}
+</textarea>
+{% endif %}
+
+<p><a href="/">home</a></p>
+</body></html>

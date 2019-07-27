@@ -126,6 +126,44 @@ class HttpHandler(BaseHTTPRequestHandler):
     def js_index(self, url_split):
         return bytes(json.dumps(self.server.swap_client.getSummary()), 'UTF-8')
 
+    def page_rpc(self, url_split, post_string):
+        swap_client = self.server.swap_client
+
+        result = None
+        messages = []
+        if post_string != '':
+            form_data = urllib.parse.parse_qs(post_string)
+            form_id = form_data[b'formid'][0].decode('utf-8')
+            if self.server.last_form_id.get('rpc', None) == form_id:
+                messages.append('Prevented double submit for form {}.'.format(form_id))
+            else:
+                self.server.last_form_id['newoffer'] = form_id
+
+                try:
+                    coin_type = Coins(int(form_data[b'coin_type'][0]))
+                except Exception:
+                    raise ValueError('Unknown Coin Type')
+
+                cmd = form_data[b'cmd'][0].decode('utf-8')
+                try:
+                    result = swap_client.callcoincli(coin_type, cmd)
+                except Exception as ex:
+                    result = str(ex)
+
+        coins = []
+        for k, v in swap_client.coin_clients.items():
+            if v['connection_type'] == 'rpc':
+                coins.append((int(k), getCoinName(k)))
+
+        template = env.get_template('rpc.html')
+        return bytes(template.render(
+            title=self.server.title,
+            h2=self.server.title,
+            coins=coins,
+            result=result,
+            form_id=os.urandom(8).hex(),
+        ), 'UTF-8')
+
     def page_active(self, url_split, post_string):
         swap_client = self.server.swap_client
         active_swaps = swap_client.listSwapsInProgress()
@@ -140,9 +178,6 @@ class HttpHandler(BaseHTTPRequestHandler):
 
     def page_wallets(self, url_split, post_string):
         swap_client = self.server.swap_client
-
-        content = html_content_start(self.server.title, self.server.title) \
-            + '<h3>Wallets</h3>'
 
         messages = []
         if post_string != '':
@@ -535,6 +570,8 @@ class HttpHandler(BaseHTTPRequestHandler):
                     return self.page_active(url_split, post_string)
                 if url_split[1] == 'wallets':
                     return self.page_wallets(url_split, post_string)
+                if url_split[1] == 'rpc':
+                    return self.page_rpc(url_split, post_string)
                 if url_split[1] == 'offer':
                     return self.page_offer(url_split, post_string)
                 if url_split[1] == 'offers':

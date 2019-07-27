@@ -1,7 +1,5 @@
 {% include 'header.html' %}
 
-<p><a href="/wallets">View Wallets</a></p>
-
 <p>
 {% if refresh %}
 Page Refresh: {{ refresh }} seconds<br/>
@@ -9,6 +7,9 @@ Page Refresh: {{ refresh }} seconds<br/>
 Version: {{ version }}
 </p>
 <p>
+<a href="/wallets">View Wallets</a><br/>
+<a href="/rpc">RPC Console</a><br/>
+<br/>
 <a href="/active">Swaps in progress: {{ summary.num_swapping }}</a><br/>
 <a href="/offers">Network Offers: {{ summary.num_network_offers }}</a><br/>
 <a href="/sentoffers">Sent Offers: {{ summary.num_sent_offers }}</a><br/>

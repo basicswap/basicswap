@@ -13,7 +13,7 @@
 {% for c in coins %}
 <option value="{{ c[0] }}">{{ c[1] }}</option>
 {% endfor %}
-</select>'
+</select>
 </td><td>Amount From</td><td><input type="text" name="amt_from"></td></tr>
 
 <tr><td>Coin To</td><td>
@@ -21,7 +21,7 @@
 {% for c in coins %}
 <option value="{{ c[0] }}">{{ c[1] }}</option>
 {% endfor %}
-</select>'
+</select>
 </td><td>Amount To</td><td><input type="text" name="amt_to"></td></tr>
 
 <tr><td>Contract locked (hrs)</td><td><input type="number" name="lockhrs" min="2" max="96" value="48"></td><td colspan=2>Participate txn will be locked for half the time.</td></tr>
