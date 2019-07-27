@@ -89,18 +89,7 @@ class Bid(Base):
     accept_msg_id = sa.Column(sa.LargeBinary)
     pkhash_seller = sa.Column(sa.LargeBinary)
 
-    #initiate_script = sa.Column(sa.LargeBinary)  # contract_script
-    #initiate_txid = sa.Column(sa.LargeBinary)
-    #initiate_txn_n = sa.Column(sa.Integer)
-    #initiate_txn_conf = sa.Column(sa.Integer)
     initiate_txn_refund = sa.Column(sa.LargeBinary)
-
-    initiate_spend_txid = sa.Column(sa.LargeBinary)
-    initiate_spend_n = sa.Column(sa.Integer)
-
-    initiate_txn_height = sa.Column(sa.Integer)
-    initiate_txn_state = sa.Column(sa.Integer)
-    initiate_txn_states = sa.Column(sa.LargeBinary)  # Packed states and times
 
     participate_script = sa.Column(sa.LargeBinary)
     participate_txid = sa.Column(sa.LargeBinary)
@@ -125,18 +114,22 @@ class Bid(Base):
     initiate_tx = None
     participate_tx = None
 
-    def setITXState(self, new_state):
+    def getITxState(self):
+        if self.initiate_tx is None:
+            return None
+        return self.initiate_tx.state
+
+    def setITxState(self, new_state):
         if self.initiate_tx is not None:
             self.initiate_tx.state = new_state
             self.initiate_tx.states = (self.initiate_tx.states if self.initiate_tx.states is not None else bytes()) + struct.pack('<iq', new_state, int(time.time()))
 
-        self.initiate_txn_state = new_state
-        if self.initiate_txn_states is None:
-            self.initiate_txn_states = struct.pack('<iq', new_state, int(time.time()))
-        else:
-            self.initiate_txn_states += struct.pack('<iq', new_state, int(time.time()))
+    def getPTxState(self):
+        if self.participate_tx is None:
+            return None
+        return self.participate_tx.state
 
-    def setPTXState(self, new_state):
+    def setPTxState(self, new_state):
         if self.participate_tx is not None:
             self.participate_tx.state = new_state
             self.participate_tx.states = (self.participate_tx.states if self.participate_tx.states is not None else bytes()) + struct.pack('<iq', new_state, int(time.time()))
@@ -173,7 +166,11 @@ class SwapTx(Base):
     script = sa.Column(sa.LargeBinary)
 
     tx_fee = sa.Column(sa.BigInteger)
+    chain_height = sa.Column(sa.Integer)
     conf = sa.Column(sa.Integer)
+
+    spend_txid = sa.Column(sa.LargeBinary)
+    spend_n = sa.Column(sa.Integer)
 
     state = sa.Column(sa.Integer)
     states = sa.Column(sa.LargeBinary)  # Packed states and times

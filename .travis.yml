@@ -6,6 +6,7 @@ stages:
   - lint
 env:
 global:
+  - TEST_DIR=/tmp/test_basicswap/
   - PARTICL_BINDIR=/opt/binaries/particl-0.18.0.12/bin/
   - BITCOIN_BINDIR=/opt/binaries/bitcoin-0.18.0/bin/
   - LITECOIN_BINDIR=/opt/binaries/litecoin-0.17.1/bin/
@@ -19,6 +20,8 @@ script:
   - export PARTICL_BINDIR=/opt/binaries/particl-0.18.0.12/bin/
   - export BITCOIN_BINDIR=/opt/binaries/bitcoin-0.18.0/bin/
   - export LITECOIN_BINDIR=/opt/binaries/litecoin-0.17.1/bin/
+  - mkdir -p ${TEST_DIR}/bin/{particl,bitcoin}
+  - cp /opt/binaries/bitcoin-0.18.0-x86_64-linux-gnu.tar.gz ${TEST_DIR}/bin/bitcoin
   - python setup.py test
 after_success:
   - echo "End test"

@@ -370,15 +370,15 @@ class Test(unittest.TestCase):
         for i in range(seconds_for):
             time.sleep(1)
             bid = swap_client.getBid(bid_id)
-            if (initiate_state is None or bid.initiate_txn_state == initiate_state) \
+            if (initiate_state is None or bid.getITxState() == initiate_state) \
                and (participate_state is None or bid.participate_txn_state == participate_state):
                 return
         raise ValueError('wait_for_bid_tx_state timed out.')
 
     def test_02_part_ltc(self):
+        logging.info('---------- Test PART to NMC')
         swap_clients = self.swap_clients
 
-        logging.info('---------- Test PART to NMC')
         offer_id = swap_clients[0].postOffer(Coins.PART, Coins.NMC, 100 * COIN, 0.1 * COIN, 100 * COIN, SwapTypes.SELLER_FIRST, ABS_LOCK_TIME)
 
         self.wait_for_offer(swap_clients[1], offer_id)
@@ -403,9 +403,9 @@ class Test(unittest.TestCase):
         assert(js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
 
     def test_03_nmc_part(self):
+        logging.info('---------- Test NMC to PART')
         swap_clients = self.swap_clients
 
-        logging.info('---------- Test NMC to PART')
         offer_id = swap_clients[1].postOffer(Coins.NMC, Coins.PART, 10 * COIN, 9.0 * COIN, 10 * COIN, SwapTypes.SELLER_FIRST, ABS_LOCK_TIME)
 
         self.wait_for_offer(swap_clients[0], offer_id)
@@ -428,9 +428,9 @@ class Test(unittest.TestCase):
         assert(js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
 
     def test_04_nmc_btc(self):
+        logging.info('---------- Test NMC to BTC')
         swap_clients = self.swap_clients
 
-        logging.info('---------- Test NMC to BTC')
         offer_id = swap_clients[0].postOffer(Coins.NMC, Coins.BTC, 10 * COIN, 0.1 * COIN, 10 * COIN, SwapTypes.SELLER_FIRST, ABS_LOCK_TIME)
 
         self.wait_for_offer(swap_clients[1], offer_id)
@@ -457,9 +457,9 @@ class Test(unittest.TestCase):
 
     def test_05_refund(self):
         # Seller submits initiate txn, buyer doesn't respond
+        logging.info('---------- Test refund, NMC to BTC')
         swap_clients = self.swap_clients
 
-        logging.info('---------- Test refund, NMC to BTC')
         offer_id = swap_clients[0].postOffer(Coins.NMC, Coins.BTC, 10 * COIN, 0.1 * COIN, 10 * COIN, SwapTypes.SELLER_FIRST,
                                              ABS_LOCK_BLOCKS, 10)
 
@@ -482,9 +482,8 @@ class Test(unittest.TestCase):
         assert(js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
 
     def test_06_self_bid(self):
-        swap_clients = self.swap_clients
-
         logging.info('---------- Test same client, BTC to NMC')
+        swap_clients = self.swap_clients
 
         js_0_before = json.loads(urlopen('http://localhost:1800/json').read())
 
@@ -507,9 +506,8 @@ class Test(unittest.TestCase):
         assert(js_0['num_recv_bids'] == js_0_before['num_recv_bids'] + 1 and js_0['num_sent_bids'] == js_0_before['num_sent_bids'] + 1)
 
     def test_07_error(self):
-        swap_clients = self.swap_clients
-
         logging.info('---------- Test error, BTC to NMC, set fee above bid value')
+        swap_clients = self.swap_clients
 
         js_0_before = json.loads(urlopen('http://localhost:1800/json').read())
 
