@@ -63,7 +63,7 @@ class Test(unittest.TestCase):
         thread = threading.Thread(target=self.run_thread)
         thread.start()
 
-        logger.log('TODO')
+        logger.warning('TODO')
         time.sleep(5)
 
         runSystem.swap_client.stopRunning()

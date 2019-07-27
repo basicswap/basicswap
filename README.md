@@ -22,10 +22,10 @@ Not ready for real-world use.
 Features still required (of many):
  - Cached addresses must be regenerated after use.
  - Option to lookup data from public explorers / nodes.
- - Load active bids from db at startup
  - Ability to swap coin-types without running nodes for all coin-types
  - More swap protocols
  - Method to load mnemonic into Particl.
+    - Load seeds for other wallets from same mnemonic.
  - COIN must be defined per coin.
 
 

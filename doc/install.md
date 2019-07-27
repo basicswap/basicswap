@@ -59,3 +59,14 @@ To run in a different directory and on testnet:
     $ export PYTHONPATH=$(pwd)
     $ python bin/basicswap-prepare.py
     $ python bin/basicswap-run.py
+
+
+## OSX
+
+    $ brew install python git protobuf
+    $ git clone https://github.com/tecnovert/basicswap.git
+    $ cd basicswap
+    $ protoc -I=basicswap --python_out=basicswap basicswap/messages.proto
+    $ pip3 install .
+    $ basicswap-prepare
+    $ basicswap-run
