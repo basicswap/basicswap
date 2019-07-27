@@ -515,9 +515,11 @@ class BasicSwap():
                         self.addWatchedOutput(coin_to, bid.bid_id, bid.participate_tx.txid.hex(), bid.participate_tx.vout, BidStates.SWAP_PARTICIPATING)
 
                     if self.coin_clients[coin_from]['last_height_checked'] < 1:
-                        self.coin_clients[coin_from]['last_height_checked'] = bid.initiate_tx.chain_height
+                        if bid.initiate_tx and bid.initiate_tx.chain_height:
+                            self.coin_clients[coin_from]['last_height_checked'] = bid.initiate_tx.chain_height
                     if self.coin_clients[coin_to]['last_height_checked'] < 1:
-                        self.coin_clients[coin_to]['last_height_checked'] = bid.participate_tx.chain_height
+                        if bid.participate_tx and bid.participate_tx.chain_height:
+                            self.coin_clients[coin_to]['last_height_checked'] = bid.participate_tx.chain_height
 
         finally:
             session.close()

@@ -59,9 +59,9 @@ def getTxIdHex(bid, tx_type, prefix):
         return 'Unknown Type'
 
     if not obj:
-        return None
+        return 'None'
     if not obj.txid:
-        return None
+        return 'None'
     return obj.txid.hex() + prefix
 
 
@@ -74,10 +74,10 @@ def getTxSpendHex(bid, tx_type):
         return 'Unknown Type'
 
     if not obj:
-        return None
+        return 'None'
     if not obj.spend_txid:
-        return None
-    obj.spend_txid.hex() + ' {}'.format(obj.spend_n)
+        return 'None'
+    return obj.spend_txid.hex() + ' {}'.format(obj.spend_n)
 
 
 def html_content_start(title, h2=None, refresh=None):
@@ -469,8 +469,8 @@ class HttpHandler(BaseHTTPRequestHandler):
         if show_txns:
             data['initiate_tx_refund'] = 'None' if not bid.initiate_txn_refund else bid.initiate_txn_refund.hex()
             data['participate_tx_refund'] = 'None' if not bid.participate_txn_refund else bid.participate_txn_refund.hex()
-            data['initiate_tx_spend'] = getTxSpendHex(bid, TxTypes.ITX),
-            data['participate_tx_spend'] = getTxSpendHex(bid, TxTypes.PTX),
+            data['initiate_tx_spend'] = getTxSpendHex(bid, TxTypes.ITX)
+            data['participate_tx_spend'] = getTxSpendHex(bid, TxTypes.PTX)
 
         old_states = []
         num_states = len(bid.states) // 12
