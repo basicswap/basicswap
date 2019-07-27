@@ -37,8 +37,8 @@ Before running docker-compose build
 ## Install as Python Module with PIP
 
     $ cd basicswap
-    $ pip3 install .
     $ protoc -I=basicswap --python_out=basicswap basicswap/messages.proto
+    $ pip3 install .
     $ basicswap-prepare
     $ basicswap-run
 
