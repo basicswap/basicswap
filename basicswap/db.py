@@ -7,7 +7,6 @@
 import struct
 import time
 import sqlalchemy as sa
-from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.ext.declarative import declarative_base
 
 CURRENT_DB_VERSION = 1
@@ -89,21 +88,11 @@ class Bid(Base):
     accept_msg_id = sa.Column(sa.LargeBinary)
     pkhash_seller = sa.Column(sa.LargeBinary)
 
+    initiate_txn_redeem = sa.Column(sa.LargeBinary)
     initiate_txn_refund = sa.Column(sa.LargeBinary)
 
-    participate_script = sa.Column(sa.LargeBinary)
-    participate_txid = sa.Column(sa.LargeBinary)
-    participate_txn_n = sa.Column(sa.Integer)
-    participate_txn_conf = sa.Column(sa.Integer)
     participate_txn_redeem = sa.Column(sa.LargeBinary)
     participate_txn_refund = sa.Column(sa.LargeBinary)
-
-    participate_spend_txid = sa.Column(sa.LargeBinary)
-    participate_spend_n = sa.Column(sa.Integer)
-
-    participate_txn_height = sa.Column(sa.Integer)
-    participate_txn_state = sa.Column(sa.Integer)
-    participate_txn_states = sa.Column(sa.LargeBinary)  # Packed states and times
 
     state = sa.Column(sa.Integer)
     state_time = sa.Column(sa.BigInteger)  # timestamp of last state change
@@ -133,12 +122,6 @@ class Bid(Base):
         if self.participate_tx is not None:
             self.participate_tx.state = new_state
             self.participate_tx.states = (self.participate_tx.states if self.participate_tx.states is not None else bytes()) + struct.pack('<iq', new_state, int(time.time()))
-
-        self.participate_txn_state = new_state
-        if self.participate_txn_states is None:
-            self.participate_txn_states = struct.pack('<iq', new_state, int(time.time()))
-        else:
-            self.participate_txn_states += struct.pack('<iq', new_state, int(time.time()))
 
     def setState(self, new_state):
         now = int(time.time())
@@ -190,4 +173,3 @@ class SentOffer(Base):
     __tablename__ = 'sentoffers'
 
     offer_id = sa.Column(sa.LargeBinary, primary_key=True)
-

@@ -20,10 +20,8 @@ import sys
 import time
 import unittest
 from unittest.mock import patch
-from io import StringIO
 import logging
 import shutil
-import json
 import threading
 
 import bin.basicswap_prepare as prepareSystem

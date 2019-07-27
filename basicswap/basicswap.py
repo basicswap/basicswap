@@ -11,13 +11,11 @@ import datetime as dt
 import zmq
 import threading
 import traceback
-import struct
 import hashlib
 import subprocess
 import logging
 import sqlalchemy as sa
 from sqlalchemy.orm import sessionmaker, scoped_session
-from sqlalchemy.ext.declarative import declarative_base
 from enum import IntEnum, auto
 
 from . import __version__
@@ -504,8 +502,8 @@ class BasicSwap():
                     offer = session.query(Offer).filter_by(offer_id=bid.offer_id).first()
                     assert(offer), 'Offer not found'
 
-                    bid.initiate_tx = session.query(SwapTx).filter(sa.and_(SwapTx.bid_id == bid_id, SwapTx.tx_type == TxTypes.ITX)).first()
-                    bid.participate_tx = session.query(SwapTx).filter(sa.and_(SwapTx.bid_id == bid_id, SwapTx.tx_type == TxTypes.PTX)).first()
+                    bid.initiate_tx = session.query(SwapTx).filter(sa.and_(SwapTx.bid_id == bid.bid_id, SwapTx.tx_type == TxTypes.ITX)).first()
+                    bid.participate_tx = session.query(SwapTx).filter(sa.and_(SwapTx.bid_id == bid.bid_id, SwapTx.tx_type == TxTypes.PTX)).first()
 
                     self.swaps_in_progress[bid.bid_id] = (bid, offer)
 
@@ -513,13 +511,13 @@ class BasicSwap():
                     coin_to = Coins(offer.coin_to)
                     if bid.initiate_tx:
                         self.addWatchedOutput(coin_from, bid.bid_id, bid.initiate_tx.txid.hex(), bid.initiate_tx.vout, BidStates.SWAP_INITIATED)
-                    if bid.participate_txid:
-                        self.addWatchedOutput(coin_to, bid.bid_id, bid.participate_txid.hex(), bid.participate_txn_n, BidStates.SWAP_PARTICIPATING)
+                    if bid.participate_tx:
+                        self.addWatchedOutput(coin_to, bid.bid_id, bid.participate_tx.txid.hex(), bid.participate_tx.vout, BidStates.SWAP_PARTICIPATING)
 
                     if self.coin_clients[coin_from]['last_height_checked'] < 1:
                         self.coin_clients[coin_from]['last_height_checked'] = bid.initiate_tx.chain_height
                     if self.coin_clients[coin_to]['last_height_checked'] < 1:
-                        self.coin_clients[coin_to]['last_height_checked'] = bid.participate_txn_height
+                        self.coin_clients[coin_to]['last_height_checked'] = bid.participate_tx.chain_height
 
         finally:
             session.close()
@@ -1023,7 +1021,6 @@ class BasicSwap():
 
         p2sh = self.callcoinrpc(Coins.PART, 'decodescript', [script.hex()])['p2sh']
 
-        #bid.initiate_script = script
         bid.pkhash_seller = pkhash_refund
 
         txn = self.createInitiateTxn(coin_from, bid_id, bid, script)
@@ -1064,7 +1061,6 @@ class BasicSwap():
             accept_msg_id = bytes.fromhex(msg_id)
 
             bid.accept_msg_id = accept_msg_id
-            #bid.initiate_txid = bytes.fromhex(txid)
             bid.setState(BidStates.BID_ACCEPTED)
 
             self.log.info('Sent BID_ACCEPT %s', accept_msg_id.hex())
@@ -1116,9 +1112,9 @@ class BasicSwap():
                 self.returnAddressToPool(bid_id, TxTypes.ITX_REDEEM)
             if bid.getITxState() != TxStates.TX_REFUNDED:
                 self.returnAddressToPool(bid_id, TxTypes.ITX_REFUND)
-            if bid.participate_txn_state != TxStates.TX_REDEEMED:
+            if bid.getPTxState() != TxStates.TX_REDEEMED:
                 self.returnAddressToPool(bid_id, TxTypes.PTX_REDEEM)
-            if bid.participate_txn_state != TxStates.TX_REFUNDED:
+            if bid.getPTxState() != TxStates.TX_REFUNDED:
                 self.returnAddressToPool(bid_id, TxTypes.PTX_REFUND)
         finally:
             session.close()
@@ -1176,7 +1172,7 @@ class BasicSwap():
         lock_value = offer.lock_value // 2
         if offer.lock_type < ABS_LOCK_BLOCKS:
             sequence = getExpectedSequence(offer.lock_type, lock_value, coin_to)
-            bid.participate_script = buildContractScript(sequence, secret_hash, pkhash_seller, pkhash_buyer_refund)
+            participate_script = buildContractScript(sequence, secret_hash, pkhash_seller, pkhash_buyer_refund)
         else:
             # Lock from the height or time of the block containing the initiate txn
             coin_from = Coins(offer.coin_from)
@@ -1207,9 +1203,10 @@ class BasicSwap():
                 self.log.debug('Setting lock value from time of block %s %s', coin_from, initiate_tx_block_hash)
                 contract_lock_value = initiate_tx_block_time + lock_value
             self.log.debug('participate %s lock_value %d %d', coin_to, lock_value, contract_lock_value)
-            bid.participate_script = buildContractScript(contract_lock_value, secret_hash, pkhash_seller, pkhash_buyer_refund, OpCodes.OP_CHECKLOCKTIMEVERIFY)
+            participate_script = buildContractScript(contract_lock_value, secret_hash, pkhash_seller, pkhash_buyer_refund, OpCodes.OP_CHECKLOCKTIMEVERIFY)
+        return participate_script
 
-    def createParticipateTxn(self, bid_id, bid, offer):
+    def createParticipateTxn(self, bid_id, bid, offer, participate_script):
         self.log.debug('createParticipateTxn')
 
         offer_id = bid.offer_id
@@ -1223,10 +1220,10 @@ class BasicSwap():
         assert(amount_to == (bid.amount * offer.rate) // COIN)
 
         if self.coin_clients[coin_to]['use_segwit']:
-            p2wsh = getP2WSH(bid.participate_script)
+            p2wsh = getP2WSH(participate_script)
             addr_to = self.encodeSegwitP2WSH(coin_to, p2wsh)
         else:
-            addr_to = self.getScriptAddress(coin_to, bid.participate_script)
+            addr_to = self.getScriptAddress(coin_to, participate_script)
 
         txn = self.callcoinrpc(coin_to, 'createrawtransaction', [[], {addr_to: format8(amount_to)}])
         options = {
@@ -1236,7 +1233,7 @@ class BasicSwap():
         txn_funded = self.callcoinrpc(coin_to, 'fundrawtransaction', [txn, options])['hex']
         txn_signed = self.callcoinrpc(coin_to, 'signrawtransactionwithwallet', [txn_funded])['hex']
 
-        refund_txn = self.createRefundTxn(coin_to, txn_signed, offer, bid, bid.participate_script, tx_type=TxTypes.PTX_REFUND)
+        refund_txn = self.createRefundTxn(coin_to, txn_signed, offer, bid, participate_script, tx_type=TxTypes.PTX_REFUND)
         bid.participate_txn_refund = bytes.fromhex(refund_txn)
 
         chain_height = self.callcoinrpc(coin_to, 'getblockchaininfo')['blocks']
@@ -1248,6 +1245,7 @@ class BasicSwap():
         else:
             vout = getVoutByAddress(txjs, addr_to)
         self.addParticipateTxn(bid_id, bid, coin_to, txid, vout, chain_height)
+        bid.participate_tx.script = participate_script
 
         return txn_signed
 
@@ -1265,9 +1263,9 @@ class BasicSwap():
         self.log.debug('createRedeemTxn for coin %s', str(coin_type))
 
         if for_txn_type == 'participate':
-            prev_txnid = bid.participate_txid.hex()
-            prev_n = bid.participate_txn_n
-            txn_script = bid.participate_script
+            prev_txnid = bid.participate_tx.txid.hex()
+            prev_n = bid.participate_tx.vout
+            txn_script = bid.participate_tx.script
             prev_amount = bid.amount_to
         else:
             prev_txnid = bid.initiate_tx.txid.hex()
@@ -1478,15 +1476,21 @@ class BasicSwap():
         bid.setITxState(TxStates.TX_CONFIRMED)
 
         # Seller first mode, buyer participates
-        self.deriveParticipateScript(bid_id, bid, offer)
+        participate_script = self.deriveParticipateScript(bid_id, bid, offer)
         if bid.was_sent:
             self.log.debug('Preparing participate txn for bid %s', bid_id.hex())
 
             coin_to = Coins(offer.coin_to)
-            txn = self.createParticipateTxn(bid_id, bid, offer)
+            txn = self.createParticipateTxn(bid_id, bid, offer, participate_script)
             txid = self.submitTxn(coin_to, txn)
             self.log.debug('Submitted participate txn %s to %s chain for bid %s', txid, chainparams[coin_to]['name'], bid_id.hex())
             bid.setPTxState(TxStates.TX_SENT)
+        else:
+            bid.participate_tx = SwapTx(
+                bid_id=bid_id,
+                tx_type=TxTypes.PTX,
+                script=participate_script,
+            )
 
         # bid saved in checkBidState
 
@@ -1506,16 +1510,21 @@ class BasicSwap():
         return tx_height
 
     def addParticipateTxn(self, bid_id, bid, coin_type, txid_hex, vout, tx_height):
-        bid.participate_txid = bytes.fromhex(txid_hex)
-        bid.participate_txn_n = vout
-        # Start checking for spends of participate_txn before fully confirmed
-
-        chain_name = chainparams[coin_type]['name']
-        self.log.debug('Watching %s chain for spend of output %s %d', chain_name, txid_hex, vout)
 
         # TODO: Check connection type
-        bid.participate_txn_height = self.setLastHeightChecked(coin_type, tx_height)
+        participate_txn_height = self.setLastHeightChecked(coin_type, tx_height)
 
+        if bid.participate_tx is None:
+            bid.participate_tx = SwapTx(
+                bid_id=bid_id,
+                tx_type=TxTypes.PTX,
+            )
+        bid.participate_tx.txid = bytes.fromhex(txid_hex)
+        bid.participate_tx.vout = vout
+        bid.participate_tx.chain_height = participate_txn_height
+
+        # Start checking for spends of participate_txn before fully confirmed
+        self.log.debug('Watching %s chain for spend of output %s %d', chainparams[coin_type]['name'], txid_hex, vout)
         self.addWatchedOutput(coin_type, bid_id, txid_hex, vout, BidStates.SWAP_PARTICIPATING)
 
     def participateTxnConfirmed(self, bid_id, bid, offer):
@@ -1642,25 +1651,25 @@ class BasicSwap():
         elif state == BidStates.SWAP_INITIATED:
             # Waiting for participate txn to be confirmed in 'to' chain
             if self.coin_clients[coin_to]['use_segwit']:
-                addr = self.encodeSegwitP2WSH(coin_to, getP2WSH(bid.participate_script))
+                addr = self.encodeSegwitP2WSH(coin_to, getP2WSH(bid.participate_tx.script))
             else:
-                addr = self.getScriptAddress(coin_to, bid.participate_script)
+                addr = self.getScriptAddress(coin_to, bid.participate_tx.script)
 
             found = self.lookupUnspentByAddress(coin_to, addr, assert_amount=bid.amount_to)
             if found:
-                if bid.participate_txn_conf != found['n_conf']:
+                if bid.participate_tx.conf != found['n_conf']:
                     save_bid = True
-                bid.participate_txn_conf = found['n_conf']
+                bid.participate_tx.conf = found['n_conf']
                 index = found['index']
-                if bid.participate_txid is None:
+                if bid.participate_tx is None or bid.participate_tx.txid is None:
                     self.log.debug('Found bid %s participate txn %s in chain %s', bid_id.hex(), found['txid'], coin_to)
                     self.addParticipateTxn(bid_id, bid, coin_to, found['txid'], found['index'], found['height'])
                     bid.setPTxState(TxStates.TX_SENT)
                     save_bid = True
 
-            if bid.participate_txn_conf is not None:
-                self.log.debug('participate_txid %s confirms %d', bid.participate_txid.hex(), bid.participate_txn_conf)
-                if bid.participate_txn_conf >= self.coin_clients[coin_to]['blocks_confirmed']:
+            if bid.participate_tx.conf is not None:
+                self.log.debug('participate txid %s confirms %d', bid.participate_tx.txid.hex(), bid.participate_tx.conf)
+                if bid.participate_tx.conf >= self.coin_clients[coin_to]['blocks_confirmed']:
                     self.participateTxnConfirmed(bid_id, bid, offer)
                     save_bid = True
         elif state == BidStates.SWAP_PARTICIPATING:
@@ -1672,14 +1681,14 @@ class BasicSwap():
         if state > BidStates.BID_ACCEPTED:
             # Wait for spend of all known swap txns
             if (bid.getITxState() is None or bid.getITxState() >= TxStates.TX_REDEEMED) \
-               and (bid.participate_txn_state is None or bid.participate_txn_state >= TxStates.TX_REDEEMED):
+               and (bid.getPTxState() is None or bid.getPTxState() >= TxStates.TX_REDEEMED):
                 self.log.info('Swap completed for bid %s', bid_id.hex())
 
                 if bid.getITxState() == TxStates.TX_REDEEMED:
                     self.returnAddressToPool(bid_id, TxTypes.ITX_REFUND)
                 else:
                     self.returnAddressToPool(bid_id, TxTypes.ITX_REDEEM)
-                if bid.participate_txn_state == TxStates.TX_REDEEMED:
+                if bid.getPTxState() == TxStates.TX_REDEEMED:
                     self.returnAddressToPool(bid_id, TxTypes.PTX_REFUND)
                 else:
                     self.returnAddressToPool(bid_id, TxTypes.PTX_REDEEM)
@@ -1701,7 +1710,7 @@ class BasicSwap():
             except Exception as ex:
                 if 'non-BIP68-final (code 64)' not in str(ex) and 'non-final' not in str(ex):
                     self.log.warning('Error trying to submit initiate refund txn: %s', str(ex))
-        if (bid.participate_txn_state == TxStates.TX_SENT or bid.participate_txn_state == TxStates.TX_CONFIRMED) \
+        if (bid.getPTxState() == TxStates.TX_SENT or bid.getPTxState() == TxStates.TX_CONFIRMED) \
            and bid.participate_txn_refund is not None:
             try:
                 txid = self.submitTxn(coin_to, bid.participate_txn_refund.hex())
@@ -1773,8 +1782,8 @@ class BasicSwap():
             bid = self.swaps_in_progress[bid_id][0]
             offer = self.swaps_in_progress[bid_id][1]
 
-            bid.participate_spend_txid = bytes.fromhex(spend_txid)
-            bid.participate_spend_n = spend_n
+            bid.participate_tx.spend_txid = bytes.fromhex(spend_txid)
+            bid.participate_tx.spend_n = spend_n
             spend_in = spend_txn['vin'][spend_n]
 
             coin_from = Coins(offer.coin_from)
@@ -1801,7 +1810,7 @@ class BasicSwap():
 
                 # TODO: Wait for depth? new state SWAP_TXI_REDEEM_SENT?
 
-            self.removeWatchedOutput(coin_to, bid_id, bid.participate_txid.hex())
+            self.removeWatchedOutput(coin_to, bid_id, bid.participate_tx.txid.hex())
             self.saveBid(bid_id, bid)
 
     def checkForSpends(self, coin_type, c):
@@ -2075,8 +2084,6 @@ class BasicSwap():
         assert(bid.accept_msg_id is None), 'Bid already accepted'
 
         bid.accept_msg_id = bytes.fromhex(msg['msgid'])
-        #bid.initiate_txid = bid_accept_data.initiate_txid
-        #bid.initiate_script = bid_accept_data.contract_script
         bid.initiate_tx = SwapTx(
             bid_id=bid_id,
             tx_type=TxTypes.ITX,

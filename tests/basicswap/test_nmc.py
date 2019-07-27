@@ -371,7 +371,7 @@ class Test(unittest.TestCase):
             time.sleep(1)
             bid = swap_client.getBid(bid_id)
             if (initiate_state is None or bid.getITxState() == initiate_state) \
-               and (participate_state is None or bid.participate_txn_state == participate_state):
+               and (participate_state is None or bid.getPTxState() == participate_state):
                 return
         raise ValueError('wait_for_bid_tx_state timed out.')
 

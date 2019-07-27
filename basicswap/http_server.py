@@ -28,6 +28,7 @@ from .basicswap import (
     SwapTypes,
     BidStates,
     TxStates,
+    TxTypes,
     strOfferState,
     strBidState,
     strTxState,
@@ -47,6 +48,36 @@ env.filters['formatts'] = format_timestamp
 
 def getCoinName(c):
     return chainparams[c]['name'].capitalize()
+
+
+def getTxIdHex(bid, tx_type, prefix):
+    if tx_type == TxTypes.ITX:
+        obj = bid.initiate_tx
+    elif tx_type == TxTypes.PTX:
+        obj = bid.participate_tx
+    else:
+        return 'Unknown Type'
+
+    if not obj:
+        return None
+    if not obj.txid:
+        return None
+    return obj.txid.hex() + prefix
+
+
+def getTxSpendHex(bid, tx_type):
+    if tx_type == TxTypes.ITX:
+        obj = bid.initiate_tx
+    elif tx_type == TxTypes.PTX:
+        obj = bid.participate_tx
+    else:
+        return 'Unknown Type'
+
+    if not obj:
+        return None
+    if not obj.spend_txid:
+        return None
+    obj.spend_txid.hex() + ' {}'.format(obj.spend_n)
 
 
 def html_content_start(title, h2=None, refresh=None):
@@ -275,7 +306,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             sent_bid_id=sent_bid_id,
             messages=messages,
             data=data,
-            bids=[(b.bid_id.hex(), format8(b.amount), strBidState(b.state), strTxState(b.getITxState()), strTxState(b.participate_txn_state)) for b in bids],
+            bids=[(b.bid_id.hex(), format8(b.amount), strBidState(b.state), strTxState(b.getITxState()), strTxState(b.getPTxState())) for b in bids],
             form_id=os.urandom(8).hex(),
         ), 'UTF-8')
 
@@ -364,10 +395,10 @@ class HttpHandler(BaseHTTPRequestHandler):
             state_description = 'Waiting for initiate txn to be spent in {} chain'.format(ticker_from)
         elif bid.state == BidStates.SWAP_COMPLETED:
             state_description = 'Swap completed'
-            if bid.getITxState() == TxStates.TX_REDEEMED and bid.participate_txn_state == TxStates.TX_REDEEMED:
+            if bid.getITxState() == TxStates.TX_REDEEMED and bid.getPTxState() == TxStates.TX_REDEEMED:
                 state_description += ' successfully'
             else:
-                state_description += ', ITX ' + strTxState(bid.getITxState() + ', PTX ' + strTxState(bid.participate_txn_state))
+                state_description += ', ITX ' + strTxState(bid.getITxState() + ', PTX ' + strTxState(bid.getPTxState()))
         elif bid.state == BidStates.SWAP_TIMEDOUT:
             state_description = 'Timed out waiting for initiate txn'
         elif bid.state == BidStates.BID_ABANDONED:
@@ -385,7 +416,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             'bid_state': strBidState(bid.state),
             'state_description': state_description,
             'itx_state': strTxState(bid.getITxState()),
-            'ptx_state': strTxState(bid.participate_txn_state),
+            'ptx_state': strTxState(bid.getPTxState()),
             'offer_id': bid.offer_id.hex(),
             'addr_from': bid.bid_addr,
             'addr_fund_proof': bid.proof_address,
@@ -393,18 +424,18 @@ class HttpHandler(BaseHTTPRequestHandler):
             'expired_at': time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(bid.expire_at)),
             'was_sent': 'True' if bid.was_sent else 'False',
             'was_received': 'True' if bid.was_received else 'False',
-            'initiate_tx': 'None' if not bid.initiate_tx else (bid.initiate_tx.txid.hex() + ' ' + ticker_from),
+            'initiate_tx': getTxIdHex(bid, TxTypes.ITX, ' ' + ticker_from),
             'initiate_conf': 'None' if (not bid.initiate_tx or not bid.initiate_tx.conf) else bid.initiate_tx.conf,
-            'participate_tx': 'None' if not bid.participate_tx else (bid.participate_tx.txid.hex() + ' ' + ticker_to),
-            'participate_conf': 'None' if not bid.participate_txn_conf else bid.participate_txn_conf,
+            'participate_tx': getTxIdHex(bid, TxTypes.PTX, ' ' + ticker_to),
+            'participate_conf': 'None' if (not bid.participate_tx or not bid.participate_tx.conf) else bid.participate_tx.conf,
             'show_txns': show_txns,
         }
 
         if show_txns:
             data['initiate_tx_refund'] = 'None' if not bid.initiate_txn_refund else bid.initiate_txn_refund.hex()
             data['participate_tx_refund'] = 'None' if not bid.participate_txn_refund else bid.participate_txn_refund.hex()
-            data['initiate_tx_spend'] = 'None' if not bid.initiate_spend_txid else (bid.initiate_spend_txid.hex() + ' {}'.format(bid.initiate_spend_n))
-            data['participate_tx_spend'] = 'None' if not bid.participate_spend_txid else (bid.participate_spend_txid.hex() + ' {}'.format(bid.participate_spend_n))
+            data['initiate_tx_spend'] = getTxSpendHex(bid, TxTypes.ITX),
+            data['participate_tx_spend'] = getTxSpendHex(bid, TxTypes.PTX),
 
         old_states = []
         num_states = len(bid.states) // 12
@@ -416,10 +447,10 @@ class HttpHandler(BaseHTTPRequestHandler):
             for i in range(num_states):
                 up = struct.unpack_from('<iq', bid.initiate_tx.states[i * 12:(i + 1) * 12])
                 old_states.append((up[1], 'ITX ' + strTxState(up[0])))
-        if bid.participate_txn_states is not None:
-            num_states = len(bid.participate_txn_states) // 12
+        if bid.participate_tx and bid.participate_tx.states is not None:
+            num_states = len(bid.participate_tx.states) // 12
             for i in range(num_states):
-                up = struct.unpack_from('<iq', bid.participate_txn_states[i * 12:(i + 1) * 12])
+                up = struct.unpack_from('<iq', bid.participate_tx.states[i * 12:(i + 1) * 12])
                 old_states.append((up[1], 'PTX ' + strTxState(up[0])))
         if len(old_states) > 0:
             old_states.sort(key=lambda x: x[0])
@@ -445,7 +476,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             h2=self.server.title,
             page_type='Sent' if sent else 'Received',
             bids=[(time.strftime('%Y-%m-%d %H:%M', time.localtime(b.created_at)),
-                   b.bid_id.hex(), b.offer_id.hex(), strBidState(b.state), strTxState(b.getITxState()), strTxState(b.participate_txn_state)) for b in bids],
+                   b.bid_id.hex(), b.offer_id.hex(), strBidState(b.state), strTxState(b.getITxState()), strTxState(b.getPTxState())) for b in bids],
         ), 'UTF-8')
 
     def page_watched(self, url_split, post_string):
