@@ -342,7 +342,7 @@ class Test(unittest.TestCase):
             time.sleep(1)
             bids = swap_client.listBids()
             for bid in bids:
-                if bid.bid_id == bid_id and bid.was_received:
+                if bid[1] == bid_id and int(bid[5]) == 1:
                     return
         raise ValueError('wait_for_bid timed out.')
 

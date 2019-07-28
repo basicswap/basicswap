@@ -51,6 +51,7 @@ from .db import (
     SwapTx,
     PooledAddress,
     SentOffer,
+    SmsgAddress,
 )
 import basicswap.config as cfg
 import basicswap.segwit_addr as segwit_addr
@@ -467,6 +468,8 @@ class BasicSwap():
 
         self.log.info('Upgrading Database from version %d to %d.', db_version, CURRENT_DB_VERSION)
 
+        raise ValueError('Scripted database upgrade not found.')
+
     def waitForDaemonRPC(self, coin_type):
         for i in range(21):
             if not self.is_running:
@@ -583,8 +586,7 @@ class BasicSwap():
             raise ValueError('Unknown locktype')
 
     def postOffer(self, coin_from, coin_to, amount, rate, min_bid_amount, swap_type,
-                  lock_type=SEQUENCE_LOCK_TIME, lock_value=48 * 60 * 60, auto_accept_bids=False):
-
+                  lock_type=SEQUENCE_LOCK_TIME, lock_value=48 * 60 * 60, auto_accept_bids=False, addr_send_from=None):
         # Offer to send offer.amount_from of coin_from in exchange for offer.amount_from * offer.rate of coin_to
 
         assert(coin_from != coin_to), 'coin_from == coin_to'
@@ -617,8 +619,10 @@ class BasicSwap():
             offer_bytes = msg_buf.SerializeToString()
             payload_hex = str.format('{:02x}', MessageTypes.OFFER) + offer_bytes.hex()
 
-            # TODO: reuse address?
-            offer_addr = self.callrpc('getnewaddress')
+            if addr_send_from is None:
+                offer_addr = self.callrpc('getnewaddress')
+            else:
+                offer_addr = addr_send_from
             self.callrpc('smsgaddlocaladdress', [offer_addr])  # Enable receiving smsg
             ro = self.callrpc('smsgsend', [offer_addr, self.network_addr, payload_hex, False, 1, False, False, True])
             msg_id = ro['msgid']
@@ -626,7 +630,6 @@ class BasicSwap():
             offer_id = bytes.fromhex(msg_id)
 
             session = scoped_session(self.session_factory)
-
             offer = Offer(
                 offer_id=offer_id,
 
@@ -646,9 +649,11 @@ class BasicSwap():
                 was_sent=True,
                 auto_accept_bids=auto_accept_bids,)
             offer.setState(OfferStates.OFFER_SENT)
-            session.add(offer)
 
+            session.add(offer)
             session.add(SentOffer(offer_id=offer_id))
+            if addr_send_from is None:
+                session.add(SmsgAddress(addr=offer_addr, use_type=MessageTypes.OFFER))
             session.commit()
             session.close()
             session.remove()
@@ -874,79 +879,91 @@ class BasicSwap():
 
         return (sign_for_addr, signature)
 
+    def saveBidInSession(self, bid_id, bid, session):
+        session.add(bid)
+        if bid.initiate_tx:
+            session.add(bid.initiate_tx)
+        if bid.participate_tx:
+            session.add(bid.participate_tx)
+
     def saveBid(self, bid_id, bid):
         self.mxDB.acquire()
         try:
             session = scoped_session(self.session_factory)
-            session.add(bid)
-            if bid.initiate_tx:
-                session.add(bid.initiate_tx)
-            if bid.participate_tx:
-                session.add(bid.participate_tx)
+            self.saveBidInSession(bid_id, bid, session)
             session.commit()
             session.close()
             session.remove()
         finally:
             self.mxDB.release()
 
-    def postBid(self, offer_id, amount):
-        self.log.debug('postBid %s %s', offer_id.hex(), format8(amount))
-
+    def postBid(self, offer_id, amount, addr_send_from=None):
         # Bid to send bid.amount * offer.rate of coin_to in exchange for bid.amount of coin_from
+        self.log.debug('postBid %s %s', offer_id.hex(), format8(amount))
+        self.mxDB.acquire()
+        try:
+            offer = self.getOffer(offer_id)
+            assert(offer), 'Offer not found: {}.'.format(offer_id.hex())
+            assert(offer.expire_at > int(time.time())), 'Offer has expired'
 
-        offer = self.getOffer(offer_id)
-        assert(offer), 'Offer not found: {}.'.format(offer_id.hex())
+            msg_buf = BidMessage()
+            msg_buf.offer_msg_id = offer_id
+            msg_buf.time_valid = 60 * 10
+            msg_buf.amount = int(amount)  # amount of coin_from
 
-        assert(offer.expire_at > int(time.time())), 'Offer has expired'
+            coin_from = Coins(offer.coin_from)
+            coin_to = Coins(offer.coin_to)
 
-        msg_buf = BidMessage()
-        msg_buf.offer_msg_id = offer_id
-        msg_buf.time_valid = 60 * 10
-        msg_buf.amount = int(amount)  # amount of coin_from
+            contract_count = self.getNewContractId()
 
-        coin_from = Coins(offer.coin_from)
-        coin_to = Coins(offer.coin_to)
+            now = int(time.time())
+            if offer.swap_type == SwapTypes.SELLER_FIRST:
+                msg_buf.pkhash_buyer = getKeyID(self.getContractPubkey(dt.datetime.fromtimestamp(now).date(), contract_count))
 
-        contract_count = self.getNewContractId()
+                proof_addr, proof_sig = self.getProofOfFunds(coin_to, msg_buf.amount)
+                msg_buf.proof_address = proof_addr
+                msg_buf.proof_signature = proof_sig
 
-        now = int(time.time())
-        if offer.swap_type == SwapTypes.SELLER_FIRST:
-            msg_buf.pkhash_buyer = getKeyID(self.getContractPubkey(dt.datetime.fromtimestamp(now).date(), contract_count))
+            bid_bytes = msg_buf.SerializeToString()
+            payload_hex = str.format('{:02x}', MessageTypes.BID) + bid_bytes.hex()
 
-            proof_addr, proof_sig = self.getProofOfFunds(coin_to, msg_buf.amount)
-            msg_buf.proof_address = proof_addr
-            msg_buf.proof_signature = proof_sig
+            if addr_send_from is None:
+                bid_addr = self.callrpc('getnewaddress')
+            else:
+                bid_addr = addr_send_from
+            self.callrpc('smsgaddlocaladdress', [bid_addr])  # Enable receiving smsg
+            ro = self.callrpc('smsgsend', [bid_addr, offer.addr_from, payload_hex, False, 1, False, False, True])
+            msg_id = ro['msgid']
 
-        bid_bytes = msg_buf.SerializeToString()
-        payload_hex = str.format('{:02x}', MessageTypes.BID) + bid_bytes.hex()
+            bid_id = bytes.fromhex(msg_id)
+            bid = Bid(
+                bid_id=bid_id,
+                offer_id=offer_id,
+                amount=msg_buf.amount,
+                pkhash_buyer=msg_buf.pkhash_buyer,
+                proof_address=msg_buf.proof_address,
 
-        # TODO: reuse address?
-        bid_addr = self.callrpc('getnewaddress')
-        self.callrpc('smsgaddlocaladdress', [bid_addr])  # Enable receiving smsg
-        ro = self.callrpc('smsgsend', [bid_addr, offer.addr_from, payload_hex, False, 1, False, False, True])
-        msg_id = ro['msgid']
+                created_at=now,
+                contract_count=contract_count,
+                amount_to=(msg_buf.amount * offer.rate) // COIN,
+                expire_at=now + msg_buf.time_valid,
+                bid_addr=bid_addr,
+                was_sent=True,
+            )
+            bid.setState(BidStates.BID_SENT)
 
-        bid_id = bytes.fromhex(msg_id)
-        bid = Bid(
-            bid_id=bid_id,
-            offer_id=offer_id,
-            amount=msg_buf.amount,
-            pkhash_buyer=msg_buf.pkhash_buyer,
-            proof_address=msg_buf.proof_address,
+            session = scoped_session(self.session_factory)
+            self.saveBidInSession(bid_id, bid, session)
+            if addr_send_from is None:
+                session.add(SmsgAddress(addr=bid_addr, use_type=MessageTypes.BID))
+            session.commit()
+            session.close()
+            session.remove()
 
-            created_at=now,
-            contract_count=contract_count,
-            amount_to=(msg_buf.amount * offer.rate) // COIN,
-            expire_at=now + msg_buf.time_valid,
-            bid_addr=bid_addr,
-            was_sent=True,
-        )
-        bid.setState(BidStates.BID_SENT)
-
-        self.saveBid(bid_id, bid)
-
-        self.log.info('Sent BID %s', bid_id.hex())
-        return bid_id
+            self.log.info('Sent BID %s', bid_id.hex())
+            return bid_id
+        finally:
+            self.mxDB.release()
 
     def getOffer(self, offer_id, sent=False):
         self.mxDB.acquire()
@@ -2274,13 +2291,19 @@ class BasicSwap():
             rv = []
             now = int(time.time())
             session = scoped_session(self.session_factory)
+
+            query_str = 'SELECT bids.created_at, bids.bid_id, bids.offer_id, bids.amount, bids.state, bids.was_received, tx1.state, tx2.state FROM bids ' + \
+                        'LEFT JOIN transactions AS tx1 ON tx1.bid_id = bids.bid_id AND tx1.tx_type = {} '.format(TxTypes.ITX) + \
+                        'LEFT JOIN transactions AS tx2 ON tx2.bid_id = bids.bid_id AND tx2.tx_type = {} '.format(TxTypes.PTX)
+
             if offer_id is not None:
-                q = session.query(Bid).filter(Bid.offer_id == offer_id)
+                query_str += 'WHERE bids.offer_id = x\'{}\' '.format(offer_id.hex())
             elif sent:
-                q = session.query(Bid).filter(Bid.was_sent == True)  # noqa E712
+                query_str += 'WHERE bids.was_sent = 1 '
             else:
-                q = session.query(Bid).filter(Bid.was_received == True)  # noqa E712
-            q = q.order_by(Bid.created_at.desc())
+                query_str += 'WHERE bids.was_received = 1 '
+            query_str += 'ORDER BY bids.created_at DESC'
+            q = self.engine.execute(query_str)
             for row in q:
                 rv.append(row)
             return rv
@@ -2311,6 +2334,21 @@ class BasicSwap():
                     rv.append((c, o[0], o[1], o[2], o[3]))
             return (rv, rv_heights)
         finally:
+            self.mxDB.release()
+
+    def listSmsgAddresses(self, use_type_str):
+        use_type = MessageTypes.OFFER if use_type_str == 'offer' else MessageTypes.BID
+        self.mxDB.acquire()
+        try:
+            session = scoped_session(self.session_factory)
+            rv = []
+            q = self.engine.execute('SELECT addr FROM smsgaddresses WHERE use_type = {} ORDER BY addr_id DESC'.format(use_type))
+            for row in q:
+                rv.append(row[0])
+            return rv
+        finally:
+            session.close()
+            session.remove()
             self.mxDB.release()
 
     def callrpc(self, method, params=[], wallet=None):

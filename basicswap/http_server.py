@@ -118,6 +118,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             bid_id = bytes.fromhex(url_split[3])
             assert(len(bid_id) == 28)
             return bytes(json.dumps(self.server.swap_client.viewBid(bid_id)), 'UTF-8')
+        assert(False), 'TODO'
         return bytes(json.dumps(self.server.swap_client.listBids()), 'UTF-8')
 
     def js_sentbids(self, url_split):
@@ -245,6 +246,10 @@ class HttpHandler(BaseHTTPRequestHandler):
             else:
                 self.server.last_form_id['newoffer'] = form_id
 
+                addr_from = form_data[b'addr_from'][0].decode('utf-8')
+                if addr_from == '-1':
+                    addr_from = None
+
                 try:
                     coin_from = Coins(int(form_data[b'coin_from'][0]))
                 except Exception:
@@ -268,7 +273,7 @@ class HttpHandler(BaseHTTPRequestHandler):
                 else:
                     lock_type = ABS_LOCK_TIME
 
-                offer_id = swap_client.postOffer(coin_from, coin_to, value_from, rate, min_bid, SwapTypes.SELLER_FIRST, auto_accept_bids=autoaccept, lock_type=lock_type, lock_value=lock_seconds)
+                offer_id = swap_client.postOffer(coin_from, coin_to, value_from, rate, min_bid, SwapTypes.SELLER_FIRST, lock_type=lock_type, lock_value=lock_seconds, auto_accept_bids=autoaccept, addr_send_from=addr_from)
                 messages.append('<a href="/offer/' + offer_id.hex() + '">Sent Offer ' + offer_id.hex() + '</a><br/>Rate: ' + format8(rate))
 
         coins = []
@@ -282,6 +287,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             h2=self.server.title,
             messages=messages,
             coins=coins,
+            addrs=swap_client.listSmsgAddresses('offer'),
             form_id=os.urandom(8).hex(),
         ), 'UTF-8')
 
@@ -298,6 +304,7 @@ class HttpHandler(BaseHTTPRequestHandler):
 
         messages = []
         sent_bid_id = None
+        show_bid_form = None
         if post_string != '':
             form_data = urllib.parse.parse_qs(post_string)
             form_id = form_data[b'formid'][0].decode('utf-8')
@@ -305,7 +312,15 @@ class HttpHandler(BaseHTTPRequestHandler):
                 messages.append('Prevented double submit for form {}.'.format(form_id))
             else:
                 self.server.last_form_id['offer'] = form_id
-                sent_bid_id = swap_client.postBid(offer_id, offer.amount_from).hex()
+
+                if b'newbid' in form_data:
+                    show_bid_form = True
+                else:
+                    addr_from = form_data[b'addr_from'][0].decode('utf-8')
+                    if addr_from == '-1':
+                        addr_from = None
+
+                    sent_bid_id = swap_client.postBid(offer_id, offer.amount_from).hex()
 
         coin_from = Coins(offer.coin_from)
         coin_to = Coins(offer.coin_to)
@@ -325,7 +340,8 @@ class HttpHandler(BaseHTTPRequestHandler):
             'addr_from': offer.addr_from,
             'created_at': offer.created_at,
             'expired_at': offer.expire_at,
-            'sent': 'True' if offer.was_sent else 'False'
+            'sent': 'True' if offer.was_sent else 'False',
+            'show_bid_form': show_bid_form,
         }
 
         if offer.was_sent:
@@ -341,7 +357,8 @@ class HttpHandler(BaseHTTPRequestHandler):
             sent_bid_id=sent_bid_id,
             messages=messages,
             data=data,
-            bids=[(b.bid_id.hex(), format8(b.amount), strBidState(b.state), strTxState(b.getITxState()), strTxState(b.getPTxState())) for b in bids],
+            bids=[(b[1].hex(), format8(b[3]), strBidState(b[4]), strTxState(b[6]), strTxState(b[7])) for b in bids],
+            addrs=None if show_bid_form is None else swap_client.listSmsgAddresses('bid'),
             form_id=os.urandom(8).hex(),
         ), 'UTF-8')
 
@@ -510,8 +527,8 @@ class HttpHandler(BaseHTTPRequestHandler):
             title=self.server.title,
             h2=self.server.title,
             page_type='Sent' if sent else 'Received',
-            bids=[(time.strftime('%Y-%m-%d %H:%M', time.localtime(b.created_at)),
-                   b.bid_id.hex(), b.offer_id.hex(), strBidState(b.state), strTxState(b.getITxState()), strTxState(b.getPTxState())) for b in bids],
+            bids=[(time.strftime('%Y-%m-%d %H:%M', time.localtime(b[0])),
+                   b[1].hex(), b[2].hex(), strBidState(b[4]), strTxState(b[6]), strTxState(b[7])) for b in bids],
         ), 'UTF-8')
 
     def page_watched(self, url_split, post_string):

@@ -9,7 +9,7 @@ import time
 import sqlalchemy as sa
 from sqlalchemy.ext.declarative import declarative_base
 
-CURRENT_DB_VERSION = 1
+CURRENT_DB_VERSION = 2
 
 Base = declarative_base()
 
@@ -173,3 +173,10 @@ class SentOffer(Base):
     __tablename__ = 'sentoffers'
 
     offer_id = sa.Column(sa.LargeBinary, primary_key=True)
+
+
+class SmsgAddress(Base):
+    __tablename__ = 'smsgaddresses'
+    addr_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
+    addr = sa.Column(sa.String)
+    use_type = sa.Column(sa.Integer)

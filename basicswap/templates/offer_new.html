@@ -8,6 +8,13 @@
 <form method="post">
 
 <table>
+<tr><td>Send From Address</td><td><select name="addr_from">
+{% for a in addrs %}
+<option value="{{ a }}">{{ a }}</option>
+{% endfor %}
+<option value="-1">-- New Address --</option>
+</select></td></tr>
+
 <tr><td>Coin From</td><td>
 <select name="coin_from"><option value="-1">-- Select Coin --</option>
 {% for c in coins %}

@@ -31,6 +31,28 @@
 {% endif %}
 </table>
 
+<form method="post">
+{% if data.show_bid_form %}
+<br/><h4>New Bid</h4>
+<table>
+<tr><td>Send From Address</td><td>
+<select name="addr_from">
+{% for a in addrs %}
+<option value="{{ a }}">{{ a }}</option>
+{% endfor %}
+<option value="-1">-- New Address --</option>
+</select>
+</td></tr>
+
+<tr><td><input type="submit" name="sendbid" value="Send Bid"></td></tr>
+</table>
+{% else %}
+<input type="submit" name="newbid" value="New Bid">
+{% endif %}
+<input type="hidden" name="formid" value="{{ form_id }}">
+</form>
+
+
 <h4>Bids</h4>
 <table>
 <tr><th>Bid ID</th><th>Bid Amount</th><th>Bid Status</th><th>ITX Status</th><th>PTX Status</th></tr>
@@ -38,11 +60,6 @@
 <tr><td><a href=/bid/{{ b[0] }}>{{ b[0] }}</a></td><td>{{ b[1] }}</td><td>{{ b[2] }}</td><td>{{ b[3] }}</td><td>{{ b[4] }}</td></tr>
 {% endfor %}
 </table>
-
-<form method="post">
-<input type="submit" value="Send Bid">
-<input type="hidden" name="formid" value="{{ form_id }}">
-</form>
 
 <p><a href="/">home</a></p>
 </body></html>

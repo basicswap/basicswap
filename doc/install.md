@@ -86,4 +86,4 @@ Right click in the directory you want to install into and select 'Git Bash Here'
 Open url in browser:
 http://localhost:12700
 
-Shutdown by pressibg ctrl + c in the Git Bash console window.
+Shutdown by pressing ctrl + c in the Git Bash console window.
