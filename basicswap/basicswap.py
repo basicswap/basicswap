@@ -415,8 +415,8 @@ class BasicSwap():
                     if not os.path.exists(authcookiepath):
                         time.sleep(0.5)
                 try:
-                    with open(authcookiepath) as fp:
-                        rpcauth = fp.read()
+                    with open(authcookiepath, 'rb') as fp:
+                        rpcauth = fp.read().decode('utf-8')
                 except Exception:
                     self.log.warning('Unable to read authcookie for %s, %s', str(coin), authcookiepath)
 
@@ -2333,7 +2333,7 @@ class BasicSwap():
     def callcoincli(self, coin_type, params, wallet=None):
         bindir = self.coin_clients[coin_type]['bindir']
         datadir = self.coin_clients[coin_type]['datadir']
-        command_cli = os.path.join(bindir, chainparams[coin_type]['name'] + '-cli')
+        command_cli = os.path.join(bindir, chainparams[coin_type]['name'] + '-cli' + ('.exe' if os.name == 'nt' else ''))
         chainname = '' if self.chain == 'mainnet' else (' -' + self.chain)
         args = command_cli + chainname + ' ' + '-datadir=' + datadir + ' ' + params
         p = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)

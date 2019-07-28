@@ -18,6 +18,7 @@ import json
 import hashlib
 import mmap
 import tarfile
+import zipfile
 import stat
 import time
 from urllib.request import urlretrieve
@@ -33,6 +34,8 @@ from bin.basicswap_run import startDaemon
 
 if platform.system() == 'Darwin':
     BIN_ARCH = 'osx64.tar.gz'
+elif platform.system() == 'Windows':
+    BIN_ARCH = 'win64.zip'
 else:
     BIN_ARCH = 'x86_64-linux-gnu.tar.gz'
 
@@ -167,14 +170,23 @@ def prepareCore(coin, version, settings, data_dir):
             raise ValueError('Signature verification failed.')
 
     bins = [coin + 'd', coin + '-cli', coin + '-tx']
-    with tarfile.open(release_path) as ft:
-        for b in bins:
-            out_path = os.path.join(bin_dir, b)
-            fi = ft.extractfile('{}-{}/bin/{}'.format(coin, version, b))
-            with open(out_path, 'wb') as fout:
-                fout.write(fi.read())
-            fi.close()
-            os.chmod(out_path, stat.S_IRWXU | stat.S_IXGRP | stat.S_IXOTH)
+    if os_name == 'win':
+        with zipfile.ZipFile(release_path) as fz:
+            for b in bins:
+                b += '.exe'
+                out_path = os.path.join(bin_dir, b)
+                with open(out_path, 'wb') as fout:
+                    fout.write(fz.read('{}-{}/bin/{}'.format(coin, version, b)))
+                os.chmod(out_path, stat.S_IRWXU | stat.S_IXGRP | stat.S_IXOTH)
+    else:
+        with tarfile.open(release_path) as ft:
+            for b in bins:
+                out_path = os.path.join(bin_dir, b)
+                fi = ft.extractfile('{}-{}/bin/{}'.format(coin, version, b))
+                with open(out_path, 'wb') as fout:
+                    fout.write(fi.read())
+                fi.close()
+                os.chmod(out_path, stat.S_IRWXU | stat.S_IXGRP | stat.S_IXOTH)
 
 
 def prepareDataDir(coin, settings, data_dir, chain, particl_mnemonic):

@@ -70,3 +70,20 @@ To run in a different directory and on testnet:
     $ pip3 install .
     $ basicswap-prepare
     $ basicswap-run
+
+
+# Windows
+
+Install git and python3
+Right click in the directory you want to install into and select 'Git Bash Here':
+
+    $ git clone https://github.com/tecnovert/basicswap.git
+    $ cd basicswap
+    $ pip3 install .
+    $ basicswap-prepare
+    $ basicswap-run
+
+Open url in browser:
+http://localhost:12700
+
+Shutdown by pressibg ctrl + c in the Git Bash console window.

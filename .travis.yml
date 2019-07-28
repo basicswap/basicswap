@@ -34,7 +34,7 @@ jobs:
       env:
       cache: false
       language: python
-      python: '3.6'
+      python: '3.7'
       install:
         - travis_retry pip install flake8==3.5.0
         - travis_retry pip install codespell==1.15.0
