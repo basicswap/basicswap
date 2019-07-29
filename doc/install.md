@@ -63,7 +63,24 @@ To run in a different directory and on testnet:
 
 ## OSX
 
-    $ brew install python git protobuf
+Install Homebrew:
+
+    https://brew.sh/
+
+Command Line Tools:
+
+    $ xcode-select --install
+
+Dependencies:
+
+    $ brew install python git protobuf gnupg
+
+Python certificates:
+
+    $ /Applications/Python\ 3.7/Install\ Certificates.command
+
+Basicswap
+
     $ git clone https://github.com/tecnovert/basicswap.git
     $ cd basicswap
     $ protoc -I=basicswap --python_out=basicswap basicswap/messages.proto
@@ -74,7 +91,11 @@ To run in a different directory and on testnet:
 
 # Windows
 
-Install git and python3
+Install git and python3:
+
+    https://gitforwindows.org/
+    https://www.python.org/downloads/windows/
+
 Right click in the directory you want to install into and select 'Git Bash Here':
 
     $ git clone https://github.com/tecnovert/basicswap.git
