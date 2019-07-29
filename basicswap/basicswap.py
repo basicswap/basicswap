@@ -604,6 +604,9 @@ class BasicSwap():
 
         self.mxDB.acquire()
         try:
+            proof_addr, proof_sig = self.getProofOfFunds(coin_from_t, amount)
+            # TODO: require prrof of funds on offers?
+
             msg_buf = OfferMessage()
             msg_buf.coin_from = int(coin_from)
             msg_buf.coin_to = int(coin_to)
@@ -2266,7 +2269,7 @@ class BasicSwap():
             session.remove()
             self.mxDB.release()
 
-    def listOffers(self, sent=False):
+    def listOffers(self, sent=False, filters={}):
         self.mxDB.acquire()
         try:
             rv = []
@@ -2274,9 +2277,18 @@ class BasicSwap():
             session = scoped_session(self.session_factory)
 
             if sent:
-                q = session.query(Offer).filter(Offer.was_sent == True).order_by(Offer.created_at.desc())  # noqa E712
+                q = session.query(Offer).filter(Offer.was_sent == True)  # noqa E712
             else:
-                q = session.query(Offer).filter(Offer.expire_at > now).order_by(Offer.created_at.desc())
+                q = session.query(Offer).filter(Offer.expire_at > now)
+
+            filter_coin_from = filters.get('coin_from', None)
+            if filter_coin_from and filter_coin_from > -1:
+                q = q.filter(Offer.coin_from == int(filter_coin_from))
+            filter_coin_to = filters.get('coin_to', None)
+            if filter_coin_to and filter_coin_to > -1:
+                q = q.filter(Offer.coin_to == int(filter_coin_to))
+
+            q = q.order_by(Offer.created_at.desc())
             for row in q:
                 rv.append(row)
             return rv

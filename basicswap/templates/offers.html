@@ -4,6 +4,32 @@
 {% if refresh %}
 <p>Page Refresh: {{ refresh }} seconds</p>
 {% endif %}
+{% for m in messages %}
+<p>{{ m }}</p>
+{% endfor %}
+
+<form method="post">
+<table>
+<tr><td>Coin From</td><td>
+<select name="coin_from"><option value="-1"{% if filters.coin_from==-1 %} selected{% endif %}>-- Any Coin --</option>
+{% for c in coins %}
+<option value="{{ c[0] }}"{% if filters.coin_from==c[0] %} selected{% endif %}>{{ c[1] }}</option>
+{% endfor %}
+</select>
+</td>
+<td>Coin To</td><td>
+<select name="coin_to"><option value="-1"{% if filters.coin_to==-1 %} selected{% endif %}>-- Any Coin --</option>
+{% for c in coins %}
+<option value="{{ c[0] }}"{% if filters.coin_to==c[0] %} selected{% endif %}>{{ c[1] }}</option>
+{% endfor %}
+</select>
+</td></tr>
+
+<tr><td><input type="submit" value="Apply Filters"></td></tr>
+</table>
+<input type="hidden" name="formid" value="{{ form_id }}">
+</form>
+
 
 <table>
 <tr><th>At</th><th>Offer ID</th><th>Coin From</th><th>Coin To</th><th>Amount From</th><th>Amount To</th><th>Rate</th></tr>

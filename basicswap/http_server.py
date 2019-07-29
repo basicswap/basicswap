@@ -50,6 +50,14 @@ def getCoinName(c):
     return chainparams[c]['name'].capitalize()
 
 
+def listAvailableCoins(swap_client):
+    coins = []
+    for k, v in swap_client.coin_clients.items():
+        if v['connection_type'] == 'rpc':
+            coins.append((int(k), getCoinName(k)))
+    return coins
+
+
 def getTxIdHex(bid, tx_type, prefix):
     if tx_type == TxTypes.ITX:
         obj = bid.initiate_tx
@@ -98,6 +106,17 @@ class HttpHandler(BaseHTTPRequestHandler):
             + '<p><a href=\'/\'>home</a></p></body></html>'
         return bytes(content, 'UTF-8')
 
+    def checkForm(self, post_string, name, messages):
+        if post_string == '':
+            return None
+        form_data = urllib.parse.parse_qs(post_string)
+        form_id = form_data[b'formid'][0].decode('utf-8')
+        if self.server.last_form_id.get(name, None) == form_id:
+            messages.append('Prevented double submit for form {}.'.format(form_id))
+        else:
+            self.server.last_form_id[name] = form_id
+        return form_data
+
     def js_error(self, error_str):
         error_str_json = json.dumps({'error': error_str})
         return bytes(error_str_json, 'UTF-8')
@@ -132,35 +151,24 @@ class HttpHandler(BaseHTTPRequestHandler):
 
         result = None
         messages = []
-        if post_string != '':
-            form_data = urllib.parse.parse_qs(post_string)
-            form_id = form_data[b'formid'][0].decode('utf-8')
-            if self.server.last_form_id.get('rpc', None) == form_id:
-                messages.append('Prevented double submit for form {}.'.format(form_id))
-            else:
-                self.server.last_form_id['newoffer'] = form_id
+        form_data = self.checkForm(post_string, 'rpc', messages)
+        if form_data:
+            try:
+                coin_type = Coins(int(form_data[b'coin_type'][0]))
+            except Exception:
+                raise ValueError('Unknown Coin Type')
 
-                try:
-                    coin_type = Coins(int(form_data[b'coin_type'][0]))
-                except Exception:
-                    raise ValueError('Unknown Coin Type')
-
-                cmd = form_data[b'cmd'][0].decode('utf-8')
-                try:
-                    result = swap_client.callcoincli(coin_type, cmd)
-                except Exception as ex:
-                    result = str(ex)
-
-        coins = []
-        for k, v in swap_client.coin_clients.items():
-            if v['connection_type'] == 'rpc':
-                coins.append((int(k), getCoinName(k)))
+            cmd = form_data[b'cmd'][0].decode('utf-8')
+            try:
+                result = swap_client.callcoincli(coin_type, cmd)
+            except Exception as ex:
+                result = str(ex)
 
         template = env.get_template('rpc.html')
         return bytes(template.render(
             title=self.server.title,
             h2=self.server.title,
-            coins=coins,
+            coins=listAvailableCoins(swap_client),
             result=result,
             form_id=os.urandom(8).hex(),
         ), 'UTF-8')
@@ -181,27 +189,21 @@ class HttpHandler(BaseHTTPRequestHandler):
         swap_client = self.server.swap_client
 
         messages = []
-        if post_string != '':
-            form_data = urllib.parse.parse_qs(post_string)
-            form_id = form_data[b'formid'][0].decode('utf-8')
-            if self.server.last_form_id.get('wallets', None) == form_id:
-                messages.append('Prevented double submit for form {}.'.format(form_id))
-            else:
-                self.server.last_form_id['wallets'] = form_id
+        form_data = self.checkForm(post_string, 'wallets', messages)
+        if form_data:
+            for c in Coins:
+                cid = str(int(c))
 
-                for c in Coins:
-                    cid = str(int(c))
+                if bytes('newaddr_' + cid, 'utf-8') in form_data:
+                    swap_client.cacheNewAddressForCoin(c)
 
-                    if bytes('newaddr_' + cid, 'utf-8') in form_data:
-                        swap_client.cacheNewAddressForCoin(c)
-
-                    if bytes('withdraw_' + cid, 'utf-8') in form_data:
-                        value = form_data[bytes('amt_' + cid, 'utf-8')][0].decode('utf-8')
-                        address = form_data[bytes('to_' + cid, 'utf-8')][0].decode('utf-8')
-                        subfee = True if bytes('subfee_' + cid, 'utf-8') in form_data else False
-                        txid = swap_client.withdrawCoin(c, value, address, subfee)
-                        ticker = swap_client.getTicker(c)
-                        messages.append('Withdrew {} {} to address {}<br/>In txid: {}'.format(value, ticker, address, txid))
+                if bytes('withdraw_' + cid, 'utf-8') in form_data:
+                    value = form_data[bytes('amt_' + cid, 'utf-8')][0].decode('utf-8')
+                    address = form_data[bytes('to_' + cid, 'utf-8')][0].decode('utf-8')
+                    subfee = True if bytes('subfee_' + cid, 'utf-8') in form_data else False
+                    txid = swap_client.withdrawCoin(c, value, address, subfee)
+                    ticker = swap_client.getTicker(c)
+                    messages.append('Withdrew {} {} to address {}<br/>In txid: {}'.format(value, ticker, address, txid))
 
         wallets = swap_client.getWalletsInfo()
 
@@ -238,55 +240,44 @@ class HttpHandler(BaseHTTPRequestHandler):
         swap_client = self.server.swap_client
 
         messages = []
-        if post_string != '':
-            form_data = urllib.parse.parse_qs(post_string)
-            form_id = form_data[b'formid'][0].decode('utf-8')
-            if self.server.last_form_id.get('newoffer', None) == form_id:
-                messages.append('Prevented double submit for form {}.'.format(form_id))
+        form_data = self.checkForm(post_string, 'newoffer', messages)
+        if form_data:
+            addr_from = form_data[b'addr_from'][0].decode('utf-8')
+            if addr_from == '-1':
+                addr_from = None
+
+            try:
+                coin_from = Coins(int(form_data[b'coin_from'][0]))
+            except Exception:
+                raise ValueError('Unknown Coin From')
+            try:
+                coin_to = Coins(int(form_data[b'coin_to'][0]))
+            except Exception:
+                raise ValueError('Unknown Coin To')
+
+            value_from = int(float(form_data[b'amt_from'][0]) * COIN)
+            value_to = int(float(form_data[b'amt_to'][0]) * COIN)
+            min_bid = int(value_from)
+            rate = int((value_to / value_from) * COIN)
+            autoaccept = True if b'autoaccept' in form_data else False
+            lock_seconds = int(form_data[b'lockhrs'][0]) * 60 * 60
+            # TODO: More accurate rate
+            # assert(value_to == (value_from * rate) // COIN)
+
+            if swap_client.coin_clients[coin_from]['use_csv'] and swap_client.coin_clients[coin_to]['use_csv']:
+                lock_type = SEQUENCE_LOCK_TIME
             else:
-                self.server.last_form_id['newoffer'] = form_id
+                lock_type = ABS_LOCK_TIME
 
-                addr_from = form_data[b'addr_from'][0].decode('utf-8')
-                if addr_from == '-1':
-                    addr_from = None
-
-                try:
-                    coin_from = Coins(int(form_data[b'coin_from'][0]))
-                except Exception:
-                    raise ValueError('Unknown Coin From')
-                try:
-                    coin_to = Coins(int(form_data[b'coin_to'][0]))
-                except Exception:
-                    raise ValueError('Unknown Coin From')
-
-                value_from = int(float(form_data[b'amt_from'][0]) * COIN)
-                value_to = int(float(form_data[b'amt_to'][0]) * COIN)
-                min_bid = int(value_from)
-                rate = int((value_to / value_from) * COIN)
-                autoaccept = True if b'autoaccept' in form_data else False
-                lock_seconds = int(form_data[b'lockhrs'][0]) * 60 * 60
-                # TODO: More accurate rate
-                # assert(value_to == (value_from * rate) // COIN)
-
-                if swap_client.coin_clients[coin_from]['use_csv'] and swap_client.coin_clients[coin_to]['use_csv']:
-                    lock_type = SEQUENCE_LOCK_TIME
-                else:
-                    lock_type = ABS_LOCK_TIME
-
-                offer_id = swap_client.postOffer(coin_from, coin_to, value_from, rate, min_bid, SwapTypes.SELLER_FIRST, lock_type=lock_type, lock_value=lock_seconds, auto_accept_bids=autoaccept, addr_send_from=addr_from)
-                messages.append('<a href="/offer/' + offer_id.hex() + '">Sent Offer ' + offer_id.hex() + '</a><br/>Rate: ' + format8(rate))
-
-        coins = []
-        for k, v in swap_client.coin_clients.items():
-            if v['connection_type'] == 'rpc':
-                coins.append((int(k), getCoinName(k)))
+            offer_id = swap_client.postOffer(coin_from, coin_to, value_from, rate, min_bid, SwapTypes.SELLER_FIRST, lock_type=lock_type, lock_value=lock_seconds, auto_accept_bids=autoaccept, addr_send_from=addr_from)
+            messages.append('<a href="/offer/' + offer_id.hex() + '">Sent Offer ' + offer_id.hex() + '</a><br/>Rate: ' + format8(rate))
 
         template = env.get_template('offer_new.html')
         return bytes(template.render(
             title=self.server.title,
             h2=self.server.title,
             messages=messages,
-            coins=coins,
+            coins=listAvailableCoins(swap_client),
             addrs=swap_client.listSmsgAddresses('offer'),
             form_id=os.urandom(8).hex(),
         ), 'UTF-8')
@@ -305,22 +296,16 @@ class HttpHandler(BaseHTTPRequestHandler):
         messages = []
         sent_bid_id = None
         show_bid_form = None
-        if post_string != '':
-            form_data = urllib.parse.parse_qs(post_string)
-            form_id = form_data[b'formid'][0].decode('utf-8')
-            if self.server.last_form_id.get('offer', None) == form_id:
-                messages.append('Prevented double submit for form {}.'.format(form_id))
+        form_data = self.checkForm(post_string, 'offer', messages)
+        if form_data:
+            if b'newbid' in form_data:
+                show_bid_form = True
             else:
-                self.server.last_form_id['offer'] = form_id
+                addr_from = form_data[b'addr_from'][0].decode('utf-8')
+                if addr_from == '-1':
+                    addr_from = None
 
-                if b'newbid' in form_data:
-                    show_bid_form = True
-                else:
-                    addr_from = form_data[b'addr_from'][0].decode('utf-8')
-                    if addr_from == '-1':
-                        addr_from = None
-
-                    sent_bid_id = swap_client.postBid(offer_id, offer.amount_from).hex()
+                sent_bid_id = swap_client.postBid(offer_id, offer.amount_from).hex()
 
         coin_from = Coins(offer.coin_from)
         coin_to = Coins(offer.coin_to)
@@ -362,17 +347,42 @@ class HttpHandler(BaseHTTPRequestHandler):
             form_id=os.urandom(8).hex(),
         ), 'UTF-8')
 
-    def page_offers(self, url_split, sent=False):
+    def page_offers(self, url_split, post_string, sent=False):
         swap_client = self.server.swap_client
-        offers = swap_client.listOffers(sent)
+
+        filters = {
+            'coin_from': -1,
+            'coin_to': -1,
+        }
+        messages = []
+        form_data = self.checkForm(post_string, 'offers', messages)
+        if form_data:
+            coin_from = int(form_data[b'coin_from'][0])
+            if coin_from > -1:
+                try:
+                    filters['coin_from'] = Coins(coin_from)
+                except Exception:
+                    raise ValueError('Unknown Coin From')
+            coin_to = int(form_data[b'coin_to'][0])
+            if coin_to > -1:
+                try:
+                    filters['coin_to'] = Coins(coin_to)
+                except Exception:
+                    raise ValueError('Unknown Coin From')
+
+        offers = swap_client.listOffers(sent, filters)
 
         template = env.get_template('offers.html')
         return bytes(template.render(
             title=self.server.title,
             h2=self.server.title,
             page_type='Sent' if sent else 'Received',
+            coins=listAvailableCoins(swap_client),
+            messages=messages,
+            filters=filters,
             offers=[(time.strftime('%Y-%m-%d %H:%M', time.localtime(o.created_at)),
                      o.offer_id.hex(), getCoinName(Coins(o.coin_from)), getCoinName(Coins(o.coin_to)), format8(o.amount_from), format8((o.amount_from * o.rate) // COIN), format8(o.rate)) for o in offers],
+            form_id=os.urandom(8).hex(),
         ), 'UTF-8')
 
     def page_advance(self, url_split, post_string):
@@ -402,27 +412,22 @@ class HttpHandler(BaseHTTPRequestHandler):
 
         messages = []
         show_txns = False
-        if post_string != '':
-            form_data = urllib.parse.parse_qs(post_string)
-            form_id = form_data[b'formid'][0].decode('utf-8')
-            if self.server.last_form_id.get('bid', None) == form_id:
-                messages.append('Prevented double submit for form {}.'.format(form_id))
-            else:
-                self.server.last_form_id['bid'] = form_id
-                if b'abandon_bid' in form_data:
-                    try:
-                        swap_client.abandonBid(bid_id)
-                        messages.append('Bid abandoned')
-                    except Exception as ex:
-                        messages.append('Error ' + str(ex))
-                if b'accept_bid' in form_data:
-                    try:
-                        swap_client.acceptBid(bid_id)
-                        messages.append('Bid accepted')
-                    except Exception as ex:
-                        messages.append('Error ' + str(ex))
-                if b'show_txns' in form_data:
-                    show_txns = True
+        form_data = self.checkForm(post_string, 'bid', messages)
+        if form_data:
+            if b'abandon_bid' in form_data:
+                try:
+                    swap_client.abandonBid(bid_id)
+                    messages.append('Bid abandoned')
+                except Exception as ex:
+                    messages.append('Error ' + str(ex))
+            if b'accept_bid' in form_data:
+                try:
+                    swap_client.acceptBid(bid_id)
+                    messages.append('Bid accepted')
+                except Exception as ex:
+                    messages.append('Error ' + str(ex))
+            if b'show_txns' in form_data:
+                show_txns = True
 
         bid, offer = swap_client.getBidAndOffer(bid_id)
         assert(bid), 'Unknown bid ID'
@@ -592,11 +597,11 @@ class HttpHandler(BaseHTTPRequestHandler):
                 if url_split[1] == 'offer':
                     return self.page_offer(url_split, post_string)
                 if url_split[1] == 'offers':
-                    return self.page_offers(url_split)
+                    return self.page_offers(url_split, post_string)
                 if url_split[1] == 'newoffer':
                     return self.page_newoffer(url_split, post_string)
                 if url_split[1] == 'sentoffers':
-                    return self.page_offers(url_split, sent=True)
+                    return self.page_offers(url_split, post_string, sent=True)
                 if url_split[1] == 'advance':
                     return self.page_advance(url_split, post_string)
                 if url_split[1] == 'bid':
