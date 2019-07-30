@@ -31,6 +31,7 @@ from .util import (
     decodeWif,
     toWIF,
     getKeyID,
+    makeInt,
 )
 from .chainparams import (
     chainparams,
@@ -554,6 +555,7 @@ class BasicSwap():
         ro = self.callrpc('smsginbox', ['unread', '', options])
         nm = 0
         for msg in ro['messages']:
+            msg['hex'] += '00'  # Add nullbtye to match output from 'smsg' cmd - TODO: make consistent
             self.processMsg(msg)
             nm += 1
         self.log.info('Scanned %d unread messages.', nm)
@@ -1580,7 +1582,7 @@ class BasicSwap():
                 continue
             # Verify amount
             if assert_amount:
-                assert(int(o['amount'] * COIN) == int(assert_amount)), 'Incorrect output amount in txn {}.'.format(assert_txid)
+                assert(makeInt(o['amount']) == int(assert_amount)), 'Incorrect output amount in txn {}: {} != {}.'.format(assert_txid, makeInt(o['amount']), int(assert_amount))
 
             if not sum_output:
                 if o['height'] > 0:
@@ -1623,7 +1625,9 @@ class BasicSwap():
                     initiate_txn = self.callcoinrpc(coin_from, 'getrawtransaction', [initiate_txnid_hex, True])
                     # Verify amount
                     vout = getVoutByAddress(initiate_txn, p2sh)
-                    assert(int(initiate_txn['vout'][vout]['value'] * COIN) == int(bid.amount)), 'Incorrect output amount in initiate txn.'
+
+                    out_value = makeInt(initiate_txn['vout'][vout]['value'])
+                    assert(out_value == int(bid.amount)), 'Incorrect output amount in initiate txn {}: {} != {}.'.format(initiate_txnid_hex, out_value, int(bid.amount))
 
                     bid.initiate_tx.conf = initiate_txn['confirmations']
                     try:
@@ -2122,6 +2126,7 @@ class BasicSwap():
         self.swaps_in_progress[bid_id] = (bid, offer)
 
     def processMsg(self, msg):
+        self.log.debug('processMsg %s', msg['hex'])
         self.mxDB.acquire()
         try:
             msg_type = int(msg['hex'][:2], 16)

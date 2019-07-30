@@ -18,6 +18,11 @@ from xmlrpc.client import (
 from .segwit_addr import bech32_decode, convertbits, bech32_encode
 
 COIN = 100000000
+DCOIN = decimal.Decimal(COIN)
+
+
+def makeInt(v):
+    return int(dquantize(decimal.Decimal(v) * DCOIN).quantize(decimal.Decimal(1)))
 
 
 def format8(i):
