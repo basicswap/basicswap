@@ -381,6 +381,7 @@ def main():
             'blocks_confirmed': 2,
             'override_feerate': 0.002,
             'conf_target': 2,
+            'core_version_group': 18,
         },
         'litecoin': {
             'connection_type': 'rpc' if 'litecoin' in with_coins else 'none',
@@ -391,6 +392,7 @@ def main():
             'use_segwit': True,
             'blocks_confirmed': 2,
             'conf_target': 2,
+            'core_version_group': 17,
         },
         'bitcoin': {
             'connection_type': 'rpc' if 'bitcoin' in with_coins else 'none',
@@ -401,6 +403,7 @@ def main():
             'use_segwit': True,
             'blocks_confirmed': 1,
             'conf_target': 2,
+            'core_version_group': 18,
         },
         'namecoin': {
             'connection_type': 'rpc' if 'namecoin' in with_coins else 'none',
@@ -412,6 +415,7 @@ def main():
             'use_csv': False,
             'blocks_confirmed': 1,
             'conf_target': 2,
+            'core_version_group': 18,
         }
     }
 

@@ -20,7 +20,7 @@ import subprocess
 import logging
 
 from basicswap import __version__
-from basicswap.basicswap import BasicSwap, Coins
+from basicswap.basicswap import BasicSwap
 from basicswap.http_server import HttpThread
 
 

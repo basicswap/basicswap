@@ -423,6 +423,7 @@ class BasicSwap():
             'last_height_checked': last_height_checked,
             'use_segwit': chain_client_settings.get('use_segwit', False),
             'use_csv': chain_client_settings.get('use_csv', True),
+            'core_version_group': chain_client_settings.get('core_version_group', 0),
             'pid': None,
         }
 
@@ -445,6 +446,7 @@ class BasicSwap():
             self.log.debug('Reading %s rpc credentials from auth cookie %s', coin, authcookiepath)
             # Wait for daemon to start
             # Test pids to ensure authcookie is read for the correct process
+            datadir_pid = -1
             for i in range(20):
                 try:
                     with open(pidfilepath, 'rb') as fp:
@@ -454,7 +456,8 @@ class BasicSwap():
                 except Exception:
                     time.sleep(0.5)
             try:
-                assert(datadir_pid == cc['pid'])
+                if os.name != 'nt' or cc['core_version_group'] > 17:  # litecoin on windows doesn't write a pid file
+                    assert(datadir_pid == cc['pid'])
                 with open(authcookiepath, 'rb') as fp:
                     cc['rpcauth'] = fp.read().decode('utf-8')
             except Exception:
