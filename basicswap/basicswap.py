@@ -301,6 +301,23 @@ class BasicSwap():
         self.data_dir = data_dir
         self.chain = chain
         self.settings = settings
+        self.coin_clients = {}
+        self.mxDB = threading.RLock()
+        self.last_expired = 0
+        self.last_checked_progress = 0
+        self.last_checked_watched = 0
+        self.last_checked_expired = 0
+        self.debug = self.settings.get('debug', DEBUG)
+        self.check_progress_seconds = self.settings.get('check_progress_seconds', 60)
+        self.check_watched_seconds = self.settings.get('check_watched_seconds', 60)
+        self.check_expired_seconds = self.settings.get('check_expired_seconds', 60 * 5)
+        self.swaps_in_progress = dict()
+
+        if self.chain == 'regtest':
+            SMSG_SECONDS_IN_DAY = 600
+
+        self.prepareLogging()
+        self.log.info('Network: {}'.format(self.chain))
 
         # Encode key to match network
         wif_prefix = chainparams[Coins.PART][self.chain]['key_prefix']
@@ -309,14 +326,8 @@ class BasicSwap():
         self.network_pubkey = self.settings['network_pubkey']
         self.network_addr = pubkeyToAddress(chainparams[Coins.PART][self.chain]['pubkey_address'], bytearray.fromhex(self.network_pubkey))
         self.wallet = self.settings.get('wallet', None)  # TODO: Move to coin_clients
-        self.last_expired = 0
 
-        self.debug = self.settings.get('debug', DEBUG)
-        self.coin_clients = {}
-
-        self.prepareLogging()
-
-        self.sqlite_file = os.path.join(self.data_dir, 'db.sqlite')
+        self.sqlite_file = os.path.join(self.data_dir, 'db{}.sqlite'.format('' if self.chain == 'mainnet' else ('_' + self.chain)))
         db_exists = os.path.exists(self.sqlite_file)
         self.engine = sa.create_engine('sqlite:///' + self.sqlite_file)
         if not db_exists:
@@ -334,7 +345,6 @@ class BasicSwap():
                 value=self.db_version
             ))
             session.commit()
-
         try:
             self._contract_count = session.query(DBKVInt).filter_by(key='contract_count').first().value
         except Exception:
@@ -348,27 +358,8 @@ class BasicSwap():
         self.zmqSubscriber.connect(self.settings['zmqhost'] + ':' + str(self.settings['zmqport']))
         self.zmqSubscriber.setsockopt_string(zmq.SUBSCRIBE, 'smsg')
 
-        # Defaults
-        self.coin_clients = {}
         for c in Coins:
-            self.coin_clients[c] = self.setDefaultConnectParams(c)
-
-        if self.chain == 'regtest':
-            SMSG_SECONDS_IN_DAY = 600
-
-        self.swaps_in_progress = dict()
-
-        self.check_progress_seconds = self.settings.get('check_progress_seconds', 60)
-        self.check_watched_seconds = self.settings.get('check_watched_seconds', 60)
-        self.check_expired_seconds = self.settings.get('check_expired_seconds', 60 * 5)
-
-        self.last_checked_progress = 0
-        self.last_checked_watched = 0
-        self.last_checked_expired = 0
-
-        self.mxDB = threading.RLock()
-
-        self.bidcount = 0
+            self.coin_clients[c] = self.setCoinConnectParams(c)
 
     def prepareLogging(self):
         self.log = logging.getLogger(self.log_name)
@@ -393,7 +384,7 @@ class BasicSwap():
         except Exception:
             return {}
 
-    def setDefaultConnectParams(self, coin):
+    def setCoinConnectParams(self, coin):
         chain_client_settings = self.getChainClientSettings(coin)
 
         bindir = os.path.expanduser(chain_client_settings.get('bindir', ''))
@@ -459,6 +450,11 @@ class BasicSwap():
                 self.waitForDaemonRPC(c)
                 core_version = self.callcoinrpc(c, 'getnetworkinfo')['version']
                 self.log.info('%s Core version %d', chainparams[c]['name'].capitalize(), core_version)
+
+                # Sanity checks
+                if c == Coins.PART:
+                    if self.callcoinrpc(c, 'getstakinginfo')['enabled'] is not False:
+                        self.log.warning('%s staking is not disabled.', chainparams[c]['name'].capitalize())
 
         self.initialise()
 
