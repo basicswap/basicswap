@@ -404,14 +404,17 @@ class BasicSwap():
         if connection_type == 'rpc':
             if 'rpcauth' in chain_client_settings:
                 rpcauth = chain_client_settings['rpcauth']
+                self.log.debug('Read %s rpc credentials from json settings', coin)
             elif 'rpcpassword' in chain_client_settings:
                 rpcauth = chain_client_settings['rpcuser'] + ':' + chain_client_settings['rpcpassword']
+                self.log.debug('Read %s rpc credentials from json settings', coin)
             if rpcauth is None:
                 if self.chain == 'mainnet':
                     testnet_name = ''
                 else:
                     testnet_name = chainparams[coin][self.chain].get('name', self.chain)
                 authcookiepath = os.path.join(datadir, testnet_name, '.cookie')
+                self.log.debug('Reading %s rpc credentials from auth cookie %s', coin, authcookiepath)
                 # Wait for daemon to start
                 for i in range(10):
                     if not os.path.exists(authcookiepath):
@@ -2244,7 +2247,8 @@ class BasicSwap():
             'deposit_address': self.getCachedAddressForCoin(coin),
             'name': chainparams[coin]['name'].capitalize(),
             'blocks': blockchaininfo['blocks'],
-            'balance': format8(walletinfo.get('total_balance', walletinfo['balance']) * COIN),
+            'balance': format8(makeInt(walletinfo['balance'])),
+            'unconfirmed': format8(makeInt(walletinfo.get('unconfirmed_balance'))),
             'synced': '{0:.2f}'.format(round(blockchaininfo['verificationprogress'], 2)),
         }
         return rv

@@ -228,6 +228,8 @@ class HttpHandler(BaseHTTPRequestHandler):
                 'synced': w['synced'],
                 'deposit_address': w['deposit_address'],
             })
+            if float(w['unconfirmed']) > 0.0:
+                wallets_formatted[-1]['unconfirmed'] = w['unconfirmed']
 
         template = env.get_template('wallets.html')
         return bytes(template.render(

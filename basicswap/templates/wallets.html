@@ -18,7 +18,7 @@
 <p>Error: {{ w.error }}</p>
 {% else %}
 <table>
-<tr><td>Balance:</td><td>{{ w.balance }}</td></tr>
+<tr><td>Balance:</td><td>{{ w.balance }}</td>{% if w.unconfirmed %}<td>Unconfirmed:</td><td>{{ w.unconfirmed }}</td>{% endif %}</tr>
 <tr><td>Blocks:</td><td>{{ w.blocks }}</td></tr>
 <tr><td>Synced:</td><td>{{ w.synced }}</td></tr>
 <tr><td><input type="submit" name="newaddr_{{ w.cid }}" value="Deposit Address"></td><td>{{ w.deposit_address }}</td></tr>
