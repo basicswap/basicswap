@@ -972,6 +972,7 @@ class BasicSwap():
     def postBid(self, offer_id, amount, addr_send_from=None):
         # Bid to send bid.amount * offer.rate of coin_to in exchange for bid.amount of coin_from
         self.log.debug('postBid %s %s', offer_id.hex(), format8(amount))
+
         self.mxDB.acquire()
         try:
             offer = self.getOffer(offer_id)
@@ -1643,7 +1644,7 @@ class BasicSwap():
 
         # TODO: Lookup from explorers
 
-        if assert_txid != None:
+        if assert_txid is not None:
             try:
                 ro = self.callcoinrpc(coin_type, 'getmempoolentry', [assert_txid])
                 self.log.debug('Tx %s found in mempool, fee %s', assert_txid, ro['fee'])

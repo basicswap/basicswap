@@ -19,6 +19,7 @@ from . import __version__
 from .util import (
     COIN,
     format8,
+    makeInt,
 )
 from .chainparams import (
     chainparams,
@@ -86,6 +87,14 @@ def getTxSpendHex(bid, tx_type):
     if not obj.spend_txid:
         return 'None'
     return obj.spend_txid.hex() + ' {}'.format(obj.spend_n)
+
+
+def validateAmountString(amount):
+    if type(amount) != str:
+        return
+    ar = amount.split('.')
+    if len(ar) > 0 and len(ar[1]) > 8:
+        raise ValueError('Too many decimal places in amount {}'.format(amount))
 
 
 def html_content_start(title, h2=None, refresh=None):
@@ -260,8 +269,14 @@ class HttpHandler(BaseHTTPRequestHandler):
             except Exception:
                 raise ValueError('Unknown Coin To')
 
-            value_from = int(float(form_data[b'amt_from'][0]) * COIN)
-            value_to = int(float(form_data[b'amt_to'][0]) * COIN)
+            value_from = form_data[b'amt_from'][0].decode('utf-8')
+            value_to = form_data[b'amt_to'][0].decode('utf-8')
+
+            validateAmountString(value_from)
+            validateAmountString(value_to)
+            value_from = makeInt(value_from)
+            value_to = makeInt(value_to)
+
             min_bid = int(value_from)
             rate = int((value_to / value_from) * COIN)
             autoaccept = True if b'autoaccept' in form_data else False
