@@ -7,9 +7,9 @@
 
 <form method="post">
 <p>
-<select name="coin_type"><option value="-1">-- Select Coin --</option>
+<select name="coin_type"><option value="-1"{% if coin_type==-1 %} selected{% endif %}>-- Select Coin --</option>
 {% for c in coins %}
-<option value="{{ c[0] }}">{{ c[1] }}</option>
+<option value="{{ c[0] }}"{% if coin_type==c[0] %} selected{% endif %}>{{ c[1] }}</option>
 {% endfor %}
 </select><br/>
 <input type="text" name="cmd"><br/>

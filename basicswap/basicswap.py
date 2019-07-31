@@ -541,6 +541,15 @@ class BasicSwap():
         self.log.error('Can\'t connect to %s RPC, exiting.', coin_type)
         self.stopRunning(1)  # systemd will try restart if fail_code != 0
 
+    def checkSynced(self, coin_from, coin_to):
+        check_coins = [coin_from, coin_to]
+        for c in check_coins:
+            if self.coin_clients[c]['connection_type'] != 'rpc':
+                continue
+                synced = round(self.callcoinrpc(c, 'getblockchaininfo')['verificationprogress'], 3)
+                if synced < 1.0:
+                    raise ValueError('{} chain is still syncing, currently at {}.'.format(synced))
+
     def setIntKV(self, str_key, int_val):
         session = scoped_session(self.session_factory)
         kv = session.query(DBKVInt).filter_by(key=str_key).first()
@@ -663,6 +672,7 @@ class BasicSwap():
 
         self.mxDB.acquire()
         try:
+            self.checkSynced(coin_from_t, coin_to_t)
             proof_addr, proof_sig = self.getProofOfFunds(coin_from_t, amount)
             # TODO: require prrof of funds on offers?
 
@@ -975,6 +985,8 @@ class BasicSwap():
 
             coin_from = Coins(offer.coin_from)
             coin_to = Coins(offer.coin_to)
+
+            self.checkSynced(coin_from, coin_to)
 
             contract_count = self.getNewContractId()
 
@@ -1628,6 +1640,18 @@ class BasicSwap():
         return self.callcoinrpc(coin_type, 'getblockchaininfo')['blocks']
 
     def lookupUnspentByAddress(self, coin_type, address, sum_output=False, assert_amount=None, assert_txid=None):
+
+        # TODO: Lookup from explorers
+
+        if assert_txid != None:
+            try:
+                ro = self.callcoinrpc(coin_type, 'getmempoolentry', [assert_txid])
+                self.log.debug('Tx %s found in mempool, fee %s', assert_txid, ro['fee'])
+                # TODO: Save info
+                return None
+            except Exception:
+                pass
+
         num_blocks = self.callcoinrpc(coin_type, 'getblockchaininfo')['blocks']
 
         sum_unspent = 0

@@ -150,6 +150,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         swap_client = self.server.swap_client
 
         result = None
+        coin_type = -1
         messages = []
         form_data = self.checkForm(post_string, 'rpc', messages)
         if form_data:
@@ -160,7 +161,7 @@ class HttpHandler(BaseHTTPRequestHandler):
 
             cmd = form_data[b'cmd'][0].decode('utf-8')
             try:
-                result = swap_client.callcoincli(coin_type, cmd)
+                result = cmd + '\n' + swap_client.callcoincli(coin_type, cmd)
             except Exception as ex:
                 result = str(ex)
 
@@ -169,6 +170,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             title=self.server.title,
             h2=self.server.title,
             coins=listAvailableCoins(swap_client),
+            coin_type=coin_type,
             result=result,
             form_id=os.urandom(8).hex(),
         ), 'UTF-8')

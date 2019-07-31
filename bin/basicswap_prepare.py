@@ -270,12 +270,19 @@ def make_rpc_func(bin_dir, data_dir, chain):
         nonlocal bin_dir
         nonlocal data_dir
         nonlocal chain
+
+        # Debug ci
+        try:
+            os.system('cat ' + os.path.join(data_dir, 'debug.log'))
+        except Exception as ex:
+            logger.error(ex)
+
         return callrpc_cli(bin_dir, data_dir, chain, cmd, cfg.PARTICL_CLI)
     return rpc_func
 
 
 def waitForRPC(rpc_func, wallet=None):
-    for i in range(5):
+    for i in range(10):
         try:
             rpc_func('getwalletinfo')
             return
