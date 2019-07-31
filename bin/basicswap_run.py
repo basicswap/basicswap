@@ -20,7 +20,7 @@ import subprocess
 import logging
 
 from basicswap import __version__
-from basicswap.basicswap import BasicSwap
+from basicswap.basicswap import BasicSwap, Coins
 from basicswap.http_server import HttpThread
 
 
@@ -58,8 +58,11 @@ def runClient(fp, data_dir, chain, test_mode):
     with open(settings_path) as fs:
         settings = json.load(fs)
 
+    swap_client = BasicSwap(fp, data_dir, settings, chain)
+
     daemons = []
     pids = []
+    threads = []
 
     if os.path.exists(pids_path):
         with open(pids_path) as fd:
@@ -67,43 +70,44 @@ def runClient(fp, data_dir, chain, test_mode):
                 # TODO: try close
                 logger.warning('Found pid for daemon {} '.format(ln.strip()))
 
-    for c, v in settings['chainclients'].items():
-        if v['manage_daemon'] is True:
-            logger.info('Starting {} daemon'.format(c.capitalize()))
-
-            filename = c + 'd' + ('.exe' if os.name == 'nt' else '')
-            daemons.append(startDaemon(v['datadir'], v['bindir'], filename))
-            pid = daemons[-1].pid
-            pids.append((c, pid))
-            logger.info('Started {} {}'.format(filename, pid))
-
-    if len(pids) > 0:
-        with open(pids_path, 'w') as fd:
-            for p in pids:
-                fd.write('{}:{}\n'.format(*p))
-
-    swap_client = BasicSwap(fp, data_dir, settings, chain)
-
-    if not test_mode:
-        # signal only works in main thread
-        signal.signal(signal.SIGINT, signal_handler)
-        signal.signal(signal.SIGTERM, signal_handler)
-    swap_client.start()
-
-    threads = []
-    if 'htmlhost' in settings:
-        swap_client.log.info('Starting server at %s:%d.' % (settings['htmlhost'], settings['htmlport']))
-        allow_cors = settings['allowcors'] if 'allowcors' in settings else ALLOW_CORS
-        tS1 = HttpThread(fp, settings['htmlhost'], settings['htmlport'], allow_cors, swap_client)
-        threads.append(tS1)
-        tS1.start()
+    # Ensure daemons are stopped
+    swap_client.stopDaemons()
 
     try:
+        # Try start daemons
+        for c, v in settings['chainclients'].items():
+            if v['manage_daemon'] is True:
+                logger.info('Starting {} daemon'.format(c.capitalize()))
+
+                filename = c + 'd' + ('.exe' if os.name == 'nt' else '')
+                daemons.append(startDaemon(v['datadir'], v['bindir'], filename))
+                pid = daemons[-1].pid
+                pids.append((c, pid))
+                swap_client.setDaemonPID(c, pid)
+                logger.info('Started {} {}'.format(filename, pid))
+        if len(pids) > 0:
+            with open(pids_path, 'w') as fd:
+                for p in pids:
+                    fd.write('{}:{}\n'.format(*p))
+
+        if not test_mode:
+            # Signal only works in main thread
+            signal.signal(signal.SIGINT, signal_handler)
+            signal.signal(signal.SIGTERM, signal_handler)
+        swap_client.start()
+
+        if 'htmlhost' in settings:
+            swap_client.log.info('Starting server at %s:%d.' % (settings['htmlhost'], settings['htmlport']))
+            allow_cors = settings['allowcors'] if 'allowcors' in settings else ALLOW_CORS
+            tS1 = HttpThread(fp, settings['htmlhost'], settings['htmlport'], allow_cors, swap_client)
+            threads.append(tS1)
+            tS1.start()
+
         logger.info('Exit with Ctrl + c.')
         while swap_client.is_running:
             time.sleep(0.5)
             swap_client.update()
-    except Exception:
+    except Exception as ex:
         traceback.print_exc()
 
     swap_client.log.info('Stopping threads.')
