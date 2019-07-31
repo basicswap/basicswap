@@ -442,7 +442,9 @@ class BasicSwap():
         if cc['connection_type'] == 'rpc' and cc['rpcauth'] is None:
             chain_client_settings = self.getChainClientSettings(coin)
             authcookiepath = os.path.join(self.getChainDatadirPath(coin), '.cookie')
-            pidfilepath = os.path.join(self.getChainDatadirPath(coin), cc['name'] + '.pid')
+
+            pidfilename = cc['name'] + ('d' if cc['name'] == 'bitcoin' else '')
+            pidfilepath = os.path.join(self.getChainDatadirPath(coin), pidfilename + '.pid')
             self.log.debug('Reading %s rpc credentials from auth cookie %s', coin, authcookiepath)
             # Wait for daemon to start
             # Test pids to ensure authcookie is read for the correct process
@@ -579,9 +581,9 @@ class BasicSwap():
 
                     coin_from = Coins(offer.coin_from)
                     coin_to = Coins(offer.coin_to)
-                    if bid.initiate_tx:
+                    if bid.initiate_tx and bid.initiate_tx.txid:
                         self.addWatchedOutput(coin_from, bid.bid_id, bid.initiate_tx.txid.hex(), bid.initiate_tx.vout, BidStates.SWAP_INITIATED)
-                    if bid.participate_tx:
+                    if bid.participate_tx and bid.participate_tx.txid:
                         self.addWatchedOutput(coin_to, bid.bid_id, bid.participate_tx.txid.hex(), bid.participate_tx.vout, BidStates.SWAP_PARTICIPATING)
 
                     if self.coin_clients[coin_from]['last_height_checked'] < 1:
