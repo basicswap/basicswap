@@ -6,9 +6,9 @@
 {% endif %}
 
 <table>
-<tr><th>Bid ID</th><th>Offer ID</th><th>Bid Status</th></tr>
+<tr><th>Bid ID</th><th>Offer ID</th><th>Bid Status</th><th>ITX Status</th><th>PTX Status</th></tr>
 {% for s in active_swaps %}
-<tr><td><a href=/bid/{{ s[0] }}>{{ s[0] }}</a></td><td><a href=/offer/{{ s[1] }}>{{ s[1] }}</a></td><td>{{ s[2] }}</td></tr>
+<tr><td><a href=/bid/{{ s[0] }}>{{ s[0] }}</a></td><td><a href=/offer/{{ s[1] }}>{{ s[1] }}</a></td><td>{{ s[2] }}</td><td>{{ s[3] }}</td><td>{{ s[4] }}</td></tr>
 {% endfor %}
 </table>
 

@@ -182,7 +182,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             title=self.server.title,
             refresh=30,
             h2=self.server.title,
-            active_swaps=[(s[0].hex(), s[1], strBidState(s[2])) for s in active_swaps],
+            active_swaps=[(s[0].hex(), s[1], strBidState(s[2]), strTxState(s[3]), strTxState(s[4])) for s in active_swaps],
         ), 'UTF-8')
 
     def page_wallets(self, url_split, post_string):
@@ -357,7 +357,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         }
         messages = []
         form_data = self.checkForm(post_string, 'offers', messages)
-        if form_data:
+        if form_data and b'applyfilters' in form_data:
             coin_from = int(form_data[b'coin_from'][0])
             if coin_from > -1:
                 try:

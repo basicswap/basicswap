@@ -58,24 +58,26 @@ class Test(unittest.TestCase):
         assert(decoded == blocks_val)
 
     def test_makeInt(self):
-        def test_case(v):
-            sv = format8(makeInt(v))
+        def test_case(vs, vf, expect_int):
+            assert(makeInt(vs) == expect_int)
+            assert(makeInt(vf) == expect_int)
+            vs_out = format8(makeInt(vs))
             # Strip
             for i in range(7):
-                if sv[-1] == '0':
-                    sv = sv[:-1]
-            assert(sv == v)
-        test_case('0.00899999')
-        test_case('899999.0')
-        test_case('899999.00899999')
-        test_case('1.0')
-        test_case('1.1')
-        test_case('1.2')
-        test_case('0.00899991')
-        test_case('0.0089999')
-        test_case('0.0089991')
-        test_case('0.123')
-        test_case('123000.000123')
+                if vs_out[-1] == '0':
+                    vs_out = vs_out[:-1]
+            assert(vs_out == vs)
+        test_case('0.00899999', 0.00899999, 899999)
+        test_case('899999.0', 899999.0, 89999900000000)
+        test_case('899999.00899999', 899999.00899999, 89999900899999)
+        test_case('1.0', 1.0, 100000000)
+        test_case('1.1', 1.1, 110000000)
+        test_case('1.2', 1.2, 120000000)
+        test_case('0.00899991', 0.00899991, 899991)
+        test_case('0.0089999', 0.0089999, 899990)
+        test_case('0.0089991', 0.0089991, 899910)
+        test_case('0.123', 0.123, 12300000)
+        test_case('123000.000123', 123000.000123, 12300000012300)
 
 
 if __name__ == '__main__':

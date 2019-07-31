@@ -2126,7 +2126,6 @@ class BasicSwap():
         self.swaps_in_progress[bid_id] = (bid, offer)
 
     def processMsg(self, msg):
-        self.log.debug('processMsg %s', msg['hex'])
         self.mxDB.acquire()
         try:
             msg_type = int(msg['hex'][:2], 16)
@@ -2294,6 +2293,13 @@ class BasicSwap():
                 q = q.filter(Offer.coin_to == int(filter_coin_to))
 
             q = q.order_by(Offer.created_at.desc())
+
+            limit = filters.get('limit', None)
+            if limit is not None:
+                q = q.limit(limit)
+            offset = filters.get('offset', None)
+            if offset is not None:
+                q = q.offset(offset)
             for row in q:
                 rv.append(row)
             return rv
@@ -2334,7 +2340,7 @@ class BasicSwap():
         try:
             rv = []
             for k, v in self.swaps_in_progress.items():
-                rv.append((k, v[0].offer_id.hex(), v[0].state))
+                rv.append((k, v[0].offer_id.hex(), v[0].state, v[0].getITxState(), v[0].getPTxState()))
             return rv
         finally:
             self.mxDB.release()
