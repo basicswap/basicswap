@@ -443,7 +443,9 @@ class BasicSwap():
             chain_client_settings = self.getChainClientSettings(coin)
             authcookiepath = os.path.join(self.getChainDatadirPath(coin), '.cookie')
 
-            pidfilename = cc['name'] + ('d' if cc['name'] == 'bitcoin' else '')
+            pidfilename = cc['name']
+            if cc['name'] == 'bitcoin' or cc['name'] == 'namecoin':
+                pidfilename += 'd'
             pidfilepath = os.path.join(self.getChainDatadirPath(coin), pidfilename + '.pid')
             self.log.debug('Reading %s rpc credentials from auth cookie %s', coin, authcookiepath)
             # Wait for daemon to start
