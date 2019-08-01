@@ -45,6 +45,7 @@ def format_timestamp(value):
 
 env = Environment(loader=PackageLoader('basicswap', 'templates'))
 env.filters['formatts'] = format_timestamp
+PAGE_LIMIT = 50
 
 
 def getCoinName(c):
@@ -373,6 +374,10 @@ class HttpHandler(BaseHTTPRequestHandler):
         filters = {
             'coin_from': -1,
             'coin_to': -1,
+            'page_no': 1,
+            'limit': PAGE_LIMIT,
+            'sort_by': 'created_at',
+            'sort_dir': 'desc',
         }
         messages = []
         form_data = self.checkForm(post_string, 'offers', messages)
@@ -389,6 +394,25 @@ class HttpHandler(BaseHTTPRequestHandler):
                     filters['coin_to'] = Coins(coin_to)
                 except Exception:
                     raise ValueError('Unknown Coin From')
+
+            if b'sort_by' in form_data:
+                sort_by = form_data[b'sort_by'][0].decode('utf-8')
+                assert(sort_by in ['created_at', 'rate']), 'Invalid sort by'
+                filters['sort_by'] = sort_by
+            if b'sort_dir' in form_data:
+                sort_dir = form_data[b'sort_dir'][0].decode('utf-8')
+                assert(sort_dir in ['asc', 'desc']), 'Invalid sort dir'
+                filters['sort_dir'] = sort_dir
+
+        if form_data and b'pageback' in form_data:
+            filters['page_no'] = int(form_data[b'pageno'][0]) - 1
+            if filters['page_no'] < 1:
+                filters['page_no'] = 1
+        if form_data and b'pageforwards' in form_data:
+            filters['page_no'] = int(form_data[b'pageno'][0]) + 1
+
+        if filters['page_no'] > 1:
+            filters['offset'] = (filters['page_no'] - 1) * PAGE_LIMIT
 
         offers = swap_client.listOffers(sent, filters)
 

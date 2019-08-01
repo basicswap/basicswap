@@ -25,9 +25,22 @@
 </select>
 </td></tr>
 
+<tr><td>Sort By</td><td>
+<select name="sort_by">
+<option value="created_at"{% if filters.sort_by=='created_at' %} selected{% endif %}>Created At</option>
+<option value="rate"{% if filters.sort_by=='rate' %} selected{% endif %}>Rate</option>
+</select>
+<select name="sort_dir">
+<option value="asc"{% if filters.sort_dir=='asc' %} selected{% endif %}>Ascending</option>
+<option value="desc"{% if filters.sort_dir=='desc' %} selected{% endif %}>Descending</option>
+</select>
+</td></tr>
+
 <tr><td><input type="submit" name='applyfilters' value="Apply Filters"></td><td><input type="submit" name='clearfilters' value="Clear Filters"></td></tr>
+<tr><td><input type="submit" name='pageback' value="Page Back"></td><td>Page: {{ filters.page_no }}</td><td><input type="submit" name='pageforwards' value="Page Forwards"></td></tr>
 </table>
 <input type="hidden" name="formid" value="{{ form_id }}">
+<input type="hidden" name="pageno" value="{{ filters.page_no }}">
 </form>
 
 

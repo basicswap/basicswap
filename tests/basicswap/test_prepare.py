@@ -33,7 +33,7 @@ class Test(unittest.TestCase):
         super(Test, self).tearDownClass()
 
     def test(self):
-        testargs = ['basicswap-prepare', '-datadir=' + test_path, '-particl_mnemonic=none']  # Why won't the daemon run in travis-ci?
+        testargs = ['basicswap-prepare', '-datadir=' + test_path]
         with patch.object(sys, 'argv', testargs):
             prepareSystem.main()
 

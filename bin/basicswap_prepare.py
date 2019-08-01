@@ -271,12 +271,6 @@ def make_rpc_func(bin_dir, data_dir, chain):
         nonlocal data_dir
         nonlocal chain
 
-        # Debug ci
-        try:
-            os.system('cat ' + os.path.join(data_dir, 'debug.log'))
-        except Exception as ex:
-            logger.error(ex)
-
         return callrpc_cli(bin_dir, data_dir, chain, cmd, cfg.PARTICL_CLI)
     return rpc_func
 

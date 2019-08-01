@@ -26,7 +26,7 @@ import threading
 
 import bin.basicswap_prepare as prepareSystem
 import bin.basicswap_run as runSystem
-test_path = os.path.expanduser('/tmp/test_basicswap')
+test_path = os.path.expanduser('~/test_basicswap1')
 
 logger = logging.getLogger()
 logger.level = logging.DEBUG

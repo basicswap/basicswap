@@ -9,7 +9,7 @@
 basicswap]$ python setup.py test
 
 Run one test:
-$ python setup.py test -s tests.test_run.Test.test_04_ltc_btc
+$ python setup.py test -s tests.basicswap.test_run.Test.test_04_ltc_btc
 
 """
 
@@ -259,6 +259,9 @@ class Test(unittest.TestCase):
                 settings = json.load(fs)
             fp = open(os.path.join(basicswap_dir, 'basicswap.log'), 'w')
             cls.swap_clients.append(BasicSwap(fp, basicswap_dir, settings, 'regtest', log_name='BasicSwap{}'.format(i)))
+            cls.swap_clients[-1].setDaemonPID(Coins.BTC, cls.daemons[0].pid)
+            cls.swap_clients[-1].setDaemonPID(Coins.LTC, cls.daemons[1].pid)
+            cls.swap_clients[-1].setDaemonPID(Coins.PART, cls.daemons[2 + i].pid)
             cls.swap_clients[-1].start()
         cls.swap_clients[0].callrpc('extkeyimportmaster', ['abandon baby cabbage dad eager fabric gadget habit ice kangaroo lab absorb'])
         cls.swap_clients[1].callrpc('extkeyimportmaster', ['pact mammal barrel matrix local final lecture chunk wasp survey bid various book strong spread fall ozone daring like topple door fatigue limb olympic', '', 'true'])
@@ -558,11 +561,16 @@ class Test(unittest.TestCase):
     def pass_99_delay(self):
         global stop_test
         logging.info('Delay')
-        for i in range(60 * 5):
+        for i in range(60 * 10):
             if stop_test:
                 break
             time.sleep(1)
             print('delay', i)
+            if i % 2 == 0:
+                offer_id = self.swap_clients[0].postOffer(Coins.BTC, Coins.LTC, 0.001 * (i + 1) * COIN, 1.0 * (i + 1) * COIN, 0.001 * (i + 1) * COIN, SwapTypes.SELLER_FIRST)
+            else:
+                offer_id = self.swap_clients[1].postOffer(Coins.LTC, Coins.BTC, 0.001 * (i + 1) * COIN, 1.0 * (i + 1) * COIN, 0.001 * COIN, SwapTypes.SELLER_FIRST)
+
         stop_test = True
 
 

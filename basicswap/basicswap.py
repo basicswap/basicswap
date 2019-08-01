@@ -54,6 +54,8 @@ from .db import (
     SentOffer,
     SmsgAddress,
 )
+
+from .explorers import ExplorerInsight, ExplorerBitAps, ExplorerChainz
 import basicswap.config as cfg
 import basicswap.segwit_addr as segwit_addr
 
@@ -361,6 +363,24 @@ class BasicSwap():
         for c in Coins:
             self.setCoinConnectParams(c)
 
+        if self.chain == 'mainnet':
+            self.coin_clients[Coins.PART]['explorers'].append(ExplorerInsight(
+                self,
+                'https://explorer.particl.io/particl-insight-api/'))
+            self.coin_clients[Coins.LTC]['explorers'].append(ExplorerBitAps(
+                self,
+                'https://api.bitaps.com/ltc/v1/blockchain'))
+            self.coin_clients[Coins.LTC]['explorers'].append(ExplorerChainz(
+                self,
+                'http://chainz.cryptoid.info/ltc/api.dws'))
+        elif self.chain == 'testnet':
+            self.coin_clients[Coins.PART]['explorers'].append(ExplorerInsight(
+                self,
+                'https://explorer-testnet.particl.io/particl-insight-api'))
+            self.coin_clients[Coins.LTC]['explorers'].append(ExplorerBitAps(
+                self,
+                'https://api.bitaps.com/ltc/testnet/v1/blockchain'))
+
     def prepareLogging(self):
         self.log = logging.getLogger(self.log_name)
         self.log.propagate = False
@@ -425,9 +445,13 @@ class BasicSwap():
             'use_csv': chain_client_settings.get('use_csv', True),
             'core_version_group': chain_client_settings.get('core_version_group', 0),
             'pid': None,
+            'explorers': [],
         }
 
     def setDaemonPID(self, name, pid):
+        if isinstance(name, Coins):
+            self.coin_clients[name]['pid'] = pid
+            return
         for c, v in self.coin_clients.items():
             if v['name'] == name:
                 v['pid'] = pid
@@ -2379,7 +2403,12 @@ class BasicSwap():
             if filter_coin_to and filter_coin_to > -1:
                 q = q.filter(Offer.coin_to == int(filter_coin_to))
 
-            q = q.order_by(Offer.created_at.desc())
+            order_dir = filters.get('sort_dir', 'desc')
+            order_by = filters.get('order_by', 'created_at')
+            if order_by == 'created_at':
+                q = q.order_by(Offer.created_at.desc() if order_dir == 'desc' else Offer.created_at.asc())
+            elif order_by == 'rate':
+                q = q.order_by(Offer.rate.desc() if order_dir == 'desc' else Offer.rate.asc())
 
             limit = filters.get('limit', None)
             if limit is not None:
