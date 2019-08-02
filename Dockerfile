@@ -7,9 +7,8 @@ RUN apt-get update; \
     apt-get install -y wget python3-pip gnupg unzip protobuf-compiler;
 
 # TODO: move coindata dir out of src dir
-RUN wget -O bs.zip https://github.com/tecnovert/basicswap/archive/master.zip; \
-    unzip bs.zip; \
-    cd basicswap-master; \
+COPY . basicswap-master
+RUN cd basicswap-master; \
     protoc -I=basicswap --python_out=basicswap basicswap/messages.proto; \
     pip3 install .;
 
