@@ -232,6 +232,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             est_fee = (fee_rate * tx_vsize) / 1000
             wallets_formatted.append({
                 'name': w['name'],
+                'version': w['version'],
                 'cid': str(int(k)),
                 'fee_rate': format8(fee_rate * COIN),
                 'est_fee': format8(est_fee * COIN),

@@ -8,7 +8,7 @@
 """
 
 mkdir -p /tmp/test_basicswap/bin/{particl,bitcoin}
-cp ~/tmp/particl-0.18.1.0-x86_64-linux-gnu.tar.gz /tmp/test_basicswap/bin/particl
+cp ~/tmp/particl-0.18.1.1-x86_64-linux-gnu.tar.gz /tmp/test_basicswap/bin/particl
 cp ~/tmp/bitcoin-0.18.0-x86_64-linux-gnu.tar.gz /tmp/test_basicswap/bin/bitcoin
 
 

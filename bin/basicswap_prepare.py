@@ -40,7 +40,7 @@ else:
     BIN_ARCH = 'x86_64-linux-gnu.tar.gz'
 
 known_coins = {
-    'particl': '0.18.1.0',
+    'particl': '0.18.1.1',
     'litecoin': '0.17.1',
     'bitcoin': '0.18.0',
     'namecoin': '0.18.0',
@@ -470,7 +470,7 @@ def main():
         return 0
 
     logger.info('With coins: %s', ', '.join(with_coins))
-    if os.path.exists(config_path):
+    if os.path.exists(config_path) and not prepare_bin_only:
         exitWithError('{} exists'.format(config_path))
 
     for c in with_coins:

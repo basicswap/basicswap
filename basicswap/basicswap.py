@@ -61,7 +61,6 @@ import basicswap.segwit_addr as segwit_addr
 
 
 DEBUG = True
-SMSG_SECONDS_IN_DAY = 86400
 
 
 MIN_OFFER_VALID_TIME = 60 * 10
@@ -316,7 +315,11 @@ class BasicSwap():
         self.swaps_in_progress = dict()
 
         if self.chain == 'regtest':
-            SMSG_SECONDS_IN_DAY = 600
+            self.SMSG_SECONDS_IN_DAY = 600
+            self.SMSG_SECONDS_IN_HOUR = 60 * 2
+        else:
+            self.SMSG_SECONDS_IN_DAY = 86400
+            self.SMSG_SECONDS_IN_HOUR = 60 * 60
 
         self.prepareLogging()
         self.log.info('Network: {}'.format(self.chain))
@@ -445,6 +448,7 @@ class BasicSwap():
             'use_csv': chain_client_settings.get('use_csv', True),
             'core_version_group': chain_client_settings.get('core_version_group', 0),
             'pid': None,
+            'core_version': None,
             'explorers': [],
         }
 
@@ -504,6 +508,7 @@ class BasicSwap():
                 self.waitForDaemonRPC(c)
                 core_version = self.callcoinrpc(c, 'getnetworkinfo')['version']
                 self.log.info('%s Core version %d', chainparams[c]['name'].capitalize(), core_version)
+                self.coin_clients[c]['core_version'] = core_version
 
                 # Sanity checks
                 if c == Coins.PART:
@@ -724,7 +729,9 @@ class BasicSwap():
             else:
                 offer_addr = addr_send_from
             self.callrpc('smsgaddlocaladdress', [offer_addr])  # Enable receiving smsg
-            ro = self.callrpc('smsgsend', [offer_addr, self.network_addr, payload_hex, False, 1, False, False, True])
+            options = {'decodehex': True, 'ttl_is_seconds': True}
+            msg_valid = self.SMSG_SECONDS_IN_HOUR * 1
+            ro = self.callrpc('smsgsend', [offer_addr, self.network_addr, payload_hex, False, msg_valid, False, options])
             msg_id = ro['msgid']
 
             offer_id = bytes.fromhex(msg_id)
@@ -1035,7 +1042,9 @@ class BasicSwap():
             else:
                 bid_addr = addr_send_from
             self.callrpc('smsgaddlocaladdress', [bid_addr])  # Enable receiving smsg
-            ro = self.callrpc('smsgsend', [bid_addr, offer.addr_from, payload_hex, False, 1, False, False, True])
+            options = {'decodehex': True, 'ttl_is_seconds': True}
+            msg_valid = self.SMSG_SECONDS_IN_HOUR * 1
+            ro = self.callrpc('smsgsend', [bid_addr, offer.addr_from, payload_hex, False, msg_valid, False, options])
             msg_id = ro['msgid']
 
             bid_id = bytes.fromhex(msg_id)
@@ -1177,7 +1186,10 @@ class BasicSwap():
 
             bid_bytes = msg_buf.SerializeToString()
             payload_hex = str.format('{:02x}', MessageTypes.BID_ACCEPT) + bid_bytes.hex()
-            ro = self.callrpc('smsgsend', [offer.addr_from, bid.bid_addr, payload_hex, False, 1, False, False, True])
+            options = {'decodehex': True, 'ttl_is_seconds': True}
+            # TODO: set msg_valid based on bid / offer parameters
+            msg_valid = self.SMSG_SECONDS_IN_HOUR * 48
+            ro = self.callrpc('smsgsend', [offer.addr_from, bid.bid_addr, payload_hex, False, msg_valid, False, options])
             msg_id = ro['msgid']
 
             accept_msg_id = bytes.fromhex(msg_id)
@@ -2004,7 +2016,7 @@ class BasicSwap():
             options = {'encoding': 'none'}
             ro = self.callrpc('smsginbox', ['all', '', options])
             for msg in ro['messages']:
-                expire_at = msg['sent'] + msg['daysretention'] * SMSG_SECONDS_IN_DAY
+                expire_at = msg['sent'] + msg['daysretention'] * self.SMSG_SECONDS_IN_DAY
                 if expire_at < now:
                     options = {'encoding': 'none', 'delete': True}
                     del_msg = self.callrpc('smsg', [msg['msgid'], options])
@@ -2351,6 +2363,7 @@ class BasicSwap():
         blockchaininfo = self.callcoinrpc(coin, 'getblockchaininfo')
         walletinfo = self.callcoinrpc(coin, 'getwalletinfo')
         rv = {
+            'version': self.coin_clients[coin]['core_version'],
             'deposit_address': self.getCachedAddressForCoin(coin),
             'name': chainparams[coin]['name'].capitalize(),
             'blocks': blockchaininfo['blocks'],
