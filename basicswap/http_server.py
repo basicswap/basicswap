@@ -20,6 +20,7 @@ from .util import (
     COIN,
     format8,
     makeInt,
+    dumpj,
 )
 from .chainparams import (
     chainparams,
@@ -58,6 +59,34 @@ def listAvailableCoins(swap_client):
         if v['connection_type'] == 'rpc':
             coins.append((int(k), getCoinName(k)))
     return coins
+
+
+def extractDomain(url):
+    return url.split('://', 1)[1].split('/', 1)[0]
+
+
+def listAvailableExplorers(swap_client):
+    explorers = []
+    for c in Coins:
+        for i, e in enumerate(swap_client.coin_clients[c]['explorers']):
+            explorers.append(('{}_{}'.format(int(c), i), swap_client.coin_clients[c]['name'].capitalize() + ' - ' + extractDomain(e.base_url)))
+    return explorers
+
+
+def listExplorerActions(swap_client):
+    actions = [('height', 'Chain Height'),
+               ('block', 'Get Block'),
+               ('tx', 'Get Transaction'),
+               ('balance', 'Address Balance'),
+               ('unspent', 'List Unspent')]
+    return actions
+
+
+def listBidStates():
+    rv = []
+    for s in BidStates:
+        rv.append((int(s), strBidState(s)))
+    return rv
 
 
 def getTxIdHex(bid, tx_type, prefix):
@@ -110,6 +139,12 @@ def html_content_start(title, h2=None, refresh=None):
 
 
 class HttpHandler(BaseHTTPRequestHandler):
+    def page_info(self, info_str):
+        content = html_content_start('BasicSwap Info') \
+            + '<p>Info: ' + info_str + '</p>' \
+            + '<p><a href=\'/\'>home</a></p></body></html>'
+        return bytes(content, 'UTF-8')
+
     def page_error(self, error_str):
         content = html_content_start('BasicSwap Error') \
             + '<p>Error: ' + error_str + '</p>' \
@@ -155,6 +190,50 @@ class HttpHandler(BaseHTTPRequestHandler):
 
     def js_index(self, url_split):
         return bytes(json.dumps(self.server.swap_client.getSummary()), 'UTF-8')
+
+    def page_explorers(self, url_split, post_string):
+        swap_client = self.server.swap_client
+
+        result = None
+        explorer = -1
+        action = -1
+        messages = []
+        form_data = self.checkForm(post_string, 'explorers', messages)
+        if form_data:
+
+            explorer = form_data[b'explorer'][0].decode('utf-8')
+            action = form_data[b'action'][0].decode('utf-8')
+
+            args = '' if not b'args' in form_data else form_data[b'args'][0].decode('utf-8')
+            try:
+                c, e = explorer.split('_')
+                exp = swap_client.coin_clients[Coins(int(c))]['explorers'][int(e)]
+                if action == 'height':
+                    result = str(exp.getChainHeight())
+                elif action == 'block':
+                    result = dumpj(exp.getBlock(args))
+                elif action == 'tx':
+                    result = dumpj(exp.getTransaction(args))
+                elif action == 'balance':
+                    result = dumpj(exp.getBalance(args))
+                elif action == 'unspent':
+                    result = dumpj(exp.lookupUnspentByAddress(args))
+                else:
+                    result = 'Unknown action'
+            except Exception as ex:
+                result = str(ex)
+
+        template = env.get_template('explorers.html')
+        return bytes(template.render(
+            title=self.server.title,
+            h2=self.server.title,
+            explorers=listAvailableExplorers(swap_client),
+            explorer=explorer,
+            actions=listExplorerActions(swap_client),
+            action=action,
+            result=result,
+            form_id=os.urandom(8).hex(),
+        ), 'UTF-8')
 
     def page_rpc(self, url_split, post_string):
         swap_client = self.server.swap_client
@@ -400,7 +479,7 @@ class HttpHandler(BaseHTTPRequestHandler):
                 sort_by = form_data[b'sort_by'][0].decode('utf-8')
                 assert(sort_by in ['created_at', 'rate']), 'Invalid sort by'
                 filters['sort_by'] = sort_by
-            if b'sort_dir' in form_data:
+            elif b'sort_dir' in form_data:
                 sort_dir = form_data[b'sort_dir'][0].decode('utf-8')
                 assert(sort_dir in ['asc', 'desc']), 'Invalid sort dir'
                 filters['sort_dir'] = sort_dir
@@ -409,7 +488,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             filters['page_no'] = int(form_data[b'pageno'][0]) - 1
             if filters['page_no'] < 1:
                 filters['page_no'] = 1
-        if form_data and b'pageforwards' in form_data:
+        elif form_data and b'pageforwards' in form_data:
             filters['page_no'] = int(form_data[b'pageno'][0]) + 1
 
         if filters['page_no'] > 1:
@@ -457,6 +536,7 @@ class HttpHandler(BaseHTTPRequestHandler):
 
         messages = []
         show_txns = False
+        edit_bid = False
         form_data = self.checkForm(post_string, 'bid', messages)
         if form_data:
             if b'abandon_bid' in form_data:
@@ -464,15 +544,26 @@ class HttpHandler(BaseHTTPRequestHandler):
                     swap_client.abandonBid(bid_id)
                     messages.append('Bid abandoned')
                 except Exception as ex:
-                    messages.append('Error ' + str(ex))
-            if b'accept_bid' in form_data:
+                    messages.append('Abandon failed ' + str(ex))
+            elif b'accept_bid' in form_data:
                 try:
                     swap_client.acceptBid(bid_id)
                     messages.append('Bid accepted')
                 except Exception as ex:
-                    messages.append('Error ' + str(ex))
-            if b'show_txns' in form_data:
+                    messages.append('Accept failed ' + str(ex))
+            elif b'show_txns' in form_data:
                 show_txns = True
+            elif b'edit_bid' in form_data:
+                edit_bid = True
+            elif b'edit_bid_submit' in form_data:
+                data = {
+                    'bid_state': int(form_data[b'new_state'][0])
+                }
+                try:
+                    swap_client.manualBidUpdate(bid_id, data)
+                    messages.append('Bid edited')
+                except Exception as ex:
+                    messages.append('Edit failed ' + str(ex))
 
         bid, offer = swap_client.getBidAndOffer(bid_id)
         assert(bid), 'Unknown bid ID'
@@ -533,6 +624,10 @@ class HttpHandler(BaseHTTPRequestHandler):
             'show_txns': show_txns,
         }
 
+        if edit_bid:
+            data['bid_state_ind'] = int(bid.state)
+            data['bid_states'] = listBidStates()
+
         if show_txns:
             data['initiate_tx_refund'] = 'None' if not bid.initiate_txn_refund else bid.initiate_txn_refund.hex()
             data['participate_tx_refund'] = 'None' if not bid.participate_txn_refund else bid.participate_txn_refund.hex()
@@ -564,6 +659,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             bid_id=bid_id.hex(),
             messages=messages,
             data=data,
+            edit_bid=edit_bid,
             form_id=os.urandom(8).hex(),
             old_states=old_states,
         ), 'UTF-8')
@@ -593,6 +689,12 @@ class HttpHandler(BaseHTTPRequestHandler):
             last_scanned=[(getCoinName(ls[0]), ls[1]) for ls in last_scanned],
             watched_outputs=[(wo[1].hex(), getCoinName(wo[0]), wo[2], wo[3], int(wo[4])) for wo in watched_outputs],
         ), 'UTF-8')
+
+    def page_shutdown(self, url_split, post_string):
+        swap_client = self.server.swap_client
+        swap_client.stopRunning()
+
+        return self.page_info('Shutting down')
 
     def page_index(self, url_split):
         swap_client = self.server.swap_client
@@ -639,6 +741,8 @@ class HttpHandler(BaseHTTPRequestHandler):
                     return self.page_wallets(url_split, post_string)
                 if url_split[1] == 'rpc':
                     return self.page_rpc(url_split, post_string)
+                if url_split[1] == 'explorers':
+                    return self.page_explorers(url_split, post_string)
                 if url_split[1] == 'offer':
                     return self.page_offer(url_split, post_string)
                 if url_split[1] == 'offers':
@@ -657,6 +761,8 @@ class HttpHandler(BaseHTTPRequestHandler):
                     return self.page_bids(url_split, post_string, sent=True)
                 if url_split[1] == 'watched':
                     return self.page_watched(url_split, post_string)
+                if url_split[1] == 'shutdown':
+                    return self.page_shutdown(url_split, post_string)
             return self.page_index(url_split)
         except Exception as ex:
             traceback.print_exc()  # TODO: Remove

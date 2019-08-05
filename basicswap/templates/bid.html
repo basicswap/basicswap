@@ -34,12 +34,33 @@
 {% endif %}
 </table>
 
+
+
 <form method="post">
+{% if edit_bid %}
+<h4>Edit Bid</h4>
+<table>
+<tr><td>Change Bid State</td><td>
+<select name="new_state">
+{% for s in data.bid_states %}
+<option value="{{ s[0] }}"{% if data.bid_state_ind==s[0] %} selected{% endif %}>{{ s[1] }}</option>
+{% endfor %}
+</select></td></tr>
+</table>
+<input name="edit_bid_cancel" type="submit" value="Cancel">
+<input name="edit_bid_submit" type="submit" value="Submit">
+{% else %}
 {% if data.was_received == 'True' %}
 <input name="accept_bid" type="submit" value="Accept Bid"><br/>
 {% endif %}
 <input name="abandon_bid" type="submit" value="Abandon Bid">
+{% if data.show_txns %}
+<input name="hide_txns" type="submit" value="Hide Info">
+{% else %}
 <input name="show_txns" type="submit" value="Show More Info">
+{% endif %}
+<input name="edit_bid" type="submit" value="Edit Bid">
+{% endif %}
 <input type="hidden" name="formid" value="{{ form_id }}">
 </form>
 

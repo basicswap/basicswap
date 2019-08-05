@@ -180,3 +180,14 @@ class SmsgAddress(Base):
     addr_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
     addr = sa.Column(sa.String)
     use_type = sa.Column(sa.Integer)
+
+
+# TODO: Delay responding to automated events
+class EventQueue(Base):
+    __tablename__ = 'eventqueue'
+    addr_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
+    created_at = sa.Column(sa.BigInteger)
+    trigger_at = sa.Column(sa.BigInteger)
+    linked_id = sa.Column(sa.LargeBinary)
+    event_type = sa.Column(sa.Integer)
+

@@ -368,21 +368,24 @@ class BasicSwap():
 
         if self.chain == 'mainnet':
             self.coin_clients[Coins.PART]['explorers'].append(ExplorerInsight(
-                self,
-                'https://explorer.particl.io/particl-insight-api/'))
+                self, Coins.PART,
+                'https://explorer.particl.io/particl-insight-api'))
             self.coin_clients[Coins.LTC]['explorers'].append(ExplorerBitAps(
-                self,
+                self, Coins.LTC,
                 'https://api.bitaps.com/ltc/v1/blockchain'))
             self.coin_clients[Coins.LTC]['explorers'].append(ExplorerChainz(
-                self,
+                self, Coins.LTC,
                 'http://chainz.cryptoid.info/ltc/api.dws'))
         elif self.chain == 'testnet':
             self.coin_clients[Coins.PART]['explorers'].append(ExplorerInsight(
-                self,
+                self, Coins.PART,
                 'https://explorer-testnet.particl.io/particl-insight-api'))
             self.coin_clients[Coins.LTC]['explorers'].append(ExplorerBitAps(
-                self,
+                self, Coins.LTC,
                 'https://api.bitaps.com/ltc/testnet/v1/blockchain'))
+
+            # non-segwit
+            # https://testnet.litecore.io/insight-api
 
     def prepareLogging(self):
         self.log = logging.getLogger(self.log_name)
@@ -593,6 +596,55 @@ class BasicSwap():
         session.close()
         session.remove()
 
+    def activateBid(self, session, bid):
+        if bid.bid_id in self.swaps_in_progress:
+            self.log.debug('Bid %s is already in progress', bid.bid_id.hex())
+
+        self.log.debug('Loading active bid %s', bid.bid_id.hex())
+
+        offer = session.query(Offer).filter_by(offer_id=bid.offer_id).first()
+        assert(offer), 'Offer not found'
+
+        bid.initiate_tx = session.query(SwapTx).filter(sa.and_(SwapTx.bid_id == bid.bid_id, SwapTx.tx_type == TxTypes.ITX)).first()
+        bid.participate_tx = session.query(SwapTx).filter(sa.and_(SwapTx.bid_id == bid.bid_id, SwapTx.tx_type == TxTypes.PTX)).first()
+
+        self.swaps_in_progress[bid.bid_id] = (bid, offer)
+
+        coin_from = Coins(offer.coin_from)
+        coin_to = Coins(offer.coin_to)
+        if bid.initiate_tx and bid.initiate_tx.txid:
+            self.addWatchedOutput(coin_from, bid.bid_id, bid.initiate_tx.txid.hex(), bid.initiate_tx.vout, BidStates.SWAP_INITIATED)
+        if bid.participate_tx and bid.participate_tx.txid:
+            self.addWatchedOutput(coin_to, bid.bid_id, bid.participate_tx.txid.hex(), bid.participate_tx.vout, BidStates.SWAP_PARTICIPATING)
+
+        if self.coin_clients[coin_from]['last_height_checked'] < 1:
+            if bid.initiate_tx and bid.initiate_tx.chain_height:
+                self.coin_clients[coin_from]['last_height_checked'] = bid.initiate_tx.chain_height
+        if self.coin_clients[coin_to]['last_height_checked'] < 1:
+            if bid.participate_tx and bid.participate_tx.chain_height:
+                self.coin_clients[coin_to]['last_height_checked'] = bid.participate_tx.chain_height
+
+        # TODO process addresspool if bid has previously been abandoned
+
+    def deactivateBid(self, offer, bid):
+        # Remove from in progress
+        self.swaps_in_progress.pop(bid.bid_id, None)
+
+        # Remove any watched outputs
+        self.removeWatchedOutput(Coins(offer.coin_from), bid.bid_id, None)
+        self.removeWatchedOutput(Coins(offer.coin_to), bid.bid_id, None)
+
+        if bid.state == BidStates.BID_ABANDONED or bid.state == BidStates.SWAP_COMPLETED:
+            # Return unused addrs to pool
+            if bid.getITxState() != TxStates.TX_REDEEMED:
+                self.returnAddressToPool(bid_id, TxTypes.ITX_REDEEM)
+            if bid.getITxState() != TxStates.TX_REFUNDED:
+                self.returnAddressToPool(bid_id, TxTypes.ITX_REFUND)
+            if bid.getPTxState() != TxStates.TX_REDEEMED:
+                self.returnAddressToPool(bid_id, TxTypes.PTX_REDEEM)
+            if bid.getPTxState() != TxStates.TX_REFUNDED:
+                self.returnAddressToPool(bid_id, TxTypes.PTX_REFUND)
+
     def loadFromDB(self):
         self.log.info('Loading data from db')
         self.mxDB.acquire()
@@ -600,29 +652,7 @@ class BasicSwap():
             session = scoped_session(self.session_factory)
             for bid in session.query(Bid):
                 if bid.state and bid.state > BidStates.BID_RECEIVED and bid.state < BidStates.SWAP_COMPLETED:
-                    self.log.debug('Loading active bid %s', bid.bid_id.hex())
-
-                    offer = session.query(Offer).filter_by(offer_id=bid.offer_id).first()
-                    assert(offer), 'Offer not found'
-
-                    bid.initiate_tx = session.query(SwapTx).filter(sa.and_(SwapTx.bid_id == bid.bid_id, SwapTx.tx_type == TxTypes.ITX)).first()
-                    bid.participate_tx = session.query(SwapTx).filter(sa.and_(SwapTx.bid_id == bid.bid_id, SwapTx.tx_type == TxTypes.PTX)).first()
-
-                    self.swaps_in_progress[bid.bid_id] = (bid, offer)
-
-                    coin_from = Coins(offer.coin_from)
-                    coin_to = Coins(offer.coin_to)
-                    if bid.initiate_tx and bid.initiate_tx.txid:
-                        self.addWatchedOutput(coin_from, bid.bid_id, bid.initiate_tx.txid.hex(), bid.initiate_tx.vout, BidStates.SWAP_INITIATED)
-                    if bid.participate_tx and bid.participate_tx.txid:
-                        self.addWatchedOutput(coin_to, bid.bid_id, bid.participate_tx.txid.hex(), bid.participate_tx.vout, BidStates.SWAP_PARTICIPATING)
-
-                    if self.coin_clients[coin_from]['last_height_checked'] < 1:
-                        if bid.initiate_tx and bid.initiate_tx.chain_height:
-                            self.coin_clients[coin_from]['last_height_checked'] = bid.initiate_tx.chain_height
-                    if self.coin_clients[coin_to]['last_height_checked'] < 1:
-                        if bid.participate_tx and bid.participate_tx.chain_height:
-                            self.coin_clients[coin_to]['last_height_checked'] = bid.participate_tx.chain_height
+                    self.activateBid(session, bid)
 
         finally:
             session.close()
@@ -1139,44 +1169,49 @@ class BasicSwap():
         pubkey_refund = self.getContractPubkey(bid_date, bid.contract_count)
         pkhash_refund = getKeyID(pubkey_refund)
 
-        if offer.lock_type < ABS_LOCK_BLOCKS:
-            sequence = getExpectedSequence(offer.lock_type, offer.lock_value, coin_from)
-            script = buildContractScript(sequence, secret_hash, bid.pkhash_buyer, pkhash_refund)
+        if bid.initiate_tx is not None:
+            self.log.warning('initiate txn %s already exists for bid %s', bid.initiate_tx.txid, bid_id.hex())
+            txid = bid.initiate_tx.txid
+            script = bid.initiate_tx.script
         else:
-            if offer.lock_type == ABS_LOCK_BLOCKS:
-                lock_value = self.callcoinrpc(coin_from, 'getblockchaininfo')['blocks'] + offer.lock_value
+            if offer.lock_type < ABS_LOCK_BLOCKS:
+                sequence = getExpectedSequence(offer.lock_type, offer.lock_value, coin_from)
+                script = buildContractScript(sequence, secret_hash, bid.pkhash_buyer, pkhash_refund)
             else:
-                lock_value = int(time.time()) + offer.lock_value
-            self.log.debug('initiate %s lock_value %d %d', coin_from, offer.lock_value, lock_value)
-            script = buildContractScript(lock_value, secret_hash, bid.pkhash_buyer, pkhash_refund, OpCodes.OP_CHECKLOCKTIMEVERIFY)
+                if offer.lock_type == ABS_LOCK_BLOCKS:
+                    lock_value = self.callcoinrpc(coin_from, 'getblockchaininfo')['blocks'] + offer.lock_value
+                else:
+                    lock_value = int(time.time()) + offer.lock_value
+                self.log.debug('initiate %s lock_value %d %d', coin_from, offer.lock_value, lock_value)
+                script = buildContractScript(lock_value, secret_hash, bid.pkhash_buyer, pkhash_refund, OpCodes.OP_CHECKLOCKTIMEVERIFY)
 
-        p2sh = self.callcoinrpc(Coins.PART, 'decodescript', [script.hex()])['p2sh']
+            p2sh = self.callcoinrpc(Coins.PART, 'decodescript', [script.hex()])['p2sh']
 
-        bid.pkhash_seller = pkhash_refund
+            bid.pkhash_seller = pkhash_refund
 
-        txn = self.createInitiateTxn(coin_from, bid_id, bid, script)
+            txn = self.createInitiateTxn(coin_from, bid_id, bid, script)
 
-        # Store the signed refund txn in case wallet is locked when refund is possible
-        refund_txn = self.createRefundTxn(coin_from, txn, offer, bid, script)
-        bid.initiate_txn_refund = bytes.fromhex(refund_txn)
+            # Store the signed refund txn in case wallet is locked when refund is possible
+            refund_txn = self.createRefundTxn(coin_from, txn, offer, bid, script)
+            bid.initiate_txn_refund = bytes.fromhex(refund_txn)
 
-        txid = self.submitTxn(coin_from, txn)
-        self.log.debug('Submitted initiate txn %s to %s chain for bid %s', txid, chainparams[coin_from]['name'], bid_id.hex())
-        bid.initiate_tx = SwapTx(
-            bid_id=bid_id,
-            tx_type=TxTypes.ITX,
-            txid=bytes.fromhex(txid),
-            script=script,
-        )
-        bid.setITxState(TxStates.TX_SENT)
+            txid = self.submitTxn(coin_from, txn)
+            self.log.debug('Submitted initiate txn %s to %s chain for bid %s', txid, chainparams[coin_from]['name'], bid_id.hex())
+            bid.initiate_tx = SwapTx(
+                bid_id=bid_id,
+                tx_type=TxTypes.ITX,
+                txid=bytes.fromhex(txid),
+                script=script,
+            )
+            bid.setITxState(TxStates.TX_SENT)
 
-        # Check non-bip68 final
-        try:
-            txid = self.submitTxn(coin_from, bid.initiate_txn_refund.hex())
-            self.log.error('Submit refund_txn unexpectedly worked: ' + txid)
-        except Exception as ex:
-            if 'non-BIP68-final' not in str(ex) and 'non-final' not in str(ex):
-                self.log.error('Submit refund_txn unexpected error' + str(ex))
+            # Check non-bip68 final
+            try:
+                txid = self.submitTxn(coin_from, bid.initiate_txn_refund.hex())
+                self.log.error('Submit refund_txn unexpectedly worked: ' + txid)
+            except Exception as ex:
+                if 'non-BIP68-final' not in str(ex) and 'non-final' not in str(ex):
+                    self.log.error('Submit refund_txn unexpected error' + str(ex))
 
         if txid is not None:
             msg_buf = BidAcceptMessage()
@@ -1234,22 +1269,7 @@ class BasicSwap():
             bid.setState(BidStates.BID_ABANDONED)
             session.commit()
 
-            # Remove from in progress
-            self.swaps_in_progress.pop(bid_id, None)
-
-            # Remove any watched outputs
-            self.removeWatchedOutput(Coins(offer.coin_from), bid_id, None)
-            self.removeWatchedOutput(Coins(offer.coin_to), bid_id, None)
-
-            # Return unused addrs to pool
-            if bid.getITxState() != TxStates.TX_REDEEMED:
-                self.returnAddressToPool(bid_id, TxTypes.ITX_REDEEM)
-            if bid.getITxState() != TxStates.TX_REFUNDED:
-                self.returnAddressToPool(bid_id, TxTypes.ITX_REFUND)
-            if bid.getPTxState() != TxStates.TX_REDEEMED:
-                self.returnAddressToPool(bid_id, TxTypes.PTX_REDEEM)
-            if bid.getPTxState() != TxStates.TX_REFUNDED:
-                self.returnAddressToPool(bid_id, TxTypes.PTX_REFUND)
+            self.deactivateBid(offer, bid)
         finally:
             session.close()
             session.remove()
@@ -1612,13 +1632,16 @@ class BasicSwap():
         # Seller first mode, buyer participates
         participate_script = self.deriveParticipateScript(bid_id, bid, offer)
         if bid.was_sent:
-            self.log.debug('Preparing participate txn for bid %s', bid_id.hex())
+            if bid.participate_tx is not None:
+                self.log.warning('Participate txn %s already exists for bid %s', bid.participate_tx.txid, bid_id.hex())
+            else:
+                self.log.debug('Preparing participate txn for bid %s', bid_id.hex())
 
-            coin_to = Coins(offer.coin_to)
-            txn = self.createParticipateTxn(bid_id, bid, offer, participate_script)
-            txid = self.submitTxn(coin_to, txn)
-            self.log.debug('Submitted participate txn %s to %s chain for bid %s', txid, chainparams[coin_to]['name'], bid_id.hex())
-            bid.setPTxState(TxStates.TX_SENT)
+                coin_to = Coins(offer.coin_to)
+                txn = self.createParticipateTxn(bid_id, bid, offer, participate_script)
+                txid = self.submitTxn(coin_to, txn)
+                self.log.debug('Submitted participate txn %s to %s chain for bid %s', txid, chainparams[coin_to]['name'], bid_id.hex())
+                bid.setPTxState(TxStates.TX_SENT)
         else:
             bid.participate_tx = SwapTx(
                 bid_id=bid_id,
@@ -2323,6 +2346,37 @@ class BasicSwap():
         except Exception as ex:
             self.log.error('update %s', str(ex))
             traceback.print_exc()
+        finally:
+            self.mxDB.release()
+
+    def manualBidUpdate(self, bid_id, data):
+        self.log.info('Manually updating bid %s', bid_id.hex())
+        self.mxDB.acquire()
+        try:
+            bid, offer = self.getBidAndOffer(bid_id)
+            assert(bid), 'Bid not found {}'.format(bid_id.hex())
+            assert(offer), 'Offer not found {}'.format(bid.offer_id.hex())
+
+            has_changed = False
+            if bid.state != data['bid_state']:
+                bid.setState(data['bid_state'])
+                self.log.debug('Set state to %s', strBidState(bid.state))
+                has_changed = True
+
+            if has_changed:
+                session = scoped_session(self.session_factory)
+                try:
+                    self.saveBidInSession(session, bid)
+                    session.commit()
+                    if bid.state and bid.state > BidStates.BID_RECEIVED and bid.state < BidStates.SWAP_COMPLETED:
+                        self.activateBid(session, bid)
+                    else:
+                        self.deactivateBid(offer, bid)
+                finally:
+                    session.close()
+                    session.remove()
+            else:
+                raise ValueError('No changes')
         finally:
             self.mxDB.release()
 

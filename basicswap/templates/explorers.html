@@ -1,0 +1,33 @@
+{% include 'header.html' %}
+
+<h3>Explorers</h3>
+{% for m in messages %}
+<p>{{ m }}</p>
+{% endfor %}
+
+<form method="post">
+<p>
+<select name="explorer"><option value="-1"{% if explorer==-1 %} selected{% endif %}>-- Select Explorer --</option>
+{% for e in explorers %}
+<option value="{{ e[0] }}"{% if explorer==e[0] %} selected{% endif %}>{{ e[1] }}</option>
+{% endfor %}
+</select><br/>
+<select name="action"><option value="-1"{% if action==-1 %} selected{% endif %}>-- Select Action --</option>
+{% for a in actions %}
+<option value="{{ a[0] }}"{% if action==a[0] %} selected{% endif %}>{{ a[1] }}</option>
+{% endfor %}
+</select><br/>
+<input type="text" name="args"><br/>
+<input type="submit" value="Submit">
+<input type="hidden" name="formid" value="{{ form_id }}">
+</p>
+</form>
+
+{% if result %}
+<textarea id="story" name="story" rows="40" cols="160">
+{{ result }}
+</textarea>
+{% endif %}
+
+<p><a href="/">home</a></p>
+</body></html>

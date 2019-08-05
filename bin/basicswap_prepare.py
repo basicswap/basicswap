@@ -485,6 +485,8 @@ def main():
         'network_key': '7sW2UEcHXvuqEjkpE5mD584zRaQYs6WXYohue4jLFZPTvMSxwvgs',
         'network_pubkey': '035758c4a22d7dd59165db02a56156e790224361eb3191f02197addcb3bde903d2',
         'chainclients': withchainclients,
+        'auto_reply_delay_min': 5,  # Min delay before sending a response message
+        'auto_reply_delay_max': 50,  # Max delay before sending a response message
         'check_progress_seconds': 60,
         'check_watched_seconds': 60,
         'check_expired_seconds': 60
