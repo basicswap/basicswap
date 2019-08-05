@@ -190,4 +190,3 @@ class EventQueue(Base):
     trigger_at = sa.Column(sa.BigInteger)
     linked_id = sa.Column(sa.LargeBinary)
     event_type = sa.Column(sa.Integer)
-

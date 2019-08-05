@@ -48,6 +48,7 @@ class ExplorerInsight(Explorer):
                 'index': utxo['vout'],
                 'height': utxo['height'],
                 'n_conf': utxo['confirmations'],
+                'value': utxo['satoshis'],
             })
         return rv
 
@@ -66,10 +67,28 @@ class ExplorerBitAps(Explorer):
 
     def getBalance(self, address):
         data = json.loads(self.readURL(self.base_url + '/address/state/' + address))
-        return data
+        return data['data']['balance']
 
     def lookupUnspentByAddress(self, address):
-        return json.loads(self.readURL(self.base_url + '/address/transactions/' + address))
+        # Can't get unspents return only if exactly one transaction exists
+        data = json.loads(self.readURL(self.base_url + '/address/transactions/' + address))
+        try:
+            assert(data['data']['list'] == 1)
+        except Exception as ex:
+            self.log.debug('Explorer error: {}'.format(str(ex)))
+            return None
+        tx = data['data']['list'][0]
+        tx_data = json.loads(self.readURL(self.base_url + '/transaction/{}'.format(tx['txId'])))['data']
+
+        for i, vout in tx_data['vOut'].items():
+            if vout['address'] == address:
+                return [{
+                    'txid': tx_data['txId'],
+                    'index': int(i),
+                    'height': tx_data['blockHeight'],
+                    'n_conf': tx_data['confirmations'],
+                    'value': vout['value'],
+                }]
 
 
 class ExplorerChainz(Explorer):

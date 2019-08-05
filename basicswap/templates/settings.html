@@ -1,0 +1,27 @@
+{% include 'header.html' %}
+
+<h3>Settings</h3>
+
+{% for m in messages %}
+<p>{{ m }}</p>
+{% endfor %}
+
+<form method="post">
+
+{% for c in chains %}
+<h4>{{ c.name }}</h4>
+<table>
+<tr><td>Chain Lookups</td><td>
+<select name="lookups_{{ c.name }}">
+<option value="local"{% if c.lookups=='local' %} selected{% endif %}>Local Node</option>
+<option value="explorer"{% if c.lookups=='explorer' %} selected{% endif %}>Explorer</option>
+</select></td></tr>
+<tr><td><input type="submit" name="apply_{{ c.name }}" value="Apply"></td></tr>
+</table>
+{% endfor %}
+
+<input type="hidden" name="formid" value="{{ form_id }}">
+</form>
+
+<p><a href="/">home</a></p>
+</body></html>

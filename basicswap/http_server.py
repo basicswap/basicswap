@@ -204,7 +204,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             explorer = form_data[b'explorer'][0].decode('utf-8')
             action = form_data[b'action'][0].decode('utf-8')
 
-            args = '' if not b'args' in form_data else form_data[b'args'][0].decode('utf-8')
+            args = '' if b'args' not in form_data else form_data[b'args'][0].decode('utf-8')
             try:
                 c, e = explorer.split('_')
                 exp = swap_client.coin_clients[Coins(int(c))]['explorers'][int(e)]
@@ -328,6 +328,32 @@ class HttpHandler(BaseHTTPRequestHandler):
             title=self.server.title,
             h2=self.server.title,
             wallets=wallets_formatted,
+            form_id=os.urandom(8).hex(),
+        ), 'UTF-8')
+
+    def page_settings(self, url_split, post_string):
+        swap_client = self.server.swap_client
+
+        messages = []
+        form_data = self.checkForm(post_string, 'settings', messages)
+        if form_data:
+            for name, c in swap_client.settings['chainclients'].items():
+                if bytes('apply_' + name, 'utf-8') in form_data:
+                    data = {'lookups': form_data[bytes('lookups_' + name, 'utf-8')][0].decode('utf-8')}
+                    swap_client.editSettings(name, data)
+        chains_formatted = []
+
+        for name, c in swap_client.settings['chainclients'].items():
+            chains_formatted.append({
+                'name': name,
+                'lookups': c.get('chain_lookups', 'local')
+            })
+
+        template = env.get_template('settings.html')
+        return bytes(template.render(
+            title=self.server.title,
+            h2=self.server.title,
+            chains=chains_formatted,
             form_id=os.urandom(8).hex(),
         ), 'UTF-8')
 
@@ -739,6 +765,8 @@ class HttpHandler(BaseHTTPRequestHandler):
                     return self.page_active(url_split, post_string)
                 if url_split[1] == 'wallets':
                     return self.page_wallets(url_split, post_string)
+                if url_split[1] == 'settings':
+                    return self.page_settings(url_split, post_string)
                 if url_split[1] == 'rpc':
                     return self.page_rpc(url_split, post_string)
                 if url_split[1] == 'explorers':

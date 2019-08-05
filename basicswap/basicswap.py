@@ -15,6 +15,8 @@ import hashlib
 import subprocess
 import logging
 import sqlalchemy as sa
+import shutil
+import json
 from sqlalchemy.orm import sessionmaker, scoped_session
 from enum import IntEnum, auto
 
@@ -453,6 +455,7 @@ class BasicSwap():
             'pid': None,
             'core_version': None,
             'explorers': [],
+            'chain_lookups': chain_client_settings.get('chain_lookups', 'local'),
         }
 
     def setDaemonPID(self, name, pid):
@@ -637,13 +640,13 @@ class BasicSwap():
         if bid.state == BidStates.BID_ABANDONED or bid.state == BidStates.SWAP_COMPLETED:
             # Return unused addrs to pool
             if bid.getITxState() != TxStates.TX_REDEEMED:
-                self.returnAddressToPool(bid_id, TxTypes.ITX_REDEEM)
+                self.returnAddressToPool(bid.bid_id, TxTypes.ITX_REDEEM)
             if bid.getITxState() != TxStates.TX_REFUNDED:
-                self.returnAddressToPool(bid_id, TxTypes.ITX_REFUND)
+                self.returnAddressToPool(bid.bid_id, TxTypes.ITX_REFUND)
             if bid.getPTxState() != TxStates.TX_REDEEMED:
-                self.returnAddressToPool(bid_id, TxTypes.PTX_REDEEM)
+                self.returnAddressToPool(bid.bid_id, TxTypes.PTX_REDEEM)
             if bid.getPTxState() != TxStates.TX_REFUNDED:
-                self.returnAddressToPool(bid_id, TxTypes.PTX_REFUND)
+                self.returnAddressToPool(bid.bid_id, TxTypes.PTX_REFUND)
 
     def loadFromDB(self):
         self.log.info('Loading data from db')
@@ -1700,12 +1703,40 @@ class BasicSwap():
 
         # bid saved in checkBidState
 
+    def getAddressBalance(self, coin_type, address):
+        if self.coin_clients[coin_type]['chain_lookups'] == 'explorer':
+            explorers = self.coin_clients[coin_type]['explorers']
+
+            # TODO: random offset into explorers, try blocks
+            for exp in explorers:
+                return exp.getBalance(address)
+        return self.lookupUnspentByAddress(coin_type, address, sum_output=True)
+
     def lookupChainHeight(self, coin_type):
         return self.callcoinrpc(coin_type, 'getblockchaininfo')['blocks']
 
     def lookupUnspentByAddress(self, coin_type, address, sum_output=False, assert_amount=None, assert_txid=None):
 
-        # TODO: Lookup from explorers
+        if self.coin_clients[coin_type]['chain_lookups'] == 'explorer':
+            explorers = self.coin_clients[coin_type]['explorers']
+
+            # TODO: random offset into explorers, try blocks
+            for exp in explorers:
+
+                # TODO: ExplorerBitAps use only gettransaction if assert_txid is set
+                rv = exp.lookupUnspentByAddress(address)
+
+                if assert_amount is not None:
+                    assert(rv['value'] == int(assert_amount)), 'Incorrect output amount in txn {}: {} != {}.'.format(assert_txid, rv['value'], int(assert_amount))
+                if assert_txid is not None:
+                    assert(rv['txid)'] == assert_txid), 'Incorrect txid'
+
+                return rv
+
+            raise ValueError('No explorer for lookupUnspentByAddress {}'.format(str(coin_type)))
+
+        if self.coin_clients[coin_type]['connection_type'] != 'rpc':
+            raise ValueError('No RPC connection for lookupUnspentByAddress {}'.format(str(coin_type)))
 
         if assert_txid is not None:
             try:
@@ -1739,6 +1770,7 @@ class BasicSwap():
                     'index': o['vout'],
                     'height': o['height'],
                     'n_conf': n_conf,
+                    'value': makeInt(o['amount']),
                 }
             else:
                 sum_unspent += o['amount'] * COIN
@@ -2153,7 +2185,7 @@ class BasicSwap():
             else:
                 addr_search = bid_data.proof_address
 
-            sum_unspent = self.lookupUnspentByAddress(coin_to, addr_search, sum_output=True)
+            sum_unspent = self.getAddressBalance(coin_to, addr_search)
             self.log.debug('Proof of funds %s %s', bid_data.proof_address, format8(sum_unspent))
             assert(sum_unspent >= bid_data.amount), 'Proof of funds failed'
 
@@ -2366,7 +2398,7 @@ class BasicSwap():
             if has_changed:
                 session = scoped_session(self.session_factory)
                 try:
-                    self.saveBidInSession(session, bid)
+                    self.saveBidInSession(bid_id, bid, session)
                     session.commit()
                     if bid.state and bid.state > BidStates.BID_RECEIVED and bid.state < BidStates.SWAP_COMPLETED:
                         self.activateBid(session, bid)
@@ -2377,6 +2409,23 @@ class BasicSwap():
                     session.remove()
             else:
                 raise ValueError('No changes')
+        finally:
+            self.mxDB.release()
+
+    def editSettings(self, coin_name, data):
+        self.log.info('Updating settings %s', coin_name)
+        self.mxDB.acquire()
+        try:
+            if 'lookups' in data:
+                self.settings['chainclients'][coin_name]['chain_lookups'] = data['lookups']
+                settings_path = os.path.join(self.data_dir, 'basicswap.json')
+                shutil.copyfile(settings_path, settings_path + '.last')
+                with open(settings_path, 'w') as fp:
+                    json.dump(self.settings, fp, indent=4)
+
+                for c in self.coin_clients:
+                    if c['name'] == coin_name:
+                        c['chain_lookups'] = data['lookups']
         finally:
             self.mxDB.release()
 
