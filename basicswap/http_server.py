@@ -123,7 +123,7 @@ def validateAmountString(amount):
     if type(amount) != str:
         return
     ar = amount.split('.')
-    if len(ar) > 0 and len(ar[1]) > 8:
+    if len(ar) > 1 and len(ar[1]) > 8:
         raise ValueError('Too many decimal places in amount {}'.format(amount))
 
 
@@ -166,18 +166,28 @@ class HttpHandler(BaseHTTPRequestHandler):
         error_str_json = json.dumps({'error': error_str})
         return bytes(error_str_json, 'UTF-8')
 
-    def js_wallets(self, url_split):
+    def js_wallets(self, url_split, post_string):
         return bytes(json.dumps(self.server.swap_client.getWalletsInfo()), 'UTF-8')
 
-    def js_offers(self, url_split):
+    def js_offers(self, url_split, post_string):
+        if len(url_split) > 3:
+            if url_split[3] == 'new':
+                if post_string == '':
+                    raise ValueError('No post data')
+                form_data = urllib.parse.parse_qs(post_string)
+                offer_id = self.postNewOffer(form_data)
+                rv = {'offer_id': offer_id.hex()}
+                return bytes(json.dumps(rv), 'UTF-8')
+            offer_id = bytes.fromhex(url_split[3])
+
         assert(False), 'TODO'
         return bytes(json.dumps(self.server.swap_client.listOffers()), 'UTF-8')
 
-    def js_sentoffers(self, url_split):
+    def js_sentoffers(self, url_split, post_string):
         assert(False), 'TODO'
         return bytes(json.dumps(self.server.swap_client.listOffers(sent=True)), 'UTF-8')
 
-    def js_bids(self, url_split):
+    def js_bids(self, url_split, post_string):
         if len(url_split) > 3:
             bid_id = bytes.fromhex(url_split[3])
             assert(len(bid_id) == 28)
@@ -185,10 +195,10 @@ class HttpHandler(BaseHTTPRequestHandler):
         assert(False), 'TODO'
         return bytes(json.dumps(self.server.swap_client.listBids()), 'UTF-8')
 
-    def js_sentbids(self, url_split):
+    def js_sentbids(self, url_split, post_string):
         return bytes(json.dumps(self.server.swap_client.listBids(sent=True)), 'UTF-8')
 
-    def js_index(self, url_split):
+    def js_index(self, url_split, post_string):
         return bytes(json.dumps(self.server.swap_client.getSummary()), 'UTF-8')
 
     def page_explorers(self, url_split, post_string):
@@ -357,47 +367,52 @@ class HttpHandler(BaseHTTPRequestHandler):
             form_id=os.urandom(8).hex(),
         ), 'UTF-8')
 
+    def postNewOffer(self, form_data):
+        swap_client = self.server.swap_client
+        addr_from = form_data[b'addr_from'][0].decode('utf-8')
+        if addr_from == '-1':
+            addr_from = None
+
+        try:
+            coin_from = Coins(int(form_data[b'coin_from'][0]))
+        except Exception:
+            raise ValueError('Unknown Coin From')
+        try:
+            coin_to = Coins(int(form_data[b'coin_to'][0]))
+        except Exception:
+            raise ValueError('Unknown Coin To')
+
+        value_from = form_data[b'amt_from'][0].decode('utf-8')
+        value_to = form_data[b'amt_to'][0].decode('utf-8')
+
+        validateAmountString(value_from)
+        validateAmountString(value_to)
+        value_from = makeInt(value_from)
+        value_to = makeInt(value_to)
+
+        min_bid = int(value_from)
+        rate = int((value_to / value_from) * COIN)
+        autoaccept = True if b'autoaccept' in form_data else False
+        lock_seconds = int(form_data[b'lockhrs'][0]) * 60 * 60
+        # TODO: More accurate rate
+        # assert(value_to == (value_from * rate) // COIN)
+
+        if swap_client.coin_clients[coin_from]['use_csv'] and swap_client.coin_clients[coin_to]['use_csv']:
+            lock_type = SEQUENCE_LOCK_TIME
+        else:
+            lock_type = ABS_LOCK_TIME
+
+        offer_id = swap_client.postOffer(coin_from, coin_to, value_from, rate, min_bid, SwapTypes.SELLER_FIRST, lock_type=lock_type, lock_value=lock_seconds, auto_accept_bids=autoaccept, addr_send_from=addr_from)
+        return offer_id
+
     def page_newoffer(self, url_split, post_string):
         swap_client = self.server.swap_client
 
         messages = []
         form_data = self.checkForm(post_string, 'newoffer', messages)
         if form_data:
-            addr_from = form_data[b'addr_from'][0].decode('utf-8')
-            if addr_from == '-1':
-                addr_from = None
-
-            try:
-                coin_from = Coins(int(form_data[b'coin_from'][0]))
-            except Exception:
-                raise ValueError('Unknown Coin From')
-            try:
-                coin_to = Coins(int(form_data[b'coin_to'][0]))
-            except Exception:
-                raise ValueError('Unknown Coin To')
-
-            value_from = form_data[b'amt_from'][0].decode('utf-8')
-            value_to = form_data[b'amt_to'][0].decode('utf-8')
-
-            validateAmountString(value_from)
-            validateAmountString(value_to)
-            value_from = makeInt(value_from)
-            value_to = makeInt(value_to)
-
-            min_bid = int(value_from)
-            rate = int((value_to / value_from) * COIN)
-            autoaccept = True if b'autoaccept' in form_data else False
-            lock_seconds = int(form_data[b'lockhrs'][0]) * 60 * 60
-            # TODO: More accurate rate
-            # assert(value_to == (value_from * rate) // COIN)
-
-            if swap_client.coin_clients[coin_from]['use_csv'] and swap_client.coin_clients[coin_to]['use_csv']:
-                lock_type = SEQUENCE_LOCK_TIME
-            else:
-                lock_type = ABS_LOCK_TIME
-
-            offer_id = swap_client.postOffer(coin_from, coin_to, value_from, rate, min_bid, SwapTypes.SELLER_FIRST, lock_type=lock_type, lock_value=lock_seconds, auto_accept_bids=autoaccept, addr_send_from=addr_from)
-            messages.append('<a href="/offer/' + offer_id.hex() + '">Sent Offer ' + offer_id.hex() + '</a><br/>Rate: ' + format8(rate))
+            offer_id = self.postNewOffer(form_data)
+            messages.append('<a href="/offer/' + offer_id.hex() + '">Sent Offer {}</a>'.format(offer_id.hex()))
 
         template = env.get_template('offer_new.html')
         return bytes(template.render(
@@ -755,8 +770,10 @@ class HttpHandler(BaseHTTPRequestHandler):
                             'bids': self.js_bids,
                             'sentbids': self.js_sentbids,
                             }.get(url_split[2], self.js_index)
-                return func(url_split)
+                return func(url_split, post_string)
             except Exception as ex:
+                if self.server.swap_client.debug is True:
+                    traceback.print_exc()
                 return self.js_error(str(ex))
         try:
             self.putHeaders(status_code, 'text/html')
@@ -793,7 +810,8 @@ class HttpHandler(BaseHTTPRequestHandler):
                     return self.page_shutdown(url_split, post_string)
             return self.page_index(url_split)
         except Exception as ex:
-            traceback.print_exc()  # TODO: Remove
+            if self.server.swap_client.debug is True:
+                traceback.print_exc()
             return self.page_error(str(ex))
 
     def do_GET(self):

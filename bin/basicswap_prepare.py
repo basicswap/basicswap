@@ -40,7 +40,7 @@ else:
     BIN_ARCH = 'x86_64-linux-gnu.tar.gz'
 
 known_coins = {
-    'particl': '0.18.1.1',
+    'particl': '0.18.1.2',
     'litecoin': '0.17.1',
     'bitcoin': '0.18.0',
     'namecoin': '0.18.0',
@@ -247,6 +247,7 @@ def printHelp():
     logger.info('\n--help, -h               Print help.')
     logger.info('--version, -v            Print version.')
     logger.info('--datadir=PATH           Path to basicswap data directory, default:~/.basicswap.')
+    logger.info('--bindir=PATH            Path to cores directory, default:datadir/bin.')
     logger.info('--mainnet                Run in mainnet mode.')
     logger.info('--testnet                Run in testnet mode.')
     logger.info('--regtest                Run in regtest mode.')
@@ -257,6 +258,7 @@ def printHelp():
     logger.info('--addcoin=               Add coin to existing setup.')
     logger.info('--disablecoin=           Make coin inactive.')
     logger.info('--preparebinonly         Don\'t prepare settings or datadirs.')
+    logger.info('--portoffset=n           Raise all ports by n.')
 
     logger.info('\n' + 'Known coins: %s', ', '.join(known_coins.keys()))
 
@@ -293,6 +295,8 @@ def exitWithError(error_msg):
 
 def main():
     data_dir = None
+    bin_dir = None
+    port_offset = None
     chain = 'mainnet'
     particl_wallet_mnemonic = None
     prepare_bin_only = False
@@ -331,10 +335,16 @@ def main():
 
         if len(s) == 2:
             if name == 'datadir':
-                data_dir = os.path.expanduser(s[1])
+                data_dir = os.path.expanduser(s[1].strip('"'))
+                continue
+            if name == 'bindir':
+                bin_dir = os.path.expanduser(s[1].strip('"'))
+                continue
+            if name == 'portoffset':
+                port_offset = int(s[1])
                 continue
             if name == 'particl_mnemonic':
-                particl_wallet_mnemonic = s[1]
+                particl_wallet_mnemonic = s[1].strip('"')
                 continue
             if name == 'withcoin':
                 if s[1] not in known_coins:
@@ -363,9 +373,14 @@ def main():
     if data_dir is None:
         default_datadir = '~/.basicswap'
         data_dir = os.path.join(os.path.expanduser(default_datadir))
+    if bin_dir is None:
+        bin_dir = os.path.join(data_dir, 'bin')
+
     logger.info('Using datadir: %s', data_dir)
     logger.info('Chain: %s', chain)
-    port_offset = 300 if chain == 'testnet' else 0
+
+    if port_offset is None:
+        port_offset = 300 if chain == 'testnet' else 0
 
     if not os.path.exists(data_dir):
         os.makedirs(data_dir)
@@ -378,7 +393,7 @@ def main():
             'manage_daemon': True,
             'rpcport': 19792 + port_offset,
             'datadir': os.path.join(data_dir, 'particl'),
-            'bindir': os.path.join(data_dir, 'bin', 'particl'),
+            'bindir': os.path.join(bin_dir, 'particl'),
             'blocks_confirmed': 2,
             'override_feerate': 0.002,
             'conf_target': 2,
@@ -390,7 +405,7 @@ def main():
             'manage_daemon': True if 'litecoin' in with_coins else False,
             'rpcport': 19795 + port_offset,
             'datadir': os.path.join(data_dir, 'litecoin'),
-            'bindir': os.path.join(data_dir, 'bin', 'litecoin'),
+            'bindir': os.path.join(bin_dir, 'litecoin'),
             'use_segwit': True,
             'blocks_confirmed': 2,
             'conf_target': 2,
@@ -402,7 +417,7 @@ def main():
             'manage_daemon': True if 'bitcoin' in with_coins else False,
             'rpcport': 19796 + port_offset,
             'datadir': os.path.join(data_dir, 'bitcoin'),
-            'bindir': os.path.join(data_dir, 'bin', 'bitcoin'),
+            'bindir': os.path.join(bin_dir, 'bitcoin'),
             'use_segwit': True,
             'blocks_confirmed': 1,
             'conf_target': 2,
@@ -414,7 +429,7 @@ def main():
             'manage_daemon': True if 'namecoin' in with_coins else False,
             'rpcport': 19798 + port_offset,
             'datadir': os.path.join(data_dir, 'namecoin'),
-            'bindir': os.path.join(data_dir, 'bin', 'namecoin'),
+            'bindir': os.path.join(bin_dir, 'namecoin'),
             'use_segwit': False,
             'use_csv': False,
             'blocks_confirmed': 1,
