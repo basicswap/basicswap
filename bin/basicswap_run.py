@@ -34,6 +34,7 @@ swap_client = None
 
 
 def signal_handler(sig, frame):
+    global swap_client
     logger.info('Signal %d detected, ending program.' % (sig))
     if swap_client is not None:
         swap_client.stopRunning()
@@ -47,7 +48,7 @@ def startDaemon(node_dir, bin_dir, daemon_bin, opts=[]):
     return subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 
-def runClient(fp, data_dir, chain, test_mode):
+def runClient(fp, data_dir, chain):
     global swap_client
     settings_path = os.path.join(data_dir, 'basicswap.json')
     pids_path = os.path.join(data_dir, '.pids')
@@ -90,10 +91,8 @@ def runClient(fp, data_dir, chain, test_mode):
                 for p in pids:
                     fd.write('{}:{}\n'.format(*p))
 
-        if not test_mode:
-            # Signal only works in main thread
-            signal.signal(signal.SIGINT, signal_handler)
-            signal.signal(signal.SIGTERM, signal_handler)
+        signal.signal(signal.SIGINT, signal_handler)
+        signal.signal(signal.SIGTERM, signal_handler)
         swap_client.start()
 
         if 'htmlhost' in settings:
@@ -163,7 +162,6 @@ def printHelp():
 def main():
     data_dir = None
     chain = 'mainnet'
-    test_mode = False
 
     for v in sys.argv[1:]:
         if len(v) < 2 or v[0] != '-':
@@ -184,9 +182,6 @@ def main():
             printHelp()
             return 0
 
-        if name == 'testmode':
-            test_mode = True
-            continue
         if name == 'testnet':
             chain = 'testnet'
             continue
@@ -212,7 +207,7 @@ def main():
 
     with open(os.path.join(data_dir, 'basicswap.log'), 'a') as fp:
         logger.info(os.path.basename(sys.argv[0]) + ', version: ' + __version__ + '\n\n')
-        runClient(fp, data_dir, chain, test_mode)
+        runClient(fp, data_dir, chain)
 
     logger.info('Done.')
     return swap_client.fail_code if swap_client is not None else 0

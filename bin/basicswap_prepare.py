@@ -217,9 +217,9 @@ def prepareDataDir(coin, settings, data_dir, chain, particl_mnemonic):
         if coin == 'particl':
             fp.write('debugexclude=libevent\n')
             fp.write('zmqpubsmsg=tcp://127.0.0.1:{}\n'.format(settings['zmqport']))
-            fp.write('spentindex=1')
-            fp.write('txindex=1')
-            fp.write('staking=0')
+            fp.write('spentindex=1\n')
+            fp.write('txindex=1\n')
+            fp.write('staking=0\n')
 
             if particl_mnemonic == 'none':
                 fp.write('createdefaultmasterkey=1')

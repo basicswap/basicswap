@@ -20,9 +20,9 @@ import time
 import unittest
 import logging
 import shutil
-import threading
 import json
 import traceback
+import multiprocessing
 from unittest.mock import patch
 from urllib.request import urlopen
 from urllib import parse
@@ -31,6 +31,9 @@ from urllib import parse
 import bin.basicswap_prepare as prepareSystem
 import bin.basicswap_run as runSystem
 test_path = os.path.expanduser('~/test_basicswap1')
+PARTICL_PORT_BASE = 11938
+BITCOIN_PORT_BASE = 10938
+
 
 logger = logging.getLogger()
 logger.level = logging.DEBUG
@@ -66,7 +69,8 @@ class Test(unittest.TestCase):
                 shutil.rmtree(client_path)
             except Exception as ex:
                 logger.warning('setUpClass %s', str(ex))
-            testargs = ['basicswap-prepare',
+            testargs = [
+                'basicswap-prepare',
                 '-datadir="{}"'.format(client_path),
                 '-bindir="{}"'.format(test_path + '/bin'),
                 '-portoffset={}'.format(i),
@@ -75,18 +79,25 @@ class Test(unittest.TestCase):
             with patch.object(sys, 'argv', testargs):
                 prepareSystem.main()
 
+            with open(os.path.join(client_path, 'particl', 'particl.conf'), 'a') as fp:
+                fp.write('port={}\n'.format(PARTICL_PORT_BASE + i))
+            with open(os.path.join(client_path, 'bitcoin', 'bitcoin.conf'), 'a') as fp:
+                fp.write('port={}\n'.format(BITCOIN_PORT_BASE + i))
+
             assert(os.path.exists(config_path))
 
     def run_thread(self, client_id):
         client_path = os.path.join(test_path, 'client{}'.format(client_id))
-        testargs = ['basicswap-run', '-datadir=' + client_path, '-regtest', '-testmode']
+        testargs = ['basicswap-run', '-datadir=' + client_path, '-regtest']
         with patch.object(sys, 'argv', testargs):
             runSystem.main()
 
     def test_reload(self):
+        processes = []
 
-        thread0 = threading.Thread(target=self.run_thread, args=(0,))
-        thread0.start()
+        for i in range(3):
+            processes.append(multiprocessing.Process(target=self.run_thread, args=(i,)))
+            processes[-1].start()
 
         try:
             waitForServer()
@@ -107,9 +118,10 @@ class Test(unittest.TestCase):
         logger.warning('TODO')
         time.sleep(5)
 
-        runSystem.swap_client.stopRunning()
-
-        thread0.join()
+        for p in processes:
+            p.terminate()
+        for p in processes:
+            p.join()
 
 
 if __name__ == '__main__':
