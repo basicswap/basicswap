@@ -7,9 +7,10 @@
 
 """
 
-mkdir -p /tmp/test_basicswap/bin/{particl,bitcoin}
-cp ~/tmp/particl-0.18.1.2-x86_64-linux-gnu.tar.gz /tmp/test_basicswap/bin/particl
-cp ~/tmp/bitcoin-0.18.0-x86_64-linux-gnu.tar.gz /tmp/test_basicswap/bin/bitcoin
+export TEST_RELOAD_PATH=/tmp/test_basicswap
+mkdir -p ${TEST_RELOAD_PATH}/bin/{particl,bitcoin}
+cp ~/tmp/particl-0.18.1.2-x86_64-linux-gnu.tar.gz ${TEST_RELOAD_PATH}/bin/particl
+cp ~/tmp/bitcoin-0.18.0-x86_64-linux-gnu.tar.gz ${TEST_RELOAD_PATH}/bin/bitcoin
 
 
 """
@@ -27,13 +28,12 @@ from unittest.mock import patch
 from urllib.request import urlopen
 from urllib import parse
 
-
 import bin.basicswap_prepare as prepareSystem
 import bin.basicswap_run as runSystem
-test_path = os.path.expanduser('~/test_basicswap1')
-PARTICL_PORT_BASE = 11938
-BITCOIN_PORT_BASE = 10938
 
+test_path = os.path.expanduser(os.getenv('TEST_RELOAD_PATH', '~/test_basicswap1'))
+PARTICL_PORT_BASE = int(os.getenv('PARTICL_PORT_BASE', '11938'))
+BITCOIN_PORT_BASE = int(os.getenv('BITCOIN_PORT_BASE', '10938'))
 
 logger = logging.getLogger()
 logger.level = logging.DEBUG
@@ -81,6 +81,8 @@ class Test(unittest.TestCase):
 
             with open(os.path.join(client_path, 'particl', 'particl.conf'), 'a') as fp:
                 fp.write('port={}\n'.format(PARTICL_PORT_BASE + i))
+                for ip in range(3):
+                    fp.write('addnode=localhost:{}\n'.format(PARTICL_PORT_BASE + ip))
             with open(os.path.join(client_path, 'bitcoin', 'bitcoin.conf'), 'a') as fp:
                 fp.write('port={}\n'.format(BITCOIN_PORT_BASE + i))
 
@@ -101,6 +103,7 @@ class Test(unittest.TestCase):
 
         try:
             waitForServer()
+
             data = parse.urlencode({
                 'addr_from': '-1',
                 'coin_from': '1',
