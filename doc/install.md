@@ -95,6 +95,7 @@ Install git and python3:
 
     https://gitforwindows.org/
     https://www.python.org/downloads/windows/
+        Remember to select the 'Add Python to environment variables' option.
 
 Right click in the directory you want to install into and select 'Git Bash Here':
 

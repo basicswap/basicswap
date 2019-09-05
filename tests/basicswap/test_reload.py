@@ -9,7 +9,7 @@
 
 export TEST_RELOAD_PATH=/tmp/test_basicswap
 mkdir -p ${TEST_RELOAD_PATH}/bin/{particl,bitcoin}
-cp ~/tmp/particl-0.18.1.3-x86_64-linux-gnu.tar.gz ${TEST_RELOAD_PATH}/bin/particl
+cp ~/tmp/particl-0.18.1.4-x86_64-linux-gnu.tar.gz ${TEST_RELOAD_PATH}/bin/particl
 cp ~/tmp/bitcoin-0.18.1-x86_64-linux-gnu.tar.gz ${TEST_RELOAD_PATH}/bin/bitcoin
 
 
