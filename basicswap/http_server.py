@@ -127,6 +127,23 @@ def validateAmountString(amount):
         raise ValueError('Too many decimal places in amount {}'.format(amount))
 
 
+def inputAmount(amount_str):
+    validateAmountString(amount_str)
+    return makeInt(amount_str)
+
+
+def setCoinFilter(form_data, field_name):
+    if field_name not in form_data:
+        return -1
+    coin_type = int(form_data[field_name][0])
+    if coin_type == -1:
+        return -1
+    try:
+        return Coins(coin_type)
+    except Exception:
+        raise ValueError('Unknown Coin Type {}'.format(str(field_name)))
+
+
 def html_content_start(title, h2=None, refresh=None):
     content = '<!DOCTYPE html><html lang="en">\n<head>' \
         + '<meta charset="UTF-8">' \
@@ -169,7 +186,7 @@ class HttpHandler(BaseHTTPRequestHandler):
     def js_wallets(self, url_split, post_string):
         return bytes(json.dumps(self.server.swap_client.getWalletsInfo()), 'UTF-8')
 
-    def js_offers(self, url_split, post_string):
+    def js_offers(self, url_split, post_string, sent=False):
         if len(url_split) > 3:
             if url_split[3] == 'new':
                 if post_string == '':
@@ -180,15 +197,76 @@ class HttpHandler(BaseHTTPRequestHandler):
                 return bytes(json.dumps(rv), 'UTF-8')
             offer_id = bytes.fromhex(url_split[3])
 
-        assert(False), 'TODO'
-        return bytes(json.dumps(self.server.swap_client.listOffers()), 'UTF-8')
+        filters = {
+            'coin_from': -1,
+            'coin_to': -1,
+            'page_no': 1,
+            'limit': PAGE_LIMIT,
+            'sort_by': 'created_at',
+            'sort_dir': 'desc',
+        }
+        if post_string != '':
+            post_data = urllib.parse.parse_qs(post_string)
+            filters['coin_from'] = setCoinFilter(form_data, b'coin_from')
+            filters['coin_to'] = setCoinFilter(form_data, b'coin_to')
+
+            if b'sort_by' in post_data:
+                sort_by = post_data[b'sort_by'][0].decode('utf-8')
+                assert(sort_by in ['created_at', 'rate']), 'Invalid sort by'
+                filters['sort_by'] = sort_by
+            if b'sort_dir' in post_data:
+                sort_dir = post_data[b'sort_dir'][0].decode('utf-8')
+                assert(sort_dir in ['asc', 'desc']), 'Invalid sort dir'
+                filters['sort_dir'] = sort_dir
+
+            if b'offset' in post_data:
+                filters['offset'] = int(post_data[b'offset'][0])
+            if b'limit' in post_data:
+                filters['limit'] = int(post_data[b'limit'][0])
+                assert(filters['limit'] > 0 and filters['limit'] <= PAGE_LIMIT), 'Invalid limit'
+
+        offers = self.server.swap_client.listOffers(sent, filters)
+        rv = []
+        for o in offers:
+            rv.append({
+                'offer_id': o.offer_id.hex(),
+                'created_at': time.strftime('%Y-%m-%d %H:%M', time.localtime(o.created_at)),
+                'coin_from': getCoinName(Coins(o.coin_from)),
+                'coin_to': getCoinName(Coins(o.coin_to)),
+                'amount_from': format8(o.amount_from),
+                'amount_to': format8((o.amount_from * o.rate) // COIN),
+                'rate': format8(o.rate)
+            })
+
+        return bytes(json.dumps(rv), 'UTF-8')
 
     def js_sentoffers(self, url_split, post_string):
-        assert(False), 'TODO'
-        return bytes(json.dumps(self.server.swap_client.listOffers(sent=True)), 'UTF-8')
+        return self.js_offers(url_split, post_string, True)
 
     def js_bids(self, url_split, post_string):
         if len(url_split) > 3:
+            if url_split[3] == 'new':
+                if post_string == '':
+                    raise ValueError('No post data')
+                post_data = urllib.parse.parse_qs(post_string)
+
+                offer_id = bytes.fromhex(post_data[b'offer_id'][0].decode('utf-8'))
+                assert(len(offer_id) == 28)
+
+                amount_from = inputAmount(post_data[b'amount_from'][0].decode('utf-8'))
+
+                addr_from = None
+                if b'addr_from' in post_data:
+                    addr_from = post_data[b'addr_from'][0].decode('utf-8')
+                    if addr_from == '-1':
+                        addr_from = None
+
+                swap_client = self.server.swap_client
+                bid_id = swap_client.postBid(offer_id, amount_from, addr_send_from=addr_from).hex()
+
+                rv = {'bid_id': bid_id}
+                return bytes(json.dumps(rv), 'UTF-8')
+
             bid_id = bytes.fromhex(url_split[3])
             assert(len(bid_id) == 28)
             return bytes(json.dumps(self.server.swap_client.viewBid(bid_id)), 'UTF-8')
@@ -382,13 +460,8 @@ class HttpHandler(BaseHTTPRequestHandler):
         except Exception:
             raise ValueError('Unknown Coin To')
 
-        value_from = form_data[b'amt_from'][0].decode('utf-8')
-        value_to = form_data[b'amt_to'][0].decode('utf-8')
-
-        validateAmountString(value_from)
-        validateAmountString(value_to)
-        value_from = makeInt(value_from)
-        value_to = makeInt(value_to)
+        value_from = inputAmount(form_data[b'amt_from'][0].decode('utf-8'))
+        value_to = inputAmount(form_data[b'amt_to'][0].decode('utf-8'))
 
         min_bid = int(value_from)
         rate = int((value_to / value_from) * COIN)
@@ -447,7 +520,7 @@ class HttpHandler(BaseHTTPRequestHandler):
                 if addr_from == '-1':
                     addr_from = None
 
-                sent_bid_id = swap_client.postBid(offer_id, offer.amount_from).hex()
+                sent_bid_id = swap_client.postBid(offer_id, offer.amount_from, addr_send_from=addr_from).hex()
 
         coin_from = Coins(offer.coin_from)
         coin_to = Coins(offer.coin_to)
@@ -503,24 +576,14 @@ class HttpHandler(BaseHTTPRequestHandler):
         messages = []
         form_data = self.checkForm(post_string, 'offers', messages)
         if form_data and b'applyfilters' in form_data:
-            coin_from = int(form_data[b'coin_from'][0])
-            if coin_from > -1:
-                try:
-                    filters['coin_from'] = Coins(coin_from)
-                except Exception:
-                    raise ValueError('Unknown Coin From')
-            coin_to = int(form_data[b'coin_to'][0])
-            if coin_to > -1:
-                try:
-                    filters['coin_to'] = Coins(coin_to)
-                except Exception:
-                    raise ValueError('Unknown Coin From')
+            filters['coin_from'] = setCoinFilter(form_data, b'coin_from')
+            filters['coin_to'] = setCoinFilter(form_data, b'coin_to')
 
             if b'sort_by' in form_data:
                 sort_by = form_data[b'sort_by'][0].decode('utf-8')
                 assert(sort_by in ['created_at', 'rate']), 'Invalid sort by'
                 filters['sort_by'] = sort_by
-            elif b'sort_dir' in form_data:
+            if b'sort_dir' in form_data:
                 sort_dir = form_data[b'sort_dir'][0].decode('utf-8')
                 assert(sort_dir in ['asc', 'desc']), 'Invalid sort dir'
                 filters['sort_dir'] = sort_dir

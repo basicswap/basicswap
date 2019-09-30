@@ -9,8 +9,10 @@
 
 export TEST_RELOAD_PATH=/tmp/test_basicswap
 mkdir -p ${TEST_RELOAD_PATH}/bin/{particl,bitcoin}
-cp ~/tmp/particl-0.18.1.4-x86_64-linux-gnu.tar.gz ${TEST_RELOAD_PATH}/bin/particl
+cp ~/tmp/particl-0.18.1.5-x86_64-linux-gnu.tar.gz ${TEST_RELOAD_PATH}/bin/particl
 cp ~/tmp/bitcoin-0.18.1-x86_64-linux-gnu.tar.gz ${TEST_RELOAD_PATH}/bin/bitcoin
+export PYTHONPATH=$(pwd)
+python tests/basicswap/test_reload.py
 
 
 """
@@ -28,6 +30,10 @@ from unittest.mock import patch
 from urllib.request import urlopen
 from urllib import parse
 
+from basicswap.util import (
+    callrpc_cli,
+)
+
 import bin.basicswap_prepare as prepareSystem
 import bin.basicswap_run as runSystem
 
@@ -41,6 +47,12 @@ if not len(logger.handlers):
     logger.addHandler(logging.StreamHandler(sys.stdout))
 
 
+def btcRpc(client_no, cmd):
+    bin_path = os.path.join(test_path, 'bin', 'bitcoin')
+    data_path = os.path.join(test_path, 'client{}'.format(client_no), 'bitcoin')
+    return callrpc_cli(bin_path, data_path, 'regtest', cmd, 'bitcoin-cli')
+
+
 def waitForServer():
     for i in range(20):
         try:
@@ -49,6 +61,24 @@ def waitForServer():
             break
         except Exception:
             traceback.print_exc()
+
+
+def waitForNumOffers(port, offers):
+    for i in range(20):
+        summary = json.loads(urlopen('http://localhost:{}/json'.format(port)).read())
+        if summary['num_network_offers'] >= offers:
+            return
+        time.sleep(1)
+    raise ValueError('waitForNumOffers failed')
+
+
+def waitForNumBids(port, bids):
+    for i in range(20):
+        summary = json.loads(urlopen('http://localhost:{}/json'.format(port)).read())
+        if summary['num_recv_bids'] >= bids:
+            return
+        time.sleep(1)
+    raise ValueError('waitForNumBids failed')
 
 
 class Test(unittest.TestCase):
@@ -72,7 +102,7 @@ class Test(unittest.TestCase):
             testargs = [
                 'basicswap-prepare',
                 '-datadir="{}"'.format(client_path),
-                '-bindir="{}"'.format(test_path + '/bin'),
+                '-bindir="{}"'.format(os.path.join(test_path, 'bin')),
                 '-portoffset={}'.format(i),
                 '-particl_mnemonic="{}"'.format(mnemonics[i]),
                 '-regtest', '-withoutcoin=litecoin', '-withcoin=bitcoin']
@@ -81,10 +111,26 @@ class Test(unittest.TestCase):
 
             with open(os.path.join(client_path, 'particl', 'particl.conf'), 'a') as fp:
                 fp.write('port={}\n'.format(PARTICL_PORT_BASE + i))
+                fp.write('bind=127.0.0.1\n')
+                fp.write('dnsseed=0\n')
                 for ip in range(3):
                     fp.write('addnode=localhost:{}\n'.format(PARTICL_PORT_BASE + ip))
-            with open(os.path.join(client_path, 'bitcoin', 'bitcoin.conf'), 'a') as fp:
+
+            # Pruned nodes don't provide blocks
+            with open(os.path.join(client_path, 'bitcoin', 'bitcoin.conf'), 'r') as fp:
+                lines = fp.readlines()
+            with open(os.path.join(client_path, 'bitcoin', 'bitcoin.conf'), 'w') as fp:
+                for line in lines:
+                    if not line.startswith('prune'):
+                        fp.write(line)
                 fp.write('port={}\n'.format(BITCOIN_PORT_BASE + i))
+                fp.write('discover=0\n')
+                fp.write('dnsseed=0\n')
+                fp.write('listenonion=0\n')
+                fp.write('upnp=0\n')
+                fp.write('bind=127.0.0.1\n')
+                for ip in range(3):
+                    fp.write('connect=localhost:{}\n'.format(BITCOIN_PORT_BASE + ip))
 
             assert(os.path.exists(config_path))
 
@@ -104,6 +150,17 @@ class Test(unittest.TestCase):
         try:
             waitForServer()
 
+            num_blocks = 500
+            btc_addr = btcRpc(1, 'getnewaddress mining_addr bech32')
+            logging.info('Mining %d bitcoin blocks to %s', num_blocks, btc_addr)
+            btcRpc(1, 'generatetoaddress {} {}'.format(num_blocks, btc_addr))
+
+            for i in range(20):
+                blocks = btcRpc(0, 'getblockchaininfo')['blocks']
+                if blocks >= 500:
+                    break
+            assert(blocks >= 500)
+
             data = parse.urlencode({
                 'addr_from': '-1',
                 'coin_from': '1',
@@ -118,8 +175,22 @@ class Test(unittest.TestCase):
         except Exception:
             traceback.print_exc()
 
+        logger.info('Waiting for offer:')
+        waitForNumOffers(12701, 1)
+
+        offers = json.loads(urlopen('http://localhost:12701/json/offers').read())
+        offer = offers[0]
+
+        data = parse.urlencode({
+            'offer_id': offer['offer_id'],
+            'amount_from': offer['amount_from']}).encode()
+
+        bid_id = json.loads(urlopen('http://localhost:12701/json/bids/new', data=data).read())
+
+        waitForNumBids(12700, 1)
+
+
         logger.warning('TODO')
-        time.sleep(5)
 
         for p in processes:
             p.terminate()
