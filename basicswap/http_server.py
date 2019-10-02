@@ -144,6 +144,77 @@ def setCoinFilter(form_data, field_name):
         raise ValueError('Unknown Coin Type {}'.format(str(field_name)))
 
 
+def describeBid(swap_client, bid, offer, edit_bid, show_txns):
+
+    coin_from = Coins(offer.coin_from)
+    coin_to = Coins(offer.coin_to)
+    ticker_from = swap_client.getTicker(coin_from)
+    ticker_to = swap_client.getTicker(coin_to)
+
+    if bid.state == BidStates.BID_SENT:
+        state_description = 'Waiting for seller to accept.'
+    elif bid.state == BidStates.BID_RECEIVED:
+        state_description = 'Waiting for seller to accept.'
+    elif bid.state == BidStates.BID_ACCEPTED:
+        if not bid.initiate_tx:
+            state_description = 'Waiting for seller to send initiate tx.'
+        else:
+            state_description = 'Waiting for initiate tx to confirm.'
+    elif bid.state == BidStates.SWAP_INITIATED:
+        state_description = 'Waiting for participate txn to be confirmed in {} chain'.format(ticker_to)
+    elif bid.state == BidStates.SWAP_PARTICIPATING:
+        state_description = 'Waiting for initiate txn to be spent in {} chain'.format(ticker_from)
+    elif bid.state == BidStates.SWAP_COMPLETED:
+        state_description = 'Swap completed'
+        if bid.getITxState() == TxStates.TX_REDEEMED and bid.getPTxState() == TxStates.TX_REDEEMED:
+            state_description += ' successfully'
+        else:
+            state_description += ', ITX ' + strTxState(bid.getITxState()) + ', PTX ' + strTxState(bid.getPTxState())
+    elif bid.state == BidStates.SWAP_TIMEDOUT:
+        state_description = 'Timed out waiting for initiate txn'
+    elif bid.state == BidStates.BID_ABANDONED:
+        state_description = 'Bid abandoned'
+    elif bid.state == BidStates.BID_ERROR:
+        state_description = bid.state_note
+    else:
+        state_description = ''
+
+    data = {
+        'amt_from': format8(bid.amount),
+        'amt_to': format8((bid.amount * offer.rate) // COIN),
+        'ticker_from': ticker_from,
+        'ticker_to': ticker_to,
+        'bid_state': strBidState(bid.state),
+        'state_description': state_description,
+        'itx_state': strTxState(bid.getITxState()),
+        'ptx_state': strTxState(bid.getPTxState()),
+        'offer_id': bid.offer_id.hex(),
+        'addr_from': bid.bid_addr,
+        'addr_fund_proof': bid.proof_address,
+        'created_at': time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(bid.created_at)),
+        'expired_at': time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(bid.expire_at)),
+        'was_sent': 'True' if bid.was_sent else 'False',
+        'was_received': 'True' if bid.was_received else 'False',
+        'initiate_tx': getTxIdHex(bid, TxTypes.ITX, ' ' + ticker_from),
+        'initiate_conf': 'None' if (not bid.initiate_tx or not bid.initiate_tx.conf) else bid.initiate_tx.conf,
+        'participate_tx': getTxIdHex(bid, TxTypes.PTX, ' ' + ticker_to),
+        'participate_conf': 'None' if (not bid.participate_tx or not bid.participate_tx.conf) else bid.participate_tx.conf,
+        'show_txns': show_txns,
+    }
+
+    if edit_bid:
+        data['bid_state_ind'] = int(bid.state)
+        data['bid_states'] = listBidStates()
+
+    if show_txns:
+        data['initiate_tx_refund'] = 'None' if not bid.initiate_txn_refund else bid.initiate_txn_refund.hex()
+        data['participate_tx_refund'] = 'None' if not bid.participate_txn_refund else bid.participate_txn_refund.hex()
+        data['initiate_tx_spend'] = getTxSpendHex(bid, TxTypes.ITX)
+        data['participate_tx_spend'] = getTxSpendHex(bid, TxTypes.PTX)
+
+    return data
+
+
 def html_content_start(title, h2=None, refresh=None):
     content = '<!DOCTYPE html><html lang="en">\n<head>' \
         + '<meta charset="UTF-8">' \
@@ -244,6 +315,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         return self.js_offers(url_split, post_string, True)
 
     def js_bids(self, url_split, post_string):
+        swap_client = self.server.swap_client
         if len(url_split) > 3:
             if url_split[3] == 'new':
                 if post_string == '':
@@ -261,7 +333,6 @@ class HttpHandler(BaseHTTPRequestHandler):
                     if addr_from == '-1':
                         addr_from = None
 
-                swap_client = self.server.swap_client
                 bid_id = swap_client.postBid(offer_id, amount_from, addr_send_from=addr_from).hex()
 
                 rv = {'bid_id': bid_id}
@@ -269,9 +340,29 @@ class HttpHandler(BaseHTTPRequestHandler):
 
             bid_id = bytes.fromhex(url_split[3])
             assert(len(bid_id) == 28)
-            return bytes(json.dumps(self.server.swap_client.viewBid(bid_id)), 'UTF-8')
-        assert(False), 'TODO'
-        return bytes(json.dumps(self.server.swap_client.listBids()), 'UTF-8')
+
+            if post_string != '':
+                post_data = urllib.parse.parse_qs(post_string)
+                if b'accept' in post_data:
+                    swap_client.acceptBid(bid_id)
+
+            bid, offer = swap_client.getBidAndOffer(bid_id)
+            assert(bid), 'Unknown bid ID'
+
+            edit_bid = False
+            show_txns = False
+            data = describeBid(swap_client, bid, offer, edit_bid, show_txns)
+
+            return bytes(json.dumps(data), 'UTF-8')
+
+        bids = swap_client.listBids()
+        return bytes(json.dumps([{
+            'bid_id': b[1].hex(),
+            'offer_id': b[2].hex(),
+            'created_at': time.strftime('%Y-%m-%d %H:%M', time.localtime(b[0])),
+            'amount_from': format8(b[3]),
+            'bid_state': strBidState(b[4])
+        } for b in bids]), 'UTF-8')
 
     def js_sentbids(self, url_split, post_string):
         return bytes(json.dumps(self.server.swap_client.listBids(sent=True)), 'UTF-8')
@@ -672,71 +763,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         bid, offer = swap_client.getBidAndOffer(bid_id)
         assert(bid), 'Unknown bid ID'
 
-        coin_from = Coins(offer.coin_from)
-        coin_to = Coins(offer.coin_to)
-        ticker_from = swap_client.getTicker(coin_from)
-        ticker_to = swap_client.getTicker(coin_to)
-
-        if bid.state == BidStates.BID_SENT:
-            state_description = 'Waiting for seller to accept.'
-        elif bid.state == BidStates.BID_RECEIVED:
-            state_description = 'Waiting for seller to accept.'
-        elif bid.state == BidStates.BID_ACCEPTED:
-            if not bid.initiate_tx:
-                state_description = 'Waiting for seller to send initiate tx.'
-            else:
-                state_description = 'Waiting for initiate tx to confirm.'
-        elif bid.state == BidStates.SWAP_INITIATED:
-            state_description = 'Waiting for participate txn to be confirmed in {} chain'.format(ticker_to)
-        elif bid.state == BidStates.SWAP_PARTICIPATING:
-            state_description = 'Waiting for initiate txn to be spent in {} chain'.format(ticker_from)
-        elif bid.state == BidStates.SWAP_COMPLETED:
-            state_description = 'Swap completed'
-            if bid.getITxState() == TxStates.TX_REDEEMED and bid.getPTxState() == TxStates.TX_REDEEMED:
-                state_description += ' successfully'
-            else:
-                state_description += ', ITX ' + strTxState(bid.getITxState() + ', PTX ' + strTxState(bid.getPTxState()))
-        elif bid.state == BidStates.SWAP_TIMEDOUT:
-            state_description = 'Timed out waiting for initiate txn'
-        elif bid.state == BidStates.BID_ABANDONED:
-            state_description = 'Bid abandoned'
-        elif bid.state == BidStates.BID_ERROR:
-            state_description = bid.state_note
-        else:
-            state_description = ''
-
-        data = {
-            'amt_from': format8(bid.amount),
-            'amt_to': format8((bid.amount * offer.rate) // COIN),
-            'ticker_from': ticker_from,
-            'ticker_to': ticker_to,
-            'bid_state': strBidState(bid.state),
-            'state_description': state_description,
-            'itx_state': strTxState(bid.getITxState()),
-            'ptx_state': strTxState(bid.getPTxState()),
-            'offer_id': bid.offer_id.hex(),
-            'addr_from': bid.bid_addr,
-            'addr_fund_proof': bid.proof_address,
-            'created_at': time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(bid.created_at)),
-            'expired_at': time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(bid.expire_at)),
-            'was_sent': 'True' if bid.was_sent else 'False',
-            'was_received': 'True' if bid.was_received else 'False',
-            'initiate_tx': getTxIdHex(bid, TxTypes.ITX, ' ' + ticker_from),
-            'initiate_conf': 'None' if (not bid.initiate_tx or not bid.initiate_tx.conf) else bid.initiate_tx.conf,
-            'participate_tx': getTxIdHex(bid, TxTypes.PTX, ' ' + ticker_to),
-            'participate_conf': 'None' if (not bid.participate_tx or not bid.participate_tx.conf) else bid.participate_tx.conf,
-            'show_txns': show_txns,
-        }
-
-        if edit_bid:
-            data['bid_state_ind'] = int(bid.state)
-            data['bid_states'] = listBidStates()
-
-        if show_txns:
-            data['initiate_tx_refund'] = 'None' if not bid.initiate_txn_refund else bid.initiate_txn_refund.hex()
-            data['participate_tx_refund'] = 'None' if not bid.participate_txn_refund else bid.participate_txn_refund.hex()
-            data['initiate_tx_spend'] = getTxSpendHex(bid, TxTypes.ITX)
-            data['participate_tx_spend'] = getTxSpendHex(bid, TxTypes.PTX)
+        data = describeBid(swap_client, bid, offer, edit_bid, show_txns)
 
         old_states = []
         num_states = len(bid.states) // 12

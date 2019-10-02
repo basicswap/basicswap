@@ -40,7 +40,7 @@ jobs:
         - travis_retry pip install codespell==1.15.0
       before_script:
       script:
-        - PYTHONWARNINGS="ignore" flake8 --ignore=E501,F841 --exclude=key.py,messages_pb2.py,.eggs
+        - PYTHONWARNINGS="ignore" flake8 --ignore=E501,F841,W503 --exclude=segwit_addr.py,key.py,messages_pb2.py,.eggs
         - codespell --check-filenames --disable-colors --quiet-level=7 -S .git,.eggs,gitianpubkeys
       after_success:
         - echo "End lint"

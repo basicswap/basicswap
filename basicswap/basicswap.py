@@ -2262,7 +2262,7 @@ class BasicSwap():
         # TODO: Verify script without decoding?
         decoded_script = self.callcoinrpc(Coins.PART, 'decodescript', [bid_accept_data.contract_script.hex()])
         lock_check_op = 'OP_CHECKSEQUENCEVERIFY' if use_csv else 'OP_CHECKLOCKTIMEVERIFY'
-        prog = re.compile('OP_IF OP_SIZE 32 OP_EQUALVERIFY OP_SHA256 (\w+) OP_EQUALVERIFY OP_DUP OP_HASH160 (\w+) OP_ELSE (\d+) {} OP_DROP OP_DUP OP_HASH160 (\w+) OP_ENDIF OP_EQUALVERIFY OP_CHECKSIG'.format(lock_check_op))
+        prog = re.compile(r'OP_IF OP_SIZE 32 OP_EQUALVERIFY OP_SHA256 (\w+) OP_EQUALVERIFY OP_DUP OP_HASH160 (\w+) OP_ELSE (\d+) {} OP_DROP OP_DUP OP_HASH160 (\w+) OP_ENDIF OP_EQUALVERIFY OP_CHECKSIG'.format(lock_check_op))
         rr = prog.match(decoded_script['asm'])
         if not rr:
             raise ValueError('Bad script')
