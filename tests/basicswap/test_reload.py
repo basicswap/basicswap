@@ -168,6 +168,7 @@ class Test(unittest.TestCase):
             runSystem.main()
 
     def test_reload(self):
+        global stop_test
         processes = []
 
         for i in range(3):

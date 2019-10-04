@@ -1563,7 +1563,8 @@ class BasicSwap():
         self.log.debug('Refund tx fee %s, rate %s', format8(tx_fee * COIN), str(fee_rate))
 
         amount_out = prev_amount * COIN - tx_fee * COIN
-        assert(amount_out > 0), 'Amount out <= 0'
+        if amount_out <= 0:
+            raise ValueError('Refund amount out <= 0')
 
         if addr_refund_out is None:
             addr_refund_out = self.getReceiveAddressFromPool(coin_type, bid.bid_id, tx_type)

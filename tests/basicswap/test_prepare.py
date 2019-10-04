@@ -15,7 +15,7 @@ import shutil
 import json
 
 import bin.basicswap_prepare as prepareSystem
-test_path = os.path.expanduser('~/test_basicswap')
+test_path = os.path.expanduser(os.getenv('TEST_PREPARE_PATH', '~/test_basicswap'))
 
 logger = logging.getLogger()
 logger.level = logging.DEBUG
