@@ -81,7 +81,7 @@ def downloadFile(url, path):
 def prepareCore(coin, version, settings, data_dir):
     logger.info('prepareCore %s v%s', coin, version)
 
-    bin_dir = settings['chainclients'][coin]['bindir']
+    bin_dir = os.path.expanduser(settings['chainclients'][coin]['bindir'])
     if not os.path.exists(bin_dir):
         os.makedirs(bin_dir)
 
@@ -126,10 +126,13 @@ def prepareCore(coin, version, settings, data_dir):
     if not os.path.exists(release_path):
         downloadFile(release_url, release_path)
 
+    # Rename assert files with full version
+    assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, version)
     assert_path = os.path.join(bin_dir, assert_filename)
     if not os.path.exists(assert_path):
         downloadFile(assert_url, assert_path)
 
+    assert_sig_filename = '{}-{}-{}-build.assert.sig'.format(coin, os_name, version)
     assert_sig_path = os.path.join(bin_dir, assert_sig_filename)
     if not os.path.exists(assert_sig_path):
         downloadFile(assert_sig_url, assert_sig_path)
