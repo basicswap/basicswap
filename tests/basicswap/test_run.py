@@ -166,7 +166,10 @@ def prepareDir(datadir, nodeId, network_key, network_pubkey):
         },
         'check_progress_seconds': 2,
         'check_watched_seconds': 4,
-        'check_expired_seconds': 60
+        'check_expired_seconds': 60,
+        'check_events_seconds': 1,
+        'min_delay_auto_accept': 1,
+        'max_delay_auto_accept': 5
     }
     with open(settings_path, 'w') as fp:
         json.dump(settings, fp, indent=4)
@@ -360,7 +363,7 @@ class Test(unittest.TestCase):
         for i in range(seconds_for):
             time.sleep(1)
             bid = swap_client.getBid(bid_id)
-            if bid.state >= state:
+            if bid and bid.state >= state:
                 return
         raise ValueError('wait_for_bid_state timed out.')
 
@@ -557,6 +560,51 @@ class Test(unittest.TestCase):
         swap_clients[0].coin_clients[Coins.LTC]['override_feerate'] = 10.0
 
         self.wait_for_bid_state(swap_clients[0], bid_id, BidStates.BID_ERROR, seconds_for=60)
+
+    def test_08_part_ltc_buyer_first(self):
+        logging.info('---------- Test PART to LTC, buyer first')
+        swap_clients = self.swap_clients
+
+        offer_id = swap_clients[0].postOffer(Coins.PART, Coins.LTC, 100 * COIN, 0.1 * COIN, 100 * COIN, SwapTypes.BUYER_FIRST)
+
+        return  # TODO
+
+        self.wait_for_offer(swap_clients[1], offer_id)
+        offers = swap_clients[1].listOffers()
+        assert(len(offers) == 1)
+        for offer in offers:
+            if offer.offer_id == offer_id:
+                bid_id = swap_clients[1].postBid(offer_id, offer.amount_from)
+
+        self.wait_for_bid(swap_clients[0], bid_id)
+
+        swap_clients[0].acceptBid(bid_id)
+
+        self.wait_for_in_progress(swap_clients[1], bid_id, sent=True)
+
+        self.wait_for_bid_state(swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, seconds_for=60)
+        self.wait_for_bid_state(swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True, seconds_for=60)
+
+        js_0 = json.loads(urlopen('http://localhost:1800/json').read())
+        js_1 = json.loads(urlopen('http://localhost:1801/json').read())
+        assert(js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
+        assert(js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
+
+    def test_09_part_ltc_auto_accept(self):
+        logging.info('---------- Test PART to LTC, auto aceept bid')
+        swap_clients = self.swap_clients
+
+        offer_id = swap_clients[0].postOffer(Coins.PART, Coins.LTC, 100 * COIN, 0.1 * COIN, 100 * COIN, SwapTypes.SELLER_FIRST, auto_accept_bids=True)
+
+        self.wait_for_offer(swap_clients[1], offer_id)
+        offers = swap_clients[1].listOffers()
+        assert(len(offers) == 1)
+        for offer in offers:
+            if offer.offer_id == offer_id:
+                bid_id = swap_clients[1].postBid(offer_id, offer.amount_from)
+
+        self.wait_for_bid_state(swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, seconds_for=60)
+        self.wait_for_bid_state(swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True, seconds_for=60)
 
     def pass_99_delay(self):
         global stop_test

@@ -7,7 +7,7 @@ stages:
   - test
 env:
   global:
-    - PART_VERSION=0.18.1.5
+    - PART_VERSION=0.18.1.6
     - BTC_VERSION=0.18.1
     - LTC_VERSION=0.17.1
     - TEST_DIR=~/test_basicswap2/

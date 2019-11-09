@@ -16,12 +16,14 @@ Base = declarative_base()
 
 class DBKVInt(Base):
     __tablename__ = 'kv_int'
+
     key = sa.Column(sa.String, primary_key=True)
     value = sa.Column(sa.Integer)
 
 
 class DBKVString(Base):
     __tablename__ = 'kv_string'
+
     key = sa.Column(sa.String, primary_key=True)
     value = sa.Column(sa.String)
 
@@ -177,16 +179,19 @@ class SentOffer(Base):
 
 class SmsgAddress(Base):
     __tablename__ = 'smsgaddresses'
+
     addr_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
     addr = sa.Column(sa.String)
     use_type = sa.Column(sa.Integer)
 
 
-# TODO: Delay responding to automated events
 class EventQueue(Base):
     __tablename__ = 'eventqueue'
-    addr_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
+
+    event_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
+    active_ind = sa.Column(sa.Integer)
     created_at = sa.Column(sa.BigInteger)
     trigger_at = sa.Column(sa.BigInteger)
     linked_id = sa.Column(sa.LargeBinary)
     event_type = sa.Column(sa.Integer)
+    event_data = sa.Column(sa.LargeBinary)

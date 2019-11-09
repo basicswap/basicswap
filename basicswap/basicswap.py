@@ -17,6 +17,8 @@ import logging
 import sqlalchemy as sa
 import shutil
 import json
+import random
+import secrets
 from sqlalchemy.orm import sessionmaker, scoped_session
 from enum import IntEnum, auto
 
@@ -55,6 +57,7 @@ from .db import (
     PooledAddress,
     SentOffer,
     SmsgAddress,
+    EventQueue,
 )
 
 from .explorers import ExplorerInsight, ExplorerBitAps, ExplorerChainz
@@ -80,6 +83,8 @@ class MessageTypes(IntEnum):
 class SwapTypes(IntEnum):
     SELLER_FIRST = auto()
     BUYER_FIRST = auto()
+    SELLER_FIRST_2MSG = auto()
+    BUYER_FIRST_2MSG = auto()
 
 
 class OfferStates(IntEnum):
@@ -134,6 +139,10 @@ class TxTypes(IntEnum):
     ITX_REFUND = auto()
     PTX_REDEEM = auto()
     PTX_REFUND = auto()
+
+
+class EventTypes(IntEnum):
+    ACCEPT_BID = auto()
 
 
 SEQUENCE_LOCK_BLOCKS = 1
@@ -306,14 +315,21 @@ class BasicSwap():
         self.settings = settings
         self.coin_clients = {}
         self.mxDB = threading.RLock()
-        self.last_expired = 0
-        self.last_checked_progress = 0
-        self.last_checked_watched = 0
-        self.last_checked_expired = 0
         self.debug = self.settings.get('debug', DEBUG)
+
         self.check_progress_seconds = self.settings.get('check_progress_seconds', 60)
         self.check_watched_seconds = self.settings.get('check_watched_seconds', 60)
         self.check_expired_seconds = self.settings.get('check_expired_seconds', 60 * 5)
+        self.check_events_seconds = self.settings.get('check_events_seconds', 10)
+        self.last_checked_progress = 0
+        self.last_checked_watched = 0
+        self.last_checked_expired = 0
+        self.last_checked_events = 0
+
+        # TODO: Adjust ranges
+        self.min_delay_auto_accept = self.settings.get('min_delay_auto_accept', 10)
+        self.max_delay_auto_accept = self.settings.get('max_delay_auto_accept', 60)
+
         self.swaps_in_progress = dict()
 
         if self.chain == 'regtest':
@@ -388,6 +404,8 @@ class BasicSwap():
 
             # non-segwit
             # https://testnet.litecore.io/insight-api
+
+        random.seed(secrets.randbits(128))
 
     def prepareLogging(self):
         self.log = logging.getLogger(self.log_name)
@@ -1037,6 +1055,24 @@ class BasicSwap():
         finally:
             self.mxDB.release()
 
+    def createEvent(self, delay, event_type, linked_id):
+        self.log.debug('createEvent %d %s', event_type, linked_id.hex())
+        self.mxDB.acquire()
+        try:
+            session = scoped_session(self.session_factory)
+            event = EventQueue()
+            event.active_ind = 1
+            event.created_at = int(time.time())
+            event.trigger_at = event.created_at + delay
+            event.event_type = event_type
+            event.linked_id = linked_id
+            session.add(event)
+            session.commit()
+            session.close()
+            session.remove()
+        finally:
+            self.mxDB.release()
+
     def postBid(self, offer_id, amount, addr_send_from=None):
         # Bid to send bid.amount * offer.rate of coin_to in exchange for bid.amount of coin_from
         self.log.debug('postBid %s %s', offer_id.hex(), format8(amount))
@@ -1173,7 +1209,7 @@ class BasicSwap():
         pkhash_refund = getKeyID(pubkey_refund)
 
         if bid.initiate_tx is not None:
-            self.log.warning('initiate txn %s already exists for bid %s', bid.initiate_tx.txid, bid_id.hex())
+            self.log.warning('Initiate txn %s already exists for bid %s', bid.initiate_tx.txid, bid_id.hex())
             txid = bid.initiate_tx.txid
             script = bid.initiate_tx.script
         else:
@@ -1185,7 +1221,7 @@ class BasicSwap():
                     lock_value = self.callcoinrpc(coin_from, 'getblockchaininfo')['blocks'] + offer.lock_value
                 else:
                     lock_value = int(time.time()) + offer.lock_value
-                self.log.debug('initiate %s lock_value %d %d', coin_from, offer.lock_value, lock_value)
+                self.log.debug('Initiate %s lock_value %d %d', coin_from, offer.lock_value, lock_value)
                 script = buildContractScript(lock_value, secret_hash, bid.pkhash_buyer, pkhash_refund, OpCodes.OP_CHECKLOCKTIMEVERIFY)
 
             p2sh = self.callcoinrpc(Coins.PART, 'decodescript', [script.hex()])['p2sh']
@@ -2079,7 +2115,29 @@ class BasicSwap():
 
             # TODO: remove offers from db
 
-            self.last_checked_expired = now
+        finally:
+            self.mxDB.release()
+
+    def checkEvents(self):
+        self.mxDB.acquire()
+        try:
+            now = int(time.time())
+
+            session = scoped_session(self.session_factory)
+
+            q = session.query(EventQueue).filter(EventQueue.trigger_at >= now)
+            for row in q:
+
+                if row.event_type == EventTypes.ACCEPT_BID:
+                    self.acceptBid(row.linked_id)
+                else:
+                    self.log.warning('Unknown event type: %d', row.event_type)
+
+                session.query.filter(EventQueue.event_id == row.event_id).delete()
+
+            session.commit()
+            session.close()
+            session.remove()
         finally:
             self.mxDB.release()
 
@@ -2228,8 +2286,10 @@ class BasicSwap():
             if self.countAcceptedBids(offer_id) > 0:
                 self.log.info('Not auto accepting bid %s, already have', bid_id.hex())
             else:
-                self.log.info('Auto accepting bid %s', bid_id.hex())
-                self.acceptBid(bid_id)
+                delay = random.randrange(self.min_delay_auto_accept, self.max_delay_auto_accept)
+                self.log.info('Auto accepting bid %s in %d seconds', bid_id.hex(), delay)
+
+                self.createEvent(delay, EventTypes.ACCEPT_BID, bid_id)
 
     def processBidAccept(self, msg):
         self.log.debug('Processing bid accepted msg %s', msg['msgid'])
@@ -2327,7 +2387,7 @@ class BasicSwap():
         clear = self.zmqSubscriber.recv()
 
         if message[0] == 3:  # Paid smsg
-            return  # TODO: switch to paid?
+            return  # TODO: Switch to paid?
 
         msg_id = message[2:]
         options = {'encoding': 'hex', 'setread': True}
@@ -2350,7 +2410,7 @@ class BasicSwap():
         try:
             # TODO: Wait for blocks / txns, would need to check multiple coins
             now = int(time.time())
-            if now - self.last_checked_progress > self.check_progress_seconds:
+            if now - self.last_checked_progress >= self.check_progress_seconds:
                 to_remove = []
                 for bid_id, v in self.swaps_in_progress.items():
                     try:
@@ -2366,16 +2426,20 @@ class BasicSwap():
                     del self.swaps_in_progress[bid_id]
                 self.last_checked_progress = now
 
-            now = int(time.time())
-            if now - self.last_checked_watched > self.check_watched_seconds:
+            if now - self.last_checked_watched >= self.check_watched_seconds:
                 for k, c in self.coin_clients.items():
                     if len(c['watched_outputs']) > 0:
                         self.checkForSpends(k, c)
                 self.last_checked_watched = now
 
-            # Expire messages
-            if int(time.time()) - self.last_checked_expired > self.check_expired_seconds:
+            if now - self.last_checked_expired >= self.check_expired_seconds:
                 self.expireMessages()
+                self.last_checked_expired = now
+
+            if now - self.last_checked_events >= self.check_events_seconds:
+                self.checkEvents()
+                self.last_checked_events = now
+
         except Exception as ex:
             self.log.error('update %s', str(ex))
             traceback.print_exc()

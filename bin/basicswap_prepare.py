@@ -40,7 +40,7 @@ else:
     BIN_ARCH = 'x86_64-linux-gnu.tar.gz'
 
 known_coins = {
-    'particl': '0.18.1.5',
+    'particl': '0.18.1.6',
     'litecoin': '0.17.1',
     'bitcoin': '0.18.1',
     'namecoin': '0.18.0',
