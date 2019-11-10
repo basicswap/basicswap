@@ -598,7 +598,7 @@ class Test(unittest.TestCase):
 
         self.wait_for_offer(swap_clients[1], offer_id)
         offers = swap_clients[1].listOffers()
-        assert(len(offers) == 1)
+        assert(len(offers) >= 1)
         for offer in offers:
             if offer.offer_id == offer_id:
                 bid_id = swap_clients[1].postBid(offer_id, offer.amount_from)

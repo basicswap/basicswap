@@ -6,6 +6,8 @@
 
 import os
 
+DEBUG = True
+
 DATADIRS = os.path.expanduser(os.getenv('DATADIRS', '/tmp/basicswap'))
 
 PARTICL_BINDIR = os.path.expanduser(os.getenv('PARTICL_BINDIR', ''))

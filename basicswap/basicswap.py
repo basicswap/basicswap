@@ -9,11 +9,8 @@ import re
 import time
 import datetime as dt
 import zmq
-import threading
 import traceback
 import hashlib
-import subprocess
-import logging
 import sqlalchemy as sa
 import shutil
 import json
@@ -25,7 +22,6 @@ from enum import IntEnum, auto
 from . import __version__
 from .util import (
     COIN,
-    callrpc,
     pubkeyToAddress,
     format8,
     encodeAddress,
@@ -63,9 +59,7 @@ from .db import (
 from .explorers import ExplorerInsight, ExplorerBitAps, ExplorerChainz
 import basicswap.config as cfg
 import basicswap.segwit_addr as segwit_addr
-
-
-DEBUG = True
+from .base import BaseApp
 
 
 MIN_OFFER_VALID_TIME = 60 * 10
@@ -303,19 +297,9 @@ def replaceAddrPrefix(addr, coin_type, chain_name, addr_type='pubkey_address'):
     return encodeAddress(bytes((chainparams[coin_type][chain_name][addr_type],)) + decodeAddress(addr)[1:])
 
 
-class BasicSwap():
+class BasicSwap(BaseApp):
     def __init__(self, fp, data_dir, settings, chain, log_name='BasicSwap'):
-        self.log_name = log_name
-        self.fp = fp
-        self.is_running = True
-        self.fail_code = 0
-
-        self.data_dir = data_dir
-        self.chain = chain
-        self.settings = settings
-        self.coin_clients = {}
-        self.mxDB = threading.RLock()
-        self.debug = self.settings.get('debug', DEBUG)
+        super().__init__(fp, data_dir, settings, chain, log_name)
 
         self.check_progress_seconds = self.settings.get('check_progress_seconds', 60)
         self.check_watched_seconds = self.settings.get('check_watched_seconds', 60)
@@ -338,9 +322,6 @@ class BasicSwap():
         else:
             self.SMSG_SECONDS_IN_DAY = 86400
             self.SMSG_SECONDS_IN_HOUR = 60 * 60
-
-        self.prepareLogging()
-        self.log.info('Network: {}'.format(self.chain))
 
         # Encode key to match network
         wif_prefix = chainparams[Coins.PART][self.chain]['key_prefix']
@@ -407,29 +388,6 @@ class BasicSwap():
 
         random.seed(secrets.randbits(128))
 
-    def prepareLogging(self):
-        self.log = logging.getLogger(self.log_name)
-        self.log.propagate = False
-
-        formatter = logging.Formatter('%(asctime)s %(levelname)s : %(message)s')
-        stream_stdout = logging.StreamHandler()
-        if self.log_name != 'BasicSwap':
-            stream_stdout.setFormatter(logging.Formatter('%(asctime)s %(name)s %(levelname)s : %(message)s'))
-        else:
-            stream_stdout.setFormatter(formatter)
-        stream_fp = logging.StreamHandler(self.fp)
-        stream_fp.setFormatter(formatter)
-
-        self.log.setLevel(logging.DEBUG if self.debug else logging.INFO)
-        self.log.addHandler(stream_fp)
-        self.log.addHandler(stream_stdout)
-
-    def getChainClientSettings(self, coin):
-        try:
-            return self.settings['chainclients'][chainparams[coin]['name']]
-        except Exception:
-            return {}
-
     def setCoinConnectParams(self, coin):
         # Set anything that does not require the daemon to be running
         chain_client_settings = self.getChainClientSettings(coin)
@@ -475,19 +433,6 @@ class BasicSwap():
             'explorers': [],
             'chain_lookups': chain_client_settings.get('chain_lookups', 'local'),
         }
-
-    def setDaemonPID(self, name, pid):
-        if isinstance(name, Coins):
-            self.coin_clients[name]['pid'] = pid
-            return
-        for c, v in self.coin_clients.items():
-            if v['name'] == name:
-                v['pid'] = pid
-
-    def getChainDatadirPath(self, coin):
-        datadir = self.coin_clients[coin]['datadir']
-        testnet_name = '' if self.chain == 'mainnet' else chainparams[coin][self.chain].get('name', self.chain)
-        return os.path.join(datadir, testnet_name)
 
     def setCoinRunParams(self, coin):
         cc = self.coin_clients[coin]
@@ -572,10 +517,6 @@ class BasicSwap():
             chain_client_settings = self.getChainClientSettings(c)
             if self.coin_clients[c]['connection_type'] == 'rpc' and chain_client_settings['manage_daemon'] is True:
                 self.stopDaemon(c)
-
-    def stopRunning(self, with_code=0):
-        self.fail_code = with_code
-        self.is_running = False
 
     def upgradeDatabase(self, db_version):
         if db_version >= CURRENT_DB_VERSION:
@@ -929,14 +870,6 @@ class BasicSwap():
                 return fee_rate
             except Exception:
                 return self.callcoinrpc(coin_type, 'getnetworkinfo')['relayfee']
-
-    def getTicker(self, coin_type):
-        ticker = chainparams[coin_type]['ticker']
-        if self.chain == 'testnet':
-            ticker = 't' + ticker
-        if self.chain == 'regtest':
-            ticker = 'rt' + ticker
-        return ticker
 
     def withdrawCoin(self, coin_type, value, addr_to, subfee):
         self.log.info('withdrawCoin %s %s to %s %s', value, self.getTicker(coin_type), addr_to, ' subfee' if subfee else '')
@@ -2670,32 +2603,3 @@ class BasicSwap():
             session.close()
             session.remove()
             self.mxDB.release()
-
-    def callrpc(self, method, params=[], wallet=None):
-        return callrpc(self.coin_clients[Coins.PART]['rpcport'], self.coin_clients[Coins.PART]['rpcauth'], method, params, wallet)
-
-    def callcoinrpc(self, coin, method, params=[], wallet=None):
-        return callrpc(self.coin_clients[coin]['rpcport'], self.coin_clients[coin]['rpcauth'], method, params, wallet)
-
-    def calltx(self, cmd):
-        bindir = self.coin_clients[Coins.PART]['bindir']
-        command_tx = os.path.join(bindir, cfg.PARTICL_TX)
-        chainname = '' if self.chain == 'mainnet' else (' -' + self.chain)
-        args = command_tx + chainname + ' ' + cmd
-        p = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-        out = p.communicate()
-        if len(out[1]) > 0:
-            raise ValueError('TX error ' + str(out[1]))
-        return out[0].decode('utf-8').strip()
-
-    def callcoincli(self, coin_type, params, wallet=None, timeout=None):
-        bindir = self.coin_clients[coin_type]['bindir']
-        datadir = self.coin_clients[coin_type]['datadir']
-        command_cli = os.path.join(bindir, chainparams[coin_type]['name'] + '-cli' + ('.exe' if os.name == 'nt' else ''))
-        chainname = '' if self.chain == 'mainnet' else (' -' + self.chain)
-        args = command_cli + chainname + ' ' + '-datadir=' + datadir + ' ' + params
-        p = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-        out = p.communicate(timeout=timeout)
-        if len(out[1]) > 0:
-            raise ValueError('CLI error ' + str(out[1]))
-        return out[0].decode('utf-8').strip()
