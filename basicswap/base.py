@@ -10,12 +10,14 @@ import logging
 import subprocess
 
 import basicswap.config as cfg
+import basicswap.segwit_addr as segwit_addr
 
 from .chainparams import (
     chainparams,
     Coins,
 )
 from .util import (
+    pubkeyToAddress,
     callrpc,
 )
 
@@ -84,6 +86,18 @@ class BaseApp:
         if self.chain == 'regtest':
             ticker = 'rt' + ticker
         return ticker
+
+    def encodeSegwitP2WSH(self, coin_type, p2wsh):
+        return segwit_addr.encode(chainparams[coin_type][self.chain]['hrp'], 0, p2wsh[2:])
+
+    def encodeSegwit(self, coin_type, raw):
+        return segwit_addr.encode(chainparams[coin_type][self.chain]['hrp'], 0, raw)
+
+    def decodeSegwit(self, coin_type, addr):
+        return bytes(segwit_addr.decode(chainparams[coin_type][self.chain]['hrp'], addr)[1])
+
+    def getScriptAddress(self, coin_type, script):
+        return pubkeyToAddress(chainparams[coin_type][self.chain]['script_address'], script)
 
     def callrpc(self, method, params=[], wallet=None):
         return callrpc(self.coin_clients[Coins.PART]['rpcport'], self.coin_clients[Coins.PART]['rpcauth'], method, params, wallet)

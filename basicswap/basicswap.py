@@ -61,7 +61,6 @@ from .db import (
 
 from .explorers import ExplorerInsight, ExplorerBitAps, ExplorerChainz
 import basicswap.config as cfg
-import basicswap.segwit_addr as segwit_addr
 from .base import BaseApp
 
 
@@ -1230,18 +1229,6 @@ class BasicSwap(BaseApp):
             session.close()
             session.remove()
             self.mxDB.release()
-
-    def encodeSegwitP2WSH(self, coin_type, p2wsh):
-        return segwit_addr.encode(chainparams[coin_type][self.chain]['hrp'], 0, p2wsh[2:])
-
-    def encodeSegwit(self, coin_type, raw):
-        return segwit_addr.encode(chainparams[coin_type][self.chain]['hrp'], 0, raw)
-
-    def decodeSegwit(self, coin_type, addr):
-        return bytes(segwit_addr.decode(chainparams[coin_type][self.chain]['hrp'], addr)[1])
-
-    def getScriptAddress(self, coin_type, script):
-        return pubkeyToAddress(chainparams[coin_type][self.chain]['script_address'], script)
 
     def setBidError(self, bif_id, bid, error_str):
         bid.setState(BidStates.BID_ERROR)
