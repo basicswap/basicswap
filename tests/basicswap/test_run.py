@@ -561,6 +561,10 @@ class Test(unittest.TestCase):
 
         self.wait_for_bid_state(swap_clients[0], bid_id, BidStates.BID_ERROR, seconds_for=60)
 
+        swap_clients[0].abandonBid(bid_id)
+        del swap_clients[0].coin_clients[Coins.BTC]['override_feerate']
+        del swap_clients[0].coin_clients[Coins.LTC]['override_feerate']
+
     def test_08_part_ltc_buyer_first(self):
         logging.info('---------- Test PART to LTC, buyer first')
         swap_clients = self.swap_clients
@@ -591,7 +595,7 @@ class Test(unittest.TestCase):
         assert(js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
 
     def test_09_part_ltc_auto_accept(self):
-        logging.info('---------- Test PART to LTC, auto aceept bid')
+        logging.info('---------- Test PART to LTC, auto accept bid')
         swap_clients = self.swap_clients
 
         offer_id = swap_clients[0].postOffer(Coins.PART, Coins.LTC, 100 * COIN, 0.1 * COIN, 100 * COIN, SwapTypes.SELLER_FIRST, auto_accept_bids=True)

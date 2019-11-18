@@ -1832,6 +1832,9 @@ class BasicSwap(BaseApp):
         elif state == BidStates.SWAP_PARTICIPATING:
             # Waiting for initiate txn spend
             pass
+        elif state == BidStates.BID_ERROR:
+            # Wait for user input
+            pass
         else:
             self.log.warning('checkBidState unknown state %s', state)
 
@@ -2050,7 +2053,7 @@ class BasicSwap(BaseApp):
                 else:
                     self.log.warning('Unknown event type: %d', row.event_type)
 
-                session.query.filter(EventQueue.event_id == row.event_id).delete()
+                session.delete(row)
 
             session.commit()
             session.close()
