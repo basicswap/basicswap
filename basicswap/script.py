@@ -4,7 +4,8 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE.txt or http://www.opensource.org/licenses/mit-license.php.
 
-from enum import IntEnum, auto
+from enum import IntEnum
+
 
 class OpCodes(IntEnum):
     OP_0 = 0x00,

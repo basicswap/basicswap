@@ -42,7 +42,7 @@ else:
 known_coins = {
     'particl': '0.18.1.6',
     'litecoin': '0.17.1',
-    'bitcoin': '0.18.1',
+    'bitcoin': '0.19.0.1',
     'namecoin': '0.18.0',
 }
 
@@ -109,7 +109,7 @@ def prepareCore(coin, version, settings, data_dir):
     elif coin == 'bitcoin':
         signing_key_name = 'laanwj'
         release_url = 'https://bitcoincore.org/bin/bitcoin-core-{}/{}'.format(version, release_filename)
-        assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, version.rsplit('.', 1)[0])
+        assert_filename = '{}-core-{}-{}-build.assert'.format(coin, os_name, '.'.join(version.split('.')[:2]))
         assert_url = 'https://raw.githubusercontent.com/bitcoin-core/gitian.sigs/master/%s-%s/%s/%s' % (version, os_dir_name, signing_key_name, assert_filename)
     elif coin == 'namecoin':
         signing_key_name = 'JeremyRand'

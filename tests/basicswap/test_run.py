@@ -222,6 +222,15 @@ def waitForRPC(rpc_func, wallet=None):
     raise ValueError('waitForRPC failed')
 
 
+def checkForks(ro):
+    if 'bip9_softforks' in ro:
+        assert(ro['bip9_softforks']['csv']['status'] == 'active')
+        assert(ro['bip9_softforks']['segwit']['status'] == 'active')
+    else:
+        assert(ro['softforks']['csv']['active'])
+        assert(ro['softforks']['segwit']['active'])
+
+
 class Test(unittest.TestCase):
 
     @classmethod
@@ -278,8 +287,7 @@ class Test(unittest.TestCase):
         ltcRpc('generatetoaddress {} {}'.format(num_blocks, cls.ltc_addr))
 
         ro = ltcRpc('getblockchaininfo')
-        assert(ro['bip9_softforks']['csv']['status'] == 'active')
-        assert(ro['bip9_softforks']['segwit']['status'] == 'active')
+        checkForks(ro)
 
         waitForRPC(btcRpc)
         cls.btc_addr = btcRpc('getnewaddress mining_addr bech32')
@@ -287,8 +295,7 @@ class Test(unittest.TestCase):
         btcRpc('generatetoaddress {} {}'.format(num_blocks, cls.btc_addr))
 
         ro = btcRpc('getblockchaininfo')
-        assert(ro['bip9_softforks']['csv']['status'] == 'active')
-        assert(ro['bip9_softforks']['segwit']['status'] == 'active')
+        checkForks(ro)
 
         ro = ltcRpc('getwalletinfo')
         print('ltcRpc', ro)
