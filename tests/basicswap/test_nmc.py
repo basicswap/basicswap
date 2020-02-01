@@ -16,7 +16,6 @@ import unittest
 import json
 import logging
 import shutil
-import subprocess
 import time
 import signal
 import threading
@@ -45,6 +44,7 @@ from basicswap.key import (
 from basicswap.http_server import (
     HttpThread,
 )
+from bin.basicswap_run import startDaemon
 
 import basicswap.config as cfg
 
@@ -173,15 +173,6 @@ def prepareDir(datadir, nodeId, network_key, network_pubkey):
         json.dump(settings, fp, indent=4)
 
 
-def startDaemon(nodeId, bin_dir=cfg.PARTICL_BINDIR, daemon_bin=cfg.PARTICLD):
-    node_dir = os.path.join(cfg.TEST_DATADIRS, str(nodeId))
-    daemon_bin = os.path.join(bin_dir, daemon_bin)
-
-    args = [daemon_bin, '-datadir=' + node_dir]
-    logging.info('Starting node ' + str(nodeId) + ' ' + daemon_bin + ' ' + '-datadir=' + node_dir)
-    return subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-
 def partRpc(cmd, node_id=0):
     return callrpc_cli(cfg.PARTICL_BINDIR, os.path.join(cfg.TEST_DATADIRS, str(node_id)), 'regtest', cmd, cfg.PARTICL_CLI)
 
@@ -233,13 +224,13 @@ class Test(unittest.TestCase):
         cls.daemons = []
         cls.swap_clients = []
 
-        cls.daemons.append(startDaemon(BTC_NODE, cfg.BITCOIN_BINDIR, cfg.BITCOIND))
+        cls.daemons.append(startDaemon(os.path.join(cfg.TEST_DATADIRS, str(BTC_NODE)), cfg.BITCOIN_BINDIR, cfg.BITCOIND))
         logging.info('Started %s %d', cfg.BITCOIND, cls.daemons[-1].pid)
-        cls.daemons.append(startDaemon(NMC_NODE, cfg.NAMECOIN_BINDIR, cfg.NAMECOIND))
+        cls.daemons.append(startDaemon(os.path.join(cfg.TEST_DATADIRS, str(NMC_NODE)), cfg.NAMECOIN_BINDIR, cfg.NAMECOIND))
         logging.info('Started %s %d', cfg.NAMECOIND, cls.daemons[-1].pid)
 
         for i in range(NUM_NODES):
-            cls.daemons.append(startDaemon(i))
+            cls.daemons.append(startDaemon(os.path.join(cfg.TEST_DATADIRS, str(i))), cfg.PARTICL_BINDIR, cfg.PARTICLD)
             logging.info('Started %s %d', cfg.PARTICLD, cls.daemons[-1].pid)
         time.sleep(1)
         for i in range(NUM_NODES):
