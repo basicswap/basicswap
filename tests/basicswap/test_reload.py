@@ -35,6 +35,7 @@ from basicswap.util import (
     callrpc_cli,
 )
 
+import basicswap.config as cfg
 import bin.basicswap_prepare as prepareSystem
 import bin.basicswap_run as runSystem
 
@@ -113,7 +114,7 @@ class Test(unittest.TestCase):
 
         for i in range(3):
             client_path = os.path.join(test_path, 'client{}'.format(i))
-            config_path = os.path.join(client_path, 'basicswap.json')
+            config_path = os.path.join(client_path, cfg.CONFIG_FILENAME)
             try:
                 shutil.rmtree(client_path)
             except Exception as ex:

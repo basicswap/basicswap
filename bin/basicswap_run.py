@@ -19,6 +19,7 @@ import signal
 import subprocess
 import logging
 
+import basicswap.config as cfg
 from basicswap import __version__
 from basicswap.basicswap import BasicSwap
 from basicswap.http_server import HttpThread
@@ -50,7 +51,7 @@ def startDaemon(node_dir, bin_dir, daemon_bin, opts=[]):
 
 def runClient(fp, data_dir, chain):
     global swap_client
-    settings_path = os.path.join(data_dir, 'basicswap.json')
+    settings_path = os.path.join(data_dir, cfg.CONFIG_FILENAME)
     pids_path = os.path.join(data_dir, '.pids')
 
     if not os.path.exists(settings_path):
@@ -153,7 +154,7 @@ def printHelp():
     logger.info('Usage: basicswap-run ')
     logger.info('\n--help, -h               Print help.')
     logger.info('--version, -v            Print version.')
-    logger.info('--datadir=PATH           Path to basicswap data directory, default:~/.basicswap.')
+    logger.info('--datadir=PATH           Path to basicswap data directory, default:{}.'.format(cfg.DEFAULT_DATADIR))
     logger.info('--mainnet                Run in mainnet mode.')
     logger.info('--testnet                Run in testnet mode.')
     logger.info('--regtest                Run in regtest mode.')
@@ -197,8 +198,7 @@ def main():
         logger.warning('Unknown argument %s', v)
 
     if data_dir is None:
-        default_datadir = '~/.basicswap'
-        data_dir = os.path.join(os.path.expanduser(default_datadir))
+        data_dir = os.path.join(os.path.expanduser(cfg.DEFAULT_DATADIR))
     logger.info('Using datadir: %s', data_dir)
     logger.info('Chain: %s', chain)
 

@@ -376,7 +376,7 @@ class BasicSwap(BaseApp):
         chain_client_settings = self.getChainClientSettings(coin)
 
         bindir = os.path.expanduser(chain_client_settings.get('bindir', ''))
-        datadir = os.path.expanduser(chain_client_settings.get('datadir', os.path.join(cfg.DATADIRS, chainparams[coin]['name'])))
+        datadir = os.path.expanduser(chain_client_settings.get('datadir', os.path.join(cfg.TEST_DATADIRS, chainparams[coin]['name'])))
 
         connection_type = chain_client_settings.get('connection_type', 'none')
         rpcauth = None
@@ -2390,7 +2390,7 @@ class BasicSwap(BaseApp):
         try:
             if 'lookups' in data:
                 self.settings['chainclients'][coin_name]['chain_lookups'] = data['lookups']
-                settings_path = os.path.join(self.data_dir, 'basicswap.json')
+                settings_path = os.path.join(self.data_dir, cfg.CONFIG_FILENAME)
                 shutil.copyfile(settings_path, settings_path + '.last')
                 with open(settings_path, 'w') as fp:
                     json.dump(self.settings, fp, indent=4)

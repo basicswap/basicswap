@@ -127,7 +127,7 @@ def prepareDir(datadir, nodeId, network_key, network_pubkey):
 
     nmcdatadir = os.path.join(datadir, str(NMC_NODE))
     btcdatadir = os.path.join(datadir, str(BTC_NODE))
-    settings_path = os.path.join(basicswap_dir, 'basicswap.json')
+    settings_path = os.path.join(basicswap_dir, cfg.CONFIG_FILENAME)
     settings = {
         'zmqhost': 'tcp://127.0.0.1',
         'zmqport': BASE_ZMQ_PORT + nodeId,
@@ -171,7 +171,7 @@ def prepareDir(datadir, nodeId, network_key, network_pubkey):
 
 
 def startDaemon(nodeId, bin_dir=cfg.PARTICL_BINDIR, daemon_bin=cfg.PARTICLD):
-    node_dir = os.path.join(cfg.DATADIRS, str(nodeId))
+    node_dir = os.path.join(cfg.TEST_DATADIRS, str(nodeId))
     daemon_bin = os.path.join(bin_dir, daemon_bin)
 
     args = [daemon_bin, '-datadir=' + node_dir]
@@ -180,15 +180,15 @@ def startDaemon(nodeId, bin_dir=cfg.PARTICL_BINDIR, daemon_bin=cfg.PARTICLD):
 
 
 def partRpc(cmd, node_id=0):
-    return callrpc_cli(cfg.PARTICL_BINDIR, os.path.join(cfg.DATADIRS, str(node_id)), 'regtest', cmd, cfg.PARTICL_CLI)
+    return callrpc_cli(cfg.PARTICL_BINDIR, os.path.join(cfg.TEST_DATADIRS, str(node_id)), 'regtest', cmd, cfg.PARTICL_CLI)
 
 
 def btcRpc(cmd):
-    return callrpc_cli(cfg.BITCOIN_BINDIR, os.path.join(cfg.DATADIRS, str(BTC_NODE)), 'regtest', cmd, cfg.BITCOIN_CLI)
+    return callrpc_cli(cfg.BITCOIN_BINDIR, os.path.join(cfg.TEST_DATADIRS, str(BTC_NODE)), 'regtest', cmd, cfg.BITCOIN_CLI)
 
 
 def nmcRpc(cmd):
-    return callrpc_cli(cfg.NAMECOIN_BINDIR, os.path.join(cfg.DATADIRS, str(NMC_NODE)), 'regtest', cmd, cfg.NAMECOIN_CLI)
+    return callrpc_cli(cfg.NAMECOIN_BINDIR, os.path.join(cfg.TEST_DATADIRS, str(NMC_NODE)), 'regtest', cmd, cfg.NAMECOIN_CLI)
 
 
 def signal_handler(sig, frame):
@@ -228,15 +228,15 @@ class Test(unittest.TestCase):
         cls.network_key = toWIF(PREFIX_SECRET_KEY_REGTEST, eckey.get_bytes())
         cls.network_pubkey = eckey.get_pubkey().get_bytes().hex()
 
-        if os.path.isdir(cfg.DATADIRS):
-            logging.info('Removing ' + cfg.DATADIRS)
-            shutil.rmtree(cfg.DATADIRS)
+        if os.path.isdir(cfg.TEST_DATADIRS):
+            logging.info('Removing ' + cfg.TEST_DATADIRS)
+            shutil.rmtree(cfg.TEST_DATADIRS)
 
         for i in range(NUM_NODES):
-            prepareDir(cfg.DATADIRS, i, cls.network_key, cls.network_pubkey)
+            prepareDir(cfg.TEST_DATADIRS, i, cls.network_key, cls.network_pubkey)
 
-        prepareOtherDir(cfg.DATADIRS, NMC_NODE)
-        prepareOtherDir(cfg.DATADIRS, BTC_NODE, 'bitcoin.conf')
+        prepareOtherDir(cfg.TEST_DATADIRS, NMC_NODE)
+        prepareOtherDir(cfg.TEST_DATADIRS, BTC_NODE, 'bitcoin.conf')
 
         cls.daemons = []
         cls.swap_clients = []
@@ -251,8 +251,8 @@ class Test(unittest.TestCase):
             logging.info('Started %s %d', cfg.PARTICLD, cls.daemons[-1].pid)
         time.sleep(1)
         for i in range(NUM_NODES):
-            basicswap_dir = os.path.join(os.path.join(cfg.DATADIRS, str(i)), 'basicswap')
-            settings_path = os.path.join(basicswap_dir, 'basicswap.json')
+            basicswap_dir = os.path.join(os.path.join(cfg.TEST_DATADIRS, str(i)), 'basicswap')
+            settings_path = os.path.join(basicswap_dir, cfg.CONFIG_FILENAME)
             with open(settings_path) as fs:
                 settings = json.load(fs)
             fp = open(os.path.join(basicswap_dir, 'basicswap.log'), 'w')

@@ -8,7 +8,9 @@ import os
 
 DEBUG = True
 
-DATADIRS = os.path.expanduser(os.getenv('DATADIRS', '/tmp/basicswap'))
+CONFIG_FILENAME = 'basicswap.json'
+DEFAULT_DATADIR = '~/.basicswap'
+TEST_DATADIRS = os.path.expanduser(os.getenv('DATADIRS', '/tmp/basicswap'))
 
 PARTICL_BINDIR = os.path.expanduser(os.getenv('PARTICL_BINDIR', ''))
 PARTICLD = os.getenv('PARTICLD', 'particld' + ('.exe' if os.name == 'nt' else ''))

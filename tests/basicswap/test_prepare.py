@@ -14,6 +14,7 @@ import logging
 import shutil
 import json
 
+import basicswap.config as cfg
 import bin.basicswap_prepare as prepareSystem
 test_path = os.path.expanduser(os.getenv('TEST_PREPARE_PATH', '~/test_basicswap'))
 
@@ -37,7 +38,7 @@ class Test(unittest.TestCase):
         with patch.object(sys, 'argv', testargs):
             prepareSystem.main()
 
-        config_path = os.path.join(test_path, 'basicswap.json')
+        config_path = os.path.join(test_path, cfg.CONFIG_FILENAME)
         self.assertTrue(os.path.exists(config_path))
 
         logger.info('Test no overwrite')

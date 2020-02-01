@@ -249,7 +249,7 @@ def printHelp():
     logger.info('Usage: basicswap-prepare ')
     logger.info('\n--help, -h               Print help.')
     logger.info('--version, -v            Print version.')
-    logger.info('--datadir=PATH           Path to basicswap data directory, default:~/.basicswap.')
+    logger.info('--datadir=PATH           Path to basicswap data directory, default:{}.'.format(cfg.DEFAULT_DATADIR))
     logger.info('--bindir=PATH            Path to cores directory, default:datadir/bin.')
     logger.info('--mainnet                Run in mainnet mode.')
     logger.info('--testnet                Run in testnet mode.')
@@ -374,8 +374,7 @@ def main():
         exitWithError('Unknown argument {}'.format(v))
 
     if data_dir is None:
-        default_datadir = '~/.basicswap'
-        data_dir = os.path.join(os.path.expanduser(default_datadir))
+        data_dir = os.path.join(os.path.expanduser(cfg.DEFAULT_DATADIR))
     if bin_dir is None:
         bin_dir = os.path.join(data_dir, 'bin')
 
@@ -387,7 +386,7 @@ def main():
 
     if not os.path.exists(data_dir):
         os.makedirs(data_dir)
-    config_path = os.path.join(data_dir, 'basicswap.json')
+    config_path = os.path.join(data_dir, cfg.CONFIG_FILENAME)
 
     withchainclients = {}
     chainclients = {
