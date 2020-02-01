@@ -34,7 +34,10 @@ from basicswap.basicswap import (
 from basicswap.util import (
     COIN,
     toWIF,
+)
+from basicswap.rpc import (
     callrpc_cli,
+    waitForRPC,
 )
 from basicswap.key import (
     ECKey,
@@ -204,17 +207,6 @@ def run_loop(self):
             c.update()
         nmcRpc('generatetoaddress 1 {}'.format(self.nmc_addr))
         btcRpc('generatetoaddress 1 {}'.format(self.btc_addr))
-
-
-def waitForRPC(rpc_func, wallet=None):
-    for i in range(5):
-        try:
-            rpc_func('getwalletinfo')
-            return
-        except Exception as ex:
-            logging.warning('Can\'t connect to daemon RPC: %s.  Trying again in %d second/s.', str(ex), (1 + i))
-            time.sleep(1 + i)
-    raise ValueError('waitForRPC failed')
 
 
 class Test(unittest.TestCase):

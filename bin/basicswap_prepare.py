@@ -20,7 +20,6 @@ import mmap
 import tarfile
 import zipfile
 import stat
-import time
 from urllib.request import urlretrieve
 import urllib.parse
 import logging
@@ -29,7 +28,10 @@ import platform
 import gnupg
 
 import basicswap.config as cfg
-from basicswap.util import callrpc_cli
+from basicswap.rpc import (
+    callrpc_cli,
+    waitForRPC,
+)
 from bin.basicswap_run import startDaemon
 
 if platform.system() == 'Darwin':
@@ -53,7 +55,7 @@ if not len(logger.handlers):
 
 
 def make_reporthook():
-    read = 0  # number of bytes read so far
+    read = 0  # Number of bytes read so far
     last_percent_str = ''
 
     def reporthook(blocknum, blocksize, totalsize):
@@ -278,17 +280,6 @@ def make_rpc_func(bin_dir, data_dir, chain):
 
         return callrpc_cli(bin_dir, data_dir, chain, cmd, cfg.PARTICL_CLI)
     return rpc_func
-
-
-def waitForRPC(rpc_func, wallet=None):
-    for i in range(10):
-        try:
-            rpc_func('getwalletinfo')
-            return
-        except Exception as ex:
-            logging.warning('Can\'t connect to daemon RPC: %s.  Trying again in %d second/s.', str(ex), (1 + i))
-            time.sleep(1 + i)
-    raise ValueError('waitForRPC failed')
 
 
 def exitWithError(error_msg):

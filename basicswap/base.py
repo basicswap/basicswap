@@ -18,6 +18,8 @@ from .chainparams import (
 )
 from .util import (
     pubkeyToAddress,
+)
+from .rpc import (
     callrpc,
 )
 

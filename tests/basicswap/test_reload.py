@@ -31,7 +31,7 @@ from unittest.mock import patch
 from urllib.request import urlopen
 from urllib import parse
 
-from basicswap.util import (
+from basicswap.rpc import (
     callrpc_cli,
 )
 
