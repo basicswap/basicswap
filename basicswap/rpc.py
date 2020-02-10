@@ -37,10 +37,11 @@ class Jsonrpc():
         # establish a "logical" server connection
 
         # get the url
-        type, uri = urllib.parse.splittype(uri)
-        if type not in ("http", "https"):
+        parsed = urllib.parse.urlparse(uri)
+        if parsed.scheme not in ("http", "https"):
             raise OSError("unsupported XML-RPC protocol")
-        self.__host, self.__handler = urllib.parse.splithost(uri)
+        self.__host = parsed.netloc
+        self.__handler = parsed.path
         if not self.__handler:
             self.__handler = "/RPC2"
 
