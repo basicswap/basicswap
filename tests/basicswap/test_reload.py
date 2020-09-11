@@ -6,7 +6,6 @@
 # file LICENSE.txt or http://www.opensource.org/licenses/mit-license.php.
 
 """
-
 export TEST_RELOAD_PATH=/tmp/test_basicswap
 mkdir -p ${TEST_RELOAD_PATH}/bin/{particl,bitcoin}
 cp ~/tmp/particl-0.19.1.1-x86_64-linux-gnu.tar.gz ${TEST_RELOAD_PATH}/bin/particl
@@ -34,6 +33,7 @@ from urllib import parse
 from basicswap.rpc import (
     callrpc_cli,
 )
+from tests.basicswap.mnemonics import mnemonics
 
 import basicswap.config as cfg
 import bin.basicswap_prepare as prepareSystem
@@ -105,12 +105,6 @@ class Test(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         super(Test, cls).setUpClass()
-
-        mnemonics = [
-            'abandon baby cabbage dad eager fabric gadget habit ice kangaroo lab absorb',
-            'actuel comédie poésie noble facile éprouver brave cellule rotule académie hilarant chambre',
-            'ちしき　いてざ　きおち　あしあと　ぽちぶくろ　こえる　さつえい　むえき　あける　ほんき　むさぼる　ねいろ',
-        ]
 
         for i in range(3):
             client_path = os.path.join(test_path, 'client{}'.format(i))

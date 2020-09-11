@@ -242,6 +242,7 @@ def prepareDataDir(coin, settings, data_dir, chain, particl_mnemonic):
             fp.write('prune=1000\n')
         elif coin == 'bitcoin':
             fp.write('prune=1000\n')
+            fp.write('fallbackfee=0.0002\n')
         elif coin == 'namecoin':
             fp.write('prune=1000\n')
         else:

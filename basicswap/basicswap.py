@@ -529,7 +529,7 @@ class BasicSwap(BaseApp):
                 continue
                 synced = round(self.callcoinrpc(c, 'getblockchaininfo')['verificationprogress'], 3)
                 if synced < 1.0:
-                    raise ValueError('{} chain is still syncing, currently at {}.'.format(synced))
+                    raise ValueError('{} chain is still syncing, currently at {}.'.format(self.coin_clients[c]['name'], synced))
 
     def setIntKV(self, str_key, int_val):
         session = scoped_session(self.session_factory)
@@ -2419,7 +2419,7 @@ class BasicSwap(BaseApp):
         q = self.engine.execute('SELECT COUNT(*) FROM offers WHERE expire_at > {}'.format(now)).first()
         num_offers = q[0]
 
-        q = self.engine.execute('SELECT COUNT(*) FROM offers WHERE was_sent = 1'.format(now)).first()
+        q = self.engine.execute('SELECT COUNT(*) FROM offers WHERE was_sent = 1').first()
         num_sent_offers = q[0]
 
         rv = {
