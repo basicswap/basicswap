@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019 tecnovert
+# Copyright (c) 2019-2020 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE.txt or http://www.opensource.org/licenses/mit-license.php.
 
@@ -42,9 +42,9 @@ else:
     BIN_ARCH = 'x86_64-linux-gnu.tar.gz'
 
 known_coins = {
-    'particl': '0.18.1.6',
-    'litecoin': '0.17.1',
-    'bitcoin': '0.19.0.1',
+    'particl': '0.19.1.1',
+    'litecoin': '0.18.1',
+    'bitcoin': '0.20.1',
     'namecoin': '0.18.0',
 }
 
@@ -80,6 +80,33 @@ def downloadFile(url, path):
     urlretrieve(url, path, make_reporthook())
 
 
+def extractCore(coin, version, settings, bin_dir, release_path):
+    logger.info('extractCore %s v%s', coin, version)
+
+    bins = [coin + 'd', coin + '-cli', coin + '-tx']
+
+    versions = version.split('.')
+    if coin == 'particl' and int(versions[1]) >= 19:
+        bins.append(coin + '-wallet')
+    if 'win32' in BIN_ARCH or 'win64' in BIN_ARCH:
+        with zipfile.ZipFile(release_path) as fz:
+            for b in bins:
+                b += '.exe'
+                out_path = os.path.join(bin_dir, b)
+                with open(out_path, 'wb') as fout:
+                    fout.write(fz.read('{}-{}/bin/{}'.format(coin, version, b)))
+                os.chmod(out_path, stat.S_IRWXU | stat.S_IXGRP | stat.S_IXOTH)
+    else:
+        with tarfile.open(release_path) as ft:
+            for b in bins:
+                out_path = os.path.join(bin_dir, b)
+                fi = ft.extractfile('{}-{}/bin/{}'.format(coin, version, b))
+                with open(out_path, 'wb') as fout:
+                    fout.write(fi.read())
+                fi.close()
+                os.chmod(out_path, stat.S_IRWXU | stat.S_IXGRP | stat.S_IXOTH)
+
+
 def prepareCore(coin, version, settings, data_dir):
     logger.info('prepareCore %s v%s', coin, version)
 
@@ -100,9 +127,9 @@ def prepareCore(coin, version, settings, data_dir):
     release_filename = '{}-{}-{}'.format(coin, version, BIN_ARCH)
     if coin == 'particl':
         signing_key_name = 'tecnovert'
-        release_url = 'https://github.com/particl/particl-core/releases/download/v{}/{}'.format(version, release_filename)
+        release_url = 'https://github.com/tecnovert/particl-core/releases/download/v{}/{}'.format(version, release_filename)
         assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, version)
-        assert_url = 'https://raw.githubusercontent.com/particl/gitian.sigs/master/%s-%s/%s/%s' % (version, os_dir_name, signing_key_name, assert_filename)
+        assert_url = 'https://raw.githubusercontent.com/tecnovert/gitian.sigs/master/%s-%s/%s/%s' % (version, os_dir_name, signing_key_name, assert_filename)
     elif coin == 'litecoin':
         signing_key_name = 'thrasher'
         release_url = 'https://download.litecoin.org/litecoin-{}/{}/{}'.format(version, os_name, release_filename)
@@ -174,24 +201,7 @@ def prepareCore(coin, version, settings, data_dir):
         if verified.username is None:
             raise ValueError('Signature verification failed.')
 
-    bins = [coin + 'd', coin + '-cli', coin + '-tx']
-    if os_name == 'win':
-        with zipfile.ZipFile(release_path) as fz:
-            for b in bins:
-                b += '.exe'
-                out_path = os.path.join(bin_dir, b)
-                with open(out_path, 'wb') as fout:
-                    fout.write(fz.read('{}-{}/bin/{}'.format(coin, version, b)))
-                os.chmod(out_path, stat.S_IRWXU | stat.S_IXGRP | stat.S_IXOTH)
-    else:
-        with tarfile.open(release_path) as ft:
-            for b in bins:
-                out_path = os.path.join(bin_dir, b)
-                fi = ft.extractfile('{}-{}/bin/{}'.format(coin, version, b))
-                with open(out_path, 'wb') as fout:
-                    fout.write(fi.read())
-                fi.close()
-                os.chmod(out_path, stat.S_IRWXU | stat.S_IXGRP | stat.S_IXOTH)
+    extractCore(coin, version, settings, bin_dir, release_path)
 
 
 def prepareDataDir(coin, settings, data_dir, chain, particl_mnemonic):
@@ -238,10 +248,6 @@ def prepareDataDir(coin, settings, data_dir, chain, particl_mnemonic):
             logger.warning('Unknown coin %s', coin)
 
 
-def extractCore(coin, version, settings):
-    logger.info('extractCore %s v%s', coin, version)
-
-
 def printVersion():
     from basicswap import __version__
     logger.info('Basicswap version:', __version__)
@@ -271,7 +277,7 @@ def printHelp():
 def make_rpc_func(bin_dir, data_dir, chain):
     bin_dir = bin_dir
     data_dir = data_dir
-    chain = '' if chain == 'mainnet' else chain
+    chain = chain
 
     def rpc_func(cmd):
         nonlocal bin_dir
@@ -402,7 +408,7 @@ def main():
             'use_segwit': True,
             'blocks_confirmed': 2,
             'conf_target': 2,
-            'core_version_group': 17,
+            'core_version_group': 18,
             'chain_lookups': 'local',
         },
         'bitcoin': {
