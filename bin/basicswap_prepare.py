@@ -198,7 +198,8 @@ def prepareCore(coin, version, settings, data_dir):
         with open(assert_sig_path, 'rb') as fp:
             verified = gpg.verify_file(fp, assert_path)
 
-        if verified.username is None:
+        if verified.valid is False \
+           and not (verified.status == 'signature valid' and verified.key_status == 'signing key has expired'):
             raise ValueError('Signature verification failed.')
 
     extractCore(coin, version, settings, bin_dir, release_path)
