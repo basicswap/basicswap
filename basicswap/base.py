@@ -10,7 +10,7 @@ import logging
 import subprocess
 
 import basicswap.config as cfg
-import basicswap.segwit_addr as segwit_addr
+import basicswap.contrib.segwit_addr as segwit_addr
 
 from .chainparams import (
     chainparams,

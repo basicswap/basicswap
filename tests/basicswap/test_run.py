@@ -42,7 +42,7 @@ from basicswap.rpc import (
     callrpc_cli,
     waitForRPC,
 )
-from basicswap.key import (
+from basicswap.contrib.key import (
     ECKey,
 )
 from basicswap.http_server import (
@@ -87,6 +87,7 @@ def prepareOtherDir(datadir, nodeId, conf_file='litecoin.conf'):
         fp.write('findpeers=0\n')
         fp.write('debug=1\n')
         fp.write('debugexclude=libevent\n')
+        fp.write('fallbackfee=0.0002\n')
 
         fp.write('acceptnonstdtxn=0\n')
 

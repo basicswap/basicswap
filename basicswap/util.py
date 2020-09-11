@@ -7,7 +7,7 @@
 import decimal
 import json
 import hashlib
-from .segwit_addr import bech32_decode, convertbits, bech32_encode
+from .contrib.segwit_addr import bech32_decode, convertbits, bech32_encode
 
 COIN = 100000000
 DCOIN = decimal.Decimal(COIN)

@@ -47,8 +47,8 @@ jobs:
         - travis_retry pip install codespell==1.15.0
       before_script:
       script:
-        - PYTHONWARNINGS="ignore" flake8 --ignore=E501,F841,W503 --exclude=segwit_addr.py,key.py,messages_pb2.py,.eggs
-        - codespell --check-filenames --disable-colors --quiet-level=7 --ignore-words=tests/lint/spelling.ignore-words.txt -S .git,.eggs,gitianpubkeys,*.pyc
+        - PYTHONWARNINGS="ignore" flake8 --ignore=E501,F841,W503 --exclude=basicswap/contrib,messages_pb2.py,.eggs
+        - codespell --check-filenames --disable-colors --quiet-level=7 --ignore-words=tests/lint/spelling.ignore-words.txt -S .git,.eggs,gitianpubkeys,*.pyc,basicswap/contrib
       after_success:
         - echo "End lint"
     - stage: test

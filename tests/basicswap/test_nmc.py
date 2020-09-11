@@ -38,7 +38,7 @@ from basicswap.rpc import (
     callrpc_cli,
     waitForRPC,
 )
-from basicswap.key import (
+from basicswap.contrib.key import (
     ECKey,
 )
 from basicswap.http_server import (
