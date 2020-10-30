@@ -3,7 +3,7 @@
 
 # Copyright (c) 2020 tecnovert
 # Distributed under the MIT software license, see the accompanying
-# file LICENSE.txt or http://www.opensource.org/licenses/mit-license.php.
+# file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 mnemonics = [
     'abandon baby cabbage dad eager fabric gadget habit ice kangaroo lab absorb',
