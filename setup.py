@@ -29,6 +29,7 @@ setuptools.setup(
         "sqlalchemy",
         "python-gnupg",
         "Jinja2",
+        "requests",
     ],
     entry_points={
         "console_scripts": [

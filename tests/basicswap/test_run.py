@@ -48,6 +48,9 @@ from basicswap.contrib.key import (
 from basicswap.http_server import (
     HttpThread,
 )
+from tests.basicswap.common import (
+    checkForks,
+)
 from bin.basicswap_run import startDaemon
 
 logger = logging.getLogger()
@@ -203,15 +206,6 @@ def run_loop(self):
             c.update()
         ltcRpc('generatetoaddress 1 {}'.format(self.ltc_addr))
         btcRpc('generatetoaddress 1 {}'.format(self.btc_addr))
-
-
-def checkForks(ro):
-    if 'bip9_softforks' in ro:
-        assert(ro['bip9_softforks']['csv']['status'] == 'active')
-        assert(ro['bip9_softforks']['segwit']['status'] == 'active')
-    else:
-        assert(ro['softforks']['csv']['active'])
-        assert(ro['softforks']['segwit']['active'])
 
 
 class Test(unittest.TestCase):

@@ -14,8 +14,9 @@ class Coins(IntEnum):
     PART = 1
     BTC = 2
     LTC = 3
-    # DCR = 4
+    #DCR = 4
     NMC = 5
+    XMR = 6
 
 
 chainparams = {
@@ -156,5 +157,26 @@ chainparams = {
             'min_amount': 1000,
             'max_amount': 100000 * COIN,
         }
+    },
+    Coins.XMR: {
+        'name': 'monero',
+        'ticker': 'XMR',
+        'client': 'xmr',
+        'mainnet': {
+            'rpcport': 18081,
+            'walletrpcport': 18082,
+        },
+        'testnet': {
+            'rpcport': 28081,
+            'walletrpcport': 28082,
+        },
+        'regtest': {
+            'rpcport': 18081,
+            'walletrpcport': 18082,
+        }
     }
 }
+
+class CoinInterface:
+    pass
+

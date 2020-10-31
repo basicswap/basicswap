@@ -93,8 +93,8 @@ class Jsonrpc():
 def callrpc(rpc_port, auth, method, params=[], wallet=None):
     try:
         url = 'http://%s@127.0.0.1:%d/' % (auth, rpc_port)
-        if wallet:
-            url += 'wallet/' + wallet
+        if wallet is not None:
+            url += 'wallet/' + urllib.parse.quote(wallet)
         x = Jsonrpc(url)
 
         v = x.json_request(method, params)
@@ -126,3 +126,14 @@ def callrpc_cli(bindir, datadir, chain, cmd, cli_bin='particl-cli'):
     except Exception:
         pass
     return r
+
+
+def make_rpc_func(port, auth, wallet=None):
+    port = port
+    auth = auth
+    wallet = wallet
+
+    def rpc_func(method, params=None, wallet_override=None):
+        nonlocal port, auth, wallet
+        return callrpc(port, auth, method, params, wallet if wallet_override is None else wallet_override)
+    return rpc_func

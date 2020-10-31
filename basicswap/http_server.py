@@ -19,7 +19,7 @@ from . import __version__
 from .util import (
     COIN,
     format8,
-    makeInt,
+    make_int,
     dumpj,
 )
 from .chainparams import (
@@ -129,7 +129,7 @@ def validateAmountString(amount):
 
 def inputAmount(amount_str):
     validateAmountString(amount_str)
-    return makeInt(amount_str)
+    return make_int(amount_str)
 
 
 def setCoinFilter(form_data, field_name):

@@ -19,6 +19,11 @@ import secrets
 from sqlalchemy.orm import sessionmaker, scoped_session
 from enum import IntEnum, auto
 
+from .interface_part import PARTInterface
+from .interface_btc import BTCInterface
+from .interface_ltc import LTCInterface
+from .interface_xmr import XMRInterface
+
 from . import __version__
 from .util import (
     COIN,
@@ -31,7 +36,7 @@ from .util import (
     decodeWif,
     toWIF,
     getKeyID,
-    makeInt,
+    make_int,
 )
 from .chainparams import (
     chainparams,
@@ -416,6 +421,27 @@ class BasicSwap(BaseApp):
             'explorers': [],
             'chain_lookups': chain_client_settings.get('chain_lookups', 'local'),
         }
+
+        if self.coin_clients[coin]['connection_type'] == 'rpc':
+            if coin == Coins.XMR:
+                self.coin_clients[coin]['walletrpcport'] = chain_client_settings.get('walletrpcport', chainparams[coin][self.chain]['walletrpcport'])
+                if 'walletrpcpassword' in chain_client_settings:
+                    self.coin_clients[coin]['walletrpcauth'] = chain_client_settings['walletrpcuser'] + ':' + chain_client_settings['walletrpcpassword']
+                else:
+                    raise ValueError('Missing XMR wallet rpc credentials.')
+            self.coin_clients[coin]['interface'] = self.createInterface(coin)
+
+    def createInterface(self, coin):
+        if coin == Coins.PART:
+            return PARTInterface(self.coin_clients[coin])
+        elif coin == Coins.BTC:
+            return BTCInterface(self.coin_clients[coin])
+        elif coin == Coins.LTC:
+            return LTCInterface(self.coin_clients[coin])
+        elif coin == Coins.XMR:
+            return XMRInterface(self.coin_clients[coin])
+        else:
+            raise ValueError('Unknown coin type')
 
     def setCoinRunParams(self, coin):
         cc = self.coin_clients[coin]
@@ -1699,7 +1725,7 @@ class BasicSwap(BaseApp):
                 continue
             # Verify amount
             if assert_amount:
-                assert(makeInt(o['amount']) == int(assert_amount)), 'Incorrect output amount in txn {}: {} != {}.'.format(assert_txid, makeInt(o['amount']), int(assert_amount))
+                assert(make_int(o['amount']) == int(assert_amount)), 'Incorrect output amount in txn {}: {} != {}.'.format(assert_txid, make_int(o['amount']), int(assert_amount))
 
             if not sum_output:
                 if o['height'] > 0:
@@ -1711,7 +1737,7 @@ class BasicSwap(BaseApp):
                     'index': o['vout'],
                     'height': o['height'],
                     'n_conf': n_conf,
-                    'value': makeInt(o['amount']),
+                    'value': make_int(o['amount']),
                 }
             else:
                 sum_unspent += o['amount'] * COIN
@@ -1744,7 +1770,7 @@ class BasicSwap(BaseApp):
                     # Verify amount
                     vout = getVoutByAddress(initiate_txn, p2sh)
 
-                    out_value = makeInt(initiate_txn['vout'][vout]['value'])
+                    out_value = make_int(initiate_txn['vout'][vout]['value'])
                     assert(out_value == int(bid.amount)), 'Incorrect output amount in initiate txn {}: {} != {}.'.format(initiate_txnid_hex, out_value, int(bid.amount))
 
                     bid.initiate_tx.conf = initiate_txn['confirmations']
@@ -2442,8 +2468,8 @@ class BasicSwap(BaseApp):
             'deposit_address': self.getCachedAddressForCoin(coin),
             'name': chainparams[coin]['name'].capitalize(),
             'blocks': blockchaininfo['blocks'],
-            'balance': format8(makeInt(walletinfo['balance'])),
-            'unconfirmed': format8(makeInt(walletinfo.get('unconfirmed_balance'))),
+            'balance': format8(make_int(walletinfo['balance'])),
+            'unconfirmed': format8(make_int(walletinfo.get('unconfirmed_balance'))),
             'synced': '{0:.2f}'.format(round(blockchaininfo['verificationprogress'], 2)),
         }
         return rv
