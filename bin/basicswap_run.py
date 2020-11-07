@@ -45,7 +45,7 @@ def startDaemon(node_dir, bin_dir, daemon_bin, opts=[]):
     daemon_bin = os.path.expanduser(os.path.join(bin_dir, daemon_bin))
 
     args = [daemon_bin, '-datadir=' + os.path.expanduser(node_dir)] + opts
-    logger.info('Starting node ' + daemon_bin + ' ' + '-datadir=' + node_dir)
+    logging.info('Starting node ' + daemon_bin + ' ' + '-datadir=' + node_dir)
     return subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 
@@ -118,9 +118,13 @@ def runClient(fp, data_dir, chain):
     closed_pids = []
     for d in daemons:
         int_pid = d.pid
-        logger.info('Terminating {}'.format(int_pid))
+        logging.info('Interrupting {}'.format(int_pid))
         try:
-            d.terminate()
+            d.send_signal(signal.SIGINT)
+        except Exception as e:
+            logging.info('Interrupting %d, error %s', d.pid, str(e))
+    for d in daemons:
+        try:
             d.wait(timeout=120)
             if d.stdout:
                 d.stdout.close()

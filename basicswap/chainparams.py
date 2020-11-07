@@ -9,6 +9,8 @@ from .util import (
     COIN,
 )
 
+XMR_COIN = 10 ** 12
+
 
 class Coins(IntEnum):
     PART = 1
@@ -25,6 +27,7 @@ chainparams = {
         'ticker': 'PART',
         'message_magic': 'Bitcoin Signed Message:\n',
         'blocks_target': 60 * 2,
+        'decimal_places': 8,
         'mainnet': {
             'rpcport': 51735,
             'pubkey_address': 0x38,
@@ -61,6 +64,7 @@ chainparams = {
         'ticker': 'BTC',
         'message_magic': 'Bitcoin Signed Message:\n',
         'blocks_target': 60 * 10,
+        'decimal_places': 8,
         'mainnet': {
             'rpcport': 8332,
             'pubkey_address': 0,
@@ -95,6 +99,7 @@ chainparams = {
         'ticker': 'LTC',
         'message_magic': 'Litecoin Signed Message:\n',
         'blocks_target': 60 * 1,
+        'decimal_places': 8,
         'mainnet': {
             'rpcport': 9332,
             'pubkey_address': 48,
@@ -129,6 +134,7 @@ chainparams = {
         'ticker': 'NMC',
         'message_magic': 'Namecoin Signed Message:\n',
         'blocks_target': 60 * 10,
+        'decimal_places': 8,
         'mainnet': {
             'rpcport': 8336,
             'pubkey_address': 52,
@@ -162,17 +168,24 @@ chainparams = {
         'name': 'monero',
         'ticker': 'XMR',
         'client': 'xmr',
+        'decimal_places': 12,
         'mainnet': {
             'rpcport': 18081,
             'walletrpcport': 18082,
+            'min_amount': 100000,
+            'max_amount': 10000 * XMR_COIN,
         },
         'testnet': {
             'rpcport': 28081,
             'walletrpcport': 28082,
+            'min_amount': 100000,
+            'max_amount': 10000 * XMR_COIN,
         },
         'regtest': {
             'rpcport': 18081,
             'walletrpcport': 18082,
+            'min_amount': 100000,
+            'max_amount': 10000 * XMR_COIN,
         }
     }
 }

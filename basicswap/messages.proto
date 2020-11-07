@@ -46,3 +46,31 @@ message BidAcceptMessage {
     bytes initiate_txid = 2;
     bytes contract_script = 3;
 }
+
+
+message XmrOfferMessage {
+    uint32 coin_from = 1;
+    uint32 coin_to = 2;
+    uint64 amount_from = 3;
+    uint64 rate = 4;
+    uint64 min_bid_amount = 5;
+    uint64 time_valid = 6;
+    enum LockType {
+        NOT_SET = 0;
+        SEQUENCE_LOCK_BLOCKS = 1;
+        SEQUENCE_LOCK_TIME = 2;
+        ABS_LOCK_BLOCKS = 3;
+        ABS_LOCK_TIME = 4;
+    }
+    LockType lock_type = 7;
+    uint32 lock_value = 8;
+    uint32 swap_type = 9;
+
+
+
+    /* optional */
+    string proof_address = 10;
+    string proof_signature = 11;
+    bytes pkhash_seller = 12;
+    bytes secret_hash = 13;
+}

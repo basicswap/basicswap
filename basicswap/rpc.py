@@ -18,14 +18,15 @@ from xmlrpc.client import (
 from .util import jsonDecimal
 
 
-def waitForRPC(rpc_func, wallet=None):
-    for i in range(5):
+def waitForRPC(rpc_func, wallet=None, max_tries=7):
+    for i in range(max_tries + 1):
         try:
             rpc_func('getwalletinfo')
             return
         except Exception as ex:
-            logging.warning('Can\'t connect to daemon RPC: %s.  Trying again in %d second/s.', str(ex), (1 + i))
-            time.sleep(1 + i)
+            if i < max_tries:
+                logging.warning('Can\'t connect to RPC: %s. Retrying in %d second/s.', str(ex), (i + 1))
+                time.sleep(i + 1)
     raise ValueError('waitForRPC failed')
 
 

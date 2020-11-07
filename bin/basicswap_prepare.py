@@ -46,6 +46,7 @@ known_coins = {
     'litecoin': '0.18.1',
     'bitcoin': '0.20.1',
     'namecoin': '0.18.0',
+    'monero': '0.17.0.1',
 }
 
 logger = logging.getLogger()
@@ -123,6 +124,15 @@ def prepareCore(coin, version, settings, data_dir):
     else:
         os_dir_name = 'linux'
         os_name = 'linux'
+
+    if coin == 'monero':
+        url = 'https://downloads.getmonero.org/cli/monero-linux-x64-v${}.tar.bz2'.format(version)
+
+        release_path = os.path.join(bin_dir, release_filename)
+        if not os.path.exists(release_path):
+            downloadFile(release_url, release_path)
+
+        raise ValueError('TODO')
 
     release_filename = '{}-{}-{}'.format(coin, version, BIN_ARCH)
     if coin == 'particl':

@@ -102,6 +102,24 @@ class BTCInterface(CoinInterface):
         self.rpc_callback = make_rpc_func(coin_settings['rpcport'], coin_settings['rpcauth'])
         self.txoType = CTxOut
 
+    def testDaemonRPC(self):
+        self.rpc_callback('getwalletinfo', [])
+
+    def getDaemonVersion(self):
+        return self.rpc_callback('getnetworkinfo')['version']
+
+    def getBlockchainInfo(self):
+        return self.rpc_callback('getblockchaininfo')
+
+    def getWalletInfo(self):
+        return self.rpc_callback('getwalletinfo')
+
+    def getNewAddress(self, use_segwit):
+        args = ['swap_receive']
+        if use_segwit:
+            args.append('bech32')
+        return self.rpc_callback('getnewaddress', args)
+
     def getNewSecretKey(self):
         return getSecretInt()
 

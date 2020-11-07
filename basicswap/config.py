@@ -32,3 +32,7 @@ NAMECOIN_BINDIR = os.path.expanduser(os.getenv('NAMECOIN_BINDIR', ''))
 NAMECOIND = os.getenv('NAMECOIND', 'namecoind' + bin_suffix)
 NAMECOIN_CLI = os.getenv('NAMECOIN_CLI', 'namecoin-cli' + bin_suffix)
 NAMECOIN_TX = os.getenv('NAMECOIN_TX', 'namecoin-tx' + bin_suffix)
+
+XMR_BINDIR = os.path.expanduser(os.getenv('XMR_BINDIR', ''))
+XMRD = os.getenv('XMRD', 'monerod' + bin_suffix)
+XMR_WALLET_RPC = os.getenv('XMR_WALLET_RPC', 'monero-wallet-rpc' + bin_suffix)

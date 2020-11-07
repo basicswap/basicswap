@@ -22,6 +22,7 @@ from enum import IntEnum, auto
 from .interface_part import PARTInterface
 from .interface_btc import BTCInterface
 from .interface_ltc import LTCInterface
+from .interface_nmc import NMCInterface
 from .interface_xmr import XMRInterface
 
 from . import __version__
@@ -29,6 +30,7 @@ from .util import (
     COIN,
     pubkeyToAddress,
     format8,
+    format_amount,
     encodeAddress,
     decodeAddress,
     SerialiseNum,
@@ -80,12 +82,15 @@ class MessageTypes(IntEnum):
     BID = auto()
     BID_ACCEPT = auto()
 
+    XMR_OFFER = auto()
+
 
 class SwapTypes(IntEnum):
     SELLER_FIRST = auto()
     BUYER_FIRST = auto()
     SELLER_FIRST_2MSG = auto()
     BUYER_FIRST_2MSG = auto()
+    XMR_SWAP = auto()
 
 
 class OfferStates(IntEnum):
@@ -317,7 +322,7 @@ class BasicSwap(BaseApp):
 
         self.network_pubkey = self.settings['network_pubkey']
         self.network_addr = pubkeyToAddress(chainparams[Coins.PART][self.chain]['pubkey_address'], bytearray.fromhex(self.network_pubkey))
-        self.wallet = self.settings.get('wallet', None)  # TODO: Move to coin_clients
+        #self.wallet = self.settings.get('wallet', None)  # TODO: Move to coin_clients
 
         self.sqlite_file = os.path.join(self.data_dir, 'db{}.sqlite'.format('' if self.chain == 'mainnet' else ('_' + self.chain)))
         db_exists = os.path.exists(self.sqlite_file)
@@ -341,6 +346,20 @@ class BasicSwap(BaseApp):
             self._contract_count = session.query(DBKVInt).filter_by(key='contract_count').first().value
         except Exception:
             self._contract_count = 0
+            session.add(DBKVInt(
+                key='contract_count',
+                value=self._contract_count
+            ))
+            session.commit()
+        try:
+            self._offer_count = session.query(DBKVInt).filter_by(key='offer_count').first().value
+        except Exception:
+            self._offer_count = 0
+            session.add(DBKVInt(
+                key='offer_count',
+                value=self._offer_count
+            ))
+            session.commit()
         session.close()
         session.remove()
 
@@ -426,7 +445,7 @@ class BasicSwap(BaseApp):
             if coin == Coins.XMR:
                 self.coin_clients[coin]['walletrpcport'] = chain_client_settings.get('walletrpcport', chainparams[coin][self.chain]['walletrpcport'])
                 if 'walletrpcpassword' in chain_client_settings:
-                    self.coin_clients[coin]['walletrpcauth'] = chain_client_settings['walletrpcuser'] + ':' + chain_client_settings['walletrpcpassword']
+                    self.coin_clients[coin]['walletrpcauth'] = (chain_client_settings['walletrpcuser'], chain_client_settings['walletrpcpassword'])
                 else:
                     raise ValueError('Missing XMR wallet rpc credentials.')
             self.coin_clients[coin]['interface'] = self.createInterface(coin)
@@ -438,6 +457,8 @@ class BasicSwap(BaseApp):
             return BTCInterface(self.coin_clients[coin])
         elif coin == Coins.LTC:
             return LTCInterface(self.coin_clients[coin])
+        elif coin == Coins.NMC:
+            return NMCInterface(self.coin_clients[coin])
         elif coin == Coins.XMR:
             return XMRInterface(self.coin_clients[coin])
         else:
@@ -445,6 +466,8 @@ class BasicSwap(BaseApp):
 
     def setCoinRunParams(self, coin):
         cc = self.coin_clients[coin]
+        if coin == Coins.XMR:
+            return
         if cc['connection_type'] == 'rpc' and cc['rpcauth'] is None:
             chain_client_settings = self.getChainClientSettings(coin)
             authcookiepath = os.path.join(self.getChainDatadirPath(coin), '.cookie')
@@ -474,6 +497,10 @@ class BasicSwap(BaseApp):
                 self.log.error('Unable to read authcookie for %s, %s, datadir pid %d, daemon pid %s', str(coin), authcookiepath, datadir_pid, cc['pid'])
                 raise ValueError('Error, terminating')
 
+    def createCoinInterface(self, coin):
+        if self.coin_clients[coin]['connection_type'] == 'rpc':
+            self.coin_clients[coin]['interface'] = self.createInterface(coin)
+
     def start(self):
         self.log.info('Starting BasicSwap %s\n\n', __version__)
         self.log.info('sqlalchemy version %s', sa.__version__)
@@ -482,9 +509,11 @@ class BasicSwap(BaseApp):
 
         for c in Coins:
             self.setCoinRunParams(c)
+            self.createCoinInterface(c)
+
             if self.coin_clients[c]['connection_type'] == 'rpc':
                 self.waitForDaemonRPC(c)
-                core_version = self.callcoinrpc(c, 'getnetworkinfo')['version']
+                core_version = self.coin_clients[c]['interface'].getDaemonVersion()
                 self.log.info('%s Core version %d', chainparams[c]['name'].capitalize(), core_version)
                 self.coin_clients[c]['core_version'] = core_version
 
@@ -540,7 +569,7 @@ class BasicSwap(BaseApp):
             if not self.is_running:
                 return
             try:
-                self.callcoinrpc(coin_type, 'getwalletinfo', [], self.wallet)
+                self.coin_clients[coin_type]['interface'].testDaemonRPC()
                 return
             except Exception as ex:
                 self.log.warning('Can\'t connect to %s RPC: %s.  Trying again in %d second/s.', coin_type, str(ex), (1 + i))
@@ -707,10 +736,19 @@ class BasicSwap(BaseApp):
         self.mxDB.acquire()
         try:
             self.checkSynced(coin_from_t, coin_to_t)
+            # TODO: require proof of funds on offers?
             proof_addr, proof_sig = self.getProofOfFunds(coin_from_t, amount)
-            # TODO: require prrof of funds on offers?
+            offer_addr = self.callrpc('getnewaddress') if addr_send_from is None else addr_send_from
 
-            msg_buf = OfferMessage()
+            offer_created_at = int(time.time())
+            if swap_type == SwapTypes.XMR_SWAP:
+                msg_buf = XmrOfferMessage()
+
+                key_path = "44445555h/999999/{}/{}/{}/{}".format(int(coin_from), int(coin_to), offer_created_at, )
+
+            else:
+                msg_buf = OfferMessage()
+
             msg_buf.coin_from = int(coin_from)
             msg_buf.coin_to = int(coin_to)
             msg_buf.amount_from = int(amount)
@@ -725,10 +763,6 @@ class BasicSwap(BaseApp):
             offer_bytes = msg_buf.SerializeToString()
             payload_hex = str.format('{:02x}', MessageTypes.OFFER) + offer_bytes.hex()
 
-            if addr_send_from is None:
-                offer_addr = self.callrpc('getnewaddress')
-            else:
-                offer_addr = addr_send_from
             self.callrpc('smsgaddlocaladdress', [offer_addr])  # Enable receiving smsg
             options = {'decodehex': True, 'ttl_is_seconds': True}
             msg_valid = self.SMSG_SECONDS_IN_HOUR * 1
@@ -752,8 +786,8 @@ class BasicSwap(BaseApp):
                 swap_type=msg_buf.swap_type,
 
                 addr_from=offer_addr,
-                created_at=int(time.time()),
-                expire_at=int(time.time()) + msg_buf.time_valid,
+                created_at=offer_created_at,
+                expire_at=offer_created_at + msg_buf.time_valid,
                 was_sent=True,
                 auto_accept_bids=auto_accept_bids,)
             offer.setState(OfferStates.OFFER_SENT)
@@ -850,15 +884,7 @@ class BasicSwap(BaseApp):
             self.mxDB.release()
 
     def getReceiveAddressForCoin(self, coin_type):
-        if coin_type == Coins.PART:
-            new_addr = self.callcoinrpc(Coins.PART, 'getnewaddress')
-        elif coin_type == Coins.LTC or coin_type == Coins.BTC or coin_type == Coins.NMC:
-            args = []
-            if self.coin_clients[coin_type]['use_segwit']:
-                args = ['swap_receive', 'bech32']
-            new_addr = self.callcoinrpc(coin_type, 'getnewaddress', args)
-        else:
-            raise ValueError('Unknown coin type.')
+        new_addr = self.coin_clients[coin_type]['interface'].getNewAddress(self.coin_clients[coin_type]['use_segwit'])
         self.log.debug('Generated new receive address %s for %s', new_addr, str(coin_type))
         return new_addr
 
@@ -2101,6 +2127,10 @@ class BasicSwap(BaseApp):
             assert(len(offer_data.secret_hash) == 0), 'Unexpected data'
         elif offer_data.swap_type == SwapTypes.BUYER_FIRST:
             raise ValueError('TODO')
+        elif offer_data.swap_type == SwapTypes.XMR_SWAP:
+            assert(coin_from != Coins.XMR)
+            assert(coin_to == Coins.XMR)
+            logging.debug('TODO - More restrictions')
         else:
             raise ValueError('Unknown swap type {}.'.format(offer_data.swap_type))
 
@@ -2461,15 +2491,17 @@ class BasicSwap(BaseApp):
 
     def getWalletInfo(self, coin):
 
-        blockchaininfo = self.callcoinrpc(coin, 'getblockchaininfo')
-        walletinfo = self.callcoinrpc(coin, 'getwalletinfo')
+        blockchaininfo = self.coin_clients[coin]['interface'].getBlockchainInfo()
+        walletinfo = self.coin_clients[coin]['interface'].getWalletInfo()
+
+        scale = chainparams[coin]['decimal_places']
         rv = {
             'version': self.coin_clients[coin]['core_version'],
             'deposit_address': self.getCachedAddressForCoin(coin),
             'name': chainparams[coin]['name'].capitalize(),
             'blocks': blockchaininfo['blocks'],
-            'balance': format8(make_int(walletinfo['balance'])),
-            'unconfirmed': format8(make_int(walletinfo.get('unconfirmed_balance'))),
+            'balance': format_amount(make_int(walletinfo['balance'], scale), scale),
+            'unconfirmed': format_amount(make_int(walletinfo.get('unconfirmed_balance'), scale), scale),
             'synced': '{0:.2f}'.format(round(blockchaininfo['verificationprogress'], 2)),
         }
         return rv

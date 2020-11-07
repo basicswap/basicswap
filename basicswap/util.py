@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2018-2019 tecnovert
+# Copyright (c) 2018-2020 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-import decimal
 import json
 import hashlib
 from .contrib.segwit_addr import bech32_decode, convertbits, bech32_encode
@@ -12,7 +11,6 @@ from .contrib.segwit_addr import bech32_decode, convertbits, bech32_encode
 OP_1 = 0x51
 OP_16 = 0x60
 COIN = 100000000
-DCOIN = decimal.Decimal(COIN)
 
 
 def assert_cond(v, err='Bad opcode'):
@@ -32,10 +30,6 @@ def format8(i):
 
 def toBool(s):
     return s.lower() in ["1", "true"]
-
-
-def dquantize(n, places=8):
-    return n.quantize(decimal.Decimal(10) ** -places)
 
 
 def jsonDecimal(obj):
@@ -229,13 +223,13 @@ def getCompactSizeLen(v):
     raise ValueError('Value too large')
 
 
-def make_int(v, precision=8, r=0):  # r = 0, no rounding, fail, r > 0 round up, r < 0 floor
+def make_int(v, scale=8, r=0):  # r = 0, no rounding, fail, r > 0 round up, r < 0 floor
     if type(v) == float:
         v = str(v)
     elif type(v) == int:
-        return v * 10 ** precision
+        return v * 10 ** scale
 
-    ep = 10 ** precision
+    ep = 10 ** scale
     have_dp = False
     rv = 0
     for c in v:
@@ -264,7 +258,7 @@ def make_int(v, precision=8, r=0):  # r = 0, no rounding, fail, r > 0 round up, 
     return rv
 
 
-def validate_amount(amount, precision=8):
+def validate_amount(amount, scale=8):
     str_amount = str(amount)
     has_decimal = False
     for c in str_amount:
@@ -275,21 +269,21 @@ def validate_amount(amount, precision=8):
             raise ValueError('Invalid amount')
 
     ar = str_amount.split('.')
-    if len(ar) > 1 and len(ar[1]) > precision:
+    if len(ar) > 1 and len(ar[1]) > scale:
         raise ValueError('Too many decimal places in amount {}'.format(str_amount))
     return True
 
 
-def format_amount(i, display_precision, precision=None):
-    if precision is None:
-        precision = display_precision
-    ep = 10 ** precision
+def format_amount(i, display_scale, scale=None):
+    if scale is None:
+        scale = display_scale
+    ep = 10 ** scale
     n = abs(i)
     quotient = n // ep
     remainder = n % ep
-    if display_precision != precision:
-        remainder %= (10 ** display_precision)
-    rv = '{}.{:0>{prec}}'.format(quotient, remainder, prec=display_precision)
+    if display_scale != scale:
+        remainder %= (10 ** display_scale)
+    rv = '{}.{:0>{prec}}'.format(quotient, remainder, prec=display_scale)
     if i < 0:
         rv = '-' + rv
     return rv

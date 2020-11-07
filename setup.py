@@ -24,6 +24,7 @@ setuptools.setup(
         "Operating System :: Linux",
     ],
     install_requires=[
+        "wheel",
         "pyzmq",
         "protobuf",
         "sqlalchemy",

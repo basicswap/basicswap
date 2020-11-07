@@ -44,6 +44,10 @@ from basicswap.contrib.key import (
 from basicswap.http_server import (
     HttpThread,
 )
+from tests.basicswap.common import (
+    TEST_HTTP_HOST,
+    TEST_HTTP_PORT,
+)
 from bin.basicswap_run import startDaemon
 
 import basicswap.config as cfg
@@ -58,7 +62,6 @@ BASE_PORT = 14792
 BASE_RPC_PORT = 19792
 BASE_ZMQ_PORT = 20792
 PREFIX_SECRET_KEY_REGTEST = 0x2e
-TEST_HTML_PORT = 1800
 NMC_NODE = 3
 BTC_NODE = 4
 stop_test = False
@@ -278,9 +281,8 @@ class Test(unittest.TestCase):
         print('nmcRpc', ro)
 
         cls.http_threads = []
-        host = '0.0.0.0'  # All interfaces (docker)
         for i in range(3):
-            t = HttpThread(cls.swap_clients[i].fp, host, TEST_HTML_PORT + i, False, cls.swap_clients[i])
+            t = HttpThread(cls.swap_clients[i].fp, TEST_HTTP_HOST, TEST_HTTP_PORT + i, False, cls.swap_clients[i])
             cls.http_threads.append(t)
             t.start()
 

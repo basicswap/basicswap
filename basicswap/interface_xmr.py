@@ -10,6 +10,9 @@ import logging
 
 from .chainparams import CoinInterface
 from .rpc_xmr import make_xmr_rpc_func, make_xmr_wallet_rpc_func
+from .util import (
+    format_amount
+)
 
 XMR_COIN = 10 ** 12
 
@@ -31,8 +34,31 @@ class XMRInterface(CoinInterface):
         rpc_cb = make_xmr_rpc_func(coin_settings['rpcport'])
         rpc_wallet_cb = make_xmr_wallet_rpc_func(coin_settings['walletrpcport'], coin_settings['walletrpcauth'])
 
-        self.rpc_cb = rpc_cb  # Not essential
+        self.rpc_cb = rpc_cb
         self.rpc_wallet_cb = rpc_wallet_cb
+
+    def testDaemonRPC(self):
+        self.rpc_wallet_cb('get_languages')
+
+    def getDaemonVersion(self):
+        return self.rpc_cb('get_version')['version']
+
+    def getBlockchainInfo(self):
+        rv = {}
+        rv['blocks'] = self.rpc_cb('get_block_count')['count']
+        rv['verificationprogress'] = 0  # TODO
+        return rv
+
+    def getWalletInfo(self):
+        rv = {}
+        balance_info = self.rpc_wallet_cb('get_balance')
+        rv['balance'] = format_amount(balance_info['unlocked_balance'], XMRInterface.exp())
+        rv['unconfirmed_balance'] = format_amount(balance_info['balance'] - balance_info['unlocked_balance'], XMRInterface.exp())
+        return rv
+
+    def getNewAddress(self, placeholder):
+        logging.debug('TODO - subaddress?')
+        return self.rpc_wallet_cb('get_address')['address']
 
     def getNewSecretKey(self):
         return edu.get_secret()

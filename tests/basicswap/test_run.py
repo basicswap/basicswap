@@ -50,6 +50,8 @@ from basicswap.http_server import (
 )
 from tests.basicswap.common import (
     checkForks,
+    TEST_HTTP_HOST,
+    TEST_HTTP_PORT,
 )
 from bin.basicswap_run import startDaemon
 
@@ -63,7 +65,6 @@ BASE_PORT = 14792
 BASE_RPC_PORT = 19792
 BASE_ZMQ_PORT = 20792
 PREFIX_SECRET_KEY_REGTEST = 0x2e
-TEST_HTML_PORT = 1800
 LTC_NODE = 3
 BTC_NODE = 4
 stop_test = False
@@ -247,11 +248,12 @@ class Test(unittest.TestCase):
             with open(settings_path) as fs:
                 settings = json.load(fs)
             fp = open(os.path.join(basicswap_dir, 'basicswap.log'), 'w')
-            cls.swap_clients.append(BasicSwap(fp, basicswap_dir, settings, 'regtest', log_name='BasicSwap{}'.format(i)))
-            cls.swap_clients[-1].setDaemonPID(Coins.BTC, cls.daemons[0].pid)
-            cls.swap_clients[-1].setDaemonPID(Coins.LTC, cls.daemons[1].pid)
-            cls.swap_clients[-1].setDaemonPID(Coins.PART, cls.daemons[2 + i].pid)
-            cls.swap_clients[-1].start()
+            sc = BasicSwap(fp, basicswap_dir, settings, 'regtest', log_name='BasicSwap{}'.format(i))
+            sc.setDaemonPID(Coins.BTC, cls.daemons[0].pid)
+            sc.setDaemonPID(Coins.LTC, cls.daemons[1].pid)
+            sc.setDaemonPID(Coins.PART, cls.daemons[2 + i].pid)
+            sc.start()
+            cls.swap_clients.append(sc)
         cls.swap_clients[0].callrpc('extkeyimportmaster', ['abandon baby cabbage dad eager fabric gadget habit ice kangaroo lab absorb'])
         cls.swap_clients[1].callrpc('extkeyimportmaster', ['pact mammal barrel matrix local final lecture chunk wasp survey bid various book strong spread fall ozone daring like topple door fatigue limb olympic', '', 'true'])
         cls.swap_clients[1].callrpc('getnewextaddress', ['lblExtTest'])
@@ -278,9 +280,8 @@ class Test(unittest.TestCase):
         print('ltcRpc', ro)
 
         cls.http_threads = []
-        host = '0.0.0.0'  # All interfaces (docker)
         for i in range(3):
-            t = HttpThread(cls.swap_clients[i].fp, host, TEST_HTML_PORT + i, False, cls.swap_clients[i])
+            t = HttpThread(cls.swap_clients[i].fp, TEST_HTTP_HOST, TEST_HTTP_PORT + i, False, cls.swap_clients[i])
             cls.http_threads.append(t)
             t.start()
 
@@ -300,8 +301,12 @@ class Test(unittest.TestCase):
         for c in cls.swap_clients:
             c.fp.close()
         for d in cls.daemons:
-            logging.info('Terminating %d', d.pid)
-            d.terminate()
+            logging.info('Interrupting %d', d.pid)
+            try:
+                d.send_signal(signal.SIGINT)
+            except Exception as e:
+                logging.info('Interrupting %d, error %s', d.pid, str(e))
+        for d in cls.daemons:
             d.wait(timeout=10)
             if d.stdout:
                 d.stdout.close()
