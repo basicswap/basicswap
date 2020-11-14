@@ -5,6 +5,7 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import json
+import decimal
 import hashlib
 from .contrib.segwit_addr import bech32_decode, convertbits, bech32_encode
 

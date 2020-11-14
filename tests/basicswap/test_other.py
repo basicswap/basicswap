@@ -1,16 +1,26 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019 tecnovert
+# Copyright (c) 2019-2020 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import unittest
+
+import basicswap.contrib.ed25519_fast as edf
+import basicswap.ed25519_fast_util as edu
+
+from basicswap.ecc_util import i2b
+from coincurve.ed25519 import ed25519_get_pubkey
+
+
 from basicswap.util import (
     SerialiseNum,
     DeserialiseNum,
     make_int,
     format8,
+    format_amount,
+    validate_amount,
 )
 from basicswap.basicswap import (
     Coins,
@@ -133,6 +143,14 @@ class Test(unittest.TestCase):
             assert(False)
         except Exception as e:
             assert('Too many decimal places' in str(e))
+
+    def test_ed25519(self):
+        privkey = edu.get_secret()
+        pubkey = edu.encodepoint(edf.scalarmult_B(privkey))
+
+        privkey_bytes = i2b(privkey)
+        pubkey_test = ed25519_get_pubkey(privkey_bytes)
+        assert(pubkey == pubkey_test)
 
 
 if __name__ == '__main__':

@@ -53,6 +53,9 @@ class Offer(Base):
     expire_at = sa.Column(sa.BigInteger)
     was_sent = sa.Column(sa.Boolean)
 
+    from_feerate = sa.Column(sa.BigInteger)
+    to_feerate = sa.Column(sa.BigInteger)
+
     auto_accept_bids = sa.Column(sa.Boolean)
 
     state = sa.Column(sa.Integer)
@@ -125,10 +128,13 @@ class Bid(Base):
             self.participate_tx.state = new_state
             self.participate_tx.states = (self.participate_tx.states if self.participate_tx.states is not None else bytes()) + struct.pack('<iq', new_state, int(time.time()))
 
-    def setState(self, new_state):
+    def setState(self, new_state, state_note=None):
         now = int(time.time())
         self.state = new_state
         self.state_time = now
+
+        if state_note is not None:
+            self.state_note = state_note
         if self.states is None:
             self.states = struct.pack('<iq', new_state, now)
         else:
@@ -195,3 +201,75 @@ class EventQueue(Base):
     linked_id = sa.Column(sa.LargeBinary)
     event_type = sa.Column(sa.Integer)
     event_data = sa.Column(sa.LargeBinary)
+
+
+class XmrOffer(Base):
+    __tablename__ = 'xmr_offers'
+
+    swap_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
+    offer_id = sa.Column(sa.LargeBinary, sa.ForeignKey('offers.offer_id'))
+
+    a_fee_rate = sa.Column(sa.BigInteger)
+    b_fee_rate = sa.Column(sa.BigInteger)
+
+    lock_time_1 = sa.Column(sa.Integer)  # Delay before the chain a lock refund tx can be mined
+    lock_time_2 = sa.Column(sa.Integer)  # Delay before the follower can spend from the chain a lock refund tx
+
+
+class XmrSwap(Base):
+    __tablename__ = 'xmr_swaps'
+
+    swap_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
+    bid_id = sa.Column(sa.LargeBinary, sa.ForeignKey('bids.bid_id'))
+    bid_msg_id2 = sa.Column(sa.LargeBinary)
+    bid_msg_id3 = sa.Column(sa.LargeBinary)
+
+    bid_accept_msg_id = sa.Column(sa.LargeBinary)
+    bid_accept_msg_id2 = sa.Column(sa.LargeBinary)
+    bid_accept_msg_id3 = sa.Column(sa.LargeBinary)
+
+    contract_count = sa.Column(sa.Integer)
+
+    sh = sa.Column(sa.LargeBinary)  # Secret hash
+
+    pkal = sa.Column(sa.LargeBinary)
+    pkarl = sa.Column(sa.LargeBinary)
+
+    pkaf = sa.Column(sa.LargeBinary)
+    pkarf = sa.Column(sa.LargeBinary)
+
+    vkbvl = sa.Column(sa.LargeBinary)
+    vkbsl = sa.Column(sa.LargeBinary)
+    pkbvl = sa.Column(sa.LargeBinary)
+    pkbsl = sa.Column(sa.LargeBinary)
+
+    vkbvf = sa.Column(sa.LargeBinary)
+    vkbsf = sa.Column(sa.LargeBinary)
+    pkbvf = sa.Column(sa.LargeBinary)
+    pkbsf = sa.Column(sa.LargeBinary)
+
+    kbsl_dleag = sa.Column(sa.LargeBinary)
+    kbsf_dleag = sa.Column(sa.LargeBinary)
+
+    a_lock_tx = sa.Column(sa.LargeBinary)
+    a_lock_tx_script = sa.Column(sa.LargeBinary)
+
+    a_lock_refund_tx = sa.Column(sa.LargeBinary)
+    a_lock_refund_tx_script = sa.Column(sa.LargeBinary)
+    a_swap_refund_value = sa.Column(sa.BigInteger)
+
+    a_lock_refund_spend_tx = sa.Column(sa.LargeBinary)
+
+    b_restore_height = sa.Column(sa.Integer)  # Height of xmr chain before the swap
+
+
+class XmrSplitData(Base):
+    __tablename__ = 'xmr_split_data'
+
+    record_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
+    bid_id = sa.Column(sa.LargeBinary)
+    msg_type = sa.Column(sa.Integer)
+    msg_sequence = sa.Column(sa.Integer)
+    dleag = sa.Column(sa.LargeBinary)
+    created_at = sa.Column(sa.BigInteger)
+

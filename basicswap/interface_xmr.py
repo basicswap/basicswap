@@ -8,11 +8,24 @@
 import time
 import logging
 
-from .chainparams import CoinInterface
-from .rpc_xmr import make_xmr_rpc_func, make_xmr_wallet_rpc_func
+import basicswap.contrib.ed25519_fast as edf
+import basicswap.ed25519_fast_util as edu
+from coincurve.ed25519 import ed25519_get_pubkey
+from coincurve.keys import PrivateKey
+from coincurve.dleag import (
+    verify_ed25519_point,
+    dleag_proof_len,
+    dleag_verify,
+    dleag_prove)
+
 from .util import (
-    format_amount
-)
+    format_amount)
+from .rpc_xmr import (
+    make_xmr_rpc_func,
+    make_xmr_wallet_rpc_func)
+from .ecc_util import (
+    b2i)
+from .chainparams import CoinInterface
 
 XMR_COIN = 10 ** 12
 
@@ -49,6 +62,9 @@ class XMRInterface(CoinInterface):
         rv['verificationprogress'] = 0  # TODO
         return rv
 
+    def getChainHeight(self):
+        return self.rpc_cb('get_block_count')['count']
+
     def getWalletInfo(self):
         rv = {}
         balance_info = self.rpc_wallet_cb('get_balance')
@@ -59,6 +75,10 @@ class XMRInterface(CoinInterface):
     def getNewAddress(self, placeholder):
         logging.debug('TODO - subaddress?')
         return self.rpc_wallet_cb('get_address')['address']
+
+    def isValidKey(self, key_bytes):
+        ki = b2i(key_bytes)
+        return ki < edf.l and ki > 8
 
     def getNewSecretKey(self):
         return edu.get_secret()
@@ -71,6 +91,26 @@ class XMRInterface(CoinInterface):
 
     def decodePubkey(self, pke):
         return edf.decodepoint(pke)
+
+    def getPubkey(self, privkey):
+        return ed25519_get_pubkey(privkey)
+
+    def verifyKey(self, k):
+        i = b2i(k)
+        return(i < edf.l and i > 8)
+
+    def verifyPubkey(self, pubkey_bytes):
+        return verify_ed25519_point(pubkey_bytes)
+
+    def proveDLEAG(self, key):
+        privkey = PrivateKey(key)
+        return dleag_prove(privkey)
+
+    def verifyDLEAG(self, dleag_bytes):
+        return dleag_verify(dleag_bytes)
+
+    def lengthDLEAG(self):
+        return dleag_proof_len()
 
     def decodeKey(self, k):
         i = b2i(k)

@@ -67,6 +67,8 @@ from tests.basicswap.common import (
 from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
 from bin.basicswap_run import startDaemon
 
+from pprint import pprint
+
 logger = logging.getLogger()
 
 NUM_NODES = 3
@@ -239,6 +241,7 @@ def prepare_swapclient_dir(datadir, node_id, network_key, network_pubkey):
         'check_watched_seconds': 4,
         'check_expired_seconds': 60,
         'check_events_seconds': 1,
+        'check_xmr_swaps_seconds': 1,
         'min_delay_auto_accept': 1,
         'max_delay_auto_accept': 5
     }
@@ -310,7 +313,7 @@ def run_loop(cls):
             btcRpc('generatetoaddress 1 {}'.format(cls.btc_addr))
 
         if cls.xmr_addr is not None:
-            callrpc_xmr_na(XMR_BASE_RPC_PORT + 0, 'generateblocks', {'wallet_address': cls.xmr_addr, 'amount_of_blocks': 1})
+            callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'generateblocks', {'wallet_address': cls.xmr_addr, 'amount_of_blocks': 1})
         time.sleep(1.0)
 
 
@@ -335,6 +338,7 @@ class Test(unittest.TestCase):
         logger.propagate = False
         logger.handlers = []
         logger.setLevel(logging.INFO)  # DEBUG shows many messages from requests.post
+        #logger.setLevel(logging.DEBUG)
         formatter = logging.Formatter('%(asctime)s %(levelname)s : %(message)s')
         stream_stdout = logging.StreamHandler()
         stream_stdout.setFormatter(formatter)
@@ -417,7 +421,7 @@ class Test(unittest.TestCase):
                 t.start()
 
             cls.btc_addr = callnoderpc(0, 'getnewaddress', ['mining_addr', 'bech32'], base_rpc_port=BTC_BASE_RPC_PORT)
-            cls.xmr_addr = cls.callxmrnodewallet(cls, 0, 'get_address')['address']
+            cls.xmr_addr = cls.callxmrnodewallet(cls, 1, 'get_address')['address']
 
             num_blocks = 500
             logging.info('Mining %d bitcoin blocks to %s', num_blocks, cls.btc_addr)
@@ -425,10 +429,10 @@ class Test(unittest.TestCase):
 
             checkForks(callnoderpc(0, 'getblockchaininfo', base_rpc_port=BTC_BASE_RPC_PORT))
 
-            if callrpc_xmr_na(XMR_BASE_RPC_PORT + 0, 'get_block_count')['count'] < num_blocks:
+            if callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'get_block_count')['count'] < num_blocks:
                 logging.info('Mining %d Monero blocks.', num_blocks)
-                callrpc_xmr_na(XMR_BASE_RPC_PORT + 0, 'generateblocks', {'wallet_address': cls.xmr_addr, 'amount_of_blocks': num_blocks})
-            rv = callrpc_xmr_na(XMR_BASE_RPC_PORT + 0, 'get_block_count')
+                callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'generateblocks', {'wallet_address': cls.xmr_addr, 'amount_of_blocks': num_blocks})
+            rv = callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'get_block_count')
             logging.info('XMR blocks: %d', rv['count'])
 
             logging.info('Starting update thread.')
@@ -509,21 +513,49 @@ class Test(unittest.TestCase):
                     return
         raise ValueError('wait_for_offer timed out.')
 
+    def wait_for_bid(self, swap_client, bid_id, state=None, sent=False):
+        logging.info('wait_for_bid %s', bid_id.hex())
+        for i in range(20):
+            time.sleep(1)
+            bids = swap_client.listBids(sent=sent)
+            for bid in bids:
+                if bid[1] == bid_id:
+                    if state is not None and state != bid[4]:
+                        continue
+                    return
+        raise ValueError('wait_for_bid timed out.')
+
     def test_01_part_xmr(self):
         logging.info('---------- Test PART to XMR')
         swap_clients = self.swap_clients
 
-        js_0 = json.loads(urlopen('http://localhost:1800/json/wallets').read())
+        js_0 = json.loads(urlopen('http://localhost:1801/json/wallets').read())
         assert(make_int(js_0[str(int(Coins.XMR))]['balance'], scale=12) > 0)
         assert(make_int(js_0[str(int(Coins.XMR))]['unconfirmed'], scale=12) > 0)
 
         offer_id = swap_clients[0].postOffer(Coins.PART, Coins.XMR, 100 * COIN, 10 * XMR_COIN, 100 * COIN, SwapTypes.XMR_SWAP)
-
         self.wait_for_offer(swap_clients[1], offer_id)
-        offers = swap_clients[1].listOffers()
+        offer = swap_clients[1].getOffer(offer_id)
+
+        offers = swap_clients[1].listOffers(filters={'offer_id': offer_id})
         assert(len(offers) == 1)
-        for offer in offers:
-            print('offer', offer)
+        offer = offers[0]
+        pprint(vars(offer))
+
+        bid_id = swap_clients[1].postXmrBid(offer_id, offer.amount_from)
+
+        self.wait_for_bid(swap_clients[0], bid_id, BidStates.BID_RECEIVED)
+
+        bid, xmr_swap = swap_clients[0].getXmrBid(bid_id)
+        assert(xmr_swap)
+
+        swap_clients[0].acceptXmrBid(bid_id)
+
+        self.wait_for_bid(swap_clients[1], bid_id, BidStates.BID_ACCEPTED, sent=True)
+
+
+
+
 
 
 if __name__ == '__main__':

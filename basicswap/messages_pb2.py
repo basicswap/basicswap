@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\x0emessages.proto\x12\tbasicswap\"\xac\x03\n\x0cOfferMessage\x12\x11\n\tcoin_from\x18\x01 \x01(\r\x12\x0f\n\x07\x63oin_to\x18\x02 \x01(\r\x12\x13\n\x0b\x61mount_from\x18\x03 \x01(\x04\x12\x0c\n\x04rate\x18\x04 \x01(\x04\x12\x16\n\x0emin_bid_amount\x18\x05 \x01(\x04\x12\x12\n\ntime_valid\x18\x06 \x01(\x04\x12\x33\n\tlock_type\x18\x07 \x01(\x0e\x32 .basicswap.OfferMessage.LockType\x12\x12\n\nlock_value\x18\x08 \x01(\r\x12\x11\n\tswap_type\x18\t \x01(\r\x12\x15\n\rproof_address\x18\n \x01(\t\x12\x17\n\x0fproof_signature\x18\x0b \x01(\t\x12\x15\n\rpkhash_seller\x18\x0c \x01(\x0c\x12\x13\n\x0bsecret_hash\x18\r \x01(\x0c\"q\n\x08LockType\x12\x0b\n\x07NOT_SET\x10\x00\x12\x18\n\x14SEQUENCE_LOCK_BLOCKS\x10\x01\x12\x16\n\x12SEQUENCE_LOCK_TIME\x10\x02\x12\x13\n\x0f\x41\x42S_LOCK_BLOCKS\x10\x03\x12\x11\n\rABS_LOCK_TIME\x10\x04\"\x8c\x01\n\nBidMessage\x12\x14\n\x0coffer_msg_id\x18\x01 \x01(\x0c\x12\x12\n\ntime_valid\x18\x02 \x01(\x04\x12\x0e\n\x06\x61mount\x18\x03 \x01(\x04\x12\x14\n\x0cpkhash_buyer\x18\x04 \x01(\x0c\x12\x15\n\rproof_address\x18\x05 \x01(\t\x12\x17\n\x0fproof_signature\x18\x06 \x01(\t\"V\n\x10\x42idAcceptMessage\x12\x12\n\nbid_msg_id\x18\x01 \x01(\x0c\x12\x15\n\rinitiate_txid\x18\x02 \x01(\x0c\x12\x17\n\x0f\x63ontract_script\x18\x03 \x01(\x0c\"\xb2\x03\n\x0fXmrOfferMessage\x12\x11\n\tcoin_from\x18\x01 \x01(\r\x12\x0f\n\x07\x63oin_to\x18\x02 \x01(\r\x12\x13\n\x0b\x61mount_from\x18\x03 \x01(\x04\x12\x0c\n\x04rate\x18\x04 \x01(\x04\x12\x16\n\x0emin_bid_amount\x18\x05 \x01(\x04\x12\x12\n\ntime_valid\x18\x06 \x01(\x04\x12\x36\n\tlock_type\x18\x07 \x01(\x0e\x32#.basicswap.XmrOfferMessage.LockType\x12\x12\n\nlock_value\x18\x08 \x01(\r\x12\x11\n\tswap_type\x18\t \x01(\r\x12\x15\n\rproof_address\x18\n \x01(\t\x12\x17\n\x0fproof_signature\x18\x0b \x01(\t\x12\x15\n\rpkhash_seller\x18\x0c \x01(\x0c\x12\x13\n\x0bsecret_hash\x18\r \x01(\x0c\"q\n\x08LockType\x12\x0b\n\x07NOT_SET\x10\x00\x12\x18\n\x14SEQUENCE_LOCK_BLOCKS\x10\x01\x12\x16\n\x12SEQUENCE_LOCK_TIME\x10\x02\x12\x13\n\x0f\x41\x42S_LOCK_BLOCKS\x10\x03\x12\x11\n\rABS_LOCK_TIME\x10\x04\x62\x06proto3'
+  serialized_pb=b'\n\x0emessages.proto\x12\tbasicswap\"\xd8\x03\n\x0cOfferMessage\x12\x11\n\tcoin_from\x18\x01 \x01(\r\x12\x0f\n\x07\x63oin_to\x18\x02 \x01(\r\x12\x13\n\x0b\x61mount_from\x18\x03 \x01(\x04\x12\x0c\n\x04rate\x18\x04 \x01(\x04\x12\x16\n\x0emin_bid_amount\x18\x05 \x01(\x04\x12\x12\n\ntime_valid\x18\x06 \x01(\x04\x12\x33\n\tlock_type\x18\x07 \x01(\x0e\x32 .basicswap.OfferMessage.LockType\x12\x12\n\nlock_value\x18\x08 \x01(\r\x12\x11\n\tswap_type\x18\t \x01(\r\x12\x15\n\rproof_address\x18\n \x01(\t\x12\x17\n\x0fproof_signature\x18\x0b \x01(\t\x12\x15\n\rpkhash_seller\x18\x0c \x01(\x0c\x12\x13\n\x0bsecret_hash\x18\r \x01(\x0c\x12\x15\n\rfee_rate_from\x18\x0e \x01(\x04\x12\x13\n\x0b\x66\x65\x65_rate_to\x18\x0f \x01(\x04\"q\n\x08LockType\x12\x0b\n\x07NOT_SET\x10\x00\x12\x18\n\x14SEQUENCE_LOCK_BLOCKS\x10\x01\x12\x16\n\x12SEQUENCE_LOCK_TIME\x10\x02\x12\x13\n\x0f\x41\x42S_LOCK_BLOCKS\x10\x03\x12\x11\n\rABS_LOCK_TIME\x10\x04\"\x8c\x01\n\nBidMessage\x12\x14\n\x0coffer_msg_id\x18\x01 \x01(\x0c\x12\x12\n\ntime_valid\x18\x02 \x01(\x04\x12\x0e\n\x06\x61mount\x18\x03 \x01(\x04\x12\x14\n\x0cpkhash_buyer\x18\x04 \x01(\x0c\x12\x15\n\rproof_address\x18\x05 \x01(\t\x12\x17\n\x0fproof_signature\x18\x06 \x01(\t\"V\n\x10\x42idAcceptMessage\x12\x12\n\nbid_msg_id\x18\x01 \x01(\x0c\x12\x15\n\rinitiate_txid\x18\x02 \x01(\x0c\x12\x17\n\x0f\x63ontract_script\x18\x03 \x01(\x0c\"\x88\x01\n\rXmrBidMessage\x12\x14\n\x0coffer_msg_id\x18\x01 \x01(\x0c\x12\x12\n\ntime_valid\x18\x02 \x01(\x04\x12\x0e\n\x06\x61mount\x18\x03 \x01(\x04\x12\x0c\n\x04pkaf\x18\x04 \x01(\x0c\x12\r\n\x05pkarf\x18\x05 \x01(\x0c\x12\x0c\n\x04kbvf\x18\x06 \x01(\x0c\x12\x12\n\nkbsf_dleag\x18\x07 \x01(\x0c\"T\n\x0fXmrSplitMessage\x12\x0e\n\x06msg_id\x18\x01 \x01(\x0c\x12\x10\n\x08msg_type\x18\x02 \x01(\r\x12\x10\n\x08sequence\x18\x03 \x01(\r\x12\r\n\x05\x64leag\x18\x04 \x01(\x0c\"\x9b\x02\n\x13XmrBidAcceptMessage\x12\x12\n\nbid_msg_id\x18\x01 \x01(\x0c\x12\n\n\x02sh\x18\x02 \x01(\x0c\x12\x0c\n\x04pkal\x18\x03 \x01(\x0c\x12\r\n\x05pkarl\x18\x04 \x01(\x0c\x12\x0c\n\x04kbvl\x18\x05 \x01(\x0c\x12\x12\n\nkbsl_dleag\x18\x06 \x01(\x0c\x12\x11\n\ta_lock_tx\x18\x07 \x01(\x0c\x12\x18\n\x10\x61_lock_tx_script\x18\x08 \x01(\x0c\x12\x18\n\x10\x61_lock_refund_tx\x18\t \x01(\x0c\x12\x1f\n\x17\x61_lock_refund_tx_script\x18\n \x01(\x0c\x12\x1e\n\x16\x61_lock_refund_spend_tx\x18\x0b \x01(\x0c\x12\x1d\n\x15\x61l_lock_refund_tx_sig\x18\x0c \x01(\x0c\x62\x06proto3'
 )
 
 
@@ -59,50 +59,10 @@ _OFFERMESSAGE_LOCKTYPE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=345,
-  serialized_end=458,
+  serialized_start=389,
+  serialized_end=502,
 )
 _sym_db.RegisterEnumDescriptor(_OFFERMESSAGE_LOCKTYPE)
-
-_XMROFFERMESSAGE_LOCKTYPE = _descriptor.EnumDescriptor(
-  name='LockType',
-  full_name='basicswap.XmrOfferMessage.LockType',
-  filename=None,
-  file=DESCRIPTOR,
-  create_key=_descriptor._internal_create_key,
-  values=[
-    _descriptor.EnumValueDescriptor(
-      name='NOT_SET', index=0, number=0,
-      serialized_options=None,
-      type=None,
-      create_key=_descriptor._internal_create_key),
-    _descriptor.EnumValueDescriptor(
-      name='SEQUENCE_LOCK_BLOCKS', index=1, number=1,
-      serialized_options=None,
-      type=None,
-      create_key=_descriptor._internal_create_key),
-    _descriptor.EnumValueDescriptor(
-      name='SEQUENCE_LOCK_TIME', index=2, number=2,
-      serialized_options=None,
-      type=None,
-      create_key=_descriptor._internal_create_key),
-    _descriptor.EnumValueDescriptor(
-      name='ABS_LOCK_BLOCKS', index=3, number=3,
-      serialized_options=None,
-      type=None,
-      create_key=_descriptor._internal_create_key),
-    _descriptor.EnumValueDescriptor(
-      name='ABS_LOCK_TIME', index=4, number=4,
-      serialized_options=None,
-      type=None,
-      create_key=_descriptor._internal_create_key),
-  ],
-  containing_type=None,
-  serialized_options=None,
-  serialized_start=345,
-  serialized_end=458,
-)
-_sym_db.RegisterEnumDescriptor(_XMROFFERMESSAGE_LOCKTYPE)
 
 
 _OFFERMESSAGE = _descriptor.Descriptor(
@@ -204,6 +164,20 @@ _OFFERMESSAGE = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='fee_rate_from', full_name='basicswap.OfferMessage.fee_rate_from', index=13,
+      number=14, type=4, cpp_type=4, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='fee_rate_to', full_name='basicswap.OfferMessage.fee_rate_to', index=14,
+      number=15, type=4, cpp_type=4, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
@@ -218,7 +192,7 @@ _OFFERMESSAGE = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=30,
-  serialized_end=458,
+  serialized_end=502,
 )
 
 
@@ -284,8 +258,8 @@ _BIDMESSAGE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=461,
-  serialized_end=601,
+  serialized_start=505,
+  serialized_end=645,
 )
 
 
@@ -330,106 +304,64 @@ _BIDACCEPTMESSAGE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=603,
-  serialized_end=689,
+  serialized_start=647,
+  serialized_end=733,
 )
 
 
-_XMROFFERMESSAGE = _descriptor.Descriptor(
-  name='XmrOfferMessage',
-  full_name='basicswap.XmrOfferMessage',
+_XMRBIDMESSAGE = _descriptor.Descriptor(
+  name='XmrBidMessage',
+  full_name='basicswap.XmrBidMessage',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   create_key=_descriptor._internal_create_key,
   fields=[
     _descriptor.FieldDescriptor(
-      name='coin_from', full_name='basicswap.XmrOfferMessage.coin_from', index=0,
-      number=1, type=13, cpp_type=3, label=1,
+      name='offer_msg_id', full_name='basicswap.XmrBidMessage.offer_msg_id', index=0,
+      number=1, type=12, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"",
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='time_valid', full_name='basicswap.XmrBidMessage.time_valid', index=1,
+      number=2, type=4, cpp_type=4, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='coin_to', full_name='basicswap.XmrOfferMessage.coin_to', index=1,
-      number=2, type=13, cpp_type=3, label=1,
-      has_default_value=False, default_value=0,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
-    _descriptor.FieldDescriptor(
-      name='amount_from', full_name='basicswap.XmrOfferMessage.amount_from', index=2,
+      name='amount', full_name='basicswap.XmrBidMessage.amount', index=2,
       number=3, type=4, cpp_type=4, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='rate', full_name='basicswap.XmrOfferMessage.rate', index=3,
-      number=4, type=4, cpp_type=4, label=1,
-      has_default_value=False, default_value=0,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
-    _descriptor.FieldDescriptor(
-      name='min_bid_amount', full_name='basicswap.XmrOfferMessage.min_bid_amount', index=4,
-      number=5, type=4, cpp_type=4, label=1,
-      has_default_value=False, default_value=0,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
-    _descriptor.FieldDescriptor(
-      name='time_valid', full_name='basicswap.XmrOfferMessage.time_valid', index=5,
-      number=6, type=4, cpp_type=4, label=1,
-      has_default_value=False, default_value=0,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
-    _descriptor.FieldDescriptor(
-      name='lock_type', full_name='basicswap.XmrOfferMessage.lock_type', index=6,
-      number=7, type=14, cpp_type=8, label=1,
-      has_default_value=False, default_value=0,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
-    _descriptor.FieldDescriptor(
-      name='lock_value', full_name='basicswap.XmrOfferMessage.lock_value', index=7,
-      number=8, type=13, cpp_type=3, label=1,
-      has_default_value=False, default_value=0,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
-    _descriptor.FieldDescriptor(
-      name='swap_type', full_name='basicswap.XmrOfferMessage.swap_type', index=8,
-      number=9, type=13, cpp_type=3, label=1,
-      has_default_value=False, default_value=0,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
-    _descriptor.FieldDescriptor(
-      name='proof_address', full_name='basicswap.XmrOfferMessage.proof_address', index=9,
-      number=10, type=9, cpp_type=9, label=1,
-      has_default_value=False, default_value=b"".decode('utf-8'),
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
-    _descriptor.FieldDescriptor(
-      name='proof_signature', full_name='basicswap.XmrOfferMessage.proof_signature', index=10,
-      number=11, type=9, cpp_type=9, label=1,
-      has_default_value=False, default_value=b"".decode('utf-8'),
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
-    _descriptor.FieldDescriptor(
-      name='pkhash_seller', full_name='basicswap.XmrOfferMessage.pkhash_seller', index=11,
-      number=12, type=12, cpp_type=9, label=1,
+      name='pkaf', full_name='basicswap.XmrBidMessage.pkaf', index=3,
+      number=4, type=12, cpp_type=9, label=1,
       has_default_value=False, default_value=b"",
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='secret_hash', full_name='basicswap.XmrOfferMessage.secret_hash', index=12,
-      number=13, type=12, cpp_type=9, label=1,
+      name='pkarf', full_name='basicswap.XmrBidMessage.pkarf', index=4,
+      number=5, type=12, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"",
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='kbvf', full_name='basicswap.XmrBidMessage.kbvf', index=5,
+      number=6, type=12, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"",
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='kbsf_dleag', full_name='basicswap.XmrBidMessage.kbsf_dleag', index=6,
+      number=7, type=12, cpp_type=9, label=1,
       has_default_value=False, default_value=b"",
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -439,7 +371,6 @@ _XMROFFERMESSAGE = _descriptor.Descriptor(
   ],
   nested_types=[],
   enum_types=[
-    _XMROFFERMESSAGE_LOCKTYPE,
   ],
   serialized_options=None,
   is_extendable=False,
@@ -447,18 +378,180 @@ _XMROFFERMESSAGE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=692,
-  serialized_end=1126,
+  serialized_start=736,
+  serialized_end=872,
+)
+
+
+_XMRSPLITMESSAGE = _descriptor.Descriptor(
+  name='XmrSplitMessage',
+  full_name='basicswap.XmrSplitMessage',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='msg_id', full_name='basicswap.XmrSplitMessage.msg_id', index=0,
+      number=1, type=12, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"",
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='msg_type', full_name='basicswap.XmrSplitMessage.msg_type', index=1,
+      number=2, type=13, cpp_type=3, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='sequence', full_name='basicswap.XmrSplitMessage.sequence', index=2,
+      number=3, type=13, cpp_type=3, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='dleag', full_name='basicswap.XmrSplitMessage.dleag', index=3,
+      number=4, type=12, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"",
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=874,
+  serialized_end=958,
+)
+
+
+_XMRBIDACCEPTMESSAGE = _descriptor.Descriptor(
+  name='XmrBidAcceptMessage',
+  full_name='basicswap.XmrBidAcceptMessage',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='bid_msg_id', full_name='basicswap.XmrBidAcceptMessage.bid_msg_id', index=0,
+      number=1, type=12, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"",
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='sh', full_name='basicswap.XmrBidAcceptMessage.sh', index=1,
+      number=2, type=12, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"",
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='pkal', full_name='basicswap.XmrBidAcceptMessage.pkal', index=2,
+      number=3, type=12, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"",
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='pkarl', full_name='basicswap.XmrBidAcceptMessage.pkarl', index=3,
+      number=4, type=12, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"",
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='kbvl', full_name='basicswap.XmrBidAcceptMessage.kbvl', index=4,
+      number=5, type=12, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"",
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='kbsl_dleag', full_name='basicswap.XmrBidAcceptMessage.kbsl_dleag', index=5,
+      number=6, type=12, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"",
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='a_lock_tx', full_name='basicswap.XmrBidAcceptMessage.a_lock_tx', index=6,
+      number=7, type=12, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"",
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='a_lock_tx_script', full_name='basicswap.XmrBidAcceptMessage.a_lock_tx_script', index=7,
+      number=8, type=12, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"",
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='a_lock_refund_tx', full_name='basicswap.XmrBidAcceptMessage.a_lock_refund_tx', index=8,
+      number=9, type=12, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"",
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='a_lock_refund_tx_script', full_name='basicswap.XmrBidAcceptMessage.a_lock_refund_tx_script', index=9,
+      number=10, type=12, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"",
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='a_lock_refund_spend_tx', full_name='basicswap.XmrBidAcceptMessage.a_lock_refund_spend_tx', index=10,
+      number=11, type=12, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"",
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='al_lock_refund_tx_sig', full_name='basicswap.XmrBidAcceptMessage.al_lock_refund_tx_sig', index=11,
+      number=12, type=12, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"",
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=961,
+  serialized_end=1244,
 )
 
 _OFFERMESSAGE.fields_by_name['lock_type'].enum_type = _OFFERMESSAGE_LOCKTYPE
 _OFFERMESSAGE_LOCKTYPE.containing_type = _OFFERMESSAGE
-_XMROFFERMESSAGE.fields_by_name['lock_type'].enum_type = _XMROFFERMESSAGE_LOCKTYPE
-_XMROFFERMESSAGE_LOCKTYPE.containing_type = _XMROFFERMESSAGE
 DESCRIPTOR.message_types_by_name['OfferMessage'] = _OFFERMESSAGE
 DESCRIPTOR.message_types_by_name['BidMessage'] = _BIDMESSAGE
 DESCRIPTOR.message_types_by_name['BidAcceptMessage'] = _BIDACCEPTMESSAGE
-DESCRIPTOR.message_types_by_name['XmrOfferMessage'] = _XMROFFERMESSAGE
+DESCRIPTOR.message_types_by_name['XmrBidMessage'] = _XMRBIDMESSAGE
+DESCRIPTOR.message_types_by_name['XmrSplitMessage'] = _XMRSPLITMESSAGE
+DESCRIPTOR.message_types_by_name['XmrBidAcceptMessage'] = _XMRBIDACCEPTMESSAGE
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 OfferMessage = _reflection.GeneratedProtocolMessageType('OfferMessage', (_message.Message,), {
@@ -482,12 +575,26 @@ BidAcceptMessage = _reflection.GeneratedProtocolMessageType('BidAcceptMessage', 
   })
 _sym_db.RegisterMessage(BidAcceptMessage)
 
-XmrOfferMessage = _reflection.GeneratedProtocolMessageType('XmrOfferMessage', (_message.Message,), {
-  'DESCRIPTOR' : _XMROFFERMESSAGE,
+XmrBidMessage = _reflection.GeneratedProtocolMessageType('XmrBidMessage', (_message.Message,), {
+  'DESCRIPTOR' : _XMRBIDMESSAGE,
   '__module__' : 'messages_pb2'
-  # @@protoc_insertion_point(class_scope:basicswap.XmrOfferMessage)
+  # @@protoc_insertion_point(class_scope:basicswap.XmrBidMessage)
   })
-_sym_db.RegisterMessage(XmrOfferMessage)
+_sym_db.RegisterMessage(XmrBidMessage)
+
+XmrSplitMessage = _reflection.GeneratedProtocolMessageType('XmrSplitMessage', (_message.Message,), {
+  'DESCRIPTOR' : _XMRSPLITMESSAGE,
+  '__module__' : 'messages_pb2'
+  # @@protoc_insertion_point(class_scope:basicswap.XmrSplitMessage)
+  })
+_sym_db.RegisterMessage(XmrSplitMessage)
+
+XmrBidAcceptMessage = _reflection.GeneratedProtocolMessageType('XmrBidAcceptMessage', (_message.Message,), {
+  'DESCRIPTOR' : _XMRBIDACCEPTMESSAGE,
+  '__module__' : 'messages_pb2'
+  # @@protoc_insertion_point(class_scope:basicswap.XmrBidAcceptMessage)
+  })
+_sym_db.RegisterMessage(XmrBidAcceptMessage)
 
 
 # @@protoc_insertion_point(module_scope)

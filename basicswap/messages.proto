@@ -26,6 +26,9 @@ message OfferMessage {
     string proof_signature = 11;
     bytes pkhash_seller = 12;
     bytes secret_hash = 13;
+
+    uint64 fee_rate_from = 14;
+    uint64 fee_rate_to = 15;
 }
 
 /* Step 2, buyer -> seller */
@@ -48,29 +51,44 @@ message BidAcceptMessage {
 }
 
 
-message XmrOfferMessage {
-    uint32 coin_from = 1;
-    uint32 coin_to = 2;
-    uint64 amount_from = 3;
-    uint64 rate = 4;
-    uint64 min_bid_amount = 5;
-    uint64 time_valid = 6;
-    enum LockType {
-        NOT_SET = 0;
-        SEQUENCE_LOCK_BLOCKS = 1;
-        SEQUENCE_LOCK_TIME = 2;
-        ABS_LOCK_BLOCKS = 3;
-        ABS_LOCK_TIME = 4;
-    }
-    LockType lock_type = 7;
-    uint32 lock_value = 8;
-    uint32 swap_type = 9;
 
+/* Step 2, buyer -> seller */
+message XmrBidMessage {
+    bytes offer_msg_id = 1;
+    uint64 time_valid = 2;          /* seconds bid is valid for */
+    uint64 amount = 3;              /* amount of amount_from bid is for */
 
+    bytes pkaf = 4;
+    bytes pkarf = 5;
 
-    /* optional */
-    string proof_address = 10;
-    string proof_signature = 11;
-    bytes pkhash_seller = 12;
-    bytes secret_hash = 13;
+    bytes kbvf = 6;
+    bytes kbsf_dleag = 7;
 }
+
+message XmrSplitMessage {
+    bytes msg_id = 1;
+    uint32 msg_type = 2;  /* 1 XmrBid, 2 XmrBidAccept */
+    uint32 sequence = 3;
+    bytes dleag = 4;
+}
+
+
+message XmrBidAcceptMessage {
+    bytes bid_msg_id = 1;
+
+    bytes sh = 2;
+    bytes pkal = 3;
+    bytes pkarl = 4;
+
+    bytes kbvl = 5;
+    bytes kbsl_dleag = 6;
+
+    /* MSG2F */
+    bytes a_lock_tx = 7;
+    bytes a_lock_tx_script = 8;
+    bytes a_lock_refund_tx = 9;
+    bytes a_lock_refund_tx_script = 10;
+    bytes a_lock_refund_spend_tx = 11;
+    bytes al_lock_refund_tx_sig = 12;
+}
+

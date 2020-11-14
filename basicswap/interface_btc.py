@@ -17,6 +17,10 @@ from .util import (
     format_amount,
     make_int
 )
+from coincurve.keys import (
+    PublicKey)
+from coincurve.dleag import (
+    verify_secp256k1_point)
 
 from .ecc_util import (
     G, ep,
@@ -126,6 +130,16 @@ class BTCInterface(CoinInterface):
     def pubkey(self, key):
         return G * key
 
+    def getPubkey(self, privkey):
+        return PublicKey.from_secret(privkey).format()
+
+    def verifyKey(self, k):
+        i = b2i(k)
+        return(i < ep.o and i > 0)
+
+    def verifyPubkey(self, pubkey_bytes):
+        return verify_secp256k1_point(pubkey_bytes)
+
     def encodePubkey(self, pk):
         return pointToCPK(pk)
 
@@ -192,14 +206,20 @@ class BTCInterface(CoinInterface):
         return secret_hash, pk1, pk2, csv_val, pk3, pk4
 
     def genScriptLockTxScript(self, sh, Kal, Kaf, lock_blocks, Karl, Karf):
+
+        Kal_enc = Kal if len(Kal) == 33 else self.encodePubkey(Kal)
+        Kaf_enc = Kaf if len(Kaf) == 33 else self.encodePubkey(Kaf)
+        Karl_enc = Karl if len(Karl) == 33 else self.encodePubkey(Karl)
+        Karf_enc = Karf if len(Karf) == 33 else self.encodePubkey(Karf)
+
         return CScript([
             CScriptOp(OP_IF),
             CScriptOp(OP_SIZE), 32, CScriptOp(OP_EQUALVERIFY),
             CScriptOp(OP_SHA256), sh, CScriptOp(OP_EQUALVERIFY),
-            2, self.encodePubkey(Kal), self.encodePubkey(Kaf), 2, CScriptOp(OP_CHECKMULTISIG),
+            2, Kal_enc, Kaf_enc, 2, CScriptOp(OP_CHECKMULTISIG),
             CScriptOp(OP_ELSE),
             lock_blocks, CScriptOp(OP_CHECKSEQUENCEVERIFY), CScriptOp(OP_DROP),
-            2, self.encodePubkey(Karl), self.encodePubkey(Karf), 2, CScriptOp(OP_CHECKMULTISIG),
+            2, Karl_enc, Karf_enc, 2, CScriptOp(OP_CHECKMULTISIG),
             CScriptOp(OP_ENDIF)])
 
     def createScriptLockTx(self, value, sh, Kal, Kaf, lock_blocks, Karl, Karf):
@@ -209,7 +229,7 @@ class BTCInterface(CoinInterface):
         tx.nVersion = self.txVersion()
         tx.vout.append(self.txoType(value, CScript([OP_0, hashlib.sha256(script).digest()])))
 
-        return tx, script
+        return tx.serialize(), script
 
     def extractScriptLockRefundScriptValues(self, script_bytes):
         script_len = len(script_bytes)
@@ -243,15 +263,22 @@ class BTCInterface(CoinInterface):
         return pk1, pk2, csv_val, pk3
 
     def genScriptLockRefundTxScript(self, Karl, Karf, csv_val, Kaf):
+
+        Kaf_enc = Kaf if len(Kaf) == 33 else self.encodePubkey(Kaf)
+        Karl_enc = Karl if len(Karl) == 33 else self.encodePubkey(Karl)
+        Karf_enc = Karf if len(Karf) == 33 else self.encodePubkey(Karf)
+
         return CScript([
             CScriptOp(OP_IF),
-            2, self.encodePubkey(Karl), self.encodePubkey(Karf), 2, CScriptOp(OP_CHECKMULTISIG),
+            2, Karl_enc, Karf_enc, 2, CScriptOp(OP_CHECKMULTISIG),
             CScriptOp(OP_ELSE),
             csv_val, CScriptOp(OP_CHECKSEQUENCEVERIFY), CScriptOp(OP_DROP),
-            self.encodePubkey(Kaf), CScriptOp(OP_CHECKSIG),
+            Kaf_enc, CScriptOp(OP_CHECKSIG),
             CScriptOp(OP_ENDIF)])
 
-    def createScriptLockRefundTx(self, tx_lock, script_lock, Karl, Karf, csv_val, Kaf, tx_fee_rate):
+    def createScriptLockRefundTx(self, tx_lock_bytes, script_lock, Karl, Karf, csv_val, Kaf, tx_fee_rate):
+        tx_lock = CTransaction()
+        tx_lock = FromHex(tx_lock, tx_lock_bytes.hex())
 
         output_script = CScript([OP_0, hashlib.sha256(script_lock).digest()])
         locked_n = findOutput(tx_lock, output_script)
@@ -281,12 +308,14 @@ class BTCInterface(CoinInterface):
         logging.info('createScriptLockRefundTx %s:\n    fee_rate, vsize, fee: %ld, %ld, %ld.',
                      i2h(tx.sha256), tx_fee_rate, vsize, pay_fee)
 
-        return tx, refund_script, tx.vout[0].nValue
+        return tx.serialize(), refund_script, tx.vout[0].nValue
 
-    def createScriptLockRefundSpendTx(self, tx_lock_refund, script_lock_refund, Kal, tx_fee_rate):
+    def createScriptLockRefundSpendTx(self, tx_lock_refund_bytes, script_lock_refund, Kal, tx_fee_rate):
         # Returns the coinA locked coin to the leader
         # The follower will sign the multisig path with a signature encumbered by the leader's coinB spend pubkey
         # When the leader publishes the decrypted signature the leader's coinB spend privatekey will be revealed to the follower
+
+        tx_lock_refund = self.loadTx(tx_lock_refund_bytes)
 
         output_script = CScript([OP_0, hashlib.sha256(script_lock_refund).digest()])
         locked_n = findOutput(tx_lock_refund, output_script)
@@ -300,7 +329,8 @@ class BTCInterface(CoinInterface):
         tx.nVersion = self.txVersion()
         tx.vin.append(CTxIn(COutPoint(tx_lock_refund_hash_int, locked_n), nSequence=0))
 
-        pubkeyhash = hash160(self.encodePubkey(Kal))
+        #pubkeyhash = hash160(self.encodePubkey(Kal))
+        pubkeyhash = hash160(Kal)
         tx.vout.append(self.txoType(locked_coin, CScript([OP_0, pubkeyhash])))
 
         witness_bytes = len(script_lock_refund)
@@ -315,7 +345,7 @@ class BTCInterface(CoinInterface):
         logging.info('createScriptLockRefundSpendTx %s:\n    fee_rate, vsize, fee: %ld, %ld, %ld.',
                      i2h(tx.sha256), tx_fee_rate, vsize, pay_fee)
 
-        return tx
+        return tx.serialize()
 
     def createScriptLockRefundSpendToFTx(self, tx_lock_refund, script_lock_refund, pkh_dest, tx_fee_rate):
         # Sends the coinA locked coin to the follower
@@ -347,7 +377,7 @@ class BTCInterface(CoinInterface):
         logging.info('createScriptLockRefundSpendToFTx %s:\n    fee_rate, vsize, fee: %ld, %ld, %ld.',
                      i2h(tx.sha256), tx_fee_rate, vsize, pay_fee)
 
-        return tx
+        return tx.serialize()
 
     def createScriptLockSpendTx(self, tx_lock, script_lock, pkh_dest, tx_fee_rate):
 
@@ -379,7 +409,7 @@ class BTCInterface(CoinInterface):
         logging.info('createScriptLockSpendTx %s:\n    fee_rate, vsize, fee: %ld, %ld, %ld.',
                      i2h(tx.sha256), tx_fee_rate, vsize, pay_fee)
 
-        return tx
+        return tx.serialize()
 
     def verifyLockTx(self, tx, script_out,
                      swap_value,
@@ -592,11 +622,13 @@ class BTCInterface(CoinInterface):
 
         return True
 
-    def signTx(self, key_int, tx, prevout_n, prevout_script, prevout_value):
+    def signTx(self, key_bytes, tx_bytes, prevout_n, prevout_script, prevout_value):
+        # TODO: use libsecp356k1
+        tx = self.loadTx(tx_bytes)
         sig_hash = SegwitV0SignatureHash(prevout_script, tx, prevout_n, SIGHASH_ALL, prevout_value)
 
         eck = ECKey()
-        eck.set(i2b(key_int), compressed=True)
+        eck.set(key_bytes, compressed=True)
 
         return eck.sign_ecdsa(sig_hash) + b'\x01'  # 0x1 is SIGHASH_ALL
 
@@ -611,22 +643,25 @@ class BTCInterface(CoinInterface):
     def decryptOtVES(self, k, esig):
         return otves.DecSig(k, esig) + b'\x01'  # 0x1 is SIGHASH_ALL
 
-    def verifyTxSig(self, tx, sig, K, prevout_n, prevout_script, prevout_value):
+    def verifyTxSig(self, tx_bytes, sig, K, prevout_n, prevout_script, prevout_value):
+        tx = self.loadTx(tx_bytes)
         sig_hash = SegwitV0SignatureHash(prevout_script, tx, prevout_n, SIGHASH_ALL, prevout_value)
 
         ecK = ECPubKey()
-        ecK.set_int(K.x(), K.y())
+        #ecK.set_int(K.x(), K.y())
+        ecK.set(K)
         return ecK.verify_ecdsa(sig[: -1], sig_hash)  # Pop the hashtype byte
 
     def fundTx(self, tx, feerate):
         feerate_str = format_amount(feerate, self.exp())
-        rv = self.rpc_callback('fundrawtransaction', [ToHex(tx), {'feeRate': feerate_str}])
-        return FromHex(tx, rv['hex'])
+        rv = self.rpc_callback('fundrawtransaction', [tx.hex(), {'feeRate': feerate_str}])
+        return bytes.fromhex(rv['hex'])
 
     def signTxWithWallet(self, tx):
         rv = self.rpc_callback('signrawtransactionwithwallet', [ToHex(tx)])
 
-        return FromHex(tx, rv['hex'])
+        #return FromHex(tx, rv['hex'])
+        return bytes.fromhex(rv['hex'])
 
     def publishTx(self, tx):
         return self.rpc_callback('sendrawtransaction', [ToHex(tx)])
@@ -640,7 +675,9 @@ class BTCInterface(CoinInterface):
         tx.deserialize(BytesIO(tx_bytes))
         return tx
 
-    def getTxHash(self, tx):
+    def getTxHash(self, tx_bytes):
+        tx = CTransaction()
+        tx = FromHex(tx, tx_bytes.hex())
         tx.rehash()
         return i2b(tx.sha256)
 
@@ -680,7 +717,7 @@ class BTCInterface(CoinInterface):
         tx.nVersion = self.txVersion()
         p2wpkh = self.getPkDest(Kbs)
         tx.vout.append(self.txoType(output_amount, p2wpkh))
-        return tx
+        return tx.serialize()
 
     def publishBLockTx(self, Kbv, Kbs, output_amount, feerate):
         b_lock_tx = self.createBLockTx(Kbs, output_amount)
