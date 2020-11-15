@@ -139,6 +139,7 @@ def prepareDir(datadir, nodeId, network_key, network_pubkey):
     btcdatadir = os.path.join(datadir, str(BTC_NODE))
     settings_path = os.path.join(basicswap_dir, cfg.CONFIG_FILENAME)
     settings = {
+        'debug': True,
         'zmqhost': 'tcp://127.0.0.1',
         'zmqport': BASE_ZMQ_PORT + nodeId,
         'htmlhost': 'localhost',

@@ -6,8 +6,6 @@
 
 import os
 
-DEBUG = True
-
 CONFIG_FILENAME = 'basicswap.json'
 DEFAULT_DATADIR = '~/.basicswap'
 TEST_DATADIRS = os.path.expanduser(os.getenv('DATADIRS', '/tmp/basicswap'))

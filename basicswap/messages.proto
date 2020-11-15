@@ -51,9 +51,8 @@ message BidAcceptMessage {
 }
 
 
-
-/* Step 2, buyer -> seller */
 message XmrBidMessage {
+    /* MSG1L, F -> L */
     bytes offer_msg_id = 1;
     uint64 time_valid = 2;          /* seconds bid is valid for */
     uint64 amount = 3;              /* amount of amount_from bid is for */
@@ -63,6 +62,8 @@ message XmrBidMessage {
 
     bytes kbvf = 6;
     bytes kbsf_dleag = 7;
+
+    bytes dest_af = 8;
 }
 
 message XmrSplitMessage {
@@ -71,7 +72,6 @@ message XmrSplitMessage {
     uint32 sequence = 3;
     bytes dleag = 4;
 }
-
 
 message XmrBidAcceptMessage {
     bytes bid_msg_id = 1;
@@ -91,4 +91,21 @@ message XmrBidAcceptMessage {
     bytes a_lock_refund_spend_tx = 11;
     bytes al_lock_refund_tx_sig = 12;
 }
+
+message XmrBidLockTxSigsMessage {
+    /* MSG3L */
+    bytes bid_msg_id = 1;
+
+    bytes af_lock_refund_spend_tx_esig = 2;
+    bytes af_lock_refund_tx_sig = 3;
+}
+
+message XmrBidLockSpendTxMessage {
+    /* MSG4F */
+    bytes bid_msg_id = 1;
+
+    bytes a_lock_spend_tx = 2;
+    bytes al_lock_spend_tx_esig = 3;
+}
+
 

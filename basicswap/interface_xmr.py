@@ -25,12 +25,16 @@ from .rpc_xmr import (
     make_xmr_wallet_rpc_func)
 from .ecc_util import (
     b2i)
-from .chainparams import CoinInterface
+from .chainparams import CoinInterface, Coins
 
 XMR_COIN = 10 ** 12
 
 
 class XMRInterface(CoinInterface):
+    @staticmethod
+    def coin_type():
+        return Coins.XMR
+
     @staticmethod
     def exp():
         return 12
@@ -43,12 +47,13 @@ class XMRInterface(CoinInterface):
     def nbK():  # No. of bytes requires to encode a public key
         return 32
 
-    def __init__(self, coin_settings):
+    def __init__(self, coin_settings, network):
         rpc_cb = make_xmr_rpc_func(coin_settings['rpcport'])
         rpc_wallet_cb = make_xmr_wallet_rpc_func(coin_settings['walletrpcport'], coin_settings['walletrpcauth'])
 
         self.rpc_cb = rpc_cb
         self.rpc_wallet_cb = rpc_wallet_cb
+        self._network = network
 
     def testDaemonRPC(self):
         self.rpc_wallet_cb('get_languages')

@@ -6,7 +6,9 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 from .interface_btc import BTCInterface
-
+from .chainparams import Coins
 
 class NMCInterface(BTCInterface):
-    pass
+    @staticmethod
+    def coin_type():
+        return Coins.NMC

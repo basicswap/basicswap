@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\x0emessages.proto\x12\tbasicswap\"\xd8\x03\n\x0cOfferMessage\x12\x11\n\tcoin_from\x18\x01 \x01(\r\x12\x0f\n\x07\x63oin_to\x18\x02 \x01(\r\x12\x13\n\x0b\x61mount_from\x18\x03 \x01(\x04\x12\x0c\n\x04rate\x18\x04 \x01(\x04\x12\x16\n\x0emin_bid_amount\x18\x05 \x01(\x04\x12\x12\n\ntime_valid\x18\x06 \x01(\x04\x12\x33\n\tlock_type\x18\x07 \x01(\x0e\x32 .basicswap.OfferMessage.LockType\x12\x12\n\nlock_value\x18\x08 \x01(\r\x12\x11\n\tswap_type\x18\t \x01(\r\x12\x15\n\rproof_address\x18\n \x01(\t\x12\x17\n\x0fproof_signature\x18\x0b \x01(\t\x12\x15\n\rpkhash_seller\x18\x0c \x01(\x0c\x12\x13\n\x0bsecret_hash\x18\r \x01(\x0c\x12\x15\n\rfee_rate_from\x18\x0e \x01(\x04\x12\x13\n\x0b\x66\x65\x65_rate_to\x18\x0f \x01(\x04\"q\n\x08LockType\x12\x0b\n\x07NOT_SET\x10\x00\x12\x18\n\x14SEQUENCE_LOCK_BLOCKS\x10\x01\x12\x16\n\x12SEQUENCE_LOCK_TIME\x10\x02\x12\x13\n\x0f\x41\x42S_LOCK_BLOCKS\x10\x03\x12\x11\n\rABS_LOCK_TIME\x10\x04\"\x8c\x01\n\nBidMessage\x12\x14\n\x0coffer_msg_id\x18\x01 \x01(\x0c\x12\x12\n\ntime_valid\x18\x02 \x01(\x04\x12\x0e\n\x06\x61mount\x18\x03 \x01(\x04\x12\x14\n\x0cpkhash_buyer\x18\x04 \x01(\x0c\x12\x15\n\rproof_address\x18\x05 \x01(\t\x12\x17\n\x0fproof_signature\x18\x06 \x01(\t\"V\n\x10\x42idAcceptMessage\x12\x12\n\nbid_msg_id\x18\x01 \x01(\x0c\x12\x15\n\rinitiate_txid\x18\x02 \x01(\x0c\x12\x17\n\x0f\x63ontract_script\x18\x03 \x01(\x0c\"\x88\x01\n\rXmrBidMessage\x12\x14\n\x0coffer_msg_id\x18\x01 \x01(\x0c\x12\x12\n\ntime_valid\x18\x02 \x01(\x04\x12\x0e\n\x06\x61mount\x18\x03 \x01(\x04\x12\x0c\n\x04pkaf\x18\x04 \x01(\x0c\x12\r\n\x05pkarf\x18\x05 \x01(\x0c\x12\x0c\n\x04kbvf\x18\x06 \x01(\x0c\x12\x12\n\nkbsf_dleag\x18\x07 \x01(\x0c\"T\n\x0fXmrSplitMessage\x12\x0e\n\x06msg_id\x18\x01 \x01(\x0c\x12\x10\n\x08msg_type\x18\x02 \x01(\r\x12\x10\n\x08sequence\x18\x03 \x01(\r\x12\r\n\x05\x64leag\x18\x04 \x01(\x0c\"\x9b\x02\n\x13XmrBidAcceptMessage\x12\x12\n\nbid_msg_id\x18\x01 \x01(\x0c\x12\n\n\x02sh\x18\x02 \x01(\x0c\x12\x0c\n\x04pkal\x18\x03 \x01(\x0c\x12\r\n\x05pkarl\x18\x04 \x01(\x0c\x12\x0c\n\x04kbvl\x18\x05 \x01(\x0c\x12\x12\n\nkbsl_dleag\x18\x06 \x01(\x0c\x12\x11\n\ta_lock_tx\x18\x07 \x01(\x0c\x12\x18\n\x10\x61_lock_tx_script\x18\x08 \x01(\x0c\x12\x18\n\x10\x61_lock_refund_tx\x18\t \x01(\x0c\x12\x1f\n\x17\x61_lock_refund_tx_script\x18\n \x01(\x0c\x12\x1e\n\x16\x61_lock_refund_spend_tx\x18\x0b \x01(\x0c\x12\x1d\n\x15\x61l_lock_refund_tx_sig\x18\x0c \x01(\x0c\x62\x06proto3'
+  serialized_pb=b'\n\x0emessages.proto\x12\tbasicswap\"\xd8\x03\n\x0cOfferMessage\x12\x11\n\tcoin_from\x18\x01 \x01(\r\x12\x0f\n\x07\x63oin_to\x18\x02 \x01(\r\x12\x13\n\x0b\x61mount_from\x18\x03 \x01(\x04\x12\x0c\n\x04rate\x18\x04 \x01(\x04\x12\x16\n\x0emin_bid_amount\x18\x05 \x01(\x04\x12\x12\n\ntime_valid\x18\x06 \x01(\x04\x12\x33\n\tlock_type\x18\x07 \x01(\x0e\x32 .basicswap.OfferMessage.LockType\x12\x12\n\nlock_value\x18\x08 \x01(\r\x12\x11\n\tswap_type\x18\t \x01(\r\x12\x15\n\rproof_address\x18\n \x01(\t\x12\x17\n\x0fproof_signature\x18\x0b \x01(\t\x12\x15\n\rpkhash_seller\x18\x0c \x01(\x0c\x12\x13\n\x0bsecret_hash\x18\r \x01(\x0c\x12\x15\n\rfee_rate_from\x18\x0e \x01(\x04\x12\x13\n\x0b\x66\x65\x65_rate_to\x18\x0f \x01(\x04\"q\n\x08LockType\x12\x0b\n\x07NOT_SET\x10\x00\x12\x18\n\x14SEQUENCE_LOCK_BLOCKS\x10\x01\x12\x16\n\x12SEQUENCE_LOCK_TIME\x10\x02\x12\x13\n\x0f\x41\x42S_LOCK_BLOCKS\x10\x03\x12\x11\n\rABS_LOCK_TIME\x10\x04\"\x8c\x01\n\nBidMessage\x12\x14\n\x0coffer_msg_id\x18\x01 \x01(\x0c\x12\x12\n\ntime_valid\x18\x02 \x01(\x04\x12\x0e\n\x06\x61mount\x18\x03 \x01(\x04\x12\x14\n\x0cpkhash_buyer\x18\x04 \x01(\x0c\x12\x15\n\rproof_address\x18\x05 \x01(\t\x12\x17\n\x0fproof_signature\x18\x06 \x01(\t\"V\n\x10\x42idAcceptMessage\x12\x12\n\nbid_msg_id\x18\x01 \x01(\x0c\x12\x15\n\rinitiate_txid\x18\x02 \x01(\x0c\x12\x17\n\x0f\x63ontract_script\x18\x03 \x01(\x0c\"\x99\x01\n\rXmrBidMessage\x12\x14\n\x0coffer_msg_id\x18\x01 \x01(\x0c\x12\x12\n\ntime_valid\x18\x02 \x01(\x04\x12\x0e\n\x06\x61mount\x18\x03 \x01(\x04\x12\x0c\n\x04pkaf\x18\x04 \x01(\x0c\x12\r\n\x05pkarf\x18\x05 \x01(\x0c\x12\x0c\n\x04kbvf\x18\x06 \x01(\x0c\x12\x12\n\nkbsf_dleag\x18\x07 \x01(\x0c\x12\x0f\n\x07\x64\x65st_af\x18\x08 \x01(\x0c\"T\n\x0fXmrSplitMessage\x12\x0e\n\x06msg_id\x18\x01 \x01(\x0c\x12\x10\n\x08msg_type\x18\x02 \x01(\r\x12\x10\n\x08sequence\x18\x03 \x01(\r\x12\r\n\x05\x64leag\x18\x04 \x01(\x0c\"\x9b\x02\n\x13XmrBidAcceptMessage\x12\x12\n\nbid_msg_id\x18\x01 \x01(\x0c\x12\n\n\x02sh\x18\x02 \x01(\x0c\x12\x0c\n\x04pkal\x18\x03 \x01(\x0c\x12\r\n\x05pkarl\x18\x04 \x01(\x0c\x12\x0c\n\x04kbvl\x18\x05 \x01(\x0c\x12\x12\n\nkbsl_dleag\x18\x06 \x01(\x0c\x12\x11\n\ta_lock_tx\x18\x07 \x01(\x0c\x12\x18\n\x10\x61_lock_tx_script\x18\x08 \x01(\x0c\x12\x18\n\x10\x61_lock_refund_tx\x18\t \x01(\x0c\x12\x1f\n\x17\x61_lock_refund_tx_script\x18\n \x01(\x0c\x12\x1e\n\x16\x61_lock_refund_spend_tx\x18\x0b \x01(\x0c\x12\x1d\n\x15\x61l_lock_refund_tx_sig\x18\x0c \x01(\x0c\"r\n\x17XmrBidLockTxSigsMessage\x12\x12\n\nbid_msg_id\x18\x01 \x01(\x0c\x12$\n\x1c\x61\x66_lock_refund_spend_tx_esig\x18\x02 \x01(\x0c\x12\x1d\n\x15\x61\x66_lock_refund_tx_sig\x18\x03 \x01(\x0c\"f\n\x18XmrBidLockSpendTxMessage\x12\x12\n\nbid_msg_id\x18\x01 \x01(\x0c\x12\x17\n\x0f\x61_lock_spend_tx\x18\x02 \x01(\x0c\x12\x1d\n\x15\x61l_lock_spend_tx_esig\x18\x03 \x01(\x0c\x62\x06proto3'
 )
 
 
@@ -366,6 +366,13 @@ _XMRBIDMESSAGE = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='dest_af', full_name='basicswap.XmrBidMessage.dest_af', index=7,
+      number=8, type=12, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"",
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
@@ -379,7 +386,7 @@ _XMRBIDMESSAGE = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=736,
-  serialized_end=872,
+  serialized_end=889,
 )
 
 
@@ -431,8 +438,8 @@ _XMRSPLITMESSAGE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=874,
-  serialized_end=958,
+  serialized_start=891,
+  serialized_end=975,
 )
 
 
@@ -540,8 +547,100 @@ _XMRBIDACCEPTMESSAGE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=961,
-  serialized_end=1244,
+  serialized_start=978,
+  serialized_end=1261,
+)
+
+
+_XMRBIDLOCKTXSIGSMESSAGE = _descriptor.Descriptor(
+  name='XmrBidLockTxSigsMessage',
+  full_name='basicswap.XmrBidLockTxSigsMessage',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='bid_msg_id', full_name='basicswap.XmrBidLockTxSigsMessage.bid_msg_id', index=0,
+      number=1, type=12, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"",
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='af_lock_refund_spend_tx_esig', full_name='basicswap.XmrBidLockTxSigsMessage.af_lock_refund_spend_tx_esig', index=1,
+      number=2, type=12, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"",
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='af_lock_refund_tx_sig', full_name='basicswap.XmrBidLockTxSigsMessage.af_lock_refund_tx_sig', index=2,
+      number=3, type=12, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"",
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=1263,
+  serialized_end=1377,
+)
+
+
+_XMRBIDLOCKSPENDTXMESSAGE = _descriptor.Descriptor(
+  name='XmrBidLockSpendTxMessage',
+  full_name='basicswap.XmrBidLockSpendTxMessage',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='bid_msg_id', full_name='basicswap.XmrBidLockSpendTxMessage.bid_msg_id', index=0,
+      number=1, type=12, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"",
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='a_lock_spend_tx', full_name='basicswap.XmrBidLockSpendTxMessage.a_lock_spend_tx', index=1,
+      number=2, type=12, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"",
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='al_lock_spend_tx_esig', full_name='basicswap.XmrBidLockSpendTxMessage.al_lock_spend_tx_esig', index=2,
+      number=3, type=12, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"",
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=1379,
+  serialized_end=1481,
 )
 
 _OFFERMESSAGE.fields_by_name['lock_type'].enum_type = _OFFERMESSAGE_LOCKTYPE
@@ -552,6 +651,8 @@ DESCRIPTOR.message_types_by_name['BidAcceptMessage'] = _BIDACCEPTMESSAGE
 DESCRIPTOR.message_types_by_name['XmrBidMessage'] = _XMRBIDMESSAGE
 DESCRIPTOR.message_types_by_name['XmrSplitMessage'] = _XMRSPLITMESSAGE
 DESCRIPTOR.message_types_by_name['XmrBidAcceptMessage'] = _XMRBIDACCEPTMESSAGE
+DESCRIPTOR.message_types_by_name['XmrBidLockTxSigsMessage'] = _XMRBIDLOCKTXSIGSMESSAGE
+DESCRIPTOR.message_types_by_name['XmrBidLockSpendTxMessage'] = _XMRBIDLOCKSPENDTXMESSAGE
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 OfferMessage = _reflection.GeneratedProtocolMessageType('OfferMessage', (_message.Message,), {
@@ -595,6 +696,20 @@ XmrBidAcceptMessage = _reflection.GeneratedProtocolMessageType('XmrBidAcceptMess
   # @@protoc_insertion_point(class_scope:basicswap.XmrBidAcceptMessage)
   })
 _sym_db.RegisterMessage(XmrBidAcceptMessage)
+
+XmrBidLockTxSigsMessage = _reflection.GeneratedProtocolMessageType('XmrBidLockTxSigsMessage', (_message.Message,), {
+  'DESCRIPTOR' : _XMRBIDLOCKTXSIGSMESSAGE,
+  '__module__' : 'messages_pb2'
+  # @@protoc_insertion_point(class_scope:basicswap.XmrBidLockTxSigsMessage)
+  })
+_sym_db.RegisterMessage(XmrBidLockTxSigsMessage)
+
+XmrBidLockSpendTxMessage = _reflection.GeneratedProtocolMessageType('XmrBidLockSpendTxMessage', (_message.Message,), {
+  'DESCRIPTOR' : _XMRBIDLOCKSPENDTXMESSAGE,
+  '__module__' : 'messages_pb2'
+  # @@protoc_insertion_point(class_scope:basicswap.XmrBidLockSpendTxMessage)
+  })
+_sym_db.RegisterMessage(XmrBidLockSpendTxMessage)
 
 
 # @@protoc_insertion_point(module_scope)

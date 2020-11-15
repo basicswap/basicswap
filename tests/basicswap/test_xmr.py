@@ -198,6 +198,7 @@ def prepare_swapclient_dir(datadir, node_id, network_key, network_pubkey):
 
     settings_path = os.path.join(basicswap_dir, cfg.CONFIG_FILENAME)
     settings = {
+        'debug': True,
         'zmqhost': 'tcp://127.0.0.1',
         'zmqport': BASE_ZMQ_PORT + node_id,
         'htmlhost': 'localhost',
@@ -513,9 +514,9 @@ class Test(unittest.TestCase):
                     return
         raise ValueError('wait_for_offer timed out.')
 
-    def wait_for_bid(self, swap_client, bid_id, state=None, sent=False):
+    def wait_for_bid(self, swap_client, bid_id, state=None, sent=False, wait_for=20):
         logging.info('wait_for_bid %s', bid_id.hex())
-        for i in range(20):
+        for i in range(wait_for):
             time.sleep(1)
             bids = swap_client.listBids(sent=sent)
             for bid in bids:
@@ -551,7 +552,11 @@ class Test(unittest.TestCase):
 
         swap_clients[0].acceptXmrBid(bid_id)
 
-        self.wait_for_bid(swap_clients[1], bid_id, BidStates.BID_ACCEPTED, sent=True)
+        self.wait_for_bid(swap_clients[1], bid_id, BidStates.BID_ACCEPTED, sent=True, wait_for=40)
+
+
+        self.wait_for_bid(swap_clients[0], bid_id, BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED, sent=True)
+
 
 
 

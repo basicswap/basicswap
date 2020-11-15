@@ -228,15 +228,21 @@ class XmrSwap(Base):
     bid_accept_msg_id2 = sa.Column(sa.LargeBinary)
     bid_accept_msg_id3 = sa.Column(sa.LargeBinary)
 
+    coin_a_lock_tx_sigs_l_id = sa.Column(sa.LargeBinary)  # MSG3L F -> L
+
     contract_count = sa.Column(sa.Integer)
 
     sh = sa.Column(sa.LargeBinary)  # Secret hash
 
+    dest_af = sa.Column(sa.LargeBinary)  # Destination for coin A amount to follower when swap completes successfully
+
     pkal = sa.Column(sa.LargeBinary)
     pkarl = sa.Column(sa.LargeBinary)
+    pkasl = sa.Column(sa.LargeBinary)
 
     pkaf = sa.Column(sa.LargeBinary)
     pkarf = sa.Column(sa.LargeBinary)
+    pkasf = sa.Column(sa.LargeBinary)
 
     vkbvl = sa.Column(sa.LargeBinary)
     vkbsl = sa.Column(sa.LargeBinary)
@@ -259,6 +265,13 @@ class XmrSwap(Base):
     a_swap_refund_value = sa.Column(sa.BigInteger)
 
     a_lock_refund_spend_tx = sa.Column(sa.LargeBinary)
+
+    af_lock_refund_spend_tx_esig = sa.Column(sa.LargeBinary)
+    af_lock_refund_spend_tx_sig = sa.Column(sa.LargeBinary)
+    af_lock_refund_tx_sig = sa.Column(sa.LargeBinary)
+
+    a_lock_spend_tx = sa.Column(sa.LargeBinary)
+    al_lock_spend_tx_esig = sa.Column(sa.LargeBinary)
 
     b_restore_height = sa.Column(sa.Integer)  # Height of xmr chain before the swap
 
