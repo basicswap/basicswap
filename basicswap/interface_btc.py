@@ -681,17 +681,22 @@ class BTCInterface(CoinInterface):
 
     def fundTx(self, tx, feerate):
         feerate_str = format_amount(feerate, self.exp())
-        rv = self.rpc_callback('fundrawtransaction', [tx.hex(), {'feeRate': feerate_str}])
+        # TODO: unlock unspents if bid cancelled
+        options = {
+            'lockUnspents': True,
+            'feeRate': feerate_str,
+        }
+        rv = self.rpc_callback('fundrawtransaction', [tx.hex(), options])
         return bytes.fromhex(rv['hex'])
 
     def signTxWithWallet(self, tx):
-        rv = self.rpc_callback('signrawtransactionwithwallet', [ToHex(tx)])
+        rv = self.rpc_callback('signrawtransactionwithwallet', [tx.hex()])
 
         #return FromHex(tx, rv['hex'])
         return bytes.fromhex(rv['hex'])
 
     def publishTx(self, tx):
-        return self.rpc_callback('sendrawtransaction', [ToHex(tx)])
+        return self.rpc_callback('sendrawtransaction', [tx.hex()])
 
     def encodeTx(self, tx):
         return tx.serialize()

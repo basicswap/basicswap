@@ -98,6 +98,7 @@ class MessageTypes(IntEnum):
     XMR_BID_SPLIT = auto()
     XMR_BID_ACCEPT = auto()
     XMR_BID_TXN_SIGS_FL = auto()
+    XMR_BID_LOCK_REFUND_SPEND_TX_LF = auto()
 
 
 class SwapTypes(IntEnum):
@@ -1073,6 +1074,8 @@ class BasicSwap(BaseApp):
             session.add(bid.initiate_tx)
         if bid.participate_tx:
             session.add(bid.participate_tx)
+        if bid.xmr_a_lock_tx:
+            session.add(bid.xmr_a_lock_tx)
         if xmr_swap is not None:
             session.add(xmr_swap)
 
@@ -2454,15 +2457,19 @@ class BasicSwap(BaseApp):
 
             q = session.query(EventQueue).filter(EventQueue.trigger_at >= now)
             for row in q:
-                if row.event_type == EventTypes.ACCEPT_BID:
-                    self.acceptBid(row.linked_id)
-                elif row.event_type == EventTypes.SIGN_XMR_SWAP_LOCK_TX_A:
-                    self.sendXmrBidTxnSigsFtoL(row.linked_id, session)
-                elif row.event_type == EventTypes.SEND_XMR_SWAP_LOCK_TX_A:
-                    self.sendXmrBidCoinALockTx(row.linked_id, session)
-                else:
-                    self.log.warning('Unknown event type: %d', row.event_type)
-
+                try:
+                    if row.event_type == EventTypes.ACCEPT_BID:
+                        self.acceptBid(row.linked_id)
+                    elif row.event_type == EventTypes.SIGN_XMR_SWAP_LOCK_TX_A:
+                        self.sendXmrBidTxnSigsFtoL(row.linked_id, session)
+                    elif row.event_type == EventTypes.SEND_XMR_SWAP_LOCK_TX_A:
+                        self.sendXmrBidCoinALockTx(row.linked_id, session)
+                    else:
+                        self.log.warning('Unknown event type: %d', row.event_type)
+                except Exception as ex:
+                    if self.debug:
+                        traceback.print_exc()
+                    self.log.error('checkEvents failed: {}'.format(str(ex)))
                 session.delete(row)
 
             session.commit()
@@ -2802,6 +2809,7 @@ class BasicSwap(BaseApp):
         self.saveBidInSession(bid.bid_id, bid, session, xmr_swap)
 
     def receiveXmrBidAccept(self, bid, session):
+        # Follower receiving MSG1F and MSG2F
         self.log.debug('Receiving xmr bid accept %s', bid.bid_id.hex())
         now = int(time.time())
 
@@ -3017,14 +3025,12 @@ class BasicSwap(BaseApp):
             # TODO: set msg_valid based on bid / offer parameters
             msg_valid = self.SMSG_SECONDS_IN_HOUR * 48
             ro = self.callrpc('smsgsend', [bid.bid_addr, offer.addr_from, payload_hex, False, msg_valid, False, options])
-            xmr_swap.coin_a_lock_tx_sigs_l_id = bytes.fromhex(ro['msgid'])
+            xmr_swap.coin_a_lock_tx_sigs_l_msg_id = bytes.fromhex(ro['msgid'])
 
-            self.log.info('Sent XMR_BID_TXN_SIGS_FL %s', xmr_swap.coin_a_lock_tx_sigs_l_id.hex())
+            self.log.info('Sent XMR_BID_TXN_SIGS_FL %s', xmr_swap.coin_a_lock_tx_sigs_l_msg_id.hex())
 
             bid.setState(BidStates.BID_ACCEPTED)
-            session.add(bid)
-            session.add(xmr_swap)
-
+            self.saveBidInSession(bid_id, bid, session, xmr_swap)
             self.swaps_in_progress[bid_id] = (bid, offer)
         except Exception as ex:
             if self.debug:
@@ -3055,11 +3061,40 @@ class BasicSwap(BaseApp):
 
         xmr_swap.al_lock_spend_tx_esig = ci_from.signTxOtVES(kal, xmr_swap.pkasf, xmr_swap.a_lock_spend_tx, 0, xmr_swap.a_lock_tx_script, bid.amount)  # self.a_swap_value
 
+        msg_buf = XmrBidLockSpendTxMessage(
+            bid_msg_id=bid_id,
+            a_lock_spend_tx=xmr_swap.a_lock_spend_tx,
+            al_lock_spend_tx_esig=xmr_swap.al_lock_spend_tx_esig)
+
+        mag_bytes = msg_buf.SerializeToString()
+        payload_hex = str.format('{:02x}', MessageTypes.XMR_BID_LOCK_REFUND_SPEND_TX_LF) + mag_bytes.hex()
+
+        options = {'decodehex': True, 'ttl_is_seconds': True}
+        # TODO: set msg_valid based on bid / offer parameters
+        msg_valid = self.SMSG_SECONDS_IN_HOUR * 48
+        ro = self.callrpc('smsgsend', [offer.addr_from, bid.bid_addr, payload_hex, False, msg_valid, False, options])
+        xmr_swap.coin_a_lock_refund_spend_tx_msg_id = bytes.fromhex(ro['msgid'])
+
         # TODO: Separate MSG4F and txn sending
 
+        # publishalocktx
+        lock_tx_signed = ci_from.signTxWithWallet(xmr_swap.a_lock_tx)
+        txid_hex = ci_from.publishTx(lock_tx_signed)
+
+        self.log.debug('Submitted lock txn %s to %s chain for bid %s', txid_hex, chainparams[coin_from]['name'], bid_id.hex())
+        bid.xmr_a_lock_tx = SwapTx(
+            bid_id=bid_id,
+            tx_type=TxTypes.XMR_SWAP_A_LOCK,
+            txid=bytes.fromhex(txid_hex),
+        )
+        bid.xmr_a_lock_tx.setState(TxStates.TX_SENT)
+
+        bid.setState(BidStates.BID_ACCEPTED)
+        self.saveBidInSession(bid_id, bid, session, xmr_swap)
+        self.swaps_in_progress[bid_id] = (bid, offer)
 
     def processXmrBidCoinALockSigs(self, msg):
-        # Follower processing MSG3L
+        # Leader processing MSG3L
         self.log.debug('Processing xmr coin a follower lock sigs msg %s', msg['msgid'])
         now = int(time.time())
         msg_bytes = bytes.fromhex(msg['hex'][2:-2])

@@ -107,6 +107,7 @@ class Bid(Base):
 
     initiate_tx = None
     participate_tx = None
+    xmr_a_lock_tx = None
 
     def getITxState(self):
         if self.initiate_tx is None:
@@ -115,8 +116,7 @@ class Bid(Base):
 
     def setITxState(self, new_state):
         if self.initiate_tx is not None:
-            self.initiate_tx.state = new_state
-            self.initiate_tx.states = (self.initiate_tx.states if self.initiate_tx.states is not None else bytes()) + struct.pack('<iq', new_state, int(time.time()))
+            self.initiate_tx.setState(new_state)
 
     def getPTxState(self):
         if self.participate_tx is None:
@@ -125,8 +125,7 @@ class Bid(Base):
 
     def setPTxState(self, new_state):
         if self.participate_tx is not None:
-            self.participate_tx.state = new_state
-            self.participate_tx.states = (self.participate_tx.states if self.participate_tx.states is not None else bytes()) + struct.pack('<iq', new_state, int(time.time()))
+            self.participate_tx.setState(new_state)
 
     def setState(self, new_state, state_note=None):
         now = int(time.time())
@@ -165,6 +164,10 @@ class SwapTx(Base):
 
     state = sa.Column(sa.Integer)
     states = sa.Column(sa.LargeBinary)  # Packed states and times
+
+    def setState(self, new_state):
+        self.state = new_state
+        self.states = (self.states if self.states is not None else bytes()) + struct.pack('<iq', new_state, int(time.time()))
 
 
 class PooledAddress(Base):
@@ -228,7 +231,8 @@ class XmrSwap(Base):
     bid_accept_msg_id2 = sa.Column(sa.LargeBinary)
     bid_accept_msg_id3 = sa.Column(sa.LargeBinary)
 
-    coin_a_lock_tx_sigs_l_id = sa.Column(sa.LargeBinary)  # MSG3L F -> L
+    coin_a_lock_tx_sigs_l_msg_id = sa.Column(sa.LargeBinary)  # MSG3L F -> L
+    coin_a_lock_refund_spend_tx_msg_id = sa.Column(sa.LargeBinary)  # MSG4F L -> F
 
     contract_count = sa.Column(sa.Integer)
 
