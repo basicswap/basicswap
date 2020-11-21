@@ -31,6 +31,7 @@ class PARTInterface(BTCInterface):
         self.rpc_callback = make_rpc_func(coin_settings['rpcport'], coin_settings['rpcauth'])
         self.txoType = CTxOutPart
         self._network = network
+        self.blocks_confirmed = coin_settings['blocks_confirmed']
 
     def getNewAddress(self, use_segwit):
         return self.rpc_callback('getnewaddress', ['swap_receive'])

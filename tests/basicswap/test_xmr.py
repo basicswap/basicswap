@@ -67,7 +67,6 @@ from tests.basicswap.common import (
 from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
 from bin.basicswap_run import startDaemon
 
-from pprint import pprint
 
 logger = logging.getLogger()
 
@@ -223,6 +222,7 @@ def prepare_swapclient_dir(datadir, node_id, network_key, network_pubkey):
                 'walletrpcport': XMR_BASE_WALLET_RPC_PORT + node_id,
                 'walletrpcuser': 'test' + str(node_id),
                 'walletrpcpassword': 'test_pass' + str(node_id),
+                'walletfile': 'testwallet',
                 'datadir': os.path.join(datadir, 'xmr_' + str(node_id)),
                 'bindir': cfg.XMR_BINDIR,
             },
@@ -303,18 +303,21 @@ def callnoderpc(node_id, method, params=[], wallet=None, base_rpc_port=BASE_RPC_
     auth = 'test{0}:test_pass{0}'.format(node_id)
     return callrpc(base_rpc_port + node_id, auth, method, params, wallet)
 
+def run_coins_loop(cls):
+    global stop_test
+    while not stop_test:
+        if cls.btc_addr is not None:
+            btcRpc('generatetoaddress 1 {}'.format(cls.btc_addr))
+
+        if cls.xmr_addr is not None:
+            callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'generateblocks', {'wallet_address': cls.xmr_addr, 'amount_of_blocks': 1})
+        time.sleep(1.0)
 
 def run_loop(cls):
     global stop_test
     while not stop_test:
         for c in cls.swap_clients:
             c.update()
-
-        if cls.btc_addr is not None:
-            btcRpc('generatetoaddress 1 {}'.format(cls.btc_addr))
-
-        if cls.xmr_addr is not None:
-            callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'generateblocks', {'wallet_address': cls.xmr_addr, 'amount_of_blocks': 1})
         time.sleep(1.0)
 
 
@@ -325,6 +328,7 @@ class Test(unittest.TestCase):
         super(Test, cls).setUpClass()
 
         cls.update_thread = None
+        cls.coins_update_thread = None
         cls.http_threads = []
         cls.swap_clients = []
         cls.part_daemons = []
@@ -425,7 +429,7 @@ class Test(unittest.TestCase):
             cls.xmr_addr = cls.callxmrnodewallet(cls, 1, 'get_address')['address']
 
             num_blocks = 500
-            logging.info('Mining %d bitcoin blocks to %s', num_blocks, cls.btc_addr)
+            logging.info('Mining %d Bitcoin blocks to %s', num_blocks, cls.btc_addr)
             callnoderpc(0, 'generatetoaddress', [num_blocks, cls.btc_addr], base_rpc_port=BTC_BASE_RPC_PORT)
 
             checkForks(callnoderpc(0, 'getblockchaininfo', base_rpc_port=BTC_BASE_RPC_PORT))
@@ -440,6 +444,9 @@ class Test(unittest.TestCase):
             signal.signal(signal.SIGINT, signal_handler)
             cls.update_thread = threading.Thread(target=run_loop, args=(cls,))
             cls.update_thread.start()
+
+            cls.coins_update_thread = threading.Thread(target=run_coins_loop, args=(cls,))
+            cls.coins_update_thread.start()
         except Exception:
             traceback.print_exc()
             Test.tearDownClass()
@@ -455,7 +462,11 @@ class Test(unittest.TestCase):
                 cls.update_thread.join()
             except Exception:
                 logging.info('Failed to join update_thread')
-        cls.update_thread = None
+        if cls.coins_update_thread is not None:
+            try:
+                cls.coins_update_thread.join()
+            except Exception:
+                logging.info('Failed to join coins_update_thread')
 
         for t in cls.http_threads:
             t.stop()
@@ -541,7 +552,6 @@ class Test(unittest.TestCase):
         offers = swap_clients[1].listOffers(filters={'offer_id': offer_id})
         assert(len(offers) == 1)
         offer = offers[0]
-        pprint(vars(offer))
 
         bid_id = swap_clients[1].postXmrBid(offer_id, offer.amount_from)
 
@@ -552,13 +562,15 @@ class Test(unittest.TestCase):
 
         swap_clients[0].acceptXmrBid(bid_id)
 
-        self.wait_for_bid(swap_clients[1], bid_id, BidStates.BID_ACCEPTED, sent=True, wait_for=40)
+        #self.wait_for_bid(swap_clients[1], bid_id, BidStates.BID_ACCEPTED, sent=True, wait_for=40)
+        #self.wait_for_bid(swap_clients[0], bid_id, BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED)
+        #self.wait_for_bid(swap_clients[1], bid_id, BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED, wait_for=40, sent=True)
 
+        #self.wait_for_bid(swap_clients[0], bid_id, BidStates.XMR_SWAP_NOSCRIPT_COIN_LOCKED, wait_for=80)
+        #self.wait_for_bid(swap_clients[1], bid_id, BidStates.XMR_SWAP_NOSCRIPT_COIN_LOCKED, sent=True)
 
-        self.wait_for_bid(swap_clients[0], bid_id, BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED, sent=True)
-
-
-
+        self.wait_for_bid(swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=180)
+        self.wait_for_bid(swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True)
 
 
 

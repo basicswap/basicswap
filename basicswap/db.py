@@ -108,6 +108,8 @@ class Bid(Base):
     initiate_tx = None
     participate_tx = None
     xmr_a_lock_tx = None
+    xmr_b_lock_tx = None
+    xmr_a_lock_spend_tx = None
 
     def getITxState(self):
         if self.initiate_tx is None:
@@ -236,6 +238,7 @@ class XmrSwap(Base):
 
     contract_count = sa.Column(sa.Integer)
 
+    sv = sa.Column(sa.LargeBinary)  # Secret value
     sh = sa.Column(sa.LargeBinary)  # Secret hash
 
     dest_af = sa.Column(sa.LargeBinary)  # Destination for coin A amount to follower when swap completes successfully
@@ -261,6 +264,10 @@ class XmrSwap(Base):
     kbsl_dleag = sa.Column(sa.LargeBinary)
     kbsf_dleag = sa.Column(sa.LargeBinary)
 
+    vkbv = sa.Column(sa.LargeBinary)
+    pkbv = sa.Column(sa.LargeBinary)
+    pkbs = sa.Column(sa.LargeBinary)
+
     a_lock_tx = sa.Column(sa.LargeBinary)
     a_lock_tx_script = sa.Column(sa.LargeBinary)
 
@@ -275,7 +282,10 @@ class XmrSwap(Base):
     af_lock_refund_tx_sig = sa.Column(sa.LargeBinary)
 
     a_lock_spend_tx = sa.Column(sa.LargeBinary)
+    a_lock_spend_tx_id = sa.Column(sa.LargeBinary)
     al_lock_spend_tx_esig = sa.Column(sa.LargeBinary)
+
+    b_lock_tx_id = sa.Column(sa.LargeBinary)
 
     b_restore_height = sa.Column(sa.Integer)  # Height of xmr chain before the swap
 

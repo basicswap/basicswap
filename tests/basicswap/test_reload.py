@@ -175,7 +175,7 @@ class Test(unittest.TestCase):
 
             num_blocks = 500
             btc_addr = btcRpc(1, 'getnewaddress mining_addr bech32')
-            logging.info('Mining %d bitcoin blocks to %s', num_blocks, btc_addr)
+            logging.info('Mining %d Bitcoin blocks to %s', num_blocks, btc_addr)
             btcRpc(1, 'generatetoaddress {} {}'.format(num_blocks, btc_addr))
 
             for i in range(20):

@@ -271,7 +271,7 @@ class Test(unittest.TestCase):
 
         waitForRPC(btcRpc)
         cls.btc_addr = btcRpc('getnewaddress mining_addr bech32')
-        logging.info('Mining %d bitcoin blocks to %s', num_blocks, cls.btc_addr)
+        logging.info('Mining %d Bitcoin blocks to %s', num_blocks, cls.btc_addr)
         btcRpc('generatetoaddress {} {}'.format(num_blocks, cls.btc_addr))
 
         ro = btcRpc('getblockchaininfo')

@@ -108,4 +108,9 @@ message XmrBidLockSpendTxMessage {
     bytes al_lock_spend_tx_esig = 3;
 }
 
+message XmrBidSecretMessage {
+    /* MSG5F */
+    bytes bid_msg_id = 1;
 
+    bytes secret_value = 2;
+}

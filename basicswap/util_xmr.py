@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-import xmrswap.contrib.Keccak as Keccak
+import basicswap.contrib.Keccak as Keccak
 from .contrib.MoneroPy.base58 import encode as xmr_b58encode
 
 

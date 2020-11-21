@@ -117,6 +117,7 @@ class BTCInterface(CoinInterface):
         self.rpc_callback = make_rpc_func(coin_settings['rpcport'], coin_settings['rpcauth'])
         self.txoType = CTxOut
         self._network = network
+        self.blocks_confirmed = coin_settings['blocks_confirmed']
 
     def testDaemonRPC(self):
         self.rpc_callback('getwalletinfo', [])
@@ -596,13 +597,14 @@ class BTCInterface(CoinInterface):
 
         return True
 
-    def verifyLockSpendTx(self, tx,
-                          lock_tx, lock_tx_script,
+    def verifyLockSpendTx(self, tx_bytes,
+                          lock_tx_bytes, lock_tx_script,
                           a_pkhash_f, feerate):
         # Verify:
         #   Must have only one input with correct prevout (n is always 0) and sequence
         #   Must have only one output with destination and amount
 
+        tx = self.loadTx(tx_bytes)
         tx_hash = self.getTxHash(tx)
         logging.info('Verifying lock spend tx: {}.'.format(b2h(tx_hash)))
 
@@ -610,6 +612,7 @@ class BTCInterface(CoinInterface):
         assert_cond(tx.nLockTime == 0, 'nLockTime not 0')
         assert_cond(len(tx.vin) == 1, 'tx doesn\'t have one input')
 
+        lock_tx = self.loadTx(lock_tx_bytes)
         lock_tx_id = self.getTxHash(lock_tx)
 
         output_script = CScript([OP_0, hashlib.sha256(lock_tx_script).digest()])
@@ -727,21 +730,24 @@ class BTCInterface(CoinInterface):
 
     def getTransaction(self, txid):
         try:
-            return self.rpc_callback('getrawtransaction', [txid.hex()])
+            return bytes.fromhex(self.rpc_callback('getrawtransaction', [txid.hex()]))
         except Exception as ex:
             # TODO: filter errors
             return None
 
-    def setTxSignature(self, tx, stack):
+    def setTxSignature(self, tx_bytes, stack):
+        tx = self.loadTx(tx_bytes)
         tx.wit.vtxinwit.clear()
         tx.wit.vtxinwit.append(CTxInWitness())
         tx.wit.vtxinwit[0].scriptWitness.stack = stack
-        return True
+        return tx.serialize()
 
-    def extractLeaderSig(self, tx):
+    def extractLeaderSig(self, tx_bytes):
+        tx = self.loadTx(tx_bytes)
         return tx.wit.vtxinwit[0].scriptWitness.stack[1]
 
-    def extractFollowerSig(self, tx):
+    def extractFollowerSig(self, tx_bytes):
+        tx = self.loadTx(tx_bytes)
         return tx.wit.vtxinwit[0].scriptWitness.stack[2]
 
     def createBLockTx(self, Kbs, output_amount):
@@ -761,7 +767,8 @@ class BTCInterface(CoinInterface):
         return self.publishTx(b_lock_tx)
 
     def recoverEncKey(self, esig, sig, K):
-        return otves.RecoverEncKey(esig, sig[:-1], K)  # Strip sighash type
+        return ecdsaotves_rec_enc_key(K, esig, sig[:-1])  # Strip sighash type
+        #return otves.RecoverEncKey(esig, sig[:-1], K)  # Strip sighash type
 
     def getTxVSize(self, tx, add_bytes=0, add_witness_bytes=0):
         wsf = self.witnessScaleFactor()
@@ -781,8 +788,8 @@ class BTCInterface(CoinInterface):
                 if utxo['amount'] * COIN != cb_swap_value:
                     logging.warning('Found output to lock tx pubkey of incorrect value: %s', str(utxo['amount']))
                 else:
-                    return True
-        return False
+                    return {'txid': utxo['txid'], 'vout': utxo['vout'], 'amount': utxo['amount'], 'height': utxo['height']}
+        return None
 
     def waitForLockTxB(self, kbv, Kbs, cb_swap_value, cb_block_confirmed):
 
@@ -804,6 +811,31 @@ class BTCInterface(CoinInterface):
 
     def spendBLockTx(self, address_to, kbv, kbs, cb_swap_value, b_fee, restore_height):
         print('TODO: spendBLockTx')
+
+    def getOutput(self, txid, dest_script, expect_value):
+        # TODO: Use getrawtransaction if txindex is active
+        utxos = self.rpc_callback('scantxoutset', ['start', ['raw({})'.format(dest_script.hex())]])
+        print('utxos', utxos)
+
+        chain_height = utxos['height']
+        rv = []
+        for utxo in utxos['unspents']:
+            print('utxo', utxo)
+            depth = 0 if 'height' not in utxo else utxos['height'] - utxo['height']
+
+            if txid and txid.hex() != utxo['txid']:
+                continue
+
+            if expect_value != utxo['amount'] * COIN:
+                continue
+
+            rv.append({
+                'depth': depth,
+                'amount': utxo['amount'] * COIN,
+                'txid': utxo['txid'],
+                'vout': utxo['vout']})
+        return rv
+
 
 
 def testBTCInterface():

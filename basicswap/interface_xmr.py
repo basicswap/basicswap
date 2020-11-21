@@ -10,6 +10,7 @@ import logging
 
 import basicswap.contrib.ed25519_fast as edf
 import basicswap.ed25519_fast_util as edu
+import basicswap.util_xmr as xmr_util
 from coincurve.ed25519 import ed25519_get_pubkey
 from coincurve.keys import PrivateKey
 from coincurve.dleag import (
@@ -19,12 +20,13 @@ from coincurve.dleag import (
     dleag_prove)
 
 from .util import (
+    dumpj,
     format_amount)
 from .rpc_xmr import (
     make_xmr_rpc_func,
     make_xmr_wallet_rpc_func)
 from .ecc_util import (
-    b2i)
+    b2i, i2b, b2h)
 from .chainparams import CoinInterface, Coins
 
 XMR_COIN = 10 ** 12
@@ -54,6 +56,10 @@ class XMRInterface(CoinInterface):
         self.rpc_cb = rpc_cb
         self.rpc_wallet_cb = rpc_wallet_cb
         self._network = network
+        self.blocks_confirmed = coin_settings['blocks_confirmed']
+
+    def setWalletFilename(self, wallet_filename):
+        self._wallet_filename = wallet_filename
 
     def testDaemonRPC(self):
         self.rpc_wallet_cb('get_languages')
@@ -77,8 +83,13 @@ class XMRInterface(CoinInterface):
         rv['unconfirmed_balance'] = format_amount(balance_info['balance'] - balance_info['unlocked_balance'], XMRInterface.exp())
         return rv
 
+    def getMainWalletAddress(self):
+        self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
+        return self.rpc_wallet_cb('get_address')['address']
+
     def getNewAddress(self, placeholder):
         logging.debug('TODO - subaddress?')
+        self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
         return self.rpc_wallet_cb('get_address')['address']
 
     def isValidKey(self, key_bytes):
@@ -123,36 +134,41 @@ class XMRInterface(CoinInterface):
         return i
 
     def sumKeys(self, ka, kb):
-        return (ka + kb) % edf.l
+        return i2b((b2i(ka) + b2i(kb)) % edf.l)
 
     def sumPubkeys(self, Ka, Kb):
-        return edf.edwards_add(Ka, Kb)
+        Ka_d = edf.decodepoint(Ka)
+        Kb_d = edf.decodepoint(Kb)
+        return self.encodePubkey(edf.edwards_add(Ka_d, Kb_d))
 
     def publishBLockTx(self, Kbv, Kbs, output_amount, feerate):
 
-        shared_addr = xmr_util.encode_address(self.encodePubkey(Kbv), self.encodePubkey(Kbs))
+        shared_addr = xmr_util.encode_address(Kbv, Kbs)
 
         # TODO: How to set feerate?
         params = {'destinations': [{'amount': output_amount, 'address': shared_addr}]}
         rv = self.rpc_wallet_cb('transfer', params)
         logging.info('publishBLockTx %s to address_b58 %s', rv['tx_hash'], shared_addr)
 
-        return rv['tx_hash']
+        return bytes.fromhex(rv['tx_hash'])
 
     def findTxB(self, kbv, Kbs, cb_swap_value, cb_block_confirmed, restore_height):
-        Kbv_enc = self.encodePubkey(self.pubkey(kbv))
-        address_b58 = xmr_util.encode_address(Kbv_enc, self.encodePubkey(Kbs))
+        #Kbv_enc = self.encodePubkey(self.pubkey(kbv))
+        Kbv = self.getPubkey(kbv)
+        address_b58 = xmr_util.encode_address(Kbv, Kbs)
 
         try:
             self.rpc_wallet_cb('close_wallet')
         except Exception as e:
             logging.warning('close_wallet failed %s', str(e))
 
+        kbv_le = kbv[::-1]
         params = {
             'restore_height': restore_height,
             'filename': address_b58,
             'address': address_b58,
-            'viewkey': b2h(intToBytes32_le(kbv)),
+            #'viewkey': b2h(intToBytes32_le(kbv)),
+            'viewkey': b2h(kbv_le),
         }
 
         try:
@@ -162,6 +178,8 @@ class XMRInterface(CoinInterface):
             logging.info('generate_from_keys %s', dumpj(rv))
             rv = self.rpc_wallet_cb('open_wallet', {'filename': address_b58})
 
+        rv = self.rpc_wallet_cb('refresh')
+
         # Debug
         try:
             current_height = self.rpc_cb('get_block_count')['count']
@@ -170,18 +188,15 @@ class XMRInterface(CoinInterface):
             logging.info('rpc_cb failed %s', str(e))
             current_height = None  # If the transfer is available it will be deep enough
 
-        # For a while after opening the wallet rpc cmds return empty data
-        for i in range(5):
-            params = {'transfer_type': 'available'}
-            rv = self.rpc_wallet_cb('incoming_transfers', params)
-            if 'transfers' in rv:
-                for transfer in rv['transfers']:
-                    if transfer['amount'] == cb_swap_value \
-                       and (current_height is None or current_height - transfer['block_height'] > cb_block_confirmed):
-                        return True
-            time.sleep(1 + i)
+        params = {'transfer_type': 'available'}
+        rv = self.rpc_wallet_cb('incoming_transfers', params)
+        if 'transfers' in rv:
+            for transfer in rv['transfers']:
+                if transfer['amount'] == cb_swap_value \
+                   and (current_height is None or current_height - transfer['block_height'] > cb_block_confirmed):
+                    return {'txid': transfer['tx_hash'], 'amount': transfer['amount'], 'height': transfer['block_height']}
 
-        return False
+        return None
 
     def waitForLockTxB(self, kbv, Kbs, cb_swap_value, cb_block_confirmed, restore_height):
 
@@ -244,11 +259,33 @@ class XMRInterface(CoinInterface):
 
         return False
 
+    def findTxnByHash(self, txid):
+        self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
+        self.rpc_wallet_cb('refresh')
+
+        try:
+            current_height = self.rpc_cb('get_block_count')['count']
+            logging.info('findTxnByHash XMR current_height %d\nhash: %s', current_height, txid)
+        except Exception as e:
+            logging.info('rpc_cb failed %s', str(e))
+            current_height = None  # If the transfer is available it will be deep enough
+
+        params = {'transfer_type': 'available'}
+        rv = self.rpc_wallet_cb('incoming_transfers', params)
+        if 'transfers' in rv:
+            for transfer in rv['transfers']:
+                if transfer['tx_hash'] == txid \
+                   and (current_height is None or current_height - transfer['block_height'] > self.blocks_confirmed):
+                    return {'txid': transfer['tx_hash'], 'amount': transfer['amount'], 'height': transfer['block_height']}
+
+        return None
+
+
     def spendBLockTx(self, address_to, kbv, kbs, cb_swap_value, b_fee_rate, restore_height):
 
-        Kbv_enc = self.encodePubkey(self.pubkey(kbv))
-        Kbs_enc = self.encodePubkey(self.pubkey(kbs))
-        address_b58 = xmr_util.encode_address(Kbv_enc, Kbs_enc)
+        Kbv = self.getPubkey(kbv)
+        Kbs = self.getPubkey(kbs)
+        address_b58 = xmr_util.encode_address(Kbv, Kbs)
 
         try:
             self.rpc_wallet_cb('close_wallet')
@@ -260,8 +297,8 @@ class XMRInterface(CoinInterface):
         params = {
             'filename': wallet_filename,
             'address': address_b58,
-            'viewkey': b2h(intToBytes32_le(kbv)),
-            'spendkey': b2h(intToBytes32_le(kbs)),
+            'viewkey': b2h(kbv[::-1]),
+            'spendkey': b2h(kbs[::-1]),
             'restore_height': restore_height,
         }
 
@@ -298,4 +335,4 @@ class XMRInterface(CoinInterface):
             b_fee += b_fee_rate
             logging.info('Raising fee to %d', b_fee)
 
-        return rv['tx_hash']
+        return bytes.fromhex(rv['tx_hash'])
