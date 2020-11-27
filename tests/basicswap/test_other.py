@@ -194,6 +194,12 @@ class Test(unittest.TestCase):
         proof = ci.proveDLEAG(key)
         assert(ci.verifyDLEAG(proof))
 
+    def test_rate(self):
+        scale_from = 8
+        scale_to = 12
+        amount_from = 100 * (10 ** scale_from)
+        rate = 0.1 * (10 ** scale_to)
+
 
 if __name__ == '__main__':
     unittest.main()

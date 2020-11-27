@@ -77,6 +77,7 @@ class XMRInterface(CoinInterface):
         return self.rpc_cb('get_block_count')['count']
 
     def getWalletInfo(self):
+        self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
         rv = {}
         balance_info = self.rpc_wallet_cb('get_balance')
         rv['balance'] = format_amount(balance_info['unlocked_balance'], XMRInterface.exp())
@@ -88,9 +89,13 @@ class XMRInterface(CoinInterface):
         return self.rpc_wallet_cb('get_address')['address']
 
     def getNewAddress(self, placeholder):
-        logging.debug('TODO - subaddress?')
+        logging.warning('TODO - subaddress?')
         self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
         return self.rpc_wallet_cb('get_address')['address']
+
+    def get_fee_rate(self):
+        logging.warning('TODO - estimate fee rate?')
+        return 0.0012595
 
     def isValidKey(self, key_bytes):
         ki = b2i(key_bytes)

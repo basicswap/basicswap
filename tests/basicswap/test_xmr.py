@@ -539,7 +539,7 @@ class Test(unittest.TestCase):
         assert(make_int(js_0[str(int(Coins.XMR))]['balance'], scale=12) > 0)
         assert(make_int(js_0[str(int(Coins.XMR))]['unconfirmed'], scale=12) > 0)
 
-        offer_id = swap_clients[0].postOffer(Coins.PART, Coins.XMR, 100 * COIN, 10 * XMR_COIN, 100 * COIN, SwapTypes.XMR_SWAP)
+        offer_id = swap_clients[0].postOffer(Coins.PART, Coins.XMR, 100 * COIN, 0.11 * XMR_COIN, 100 * COIN, SwapTypes.XMR_SWAP)
         self.wait_for_offer(swap_clients[1], offer_id)
         offers = swap_clients[1].listOffers(filters={'offer_id': offer_id})
         assert(len(offers) == 1)
@@ -554,13 +554,6 @@ class Test(unittest.TestCase):
 
         swap_clients[0].acceptXmrBid(bid_id)
 
-        #self.wait_for_bid(swap_clients[1], bid_id, BidStates.BID_ACCEPTED, sent=True, wait_for=40)
-        #self.wait_for_bid(swap_clients[0], bid_id, BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED)
-        #self.wait_for_bid(swap_clients[1], bid_id, BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED, wait_for=40, sent=True)
-
-        #self.wait_for_bid(swap_clients[0], bid_id, BidStates.XMR_SWAP_NOSCRIPT_COIN_LOCKED, wait_for=80)
-        #self.wait_for_bid(swap_clients[1], bid_id, BidStates.XMR_SWAP_NOSCRIPT_COIN_LOCKED, sent=True)
-
         self.wait_for_bid(swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=180)
         self.wait_for_bid(swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True)
 
@@ -570,7 +563,7 @@ class Test(unittest.TestCase):
 
         js_w0_before = json.loads(urlopen('http://localhost:1800/json/wallets').read())
 
-        offer_id = swap_clients[0].postOffer(Coins.PART, Coins.XMR, 101 * COIN, 1.1 * XMR_COIN, 101 * COIN, SwapTypes.XMR_SWAP,
+        offer_id = swap_clients[0].postOffer(Coins.PART, Coins.XMR, 101 * COIN, 0.12 * XMR_COIN, 101 * COIN, SwapTypes.XMR_SWAP,
             lock_type=SEQUENCE_LOCK_BLOCKS, lock_value=12)
         self.wait_for_offer(swap_clients[1], offer_id)
         offer = swap_clients[1].getOffer(offer_id)
@@ -599,7 +592,7 @@ class Test(unittest.TestCase):
 
         js_w0_before = json.loads(urlopen('http://localhost:1800/json/wallets').read())
 
-        offer_id = swap_clients[0].postOffer(Coins.PART, Coins.XMR, 101 * COIN, 1.1 * XMR_COIN, 101 * COIN, SwapTypes.XMR_SWAP,
+        offer_id = swap_clients[0].postOffer(Coins.PART, Coins.XMR, 101 * COIN, 0.13 * XMR_COIN, 101 * COIN, SwapTypes.XMR_SWAP,
             lock_type=SEQUENCE_LOCK_BLOCKS, lock_value=12)
         self.wait_for_offer(swap_clients[1], offer_id)
         offer = swap_clients[1].getOffer(offer_id)
@@ -626,7 +619,7 @@ class Test(unittest.TestCase):
 
         swap_clients = self.swap_clients
 
-        offer_id = swap_clients[0].postOffer(Coins.PART, Coins.XMR, 101 * COIN, 1.1 * XMR_COIN, 101 * COIN, SwapTypes.XMR_SWAP,
+        offer_id = swap_clients[0].postOffer(Coins.PART, Coins.XMR, 101 * COIN, 0.14 * XMR_COIN, 101 * COIN, SwapTypes.XMR_SWAP,
             lock_type=SEQUENCE_LOCK_BLOCKS, lock_value=18)
         self.wait_for_offer(swap_clients[1], offer_id)
         offer = swap_clients[1].getOffer(offer_id)

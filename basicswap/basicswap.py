@@ -751,7 +751,7 @@ class BasicSwap(BaseApp):
         assert(amount > chainparams[coin_from][self.chain]['min_amount']), 'From amount below min value for chain'
         assert(amount < chainparams[coin_from][self.chain]['max_amount']), 'From amount above max value for chain'
 
-        amount_to = (amount * rate) // COIN
+        amount_to = (amount * rate) // (10 ** chainparams[coin_from]['decimal_places'])
         assert(amount_to > chainparams[coin_to][self.chain]['min_amount']), 'To amount below min value for chain'
         assert(amount_to < chainparams[coin_to][self.chain]['max_amount']), 'To amount above max value for chain'
 
@@ -992,15 +992,8 @@ class BasicSwap(BaseApp):
         override_feerate = self.coin_clients[coin_type].get('override_feerate', None)
         if override_feerate:
             return override_feerate
-        try:
-            return self.callcoinrpc(coin_type, 'estimatesmartfee', [2])['feerate']
-        except Exception:
-            try:
-                fee_rate = self.callcoinrpc(coin_type, 'getwalletinfo')['paytxfee']
-                assert(fee_rate > 0.0), '0 feerate'
-                return fee_rate
-            except Exception:
-                return self.callcoinrpc(coin_type, 'getnetworkinfo')['relayfee']
+
+        return self.ci(coin_type).get_fee_rate()
 
     def withdrawCoin(self, coin_type, value, addr_to, subfee):
         self.log.info('withdrawCoin %s %s to %s %s', value, self.getTicker(coin_type), addr_to, ' subfee' if subfee else '')
@@ -1719,7 +1712,6 @@ class BasicSwap(BaseApp):
         self.log.error('Bid %s - Error: %s', bid_id.hex(), error_str)
         bid.setState(BidStates.BID_ERROR)
         bid.state_note = 'error msg: ' + error_str
-        print('[rm] saveBid 5')
         self.saveBid(bid_id, bid)
 
     def createInitiateTxn(self, coin_type, bid_id, bid, initiate_script):
@@ -3502,7 +3494,6 @@ class BasicSwap(BaseApp):
         bid.xmr_b_lock_tx.setState(TxStates.TX_NONE)
         #bid.txns[TxTypes.XMR_SWAP_B_LOCK] = xmr_b_lock_tx
 
-        print('[rm] saveBidInSession 23')
         self.saveBidInSession(bid_id, bid, session, xmr_swap)
 
         # Update copy of bid in swaps_in_progress
@@ -3538,7 +3529,6 @@ class BasicSwap(BaseApp):
         xmr_swap.coin_a_lock_refund_spend_tx_msg_id = bytes.fromhex(ro['msgid'])
 
         bid.setState(BidStates.XMR_SWAP_SECRET_SHARED)
-        print('[rm] saveBidInSession 24')
         self.saveBidInSession(bid_id, bid, session, xmr_swap)
         # Update copy of bid in swaps_in_progress
         self.swaps_in_progress[bid_id] = (bid, offer)
@@ -3590,7 +3580,6 @@ class BasicSwap(BaseApp):
         )
         bid.xmr_a_lock_spend_tx.setState(TxStates.TX_NONE)
 
-        print('[rm] saveBidInSession 25')
         self.saveBidInSession(bid_id, bid, session, xmr_swap)
         # Update copy of bid in swaps_in_progress
         self.swaps_in_progress[bid_id] = (bid, offer)
@@ -3633,7 +3622,6 @@ class BasicSwap(BaseApp):
         #print('[rm] TxTypes.XMR_SWAP_B_LOCK', txn.bid_id.hex())
         #txn.spend_txid = txid
         #bid.txns[TxTypes.XMR_SWAP_B_LOCK].spend_txid = txid
-        print('[rm] saveBidInSession 26')
         self.saveBidInSession(bid_id, bid, session, xmr_swap)
         # Update copy of bid in swaps_in_progress
         self.swaps_in_progress[bid_id] = (bid, offer)
@@ -3674,7 +3662,6 @@ class BasicSwap(BaseApp):
         bid.xmr_b_lock_tx.spend_txid = txid
 
         bid.setState(BidStates.XMR_SWAP_NOSCRIPT_TX_RECOVERED)
-        print('[rm] saveBidInSession 32')
         self.saveBidInSession(bid_id, bid, session, xmr_swap)
         # Update copy of bid in swaps_in_progress
         self.swaps_in_progress[bid_id] = (bid, offer)
@@ -3734,7 +3721,6 @@ class BasicSwap(BaseApp):
             self.createEvent(delay, EventTypes.SEND_XMR_SWAP_LOCK_TX_A, bid_id)
 
             bid.setState(BidStates.SWAP_DELAYING)
-            print('[rm] saveBid 27')
             self.saveBid(bid_id, bid, xmr_swap=xmr_swap)
         except Exception as ex:
             if self.debug:
@@ -3780,7 +3766,6 @@ class BasicSwap(BaseApp):
             assert(v), 'verifyTxOtVES failed'
 
             bid.setState(BidStates.XMR_SWAP_HAVE_SCRIPT_COIN_SPEND_TX)
-            print('[rm] saveBid 28')
             self.saveBid(bid_id, bid, xmr_swap=xmr_swap)
         except Exception as ex:
             if self.debug:
@@ -3835,7 +3820,6 @@ class BasicSwap(BaseApp):
         self.createEvent(delay, EventTypes.REDEEM_XMR_SWAP_LOCK_TX_A, bid_id)
 
         bid.setState(BidStates.XMR_SWAP_SECRET_SHARED)
-        print('[rm] saveBid 29')
         self.saveBid(bid_id, bid, xmr_swap=xmr_swap)
         self.swaps_in_progress[bid_id] = (bid, offer)
 
@@ -3905,7 +3889,6 @@ class BasicSwap(BaseApp):
                 for bid_id, v in self.swaps_in_progress.items():
                     try:
                         if self.checkBidState(bid_id, v[0], v[1]) is True:
-                            self.log.debug('[rm] removing state: %s', BidStates(v[0].state))
                             to_remove.append(bid_id)
                     except Exception as ex:
                         self.log.error('checkBidState %s %s', bid_id.hex(), str(ex))
@@ -3960,7 +3943,6 @@ class BasicSwap(BaseApp):
             if has_changed:
                 session = scoped_session(self.session_factory)
                 try:
-                    print('[rm] saveBidInSession 30')
                     self.saveBidInSession(bid_id, bid, session)
                     session.commit()
                     if bid.state and bid.state > BidStates.BID_RECEIVED and bid.state < BidStates.SWAP_COMPLETED:
@@ -4213,5 +4195,4 @@ class BasicSwap(BaseApp):
         self.log.debug('Bid %s Setting debug flag: %s', bid_id.hex(), debug_ind)
         bid = self.getBid(bid_id)
         bid.debug_ind = debug_ind
-        print('[rm] saveBid 31')
         self.saveBid(bid_id, bid)

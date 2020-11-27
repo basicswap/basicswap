@@ -192,4 +192,8 @@ chainparams = {
 
 
 class CoinInterface:
-    pass
+    def format_amount(self, amount_int):
+        return format_amount(feerate, self.exp())
+
+    def coin_name(self):
+        return chainparams[self.coin_type()]['name'].capitalize()
