@@ -105,11 +105,15 @@ class Bid(Base):
 
     state_note = sa.Column(sa.String)
 
+    debug_ind = sa.Column(sa.Integer)
+
     initiate_tx = None
     participate_tx = None
     xmr_a_lock_tx = None
-    xmr_b_lock_tx = None
     xmr_a_lock_spend_tx = None
+    xmr_b_lock_tx = None  # TODO: Can't move to txns due to error: Exception UPDATE statement on table expected to update 1 row(s); 0 were matched
+
+    txns = {}
 
     def getITxState(self):
         if self.initiate_tx is None:
@@ -273,17 +277,22 @@ class XmrSwap(Base):
 
     a_lock_refund_tx = sa.Column(sa.LargeBinary)
     a_lock_refund_tx_script = sa.Column(sa.LargeBinary)
+    a_lock_refund_tx_id = sa.Column(sa.LargeBinary)
     a_swap_refund_value = sa.Column(sa.BigInteger)
+    al_lock_refund_tx_sig = sa.Column(sa.LargeBinary)
+    af_lock_refund_tx_sig = sa.Column(sa.LargeBinary)
 
     a_lock_refund_spend_tx = sa.Column(sa.LargeBinary)
+    a_lock_refund_spend_tx_id = sa.Column(sa.LargeBinary)
 
     af_lock_refund_spend_tx_esig = sa.Column(sa.LargeBinary)
     af_lock_refund_spend_tx_sig = sa.Column(sa.LargeBinary)
-    af_lock_refund_tx_sig = sa.Column(sa.LargeBinary)
 
     a_lock_spend_tx = sa.Column(sa.LargeBinary)
     a_lock_spend_tx_id = sa.Column(sa.LargeBinary)
     al_lock_spend_tx_esig = sa.Column(sa.LargeBinary)
+
+    a_lock_refund_swipe_tx = sa.Column(sa.LargeBinary)  # Follower spends script coin lock refund tx
 
     b_lock_tx_id = sa.Column(sa.LargeBinary)
 

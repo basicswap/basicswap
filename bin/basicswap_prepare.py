@@ -128,6 +128,8 @@ def prepareCore(coin, version, settings, data_dir):
     if coin == 'monero':
         url = 'https://downloads.getmonero.org/cli/monero-linux-x64-v${}.tar.bz2'.format(version)
 
+        # TODO
+
         release_path = os.path.join(bin_dir, release_filename)
         if not os.path.exists(release_path):
             downloadFile(release_url, release_path)

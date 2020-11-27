@@ -280,7 +280,6 @@ class XMRInterface(CoinInterface):
 
         return None
 
-
     def spendBLockTx(self, address_to, kbv, kbs, cb_swap_value, b_fee_rate, restore_height):
 
         Kbv = self.getPubkey(kbv)

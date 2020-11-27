@@ -11,7 +11,6 @@ import logging
 from io import BytesIO
 from basicswap.contrib.test_framework import segwit_addr
 
-
 from .util import (
     decodeScriptNum,
     getCompactSizeLen,
@@ -42,8 +41,7 @@ from .contrib.test_framework.messages import (
     CTxIn,
     CTxInWitness,
     CTxOut,
-    FromHex,
-    ToHex)
+    FromHex)
 
 from .contrib.test_framework.script import (
     CScript,
@@ -110,7 +108,8 @@ class BTCInterface(CoinInterface):
             rv += output.nValue
         return rv
 
-    def compareFeeRates(self, a, b):
+    @staticmethod
+    def compareFeeRates(a, b):
         return abs(a - b) < 20
 
     def __init__(self, coin_settings, network):
@@ -118,6 +117,9 @@ class BTCInterface(CoinInterface):
         self.txoType = CTxOut
         self._network = network
         self.blocks_confirmed = coin_settings['blocks_confirmed']
+
+    def coin_name(self):
+        return chainparams[self.coin_type()]['name']
 
     def testDaemonRPC(self):
         self.rpc_callback('getwalletinfo', [])
@@ -330,10 +332,10 @@ class BTCInterface(CoinInterface):
 
         return tx.serialize(), refund_script, tx.vout[0].nValue
 
-    def createScriptLockRefundSpendTx(self, tx_lock_refund_bytes, script_lock_refund, Kal, tx_fee_rate):
+    def createScriptLockRefundSpendTx(self, tx_lock_refund_bytes, script_lock_refund, pkh_refund_to, tx_fee_rate):
         # Returns the coinA locked coin to the leader
         # The follower will sign the multisig path with a signature encumbered by the leader's coinB spend pubkey
-        # When the leader publishes the decrypted signature the leader's coinB spend privatekey will be revealed to the follower
+        # If the leader publishes the decrypted signature the leader's coinB spend privatekey will be revealed to the follower
 
         tx_lock_refund = self.loadTx(tx_lock_refund_bytes)
 
@@ -349,9 +351,8 @@ class BTCInterface(CoinInterface):
         tx.nVersion = self.txVersion()
         tx.vin.append(CTxIn(COutPoint(tx_lock_refund_hash_int, locked_n), nSequence=0))
 
-        #pubkeyhash = hash160(self.encodePubkey(Kal))
-        pubkeyhash = hash160(Kal)
-        tx.vout.append(self.txoType(locked_coin, CScript([OP_0, pubkeyhash])))
+        #pubkeyhash = hash160(Kal)
+        tx.vout.append(self.txoType(locked_coin, CScript([OP_0, pkh_refund_to])))
 
         witness_bytes = len(script_lock_refund)
         witness_bytes += 73 * 2  # 2 signatures (72 + 1 byte size)
@@ -367,8 +368,11 @@ class BTCInterface(CoinInterface):
 
         return tx.serialize()
 
-    def createScriptLockRefundSpendToFTx(self, tx_lock_refund, script_lock_refund, pkh_dest, tx_fee_rate):
+    def createScriptLockRefundSpendToFTx(self, tx_lock_refund_bytes, script_lock_refund, pkh_dest, tx_fee_rate):
         # Sends the coinA locked coin to the follower
+
+        tx_lock_refund = self.loadTx(tx_lock_refund_bytes)
+
         output_script = CScript([OP_0, hashlib.sha256(script_lock_refund).digest()])
         locked_n = findOutput(tx_lock_refund, output_script)
         assert_cond(locked_n is not None, 'Output not found in tx')
@@ -575,10 +579,11 @@ class BTCInterface(CoinInterface):
 
         assert_cond(len(tx.vout) == 1, 'tx doesn\'t have one output')
 
-        p2wpkh = CScript([OP_0, hash160(Kal)])
-        locked_n = findOutput(tx, p2wpkh)
-        assert_cond(locked_n is not None, 'Output not found in lock refund spend tx')
-        tx_value = tx.vout[locked_n].nValue
+        # Destination doesn't matter to the follower
+        #p2wpkh = CScript([OP_0, hash160(Kal)])
+        #locked_n = findOutput(tx, p2wpkh)
+        #assert_cond(locked_n is not None, 'Output not found in lock refund spend tx')
+        tx_value = tx.vout[0].nValue
 
         fee_paid = prevout_value - tx_value
         assert(fee_paid > 0)
@@ -661,26 +666,27 @@ class BTCInterface(CoinInterface):
         sig_hash = SegwitV0SignatureHash(prevout_script, tx, prevout_n, SIGHASH_ALL, prevout_value)
 
         return ecdsaotves_enc_sign(key_sign, pubkey_encrypt, sig_hash)
-        #return otves.EncSign(key_sign, key_encrypt, sig_hash)
 
-    def verifyTxOtVES(self, tx_bytes, sig, Ks, Ke, prevout_n, prevout_script, prevout_value):
+    def verifyTxOtVES(self, tx_bytes, ct, Ks, Ke, prevout_n, prevout_script, prevout_value):
         tx = self.loadTx(tx_bytes)
         sig_hash = SegwitV0SignatureHash(prevout_script, tx, prevout_n, SIGHASH_ALL, prevout_value)
-        return ecdsaotves_enc_verify(Ks, Ke, sig_hash, sig)
-        #return otves.EncVrfy(Ks, Ke, sig_hash, sig)
+        return ecdsaotves_enc_verify(Ks, Ke, sig_hash, ct)
 
     def decryptOtVES(self, k, esig):
         return ecdsaotves_dec_sig(k, esig) + b'\x01'  # 0x1 is SIGHASH_ALL
-        #return otves.DecSig(k, esig) + b'\x01'  # 0x1 is SIGHASH_ALL
 
     def verifyTxSig(self, tx_bytes, sig, K, prevout_n, prevout_script, prevout_value):
         tx = self.loadTx(tx_bytes)
         sig_hash = SegwitV0SignatureHash(prevout_script, tx, prevout_n, SIGHASH_ALL, prevout_value)
 
         ecK = ECPubKey()
-        #ecK.set_int(K.x(), K.y())
         ecK.set(K)
         return ecK.verify_ecdsa(sig[: -1], sig_hash)  # Pop the hashtype byte
+
+    def verifySig(self, pubkey, signed_hash, sig):
+        ecK = ECPubKey()
+        ecK.set(pubkey)
+        return ecK.verify_ecdsa(sig, signed_hash)
 
     def fundTx(self, tx, feerate):
         feerate_str = format_amount(feerate, self.exp())

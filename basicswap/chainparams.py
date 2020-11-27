@@ -16,7 +16,7 @@ class Coins(IntEnum):
     PART = 1
     BTC = 2
     LTC = 3
-    #DCR = 4
+    # DCR = 4
     NMC = 5
     XMR = 6
 
@@ -190,6 +190,6 @@ chainparams = {
     }
 }
 
+
 class CoinInterface:
     pass
-

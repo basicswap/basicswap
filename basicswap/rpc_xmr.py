@@ -82,4 +82,3 @@ def make_xmr_wallet_rpc_func(port, auth):
         nonlocal port, auth
         return callrpc_xmr(port, auth, method, params)
     return rpc_func
-

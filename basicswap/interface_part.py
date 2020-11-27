@@ -10,7 +10,7 @@ from .contrib.test_framework.messages import (
 )
 
 from .interface_btc import BTCInterface
-from .chainparams import CoinInterface, Coins
+from .chainparams import Coins
 from .rpc import make_rpc_func
 
 

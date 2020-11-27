@@ -6,6 +6,7 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import unittest
+import secrets
 
 import basicswap.contrib.ed25519_fast as edf
 import basicswap.ed25519_fast_util as edu
@@ -13,6 +14,14 @@ import basicswap.ed25519_fast_util as edu
 from basicswap.ecc_util import i2b
 from coincurve.ed25519 import ed25519_get_pubkey
 
+from coincurve.ecdsaotves import (
+    ecdsaotves_enc_sign,
+    ecdsaotves_enc_verify,
+    ecdsaotves_dec_sig,
+    ecdsaotves_rec_enc_key)
+
+from basicswap.interface_btc import BTCInterface
+from basicswap.interface_xmr import XMRInterface
 
 from basicswap.util import (
     SerialiseNum,
@@ -29,6 +38,9 @@ from basicswap.basicswap import (
     SEQUENCE_LOCK_BLOCKS,
     SEQUENCE_LOCK_TIME,
 )
+
+from basicswap.ecc_util import (
+    i2b)
 
 
 class Test(unittest.TestCase):
@@ -151,6 +163,36 @@ class Test(unittest.TestCase):
         privkey_bytes = i2b(privkey)
         pubkey_test = ed25519_get_pubkey(privkey_bytes)
         assert(pubkey == pubkey_test)
+
+    def test_ecdsa_otves(self):
+        coin_settings = {'rpcport': 0, 'rpcauth': 'none', 'blocks_confirmed': 1}
+        ci = BTCInterface(coin_settings, 'regtest')
+        vk_sign = i2b(ci.getNewSecretKey())
+        vk_encrypt = i2b(ci.getNewSecretKey())
+
+        pk_sign = ci.getPubkey(vk_sign)
+        pk_encrypt = ci.getPubkey(vk_encrypt)
+        sign_hash = secrets.token_bytes(32)
+
+        cipher_text = ecdsaotves_enc_sign(vk_sign, pk_encrypt, sign_hash)
+
+        assert(ecdsaotves_enc_verify(pk_sign, pk_encrypt, sign_hash, cipher_text))
+
+        sig = ecdsaotves_dec_sig(vk_encrypt, cipher_text)
+
+        assert(ci.verifySig(pk_sign, sign_hash, sig))
+
+        recovered_key = ecdsaotves_rec_enc_key(pk_encrypt, cipher_text, sig)
+
+        assert(vk_encrypt == recovered_key)
+
+    def test_dleag(self):
+        coin_settings = {'rpcport': 0, 'walletrpcport': 0, 'walletrpcauth': 'none', 'blocks_confirmed': 1}
+        ci = XMRInterface(coin_settings, 'regtest')
+
+        key = i2b(ci.getNewSecretKey())
+        proof = ci.proveDLEAG(key)
+        assert(ci.verifyDLEAG(proof))
 
 
 if __name__ == '__main__':
