@@ -200,6 +200,20 @@ class Test(unittest.TestCase):
         amount_from = 100 * (10 ** scale_from)
         rate = 0.1 * (10 ** scale_to)
 
+        amount_to = int((amount_from * rate) // (10 ** scale_from))
+        assert('100.00000000' == format_amount(amount_from, scale_from))
+        assert('10.000000000000' == format_amount(amount_to, scale_to))
+
+        scale_from = 12
+        scale_to = 8
+        amount_from = 1 * (10 ** scale_from)
+        rate = 12 * (10 ** scale_to)
+
+        amount_to = int((amount_from * rate) // (10 ** scale_from))
+        assert('1.000000000000' == format_amount(amount_from, scale_from))
+        assert('12.00000000' == format_amount(amount_to, scale_to))
+
+
 
 if __name__ == '__main__':
     unittest.main()

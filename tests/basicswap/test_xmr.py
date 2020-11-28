@@ -81,6 +81,8 @@ XMR_BASE_ZMQ_PORT = 22792
 XMR_BASE_WALLET_RPC_PORT = 23792
 
 PREFIX_SECRET_KEY_REGTEST = 0x2e
+
+delay_event = threading.Event()
 stop_test = False
 
 
@@ -263,8 +265,9 @@ def make_rpc_func(node_id, base_rpc_port=BASE_RPC_PORT):
 
 def signal_handler(sig, frame):
     global stop_test
-    print('signal {} detected.'.format(sig))
+    logging.info('signal {} detected.'.format(sig))
     stop_test = True
+    delay_event.set()
 
 
 def waitForXMRNode(rpc_offset, max_tries=7):
@@ -531,6 +534,11 @@ class Test(unittest.TestCase):
                     return
         raise ValueError('wait_for_bid timed out.')
 
+    def delay_for(self, delay_for=60):
+        logging.info('Delaying for {} seconds.'.format(delay_for))
+        delay_event.clear()
+        delay_event.wait(delay_for)
+
     def test_01_part_xmr(self):
         logging.info('---------- Test PART to XMR')
         swap_clients = self.swap_clients
@@ -556,6 +564,12 @@ class Test(unittest.TestCase):
 
         self.wait_for_bid(swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=180)
         self.wait_for_bid(swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True)
+
+        js_0_end = json.loads(urlopen('http://localhost:1800/json/wallets').read())
+        end_xmr = float(js_0_end['6']['balance']) + float(js_0_end['6']['unconfirmed'])
+        assert(end_xmr > 10.9 and end_xmr < 11.0)
+
+        self.delay_for(600)
 
     def test_02_leader_recover_a_lock_tx(self):
         logging.info('---------- Test PART to XMR leader recovers coin a lock tx')
@@ -657,6 +671,9 @@ class Test(unittest.TestCase):
 
         self.wait_for_bid(swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=180)
         self.wait_for_bid(swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True)
+
+    def pass_06_delay(self):
+        self.delay_for(60)
 
 
 if __name__ == '__main__':

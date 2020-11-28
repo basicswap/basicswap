@@ -17,8 +17,6 @@ from jinja2 import Environment, PackageLoader
 
 from . import __version__
 from .util import (
-    COIN,
-    format8,
     make_int,
     dumpj,
 )
@@ -157,6 +155,8 @@ def describeBid(swap_client, bid, offer, edit_bid, show_txns):
 
     coin_from = Coins(offer.coin_from)
     coin_to = Coins(offer.coin_to)
+    ci_from = swap_client.ci(coin_from)
+    ci_to = swap_client.ci(coin_to)
     ticker_from = swap_client.getTicker(coin_from)
     ticker_to = swap_client.getTicker(coin_to)
 
@@ -189,8 +189,8 @@ def describeBid(swap_client, bid, offer, edit_bid, show_txns):
         state_description = ''
 
     data = {
-        'amt_from': format8(bid.amount),
-        'amt_to': format8((bid.amount * offer.rate) // COIN),
+        'amt_from': ci_from.format_amount(bid.amount),
+        'amt_to': ci_to.format_amount((bid.amount * offer.rate) // ci_from.COIN()),
         'ticker_from': ticker_from,
         'ticker_to': ticker_to,
         'bid_state': strBidState(bid.state),
@@ -374,6 +374,8 @@ class HttpHandler(BaseHTTPRequestHandler):
                     'error': w['error']
                 })
                 continue
+
+            ci = swap_client.ci(k)
             fee_rate = swap_client.getFeeRateForCoin(k)
             tx_vsize = swap_client.getContractSpendTxVSize(k)
             est_fee = (fee_rate * tx_vsize) / 1000
@@ -381,8 +383,8 @@ class HttpHandler(BaseHTTPRequestHandler):
                 'name': w['name'],
                 'version': w['version'],
                 'cid': str(int(k)),
-                'fee_rate': format8(fee_rate * COIN),
-                'est_fee': format8(est_fee * COIN),
+                'fee_rate': ci.format_amount(int(fee_rate * ci.COIN())),
+                'est_fee': ci.format_amount(int(est_fee * ci.COIN())),
                 'balance': w['balance'],
                 'blocks': w['blocks'],
                 'synced': w['synced'],
@@ -437,6 +439,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             raise ValueError('Unknown Coin From')
         try:
             coin_to = Coins(int(form_data[b'coin_to'][0]))
+            ci_to = swap_client.ci(coin_to)
         except Exception:
             raise ValueError('Unknown Coin To')
 
@@ -444,7 +447,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         value_to = inputAmount(form_data[b'amt_to'][0].decode('utf-8'))
 
         min_bid = int(value_from)
-        rate = int((value_to / value_from) * COIN)
+        rate = int((value_to / value_from) * ci_to.COIN())
         autoaccept = True if b'autoaccept' in form_data else False
         lock_seconds = int(form_data[b'lockhrs'][0]) * 60 * 60
         # TODO: More accurate rate
@@ -516,8 +519,8 @@ class HttpHandler(BaseHTTPRequestHandler):
             'coin_from': ci_from.coin_name(),
             'coin_to': ci_to.coin_name(),
             'amt_from': ci_from.format_amount(offer.amount_from),
-            'amt_to': ci_to.format_amount((offer.amount_from * offer.rate) // COIN),
-            'rate': format8(offer.rate),
+            'amt_to': ci_to.format_amount((offer.amount_from * offer.rate) // ci_from.COIN()),
+            'rate': ci_to.format_amount(offer.rate),
             'lock_type': getLockName(offer.lock_type),
             'lock_value': offer.lock_value,
             'addr_from': offer.addr_from,
@@ -540,7 +543,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             sent_bid_id=sent_bid_id,
             messages=messages,
             data=data,
-            bids=[(b[1].hex(), format8(b[3]), strBidState(b[4]), strTxState(b[6]), strTxState(b[7])) for b in bids],
+            bids=[(b[1].hex(), ci_from.format_amount(b[3]), strBidState(b[4]), strTxState(b[6]), strTxState(b[7])) for b in bids],
             addrs=None if show_bid_form is None else swap_client.listSmsgAddresses('bid'),
             form_id=os.urandom(8).hex(),
         ), 'UTF-8')
@@ -583,6 +586,18 @@ class HttpHandler(BaseHTTPRequestHandler):
 
         offers = swap_client.listOffers(sent, filters)
 
+        formatted_offers = []
+        for o in offers:
+            ci_from = swap_client.ci(Coins(o.coin_from))
+            ci_to = swap_client.ci(Coins(o.coin_to))
+            formatted_offers.append((
+                time.strftime('%Y-%m-%d %H:%M', time.localtime(o.created_at)),
+                o.offer_id.hex(),
+                ci_from.coin_name(), ci_to.coin_name(),
+                ci_from.format_amount(o.amount_from),
+                ci_to.format_amount((o.amount_from * o.rate) // ci_from.COIN()),
+                ci_to.format_amount(o.rate)))
+
         template = env.get_template('offers.html')
         return bytes(template.render(
             title=self.server.title,
@@ -591,8 +606,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             coins=listAvailableCoins(swap_client),
             messages=messages,
             filters=filters,
-            offers=[(time.strftime('%Y-%m-%d %H:%M', time.localtime(o.created_at)),
-                     o.offer_id.hex(), getCoinName(Coins(o.coin_from)), getCoinName(Coins(o.coin_to)), format8(o.amount_from), format8((o.amount_from * o.rate) // COIN), format8(o.rate)) for o in offers],
+            offers=formatted_offers,
             form_id=os.urandom(8).hex(),
         ), 'UTF-8')
 

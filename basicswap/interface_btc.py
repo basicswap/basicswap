@@ -82,6 +82,10 @@ class BTCInterface(CoinInterface):
         return Coins.BTC
 
     @staticmethod
+    def COIN():
+        return COIN
+
+    @staticmethod
     def exp():
         return 8
 
@@ -117,9 +121,6 @@ class BTCInterface(CoinInterface):
         self.txoType = CTxOut
         self._network = network
         self.blocks_confirmed = coin_settings['blocks_confirmed']
-
-    def coin_name(self):
-        return chainparams[self.coin_type()]['name']
 
     def testDaemonRPC(self):
         self.rpc_callback('getwalletinfo', [])

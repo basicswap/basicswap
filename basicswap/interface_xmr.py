@@ -38,6 +38,10 @@ class XMRInterface(CoinInterface):
         return Coins.XMR
 
     @staticmethod
+    def COIN():
+        return XMR_COIN
+
+    @staticmethod
     def exp():
         return 12
 
@@ -279,6 +283,7 @@ class XMRInterface(CoinInterface):
         rv = self.rpc_wallet_cb('incoming_transfers', params)
         if 'transfers' in rv:
             for transfer in rv['transfers']:
+                print('[rm] transfer', transfer)
                 if transfer['tx_hash'] == txid \
                    and (current_height is None or current_height - transfer['block_height'] > self.blocks_confirmed):
                     return {'txid': transfer['tx_hash'], 'amount': transfer['amount'], 'height': transfer['block_height']}

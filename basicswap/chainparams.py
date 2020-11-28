@@ -7,6 +7,7 @@
 from enum import IntEnum
 from .util import (
     COIN,
+    format_amount
 )
 
 XMR_COIN = 10 ** 12
@@ -193,7 +194,7 @@ chainparams = {
 
 class CoinInterface:
     def format_amount(self, amount_int):
-        return format_amount(feerate, self.exp())
+        return format_amount(amount_int, self.exp())
 
     def coin_name(self):
         return chainparams[self.coin_type()]['name'].capitalize()

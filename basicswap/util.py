@@ -276,6 +276,8 @@ def validate_amount(amount, scale=8):
 
 
 def format_amount(i, display_scale, scale=None):
+    if not isinstance(i, int):
+        raise ValueError('Amount must be an integer.')  # Raise error instead of converting as amounts should always be integers
     if scale is None:
         scale = display_scale
     ep = 10 ** scale
@@ -284,7 +286,7 @@ def format_amount(i, display_scale, scale=None):
     remainder = n % ep
     if display_scale != scale:
         remainder %= (10 ** display_scale)
-    rv = '{}.{:0>{prec}}'.format(quotient, remainder, prec=display_scale)
+    rv = '{}.{:0>{scale}}'.format(quotient, remainder, scale=display_scale)
     if i < 0:
         rv = '-' + rv
     return rv
