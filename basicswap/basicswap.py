@@ -348,6 +348,15 @@ def replaceAddrPrefix(addr, coin_type, chain_name, addr_type='pubkey_address'):
     return encodeAddress(bytes((chainparams[coin_type][chain_name][addr_type],)) + decodeAddress(addr)[1:])
 
 
+class WatchedOutput():
+    def __init__(self, bid_id, txid_hex, vout, tx_type, swap_type):
+        self.bid_id = bid_id
+        self.txid_hex = txid_hex
+        self.vout = vout
+        self.tx_type = tx_type
+        self.swap_type = swap_type
+
+
 class BasicSwap(BaseApp):
     def __init__(self, fp, data_dir, settings, chain, log_name='BasicSwap'):
         super().__init__(fp, data_dir, settings, chain, log_name)
@@ -674,6 +683,7 @@ class BasicSwap(BaseApp):
         if bid.participate_tx and bid.participate_tx.txid:
             self.addWatchedOutput(coin_to, bid.bid_id, bid.participate_tx.txid.hex(), bid.participate_tx.vout, BidStates.SWAP_PARTICIPATING)
 
+        # TODO: watch for xmr bid outputs
         if self.coin_clients[coin_from]['last_height_checked'] < 1:
             if bid.initiate_tx and bid.initiate_tx.chain_height:
                 self.coin_clients[coin_from]['last_height_checked'] = bid.initiate_tx.chain_height
@@ -685,6 +695,7 @@ class BasicSwap(BaseApp):
 
     def deactivateBid(self, offer, bid):
         # Remove from in progress
+        self.log.debug('Removing bid from in-progress: %s', bid.bid_id.hex())
         self.swaps_in_progress.pop(bid.bid_id, None)
 
         # Remove any watched outputs
@@ -693,13 +704,15 @@ class BasicSwap(BaseApp):
 
         if bid.state == BidStates.BID_ABANDONED or bid.state == BidStates.SWAP_COMPLETED:
             # Return unused addrs to pool
-            if bid.getITxState() != TxStates.TX_REDEEMED:
+            itx_state = bid.getITxState()
+            ptx_state = bid.getPTxState()
+            if itx_state is not None and itx_state != TxStates.TX_REDEEMED:
                 self.returnAddressToPool(bid.bid_id, TxTypes.ITX_REDEEM)
-            if bid.getITxState() != TxStates.TX_REFUNDED:
+            if itx_state is not None and itx_state != TxStates.TX_REFUNDED:
                 self.returnAddressToPool(bid.bid_id, TxTypes.ITX_REFUND)
-            if bid.getPTxState() != TxStates.TX_REDEEMED:
+            if ptx_state is not None and ptx_state != TxStates.TX_REDEEMED:
                 self.returnAddressToPool(bid.bid_id, TxTypes.PTX_REDEEM)
-            if bid.getPTxState() != TxStates.TX_REFUNDED:
+            if ptx_state is not None and ptx_state != TxStates.TX_REFUNDED:
                 self.returnAddressToPool(bid.bid_id, TxTypes.PTX_REFUND)
 
     def loadFromDB(self):
@@ -2636,9 +2649,9 @@ class BasicSwap(BaseApp):
         except Exception:
             return None
 
-    def addWatchedOutput(self, coin_type, bid_id, txid_hex, vout, tx_type):
+    def addWatchedOutput(self, coin_type, bid_id, txid_hex, vout, tx_type, swap_type=None):
         self.log.debug('Adding watched output %s bid %s tx %s type %s', coin_type, bid_id.hex(), txid_hex, tx_type)
-        self.coin_clients[coin_type]['watched_outputs'].append((bid_id, txid_hex, vout, tx_type))
+        self.coin_clients[coin_type]['watched_outputs'].append(WatchedOutput(bid_id, txid_hex, vout, tx_type, swap_type))
 
     def removeWatchedOutput(self, coin_type, bid_id, txid_hex):
         # Remove all for bid if txid is None
@@ -2646,9 +2659,9 @@ class BasicSwap(BaseApp):
         old_len = len(self.coin_clients[coin_type]['watched_outputs'])
         for i in range(old_len - 1, -1, -1):
             wo = self.coin_clients[coin_type]['watched_outputs'][i]
-            if wo[0] == bid_id and (txid_hex is None or wo[1] == txid_hex):
+            if wo.bid_id == bid_id and (txid_hex is None or wo.txid_hex == txid_hex):
                 del self.coin_clients[coin_type]['watched_outputs'][i]
-                self.log.debug('Removed watched output %s %s %s', str(coin_type), bid_id.hex(), wo[1])
+                self.log.debug('Removed watched output %s %s %s', str(coin_type), bid_id.hex(), wo.txid_hex)
 
     def initiateTxnSpent(self, bid_id, spend_txid, spend_n, spend_txn):
         self.log.debug('Bid %s initiate txn spent by %s %d', bid_id.hex(), spend_txid, spend_n)
@@ -2716,28 +2729,36 @@ class BasicSwap(BaseApp):
             self.removeWatchedOutput(coin_to, bid_id, bid.participate_tx.txid.hex())
             self.saveBid(bid_id, bid)
 
+    def processSpentOutput(self, coin_type, watched_output, spend_txid_hex, spend_n, spend_txn):
+        if watched_output.swap_type == SwapTypes.XMR_SWAP:
+
+            self.removeWatchedOutput(coin_type, watched_output.bid_id, watched_output.txid_hex)
+            return
+
+        if watched_output.tx_type == BidStates.SWAP_PARTICIPATING:
+            self.participateTxnSpent(watched_output.bid_id, spend_txid_hex, spend_n, spend_txn)
+        else:
+            self.initiateTxnSpent(watched_output.bid_id, spend_txid_hex, spend_n, spend_txn)
+
     def checkForSpends(self, coin_type, c):
         # assert(self.mxDB.locked()) self.log.debug('checkForSpends %s', coin_type)
+        self.log.debug('checkForSpends %s', coin_type)
 
         if coin_type == Coins.PART:
             # TODO: batch getspentinfo
             for o in c['watched_outputs']:
                 found_spend = None
                 try:
-                    found_spend = self.callcoinrpc(Coins.PART, 'getspentinfo', [{'txid': o[1], 'index': o[2]}])
+                    found_spend = self.callcoinrpc(Coins.PART, 'getspentinfo', [{'txid': o.txid_hex, 'index': o.vout}])
                 except Exception as ex:
                     if 'Unable to get spent info' not in str(ex):
                         self.log.warning('getspentinfo %s', str(ex))
                 if found_spend is not None:
-                    self.log.debug('Found spend in spentindex %s %d in %s %d', o[1], o[2], found_spend['txid'], found_spend['index'])
-                    bid_id = o[0]
+                    self.log.debug('Found spend in spentindex %s %d in %s %d', o.txid_hex, o.vout, found_spend['txid'], found_spend['index'])
                     spend_txid = found_spend['txid']
                     spend_n = found_spend['index']
                     spend_txn = self.callcoinrpc(Coins.PART, 'getrawtransaction', [spend_txid, True])
-                    if o[3] == BidStates.SWAP_PARTICIPATING:
-                        self.participateTxnSpent(bid_id, spend_txid, spend_n, spend_txn)
-                    else:
-                        self.initiateTxnSpent(bid_id, spend_txid, spend_n, spend_txn)
+                    self.processSpentOutput(coin_type, o, spend_txid, spend_n, spend_txn)
         else:
             chain_blocks = self.callcoinrpc(coin_type, 'getblockchaininfo')['blocks']
             last_height_checked = c['last_height_checked']
@@ -2752,13 +2773,9 @@ class BasicSwap(BaseApp):
                             inp_txid = inp.get('txid', None)
                             if inp_txid is None:  # Coinbase
                                 continue
-                            if inp_txid == o[1] and inp['vout'] == o[2]:
-                                self.log.debug('Found spend from search %s %d in %s %d', o[1], o[2], tx['txid'], i)
-                                bid_id = o[0]
-                                if o[3] == BidStates.SWAP_PARTICIPATING:
-                                    self.participateTxnSpent(bid_id, tx['txid'], i, tx)
-                                else:
-                                    self.initiateTxnSpent(bid_id, tx['txid'], i, tx)
+                            if inp_txid == o.txid_hex and inp['vout'] == o.vout:
+                                self.log.debug('Found spend from search %s %d in %s %d', o.txid_hex, o.vout, tx['txid'], i)
+                                self.processSpentOutput(coin_type, o, tx['txid'], i, tx)
                 last_height_checked += 1
             if c['last_height_checked'] != last_height_checked:
                 c['last_height_checked'] = last_height_checked
@@ -3306,7 +3323,7 @@ class BasicSwap(BaseApp):
             xmr_swap.al_lock_refund_tx_sig = msg_data.al_lock_refund_tx_sig
 
             check_a_lock_tx_inputs = True
-            xmr_swap.a_lock_tx_id, lock_tx_vout = ci_from.verifyLockTx(
+            xmr_swap.a_lock_tx_id, xmr_swap.a_lock_tx_vout = ci_from.verifyLockTx(
                 xmr_swap.a_lock_tx, xmr_swap.a_lock_tx_script,
                 bid.amount,
                 xmr_swap.sh,
@@ -3317,9 +3334,11 @@ class BasicSwap(BaseApp):
             )
             a_lock_tx_dest = ci_from.getScriptDest(xmr_swap.a_lock_tx_script)
 
+            self.addWatchedOutput(coin_from, bid.bid_id, xmr_swap.a_lock_tx_id, xmr_swap.a_lock_tx_vout, TxTypes.XMR_SWAP_A_LOCK, SwapTypes.XMR_SWAP)
+
             lock_refund_tx_id, xmr_swap.a_swap_refund_value = ci_from.verifyLockRefundTx(
                 xmr_swap.a_lock_refund_tx, xmr_swap.a_lock_refund_tx_script,
-                xmr_swap.a_lock_tx_id, lock_tx_vout, xmr_offer.lock_time_1, xmr_swap.a_lock_tx_script,
+                xmr_swap.a_lock_tx_id, xmr_swap.a_lock_tx_vout, xmr_offer.lock_time_1, xmr_swap.a_lock_tx_script,
                 xmr_swap.pkarl, xmr_swap.pkarf,
                 xmr_offer.lock_time_2,
                 xmr_swap.pkaf,
@@ -3889,16 +3908,15 @@ class BasicSwap(BaseApp):
                 for bid_id, v in self.swaps_in_progress.items():
                     try:
                         if self.checkBidState(bid_id, v[0], v[1]) is True:
-                            to_remove.append(bid_id)
+                            to_remove.append((bid_id, v[0], v[1]))
                     except Exception as ex:
                         self.log.error('checkBidState %s %s', bid_id.hex(), str(ex))
                         if self.debug:
                             traceback.print_exc()
                         self.setBidError(bid_id, v[0], str(ex))
 
-                for bid_id in to_remove:
-                    self.log.debug('Removing bid from in-progress: %s', bid_id.hex())
-                    del self.swaps_in_progress[bid_id]
+                for bid_id, bid, offer in to_remove:
+                    self.deactivateBid(offer, bid)
                 self._last_checked_progress = now
 
             if now - self._last_checked_watched >= self.check_watched_seconds:
@@ -4136,7 +4154,7 @@ class BasicSwap(BaseApp):
                 if self.coin_clients[c]['connection_type'] == 'rpc':
                     rv_heights.append((c, v['last_height_checked']))
                 for o in v['watched_outputs']:
-                    rv.append((c, o[0], o[1], o[2], o[3]))
+                    rv.append((c, o.bid_id, o.txid_hex, o.vout, o.tx_type))
             return (rv, rv_heights)
         finally:
             self.mxDB.release()

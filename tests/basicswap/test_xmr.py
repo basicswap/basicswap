@@ -569,7 +569,7 @@ class Test(unittest.TestCase):
         end_xmr = float(js_0_end['6']['balance']) + float(js_0_end['6']['unconfirmed'])
         assert(end_xmr > 10.9 and end_xmr < 11.0)
 
-        self.delay_for(600)
+        self.delay_for(600)  # [rm]
 
     def test_02_leader_recover_a_lock_tx(self):
         logging.info('---------- Test PART to XMR leader recovers coin a lock tx')

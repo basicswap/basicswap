@@ -274,6 +274,8 @@ class XmrSwap(Base):
 
     a_lock_tx = sa.Column(sa.LargeBinary)
     a_lock_tx_script = sa.Column(sa.LargeBinary)
+    a_lock_tx_id = sa.Column(sa.LargeBinary)
+    a_lock_tx_vout = sa.Column(sa.Integer)
 
     a_lock_refund_tx = sa.Column(sa.LargeBinary)
     a_lock_refund_tx_script = sa.Column(sa.LargeBinary)
