@@ -154,8 +154,7 @@ class BTCInterface(CoinInterface):
     def decodeAddress(self, address):
         bech32_prefix = chainparams[self.coin_type()][self._network]['hrp']
         if address.startswith(bech32_prefix):
-            ignr, pkhash = segwit_addr.decode(bech32_prefix, address)
-            return pkhash
+            return bytes(segwit_addr.decode(bech32_prefix, address)[1])
         return decodeAddress(address)[1:]
 
     def getNewSecretKey(self):
@@ -734,6 +733,12 @@ class BTCInterface(CoinInterface):
         tx.rehash()
         return i2b(tx.sha256)
 
+    def getTxOutputPos(self, tx, script):
+        if isinstance(tx, bytes):
+            tx = self.loadTx(tx)
+        script_pk = CScript([OP_0, hashlib.sha256(script).digest()])
+        return findOutput(tx, script_pk)
+
     def getPubkeyHash(self, K):
         return hash160(self.encodePubkey(K))
 
@@ -749,6 +754,13 @@ class BTCInterface(CoinInterface):
     def getTransaction(self, txid):
         try:
             return bytes.fromhex(self.rpc_callback('getrawtransaction', [txid.hex()]))
+        except Exception as ex:
+            # TODO: filter errors
+            return None
+
+    def getWalletTransaction(self, txid):
+        try:
+            return bytes.fromhex(self.rpc_callback('gettransaction', [txid.hex()]))
         except Exception as ex:
             # TODO: filter errors
             return None
@@ -833,8 +845,12 @@ class BTCInterface(CoinInterface):
     def getOutput(self, txid, dest_script, expect_value):
         # TODO: Use getrawtransaction if txindex is active
         utxos = self.rpc_callback('scantxoutset', ['start', ['raw({})'.format(dest_script.hex())]])
-        print('utxos', utxos)
-
+        '''
+        bech32_prefix = chainparams[self.coin_type()][self._network]['hrp']
+        address = segwit_addr.encode(bech32_prefix, 0, list(dest_script[2:]))
+        print('[rm] address', address)
+        utxos = self.rpc_callback('scantxoutset', ['start', ['addr({})'.format(address)]])
+        '''
         chain_height = utxos['height']
         rv = []
         for utxo in utxos['unspents']:

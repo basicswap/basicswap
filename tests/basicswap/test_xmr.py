@@ -71,9 +71,9 @@ BASE_PORT = 14792
 BASE_RPC_PORT = 19792
 BASE_ZMQ_PORT = 20792
 
-BTC_BASE_PORT = 114792
-BTC_BASE_RPC_PORT = 119792
-BTC_BASE_ZMQ_PORT = 120792
+BTC_BASE_PORT = 31792
+BTC_BASE_RPC_PORT = 32792
+BTC_BASE_ZMQ_PORT = 33792
 
 XMR_BASE_P2P_PORT = 17792
 XMR_BASE_RPC_PORT = 21792
@@ -512,9 +512,11 @@ class Test(unittest.TestCase):
     def callxmrnodewallet(self, node_id, method, params=None):
         return callrpc_xmr(XMR_BASE_WALLET_RPC_PORT + node_id, self.xmr_wallet_auth[node_id], method, params)
 
-    def wait_for_offer(self, swap_client, offer_id):
+    def wait_for_offer(self, swap_client, offer_id, wait_for=20):
         logging.info('wait_for_offer %s', offer_id.hex())
-        for i in range(20):
+        for i in range(wait_for):
+            if stop_test:
+                raise ValueError('Test stopped.')
             time.sleep(1)
             offers = swap_client.listOffers()
             for offer in offers:
@@ -525,6 +527,8 @@ class Test(unittest.TestCase):
     def wait_for_bid(self, swap_client, bid_id, state=None, sent=False, wait_for=20):
         logging.info('wait_for_bid %s', bid_id.hex())
         for i in range(wait_for):
+            if stop_test:
+                raise ValueError('Test stopped.')
             time.sleep(1)
             bids = swap_client.listBids(sent=sent)
             for bid in bids:
@@ -624,7 +628,7 @@ class Test(unittest.TestCase):
         swap_clients[0].acceptXmrBid(bid_id)
 
         self.wait_for_bid(swap_clients[0], bid_id, BidStates.BID_ABANDONED, wait_for=180)
-        self.wait_for_bid(swap_clients[1], bid_id, BidStates.XMR_SWAP_FAILED_SWIPED, sent=True)
+        self.wait_for_bid(swap_clients[1], bid_id, BidStates.XMR_SWAP_FAILED_SWIPED, wait_for=80, sent=True)
 
         js_w0_after = json.loads(urlopen('http://localhost:1800/json/wallets').read())
 
@@ -655,7 +659,7 @@ class Test(unittest.TestCase):
     def test_05_btc_xmr(self):
         logging.info('---------- Test BTC to XMR')
         swap_clients = self.swap_clients
-        offer_id = swap_clients[0].postOffer(Coins.BTC, Coins.XMR, 10 * COIN, 100 * XMR_COIN, 100 * COIN, SwapTypes.XMR_SWAP)
+        offer_id = swap_clients[0].postOffer(Coins.BTC, Coins.XMR, 10 * COIN, 100 * XMR_COIN, 10 * COIN, SwapTypes.XMR_SWAP)
         self.wait_for_offer(swap_clients[1], offer_id)
         offers = swap_clients[1].listOffers(filters={'offer_id': offer_id})
         offer = offers[0]

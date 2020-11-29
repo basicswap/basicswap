@@ -35,3 +35,8 @@ class PARTInterface(BTCInterface):
 
     def getNewAddress(self, use_segwit):
         return self.rpc_callback('getnewaddress', ['swap_receive'])
+
+    def haveSpentIndex(self):
+        version = self.getDaemonVersion()
+        index_info = self.rpc_callback('getinsightinfo' if int(str(version)[:2]) > 19 else 'getindexinfo')
+        return index_info['spentindex']
