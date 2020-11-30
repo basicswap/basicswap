@@ -398,7 +398,7 @@ class BasicSwap(BaseApp):
 
         self.network_pubkey = self.settings['network_pubkey']
         self.network_addr = pubkeyToAddress(chainparams[Coins.PART][self.chain]['pubkey_address'], bytes.fromhex(self.network_pubkey))
-        #self.wallet = self.settings.get('wallet', None)  # TODO: Move to coin_clients
+        # self.wallet = self.settings.get('wallet', None)  # TODO: Move to coin_clients
 
         self.sqlite_file = os.path.join(self.data_dir, 'db{}.sqlite'.format('' if self.chain == 'mainnet' else ('_' + self.chain)))
         db_exists = os.path.exists(self.sqlite_file)
@@ -1167,7 +1167,7 @@ class BasicSwap(BaseApp):
         session.add(event)
 
     def createEvent(self, delay, event_type, linked_id):
-        #self.log.debug('createEvent %d %s', event_type, linked_id.hex())
+        # self.log.debug('createEvent %d %s', event_type, linked_id.hex())
         self.mxDB.acquire()
         try:
             session = scoped_session(self.session_factory)
@@ -1683,7 +1683,6 @@ class BasicSwap(BaseApp):
             session.close()
             session.remove()
 
-            #self.swaps_in_progress[bid_id] = (bid, offer)
             # Add to swaps_in_progress only when waiting on txns
             self.log.info('Sent XMR_BID_ACCEPT_LF %s', bid_id.hex())
             return bid_id
@@ -2319,7 +2318,6 @@ class BasicSwap(BaseApp):
                         return rv
 
             state = BidStates(bid.state)
-            #rv = True  # Remove from swaps_in_progress
             if state == BidStates.SWAP_COMPLETED:
                 rv = True  # Remove from swaps_in_progress
             elif state == BidStates.XMR_SWAP_FAILED_REFUNDED:
@@ -2370,7 +2368,6 @@ class BasicSwap(BaseApp):
                             txid=b_lock_tx_id,
                         )
 
-                    #bid.txns[TxTypes.XMR_SWAP_B_LOCK].setState(TxStates.TX_CONFIRMED)
                     bid.xmr_b_lock_tx.setState(TxStates.TX_CONFIRMED)
 
                     bid.setState(BidStates.XMR_SWAP_NOSCRIPT_COIN_LOCKED)
@@ -2382,9 +2379,6 @@ class BasicSwap(BaseApp):
                         self.createEventInSession(delay, EventTypes.SEND_XMR_SECRET, bid_id, session)
 
                     session.commit()
-                # Waiting for initiate txn to be confirmed in 'from' chain
-                #initiate_txnid_hex = bid.initiate_tx.txid.hex()
-                #p2sh = self.getScriptAddress(coin_from, bid.initiate_tx.script)
             elif state == BidStates.XMR_SWAP_SECRET_SHARED:
                 # Wait for script spend tx to confirm
                 # TODO: Use explorer to get tx / block hash for getrawtransaction

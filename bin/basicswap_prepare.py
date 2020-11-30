@@ -46,7 +46,7 @@ known_coins = {
     'litecoin': '0.18.1',
     'bitcoin': '0.20.1',
     'namecoin': '0.18.0',
-    'monero': '0.17.0.1',
+    'monero': '0.17.1.5',
 }
 
 logger = logging.getLogger()
@@ -86,6 +86,22 @@ def extractCore(coin, version, settings, bin_dir, release_path):
 
     bins = [coin + 'd', coin + '-cli', coin + '-tx']
 
+    if coin == 'monero':
+        with tarfile.open(release_path) as ft:
+            for member in ft.getmembers():
+                if member.isdir():
+                    continue
+                out_path = os.path.join(bin_dir, os.path.basename(member.name))
+                fi = ft.extractfile(member)
+                with open(out_path, 'wb') as fout:
+                    fout.write(fi.read())
+                fi.close()
+                os.chmod(out_path, stat.S_IRWXU | stat.S_IXGRP | stat.S_IXOTH)
+
+                print('member', member)
+        return
+
+    bins = [coin + 'd', coin + '-cli', coin + '-tx']
     versions = version.split('.')
     if coin == 'particl' and int(versions[1]) >= 19:
         bins.append(coin + '-wallet')
@@ -125,58 +141,62 @@ def prepareCore(coin, version, settings, data_dir):
         os_dir_name = 'linux'
         os_name = 'linux'
 
+    release_filename = '{}-{}-{}'.format(coin, version, BIN_ARCH)
     if coin == 'monero':
-        url = 'https://downloads.getmonero.org/cli/monero-linux-x64-v${}.tar.bz2'.format(version)
-
-        # TODO
+        release_url = 'https://downloads.getmonero.org/cli/monero-linux-x64-v{}.tar.bz2'.format(version)
 
         release_path = os.path.join(bin_dir, release_filename)
         if not os.path.exists(release_path):
             downloadFile(release_url, release_path)
 
-        raise ValueError('TODO')
-
-    release_filename = '{}-{}-{}'.format(coin, version, BIN_ARCH)
-    if coin == 'particl':
-        signing_key_name = 'tecnovert'
-        release_url = 'https://github.com/tecnovert/particl-core/releases/download/v{}/{}'.format(version, release_filename)
-        assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, version)
-        assert_url = 'https://raw.githubusercontent.com/tecnovert/gitian.sigs/master/%s-%s/%s/%s' % (version, os_dir_name, signing_key_name, assert_filename)
-    elif coin == 'litecoin':
-        signing_key_name = 'thrasher'
-        release_url = 'https://download.litecoin.org/litecoin-{}/{}/{}'.format(version, os_name, release_filename)
-        assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, version.rsplit('.', 1)[0])
-        assert_url = 'https://raw.githubusercontent.com/litecoin-project/gitian.sigs.ltc/master/%s-%s/%s/%s' % (version, os_dir_name, signing_key_name, assert_filename)
-    elif coin == 'bitcoin':
-        signing_key_name = 'laanwj'
-        release_url = 'https://bitcoincore.org/bin/bitcoin-core-{}/{}'.format(version, release_filename)
-        assert_filename = '{}-core-{}-{}-build.assert'.format(coin, os_name, '.'.join(version.split('.')[:2]))
-        assert_url = 'https://raw.githubusercontent.com/bitcoin-core/gitian.sigs/master/%s-%s/%s/%s' % (version, os_dir_name, signing_key_name, assert_filename)
-    elif coin == 'namecoin':
-        signing_key_name = 'JeremyRand'
-        release_url = 'https://beta.namecoin.org/files/namecoin-core/namecoin-core-{}/{}'.format(version, release_filename)
-        assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, version.rsplit('.', 1)[0])
-        assert_url = 'https://raw.githubusercontent.com/namecoin/gitian.sigs/master/%s-%s/%s/%s' % (version, os_dir_name, signing_key_name, assert_filename)
+        # TODO: How to get version specific hashes
+        assert_filename = 'monero-{}-hashes.txt'.format(version)
+        assert_url = 'https://www.getmonero.org/downloads/hashes.txt'
+        assert_path = os.path.join(bin_dir, assert_filename)
+        if not os.path.exists(assert_path):
+            downloadFile(assert_url, assert_path)
     else:
-        raise ValueError('Unknown coin')
+        release_filename = '{}-{}-{}'.format(coin, version, BIN_ARCH)
+        if coin == 'particl':
+            signing_key_name = 'tecnovert'
+            release_url = 'https://github.com/tecnovert/particl-core/releases/download/v{}/{}'.format(version, release_filename)
+            assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, version)
+            assert_url = 'https://raw.githubusercontent.com/tecnovert/gitian.sigs/master/%s-%s/%s/%s' % (version, os_dir_name, signing_key_name, assert_filename)
+        elif coin == 'litecoin':
+            signing_key_name = 'thrasher'
+            release_url = 'https://download.litecoin.org/litecoin-{}/{}/{}'.format(version, os_name, release_filename)
+            assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, version.rsplit('.', 1)[0])
+            assert_url = 'https://raw.githubusercontent.com/litecoin-project/gitian.sigs.ltc/master/%s-%s/%s/%s' % (version, os_dir_name, signing_key_name, assert_filename)
+        elif coin == 'bitcoin':
+            signing_key_name = 'laanwj'
+            release_url = 'https://bitcoincore.org/bin/bitcoin-core-{}/{}'.format(version, release_filename)
+            assert_filename = '{}-core-{}-{}-build.assert'.format(coin, os_name, '.'.join(version.split('.')[:2]))
+            assert_url = 'https://raw.githubusercontent.com/bitcoin-core/gitian.sigs/master/%s-%s/%s/%s' % (version, os_dir_name, signing_key_name, assert_filename)
+        elif coin == 'namecoin':
+            signing_key_name = 'JeremyRand'
+            release_url = 'https://beta.namecoin.org/files/namecoin-core/namecoin-core-{}/{}'.format(version, release_filename)
+            assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, version.rsplit('.', 1)[0])
+            assert_url = 'https://raw.githubusercontent.com/namecoin/gitian.sigs/master/%s-%s/%s/%s' % (version, os_dir_name, signing_key_name, assert_filename)
+        else:
+            raise ValueError('Unknown coin')
 
-    assert_sig_filename = assert_filename + '.sig'
-    assert_sig_url = assert_url + '.sig'
+        assert_sig_filename = assert_filename + '.sig'
+        assert_sig_url = assert_url + '.sig'
 
-    release_path = os.path.join(bin_dir, release_filename)
-    if not os.path.exists(release_path):
-        downloadFile(release_url, release_path)
+        release_path = os.path.join(bin_dir, release_filename)
+        if not os.path.exists(release_path):
+            downloadFile(release_url, release_path)
 
-    # Rename assert files with full version
-    assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, version)
-    assert_path = os.path.join(bin_dir, assert_filename)
-    if not os.path.exists(assert_path):
-        downloadFile(assert_url, assert_path)
+        # Rename assert files with full version
+        assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, version)
+        assert_path = os.path.join(bin_dir, assert_filename)
+        if not os.path.exists(assert_path):
+            downloadFile(assert_url, assert_path)
 
-    assert_sig_filename = '{}-{}-{}-build.assert.sig'.format(coin, os_name, version)
-    assert_sig_path = os.path.join(bin_dir, assert_sig_filename)
-    if not os.path.exists(assert_sig_path):
-        downloadFile(assert_sig_url, assert_sig_path)
+        assert_sig_filename = '{}-{}-{}-build.assert.sig'.format(coin, os_name, version)
+        assert_sig_path = os.path.join(bin_dir, assert_sig_filename)
+        if not os.path.exists(assert_sig_path):
+            downloadFile(assert_sig_url, assert_sig_path)
 
     hasher = hashlib.sha256()
     with open(release_path, 'rb') as fp:
@@ -197,22 +217,37 @@ def prepareCore(coin, version, settings, data_dir):
     """
     gpg = gnupg.GPG()
 
-    with open(assert_sig_path, 'rb') as fp:
-        verified = gpg.verify_file(fp, assert_path)
+    if coin == 'monero':
+        with open(assert_path, 'rb') as fp:
+            verified = gpg.verify_file(fp)
 
-    if verified.username is None:
-        logger.warning('Signature not verified.')
+        if verified.username is None:
+            logger.warning('Signature not verified.')
 
-        pubkeyurl = 'https://raw.githubusercontent.com/tecnovert/basicswap/master/gitianpubkeys/{}_{}.pgp'.format(coin, signing_key_name)
-        logger.info('Importing public key from url: ' + pubkeyurl)
-        gpg.import_keys(urllib.request.urlopen(pubkeyurl).read())
-
+            pubkeyurl = 'https://raw.githubusercontent.com/monero-project/monero/master/utils/gpg_keys/binaryfate.asc'
+            logger.info('Importing public key from url: ' + pubkeyurl)
+            rv = gpg.import_keys(urllib.request.urlopen(pubkeyurl).read())
+            assert('F0AF4D462A0BDF92' in rv)
+            print('import_keys', rv)
+            with open(assert_path, 'rb') as fp:
+                verified = gpg.verify_file(fp)
+    else:
         with open(assert_sig_path, 'rb') as fp:
             verified = gpg.verify_file(fp, assert_path)
 
-        if verified.valid is False \
-           and not (verified.status == 'signature valid' and verified.key_status == 'signing key has expired'):
-            raise ValueError('Signature verification failed.')
+        if verified.username is None:
+            logger.warning('Signature not verified.')
+
+            pubkeyurl = 'https://raw.githubusercontent.com/tecnovert/basicswap/master/gitianpubkeys/{}_{}.pgp'.format(coin, signing_key_name)
+            logger.info('Importing public key from url: ' + pubkeyurl)
+            gpg.import_keys(urllib.request.urlopen(pubkeyurl).read())
+
+            with open(assert_sig_path, 'rb') as fp:
+                verified = gpg.verify_file(fp, assert_path)
+
+    if verified.valid is False \
+       and not (verified.status == 'signature valid' and verified.key_status == 'signing key has expired'):
+        raise ValueError('Signature verification failed.')
 
     extractCore(coin, version, settings, bin_dir, release_path)
 
@@ -449,6 +484,17 @@ def main():
             'conf_target': 2,
             'core_version_group': 18,
             'chain_lookups': 'local',
+        },
+        'monero': {
+            'connection_type': 'rpc' if 'monero' in with_coins else 'none',
+            'manage_daemon': True if 'monero' in with_coins else False,
+            'rpcport': 29798 + port_offset,
+            'walletrpcport': 29799 + port_offset,
+            #'walletrpcuser': 'test' + str(node_id),
+            #'walletrpcpassword': 'test_pass' + str(node_id),
+            'walletfile': 'basicswap',
+            'datadir': os.path.join(data_dir, 'monero'),
+            'bindir': os.path.join(bin_dir, 'monero'),
         }
     }
 

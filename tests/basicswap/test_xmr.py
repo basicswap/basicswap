@@ -701,6 +701,5 @@ class Test(unittest.TestCase):
         self.wait_for_bid(swap_clients[1], bid2_id, BidStates.SWAP_COMPLETED, sent=True)
 
 
-
 if __name__ == '__main__':
     unittest.main()
