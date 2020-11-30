@@ -310,4 +310,3 @@ class XmrSplitData(Base):
     msg_sequence = sa.Column(sa.Integer)
     dleag = sa.Column(sa.LargeBinary)
     created_at = sa.Column(sa.BigInteger)
-

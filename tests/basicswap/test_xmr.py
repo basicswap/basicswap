@@ -23,14 +23,12 @@ from basicswap.basicswap import (
     Coins,
     SwapTypes,
     BidStates,
-    TxStates,
     DebugTypes,
     SEQUENCE_LOCK_BLOCKS,
 )
 from basicswap.util import (
     COIN,
     toWIF,
-    dumpje,
     make_int,
 )
 from basicswap.rpc import (
@@ -340,7 +338,6 @@ class Test(unittest.TestCase):
         logger.propagate = False
         logger.handlers = []
         logger.setLevel(logging.INFO)  # DEBUG shows many messages from requests.post
-        #logger.setLevel(logging.DEBUG)
         formatter = logging.Formatter('%(asctime)s %(levelname)s : %(message)s')
         stream_stdout = logging.StreamHandler()
         stream_stdout.setFormatter(formatter)
@@ -573,15 +570,14 @@ class Test(unittest.TestCase):
         end_xmr = float(js_0_end['6']['balance']) + float(js_0_end['6']['unconfirmed'])
         assert(end_xmr > 10.9 and end_xmr < 11.0)
 
-        self.delay_for(600)  # [rm]
-
     def test_02_leader_recover_a_lock_tx(self):
         logging.info('---------- Test PART to XMR leader recovers coin a lock tx')
         swap_clients = self.swap_clients
 
         js_w0_before = json.loads(urlopen('http://localhost:1800/json/wallets').read())
 
-        offer_id = swap_clients[0].postOffer(Coins.PART, Coins.XMR, 101 * COIN, 0.12 * XMR_COIN, 101 * COIN, SwapTypes.XMR_SWAP,
+        offer_id = swap_clients[0].postOffer(
+            Coins.PART, Coins.XMR, 101 * COIN, 0.12 * XMR_COIN, 101 * COIN, SwapTypes.XMR_SWAP,
             lock_type=SEQUENCE_LOCK_BLOCKS, lock_value=12)
         self.wait_for_offer(swap_clients[1], offer_id)
         offer = swap_clients[1].getOffer(offer_id)
@@ -610,7 +606,8 @@ class Test(unittest.TestCase):
 
         js_w0_before = json.loads(urlopen('http://localhost:1800/json/wallets').read())
 
-        offer_id = swap_clients[0].postOffer(Coins.PART, Coins.XMR, 101 * COIN, 0.13 * XMR_COIN, 101 * COIN, SwapTypes.XMR_SWAP,
+        offer_id = swap_clients[0].postOffer(
+            Coins.PART, Coins.XMR, 101 * COIN, 0.13 * XMR_COIN, 101 * COIN, SwapTypes.XMR_SWAP,
             lock_type=SEQUENCE_LOCK_BLOCKS, lock_value=12)
         self.wait_for_offer(swap_clients[1], offer_id)
         offer = swap_clients[1].getOffer(offer_id)
@@ -637,7 +634,8 @@ class Test(unittest.TestCase):
 
         swap_clients = self.swap_clients
 
-        offer_id = swap_clients[0].postOffer(Coins.PART, Coins.XMR, 101 * COIN, 0.14 * XMR_COIN, 101 * COIN, SwapTypes.XMR_SWAP,
+        offer_id = swap_clients[0].postOffer(
+            Coins.PART, Coins.XMR, 101 * COIN, 0.14 * XMR_COIN, 101 * COIN, SwapTypes.XMR_SWAP,
             lock_type=SEQUENCE_LOCK_BLOCKS, lock_value=18)
         self.wait_for_offer(swap_clients[1], offer_id)
         offer = swap_clients[1].getOffer(offer_id)
@@ -676,8 +674,32 @@ class Test(unittest.TestCase):
         self.wait_for_bid(swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=180)
         self.wait_for_bid(swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True)
 
-    def pass_06_delay(self):
-        self.delay_for(60)
+    def test_06_multiple_swaps(self):
+        logging.info('---------- Test Multiple concurrent swaps')
+        swap_clients = self.swap_clients
+        offer1_id = swap_clients[0].postOffer(Coins.BTC, Coins.XMR, 10 * COIN, 100 * XMR_COIN, 10 * COIN, SwapTypes.XMR_SWAP)
+        offer2_id = swap_clients[0].postOffer(Coins.PART, Coins.XMR, 10 * COIN, 0.14 * XMR_COIN, 10 * COIN, SwapTypes.XMR_SWAP)
+
+        self.wait_for_offer(swap_clients[1], offer1_id)
+        offer1 = swap_clients[1].getOffer(offer1_id)
+        self.wait_for_offer(swap_clients[1], offer2_id)
+        offer2 = swap_clients[1].getOffer(offer2_id)
+
+        bid1_id = swap_clients[1].postXmrBid(offer1_id, offer1.amount_from)
+        bid2_id = swap_clients[1].postXmrBid(offer2_id, offer2.amount_from)
+
+        self.wait_for_bid(swap_clients[0], bid1_id, BidStates.BID_RECEIVED)
+        swap_clients[0].acceptXmrBid(bid1_id)
+
+        self.wait_for_bid(swap_clients[0], bid2_id, BidStates.BID_RECEIVED)
+        swap_clients[0].acceptXmrBid(bid2_id)
+
+        self.wait_for_bid(swap_clients[0], bid1_id, BidStates.SWAP_COMPLETED, wait_for=180)
+        self.wait_for_bid(swap_clients[1], bid1_id, BidStates.SWAP_COMPLETED, sent=True)
+
+        self.wait_for_bid(swap_clients[0], bid2_id, BidStates.SWAP_COMPLETED, wait_for=180)
+        self.wait_for_bid(swap_clients[1], bid2_id, BidStates.SWAP_COMPLETED, sent=True)
+
 
 
 if __name__ == '__main__':

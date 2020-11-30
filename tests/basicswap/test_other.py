@@ -27,7 +27,6 @@ from basicswap.util import (
     SerialiseNum,
     DeserialiseNum,
     make_int,
-    format8,
     format_amount,
     validate_amount,
 )
@@ -38,9 +37,6 @@ from basicswap.basicswap import (
     SEQUENCE_LOCK_BLOCKS,
     SEQUENCE_LOCK_TIME,
 )
-
-from basicswap.ecc_util import (
-    i2b)
 
 
 class Test(unittest.TestCase):
@@ -212,7 +208,6 @@ class Test(unittest.TestCase):
         amount_to = int((amount_from * rate) // (10 ** scale_from))
         assert('1.000000000000' == format_amount(amount_from, scale_from))
         assert('12.00000000' == format_amount(amount_to, scale_to))
-
 
 
 if __name__ == '__main__':

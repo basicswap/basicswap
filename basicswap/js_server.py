@@ -4,44 +4,30 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-import os
 import json
 import time
-import struct
-import traceback
-import threading
 import urllib.parse
 
-from . import __version__
-from .util import (
-    COIN,
-    format8,
-    make_int,
-    dumpj,
-)
-from .chainparams import (
-    chainparams,
-    Coins,
-)
+from .util import format8
 from .basicswap import (
-    SwapTypes,
-    BidStates,
-    TxStates,
-    TxTypes,
-    strOfferState,
     strBidState,
-    strTxState,
-    getLockName,
-    SEQUENCE_LOCK_TIME,
-    ABS_LOCK_TIME,
 )
+from .ui import (
+    PAGE_LIMIT,
+    inputAmount,
+    describeBid,
+    setCoinFilter,
+)
+
 
 def js_error(self, error_str):
     error_str_json = json.dumps({'error': error_str})
     return bytes(error_str_json, 'UTF-8')
 
+
 def js_wallets(self, url_split, post_string):
     return bytes(json.dumps(self.server.swap_client.getWalletsInfo()), 'UTF-8')
+
 
 def js_offers(self, url_split, post_string, sent=False):
     if len(url_split) > 3:
@@ -82,26 +68,27 @@ def js_offers(self, url_split, post_string, sent=False):
             filters['limit'] = int(post_data[b'limit'][0])
             assert(filters['limit'] > 0 and filters['limit'] <= PAGE_LIMIT), 'Invalid limit'
 
-    ci_from = self.server.swap_client.ci(o.coin_from)
-    ci_to = self.server.swap_client.ci(o.coin_to)
-
     offers = self.server.swap_client.listOffers(sent, filters)
     rv = []
     for o in offers:
+        ci_from = self.server.swap_client.ci(o.coin_from)
+        ci_to = self.server.swap_client.ci(o.coin_to)
         rv.append({
             'offer_id': o.offer_id.hex(),
             'created_at': time.strftime('%Y-%m-%d %H:%M', time.localtime(o.created_at)),
             'coin_from': ci_from.coin_name(),
             'coin_to': ci_to.coin_name(),
             'amount_from': ci_from.format_amount(o.amount_from),
-            'amount_to': ci_to.format_amount((o.amount_from * o.rate) // COIN),
-            'rate': format8(o.rate)
+            'amount_to': ci_to.format_amount((o.amount_from * o.rate) // ci_from.COIN()),
+            'rate': ci_to.format_amount(o.rate)
         })
 
     return bytes(json.dumps(rv), 'UTF-8')
 
+
 def js_sentoffers(self, url_split, post_string):
     return self.js_offers(url_split, post_string, True)
+
 
 def js_bids(self, url_split, post_string):
     swap_client = self.server.swap_client
@@ -153,8 +140,10 @@ def js_bids(self, url_split, post_string):
         'bid_state': strBidState(b[4])
     } for b in bids]), 'UTF-8')
 
+
 def js_sentbids(self, url_split, post_string):
     return bytes(json.dumps(self.server.swap_client.listBids(sent=True)), 'UTF-8')
+
 
 def js_index(self, url_split, post_string):
     return bytes(json.dumps(self.server.swap_client.getSummary()), 'UTF-8')

@@ -362,7 +362,6 @@ class BTCInterface(CoinInterface):
         tx.nVersion = self.txVersion()
         tx.vin.append(CTxIn(COutPoint(tx_lock_refund_hash_int, locked_n), nSequence=0))
 
-        #pubkeyhash = hash160(Kal)
         tx.vout.append(self.txoType(locked_coin, CScript([OP_0, pkh_refund_to])))
 
         witness_bytes = len(script_lock_refund)
@@ -591,9 +590,11 @@ class BTCInterface(CoinInterface):
         assert_cond(len(tx.vout) == 1, 'tx doesn\'t have one output')
 
         # Destination doesn't matter to the follower
-        #p2wpkh = CScript([OP_0, hash160(Kal)])
-        #locked_n = findOutput(tx, p2wpkh)
-        #assert_cond(locked_n is not None, 'Output not found in lock refund spend tx')
+        '''
+        p2wpkh = CScript([OP_0, hash160(Kal)])
+        locked_n = findOutput(tx, p2wpkh)
+        assert_cond(locked_n is not None, 'Output not found in lock refund spend tx')
+        '''
         tx_value = tx.vout[0].nValue
 
         fee_paid = prevout_value - tx_value
@@ -711,8 +712,6 @@ class BTCInterface(CoinInterface):
 
     def signTxWithWallet(self, tx):
         rv = self.rpc_callback('signrawtransactionwithwallet', [tx.hex()])
-
-        #return FromHex(tx, rv['hex'])
         return bytes.fromhex(rv['hex'])
 
     def publishTx(self, tx):
@@ -798,7 +797,6 @@ class BTCInterface(CoinInterface):
 
     def recoverEncKey(self, esig, sig, K):
         return ecdsaotves_rec_enc_key(K, esig, sig[:-1])  # Strip sighash type
-        #return otves.RecoverEncKey(esig, sig[:-1], K)  # Strip sighash type
 
     def getTxVSize(self, tx, add_bytes=0, add_witness_bytes=0):
         wsf = self.witnessScaleFactor()
@@ -845,12 +843,6 @@ class BTCInterface(CoinInterface):
     def getOutput(self, txid, dest_script, expect_value):
         # TODO: Use getrawtransaction if txindex is active
         utxos = self.rpc_callback('scantxoutset', ['start', ['raw({})'.format(dest_script.hex())]])
-        '''
-        bech32_prefix = chainparams[self.coin_type()][self._network]['hrp']
-        address = segwit_addr.encode(bech32_prefix, 0, list(dest_script[2:]))
-        print('[rm] address', address)
-        utxos = self.rpc_callback('scantxoutset', ['start', ['addr({})'.format(address)]])
-        '''
         chain_height = utxos['height']
         rv = []
         for utxo in utxos['unspents']:
@@ -869,7 +861,6 @@ class BTCInterface(CoinInterface):
                 'txid': utxo['txid'],
                 'vout': utxo['vout']})
         return rv
-
 
 
 def testBTCInterface():
@@ -952,7 +943,6 @@ def testBTCInterface():
         assert(str(e) == 'Bad scriptnum length')
 
     print('Passed.')
-
 
 
 if __name__ == "__main__":

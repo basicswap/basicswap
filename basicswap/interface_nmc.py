@@ -8,6 +8,7 @@
 from .interface_btc import BTCInterface
 from .chainparams import Coins
 
+
 class NMCInterface(BTCInterface):
     @staticmethod
     def coin_type():

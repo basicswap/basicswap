@@ -151,6 +151,7 @@ class XMRInterface(CoinInterface):
         return self.encodePubkey(edf.edwards_add(Ka_d, Kb_d))
 
     def publishBLockTx(self, Kbv, Kbs, output_amount, feerate):
+        self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
 
         shared_addr = xmr_util.encode_address(Kbv, Kbs)
 
@@ -158,11 +159,18 @@ class XMRInterface(CoinInterface):
         params = {'destinations': [{'amount': output_amount, 'address': shared_addr}]}
         rv = self.rpc_wallet_cb('transfer', params)
         logging.info('publishBLockTx %s to address_b58 %s', rv['tx_hash'], shared_addr)
+        tx_hash = bytes.fromhex(rv['tx_hash'])
 
-        return bytes.fromhex(rv['tx_hash'])
+        # Debug
+        for i in range(10):
+            params = {'out': True, 'pending': True, 'failed': True, 'pool': True, }
+            rv = self.rpc_wallet_cb('get_transfers', params)
+            logging.info('[rm] get_transfers {}'.format(dumpj(rv)))
+            time.sleep(1)
+
+        return tx_hash
 
     def findTxB(self, kbv, Kbs, cb_swap_value, cb_block_confirmed, restore_height):
-        #Kbv_enc = self.encodePubkey(self.pubkey(kbv))
         Kbv = self.getPubkey(kbv)
         address_b58 = xmr_util.encode_address(Kbv, Kbs)
 
@@ -176,7 +184,6 @@ class XMRInterface(CoinInterface):
             'restore_height': restore_height,
             'filename': address_b58,
             'address': address_b58,
-            #'viewkey': b2h(intToBytes32_le(kbv)),
             'viewkey': b2h(kbv_le),
         }
 
@@ -220,7 +227,7 @@ class XMRInterface(CoinInterface):
         params = {
             'filename': address_b58,
             'address': address_b58,
-            'viewkey': b2h(intToBytes32_le(kbv)),
+            'viewkey': b2h(kbv[::-1]),
             'restore_height': restore_height,
         }
         self.rpc_wallet_cb('generate_from_keys', params)
