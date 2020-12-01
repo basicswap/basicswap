@@ -7,7 +7,7 @@ lint_task:
     - pip install codespell
   script:
     - PYTHONWARNINGS="ignore" flake8 --ignore=E501,F841,W503 --exclude=basicswap/contrib,messages_pb2.py,.eggs
-    - codespell --check-filenames --disable-colors --quiet-level=7 --ignore-words=tests/lint/spelling.ignore-words.txt -S .git,.eggs,gitianpubkeys,*.pyc,*mnemonics.py,basicswap/contrib
+    - codespell --check-filenames --disable-colors --quiet-level=7 --ignore-words=tests/lint/spelling.ignore-words.txt -S .git,.eggs,gitianpubkeys,*.pyc,*basicswap/contrib,*mnemonics.py
 
 test_task:
   environment:

@@ -227,8 +227,8 @@ def prepareCore(coin, version, settings, data_dir):
             pubkeyurl = 'https://raw.githubusercontent.com/monero-project/monero/master/utils/gpg_keys/binaryfate.asc'
             logger.info('Importing public key from url: ' + pubkeyurl)
             rv = gpg.import_keys(urllib.request.urlopen(pubkeyurl).read())
-            assert('F0AF4D462A0BDF92' in rv)
             print('import_keys', rv)
+            assert('F0AF4D462A0BDF92' in rv.fingerprints[0])
             with open(assert_path, 'rb') as fp:
                 verified = gpg.verify_file(fp)
     else:
@@ -395,15 +395,19 @@ def main():
             if name == 'particl_mnemonic':
                 particl_wallet_mnemonic = s[1].strip('"')
                 continue
-            if name == 'withcoin':
-                if s[1] not in known_coins:
-                    exitWithError('Unknown coin {}'.format(s[1]))
-                with_coins.add(s[1])
+            if name == 'withcoin' or name == 'withcoins':
+                coins = s[1].split(',')
+                for coin in coins:
+                    if coin not in known_coins:
+                        exitWithError('Unknown coin {}'.format(coin))
+                    with_coins.add(coin)
                 continue
-            if name == 'withoutcoin':
-                if s[1] not in known_coins:
-                    exitWithError('Unknown coin {}'.format(s[1]))
-                with_coins.discard(s[1])
+            if name == 'withoutcoin' or name == 'withoutcoins':
+                coins = s[1].split(',')
+                for coin in coins:
+                    if coin not in known_coins:
+                        exitWithError('Unknown coin {}'.format(coin))
+                    with_coins.discard(coin)
                 continue
             if name == 'addcoin':
                 if s[1] not in known_coins:

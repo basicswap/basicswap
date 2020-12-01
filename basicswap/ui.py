@@ -48,7 +48,7 @@ def setCoinFilter(form_data, field_name):
         raise ValueError('Unknown Coin Type {}'.format(str(field_name)))
 
 
-def getTxIdHex(bid, tx_type, prefix):
+def getTxIdHex(bid, tx_type, suffix):
     if tx_type == TxTypes.ITX:
         obj = bid.initiate_tx
     elif tx_type == TxTypes.PTX:
@@ -60,7 +60,7 @@ def getTxIdHex(bid, tx_type, prefix):
         return 'None'
     if not obj.txid:
         return 'None'
-    return obj.txid.hex() + prefix
+    return obj.txid.hex() + suffix
 
 
 def getTxSpendHex(bid, tx_type):
@@ -86,13 +86,10 @@ def listBidStates():
 
 
 def describeBid(swap_client, bid, offer, edit_bid, show_txns):
-
-    coin_from = Coins(offer.coin_from)
-    coin_to = Coins(offer.coin_to)
-    ci_from = swap_client.ci(coin_from)
-    ci_to = swap_client.ci(coin_to)
-    ticker_from = swap_client.getTicker(coin_from)
-    ticker_to = swap_client.getTicker(coin_to)
+    ci_from = swap_client.ci(Coins(offer.coin_from))
+    ci_to = swap_client.ci(Coins(offer.coin_to))
+    ticker_from = ci_from.ticker()
+    ticker_to = ci_to.ticker()
 
     if bid.state == BidStates.BID_SENT:
         state_description = 'Waiting for seller to accept.'

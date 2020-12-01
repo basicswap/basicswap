@@ -166,6 +166,8 @@ class XMRInterface(CoinInterface):
             params = {'out': True, 'pending': True, 'failed': True, 'pool': True, }
             rv = self.rpc_wallet_cb('get_transfers', params)
             logging.info('[rm] get_transfers {}'.format(dumpj(rv)))
+            if 'pending' not in rv:
+                break
             time.sleep(1)
 
         return tx_hash

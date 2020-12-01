@@ -198,3 +198,6 @@ class CoinInterface:
 
     def coin_name(self):
         return chainparams[self.coin_type()]['name'].capitalize()
+
+    def ticker(self):
+        return chainparams[self.coin_type()]['ticker']

@@ -211,6 +211,8 @@ def strOfferState(state):
 def strBidState(state):
     if state == BidStates.BID_SENT:
         return 'Sent'
+    if state == BidStates.BID_RECEIVING:
+        return 'Receiving'
     if state == BidStates.BID_RECEIVED:
         return 'Received'
     if state == BidStates.BID_ACCEPTED:
@@ -227,6 +229,28 @@ def strBidState(state):
         return 'Abandoned'
     if state == BidStates.BID_ERROR:
         return 'Error'
+    if state == BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED:
+        return 'Script coin locked'
+    if state == BidStates.XMR_SWAP_HAVE_SCRIPT_COIN_SPEND_TX:
+        return 'Script coin spend tx valid'
+    if state == BidStates.XMR_SWAP_NOSCRIPT_COIN_LOCKED:
+        return 'Scriptless coin locked'
+    if state == BidStates.XMR_SWAP_SECRET_SHARED:
+        return 'Secret shared'
+    if state == BidStates.XMR_SWAP_SCRIPT_TX_REDEEMED:
+        return 'Script tx redeemed'
+    if state == BidStates.XMR_SWAP_NOSCRIPT_TX_REDEEMED:
+        return 'Scriptless tx redeemed'
+    if state == BidStates.XMR_SWAP_NOSCRIPT_TX_RECOVERED:
+        return 'Scriptless tx recovered'
+    if state == BidStates.XMR_SWAP_FAILED_REFUNDED:
+        return 'Failed, refunded'
+    if state == BidStates.XMR_SWAP_FAILED_SWIPED:
+        return 'Failed, swiped'
+    if state == BidStates.XMR_SWAP_FAILED:
+        return 'Failed'
+    if state == BidStates.SWAP_DELAYING:
+        return 'Delaying'
     return 'Unknown'
 
 
@@ -2359,7 +2383,7 @@ class BasicSwap(BaseApp):
 
                 found_tx = ci_to.findTxB(xmr_swap.vkbv, xmr_swap.pkbs, bid.amount_to, ci_to.blocks_confirmed, xmr_swap.b_restore_height)
                 if found_tx is not None:
-
+                    self.log.debug('Found {} lock tx in chain'.format(ci_to.coin_name()))
                     if bid.xmr_b_lock_tx is None:
                         b_lock_tx_id = bytes.fromhex(found_tx['txid'])
                         bid.xmr_b_lock_tx = SwapTx(
@@ -2383,7 +2407,7 @@ class BasicSwap(BaseApp):
                 # Wait for script spend tx to confirm
                 # TODO: Use explorer to get tx / block hash for getrawtransaction
                 pass
-            elif state == BidStates.XMR_SWAP_SCRIPT_TX_REDEEMED:
+            elif state == BidStates.XMR_SWAP_NOSCRIPT_TX_REDEEMED:
                 txid_hex = bid.xmr_b_lock_tx.spend_txid.hex()
 
                 found_tx = ci_to.findTxnByHash(txid_hex)
@@ -2741,6 +2765,7 @@ class BasicSwap(BaseApp):
 
             else:
                 self.log.info('Coin a lock refund spent by unknown tx, bid {}'.format(bid_id.hex()))
+                bid.setState(BidStates.XMR_SWAP_FAILED_SWIPED)
 
             self.saveBidInSession(bid_id, bid, session, xmr_swap)
             # Update copy of bid in swaps_in_progress
@@ -2835,7 +2860,7 @@ class BasicSwap(BaseApp):
         try:
             session = scoped_session(self.session_factory)
 
-            q = session.query(EventQueue).filter(EventQueue.trigger_at >= now)
+            q = session.query(EventQueue).filter(sa.and_(EventQueue.active_ind == 1, EventQueue.trigger_at <= now))
             for row in q:
                 try:
                     if row.event_type == EventTypes.ACCEPT_BID:
@@ -2860,7 +2885,11 @@ class BasicSwap(BaseApp):
                     if self.debug:
                         traceback.print_exc()
                     self.log.error('checkEvents failed: {}'.format(str(ex)))
-                session.delete(row)
+
+            if self.debug:
+                session.execute('UPDATE eventqueue SET active_ind = 2 WHERE trigger_at <= {}'.format(now))
+            else:
+                session.execute('DELETE FROM eventqueue WHERE trigger_at <= {}'.format(now))
 
             session.commit()
         finally:
@@ -3683,6 +3712,7 @@ class BasicSwap(BaseApp):
         txid = ci_to.spendBLockTx(address_to, xmr_swap.vkbv, vkbs, bid.amount_to, xmr_offer.b_fee_rate, xmr_swap.b_restore_height)
 
         bid.xmr_b_lock_tx.spend_txid = txid
+        bid.setState(BidStates.XMR_SWAP_NOSCRIPT_TX_REDEEMED)
         # TODO: Why does using bid.txns error here?
         self.saveBidInSession(bid_id, bid, session, xmr_swap)
         # Update copy of bid in swaps_in_progress
