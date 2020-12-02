@@ -2,12 +2,10 @@ version: '3'
 services:
 
     swapclient:
+        image: i_swapclient
         stop_grace_period: 5m
         build:
             context: ../
-            args:
-                - WITH_COINS=--withcoins=monero
-                - WITHOUT_COINS=--withoutcoins=litecoin
         volumes:
             - ${COINDATA_PATH}:/coindata
         ports:

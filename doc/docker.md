@@ -1,7 +1,29 @@
 
+# Docker Setup
+
+## Build the images
+```
+$ docker-compose build
+```
+
+## Prepare the binaries, coin dirs and settings
+```
+$ docker run -t --name swap_prepare -v /tmp/coindata:/coindata i_swapclient basicswap-prepare --datadir=/coindata --withcoins=monero --withoutcoins=litecoin
+```
+
+Record the mnemonic from the output of the above command.
+
+Remove swap_prepare container (and logs):
+```
+$ docker rm swap_prepare
+```
+
+
+# Running on windows 10
+
+
 Work in progress - doesn't work reliably.
 
-Running on windows 10
 
 Install the latest docker toolbox from:
 https://github.com/docker/toolbox/releases

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019 tecnovert
+# Copyright (c) 2019-2020 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -10,14 +10,15 @@ Atomic Swap Client - Proof of Concept
 
 """
 
-import sys
 import os
-import time
+import sys
 import json
-import traceback
+import time
 import signal
-import subprocess
 import logging
+import traceback
+import subprocess
+
 
 import basicswap.config as cfg
 from basicswap import __version__

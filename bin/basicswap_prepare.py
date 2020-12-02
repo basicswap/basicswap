@@ -8,24 +8,22 @@
 """
 Atomic Swap Client - Proof of Concept
 
-sudo pip install python-gnupg
-
 """
 
-import sys
 import os
+import sys
 import json
-import hashlib
 import mmap
+import stat
+import gnupg
+import hashlib
 import tarfile
 import zipfile
-import stat
-from urllib.request import urlretrieve
-import urllib.parse
 import logging
 import platform
+import urllib.parse
+from urllib.request import urlretrieve
 
-import gnupg
 
 import basicswap.config as cfg
 from basicswap.rpc import (
@@ -571,8 +569,8 @@ def main():
             'network_key': '7sW2UEcHXvuqEjkpE5mD584zRaQYs6WXYohue4jLFZPTvMSxwvgs',
             'network_pubkey': '035758c4a22d7dd59165db02a56156e790224361eb3191f02197addcb3bde903d2',
             'chainclients': withchainclients,
-            'auto_reply_delay_min': 5,  # Min delay before sending a response message
-            'auto_reply_delay_max': 50,  # Max delay before sending a response message
+            'min_delay_event': 5,  # Min delay in seconds before reacting to an event
+            'max_delay_event': 50,  # Max delay in seconds before reacting to an event
             'check_progress_seconds': 60,
             'check_watched_seconds': 60,
             'check_expired_seconds': 60
