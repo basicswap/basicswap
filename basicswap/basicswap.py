@@ -9,6 +9,7 @@ import re
 import zmq
 import json
 import time
+import base64
 import shutil
 import random
 import logging
@@ -59,9 +60,11 @@ from .messages_pb2 import (
     XmrBidLockTxSigsMessage,
     XmrBidLockSpendTxMessage,
     XmrBidSecretMessage,
+    OfferRevokeMessage,
 )
 from .db import (
     CURRENT_DB_VERSION,
+    TableTypes,
     Base,
     DBKVInt,
     DBKVString,
@@ -72,6 +75,7 @@ from .db import (
     SentOffer,
     SmsgAddress,
     EventQueue,
+    EventLog,
     XmrOffer,
     XmrSwap,
     XmrSplitData,
@@ -100,6 +104,7 @@ class MessageTypes(IntEnum):
     XMR_BID_TXN_SIGS_FL = auto()
     XMR_BID_LOCK_SPEND_TX_LF = auto()
     XMR_BID_SECRET_LF = auto()
+    OFFER_REVOKE = auto()
 
 
 class SwapTypes(IntEnum):
@@ -174,6 +179,10 @@ class EventTypes(IntEnum):
     REDEEM_XMR_SWAP_LOCK_TX_A = auto()  # Follower
     REDEEM_XMR_SWAP_LOCK_TX_B = auto()  # Leader
     RECOVER_XMR_SWAP_LOCK_TX_B = auto()
+
+
+class EventLogTypes(IntEnum):
+    FAILED_TX_B_PUBLISH = auto()
 
 
 class XmrSplitMsgTypes(IntEnum):
@@ -404,8 +413,11 @@ class BasicSwap(BaseApp):
         self._last_checked_xmr_swaps = 0
 
         # TODO: Adjust ranges
-        self.min_delay_auto_accept = self.settings.get('min_delay_auto_accept', 10)
-        self.max_delay_auto_accept = self.settings.get('max_delay_auto_accept', 60)
+        self.min_delay_event = self.settings.get('min_delay_event', 10)
+        self.max_delay_event = self.settings.get('max_delay_event', 60)
+
+        self.min_delay_retry = self.settings.get('min_delay_retry', 20)
+        self.max_delay_retry = self.settings.get('max_delay_retry', 120)
 
         self.swaps_in_progress = dict()
 
@@ -922,6 +934,35 @@ class BasicSwap(BaseApp):
         self.log.info('Sent OFFER %s', offer_id.hex())
         return offer_id
 
+    def revokeOffer(self, offer_id):
+        self.log.info('Revoking offer %s', offer_id.hex())
+
+        session = None
+        self.mxDB.acquire()
+        try:
+            session = scoped_session(self.session_factory)
+
+            offer = session.query(Offer).filter_by(offer_id=offer_id).first()
+
+            msg_buf = OfferRevokeMessage()
+            msg_buf.offer_msg_id = offer_id
+
+            signature_enc = self.callcoinrpc(Coins.PART, 'signmessage', [offer.addr_from, offer_id.hex() + '_revoke'])
+
+            msg_buf.signature = base64.b64decode(signature_enc)
+
+            msg_bytes = msg_buf.SerializeToString()
+            payload_hex = str.format('{:02x}', MessageTypes.OFFER_REVOKE) + msg_bytes.hex()
+
+            options = {'decodehex': True, 'ttl_is_seconds': True}
+            ro = self.callrpc('smsgsend', [offer.addr_from, self.network_addr, payload_hex, False, offer.time_valid, False, options])
+            msg_id = ro['msgid']
+        finally:
+            if session:
+                session.close()
+                session.remove()
+            self.mxDB.release()
+
     def getPathKey(self, coin_from, coin_to, offer_created_at, contract_count, key_no, for_xmr=False):
         account = self.callcoinrpc(Coins.PART, 'extkey', ['account'])
         evkey = self.callcoinrpc(Coins.PART, 'extkey', ['account', 'default', 'true'])['evkey']
@@ -1141,7 +1182,7 @@ class BasicSwap(BaseApp):
 
         return (sign_for_addr, signature)
 
-    def saveBidInSession(self, bid_id, bid, session, xmr_swap=None):
+    def saveBidInSession(self, bid_id, bid, session, xmr_swap=None, save_in_progress=None):
         session.add(bid)
         if bid.initiate_tx:
             session.add(bid.initiate_tx)
@@ -1157,6 +1198,11 @@ class BasicSwap(BaseApp):
             session.add(tx)
         if xmr_swap is not None:
             session.add(xmr_swap)
+
+        if save_in_progress is not None:
+            if not isinstance(save_in_progress, Offer):
+                raise ValueError('Must specify offer for save_in_progress')
+            self.swaps_in_progress[bid_id] = (bid, save_in_progress)  # (bid, offer)
 
     def saveBid(self, bid_id, bid, xmr_swap=None):
         self.mxDB.acquire()
@@ -1182,12 +1228,13 @@ class BasicSwap(BaseApp):
 
     def createEventInSession(self, delay, event_type, linked_id, session):
         self.log.debug('createEvent %d %s', event_type, linked_id.hex())
-        event = EventQueue()
-        event.active_ind = 1
-        event.created_at = int(time.time())
-        event.trigger_at = event.created_at + delay
-        event.event_type = event_type
-        event.linked_id = linked_id
+        now = int(time.time())
+        event = EventQueue(
+            active_ind=1,
+            created_at=now,
+            trigger_at=now + delay,
+            event_type=event_type,
+            linked_id=linked_id)
         session.add(event)
 
     def createEvent(self, delay, event_type, linked_id):
@@ -1201,6 +1248,21 @@ class BasicSwap(BaseApp):
             session.remove()
         finally:
             self.mxDB.release()
+
+    def logBidEvent(self, bid, event_type, event_msg, session):
+        self.log.debug('logBidEvent %s %s', bid.bid_id.hex(), event_type)
+        entry = EventLog(
+            active_ind=1,
+            created_at=int(time.time()),
+            linked_type=TableTypes.BID,
+            linked_id=bid.bid_id,
+            event_type=int(event_type),
+            event_msg=event_msg)
+        session.add(entry)
+
+    def countBidEvents(self, bid, event_type, session):
+        q = session.execute('SELECT COUNT(*) FROM eventlog WHERE linked_type = {} AND linked_id = x\'{}\' AND event_type = {}'.format(int(TableTypes.BID), bid.bid_id.hex(), int(event_type))).first()
+        return q[0]
 
     def postBid(self, offer_id, amount, addr_send_from=None):
         # Bid to send bid.amount * offer.rate of coin_to in exchange for bid.amount of coin_from
@@ -2370,7 +2432,7 @@ class BasicSwap(BaseApp):
                     self.saveBidInSession(bid_id, bid, session, xmr_swap)
 
                     if bid.was_sent:
-                        delay = random.randrange(self.min_delay_auto_accept, self.max_delay_auto_accept)
+                        delay = random.randrange(self.min_delay_event, self.max_delay_event)
                         self.log.info('Sending xmr swap chain B lock tx for bid %s in %d seconds', bid_id.hex(), delay)
                         self.createEventInSession(delay, EventTypes.SEND_XMR_SWAP_LOCK_TX_B, bid_id, session)
                         # bid.setState(BidStates.SWAP_DELAYING)
@@ -2398,7 +2460,7 @@ class BasicSwap(BaseApp):
                     self.saveBidInSession(bid_id, bid, session, xmr_swap)
 
                     if bid.was_received:
-                        delay = random.randrange(self.min_delay_auto_accept, self.max_delay_auto_accept)
+                        delay = random.randrange(self.min_delay_event, self.max_delay_event)
                         self.log.info('Releasing xmr swap secret for bid %s in %d seconds', bid_id.hex(), delay)
                         self.createEventInSession(delay, EventTypes.SEND_XMR_SECRET, bid_id, session)
 
@@ -2697,7 +2759,7 @@ class BasicSwap(BaseApp):
                     if not bid.was_received:
                         bid.setState(BidStates.SWAP_COMPLETED)
                     if bid.was_received:
-                        delay = random.randrange(self.min_delay_auto_accept, self.max_delay_auto_accept)
+                        delay = random.randrange(self.min_delay_event, self.max_delay_event)
                         self.log.info('Redeeming coin b lock tx for bid %s in %d seconds', bid_id.hex(), delay)
                         self.createEventInSession(delay, EventTypes.REDEEM_XMR_SWAP_LOCK_TX_B, bid_id, session)
                 else:
@@ -2710,9 +2772,7 @@ class BasicSwap(BaseApp):
             else:
                 self.setBidError(bid.bid_id, bid, 'Unexpected txn spent coin a lock tx: {}'.format(spend_txid_hex), save_bid=False)
 
-            self.saveBidInSession(bid_id, bid, session, xmr_swap)
-            # Update copy of bid in swaps_in_progress
-            self.swaps_in_progress[bid_id] = (bid, offer)
+            self.saveBidInSession(bid_id, bid, session, xmr_swap, save_in_progress=offer)
             session.commit()
         except Exception as ex:
             self.log.error('process_XMR_SWAP_A_LOCK_tx_spend %s', str(ex))
@@ -2753,7 +2813,7 @@ class BasicSwap(BaseApp):
                             txid=xmr_swap.a_lock_refund_spend_tx_id,
                         )
                     if bid.xmr_b_lock_tx is not None:
-                        delay = random.randrange(self.min_delay_auto_accept, self.max_delay_auto_accept)
+                        delay = random.randrange(self.min_delay_event, self.max_delay_event)
                         self.log.info('Recovering xmr swap chain B lock tx for bid %s in %d seconds', bid_id.hex(), delay)
                         self.createEventInSession(delay, EventTypes.RECOVER_XMR_SWAP_LOCK_TX_B, bid_id, session)
                     else:
@@ -2767,9 +2827,7 @@ class BasicSwap(BaseApp):
                 self.log.info('Coin a lock refund spent by unknown tx, bid {}'.format(bid_id.hex()))
                 bid.setState(BidStates.XMR_SWAP_FAILED_SWIPED)
 
-            self.saveBidInSession(bid_id, bid, session, xmr_swap)
-            # Update copy of bid in swaps_in_progress
-            self.swaps_in_progress[bid_id] = (bid, offer)
+            self.saveBidInSession(bid_id, bid, session, xmr_swap, save_in_progress=offer)
             session.commit()
         except Exception as ex:
             self.log.error('process_XMR_SWAP_A_LOCK_REFUND_tx_spend %s', str(ex))
@@ -2990,6 +3048,7 @@ class BasicSwap(BaseApp):
         if existing_offer is None:
             offer = Offer(
                 offer_id=offer_id,
+                active_ind=1,
 
                 coin_from=offer_data.coin_from,
                 coin_to=offer_data.coin_to,
@@ -3028,6 +3087,44 @@ class BasicSwap(BaseApp):
         session.close()
         session.remove()
 
+    def processOfferRevoke(self, msg):
+        assert(msg['to'] == self.network_addr), 'Message received on wrong address'
+
+        msg_bytes = bytes.fromhex(msg['hex'][2:-2])
+        msg_data = OfferRevokeMessage()
+        msg_data.ParseFromString(msg_bytes)
+
+        now = int(time.time())
+        self.mxDB.acquire()
+        session = None
+        try:
+            session = scoped_session(self.session_factory)
+
+            offer = session.query(Offer).filter_by(offer_id=msg_data.offer_msg_id).first()
+            if offer is None:
+                raise ValueError('Offer not found: {}'.format(msg_data.offer_msg_id.hex()))
+
+            if offer.expire_at <= now:
+                raise ValueError('Offer already expired: {}'.format(msg_data.offer_msg_id.hex()))
+
+            if len(msg_data.signature) != 65:
+                raise ValueError('Invalid signature length')
+
+            signature_enc = base64.b64encode(msg_data.signature).decode('utf-8')
+
+            passed = self.callcoinrpc(Coins.PART, 'verifymessage', [offer.addr_from, signature_enc, msg_data.offer_msg_id.hex() + '_revoke'])
+            assert(passed is True), 'Proof of funds signature invalid'
+
+            offer.active_ind = 2
+            # TODO: Remove message, or wait for expire
+
+            session.add(offer)
+            session.commit()
+        finally:
+            if session:
+                session.close()
+                session.remove()
+            self.mxDB.release()
     def processBid(self, msg):
         self.log.debug('Processing bid msg %s', msg['msgid'])
         now = int(time.time())
@@ -3110,7 +3207,7 @@ class BasicSwap(BaseApp):
             if self.countAcceptedBids(offer_id) > 0:
                 self.log.info('Not auto accepting bid %s, already have', bid_id.hex())
             else:
-                delay = random.randrange(self.min_delay_auto_accept, self.max_delay_auto_accept)
+                delay = random.randrange(self.min_delay_event, self.max_delay_event)
                 self.log.info('Auto accepting bid %s in %d seconds', bid_id.hex(), delay)
                 self.createEvent(delay, EventTypes.ACCEPT_BID, bid_id)
 
@@ -3275,7 +3372,7 @@ class BasicSwap(BaseApp):
         bid.setState(BidStates.SWAP_DELAYING)
         self.saveBidInSession(bid.bid_id, bid, session, xmr_swap)
 
-        delay = random.randrange(self.min_delay_auto_accept, self.max_delay_auto_accept)
+        delay = random.randrange(self.min_delay_event, self.max_delay_event)
         self.log.info('Responding to xmr bid accept %s in %d seconds', bid.bid_id.hex(), delay)
         self.createEventInSession(delay, EventTypes.SIGN_XMR_SWAP_LOCK_TX_A, bid.bid_id, session)
 
@@ -3573,15 +3670,22 @@ class BasicSwap(BaseApp):
         try:
             b_lock_tx_id = ci_to.publishBLockTx(xmr_swap.pkbv, xmr_swap.pkbs, bid.amount_to, xmr_offer.b_fee_rate)
         except Exception as ex:
-            self.log.error('publishBLockTx failed for bid {} with error {}'.format(bid_id.hex(), str(ex)))
+            error_msg = 'publishBLockTx failed for bid {} with error {}'.format(bid_id.hex(), str(ex))
+            num_retries = self.countBidEvents(bid, EventLogTypes.FAILED_TX_B_PUBLISH, session)
+            if num_retries > 0:
+                error_msg += ', retry no. {}'.format(num_retries)
+            self.log.error(error_msg)
 
-            if 'not enough unlocked money' in str(ex):
-                delay = random.randrange(self.min_delay_auto_accept, self.max_delay_auto_accept)  # TODO: New delay range
+            str_error = str(ex)
+            if num_retries < 5 and 'not enough unlocked money' in str_error or 'transaction was rejected by daemon' in str_error:
+                delay = random.randrange(self.min_delay_retry, self.max_delay_retry)
                 self.log.info('Retrying sending xmr swap chain B lock tx for bid %s in %d seconds', bid_id.hex(), delay)
                 self.createEventInSession(delay, EventTypes.SEND_XMR_SWAP_LOCK_TX_B, bid_id, session)
             else:
                 self.setBidError(bid_id, bid, 'publishBLockTx failed: ' + str(ex), save_bid=False)
-                self.saveBidInSession(bid_id, bid, session, xmr_swap)
+                self.saveBidInSession(bid_id, bid, session, xmr_swap, save_in_progress=offer)
+
+            self.logBidEvent(bid, EventLogTypes.FAILED_TX_B_PUBLISH, str_error, session)
             return
 
         self.log.debug('Submitted lock txn %s to %s chain for bid %s', b_lock_tx_id.hex(), chainparams[coin_to]['name'], bid_id.hex())
@@ -3592,10 +3696,7 @@ class BasicSwap(BaseApp):
         )
         bid.xmr_b_lock_tx.setState(TxStates.TX_NONE)
 
-        self.saveBidInSession(bid_id, bid, session, xmr_swap)
-
-        # Update copy of bid in swaps_in_progress
-        self.swaps_in_progress[bid_id] = (bid, offer)
+        self.saveBidInSession(bid_id, bid, session, xmr_swap, save_in_progress=offer)
 
     def sendXmrBidSecret(self, bid_id, session):
         # Leader sending lock tx a release secret (MSG5F)
@@ -3627,9 +3728,7 @@ class BasicSwap(BaseApp):
         xmr_swap.coin_a_lock_refund_spend_tx_msg_id = bytes.fromhex(ro['msgid'])
 
         bid.setState(BidStates.XMR_SWAP_SECRET_SHARED)
-        self.saveBidInSession(bid_id, bid, session, xmr_swap)
-        # Update copy of bid in swaps_in_progress
-        self.swaps_in_progress[bid_id] = (bid, offer)
+        self.saveBidInSession(bid_id, bid, session, xmr_swap, save_in_progress=offer)
 
     def redeemXmrBidCoinALockTx(self, bid_id, session):
         # Follower redeeming A lock tx
@@ -3678,9 +3777,7 @@ class BasicSwap(BaseApp):
         )
         bid.xmr_a_lock_spend_tx.setState(TxStates.TX_NONE)
 
-        self.saveBidInSession(bid_id, bid, session, xmr_swap)
-        # Update copy of bid in swaps_in_progress
-        self.swaps_in_progress[bid_id] = (bid, offer)
+        self.saveBidInSession(bid_id, bid, session, xmr_swap, save_in_progress=offer)
 
     def redeemXmrBidCoinBLockTx(self, bid_id, session):
         # Leader redeeming B lock tx
@@ -3714,9 +3811,7 @@ class BasicSwap(BaseApp):
         bid.xmr_b_lock_tx.spend_txid = txid
         bid.setState(BidStates.XMR_SWAP_NOSCRIPT_TX_REDEEMED)
         # TODO: Why does using bid.txns error here?
-        self.saveBidInSession(bid_id, bid, session, xmr_swap)
-        # Update copy of bid in swaps_in_progress
-        self.swaps_in_progress[bid_id] = (bid, offer)
+        self.saveBidInSession(bid_id, bid, session, xmr_swap, save_in_progress=offer)
 
     def recoverXmrBidCoinBLockTx(self, bid_id, session):
         # Follower recovering B lock tx
@@ -3750,9 +3845,7 @@ class BasicSwap(BaseApp):
         bid.xmr_b_lock_tx.spend_txid = txid
 
         bid.setState(BidStates.XMR_SWAP_NOSCRIPT_TX_RECOVERED)
-        self.saveBidInSession(bid_id, bid, session, xmr_swap)
-        # Update copy of bid in swaps_in_progress
-        self.swaps_in_progress[bid_id] = (bid, offer)
+        self.saveBidInSession(bid_id, bid, session, xmr_swap, save_in_progress=offer)
 
     def processXmrBidCoinALockSigs(self, msg):
         # Leader processing MSG3L
@@ -3803,7 +3896,7 @@ class BasicSwap(BaseApp):
             assert(v), 'Invalid signature for lock refund spend txn'
             self.addLockRefundSigs(xmr_swap, ci_from)
 
-            delay = random.randrange(self.min_delay_auto_accept, self.max_delay_auto_accept)
+            delay = random.randrange(self.min_delay_event, self.max_delay_event)
             self.log.info('Sending coin A lock tx for xmr bid %s in %d seconds', bid_id.hex(), delay)
             self.createEvent(delay, EventTypes.SEND_XMR_SWAP_LOCK_TX_A, bid_id)
 
@@ -3902,7 +3995,7 @@ class BasicSwap(BaseApp):
 
         xmr_swap.sv = msg_data.secret_value
 
-        delay = random.randrange(self.min_delay_auto_accept, self.max_delay_auto_accept)
+        delay = random.randrange(self.min_delay_event, self.max_delay_event)
         self.log.info('Redeeming coin A lock tx for xmr bid %s in %d seconds', bid_id.hex(), delay)
         self.createEvent(delay, EventTypes.REDEEM_XMR_SWAP_LOCK_TX_A, bid_id)
 
@@ -3934,6 +4027,8 @@ class BasicSwap(BaseApp):
                 self.processXmrSplitMessage(msg)
             elif msg_type == MessageTypes.XMR_BID_SECRET_LF:
                 self.processXmrSecretMessage(msg)
+            if msg_type == MessageTypes.OFFER_REVOKE:
+                self.processOfferRevoke(msg)
 
         except Exception as ex:
             self.log.error('processMsg %s', str(ex))
@@ -4143,7 +4238,7 @@ class BasicSwap(BaseApp):
             if sent:
                 q = session.query(Offer).filter(Offer.was_sent == True)  # noqa E712
             else:
-                q = session.query(Offer).filter(Offer.expire_at > now)
+                q = session.query(Offer).filter(sa.and_(Offer.expire_at > now, Offer.active_ind == 1))
 
             filter_offer_id = filters.get('offer_id', None)
             if filter_offer_id is not None:

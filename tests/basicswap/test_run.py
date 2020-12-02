@@ -176,8 +176,8 @@ def prepareDir(datadir, nodeId, network_key, network_pubkey):
         'check_watched_seconds': 4,
         'check_expired_seconds': 60,
         'check_events_seconds': 1,
-        'min_delay_auto_accept': 1,
-        'max_delay_auto_accept': 5
+        'min_delay_event': 1,
+        'max_delay_event': 5
     }
     with open(settings_path, 'w') as fp:
         json.dump(settings, fp, indent=4)

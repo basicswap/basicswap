@@ -1,16 +1,18 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019 tecnovert
+# Copyright (c) 2019-2020 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import struct
 import time
 import sqlalchemy as sa
+
 from sqlalchemy.ext.declarative import declarative_base
+from enum import IntEnum, auto
 
-CURRENT_DB_VERSION = 2
 
+CURRENT_DB_VERSION = 3
 Base = declarative_base()
 
 
@@ -32,6 +34,7 @@ class Offer(Base):
     __tablename__ = 'offers'
 
     offer_id = sa.Column(sa.LargeBinary, primary_key=True)
+    active_ind = sa.Column(sa.Integer)
 
     coin_from = sa.Column(sa.Integer)
     coin_to = sa.Column(sa.Integer)
@@ -75,6 +78,7 @@ class Bid(Base):
 
     bid_id = sa.Column(sa.LargeBinary, primary_key=True)
     offer_id = sa.Column(sa.LargeBinary, sa.ForeignKey('offers.offer_id'))
+    active_ind = sa.Column(sa.Integer)
 
     was_sent = sa.Column(sa.Boolean)
     was_received = sa.Column(sa.Boolean)
@@ -212,6 +216,20 @@ class EventQueue(Base):
     event_data = sa.Column(sa.LargeBinary)
 
 
+class EventLog(Base):
+    __tablename__ = 'eventlog'
+
+    event_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
+    active_ind = sa.Column(sa.Integer)
+    created_at = sa.Column(sa.BigInteger)
+    linked_type = sa.Column(sa.Integer)
+    linked_id = sa.Column(sa.LargeBinary)
+    event_type = sa.Column(sa.Integer)
+    event_msg = sa.Column(sa.String)
+
+    __table_args__ = (sa.Index('main_index', 'linked_type', 'linked_id'), )
+
+
 class XmrOffer(Base):
     __tablename__ = 'xmr_offers'
 
@@ -310,3 +328,8 @@ class XmrSplitData(Base):
     msg_sequence = sa.Column(sa.Integer)
     dleag = sa.Column(sa.LargeBinary)
     created_at = sa.Column(sa.BigInteger)
+
+
+class TableTypes(IntEnum):
+    OFFER = auto()
+    BID = auto()

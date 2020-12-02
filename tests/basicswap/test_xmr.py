@@ -235,8 +235,10 @@ def prepare_swapclient_dir(datadir, node_id, network_key, network_pubkey):
         'check_expired_seconds': 60,
         'check_events_seconds': 1,
         'check_xmr_swaps_seconds': 1,
-        'min_delay_auto_accept': 1,
-        'max_delay_auto_accept': 5
+        'min_delay_event': 1,
+        'max_delay_event': 5,
+        'min_delay_retry': 2,
+        'max_delay_retry': 10
     }
 
     with open(settings_path, 'w') as fp:
@@ -521,6 +523,22 @@ class Test(unittest.TestCase):
                     return
         raise ValueError('wait_for_offer timed out.')
 
+    def wait_for_no_offer(self, swap_client, offer_id, wait_for=20):
+        logging.info('wait_for_no_offer %s', offer_id.hex())
+        for i in range(wait_for):
+            if stop_test:
+                raise ValueError('Test stopped.')
+            time.sleep(1)
+            offers = swap_client.listOffers()
+            found_offer = False
+            for offer in offers:
+                if offer.offer_id == offer_id:
+                    found_offer = True
+                    break
+            if not found_offer:
+                return True
+        raise ValueError('wait_for_offer timed out.')
+
     def wait_for_bid(self, swap_client, bid_id, state=None, sent=False, wait_for=20):
         logging.info('wait_for_bid %s', bid_id.hex())
         for i in range(wait_for):
@@ -688,18 +706,39 @@ class Test(unittest.TestCase):
         bid1_id = swap_clients[1].postXmrBid(offer1_id, offer1.amount_from)
         bid2_id = swap_clients[1].postXmrBid(offer2_id, offer2.amount_from)
 
+        offer3_id = swap_clients[0].postOffer(Coins.PART, Coins.XMR, 11 * COIN, 0.15 * XMR_COIN, 11 * COIN, SwapTypes.XMR_SWAP)
+
         self.wait_for_bid(swap_clients[0], bid1_id, BidStates.BID_RECEIVED)
         swap_clients[0].acceptXmrBid(bid1_id)
+
+        self.wait_for_offer(swap_clients[1], offer3_id)
+        offer3 = swap_clients[1].getOffer(offer3_id)
+        bid3_id = swap_clients[1].postXmrBid(offer3_id, offer3.amount_from)
 
         self.wait_for_bid(swap_clients[0], bid2_id, BidStates.BID_RECEIVED)
         swap_clients[0].acceptXmrBid(bid2_id)
 
+        self.wait_for_bid(swap_clients[0], bid3_id, BidStates.BID_RECEIVED)
+        swap_clients[0].acceptXmrBid(bid3_id)
+
         self.wait_for_bid(swap_clients[0], bid1_id, BidStates.SWAP_COMPLETED, wait_for=180)
         self.wait_for_bid(swap_clients[1], bid1_id, BidStates.SWAP_COMPLETED, sent=True)
 
-        self.wait_for_bid(swap_clients[0], bid2_id, BidStates.SWAP_COMPLETED, wait_for=180)
+        self.wait_for_bid(swap_clients[0], bid2_id, BidStates.SWAP_COMPLETED, wait_for=60)
         self.wait_for_bid(swap_clients[1], bid2_id, BidStates.SWAP_COMPLETED, sent=True)
 
+        self.wait_for_bid(swap_clients[0], bid3_id, BidStates.SWAP_COMPLETED, wait_for=60)
+        self.wait_for_bid(swap_clients[1], bid3_id, BidStates.SWAP_COMPLETED, sent=True)
+
+    def test_07_revoke_offer(self):
+        logging.info('---------- Test offer revocaction')
+        swap_clients = self.swap_clients
+        offer_id = swap_clients[0].postOffer(Coins.BTC, Coins.XMR, 10 * COIN, 100 * XMR_COIN, 10 * COIN, SwapTypes.XMR_SWAP)
+        self.wait_for_offer(swap_clients[1], offer_id)
+
+        swap_clients[0].revokeOffer(offer_id)
+
+        self.wait_for_no_offer(swap_clients[1], offer_id)
 
 if __name__ == '__main__':
     unittest.main()

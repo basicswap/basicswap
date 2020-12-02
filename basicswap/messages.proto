@@ -50,6 +50,11 @@ message BidAcceptMessage {
     bytes contract_script = 3;
 }
 
+message OfferRevokeMessage {
+    bytes offer_msg_id = 1;
+    bytes signature = 2;
+}
+
 
 message XmrBidMessage {
     /* MSG1L, F -> L */

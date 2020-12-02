@@ -12,3 +12,10 @@ TODO:
 
 class Peer:
     pass
+
+
+class Network:
+    def __init__(self, network_port, network_key):
+        self._network_port = network_port
+        self._network_key = network_key
+        self._peers = []
