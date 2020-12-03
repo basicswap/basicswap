@@ -551,7 +551,6 @@ class BasicSwap(BaseApp):
                     self.coin_clients[coin]['walletrpcauth'] = (chain_client_settings['walletrpcuser'], chain_client_settings['walletrpcpassword'])
                 else:
                     raise ValueError('Missing XMR wallet rpc credentials.')
-            self.coin_clients[coin]['interface'] = self.createInterface(coin)
 
     def ci(self, coin):  # coin interface
         return self.coin_clients[coin]['interface']
@@ -593,17 +592,17 @@ class BasicSwap(BaseApp):
                 try:
                     with open(pidfilepath, 'rb') as fp:
                         datadir_pid = int(fp.read().decode('utf-8'))
-                    assert(datadir_pid == cc['pid'])
+                    assert(datadir_pid == cc['pid']), 'Mismatched pid'
                     assert(os.path.exists(authcookiepath))
                 except Exception:
                     time.sleep(0.5)
             try:
                 if os.name != 'nt' or cc['core_version_group'] > 17:  # litecoin on windows doesn't write a pid file
-                    assert(datadir_pid == cc['pid'])
+                    assert(datadir_pid == cc['pid']), 'Mismatched pid'
                 with open(authcookiepath, 'rb') as fp:
                     cc['rpcauth'] = fp.read().decode('utf-8')
-            except Exception:
-                self.log.error('Unable to read authcookie for %s, %s, datadir pid %d, daemon pid %s', str(coin), authcookiepath, datadir_pid, cc['pid'])
+            except Exception as e:
+                self.log.error('Unable to read authcookie for %s, %s, datadir pid %d, daemon pid %s. Error: %s', str(coin), authcookiepath, datadir_pid, cc['pid'], str(e))
                 raise ValueError('Error, terminating')
 
     def createCoinInterface(self, coin):
@@ -626,6 +625,9 @@ class BasicSwap(BaseApp):
                 self.log.info('%s Core version %d', chainparams[c]['name'].capitalize(), core_version)
                 self.coin_clients[c]['core_version'] = core_version
 
+                if c == Coins.XMR:
+                    self.coin_clients[c]['interface'].ensureWalletExists()
+
                 if c == Coins.PART:
                     self.coin_clients[c]['have_spent_index'] = self.coin_clients[c]['interface'].haveSpentIndex()
 
@@ -636,6 +638,8 @@ class BasicSwap(BaseApp):
         self.initialise()
 
     def stopDaemon(self, coin):
+        if coin == Coins.XMR:
+            return
         num_tries = 10
         authcookiepath = os.path.join(self.getChainDatadirPath(coin), '.cookie')
         stopping = False
@@ -696,6 +700,19 @@ class BasicSwap(BaseApp):
                 synced = round(self.callcoinrpc(c, 'getblockchaininfo')['verificationprogress'], 3)
                 if synced < 1.0:
                     raise ValueError('{} chain is still syncing, currently at {}.'.format(self.coin_clients[c]['name'], synced))
+
+    def initialiseWallet(self, coin_type):
+        ci = self.ci(coin_type)
+        self.log.info('Initialising {} wallet.'.format(ci.coin_name()))
+
+        if coin_type == Coins.XMR:
+            key_view = self.getWalletKey(coin_type, 1, for_ed25519=True)
+            key_spend = self.getWalletKey(coin_type, 2, for_ed25519=True)
+            ci.initialiseWallet(key_view, key_spend)
+            return
+
+        root_key = self.getWalletKey(coin_type, 1)
+        ci.initialiseWallet(root_key)
 
     def setIntKV(self, str_key, int_val):
         session = scoped_session(self.session_factory)
@@ -963,19 +980,8 @@ class BasicSwap(BaseApp):
                 session.remove()
             self.mxDB.release()
 
-    def getPathKey(self, coin_from, coin_to, offer_created_at, contract_count, key_no, for_xmr=False):
-        account = self.callcoinrpc(Coins.PART, 'extkey', ['account'])
-        evkey = self.callcoinrpc(Coins.PART, 'extkey', ['account', 'default', 'true'])['evkey']
-        ci = self.ci(coin_to)
-
-        days = offer_created_at // 86400
-        secs = offer_created_at - days * 86400
-        key_path_base = '44445555h/999999/{}/{}/{}/{}/{}/{}'.format(int(coin_from), int(coin_to), days, secs, contract_count, key_no)
-
-        if not for_xmr:
-            extkey = self.callcoinrpc(Coins.PART, 'extkey', ['info', evkey, key_path_base])['key_info']['result']
-            return decodeWif(self.callcoinrpc(Coins.PART, 'extkey', ['info', extkey])['key_info']['privkey'])
-
+    def grindForEd25519Key(self, coin_type, evkey, key_path_base):
+        ci = self.ci(coin_type)
         nonce = 1
         while True:
             key_path = key_path_base + '/{}'.format(nonce)
@@ -986,7 +992,34 @@ class BasicSwap(BaseApp):
                 return privkey
             nonce += 1
             if nonce > 1000:
-                raise ValueError('getKeyForXMR failed')
+                raise ValueError('grindForEd25519Key failed')
+
+    def getWalletKey(self, coin_type, key_num, for_ed25519=False):
+        account = self.callcoinrpc(Coins.PART, 'extkey', ['account'])
+        evkey = self.callcoinrpc(Coins.PART, 'extkey', ['account', 'default', 'true'])['evkey']
+
+        key_path_base = '44445555h/1h/{}/{}'.format(int(coin_type), key_num)
+
+        if not for_ed25519:
+            extkey = self.callcoinrpc(Coins.PART, 'extkey', ['info', evkey, key_path_base])['key_info']['result']
+            return decodeWif(self.callcoinrpc(Coins.PART, 'extkey', ['info', extkey])['key_info']['privkey'])
+
+        return self.grindForEd25519Key(coin_type, evkey, key_path_base)
+
+    def getPathKey(self, coin_from, coin_to, offer_created_at, contract_count, key_no, for_ed25519=False):
+        account = self.callcoinrpc(Coins.PART, 'extkey', ['account'])
+        evkey = self.callcoinrpc(Coins.PART, 'extkey', ['account', 'default', 'true'])['evkey']
+        ci = self.ci(coin_to)
+
+        days = offer_created_at // 86400
+        secs = offer_created_at - days * 86400
+        key_path_base = '44445555h/999999/{}/{}/{}/{}/{}/{}'.format(int(coin_from), int(coin_to), days, secs, contract_count, key_no)
+
+        if not for_ed25519:
+            extkey = self.callcoinrpc(Coins.PART, 'extkey', ['info', evkey, key_path_base])['key_info']['result']
+            return decodeWif(self.callcoinrpc(Coins.PART, 'extkey', ['info', extkey])['key_info']['privkey'])
+
+        return self.grindForEd25519Key(coin_to, evkey, key_path_base)
 
     def getContractPubkey(self, date, contract_count):
         account = self.callcoinrpc(Coins.PART, 'extkey', ['account'])
@@ -1550,8 +1583,8 @@ class BasicSwap(BaseApp):
             xmr_swap.contract_count = self.getNewContractId()
             xmr_swap.dest_af = msg_buf.dest_af
             xmr_swap.b_restore_height = self.ci(coin_to).getChainHeight()
-            kbvf = self.getPathKey(coin_from, coin_to, bid_created_at, xmr_swap.contract_count, 1, for_xmr=True)
-            kbsf = self.getPathKey(coin_from, coin_to, bid_created_at, xmr_swap.contract_count, 2, for_xmr=True)
+            kbvf = self.getPathKey(coin_from, coin_to, bid_created_at, xmr_swap.contract_count, 1, for_ed25519=True)
+            kbsf = self.getPathKey(coin_from, coin_to, bid_created_at, xmr_swap.contract_count, 2, for_ed25519=True)
 
             kaf = self.getPathKey(coin_from, coin_to, bid_created_at, xmr_swap.contract_count, 3)
             karf = self.getPathKey(coin_from, coin_to, bid_created_at, xmr_swap.contract_count, 4)
@@ -1660,8 +1693,8 @@ class BasicSwap(BaseApp):
 
             contract_secret = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, 1)
 
-            kbvl = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, 2, for_xmr=True)
-            kbsl = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, 3, for_xmr=True)
+            kbvl = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, 2, for_ed25519=True)
+            kbsl = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, 3, for_ed25519=True)
 
             kal = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, 4)
             karl = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, 5)
@@ -3746,7 +3779,7 @@ class BasicSwap(BaseApp):
         ci_from = self.ci(coin_from)
         ci_to = self.ci(coin_to)
 
-        kbsf = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, 2, for_xmr=True)
+        kbsf = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, 2, for_ed25519=True)
         kaf = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, 3)
 
         al_lock_spend_sig = ci_from.decryptOtVES(kbsf, xmr_swap.al_lock_spend_tx_esig)
@@ -3801,7 +3834,7 @@ class BasicSwap(BaseApp):
         kbsf = ci_from.recoverEncKey(xmr_swap.al_lock_spend_tx_esig, xmr_swap.al_lock_spend_tx_sig, xmr_swap.pkasf)
         assert(kbsf is not None)
 
-        kbsl = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, 3, for_xmr=True)
+        kbsl = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, 3, for_ed25519=True)
         vkbs = ci_to.sumKeys(kbsl, kbsf)
 
         address_to = ci_to.getMainWalletAddress()
@@ -3835,7 +3868,7 @@ class BasicSwap(BaseApp):
         kbsl = ci_from.recoverEncKey(xmr_swap.af_lock_refund_spend_tx_esig, af_lock_refund_spend_tx_sig, xmr_swap.pkasl)
         assert(kbsl is not None)
 
-        kbsf = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, 2, for_xmr=True)
+        kbsf = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, 2, for_ed25519=True)
         vkbs = ci_to.sumKeys(kbsl, kbsf)
 
         address_to = ci_to.getMainWalletAddress()
@@ -3874,7 +3907,7 @@ class BasicSwap(BaseApp):
             xmr_swap.af_lock_refund_spend_tx_esig = msg_data.af_lock_refund_spend_tx_esig
             xmr_swap.af_lock_refund_tx_sig = msg_data.af_lock_refund_tx_sig
 
-            kbsl = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, 3, for_xmr=True)
+            kbsl = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, 3, for_ed25519=True)
             karl = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, 5)
 
             xmr_swap.af_lock_refund_spend_tx_sig = ci_from.decryptOtVES(kbsl, xmr_swap.af_lock_refund_spend_tx_esig)

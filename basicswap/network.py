@@ -15,7 +15,7 @@ class Peer:
 
 
 class Network:
-    def __init__(self, network_port, network_key):
-        self._network_port = network_port
+    def __init__(self, p2p_port, network_key):
+        self._p2p_port = p2p_port
         self._network_key = network_key
         self._peers = []

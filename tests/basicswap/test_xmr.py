@@ -55,7 +55,7 @@ from tests.basicswap.common import (
     TEST_HTTP_PORT,
 )
 from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
-from bin.basicswap_run import startDaemon
+from bin.basicswap_run import startDaemon, startXmrDaemon
 
 
 logger = logging.getLogger()
@@ -479,12 +479,9 @@ class Test(unittest.TestCase):
         for d in cls.xmr_daemons:
             try:
                 d.wait(timeout=20)
-                if d.stdout:
-                    d.stdout.close()
-                if d.stderr:
-                    d.stderr.close()
-                if d.stdin:
-                    d.stdin.close()
+                for fp in (d.stdout, d.stderr, d.stdin):
+                    if fp:
+                        fp.close()
             except Exception as e:
                 logging.info('Closing %d, error %s', d.pid, str(e))
 
@@ -497,12 +494,9 @@ class Test(unittest.TestCase):
         for d in cls.part_daemons + cls.btc_daemons:
             try:
                 d.wait(timeout=20)
-                if d.stdout:
-                    d.stdout.close()
-                if d.stderr:
-                    d.stderr.close()
-                if d.stdin:
-                    d.stdin.close()
+                for fp in (d.stdout, d.stderr, d.stdin):
+                    if fp:
+                        fp.close()
             except Exception as e:
                 logging.info('Closing %d, error %s', d.pid, str(e))
 

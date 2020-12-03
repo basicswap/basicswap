@@ -8,6 +8,7 @@ import os
 
 CONFIG_FILENAME = 'basicswap.json'
 DEFAULT_DATADIR = '~/.basicswap'
+DEFAULT_ALLOW_CORS = False
 TEST_DATADIRS = os.path.expanduser(os.getenv('DATADIRS', '/tmp/basicswap'))
 
 bin_suffix = ('.exe' if os.name == 'nt' else '')

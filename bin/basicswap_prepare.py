@@ -16,6 +16,7 @@ import json
 import mmap
 import stat
 import gnupg
+import signal
 import hashlib
 import tarfile
 import zipfile
@@ -24,13 +25,15 @@ import platform
 import urllib.parse
 from urllib.request import urlretrieve
 
-
 import basicswap.config as cfg
 from basicswap.rpc import (
     callrpc_cli,
     waitForRPC,
 )
-from bin.basicswap_run import startDaemon
+from basicswap.basicswap import BasicSwap
+from basicswap.chainparams import Coins
+from bin.basicswap_run import startDaemon, startXmrWalletDaemon
+
 
 if platform.system() == 'Darwin':
     BIN_ARCH = 'osx64.tar.gz'
@@ -40,7 +43,7 @@ else:
     BIN_ARCH = 'x86_64-linux-gnu.tar.gz'
 
 known_coins = {
-    'particl': '0.19.1.1',
+    'particl': '0.19.1.2',
     'litecoin': '0.18.1',
     'bitcoin': '0.20.1',
     'namecoin': '0.18.0',
@@ -51,6 +54,13 @@ logger = logging.getLogger()
 logger.level = logging.DEBUG
 if not len(logger.handlers):
     logger.addHandler(logging.StreamHandler(sys.stdout))
+
+XMR_RPC_HOST = os.getenv('XMR_RPC_HOST', 'localhost')
+BASE_XMR_RPC_PORT = os.getenv('BASE_XMR_RPC_PORT', 29798)
+BASE_XMR_ZMQ_PORT = os.getenv('BASE_XMR_ZMQ_PORT', 29898)
+BASE_XMR_WALLET_PORT = os.getenv('BASE_XMR_WALLET_PORT', 29998)
+XMR_WALLET_RPC_USER = os.getenv('XMR_WALLET_RPC_USER', 'xmr_wallet_user')
+XMR_WALLET_RPC_PWD = os.getenv('XMR_WALLET_RPC_PWD', 'xmr_wallet_pwd')
 
 
 def make_reporthook():
@@ -95,8 +105,6 @@ def extractCore(coin, version, settings, bin_dir, release_path):
                     fout.write(fi.read())
                 fi.close()
                 os.chmod(out_path, stat.S_IRWXU | stat.S_IXGRP | stat.S_IXOTH)
-
-                print('member', member)
         return
 
     bins = [coin + 'd', coin + '-cli', coin + '-tx']
@@ -257,10 +265,40 @@ def prepareDataDir(coin, settings, data_dir, chain, particl_mnemonic):
     if not os.path.exists(data_dir):
         os.makedirs(data_dir)
 
+    if coin == 'monero':
+        core_conf_path = os.path.join(data_dir, coin + 'd.conf')
+        if os.path.exists(core_conf_path):
+            exitWithError('{} exists'.format(core_conf_path))
+        with open(core_conf_path, 'w') as fp:
+            if chain == 'regtest':
+                fp.write('regtest=1\n')
+                fp.write('keep-fakechain=1\n')
+                fp.write('fixed-difficulty=1\n')
+            elif chain == 'testnet':
+                fp.write('testnet=1\n')
+            fp.write('data-dir={}\n'.format(data_dir))
+            fp.write('rpc-bind-port={}\n'.format(core_settings['rpcport']))
+            fp.write('rpc-bind-ip=127.0.0.1\n')
+            fp.write('zmq-rpc-bind-port={}\n'.format(core_settings['zmqport']))
+            fp.write('zmq-rpc-bind-ip=127.0.0.1\n')
+
+            #fp.write('zmq-rpc-bind-port={}\n'.format(core_settings['zmqport']))
+            #fp.write('zmq-rpc-bind-ip=127.0.0.1\n')
+        wallet_conf_path = os.path.join(data_dir, coin + '_wallet.conf')
+        if os.path.exists(wallet_conf_path):
+            exitWithError('{} exists'.format(wallet_conf_path))
+        with open(wallet_conf_path, 'w') as fp:
+            fp.write('daemon-address={}:{}\n'.format(core_settings['rpchost'], core_settings['rpcport']))
+            fp.write('no-dns=1\n')
+            fp.write('rpc-bind-port={}\n'.format(core_settings['walletrpcport']))
+            fp.write('wallet-dir={}\n'.format(os.path.join(data_dir, 'wallets')))
+            fp.write('log-file={}\n'.format(os.path.join(data_dir, 'wallet.log')))
+            fp.write('shared-ringdb-dir={}\n'.format(os.path.join(data_dir, 'shared-ringdb')))
+            fp.write('rpc-login={}:{}\n'.format(core_settings['walletrpcuser'], core_settings['walletrpcpassword']))
+        return
     core_conf_path = os.path.join(data_dir, coin + '.conf')
     if os.path.exists(core_conf_path):
         exitWithError('{} exists'.format(core_conf_path))
-
     with open(core_conf_path, 'w') as fp:
         if chain != 'mainnet':
             fp.write(chain + '=1\n')
@@ -490,11 +528,14 @@ def main():
         'monero': {
             'connection_type': 'rpc' if 'monero' in with_coins else 'none',
             'manage_daemon': True if 'monero' in with_coins else False,
-            'rpcport': 29798 + port_offset,
-            'walletrpcport': 29799 + port_offset,
-            #'walletrpcuser': 'test' + str(node_id),
-            #'walletrpcpassword': 'test_pass' + str(node_id),
-            'walletfile': 'basicswap',
+            'manage_wallet_daemon': True if 'monero' in with_coins else False,
+            'rpcport': BASE_XMR_RPC_PORT + port_offset,
+            'zmqport': BASE_XMR_ZMQ_PORT + port_offset,
+            'walletrpcport': BASE_XMR_WALLET_PORT + port_offset,
+            'rpchost': XMR_RPC_HOST,
+            'walletrpcuser': XMR_WALLET_RPC_USER,
+            'walletrpcpassword': XMR_WALLET_RPC_PWD,
+            'walletfile': 'swap_wallet',
             'datadir': os.path.join(data_dir, 'monero'),
             'bindir': os.path.join(bin_dir, 'monero'),
         }
@@ -597,26 +638,57 @@ def main():
 
     particl_settings = settings['chainclients']['particl']
     partRpc = make_rpc_func(particl_settings['bindir'], particl_settings['datadir'], chain)
-    d = startDaemon(particl_settings['datadir'], particl_settings['bindir'], cfg.PARTICLD, ['-noconnect', '-nofindpeers', '-nostaking', '-nodnsseed', '-nolisten'])
+
+    daemons = []
+    daemons.append(startDaemon(particl_settings['datadir'], particl_settings['bindir'], cfg.PARTICLD, ['-noconnect', '-nofindpeers', '-nostaking', '-nodnsseed', '-nolisten']))
     try:
         waitForRPC(partRpc)
 
         if particl_wallet_mnemonic is None:
             particl_wallet_mnemonic = partRpc('mnemonic new')['mnemonic']
         partRpc('extkeyimportmaster "{}"'.format(particl_wallet_mnemonic))
+
+        # Initialise wallets
+        with open(os.path.join(data_dir, 'basicswap.log'), 'a') as fp:
+            swap_client = BasicSwap(fp, data_dir, settings, chain)
+
+            swap_client.setCoinConnectParams(Coins.PART)
+            swap_client.setDaemonPID(Coins.PART, daemons[-1].pid)
+            swap_client.setCoinRunParams(Coins.PART)
+            swap_client.createCoinInterface(Coins.PART)
+
+            for coin_name in with_coins:
+                coin_settings = settings['chainclients'][coin_name]
+                c = swap_client.getCoinIdFromName(coin_name)
+                if c == Coins.PART:
+                    continue
+
+                swap_client.setCoinConnectParams(c)
+
+                if c == Coins.XMR:
+                    if not coin_settings['manage_wallet_daemon']:
+                        continue
+                    daemons.append(startXmrWalletDaemon(coin_settings['datadir'], coin_settings['bindir'], 'monero-wallet-rpc'))
+                else:
+                    if not coin_settings['manage_daemon']:
+                        continue
+                    filename = coin_name + 'd' + ('.exe' if os.name == 'nt' else '')
+                    daemons.append(startDaemon(coin_settings['datadir'], coin_settings['bindir'], filename, ['-noconnect', '-nodnsseed', '-nolisten']))
+                swap_client.setDaemonPID(c, daemons[-1].pid)
+                swap_client.setCoinRunParams(c)
+                swap_client.createCoinInterface(c)
+                swap_client.waitForDaemonRPC(c)
+                swap_client.initialiseWallet(c)
     finally:
-        logger.info('Terminating {}'.format(d.pid))
-        d.terminate()
-        d.wait(timeout=120)
-        if d.stdout:
-            d.stdout.close()
-        if d.stderr:
-            d.stderr.close()
-        if d.stdin:
-            d.stdin.close()
+        for d in daemons:
+            logging.info('Interrupting {}'.format(d.pid))
+            d.send_signal(signal.SIGINT)
+            d.wait(timeout=120)
+            for fp in (d.stdout, d.stderr, d.stdin):
+                if fp:
+                    fp.close()
 
     logger.info('IMPORTANT - Save your particl wallet recovery phrase:\n{}\n'.format(particl_wallet_mnemonic))
-
     logger.info('Done.')
 
 

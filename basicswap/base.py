@@ -49,6 +49,9 @@ class BaseApp:
         self.log = logging.getLogger(self.log_name)
         self.log.propagate = False
 
+        # Remove any existing handlers
+        self.log.handlers = []
+
         formatter = logging.Formatter('%(asctime)s %(levelname)s : %(message)s')
         stream_stdout = logging.StreamHandler()
         if self.log_name != 'BasicSwap':
@@ -80,6 +83,12 @@ class BaseApp:
         datadir = self.coin_clients[coin]['datadir']
         testnet_name = '' if self.chain == 'mainnet' else chainparams[coin][self.chain].get('name', self.chain)
         return os.path.join(datadir, testnet_name)
+
+    def getCoinIdFromName(self, coin_name):
+        for c, params in chainparams.items():
+            if coin_name.lower() == params['name'].lower():
+                return c
+        raise ValueError('Unknown coin: {}'.format(coin_name))
 
     def getTicker(self, coin_type):
         ticker = chainparams[coin_type]['ticker']

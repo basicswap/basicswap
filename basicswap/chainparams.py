@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019 tecnovert
+# Copyright (c) 2019-2020 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -70,6 +70,7 @@ chainparams = {
             'rpcport': 8332,
             'pubkey_address': 0,
             'script_address': 5,
+            'key_prefix': 128,
             'hrp': 'bc',
             'bip44': 0,
             'min_amount': 1000,
@@ -79,6 +80,7 @@ chainparams = {
             'rpcport': 18332,
             'pubkey_address': 111,
             'script_address': 196,
+            'key_prefix': 239,
             'hrp': 'tb',
             'bip44': 1,
             'min_amount': 1000,
@@ -89,6 +91,7 @@ chainparams = {
             'rpcport': 18443,
             'pubkey_address': 111,
             'script_address': 196,
+            'key_prefix': 239,
             'hrp': 'bcrt',
             'bip44': 1,
             'min_amount': 1000,
@@ -105,6 +108,7 @@ chainparams = {
             'rpcport': 9332,
             'pubkey_address': 48,
             'script_address': 50,
+            'key_prefix': 176,
             'hrp': 'ltc',
             'bip44': 2,
             'min_amount': 1000,
@@ -114,6 +118,7 @@ chainparams = {
             'rpcport': 19332,
             'pubkey_address': 111,
             'script_address': 58,
+            'key_prefix': 239,
             'hrp': 'tltc',
             'bip44': 1,
             'min_amount': 1000,
@@ -124,6 +129,7 @@ chainparams = {
             'rpcport': 19443,
             'pubkey_address': 111,
             'script_address': 58,
+            'key_prefix': 239,
             'hrp': 'rltc',
             'bip44': 1,
             'min_amount': 1000,

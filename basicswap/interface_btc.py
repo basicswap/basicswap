@@ -17,6 +17,7 @@ from .util import (
     dumpj,
     format_amount,
     make_int,
+    toWIF,
     decodeAddress)
 from coincurve.keys import (
     PublicKey)
@@ -130,6 +131,16 @@ class BTCInterface(CoinInterface):
 
     def getBlockchainInfo(self):
         return self.rpc_callback('getblockchaininfo')
+
+    def initialiseWallet(self, key_bytes):
+        wif_prefix = chainparams[self.coin_type()][self._network]['key_prefix']
+        key_wif = toWIF(wif_prefix, key_bytes)
+
+        try:
+            self.rpc_callback('sethdseed', [True, key_wif])
+        except Exception as e:
+            # <  0.21: Cannot set a new HD seed while still in Initial Block Download.
+            logging.error('sethdseed failed: {}'.format(str(e)))
 
     def getWalletInfo(self):
         return self.rpc_callback('getwalletinfo')

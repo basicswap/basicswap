@@ -40,3 +40,6 @@ class PARTInterface(BTCInterface):
         version = self.getDaemonVersion()
         index_info = self.rpc_callback('getinsightinfo' if int(str(version)[:2]) > 19 else 'getindexinfo')
         return index_info['spentindex']
+
+    def initialiseWallet(self, key):
+        raise ValueError('TODO')

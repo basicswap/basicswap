@@ -5,8 +5,8 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-import unittest
 import secrets
+import unittest
 
 import basicswap.contrib.ed25519_fast as edf
 import basicswap.ed25519_fast_util as edu

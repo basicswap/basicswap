@@ -65,11 +65,45 @@ class XMRInterface(CoinInterface):
     def setWalletFilename(self, wallet_filename):
         self._wallet_filename = wallet_filename
 
+    def initialiseWallet(self, key_view, key_spend, restore_height=None):
+        try:
+            self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
+            # TODO: Check address
+            return  # Wallet exists
+        except Exception as e:
+            pass
+
+        try:
+            if restore_height is None:
+                restore_height = self.getChainHeight()
+        except Exception as e:
+            logging.warning('Unable to get restore_height, set to zero. Error: {}'.format(str(e)))
+            restore_height = 0
+
+        Kbv = self.getPubkey(key_view)
+        Kbs = self.getPubkey(key_spend)
+        address_b58 = xmr_util.encode_address(Kbv, Kbs)
+
+        params = {
+            'filename': self._wallet_filename,
+            'address': address_b58,
+            'viewkey': b2h(key_view[::-1]),
+            'spendkey': b2h(key_spend[::-1]),
+            'restore_height': restore_height,
+        }
+        rv = self.rpc_wallet_cb('generate_from_keys', params)
+        logging.info('generate_from_keys %s', dumpj(rv))
+        self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
+
+    def ensureWalletExists(self):
+        self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
+
     def testDaemonRPC(self):
         self.rpc_wallet_cb('get_languages')
 
     def getDaemonVersion(self):
-        return self.rpc_cb('get_version')['version']
+        return self.rpc_wallet_cb('get_version')['version']
+        #return self.rpc_cb('get_version')['version']
 
     def getBlockchainInfo(self):
         rv = {}

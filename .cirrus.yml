@@ -11,7 +11,7 @@ lint_task:
 
 test_task:
   environment:
-    - PART_VERSION: 0.19.1.1
+    - PART_VERSION: 0.19.1.2
     - BTC_VERSION: 0.20.1
     - LTC_VERSION: 0.18.1
     - TEST_RELOAD_PATH: $HOME/test_basicswap1/
