@@ -621,19 +621,39 @@ class BasicSwap(BaseApp):
 
             if self.coin_clients[c]['connection_type'] == 'rpc':
                 self.waitForDaemonRPC(c)
-                core_version = self.coin_clients[c]['interface'].getDaemonVersion()
-                self.log.info('%s Core version %d', chainparams[c]['name'].capitalize(), core_version)
+                ci = self.ci(c)
+                core_version = ci.getDaemonVersion()
+                self.log.info('%s Core version %d', ci.coin_name(), core_version)
                 self.coin_clients[c]['core_version'] = core_version
 
-                if c == Coins.XMR:
-                    self.coin_clients[c]['interface'].ensureWalletExists()
-
                 if c == Coins.PART:
-                    self.coin_clients[c]['have_spent_index'] = self.coin_clients[c]['interface'].haveSpentIndex()
+                    self.coin_clients[c]['have_spent_index'] = ci.haveSpentIndex()
 
                     # Sanity checks
                     if self.callcoinrpc(c, 'getstakinginfo')['enabled'] is not False:
-                        self.log.warning('%s staking is not disabled.', chainparams[c]['name'].capitalize())
+                        self.log.warning('%s staking is not disabled.', ci.coin_name())
+                elif c == Coins.XMR:
+                    ci.ensureWalletExists()
+
+                    expect_address = self.getStringKV('main_wallet_addr_' + chainparams[c]['name'])
+                    self.log.debug('[rm] expect_address %s', expect_address)
+                    if expect_address is None:
+                        self.log.warning('Can\'t find expected main wallet address for coin {}'.format(ci.coin_name()))
+                    else:
+                        if expect_address == ci.getMainWalletAddress():
+                            ci.setWalletSeedWarning(False)
+                        else:
+                            self.log.warning('Wallet for coin {} not derived from swap seed.'.format(ci.coin_name()))
+                else:
+                    expect_seedid = self.getStringKV('main_wallet_seedid_' + chainparams[c]['name'])
+                    self.log.debug('[rm] expect_seedid %s', expect_seedid)
+                    if expect_seedid is None:
+                        self.log.warning('Can\'t find expected wallet seed id for coin {}'.format(ci.coin_name()))
+                    else:
+                        if expect_seedid == ci.getWalletSeedID():
+                            ci.setWalletSeedWarning(False)
+                        else:
+                            self.log.warning('Wallet for coin {} not derived from swap seed.'.format(ci.coin_name()))
 
         self.initialise()
 
@@ -702,6 +722,8 @@ class BasicSwap(BaseApp):
                     raise ValueError('{} chain is still syncing, currently at {}.'.format(self.coin_clients[c]['name'], synced))
 
     def initialiseWallet(self, coin_type):
+        if coin_type == Coins.PART:
+            return
         ci = self.ci(coin_type)
         self.log.info('Initialising {} wallet.'.format(ci.coin_name()))
 
@@ -709,20 +731,63 @@ class BasicSwap(BaseApp):
             key_view = self.getWalletKey(coin_type, 1, for_ed25519=True)
             key_spend = self.getWalletKey(coin_type, 2, for_ed25519=True)
             ci.initialiseWallet(key_view, key_spend)
+            root_address = ci.getAddressFromKeys(key_view, key_spend)
+
+            key_str = 'main_wallet_addr_' + chainparams[coin_type]['name']
+            self.setStringKV(key_str, root_address)
             return
 
         root_key = self.getWalletKey(coin_type, 1)
+        root_hash = ci.getAddressHashFromKey(root_key)
         ci.initialiseWallet(root_key)
 
+        key_str = 'main_wallet_seedid_' + chainparams[coin_type]['name']
+        self.setStringKV(key_str, root_hash.hex())
+
     def setIntKV(self, str_key, int_val):
-        session = scoped_session(self.session_factory)
-        kv = session.query(DBKVInt).filter_by(key=str_key).first()
-        if not kv:
-            kv = DBKVInt(key=str_key, value=int_val)
-        session.add(kv)
-        session.commit()
-        session.close()
-        session.remove()
+        self.mxDB.acquire()
+        try:
+            session = scoped_session(self.session_factory)
+            kv = session.query(DBKVInt).filter_by(key=str_key).first()
+            if not kv:
+                kv = DBKVInt(key=str_key, value=int_val)
+            else:
+                kv.value = int_val
+            session.add(kv)
+            session.commit()
+            session.close()
+            session.remove()
+        finally:
+            self.mxDB.release()
+
+    def setStringKV(self, str_key, str_val):
+        self.mxDB.acquire()
+        try:
+            session = scoped_session(self.session_factory)
+            kv = session.query(DBKVString).filter_by(key=str_key).first()
+            if not kv:
+                kv = DBKVString(key=str_key, value=str_val)
+            else:
+                kv.value = str_val
+            session.add(kv)
+            session.commit()
+            session.close()
+            session.remove()
+        finally:
+            self.mxDB.release()
+
+    def getStringKV(self, str_key):
+        self.mxDB.acquire()
+        try:
+            session = scoped_session(self.session_factory)
+            v = session.query(DBKVString).filter_by(key=str_key).first()
+            if not v:
+                return None
+            return v.value
+        finally:
+            session.close()
+            session.remove()
+            self.mxDB.release()
 
     def activateBid(self, session, bid):
         if bid.bid_id in self.swaps_in_progress:
@@ -756,7 +821,7 @@ class BasicSwap(BaseApp):
 
         # TODO process addresspool if bid has previously been abandoned
 
-    def deactivateBid(self, offer, bid):
+    def deactivateBid(self, session, offer, bid):
         # Remove from in progress
         self.log.debug('Removing bid from in-progress: %s', bid.bid_id.hex())
         self.swaps_in_progress.pop(bid.bid_id, None)
@@ -1126,25 +1191,8 @@ class BasicSwap(BaseApp):
     def cacheNewAddressForCoin(self, coin_type):
         self.log.debug('cacheNewAddressForCoin %s', coin_type)
         key_str = 'receive_addr_' + chainparams[coin_type]['name']
-        session = scoped_session(self.session_factory)
         addr = self.getReceiveAddressForCoin(coin_type)
-        self.mxDB.acquire()
-        try:
-            session = scoped_session(self.session_factory)
-            try:
-                kv = session.query(DBKVString).filter_by(key=key_str).first()
-                kv.value = addr
-            except Exception:
-                kv = DBKVString(
-                    key=key_str,
-                    value=addr
-                )
-            session.add(kv)
-            session.commit()
-            session.close()
-            session.remove()
-        finally:
-            self.mxDB.release()
+        self.setStringKV(key_str, addr)
         return addr
 
     def getCachedAddressForCoin(self, coin_type):
@@ -1838,9 +1886,9 @@ class BasicSwap(BaseApp):
 
             # Mark bid as abandoned, no further processing will be done
             bid.setState(BidStates.BID_ABANDONED)
+            self.deactivateBid(session, offer, bid)
+            session.add(bid)
             session.commit()
-
-            self.deactivateBid(offer, bid)
         finally:
             session.close()
             session.remove()
@@ -3986,6 +4034,7 @@ class BasicSwap(BaseApp):
             self.setBidError(bid_id, bid, str(ex))
 
         # Update copy of bid in swaps_in_progress
+        assert(bid_id in self.swaps_in_progress)
         self.swaps_in_progress[bid_id] = (bid, offer)
 
     def processXmrSplitMessage(self, msg):
@@ -4112,7 +4161,7 @@ class BasicSwap(BaseApp):
                         self.setBidError(bid_id, v[0], str(ex))
 
                 for bid_id, bid, offer in to_remove:
-                    self.deactivateBid(offer, bid)
+                    self.deactivateBid(None, offer, bid)
                 self._last_checked_progress = now
 
             if now - self._last_checked_watched >= self.check_watched_seconds:
@@ -4157,12 +4206,20 @@ class BasicSwap(BaseApp):
             if has_changed:
                 session = scoped_session(self.session_factory)
                 try:
-                    self.saveBidInSession(bid_id, bid, session)
-                    session.commit()
-                    if bid.state and bid.state > BidStates.BID_RECEIVED and bid.state < BidStates.SWAP_COMPLETED:
+                    activate_bid = False
+                    if offer.swap_type == SwapTypes.BUYER_FIRST:
+                        if bid.state and bid.state > BidStates.BID_RECEIVED and bid.state < BidStates.SWAP_COMPLETED:
+                            activate_bid = True
+                    else:
+                        raise ValueError('TODO')
+
+                    if activate_bid:
                         self.activateBid(session, bid)
                     else:
-                        self.deactivateBid(offer, bid)
+                        self.deactivateBid(session, offer, bid)
+
+                    self.saveBidInSession(bid_id, bid, session)
+                    session.commit()
                 finally:
                     session.close()
                     session.remove()
@@ -4222,8 +4279,9 @@ class BasicSwap(BaseApp):
 
     def getWalletInfo(self, coin):
 
-        blockchaininfo = self.coin_clients[coin]['interface'].getBlockchainInfo()
-        walletinfo = self.coin_clients[coin]['interface'].getWalletInfo()
+        ci = self.ci(coin)
+        blockchaininfo = ci.getBlockchainInfo()
+        walletinfo = ci.getWalletInfo()
 
         scale = chainparams[coin]['decimal_places']
         rv = {
@@ -4234,6 +4292,7 @@ class BasicSwap(BaseApp):
             'balance': format_amount(make_int(walletinfo['balance'], scale), scale),
             'unconfirmed': format_amount(make_int(walletinfo.get('unconfirmed_balance'), scale), scale),
             'synced': '{0:.2f}'.format(round(blockchaininfo['verificationprogress'], 2)),
+            'expected_seed': ci.knownWalletSeed(),
         }
         return rv
 

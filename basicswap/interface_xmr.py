@@ -54,6 +54,7 @@ class XMRInterface(CoinInterface):
         return 32
 
     def __init__(self, coin_settings, network):
+        super().__init__()
         rpc_cb = make_xmr_rpc_func(coin_settings['rpcport'])
         rpc_wallet_cb = make_xmr_wallet_rpc_func(coin_settings['walletrpcport'], coin_settings['walletrpcauth'])
 
@@ -153,6 +154,11 @@ class XMRInterface(CoinInterface):
 
     def getPubkey(self, privkey):
         return ed25519_get_pubkey(privkey)
+
+    def getAddressFromKeys(self, key_view, key_spend):
+        pk_view = self.getPubkey(key_view)
+        pk_spend = self.getPubkey(key_spend)
+        return xmr_util.encode_address(pk_view, pk_spend)
 
     def verifyKey(self, k):
         i = b2i(k)

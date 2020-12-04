@@ -254,6 +254,7 @@ class HttpHandler(BaseHTTPRequestHandler):
                 'blocks': w['blocks'],
                 'synced': w['synced'],
                 'deposit_address': w['deposit_address'],
+                'expected_seed': w['expected_seed'],
             })
             if float(w['unconfirmed']) > 0.0:
                 wallets_formatted[-1]['unconfirmed'] = w['unconfirmed']

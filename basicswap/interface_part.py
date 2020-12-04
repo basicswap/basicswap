@@ -33,6 +33,10 @@ class PARTInterface(BTCInterface):
         self._network = network
         self.blocks_confirmed = coin_settings['blocks_confirmed']
 
+    def knownWalletSeed(self):
+        # TODO: Double check
+        return True
+
     def getNewAddress(self, use_segwit):
         return self.rpc_callback('getnewaddress', ['swap_receive'])
 

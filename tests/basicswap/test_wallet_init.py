@@ -178,14 +178,22 @@ class Test(unittest.TestCase):
         try:
             waitForServer(12700)
 
-            wallets = json.loads(urlopen('http://localhost:12700/json/wallets').read())
-            print('[rm] wallets', dumpj(wallets))
+            wallets_0 = json.loads(urlopen('http://localhost:12700/json/wallets').read())
+            print('[rm] wallets_0', dumpj(wallets_0))
+            assert(wallets_0['1']['expected_seed'] == True)
+            assert(wallets_0['6']['expected_seed'] == True)
 
             waitForServer(12701)
-            wallets = json.loads(urlopen('http://localhost:12701/json/wallets').read())
-            print('[rm] wallets', dumpj(wallets))
+            wallets_1 = json.loads(urlopen('http://localhost:12701/json/wallets').read())
+            print('[rm] wallets_1', dumpj(wallets_1))
 
-            raise ValueError('TODO')
+            assert(wallets_0['1']['expected_seed'] == True)
+            assert(wallets_1['6']['expected_seed'] == True)
+
+            # TODO: Check other coins
+
+            assert(wallets_0['1']['deposit_address'] == wallets_1['1']['deposit_address'])
+            assert(wallets_0['6']['deposit_address'] == wallets_1['6']['deposit_address'])
         except Exception:
             traceback.print_exc()
 

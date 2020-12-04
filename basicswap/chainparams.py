@@ -199,6 +199,9 @@ chainparams = {
 
 
 class CoinInterface:
+    def __init__(self):
+        self._unknown_wallet_seed = True
+
     def format_amount(self, amount_int):
         return format_amount(amount_int, self.exp())
 
@@ -207,3 +210,9 @@ class CoinInterface:
 
     def ticker(self):
         return chainparams[self.coin_type()]['ticker']
+
+    def setWalletSeedWarning(self, value):
+        self._unknown_wallet_seed = value
+
+    def knownWalletSeed(self):
+        return not self._unknown_wallet_seed

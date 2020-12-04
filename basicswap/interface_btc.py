@@ -118,6 +118,7 @@ class BTCInterface(CoinInterface):
         return abs(a - b) < 20
 
     def __init__(self, coin_settings, network):
+        super().__init__()
         self.rpc_callback = make_rpc_func(coin_settings['rpcport'], coin_settings['rpcauth'])
         self.txoType = CTxOut
         self._network = network
@@ -144,6 +145,9 @@ class BTCInterface(CoinInterface):
 
     def getWalletInfo(self):
         return self.rpc_callback('getwalletinfo')
+
+    def getWalletSeedID(self):
+        return self.rpc_callback('getwalletinfo')['hdseedid']
 
     def getNewAddress(self, use_segwit):
         args = ['swap_receive']
@@ -176,6 +180,10 @@ class BTCInterface(CoinInterface):
 
     def getPubkey(self, privkey):
         return PublicKey.from_secret(privkey).format()
+
+    def getAddressHashFromKey(self, key):
+        pk = self.getPubkey(key)
+        return hash160(pk)
 
     def verifyKey(self, k):
         i = b2i(k)
