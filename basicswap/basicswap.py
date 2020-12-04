@@ -530,6 +530,7 @@ class BasicSwap(BaseApp):
             'connection_type': connection_type,
             'bindir': bindir,
             'datadir': datadir,
+            'rpchost': chain_client_settings.get('rpchost', '127.0.0.1'),
             'rpcport': chain_client_settings.get('rpcport', chainparams[coin][self.chain]['rpcport']),
             'rpcauth': rpcauth,
             'blocks_confirmed': chain_client_settings.get('blocks_confirmed', 6),
@@ -543,6 +544,7 @@ class BasicSwap(BaseApp):
             'core_version': None,
             'explorers': [],
             'chain_lookups': chain_client_settings.get('chain_lookups', 'local'),
+            'restore_height': chain_client_settings.get('restore_height', 0),
         }
 
         if self.coin_clients[coin]['connection_type'] == 'rpc':

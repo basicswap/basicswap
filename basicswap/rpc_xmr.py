@@ -28,9 +28,9 @@ def callrpc_xmr(rpc_port, auth, method, params=[], path='json_rpc'):
     return r['result']
 
 
-def callrpc_xmr_na(rpc_port, method, params=[], path='json_rpc'):
+def callrpc_xmr_na(rpc_port, method, params=[], rpc_host='127.0.0.1', path='json_rpc'):
     try:
-        url = 'http://127.0.0.1:{}/{}'.format(rpc_port, path)
+        url = 'http://{}:{}/{}'.format(rpc_host, rpc_port, path)
         request_body = {
             'method': method,
             'params': params,
@@ -65,12 +65,14 @@ def callrpc_xmr2(rpc_port, method, params=[]):
     return r
 
 
-def make_xmr_rpc_func(port):
+def make_xmr_rpc_func(port, host='127.0.0.1'):
     port = port
+    host = host
 
     def rpc_func(method, params=None, wallet=None):
         nonlocal port
-        return callrpc_xmr_na(port, method, params)
+        nonlocal host
+        return callrpc_xmr_na(port, method, params, rpc_host=host)
     return rpc_func
 
 

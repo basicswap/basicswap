@@ -29,4 +29,4 @@ VOLUME /coindata
 COPY ./docker/entrypoint.sh /entrypoint.sh
 
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["basicswap-run", "-datadir=/coindata/basicswap"]
+CMD ["basicswap-run", "-datadir=/coindata"]

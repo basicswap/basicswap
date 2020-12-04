@@ -55,13 +55,14 @@ class XMRInterface(CoinInterface):
 
     def __init__(self, coin_settings, network):
         super().__init__()
-        rpc_cb = make_xmr_rpc_func(coin_settings['rpcport'])
+        rpc_cb = make_xmr_rpc_func(coin_settings['rpcport'], host=coin_settings['rpchost'])
         rpc_wallet_cb = make_xmr_wallet_rpc_func(coin_settings['walletrpcport'], coin_settings['walletrpcauth'])
 
         self.rpc_cb = rpc_cb
         self.rpc_wallet_cb = rpc_wallet_cb
         self._network = network
         self.blocks_confirmed = coin_settings['blocks_confirmed']
+        self._restore_height = coin_settings['restore_height']
 
     def setWalletFilename(self, wallet_filename):
         self._wallet_filename = wallet_filename
@@ -74,13 +75,6 @@ class XMRInterface(CoinInterface):
         except Exception as e:
             pass
 
-        try:
-            if restore_height is None:
-                restore_height = self.getChainHeight()
-        except Exception as e:
-            logging.warning('Unable to get restore_height, set to zero. Error: {}'.format(str(e)))
-            restore_height = 0
-
         Kbv = self.getPubkey(key_view)
         Kbs = self.getPubkey(key_spend)
         address_b58 = xmr_util.encode_address(Kbv, Kbs)
@@ -90,7 +84,7 @@ class XMRInterface(CoinInterface):
             'address': address_b58,
             'viewkey': b2h(key_view[::-1]),
             'spendkey': b2h(key_spend[::-1]),
-            'restore_height': restore_height,
+            'restore_height': self._restore_height,
         }
         rv = self.rpc_wallet_cb('generate_from_keys', params)
         logging.info('generate_from_keys %s', dumpj(rv))

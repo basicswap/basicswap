@@ -56,11 +56,13 @@ if not len(logger.handlers):
     logger.addHandler(logging.StreamHandler(sys.stdout))
 
 XMR_RPC_HOST = os.getenv('XMR_RPC_HOST', 'localhost')
-BASE_XMR_RPC_PORT = os.getenv('BASE_XMR_RPC_PORT', 29798)
-BASE_XMR_ZMQ_PORT = os.getenv('BASE_XMR_ZMQ_PORT', 30898)
-BASE_XMR_WALLET_PORT = os.getenv('BASE_XMR_WALLET_PORT', 29998)
+BASE_XMR_RPC_PORT = int(os.getenv('BASE_XMR_RPC_PORT', 29798))
+BASE_XMR_ZMQ_PORT = int(os.getenv('BASE_XMR_ZMQ_PORT', 30898))
+BASE_XMR_WALLET_PORT = int(os.getenv('BASE_XMR_WALLET_PORT', 29998))
 XMR_WALLET_RPC_USER = os.getenv('XMR_WALLET_RPC_USER', 'xmr_wallet_user')
 XMR_WALLET_RPC_PWD = os.getenv('XMR_WALLET_RPC_PWD', 'xmr_wallet_pwd')
+
+DEFAULT_XMR_RESTORE_HEIGHT = 2245107
 
 
 def make_reporthook():
@@ -353,6 +355,9 @@ def printHelp():
     logger.info('--disablecoin=           Make coin inactive.')
     logger.info('--preparebinonly         Don\'t prepare settings or datadirs.')
     logger.info('--portoffset=n           Raise all ports by n.')
+    logger.info('--htmlhost=              Interface to host on, default:localhost.')
+    logger.info('--xmrrestoreheight=n     Block height to restore Monero wallet from, default:{}.'.format(DEFAULT_XMR_RESTORE_HEIGHT))
+
 
     logger.info('\n' + 'Known coins: %s', ', '.join(known_coins.keys()))
 
@@ -386,6 +391,8 @@ def main():
     with_coins = {'particl', 'litecoin'}
     add_coin = ''
     disable_coin = ''
+    htmlhost = 'localhost'
+    xmr_restore_height = DEFAULT_XMR_RESTORE_HEIGHT
 
     for v in sys.argv[1:]:
         if len(v) < 2 or v[0] != '-':
@@ -415,7 +422,6 @@ def main():
         if name == 'preparebinonly':
             prepare_bin_only = True
             continue
-
         if len(s) == 2:
             if name == 'datadir':
                 data_dir = os.path.expanduser(s[1].strip('"'))
@@ -453,6 +459,12 @@ def main():
                 if s[1] not in known_coins:
                     exitWithError('Unknown coin {}'.format(s[1]))
                 disable_coin = s[1]
+                continue
+            if name == 'htmlhost':
+                htmlhost = s[1].strip('"')
+                continue
+            if name == 'xmrrestoreheight':
+                xmr_restore_height = int(s[1])
                 continue
 
         exitWithError('Unknown argument {}'.format(v))
@@ -525,7 +537,7 @@ def main():
         },
         'monero': {
             'connection_type': 'rpc' if 'monero' in with_coins else 'none',
-            'manage_daemon': True if 'monero' in with_coins else False,
+            'manage_daemon': True if ('monero' in with_coins and XMR_RPC_HOST == 'localhost') else False,
             'manage_wallet_daemon': True if 'monero' in with_coins else False,
             'rpcport': BASE_XMR_RPC_PORT + port_offset,
             'zmqport': BASE_XMR_ZMQ_PORT + port_offset,
@@ -536,6 +548,7 @@ def main():
             'walletfile': 'swap_wallet',
             'datadir': os.path.join(data_dir, 'monero'),
             'bindir': os.path.join(bin_dir, 'monero'),
+            'restore_height': xmr_restore_height,
         }
     }
 
@@ -603,7 +616,7 @@ def main():
             'debug': True,
             'zmqhost': 'tcp://127.0.0.1',
             'zmqport': 20792 + port_offset,
-            'htmlhost': 'localhost',
+            'htmlhost': htmlhost,
             'htmlport': 12700 + port_offset,
             'network_key': '7sW2UEcHXvuqEjkpE5mD584zRaQYs6WXYohue4jLFZPTvMSxwvgs',
             'network_pubkey': '035758c4a22d7dd59165db02a56156e790224361eb3191f02197addcb3bde903d2',
