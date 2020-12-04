@@ -66,10 +66,11 @@ def startXmrWalletDaemon(node_dir, bin_dir, wallet_bin, opts=[]):
     args += opts
     logging.info('Starting wallet daemon {} --wallet-dir={}'.format(daemon_bin, node_dir))
 
-    #return subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=data_dir)
+    # TODO: return subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=data_dir)
     wallet_stdout = open(os.path.join(data_dir, 'wallet_stdout.log'), 'w')
     wallet_stderr = open(os.path.join(data_dir, 'wallet_stderr.log'), 'w')
     return subprocess.Popen(args, stdin=subprocess.PIPE, stdout=wallet_stdout, stderr=wallet_stderr, cwd=data_dir)
+
 
 def runClient(fp, data_dir, chain):
     global swap_client

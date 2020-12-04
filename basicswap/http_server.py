@@ -324,7 +324,11 @@ class HttpHandler(BaseHTTPRequestHandler):
         else:
             lock_type = ABS_LOCK_TIME
 
-        offer_id = swap_client.postOffer(coin_from, coin_to, value_from, rate, min_bid, SwapTypes.SELLER_FIRST, lock_type=lock_type, lock_value=lock_seconds, auto_accept_bids=autoaccept, addr_send_from=addr_from)
+        swap_type = SwapTypes.SELLER_FIRST
+        if coin_to == Coins.XMR:
+            swap_type = SwapTypes.XMR_SWAP
+
+        offer_id = swap_client.postOffer(coin_from, coin_to, value_from, rate, min_bid, swap_type, lock_type=lock_type, lock_value=lock_seconds, auto_accept_bids=autoaccept, addr_send_from=addr_from)
         return offer_id
 
     def page_newoffer(self, url_split, post_string):

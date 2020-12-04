@@ -11,6 +11,7 @@ import urllib.parse
 from .util import format8
 from .basicswap import (
     strBidState,
+    SwapTypes,
 )
 from .ui import (
     PAGE_LIMIT,
@@ -109,7 +110,11 @@ def js_bids(self, url_split, post_string):
                 if addr_from == '-1':
                     addr_from = None
 
-            bid_id = swap_client.postBid(offer_id, amount_from, addr_send_from=addr_from).hex()
+            offer = swap_client.getOffer(offer_id)
+            if offer and offer.swap_type == SwapTypes.XMR_SWAP:
+                bid_id = swap_client.postXmrBid(offer_id, amount_from, addr_send_from=addr_from).hex()
+            else:
+                bid_id = swap_client.postBid(offer_id, amount_from, addr_send_from=addr_from).hex()
 
             rv = {'bid_id': bid_id}
             return bytes(json.dumps(rv), 'UTF-8')

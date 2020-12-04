@@ -25,19 +25,10 @@ import shutil
 import logging
 import unittest
 import traceback
-import threading
 import multiprocessing
-from urllib import parse
 from urllib.request import urlopen
 from unittest.mock import patch
 
-
-from basicswap.rpc import (
-    callrpc_cli,
-)
-from basicswap.util import (
-    dumpj
-)
 from tests.basicswap.mnemonics import mnemonics
 
 import basicswap.config as cfg
@@ -179,16 +170,14 @@ class Test(unittest.TestCase):
             waitForServer(12700)
 
             wallets_0 = json.loads(urlopen('http://localhost:12700/json/wallets').read())
-            print('[rm] wallets_0', dumpj(wallets_0))
-            assert(wallets_0['1']['expected_seed'] == True)
-            assert(wallets_0['6']['expected_seed'] == True)
+            assert(wallets_0['1']['expected_seed'] is True)
+            assert(wallets_0['6']['expected_seed'] is True)
 
             waitForServer(12701)
             wallets_1 = json.loads(urlopen('http://localhost:12701/json/wallets').read())
-            print('[rm] wallets_1', dumpj(wallets_1))
 
-            assert(wallets_0['1']['expected_seed'] == True)
-            assert(wallets_1['6']['expected_seed'] == True)
+            assert(wallets_0['1']['expected_seed'] is True)
+            assert(wallets_1['6']['expected_seed'] is True)
 
             # TODO: Check other coins
 

@@ -152,15 +152,6 @@ def prepareDataDir(datadir, node_id, conf_file, dir_prefix, base_p2p_port=BASE_P
             fp.write('addnode=127.0.0.1:{}\n'.format(base_p2p_port + i))
 
 
-def startXmrDaemon(node_dir, bin_dir, daemon_bin, opts=[]):
-    daemon_bin = os.path.expanduser(os.path.join(bin_dir, daemon_bin))
-
-    args = [daemon_bin, '--config-file=' + os.path.join(os.path.expanduser(node_dir), 'monerod.conf')] + opts
-    logging.info('Starting node {} --data-dir={}'.format(daemon_bin, node_dir))
-
-    return subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-
 def startXmrWalletRPC(node_dir, bin_dir, wallet_bin, node_id, opts=[]):
     daemon_bin = os.path.expanduser(os.path.join(bin_dir, wallet_bin))
 
@@ -733,6 +724,7 @@ class Test(unittest.TestCase):
         swap_clients[0].revokeOffer(offer_id)
 
         self.wait_for_no_offer(swap_clients[1], offer_id)
+
 
 if __name__ == '__main__':
     unittest.main()

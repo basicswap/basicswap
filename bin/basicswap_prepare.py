@@ -57,7 +57,7 @@ if not len(logger.handlers):
 
 XMR_RPC_HOST = os.getenv('XMR_RPC_HOST', 'localhost')
 BASE_XMR_RPC_PORT = os.getenv('BASE_XMR_RPC_PORT', 29798)
-BASE_XMR_ZMQ_PORT = os.getenv('BASE_XMR_ZMQ_PORT', 29898)
+BASE_XMR_ZMQ_PORT = os.getenv('BASE_XMR_ZMQ_PORT', 30898)
 BASE_XMR_WALLET_PORT = os.getenv('BASE_XMR_WALLET_PORT', 29998)
 XMR_WALLET_RPC_USER = os.getenv('XMR_WALLET_RPC_USER', 'xmr_wallet_user')
 XMR_WALLET_RPC_PWD = os.getenv('XMR_WALLET_RPC_PWD', 'xmr_wallet_pwd')
@@ -282,8 +282,6 @@ def prepareDataDir(coin, settings, data_dir, chain, particl_mnemonic):
             fp.write('zmq-rpc-bind-port={}\n'.format(core_settings['zmqport']))
             fp.write('zmq-rpc-bind-ip=127.0.0.1\n')
 
-            #fp.write('zmq-rpc-bind-port={}\n'.format(core_settings['zmqport']))
-            #fp.write('zmq-rpc-bind-ip=127.0.0.1\n')
         wallet_conf_path = os.path.join(data_dir, coin + '_wallet.conf')
         if os.path.exists(wallet_conf_path):
             exitWithError('{} exists'.format(wallet_conf_path))

@@ -104,7 +104,6 @@ class XMRInterface(CoinInterface):
 
     def getDaemonVersion(self):
         return self.rpc_wallet_cb('get_version')['version']
-        #return self.rpc_cb('get_version')['version']
 
     def getBlockchainInfo(self):
         rv = {}

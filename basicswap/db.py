@@ -103,6 +103,7 @@ class Bid(Base):
     participate_txn_redeem = sa.Column(sa.LargeBinary)
     participate_txn_refund = sa.Column(sa.LargeBinary)
 
+    in_progress = sa.Column(sa.Integer)
     state = sa.Column(sa.Integer)
     state_time = sa.Column(sa.BigInteger)  # Timestamp of last state change
     states = sa.Column(sa.LargeBinary)  # Packed states and times

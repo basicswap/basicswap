@@ -30,12 +30,8 @@ from urllib import parse
 from urllib.request import urlopen
 from unittest.mock import patch
 
-
-from basicswap.rpc import (
-    callrpc_cli,
-)
-from basicswap.util import (
-    dumpj
+from basicswap.rpc_xmr import (
+    callrpc_xmr_na,
 )
 from tests.basicswap.mnemonics import mnemonics
 
@@ -47,9 +43,8 @@ test_path = os.path.expanduser(os.getenv('TEST_RELOAD_PATH', '~/test_basicswap1'
 PARTICL_PORT_BASE = int(os.getenv('PARTICL_PORT_BASE', '11938'))
 
 XMR_BASE_P2P_PORT = 17792
-XMR_BASE_RPC_PORT = 21792
-XMR_BASE_ZMQ_PORT = 22792
-XMR_BASE_WALLET_RPC_PORT = 23792
+XMR_BASE_RPC_PORT = 29798
+XMR_BASE_WALLET_RPC_PORT = 29998
 
 stop_test = False
 
@@ -97,10 +92,8 @@ def waitForNumSwapping(port, bids):
 
 
 def updateThread(xmr_addr):
-    #btc_addr = btcRpc(0, 'getnewaddress mining_addr bech32')
-
     while not stop_test:
-        #btcRpc(0, 'generatetoaddress {} {}'.format(1, btc_addr))
+        callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'generateblocks', {'wallet_address': xmr_addr, 'amount_of_blocks': 1})
         time.sleep(5)
 
 
@@ -165,27 +158,17 @@ class Test(unittest.TestCase):
             processes[-1].start()
 
         try:
-            waitForServer(12700)
+            waitForServer(12701)
 
             wallets = json.loads(urlopen('http://localhost:12701/json/wallets').read())
-            print('[rm] wallets', dumpj(wallets))
 
             xmr_addr1 = wallets['6']['deposit_address']
             num_blocks = 500
 
-            raise ValueError('TODO')
-            '''
-
-            btc_addr = btcRpc(1, 'getnewaddress mining_addr bech32')
-            logging.info('Mining %d Bitcoin blocks to %s', num_blocks, btc_addr)
-            btcRpc(1, 'generatetoaddress {} {}'.format(num_blocks, btc_addr))
-
-            for i in range(20):
-                blocks = btcRpc(0, 'getblockchaininfo')['blocks']
-                if blocks >= 500:
-                    break
-            assert(blocks >= 500)
-            '''
+            logging.info('Mining %d Monero blocks.', num_blocks)
+            callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'generateblocks', {'wallet_address': xmr_addr1, 'amount_of_blocks': num_blocks})
+            rv = callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'get_block_count')
+            logging.info('XMR blocks: %d', rv['count'])
 
             data = parse.urlencode({
                 'addr_from': '-1',
@@ -199,8 +182,7 @@ class Test(unittest.TestCase):
             summary = json.loads(urlopen('http://localhost:12700/json').read())
             assert(summary['num_sent_offers'] == 1)
 
-
-            logger.info('Waiting for offer:')
+            logger.info('Waiting for offer')
             waitForNumOffers(12701, 1)
 
             offers = json.loads(urlopen('http://localhost:12701/json/offers').read())
@@ -214,8 +196,12 @@ class Test(unittest.TestCase):
 
             waitForNumBids(12700, 1)
 
-            bids = json.loads(urlopen('http://localhost:12700/json/bids').read())
-            bid = bids[0]
+            for i in range(10):
+                bids = json.loads(urlopen('http://localhost:12700/json/bids').read())
+                bid = bids[0]
+                if bid['bid_state'] == 'Received':
+                    break
+                time.sleep(1)
 
             data = parse.urlencode({
                 'accept': True
@@ -225,7 +211,7 @@ class Test(unittest.TestCase):
 
             waitForNumSwapping(12701, 1)
 
-            logger.info('Restarting client:')
+            logger.info('Restarting client')
             c1 = processes[1]
             c1.terminate()
             c1.join()
@@ -236,10 +222,10 @@ class Test(unittest.TestCase):
             rv = json.loads(urlopen('http://localhost:12701/json').read())
             assert(rv['num_swapping'] == 1)
 
-            update_thread = threading.Thread(target=updateThread, args=(xmr_addr,))
+            update_thread = threading.Thread(target=updateThread, args=(xmr_addr1,))
             update_thread.start()
 
-            logger.info('Completing swap:')
+            logger.info('Completing swap')
             for i in range(240):
                 time.sleep(5)
 
@@ -251,6 +237,7 @@ class Test(unittest.TestCase):
         except Exception:
             traceback.print_exc()
 
+        logger.info('Stopping test')
         stop_test = True
         if update_thread:
             update_thread.join()
