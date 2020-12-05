@@ -816,14 +816,12 @@ class BasicSwap(BaseApp):
             if bid.participate_tx and bid.participate_tx.txid:
                 self.addWatchedOutput(coin_to, bid.bid_id, bid.participate_tx.txid.hex(), bid.participate_tx.vout, BidStates.SWAP_PARTICIPATING)
 
-        # TODO: watch for xmr bid outputs
-
-        if self.coin_clients[coin_from]['last_height_checked'] < 1:
-            if bid.initiate_tx and bid.initiate_tx.chain_height:
-                self.coin_clients[coin_from]['last_height_checked'] = bid.initiate_tx.chain_height
-        if self.coin_clients[coin_to]['last_height_checked'] < 1:
-            if bid.participate_tx and bid.participate_tx.chain_height:
-                self.coin_clients[coin_to]['last_height_checked'] = bid.participate_tx.chain_height
+            if self.coin_clients[coin_from]['last_height_checked'] < 1:
+                if bid.initiate_tx and bid.initiate_tx.chain_height:
+                    self.coin_clients[coin_from]['last_height_checked'] = bid.initiate_tx.chain_height
+            if self.coin_clients[coin_to]['last_height_checked'] < 1:
+                if bid.participate_tx and bid.participate_tx.chain_height:
+                    self.coin_clients[coin_to]['last_height_checked'] = bid.participate_tx.chain_height
 
         # TODO process addresspool if bid has previously been abandoned
 
@@ -980,7 +978,9 @@ class BasicSwap(BaseApp):
 
                 # TODO: Dynamic fee selection
                 xmr_offer.a_fee_rate = make_int(0.00032595, self.ci(coin_from).exp())
-                xmr_offer.b_fee_rate = make_int(0.0012595, self.ci(coin_to).exp())
+                # xmr_offer.b_fee_rate = make_int(0.0012595, self.ci(coin_to).exp())
+                xmr_offer.b_fee_rate = make_int(0.00002, self.ci(coin_to).exp())  # abs fee
+
                 msg_buf.fee_rate_from = xmr_offer.a_fee_rate
                 msg_buf.fee_rate_to = xmr_offer.b_fee_rate
 
@@ -1198,12 +1198,19 @@ class BasicSwap(BaseApp):
 
         return self.ci(coin_type).get_fee_rate()
 
+    def estimateWithdrawFee(self, coin_type, fee_rate):
+        if coin_type == Coins.XMR:
+            self.log.error('TODO: estimateWithdrawFee XMR')
+            return None
+        tx_vsize = self.getContractSpendTxVSize(coin_type)
+        est_fee = (fee_rate * tx_vsize) / 1000
+        return est_fee
+
     def withdrawCoin(self, coin_type, value, addr_to, subfee):
         self.log.info('withdrawCoin %s %s to %s %s', value, self.getTicker(coin_type), addr_to, ' subfee' if subfee else '')
-        params = [addr_to, value, '', '', subfee, True, self.coin_clients[coin_type]['conf_target']]
-        if coin_type == Coins.PART:
-            params.insert(5, '')  # narration
-        return self.callcoinrpc(coin_type, 'sendtoaddress', params)
+
+        ci = self.ci(coin_type)
+        return ci.withdrawCoin(value, addr_to, subfee)
 
     def cacheNewAddressForCoin(self, coin_type):
         self.log.debug('cacheNewAddressForCoin %s', coin_type)
@@ -2765,7 +2772,15 @@ class BasicSwap(BaseApp):
 
     def addWatchedOutput(self, coin_type, bid_id, txid_hex, vout, tx_type, swap_type=None):
         self.log.debug('Adding watched output %s bid %s tx %s type %s', coin_type, bid_id.hex(), txid_hex, tx_type)
-        self.coin_clients[coin_type]['watched_outputs'].append(WatchedOutput(bid_id, txid_hex, vout, tx_type, swap_type))
+
+        watched = self.coin_clients[coin_type]['watched_outputs']
+
+        for wo in watched:
+            if wo.bid_id == bid_id and wo.txid_hex == txid_hex and wo.vout == vout:
+                self.log.debug('Output already being watched.')
+                return
+
+        watched.append(WatchedOutput(bid_id, txid_hex, vout, tx_type, swap_type))
 
     def removeWatchedOutput(self, coin_type, bid_id, txid_hex):
         # Remove all for bid if txid is None
@@ -2862,6 +2877,8 @@ class BasicSwap(BaseApp):
             spending_txid = bytes.fromhex(spend_txid_hex)
 
             if spending_txid == xmr_swap.a_lock_spend_tx_id:
+                self.log.debug('[rm] state %d', state)
+                self.log.debug('[rm] BidStates.XMR_SWAP_SECRET_SHARED %d', BidStates.XMR_SWAP_SECRET_SHARED)
                 if state == BidStates.XMR_SWAP_SECRET_SHARED:
                     xmr_swap.a_lock_spend_tx = bytes.fromhex(spend_txn['hex'])
                     bid.setState(BidStates.XMR_SWAP_SCRIPT_TX_REDEEMED)  # TODO: Wait for confirmation?
@@ -4232,24 +4249,28 @@ class BasicSwap(BaseApp):
             if bid.state != data['bid_state']:
                 bid.setState(data['bid_state'])
                 self.log.debug('Set state to %s', strBidState(bid.state))
+                self.log.debug('[rm] Set bid.state %d', bid.state)
                 has_changed = True
 
             if has_changed:
                 session = scoped_session(self.session_factory)
                 try:
-
                     activate_bid = False
                     if offer.swap_type == SwapTypes.SELLER_FIRST:
                         if bid.state and bid.state > BidStates.BID_RECEIVED and bid.state < BidStates.SWAP_COMPLETED:
                             activate_bid = True
                     else:
-                        raise ValueError('TODO')
+                        self.log.debug('TODO - determine in-progress for manualBidUpdate')
+                        if offer.swap_type == SwapTypes.XMR_SWAP:
+                            if bid.state and bid.state == BidStates.XMR_SWAP_SECRET_SHARED:
+                                activate_bid = True
 
                     if activate_bid:
                         self.activateBid(session, bid)
                     else:
                         self.deactivateBid(session, offer, bid)
 
+                    self.log.debug('[rm] bid.state %d', bid.state)
                     self.saveBidInSession(bid_id, bid, session)
                     session.commit()
                 finally:

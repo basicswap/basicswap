@@ -547,9 +547,9 @@ class Test(unittest.TestCase):
         logging.info('---------- Test PART to XMR')
         swap_clients = self.swap_clients
 
-        js_0 = json.loads(urlopen('http://localhost:1801/json/wallets').read())
-        assert(make_int(js_0[str(int(Coins.XMR))]['balance'], scale=12) > 0)
-        assert(make_int(js_0[str(int(Coins.XMR))]['unconfirmed'], scale=12) > 0)
+        js_1 = json.loads(urlopen('http://localhost:1801/json/wallets').read())
+        assert(make_int(js_1[str(int(Coins.XMR))]['balance'], scale=12) > 0)
+        assert(make_int(js_1[str(int(Coins.XMR))]['unconfirmed'], scale=12) > 0)
 
         offer_id = swap_clients[0].postOffer(Coins.PART, Coins.XMR, 100 * COIN, 0.11 * XMR_COIN, 100 * COIN, SwapTypes.XMR_SWAP)
         self.wait_for_offer(swap_clients[1], offer_id)
@@ -724,6 +724,14 @@ class Test(unittest.TestCase):
         swap_clients[0].revokeOffer(offer_id)
 
         self.wait_for_no_offer(swap_clients[1], offer_id)
+
+    def test_08_withdraw(self):
+        logging.info('---------- Test xmr withdrawals')
+        swap_clients = self.swap_clients
+        js_0 = json.loads(urlopen('http://localhost:1800/json/wallets').read())
+        address_to = js_0[str(int(Coins.XMR))]['deposit_address']
+
+        swap_clients[1].withdrawCoin(Coins.XMR, 1.1, address_to, False)
 
 
 if __name__ == '__main__':

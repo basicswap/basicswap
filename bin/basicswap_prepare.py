@@ -358,7 +358,6 @@ def printHelp():
     logger.info('--htmlhost=              Interface to host on, default:localhost.')
     logger.info('--xmrrestoreheight=n     Block height to restore Monero wallet from, default:{}.'.format(DEFAULT_XMR_RESTORE_HEIGHT))
 
-
     logger.info('\n' + 'Known coins: %s', ', '.join(known_coins.keys()))
 
 

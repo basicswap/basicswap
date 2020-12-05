@@ -12,7 +12,10 @@ RUN wget -O coincurve-anonswap.zip https://github.com/tecnovert/coincurve/archiv
     cd coincurve-anonswap && \
     python3 setup.py install --force
 
-# TODO: move coindata dir out of src dir
+# Install requirements first so as to skip in subsequent rebuilds
+COPY ./requirements.txt requirements.txt
+RUN pip3 install -r requirements.txt
+
 COPY . basicswap-master
 RUN cd basicswap-master; \
     protoc -I=basicswap --python_out=basicswap basicswap/messages.proto; \

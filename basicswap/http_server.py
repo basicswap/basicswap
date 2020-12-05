@@ -242,14 +242,13 @@ class HttpHandler(BaseHTTPRequestHandler):
 
             ci = swap_client.ci(k)
             fee_rate = swap_client.getFeeRateForCoin(k)
-            tx_vsize = swap_client.getContractSpendTxVSize(k)
-            est_fee = (fee_rate * tx_vsize) / 1000
+            est_fee = swap_client.estimateWithdrawFee(k, fee_rate)
             wallets_formatted.append({
                 'name': w['name'],
                 'version': w['version'],
                 'cid': str(int(k)),
                 'fee_rate': ci.format_amount(int(fee_rate * ci.COIN())),
-                'est_fee': ci.format_amount(int(est_fee * ci.COIN())),
+                'est_fee': 'Unknown' if est_fee is None else ci.format_amount(int(est_fee * ci.COIN())),
                 'balance': w['balance'],
                 'blocks': w['blocks'],
                 'synced': w['synced'],

@@ -161,7 +161,7 @@ class Test(unittest.TestCase):
         assert(pubkey == pubkey_test)
 
     def test_ecdsa_otves(self):
-        coin_settings = {'rpcport': 0, 'rpcauth': 'none', 'blocks_confirmed': 1}
+        coin_settings = {'rpcport': 0, 'rpcauth': 'none', 'blocks_confirmed': 1, 'conf_target': 1}
         ci = BTCInterface(coin_settings, 'regtest')
         vk_sign = i2b(ci.getNewSecretKey())
         vk_encrypt = i2b(ci.getNewSecretKey())
@@ -183,7 +183,7 @@ class Test(unittest.TestCase):
         assert(vk_encrypt == recovered_key)
 
     def test_dleag(self):
-        coin_settings = {'rpcport': 0, 'walletrpcport': 0, 'walletrpcauth': 'none', 'blocks_confirmed': 1}
+        coin_settings = {'rpcport': 0, 'walletrpcport': 0, 'walletrpcauth': 'none', 'blocks_confirmed': 1, 'conf_target': 1}
         ci = XMRInterface(coin_settings, 'regtest')
 
         key = i2b(ci.getNewSecretKey())

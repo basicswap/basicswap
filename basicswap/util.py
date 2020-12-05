@@ -14,6 +14,10 @@ OP_16 = 0x60
 COIN = 100000000
 
 
+decimal_ctx = decimal.Context()
+decimal_ctx.prec = 20
+
+
 def assert_cond(v, err='Bad opcode'):
     if not v:
         raise ValueError(err)
@@ -224,9 +228,15 @@ def getCompactSizeLen(v):
     raise ValueError('Value too large')
 
 
+def float_to_str(f):
+    # stackoverflow.com/questions/38847690
+    d1 = decimal_ctx.create_decimal(repr(f))
+    return format(d1, 'f')
+
+
 def make_int(v, scale=8, r=0):  # r = 0, no rounding, fail, r > 0 round up, r < 0 floor
     if type(v) == float:
-        v = str(v)
+        v = float_to_str(v)
     elif type(v) == int:
         return v * 10 ** scale
 
@@ -239,7 +249,8 @@ def make_int(v, scale=8, r=0):  # r = 0, no rounding, fail, r > 0 round up, r < 
             have_dp = True
             continue
         if not c.isdigit():
-            raise ValueError('Invalid char')
+
+            raise ValueError('Invalid char: ' + c)
         if have_dp:
             ep //= 10
             if ep <= 0:
@@ -260,7 +271,7 @@ def make_int(v, scale=8, r=0):  # r = 0, no rounding, fail, r > 0 round up, r < 
 
 
 def validate_amount(amount, scale=8):
-    str_amount = str(amount)
+    str_amount = float_to_str(amount) if type(amount) == float else str(amount)
     has_decimal = False
     for c in str_amount:
         if c == '.' and not has_decimal:

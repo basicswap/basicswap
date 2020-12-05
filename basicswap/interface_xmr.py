@@ -21,6 +21,7 @@ from coincurve.dleag import (
 
 from .util import (
     dumpj,
+    make_int,
     format_amount)
 from .rpc_xmr import (
     make_xmr_rpc_func,
@@ -55,14 +56,14 @@ class XMRInterface(CoinInterface):
 
     def __init__(self, coin_settings, network):
         super().__init__()
-        rpc_cb = make_xmr_rpc_func(coin_settings['rpcport'], host=coin_settings['rpchost'])
+        rpc_cb = make_xmr_rpc_func(coin_settings['rpcport'], host=coin_settings.get('rpchost', 'localhost'))
         rpc_wallet_cb = make_xmr_wallet_rpc_func(coin_settings['walletrpcport'], coin_settings['walletrpcauth'])
 
         self.rpc_cb = rpc_cb
         self.rpc_wallet_cb = rpc_wallet_cb
         self._network = network
         self.blocks_confirmed = coin_settings['blocks_confirmed']
-        self._restore_height = coin_settings['restore_height']
+        self._restore_height = coin_settings.get('restore_height', 0)
 
     def setWalletFilename(self, wallet_filename):
         self._wallet_filename = wallet_filename
@@ -368,14 +369,26 @@ class XMRInterface(CoinInterface):
                 break
 
             time.sleep(1 + i)
+        if rv['balance'] < cb_swap_value:
+            logging.error('wallet {} balance {}, expected {}'.format(wallet_filename, rv['balance'], cb_swap_value))
+            raise ValueError('Invalid balance')
 
+        params = {'address': address_to}
+        rv = self.rpc_wallet_cb('sweep_all', params)
+        print('sweep_all', rv)
+
+        return bytes.fromhex(rv['tx_hash_list'][0])
+
+        """
         # TODO: need a subfee from output option
-        b_fee = b_fee_rate * 10  # Guess
+        # b_fee = b_fee_rate * 10  # Guess
+        b_fee = b_fee_rate
 
         num_tries = 20
         for i in range(1 + num_tries):
             try:
                 params = {'destinations': [{'amount': cb_swap_value - b_fee, 'address': address_to}]}
+                logging.debug('params', dumpj(params))
                 rv = self.rpc_wallet_cb('transfer', params)
                 print('transfer', rv)
                 break
@@ -387,3 +400,12 @@ class XMRInterface(CoinInterface):
             logging.info('Raising fee to %d', b_fee)
 
         return bytes.fromhex(rv['tx_hash'])
+        """
+
+    def withdrawCoin(self, value, addr_to, subfee):
+        self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
+
+        value_sats = make_int(value, self.exp())
+        params = {'destinations': [{'amount': value_sats, 'address': addr_to}]}
+        rv = self.rpc_wallet_cb('transfer', params)
+        return rv['tx_hash']

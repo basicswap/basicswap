@@ -32,6 +32,7 @@ class PARTInterface(BTCInterface):
         self.txoType = CTxOutPart
         self._network = network
         self.blocks_confirmed = coin_settings['blocks_confirmed']
+        self._conf_target = coin_settings['conf_target']
 
     def knownWalletSeed(self):
         # TODO: Double check
@@ -47,3 +48,7 @@ class PARTInterface(BTCInterface):
 
     def initialiseWallet(self, key):
         raise ValueError('TODO')
+
+    def withdrawCoin(self, value, addr_to, subfee):
+        params = [addr_to, value, '', '', subfee, '', True, self._conf_target]
+        return self.rpc_callback('sendtoaddress', params)

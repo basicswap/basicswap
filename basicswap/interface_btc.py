@@ -123,6 +123,7 @@ class BTCInterface(CoinInterface):
         self.txoType = CTxOut
         self._network = network
         self.blocks_confirmed = coin_settings['blocks_confirmed']
+        self._conf_target = coin_settings['conf_target']
 
     def testDaemonRPC(self):
         self.rpc_callback('getwalletinfo', [])
@@ -880,6 +881,10 @@ class BTCInterface(CoinInterface):
                 'txid': utxo['txid'],
                 'vout': utxo['vout']})
         return rv
+
+    def withdrawCoin(self, value, addr_to, subfee):
+        params = [addr_to, value, '', '', subfee, True, self._conf_target]
+        return self.rpc_callback('sendtoaddress', params)
 
 
 def testBTCInterface():
