@@ -5,11 +5,6 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-"""
-Atomic Swap Client - Proof of Concept
-
-"""
-
 import os
 import sys
 import json

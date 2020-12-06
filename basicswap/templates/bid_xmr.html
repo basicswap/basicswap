@@ -1,0 +1,72 @@
+{% include 'header.html' %}
+
+<h3>Bid {{ bid_id }}</h3>
+{% if refresh %}
+<p>Page Refresh: {{ refresh }} seconds</p>
+{% endif %}
+
+{% for m in messages %}
+<p>{{ m }}</p>
+{% endfor %}
+
+<table>
+<tr><td>Swap</td><td>{{ data.amt_from }} {{ data.ticker_from }} for {{ data.amt_to }} {{ data.ticker_to }}</td></tr>
+<tr><td>Bid State</td><td>{{ data.bid_state }}</td></tr>
+<tr><td>StateDescription </td><td>{{ data.state_description }}</td></tr>
+<tr><td>Offer</td><td><a href="/offer/{{ data.offer_id }}">{{ data.offer_id }}</a></td></tr>
+<tr><td>Address From</td><td>{{ data.addr_from }}</td></tr>
+<tr><td>Created At</td><td>{{ data.created_at }}</td></tr>
+<tr><td>Expired At</td><td>{{ data.expired_at }}</td></tr>
+<tr><td>Sent</td><td>{{ data.was_sent }}</td></tr>
+<tr><td>Received</td><td>{{ data.was_received }}</td></tr>
+</table>
+
+{% if data.show_txns %}
+<h4>Transactions</h4>
+<table>
+<tr><th>Tx Type</th><th>Tx ID</th></tr>
+{% for tx in data.txns %}
+<tr><td>{{ tx.type }}</td><td>{{ tx.txid }}</td></tr>
+{% endfor %}
+</table>
+{% endif %}
+
+<form method="post">
+{% if edit_bid %}
+<h4>Edit Bid</h4>
+<table>
+<tr><td>Change Bid State</td><td>
+<select name="new_state">
+{% for s in data.bid_states %}
+<option value="{{ s[0] }}"{% if data.bid_state_ind==s[0] %} selected{% endif %}>{{ s[1] }}</option>
+{% endfor %}
+</select></td></tr>
+</table>
+<input name="edit_bid_cancel" type="submit" value="Cancel">
+<input name="edit_bid_submit" type="submit" value="Submit">
+{% else %}
+{% if data.was_received == 'True' %}
+<input name="accept_bid" type="submit" value="Accept Bid"><br/>
+{% endif %}
+<input name="abandon_bid" type="submit" value="Abandon Bid">
+{% if data.show_txns %}
+<input name="hide_txns" type="submit" value="Hide Info">
+{% else %}
+<input name="show_txns" type="submit" value="Show More Info">
+{% endif %}
+<input name="edit_bid" type="submit" value="Edit Bid">
+{% endif %}
+<input type="hidden" name="formid" value="{{ form_id }}">
+</form>
+
+
+<h4>Old States</h4>
+<table>
+<tr><th>State</th><th>Set At</th></tr>
+{% for s in old_states %}
+<tr><td>{{ s[1] }}</td><td>{{ s[0] | formatts }}</td></tr>
+{% endfor %}
+</table>
+
+<p><a href="/">home</a></p>
+</body></html>

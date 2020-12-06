@@ -134,6 +134,12 @@ class BTCInterface(CoinInterface):
     def getBlockchainInfo(self):
         return self.rpc_callback('getblockchaininfo')
 
+    def getChainHeight(self):
+        return self.rpc_callback('getblockchaininfo')['blocks']
+
+    def getMempoolTx(self, txid):
+        return self.rpc_callback('getrawtransaction', [txid.hex()])
+
     def initialiseWallet(self, key_bytes):
         wif_prefix = chainparams[self.coin_type()][self._network]['key_prefix']
         key_wif = toWIF(wif_prefix, key_bytes)

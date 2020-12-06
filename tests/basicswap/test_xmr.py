@@ -538,6 +538,16 @@ class Test(unittest.TestCase):
                     return
         raise ValueError('wait_for_bid timed out.')
 
+    def wait_for_none_active(self, port, wait_for=30):
+        for i in range(wait_for):
+            if stop_test:
+                raise ValueError('Test stopped.')
+            time.sleep(1)
+            js = json.loads(urlopen('http://localhost:{}/json'.format(port)).read())
+            if js['num_swapping'] == 0 and js['num_watched_outputs'] == 0:
+                return
+        raise ValueError('wait_for_none_active timed out.')
+
     def delay_for(self, delay_for=60):
         logging.info('Delaying for {} seconds.'.format(delay_for))
         delay_event.clear()
@@ -632,6 +642,9 @@ class Test(unittest.TestCase):
 
         js_w0_after = json.loads(urlopen('http://localhost:1800/json/wallets').read())
 
+        self.wait_for_none_active(1800)
+        self.wait_for_none_active(1801)
+
     def test_04_follower_recover_b_lock_tx(self):
         logging.info('---------- Test PART to XMR follower recovers coin b lock tx')
 
@@ -709,11 +722,14 @@ class Test(unittest.TestCase):
         self.wait_for_bid(swap_clients[0], bid1_id, BidStates.SWAP_COMPLETED, wait_for=180)
         self.wait_for_bid(swap_clients[1], bid1_id, BidStates.SWAP_COMPLETED, sent=True)
 
-        self.wait_for_bid(swap_clients[0], bid2_id, BidStates.SWAP_COMPLETED, wait_for=60)
+        self.wait_for_bid(swap_clients[0], bid2_id, BidStates.SWAP_COMPLETED, wait_for=120)
         self.wait_for_bid(swap_clients[1], bid2_id, BidStates.SWAP_COMPLETED, sent=True)
 
-        self.wait_for_bid(swap_clients[0], bid3_id, BidStates.SWAP_COMPLETED, wait_for=60)
+        self.wait_for_bid(swap_clients[0], bid3_id, BidStates.SWAP_COMPLETED, wait_for=120)
         self.wait_for_bid(swap_clients[1], bid3_id, BidStates.SWAP_COMPLETED, sent=True)
+
+        self.wait_for_none_active(1800)
+        self.wait_for_none_active(1801)
 
     def test_07_revoke_offer(self):
         logging.info('---------- Test offer revocaction')
@@ -732,6 +748,17 @@ class Test(unittest.TestCase):
         address_to = js_0[str(int(Coins.XMR))]['deposit_address']
 
         swap_clients[1].withdrawCoin(Coins.XMR, 1.1, address_to, False)
+
+    def test_09_auto_accept(self):
+        logging.info('---------- Test BTC to XMR auto accept')
+        swap_clients = self.swap_clients
+        offer_id = swap_clients[0].postOffer(Coins.BTC, Coins.XMR, 11 * COIN, 101 * XMR_COIN, 10 * COIN, SwapTypes.XMR_SWAP, auto_accept_bids=True)
+        self.wait_for_offer(swap_clients[1], offer_id)
+        offer = swap_clients[1].listOffers(filters={'offer_id': offer_id})[0]
+
+        bid_id = swap_clients[1].postXmrBid(offer_id, offer.amount_from)
+        self.wait_for_bid(swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=180)
+        self.wait_for_bid(swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True)
 
 
 if __name__ == '__main__':

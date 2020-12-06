@@ -13,9 +13,11 @@ from .chainparams import (
     Coins,
 )
 from .basicswap import (
+    SwapTypes,
     BidStates,
     TxStates,
     TxTypes,
+    strTxType,
     strBidState,
     strTxState,
 )
@@ -147,9 +149,24 @@ def describeBid(swap_client, bid, offer, edit_bid, show_txns):
         data['bid_states'] = listBidStates()
 
     if show_txns:
-        data['initiate_tx_refund'] = 'None' if not bid.initiate_txn_refund else bid.initiate_txn_refund.hex()
-        data['participate_tx_refund'] = 'None' if not bid.participate_txn_refund else bid.participate_txn_refund.hex()
-        data['initiate_tx_spend'] = getTxSpendHex(bid, TxTypes.ITX)
-        data['participate_tx_spend'] = getTxSpendHex(bid, TxTypes.PTX)
+        if offer.swap_type == SwapTypes.XMR_SWAP:
+            txns = []
+            if bid.xmr_a_lock_tx:
+                txns.append({'type': 'Chain A Lock', 'txid': bid.xmr_a_lock_tx.txid.hex()})
+            if bid.xmr_a_lock_spend_tx:
+                txns.append({'type': 'Chain A Lock Spend', 'txid': bid.xmr_a_lock_spend_tx.txid.hex()})
+            if bid.xmr_b_lock_tx:
+                txns.append({'type': 'Chain B Lock', 'txid': bid.xmr_b_lock_tx.txid.hex()})
+            if bid.xmr_b_lock_tx and bid.xmr_b_lock_tx.spend_txid:
+                txns.append({'type': 'Chain B Lock Spend', 'txid': bid.xmr_b_lock_tx.spend_txid.hex()})
+
+            for tx_type, tx in bid.txns.items():
+                txns.append({'type': strTxType(tx_type), 'txid': tx.txid.hex()})
+            data['txns'] = txns
+        else:
+            data['initiate_tx_refund'] = 'None' if not bid.initiate_txn_refund else bid.initiate_txn_refund.hex()
+            data['participate_tx_refund'] = 'None' if not bid.participate_txn_refund else bid.participate_txn_refund.hex()
+            data['initiate_tx_spend'] = getTxSpendHex(bid, TxTypes.ITX)
+            data['participate_tx_spend'] = getTxSpendHex(bid, TxTypes.PTX)
 
     return data

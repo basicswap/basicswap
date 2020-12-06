@@ -49,7 +49,7 @@ jobs:
       env:
       cache: false
       install:
-        - travis_retry pip install flake8==3.5.0
+        - travis_retry pip install flake8==3.7.0
         - travis_retry pip install codespell==1.15.0
       before_script:
       script:

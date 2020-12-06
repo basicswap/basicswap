@@ -5,11 +5,6 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-"""
-Atomic Swap Client - Proof of Concept
-
-"""
-
 import os
 import sys
 import json
@@ -548,6 +543,7 @@ def main():
             'datadir': os.path.join(data_dir, 'monero'),
             'bindir': os.path.join(bin_dir, 'monero'),
             'restore_height': xmr_restore_height,
+            'blocks_confirmed': 7,  # TODO: 10?
         }
     }
 

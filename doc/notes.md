@@ -11,9 +11,8 @@ Features still required (of many):
  - Option to lookup data from public explorers / nodes.
  - Ability to swap coin-types without running nodes for all coin-types
  - More swap protocols
- - Method to load mnemonic into Particl.
-    - Load seeds for other wallets from same mnemonic.
- - COIN must be defined per coin.
+ - Manual method to set wallet seeds from particl mnemonic
+    - prepare script tries to load seeds automatically, btc versions < 0.21 require a fully synced chain
 
 
 ## Seller first protocol:

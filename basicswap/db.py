@@ -12,7 +12,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from enum import IntEnum, auto
 
 
-CURRENT_DB_VERSION = 3
+CURRENT_DB_VERSION = 4
 Base = declarative_base()
 
 
@@ -317,7 +317,8 @@ class XmrSwap(Base):
 
     b_lock_tx_id = sa.Column(sa.LargeBinary)
 
-    b_restore_height = sa.Column(sa.Integer)  # Height of xmr chain before the swap
+    start_chain_a_height = sa.Column(sa.Integer)  # Height of script chain before the swap
+    b_restore_height = sa.Column(sa.Integer)  # Height of scriptless chain before the swap
 
 
 class XmrSplitData(Base):
@@ -329,6 +330,16 @@ class XmrSplitData(Base):
     msg_sequence = sa.Column(sa.Integer)
     dleag = sa.Column(sa.LargeBinary)
     created_at = sa.Column(sa.BigInteger)
+
+
+class RevokedMessage(Base):
+    __tablename__ = 'revoked_messages'
+
+    record_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
+    active_ind = sa.Column(sa.Integer)
+    msg_id = sa.Column(sa.LargeBinary)
+    created_at = sa.Column(sa.BigInteger)
+    expires_at = sa.Column(sa.BigInteger)
 
 
 class TableTypes(IntEnum):

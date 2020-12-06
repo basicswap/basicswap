@@ -7,6 +7,7 @@
 ## Run Using Docker
 
 Docker must be installed and started:
+
     $ sudo systemctl status docker | grep Active
 
 Should return a line containing `active (running)`
@@ -20,8 +21,8 @@ Create the images:
 Prepare the datadir:
 Set XMR_RPC_HOST and BASE_XMR_RPC_PORT to a public XMR node or exclude to run a local node.
 
-    $ export SWAP_DATADIR=/var/data/coinswaps
-    $ docker run -e XMR_RPC_HOST="node.xmr.to" -e BASE_XMR_RPC_PORT=18081 -t --name swap_prepare -v $SWAP_DATADIR:/coindata i_swapclient \
+    $ export COINDATA_PATH=/var/data/coinswaps
+    $ docker run -e XMR_RPC_HOST="node.xmr.to" -e BASE_XMR_RPC_PORT=18081 -t --name swap_prepare -v $COINDATA_PATH:/coindata i_swapclient \
     basicswap-prepare --datadir=/coindata --withcoins=monero --withoutcoins=litecoin --htmlhost="0.0.0.0" --xmrrestoreheight=2245107
 
 Record the mnemonic from the output of the above command.
@@ -33,10 +34,18 @@ Remove swap_prepare container (and logs):
 
 Start the container
 
-    $ export SWAP_DATADIR=/var/data/coinswaps
+    $ export COINDATA_PATH=/var/data/coinswaps
     $ docker-compose up
 
 Open in browser: `http://localhost:12700`
+
+### Add a coin
+
+    $ docker-compose stop
+    $ export COINDATA_PATH=/var/data/coinswaps
+    $ docker run -t --name swap_prepare -v $COINDATA_PATH:/coindata i_swapclient basicswap-prepare --datadir=/coindata --addcoin=bitcoin
+
+You can copy an existing pruned datadir (excluding bitcoin.conf and any wallets) over to `$COINDATA_PATH/bitcoin`
 
 
 ## Run Without Docker:

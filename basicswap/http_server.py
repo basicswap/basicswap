@@ -558,7 +558,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         if len(old_states) > 0:
             old_states.sort(key=lambda x: x[0])
 
-        template = env.get_template('bid.html')
+        template = env.get_template('bid_xmr.html') if offer.swap_type == SwapTypes.XMR_SWAP else env.get_template('bid.html')
         return bytes(template.render(
             title=self.server.title,
             h2=self.server.title,

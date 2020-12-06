@@ -372,6 +372,9 @@ class XMRInterface(CoinInterface):
         if rv['balance'] < cb_swap_value:
             logging.error('wallet {} balance {}, expected {}'.format(wallet_filename, rv['balance'], cb_swap_value))
             raise ValueError('Invalid balance')
+        if rv['unlocked_balance'] < cb_swap_value:
+            logging.error('wallet {} balance {}, expected {}, blocks_to_unlock {}'.format(wallet_filename, rv['unlocked_balance'], cb_swap_value, rv['blocks_to_unlock']))
+            raise ValueError('Invalid unlocked_balance')
 
         params = {'address': address_to}
         rv = self.rpc_wallet_cb('sweep_all', params)
