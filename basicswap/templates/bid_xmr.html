@@ -68,5 +68,13 @@
 {% endfor %}
 </table>
 
+<h4>Events</h4>
+<table>
+<tr><th>At</th><th>Event</th></tr>
+{% for e in data.events %}
+<tr><td>{{ e.at | formatts }}</td><td>{{ e.desc }}</td></tr>
+{% endfor %}
+</table>
+
 <p><a href="/">home</a></p>
 </body></html>

@@ -25,17 +25,17 @@ from .basicswap import (
 PAGE_LIMIT = 50
 
 
-def validateAmountString(amount):
+def validateAmountString(amount, ci):
     if type(amount) != str:
         return
     ar = amount.split('.')
-    if len(ar) > 1 and len(ar[1]) > 8:
+    if len(ar) > 1 and len(ar[1]) > ci.exp():
         raise ValueError('Too many decimal places in amount {}'.format(amount))
 
 
-def inputAmount(amount_str):
-    validateAmountString(amount_str)
-    return make_int(amount_str)
+def inputAmount(amount_str, ci):
+    validateAmountString(amount_str, ci)
+    return make_int(amount_str, ci.exp())
 
 
 def setCoinFilter(form_data, field_name):
@@ -168,5 +168,8 @@ def describeBid(swap_client, bid, offer, edit_bid, show_txns):
             data['participate_tx_refund'] = 'None' if not bid.participate_txn_refund else bid.participate_txn_refund.hex()
             data['initiate_tx_spend'] = getTxSpendHex(bid, TxTypes.ITX)
             data['participate_tx_spend'] = getTxSpendHex(bid, TxTypes.PTX)
+
+    if offer.swap_type == SwapTypes.XMR_SWAP:
+        data['events'] = swap_client.list_bid_events(bid.bid_id)
 
     return data

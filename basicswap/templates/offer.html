@@ -29,7 +29,14 @@
 {% if data.sent == 'True' %}
 <tr><td>Auto Accept Bids</td><td>{{ data.auto_accept }}</td></tr>
 {% endif %}
+
+{% if data.xmr_type == true %}
+<tr><td>Chain A offer fee rate</td><td>{{ data.a_fee_rate }}</td></tr>
+<tr><td>Chain A local fee rate</td><td>{{ data.a_fee_rate_verify }} {% if data.a_fee_warn == true %} WARNING {% endif %}</td></tr>
+{% endif %}
 </table>
+
+
 
 <form method="post">
 {% if data.show_bid_form %}

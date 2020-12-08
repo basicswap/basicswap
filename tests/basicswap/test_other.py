@@ -200,6 +200,9 @@ class Test(unittest.TestCase):
         assert('100.00000000' == format_amount(amount_from, scale_from))
         assert('10.000000000000' == format_amount(amount_to, scale_to))
 
+        rate_check = int((amount_to / amount_from) * (10 ** scale_from))
+        assert(rate == rate_check)
+
         scale_from = 12
         scale_to = 8
         amount_from = 1 * (10 ** scale_from)
@@ -208,6 +211,9 @@ class Test(unittest.TestCase):
         amount_to = int((amount_from * rate) // (10 ** scale_from))
         assert('1.000000000000' == format_amount(amount_from, scale_from))
         assert('12.00000000' == format_amount(amount_to, scale_to))
+
+        rate_check = int((amount_to / amount_from) * (10 ** scale_from))
+        assert(rate == rate_check)
 
 
 if __name__ == '__main__':

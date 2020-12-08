@@ -183,7 +183,7 @@ class EventTypes(IntEnum):
 
 
 class EventLogTypes(IntEnum):
-    FAILED_TX_B_PUBLISH = auto()
+    FAILED_TX_B_LOCK_PUBLISH = auto()
     LOCK_TX_A_PUBLISHED = auto()
     LOCK_TX_B_PUBLISHED = auto()
     FAILED_TX_B_SPEND = auto()
@@ -306,6 +306,19 @@ def getLockName(lock_type):
         return 'blocks'
     if lock_type == ABS_LOCK_TIME:
         return 'time'
+
+
+def describeEventEntry(event_type, event_msg):
+    if event_type == EventLogTypes.FAILED_TX_B_LOCK_PUBLISH:
+        return 'Failed to publish lock tx b'
+    if event_type == EventLogTypes.FAILED_TX_B_LOCK_PUBLISH:
+        return 'Failed to publish lock tx b'
+    if event_type == EventLogTypes.LOCK_TX_A_PUBLISHED:
+        return 'Lock tx a published'
+    if event_type == EventLogTypes.LOCK_TX_B_PUBLISHED:
+        return 'Lock tx b published'
+    if event_type == EventLogTypes.FAILED_TX_B_SPEND:
+        return 'Failed to publish lock tx b spend'
 
 
 def getExpectedSequence(lockType, lockVal, coin_type):
@@ -995,8 +1008,13 @@ class BasicSwap(BaseApp):
                 # Delay before the follower can spend from the chain a lock refund tx
                 xmr_offer.lock_time_2 = getExpectedSequence(lock_type, lock_value, coin_from)
 
-                # TODO: Dynamic fee selection
-                xmr_offer.a_fee_rate = make_int(0.00032595, self.ci(coin_from).exp())
+                # TODO: max fee warning?
+                chain_client_settings = self.getChainClientSettings(coin_from)
+                lock_tx_fee_premium = chain_client_settings.get('lock_tx_fee_premium', 0.0)
+
+                xmr_offer.a_fee_rate = make_int(self.getFeeRateForCoin(coin_from) + lock_tx_fee_premium, self.ci(coin_from).exp())
+
+                # Unused: TODO - Set priority?
                 # xmr_offer.b_fee_rate = make_int(0.0012595, self.ci(coin_to).exp())
                 xmr_offer.b_fee_rate = make_int(0.00002, self.ci(coin_to).exp())  # abs fee
 
@@ -1210,9 +1228,9 @@ class BasicSwap(BaseApp):
         return self.callcoinrpc(coin_type, 'getnetworkinfo')['relayfee']
 
     def getFeeRateForCoin(self, coin_type):
-        # TODO: Per coin settings to override feerate
         override_feerate = self.coin_clients[coin_type].get('override_feerate', None)
         if override_feerate:
+            self.log.debug('Fee rate override used for %s: %f', str(coin_type), override_feerate)
             return override_feerate
 
         return self.ci(coin_type).get_fee_rate()
@@ -1554,6 +1572,23 @@ class BasicSwap(BaseApp):
                     bid.initiate_tx = session.query(SwapTx).filter(sa.and_(SwapTx.bid_id == bid_id, SwapTx.tx_type == TxTypes.ITX)).first()
                     bid.participate_tx = session.query(SwapTx).filter(sa.and_(SwapTx.bid_id == bid_id, SwapTx.tx_type == TxTypes.PTX)).first()
             return bid, offer
+        finally:
+            session.close()
+            session.remove()
+            self.mxDB.release()
+
+    def list_bid_events(self, bid_id):
+        self.mxDB.acquire()
+        events = []
+        try:
+            session = scoped_session(self.session_factory)
+            query_str = 'SELECT created_at, event_type, event_msg FROM eventlog ' + \
+                        'WHERE linked_type = {} AND linked_id = x\'{}\' '.format(TableTypes.BID, bid_id.hex())
+            q = self.engine.execute(query_str)
+
+            for row in q:
+                events.append({'at': row[0], 'desc': describeEventEntry(row[1], row[2])})
+            return events
         finally:
             session.close()
             session.remove()
@@ -3822,6 +3857,8 @@ class BasicSwap(BaseApp):
 
         bid.setState(BidStates.XMR_SWAP_HAVE_SCRIPT_COIN_SPEND_TX)
         self.watchXmrSwap(bid, offer, xmr_swap)
+        self.logBidEvent(bid, EventLogTypes.LOCK_TX_A_PUBLISHED, '', session)
+
         self.saveBidInSession(bid_id, bid, session, xmr_swap)
 
     def sendXmrBidCoinBLockTx(self, bid_id, session):
@@ -3852,7 +3889,7 @@ class BasicSwap(BaseApp):
             b_lock_tx_id = ci_to.publishBLockTx(xmr_swap.pkbv, xmr_swap.pkbs, bid.amount_to, xmr_offer.b_fee_rate)
         except Exception as ex:
             error_msg = 'publishBLockTx failed for bid {} with error {}'.format(bid_id.hex(), str(ex))
-            num_retries = self.countBidEvents(bid, EventLogTypes.FAILED_TX_B_PUBLISH, session)
+            num_retries = self.countBidEvents(bid, EventLogTypes.FAILED_TX_B_LOCK_PUBLISH, session)
             if num_retries > 0:
                 error_msg += ', retry no. {}'.format(num_retries)
             self.log.error(error_msg)
@@ -3866,7 +3903,7 @@ class BasicSwap(BaseApp):
                 self.setBidError(bid_id, bid, 'publishBLockTx failed: ' + str(ex), save_bid=False)
                 self.saveBidInSession(bid_id, bid, session, xmr_swap, save_in_progress=offer)
 
-            self.logBidEvent(bid, EventLogTypes.FAILED_TX_B_PUBLISH, str_error, session)
+            self.logBidEvent(bid, EventLogTypes.FAILED_TX_B_LOCK_PUBLISH, str_error, session)
             return
 
         self.log.debug('Submitted lock txn %s to %s chain for bid %s', b_lock_tx_id.hex(), chainparams[coin_to]['name'], bid_id.hex())
@@ -3876,6 +3913,7 @@ class BasicSwap(BaseApp):
             txid=b_lock_tx_id,
         )
         bid.xmr_b_lock_tx.setState(TxStates.TX_NONE)
+        self.logBidEvent(bid, EventLogTypes.LOCK_TX_B_PUBLISHED, '', session)
 
         self.saveBidInSession(bid_id, bid, session, xmr_swap, save_in_progress=offer)
 

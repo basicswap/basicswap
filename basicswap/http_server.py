@@ -17,6 +17,7 @@ from jinja2 import Environment, PackageLoader
 from . import __version__
 from .util import (
     dumpj,
+    make_int,
 )
 from .chainparams import (
     chainparams,
@@ -300,6 +301,7 @@ class HttpHandler(BaseHTTPRequestHandler):
 
         try:
             coin_from = Coins(int(form_data[b'coin_from'][0]))
+            ci_from = swap_client.ci(coin_from)
         except Exception:
             raise ValueError('Unknown Coin From')
         try:
@@ -308,11 +310,11 @@ class HttpHandler(BaseHTTPRequestHandler):
         except Exception:
             raise ValueError('Unknown Coin To')
 
-        value_from = inputAmount(form_data[b'amt_from'][0].decode('utf-8'))
-        value_to = inputAmount(form_data[b'amt_to'][0].decode('utf-8'))
+        value_from = inputAmount(form_data[b'amt_from'][0].decode('utf-8'), ci_from)
+        value_to = inputAmount(form_data[b'amt_to'][0].decode('utf-8'), ci_to)
 
         min_bid = int(value_from)
-        rate = int((value_to / value_from) * ci_to.COIN())
+        rate = int((value_to / value_from) * ci_from.COIN())
         autoaccept = True if b'autoaccept' in form_data else False
         lock_seconds = int(form_data[b'lockhrs'][0]) * 60 * 60
         # TODO: More accurate rate
@@ -357,7 +359,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         except Exception:
             raise ValueError('Bad offer ID')
         swap_client = self.server.swap_client
-        offer = swap_client.getOffer(offer_id)
+        offer, xmr_offer = swap_client.getXmrOffer(offer_id)
         assert(offer), 'Unknown offer ID'
 
         messages = []
@@ -374,16 +376,12 @@ class HttpHandler(BaseHTTPRequestHandler):
 
                 sent_bid_id = swap_client.postBid(offer_id, offer.amount_from, addr_send_from=addr_from).hex()
 
-        coin_from = Coins(offer.coin_from)
-        coin_to = Coins(offer.coin_to)
-        ci_from = swap_client.ci(coin_from)
-        ci_to = swap_client.ci(coin_to)
-        ticker_from = swap_client.getTicker(coin_from)
-        ticker_to = swap_client.getTicker(coin_to)
+        ci_from = swap_client.ci(Coins(offer.coin_from))
+        ci_to = swap_client.ci(Coins(offer.coin_to))
 
         data = {
-            'tla_from': swap_client.getTicker(coin_from),
-            'tla_to': swap_client.getTicker(coin_to),
+            'tla_from': ci_from.ticker(),
+            'tla_to': ci_to.ticker(),
             'state': strOfferState(offer.state),
             'coin_from': ci_from.coin_name(),
             'coin_to': ci_to.coin_name(),
@@ -398,6 +396,13 @@ class HttpHandler(BaseHTTPRequestHandler):
             'sent': 'True' if offer.was_sent else 'False',
             'show_bid_form': show_bid_form,
         }
+
+        if xmr_offer:
+            int_fee_rate_now = make_int(ci_from.get_fee_rate(), ci_from.exp())
+            data['xmr_type'] = True
+            data['a_fee_rate'] = ci_from.format_amount(xmr_offer.a_fee_rate)
+            data['a_fee_rate_verify'] = ci_from.format_amount(int_fee_rate_now)
+            data['a_fee_warn'] = xmr_offer.a_fee_rate < int_fee_rate_now
 
         if offer.was_sent:
             data['auto_accept'] = 'True' if offer.auto_accept_bids else 'False'

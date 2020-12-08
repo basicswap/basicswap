@@ -59,7 +59,9 @@ class Offer(Base):
     from_feerate = sa.Column(sa.BigInteger)
     to_feerate = sa.Column(sa.BigInteger)
 
+    # Local fields
     auto_accept_bids = sa.Column(sa.Boolean)
+    withdraw_to_addr = sa.Column(sa.String)  # Address to spend lock tx to - address from wallet if empty TODO
 
     state = sa.Column(sa.Integer)
     states = sa.Column(sa.LargeBinary)  # Packed states and times
@@ -87,6 +89,7 @@ class Bid(Base):
     expire_at = sa.Column(sa.BigInteger)
     bid_addr = sa.Column(sa.String)
     proof_address = sa.Column(sa.String)
+    withdraw_to_addr = sa.Column(sa.String)  # Address to spend lock tx to - address from wallet if empty TODO
 
     recovered_secret = sa.Column(sa.LargeBinary)
     amount_to = sa.Column(sa.BigInteger)  # amount * offer.rate
