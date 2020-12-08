@@ -645,7 +645,7 @@ class BasicSwap(BaseApp):
             self.coin_clients[coin]['interface'] = self.createInterface(coin)
 
     def start(self):
-        self.log.info('Starting BasicSwap %s\n\n', __version__)
+        self.log.info('Starting BasicSwap %s, database v%d\n\n', __version__, self.db_version)
         self.log.info('sqlalchemy version %s', sa.__version__)
 
         self.upgradeDatabase(self.db_version)
@@ -728,9 +728,32 @@ class BasicSwap(BaseApp):
         if db_version >= CURRENT_DB_VERSION:
             return
 
-        self.log.info('Upgrading Database from version %d to %d.', db_version, CURRENT_DB_VERSION)
+        self.log.info('Upgrading database from version %d to %d.', db_version, CURRENT_DB_VERSION)
 
-        raise ValueError('Scripted database upgrade not found.')
+        while True:
+            if db_version == 4:
+                session = scoped_session(self.session_factory)
+
+                session.execute('ALTER TABLE bids ADD COLUMN withdraw_to_addr TEXT')
+                session.execute('ALTER TABLE offers ADD COLUMN withdraw_to_addr TEXT')
+
+                db_version += 1
+                self.db_version = db_version
+                kv = session.query(DBKVInt).filter_by(key='db_version').first()
+                if not kv:
+                    kv = DBKVInt(key=str_key, value=db_version)
+                else:
+                    kv.value = db_version
+                session.add(kv)
+                session.commit()
+                session.close()
+                session.remove()
+                self.log.info('Upgraded database to version {}'.format(self.db_version))
+                continue
+            break
+
+        if db_version != CURRENT_DB_VERSION:
+            raise ValueError('Unable to upgrade database.')
 
     def waitForDaemonRPC(self, coin_type):
         for i in range(21):

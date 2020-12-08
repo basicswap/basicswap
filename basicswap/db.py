@@ -12,7 +12,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from enum import IntEnum, auto
 
 
-CURRENT_DB_VERSION = 4
+CURRENT_DB_VERSION = 5
 Base = declarative_base()
 
 
