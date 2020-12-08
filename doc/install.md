@@ -20,6 +20,8 @@ Create the images:
 
 Prepare the datadir:
 Set XMR_RPC_HOST and BASE_XMR_RPC_PORT to a public XMR node or exclude to run a local node.
+Set xmrrestoreheight to the current xmr chain height.
+Adjust `--withcoins` and `--withoutcoins` as desired, eg: `--withcoins=monero,bitcoin`.  By default Particl and Litecoin are loaded.
 
     $ export COINDATA_PATH=/var/data/coinswaps
     $ docker run -e XMR_RPC_HOST="node.xmr.to" -e BASE_XMR_RPC_PORT=18081 -t --name swap_prepare -v $COINDATA_PATH:/coindata i_swapclient \
@@ -46,6 +48,7 @@ Open in browser: `http://localhost:12700`
     $ docker run -t --name swap_prepare -v $COINDATA_PATH:/coindata i_swapclient basicswap-prepare --datadir=/coindata --addcoin=bitcoin
 
 You can copy an existing pruned datadir (excluding bitcoin.conf and any wallets) over to `$COINDATA_PATH/bitcoin`
+Remove any existing wallets after copying over a pruned chain or the Bitcoin daemon won't start.
 
 
 ## Run Without Docker:

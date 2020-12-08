@@ -1715,7 +1715,7 @@ class BasicSwap(BaseApp):
     def postXmrBid(self, offer_id, amount, addr_send_from=None):
         # Bid to send bid.amount * offer.rate of coin_to in exchange for bid.amount of coin_from
         # Send MSG1L F -> L
-        self.log.debug('postBid %s %s', offer_id.hex(), format8(amount))
+        self.log.debug('postXmrBid %s %s', offer_id.hex(), format8(amount))
 
         self.mxDB.acquire()
         try:

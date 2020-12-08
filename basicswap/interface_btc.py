@@ -216,6 +216,9 @@ class BTCInterface(CoinInterface):
     def sumPubkeys(self, Ka, Kb):
         return Ka + Kb
 
+    def getScriptForPubkeyHash(self, pkh):
+        return CScript([OP_0, pkh])
+
     def extractScriptLockScriptValues(self, script_bytes):
         script_len = len(script_bytes)
         assert_cond(script_len > 112, 'Bad script length')
@@ -286,7 +289,7 @@ class BTCInterface(CoinInterface):
         script = self.genScriptLockTxScript(sh, Kal, Kaf, lock_blocks, Karl, Karf)
         tx = CTransaction()
         tx.nVersion = self.txVersion()
-        tx.vout.append(self.txoType(value, CScript([OP_0, hashlib.sha256(script).digest()])))
+        tx.vout.append(self.txoType(value, self.getScriptDest(script)))
 
         return tx.serialize(), script
 
@@ -388,7 +391,7 @@ class BTCInterface(CoinInterface):
         tx.nVersion = self.txVersion()
         tx.vin.append(CTxIn(COutPoint(tx_lock_refund_hash_int, locked_n), nSequence=0))
 
-        tx.vout.append(self.txoType(locked_coin, CScript([OP_0, pkh_refund_to])))
+        tx.vout.append(self.txoType(locked_coin, self.getScriptForPubkeyHash(pkh_refund_to)))
 
         witness_bytes = len(script_lock_refund)
         witness_bytes += 73 * 2  # 2 signatures (72 + 1 byte size)
@@ -423,7 +426,7 @@ class BTCInterface(CoinInterface):
         tx.nVersion = self.txVersion()
         tx.vin.append(CTxIn(COutPoint(tx_lock_refund_hash_int, locked_n), nSequence=lock2_value))
 
-        tx.vout.append(self.txoType(locked_coin, CScript([OP_0, pkh_dest])))
+        tx.vout.append(self.txoType(locked_coin, self.getScriptForPubkeyHash(pkh_dest)))
 
         witness_bytes = len(script_lock_refund)
         witness_bytes += 73  # signature (72 + 1 byte size)
@@ -453,8 +456,7 @@ class BTCInterface(CoinInterface):
         tx.nVersion = self.txVersion()
         tx.vin.append(CTxIn(COutPoint(tx_lock_hash_int, locked_n)))
 
-        p2wpkh = CScript([OP_0, pkh_dest])
-        tx.vout.append(self.txoType(locked_coin, p2wpkh))
+        tx.vout.append(self.txoType(locked_coin, self.getScriptForPubkeyHash(pkh_dest)))
 
         witness_bytes = len(script_lock)
         witness_bytes += 33  # sv, size
@@ -668,7 +670,7 @@ class BTCInterface(CoinInterface):
         assert_cond(tx.vin[0].prevout.hash == b2i(lock_tx_id) and tx.vin[0].prevout.n == locked_n, 'Input prevout mismatch')
 
         assert_cond(len(tx.vout) == 1, 'tx doesn\'t have one output')
-        p2wpkh = CScript([OP_0, a_pkhash_f])
+        p2wpkh =  self.getScriptForPubkeyHash(a_pkhash_f)
         assert_cond(tx.vout[0].scriptPubKey == p2wpkh, 'Bad output destination')
 
         fee_paid = locked_coin - tx.vout[0].nValue
@@ -771,7 +773,7 @@ class BTCInterface(CoinInterface):
         return CScript([OP_0, hashlib.sha256(script).digest()])
 
     def getPkDest(self, K):
-        return CScript([OP_0, self.getPubkeyHash(K)])
+        return self.getScriptForPubkeyHash(self.getPubkeyHash(K))
 
     def scanTxOutset(self, dest):
         return self.rpc_callback('scantxoutset', ['start', ['raw({})'.format(dest.hex())]])

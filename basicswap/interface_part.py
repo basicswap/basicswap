@@ -8,6 +8,10 @@
 from .contrib.test_framework.messages import (
     CTxOutPart,
 )
+from .contrib.test_framework.script import (
+    CScript,
+    OP_DUP, OP_HASH160, OP_EQUALVERIFY, OP_CHECKSIG
+)
 
 from .interface_btc import BTCInterface
 from .chainparams import Coins
@@ -52,3 +56,6 @@ class PARTInterface(BTCInterface):
     def withdrawCoin(self, value, addr_to, subfee):
         params = [addr_to, value, '', '', subfee, '', True, self._conf_target]
         return self.rpc_callback('sendtoaddress', params)
+
+    def getScriptForPubkeyHash(self, pkh):
+        return CScript([OP_DUP, OP_HASH160, pkh, OP_EQUALVERIFY, OP_CHECKSIG])
