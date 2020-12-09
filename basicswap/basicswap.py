@@ -187,6 +187,8 @@ class EventLogTypes(IntEnum):
     LOCK_TX_A_PUBLISHED = auto()
     LOCK_TX_B_PUBLISHED = auto()
     FAILED_TX_B_SPEND = auto()
+    LOCK_TX_B_SEEN = auto()
+    LOCK_TX_B_CONFIRMED = auto()
 
 
 class XmrSplitMsgTypes(IntEnum):
@@ -319,6 +321,10 @@ def describeEventEntry(event_type, event_msg):
         return 'Lock tx b published'
     if event_type == EventLogTypes.FAILED_TX_B_SPEND:
         return 'Failed to publish lock tx b spend'
+    if event_type == EventLogTypes.LOCK_TX_B_SEEN:
+        return 'Lock tx b seen in chain'
+    if event_type == EventLogTypes.LOCK_TX_B_CONFIRMED:
+        return 'Lock tx b confirmed in chain'
 
 
 def getExpectedSequence(lockType, lockVal, coin_type):
@@ -569,6 +575,7 @@ class BasicSwap(BaseApp):
             'conf_target': chain_client_settings.get('conf_target', 2),
             'watched_outputs': [],
             'last_height_checked': last_height_checked,
+            'last_height': None,
             'use_segwit': chain_client_settings.get('use_segwit', False),
             'use_csv': chain_client_settings.get('use_csv', True),
             'core_version_group': chain_client_settings.get('core_version_group', 0),
@@ -2643,27 +2650,41 @@ class BasicSwap(BaseApp):
                 if bid.was_sent and bid.xmr_b_lock_tx is None:
                     return rv
 
+                bid_changed = False
+                # Have to use findTxB instead of relying on the first seen height to detect chain reorgs
                 found_tx = ci_to.findTxB(xmr_swap.vkbv, xmr_swap.pkbs, bid.amount_to, ci_to.blocks_confirmed, xmr_swap.b_restore_height)
                 if found_tx is not None:
-                    self.log.debug('Found {} lock tx in chain'.format(ci_to.coin_name()))
                     if bid.xmr_b_lock_tx is None:
+                        self.log.debug('Found {} lock tx in chain'.format(ci_to.coin_name()))
+                        self.logBidEvent(bid, EventLogTypes.LOCK_TX_B_SEEN, '', session)
                         b_lock_tx_id = bytes.fromhex(found_tx['txid'])
                         bid.xmr_b_lock_tx = SwapTx(
                             bid_id=bid_id,
                             tx_type=TxTypes.XMR_SWAP_B_LOCK,
                             txid=b_lock_tx_id,
+                            chain_height=found_tx['height'],
                         )
+                        bid_changed = True
+                    else:
+                        bid.xmr_b_lock_tx.chain_height = found_tx['height']
+                        bid_changed = True
 
-                    bid.xmr_b_lock_tx.setState(TxStates.TX_CONFIRMED)
+                if bid.xmr_b_lock_tx and bid.xmr_b_lock_tx.chain_height is not None and bid.xmr_b_lock_tx.chain_height > 0:
+                    chain_height = ci_to.getChainHeight()
+                    self.coin_clients[ci_to.coin_type()]['last_height'] = chain_height
 
-                    bid.setState(BidStates.XMR_SWAP_NOSCRIPT_COIN_LOCKED)
+                    if chain_height - bid.xmr_b_lock_tx.chain_height >= ci_to.blocks_confirmed:
+                        self.logBidEvent(bid, EventLogTypes.LOCK_TX_B_CONFIRMED, '', session)
+                        bid.xmr_b_lock_tx.setState(TxStates.TX_CONFIRMED)
+                        bid.setState(BidStates.XMR_SWAP_NOSCRIPT_COIN_LOCKED)
+
+                        if bid.was_received:
+                            delay = random.randrange(self.min_delay_event, self.max_delay_event)
+                            self.log.info('Releasing xmr swap secret for bid %s in %d seconds', bid_id.hex(), delay)
+                            self.createEventInSession(delay, EventTypes.SEND_XMR_SECRET, bid_id, session)
+
+                if bid_changed:
                     self.saveBidInSession(bid_id, bid, session, xmr_swap)
-
-                    if bid.was_received:
-                        delay = random.randrange(self.min_delay_event, self.max_delay_event)
-                        self.log.info('Releasing xmr swap secret for bid %s in %d seconds', bid_id.hex(), delay)
-                        self.createEventInSession(delay, EventTypes.SEND_XMR_SECRET, bid_id, session)
-
                     session.commit()
             elif state == BidStates.XMR_SWAP_SECRET_SHARED:
                 # Wait for script spend tx to confirm

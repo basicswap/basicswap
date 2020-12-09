@@ -24,9 +24,9 @@
 {% if data.show_txns %}
 <h4>Transactions</h4>
 <table>
-<tr><th>Tx Type</th><th>Tx ID</th></tr>
+<tr><th>Tx Type</th><th>Tx ID</th><th>Blocks Deep</th></tr>
 {% for tx in data.txns %}
-<tr><td>{{ tx.type }}</td><td>{{ tx.txid }}</td></tr>
+<tr><td>{{ tx.type }}</td><td>{{ tx.txid }}</td><td>{{ tx.confirms }}</td></tr>
 {% endfor %}
 </table>
 {% endif %}

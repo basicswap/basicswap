@@ -232,21 +232,24 @@ class XMRInterface(CoinInterface):
 
         rv = self.rpc_wallet_cb('refresh')
 
+        '''
         # Debug
         try:
-            current_height = self.rpc_cb('get_block_count')['count']
+            current_height = self.rpc_wallet_cb('get_block_count')['count']
             logging.info('findTxB XMR current_height %d\nAddress: %s', current_height, address_b58)
         except Exception as e:
             logging.info('rpc_cb failed %s', str(e))
             current_height = None  # If the transfer is available it will be deep enough
-
+        '''
         params = {'transfer_type': 'available'}
         rv = self.rpc_wallet_cb('incoming_transfers', params)
         if 'transfers' in rv:
             for transfer in rv['transfers']:
-                if transfer['amount'] == cb_swap_value \
-                   and (current_height is None or current_height - transfer['block_height'] > cb_block_confirmed):
-                    return {'txid': transfer['tx_hash'], 'amount': transfer['amount'], 'height': transfer['block_height']}
+                if transfer['amount'] == cb_swap_value:
+                #   and (current_height is None or current_height - transfer['block_height'] > cb_block_confirmed):
+                    return {'txid': transfer['tx_hash'], 'amount': transfer['amount'], 'height': 0 if 'block_height' not in transfer else transfer['block_height']}
+                else:
+                    logging.warning('Incorrect amount detected for coin b lock txn: {}'.format(transfer['tx_hash']))
 
         return None
 
