@@ -12,7 +12,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from enum import IntEnum, auto
 
 
-CURRENT_DB_VERSION = 5
+CURRENT_DB_VERSION = 6
 Base = declarative_base()
 
 
@@ -264,17 +264,12 @@ class XmrSwap(Base):
 
     contract_count = sa.Column(sa.Integer)
 
-    sv = sa.Column(sa.LargeBinary)  # Secret value
-    sh = sa.Column(sa.LargeBinary)  # Secret hash
-
     dest_af = sa.Column(sa.LargeBinary)  # Destination for coin A amount to follower when swap completes successfully
 
     pkal = sa.Column(sa.LargeBinary)
-    pkarl = sa.Column(sa.LargeBinary)
     pkasl = sa.Column(sa.LargeBinary)
 
     pkaf = sa.Column(sa.LargeBinary)
-    pkarf = sa.Column(sa.LargeBinary)
     pkasf = sa.Column(sa.LargeBinary)
 
     vkbvl = sa.Column(sa.LargeBinary)
@@ -315,6 +310,7 @@ class XmrSwap(Base):
     a_lock_spend_tx = sa.Column(sa.LargeBinary)
     a_lock_spend_tx_id = sa.Column(sa.LargeBinary)
     al_lock_spend_tx_esig = sa.Column(sa.LargeBinary)
+    kal_sig = sa.Column(sa.LargeBinary)
 
     a_lock_refund_swipe_tx = sa.Column(sa.LargeBinary)  # Follower spends script coin lock refund tx
 

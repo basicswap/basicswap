@@ -63,12 +63,11 @@ message XmrBidMessage {
     uint64 amount = 3;              /* amount of amount_from bid is for */
 
     bytes pkaf = 4;
-    bytes pkarf = 5;
 
-    bytes kbvf = 6;
-    bytes kbsf_dleag = 7;
+    bytes kbvf = 5;
+    bytes kbsf_dleag = 6;
 
-    bytes dest_af = 8;
+    bytes dest_af = 7;
 }
 
 message XmrSplitMessage {
@@ -81,20 +80,18 @@ message XmrSplitMessage {
 message XmrBidAcceptMessage {
     bytes bid_msg_id = 1;
 
-    bytes sh = 2;
     bytes pkal = 3;
-    bytes pkarl = 4;
 
-    bytes kbvl = 5;
-    bytes kbsl_dleag = 6;
+    bytes kbvl = 4;
+    bytes kbsl_dleag = 5;
 
     /* MSG2F */
-    bytes a_lock_tx = 7;
-    bytes a_lock_tx_script = 8;
-    bytes a_lock_refund_tx = 9;
-    bytes a_lock_refund_tx_script = 10;
-    bytes a_lock_refund_spend_tx = 11;
-    bytes al_lock_refund_tx_sig = 12;
+    bytes a_lock_tx = 6;
+    bytes a_lock_tx_script = 7;
+    bytes a_lock_refund_tx = 8;
+    bytes a_lock_refund_tx_script = 9;
+    bytes a_lock_refund_spend_tx = 10;
+    bytes al_lock_refund_tx_sig = 11;
 }
 
 message XmrBidLockTxSigsMessage {
@@ -110,12 +107,12 @@ message XmrBidLockSpendTxMessage {
     bytes bid_msg_id = 1;
 
     bytes a_lock_spend_tx = 2;
-    bytes al_lock_spend_tx_esig = 3;
+    bytes kal_sig = 3;
 }
 
-message XmrBidSecretMessage {
+message XmrBidLockReleaseMessage {
     /* MSG5F */
     bytes bid_msg_id = 1;
 
-    bytes secret_value = 2;
+    bytes al_lock_spend_tx_esig = 2;
 }
