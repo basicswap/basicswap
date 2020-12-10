@@ -36,7 +36,6 @@ from .util import (
     format_amount,
     encodeAddress,
     decodeAddress,
-    SerialiseNum,
     DeserialiseNum,
     decodeWif,
     toWIF,
@@ -80,10 +79,14 @@ from .db import (
     XmrSwap,
     XmrSplitData,
 )
-
-from .explorers import ExplorerInsight, ExplorerBitAps, ExplorerChainz
-import basicswap.config as cfg
 from .base import BaseApp
+from .explorers import (
+    ExplorerInsight,
+    ExplorerBitAps,
+    ExplorerChainz,
+)
+import basicswap.config as cfg
+import basicswap.protocols.atomic_swap_1 as atomic_swap_1
 
 
 MIN_OFFER_VALID_TIME = 60 * 10
@@ -346,37 +349,6 @@ def decodeSequence(lock_value):
     if lock_value & SEQUENCE_LOCKTIME_TYPE_FLAG:
         return (lock_value & SEQUENCE_LOCKTIME_MASK) << SEQUENCE_LOCKTIME_GRANULARITY
     return lock_value & SEQUENCE_LOCKTIME_MASK
-
-
-def buildContractScript(lock_val, secret_hash, pkh_redeem, pkh_refund, op_lock=OpCodes.OP_CHECKSEQUENCEVERIFY):
-    script = bytearray([
-        OpCodes.OP_IF,
-        OpCodes.OP_SIZE,
-        0x01, 0x20,  # 32
-        OpCodes.OP_EQUALVERIFY,
-        OpCodes.OP_SHA256,
-        0x20]) \
-        + secret_hash \
-        + bytearray([
-            OpCodes.OP_EQUALVERIFY,
-            OpCodes.OP_DUP,
-            OpCodes.OP_HASH160,
-            0x14]) \
-        + pkh_redeem \
-        + bytearray([OpCodes.OP_ELSE, ]) \
-        + SerialiseNum(lock_val) \
-        + bytearray([
-            op_lock,
-            OpCodes.OP_DROP,
-            OpCodes.OP_DUP,
-            OpCodes.OP_HASH160,
-            0x14]) \
-        + pkh_refund \
-        + bytearray([
-            OpCodes.OP_ENDIF,
-            OpCodes.OP_EQUALVERIFY,
-            OpCodes.OP_CHECKSIG])
-    return script
 
 
 def extractScriptSecretHash(script):
@@ -748,7 +720,7 @@ class BasicSwap(BaseApp):
                 self.db_version = db_version
                 kv = session.query(DBKVInt).filter_by(key='db_version').first()
                 if not kv:
-                    kv = DBKVInt(key=str_key, value=db_version)
+                    kv = DBKVInt(key='db_version', value=db_version)
                 else:
                     kv.value = db_version
                 session.add(kv)
@@ -1658,14 +1630,14 @@ class BasicSwap(BaseApp):
         else:
             if offer.lock_type < ABS_LOCK_BLOCKS:
                 sequence = getExpectedSequence(offer.lock_type, offer.lock_value, coin_from)
-                script = buildContractScript(sequence, secret_hash, bid.pkhash_buyer, pkhash_refund)
+                script = atomic_swap_1.buildContractScript(sequence, secret_hash, bid.pkhash_buyer, pkhash_refund)
             else:
                 if offer.lock_type == ABS_LOCK_BLOCKS:
                     lock_value = self.callcoinrpc(coin_from, 'getblockchaininfo')['blocks'] + offer.lock_value
                 else:
                     lock_value = int(time.time()) + offer.lock_value
                 self.log.debug('Initiate %s lock_value %d %d', coin_from, offer.lock_value, lock_value)
-                script = buildContractScript(lock_value, secret_hash, bid.pkhash_buyer, pkhash_refund, OpCodes.OP_CHECKLOCKTIMEVERIFY)
+                script = atomic_swap_1.buildContractScript(lock_value, secret_hash, bid.pkhash_buyer, pkhash_refund, OpCodes.OP_CHECKLOCKTIMEVERIFY)
 
             p2sh = self.callcoinrpc(Coins.PART, 'decodescript', [script.hex()])['p2sh']
 
@@ -2061,7 +2033,7 @@ class BasicSwap(BaseApp):
         lock_value = offer.lock_value // 2
         if offer.lock_type < ABS_LOCK_BLOCKS:
             sequence = getExpectedSequence(offer.lock_type, lock_value, coin_to)
-            participate_script = buildContractScript(sequence, secret_hash, pkhash_seller, pkhash_buyer_refund)
+            participate_script = atomic_swap_1.buildContractScript(sequence, secret_hash, pkhash_seller, pkhash_buyer_refund)
         else:
             # Lock from the height or time of the block containing the initiate txn
             coin_from = Coins(offer.coin_from)
@@ -2092,7 +2064,7 @@ class BasicSwap(BaseApp):
                 self.log.debug('Setting lock value from time of block %s %s', coin_from, initiate_tx_block_hash)
                 contract_lock_value = initiate_tx_block_time + lock_value
             self.log.debug('participate %s lock_value %d %d', coin_to, lock_value, contract_lock_value)
-            participate_script = buildContractScript(contract_lock_value, secret_hash, pkhash_seller, pkhash_buyer_refund, OpCodes.OP_CHECKLOCKTIMEVERIFY)
+            participate_script = atomic_swap_1.buildContractScript(contract_lock_value, secret_hash, pkhash_seller, pkhash_buyer_refund, OpCodes.OP_CHECKLOCKTIMEVERIFY)
         return participate_script
 
     def createParticipateTxn(self, bid_id, bid, offer, participate_script):
@@ -3629,6 +3601,15 @@ class BasicSwap(BaseApp):
             raise ValueError('Invalid pubkey.')
         if not ci_from.verifyPubkey(xmr_swap.pkarl):
             raise ValueError('Invalid pubkey.')
+
+        if xmr_swap.pkbvl == xmr_swap.pkbvf:
+            raise ValueError('Duplicate scriptless view pubkey.')
+        if xmr_swap.pkbsl == xmr_swap.pkbsf:
+            raise ValueError('Duplicate scriptless spend pubkey.')
+        if xmr_swap.pkal == xmr_swap.pkaf:
+            raise ValueError('Duplicate script spend pubkey.')
+        if xmr_swap.pkarl == xmr_swap.pkarf:
+            raise ValueError('Duplicate script spend pubkey.')
 
         bid.setState(BidStates.SWAP_DELAYING)
         self.saveBidInSession(bid.bid_id, bid, session, xmr_swap)

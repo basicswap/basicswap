@@ -159,6 +159,8 @@ class XMRInterface(CoinInterface):
         return(i < edf.l and i > 8)
 
     def verifyPubkey(self, pubkey_bytes):
+        # Calls ed25519_decode_check_point() in secp256k1
+        # Checks for small order
         return verify_ed25519_point(pubkey_bytes)
 
     def proveDLEAG(self, key):
@@ -240,13 +242,13 @@ class XMRInterface(CoinInterface):
         except Exception as e:
             logging.info('rpc_cb failed %s', str(e))
             current_height = None  # If the transfer is available it will be deep enough
+            #   and (current_height is None or current_height - transfer['block_height'] > cb_block_confirmed):
         '''
         params = {'transfer_type': 'available'}
         rv = self.rpc_wallet_cb('incoming_transfers', params)
         if 'transfers' in rv:
             for transfer in rv['transfers']:
                 if transfer['amount'] == cb_swap_value:
-                #   and (current_height is None or current_height - transfer['block_height'] > cb_block_confirmed):
                     return {'txid': transfer['tx_hash'], 'amount': transfer['amount'], 'height': 0 if 'block_height' not in transfer else transfer['block_height']}
                 else:
                     logging.warning('Incorrect amount detected for coin b lock txn: {}'.format(transfer['tx_hash']))

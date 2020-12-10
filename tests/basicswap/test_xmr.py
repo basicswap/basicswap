@@ -760,6 +760,36 @@ class Test(unittest.TestCase):
         self.wait_for_bid(swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=180)
         self.wait_for_bid(swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True)
 
+    def test_10_locked_refundtx(self):
+        logging.info('---------- Test Refund tx is locked')
+        swap_clients = self.swap_clients
+        offer_id = swap_clients[0].postOffer(Coins.BTC, Coins.XMR, 10 * COIN, 100 * XMR_COIN, 10 * COIN, SwapTypes.XMR_SWAP)
+        self.wait_for_offer(swap_clients[1], offer_id)
+        offers = swap_clients[1].listOffers(filters={'offer_id': offer_id})
+        offer = offers[0]
+
+        bid_id = swap_clients[1].postXmrBid(offer_id, offer.amount_from)
+
+        self.wait_for_bid(swap_clients[0], bid_id, BidStates.BID_RECEIVED)
+
+        bid, xmr_swap = swap_clients[0].getXmrBid(bid_id)
+        assert(xmr_swap)
+
+        swap_clients[1].setBidDebugInd(bid_id, DebugTypes.BID_STOP_AFTER_COIN_A_LOCK)
+
+        swap_clients[0].acceptXmrBid(bid_id)
+
+        self.wait_for_bid(swap_clients[0], bid_id, BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED, wait_for=180)
+
+        bid, xmr_swap = swap_clients[0].getXmrBid(bid_id)
+        assert(xmr_swap)
+
+        try:
+            swap_clients[0].ci(Coins.BTC).publishTx(xmr_swap.a_lock_refund_tx)
+            assert(False), 'Lock refund tx should be locked'
+        except Exception as e:
+            assert('non-BIP68-final' in str(e))
+
 
 if __name__ == '__main__':
     unittest.main()

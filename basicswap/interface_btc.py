@@ -670,7 +670,7 @@ class BTCInterface(CoinInterface):
         assert_cond(tx.vin[0].prevout.hash == b2i(lock_tx_id) and tx.vin[0].prevout.n == locked_n, 'Input prevout mismatch')
 
         assert_cond(len(tx.vout) == 1, 'tx doesn\'t have one output')
-        p2wpkh =  self.getScriptForPubkeyHash(a_pkhash_f)
+        p2wpkh = self.getScriptForPubkeyHash(a_pkhash_f)
         assert_cond(tx.vout[0].scriptPubKey == p2wpkh, 'Bad output destination')
 
         fee_paid = locked_coin - tx.vout[0].nValue

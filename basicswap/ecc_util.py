@@ -19,13 +19,14 @@ class ECCParameters():
         self.o = o
 
 
-ep = ECCParameters( \
-    p  = 0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f, \
-    a  = 0x0, \
-    b  = 0x7, \
-    Gx = 0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798, \
-    Gy = 0x483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8, \
-    o  = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141)  # noqa: E221,E251,E502
+ep = ECCParameters(
+    p=0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f,
+    a=0x0,
+    b=0x7,
+    Gx=0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798,
+    Gy=0x483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8,
+    o=0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141)
+
 
 curve_secp256k1 = CurveFp(ep.p, ep.a, ep.b)
 G = Point(curve_secp256k1, ep.Gx, ep.Gy, ep.o)
