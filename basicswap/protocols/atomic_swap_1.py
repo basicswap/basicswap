@@ -41,3 +41,7 @@ def buildContractScript(lock_val, secret_hash, pkh_redeem, pkh_refund, op_lock=O
             OpCodes.OP_EQUALVERIFY,
             OpCodes.OP_CHECKSIG])
     return script
+
+
+def extractScriptSecretHash(script):
+    return script[7:39]

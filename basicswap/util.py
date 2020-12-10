@@ -301,3 +301,13 @@ def format_amount(i, display_scale, scale=None):
     if i < 0:
         rv = '-' + rv
     return rv
+
+
+def getP2SHScriptForHash(p2sh):
+    return bytes([OpCodes.OP_HASH160, 0x14]) \
+        + p2sh \
+        + bytes([OpCodes.OP_EQUAL])
+
+
+def getP2WSH(script):
+    return bytes([OpCodes.OP_0, 0x20]) + hashlib.sha256(script).digest()

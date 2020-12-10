@@ -41,6 +41,8 @@ from .util import (
     toWIF,
     getKeyID,
     make_int,
+    getP2SHScriptForHash,
+    getP2WSH,
 )
 from .chainparams import (
     chainparams,
@@ -190,6 +192,8 @@ class EventLogTypes(IntEnum):
     LOCK_TX_A_PUBLISHED = auto()
     LOCK_TX_B_PUBLISHED = auto()
     FAILED_TX_B_SPEND = auto()
+    LOCK_TX_A_SEEN = auto()
+    LOCK_TX_A_CONFIRMED = auto()
     LOCK_TX_B_SEEN = auto()
     LOCK_TX_B_CONFIRMED = auto()
 
@@ -324,6 +328,10 @@ def describeEventEntry(event_type, event_msg):
         return 'Lock tx b published'
     if event_type == EventLogTypes.FAILED_TX_B_SPEND:
         return 'Failed to publish lock tx b spend'
+    if event_type == EventLogTypes.LOCK_TX_A_SEEN:
+        return 'Lock tx a seen in chain'
+    if event_type == EventLogTypes.LOCK_TX_A_CONFIRMED:
+        return 'Lock tx a confirmed in chain'
     if event_type == EventLogTypes.LOCK_TX_B_SEEN:
         return 'Lock tx b seen in chain'
     if event_type == EventLogTypes.LOCK_TX_B_CONFIRMED:
@@ -351,10 +359,6 @@ def decodeSequence(lock_value):
     return lock_value & SEQUENCE_LOCKTIME_MASK
 
 
-def extractScriptSecretHash(script):
-    return script[7:39]
-
-
 def getVoutByAddress(txjs, p2sh):
     for o in txjs['vout']:
         try:
@@ -373,16 +377,6 @@ def getVoutByP2WSH(txjs, p2wsh_hex):
         except Exception:
             pass
     raise ValueError('P2WSH output not found in txn')
-
-
-def getP2SHScriptForHash(p2sh):
-    return bytearray([OpCodes.OP_HASH160, 0x14]) \
-        + p2sh \
-        + bytearray([OpCodes.OP_EQUAL])
-
-
-def getP2WSH(script):
-    return bytearray([OpCodes.OP_0, 0x20]) + hashlib.sha256(script).digest()
 
 
 def replaceAddrPrefix(addr, coin_type, chain_name, addr_type='pubkey_address'):
@@ -566,7 +560,7 @@ class BasicSwap(BaseApp):
                 else:
                     raise ValueError('Missing XMR wallet rpc credentials.')
 
-    def ci(self, coin):  # coin interface
+    def ci(self, coin):  # Coin interface
         return self.coin_clients[coin]['interface']
 
     def createInterface(self, coin):
@@ -611,7 +605,7 @@ class BasicSwap(BaseApp):
                 except Exception:
                     time.sleep(0.5)
             try:
-                if os.name != 'nt' or cc['core_version_group'] > 17:  # litecoin on windows doesn't write a pid file
+                if os.name != 'nt' or cc['core_version_group'] > 17:  # Litecoin on windows doesn't write a pid file
                     assert(datadir_pid == cc['pid']), 'Mismatched pid'
                 with open(authcookiepath, 'rb') as fp:
                     cc['rpcauth'] = fp.read().decode('utf-8')
@@ -2025,7 +2019,7 @@ class BasicSwap(BaseApp):
 
         bid_date = dt.datetime.fromtimestamp(bid.created_at).date()
 
-        secret_hash = extractScriptSecretHash(bid.initiate_tx.script)
+        secret_hash = atomic_swap_1.extractScriptSecretHash(bid.initiate_tx.script)
         pkhash_seller = bid.pkhash_seller
         pkhash_buyer_refund = bid.pkhash_buyer
 
@@ -2594,9 +2588,10 @@ class BasicSwap(BaseApp):
                     return rv
 
                 # TODO: Timeout waiting for transactions
-
+                bid_changed = False
                 a_lock_tx_dest = ci_from.getScriptDest(xmr_swap.a_lock_tx_script)
-                utxos = ci_from.getOutput(bid.xmr_a_lock_tx.txid, a_lock_tx_dest, bid.amount)
+                utxos, chain_height = ci_from.getOutput(bid.xmr_a_lock_tx.txid, a_lock_tx_dest, bid.amount)
+                self.coin_clients[ci_from.coin_type()]['last_height'] = chain_height
 
                 if len(utxos) < 1:
                     return rv
@@ -2605,7 +2600,15 @@ class BasicSwap(BaseApp):
                     raise ValueError('Too many outputs for chain A lock tx')
 
                 utxo = utxos[0]
+                if not bid.xmr_a_lock_tx.chain_height and utxo['height'] != 0:
+                    self.logBidEvent(bid, EventLogTypes.LOCK_TX_A_SEEN, '', session)
+                    bid_changed = True
+                if bid.xmr_a_lock_tx.chain_height != utxo['height'] and utxo['height'] != 0:
+                    bid.xmr_a_lock_tx.chain_height = utxo['height']
+                    bid_changed = True
+
                 if utxo['depth'] >= ci_from.blocks_confirmed:
+                    self.logBidEvent(bid, EventLogTypes.LOCK_TX_A_CONFIRMED, '', session)
                     bid.xmr_a_lock_tx.setState(TxStates.TX_CONFIRMED)
                     bid.setState(BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED)
                     self.saveBidInSession(bid_id, bid, session, xmr_swap)
@@ -2615,7 +2618,9 @@ class BasicSwap(BaseApp):
                         self.log.info('Sending xmr swap chain B lock tx for bid %s in %d seconds', bid_id.hex(), delay)
                         self.createEventInSession(delay, EventTypes.SEND_XMR_SWAP_LOCK_TX_B, bid_id, session)
                         # bid.setState(BidStates.SWAP_DELAYING)
+                    bid_changed = True
 
+                if bid_changed:
                     session.commit()
 
             elif state == BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED:

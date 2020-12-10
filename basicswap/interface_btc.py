@@ -874,9 +874,6 @@ class BTCInterface(CoinInterface):
         chain_height = utxos['height']
         rv = []
         for utxo in utxos['unspents']:
-            print('utxo', utxo)
-            depth = 0 if 'height' not in utxo else utxos['height'] - utxo['height']
-
             if txid and txid.hex() != utxo['txid']:
                 continue
 
@@ -884,11 +881,12 @@ class BTCInterface(CoinInterface):
                 continue
 
             rv.append({
-                'depth': depth,
+                'depth': 0 if 'height' not in utxo else chain_height - utxo['height'],
+                'height': 0 if 'height' not in utxo else utxo['height'],
                 'amount': utxo['amount'] * COIN,
                 'txid': utxo['txid'],
                 'vout': utxo['vout']})
-        return rv
+        return rv, chain_height
 
     def withdrawCoin(self, value, addr_to, subfee):
         params = [addr_to, value, '', '', subfee, True, self._conf_target]
