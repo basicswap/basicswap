@@ -18,6 +18,7 @@ import hashlib
 import datetime as dt
 import traceback
 import sqlalchemy as sa
+import collections
 
 from enum import IntEnum, auto
 from sqlalchemy.orm import sessionmaker, scoped_session
@@ -416,6 +417,7 @@ class BasicSwap(BaseApp):
         self._last_checked_expired = 0
         self._last_checked_events = 0
         self._last_checked_xmr_swaps = 0
+        self._possibly_revoked_offers = collections.deque([], maxlen=48)  # TODO: improve
 
         # TODO: Adjust ranges
         self.min_delay_event = self.settings.get('min_delay_event', 10)
@@ -3256,6 +3258,9 @@ class BasicSwap(BaseApp):
 
         offer_id = bytes.fromhex(msg['msgid'])
 
+        if self.isOfferRevoked(offer_id, msg['from']):
+            raise ValueError('Offer has been revoked {}.'.format(offer_id.hex()))
+
         session = scoped_session(self.session_factory)
         # Check for sent
         existing_offer = self.getOffer(offer_id)
@@ -3316,18 +3321,16 @@ class BasicSwap(BaseApp):
 
             if len(msg_data.offer_msg_id) != 28:
                 raise ValueError('Invalid msg_id length')
-
-            # TODO: Add to db in case received out of order, or add extra startup logic
+            if len(msg_data.signature) != 65:
+                raise ValueError('Invalid signature length')
 
             offer = session.query(Offer).filter_by(offer_id=msg_data.offer_msg_id).first()
             if offer is None:
+                self.storeOfferRevoke(msg_data.offer_msg_id, msg_data.signature)
                 raise ValueError('Offer not found: {}'.format(msg_data.offer_msg_id.hex()))
 
             if offer.expire_at <= now:
                 raise ValueError('Offer already expired: {}'.format(msg_data.offer_msg_id.hex()))
-
-            if len(msg_data.signature) != 65:
-                raise ValueError('Invalid signature length')
 
             signature_enc = base64.b64encode(msg_data.signature).decode('utf-8')
 
@@ -3366,7 +3369,7 @@ class BasicSwap(BaseApp):
         assert(bid_data.amount >= offer.min_bid_amount), 'Bid amount below minimum'
         assert(now <= msg['sent'] + bid_data.time_valid), 'Bid expired'
 
-        # TODO: allow higher bids
+        # TODO: Allow higher bids
         # assert(bid_data.rate != offer['data'].rate), 'Bid rate mismatch'
 
         coin_to = Coins(offer.coin_to)
@@ -3623,6 +3626,8 @@ class BasicSwap(BaseApp):
         ci_to = self.ci(Coins(offer.coin_to))
 
         logging.debug('TODO: xmr bid validation')
+        assert(ci_to.verifyKey(bid_data.kbvf))
+        assert(ci_from.verifyPubkey(bid_data.pkaf))
 
         bid_id = bytes.fromhex(msg['msgid'])
 
@@ -4649,3 +4654,19 @@ class BasicSwap(BaseApp):
         bid = self.getBid(bid_id)
         bid.debug_ind = debug_ind
         self.saveBid(bid_id, bid)
+
+    def storeOfferRevoke(self, offer_id, sig):
+        self.log.debug('Storing revoke request for offer: %s', offer_id.hex())
+        for pair in self._possibly_revoked_offers:
+            if offer_id == pair[0]:
+                return False
+        self._possibly_revoked_offers.appendleft((offer_id, sig))
+        return True
+
+    def isOfferRevoked(self, offer_id, offer_addr_from):
+        for pair in self._possibly_revoked_offers:
+            if offer_id == pair[0]:
+                signature_enc = base64.b64encode(pair[1]).decode('utf-8')
+                passed = self.callcoinrpc(Coins.PART, 'verifymessage', [offer_addr_from, signature_enc, offer_id.hex() + '_revoke'])
+                return True if passed is True else False  # _possibly_revoked_offers should not contain duplicates
+        return False

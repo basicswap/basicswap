@@ -55,7 +55,6 @@ message OfferRevokeMessage {
     bytes signature = 2;
 }
 
-
 message XmrBidMessage {
     /* MSG1L, F -> L */
     bytes offer_msg_id = 1;
