@@ -221,8 +221,13 @@ class HttpHandler(BaseHTTPRequestHandler):
 
                 if bytes('newaddr_' + cid, 'utf-8') in form_data:
                     swap_client.cacheNewAddressForCoin(c)
-
-                if bytes('withdraw_' + cid, 'utf-8') in form_data:
+                elif bytes('reseed_' + cid, 'utf-8') in form_data:
+                    try:
+                        swap_client.reseedWallet(c)
+                        messages.append('Reseed complete ' + str(c))
+                    except Exception as ex:
+                        messages.append('Reseed failed ' + str(ex))
+                elif bytes('withdraw_' + cid, 'utf-8') in form_data:
                     value = form_data[bytes('amt_' + cid, 'utf-8')][0].decode('utf-8')
                     address = form_data[bytes('to_' + cid, 'utf-8')][0].decode('utf-8')
                     subfee = True if bytes('subfee_' + cid, 'utf-8') in form_data else False
@@ -255,6 +260,7 @@ class HttpHandler(BaseHTTPRequestHandler):
                 'synced': w['synced'],
                 'deposit_address': w['deposit_address'],
                 'expected_seed': w['expected_seed'],
+                'balance_all': float(w['balance']) + float(w['unconfirmed']),
             })
             if float(w['unconfirmed']) > 0.0:
                 wallets_formatted[-1]['unconfirmed'] = w['unconfirmed']
@@ -263,6 +269,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         return bytes(template.render(
             title=self.server.title,
             h2=self.server.title,
+            messages=messages,
             wallets=wallets_formatted,
             form_id=os.urandom(8).hex(),
         ), 'UTF-8')

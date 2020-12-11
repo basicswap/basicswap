@@ -11,7 +11,6 @@
 
 <form method="post">
 
-
 {% for w in wallets %}
 <h4>{{ w.name }} {{ w.version }}</h4>
 {% if w.error %}
@@ -21,7 +20,7 @@
 <tr><td>Balance:</td><td>{{ w.balance }}</td>{% if w.unconfirmed %}<td>Unconfirmed:</td><td>{{ w.unconfirmed }}</td>{% endif %}</tr>
 <tr><td>Blocks:</td><td>{{ w.blocks }}</td></tr>
 <tr><td>Synced:</td><td>{{ w.synced }}</td></tr>
-<tr><td>Expected Seed:</td><td>{{ w.expected_seed }}</td></tr>
+<tr><td>Expected Seed:</td><td>{{ w.expected_seed }}</td>{% if w.expected_seed != true %}<td><input type="submit" name="reseed_{{ w.cid }}" value="Reseed wallet" onclick="confirmReseed()"></td>{% endif %}</tr>
 <tr><td><input type="submit" name="newaddr_{{ w.cid }}" value="Deposit Address"></td><td>{{ w.deposit_address }}</td></tr>
 <tr><td><input type="submit" name="withdraw_{{ w.cid }}" value="Withdraw"></td><td>Amount: <input type="text" name="amt_{{ w.cid }}"></td><td>Address: <input type="text" name="to_{{ w.cid }}"></td><td>Subtract fee: <input type="checkbox" name="subfee_{{ w.cid }}"></td></tr>
 <tr><td>Fee Rate:</td><td>{{ w.fee_rate }}</td><td>Est Fee:</td><td>{{ w.est_fee }}</td></tr>
@@ -33,4 +32,10 @@
 </form>
 
 <p><a href="/">home</a></p>
+
+<script>
+function confirmReseed() {
+    confirm("Are you sure?\nBackup your wallet before and after.\nWon't detect used keys.\nShould only be used for new wallets.");
+}
+</script>
 </body></html>

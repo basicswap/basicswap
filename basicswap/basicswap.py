@@ -645,23 +645,7 @@ class BasicSwap(BaseApp):
                 elif c == Coins.XMR:
                     ci.ensureWalletExists()
 
-                    expect_address = self.getStringKV('main_wallet_addr_' + chainparams[c]['name'])
-                    if expect_address is None:
-                        self.log.warning('Can\'t find expected main wallet address for coin {}'.format(ci.coin_name()))
-                    else:
-                        if expect_address == ci.getMainWalletAddress():
-                            ci.setWalletSeedWarning(False)
-                        else:
-                            self.log.warning('Wallet for coin {} not derived from swap seed.'.format(ci.coin_name()))
-                else:
-                    expect_seedid = self.getStringKV('main_wallet_seedid_' + chainparams[c]['name'])
-                    if expect_seedid is None:
-                        self.log.warning('Can\'t find expected wallet seed id for coin {}'.format(ci.coin_name()))
-                    else:
-                        if expect_seedid == ci.getWalletSeedID():
-                            ci.setWalletSeedWarning(False)
-                        else:
-                            self.log.warning('Wallet for coin {} not derived from swap seed.'.format(ci.coin_name()))
+                self.checkWalletSeed(c)
 
         self.initialise()
 
@@ -769,7 +753,7 @@ class BasicSwap(BaseApp):
             return
 
         root_key = self.getWalletKey(coin_type, 1)
-        root_hash = ci.getAddressHashFromKey(root_key)
+        root_hash = ci.getAddressHashFromKey(root_key)[::-1]
         ci.initialiseWallet(root_key)
 
         key_str = 'main_wallet_seedid_' + chainparams[coin_type]['name']
@@ -1253,6 +1237,47 @@ class BasicSwap(BaseApp):
         addr = self.getReceiveAddressForCoin(coin_type)
         self.setStringKV(key_str, addr)
         return addr
+
+    def checkWalletSeed(self, c):
+        ci = self.ci(c)
+        if c == Coins.PART:
+            return True  # TODO
+        if c == Coins.XMR:
+            expect_address = self.getStringKV('main_wallet_addr_' + chainparams[c]['name'])
+            if expect_address is None:
+                self.log.warning('Can\'t find expected main wallet address for coin {}'.format(ci.coin_name()))
+                return False
+            if expect_address == ci.getMainWalletAddress():
+                ci.setWalletSeedWarning(False)
+                return True
+            self.log.warning('Wallet for coin {} not derived from swap seed.'.format(ci.coin_name()))
+            return False
+
+        expect_seedid = self.getStringKV('main_wallet_seedid_' + chainparams[c]['name'])
+        if expect_seedid is None:
+            self.log.warning('Can\'t find expected wallet seed id for coin {}'.format(ci.coin_name()))
+            return False
+        if expect_seedid == ci.getWalletSeedID():
+            ci.setWalletSeedWarning(False)
+            return True
+        self.log.warning('Wallet for coin {} not derived from swap seed.'.format(ci.coin_name()))
+        return False
+
+    def reseedWallet(self, coin_type):
+        self.log.info('reseedWallet %s', coin_type)
+        ci = self.ci(coin_type)
+        if ci.knownWalletSeed():
+            raise ValueError('{} wallet seed is already derived from the particl mnemonic'.format(ci.coin_name()))
+
+        self.initialiseWallet(coin_type)
+
+        # TODO: How to scan pruned blocks?
+
+        if not self.checkWalletSeed(coin_type):
+            if coin_type == Coins.XMR:
+                raise ValueError('TODO: How to reseed XMR wallet?')
+            else:
+                raise ValueError('Wallet seed doesn\'t match expected.')
 
     def getCachedAddressForCoin(self, coin_type):
         self.log.debug('getCachedAddressForCoin %s', coin_type)
