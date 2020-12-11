@@ -6,37 +6,36 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import secrets
+import hashlib
 import unittest
 
 import basicswap.contrib.ed25519_fast as edf
 import basicswap.ed25519_fast_util as edu
 
-from basicswap.ecc_util import i2b
 from coincurve.ed25519 import ed25519_get_pubkey
-
 from coincurve.ecdsaotves import (
     ecdsaotves_enc_sign,
     ecdsaotves_enc_verify,
     ecdsaotves_dec_sig,
     ecdsaotves_rec_enc_key)
+from coincurve.keys import (
+    PrivateKey)
 
+from basicswap.ecc_util import i2b
 from basicswap.interface_btc import BTCInterface
 from basicswap.interface_xmr import XMRInterface
-
 from basicswap.util import (
     SerialiseNum,
     DeserialiseNum,
     make_int,
     format_amount,
-    validate_amount,
-)
+    validate_amount)
 from basicswap.basicswap import (
     Coins,
     getExpectedSequence,
     decodeSequence,
     SEQUENCE_LOCK_BLOCKS,
-    SEQUENCE_LOCK_TIME,
-)
+    SEQUENCE_LOCK_TIME)
 
 
 class Test(unittest.TestCase):
@@ -182,6 +181,20 @@ class Test(unittest.TestCase):
 
         assert(vk_encrypt == recovered_key)
 
+    def test_sign(self):
+        coin_settings = {'rpcport': 0, 'rpcauth': 'none', 'blocks_confirmed': 1, 'conf_target': 1}
+        ci = BTCInterface(coin_settings, 'regtest')
+
+        vk = i2b(ci.getNewSecretKey())
+        pk = ci.getPubkey(vk)
+
+        message = 'test signing message'
+        message_hash = hashlib.sha256(bytes(message, 'utf-8')).digest()
+        eck = PrivateKey(vk)
+        sig = eck.sign(message.encode('utf-8'))
+
+        ci.verifySig(pk, message_hash, sig)
+
     def test_sign_compact(self):
         coin_settings = {'rpcport': 0, 'rpcauth': 'none', 'blocks_confirmed': 1, 'conf_target': 1}
         ci = BTCInterface(coin_settings, 'regtest')
@@ -191,6 +204,7 @@ class Test(unittest.TestCase):
         sig = ci.signCompact(vk, 'test signing message')
         assert(len(sig) == 64)
         ci.verifyCompact(pk, 'test signing message', sig)
+
 
     def test_dleag(self):
         coin_settings = {'rpcport': 0, 'walletrpcport': 0, 'walletrpcauth': 'none', 'blocks_confirmed': 1, 'conf_target': 1}

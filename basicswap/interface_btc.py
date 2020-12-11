@@ -64,8 +64,6 @@ from .contrib.test_framework.script import (
     SegwitV0SignatureHash,
     hash160)
 
-from .contrib.test_framework.key import ECKey, ECPubKey
-
 from .chainparams import CoinInterface, Coins, chainparams
 from .rpc import make_rpc_func
 from .util import assert_cond
@@ -642,14 +640,11 @@ class BTCInterface(CoinInterface):
         return True
 
     def signTx(self, key_bytes, tx_bytes, prevout_n, prevout_script, prevout_value):
-        # TODO: use libsecp356k1
         tx = self.loadTx(tx_bytes)
         sig_hash = SegwitV0SignatureHash(prevout_script, tx, prevout_n, SIGHASH_ALL, prevout_value)
 
-        eck = ECKey()
-        eck.set(key_bytes, compressed=True)
-
-        return eck.sign_ecdsa(sig_hash) + b'\x01'  # 0x1 is SIGHASH_ALL
+        eck = PrivateKey(key_bytes)
+        return eck.sign(sig_hash, hasher=None) + bytes((SIGHASH_ALL,))
 
     def signTxOtVES(self, key_sign, pubkey_encrypt, tx_bytes, prevout_n, prevout_script, prevout_value):
         tx = self.loadTx(tx_bytes)
@@ -663,20 +658,18 @@ class BTCInterface(CoinInterface):
         return ecdsaotves_enc_verify(Ks, Ke, sig_hash, ct)
 
     def decryptOtVES(self, k, esig):
-        return ecdsaotves_dec_sig(k, esig) + b'\x01'  # 0x1 is SIGHASH_ALL
+        return ecdsaotves_dec_sig(k, esig) + bytes((SIGHASH_ALL,))
 
     def verifyTxSig(self, tx_bytes, sig, K, prevout_n, prevout_script, prevout_value):
         tx = self.loadTx(tx_bytes)
         sig_hash = SegwitV0SignatureHash(prevout_script, tx, prevout_n, SIGHASH_ALL, prevout_value)
 
-        ecK = ECPubKey()
-        ecK.set(K)
-        return ecK.verify_ecdsa(sig[: -1], sig_hash)  # Pop the hashtype byte
+        pubkey = PublicKey(K)
+        return pubkey.verify(sig[: -1], sig_hash, hasher=None)  # Pop the hashtype byte
 
     def verifySig(self, pubkey, signed_hash, sig):
-        ecK = ECPubKey()
-        ecK.set(pubkey)
-        return ecK.verify_ecdsa(sig, signed_hash)
+        pubkey = PublicKey(pubkey)
+        return pubkey.verify(sig, signed_hash, hasher=None)
 
     def fundTx(self, tx, feerate):
         feerate_str = format_amount(feerate, self.exp())

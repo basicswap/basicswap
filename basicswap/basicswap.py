@@ -4440,7 +4440,7 @@ class BasicSwap(BaseApp):
                 bids_received += r[2]
 
         now = int(time.time())
-        q = self.engine.execute('SELECT COUNT(*) FROM offers WHERE expire_at > {}'.format(now)).first()
+        q = self.engine.execute('SELECT COUNT(*) FROM offers WHERE active_ind = 1 AND expire_at > {}'.format(now)).first()
         num_offers = q[0]
 
         q = self.engine.execute('SELECT COUNT(*) FROM offers WHERE was_sent = 1').first()

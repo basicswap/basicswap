@@ -53,7 +53,7 @@
 {% if data.was_received == 'True' %}
 <input name="accept_bid" type="submit" value="Accept Bid"><br/>
 {% endif %}
-<input name="abandon_bid" type="submit" value="Abandon Bid">
+<input name="abandon_bid" type="submit" value="Abandon Bid" onclick="confirmPopup()">
 {% if data.show_txns %}
 <input name="hide_txns" type="submit" value="Hide Info">
 {% else %}
@@ -74,4 +74,10 @@
 </table>
 
 <p><a href="/">home</a></p>
+
+<script>
+function confirmPopup() {
+    confirm("Are you sure?");
+}
+</script>
 </body></html>

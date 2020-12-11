@@ -26,6 +26,7 @@
 <tr><td>Created At</td><td>{{ data.created_at | formatts }}</td></tr>
 <tr><td>Expired At</td><td>{{ data.expired_at | formatts }}</td></tr>
 <tr><td>Sent</td><td>{{ data.sent }}</td></tr>
+<tr><td>Revoked</td><td>{{ data.was_revoked }}</td></tr>
 {% if data.sent == 'True' %}
 <tr><td>Auto Accept Bids</td><td>{{ data.auto_accept }}</td></tr>
 {% endif %}
@@ -56,6 +57,9 @@
 {% else %}
 <input type="submit" name="newbid" value="New Bid">
 {% endif %}
+{% if data.sent == 'True' %}
+<input name="revoke_offer" type="submit" value="Revoke Offer" onclick="confirmPopup()">
+{% endif %}
 <input type="hidden" name="formid" value="{{ form_id }}">
 </form>
 
@@ -69,4 +73,10 @@
 </table>
 
 <p><a href="/">home</a></p>
+
+<script>
+function confirmPopup() {
+    confirm("Are you sure?");
+}
+</script>
 </body></html>

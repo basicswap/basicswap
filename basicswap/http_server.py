@@ -367,7 +367,13 @@ class HttpHandler(BaseHTTPRequestHandler):
         show_bid_form = None
         form_data = self.checkForm(post_string, 'offer', messages)
         if form_data:
-            if b'newbid' in form_data:
+            if b'revoke_offer' in form_data:
+                try:
+                    swap_client.revokeOffer(offer_id)
+                    messages.append('Offer revoked')
+                except Exception as ex:
+                    messages.append('Revoke offer failed ' + str(ex))
+            elif b'newbid' in form_data:
                 show_bid_form = True
             else:
                 addr_from = form_data[b'addr_from'][0].decode('utf-8')
@@ -394,6 +400,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             'created_at': offer.created_at,
             'expired_at': offer.expire_at,
             'sent': 'True' if offer.was_sent else 'False',
+            'was_revoked': 'True' if offer.active_ind == 2 else 'False',
             'show_bid_form': show_bid_form,
         }
 
