@@ -236,6 +236,8 @@ def strBidState(state):
         return 'Sent'
     if state == BidStates.BID_RECEIVING:
         return 'Receiving'
+    if state == BidStates.BID_RECEIVING_ACC:
+        return 'Receiving accept'
     if state == BidStates.BID_RECEIVED:
         return 'Received'
     if state == BidStates.BID_ACCEPTED:
@@ -2624,16 +2626,16 @@ class BasicSwap(BaseApp):
                     self.logBidEvent(bid, EventLogTypes.LOCK_TX_A_CONFIRMED, '', session)
                     bid.xmr_a_lock_tx.setState(TxStates.TX_CONFIRMED)
                     bid.setState(BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED)
-                    self.saveBidInSession(bid_id, bid, session, xmr_swap)
+                    bid_changed = True
 
                     if bid.was_sent:
                         delay = random.randrange(self.min_delay_event, self.max_delay_event)
                         self.log.info('Sending xmr swap chain B lock tx for bid %s in %d seconds', bid_id.hex(), delay)
                         self.createEventInSession(delay, EventTypes.SEND_XMR_SWAP_LOCK_TX_B, bid_id, session)
                         # bid.setState(BidStates.SWAP_DELAYING)
-                    bid_changed = True
 
                 if bid_changed:
+                    self.saveBidInSession(bid_id, bid, session, xmr_swap)
                     session.commit()
 
             elif state == BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED:

@@ -824,7 +824,7 @@ class BTCInterface(CoinInterface):
                 continue
 
             rv.append({
-                'depth': 0 if 'height' not in utxo else chain_height - utxo['height'],
+                'depth': 0 if 'height' not in utxo else (chain_height - utxo['height']) + 1,
                 'height': 0 if 'height' not in utxo else utxo['height'],
                 'amount': utxo['amount'] * COIN,
                 'txid': utxo['txid'],
