@@ -38,5 +38,4 @@ class Network:
             readable, writable, errored = select.select([self._socket], [], [])
             for s in readable:
                 client_socket, address = self._socket.accept()
-                    read_list.append(client_socket)
-                    logging.info('Connection from %s', address)
+                logging.info('Connection from %s', address)

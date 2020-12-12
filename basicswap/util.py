@@ -7,10 +7,11 @@
 import json
 import decimal
 import hashlib
+
+from .script import OpCodes
 from .contrib.segwit_addr import bech32_decode, convertbits, bech32_encode
 
-OP_1 = 0x51
-OP_16 = 0x60
+
 COIN = 100000000
 
 
@@ -195,8 +196,8 @@ def DeserialiseNum(b, o=0):
 def decodeScriptNum(script_bytes, o):
     v = 0
     num_len = script_bytes[o]
-    if num_len >= OP_1 and num_len <= OP_16:
-        return((num_len - OP_1) + 1, 1)
+    if num_len >= OpCodes.OP_1 and num_len <= OpCodes.OP_16:
+        return((num_len - OpCodes.OP_1) + 1, 1)
 
     if num_len > 4:
         raise ValueError('Bad scriptnum length')  # Max 4 bytes

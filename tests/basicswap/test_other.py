@@ -205,7 +205,6 @@ class Test(unittest.TestCase):
         assert(len(sig) == 64)
         ci.verifyCompact(pk, 'test signing message', sig)
 
-
     def test_dleag(self):
         coin_settings = {'rpcport': 0, 'walletrpcport': 0, 'walletrpcauth': 'none', 'blocks_confirmed': 1, 'conf_target': 1}
         ci = XMRInterface(coin_settings, 'regtest')

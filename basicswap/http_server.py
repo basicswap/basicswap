@@ -526,6 +526,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         messages = []
         show_txns = False
         edit_bid = False
+        view_tx_ind = None
         form_data = self.checkForm(post_string, 'bid', messages)
         if form_data:
             if b'abandon_bid' in form_data:
@@ -553,11 +554,14 @@ class HttpHandler(BaseHTTPRequestHandler):
                     messages.append('Bid edited')
                 except Exception as ex:
                     messages.append('Edit failed ' + str(ex))
+            elif b'view_tx_submit' in form_data:
+                show_txns = True
+                view_tx_ind = form_data[b'view_tx'][0].decode('utf-8')
 
-        bid, offer = swap_client.getBidAndOffer(bid_id)
+        bid, xmr_swap, offer, xmr_offer, events = swap_client.getXmrBidAndOffer(bid_id)
         assert(bid), 'Unknown bid ID'
 
-        data = describeBid(swap_client, bid, offer, edit_bid, show_txns)
+        data = describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, events, edit_bid, show_txns, view_tx_ind)
 
         old_states = []
         num_states = len(bid.states) // 12

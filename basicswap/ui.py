@@ -87,7 +87,7 @@ def listBidStates():
     return rv
 
 
-def describeBid(swap_client, bid, offer, edit_bid, show_txns):
+def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_bid, show_txns, view_tx_ind=None):
     ci_from = swap_client.ci(Coins(offer.coin_from))
     ci_to = swap_client.ci(Coins(offer.coin_to))
     ticker_from = ci_from.ticker()
@@ -165,7 +165,13 @@ def describeBid(swap_client, bid, offer, edit_bid, show_txns):
                 txns.append({'type': 'Chain B Lock', 'txid': bid.xmr_b_lock_tx.txid.hex(), 'confirms': confirms})
             if bid.xmr_b_lock_tx and bid.xmr_b_lock_tx.spend_txid:
                 txns.append({'type': 'Chain B Lock Spend', 'txid': bid.xmr_b_lock_tx.spend_txid.hex()})
+            if xmr_swap.a_lock_refund_tx:
+                txns.append({'type': strTxType(TxTypes.XMR_SWAP_A_LOCK_REFUND), 'txid': xmr_swap.a_lock_refund_tx_id.hex()})
+            if xmr_swap.a_lock_refund_spend_tx:
+                txns.append({'type': strTxType(TxTypes.XMR_SWAP_A_LOCK_REFUND_SPEND), 'txid': xmr_swap.a_lock_refund_spend_tx_id.hex()})
             for tx_type, tx in bid.txns.items():
+                if tx_type in (TxTypes.XMR_SWAP_A_LOCK_REFUND, TxTypes.XMR_SWAP_A_LOCK_REFUND_SPEND):
+                    continue
                 txns.append({'type': strTxType(tx_type), 'txid': tx.txid.hex()})
             data['txns'] = txns
         else:
@@ -175,6 +181,18 @@ def describeBid(swap_client, bid, offer, edit_bid, show_txns):
             data['participate_tx_spend'] = getTxSpendHex(bid, TxTypes.PTX)
 
     if offer.swap_type == SwapTypes.XMR_SWAP:
-        data['events'] = swap_client.list_bid_events(bid.bid_id)
+        if view_tx_ind:
+            data['view_tx_ind'] = view_tx_ind
+            view_tx_id = bytes.fromhex(view_tx_ind)
+
+            if xmr_swap:
+                if view_tx_id == xmr_swap.a_lock_tx_id and xmr_swap.a_lock_tx:
+                    data['view_tx_hex'] = xmr_swap.a_lock_tx.hex()
+                if view_tx_id == xmr_swap.a_lock_refund_tx_id and xmr_swap.a_lock_refund_tx:
+                    data['view_tx_hex'] = xmr_swap.a_lock_refund_tx.hex()
+                if view_tx_id == xmr_swap.a_lock_refund_spend_tx_id and xmr_swap.a_lock_refund_spend_tx:
+                    data['view_tx_hex'] = xmr_swap.a_lock_refund_spend_tx.hex()
+
+        data['events'] = bid_events
 
     return data

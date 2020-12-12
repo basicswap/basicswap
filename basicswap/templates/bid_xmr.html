@@ -21,16 +21,6 @@
 <tr><td>Received</td><td>{{ data.was_received }}</td></tr>
 </table>
 
-{% if data.show_txns %}
-<h4>Transactions</h4>
-<table>
-<tr><th>Tx Type</th><th>Tx ID</th><th>Blocks Deep</th></tr>
-{% for tx in data.txns %}
-<tr><td>{{ tx.type }}</td><td>{{ tx.txid }}</td><td>{{ tx.confirms }}</td></tr>
-{% endfor %}
-</table>
-{% endif %}
-
 <form method="post">
 {% if edit_bid %}
 <h4>Edit Bid</h4>
@@ -57,6 +47,29 @@
 <input name="edit_bid" type="submit" value="Edit Bid">
 {% endif %}
 <input type="hidden" name="formid" value="{{ form_id }}">
+
+{% if data.show_txns %}
+<h4>Transactions</h4>
+<table>
+<tr><th>Tx Type</th><th>Tx ID</th><th>Blocks Deep</th></tr>
+{% for tx in data.txns %}
+<tr><td>{{ tx.type }}</td><td>{{ tx.txid }}</td><td>{{ tx.confirms }}</td></tr>
+{% endfor %}
+</table>
+<table>
+<tr><td>View Transaction</td><td>
+<select name="view_tx">
+{% for tx in data.txns %}
+<option value="{{ tx.txid }}"{% if data.view_tx_ind==tx.txid %} selected{% endif %}>{{ tx.type }} {{ tx.txid }}</option>
+{% endfor %}
+</select></td></tr>
+</table>
+<input name="view_tx_submit" type="submit" value="View Tx">
+
+{% if data.view_tx_hex %}
+<p>{{ data.view_tx_hex }}</p>
+{% endif %}
+{% endif %}
 </form>
 
 

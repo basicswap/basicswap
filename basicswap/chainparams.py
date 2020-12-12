@@ -7,7 +7,8 @@
 from enum import IntEnum
 from .util import (
     COIN,
-    format_amount
+    format_amount,
+    make_int
 )
 
 XMR_COIN = 10 ** 12
@@ -202,7 +203,11 @@ class CoinInterface:
     def __init__(self):
         self._unknown_wallet_seed = True
 
-    def format_amount(self, amount_int):
+    def make_int(self, amount_in):
+        return make_int(amount_in, self.exp())
+
+    def format_amount(self, amount_in, conv_int=False):
+        amount_int = make_int(amount_in, self.exp()) if conv_int else amount_in
         return format_amount(amount_int, self.exp())
 
     def coin_name(self):

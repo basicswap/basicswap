@@ -1602,22 +1602,43 @@ class BasicSwap(BaseApp):
             session.remove()
             self.mxDB.release()
 
-    def list_bid_events(self, bid_id):
+    def getXmrBidAndOffer(self, bid_id, list_events=True):
         self.mxDB.acquire()
-        events = []
         try:
             session = scoped_session(self.session_factory)
-            query_str = 'SELECT created_at, event_type, event_msg FROM eventlog ' + \
-                        'WHERE linked_type = {} AND linked_id = x\'{}\' '.format(TableTypes.BID, bid_id.hex())
-            q = self.engine.execute(query_str)
+            xmr_swap = None
+            offer = None
+            xmr_offer = None
+            events = []
 
-            for row in q:
-                events.append({'at': row[0], 'desc': describeEventEntry(row[1], row[2])})
-            return events
+            bid = session.query(Bid).filter_by(bid_id=bid_id).first()
+            if bid:
+                offer = session.query(Offer).filter_by(offer_id=bid.offer_id).first()
+                if offer and offer.swap_type == SwapTypes.XMR_SWAP:
+                    xmr_swap = session.query(XmrSwap).filter_by(bid_id=bid.bid_id).first()
+                    xmr_offer = session.query(XmrOffer).filter_by(offer_id=bid.offer_id).first()
+                    self.loadBidTxns(bid, session)
+                    if list_events:
+                        events = self.list_bid_events(bid.bid_id, session)
+                else:
+                    bid.initiate_tx = session.query(SwapTx).filter(sa.and_(SwapTx.bid_id == bid_id, SwapTx.tx_type == TxTypes.ITX)).first()
+                    bid.participate_tx = session.query(SwapTx).filter(sa.and_(SwapTx.bid_id == bid_id, SwapTx.tx_type == TxTypes.PTX)).first()
+
+            return bid, xmr_swap, offer, xmr_offer, events
         finally:
             session.close()
             session.remove()
             self.mxDB.release()
+
+    def list_bid_events(self, bid_id, session):
+        session = scoped_session(self.session_factory)
+        query_str = 'SELECT created_at, event_type, event_msg FROM eventlog ' + \
+                    'WHERE linked_type = {} AND linked_id = x\'{}\' '.format(TableTypes.BID, bid_id.hex())
+        q = self.engine.execute(query_str)
+        events = []
+        for row in q:
+            events.append({'at': row[0], 'desc': describeEventEntry(row[1], row[2])})
+        return events
 
     def acceptBid(self, bid_id):
         self.log.info('Accepting bid %s', bid_id.hex())
@@ -4269,7 +4290,7 @@ class BasicSwap(BaseApp):
                 xmr_swap.a_lock_spend_tx, xmr_swap.al_lock_spend_tx_esig,
                 xmr_swap.pkal, xmr_swap.pkasf, 0, xmr_swap.a_lock_tx_script, bid.amount)
             assert(v), 'verifyTxOtVES failed'
-        except Exception as e:
+        except Exception as ex:
             if self.debug:
                 traceback.print_exc()
             self.setBidError(bid_id, bid, str(ex))
@@ -4422,7 +4443,7 @@ class BasicSwap(BaseApp):
                     else:
                         self.log.debug('TODO - determine in-progress for manualBidUpdate')
                         if offer.swap_type == SwapTypes.XMR_SWAP:
-                            if bid.state and bid.state in (BidStates.XMR_SWAP_LOCK_RELEASED, BidStates.XMR_SWAP_NOSCRIPT_TX_REDEEMED):
+                            if bid.state and bid.state in (BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED, BidStates.XMR_SWAP_LOCK_RELEASED, BidStates.XMR_SWAP_NOSCRIPT_TX_REDEEMED):
                                 activate_bid = True
 
                     if activate_bid:

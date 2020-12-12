@@ -11,6 +11,7 @@ class OpCodes(IntEnum):
     OP_0 = 0x00,
     OP_PUSHDATA1 = 0x4c,
     OP_1 = 0x51,
+    OP_16 = 0x60,
     OP_IF = 0x63,
     OP_ELSE = 0x67,
     OP_ENDIF = 0x68,

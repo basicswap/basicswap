@@ -127,12 +127,12 @@ def js_bids(self, url_split, post_string):
             if b'accept' in post_data:
                 swap_client.acceptBid(bid_id)
 
-        bid, offer = swap_client.getBidAndOffer(bid_id)
+        bid, xmr_swap, offer, xmr_offer, events = swap_client.getXmrBidAndOffer(bid_id)
         assert(bid), 'Unknown bid ID'
 
         edit_bid = False
         show_txns = False
-        data = describeBid(swap_client, bid, offer, edit_bid, show_txns)
+        data = describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, events, edit_bid, show_txns)
 
         return bytes(json.dumps(data), 'UTF-8')
 
