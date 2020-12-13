@@ -102,7 +102,11 @@ def js_bids(self, url_split, post_string):
             offer_id = bytes.fromhex(post_data[b'offer_id'][0].decode('utf-8'))
             assert(len(offer_id) == 28)
 
-            amount_from = inputAmount(post_data[b'amount_from'][0].decode('utf-8'))
+            offer = swap_client.getOffer(offer_id)
+            assert(offer), 'Offer not found.'
+
+            ci_from = swap_client.ci(offer.coin_from)
+            amount_from = inputAmount(post_data[b'amount_from'][0].decode('utf-8'), ci_from)
 
             addr_from = None
             if b'addr_from' in post_data:
@@ -110,8 +114,7 @@ def js_bids(self, url_split, post_string):
                 if addr_from == '-1':
                     addr_from = None
 
-            offer = swap_client.getOffer(offer_id)
-            if offer and offer.swap_type == SwapTypes.XMR_SWAP:
+            if offer.swap_type == SwapTypes.XMR_SWAP:
                 bid_id = swap_client.postXmrBid(offer_id, amount_from, addr_send_from=addr_from).hex()
             else:
                 bid_id = swap_client.postBid(offer_id, amount_from, addr_send_from=addr_from).hex()

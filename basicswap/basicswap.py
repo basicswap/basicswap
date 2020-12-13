@@ -89,6 +89,7 @@ from .explorers import (
     ExplorerChainz,
 )
 import basicswap.config as cfg
+import basicswap.network as bsn
 import basicswap.protocols.atomic_swap_1 as atomic_swap_1
 
 
@@ -507,6 +508,12 @@ class BasicSwap(BaseApp):
 
         random.seed(secrets.randbits(128))
 
+    def finalise(self):
+        if self._network:
+            self._network.stopNetwork()
+            self._network = None
+        self.log.info('Finalise')
+
     def setCoinConnectParams(self, coin):
         # Set anything that does not require the daemon to be running
         chain_client_settings = self.getChainClientSettings(coin)
@@ -642,12 +649,21 @@ class BasicSwap(BaseApp):
                     self.coin_clients[c]['have_spent_index'] = ci.haveSpentIndex()
 
                     # Sanity checks
+                    rv = self.callcoinrpc(c, 'extkey')
+                    if 'result' in rv and 'No keys to list.' in rv['result']:
+                        raise ValueError('No keys loaded.')
+
                     if self.callcoinrpc(c, 'getstakinginfo')['enabled'] is not False:
                         self.log.warning('%s staking is not disabled.', ci.coin_name())
                 elif c == Coins.XMR:
                     ci.ensureWalletExists()
 
                 self.checkWalletSeed(c)
+
+        if 'p2p_host' in self.settings:
+            network_key = self.getNetworkKey(1)
+            self._network = bsn.Network(self.settings['p2p_host'], self.settings['p2p_port'], network_key)
+            self._network.startNetwork()
 
         self.initialise()
 
@@ -1098,7 +1114,6 @@ class BasicSwap(BaseApp):
                 raise ValueError('grindForEd25519Key failed')
 
     def getWalletKey(self, coin_type, key_num, for_ed25519=False):
-        account = self.callcoinrpc(Coins.PART, 'extkey', ['account'])
         evkey = self.callcoinrpc(Coins.PART, 'extkey', ['account', 'default', 'true'])['evkey']
 
         key_path_base = '44445555h/1h/{}/{}'.format(int(coin_type), key_num)
@@ -1110,7 +1125,6 @@ class BasicSwap(BaseApp):
         return self.grindForEd25519Key(coin_type, evkey, key_path_base)
 
     def getPathKey(self, coin_from, coin_to, offer_created_at, contract_count, key_no, for_ed25519=False):
-        account = self.callcoinrpc(Coins.PART, 'extkey', ['account'])
         evkey = self.callcoinrpc(Coins.PART, 'extkey', ['account', 'default', 'true'])['evkey']
         ci = self.ci(coin_to)
 
@@ -1123,6 +1137,14 @@ class BasicSwap(BaseApp):
             return decodeWif(self.callcoinrpc(Coins.PART, 'extkey', ['info', extkey])['key_info']['privkey'])
 
         return self.grindForEd25519Key(coin_to, evkey, key_path_base)
+
+    def getNetworkKey(self, key_num):
+        evkey = self.callcoinrpc(Coins.PART, 'extkey', ['account', 'default', 'true'])['evkey']
+
+        key_path = '44445556h/1h/{}'.format(int(key_num))
+
+        extkey = self.callcoinrpc(Coins.PART, 'extkey', ['info', evkey, key_path])['key_info']['result']
+        return decodeWif(self.callcoinrpc(Coins.PART, 'extkey', ['info', extkey])['key_info']['privkey'])
 
     def getContractPubkey(self, date, contract_count):
         account = self.callcoinrpc(Coins.PART, 'extkey', ['account'])

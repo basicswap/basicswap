@@ -37,6 +37,7 @@ class BaseApp:
         self.coin_clients = {}
         self.mxDB = threading.RLock()
         self.debug = self.settings.get('debug', False)
+        self._network = None
 
         self.prepareLogging()
         self.log.info('Network: {}'.format(self.chain))

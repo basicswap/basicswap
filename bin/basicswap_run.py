@@ -142,7 +142,8 @@ def runClient(fp, data_dir, chain):
     except Exception as ex:
         traceback.print_exc()
 
-    swap_client.log.info('Stopping threads.')
+    swap_client.finalise()
+    swap_client.log.info('Stopping HTTP threads.')
     for t in threads:
         t.stop()
         t.join()
