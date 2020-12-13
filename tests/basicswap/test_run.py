@@ -212,13 +212,21 @@ def signal_handler(sig, frame):
     delay_event.set()
 
 
-def run_loop(self):
+def run_coins_loop(cls):
+    while not stop_test:
+        try:
+            time.sleep(1.0)
+            ltcRpc('generatetoaddress 1 {}'.format(cls.ltc_addr))
+            btcRpc('generatetoaddress 1 {}'.format(cls.btc_addr))
+        except Exception as e:
+            logging.warning('run_coins_loop ' + str(e))
+
+
+def run_loop(cls):
     while not stop_test:
         time.sleep(1)
-        for c in self.swap_clients:
+        for c in cls.swap_clients:
             c.update()
-        ltcRpc('generatetoaddress 1 {}'.format(self.ltc_addr))
-        btcRpc('generatetoaddress 1 {}'.format(self.btc_addr))
 
 
 def make_part_cli_rpc_func(node_id):
@@ -328,6 +336,9 @@ class Test(unittest.TestCase):
         cls.update_thread = threading.Thread(target=run_loop, args=(cls,))
         cls.update_thread.start()
 
+        cls.coins_update_thread = threading.Thread(target=run_coins_loop, args=(cls,))
+        cls.coins_update_thread.start()
+
         # Wait for height, or sequencelock is thrown off by genesis blocktime
         num_blocks = 3
         logging.info('Waiting for Particl chain height %d', num_blocks)
@@ -345,6 +356,7 @@ class Test(unittest.TestCase):
         logging.info('Finalising')
         stop_test = True
         cls.update_thread.join()
+        cls.coins_update_thread.join()
         for t in cls.http_threads:
             t.stop()
             t.join()

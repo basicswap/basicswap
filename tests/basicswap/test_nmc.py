@@ -204,13 +204,21 @@ def signal_handler(sig, frame):
     delay_event.set()
 
 
+def run_coins_loop(cls):
+    while not stop_test:
+        time.sleep(1.0)
+        try:
+            nmcRpc('generatetoaddress 1 {}'.format(cls.nmc_addr))
+            btcRpc('generatetoaddress 1 {}'.format(cls.btc_addr))
+        except Exception as e:
+            logging.warning('run_coins_loop ' + str(e))
+
+
 def run_loop(self):
     while not stop_test:
         time.sleep(1)
         for c in self.swap_clients:
             c.update()
-        nmcRpc('generatetoaddress 1 {}'.format(self.nmc_addr))
-        btcRpc('generatetoaddress 1 {}'.format(self.btc_addr))
 
 
 def make_part_cli_rpc_func(node_id):
@@ -260,6 +268,7 @@ class Test(unittest.TestCase):
             cls.daemons.append(startDaemon(os.path.join(cfg.TEST_DATADIRS, str(i)), cfg.PARTICL_BINDIR, cfg.PARTICLD))
             logging.info('Started %s %d', cfg.PARTICLD, cls.daemons[-1].pid)
 
+        for i in range(NUM_NODES):
             rpc = make_part_cli_rpc_func(i)
             waitForRPC(rpc)
             if i == 0:
@@ -271,8 +280,6 @@ class Test(unittest.TestCase):
             else:
                 rpc('extkeyimportmaster', [rpc('mnemonic', ['new'])['master']])
 
-        time.sleep(1)
-        for i in range(NUM_NODES):
             basicswap_dir = os.path.join(os.path.join(cfg.TEST_DATADIRS, str(i)), 'basicswap')
             settings_path = os.path.join(basicswap_dir, cfg.CONFIG_FILENAME)
             with open(settings_path) as fs:
@@ -319,12 +326,27 @@ class Test(unittest.TestCase):
         cls.update_thread = threading.Thread(target=run_loop, args=(cls,))
         cls.update_thread.start()
 
+        cls.coins_update_thread = threading.Thread(target=run_coins_loop, args=(cls,))
+        cls.coins_update_thread.start()
+
+        # Wait for height, or sequencelock is thrown off by genesis blocktime
+        num_blocks = 3
+        logging.info('Waiting for Particl chain height %d', num_blocks)
+        for i in range(60):
+            particl_blocks = cls.swap_clients[0].callrpc('getblockchaininfo')['blocks']
+            print('particl_blocks', particl_blocks)
+            if particl_blocks >= num_blocks:
+                break
+            delay_event.wait(1)
+        assert(particl_blocks >= num_blocks)
+
     @classmethod
     def tearDownClass(cls):
         global stop_test
         logging.info('Finalising')
         stop_test = True
         cls.update_thread.join()
+        cls.coins_update_thread.join()
         for t in cls.http_threads:
             t.stop()
             t.join()

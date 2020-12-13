@@ -141,15 +141,17 @@ def callnoderpc(node_id, method, params=[], wallet=None, base_rpc_port=BASE_RPC_
 
 
 def run_coins_loop(cls):
-    global stop_test
     while not stop_test:
-        if cls.btc_addr is not None:
-            btcRpc('generatetoaddress 1 {}'.format(cls.btc_addr))
         time.sleep(1.0)
+        try:
+            if cls.btc_addr is not None:
+                btcRpc('generatetoaddress 1 {}'.format(cls.btc_addr))
+        except Exception as e:
+            logging.warning('run_coins_loop ' + str(e))
+
 
 
 def run_loop(cls):
-    global stop_test
     while not stop_test:
         for c in cls.swap_clients:
             c.update()
