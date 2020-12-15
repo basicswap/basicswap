@@ -5,3 +5,4 @@ sqlalchemy
 python-gnupg
 Jinja2
 requests
+pycryptodome

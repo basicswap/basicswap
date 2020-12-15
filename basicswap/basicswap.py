@@ -10,11 +10,12 @@ import zmq
 import json
 import time
 import base64
-import shutil
 import random
+import shutil
+import struct
+import hashlib
 import logging
 import secrets
-import hashlib
 import datetime as dt
 import traceback
 import sqlalchemy as sa
@@ -387,8 +388,9 @@ def replaceAddrPrefix(addr, coin_type, chain_name, addr_type='pubkey_address'):
     return encodeAddress(bytes((chainparams[coin_type][chain_name][addr_type],)) + decodeAddress(addr)[1:])
 
 
-class WatchedOutput():
-    # Watch for spends
+class WatchedOutput():  # Watch for spends
+    __slots__ = ('bid_id', 'txid_hex', 'vout', 'tx_type', 'swap_type')
+
     def __init__(self, bid_id, txid_hex, vout, tx_type, swap_type):
         self.bid_id = bid_id
         self.txid_hex = txid_hex
@@ -398,6 +400,7 @@ class WatchedOutput():
 
 
 class WatchedTransaction():
+    # TODO
     # Watch for presence in mempool (getrawtransaction)
     def __init__(self, bid_id, txid_hex, tx_type, swap_type):
         self.bid_id = bid_id
@@ -409,6 +412,9 @@ class WatchedTransaction():
 class BasicSwap(BaseApp):
     def __init__(self, fp, data_dir, settings, chain, log_name='BasicSwap'):
         super().__init__(fp, data_dir, settings, chain, log_name)
+
+        v = __version__.split('.')
+        self._version = struct.pack('>HHH', int(v[0]), int(v[1]), int(v[2]))
 
         self.check_progress_seconds = self.settings.get('check_progress_seconds', 60)
         self.check_watched_seconds = self.settings.get('check_watched_seconds', 60)
@@ -509,10 +515,14 @@ class BasicSwap(BaseApp):
         random.seed(secrets.randbits(128))
 
     def finalise(self):
+        self.log.info('Finalise')
+
+        with self.mxDB:
+            self.is_running = False
+
         if self._network:
             self._network.stopNetwork()
             self._network = None
-        self.log.info('Finalise')
 
     def setCoinConnectParams(self, coin):
         # Set anything that does not require the daemon to be running
@@ -662,7 +672,7 @@ class BasicSwap(BaseApp):
 
         if 'p2p_host' in self.settings:
             network_key = self.getNetworkKey(1)
-            self._network = bsn.Network(self.settings['p2p_host'], self.settings['p2p_port'], network_key)
+            self._network = bsn.Network(self.settings['p2p_host'], self.settings['p2p_port'], network_key, self)
             self._network.startNetwork()
 
         self.initialise()
@@ -4740,3 +4750,7 @@ class BasicSwap(BaseApp):
                 passed = self.callcoinrpc(Coins.PART, 'verifymessage', [offer_addr_from, signature_enc, offer_id.hex() + '_revoke'])
                 return True if passed is True else False  # _possibly_revoked_offers should not contain duplicates
         return False
+
+    def add_connection(self, host, port, peer_pubkey):
+        self.log.info('add_connection %s %d %s', host, port, peer_pubkey.hex())
+        self._network.add_connection(host, port, peer_pubkey)

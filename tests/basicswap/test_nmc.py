@@ -206,19 +206,19 @@ def signal_handler(sig, frame):
 
 def run_coins_loop(cls):
     while not stop_test:
-        time.sleep(1.0)
         try:
             nmcRpc('generatetoaddress 1 {}'.format(cls.nmc_addr))
             btcRpc('generatetoaddress 1 {}'.format(cls.btc_addr))
         except Exception as e:
             logging.warning('run_coins_loop ' + str(e))
+        time.sleep(1.0)
 
 
 def run_loop(self):
     while not stop_test:
-        time.sleep(1)
         for c in self.swap_clients:
             c.update()
+        time.sleep(1)
 
 
 def make_part_cli_rpc_func(node_id):

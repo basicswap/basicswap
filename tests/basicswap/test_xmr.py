@@ -238,7 +238,6 @@ def callnoderpc(node_id, method, params=[], wallet=None, base_rpc_port=BASE_RPC_
 
 def run_coins_loop(cls):
     while not stop_test:
-        time.sleep(1.0)
         try:
             if cls.btc_addr is not None:
                 btcRpc('generatetoaddress 1 {}'.format(cls.btc_addr))
@@ -246,6 +245,7 @@ def run_coins_loop(cls):
                 callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'generateblocks', {'wallet_address': cls.xmr_addr, 'amount_of_blocks': 1})
         except Exception as e:
             logging.warning('run_coins_loop ' + str(e))
+        time.sleep(1.0)
 
 
 def run_loop(cls):

@@ -43,6 +43,7 @@ from tests.basicswap.common import (
     checkForks,
     stopDaemons,
     wait_for_offer,
+    delay_for,
     TEST_HTTP_HOST,
     TEST_HTTP_PORT,
     BASE_P2P_PORT,
@@ -142,13 +143,12 @@ def callnoderpc(node_id, method, params=[], wallet=None, base_rpc_port=BASE_RPC_
 
 def run_coins_loop(cls):
     while not stop_test:
-        time.sleep(1.0)
         try:
             if cls.btc_addr is not None:
                 btcRpc('generatetoaddress 1 {}'.format(cls.btc_addr))
         except Exception as e:
             logging.warning('run_coins_loop ' + str(e))
-
+        time.sleep(1.0)
 
 
 def run_loop(cls):
@@ -302,6 +302,10 @@ class Test(unittest.TestCase):
 
         offer_id = swap_clients[0].postOffer(Coins.PART, Coins.BTC, 100 * COIN, 0.1 * COIN, 100 * COIN, SwapTypes.SELLER_FIRST)
         wait_for_offer(delay_event, swap_clients[1], offer_id)
+
+        swap_clients[1].add_connection('127.0.0.1', BASE_P2P_PORT + 0, swap_clients[0]._network._network_pubkey)
+
+        delay_for(delay_event, 1000)
 
 
 if __name__ == '__main__':
