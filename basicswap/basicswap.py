@@ -970,7 +970,7 @@ class BasicSwap(BaseApp):
             raise ValueError('Unknown locktype')
 
     def postOffer(self, coin_from, coin_to, amount, rate, min_bid_amount, swap_type,
-                  lock_type=SEQUENCE_LOCK_TIME, lock_value=48 * 60 * 60, auto_accept_bids=False, addr_send_from=None):
+                  lock_type=SEQUENCE_LOCK_TIME, lock_value=48 * 60 * 60, auto_accept_bids=False, addr_send_from=None, extra_options={}):
         # Offer to send offer.amount_from of coin_from in exchange for offer.amount_from * offer.rate of coin_to
 
         assert(coin_from != coin_to), 'coin_from == coin_to'
@@ -1009,6 +1009,30 @@ class BasicSwap(BaseApp):
             msg_buf.lock_value = lock_value
             msg_buf.swap_type = swap_type
 
+            if 'from_fee_override' in extra_options:
+                msg_buf.fee_rate_from = make_int(extra_options['from_fee_override'], self.ci(coin_from).exp())
+            else:
+                # TODO: conf_target = ci_from.settings.get('conf_target', 2)
+                conf_target = 2
+                if 'from_fee_conf_target' in extra_options:
+                    conf_target = extra_options['from_fee_conf_target']
+                fee_rate, fee_src = self.getFeeRateForCoin(coin_from, conf_target)
+                if 'from_fee_multiplier_percent' in extra_options:
+                    fee_rate *= extra_options['fee_multiplier'] / 100.0
+                msg_buf.fee_rate_from = make_int(fee_rate, self.ci(coin_from).exp())
+
+            if 'to_fee_override' in extra_options:
+                msg_buf.fee_rate_to = make_int(extra_options['to_fee_override'], self.ci(coin_to).exp())
+            else:
+                # TODO: conf_target = ci_to.settings.get('conf_target', 2)
+                conf_target = 2
+                if 'to_fee_conf_target' in extra_options:
+                    conf_target = extra_options['to_fee_conf_target']
+                fee_rate, fee_src = self.getFeeRateForCoin(coin_to, conf_target)
+                if 'to_fee_multiplier_percent' in extra_options:
+                    fee_rate *= extra_options['fee_multiplier'] / 100.0
+                msg_buf.fee_rate_to = make_int(fee_rate, self.ci(coin_to).exp())
+
             if swap_type == SwapTypes.XMR_SWAP:
                 xmr_offer = XmrOffer()
 
@@ -1018,18 +1042,8 @@ class BasicSwap(BaseApp):
                 # Delay before the follower can spend from the chain a lock refund tx
                 xmr_offer.lock_time_2 = getExpectedSequence(lock_type, lock_value, coin_from)
 
-                # TODO: max fee warning?
-                chain_client_settings = self.getChainClientSettings(coin_from)
-                lock_tx_fee_premium = chain_client_settings.get('lock_tx_fee_premium', 0.0)
-
-                xmr_offer.a_fee_rate = make_int(self.getFeeRateForCoin(coin_from) + lock_tx_fee_premium, self.ci(coin_from).exp())
-
-                # Unused: TODO - Set priority?
-                # xmr_offer.b_fee_rate = make_int(0.0012595, self.ci(coin_to).exp())
-                xmr_offer.b_fee_rate = make_int(0.00002, self.ci(coin_to).exp())  # abs fee
-
-                msg_buf.fee_rate_from = xmr_offer.a_fee_rate
-                msg_buf.fee_rate_to = xmr_offer.b_fee_rate
+                xmr_offer.a_fee_rate = msg_buf.fee_rate_from
+                xmr_offer.b_fee_rate = msg_buf.fee_rate_to  # Unused: TODO - Set priority?
 
             offer_bytes = msg_buf.SerializeToString()
             payload_hex = str.format('{:02x}', MessageTypes.OFFER) + offer_bytes.hex()
@@ -1243,13 +1257,13 @@ class BasicSwap(BaseApp):
     def getRelayFeeRateForCoin(self, coin_type):
         return self.callcoinrpc(coin_type, 'getnetworkinfo')['relayfee']
 
-    def getFeeRateForCoin(self, coin_type):
+    def getFeeRateForCoin(self, coin_type, conf_target=2):
         override_feerate = self.coin_clients[coin_type].get('override_feerate', None)
         if override_feerate:
             self.log.debug('Fee rate override used for %s: %f', str(coin_type), override_feerate)
-            return override_feerate
+            return override_feerate, 'override_feerate'
 
-        return self.ci(coin_type).get_fee_rate()
+        return self.ci(coin_type).get_fee_rate(conf_target)
 
     def estimateWithdrawFee(self, coin_type, fee_rate):
         if coin_type == Coins.XMR:

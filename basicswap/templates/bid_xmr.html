@@ -36,9 +36,11 @@
 <input name="edit_bid_submit" type="submit" value="Submit">
 {% else %}
 {% if data.was_received == 'True' %}
-<input name="accept_bid" type="submit" value="Accept Bid"><br/>
+<input name="accept_bid" type="submit" value="Accept Bid" onclick="confirmPopup(\"Accept\")"><br/>
 {% endif %}
-<input name="abandon_bid" type="submit" value="Abandon Bid" onclick="confirmPopup()">
+{% if data.can_abandon == true %}
+<input name="abandon_bid" type="submit" value="Abandon Bid" onclick="confirmPopup(\"Abandon\")">
+{% endif %}
 {% if data.show_txns %}
 <input name="hide_txns" type="submit" value="Hide Info">
 {% else %}
@@ -91,8 +93,8 @@
 
 <p><a href="/">home</a></p>
 <script>
-function confirmPopup() {
-    confirm("Are you sure?");
+function confirmPopup(name) {
+    confirm(name + " Bid - Are you sure?");
 }
 </script>
 </body></html>

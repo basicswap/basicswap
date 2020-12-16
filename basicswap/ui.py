@@ -142,6 +142,7 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
         'participate_tx': getTxIdHex(bid, TxTypes.PTX, ' ' + ticker_to),
         'participate_conf': 'None' if (not bid.participate_tx or not bid.participate_tx.conf) else bid.participate_tx.conf,
         'show_txns': show_txns,
+        'can_abandon': True if bid.state not in (BidStates.BID_ABANDONED, BidStates.SWAP_COMPLETED) else False,
     }
 
     if edit_bid:

@@ -17,7 +17,6 @@ from jinja2 import Environment, PackageLoader
 from . import __version__
 from .util import (
     dumpj,
-    make_int,
 )
 from .chainparams import (
     chainparams,
@@ -300,61 +299,186 @@ class HttpHandler(BaseHTTPRequestHandler):
             form_id=os.urandom(8).hex(),
         ), 'UTF-8')
 
-    def postNewOffer(self, form_data):
+    def parseOfferFormData(self, form_data):
         swap_client = self.server.swap_client
-        addr_from = form_data[b'addr_from'][0].decode('utf-8')
-        if addr_from == '-1':
-            addr_from = None
+
+        errors = []
+        page_data = {}
+        parsed_data = {}
+
+        if b'addr_from' in form_data:
+            page_data['addr_from'] = form_data[b'addr_from'][0].decode('utf-8')
+            parsed_data['addr_from'] = None if page_data['addr_from'] == '-1' else page_data['addr_from']
 
         try:
-            coin_from = Coins(int(form_data[b'coin_from'][0]))
+            page_data['coin_from'] = int(form_data[b'coin_from'][0])
+            coin_from = Coins(page_data['coin_from'])
             ci_from = swap_client.ci(coin_from)
+            parsed_data['coin_from'] = coin_from
         except Exception:
-            raise ValueError('Unknown Coin From')
+            errors.append('Unknown Coin From')
+
         try:
-            coin_to = Coins(int(form_data[b'coin_to'][0]))
+            page_data['coin_to'] = int(form_data[b'coin_to'][0])
+            coin_to = Coins(page_data['coin_to'])
             ci_to = swap_client.ci(coin_to)
+            parsed_data['coin_to'] = coin_to
+            if coin_to == Coins.XMR:
+                page_data['swap_style'] = 'xmr'
         except Exception:
-            raise ValueError('Unknown Coin To')
+            errors.append('Unknown Coin To')
 
-        value_from = inputAmount(form_data[b'amt_from'][0].decode('utf-8'), ci_from)
-        value_to = inputAmount(form_data[b'amt_to'][0].decode('utf-8'), ci_to)
+        page_data['fee_from_conf'] = int(form_data[b'fee_from_conf'][0])
+        page_data['fee_from_extra'] = int(form_data[b'fee_from_extra'][0])
 
-        min_bid = int(value_from)
-        rate = int((value_to / value_from) * ci_from.COIN())
-        autoaccept = True if b'autoaccept' in form_data else False
-        lock_seconds = int(form_data[b'lockhrs'][0]) * 60 * 60
-        # TODO: More accurate rate
-        # assert(value_to == (value_from * rate) // COIN)
+        parsed_data['fee_from_conf'] = page_data['fee_from_conf']
+        parsed_data['fee_from_extra'] = page_data['fee_from_extra']
 
-        if swap_client.coin_clients[coin_from]['use_csv'] and swap_client.coin_clients[coin_to]['use_csv']:
+        page_data['fee_to_conf'] = int(form_data[b'fee_to_conf'][0])
+        page_data['fee_to_extra'] = int(form_data[b'fee_to_extra'][0])
+
+        parsed_data['fee_to_conf'] = page_data['fee_to_conf']
+        parsed_data['fee_to_extra'] = page_data['fee_to_extra']
+
+        if b'check_offer' in form_data:
+            page_data['check_offer'] = True
+        if b'submit_offer' in form_data:
+            page_data['submit_offer'] = True
+
+        try:
+            page_data['amt_from'] = form_data[b'amt_from'][0].decode('utf-8')
+            parsed_data['amt_from'] = inputAmount(page_data['amt_from'], ci_from)
+            parsed_data['min_bid'] = int(parsed_data['amt_from'])
+        except Exception as e:
+            errors.append('Amount From')
+
+        try:
+            page_data['amt_to'] = form_data[b'amt_to'][0].decode('utf-8')
+            parsed_data['amt_to'] = inputAmount(page_data['amt_to'], ci_to)
+        except Exception as e:
+            errors.append('Amount To')
+
+        if 'amt_to' in parsed_data and 'amt_from' in parsed_data:
+            parsed_data['rate'] = int((parsed_data['amt_to'] / parsed_data['amt_from']) * ci_from.COIN())
+
+        page_data['lockhrs'] = int(form_data[b'lockhrs'][0])
+        parsed_data['lock_seconds'] = page_data['lockhrs'] * 60 * 60
+
+        page_data['autoaccept'] = True if b'autoaccept' in form_data else False
+        parsed_data['autoaccept'] = page_data['autoaccept']
+
+        if len(errors) == 0:
+            if b'fee_rate_from' in form_data:
+                page_data['from_fee_override'] = form_data[b'fee_rate_from'][0].decode('utf-8')
+                parsed_data['from_fee_override'] = page_data['from_fee_override']
+            else:
+                from_fee_override, page_data['from_fee_src'] = swap_client.getFeeRateForCoin(parsed_data['coin_from'], page_data['fee_from_conf'])
+                if page_data['fee_from_extra'] > 0:
+                    from_fee_override += from_fee_override * (float(page_data['fee_from_extra']) / 100.0)
+                page_data['from_fee_override'] = ci_from.format_amount(ci_from.make_int(from_fee_override, r=1))
+                parsed_data['from_fee_override'] = page_data['from_fee_override']
+
+            if b'fee_rate_to' in form_data:
+                page_data['to_fee_override'] = form_data[b'fee_rate_to'][0].decode('utf-8')
+                parsed_data['to_fee_override'] = page_data['to_fee_override']
+            else:
+                to_fee_override, page_data['to_fee_src'] = swap_client.getFeeRateForCoin(parsed_data['coin_to'], page_data['fee_to_conf'])
+                if page_data['fee_to_extra'] > 0:
+                    to_fee_override += to_fee_override * (float(page_data['fee_to_extra']) / 100.0)
+
+                page_data['to_fee_override'] = ci_to.format_amount(ci_to.make_int(to_fee_override, r=1))
+                parsed_data['to_fee_override'] = page_data['to_fee_override']
+
+        return page_data, parsed_data, errors
+
+    def postNewOfferFromParsed(self, parsed_data):
+        swap_client = self.server.swap_client
+
+        swap_type = SwapTypes.SELLER_FIRST
+        if parsed_data['coin_to'] == Coins.XMR:
+            swap_type = SwapTypes.XMR_SWAP
+
+        if swap_client.coin_clients[parsed_data['coin_from']]['use_csv'] and swap_client.coin_clients[parsed_data['coin_to']]['use_csv']:
             lock_type = SEQUENCE_LOCK_TIME
         else:
             lock_type = ABS_LOCK_TIME
 
-        swap_type = SwapTypes.SELLER_FIRST
-        if coin_to == Coins.XMR:
-            swap_type = SwapTypes.XMR_SWAP
+        extra_options = {}
 
-        offer_id = swap_client.postOffer(coin_from, coin_to, value_from, rate, min_bid, swap_type, lock_type=lock_type, lock_value=lock_seconds, auto_accept_bids=autoaccept, addr_send_from=addr_from)
+        if 'fee_from_conf' in parsed_data:
+            extra_options['from_fee_conf_target'] = parsed_data['fee_from_conf']
+        if 'from_fee_multiplier_percent' in parsed_data:
+            extra_options['from_fee_multiplier_percent'] = parsed_data['fee_from_extra']
+        if 'from_fee_override' in parsed_data:
+            extra_options['from_fee_override'] = parsed_data['from_fee_override']
+
+        if 'fee_to_conf' in parsed_data:
+            extra_options['to_fee_conf_target'] = parsed_data['fee_to_conf']
+        if 'to_fee_multiplier_percent' in parsed_data:
+            extra_options['to_fee_multiplier_percent'] = parsed_data['fee_to_extra']
+        if 'to_fee_override' in parsed_data:
+            extra_options['to_fee_override'] = parsed_data['to_fee_override']
+
+        offer_id = swap_client.postOffer(
+            parsed_data['coin_from'],
+            parsed_data['coin_to'],
+            parsed_data['amt_from'],
+            parsed_data['rate'],
+            parsed_data['min_bid'],
+            swap_type,
+            lock_type=lock_type,
+            lock_value=parsed_data['lock_seconds'],
+            auto_accept_bids=parsed_data['autoaccept'],
+            addr_send_from=parsed_data['addr_from'],
+            extra_options=extra_options)
         return offer_id
+
+    def postNewOffer(self, form_data):
+        page_data, parsed_data = self.parseOfferFormData(form_data)
+        return self.postNewOfferFromParsed(parsed_data)
 
     def page_newoffer(self, url_split, post_string):
         swap_client = self.server.swap_client
 
         messages = []
+        page_data = {}
         form_data = self.checkForm(post_string, 'newoffer', messages)
-        if form_data:
-            offer_id = self.postNewOffer(form_data)
-            messages.append('<a href="/offer/' + offer_id.hex() + '">Sent Offer {}</a>'.format(offer_id.hex()))
 
-        template = env.get_template('offer_new.html')
+        if form_data:
+            try:
+                page_data, parsed_data, errors = self.parseOfferFormData(form_data)
+                for e in errors:
+                    messages.append('Error: {}'.format(str(e)))
+            except Exception as e:
+                messages.append('Error: {}'.format(str(e)))
+
+        if len(messages) == 0 and 'submit_offer' in page_data:
+            try:
+                offer_id = self.postNewOfferFromParsed(parsed_data)
+                messages.append('<a href="/offer/' + offer_id.hex() + '">Sent Offer {}</a>'.format(offer_id.hex()))
+                page_data = {}
+            except Exception as e:
+                messages.append('Error: {}'.format(str(e)))
+
+        if not page_data:
+            # Set defaults
+            page_data['fee_from_conf'] = 2
+            page_data['fee_to_conf'] = 2
+            page_data['lockhrs'] = 32
+            page_data['autoaccept'] = True
+
+        if len(messages) == 0 and 'check_offer' in page_data:
+            template = env.get_template('offer_confirm.html')
+        else:
+            template = env.get_template('offer_new.html')
+
         return bytes(template.render(
             title=self.server.title,
             h2=self.server.title,
             messages=messages,
             coins=listAvailableCoins(swap_client),
             addrs=swap_client.listSmsgAddresses('offer'),
+            data=page_data,
             form_id=os.urandom(8).hex(),
         ), 'UTF-8')
 
@@ -412,10 +536,12 @@ class HttpHandler(BaseHTTPRequestHandler):
         }
 
         if xmr_offer:
-            int_fee_rate_now = make_int(ci_from.get_fee_rate(), ci_from.exp())
+
+            int_fee_rate_now, fee_source = ci_from.get_fee_rate()
             data['xmr_type'] = True
             data['a_fee_rate'] = ci_from.format_amount(xmr_offer.a_fee_rate)
-            data['a_fee_rate_verify'] = ci_from.format_amount(int_fee_rate_now)
+            data['a_fee_rate_verify'] = ci_from.format_amount(int_fee_rate_now, conv_int=True)
+            data['a_fee_rate_verify_src'] = fee_source
             data['a_fee_warn'] = xmr_offer.a_fee_rate < int_fee_rate_now
 
         if offer.was_sent:

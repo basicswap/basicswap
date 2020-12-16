@@ -53,7 +53,9 @@
 {% if data.was_received == 'True' %}
 <input name="accept_bid" type="submit" value="Accept Bid"><br/>
 {% endif %}
+{% if data.can_abandon == true %}
 <input name="abandon_bid" type="submit" value="Abandon Bid" onclick="confirmPopup()">
+{% endif %}
 {% if data.show_txns %}
 <input name="hide_txns" type="submit" value="Hide Info">
 {% else %}

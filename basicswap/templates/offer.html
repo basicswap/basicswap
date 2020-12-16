@@ -33,7 +33,7 @@
 
 {% if data.xmr_type == true %}
 <tr><td>Chain A offer fee rate</td><td>{{ data.a_fee_rate }}</td></tr>
-<tr><td>Chain A local fee rate</td><td>{{ data.a_fee_rate_verify }} {% if data.a_fee_warn == true %} WARNING {% endif %}</td></tr>
+<tr><td>Chain A local fee rate</td><td>{{ data.a_fee_rate_verify }}, fee source: {{ data.a_fee_rate_verify_src }} {% if data.a_fee_warn == true %} WARNING {% endif %}</td></tr>
 {% endif %}
 </table>
 
@@ -57,7 +57,7 @@
 {% else %}
 <input type="submit" name="newbid" value="New Bid">
 {% endif %}
-{% if data.sent == 'True' %}
+{% if data.sent == 'True' and data.was_revoked != true %}
 <input name="revoke_offer" type="submit" value="Revoke Offer" onclick="confirmPopup()">
 {% endif %}
 <input type="hidden" name="formid" value="{{ form_id }}">

@@ -156,16 +156,16 @@ class BTCInterface(CoinInterface):
             args.append('bech32')
         return self.rpc_callback('getnewaddress', args)
 
-    def get_fee_rate(self):
+    def get_fee_rate(self, conf_target=2):
         try:
-            return self.rpc_callback('estimatesmartfee', [2])['feerate']
+            return self.rpc_callback('estimatesmartfee', [conf_target])['feerate'], 'estimatesmartfee'
         except Exception:
             try:
-                fee_rate = self.rpc_callback('getwalletinfo')['paytxfee']
+                fee_rate = self.rpc_callback('getwalletinfo')['paytxfee'], 'paytxfee'
                 assert(fee_rate > 0.0), '0 feerate'
                 return fee_rate
             except Exception:
-                return self.rpc_callback('getnetworkinfo')['relayfee']
+                return self.rpc_callback('getnetworkinfo')['relayfee'], 'relayfee'
 
     def decodeAddress(self, address):
         bech32_prefix = chainparams[self.coin_type()][self._network]['hrp']

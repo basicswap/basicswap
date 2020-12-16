@@ -126,9 +126,9 @@ class XMRInterface(CoinInterface):
         self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
         return self.rpc_wallet_cb('get_address')['address']
 
-    def get_fee_rate(self):
+    def get_fee_rate(self, conf_target=2):
         logging.warning('TODO - estimate fee rate?')
-        return 0.0012595
+        return 0.0, 'unused'
 
     def isValidKey(self, key_bytes):
         ki = b2i(key_bytes)
