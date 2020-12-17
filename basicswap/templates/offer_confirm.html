@@ -22,6 +22,7 @@
 {% endfor %}
 </select>
 </td><td>Amount From</td><td><input type="text" name="amt_from" value="{{ data.amt_from }}" readonly></td><td>The amount you will send.</td></tr>
+{% if data.swap_style == 'xmr' %}
 </td><td>Fee Rate From</td><td><input name="fee_rate_from" value="{{ data.from_fee_override }}" readonly></td><td>Fee Rate Source</td><td>{{ data.from_fee_src }}</td></tr>
 </td><td>Fee From Confirm Target</td><td><input type="number" name="fee_from_conf" min="1" max="32" value="{{ data.fee_from_conf }}" readonly></td></tr>
 </td><td>Fee From Extra Fee</td><td>
@@ -31,6 +32,7 @@
 <option value="50"{% if data.fee_from_extra==50 %} selected{% endif %}>50%</option>
 <option value="100"{% if data.fee_from_extra==100 %} selected{% endif %}>100%</option>
 </select></td></tr>
+{% endif %}
 
 <tr><td>Coin To</td><td>
 <select name="coin_to_" disabled><option value="-1">-- Select Coin --</option>
@@ -39,7 +41,8 @@
 {% endfor %}
 </select>
 </td><td>Amount To</td><td><input type="text" name="amt_to" value="{{ data.amt_to }}" readonly></td><td>The amount you will receive.</td></tr>
-</td><td>Fee Rate From</td><td><input name="fee_rate_to" value="{{ data.to_fee_override }}" readonly></td><td>Fee Rate Source</td><td>{{ data.to_fee_src }}</td></tr>
+{% if data.swap_style == 'xmr' and coin_to != '6' %}
+</td><td>Fee Rate To</td><td><input name="fee_rate_to" value="{{ data.to_fee_override }}" readonly></td><td>Fee Rate Source</td><td>{{ data.to_fee_src }}</td></tr>
 </td><td>Fee To Confirm Target</td><td><input type="number" name="fee_to_conf" min="1" max="32" value="{{ data.fee_to_conf }}" readonly></td></tr>
 </td><td>Fee To Extra Fee</td><td>
 <select name="fee_to_extra_" disabled>
@@ -48,19 +51,23 @@
 <option value="50"{% if data.fee_to_extra==50 %} selected{% endif %}>50%</option>
 <option value="100"{% if data.fee_to_extra==100 %} selected{% endif %}>100%</option>
 </select></td></tr>
+{% endif %}
 
 <tr><td>Contract locked (hrs)</td><td><input type="number" name="lockhrs" min="1" max="64" value="{{ data.lockhrs }}" readonly></td>{% if data.swap_style != 'xmr' %}<td colspan=2>Participate txn will be locked for half the time.</td>{% endif %}</tr>
-<tr><td>Auto Accept Bids</td><td colspan=3><input type="checkbox" name="autoaccept" value="aa" {% if data.autoaccept==true %} checked{% endif %} readonly></td></tr>
+<tr><td>Auto Accept Bids</td><td colspan=3><input type="checkbox" name="autoaccept_" value="aa" {% if data.autoaccept==true %} checked="true"{% endif %} disabled></td></tr>
 </table>
 
 <input name="submit_offer" type="submit" value="Confirm Offer">
-<input type="submit" value="Back">
+<input name="step2" type="submit" value="Back">
 <input type="hidden" name="formid" value="{{ form_id }}">
 <input type="hidden" name="addr_from" value="{{ data.addr_from }}">
 <input type="hidden" name="coin_from" value="{{ data.coin_from }}">
 <input type="hidden" name="fee_from_extra" value="{{ data.fee_from_extra }}">
 <input type="hidden" name="coin_to" value="{{ data.coin_to }}">
 <input type="hidden" name="fee_to_extra" value="{{ data.fee_to_extra }}">
+{% if data.autoaccept==true %}
+<input type="hidden" name="autoaccept" value="aa">
+{% endif %}
 </form>
 
 <p><a href="/">home</a></p>

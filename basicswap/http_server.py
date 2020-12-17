@@ -299,11 +299,10 @@ class HttpHandler(BaseHTTPRequestHandler):
             form_id=os.urandom(8).hex(),
         ), 'UTF-8')
 
-    def parseOfferFormData(self, form_data):
+    def parseOfferFormData(self, form_data, page_data):
         swap_client = self.server.swap_client
 
         errors = []
-        page_data = {}
         parsed_data = {}
 
         if b'addr_from' in form_data:
@@ -325,25 +324,10 @@ class HttpHandler(BaseHTTPRequestHandler):
             parsed_data['coin_to'] = coin_to
             if coin_to == Coins.XMR:
                 page_data['swap_style'] = 'xmr'
+            else:
+                page_data['swap_style'] = 'atomic'
         except Exception:
             errors.append('Unknown Coin To')
-
-        page_data['fee_from_conf'] = int(form_data[b'fee_from_conf'][0])
-        page_data['fee_from_extra'] = int(form_data[b'fee_from_extra'][0])
-
-        parsed_data['fee_from_conf'] = page_data['fee_from_conf']
-        parsed_data['fee_from_extra'] = page_data['fee_from_extra']
-
-        page_data['fee_to_conf'] = int(form_data[b'fee_to_conf'][0])
-        page_data['fee_to_extra'] = int(form_data[b'fee_to_extra'][0])
-
-        parsed_data['fee_to_conf'] = page_data['fee_to_conf']
-        parsed_data['fee_to_extra'] = page_data['fee_to_extra']
-
-        if b'check_offer' in form_data:
-            page_data['check_offer'] = True
-        if b'submit_offer' in form_data:
-            page_data['submit_offer'] = True
 
         try:
             page_data['amt_from'] = form_data[b'amt_from'][0].decode('utf-8')
@@ -361,13 +345,42 @@ class HttpHandler(BaseHTTPRequestHandler):
         if 'amt_to' in parsed_data and 'amt_from' in parsed_data:
             parsed_data['rate'] = int((parsed_data['amt_to'] / parsed_data['amt_from']) * ci_from.COIN())
 
-        page_data['lockhrs'] = int(form_data[b'lockhrs'][0])
-        parsed_data['lock_seconds'] = page_data['lockhrs'] * 60 * 60
+        if b'step1' in form_data:
+            if len(errors) == 0 and b'continue' in form_data:
+                page_data['step2'] = True
+            return parsed_data, errors
+
+        page_data['step2'] = True
+
+        if b'fee_from_conf' in form_data:
+            page_data['fee_from_conf'] = int(form_data[b'fee_from_conf'][0])
+            parsed_data['fee_from_conf'] = page_data['fee_from_conf']
+
+        if b'fee_from_extra' in form_data:
+            page_data['fee_from_extra'] = int(form_data[b'fee_from_extra'][0])
+            parsed_data['fee_from_extra'] = page_data['fee_from_extra']
+
+        if b'fee_to_conf' in form_data:
+            page_data['fee_to_conf'] = int(form_data[b'fee_to_conf'][0])
+            parsed_data['fee_to_conf'] = page_data['fee_to_conf']
+
+        if b'fee_to_extra' in form_data:
+            page_data['fee_to_extra'] = int(form_data[b'fee_to_extra'][0])
+            parsed_data['fee_to_extra'] = page_data['fee_to_extra']
+
+        if b'check_offer' in form_data:
+            page_data['check_offer'] = True
+        if b'submit_offer' in form_data:
+            page_data['submit_offer'] = True
+
+        if b'lockhrs' in form_data:
+            page_data['lockhrs'] = int(form_data[b'lockhrs'][0])
+            parsed_data['lock_seconds'] = page_data['lockhrs'] * 60 * 60
 
         page_data['autoaccept'] = True if b'autoaccept' in form_data else False
         parsed_data['autoaccept'] = page_data['autoaccept']
 
-        if len(errors) == 0:
+        if len(errors) == 0 and page_data['swap_style'] == 'xmr':
             if b'fee_rate_from' in form_data:
                 page_data['from_fee_override'] = form_data[b'fee_rate_from'][0].decode('utf-8')
                 parsed_data['from_fee_override'] = page_data['from_fee_override']
@@ -378,18 +391,18 @@ class HttpHandler(BaseHTTPRequestHandler):
                 page_data['from_fee_override'] = ci_from.format_amount(ci_from.make_int(from_fee_override, r=1))
                 parsed_data['from_fee_override'] = page_data['from_fee_override']
 
-            if b'fee_rate_to' in form_data:
-                page_data['to_fee_override'] = form_data[b'fee_rate_to'][0].decode('utf-8')
-                parsed_data['to_fee_override'] = page_data['to_fee_override']
-            else:
-                to_fee_override, page_data['to_fee_src'] = swap_client.getFeeRateForCoin(parsed_data['coin_to'], page_data['fee_to_conf'])
-                if page_data['fee_to_extra'] > 0:
-                    to_fee_override += to_fee_override * (float(page_data['fee_to_extra']) / 100.0)
+            if coin_to == Coins.XMR:
+                if b'fee_rate_to' in form_data:
+                    page_data['to_fee_override'] = form_data[b'fee_rate_to'][0].decode('utf-8')
+                    parsed_data['to_fee_override'] = page_data['to_fee_override']
+                else:
+                    to_fee_override, page_data['to_fee_src'] = swap_client.getFeeRateForCoin(parsed_data['coin_to'], page_data['fee_to_conf'])
+                    if page_data['fee_to_extra'] > 0:
+                        to_fee_override += to_fee_override * (float(page_data['fee_to_extra']) / 100.0)
+                    page_data['to_fee_override'] = ci_to.format_amount(ci_to.make_int(to_fee_override, r=1))
+                    parsed_data['to_fee_override'] = page_data['to_fee_override']
 
-                page_data['to_fee_override'] = ci_to.format_amount(ci_to.make_int(to_fee_override, r=1))
-                parsed_data['to_fee_override'] = page_data['to_fee_override']
-
-        return page_data, parsed_data, errors
+        return parsed_data, errors
 
     def postNewOfferFromParsed(self, parsed_data):
         swap_client = self.server.swap_client
@@ -434,19 +447,26 @@ class HttpHandler(BaseHTTPRequestHandler):
         return offer_id
 
     def postNewOffer(self, form_data):
-        page_data, parsed_data = self.parseOfferFormData(form_data)
+        page_data = {}
+        parsed_data = self.parseOfferFormData(form_data, page_data)
         return self.postNewOfferFromParsed(parsed_data)
 
     def page_newoffer(self, url_split, post_string):
         swap_client = self.server.swap_client
 
         messages = []
-        page_data = {}
+        page_data = {
+            # Set defaults
+            'fee_from_conf': 2,
+            'fee_to_conf': 2,
+            'lockhrs': 32,
+            'autoaccept': True
+        }
         form_data = self.checkForm(post_string, 'newoffer', messages)
 
         if form_data:
             try:
-                page_data, parsed_data, errors = self.parseOfferFormData(form_data)
+                parsed_data, errors = self.parseOfferFormData(form_data, page_data)
                 for e in errors:
                     messages.append('Error: {}'.format(str(e)))
             except Exception as e:
@@ -460,17 +480,12 @@ class HttpHandler(BaseHTTPRequestHandler):
             except Exception as e:
                 messages.append('Error: {}'.format(str(e)))
 
-        if not page_data:
-            # Set defaults
-            page_data['fee_from_conf'] = 2
-            page_data['fee_to_conf'] = 2
-            page_data['lockhrs'] = 32
-            page_data['autoaccept'] = True
-
         if len(messages) == 0 and 'check_offer' in page_data:
             template = env.get_template('offer_confirm.html')
+        elif 'step2' in page_data:
+            template = env.get_template('offer_new_2.html')
         else:
-            template = env.get_template('offer_new.html')
+            template = env.get_template('offer_new_1.html')
 
         return bytes(template.render(
             title=self.server.title,
@@ -536,7 +551,6 @@ class HttpHandler(BaseHTTPRequestHandler):
         }
 
         if xmr_offer:
-
             int_fee_rate_now, fee_source = ci_from.get_fee_rate()
             data['xmr_type'] = True
             data['a_fee_rate'] = ci_from.format_amount(xmr_offer.a_fee_rate)

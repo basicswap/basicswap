@@ -42,6 +42,7 @@
 <form method="post">
 {% if data.show_bid_form %}
 <br/><h4>New Bid</h4>
+<p>You will send {{ data.amt_to }} {{ data.tla_to }} and receive {{ data.amt_from }} {{ data.tla_from }}</p>
 <table>
 <tr><td>Send From Address</td><td>
 <select name="addr_from">
@@ -52,13 +53,13 @@
 </select>
 </td></tr>
 
-<tr><td><input type="submit" name="sendbid" value="Send Bid"></td></tr>
+<tr><td><input type="submit" name="sendbid" value="Send Bid"><input type="submit" name="cancel" value="Cancel"></td></tr>
 </table>
 {% else %}
 <input type="submit" name="newbid" value="New Bid">
-{% endif %}
 {% if data.sent == 'True' and data.was_revoked != true %}
 <input name="revoke_offer" type="submit" value="Revoke Offer" onclick="confirmPopup()">
+{% endif %}
 {% endif %}
 <input type="hidden" name="formid" value="{{ form_id }}">
 </form>
