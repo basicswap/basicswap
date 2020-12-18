@@ -1,36 +1,34 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019 tecnovert
+# Copyright (c) 2019-2020 tecnovert
 # Distributed under the MIT software license, see the accompanying
-# file LICENSE.txt or http://www.opensource.org/licenses/mit-license.php.
+# file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-"""
-Atomic Swap Client - Proof of Concept
-
-sudo pip install python-gnupg
-
-"""
-
-import sys
 import os
+import sys
 import json
-import hashlib
 import mmap
+import stat
+import gnupg
+import signal
+import hashlib
 import tarfile
 import zipfile
-import stat
-import time
-from urllib.request import urlretrieve
-import urllib.parse
 import logging
 import platform
-
-import gnupg
+import urllib.parse
+from urllib.request import urlretrieve
 
 import basicswap.config as cfg
-from basicswap.util import callrpc_cli
-from bin.basicswap_run import startDaemon
+from basicswap.rpc import (
+    callrpc_cli,
+    waitForRPC,
+)
+from basicswap.basicswap import BasicSwap
+from basicswap.chainparams import Coins
+from bin.basicswap_run import startDaemon, startXmrWalletDaemon
+
 
 if platform.system() == 'Darwin':
     BIN_ARCH = 'osx64.tar.gz'
@@ -40,10 +38,11 @@ else:
     BIN_ARCH = 'x86_64-linux-gnu.tar.gz'
 
 known_coins = {
-    'particl': '0.18.1.2',
-    'litecoin': '0.17.1',
-    'bitcoin': '0.18.0',
+    'particl': '0.19.1.2',
+    'litecoin': '0.18.1',
+    'bitcoin': '0.20.1',
     'namecoin': '0.18.0',
+    'monero': '0.17.1.5',
 }
 
 logger = logging.getLogger()
@@ -51,9 +50,18 @@ logger.level = logging.DEBUG
 if not len(logger.handlers):
     logger.addHandler(logging.StreamHandler(sys.stdout))
 
+XMR_RPC_HOST = os.getenv('XMR_RPC_HOST', 'localhost')
+BASE_XMR_RPC_PORT = int(os.getenv('BASE_XMR_RPC_PORT', 29798))
+BASE_XMR_ZMQ_PORT = int(os.getenv('BASE_XMR_ZMQ_PORT', 30898))
+BASE_XMR_WALLET_PORT = int(os.getenv('BASE_XMR_WALLET_PORT', 29998))
+XMR_WALLET_RPC_USER = os.getenv('XMR_WALLET_RPC_USER', 'xmr_wallet_user')
+XMR_WALLET_RPC_PWD = os.getenv('XMR_WALLET_RPC_PWD', 'xmr_wallet_pwd')
+
+DEFAULT_XMR_RESTORE_HEIGHT = 2245107
+
 
 def make_reporthook():
-    read = 0  # number of bytes read so far
+    read = 0  # Number of bytes read so far
     last_percent_str = ''
 
     def reporthook(blocknum, blocksize, totalsize):
@@ -78,10 +86,51 @@ def downloadFile(url, path):
     urlretrieve(url, path, make_reporthook())
 
 
+def extractCore(coin, version, settings, bin_dir, release_path):
+    logger.info('extractCore %s v%s', coin, version)
+
+    bins = [coin + 'd', coin + '-cli', coin + '-tx']
+
+    if coin == 'monero':
+        with tarfile.open(release_path) as ft:
+            for member in ft.getmembers():
+                if member.isdir():
+                    continue
+                out_path = os.path.join(bin_dir, os.path.basename(member.name))
+                fi = ft.extractfile(member)
+                with open(out_path, 'wb') as fout:
+                    fout.write(fi.read())
+                fi.close()
+                os.chmod(out_path, stat.S_IRWXU | stat.S_IXGRP | stat.S_IXOTH)
+        return
+
+    bins = [coin + 'd', coin + '-cli', coin + '-tx']
+    versions = version.split('.')
+    if coin == 'particl' and int(versions[1]) >= 19:
+        bins.append(coin + '-wallet')
+    if 'win32' in BIN_ARCH or 'win64' in BIN_ARCH:
+        with zipfile.ZipFile(release_path) as fz:
+            for b in bins:
+                b += '.exe'
+                out_path = os.path.join(bin_dir, b)
+                with open(out_path, 'wb') as fout:
+                    fout.write(fz.read('{}-{}/bin/{}'.format(coin, version, b)))
+                os.chmod(out_path, stat.S_IRWXU | stat.S_IXGRP | stat.S_IXOTH)
+    else:
+        with tarfile.open(release_path) as ft:
+            for b in bins:
+                out_path = os.path.join(bin_dir, b)
+                fi = ft.extractfile('{}-{}/bin/{}'.format(coin, version, b))
+                with open(out_path, 'wb') as fout:
+                    fout.write(fi.read())
+                fi.close()
+                os.chmod(out_path, stat.S_IRWXU | stat.S_IXGRP | stat.S_IXOTH)
+
+
 def prepareCore(coin, version, settings, data_dir):
     logger.info('prepareCore %s v%s', coin, version)
 
-    bin_dir = settings['chainclients'][coin]['bindir']
+    bin_dir = os.path.expanduser(settings['chainclients'][coin]['bindir'])
     if not os.path.exists(bin_dir):
         os.makedirs(bin_dir)
 
@@ -96,43 +145,61 @@ def prepareCore(coin, version, settings, data_dir):
         os_name = 'linux'
 
     release_filename = '{}-{}-{}'.format(coin, version, BIN_ARCH)
-    if coin == 'particl':
-        signing_key_name = 'tecnovert'
-        release_url = 'https://github.com/particl/particl-core/releases/download/v{}/{}'.format(version, release_filename)
-        assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, version)
-        assert_url = 'https://raw.githubusercontent.com/particl/gitian.sigs/master/%s-%s/%s/%s' % (version, os_dir_name, signing_key_name, assert_filename)
-    elif coin == 'litecoin':
-        signing_key_name = 'thrasher'
-        release_url = 'https://download.litecoin.org/litecoin-{}/{}/{}'.format(version, os_name, release_filename)
-        assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, version.rsplit('.', 1)[0])
-        assert_url = 'https://raw.githubusercontent.com/litecoin-project/gitian.sigs.ltc/master/%s-%s/%s/%s' % (version, os_dir_name, signing_key_name, assert_filename)
-    elif coin == 'bitcoin':
-        signing_key_name = 'laanwj'
-        release_url = 'https://bitcoincore.org/bin/bitcoin-core-{}/{}'.format(version, release_filename)
-        assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, version.rsplit('.', 1)[0])
-        assert_url = 'https://raw.githubusercontent.com/bitcoin-core/gitian.sigs/master/%s-%s/%s/%s' % (version, os_dir_name, signing_key_name, assert_filename)
-    elif coin == 'namecoin':
-        signing_key_name = 'JeremyRand'
-        release_url = 'https://beta.namecoin.org/files/namecoin-core/namecoin-core-{}/{}'.format(version, release_filename)
-        assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, version.rsplit('.', 1)[0])
-        assert_url = 'https://raw.githubusercontent.com/namecoin/gitian.sigs/master/%s-%s/%s/%s' % (version, os_dir_name, signing_key_name, assert_filename)
+    if coin == 'monero':
+        release_url = 'https://downloads.getmonero.org/cli/monero-linux-x64-v{}.tar.bz2'.format(version)
+
+        release_path = os.path.join(bin_dir, release_filename)
+        if not os.path.exists(release_path):
+            downloadFile(release_url, release_path)
+
+        # TODO: How to get version specific hashes
+        assert_filename = 'monero-{}-hashes.txt'.format(version)
+        assert_url = 'https://www.getmonero.org/downloads/hashes.txt'
+        assert_path = os.path.join(bin_dir, assert_filename)
+        if not os.path.exists(assert_path):
+            downloadFile(assert_url, assert_path)
     else:
-        raise ValueError('Unknown coin')
+        release_filename = '{}-{}-{}'.format(coin, version, BIN_ARCH)
+        if coin == 'particl':
+            signing_key_name = 'tecnovert'
+            release_url = 'https://github.com/tecnovert/particl-core/releases/download/v{}/{}'.format(version, release_filename)
+            assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, version)
+            assert_url = 'https://raw.githubusercontent.com/tecnovert/gitian.sigs/master/%s-%s/%s/%s' % (version, os_dir_name, signing_key_name, assert_filename)
+        elif coin == 'litecoin':
+            signing_key_name = 'thrasher'
+            release_url = 'https://download.litecoin.org/litecoin-{}/{}/{}'.format(version, os_name, release_filename)
+            assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, version.rsplit('.', 1)[0])
+            assert_url = 'https://raw.githubusercontent.com/litecoin-project/gitian.sigs.ltc/master/%s-%s/%s/%s' % (version, os_dir_name, signing_key_name, assert_filename)
+        elif coin == 'bitcoin':
+            signing_key_name = 'laanwj'
+            release_url = 'https://bitcoincore.org/bin/bitcoin-core-{}/{}'.format(version, release_filename)
+            assert_filename = '{}-core-{}-{}-build.assert'.format(coin, os_name, '.'.join(version.split('.')[:2]))
+            assert_url = 'https://raw.githubusercontent.com/bitcoin-core/gitian.sigs/master/%s-%s/%s/%s' % (version, os_dir_name, signing_key_name, assert_filename)
+        elif coin == 'namecoin':
+            signing_key_name = 'JeremyRand'
+            release_url = 'https://beta.namecoin.org/files/namecoin-core/namecoin-core-{}/{}'.format(version, release_filename)
+            assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, version.rsplit('.', 1)[0])
+            assert_url = 'https://raw.githubusercontent.com/namecoin/gitian.sigs/master/%s-%s/%s/%s' % (version, os_dir_name, signing_key_name, assert_filename)
+        else:
+            raise ValueError('Unknown coin')
 
-    assert_sig_filename = assert_filename + '.sig'
-    assert_sig_url = assert_url + '.sig'
+        assert_sig_filename = assert_filename + '.sig'
+        assert_sig_url = assert_url + '.sig'
 
-    release_path = os.path.join(bin_dir, release_filename)
-    if not os.path.exists(release_path):
-        downloadFile(release_url, release_path)
+        release_path = os.path.join(bin_dir, release_filename)
+        if not os.path.exists(release_path):
+            downloadFile(release_url, release_path)
 
-    assert_path = os.path.join(bin_dir, assert_filename)
-    if not os.path.exists(assert_path):
-        downloadFile(assert_url, assert_path)
+        # Rename assert files with full version
+        assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, version)
+        assert_path = os.path.join(bin_dir, assert_filename)
+        if not os.path.exists(assert_path):
+            downloadFile(assert_url, assert_path)
 
-    assert_sig_path = os.path.join(bin_dir, assert_sig_filename)
-    if not os.path.exists(assert_sig_path):
-        downloadFile(assert_sig_url, assert_sig_path)
+        assert_sig_filename = '{}-{}-{}-build.assert.sig'.format(coin, os_name, version)
+        assert_sig_path = os.path.join(bin_dir, assert_sig_filename)
+        if not os.path.exists(assert_sig_path):
+            downloadFile(assert_sig_url, assert_sig_path)
 
     hasher = hashlib.sha256()
     with open(release_path, 'rb') as fp:
@@ -153,40 +220,39 @@ def prepareCore(coin, version, settings, data_dir):
     """
     gpg = gnupg.GPG()
 
-    with open(assert_sig_path, 'rb') as fp:
-        verified = gpg.verify_file(fp, assert_path)
+    if coin == 'monero':
+        with open(assert_path, 'rb') as fp:
+            verified = gpg.verify_file(fp)
 
-    if verified.username is None:
-        logger.warning('Signature not verified.')
+        if verified.username is None:
+            logger.warning('Signature not verified.')
 
-        pubkeyurl = 'https://raw.githubusercontent.com/tecnovert/basicswap/master/gitianpubkeys/{}_{}.pgp'.format(coin, signing_key_name)
-        logger.info('Importing public key from url: ' + pubkeyurl)
-        gpg.import_keys(urllib.request.urlopen(pubkeyurl).read())
-
+            pubkeyurl = 'https://raw.githubusercontent.com/monero-project/monero/master/utils/gpg_keys/binaryfate.asc'
+            logger.info('Importing public key from url: ' + pubkeyurl)
+            rv = gpg.import_keys(urllib.request.urlopen(pubkeyurl).read())
+            print('import_keys', rv)
+            assert('F0AF4D462A0BDF92' in rv.fingerprints[0])
+            with open(assert_path, 'rb') as fp:
+                verified = gpg.verify_file(fp)
+    else:
         with open(assert_sig_path, 'rb') as fp:
             verified = gpg.verify_file(fp, assert_path)
 
         if verified.username is None:
-            raise ValueError('Signature verification failed.')
+            logger.warning('Signature not verified.')
 
-    bins = [coin + 'd', coin + '-cli', coin + '-tx']
-    if os_name == 'win':
-        with zipfile.ZipFile(release_path) as fz:
-            for b in bins:
-                b += '.exe'
-                out_path = os.path.join(bin_dir, b)
-                with open(out_path, 'wb') as fout:
-                    fout.write(fz.read('{}-{}/bin/{}'.format(coin, version, b)))
-                os.chmod(out_path, stat.S_IRWXU | stat.S_IXGRP | stat.S_IXOTH)
-    else:
-        with tarfile.open(release_path) as ft:
-            for b in bins:
-                out_path = os.path.join(bin_dir, b)
-                fi = ft.extractfile('{}-{}/bin/{}'.format(coin, version, b))
-                with open(out_path, 'wb') as fout:
-                    fout.write(fi.read())
-                fi.close()
-                os.chmod(out_path, stat.S_IRWXU | stat.S_IXGRP | stat.S_IXOTH)
+            pubkeyurl = 'https://raw.githubusercontent.com/tecnovert/basicswap/master/gitianpubkeys/{}_{}.pgp'.format(coin, signing_key_name)
+            logger.info('Importing public key from url: ' + pubkeyurl)
+            gpg.import_keys(urllib.request.urlopen(pubkeyurl).read())
+
+            with open(assert_sig_path, 'rb') as fp:
+                verified = gpg.verify_file(fp, assert_path)
+
+    if verified.valid is False \
+       and not (verified.status == 'signature valid' and verified.key_status == 'signing key has expired'):
+        raise ValueError('Signature verification failed.')
+
+    extractCore(coin, version, settings, bin_dir, release_path)
 
 
 def prepareDataDir(coin, settings, data_dir, chain, particl_mnemonic):
@@ -196,10 +262,38 @@ def prepareDataDir(coin, settings, data_dir, chain, particl_mnemonic):
     if not os.path.exists(data_dir):
         os.makedirs(data_dir)
 
+    if coin == 'monero':
+        core_conf_path = os.path.join(data_dir, coin + 'd.conf')
+        if os.path.exists(core_conf_path):
+            exitWithError('{} exists'.format(core_conf_path))
+        with open(core_conf_path, 'w') as fp:
+            if chain == 'regtest':
+                fp.write('regtest=1\n')
+                fp.write('keep-fakechain=1\n')
+                fp.write('fixed-difficulty=1\n')
+            elif chain == 'testnet':
+                fp.write('testnet=1\n')
+            fp.write('data-dir={}\n'.format(data_dir))
+            fp.write('rpc-bind-port={}\n'.format(core_settings['rpcport']))
+            fp.write('rpc-bind-ip=127.0.0.1\n')
+            fp.write('zmq-rpc-bind-port={}\n'.format(core_settings['zmqport']))
+            fp.write('zmq-rpc-bind-ip=127.0.0.1\n')
+
+        wallet_conf_path = os.path.join(data_dir, coin + '_wallet.conf')
+        if os.path.exists(wallet_conf_path):
+            exitWithError('{} exists'.format(wallet_conf_path))
+        with open(wallet_conf_path, 'w') as fp:
+            fp.write('daemon-address={}:{}\n'.format(core_settings['rpchost'], core_settings['rpcport']))
+            fp.write('no-dns=1\n')
+            fp.write('rpc-bind-port={}\n'.format(core_settings['walletrpcport']))
+            fp.write('wallet-dir={}\n'.format(os.path.join(data_dir, 'wallets')))
+            fp.write('log-file={}\n'.format(os.path.join(data_dir, 'wallet.log')))
+            fp.write('shared-ringdb-dir={}\n'.format(os.path.join(data_dir, 'shared-ringdb')))
+            fp.write('rpc-login={}:{}\n'.format(core_settings['walletrpcuser'], core_settings['walletrpcpassword']))
+        return
     core_conf_path = os.path.join(data_dir, coin + '.conf')
     if os.path.exists(core_conf_path):
         exitWithError('{} exists'.format(core_conf_path))
-
     with open(core_conf_path, 'w') as fp:
         if chain != 'mainnet':
             fp.write(chain + '=1\n')
@@ -227,14 +321,11 @@ def prepareDataDir(coin, settings, data_dir, chain, particl_mnemonic):
             fp.write('prune=1000\n')
         elif coin == 'bitcoin':
             fp.write('prune=1000\n')
+            fp.write('fallbackfee=0.0002\n')
         elif coin == 'namecoin':
             fp.write('prune=1000\n')
         else:
             logger.warning('Unknown coin %s', coin)
-
-
-def extractCore(coin, version, settings):
-    logger.info('extractCore %s v%s', coin, version)
 
 
 def printVersion():
@@ -246,19 +337,21 @@ def printHelp():
     logger.info('Usage: basicswap-prepare ')
     logger.info('\n--help, -h               Print help.')
     logger.info('--version, -v            Print version.')
-    logger.info('--datadir=PATH           Path to basicswap data directory, default:~/.basicswap.')
+    logger.info('--datadir=PATH           Path to basicswap data directory, default:{}.'.format(cfg.DEFAULT_DATADIR))
     logger.info('--bindir=PATH            Path to cores directory, default:datadir/bin.')
     logger.info('--mainnet                Run in mainnet mode.')
     logger.info('--testnet                Run in testnet mode.')
     logger.info('--regtest                Run in regtest mode.')
-    logger.info('--particl_mnemonic=      Recovery phrase to use for the Particl wallet, default is randomly generated,\n' +
-                '                         "none" to set autogenerate account mode.')
+    logger.info('--particl_mnemonic=      Recovery phrase to use for the Particl wallet, default is randomly generated,\n'
+                + '                         "none" to set autogenerate account mode.')
     logger.info('--withcoin=              Prepare system to run daemon for coin.')
     logger.info('--withoutcoin=           Do not prepare system to run daemon for coin.')
     logger.info('--addcoin=               Add coin to existing setup.')
     logger.info('--disablecoin=           Make coin inactive.')
     logger.info('--preparebinonly         Don\'t prepare settings or datadirs.')
     logger.info('--portoffset=n           Raise all ports by n.')
+    logger.info('--htmlhost=              Interface to host on, default:localhost.')
+    logger.info('--xmrrestoreheight=n     Block height to restore Monero wallet from, default:{}.'.format(DEFAULT_XMR_RESTORE_HEIGHT))
 
     logger.info('\n' + 'Known coins: %s', ', '.join(known_coins.keys()))
 
@@ -266,7 +359,7 @@ def printHelp():
 def make_rpc_func(bin_dir, data_dir, chain):
     bin_dir = bin_dir
     data_dir = data_dir
-    chain = '' if chain == 'mainnet' else chain
+    chain = chain
 
     def rpc_func(cmd):
         nonlocal bin_dir
@@ -275,17 +368,6 @@ def make_rpc_func(bin_dir, data_dir, chain):
 
         return callrpc_cli(bin_dir, data_dir, chain, cmd, cfg.PARTICL_CLI)
     return rpc_func
-
-
-def waitForRPC(rpc_func, wallet=None):
-    for i in range(10):
-        try:
-            rpc_func('getwalletinfo')
-            return
-        except Exception as ex:
-            logging.warning('Can\'t connect to daemon RPC: %s.  Trying again in %d second/s.', str(ex), (1 + i))
-            time.sleep(1 + i)
-    raise ValueError('waitForRPC failed')
 
 
 def exitWithError(error_msg):
@@ -303,6 +385,8 @@ def main():
     with_coins = {'particl', 'litecoin'}
     add_coin = ''
     disable_coin = ''
+    htmlhost = 'localhost'
+    xmr_restore_height = DEFAULT_XMR_RESTORE_HEIGHT
 
     for v in sys.argv[1:]:
         if len(v) < 2 or v[0] != '-':
@@ -332,7 +416,6 @@ def main():
         if name == 'preparebinonly':
             prepare_bin_only = True
             continue
-
         if len(s) == 2:
             if name == 'datadir':
                 data_dir = os.path.expanduser(s[1].strip('"'))
@@ -346,15 +429,19 @@ def main():
             if name == 'particl_mnemonic':
                 particl_wallet_mnemonic = s[1].strip('"')
                 continue
-            if name == 'withcoin':
-                if s[1] not in known_coins:
-                    exitWithError('Unknown coin {}'.format(s[1]))
-                with_coins.add(s[1])
+            if name == 'withcoin' or name == 'withcoins':
+                coins = s[1].split(',')
+                for coin in coins:
+                    if coin not in known_coins:
+                        exitWithError('Unknown coin {}'.format(coin))
+                    with_coins.add(coin)
                 continue
-            if name == 'withoutcoin':
-                if s[1] not in known_coins:
-                    exitWithError('Unknown coin {}'.format(s[1]))
-                with_coins.discard(s[1])
+            if name == 'withoutcoin' or name == 'withoutcoins':
+                coins = s[1].split(',')
+                for coin in coins:
+                    if coin not in known_coins:
+                        exitWithError('Unknown coin {}'.format(coin))
+                    with_coins.discard(coin)
                 continue
             if name == 'addcoin':
                 if s[1] not in known_coins:
@@ -367,12 +454,17 @@ def main():
                     exitWithError('Unknown coin {}'.format(s[1]))
                 disable_coin = s[1]
                 continue
+            if name == 'htmlhost':
+                htmlhost = s[1].strip('"')
+                continue
+            if name == 'xmrrestoreheight':
+                xmr_restore_height = int(s[1])
+                continue
 
         exitWithError('Unknown argument {}'.format(v))
 
     if data_dir is None:
-        default_datadir = '~/.basicswap'
-        data_dir = os.path.join(os.path.expanduser(default_datadir))
+        data_dir = os.path.join(os.path.expanduser(cfg.DEFAULT_DATADIR))
     if bin_dir is None:
         bin_dir = os.path.join(data_dir, 'bin')
 
@@ -384,7 +476,7 @@ def main():
 
     if not os.path.exists(data_dir):
         os.makedirs(data_dir)
-    config_path = os.path.join(data_dir, 'basicswap.json')
+    config_path = os.path.join(data_dir, cfg.CONFIG_FILENAME)
 
     withchainclients = {}
     chainclients = {
@@ -409,7 +501,7 @@ def main():
             'use_segwit': True,
             'blocks_confirmed': 2,
             'conf_target': 2,
-            'core_version_group': 17,
+            'core_version_group': 18,
             'chain_lookups': 'local',
         },
         'bitcoin': {
@@ -436,6 +528,22 @@ def main():
             'conf_target': 2,
             'core_version_group': 18,
             'chain_lookups': 'local',
+        },
+        'monero': {
+            'connection_type': 'rpc' if 'monero' in with_coins else 'none',
+            'manage_daemon': True if ('monero' in with_coins and XMR_RPC_HOST == 'localhost') else False,
+            'manage_wallet_daemon': True if 'monero' in with_coins else False,
+            'rpcport': BASE_XMR_RPC_PORT + port_offset,
+            'zmqport': BASE_XMR_ZMQ_PORT + port_offset,
+            'walletrpcport': BASE_XMR_WALLET_PORT + port_offset,
+            'rpchost': XMR_RPC_HOST,
+            'walletrpcuser': XMR_WALLET_RPC_USER,
+            'walletrpcpassword': XMR_WALLET_RPC_PWD,
+            'walletfile': 'swap_wallet',
+            'datadir': os.path.join(data_dir, 'monero'),
+            'bindir': os.path.join(bin_dir, 'monero'),
+            'restore_height': xmr_restore_height,
+            'blocks_confirmed': 7,  # TODO: 10?
         }
     }
 
@@ -503,13 +611,13 @@ def main():
             'debug': True,
             'zmqhost': 'tcp://127.0.0.1',
             'zmqport': 20792 + port_offset,
-            'htmlhost': 'localhost',
+            'htmlhost': htmlhost,
             'htmlport': 12700 + port_offset,
             'network_key': '7sW2UEcHXvuqEjkpE5mD584zRaQYs6WXYohue4jLFZPTvMSxwvgs',
             'network_pubkey': '035758c4a22d7dd59165db02a56156e790224361eb3191f02197addcb3bde903d2',
             'chainclients': withchainclients,
-            'auto_reply_delay_min': 5,  # Min delay before sending a response message
-            'auto_reply_delay_max': 50,  # Max delay before sending a response message
+            'min_delay_event': 5,  # Min delay in seconds before reacting to an event
+            'max_delay_event': 50,  # Max delay in seconds before reacting to an event
             'check_progress_seconds': 60,
             'check_watched_seconds': 60,
             'check_expired_seconds': 60
@@ -536,26 +644,57 @@ def main():
 
     particl_settings = settings['chainclients']['particl']
     partRpc = make_rpc_func(particl_settings['bindir'], particl_settings['datadir'], chain)
-    d = startDaemon(particl_settings['datadir'], particl_settings['bindir'], cfg.PARTICLD, ['-noconnect', '-nofindpeers', '-nostaking', '-nodnsseed', '-nolisten'])
+
+    daemons = []
+    daemons.append(startDaemon(particl_settings['datadir'], particl_settings['bindir'], cfg.PARTICLD, ['-noconnect', '-nofindpeers', '-nostaking', '-nodnsseed', '-nolisten']))
     try:
         waitForRPC(partRpc)
 
         if particl_wallet_mnemonic is None:
             particl_wallet_mnemonic = partRpc('mnemonic new')['mnemonic']
         partRpc('extkeyimportmaster "{}"'.format(particl_wallet_mnemonic))
+
+        # Initialise wallets
+        with open(os.path.join(data_dir, 'basicswap.log'), 'a') as fp:
+            swap_client = BasicSwap(fp, data_dir, settings, chain)
+
+            swap_client.setCoinConnectParams(Coins.PART)
+            swap_client.setDaemonPID(Coins.PART, daemons[-1].pid)
+            swap_client.setCoinRunParams(Coins.PART)
+            swap_client.createCoinInterface(Coins.PART)
+
+            for coin_name in with_coins:
+                coin_settings = settings['chainclients'][coin_name]
+                c = swap_client.getCoinIdFromName(coin_name)
+                if c == Coins.PART:
+                    continue
+
+                swap_client.setCoinConnectParams(c)
+
+                if c == Coins.XMR:
+                    if not coin_settings['manage_wallet_daemon']:
+                        continue
+                    daemons.append(startXmrWalletDaemon(coin_settings['datadir'], coin_settings['bindir'], 'monero-wallet-rpc'))
+                else:
+                    if not coin_settings['manage_daemon']:
+                        continue
+                    filename = coin_name + 'd' + ('.exe' if os.name == 'nt' else '')
+                    daemons.append(startDaemon(coin_settings['datadir'], coin_settings['bindir'], filename, ['-noconnect', '-nodnsseed', '-nolisten']))
+                swap_client.setDaemonPID(c, daemons[-1].pid)
+                swap_client.setCoinRunParams(c)
+                swap_client.createCoinInterface(c)
+                swap_client.waitForDaemonRPC(c)
+                swap_client.initialiseWallet(c)
     finally:
-        logger.info('Terminating {}'.format(d.pid))
-        d.terminate()
-        d.wait(timeout=120)
-        if d.stdout:
-            d.stdout.close()
-        if d.stderr:
-            d.stderr.close()
-        if d.stdin:
-            d.stdin.close()
+        for d in daemons:
+            logging.info('Interrupting {}'.format(d.pid))
+            d.send_signal(signal.SIGINT)
+            d.wait(timeout=120)
+            for fp in (d.stdout, d.stderr, d.stdin):
+                if fp:
+                    fp.close()
 
     logger.info('IMPORTANT - Save your particl wallet recovery phrase:\n{}\n'.format(particl_wallet_mnemonic))
-
     logger.info('Done.')
 
 

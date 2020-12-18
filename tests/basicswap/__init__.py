@@ -12,5 +12,6 @@ def test_suite():
     suite.addTests(loader.loadTestsFromModule(test_prepare))
     suite.addTests(loader.loadTestsFromModule(test_run))
     suite.addTests(loader.loadTestsFromModule(test_reload))
+    # TODO: Add to ci scripts suite.addTests(loader.loadTestsFromModule(test_xmr))
 
     return suite

@@ -1,0 +1,41 @@
+{% include 'header.html' %}
+
+<h3>New Offer</h3>
+{% for m in messages %}
+<p>{{ m }}</p>
+{% endfor %}
+
+<form method="post">
+
+<table>
+<tr><td>Send From Address</td><td><select name="addr_from">
+{% for a in addrs %}
+<option{% if data.addr_from==a %} selected{% endif %} value="{{ a }}">{{ a }}</option>
+{% endfor %}
+<option{% if data.addr_from=="-1" %} selected{% endif %} value="-1">-- New Address --</option>
+</select></td></tr>
+
+<tr><td>Coin From</td><td>
+<select name="coin_from"><option value="-1">-- Select Coin --</option>
+{% for c in coins %}
+<option{% if data.coin_from==c[0] %} selected{% endif %} value="{{ c[0] }}">{{ c[1] }}</option>
+{% endfor %}
+</select>
+</td><td>Amount From</td><td><input type="text" name="amt_from" value="{{ data.amt_from }}"></td><td>The amount you will send.</td></tr>
+
+<tr><td>Coin To</td><td>
+<select name="coin_to"><option value="-1">-- Select Coin --</option>
+{% for c in coins %}
+<option{% if data.coin_to==c[0] %} selected{% endif %}  value="{{ c[0] }}">{{ c[1] }}</option>
+{% endfor %}
+</select>
+</td><td>Amount To</td><td><input type="text" name="amt_to" value="{{ data.amt_to }}"></td><td>The amount you will receive.</td></tr>
+</table>
+
+<input name="continue" type="submit" value="Continue">
+<input type="hidden" name="formid" value="{{ form_id }}">
+<input type="hidden" name="step1" value="a">
+</form>
+
+<p><a href="/">home</a></p>
+</body></html>

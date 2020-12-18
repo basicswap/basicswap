@@ -1,28 +1,27 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2018-2019 tecnovert
+# Copyright (c) 2018-2020 tecnovert
 # Distributed under the MIT software license, see the accompanying
-# file LICENSE.txt or http://www.opensource.org/licenses/mit-license.php.
+# file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-import os
-import decimal
-import subprocess
 import json
-import traceback
+import decimal
 import hashlib
-import urllib
-from xmlrpc.client import (
-    Transport,
-    Fault,
-)
-from .segwit_addr import bech32_decode, convertbits, bech32_encode
+
+from .script import OpCodes
+from .contrib.segwit_addr import bech32_decode, convertbits, bech32_encode
+
 
 COIN = 100000000
-DCOIN = decimal.Decimal(COIN)
 
 
-def makeInt(v):
-    return int(dquantize(decimal.Decimal(v) * DCOIN).quantize(decimal.Decimal(1)))
+decimal_ctx = decimal.Context()
+decimal_ctx.prec = 20
+
+
+def assert_cond(v, err='Bad opcode'):
+    if not v:
+        raise ValueError(err)
 
 
 def format8(i):
@@ -37,10 +36,6 @@ def format8(i):
 
 def toBool(s):
     return s.lower() in ["1", "true"]
-
-
-def dquantize(n, places=8):
-    return n.quantize(decimal.Decimal(10) ** -places)
 
 
 def jsonDecimal(obj):
@@ -198,100 +193,122 @@ def DeserialiseNum(b, o=0):
     return v
 
 
-class Jsonrpc():
-    # __getattr__ complicates extending ServerProxy
-    def __init__(self, uri, transport=None, encoding=None, verbose=False,
-                 allow_none=False, use_datetime=False, use_builtin_types=False,
-                 *, context=None):
-        # establish a "logical" server connection
+def decodeScriptNum(script_bytes, o):
+    v = 0
+    num_len = script_bytes[o]
+    if num_len >= OpCodes.OP_1 and num_len <= OpCodes.OP_16:
+        return((num_len - OpCodes.OP_1) + 1, 1)
 
-        # get the url
-        type, uri = urllib.parse.splittype(uri)
-        if type not in ("http", "https"):
-            raise OSError("unsupported XML-RPC protocol")
-        self.__host, self.__handler = urllib.parse.splithost(uri)
-        if not self.__handler:
-            self.__handler = "/RPC2"
-
-        if transport is None:
-            handler = Transport
-            extra_kwargs = {}
-            transport = handler(use_datetime=use_datetime,
-                                use_builtin_types=use_builtin_types,
-                                **extra_kwargs)
-        self.__transport = transport
-
-        self.__encoding = encoding or 'utf-8'
-        self.__verbose = verbose
-        self.__allow_none = allow_none
-
-    def close(self):
-        if self.__transport is not None:
-            self.__transport.close()
-
-    def json_request(self, method, params):
-        try:
-            connection = self.__transport.make_connection(self.__host)
-            headers = self.__transport._extra_headers[:]
-
-            request_body = {
-                'method': method,
-                'params': params,
-                'id': 2
-            }
-
-            connection.putrequest("POST", self.__handler)
-            headers.append(("Content-Type", "application/json"))
-            headers.append(("User-Agent", 'jsonrpc'))
-            self.__transport.send_headers(connection, headers)
-            self.__transport.send_content(connection, json.dumps(request_body, default=jsonDecimal).encode('utf-8'))
-
-            resp = connection.getresponse()
-            return resp.read()
-
-        except Fault:
-            raise
-        except Exception:
-            # All unexpected errors leave connection in
-            # a strange state, so we clear it.
-            self.__transport.close()
-            raise
+    if num_len > 4:
+        raise ValueError('Bad scriptnum length')  # Max 4 bytes
+    if num_len + o >= len(script_bytes):
+        raise ValueError('Bad script length')
+    o += 1
+    for i in range(num_len):
+        b = script_bytes[o + i]
+        # Negative flag set in last byte, if num is positive and > 0x80 an extra 0x00 byte will be appended
+        if i == num_len - 1 and b & 0x80:
+            b &= (~(0x80) & 0xFF)
+            v += int(b) << 8 * i
+            v *= -1
+        else:
+            v += int(b) << 8 * i
+    return(v, 1 + num_len)
 
 
-def callrpc(rpc_port, auth, method, params=[], wallet=None):
-
-    try:
-        url = 'http://%s@127.0.0.1:%d/' % (auth, rpc_port)
-        if wallet:
-            url += 'wallet/' + wallet
-        x = Jsonrpc(url)
-
-        v = x.json_request(method, params)
-        x.close()
-        r = json.loads(v.decode('utf-8'))
-    except Exception as ex:
-        traceback.print_exc()
-        raise ValueError('RPC Server Error')
-
-    if 'error' in r and r['error'] is not None:
-        raise ValueError('RPC error ' + str(r['error']))
-
-    return r['result']
+def getCompactSizeLen(v):
+    # Compact Size
+    if v < 253:
+        return 1
+    if v < 0xffff:  # USHRT_MAX
+        return 3
+    if v < 0xffffffff:  # UINT_MAX
+        return 5
+    if v < 0xffffffffffffffff:  # UINT_MAX
+        return 9
+    raise ValueError('Value too large')
 
 
-def callrpc_cli(bindir, datadir, chain, cmd, cli_bin='particl-cli'):
-    cli_bin = os.path.join(bindir, cli_bin)
+def float_to_str(f):
+    # stackoverflow.com/questions/38847690
+    d1 = decimal_ctx.create_decimal(repr(f))
+    return format(d1, 'f')
 
-    args = cli_bin + ('' if chain == 'mainnet' else ' -' + chain) + ' -datadir=' + datadir + ' ' + cmd
-    p = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-    out = p.communicate()
 
-    if len(out[1]) > 0:
-        raise ValueError('RPC error ' + str(out[1]))
+def make_int(v, scale=8, r=0):  # r = 0, no rounding, fail, r > 0 round up, r < 0 floor
+    if type(v) == float:
+        v = float_to_str(v)
+    elif type(v) == int:
+        return v * 10 ** scale
 
-    r = out[0].decode('utf-8').strip()
-    try:
-        r = json.loads(r)
-    except Exception:
-        pass
-    return r
+    ep = 10 ** scale
+    have_dp = False
+    rv = 0
+    for c in v:
+        if c == '.':
+            rv *= ep
+            have_dp = True
+            continue
+        if not c.isdigit():
+
+            raise ValueError('Invalid char: ' + c)
+        if have_dp:
+            ep //= 10
+            if ep <= 0:
+                if r == 0:
+                    raise ValueError('Mantissa too long')
+                if r > 0:
+                    # Round up
+                    if int(c) > 4:
+                        rv += 1
+                break
+
+            rv += ep * int(c)
+        else:
+            rv = rv * 10 + int(c)
+    if not have_dp:
+        rv *= ep
+    return rv
+
+
+def validate_amount(amount, scale=8):
+    str_amount = float_to_str(amount) if type(amount) == float else str(amount)
+    has_decimal = False
+    for c in str_amount:
+        if c == '.' and not has_decimal:
+            has_decimal = True
+            continue
+        if not c.isdigit():
+            raise ValueError('Invalid amount')
+
+    ar = str_amount.split('.')
+    if len(ar) > 1 and len(ar[1]) > scale:
+        raise ValueError('Too many decimal places in amount {}'.format(str_amount))
+    return True
+
+
+def format_amount(i, display_scale, scale=None):
+    if not isinstance(i, int):
+        raise ValueError('Amount must be an integer.')  # Raise error instead of converting as amounts should always be integers
+    if scale is None:
+        scale = display_scale
+    ep = 10 ** scale
+    n = abs(i)
+    quotient = n // ep
+    remainder = n % ep
+    if display_scale != scale:
+        remainder %= (10 ** display_scale)
+    rv = '{}.{:0>{scale}}'.format(quotient, remainder, scale=display_scale)
+    if i < 0:
+        rv = '-' + rv
+    return rv
+
+
+def getP2SHScriptForHash(p2sh):
+    return bytes([OpCodes.OP_HASH160, 0x14]) \
+        + p2sh \
+        + bytes([OpCodes.OP_EQUAL])
+
+
+def getP2WSH(script):
+    return bytes([OpCodes.OP_0, 0x20]) + hashlib.sha256(script).digest()

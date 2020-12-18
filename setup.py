@@ -24,11 +24,13 @@ setuptools.setup(
         "Operating System :: Linux",
     ],
     install_requires=[
+        "wheel",
         "pyzmq",
         "protobuf",
         "sqlalchemy",
         "python-gnupg",
         "Jinja2",
+        "requests",
     ],
     entry_points={
         "console_scripts": [

@@ -4,27 +4,42 @@ language: python
 python: '3.7'
 stages:
   - lint
+  - test
 env:
-global:
-  - TEST_DIR=~/test_basicswap2/
-  - PARTICL_BINDIR=/opt/binaries/particl-0.18.1.2/bin/
-  - BITCOIN_BINDIR=/opt/binaries/bitcoin-0.18.0/bin/
-  - LITECOIN_BINDIR=/opt/binaries/litecoin-0.17.1/bin/
+  global:
+    - PART_VERSION=0.19.1.2
+    - BTC_VERSION=0.20.1
+    - LTC_VERSION=0.18.1
+    - XMR_VERSION=0.17.1.5
+    - TEST_DIR=~/test_basicswap2/
+    - TEST_RELOAD_PATH=~/test_basicswap1/
+    - BIN_DIRS=~/binaries
+    - PARTICL_BINDIR=${BIN_DIRS}/particl-${PART_VERSION}/bin/
+    - BITCOIN_BINDIR=${BIN_DIRS}/bitcoin-${BTC_VERSION}/bin/
+    - LITECOIN_BINDIR=${BIN_DIRS}/litecoin-${LTC_VERSION}/bin/
+    - MONERO_BINDIR=${BIN_DIRS}/monero-${XMR_VERSION}/bin/
+cache:
+  directories:
+    - "$BIN_DIRS"
 before_install:
-  - sudo apt-get install -y wget gnupg2
+  - sudo apt-get install -y wget python3-pip gnupg unzip protobuf-compiler automake libtool pkg-config
 before_script:
-  - if [ ! -d "/opt/binaries" ]; then mkdir -p "/opt/binaries" ; fi
-  - if [ ! -d "$BITCOIN_BINDIR" ]; then cd "/opt/binaries" && wget https://bitcoincore.org/bin/bitcoin-core-0.18.0/bitcoin-0.18.0-x86_64-linux-gnu.tar.gz && tar xvf bitcoin-0.18.0-x86_64-linux-gnu.tar.gz ; fi
-  - if [ ! -d "$LITECOIN_BINDIR" ]; then cd "/opt/binaries" && wget https://download.litecoin.org/litecoin-0.17.1/linux/litecoin-0.17.1-x86_64-linux-gnu.tar.gz && tar xvf litecoin-0.17.1-x86_64-linux-gnu.tar.gz ; fi
-  - if [ ! -d "$PARTICL_BINDIR" ]; then cd "/opt/binaries" && wget https://github.com/particl/particl-core/releases/download/v0.18.1.2/particl-0.18.1.2-x86_64-linux-gnu_nousb.tar.gz && tar xvf particl-0.18.1.2-x86_64-linux-gnu_nousb.tar.gz ; fi
+  - if [ ! -d "$BIN_DIRS" ]; then mkdir -p "$BIN_DIRS" ; fi
+  - if [ ! -d "$PARTICL_BINDIR" ]; then cd "$BIN_DIRS" && wget https://github.com/tecnovert/particl-core/releases/download/v${PART_VERSION}/particl-${PART_VERSION}-x86_64-linux-gnu.tar.gz && tar xvf particl-${PART_VERSION}-x86_64-linux-gnu.tar.gz ; fi
+  - if [ ! -d "$BITCOIN_BINDIR" ]; then cd "$BIN_DIRS" && wget https://bitcoincore.org/bin/bitcoin-core-${BTC_VERSION}/bitcoin-${BTC_VERSION}-x86_64-linux-gnu.tar.gz && tar xvf bitcoin-${BTC_VERSION}-x86_64-linux-gnu.tar.gz ; fi
+  - if [ ! -d "$LITECOIN_BINDIR" ]; then cd "$BIN_DIRS" && wget https://download.litecoin.org/litecoin-${LTC_VERSION}/linux/litecoin-${LTC_VERSION}-x86_64-linux-gnu.tar.gz && tar xvf litecoin-${LTC_VERSION}-x86_64-linux-gnu.tar.gz ; fi
+  - wget -O coincurve-anonswap.zip https://github.com/tecnovert/coincurve/archive/anonswap.zip
+  - unzip coincurve-anonswap.zip
+  - cd coincurve-anonswap
+  - python3 setup.py install --force
 script:
   - cd $TRAVIS_BUILD_DIR
-  - export PARTICL_BINDIR=/opt/binaries/particl-0.18.1.2/bin/
-  - export BITCOIN_BINDIR=/opt/binaries/bitcoin-0.18.0/bin/
-  - export LITECOIN_BINDIR=/opt/binaries/litecoin-0.17.1/bin/
-  - export DATADIRS=~/test_basicswap2/
-  - mkdir -p ${DATADIRS}/bin/{particl,bitcoin}
-  - cp /opt/binaries/bitcoin-0.18.0-x86_64-linux-gnu.tar.gz ${DATADIRS}/bin/bitcoin
+  - export DATADIRS="${TEST_DIR}"
+  - mkdir -p ${DATADIRS}/bin/{particl,bitcoin,monero}
+  - cp "${BIN_DIRS}/bitcoin-${BTC_VERSION}-x86_64-linux-gnu.tar.gz" "${DATADIRS}/bin/bitcoin"
+  - mkdir -p ${TEST_RELOAD_PATH}/bin/{particl,bitcoin,monero}
+  - cp "${BIN_DIRS}/particl-${PART_VERSION}-x86_64-linux-gnu.tar.gz" "${TEST_RELOAD_PATH}/bin/particl"
+  - cp "${BIN_DIRS}/bitcoin-${BTC_VERSION}-x86_64-linux-gnu.tar.gz" "${TEST_RELOAD_PATH}/bin/bitcoin"
   - python setup.py test
 after_success:
   - echo "End test"
@@ -33,14 +48,14 @@ jobs:
     - stage: lint
       env:
       cache: false
-      language: python
-      python: '3.7'
       install:
-        - travis_retry pip install flake8==3.5.0
+        - travis_retry pip install flake8==3.7.0
         - travis_retry pip install codespell==1.15.0
       before_script:
       script:
-        - PYTHONWARNINGS="ignore" flake8 --ignore=E501,F841 --exclude=key.py,messages_pb2.py,.eggs
-        - codespell --check-filenames --disable-colors --quiet-level=7 -S .git,.eggs,gitianpubkeys
+        - PYTHONWARNINGS="ignore" flake8 --ignore=E501,F841,W503 --exclude=basicswap/contrib,messages_pb2.py,.eggs
+        - codespell --check-filenames --disable-colors --quiet-level=7 --ignore-words=tests/lint/spelling.ignore-words.txt -S .git,.eggs,gitianpubkeys,*.pyc,*basicswap/contrib,*mnemonics.py
       after_success:
         - echo "End lint"
+    - stage: test
+      env:

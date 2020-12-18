@@ -1,13 +1,17 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019 tecnovert
+# Copyright (c) 2019-2020 tecnovert
 # Distributed under the MIT software license, see the accompanying
-# file LICENSE.txt or http://www.opensource.org/licenses/mit-license.php.
+# file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 from enum import IntEnum
 from .util import (
     COIN,
+    format_amount,
+    make_int
 )
+
+XMR_COIN = 10 ** 12
 
 
 class Coins(IntEnum):
@@ -16,6 +20,7 @@ class Coins(IntEnum):
     LTC = 3
     # DCR = 4
     NMC = 5
+    XMR = 6
 
 
 chainparams = {
@@ -24,6 +29,7 @@ chainparams = {
         'ticker': 'PART',
         'message_magic': 'Bitcoin Signed Message:\n',
         'blocks_target': 60 * 2,
+        'decimal_places': 8,
         'mainnet': {
             'rpcport': 51735,
             'pubkey_address': 0x38,
@@ -60,10 +66,12 @@ chainparams = {
         'ticker': 'BTC',
         'message_magic': 'Bitcoin Signed Message:\n',
         'blocks_target': 60 * 10,
+        'decimal_places': 8,
         'mainnet': {
             'rpcport': 8332,
             'pubkey_address': 0,
             'script_address': 5,
+            'key_prefix': 128,
             'hrp': 'bc',
             'bip44': 0,
             'min_amount': 1000,
@@ -73,6 +81,7 @@ chainparams = {
             'rpcport': 18332,
             'pubkey_address': 111,
             'script_address': 196,
+            'key_prefix': 239,
             'hrp': 'tb',
             'bip44': 1,
             'min_amount': 1000,
@@ -83,6 +92,7 @@ chainparams = {
             'rpcport': 18443,
             'pubkey_address': 111,
             'script_address': 196,
+            'key_prefix': 239,
             'hrp': 'bcrt',
             'bip44': 1,
             'min_amount': 1000,
@@ -94,10 +104,12 @@ chainparams = {
         'ticker': 'LTC',
         'message_magic': 'Litecoin Signed Message:\n',
         'blocks_target': 60 * 1,
+        'decimal_places': 8,
         'mainnet': {
             'rpcport': 9332,
             'pubkey_address': 48,
             'script_address': 50,
+            'key_prefix': 176,
             'hrp': 'ltc',
             'bip44': 2,
             'min_amount': 1000,
@@ -107,6 +119,7 @@ chainparams = {
             'rpcport': 19332,
             'pubkey_address': 111,
             'script_address': 58,
+            'key_prefix': 239,
             'hrp': 'tltc',
             'bip44': 1,
             'min_amount': 1000,
@@ -117,6 +130,7 @@ chainparams = {
             'rpcport': 19443,
             'pubkey_address': 111,
             'script_address': 58,
+            'key_prefix': 239,
             'hrp': 'rltc',
             'bip44': 1,
             'min_amount': 1000,
@@ -128,6 +142,7 @@ chainparams = {
         'ticker': 'NMC',
         'message_magic': 'Namecoin Signed Message:\n',
         'blocks_target': 60 * 10,
+        'decimal_places': 8,
         'mainnet': {
             'rpcport': 8336,
             'pubkey_address': 52,
@@ -156,5 +171,53 @@ chainparams = {
             'min_amount': 1000,
             'max_amount': 100000 * COIN,
         }
+    },
+    Coins.XMR: {
+        'name': 'monero',
+        'ticker': 'XMR',
+        'client': 'xmr',
+        'decimal_places': 12,
+        'mainnet': {
+            'rpcport': 18081,
+            'walletrpcport': 18082,
+            'min_amount': 100000,
+            'max_amount': 10000 * XMR_COIN,
+        },
+        'testnet': {
+            'rpcport': 28081,
+            'walletrpcport': 28082,
+            'min_amount': 100000,
+            'max_amount': 10000 * XMR_COIN,
+        },
+        'regtest': {
+            'rpcport': 18081,
+            'walletrpcport': 18082,
+            'min_amount': 100000,
+            'max_amount': 10000 * XMR_COIN,
+        }
     }
 }
+
+
+class CoinInterface:
+    def __init__(self):
+        self._unknown_wallet_seed = True
+
+    def make_int(self, amount_in, r=0):
+        return make_int(amount_in, self.exp(), r=r)
+
+    def format_amount(self, amount_in, conv_int=False):
+        amount_int = make_int(amount_in, self.exp()) if conv_int else amount_in
+        return format_amount(amount_int, self.exp())
+
+    def coin_name(self):
+        return chainparams[self.coin_type()]['name'].capitalize()
+
+    def ticker(self):
+        return chainparams[self.coin_type()]['ticker']
+
+    def setWalletSeedWarning(self, value):
+        self._unknown_wallet_seed = value
+
+    def knownWalletSeed(self):
+        return not self._unknown_wallet_seed

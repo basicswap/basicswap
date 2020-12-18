@@ -1,24 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019 tecnovert
+# Copyright (c) 2019-2020 tecnovert
 # Distributed under the MIT software license, see the accompanying
-# file LICENSE.txt or http://www.opensource.org/licenses/mit-license.php.
+# file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-"""
-Atomic Swap Client - Proof of Concept
-
-"""
-
-import sys
 import os
-import time
+import sys
 import json
-import traceback
+import time
 import signal
-import subprocess
 import logging
+import traceback
+import subprocess
 
+import basicswap.config as cfg
 from basicswap import __version__
 from basicswap.basicswap import BasicSwap
 from basicswap.http_server import HttpThread
@@ -29,7 +25,6 @@ logger.level = logging.DEBUG
 if not len(logger.handlers):
     logger.addHandler(logging.StreamHandler(sys.stdout))
 
-ALLOW_CORS = False
 swap_client = None
 
 
@@ -44,13 +39,37 @@ def startDaemon(node_dir, bin_dir, daemon_bin, opts=[]):
     daemon_bin = os.path.expanduser(os.path.join(bin_dir, daemon_bin))
 
     args = [daemon_bin, '-datadir=' + os.path.expanduser(node_dir)] + opts
-    logger.info('Starting node ' + daemon_bin + ' ' + '-datadir=' + node_dir)
+    logging.info('Starting node ' + daemon_bin + ' ' + '-datadir=' + node_dir)
     return subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+
+def startXmrDaemon(node_dir, bin_dir, daemon_bin, opts=[]):
+    daemon_bin = os.path.expanduser(os.path.join(bin_dir, daemon_bin))
+
+    args = [daemon_bin, '--config-file=' + os.path.join(os.path.expanduser(node_dir), 'monerod.conf')] + opts
+    logging.info('Starting node {} --data-dir={}'.format(daemon_bin, node_dir))
+
+    return subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+
+def startXmrWalletDaemon(node_dir, bin_dir, wallet_bin, opts=[]):
+    daemon_bin = os.path.expanduser(os.path.join(bin_dir, wallet_bin))
+
+    data_dir = os.path.expanduser(node_dir)
+    args = [daemon_bin, '--config-file=' + os.path.join(os.path.expanduser(node_dir), 'monero_wallet.conf')] + opts
+
+    args += opts
+    logging.info('Starting wallet daemon {} --wallet-dir={}'.format(daemon_bin, node_dir))
+
+    # TODO: return subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=data_dir)
+    wallet_stdout = open(os.path.join(data_dir, 'wallet_stdout.log'), 'w')
+    wallet_stderr = open(os.path.join(data_dir, 'wallet_stderr.log'), 'w')
+    return subprocess.Popen(args, stdin=subprocess.PIPE, stdout=wallet_stdout, stderr=wallet_stderr, cwd=data_dir)
 
 
 def runClient(fp, data_dir, chain):
     global swap_client
-    settings_path = os.path.join(data_dir, 'basicswap.json')
+    settings_path = os.path.join(data_dir, cfg.CONFIG_FILENAME)
     pids_path = os.path.join(data_dir, '.pids')
 
     if not os.path.exists(settings_path):
@@ -77,6 +96,20 @@ def runClient(fp, data_dir, chain):
     try:
         # Try start daemons
         for c, v in settings['chainclients'].items():
+            if c == 'monero':
+                if v['manage_daemon'] is True:
+                    logger.info('Starting {} daemon'.format(c.capitalize()))
+                    daemons.append(startXmrDaemon(v['datadir'], v['bindir'], 'monerod'))
+                    pid = daemons[-1].pid
+                    logger.info('Started {} {}'.format('monerod', pid))
+
+                if v['manage_wallet_daemon'] is True:
+                    logger.info('Starting {} wallet daemon'.format(c.capitalize()))
+                    daemons.append(startXmrWalletDaemon(v['datadir'], v['bindir'], 'monero-wallet-rpc'))
+                    pid = daemons[-1].pid
+                    logger.info('Started {} {}'.format('monero-wallet-rpc', pid))
+
+                continue
             if v['manage_daemon'] is True:
                 logger.info('Starting {} daemon'.format(c.capitalize()))
 
@@ -97,7 +130,7 @@ def runClient(fp, data_dir, chain):
 
         if 'htmlhost' in settings:
             swap_client.log.info('Starting server at %s:%d.' % (settings['htmlhost'], settings['htmlport']))
-            allow_cors = settings['allowcors'] if 'allowcors' in settings else ALLOW_CORS
+            allow_cors = settings['allowcors'] if 'allowcors' in settings else cfg.DEFAULT_ALLOW_CORS
             tS1 = HttpThread(fp, settings['htmlhost'], settings['htmlport'], allow_cors, swap_client)
             threads.append(tS1)
             tS1.start()
@@ -109,25 +142,26 @@ def runClient(fp, data_dir, chain):
     except Exception as ex:
         traceback.print_exc()
 
-    swap_client.log.info('Stopping threads.')
+    swap_client.finalise()
+    swap_client.log.info('Stopping HTTP threads.')
     for t in threads:
         t.stop()
         t.join()
 
     closed_pids = []
     for d in daemons:
-        int_pid = d.pid
-        logger.info('Terminating {}'.format(int_pid))
+        logging.info('Interrupting {}'.format(d.pid))
         try:
-            d.terminate()
+            d.send_signal(signal.SIGINT)
+        except Exception as e:
+            logging.info('Interrupting %d, error %s', d.pid, str(e))
+    for d in daemons:
+        try:
             d.wait(timeout=120)
-            if d.stdout:
-                d.stdout.close()
-            if d.stderr:
-                d.stderr.close()
-            if d.stdin:
-                d.stdin.close()
-            closed_pids.append(int_pid)
+            for fp in (d.stdout, d.stderr, d.stdin):
+                if fp:
+                    fp.close()
+            closed_pids.append(d.pid)
         except Exception as ex:
             logger.error('Error: {}'.format(ex))
 
@@ -153,7 +187,7 @@ def printHelp():
     logger.info('Usage: basicswap-run ')
     logger.info('\n--help, -h               Print help.')
     logger.info('--version, -v            Print version.')
-    logger.info('--datadir=PATH           Path to basicswap data directory, default:~/.basicswap.')
+    logger.info('--datadir=PATH           Path to basicswap data directory, default:{}.'.format(cfg.DEFAULT_DATADIR))
     logger.info('--mainnet                Run in mainnet mode.')
     logger.info('--testnet                Run in testnet mode.')
     logger.info('--regtest                Run in regtest mode.')
@@ -197,8 +231,7 @@ def main():
         logger.warning('Unknown argument %s', v)
 
     if data_dir is None:
-        default_datadir = '~/.basicswap'
-        data_dir = os.path.join(os.path.expanduser(default_datadir))
+        data_dir = os.path.join(os.path.expanduser(cfg.DEFAULT_DATADIR))
     logger.info('Using datadir: %s', data_dir)
     logger.info('Chain: %s', chain)
 

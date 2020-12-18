@@ -3,37 +3,46 @@
 
 # Copyright (c) 2019 tecnovert
 # Distributed under the MIT software license, see the accompanying
-# file LICENSE.txt or http://www.opensource.org/licenses/mit-license.php.
+# file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 """
-
 export TEST_RELOAD_PATH=/tmp/test_basicswap
 mkdir -p ${TEST_RELOAD_PATH}/bin/{particl,bitcoin}
-cp ~/tmp/particl-0.18.1.2-x86_64-linux-gnu.tar.gz ${TEST_RELOAD_PATH}/bin/particl
-cp ~/tmp/bitcoin-0.18.0-x86_64-linux-gnu.tar.gz ${TEST_RELOAD_PATH}/bin/bitcoin
+cp ~/tmp/particl-0.19.1.2-x86_64-linux-gnu.tar.gz ${TEST_RELOAD_PATH}/bin/particl
+cp ~/tmp/bitcoin-0.20.1-x86_64-linux-gnu.tar.gz ${TEST_RELOAD_PATH}/bin/bitcoin
+export PYTHONPATH=$(pwd)
+python tests/basicswap/test_reload.py
 
 
 """
 
 import os
 import sys
-import time
-import unittest
-import logging
-import shutil
 import json
+import time
+import shutil
+import logging
+import unittest
 import traceback
+import threading
 import multiprocessing
-from unittest.mock import patch
-from urllib.request import urlopen
 from urllib import parse
+from urllib.request import urlopen
+from unittest.mock import patch
 
+from basicswap.rpc import (
+    callrpc_cli,
+)
+from tests.basicswap.mnemonics import mnemonics
+
+import basicswap.config as cfg
 import bin.basicswap_prepare as prepareSystem
 import bin.basicswap_run as runSystem
 
 test_path = os.path.expanduser(os.getenv('TEST_RELOAD_PATH', '~/test_basicswap1'))
 PARTICL_PORT_BASE = int(os.getenv('PARTICL_PORT_BASE', '11938'))
 BITCOIN_PORT_BASE = int(os.getenv('BITCOIN_PORT_BASE', '10938'))
+stop_test = False
 
 logger = logging.getLogger()
 logger.level = logging.DEBUG
@@ -41,14 +50,55 @@ if not len(logger.handlers):
     logger.addHandler(logging.StreamHandler(sys.stdout))
 
 
-def waitForServer():
+def btcRpc(client_no, cmd):
+    bin_path = os.path.join(test_path, 'bin', 'bitcoin')
+    data_path = os.path.join(test_path, 'client{}'.format(client_no), 'bitcoin')
+    return callrpc_cli(bin_path, data_path, 'regtest', cmd, 'bitcoin-cli')
+
+
+def waitForServer(port):
     for i in range(20):
         try:
             time.sleep(1)
-            summary = json.loads(urlopen('http://localhost:12700/json').read())
+            summary = json.loads(urlopen('http://localhost:{}/json'.format(port)).read())
             break
         except Exception:
             traceback.print_exc()
+
+
+def waitForNumOffers(port, offers):
+    for i in range(20):
+        summary = json.loads(urlopen('http://localhost:{}/json'.format(port)).read())
+        if summary['num_network_offers'] >= offers:
+            return
+        time.sleep(1)
+    raise ValueError('waitForNumOffers failed')
+
+
+def waitForNumBids(port, bids):
+    for i in range(20):
+        summary = json.loads(urlopen('http://localhost:{}/json'.format(port)).read())
+        if summary['num_recv_bids'] >= bids:
+            return
+        time.sleep(1)
+    raise ValueError('waitForNumBids failed')
+
+
+def waitForNumSwapping(port, bids):
+    for i in range(20):
+        summary = json.loads(urlopen('http://localhost:{}/json'.format(port)).read())
+        if summary['num_swapping'] >= bids:
+            return
+        time.sleep(1)
+    raise ValueError('waitForNumSwapping failed')
+
+
+def updateThread():
+    btc_addr = btcRpc(0, 'getnewaddress mining_addr bech32')
+
+    while not stop_test:
+        btcRpc(0, 'generatetoaddress {} {}'.format(1, btc_addr))
+        time.sleep(5)
 
 
 class Test(unittest.TestCase):
@@ -56,15 +106,9 @@ class Test(unittest.TestCase):
     def setUpClass(cls):
         super(Test, cls).setUpClass()
 
-        mnemonics = [
-            'abandon baby cabbage dad eager fabric gadget habit ice kangaroo lab absorb',
-            'actuel comédie poésie noble facile éprouver brave cellule rotule académie hilarant chambre',
-            'ちしき　いてざ　きおち　あしあと　ぽちぶくろ　こえる　さつえい　むえき　あける　ほんき　むさぼる　ねいろ',
-        ]
-
         for i in range(3):
             client_path = os.path.join(test_path, 'client{}'.format(i))
-            config_path = os.path.join(client_path, 'basicswap.json')
+            config_path = os.path.join(client_path, cfg.CONFIG_FILENAME)
             try:
                 shutil.rmtree(client_path)
             except Exception as ex:
@@ -72,19 +116,43 @@ class Test(unittest.TestCase):
             testargs = [
                 'basicswap-prepare',
                 '-datadir="{}"'.format(client_path),
-                '-bindir="{}"'.format(test_path + '/bin'),
+                '-bindir="{}"'.format(os.path.join(test_path, 'bin')),
                 '-portoffset={}'.format(i),
                 '-particl_mnemonic="{}"'.format(mnemonics[i]),
                 '-regtest', '-withoutcoin=litecoin', '-withcoin=bitcoin']
             with patch.object(sys, 'argv', testargs):
                 prepareSystem.main()
 
-            with open(os.path.join(client_path, 'particl', 'particl.conf'), 'a') as fp:
+            with open(os.path.join(client_path, 'particl', 'particl.conf'), 'r') as fp:
+                lines = fp.readlines()
+            with open(os.path.join(client_path, 'particl', 'particl.conf'), 'w') as fp:
+                for line in lines:
+                    if not line.startswith('staking'):
+                        fp.write(line)
                 fp.write('port={}\n'.format(PARTICL_PORT_BASE + i))
+                fp.write('bind=127.0.0.1\n')
+                fp.write('dnsseed=0\n')
+                fp.write('minstakeinterval=5\n')
                 for ip in range(3):
-                    fp.write('addnode=localhost:{}\n'.format(PARTICL_PORT_BASE + ip))
-            with open(os.path.join(client_path, 'bitcoin', 'bitcoin.conf'), 'a') as fp:
+                    if ip != i:
+                        fp.write('connect=localhost:{}\n'.format(PARTICL_PORT_BASE + ip))
+
+            # Pruned nodes don't provide blocks
+            with open(os.path.join(client_path, 'bitcoin', 'bitcoin.conf'), 'r') as fp:
+                lines = fp.readlines()
+            with open(os.path.join(client_path, 'bitcoin', 'bitcoin.conf'), 'w') as fp:
+                for line in lines:
+                    if not line.startswith('prune'):
+                        fp.write(line)
                 fp.write('port={}\n'.format(BITCOIN_PORT_BASE + i))
+                fp.write('discover=0\n')
+                fp.write('dnsseed=0\n')
+                fp.write('listenonion=0\n')
+                fp.write('upnp=0\n')
+                fp.write('bind=127.0.0.1\n')
+                for ip in range(3):
+                    if ip != i:
+                        fp.write('connect=localhost:{}\n'.format(BITCOIN_PORT_BASE + ip))
 
             assert(os.path.exists(config_path))
 
@@ -95,6 +163,7 @@ class Test(unittest.TestCase):
             runSystem.main()
 
     def test_reload(self):
+        global stop_test
         processes = []
 
         for i in range(3):
@@ -102,7 +171,18 @@ class Test(unittest.TestCase):
             processes[-1].start()
 
         try:
-            waitForServer()
+            waitForServer(12700)
+
+            num_blocks = 500
+            btc_addr = btcRpc(1, 'getnewaddress mining_addr bech32')
+            logging.info('Mining %d Bitcoin blocks to %s', num_blocks, btc_addr)
+            btcRpc(1, 'generatetoaddress {} {}'.format(num_blocks, btc_addr))
+
+            for i in range(20):
+                blocks = btcRpc(0, 'getblockchaininfo')['blocks']
+                if blocks >= 500:
+                    break
+            assert(blocks >= 500)
 
             data = parse.urlencode({
                 'addr_from': '-1',
@@ -118,9 +198,57 @@ class Test(unittest.TestCase):
         except Exception:
             traceback.print_exc()
 
-        logger.warning('TODO')
-        time.sleep(5)
+        logger.info('Waiting for offer:')
+        waitForNumOffers(12701, 1)
 
+        offers = json.loads(urlopen('http://localhost:12701/json/offers').read())
+        offer = offers[0]
+
+        data = parse.urlencode({
+            'offer_id': offer['offer_id'],
+            'amount_from': offer['amount_from']}).encode()
+
+        bid_id = json.loads(urlopen('http://localhost:12701/json/bids/new', data=data).read())
+
+        waitForNumBids(12700, 1)
+
+        bids = json.loads(urlopen('http://localhost:12700/json/bids').read())
+        bid = bids[0]
+
+        data = parse.urlencode({
+            'accept': True
+        }).encode()
+        rv = json.loads(urlopen('http://localhost:12700/json/bids/{}'.format(bid['bid_id']), data=data).read())
+        assert(rv['bid_state'] == 'Accepted')
+
+        waitForNumSwapping(12701, 1)
+
+        logger.info('Restarting client:')
+        c1 = processes[1]
+        c1.terminate()
+        c1.join()
+        processes[1] = multiprocessing.Process(target=self.run_thread, args=(1,))
+        processes[1].start()
+
+        waitForServer(12701)
+        rv = json.loads(urlopen('http://localhost:12701/json').read())
+        assert(rv['num_swapping'] == 1)
+
+        update_thread = threading.Thread(target=updateThread)
+        update_thread.start()
+
+        logger.info('Completing swap:')
+        for i in range(240):
+            time.sleep(5)
+
+            rv = json.loads(urlopen('http://localhost:12700/json/bids/{}'.format(bid['bid_id'])).read())
+            print(rv)
+            if rv['bid_state'] == 'Completed':
+                break
+        assert(rv['bid_state'] == 'Completed')
+
+        stop_test = True
+        update_thread.join()
         for p in processes:
             p.terminate()
         for p in processes:

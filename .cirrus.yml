@@ -1,0 +1,46 @@
+container:
+  image: python
+
+lint_task:
+  setup_script:
+    - pip install flake8
+    - pip install codespell
+  script:
+    - flake8 --version
+    - PYTHONWARNINGS="ignore" flake8 --ignore=E501,F841,W503 --exclude=basicswap/contrib,messages_pb2.py,.eggs
+    - codespell --check-filenames --disable-colors --quiet-level=7 --ignore-words=tests/lint/spelling.ignore-words.txt -S .git,.eggs,gitianpubkeys,*.pyc,*basicswap/contrib,*mnemonics.py
+
+test_task:
+  environment:
+    - PART_VERSION: 0.19.1.2
+    - BTC_VERSION: 0.20.1
+    - LTC_VERSION: 0.18.1
+    - XMR_VERSION: 0.17.1.5
+    - TEST_RELOAD_PATH: $HOME/test_basicswap1/
+    - TEST_DIR: $HOME/test_basicswap2/
+    - BIN_DIRS: $HOME/binaries
+    - PARTICL_BINDIR: ${BIN_DIRS}/particl-${PART_VERSION}/bin
+    - BITCOIN_BINDIR: ${BIN_DIRS}/bitcoin-${BTC_VERSION}/bin
+    - LITECOIN_BINDIR: ${BIN_DIRS}/litecoin-${LTC_VERSION}/bin
+    - MONERO_BINDIR: ${BIN_DIRS}/monero-${XMR_VERSION}/bin
+  setup_script:
+    - apt-get update
+    - apt-get install -y wget python3-pip gnupg unzip protobuf-compiler automake libtool pkg-config
+    - if [ ! -d "$BIN_DIRS" ]; then mkdir -p "$BIN_DIRS" ; fi
+    - if [ ! -d "$PARTICL_BINDIR" ]; then cd "$BIN_DIRS" && wget https://github.com/tecnovert/particl-core/releases/download/v${PART_VERSION}/particl-${PART_VERSION}-x86_64-linux-gnu.tar.gz && tar xvf particl-${PART_VERSION}-x86_64-linux-gnu.tar.gz; fi
+    - if [ ! -d "$BITCOIN_BINDIR" ]; then cd "$BIN_DIRS" && wget https://bitcoincore.org/bin/bitcoin-core-${BTC_VERSION}/bitcoin-${BTC_VERSION}-x86_64-linux-gnu.tar.gz && tar xvf bitcoin-${BTC_VERSION}-x86_64-linux-gnu.tar.gz; fi
+    - if [ ! -d "$LITECOIN_BINDIR" ]; then cd "$BIN_DIRS" && wget https://download.litecoin.org/litecoin-${LTC_VERSION}/linux/litecoin-${LTC_VERSION}-x86_64-linux-gnu.tar.gz && tar xvf litecoin-${LTC_VERSION}-x86_64-linux-gnu.tar.gz ; fi
+    - wget -O coincurve-anonswap.zip https://github.com/tecnovert/coincurve/archive/anonswap.zip
+    - unzip coincurve-anonswap.zip
+    - cd coincurve-anonswap
+    - python3 setup.py install --force
+  script:
+    - cd "${CIRRUS_WORKING_DIR}"
+    - export DATADIRS="${TEST_DIR}"
+    - mkdir -p ${DATADIRS}/bin/{particl,bitcoin,monero}
+    - cp "${BIN_DIRS}/bitcoin-${BTC_VERSION}-x86_64-linux-gnu.tar.gz" "${DATADIRS}/bin/bitcoin"
+    - cp "${BIN_DIRS}/particl-${PART_VERSION}-x86_64-linux-gnu.tar.gz" "${DATADIRS}/bin/particl"
+    - mkdir -p ${TEST_RELOAD_PATH}/bin/{particl,bitcoin,monero}
+    - cp "${BIN_DIRS}/particl-${PART_VERSION}-x86_64-linux-gnu.tar.gz" "${TEST_RELOAD_PATH}/bin/particl"
+    - cp "${BIN_DIRS}/bitcoin-${BTC_VERSION}-x86_64-linux-gnu.tar.gz" "${TEST_RELOAD_PATH}/bin/bitcoin"
+    - python setup.py test

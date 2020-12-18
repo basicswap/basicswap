@@ -3,19 +3,21 @@
 
 # Copyright (c) 2019 tecnovert
 # Distributed under the MIT software license, see the accompanying
-# file LICENSE.txt or http://www.opensource.org/licenses/mit-license.php.
+# file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import os
 import sys
-import unittest
-from unittest.mock import patch
-from io import StringIO
-import logging
-import shutil
 import json
+import shutil
+import logging
+import unittest
 
+from io import StringIO
+from unittest.mock import patch
+
+import basicswap.config as cfg
 import bin.basicswap_prepare as prepareSystem
-test_path = os.path.expanduser('~/test_basicswap')
+test_path = os.path.expanduser(os.getenv('TEST_PREPARE_PATH', '~/test_basicswap'))
 
 logger = logging.getLogger()
 logger.level = logging.DEBUG
@@ -37,7 +39,7 @@ class Test(unittest.TestCase):
         with patch.object(sys, 'argv', testargs):
             prepareSystem.main()
 
-        config_path = os.path.join(test_path, 'basicswap.json')
+        config_path = os.path.join(test_path, cfg.CONFIG_FILENAME)
         self.assertTrue(os.path.exists(config_path))
 
         logger.info('Test no overwrite')

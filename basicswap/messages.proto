@@ -26,6 +26,9 @@ message OfferMessage {
     string proof_signature = 11;
     bytes pkhash_seller = 12;
     bytes secret_hash = 13;
+
+    uint64 fee_rate_from = 14;
+    uint64 fee_rate_to = 15;
 }
 
 /* Step 2, buyer -> seller */
@@ -45,4 +48,70 @@ message BidAcceptMessage {
     bytes bid_msg_id = 1;
     bytes initiate_txid = 2;
     bytes contract_script = 3;
+}
+
+message OfferRevokeMessage {
+    bytes offer_msg_id = 1;
+    bytes signature = 2;
+}
+
+message XmrBidMessage {
+    /* MSG1L, F -> L */
+    bytes offer_msg_id = 1;
+    uint64 time_valid = 2;          /* seconds bid is valid for */
+    uint64 amount = 3;              /* amount of amount_from bid is for */
+
+    bytes pkaf = 4;
+
+    bytes kbvf = 5;
+    bytes kbsf_dleag = 6;
+
+    bytes dest_af = 7;
+}
+
+message XmrSplitMessage {
+    bytes msg_id = 1;
+    uint32 msg_type = 2;  /* 1 XmrBid, 2 XmrBidAccept */
+    uint32 sequence = 3;
+    bytes dleag = 4;
+}
+
+message XmrBidAcceptMessage {
+    bytes bid_msg_id = 1;
+
+    bytes pkal = 3;
+
+    bytes kbvl = 4;
+    bytes kbsl_dleag = 5;
+
+    /* MSG2F */
+    bytes a_lock_tx = 6;
+    bytes a_lock_tx_script = 7;
+    bytes a_lock_refund_tx = 8;
+    bytes a_lock_refund_tx_script = 9;
+    bytes a_lock_refund_spend_tx = 10;
+    bytes al_lock_refund_tx_sig = 11;
+}
+
+message XmrBidLockTxSigsMessage {
+    /* MSG3L */
+    bytes bid_msg_id = 1;
+
+    bytes af_lock_refund_spend_tx_esig = 2;
+    bytes af_lock_refund_tx_sig = 3;
+}
+
+message XmrBidLockSpendTxMessage {
+    /* MSG4F */
+    bytes bid_msg_id = 1;
+
+    bytes a_lock_spend_tx = 2;
+    bytes kal_sig = 3;
+}
+
+message XmrBidLockReleaseMessage {
+    /* MSG5F */
+    bytes bid_msg_id = 1;
+
+    bytes al_lock_spend_tx_esig = 2;
 }

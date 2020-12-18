@@ -1,0 +1,67 @@
+{% include 'header.html' %}
+
+<h3>New Offer</h3>
+{% for m in messages %}
+<p>{{ m }}</p>
+{% endfor %}
+
+<form method="post">
+
+<table>
+<tr><td>Send From Address</td><td><select name="addr_from_" disabled>
+{% for a in addrs %}
+<option{% if data.addr_from==a %} selected{% endif %} value="{{ a }}">{{ a }}</option>
+{% endfor %}
+<option{% if data.addr_from=="-1" %} selected{% endif %} value="-1">-- New Address --</option>
+</select></td></tr>
+
+<tr><td>Coin From</td><td>
+<select name="coin_from_" disabled><option value="-1">-- Select Coin --</option>
+{% for c in coins %}
+<option{% if data.coin_from==c[0] %} selected{% endif %} value="{{ c[0] }}">{{ c[1] }}</option>
+{% endfor %}
+</select>
+</td><td>Amount From</td><td><input type="text" name="amt_from" value="{{ data.amt_from }}" readonly></td><td>The amount you will send.</td></tr>
+{% if data.swap_style == 'xmr' %}
+</td><td>Fee From Confirm Target</td><td><input type="number" name="fee_from_conf" min="1" max="32" value="{{ data.fee_from_conf }}"></td></tr>
+</td><td>Fee From Extra Fee</td><td>
+<select name="fee_from_extra">
+<option value="0">None</option>
+<option value="10"{% if data.fee_from_extra==10 %} selected{% endif %}>10%</option>
+<option value="50"{% if data.fee_from_extra==50 %} selected{% endif %}>50%</option>
+<option value="100"{% if data.fee_from_extra==100 %} selected{% endif %}>100%</option>
+</select></td></tr>
+{% endif %}
+
+<tr><td>Coin To</td><td>
+<select name="coin_to_" disabled><option value="-1">-- Select Coin --</option>
+{% for c in coins %}
+<option{% if data.coin_to==c[0] %} selected{% endif %}  value="{{ c[0] }}">{{ c[1] }}</option>
+{% endfor %}
+</select>
+</td><td>Amount To</td><td><input type="text" name="amt_to" value="{{ data.amt_to }}" readonly></td><td>The amount you will receive.</td></tr>
+{% if data.swap_style == 'xmr' and coin_to != '6' %}
+</td><td>Fee To Confirm Target</td><td><input type="number" name="fee_to_conf" min="1" max="32" value="{{ data.fee_to_conf }}"></td></tr>
+</td><td>Fee To Extra Fee</td><td>
+<select name="fee_to_extra">
+<option value="0">None</option>
+<option value="10"{% if data.fee_to_extra==10 %} selected{% endif %}>10%</option>
+<option value="50"{% if data.fee_to_extra==50 %} selected{% endif %}>50%</option>
+<option value="100"{% if data.fee_to_extra==100 %} selected{% endif %}>100%</option>
+</select></td></tr>
+{% endif %}
+
+<tr><td>Contract locked (hrs)</td><td><input type="number" name="lockhrs" min="1" max="64" value="{{ data.lockhrs }}"></td><td colspan=2>Participate txn will be locked for half the time.</td></tr>
+<tr><td>Auto Accept Bids</td><td colspan=3><input type="checkbox" name="autoaccept" value="aa" {% if data.autoaccept==true %} checked="true"{% endif %}></td></tr>
+</table>
+
+<input name="check_offer" type="submit" value="Continue">
+<input name="step1" type="submit" value="Back">
+<input type="hidden" name="formid" value="{{ form_id }}">
+<input type="hidden" name="addr_from" value="{{ data.addr_from }}">
+<input type="hidden" name="coin_from" value="{{ data.coin_from }}">
+<input type="hidden" name="coin_to" value="{{ data.coin_to }}">
+</form>
+
+<p><a href="/">home</a></p>
+</body></html>
