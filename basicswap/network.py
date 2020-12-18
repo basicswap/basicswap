@@ -99,7 +99,7 @@ class MsgHandshake:
 
 class Peer:
     __slots__ = (
-        '_mx', '_pubkey', '_address', '_socket', '_version', '_ready',
+        '_mx', '_pubkey', '_address', '_socket', '_version', '_ready', '_incoming',
         '_connected_at', '_last_received_at', '_bytes_sent', '_bytes_received',
         '_receiving_length', '_receiving_buffer', '_recv_messages', '_misbehaving_score',
         '_ke', '_km', '_dir', '_sent_nonce', '_recv_nonce', '_last_handshake_at',
@@ -111,7 +111,8 @@ class Peer:
         self._address = address
         self._socket = socket
         self._version = None
-        self._ready = False  # True When handshake is complete
+        self._ready = False  # True when handshake is complete
+        self._incoming = False
         self._connected_at = time.time()
         self._last_received_at = 0
         self._last_handshake_at = 0
@@ -122,7 +123,7 @@ class Peer:
         self._receiving_length = 0
         self._receiving_buffer = None
         self._recv_messages = queue.Queue()  # Built in mutex
-        self._misbehaving_score = 0
+        self._misbehaving_score = 0  # TODO: Must be persistent - save to db
 
         self._ping_nonce = 0
         self._last_ping_at = 0  # ms
@@ -146,7 +147,9 @@ def listen_thread(cls):
                 if s == cls._socket:
                     peer_socket, address = cls._socket.accept()
                     logging.info('Connection from %s', address)
-                    cls._peers.append(Peer(address, peer_socket, None))
+                    new_peer = Peer(address, peer_socket, None)
+                    new_peer._incoming = True
+                    cls._peers.append(new_peer)
                     cls._error_sockets.append(peer_socket)
                     cls._read_sockets.append(peer_socket)
                 else:
@@ -183,21 +186,22 @@ def msg_thread(cls):
     while cls._running:
         processed = False
 
-        for peer in cls._peers:
-            try:
-                now_us = time.time_ns() // 1000
-                if peer._ready is True:
-                    if now_us - peer._last_ping_at >= 5000000:  # 5 seconds  TODO: Make variable
-                        cls.send_ping(peer)
-                msg = peer._recv_messages.get(False)
-                cls.process_message(peer, msg)
-                processed = True
-            except queue.Empty:
-                pass
-            except Exception as e:
-                logging.warning('process message error %s', str(e))
-                if cls._sc.debug:
-                    traceback.print_exc()
+        with cls._mx:
+            for peer in cls._peers:
+                try:
+                    now_us = time.time_ns() // 1000
+                    if peer._ready is True:
+                        if now_us - peer._last_ping_at >= 5000000:  # 5 seconds  TODO: Make variable
+                            cls.send_ping(peer)
+                    msg = peer._recv_messages.get(False)
+                    cls.process_message(peer, msg)
+                    processed = True
+                except queue.Empty:
+                    pass
+                except Exception as e:
+                    logging.warning('process message error %s', str(e))
+                    if cls._sc.debug:
+                        traceback.print_exc()
 
         if processed is False:
             time.sleep(timeout)
@@ -572,3 +576,27 @@ class Network:
             if self._sc.debug:
                 self._sc.log.error('Invalid message received from %s %s', peer._address, str(e))
             # TODO: misbehaving
+
+    def test_onion(self, path):
+        self._sc.log.debug('test_onion packet')
+
+        plaintext = 'test'
+
+    def get_info(self):
+        rv = {}
+
+        peers = []
+        with self._mx:
+            for peer in self._peers:
+                peer_info = {
+                    'pubkey': 'Unknown' if not peer._pubkey else peer._pubkey.hex(),
+                    'address': '{}:{}'.format(peer._address[0], peer._address[1]),
+                    'bytessent': peer._bytes_sent,
+                    'bytesrecv': peer._bytes_received,
+                    'ready': peer._ready,
+                    'incoming': peer._incoming,
+                }
+                peers.append(peer_info)
+
+        rv['peers'] = peers
+        return rv

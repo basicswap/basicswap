@@ -25,6 +25,7 @@ from basicswap.basicswap import (
 from basicswap.util import (
     COIN,
     toWIF,
+    dumpj,
 )
 from basicswap.rpc import (
     callrpc,
@@ -42,7 +43,6 @@ from tests.basicswap.common import (
     make_rpc_func,
     checkForks,
     stopDaemons,
-    wait_for_offer,
     delay_for,
     TEST_HTTP_HOST,
     TEST_HTTP_PORT,
@@ -294,16 +294,39 @@ class Test(unittest.TestCase):
 
         super(Test, cls).tearDownClass()
 
-    def test_01_part_btc(self):
-        logging.info('---------- Test PART to BTC')
+    def wait_for_num_nodes(self, port, expect_nodes, wait_for=20):
+        for i in range(wait_for):
+            if delay_event.is_set():
+                raise ValueError('Test stopped.')
+            js = json.loads(urlopen('http://localhost:{}/json/network'.format(port)).read())
+            num_nodes = 0
+            for p in js['peers']:
+                if p['ready'] is True:
+                    num_nodes += 1
+            if num_nodes >= expect_nodes:
+                return True
+            delay_event.wait(1)
+        raise ValueError('wait_for_num_nodes timed out.')
+
+    def test_01_network(self):
+
+        logging.info('---------- Test Network')
         swap_clients = self.swap_clients
 
         js_1 = json.loads(urlopen('http://localhost:1801/json/wallets').read())
 
         offer_id = swap_clients[0].postOffer(Coins.PART, Coins.BTC, 100 * COIN, 0.1 * COIN, 100 * COIN, SwapTypes.SELLER_FIRST)
-        wait_for_offer(delay_event, swap_clients[1], offer_id)
 
         swap_clients[1].add_connection('127.0.0.1', BASE_P2P_PORT + 0, swap_clients[0]._network._network_pubkey)
+        swap_clients[2].add_connection('127.0.0.1', BASE_P2P_PORT + 0, swap_clients[0]._network._network_pubkey)
+
+        self.wait_for_num_nodes(1800, 2)
+
+        js_n0 = json.loads(urlopen('http://localhost:1800/json/network').read())
+        print(dumpj(js_n0))
+
+        path = [swap_clients[0]._network._network_pubkey, swap_clients[2]._network._network_pubkey]
+        swap_clients[1].test_onion(path)
 
         delay_for(delay_event, 1000)
 

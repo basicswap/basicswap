@@ -38,6 +38,7 @@ from .js_server import (
     js_sentoffers,
     js_bids,
     js_sentbids,
+    js_network,
     js_index,
 )
 from .ui import (
@@ -246,13 +247,14 @@ class HttpHandler(BaseHTTPRequestHandler):
                 continue
 
             ci = swap_client.ci(k)
-            fee_rate = swap_client.getFeeRateForCoin(k)
+            fee_rate, fee_src = swap_client.getFeeRateForCoin(k)
             est_fee = swap_client.estimateWithdrawFee(k, fee_rate)
             wallets_formatted.append({
                 'name': w['name'],
                 'version': w['version'],
                 'cid': str(int(k)),
                 'fee_rate': ci.format_amount(int(fee_rate * ci.COIN())),
+                'fee_rate_src': fee_src,
                 'est_fee': 'Unknown' if est_fee is None else ci.format_amount(int(est_fee * ci.COIN())),
                 'balance': w['balance'],
                 'blocks': w['blocks'],
@@ -797,6 +799,7 @@ class HttpHandler(BaseHTTPRequestHandler):
                             'sentoffers': js_sentoffers,
                             'bids': js_bids,
                             'sentbids': js_sentbids,
+                            'network': js_network,
                             }.get(url_split[2], js_index)
                 return func(self, url_split, post_string)
             except Exception as ex:

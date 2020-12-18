@@ -153,5 +153,9 @@ def js_sentbids(self, url_split, post_string):
     return bytes(json.dumps(self.server.swap_client.listBids(sent=True)), 'UTF-8')
 
 
+def js_network(self, url_split, post_string):
+    return bytes(json.dumps(self.server.swap_client.get_network_info()), 'UTF-8')
+
+
 def js_index(self, url_split, post_string):
     return bytes(json.dumps(self.server.swap_client.getSummary()), 'UTF-8')

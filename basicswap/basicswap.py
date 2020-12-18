@@ -2239,7 +2239,7 @@ class BasicSwap(BaseApp):
         prevout_s = ' in={}:{}'.format(prev_txnid, prev_n)
 
         if fee_rate is None:
-            fee_rate = self.getFeeRateForCoin(coin_type)
+            fee_rate, fee_src = self.getFeeRateForCoin(coin_type)
 
         tx_vsize = self.getContractSpendTxVSize(coin_type)
         tx_fee = (fee_rate * tx_vsize) / 1000
@@ -2335,7 +2335,7 @@ class BasicSwap(BaseApp):
             sequence = 1
         prevout_s = ' in={}:{}:{}'.format(txjs['txid'], vout, sequence)
 
-        fee_rate = self.getFeeRateForCoin(coin_type)
+        fee_rate, fee_src = self.getFeeRateForCoin(coin_type)
 
         tx_vsize = self.getContractSpendTxVSize(coin_type, False)
         tx_fee = (fee_rate * tx_vsize) / 1000
@@ -4768,3 +4768,8 @@ class BasicSwap(BaseApp):
     def add_connection(self, host, port, peer_pubkey):
         self.log.info('add_connection %s %d %s', host, port, peer_pubkey.hex())
         self._network.add_connection(host, port, peer_pubkey)
+
+    def get_network_info(self):
+        if not self._network:
+            return {'Error': 'Not Initialised'}
+        return self._network.get_info()
