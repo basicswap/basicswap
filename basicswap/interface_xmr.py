@@ -64,9 +64,10 @@ class XMRInterface(CoinInterface):
         self._network = network
         self.blocks_confirmed = coin_settings['blocks_confirmed']
         self._restore_height = coin_settings.get('restore_height', 0)
-        self._fee_priority = coin_settings.get('fee_priority', 0)
+        self.setFeePriority(coin_settings.get('fee_priority', 0))
 
     def setFeePriority(self, new_priority):
+        assert(new_priority >= 0 and new_priority < 4), 'Invalid fee_priority value'
         self._fee_priority = new_priority
 
     def setWalletFilename(self, wallet_filename):

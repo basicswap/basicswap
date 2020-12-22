@@ -31,6 +31,7 @@ setuptools.setup(
         "python-gnupg",
         "Jinja2",
         "requests",
+        "pycryptodome",
     ],
     entry_points={
         "console_scripts": [
