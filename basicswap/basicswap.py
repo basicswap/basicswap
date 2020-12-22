@@ -571,6 +571,7 @@ class BasicSwap(BaseApp):
             'explorers': [],
             'chain_lookups': chain_client_settings.get('chain_lookups', 'local'),
             'restore_height': chain_client_settings.get('restore_height', 0),
+            'fee_priority': chain_client_settings.get('fee_priority', 0),
         }
 
         if self.coin_clients[coin]['connection_type'] == 'rpc':
@@ -2713,9 +2714,10 @@ class BasicSwap(BaseApp):
                 # Have to use findTxB instead of relying on the first seen height to detect chain reorgs
                 found_tx = ci_to.findTxB(xmr_swap.vkbv, xmr_swap.pkbs, bid.amount_to, ci_to.blocks_confirmed, xmr_swap.b_restore_height)
                 if found_tx is not None:
+                    if bid.xmr_b_lock_tx is None or not bid.xmr_b_lock_tx.chain_height:
+                        self.logBidEvent(bid, EventLogTypes.LOCK_TX_B_SEEN, '', session)
                     if bid.xmr_b_lock_tx is None:
                         self.log.debug('Found {} lock tx in chain'.format(ci_to.coin_name()))
-                        self.logBidEvent(bid, EventLogTypes.LOCK_TX_B_SEEN, '', session)
                         b_lock_tx_id = bytes.fromhex(found_tx['txid'])
                         bid.xmr_b_lock_tx = SwapTx(
                             bid_id=bid_id,
@@ -4509,20 +4511,35 @@ class BasicSwap(BaseApp):
 
     def editSettings(self, coin_name, data):
         self.log.info('Updating settings %s', coin_name)
-        self.mxDB.acquire()
-        try:
+        with self.mxDB:
+            settings_changed = False
             if 'lookups' in data:
-                self.settings['chainclients'][coin_name]['chain_lookups'] = data['lookups']
+                if self.settings['chainclients'][coin_name].get('chain_lookups', 'local') != data['lookups']:
+                    settings_changed = True
+                    self.settings['chainclients'][coin_name]['chain_lookups'] = data['lookups']
+                    for coin, cc in self.coin_clients.items():
+                        if cc['name'] == coin_name:
+                            cc['chain_lookups'] = data['lookups']
+                            break
+
+            if 'fee_priority' in data:
+                new_fee_priority = data['fee_priority']
+                assert(new_fee_priority >= 0 and new_fee_priority < 4), 'Invalid priority'
+
+                if self.settings['chainclients'][coin_name].get('fee_priority', 0) != data['fee_priority']:
+                    settings_changed = True
+                    self.settings['chainclients'][coin_name]['fee_priority'] = data['fee_priority']
+                    for coin, cc in self.coin_clients.items():
+                        if cc['name'] == coin_name:
+                            cc['fee_priority'] = data['fee_priority']
+                            break
+                    self.ci(Coins.XMR).setFeePriority(data['fee_priority'])
+
+            if settings_changed:
                 settings_path = os.path.join(self.data_dir, cfg.CONFIG_FILENAME)
                 shutil.copyfile(settings_path, settings_path + '.last')
                 with open(settings_path, 'w') as fp:
                     json.dump(self.settings, fp, indent=4)
-
-                for c in self.coin_clients:
-                    if c['name'] == coin_name:
-                        c['chain_lookups'] = data['lookups']
-        finally:
-            self.mxDB.release()
 
     def getSummary(self, opts=None):
         num_watched_outputs = 0

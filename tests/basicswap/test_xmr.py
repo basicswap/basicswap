@@ -548,6 +548,8 @@ class Test(unittest.TestCase):
         offers = swap_clients[1].listOffers(filters={'offer_id': offer_id})
         offer = offers[0]
 
+        swap_clients[1].ci(Coins.XMR).setFeePriority(3)
+
         bid_id = swap_clients[1].postXmrBid(offer_id, offer.amount_from)
 
         wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.BID_RECEIVED)
@@ -559,6 +561,8 @@ class Test(unittest.TestCase):
 
         wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=180)
         wait_for_bid(delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True)
+
+        swap_clients[1].ci(Coins.XMR).setFeePriority(0)
 
     def test_06_multiple_swaps(self):
         logging.info('---------- Test Multiple concurrent swaps')

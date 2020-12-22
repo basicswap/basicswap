@@ -284,6 +284,9 @@ class HttpHandler(BaseHTTPRequestHandler):
             for name, c in swap_client.settings['chainclients'].items():
                 if bytes('apply_' + name, 'utf-8') in form_data:
                     data = {'lookups': form_data[bytes('lookups_' + name, 'utf-8')][0].decode('utf-8')}
+                    if name == 'monero':
+                        data['fee_priority'] = int(form_data[bytes('fee_priority_' + name, 'utf-8')][0])
+
                     swap_client.editSettings(name, data)
         chains_formatted = []
 
@@ -292,6 +295,8 @@ class HttpHandler(BaseHTTPRequestHandler):
                 'name': name,
                 'lookups': c.get('chain_lookups', 'local')
             })
+            if name == 'monero':
+                chains_formatted[-1]['fee_priority'] = c.get('fee_priority', 0)
 
         template = env.get_template('settings.html')
         return bytes(template.render(

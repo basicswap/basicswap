@@ -64,6 +64,10 @@ class XMRInterface(CoinInterface):
         self._network = network
         self.blocks_confirmed = coin_settings['blocks_confirmed']
         self._restore_height = coin_settings.get('restore_height', 0)
+        self._fee_priority = coin_settings.get('fee_priority', 0)
+
+    def setFeePriority(self, new_priority):
+        self._fee_priority = new_priority
 
     def setWalletFilename(self, wallet_filename):
         self._wallet_filename = wallet_filename
@@ -191,8 +195,9 @@ class XMRInterface(CoinInterface):
 
         shared_addr = xmr_util.encode_address(Kbv, Kbs)
 
-        # TODO: How to set feerate?
         params = {'destinations': [{'amount': output_amount, 'address': shared_addr}]}
+        if self._fee_priority > 0:
+            params['priority'] = self._fee_priority
         rv = self.rpc_wallet_cb('transfer', params)
         logging.info('publishBLockTx %s to address_b58 %s', rv['tx_hash'], shared_addr)
         tx_hash = bytes.fromhex(rv['tx_hash'])
@@ -382,38 +387,19 @@ class XMRInterface(CoinInterface):
             raise ValueError('Invalid unlocked_balance')
 
         params = {'address': address_to}
+        if self._fee_priority > 0:
+            params['priority'] = self._fee_priority
         rv = self.rpc_wallet_cb('sweep_all', params)
         print('sweep_all', rv)
 
         return bytes.fromhex(rv['tx_hash_list'][0])
-
-        """
-        # TODO: need a subfee from output option
-        # b_fee = b_fee_rate * 10  # Guess
-        b_fee = b_fee_rate
-
-        num_tries = 20
-        for i in range(1 + num_tries):
-            try:
-                params = {'destinations': [{'amount': cb_swap_value - b_fee, 'address': address_to}]}
-                logging.debug('params', dumpj(params))
-                rv = self.rpc_wallet_cb('transfer', params)
-                print('transfer', rv)
-                break
-            except Exception as e:
-                print('str(e)', str(e))
-            if i >= num_tries:
-                raise ValueError('transfer failed.')
-            b_fee += b_fee_rate
-            logging.info('Raising fee to %d', b_fee)
-
-        return bytes.fromhex(rv['tx_hash'])
-        """
 
     def withdrawCoin(self, value, addr_to, subfee):
         self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
 
         value_sats = make_int(value, self.exp())
         params = {'destinations': [{'amount': value_sats, 'address': addr_to}]}
+        if self._fee_priority > 0:
+            params['priority'] = self._fee_priority
         rv = self.rpc_wallet_cb('transfer', params)
         return rv['tx_hash']

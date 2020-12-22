@@ -9,13 +9,22 @@
 <form method="post">
 
 {% for c in chains %}
-<h4>{{ c.name }}</h4>
+<h4>{{ c.name|capitalize }}</h4>
 <table>
 <tr><td>Chain Lookups</td><td>
 <select name="lookups_{{ c.name }}">
 <option value="local"{% if c.lookups=='local' %} selected{% endif %}>Local Node</option>
 <option value="explorer"{% if c.lookups=='explorer' %} selected{% endif %}>Explorer</option>
 </select></td></tr>
+{% if c.name == 'monero' %}
+<tr><td>Transaction Fee Priority</td><td>
+<select name="fee_priority_{{ c.name }}">
+<option value="0"{% if c.fee_priority==0 %} selected{% endif %}>Default</option>
+<option value="1"{% if c.fee_priority==1 %} selected{% endif %}>Low</option>
+<option value="2"{% if c.fee_priority==2 %} selected{% endif %}>Medium</option>
+<option value="3"{% if c.fee_priority==3 %} selected{% endif %}>High</option>
+</select></td></tr>
+{% endif %}
 <tr><td><input type="submit" name="apply_{{ c.name }}" value="Apply"></td></tr>
 </table>
 {% endfor %}

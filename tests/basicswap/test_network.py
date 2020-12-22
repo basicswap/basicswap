@@ -326,7 +326,7 @@ class Test(unittest.TestCase):
         print(dumpj(js_n0))
 
         path = [swap_clients[0]._network._network_pubkey, swap_clients[2]._network._network_pubkey]
-        swap_clients[1].test_onion(path)
+        swap_clients[1]._network.test_onion(path)
 
         delay_for(delay_event, 1000)
 
