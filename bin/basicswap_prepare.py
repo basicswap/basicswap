@@ -42,7 +42,7 @@ known_coins = {
     'litecoin': '0.18.1',
     'bitcoin': '0.20.1',
     'namecoin': '0.18.0',
-    'monero': '0.17.1.5',
+    'monero': '0.17.1.7',
 }
 
 logger = logging.getLogger()
@@ -56,6 +56,7 @@ BASE_XMR_ZMQ_PORT = int(os.getenv('BASE_XMR_ZMQ_PORT', 30898))
 BASE_XMR_WALLET_PORT = int(os.getenv('BASE_XMR_WALLET_PORT', 29998))
 XMR_WALLET_RPC_USER = os.getenv('XMR_WALLET_RPC_USER', 'xmr_wallet_user')
 XMR_WALLET_RPC_PWD = os.getenv('XMR_WALLET_RPC_PWD', 'xmr_wallet_pwd')
+XMR_SITE_COMMIT = 'db495b958f1fc6abfdfdb0a6756d902d59d9d21e'  # Lock hashes.txt to monero version
 
 DEFAULT_XMR_RESTORE_HEIGHT = 2245107
 
@@ -152,9 +153,9 @@ def prepareCore(coin, version, settings, data_dir):
         if not os.path.exists(release_path):
             downloadFile(release_url, release_path)
 
-        # TODO: How to get version specific hashes
         assert_filename = 'monero-{}-hashes.txt'.format(version)
-        assert_url = 'https://www.getmonero.org/downloads/hashes.txt'
+        # assert_url = 'https://www.getmonero.org/downloads/hashes.txt'
+        assert_url = 'https://raw.githubusercontent.com/monero-project/monero-site/{}/downloads/hashes.txt'.format(XMR_SITE_COMMIT)
         assert_path = os.path.join(bin_dir, assert_filename)
         if not os.path.exists(assert_path):
             downloadFile(assert_url, assert_path)
