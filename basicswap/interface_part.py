@@ -32,7 +32,7 @@ class PARTInterface(BTCInterface):
         return 0xa0
 
     def __init__(self, coin_settings, network):
-        self.rpc_callback = make_rpc_func(coin_settings['rpcport'], coin_settings['rpcauth'])
+        self.rpc_callback = make_rpc_func(coin_settings['rpcport'], coin_settings['rpcauth'], host=coin_settings['rpchost'])
         self.txoType = CTxOutPart
         self._network = network
         self.blocks_confirmed = coin_settings['blocks_confirmed']

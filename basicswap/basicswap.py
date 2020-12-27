@@ -576,6 +576,7 @@ class BasicSwap(BaseApp):
 
         if self.coin_clients[coin]['connection_type'] == 'rpc':
             if coin == Coins.XMR:
+                self.coin_clients[coin]['walletrpchost'] = chain_client_settings.get('walletrpchost', 'localhost')
                 self.coin_clients[coin]['walletrpcport'] = chain_client_settings.get('walletrpcport', chainparams[coin][self.chain]['walletrpcport'])
                 if 'walletrpcpassword' in chain_client_settings:
                     self.coin_clients[coin]['walletrpcauth'] = (chain_client_settings['walletrpcuser'], chain_client_settings['walletrpcpassword'])

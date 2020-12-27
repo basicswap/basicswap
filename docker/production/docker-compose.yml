@@ -1,0 +1,70 @@
+version: '3.3'
+
+services:
+    particl_core:
+        image: i_particl
+        build:
+            context: particl
+            dockerfile: Dockerfile
+        container_name: particl_core
+        volumes:
+            - /var/swapdata/particl:/data
+        ports:
+            - "51738:51738"
+        expose:
+            - 51735
+        restart: unless-stopped
+    bitcoin_core:
+        image: i_bitcoin
+        build:
+            context: bitcoin
+            dockerfile: Dockerfile
+        container_name: bitcoin_core
+        volumes:
+            - /var/swapdata/bitcoin:/data
+        ports:
+            - "8333:8333"
+        expose:
+            - 8332
+        restart: unless-stopped
+    #monero_daemon:
+        #image: i_monero_daemon
+        #build:
+            #context: monero_daemon
+            #dockerfile: Dockerfile
+        #container_name: monero_daemon
+        #volumes:
+            #- /var/swapdata/monero_daemon:/data
+        #ports:
+            #- "18080:18080"
+        #expose:
+            #- 8332
+        #restart: unless-stopped
+    monero_wallet:
+        image: i_monero_wallet
+        build:
+            context: monero_wallet
+            dockerfile: Dockerfile
+        container_name: monero_wallet
+        volumes:
+            - /var/swapdata/monero_wallet:/data
+        expose:
+            - 8332
+        restart: unless-stopped
+    swapclient:
+        image: i_swapclient
+        build:
+            context: swapclient
+            dockerfile: Dockerfile
+        container_name: swapclient
+        volumes:
+            - /var/swapdata/swapclient:/data
+        ports:
+            - "${HTML_PORT}"  # Expose only to localhost, see .env
+        depends_on:
+            - particl_core
+        restart: unless-stopped
+networks:
+    default:
+        external:
+            name: coinswap_network

@@ -54,11 +54,18 @@ XMR_RPC_HOST = os.getenv('XMR_RPC_HOST', 'localhost')
 BASE_XMR_RPC_PORT = int(os.getenv('BASE_XMR_RPC_PORT', 29798))
 BASE_XMR_ZMQ_PORT = int(os.getenv('BASE_XMR_ZMQ_PORT', 30898))
 BASE_XMR_WALLET_PORT = int(os.getenv('BASE_XMR_WALLET_PORT', 29998))
+XMR_WALLET_RPC_HOST = os.getenv('XMR_WALLET_RPC_HOST', 'localhost')
 XMR_WALLET_RPC_USER = os.getenv('XMR_WALLET_RPC_USER', 'xmr_wallet_user')
 XMR_WALLET_RPC_PWD = os.getenv('XMR_WALLET_RPC_PWD', 'xmr_wallet_pwd')
 XMR_SITE_COMMIT = 'db495b958f1fc6abfdfdb0a6756d902d59d9d21e'  # Lock hashes.txt to monero version
 
 DEFAULT_XMR_RESTORE_HEIGHT = 2245107
+
+
+PART_RPC_HOST = os.getenv('PART_RPC_HOST', 'localhost')
+LTC_RPC_HOST = os.getenv('LTC_RPC_HOST', 'localhost')
+BTC_RPC_HOST = os.getenv('BTC_RPC_HOST', 'localhost')
+NMC_RPC_HOST = os.getenv('NMC_RPC_HOST', 'localhost')
 
 
 def make_reporthook():
@@ -256,7 +263,7 @@ def prepareCore(coin, version, settings, data_dir):
     extractCore(coin, version, settings, bin_dir, release_path)
 
 
-def prepareDataDir(coin, settings, data_dir, chain, particl_mnemonic):
+def prepareDataDir(coin, settings, chain, particl_mnemonic):
     core_settings = settings['chainclients'][coin]
     data_dir = core_settings['datadir']
 
@@ -350,6 +357,7 @@ def printHelp():
     logger.info('--addcoin=               Add coin to existing setup.')
     logger.info('--disablecoin=           Make coin inactive.')
     logger.info('--preparebinonly         Don\'t prepare settings or datadirs.')
+    logger.info('--nocores                Don\'t download and extract any coin clients.')
     logger.info('--portoffset=n           Raise all ports by n.')
     logger.info('--htmlhost=              Interface to host on, default:localhost.')
     logger.info('--xmrrestoreheight=n     Block height to restore Monero wallet from, default:{}.'.format(DEFAULT_XMR_RESTORE_HEIGHT))
@@ -383,6 +391,7 @@ def main():
     chain = 'mainnet'
     particl_wallet_mnemonic = None
     prepare_bin_only = False
+    no_cores = False
     with_coins = {'particl', 'litecoin'}
     add_coin = ''
     disable_coin = ''
@@ -416,6 +425,9 @@ def main():
             continue
         if name == 'preparebinonly':
             prepare_bin_only = True
+            continue
+        if name == 'nocores':
+            no_cores = True
             continue
         if len(s) == 2:
             if name == 'datadir':
@@ -483,9 +495,10 @@ def main():
     chainclients = {
         'particl': {
             'connection_type': 'rpc',
-            'manage_daemon': True,
+            'manage_daemon': True if ('particl' in with_coins and PART_RPC_HOST == 'localhost') else False,
+            'rpchost': PART_RPC_HOST,
             'rpcport': 19792 + port_offset,
-            'datadir': os.path.join(data_dir, 'particl'),
+            'datadir': os.getenv('PART_DATA_DIR', os.path.join(data_dir, 'particl')),
             'bindir': os.path.join(bin_dir, 'particl'),
             'blocks_confirmed': 2,
             'override_feerate': 0.002,
@@ -495,9 +508,10 @@ def main():
         },
         'litecoin': {
             'connection_type': 'rpc' if 'litecoin' in with_coins else 'none',
-            'manage_daemon': True if 'litecoin' in with_coins else False,
+            'manage_daemon': True if ('litecoin' in with_coins and LTC_RPC_HOST == 'localhost') else False,
+            'rpchost': LTC_RPC_HOST,
             'rpcport': 19795 + port_offset,
-            'datadir': os.path.join(data_dir, 'litecoin'),
+            'datadir': os.getenv('LTC_DATA_DIR', os.path.join(data_dir, 'litecoin')),
             'bindir': os.path.join(bin_dir, 'litecoin'),
             'use_segwit': True,
             'blocks_confirmed': 2,
@@ -507,9 +521,10 @@ def main():
         },
         'bitcoin': {
             'connection_type': 'rpc' if 'bitcoin' in with_coins else 'none',
-            'manage_daemon': True if 'bitcoin' in with_coins else False,
+            'manage_daemon': True if ('bitcoin' in with_coins and BTC_RPC_HOST == 'localhost') else False,
+            'rpchost': BTC_RPC_HOST,
             'rpcport': 19796 + port_offset,
-            'datadir': os.path.join(data_dir, 'bitcoin'),
+            'datadir': os.getenv('BTC_DATA_DIR', os.path.join(data_dir, 'bitcoin')),
             'bindir': os.path.join(bin_dir, 'bitcoin'),
             'use_segwit': True,
             'blocks_confirmed': 1,
@@ -519,9 +534,10 @@ def main():
         },
         'namecoin': {
             'connection_type': 'rpc' if 'namecoin' in with_coins else 'none',
-            'manage_daemon': True if 'namecoin' in with_coins else False,
+            'manage_daemon': True if ('namecoin' in with_coins and NMC_RPC_HOST == 'localhost') else False,
+            'rpchost': NMC_RPC_HOST,
             'rpcport': 19798 + port_offset,
-            'datadir': os.path.join(data_dir, 'namecoin'),
+            'datadir': os.getenv('NMC_DATA_DIR', os.path.join(data_dir, 'namecoin')),
             'bindir': os.path.join(bin_dir, 'namecoin'),
             'use_segwit': False,
             'use_csv': False,
@@ -533,15 +549,16 @@ def main():
         'monero': {
             'connection_type': 'rpc' if 'monero' in with_coins else 'none',
             'manage_daemon': True if ('monero' in with_coins and XMR_RPC_HOST == 'localhost') else False,
-            'manage_wallet_daemon': True if 'monero' in with_coins else False,
+            'manage_wallet_daemon': True if ('monero' in with_coins and XMR_WALLET_RPC_HOST == 'localhost') else False,
             'rpcport': BASE_XMR_RPC_PORT + port_offset,
             'zmqport': BASE_XMR_ZMQ_PORT + port_offset,
             'walletrpcport': BASE_XMR_WALLET_PORT + port_offset,
             'rpchost': XMR_RPC_HOST,
+            'walletrpchost': XMR_WALLET_RPC_HOST,
             'walletrpcuser': XMR_WALLET_RPC_USER,
             'walletrpcpassword': XMR_WALLET_RPC_PWD,
             'walletfile': 'swap_wallet',
-            'datadir': os.path.join(data_dir, 'monero'),
+            'datadir': os.getenv('XMR_DATA_DIR', os.path.join(data_dir, 'monero')),
             'bindir': os.path.join(bin_dir, 'monero'),
             'restore_height': xmr_restore_height,
             'blocks_confirmed': 7,  # TODO: 10?
@@ -587,10 +604,11 @@ def main():
 
         settings['chainclients'][add_coin] = chainclients[add_coin]
 
-        prepareCore(add_coin, known_coins[add_coin], settings, data_dir)
+        if not no_cores:
+            prepareCore(add_coin, known_coins[add_coin], settings, data_dir)
 
         if not prepare_bin_only:
-            prepareDataDir(add_coin, settings, data_dir, chain, particl_wallet_mnemonic)
+            prepareDataDir(add_coin, settings, chain, particl_wallet_mnemonic)
             with open(config_path, 'w') as fp:
                 json.dump(settings, fp, indent=4)
 
@@ -624,15 +642,16 @@ def main():
             'check_expired_seconds': 60
         }
 
-    for c in with_coins:
-        prepareCore(c, known_coins[c], settings, data_dir)
+    if not no_cores:
+        for c in with_coins:
+            prepareCore(c, known_coins[c], settings, data_dir)
 
     if prepare_bin_only:
         logger.info('Done.')
         return 0
 
     for c in with_coins:
-        prepareDataDir(c, settings, data_dir, chain, particl_wallet_mnemonic)
+        prepareDataDir(c, settings, chain, particl_wallet_mnemonic)
 
     with open(config_path, 'w') as fp:
         json.dump(settings, fp, indent=4)
