@@ -53,27 +53,51 @@ Remove any existing wallets after copying over a pruned chain or the Bitcoin dae
 
 ## Run Without Docker:
 
+
+### Ubuntu Setup:
+
     $ apt-get install -y wget python3-pip gnupg unzip protobuf-compiler automake libtool pkg-config
 
-    $ export SWAP_DATADIR=/var/data/coinswaps
+### OSX Setup:
+
+Install Homebrew:
+
+    https://brew.sh/
+
+Command Line Tools:
+
+    $ xcode-select --install
+
+Dependencies:
+
+    $ brew install wget unzip python git protobuf gnupg automake libtool pkg-config
+
+
+### Basicswap:
+
+    $ export SWAP_DATADIR=/Users/$USER/coinswaps
     $ mkdirs -p "$SWAP_DATADIR/venv"
     $ python3 -m venv "$SWAP_DATADIR/venv"
     $ . $SWAP_DATADIR/venv/bin/activate && python -V
+    $ cd $SWAP_DATADIR
     $ wget -O coincurve-anonswap.zip https://github.com/tecnovert/coincurve/archive/anonswap.zip
     $ unzip coincurve-anonswap.zip
-    $ cd coincurve-anonswap
+    $ cd $SWAP_DATADIR/coincurve-anonswap
     $ python3 setup.py install --force
 
 
     $ cd $SWAP_DATADIR
     $ git clone https://github.com/tecnovert/basicswap.git
-    $ cd basicswap
+    $ cd $SWAP_DATADIR/basicswap
     $ protoc -I=basicswap --python_out=basicswap basicswap/messages.proto
     $ pip3 install .
 
 Prepare the datadir:
 
     XMR_RPC_HOST="node.xmr.to" BASE_XMR_RPC_PORT=18081 basicswap-prepare --datadir=$SWAP_DATADIR --withcoins=monero --withoutcoins=litecoin --xmrrestoreheight=2245107
+
+    OR using a local XMR daemon:
+    basicswap-prepare --datadir=$SWAP_DATADIR --withcoins=monero --withoutcoins=litecoin --xmrrestoreheight=2245107
 
 Record the mnemonic from the output of the above command.
 
@@ -82,6 +106,14 @@ Start the app
     $ basicswap-run --datadir=$SWAP_DATADIR
 
 Open in browser: `http://localhost:12700`
+
+
+Start after installed:
+
+    $ export SWAP_DATADIR=/Users/$USER/coinswaps
+    $ python3 -m venv "$SWAP_DATADIR/venv"
+    $ basicswap-run --datadir=$SWAP_DATADIR
+
 
 
 Old notes
@@ -95,34 +127,6 @@ Old notes
     $ export PYTHONPATH=$(pwd)
     $ python bin/basicswap-prepare.py
     $ python bin/basicswap-run.py
-
-
-## OSX
-
-Install Homebrew:
-
-    https://brew.sh/
-
-Command Line Tools:
-
-    $ xcode-select --install
-
-Dependencies:
-
-    $ brew install python git protobuf gnupg
-
-Python certificates:
-
-    $ /Applications/Python\ 3.7/Install\ Certificates.command
-
-Basicswap
-
-    $ git clone https://github.com/tecnovert/basicswap.git
-    $ cd basicswap
-    $ protoc -I=basicswap --python_out=basicswap basicswap/messages.proto
-    $ pip3 install .
-    $ basicswap-prepare
-    $ basicswap-run
 
 
 # Windows

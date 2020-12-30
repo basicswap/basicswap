@@ -154,8 +154,9 @@ def prepareCore(coin, version, settings, data_dir):
 
     release_filename = '{}-{}-{}'.format(coin, version, BIN_ARCH)
     if coin == 'monero':
-        release_url = 'https://downloads.getmonero.org/cli/monero-linux-x64-v{}.tar.bz2'.format(version)
-
+        if os_name == 'osx':
+            os_name = 'mac'
+        release_url = 'https://downloads.getmonero.org/cli/monero-{}-x64-v{}.tar.bz2'.format(os_name, version)
         release_path = os.path.join(bin_dir, release_filename)
         if not os.path.exists(release_path):
             downloadFile(release_url, release_path)
@@ -240,6 +241,7 @@ def prepareCore(coin, version, settings, data_dir):
             rv = gpg.import_keys(urllib.request.urlopen(pubkeyurl).read())
             print('import_keys', rv)
             assert('F0AF4D462A0BDF92' in rv.fingerprints[0])
+            gpg.trust_keys('F0AF4D462A0BDF92', 'TRUST_FULLY')
             with open(assert_path, 'rb') as fp:
                 verified = gpg.verify_file(fp)
     else:
@@ -251,7 +253,10 @@ def prepareCore(coin, version, settings, data_dir):
 
             pubkeyurl = 'https://raw.githubusercontent.com/tecnovert/basicswap/master/gitianpubkeys/{}_{}.pgp'.format(coin, signing_key_name)
             logger.info('Importing public key from url: ' + pubkeyurl)
-            gpg.import_keys(urllib.request.urlopen(pubkeyurl).read())
+            rv = gpg.import_keys(urllib.request.urlopen(pubkeyurl).read())
+
+            for key in rv.fingerprints:
+                gpg.trust_keys(key, 'TRUST_FULLY')
 
             with open(assert_sig_path, 'rb') as fp:
                 verified = gpg.verify_file(fp, assert_path)
@@ -286,6 +291,7 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic):
             fp.write('rpc-bind-ip=127.0.0.1\n')
             fp.write('zmq-rpc-bind-port={}\n'.format(core_settings['zmqport']))
             fp.write('zmq-rpc-bind-ip=127.0.0.1\n')
+            fp.write('prune-blockchain=1')
 
         wallet_conf_path = os.path.join(data_dir, coin + '_wallet.conf')
         if os.path.exists(wallet_conf_path):
