@@ -20,14 +20,24 @@ If the dependencies and db format have changed the container must be built with 
     $ mv --backup=numbered $COINDATA_PATH/db.sqlite $COINDATA_PATH/db_bkp.sqlite
     $ docker-compose up
 
+#### Update core versions
 
-### If installed through pip:
+After updating the code and rebuilding the container:
+
+    basicswap/docker]$ docker run \
+        -t --name swap_prepare -v $COINDATA_PATH:/coindata i_swapclient \
+        basicswap-prepare --datadir=/coindata --preparebinonly --withcoins=monero --withoutcoins=litecoin
+
+    docker rm swap_prepare
+
+
+## If installed through pip:
 
     cd basicswap
     git pull
     pip3 install .
 
 
-## Update core versions
+#### Update core versions
 
     basicswap-prepare -preparebinonly

@@ -9,7 +9,7 @@
 export TEST_RELOAD_PATH=/tmp/test_basicswap
 mkdir -p ${TEST_RELOAD_PATH}/bin/{particl,monero}
 cp ~/tmp/particl-0.19.1.2-x86_64-linux-gnu.tar.gz ${TEST_RELOAD_PATH}/bin/particl
-cp ~/tmp/monero-0.17.1.5-x86_64-linux-gnu.tar.gz ${TEST_RELOAD_PATH}/bin/monero
+cp ~/tmp/monero-0.17.1.8-x86_64-linux-gnu.tar.gz ${TEST_RELOAD_PATH}/bin/monero
 export PYTHONPATH=$(pwd)
 python tests/basicswap/test_reload_xmr.py
 

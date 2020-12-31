@@ -42,7 +42,7 @@ known_coins = {
     'litecoin': '0.18.1',
     'bitcoin': '0.20.1',
     'namecoin': '0.18.0',
-    'monero': '0.17.1.7',
+    'monero': '0.17.1.8',
 }
 
 logger = logging.getLogger()
@@ -57,7 +57,7 @@ BASE_XMR_WALLET_PORT = int(os.getenv('BASE_XMR_WALLET_PORT', 29998))
 XMR_WALLET_RPC_HOST = os.getenv('XMR_WALLET_RPC_HOST', 'localhost')
 XMR_WALLET_RPC_USER = os.getenv('XMR_WALLET_RPC_USER', 'xmr_wallet_user')
 XMR_WALLET_RPC_PWD = os.getenv('XMR_WALLET_RPC_PWD', 'xmr_wallet_pwd')
-XMR_SITE_COMMIT = 'db495b958f1fc6abfdfdb0a6756d902d59d9d21e'  # Lock hashes.txt to monero version
+XMR_SITE_COMMIT = '9a34b4f554de8717f72b45c46469964630b3d15f'  # Lock hashes.txt to monero version
 
 DEFAULT_XMR_RESTORE_HEIGHT = 2245107
 
@@ -241,7 +241,7 @@ def prepareCore(coin, version, settings, data_dir):
             rv = gpg.import_keys(urllib.request.urlopen(pubkeyurl).read())
             print('import_keys', rv)
             assert('F0AF4D462A0BDF92' in rv.fingerprints[0])
-            gpg.trust_keys('F0AF4D462A0BDF92', 'TRUST_FULLY')
+            gpg.trust_keys(rv.fingerprints[0], 'TRUST_FULLY')
             with open(assert_path, 'rb') as fp:
                 verified = gpg.verify_file(fp)
     else:

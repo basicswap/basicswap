@@ -15,7 +15,7 @@ test_task:
     - PART_VERSION: 0.19.1.2
     - BTC_VERSION: 0.20.1
     - LTC_VERSION: 0.18.1
-    - XMR_VERSION: 0.17.1.5
+    - XMR_VERSION: 0.17.1.8
     - TEST_RELOAD_PATH: $HOME/test_basicswap1/
     - TEST_DIR: $HOME/test_basicswap2/
     - BIN_DIRS: $HOME/binaries
