@@ -292,6 +292,8 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic):
             fp.write('zmq-rpc-bind-port={}\n'.format(core_settings['zmqport']))
             fp.write('zmq-rpc-bind-ip=127.0.0.1\n')
             fp.write('prune-blockchain=1')
+            fp.write('restricted-rpc=1')
+            fp.write('bootstrap-daemon-address=auto')
 
         wallet_conf_path = os.path.join(data_dir, coin + '_wallet.conf')
         if os.path.exists(wallet_conf_path):

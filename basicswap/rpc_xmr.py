@@ -51,6 +51,23 @@ def callrpc_xmr_na(rpc_port, method, params=[], rpc_host='127.0.0.1', path='json
     return r['result']
 
 
+def callrpc_xmr2(rpc_port, method, params=None, rpc_host='127.0.0.1'):
+    try:
+        url = 'http://{}:{}/{}'.format(rpc_host, rpc_port, method)
+        headers = {
+            'content-type': 'application/json'
+        }
+        if params is None:
+            p = requests.post(url, headers=headers)
+        else:
+            p = requests.post(url, data=json.dumps(params), headers=headers)
+        r = json.loads(p.text)
+    except Exception as ex:
+        raise ValueError('RPC Server Error: {}'.format(str(ex)))
+
+    return r
+
+
 def make_xmr_rpc_func(port, host='127.0.0.1'):
     port = port
     host = host
@@ -59,6 +76,17 @@ def make_xmr_rpc_func(port, host='127.0.0.1'):
         nonlocal port
         nonlocal host
         return callrpc_xmr_na(port, method, params, rpc_host=host)
+    return rpc_func
+
+
+def make_xmr_rpc2_func(port, host='127.0.0.1'):
+    port = port
+    host = host
+
+    def rpc_func(method, params=None, wallet=None):
+        nonlocal port
+        nonlocal host
+        return callrpc_xmr2(port, method, params, rpc_host=host)
     return rpc_func
 
 

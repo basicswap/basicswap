@@ -83,7 +83,7 @@ Dependencies:
     $ wget -O coincurve-anonswap.zip https://github.com/tecnovert/coincurve/archive/anonswap.zip
     $ unzip coincurve-anonswap.zip
     $ cd $SWAP_DATADIR/coincurve-anonswap
-    $ python3 setup.py install --force
+    $ pip3 install .
 
 
     $ cd $SWAP_DATADIR
@@ -106,6 +106,7 @@ Start the app
     $ basicswap-run --datadir=$SWAP_DATADIR
 
 Open in browser: `http://localhost:12700`
+It may take a few minutes to start as the coin daemons are started before the http interface.
 
 
 Start after installed:

@@ -25,6 +25,7 @@ from .util import (
     format_amount)
 from .rpc_xmr import (
     make_xmr_rpc_func,
+    make_xmr_rpc2_func,
     make_xmr_wallet_rpc_func)
 from .ecc_util import (
     b2i, i2b, b2h)
@@ -56,11 +57,10 @@ class XMRInterface(CoinInterface):
 
     def __init__(self, coin_settings, network):
         super().__init__()
-        rpc_cb = make_xmr_rpc_func(coin_settings['rpcport'], host=coin_settings.get('rpchost', 'localhost'))
-        rpc_wallet_cb = make_xmr_wallet_rpc_func(coin_settings['walletrpcport'], coin_settings['walletrpcauth'])
+        self.rpc_cb = make_xmr_rpc_func(coin_settings['rpcport'], host=coin_settings.get('rpchost', 'localhost'))
+        self.rpc_cb2 = make_xmr_rpc2_func(coin_settings['rpcport'], host=coin_settings.get('rpchost', 'localhost'))  # non-json endpoint
+        self.rpc_wallet_cb = make_xmr_wallet_rpc_func(coin_settings['walletrpcport'], coin_settings['walletrpcauth'])
 
-        self.rpc_cb = rpc_cb
-        self.rpc_wallet_cb = rpc_wallet_cb
         self._network = network
         self.blocks_confirmed = coin_settings['blocks_confirmed']
         self._restore_height = coin_settings.get('restore_height', 0)
@@ -107,12 +107,18 @@ class XMRInterface(CoinInterface):
 
     def getBlockchainInfo(self):
         rv = {}
-        rv['blocks'] = self.rpc_cb('get_block_count')['count']
+
+        # get_block_count returns "Internal error" if bootstrap-daemon is active
+        # rv['blocks'] = self.rpc_cb('get_block_count')['count']
+        rv['blocks'] = self.rpc_cb2('get_height')['height']
         rv['verificationprogress'] = 0  # TODO
         return rv
 
     def getChainHeight(self):
-        return self.rpc_cb('get_block_count')['count']
+        # get_block_count returns "Internal error" if bootstrap-daemon is active
+        # return self.rpc_cb('get_info')['height']
+        # return self.rpc_cb('get_block_count')['count']
+        return self.rpc_cb2('get_height')['height']
 
     def getWalletInfo(self):
         self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
@@ -243,7 +249,7 @@ class XMRInterface(CoinInterface):
         '''
         # Debug
         try:
-            current_height = self.rpc_wallet_cb('get_block_count')['count']
+            current_height = self.rpc_wallet_cb('get_height')['height']
             logging.info('findTxB XMR current_height %d\nAddress: %s', current_height, address_b58)
         except Exception as e:
             logging.info('rpc_cb failed %s', str(e))
@@ -285,7 +291,7 @@ class XMRInterface(CoinInterface):
         num_tries = 40
         for i in range(num_tries + 1):
             try:
-                current_height = self.rpc_cb('get_block_count')['count']
+                current_height = self.rpc_cb2('get_height')['height']
                 print('current_height', current_height)
             except Exception as e:
                 logging.warning('rpc_cb failed %s', str(e))
@@ -327,7 +333,7 @@ class XMRInterface(CoinInterface):
         self.rpc_wallet_cb('refresh')
 
         try:
-            current_height = self.rpc_cb('get_block_count')['count']
+            current_height = self.rpc_cb2('get_height')['height']
             logging.info('findTxnByHash XMR current_height %d\nhash: %s', current_height, txid)
         except Exception as e:
             logging.info('rpc_cb failed %s', str(e))
