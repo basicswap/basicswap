@@ -76,7 +76,7 @@ Dependencies:
 ### Basicswap:
 
     $ export SWAP_DATADIR=/Users/$USER/coinswaps
-    $ mkdirs -p "$SWAP_DATADIR/venv"
+    $ mkdir -p "$SWAP_DATADIR/venv"
     $ python3 -m venv "$SWAP_DATADIR/venv"
     $ . $SWAP_DATADIR/venv/bin/activate && python -V
     $ cd $SWAP_DATADIR
