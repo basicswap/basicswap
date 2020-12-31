@@ -244,7 +244,7 @@ class XMRInterface(CoinInterface):
             logging.info('generate_from_keys %s', dumpj(rv))
             rv = self.rpc_wallet_cb('open_wallet', {'filename': address_b58})
 
-        rv = self.rpc_wallet_cb('refresh')
+        rv = self.rpc_wallet_cb('refresh', timeout=600)
 
         '''
         # Debug

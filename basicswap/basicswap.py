@@ -1821,6 +1821,11 @@ class BasicSwap(BaseApp):
             xmr_swap.dest_af = msg_buf.dest_af
             xmr_swap.start_chain_a_height = ci_from.getChainHeight()
             xmr_swap.b_restore_height = ci_to.getChainHeight()
+
+            if xmr_swap.b_restore_height < ci_to._restore_height:
+                xmr_swap.b_restore_height = ci_to._restore_height
+                self.log.warning('XMR swap restore height clamped to {}'.format(ci_to._restore_height))
+
             kbvf = self.getPathKey(coin_from, coin_to, bid_created_at, xmr_swap.contract_count, 1, for_ed25519=True)
             kbsf = self.getPathKey(coin_from, coin_to, bid_created_at, xmr_swap.contract_count, 2, for_ed25519=True)
 
@@ -3751,6 +3756,9 @@ class BasicSwap(BaseApp):
                 b_restore_height=ci_to.getChainHeight(),
                 start_chain_a_height=ci_from.getChainHeight(),
             )
+            if xmr_swap.b_restore_height < ci_to._restore_height:
+                xmr_swap.b_restore_height = ci_to._restore_height
+                self.log.warning('XMR swap restore height clamped to {}'.format(ci_to._restore_height))
         else:
             bid.created_at = msg['sent']
             bid.expire_at = msg['sent'] + bid_data.time_valid
