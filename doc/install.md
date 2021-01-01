@@ -112,7 +112,7 @@ It may take a few minutes to start as the coin daemons are started before the ht
 Start after installed:
 
     $ export SWAP_DATADIR=/Users/$USER/coinswaps
-    $ python3 -m venv "$SWAP_DATADIR/venv"
+    $ . $SWAP_DATADIR/venv/bin/activate && python -V
     $ basicswap-run --datadir=$SWAP_DATADIR
 
 
