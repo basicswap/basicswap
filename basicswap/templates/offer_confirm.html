@@ -15,7 +15,7 @@
 <option{% if data.addr_from=="-1" %} selected{% endif %} value="-1">-- New Address --</option>
 </select></td></tr>
 
-<tr><td>Coin From</td><td>
+<tr class="padded_row"><td class="bold">Coin From</td><td>
 <select name="coin_from_" disabled><option value="-1">-- Select Coin --</option>
 {% for c in coins %}
 <option{% if data.coin_from==c[0] %} selected{% endif %} value="{{ c[0] }}">{{ c[1] }}</option>
@@ -35,7 +35,7 @@
 <tr><td>Lock Tx Spend Fee</td><td>{{ data.amt_from_lock_spend_tx_fee }} {{ data.tla_from }}</td></tr>
 {% endif %}
 
-<tr><td>Coin To</td><td>
+<tr class="padded_row"><td class="bold">Coin To</td><td>
 <select name="coin_to_" disabled><option value="-1">-- Select Coin --</option>
 {% for c in coins %}
 <option{% if data.coin_to==c[0] %} selected{% endif %} value="{{ c[0] }}">{{ c[1] }}</option>
@@ -54,7 +54,7 @@
 </select></td></tr>
 {% endif %}
 
-<tr><td>Contract locked (hrs)</td><td><input type="number" name="lockhrs" min="1" max="64" value="{{ data.lockhrs }}" readonly></td>{% if data.swap_style != 'xmr' %}<td colspan=2>Participate txn will be locked for half the time.</td>{% endif %}</tr>
+<tr class="padded_row"><td>Contract locked (hrs)</td><td><input type="number" name="lockhrs" min="1" max="64" value="{{ data.lockhrs }}" readonly></td>{% if data.swap_style != 'xmr' %}<td colspan=2>Participate txn will be locked for half the time.</td>{% endif %}</tr>
 <tr><td>Auto Accept Bids</td><td colspan=3><input type="checkbox" name="autoaccept_" value="aa" {% if data.autoaccept==true %} checked="true"{% endif %} disabled></td></tr>
 </table>
 
@@ -71,5 +71,4 @@
 {% endif %}
 </form>
 
-<p><a href="/">home</a></p>
 </body></html>

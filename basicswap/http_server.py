@@ -794,6 +794,12 @@ class HttpHandler(BaseHTTPRequestHandler):
             summary=summary
         ), 'UTF-8')
 
+    def page_404(self, url_split):
+        template = env.get_template('404.html')
+        return bytes(template.render(
+            title=self.server.title,
+        ), 'UTF-8')
+
     def putHeaders(self, status_code, content_type):
         self.send_response(status_code)
         if self.server.allow_cors:
@@ -820,6 +826,28 @@ class HttpHandler(BaseHTTPRequestHandler):
                 if self.server.swap_client.debug is True:
                     traceback.print_exc()
                 return js_error(self, str(ex))
+
+        if len(url_split) > 1 and url_split[1] == 'static':
+            try:
+                static_path = os.path.join(os.path.dirname(__file__), 'static')
+
+                if url_split[2] == 'favicon-32.png':
+                    self.putHeaders(status_code, 'image/png')
+                    with open(os.path.join(static_path, 'favicon-32.png'), 'rb') as fp:
+                        return fp.read()
+                elif url_split[2] == 'style.css':
+                    self.putHeaders(status_code, 'text/css')
+                    with open(os.path.join(static_path, 'style.css'), 'rb') as fp:
+                        return fp.read()
+                else:
+                    self.putHeaders(status_code, 'text/html')
+                    return self.page_404(url_split)
+            except Exception as ex:
+                self.putHeaders(status_code, 'text/html')
+                if self.server.swap_client.debug is True:
+                    traceback.print_exc()
+                return self.page_error(str(ex))
+
         try:
             self.putHeaders(status_code, 'text/html')
             if len(url_split) > 1:

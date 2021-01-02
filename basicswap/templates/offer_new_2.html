@@ -15,7 +15,7 @@
 <option{% if data.addr_from=="-1" %} selected{% endif %} value="-1">-- New Address --</option>
 </select></td></tr>
 
-<tr><td>Coin From</td><td>
+<tr class="padded_row"><td class="bold">Coin From</td><td>
 <select name="coin_from_" disabled><option value="-1">-- Select Coin --</option>
 {% for c in coins %}
 <option{% if data.coin_from==c[0] %} selected{% endif %} value="{{ c[0] }}">{{ c[1] }}</option>
@@ -33,7 +33,7 @@
 </select></td></tr>
 {% endif %}
 
-<tr><td>Coin To</td><td>
+<tr class="padded_row"><td class="bold">Coin To</td><td>
 <select name="coin_to_" disabled><option value="-1">-- Select Coin --</option>
 {% for c in coins %}
 <option{% if data.coin_to==c[0] %} selected{% endif %}  value="{{ c[0] }}">{{ c[1] }}</option>
@@ -51,7 +51,7 @@
 </select></td></tr>
 {% endif %}
 
-<tr><td>Contract locked (hrs)</td><td><input type="number" name="lockhrs" min="1" max="64" value="{{ data.lockhrs }}"></td><td colspan=2>Participate txn will be locked for half the time.</td></tr>
+<tr class="padded_row"><td>Contract locked (hrs)</td><td><input type="number" name="lockhrs" min="1" max="64" value="{{ data.lockhrs }}"></td><td colspan=2>Participate txn will be locked for half the time.</td></tr>
 <tr><td>Auto Accept Bids</td><td colspan=3><input type="checkbox" name="autoaccept" value="aa" {% if data.autoaccept==true %} checked="true"{% endif %}></td></tr>
 </table>
 
@@ -63,5 +63,4 @@
 <input type="hidden" name="coin_to" value="{{ data.coin_to }}">
 </form>
 
-<p><a href="/">home</a></p>
 </body></html>

@@ -2,3 +2,4 @@ include *.md LICENSE
 
 recursive-include doc *
 recursive-include basicswap/templates *
+recursive-include basicswap/static *
