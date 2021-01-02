@@ -8,6 +8,7 @@
 import os
 import json
 import time
+import random
 import shutil
 import signal
 import logging
@@ -260,6 +261,8 @@ class Test(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         super(Test, cls).setUpClass()
+
+        random.seed(time.time())
 
         cls.update_thread = None
         cls.coins_update_thread = None
@@ -567,8 +570,15 @@ class Test(unittest.TestCase):
     def test_06_multiple_swaps(self):
         logging.info('---------- Test Multiple concurrent swaps')
         swap_clients = self.swap_clients
-        offer1_id = swap_clients[0].postOffer(Coins.BTC, Coins.XMR, 10 * COIN, 100 * XMR_COIN, 10 * COIN, SwapTypes.XMR_SWAP)
-        offer2_id = swap_clients[0].postOffer(Coins.PART, Coins.XMR, 10 * COIN, 0.14 * XMR_COIN, 10 * COIN, SwapTypes.XMR_SWAP)
+
+        amt_1 = make_int(random.uniform(0.001, 100.0), scale=8, r=1)
+        amt_2 = make_int(random.uniform(0.001, 100.0), scale=8, r=1)
+
+        rate_1 = make_int(random.uniform(80.0, 110.0), scale=12, r=1)
+        rate_2 = make_int(random.uniform(0.01, 0.5), scale=12, r=1)
+
+        offer1_id = swap_clients[0].postOffer(Coins.BTC, Coins.XMR, amt_1, rate_1, amt_1, SwapTypes.XMR_SWAP)
+        offer2_id = swap_clients[0].postOffer(Coins.PART, Coins.XMR, amt_2, rate_2, amt_2, SwapTypes.XMR_SWAP)
 
         wait_for_offer(delay_event, swap_clients[1], offer1_id)
         offer1 = swap_clients[1].getOffer(offer1_id)
