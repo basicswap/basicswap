@@ -42,7 +42,7 @@
 <form method="post">
 {% if data.show_bid_form %}
 <br/><h4>New Bid</h4>
-<p>You will send {{ data.amt_to }} {{ data.tla_to }} and receive {{ data.amt_from }} {{ data.tla_from }}</p>
+<p>You will send {{ data.amt_to }} {{ data.tla_to }} and receive {{ data.amt_from }} {{ data.tla_from }} (excluding {{ data.amt_from_lock_spend_tx_fee }} {{ data.tla_from }} in tx fees). </p>
 <table>
 <tr><td>Send From Address</td><td>
 <select name="addr_from">
@@ -63,7 +63,6 @@
 {% endif %}
 <input type="hidden" name="formid" value="{{ form_id }}">
 </form>
-
 
 <h4>Bids</h4>
 <table>

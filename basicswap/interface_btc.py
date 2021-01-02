@@ -111,6 +111,10 @@ class BTCInterface(CoinInterface):
     def compareFeeRates(a, b):
         return abs(a - b) < 20
 
+    @staticmethod
+    def xmr_swap_alock_spend_tx_vsize():
+        return 147
+
     def __init__(self, coin_settings, network):
         super().__init__()
         self.rpc_callback = make_rpc_func(coin_settings['rpcport'], coin_settings['rpcauth'], host=coin_settings['rpchost'])
@@ -409,7 +413,7 @@ class BTCInterface(CoinInterface):
 
         witness_bytes = len(script_lock)
         witness_bytes += 33  # sv, size
-        witness_bytes += 73 * 2  # 2 signatures (72 + 1 byts size)
+        witness_bytes += 73 * 2  # 2 signatures (72 + 1 byte size)
         witness_bytes += 4  # 1 empty, 1 true witness stack values
         witness_bytes += getCompactSizeLen(witness_bytes)
         vsize = self.getTxVSize(tx, add_witness_bytes=witness_bytes)

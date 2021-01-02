@@ -398,6 +398,11 @@ class HttpHandler(BaseHTTPRequestHandler):
                 page_data['from_fee_override'] = ci_from.format_amount(ci_from.make_int(from_fee_override, r=1))
                 parsed_data['from_fee_override'] = page_data['from_fee_override']
 
+                lock_spend_tx_vsize = ci_from.xmr_swap_alock_spend_tx_vsize()
+                lock_spend_tx_fee = ci_from.make_int(ci_from.make_int(from_fee_override, r=1) * lock_spend_tx_vsize / 1000, r=1)
+                page_data['amt_from_lock_spend_tx_fee'] = ci_from.format_amount(lock_spend_tx_fee // ci_from.COIN())
+                page_data['tla_from'] = ci_from.ticker()
+
             if coin_to == Coins.XMR:
                 if b'fee_rate_to' in form_data:
                     page_data['to_fee_override'] = form_data[b'fee_rate_to'][0].decode('utf-8')
@@ -564,6 +569,10 @@ class HttpHandler(BaseHTTPRequestHandler):
             data['a_fee_rate_verify'] = ci_from.format_amount(int_fee_rate_now, conv_int=True)
             data['a_fee_rate_verify_src'] = fee_source
             data['a_fee_warn'] = xmr_offer.a_fee_rate < int_fee_rate_now
+
+            lock_spend_tx_vsize = ci_from.xmr_swap_alock_spend_tx_vsize()
+            lock_spend_tx_fee = ci_from.make_int(xmr_offer.a_fee_rate * lock_spend_tx_vsize / 1000, r=1)
+            data['amt_from_lock_spend_tx_fee'] = ci_from.format_amount(lock_spend_tx_fee // ci_from.COIN())
 
         if offer.was_sent:
             data['auto_accept'] = 'True' if offer.auto_accept_bids else 'False'

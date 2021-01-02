@@ -23,15 +23,16 @@
 </select>
 </td><td>Amount From</td><td><input type="text" name="amt_from" value="{{ data.amt_from }}" readonly></td><td>The amount you will send.</td></tr>
 {% if data.swap_style == 'xmr' %}
-</td><td>Fee Rate From</td><td><input name="fee_rate_from" value="{{ data.from_fee_override }}" readonly></td><td>Fee Rate Source</td><td>{{ data.from_fee_src }}</td></tr>
-</td><td>Fee From Confirm Target</td><td><input type="number" name="fee_from_conf" min="1" max="32" value="{{ data.fee_from_conf }}" readonly></td></tr>
-</td><td>Fee From Extra Fee</td><td>
+<tr><td>Fee Rate From</td><td><input name="fee_rate_from" value="{{ data.from_fee_override }}" readonly></td><td>Fee Rate Source</td><td>{{ data.from_fee_src }}</td></tr>
+<tr><td>Fee From Confirm Target</td><td><input type="number" name="fee_from_conf" min="1" max="32" value="{{ data.fee_from_conf }}" readonly></td></tr>
+<tr><td>Fee From Increase By</td><td>
 <select name="fee_from_extra_" disabled>
 <option value="0">None</option>
 <option value="10"{% if data.fee_from_extra==10 %} selected{% endif %}>10%</option>
 <option value="50"{% if data.fee_from_extra==50 %} selected{% endif %}>50%</option>
 <option value="100"{% if data.fee_from_extra==100 %} selected{% endif %}>100%</option>
 </select></td></tr>
+<tr><td>Lock Tx Spend Fee</td><td>{{ data.amt_from_lock_spend_tx_fee }} {{ data.tla_from }}</td></tr>
 {% endif %}
 
 <tr><td>Coin To</td><td>
@@ -42,9 +43,9 @@
 </select>
 </td><td>Amount To</td><td><input type="text" name="amt_to" value="{{ data.amt_to }}" readonly></td><td>The amount you will receive.</td></tr>
 {% if data.swap_style == 'xmr' and coin_to != '6' %}
-</td><td>Fee Rate To</td><td><input name="fee_rate_to" value="{{ data.to_fee_override }}" readonly></td><td>Fee Rate Source</td><td>{{ data.to_fee_src }}</td></tr>
-</td><td>Fee To Confirm Target</td><td><input type="number" name="fee_to_conf" min="1" max="32" value="{{ data.fee_to_conf }}" readonly></td></tr>
-</td><td>Fee To Extra Fee</td><td>
+<tr><td>Fee Rate To</td><td><input name="fee_rate_to" value="{{ data.to_fee_override }}" readonly></td><td>Fee Rate Source</td><td>{{ data.to_fee_src }}</td></tr>
+<tr><td>Fee To Confirm Target</td><td><input type="number" name="fee_to_conf" min="1" max="32" value="{{ data.fee_to_conf }}" readonly></td></tr>
+<tr><td>Fee To Increase By</td><td>
 <select name="fee_to_extra_" disabled>
 <option value="0">None</option>
 <option value="10"{% if data.fee_to_extra==10 %} selected{% endif %}>10%</option>

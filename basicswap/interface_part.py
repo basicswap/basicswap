@@ -31,6 +31,10 @@ class PARTInterface(BTCInterface):
     def txVersion():
         return 0xa0
 
+    @staticmethod
+    def xmr_swap_alock_spend_tx_vsize():
+        return 213
+
     def __init__(self, coin_settings, network):
         self.rpc_callback = make_rpc_func(coin_settings['rpcport'], coin_settings['rpcauth'], host=coin_settings['rpchost'])
         self.txoType = CTxOutPart

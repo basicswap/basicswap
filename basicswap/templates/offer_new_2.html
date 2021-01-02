@@ -23,8 +23,8 @@
 </select>
 </td><td>Amount From</td><td><input type="text" name="amt_from" value="{{ data.amt_from }}" readonly></td><td>The amount you will send.</td></tr>
 {% if data.swap_style == 'xmr' %}
-</td><td>Fee From Confirm Target</td><td><input type="number" name="fee_from_conf" min="1" max="32" value="{{ data.fee_from_conf }}"></td></tr>
-</td><td>Fee From Extra Fee</td><td>
+<tr><td>Fee From Confirm Target</td><td><input type="number" name="fee_from_conf" min="1" max="32" value="{{ data.fee_from_conf }}"></td></tr>
+<tr><td>Fee From Increase By</td><td>
 <select name="fee_from_extra">
 <option value="0">None</option>
 <option value="10"{% if data.fee_from_extra==10 %} selected{% endif %}>10%</option>
@@ -41,8 +41,8 @@
 </select>
 </td><td>Amount To</td><td><input type="text" name="amt_to" value="{{ data.amt_to }}" readonly></td><td>The amount you will receive.</td></tr>
 {% if data.swap_style == 'xmr' and coin_to != '6' %}
-</td><td>Fee To Confirm Target</td><td><input type="number" name="fee_to_conf" min="1" max="32" value="{{ data.fee_to_conf }}"></td></tr>
-</td><td>Fee To Extra Fee</td><td>
+<tr><td>Fee To Confirm Target</td><td><input type="number" name="fee_to_conf" min="1" max="32" value="{{ data.fee_to_conf }}"></td></tr>
+<tr><td>Fee To Increase By</td><td>
 <select name="fee_to_extra">
 <option value="0">None</option>
 <option value="10"{% if data.fee_to_extra==10 %} selected{% endif %}>10%</option>
