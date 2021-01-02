@@ -783,7 +783,7 @@ class BTCInterface(CoinInterface):
 
         for utxo in rv['unspents']:
             if 'height' in utxo and utxo['height'] > 0 and rv['height'] - utxo['height'] > cb_block_confirmed:
-                if utxo['amount'] * COIN != cb_swap_value:
+                if self.make_int(utxo['amount']) != cb_swap_value:
                     logging.warning('Found output to lock tx pubkey of incorrect value: %s', str(utxo['amount']))
                 else:
                     return {'txid': utxo['txid'], 'vout': utxo['vout'], 'amount': utxo['amount'], 'height': utxo['height']}
@@ -801,7 +801,7 @@ class BTCInterface(CoinInterface):
             for utxo in rv['unspents']:
                 if 'height' in utxo and utxo['height'] > 0 and rv['height'] - utxo['height'] > cb_block_confirmed:
 
-                    if utxo['amount'] * COIN != cb_swap_value:
+                    if self.make_int(utxo['amount']) != cb_swap_value:
                         logging.warning('Found output to lock tx pubkey of incorrect value: %s', str(utxo['amount']))
                     else:
                         return True
@@ -819,13 +819,13 @@ class BTCInterface(CoinInterface):
             if txid and txid.hex() != utxo['txid']:
                 continue
 
-            if expect_value != utxo['amount'] * COIN:
+            if expect_value != self.make_int(utxo['amount']):
                 continue
 
             rv.append({
                 'depth': 0 if 'height' not in utxo else (chain_height - utxo['height']) + 1,
                 'height': 0 if 'height' not in utxo else utxo['height'],
-                'amount': utxo['amount'] * COIN,
+                'amount': self.make_int(utxo['amount']),
                 'txid': utxo['txid'],
                 'vout': utxo['vout']})
         return rv, chain_height

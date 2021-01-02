@@ -33,11 +33,13 @@ After updating the code and rebuilding the container:
 
 ## If installed through pip:
 
-    cd basicswap
-    git pull
-    pip3 install .
+    $ export SWAP_DATADIR=/Users/$USER/coinswaps
+    $ . $SWAP_DATADIR/venv/bin/activate && python -V
+    $ cd $SWAP_DATADIR/basicswap
+    $ git pull
+    $ pip3 install .
 
 
 #### Update core versions
 
-    basicswap-prepare -preparebinonly
+    basicswap-prepare -preparebinonly --withcoins=monero --withoutcoins=litecoin

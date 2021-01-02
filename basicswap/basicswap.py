@@ -4500,7 +4500,7 @@ class BasicSwap(BaseApp):
                     else:
                         self.log.debug('TODO - determine in-progress for manualBidUpdate')
                         if offer.swap_type == SwapTypes.XMR_SWAP:
-                            if bid.state and bid.state in (BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED, BidStates.XMR_SWAP_LOCK_RELEASED, BidStates.XMR_SWAP_NOSCRIPT_TX_REDEEMED):
+                            if bid.state and bid.state in (BidStates.XMR_SWAP_HAVE_SCRIPT_COIN_SPEND_TX, BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED, BidStates.XMR_SWAP_LOCK_RELEASED, BidStates.XMR_SWAP_NOSCRIPT_TX_REDEEMED):
                                 activate_bid = True
 
                     if activate_bid:
