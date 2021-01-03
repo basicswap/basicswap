@@ -10,7 +10,11 @@
 {% endfor %}
 
 <table>
+{% if data.was_sent == 'True' %}
+<tr><td>Swap</td><td>{{ data.amt_to }} {{ data.ticker_to }} for {{ data.amt_from }} {{ data.ticker_from }}</td></tr>
+{% else %}
 <tr><td>Swap</td><td>{{ data.amt_from }} {{ data.ticker_from }} for {{ data.amt_to }} {{ data.ticker_to }}</td></tr>
+{% endif %}
 <tr><td>Bid State</td><td>{{ data.bid_state }}</td></tr>
 <tr><td>StateDescription </td><td>{{ data.state_description }}</td></tr>
 <tr><td>Offer</td><td><a href="/offer/{{ data.offer_id }}">{{ data.offer_id }}</a></td></tr>
