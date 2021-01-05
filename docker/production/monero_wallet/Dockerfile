@@ -16,4 +16,4 @@ COPY entrypoint.sh /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
 
 EXPOSE 18080
-CMD ["monero-wallet-rpc", "--config-file=/home/monero/.monero/monerod.conf"]
+CMD ["monero-wallet-rpc", "--non-interactive", "--config-file=/home/monero/.monero/monerod.conf"]

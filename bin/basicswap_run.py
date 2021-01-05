@@ -46,17 +46,21 @@ def startDaemon(node_dir, bin_dir, daemon_bin, opts=[]):
 def startXmrDaemon(node_dir, bin_dir, daemon_bin, opts=[]):
     daemon_bin = os.path.expanduser(os.path.join(bin_dir, daemon_bin))
 
-    args = [daemon_bin, '--config-file=' + os.path.join(os.path.expanduser(node_dir), 'monerod.conf')] + opts
+    data_dir = os.path.expanduser(node_dir)
+    args = [daemon_bin, '--non-interactive', '--config-file=' + os.path.join(data_dir, 'monerod.conf')] + opts
     logging.info('Starting node {} --data-dir={}'.format(daemon_bin, node_dir))
 
-    return subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    # return subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    file_stdout = open(os.path.join(data_dir, 'core_stdout.log'), 'w')
+    file_stderr = open(os.path.join(data_dir, 'core_stderr.log'), 'w')
+    return subprocess.Popen(args, stdin=subprocess.PIPE, stdout=file_stdout, stderr=file_stderr)
 
 
 def startXmrWalletDaemon(node_dir, bin_dir, wallet_bin, opts=[]):
     daemon_bin = os.path.expanduser(os.path.join(bin_dir, wallet_bin))
 
     data_dir = os.path.expanduser(node_dir)
-    args = [daemon_bin, '--config-file=' + os.path.join(os.path.expanduser(node_dir), 'monero_wallet.conf')] + opts
+    args = [daemon_bin, '--non-interactive', '--config-file=' + os.path.join(data_dir, 'monero_wallet.conf')] + opts
 
     args += opts
     logging.info('Starting wallet daemon {} --wallet-dir={}'.format(daemon_bin, node_dir))
