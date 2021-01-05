@@ -21,11 +21,11 @@ Create the images:
 Prepare the datadir:
 Set XMR_RPC_HOST and BASE_XMR_RPC_PORT to a public XMR node or exclude to run a local node.
 Set xmrrestoreheight to the current xmr chain height.
-Adjust `--withcoins` and `--withoutcoins` as desired, eg: `--withcoins=monero,bitcoin`.  By default Particl and Litecoin are loaded.
+Adjust `--withcoins` and `--withoutcoins` as desired, eg: `--withcoins=monero,bitcoin`.  By default only Particl is loaded.
 
     $ export COINDATA_PATH=/var/data/coinswaps
     $ docker run -e XMR_RPC_HOST="node.xmr.to" -e BASE_XMR_RPC_PORT=18081 -t --name swap_prepare -v $COINDATA_PATH:/coindata i_swapclient \
-    basicswap-prepare --datadir=/coindata --withcoins=monero --withoutcoins=litecoin --htmlhost="0.0.0.0" --xmrrestoreheight=2245107
+    basicswap-prepare --datadir=/coindata --withcoins=monero --htmlhost="0.0.0.0" --xmrrestoreheight=2245107
 
 Record the mnemonic from the output of the above command.
 
@@ -104,10 +104,10 @@ Dependencies:
 
 Prepare the datadir:
 
-    XMR_RPC_HOST="node.xmr.to" BASE_XMR_RPC_PORT=18081 basicswap-prepare --datadir=$SWAP_DATADIR --withcoins=monero --withoutcoins=litecoin --xmrrestoreheight=2245107
+    XMR_RPC_HOST="node.xmr.to" BASE_XMR_RPC_PORT=18081 basicswap-prepare --datadir=$SWAP_DATADIR --withcoins=monero --xmrrestoreheight=2245107
 
     OR using a local XMR daemon:
-    basicswap-prepare --datadir=$SWAP_DATADIR --withcoins=monero --withoutcoins=litecoin --xmrrestoreheight=2245107
+    basicswap-prepare --datadir=$SWAP_DATADIR --withcoins=monero --xmrrestoreheight=2245107
 
 Record the mnemonic from the output of the above command.
 

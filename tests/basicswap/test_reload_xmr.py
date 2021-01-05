@@ -115,7 +115,7 @@ class Test(unittest.TestCase):
                 '-bindir="{}"'.format(os.path.join(test_path, 'bin')),
                 '-portoffset={}'.format(i),
                 '-particl_mnemonic="{}"'.format(mnemonics[i]),
-                '-regtest', '-withoutcoin=litecoin', '-withcoin=monero']
+                '-regtest', '-withcoin=monero']
             with patch.object(sys, 'argv', testargs):
                 prepareSystem.main()
 

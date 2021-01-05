@@ -35,7 +35,7 @@ class Test(unittest.TestCase):
         super(Test, self).tearDownClass()
 
     def test(self):
-        testargs = ['basicswap-prepare', '-datadir=' + test_path]
+        testargs = ['basicswap-prepare', '-datadir=' + test_path, '-withcoin=litecoin']
         with patch.object(sys, 'argv', testargs):
             prepareSystem.main()
 
@@ -43,7 +43,7 @@ class Test(unittest.TestCase):
         self.assertTrue(os.path.exists(config_path))
 
         logger.info('Test no overwrite')
-        testargs = ['basicswap-prepare', '-datadir=' + test_path]
+        testargs = ['basicswap-prepare', '-datadir=' + test_path, '-withcoin=litecoin']
         with patch('sys.stderr', new=StringIO()) as fake_stderr:
             with patch.object(sys, 'argv', testargs):
                 with self.assertRaises(SystemExit) as cm:

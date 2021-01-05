@@ -26,7 +26,7 @@ After updating the code and rebuilding the container:
 
     basicswap/docker]$ docker run \
         -t --name swap_prepare -v $COINDATA_PATH:/coindata i_swapclient \
-        basicswap-prepare --datadir=/coindata --preparebinonly --withcoins=monero --withoutcoins=litecoin
+        basicswap-prepare --datadir=/coindata --preparebinonly --withcoins=monero
 
     docker rm swap_prepare
 

@@ -1,6 +1,6 @@
 FROM i_swapclient as install_stage
 
-RUN basicswap-prepare --preparebinonly --bindir=/coin_bin --withcoin=monero --withoutcoins=particl,litecoin
+RUN basicswap-prepare --preparebinonly --bindir=/coin_bin --withcoin=monero --withoutcoins=particl
 
 FROM debian:buster-slim
 

@@ -400,7 +400,7 @@ def main():
     particl_wallet_mnemonic = None
     prepare_bin_only = False
     no_cores = False
-    with_coins = {'particl', 'litecoin'}
+    with_coins = {'particl'}
     add_coin = ''
     disable_coin = ''
     htmlhost = 'localhost'
