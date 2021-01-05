@@ -41,6 +41,8 @@ Start the container
 
 Open in browser: `http://localhost:12700`
 
+
+
 ### Add a coin
 
     $ docker-compose stop
@@ -49,6 +51,14 @@ Open in browser: `http://localhost:12700`
 
 You can copy an existing pruned datadir (excluding bitcoin.conf and any wallets) over to `$COINDATA_PATH/bitcoin`
 Remove any existing wallets after copying over a pruned chain or the Bitcoin daemon won't start.
+
+
+## Windows
+
+Setup Docker Desktop on the WSL 2 backend.
+[docs.docker.com/docker-for-windows/wsl](https://docs.docker.com/docker-for-windows/wsl/)
+
+Launch the docker commands through a WSL terminal.
 
 
 ## Run Without Docker:
@@ -114,39 +124,3 @@ Start after installed:
     $ export SWAP_DATADIR=/Users/$USER/coinswaps
     $ . $SWAP_DATADIR/venv/bin/activate && python -V
     $ basicswap-run --datadir=$SWAP_DATADIR
-
-
-
-Old notes
-=============
-
-## Run Without Installing
-
-    $ cd basicswap
-    $ pip install sqlalchemy protobuf pyzmq
-    $ protoc -I=basicswap --python_out=basicswap basicswap/messages.proto
-    $ export PYTHONPATH=$(pwd)
-    $ python bin/basicswap-prepare.py
-    $ python bin/basicswap-run.py
-
-
-# Windows
-
-Install git and python3:
-
-    https://gitforwindows.org/
-    https://www.python.org/downloads/windows/
-        Remember to select the 'Add Python to environment variables' option.
-
-Right click in the directory you want to install into and select 'Git Bash Here':
-
-    $ git clone https://github.com/tecnovert/basicswap.git
-    $ cd basicswap
-    $ pip3 install .
-    $ basicswap-prepare
-    $ basicswap-run
-
-Open url in browser:
-http://localhost:12700
-
-Shutdown by pressing ctrl + c in the Git Bash console window.
