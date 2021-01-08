@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019 tecnovert
+# Copyright (c) 2019-2021 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import os
-import time
 import struct
 import traceback
 import threading
@@ -16,6 +15,7 @@ from jinja2 import Environment, PackageLoader
 
 from . import __version__
 from .util import (
+    format_timestamp,
     dumpj,
 )
 from .chainparams import (
@@ -47,10 +47,6 @@ from .ui import (
     describeBid,
     setCoinFilter,
 )
-
-
-def format_timestamp(value):
-    return time.strftime('%Y-%m-%d %H:%M', time.localtime(value))
 
 
 env = Environment(loader=PackageLoader('basicswap', 'templates'))
@@ -635,7 +631,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             ci_from = swap_client.ci(Coins(o.coin_from))
             ci_to = swap_client.ci(Coins(o.coin_to))
             formatted_offers.append((
-                time.strftime('%Y-%m-%d %H:%M', time.localtime(o.created_at)),
+                format_timestamp(o.created_at),
                 o.offer_id.hex(),
                 ci_from.coin_name(), ci_to.coin_name(),
                 ci_from.format_amount(o.amount_from),
@@ -758,7 +754,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             title=self.server.title,
             h2=self.server.title,
             page_type='Sent' if sent else 'Received',
-            bids=[(time.strftime('%Y-%m-%d %H:%M', time.localtime(b[0])),
+            bids=[(format_timestamp(b[0]),
                    b[1].hex(), b[2].hex(), strBidState(b[4]), strTxState(b[6]), strTxState(b[7])) for b in bids],
         ), 'UTF-8')
 

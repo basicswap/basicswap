@@ -40,10 +40,10 @@
 <input name="edit_bid_submit" type="submit" value="Submit">
 {% else %}
 {% if data.was_received == 'True' %}
-<input name="accept_bid" type="submit" value="Accept Bid" onclick="confirmPopup(\"Accept\")"><br/>
+<input name="accept_bid" type="submit" value="Accept Bid" onclick='confirmPopup("Accept")'><br/>
 {% endif %}
 {% if data.can_abandon == true %}
-<input name="abandon_bid" type="submit" value="Abandon Bid" onclick="confirmPopup(\"Abandon\")">
+<input name="abandon_bid" type="submit" value="Abandon Bid" onclick='confirmPopup("Abandon")'>
 {% endif %}
 {% if data.show_txns %}
 <input name="hide_txns" type="submit" value="Hide Info">

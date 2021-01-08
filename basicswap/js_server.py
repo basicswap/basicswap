@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2020 tecnovert
+# Copyright (c) 2020-2021 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -8,7 +8,10 @@ import json
 import time
 import urllib.parse
 
-from .util import format8
+from .util import (
+    format8,
+    format_timestamp,
+)
 from .basicswap import (
     strBidState,
     SwapTypes,
@@ -143,7 +146,7 @@ def js_bids(self, url_split, post_string):
     return bytes(json.dumps([{
         'bid_id': b[1].hex(),
         'offer_id': b[2].hex(),
-        'created_at': time.strftime('%Y-%m-%d %H:%M', time.localtime(b[0])),
+        'created_at': format_timestamp(b[0]),
         'amount_from': format8(b[3]),
         'bid_state': strBidState(b[4])
     } for b in bids]), 'UTF-8')

@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2018-2020 tecnovert
+# Copyright (c) 2018-2021 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
+
 import json
+import time
 import decimal
 import hashlib
 
@@ -302,6 +304,10 @@ def format_amount(i, display_scale, scale=None):
     if i < 0:
         rv = '-' + rv
     return rv
+
+
+def format_timestamp(value):
+    return time.strftime('%Y-%m-%d %H:%M', time.localtime(value))
 
 
 def getP2SHScriptForHash(p2sh):

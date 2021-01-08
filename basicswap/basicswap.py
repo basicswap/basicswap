@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019-2020 tecnovert
+# Copyright (c) 2019-2021 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -36,6 +36,7 @@ from .util import (
     pubkeyToAddress,
     format8,
     format_amount,
+    format_timestamp,
     encodeAddress,
     decodeAddress,
     DeserialiseNum,
@@ -895,6 +896,12 @@ class BasicSwap(BaseApp):
             if ptx_state is not None and ptx_state != TxStates.TX_REFUNDED:
                 self.returnAddressToPool(bid.bid_id, TxTypes.PTX_REFUND)
 
+        # Remove any delayed events
+        if self.debug:
+            session.execute('UPDATE eventqueue SET active_ind = 2 WHERE linked_id = {}'.format(bid.bid_id))
+        else:
+            session.execute('DELETE FROM eventqueue WHERE linked_id = {}'.format(bid.bid_id))
+
     def loadFromDB(self):
         self.log.info('Loading data from db')
         self.mxDB.acquire()
@@ -955,7 +962,7 @@ class BasicSwap(BaseApp):
 
     def validateOfferLockValue(self, coin_from, coin_to, lock_type, lock_value):
         if lock_type == OfferMessage.SEQUENCE_LOCK_TIME:
-            assert(lock_value >= 2 * 60 * 60 and lock_value <= 96 * 60 * 60), 'Invalid lock_value time'
+            assert(lock_value >= 1 * 60 * 60 and lock_value <= 96 * 60 * 60), 'Invalid lock_value time'
             assert(self.coin_clients[coin_from]['use_csv'] and self.coin_clients[coin_to]['use_csv']), 'Both coins need CSV activated.'
         elif lock_type == OfferMessage.SEQUENCE_LOCK_BLOCKS:
             assert(lock_value >= 5 and lock_value <= 1000), 'Invalid lock_value blocks'
@@ -1681,11 +1688,19 @@ class BasicSwap(BaseApp):
     def list_bid_events(self, bid_id, session):
         session = scoped_session(self.session_factory)
         query_str = 'SELECT created_at, event_type, event_msg FROM eventlog ' + \
-                    'WHERE linked_type = {} AND linked_id = x\'{}\' '.format(TableTypes.BID, bid_id.hex())
+                    'WHERE active_ind = 1 AND linked_type = {} AND linked_id = x\'{}\' '.format(TableTypes.BID, bid_id.hex())
         q = self.engine.execute(query_str)
         events = []
         for row in q:
             events.append({'at': row[0], 'desc': describeEventEntry(row[1], row[2])})
+
+        query_str = 'SELECT created_at, trigger_at FROM eventqueue ' + \
+                    'WHERE active_ind = 1 AND linked_id = x\'{}\' '.format(bid_id.hex())
+        q = self.engine.execute(query_str)
+        events = []
+        for row in q:
+            events.append({'at': row[0], 'desc': 'Delaying until: {}'.format(format_timestamp(row[1]))})
+
         return events
 
     def acceptBid(self, bid_id):
@@ -2035,24 +2050,6 @@ class BasicSwap(BaseApp):
             self.log.info('Sent XMR_BID_ACCEPT_LF %s', bid_id.hex())
             return bid_id
         finally:
-            self.mxDB.release()
-
-    def abandonOffer(self, offer_id):
-        self.log.info('Abandoning Offer %s', offer_id.hex())
-        self.mxDB.acquire()
-        try:
-            session = scoped_session(self.session_factory)
-            offer = session.query(Offer).filter_by(offer_id=offer_id).first()
-            assert(offer), 'Offer not found'
-
-            # TODO: abandon linked bids?
-
-            # Mark bid as abandoned, no further processing will be done
-            offer.setState(OfferStates.OFFER_ABANDONED)
-            session.commit()
-        finally:
-            session.close()
-            session.remove()
             self.mxDB.release()
 
     def abandonBid(self, bid_id):
@@ -3289,6 +3286,7 @@ class BasicSwap(BaseApp):
                         self.log.info('Verify xmr bid {} failed: {}'.format(bid.bid_id.hex(), str(ex)))
                         bid.setState(BidStates.BID_ERROR, 'Failed validation: ' + str(ex))
                         session.add(bid)
+                        self.updateBidInProgress(bid)
                     continue
                 if bid.created_at + ttl_xmr_split_messages < now:
                     self.log.debug('Expiring partially received bid: {}'.format(bid.bid_id.hex()))
@@ -4500,7 +4498,7 @@ class BasicSwap(BaseApp):
                     else:
                         self.log.debug('TODO - determine in-progress for manualBidUpdate')
                         if offer.swap_type == SwapTypes.XMR_SWAP:
-                            if bid.state and bid.state in (BidStates.XMR_SWAP_HAVE_SCRIPT_COIN_SPEND_TX, BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED, BidStates.XMR_SWAP_LOCK_RELEASED, BidStates.XMR_SWAP_NOSCRIPT_TX_REDEEMED):
+                            if bid.state and bid.state in (BidStates.XMR_SWAP_HAVE_SCRIPT_COIN_SPEND_TX, BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED, BidStates.XMR_SWAP_NOSCRIPT_COIN_LOCKED, BidStates.XMR_SWAP_LOCK_RELEASED, BidStates.XMR_SWAP_NOSCRIPT_TX_REDEEMED):
                                 activate_bid = True
 
                     if activate_bid:
@@ -4791,6 +4789,12 @@ class BasicSwap(BaseApp):
                 passed = self.callcoinrpc(Coins.PART, 'verifymessage', [offer_addr_from, signature_enc, offer_id.hex() + '_revoke'])
                 return True if passed is True else False  # _possibly_revoked_offers should not contain duplicates
         return False
+
+    def updateBidInProgress(self, bid):
+        swap_in_progress = self.swaps_in_progress.get(bid.bid_id, None)
+        if swap_in_progress is None:
+            return
+        self.swaps_in_progress[bid.bid_id] = (bid, swap_in_progress[1])
 
     def add_connection(self, host, port, peer_pubkey):
         self.log.info('add_connection %s %d %s', host, port, peer_pubkey.hex())
