@@ -4648,7 +4648,8 @@ class BasicSwap(BaseApp):
                 q = q.filter(Offer.coin_to == int(filter_coin_to))
 
             order_dir = filters.get('sort_dir', 'desc')
-            order_by = filters.get('order_by', 'created_at')
+            order_by = filters.get('sort_by', 'created_at')
+
             if order_by == 'created_at':
                 q = q.order_by(Offer.created_at.desc() if order_dir == 'desc' else Offer.created_at.asc())
             elif order_by == 'rate':
