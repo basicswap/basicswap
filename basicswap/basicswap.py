@@ -436,6 +436,8 @@ class BasicSwap(BaseApp):
         self.min_delay_retry = self.settings.get('min_delay_retry', 60)
         self.max_delay_retry = self.settings.get('max_delay_retry', 5 * 60)
 
+        self._bid_expired_leeway = 5
+
         self.swaps_in_progress = dict()
 
         if self.chain == 'regtest':
@@ -896,11 +898,36 @@ class BasicSwap(BaseApp):
             if ptx_state is not None and ptx_state != TxStates.TX_REFUNDED:
                 self.returnAddressToPool(bid.bid_id, TxTypes.PTX_REFUND)
 
-        # Remove any delayed events
-        if self.debug:
-            session.execute('UPDATE eventqueue SET active_ind = 2 WHERE linked_id = {}'.format(bid.bid_id))
-        else:
-            session.execute('DELETE FROM eventqueue WHERE linked_id = {}'.format(bid.bid_id))
+        use_session = None
+        try:
+            if session:
+                use_session = session
+            else:
+                self.mxDB.acquire()
+                use_session = scoped_session(self.session_factory)
+
+            # Remove any delayed events
+            if self.debug:
+                use_session.execute('UPDATE eventqueue SET active_ind = 2 WHERE linked_id = x\'{}\' '.format(bid.bid_id.hex()))
+            else:
+                use_session.execute('DELETE FROM eventqueue WHERE linked_id = x\'{}\' '.format(bid.bid_id.hex()))
+
+            # Unlock locked inputs (TODO)
+            if offer.swap_type == SwapTypes.XMR_SWAP:
+                xmr_swap = use_session.query(XmrSwap).filter_by(bid_id=bid.bid_id).first()
+                if xmr_swap:
+                    try:
+                        self.ci(offer.coin_from).unlockInputs(xmr_swap.a_lock_tx)
+                    except Exception as e:
+                        if self.debug:
+                            self.log.info('unlockInputs failed {}'.format(str(e)))
+                        pass  # Invalid parameter, unknown transaction
+        finally:
+            if session is None:
+                use_session.commit()
+                use_session.close()
+                use_session.remove()
+                self.mxDB.release()
 
     def loadFromDB(self):
         self.log.info('Loading data from db')
@@ -1370,7 +1397,6 @@ class BasicSwap(BaseApp):
             session.remove()
         finally:
             self.mxDB.release()
-
         return self._contract_count
 
     def getProofOfFunds(self, coin_type, amount_for):
@@ -1486,7 +1512,7 @@ class BasicSwap(BaseApp):
         q = session.execute('SELECT COUNT(*) FROM eventlog WHERE linked_type = {} AND linked_id = x\'{}\' AND event_type = {}'.format(int(TableTypes.BID), bid.bid_id.hex(), int(event_type))).first()
         return q[0]
 
-    def postBid(self, offer_id, amount, addr_send_from=None):
+    def postBid(self, offer_id, amount, addr_send_from=None, extra_options={}):
         # Bid to send bid.amount * offer.rate of coin_to in exchange for bid.amount of coin_from
         self.log.debug('postBid %s %s', offer_id.hex(), format8(amount))
 
@@ -1501,7 +1527,7 @@ class BasicSwap(BaseApp):
         try:
             msg_buf = BidMessage()
             msg_buf.offer_msg_id = offer_id
-            msg_buf.time_valid = 60 * 10
+            msg_buf.time_valid = extra_options.get('time_valid', 60 * 10)
             msg_buf.amount = int(amount)  # amount of coin_from
 
             coin_from = Coins(offer.coin_from)
@@ -2855,7 +2881,7 @@ class BasicSwap(BaseApp):
             if bid.initiate_tx is None and \
                bid.state_time + INITIATE_TX_TIMEOUT < int(time.time()):
                 self.log.info('Swap timed out waiting for initiate tx for bid %s', bid_id.hex())
-                bid.setState(BidStates.SWAP_TIMEDOUT)
+                bid.setState(BidStates.SWAP_TIMEDOUT, 'Timed out waiting for initiate tx')
                 self.saveBid(bid_id, bid)
                 return True  # Mark bid for archiving
         elif state == BidStates.SWAP_INITIATED:
@@ -3553,7 +3579,7 @@ class BasicSwap(BaseApp):
         assert(offer), 'Offer not found ' + bid.offer_id.hex()
         coin_from = Coins(offer.coin_from)
 
-        # assert(bid.expire_at > now), 'Bid expired'  # How much time over to accept
+        assert(bid.expire_at > now + self._bid_expired_leeway), 'Bid expired'
 
         if bid.state >= BidStates.BID_ACCEPTED:
             if bid.was_received:  # Sent to self

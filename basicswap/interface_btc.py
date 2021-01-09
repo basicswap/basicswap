@@ -680,6 +680,14 @@ class BTCInterface(CoinInterface):
         rv = self.rpc_callback('fundrawtransaction', [tx.hex(), options])
         return bytes.fromhex(rv['hex'])
 
+    def unlockInputs(self, tx_bytes):
+        tx = self.loadTx(tx_bytes)
+
+        inputs = []
+        for pi in tx.vin:
+            inputs.append({'txid': i2h(pi.prevout.hash), 'vout': pi.prevout.n})
+        self.rpc_callback('lockunspent', [True, inputs])
+
     def signTxWithWallet(self, tx):
         rv = self.rpc_callback('signrawtransactionwithwallet', [tx.hex()])
         return bytes.fromhex(rv['hex'])
