@@ -42,7 +42,7 @@ known_coins = {
     'litecoin': '0.18.1',
     'bitcoin': '0.20.1',
     'namecoin': '0.18.0',
-    'monero': '0.17.1.8',
+    'monero': '0.17.1.9',
 }
 
 logger = logging.getLogger()
@@ -57,7 +57,7 @@ BASE_XMR_WALLET_PORT = int(os.getenv('BASE_XMR_WALLET_PORT', 29998))
 XMR_WALLET_RPC_HOST = os.getenv('XMR_WALLET_RPC_HOST', 'localhost')
 XMR_WALLET_RPC_USER = os.getenv('XMR_WALLET_RPC_USER', 'xmr_wallet_user')
 XMR_WALLET_RPC_PWD = os.getenv('XMR_WALLET_RPC_PWD', 'xmr_wallet_pwd')
-XMR_SITE_COMMIT = '9a34b4f554de8717f72b45c46469964630b3d15f'  # Lock hashes.txt to monero version
+XMR_SITE_COMMIT = 'd27c1eee9fe0e8daa011d07baae8b67dd2b62a04'  # Lock hashes.txt to monero version
 
 DEFAULT_XMR_RESTORE_HEIGHT = 2245107
 
