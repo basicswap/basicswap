@@ -12,7 +12,7 @@ setuptools.setup(
     version=__version__,
     author="tecnovert",
     author_email="tecnovert@tecnovert.net",
-    description="Simple atomic swap demo",
+    description="Simple atomic swap system",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
     url="https://github.com/tecnovert/basicswap",
@@ -22,6 +22,13 @@ setuptools.setup(
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
         "Operating System :: Linux",
+    ],
+    keywords=[
+        "crypto",
+        "cryptocurrency",
+        "particl",
+        "bitcoin",
+        "monero",
     ],
     install_requires=[
         "wheel",
@@ -38,6 +45,5 @@ setuptools.setup(
             "basicswap-run=bin.basicswap_run:main",
             "basicswap-prepare=bin.basicswap_prepare:main",
         ]
-    },
-    test_suite="tests.basicswap.test_suite"
+    }
 )

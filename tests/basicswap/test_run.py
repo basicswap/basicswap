@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019 tecnovert
+# Copyright (c) 2019-2021 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 """
-basicswap]$ python setup.py test
+basicswap]$ pytest
 
 Run one test:
-$ python setup.py test -s tests.basicswap.test_run.Test.test_04_ltc_btc
+$ pytest -v -s tests/basicswap/test_run.py::Test::test_04_ltc_btc
 
 """
 

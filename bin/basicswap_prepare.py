@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019-2020 tecnovert
+# Copyright (c) 2019-2021 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -31,11 +31,14 @@ from bin.basicswap_run import startDaemon, startXmrWalletDaemon
 
 
 if platform.system() == 'Darwin':
-    BIN_ARCH = 'osx64.tar.gz'
+    BIN_ARCH = 'osx64'
+    FILE_EXT = 'tar.gz'
 elif platform.system() == 'Windows':
-    BIN_ARCH = 'win64.zip'
+    BIN_ARCH = 'win64'
+    FILE_EXT = 'zip'
 else:
-    BIN_ARCH = 'x86_64-linux-gnu.tar.gz'
+    BIN_ARCH = 'x86_64-linux-gnu'
+    FILE_EXT = 'tar.gz'
 
 known_coins = {
     'particl': '0.19.1.2',
@@ -67,6 +70,8 @@ LTC_RPC_HOST = os.getenv('LTC_RPC_HOST', 'localhost')
 BTC_RPC_HOST = os.getenv('BTC_RPC_HOST', 'localhost')
 NMC_RPC_HOST = os.getenv('NMC_RPC_HOST', 'localhost')
 
+extract_core_overwrite = True
+
 
 def make_reporthook():
     read = 0  # Number of bytes read so far
@@ -88,6 +93,7 @@ def make_reporthook():
 
 def downloadFile(url, path):
     logger.info('Downloading file %s', url)
+    logger.info('To %s', path)
     opener = urllib.request.build_opener()
     opener.addheaders = [('User-agent', 'Mozilla/5.0')]
     urllib.request.install_opener(opener)
@@ -97,19 +103,31 @@ def downloadFile(url, path):
 def extractCore(coin, version, settings, bin_dir, release_path):
     logger.info('extractCore %s v%s', coin, version)
 
-    bins = [coin + 'd', coin + '-cli', coin + '-tx']
-
     if coin == 'monero':
+        bins = ['monerod', 'monero-wallet-rpc']
+        num_exist = 0
+        for b in bins:
+            out_path = os.path.join(bin_dir, b)
+            if os.path.exists(out_path):
+                num_exist += 1
+        if not extract_core_overwrite and num_exist == len(bins):
+            logger.info('Skipping extract, files exist.')
+            return
+
         with tarfile.open(release_path) as ft:
             for member in ft.getmembers():
                 if member.isdir():
                     continue
-                out_path = os.path.join(bin_dir, os.path.basename(member.name))
-                fi = ft.extractfile(member)
-                with open(out_path, 'wb') as fout:
-                    fout.write(fi.read())
-                fi.close()
-                os.chmod(out_path, stat.S_IRWXU | stat.S_IXGRP | stat.S_IXOTH)
+                bin_name = os.path.basename(member.name)
+                if bin_name not in bins:
+                    continue
+                out_path = os.path.join(bin_dir, bin_name)
+                if (not os.path.exists(out_path)) or extract_core_overwrite:
+                    fi = ft.extractfile(member)
+                    with open(out_path, 'wb') as fout:
+                        fout.write(fi.read())
+                    fi.close()
+                    os.chmod(out_path, stat.S_IRWXU | stat.S_IXGRP | stat.S_IXOTH)
         return
 
     bins = [coin + 'd', coin + '-cli', coin + '-tx']
@@ -121,18 +139,20 @@ def extractCore(coin, version, settings, bin_dir, release_path):
             for b in bins:
                 b += '.exe'
                 out_path = os.path.join(bin_dir, b)
-                with open(out_path, 'wb') as fout:
-                    fout.write(fz.read('{}-{}/bin/{}'.format(coin, version, b)))
-                os.chmod(out_path, stat.S_IRWXU | stat.S_IXGRP | stat.S_IXOTH)
+                if (not os.path.exists(out_path)) or extract_core_overwrite:
+                    with open(out_path, 'wb') as fout:
+                        fout.write(fz.read('{}-{}/bin/{}'.format(coin, version, b)))
+                    os.chmod(out_path, stat.S_IRWXU | stat.S_IXGRP | stat.S_IXOTH)
     else:
         with tarfile.open(release_path) as ft:
             for b in bins:
                 out_path = os.path.join(bin_dir, b)
-                fi = ft.extractfile('{}-{}/bin/{}'.format(coin, version, b))
-                with open(out_path, 'wb') as fout:
-                    fout.write(fi.read())
-                fi.close()
-                os.chmod(out_path, stat.S_IRWXU | stat.S_IXGRP | stat.S_IXOTH)
+                if not os.path.exists(out_path) or extract_core_overwrite:
+                    fi = ft.extractfile('{}-{}/bin/{}'.format(coin, version, b))
+                    with open(out_path, 'wb') as fout:
+                        fout.write(fi.read())
+                    fi.close()
+                    os.chmod(out_path, stat.S_IRWXU | stat.S_IXGRP | stat.S_IXOTH)
 
 
 def prepareCore(coin, version, settings, data_dir):
@@ -152,11 +172,12 @@ def prepareCore(coin, version, settings, data_dir):
         os_dir_name = 'linux'
         os_name = 'linux'
 
-    release_filename = '{}-{}-{}'.format(coin, version, BIN_ARCH)
     if coin == 'monero':
+        use_file_ext = 'tar.bz2' if FILE_EXT == 'tar.gz' else FILE_EXT
+        release_filename = '{}-{}-{}.{}'.format(coin, version, BIN_ARCH, use_file_ext)
         if os_name == 'osx':
             os_name = 'mac'
-        release_url = 'https://downloads.getmonero.org/cli/monero-{}-x64-v{}.tar.bz2'.format(os_name, version)
+        release_url = 'https://downloads.getmonero.org/cli/monero-{}-x64-v{}.{}'.format(os_name, version, use_file_ext)
         release_path = os.path.join(bin_dir, release_filename)
         if not os.path.exists(release_path):
             downloadFile(release_url, release_path)
@@ -168,7 +189,7 @@ def prepareCore(coin, version, settings, data_dir):
         if not os.path.exists(assert_path):
             downloadFile(assert_url, assert_path)
     else:
-        release_filename = '{}-{}-{}'.format(coin, version, BIN_ARCH)
+        release_filename = '{}-{}-{}.{}'.format(coin, version, BIN_ARCH, FILE_EXT)
         if coin == 'particl':
             signing_key_name = 'tecnovert'
             release_url = 'https://github.com/tecnovert/particl-core/releases/download/v{}/{}'.format(version, release_filename)
@@ -284,16 +305,17 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic):
                 fp.write('regtest=1\n')
                 fp.write('keep-fakechain=1\n')
                 fp.write('fixed-difficulty=1\n')
-            elif chain == 'testnet':
+            else:
+                fp.write('bootstrap-daemon-address=auto\n')
+                fp.write('restricted-rpc=1\n')
+            if chain == 'testnet':
                 fp.write('testnet=1\n')
             fp.write('data-dir={}\n'.format(data_dir))
             fp.write('rpc-bind-port={}\n'.format(core_settings['rpcport']))
             fp.write('rpc-bind-ip=127.0.0.1\n')
             fp.write('zmq-rpc-bind-port={}\n'.format(core_settings['zmqport']))
             fp.write('zmq-rpc-bind-ip=127.0.0.1\n')
-            fp.write('prune-blockchain=1')
-            fp.write('restricted-rpc=1')
-            fp.write('bootstrap-daemon-address=auto')
+            fp.write('prune-blockchain=1\n')
 
         wallet_conf_path = os.path.join(data_dir, coin + '_wallet.conf')
         if os.path.exists(wallet_conf_path):
@@ -346,7 +368,11 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic):
 
 def printVersion():
     from basicswap import __version__
-    logger.info('Basicswap version:', __version__)
+    logger.info('Basicswap version: %s', __version__)
+
+    logger.info('Core versions:')
+    for coin, version in known_coins.items():
+        logger.info('\t%s: %s', coin, version)
 
 
 def printHelp():
@@ -369,6 +395,7 @@ def printHelp():
     logger.info('--portoffset=n           Raise all ports by n.')
     logger.info('--htmlhost=              Interface to host on, default:localhost.')
     logger.info('--xmrrestoreheight=n     Block height to restore Monero wallet from, default:{}.'.format(DEFAULT_XMR_RESTORE_HEIGHT))
+    logger.info('--noextractover          Prevent extracting cores if files exist.  Speeds up tests')
 
     logger.info('\n' + 'Known coins: %s', ', '.join(known_coins.keys()))
 
@@ -393,6 +420,7 @@ def exitWithError(error_msg):
 
 
 def main():
+    global extract_core_overwrite
     data_dir = None
     bin_dir = None
     port_offset = None
@@ -436,6 +464,9 @@ def main():
             continue
         if name == 'nocores':
             no_cores = True
+            continue
+        if name == 'noextractover':
+            extract_core_overwrite = False
             continue
         if len(s) == 2:
             if name == 'datadir':
@@ -489,7 +520,8 @@ def main():
     if bin_dir is None:
         bin_dir = os.path.join(data_dir, 'bin')
 
-    logger.info('Using datadir: %s', data_dir)
+    logger.info('datadir: %s', data_dir)
+    logger.info('bindir:  %s', bin_dir)
     logger.info('Chain: %s', chain)
 
     if port_offset is None:

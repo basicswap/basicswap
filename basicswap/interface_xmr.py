@@ -123,6 +123,7 @@ class XMRInterface(CoinInterface):
     def getWalletInfo(self):
         self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
         rv = {}
+        self.rpc_wallet_cb('refresh')
         balance_info = self.rpc_wallet_cb('get_balance')
         rv['balance'] = format_amount(balance_info['unlocked_balance'], XMRInterface.exp())
         rv['unconfirmed_balance'] = format_amount(balance_info['balance'] - balance_info['unlocked_balance'], XMRInterface.exp())

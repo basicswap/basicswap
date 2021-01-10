@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2020 tecnovert
+# Copyright (c) 2020-2021 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -36,7 +36,8 @@ class PARTInterface(BTCInterface):
         return 213
 
     def __init__(self, coin_settings, network):
-        self.rpc_callback = make_rpc_func(coin_settings['rpcport'], coin_settings['rpcauth'], host=coin_settings['rpchost'])
+        rpc_host = coin_settings.get('rpchost', 'localhost')
+        self.rpc_callback = make_rpc_func(coin_settings['rpcport'], coin_settings['rpcauth'], host=rpc_host)
         self.txoType = CTxOutPart
         self._network = network
         self.blocks_confirmed = coin_settings['blocks_confirmed']

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019 tecnovert
+# Copyright (c) 2019-2021 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -12,7 +12,6 @@ cp ~/tmp/particl-0.19.1.2-x86_64-linux-gnu.tar.gz ${TEST_RELOAD_PATH}/bin/partic
 cp ~/tmp/bitcoin-0.20.1-x86_64-linux-gnu.tar.gz ${TEST_RELOAD_PATH}/bin/bitcoin
 export PYTHONPATH=$(pwd)
 python tests/basicswap/test_reload.py
-
 
 """
 
@@ -61,9 +60,10 @@ def waitForServer(port):
         try:
             time.sleep(1)
             summary = json.loads(urlopen('http://localhost:{}/json'.format(port)).read())
-            break
+            return
         except Exception:
             traceback.print_exc()
+    raise ValueError('waitForServer failed')
 
 
 def waitForNumOffers(port, offers):

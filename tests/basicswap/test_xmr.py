@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2020 tecnovert
+# Copyright (c) 2020-2021 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -103,7 +103,7 @@ def prepareXmrDataDir(datadir, node_id, conf_file):
         fp.write('rpc-bind-port={}\n'.format(XMR_BASE_RPC_PORT + node_id))
         fp.write('p2p-bind-ip=127.0.0.1\n')
         fp.write('rpc-bind-ip=127.0.0.1\n')
-
+        fp.write('prune-blockchain=1\n')
         fp.write('zmq-rpc-bind-port={}\n'.format(XMR_BASE_ZMQ_PORT + node_id))
         fp.write('zmq-rpc-bind-ip=127.0.0.1\n')
 
@@ -118,6 +118,7 @@ def startXmrWalletRPC(node_dir, bin_dir, wallet_bin, node_id, opts=[]):
 
     data_dir = os.path.expanduser(node_dir)
     args = [daemon_bin]
+    args += ['--non-interactive']
     args += ['--daemon-address=localhost:{}'.format(XMR_BASE_RPC_PORT + node_id)]
     args += ['--no-dns']
     args += ['--rpc-bind-port={}'.format(XMR_BASE_WALLET_RPC_PORT + node_id)]
@@ -370,17 +371,17 @@ class Test(unittest.TestCase):
             cls.btc_addr = callnoderpc(0, 'getnewaddress', ['mining_addr', 'bech32'], base_rpc_port=BTC_BASE_RPC_PORT)
             cls.xmr_addr = cls.callxmrnodewallet(cls, 1, 'get_address')['address']
 
-            num_blocks = 500
+            num_blocks = 500  # Mine enough to activate segwit
             logging.info('Mining %d Bitcoin blocks to %s', num_blocks, cls.btc_addr)
             callnoderpc(0, 'generatetoaddress', [num_blocks, cls.btc_addr], base_rpc_port=BTC_BASE_RPC_PORT)
 
             checkForks(callnoderpc(0, 'getblockchaininfo', base_rpc_port=BTC_BASE_RPC_PORT))
 
+            num_blocks = 100
             if callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'get_block_count')['count'] < num_blocks:
-                logging.info('Mining %d Monero blocks.', num_blocks)
+                logging.info('Mining %d Monero blocks to %s.', num_blocks, cls.xmr_addr)
                 callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'generateblocks', {'wallet_address': cls.xmr_addr, 'amount_of_blocks': num_blocks})
-            rv = callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'get_block_count')
-            logging.info('XMR blocks: %d', rv['count'])
+            logging.info('XMR blocks: %d', callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'get_block_count')['count'])
 
             logging.info('Starting update thread.')
             signal.signal(signal.SIGINT, signal_handler)
@@ -629,7 +630,11 @@ class Test(unittest.TestCase):
         logging.info('---------- Test xmr withdrawals')
         swap_clients = self.swap_clients
         js_0 = json.loads(urlopen('http://localhost:1800/json/wallets').read())
+        print('js_0 debug', js_0)
         address_to = js_0[str(int(Coins.XMR))]['deposit_address']
+
+        js_1 = json.loads(urlopen('http://localhost:1801/json/wallets').read())
+        assert(float(js_1[str(int(Coins.XMR))]['balance']) > 0.0)
 
         swap_clients[1].withdrawCoin(Coins.XMR, 1.1, address_to, False)
 

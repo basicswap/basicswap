@@ -1,23 +1,23 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019-2020 tecnovert
+# Copyright (c) 2019-2021 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 """
-basicswap]$ python tests/test_nmc.py
+basicswap]$ python tests/basicswap/extended/test_nmc.py
 
 """
 
 import os
 import sys
-import unittest
 import json
-import logging
-import shutil
 import time
+import shutil
 import signal
+import logging
+import unittest
 import threading
 from urllib.request import urlopen
 

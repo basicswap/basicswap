@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2020 tecnovert
+# Copyright (c) 2020-2021 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -9,10 +9,10 @@
 export TEST_PATH=/tmp/test_basicswap_wallet_init
 mkdir -p ${TEST_PATH}/bin/{particl,monero,bitcoin}
 cp ~/tmp/particl-0.19.1.2-x86_64-linux-gnu.tar.gz ${TEST_PATH}/bin/particl
-cp ~/tmp/monero-0.17.1.9-x86_64-linux-gnu.tar.gz ${TEST_PATH}/bin/monero
+cp ~/tmp/monero-linux-x64-v0.17.1.9.tar.bz2 ${TEST_PATH}/bin/monero/monero-0.17.1.9-x86_64-linux-gnu.tar.bz2
 cp ~/tmp/bitcoin-0.20.1-x86_64-linux-gnu.tar.gz ${TEST_PATH}/bin/bitcoin
 export PYTHONPATH=$(pwd)
-python tests/basicswap/test_wallet_init.py
+python tests/basicswap/extended/test_wallet_init.py
 
 
 """
@@ -61,33 +61,6 @@ def waitForServer(port):
             traceback.print_exc()
 
 
-def waitForNumOffers(port, offers):
-    for i in range(20):
-        summary = json.loads(urlopen('http://localhost:{}/json'.format(port)).read())
-        if summary['num_network_offers'] >= offers:
-            return
-        time.sleep(1)
-    raise ValueError('waitForNumOffers failed')
-
-
-def waitForNumBids(port, bids):
-    for i in range(20):
-        summary = json.loads(urlopen('http://localhost:{}/json'.format(port)).read())
-        if summary['num_recv_bids'] >= bids:
-            return
-        time.sleep(1)
-    raise ValueError('waitForNumBids failed')
-
-
-def waitForNumSwapping(port, bids):
-    for i in range(20):
-        summary = json.loads(urlopen('http://localhost:{}/json'.format(port)).read())
-        if summary['num_swapping'] >= bids:
-            return
-        time.sleep(1)
-    raise ValueError('waitForNumSwapping failed')
-
-
 class Test(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -106,7 +79,10 @@ class Test(unittest.TestCase):
                 '-bindir="{}"'.format(os.path.join(test_path, 'bin')),
                 '-portoffset={}'.format(i),
                 '-particl_mnemonic="{}"'.format(mnemonics[0]),
-                '-regtest', '-withcoin=monero,bitcoin']
+                '-regtest',
+                '-withcoin=monero,bitcoin',
+                '-noextractover',
+                '-xmrrestoreheight=0']
             with patch.object(sys, 'argv', testargs):
                 prepareSystem.main()
 

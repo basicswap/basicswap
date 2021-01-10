@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2020 tecnovert
+# Copyright (c) 2020-2021 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -9,7 +9,7 @@
 export TEST_RELOAD_PATH=/tmp/test_basicswap
 mkdir -p ${TEST_RELOAD_PATH}/bin/{particl,monero}
 cp ~/tmp/particl-0.19.1.2-x86_64-linux-gnu.tar.gz ${TEST_RELOAD_PATH}/bin/particl
-cp ~/tmp/monero-0.17.1.9-x86_64-linux-gnu.tar.gz ${TEST_RELOAD_PATH}/bin/monero
+cp ~/tmp/monero-linux-x64-v0.17.1.9.tar.bz2 ${TEST_RELOAD_PATH}/bin/monero/monero-0.17.1.9-x86_64-linux-gnu.tar.bz2
 export PYTHONPATH=$(pwd)
 python tests/basicswap/test_reload_xmr.py
 
@@ -19,8 +19,8 @@ python tests/basicswap/test_reload_xmr.py
 import os
 import sys
 import json
-import time
 import shutil
+import signal
 import logging
 import unittest
 import traceback
@@ -46,7 +46,7 @@ XMR_BASE_P2P_PORT = 17792
 XMR_BASE_RPC_PORT = 29798
 XMR_BASE_WALLET_RPC_PORT = 29998
 
-stop_test = False
+delay_event = threading.Event()
 
 logger = logging.getLogger()
 logger.level = logging.DEBUG
@@ -54,53 +54,73 @@ if not len(logger.handlers):
     logger.addHandler(logging.StreamHandler(sys.stdout))
 
 
-def waitForServer(port):
-    for i in range(20):
+def waitForServer(port, wait_for=20):
+    for i in range(wait_for):
+        if delay_event.is_set():
+            raise ValueError('Test stopped.')
         try:
-            time.sleep(1)
+            delay_event.wait(1)
             summary = json.loads(urlopen('http://localhost:{}/json'.format(port)).read())
-            break
+            return
         except Exception:
             traceback.print_exc()
+    raise ValueError('waitForServer failed')
 
 
-def waitForNumOffers(port, offers):
-    for i in range(20):
+def waitForNumOffers(port, offers, wait_for=20):
+    for i in range(wait_for):
+        if delay_event.is_set():
+            raise ValueError('Test stopped.')
         summary = json.loads(urlopen('http://localhost:{}/json'.format(port)).read())
         if summary['num_network_offers'] >= offers:
             return
-        time.sleep(1)
+        delay_event.wait(1)
     raise ValueError('waitForNumOffers failed')
 
 
-def waitForNumBids(port, bids):
-    for i in range(20):
+def waitForNumBids(port, bids, wait_for=20):
+    for i in range(wait_for):
+        if delay_event.is_set():
+            raise ValueError('Test stopped.')
         summary = json.loads(urlopen('http://localhost:{}/json'.format(port)).read())
         if summary['num_recv_bids'] >= bids:
             return
-        time.sleep(1)
+        delay_event.wait(1)
     raise ValueError('waitForNumBids failed')
 
 
-def waitForNumSwapping(port, bids):
-    for i in range(20):
+def waitForNumSwapping(port, bids, wait_for=60):
+    for i in range(wait_for):
+        if delay_event.is_set():
+            raise ValueError('Test stopped.')
         summary = json.loads(urlopen('http://localhost:{}/json'.format(port)).read())
         if summary['num_swapping'] >= bids:
             return
-        time.sleep(1)
+        delay_event.wait(1)
     raise ValueError('waitForNumSwapping failed')
 
 
 def updateThread(xmr_addr):
-    while not stop_test:
-        callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'generateblocks', {'wallet_address': xmr_addr, 'amount_of_blocks': 1})
-        time.sleep(5)
+    while not delay_event.is_set():
+        try:
+            callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'generateblocks', {'wallet_address': xmr_addr, 'amount_of_blocks': 1})
+        except Exception as e:
+            print('updateThread error', str(e))
+        delay_event.wait(2)
+
+
+def signal_handler(sig, frame):
+    logging.info('signal {} detected.'.format(sig))
+    delay_event.set()
 
 
 class Test(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         super(Test, cls).setUpClass()
+
+        cls.update_thread = None
+        cls.processes = []
 
         for i in range(3):
             client_path = os.path.join(test_path, 'client{}'.format(i))
@@ -115,7 +135,10 @@ class Test(unittest.TestCase):
                 '-bindir="{}"'.format(os.path.join(test_path, 'bin')),
                 '-portoffset={}'.format(i),
                 '-particl_mnemonic="{}"'.format(mnemonics[i]),
-                '-regtest', '-withcoin=monero']
+                '-regtest',
+                '-withcoin=monero',
+                '-noextractover',
+                '-xmrrestoreheight=0']
             with patch.object(sys, 'argv', testargs):
                 prepareSystem.main()
 
@@ -140,7 +163,22 @@ class Test(unittest.TestCase):
                     if ip != i:
                         fp.write('add-exclusive-node=127.0.0.1:{}\n'.format(XMR_BASE_P2P_PORT + ip))
 
-            assert(os.path.exists(config_path))
+            with open(config_path) as fs:
+                settings = json.load(fs)
+
+            settings['min_delay_event'] = 1
+            settings['max_delay_event'] = 4
+
+            settings['check_progress_seconds'] = 5
+            settings['check_watched_seconds'] = 5
+            settings['check_expired_seconds'] = 60
+            settings['check_events_seconds'] = 5
+            settings['check_xmr_swaps_seconds'] = 5
+
+            with open(config_path, 'w') as fp:
+                json.dump(settings, fp, indent=4)
+
+        signal.signal(signal.SIGINT, signal_handler)
 
     def run_thread(self, client_id):
         client_path = os.path.join(test_path, 'client{}'.format(client_id))
@@ -148,14 +186,12 @@ class Test(unittest.TestCase):
         with patch.object(sys, 'argv', testargs):
             runSystem.main()
 
-    def test_reload(self):
-        global stop_test
-        update_thread = None
-        processes = []
+    def start_processes(self):
+        delay_event.clear()
 
         for i in range(3):
-            processes.append(multiprocessing.Process(target=self.run_thread, args=(i,)))
-            processes[-1].start()
+            self.processes.append(multiprocessing.Process(target=self.run_thread, args=(i,)))
+            self.processes[-1].start()
 
         try:
             waitForServer(12701)
@@ -163,12 +199,38 @@ class Test(unittest.TestCase):
             wallets = json.loads(urlopen('http://localhost:12701/json/wallets').read())
 
             xmr_addr1 = wallets['6']['deposit_address']
-            num_blocks = 500
+            num_blocks = 100
 
-            logging.info('Mining %d Monero blocks.', num_blocks)
-            callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'generateblocks', {'wallet_address': xmr_addr1, 'amount_of_blocks': num_blocks})
-            rv = callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'get_block_count')
-            logging.info('XMR blocks: %d', rv['count'])
+            if callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'get_block_count')['count'] < num_blocks:
+                logging.info('Mining {} Monero blocks to {}.'.format(num_blocks, xmr_addr1))
+                callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'generateblocks', {'wallet_address': xmr_addr1, 'amount_of_blocks': num_blocks})
+            logging.info('XMR blocks: %d', callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'get_block_count')['count'])
+
+            self.update_thread = threading.Thread(target=updateThread, args=(xmr_addr1,))
+            self.update_thread.start()
+        except Exception:
+            traceback.print_exc()
+
+    def stop_processes(self):
+        logger.info('Stopping test')
+        delay_event.set()
+        if self.update_thread:
+            self.update_thread.join()
+        for p in self.processes:
+            p.terminate()
+        for p in self.processes:
+            p.join()
+        self.update_thread = None
+        self.processes = []
+
+    def test_01_reload(self):
+        self.start_processes()
+
+        try:
+            waitForServer(12700)
+            waitForServer(12701)
+            wallets1 = json.loads(urlopen('http://localhost:12701/json/wallets').read())
+            assert(float(wallets1['6']['balance']) > 0.0)
 
             data = parse.urlencode({
                 'addr_from': '-1',
@@ -201,7 +263,7 @@ class Test(unittest.TestCase):
                 bid = bids[0]
                 if bid['bid_state'] == 'Received':
                     break
-                time.sleep(1)
+                delay_event.wait(1)
 
             data = parse.urlencode({
                 'accept': True
@@ -212,39 +274,48 @@ class Test(unittest.TestCase):
             waitForNumSwapping(12701, 1)
 
             logger.info('Restarting client')
-            c1 = processes[1]
+            c1 = self.processes[1]
             c1.terminate()
             c1.join()
-            processes[1] = multiprocessing.Process(target=self.run_thread, args=(1,))
-            processes[1].start()
+            self.processes[1] = multiprocessing.Process(target=self.run_thread, args=(1,))
+            self.processes[1].start()
 
             waitForServer(12701)
             rv = json.loads(urlopen('http://localhost:12701/json').read())
             assert(rv['num_swapping'] == 1)
 
-            update_thread = threading.Thread(target=updateThread, args=(xmr_addr1,))
-            update_thread.start()
-
             logger.info('Completing swap')
             for i in range(240):
-                time.sleep(5)
+                if delay_event.is_set():
+                    raise ValueError('Test stopped.')
+                delay_event.wait(4)
 
                 rv = json.loads(urlopen('http://localhost:12700/json/bids/{}'.format(bid['bid_id'])).read())
-                print(rv)
                 if rv['bid_state'] == 'Completed':
                     break
             assert(rv['bid_state'] == 'Completed')
-        except Exception:
+        except Exception as e:
             traceback.print_exc()
+            raise(e)
+        finally:
+            self.stop_processes()
 
-        logger.info('Stopping test')
-        stop_test = True
-        if update_thread:
-            update_thread.join()
-        for p in processes:
-            p.terminate()
-        for p in processes:
-            p.join()
+    def test_02_bids_offline(self):
+        # Start multiple bids while offering node is offline
+        self.start_processes()
+
+        try:
+            waitForServer(12700)
+            waitForServer(12701)
+            wallets1 = json.loads(urlopen('http://localhost:12701/json/wallets').read())
+            print('wallets 1', json.dumps(wallets1, indent=4))
+            assert(float(wallets1['6']['balance']) > 0.0)
+
+        except Exception as e:
+            traceback.print_exc()
+            raise(e)
+        finally:
+            self.stop_processes()
 
 
 if __name__ == '__main__':

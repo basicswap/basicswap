@@ -383,32 +383,35 @@ class HttpHandler(BaseHTTPRequestHandler):
         page_data['autoaccept'] = True if b'autoaccept' in form_data else False
         parsed_data['autoaccept'] = page_data['autoaccept']
 
-        if len(errors) == 0 and page_data['swap_style'] == 'xmr':
-            if b'fee_rate_from' in form_data:
-                page_data['from_fee_override'] = form_data[b'fee_rate_from'][0].decode('utf-8')
-                parsed_data['from_fee_override'] = page_data['from_fee_override']
-            else:
-                from_fee_override, page_data['from_fee_src'] = swap_client.getFeeRateForCoin(parsed_data['coin_from'], page_data['fee_from_conf'])
-                if page_data['fee_from_extra'] > 0:
-                    from_fee_override += from_fee_override * (float(page_data['fee_from_extra']) / 100.0)
-                page_data['from_fee_override'] = ci_from.format_amount(ci_from.make_int(from_fee_override, r=1))
-                parsed_data['from_fee_override'] = page_data['from_fee_override']
-
-                lock_spend_tx_vsize = ci_from.xmr_swap_alock_spend_tx_vsize()
-                lock_spend_tx_fee = ci_from.make_int(ci_from.make_int(from_fee_override, r=1) * lock_spend_tx_vsize / 1000, r=1)
-                page_data['amt_from_lock_spend_tx_fee'] = ci_from.format_amount(lock_spend_tx_fee // ci_from.COIN())
-                page_data['tla_from'] = ci_from.ticker()
-
-            if coin_to == Coins.XMR:
-                if b'fee_rate_to' in form_data:
-                    page_data['to_fee_override'] = form_data[b'fee_rate_to'][0].decode('utf-8')
-                    parsed_data['to_fee_override'] = page_data['to_fee_override']
+        try:
+            if len(errors) == 0 and page_data['swap_style'] == 'xmr':
+                if b'fee_rate_from' in form_data:
+                    page_data['from_fee_override'] = form_data[b'fee_rate_from'][0].decode('utf-8')
+                    parsed_data['from_fee_override'] = page_data['from_fee_override']
                 else:
-                    to_fee_override, page_data['to_fee_src'] = swap_client.getFeeRateForCoin(parsed_data['coin_to'], page_data['fee_to_conf'])
-                    if page_data['fee_to_extra'] > 0:
-                        to_fee_override += to_fee_override * (float(page_data['fee_to_extra']) / 100.0)
-                    page_data['to_fee_override'] = ci_to.format_amount(ci_to.make_int(to_fee_override, r=1))
-                    parsed_data['to_fee_override'] = page_data['to_fee_override']
+                    from_fee_override, page_data['from_fee_src'] = swap_client.getFeeRateForCoin(parsed_data['coin_from'], page_data['fee_from_conf'])
+                    if page_data['fee_from_extra'] > 0:
+                        from_fee_override += from_fee_override * (float(page_data['fee_from_extra']) / 100.0)
+                    page_data['from_fee_override'] = ci_from.format_amount(ci_from.make_int(from_fee_override, r=1))
+                    parsed_data['from_fee_override'] = page_data['from_fee_override']
+
+                    lock_spend_tx_vsize = ci_from.xmr_swap_alock_spend_tx_vsize()
+                    lock_spend_tx_fee = ci_from.make_int(ci_from.make_int(from_fee_override, r=1) * lock_spend_tx_vsize / 1000, r=1)
+                    page_data['amt_from_lock_spend_tx_fee'] = ci_from.format_amount(lock_spend_tx_fee // ci_from.COIN())
+                    page_data['tla_from'] = ci_from.ticker()
+
+                if coin_to == Coins.XMR:
+                    if b'fee_rate_to' in form_data:
+                        page_data['to_fee_override'] = form_data[b'fee_rate_to'][0].decode('utf-8')
+                        parsed_data['to_fee_override'] = page_data['to_fee_override']
+                    else:
+                        to_fee_override, page_data['to_fee_src'] = swap_client.getFeeRateForCoin(parsed_data['coin_to'], page_data['fee_to_conf'])
+                        if page_data['fee_to_extra'] > 0:
+                            to_fee_override += to_fee_override * (float(page_data['fee_to_extra']) / 100.0)
+                        page_data['to_fee_override'] = ci_to.format_amount(ci_to.make_int(to_fee_override, r=1))
+                        parsed_data['to_fee_override'] = page_data['to_fee_override']
+        except Exception as e:
+            print('Error setting fee', str(e))  # Expected if missing fields
 
         return parsed_data, errors
 
@@ -456,7 +459,9 @@ class HttpHandler(BaseHTTPRequestHandler):
 
     def postNewOffer(self, form_data):
         page_data = {}
-        parsed_data = self.parseOfferFormData(form_data, page_data)
+        parsed_data, errors = self.parseOfferFormData(form_data, page_data)
+        if len(errors) > 0:
+            raise ValueError('Parse errors: ' + ' '.join(errors))
         return self.postNewOfferFromParsed(parsed_data)
 
     def page_newoffer(self, url_split, post_string):

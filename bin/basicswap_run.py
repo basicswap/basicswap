@@ -184,7 +184,7 @@ def runClient(fp, data_dir, chain):
 
 
 def printVersion():
-    logger.info('Basicswap version:', __version__)
+    logger.info('Basicswap version: %s', __version__)
 
 
 def printHelp():
