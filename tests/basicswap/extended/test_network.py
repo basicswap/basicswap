@@ -79,7 +79,7 @@ def prepare_swapclient_dir(datadir, node_id, network_key, network_pubkey):
         'p2p_port': BASE_P2P_PORT + node_id,
         'zmqhost': 'tcp://127.0.0.1',
         'zmqport': BASE_ZMQ_PORT + node_id,
-        'htmlhost': 'localhost',
+        'htmlhost': '127.0.0.1',
         'htmlport': TEST_HTTP_PORT + node_id,
         'network_key': network_key,
         'network_pubkey': network_pubkey,
@@ -298,7 +298,7 @@ class Test(unittest.TestCase):
         for i in range(wait_for):
             if delay_event.is_set():
                 raise ValueError('Test stopped.')
-            js = json.loads(urlopen('http://localhost:{}/json/network'.format(port)).read())
+            js = json.loads(urlopen('http://127.0.0.1:{}/json/network'.format(port)).read())
             num_nodes = 0
             for p in js['peers']:
                 if p['ready'] is True:
@@ -313,7 +313,7 @@ class Test(unittest.TestCase):
         logging.info('---------- Test Network')
         swap_clients = self.swap_clients
 
-        js_1 = json.loads(urlopen('http://localhost:1801/json/wallets').read())
+        js_1 = json.loads(urlopen('http://127.0.0.1:1801/json/wallets').read())
 
         offer_id = swap_clients[0].postOffer(Coins.PART, Coins.BTC, 100 * COIN, 0.1 * COIN, 100 * COIN, SwapTypes.SELLER_FIRST)
 
@@ -322,7 +322,7 @@ class Test(unittest.TestCase):
 
         self.wait_for_num_nodes(1800, 2)
 
-        js_n0 = json.loads(urlopen('http://localhost:1800/json/network').read())
+        js_n0 = json.loads(urlopen('http://127.0.0.1:1800/json/network').read())
         print(dumpj(js_n0))
 
         path = [swap_clients[0]._network._network_pubkey, swap_clients[2]._network._network_pubkey]

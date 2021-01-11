@@ -55,10 +55,10 @@ def waitForServer(port):
     for i in range(20):
         try:
             time.sleep(1)
-            summary = json.loads(urlopen('http://localhost:{}/json'.format(port)).read())
+            summary = json.loads(urlopen('http://127.0.0.1:{}/json'.format(port)).read())
             break
-        except Exception:
-            traceback.print_exc()
+        except Exception as e:
+            print('waitForServer, error:', str(e))
 
 
 class Test(unittest.TestCase):
@@ -98,7 +98,7 @@ class Test(unittest.TestCase):
                 fp.write('minstakeinterval=5\n')
                 for ip in range(3):
                     if ip != i:
-                        fp.write('connect=localhost:{}\n'.format(PARTICL_PORT_BASE + ip))
+                        fp.write('connect=127.0.0.1:{}\n'.format(PARTICL_PORT_BASE + ip))
 
             # Pruned nodes don't provide blocks
             with open(os.path.join(client_path, 'bitcoin', 'bitcoin.conf'), 'r') as fp:
@@ -115,7 +115,7 @@ class Test(unittest.TestCase):
                 fp.write('bind=127.0.0.1\n')
                 for ip in range(3):
                     if ip != i:
-                        fp.write('connect=localhost:{}\n'.format(BITCOIN_PORT_BASE + ip))
+                        fp.write('connect=127.0.0.1:{}\n'.format(BITCOIN_PORT_BASE + ip))
 
             with open(os.path.join(client_path, 'monero', 'monerod.conf'), 'a') as fp:
                 fp.write('p2p-bind-ip=127.0.0.1\n')
@@ -145,12 +145,12 @@ class Test(unittest.TestCase):
         try:
             waitForServer(12700)
 
-            wallets_0 = json.loads(urlopen('http://localhost:12700/json/wallets').read())
+            wallets_0 = json.loads(urlopen('http://127.0.0.1:12700/json/wallets').read())
             assert(wallets_0['1']['expected_seed'] is True)
             assert(wallets_0['6']['expected_seed'] is True)
 
             waitForServer(12701)
-            wallets_1 = json.loads(urlopen('http://localhost:12701/json/wallets').read())
+            wallets_1 = json.loads(urlopen('http://127.0.0.1:12701/json/wallets').read())
 
             assert(wallets_0['1']['expected_seed'] is True)
             assert(wallets_1['6']['expected_seed'] is True)

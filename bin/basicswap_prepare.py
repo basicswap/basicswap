@@ -53,11 +53,11 @@ logger.level = logging.DEBUG
 if not len(logger.handlers):
     logger.addHandler(logging.StreamHandler(sys.stdout))
 
-XMR_RPC_HOST = os.getenv('XMR_RPC_HOST', 'localhost')
+XMR_RPC_HOST = os.getenv('XMR_RPC_HOST', '127.0.0.1')
 BASE_XMR_RPC_PORT = int(os.getenv('BASE_XMR_RPC_PORT', 29798))
 BASE_XMR_ZMQ_PORT = int(os.getenv('BASE_XMR_ZMQ_PORT', 30898))
 BASE_XMR_WALLET_PORT = int(os.getenv('BASE_XMR_WALLET_PORT', 29998))
-XMR_WALLET_RPC_HOST = os.getenv('XMR_WALLET_RPC_HOST', 'localhost')
+XMR_WALLET_RPC_HOST = os.getenv('XMR_WALLET_RPC_HOST', '127.0.0.1')
 XMR_WALLET_RPC_USER = os.getenv('XMR_WALLET_RPC_USER', 'xmr_wallet_user')
 XMR_WALLET_RPC_PWD = os.getenv('XMR_WALLET_RPC_PWD', 'xmr_wallet_pwd')
 XMR_SITE_COMMIT = 'd27c1eee9fe0e8daa011d07baae8b67dd2b62a04'  # Lock hashes.txt to monero version
@@ -65,10 +65,10 @@ XMR_SITE_COMMIT = 'd27c1eee9fe0e8daa011d07baae8b67dd2b62a04'  # Lock hashes.txt 
 DEFAULT_XMR_RESTORE_HEIGHT = 2245107
 
 
-PART_RPC_HOST = os.getenv('PART_RPC_HOST', 'localhost')
-LTC_RPC_HOST = os.getenv('LTC_RPC_HOST', 'localhost')
-BTC_RPC_HOST = os.getenv('BTC_RPC_HOST', 'localhost')
-NMC_RPC_HOST = os.getenv('NMC_RPC_HOST', 'localhost')
+PART_RPC_HOST = os.getenv('PART_RPC_HOST', '127.0.0.1')
+LTC_RPC_HOST = os.getenv('LTC_RPC_HOST', '127.0.0.1')
+BTC_RPC_HOST = os.getenv('BTC_RPC_HOST', '127.0.0.1')
+NMC_RPC_HOST = os.getenv('NMC_RPC_HOST', '127.0.0.1')
 
 extract_core_overwrite = True
 
@@ -82,7 +82,7 @@ def make_reporthook():
         nonlocal last_percent_str
         read += blocksize
         if totalsize > 0:
-            percent_str = '%5.1f%%' % (read * 1e2 / totalsize)
+            percent_str = '%5.0f%%' % (read * 1e2 / totalsize)
             if percent_str != last_percent_str:
                 logger.info(percent_str)
                 last_percent_str = percent_str
@@ -393,7 +393,7 @@ def printHelp():
     logger.info('--preparebinonly         Don\'t prepare settings or datadirs.')
     logger.info('--nocores                Don\'t download and extract any coin clients.')
     logger.info('--portoffset=n           Raise all ports by n.')
-    logger.info('--htmlhost=              Interface to host on, default:localhost.')
+    logger.info('--htmlhost=              Interface to host on, default:127.0.0.1.')
     logger.info('--xmrrestoreheight=n     Block height to restore Monero wallet from, default:{}.'.format(DEFAULT_XMR_RESTORE_HEIGHT))
     logger.info('--noextractover          Prevent extracting cores if files exist.  Speeds up tests')
 
@@ -431,7 +431,7 @@ def main():
     with_coins = {'particl'}
     add_coin = ''
     disable_coin = ''
-    htmlhost = 'localhost'
+    htmlhost = '127.0.0.1'
     xmr_restore_height = DEFAULT_XMR_RESTORE_HEIGHT
 
     for v in sys.argv[1:]:
@@ -535,7 +535,7 @@ def main():
     chainclients = {
         'particl': {
             'connection_type': 'rpc',
-            'manage_daemon': True if ('particl' in with_coins and PART_RPC_HOST == 'localhost') else False,
+            'manage_daemon': True if ('particl' in with_coins and PART_RPC_HOST == '127.0.0.1') else False,
             'rpchost': PART_RPC_HOST,
             'rpcport': 19792 + port_offset,
             'datadir': os.getenv('PART_DATA_DIR', os.path.join(data_dir, 'particl')),
@@ -548,7 +548,7 @@ def main():
         },
         'litecoin': {
             'connection_type': 'rpc' if 'litecoin' in with_coins else 'none',
-            'manage_daemon': True if ('litecoin' in with_coins and LTC_RPC_HOST == 'localhost') else False,
+            'manage_daemon': True if ('litecoin' in with_coins and LTC_RPC_HOST == '127.0.0.1') else False,
             'rpchost': LTC_RPC_HOST,
             'rpcport': 19795 + port_offset,
             'datadir': os.getenv('LTC_DATA_DIR', os.path.join(data_dir, 'litecoin')),
@@ -561,7 +561,7 @@ def main():
         },
         'bitcoin': {
             'connection_type': 'rpc' if 'bitcoin' in with_coins else 'none',
-            'manage_daemon': True if ('bitcoin' in with_coins and BTC_RPC_HOST == 'localhost') else False,
+            'manage_daemon': True if ('bitcoin' in with_coins and BTC_RPC_HOST == '127.0.0.1') else False,
             'rpchost': BTC_RPC_HOST,
             'rpcport': 19796 + port_offset,
             'datadir': os.getenv('BTC_DATA_DIR', os.path.join(data_dir, 'bitcoin')),
@@ -574,7 +574,7 @@ def main():
         },
         'namecoin': {
             'connection_type': 'rpc' if 'namecoin' in with_coins else 'none',
-            'manage_daemon': True if ('namecoin' in with_coins and NMC_RPC_HOST == 'localhost') else False,
+            'manage_daemon': True if ('namecoin' in with_coins and NMC_RPC_HOST == '127.0.0.1') else False,
             'rpchost': NMC_RPC_HOST,
             'rpcport': 19798 + port_offset,
             'datadir': os.getenv('NMC_DATA_DIR', os.path.join(data_dir, 'namecoin')),
@@ -588,8 +588,8 @@ def main():
         },
         'monero': {
             'connection_type': 'rpc' if 'monero' in with_coins else 'none',
-            'manage_daemon': True if ('monero' in with_coins and XMR_RPC_HOST == 'localhost') else False,
-            'manage_wallet_daemon': True if ('monero' in with_coins and XMR_WALLET_RPC_HOST == 'localhost') else False,
+            'manage_daemon': True if ('monero' in with_coins and XMR_RPC_HOST == '127.0.0.1') else False,
+            'manage_wallet_daemon': True if ('monero' in with_coins and XMR_WALLET_RPC_HOST == '127.0.0.1') else False,
             'rpcport': BASE_XMR_RPC_PORT + port_offset,
             'zmqport': BASE_XMR_ZMQ_PORT + port_offset,
             'walletrpcport': BASE_XMR_WALLET_PORT + port_offset,

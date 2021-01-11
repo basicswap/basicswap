@@ -36,7 +36,7 @@ class PARTInterface(BTCInterface):
         return 213
 
     def __init__(self, coin_settings, network):
-        rpc_host = coin_settings.get('rpchost', 'localhost')
+        rpc_host = coin_settings.get('rpchost', '127.0.0.1')
         self.rpc_callback = make_rpc_func(coin_settings['rpcport'], coin_settings['rpcauth'], host=rpc_host)
         self.txoType = CTxOutPart
         self._network = network

@@ -330,6 +330,8 @@ class XmrSplitData(Base):
     dleag = sa.Column(sa.LargeBinary)
     created_at = sa.Column(sa.BigInteger)
 
+    __table_args__ = (sa.UniqueConstraint('bid_id', 'msg_type', 'msg_sequence', name='uc_1'),)
+
 
 class RevokedMessage(Base):
     __tablename__ = 'revoked_messages'

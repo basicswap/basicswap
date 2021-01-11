@@ -119,7 +119,7 @@ def startXmrWalletRPC(node_dir, bin_dir, wallet_bin, node_id, opts=[]):
     data_dir = os.path.expanduser(node_dir)
     args = [daemon_bin]
     args += ['--non-interactive']
-    args += ['--daemon-address=localhost:{}'.format(XMR_BASE_RPC_PORT + node_id)]
+    args += ['--daemon-address=127.0.0.1:{}'.format(XMR_BASE_RPC_PORT + node_id)]
     args += ['--no-dns']
     args += ['--rpc-bind-port={}'.format(XMR_BASE_WALLET_RPC_PORT + node_id)]
     args += ['--wallet-dir={}'.format(os.path.join(data_dir, 'wallets'))]
@@ -145,7 +145,7 @@ def prepare_swapclient_dir(datadir, node_id, network_key, network_pubkey):
         'debug': True,
         'zmqhost': 'tcp://127.0.0.1',
         'zmqport': BASE_ZMQ_PORT + node_id,
-        'htmlhost': 'localhost',
+        'htmlhost': '127.0.0.1',
         'htmlport': TEST_HTTP_PORT + node_id,
         'network_key': network_key,
         'network_pubkey': network_pubkey,
@@ -431,7 +431,7 @@ class Test(unittest.TestCase):
         logging.info('---------- Test PART to XMR')
         swap_clients = self.swap_clients
 
-        js_1 = json.loads(urlopen('http://localhost:1801/json/wallets').read())
+        js_1 = json.loads(urlopen('http://127.0.0.1:1801/json/wallets').read())
         assert(make_int(js_1[str(int(Coins.XMR))]['balance'], scale=12) > 0)
         assert(make_int(js_1[str(int(Coins.XMR))]['unconfirmed'], scale=12) > 0)
 
@@ -453,7 +453,7 @@ class Test(unittest.TestCase):
         wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=180)
         wait_for_bid(delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True)
 
-        js_0_end = json.loads(urlopen('http://localhost:1800/json/wallets').read())
+        js_0_end = json.loads(urlopen('http://127.0.0.1:1800/json/wallets').read())
         end_xmr = float(js_0_end['6']['balance']) + float(js_0_end['6']['unconfirmed'])
         assert(end_xmr > 10.9 and end_xmr < 11.0)
 
@@ -461,7 +461,7 @@ class Test(unittest.TestCase):
         logging.info('---------- Test PART to XMR leader recovers coin a lock tx')
         swap_clients = self.swap_clients
 
-        js_w0_before = json.loads(urlopen('http://localhost:1800/json/wallets').read())
+        js_w0_before = json.loads(urlopen('http://127.0.0.1:1800/json/wallets').read())
 
         offer_id = swap_clients[0].postOffer(
             Coins.PART, Coins.XMR, 101 * COIN, 0.12 * XMR_COIN, 101 * COIN, SwapTypes.XMR_SWAP,
@@ -483,7 +483,7 @@ class Test(unittest.TestCase):
         wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.XMR_SWAP_FAILED_REFUNDED, wait_for=180)
         wait_for_bid(delay_event, swap_clients[1], bid_id, BidStates.XMR_SWAP_FAILED_REFUNDED, sent=True)
 
-        js_w0_after = json.loads(urlopen('http://localhost:1800/json/wallets').read())
+        js_w0_after = json.loads(urlopen('http://127.0.0.1:1800/json/wallets').read())
         print('[rm] js_w0_before', json.dumps(js_w0_before))
         print('[rm] js_w0_after', json.dumps(js_w0_after))
 
@@ -491,7 +491,7 @@ class Test(unittest.TestCase):
         logging.info('---------- Test PART to XMR follower recovers coin a lock tx')
         swap_clients = self.swap_clients
 
-        js_w0_before = json.loads(urlopen('http://localhost:1800/json/wallets').read())
+        js_w0_before = json.loads(urlopen('http://127.0.0.1:1800/json/wallets').read())
 
         offer_id = swap_clients[0].postOffer(
             Coins.PART, Coins.XMR, 101 * COIN, 0.13 * XMR_COIN, 101 * COIN, SwapTypes.XMR_SWAP,
@@ -514,7 +514,7 @@ class Test(unittest.TestCase):
         wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.BID_ABANDONED, wait_for=180)
         wait_for_bid(delay_event, swap_clients[1], bid_id, BidStates.XMR_SWAP_FAILED_SWIPED, wait_for=80, sent=True)
 
-        js_w0_after = json.loads(urlopen('http://localhost:1800/json/wallets').read())
+        js_w0_after = json.loads(urlopen('http://127.0.0.1:1800/json/wallets').read())
 
         wait_for_none_active(delay_event, 1800)
         wait_for_none_active(delay_event, 1801)
@@ -629,11 +629,11 @@ class Test(unittest.TestCase):
     def test_08_withdraw(self):
         logging.info('---------- Test xmr withdrawals')
         swap_clients = self.swap_clients
-        js_0 = json.loads(urlopen('http://localhost:1800/json/wallets').read())
+        js_0 = json.loads(urlopen('http://127.0.0.1:1800/json/wallets').read())
         print('js_0 debug', js_0)
         address_to = js_0[str(int(Coins.XMR))]['deposit_address']
 
-        js_1 = json.loads(urlopen('http://localhost:1801/json/wallets').read())
+        js_1 = json.loads(urlopen('http://127.0.0.1:1801/json/wallets').read())
         assert(float(js_1[str(int(Coins.XMR))]['balance']) > 0.0)
 
         swap_clients[1].withdrawCoin(Coins.XMR, 1.1, address_to, False)

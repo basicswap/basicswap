@@ -162,7 +162,7 @@ def wait_for_none_active(delay_event, port, wait_for=30):
         if delay_event.is_set():
             raise ValueError('Test stopped.')
         delay_event.wait(1)
-        js = json.loads(urlopen('http://localhost:{}/json'.format(port)).read())
+        js = json.loads(urlopen('http://127.0.0.1:{}/json'.format(port)).read())
         if js['num_swapping'] == 0 and js['num_watched_outputs'] == 0:
             return
     raise ValueError('wait_for_none_active timed out.')

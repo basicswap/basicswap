@@ -146,7 +146,7 @@ def prepareDir(datadir, nodeId, network_key, network_pubkey):
         'debug': True,
         'zmqhost': 'tcp://127.0.0.1',
         'zmqport': BASE_ZMQ_PORT + nodeId,
-        'htmlhost': 'localhost',
+        'htmlhost': '127.0.0.1',
         'htmlport': 12700 + nodeId,
         'network_key': network_key,
         'network_pubkey': network_pubkey,
@@ -380,8 +380,8 @@ class Test(unittest.TestCase):
         wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=60)
         wait_for_bid(delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=60)
 
-        js_0 = json.loads(urlopen('http://localhost:1800/json').read())
-        js_1 = json.loads(urlopen('http://localhost:1801/json').read())
+        js_0 = json.loads(urlopen('http://127.0.0.1:1800/json').read())
+        js_1 = json.loads(urlopen('http://127.0.0.1:1801/json').read())
         assert(js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
         assert(js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
 
@@ -405,8 +405,8 @@ class Test(unittest.TestCase):
         wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=60)
         wait_for_bid(delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, wait_for=60)
 
-        js_0 = json.loads(urlopen('http://localhost:1800/json').read())
-        js_1 = json.loads(urlopen('http://localhost:1801/json').read())
+        js_0 = json.loads(urlopen('http://127.0.0.1:1800/json').read())
+        js_1 = json.loads(urlopen('http://127.0.0.1:1801/json').read())
         assert(js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
         assert(js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
 
@@ -430,10 +430,10 @@ class Test(unittest.TestCase):
         wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=60)
         wait_for_bid(delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=60)
 
-        js_0bid = json.loads(urlopen('http://localhost:1800/json/bids/{}'.format(bid_id.hex())).read())
+        js_0bid = json.loads(urlopen('http://127.0.0.1:1800/json/bids/{}'.format(bid_id.hex())).read())
 
-        js_0 = json.loads(urlopen('http://localhost:1800/json').read())
-        js_1 = json.loads(urlopen('http://localhost:1801/json').read())
+        js_0 = json.loads(urlopen('http://127.0.0.1:1800/json').read())
+        js_1 = json.loads(urlopen('http://127.0.0.1:1801/json').read())
 
         assert(js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
         assert(js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
@@ -459,8 +459,8 @@ class Test(unittest.TestCase):
         wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=60)
         wait_for_bid(delay_event, swap_clients[1], bid_id, BidStates.BID_ABANDONED, sent=True, wait_for=60)
 
-        js_0 = json.loads(urlopen('http://localhost:1800/json').read())
-        js_1 = json.loads(urlopen('http://localhost:1801/json').read())
+        js_0 = json.loads(urlopen('http://127.0.0.1:1800/json').read())
+        js_1 = json.loads(urlopen('http://127.0.0.1:1801/json').read())
         assert(js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
         assert(js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
 
@@ -468,7 +468,7 @@ class Test(unittest.TestCase):
         logging.info('---------- Test same client, BTC to NMC')
         swap_clients = self.swap_clients
 
-        js_0_before = json.loads(urlopen('http://localhost:1800/json').read())
+        js_0_before = json.loads(urlopen('http://127.0.0.1:1800/json').read())
 
         offer_id = swap_clients[0].postOffer(Coins.NMC, Coins.BTC, 10 * COIN, 10 * COIN, 10 * COIN, SwapTypes.SELLER_FIRST, ABS_LOCK_TIME)
 
@@ -484,7 +484,7 @@ class Test(unittest.TestCase):
         wait_for_bid_tx_state(delay_event, swap_clients[0], bid_id, TxStates.TX_REDEEMED, TxStates.TX_REDEEMED, wait_for=60)
         wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=60)
 
-        js_0 = json.loads(urlopen('http://localhost:1800/json').read())
+        js_0 = json.loads(urlopen('http://127.0.0.1:1800/json').read())
         assert(js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
         assert(js_0['num_recv_bids'] == js_0_before['num_recv_bids'] + 1 and js_0['num_sent_bids'] == js_0_before['num_sent_bids'] + 1)
 
@@ -492,7 +492,7 @@ class Test(unittest.TestCase):
         logging.info('---------- Test error, BTC to NMC, set fee above bid value')
         swap_clients = self.swap_clients
 
-        js_0_before = json.loads(urlopen('http://localhost:1800/json').read())
+        js_0_before = json.loads(urlopen('http://127.0.0.1:1800/json').read())
 
         offer_id = swap_clients[0].postOffer(Coins.NMC, Coins.BTC, 0.001 * COIN, 1.0 * COIN, 0.001 * COIN, SwapTypes.SELLER_FIRST, ABS_LOCK_TIME)
 

@@ -59,16 +59,16 @@ def waitForServer(port):
     for i in range(20):
         try:
             time.sleep(1)
-            summary = json.loads(urlopen('http://localhost:{}/json'.format(port)).read())
+            summary = json.loads(urlopen('http://127.0.0.1:{}/json'.format(port)).read())
             return
-        except Exception:
-            traceback.print_exc()
+        except Exception as e:
+            print('waitForServer, error:', str(e))
     raise ValueError('waitForServer failed')
 
 
 def waitForNumOffers(port, offers):
     for i in range(20):
-        summary = json.loads(urlopen('http://localhost:{}/json'.format(port)).read())
+        summary = json.loads(urlopen('http://127.0.0.1:{}/json'.format(port)).read())
         if summary['num_network_offers'] >= offers:
             return
         time.sleep(1)
@@ -77,7 +77,7 @@ def waitForNumOffers(port, offers):
 
 def waitForNumBids(port, bids):
     for i in range(20):
-        summary = json.loads(urlopen('http://localhost:{}/json'.format(port)).read())
+        summary = json.loads(urlopen('http://127.0.0.1:{}/json'.format(port)).read())
         if summary['num_recv_bids'] >= bids:
             return
         time.sleep(1)
@@ -86,7 +86,7 @@ def waitForNumBids(port, bids):
 
 def waitForNumSwapping(port, bids):
     for i in range(20):
-        summary = json.loads(urlopen('http://localhost:{}/json'.format(port)).read())
+        summary = json.loads(urlopen('http://127.0.0.1:{}/json'.format(port)).read())
         if summary['num_swapping'] >= bids:
             return
         time.sleep(1)
@@ -135,7 +135,7 @@ class Test(unittest.TestCase):
                 fp.write('minstakeinterval=5\n')
                 for ip in range(3):
                     if ip != i:
-                        fp.write('connect=localhost:{}\n'.format(PARTICL_PORT_BASE + ip))
+                        fp.write('connect=127.0.0.1:{}\n'.format(PARTICL_PORT_BASE + ip))
 
             # Pruned nodes don't provide blocks
             with open(os.path.join(client_path, 'bitcoin', 'bitcoin.conf'), 'r') as fp:
@@ -152,7 +152,7 @@ class Test(unittest.TestCase):
                 fp.write('bind=127.0.0.1\n')
                 for ip in range(3):
                     if ip != i:
-                        fp.write('connect=localhost:{}\n'.format(BITCOIN_PORT_BASE + ip))
+                        fp.write('connect=127.0.0.1:{}\n'.format(BITCOIN_PORT_BASE + ip))
 
             assert(os.path.exists(config_path))
 
@@ -180,9 +180,10 @@ class Test(unittest.TestCase):
 
             for i in range(20):
                 blocks = btcRpc(0, 'getblockchaininfo')['blocks']
-                if blocks >= 500:
+                if blocks >= num_blocks:
                     break
-            assert(blocks >= 500)
+                time.sleep(2)
+            assert(blocks >= num_blocks)
 
             data = parse.urlencode({
                 'addr_from': '-1',
@@ -192,8 +193,8 @@ class Test(unittest.TestCase):
                 'amt_to': '1',
                 'lockhrs': '24'}).encode()
 
-            offer_id = json.loads(urlopen('http://localhost:12700/json/offers/new', data=data).read())
-            summary = json.loads(urlopen('http://localhost:12700/json').read())
+            offer_id = json.loads(urlopen('http://127.0.0.1:12700/json/offers/new', data=data).read())
+            summary = json.loads(urlopen('http://127.0.0.1:12700/json').read())
             assert(summary['num_sent_offers'] == 1)
         except Exception:
             traceback.print_exc()
@@ -201,24 +202,24 @@ class Test(unittest.TestCase):
         logger.info('Waiting for offer:')
         waitForNumOffers(12701, 1)
 
-        offers = json.loads(urlopen('http://localhost:12701/json/offers').read())
+        offers = json.loads(urlopen('http://127.0.0.1:12701/json/offers').read())
         offer = offers[0]
 
         data = parse.urlencode({
             'offer_id': offer['offer_id'],
             'amount_from': offer['amount_from']}).encode()
 
-        bid_id = json.loads(urlopen('http://localhost:12701/json/bids/new', data=data).read())
+        bid_id = json.loads(urlopen('http://127.0.0.1:12701/json/bids/new', data=data).read())
 
         waitForNumBids(12700, 1)
 
-        bids = json.loads(urlopen('http://localhost:12700/json/bids').read())
+        bids = json.loads(urlopen('http://127.0.0.1:12700/json/bids').read())
         bid = bids[0]
 
         data = parse.urlencode({
             'accept': True
         }).encode()
-        rv = json.loads(urlopen('http://localhost:12700/json/bids/{}'.format(bid['bid_id']), data=data).read())
+        rv = json.loads(urlopen('http://127.0.0.1:12700/json/bids/{}'.format(bid['bid_id']), data=data).read())
         assert(rv['bid_state'] == 'Accepted')
 
         waitForNumSwapping(12701, 1)
@@ -231,7 +232,7 @@ class Test(unittest.TestCase):
         processes[1].start()
 
         waitForServer(12701)
-        rv = json.loads(urlopen('http://localhost:12701/json').read())
+        rv = json.loads(urlopen('http://127.0.0.1:12701/json').read())
         assert(rv['num_swapping'] == 1)
 
         update_thread = threading.Thread(target=updateThread)
@@ -241,7 +242,7 @@ class Test(unittest.TestCase):
         for i in range(240):
             time.sleep(5)
 
-            rv = json.loads(urlopen('http://localhost:12700/json/bids/{}'.format(bid['bid_id'])).read())
+            rv = json.loads(urlopen('http://127.0.0.1:12700/json/bids/{}'.format(bid['bid_id'])).read())
             print(rv)
             if rv['bid_state'] == 'Completed':
                 break

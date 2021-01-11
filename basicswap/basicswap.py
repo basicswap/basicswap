@@ -440,12 +440,7 @@ class BasicSwap(BaseApp):
 
         self.swaps_in_progress = dict()
 
-        if self.chain == 'regtest':
-            self.SMSG_SECONDS_IN_DAY = 600
-            self.SMSG_SECONDS_IN_HOUR = 60 * 2
-        else:
-            self.SMSG_SECONDS_IN_DAY = 86400
-            self.SMSG_SECONDS_IN_HOUR = 60 * 60
+        self.SMSG_SECONDS_IN_HOUR = 60 * 2 if self.chain == 'regtest' else 60 * 60
 
         # Encode key to match network
         wif_prefix = chainparams[Coins.PART][self.chain]['key_prefix']
@@ -579,7 +574,7 @@ class BasicSwap(BaseApp):
 
         if self.coin_clients[coin]['connection_type'] == 'rpc':
             if coin == Coins.XMR:
-                self.coin_clients[coin]['walletrpchost'] = chain_client_settings.get('walletrpchost', 'localhost')
+                self.coin_clients[coin]['walletrpchost'] = chain_client_settings.get('walletrpchost', '127.0.0.1')
                 self.coin_clients[coin]['walletrpcport'] = chain_client_settings.get('walletrpcport', chainparams[coin][self.chain]['walletrpcport'])
                 if 'walletrpcpassword' in chain_client_settings:
                     self.coin_clients[coin]['walletrpcauth'] = (chain_client_settings['walletrpcuser'], chain_client_settings['walletrpcpassword'])
@@ -803,9 +798,9 @@ class BasicSwap(BaseApp):
                 kv.value = int_val
             session.add(kv)
             session.commit()
+        finally:
             session.close()
             session.remove()
-        finally:
             self.mxDB.release()
 
     def setStringKV(self, str_key, str_val):
@@ -819,9 +814,9 @@ class BasicSwap(BaseApp):
                 kv.value = str_val
             session.add(kv)
             session.commit()
+        finally:
             session.close()
             session.remove()
-        finally:
             self.mxDB.release()
 
     def getStringKV(self, str_key):
@@ -963,12 +958,15 @@ class BasicSwap(BaseApp):
         self.loadFromDB()
 
         # Scan inbox
-        options = {'encoding': 'hex'}
+        # TODO: Redundant? small window for zmq messages to go unnoticed during startup?
+        # options = {'encoding': 'hex'}
+        options = {'encoding': 'none'}
         ro = self.callrpc('smsginbox', ['unread', '', options])
         nm = 0
         for msg in ro['messages']:
-            msg['hex'] += '00'  # Add nullbtye to match output from 'smsg' cmd - TODO: make consistent
-            self.processMsg(msg)
+            # TODO: Remove workaround for smsginbox bug
+            get_msg = self.callrpc('smsg', [msg['msgid'], {'encoding': 'hex', 'setread': True}])
+            self.processMsg(get_msg)
             nm += 1
         self.log.info('Scanned %d unread messages.', nm)
 
@@ -1024,6 +1022,7 @@ class BasicSwap(BaseApp):
         self.validateOfferLockValue(coin_from_t, coin_to_t, lock_type, lock_value)
 
         self.mxDB.acquire()
+        session = None
         try:
             self.checkSynced(coin_from_t, coin_to_t)
             # TODO: require proof of funds on offers?
@@ -1123,9 +1122,11 @@ class BasicSwap(BaseApp):
             if addr_send_from is None:
                 session.add(SmsgAddress(addr=offer_addr, use_type=MessageTypes.OFFER))
             session.commit()
-            session.close()
-            session.remove()
+
         finally:
+            if session:
+                session.close()
+                session.remove()
             self.mxDB.release()
         self.log.info('Sent OFFER %s', offer_id.hex())
         return offer_id
@@ -1262,9 +1263,9 @@ class BasicSwap(BaseApp):
             addr = record.addr
             session.add(record)
             session.commit()
+        finally:
             session.close()
             session.remove()
-        finally:
             self.mxDB.release()
         return addr
 
@@ -1280,9 +1281,9 @@ class BasicSwap(BaseApp):
                 session.commit()
             except Exception as ex:
                 pass
+        finally:
             session.close()
             session.remove()
-        finally:
             self.mxDB.release()
 
     def getReceiveAddressForCoin(self, coin_type):
@@ -1380,9 +1381,9 @@ class BasicSwap(BaseApp):
                     value=addr
                 ))
                 session.commit()
+        finally:
             session.close()
             session.remove()
-        finally:
             self.mxDB.release()
         return addr
 
@@ -1391,11 +1392,11 @@ class BasicSwap(BaseApp):
         try:
             self._contract_count += 1
             session = scoped_session(self.session_factory)
-            self.engine.execute('UPDATE kv_int SET value = {} WHERE KEY="contract_count"'.format(self._contract_count))
+            session.execute('UPDATE kv_int SET value = {} WHERE KEY="contract_count"'.format(self._contract_count))
             session.commit()
+        finally:
             session.close()
             session.remove()
-        finally:
             self.mxDB.release()
         return self._contract_count
 
@@ -1458,9 +1459,9 @@ class BasicSwap(BaseApp):
             session = scoped_session(self.session_factory)
             self.saveBidInSession(bid_id, bid, session, xmr_swap)
             session.commit()
+        finally:
             session.close()
             session.remove()
-        finally:
             self.mxDB.release()
 
     def saveToDB(self, db_record):
@@ -1469,9 +1470,9 @@ class BasicSwap(BaseApp):
             session = scoped_session(self.session_factory)
             session.add(db_record)
             session.commit()
+        finally:
             session.close()
             session.remove()
-        finally:
             self.mxDB.release()
 
     def createEventInSession(self, delay, event_type, linked_id, session):
@@ -1492,9 +1493,9 @@ class BasicSwap(BaseApp):
             session = scoped_session(self.session_factory)
             self.createEventInSession(delay, event_type, linked_id, session)
             session.commit()
+        finally:
             session.close()
             session.remove()
-        finally:
             self.mxDB.release()
 
     def logBidEvent(self, bid, event_type, event_msg, session):
@@ -1577,13 +1578,15 @@ class BasicSwap(BaseApp):
             )
             bid.setState(BidStates.BID_SENT)
 
-            session = scoped_session(self.session_factory)
-            self.saveBidInSession(bid_id, bid, session)
-            if addr_send_from is None:
-                session.add(SmsgAddress(addr=bid_addr, use_type=MessageTypes.BID))
-            session.commit()
-            session.close()
-            session.remove()
+            try:
+                session = scoped_session(self.session_factory)
+                self.saveBidInSession(bid_id, bid, session)
+                if addr_send_from is None:
+                    session.add(SmsgAddress(addr=bid_addr, use_type=MessageTypes.BID))
+                session.commit()
+            finally:
+                session.close()
+                session.remove()
 
             self.log.info('Sent BID %s', bid_id.hex())
             return bid_id
@@ -1712,17 +1715,16 @@ class BasicSwap(BaseApp):
             self.mxDB.release()
 
     def list_bid_events(self, bid_id, session):
-        session = scoped_session(self.session_factory)
         query_str = 'SELECT created_at, event_type, event_msg FROM eventlog ' + \
                     'WHERE active_ind = 1 AND linked_type = {} AND linked_id = x\'{}\' '.format(TableTypes.BID, bid_id.hex())
-        q = self.engine.execute(query_str)
+        q = session.execute(query_str)
         events = []
         for row in q:
             events.append({'at': row[0], 'desc': describeEventEntry(row[1], row[2])})
 
         query_str = 'SELECT created_at, trigger_at FROM eventqueue ' + \
                     'WHERE active_ind = 1 AND linked_id = x\'{}\' '.format(bid_id.hex())
-        q = self.engine.execute(query_str)
+        q = session.execute(query_str)
         events = []
         for row in q:
             events.append({'at': row[0], 'desc': 'Delaying until: {}'.format(format_timestamp(row[1]))})
@@ -1736,13 +1738,13 @@ class BasicSwap(BaseApp):
         assert(bid), 'Bid not found'
         assert(offer), 'Offer not found'
 
-        if offer.swap_type == SwapTypes.XMR_SWAP:
-            return self.acceptXmrBid(bid_id)
-
         # Ensure bid is still valid
         now = int(time.time())
         assert(bid.expire_at > now), 'Bid expired'
-        assert(bid.state == BidStates.BID_RECEIVED), 'Wrong bid state: {}'.format(BidStates(bid.state))
+        assert(bid.state == BidStates.BID_RECEIVED), 'Wrong bid state: {}'.format(str(BidStates(bid.state)))
+
+        if offer.swap_type == SwapTypes.XMR_SWAP:
+            return self.acceptXmrBid(bid_id)
 
         if bid.contract_count is None:
             bid.contract_count = self.getNewContractId()
@@ -1934,13 +1936,15 @@ class BasicSwap(BaseApp):
             )
             bid.setState(BidStates.BID_SENT)
 
-            session = scoped_session(self.session_factory)
-            self.saveBidInSession(xmr_swap.bid_id, bid, session, xmr_swap)
-            if addr_send_from is None:
-                session.add(SmsgAddress(addr=bid_addr, use_type=MessageTypes.BID))
-            session.commit()
-            session.close()
-            session.remove()
+            try:
+                session = scoped_session(self.session_factory)
+                self.saveBidInSession(xmr_swap.bid_id, bid, session, xmr_swap)
+                if addr_send_from is None:
+                    session.add(SmsgAddress(addr=bid_addr, use_type=MessageTypes.BID))
+                session.commit()
+            finally:
+                session.close()
+                session.remove()
 
             self.log.info('Sent XMR_BID_FL %s', xmr_swap.bid_id.hex())
             return xmr_swap.bid_id
@@ -1957,7 +1961,8 @@ class BasicSwap(BaseApp):
             bid, xmr_swap = self.getXmrBid(bid_id)
             assert(bid), 'Bid not found: {}.'.format(bid_id.hex())
             assert(xmr_swap), 'XMR swap not found: {}.'.format(bid_id.hex())
-            assert(bid.expire_at > now), 'Offer has expired'
+            assert(bid.expire_at > now), 'Bid expired'
+            assert(bid.state == BidStates.BID_RECEIVED), 'Wrong bid state: {}'.format(str(BidStates(bid.state)))
 
             offer, xmr_offer = self.getXmrOffer(bid.offer_id)
             assert(offer), 'Offer not found: {}.'.format(bid.offer_id.hex())
@@ -2066,11 +2071,7 @@ class BasicSwap(BaseApp):
 
             bid.setState(BidStates.BID_ACCEPTED)
 
-            session = scoped_session(self.session_factory)
-            self.saveBidInSession(bid_id, bid, session, xmr_swap)
-            session.commit()
-            session.close()
-            session.remove()
+            self.saveBid(bid_id, bid, xmr_swap=xmr_swap)
 
             # Add to swaps_in_progress only when waiting on txns
             self.log.info('Sent XMR_BID_ACCEPT_LF %s', bid_id.hex())
@@ -3182,7 +3183,7 @@ class BasicSwap(BaseApp):
             self.initiateTxnSpent(watched_output.bid_id, spend_txid_hex, spend_n, spend_txn)
 
     def checkForSpends(self, coin_type, c):
-        # assert(self.mxDB.locked()) self.log.debug('checkForSpends %s', coin_type)
+        # assert(self.mxDB.locked())
         self.log.debug('checkForSpends %s', coin_type)
 
         if coin_type == Coins.PART and self.coin_clients[coin_type]['have_spent_index']:
@@ -3236,11 +3237,18 @@ class BasicSwap(BaseApp):
             now = int(time.time())
             options = {'encoding': 'none'}
             ro = self.callrpc('smsginbox', ['all', '', options])
+            num_messages = 0
+            num_removed = 0
             for msg in ro['messages']:
-                expire_at = msg['sent'] + msg['daysretention'] * self.SMSG_SECONDS_IN_DAY
+                num_messages += 1
+                expire_at = msg['sent'] + msg['ttl']
                 if expire_at < now:
                     options = {'encoding': 'none', 'delete': True}
                     del_msg = self.callrpc('smsg', [msg['msgid'], options])
+                    num_removed += 1
+
+            if num_messages + num_removed > 0:
+                logging.info('Expired {} / {} messages.'.format(num_removed, num_messages))
 
             logging.debug('TODO: Expire records from db')
 
@@ -3303,7 +3311,7 @@ class BasicSwap(BaseApp):
             session = scoped_session(self.session_factory)
             q = session.query(Bid).filter(Bid.state == BidStates.BID_RECEIVING)
             for bid in q:
-                q = self.engine.execute('SELECT COUNT(*) FROM xmr_split_data WHERE bid_id = x\'{}\' AND msg_type = {}'.format(bid.bid_id.hex(), XmrSplitMsgTypes.BID)).first()
+                q = session.execute('SELECT COUNT(*) FROM xmr_split_data WHERE bid_id = x\'{}\' AND msg_type = {}'.format(bid.bid_id.hex(), XmrSplitMsgTypes.BID)).first()
                 num_segments = q[0]
                 if num_segments > 1:
                     try:
@@ -3321,7 +3329,7 @@ class BasicSwap(BaseApp):
 
             q = session.query(Bid).filter(Bid.state == BidStates.BID_RECEIVING_ACC)
             for bid in q:
-                q = self.engine.execute('SELECT COUNT(*) FROM xmr_split_data WHERE bid_id = x\'{}\' AND msg_type = {}'.format(bid.bid_id.hex(), XmrSplitMsgTypes.BID_ACCEPT)).first()
+                q = session.execute('SELECT COUNT(*) FROM xmr_split_data WHERE bid_id = x\'{}\' AND msg_type = {}'.format(bid.bid_id.hex(), XmrSplitMsgTypes.BID_ACCEPT)).first()
                 num_segments = q[0]
                 if num_segments > 1:
                     try:
@@ -3330,6 +3338,7 @@ class BasicSwap(BaseApp):
                         self.log.info('Verify xmr bid accept {} failed: {}'.format(bid.bid_id.hex(), str(ex)))
                         bid.setState(BidStates.BID_ERROR, 'Failed accept validation: ' + str(ex))
                         session.add(bid)
+                        self.updateBidInProgress(bid)
                     continue
                 if bid.created_at + ttl_xmr_split_messages < now:
                     self.log.debug('Expiring partially received bid accept: {}'.format(bid.bid_id.hex()))
@@ -3388,49 +3397,51 @@ class BasicSwap(BaseApp):
             raise ValueError('Offer has been revoked {}.'.format(offer_id.hex()))
 
         session = scoped_session(self.session_factory)
-        # Check for sent
-        existing_offer = self.getOffer(offer_id)
-        if existing_offer is None:
-            offer = Offer(
-                offer_id=offer_id,
-                active_ind=1,
+        try:
+            # Check for sent
+            existing_offer = self.getOffer(offer_id)
+            if existing_offer is None:
+                offer = Offer(
+                    offer_id=offer_id,
+                    active_ind=1,
 
-                coin_from=offer_data.coin_from,
-                coin_to=offer_data.coin_to,
-                amount_from=offer_data.amount_from,
-                rate=offer_data.rate,
-                min_bid_amount=offer_data.min_bid_amount,
-                time_valid=offer_data.time_valid,
-                lock_type=int(offer_data.lock_type),
-                lock_value=offer_data.lock_value,
-                swap_type=offer_data.swap_type,
+                    coin_from=offer_data.coin_from,
+                    coin_to=offer_data.coin_to,
+                    amount_from=offer_data.amount_from,
+                    rate=offer_data.rate,
+                    min_bid_amount=offer_data.min_bid_amount,
+                    time_valid=offer_data.time_valid,
+                    lock_type=int(offer_data.lock_type),
+                    lock_value=offer_data.lock_value,
+                    swap_type=offer_data.swap_type,
 
-                addr_from=msg['from'],
-                created_at=msg['sent'],
-                expire_at=msg['sent'] + offer_data.time_valid,
-                was_sent=False)
-            offer.setState(OfferStates.OFFER_RECEIVED)
-            session.add(offer)
+                    addr_from=msg['from'],
+                    created_at=msg['sent'],
+                    expire_at=msg['sent'] + offer_data.time_valid,
+                    was_sent=False)
+                offer.setState(OfferStates.OFFER_RECEIVED)
+                session.add(offer)
 
-            if offer.swap_type == SwapTypes.XMR_SWAP:
-                xmr_offer = XmrOffer()
+                if offer.swap_type == SwapTypes.XMR_SWAP:
+                    xmr_offer = XmrOffer()
 
-                xmr_offer.offer_id = offer_id
-                xmr_offer.lock_time_1 = getExpectedSequence(offer_data.lock_type, offer_data.lock_value, coin_from)
-                xmr_offer.lock_time_2 = getExpectedSequence(offer_data.lock_type, offer_data.lock_value, coin_from)
+                    xmr_offer.offer_id = offer_id
+                    xmr_offer.lock_time_1 = getExpectedSequence(offer_data.lock_type, offer_data.lock_value, coin_from)
+                    xmr_offer.lock_time_2 = getExpectedSequence(offer_data.lock_type, offer_data.lock_value, coin_from)
 
-                xmr_offer.a_fee_rate = offer_data.fee_rate_from
-                xmr_offer.b_fee_rate = offer_data.fee_rate_to
+                    xmr_offer.a_fee_rate = offer_data.fee_rate_from
+                    xmr_offer.b_fee_rate = offer_data.fee_rate_to
 
-                session.add(xmr_offer)
+                    session.add(xmr_offer)
 
-            self.log.debug('Received new offer %s', offer_id.hex())
-        else:
-            existing_offer.setState(OfferStates.OFFER_RECEIVED)
-            session.add(existing_offer)
-        session.commit()
-        session.close()
-        session.remove()
+                self.log.debug('Received new offer %s', offer_id.hex())
+            else:
+                existing_offer.setState(OfferStates.OFFER_RECEIVED)
+                session.add(existing_offer)
+            session.commit()
+        finally:
+            session.close()
+            session.remove()
 
     def processOfferRevoke(self, msg):
         assert(msg['to'] == self.network_addr), 'Message received on wrong address'
@@ -3540,6 +3551,7 @@ class BasicSwap(BaseApp):
                 was_received=True,
             )
         else:
+            assert(bid.state == BidStates.BID_SENT), 'Wrong bid state: {}'.format(str(BidStates(bid.state)))
             bid.created_at = msg['sent']
             bid.expire_at = msg['sent'] + bid_data.time_valid
             bid.was_received = True
@@ -3585,7 +3597,7 @@ class BasicSwap(BaseApp):
             if bid.was_received:  # Sent to self
                 self.log.info('Received valid bid accept %s for bid %s sent to self', bid.accept_msg_id.hex(), bid_id.hex())
                 return
-            raise ValueError('Wrong bid state: {}'.format(str(BidStates(bid.state))))
+            raise ValueError('Wrong bid state: {}'.format(str(BidStates(str(BidStates(bid.state))))))
 
         use_csv = True if offer.lock_type < ABS_LOCK_BLOCKS else False
 
@@ -3784,6 +3796,7 @@ class BasicSwap(BaseApp):
                 xmr_swap.b_restore_height = ci_to._restore_height
                 self.log.warning('XMR swap restore height clamped to {}'.format(ci_to._restore_height))
         else:
+            assert(bid.state == BidStates.BID_SENT), 'Wrong bid state: {}'.format(str(BidStates(bid.state)))
             bid.created_at = msg['sent']
             bid.expire_at = msg['sent'] + bid_data.time_valid
             bid.was_received = True
@@ -4336,13 +4349,25 @@ class BasicSwap(BaseApp):
         assert(len(msg_data.msg_id) == 28), 'Bad msg_id length'
 
         if msg_data.msg_type == XmrSplitMsgTypes.BID or msg_data.msg_type == XmrSplitMsgTypes.BID_ACCEPT:
-            dbr = XmrSplitData()
-            dbr.bid_id = msg_data.msg_id
-            dbr.msg_type = msg_data.msg_type
-            dbr.msg_sequence = msg_data.sequence
-            dbr.dleag = msg_data.dleag
-            dbr.created_at = now
-            self.saveToDB(dbr)
+            try:
+                session = scoped_session(self.session_factory)
+                q = session.execute('SELECT COUNT(*) FROM xmr_split_data WHERE bid_id = x\'{}\' AND msg_type = {} AND msg_sequence = {}'.format(msg_data.msg_id.hex(), msg_data.msg_type, msg_data.sequence)).first()
+                num_exists = q[0]
+                if num_exists > 0:
+                    self.log.warning('Ignoring duplicate xmr_split_data entry: ({}, {}, {})'.format(msg_data.msg_id.hex(), msg_data.msg_type, msg_data.sequence))
+                    return
+
+                dbr = XmrSplitData()
+                dbr.bid_id = msg_data.msg_id
+                dbr.msg_type = msg_data.msg_type
+                dbr.msg_sequence = msg_data.sequence
+                dbr.dleag = msg_data.dleag
+                dbr.created_at = now
+                session.add(dbr)
+                session.commit()
+            finally:
+                session.close()
+                session.remove()
 
     def processXmrLockReleaseMessage(self, msg):
         self.log.debug('Processing xmr secret msg %s', msg['msgid'])
@@ -4640,9 +4665,9 @@ class BasicSwap(BaseApp):
         try:
             session = scoped_session(self.session_factory)
             if offer_id:
-                q = self.engine.execute('SELECT COUNT(*) FROM bids WHERE state >= {} AND offer_id = x\'{}\''.format(BidStates.BID_ACCEPTED, offer_id.hex())).first()
+                q = session.execute('SELECT COUNT(*) FROM bids WHERE state >= {} AND offer_id = x\'{}\''.format(BidStates.BID_ACCEPTED, offer_id.hex())).first()
             else:
-                q = self.engine.execute('SELECT COUNT(*) FROM bids WHERE state >= {}'.format(BidStates.BID_ACCEPTED)).first()
+                q = session.execute('SELECT COUNT(*) FROM bids WHERE state >= {}'.format(BidStates.BID_ACCEPTED)).first()
             return q[0]
         finally:
             session.close()
@@ -4712,7 +4737,7 @@ class BasicSwap(BaseApp):
                 query_str += 'WHERE bids.was_received = 1 '
             query_str += 'ORDER BY bids.created_at DESC'
 
-            q = self.engine.execute(query_str)
+            q = session.execute(query_str)
             for row in q:
                 rv.append(row)
             return rv
@@ -4751,7 +4776,7 @@ class BasicSwap(BaseApp):
         try:
             session = scoped_session(self.session_factory)
             rv = []
-            q = self.engine.execute('SELECT addr FROM smsgaddresses WHERE use_type = {} ORDER BY addr_id DESC'.format(use_type))
+            q = session.execute('SELECT addr FROM smsgaddresses WHERE use_type = {} ORDER BY addr_id DESC'.format(use_type))
             for row in q:
                 rv.append(row[0])
             return rv

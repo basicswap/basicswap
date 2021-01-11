@@ -39,6 +39,7 @@ from .js_server import (
     js_bids,
     js_sentbids,
     js_network,
+    js_revokeoffer,
     js_index,
 )
 from .ui import (
@@ -821,6 +822,7 @@ class HttpHandler(BaseHTTPRequestHandler):
                             'bids': js_bids,
                             'sentbids': js_sentbids,
                             'network': js_network,
+                            'revokeoffer': js_revokeoffer,
                             }.get(url_split[2], js_index)
                 return func(self, url_split, post_string)
             except Exception as ex:

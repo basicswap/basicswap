@@ -60,10 +60,10 @@ def waitForServer(port, wait_for=20):
             raise ValueError('Test stopped.')
         try:
             delay_event.wait(1)
-            summary = json.loads(urlopen('http://localhost:{}/json'.format(port)).read())
+            summary = json.loads(urlopen('http://127.0.0.1:{}/json'.format(port)).read())
             return
-        except Exception:
-            traceback.print_exc()
+        except Exception as e:
+            print('waitForServer, error:', str(e))
     raise ValueError('waitForServer failed')
 
 
@@ -71,7 +71,7 @@ def waitForNumOffers(port, offers, wait_for=20):
     for i in range(wait_for):
         if delay_event.is_set():
             raise ValueError('Test stopped.')
-        summary = json.loads(urlopen('http://localhost:{}/json'.format(port)).read())
+        summary = json.loads(urlopen('http://127.0.0.1:{}/json'.format(port)).read())
         if summary['num_network_offers'] >= offers:
             return
         delay_event.wait(1)
@@ -82,7 +82,7 @@ def waitForNumBids(port, bids, wait_for=20):
     for i in range(wait_for):
         if delay_event.is_set():
             raise ValueError('Test stopped.')
-        summary = json.loads(urlopen('http://localhost:{}/json'.format(port)).read())
+        summary = json.loads(urlopen('http://127.0.0.1:{}/json'.format(port)).read())
         if summary['num_recv_bids'] >= bids:
             return
         delay_event.wait(1)
@@ -93,11 +93,23 @@ def waitForNumSwapping(port, bids, wait_for=60):
     for i in range(wait_for):
         if delay_event.is_set():
             raise ValueError('Test stopped.')
-        summary = json.loads(urlopen('http://localhost:{}/json'.format(port)).read())
+        summary = json.loads(urlopen('http://127.0.0.1:{}/json'.format(port)).read())
         if summary['num_swapping'] >= bids:
             return
         delay_event.wait(1)
     raise ValueError('waitForNumSwapping failed')
+
+
+def waitForBidState(port, bid_id, state_str, wait_for=60):
+    for i in range(wait_for):
+        if delay_event.is_set():
+            raise ValueError('Test stopped.')
+        bid = json.loads(urlopen('http://127.0.0.1:12700/json/bids/{}'.format(bid_id)).read())
+        print('[rm] bid', bid)
+        if bid['bid_state'] == state_str:
+            return
+        delay_event.wait(1)
+    raise ValueError('waitForBidState failed')
 
 
 def updateThread(xmr_addr):
@@ -154,7 +166,7 @@ class Test(unittest.TestCase):
                 fp.write('minstakeinterval=5\n')
                 for ip in range(3):
                     if ip != i:
-                        fp.write('connect=localhost:{}\n'.format(PARTICL_PORT_BASE + ip))
+                        fp.write('connect=127.0.0.1:{}\n'.format(PARTICL_PORT_BASE + ip))
 
             with open(os.path.join(client_path, 'monero', 'monerod.conf'), 'a') as fp:
                 fp.write('p2p-bind-ip=127.0.0.1\n')
@@ -196,7 +208,7 @@ class Test(unittest.TestCase):
         try:
             waitForServer(12701)
 
-            wallets = json.loads(urlopen('http://localhost:12701/json/wallets').read())
+            wallets = json.loads(urlopen('http://127.0.0.1:12701/json/wallets').read())
 
             xmr_addr1 = wallets['6']['deposit_address']
             num_blocks = 100
@@ -229,7 +241,7 @@ class Test(unittest.TestCase):
         try:
             waitForServer(12700)
             waitForServer(12701)
-            wallets1 = json.loads(urlopen('http://localhost:12701/json/wallets').read())
+            wallets1 = json.loads(urlopen('http://127.0.0.1:12701/json/wallets').read())
             assert(float(wallets1['6']['balance']) > 0.0)
 
             data = parse.urlencode({
@@ -240,26 +252,26 @@ class Test(unittest.TestCase):
                 'amt_to': '1',
                 'lockhrs': '24'}).encode()
 
-            offer_id = json.loads(urlopen('http://localhost:12700/json/offers/new', data=data).read())
-            summary = json.loads(urlopen('http://localhost:12700/json').read())
+            offer_id = json.loads(urlopen('http://127.0.0.1:12700/json/offers/new', data=data).read())['offer_id']
+            summary = json.loads(urlopen('http://127.0.0.1:12700/json').read())
             assert(summary['num_sent_offers'] == 1)
 
             logger.info('Waiting for offer')
             waitForNumOffers(12701, 1)
 
-            offers = json.loads(urlopen('http://localhost:12701/json/offers').read())
+            offers = json.loads(urlopen('http://127.0.0.1:12701/json/offers').read())
             offer = offers[0]
 
             data = parse.urlencode({
                 'offer_id': offer['offer_id'],
                 'amount_from': offer['amount_from']}).encode()
 
-            bid_id = json.loads(urlopen('http://localhost:12701/json/bids/new', data=data).read())
+            bid_id = json.loads(urlopen('http://127.0.0.1:12701/json/bids/new', data=data).read())
 
             waitForNumBids(12700, 1)
 
             for i in range(10):
-                bids = json.loads(urlopen('http://localhost:12700/json/bids').read())
+                bids = json.loads(urlopen('http://127.0.0.1:12700/json/bids').read())
                 bid = bids[0]
                 if bid['bid_state'] == 'Received':
                     break
@@ -268,7 +280,7 @@ class Test(unittest.TestCase):
             data = parse.urlencode({
                 'accept': True
             }).encode()
-            rv = json.loads(urlopen('http://localhost:12700/json/bids/{}'.format(bid['bid_id']), data=data).read())
+            rv = json.loads(urlopen('http://127.0.0.1:12700/json/bids/{}'.format(bid['bid_id']), data=data).read())
             assert(rv['bid_state'] == 'Accepted')
 
             waitForNumSwapping(12701, 1)
@@ -281,8 +293,11 @@ class Test(unittest.TestCase):
             self.processes[1].start()
 
             waitForServer(12701)
-            rv = json.loads(urlopen('http://localhost:12701/json').read())
+            rv = json.loads(urlopen('http://127.0.0.1:12701/json').read())
             assert(rv['num_swapping'] == 1)
+
+            rv = json.loads(urlopen('http://127.0.0.1:12700/json/revokeoffer/{}'.format(offer_id)).read())
+            assert(rv['revoked_offer'] == offer_id)
 
             logger.info('Completing swap')
             for i in range(240):
@@ -290,10 +305,15 @@ class Test(unittest.TestCase):
                     raise ValueError('Test stopped.')
                 delay_event.wait(4)
 
-                rv = json.loads(urlopen('http://localhost:12700/json/bids/{}'.format(bid['bid_id'])).read())
+                rv = json.loads(urlopen('http://127.0.0.1:12700/json/bids/{}'.format(bid['bid_id'])).read())
                 if rv['bid_state'] == 'Completed':
                     break
             assert(rv['bid_state'] == 'Completed')
+
+            # Ensure offer was revoked
+            summary = json.loads(urlopen('http://127.0.0.1:12700/json').read())
+            assert(summary['num_network_offers'] == 0)
+
         except Exception as e:
             traceback.print_exc()
             raise(e)
@@ -307,9 +327,88 @@ class Test(unittest.TestCase):
         try:
             waitForServer(12700)
             waitForServer(12701)
-            wallets1 = json.loads(urlopen('http://localhost:12701/json/wallets').read())
-            print('wallets 1', json.dumps(wallets1, indent=4))
+            wallets1 = json.loads(urlopen('http://127.0.0.1:12701/json/wallets').read())
             assert(float(wallets1['6']['balance']) > 0.0)
+
+            offer_data = {
+                'addr_from': '-1',
+                'coin_from': '1',
+                'coin_to': '6',
+                'amt_from': '1',
+                'amt_to': '1',
+                'lockhrs': '24',
+                'autoaccept': True}
+            rv = json.loads(urlopen('http://127.0.0.1:12700/json/offers/new', data=parse.urlencode(offer_data).encode()).read())
+            offer0_id = rv['offer_id']
+
+            offer_data['amt_from'] = '2'
+            rv = json.loads(urlopen('http://127.0.0.1:12700/json/offers/new', data=parse.urlencode(offer_data).encode()).read())
+            offer1_id = rv['offer_id']
+
+            summary = json.loads(urlopen('http://127.0.0.1:12700/json').read())
+            assert(summary['num_sent_offers'] > 1)
+
+            logger.info('Waiting for offer')
+            waitForNumOffers(12701, 2)
+
+            logger.info('Stopping node 0')
+            c0 = self.processes[0]
+            c0.terminate()
+            c0.join()
+
+            offers = json.loads(urlopen('http://127.0.0.1:12701/json/offers/{}'.format(offer0_id)).read())
+            assert(len(offers) == 1)
+            offer0 = offers[0]
+
+            bid_data = {
+                'offer_id': offer0_id,
+                'amount_from': offer0['amount_from']}
+
+            bid0_id = json.loads(urlopen('http://127.0.0.1:12701/json/bids/new', data=parse.urlencode(bid_data).encode()).read())['bid_id']
+
+            offers = json.loads(urlopen('http://127.0.0.1:12701/json/offers/{}'.format(offer1_id)).read())
+            assert(len(offers) == 1)
+            offer1 = offers[0]
+
+            bid_data = {
+                'offer_id': offer1_id,
+                'amount_from': offer1['amount_from']}
+
+            bid1_id = json.loads(urlopen('http://127.0.0.1:12701/json/bids/new', data=parse.urlencode(bid_data).encode()).read())['bid_id']
+
+            delay_event.wait(5)
+
+            logger.info('Starting node 0')
+            self.processes[0] = multiprocessing.Process(target=self.run_thread, args=(0,))
+            self.processes[0].start()
+
+            waitForServer(12700)
+            waitForNumBids(12700, 2)
+
+            waitForBidState(12700, bid0_id, 'Received')
+            waitForBidState(12700, bid1_id, 'Received')
+
+            # Manually accept on top of auto-accept for extra chaos
+            data = parse.urlencode({
+                'accept': True
+            }).encode()
+            rv = json.loads(urlopen('http://127.0.0.1:12700/json/bids/{}'.format(bid0_id), data=data).read())
+            assert(rv['bid_state'] == 'Accepted')
+            rv = json.loads(urlopen('http://127.0.0.1:12700/json/bids/{}'.format(bid1_id), data=data).read())
+            assert(rv['bid_state'] == 'Accepted')
+
+            logger.info('Completing swap')
+            for i in range(240):
+                if delay_event.is_set():
+                    raise ValueError('Test stopped.')
+                delay_event.wait(4)
+
+                rv0 = json.loads(urlopen('http://127.0.0.1:12700/json/bids/{}'.format(bid0_id)).read())
+                rv1 = json.loads(urlopen('http://127.0.0.1:12700/json/bids/{}'.format(bid1_id)).read())
+                if rv0['bid_state'] == 'Completed' and rv1['bid_state'] == 'Completed':
+                    break
+            assert(rv0['bid_state'] == 'Completed')
+            assert(rv1['bid_state'] == 'Completed')
 
         except Exception as e:
             traceback.print_exc()

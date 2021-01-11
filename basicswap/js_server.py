@@ -34,6 +34,7 @@ def js_wallets(self, url_split, post_string):
 
 
 def js_offers(self, url_split, post_string, sent=False):
+    offer_id = None
     if len(url_split) > 3:
         if url_split[3] == 'new':
             if post_string == '':
@@ -52,6 +53,10 @@ def js_offers(self, url_split, post_string, sent=False):
         'sort_by': 'created_at',
         'sort_dir': 'desc',
     }
+
+    if offer_id:
+        filters['offer_id'] = offer_id
+
     if post_string != '':
         post_data = urllib.parse.parse_qs(post_string)
         filters['coin_from'] = setCoinFilter(form_data, b'coin_from')
@@ -158,6 +163,13 @@ def js_sentbids(self, url_split, post_string):
 
 def js_network(self, url_split, post_string):
     return bytes(json.dumps(self.server.swap_client.get_network_info()), 'UTF-8')
+
+
+def js_revokeoffer(self, url_split, post_string):
+    offer_id = bytes.fromhex(url_split[3])
+    assert(len(offer_id) == 28)
+    self.server.swap_client.revokeOffer(offer_id)
+    return bytes(json.dumps({'revoked_offer': offer_id.hex()}), 'UTF-8')
 
 
 def js_index(self, url_split, post_string):
