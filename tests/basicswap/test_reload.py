@@ -18,7 +18,6 @@ python tests/basicswap/test_reload.py
 import os
 import sys
 import json
-import time
 import shutil
 import logging
 import unittest
@@ -33,6 +32,12 @@ from basicswap.rpc import (
     callrpc_cli,
 )
 from tests.basicswap.mnemonics import mnemonics
+from tests.basicswap.common import (
+    waitForServer,
+    waitForNumOffers,
+    waitForNumBids,
+    waitForNumSwapping,
+)
 
 import basicswap.config as cfg
 import bin.basicswap_prepare as prepareSystem
@@ -41,7 +46,7 @@ import bin.basicswap_run as runSystem
 test_path = os.path.expanduser(os.getenv('TEST_RELOAD_PATH', '~/test_basicswap1'))
 PARTICL_PORT_BASE = int(os.getenv('PARTICL_PORT_BASE', '11938'))
 BITCOIN_PORT_BASE = int(os.getenv('BITCOIN_PORT_BASE', '10938'))
-stop_test = False
+delay_event = threading.Event()
 
 logger = logging.getLogger()
 logger.level = logging.DEBUG
@@ -55,50 +60,12 @@ def btcRpc(client_no, cmd):
     return callrpc_cli(bin_path, data_path, 'regtest', cmd, 'bitcoin-cli')
 
 
-def waitForServer(port):
-    for i in range(20):
-        try:
-            time.sleep(1)
-            summary = json.loads(urlopen('http://127.0.0.1:{}/json'.format(port)).read())
-            return
-        except Exception as e:
-            print('waitForServer, error:', str(e))
-    raise ValueError('waitForServer failed')
-
-
-def waitForNumOffers(port, offers):
-    for i in range(20):
-        summary = json.loads(urlopen('http://127.0.0.1:{}/json'.format(port)).read())
-        if summary['num_network_offers'] >= offers:
-            return
-        time.sleep(1)
-    raise ValueError('waitForNumOffers failed')
-
-
-def waitForNumBids(port, bids):
-    for i in range(20):
-        summary = json.loads(urlopen('http://127.0.0.1:{}/json'.format(port)).read())
-        if summary['num_recv_bids'] >= bids:
-            return
-        time.sleep(1)
-    raise ValueError('waitForNumBids failed')
-
-
-def waitForNumSwapping(port, bids):
-    for i in range(20):
-        summary = json.loads(urlopen('http://127.0.0.1:{}/json'.format(port)).read())
-        if summary['num_swapping'] >= bids:
-            return
-        time.sleep(1)
-    raise ValueError('waitForNumSwapping failed')
-
-
 def updateThread():
     btc_addr = btcRpc(0, 'getnewaddress mining_addr bech32')
 
-    while not stop_test:
+    while not delay_event.is_set():
         btcRpc(0, 'generatetoaddress {} {}'.format(1, btc_addr))
-        time.sleep(5)
+        delay_event.wait(5)
 
 
 class Test(unittest.TestCase):
@@ -171,7 +138,7 @@ class Test(unittest.TestCase):
             processes[-1].start()
 
         try:
-            waitForServer(12700)
+            waitForServer(delay_event, 12700)
 
             num_blocks = 500
             btc_addr = btcRpc(1, 'getnewaddress mining_addr bech32')
@@ -179,10 +146,12 @@ class Test(unittest.TestCase):
             btcRpc(1, 'generatetoaddress {} {}'.format(num_blocks, btc_addr))
 
             for i in range(20):
+                if delay_event.is_set():
+                    raise ValueError('Test stopped.')
                 blocks = btcRpc(0, 'getblockchaininfo')['blocks']
                 if blocks >= num_blocks:
                     break
-                time.sleep(2)
+                delay_event.wait(2)
             assert(blocks >= num_blocks)
 
             data = parse.urlencode({
@@ -200,7 +169,7 @@ class Test(unittest.TestCase):
             traceback.print_exc()
 
         logger.info('Waiting for offer:')
-        waitForNumOffers(12701, 1)
+        waitForNumOffers(delay_event, 12701, 1)
 
         offers = json.loads(urlopen('http://127.0.0.1:12701/json/offers').read())
         offer = offers[0]
@@ -211,7 +180,7 @@ class Test(unittest.TestCase):
 
         bid_id = json.loads(urlopen('http://127.0.0.1:12701/json/bids/new', data=data).read())
 
-        waitForNumBids(12700, 1)
+        waitForNumBids(delay_event, 12700, 1)
 
         bids = json.loads(urlopen('http://127.0.0.1:12700/json/bids').read())
         bid = bids[0]
@@ -222,7 +191,7 @@ class Test(unittest.TestCase):
         rv = json.loads(urlopen('http://127.0.0.1:12700/json/bids/{}'.format(bid['bid_id']), data=data).read())
         assert(rv['bid_state'] == 'Accepted')
 
-        waitForNumSwapping(12701, 1)
+        waitForNumSwapping(delay_event, 12701, 1)
 
         logger.info('Restarting client:')
         c1 = processes[1]
@@ -231,7 +200,7 @@ class Test(unittest.TestCase):
         processes[1] = multiprocessing.Process(target=self.run_thread, args=(1,))
         processes[1].start()
 
-        waitForServer(12701)
+        waitForServer(delay_event, 12701)
         rv = json.loads(urlopen('http://127.0.0.1:12701/json').read())
         assert(rv['num_swapping'] == 1)
 
@@ -240,7 +209,7 @@ class Test(unittest.TestCase):
 
         logger.info('Completing swap:')
         for i in range(240):
-            time.sleep(5)
+            delay_event.wait(5)
 
             rv = json.loads(urlopen('http://127.0.0.1:12700/json/bids/{}'.format(bid['bid_id'])).read())
             print(rv)
@@ -248,7 +217,7 @@ class Test(unittest.TestCase):
                 break
         assert(rv['bid_state'] == 'Completed')
 
-        stop_test = True
+        delay_event.set()
         update_thread.join()
         for p in processes:
             p.terminate()

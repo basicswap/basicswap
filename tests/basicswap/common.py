@@ -157,17 +157,6 @@ def wait_for_no_offer(delay_event, swap_client, offer_id, wait_for=20):
     raise ValueError('wait_for_offer timed out.')
 
 
-def wait_for_none_active(delay_event, port, wait_for=30):
-    for i in range(wait_for):
-        if delay_event.is_set():
-            raise ValueError('Test stopped.')
-        delay_event.wait(1)
-        js = json.loads(urlopen('http://127.0.0.1:{}/json'.format(port)).read())
-        if js['num_swapping'] == 0 and js['num_watched_outputs'] == 0:
-            return
-    raise ValueError('wait_for_none_active timed out.')
-
-
 def wait_for_in_progress(delay_event, swap_client, bid_id, sent=False):
     logging.info('wait_for_in_progress %s', bid_id.hex())
     for i in range(20):
@@ -179,6 +168,63 @@ def wait_for_in_progress(delay_event, swap_client, bid_id, sent=False):
             if b[0] == bid_id:
                 return
     raise ValueError('wait_for_in_progress timed out.')
+
+
+def wait_for_none_active(delay_event, port, wait_for=30):
+    for i in range(wait_for):
+        if delay_event.is_set():
+            raise ValueError('Test stopped.')
+        delay_event.wait(1)
+        js = json.loads(urlopen('http://127.0.0.1:{}/json'.format(port)).read())
+        if js['num_swapping'] == 0 and js['num_watched_outputs'] == 0:
+            return
+    raise ValueError('wait_for_none_active timed out.')
+
+
+def waitForServer(delay_event, port, wait_for=20):
+    for i in range(wait_for):
+        if delay_event.is_set():
+            raise ValueError('Test stopped.')
+        try:
+            delay_event.wait(1)
+            summary = json.loads(urlopen('http://127.0.0.1:{}/json'.format(port)).read())
+            return
+        except Exception as e:
+            print('waitForServer, error:', str(e))
+    raise ValueError('waitForServer failed')
+
+
+def waitForNumOffers(delay_event, port, offers, wait_for=20):
+    for i in range(wait_for):
+        if delay_event.is_set():
+            raise ValueError('Test stopped.')
+        summary = json.loads(urlopen('http://127.0.0.1:{}/json'.format(port)).read())
+        if summary['num_network_offers'] >= offers:
+            return
+        delay_event.wait(1)
+    raise ValueError('waitForNumOffers failed')
+
+
+def waitForNumBids(delay_event, port, bids, wait_for=20):
+    for i in range(wait_for):
+        if delay_event.is_set():
+            raise ValueError('Test stopped.')
+        summary = json.loads(urlopen('http://127.0.0.1:{}/json'.format(port)).read())
+        if summary['num_recv_bids'] >= bids:
+            return
+        delay_event.wait(1)
+    raise ValueError('waitForNumBids failed')
+
+
+def waitForNumSwapping(delay_event, port, bids, wait_for=60):
+    for i in range(wait_for):
+        if delay_event.is_set():
+            raise ValueError('Test stopped.')
+        summary = json.loads(urlopen('http://127.0.0.1:{}/json'.format(port)).read())
+        if summary['num_swapping'] >= bids:
+            return
+        delay_event.wait(1)
+    raise ValueError('waitForNumSwapping failed')
 
 
 def delay_for(delay_event, delay_for=60):
