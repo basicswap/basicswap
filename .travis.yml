@@ -7,17 +7,17 @@ stages:
   - test
 env:
   global:
-    - TEST_PREPARE_PATH: ~/test_basicswap-prepare
-    - TEST_DIR=~/test_basicswap2
+    - TEST_PREPARE_PATH=~/test_basicswap-prepare
+    - TEST_DIR=${HOME}/test_basicswap2
     - TEST_RELOAD_PATH=~/test_basicswap1
-    - BIN_DIRS=~/cached_bin
-    - PARTICL_BINDIR=${BIN_DIRS}/particl
-    - BITCOIN_BINDIR=${BIN_DIRS}/bitcoin
-    - LITECOIN_BINDIR=${BIN_DIRS}/litecoin
-    - XMR_BINDIR=${BIN_DIRS}/monero
+    - BIN_DIR=~/cached_bin
+    - PARTICL_BINDIR=${BIN_DIR}/particl
+    - BITCOIN_BINDIR=${BIN_DIR}/bitcoin
+    - LITECOIN_BINDIR=${BIN_DIR}/litecoin
+    - XMR_BINDIR=${BIN_DIR}/monero
 cache:
   directories:
-    - "$BIN_DIRS"
+    - "$BIN_DIR"
 before_install:
   - sudo apt-get install -y wget python3-pip gnupg unzip protobuf-compiler automake libtool pkg-config
 install:
@@ -30,7 +30,7 @@ before_script:
 script:
   - cd $TRAVIS_BUILD_DIR
   - python3 setup.py install
-  - basicswap-prepare --bindir=${BIN_DIRS} --preparebinonly --withcoins=particl,bitcoin,litecoin,monero
+  - basicswap-prepare --bindir=${BIN_DIR} --preparebinonly --withcoins=particl,bitcoin,litecoin,monero
   - export DATADIRS="${TEST_DIR}"
   - mkdir -p "${DATADIRS}/bin"
   - cp -r ${BIN_DIR} "${DATADIRS}/bin"

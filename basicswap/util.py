@@ -306,8 +306,11 @@ def format_amount(i, display_scale, scale=None):
     return rv
 
 
-def format_timestamp(value):
-    return time.strftime('%Y-%m-%d %H:%M', time.localtime(value))
+def format_timestamp(value, with_seconds=False):
+    str_format = '%Y-%m-%d %H:%M'
+    if with_seconds:
+        str_format += ':%S'
+    return time.strftime(str_format, time.localtime(value))
 
 
 def getP2SHScriptForHash(p2sh):

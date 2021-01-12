@@ -4,10 +4,9 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-import time
-
 from .util import (
     make_int,
+    format_timestamp,
 )
 from .chainparams import (
     Coins,
@@ -133,8 +132,8 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
         'offer_id': bid.offer_id.hex(),
         'addr_from': bid.bid_addr,
         'addr_fund_proof': bid.proof_address,
-        'created_at': time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(bid.created_at)),
-        'expired_at': time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(bid.expire_at)),
+        'created_at': format_timestamp(bid.created_at, with_seconds=True),
+        'expired_at': format_timestamp(bid.expire_at, with_seconds=True),
         'was_sent': 'True' if bid.was_sent else 'False',
         'was_received': 'True' if bid.was_received else 'False',
         'initiate_tx': getTxIdHex(bid, TxTypes.ITX, ' ' + ticker_from),

@@ -1725,9 +1725,8 @@ class BasicSwap(BaseApp):
         query_str = 'SELECT created_at, trigger_at FROM eventqueue ' + \
                     'WHERE active_ind = 1 AND linked_id = x\'{}\' '.format(bid_id.hex())
         q = session.execute(query_str)
-        events = []
         for row in q:
-            events.append({'at': row[0], 'desc': 'Delaying until: {}'.format(format_timestamp(row[1]))})
+            events.append({'at': row[0], 'desc': 'Delaying until: {}'.format(format_timestamp(row[1], with_seconds=True))})
 
         return events
 

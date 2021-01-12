@@ -5,7 +5,6 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import json
-import time
 import urllib.parse
 
 from .util import (
@@ -84,7 +83,7 @@ def js_offers(self, url_split, post_string, sent=False):
         ci_to = self.server.swap_client.ci(o.coin_to)
         rv.append({
             'offer_id': o.offer_id.hex(),
-            'created_at': time.strftime('%Y-%m-%d %H:%M', time.localtime(o.created_at)),
+            'created_at': format_timestamp(o.created_at),
             'coin_from': ci_from.coin_name(),
             'coin_to': ci_to.coin_name(),
             'amount_from': ci_from.format_amount(o.amount_from),
