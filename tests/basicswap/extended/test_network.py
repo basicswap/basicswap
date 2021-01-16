@@ -195,7 +195,9 @@ class Test(unittest.TestCase):
         try:
             logging.info('Preparing coin nodes.')
             for i in range(NUM_NODES):
-                prepareDataDir(TEST_DIR, i, 'particl.conf', 'part_')
+                data_dir = prepareDataDir(TEST_DIR, i, 'particl.conf', 'part_')
+                if os.path.exists(os.path.join(cfg.PARTICL_BINDIR, 'particl-wallet')):
+                    callrpc_cli(cfg.PARTICL_BINDIR, data_dir, 'regtest', '-wallet=wallet.dat create', 'particl-wallet')
 
                 cls.part_daemons.append(startDaemon(os.path.join(TEST_DIR, 'part_' + str(i)), cfg.PARTICL_BINDIR, cfg.PARTICLD))
                 logging.info('Started %s %d', cfg.PARTICLD, cls.part_daemons[-1].pid)

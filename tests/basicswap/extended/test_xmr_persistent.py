@@ -9,8 +9,8 @@
 export RESET_TEST=true
 export TEST_PATH=/tmp/test_persistent
 mkdir -p ${TEST_PATH}/bin/{particl,monero,bitcoin}
-cp ~/tmp/particl-0.19.1.2-x86_64-linux-gnu.tar.gz ${TEST_PATH}/bin/particl
-cp ~/tmp/bitcoin-0.20.1-x86_64-linux-gnu.tar.gz ${TEST_PATH}/bin/bitcoin
+cp ~/tmp/particl-0.21.0.1-x86_64-linux-gnu.tar.gz ${TEST_PATH}/bin/particl
+cp ~/tmp/bitcoin-0.21.0-x86_64-linux-gnu.tar.gz ${TEST_PATH}/bin/bitcoin
 cp ~/tmp/monero-linux-x64-v0.17.1.9.tar.bz2 ${TEST_PATH}/bin/monero/monero-0.17.1.9-x86_64-linux-gnu.tar.bz2
 export PYTHONPATH=$(pwd)
 python tests/basicswap/extended/test_xmr_persistent.py
@@ -74,11 +74,12 @@ if not len(logger.handlers):
     logger.addHandler(logging.StreamHandler(sys.stdout))
 
 
-def callpartrpc(node_id, method, params=[], wallet=None, base_rpc_port=BASE_PART_RPC_PORT+PORT_OFS):
+def callpartrpc(node_id, method, params=[], wallet=None, base_rpc_port=BASE_PART_RPC_PORT + PORT_OFS):
     auth = 'test_part_{0}:test_part_pwd_{0}'.format(node_id)
     return callrpc(base_rpc_port + node_id, auth, method, params, wallet)
 
-def callbtcrpc(node_id, method, params=[], wallet=None, base_rpc_port=BASE_BTC_RPC_PORT+PORT_OFS):
+
+def callbtcrpc(node_id, method, params=[], wallet=None, base_rpc_port=BASE_BTC_RPC_PORT + PORT_OFS):
     auth = 'test_btc_{0}:test_btc_pwd_{0}'.format(node_id)
     return callrpc(base_rpc_port + node_id, auth, method, params, wallet)
 
@@ -230,19 +231,12 @@ class Test(unittest.TestCase):
 
         xmr_addr1 = wallets['6']['deposit_address']
         num_blocks = 100
-
         if callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'get_block_count')['count'] < num_blocks:
             logging.info('Mining {} Monero blocks to {}.'.format(num_blocks, xmr_addr1))
             callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'generateblocks', {'wallet_address': xmr_addr1, 'amount_of_blocks': num_blocks})
         logging.info('XMR blocks: %d', callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'get_block_count')['count'])
 
-
         self.btc_addr = callbtcrpc(0, 'getnewaddress', ['mining_addr', 'bech32'])
-
-
-        rv = callbtcrpc(0, 'getblockchaininfo')
-        print('rv', rv)
-
         num_blocks = 500  # Mine enough to activate segwit
         if callbtcrpc(0, 'getblockchaininfo')['blocks'] < num_blocks:
             logging.info('Mining %d Bitcoin blocks to %s', num_blocks, self.btc_addr)
@@ -288,7 +282,7 @@ class Test(unittest.TestCase):
         waitForServer(self.delay_event, UI_PORT + 1)
 
         while not self.delay_event.is_set():
-            logging.info('Looping indefinitly, ctrl+c to exit.')
+            logging.info('Looping indefinitely, ctrl+c to exit.')
             self.delay_event.wait(10)
 
 

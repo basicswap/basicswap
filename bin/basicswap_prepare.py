@@ -41,9 +41,9 @@ else:
     FILE_EXT = 'tar.gz'
 
 known_coins = {
-    'particl': '0.19.1.2',
+    'particl': '0.21.0.1',
     'litecoin': '0.18.1',
-    'bitcoin': '0.20.1',
+    'bitcoin': '0.21.0',
     'namecoin': '0.18.0',
     'monero': '0.17.1.9',
 }
@@ -140,7 +140,7 @@ def extractCore(coin, version, settings, bin_dir, release_path):
 
     bins = [coin + 'd', coin + '-cli', coin + '-tx']
     versions = version.split('.')
-    if coin == 'particl' and int(versions[1]) >= 19:
+    if int(versions[1]) >= 19:
         bins.append(coin + '-wallet')
     if 'win32' in BIN_ARCH or 'win64' in BIN_ARCH:
         with zipfile.ZipFile(release_path) as fz:
@@ -299,6 +299,7 @@ def prepareCore(coin, version, settings, data_dir):
 
 def prepareDataDir(coin, settings, chain, particl_mnemonic):
     core_settings = settings['chainclients'][coin]
+    bin_dir = core_settings['bindir']
     data_dir = core_settings['datadir']
 
     if not os.path.exists(data_dir):
@@ -353,6 +354,7 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic):
         fp.write('rpcport={}\n'.format(core_settings['rpcport']))
         fp.write('printtoconsole=0\n')
         fp.write('daemon=0\n')
+        fp.write('wallet=wallet.dat\n')
 
         if coin == 'particl':
             fp.write('debugexclude=libevent\n')
@@ -364,14 +366,19 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic):
             if particl_mnemonic == 'none':
                 fp.write('createdefaultmasterkey=1')
         elif coin == 'litecoin':
-            fp.write('prune=1000\n')
+            fp.write('prune=2000\n')
         elif coin == 'bitcoin':
-            fp.write('prune=1000\n')
+            fp.write('prune=2000\n')
             fp.write('fallbackfee=0.0002\n')
         elif coin == 'namecoin':
-            fp.write('prune=1000\n')
+            fp.write('prune=2000\n')
         else:
             logger.warning('Unknown coin %s', coin)
+
+    wallet_util = coin + '-wallet'
+    if os.path.exists(os.path.join(bin_dir, wallet_util)):
+        logger.info('Creating wallet.dat for {}.'.format(wallet_util.capitalize()))
+        callrpc_cli(bin_dir, data_dir, chain, '-wallet=wallet.dat create', wallet_util)
 
 
 def printVersion():

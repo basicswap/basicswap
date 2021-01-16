@@ -59,6 +59,7 @@ def prepareDataDir(datadir, node_id, conf_file, dir_prefix, base_p2p_port=BASE_P
         fp.write('fallbackfee=0.01\n')
         fp.write('acceptnonstdtxn=0\n')
         fp.write('txindex=1\n')
+        fp.write('wallet=wallet.dat\n')
 
         fp.write('findpeers=0\n')
         # minstakeinterval=5  # Using walletsettings stakelimit instead
@@ -71,6 +72,8 @@ def prepareDataDir(datadir, node_id, conf_file, dir_prefix, base_p2p_port=BASE_P
             if node_id == i:
                 continue
             fp.write('addnode=127.0.0.1:{}\n'.format(base_p2p_port + i))
+
+    return node_dir
 
 
 def checkForks(ro):

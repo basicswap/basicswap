@@ -101,8 +101,10 @@ def prepareOtherDir(datadir, nodeId, conf_file='litecoin.conf'):
         fp.write('debug=1\n')
         fp.write('debugexclude=libevent\n')
         fp.write('fallbackfee=0.0002\n')
+        fp.write('wallet=wallet.dat\n')
 
         fp.write('acceptnonstdtxn=0\n')
+    return node_dir
 
 
 def prepareDir(datadir, nodeId, network_key, network_pubkey):
@@ -127,6 +129,7 @@ def prepareDir(datadir, nodeId, network_key, network_pubkey):
         fp.write('debug=1\n')
         fp.write('debugexclude=libevent\n')
         fp.write('zmqpubsmsg=tcp://127.0.0.1:' + str(BASE_ZMQ_PORT + nodeId) + '\n')
+        fp.write('wallet=wallet.dat\n')
 
         fp.write('acceptnonstdtxn=0\n')
         fp.write('minstakeinterval=2\n')
@@ -191,6 +194,8 @@ def prepareDir(datadir, nodeId, network_key, network_pubkey):
     }
     with open(settings_path, 'w') as fp:
         json.dump(settings, fp, indent=4)
+
+    return node_dir
 
 
 def partRpc(cmd, node_id=0):
@@ -263,10 +268,12 @@ class Test(unittest.TestCase):
             shutil.rmtree(cfg.TEST_DATADIRS)
 
         for i in range(NUM_NODES):
-            prepareDir(cfg.TEST_DATADIRS, i, cls.network_key, cls.network_pubkey)
+            data_dir = prepareDir(cfg.TEST_DATADIRS, i, cls.network_key, cls.network_pubkey)
+            callrpc_cli(cfg.PARTICL_BINDIR, data_dir, 'regtest', '-wallet=wallet.dat create', 'particl-wallet')  # Necessary for 0.21
 
         prepareOtherDir(cfg.TEST_DATADIRS, LTC_NODE)
-        prepareOtherDir(cfg.TEST_DATADIRS, BTC_NODE, 'bitcoin.conf')
+        data_dir = prepareOtherDir(cfg.TEST_DATADIRS, BTC_NODE, 'bitcoin.conf')
+        callrpc_cli(cfg.BITCOIN_BINDIR, data_dir, 'regtest', '-wallet=wallet.dat create', 'bitcoin-wallet')  # Necessary for 0.21
 
         cls.daemons = []
         cls.swap_clients = []

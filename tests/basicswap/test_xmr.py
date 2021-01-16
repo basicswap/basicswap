@@ -299,7 +299,9 @@ class Test(unittest.TestCase):
         try:
             logging.info('Preparing coin nodes.')
             for i in range(NUM_NODES):
-                prepareDataDir(TEST_DIR, i, 'particl.conf', 'part_')
+                data_dir = prepareDataDir(TEST_DIR, i, 'particl.conf', 'part_')
+                if os.path.exists(os.path.join(cfg.PARTICL_BINDIR, 'particl-wallet')):
+                    callrpc_cli(cfg.PARTICL_BINDIR, data_dir, 'regtest', '-wallet=wallet.dat create', 'particl-wallet')
 
                 cls.part_daemons.append(startDaemon(os.path.join(TEST_DIR, 'part_' + str(i)), cfg.PARTICL_BINDIR, cfg.PARTICLD))
                 logging.info('Started %s %d', cfg.PARTICLD, cls.part_daemons[-1].pid)
@@ -320,7 +322,9 @@ class Test(unittest.TestCase):
                 rpc('walletsettings', ['stakingoptions', {'stakecombinethreshold': 100, 'stakesplitthreshold': 200}])
 
             for i in range(NUM_BTC_NODES):
-                prepareDataDir(TEST_DIR, i, 'bitcoin.conf', 'btc_', base_p2p_port=BTC_BASE_PORT, base_rpc_port=BTC_BASE_RPC_PORT)
+                data_dir = prepareDataDir(TEST_DIR, i, 'bitcoin.conf', 'btc_', base_p2p_port=BTC_BASE_PORT, base_rpc_port=BTC_BASE_RPC_PORT)
+                if os.path.exists(os.path.join(cfg.BITCOIN_BINDIR, 'bitcoin-wallet')):
+                    callrpc_cli(cfg.BITCOIN_BINDIR, data_dir, 'regtest', '-wallet=wallet.dat create', 'bitcoin-wallet')
 
                 cls.btc_daemons.append(startDaemon(os.path.join(TEST_DIR, 'btc_' + str(i)), cfg.BITCOIN_BINDIR, cfg.BITCOIND))
                 logging.info('Started %s %d', cfg.BITCOIND, cls.part_daemons[-1].pid)
