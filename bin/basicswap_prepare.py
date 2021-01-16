@@ -64,11 +64,19 @@ XMR_SITE_COMMIT = 'd27c1eee9fe0e8daa011d07baae8b67dd2b62a04'  # Lock hashes.txt 
 
 DEFAULT_XMR_RESTORE_HEIGHT = 2245107
 
+UI_HTML_PORT = int(os.getenv('BASE_XMR_RPC_PORT', 12700))
+PART_ZMQ_PORT = int(os.getenv('PART_ZMQ_PORT', 20792))
 
 PART_RPC_HOST = os.getenv('PART_RPC_HOST', '127.0.0.1')
 LTC_RPC_HOST = os.getenv('LTC_RPC_HOST', '127.0.0.1')
 BTC_RPC_HOST = os.getenv('BTC_RPC_HOST', '127.0.0.1')
 NMC_RPC_HOST = os.getenv('NMC_RPC_HOST', '127.0.0.1')
+
+PART_RPC_PORT = int(os.getenv('PART_RPC_PORT', 19792))
+LTC_RPC_PORT = int(os.getenv('LTC_RPC_PORT', 19795))
+BTC_RPC_PORT = int(os.getenv('BTC_RPC_PORT', 19796))
+NMC_RPC_PORT = int(os.getenv('NMC_RPC_PORT', 19798))
+
 
 extract_core_overwrite = True
 
@@ -537,7 +545,7 @@ def main():
             'connection_type': 'rpc',
             'manage_daemon': True if ('particl' in with_coins and PART_RPC_HOST == '127.0.0.1') else False,
             'rpchost': PART_RPC_HOST,
-            'rpcport': 19792 + port_offset,
+            'rpcport': PART_RPC_PORT + port_offset,
             'datadir': os.getenv('PART_DATA_DIR', os.path.join(data_dir, 'particl')),
             'bindir': os.path.join(bin_dir, 'particl'),
             'blocks_confirmed': 2,
@@ -550,7 +558,7 @@ def main():
             'connection_type': 'rpc' if 'litecoin' in with_coins else 'none',
             'manage_daemon': True if ('litecoin' in with_coins and LTC_RPC_HOST == '127.0.0.1') else False,
             'rpchost': LTC_RPC_HOST,
-            'rpcport': 19795 + port_offset,
+            'rpcport': LTC_RPC_PORT + port_offset,
             'datadir': os.getenv('LTC_DATA_DIR', os.path.join(data_dir, 'litecoin')),
             'bindir': os.path.join(bin_dir, 'litecoin'),
             'use_segwit': True,
@@ -563,7 +571,7 @@ def main():
             'connection_type': 'rpc' if 'bitcoin' in with_coins else 'none',
             'manage_daemon': True if ('bitcoin' in with_coins and BTC_RPC_HOST == '127.0.0.1') else False,
             'rpchost': BTC_RPC_HOST,
-            'rpcport': 19796 + port_offset,
+            'rpcport': BTC_RPC_PORT + port_offset,
             'datadir': os.getenv('BTC_DATA_DIR', os.path.join(data_dir, 'bitcoin')),
             'bindir': os.path.join(bin_dir, 'bitcoin'),
             'use_segwit': True,
@@ -576,7 +584,7 @@ def main():
             'connection_type': 'rpc' if 'namecoin' in with_coins else 'none',
             'manage_daemon': True if ('namecoin' in with_coins and NMC_RPC_HOST == '127.0.0.1') else False,
             'rpchost': NMC_RPC_HOST,
-            'rpcport': 19798 + port_offset,
+            'rpcport': NMC_RPC_PORT + port_offset,
             'datadir': os.getenv('NMC_DATA_DIR', os.path.join(data_dir, 'namecoin')),
             'bindir': os.path.join(bin_dir, 'namecoin'),
             'use_segwit': False,
@@ -669,9 +677,9 @@ def main():
         settings = {
             'debug': True,
             'zmqhost': 'tcp://127.0.0.1',
-            'zmqport': 20792 + port_offset,
+            'zmqport': PART_ZMQ_PORT + port_offset,
             'htmlhost': htmlhost,
-            'htmlport': 12700 + port_offset,
+            'htmlport': UI_HTML_PORT + port_offset,
             'network_key': '7sW2UEcHXvuqEjkpE5mD584zRaQYs6WXYohue4jLFZPTvMSxwvgs',
             'network_pubkey': '035758c4a22d7dd59165db02a56156e790224361eb3191f02197addcb3bde903d2',
             'chainclients': withchainclients,

@@ -7,7 +7,6 @@ stages:
   - test
 env:
   global:
-    - TEST_PREPARE_PATH=~/test_basicswap-prepare
     - TEST_DIR=${HOME}/test_basicswap2
     - TEST_RELOAD_PATH=~/test_basicswap1
     - BIN_DIR=~/cached_bin
@@ -36,8 +35,6 @@ script:
   - cp -r ${BIN_DIR} "${DATADIRS}/bin"
   - mkdir -p "${TEST_RELOAD_PATH}/bin"
   - cp -r ${BIN_DIR} "${TEST_RELOAD_PATH}/bin"
-  - mkdir -p "${TEST_PREPARE_PATH}/bin"
-  - cp -r ${BIN_DIR} "${TEST_PREPARE_PATH}/bin"
   - tox
 after_success:
   - echo "End test"

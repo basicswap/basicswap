@@ -95,6 +95,9 @@ class Test(unittest.TestCase):
                 fp.write('port={}\n'.format(PARTICL_PORT_BASE + i))
                 fp.write('bind=127.0.0.1\n')
                 fp.write('dnsseed=0\n')
+                fp.write('discover=0\n')
+                fp.write('listenonion=0\n')
+                fp.write('upnp=0\n')
                 fp.write('minstakeinterval=5\n')
                 for ip in range(3):
                     if ip != i:
@@ -108,11 +111,11 @@ class Test(unittest.TestCase):
                     if not line.startswith('prune'):
                         fp.write(line)
                 fp.write('port={}\n'.format(BITCOIN_PORT_BASE + i))
-                fp.write('discover=0\n')
+                fp.write('bind=127.0.0.1\n')
                 fp.write('dnsseed=0\n')
+                fp.write('discover=0\n')
                 fp.write('listenonion=0\n')
                 fp.write('upnp=0\n')
-                fp.write('bind=127.0.0.1\n')
                 for ip in range(3):
                     if ip != i:
                         fp.write('connect=127.0.0.1:{}\n'.format(BITCOIN_PORT_BASE + ip))
