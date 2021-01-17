@@ -45,4 +45,4 @@ If updating from versions below 0.21, you may need to add `wallet=wallet.dat` to
 
 #### Update core versions
 
-    basicswap-prepare -preparebinonly --withcoins=monero --withoutcoins=litecoin
+    basicswap-prepare -preparebinonly --withcoins=monero,bitcoin
