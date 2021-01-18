@@ -122,7 +122,11 @@ class BTCInterface(CoinInterface):
         self.txoType = CTxOut
         self._network = network
         self.blocks_confirmed = coin_settings['blocks_confirmed']
-        self._conf_target = coin_settings['conf_target']
+        self.setConfTarget(coin_settings['conf_target'])
+
+    def setConfTarget(self, new_conf_target):
+        assert(new_conf_target >= 1 and new_conf_target < 33), 'Invalid conf_target value'
+        self._conf_target = new_conf_target
 
     def testDaemonRPC(self):
         self.rpc_callback('getwalletinfo', [])

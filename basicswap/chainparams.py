@@ -206,8 +206,8 @@ class CoinInterface:
     def make_int(self, amount_in, r=0):
         return make_int(amount_in, self.exp(), r=r)
 
-    def format_amount(self, amount_in, conv_int=False):
-        amount_int = make_int(amount_in, self.exp()) if conv_int else amount_in
+    def format_amount(self, amount_in, conv_int=False, r=0):
+        amount_int = make_int(amount_in, self.exp(), r=r) if conv_int else amount_in
         return format_amount(amount_int, self.exp())
 
     def coin_name(self):

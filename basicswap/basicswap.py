@@ -32,7 +32,6 @@ from .interface_xmr import XMRInterface
 
 from . import __version__
 from .util import (
-    COIN,
     pubkeyToAddress,
     format8,
     format_amount,
@@ -981,7 +980,7 @@ class BasicSwap(BaseApp):
         assert(amount > chainparams[coin_from][self.chain]['min_amount']), 'From amount below min value for chain'
         assert(amount < chainparams[coin_from][self.chain]['max_amount']), 'From amount above max value for chain'
 
-        amount_to = (amount * rate) // (10 ** chainparams[coin_from]['decimal_places'])
+        amount_to = int((amount * rate) // self.ci(coin_from).COIN())
         assert(amount_to > chainparams[coin_to][self.chain]['min_amount']), 'To amount below min value for chain'
         assert(amount_to < chainparams[coin_to][self.chain]['max_amount']), 'To amount above max value for chain'
 
@@ -1026,7 +1025,7 @@ class BasicSwap(BaseApp):
         try:
             self.checkSynced(coin_from_t, coin_to_t)
             # TODO: require proof of funds on offers?
-            proof_addr, proof_sig = self.getProofOfFunds(coin_from_t, amount)
+            proof_addr, proof_sig = self.getProofOfFunds(coin_from_t, int(amount))
             offer_addr = self.callrpc('getnewaddress') if addr_send_from is None else addr_send_from
 
             offer_created_at = int(time.time())
@@ -1401,7 +1400,8 @@ class BasicSwap(BaseApp):
         return self._contract_count
 
     def getProofOfFunds(self, coin_type, amount_for):
-        self.log.debug('getProofOfFunds %s %s', str(coin_type), format8(amount_for))
+        ci = self.ci(coin_type)
+        self.log.debug('getProofOfFunds %s %s', ci.coin_name(), ci.format_amount(amount_for))
 
         if self.coin_clients[coin_type]['connection_type'] != 'rpc':
             return (None, None)
@@ -1410,7 +1410,7 @@ class BasicSwap(BaseApp):
         unspent_addr = dict()
         unspent = self.callcoinrpc(coin_type, 'listunspent')
         for u in unspent:
-            unspent_addr[u['address']] = unspent_addr.get(u['address'], 0.0) * COIN + u['amount'] * COIN
+            unspent_addr[u['address']] = unspent_addr.get(u['address'], 0) + ci.make_int(u['amount'], r=1)
 
         sign_for_addr = None
         for addr, value in unspent_addr.items():
@@ -1538,11 +1538,13 @@ class BasicSwap(BaseApp):
 
             contract_count = self.getNewContractId()
 
+            amount_to = int((msg_buf.amount * offer.rate) // self.ci(coin_from).COIN())
+
             now = int(time.time())
             if offer.swap_type == SwapTypes.SELLER_FIRST:
                 msg_buf.pkhash_buyer = getKeyID(self.getContractPubkey(dt.datetime.fromtimestamp(now).date(), contract_count))
 
-                proof_addr, proof_sig = self.getProofOfFunds(coin_to, msg_buf.amount)
+                proof_addr, proof_sig = self.getProofOfFunds(coin_to, amount_to)
                 msg_buf.proof_address = proof_addr
                 msg_buf.proof_signature = proof_sig
             else:
@@ -1571,7 +1573,7 @@ class BasicSwap(BaseApp):
 
                 created_at=now,
                 contract_count=contract_count,
-                amount_to=(msg_buf.amount * offer.rate) // COIN,
+                amount_to=amount_to,
                 expire_at=now + msg_buf.time_valid,
                 bid_addr=bid_addr,
                 was_sent=True,
@@ -1928,7 +1930,7 @@ class BasicSwap(BaseApp):
                 amount=msg_buf.amount,
                 created_at=bid_created_at,
                 contract_count=xmr_swap.contract_count,
-                amount_to=(msg_buf.amount * offer.rate) // COIN,
+                amount_to=(msg_buf.amount * offer.rate) // ci_from.COIN(),
                 expire_at=bid_created_at + msg_buf.time_valid,
                 bid_addr=bid_addr,
                 was_sent=True,
@@ -2184,7 +2186,7 @@ class BasicSwap(BaseApp):
 
         amount_to = bid.amount_to
         # Check required?
-        assert(amount_to == (bid.amount * offer.rate) // COIN)
+        assert(amount_to == (bid.amount * offer.rate) // self.ci(offer.coin_from).COIN())
 
         if self.coin_clients[coin_to]['use_segwit']:
             p2wsh = getP2WSH(participate_script)
@@ -2274,9 +2276,10 @@ class BasicSwap(BaseApp):
         tx_vsize = self.getContractSpendTxVSize(coin_type)
         tx_fee = (fee_rate * tx_vsize) / 1000
 
-        self.log.debug('Redeem tx fee %s, rate %s', format8(tx_fee * COIN), str(fee_rate))
+        ci = self.ci(coin_type)
+        self.log.debug('Redeem tx fee %s, rate %s', ci.format_amount(tx_fee, conv_int=True, r=1), str(fee_rate))
 
-        amount_out = prev_amount - tx_fee * COIN
+        amount_out = prev_amount - ci.make_int(tx_fee, r=1)
         assert(amount_out > 0), 'Amount out <= 0'
 
         if addr_redeem_out is None:
@@ -2370,9 +2373,10 @@ class BasicSwap(BaseApp):
         tx_vsize = self.getContractSpendTxVSize(coin_type, False)
         tx_fee = (fee_rate * tx_vsize) / 1000
 
-        self.log.debug('Refund tx fee %s, rate %s', format8(tx_fee * COIN), str(fee_rate))
+        ci = self.ci(coin_type)
+        self.log.debug('Refund tx fee %s, rate %s', ci.format_amount(tx_fee, conv_int=True, r=1), str(fee_rate))
 
-        amount_out = prev_amount * COIN - tx_fee * COIN
+        amount_out = ci.make_int(prev_amount, r=1) - ci.make_int(tx_fee, r=1)
         if amount_out <= 0:
             raise ValueError('Refund amount out <= 0')
 
@@ -2528,6 +2532,7 @@ class BasicSwap(BaseApp):
 
     def lookupUnspentByAddress(self, coin_type, address, sum_output=False, assert_amount=None, assert_txid=None):
 
+        ci = self.ci(coin_type)
         if self.coin_clients[coin_type]['chain_lookups'] == 'explorer':
             explorers = self.coin_clients[coin_type]['explorers']
 
@@ -2581,10 +2586,10 @@ class BasicSwap(BaseApp):
                     'index': o['vout'],
                     'height': o['height'],
                     'n_conf': n_conf,
-                    'value': make_int(o['amount']),
+                    'value': ci.make_int(o['amount']),
                 }
             else:
-                sum_unspent += o['amount'] * COIN
+                sum_unspent += ci.make_int(o['amount'])
         if sum_output:
             return sum_unspent
         return None
@@ -3509,6 +3514,8 @@ class BasicSwap(BaseApp):
         # assert(bid_data.rate != offer['data'].rate), 'Bid rate mismatch'
 
         coin_to = Coins(offer.coin_to)
+
+        amount_to = int((bid_data.amount * offer.rate) // self.ci(offer.coin_from).COIN())
         swap_type = offer.swap_type
         if swap_type == SwapTypes.SELLER_FIRST:
             assert(len(bid_data.pkhash_buyer) == 20), 'Bad pkhash_buyer length'
@@ -3525,8 +3532,8 @@ class BasicSwap(BaseApp):
                 addr_search = bid_data.proof_address
 
             sum_unspent = self.getAddressBalance(coin_to, addr_search)
-            self.log.debug('Proof of funds %s %s', bid_data.proof_address, format8(sum_unspent))
-            assert(sum_unspent >= bid_data.amount), 'Proof of funds failed'
+            self.log.debug('Proof of funds %s %s', bid_data.proof_address, self.ci(coin_to).format_amount(sum_unspent))
+            assert(sum_unspent >= amount_to), 'Proof of funds failed'
 
         elif swap_type == SwapTypes.BUYER_FIRST:
             raise ValueError('TODO')
@@ -3544,7 +3551,7 @@ class BasicSwap(BaseApp):
                 pkhash_buyer=bid_data.pkhash_buyer,
 
                 created_at=msg['sent'],
-                amount_to=(bid_data.amount * offer.rate) // COIN,
+                amount_to=amount_to,
                 expire_at=msg['sent'] + bid_data.time_valid,
                 bid_addr=msg['from'],
                 was_received=True,
@@ -3596,7 +3603,7 @@ class BasicSwap(BaseApp):
             if bid.was_received:  # Sent to self
                 self.log.info('Received valid bid accept %s for bid %s sent to self', bid.accept_msg_id.hex(), bid_id.hex())
                 return
-            raise ValueError('Wrong bid state: {}'.format(str(BidStates(str(BidStates(bid.state))))))
+            raise ValueError('Wrong bid state: {}'.format(str(BidStates(bid.state))))
 
         use_csv = True if offer.lock_type < ABS_LOCK_BLOCKS else False
 
@@ -3775,7 +3782,7 @@ class BasicSwap(BaseApp):
                 offer_id=offer_id,
                 amount=bid_data.amount,
                 created_at=msg['sent'],
-                amount_to=(bid_data.amount * offer.rate) // COIN,
+                amount_to=(bid_data.amount * offer.rate) // ci_from.COIN(),
                 expire_at=msg['sent'] + bid_data.time_valid,
                 bid_addr=msg['from'],
                 was_received=True,
@@ -4569,11 +4576,12 @@ class BasicSwap(BaseApp):
     def editSettings(self, coin_name, data):
         self.log.info('Updating settings %s', coin_name)
         with self.mxDB:
+            settings_cc = self.settings['chainclients'][coin_name]
             settings_changed = False
             if 'lookups' in data:
-                if self.settings['chainclients'][coin_name].get('chain_lookups', 'local') != data['lookups']:
+                if settings_cc.get('chain_lookups', 'local') != data['lookups']:
                     settings_changed = True
-                    self.settings['chainclients'][coin_name]['chain_lookups'] = data['lookups']
+                    settings_cc['chain_lookups'] = data['lookups']
                     for coin, cc in self.coin_clients.items():
                         if cc['name'] == coin_name:
                             cc['chain_lookups'] = data['lookups']
@@ -4583,20 +4591,34 @@ class BasicSwap(BaseApp):
                 new_fee_priority = data['fee_priority']
                 assert(new_fee_priority >= 0 and new_fee_priority < 4), 'Invalid priority'
 
-                if self.settings['chainclients'][coin_name].get('fee_priority', 0) != data['fee_priority']:
+                if settings_cc.get('fee_priority', 0) != new_fee_priority:
                     settings_changed = True
-                    self.settings['chainclients'][coin_name]['fee_priority'] = data['fee_priority']
+                    settings_cc['fee_priority'] = new_fee_priority
                     for coin, cc in self.coin_clients.items():
                         if cc['name'] == coin_name:
-                            cc['fee_priority'] = data['fee_priority']
+                            cc['fee_priority'] = new_fee_priority
+                            self.ci(coin).setFeePriority(new_fee_priority)
                             break
-                    self.ci(Coins.XMR).setFeePriority(data['fee_priority'])
+
+            if 'conf_target' in data:
+                new_conf_target = data['conf_target']
+                assert(new_conf_target >= 1 and new_conf_target < 33), 'Invalid conf_target'
+
+                if settings_cc.get('conf_target', 2) != new_conf_target:
+                    settings_changed = True
+                    settings_cc['conf_target'] = new_conf_target
+                    for coin, cc in self.coin_clients.items():
+                        if cc['name'] == coin_name:
+                            cc['conf_target'] = new_conf_target
+                            self.ci(coin).setConfTarget(new_conf_target)
+                            break
 
             if settings_changed:
                 settings_path = os.path.join(self.data_dir, cfg.CONFIG_FILENAME)
                 shutil.copyfile(settings_path, settings_path + '.last')
                 with open(settings_path, 'w') as fp:
                     json.dump(self.settings, fp, indent=4)
+        return settings_changed
 
     def getSummary(self, opts=None):
         num_watched_outputs = 0

@@ -15,8 +15,8 @@ from jinja2 import Environment, PackageLoader
 
 from . import __version__
 from .util import (
-    format_timestamp,
     dumpj,
+    format_timestamp,
 )
 from .chainparams import (
     chainparams,
@@ -283,8 +283,11 @@ class HttpHandler(BaseHTTPRequestHandler):
                     data = {'lookups': form_data[bytes('lookups_' + name, 'utf-8')][0].decode('utf-8')}
                     if name == 'monero':
                         data['fee_priority'] = int(form_data[bytes('fee_priority_' + name, 'utf-8')][0])
+                    else:
+                        data['conf_target'] = int(form_data[bytes('conf_target_' + name, 'utf-8')][0])
 
-                    swap_client.editSettings(name, data)
+                    if swap_client.editSettings(name, data) is True:
+                        messages.append('Settings applied.')
         chains_formatted = []
 
         for name, c in swap_client.settings['chainclients'].items():
@@ -294,11 +297,14 @@ class HttpHandler(BaseHTTPRequestHandler):
             })
             if name == 'monero':
                 chains_formatted[-1]['fee_priority'] = c.get('fee_priority', 0)
+            else:
+                chains_formatted[-1]['conf_target'] = c.get('conf_target', 2)
 
         template = env.get_template('settings.html')
         return bytes(template.render(
             title=self.server.title,
             h2=self.server.title,
+            messages=messages,
             chains=chains_formatted,
             form_id=os.urandom(8).hex(),
         ), 'UTF-8')
@@ -317,6 +323,8 @@ class HttpHandler(BaseHTTPRequestHandler):
             page_data['coin_from'] = int(form_data[b'coin_from'][0])
             coin_from = Coins(page_data['coin_from'])
             ci_from = swap_client.ci(coin_from)
+            if coin_from != Coins.XMR:
+                page_data['fee_from_conf'] = ci_from._conf_target  # Set default value
             parsed_data['coin_from'] = coin_from
         except Exception:
             errors.append('Unknown Coin From')
@@ -535,7 +543,7 @@ class HttpHandler(BaseHTTPRequestHandler):
                     messages.append('Revoke offer failed ' + str(ex))
             elif b'newbid' in form_data:
                 show_bid_form = True
-            else:
+            elif b'sendbid' in form_data:
                 addr_from = form_data[b'addr_from'][0].decode('utf-8')
                 if addr_from == '-1':
                     addr_from = None
