@@ -24,14 +24,10 @@ Set xmrrestoreheight to the current xmr chain height.
 Adjust `--withcoins` and `--withoutcoins` as desired, eg: `--withcoins=monero,bitcoin`.  By default only Particl is loaded.
 
     $ export COINDATA_PATH=/var/data/coinswaps
-    $ docker run -e XMR_RPC_HOST="node.xmr.to" -e BASE_XMR_RPC_PORT=18081 -t --name swap_prepare -v $COINDATA_PATH:/coindata i_swapclient \
+    $ docker run --rm -e XMR_RPC_HOST="node.xmr.to" -e BASE_XMR_RPC_PORT=18081 -t --name swap_prepare -v $COINDATA_PATH:/coindata i_swapclient \
     basicswap-prepare --datadir=/coindata --withcoins=monero --htmlhost="0.0.0.0" --xmrrestoreheight=2245107
 
 Record the mnemonic from the output of the above command.
-
-Remove swap_prepare container (and logs):
-
-    $ docker rm swap_prepare
 
 
 Start the container

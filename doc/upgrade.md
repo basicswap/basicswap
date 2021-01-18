@@ -24,11 +24,10 @@ If the dependencies and db format have changed the container must be built with 
 
 After updating the code and rebuilding the container run:
 
-    basicswap/docker]$ docker run \
-        -t --name swap_prepare -v $COINDATA_PATH:/coindata i_swapclient \
-        basicswap-prepare --datadir=/coindata --preparebinonly --withcoins=monero
+    basicswap/docker]$ export COINDATA_PATH=[PATH_TO]
+    $ docker-compose run --rm swapclient \
+        basicswap-prepare --datadir=/coindata --preparebinonly --withcoins=monero,bitcoin
 
-    docker rm swap_prepare
 
 Specify all required coins after `--withcoins=`, separated by commas.
 If updating from versions below 0.21, you may need to add `wallet=wallet.dat` to the core config files.
