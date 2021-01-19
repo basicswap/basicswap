@@ -92,33 +92,36 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
     ticker_from = ci_from.ticker()
     ticker_to = ci_to.ticker()
 
-    if bid.state == BidStates.BID_SENT:
-        state_description = 'Waiting for seller to accept.'
-    elif bid.state == BidStates.BID_RECEIVED:
-        state_description = 'Waiting for seller to accept.'
-    elif bid.state == BidStates.BID_ACCEPTED:
-        if not bid.initiate_tx:
-            state_description = 'Waiting for seller to send initiate tx.'
-        else:
-            state_description = 'Waiting for initiate tx to confirm.'
-    elif bid.state == BidStates.SWAP_INITIATED:
-        state_description = 'Waiting for participate txn to be confirmed in {} chain'.format(ticker_to)
-    elif bid.state == BidStates.SWAP_PARTICIPATING:
-        state_description = 'Waiting for initiate txn to be spent in {} chain'.format(ticker_from)
-    elif bid.state == BidStates.SWAP_COMPLETED:
-        state_description = 'Swap completed'
-        if bid.getITxState() == TxStates.TX_REDEEMED and bid.getPTxState() == TxStates.TX_REDEEMED:
-            state_description += ' successfully'
-        else:
-            state_description += ', ITX ' + strTxState(bid.getITxState()) + ', PTX ' + strTxState(bid.getPTxState())
-    elif bid.state == BidStates.SWAP_TIMEDOUT:
-        state_description = 'Timed out waiting for initiate txn'
-    elif bid.state == BidStates.BID_ABANDONED:
-        state_description = 'Bid abandoned'
-    elif bid.state == BidStates.BID_ERROR:
-        state_description = bid.state_note
-    else:
-        state_description = ''
+    state_description = ''
+    if offer.swap_type == SwapTypes.SELLER_FIRST:
+        if bid.state == BidStates.BID_SENT:
+            state_description = 'Waiting for seller to accept.'
+        elif bid.state == BidStates.BID_RECEIVED:
+            state_description = 'Waiting for seller to accept.'
+        elif bid.state == BidStates.BID_ACCEPTED:
+            if not bid.initiate_tx:
+                state_description = 'Waiting for seller to send initiate tx.'
+            else:
+                state_description = 'Waiting for initiate tx to confirm.'
+        elif bid.state == BidStates.SWAP_INITIATED:
+            state_description = 'Waiting for participate txn to be confirmed in {} chain'.format(ticker_to)
+        elif bid.state == BidStates.SWAP_PARTICIPATING:
+            if bid.was_sent:
+                state_description = 'Waiting for participate txn to be spent in {} chain'.format(ticker_to)
+            else:
+                state_description = 'Waiting for initiate txn to be spent in {} chain'.format(ticker_from)
+        elif bid.state == BidStates.SWAP_COMPLETED:
+            state_description = 'Swap completed'
+            if bid.getITxState() == TxStates.TX_REDEEMED and bid.getPTxState() == TxStates.TX_REDEEMED:
+                state_description += ' successfully'
+            else:
+                state_description += ', ITX ' + strTxState(bid.getITxState()) + ', PTX ' + strTxState(bid.getPTxState())
+        elif bid.state == BidStates.SWAP_TIMEDOUT:
+            state_description = 'Timed out waiting for initiate txn'
+        elif bid.state == BidStates.BID_ABANDONED:
+            state_description = 'Bid abandoned'
+        elif bid.state == BidStates.BID_ERROR:
+            state_description = bid.state_note
 
     data = {
         'amt_from': ci_from.format_amount(bid.amount),

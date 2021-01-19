@@ -68,6 +68,8 @@ UI_PORT = 12700 + PORT_OFS
 BASE_PART_RPC_PORT = 19792
 BASE_BTC_RPC_PORT = 19796
 
+NUM_NODES = 3
+
 logger = logging.getLogger()
 logger.level = logging.DEBUG
 if not len(logger.handlers):
@@ -109,7 +111,7 @@ class Test(unittest.TestCase):
 
         random.seed(time.time())
 
-        for i in range(3):
+        for i in range(NUM_NODES):
             client_path = os.path.join(test_path, 'client{}'.format(i))
             config_path = os.path.join(client_path, cfg.CONFIG_FILENAME)
             if RESET_TEST:
@@ -152,7 +154,7 @@ class Test(unittest.TestCase):
                     fp.write('minstakeinterval=5\n')
                     salt = generate_salt(16)
                     fp.write('rpcauth={}:{}${}\n'.format('test_part_' + str(i), salt, password_to_hmac(salt, 'test_part_pwd_' + str(i))))
-                    for ip in range(3):
+                    for ip in range(NUM_NODES):
                         if ip != i:
                             fp.write('connect=127.0.0.1:{}\n'.format(PARTICL_PORT_BASE + ip + PORT_OFS))
 
@@ -171,14 +173,14 @@ class Test(unittest.TestCase):
                     fp.write('upnp=0\n')
                     salt = generate_salt(16)
                     fp.write('rpcauth={}:{}${}\n'.format('test_btc_' + str(i), salt, password_to_hmac(salt, 'test_btc_pwd_' + str(i))))
-                    for ip in range(3):
+                    for ip in range(NUM_NODES):
                         if ip != i:
                             fp.write('connect=127.0.0.1:{}\n'.format(BITCOIN_PORT_BASE + ip + PORT_OFS))
 
                 with open(os.path.join(client_path, 'monero', 'monerod.conf'), 'a') as fp:
                     fp.write('p2p-bind-ip=127.0.0.1\n')
                     fp.write('p2p-bind-port={}\n'.format(XMR_BASE_P2P_PORT + i + PORT_OFS))
-                    for ip in range(3):
+                    for ip in range(NUM_NODES):
                         if ip != i:
                             fp.write('add-exclusive-node=127.0.0.1:{}\n'.format(XMR_BASE_P2P_PORT + ip + PORT_OFS))
 
@@ -220,7 +222,7 @@ class Test(unittest.TestCase):
     def start_processes(self):
         self.delay_event.clear()
 
-        for i in range(3):
+        for i in range(NUM_NODES):
             self.processes.append(multiprocessing.Process(target=self.run_thread, args=(i,)))
             self.processes[-1].start()
 
@@ -243,6 +245,9 @@ class Test(unittest.TestCase):
             callbtcrpc(0, 'generatetoaddress', [num_blocks, self.btc_addr])
         logging.info('BTC blocks: %d', callbtcrpc(0, 'getblockchaininfo')['blocks'])
 
+        # Lower output split threshold for more stakeable outputs
+        for i in range(NUM_NODES):
+            callpartrpc(i, 'walletsettings', ['stakingoptions', {'stakecombinethreshold': 100, 'stakesplitthreshold': 200}])
         self.update_thread = threading.Thread(target=updateThread, args=(self,))
         self.update_thread.start()
 
