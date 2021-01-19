@@ -6,6 +6,7 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import time
+import base64
 import hashlib
 import logging
 from io import BytesIO
@@ -14,10 +15,12 @@ from basicswap.contrib.test_framework import segwit_addr
 from .util import (
     decodeScriptNum,
     getCompactSizeLen,
+    SerialiseNumCompact,
     dumpj,
     format_amount,
     make_int,
     toWIF,
+    assert_cond,
     decodeAddress)
 from coincurve.keys import (
     PrivateKey,
@@ -61,7 +64,6 @@ from .contrib.test_framework.script import (
 
 from .chainparams import CoinInterface, Coins, chainparams
 from .rpc import make_rpc_func
-from .util import assert_cond
 
 
 def findOutput(tx, script_pk):
@@ -858,6 +860,26 @@ class BTCInterface(CoinInterface):
         pubkey = PublicKey(K)
         rv = pubkey.verify_compact(sig, message_hash, hasher=None)
         assert(rv is True)
+
+    def verifyMessage(self, address, message, signature, message_magic=None):
+        if message_magic is None:
+            message_magic = chainparams[self.coin_type()]['message_magic']
+
+        message_bytes = SerialiseNumCompact(len(message_magic)) + bytes(message_magic, 'utf-8') + SerialiseNumCompact(len(message)) + bytes(message, 'utf-8')
+        message_hash = hashlib.sha256(hashlib.sha256(message_bytes).digest()).digest()
+        signature_bytes = base64.b64decode(signature)
+        rec_id = (signature_bytes[0] - 27) & 3
+        signature_bytes = signature_bytes[1:] + bytes((rec_id,))
+        try:
+            pubkey = PublicKey.from_signature_and_message(signature_bytes, message_hash, hasher=None)
+        except Exception as e:
+            logging.info('verifyMessage failed: ' + str(e))
+            return False
+
+        address_hash = self.decodeAddress(address)
+        pubkey_hash = hash160(pubkey.format())
+
+        return True if address_hash == pubkey_hash else False
 
 
 def testBTCInterface():

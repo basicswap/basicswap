@@ -3523,7 +3523,7 @@ class BasicSwap(BaseApp):
             # Verify proof of funds
             bid_proof_address = replaceAddrPrefix(bid_data.proof_address, Coins.PART, self.chain)
             mm = chainparams[coin_to]['message_magic']
-            passed = self.callcoinrpc(Coins.PART, 'verifymessage', [bid_proof_address, bid_data.proof_signature, bid_data.proof_address + '_swap_proof', mm])
+            passed = self.ci(Coins.PART).verifyMessage(bid_proof_address, bid_data.proof_address + '_swap_proof', bid_data.proof_signature, mm)
             assert(passed is True), 'Proof of funds signature invalid'
 
             if self.coin_clients[coin_to]['use_segwit']:

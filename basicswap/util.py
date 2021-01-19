@@ -7,6 +7,7 @@
 
 import json
 import time
+import struct
 import decimal
 import hashlib
 
@@ -113,9 +114,9 @@ def decodeWif(network_key):
 
 
 def toWIF(prefix_byte, b, compressed=True):
-    b = bytes((prefix_byte, )) + b
+    b = bytes((prefix_byte,)) + b
     if compressed:
-        b += bytes((0x01, ))
+        b += bytes((0x01,))
     b += hashlib.sha256(hashlib.sha256(b).digest()).digest()[:4]
     return b58encode(b)
 
@@ -163,9 +164,9 @@ def pubkeyToAddress(prefix, pubkey):
 
 def SerialiseNum(n):
     if n == 0:
-        return bytes([0x00])
+        return bytes((0x00,))
     if n > 0 and n <= 16:
-        return bytes([0x50 + n])
+        return bytes((0x50 + n,))
     rv = bytearray()
     neg = n < 0
     absvalue = -n if neg else n
@@ -176,7 +177,7 @@ def SerialiseNum(n):
         rv.append(0x80 if neg else 0)
     elif neg:
         rv[-1] |= 0x80
-    return bytes([len(rv)]) + rv
+    return bytes((len(rv),)) + rv
 
 
 def DeserialiseNum(b, o=0):
@@ -222,12 +223,24 @@ def getCompactSizeLen(v):
     # Compact Size
     if v < 253:
         return 1
-    if v < 0xffff:  # USHRT_MAX
+    if v <= 0xffff:  # USHRT_MAX
         return 3
-    if v < 0xffffffff:  # UINT_MAX
+    if v <= 0xffffffff:  # UINT_MAX
         return 5
-    if v < 0xffffffffffffffff:  # UINT_MAX
+    if v <= 0xffffffffffffffff:  # UINT_MAX
         return 9
+    raise ValueError('Value too large')
+
+
+def SerialiseNumCompact(v):
+    if v < 253:
+        return bytes((v,))
+    if v <= 0xffff:  # USHRT_MAX
+        return struct.pack("<BH", 253, v)
+    if v <= 0xffffffff:  # UINT_MAX
+        return struct.pack("<BI", 254, v)
+    if v <= 0xffffffffffffffff:  # UINT_MAX
+        return struct.pack("<BQ", 255, v)
     raise ValueError('Value too large')
 
 
@@ -314,10 +327,10 @@ def format_timestamp(value, with_seconds=False):
 
 
 def getP2SHScriptForHash(p2sh):
-    return bytes([OpCodes.OP_HASH160, 0x14]) \
+    return bytes((OpCodes.OP_HASH160, 0x14)) \
         + p2sh \
-        + bytes([OpCodes.OP_EQUAL])
+        + bytes((OpCodes.OP_EQUAL,))
 
 
 def getP2WSH(script):
-    return bytes([OpCodes.OP_0, 0x20]) + hashlib.sha256(script).digest()
+    return bytes((OpCodes.OP_0, 0x20)) + hashlib.sha256(script).digest()
