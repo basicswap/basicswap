@@ -69,6 +69,8 @@ BASE_PART_RPC_PORT = 19792
 BASE_BTC_RPC_PORT = 19796
 
 NUM_NODES = 3
+EXTRA_CONFIG_JSON = json.loads(os.getenv('EXTRA_CONFIG_JSON', '{}'))
+
 
 logger = logging.getLogger()
 logger.level = logging.DEBUG
@@ -176,6 +178,8 @@ class Test(unittest.TestCase):
                     for ip in range(NUM_NODES):
                         if ip != i:
                             fp.write('connect=127.0.0.1:{}\n'.format(BITCOIN_PORT_BASE + ip + PORT_OFS))
+                    for opt in EXTRA_CONFIG_JSON.get('btc{}'.format(i), []):
+                        fp.write(opt + '\n')
 
                 with open(os.path.join(client_path, 'monero', 'monerod.conf'), 'a') as fp:
                     fp.write('p2p-bind-ip=127.0.0.1\n')

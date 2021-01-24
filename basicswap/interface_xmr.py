@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2020 tecnovert
+# Copyright (c) 2020-2021 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -11,7 +11,10 @@ import logging
 import basicswap.contrib.ed25519_fast as edf
 import basicswap.ed25519_fast_util as edu
 import basicswap.util_xmr as xmr_util
-from coincurve.ed25519 import ed25519_get_pubkey
+from coincurve.ed25519 import (
+    ed25519_get_pubkey,
+    ed25519_scalar_add,
+    ed25519_add)
 from coincurve.keys import PrivateKey
 from coincurve.dleag import (
     verify_ed25519_point,
@@ -191,12 +194,10 @@ class XMRInterface(CoinInterface):
         return i
 
     def sumKeys(self, ka, kb):
-        return i2b((b2i(ka) + b2i(kb)) % edf.l)
+        return ed25519_scalar_add(ka, kb)
 
     def sumPubkeys(self, Ka, Kb):
-        Ka_d = edf.decodepoint(Ka)
-        Kb_d = edf.decodepoint(Kb)
-        return self.encodePubkey(edf.edwards_add(Ka_d, Kb_d))
+        return ed25519_add(Ka, Kb)
 
     def publishBLockTx(self, Kbv, Kbs, output_amount, feerate):
         self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
