@@ -58,8 +58,8 @@ def js_offers(self, url_split, post_string, sent=False):
 
     if post_string != '':
         post_data = urllib.parse.parse_qs(post_string)
-        filters['coin_from'] = setCoinFilter(form_data, b'coin_from')
-        filters['coin_to'] = setCoinFilter(form_data, b'coin_to')
+        filters['coin_from'] = setCoinFilter(post_data, b'coin_from')
+        filters['coin_to'] = setCoinFilter(post_data, b'coin_to')
 
         if b'sort_by' in post_data:
             sort_by = post_data[b'sort_by'][0].decode('utf-8')

@@ -38,7 +38,7 @@ from basicswap.rpc_xmr import (
 from basicswap.rpc import (
     callrpc,
 )
-from tests.basicswap.mnemonics import mnemonics
+from tests.basicswap.mnemonics import mnemonics as test_mnemonics
 from tests.basicswap.common import (
     waitForServer,
 )
@@ -68,7 +68,7 @@ UI_PORT = 12700 + PORT_OFS
 BASE_PART_RPC_PORT = 19792
 BASE_BTC_RPC_PORT = 19796
 
-NUM_NODES = 3
+NUM_NODES = int(os.getenv('NUM_NODES', 3))
 EXTRA_CONFIG_JSON = json.loads(os.getenv('EXTRA_CONFIG_JSON', '{}'))
 
 
@@ -76,6 +76,14 @@ logger = logging.getLogger()
 logger.level = logging.DEBUG
 if not len(logger.handlers):
     logger.addHandler(logging.StreamHandler(sys.stdout))
+
+
+def recursive_update_dict(base, new_vals):
+    for key, value in new_vals.items():
+        if key in base and isinstance(value, dict):
+            recursive_update_dict(base[key], value)
+        else:
+            base[key] = value
 
 
 def callpartrpc(node_id, method, params=[], wallet=None, base_rpc_port=BASE_PART_RPC_PORT + PORT_OFS):
@@ -113,7 +121,9 @@ class Test(unittest.TestCase):
 
         random.seed(time.time())
 
+        logging.info('Preparing %d nodes.', NUM_NODES)
         for i in range(NUM_NODES):
+            logging.info('Preparing node: %d.', i)
             client_path = os.path.join(test_path, 'client{}'.format(i))
             config_path = os.path.join(client_path, cfg.CONFIG_FILENAME)
             if RESET_TEST:
@@ -133,11 +143,12 @@ class Test(unittest.TestCase):
                     '-datadir="{}"'.format(client_path),
                     '-bindir="{}"'.format(os.path.join(test_path, 'bin')),
                     '-portoffset={}'.format(i + PORT_OFS),
-                    '-particl_mnemonic="{}"'.format(mnemonics[i]),
                     '-regtest',
                     '-withcoins=monero,bitcoin',
                     '-noextractover',
                     '-xmrrestoreheight=0']
+                if i < len(test_mnemonics):
+                    testargs.append('-particl_mnemonic="{}"'.format(test_mnemonics[i]))
                 with patch.object(sys, 'argv', testargs):
                     prepareSystem.main()
 
@@ -208,6 +219,9 @@ class Test(unittest.TestCase):
                 settings['chainclients']['bitcoin']['rpcuser'] = 'test_btc_' + str(i)
                 settings['chainclients']['bitcoin']['rpcpassword'] = 'test_btc_pwd_' + str(i)
 
+                extra_config = EXTRA_CONFIG_JSON.get('sc{}'.format(i), {})
+                recursive_update_dict(settings, extra_config)
+
                 with open(config_path, 'w') as fp:
                     json.dump(settings, fp, indent=4)
 
@@ -230,8 +244,8 @@ class Test(unittest.TestCase):
             self.processes.append(multiprocessing.Process(target=self.run_thread, args=(i,)))
             self.processes[-1].start()
 
-        waitForServer(self.delay_event, UI_PORT + 0)
-        waitForServer(self.delay_event, UI_PORT + 1)
+        for i in range(NUM_NODES):
+            waitForServer(self.delay_event, UI_PORT + i)
 
         wallets = json.loads(urlopen('http://127.0.0.1:{}/json/wallets'.format(UI_PORT + 1)).read())
 

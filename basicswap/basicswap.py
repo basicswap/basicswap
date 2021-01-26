@@ -29,6 +29,7 @@ from .interface_btc import BTCInterface
 from .interface_ltc import LTCInterface
 from .interface_nmc import NMCInterface
 from .interface_xmr import XMRInterface
+from .interface_bitcore_btc import BitcoreBTCInterface
 
 from . import __version__
 from .util import (
@@ -600,6 +601,12 @@ class BasicSwap(BaseApp):
         else:
             raise ValueError('Unknown coin type')
 
+    def createBitcoreInterface(self, coin):
+        if coin == Coins.BTC:
+            return BitcoreBTCInterface(self.coin_clients[coin], self.chain)
+        else:
+            raise ValueError('Unknown coin type')
+
     def setCoinRunParams(self, coin):
         cc = self.coin_clients[coin]
         if coin == Coins.XMR:
@@ -636,6 +643,8 @@ class BasicSwap(BaseApp):
     def createCoinInterface(self, coin):
         if self.coin_clients[coin]['connection_type'] == 'rpc':
             self.coin_clients[coin]['interface'] = self.createInterface(coin)
+        elif self.coin_clients[coin]['connection_type'] == 'bitcore':
+            self.coin_clients[coin]['interface'] = self.createBitcoreInterface(coin)
 
     def start(self):
         self.log.info('Starting BasicSwap %s, database v%d\n\n', __version__, self.db_version)

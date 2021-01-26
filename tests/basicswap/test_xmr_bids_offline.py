@@ -82,6 +82,15 @@ class Test(XmrTestBase):
         assert(len(offers) == 1)
         offer0 = offers[0]
 
+        post_data = {
+            'coin_from': '1'
+        }
+        test_post_offers = json.loads(urlopen('http://127.0.0.1:12701/json/offers', data=parse.urlencode(post_data).encode()).read())
+        assert(len(test_post_offers) == 2)
+        post_data['coin_from'] = '2'
+        test_post_offers = json.loads(urlopen('http://127.0.0.1:12701/json/offers', data=parse.urlencode(post_data).encode()).read())
+        assert(len(test_post_offers) == 0)
+
         bid_data = {
             'offer_id': offer0_id,
             'amount_from': offer0['amount_from']}
