@@ -53,12 +53,12 @@ class Test(XmrTestBase):
         assert(float(wallets1['6']['balance']) > 0.0)
 
         offer_data = {
-            'addr_from': '-1',
-            'coin_from': '1',
-            'coin_to': '6',
-            'amt_from': '1',
-            'amt_to': '1',
-            'lockhrs': '24',
+            'addr_from': -1,
+            'coin_from': 1,
+            'coin_to': 6,
+            'amt_from': 1,
+            'amt_to': 1,
+            'lockhrs': 24,
             'autoaccept': True}
         rv = json.loads(urlopen('http://127.0.0.1:12700/json/offers/new', data=parse.urlencode(offer_data).encode()).read())
         offer0_id = rv['offer_id']

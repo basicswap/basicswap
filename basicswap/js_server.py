@@ -20,6 +20,7 @@ from .ui import (
     inputAmount,
     describeBid,
     setCoinFilter,
+    get_data_entry,
 )
 
 
@@ -28,17 +29,21 @@ def js_error(self, error_str):
     return bytes(error_str_json, 'UTF-8')
 
 
-def js_wallets(self, url_split, post_string):
+def js_wallets(self, url_split, post_string, is_json):
     return bytes(json.dumps(self.server.swap_client.getWalletsInfo()), 'UTF-8')
 
 
-def js_offers(self, url_split, post_string, sent=False):
+def js_offers(self, url_split, post_string, is_json, sent=False):
     offer_id = None
     if len(url_split) > 3:
         if url_split[3] == 'new':
             if post_string == '':
                 raise ValueError('No post data')
-            form_data = urllib.parse.parse_qs(post_string)
+            if is_json:
+                form_data = json.loads(post_string)
+                form_data['is_json'] = True
+            else:
+                form_data = urllib.parse.parse_qs(post_string)
             offer_id = self.postNewOffer(form_data)
             rv = {'offer_id': offer_id.hex()}
             return bytes(json.dumps(rv), 'UTF-8')
@@ -57,23 +62,27 @@ def js_offers(self, url_split, post_string, sent=False):
         filters['offer_id'] = offer_id
 
     if post_string != '':
-        post_data = urllib.parse.parse_qs(post_string)
-        filters['coin_from'] = setCoinFilter(post_data, b'coin_from')
-        filters['coin_to'] = setCoinFilter(post_data, b'coin_to')
+        if is_json:
+            post_data = json.loads(post_string)
+            post_data['is_json'] = True
+        else:
+            post_data = urllib.parse.parse_qs(post_string)
+        filters['coin_from'] = setCoinFilter(post_data, 'coin_from')
+        filters['coin_to'] = setCoinFilter(post_data, 'coin_to')
 
         if b'sort_by' in post_data:
-            sort_by = post_data[b'sort_by'][0].decode('utf-8')
+            sort_by = get_data_entry(post_data, 'sort_by')
             assert(sort_by in ['created_at', 'rate']), 'Invalid sort by'
             filters['sort_by'] = sort_by
         if b'sort_dir' in post_data:
-            sort_dir = post_data[b'sort_dir'][0].decode('utf-8')
+            sort_dir = get_data_entry(post_data, 'sort_dir')
             assert(sort_dir in ['asc', 'desc']), 'Invalid sort dir'
             filters['sort_dir'] = sort_dir
 
         if b'offset' in post_data:
-            filters['offset'] = int(post_data[b'offset'][0])
+            filters['offset'] = int(get_data_entry(post_data, 'offset'))
         if b'limit' in post_data:
-            filters['limit'] = int(post_data[b'limit'][0])
+            filters['limit'] = int(get_data_entry(post_data, 'limit'))
             assert(filters['limit'] > 0 and filters['limit'] <= PAGE_LIMIT), 'Invalid limit'
 
     offers = self.server.swap_client.listOffers(sent, filters)
@@ -94,11 +103,11 @@ def js_offers(self, url_split, post_string, sent=False):
     return bytes(json.dumps(rv), 'UTF-8')
 
 
-def js_sentoffers(self, url_split, post_string):
-    return self.js_offers(url_split, post_string, True)
+def js_sentoffers(self, url_split, post_string, is_json):
+    return self.js_offers(url_split, post_string, is_json, True)
 
 
-def js_bids(self, url_split, post_string):
+def js_bids(self, url_split, post_string, is_json):
     swap_client = self.server.swap_client
     if len(url_split) > 3:
         if url_split[3] == 'new':
@@ -156,20 +165,20 @@ def js_bids(self, url_split, post_string):
     } for b in bids]), 'UTF-8')
 
 
-def js_sentbids(self, url_split, post_string):
+def js_sentbids(self, url_split, post_string, is_json):
     return bytes(json.dumps(self.server.swap_client.listBids(sent=True)), 'UTF-8')
 
 
-def js_network(self, url_split, post_string):
+def js_network(self, url_split, post_string, is_json):
     return bytes(json.dumps(self.server.swap_client.get_network_info()), 'UTF-8')
 
 
-def js_revokeoffer(self, url_split, post_string):
+def js_revokeoffer(self, url_split, post_string, is_json):
     offer_id = bytes.fromhex(url_split[3])
     assert(len(offer_id) == 28)
     self.server.swap_client.revokeOffer(offer_id)
     return bytes(json.dumps({'revoked_offer': offer_id.hex()}), 'UTF-8')
 
 
-def js_index(self, url_split, post_string):
+def js_index(self, url_split, post_string, is_json):
     return bytes(json.dumps(self.server.swap_client.getSummary()), 'UTF-8')

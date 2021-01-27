@@ -47,6 +47,8 @@ from .ui import (
     inputAmount,
     describeBid,
     setCoinFilter,
+    get_data_entry,
+    have_data_entry,
 )
 
 
@@ -315,12 +317,14 @@ class HttpHandler(BaseHTTPRequestHandler):
         errors = []
         parsed_data = {}
 
-        if b'addr_from' in form_data:
-            page_data['addr_from'] = form_data[b'addr_from'][0].decode('utf-8')
+        if have_data_entry(form_data, 'addr_from'):
+            page_data['addr_from'] = get_data_entry(form_data, 'addr_from')
             parsed_data['addr_from'] = None if page_data['addr_from'] == '-1' else page_data['addr_from']
+        else:
+            parsed_data['addr_from'] = None
 
         try:
-            page_data['coin_from'] = int(form_data[b'coin_from'][0])
+            page_data['coin_from'] = int(get_data_entry(form_data, 'coin_from'))
             coin_from = Coins(page_data['coin_from'])
             ci_from = swap_client.ci(coin_from)
             if coin_from != Coins.XMR:
@@ -330,7 +334,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             errors.append('Unknown Coin From')
 
         try:
-            page_data['coin_to'] = int(form_data[b'coin_to'][0])
+            page_data['coin_to'] = int(get_data_entry(form_data, 'coin_to'))
             coin_to = Coins(page_data['coin_to'])
             ci_to = swap_client.ci(coin_to)
             parsed_data['coin_to'] = coin_to
@@ -342,16 +346,16 @@ class HttpHandler(BaseHTTPRequestHandler):
             errors.append('Unknown Coin To')
 
         try:
-            page_data['amt_from'] = form_data[b'amt_from'][0].decode('utf-8')
+            page_data['amt_from'] = get_data_entry(form_data, 'amt_from')
             parsed_data['amt_from'] = inputAmount(page_data['amt_from'], ci_from)
             parsed_data['min_bid'] = int(parsed_data['amt_from'])
-        except Exception as e:
+        except Exception:
             errors.append('Amount From')
 
         try:
-            page_data['amt_to'] = form_data[b'amt_to'][0].decode('utf-8')
+            page_data['amt_to'] = get_data_entry(form_data, 'amt_to')
             parsed_data['amt_to'] = inputAmount(page_data['amt_to'], ci_to)
-        except Exception as e:
+        except Exception:
             errors.append('Amount To')
 
         if 'amt_to' in parsed_data and 'amt_from' in parsed_data:
@@ -364,38 +368,38 @@ class HttpHandler(BaseHTTPRequestHandler):
 
         page_data['step2'] = True
 
-        if b'fee_from_conf' in form_data:
-            page_data['fee_from_conf'] = int(form_data[b'fee_from_conf'][0])
+        if have_data_entry(form_data, 'fee_from_conf'):
+            page_data['fee_from_conf'] = int(get_data_entry(form_data, 'fee_from_conf'))
             parsed_data['fee_from_conf'] = page_data['fee_from_conf']
 
-        if b'fee_from_extra' in form_data:
-            page_data['fee_from_extra'] = int(form_data[b'fee_from_extra'][0])
+        if have_data_entry(form_data, 'fee_from_extra'):
+            page_data['fee_from_extra'] = int(get_data_entry(form_data, 'fee_from_extra'))
             parsed_data['fee_from_extra'] = page_data['fee_from_extra']
 
-        if b'fee_to_conf' in form_data:
-            page_data['fee_to_conf'] = int(form_data[b'fee_to_conf'][0])
+        if have_data_entry(form_data, 'fee_to_conf'):
+            page_data['fee_to_conf'] = int(get_data_entry(form_data, 'fee_to_conf'))
             parsed_data['fee_to_conf'] = page_data['fee_to_conf']
 
-        if b'fee_to_extra' in form_data:
-            page_data['fee_to_extra'] = int(form_data[b'fee_to_extra'][0])
+        if have_data_entry(form_data, 'fee_to_extra'):
+            page_data['fee_to_extra'] = int(get_data_entry(form_data, 'fee_to_extra'))
             parsed_data['fee_to_extra'] = page_data['fee_to_extra']
 
-        if b'check_offer' in form_data:
+        if have_data_entry(form_data, 'check_offer'):
             page_data['check_offer'] = True
-        if b'submit_offer' in form_data:
+        if have_data_entry(form_data, 'submit_offer'):
             page_data['submit_offer'] = True
 
-        if b'lockhrs' in form_data:
-            page_data['lockhrs'] = int(form_data[b'lockhrs'][0])
+        if have_data_entry(form_data, 'lockhrs'):
+            page_data['lockhrs'] = int(get_data_entry(form_data, 'lockhrs'))
             parsed_data['lock_seconds'] = page_data['lockhrs'] * 60 * 60
 
-        page_data['autoaccept'] = True if b'autoaccept' in form_data else False
+        page_data['autoaccept'] = True if have_data_entry(form_data, 'autoaccept') else False
         parsed_data['autoaccept'] = page_data['autoaccept']
 
         try:
             if len(errors) == 0 and page_data['swap_style'] == 'xmr':
-                if b'fee_rate_from' in form_data:
-                    page_data['from_fee_override'] = form_data[b'fee_rate_from'][0].decode('utf-8')
+                if have_data_entry(form_data, 'fee_rate_from'):
+                    page_data['from_fee_override'] = get_data_entry(form_data, 'fee_rate_from')
                     parsed_data['from_fee_override'] = page_data['from_fee_override']
                 else:
                     from_fee_override, page_data['from_fee_src'] = swap_client.getFeeRateForCoin(parsed_data['coin_from'], page_data['fee_from_conf'])
@@ -410,8 +414,8 @@ class HttpHandler(BaseHTTPRequestHandler):
                     page_data['tla_from'] = ci_from.ticker()
 
                 if coin_to == Coins.XMR:
-                    if b'fee_rate_to' in form_data:
-                        page_data['to_fee_override'] = form_data[b'fee_rate_to'][0].decode('utf-8')
+                    if have_data_entry(form_data, 'fee_rate_to'):
+                        page_data['to_fee_override'] = get_data_entry(form_data, 'fee_rate_to')
                         parsed_data['to_fee_override'] = page_data['to_fee_override']
                     else:
                         to_fee_override, page_data['to_fee_src'] = swap_client.getFeeRateForCoin(parsed_data['coin_to'], page_data['fee_to_conf'])
@@ -616,8 +620,8 @@ class HttpHandler(BaseHTTPRequestHandler):
         messages = []
         form_data = self.checkForm(post_string, 'offers', messages)
         if form_data and b'applyfilters' in form_data:
-            filters['coin_from'] = setCoinFilter(form_data, b'coin_from')
-            filters['coin_to'] = setCoinFilter(form_data, b'coin_to')
+            filters['coin_from'] = setCoinFilter(form_data, 'coin_from')
+            filters['coin_to'] = setCoinFilter(form_data, 'coin_to')
 
             if b'sort_by' in form_data:
                 sort_by = form_data[b'sort_by'][0].decode('utf-8')
@@ -814,10 +818,10 @@ class HttpHandler(BaseHTTPRequestHandler):
         self.send_response(status_code)
         if self.server.allow_cors:
             self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Content-type', content_type)
+        self.send_header('Content-Type', content_type)
         self.end_headers()
 
-    def handle_http(self, status_code, path, post_string=''):
+    def handle_http(self, status_code, path, post_string='', is_json=False):
         url_split = self.path.split('/')
         if len(url_split) > 1 and url_split[1] == 'json':
             try:
@@ -832,7 +836,7 @@ class HttpHandler(BaseHTTPRequestHandler):
                             'network': js_network,
                             'revokeoffer': js_revokeoffer,
                             }.get(url_split[2], js_index)
-                return func(self, url_split, post_string)
+                return func(self, url_split, post_string, is_json)
             except Exception as ex:
                 if self.server.swap_client.debug is True:
                     traceback.print_exc()
@@ -903,8 +907,10 @@ class HttpHandler(BaseHTTPRequestHandler):
         self.wfile.write(response)
 
     def do_POST(self):
-        post_string = self.rfile.read(int(self.headers['Content-Length']))
-        response = self.handle_http(200, self.path, post_string)
+        post_string = self.rfile.read(int(self.headers.get('Content-Length')))
+
+        is_json = True if 'json' in self.headers.get('Content-Type', '') else False
+        response = self.handle_http(200, self.path, post_string, is_json)
         self.wfile.write(response)
 
     def do_HEAD(self):

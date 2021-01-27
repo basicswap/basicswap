@@ -15,7 +15,7 @@ def callrpc_xmr(rpc_port, auth, method, params=[], rpc_host='127.0.0.1', path='j
             'jsonrpc': '2.0'
         }
         headers = {
-            'content-type': 'application/json'
+            'Content-Type': 'application/json'
         }
         p = requests.post(url, data=json.dumps(request_body), auth=requests.auth.HTTPDigestAuth(auth[0], auth[1]), headers=headers, timeout=timeout)
         r = json.loads(p.text)
@@ -38,7 +38,7 @@ def callrpc_xmr_na(rpc_port, method, params=[], rpc_host='127.0.0.1', path='json
             'jsonrpc': '2.0'
         }
         headers = {
-            'content-type': 'application/json'
+            'Content-Type': 'application/json'
         }
         p = requests.post(url, data=json.dumps(request_body), headers=headers, timeout=timeout)
         r = json.loads(p.text)
@@ -55,7 +55,7 @@ def callrpc_xmr2(rpc_port, method, params=None, rpc_host='127.0.0.1', timeout=12
     try:
         url = 'http://{}:{}/{}'.format(rpc_host, rpc_port, method)
         headers = {
-            'content-type': 'application/json'
+            'Content-Type': 'application/json'
         }
         if params is None:
             p = requests.post(url, headers=headers, timeout=timeout)

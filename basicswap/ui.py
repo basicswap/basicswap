@@ -37,10 +37,22 @@ def inputAmount(amount_str, ci):
     return make_int(amount_str, ci.exp())
 
 
+def get_data_entry(post_data, name):
+    if 'is_json' in post_data:
+        return post_data[name]
+    return post_data[name.encode('utf-8')][0].decode('utf-8')
+
+def have_data_entry(post_data, name):
+    if 'is_json' in post_data:
+        return name in post_data
+    return name.encode('utf-8') in post_data
+
+
 def setCoinFilter(form_data, field_name):
-    if field_name not in form_data:
+    try:
+        coin_type = int(get_data_entry(form_data, field_name))
+    except Exception:
         return -1
-    coin_type = int(form_data[field_name][0])
     if coin_type == -1:
         return -1
     try:
@@ -199,3 +211,4 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
         data['events'] = bid_events
 
     return data
+
