@@ -389,6 +389,15 @@ def replaceAddrPrefix(addr, coin_type, chain_name, addr_type='pubkey_address'):
     return encodeAddress(bytes((chainparams[coin_type][chain_name][addr_type],)) + decodeAddress(addr)[1:])
 
 
+def getOfferProofOfFundsHash(offer_msg, offer_addr):
+    # TODO: Hash must not include proof_of_funds sig if it exists in offer_msg
+    h = hashlib.sha256()
+    h.update(offer_addr.encode('utf-8'))
+    offer_bytes = offer_msg.SerializeToString()
+    h.update(offer_bytes)
+    return h.digest()
+
+
 class WatchedOutput():  # Watch for spends
     __slots__ = ('bid_id', 'txid_hex', 'vout', 'tx_type', 'swap_type')
 
@@ -1033,10 +1042,7 @@ class BasicSwap(BaseApp):
         session = None
         try:
             self.checkSynced(coin_from_t, coin_to_t)
-            # TODO: require proof of funds on offers?
-            proof_addr, proof_sig = self.getProofOfFunds(coin_from_t, int(amount))
             offer_addr = self.callrpc('getnewaddress') if addr_send_from is None else addr_send_from
-
             offer_created_at = int(time.time())
 
             msg_buf = OfferMessage()
@@ -1087,6 +1093,10 @@ class BasicSwap(BaseApp):
 
                 xmr_offer.a_fee_rate = msg_buf.fee_rate_from
                 xmr_offer.b_fee_rate = msg_buf.fee_rate_to  # Unused: TODO - Set priority?
+
+            proof_of_funds_hash = getOfferProofOfFundsHash(msg_buf, offer_addr)
+            proof_addr, proof_sig = self.getProofOfFunds(coin_from_t, int(amount), proof_of_funds_hash)
+            # TODO: For now proof_of_funds is just a client side checkm, may need to be sent with offers in future however.
 
             offer_bytes = msg_buf.SerializeToString()
             payload_hex = str.format('{:02x}', MessageTypes.OFFER) + offer_bytes.hex()
@@ -1408,7 +1418,7 @@ class BasicSwap(BaseApp):
             self.mxDB.release()
         return self._contract_count
 
-    def getProofOfFunds(self, coin_type, amount_for):
+    def getProofOfFunds(self, coin_type, amount_for, extra_commit_bytes):
         ci = self.ci(coin_type)
         self.log.debug('getProofOfFunds %s %s', ci.coin_name(), ci.format_amount(amount_for))
 
@@ -1436,7 +1446,7 @@ class BasicSwap(BaseApp):
             pkh = addrinfo['scriptPubKey'][4:]
             sign_for_addr = encodeAddress(bytes((chainparams[coin_type][self.chain]['pubkey_address'],)) + bytes.fromhex(pkh))
             self.log.debug('sign_for_addr converted %s', sign_for_addr)
-        signature = self.callcoinrpc(coin_type, 'signmessage', [sign_for_addr, sign_for_addr + '_swap_proof'])
+        signature = self.callcoinrpc(coin_type, 'signmessage', [sign_for_addr, sign_for_addr + '_swap_proof_' + extra_commit_bytes.hex()])
 
         return (sign_for_addr, signature)
 
@@ -1553,7 +1563,7 @@ class BasicSwap(BaseApp):
             if offer.swap_type == SwapTypes.SELLER_FIRST:
                 msg_buf.pkhash_buyer = getKeyID(self.getContractPubkey(dt.datetime.fromtimestamp(now).date(), contract_count))
 
-                proof_addr, proof_sig = self.getProofOfFunds(coin_to, amount_to)
+                proof_addr, proof_sig = self.getProofOfFunds(coin_to, amount_to, offer_id)
                 msg_buf.proof_address = proof_addr
                 msg_buf.proof_signature = proof_sig
             else:
@@ -3532,7 +3542,7 @@ class BasicSwap(BaseApp):
             # Verify proof of funds
             bid_proof_address = replaceAddrPrefix(bid_data.proof_address, Coins.PART, self.chain)
             mm = chainparams[coin_to]['message_magic']
-            passed = self.ci(Coins.PART).verifyMessage(bid_proof_address, bid_data.proof_address + '_swap_proof', bid_data.proof_signature, mm)
+            passed = self.ci(Coins.PART).verifyMessage(bid_proof_address, bid_data.proof_address + '_swap_proof_' + offer_id.hex(), bid_data.proof_signature, mm)
             assert(passed is True), 'Proof of funds signature invalid'
 
             if self.coin_clients[coin_to]['use_segwit']:
