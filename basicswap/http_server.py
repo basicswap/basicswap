@@ -46,6 +46,7 @@ from .ui import (
     PAGE_LIMIT,
     inputAmount,
     describeBid,
+    getCoinType,
     setCoinFilter,
     get_data_entry,
     have_data_entry,
@@ -324,7 +325,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             parsed_data['addr_from'] = None
 
         try:
-            page_data['coin_from'] = int(get_data_entry(form_data, 'coin_from'))
+            page_data['coin_from'] = getCoinType(get_data_entry(form_data, 'coin_from'))
             coin_from = Coins(page_data['coin_from'])
             ci_from = swap_client.ci(coin_from)
             if coin_from != Coins.XMR:
@@ -334,7 +335,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             errors.append('Unknown Coin From')
 
         try:
-            page_data['coin_to'] = int(get_data_entry(form_data, 'coin_to'))
+            page_data['coin_to'] = getCoinType(get_data_entry(form_data, 'coin_to'))
             coin_to = Coins(page_data['coin_to'])
             ci_to = swap_client.ci(coin_to)
             parsed_data['coin_to'] = coin_to

@@ -52,8 +52,8 @@ class Test(XmrTestBase):
 
         data = parse.urlencode({
             'addr_from': '-1',
-            'coin_from': '1',
-            'coin_to': '6',
+            'coin_from': 'part',
+            'coin_to': 'xmr',
             'amt_from': '1',
             'amt_to': '1',
             'lockhrs': '24'}).encode()

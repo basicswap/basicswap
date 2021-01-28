@@ -24,6 +24,22 @@ from .basicswap import (
 PAGE_LIMIT = 50
 
 
+def tickerToCoinId(ticker):
+    search_str = ticker.upper()
+    for c in Coins:
+        if c.name == search_str:
+            return c.value
+    raise ValueError('Unknown coin')
+
+
+def getCoinType(coin_type_ind):
+    # coin_type_ind can be int id or str ticker
+    try:
+        return int(coin_type_ind)
+    except Exception:
+        return tickerToCoinId(coin_type_ind)
+
+
 def validateAmountString(amount, ci):
     if type(amount) != str:
         return
@@ -42,6 +58,7 @@ def get_data_entry(post_data, name):
         return post_data[name]
     return post_data[name.encode('utf-8')][0].decode('utf-8')
 
+
 def have_data_entry(post_data, name):
     if 'is_json' in post_data:
         return name in post_data
@@ -50,7 +67,7 @@ def have_data_entry(post_data, name):
 
 def setCoinFilter(form_data, field_name):
     try:
-        coin_type = int(get_data_entry(form_data, field_name))
+        coin_type = getCoinType(get_data_entry(form_data, field_name))
     except Exception:
         return -1
     if coin_type == -1:
@@ -211,4 +228,3 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
         data['events'] = bid_events
 
     return data
-

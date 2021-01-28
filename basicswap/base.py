@@ -5,22 +5,22 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import os
-import threading
 import logging
+import threading
 import subprocess
 
 import basicswap.config as cfg
 import basicswap.contrib.segwit_addr as segwit_addr
 
-from .chainparams import (
-    chainparams,
-    Coins,
+from .rpc import (
+    callrpc,
 )
 from .util import (
     pubkeyToAddress,
 )
-from .rpc import (
-    callrpc,
+from .chainparams import (
+    Coins,
+    chainparams,
 )
 
 
