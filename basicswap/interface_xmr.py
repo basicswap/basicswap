@@ -58,7 +58,7 @@ class XMRInterface(CoinInterface):
     def nbK():  # No. of bytes requires to encode a public key
         return 32
 
-    def __init__(self, coin_settings, network):
+    def __init__(self, coin_settings, network, swap_client=None):
         super().__init__()
         self.rpc_cb = make_xmr_rpc_func(coin_settings['rpcport'], host=coin_settings.get('rpchost', '127.0.0.1'))
         self.rpc_cb2 = make_xmr_rpc2_func(coin_settings['rpcport'], host=coin_settings.get('rpchost', '127.0.0.1'))  # non-json endpoint
@@ -68,6 +68,8 @@ class XMRInterface(CoinInterface):
         self.blocks_confirmed = coin_settings['blocks_confirmed']
         self._restore_height = coin_settings.get('restore_height', 0)
         self.setFeePriority(coin_settings.get('fee_priority', 0))
+        self._sc = swap_client
+        self._log = self._sc.log if self._sc.log else logging
 
     def setFeePriority(self, new_priority):
         assert(new_priority >= 0 and new_priority < 4), 'Invalid fee_priority value'
@@ -96,7 +98,7 @@ class XMRInterface(CoinInterface):
             'restore_height': self._restore_height,
         }
         rv = self.rpc_wallet_cb('generate_from_keys', params)
-        logging.info('generate_from_keys %s', dumpj(rv))
+        self._log.info('generate_from_keys %s', dumpj(rv))
         self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
 
     def ensureWalletExists(self):
@@ -137,12 +139,12 @@ class XMRInterface(CoinInterface):
         return self.rpc_wallet_cb('get_address')['address']
 
     def getNewAddress(self, placeholder):
-        logging.warning('TODO - subaddress?')
+        self._log.warning('TODO - subaddress?')
         self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
         return self.rpc_wallet_cb('get_address')['address']
 
     def get_fee_rate(self, conf_target=2):
-        logging.warning('TODO - estimate fee rate?')
+        self._log.warning('TODO - estimate fee rate?')
         return 0.0, 'unused'
 
     def isValidKey(self, key_bytes):
@@ -208,14 +210,14 @@ class XMRInterface(CoinInterface):
         if self._fee_priority > 0:
             params['priority'] = self._fee_priority
         rv = self.rpc_wallet_cb('transfer', params)
-        logging.info('publishBLockTx %s to address_b58 %s', rv['tx_hash'], shared_addr)
+        self._log.info('publishBLockTx %s to address_b58 %s', rv['tx_hash'], shared_addr)
         tx_hash = bytes.fromhex(rv['tx_hash'])
 
         # Debug
         for i in range(10):
             params = {'out': True, 'pending': True, 'failed': True, 'pool': True, }
             rv = self.rpc_wallet_cb('get_transfers', params)
-            logging.info('[rm] get_transfers {}'.format(dumpj(rv)))
+            self._log.info('[rm] get_transfers {}'.format(dumpj(rv)))
             if 'pending' not in rv:
                 break
             time.sleep(1)
@@ -229,7 +231,7 @@ class XMRInterface(CoinInterface):
         try:
             self.rpc_wallet_cb('close_wallet')
         except Exception as e:
-            logging.warning('close_wallet failed %s', str(e))
+            self._log.warning('close_wallet failed %s', str(e))
 
         kbv_le = kbv[::-1]
         params = {
@@ -243,7 +245,7 @@ class XMRInterface(CoinInterface):
             rv = self.rpc_wallet_cb('open_wallet', {'filename': address_b58})
         except Exception as e:
             rv = self.rpc_wallet_cb('generate_from_keys', params)
-            logging.info('generate_from_keys %s', dumpj(rv))
+            self._log.info('generate_from_keys %s', dumpj(rv))
             rv = self.rpc_wallet_cb('open_wallet', {'filename': address_b58})
 
         rv = self.rpc_wallet_cb('refresh', timeout=600)
@@ -252,9 +254,9 @@ class XMRInterface(CoinInterface):
         # Debug
         try:
             current_height = self.rpc_wallet_cb('get_height')['height']
-            logging.info('findTxB XMR current_height %d\nAddress: %s', current_height, address_b58)
+            self._log.info('findTxB XMR current_height %d\nAddress: %s', current_height, address_b58)
         except Exception as e:
-            logging.info('rpc_cb failed %s', str(e))
+            self._log.info('rpc_cb failed %s', str(e))
             current_height = None  # If the transfer is available it will be deep enough
             #   and (current_height is None or current_height - transfer['block_height'] > cb_block_confirmed):
         '''
@@ -265,7 +267,7 @@ class XMRInterface(CoinInterface):
                 if transfer['amount'] == cb_swap_value:
                     return {'txid': transfer['tx_hash'], 'amount': transfer['amount'], 'height': 0 if 'block_height' not in transfer else transfer['block_height']}
                 else:
-                    logging.warning('Incorrect amount detected for coin b lock txn: {}'.format(transfer['tx_hash']))
+                    self._log.warning('Incorrect amount detected for coin b lock txn: {}'.format(transfer['tx_hash']))
 
         return None
 
@@ -277,7 +279,7 @@ class XMRInterface(CoinInterface):
         try:
             self.rpc_wallet_cb('close_wallet')
         except Exception as e:
-            logging.warning('close_wallet failed %s', str(e))
+            self._log.warning('close_wallet failed %s', str(e))
 
         params = {
             'filename': address_b58,
@@ -296,7 +298,7 @@ class XMRInterface(CoinInterface):
                 current_height = self.rpc_cb2('get_height')['height']
                 print('current_height', current_height)
             except Exception as e:
-                logging.warning('rpc_cb failed %s', str(e))
+                self._log.warning('rpc_cb failed %s', str(e))
                 current_height = None  # If the transfer is available it will be deep enough
 
             # TODO: Make accepting current_height == None a user selectable option
@@ -336,9 +338,9 @@ class XMRInterface(CoinInterface):
 
         try:
             current_height = self.rpc_cb2('get_height')['height']
-            logging.info('findTxnByHash XMR current_height %d\nhash: %s', current_height, txid)
+            self._log.info('findTxnByHash XMR current_height %d\nhash: %s', current_height, txid)
         except Exception as e:
-            logging.info('rpc_cb failed %s', str(e))
+            self._log.info('rpc_cb failed %s', str(e))
             current_height = None  # If the transfer is available it will be deep enough
 
         params = {'transfer_type': 'available'}
@@ -361,7 +363,7 @@ class XMRInterface(CoinInterface):
         try:
             self.rpc_wallet_cb('close_wallet')
         except Exception as e:
-            logging.warning('close_wallet failed %s', str(e))
+            self._log.warning('close_wallet failed %s', str(e))
 
         wallet_filename = address_b58 + '_spend'
 
@@ -377,7 +379,7 @@ class XMRInterface(CoinInterface):
             self.rpc_wallet_cb('open_wallet', {'filename': wallet_filename})
         except Exception as e:
             rv = self.rpc_wallet_cb('generate_from_keys', params)
-            logging.info('generate_from_keys %s', dumpj(rv))
+            self._log.info('generate_from_keys %s', dumpj(rv))
             self.rpc_wallet_cb('open_wallet', {'filename': wallet_filename})
 
         # For a while after opening the wallet rpc cmds return empty data
@@ -389,10 +391,10 @@ class XMRInterface(CoinInterface):
 
             time.sleep(1 + i)
         if rv['balance'] < cb_swap_value:
-            logging.error('wallet {} balance {}, expected {}'.format(wallet_filename, rv['balance'], cb_swap_value))
+            self._log.error('wallet {} balance {}, expected {}'.format(wallet_filename, rv['balance'], cb_swap_value))
             raise ValueError('Invalid balance')
         if rv['unlocked_balance'] < cb_swap_value:
-            logging.error('wallet {} balance {}, expected {}, blocks_to_unlock {}'.format(wallet_filename, rv['unlocked_balance'], cb_swap_value, rv['blocks_to_unlock']))
+            self._log.error('wallet {} balance {}, expected {}, blocks_to_unlock {}'.format(wallet_filename, rv['unlocked_balance'], cb_swap_value, rv['blocks_to_unlock']))
             raise ValueError('Invalid unlocked_balance')
 
         params = {'address': address_to}

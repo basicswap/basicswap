@@ -393,6 +393,8 @@ class HttpHandler(BaseHTTPRequestHandler):
         if have_data_entry(form_data, 'lockhrs'):
             page_data['lockhrs'] = int(get_data_entry(form_data, 'lockhrs'))
             parsed_data['lock_seconds'] = page_data['lockhrs'] * 60 * 60
+        elif have_data_entry(form_data, 'lockseconds'):
+            parsed_data['lock_seconds'] = int(get_data_entry(form_data, 'lockseconds'))
 
         page_data['autoaccept'] = True if have_data_entry(form_data, 'autoaccept') else False
         parsed_data['autoaccept'] = page_data['autoaccept']

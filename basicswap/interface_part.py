@@ -15,7 +15,6 @@ from .contrib.test_framework.script import (
 
 from .interface_btc import BTCInterface
 from .chainparams import Coins
-from .rpc import make_rpc_func
 
 
 class PARTInterface(BTCInterface):
@@ -35,13 +34,9 @@ class PARTInterface(BTCInterface):
     def xmr_swap_alock_spend_tx_vsize():
         return 213
 
-    def __init__(self, coin_settings, network):
-        rpc_host = coin_settings.get('rpchost', '127.0.0.1')
-        self.rpc_callback = make_rpc_func(coin_settings['rpcport'], coin_settings['rpcauth'], host=rpc_host)
-        self.txoType = CTxOutPart
-        self._network = network
-        self.blocks_confirmed = coin_settings['blocks_confirmed']
-        self._conf_target = coin_settings['conf_target']
+    @staticmethod
+    def txoType():
+        return CTxOutPart
 
     def knownWalletSeed(self):
         # TODO: Double check

@@ -14,7 +14,6 @@ import random
 import shutil
 import struct
 import hashlib
-import logging
 import secrets
 import datetime as dt
 import traceback
@@ -200,6 +199,7 @@ class EventLogTypes(IntEnum):
     LOCK_TX_A_CONFIRMED = auto()
     LOCK_TX_B_SEEN = auto()
     LOCK_TX_B_CONFIRMED = auto()
+    DEBUG_TWEAK_APPLIED = auto()
 
 
 class XmrSplitMsgTypes(IntEnum):
@@ -342,6 +342,8 @@ def describeEventEntry(event_type, event_msg):
         return 'Lock tx b seen in chain'
     if event_type == EventLogTypes.LOCK_TX_B_CONFIRMED:
         return 'Lock tx b confirmed in chain'
+    if event_type == EventLogTypes.DEBUG_TWEAK_APPLIED:
+        return 'Debug tweak applied ' + event_msg
 
 
 def getExpectedSequence(lockType, lockVal, coin_type):
@@ -444,6 +446,9 @@ class BasicSwap(BaseApp):
 
         self.min_delay_retry = self.settings.get('min_delay_retry', 60)
         self.max_delay_retry = self.settings.get('max_delay_retry', 5 * 60)
+
+        self.min_sequence_lock_seconds = self.settings.get('min_sequence_lock_seconds', 1 * 60 * 60)
+        self.max_sequence_lock_seconds = self.settings.get('max_sequence_lock_seconds', 96 * 60 * 60)
 
         self._bid_expired_leeway = 5
 
@@ -595,15 +600,15 @@ class BasicSwap(BaseApp):
 
     def createInterface(self, coin):
         if coin == Coins.PART:
-            return PARTInterface(self.coin_clients[coin], self.chain)
+            return PARTInterface(self.coin_clients[coin], self.chain, self)
         elif coin == Coins.BTC:
-            return BTCInterface(self.coin_clients[coin], self.chain)
+            return BTCInterface(self.coin_clients[coin], self.chain, self)
         elif coin == Coins.LTC:
-            return LTCInterface(self.coin_clients[coin], self.chain)
+            return LTCInterface(self.coin_clients[coin], self.chain, self)
         elif coin == Coins.NMC:
-            return NMCInterface(self.coin_clients[coin], self.chain)
+            return NMCInterface(self.coin_clients[coin], self.chain, self)
         elif coin == Coins.XMR:
-            xmr_i = XMRInterface(self.coin_clients[coin], self.chain)
+            xmr_i = XMRInterface(self.coin_clients[coin], self.chain, self)
             chain_client_settings = self.getChainClientSettings(coin)
             xmr_i.setWalletFilename(chain_client_settings['walletfile'])
             return xmr_i
@@ -735,6 +740,20 @@ class BasicSwap(BaseApp):
         self.log.info('Upgrading database from version %d to %d.', db_version, CURRENT_DB_VERSION)
 
         while True:
+            if db_version == 6:
+                session = scoped_session(self.session_factory)
+
+                session.execute('ALTER TABLE bids ADD COLUMN security_token BLOB')
+                session.execute('ALTER TABLE offers ADD COLUMN security_token BLOB')
+
+                db_version += 1
+                self.db_version = db_version
+                self.setIntKVInSession('db_version', db_version, session)
+                session.commit()
+                session.close()
+                session.remove()
+                self.log.info('Upgraded database to version {}'.format(self.db_version))
+                continue
             if db_version == 4:
                 session = scoped_session(self.session_factory)
 
@@ -743,12 +762,7 @@ class BasicSwap(BaseApp):
 
                 db_version += 1
                 self.db_version = db_version
-                kv = session.query(DBKVInt).filter_by(key='db_version').first()
-                if not kv:
-                    kv = DBKVInt(key='db_version', value=db_version)
-                else:
-                    kv.value = db_version
-                session.add(kv)
+                self.setIntKVInSession('db_version', db_version, session)
                 session.commit()
                 session.close()
                 session.remove()
@@ -804,16 +818,19 @@ class BasicSwap(BaseApp):
         key_str = 'main_wallet_seedid_' + chainparams[coin_type]['name']
         self.setStringKV(key_str, root_hash.hex())
 
+    def setIntKVInSession(self, str_key, int_val, session):
+        kv = session.query(DBKVInt).filter_by(key=str_key).first()
+        if not kv:
+            kv = DBKVInt(key=str_key, value=int_val)
+        else:
+            kv.value = int_val
+        session.add(kv)
+
     def setIntKV(self, str_key, int_val):
         self.mxDB.acquire()
         try:
             session = scoped_session(self.session_factory)
-            kv = session.query(DBKVInt).filter_by(key=str_key).first()
-            if not kv:
-                kv = DBKVInt(key=str_key, value=int_val)
-            else:
-                kv.value = int_val
-            session.add(kv)
+            self.setIntKVInSession(str_key, int_val, session)
             session.commit()
         finally:
             session.close()
@@ -1004,7 +1021,7 @@ class BasicSwap(BaseApp):
 
     def validateOfferLockValue(self, coin_from, coin_to, lock_type, lock_value):
         if lock_type == OfferMessage.SEQUENCE_LOCK_TIME:
-            assert(lock_value >= 1 * 60 * 60 and lock_value <= 96 * 60 * 60), 'Invalid lock_value time'
+            assert(lock_value >= self.min_sequence_lock_seconds and lock_value <= self.max_sequence_lock_seconds), 'Invalid lock_value time'
             assert(self.coin_clients[coin_from]['use_csv'] and self.coin_clients[coin_to]['use_csv']), 'Both coins need CSV activated.'
         elif lock_type == OfferMessage.SEQUENCE_LOCK_BLOCKS:
             assert(lock_value >= 5 and lock_value <= 1000), 'Invalid lock_value blocks'
@@ -1109,6 +1126,10 @@ class BasicSwap(BaseApp):
 
             offer_id = bytes.fromhex(msg_id)
 
+            security_token = extra_options.get('security_token', None)
+            if security_token is not None and len(security_token) != 20:
+                raise ValueError('Security token must be 20 bytes long.')
+
             session = scoped_session(self.session_factory)
             offer = Offer(
                 offer_id=offer_id,
@@ -1128,7 +1149,8 @@ class BasicSwap(BaseApp):
                 created_at=offer_created_at,
                 expire_at=offer_created_at + msg_buf.time_valid,
                 was_sent=True,
-                auto_accept_bids=auto_accept_bids,)
+                auto_accept_bids=auto_accept_bids,
+                security_token=security_token)
             offer.setState(OfferStates.OFFER_SENT)
 
             if swap_type == SwapTypes.XMR_SWAP:
@@ -1149,7 +1171,7 @@ class BasicSwap(BaseApp):
         self.log.info('Sent OFFER %s', offer_id.hex())
         return offer_id
 
-    def revokeOffer(self, offer_id):
+    def revokeOffer(self, offer_id, security_token=None):
         self.log.info('Revoking offer %s', offer_id.hex())
 
         session = None
@@ -1158,6 +1180,9 @@ class BasicSwap(BaseApp):
             session = scoped_session(self.session_factory)
 
             offer = session.query(Offer).filter_by(offer_id=offer_id).first()
+
+            if len(offer.security_token > 0) and offer.security_token != security_token:
+                raise ValueError('Mismatched security token')
 
             msg_buf = OfferRevokeMessage()
             msg_buf.offer_msg_id = offer_id
@@ -2652,7 +2677,7 @@ class BasicSwap(BaseApp):
                             self.saveBidInSession(bid_id, bid, session, xmr_swap)
                             session.commit()
                         except Exception as ex:
-                            logging.debug('Trying to publish coin a lock refund spend tx: %s', str(ex))
+                            self.log.debug('Trying to publish coin a lock refund spend tx: %s', str(ex))
 
                 if bid.was_sent:
                     if xmr_swap.a_lock_refund_swipe_tx is None:
@@ -2672,7 +2697,7 @@ class BasicSwap(BaseApp):
                             self.saveBidInSession(bid_id, bid, session, xmr_swap)
                             session.commit()
                         except Exception as ex:
-                            logging.debug('Trying to publish coin a lock refund swipe tx: %s', str(ex))
+                            self.log.debug('Trying to publish coin a lock refund swipe tx: %s', str(ex))
 
                 if BidStates(bid.state) == BidStates.XMR_SWAP_NOSCRIPT_TX_RECOVERED:
                     txid_hex = bid.xmr_b_lock_tx.spend_txid.hex()
@@ -3271,9 +3296,9 @@ class BasicSwap(BaseApp):
                     num_removed += 1
 
             if num_messages + num_removed > 0:
-                logging.info('Expired {} / {} messages.'.format(num_removed, num_messages))
+                self.log.info('Expired {} / {} messages.'.format(num_removed, num_messages))
 
-            logging.debug('TODO: Expire records from db')
+            self.log.debug('TODO: Expire records from db')
 
         finally:
             self.mxDB.release()
@@ -3410,7 +3435,7 @@ class BasicSwap(BaseApp):
         elif offer_data.swap_type == SwapTypes.XMR_SWAP:
             assert(coin_from != Coins.XMR)
             assert(coin_to == Coins.XMR)
-            logging.debug('TODO - More restrictions')
+            self.log.debug('TODO - More restrictions')
         else:
             raise ValueError('Unknown swap type {}.'.format(offer_data.swap_type))
 
@@ -3788,7 +3813,7 @@ class BasicSwap(BaseApp):
         ci_from = self.ci(Coins(offer.coin_from))
         ci_to = self.ci(Coins(offer.coin_to))
 
-        logging.debug('TODO: xmr bid validation')
+        self.log.debug('TODO: xmr bid validation')
         assert(ci_to.verifyKey(bid_data.kbvf))
         assert(ci_from.verifyPubkey(bid_data.pkaf))
 
@@ -3892,7 +3917,7 @@ class BasicSwap(BaseApp):
                 xmr_swap.a_swap_refund_value, xmr_offer.a_fee_rate
             )
 
-            logging.info('Checking leader\'s lock refund tx signature')
+            self.log.info('Checking leader\'s lock refund tx signature')
             v = ci_from.verifyTxSig(xmr_swap.a_lock_refund_tx, xmr_swap.al_lock_refund_tx_sig, xmr_swap.pkal, 0, xmr_swap.a_lock_tx_script, bid.amount)
 
             bid.setState(BidStates.BID_RECEIVING_ACC)
@@ -4056,7 +4081,9 @@ class BasicSwap(BaseApp):
 
         if bid.debug_ind == DebugTypes.BID_STOP_AFTER_COIN_A_LOCK:
             self.log.debug('XMR bid %s: Abandoning bid for testing: %d.', bid_id.hex(), bid.debug_ind)
-            # bid.setState(BidStates.BID_ABANDONED) # TODO: Retry if state
+            bid.setState(BidStates.BID_ABANDONED)
+            self.saveBidInSession(bid_id, bid, session, xmr_swap, save_in_progress=offer)
+            self.logBidEvent(bid, EventLogTypes.DEBUG_TWEAK_APPLIED, 'ind {}'.format(bid.debug_ind), session)
             return
 
         if bid.debug_ind == DebugTypes.CREATE_INVALID_COIN_B_LOCK:

@@ -206,6 +206,7 @@ class Test(unittest.TestCase):
                 settings['max_delay_event'] = 4
                 settings['min_delay_retry'] = 10
                 settings['max_delay_retry'] = 20
+                settings['min_sequence_lock_seconds'] = 60
 
                 settings['check_progress_seconds'] = 5
                 settings['check_watched_seconds'] = 5

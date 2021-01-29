@@ -117,14 +117,19 @@ class BTCInterface(CoinInterface):
     def xmr_swap_alock_spend_tx_vsize():
         return 147
 
-    def __init__(self, coin_settings, network):
+    @staticmethod
+    def txoType():
+        return CTxOut
+
+    def __init__(self, coin_settings, network, swap_client=None):
         super().__init__()
         rpc_host = coin_settings.get('rpchost', '127.0.0.1')
         self.rpc_callback = make_rpc_func(coin_settings['rpcport'], coin_settings['rpcauth'], host=rpc_host)
-        self.txoType = CTxOut
         self._network = network
         self.blocks_confirmed = coin_settings['blocks_confirmed']
         self.setConfTarget(coin_settings['conf_target'])
+        self._sc = swap_client
+        self._log = self._sc.log if self._sc.log else logging
 
     def setConfTarget(self, new_conf_target):
         assert(new_conf_target >= 1 and new_conf_target < 33), 'Invalid conf_target value'
@@ -153,7 +158,7 @@ class BTCInterface(CoinInterface):
             self.rpc_callback('sethdseed', [True, key_wif])
         except Exception as e:
             # <  0.21: Cannot set a new HD seed while still in Initial Block Download.
-            logging.error('sethdseed failed: {}'.format(str(e)))
+            self._log.error('sethdseed failed: {}'.format(str(e)))
 
     def getWalletInfo(self):
         return self.rpc_callback('getwalletinfo')
@@ -252,7 +257,7 @@ class BTCInterface(CoinInterface):
         script = self.genScriptLockTxScript(Kal, Kaf)
         tx = CTransaction()
         tx.nVersion = self.txVersion()
-        tx.vout.append(self.txoType(value, self.getScriptDest(script)))
+        tx.vout.append(self.txoType()(value, self.getScriptDest(script)))
 
         return tx.serialize(), script
 
@@ -316,10 +321,10 @@ class BTCInterface(CoinInterface):
         tx = CTransaction()
         tx.nVersion = self.txVersion()
         tx.vin.append(CTxIn(COutPoint(tx_lock_hash_int, locked_n), nSequence=lock1_value))
-        tx.vout.append(self.txoType(locked_coin, CScript([OP_0, hashlib.sha256(refund_script).digest()])))
+        tx.vout.append(self.txoType()(locked_coin, CScript([OP_0, hashlib.sha256(refund_script).digest()])))
 
         witness_bytes = len(script_lock)
-        witness_bytes += 73 * 2  # 2 signatures (72 + 1 byts size)
+        witness_bytes += 74 * 2  # 2 signatures (72 + 1 byte sighashtype + 1 byte size) - Use maximum txn size for estimate
         witness_bytes += 2  # 2 empty witness stack values
         witness_bytes += getCompactSizeLen(witness_bytes)
         vsize = self.getTxVSize(tx, add_witness_bytes=witness_bytes)
@@ -327,8 +332,8 @@ class BTCInterface(CoinInterface):
         tx.vout[0].nValue = locked_coin - pay_fee
 
         tx.rehash()
-        logging.info('createScriptLockRefundTx %s:\n    fee_rate, vsize, fee: %ld, %ld, %ld.',
-                     i2h(tx.sha256), tx_fee_rate, vsize, pay_fee)
+        self._log.info('createScriptLockRefundTx %s:\n    fee_rate, vsize, fee: %ld, %ld, %ld.',
+                       i2h(tx.sha256), tx_fee_rate, vsize, pay_fee)
 
         return tx.serialize(), refund_script, tx.vout[0].nValue
 
@@ -351,7 +356,7 @@ class BTCInterface(CoinInterface):
         tx.nVersion = self.txVersion()
         tx.vin.append(CTxIn(COutPoint(tx_lock_refund_hash_int, locked_n), nSequence=0))
 
-        tx.vout.append(self.txoType(locked_coin, self.getScriptForPubkeyHash(pkh_refund_to)))
+        tx.vout.append(self.txoType()(locked_coin, self.getScriptForPubkeyHash(pkh_refund_to)))
 
         witness_bytes = len(script_lock_refund)
         witness_bytes += 73 * 2  # 2 signatures (72 + 1 byte size)
@@ -362,8 +367,8 @@ class BTCInterface(CoinInterface):
         tx.vout[0].nValue = locked_coin - pay_fee
 
         tx.rehash()
-        logging.info('createScriptLockRefundSpendTx %s:\n    fee_rate, vsize, fee: %ld, %ld, %ld.',
-                     i2h(tx.sha256), tx_fee_rate, vsize, pay_fee)
+        self._log.info('createScriptLockRefundSpendTx %s:\n    fee_rate, vsize, fee: %ld, %ld, %ld.',
+                       i2h(tx.sha256), tx_fee_rate, vsize, pay_fee)
 
         return tx.serialize()
 
@@ -386,7 +391,7 @@ class BTCInterface(CoinInterface):
         tx.nVersion = self.txVersion()
         tx.vin.append(CTxIn(COutPoint(tx_lock_refund_hash_int, locked_n), nSequence=lock2_value))
 
-        tx.vout.append(self.txoType(locked_coin, self.getScriptForPubkeyHash(pkh_dest)))
+        tx.vout.append(self.txoType()(locked_coin, self.getScriptForPubkeyHash(pkh_dest)))
 
         witness_bytes = len(script_lock_refund)
         witness_bytes += 73  # signature (72 + 1 byte size)
@@ -397,8 +402,8 @@ class BTCInterface(CoinInterface):
         tx.vout[0].nValue = locked_coin - pay_fee
 
         tx.rehash()
-        logging.info('createScriptLockRefundSpendToFTx %s:\n    fee_rate, vsize, fee: %ld, %ld, %ld.',
-                     i2h(tx.sha256), tx_fee_rate, vsize, pay_fee)
+        self._log.info('createScriptLockRefundSpendToFTx %s:\n    fee_rate, vsize, fee: %ld, %ld, %ld.',
+                       i2h(tx.sha256), tx_fee_rate, vsize, pay_fee)
 
         return tx.serialize()
 
@@ -416,7 +421,7 @@ class BTCInterface(CoinInterface):
         tx.nVersion = self.txVersion()
         tx.vin.append(CTxIn(COutPoint(tx_lock_hash_int, locked_n)))
 
-        tx.vout.append(self.txoType(locked_coin, self.getScriptForPubkeyHash(pkh_dest)))
+        tx.vout.append(self.txoType()(locked_coin, self.getScriptForPubkeyHash(pkh_dest)))
 
         witness_bytes = len(script_lock)
         witness_bytes += 33  # sv, size
@@ -428,8 +433,8 @@ class BTCInterface(CoinInterface):
         tx.vout[0].nValue = locked_coin - pay_fee
 
         tx.rehash()
-        logging.info('createScriptLockSpendTx %s:\n    fee_rate, vsize, fee: %ld, %ld, %ld.',
-                     i2h(tx.sha256), tx_fee_rate, vsize, pay_fee)
+        self._log.info('createScriptLockSpendTx %s:\n    fee_rate, vsize, fee: %ld, %ld, %ld.',
+                       i2h(tx.sha256), tx_fee_rate, vsize, pay_fee)
 
         return tx.serialize()
 
@@ -447,7 +452,7 @@ class BTCInterface(CoinInterface):
 
         tx = self.loadTx(tx_bytes)
         tx_hash = self.getTxHash(tx)
-        logging.info('Verifying lock tx: {}.'.format(b2h(tx_hash)))
+        self._log.info('Verifying lock tx: {}.'.format(b2h(tx_hash)))
 
         assert_cond(tx.nVersion == self.txVersion(), 'Bad version')
         assert_cond(tx.nLockTime == 0, 'Bad nLockTime')
@@ -491,10 +496,10 @@ class BTCInterface(CoinInterface):
             vsize = self.getTxVSize(tx, add_bytes, add_witness_bytes)
             fee_rate_paid = fee_paid * 1000 / vsize
 
-            logging.info('tx amount, vsize, feerate: %ld, %ld, %ld', locked_coin, vsize, fee_rate_paid)
+            self._log.info('tx amount, vsize, feerate: %ld, %ld, %ld', locked_coin, vsize, fee_rate_paid)
 
             if not self.compareFeeRates(fee_rate_paid, feerate):
-                logging.warning('feerate paid doesn\'t match expected: %ld, %ld', fee_rate_paid, feerate)
+                self._log.warning('feerate paid doesn\'t match expected: %ld, %ld', fee_rate_paid, feerate)
                 # TODO: Display warning to user
 
         return tx_hash, locked_n
@@ -509,7 +514,7 @@ class BTCInterface(CoinInterface):
 
         tx = self.loadTx(tx_bytes)
         tx_hash = self.getTxHash(tx)
-        logging.info('Verifying lock refund tx: {}.'.format(b2h(tx_hash)))
+        self._log.info('Verifying lock refund tx: {}.'.format(b2h(tx_hash)))
 
         assert_cond(tx.nVersion == self.txVersion(), 'Bad version')
         assert_cond(tx.nLockTime == 0, 'nLockTime not 0')
@@ -543,7 +548,7 @@ class BTCInterface(CoinInterface):
         vsize = self.getTxVSize(tx, add_witness_bytes=witness_bytes)
         fee_rate_paid = fee_paid * 1000 / vsize
 
-        logging.info('tx amount, vsize, feerate: %ld, %ld, %ld', locked_coin, vsize, fee_rate_paid)
+        self._log.info('tx amount, vsize, feerate: %ld, %ld, %ld', locked_coin, vsize, fee_rate_paid)
 
         if not self.compareFeeRates(fee_rate_paid, feerate):
             raise ValueError('Bad fee rate')
@@ -559,7 +564,7 @@ class BTCInterface(CoinInterface):
         #   Must have only one output sending lock refund tx value - fee to leader's address, TODO: follower shouldn't need to verify destination addr
         tx = self.loadTx(tx_bytes)
         tx_hash = self.getTxHash(tx)
-        logging.info('Verifying lock refund spend tx: {}.'.format(b2h(tx_hash)))
+        self._log.info('Verifying lock refund spend tx: {}.'.format(b2h(tx_hash)))
 
         assert_cond(tx.nVersion == self.txVersion(), 'Bad version')
         assert_cond(tx.nLockTime == 0, 'nLockTime not 0')
@@ -589,7 +594,7 @@ class BTCInterface(CoinInterface):
         vsize = self.getTxVSize(tx, add_witness_bytes=witness_bytes)
         fee_rate_paid = fee_paid * 1000 / vsize
 
-        logging.info('tx amount, vsize, feerate: %ld, %ld, %ld', tx_value, vsize, fee_rate_paid)
+        self._log.info('tx amount, vsize, feerate: %ld, %ld, %ld', tx_value, vsize, fee_rate_paid)
 
         if not self.compareFeeRates(fee_rate_paid, feerate):
             raise ValueError('Bad fee rate')
@@ -605,7 +610,7 @@ class BTCInterface(CoinInterface):
 
         tx = self.loadTx(tx_bytes)
         tx_hash = self.getTxHash(tx)
-        logging.info('Verifying lock spend tx: {}.'.format(b2h(tx_hash)))
+        self._log.info('Verifying lock spend tx: {}.'.format(b2h(tx_hash)))
 
         assert_cond(tx.nVersion == self.txVersion(), 'Bad version')
         assert_cond(tx.nLockTime == 0, 'nLockTime not 0')
@@ -638,7 +643,7 @@ class BTCInterface(CoinInterface):
         vsize = self.getTxVSize(tx, add_witness_bytes=witness_bytes)
         fee_rate_paid = fee_paid * 1000 / vsize
 
-        logging.info('tx amount, vsize, feerate: %ld, %ld, %ld', tx.vout[0].nValue, vsize, fee_rate_paid)
+        self._log.info('tx amount, vsize, feerate: %ld, %ld, %ld', tx.vout[0].nValue, vsize, fee_rate_paid)
 
         if not self.compareFeeRates(fee_rate_paid, feerate):
             raise ValueError('Bad fee rate')
@@ -768,7 +773,7 @@ class BTCInterface(CoinInterface):
         tx = CTransaction()
         tx.nVersion = self.txVersion()
         p2wpkh = self.getPkDest(Kbs)
-        tx.vout.append(self.txoType(output_amount, p2wpkh))
+        tx.vout.append(self.txoType()(output_amount, p2wpkh))
         return tx.serialize()
 
     def publishBLockTx(self, Kbv, Kbs, output_amount, feerate):
@@ -799,7 +804,7 @@ class BTCInterface(CoinInterface):
         for utxo in rv['unspents']:
             if 'height' in utxo and utxo['height'] > 0 and rv['height'] - utxo['height'] > cb_block_confirmed:
                 if self.make_int(utxo['amount']) != cb_swap_value:
-                    logging.warning('Found output to lock tx pubkey of incorrect value: %s', str(utxo['amount']))
+                    self._log.warning('Found output to lock tx pubkey of incorrect value: %s', str(utxo['amount']))
                 else:
                     return {'txid': utxo['txid'], 'vout': utxo['vout'], 'amount': utxo['amount'], 'height': utxo['height']}
         return None
@@ -817,7 +822,7 @@ class BTCInterface(CoinInterface):
                 if 'height' in utxo and utxo['height'] > 0 and rv['height'] - utxo['height'] > cb_block_confirmed:
 
                     if self.make_int(utxo['amount']) != cb_swap_value:
-                        logging.warning('Found output to lock tx pubkey of incorrect value: %s', str(utxo['amount']))
+                        self._log.warning('Found output to lock tx pubkey of incorrect value: %s', str(utxo['amount']))
                     else:
                         return True
         return False
@@ -873,7 +878,7 @@ class BTCInterface(CoinInterface):
         try:
             pubkey = PublicKey.from_signature_and_message(signature_bytes, message_hash, hasher=None)
         except Exception as e:
-            logging.info('verifyMessage failed: ' + str(e))
+            self._log.info('verifyMessage failed: ' + str(e))
             return False
 
         address_hash = self.decodeAddress(address)

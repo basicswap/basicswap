@@ -21,6 +21,7 @@ from .ui import (
     describeBid,
     setCoinFilter,
     get_data_entry,
+    have_data_entry,
 )
 
 
@@ -70,11 +71,11 @@ def js_offers(self, url_split, post_string, is_json, sent=False):
         filters['coin_from'] = setCoinFilter(post_data, 'coin_from')
         filters['coin_to'] = setCoinFilter(post_data, 'coin_to')
 
-        if b'sort_by' in post_data:
+        if have_data_entry(post_data, 'sort_by'):
             sort_by = get_data_entry(post_data, 'sort_by')
             assert(sort_by in ['created_at', 'rate']), 'Invalid sort by'
             filters['sort_by'] = sort_by
-        if b'sort_dir' in post_data:
+        if have_data_entry(post_data, 'sort_dir'):
             sort_dir = get_data_entry(post_data, 'sort_dir')
             assert(sort_dir in ['asc', 'desc']), 'Invalid sort dir'
             filters['sort_dir'] = sort_dir
@@ -113,38 +114,51 @@ def js_bids(self, url_split, post_string, is_json):
         if url_split[3] == 'new':
             if post_string == '':
                 raise ValueError('No post data')
-            post_data = urllib.parse.parse_qs(post_string)
+            if is_json:
+                post_data = json.loads(post_string)
+                post_data['is_json'] = True
+            else:
+                post_data = urllib.parse.parse_qs(post_string)
 
-            offer_id = bytes.fromhex(post_data[b'offer_id'][0].decode('utf-8'))
+            offer_id = bytes.fromhex(get_data_entry(post_data, 'offer_id'))
             assert(len(offer_id) == 28)
 
             offer = swap_client.getOffer(offer_id)
             assert(offer), 'Offer not found.'
 
             ci_from = swap_client.ci(offer.coin_from)
-            amount_from = inputAmount(post_data[b'amount_from'][0].decode('utf-8'), ci_from)
+            amount_from = inputAmount(get_data_entry(post_data, 'amount_from'), ci_from)
 
             addr_from = None
-            if b'addr_from' in post_data:
-                addr_from = post_data[b'addr_from'][0].decode('utf-8')
+            if have_data_entry(post_data, 'addr_from'):
+                addr_from = get_data_entry(post_data, 'addr_from')
                 if addr_from == '-1':
                     addr_from = None
 
             if offer.swap_type == SwapTypes.XMR_SWAP:
-                bid_id = swap_client.postXmrBid(offer_id, amount_from, addr_send_from=addr_from).hex()
+                bid_id = swap_client.postXmrBid(offer_id, amount_from, addr_send_from=addr_from)
             else:
-                bid_id = swap_client.postBid(offer_id, amount_from, addr_send_from=addr_from).hex()
+                bid_id = swap_client.postBid(offer_id, amount_from, addr_send_from=addr_from)
 
-            rv = {'bid_id': bid_id}
+            if have_data_entry(post_data, 'debugind'):
+                swap_client.setBidDebugInd(bid_id, int(get_data_entry(post_data, 'debugind')))
+
+            rv = {'bid_id': bid_id.hex()}
             return bytes(json.dumps(rv), 'UTF-8')
 
         bid_id = bytes.fromhex(url_split[3])
         assert(len(bid_id) == 28)
 
         if post_string != '':
-            post_data = urllib.parse.parse_qs(post_string)
-            if b'accept' in post_data:
+            if is_json:
+                post_data = json.loads(post_string)
+                post_data['is_json'] = True
+            else:
+                post_data = urllib.parse.parse_qs(post_string)
+            if have_data_entry(post_data, 'accept'):
                 swap_client.acceptBid(bid_id)
+            elif have_data_entry(post_data, 'debugind'):
+                swap_client.setBidDebugInd(bid_id, int(get_data_entry(post_data, 'debugind')))
 
         bid, xmr_swap, offer, xmr_offer, events = swap_client.getXmrBidAndOffer(bid_id)
         assert(bid), 'Unknown bid ID'

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019-2020 tecnovert
+# Copyright (c) 2019-2021 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -12,7 +12,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from enum import IntEnum, auto
 
 
-CURRENT_DB_VERSION = 6
+CURRENT_DB_VERSION = 7
 Base = declarative_base()
 
 
@@ -62,6 +62,7 @@ class Offer(Base):
     # Local fields
     auto_accept_bids = sa.Column(sa.Boolean)
     withdraw_to_addr = sa.Column(sa.String)  # Address to spend lock tx to - address from wallet if empty TODO
+    security_token = sa.Column(sa.LargeBinary)
 
     state = sa.Column(sa.Integer)
     states = sa.Column(sa.LargeBinary)  # Packed states and times
@@ -114,6 +115,7 @@ class Bid(Base):
     state_note = sa.Column(sa.String)
 
     debug_ind = sa.Column(sa.Integer)
+    security_token = sa.Column(sa.LargeBinary)
 
     initiate_tx = None
     participate_tx = None
