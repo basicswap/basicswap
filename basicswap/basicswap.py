@@ -211,6 +211,8 @@ class DebugTypes(IntEnum):
     BID_STOP_AFTER_COIN_A_LOCK = auto()
     BID_DONT_SPEND_COIN_A_LOCK_REFUND = auto()
     CREATE_INVALID_COIN_B_LOCK = auto()
+    BUYER_STOP_AFTER_ITX = auto()
+    MAKE_INVALID_PTX = auto()
 
 
 SEQUENCE_LOCK_BLOCKS = 1
@@ -754,11 +756,12 @@ class BasicSwap(BaseApp):
                 session.remove()
                 self.log.info('Upgraded database to version {}'.format(self.db_version))
                 continue
-            if db_version == 4:
+            if db_version == 7:
                 session = scoped_session(self.session_factory)
 
-                session.execute('ALTER TABLE bids ADD COLUMN withdraw_to_addr TEXT')
-                session.execute('ALTER TABLE offers ADD COLUMN withdraw_to_addr TEXT')
+                session.execute('ALTER TABLE transactions ADD COLUMN block_hash BLOB')
+                session.execute('ALTER TABLE transactions ADD COLUMN block_height INTEGER')
+                session.execute('ALTER TABLE transactions ADD COLUMN block_time INTEGER')
 
                 db_version += 1
                 self.db_version = db_version
@@ -1181,7 +1184,7 @@ class BasicSwap(BaseApp):
 
             offer = session.query(Offer).filter_by(offer_id=offer_id).first()
 
-            if len(offer.security_token > 0) and offer.security_token != security_token:
+            if offer.security_token is not None and offer.security_token != security_token:
                 raise ValueError('Mismatched security token')
 
             msg_buf = OfferRevokeMessage()
@@ -1551,7 +1554,19 @@ class BasicSwap(BaseApp):
             linked_id=bid.bid_id,
             event_type=int(event_type),
             event_msg=event_msg)
-        session.add(entry)
+
+        if session is not None:
+            session.add(entry)
+            return
+        self.mxDB.acquire()
+        try:
+            session = scoped_session(self.session_factory)
+            session.add(entry)
+            session.commit()
+        finally:
+            session.close()
+            session.remove()
+            self.mxDB.release()
 
     def countBidEvents(self, bid, event_type, session):
         q = session.execute('SELECT COUNT(*) FROM eventlog WHERE linked_type = {} AND linked_id = x\'{}\' AND event_type = {}'.format(int(TableTypes.BID), bid.bid_id.hex(), int(event_type))).first()
@@ -1748,11 +1763,11 @@ class BasicSwap(BaseApp):
                     xmr_swap = session.query(XmrSwap).filter_by(bid_id=bid.bid_id).first()
                     xmr_offer = session.query(XmrOffer).filter_by(offer_id=bid.offer_id).first()
                     self.loadBidTxns(bid, session)
-                    if list_events:
-                        events = self.list_bid_events(bid.bid_id, session)
                 else:
                     bid.initiate_tx = session.query(SwapTx).filter(sa.and_(SwapTx.bid_id == bid_id, SwapTx.tx_type == TxTypes.ITX)).first()
                     bid.participate_tx = session.query(SwapTx).filter(sa.and_(SwapTx.bid_id == bid_id, SwapTx.tx_type == TxTypes.PTX)).first()
+                if list_events:
+                    events = self.list_bid_events(bid.bid_id, session)
 
             return bid, xmr_swap, offer, xmr_offer, events
         finally:
@@ -2198,7 +2213,6 @@ class BasicSwap(BaseApp):
                 cblock_height = blockchaininfo['blocks']
                 max_tries = 1000
                 for i in range(max_tries):
-                    self.log.debug('wtf %d', i)
                     prev_block = self.callcoinrpc(coin_to, 'getblock', [cblock_hash, ])
                     self.log.debug('prev_block %s', str(prev_block))
 
@@ -2231,6 +2245,11 @@ class BasicSwap(BaseApp):
         amount_to = bid.amount_to
         # Check required?
         assert(amount_to == (bid.amount * offer.rate) // self.ci(offer.coin_from).COIN())
+
+        if bid.debug_ind == DebugTypes.MAKE_INVALID_PTX:
+            amount_to -= 1
+            self.log.debug('bid %s: Make invalid PTx for testing: %d.', bid_id.hex(), bid.debug_ind)
+            self.logBidEvent(bid, EventLogTypes.DEBUG_TWEAK_APPLIED, 'ind {}'.format(bid.debug_ind), None)
 
         if self.coin_clients[coin_to]['use_segwit']:
             p2wsh = getP2WSH(participate_script)
@@ -2491,6 +2510,12 @@ class BasicSwap(BaseApp):
         bid.setState(BidStates.SWAP_INITIATED)
         bid.setITxState(TxStates.TX_CONFIRMED)
 
+        if bid.debug_ind == DebugTypes.BUYER_STOP_AFTER_ITX:
+            self.log.debug('bid %s: Abandoning bid for testing: %d.', bid_id.hex(), bid.debug_ind)
+            bid.setState(BidStates.BID_ABANDONED)
+            self.logBidEvent(bid, EventLogTypes.DEBUG_TWEAK_APPLIED, 'ind {}'.format(bid.debug_ind), None)
+            return  # Bid saved in checkBidState
+
         # Seller first mode, buyer participates
         participate_script = self.deriveParticipateScript(bid_id, bid, offer)
         if bid.was_sent:
@@ -2511,7 +2536,7 @@ class BasicSwap(BaseApp):
                 script=participate_script,
             )
 
-        # bid saved in checkBidState
+        # Bid saved in checkBidState
 
     def setLastHeightChecked(self, coin_type, tx_height):
         chain_name = chainparams[coin_type]['name']
@@ -2661,6 +2686,7 @@ class BasicSwap(BaseApp):
                         bid.setState(BidStates.BID_ABANDONED)
                         rv = True
                         self.saveBidInSession(bid_id, bid, session, xmr_swap)
+                        self.logBidEvent(bid, EventLogTypes.DEBUG_TWEAK_APPLIED, 'ind {}'.format(bid.debug_ind), session)
                         session.commit()
                         return rv
 
@@ -2872,6 +2898,9 @@ class BasicSwap(BaseApp):
         coin_to = Coins(offer.coin_to)
         # TODO: Batch calls to scantxoutset
         # TODO: timeouts
+        if state == BidStates.BID_ABANDONED:
+            self.log.info('Deactivating abandoned bid: %s', bid_id.hex())
+            return True  # Mark bid for archiving
         if state == BidStates.BID_ACCEPTED:
             # Waiting for initiate txn to be confirmed in 'from' chain
             initiate_txnid_hex = bid.initiate_tx.txid.hex()
@@ -3096,13 +3125,13 @@ class BasicSwap(BaseApp):
                 # TODO: Wait for depth?
                 bid.setPTxState(TxStates.TX_REDEEMED)
 
-            if bid.was_sent:
-                txn = self.createRedeemTxn(coin_from, bid, for_txn_type='initiate')
-                txid = self.submitTxn(coin_from, txn)
+                if bid.was_sent:
+                    txn = self.createRedeemTxn(coin_from, bid, for_txn_type='initiate')
+                    txid = self.submitTxn(coin_from, txn)
 
-                bid.initiate_tx.spend_txid = bytes.fromhex(txid)
-                # bid.initiate_txn_redeem = bytes.fromhex(txn)  # Worth keeping?
-                self.log.debug('Submitted initiate redeem txn %s to %s chain for bid %s', txid, chainparams[coin_from]['name'], bid_id.hex())
+                    bid.initiate_tx.spend_txid = bytes.fromhex(txid)
+                    # bid.initiate_txn_redeem = bytes.fromhex(txn)  # Worth keeping?
+                    self.log.debug('Submitted initiate redeem txn %s to %s chain for bid %s', txid, chainparams[coin_from]['name'], bid_id.hex())
 
                 # TODO: Wait for depth? new state SWAP_TXI_REDEEM_SENT?
 
@@ -4089,6 +4118,7 @@ class BasicSwap(BaseApp):
         if bid.debug_ind == DebugTypes.CREATE_INVALID_COIN_B_LOCK:
             self.log.debug('XMR bid %s: Debug %d - Reducing lock b txn amount by 10%%.', bid_id.hex(), bid.debug_ind)
             bid.amount_to -= int(bid.amount_to * 0.1)
+            self.logBidEvent(bid, EventLogTypes.DEBUG_TWEAK_APPLIED, 'ind {}'.format(bid.debug_ind), session)
         try:
             b_lock_tx_id = ci_to.publishBLockTx(xmr_swap.pkbv, xmr_swap.pkbs, bid.amount_to, xmr_offer.b_fee_rate)
         except Exception as ex:

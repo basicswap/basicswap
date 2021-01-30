@@ -736,6 +736,9 @@ class HttpHandler(BaseHTTPRequestHandler):
 
         data = describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, events, edit_bid, show_txns, view_tx_ind)
 
+        if bid.debug_ind is not None and bid.debug_ind > 0:
+            messages.append('Debug flag set: {}'.format(bid.debug_ind))
+
         old_states = []
         num_states = len(bid.states) // 12
         for i in range(num_states):

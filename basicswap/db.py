@@ -12,7 +12,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from enum import IntEnum, auto
 
 
-CURRENT_DB_VERSION = 7
+CURRENT_DB_VERSION = 8
 Base = declarative_base()
 
 
@@ -177,6 +177,10 @@ class SwapTx(Base):
 
     spend_txid = sa.Column(sa.LargeBinary)
     spend_n = sa.Column(sa.Integer)
+
+    block_hash = sa.Column(sa.LargeBinary)
+    block_height = sa.Column(sa.Integer)
+    block_time = sa.Column(sa.BigInteger)
 
     state = sa.Column(sa.Integer)
     states = sa.Column(sa.LargeBinary)  # Packed states and times

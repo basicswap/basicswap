@@ -17,6 +17,7 @@ import os
 import sys
 import json
 import time
+import random
 import shutil
 import signal
 import logging
@@ -31,12 +32,15 @@ from basicswap.basicswap import (
     SwapTypes,
     BidStates,
     TxStates,
+    DebugTypes,
     SEQUENCE_LOCK_BLOCKS,
 )
 from basicswap.util import (
     COIN,
     toWIF,
     dumpje,
+    make_int,
+    format_amount,
 )
 from basicswap.rpc import (
     callrpc_cli,
@@ -442,10 +446,8 @@ class Test(unittest.TestCase):
         offer_id = swap_clients[1].postOffer(Coins.LTC, Coins.PART, 10 * COIN, 9.0 * COIN, 10 * COIN, SwapTypes.SELLER_FIRST)
 
         wait_for_offer(delay_event, swap_clients[0], offer_id)
-        offers = swap_clients[0].listOffers()
-        for offer in offers:
-            if offer.offer_id == offer_id:
-                bid_id = swap_clients[0].postBid(offer_id, offer.amount_from)
+        offer = swap_clients[0].getOffer(offer_id)
+        bid_id = swap_clients[0].postBid(offer_id, offer.amount_from)
 
         wait_for_bid(delay_event, swap_clients[1], bid_id)
         swap_clients[1].acceptBid(bid_id)
@@ -467,10 +469,8 @@ class Test(unittest.TestCase):
         offer_id = swap_clients[0].postOffer(Coins.LTC, Coins.BTC, 10 * COIN, 0.1 * COIN, 10 * COIN, SwapTypes.SELLER_FIRST)
 
         wait_for_offer(delay_event, swap_clients[1], offer_id)
-        offers = swap_clients[1].listOffers()
-        for offer in offers:
-            if offer.offer_id == offer_id:
-                bid_id = swap_clients[1].postBid(offer_id, offer.amount_from)
+        offer = swap_clients[1].getOffer(offer_id)
+        bid_id = swap_clients[1].postBid(offer_id, offer.amount_from)
 
         wait_for_bid(delay_event, swap_clients[0], bid_id)
         swap_clients[0].acceptBid(bid_id)
@@ -497,10 +497,8 @@ class Test(unittest.TestCase):
                                              SEQUENCE_LOCK_BLOCKS, 10)
 
         wait_for_offer(delay_event, swap_clients[1], offer_id)
-        offers = swap_clients[1].listOffers()
-        for offer in offers:
-            if offer.offer_id == offer_id:
-                bid_id = swap_clients[1].postBid(offer_id, offer.amount_from)
+        offer = swap_clients[1].getOffer(offer_id)
+        bid_id = swap_clients[1].postBid(offer_id, offer.amount_from)
 
         wait_for_bid(delay_event, swap_clients[0], bid_id)
         swap_clients[1].abandonBid(bid_id)
@@ -508,6 +506,11 @@ class Test(unittest.TestCase):
 
         wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=60)
         wait_for_bid(delay_event, swap_clients[1], bid_id, BidStates.BID_ABANDONED, sent=True, wait_for=60)
+
+        js_0_bid = json.loads(urlopen('http://127.0.0.1:1800/json/bids/{}'.format(bid_id.hex())).read())
+        js_1_bid = json.loads(urlopen('http://127.0.0.1:1801/json/bids/{}'.format(bid_id.hex())).read())
+        assert(js_0_bid['itx_state'] == 'Refunded')
+        assert(js_1_bid['ptx_state'] == 'Unknown')
 
         js_0 = json.loads(urlopen('http://127.0.0.1:1800/json').read())
         js_1 = json.loads(urlopen('http://127.0.0.1:1801/json').read())
@@ -523,10 +526,9 @@ class Test(unittest.TestCase):
         offer_id = swap_clients[0].postOffer(Coins.BTC, Coins.LTC, 10 * COIN, 10 * COIN, 10 * COIN, SwapTypes.SELLER_FIRST)
 
         wait_for_offer(delay_event, swap_clients[0], offer_id)
+        offer = swap_clients[0].getOffer(offer_id)
         offers = swap_clients[0].listOffers()
-        for offer in offers:
-            if offer.offer_id == offer_id:
-                bid_id = swap_clients[0].postBid(offer_id, offer.amount_from)
+        bid_id = swap_clients[0].postBid(offer_id, offer.amount_from)
 
         wait_for_bid(delay_event, swap_clients[0], bid_id)
         swap_clients[0].acceptBid(bid_id)
@@ -547,10 +549,8 @@ class Test(unittest.TestCase):
         offer_id = swap_clients[0].postOffer(Coins.BTC, Coins.LTC, 0.001 * COIN, 1.0 * COIN, 0.001 * COIN, SwapTypes.SELLER_FIRST)
 
         wait_for_offer(delay_event, swap_clients[0], offer_id)
-        offers = swap_clients[0].listOffers()
-        for offer in offers:
-            if offer.offer_id == offer_id:
-                bid_id = swap_clients[0].postBid(offer_id, offer.amount_from)
+        offer = swap_clients[0].getOffer(offer_id)
+        bid_id = swap_clients[0].postBid(offer_id, offer.amount_from)
 
         wait_for_bid(delay_event, swap_clients[0], bid_id)
         swap_clients[0].acceptBid(bid_id)
@@ -569,28 +569,7 @@ class Test(unittest.TestCase):
 
         offer_id = swap_clients[0].postOffer(Coins.PART, Coins.LTC, 100 * COIN, 0.1 * COIN, 100 * COIN, SwapTypes.BUYER_FIRST)
 
-        return  # TODO
-
-        wait_for_offer(delay_event, swap_clients[1], offer_id)
-        offers = swap_clients[1].listOffers()
-        assert(len(offers) == 1)
-        for offer in offers:
-            if offer.offer_id == offer_id:
-                bid_id = swap_clients[1].postBid(offer_id, offer.amount_from)
-
-        wait_for_bid(delay_event, swap_clients[0], bid_id)
-
-        swap_clients[0].acceptBid(bid_id)
-
-        wait_for_in_progress(delay_event, swap_clients[1], bid_id, sent=True)
-
-        wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=60)
-        wait_for_bid(delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=60)
-
-        js_0 = json.loads(urlopen('http://127.0.0.1:1800/json').read())
-        js_1 = json.loads(urlopen('http://127.0.0.1:1801/json').read())
-        assert(js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
-        assert(js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
+        logging.warning('TODO')
 
     def test_09_part_ltc_auto_accept(self):
         logging.info('---------- Test PART to LTC, auto accept bid')
@@ -607,6 +586,70 @@ class Test(unittest.TestCase):
 
         wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=60)
         wait_for_bid(delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=60)
+
+    def test_10_bad_ptx(self):
+        # Invalid PTX sent, swap should stall and ITx and PTx should be reclaimed by senders
+        logging.info('---------- Test bad PTx, LTC to BTC')
+        swap_clients = self.swap_clients
+
+        swap_value = make_int(random.uniform(0.001, 10.0), scale=8, r=1)
+        logging.info('swap_value {}'.format(format_amount(swap_value, 8)))
+        offer_id = swap_clients[0].postOffer(Coins.LTC, Coins.BTC, swap_value, 0.1 * COIN, swap_value, SwapTypes.SELLER_FIRST,
+                                             SEQUENCE_LOCK_BLOCKS, 10)
+
+        wait_for_offer(delay_event, swap_clients[1], offer_id)
+        offer = swap_clients[1].getOffer(offer_id)
+        bid_id = swap_clients[1].postBid(offer_id, offer.amount_from)
+        swap_clients[1].setBidDebugInd(bid_id, DebugTypes.MAKE_INVALID_PTX)
+
+        wait_for_bid(delay_event, swap_clients[0], bid_id)
+        swap_clients[0].acceptBid(bid_id)
+
+        wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=120)
+        wait_for_bid(delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=120)
+
+        js_0_bid = json.loads(urlopen('http://127.0.0.1:1800/json/bids/{}'.format(bid_id.hex())).read())
+        js_1_bid = json.loads(urlopen('http://127.0.0.1:1801/json/bids/{}'.format(bid_id.hex())).read())
+        assert(js_0_bid['itx_state'] == 'Refunded')
+        assert(js_1_bid['ptx_state'] == 'Refunded')
+
+        js_0 = json.loads(urlopen('http://127.0.0.1:1800/json').read())
+        js_1 = json.loads(urlopen('http://127.0.0.1:1801/json').read())
+        assert(js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
+        assert(js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
+
+    '''
+    def test_11_refund(self):
+        # Seller submits initiate txn, buyer doesn't respond, repeat of test 5 using debug_ind
+        logging.info('---------- Test refund, LTC to BTC')
+        swap_clients = self.swap_clients
+
+        swap_value = make_int(random.uniform(0.001, 10.0), scale=8, r=1)
+        logging.info('swap_value {}'.format(format_amount(swap_value, 8)))
+        offer_id = swap_clients[0].postOffer(Coins.LTC, Coins.BTC, swap_value, 0.1 * COIN, swap_value, SwapTypes.SELLER_FIRST,
+                                             SEQUENCE_LOCK_BLOCKS, 10)
+
+        wait_for_offer(delay_event, swap_clients[1], offer_id)
+        offer = swap_clients[1].getOffer(offer_id)
+        bid_id = swap_clients[1].postBid(offer_id, offer.amount_from)
+        swap_clients[1].setBidDebugInd(bid_id, DebugTypes.BUYER_STOP_AFTER_ITX)
+
+        wait_for_bid(delay_event, swap_clients[0], bid_id)
+        swap_clients[0].acceptBid(bid_id)
+
+        wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=120)
+        wait_for_bid(delay_event, swap_clients[1], bid_id, BidStates.BID_ABANDONED, sent=True, wait_for=120)
+
+        js_0_bid = json.loads(urlopen('http://127.0.0.1:1800/json/bids/{}'.format(bid_id.hex())).read())
+        js_1_bid = json.loads(urlopen('http://127.0.0.1:1801/json/bids/{}'.format(bid_id.hex())).read())
+        assert(js_0_bid['itx_state'] == 'Refunded')
+        assert(js_1_bid['ptx_state'] == 'Unknown')
+
+        js_0 = json.loads(urlopen('http://127.0.0.1:1800/json').read())
+        js_1 = json.loads(urlopen('http://127.0.0.1:1801/json').read())
+        assert(js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
+        assert(js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
+    '''
 
     def pass_99_delay(self):
         global stop_test

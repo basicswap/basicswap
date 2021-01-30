@@ -174,6 +174,7 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
         'participate_conf': 'None' if (not bid.participate_tx or not bid.participate_tx.conf) else bid.participate_tx.conf,
         'show_txns': show_txns,
         'can_abandon': True if bid.state not in (BidStates.BID_ABANDONED, BidStates.SWAP_COMPLETED) else False,
+        'events': bid_events,
     }
 
     if edit_bid:
@@ -224,7 +225,5 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
                     data['view_tx_hex'] = xmr_swap.a_lock_refund_tx.hex()
                 if view_tx_id == xmr_swap.a_lock_refund_spend_tx_id and xmr_swap.a_lock_refund_spend_tx:
                     data['view_tx_hex'] = xmr_swap.a_lock_refund_spend_tx.hex()
-
-        data['events'] = bid_events
 
     return data
