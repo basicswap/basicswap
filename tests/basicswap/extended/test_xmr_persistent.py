@@ -250,11 +250,11 @@ class Test(unittest.TestCase):
 
         wallets = json.loads(urlopen('http://127.0.0.1:{}/json/wallets'.format(UI_PORT + 1)).read())
 
-        xmr_addr1 = wallets['6']['deposit_address']
+        self.xmr_addr = wallets['6']['deposit_address']
         num_blocks = 100
         if callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'get_block_count')['count'] < num_blocks:
-            logging.info('Mining {} Monero blocks to {}.'.format(num_blocks, xmr_addr1))
-            callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'generateblocks', {'wallet_address': xmr_addr1, 'amount_of_blocks': num_blocks})
+            logging.info('Mining {} Monero blocks to {}.'.format(num_blocks, self.xmr_addr))
+            callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'generateblocks', {'wallet_address': self.xmr_addr, 'amount_of_blocks': num_blocks})
         logging.info('XMR blocks: %d', callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'get_block_count')['count'])
 
         self.btc_addr = callbtcrpc(0, 'getnewaddress', ['mining_addr', 'bech32'])

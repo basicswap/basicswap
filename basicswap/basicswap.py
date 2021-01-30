@@ -4116,8 +4116,8 @@ class BasicSwap(BaseApp):
             return
 
         if bid.debug_ind == DebugTypes.CREATE_INVALID_COIN_B_LOCK:
-            self.log.debug('XMR bid %s: Debug %d - Reducing lock b txn amount by 10%%.', bid_id.hex(), bid.debug_ind)
             bid.amount_to -= int(bid.amount_to * 0.1)
+            self.log.debug('XMR bid %s: Debug %d - Reducing lock b txn amount by 10%% to %s.', bid_id.hex(), bid.debug_ind, ci_to.format_amount(bid.amount_to))
             self.logBidEvent(bid, EventLogTypes.DEBUG_TWEAK_APPLIED, 'ind {}'.format(bid.debug_ind), session)
         try:
             b_lock_tx_id = ci_to.publishBLockTx(xmr_swap.pkbv, xmr_swap.pkbs, bid.amount_to, xmr_offer.b_fee_rate)
