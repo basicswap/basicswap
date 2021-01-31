@@ -101,11 +101,19 @@ def updateThread(cls):
         try:
             if cls.btc_addr is not None:
                 callbtcrpc(0, 'generatetoaddress', [1, cls.btc_addr])
+        except Exception as e:
+            print('updateThread error', str(e))
+        cls.delay_event.wait(random.randrange(cls.update_min, cls.update_max))
+
+
+def updateThreadXmr(cls):
+    while not cls.delay_event.is_set():
+        try:
             if cls.xmr_addr is not None:
                 callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'generateblocks', {'wallet_address': cls.xmr_addr, 'amount_of_blocks': 1})
         except Exception as e:
-            print('updateThread error', str(e))
-        cls.delay_event.wait(random.randrange(1, 4))
+            print('updateThreadXmr error', str(e))
+        cls.delay_event.wait(random.randrange(cls.xmr_update_min, cls.xmr_update_max))
 
 
 class Test(unittest.TestCase):
@@ -113,8 +121,15 @@ class Test(unittest.TestCase):
     def setUpClass(cls):
         super(Test, cls).setUpClass()
 
+        cls.update_min = int(os.getenv('UPDATE_THREAD_MIN_WAIT', '1'))
+        cls.update_max = cls.update_min * 4
+
+        cls.xmr_update_min = int(os.getenv('XMR_UPDATE_THREAD_MIN_WAIT', '1'))
+        cls.xmr_update_max = cls.xmr_update_min * 4
+
         cls.delay_event = threading.Event()
         cls.update_thread = None
+        cls.update_thread_xmr = None
         cls.processes = []
         cls.btc_addr = None
         cls.xmr_addr = None
@@ -204,8 +219,8 @@ class Test(unittest.TestCase):
 
                 settings['min_delay_event'] = 1
                 settings['max_delay_event'] = 4
-                settings['min_delay_retry'] = 10
-                settings['max_delay_retry'] = 20
+                settings['min_delay_retry'] = 15
+                settings['max_delay_retry'] = 30
                 settings['min_sequence_lock_seconds'] = 60
 
                 settings['check_progress_seconds'] = 5
@@ -270,6 +285,9 @@ class Test(unittest.TestCase):
         self.update_thread = threading.Thread(target=updateThread, args=(self,))
         self.update_thread.start()
 
+        self.update_thread_xmr = threading.Thread(target=updateThreadXmr, args=(self,))
+        self.update_thread_xmr.start()
+
         # Wait for height, or sequencelock is thrown off by genesis blocktime
         num_blocks = 3
         logging.info('Waiting for Particl chain height %d', num_blocks)
@@ -291,11 +309,14 @@ class Test(unittest.TestCase):
         cls.delay_event.set()
         if cls.update_thread:
             cls.update_thread.join()
+        if cls.update_thread_xmr:
+            cls.update_thread_xmr.join()
         for p in cls.processes:
             p.terminate()
         for p in cls.processes:
             p.join()
         cls.update_thread = None
+        cls.update_thread_xmr = None
         cls.processes = []
 
     def test_persistent(self):

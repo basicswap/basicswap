@@ -632,7 +632,6 @@ class Test(unittest.TestCase):
 
         assert(make_int(js_w1_after['2']['balance'], scale=8, r=1) - (make_int(js_w1_before['2']['balance'], scale=8, r=1) + amt_1) < 1000)
 
-
     def test_07_revoke_offer(self):
         logging.info('---------- Test offer revocaction')
         swap_clients = self.swap_clients

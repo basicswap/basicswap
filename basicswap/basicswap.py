@@ -200,6 +200,12 @@ class EventLogTypes(IntEnum):
     LOCK_TX_B_SEEN = auto()
     LOCK_TX_B_CONFIRMED = auto()
     DEBUG_TWEAK_APPLIED = auto()
+    FAILED_TX_B_REFUND = auto()
+    LOCK_TX_B_INVALID = auto()
+    LOCK_TX_A_REFUND_TX_PUBLISHED = auto()
+    LOCK_TX_A_REFUND_SPEND_TX_PUBLISHED = auto()
+    LOCK_TX_A_REFUND_SWIPE_TX_PUBLISHED = auto()
+    LOCK_TX_B_REFUND_TX_PUBLISHED = auto()
 
 
 class XmrSplitMsgTypes(IntEnum):
@@ -327,25 +333,37 @@ def getLockName(lock_type):
 
 def describeEventEntry(event_type, event_msg):
     if event_type == EventLogTypes.FAILED_TX_B_LOCK_PUBLISH:
-        return 'Failed to publish lock tx b'
+        return 'Failed to publish lock tx B'
     if event_type == EventLogTypes.FAILED_TX_B_LOCK_PUBLISH:
-        return 'Failed to publish lock tx b'
+        return 'Failed to publish lock tx B'
     if event_type == EventLogTypes.LOCK_TX_A_PUBLISHED:
-        return 'Lock tx a published'
+        return 'Lock tx A published'
     if event_type == EventLogTypes.LOCK_TX_B_PUBLISHED:
-        return 'Lock tx b published'
+        return 'Lock tx B published'
     if event_type == EventLogTypes.FAILED_TX_B_SPEND:
-        return 'Failed to publish lock tx b spend'
+        return 'Failed to publish lock tx B spend'
     if event_type == EventLogTypes.LOCK_TX_A_SEEN:
-        return 'Lock tx a seen in chain'
+        return 'Lock tx A seen in chain'
     if event_type == EventLogTypes.LOCK_TX_A_CONFIRMED:
-        return 'Lock tx a confirmed in chain'
+        return 'Lock tx A confirmed in chain'
     if event_type == EventLogTypes.LOCK_TX_B_SEEN:
-        return 'Lock tx b seen in chain'
+        return 'Lock tx B seen in chain'
     if event_type == EventLogTypes.LOCK_TX_B_CONFIRMED:
-        return 'Lock tx b confirmed in chain'
+        return 'Lock tx B confirmed in chain'
     if event_type == EventLogTypes.DEBUG_TWEAK_APPLIED:
         return 'Debug tweak applied ' + event_msg
+    if event_type == EventLogTypes.FAILED_TX_B_REFUND:
+        return 'Failed to publish lock tx B refund'
+    if event_type == EventLogTypes.LOCK_TX_B_INVALID:
+        return 'Detected invalid lock Tx B'
+    if event_type == EventLogTypes.LOCK_TX_A_REFUND_TX_PUBLISHED:
+        return 'Lock tx A refund tx published'
+    if event_type == EventLogTypes.LOCK_TX_A_REFUND_SPEND_TX_PUBLISHED:
+        return 'Lock tx A refund spend tx published'
+    if event_type == EventLogTypes.LOCK_TX_A_REFUND_SWIPE_TX_PUBLISHED:
+        return 'Lock tx A refund swipe tx published'
+    if event_type == EventLogTypes.LOCK_TX_B_REFUND_TX_PUBLISHED:
+        return 'Lock tx B refund tx published'
 
 
 def getExpectedSequence(lockType, lockVal, coin_type):
@@ -2693,6 +2711,7 @@ class BasicSwap(BaseApp):
                     if TxTypes.XMR_SWAP_A_LOCK_REFUND_SPEND not in bid.txns:
                         try:
                             txid = ci_from.publishTx(xmr_swap.a_lock_refund_spend_tx)
+                            self.logBidEvent(bid, EventLogTypes.LOCK_TX_A_REFUND_SPEND_TX_PUBLISHED, '', session)
 
                             self.log.info('Submitted coin a lock refund spend tx for bid {}'.format(bid_id.hex()))
                             bid.txns[TxTypes.XMR_SWAP_A_LOCK_REFUND_SPEND] = SwapTx(
@@ -2714,6 +2733,7 @@ class BasicSwap(BaseApp):
                     if TxTypes.XMR_SWAP_A_LOCK_REFUND_SWIPE not in bid.txns:
                         try:
                             txid = ci_from.publishTx(xmr_swap.a_lock_refund_swipe_tx)
+                            self.logBidEvent(bid, EventLogTypes.LOCK_TX_A_REFUND_SWIPE_TX_PUBLISHED, '', session)
                             self.log.info('Submitted coin a lock refund swipe tx for bid {}'.format(bid_id.hex()))
                             bid.txns[TxTypes.XMR_SWAP_A_LOCK_REFUND_SWIPE] = SwapTx(
                                 bid_id=bid_id,
@@ -2742,6 +2762,7 @@ class BasicSwap(BaseApp):
                         txid = ci_from.publishTx(xmr_swap.a_lock_refund_tx)
 
                         self.log.info('Submitted coin a lock refund tx for bid {}'.format(bid_id.hex()))
+                        self.logBidEvent(bid, EventLogTypes.LOCK_TX_A_REFUND_TX_PUBLISHED, '', session)
                         bid.txns[TxTypes.XMR_SWAP_A_LOCK_REFUND] = SwapTx(
                             bid_id=bid_id,
                             tx_type=TxTypes.XMR_SWAP_A_LOCK_REFUND,
@@ -2789,6 +2810,13 @@ class BasicSwap(BaseApp):
                 utxo = utxos[0]
                 if not bid.xmr_a_lock_tx.chain_height and utxo['height'] != 0:
                     self.logBidEvent(bid, EventLogTypes.LOCK_TX_A_SEEN, '', session)
+
+                    block_header = ci_from.getBlockHeaderFromHeight(utxo['height'])
+
+                    bid.xmr_a_lock_tx.block_hash = bytes.fromhex(block_header['hash'])
+                    bid.xmr_a_lock_tx.block_height = block_header['height']
+                    bid.xmr_a_lock_tx.block_time = block_header['time']  # Or median_time?
+
                     bid_changed = True
                 if bid.xmr_a_lock_tx.chain_height != utxo['height'] and utxo['height'] != 0:
                     bid.xmr_a_lock_tx.chain_height = utxo['height']
@@ -2817,7 +2845,12 @@ class BasicSwap(BaseApp):
                 bid_changed = False
                 # Have to use findTxB instead of relying on the first seen height to detect chain reorgs
                 found_tx = ci_to.findTxB(xmr_swap.vkbv, xmr_swap.pkbs, bid.amount_to, ci_to.blocks_confirmed, xmr_swap.b_restore_height)
-                if found_tx is not None:
+
+                if isinstance(found_tx, int) and found_tx == -1:
+                    if self.countBidEvents(bid, EventLogTypes.LOCK_TX_B_INVALID, session) < 1:
+                        self.logBidEvent(bid, EventLogTypes.LOCK_TX_B_INVALID, 'Detected invalid lock tx B', session)
+                        bid_changed = True
+                elif found_tx is not None:
                     if bid.xmr_b_lock_tx is None or not bid.xmr_b_lock_tx.chain_height:
                         self.logBidEvent(bid, EventLogTypes.LOCK_TX_B_SEEN, '', session)
                     if bid.xmr_b_lock_tx is None:
@@ -3581,6 +3614,7 @@ class BasicSwap(BaseApp):
         assert(msg['to'] == offer.addr_from), 'Received on incorrect address'
         assert(now <= offer.expire_at), 'Offer expired'
         assert(bid_data.amount >= offer.min_bid_amount), 'Bid amount below minimum'
+        assert(bid_data.amount <= offer.amount_from), 'Bid amount above offer amount'
         assert(now <= msg['sent'] + bid_data.time_valid), 'Bid expired'
 
         # TODO: Allow higher bids
@@ -3646,6 +3680,8 @@ class BasicSwap(BaseApp):
         if offer.auto_accept_bids:
             if self.countAcceptedBids(offer_id) > 0:
                 self.log.info('Not auto accepting bid %s, already have', bid_id.hex())
+            elif bid_data.amount != offer.amount_from:
+                self.log.info('Not auto accepting bid %s, want exact amount match', bid_id.hex())
             else:
                 delay = random.randrange(self.min_delay_event, self.max_delay_event)
                 self.log.info('Auto accepting bid %s in %d seconds', bid_id.hex(), delay)
@@ -3766,6 +3802,8 @@ class BasicSwap(BaseApp):
         if offer.auto_accept_bids:
             if self.countAcceptedBids(bid.offer_id) > 0:
                 self.log.info('Not auto accepting bid %s, already have', bid.bid_id.hex())
+            elif bid.amount != offer.amount_from:
+                self.log.info('Not auto accepting bid %s, want exact amount match', bid_id.hex())
             else:
                 delay = random.randrange(self.min_delay_event, self.max_delay_event)
                 self.log.info('Auto accepting xmr bid %s in %d seconds', bid.bid_id.hex(), delay)
@@ -3842,7 +3880,15 @@ class BasicSwap(BaseApp):
         ci_from = self.ci(Coins(offer.coin_from))
         ci_to = self.ci(Coins(offer.coin_to))
 
+        assert(offer.state == OfferStates.OFFER_RECEIVED), 'Bad offer state'
+        assert(msg['to'] == offer.addr_from), 'Received on incorrect address'
+        assert(now <= offer.expire_at), 'Offer expired'
+        assert(bid_data.amount >= offer.min_bid_amount), 'Bid amount below minimum'
+        assert(bid_data.amount <= offer.amount_from), 'Bid amount above offer amount'
+        assert(now <= msg['sent'] + bid_data.time_valid), 'Bid expired'
+
         self.log.debug('TODO: xmr bid validation')
+
         assert(ci_to.verifyKey(bid_data.kbvf))
         assert(ci_from.verifyPubkey(bid_data.pkaf))
 
@@ -4310,7 +4356,29 @@ class BasicSwap(BaseApp):
 
         address_to = ci_to.getMainWalletAddress()
 
-        txid = ci_to.spendBLockTx(address_to, xmr_swap.vkbv, vkbs, bid.amount_to, xmr_offer.b_fee_rate, xmr_swap.b_restore_height)
+        try:
+            txid = ci_to.spendBLockTx(address_to, xmr_swap.vkbv, vkbs, bid.amount_to, xmr_offer.b_fee_rate, xmr_swap.b_restore_height)
+            self.log.debug('Submitted lock B refund txn %s to %s chain for bid %s', txid.hex(), ci_to.coin_name(), bid_id.hex())
+            self.logBidEvent(bid, EventLogTypes.LOCK_TX_B_REFUND_TX_PUBLISHED, '', session)
+        except Exception as ex:
+            # TODO: Make min-conf 10?
+            error_msg = 'spendBLockTx refund failed for bid {} with error {}'.format(bid_id.hex(), str(ex))
+            num_retries = self.countBidEvents(bid, EventLogTypes.FAILED_TX_B_REFUND, session)
+            if num_retries > 0:
+                error_msg += ', retry no. {}'.format(num_retries)
+            self.log.error(error_msg)
+
+            str_error = str(ex)
+            if num_retries < 100 and 'Invalid unlocked_balance' in str_error:
+                delay = random.randrange(self.min_delay_retry, self.max_delay_retry)
+                self.log.info('Retrying sending xmr swap chain B refund tx for bid %s in %d seconds', bid_id.hex(), delay)
+                self.createEventInSession(delay, EventTypes.RECOVER_XMR_SWAP_LOCK_TX_B, bid_id, session)
+            else:
+                self.setBidError(bid_id, bid, 'spendBLockTx for refund failed: ' + str(ex), save_bid=False)
+                self.saveBidInSession(bid_id, bid, session, xmr_swap, save_in_progress=offer)
+
+            self.logBidEvent(bid, EventLogTypes.FAILED_TX_B_REFUND, str_error, session)
+            return
 
         bid.xmr_b_lock_tx.spend_txid = txid
 

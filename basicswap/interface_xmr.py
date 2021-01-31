@@ -268,7 +268,7 @@ class XMRInterface(CoinInterface):
                     return {'txid': transfer['tx_hash'], 'amount': transfer['amount'], 'height': 0 if 'block_height' not in transfer else transfer['block_height']}
                 else:
                     self._log.warning('Incorrect amount detected for coin b lock txn: {}'.format(transfer['tx_hash']))
-
+                    return -1
         return None
 
     def waitForLockTxB(self, kbv, Kbs, cb_swap_value, cb_block_confirmed, restore_height):
