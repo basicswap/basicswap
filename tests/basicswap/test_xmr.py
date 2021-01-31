@@ -576,12 +576,17 @@ class Test(unittest.TestCase):
         logging.info('---------- Test Multiple concurrent swaps')
         swap_clients = self.swap_clients
 
-        amt_1 = make_int(random.uniform(0.001, 100.0), scale=8, r=1)
-        amt_2 = make_int(random.uniform(0.001, 100.0), scale=8, r=1)
+        js_w0_before = json.loads(urlopen('http://127.0.0.1:1800/json/wallets').read())
+        js_w1_before = json.loads(urlopen('http://127.0.0.1:1801/json/wallets').read())
+
+        amt_1 = make_int(random.uniform(0.001, 49.0), scale=8, r=1)
+        amt_2 = make_int(random.uniform(0.001, 49.0), scale=8, r=1)
 
         rate_1 = make_int(random.uniform(80.0, 110.0), scale=12, r=1)
         rate_2 = make_int(random.uniform(0.01, 0.5), scale=12, r=1)
 
+        logging.info('amt_1 {}, rate_1 {}'.format(amt_1, rate_1))
+        logging.info('amt_2 {}, rate_2 {}'.format(amt_2, rate_2))
         offer1_id = swap_clients[0].postOffer(Coins.BTC, Coins.XMR, amt_1, rate_1, amt_1, SwapTypes.XMR_SWAP)
         offer2_id = swap_clients[0].postOffer(Coins.PART, Coins.XMR, amt_2, rate_2, amt_2, SwapTypes.XMR_SWAP)
 
@@ -619,6 +624,14 @@ class Test(unittest.TestCase):
 
         wait_for_none_active(delay_event, 1800)
         wait_for_none_active(delay_event, 1801)
+
+        js_w0_after = json.loads(urlopen('http://127.0.0.1:1800/json/wallets').read())
+        js_w1_after = json.loads(urlopen('http://127.0.0.1:1801/json/wallets').read())
+        logging.info('[rm] js_w0_after {}'.format(json.dumps(js_w0_after, indent=4)))
+        logging.info('[rm] js_w1_after {}'.format(json.dumps(js_w1_after, indent=4)))
+
+        assert(make_int(js_w1_after['2']['balance'], scale=8, r=1) - (make_int(js_w1_before['2']['balance'], scale=8, r=1) + amt_1) < 1000)
+
 
     def test_07_revoke_offer(self):
         logging.info('---------- Test offer revocaction')

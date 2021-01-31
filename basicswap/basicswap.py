@@ -4129,7 +4129,7 @@ class BasicSwap(BaseApp):
             self.log.error(error_msg)
 
             str_error = str(ex)
-            if num_retries < 5 and 'not enough unlocked money' in str_error or 'transaction was rejected by daemon' in str_error:
+            if num_retries < 5 and ('not enough unlocked money' in str_error or 'transaction was rejected by daemon' in str_error):
                 delay = random.randrange(self.min_delay_retry, self.max_delay_retry)
                 self.log.info('Retrying sending xmr swap chain B lock tx for bid %s in %d seconds', bid_id.hex(), delay)
                 self.createEventInSession(delay, EventTypes.SEND_XMR_SWAP_LOCK_TX_B, bid_id, session)
