@@ -205,7 +205,7 @@ def prepareCore(coin, version, settings, data_dir):
             assert_url = 'https://raw.githubusercontent.com/tecnovert/gitian.sigs/master/%s-%s/%s/%s' % (version, os_dir_name, signing_key_name, assert_filename)
         elif coin == 'litecoin':
             signing_key_name = 'thrasher'
-            release_url = 'https://download.litecoin.org/litecoin-{}/{}/{}'.format(version, os_name, release_filename)
+            release_url = 'https://download2.litecoin.org/litecoin-{}/{}/{}'.format(version, os_name, release_filename)
             assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, version.rsplit('.', 1)[0])
             assert_url = 'https://raw.githubusercontent.com/litecoin-project/gitian.sigs.ltc/master/%s-%s/%s/%s' % (version, os_dir_name, signing_key_name, assert_filename)
         elif coin == 'bitcoin':

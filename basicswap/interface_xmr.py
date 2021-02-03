@@ -69,7 +69,7 @@ class XMRInterface(CoinInterface):
         self._restore_height = coin_settings.get('restore_height', 0)
         self.setFeePriority(coin_settings.get('fee_priority', 0))
         self._sc = swap_client
-        self._log = self._sc.log if self._sc.log else logging
+        self._log = self._sc.log if self._sc and self._sc.log else logging
 
     def setFeePriority(self, new_priority):
         assert(new_priority >= 0 and new_priority < 4), 'Invalid fee_priority value'

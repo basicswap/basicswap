@@ -16,6 +16,7 @@ import struct
 import hashlib
 import secrets
 import datetime as dt
+import threading
 import traceback
 import sqlalchemy as sa
 import collections
@@ -33,7 +34,6 @@ from .interface_bitcore_btc import BitcoreBTCInterface
 from . import __version__
 from .util import (
     pubkeyToAddress,
-    format8,
     format_amount,
     format_timestamp,
     encodeAddress,
@@ -89,6 +89,11 @@ from .explorers import (
     ExplorerBitAps,
     ExplorerChainz,
 )
+from .types import (
+    SEQUENCE_LOCK_BLOCKS,
+    SEQUENCE_LOCK_TIME,
+    ABS_LOCK_BLOCKS,
+    ABS_LOCK_TIME)
 import basicswap.config as cfg
 import basicswap.network as bsn
 import basicswap.protocols.atomic_swap_1 as atomic_swap_1
@@ -152,6 +157,7 @@ class BidStates(IntEnum):
     SWAP_TIMEDOUT = auto()
     BID_ABANDONED = auto()          # Bid will no longer be processed
     BID_ERROR = auto()              # An error occurred
+    BID_STALLED_FOR_TEST = auto()
 
 
 class TxStates(IntEnum):
@@ -221,14 +227,6 @@ class DebugTypes(IntEnum):
     MAKE_INVALID_PTX = auto()
 
 
-SEQUENCE_LOCK_BLOCKS = 1
-SEQUENCE_LOCK_TIME = 2
-ABS_LOCK_BLOCKS = 3
-ABS_LOCK_TIME = 4
-
-SEQUENCE_LOCKTIME_GRANULARITY = 9  # 512 seconds
-SEQUENCE_LOCKTIME_TYPE_FLAG = (1 << 22)
-SEQUENCE_LOCKTIME_MASK = 0x0000ffff
 INITIATE_TX_TIMEOUT = 40 * 60  # TODO: make variable per coin
 
 
@@ -263,6 +261,8 @@ def strBidState(state):
         return 'Timed-out'
     if state == BidStates.BID_ABANDONED:
         return 'Abandoned'
+    if state == BidStates.BID_STALLED_FOR_TEST:
+        return 'Stalled (debug)'
     if state == BidStates.BID_ERROR:
         return 'Error'
     if state == BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED:
@@ -366,27 +366,6 @@ def describeEventEntry(event_type, event_msg):
         return 'Lock tx B refund tx published'
 
 
-def getExpectedSequence(lockType, lockVal, coin_type):
-    assert(lockVal >= 1), 'Bad lockVal'
-    if lockType == SEQUENCE_LOCK_BLOCKS:
-        return lockVal
-    if lockType == SEQUENCE_LOCK_TIME:
-        secondsLocked = lockVal
-        # Ensure the locked time is never less than lockVal
-        if secondsLocked % (1 << SEQUENCE_LOCKTIME_GRANULARITY) != 0:
-            secondsLocked += (1 << SEQUENCE_LOCKTIME_GRANULARITY)
-        secondsLocked >>= SEQUENCE_LOCKTIME_GRANULARITY
-        return secondsLocked | SEQUENCE_LOCKTIME_TYPE_FLAG
-    raise ValueError('Unknown lock type')
-
-
-def decodeSequence(lock_value):
-    # Return the raw value
-    if lock_value & SEQUENCE_LOCKTIME_TYPE_FLAG:
-        return (lock_value & SEQUENCE_LOCKTIME_MASK) << SEQUENCE_LOCKTIME_GRANULARITY
-    return lock_value & SEQUENCE_LOCKTIME_MASK
-
-
 def getVoutByAddress(txjs, p2sh):
     for o in txjs['vout']:
         try:
@@ -418,6 +397,29 @@ def getOfferProofOfFundsHash(offer_msg, offer_addr):
     offer_bytes = offer_msg.SerializeToString()
     h.update(offer_bytes)
     return h.digest()
+
+
+def threadPollChainState(swap_client, coin_type):
+    while not swap_client.delay_event.is_set():
+        try:
+            ci = swap_client.ci(coin_type)
+            if coin_type == Coins.XMR:
+                new_height = ci.getChainHeight()
+                if new_height != swap_client.coin_clients[coin_type]['chain_height']:
+                    swap_client.log.debug('New {} block at height: {}'.format(str(coin_type), new_height))
+                    with swap_client.mxDB:
+                        swap_client.coin_clients[coin_type]['chain_height'] = new_height
+            else:
+                chain_state = ci.getBlockchainInfo()
+                if chain_state['bestblockhash'] != swap_client.coin_clients[coin_type]['chain_best_block']:
+                    swap_client.log.debug('New {} block at height: {}'.format(str(coin_type), chain_state['blocks']))
+                    with swap_client.mxDB:
+                        swap_client.coin_clients[coin_type]['chain_height'] = chain_state['blocks']
+                        swap_client.coin_clients[coin_type]['chain_best_block'] = chain_state['bestblockhash']
+                        swap_client.coin_clients[coin_type]['chain_median_time'] = chain_state['mediantime']
+        except Exception as e:
+            swap_client.log.warning('threadPollChainState error: {}'.format(str(e)))
+        swap_client.delay_event.wait(random.randrange(20, 30))  # random to stagger updates
 
 
 class WatchedOutput():  # Watch for spends
@@ -475,6 +477,9 @@ class BasicSwap(BaseApp):
         self.swaps_in_progress = dict()
 
         self.SMSG_SECONDS_IN_HOUR = 60 * 2 if self.chain == 'regtest' else 60 * 60
+
+        self.delay_event = threading.Event()
+        self.threads = []
 
         # Encode key to match network
         wif_prefix = chainparams[Coins.PART][self.chain]['key_prefix']
@@ -551,10 +556,14 @@ class BasicSwap(BaseApp):
 
         with self.mxDB:
             self.is_running = False
+            self.delay_event.set()
 
         if self._network:
             self._network.stopNetwork()
             self._network = None
+
+        for t in self.threads:
+            t.join()
 
     def setCoinConnectParams(self, coin):
         # Set anything that does not require the daemon to be running
@@ -594,7 +603,6 @@ class BasicSwap(BaseApp):
             'conf_target': chain_client_settings.get('conf_target', 2),
             'watched_outputs': [],
             'last_height_checked': last_height_checked,
-            'last_height': None,
             'use_segwit': chain_client_settings.get('use_segwit', False),
             'use_csv': chain_client_settings.get('use_csv', True),
             'core_version_group': chain_client_settings.get('core_version_group', 0),
@@ -604,6 +612,11 @@ class BasicSwap(BaseApp):
             'chain_lookups': chain_client_settings.get('chain_lookups', 'local'),
             'restore_height': chain_client_settings.get('restore_height', 0),
             'fee_priority': chain_client_settings.get('fee_priority', 0),
+
+            # Chain state
+            'chain_height': None,
+            'chain_best_block': None,
+            'chain_median_time': None,
         }
 
         if self.coin_clients[coin]['connection_type'] == 'rpc':
@@ -696,6 +709,10 @@ class BasicSwap(BaseApp):
                 core_version = ci.getDaemonVersion()
                 self.log.info('%s Core version %d', ci.coin_name(), core_version)
                 self.coin_clients[c]['core_version'] = core_version
+
+                t = threading.Thread(target=threadPollChainState, args=(self, c))
+                self.threads.append(t)
+                t.start()
 
                 if c == Coins.PART:
                     self.coin_clients[c]['have_spent_index'] = ci.haveSpentIndex()
@@ -1065,10 +1082,12 @@ class BasicSwap(BaseApp):
         assert(coin_from != coin_to), 'coin_from == coin_to'
         try:
             coin_from_t = Coins(coin_from)
+            ci_from = self.ci(coin_from_t)
         except Exception:
             raise ValueError('Unknown coin from type')
         try:
             coin_to_t = Coins(coin_to)
+            ci_to = self.ci(coin_to_t)
         except Exception:
             raise ValueError('Unknown coin to type')
 
@@ -1124,10 +1143,10 @@ class BasicSwap(BaseApp):
                 xmr_offer = XmrOffer()
 
                 # Delay before the chain a lock refund tx can be mined
-                xmr_offer.lock_time_1 = getExpectedSequence(lock_type, lock_value, coin_from)
+                xmr_offer.lock_time_1 = ci_from.getExpectedSequence(lock_type, lock_value)
 
                 # Delay before the follower can spend from the chain a lock refund tx
-                xmr_offer.lock_time_2 = getExpectedSequence(lock_type, lock_value, coin_from)
+                xmr_offer.lock_time_2 = ci_from.getExpectedSequence(lock_type, lock_value)
 
                 xmr_offer.a_fee_rate = msg_buf.fee_rate_from
                 xmr_offer.b_fee_rate = msg_buf.fee_rate_to  # Unused: TODO - Set priority?
@@ -1359,7 +1378,8 @@ class BasicSwap(BaseApp):
         return self.callcoinrpc(coin_type, 'getnetworkinfo')['relayfee']
 
     def getFeeRateForCoin(self, coin_type, conf_target=2):
-        override_feerate = self.coin_clients[coin_type].get('override_feerate', None)
+        chain_client_settings = self.getChainClientSettings(coin_type)
+        override_feerate = chain_client_settings.get('override_feerate', None)
         if override_feerate:
             self.log.debug('Fee rate override used for %s: %f', str(coin_type), override_feerate)
             return override_feerate, 'override_feerate'
@@ -1592,7 +1612,7 @@ class BasicSwap(BaseApp):
 
     def postBid(self, offer_id, amount, addr_send_from=None, extra_options={}):
         # Bid to send bid.amount * offer.rate of coin_to in exchange for bid.amount of coin_from
-        self.log.debug('postBid %s %s', offer_id.hex(), format8(amount))
+        self.log.debug('postBid %s', offer_id.hex())
 
         offer = self.getOffer(offer_id)
         assert(offer), 'Offer not found: {}.'.format(offer_id.hex())
@@ -1828,6 +1848,7 @@ class BasicSwap(BaseApp):
             bid.contract_count = self.getNewContractId()
 
         coin_from = Coins(offer.coin_from)
+        ci_from = self.ci(coin_from)
         bid_date = dt.datetime.fromtimestamp(bid.created_at).date()
 
         secret = self.getContractSecret(bid_date, bid.contract_count)
@@ -1842,7 +1863,7 @@ class BasicSwap(BaseApp):
             script = bid.initiate_tx.script
         else:
             if offer.lock_type < ABS_LOCK_BLOCKS:
-                sequence = getExpectedSequence(offer.lock_type, offer.lock_value, coin_from)
+                sequence = ci_from.getExpectedSequence(offer.lock_type, offer.lock_value)
                 script = atomic_swap_1.buildContractScript(sequence, secret_hash, bid.pkhash_buyer, pkhash_refund)
             else:
                 if offer.lock_type == ABS_LOCK_BLOCKS:
@@ -1907,7 +1928,7 @@ class BasicSwap(BaseApp):
     def postXmrBid(self, offer_id, amount, addr_send_from=None):
         # Bid to send bid.amount * offer.rate of coin_to in exchange for bid.amount of coin_from
         # Send MSG1L F -> L
-        self.log.debug('postXmrBid %s %s', offer_id.hex(), format8(amount))
+        self.log.debug('postXmrBid %s', offer_id.hex())
 
         self.mxDB.acquire()
         try:
@@ -2187,13 +2208,14 @@ class BasicSwap(BaseApp):
     def createInitiateTxn(self, coin_type, bid_id, bid, initiate_script):
         if self.coin_clients[coin_type]['connection_type'] != 'rpc':
             return None
+        ci = self.ci(coin_type)
 
         if self.coin_clients[coin_type]['use_segwit']:
             addr_to = self.encodeSegwitP2WSH(coin_type, getP2WSH(initiate_script))
         else:
             addr_to = self.getScriptAddress(coin_type, initiate_script)
         self.log.debug('Create initiate txn for coin %s to %s for bid %s', str(coin_type), addr_to, bid_id.hex())
-        txn = self.callcoinrpc(coin_type, 'createrawtransaction', [[], {addr_to: format8(bid.amount)}])
+        txn = self.callcoinrpc(coin_type, 'createrawtransaction', [[], {addr_to: ci.format_amount(bid.amount)}])
 
         options = {
             'lockUnspents': True,
@@ -2207,6 +2229,7 @@ class BasicSwap(BaseApp):
         self.log.debug('deriveParticipateScript for bid %s', bid_id.hex())
 
         coin_to = Coins(offer.coin_to)
+        ci_to = self.ci(coin_to)
 
         bid_date = dt.datetime.fromtimestamp(bid.created_at).date()
 
@@ -2217,7 +2240,7 @@ class BasicSwap(BaseApp):
         # Participate txn is locked for half the time of the initiate txn
         lock_value = offer.lock_value // 2
         if offer.lock_type < ABS_LOCK_BLOCKS:
-            sequence = getExpectedSequence(offer.lock_type, lock_value, coin_to)
+            sequence = ci_to.getExpectedSequence(offer.lock_type, lock_value)
             participate_script = atomic_swap_1.buildContractScript(sequence, secret_hash, pkhash_seller, pkhash_buyer_refund)
         else:
             # Lock from the height or time of the block containing the initiate txn
@@ -2259,6 +2282,7 @@ class BasicSwap(BaseApp):
 
         if self.coin_clients[coin_to]['connection_type'] != 'rpc':
             return None
+        ci = self.ci(coin_to)
 
         amount_to = bid.amount_to
         # Check required?
@@ -2275,7 +2299,7 @@ class BasicSwap(BaseApp):
         else:
             addr_to = self.getScriptAddress(coin_to, participate_script)
 
-        txn = self.callcoinrpc(coin_to, 'createrawtransaction', [[], {addr_to: format8(amount_to)}])
+        txn = self.callcoinrpc(coin_to, 'createrawtransaction', [[], {addr_to: ci.format_amount(amount_to)}])
         options = {
             'lockUnspents': True,
             'conf_target': self.coin_clients[coin_to]['conf_target'],
@@ -2311,6 +2335,7 @@ class BasicSwap(BaseApp):
 
     def createRedeemTxn(self, coin_type, bid, for_txn_type='participate', addr_redeem_out=None, fee_rate=None):
         self.log.debug('createRedeemTxn for coin %s', str(coin_type))
+        ci = self.ci(coin_type)
 
         if for_txn_type == 'participate':
             prev_txnid = bid.participate_tx.txid.hex()
@@ -2334,7 +2359,7 @@ class BasicSwap(BaseApp):
             'vout': prev_n,
             'scriptPubKey': script_pub_key,
             'redeemScript': txn_script.hex(),
-            'amount': format8(prev_amount)}
+            'amount': ci.format_amount(prev_amount)}
 
         bid_date = dt.datetime.fromtimestamp(bid.created_at).date()
         wif_prefix = chainparams[Coins.PART][self.chain]['key_prefix']
@@ -2357,7 +2382,6 @@ class BasicSwap(BaseApp):
         tx_vsize = self.getContractSpendTxVSize(coin_type)
         tx_fee = (fee_rate * tx_vsize) / 1000
 
-        ci = self.ci(coin_type)
         self.log.debug('Redeem tx fee %s, rate %s', ci.format_amount(tx_fee, conv_int=True, r=1), str(fee_rate))
 
         amount_out = prev_amount - ci.make_int(tx_fee, r=1)
@@ -2373,7 +2397,7 @@ class BasicSwap(BaseApp):
         else:
             addr_redeem_out = replaceAddrPrefix(addr_redeem_out, Coins.PART, self.chain)
         self.log.debug('addr_redeem_out %s', addr_redeem_out)
-        output_to = ' outaddr={}:{}'.format(format8(amount_out), addr_redeem_out)
+        output_to = ' outaddr={}:{}'.format(ci.format_amount(amount_out), addr_redeem_out)
         if coin_type == Coins.PART:
             redeem_txn = self.calltx('-create' + prevout_s + output_to)
         else:
@@ -2471,7 +2495,7 @@ class BasicSwap(BaseApp):
             addr_refund_out = replaceAddrPrefix(addr_refund_out, Coins.PART, self.chain)
         self.log.debug('addr_refund_out %s', addr_refund_out)
 
-        output_to = ' outaddr={}:{}'.format(format8(amount_out), addr_refund_out)
+        output_to = ' outaddr={}:{}'.format(ci.format_amount(amount_out), addr_refund_out)
         if coin_type == Coins.PART:
             refund_txn = self.calltx('-create' + prevout_s + output_to)
         else:
@@ -2700,8 +2724,8 @@ class BasicSwap(BaseApp):
                 refund_tx = bid.txns[TxTypes.XMR_SWAP_A_LOCK_REFUND]
                 if bid.was_received:
                     if bid.debug_ind == DebugTypes.BID_DONT_SPEND_COIN_A_LOCK_REFUND:
-                        self.log.debug('XMR bid %s: Abandoning bid for testing: %d.', bid_id.hex(), bid.debug_ind)
-                        bid.setState(BidStates.BID_ABANDONED)
+                        self.log.debug('XMR bid %s: Stalling bid for testing: %d.', bid_id.hex(), bid.debug_ind)
+                        bid.setState(BidStates.BID_STALLED_FOR_TEST)
                         rv = True
                         self.saveBidInSession(bid_id, bid, session, xmr_swap)
                         self.logBidEvent(bid, EventLogTypes.DEBUG_TWEAK_APPLIED, 'ind {}'.format(bid.debug_ind), session)
@@ -2799,7 +2823,6 @@ class BasicSwap(BaseApp):
                 bid_changed = False
                 a_lock_tx_dest = ci_from.getScriptDest(xmr_swap.a_lock_tx_script)
                 utxos, chain_height = ci_from.getOutput(bid.xmr_a_lock_tx.txid, a_lock_tx_dest, bid.amount)
-                self.coin_clients[ci_from.coin_type()]['last_height'] = chain_height
 
                 if len(utxos) < 1:
                     return rv
@@ -2869,7 +2892,6 @@ class BasicSwap(BaseApp):
 
                 if bid.xmr_b_lock_tx and bid.xmr_b_lock_tx.chain_height is not None and bid.xmr_b_lock_tx.chain_height > 0:
                     chain_height = ci_to.getChainHeight()
-                    self.coin_clients[ci_to.coin_type()]['last_height'] = chain_height
 
                     if chain_height - bid.xmr_b_lock_tx.chain_height >= ci_to.blocks_confirmed:
                         self.logBidEvent(bid, EventLogTypes.LOCK_TX_B_CONFIRMED, '', session)
@@ -3476,7 +3498,9 @@ class BasicSwap(BaseApp):
         # Validate data
         now = int(time.time())
         coin_from = Coins(offer_data.coin_from)
+        ci_from = self.ci(coin_from)
         coin_to = Coins(offer_data.coin_to)
+        ci_to = self.ci(coin_to)
         chain_from = chainparams[coin_from][self.chain]
         assert(offer_data.coin_from != offer_data.coin_to), 'coin_from == coin_to'
 
@@ -3536,8 +3560,8 @@ class BasicSwap(BaseApp):
                     xmr_offer = XmrOffer()
 
                     xmr_offer.offer_id = offer_id
-                    xmr_offer.lock_time_1 = getExpectedSequence(offer_data.lock_type, offer_data.lock_value, coin_from)
-                    xmr_offer.lock_time_2 = getExpectedSequence(offer_data.lock_type, offer_data.lock_value, coin_from)
+                    xmr_offer.lock_time_1 = ci_from.getExpectedSequence(offer_data.lock_type, offer_data.lock_value)
+                    xmr_offer.lock_time_2 = ci_from.getExpectedSequence(offer_data.lock_type, offer_data.lock_value)
 
                     xmr_offer.a_fee_rate = offer_data.fee_rate_from
                     xmr_offer.b_fee_rate = offer_data.fee_rate_to
@@ -3705,6 +3729,7 @@ class BasicSwap(BaseApp):
         assert(bid is not None and bid.was_sent is True), 'Unknown bidid'
         assert(offer), 'Offer not found ' + bid.offer_id.hex()
         coin_from = Coins(offer.coin_from)
+        ci_from = self.ci(coin_from)
 
         assert(bid.expire_at > now + self._bid_expired_leeway), 'Bid expired'
 
@@ -3730,7 +3755,7 @@ class BasicSwap(BaseApp):
 
         script_lock_value = int(scriptvalues[2])
         if use_csv:
-            expect_sequence = getExpectedSequence(offer.lock_type, offer.lock_value, coin_from)
+            expect_sequence = ci_from.getExpectedSequence(offer.lock_type, offer.lock_value)
             assert(script_lock_value == expect_sequence), 'sequence mismatch'
         else:
             if offer.lock_type == ABS_LOCK_BLOCKS:
@@ -3803,7 +3828,7 @@ class BasicSwap(BaseApp):
             if self.countAcceptedBids(bid.offer_id) > 0:
                 self.log.info('Not auto accepting bid %s, already have', bid.bid_id.hex())
             elif bid.amount != offer.amount_from:
-                self.log.info('Not auto accepting bid %s, want exact amount match', bid_id.hex())
+                self.log.info('Not auto accepting bid %s, want exact amount match', bid.bid_id.hex())
             else:
                 delay = random.randrange(self.min_delay_event, self.max_delay_event)
                 self.log.info('Auto accepting xmr bid %s in %d seconds', bid.bid_id.hex(), delay)
@@ -4155,8 +4180,8 @@ class BasicSwap(BaseApp):
         ci_to = self.ci(coin_to)
 
         if bid.debug_ind == DebugTypes.BID_STOP_AFTER_COIN_A_LOCK:
-            self.log.debug('XMR bid %s: Abandoning bid for testing: %d.', bid_id.hex(), bid.debug_ind)
-            bid.setState(BidStates.BID_ABANDONED)
+            self.log.debug('XMR bid %s: Stalling bid for testing: %d.', bid_id.hex(), bid.debug_ind)
+            bid.setState(BidStates.BID_STALLED_FOR_TEST)
             self.saveBidInSession(bid_id, bid, session, xmr_swap, save_in_progress=offer)
             self.logBidEvent(bid, EventLogTypes.DEBUG_TWEAK_APPLIED, 'ind {}'.format(bid.debug_ind), session)
             return
@@ -4890,7 +4915,8 @@ class BasicSwap(BaseApp):
             now = int(time.time())
             session = scoped_session(self.session_factory)
 
-            query_str = 'SELECT bids.created_at, bids.bid_id, bids.offer_id, bids.amount, bids.state, bids.was_received, tx1.state, tx2.state FROM bids ' + \
+            query_str = 'SELECT bids.created_at, bids.bid_id, bids.offer_id, bids.amount, bids.state, bids.was_received, tx1.state, tx2.state, offers.coin_from FROM bids ' + \
+                        'LEFT JOIN offers ON offers.offer_id = bids.offer_id ' + \
                         'LEFT JOIN transactions AS tx1 ON tx1.bid_id = bids.bid_id AND tx1.tx_type = {} '.format(TxTypes.ITX) + \
                         'LEFT JOIN transactions AS tx2 ON tx2.bid_id = bids.bid_id AND tx2.tx_type = {} '.format(TxTypes.PTX)
 

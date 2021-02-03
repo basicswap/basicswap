@@ -515,7 +515,7 @@ class Test(unittest.TestCase):
 
         swap_clients[0].acceptXmrBid(bid_id)
 
-        wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.BID_ABANDONED, wait_for=180)
+        wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.BID_STALLED_FOR_TEST, wait_for=180)
         wait_for_bid(delay_event, swap_clients[1], bid_id, BidStates.XMR_SWAP_FAILED_SWIPED, wait_for=80, sent=True)
 
         js_w0_after = json.loads(urlopen('http://127.0.0.1:1800/json/wallets').read())

@@ -8,7 +8,6 @@ import json
 import urllib.parse
 
 from .util import (
-    format8,
     format_timestamp,
 )
 from .basicswap import (
@@ -174,7 +173,8 @@ def js_bids(self, url_split, post_string, is_json):
         'bid_id': b[1].hex(),
         'offer_id': b[2].hex(),
         'created_at': format_timestamp(b[0]),
-        'amount_from': format8(b[3]),
+        'coin_from': b[8],
+        'amount_from': swap_client.ci(b[8]).format_amount(b[3]),
         'bid_state': strBidState(b[4])
     } for b in bids]), 'UTF-8')
 

@@ -20,6 +20,9 @@ from .basicswap import (
     strBidState,
     strTxState,
 )
+from .types import (
+    SEQUENCE_LOCK_TIME,
+)
 
 PAGE_LIMIT = 50
 
@@ -186,15 +189,15 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
             txns = []
             if bid.xmr_a_lock_tx:
                 confirms = None
-                if swap_client.coin_clients[ci_from.coin_type()]['last_height'] and bid.xmr_a_lock_tx.chain_height:
-                    confirms = (swap_client.coin_clients[ci_from.coin_type()]['last_height'] - bid.xmr_a_lock_tx.chain_height) + 1
+                if swap_client.coin_clients[ci_from.coin_type()]['chain_height'] and bid.xmr_a_lock_tx.chain_height:
+                    confirms = (swap_client.coin_clients[ci_from.coin_type()]['chain_height'] - bid.xmr_a_lock_tx.chain_height) + 1
                 txns.append({'type': 'Chain A Lock', 'txid': bid.xmr_a_lock_tx.txid.hex(), 'confirms': confirms})
             if bid.xmr_a_lock_spend_tx:
                 txns.append({'type': 'Chain A Lock Spend', 'txid': bid.xmr_a_lock_spend_tx.txid.hex()})
             if bid.xmr_b_lock_tx:
                 confirms = None
-                if swap_client.coin_clients[ci_to.coin_type()]['last_height'] and bid.xmr_b_lock_tx.chain_height:
-                    confirms = (swap_client.coin_clients[ci_to.coin_type()]['last_height'] - bid.xmr_b_lock_tx.chain_height) + 1
+                if swap_client.coin_clients[ci_to.coin_type()]['chain_height'] and bid.xmr_b_lock_tx.chain_height:
+                    confirms = (swap_client.coin_clients[ci_to.coin_type()]['chain_height'] - bid.xmr_b_lock_tx.chain_height) + 1
                 txns.append({'type': 'Chain B Lock', 'txid': bid.xmr_b_lock_tx.txid.hex(), 'confirms': confirms})
             if bid.xmr_b_lock_tx and bid.xmr_b_lock_tx.spend_txid:
                 txns.append({'type': 'Chain B Lock Spend', 'txid': bid.xmr_b_lock_tx.spend_txid.hex()})
@@ -214,6 +217,15 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
             data['participate_tx_spend'] = getTxSpendHex(bid, TxTypes.PTX)
 
     if offer.swap_type == SwapTypes.XMR_SWAP:
+
+        data['coin_a_lock_refund_tx_est_final'] = 'None'
+        if bid.xmr_a_lock_tx and bid.xmr_a_lock_tx.block_time:
+            if offer.lock_type == SEQUENCE_LOCK_TIME:
+                raw_sequence = ci_from.getExpectedSequence(offer.lock_type, offer.lock_value)
+                seconds_locked = ci_from.decodeSequence(raw_sequence)
+                data['coin_a_lock_refund_tx_est_final'] = bid.xmr_a_lock_tx.block_time + seconds_locked
+                data['coin_a_last_median_time'] = swap_client.coin_clients[offer.coin_from]['chain_median_time']
+
         if view_tx_ind:
             data['view_tx_ind'] = view_tx_ind
             view_tx_id = bytes.fromhex(view_tx_ind)

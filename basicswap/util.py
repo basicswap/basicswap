@@ -27,16 +27,6 @@ def assert_cond(v, err='Bad opcode'):
         raise ValueError(err)
 
 
-def format8(i):
-    n = abs(i)
-    quotient = n // COIN
-    remainder = n % COIN
-    rv = "%d.%08d" % (quotient, remainder)
-    if i < 0:
-        rv = '-' + rv
-    return rv
-
-
 def toBool(s):
     return s.lower() in ["1", "true"]
 

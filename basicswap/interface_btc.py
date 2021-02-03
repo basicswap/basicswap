@@ -62,8 +62,17 @@ from .contrib.test_framework.script import (
     SegwitV0SignatureHash,
     hash160)
 
+from .types import (
+    SEQUENCE_LOCK_BLOCKS,
+    SEQUENCE_LOCK_TIME)
+
 from .chainparams import CoinInterface, Coins, chainparams
 from .rpc import make_rpc_func
+
+
+SEQUENCE_LOCKTIME_GRANULARITY = 9  # 512 seconds
+SEQUENCE_LOCKTIME_TYPE_FLAG = (1 << 22)
+SEQUENCE_LOCKTIME_MASK = 0x0000ffff
 
 
 def findOutput(tx, script_pk):
@@ -121,6 +130,27 @@ class BTCInterface(CoinInterface):
     def txoType():
         return CTxOut
 
+    @staticmethod
+    def getExpectedSequence(lockType, lockVal):
+        assert(lockVal >= 1), 'Bad lockVal'
+        if lockType == SEQUENCE_LOCK_BLOCKS:
+            return lockVal
+        if lockType == SEQUENCE_LOCK_TIME:
+            secondsLocked = lockVal
+            # Ensure the locked time is never less than lockVal
+            if secondsLocked % (1 << SEQUENCE_LOCKTIME_GRANULARITY) != 0:
+                secondsLocked += (1 << SEQUENCE_LOCKTIME_GRANULARITY)
+            secondsLocked >>= SEQUENCE_LOCKTIME_GRANULARITY
+            return secondsLocked | SEQUENCE_LOCKTIME_TYPE_FLAG
+        raise ValueError('Unknown lock type')
+
+    @staticmethod
+    def decodeSequence(lock_value):
+        # Return the raw value
+        if lock_value & SEQUENCE_LOCKTIME_TYPE_FLAG:
+            return (lock_value & SEQUENCE_LOCKTIME_MASK) << SEQUENCE_LOCKTIME_GRANULARITY
+        return lock_value & SEQUENCE_LOCKTIME_MASK
+
     def __init__(self, coin_settings, network, swap_client=None):
         super().__init__()
         rpc_host = coin_settings.get('rpchost', '127.0.0.1')
@@ -129,7 +159,7 @@ class BTCInterface(CoinInterface):
         self.blocks_confirmed = coin_settings['blocks_confirmed']
         self.setConfTarget(coin_settings['conf_target'])
         self._sc = swap_client
-        self._log = self._sc.log if self._sc.log else logging
+        self._log = self._sc.log if self._sc and self._sc.log else logging
 
     def setConfTarget(self, new_conf_target):
         assert(new_conf_target >= 1 and new_conf_target < 33), 'Invalid conf_target value'
@@ -152,6 +182,9 @@ class BTCInterface(CoinInterface):
 
     def getBlockHeaderFromHeight(self, height):
         block_hash = self.rpc_callback('getblockhash', [height])
+        return self.rpc_callback('getblockheader', [block_hash])
+
+    def getBlockHeader(self, block_hash):
         return self.rpc_callback('getblockheader', [block_hash])
 
     def initialiseWallet(self, key_bytes):
@@ -363,7 +396,7 @@ class BTCInterface(CoinInterface):
         tx.vout.append(self.txoType()(locked_coin, self.getScriptForPubkeyHash(pkh_refund_to)))
 
         witness_bytes = len(script_lock_refund)
-        witness_bytes += 73 * 2  # 2 signatures (72 + 1 byte size)
+        witness_bytes += 74 * 2  # 2 signatures (72 + 1 byte sighashtype + 1 byte size) - Use maximum txn size for estimate
         witness_bytes += 4  # 1 empty, 1 true witness stack values
         witness_bytes += getCompactSizeLen(witness_bytes)
         vsize = self.getTxVSize(tx, add_witness_bytes=witness_bytes)
@@ -398,7 +431,7 @@ class BTCInterface(CoinInterface):
         tx.vout.append(self.txoType()(locked_coin, self.getScriptForPubkeyHash(pkh_dest)))
 
         witness_bytes = len(script_lock_refund)
-        witness_bytes += 73  # signature (72 + 1 byte size)
+        witness_bytes += 74  # 2 signatures (72 + 1 byte sighashtype + 1 byte size) - Use maximum txn size for estimate
         witness_bytes += 1  # 1 empty stack value
         witness_bytes += getCompactSizeLen(witness_bytes)
         vsize = self.getTxVSize(tx, add_witness_bytes=witness_bytes)
@@ -429,7 +462,7 @@ class BTCInterface(CoinInterface):
 
         witness_bytes = len(script_lock)
         witness_bytes += 33  # sv, size
-        witness_bytes += 73 * 2  # 2 signatures (72 + 1 byte size)
+        witness_bytes += 74 * 2  # 2 signatures (72 + 1 byte sighashtype + 1 byte size) - Use maximum txn size for estimate
         witness_bytes += 4  # 1 empty, 1 true witness stack values
         witness_bytes += getCompactSizeLen(witness_bytes)
         vsize = self.getTxVSize(tx, add_witness_bytes=witness_bytes)
@@ -546,7 +579,7 @@ class BTCInterface(CoinInterface):
         assert(fee_paid > 0)
 
         witness_bytes = len(prevout_script)
-        witness_bytes += 73 * 2  # 2 signatures (72 + 1 byts size)
+        witness_bytes += 74 * 2  # 2 signatures (72 + 1 byte sighashtype + 1 byte size) - Use maximum txn size for estimate
         witness_bytes += 2  # 2 empty witness stack values
         witness_bytes += getCompactSizeLen(witness_bytes)
         vsize = self.getTxVSize(tx, add_witness_bytes=witness_bytes)
@@ -555,7 +588,7 @@ class BTCInterface(CoinInterface):
         self._log.info('tx amount, vsize, feerate: %ld, %ld, %ld', locked_coin, vsize, fee_rate_paid)
 
         if not self.compareFeeRates(fee_rate_paid, feerate):
-            raise ValueError('Bad fee rate')
+            raise ValueError('Bad fee rate, expected: {}'.format(feerate))
 
         return tx_hash, locked_coin
 
@@ -592,7 +625,7 @@ class BTCInterface(CoinInterface):
         assert(fee_paid > 0)
 
         witness_bytes = len(prevout_script)
-        witness_bytes += 73 * 2  # 2 signatures (72 + 1 byts size)
+        witness_bytes += 74 * 2  # 2 signatures (72 + 1 byte sighashtype + 1 byte size) - Use maximum txn size for estimate
         witness_bytes += 4  # 1 empty, 1 true witness stack values
         witness_bytes += getCompactSizeLen(witness_bytes)
         vsize = self.getTxVSize(tx, add_witness_bytes=witness_bytes)
@@ -601,7 +634,7 @@ class BTCInterface(CoinInterface):
         self._log.info('tx amount, vsize, feerate: %ld, %ld, %ld', tx_value, vsize, fee_rate_paid)
 
         if not self.compareFeeRates(fee_rate_paid, feerate):
-            raise ValueError('Bad fee rate')
+            raise ValueError('Bad fee rate, expected: {}'.format(feerate))
 
         return True
 
@@ -641,7 +674,7 @@ class BTCInterface(CoinInterface):
 
         witness_bytes = len(lock_tx_script)
         witness_bytes += 33  # sv, size
-        witness_bytes += 73 * 2  # 2 signatures (72 + 1 byts size)
+        witness_bytes += 74 * 2  # 2 signatures (72 + 1 byte sighashtype + 1 byte size) - Use maximum txn size for estimate
         witness_bytes += 4  # 1 empty, 1 true witness stack values
         witness_bytes += getCompactSizeLen(witness_bytes)
         vsize = self.getTxVSize(tx, add_witness_bytes=witness_bytes)
@@ -650,7 +683,7 @@ class BTCInterface(CoinInterface):
         self._log.info('tx amount, vsize, feerate: %ld, %ld, %ld', tx.vout[0].nValue, vsize, fee_rate_paid)
 
         if not self.compareFeeRates(fee_rate_paid, feerate):
-            raise ValueError('Bad fee rate')
+            raise ValueError('Bad fee rate, expected: {}'.format(feerate))
 
         return True
 

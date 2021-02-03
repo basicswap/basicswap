@@ -23,6 +23,11 @@
 <tr><td>Expired At</td><td>{{ data.expired_at }}</td></tr>
 <tr><td>Sent</td><td>{{ data.was_sent }}</td></tr>
 <tr><td>Received</td><td>{{ data.was_received }}</td></tr>
+{% if data.coin_a_lock_refund_tx_est_final != 'None' %}
+<tr><td>{{ data.ticker_from }} lock refund tx valid at</td><td>{{ data.coin_a_lock_refund_tx_est_final | formatts }}</td></tr>
+<tr><td>{{ data.ticker_from }} chain median time</td><td>{{ data.coin_a_last_median_time | formatts }}</td></tr>
+{% endif %}
+
 </table>
 
 <form method="post">

@@ -30,10 +30,7 @@ from basicswap.util import (
     make_int,
     format_amount,
     validate_amount)
-from basicswap.basicswap import (
-    Coins,
-    getExpectedSequence,
-    decodeSequence,
+from basicswap.types import (
     SEQUENCE_LOCK_BLOCKS,
     SEQUENCE_LOCK_TIME)
 
@@ -57,21 +54,24 @@ class Test(unittest.TestCase):
         test_case(4194642)
 
     def test_sequence(self):
+        coin_settings = {'rpcport': 0, 'rpcauth': 'none', 'blocks_confirmed': 1, 'conf_target': 1}
+        ci = BTCInterface(coin_settings, 'regtest')
+
         time_val = 48 * 60 * 60
-        encoded = getExpectedSequence(SEQUENCE_LOCK_TIME, time_val, Coins.PART)
-        decoded = decodeSequence(encoded)
+        encoded = ci.getExpectedSequence(SEQUENCE_LOCK_TIME, time_val)
+        decoded = ci.decodeSequence(encoded)
         assert(decoded >= time_val)
         assert(decoded <= time_val + 512)
 
         time_val = 24 * 60
-        encoded = getExpectedSequence(SEQUENCE_LOCK_TIME, time_val, Coins.PART)
-        decoded = decodeSequence(encoded)
+        encoded = ci.getExpectedSequence(SEQUENCE_LOCK_TIME, time_val)
+        decoded = ci.decodeSequence(encoded)
         assert(decoded >= time_val)
         assert(decoded <= time_val + 512)
 
         blocks_val = 123
-        encoded = getExpectedSequence(SEQUENCE_LOCK_BLOCKS, blocks_val, Coins.PART)
-        decoded = decodeSequence(encoded)
+        encoded = ci.getExpectedSequence(SEQUENCE_LOCK_BLOCKS, blocks_val)
+        decoded = ci.decodeSequence(encoded)
         assert(decoded == blocks_val)
 
     def test_make_int(self):

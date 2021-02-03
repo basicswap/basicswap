@@ -554,14 +554,14 @@ class Test(unittest.TestCase):
 
         wait_for_bid(delay_event, swap_clients[0], bid_id)
         swap_clients[0].acceptBid(bid_id)
-        swap_clients[0].coin_clients[Coins.BTC]['override_feerate'] = 10.0
-        swap_clients[0].coin_clients[Coins.LTC]['override_feerate'] = 10.0
+        swap_clients[0].getChainClientSettings(Coins.BTC)['override_feerate'] = 10.0
+        swap_clients[0].getChainClientSettings(Coins.LTC)['override_feerate'] = 10.0
 
         wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.BID_ERROR, wait_for=60)
 
         swap_clients[0].abandonBid(bid_id)
-        del swap_clients[0].coin_clients[Coins.BTC]['override_feerate']
-        del swap_clients[0].coin_clients[Coins.LTC]['override_feerate']
+        del swap_clients[0].getChainClientSettings(Coins.BTC)['override_feerate']
+        del swap_clients[0].getChainClientSettings(Coins.LTC)['override_feerate']
 
     def test_08_part_ltc_buyer_first(self):
         logging.info('---------- Test PART to LTC, buyer first')
