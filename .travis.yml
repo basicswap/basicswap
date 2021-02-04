@@ -20,7 +20,7 @@ cache:
 before_install:
   - sudo apt-get install -y wget python3-pip gnupg unzip protobuf-compiler automake libtool pkg-config
 install:
-  - travis_retry pip install tox
+  - travis_retry pip install tox pytest
 before_script:
   - wget -O coincurve-anonswap.zip https://github.com/tecnovert/coincurve/archive/anonswap.zip
   - unzip coincurve-anonswap.zip
@@ -35,7 +35,10 @@ script:
   - cp -r ${BIN_DIR} "${DATADIRS}/bin"
   - mkdir -p "${TEST_RELOAD_PATH}/bin"
   - cp -r ${BIN_DIR} "${TEST_RELOAD_PATH}/bin"
-  - tox
+  - # tox
+  - pytest tests/basicswap/test_xmr.py
+  - pytest tests/basicswap/test_xmr_reload.py
+  - pytest tests/basicswap/test_xmr_bids_offline.py
 after_success:
   - echo "End test"
 jobs:

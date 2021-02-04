@@ -760,6 +760,8 @@ def main():
                 swap_client.createCoinInterface(c)
                 swap_client.waitForDaemonRPC(c)
                 swap_client.initialiseWallet(c)
+            swap_client.finalise()
+            del swap_client
     finally:
         for d in daemons:
             logging.info('Interrupting {}'.format(d.pid))

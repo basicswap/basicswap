@@ -23,13 +23,14 @@ import collections
 
 from enum import IntEnum, auto
 from sqlalchemy.orm import sessionmaker, scoped_session
+from sqlalchemy.orm.session import close_all_sessions
 
 from .interface_part import PARTInterface
 from .interface_btc import BTCInterface
 from .interface_ltc import LTCInterface
 from .interface_nmc import NMCInterface
 from .interface_xmr import XMRInterface
-from .interface_bitcore_btc import BitcoreBTCInterface
+from .interface_passthrough_btc import PassthroughBTCInterface
 
 from . import __version__
 from .util import (
@@ -487,13 +488,20 @@ class BasicSwap(BaseApp):
 
         self.network_pubkey = self.settings['network_pubkey']
         self.network_addr = pubkeyToAddress(chainparams[Coins.PART][self.chain]['pubkey_address'], bytes.fromhex(self.network_pubkey))
-        # self.wallet = self.settings.get('wallet', None)  # TODO: Move to coin_clients
 
         self.sqlite_file = os.path.join(self.data_dir, 'db{}.sqlite'.format('' if self.chain == 'mainnet' else ('_' + self.chain)))
         db_exists = os.path.exists(self.sqlite_file)
-        self.engine = sa.create_engine('sqlite:///' + self.sqlite_file)  # , echo=True
+
+        # HACK: create_all hangs when using tox, unless create_engine is called with echo=True
         if not db_exists:
+            if os.getenv('FOR_TOX'):
+                self.engine = sa.create_engine('sqlite:///' + self.sqlite_file, echo=True)
+            else:
+                self.engine = sa.create_engine('sqlite:///' + self.sqlite_file)
+            close_all_sessions()
             Base.metadata.create_all(self.engine)
+            self.engine.dispose()
+        self.engine = sa.create_engine('sqlite:///' + self.sqlite_file)
         self.session_factory = sessionmaker(bind=self.engine, expire_on_commit=False)
 
         session = scoped_session(self.session_factory)
@@ -564,6 +572,9 @@ class BasicSwap(BaseApp):
 
         for t in self.threads:
             t.join()
+
+        close_all_sessions()
+        self.engine.dispose()
 
     def setCoinConnectParams(self, coin):
         # Set anything that does not require the daemon to be running
@@ -648,9 +659,9 @@ class BasicSwap(BaseApp):
         else:
             raise ValueError('Unknown coin type')
 
-    def createBitcoreInterface(self, coin):
+    def createPassthroughInterface(self, coin):
         if coin == Coins.BTC:
-            return BitcoreBTCInterface(self.coin_clients[coin], self.chain)
+            return PassthroughBTCInterface(self.coin_clients[coin], self.chain)
         else:
             raise ValueError('Unknown coin type')
 
@@ -690,8 +701,8 @@ class BasicSwap(BaseApp):
     def createCoinInterface(self, coin):
         if self.coin_clients[coin]['connection_type'] == 'rpc':
             self.coin_clients[coin]['interface'] = self.createInterface(coin)
-        elif self.coin_clients[coin]['connection_type'] == 'bitcore':
-            self.coin_clients[coin]['interface'] = self.createBitcoreInterface(coin)
+        elif self.coin_clients[coin]['connection_type'] == 'passthrough':
+            self.coin_clients[coin]['interface'] = self.createPassthroughInterface(coin)
 
     def start(self):
         self.log.info('Starting BasicSwap %s, database v%d\n\n', __version__, self.db_version)
@@ -825,13 +836,15 @@ class BasicSwap(BaseApp):
         self.stopRunning(1)  # systemd will try restart if fail_code != 0
 
     def checkSynced(self, coin_from, coin_to):
-        check_coins = [coin_from, coin_to]
+        check_coins = (coin_from, coin_to)
         for c in check_coins:
             if self.coin_clients[c]['connection_type'] != 'rpc':
                 continue
-                synced = round(self.callcoinrpc(c, 'getblockchaininfo')['verificationprogress'], 3)
-                if synced < 1.0:
-                    raise ValueError('{} chain is still syncing, currently at {}.'.format(self.coin_clients[c]['name'], synced))
+            if c == Coins.XMR:
+                continue  # TODO
+            synced = round(self.ci(c).getBlockchainInfo()['verificationprogress'], 3)
+            if synced < 1.0:
+                raise ValueError('{} chain is still syncing, currently at {}.'.format(self.coin_clients[c]['name'], synced))
 
     def initialiseWallet(self, coin_type):
         if coin_type == Coins.PART:
@@ -876,20 +889,19 @@ class BasicSwap(BaseApp):
             self.mxDB.release()
 
     def setStringKV(self, str_key, str_val):
-        self.mxDB.acquire()
-        try:
-            session = scoped_session(self.session_factory)
-            kv = session.query(DBKVString).filter_by(key=str_key).first()
-            if not kv:
-                kv = DBKVString(key=str_key, value=str_val)
-            else:
-                kv.value = str_val
-            session.add(kv)
-            session.commit()
-        finally:
-            session.close()
-            session.remove()
-            self.mxDB.release()
+        with self.mxDB:
+            try:
+                session = scoped_session(self.session_factory)
+                kv = session.query(DBKVString).filter_by(key=str_key).first()
+                if not kv:
+                    kv = DBKVString(key=str_key, value=str_val)
+                else:
+                    kv.value = str_val
+                session.add(kv)
+                session.commit()
+            finally:
+                session.close()
+                session.remove()
 
     def getStringKV(self, str_key):
         self.mxDB.acquire()

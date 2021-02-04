@@ -10,7 +10,7 @@ from .contrib.test_framework.messages import (
     CTxOut)
 
 
-class BitcoreBTCInterface(BTCInterface):
+class PassthroughBTCInterface(BTCInterface):
     def __init__(self, coin_settings, network):
         super().__init__(coin_settings, network)
         self.txoType = CTxOut

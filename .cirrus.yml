@@ -22,7 +22,7 @@ test_task:
   setup_script:
     - apt-get update
     - apt-get install -y wget python3-pip gnupg unzip protobuf-compiler automake libtool pkg-config
-    - pip install tox
+    - pip install tox pytest
     - python3 setup.py install
     - wget -O coincurve-anonswap.zip https://github.com/tecnovert/coincurve/archive/anonswap.zip
     - unzip coincurve-anonswap.zip
@@ -42,4 +42,7 @@ test_task:
     - cp -r ${BIN_DIR} "${DATADIRS}/bin"
     - mkdir -p "${TEST_RELOAD_PATH}/bin"
     - cp -r ${BIN_DIR} "${TEST_RELOAD_PATH}/bin"
-    - tox
+    - # tox
+    - pytest tests/basicswap/test_other.py
+    - pytest tests/basicswap/test_run.py
+    - pytest tests/basicswap/test_reload.py
