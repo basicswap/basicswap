@@ -43,7 +43,7 @@ Open in browser: `http://localhost:12700`
 
     $ docker-compose stop
     $ export COINDATA_PATH=/var/data/coinswaps
-    $ docker run -t --name swap_prepare -v $COINDATA_PATH:/coindata i_swapclient basicswap-prepare --datadir=/coindata --addcoin=bitcoin
+    $ docker run --rm -t --name swap_prepare -v $COINDATA_PATH:/coindata i_swapclient basicswap-prepare --datadir=/coindata --addcoin=bitcoin
 
 You can copy an existing pruned datadir (excluding bitcoin.conf and any wallets) over to `$COINDATA_PATH/bitcoin`
 Remove any existing wallets after copying over a pruned chain or the Bitcoin daemon won't start.
@@ -51,10 +51,36 @@ Remove any existing wallets after copying over a pruned chain or the Bitcoin dae
 
 ## Windows
 
+Install Git:
+
+    https://gitforwindows.org/
+
+Right click in the directory you want the source code and select 'Git Bash Here':
+
+    $ git clone https://github.com/tecnovert/basicswap.git
+
 Setup Docker Desktop on the WSL 2 backend.
 [docs.docker.com/docker-for-windows/wsl](https://docs.docker.com/docker-for-windows/wsl/)
 
 Launch the docker commands through a WSL terminal.
+
+
+Open cmd-prompt with windows key + R -> "cmd" -> Enter
+
+    > wsl
+
+Go to the directory containing the source code:
+
+    cd /mnt/c/tmp/basicswap/docker/
+
+The following will set COINDATA_PATH to a directory in your windows home dir.
+
+    export COINDATA_PATH=$(wslpath "$(wslvar USERPROFILE)")/coinswaps
+    echo $COINDATA_PATH
+    /mnt/c/Users/USER/coinswaps
+
+
+Continue from the [Run Using Docker](#run-using-docker) section.
 
 
 ## Run Without Docker:
