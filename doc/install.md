@@ -73,11 +73,10 @@ Go to the directory containing the source code:
 
     cd /mnt/c/tmp/basicswap/docker/
 
-The following will set COINDATA_PATH to a directory in your windows home dir.
+It's significantly faster to keep COINDATA_PATH in the linux filesystem.
+You can access it from the windows side at: `\\wsl$\Ubuntu-20.04`
 
-    export COINDATA_PATH=$(wslpath "$(wslvar USERPROFILE)")/coinswaps
-    echo $COINDATA_PATH
-    /mnt/c/Users/USER/coinswaps
+    export COINDATA_PATH=/home/$USER/coinswaps
 
 
 Continue from the [Run Using Docker](#run-using-docker) section.
