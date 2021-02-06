@@ -21,6 +21,8 @@ class Coins(IntEnum):
     # DCR = 4
     NMC = 5
     XMR = 6
+    PART_BLIND = 7
+    PART_ANON = 8
 
 
 chainparams = {
@@ -202,6 +204,10 @@ chainparams = {
 class CoinInterface:
     def __init__(self):
         self._unknown_wallet_seed = True
+        self.setDefaults()
+
+    def setDefaults(self):
+        pass
 
     def make_int(self, amount_in, r=0):
         return make_int(amount_in, self.exp(), r=r)

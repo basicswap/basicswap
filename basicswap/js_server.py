@@ -30,6 +30,7 @@ def js_error(self, error_str):
 
 
 def js_wallets(self, url_split, post_string, is_json):
+    # TODO: Withdrawals
     return bytes(json.dumps(self.server.swap_client.getWalletsInfo()), 'UTF-8')
 
 

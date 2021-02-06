@@ -534,7 +534,8 @@ class BasicSwap(BaseApp):
         self.zmqSubscriber.setsockopt_string(zmq.SUBSCRIBE, 'smsg')
 
         for c in Coins:
-            self.setCoinConnectParams(c)
+            if c in chainparams:
+                self.setCoinConnectParams(c)
 
         if self.chain == 'mainnet':
             self.coin_clients[Coins.PART]['explorers'].append(ExplorerInsight(
@@ -711,6 +712,8 @@ class BasicSwap(BaseApp):
         self.upgradeDatabase(self.db_version)
 
         for c in Coins:
+            if not c in chainparams:
+                continue
             self.setCoinRunParams(c)
             self.createCoinInterface(c)
 
@@ -777,6 +780,8 @@ class BasicSwap(BaseApp):
 
     def stopDaemons(self):
         for c in Coins:
+            if not c in chainparams:
+                continue
             chain_client_settings = self.getChainClientSettings(c)
             if self.coin_clients[c]['connection_type'] == 'rpc' and chain_client_settings['manage_daemon'] is True:
                 self.stopDaemon(c)
@@ -1382,7 +1387,7 @@ class BasicSwap(BaseApp):
             self.mxDB.release()
 
     def getReceiveAddressForCoin(self, coin_type):
-        new_addr = self.coin_clients[coin_type]['interface'].getNewAddress(self.coin_clients[coin_type]['use_segwit'])
+        new_addr = self.ci(coin_type).getNewAddress(self.coin_clients[coin_type]['use_segwit'])
         self.log.debug('Generated new receive address %s for %s', new_addr, str(coin_type))
         return new_addr
 
@@ -1411,6 +1416,17 @@ class BasicSwap(BaseApp):
 
         ci = self.ci(coin_type)
         return ci.withdrawCoin(value, addr_to, subfee)
+
+    def withdrawParticl(self, type_from, type_to, value, addr_to, subfee):
+        self.log.info('withdrawParticl %s %s to %s %s %s', value, type_from, type_to, addr_to, ' subfee' if subfee else '')
+
+        if type_from == 'plain':
+            type_from = 'part'
+        if type_to == 'plain':
+            type_to = 'part'
+
+        ci = self.ci(Coins.PART)
+        return ci.sendTypeTo(type_from, type_to, value, addr_to, subfee)
 
     def cacheNewAddressForCoin(self, coin_type):
         self.log.debug('cacheNewAddressForCoin %s', coin_type)
@@ -1472,6 +1488,31 @@ class BasicSwap(BaseApp):
                 addr = session.query(DBKVString).filter_by(key=key_str).first().value
             except Exception:
                 addr = self.getReceiveAddressForCoin(coin_type)
+                session.add(DBKVString(
+                    key=key_str,
+                    value=addr
+                ))
+                session.commit()
+        finally:
+            session.close()
+            session.remove()
+            self.mxDB.release()
+        return addr
+
+    def getCachedStealthAddressForCoin(self, coin_type):
+        self.log.debug('getCachedStealthAddressForCoin %s', coin_type)
+        # TODO: auto refresh after used
+
+        ci = self.ci(coin_type)
+        key_str = 'stealth_addr_' + ci.coin_name()
+        self.mxDB.acquire()
+        try:
+            session = scoped_session(self.session_factory)
+            try:
+                addr = session.query(DBKVString).filter_by(key=key_str).first().value
+            except Exception:
+                addr = ci.getNewStealthAddress()
+                self.log.info('Generated new stealth address for %s', coin_type)
                 session.add(DBKVString(
                     key=key_str,
                     value=addr
@@ -4850,11 +4891,20 @@ class BasicSwap(BaseApp):
             'synced': '{0:.2f}'.format(round(blockchaininfo['verificationprogress'], 2)),
             'expected_seed': ci.knownWalletSeed(),
         }
+
+        if coin == Coins.PART:
+            rv['anon_balance'] = walletinfo['anon_balance']
+            rv['anon_unconfirmed'] = walletinfo['unconfirmed_anon']
+            rv['blind_balance'] = walletinfo['blind_balance']
+            rv['blind_unconfirmed'] = walletinfo['unconfirmed_blind']
+
         return rv
 
     def getWalletsInfo(self, opts=None):
         rv = {}
         for c in Coins:
+            if not c in chainparams:
+                continue
             if self.coin_clients[c]['connection_type'] == 'rpc':
                 try:
                     rv[c] = self.getWalletInfo(c)

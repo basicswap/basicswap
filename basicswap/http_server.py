@@ -76,6 +76,8 @@ def extractDomain(url):
 def listAvailableExplorers(swap_client):
     explorers = []
     for c in Coins:
+        if not c in chainparams:
+            continue
         for i, e in enumerate(swap_client.coin_clients[c]['explorers']):
             explorers.append(('{}_{}'.format(int(c), i), swap_client.coin_clients[c]['name'].capitalize() + ' - ' + extractDomain(e.base_url)))
     return explorers
@@ -213,10 +215,13 @@ class HttpHandler(BaseHTTPRequestHandler):
     def page_wallets(self, url_split, post_string):
         swap_client = self.server.swap_client
 
+        page_data = {}
         messages = []
         form_data = self.checkForm(post_string, 'wallets', messages)
         if form_data:
             for c in Coins:
+                if not c in chainparams:
+                    continue
                 cid = str(int(c))
 
                 if bytes('newaddr_' + cid, 'utf-8') in form_data:
@@ -228,12 +233,43 @@ class HttpHandler(BaseHTTPRequestHandler):
                     except Exception as ex:
                         messages.append('Reseed failed ' + str(ex))
                 elif bytes('withdraw_' + cid, 'utf-8') in form_data:
-                    value = form_data[bytes('amt_' + cid, 'utf-8')][0].decode('utf-8')
-                    address = form_data[bytes('to_' + cid, 'utf-8')][0].decode('utf-8')
+                    try:
+                        value = form_data[bytes('amt_' + cid, 'utf-8')][0].decode('utf-8')
+                        page_data['wd_value_' + cid] = value
+                    except Exception as e:
+                        messages.append('Error: Missing value')
+                    try:
+                        address = form_data[bytes('to_' + cid, 'utf-8')][0].decode('utf-8')
+                        page_data['wd_address_' + cid] = address
+                    except Exception as e:
+                        messages.append('Error: Missing address')
+
                     subfee = True if bytes('subfee_' + cid, 'utf-8') in form_data else False
-                    txid = swap_client.withdrawCoin(c, value, address, subfee)
-                    ticker = swap_client.getTicker(c)
-                    messages.append('Withdrew {} {} to address {}<br/>In txid: {}'.format(value, ticker, address, txid))
+                    page_data['wd_subfee_' + cid] = subfee
+
+                    if c == Coins.PART:
+                        try:
+                            type_from = form_data[bytes('withdraw_type_from_' + cid, 'utf-8')][0].decode('utf-8')
+                            type_to = form_data[bytes('withdraw_type_to_' + cid, 'utf-8')][0].decode('utf-8')
+                            page_data['wd_type_from_' + cid] = type_from
+                            page_data['wd_type_to_' + cid] = type_to
+                        except Exception as e:
+                            messages.append('Error: Missing type')
+
+                    if len(messages) == 0:
+                        ticker = swap_client.getTicker(c)
+                        if c == Coins.PART:
+                            try:
+                                txid = swap_client.withdrawParticl(type_from, type_to, value, address, subfee)
+                                messages.append('Withdrew {} {} ({} to {}) to address {}<br/>In txid: {}'.format(value, ticker, type_from, type_to, address, txid))
+                            except Exception as e:
+                                messages.append('Error: {}'.format(str(e)))
+                        else:
+                            try:
+                                txid = swap_client.withdrawCoin(c, value, address, subfee)
+                                messages.append('Withdrew {} {} to address {}<br/>In txid: {}'.format(value, ticker, address, txid))
+                            except Exception as e:
+                                messages.append('Error: {}'.format(str(e)))
 
         wallets = swap_client.getWalletsInfo()
 
@@ -249,10 +285,11 @@ class HttpHandler(BaseHTTPRequestHandler):
             ci = swap_client.ci(k)
             fee_rate, fee_src = swap_client.getFeeRateForCoin(k)
             est_fee = swap_client.estimateWithdrawFee(k, fee_rate)
-            wallets_formatted.append({
+            cid = str(int(k))
+            wf = {
                 'name': w['name'],
                 'version': w['version'],
-                'cid': str(int(k)),
+                'cid': cid,
                 'fee_rate': ci.format_amount(int(fee_rate * ci.COIN())),
                 'fee_rate_src': fee_src,
                 'est_fee': 'Unknown' if est_fee is None else ci.format_amount(int(est_fee * ci.COIN())),
@@ -262,9 +299,32 @@ class HttpHandler(BaseHTTPRequestHandler):
                 'deposit_address': w['deposit_address'],
                 'expected_seed': w['expected_seed'],
                 'balance_all': float(w['balance']) + float(w['unconfirmed']),
-            })
+            }
             if float(w['unconfirmed']) > 0.0:
-                wallets_formatted[-1]['unconfirmed'] = w['unconfirmed']
+                wf['unconfirmed'] = w['unconfirmed']
+
+            if k == Coins.PART:
+                wf['stealth_address'] = swap_client.getCachedStealthAddressForCoin(Coins.PART)
+                wf['blind_balance'] = w['blind_balance']
+                if float(w['blind_unconfirmed']) > 0.0:
+                    wf['blind_unconfirmed'] = w['blind_unconfirmed']
+                wf['anon_balance'] = w['anon_balance']
+                if float(w['anon_unconfirmed']) > 0.0:
+                    wf['anon_unconfirmed'] = w['anon_unconfirmed']
+
+            if 'wd_type_from_' + cid in page_data:
+                wf['wd_type_from'] = page_data['wd_type_from_' + cid]
+            if 'wd_type_to_' + cid in page_data:
+                wf['wd_type_to'] = page_data['wd_type_to_' + cid]
+
+            if 'wd_value_' + cid in page_data:
+                wf['wd_value'] = page_data['wd_value_' + cid]
+            if 'wd_address_' + cid in page_data:
+                wf['wd_address'] = page_data['wd_address_' + cid]
+            if 'wd_subfee_' + cid in page_data:
+                wf['wd_subfee'] = page_data['wd_subfee_' + cid]
+
+            wallets_formatted.append(wf)
 
         template = env.get_template('wallets.html')
         return bytes(template.render(
