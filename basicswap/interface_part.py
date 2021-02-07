@@ -97,4 +97,3 @@ class PARTInterfaceAnon(PARTInterface):
     @staticmethod
     def balance_type():
         return BalanceTypes.ANON
-

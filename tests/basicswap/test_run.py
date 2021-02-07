@@ -16,7 +16,6 @@ $ pytest -v -s tests/basicswap/test_run.py::Test::test_04_ltc_btc
 import os
 import sys
 import json
-import time
 import random
 import shutil
 import signal
@@ -73,8 +72,7 @@ NUM_NODES = 3
 LTC_NODE = 3
 BTC_NODE = 4
 
-delay_event = threading.Event()
-stop_test = False
+test_delay_event = threading.Event()
 
 
 logger = logging.getLogger()
@@ -215,27 +213,25 @@ def ltcRpc(cmd):
 
 
 def signal_handler(sig, frame):
-    global stop_test
     print('signal {} detected.'.format(sig))
-    stop_test = True
-    delay_event.set()
+    test_delay_event.set()
 
 
 def run_coins_loop(cls):
-    while not stop_test:
+    while not test_delay_event.is_set():
         try:
             ltcRpc('generatetoaddress 1 {}'.format(cls.ltc_addr))
             btcRpc('generatetoaddress 1 {}'.format(cls.btc_addr))
         except Exception as e:
             logging.warning('run_coins_loop ' + str(e))
-        time.sleep(1.0)
+        test_delay_event.wait(1.0)
 
 
 def run_loop(cls):
-    while not stop_test:
+    while not test_delay_event.is_set():
         for c in cls.swap_clients:
             c.update()
-        time.sleep(1)
+        test_delay_event.wait(1)
 
 
 def make_part_cli_rpc_func(node_id):
@@ -358,14 +354,13 @@ class Test(unittest.TestCase):
             print('particl_blocks', particl_blocks)
             if particl_blocks >= num_blocks:
                 break
-            delay_event.wait(1)
+            test_delay_event.wait(1)
         assert(particl_blocks >= num_blocks)
 
     @classmethod
     def tearDownClass(cls):
-        global stop_test
         logging.info('Finalising')
-        stop_test = True
+        test_delay_event.set()
         cls.update_thread.join()
         cls.coins_update_thread.join()
         for t in cls.http_threads:
@@ -418,21 +413,21 @@ class Test(unittest.TestCase):
 
         offer_id = swap_clients[0].postOffer(Coins.PART, Coins.LTC, 100 * COIN, 0.1 * COIN, 100 * COIN, SwapTypes.SELLER_FIRST)
 
-        wait_for_offer(delay_event, swap_clients[1], offer_id)
+        wait_for_offer(test_delay_event, swap_clients[1], offer_id)
         offers = swap_clients[1].listOffers()
         assert(len(offers) == 1)
         for offer in offers:
             if offer.offer_id == offer_id:
                 bid_id = swap_clients[1].postBid(offer_id, offer.amount_from)
 
-        wait_for_bid(delay_event, swap_clients[0], bid_id)
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id)
 
         swap_clients[0].acceptBid(bid_id)
 
-        wait_for_in_progress(delay_event, swap_clients[1], bid_id, sent=True)
+        wait_for_in_progress(test_delay_event, swap_clients[1], bid_id, sent=True)
 
-        wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=60)
-        wait_for_bid(delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=60)
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=60)
+        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=60)
 
         js_0 = json.loads(urlopen('http://127.0.0.1:1800/json').read())
         js_1 = json.loads(urlopen('http://127.0.0.1:1801/json').read())
@@ -445,17 +440,17 @@ class Test(unittest.TestCase):
 
         offer_id = swap_clients[1].postOffer(Coins.LTC, Coins.PART, 10 * COIN, 9.0 * COIN, 10 * COIN, SwapTypes.SELLER_FIRST)
 
-        wait_for_offer(delay_event, swap_clients[0], offer_id)
+        wait_for_offer(test_delay_event, swap_clients[0], offer_id)
         offer = swap_clients[0].getOffer(offer_id)
         bid_id = swap_clients[0].postBid(offer_id, offer.amount_from)
 
-        wait_for_bid(delay_event, swap_clients[1], bid_id)
+        wait_for_bid(test_delay_event, swap_clients[1], bid_id)
         swap_clients[1].acceptBid(bid_id)
 
-        wait_for_in_progress(delay_event, swap_clients[0], bid_id, sent=True)
+        wait_for_in_progress(test_delay_event, swap_clients[0], bid_id, sent=True)
 
-        wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=60)
-        wait_for_bid(delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, wait_for=60)
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=60)
+        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, wait_for=60)
 
         js_0 = json.loads(urlopen('http://127.0.0.1:1800/json').read())
         js_1 = json.loads(urlopen('http://127.0.0.1:1801/json').read())
@@ -468,17 +463,17 @@ class Test(unittest.TestCase):
 
         offer_id = swap_clients[0].postOffer(Coins.LTC, Coins.BTC, 10 * COIN, 0.1 * COIN, 10 * COIN, SwapTypes.SELLER_FIRST)
 
-        wait_for_offer(delay_event, swap_clients[1], offer_id)
+        wait_for_offer(test_delay_event, swap_clients[1], offer_id)
         offer = swap_clients[1].getOffer(offer_id)
         bid_id = swap_clients[1].postBid(offer_id, offer.amount_from)
 
-        wait_for_bid(delay_event, swap_clients[0], bid_id)
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id)
         swap_clients[0].acceptBid(bid_id)
 
-        wait_for_in_progress(delay_event, swap_clients[1], bid_id, sent=True)
+        wait_for_in_progress(test_delay_event, swap_clients[1], bid_id, sent=True)
 
-        wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=60)
-        wait_for_bid(delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=60)
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=60)
+        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=60)
 
         js_0bid = json.loads(urlopen('http://127.0.0.1:1800/json/bids/{}'.format(bid_id.hex())).read())
 
@@ -496,16 +491,16 @@ class Test(unittest.TestCase):
         offer_id = swap_clients[0].postOffer(Coins.LTC, Coins.BTC, 10 * COIN, 0.1 * COIN, 10 * COIN, SwapTypes.SELLER_FIRST,
                                              SEQUENCE_LOCK_BLOCKS, 10)
 
-        wait_for_offer(delay_event, swap_clients[1], offer_id)
+        wait_for_offer(test_delay_event, swap_clients[1], offer_id)
         offer = swap_clients[1].getOffer(offer_id)
         bid_id = swap_clients[1].postBid(offer_id, offer.amount_from)
 
-        wait_for_bid(delay_event, swap_clients[0], bid_id)
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id)
         swap_clients[1].abandonBid(bid_id)
         swap_clients[0].acceptBid(bid_id)
 
-        wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=60)
-        wait_for_bid(delay_event, swap_clients[1], bid_id, BidStates.BID_ABANDONED, sent=True, wait_for=60)
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=60)
+        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.BID_ABANDONED, sent=True, wait_for=60)
 
         js_0_bid = json.loads(urlopen('http://127.0.0.1:1800/json/bids/{}'.format(bid_id.hex())).read())
         js_1_bid = json.loads(urlopen('http://127.0.0.1:1801/json/bids/{}'.format(bid_id.hex())).read())
@@ -525,16 +520,16 @@ class Test(unittest.TestCase):
 
         offer_id = swap_clients[0].postOffer(Coins.BTC, Coins.LTC, 10 * COIN, 10 * COIN, 10 * COIN, SwapTypes.SELLER_FIRST)
 
-        wait_for_offer(delay_event, swap_clients[0], offer_id)
+        wait_for_offer(test_delay_event, swap_clients[0], offer_id)
         offer = swap_clients[0].getOffer(offer_id)
         offers = swap_clients[0].listOffers()
         bid_id = swap_clients[0].postBid(offer_id, offer.amount_from)
 
-        wait_for_bid(delay_event, swap_clients[0], bid_id)
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id)
         swap_clients[0].acceptBid(bid_id)
 
-        wait_for_bid_tx_state(delay_event, swap_clients[0], bid_id, TxStates.TX_REDEEMED, TxStates.TX_REDEEMED, wait_for=60)
-        wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=60)
+        wait_for_bid_tx_state(test_delay_event, swap_clients[0], bid_id, TxStates.TX_REDEEMED, TxStates.TX_REDEEMED, wait_for=60)
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=60)
 
         js_0 = json.loads(urlopen('http://127.0.0.1:1800/json').read())
         assert(js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
@@ -548,16 +543,16 @@ class Test(unittest.TestCase):
 
         offer_id = swap_clients[0].postOffer(Coins.BTC, Coins.LTC, 0.001 * COIN, 1.0 * COIN, 0.001 * COIN, SwapTypes.SELLER_FIRST)
 
-        wait_for_offer(delay_event, swap_clients[0], offer_id)
+        wait_for_offer(test_delay_event, swap_clients[0], offer_id)
         offer = swap_clients[0].getOffer(offer_id)
         bid_id = swap_clients[0].postBid(offer_id, offer.amount_from)
 
-        wait_for_bid(delay_event, swap_clients[0], bid_id)
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id)
         swap_clients[0].acceptBid(bid_id)
         swap_clients[0].getChainClientSettings(Coins.BTC)['override_feerate'] = 10.0
         swap_clients[0].getChainClientSettings(Coins.LTC)['override_feerate'] = 10.0
 
-        wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.BID_ERROR, wait_for=60)
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.BID_ERROR, wait_for=60)
 
         swap_clients[0].abandonBid(bid_id)
         del swap_clients[0].getChainClientSettings(Coins.BTC)['override_feerate']
@@ -577,15 +572,15 @@ class Test(unittest.TestCase):
 
         offer_id = swap_clients[0].postOffer(Coins.PART, Coins.LTC, 100 * COIN, 0.1 * COIN, 100 * COIN, SwapTypes.SELLER_FIRST, auto_accept_bids=True)
 
-        wait_for_offer(delay_event, swap_clients[1], offer_id)
+        wait_for_offer(test_delay_event, swap_clients[1], offer_id)
         offers = swap_clients[1].listOffers()
         assert(len(offers) >= 1)
         for offer in offers:
             if offer.offer_id == offer_id:
                 bid_id = swap_clients[1].postBid(offer_id, offer.amount_from)
 
-        wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=60)
-        wait_for_bid(delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=60)
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=60)
+        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=60)
 
     def test_10_bad_ptx(self):
         # Invalid PTX sent, swap should stall and ITx and PTx should be reclaimed by senders
@@ -597,16 +592,16 @@ class Test(unittest.TestCase):
         offer_id = swap_clients[0].postOffer(Coins.LTC, Coins.BTC, swap_value, 0.1 * COIN, swap_value, SwapTypes.SELLER_FIRST,
                                              SEQUENCE_LOCK_BLOCKS, 10)
 
-        wait_for_offer(delay_event, swap_clients[1], offer_id)
+        wait_for_offer(test_delay_event, swap_clients[1], offer_id)
         offer = swap_clients[1].getOffer(offer_id)
         bid_id = swap_clients[1].postBid(offer_id, offer.amount_from)
         swap_clients[1].setBidDebugInd(bid_id, DebugTypes.MAKE_INVALID_PTX)
 
-        wait_for_bid(delay_event, swap_clients[0], bid_id)
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id)
         swap_clients[0].acceptBid(bid_id)
 
-        wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=120)
-        wait_for_bid(delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=120)
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=120)
+        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=120)
 
         js_0_bid = json.loads(urlopen('http://127.0.0.1:1800/json/bids/{}'.format(bid_id.hex())).read())
         js_1_bid = json.loads(urlopen('http://127.0.0.1:1801/json/bids/{}'.format(bid_id.hex())).read())
@@ -629,16 +624,16 @@ class Test(unittest.TestCase):
         offer_id = swap_clients[0].postOffer(Coins.LTC, Coins.BTC, swap_value, 0.1 * COIN, swap_value, SwapTypes.SELLER_FIRST,
                                              SEQUENCE_LOCK_BLOCKS, 10)
 
-        wait_for_offer(delay_event, swap_clients[1], offer_id)
+        wait_for_offer(test_delay_event, swap_clients[1], offer_id)
         offer = swap_clients[1].getOffer(offer_id)
         bid_id = swap_clients[1].postBid(offer_id, offer.amount_from)
         swap_clients[1].setBidDebugInd(bid_id, DebugTypes.BUYER_STOP_AFTER_ITX)
 
-        wait_for_bid(delay_event, swap_clients[0], bid_id)
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id)
         swap_clients[0].acceptBid(bid_id)
 
-        wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=120)
-        wait_for_bid(delay_event, swap_clients[1], bid_id, BidStates.BID_ABANDONED, sent=True, wait_for=120)
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=120)
+        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.BID_ABANDONED, sent=True, wait_for=120)
 
         js_0_bid = json.loads(urlopen('http://127.0.0.1:1800/json/bids/{}'.format(bid_id.hex())).read())
         js_1_bid = json.loads(urlopen('http://127.0.0.1:1801/json/bids/{}'.format(bid_id.hex())).read())
@@ -652,19 +647,16 @@ class Test(unittest.TestCase):
     '''
 
     def pass_99_delay(self):
-        global stop_test
         logging.info('Delay')
         for i in range(60 * 10):
-            if stop_test:
+            if test_delay_event.is_set():
                 break
-            time.sleep(1)
+            test_delay_event.wait(1)
             print('delay', i)
             if i % 2 == 0:
                 offer_id = self.swap_clients[0].postOffer(Coins.BTC, Coins.LTC, 0.001 * (i + 1) * COIN, 1.0 * (i + 1) * COIN, 0.001 * (i + 1) * COIN, SwapTypes.SELLER_FIRST)
             else:
                 offer_id = self.swap_clients[1].postOffer(Coins.LTC, Coins.BTC, 0.001 * (i + 1) * COIN, 1.0 * (i + 1) * COIN, 0.001 * COIN, SwapTypes.SELLER_FIRST)
-
-        stop_test = True
 
 
 if __name__ == '__main__':

@@ -59,6 +59,8 @@ from tests.basicswap.common import (
     wait_for_offer,
     wait_for_no_offer,
     wait_for_none_active,
+    wait_for_balance,
+    post_json_req,
     TEST_HTTP_HOST,
     TEST_HTTP_PORT,
     BASE_RPC_PORT,
@@ -82,8 +84,7 @@ XMR_BASE_RPC_PORT = 21792
 XMR_BASE_ZMQ_PORT = 22792
 XMR_BASE_WALLET_RPC_PORT = 23792
 
-delay_event = threading.Event()
-stop_test = False
+test_delay_event = threading.Event()
 
 
 def prepareXmrDataDir(datadir, node_id, conf_file):
@@ -203,10 +204,8 @@ def btcRpc(cmd, node_id=0):
 
 
 def signal_handler(sig, frame):
-    global stop_test
     logging.info('signal {} detected.'.format(sig))
-    stop_test = True
-    delay_event.set()
+    test_delay_event.set()
 
 
 def waitForXMRNode(rpc_offset, max_tries=7):
@@ -239,7 +238,7 @@ def callnoderpc(node_id, method, params=[], wallet=None, base_rpc_port=BASE_RPC_
 
 
 def run_coins_loop(cls):
-    while not stop_test:
+    while not test_delay_event.is_set():
         try:
             if cls.btc_addr is not None:
                 btcRpc('generatetoaddress 1 {}'.format(cls.btc_addr))
@@ -247,14 +246,14 @@ def run_coins_loop(cls):
                 callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'generateblocks', {'wallet_address': cls.xmr_addr, 'amount_of_blocks': 1})
         except Exception as e:
             logging.warning('run_coins_loop ' + str(e))
-        time.sleep(1.0)
+        test_delay_event.wait(1.0)
 
 
 def run_loop(cls):
-    while not stop_test:
+    while not test_delay_event.is_set():
         for c in cls.swap_clients:
             c.update()
-        time.sleep(1.0)
+        test_delay_event.wait(1.0)
 
 
 class Test(unittest.TestCase):
@@ -401,9 +400,8 @@ class Test(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        global stop_test
         logging.info('Finalising')
-        stop_test = True
+        test_delay_event.set()
         if cls.update_thread is not None:
             try:
                 cls.update_thread.join()
@@ -440,22 +438,22 @@ class Test(unittest.TestCase):
         assert(make_int(js_1[str(int(Coins.XMR))]['unconfirmed'], scale=12) > 0)
 
         offer_id = swap_clients[0].postOffer(Coins.PART, Coins.XMR, 100 * COIN, 0.11 * XMR_COIN, 100 * COIN, SwapTypes.XMR_SWAP)
-        wait_for_offer(delay_event, swap_clients[1], offer_id)
+        wait_for_offer(test_delay_event, swap_clients[1], offer_id)
         offers = swap_clients[1].listOffers(filters={'offer_id': offer_id})
         assert(len(offers) == 1)
         offer = offers[0]
 
         bid_id = swap_clients[1].postXmrBid(offer_id, offer.amount_from)
 
-        wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.BID_RECEIVED)
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.BID_RECEIVED)
 
         bid, xmr_swap = swap_clients[0].getXmrBid(bid_id)
         assert(xmr_swap)
 
         swap_clients[0].acceptXmrBid(bid_id)
 
-        wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=180)
-        wait_for_bid(delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True)
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=180)
+        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True)
 
         js_0_end = json.loads(urlopen('http://127.0.0.1:1800/json/wallets').read())
         end_xmr = float(js_0_end['6']['balance']) + float(js_0_end['6']['unconfirmed'])
@@ -470,12 +468,12 @@ class Test(unittest.TestCase):
         offer_id = swap_clients[0].postOffer(
             Coins.PART, Coins.XMR, 101 * COIN, 0.12 * XMR_COIN, 101 * COIN, SwapTypes.XMR_SWAP,
             lock_type=SEQUENCE_LOCK_BLOCKS, lock_value=12)
-        wait_for_offer(delay_event, swap_clients[1], offer_id)
+        wait_for_offer(test_delay_event, swap_clients[1], offer_id)
         offer = swap_clients[1].getOffer(offer_id)
 
         bid_id = swap_clients[1].postXmrBid(offer_id, offer.amount_from)
 
-        wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.BID_RECEIVED)
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.BID_RECEIVED)
 
         bid, xmr_swap = swap_clients[0].getXmrBid(bid_id)
         assert(xmr_swap)
@@ -484,8 +482,8 @@ class Test(unittest.TestCase):
 
         swap_clients[0].acceptXmrBid(bid_id)
 
-        wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.XMR_SWAP_FAILED_REFUNDED, wait_for=180)
-        wait_for_bid(delay_event, swap_clients[1], bid_id, BidStates.XMR_SWAP_FAILED_REFUNDED, sent=True)
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.XMR_SWAP_FAILED_REFUNDED, wait_for=180)
+        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.XMR_SWAP_FAILED_REFUNDED, sent=True)
 
         js_w0_after = json.loads(urlopen('http://127.0.0.1:1800/json/wallets').read())
         print('[rm] js_w0_before', json.dumps(js_w0_before))
@@ -500,12 +498,12 @@ class Test(unittest.TestCase):
         offer_id = swap_clients[0].postOffer(
             Coins.PART, Coins.XMR, 101 * COIN, 0.13 * XMR_COIN, 101 * COIN, SwapTypes.XMR_SWAP,
             lock_type=SEQUENCE_LOCK_BLOCKS, lock_value=12)
-        wait_for_offer(delay_event, swap_clients[1], offer_id)
+        wait_for_offer(test_delay_event, swap_clients[1], offer_id)
         offer = swap_clients[1].getOffer(offer_id)
 
         bid_id = swap_clients[1].postXmrBid(offer_id, offer.amount_from)
 
-        wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.BID_RECEIVED)
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.BID_RECEIVED)
 
         bid, xmr_swap = swap_clients[0].getXmrBid(bid_id)
         assert(xmr_swap)
@@ -515,13 +513,13 @@ class Test(unittest.TestCase):
 
         swap_clients[0].acceptXmrBid(bid_id)
 
-        wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.BID_STALLED_FOR_TEST, wait_for=180)
-        wait_for_bid(delay_event, swap_clients[1], bid_id, BidStates.XMR_SWAP_FAILED_SWIPED, wait_for=80, sent=True)
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.BID_STALLED_FOR_TEST, wait_for=180)
+        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.XMR_SWAP_FAILED_SWIPED, wait_for=80, sent=True)
 
         js_w0_after = json.loads(urlopen('http://127.0.0.1:1800/json/wallets').read())
 
-        wait_for_none_active(delay_event, 1800)
-        wait_for_none_active(delay_event, 1801)
+        wait_for_none_active(test_delay_event, 1800)
+        wait_for_none_active(test_delay_event, 1801)
 
     def test_04_follower_recover_b_lock_tx(self):
         logging.info('---------- Test PART to XMR follower recovers coin b lock tx')
@@ -531,12 +529,12 @@ class Test(unittest.TestCase):
         offer_id = swap_clients[0].postOffer(
             Coins.PART, Coins.XMR, 101 * COIN, 0.14 * XMR_COIN, 101 * COIN, SwapTypes.XMR_SWAP,
             lock_type=SEQUENCE_LOCK_BLOCKS, lock_value=18)
-        wait_for_offer(delay_event, swap_clients[1], offer_id)
+        wait_for_offer(test_delay_event, swap_clients[1], offer_id)
         offer = swap_clients[1].getOffer(offer_id)
 
         bid_id = swap_clients[1].postXmrBid(offer_id, offer.amount_from)
 
-        wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.BID_RECEIVED)
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.BID_RECEIVED)
 
         bid, xmr_swap = swap_clients[0].getXmrBid(bid_id)
         assert(xmr_swap)
@@ -545,14 +543,14 @@ class Test(unittest.TestCase):
 
         swap_clients[0].acceptXmrBid(bid_id)
 
-        wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.XMR_SWAP_FAILED_REFUNDED, wait_for=180)
-        wait_for_bid(delay_event, swap_clients[1], bid_id, BidStates.XMR_SWAP_FAILED_REFUNDED, sent=True)
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.XMR_SWAP_FAILED_REFUNDED, wait_for=180)
+        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.XMR_SWAP_FAILED_REFUNDED, sent=True)
 
     def test_05_btc_xmr(self):
         logging.info('---------- Test BTC to XMR')
         swap_clients = self.swap_clients
         offer_id = swap_clients[0].postOffer(Coins.BTC, Coins.XMR, 10 * COIN, 100 * XMR_COIN, 10 * COIN, SwapTypes.XMR_SWAP)
-        wait_for_offer(delay_event, swap_clients[1], offer_id)
+        wait_for_offer(test_delay_event, swap_clients[1], offer_id)
         offers = swap_clients[1].listOffers(filters={'offer_id': offer_id})
         offer = offers[0]
 
@@ -560,15 +558,15 @@ class Test(unittest.TestCase):
 
         bid_id = swap_clients[1].postXmrBid(offer_id, offer.amount_from)
 
-        wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.BID_RECEIVED)
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.BID_RECEIVED)
 
         bid, xmr_swap = swap_clients[0].getXmrBid(bid_id)
         assert(xmr_swap)
 
         swap_clients[0].acceptXmrBid(bid_id)
 
-        wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=180)
-        wait_for_bid(delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True)
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=180)
+        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True)
 
         swap_clients[1].ci(Coins.XMR).setFeePriority(0)
 
@@ -590,9 +588,9 @@ class Test(unittest.TestCase):
         offer1_id = swap_clients[0].postOffer(Coins.BTC, Coins.XMR, amt_1, rate_1, amt_1, SwapTypes.XMR_SWAP)
         offer2_id = swap_clients[0].postOffer(Coins.PART, Coins.XMR, amt_2, rate_2, amt_2, SwapTypes.XMR_SWAP)
 
-        wait_for_offer(delay_event, swap_clients[1], offer1_id)
+        wait_for_offer(test_delay_event, swap_clients[1], offer1_id)
         offer1 = swap_clients[1].getOffer(offer1_id)
-        wait_for_offer(delay_event, swap_clients[1], offer2_id)
+        wait_for_offer(test_delay_event, swap_clients[1], offer2_id)
         offer2 = swap_clients[1].getOffer(offer2_id)
 
         bid1_id = swap_clients[1].postXmrBid(offer1_id, offer1.amount_from)
@@ -600,30 +598,30 @@ class Test(unittest.TestCase):
 
         offer3_id = swap_clients[0].postOffer(Coins.PART, Coins.XMR, 11 * COIN, 0.15 * XMR_COIN, 11 * COIN, SwapTypes.XMR_SWAP)
 
-        wait_for_bid(delay_event, swap_clients[0], bid1_id, BidStates.BID_RECEIVED)
+        wait_for_bid(test_delay_event, swap_clients[0], bid1_id, BidStates.BID_RECEIVED)
         swap_clients[0].acceptXmrBid(bid1_id)
 
-        wait_for_offer(delay_event, swap_clients[1], offer3_id)
+        wait_for_offer(test_delay_event, swap_clients[1], offer3_id)
         offer3 = swap_clients[1].getOffer(offer3_id)
         bid3_id = swap_clients[1].postXmrBid(offer3_id, offer3.amount_from)
 
-        wait_for_bid(delay_event, swap_clients[0], bid2_id, BidStates.BID_RECEIVED)
+        wait_for_bid(test_delay_event, swap_clients[0], bid2_id, BidStates.BID_RECEIVED)
         swap_clients[0].acceptXmrBid(bid2_id)
 
-        wait_for_bid(delay_event, swap_clients[0], bid3_id, BidStates.BID_RECEIVED)
+        wait_for_bid(test_delay_event, swap_clients[0], bid3_id, BidStates.BID_RECEIVED)
         swap_clients[0].acceptXmrBid(bid3_id)
 
-        wait_for_bid(delay_event, swap_clients[0], bid1_id, BidStates.SWAP_COMPLETED, wait_for=180)
-        wait_for_bid(delay_event, swap_clients[1], bid1_id, BidStates.SWAP_COMPLETED, sent=True)
+        wait_for_bid(test_delay_event, swap_clients[0], bid1_id, BidStates.SWAP_COMPLETED, wait_for=180)
+        wait_for_bid(test_delay_event, swap_clients[1], bid1_id, BidStates.SWAP_COMPLETED, sent=True)
 
-        wait_for_bid(delay_event, swap_clients[0], bid2_id, BidStates.SWAP_COMPLETED, wait_for=120)
-        wait_for_bid(delay_event, swap_clients[1], bid2_id, BidStates.SWAP_COMPLETED, sent=True)
+        wait_for_bid(test_delay_event, swap_clients[0], bid2_id, BidStates.SWAP_COMPLETED, wait_for=120)
+        wait_for_bid(test_delay_event, swap_clients[1], bid2_id, BidStates.SWAP_COMPLETED, sent=True)
 
-        wait_for_bid(delay_event, swap_clients[0], bid3_id, BidStates.SWAP_COMPLETED, wait_for=120)
-        wait_for_bid(delay_event, swap_clients[1], bid3_id, BidStates.SWAP_COMPLETED, sent=True)
+        wait_for_bid(test_delay_event, swap_clients[0], bid3_id, BidStates.SWAP_COMPLETED, wait_for=120)
+        wait_for_bid(test_delay_event, swap_clients[1], bid3_id, BidStates.SWAP_COMPLETED, sent=True)
 
-        wait_for_none_active(delay_event, 1800)
-        wait_for_none_active(delay_event, 1801)
+        wait_for_none_active(test_delay_event, 1800)
+        wait_for_none_active(test_delay_event, 1801)
 
         js_w0_after = json.loads(urlopen('http://127.0.0.1:1800/json/wallets').read())
         js_w1_after = json.loads(urlopen('http://127.0.0.1:1801/json/wallets').read())
@@ -636,11 +634,11 @@ class Test(unittest.TestCase):
         logging.info('---------- Test offer revocaction')
         swap_clients = self.swap_clients
         offer_id = swap_clients[0].postOffer(Coins.BTC, Coins.XMR, 10 * COIN, 100 * XMR_COIN, 10 * COIN, SwapTypes.XMR_SWAP)
-        wait_for_offer(delay_event, swap_clients[1], offer_id)
+        wait_for_offer(test_delay_event, swap_clients[1], offer_id)
 
         swap_clients[0].revokeOffer(offer_id)
 
-        wait_for_no_offer(delay_event, swap_clients[1], offer_id)
+        wait_for_no_offer(test_delay_event, swap_clients[1], offer_id)
 
     def test_08_withdraw(self):
         logging.info('---------- Test xmr withdrawals')
@@ -658,24 +656,24 @@ class Test(unittest.TestCase):
         logging.info('---------- Test BTC to XMR auto accept')
         swap_clients = self.swap_clients
         offer_id = swap_clients[0].postOffer(Coins.BTC, Coins.XMR, 11 * COIN, 101 * XMR_COIN, 10 * COIN, SwapTypes.XMR_SWAP, auto_accept_bids=True)
-        wait_for_offer(delay_event, swap_clients[1], offer_id)
+        wait_for_offer(test_delay_event, swap_clients[1], offer_id)
         offer = swap_clients[1].listOffers(filters={'offer_id': offer_id})[0]
 
         bid_id = swap_clients[1].postXmrBid(offer_id, offer.amount_from)
-        wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=180)
-        wait_for_bid(delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True)
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=180)
+        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True)
 
     def test_10_locked_refundtx(self):
         logging.info('---------- Test Refund tx is locked')
         swap_clients = self.swap_clients
         offer_id = swap_clients[0].postOffer(Coins.BTC, Coins.XMR, 10 * COIN, 100 * XMR_COIN, 10 * COIN, SwapTypes.XMR_SWAP)
-        wait_for_offer(delay_event, swap_clients[1], offer_id)
+        wait_for_offer(test_delay_event, swap_clients[1], offer_id)
         offers = swap_clients[1].listOffers(filters={'offer_id': offer_id})
         offer = offers[0]
 
         bid_id = swap_clients[1].postXmrBid(offer_id, offer.amount_from)
 
-        wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.BID_RECEIVED)
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.BID_RECEIVED)
 
         bid, xmr_swap = swap_clients[0].getXmrBid(bid_id)
         assert(xmr_swap)
@@ -684,7 +682,7 @@ class Test(unittest.TestCase):
 
         swap_clients[0].acceptXmrBid(bid_id)
 
-        wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED, wait_for=180)
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED, wait_for=180)
 
         bid, xmr_swap = swap_clients[0].getXmrBid(bid_id)
         assert(xmr_swap)
@@ -694,6 +692,48 @@ class Test(unittest.TestCase):
             assert(False), 'Lock refund tx should be locked'
         except Exception as e:
             assert('non-BIP68-final' in str(e))
+
+    def test_11_particl_anon(self):
+        logging.info('---------- Test Particl anon transactions')
+        swap_clients = self.swap_clients
+
+        js_0 = json.loads(urlopen('http://127.0.0.1:1800/json/wallets/part').read())
+        assert(float(js_0['anon_balance']) == 0.0)
+
+        js_1 = json.loads(urlopen('http://127.0.0.1:1801/json/wallets/part').read())
+        assert(float(js_1['balance']) > 200.0)
+
+        post_json = {
+            'value': 100,
+            'address': js_0['stealth_address'],
+            'subfee': False,
+            'type_to': 'anon',
+        }
+        json_rv = json.loads(post_json_req('http://127.0.0.1:1801/json/wallets/part/withdraw', post_json))
+        assert(len(json_rv['txid']) == 64)
+
+        post_json['value'] = 0.5
+        for i in range(22):
+            json_rv = json.loads(post_json_req('http://127.0.0.1:1801/json/wallets/part/withdraw', post_json))
+            assert(len(json_rv['txid']) == 64)
+
+        logging.info('Waiting for anon balance')
+        wait_for_balance(test_delay_event, 'http://127.0.0.1:1800/json/wallets/part', 'anon_balance', 110.0)
+
+        post_json = {
+            'value': 10,
+            'address': js_0['stealth_address'],
+            'subfee': True,
+            'type_from': 'anon',
+            'type_to': 'blind',
+        }
+        json_rv = json.loads(post_json_req('http://127.0.0.1:1800/json/wallets/part/withdraw', post_json))
+        assert(len(json_rv['txid']) == 64)
+
+        logging.info('Waiting for blind balance')
+        wait_for_balance(test_delay_event, 'http://127.0.0.1:1800/json/wallets/part', 'blind_balance', 9.8)
+        if float(js_0['blind_balance']) >= 10.0:
+            raise ValueError('Expect blind balance < 10')
 
 
 if __name__ == '__main__':

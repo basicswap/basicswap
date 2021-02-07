@@ -76,7 +76,7 @@ def extractDomain(url):
 def listAvailableExplorers(swap_client):
     explorers = []
     for c in Coins:
-        if not c in chainparams:
+        if c not in chainparams:
             continue
         for i, e in enumerate(swap_client.coin_clients[c]['explorers']):
             explorers.append(('{}_{}'.format(int(c), i), swap_client.coin_clients[c]['name'].capitalize() + ' - ' + extractDomain(e.base_url)))
@@ -220,7 +220,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         form_data = self.checkForm(post_string, 'wallets', messages)
         if form_data:
             for c in Coins:
-                if not c in chainparams:
+                if c not in chainparams:
                     continue
                 cid = str(int(c))
 
@@ -304,13 +304,12 @@ class HttpHandler(BaseHTTPRequestHandler):
                 wf['unconfirmed'] = w['unconfirmed']
 
             if k == Coins.PART:
-                wf['stealth_address'] = swap_client.getCachedStealthAddressForCoin(Coins.PART)
                 wf['blind_balance'] = w['blind_balance']
                 if float(w['blind_unconfirmed']) > 0.0:
                     wf['blind_unconfirmed'] = w['blind_unconfirmed']
                 wf['anon_balance'] = w['anon_balance']
-                if float(w['anon_unconfirmed']) > 0.0:
-                    wf['anon_unconfirmed'] = w['anon_unconfirmed']
+                if float(w['anon_pending']) > 0.0:
+                    wf['anon_pending'] = w['anon_pending']
 
             if 'wd_type_from_' + cid in page_data:
                 wf['wd_type_from'] = page_data['wd_type_from_' + cid]

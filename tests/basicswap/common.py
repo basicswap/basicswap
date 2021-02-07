@@ -9,6 +9,7 @@ import os
 import json
 import signal
 import logging
+import urllib
 from urllib.request import urlopen
 
 from basicswap.rpc import callrpc
@@ -228,6 +229,26 @@ def waitForNumSwapping(delay_event, port, bids, wait_for=60):
             return
         delay_event.wait(1)
     raise ValueError('waitForNumSwapping failed')
+
+
+def wait_for_balance(delay_event, url, balance_key, expect_amount, iterations=20, delay_time=3):
+    i = 0
+    while not delay_event.is_set():
+        rv_js = json.loads(urlopen(url).read())
+        if float(rv_js[balance_key]) >= expect_amount:
+            break
+        delay_event.wait(delay_time)
+        i += 1
+        if i > iterations:
+            raise ValueError('Expect {} {}'.format(balance_key, expect_amount))
+
+
+def post_json_req(url, json_data):
+    req = urllib.request.Request(url)
+    req.add_header('Content-Type', 'application/json; charset=utf-8')
+    post_bytes = json.dumps(json_data).encode('utf-8')
+    req.add_header('Content-Length', len(post_bytes))
+    return urlopen(req, post_bytes).read()
 
 
 def delay_for(delay_event, delay_for=60):

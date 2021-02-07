@@ -56,6 +56,15 @@ def inputAmount(amount_str, ci):
     return make_int(amount_str, ci.exp())
 
 
+def get_data_entry_or(post_data, name, default):
+    if 'is_json' in post_data:
+        return post_data.get(name, default)
+    key_bytes = name.encode('utf-8')
+    if key_bytes in post_data:
+        return post_data[key_bytes][0].decode('utf-8')
+    return default
+
+
 def get_data_entry(post_data, name):
     if 'is_json' in post_data:
         return post_data[name]

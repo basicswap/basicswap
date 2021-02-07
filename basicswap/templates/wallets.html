@@ -22,7 +22,7 @@
 
 {% if w.cid == '1' %}
 <tr><td>Blind Balance:</td><td>{{ w.blind_balance }}</td>{% if w.blind_unconfirmed %}<td>Blind Unconfirmed:</td><td>{{ w.blind_unconfirmed }}</td>{% endif %}</tr>
-<tr><td>Anon Balance:</td><td>{{ w.anon_balance }}</td>{% if w.anon_unconfirmed %}<td>Anon Unconfirmed:</td><td>{{ w.anon_unconfirmed }}</td>{% endif %}</tr>
+<tr><td>Anon Balance:</td><td>{{ w.anon_balance }}</td>{% if w.anon_pending %}<td>Anon Pending:</td><td>{{ w.anon_pending }}</td>{% endif %}</tr>
 {% endif %}
 
 

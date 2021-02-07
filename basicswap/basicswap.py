@@ -712,7 +712,7 @@ class BasicSwap(BaseApp):
         self.upgradeDatabase(self.db_version)
 
         for c in Coins:
-            if not c in chainparams:
+            if c not in chainparams:
                 continue
             self.setCoinRunParams(c)
             self.createCoinInterface(c)
@@ -780,7 +780,7 @@ class BasicSwap(BaseApp):
 
     def stopDaemons(self):
         for c in Coins:
-            if not c in chainparams:
+            if c not in chainparams:
                 continue
             chain_client_settings = self.getChainClientSettings(c)
             if self.coin_clients[c]['connection_type'] == 'rpc' and chain_client_settings['manage_daemon'] is True:
@@ -4893,8 +4893,9 @@ class BasicSwap(BaseApp):
         }
 
         if coin == Coins.PART:
+            rv['stealth_address'] = self.getCachedStealthAddressForCoin(Coins.PART)
             rv['anon_balance'] = walletinfo['anon_balance']
-            rv['anon_unconfirmed'] = walletinfo['unconfirmed_anon']
+            rv['anon_pending'] = walletinfo['unconfirmed_anon'] + walletinfo['immature_anon_balance']
             rv['blind_balance'] = walletinfo['blind_balance']
             rv['blind_unconfirmed'] = walletinfo['unconfirmed_blind']
 
@@ -4903,7 +4904,7 @@ class BasicSwap(BaseApp):
     def getWalletsInfo(self, opts=None):
         rv = {}
         for c in Coins:
-            if not c in chainparams:
+            if c not in chainparams:
                 continue
             if self.coin_clients[c]['connection_type'] == 'rpc':
                 try:

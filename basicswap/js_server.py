@@ -8,11 +8,15 @@ import json
 import urllib.parse
 
 from .util import (
+    toBool,
     format_timestamp,
 )
 from .basicswap import (
     strBidState,
     SwapTypes,
+)
+from .chainparams import (
+    Coins,
 )
 from .ui import (
     PAGE_LIMIT,
@@ -20,7 +24,9 @@ from .ui import (
     describeBid,
     setCoinFilter,
     get_data_entry,
+    get_data_entry_or,
     have_data_entry,
+    tickerToCoinId,
 )
 
 
@@ -29,8 +35,40 @@ def js_error(self, error_str):
     return bytes(error_str_json, 'UTF-8')
 
 
+def withdraw_coin(swap_client, coin_type, post_string, is_json):
+    if is_json:
+        post_data = json.loads(post_string)
+        post_data['is_json'] = True
+    else:
+        post_data = urllib.parse.parse_qs(post_string)
+
+    value = get_data_entry(post_data, 'value')
+    address = get_data_entry(post_data, 'address')
+    subfee = get_data_entry(post_data, 'subfee')
+    if not isinstance(subfee, bool):
+        subfee = toBool(subfee)
+
+    if coin_type == Coins.PART:
+        type_from = get_data_entry_or(post_data, 'type_from', 'plain')
+        type_to = get_data_entry_or(post_data, 'type_to', 'plain')
+        txid_hex = swap_client.withdrawParticl(type_from, type_to, value, address, subfee)
+    else:
+        txid_hex = swap_client.withdrawCoin(coin_type, value, address, subfee)
+
+    return {'txid': txid_hex}
+
+
 def js_wallets(self, url_split, post_string, is_json):
-    # TODO: Withdrawals
+    if len(url_split) > 3:
+        ticker_str = url_split[3]
+        coin_type = tickerToCoinId(ticker_str)
+
+        if len(url_split) > 4:
+            cmd = url_split[4]
+            if cmd == 'withdraw':
+                return bytes(json.dumps(withdraw_coin(self.server.swap_client, coin_type, post_string, is_json)), 'UTF-8')
+            raise ValueError('Unknown command')
+        return bytes(json.dumps(self.server.swap_client.getWalletInfo(coin_type)), 'UTF-8')
     return bytes(json.dumps(self.server.swap_client.getWalletsInfo()), 'UTF-8')
 
 
