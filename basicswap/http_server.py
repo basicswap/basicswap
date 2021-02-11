@@ -58,6 +58,8 @@ env.filters['formatts'] = format_timestamp
 
 
 def getCoinName(c):
+    if c == Coins.PART_ANON:
+        return chainparams[Coins.PART]['name'].capitalize() + 'Anon'
     return chainparams[c]['name'].capitalize()
 
 
@@ -66,6 +68,9 @@ def listAvailableCoins(swap_client):
     for k, v in swap_client.coin_clients.items():
         if v['connection_type'] == 'rpc':
             coins.append((int(k), getCoinName(k)))
+
+            if k == Coins.PART:
+                coins.append((int(Coins.PART_ANON), getCoinName(k)))
     return coins
 
 

@@ -200,6 +200,26 @@ class BTCInterface(CoinInterface):
     def getWalletInfo(self):
         return self.rpc_callback('getwalletinfo')
 
+    def walletRestoreHeight(self):
+        return self._restore_height
+
+    def getWalletRestoreHeight(self):
+        start_time = self.rpc_callback('getwalletinfo')['keypoololdest']
+
+        blockchaininfo = self.rpc_callback('getblockchaininfo')
+        best_block = blockchaininfo['bestblockhash']
+
+        chain_synced = round(blockchaininfo['verificationprogress'], 3)
+        if chain_synced < 1.0:
+            raise ValueError('{} chain isn\'t synced.'.format(self.chain_name()))
+
+        block_hash = best_block
+        while True:
+            block_header = self.rpc_callback('getblockheader', [block_hash])
+            if block_header['time'] < start_time:
+                return block_header['height']
+            block_hash = block_header['previousblockhash']
+
     def getWalletSeedID(self):
         return self.rpc_callback('getwalletinfo')['hdseedid']
 
@@ -229,9 +249,6 @@ class BTCInterface(CoinInterface):
     def getNewSecretKey(self):
         return getSecretInt()
 
-    def pubkey(self, key):
-        return G * key
-
     def getPubkey(self, privkey):
         return PublicKey.from_secret(privkey).format()
 
@@ -258,10 +275,11 @@ class BTCInterface(CoinInterface):
         return i
 
     def sumKeys(self, ka, kb):
-        return (ka + kb) % ep.o
+        # TODO: Add to coincurve
+        return i2b((b2i(ka) + b2i(kb)) % ep.o)
 
     def sumPubkeys(self, Ka, Kb):
-        return Ka + Kb
+        return PublicKey.combine_keys([PublicKey(Ka), PublicKey(Kb)]).format()
 
     def getScriptForPubkeyHash(self, pkh):
         return CScript([OP_0, pkh])

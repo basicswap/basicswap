@@ -735,6 +735,31 @@ class Test(unittest.TestCase):
         if float(js_0['blind_balance']) >= 10.0:
             raise ValueError('Expect blind balance < 10')
 
+        logging.warning('TODO')
+        return
+
+        amt_swap = make_int(random.uniform(0.1, 2.0), scale=8, r=1)
+        rate_swap = make_int(random.uniform(2.0, 20.0), scale=8, r=1)
+        offer_id = swap_clients[0].postOffer(Coins.BTC, Coins.PART_ANON, amt_swap, rate_swap, amt_swap, SwapTypes.XMR_SWAP)
+        wait_for_offer(test_delay_event, swap_clients[1], offer_id)
+        offers = swap_clients[1].listOffers(filters={'offer_id': offer_id})
+        offer = offers[0]
+
+        bid_id = swap_clients[1].postXmrBid(offer_id, offer.amount_from)
+
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.BID_RECEIVED)
+
+        bid, xmr_swap = swap_clients[0].getXmrBid(bid_id)
+        assert(xmr_swap)
+
+        swap_clients[0].acceptXmrBid(bid_id)
+
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=180)
+        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True)
+
+        js_1 = json.loads(urlopen('http://127.0.0.1:1801/json/wallets/part').read())
+        print('[rm] js_1', js_1)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -203,11 +203,11 @@ chainparams = {
 
 class CoinInterface:
     def __init__(self):
-        self._unknown_wallet_seed = True
         self.setDefaults()
 
     def setDefaults(self):
-        pass
+        self._unknown_wallet_seed = True
+        self._restore_height = None
 
     def make_int(self, amount_in, r=0):
         return make_int(amount_in, self.exp(), r=r)
@@ -222,8 +222,17 @@ class CoinInterface:
     def ticker(self):
         return chainparams[self.coin_type()]['ticker']
 
+    def min_amount(self):
+        return chainparams[self.coin_type()][self._network]['min_amount']
+
+    def max_amount(self):
+        return chainparams[self.coin_type()][self._network]['max_amount']
+
     def setWalletSeedWarning(self, value):
         self._unknown_wallet_seed = value
+
+    def setWalletRestoreHeight(self, value):
+        self._restore_height = value
 
     def knownWalletSeed(self):
         return not self._unknown_wallet_seed

@@ -25,7 +25,7 @@ from enum import IntEnum, auto
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.orm.session import close_all_sessions
 
-from .interface_part import PARTInterface
+from .interface_part import PARTInterface, PARTInterfaceAnon
 from .interface_btc import BTCInterface
 from .interface_ltc import LTCInterface
 from .interface_nmc import NMCInterface
@@ -631,6 +631,9 @@ class BasicSwap(BaseApp):
             'chain_median_time': None,
         }
 
+        if coin == Coins.PART:
+            self.coin_clients[Coins.PART_ANON] = self.coin_clients[coin]
+
         if self.coin_clients[coin]['connection_type'] == 'rpc':
             if coin == Coins.XMR:
                 self.coin_clients[coin]['walletrpchost'] = chain_client_settings.get('walletrpchost', '127.0.0.1')
@@ -641,6 +644,8 @@ class BasicSwap(BaseApp):
                     raise ValueError('Missing XMR wallet rpc credentials.')
 
     def ci(self, coin):  # Coin interface
+        if coin == Coins.PART_ANON:
+            return self.coin_clients[Coins.PART]['interface_anon']
         return self.coin_clients[coin]['interface']
 
     def createInterface(self, coin):
@@ -702,6 +707,8 @@ class BasicSwap(BaseApp):
     def createCoinInterface(self, coin):
         if self.coin_clients[coin]['connection_type'] == 'rpc':
             self.coin_clients[coin]['interface'] = self.createInterface(coin)
+            if coin == Coins.PART:
+                self.coin_clients[coin]['interface_anon'] = PARTInterfaceAnon(self.coin_clients[coin], self.chain, self)
         elif self.coin_clients[coin]['connection_type'] == 'passthrough':
             self.coin_clients[coin]['interface'] = self.createPassthroughInterface(coin)
 
@@ -1066,13 +1073,15 @@ class BasicSwap(BaseApp):
             raise ValueError('Invalid swap type for XMR')
 
     def validateOfferAmounts(self, coin_from, coin_to, amount, rate, min_bid_amount):
+        ci_from = self.ci(coin_from)
+        ci_to = self.ci(coin_to)
         assert(amount >= min_bid_amount), 'amount < min_bid_amount'
-        assert(amount > chainparams[coin_from][self.chain]['min_amount']), 'From amount below min value for chain'
-        assert(amount < chainparams[coin_from][self.chain]['max_amount']), 'From amount above max value for chain'
+        assert(amount > ci_from.min_amount()), 'From amount below min value for chain'
+        assert(amount < ci_from.max_amount()), 'From amount above max value for chain'
 
-        amount_to = int((amount * rate) // self.ci(coin_from).COIN())
-        assert(amount_to > chainparams[coin_to][self.chain]['min_amount']), 'To amount below min value for chain'
-        assert(amount_to < chainparams[coin_to][self.chain]['max_amount']), 'To amount above max value for chain'
+        amount_to = int((amount * rate) // ci_from.COIN())
+        assert(amount_to > ci_to.min_amount()), 'To amount below min value for chain'
+        assert(amount_to < ci_to.max_amount()), 'To amount above max value for chain'
 
     def validateOfferLockValue(self, coin_from, coin_to, lock_type, lock_value):
         if lock_type == OfferMessage.SEQUENCE_LOCK_TIME:
@@ -1268,7 +1277,7 @@ class BasicSwap(BaseApp):
             extkey = self.callcoinrpc(Coins.PART, 'extkey', ['info', evkey, key_path])['key_info']['result']
             privkey = decodeWif(self.callcoinrpc(Coins.PART, 'extkey', ['info', extkey])['key_info']['privkey'])
 
-            if ci.isValidKey(privkey):
+            if ci.verifyKey(privkey):
                 return privkey
             nonce += 1
             if nonce > 1000:
@@ -1501,7 +1510,6 @@ class BasicSwap(BaseApp):
 
     def getCachedStealthAddressForCoin(self, coin_type):
         self.log.debug('getCachedStealthAddressForCoin %s', coin_type)
-        # TODO: auto refresh after used
 
         ci = self.ci(coin_type)
         key_str = 'stealth_addr_' + ci.coin_name()
@@ -1523,6 +1531,37 @@ class BasicSwap(BaseApp):
             session.remove()
             self.mxDB.release()
         return addr
+
+    def getCachedWalletRestoreHeight(self, ci):
+        self.log.debug('getCachedWalletRestoreHeight %s', ci.coin_name())
+
+        key_str = 'restore_height_' + ci.coin_name()
+        self.mxDB.acquire()
+        try:
+            session = scoped_session(self.session_factory)
+            try:
+                wrh = session.query(DBKVInt).filter_by(key=key_str).first().value
+            except Exception:
+                wrh = ci.getWalletRestoreHeight()
+                self.log.info('Found restore height for %s', ci.coin_name())
+                session.add(DBKVInt(
+                    key=key_str,
+                    value=wrh
+                ))
+                session.commit()
+        finally:
+            session.close()
+            session.remove()
+            self.mxDB.release()
+        return wrh
+
+    def getWalletRestoreHeight(self, ci):
+        wrh = ci._restore_height
+        if wrh is not None:
+            return wrh
+        found_height = self.getCachedWalletRestoreHeight(ci)
+        ci.setWalletRestoreHeight(found_height)
+        return found_height
 
     def getNewContractId(self):
         self.mxDB.acquire()
@@ -2017,12 +2056,15 @@ class BasicSwap(BaseApp):
             xmr_swap.start_chain_a_height = ci_from.getChainHeight()
             xmr_swap.b_restore_height = ci_to.getChainHeight()
 
-            if xmr_swap.b_restore_height < ci_to._restore_height:
-                xmr_swap.b_restore_height = ci_to._restore_height
-                self.log.warning('XMR swap restore height clamped to {}'.format(ci_to._restore_height))
+            wallet_restore_height = self.getWalletRestoreHeight(ci_to)
+            if xmr_swap.b_restore_height < wallet_restore_height:
+                xmr_swap.b_restore_height = wallet_restore_height
+                self.log.warning('XMR swap restore height clamped to {}'.format(wallet_restore_height))
 
-            kbvf = self.getPathKey(coin_from, coin_to, bid_created_at, xmr_swap.contract_count, 1, for_ed25519=True)
-            kbsf = self.getPathKey(coin_from, coin_to, bid_created_at, xmr_swap.contract_count, 2, for_ed25519=True)
+
+            for_ed25519 = True if coin_to == Coins.XMR else False
+            kbvf = self.getPathKey(coin_from, coin_to, bid_created_at, xmr_swap.contract_count, 1, for_ed25519)
+            kbsf = self.getPathKey(coin_from, coin_to, bid_created_at, xmr_swap.contract_count, 2, for_ed25519)
 
             kaf = self.getPathKey(coin_from, coin_to, bid_created_at, xmr_swap.contract_count, 3)
 
@@ -2032,13 +2074,19 @@ class BasicSwap(BaseApp):
 
             xmr_swap.pkaf = ci_from.getPubkey(kaf)
 
-            xmr_swap.kbsf_dleag = ci_to.proveDLEAG(kbsf)
+            if coin_to == Coins.XMR:
+                xmr_swap.kbsf_dleag = ci_to.proveDLEAG(kbsf)
+            else:
+                xmr_swap.kbsf_dleag = xmr_swap.pkbsf
             xmr_swap.pkasf = xmr_swap.kbsf_dleag[0: 33]
             assert(xmr_swap.pkasf == ci_from.getPubkey(kbsf))
 
             msg_buf.pkaf = xmr_swap.pkaf
             msg_buf.kbvf = kbvf
-            msg_buf.kbsf_dleag = xmr_swap.kbsf_dleag[:16000]
+            if coin_to == Coins.XMR:
+                msg_buf.kbsf_dleag = xmr_swap.kbsf_dleag[:16000]
+            else:
+                msg_buf.kbsf_dleag = xmr_swap.kbsf_dleag
 
             bid_bytes = msg_buf.SerializeToString()
             payload_hex = str.format('{:02x}', MessageTypes.XMR_BID_FL) + bid_bytes.hex()
@@ -2053,27 +2101,28 @@ class BasicSwap(BaseApp):
             ro = self.callrpc('smsgsend', [bid_addr, offer.addr_from, payload_hex, False, msg_valid, False, options])
             xmr_swap.bid_id = bytes.fromhex(ro['msgid'])
 
-            msg_buf2 = XmrSplitMessage(
-                msg_id=xmr_swap.bid_id,
-                msg_type=XmrSplitMsgTypes.BID,
-                sequence=2,
-                dleag=xmr_swap.kbsf_dleag[16000:32000]
-            )
-            msg_bytes = msg_buf2.SerializeToString()
-            payload_hex = str.format('{:02x}', MessageTypes.XMR_BID_SPLIT) + msg_bytes.hex()
-            ro = self.callrpc('smsgsend', [bid_addr, offer.addr_from, payload_hex, False, msg_valid, False, options])
-            xmr_swap.bid_msg_id2 = bytes.fromhex(ro['msgid'])
+            if coin_to == Coins.XMR:
+                msg_buf2 = XmrSplitMessage(
+                    msg_id=xmr_swap.bid_id,
+                    msg_type=XmrSplitMsgTypes.BID,
+                    sequence=2,
+                    dleag=xmr_swap.kbsf_dleag[16000:32000]
+                )
+                msg_bytes = msg_buf2.SerializeToString()
+                payload_hex = str.format('{:02x}', MessageTypes.XMR_BID_SPLIT) + msg_bytes.hex()
+                ro = self.callrpc('smsgsend', [bid_addr, offer.addr_from, payload_hex, False, msg_valid, False, options])
+                xmr_swap.bid_msg_id2 = bytes.fromhex(ro['msgid'])
 
-            msg_buf3 = XmrSplitMessage(
-                msg_id=xmr_swap.bid_id,
-                msg_type=XmrSplitMsgTypes.BID,
-                sequence=3,
-                dleag=xmr_swap.kbsf_dleag[32000:]
-            )
-            msg_bytes = msg_buf3.SerializeToString()
-            payload_hex = str.format('{:02x}', MessageTypes.XMR_BID_SPLIT) + msg_bytes.hex()
-            ro = self.callrpc('smsgsend', [bid_addr, offer.addr_from, payload_hex, False, msg_valid, False, options])
-            xmr_swap.bid_msg_id3 = bytes.fromhex(ro['msgid'])
+                msg_buf3 = XmrSplitMessage(
+                    msg_id=xmr_swap.bid_id,
+                    msg_type=XmrSplitMsgTypes.BID,
+                    sequence=3,
+                    dleag=xmr_swap.kbsf_dleag[32000:]
+                )
+                msg_bytes = msg_buf3.SerializeToString()
+                payload_hex = str.format('{:02x}', MessageTypes.XMR_BID_SPLIT) + msg_bytes.hex()
+                ro = self.callrpc('smsgsend', [bid_addr, offer.addr_from, payload_hex, False, msg_valid, False, options])
+                xmr_swap.bid_msg_id3 = bytes.fromhex(ro['msgid'])
 
             bid = Bid(
                 bid_id=xmr_swap.bid_id,
@@ -2129,8 +2178,9 @@ class BasicSwap(BaseApp):
             if xmr_swap.contract_count is None:
                 xmr_swap.contract_count = self.getNewContractId()
 
-            kbvl = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, 1, for_ed25519=True)
-            kbsl = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, 2, for_ed25519=True)
+            for_ed25519 = True if coin_to == Coins.XMR else False
+            kbvl = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, 1, for_ed25519)
+            kbsl = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, 2, for_ed25519)
 
             kal = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, 3)
 
@@ -2144,7 +2194,10 @@ class BasicSwap(BaseApp):
 
             xmr_swap.pkal = ci_from.getPubkey(kal)
 
-            xmr_swap.kbsl_dleag = ci_to.proveDLEAG(kbsl)
+            if coin_to == Coins.XMR:
+                xmr_swap.kbsl_dleag = ci_to.proveDLEAG(kbsl)
+            else:
+                xmr_swap.kbsl_dleag = xmr_swap.pkbsl
 
             # MSG2F
             xmr_swap.a_lock_tx, xmr_swap.a_lock_tx_script = ci_from.createScriptLockTx(
@@ -2180,7 +2233,10 @@ class BasicSwap(BaseApp):
             msg_buf.bid_msg_id = bid_id
             msg_buf.pkal = xmr_swap.pkal
             msg_buf.kbvl = kbvl
-            msg_buf.kbsl_dleag = xmr_swap.kbsl_dleag[:16000]
+            if coin_to == Coins.XMR:
+                msg_buf.kbsl_dleag = xmr_swap.kbsl_dleag[:16000]
+            else:
+                msg_buf.kbsl_dleag = xmr_swap.kbsl_dleag
 
             # MSG2F
             msg_buf.a_lock_tx = xmr_swap.a_lock_tx
@@ -2199,27 +2255,28 @@ class BasicSwap(BaseApp):
             bid.accept_msg_id = bytes.fromhex(msg_id)
             xmr_swap.bid_accept_msg_id = bid.accept_msg_id
 
-            msg_buf2 = XmrSplitMessage(
-                msg_id=bid_id,
-                msg_type=XmrSplitMsgTypes.BID_ACCEPT,
-                sequence=2,
-                dleag=xmr_swap.kbsl_dleag[16000:32000]
-            )
-            msg_bytes = msg_buf2.SerializeToString()
-            payload_hex = str.format('{:02x}', MessageTypes.XMR_BID_SPLIT) + msg_bytes.hex()
-            ro = self.callrpc('smsgsend', [offer.addr_from, bid.bid_addr, payload_hex, False, msg_valid, False, options])
-            xmr_swap.bid_accept_msg_id2 = bytes.fromhex(ro['msgid'])
+            if coin_to == Coins.XMR:
+                msg_buf2 = XmrSplitMessage(
+                    msg_id=bid_id,
+                    msg_type=XmrSplitMsgTypes.BID_ACCEPT,
+                    sequence=2,
+                    dleag=xmr_swap.kbsl_dleag[16000:32000]
+                )
+                msg_bytes = msg_buf2.SerializeToString()
+                payload_hex = str.format('{:02x}', MessageTypes.XMR_BID_SPLIT) + msg_bytes.hex()
+                ro = self.callrpc('smsgsend', [offer.addr_from, bid.bid_addr, payload_hex, False, msg_valid, False, options])
+                xmr_swap.bid_accept_msg_id2 = bytes.fromhex(ro['msgid'])
 
-            msg_buf3 = XmrSplitMessage(
-                msg_id=bid_id,
-                msg_type=XmrSplitMsgTypes.BID_ACCEPT,
-                sequence=3,
-                dleag=xmr_swap.kbsl_dleag[32000:]
-            )
-            msg_bytes = msg_buf3.SerializeToString()
-            payload_hex = str.format('{:02x}', MessageTypes.XMR_BID_SPLIT) + msg_bytes.hex()
-            ro = self.callrpc('smsgsend', [offer.addr_from, bid.bid_addr, payload_hex, False, msg_valid, False, options])
-            xmr_swap.bid_accept_msg_id3 = bytes.fromhex(ro['msgid'])
+                msg_buf3 = XmrSplitMessage(
+                    msg_id=bid_id,
+                    msg_type=XmrSplitMsgTypes.BID_ACCEPT,
+                    sequence=3,
+                    dleag=xmr_swap.kbsl_dleag[32000:]
+                )
+                msg_bytes = msg_buf3.SerializeToString()
+                payload_hex = str.format('{:02x}', MessageTypes.XMR_BID_SPLIT) + msg_bytes.hex()
+                ro = self.callrpc('smsgsend', [offer.addr_from, bid.bid_addr, payload_hex, False, msg_valid, False, options])
+                xmr_swap.bid_accept_msg_id3 = bytes.fromhex(ro['msgid'])
 
             bid.setState(BidStates.BID_ACCEPTED)
 
@@ -3573,7 +3630,8 @@ class BasicSwap(BaseApp):
             raise ValueError('TODO')
         elif offer_data.swap_type == SwapTypes.XMR_SWAP:
             assert(coin_from != Coins.XMR)
-            assert(coin_to == Coins.XMR)
+            assert(coin_from != Coins.PART_ANON)
+            assert(coin_to == Coins.XMR or coin_to == Coins.PART_ANON)
             self.log.debug('TODO - More restrictions')
         else:
             raise ValueError('Unknown swap type {}.'.format(offer_data.swap_type))
@@ -3850,23 +3908,30 @@ class BasicSwap(BaseApp):
         ci_from = self.ci(Coins(offer.coin_from))
         ci_to = self.ci(Coins(offer.coin_to))
 
-        if len(xmr_swap.kbsf_dleag) < ci_to.lengthDLEAG():
-            q = session.query(XmrSplitData).filter(sa.and_(XmrSplitData.bid_id == bid.bid_id, XmrSplitData.msg_type == XmrSplitMsgTypes.BID)).order_by(XmrSplitData.msg_sequence.asc())
-            for row in q:
-                xmr_swap.kbsf_dleag += row.dleag
+        if offer.coin_to == Coins.XMR:
+            if len(xmr_swap.kbsf_dleag) < ci_to.lengthDLEAG():
+                q = session.query(XmrSplitData).filter(sa.and_(XmrSplitData.bid_id == bid.bid_id, XmrSplitData.msg_type == XmrSplitMsgTypes.BID)).order_by(XmrSplitData.msg_sequence.asc())
+                for row in q:
+                    xmr_swap.kbsf_dleag += row.dleag
+
+            if not ci_to.verifyDLEAG(xmr_swap.kbsf_dleag):
+                raise ValueError('Invalid DLEAG proof.')
+
+            # Extract pubkeys from MSG1L DLEAG
+            xmr_swap.pkasf = xmr_swap.kbsf_dleag[0: 33]
+            if not ci_from.verifyPubkey(xmr_swap.pkasf):
+                raise ValueError('Invalid coin a pubkey.')
+            xmr_swap.pkbsf = xmr_swap.kbsf_dleag[33: 33 + 32]
+            if not ci_to.verifyPubkey(xmr_swap.pkbsf):
+                raise ValueError('Invalid coin b pubkey.')
+        else:
+            xmr_swap.pkasf = xmr_swap.kbsf_dleag[0: 33]
+            if not ci_from.verifyPubkey(xmr_swap.pkasf):
+                raise ValueError('Invalid coin a pubkey.')
+            xmr_swap.pkbsf = xmr_swap.pkasf
 
         if not ci_to.verifyKey(xmr_swap.vkbvf):
             raise ValueError('Invalid key.')
-        if not ci_to.verifyDLEAG(xmr_swap.kbsf_dleag):
-            raise ValueError('Invalid DLEAG proof.')
-
-        # Extract pubkeys from MSG1L DLEAG
-        xmr_swap.pkasf = xmr_swap.kbsf_dleag[0: 33]
-        if not ci_from.verifyPubkey(xmr_swap.pkasf):
-            raise ValueError('Invalid coin a pubkey.')
-        xmr_swap.pkbsf = xmr_swap.kbsf_dleag[33: 33 + 32]
-        if not ci_to.verifyPubkey(xmr_swap.pkbsf):
-            raise ValueError('Invalid coin b pubkey.')
 
         if not ci_from.verifyPubkey(xmr_swap.pkaf):
             raise ValueError('Invalid pubkey.')
@@ -3897,26 +3962,32 @@ class BasicSwap(BaseApp):
         assert(xmr_offer), 'XMR offer not found: {}.'.format(bid.offer_id.hex())
         xmr_swap = session.query(XmrSwap).filter_by(bid_id=bid.bid_id).first()
         assert(xmr_swap), 'XMR swap not found: {}.'.format(bid.bid_id.hex())
-        ci_from = self.ci(Coins(offer.coin_from))
-        ci_to = self.ci(Coins(offer.coin_to))
+        ci_from = self.ci(offer.coin_from)
+        ci_to = self.ci(offer.coin_to)
 
-        if len(xmr_swap.kbsl_dleag) < ci_to.lengthDLEAG():
-            q = session.query(XmrSplitData).filter(sa.and_(XmrSplitData.bid_id == bid.bid_id, XmrSplitData.msg_type == XmrSplitMsgTypes.BID_ACCEPT)).order_by(XmrSplitData.msg_sequence.asc())
-            for row in q:
-                xmr_swap.kbsl_dleag += row.dleag
+        if offer.coin_to == Coins.XMR:
+            if len(xmr_swap.kbsl_dleag) < ci_to.lengthDLEAG():
+                q = session.query(XmrSplitData).filter(sa.and_(XmrSplitData.bid_id == bid.bid_id, XmrSplitData.msg_type == XmrSplitMsgTypes.BID_ACCEPT)).order_by(XmrSplitData.msg_sequence.asc())
+                for row in q:
+                    xmr_swap.kbsl_dleag += row.dleag
+            if not ci_to.verifyDLEAG(xmr_swap.kbsl_dleag):
+                raise ValueError('Invalid DLEAG proof.')
+
+            # Extract pubkeys from MSG1F DLEAG
+            xmr_swap.pkasl = xmr_swap.kbsl_dleag[0: 33]
+            if not ci_from.verifyPubkey(xmr_swap.pkasl):
+                raise ValueError('Invalid coin a pubkey.')
+            xmr_swap.pkbsl = xmr_swap.kbsl_dleag[33: 33 + 32]
+            if not ci_to.verifyPubkey(xmr_swap.pkbsl):
+                raise ValueError('Invalid coin b pubkey.')
+        else:
+            xmr_swap.pkasl = xmr_swap.kbsl_dleag[0: 33]
+            if not ci_from.verifyPubkey(xmr_swap.pkasl):
+                raise ValueError('Invalid coin a pubkey.')
+            xmr_swap.pkbsl = xmr_swap.pkasl
 
         if not ci_to.verifyKey(xmr_swap.vkbvl):
             raise ValueError('Invalid key.')
-        if not ci_to.verifyDLEAG(xmr_swap.kbsl_dleag):
-            raise ValueError('Invalid DLEAG proof.')
-
-        # Extract pubkeys from MSG1F DLEAG
-        xmr_swap.pkasl = xmr_swap.kbsl_dleag[0: 33]
-        if not ci_from.verifyPubkey(xmr_swap.pkasl):
-            raise ValueError('Invalid coin a pubkey.')
-        xmr_swap.pkbsl = xmr_swap.kbsl_dleag[33: 33 + 32]
-        if not ci_to.verifyPubkey(xmr_swap.pkbsl):
-            raise ValueError('Invalid coin b pubkey.')
 
         xmr_swap.vkbv = ci_to.sumKeys(xmr_swap.vkbvl, xmr_swap.vkbvf)
         xmr_swap.pkbv = ci_to.sumPubkeys(xmr_swap.pkbvl, xmr_swap.pkbvf)
@@ -3955,8 +4026,8 @@ class BasicSwap(BaseApp):
         offer, xmr_offer = self.getXmrOffer(offer_id, sent=True)
         assert(offer and offer.was_sent), 'Offer not found: {}.'.format(offer_id.hex())
         assert(xmr_offer), 'XMR offer not found: {}.'.format(offer_id.hex())
-        ci_from = self.ci(Coins(offer.coin_from))
-        ci_to = self.ci(Coins(offer.coin_to))
+        ci_from = self.ci(offer.coin_from)
+        ci_to = self.ci(offer.coin_to)
 
         assert(offer.state == OfferStates.OFFER_RECEIVED), 'Bad offer state'
         assert(msg['to'] == offer.addr_from), 'Received on incorrect address'
@@ -3995,9 +4066,10 @@ class BasicSwap(BaseApp):
                 b_restore_height=ci_to.getChainHeight(),
                 start_chain_a_height=ci_from.getChainHeight(),
             )
-            if xmr_swap.b_restore_height < ci_to._restore_height:
-                xmr_swap.b_restore_height = ci_to._restore_height
-                self.log.warning('XMR swap restore height clamped to {}'.format(ci_to._restore_height))
+            wallet_restore_height = self.getWalletRestoreHeight(ci_to)
+            if xmr_swap.b_restore_height < wallet_restore_height:
+                xmr_swap.b_restore_height = wallet_restore_height
+                self.log.warning('XMR swap restore height clamped to {}'.format(wallet_restore_height))
         else:
             assert(bid.state == BidStates.BID_SENT), 'Wrong bid state: {}'.format(str(BidStates(bid.state)))
             bid.created_at = msg['sent']
@@ -4008,6 +4080,16 @@ class BasicSwap(BaseApp):
 
         self.log.info('Receiving xmr bid %s for offer %s', bid_id.hex(), bid_data.offer_msg_id.hex())
         self.saveBid(bid_id, bid, xmr_swap=xmr_swap)
+
+        if offer.coin_to != Coins.XMR:
+            with self.mxDB:
+                try:
+                    session = scoped_session(self.session_factory)
+                    self.receiveXmrBid(bid, session)
+                    session.commit()
+                finally:
+                    session.close()
+                    session.remove()
 
     def processXmrBidAccept(self, msg):
         # F receiving MSG1F and MSG2F
@@ -4027,8 +4109,8 @@ class BasicSwap(BaseApp):
         offer, xmr_offer = self.getXmrOffer(bid.offer_id, sent=True)
         assert(offer), 'Offer not found: {}.'.format(bid.offer_id.hex())
         assert(xmr_offer), 'XMR offer not found: {}.'.format(bid.offer_id.hex())
-        ci_from = self.ci(Coins(offer.coin_from))
-        ci_to = self.ci(Coins(offer.coin_to))
+        ci_from = self.ci(offer.coin_from)
+        ci_to = self.ci(offer.coin_to)
 
         try:
             xmr_swap.pkal = msg_data.pkal
@@ -4075,6 +4157,16 @@ class BasicSwap(BaseApp):
 
             bid.setState(BidStates.BID_RECEIVING_ACC)
             self.saveBid(bid.bid_id, bid, xmr_swap=xmr_swap)
+
+            if offer.coin_to != Coins.XMR:
+                with self.mxDB:
+                    try:
+                        session = scoped_session(self.session_factory)
+                        self.receiveXmrBidAccept(bid, session)
+                        session.commit()
+                    finally:
+                        session.close()
+                        session.remove()
         except Exception as ex:
             if self.debug:
                 traceback.print_exc()
@@ -4321,7 +4413,8 @@ class BasicSwap(BaseApp):
         ci_from = self.ci(coin_from)
         ci_to = self.ci(coin_to)
 
-        kbsf = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, 2, for_ed25519=True)
+        for_ed25519 = True if coin_to == Coins.XMR else False
+        kbsf = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, 2, for_ed25519)
         kaf = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, 3)
 
         al_lock_spend_sig = ci_from.decryptOtVES(kbsf, xmr_swap.al_lock_spend_tx_esig)
@@ -4374,7 +4467,8 @@ class BasicSwap(BaseApp):
         kbsf = ci_from.recoverEncKey(xmr_swap.al_lock_spend_tx_esig, xmr_swap.al_lock_spend_tx_sig, xmr_swap.pkasf)
         assert(kbsf is not None)
 
-        kbsl = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, 2, for_ed25519=True)
+        for_ed25519 = True if coin_to == Coins.XMR else False
+        kbsl = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, 2, for_ed25519)
         vkbs = ci_to.sumKeys(kbsl, kbsf)
 
         address_to = ci_to.getMainWalletAddress()
@@ -4429,7 +4523,8 @@ class BasicSwap(BaseApp):
         kbsl = ci_from.recoverEncKey(xmr_swap.af_lock_refund_spend_tx_esig, af_lock_refund_spend_tx_sig, xmr_swap.pkasl)
         assert(kbsl is not None)
 
-        kbsf = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, 2, for_ed25519=True)
+        for_ed25519 = True if coin_to == Coins.XMR else False
+        kbsf = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, 2, for_ed25519)
         vkbs = ci_to.sumKeys(kbsl, kbsf)
 
         address_to = ci_to.getMainWalletAddress()
@@ -4490,7 +4585,8 @@ class BasicSwap(BaseApp):
             xmr_swap.af_lock_refund_spend_tx_esig = msg_data.af_lock_refund_spend_tx_esig
             xmr_swap.af_lock_refund_tx_sig = msg_data.af_lock_refund_tx_sig
 
-            kbsl = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, 2, for_ed25519=True)
+            for_ed25519 = True if coin_to == Coins.XMR else False
+            kbsl = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, 2, for_ed25519)
             kal = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, 3)
 
             xmr_swap.af_lock_refund_spend_tx_sig = ci_from.decryptOtVES(kbsl, xmr_swap.af_lock_refund_spend_tx_esig)

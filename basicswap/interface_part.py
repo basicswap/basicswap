@@ -97,3 +97,12 @@ class PARTInterfaceAnon(PARTInterface):
     @staticmethod
     def balance_type():
         return BalanceTypes.ANON
+
+    def publishBLockTx(self, Kbv, Kbs, output_amount, feerate):
+        raise ValueError('TODO - new core release')
+
+    def findTxB(self, kbv, Kbs, cb_swap_value, cb_block_confirmed, restore_height):
+        raise ValueError('TODO - new core release')
+
+    def spendBLockTx(self, address_to, kbv, kbs, cb_swap_value, b_fee, restore_height):
+        raise ValueError('TODO - new core release')
