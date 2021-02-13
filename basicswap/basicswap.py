@@ -870,7 +870,7 @@ class BasicSwap(BaseApp):
             ci.initialiseWallet(key_view, key_spend)
             root_address = ci.getAddressFromKeys(key_view, key_spend)
 
-            key_str = 'main_wallet_addr_' + chainparams[coin_type]['name']
+            key_str = 'main_wallet_addr_' + ci.coin_name()
             self.setStringKV(key_str, root_address)
             return
 
@@ -878,7 +878,7 @@ class BasicSwap(BaseApp):
         root_hash = ci.getAddressHashFromKey(root_key)[::-1]
         ci.initialiseWallet(root_key)
 
-        key_str = 'main_wallet_seedid_' + chainparams[coin_type]['name']
+        key_str = 'main_wallet_seedid_' + ci.coin_name()
         self.setStringKV(key_str, root_hash.hex())
 
     def setIntKVInSession(self, str_key, int_val, session):
@@ -1101,6 +1101,12 @@ class BasicSwap(BaseApp):
         else:
             raise ValueError('Unknown locktype')
 
+    def validateOfferValidTime(self, coin_from, coin_to, valid_for_seconds):
+        if valid_for_seconds < 60 * 60:  # SMSG_MIN_TTL
+            raise ValueError('Offer TTL too low')
+        if valid_for_seconds > 48 * 60 * 60:
+            raise ValueError('Offer TTL too high')
+
     def postOffer(self, coin_from, coin_to, amount, rate, min_bid_amount, swap_type,
                   lock_type=SEQUENCE_LOCK_TIME, lock_value=48 * 60 * 60, auto_accept_bids=False, addr_send_from=None, extra_options={}):
         # Offer to send offer.amount_from of coin_from in exchange for offer.amount_from * offer.rate of coin_to
@@ -1117,9 +1123,12 @@ class BasicSwap(BaseApp):
         except Exception:
             raise ValueError('Unknown coin to type')
 
+        valid_for_seconds = extra_options.get('valid_for_seconds', 60 * 60)
+
         self.validateSwapType(coin_from_t, coin_to_t, swap_type)
         self.validateOfferAmounts(coin_from_t, coin_to_t, amount, rate, min_bid_amount)
         self.validateOfferLockValue(coin_from_t, coin_to_t, lock_type, lock_value)
+        self.validateOfferValidTime(coin_from_t, coin_to_t, valid_for_seconds)
 
         self.mxDB.acquire()
         session = None
@@ -1136,7 +1145,7 @@ class BasicSwap(BaseApp):
             msg_buf.rate = int(rate)
             msg_buf.min_bid_amount = int(min_bid_amount)
 
-            msg_buf.time_valid = 60 * 60
+            msg_buf.time_valid = valid_for_seconds
             msg_buf.lock_type = lock_type
             msg_buf.lock_value = lock_value
             msg_buf.swap_type = swap_type
@@ -1424,7 +1433,9 @@ class BasicSwap(BaseApp):
         self.log.info('withdrawCoin %s %s to %s %s', value, self.getTicker(coin_type), addr_to, ' subfee' if subfee else '')
 
         ci = self.ci(coin_type)
-        return ci.withdrawCoin(value, addr_to, subfee)
+        txid = ci.withdrawCoin(value, addr_to, subfee)
+        self.log.debug('In txn: {}'.format(txid))
+        return txid
 
     def withdrawParticl(self, type_from, type_to, value, addr_to, subfee):
         self.log.info('withdrawParticl %s %s to %s %s %s', value, type_from, type_to, addr_to, ' subfee' if subfee else '')
@@ -1435,7 +1446,9 @@ class BasicSwap(BaseApp):
             type_to = 'part'
 
         ci = self.ci(Coins.PART)
-        return ci.sendTypeTo(type_from, type_to, value, addr_to, subfee)
+        txid = ci.sendTypeTo(type_from, type_to, value, addr_to, subfee)
+        self.log.debug('In txn: {}'.format(txid))
+        return txid
 
     def cacheNewAddressForCoin(self, coin_type):
         self.log.debug('cacheNewAddressForCoin %s', coin_type)
@@ -1449,7 +1462,7 @@ class BasicSwap(BaseApp):
         if c == Coins.PART:
             return True  # TODO
         if c == Coins.XMR:
-            expect_address = self.getStringKV('main_wallet_addr_' + chainparams[c]['name'])
+            expect_address = self.getStringKV('main_wallet_addr_' + ci.coin_name())
             if expect_address is None:
                 self.log.warning('Can\'t find expected main wallet address for coin {}'.format(ci.coin_name()))
                 return False
@@ -1459,7 +1472,7 @@ class BasicSwap(BaseApp):
             self.log.warning('Wallet for coin {} not derived from swap seed.'.format(ci.coin_name()))
             return False
 
-        expect_seedid = self.getStringKV('main_wallet_seedid_' + chainparams[c]['name'])
+        expect_seedid = self.getStringKV('main_wallet_seedid_' + ci.coin_name())
         if expect_seedid is None:
             self.log.warning('Can\'t find expected wallet seed id for coin {}'.format(ci.coin_name()))
             return False
@@ -1976,7 +1989,7 @@ class BasicSwap(BaseApp):
             bid.initiate_txn_refund = bytes.fromhex(refund_txn)
 
             txid = self.submitTxn(coin_from, txn)
-            self.log.debug('Submitted initiate txn %s to %s chain for bid %s', txid, chainparams[coin_from]['name'], bid_id.hex())
+            self.log.debug('Submitted initiate txn %s to %s chain for bid %s', txid, ci_from.coin_name(), bid_id.hex())
             bid.initiate_tx = SwapTx(
                 bid_id=bid_id,
                 tx_type=TxTypes.ITX,
@@ -2060,7 +2073,6 @@ class BasicSwap(BaseApp):
             if xmr_swap.b_restore_height < wallet_restore_height:
                 xmr_swap.b_restore_height = wallet_restore_height
                 self.log.warning('XMR swap restore height clamped to {}'.format(wallet_restore_height))
-
 
             for_ed25519 = True if coin_to == Coins.XMR else False
             kbvf = self.getPathKey(coin_from, coin_to, bid_created_at, xmr_swap.contract_count, 1, for_ed25519)
@@ -3617,6 +3629,7 @@ class BasicSwap(BaseApp):
         self.validateSwapType(coin_from, coin_to, offer_data.swap_type)
         self.validateOfferAmounts(coin_from, coin_to, offer_data.amount_from, offer_data.rate, offer_data.min_bid_amount)
         self.validateOfferLockValue(coin_from, coin_to, offer_data.lock_type, offer_data.lock_value)
+        self.validateOfferValidTime(coin_from, coin_to, offer_data.time_valid)
 
         assert(offer_data.time_valid >= MIN_OFFER_VALID_TIME and offer_data.time_valid <= MAX_OFFER_VALID_TIME), 'Invalid time_valid'
         assert(msg['sent'] + offer_data.time_valid >= now), 'Offer expired'
@@ -3629,9 +3642,8 @@ class BasicSwap(BaseApp):
         elif offer_data.swap_type == SwapTypes.BUYER_FIRST:
             raise ValueError('TODO')
         elif offer_data.swap_type == SwapTypes.XMR_SWAP:
-            assert(coin_from != Coins.XMR)
-            assert(coin_from != Coins.PART_ANON)
-            assert(coin_to == Coins.XMR or coin_to == Coins.PART_ANON)
+            assert(coin_from not in (Coins.XMR, Coins.PART_ANON))
+            assert(coin_to in (Coins.XMR, Coins.PART_ANON))
             self.log.debug('TODO - More restrictions')
         else:
             raise ValueError('Unknown swap type {}.'.format(offer_data.swap_type))
@@ -4225,7 +4237,7 @@ class BasicSwap(BaseApp):
 
             a_lock_tx_id = ci_from.getTxHash(xmr_swap.a_lock_tx)
             a_lock_tx_vout = ci_from.getTxOutputPos(xmr_swap.a_lock_tx, xmr_swap.a_lock_tx_script)
-            self.log.debug('Waiting for lock txn %s to %s chain for bid %s', a_lock_tx_id.hex(), chainparams[coin_from]['name'], bid_id.hex())
+            self.log.debug('Waiting for lock txn %s to %s chain for bid %s', a_lock_tx_id.hex(), ci_from.coin_name(), bid_id.hex())
             bid.xmr_a_lock_tx = SwapTx(
                 bid_id=bid_id,
                 tx_type=TxTypes.XMR_SWAP_A_LOCK,
@@ -4292,7 +4304,7 @@ class BasicSwap(BaseApp):
 
         vout_pos = ci_from.getTxOutputPos(xmr_swap.a_lock_tx, xmr_swap.a_lock_tx_script)
 
-        self.log.debug('Submitted lock txn %s to %s chain for bid %s', txid_hex, chainparams[coin_from]['name'], bid_id.hex())
+        self.log.debug('Submitted lock txn %s to %s chain for bid %s', txid_hex, ci_from.coin_name(), bid_id.hex())
 
         bid.xmr_a_lock_tx = SwapTx(
             bid_id=bid_id,
@@ -4356,7 +4368,7 @@ class BasicSwap(BaseApp):
             self.logBidEvent(bid, EventLogTypes.FAILED_TX_B_LOCK_PUBLISH, str_error, session)
             return
 
-        self.log.debug('Submitted lock txn %s to %s chain for bid %s', b_lock_tx_id.hex(), chainparams[coin_to]['name'], bid_id.hex())
+        self.log.debug('Submitted lock txn %s to %s chain for bid %s', b_lock_tx_id.hex(), ci_to.coin_name(), bid_id.hex())
         bid.xmr_b_lock_tx = SwapTx(
             bid_id=bid_id,
             tx_type=TxTypes.XMR_SWAP_B_LOCK,
@@ -4435,7 +4447,7 @@ class BasicSwap(BaseApp):
         xmr_swap.a_lock_spend_tx = ci_from.setTxSignature(xmr_swap.a_lock_spend_tx, witness_stack)
 
         txid = bytes.fromhex(ci_from.publishTx(xmr_swap.a_lock_spend_tx))
-        self.log.debug('Submitted lock spend txn %s to %s chain for bid %s', txid.hex(), chainparams[coin_from]['name'], bid_id.hex())
+        self.log.debug('Submitted lock spend txn %s to %s chain for bid %s', txid.hex(), ci_from.coin_name(), bid_id.hex())
         bid.xmr_a_lock_spend_tx = SwapTx(
             bid_id=bid_id,
             tx_type=TxTypes.XMR_SWAP_A_LOCK_SPEND,
@@ -4980,7 +4992,7 @@ class BasicSwap(BaseApp):
         rv = {
             'version': self.coin_clients[coin]['core_version'],
             'deposit_address': self.getCachedAddressForCoin(coin),
-            'name': chainparams[coin]['name'].capitalize(),
+            'name': ci.coin_name().capitalize(),
             'blocks': blockchaininfo['blocks'],
             'balance': format_amount(make_int(walletinfo['balance'], scale), scale),
             'unconfirmed': format_amount(make_int(walletinfo.get('unconfirmed_balance'), scale), scale),

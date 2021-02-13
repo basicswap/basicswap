@@ -235,6 +235,7 @@ def wait_for_balance(delay_event, url, balance_key, expect_amount, iterations=20
     i = 0
     while not delay_event.is_set():
         rv_js = json.loads(urlopen(url).read())
+        print("[rm] rv_js", rv_js)
         if float(rv_js[balance_key]) >= expect_amount:
             break
         delay_event.wait(delay_time)

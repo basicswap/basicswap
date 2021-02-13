@@ -54,7 +54,8 @@
 </select></td></tr>
 {% endif %}
 
-<tr class="padded_row"><td>Contract locked (hrs)</td><td><input type="number" name="lockhrs" min="1" max="64" value="{{ data.lockhrs }}" readonly></td>{% if data.swap_style != 'xmr' %}<td colspan=2>Participate txn will be locked for half the time.</td>{% endif %}</tr>
+<tr class="padded_row"><td>Offer valid (hrs)</td><td><input type="number" name="validhrs" min="1" max="48" value="{{ data.validhrs }}" readonly></td></tr>
+<tr><td>Contract locked (hrs)</td><td><input type="number" name="lockhrs" min="1" max="64" value="{{ data.lockhrs }}" readonly></td>{% if data.swap_style != 'xmr' %}<td colspan=2>Participate txn will be locked for half the time.</td>{% endif %}</tr>
 <tr><td>Auto Accept Bids</td><td colspan=3><input type="checkbox" name="autoaccept_" value="aa" {% if data.autoaccept==true %} checked="true"{% endif %} disabled></td></tr>
 </table>
 

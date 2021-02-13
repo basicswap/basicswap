@@ -66,11 +66,14 @@ def getCoinName(c):
 def listAvailableCoins(swap_client):
     coins = []
     for k, v in swap_client.coin_clients.items():
+        if k not in chainparams:
+            continue
         if v['connection_type'] == 'rpc':
             coins.append((int(k), getCoinName(k)))
-
             if k == Coins.PART:
-                coins.append((int(Coins.PART_ANON), getCoinName(k)))
+                pass
+                # TODO: Uncomment
+                # coins.append((int(Coins.PART_ANON), getCoinName(k)))
     return coins
 
 
@@ -402,13 +405,16 @@ class HttpHandler(BaseHTTPRequestHandler):
             page_data['coin_to'] = getCoinType(get_data_entry(form_data, 'coin_to'))
             coin_to = Coins(page_data['coin_to'])
             ci_to = swap_client.ci(coin_to)
+            if coin_to != Coins.XMR:
+                page_data['fee_to_conf'] = ci_to._conf_target  # Set default value
             parsed_data['coin_to'] = coin_to
-            if coin_to == Coins.XMR:
-                page_data['swap_style'] = 'xmr'
-            else:
-                page_data['swap_style'] = 'atomic'
         except Exception:
             errors.append('Unknown Coin To')
+
+        if parsed_data['coin_to'] in (Coins.XMR, Coins.PART_ANON):
+            page_data['swap_style'] = 'xmr'
+        else:
+            page_data['swap_style'] = 'atomic'
 
         try:
             page_data['amt_from'] = get_data_entry(form_data, 'amt_from')
@@ -460,6 +466,12 @@ class HttpHandler(BaseHTTPRequestHandler):
         elif have_data_entry(form_data, 'lockseconds'):
             parsed_data['lock_seconds'] = int(get_data_entry(form_data, 'lockseconds'))
 
+        if have_data_entry(form_data, 'validhrs'):
+            page_data['validhrs'] = int(get_data_entry(form_data, 'validhrs'))
+            parsed_data['valid_for_seconds'] = page_data['validhrs'] * 60 * 60
+        elif have_data_entry(form_data, 'valid_for_seconds'):
+            parsed_data['valid_for_seconds'] = int(get_data_entry(form_data, 'valid_for_seconds'))
+
         page_data['autoaccept'] = True if have_data_entry(form_data, 'autoaccept') else False
         parsed_data['autoaccept'] = page_data['autoaccept']
 
@@ -499,7 +511,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         swap_client = self.server.swap_client
 
         swap_type = SwapTypes.SELLER_FIRST
-        if parsed_data['coin_to'] == Coins.XMR:
+        if parsed_data['coin_to'] in (Coins.XMR, Coins.PART_ANON):
             swap_type = SwapTypes.XMR_SWAP
 
         if swap_client.coin_clients[parsed_data['coin_from']]['use_csv'] and swap_client.coin_clients[parsed_data['coin_to']]['use_csv']:
@@ -522,6 +534,8 @@ class HttpHandler(BaseHTTPRequestHandler):
             extra_options['to_fee_multiplier_percent'] = parsed_data['fee_to_extra']
         if 'to_fee_override' in parsed_data:
             extra_options['to_fee_override'] = parsed_data['to_fee_override']
+        if 'valid_for_seconds' in parsed_data:
+            extra_options['valid_for_seconds'] = parsed_data['valid_for_seconds']
 
         offer_id = swap_client.postOffer(
             parsed_data['coin_from'],
@@ -552,6 +566,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             # Set defaults
             'fee_from_conf': 2,
             'fee_to_conf': 2,
+            'validhrs': 1,
             'lockhrs': 32,
             'autoaccept': True
         }

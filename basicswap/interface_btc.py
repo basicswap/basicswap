@@ -34,7 +34,7 @@ from coincurve.ecdsaotves import (
     ecdsaotves_rec_enc_key)
 
 from .ecc_util import (
-    G, ep,
+    ep,
     pointToCPK, CPKToPoint,
     getSecretInt,
     b2h, i2b, b2i, i2h)
@@ -92,23 +92,23 @@ class BTCInterface(CoinInterface):
         return COIN
 
     @staticmethod
-    def exp():
+    def exp() -> int:
         return 8
 
     @staticmethod
-    def nbk():
+    def nbk() -> int:
         return 32
 
     @staticmethod
-    def nbK():  # No. of bytes requires to encode a public key
+    def nbK() -> int:  # No. of bytes requires to encode a public key
         return 33
 
     @staticmethod
-    def witnessScaleFactor():
+    def witnessScaleFactor() -> int:
         return 4
 
     @staticmethod
-    def txVersion():
+    def txVersion() -> int:
         return 2
 
     @staticmethod
@@ -119,11 +119,11 @@ class BTCInterface(CoinInterface):
         return rv
 
     @staticmethod
-    def compareFeeRates(a, b):
+    def compareFeeRates(a, b) -> bool:
         return abs(a - b) < 20
 
     @staticmethod
-    def xmr_swap_alock_spend_tx_vsize():
+    def xmr_swap_alock_spend_tx_vsize() -> int:
         return 147
 
     @staticmethod
@@ -921,7 +921,7 @@ class BTCInterface(CoinInterface):
         rv = pubkey.verify_compact(sig, message_hash, hasher=None)
         assert(rv is True)
 
-    def verifyMessage(self, address, message, signature, message_magic=None):
+    def verifyMessage(self, address, message, signature, message_magic=None) -> bool:
         if message_magic is None:
             message_magic = chainparams[self.coin_type()]['message_magic']
 

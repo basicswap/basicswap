@@ -15,8 +15,9 @@ from .contrib.test_framework.script import (
     OP_DUP, OP_HASH160, OP_EQUALVERIFY, OP_CHECKSIG
 )
 
+from .util import encodeStealthAddress
+from .chainparams import Coins, chainparams
 from .interface_btc import BTCInterface
-from .chainparams import Coins
 
 
 class BalanceTypes(IntEnum):
@@ -35,22 +36,22 @@ class PARTInterface(BTCInterface):
         return BalanceTypes.PLAIN
 
     @staticmethod
-    def witnessScaleFactor():
+    def witnessScaleFactor() -> int:
         return 2
 
     @staticmethod
-    def txVersion():
+    def txVersion() -> int:
         return 0xa0
 
     @staticmethod
-    def xmr_swap_alock_spend_tx_vsize():
+    def xmr_swap_alock_spend_tx_vsize() -> int:
         return 213
 
     @staticmethod
     def txoType():
         return CTxOutPart
 
-    def setDefaults(self):
+    def setDefaults(self) -> None:
         super().setDefaults()
         self._anon_tx_ring_size = 8  # TODO: Make option
 
@@ -86,6 +87,11 @@ class PARTInterface(BTCInterface):
     def getScriptForPubkeyHash(self, pkh):
         return CScript([OP_DUP, OP_HASH160, pkh, OP_EQUALVERIFY, OP_CHECKSIG])
 
+    def formatStealthAddress(self, scan_pubkey, spend_pubkey):
+        prefix_byte = chainparams[self.coin_type()][self._network]['stealth_key_prefix']
+
+        return encodeStealthAddress(prefix_byte, scan_pubkey, spend_pubkey)
+
 
 class PARTInterfaceBlind(PARTInterface):
     @staticmethod
@@ -99,7 +105,17 @@ class PARTInterfaceAnon(PARTInterface):
         return BalanceTypes.ANON
 
     def publishBLockTx(self, Kbv, Kbs, output_amount, feerate):
-        raise ValueError('TODO - new core release')
+        sx_addr = self.formatStealthAddress(Kbv, Kbs)
+        self._log.debug('sx_addr: {}'.format(sx_addr))
+
+        # TODO: Fund from other balances
+        params = ['anon', 'anon',
+                  [{'address': sx_addr, 'amount': self.format_amount(output_amount)}, ],
+                  '', '', self._anon_tx_ring_size, 1, False,
+                  {'conf_target': self._conf_target, 'blind_watchonly_visible': True}]
+
+        txid = self.rpc_callback('sendtypeto', params)
+        return bytes.fromhex(txid)
 
     def findTxB(self, kbv, Kbs, cb_swap_value, cb_block_confirmed, restore_height):
         raise ValueError('TODO - new core release')

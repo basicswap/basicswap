@@ -47,15 +47,15 @@ class XMRInterface(CoinInterface):
         return XMR_COIN
 
     @staticmethod
-    def exp():
+    def exp() -> int:
         return 12
 
     @staticmethod
-    def nbk():
+    def nbk() -> int:
         return 32
 
     @staticmethod
-    def nbK():  # No. of bytes requires to encode a public key
+    def nbK() -> int:  # No. of bytes requires to encode a public key
         return 32
 
     def __init__(self, coin_settings, network, swap_client=None):

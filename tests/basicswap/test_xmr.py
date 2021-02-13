@@ -703,9 +703,10 @@ class Test(unittest.TestCase):
         js_1 = json.loads(urlopen('http://127.0.0.1:1801/json/wallets/part').read())
         assert(float(js_1['balance']) > 200.0)
 
+        callnoderpc(1, 'reservebalance', [True, 1000000])  # Stop staking to avoid conflicts (input used by tx->anon staked before tx gets in the chain)
         post_json = {
             'value': 100,
-            'address': js_0['stealth_address'],
+            'address': js_1['stealth_address'],
             'subfee': False,
             'type_to': 'anon',
         }
@@ -718,8 +719,13 @@ class Test(unittest.TestCase):
             assert(len(json_rv['txid']) == 64)
 
         logging.info('Waiting for anon balance')
-        wait_for_balance(test_delay_event, 'http://127.0.0.1:1800/json/wallets/part', 'anon_balance', 110.0)
+        try:
+            wait_for_balance(test_delay_event, 'http://127.0.0.1:1801/json/wallets/part', 'anon_balance', 110.0)
+        except Exception as e:
+            ft = callnoderpc(0, 'filtertransactions', [{'count': 0}])
+            raise e
 
+        callnoderpc(1, 'reservebalance', [False])
         post_json = {
             'value': 10,
             'address': js_0['stealth_address'],
@@ -727,7 +733,7 @@ class Test(unittest.TestCase):
             'type_from': 'anon',
             'type_to': 'blind',
         }
-        json_rv = json.loads(post_json_req('http://127.0.0.1:1800/json/wallets/part/withdraw', post_json))
+        json_rv = json.loads(post_json_req('http://127.0.0.1:1801/json/wallets/part/withdraw', post_json))
         assert(len(json_rv['txid']) == 64)
 
         logging.info('Waiting for blind balance')
@@ -735,14 +741,13 @@ class Test(unittest.TestCase):
         if float(js_0['blind_balance']) >= 10.0:
             raise ValueError('Expect blind balance < 10')
 
-        logging.warning('TODO')
-        return
+        return  # TODO
 
         amt_swap = make_int(random.uniform(0.1, 2.0), scale=8, r=1)
         rate_swap = make_int(random.uniform(2.0, 20.0), scale=8, r=1)
         offer_id = swap_clients[0].postOffer(Coins.BTC, Coins.PART_ANON, amt_swap, rate_swap, amt_swap, SwapTypes.XMR_SWAP)
         wait_for_offer(test_delay_event, swap_clients[1], offer_id)
-        offers = swap_clients[1].listOffers(filters={'offer_id': offer_id})
+        offers = swap_clients[0].listOffers(filters={'offer_id': offer_id})
         offer = offers[0]
 
         bid_id = swap_clients[1].postXmrBid(offer_id, offer.amount_from)

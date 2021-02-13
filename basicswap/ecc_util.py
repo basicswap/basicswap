@@ -33,42 +33,42 @@ G = Point(curve_secp256k1, ep.Gx, ep.Gy, ep.o)
 SECP256K1_ORDER_HALF = ep.o // 2
 
 
-def ToDER(P):
+def ToDER(P) -> bytes:
     return bytes((4, )) + int(P.x()).to_bytes(32, byteorder='big') + int(P.y()).to_bytes(32, byteorder='big')
 
 
-def bytes32ToInt(b):
+def bytes32ToInt(b) -> int:
     return int.from_bytes(b, byteorder='big')
 
 
-def intToBytes32(i):
+def intToBytes32(i: int) -> bytes:
     return i.to_bytes(32, byteorder='big')
 
 
-def intToBytes32_le(i):
+def intToBytes32_le(i: int) -> bytes:
     return i.to_bytes(32, byteorder='little')
 
 
-def bytesToHexStr(b):
+def bytesToHexStr(b: bytes) -> str:
     return codecs.encode(b, 'hex').decode('utf-8')
 
 
-def hexStrToBytes(h):
+def hexStrToBytes(h: str) -> bytes:
     if h.startswith('0x'):
         h = h[2:]
     return bytes.fromhex(h)
 
 
-def getSecretBytes():
+def getSecretBytes() -> bytes:
     i = 1 + secrets.randbelow(ep.o - 1)
     return intToBytes32(i)
 
 
-def getSecretInt():
+def getSecretInt() -> int:
     return 1 + secrets.randbelow(ep.o - 1)
 
 
-def getInsecureBytes():
+def getInsecureBytes() -> bytes:
     while True:
         s = os.urandom(32)
 
@@ -77,7 +77,7 @@ def getInsecureBytes():
             return s
 
 
-def getInsecureInt():
+def getInsecureInt() -> int:
     while True:
         s = os.urandom(32)
 
@@ -86,7 +86,7 @@ def getInsecureInt():
             return s_test
 
 
-def powMod(x, y, z):
+def powMod(x, y, z) -> int:
     # Calculate (x ** y) % z efficiently.
     number = 1
     while y:

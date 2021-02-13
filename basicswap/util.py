@@ -27,7 +27,7 @@ def assert_cond(v, err='Bad opcode'):
         raise ValueError(err)
 
 
-def toBool(s):
+def toBool(s) -> bool:
     return s.lower() in ["1", "true"]
 
 
@@ -170,7 +170,7 @@ def SerialiseNum(n):
     return bytes((len(rv),)) + rv
 
 
-def DeserialiseNum(b, o=0):
+def DeserialiseNum(b, o=0) -> int:
     if b[o] == 0:
         return 0
     if b[o] > 0x50 and b[o] <= 0x50 + 16:
@@ -276,7 +276,7 @@ def make_int(v, scale=8, r=0):  # r = 0, no rounding, fail, r > 0 round up, r < 
     return rv
 
 
-def validate_amount(amount, scale=8):
+def validate_amount(amount, scale=8) -> bool:
     str_amount = float_to_str(amount) if type(amount) == float else str(amount)
     has_decimal = False
     for c in str_amount:
@@ -324,3 +324,16 @@ def getP2SHScriptForHash(p2sh):
 
 def getP2WSH(script):
     return bytes((OpCodes.OP_0, 0x20)) + hashlib.sha256(script).digest()
+
+
+def encodeStealthAddress(prefix_byte, scan_pubkey, spend_pubkey):
+    data = bytes((0x00,))
+    data += scan_pubkey
+    data += bytes((0x01,))
+    data += spend_pubkey
+    data += bytes((0x00,))  # number_signatures - unused
+    data += bytes((0x00,))  # num prefix bits
+
+    b = bytes((prefix_byte,)) + data
+    b += hashlib.sha256(hashlib.sha256(b).digest()).digest()[:4]
+    return b58encode(b)
