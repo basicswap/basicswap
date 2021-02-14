@@ -715,6 +715,7 @@ class BasicSwap(BaseApp):
     def start(self):
         self.log.info('Starting BasicSwap %s, database v%d\n\n', __version__, self.db_version)
         self.log.info('sqlalchemy version %s', sa.__version__)
+        self.log.info('timezone offset: %d (%s)', time.timezone, time.tzname[0])
 
         self.upgradeDatabase(self.db_version)
 

@@ -13,12 +13,14 @@ Docker must be installed and started:
 Should return a line containing `active (running)`
 
 
-Create the images:
+#### Create the images:
 
     $ cd basicswap/docker
     $ docker-compose build
 
-Prepare the datadir:
+
+#### Prepare the datadir:
+
 Set XMR_RPC_HOST and BASE_XMR_RPC_PORT to a public XMR node or exclude to run a local node.
 Set xmrrestoreheight to the current xmr chain height.
 Adjust `--withcoins` and `--withoutcoins` as desired, eg: `--withcoins=monero,bitcoin`.  By default only Particl is loaded.
@@ -27,10 +29,16 @@ Adjust `--withcoins` and `--withoutcoins` as desired, eg: `--withcoins=monero,bi
     $ docker run --rm -e XMR_RPC_HOST="node.xmr.to" -e BASE_XMR_RPC_PORT=18081 -t --name swap_prepare -v $COINDATA_PATH:/coindata i_swapclient \
     basicswap-prepare --datadir=/coindata --withcoins=monero --htmlhost="0.0.0.0" --xmrrestoreheight=2245107
 
-Record the mnemonic from the output of the above command.
+**Record the mnemonic from the output of the above command.**
 
 
-Start the container
+#### Set the timezone:
+
+Edit the `.env` file in the docker directory, set TZ to your local timezone.
+Valid options can be listed with: `timedatectl list-timezones`
+
+
+#### Start the container:
 
     $ export COINDATA_PATH=/var/data/coinswaps
     $ docker-compose up

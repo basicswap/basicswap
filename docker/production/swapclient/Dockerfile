@@ -5,7 +5,7 @@ ENV LANG=C.UTF-8 \
     DATADIR=/data
 
 RUN apt-get update; \
-    apt-get install -y wget python3-pip gnupg unzip protobuf-compiler automake libtool pkg-config gosu;
+    apt-get install -y wget python3-pip gnupg unzip protobuf-compiler automake libtool pkg-config gosu tzdata;
 
 RUN wget -O coincurve-anonswap.zip https://github.com/tecnovert/coincurve/archive/anonswap.zip && \
     unzip coincurve-anonswap.zip && \

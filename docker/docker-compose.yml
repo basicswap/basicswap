@@ -10,6 +10,8 @@ services:
             - ${COINDATA_PATH}:/coindata
         ports:
             - "${HTML_PORT}"  # Expose only to localhost, see .env
+        environment:
+            - TZ
 
 volumes:
   coindata:

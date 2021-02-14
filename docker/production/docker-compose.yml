@@ -61,6 +61,8 @@ services:
             - /var/swapdata/swapclient:/data
         ports:
             - "${HTML_PORT}"  # Expose only to localhost, see .env
+        environment:
+            - TZ
         depends_on:
             - particl_core
         restart: unless-stopped
