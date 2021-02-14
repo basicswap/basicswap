@@ -888,7 +888,10 @@ class BTCInterface(CoinInterface):
     def getOutput(self, txid, dest_script, expect_value):
         # TODO: Use getrawtransaction if txindex is active
         utxos = self.rpc_callback('scantxoutset', ['start', ['raw({})'.format(dest_script.hex())]])
-        chain_height = utxos['height']
+        if 'height' in utxos:  # chain_height not returned by v18 codebase
+            chain_height = utxos['height']
+        else:
+            chain_height = self.getChainHeight()
         rv = []
         for utxo in utxos['unspents']:
             if txid and txid.hex() != utxo['txid']:
