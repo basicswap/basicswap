@@ -871,7 +871,7 @@ class BasicSwap(BaseApp):
             ci.initialiseWallet(key_view, key_spend)
             root_address = ci.getAddressFromKeys(key_view, key_spend)
 
-            key_str = 'main_wallet_addr_' + ci.coin_name()
+            key_str = 'main_wallet_addr_' + ci.coin_name().lower()
             self.setStringKV(key_str, root_address)
             return
 
@@ -879,7 +879,7 @@ class BasicSwap(BaseApp):
         root_hash = ci.getAddressHashFromKey(root_key)[::-1]
         ci.initialiseWallet(root_key)
 
-        key_str = 'main_wallet_seedid_' + ci.coin_name()
+        key_str = 'main_wallet_seedid_' + ci.coin_name().lower()
         self.setStringKV(key_str, root_hash.hex())
 
     def setIntKVInSession(self, str_key, int_val, session):
@@ -1463,7 +1463,7 @@ class BasicSwap(BaseApp):
         if c == Coins.PART:
             return True  # TODO
         if c == Coins.XMR:
-            expect_address = self.getStringKV('main_wallet_addr_' + ci.coin_name())
+            expect_address = self.getStringKV('main_wallet_addr_' + ci.coin_name().lower())
             if expect_address is None:
                 self.log.warning('Can\'t find expected main wallet address for coin {}'.format(ci.coin_name()))
                 return False
@@ -1473,7 +1473,7 @@ class BasicSwap(BaseApp):
             self.log.warning('Wallet for coin {} not derived from swap seed.'.format(ci.coin_name()))
             return False
 
-        expect_seedid = self.getStringKV('main_wallet_seedid_' + ci.coin_name())
+        expect_seedid = self.getStringKV('main_wallet_seedid_' + ci.coin_name().lower())
         if expect_seedid is None:
             self.log.warning('Can\'t find expected wallet seed id for coin {}'.format(ci.coin_name()))
             return False
@@ -1526,7 +1526,7 @@ class BasicSwap(BaseApp):
         self.log.debug('getCachedStealthAddressForCoin %s', coin_type)
 
         ci = self.ci(coin_type)
-        key_str = 'stealth_addr_' + ci.coin_name()
+        key_str = 'stealth_addr_' + ci.coin_name().lower()
         self.mxDB.acquire()
         try:
             session = scoped_session(self.session_factory)
@@ -1549,7 +1549,7 @@ class BasicSwap(BaseApp):
     def getCachedWalletRestoreHeight(self, ci):
         self.log.debug('getCachedWalletRestoreHeight %s', ci.coin_name())
 
-        key_str = 'restore_height_' + ci.coin_name()
+        key_str = 'restore_height_' + ci.coin_name().lower()
         self.mxDB.acquire()
         try:
             session = scoped_session(self.session_factory)
@@ -5045,7 +5045,7 @@ class BasicSwap(BaseApp):
         rv = {
             'version': self.coin_clients[coin]['core_version'],
             'deposit_address': self.getCachedAddressForCoin(coin),
-            'name': ci.coin_name().capitalize(),
+            'name': ci.coin_name(),
             'blocks': blockchaininfo['blocks'],
             'balance': format_amount(make_int(walletinfo['balance'], scale), scale),
             'unconfirmed': format_amount(make_int(walletinfo.get('unconfirmed_balance'), scale), scale),

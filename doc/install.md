@@ -32,7 +32,7 @@ Adjust `--withcoins` and `--withoutcoins` as desired, eg: `--withcoins=monero,bi
 **Record the mnemonic from the output of the above command.**
 
 
-#### Set the timezone:
+#### Set the timezone (optional):
 
 Edit the `.env` file in the docker directory, set TZ to your local timezone.
 Valid options can be listed with: `timedatectl list-timezones`
