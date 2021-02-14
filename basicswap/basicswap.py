@@ -4950,6 +4950,58 @@ class BasicSwap(BaseApp):
                     json.dump(self.settings, fp, indent=4)
         return settings_changed
 
+    def enableCoin(self, coin_name):
+        self.log.info('Enabling coin %s', coin_name)
+
+        coin_id = self.getCoinIdFromName(coin_name)
+        if coin_id in (Coins.PART, Coins.PART_BLIND, Coins.PART_ANON):
+            raise ValueError('Invalid coin')
+
+        settings_cc = self.settings['chainclients'][coin_name]
+        if 'connection_type_prev' not in settings_cc:
+            raise ValueError('Can\'t find previous value.')
+        settings_cc['connection_type'] = settings_cc['connection_type_prev']
+        del settings_cc['connection_type_prev']
+        if 'manage_daemon_prev' in settings_cc:
+            settings_cc['manage_daemon'] = settings_cc['manage_daemon_prev']
+            del settings_cc['manage_daemon_prev']
+        if 'manage_wallet_daemon_prev' in settings_cc:
+            settings_cc['manage_wallet_daemon'] = settings_cc['manage_wallet_daemon_prev']
+            del settings_cc['manage_wallet_daemon_prev']
+
+        settings_path = os.path.join(self.data_dir, cfg.CONFIG_FILENAME)
+        shutil.copyfile(settings_path, settings_path + '.last')
+        with open(settings_path, 'w') as fp:
+            json.dump(self.settings, fp, indent=4)
+        # Client must be restarted
+
+    def disableCoin(self, coin_name):
+        self.log.info('Disabling coin %s', coin_name)
+
+        coin_id = self.getCoinIdFromName(coin_name)
+        if coin_id in (Coins.PART, Coins.PART_BLIND, Coins.PART_ANON):
+            raise ValueError('Invalid coin')
+
+        settings_cc = self.settings['chainclients'][coin_name]
+
+        if settings_cc['connection_type'] != 'rpc':
+            raise ValueError('Already disabled.')
+
+        settings_cc['manage_daemon_prev'] = settings_cc['manage_daemon']
+        settings_cc['manage_daemon'] = False
+        settings_cc['connection_type_prev'] = settings_cc['connection_type']
+        settings_cc['connection_type'] = 'none'
+
+        if 'manage_wallet_daemon' in settings_cc:
+            settings_cc['manage_wallet_daemon_prev'] = settings_cc['manage_wallet_daemon']
+            settings_cc['manage_wallet_daemon'] = False
+
+        settings_path = os.path.join(self.data_dir, cfg.CONFIG_FILENAME)
+        shutil.copyfile(settings_path, settings_path + '.last')
+        with open(settings_path, 'w') as fp:
+            json.dump(self.settings, fp, indent=4)
+        # Client must be restarted
+
     def getSummary(self, opts=None):
         num_watched_outputs = 0
         for c, v in self.coin_clients.items():

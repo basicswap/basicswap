@@ -11,6 +11,15 @@
 {% for c in chains %}
 <h4>{{ c.name|capitalize }}</h4>
 <table>
+{% if c.connection_type %}
+<tr><td>Connection Type</td><td>{{ c.connection_type }}</td></tr>
+{% endif %}
+{% if c.manage_daemon is defined %}
+<tr><td>Manage Daemon</td><td>{{ c.manage_daemon }}</td></tr>
+{% endif %}
+{% if c.manage_wallet_daemon is defined %}
+<tr><td>Manage Wallet Daemon</td><td>{{ c.manage_wallet_daemon }}</td></tr>
+{% endif %}
 <tr><td>Chain Lookups</td><td>
 <select name="lookups_{{ c.name }}">
 <option value="local"{% if c.lookups=='local' %} selected{% endif %}>Local Node</option>
@@ -27,12 +36,25 @@
 {% else %}
 <tr><td>Blocks Confirmed Target</td><td><input type="number" name="conf_target_{{ c.name }}" min="1" max="32" value="{{ c.conf_target }}"></td></tr>
 {% endif %}
-<tr><td><input type="submit" name="apply_{{ c.name }}" value="Apply"></td></tr>
+<tr><td><input type="submit" name="apply_{{ c.name }}" value="Apply">
+{% if c.can_disable == true %}
+<input type="submit" name="disable_{{ c.name }}" value="Disable" onclick="confirmPopup('Disable', '{{ c.name|capitalize }}')">
+{% endif %}
+{% if c.can_reenable == true %}
+<input type="submit" name="enable_{{ c.name }}" value="Enable" onclick="confirmPopup('Enable', '{{ c.name|capitalize }}')">
+{% endif %}
+</td></tr>
 </table>
 {% endfor %}
+</table>
 
 <input type="hidden" name="formid" value="{{ form_id }}">
 </form>
 
 <p><a href="/">home</a></p>
+<script>
+function confirmPopup(action, coin_name) {
+    confirm(action + " " + coin_name + "?\nWill shutdown basicswap.");
+}
+</script>
 </body></html>

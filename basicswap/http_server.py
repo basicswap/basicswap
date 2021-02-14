@@ -358,17 +358,34 @@ class HttpHandler(BaseHTTPRequestHandler):
 
                     if swap_client.editSettings(name, data) is True:
                         messages.append('Settings applied.')
+                elif bytes('enable_' + name, 'utf-8') in form_data:
+                    swap_client.enableCoin(name)
+                    messages.append(name.capitalize() + ' enabled, shutting down.')
+                    swap_client.stopRunning()
+                elif bytes('disable_' + name, 'utf-8') in form_data:
+                    swap_client.disableCoin(name)
+                    messages.append(name.capitalize() + ' disabled, shutting down.')
+                    swap_client.stopRunning()
         chains_formatted = []
 
         for name, c in swap_client.settings['chainclients'].items():
             chains_formatted.append({
                 'name': name,
-                'lookups': c.get('chain_lookups', 'local')
+                'lookups': c.get('chain_lookups', 'local'),
+                'manage_daemon': c.get('manage_daemon', 'Unknown'),
+                'connection_type': c.get('connection_type', 'Unknown'),
             })
             if name == 'monero':
                 chains_formatted[-1]['fee_priority'] = c.get('fee_priority', 0)
+                chains_formatted[-1]['manage_wallet_daemon'] = c.get('manage_wallet_daemon', 'Unknown')
             else:
                 chains_formatted[-1]['conf_target'] = c.get('conf_target', 2)
+            if name != 'particl':
+                if c.get('connection_type', 'Unknown') == 'none':
+                    if 'connection_type_prev' in c:
+                        chains_formatted[-1]['can_reenable'] = True
+                else:
+                    chains_formatted[-1]['can_disable'] = True
 
         template = env.get_template('settings.html')
         return bytes(template.render(
