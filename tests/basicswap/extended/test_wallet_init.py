@@ -99,6 +99,7 @@ class Test(unittest.TestCase):
                 fp.write('listenonion=0\n')
                 fp.write('upnp=0\n')
                 fp.write('minstakeinterval=5\n')
+                fp.write('smsgsregtestadjust=0\n')
                 for ip in range(3):
                     if ip != i:
                         fp.write('connect=127.0.0.1:{}\n'.format(PARTICL_PORT_BASE + ip))

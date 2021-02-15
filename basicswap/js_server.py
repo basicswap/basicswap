@@ -9,7 +9,6 @@ import urllib.parse
 
 from .util import (
     toBool,
-    format_timestamp,
 )
 from .basicswap import (
     strBidState,
@@ -131,7 +130,8 @@ def js_offers(self, url_split, post_string, is_json, sent=False):
         ci_to = self.server.swap_client.ci(o.coin_to)
         rv.append({
             'offer_id': o.offer_id.hex(),
-            'created_at': format_timestamp(o.created_at),
+            'created_at': o.created_at,
+            'expire_at': o.expire_at,
             'coin_from': ci_from.coin_name(),
             'coin_to': ci_to.coin_name(),
             'amount_from': ci_from.format_amount(o.amount_from),
@@ -173,10 +173,20 @@ def js_bids(self, url_split, post_string, is_json):
                 if addr_from == '-1':
                     addr_from = None
 
-            if offer.swap_type == SwapTypes.XMR_SWAP:
-                bid_id = swap_client.postXmrBid(offer_id, amount_from, addr_send_from=addr_from)
+            if have_data_entry(post_data, 'validmins'):
+                valid_for_seconds = int(get_data_entry(post_data, 'validmins')) * 60
+            elif have_data_entry(post_data, 'valid_for_seconds'):
+                valid_for_seconds = int(get_data_entry(post_data, 'valid_for_seconds'))
             else:
-                bid_id = swap_client.postBid(offer_id, amount_from, addr_send_from=addr_from)
+                valid_for_seconds = 10 * 60
+
+            extra_options = {
+                'valid_for_seconds': valid_for_seconds,
+            }
+            if offer.swap_type == SwapTypes.XMR_SWAP:
+                bid_id = swap_client.postXmrBid(offer_id, amount_from, addr_send_from=addr_from, extra_options=extra_options)
+            else:
+                bid_id = swap_client.postBid(offer_id, amount_from, addr_send_from=addr_from, extra_options=extra_options)
 
             if have_data_entry(post_data, 'debugind'):
                 swap_client.setBidDebugInd(bid_id, int(get_data_entry(post_data, 'debugind')))
@@ -203,18 +213,18 @@ def js_bids(self, url_split, post_string, is_json):
 
         edit_bid = False
         show_txns = False
-        data = describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, events, edit_bid, show_txns)
-
+        data = describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, events, edit_bid, show_txns, for_api=True)
         return bytes(json.dumps(data), 'UTF-8')
 
     bids = swap_client.listBids()
     return bytes(json.dumps([{
-        'bid_id': b[1].hex(),
-        'offer_id': b[2].hex(),
-        'created_at': format_timestamp(b[0]),
-        'coin_from': b[8],
-        'amount_from': swap_client.ci(b[8]).format_amount(b[3]),
-        'bid_state': strBidState(b[4])
+        'bid_id': b[2].hex(),
+        'offer_id': b[3].hex(),
+        'created_at': b[0],
+        'expire_at': b[1],
+        'coin_from': b[9],
+        'amount_from': swap_client.ci(b[9]).format_amount(b[4]),
+        'bid_state': strBidState(b[5])
     } for b in bids]), 'UTF-8')
 
 

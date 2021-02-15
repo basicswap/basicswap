@@ -633,6 +633,9 @@ class HttpHandler(BaseHTTPRequestHandler):
         offer, xmr_offer = swap_client.getXmrOffer(offer_id)
         assert(offer), 'Unknown offer ID'
 
+        extend_data = {  # Defaults
+            'nb_validmins': 10,
+        }
         messages = []
         sent_bid_id = None
         show_bid_form = None
@@ -643,15 +646,26 @@ class HttpHandler(BaseHTTPRequestHandler):
                     swap_client.revokeOffer(offer_id)
                     messages.append('Offer revoked')
                 except Exception as ex:
-                    messages.append('Revoke offer failed ' + str(ex))
+                    messages.append('Revoke offer failed: ' + str(ex))
             elif b'newbid' in form_data:
                 show_bid_form = True
             elif b'sendbid' in form_data:
-                addr_from = form_data[b'addr_from'][0].decode('utf-8')
-                if addr_from == '-1':
-                    addr_from = None
+                try:
+                    addr_from = form_data[b'addr_from'][0].decode('utf-8')
+                    extend_data['nb_addr_from'] = addr_from
+                    if addr_from == '-1':
+                        addr_from = None
 
-                sent_bid_id = swap_client.postBid(offer_id, offer.amount_from, addr_send_from=addr_from).hex()
+                    minutes_valid = int(form_data[b'validmins'][0].decode('utf-8'))
+                    extend_data['nb_validmins'] = minutes_valid
+
+                    extra_options = {
+                        'valid_for_seconds': minutes_valid * 60,
+                    }
+                    sent_bid_id = swap_client.postBid(offer_id, offer.amount_from, addr_send_from=addr_from, extra_options=extra_options).hex()
+                except Exception as ex:
+                    messages.append('Error: Send bid failed: ' + str(ex))
+                    show_bid_form = True
 
         ci_from = swap_client.ci(Coins(offer.coin_from))
         ci_to = swap_client.ci(Coins(offer.coin_to))
@@ -674,6 +688,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             'was_revoked': 'True' if offer.active_ind == 2 else 'False',
             'show_bid_form': show_bid_form,
         }
+        data.update(extend_data)
 
         if xmr_offer:
             int_fee_rate_now, fee_source = ci_from.get_fee_rate()
@@ -700,7 +715,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             sent_bid_id=sent_bid_id,
             messages=messages,
             data=data,
-            bids=[(b[1].hex(), ci_from.format_amount(b[3]), strBidState(b[4]), strTxState(b[6]), strTxState(b[7])) for b in bids],
+            bids=[(b[2].hex(), ci_from.format_amount(b[4]), strBidState(b[5]), strTxState(b[7]), strTxState(b[8])) for b in bids],
             addrs=None if show_bid_form is None else swap_client.listSmsgAddresses('bid'),
             form_id=os.urandom(8).hex(),
         ), 'UTF-8')
@@ -875,7 +890,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             h2=self.server.title,
             page_type='Sent' if sent else 'Received',
             bids=[(format_timestamp(b[0]),
-                   b[1].hex(), b[2].hex(), strBidState(b[4]), strTxState(b[6]), strTxState(b[7])) for b in bids],
+                   b[2].hex(), b[3].hex(), strBidState(b[5]), strTxState(b[7]), strTxState(b[8])) for b in bids],
         ), 'UTF-8')
 
     def page_watched(self, url_split, post_string):

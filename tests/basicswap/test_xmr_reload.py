@@ -68,11 +68,29 @@ class Test(XmrTestBase):
         offers = json.loads(urlopen('http://127.0.0.1:12701/json/offers').read())
         offer = offers[0]
 
-        data = parse.urlencode({
+        data = {
             'offer_id': offer['offer_id'],
-            'amount_from': offer['amount_from']}).encode()
+            'amount_from': offer['amount_from']}
 
-        bid_id = json.loads(urlopen('http://127.0.0.1:12701/json/bids/new', data=data).read())
+        data['valid_for_seconds'] = 24 * 60 * 60 + 1
+        bid = json.loads(urlopen('http://127.0.0.1:12701/json/bids/new', data=parse.urlencode(data).encode()).read())
+        assert(bid['error'] == 'Bid TTL too high')
+        del data['valid_for_seconds']
+        data['validmins'] = 24 * 60 + 1
+        bid = json.loads(urlopen('http://127.0.0.1:12701/json/bids/new', data=parse.urlencode(data).encode()).read())
+        assert(bid['error'] == 'Bid TTL too high')
+
+        del data['validmins']
+        data['valid_for_seconds'] = 10
+        bid = json.loads(urlopen('http://127.0.0.1:12701/json/bids/new', data=parse.urlencode(data).encode()).read())
+        assert(bid['error'] == 'Bid TTL too low')
+        del data['valid_for_seconds']
+        data['validmins'] = 1
+        bid = json.loads(urlopen('http://127.0.0.1:12701/json/bids/new', data=parse.urlencode(data).encode()).read())
+        assert(bid['error'] == 'Bid TTL too low')
+
+        data['validmins'] = 60
+        bid_id = json.loads(urlopen('http://127.0.0.1:12701/json/bids/new', data=parse.urlencode(data).encode()).read())
 
         waitForNumBids(self.delay_event, 12700, 1)
 
@@ -82,6 +100,7 @@ class Test(XmrTestBase):
             if bid['bid_state'] == 'Received':
                 break
             self.delay_event.wait(1)
+        assert(bid['expire_at'] == bid['created_at'] + data['validmins'] * 60)
 
         data = parse.urlencode({
             'accept': True

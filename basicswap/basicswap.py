@@ -100,12 +100,6 @@ import basicswap.network as bsn
 import basicswap.protocols.atomic_swap_1 as atomic_swap_1
 
 
-MIN_OFFER_VALID_TIME = 60 * 10
-MAX_OFFER_VALID_TIME = 60 * 60 * 48
-MIN_BID_VALID_TIME = 60 * 10
-MAX_BID_VALID_TIME = 60 * 60 * 48
-
-
 class MessageTypes(IntEnum):
     OFFER = auto()
     BID = auto()
@@ -226,9 +220,6 @@ class DebugTypes(IntEnum):
     CREATE_INVALID_COIN_B_LOCK = auto()
     BUYER_STOP_AFTER_ITX = auto()
     MAKE_INVALID_PTX = auto()
-
-
-INITIATE_TX_TIMEOUT = 40 * 60  # TODO: make variable per coin
 
 
 def strOfferState(state):
@@ -477,7 +468,7 @@ class BasicSwap(BaseApp):
 
         self.swaps_in_progress = dict()
 
-        self.SMSG_SECONDS_IN_HOUR = 60 * 2 if self.chain == 'regtest' else 60 * 60
+        self.SMSG_SECONDS_IN_HOUR = 60 * 60  # Note: Set smsgsregtestadjust=0 for regtest
 
         self.delay_event = threading.Event()
         self.threads = []
@@ -1102,11 +1093,19 @@ class BasicSwap(BaseApp):
         else:
             raise ValueError('Unknown locktype')
 
-    def validateOfferValidTime(self, coin_from, coin_to, valid_for_seconds):
-        if valid_for_seconds < 60 * 60:  # SMSG_MIN_TTL
+    def validateOfferValidTime(self, offer_type, coin_from, coin_to, valid_for_seconds):
+        # TODO: adjust
+        if valid_for_seconds < 10 * 60:
             raise ValueError('Offer TTL too low')
         if valid_for_seconds > 48 * 60 * 60:
             raise ValueError('Offer TTL too high')
+
+    def validateBidValidTime(self, offer_type, coin_from, coin_to, valid_for_seconds):
+        # TODO: adjust
+        if valid_for_seconds < 10 * 60:
+            raise ValueError('Bid TTL too low')
+        if valid_for_seconds > 24 * 60 * 60:
+            raise ValueError('Bid TTL too high')
 
     def postOffer(self, coin_from, coin_to, amount, rate, min_bid_amount, swap_type,
                   lock_type=SEQUENCE_LOCK_TIME, lock_value=48 * 60 * 60, auto_accept_bids=False, addr_send_from=None, extra_options={}):
@@ -1129,7 +1128,7 @@ class BasicSwap(BaseApp):
         self.validateSwapType(coin_from_t, coin_to_t, swap_type)
         self.validateOfferAmounts(coin_from_t, coin_to_t, amount, rate, min_bid_amount)
         self.validateOfferLockValue(coin_from_t, coin_to_t, lock_type, lock_value)
-        self.validateOfferValidTime(coin_from_t, coin_to_t, valid_for_seconds)
+        self.validateOfferValidTime(swap_type, coin_from_t, coin_to_t, valid_for_seconds)
 
         self.mxDB.acquire()
         session = None
@@ -1196,7 +1195,7 @@ class BasicSwap(BaseApp):
 
             self.callrpc('smsgaddlocaladdress', [offer_addr])  # Enable receiving smsg
             options = {'decodehex': True, 'ttl_is_seconds': True}
-            msg_valid = self.SMSG_SECONDS_IN_HOUR * 1
+            msg_valid = max(self.SMSG_SECONDS_IN_HOUR * 1, valid_for_seconds)
             ro = self.callrpc('smsgsend', [offer_addr, self.network_addr, payload_hex, False, msg_valid, False, options])
             msg_id = ro['msgid']
 
@@ -1725,13 +1724,16 @@ class BasicSwap(BaseApp):
         assert(offer.expire_at > int(time.time())), 'Offer has expired'
 
         if offer.swap_type == SwapTypes.XMR_SWAP:
-            return self.postXmrBid(offer_id, amount, addr_send_from)
+            return self.postXmrBid(offer_id, amount, addr_send_from, extra_options)
+
+        valid_for_seconds = extra_options.get('valid_for_seconds', 60 * 10)
+        self.validateBidValidTime(offer.swap_type, offer.coin_from, offer.coin_to, valid_for_seconds)
 
         self.mxDB.acquire()
         try:
             msg_buf = BidMessage()
             msg_buf.offer_msg_id = offer_id
-            msg_buf.time_valid = extra_options.get('time_valid', 60 * 10)
+            msg_buf.time_valid = valid_for_seconds
             msg_buf.amount = int(amount)  # amount of coin_from
 
             coin_from = Coins(offer.coin_from)
@@ -1762,12 +1764,13 @@ class BasicSwap(BaseApp):
                 bid_addr = addr_send_from
             self.callrpc('smsgaddlocaladdress', [bid_addr])  # Enable receiving smsg
             options = {'decodehex': True, 'ttl_is_seconds': True}
-            msg_valid = self.SMSG_SECONDS_IN_HOUR * 1
+            msg_valid = max(self.SMSG_SECONDS_IN_HOUR * 1, valid_for_seconds)
             ro = self.callrpc('smsgsend', [bid_addr, offer.addr_from, payload_hex, False, msg_valid, False, options])
             msg_id = ro['msgid']
 
             bid_id = bytes.fromhex(msg_id)
             bid = Bid(
+                active_ind=1,
                 bid_id=bid_id,
                 offer_id=offer_id,
                 amount=msg_buf.amount,
@@ -2031,7 +2034,7 @@ class BasicSwap(BaseApp):
             self.saveBid(bid_id, bid)
             self.swaps_in_progress[bid_id] = (bid, offer)
 
-    def postXmrBid(self, offer_id, amount, addr_send_from=None):
+    def postXmrBid(self, offer_id, amount, addr_send_from=None, extra_options={}):
         # Bid to send bid.amount * offer.rate of coin_to in exchange for bid.amount of coin_from
         # Send MSG1L F -> L
         self.log.debug('postXmrBid %s', offer_id.hex())
@@ -2044,6 +2047,9 @@ class BasicSwap(BaseApp):
             assert(xmr_offer), 'XMR offer not found: {}.'.format(offer_id.hex())
             assert(offer.expire_at > int(time.time())), 'Offer has expired'
 
+            valid_for_seconds = extra_options.get('valid_for_seconds', 60 * 10)
+            self.validateBidValidTime(offer.swap_type, offer.coin_from, offer.coin_to, valid_for_seconds)
+
             coin_from = Coins(offer.coin_from)
             coin_to = Coins(offer.coin_to)
             ci_from = self.ci(coin_from)
@@ -2053,7 +2059,7 @@ class BasicSwap(BaseApp):
 
             msg_buf = XmrBidMessage()
             msg_buf.offer_msg_id = offer_id
-            msg_buf.time_valid = 60 * 10
+            msg_buf.time_valid = valid_for_seconds
             msg_buf.amount = int(amount)  # Amount of coin_from
 
             address_out = self.getReceiveAddressFromPool(coin_from, offer_id, TxTypes.XMR_SWAP_A_LOCK)
@@ -2110,7 +2116,7 @@ class BasicSwap(BaseApp):
                 bid_addr = addr_send_from
             self.callrpc('smsgaddlocaladdress', [bid_addr])  # Enable receiving smsg
             options = {'decodehex': True, 'ttl_is_seconds': True}
-            msg_valid = self.SMSG_SECONDS_IN_HOUR * 1
+            msg_valid = max(self.SMSG_SECONDS_IN_HOUR * 1, valid_for_seconds)
             ro = self.callrpc('smsgsend', [bid_addr, offer.addr_from, payload_hex, False, msg_valid, False, options])
             xmr_swap.bid_id = bytes.fromhex(ro['msgid'])
 
@@ -2138,6 +2144,7 @@ class BasicSwap(BaseApp):
                 xmr_swap.bid_msg_id3 = bytes.fromhex(ro['msgid'])
 
             bid = Bid(
+                active_ind=1,
                 bid_id=xmr_swap.bid_id,
                 offer_id=offer_id,
                 amount=msg_buf.amount,
@@ -3135,7 +3142,7 @@ class BasicSwap(BaseApp):
 
             # Bid times out if buyer doesn't see tx in chain within INITIATE_TX_TIMEOUT seconds
             if bid.initiate_tx is None and \
-               bid.state_time + INITIATE_TX_TIMEOUT < int(time.time()):
+               bid.state_time + atomic_swap_1.INITIATE_TX_TIMEOUT < int(time.time()):
                 self.log.info('Swap timed out waiting for initiate tx for bid %s', bid_id.hex())
                 bid.setState(BidStates.SWAP_TIMEDOUT, 'Timed out waiting for initiate tx')
                 self.saveBid(bid_id, bid)
@@ -3630,9 +3637,8 @@ class BasicSwap(BaseApp):
         self.validateSwapType(coin_from, coin_to, offer_data.swap_type)
         self.validateOfferAmounts(coin_from, coin_to, offer_data.amount_from, offer_data.rate, offer_data.min_bid_amount)
         self.validateOfferLockValue(coin_from, coin_to, offer_data.lock_type, offer_data.lock_value)
-        self.validateOfferValidTime(coin_from, coin_to, offer_data.time_valid)
+        self.validateOfferValidTime(offer_data.swap_type, coin_from, coin_to, offer_data.time_valid)
 
-        assert(offer_data.time_valid >= MIN_OFFER_VALID_TIME and offer_data.time_valid <= MAX_OFFER_VALID_TIME), 'Invalid time_valid'
         assert(msg['sent'] + offer_data.time_valid >= now), 'Offer expired'
 
         if offer_data.swap_type == SwapTypes.SELLER_FIRST:
@@ -3752,17 +3758,17 @@ class BasicSwap(BaseApp):
 
         # Validate data
         assert(len(bid_data.offer_msg_id) == 28), 'Bad offer_id length'
-        assert(bid_data.time_valid >= MIN_BID_VALID_TIME and bid_data.time_valid <= MAX_BID_VALID_TIME), 'Invalid time_valid'
 
         offer_id = bid_data.offer_msg_id
         offer = self.getOffer(offer_id, sent=True)
-        assert(offer and offer.was_sent), 'Unknown offerid'
+        assert(offer and offer.was_sent), 'Unknown offer'
 
         assert(offer.state == OfferStates.OFFER_RECEIVED), 'Bad offer state'
         assert(msg['to'] == offer.addr_from), 'Received on incorrect address'
         assert(now <= offer.expire_at), 'Offer expired'
         assert(bid_data.amount >= offer.min_bid_amount), 'Bid amount below minimum'
         assert(bid_data.amount <= offer.amount_from), 'Bid amount above offer amount'
+        self.validateBidValidTime(offer.swap_type, offer.coin_from, offer.coin_to, bid_data.time_valid)
         assert(now <= msg['sent'] + bid_data.time_valid), 'Bid expired'
 
         # TODO: Allow higher bids
@@ -3800,6 +3806,7 @@ class BasicSwap(BaseApp):
         bid = self.getBid(bid_id)
         if bid is None:
             bid = Bid(
+                active_ind=1,
                 bid_id=bid_id,
                 offer_id=offer_id,
                 amount=bid_data.amount,
@@ -3885,7 +3892,7 @@ class BasicSwap(BaseApp):
             if offer.lock_type == ABS_LOCK_BLOCKS:
                 self.log.warning('TODO: validate absolute lock values')
             else:
-                assert(script_lock_value <= bid.created_at + offer.lock_value + INITIATE_TX_TIMEOUT), 'script lock time too high'
+                assert(script_lock_value <= bid.created_at + offer.lock_value + atomic_swap_1.INITIATE_TX_TIMEOUT), 'script lock time too high'
                 assert(script_lock_value >= bid.created_at + offer.lock_value), 'script lock time too low'
 
         assert(len(scriptvalues[3]) == 40), 'pkhash_refund bad length'
@@ -4033,12 +4040,12 @@ class BasicSwap(BaseApp):
 
         # Validate data
         assert(len(bid_data.offer_msg_id) == 28), 'Bad offer_id length'
-        assert(bid_data.time_valid >= MIN_BID_VALID_TIME and bid_data.time_valid <= MAX_BID_VALID_TIME), 'Invalid time_valid'
 
         offer_id = bid_data.offer_msg_id
         offer, xmr_offer = self.getXmrOffer(offer_id, sent=True)
         assert(offer and offer.was_sent), 'Offer not found: {}.'.format(offer_id.hex())
         assert(xmr_offer), 'XMR offer not found: {}.'.format(offer_id.hex())
+
         ci_from = self.ci(offer.coin_from)
         ci_to = self.ci(offer.coin_to)
 
@@ -4047,9 +4054,8 @@ class BasicSwap(BaseApp):
         assert(now <= offer.expire_at), 'Offer expired'
         assert(bid_data.amount >= offer.min_bid_amount), 'Bid amount below minimum'
         assert(bid_data.amount <= offer.amount_from), 'Bid amount above offer amount'
+        self.validateBidValidTime(offer.swap_type, offer.coin_from, offer.coin_to, bid_data.time_valid)
         assert(now <= msg['sent'] + bid_data.time_valid), 'Bid expired'
-
-        self.log.debug('TODO: xmr bid validation')
 
         assert(ci_to.verifyKey(bid_data.kbvf))
         assert(ci_from.verifyPubkey(bid_data.pkaf))
@@ -4059,6 +4065,7 @@ class BasicSwap(BaseApp):
         bid, xmr_swap = self.getXmrBid(bid_id)
         if bid is None:
             bid = Bid(
+                active_ind=1,
                 bid_id=bid_id,
                 offer_id=offer_id,
                 amount=bid_data.amount,
@@ -4839,6 +4846,8 @@ class BasicSwap(BaseApp):
 
             if now - self._last_checked_watched >= self.check_watched_seconds:
                 for k, c in self.coin_clients.items():
+                    if k == Coins.PART_ANON:
+                        continue
                     if len(c['watched_outputs']) > 0:
                         self.checkForSpends(k, c)
                 self._last_checked_watched = now
@@ -5132,25 +5141,29 @@ class BasicSwap(BaseApp):
             session.remove()
             self.mxDB.release()
 
-    def listBids(self, sent=False, offer_id=None, for_html=False):
+    def listBids(self, sent=False, offer_id=None, for_html=False, filters={}):
         self.mxDB.acquire()
         try:
             rv = []
             now = int(time.time())
             session = scoped_session(self.session_factory)
 
-            query_str = 'SELECT bids.created_at, bids.bid_id, bids.offer_id, bids.amount, bids.state, bids.was_received, tx1.state, tx2.state, offers.coin_from FROM bids ' + \
+            query_str = 'SELECT bids.created_at, bids.expire_at, bids.bid_id, bids.offer_id, bids.amount, bids.state, bids.was_received, tx1.state, tx2.state, offers.coin_from FROM bids ' + \
                         'LEFT JOIN offers ON offers.offer_id = bids.offer_id ' + \
                         'LEFT JOIN transactions AS tx1 ON tx1.bid_id = bids.bid_id AND tx1.tx_type = {} '.format(TxTypes.ITX) + \
                         'LEFT JOIN transactions AS tx2 ON tx2.bid_id = bids.bid_id AND tx2.tx_type = {} '.format(TxTypes.PTX)
 
+            query_str += 'WHERE bids.active_ind = 1 '
+            filter_bid_id = filters.get('bid_id', None)
+            if filter_bid_id is not None:
+                query_str += 'AND bids.bid_id = x\'{}\' '.format(filter_bid_id.hex())
             if offer_id is not None:
-                query_str += 'WHERE bids.offer_id = x\'{}\' '.format(offer_id.hex())
+                query_str += 'AND bids.offer_id = x\'{}\' '.format(offer_id.hex())
             elif sent:
-                query_str += 'WHERE bids.was_sent = 1 '
+                query_str += 'AND bids.was_sent = 1 '
             else:
-                query_str += 'WHERE bids.was_received = 1 '
-            query_str += 'ORDER BY bids.created_at DESC'
+                query_str += 'AND bids.was_received = 1 '
+            query_str += ' ORDER BY bids.created_at DESC'
 
             q = session.execute(query_str)
             for row in q:

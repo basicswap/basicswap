@@ -12,6 +12,9 @@ from basicswap.script import (
 )
 
 
+INITIATE_TX_TIMEOUT = 40 * 60  # TODO: make variable per coin
+
+
 def buildContractScript(lock_val, secret_hash, pkh_redeem, pkh_refund, op_lock=OpCodes.OP_CHECKSEQUENCEVERIFY):
     script = bytearray([
         OpCodes.OP_IF,

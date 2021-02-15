@@ -61,13 +61,13 @@ def prepareDataDir(datadir, node_id, conf_file, dir_prefix, base_p2p_port=BASE_P
         fp.write('acceptnonstdtxn=0\n')
         fp.write('txindex=1\n')
         fp.write('wallet=wallet.dat\n')
-
         fp.write('findpeers=0\n')
-        # minstakeinterval=5  # Using walletsettings stakelimit instead
-        fp.write('stakethreadconddelayms=1000\n')
 
         if base_p2p_port == BASE_PORT:  # Particl
             fp.write('zmqpubsmsg=tcp://127.0.0.1:{}\n'.format(BASE_ZMQ_PORT + node_id))
+            # minstakeinterval=5  # Using walletsettings stakelimit instead
+            fp.write('stakethreadconddelayms=1000\n')
+            fp.write('smsgsregtestadjust=0\n')
 
         for i in range(0, num_nodes):
             if node_id == i:
@@ -109,10 +109,15 @@ def wait_for_bid(delay_event, swap_client, bid_id, state=None, sent=False, wait_
         if delay_event.is_set():
             raise ValueError('Test stopped.')
         delay_event.wait(1)
-        bids = swap_client.listBids(sent=sent)
+
+        filters = {
+            'bid_id': bid_id,
+        }
+        bids = swap_client.listBids(sent=sent, filters=filters)
+        assert(len(bids) < 2)
         for bid in bids:
-            if bid[1] == bid_id:
-                if state is not None and state != bid[4]:
+            if bid[2] == bid_id:
+                if state is not None and state != bid[5]:
                     continue
                 return
     raise ValueError('wait_for_bid timed out.')
@@ -235,7 +240,6 @@ def wait_for_balance(delay_event, url, balance_key, expect_amount, iterations=20
     i = 0
     while not delay_event.is_set():
         rv_js = json.loads(urlopen(url).read())
-        print("[rm] rv_js", rv_js)
         if float(rv_js[balance_key]) >= expect_amount:
             break
         delay_event.wait(delay_time)

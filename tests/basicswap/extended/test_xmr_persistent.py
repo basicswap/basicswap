@@ -180,6 +180,7 @@ class Test(unittest.TestCase):
                     fp.write('listenonion=0\n')
                     fp.write('upnp=0\n')
                     fp.write('minstakeinterval=5\n')
+                    fp.write('smsgsregtestadjust=0\n')
                     salt = generate_salt(16)
                     fp.write('rpcauth={}:{}${}\n'.format('test_part_' + str(i), salt, password_to_hmac(salt, 'test_part_pwd_' + str(i))))
                     for ip in range(NUM_NODES):

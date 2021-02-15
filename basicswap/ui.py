@@ -127,7 +127,7 @@ def listBidStates():
     return rv
 
 
-def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_bid, show_txns, view_tx_ind=None):
+def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_bid, show_txns, view_tx_ind=None, for_api=False):
     ci_from = swap_client.ci(Coins(offer.coin_from))
     ci_to = swap_client.ci(Coins(offer.coin_to))
     ticker_from = ci_from.ticker()
@@ -176,8 +176,8 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
         'offer_id': bid.offer_id.hex(),
         'addr_from': bid.bid_addr,
         'addr_fund_proof': bid.proof_address,
-        'created_at': format_timestamp(bid.created_at, with_seconds=True),
-        'expired_at': format_timestamp(bid.expire_at, with_seconds=True),
+        'created_at': bid.created_at if for_api else format_timestamp(bid.created_at, with_seconds=True),
+        'expired_at': bid.expire_at if for_api else format_timestamp(bid.expire_at, with_seconds=True),
         'was_sent': 'True' if bid.was_sent else 'False',
         'was_received': 'True' if bid.was_received else 'False',
         'initiate_tx': getTxIdHex(bid, TxTypes.ITX, ' ' + ticker_from),
@@ -226,7 +226,6 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
             data['participate_tx_spend'] = getTxSpendHex(bid, TxTypes.PTX)
 
     if offer.swap_type == SwapTypes.XMR_SWAP:
-
         data['coin_a_lock_refund_tx_est_final'] = 'None'
         if bid.xmr_a_lock_tx and bid.xmr_a_lock_tx.block_time:
             if offer.lock_type == SEQUENCE_LOCK_TIME:

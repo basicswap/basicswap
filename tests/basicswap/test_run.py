@@ -135,6 +135,7 @@ def prepareDir(datadir, nodeId, network_key, network_pubkey):
 
         fp.write('acceptnonstdtxn=0\n')
         fp.write('minstakeinterval=2\n')
+        fp.write('smsgsregtestadjust=0\n')
         fp.write('stakethreadconddelayms=1000\n')
 
         for i in range(0, NUM_NODES):

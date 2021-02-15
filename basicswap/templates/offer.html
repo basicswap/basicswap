@@ -52,11 +52,12 @@
 <tr><td>Send From Address</td><td>
 <select name="addr_from">
 {% for a in addrs %}
-<option value="{{ a }}">{{ a }}</option>
+<option value="{{ a }}" {% if data.nb_addr_from==a %} selected{% endif %}>{{ a }}</option>
 {% endfor %}
-<option value="-1">-- New Address --</option>
+<option value="-1" {% if data.nb_addr_from=="-1" %} selected{% endif %}>-- New Address --</option>
 </select>
 </td></tr>
+<tr><td>Minutes valid</td><td><input type="number" name="validmins" min="10" max="1440" value="{{ data.nb_validmins }}"></td></tr>
 
 <tr><td><input type="submit" name="sendbid" value="Send Bid"><input type="submit" name="cancel" value="Cancel"></td></tr>
 </table>
