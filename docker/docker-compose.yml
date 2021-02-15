@@ -12,6 +12,11 @@ services:
             - "${HTML_PORT}"  # Expose only to localhost, see .env
         environment:
             - TZ
+        logging:
+            driver: "local"
+            options:
+                max-size: "10m"
+                max-file: "5"
 
 volumes:
   coindata:

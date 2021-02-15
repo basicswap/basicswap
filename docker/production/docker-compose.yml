@@ -13,6 +13,11 @@ services:
             - "51738:51738"
         expose:
             - 51735
+        logging:
+            driver: "local"
+            options:
+                max-size: "10m"
+                max-file: "3"
         restart: unless-stopped
     bitcoin_core:
         image: i_bitcoin
@@ -26,6 +31,11 @@ services:
             - "8333:8333"
         expose:
             - 8332
+        logging:
+            driver: "local"
+            options:
+                max-size: "10m"
+                max-file: "3"
         restart: unless-stopped
     #monero_daemon:
         #image: i_monero_daemon
@@ -39,6 +49,11 @@ services:
             #- "18080:18080"
         #expose:
             #- 8332
+        #logging:
+            #driver: "local"
+            #options:
+                #max-size: "10m"
+                #max-file: "3"
         #restart: unless-stopped
     monero_wallet:
         image: i_monero_wallet
@@ -50,6 +65,11 @@ services:
             - /var/swapdata/monero_wallet:/data
         expose:
             - 8332
+        logging:
+            driver: "local"
+            options:
+                max-size: "10m"
+                max-file: "3"
         restart: unless-stopped
     swapclient:
         image: i_swapclient
@@ -63,6 +83,11 @@ services:
             - "${HTML_PORT}"  # Expose only to localhost, see .env
         environment:
             - TZ
+        logging:
+            driver: "local"
+            options:
+                max-size: "10m"
+                max-file: "5"
         depends_on:
             - particl_core
         restart: unless-stopped
