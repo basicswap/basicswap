@@ -35,6 +35,7 @@ class BaseApp:
         self.chain = chain
         self.settings = settings
         self.coin_clients = {}
+        self.coin_interfaces = {}
         self.mxDB = threading.RLock()
         self.debug = self.settings.get('debug', False)
         self._network = None
@@ -90,14 +91,6 @@ class BaseApp:
             if coin_name.lower() == params['name'].lower():
                 return c
         raise ValueError('Unknown coin: {}'.format(coin_name))
-
-    def getTicker(self, coin_type):
-        ticker = chainparams[coin_type]['ticker']
-        if self.chain == 'testnet':
-            ticker = 't' + ticker
-        if self.chain == 'regtest':
-            ticker = 'rt' + ticker
-        return ticker
 
     def encodeSegwitP2WSH(self, coin_type, p2wsh):
         return segwit_addr.encode(chainparams[coin_type][self.chain]['hrp'], 0, p2wsh[2:])

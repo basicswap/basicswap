@@ -14,7 +14,6 @@ class Explorer():
         self.coin_type = coin_type
         self.base_url = base_url
         self.log = self.swapclient.log
-        self.coin_settings = self.swapclient.coin_clients[self.coin_type]
 
     def readURL(self, url):
         self.log.debug('Explorer url: {}'.format(url))

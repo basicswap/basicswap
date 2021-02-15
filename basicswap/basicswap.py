@@ -1430,9 +1430,9 @@ class BasicSwap(BaseApp):
         return est_fee
 
     def withdrawCoin(self, coin_type, value, addr_to, subfee):
-        self.log.info('withdrawCoin %s %s to %s %s', value, self.getTicker(coin_type), addr_to, ' subfee' if subfee else '')
-
         ci = self.ci(coin_type)
+        self.log.info('withdrawCoin %s %s to %s %s', value, ci.ticker(), addr_to, ' subfee' if subfee else '')
+
         txid = ci.withdrawCoin(value, addr_to, subfee)
         self.log.debug('In txn: {}'.format(txid))
         return txid

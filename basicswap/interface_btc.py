@@ -152,10 +152,9 @@ class BTCInterface(CoinInterface):
         return lock_value & SEQUENCE_LOCKTIME_MASK
 
     def __init__(self, coin_settings, network, swap_client=None):
-        super().__init__()
+        super().__init__(network)
         rpc_host = coin_settings.get('rpchost', '127.0.0.1')
         self.rpc_callback = make_rpc_func(coin_settings['rpcport'], coin_settings['rpcauth'], host=rpc_host)
-        self._network = network
         self.blocks_confirmed = coin_settings['blocks_confirmed']
         self.setConfTarget(coin_settings['conf_target'])
         self._sc = swap_client

@@ -205,8 +205,9 @@ chainparams = {
 
 
 class CoinInterface:
-    def __init__(self):
+    def __init__(self, network):
         self.setDefaults()
+        self._network = network
 
     def setDefaults(self):
         self._unknown_wallet_seed = True
@@ -223,7 +224,12 @@ class CoinInterface:
         return chainparams[self.coin_type()]['name'].capitalize()
 
     def ticker(self):
-        return chainparams[self.coin_type()]['ticker']
+        ticker = chainparams[self.coin_type()]['ticker']
+        if self._network == 'testnet':
+            ticker = 't' + ticker
+        elif self._network == 'regtest':
+            ticker = 'rt' + ticker
+        return ticker
 
     def min_amount(self):
         return chainparams[self.coin_type()][self._network]['min_amount']
