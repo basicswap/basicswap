@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019-2020 tecnovert
+# Copyright (c) 2019-2021 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-import secrets
 import hashlib
+import secrets
 import unittest
 
 import basicswap.contrib.ed25519_fast as edf
@@ -216,27 +216,51 @@ class Test(unittest.TestCase):
     def test_rate(self):
         scale_from = 8
         scale_to = 12
-        amount_from = 100 * (10 ** scale_from)
-        rate = 0.1 * (10 ** scale_to)
+        amount_from = make_int(100, scale_from)
+        rate = make_int(0.1, scale_to)
 
         amount_to = int((amount_from * rate) // (10 ** scale_from))
         assert('100.00000000' == format_amount(amount_from, scale_from))
         assert('10.000000000000' == format_amount(amount_to, scale_to))
 
-        rate_check = int((amount_to / amount_from) * (10 ** scale_from))
+        rate_check = make_int((amount_to / amount_from), scale_from)
         assert(rate == rate_check)
 
         scale_from = 12
         scale_to = 8
-        amount_from = 1 * (10 ** scale_from)
-        rate = 12 * (10 ** scale_to)
+        amount_from = make_int(1, scale_from)
+        rate = make_int(12, scale_to)
 
         amount_to = int((amount_from * rate) // (10 ** scale_from))
         assert('1.000000000000' == format_amount(amount_from, scale_from))
         assert('12.00000000' == format_amount(amount_to, scale_to))
 
-        rate_check = int((amount_to / amount_from) * (10 ** scale_from))
+        rate_check = make_int((amount_to / amount_from), scale_from)
         assert(rate == rate_check)
+
+        scale_from = 8
+        scale_to = 8
+        amount_from = make_int(0.073, scale_from)
+        amount_to = make_int(10, scale_to)
+        rate = make_int(amount_to / amount_from, scale_to, r=1)
+        amount_to_recreate = int((amount_from * rate) // (10 ** scale_from))
+        assert('10.00000000' == format_amount(amount_to_recreate, scale_to))
+
+        scale_from = 8
+        scale_to = 12
+        amount_from = make_int(10.0, scale_from)
+        amount_to = make_int(0.06935, scale_to)
+        rate = make_int(amount_to / amount_from, scale_from, r=1)
+        amount_to_recreate = int((amount_from * rate) // (10 ** scale_from))
+        assert('0.069350000000' == format_amount(amount_to_recreate, scale_to))
+
+        scale_from = 12
+        scale_to = 8
+        amount_from = make_int(0.06935, scale_from)
+        amount_to = make_int(10.0, scale_to)
+        rate = make_int(amount_to / amount_from, scale_from, r=1)
+        amount_to_recreate = int((amount_from * rate) // (10 ** scale_from))
+        assert('10.00000000' == format_amount(amount_to_recreate, scale_to))
 
 
 if __name__ == '__main__':

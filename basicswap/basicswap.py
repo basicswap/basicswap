@@ -5134,6 +5134,12 @@ class BasicSwap(BaseApp):
             if offset is not None:
                 q = q.offset(offset)
             for row in q:
+                # Show offers for enabled coins only
+                try:
+                    ci_from = self.ci(row.coin_from)
+                    ci_to = self.ci(row.coin_to)
+                except Exception as e:
+                    continue
                 rv.append(row)
             return rv
         finally:

@@ -447,7 +447,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             errors.append('Amount To')
 
         if 'amt_to' in parsed_data and 'amt_from' in parsed_data:
-            parsed_data['rate'] = int((parsed_data['amt_to'] / parsed_data['amt_from']) * ci_from.COIN())
+            parsed_data['rate'] = ci_from.make_int(parsed_data['amt_to'] / parsed_data['amt_from'], r=1)
 
         if b'step1' in form_data:
             if len(errors) == 0 and b'continue' in form_data:
