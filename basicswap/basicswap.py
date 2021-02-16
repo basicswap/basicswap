@@ -470,7 +470,6 @@ class BasicSwap(BaseApp):
 
         self.SMSG_SECONDS_IN_HOUR = 60 * 60  # Note: Set smsgsregtestadjust=0 for regtest
 
-        self.delay_event = threading.Event()
         self.threads = []
 
         # Encode key to match network

@@ -64,7 +64,7 @@ XMR_SITE_COMMIT = 'd27c1eee9fe0e8daa011d07baae8b67dd2b62a04'  # Lock hashes.txt 
 
 DEFAULT_XMR_RESTORE_HEIGHT = 2245107
 
-UI_HTML_PORT = int(os.getenv('BASE_XMR_RPC_PORT', 12700))
+UI_HTML_PORT = int(os.getenv('UI_HTML_PORT', 12700))
 PART_ZMQ_PORT = int(os.getenv('PART_ZMQ_PORT', 20792))
 
 PART_RPC_HOST = os.getenv('PART_RPC_HOST', '127.0.0.1')
@@ -131,11 +131,12 @@ def extractCore(coin, version, settings, bin_dir, release_path):
                     continue
                 out_path = os.path.join(bin_dir, bin_name)
                 if (not os.path.exists(out_path)) or extract_core_overwrite:
-                    fi = ft.extractfile(member)
-                    with open(out_path, 'wb') as fout:
+                    with open(out_path, 'wb') as fout, ft.extractfile(member) as fi:
                         fout.write(fi.read())
-                    fi.close()
-                    os.chmod(out_path, stat.S_IRWXU | stat.S_IXGRP | stat.S_IXOTH)
+                    try:
+                        os.chmod(out_path, stat.S_IRWXU | stat.S_IXGRP | stat.S_IXOTH)
+                    except Exception as e:
+                        logging.warning('Unable to set file permissions: %s, for %s', str(e), out_path)
         return
 
     bins = [coin + 'd', coin + '-cli', coin + '-tx']
@@ -150,17 +151,21 @@ def extractCore(coin, version, settings, bin_dir, release_path):
                 if (not os.path.exists(out_path)) or extract_core_overwrite:
                     with open(out_path, 'wb') as fout:
                         fout.write(fz.read('{}-{}/bin/{}'.format(coin, version, b)))
-                    os.chmod(out_path, stat.S_IRWXU | stat.S_IXGRP | stat.S_IXOTH)
+                    try:
+                        os.chmod(out_path, stat.S_IRWXU | stat.S_IXGRP | stat.S_IXOTH)
+                    except Exception as e:
+                        logging.warning('Unable to set file permissions: %s, for %s', str(e), out_path)
     else:
         with tarfile.open(release_path) as ft:
             for b in bins:
                 out_path = os.path.join(bin_dir, b)
                 if not os.path.exists(out_path) or extract_core_overwrite:
-                    fi = ft.extractfile('{}-{}/bin/{}'.format(coin, version, b))
-                    with open(out_path, 'wb') as fout:
+                    with open(out_path, 'wb') as fout, ft.extractfile('{}-{}/bin/{}'.format(coin, version, b)) as fi:
                         fout.write(fi.read())
-                    fi.close()
-                    os.chmod(out_path, stat.S_IRWXU | stat.S_IXGRP | stat.S_IXOTH)
+                    try:
+                        os.chmod(out_path, stat.S_IRWXU | stat.S_IXGRP | stat.S_IXOTH)
+                    except Exception as e:
+                        logging.warning('Unable to set file permissions: %s, for %s', str(e), out_path)
 
 
 def prepareCore(coin, version, settings, data_dir):

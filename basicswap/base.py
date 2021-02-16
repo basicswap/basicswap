@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019 tecnovert
+# Copyright (c) 2019-2021 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -38,14 +38,16 @@ class BaseApp:
         self.coin_interfaces = {}
         self.mxDB = threading.RLock()
         self.debug = self.settings.get('debug', False)
+        self.delay_event = threading.Event()
         self._network = None
-
         self.prepareLogging()
         self.log.info('Network: {}'.format(self.chain))
 
     def stopRunning(self, with_code=0):
         self.fail_code = with_code
-        self.is_running = False
+        with self.mxDB:
+            self.is_running = False
+            self.delay_event.set()
 
     def prepareLogging(self):
         self.log = logging.getLogger(self.log_name)
