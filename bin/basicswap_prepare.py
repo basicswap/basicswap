@@ -41,11 +41,11 @@ else:
     FILE_EXT = 'tar.gz'
 
 known_coins = {
-    'particl': '0.19.2.4',
-    'litecoin': '0.18.1',
-    'bitcoin': '0.21.0',
-    'namecoin': '0.18.0',
-    'monero': '0.17.1.9',
+    'particl': ('0.21.0.2', 'rc1'),
+    'litecoin': ('0.18.1', ''),
+    'bitcoin': ('0.21.0', ''),
+    'namecoin': ('0.18.0', ''),
+    'monero': ('0.17.1.9', ''),
 }
 
 logger = logging.getLogger()
@@ -108,8 +108,9 @@ def downloadFile(url, path):
     urlretrieve(url, path, make_reporthook())
 
 
-def extractCore(coin, version, settings, bin_dir, release_path):
-    logger.info('extractCore %s v%s', coin, version)
+def extractCore(coin, version_pair, settings, bin_dir, release_path):
+    version, version_tag = version_pair
+    logger.info('extractCore %s v%s%s', coin, version, version_tag)
 
     if coin == 'monero':
         bins = ['monerod', 'monero-wallet-rpc']
@@ -160,7 +161,7 @@ def extractCore(coin, version, settings, bin_dir, release_path):
             for b in bins:
                 out_path = os.path.join(bin_dir, b)
                 if not os.path.exists(out_path) or extract_core_overwrite:
-                    with open(out_path, 'wb') as fout, ft.extractfile('{}-{}/bin/{}'.format(coin, version, b)) as fi:
+                    with open(out_path, 'wb') as fout, ft.extractfile('{}-{}/bin/{}'.format(coin, version + version_tag, b)) as fi:
                         fout.write(fi.read())
                     try:
                         os.chmod(out_path, stat.S_IRWXU | stat.S_IXGRP | stat.S_IXOTH)
@@ -168,8 +169,9 @@ def extractCore(coin, version, settings, bin_dir, release_path):
                         logging.warning('Unable to set file permissions: %s, for %s', str(e), out_path)
 
 
-def prepareCore(coin, version, settings, data_dir):
-    logger.info('prepareCore %s v%s', coin, version)
+def prepareCore(coin, version_pair, settings, data_dir):
+    version, version_tag = version_pair
+    logger.info('prepareCore %s v%s%s', coin, version, version_tag)
 
     bin_dir = os.path.expanduser(settings['chainclients'][coin]['bindir'])
     if not os.path.exists(bin_dir):
@@ -202,12 +204,12 @@ def prepareCore(coin, version, settings, data_dir):
         if not os.path.exists(assert_path):
             downloadFile(assert_url, assert_path)
     else:
-        release_filename = '{}-{}-{}.{}'.format(coin, version, BIN_ARCH, FILE_EXT)
+        release_filename = '{}-{}-{}.{}'.format(coin, version + version_tag, BIN_ARCH, FILE_EXT)
         if coin == 'particl':
             signing_key_name = 'tecnovert'
-            release_url = 'https://github.com/tecnovert/particl-core/releases/download/v{}/{}'.format(version, release_filename)
+            release_url = 'https://github.com/tecnovert/particl-core/releases/download/v{}/{}'.format(version + version_tag, release_filename)
             assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, version)
-            assert_url = 'https://raw.githubusercontent.com/tecnovert/gitian.sigs/master/%s-%s/%s/%s' % (version, os_dir_name, signing_key_name, assert_filename)
+            assert_url = 'https://raw.githubusercontent.com/tecnovert/gitian.sigs/master/%s-%s/%s/%s' % (version + version_tag, os_dir_name, signing_key_name, assert_filename)
         elif coin == 'litecoin':
             signing_key_name = 'thrasher'
             release_url = 'https://download2.litecoin.org/litecoin-{}/{}/{}'.format(version, os_name, release_filename)
@@ -299,7 +301,7 @@ def prepareCore(coin, version, settings, data_dir):
        and not (verified.status == 'signature valid' and verified.key_status == 'signing key has expired'):
         raise ValueError('Signature verification failed.')
 
-    extractCore(coin, version, settings, bin_dir, release_path)
+    extractCore(coin, version_pair, settings, bin_dir, release_path)
 
 
 def prepareDataDir(coin, settings, chain, particl_mnemonic):
@@ -392,7 +394,7 @@ def printVersion():
 
     logger.info('Core versions:')
     for coin, version in known_coins.items():
-        logger.info('\t%s: %s', coin, version)
+        logger.info('\t%s: %s%s', coin, version[0], version[1])
 
 
 def printHelp():
