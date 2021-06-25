@@ -791,28 +791,32 @@ class BasicSwap(BaseApp):
         self.log.info('Upgrading database from version %d to %d.', db_version, CURRENT_DB_VERSION)
 
         while True:
-            if db_version == 6:
-                session = scoped_session(self.session_factory)
+            session = scoped_session(self.session_factory)
 
+            current_version = db_version
+            if current_version == 6:
                 session.execute('ALTER TABLE bids ADD COLUMN security_token BLOB')
                 session.execute('ALTER TABLE offers ADD COLUMN security_token BLOB')
-
                 db_version += 1
-                self.db_version = db_version
-                self.setIntKVInSession('db_version', db_version, session)
-                session.commit()
-                session.close()
-                session.remove()
-                self.log.info('Upgraded database to version {}'.format(self.db_version))
-                continue
-            if db_version == 7:
-                session = scoped_session(self.session_factory)
-
+            elif current_version == 7:
                 session.execute('ALTER TABLE transactions ADD COLUMN block_hash BLOB')
                 session.execute('ALTER TABLE transactions ADD COLUMN block_height INTEGER')
                 session.execute('ALTER TABLE transactions ADD COLUMN block_time INTEGER')
-
                 db_version += 1
+            elif current_version == 8:
+                session.execute('''
+                    CREATE TABLE wallets (
+                        record_id INTEGER NOT NULL,
+                        coin_id INTEGER,
+                        wallet_name VARCHAR,
+                        balance_type INTEGER,
+                        amount BIGINT,
+                        updated_at BIGINT,
+                        created_at BIGINT,
+                        PRIMARY KEY (record_id))''')
+                db_version += 1
+
+            if current_version != db_version:
                 self.db_version = db_version
                 self.setIntKVInSession('db_version', db_version, session)
                 session.commit()

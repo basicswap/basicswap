@@ -4,16 +4,21 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-import struct
 import time
+import struct
 import sqlalchemy as sa
 
-from sqlalchemy.ext.declarative import declarative_base
 from enum import IntEnum, auto
+from sqlalchemy.ext.declarative import declarative_base
 
 
 CURRENT_DB_VERSION = 8
 Base = declarative_base()
+
+
+class TableTypes(IntEnum):
+    OFFER = auto()
+    BID = auto()
 
 
 class DBKVInt(Base):
@@ -349,6 +354,13 @@ class RevokedMessage(Base):
     expires_at = sa.Column(sa.BigInteger)
 
 
-class TableTypes(IntEnum):
-    OFFER = auto()
-    BID = auto()
+class Wallets(Base):
+    __tablename__ = 'wallets'
+
+    record_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
+    coin_id = sa.Column(sa.Integer)
+    wallet_name = sa.Column(sa.String)
+    balance_type = sa.Column(sa.Integer)
+    amount = sa.Column(sa.BigInteger)
+    updated_at = sa.Column(sa.BigInteger)
+    created_at = sa.Column(sa.BigInteger)
