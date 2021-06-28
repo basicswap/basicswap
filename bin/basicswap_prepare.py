@@ -27,6 +27,7 @@ from basicswap.rpc import (
 )
 from basicswap.basicswap import BasicSwap
 from basicswap.chainparams import Coins
+from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
 from bin.basicswap_run import startDaemon, startXmrWalletDaemon
 
 
@@ -77,6 +78,14 @@ LTC_RPC_PORT = int(os.getenv('LTC_RPC_PORT', 19795))
 BTC_RPC_PORT = int(os.getenv('BTC_RPC_PORT', 19796))
 NMC_RPC_PORT = int(os.getenv('NMC_RPC_PORT', 19798))
 
+PART_RPC_USER = os.getenv('PART_RPC_USER', '')
+PART_RPC_PWD = os.getenv('PART_RPC_PWD', '')
+BTC_RPC_USER = os.getenv('BTC_RPC_USER', '')
+BTC_RPC_PWD = os.getenv('BTC_RPC_PWD', '')
+LTC_RPC_USER = os.getenv('LTC_RPC_USER', '')
+LTC_RPC_PWD = os.getenv('LTC_RPC_PWD', '')
+
+COINS_BIND_IP = os.getenv('COINS_BIND_IP', '127.0.0.1')
 
 extract_core_overwrite = True
 
@@ -328,18 +337,23 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic):
                 fp.write('testnet=1\n')
             fp.write('data-dir={}\n'.format(data_dir))
             fp.write('rpc-bind-port={}\n'.format(core_settings['rpcport']))
-            fp.write('rpc-bind-ip=127.0.0.1\n')
+            fp.write('rpc-bind-ip={}\n'.format(COINS_BIND_IP))
             fp.write('zmq-rpc-bind-port={}\n'.format(core_settings['zmqport']))
-            fp.write('zmq-rpc-bind-ip=127.0.0.1\n')
+            fp.write('zmq-rpc-bind-ip={}\n'.format(COINS_BIND_IP))
             fp.write('prune-blockchain=1\n')
 
-        wallet_conf_path = os.path.join(data_dir, coin + '_wallet.conf')
+        wallets_dir = core_settings.get('walletsdir', data_dir)
+        if not os.path.exists(wallets_dir):
+            os.makedirs(wallets_dir)
+
+        wallet_conf_path = os.path.join(wallets_dir, coin + '_wallet.conf')
         if os.path.exists(wallet_conf_path):
             exitWithError('{} exists'.format(wallet_conf_path))
         with open(wallet_conf_path, 'w') as fp:
             fp.write('daemon-address={}:{}\n'.format(core_settings['rpchost'], core_settings['rpcport']))
             fp.write('no-dns=1\n')
             fp.write('rpc-bind-port={}\n'.format(core_settings['walletrpcport']))
+            fp.write('rpc-bind-ip={}\n'.format(COINS_BIND_IP))
             fp.write('wallet-dir={}\n'.format(os.path.join(data_dir, 'wallets')))
             fp.write('log-file={}\n'.format(os.path.join(data_dir, 'wallet.log')))
             fp.write('shared-ringdb-dir={}\n'.format(os.path.join(data_dir, 'shared-ringdb')))
@@ -358,25 +372,36 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic):
             else:
                 logger.warning('Unknown chain %s', chain)
 
+        if COINS_BIND_IP != '127.0.0.1':
+            fp.write('rpcallowip=127.0.0.1\n')
+            fp.write('rpcallowip=172.0.0.0/8\n')  # Allow 172.x.x.x, range used by docker
+            fp.write('rpcbind={}\n'.format(COINS_BIND_IP))
+
         fp.write('rpcport={}\n'.format(core_settings['rpcport']))
         fp.write('printtoconsole=0\n')
         fp.write('daemon=0\n')
         fp.write('wallet=wallet.dat\n')
 
+        salt = generate_salt(16)
         if coin == 'particl':
             fp.write('debugexclude=libevent\n')
-            fp.write('zmqpubsmsg=tcp://127.0.0.1:{}\n'.format(settings['zmqport']))
+            fp.write('zmqpubsmsg=tcp://{}:{}\n'.format(COINS_BIND_IP, settings['zmqport']))
             fp.write('spentindex=1\n')
             fp.write('txindex=1\n')
             fp.write('staking=0\n')
-
+            if PART_RPC_USER != '':
+                fp.write('rpcauth={}:{}${}\n'.format(PART_RPC_USER, salt, password_to_hmac(salt, PART_RPC_PWD)))
             if particl_mnemonic == 'none':
                 fp.write('createdefaultmasterkey=1')
         elif coin == 'litecoin':
             fp.write('prune=2000\n')
+            if LTC_RPC_USER != '':
+                fp.write('rpcauth={}:{}${}\n'.format(LTC_RPC_USER, salt, password_to_hmac(salt, LTC_RPC_PWD)))
         elif coin == 'bitcoin':
             fp.write('prune=2000\n')
             fp.write('fallbackfee=0.0002\n')
+            if BTC_RPC_USER != '':
+                fp.write('rpcauth={}:{}${}\n'.format(BTC_RPC_USER, salt, password_to_hmac(salt, BTC_RPC_PWD)))
         elif coin == 'namecoin':
             fp.write('prune=2000\n')
         else:
@@ -626,6 +651,18 @@ def main():
             'blocks_confirmed': 7,  # TODO: 10?
         }
     }
+
+    if PART_RPC_USER != '':
+        chainclients['particl']['rpcuser'] = PART_RPC_USER
+        chainclients['particl']['rpcpassword'] = PART_RPC_PWD
+    if LTC_RPC_USER != '':
+        chainclients['litecoin']['rpcuser'] = LTC_RPC_USER
+        chainclients['litecoin']['rpcpassword'] = LTC_RPC_PWD
+    if BTC_RPC_USER != '':
+        chainclients['bitcoin']['rpcuser'] = BTC_RPC_USER
+        chainclients['bitcoin']['rpcpassword'] = BTC_RPC_PWD
+
+    chainclients['monero']['walletsdir'] = os.getenv('XMR_WALLETS_DIR', chainclients['monero']['datadir'])
 
     if disable_coin != '':
         logger.info('Disabling coin: %s', disable_coin)

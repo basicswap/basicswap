@@ -2,18 +2,16 @@ FROM i_monero_daemon
 
 ENV MONERO_DATA /data
 
-RUN groupadd -r monero && useradd -r -m -g monero monero \
+RUN groupadd -r monero_wallet && useradd -r -m -g monero_wallet monero_wallet \
     && apt-get update \
     && apt-get install -qq --no-install-recommends gosu \
     && rm -rf /var/lib/apt/lists/* \
     && mkdir -p "$MONERO_DATA" \
-    && chown -R monero:monero "$MONERO_DATA" \
-    && ln -sfn "$MONERO_DATA" /home/monero/.monero \
-    && chown -h monero:monero /home/monero/.monero
+    && chown -R monero_wallet:monero_wallet "$MONERO_DATA"
 VOLUME $MONERO_DATA
 
 COPY entrypoint.sh /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
 
 EXPOSE 18080
-CMD ["monero-wallet-rpc", "--non-interactive", "--config-file=/home/monero/.monero/monerod.conf"]
+CMD ["monero-wallet-rpc", "--non-interactive", "--config-file=/data/monero_wallet.conf"]

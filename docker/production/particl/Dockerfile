@@ -1,6 +1,7 @@
 FROM i_swapclient as install_stage
 
-RUN basicswap-prepare --preparebinonly --bindir=/coin_bin --withcoin=particl
+RUN basicswap-prepare --preparebinonly --bindir=/coin_bin --withcoin=particl && \
+    find /coin_bin -name *.tar.gz -delete
 
 FROM debian:buster-slim
 COPY --from=install_stage /coin_bin .
@@ -21,4 +22,4 @@ COPY entrypoint.sh /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
 
 EXPOSE 51735 20792 51738
-CMD ["particld"]
+CMD ["/particl/particld", "--datadir=/data"]

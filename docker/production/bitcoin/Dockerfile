@@ -2,7 +2,8 @@
 
 FROM i_swapclient as install_stage
 
-RUN basicswap-prepare --preparebinonly --bindir=/coin_bin --withcoin=bitcoin --withoutcoins=particl
+RUN basicswap-prepare --preparebinonly --bindir=/coin_bin --withcoin=bitcoin --withoutcoins=particl && \
+    find /coin_bin -name *.tar.gz -delete
 
 FROM debian:buster-slim
 COPY --from=install_stage /coin_bin .
@@ -23,4 +24,4 @@ COPY entrypoint.sh /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
 
 EXPOSE 8332 8333 18332 18333 18443 18444
-CMD ["bitcoind"]
+CMD ["/bitcoin/bitcoind", "--datadir=/data"]

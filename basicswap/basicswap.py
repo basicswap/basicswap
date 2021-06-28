@@ -729,13 +729,17 @@ class BasicSwap(BaseApp):
                 if c == Coins.PART:
                     self.coin_clients[c]['have_spent_index'] = ci.haveSpentIndex()
 
-                    # Sanity checks
-                    rv = self.callcoinrpc(c, 'extkey')
-                    if 'result' in rv and 'No keys to list.' in rv['result']:
-                        raise ValueError('No keys loaded.')
+                    try:
+                        # Sanity checks
+                        rv = self.callcoinrpc(c, 'extkey')
+                        if 'result' in rv and 'No keys to list.' in rv['result']:
+                            raise ValueError('No keys loaded.')
 
-                    if self.callcoinrpc(c, 'getstakinginfo')['enabled'] is not False:
-                        self.log.warning('%s staking is not disabled.', ci.coin_name())
+                        if self.callcoinrpc(c, 'getstakinginfo')['enabled'] is not False:
+                            self.log.warning('%s staking is not disabled.', ci.coin_name())
+                    except Exception as e:
+                        self.log.error('Sanity checks failed: %s', str(e))
+
                 elif c == Coins.XMR:
                     ci.ensureWalletExists()
 

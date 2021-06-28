@@ -18,7 +18,12 @@ RUN wget -O basicswap-master.zip https://github.com/tecnovert/basicswap/archive/
     protoc -I=basicswap --python_out=basicswap basicswap/messages.proto; \
     pip3 install .;
 
-RUN useradd -ms /bin/bash swap_user && \
+#COPY ./test_code basicswap-master
+#RUN cd basicswap-master; \
+#    protoc -I=basicswap --python_out=basicswap basicswap/messages.proto; \
+#    pip3 install .;
+
+RUN groupadd -r swap_user && useradd -g swap_user -ms /bin/bash swap_user && \
     mkdir /data && chown swap_user -R /data
 
 # Expose html port
