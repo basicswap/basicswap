@@ -1,8 +1,6 @@
 
 # Simple Atomic Swap Network - Proof of Concept
 
-[![Build Status](https://travis-ci.org/tecnovert/basicswap.svg?branch=master)](https://travis-ci.org/tecnovert/basicswap)
-
 ## Overview
 
 Simple atomic swap experiment, doesn't have many interesting features yet.
