@@ -58,6 +58,7 @@ from tests.basicswap.common import (
     wait_for_bid,
     wait_for_bid_tx_state,
     wait_for_in_progress,
+    post_json_req,
     TEST_HTTP_HOST,
     TEST_HTTP_PORT,
     BASE_PORT,
@@ -646,6 +647,22 @@ class Test(unittest.TestCase):
         assert(js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
         assert(js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
     '''
+
+    def test_12_withdrawal(self):
+        logging.info('---------- Test LTC withdrawals')
+
+        ltc_addr = ltcRpc('getnewaddress "Withdrawal test" legacy')
+        logging.info('ltc_addr {}'.format(ltc_addr))
+        wallets0 = json.loads(urlopen('http://127.0.0.1:{}/json/wallets'.format(TEST_HTTP_PORT + 0)).read())
+        assert(float(wallets0['3']['balance']) > 100)
+
+        post_json = {
+            'value': 100,
+            'address': ltc_addr,
+            'subfee': False,
+        }
+        json_rv = json.loads(post_json_req('http://127.0.0.1:{}/json/wallets/ltc/withdraw'.format(TEST_HTTP_PORT + 0), post_json))
+        assert(len(json_rv['txid']) == 64)
 
     def pass_99_delay(self):
         logging.info('Delay')

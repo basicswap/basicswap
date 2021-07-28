@@ -265,7 +265,8 @@ class HttpHandler(BaseHTTPRequestHandler):
                             messages.append('Error: Missing type')
 
                     if len(messages) == 0:
-                        ticker = swap_client.getTicker(c)
+                        ci = swap_client.ci(c)
+                        ticker = ci.ticker()
                         if c == Coins.PART:
                             try:
                                 txid = swap_client.withdrawParticl(type_from, type_to, value, address, subfee)

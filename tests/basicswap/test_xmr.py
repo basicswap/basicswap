@@ -641,7 +641,7 @@ class Test(unittest.TestCase):
         wait_for_no_offer(test_delay_event, swap_clients[1], offer_id)
 
     def test_08_withdraw(self):
-        logging.info('---------- Test xmr withdrawals')
+        logging.info('---------- Test XMR withdrawals')
         swap_clients = self.swap_clients
         js_0 = json.loads(urlopen('http://127.0.0.1:1800/json/wallets').read())
         print('js_0 debug', js_0)
