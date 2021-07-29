@@ -652,7 +652,6 @@ class Test(unittest.TestCase):
         logging.info('---------- Test LTC withdrawals')
 
         ltc_addr = ltcRpc('getnewaddress "Withdrawal test" legacy')
-        logging.info('ltc_addr {}'.format(ltc_addr))
         wallets0 = json.loads(urlopen('http://127.0.0.1:{}/json/wallets'.format(TEST_HTTP_PORT + 0)).read())
         assert(float(wallets0['3']['balance']) > 100)
 

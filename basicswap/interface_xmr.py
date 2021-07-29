@@ -404,9 +404,21 @@ class XMRInterface(CoinInterface):
         return bytes.fromhex(rv['tx_hash_list'][0])
 
     def withdrawCoin(self, value, addr_to, subfee):
+        value_sats = make_int(value, self.exp())
+
         self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
 
-        value_sats = make_int(value, self.exp())
+        if subfee:
+            balance = self.rpc_wallet_cb('get_balance')
+            if balance['unlocked_balance'] - value_sats <= 10:
+                self._log.info('subfee enabled and value close to total, using sweep_all.')
+                params = {'address': addr_to}
+                if self._fee_priority > 0:
+                    params['priority'] = self._fee_priority
+                rv = self.rpc_wallet_cb('sweep_all', params)
+                return rv['tx_hash_list'][0]
+            raise ValueError('Withdraw value must be close to total to use subfee/sweep_all.')
+
         params = {'destinations': [{'amount': value_sats, 'address': addr_to}]}
         if self._fee_priority > 0:
             params['priority'] = self._fee_priority

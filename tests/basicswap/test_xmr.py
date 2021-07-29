@@ -237,11 +237,16 @@ def callnoderpc(node_id, method, params=[], wallet=None, base_rpc_port=BASE_RPC_
     return callrpc(base_rpc_port + node_id, auth, method, params, wallet)
 
 
+pause_event = threading.Event()
+
+
 def run_coins_loop(cls):
     while not test_delay_event.is_set():
+        pause_event.wait()
         try:
             if cls.btc_addr is not None:
                 btcRpc('generatetoaddress 1 {}'.format(cls.btc_addr))
+            logging.warning('cls.xmr_addr ' + str(cls.xmr_addr))
             if cls.xmr_addr is not None:
                 callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'generateblocks', {'wallet_address': cls.xmr_addr, 'amount_of_blocks': 1})
         except Exception as e:
@@ -391,6 +396,7 @@ class Test(unittest.TestCase):
             cls.update_thread = threading.Thread(target=run_loop, args=(cls,))
             cls.update_thread.start()
 
+            pause_event.set()
             cls.coins_update_thread = threading.Thread(target=run_coins_loop, args=(cls,))
             cls.coins_update_thread.start()
         except Exception:
@@ -644,7 +650,6 @@ class Test(unittest.TestCase):
         logging.info('---------- Test XMR withdrawals')
         swap_clients = self.swap_clients
         js_0 = json.loads(urlopen('http://127.0.0.1:1800/json/wallets').read())
-        print('js_0 debug', js_0)
         address_to = js_0[str(int(Coins.XMR))]['deposit_address']
 
         js_1 = json.loads(urlopen('http://127.0.0.1:1801/json/wallets').read())
@@ -764,6 +769,34 @@ class Test(unittest.TestCase):
 
         js_1 = json.loads(urlopen('http://127.0.0.1:1801/json/wallets/part').read())
         print('[rm] js_1', js_1)
+
+    def test_98_withdraw_all(self):
+        logging.info('---------- Test XMR withdrawal all')
+        try:
+            logging.info('Disabling XMR mining')
+            pause_event.clear()
+
+            js_0 = json.loads(urlopen('http://127.0.0.1:1800/json/wallets').read())
+            address_to = js_0[str(int(Coins.XMR))]['deposit_address']
+
+            wallets1 = json.loads(urlopen('http://127.0.0.1:{}/json/wallets'.format(TEST_HTTP_PORT + 1)).read())
+            xmr_total = float(wallets1[str(int(Coins.XMR))]['balance'])
+            assert(xmr_total > 10)
+
+            post_json = {
+                'value': 10,
+                'address': address_to,
+                'subfee': True,
+            }
+            json_rv = json.loads(post_json_req('http://127.0.0.1:{}/json/wallets/xmr/withdraw'.format(TEST_HTTP_PORT + 1), post_json))
+            assert(json_rv['error'] == 'Withdraw value must be close to total to use subfee/sweep_all.')
+
+            post_json['value'] = xmr_total
+            json_rv = json.loads(post_json_req('http://127.0.0.1:{}/json/wallets/xmr/withdraw'.format(TEST_HTTP_PORT + 1), post_json))
+            assert(len(json_rv['txid']) == 64)
+        finally:
+            logging.info('Restoring XMR mining')
+            pause_event.set()
 
 
 if __name__ == '__main__':
