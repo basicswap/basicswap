@@ -207,6 +207,9 @@ class EventLogTypes(IntEnum):
     LOCK_TX_A_REFUND_SPEND_TX_PUBLISHED = auto()
     LOCK_TX_A_REFUND_SWIPE_TX_PUBLISHED = auto()
     LOCK_TX_B_REFUND_TX_PUBLISHED = auto()
+    SYSTEM_WARNING = auto()
+    LOCK_TX_A_SPEND_TX_PUBLISHED = auto()
+    LOCK_TX_B_SPEND_TX_PUBLISHED = auto()
 
 
 class XmrSplitMsgTypes(IntEnum):
@@ -356,6 +359,12 @@ def describeEventEntry(event_type, event_msg):
         return 'Lock tx A refund swipe tx published'
     if event_type == EventLogTypes.LOCK_TX_B_REFUND_TX_PUBLISHED:
         return 'Lock tx B refund tx published'
+    if event_type == EventLogTypes.LOCK_TX_A_SPEND_TX_PUBLISHED:
+        return 'Lock tx A spend tx published'
+    if event_type == EventLogTypes.LOCK_TX_B_SPEND_TX_PUBLISHED:
+        return 'Lock tx B spend tx published'
+    if event_type == EventLogTypes.SYSTEM_WARNING:
+        return 'Warning: ' + event_msg
 
 
 def getVoutByAddress(txjs, p2sh):
@@ -1695,13 +1704,13 @@ class BasicSwap(BaseApp):
             session.remove()
             self.mxDB.release()
 
-    def logBidEvent(self, bid, event_type, event_msg, session):
-        self.log.debug('logBidEvent %s %s', bid.bid_id.hex(), event_type)
+    def logBidEvent(self, bid_id, event_type, event_msg, session):
+        self.log.debug('logBidEvent %s %s', bid_id.hex(), event_type)
         entry = EventLog(
             active_ind=1,
             created_at=int(time.time()),
             linked_type=TableTypes.BID,
-            linked_id=bid.bid_id,
+            linked_id=bid_id,
             event_type=int(event_type),
             event_msg=event_msg)
 
@@ -2428,7 +2437,7 @@ class BasicSwap(BaseApp):
         if bid.debug_ind == DebugTypes.MAKE_INVALID_PTX:
             amount_to -= 1
             self.log.debug('bid %s: Make invalid PTx for testing: %d.', bid_id.hex(), bid.debug_ind)
-            self.logBidEvent(bid, EventLogTypes.DEBUG_TWEAK_APPLIED, 'ind {}'.format(bid.debug_ind), None)
+            self.logBidEvent(bid.bid_id, EventLogTypes.DEBUG_TWEAK_APPLIED, 'ind {}'.format(bid.debug_ind), None)
 
         if self.coin_clients[coin_to]['use_segwit']:
             p2wsh = getP2WSH(participate_script)
@@ -2692,7 +2701,7 @@ class BasicSwap(BaseApp):
         if bid.debug_ind == DebugTypes.BUYER_STOP_AFTER_ITX:
             self.log.debug('bid %s: Abandoning bid for testing: %d.', bid_id.hex(), bid.debug_ind)
             bid.setState(BidStates.BID_ABANDONED)
-            self.logBidEvent(bid, EventLogTypes.DEBUG_TWEAK_APPLIED, 'ind {}'.format(bid.debug_ind), None)
+            self.logBidEvent(bid.bid_id, EventLogTypes.DEBUG_TWEAK_APPLIED, 'ind {}'.format(bid.debug_ind), None)
             return  # Bid saved in checkBidState
 
         # Seller first mode, buyer participates
@@ -2865,14 +2874,14 @@ class BasicSwap(BaseApp):
                         bid.setState(BidStates.BID_STALLED_FOR_TEST)
                         rv = True
                         self.saveBidInSession(bid_id, bid, session, xmr_swap)
-                        self.logBidEvent(bid, EventLogTypes.DEBUG_TWEAK_APPLIED, 'ind {}'.format(bid.debug_ind), session)
+                        self.logBidEvent(bid.bid_id, EventLogTypes.DEBUG_TWEAK_APPLIED, 'ind {}'.format(bid.debug_ind), session)
                         session.commit()
                         return rv
 
                     if TxTypes.XMR_SWAP_A_LOCK_REFUND_SPEND not in bid.txns:
                         try:
                             txid = ci_from.publishTx(xmr_swap.a_lock_refund_spend_tx)
-                            self.logBidEvent(bid, EventLogTypes.LOCK_TX_A_REFUND_SPEND_TX_PUBLISHED, '', session)
+                            self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_A_REFUND_SPEND_TX_PUBLISHED, '', session)
 
                             self.log.info('Submitted coin a lock refund spend tx for bid {}'.format(bid_id.hex()))
                             bid.txns[TxTypes.XMR_SWAP_A_LOCK_REFUND_SPEND] = SwapTx(
@@ -2894,7 +2903,7 @@ class BasicSwap(BaseApp):
                     if TxTypes.XMR_SWAP_A_LOCK_REFUND_SWIPE not in bid.txns:
                         try:
                             txid = ci_from.publishTx(xmr_swap.a_lock_refund_swipe_tx)
-                            self.logBidEvent(bid, EventLogTypes.LOCK_TX_A_REFUND_SWIPE_TX_PUBLISHED, '', session)
+                            self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_A_REFUND_SWIPE_TX_PUBLISHED, '', session)
                             self.log.info('Submitted coin a lock refund swipe tx for bid {}'.format(bid_id.hex()))
                             bid.txns[TxTypes.XMR_SWAP_A_LOCK_REFUND_SWIPE] = SwapTx(
                                 bid_id=bid_id,
@@ -2923,7 +2932,7 @@ class BasicSwap(BaseApp):
                         txid = ci_from.publishTx(xmr_swap.a_lock_refund_tx)
 
                         self.log.info('Submitted coin a lock refund tx for bid {}'.format(bid_id.hex()))
-                        self.logBidEvent(bid, EventLogTypes.LOCK_TX_A_REFUND_TX_PUBLISHED, '', session)
+                        self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_A_REFUND_TX_PUBLISHED, '', session)
                         bid.txns[TxTypes.XMR_SWAP_A_LOCK_REFUND] = SwapTx(
                             bid_id=bid_id,
                             tx_type=TxTypes.XMR_SWAP_A_LOCK_REFUND,
@@ -2969,7 +2978,7 @@ class BasicSwap(BaseApp):
 
                 utxo = utxos[0]
                 if not bid.xmr_a_lock_tx.chain_height and utxo['height'] != 0:
-                    self.logBidEvent(bid, EventLogTypes.LOCK_TX_A_SEEN, '', session)
+                    self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_A_SEEN, '', session)
 
                     block_header = ci_from.getBlockHeaderFromHeight(utxo['height'])
 
@@ -2983,7 +2992,7 @@ class BasicSwap(BaseApp):
                     bid_changed = True
 
                 if utxo['depth'] >= ci_from.blocks_confirmed:
-                    self.logBidEvent(bid, EventLogTypes.LOCK_TX_A_CONFIRMED, '', session)
+                    self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_A_CONFIRMED, '', session)
                     bid.xmr_a_lock_tx.setState(TxStates.TX_CONFIRMED)
                     bid.setState(BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED)
                     bid_changed = True
@@ -3008,11 +3017,11 @@ class BasicSwap(BaseApp):
 
                 if isinstance(found_tx, int) and found_tx == -1:
                     if self.countBidEvents(bid, EventLogTypes.LOCK_TX_B_INVALID, session) < 1:
-                        self.logBidEvent(bid, EventLogTypes.LOCK_TX_B_INVALID, 'Detected invalid lock tx B', session)
+                        self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_B_INVALID, 'Detected invalid lock tx B', session)
                         bid_changed = True
                 elif found_tx is not None:
                     if bid.xmr_b_lock_tx is None or not bid.xmr_b_lock_tx.chain_height:
-                        self.logBidEvent(bid, EventLogTypes.LOCK_TX_B_SEEN, '', session)
+                        self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_B_SEEN, '', session)
                     if bid.xmr_b_lock_tx is None:
                         self.log.debug('Found {} lock tx in chain'.format(ci_to.coin_name()))
                         b_lock_tx_id = bytes.fromhex(found_tx['txid'])
@@ -3031,7 +3040,7 @@ class BasicSwap(BaseApp):
                     chain_height = ci_to.getChainHeight()
 
                     if chain_height - bid.xmr_b_lock_tx.chain_height >= ci_to.blocks_confirmed:
-                        self.logBidEvent(bid, EventLogTypes.LOCK_TX_B_CONFIRMED, '', session)
+                        self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_B_CONFIRMED, '', session)
                         bid.xmr_b_lock_tx.setState(TxStates.TX_CONFIRMED)
                         bid.setState(BidStates.XMR_SWAP_NOSCRIPT_COIN_LOCKED)
 
@@ -4331,7 +4340,7 @@ class BasicSwap(BaseApp):
 
         bid.setState(BidStates.XMR_SWAP_HAVE_SCRIPT_COIN_SPEND_TX)
         self.watchXmrSwap(bid, offer, xmr_swap)
-        self.logBidEvent(bid, EventLogTypes.LOCK_TX_A_PUBLISHED, '', session)
+        self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_A_PUBLISHED, '', session)
 
         self.saveBidInSession(bid_id, bid, session, xmr_swap)
 
@@ -4355,13 +4364,13 @@ class BasicSwap(BaseApp):
             self.log.debug('XMR bid %s: Stalling bid for testing: %d.', bid_id.hex(), bid.debug_ind)
             bid.setState(BidStates.BID_STALLED_FOR_TEST)
             self.saveBidInSession(bid_id, bid, session, xmr_swap, save_in_progress=offer)
-            self.logBidEvent(bid, EventLogTypes.DEBUG_TWEAK_APPLIED, 'ind {}'.format(bid.debug_ind), session)
+            self.logBidEvent(bid.bid_id, EventLogTypes.DEBUG_TWEAK_APPLIED, 'ind {}'.format(bid.debug_ind), session)
             return
 
         if bid.debug_ind == DebugTypes.CREATE_INVALID_COIN_B_LOCK:
             bid.amount_to -= int(bid.amount_to * 0.1)
             self.log.debug('XMR bid %s: Debug %d - Reducing lock b txn amount by 10%% to %s.', bid_id.hex(), bid.debug_ind, ci_to.format_amount(bid.amount_to))
-            self.logBidEvent(bid, EventLogTypes.DEBUG_TWEAK_APPLIED, 'ind {}'.format(bid.debug_ind), session)
+            self.logBidEvent(bid.bid_id, EventLogTypes.DEBUG_TWEAK_APPLIED, 'ind {}'.format(bid.debug_ind), session)
         try:
             b_lock_tx_id = ci_to.publishBLockTx(xmr_swap.pkbv, xmr_swap.pkbs, bid.amount_to, xmr_offer.b_fee_rate)
         except Exception as ex:
@@ -4372,7 +4381,7 @@ class BasicSwap(BaseApp):
             self.log.error(error_msg)
 
             str_error = str(ex)
-            if num_retries < 5 and ('not enough unlocked money' in str_error or 'transaction was rejected by daemon' in str_error):
+            if num_retries < 5 and ('not enough unlocked money' in str_error or 'transaction was rejected by daemon' in str_error or self.is_transient_error(ex)):
                 delay = random.randrange(self.min_delay_retry, self.max_delay_retry)
                 self.log.info('Retrying sending xmr swap chain B lock tx for bid %s in %d seconds', bid_id.hex(), delay)
                 self.createEventInSession(delay, EventTypes.SEND_XMR_SWAP_LOCK_TX_B, bid_id, session)
@@ -4380,7 +4389,7 @@ class BasicSwap(BaseApp):
                 self.setBidError(bid_id, bid, 'publishBLockTx failed: ' + str(ex), save_bid=False)
                 self.saveBidInSession(bid_id, bid, session, xmr_swap, save_in_progress=offer)
 
-            self.logBidEvent(bid, EventLogTypes.FAILED_TX_B_LOCK_PUBLISH, str_error, session)
+            self.logBidEvent(bid.bid_id, EventLogTypes.FAILED_TX_B_LOCK_PUBLISH, str_error, session)
             return
 
         self.log.debug('Submitted lock txn %s to %s chain for bid %s', b_lock_tx_id.hex(), ci_to.coin_name(), bid_id.hex())
@@ -4390,7 +4399,7 @@ class BasicSwap(BaseApp):
             txid=b_lock_tx_id,
         )
         bid.xmr_b_lock_tx.setState(TxStates.TX_NONE)
-        self.logBidEvent(bid, EventLogTypes.LOCK_TX_B_PUBLISHED, '', session)
+        self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_B_PUBLISHED, '', session)
 
         self.saveBidInSession(bid_id, bid, session, xmr_swap, save_in_progress=offer)
 
@@ -4463,6 +4472,7 @@ class BasicSwap(BaseApp):
 
         txid = bytes.fromhex(ci_from.publishTx(xmr_swap.a_lock_spend_tx))
         self.log.debug('Submitted lock spend txn %s to %s chain for bid %s', txid.hex(), ci_from.coin_name(), bid_id.hex())
+        self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_A_SPEND_TX_PUBLISHED, '', session)
         bid.xmr_a_lock_spend_tx = SwapTx(
             bid_id=bid_id,
             tx_type=TxTypes.XMR_SWAP_A_LOCK_SPEND,
@@ -4503,6 +4513,7 @@ class BasicSwap(BaseApp):
         try:
             txid = ci_to.spendBLockTx(address_to, xmr_swap.vkbv, vkbs, bid.amount_to, xmr_offer.b_fee_rate, xmr_swap.b_restore_height)
             self.log.debug('Submitted lock B spend txn %s to %s chain for bid %s', txid.hex(), ci_to.coin_name(), bid_id.hex())
+            self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_B_SPEND_TX_PUBLISHED, '', session)
         except Exception as ex:
             # TODO: Make min-conf 10?
             error_msg = 'spendBLockTx failed for bid {} with error {}'.format(bid_id.hex(), str(ex))
@@ -4512,7 +4523,7 @@ class BasicSwap(BaseApp):
             self.log.error(error_msg)
 
             str_error = str(ex)
-            if num_retries < 100 and 'Invalid unlocked_balance' in str_error:
+            if num_retries < 100 and ('Invalid unlocked_balance' in str_error or self.is_transient_error(ex)):
                 delay = random.randrange(self.min_delay_retry, self.max_delay_retry)
                 self.log.info('Retrying sending xmr swap chain B spend tx for bid %s in %d seconds', bid_id.hex(), delay)
                 self.createEventInSession(delay, EventTypes.REDEEM_XMR_SWAP_LOCK_TX_B, bid_id, session)
@@ -4520,7 +4531,7 @@ class BasicSwap(BaseApp):
                 self.setBidError(bid_id, bid, 'spendBLockTx failed: ' + str(ex), save_bid=False)
                 self.saveBidInSession(bid_id, bid, session, xmr_swap, save_in_progress=offer)
 
-            self.logBidEvent(bid, EventLogTypes.FAILED_TX_B_SPEND, str_error, session)
+            self.logBidEvent(bid.bid_id, EventLogTypes.FAILED_TX_B_SPEND, str_error, session)
             return
 
         bid.xmr_b_lock_tx.spend_txid = txid
@@ -4559,7 +4570,7 @@ class BasicSwap(BaseApp):
         try:
             txid = ci_to.spendBLockTx(address_to, xmr_swap.vkbv, vkbs, bid.amount_to, xmr_offer.b_fee_rate, xmr_swap.b_restore_height)
             self.log.debug('Submitted lock B refund txn %s to %s chain for bid %s', txid.hex(), ci_to.coin_name(), bid_id.hex())
-            self.logBidEvent(bid, EventLogTypes.LOCK_TX_B_REFUND_TX_PUBLISHED, '', session)
+            self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_B_REFUND_TX_PUBLISHED, '', session)
         except Exception as ex:
             # TODO: Make min-conf 10?
             error_msg = 'spendBLockTx refund failed for bid {} with error {}'.format(bid_id.hex(), str(ex))
@@ -4569,7 +4580,7 @@ class BasicSwap(BaseApp):
             self.log.error(error_msg)
 
             str_error = str(ex)
-            if num_retries < 100 and 'Invalid unlocked_balance' in str_error:
+            if num_retries < 100 and ('Invalid unlocked_balance' in str_error or self.is_transient_error(ex)):
                 delay = random.randrange(self.min_delay_retry, self.max_delay_retry)
                 self.log.info('Retrying sending xmr swap chain B refund tx for bid %s in %d seconds', bid_id.hex(), delay)
                 self.createEventInSession(delay, EventTypes.RECOVER_XMR_SWAP_LOCK_TX_B, bid_id, session)
@@ -4577,7 +4588,7 @@ class BasicSwap(BaseApp):
                 self.setBidError(bid_id, bid, 'spendBLockTx for refund failed: ' + str(ex), save_bid=False)
                 self.saveBidInSession(bid_id, bid, session, xmr_swap, save_in_progress=offer)
 
-            self.logBidEvent(bid, EventLogTypes.FAILED_TX_B_REFUND, str_error, session)
+            self.logBidEvent(bid.bid_id, EventLogTypes.FAILED_TX_B_REFUND, str_error, session)
             return
 
         bid.xmr_b_lock_tx.spend_txid = txid
@@ -4842,10 +4853,14 @@ class BasicSwap(BaseApp):
                         if self.checkBidState(bid_id, v[0], v[1]) is True:
                             to_remove.append((bid_id, v[0], v[1]))
                     except Exception as ex:
-                        self.log.error('checkBidState %s %s', bid_id.hex(), str(ex))
                         if self.debug:
                             traceback.print_exc()
-                        self.setBidError(bid_id, v[0], str(ex))
+                        if self.is_transient_error(ex):
+                            self.log.warning('checkBidState %s %s', bid_id.hex(), str(ex))
+                            self.logBidEvent(bid_id, EventLogTypes.SYSTEM_WARNING, 'No connection to daemon', session=None)
+                        else:
+                            self.log.error('checkBidState %s %s', bid_id.hex(), str(ex))
+                            self.setBidError(bid_id, v[0], str(ex))
 
                 for bid_id, bid, offer in to_remove:
                     self.deactivateBid(None, offer, bid)
