@@ -78,30 +78,32 @@ class XMRInterface(CoinInterface):
         self._wallet_filename = wallet_filename
 
     def initialiseWallet(self, key_view, key_spend, restore_height=None):
-        try:
+        with self._mx_wallet:
+            try:
+                self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
+                # TODO: Check address
+                return  # Wallet exists
+            except Exception as e:
+                pass
+
+            Kbv = self.getPubkey(key_view)
+            Kbs = self.getPubkey(key_spend)
+            address_b58 = xmr_util.encode_address(Kbv, Kbs)
+
+            params = {
+                'filename': self._wallet_filename,
+                'address': address_b58,
+                'viewkey': b2h(key_view[::-1]),
+                'spendkey': b2h(key_spend[::-1]),
+                'restore_height': self._restore_height,
+            }
+            rv = self.rpc_wallet_cb('generate_from_keys', params)
+            self._log.info('generate_from_keys %s', dumpj(rv))
             self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
-            # TODO: Check address
-            return  # Wallet exists
-        except Exception as e:
-            pass
-
-        Kbv = self.getPubkey(key_view)
-        Kbs = self.getPubkey(key_spend)
-        address_b58 = xmr_util.encode_address(Kbv, Kbs)
-
-        params = {
-            'filename': self._wallet_filename,
-            'address': address_b58,
-            'viewkey': b2h(key_view[::-1]),
-            'spendkey': b2h(key_spend[::-1]),
-            'restore_height': self._restore_height,
-        }
-        rv = self.rpc_wallet_cb('generate_from_keys', params)
-        self._log.info('generate_from_keys %s', dumpj(rv))
-        self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
 
     def ensureWalletExists(self):
-        self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
+        with self._mx_wallet:
+            self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
 
     def testDaemonRPC(self):
         self.rpc_wallet_cb('get_languages')
@@ -125,25 +127,28 @@ class XMRInterface(CoinInterface):
         return self.rpc_cb2('get_height')['height']
 
     def getWalletInfo(self):
-        self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
-        rv = {}
-        self.rpc_wallet_cb('refresh')
-        balance_info = self.rpc_wallet_cb('get_balance')
-        rv['balance'] = format_amount(balance_info['unlocked_balance'], XMRInterface.exp())
-        rv['unconfirmed_balance'] = format_amount(balance_info['balance'] - balance_info['unlocked_balance'], XMRInterface.exp())
-        return rv
+        with self._mx_wallet:
+            self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
+            rv = {}
+            self.rpc_wallet_cb('refresh')
+            balance_info = self.rpc_wallet_cb('get_balance')
+            rv['balance'] = format_amount(balance_info['unlocked_balance'], XMRInterface.exp())
+            rv['unconfirmed_balance'] = format_amount(balance_info['balance'] - balance_info['unlocked_balance'], XMRInterface.exp())
+            return rv
 
     def walletRestoreHeight(self):
         return self._restore_height
 
     def getMainWalletAddress(self):
-        self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
-        return self.rpc_wallet_cb('get_address')['address']
+        with self._mx_wallet:
+            self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
+            return self.rpc_wallet_cb('get_address')['address']
 
     def getNewAddress(self, placeholder):
-        self._log.warning('TODO - subaddress?')
-        self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
-        return self.rpc_wallet_cb('get_address')['address']
+        with self._mx_wallet:
+            self._log.warning('TODO - subaddress?')
+            self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
+            return self.rpc_wallet_cb('get_address')['address']
 
     def get_fee_rate(self, conf_target=2):
         self._log.warning('TODO - estimate fee rate?')
@@ -199,228 +204,234 @@ class XMRInterface(CoinInterface):
     def sumPubkeys(self, Ka, Kb):
         return ed25519_add(Ka, Kb)
 
+    def encodeSharedAddress(self, Kbv, Kbs):
+        return xmr_util.encode_address(Kbv, Kbs)
+
     def publishBLockTx(self, Kbv, Kbs, output_amount, feerate):
-        self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
+        with self._mx_wallet:
+            self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
 
-        shared_addr = xmr_util.encode_address(Kbv, Kbs)
+            shared_addr = xmr_util.encode_address(Kbv, Kbs)
 
-        params = {'destinations': [{'amount': output_amount, 'address': shared_addr}]}
-        if self._fee_priority > 0:
-            params['priority'] = self._fee_priority
-        rv = self.rpc_wallet_cb('transfer', params)
-        self._log.info('publishBLockTx %s to address_b58 %s', rv['tx_hash'], shared_addr)
-        tx_hash = bytes.fromhex(rv['tx_hash'])
+            params = {'destinations': [{'amount': output_amount, 'address': shared_addr}]}
+            if self._fee_priority > 0:
+                params['priority'] = self._fee_priority
+            rv = self.rpc_wallet_cb('transfer', params)
+            self._log.info('publishBLockTx %s to address_b58 %s', rv['tx_hash'], shared_addr)
+            tx_hash = bytes.fromhex(rv['tx_hash'])
 
-        # Debug
-        for i in range(10):
-            params = {'out': True, 'pending': True, 'failed': True, 'pool': True, }
-            rv = self.rpc_wallet_cb('get_transfers', params)
-            self._log.info('[rm] get_transfers {}'.format(dumpj(rv)))
-            if 'pending' not in rv:
-                break
-            time.sleep(1)
+            # Debug
+            for i in range(10):
+                params = {'out': True, 'pending': True, 'failed': True, 'pool': True, }
+                rv = self.rpc_wallet_cb('get_transfers', params)
+                self._log.info('[rm] get_transfers {}'.format(dumpj(rv)))
+                if 'pending' not in rv:
+                    break
+                time.sleep(1)
 
-        return tx_hash
+            return tx_hash
 
     def findTxB(self, kbv, Kbs, cb_swap_value, cb_block_confirmed, restore_height):
-        Kbv = self.getPubkey(kbv)
-        address_b58 = xmr_util.encode_address(Kbv, Kbs)
+        with self._mx_wallet:
+            Kbv = self.getPubkey(kbv)
+            address_b58 = xmr_util.encode_address(Kbv, Kbs)
 
-        try:
-            self.rpc_wallet_cb('close_wallet')
-        except Exception as e:
-            self._log.warning('close_wallet failed %s', str(e))
+            try:
+                self.rpc_wallet_cb('close_wallet')
+            except Exception as e:
+                self._log.warning('close_wallet failed %s', str(e))
 
-        kbv_le = kbv[::-1]
-        params = {
-            'restore_height': restore_height,
-            'filename': address_b58,
-            'address': address_b58,
-            'viewkey': b2h(kbv_le),
-        }
+            kbv_le = kbv[::-1]
+            params = {
+                'restore_height': restore_height,
+                'filename': address_b58,
+                'address': address_b58,
+                'viewkey': b2h(kbv_le),
+            }
 
-        try:
-            rv = self.rpc_wallet_cb('open_wallet', {'filename': address_b58})
-        except Exception as e:
-            rv = self.rpc_wallet_cb('generate_from_keys', params)
-            self._log.info('generate_from_keys %s', dumpj(rv))
-            rv = self.rpc_wallet_cb('open_wallet', {'filename': address_b58})
+            try:
+                rv = self.rpc_wallet_cb('open_wallet', {'filename': address_b58})
+            except Exception as e:
+                rv = self.rpc_wallet_cb('generate_from_keys', params)
+                self._log.info('generate_from_keys %s', dumpj(rv))
+                rv = self.rpc_wallet_cb('open_wallet', {'filename': address_b58})
 
-        rv = self.rpc_wallet_cb('refresh', timeout=600)
+            self.rpc_wallet_cb('refresh', timeout=600)
 
-        '''
-        # Debug
-        try:
-            current_height = self.rpc_wallet_cb('get_height')['height']
-            self._log.info('findTxB XMR current_height %d\nAddress: %s', current_height, address_b58)
-        except Exception as e:
-            self._log.info('rpc_cb failed %s', str(e))
-            current_height = None  # If the transfer is available it will be deep enough
-            #   and (current_height is None or current_height - transfer['block_height'] > cb_block_confirmed):
-        '''
-        params = {'transfer_type': 'available'}
-        rv = self.rpc_wallet_cb('incoming_transfers', params)
-        if 'transfers' in rv:
-            for transfer in rv['transfers']:
-                if transfer['amount'] == cb_swap_value:
-                    return {'txid': transfer['tx_hash'], 'amount': transfer['amount'], 'height': 0 if 'block_height' not in transfer else transfer['block_height']}
-                else:
-                    self._log.warning('Incorrect amount detected for coin b lock txn: {}'.format(transfer['tx_hash']))
-                    return -1
-        return None
+            '''
+            # Debug
+            try:
+                current_height = self.rpc_wallet_cb('get_height')['height']
+                self._log.info('findTxB XMR current_height %d\nAddress: %s', current_height, address_b58)
+            except Exception as e:
+                self._log.info('rpc_cb failed %s', str(e))
+                current_height = None  # If the transfer is available it will be deep enough
+                #   and (current_height is None or current_height - transfer['block_height'] > cb_block_confirmed):
+            '''
+            params = {'transfer_type': 'available'}
+            rv = self.rpc_wallet_cb('incoming_transfers', params)
+            if 'transfers' in rv:
+                for transfer in rv['transfers']:
+                    if transfer['amount'] == cb_swap_value:
+                        return {'txid': transfer['tx_hash'], 'amount': transfer['amount'], 'height': 0 if 'block_height' not in transfer else transfer['block_height']}
+                    else:
+                        self._log.warning('Incorrect amount detected for coin b lock txn: {}'.format(transfer['tx_hash']))
+                        return -1
+            return None
 
     def waitForLockTxB(self, kbv, Kbs, cb_swap_value, cb_block_confirmed, restore_height):
+        with self._mx_wallet:
+            Kbv_enc = self.encodePubkey(self.pubkey(kbv))
+            address_b58 = xmr_util.encode_address(Kbv_enc, self.encodePubkey(Kbs))
 
-        Kbv_enc = self.encodePubkey(self.pubkey(kbv))
-        address_b58 = xmr_util.encode_address(Kbv_enc, self.encodePubkey(Kbs))
+            try:
+                self.rpc_wallet_cb('close_wallet')
+            except Exception as e:
+                self._log.warning('close_wallet failed %s', str(e))
 
-        try:
-            self.rpc_wallet_cb('close_wallet')
-        except Exception as e:
-            self._log.warning('close_wallet failed %s', str(e))
+            params = {
+                'filename': address_b58,
+                'address': address_b58,
+                'viewkey': b2h(kbv[::-1]),
+                'restore_height': restore_height,
+            }
+            self.rpc_wallet_cb('generate_from_keys', params)
 
-        params = {
-            'filename': address_b58,
-            'address': address_b58,
-            'viewkey': b2h(kbv[::-1]),
-            'restore_height': restore_height,
-        }
-        self.rpc_wallet_cb('generate_from_keys', params)
+            self.rpc_wallet_cb('open_wallet', {'filename': address_b58})
+            # For a while after opening the wallet rpc cmds return empty data
 
-        self.rpc_wallet_cb('open_wallet', {'filename': address_b58})
-        # For a while after opening the wallet rpc cmds return empty data
+            num_tries = 40
+            for i in range(num_tries + 1):
+                try:
+                    current_height = self.rpc_cb2('get_height')['height']
+                    print('current_height', current_height)
+                except Exception as e:
+                    self._log.warning('rpc_cb failed %s', str(e))
+                    current_height = None  # If the transfer is available it will be deep enough
 
-        num_tries = 40
-        for i in range(num_tries + 1):
+                # TODO: Make accepting current_height == None a user selectable option
+                #       Or look for all transfers and check height
+
+                params = {'transfer_type': 'available'}
+                rv = self.rpc_wallet_cb('incoming_transfers', params)
+                print('rv', rv)
+
+                if 'transfers' in rv:
+                    for transfer in rv['transfers']:
+                        if transfer['amount'] == cb_swap_value \
+                           and (current_height is None or current_height - transfer['block_height'] > cb_block_confirmed):
+                            return True
+
+                # TODO: Is it necessary to check the address?
+
+                '''
+                rv = self.rpc_wallet_cb('get_balance')
+                print('get_balance', rv)
+
+                if 'per_subaddress' in rv:
+                    for sub_addr in rv['per_subaddress']:
+                        if sub_addr['address'] == address_b58:
+
+                '''
+
+                if i >= num_tries:
+                    raise ValueError('Balance not confirming on node')
+                time.sleep(1)
+
+            return False
+
+    def findTxnByHash(self, txid):
+        with self._mx_wallet:
+            self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
+            self.rpc_wallet_cb('refresh')
+
             try:
                 current_height = self.rpc_cb2('get_height')['height']
-                print('current_height', current_height)
+                self._log.info('findTxnByHash XMR current_height %d\nhash: %s', current_height, txid)
             except Exception as e:
-                self._log.warning('rpc_cb failed %s', str(e))
+                self._log.info('rpc_cb failed %s', str(e))
                 current_height = None  # If the transfer is available it will be deep enough
-
-            # TODO: Make accepting current_height == None a user selectable option
-            #       Or look for all transfers and check height
 
             params = {'transfer_type': 'available'}
             rv = self.rpc_wallet_cb('incoming_transfers', params)
-            print('rv', rv)
-
             if 'transfers' in rv:
                 for transfer in rv['transfers']:
-                    if transfer['amount'] == cb_swap_value \
-                       and (current_height is None or current_height - transfer['block_height'] > cb_block_confirmed):
-                        return True
+                    if transfer['tx_hash'] == txid \
+                       and (current_height is None or current_height - transfer['block_height'] > self.blocks_confirmed):
+                        return {'txid': transfer['tx_hash'], 'amount': transfer['amount'], 'height': transfer['block_height']}
 
-            # TODO: Is it necessary to check the address?
-
-            '''
-            rv = self.rpc_wallet_cb('get_balance')
-            print('get_balance', rv)
-
-            if 'per_subaddress' in rv:
-                for sub_addr in rv['per_subaddress']:
-                    if sub_addr['address'] == address_b58:
-
-            '''
-
-            if i >= num_tries:
-                raise ValueError('Balance not confirming on node')
-            time.sleep(1)
-
-        return False
-
-    def findTxnByHash(self, txid):
-        self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
-        self.rpc_wallet_cb('refresh')
-
-        try:
-            current_height = self.rpc_cb2('get_height')['height']
-            self._log.info('findTxnByHash XMR current_height %d\nhash: %s', current_height, txid)
-        except Exception as e:
-            self._log.info('rpc_cb failed %s', str(e))
-            current_height = None  # If the transfer is available it will be deep enough
-
-        params = {'transfer_type': 'available'}
-        rv = self.rpc_wallet_cb('incoming_transfers', params)
-        if 'transfers' in rv:
-            for transfer in rv['transfers']:
-                print('[rm] transfer', transfer)
-                if transfer['tx_hash'] == txid \
-                   and (current_height is None or current_height - transfer['block_height'] > self.blocks_confirmed):
-                    return {'txid': transfer['tx_hash'], 'amount': transfer['amount'], 'height': transfer['block_height']}
-
-        return None
+            return None
 
     def spendBLockTx(self, address_to, kbv, kbs, cb_swap_value, b_fee_rate, restore_height):
+        with self._mx_wallet:
+            Kbv = self.getPubkey(kbv)
+            Kbs = self.getPubkey(kbs)
+            address_b58 = xmr_util.encode_address(Kbv, Kbs)
 
-        Kbv = self.getPubkey(kbv)
-        Kbs = self.getPubkey(kbs)
-        address_b58 = xmr_util.encode_address(Kbv, Kbs)
+            try:
+                self.rpc_wallet_cb('close_wallet')
+            except Exception as e:
+                self._log.warning('close_wallet failed %s', str(e))
 
-        try:
-            self.rpc_wallet_cb('close_wallet')
-        except Exception as e:
-            self._log.warning('close_wallet failed %s', str(e))
+            wallet_filename = address_b58 + '_spend'
 
-        wallet_filename = address_b58 + '_spend'
+            params = {
+                'filename': wallet_filename,
+                'address': address_b58,
+                'viewkey': b2h(kbv[::-1]),
+                'spendkey': b2h(kbs[::-1]),
+                'restore_height': restore_height,
+            }
 
-        params = {
-            'filename': wallet_filename,
-            'address': address_b58,
-            'viewkey': b2h(kbv[::-1]),
-            'spendkey': b2h(kbs[::-1]),
-            'restore_height': restore_height,
-        }
+            try:
+                self.rpc_wallet_cb('open_wallet', {'filename': wallet_filename})
+            except Exception as e:
+                rv = self.rpc_wallet_cb('generate_from_keys', params)
+                self._log.info('generate_from_keys %s', dumpj(rv))
+                self.rpc_wallet_cb('open_wallet', {'filename': wallet_filename})
 
-        try:
-            self.rpc_wallet_cb('open_wallet', {'filename': wallet_filename})
-        except Exception as e:
-            rv = self.rpc_wallet_cb('generate_from_keys', params)
-            self._log.info('generate_from_keys %s', dumpj(rv))
-            self.rpc_wallet_cb('open_wallet', {'filename': wallet_filename})
+            # For a while after opening the wallet rpc cmds return empty data
+            for i in range(10):
+                rv = self.rpc_wallet_cb('get_balance')
+                print('get_balance', rv)
+                if rv['balance'] >= cb_swap_value:
+                    break
 
-        # For a while after opening the wallet rpc cmds return empty data
-        for i in range(10):
-            rv = self.rpc_wallet_cb('get_balance')
-            print('get_balance', rv)
-            if rv['balance'] >= cb_swap_value:
-                break
+                time.sleep(1 + i)
+            if rv['balance'] < cb_swap_value:
+                self._log.error('wallet {} balance {}, expected {}'.format(wallet_filename, rv['balance'], cb_swap_value))
+                raise ValueError('Invalid balance')
+            if rv['unlocked_balance'] < cb_swap_value:
+                self._log.error('wallet {} balance {}, expected {}, blocks_to_unlock {}'.format(wallet_filename, rv['unlocked_balance'], cb_swap_value, rv['blocks_to_unlock']))
+                raise ValueError('Invalid unlocked_balance')
 
-            time.sleep(1 + i)
-        if rv['balance'] < cb_swap_value:
-            self._log.error('wallet {} balance {}, expected {}'.format(wallet_filename, rv['balance'], cb_swap_value))
-            raise ValueError('Invalid balance')
-        if rv['unlocked_balance'] < cb_swap_value:
-            self._log.error('wallet {} balance {}, expected {}, blocks_to_unlock {}'.format(wallet_filename, rv['unlocked_balance'], cb_swap_value, rv['blocks_to_unlock']))
-            raise ValueError('Invalid unlocked_balance')
+            params = {'address': address_to}
+            if self._fee_priority > 0:
+                params['priority'] = self._fee_priority
+            rv = self.rpc_wallet_cb('sweep_all', params)
+            print('sweep_all', rv)
 
-        params = {'address': address_to}
-        if self._fee_priority > 0:
-            params['priority'] = self._fee_priority
-        rv = self.rpc_wallet_cb('sweep_all', params)
-        print('sweep_all', rv)
-
-        return bytes.fromhex(rv['tx_hash_list'][0])
+            return bytes.fromhex(rv['tx_hash_list'][0])
 
     def withdrawCoin(self, value, addr_to, subfee):
-        value_sats = make_int(value, self.exp())
+        with self._mx_wallet:
+            value_sats = make_int(value, self.exp())
 
-        self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
+            self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
 
-        if subfee:
-            balance = self.rpc_wallet_cb('get_balance')
-            if balance['unlocked_balance'] - value_sats <= 10:
-                self._log.info('subfee enabled and value close to total, using sweep_all.')
-                params = {'address': addr_to}
-                if self._fee_priority > 0:
-                    params['priority'] = self._fee_priority
-                rv = self.rpc_wallet_cb('sweep_all', params)
-                return rv['tx_hash_list'][0]
-            raise ValueError('Withdraw value must be close to total to use subfee/sweep_all.')
+            if subfee:
+                balance = self.rpc_wallet_cb('get_balance')
+                if balance['unlocked_balance'] - value_sats <= 10:
+                    self._log.info('subfee enabled and value close to total, using sweep_all.')
+                    params = {'address': addr_to}
+                    if self._fee_priority > 0:
+                        params['priority'] = self._fee_priority
+                    rv = self.rpc_wallet_cb('sweep_all', params)
+                    return rv['tx_hash_list'][0]
+                raise ValueError('Withdraw value must be close to total to use subfee/sweep_all.')
 
-        params = {'destinations': [{'amount': value_sats, 'address': addr_to}]}
-        if self._fee_priority > 0:
-            params['priority'] = self._fee_priority
-        rv = self.rpc_wallet_cb('transfer', params)
-        return rv['tx_hash']
+            params = {'destinations': [{'amount': value_sats, 'address': addr_to}]}
+            if self._fee_priority > 0:
+                params['priority'] = self._fee_priority
+            rv = self.rpc_wallet_cb('transfer', params)
+            return rv['tx_hash']

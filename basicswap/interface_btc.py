@@ -245,6 +245,12 @@ class BTCInterface(CoinInterface):
             return bytes(segwit_addr.decode(bech32_prefix, address)[1])
         return decodeAddress(address)[1:]
 
+    def pubkey_to_segwit_address(self, pk):
+        bech32_prefix = chainparams[self.coin_type()][self._network]['hrp']
+        version = 0
+        pkh = hash160(pk)
+        return encode_segwit_address(bech32_prefix, version, pkh)
+
     def getNewSecretKey(self):
         return getSecretInt()
 
@@ -829,6 +835,9 @@ class BTCInterface(CoinInterface):
         p2wpkh = self.getPkDest(Kbs)
         tx.vout.append(self.txoType()(output_amount, p2wpkh))
         return tx.serialize()
+
+    def encodeSharedAddress(self, Kbv, Kbs):
+        return self.pubkey_to_segwit_address(Kbs)
 
     def publishBLockTx(self, Kbv, Kbs, output_amount, feerate):
         b_lock_tx = self.createBLockTx(Kbs, output_amount)

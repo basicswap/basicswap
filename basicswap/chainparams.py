@@ -4,6 +4,8 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
+import threading
+
 from enum import IntEnum
 from .util import (
     COIN,
@@ -208,6 +210,7 @@ class CoinInterface:
     def __init__(self, network):
         self.setDefaults()
         self._network = network
+        self._mx_wallet = threading.Lock()
 
     def setDefaults(self):
         self._unknown_wallet_seed = True

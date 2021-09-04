@@ -246,7 +246,6 @@ def run_coins_loop(cls):
         try:
             if cls.btc_addr is not None:
                 btcRpc('generatetoaddress 1 {}'.format(cls.btc_addr))
-            logging.warning('cls.xmr_addr ' + str(cls.xmr_addr))
             if cls.xmr_addr is not None:
                 callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'generateblocks', {'wallet_address': cls.xmr_addr, 'amount_of_blocks': 1})
         except Exception as e:
