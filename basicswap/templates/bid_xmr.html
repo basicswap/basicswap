@@ -60,6 +60,9 @@
 <input type="hidden" name="formid" value="{{ form_id }}">
 
 {% if data.show_txns %}
+{% if data.xmr_b_shared_address %}
+<p>Shared Address: {{ data.xmr_b_shared_address }}</p>
+{% endif %}
 <h4>Transactions</h4>
 <table>
 <tr><th>Tx Type</th><th>Tx ID</th><th>Blocks Deep</th></tr>

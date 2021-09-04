@@ -219,6 +219,8 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
                     continue
                 txns.append({'type': strTxType(tx_type), 'txid': tx.txid.hex()})
             data['txns'] = txns
+
+            data['xmr_b_shared_address'] = ci_to.encodeSharedAddress(xmr_swap.pkbv, xmr_swap.pkbs) if xmr_swap.pkbs else None
         else:
             data['initiate_tx_refund'] = 'None' if not bid.initiate_txn_refund else bid.initiate_txn_refund.hex()
             data['participate_tx_refund'] = 'None' if not bid.participate_txn_refund else bid.participate_txn_refund.hex()
