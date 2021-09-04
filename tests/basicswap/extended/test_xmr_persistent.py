@@ -9,9 +9,9 @@
 export RESET_TEST=true
 export TEST_PATH=/tmp/test_persistent
 mkdir -p ${TEST_PATH}/bin/{particl,monero,bitcoin}
-cp ~/tmp/particl-0.21.0.1-x86_64-linux-gnu.tar.gz ${TEST_PATH}/bin/particl
-cp ~/tmp/bitcoin-0.21.0-x86_64-linux-gnu.tar.gz ${TEST_PATH}/bin/bitcoin
-cp ~/tmp/monero-linux-x64-v0.17.1.9.tar.bz2 ${TEST_PATH}/bin/monero/monero-0.17.1.9-x86_64-linux-gnu.tar.bz2
+cp ~/tmp/particl-0.21.2.3-x86_64-linux-gnu.tar.gz ${TEST_PATH}/bin/particl
+cp ~/tmp/bitcoin-0.21.1-x86_64-linux-gnu.tar.gz ${TEST_PATH}/bin/bitcoin
+cp ~/tmp/monero-linux-x64-v0.17.2.3.tar.bz2 ${TEST_PATH}/bin/monero/monero-0.17.2.3-x86_64-linux-gnu.tar.bz2
 export PYTHONPATH=$(pwd)
 python tests/basicswap/extended/test_xmr_persistent.py
 

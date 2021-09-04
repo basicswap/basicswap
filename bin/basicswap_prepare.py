@@ -42,11 +42,11 @@ else:
     FILE_EXT = 'tar.gz'
 
 known_coins = {
-    'particl': ('0.21.1.2', ''),
+    'particl': ('0.21.2.3', ''),
     'litecoin': ('0.18.1', ''),
     'bitcoin': ('0.21.1', ''),
     'namecoin': ('0.18.0', ''),
-    'monero': ('0.17.2.0', ''),
+    'monero': ('0.17.2.3', ''),
 }
 
 logger = logging.getLogger()
@@ -61,7 +61,7 @@ BASE_XMR_WALLET_PORT = int(os.getenv('BASE_XMR_WALLET_PORT', 29998))
 XMR_WALLET_RPC_HOST = os.getenv('XMR_WALLET_RPC_HOST', '127.0.0.1')
 XMR_WALLET_RPC_USER = os.getenv('XMR_WALLET_RPC_USER', 'xmr_wallet_user')
 XMR_WALLET_RPC_PWD = os.getenv('XMR_WALLET_RPC_PWD', 'xmr_wallet_pwd')
-XMR_SITE_COMMIT = 'b86dac8b74e3e8663f8f468c19c2fea6ec523b62'  # Lock hashes.txt to monero version
+XMR_SITE_COMMIT = 'ba7fcd947349416bedc0eb2e864416c3779af820'  # Lock hashes.txt to monero version
 
 DEFAULT_XMR_RESTORE_HEIGHT = 2245107
 
