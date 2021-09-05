@@ -4,6 +4,7 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
+import json
 from .util import (
     make_int,
     format_timestamp,
@@ -127,7 +128,7 @@ def listBidStates():
     return rv
 
 
-def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_bid, show_txns, view_tx_ind=None, for_api=False):
+def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_bid, show_txns, view_tx_ind=None, for_api=False, show_lock_transfers=False):
     ci_from = swap_client.ci(Coins(offer.coin_from))
     ci_to = swap_client.ci(Coins(offer.coin_to))
     ticker_from = ci_from.ticker()
@@ -221,6 +222,12 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
             data['txns'] = txns
 
             data['xmr_b_shared_address'] = ci_to.encodeSharedAddress(xmr_swap.pkbv, xmr_swap.pkbs) if xmr_swap.pkbs else None
+
+            if show_lock_transfers:
+                if xmr_swap.pkbs:
+                    data['lock_transfers'] = json.dumps(ci_to.showLockTransfers(xmr_swap.pkbv, xmr_swap.pkbs), indent=4)
+                else:
+                    data['lock_transfers'] = 'Shared address not yet known.'
         else:
             data['initiate_tx_refund'] = 'None' if not bid.initiate_txn_refund else bid.initiate_txn_refund.hex()
             data['participate_tx_refund'] = 'None' if not bid.participate_txn_refund else bid.participate_txn_refund.hex()

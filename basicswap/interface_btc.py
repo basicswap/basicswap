@@ -249,7 +249,7 @@ class BTCInterface(CoinInterface):
         bech32_prefix = chainparams[self.coin_type()][self._network]['hrp']
         version = 0
         pkh = hash160(pk)
-        return encode_segwit_address(bech32_prefix, version, pkh)
+        return segwit_addr.encode(bech32_prefix, version, pkh)
 
     def getNewSecretKey(self):
         return getSecretInt()
@@ -951,6 +951,9 @@ class BTCInterface(CoinInterface):
         pubkey_hash = hash160(pubkey.format())
 
         return True if address_hash == pubkey_hash else False
+
+    def showLockTransfers(self, Kbv, Kbs):
+        return 'Unimplemented'
 
 
 def testBTCInterface():

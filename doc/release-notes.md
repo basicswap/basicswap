@@ -2,6 +2,7 @@
 ==============
 - Raised Particl and Monero daemon versions.
 - Display shared address on bid page if show more info is enabled.
+- Added View Lock Wallet Transfers button to bid page.
 
 
 0.0.6

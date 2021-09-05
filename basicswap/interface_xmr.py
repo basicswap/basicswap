@@ -435,3 +435,22 @@ class XMRInterface(CoinInterface):
                 params['priority'] = self._fee_priority
             rv = self.rpc_wallet_cb('transfer', params)
             return rv['tx_hash']
+
+    def showLockTransfers(self, Kbv, Kbs):
+        with self._mx_wallet:
+            try:
+                address_b58 = xmr_util.encode_address(Kbv, Kbs)
+                wallet_file = address_b58 + '_spend'
+                try:
+                    self.rpc_wallet_cb('open_wallet', {'filename': wallet_file})
+                except Exception:
+                    wallet_file = address_b58
+                    self.rpc_wallet_cb('open_wallet', {'filename': wallet_file})
+
+                self.rpc_wallet_cb('refresh')
+
+                rv = self.rpc_wallet_cb('get_transfers', {'in': True, 'out': True, 'pending': True, 'failed': True})
+                rv['filename'] = wallet_file
+                return rv
+            except Exception as e:
+                return {'error': str(e)}

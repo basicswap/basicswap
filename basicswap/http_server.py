@@ -810,6 +810,7 @@ class HttpHandler(BaseHTTPRequestHandler):
 
         messages = []
         show_txns = False
+        show_lock_transfers = False
         edit_bid = False
         view_tx_ind = None
         form_data = self.checkForm(post_string, 'bid', messages)
@@ -842,11 +843,14 @@ class HttpHandler(BaseHTTPRequestHandler):
             elif b'view_tx_submit' in form_data:
                 show_txns = True
                 view_tx_ind = form_data[b'view_tx'][0].decode('utf-8')
+            elif b'view_lock_transfers' in form_data:
+                show_txns = True
+                show_lock_transfers = True
 
         bid, xmr_swap, offer, xmr_offer, events = swap_client.getXmrBidAndOffer(bid_id)
         assert(bid), 'Unknown bid ID'
 
-        data = describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, events, edit_bid, show_txns, view_tx_ind)
+        data = describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, events, edit_bid, show_txns, view_tx_ind, show_lock_transfers=show_lock_transfers)
 
         if bid.debug_ind is not None and bid.debug_ind > 0:
             messages.append('Debug flag set: {}'.format(bid.debug_ind))

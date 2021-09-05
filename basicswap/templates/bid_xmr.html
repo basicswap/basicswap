@@ -79,9 +79,19 @@
 </select></td></tr>
 </table>
 <input name="view_tx_submit" type="submit" value="View Tx">
+<input name="view_lock_transfers" type="submit" value="View Lock Wallet Transfers">
 
 {% if data.view_tx_hex %}
 <p>{{ data.view_tx_hex }}</p>
+{% endif %}
+
+{% if data.lock_transfers %}
+<p>
+<label for="transfers_view">Lock wallet transfers:</label><br/>
+<textarea id="transfers_view" rows="10" cols="150" readonly>
+{{ data.lock_transfers }}
+</textarea>
+</p>
 {% endif %}
 {% endif %}
 </form>

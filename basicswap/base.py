@@ -135,6 +135,6 @@ class BaseApp:
             raise ValueError('CLI error ' + str(out[1]))
         return out[0].decode('utf-8').strip()
 
-    def is_transient_error(ex):
-        str_error = str(ex).tolower()
+    def is_transient_error(self, ex):
+        str_error = str(ex).lower()
         return 'read timed out' in str_error or 'no connection to daemon' in str_error
