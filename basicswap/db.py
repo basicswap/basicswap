@@ -12,7 +12,7 @@ from enum import IntEnum, auto
 from sqlalchemy.ext.declarative import declarative_base
 
 
-CURRENT_DB_VERSION = 9
+CURRENT_DB_VERSION = 10
 Base = declarative_base()
 
 
@@ -360,6 +360,7 @@ class Wallets(Base):
     record_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
     coin_id = sa.Column(sa.Integer)
     wallet_name = sa.Column(sa.String)
+    wallet_data = sa.Column(sa.String)
     balance_type = sa.Column(sa.Integer)
     amount = sa.Column(sa.BigInteger)
     updated_at = sa.Column(sa.BigInteger)

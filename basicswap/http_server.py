@@ -279,15 +279,28 @@ class HttpHandler(BaseHTTPRequestHandler):
                                 messages.append('Withdrew {} {} to address {}<br/>In txid: {}'.format(value, ticker, address, txid))
                             except Exception as e:
                                 messages.append('Error: {}'.format(str(e)))
+                        swap_client.updateWalletsInfo(True, c)
 
-        wallets = swap_client.getWalletsInfo()
+        swap_client.updateWalletsInfo()
+        wallets = swap_client.getCachedWalletsInfo()
 
         wallets_formatted = []
-        for k, w in wallets.items():
+        sk = sorted(wallets.keys())
+
+        for k in sk:
+            w = wallets[k]
             if 'error' in w:
                 wallets_formatted.append({
                     'cid': str(int(k)),
                     'error': w['error']
+                })
+                continue
+
+            if 'balance' not in w:
+                wallets_formatted.append({
+                    'name': w['name'],
+                    'havedata': False,
+                    'updating': w['updating'],
                 })
                 continue
 
@@ -308,11 +321,16 @@ class HttpHandler(BaseHTTPRequestHandler):
                 'deposit_address': w['deposit_address'],
                 'expected_seed': w['expected_seed'],
                 'balance_all': float(w['balance']) + float(w['unconfirmed']),
+                'updating': w['updating'],
+                'lastupdated': format_timestamp(w['lastupdated']),
+                'havedata': True,
             }
             if float(w['unconfirmed']) > 0.0:
                 wf['unconfirmed'] = w['unconfirmed']
 
             if k == Coins.PART:
+
+                wf['stealth_address'] = w['stealth_address']
                 wf['blind_balance'] = w['blind_balance']
                 if float(w['blind_unconfirmed']) > 0.0:
                     wf['blind_unconfirmed'] = w['blind_unconfirmed']

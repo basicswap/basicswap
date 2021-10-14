@@ -1,5 +1,7 @@
 {% include 'header.html' %}
 
+<p><a href="/wallets">refresh</a></p>
+
 <h3>Wallets</h3>
 {% if refresh %}
 <p>Page Refresh: {{ refresh }} seconds</p>
@@ -13,10 +15,15 @@
 
 {% for w in wallets %}
 <h4>{{ w.name }} {{ w.version }}</h4>
+{% if w.updating %}
+<h5>Updating</h5>
+{% endif %}
+{% if w.havedata %}
 {% if w.error %}
 <p>Error: {{ w.error }}</p>
 {% else %}
 <table>
+<tr><td>Last updated:</td><td>{{ w.lastupdated }}</td></tr>
 <tr><td>Balance:</td><td>{{ w.balance }}</td>{% if w.unconfirmed %}<td>Unconfirmed:</td><td>{{ w.unconfirmed }}</td>{% endif %}</tr>
 
 
@@ -50,6 +57,7 @@
 <tr><td>Fee Rate:</td><td>{{ w.fee_rate }}</td><td>Est Fee:</td><td>{{ w.est_fee }}</td></tr>
 </table>
 {% endif %}
+{% endif %} <!-- havedata -->
 {% endfor %}
 
 <input type="hidden" name="formid" value="{{ form_id }}">

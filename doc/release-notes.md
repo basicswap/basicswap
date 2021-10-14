@@ -1,3 +1,10 @@
+0.0.22
+==============
+- Improved wallets page
+  - Consistent wallet order
+  - Separated RPC calls into threads.
+
+
 0.0.21
 ==============
 - Raised Particl and Monero daemon versions.

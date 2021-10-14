@@ -6,6 +6,7 @@
 
 import os
 import re
+import sys
 import zmq
 import json
 import time
@@ -20,6 +21,7 @@ import threading
 import traceback
 import sqlalchemy as sa
 import collections
+import concurrent.futures
 
 from enum import IntEnum, auto
 from sqlalchemy.orm import sessionmaker, scoped_session
@@ -83,6 +85,7 @@ from .db import (
     XmrOffer,
     XmrSwap,
     XmrSplitData,
+    Wallets,
 )
 from .base import BaseApp
 from .explorers import (
@@ -462,6 +465,8 @@ class BasicSwap(BaseApp):
         self._last_checked_events = 0
         self._last_checked_xmr_swaps = 0
         self._possibly_revoked_offers = collections.deque([], maxlen=48)  # TODO: improve
+        self._updating_wallets_info = {}
+        self._last_updated_wallets_info = 0
 
         # TODO: Adjust ranges
         self.min_delay_event = self.settings.get('min_delay_event', 10)
@@ -480,6 +485,7 @@ class BasicSwap(BaseApp):
         self.SMSG_SECONDS_IN_HOUR = 60 * 60  # Note: Set smsgsregtestadjust=0 for regtest
 
         self.threads = []
+        self.thread_pool = concurrent.futures.ThreadPoolExecutor(max_workers=4, thread_name_prefix='bsp')
 
         # Encode key to match network
         wif_prefix = chainparams[Coins.PART][self.chain]['key_prefix']
@@ -572,6 +578,11 @@ class BasicSwap(BaseApp):
 
         for t in self.threads:
             t.join()
+
+        if sys.version_info[1] >= 9:
+            self.thread_pool.shutdown(cancel_futures=True)
+        else:
+            self.thread_pool.shutdown()
 
         close_all_sessions()
         self.engine.dispose()
@@ -827,6 +838,9 @@ class BasicSwap(BaseApp):
                         updated_at BIGINT,
                         created_at BIGINT,
                         PRIMARY KEY (record_id))''')
+                db_version += 1
+            elif current_version == 9:
+                session.execute('ALTER TABLE wallets ADD COLUMN wallet_data VARCHAR')
                 db_version += 1
 
             if current_version != db_version:
@@ -5093,6 +5107,46 @@ class BasicSwap(BaseApp):
 
         return rv
 
+    def updateWalletInfo(self, coin):
+        wi = self.getWalletInfo(coin)
+
+        # Store wallet info to db so it's available after startup
+        self.mxDB.acquire()
+        try:
+            rv = []
+            now = int(time.time())
+            session = scoped_session(self.session_factory)
+
+            session.add(Wallets(coin_id=coin, wallet_data=json.dumps(wi), created_at=now))
+
+            coin_id = int(coin)
+            query_str = f'DELETE FROM wallets WHERE coin_id = {coin_id} AND record_id NOT IN (SELECT record_id FROM wallets WHERE coin_id = {coin_id} ORDER BY created_at DESC LIMIT 3 )'
+            session.execute(query_str)
+            session.commit()
+        except Exception as e:
+            self.log.error(f'updateWalletInfo {e}')
+
+        finally:
+            session.close()
+            session.remove()
+            self._updating_wallets_info[int(coin)] = False
+            self.mxDB.release()
+
+    def updateWalletsInfo(self, force_update=False, only_coin=None):
+        now = int(time.time())
+        if not force_update and now - self._last_updated_wallets_info < 30:
+            return
+        for c in Coins:
+            if only_coin is not None and c != only_coin:
+                continue
+            if c not in chainparams:
+                continue
+            if self.coin_clients[c]['connection_type'] == 'rpc':
+                self._updating_wallets_info[int(c)] = True
+                self.thread_pool.submit(self.updateWalletInfo, c)
+        if only_coin is None:
+            self._last_updated_wallets_info = int(time.time())
+
     def getWalletsInfo(self, opts=None):
         rv = {}
         for c in Coins:
@@ -5103,6 +5157,44 @@ class BasicSwap(BaseApp):
                     rv[c] = self.getWalletInfo(c)
                 except Exception as ex:
                     rv[c] = {'name': chainparams[c]['name'].capitalize(), 'error': str(ex)}
+        return rv
+
+    def getCachedWalletsInfo(self, opts=None):
+        rv = {}
+        # Requires? self.mxDB.acquire()
+        try:
+            session = scoped_session(self.session_factory)
+            inner_str = 'SELECT coin_id, MAX(created_at) as max_created_at FROM wallets GROUP BY coin_id'
+            query_str = 'SELECT a.coin_id, wallet_data, created_at FROM wallets a, ({}) b WHERE a.coin_id = b.coin_id AND a.created_at = b.max_created_at'.format(inner_str)
+
+            q = session.execute(query_str)
+            for row in q:
+                coin_id = row[0]
+                wallet_data = json.loads(row[1])
+                wallet_data['lastupdated'] = row[2]
+                wallet_data['updating'] = self._updating_wallets_info.get(coin_id, False)
+
+                # Ensure the latest deposit address is displayed
+                q = session.execute('SELECT value FROM kv_string WHERE key = "receive_addr_{}"'.format(chainparams[coin_id]['name']))
+                for row in q:
+                    wallet_data['deposit_address'] = row[0]
+
+                rv[coin_id] = wallet_data
+        finally:
+            session.close()
+            session.remove()
+
+        for c in Coins:
+            if c not in chainparams:
+                continue
+            if self.coin_clients[c]['connection_type'] == 'rpc':
+                coin_id = int(c)
+                if coin_id not in rv:
+                    rv[coin_id] = {
+                        'name': chainparams[c]['name'].capitalize(),
+                        'updating': self._updating_wallets_info.get(coin_id, False),
+                    }
+
         return rv
 
     def countAcceptedBids(self, offer_id=None):
