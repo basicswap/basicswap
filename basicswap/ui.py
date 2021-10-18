@@ -12,7 +12,8 @@ from .util import (
 from .chainparams import (
     Coins,
 )
-from .basicswap import (
+from .basicswap_util import (
+    SEQUENCE_LOCK_TIME,
     SwapTypes,
     BidStates,
     TxStates,
@@ -20,9 +21,7 @@ from .basicswap import (
     strTxType,
     strBidState,
     strTxState,
-)
-from .types import (
-    SEQUENCE_LOCK_TIME,
+    getLastBidState,
 )
 
 PAGE_LIMIT = 50
@@ -164,6 +163,42 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
             state_description = 'Bid abandoned'
         elif bid.state == BidStates.BID_ERROR:
             state_description = bid.state_note
+    elif offer.swap_type == SwapTypes.XMR_SWAP:
+        if bid.state == BidStates.BID_RECEIVING:
+            # Offerer receiving bid from bidder
+            state_description = 'Waiting for bid to be fully received'
+        elif bid.state == BidStates.BID_RECEIVED:
+            # Offerer received bid from bidder
+            # TODO: Manual vs automatic
+            state_description = 'Bid must be accepted'
+        elif bid.state == BidStates.BID_RECEIVING_ACC:
+            state_description = 'Receiving accepted bid message'
+        elif bid.state == BidStates.BID_ACCEPTED:
+            state_description = 'Offerer has accepted bid, waiting for bidder to respond'
+        elif bid.state == BidStates.SWAP_DELAYING:
+            last_state = getLastBidState(bid.states)
+            if last_state == BidStates.BID_RECEIVED:
+                state_description = 'Delaying before accepting bid'
+            elif last_state == BidStates.BID_RECEIVING_ACC:
+                state_description = 'Delaying before responding to accepted bid'
+            elif last_state == BidStates.XMR_SWAP_SCRIPT_TX_REDEEMED:
+                state_description = f'Delaying before spending from {ticker_to} lock tx'
+            elif last_state == BidStates.BID_ACCEPTED:
+                state_description = f'Delaying before sending {ticker_from} lock tx'
+            else:
+                state_description = 'Delaying before automated action'
+        elif bid.state == BidStates.XMR_SWAP_HAVE_SCRIPT_COIN_SPEND_TX:
+            state_description = f'Waiting for {ticker_from} lock tx to confirm in chain'
+        elif bid.state == BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED:
+            state_description = f'Waiting for {ticker_to} lock tx to confirm in chain'
+        elif bid.state == BidStates.XMR_SWAP_NOSCRIPT_COIN_LOCKED:
+            state_description = f'Waiting for offerer to unlock {ticker_from} lock tx'
+        elif bid.state == BidStates.XMR_SWAP_LOCK_RELEASED:
+            state_description = f'Waiting for bidder to spend from {ticker_from} lock tx'
+        elif bid.state == BidStates.XMR_SWAP_SCRIPT_TX_REDEEMED:
+            state_description = f'Waiting for offerer to spend from {ticker_to} lock tx'
+        elif bid.state == BidStates.XMR_SWAP_NOSCRIPT_TX_REDEEMED:
+            state_description = f'Waiting for {ticker_to} lock tx spend tx to confirm in chain'
 
     data = {
         'amt_from': ci_from.format_amount(bid.amount),

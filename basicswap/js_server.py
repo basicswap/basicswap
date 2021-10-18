@@ -10,7 +10,7 @@ import urllib.parse
 from .util import (
     toBool,
 )
-from .basicswap import (
+from .basicswap_util import (
     strBidState,
     SwapTypes,
 )

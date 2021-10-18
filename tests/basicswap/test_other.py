@@ -24,15 +24,16 @@ from coincurve.keys import (
 from basicswap.ecc_util import i2b
 from basicswap.interface_btc import BTCInterface
 from basicswap.interface_xmr import XMRInterface
+
+from basicswap.basicswap_util import (
+    SEQUENCE_LOCK_BLOCKS,
+    SEQUENCE_LOCK_TIME)
 from basicswap.util import (
     SerialiseNum,
     DeserialiseNum,
     make_int,
     format_amount,
     validate_amount)
-from basicswap.types import (
-    SEQUENCE_LOCK_BLOCKS,
-    SEQUENCE_LOCK_TIME)
 
 
 class Test(unittest.TestCase):

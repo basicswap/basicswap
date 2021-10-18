@@ -62,7 +62,7 @@ from .contrib.test_framework.script import (
     SegwitV0SignatureHash,
     hash160)
 
-from .types import (
+from .basicswap_util import (
     SEQUENCE_LOCK_BLOCKS,
     SEQUENCE_LOCK_TIME)
 

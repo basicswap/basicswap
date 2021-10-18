@@ -22,7 +22,7 @@ from .chainparams import (
     chainparams,
     Coins,
 )
-from .basicswap import (
+from .basicswap_util import (
     SwapTypes,
     strOfferState,
     strBidState,

@@ -32,6 +32,8 @@ from basicswap.basicswap import (
     BidStates,
     TxStates,
     DebugTypes,
+)
+from basicswap.basicswap_util import (
     SEQUENCE_LOCK_BLOCKS,
 )
 from basicswap.util import (
