@@ -336,3 +336,19 @@ def getLastBidState(packed_states):
         return struct.unpack_from('<i', packed_states[(num_states - 2) * 12:])[0]
     except Exception:
         return BidStates.BID_STATE_UNKNOWN
+
+
+def isActiveBidState(state):
+    if state == BidStates.XMR_SWAP_HAVE_SCRIPT_COIN_SPEND_TX:
+        return True
+    if state == BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED:
+        return True
+    if state == BidStates.XMR_SWAP_NOSCRIPT_COIN_LOCKED:
+        return True
+    if state == BidStates.XMR_SWAP_LOCK_RELEASED:
+        return True
+    if state == BidStates.XMR_SWAP_NOSCRIPT_TX_REDEEMED:
+        return True
+    if state == BidStates.XMR_SWAP_SCRIPT_TX_REDEEMED:
+        return True
+    return False

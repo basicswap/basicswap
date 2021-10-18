@@ -164,6 +164,8 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
         elif bid.state == BidStates.BID_ERROR:
             state_description = bid.state_note
     elif offer.swap_type == SwapTypes.XMR_SWAP:
+        if bid.state == BidStates.BID_SENT:
+            tate_description = 'Waiting for offerer to accept'
         if bid.state == BidStates.BID_RECEIVING:
             # Offerer receiving bid from bidder
             state_description = 'Waiting for bid to be fully received'
@@ -188,9 +190,9 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
             else:
                 state_description = 'Delaying before automated action'
         elif bid.state == BidStates.XMR_SWAP_HAVE_SCRIPT_COIN_SPEND_TX:
-            state_description = f'Waiting for {ticker_from} lock tx to confirm in chain'
+            state_description = f'Waiting for {ticker_from} lock tx to confirm in chain ({ci_from.blocks_confirmed} blocks)'
         elif bid.state == BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED:
-            state_description = f'Waiting for {ticker_to} lock tx to confirm in chain'
+            state_description = f'Waiting for {ticker_to} lock tx to confirm in chain ({ci_to.blocks_confirmed} blocks)'
         elif bid.state == BidStates.XMR_SWAP_NOSCRIPT_COIN_LOCKED:
             state_description = f'Waiting for offerer to unlock {ticker_from} lock tx'
         elif bid.state == BidStates.XMR_SWAP_LOCK_RELEASED:

@@ -115,7 +115,8 @@ from .basicswap_util import (
     getVoutByP2WSH,
     replaceAddrPrefix,
     getOfferProofOfFundsHash,
-    getLastBidState)
+    getLastBidState,
+    isActiveBidState)
 
 
 def threadPollChainState(swap_client, coin_type):
@@ -4244,9 +4245,8 @@ class BasicSwap(BaseApp):
         kbsl = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, 2, for_ed25519)
         vkbs = ci_to.sumKeys(kbsl, kbsf)
 
-        address_to = ci_to.getMainWalletAddress()
-
         try:
+            address_to = ci_to.getMainWalletAddress()  # TODO: cache main wallet address to reduce network traffic
             txid = ci_to.spendBLockTx(address_to, xmr_swap.vkbv, vkbs, bid.amount_to, xmr_offer.b_fee_rate, xmr_swap.b_restore_height)
             self.log.debug('Submitted lock B spend txn %s to %s chain for bid %s', txid.hex(), ci_to.coin_name(), bid_id.hex())
             self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_B_SPEND_TX_PUBLISHED, '', session)
@@ -4653,7 +4653,7 @@ class BasicSwap(BaseApp):
                     else:
                         self.log.debug('TODO - determine in-progress for manualBidUpdate')
                         if offer.swap_type == SwapTypes.XMR_SWAP:
-                            if bid.state and bid.state in (BidStates.XMR_SWAP_HAVE_SCRIPT_COIN_SPEND_TX, BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED, BidStates.XMR_SWAP_NOSCRIPT_COIN_LOCKED, BidStates.XMR_SWAP_LOCK_RELEASED, BidStates.XMR_SWAP_NOSCRIPT_TX_REDEEMED):
+                            if bid.state and isActiveBidState(bid.state):
                                 activate_bid = True
 
                     if activate_bid:

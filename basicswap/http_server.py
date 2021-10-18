@@ -240,6 +240,7 @@ class HttpHandler(BaseHTTPRequestHandler):
                         messages.append('Reseed complete ' + str(c))
                     except Exception as ex:
                         messages.append('Reseed failed ' + str(ex))
+                    swap_client.updateWalletsInfo(True, c)
                 elif bytes('withdraw_' + cid, 'utf-8') in form_data:
                     try:
                         value = form_data[bytes('amt_' + cid, 'utf-8')][0].decode('utf-8')
