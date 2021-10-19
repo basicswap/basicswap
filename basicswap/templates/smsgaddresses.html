@@ -1,0 +1,47 @@
+{% include 'header.html' %}
+
+<h3>Active SMSG Addresses</h3>
+
+{% for m in messages %}
+<p>{{ m }}</p>
+{% endfor %}
+
+<form method="post">
+
+{% if data.edit_address %}
+<input type="hidden" name="edit_address_id" value="{{ data.addr_data.id }}">
+<input type="hidden" name="edit_address" value="{{ data.addr_data.addr }}">
+
+<br/><h4>Edit Address {{ data.addr_data.addr }}</h4>
+<table>
+<tr><td>Active</td><td><select name="active_ind">
+<option value="1"{% if data.addr_data.active_ind==1 %} selected{% endif %}>True</option>
+<option value="0"{% if data.addr_data.active_ind==0 %} selected{% endif %}>False</option>
+</select></td></tr>
+<tr><td>Note</td><td><input name="addressnote" type="text" value="{{ data.addr_data.note }}" maxlength="30"></td></tr>
+
+<tr><td><input type="submit" name="saveaddr" value="Save Address"><input type="submit" name="cancel" value="Cancel"></td></tr>
+</table>
+{% elif data.new_address %}
+<br/><h4>New Address</h4>
+<table>
+<tr><td>Note</td><td><input name="addressnote" type="text" value="" maxlength="30"></td></tr>
+
+<tr><td><input type="submit" name="createnewaddr" value="Create Address"><input type="submit" name="cancel" value="Cancel"></td></tr>
+</table>
+{% else %}
+<table>
+<tr><th>Address</th><th>Type</th><th>Active</th><th>Created At</th><th>Note</th><th>Action</th></tr>
+<tr><td><b>{{ network_addr }}</b></td><td>Network Address<td/></tr>
+{% for sa in smsgaddresses %}
+<tr><td>{{ sa.addr }}</td><td>{{ sa.type }}</td><td>{{ sa.active_ind }}</td><td>{{ sa.created_at | formatts }}</td><td>{{ sa.note }}</td><td><input type="submit" name="editaddr_{{ sa.id }}" value="Edit"></td></tr>
+{% endfor %}
+</table>
+
+<input type="submit" name="shownewaddr" value="New Address">
+{% endif %}
+<input type="hidden" name="formid" value="{{ form_id }}">
+</form>
+
+<p><a href="/">home</a></p>
+</body></html>

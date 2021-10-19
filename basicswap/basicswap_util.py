@@ -239,6 +239,14 @@ def strTxType(tx_type):
     return 'Unknown'
 
 
+def strMessageType(msg_type):
+    if msg_type == MessageTypes.OFFER:
+        return 'Offers'
+    if msg_type == MessageTypes.BID:
+        return 'Bids'
+    return 'Unknown'
+
+
 def getLockName(lock_type):
     if lock_type == SEQUENCE_LOCK_BLOCKS:
         return 'Sequence lock, blocks'

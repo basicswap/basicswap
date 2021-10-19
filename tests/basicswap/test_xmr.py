@@ -466,6 +466,74 @@ class Test(unittest.TestCase):
         end_xmr = float(js_0_end['6']['balance']) + float(js_0_end['6']['unconfirmed'])
         assert(end_xmr > 10.9 and end_xmr < 11.0)
 
+
+    def test_011_smsgaddresses(self):
+        js_1 = json.loads(urlopen('http://127.0.0.1:1801/json/smsgaddresses').read())
+
+        post_json = {
+            'addressnote': 'testing',
+        }
+        json_rv = json.loads(post_json_req('http://127.0.0.1:1801/json/smsgaddresses/new', post_json))
+        new_address = json_rv['new_address']
+
+        js_2 = json.loads(urlopen('http://127.0.0.1:1801/json/smsgaddresses').read())
+        assert(len(js_2) == len(js_1) + 1)
+        found = False
+        for addr in js_2:
+            if addr['addr'] == new_address:
+                assert(addr['note'] == 'testing')
+                found = True
+        assert(found is True)
+
+        found = False
+        lks = callnoderpc(1, 'smsglocalkeys')
+        for key in lks['wallet_keys']:
+            if key['address'] == new_address:
+                assert(key['receive'] == '1')
+                found = True
+        assert(found is True)
+
+        # Disable
+        post_json = {
+            'address': new_address,
+            'addressnote': 'testing2',
+            'active_ind': '0',
+        }
+        json_rv = json.loads(post_json_req('http://127.0.0.1:1801/json/smsgaddresses/edit', post_json))
+        assert(json_rv['edited_address'] == new_address)
+
+        js_3 = json.loads(urlopen('http://127.0.0.1:1801/json/smsgaddresses').read())
+        found = False
+        for addr in js_3:
+            if addr['addr'] == new_address:
+                assert(addr['note'] == 'testing2')
+                assert(addr['active_ind'] == 0)
+                found = True
+        assert(found is True)
+
+        found = False
+        lks = callnoderpc(1, 'smsglocalkeys')
+        for key in lks['wallet_keys']:
+            if key['address'] == new_address:
+                found = True
+        assert(found is False)
+
+        # Reenable
+        post_json = {
+            'address': new_address,
+            'active_ind': '1',
+        }
+        json_rv = json.loads(post_json_req('http://127.0.0.1:1801/json/smsgaddresses/edit', post_json))
+        assert(json_rv['edited_address'] == new_address)
+
+        found = False
+        lks = callnoderpc(1, 'smsglocalkeys')
+        for key in lks['wallet_keys']:
+            if key['address'] == new_address:
+                assert(key['receive'] == '1')
+                found = True
+        assert(found is True)
+
     def test_02_leader_recover_a_lock_tx(self):
         logging.info('---------- Test PART to XMR leader recovers coin a lock tx')
         swap_clients = self.swap_clients

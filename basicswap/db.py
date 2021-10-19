@@ -12,7 +12,7 @@ from enum import IntEnum, auto
 from sqlalchemy.ext.declarative import declarative_base
 
 
-CURRENT_DB_VERSION = 10
+CURRENT_DB_VERSION = 11
 Base = declarative_base()
 
 
@@ -215,8 +215,11 @@ class SmsgAddress(Base):
     __tablename__ = 'smsgaddresses'
 
     addr_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
-    addr = sa.Column(sa.String)
+    active_ind = sa.Column(sa.Integer)
+    created_at = sa.Column(sa.BigInteger)
+    addr = sa.Column(sa.String, unique=True)
     use_type = sa.Column(sa.Integer)
+    note = sa.Column(sa.String)
 
 
 class EventQueue(Base):

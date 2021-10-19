@@ -558,6 +558,12 @@ class BasicSwap(BaseApp):
             elif current_version == 9:
                 session.execute('ALTER TABLE wallets ADD COLUMN wallet_data VARCHAR')
                 db_version += 1
+            elif current_version == 10:
+                session.execute('ALTER TABLE smsgaddresses ADD COLUMN active_ind INTEGER')
+                session.execute('ALTER TABLE smsgaddresses ADD COLUMN created_at INTEGER')
+                session.execute('ALTER TABLE smsgaddresses ADD COLUMN note VARCHAR')
+                session.execute('UPDATE smsgaddresses SET active_ind = 1, created_at = 1')
+                db_version += 1
 
             if current_version != db_version:
                 self.db_version = db_version
@@ -981,7 +987,7 @@ class BasicSwap(BaseApp):
             session.add(offer)
             session.add(SentOffer(offer_id=offer_id))
             if addr_send_from is None:
-                session.add(SmsgAddress(addr=offer_addr, use_type=MessageTypes.OFFER))
+                session.add(SmsgAddress(addr=offer_addr, use_type=MessageTypes.OFFER, active_ind=1, created_at=offer_created_at))
             session.commit()
 
         finally:
@@ -1536,7 +1542,7 @@ class BasicSwap(BaseApp):
                 session = scoped_session(self.session_factory)
                 self.saveBidInSession(bid_id, bid, session)
                 if addr_send_from is None:
-                    session.add(SmsgAddress(addr=bid_addr, use_type=MessageTypes.BID))
+                    session.add(SmsgAddress(addr=bid_addr, use_type=MessageTypes.BID, active_ind=1, created_at=now))
                 session.commit()
             finally:
                 session.close()
@@ -1907,7 +1913,7 @@ class BasicSwap(BaseApp):
                 session = scoped_session(self.session_factory)
                 self.saveBidInSession(xmr_swap.bid_id, bid, session, xmr_swap)
                 if addr_send_from is None:
-                    session.add(SmsgAddress(addr=bid_addr, use_type=MessageTypes.BID))
+                    session.add(SmsgAddress(addr=bid_addr, use_type=MessageTypes.BID, active_ind=1, created_at=bid_created_at))
                 session.commit()
             finally:
                 session.close()
@@ -5040,13 +5046,73 @@ class BasicSwap(BaseApp):
         finally:
             self.mxDB.release()
 
+    def listAllSMSGAddresses(self, addr_id=None):
+        filters = ''
+        if addr_id is not None:
+            filters += f' WHERE addr_id = {addr_id} '
+        self.mxDB.acquire()
+        try:
+            session = scoped_session(self.session_factory)
+            rv = []
+            query_str = f'SELECT addr_id, addr, use_type, active_ind, created_at, note FROM smsgaddresses {filters} ORDER BY created_at'
+
+            q = session.execute(query_str)
+            for row in q:
+                rv.append({
+                    'id': row[0],
+                    'addr': row[1],
+                    'type': row[2],
+                    'active_ind': row[3],
+                    'created_at': row[4],
+                    'note': row[5],
+                })
+            return rv
+        finally:
+            session.close()
+            session.remove()
+            self.mxDB.release()
+
+        #listening_keys = self.callcoinrpc(Coins.PART, 'smsglocalkeys', [])
+        return []
+
+    def addSMSGAddress(self, addressnote=None):
+        # TODO: smsg addresses should be generated from a unique chain
+        self.mxDB.acquire()
+        try:
+            session = scoped_session(self.session_factory)
+            now = int(time.time())
+            new_addr = self.callrpc('getnewaddress')
+            self.callrpc('smsgaddlocaladdress', [new_addr])  # Enable receiving smsgs
+
+            session.add(SmsgAddress(addr=new_addr, use_type=MessageTypes.OFFER, active_ind=1, created_at=now, note=addressnote))
+            session.commit()
+            return new_addr
+        finally:
+            session.close()
+            session.remove()
+            self.mxDB.release()
+
+    def editSMSGAddress(self, address, active_ind, addressnote):
+        self.mxDB.acquire()
+        try:
+            session = scoped_session(self.session_factory)
+            mode = '-' if active_ind == 0 else '+'
+            self.callrpc('smsglocalkeys', ['recv', mode, address])
+
+            session.execute('UPDATE smsgaddresses SET active_ind = {}, note = "{}" WHERE addr = "{}"'.format(active_ind, addressnote, address))
+            session.commit()
+        finally:
+            session.close()
+            session.remove()
+            self.mxDB.release()
+
     def listSmsgAddresses(self, use_type_str):
         use_type = MessageTypes.OFFER if use_type_str == 'offer' else MessageTypes.BID
         self.mxDB.acquire()
         try:
             session = scoped_session(self.session_factory)
             rv = []
-            q = session.execute('SELECT addr FROM smsgaddresses WHERE use_type = {} ORDER BY addr_id DESC'.format(use_type))
+            q = session.execute('SELECT addr FROM smsgaddresses WHERE use_type = {} AND active_ind = 1 ORDER BY addr_id DESC'.format(use_type))
             for row in q:
                 rv.append(row[0])
             return rv

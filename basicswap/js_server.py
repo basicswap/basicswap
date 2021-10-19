@@ -245,3 +245,27 @@ def js_revokeoffer(self, url_split, post_string, is_json):
 
 def js_index(self, url_split, post_string, is_json):
     return bytes(json.dumps(self.server.swap_client.getSummary()), 'UTF-8')
+
+
+def js_smsgaddresses(self, url_split, post_string, is_json):
+    swap_client = self.server.swap_client
+    if len(url_split) > 3:
+        if post_string == '':
+            raise ValueError('No post data')
+        if is_json:
+            post_data = json.loads(post_string)
+            post_data['is_json'] = True
+        else:
+            post_data = urllib.parse.parse_qs(post_string)
+        if url_split[3] == 'new':
+            addressnote = get_data_entry_or(post_data, 'addressnote', '')
+            new_addr = swap_client.addSMSGAddress(addressnote)
+            return bytes(json.dumps({'new_address': new_addr}), 'UTF-8')
+        elif url_split[3] == 'edit':
+            address = get_data_entry(post_data, 'address')
+            activeind = int(get_data_entry(post_data, 'active_ind'))
+            addressnote = get_data_entry_or(post_data, 'addressnote', '')
+            new_addr = swap_client.editSMSGAddress(address, activeind, addressnote)
+            return bytes(json.dumps({'edited_address': address}), 'UTF-8')
+
+    return bytes(json.dumps(swap_client.listAllSMSGAddresses()), 'UTF-8')

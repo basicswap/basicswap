@@ -27,6 +27,7 @@ from .basicswap_util import (
     strOfferState,
     strBidState,
     strTxState,
+    strMessageType,
     getLockName,
     SEQUENCE_LOCK_TIME,
     ABS_LOCK_TIME,
@@ -40,6 +41,7 @@ from .js_server import (
     js_sentbids,
     js_network,
     js_revokeoffer,
+    js_smsgaddresses,
     js_index,
 )
 from .ui import (
@@ -75,6 +77,16 @@ def listAvailableCoins(swap_client):
                 # TODO: Uncomment
                 # coins.append((int(Coins.PART_ANON), getCoinName(k)))
     return coins
+
+
+def validateTextInput(text, name, messages, max_length=None):
+    if max_length is not None and len(text) > max_length:
+        messages.append(f'Error: {name} is too long')
+        return False
+    if len(text) > 0 and text.isalnum() is False:
+        messages.append(f'Error: {name} must consist of only letters and digits')
+        return False
+    return True
 
 
 def extractDomain(url):
@@ -930,6 +942,67 @@ class HttpHandler(BaseHTTPRequestHandler):
             watched_outputs=[(wo[1].hex(), getCoinName(wo[0]), wo[2], wo[3], int(wo[4])) for wo in watched_outputs],
         ), 'UTF-8')
 
+    def page_smsgaddresses(self, url_split, post_string):
+        swap_client = self.server.swap_client
+
+        page_data = {}
+        messages = []
+        smsgaddresses = []
+
+        listaddresses = True
+        form_data = self.checkForm(post_string, 'smsgaddresses', messages)
+        if form_data:
+            edit_address_id = None
+            for key in form_data:
+                if key.startswith(b'editaddr_'):
+                    edit_address_id = int(key.split(b'_')[1])
+                    break
+            if edit_address_id is not None:
+                listaddresses = False
+                page_data['edit_address'] = edit_address_id
+                page_data['addr_data'] = swap_client.listAllSMSGAddresses(addr_id=edit_address_id)[0]
+            elif b'saveaddr' in form_data:
+                edit_address_id = int(form_data[b'edit_address_id'][0].decode('utf-8'))
+                edit_addr = form_data[b'edit_address'][0].decode('utf-8')
+                active_ind = int(form_data[b'active_ind'][0].decode('utf-8'))
+                assert(active_ind == 0 or active_ind == 1), 'Invalid sort by'
+                addressnote = '' if b'addressnote' not in form_data else form_data[b'addressnote'][0].decode('utf-8')
+                if not validateTextInput(addressnote, 'Address note', messages, max_length=30):
+                    listaddresses = False
+                    page_data['edit_address'] = edit_address_id
+                else:
+                    swap_client.editSMSGAddress(edit_addr, active_ind=active_ind, addressnote=addressnote)
+                    messages.append(f'Edited address {edit_addr}')
+            elif b'shownewaddr' in form_data:
+                listaddresses = False
+                page_data['new_address'] = True
+            elif b'createnewaddr' in form_data:
+                addressnote = '' if b'addressnote' not in form_data else form_data[b'addressnote'][0].decode('utf-8')
+                if not validateTextInput(addressnote, 'Address note', messages, max_length=30):
+                    listaddresses = False
+                    page_data['new_address'] = True
+                else:
+                    new_addr = swap_client.addSMSGAddress(addressnote=addressnote)
+                    messages.append(f'Created address {new_addr}')
+
+        if listaddresses is True:
+            smsgaddresses = swap_client.listAllSMSGAddresses()
+        network_addr = swap_client.network_addr
+
+        for addr in smsgaddresses:
+            addr['type'] = strMessageType(addr['type'])
+
+        template = env.get_template('smsgaddresses.html')
+        return bytes(template.render(
+            title=self.server.title,
+            h2=self.server.title,
+            messages=messages,
+            data=page_data,
+            form_id=os.urandom(8).hex(),
+            smsgaddresses=smsgaddresses,
+            network_addr=network_addr,
+        ), 'UTF-8')
+
     def page_shutdown(self, url_split, post_string):
         swap_client = self.server.swap_client
         swap_client.stopRunning()
@@ -976,6 +1049,7 @@ class HttpHandler(BaseHTTPRequestHandler):
                             'sentbids': js_sentbids,
                             'network': js_network,
                             'revokeoffer': js_revokeoffer,
+                            'smsgaddresses': js_smsgaddresses,
                             }.get(url_split[2], js_index)
                 return func(self, url_split, post_string, is_json)
             except Exception as ex:
@@ -1035,6 +1109,8 @@ class HttpHandler(BaseHTTPRequestHandler):
                     return self.page_bids(url_split, post_string, sent=True)
                 if url_split[1] == 'watched':
                     return self.page_watched(url_split, post_string)
+                if url_split[1] == 'smsgaddresses':
+                    return self.page_smsgaddresses(url_split, post_string)
                 if url_split[1] == 'shutdown':
                     return self.page_shutdown(url_split, post_string)
             return self.page_index(url_split)
