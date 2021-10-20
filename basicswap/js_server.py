@@ -129,6 +129,8 @@ def js_offers(self, url_split, post_string, is_json, sent=False):
         ci_from = self.server.swap_client.ci(o.coin_from)
         ci_to = self.server.swap_client.ci(o.coin_to)
         rv.append({
+            'addr_from': o.addr_from,
+            'addr_to': o.addr_to,
             'offer_id': o.offer_id.hex(),
             'created_at': o.created_at,
             'expire_at': o.expire_at,
@@ -136,7 +138,7 @@ def js_offers(self, url_split, post_string, is_json, sent=False):
             'coin_to': ci_to.coin_name(),
             'amount_from': ci_from.format_amount(o.amount_from),
             'amount_to': ci_to.format_amount((o.amount_from * o.rate) // ci_from.COIN()),
-            'rate': ci_to.format_amount(o.rate)
+            'rate': ci_to.format_amount(o.rate),
         })
 
     return bytes(json.dumps(rv), 'UTF-8')
@@ -259,8 +261,13 @@ def js_smsgaddresses(self, url_split, post_string, is_json):
             post_data = urllib.parse.parse_qs(post_string)
         if url_split[3] == 'new':
             addressnote = get_data_entry_or(post_data, 'addressnote', '')
-            new_addr = swap_client.addSMSGAddress(addressnote)
-            return bytes(json.dumps({'new_address': new_addr}), 'UTF-8')
+            new_addr, pubkey = swap_client.newSMSGAddress(addressnote)
+            return bytes(json.dumps({'new_address': new_addr, 'pubkey': pubkey}), 'UTF-8')
+        if url_split[3] == 'add':
+            addressnote = get_data_entry_or(post_data, 'addressnote', '')
+            pubkey_hex = get_data_entry(post_data, 'addresspubkey')
+            added_address = swap_client.addSMSGAddress(pubkey_hex, addressnote)
+            return bytes(json.dumps({'added_address': added_address, 'pubkey': pubkey_hex}), 'UTF-8')
         elif url_split[3] == 'edit':
             address = get_data_entry(post_data, 'address')
             activeind = int(get_data_entry(post_data, 'active_ind'))

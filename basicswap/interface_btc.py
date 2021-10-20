@@ -13,6 +13,7 @@ from io import BytesIO
 from basicswap.contrib.test_framework import segwit_addr
 
 from .util import (
+    b58encode,
     decodeScriptNum,
     getCompactSizeLen,
     SerialiseNumCompact,
@@ -250,6 +251,13 @@ class BTCInterface(CoinInterface):
         version = 0
         pkh = hash160(pk)
         return segwit_addr.encode(bech32_prefix, version, pkh)
+
+    def pubkey_to_address(self, pk):
+        assert(len(pk) == 33)
+        prefix = chainparams[self.coin_type()][self._network]['pubkey_address']
+        data = bytes((prefix,)) + hash160(pk)
+        checksum = hashlib.sha256(hashlib.sha256(data).digest()).digest()
+        return b58encode(data + checksum[0:4])
 
     def getNewSecretKey(self):
         return getSecretInt()

@@ -99,6 +99,7 @@ from .basicswap_util import (
     SEQUENCE_LOCK_TIME,
     ABS_LOCK_BLOCKS,
     ABS_LOCK_TIME,
+    AddressTypes,
     MessageTypes,
     SwapTypes,
     OfferStates,
@@ -117,6 +118,14 @@ from .basicswap_util import (
     getOfferProofOfFundsHash,
     getLastBidState,
     isActiveBidState)
+
+
+def validOfferStateToReceiveBid(offer_state):
+    if offer_state == OfferStates.OFFER_RECEIVED:
+        return True
+    if offer_state == OfferStates.OFFER_SENT:
+        return True
+    return False
 
 
 def threadPollChainState(swap_client, coin_type):
@@ -562,7 +571,11 @@ class BasicSwap(BaseApp):
                 session.execute('ALTER TABLE smsgaddresses ADD COLUMN active_ind INTEGER')
                 session.execute('ALTER TABLE smsgaddresses ADD COLUMN created_at INTEGER')
                 session.execute('ALTER TABLE smsgaddresses ADD COLUMN note VARCHAR')
+                session.execute('ALTER TABLE smsgaddresses ADD COLUMN pubkey VARCHAR')
                 session.execute('UPDATE smsgaddresses SET active_ind = 1, created_at = 1')
+
+                session.execute('ALTER TABLE offers ADD COLUMN addr_to VARCHAR')
+                session.execute(f'UPDATE offers SET addr_to = "{self.network_addr}"')
                 db_version += 1
 
             if current_version != db_version:
@@ -859,6 +872,11 @@ class BasicSwap(BaseApp):
         if valid_for_seconds > 24 * 60 * 60:
             raise ValueError('Bid TTL too high')
 
+    def getOfferAddressTo(self, extra_options):
+        if 'addr_send_to' in extra_options:
+            return extra_options['addr_send_to']
+        return self.network_addr
+
     def postOffer(self, coin_from, coin_to, amount, rate, min_bid_amount, swap_type,
                   lock_type=SEQUENCE_LOCK_TIME, lock_value=48 * 60 * 60, auto_accept_bids=False, addr_send_from=None, extra_options={}):
         # Offer to send offer.amount_from of coin_from in exchange for offer.amount_from * offer.rate of coin_to
@@ -881,6 +899,8 @@ class BasicSwap(BaseApp):
         self.validateOfferAmounts(coin_from_t, coin_to_t, amount, rate, min_bid_amount)
         self.validateOfferLockValue(coin_from_t, coin_to_t, lock_type, lock_value)
         self.validateOfferValidTime(swap_type, coin_from_t, coin_to_t, valid_for_seconds)
+
+        offer_addr_to = self.getOfferAddressTo(extra_options)
 
         self.mxDB.acquire()
         session = None
@@ -948,7 +968,7 @@ class BasicSwap(BaseApp):
             self.callrpc('smsgaddlocaladdress', [offer_addr])  # Enable receiving smsg
             options = {'decodehex': True, 'ttl_is_seconds': True}
             msg_valid = max(self.SMSG_SECONDS_IN_HOUR * 1, valid_for_seconds)
-            ro = self.callrpc('smsgsend', [offer_addr, self.network_addr, payload_hex, False, msg_valid, False, options])
+            ro = self.callrpc('smsgsend', [offer_addr, offer_addr_to, payload_hex, False, msg_valid, False, options])
             msg_id = ro['msgid']
 
             offer_id = bytes.fromhex(msg_id)
@@ -972,6 +992,7 @@ class BasicSwap(BaseApp):
                 lock_value=msg_buf.lock_value,
                 swap_type=msg_buf.swap_type,
 
+                addr_to=offer_addr_to,
                 addr_from=offer_addr,
                 created_at=offer_created_at,
                 expire_at=offer_created_at + msg_buf.time_valid,
@@ -987,7 +1008,7 @@ class BasicSwap(BaseApp):
             session.add(offer)
             session.add(SentOffer(offer_id=offer_id))
             if addr_send_from is None:
-                session.add(SmsgAddress(addr=offer_addr, use_type=MessageTypes.OFFER, active_ind=1, created_at=offer_created_at))
+                session.add(SmsgAddress(addr=offer_addr, use_type=AddressTypes.OFFER, active_ind=1, created_at=offer_created_at))
             session.commit()
 
         finally:
@@ -1542,7 +1563,7 @@ class BasicSwap(BaseApp):
                 session = scoped_session(self.session_factory)
                 self.saveBidInSession(bid_id, bid, session)
                 if addr_send_from is None:
-                    session.add(SmsgAddress(addr=bid_addr, use_type=MessageTypes.BID, active_ind=1, created_at=now))
+                    session.add(SmsgAddress(addr=bid_addr, use_type=AddressTypes.BID, active_ind=1, created_at=now))
                 session.commit()
             finally:
                 session.close()
@@ -1913,7 +1934,7 @@ class BasicSwap(BaseApp):
                 session = scoped_session(self.session_factory)
                 self.saveBidInSession(xmr_swap.bid_id, bid, session, xmr_swap)
                 if addr_send_from is None:
-                    session.add(SmsgAddress(addr=bid_addr, use_type=MessageTypes.BID, active_ind=1, created_at=bid_created_at))
+                    session.add(SmsgAddress(addr=bid_addr, use_type=AddressTypes.BID, active_ind=1, created_at=bid_created_at))
                 session.commit()
             finally:
                 session.close()
@@ -3376,8 +3397,6 @@ class BasicSwap(BaseApp):
             self.mxDB.release()
 
     def processOffer(self, msg):
-        assert(msg['to'] == self.network_addr), 'Offer received on wrong address'
-
         offer_bytes = bytes.fromhex(msg['hex'][2:-2])
         offer_data = OfferMessage()
         offer_data.ParseFromString(offer_bytes)
@@ -3419,6 +3438,14 @@ class BasicSwap(BaseApp):
 
         session = scoped_session(self.session_factory)
         try:
+            # Offers must be received on the public network_addr or manually created addresses
+            if msg['to'] != self.network_addr:
+                # Double check active_ind, shouldn't be possible to receive message if not active
+                query_str = 'SELECT COUNT(addr_id) FROM smsgaddresses WHERE addr = "{}" AND use_type = {} AND active_ind = 1'.format(msg['to'], AddressTypes.RECV_OFFER)
+                rv = session.execute(query_str).first()
+                if rv[0] < 1:
+                    raise ValueError('Offer received on incorrect address')
+
             # Check for sent
             existing_offer = self.getOffer(offer_id)
             if existing_offer is None:
@@ -3436,6 +3463,7 @@ class BasicSwap(BaseApp):
                     lock_value=offer_data.lock_value,
                     swap_type=offer_data.swap_type,
 
+                    addr_to=msg['to'],
                     addr_from=msg['from'],
                     created_at=msg['sent'],
                     expire_at=msg['sent'] + offer_data.time_valid,
@@ -3808,7 +3836,8 @@ class BasicSwap(BaseApp):
         ci_from = self.ci(offer.coin_from)
         ci_to = self.ci(offer.coin_to)
 
-        assert(offer.state == OfferStates.OFFER_RECEIVED), 'Bad offer state'
+        if not validOfferStateToReceiveBid(offer.state):
+            raise ValueError('Bad offer state')
         assert(msg['to'] == offer.addr_from), 'Received on incorrect address'
         assert(now <= offer.expire_at), 'Offer expired'
         assert(bid_data.amount >= offer.min_bid_amount), 'Bid amount below minimum'
@@ -4307,9 +4336,8 @@ class BasicSwap(BaseApp):
         kbsf = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, 2, for_ed25519)
         vkbs = ci_to.sumKeys(kbsl, kbsf)
 
-        address_to = ci_to.getMainWalletAddress()
-
         try:
+            address_to = ci_to.getMainWalletAddress()
             txid = ci_to.spendBLockTx(address_to, xmr_swap.vkbv, vkbs, bid.amount_to, xmr_offer.b_fee_rate, xmr_swap.b_restore_height)
             self.log.debug('Submitted lock B refund txn %s to %s chain for bid %s', txid.hex(), ci_to.coin_name(), bid_id.hex())
             self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_B_REFUND_TX_PUBLISHED, '', session)
@@ -5054,7 +5082,7 @@ class BasicSwap(BaseApp):
         try:
             session = scoped_session(self.session_factory)
             rv = []
-            query_str = f'SELECT addr_id, addr, use_type, active_ind, created_at, note FROM smsgaddresses {filters} ORDER BY created_at'
+            query_str = f'SELECT addr_id, addr, use_type, active_ind, created_at, note, pubkey FROM smsgaddresses {filters} ORDER BY created_at'
 
             q = session.execute(query_str)
             for row in q:
@@ -5065,6 +5093,7 @@ class BasicSwap(BaseApp):
                     'active_ind': row[3],
                     'created_at': row[4],
                     'note': row[5],
+                    'pubkey': row[6],
                 })
             return rv
         finally:
@@ -5072,21 +5101,36 @@ class BasicSwap(BaseApp):
             session.remove()
             self.mxDB.release()
 
-        #listening_keys = self.callcoinrpc(Coins.PART, 'smsglocalkeys', [])
-        return []
-
-    def addSMSGAddress(self, addressnote=None):
+    def newSMSGAddress(self, addressnote=None):
         # TODO: smsg addresses should be generated from a unique chain
         self.mxDB.acquire()
         try:
             session = scoped_session(self.session_factory)
             now = int(time.time())
             new_addr = self.callrpc('getnewaddress')
+            addr_info = self.callrpc('getaddressinfo', [new_addr])
             self.callrpc('smsgaddlocaladdress', [new_addr])  # Enable receiving smsgs
 
-            session.add(SmsgAddress(addr=new_addr, use_type=MessageTypes.OFFER, active_ind=1, created_at=now, note=addressnote))
+            session.add(SmsgAddress(addr=new_addr, use_type=AddressTypes.RECV_OFFER, active_ind=1, created_at=now, note=addressnote, pubkey=addr_info['pubkey']))
             session.commit()
-            return new_addr
+            return new_addr, addr_info['pubkey']
+        finally:
+            session.close()
+            session.remove()
+            self.mxDB.release()
+
+    def addSMSGAddress(self, pubkey_hex, addressnote=None):
+        self.mxDB.acquire()
+        try:
+            session = scoped_session(self.session_factory)
+            now = int(time.time())
+            ci = self.ci(Coins.PART)
+            add_addr = ci.pubkey_to_address(bytes.fromhex(pubkey_hex))
+            self.callrpc('smsgaddaddress', [add_addr, pubkey_hex])
+
+            session.add(SmsgAddress(addr=add_addr, use_type=AddressTypes.SEND_OFFER, active_ind=1, created_at=now, note=addressnote, pubkey=pubkey_hex))
+            session.commit()
+            return add_addr
         finally:
             session.close()
             session.remove()
@@ -5107,7 +5151,15 @@ class BasicSwap(BaseApp):
             self.mxDB.release()
 
     def listSmsgAddresses(self, use_type_str):
-        use_type = MessageTypes.OFFER if use_type_str == 'offer' else MessageTypes.BID
+        if use_type_str == 'offer_send_from':
+            use_type = AddressTypes.OFFER
+        elif use_type_str == 'offer_send_to':
+            use_type = AddressTypes.SEND_OFFER
+        elif use_type_str == 'bid':
+            use_type = AddressTypes.BID
+        else:
+            raise ValueError('Unknown address type')
+
         self.mxDB.acquire()
         try:
             session = scoped_session(self.session_factory)

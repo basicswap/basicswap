@@ -466,8 +466,9 @@ class Test(unittest.TestCase):
         end_xmr = float(js_0_end['6']['balance']) + float(js_0_end['6']['unconfirmed'])
         assert(end_xmr > 10.9 and end_xmr < 11.0)
 
-
     def test_011_smsgaddresses(self):
+        logging.info('---------- Test address management and private offers')
+        swap_clients = self.swap_clients
         js_1 = json.loads(urlopen('http://127.0.0.1:1801/json/smsgaddresses').read())
 
         post_json = {
@@ -475,6 +476,7 @@ class Test(unittest.TestCase):
         }
         json_rv = json.loads(post_json_req('http://127.0.0.1:1801/json/smsgaddresses/new', post_json))
         new_address = json_rv['new_address']
+        new_address_pk = json_rv['pubkey']
 
         js_2 = json.loads(urlopen('http://127.0.0.1:1801/json/smsgaddresses').read())
         assert(len(js_2) == len(js_1) + 1)
@@ -533,6 +535,33 @@ class Test(unittest.TestCase):
                 assert(key['receive'] == '1')
                 found = True
         assert(found is True)
+
+        post_json = {
+            'addresspubkey': new_address_pk,
+            'addressnote': 'testing_add_addr',
+        }
+        json_rv = json.loads(post_json_req('http://127.0.0.1:1800/json/smsgaddresses/add', post_json))
+        assert(json_rv['added_address'] == new_address)
+
+        post_json = {
+            'addr_to': new_address,
+            'addr_from': -1,
+            'coin_from': 1,
+            'coin_to': 6,
+            'amt_from': 1,
+            'amt_to': 1,
+            'lockhrs': 24,
+            'autoaccept': True}
+        rv = json.loads(post_json_req('http://127.0.0.1:1800/json/offers/new', post_json))
+        offer_id_hex = rv['offer_id']
+
+        wait_for_offer(test_delay_event, swap_clients[1], bytes.fromhex(offer_id_hex))
+
+        rv = json.loads(urlopen(f'http://127.0.0.1:1801/json/offers/{offer_id_hex}').read())
+        assert(rv[0]['addr_to'] == new_address)
+
+        rv = json.loads(urlopen(f'http://127.0.0.1:1800/json/offers/{offer_id_hex}').read())
+        assert(rv[0]['addr_to'] == new_address)
 
     def test_02_leader_recover_a_lock_tx(self):
         logging.info('---------- Test PART to XMR leader recovers coin a lock tx')

@@ -38,6 +38,13 @@ class MessageTypes(IntEnum):
     OFFER_REVOKE = auto()
 
 
+class AddressTypes(IntEnum):
+    OFFER = auto()
+    BID = auto()
+    RECV_OFFER = auto()
+    SEND_OFFER = auto()
+
+
 class SwapTypes(IntEnum):
     SELLER_FIRST = auto()
     BUYER_FIRST = auto()
@@ -239,11 +246,15 @@ def strTxType(tx_type):
     return 'Unknown'
 
 
-def strMessageType(msg_type):
-    if msg_type == MessageTypes.OFFER:
-        return 'Offers'
-    if msg_type == MessageTypes.BID:
-        return 'Bids'
+def strAddressType(addr_type):
+    if addr_type == AddressTypes.OFFER:
+        return 'Offer'
+    if addr_type == AddressTypes.BID:
+        return 'Bid'
+    if addr_type == AddressTypes.RECV_OFFER:
+        return 'Offer recv'
+    if addr_type == AddressTypes.SEND_OFFER:
+        return 'Offer send'
     return 'Unknown'
 
 

@@ -57,6 +57,7 @@ class Offer(Base):
     secret_hash = sa.Column(sa.LargeBinary)
 
     addr_from = sa.Column(sa.String)
+    addr_to = sa.Column(sa.String)
     created_at = sa.Column(sa.BigInteger)
     expire_at = sa.Column(sa.BigInteger)
     was_sent = sa.Column(sa.Boolean)
@@ -218,6 +219,7 @@ class SmsgAddress(Base):
     active_ind = sa.Column(sa.Integer)
     created_at = sa.Column(sa.BigInteger)
     addr = sa.Column(sa.String, unique=True)
+    pubkey = sa.Column(sa.String)
     use_type = sa.Column(sa.Integer)
     note = sa.Column(sa.String)
 

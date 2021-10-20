@@ -14,6 +14,7 @@
 
 <br/><h4>Edit Address {{ data.addr_data.addr }}</h4>
 <table>
+<tr><td>Pubkey</td><td>{{ data.addr_data.pubkey }}</td></tr>
 <tr><td>Active</td><td><select name="active_ind">
 <option value="1"{% if data.addr_data.active_ind==1 %} selected{% endif %}>True</option>
 <option value="0"{% if data.addr_data.active_ind==0 %} selected{% endif %}>False</option>
@@ -23,11 +24,19 @@
 <tr><td><input type="submit" name="saveaddr" value="Save Address"><input type="submit" name="cancel" value="Cancel"></td></tr>
 </table>
 {% elif data.new_address %}
-<br/><h4>New Address</h4>
+<br/><h4>New Receiving Address</h4>
 <table>
 <tr><td>Note</td><td><input name="addressnote" type="text" value="" maxlength="30"></td></tr>
 
 <tr><td><input type="submit" name="createnewaddr" value="Create Address"><input type="submit" name="cancel" value="Cancel"></td></tr>
+</table>
+{% elif data.new_send_address %}
+<br/><h4>Add Sending Address</h4>
+<table>
+<tr><td>Pubkey</td><td><input name="addresspubkey" type="text" value="" maxlength="66"></td></tr>
+<tr><td>Note</td><td><input name="addressnote" type="text" value="" maxlength="30"></td></tr>
+
+<tr><td><input type="submit" name="createnewsendaddr" value="Add Address"><input type="submit" name="cancel" value="Cancel"></td></tr>
 </table>
 {% else %}
 <table>
@@ -39,6 +48,7 @@
 </table>
 
 <input type="submit" name="shownewaddr" value="New Address">
+<input type="submit" name="showaddaddr" value="Add Sending Address">
 {% endif %}
 <input type="hidden" name="formid" value="{{ form_id }}">
 </form>

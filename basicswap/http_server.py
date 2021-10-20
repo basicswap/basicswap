@@ -27,7 +27,7 @@ from .basicswap_util import (
     strOfferState,
     strBidState,
     strTxState,
-    strMessageType,
+    strAddressType,
     getLockName,
     SEQUENCE_LOCK_TIME,
     ABS_LOCK_TIME,
@@ -57,6 +57,12 @@ from .ui import (
 
 env = Environment(loader=PackageLoader('basicswap', 'templates'))
 env.filters['formatts'] = format_timestamp
+
+
+def value_or_none(v):
+    if v == -1 or v == '-1':
+        return None
+    return v
 
 
 def getCoinName(c):
@@ -434,9 +440,15 @@ class HttpHandler(BaseHTTPRequestHandler):
         errors = []
         parsed_data = {}
 
+        if have_data_entry(form_data, 'addr_to'):
+            page_data['addr_to'] = get_data_entry(form_data, 'addr_to')
+            addr_to = value_or_none(page_data['addr_to'])
+            if addr_to is not None:
+                parsed_data['addr_to'] = addr_to
+
         if have_data_entry(form_data, 'addr_from'):
             page_data['addr_from'] = get_data_entry(form_data, 'addr_from')
-            parsed_data['addr_from'] = None if page_data['addr_from'] == '-1' else page_data['addr_from']
+            parsed_data['addr_from'] = value_or_none(page_data['addr_from'])
         else:
             parsed_data['addr_from'] = None
 
@@ -586,6 +598,9 @@ class HttpHandler(BaseHTTPRequestHandler):
         if 'valid_for_seconds' in parsed_data:
             extra_options['valid_for_seconds'] = parsed_data['valid_for_seconds']
 
+        if 'addr_to' in parsed_data:
+            extra_options['addr_send_to'] = parsed_data['addr_to']
+
         offer_id = swap_client.postOffer(
             parsed_data['coin_from'],
             parsed_data['coin_to'],
@@ -613,6 +628,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         messages = []
         page_data = {
             # Set defaults
+            'addr_to': -1,
             'fee_from_conf': 2,
             'fee_to_conf': 2,
             'validhrs': 1,
@@ -649,7 +665,8 @@ class HttpHandler(BaseHTTPRequestHandler):
             h2=self.server.title,
             messages=messages,
             coins=listAvailableCoins(swap_client),
-            addrs=swap_client.listSmsgAddresses('offer'),
+            addrs=swap_client.listSmsgAddresses('offer_send_from'),
+            addrs_to=swap_client.listSmsgAddresses('offer_send_to'),
             data=page_data,
             form_id=os.urandom(8).hex(),
         ), 'UTF-8')
@@ -714,6 +731,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             'lock_type': getLockName(offer.lock_type),
             'lock_value': offer.lock_value,
             'addr_from': offer.addr_from,
+            'addr_to': 'Public' if offer.addr_to == swap_client.network_addr else offer.addr_to,
             'created_at': offer.created_at,
             'expired_at': offer.expire_at,
             'sent': 'True' if offer.was_sent else 'False',
@@ -800,7 +818,8 @@ class HttpHandler(BaseHTTPRequestHandler):
                 ci_from.coin_name(), ci_to.coin_name(),
                 ci_from.format_amount(o.amount_from),
                 ci_to.format_amount((o.amount_from * o.rate) // ci_from.COIN()),
-                ci_to.format_amount(o.rate)))
+                ci_to.format_amount(o.rate),
+                'Public' if o.addr_to == swap_client.network_addr else o.addr_to))
 
         template = env.get_template('offers.html')
         return bytes(template.render(
@@ -976,21 +995,34 @@ class HttpHandler(BaseHTTPRequestHandler):
             elif b'shownewaddr' in form_data:
                 listaddresses = False
                 page_data['new_address'] = True
+            elif b'showaddaddr' in form_data:
+                listaddresses = False
+                page_data['new_send_address'] = True
             elif b'createnewaddr' in form_data:
                 addressnote = '' if b'addressnote' not in form_data else form_data[b'addressnote'][0].decode('utf-8')
                 if not validateTextInput(addressnote, 'Address note', messages, max_length=30):
                     listaddresses = False
                     page_data['new_address'] = True
                 else:
-                    new_addr = swap_client.addSMSGAddress(addressnote=addressnote)
-                    messages.append(f'Created address {new_addr}')
+                    new_addr, pubkey = swap_client.newSMSGAddress(addressnote=addressnote)
+                    messages.append(f'Created address {new_addr}, pubkey {pubkey}')
+            elif b'createnewsendaddr' in form_data:
+                pubkey_hex = form_data[b'addresspubkey'][0].decode('utf-8')
+                addressnote = '' if b'addressnote' not in form_data else form_data[b'addressnote'][0].decode('utf-8')
+                if not validateTextInput(addressnote, 'Address note', messages, max_length=30) or \
+                   not validateTextInput(pubkey_hex, 'Pubkey', messages, max_length=66):
+                    listaddresses = False
+                    page_data['new_send_address'] = True
+                else:
+                    new_addr = swap_client.addSMSGAddress(pubkey_hex, addressnote=addressnote)
+                    messages.append(f'Added address {new_addr}')
 
         if listaddresses is True:
             smsgaddresses = swap_client.listAllSMSGAddresses()
         network_addr = swap_client.network_addr
 
         for addr in smsgaddresses:
-            addr['type'] = strMessageType(addr['type'])
+            addr['type'] = strAddressType(addr['type'])
 
         template = env.get_template('smsgaddresses.html')
         return bytes(template.render(

@@ -8,6 +8,12 @@
 <form method="post">
 
 <table>
+<tr><td>Send To</td><td><select name="addr_to">
+<option{% if data.addr_to=="-1" %} selected{% endif %} value="-1">-- Public Network --</option>
+{% for a in addrs_to %}
+<option{% if data.addr_to==a %} selected{% endif %} value="{{ a }}">{{ a }}</option>
+{% endfor %}
+</select></td></tr>
 <tr><td>Send From Address</td><td><select name="addr_from">
 {% for a in addrs %}
 <option{% if data.addr_from==a %} selected{% endif %} value="{{ a }}">{{ a }}</option>

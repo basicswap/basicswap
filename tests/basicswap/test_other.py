@@ -21,7 +21,7 @@ from coincurve.ecdsaotves import (
 from coincurve.keys import (
     PrivateKey)
 
-from basicswap.ecc_util import i2b
+from basicswap.ecc_util import i2b, h2b
 from basicswap.interface_btc import BTCInterface
 from basicswap.interface_xmr import XMRInterface
 
@@ -205,6 +205,13 @@ class Test(unittest.TestCase):
         sig = ci.signCompact(vk, 'test signing message')
         assert(len(sig) == 64)
         ci.verifyCompact(pk, 'test signing message', sig)
+
+    def test_pubkey_to_address(self):
+        coin_settings = {'rpcport': 0, 'rpcauth': 'none', 'blocks_confirmed': 1, 'conf_target': 1}
+        ci = BTCInterface(coin_settings, 'regtest')
+        pk = h2b('02c26a344e7d21bcc6f291532679559f2fd234c881271ff98714855edc753763a6')
+        addr = ci.pubkey_to_address(pk)
+        assert(addr == 'mj6SdSxmWRmdDqR5R3FfZmRiLmQfQAsLE8')
 
     def test_dleag(self):
         coin_settings = {'rpcport': 0, 'walletrpcport': 0, 'walletrpcauth': 'none', 'blocks_confirmed': 1, 'conf_target': 1}
