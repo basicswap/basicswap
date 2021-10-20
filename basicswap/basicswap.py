@@ -1230,12 +1230,15 @@ class BasicSwap(BaseApp):
         self.setStringKV(key_str, addr)
         return addr
 
+    def getCachedMainWalletAddress(self, ci):
+        return self.getStringKV('main_wallet_addr_' + ci.coin_name().lower())
+
     def checkWalletSeed(self, c):
         ci = self.ci(c)
         if c == Coins.PART:
             return True  # TODO
         if c == Coins.XMR:
-            expect_address = self.getStringKV('main_wallet_addr_' + ci.coin_name().lower())
+            expect_address = self.getCachedMainWalletAddress(ci)
             if expect_address is None:
                 self.log.warning('Can\'t find expected main wallet address for coin {}'.format(ci.coin_name()))
                 return False
@@ -4281,7 +4284,7 @@ class BasicSwap(BaseApp):
         vkbs = ci_to.sumKeys(kbsl, kbsf)
 
         try:
-            address_to = ci_to.getMainWalletAddress()  # TODO: cache main wallet address to reduce network traffic
+            address_to = self.getCachedMainWalletAddress(ci_to)
             txid = ci_to.spendBLockTx(address_to, xmr_swap.vkbv, vkbs, bid.amount_to, xmr_offer.b_fee_rate, xmr_swap.b_restore_height)
             self.log.debug('Submitted lock B spend txn %s to %s chain for bid %s', txid.hex(), ci_to.coin_name(), bid_id.hex())
             self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_B_SPEND_TX_PUBLISHED, '', session)
@@ -4337,7 +4340,7 @@ class BasicSwap(BaseApp):
         vkbs = ci_to.sumKeys(kbsl, kbsf)
 
         try:
-            address_to = ci_to.getMainWalletAddress()
+            address_to = self.getCachedMainWalletAddress(ci_to)
             txid = ci_to.spendBLockTx(address_to, xmr_swap.vkbv, vkbs, bid.amount_to, xmr_offer.b_fee_rate, xmr_swap.b_restore_height)
             self.log.debug('Submitted lock B refund txn %s to %s chain for bid %s', txid.hex(), ci_to.coin_name(), bid_id.hex())
             self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_B_REFUND_TX_PUBLISHED, '', session)

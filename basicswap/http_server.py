@@ -89,7 +89,7 @@ def validateTextInput(text, name, messages, max_length=None):
     if max_length is not None and len(text) > max_length:
         messages.append(f'Error: {name} is too long')
         return False
-    if len(text) > 0 and text.isalnum() is False:
+    if len(text) > 0 and all(c.isalnum() or c.isspace() for c in text) is False:
         messages.append(f'Error: {name} must consist of only letters and digits')
         return False
     return True

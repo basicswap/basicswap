@@ -371,6 +371,9 @@ class Test(unittest.TestCase):
                 sc.setDaemonPID(Coins.BTC, cls.btc_daemons[i].pid)
                 sc.setDaemonPID(Coins.PART, cls.part_daemons[i].pid)
                 sc.start()
+                # Set XMR main wallet address
+                xmr_ci = sc.ci(Coins.XMR)
+                sc.setStringKV('main_wallet_addr_' + xmr_ci.coin_name().lower(), xmr_ci.getMainWalletAddress())
                 cls.swap_clients.append(sc)
 
                 t = HttpThread(cls.swap_clients[i].fp, TEST_HTTP_HOST, TEST_HTTP_PORT + i, False, cls.swap_clients[i])
@@ -520,7 +523,7 @@ class Test(unittest.TestCase):
                 found = True
         assert(found is False)
 
-        # Reenable
+        # Re-enable
         post_json = {
             'address': new_address,
             'active_ind': '1',
