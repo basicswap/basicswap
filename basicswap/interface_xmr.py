@@ -23,6 +23,7 @@ from coincurve.dleag import (
     dleag_prove)
 
 from .util import (
+    ensure,
     dumpj,
     make_int,
     format_amount)
@@ -71,7 +72,7 @@ class XMRInterface(CoinInterface):
         self._log = self._sc.log if self._sc and self._sc.log else logging
 
     def setFeePriority(self, new_priority):
-        assert(new_priority >= 0 and new_priority < 4), 'Invalid fee_priority value'
+        ensure(new_priority >= 0 and new_priority < 4, 'Invalid fee_priority value')
         self._fee_priority = new_priority
 
     def setWalletFilename(self, wallet_filename):

@@ -47,6 +47,7 @@ from .util import (
     make_int,
     getP2SHScriptForHash,
     getP2WSH,
+    ensure,
 )
 from .chainparams import (
     chainparams,
@@ -118,6 +119,8 @@ from .basicswap_util import (
     getOfferProofOfFundsHash,
     getLastBidState,
     isActiveBidState)
+
+non_script_type_coins = (Coins.XMR, Coins.PART_ANON)
 
 
 def validOfferStateToReceiveBid(offer_state):
@@ -692,7 +695,8 @@ class BasicSwap(BaseApp):
         self.log.debug('Loading active bid %s', bid.bid_id.hex())
 
         offer = session.query(Offer).filter_by(offer_id=bid.offer_id).first()
-        assert(offer), 'Offer not found'
+        if not offer:
+            raise ValueError('Offer not found')
 
         if offer.swap_type == SwapTypes.XMR_SWAP:
             xmr_swap = session.query(XmrSwap).filter_by(bid_id=bid.bid_id).first()
@@ -804,7 +808,7 @@ class BasicSwap(BaseApp):
             self.log.info('Importing network key to SMSG')
             self.callrpc('smsgimportprivkey', [self.network_key, 'basicswap offers'])
             ro = self.callrpc('smsglocalkeys', ['anon', '-', self.network_addr])
-            assert(ro['result'] == 'Success.'), 'smsglocalkeys failed'
+            ensure(ro['result'] == 'Success.', 'smsglocalkeys failed')
 
         # TODO: Ensure smsg is enabled for the active wallet.
 
@@ -832,29 +836,29 @@ class BasicSwap(BaseApp):
     def validateOfferAmounts(self, coin_from, coin_to, amount, rate, min_bid_amount):
         ci_from = self.ci(coin_from)
         ci_to = self.ci(coin_to)
-        assert(amount >= min_bid_amount), 'amount < min_bid_amount'
-        assert(amount > ci_from.min_amount()), 'From amount below min value for chain'
-        assert(amount < ci_from.max_amount()), 'From amount above max value for chain'
+        ensure(amount >= min_bid_amount, 'amount < min_bid_amount')
+        ensure(amount > ci_from.min_amount(), 'From amount below min value for chain')
+        ensure(amount < ci_from.max_amount(), 'From amount above max value for chain')
 
         amount_to = int((amount * rate) // ci_from.COIN())
-        assert(amount_to > ci_to.min_amount()), 'To amount below min value for chain'
-        assert(amount_to < ci_to.max_amount()), 'To amount above max value for chain'
+        ensure(amount_to > ci_to.min_amount(), 'To amount below min value for chain')
+        ensure(amount_to < ci_to.max_amount(), 'To amount above max value for chain')
 
     def validateOfferLockValue(self, coin_from, coin_to, lock_type, lock_value):
         if lock_type == OfferMessage.SEQUENCE_LOCK_TIME:
-            assert(lock_value >= self.min_sequence_lock_seconds and lock_value <= self.max_sequence_lock_seconds), 'Invalid lock_value time'
-            assert(self.coin_clients[coin_from]['use_csv'] and self.coin_clients[coin_to]['use_csv']), 'Both coins need CSV activated.'
+            ensure(lock_value >= self.min_sequence_lock_seconds and lock_value <= self.max_sequence_lock_seconds, 'Invalid lock_value time')
+            ensure(self.coin_clients[coin_from]['use_csv'] and self.coin_clients[coin_to]['use_csv'], 'Both coins need CSV activated.')
         elif lock_type == OfferMessage.SEQUENCE_LOCK_BLOCKS:
-            assert(lock_value >= 5 and lock_value <= 1000), 'Invalid lock_value blocks'
-            assert(self.coin_clients[coin_from]['use_csv'] and self.coin_clients[coin_to]['use_csv']), 'Both coins need CSV activated.'
+            ensure(lock_value >= 5 and lock_value <= 1000, 'Invalid lock_value blocks')
+            ensure(self.coin_clients[coin_from]['use_csv'] and self.coin_clients[coin_to]['use_csv'], 'Both coins need CSV activated.')
         elif lock_type == ABS_LOCK_TIME:
             # TODO: range?
-            assert(not self.coin_clients[coin_from]['use_csv'] or not self.coin_clients[coin_to]['use_csv']), 'Should use CSV.'
-            assert(lock_value >= 4 * 60 * 60 and lock_value <= 96 * 60 * 60), 'Invalid lock_value time'
+            ensure(not self.coin_clients[coin_from]['use_csv'] or not self.coin_clients[coin_to]['use_csv'], 'Should use CSV.')
+            ensure(lock_value >= 4 * 60 * 60 and lock_value <= 96 * 60 * 60, 'Invalid lock_value time')
         elif lock_type == ABS_LOCK_BLOCKS:
             # TODO: range?
-            assert(not self.coin_clients[coin_from]['use_csv'] or not self.coin_clients[coin_to]['use_csv']), 'Should use CSV.'
-            assert(lock_value >= 10 and lock_value <= 1000), 'Invalid lock_value blocks'
+            ensure(not self.coin_clients[coin_from]['use_csv'] or not self.coin_clients[coin_to]['use_csv'], 'Should use CSV.')
+            ensure(lock_value >= 10 and lock_value <= 1000, 'Invalid lock_value blocks')
         else:
             raise ValueError('Unknown locktype')
 
@@ -881,7 +885,7 @@ class BasicSwap(BaseApp):
                   lock_type=SEQUENCE_LOCK_TIME, lock_value=48 * 60 * 60, auto_accept_bids=False, addr_send_from=None, extra_options={}):
         # Offer to send offer.amount_from of coin_from in exchange for offer.amount_from * offer.rate of coin_to
 
-        assert(coin_from != coin_to), 'coin_from == coin_to'
+        ensure(coin_from != coin_to, 'coin_from == coin_to')
         try:
             coin_from_t = Coins(coin_from)
             ci_from = self.ci(coin_from_t)
@@ -960,7 +964,7 @@ class BasicSwap(BaseApp):
 
             proof_of_funds_hash = getOfferProofOfFundsHash(msg_buf, offer_addr)
             proof_addr, proof_sig = self.getProofOfFunds(coin_from_t, int(amount), proof_of_funds_hash)
-            # TODO: For now proof_of_funds is just a client side checkm, may need to be sent with offers in future however.
+            # TODO: For now proof_of_funds is just a client side check, may need to be sent with offers in future however.
 
             offer_bytes = msg_buf.SerializeToString()
             payload_hex = str.format('{:02x}', MessageTypes.OFFER) + offer_bytes.hex()
@@ -1384,7 +1388,7 @@ class BasicSwap(BaseApp):
                 sign_for_addr = addr
                 break
 
-        assert(sign_for_addr is not None), 'Could not find address with enough funds for proof'
+        ensure(sign_for_addr is not None, 'Could not find address with enough funds for proof')
 
         self.log.debug('sign_for_addr %s', sign_for_addr)
         if self.coin_clients[coin_type]['use_segwit']:
@@ -1496,8 +1500,8 @@ class BasicSwap(BaseApp):
         self.log.debug('postBid %s', offer_id.hex())
 
         offer = self.getOffer(offer_id)
-        assert(offer), 'Offer not found: {}.'.format(offer_id.hex())
-        assert(offer.expire_at > int(time.time())), 'Offer has expired'
+        ensure(offer, 'Offer not found: {}.'.format(offer_id.hex()))
+        ensure(offer.expire_at > int(time.time()), 'Offer has expired')
 
         if offer.swap_type == SwapTypes.XMR_SWAP:
             return self.postXmrBid(offer_id, amount, addr_send_from, extra_options)
@@ -1718,13 +1722,13 @@ class BasicSwap(BaseApp):
         self.log.info('Accepting bid %s', bid_id.hex())
 
         bid, offer = self.getBidAndOffer(bid_id)
-        assert(bid), 'Bid not found'
-        assert(offer), 'Offer not found'
+        ensure(bid, 'Bid not found')
+        ensure(offer, 'Offer not found')
 
         # Ensure bid is still valid
         now = int(time.time())
-        assert(bid.expire_at > now), 'Bid expired'
-        assert(bid.state == BidStates.BID_RECEIVED), 'Wrong bid state: {}'.format(str(BidStates(bid.state)))
+        ensure(bid.expire_at > now, 'Bid expired')
+        ensure(bid.state == BidStates.BID_RECEIVED, 'Wrong bid state: {}'.format(str(BidStates(bid.state))))
 
         if offer.swap_type == SwapTypes.XMR_SWAP:
             return self.acceptXmrBid(bid_id)
@@ -1819,9 +1823,9 @@ class BasicSwap(BaseApp):
         try:
             offer, xmr_offer = self.getXmrOffer(offer_id)
 
-            assert(offer), 'Offer not found: {}.'.format(offer_id.hex())
-            assert(xmr_offer), 'XMR offer not found: {}.'.format(offer_id.hex())
-            assert(offer.expire_at > int(time.time())), 'Offer has expired'
+            ensure(offer, 'Offer not found: {}.'.format(offer_id.hex()))
+            ensure(xmr_offer, 'XMR offer not found: {}.'.format(offer_id.hex()))
+            ensure(offer.expire_at > int(time.time()), 'Offer has expired')
 
             valid_for_seconds = extra_options.get('valid_for_seconds', 60 * 10)
             self.validateBidValidTime(offer.swap_type, offer.coin_from, offer.coin_to, valid_for_seconds)
@@ -1956,20 +1960,20 @@ class BasicSwap(BaseApp):
         self.mxDB.acquire()
         try:
             bid, xmr_swap = self.getXmrBid(bid_id)
-            assert(bid), 'Bid not found: {}.'.format(bid_id.hex())
-            assert(xmr_swap), 'XMR swap not found: {}.'.format(bid_id.hex())
-            assert(bid.expire_at > now), 'Bid expired'
+            ensure(bid, 'Bid not found: {}.'.format(bid_id.hex()))
+            ensure(xmr_swap, 'XMR swap not found: {}.'.format(bid_id.hex()))
+            ensure(bid.expire_at > now, 'Bid expired')
 
             last_bid_state = bid.state
             if last_bid_state == BidStates.SWAP_DELAYING:
                 last_bid_state = getLastBidState(bid.states)
 
-            assert(last_bid_state == BidStates.BID_RECEIVED), 'Wrong bid state: {}'.format(str(BidStates(last_bid_state)))
+            ensure(last_bid_state == BidStates.BID_RECEIVED, 'Wrong bid state: {}'.format(str(BidStates(last_bid_state))))
 
             offer, xmr_offer = self.getXmrOffer(bid.offer_id)
-            assert(offer), 'Offer not found: {}.'.format(bid.offer_id.hex())
-            assert(xmr_offer), 'XMR offer not found: {}.'.format(bid.offer_id.hex())
-            assert(offer.expire_at > now), 'Offer has expired'
+            ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
+            ensure(xmr_offer, 'XMR offer not found: {}.'.format(bid.offer_id.hex()))
+            ensure(offer.expire_at > now, 'Offer has expired')
 
             coin_from = Coins(offer.coin_from)
             coin_to = Coins(offer.coin_to)
@@ -2020,7 +2024,7 @@ class BasicSwap(BaseApp):
 
             xmr_swap.al_lock_refund_tx_sig = ci_from.signTx(kal, xmr_swap.a_lock_refund_tx, 0, xmr_swap.a_lock_tx_script, bid.amount)
             v = ci_from.verifyTxSig(xmr_swap.a_lock_refund_tx, xmr_swap.al_lock_refund_tx_sig, xmr_swap.pkal, 0, xmr_swap.a_lock_tx_script, bid.amount)
-            assert(v)
+            ensure(v, 'Invalid coin A lock tx refund tx leader sig')
 
             pkh_refund_to = ci_from.decodeAddress(self.getReceiveAddressForCoin(coin_from))
             xmr_swap.a_lock_refund_spend_tx = ci_from.createScriptLockRefundSpendTx(
@@ -2095,9 +2099,9 @@ class BasicSwap(BaseApp):
         try:
             session = scoped_session(self.session_factory)
             bid = session.query(Bid).filter_by(bid_id=bid_id).first()
-            assert(bid), 'Bid not found'
+            ensure(bid, 'Bid not found')
             offer = session.query(Offer).filter_by(offer_id=bid.offer_id).first()
-            assert(offer), 'Offer not found'
+            ensure(offer, 'Offer not found')
 
             # Mark bid as abandoned, no further processing will be done
             bid.setState(BidStates.BID_ABANDONED)
@@ -2174,7 +2178,7 @@ class BasicSwap(BaseApp):
                     cblock_hash = prev_block['previousblockhash']
                     cblock_height = prev_block['height']
 
-                assert(prev_block['time'] <= initiate_tx_block_time), 'Block not found for lock height'
+                ensure(prev_block['time'] <= initiate_tx_block_time, 'Block not found for lock height')
 
                 self.log.debug('Setting lock value from height of block %s %s', coin_to, cblock_hash)
                 contract_lock_value = cblock_height + lock_value
@@ -2280,7 +2284,7 @@ class BasicSwap(BaseApp):
         secret = bid.recovered_secret
         if secret is None:
             secret = self.getContractSecret(bid_date, bid.contract_count)
-        assert(len(secret) == 32), 'Bad secret length'
+        ensure(len(secret) == 32, 'Bad secret length')
 
         if self.coin_clients[coin_type]['connection_type'] != 'rpc':
             return None
@@ -2296,7 +2300,7 @@ class BasicSwap(BaseApp):
         self.log.debug('Redeem tx fee %s, rate %s', ci.format_amount(tx_fee, conv_int=True, r=1), str(fee_rate))
 
         amount_out = prev_amount - ci.make_int(tx_fee, r=1)
-        assert(amount_out > 0), 'Amount out <= 0'
+        ensure(amount_out > 0, 'Amount out <= 0')
 
         if addr_redeem_out is None:
             addr_redeem_out = self.getReceiveAddressFromPool(coin_type, bid.bid_id, TxTypes.PTX_REDEEM if for_txn_type == 'participate' else TxTypes.ITX_REDEEM)
@@ -2335,16 +2339,16 @@ class BasicSwap(BaseApp):
             redeem_txn = self.calltx(redeem_txn + ' scriptsig=0:' + script)
 
         ro = self.callcoinrpc(Coins.PART, 'verifyrawtransaction', [redeem_txn, [prevout]])
-        assert(ro['inputs_valid'] is True), 'inputs_valid is false'
-        assert(ro['complete'] is True), 'complete is false'
-        assert(ro['validscripts'] == 1), 'validscripts != 1'
+        ensure(ro['inputs_valid'] is True, 'inputs_valid is false')
+        ensure(ro['complete'] is True, 'complete is false')
+        ensure(ro['validscripts'] == 1, 'validscripts != 1')
 
         if self.debug:
             # Check fee
             if self.coin_clients[coin_type]['connection_type'] == 'rpc':
                 redeem_txjs = self.callcoinrpc(coin_type, 'decoderawtransaction', [redeem_txn])
                 self.log.debug('vsize paid, actual vsize %d %d', tx_vsize, redeem_txjs['vsize'])
-                assert(tx_vsize >= redeem_txjs['vsize']), 'Underpaid fee'
+                ensure(tx_vsize >= redeem_txjs['vsize'], 'Underpaid fee')
 
             redeem_txjs = self.callcoinrpc(Coins.PART, 'decoderawtransaction', [redeem_txn])
             self.log.debug('Have valid redeem txn %s for contract %s tx %s', redeem_txjs['txid'], for_txn_type, prev_txnid)
@@ -2398,7 +2402,7 @@ class BasicSwap(BaseApp):
 
         if addr_refund_out is None:
             addr_refund_out = self.getReceiveAddressFromPool(coin_type, bid.bid_id, tx_type)
-        assert(addr_refund_out is not None), 'addr_refund_out is null'
+        ensure(addr_refund_out is not None, 'addr_refund_out is null')
         if self.coin_clients[coin_type]['use_segwit']:
             # Change to btc hrp
             addr_refund_out = self.encodeSegwit(Coins.PART, self.decodeSegwit(coin_type, addr_refund_out))
@@ -2434,16 +2438,16 @@ class BasicSwap(BaseApp):
             refund_txn = self.calltx(refund_txn + ' scriptsig=0:' + script)
 
         ro = self.callcoinrpc(Coins.PART, 'verifyrawtransaction', [refund_txn, [prevout]])
-        assert(ro['inputs_valid'] is True), 'inputs_valid is false'
-        assert(ro['complete'] is True), 'complete is false'
-        assert(ro['validscripts'] == 1), 'validscripts != 1'
+        ensure(ro['inputs_valid'] is True, 'inputs_valid is false')
+        ensure(ro['complete'] is True, 'complete is false')
+        ensure(ro['validscripts'] == 1, 'validscripts != 1')
 
         if self.debug:
             # Check fee
             if self.coin_clients[coin_type]['connection_type'] == 'rpc':
                 refund_txjs = self.callcoinrpc(coin_type, 'decoderawtransaction', [refund_txn])
                 self.log.debug('vsize paid, actual vsize %d %d', tx_vsize, refund_txjs['vsize'])
-                assert(tx_vsize >= refund_txjs['vsize']), 'underpaid fee'
+                ensure(tx_vsize >= refund_txjs['vsize'], 'underpaid fee')
 
             refund_txjs = self.callcoinrpc(Coins.PART, 'decoderawtransaction', [refund_txn])
             self.log.debug('Have valid refund txn %s for contract tx %s', refund_txjs['txid'], txjs['txid'])
@@ -2565,9 +2569,9 @@ class BasicSwap(BaseApp):
                 rv = exp.lookupUnspentByAddress(address)
 
                 if assert_amount is not None:
-                    assert(rv['value'] == int(assert_amount)), 'Incorrect output amount in txn {}: {} != {}.'.format(assert_txid, rv['value'], int(assert_amount))
+                    ensure(rv['value'] == int(assert_amount), 'Incorrect output amount in txn {}: {} != {}.'.format(assert_txid, rv['value'], int(assert_amount)))
                 if assert_txid is not None:
-                    assert(rv['txid)'] == assert_txid), 'Incorrect txid'
+                    ensure(rv['txid)'] == assert_txid, 'Incorrect txid')
 
                 return rv
 
@@ -2596,7 +2600,7 @@ class BasicSwap(BaseApp):
                 continue
             # Verify amount
             if assert_amount:
-                assert(make_int(o['amount']) == int(assert_amount)), 'Incorrect output amount in txn {}: {} != {}.'.format(assert_txid, make_int(o['amount']), int(assert_amount))
+                ensure(make_int(o['amount']) == int(assert_amount), 'Incorrect output amount in txn {}: {} != {}.'.format(assert_txid, make_int(o['amount']), int(assert_amount)))
 
             if not sum_output:
                 if o['height'] > 0:
@@ -2627,9 +2631,9 @@ class BasicSwap(BaseApp):
             self.mxDB.acquire()
             session = scoped_session(self.session_factory)
             xmr_offer = session.query(XmrOffer).filter_by(offer_id=offer.offer_id).first()
-            assert(xmr_offer), 'XMR offer not found: {}.'.format(offer.offer_id.hex())
+            ensure(xmr_offer, 'XMR offer not found: {}.'.format(offer.offer_id.hex()))
             xmr_swap = session.query(XmrSwap).filter_by(bid_id=bid.bid_id).first()
-            assert(xmr_swap), 'XMR swap not found: {}.'.format(bid.bid_id.hex())
+            ensure(xmr_swap, 'XMR swap not found: {}.'.format(bid.bid_id.hex()))
 
             if TxTypes.XMR_SWAP_A_LOCK_REFUND in bid.txns:
                 refund_tx = bid.txns[TxTypes.XMR_SWAP_A_LOCK_REFUND]
@@ -2881,7 +2885,7 @@ class BasicSwap(BaseApp):
                     vout = getVoutByAddress(initiate_txn, p2sh)
 
                     out_value = make_int(initiate_txn['vout'][vout]['value'])
-                    assert(out_value == int(bid.amount)), 'Incorrect output amount in initiate txn {}: {} != {}.'.format(initiate_txnid_hex, out_value, int(bid.amount))
+                    ensure(out_value == int(bid.amount), 'Incorrect output amount in initiate txn {}: {} != {}.'.format(initiate_txnid_hex, out_value, int(bid.amount)))
 
                     bid.initiate_tx.conf = initiate_txn['confirmations']
                     try:
@@ -3007,11 +3011,11 @@ class BasicSwap(BaseApp):
     def extractSecret(self, coin_type, bid, spend_in):
         try:
             if coin_type == Coins.PART or self.coin_clients[coin_type]['use_segwit']:
-                assert(len(spend_in['txinwitness']) == 5), 'Bad witness size'
+                ensure(len(spend_in['txinwitness']) == 5, 'Bad witness size')
                 return bytes.fromhex(spend_in['txinwitness'][2])
             else:
                 script_sig = spend_in['scriptSig']['asm'].split(' ')
-                assert(len(script_sig) == 5), 'Bad witness size'
+                ensure(len(script_sig) == 5, 'Bad witness size')
                 return bytes.fromhex(script_sig[2])
         except Exception:
             return None
@@ -3110,12 +3114,12 @@ class BasicSwap(BaseApp):
         try:
             session = scoped_session(self.session_factory)
             bid, xmr_swap = self.getXmrBidFromSession(session, bid_id)
-            assert(bid), 'Bid not found: {}.'.format(bid_id.hex())
-            assert(xmr_swap), 'XMR swap not found: {}.'.format(bid_id.hex())
+            ensure(bid, 'Bid not found: {}.'.format(bid_id.hex()))
+            ensure(xmr_swap, 'XMR swap not found: {}.'.format(bid_id.hex()))
 
             offer, xmr_offer = self.getXmrOfferFromSession(session, bid.offer_id, sent=False)
-            assert(offer), 'Offer not found: {}.'.format(bid.offer_id.hex())
-            assert(xmr_offer), 'XMR offer not found: {}.'.format(bid.offer_id.hex())
+            ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
+            ensure(xmr_offer, 'XMR offer not found: {}.'.format(bid.offer_id.hex()))
             coin_from = Coins(offer.coin_from)
             coin_to = Coins(offer.coin_to)
 
@@ -3161,12 +3165,12 @@ class BasicSwap(BaseApp):
         try:
             session = scoped_session(self.session_factory)
             bid, xmr_swap = self.getXmrBidFromSession(session, bid_id)
-            assert(bid), 'Bid not found: {}.'.format(bid_id.hex())
-            assert(xmr_swap), 'XMR swap not found: {}.'.format(bid_id.hex())
+            ensure(bid, 'Bid not found: {}.'.format(bid_id.hex()))
+            ensure(xmr_swap, 'XMR swap not found: {}.'.format(bid_id.hex()))
 
             offer, xmr_offer = self.getXmrOfferFromSession(session, bid.offer_id, sent=False)
-            assert(offer), 'Offer not found: {}.'.format(bid.offer_id.hex())
-            assert(xmr_offer), 'XMR offer not found: {}.'.format(bid.offer_id.hex())
+            ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
+            ensure(xmr_offer, 'XMR offer not found: {}.'.format(bid.offer_id.hex()))
             coin_from = Coins(offer.coin_from)
             coin_to = Coins(offer.coin_to)
 
@@ -3411,25 +3415,25 @@ class BasicSwap(BaseApp):
         coin_to = Coins(offer_data.coin_to)
         ci_to = self.ci(coin_to)
         chain_from = chainparams[coin_from][self.chain]
-        assert(offer_data.coin_from != offer_data.coin_to), 'coin_from == coin_to'
+        ensure(offer_data.coin_from != offer_data.coin_to, 'coin_from == coin_to')
 
         self.validateSwapType(coin_from, coin_to, offer_data.swap_type)
         self.validateOfferAmounts(coin_from, coin_to, offer_data.amount_from, offer_data.rate, offer_data.min_bid_amount)
         self.validateOfferLockValue(coin_from, coin_to, offer_data.lock_type, offer_data.lock_value)
         self.validateOfferValidTime(offer_data.swap_type, coin_from, coin_to, offer_data.time_valid)
 
-        assert(msg['sent'] + offer_data.time_valid >= now), 'Offer expired'
+        ensure(msg['sent'] + offer_data.time_valid >= now, 'Offer expired')
 
         if offer_data.swap_type == SwapTypes.SELLER_FIRST:
-            assert(len(offer_data.proof_address) == 0), 'Unexpected data'
-            assert(len(offer_data.proof_signature) == 0), 'Unexpected data'
-            assert(len(offer_data.pkhash_seller) == 0), 'Unexpected data'
-            assert(len(offer_data.secret_hash) == 0), 'Unexpected data'
+            ensure(len(offer_data.proof_address) == 0, 'Unexpected data')
+            ensure(len(offer_data.proof_signature) == 0, 'Unexpected data')
+            ensure(len(offer_data.pkhash_seller) == 0, 'Unexpected data')
+            ensure(len(offer_data.secret_hash) == 0, 'Unexpected data')
         elif offer_data.swap_type == SwapTypes.BUYER_FIRST:
             raise ValueError('TODO')
         elif offer_data.swap_type == SwapTypes.XMR_SWAP:
-            assert(coin_from not in (Coins.XMR, Coins.PART_ANON))
-            assert(coin_to in (Coins.XMR, Coins.PART_ANON))
+            ensure(coin_from not in non_script_type_coins, 'Invalid coin from type')
+            ensure(coin_to in non_script_type_coins, 'Invalid coin to type')
             self.log.debug('TODO - More restrictions')
         else:
             raise ValueError('Unknown swap type {}.'.format(offer_data.swap_type))
@@ -3496,7 +3500,7 @@ class BasicSwap(BaseApp):
             session.remove()
 
     def processOfferRevoke(self, msg):
-        assert(msg['to'] == self.network_addr), 'Message received on wrong address'
+        ensure(msg['to'] == self.network_addr, 'Message received on wrong address')
 
         msg_bytes = bytes.fromhex(msg['hex'][2:-2])
         msg_data = OfferRevokeMessage()
@@ -3524,7 +3528,7 @@ class BasicSwap(BaseApp):
             signature_enc = base64.b64encode(msg_data.signature).decode('utf-8')
 
             passed = self.callcoinrpc(Coins.PART, 'verifymessage', [offer.addr_from, signature_enc, msg_data.offer_msg_id.hex() + '_revoke'])
-            assert(passed is True), 'Signature invalid'
+            ensure(passed is True, 'Signature invalid')
 
             offer.active_ind = 2
             # TODO: Remove message, or wait for expire
@@ -3545,19 +3549,19 @@ class BasicSwap(BaseApp):
         bid_data.ParseFromString(bid_bytes)
 
         # Validate data
-        assert(len(bid_data.offer_msg_id) == 28), 'Bad offer_id length'
+        ensure(len(bid_data.offer_msg_id) == 28, 'Bad offer_id length')
 
         offer_id = bid_data.offer_msg_id
         offer = self.getOffer(offer_id, sent=True)
-        assert(offer and offer.was_sent), 'Unknown offer'
+        ensure(offer and offer.was_sent, 'Unknown offer')
 
-        assert(offer.state == OfferStates.OFFER_RECEIVED), 'Bad offer state'
-        assert(msg['to'] == offer.addr_from), 'Received on incorrect address'
-        assert(now <= offer.expire_at), 'Offer expired'
-        assert(bid_data.amount >= offer.min_bid_amount), 'Bid amount below minimum'
-        assert(bid_data.amount <= offer.amount_from), 'Bid amount above offer amount'
+        ensure(offer.state == OfferStates.OFFER_RECEIVED, 'Bad offer state')
+        ensure(msg['to'] == offer.addr_from, 'Received on incorrect address')
+        ensure(now <= offer.expire_at, 'Offer expired')
+        ensure(bid_data.amount >= offer.min_bid_amount, 'Bid amount below minimum')
+        ensure(bid_data.amount <= offer.amount_from, 'Bid amount above offer amount')
         self.validateBidValidTime(offer.swap_type, offer.coin_from, offer.coin_to, bid_data.time_valid)
-        assert(now <= msg['sent'] + bid_data.time_valid), 'Bid expired'
+        ensure(now <= msg['sent'] + bid_data.time_valid, 'Bid expired')
 
         # TODO: Allow higher bids
         # assert(bid_data.rate != offer['data'].rate), 'Bid rate mismatch'
@@ -3567,13 +3571,13 @@ class BasicSwap(BaseApp):
         amount_to = int((bid_data.amount * offer.rate) // self.ci(offer.coin_from).COIN())
         swap_type = offer.swap_type
         if swap_type == SwapTypes.SELLER_FIRST:
-            assert(len(bid_data.pkhash_buyer) == 20), 'Bad pkhash_buyer length'
+            ensure(len(bid_data.pkhash_buyer) == 20, 'Bad pkhash_buyer length')
 
             # Verify proof of funds
             bid_proof_address = replaceAddrPrefix(bid_data.proof_address, Coins.PART, self.chain)
             mm = chainparams[coin_to]['message_magic']
             passed = self.ci(Coins.PART).verifyMessage(bid_proof_address, bid_data.proof_address + '_swap_proof_' + offer_id.hex(), bid_data.proof_signature, mm)
-            assert(passed is True), 'Proof of funds signature invalid'
+            ensure(passed is True, 'Proof of funds signature invalid')
 
             if self.coin_clients[coin_to]['use_segwit']:
                 addr_search = self.encodeSegwit(coin_to, decodeAddress(bid_data.proof_address)[1:])
@@ -3582,7 +3586,7 @@ class BasicSwap(BaseApp):
 
             sum_unspent = self.getAddressBalance(coin_to, addr_search)
             self.log.debug('Proof of funds %s %s', bid_data.proof_address, self.ci(coin_to).format_amount(sum_unspent))
-            assert(sum_unspent >= amount_to), 'Proof of funds failed'
+            ensure(sum_unspent >= amount_to, 'Proof of funds failed')
 
         elif swap_type == SwapTypes.BUYER_FIRST:
             raise ValueError('TODO')
@@ -3607,7 +3611,7 @@ class BasicSwap(BaseApp):
                 was_received=True,
             )
         else:
-            assert(bid.state == BidStates.BID_SENT), 'Wrong bid state: {}'.format(str(BidStates(bid.state)))
+            ensure(bid.state == BidStates.BID_SENT, 'Wrong bid state: {}'.format(str(BidStates(bid.state))))
             bid.created_at = msg['sent']
             bid.expire_at = msg['sent'] + bid_data.time_valid
             bid.was_received = True
@@ -3637,20 +3641,20 @@ class BasicSwap(BaseApp):
         bid_accept_data = BidAcceptMessage()
         bid_accept_data.ParseFromString(bid_accept_bytes)
 
-        assert(len(bid_accept_data.bid_msg_id) == 28), 'Bad bid_msg_id length'
-        assert(len(bid_accept_data.initiate_txid) == 32), 'Bad initiate_txid length'
-        assert(len(bid_accept_data.contract_script) < 100), 'Bad contract_script length'
+        ensure(len(bid_accept_data.bid_msg_id) == 28, 'Bad bid_msg_id length')
+        ensure(len(bid_accept_data.initiate_txid) == 32, 'Bad initiate_txid length')
+        ensure(len(bid_accept_data.contract_script) < 100, 'Bad contract_script length')
 
         self.log.debug('for bid %s', bid_accept_data.bid_msg_id.hex())
 
         bid_id = bid_accept_data.bid_msg_id
         bid, offer = self.getBidAndOffer(bid_id)
-        assert(bid is not None and bid.was_sent is True), 'Unknown bidid'
-        assert(offer), 'Offer not found ' + bid.offer_id.hex()
+        ensure(bid is not None and bid.was_sent is True, 'Unknown bidid')
+        ensure(offer, 'Offer not found ' + bid.offer_id.hex())
         coin_from = Coins(offer.coin_from)
         ci_from = self.ci(coin_from)
 
-        assert(bid.expire_at > now + self._bid_expired_leeway), 'Bid expired'
+        ensure(bid.expire_at > now + self._bid_expired_leeway, 'Bid expired')
 
         if bid.state >= BidStates.BID_ACCEPTED:
             if bid.was_received:  # Sent to self
@@ -3669,23 +3673,23 @@ class BasicSwap(BaseApp):
             raise ValueError('Bad script')
         scriptvalues = rr.groups()
 
-        assert(len(scriptvalues[0]) == 64), 'Bad secret_hash length'
-        assert(bytes.fromhex(scriptvalues[1]) == bid.pkhash_buyer), 'pkhash_buyer mismatch'
+        ensure(len(scriptvalues[0]) == 64, 'Bad secret_hash length')
+        ensure(bytes.fromhex(scriptvalues[1]) == bid.pkhash_buyer, 'pkhash_buyer mismatch')
 
         script_lock_value = int(scriptvalues[2])
         if use_csv:
             expect_sequence = ci_from.getExpectedSequence(offer.lock_type, offer.lock_value)
-            assert(script_lock_value == expect_sequence), 'sequence mismatch'
+            ensure(script_lock_value == expect_sequence, 'sequence mismatch')
         else:
             if offer.lock_type == ABS_LOCK_BLOCKS:
                 self.log.warning('TODO: validate absolute lock values')
             else:
-                assert(script_lock_value <= bid.created_at + offer.lock_value + atomic_swap_1.INITIATE_TX_TIMEOUT), 'script lock time too high'
-                assert(script_lock_value >= bid.created_at + offer.lock_value), 'script lock time too low'
+                ensure(script_lock_value <= bid.created_at + offer.lock_value + atomic_swap_1.INITIATE_TX_TIMEOUT, 'script lock time too high')
+                ensure(script_lock_value >= bid.created_at + offer.lock_value, 'script lock time too low')
 
-        assert(len(scriptvalues[3]) == 40), 'pkhash_refund bad length'
+        ensure(len(scriptvalues[3]) == 40, 'pkhash_refund bad length')
 
-        assert(bid.accept_msg_id is None), 'Bid already accepted'
+        ensure(bid.accept_msg_id is None, 'Bid already accepted')
 
         bid.accept_msg_id = bytes.fromhex(msg['msgid'])
         bid.initiate_tx = SwapTx(
@@ -3708,10 +3712,10 @@ class BasicSwap(BaseApp):
         now = int(time.time())
 
         offer, xmr_offer = self.getXmrOfferFromSession(session, bid.offer_id, sent=True)
-        assert(offer and offer.was_sent), 'Offer not found: {}.'.format(bid.offer_id.hex())
-        assert(xmr_offer), 'XMR offer not found: {}.'.format(bid.offer_id.hex())
+        ensure(offer and offer.was_sent, 'Offer not found: {}.'.format(bid.offer_id.hex()))
+        ensure(xmr_offer, 'XMR offer not found: {}.'.format(bid.offer_id.hex()))
         xmr_swap = session.query(XmrSwap).filter_by(bid_id=bid.bid_id).first()
-        assert(xmr_swap), 'XMR swap not found: {}.'.format(bid.bid_id.hex())
+        ensure(xmr_swap, 'XMR swap not found: {}.'.format(bid.bid_id.hex()))
 
         ci_from = self.ci(Coins(offer.coin_from))
         ci_to = self.ci(Coins(offer.coin_to))
@@ -3768,10 +3772,10 @@ class BasicSwap(BaseApp):
         now = int(time.time())
 
         offer, xmr_offer = self.getXmrOffer(bid.offer_id, sent=True)
-        assert(offer), 'Offer not found: {}.'.format(bid.offer_id.hex())
-        assert(xmr_offer), 'XMR offer not found: {}.'.format(bid.offer_id.hex())
+        ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
+        ensure(xmr_offer, 'XMR offer not found: {}.'.format(bid.offer_id.hex()))
         xmr_swap = session.query(XmrSwap).filter_by(bid_id=bid.bid_id).first()
-        assert(xmr_swap), 'XMR swap not found: {}.'.format(bid.bid_id.hex())
+        ensure(xmr_swap, 'XMR swap not found: {}.'.format(bid.bid_id.hex()))
         ci_from = self.ci(offer.coin_from)
         ci_to = self.ci(offer.coin_to)
 
@@ -3829,27 +3833,27 @@ class BasicSwap(BaseApp):
         bid_data.ParseFromString(bid_bytes)
 
         # Validate data
-        assert(len(bid_data.offer_msg_id) == 28), 'Bad offer_id length'
+        ensure(len(bid_data.offer_msg_id) == 28, 'Bad offer_id length')
 
         offer_id = bid_data.offer_msg_id
         offer, xmr_offer = self.getXmrOffer(offer_id, sent=True)
-        assert(offer and offer.was_sent), 'Offer not found: {}.'.format(offer_id.hex())
-        assert(xmr_offer), 'XMR offer not found: {}.'.format(offer_id.hex())
+        ensure(offer and offer.was_sent, 'Offer not found: {}.'.format(offer_id.hex()))
+        ensure(xmr_offer, 'XMR offer not found: {}.'.format(offer_id.hex()))
 
         ci_from = self.ci(offer.coin_from)
         ci_to = self.ci(offer.coin_to)
 
         if not validOfferStateToReceiveBid(offer.state):
             raise ValueError('Bad offer state')
-        assert(msg['to'] == offer.addr_from), 'Received on incorrect address'
-        assert(now <= offer.expire_at), 'Offer expired'
-        assert(bid_data.amount >= offer.min_bid_amount), 'Bid amount below minimum'
-        assert(bid_data.amount <= offer.amount_from), 'Bid amount above offer amount'
+        ensure(msg['to'] == offer.addr_from, 'Received on incorrect address')
+        ensure(now <= offer.expire_at, 'Offer expired')
+        ensure(bid_data.amount >= offer.min_bid_amount, 'Bid amount below minimum')
+        ensure(bid_data.amount <= offer.amount_from, 'Bid amount above offer amount')
         self.validateBidValidTime(offer.swap_type, offer.coin_from, offer.coin_to, bid_data.time_valid)
-        assert(now <= msg['sent'] + bid_data.time_valid), 'Bid expired'
+        ensure(now <= msg['sent'] + bid_data.time_valid, 'Bid expired')
 
-        assert(ci_to.verifyKey(bid_data.kbvf))
-        assert(ci_from.verifyPubkey(bid_data.pkaf))
+        ensure(ci_to.verifyKey(bid_data.kbvf), 'Invalid chain B follower view key')
+        ensure(ci_from.verifyPubkey(bid_data.pkaf), 'Invalid chain A follower public key')
 
         bid_id = bytes.fromhex(msg['msgid'])
 
@@ -3882,7 +3886,7 @@ class BasicSwap(BaseApp):
                 xmr_swap.b_restore_height = wallet_restore_height
                 self.log.warning('XMR swap restore height clamped to {}'.format(wallet_restore_height))
         else:
-            assert(bid.state == BidStates.BID_SENT), 'Wrong bid state: {}'.format(str(BidStates(bid.state)))
+            ensure(bid.state == BidStates.BID_SENT, 'Wrong bid state: {}'.format(str(BidStates(bid.state))))
             bid.created_at = msg['sent']
             bid.expire_at = msg['sent'] + bid_data.time_valid
             bid.was_received = True
@@ -3910,16 +3914,16 @@ class BasicSwap(BaseApp):
         msg_data = XmrBidAcceptMessage()
         msg_data.ParseFromString(msg_bytes)
 
-        assert(len(msg_data.bid_msg_id) == 28), 'Bad bid_msg_id length'
+        ensure(len(msg_data.bid_msg_id) == 28, 'Bad bid_msg_id length')
 
         self.log.debug('for bid %s', msg_data.bid_msg_id.hex())
         bid, xmr_swap = self.getXmrBid(msg_data.bid_msg_id)
-        assert(bid), 'Bid not found: {}.'.format(msg_data.bid_id.hex())
-        assert(xmr_swap), 'XMR swap not found: {}.'.format(msg_data.bid_id.hex())
+        ensure(bid, 'Bid not found: {}.'.format(msg_data.bid_msg_id.hex()))
+        ensure(xmr_swap, 'XMR swap not found: {}.'.format(msg_data.bid_msg_id.hex()))
 
         offer, xmr_offer = self.getXmrOffer(bid.offer_id, sent=True)
-        assert(offer), 'Offer not found: {}.'.format(bid.offer_id.hex())
-        assert(xmr_offer), 'XMR offer not found: {}.'.format(bid.offer_id.hex())
+        ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
+        ensure(xmr_offer, 'XMR offer not found: {}.'.format(bid.offer_id.hex()))
         ci_from = self.ci(offer.coin_from)
         ci_to = self.ci(offer.coin_to)
 
@@ -3998,12 +4002,12 @@ class BasicSwap(BaseApp):
         self.log.debug('Signing xmr bid lock txns %s', bid_id.hex())
 
         bid, xmr_swap = self.getXmrBidFromSession(session, bid_id)
-        assert(bid), 'Bid not found: {}.'.format(bid_id.hex())
-        assert(xmr_swap), 'XMR swap not found: {}.'.format(bid_id.hex())
+        ensure(bid, 'Bid not found: {}.'.format(bid_id.hex()))
+        ensure(xmr_swap, 'XMR swap not found: {}.'.format(bid_id.hex()))
 
         offer, xmr_offer = self.getXmrOfferFromSession(session, bid.offer_id, sent=False)
-        assert(offer), 'Offer not found: {}.'.format(bid.offer_id.hex())
-        assert(xmr_offer), 'XMR offer not found: {}.'.format(bid.offer_id.hex())
+        ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
+        ensure(xmr_offer, 'XMR offer not found: {}.'.format(bid.offer_id.hex()))
         coin_from = Coins(offer.coin_from)
         coin_to = Coins(offer.coin_to)
         ci_from = self.ci(coin_from)
@@ -4057,12 +4061,12 @@ class BasicSwap(BaseApp):
         self.log.debug('Sending coin A lock tx for xmr bid %s', bid_id.hex())
 
         bid, xmr_swap = self.getXmrBidFromSession(session, bid_id)
-        assert(bid), 'Bid not found: {}.'.format(bid_id.hex())
-        assert(xmr_swap), 'XMR swap not found: {}.'.format(bid_id.hex())
+        ensure(bid, 'Bid not found: {}.'.format(bid_id.hex()))
+        ensure(xmr_swap, 'XMR swap not found: {}.'.format(bid_id.hex()))
 
         offer, xmr_offer = self.getXmrOfferFromSession(session, bid.offer_id, sent=False)
-        assert(offer), 'Offer not found: {}.'.format(bid.offer_id.hex())
-        assert(xmr_offer), 'XMR offer not found: {}.'.format(bid.offer_id.hex())
+        ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
+        ensure(xmr_offer, 'XMR offer not found: {}.'.format(bid.offer_id.hex()))
         coin_from = Coins(offer.coin_from)
         coin_to = Coins(offer.coin_to)
         ci_from = self.ci(coin_from)
@@ -4124,12 +4128,12 @@ class BasicSwap(BaseApp):
         self.log.debug('Sending coin B lock tx for xmr bid %s', bid_id.hex())
 
         bid, xmr_swap = self.getXmrBidFromSession(session, bid_id)
-        assert(bid), 'Bid not found: {}.'.format(bid_id.hex())
-        assert(xmr_swap), 'XMR swap not found: {}.'.format(bid_id.hex())
+        ensure(bid, 'Bid not found: {}.'.format(bid_id.hex()))
+        ensure(xmr_swap, 'XMR swap not found: {}.'.format(bid_id.hex()))
 
         offer, xmr_offer = self.getXmrOfferFromSession(session, bid.offer_id, sent=False)
-        assert(offer), 'Offer not found: {}.'.format(bid.offer_id.hex())
-        assert(xmr_offer), 'XMR offer not found: {}.'.format(bid.offer_id.hex())
+        ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
+        ensure(xmr_offer, 'XMR offer not found: {}.'.format(bid.offer_id.hex()))
         coin_from = Coins(offer.coin_from)
         coin_to = Coins(offer.coin_to)
         ci_from = self.ci(coin_from)
@@ -4183,12 +4187,12 @@ class BasicSwap(BaseApp):
         self.log.debug('Sending bid secret for xmr bid %s', bid_id.hex())
 
         bid, xmr_swap = self.getXmrBidFromSession(session, bid_id)
-        assert(bid), 'Bid not found: {}.'.format(bid_id.hex())
-        assert(xmr_swap), 'XMR swap not found: {}.'.format(bid_id.hex())
+        ensure(bid, 'Bid not found: {}.'.format(bid_id.hex()))
+        ensure(xmr_swap, 'XMR swap not found: {}.'.format(bid_id.hex()))
 
         offer, xmr_offer = self.getXmrOfferFromSession(session, bid.offer_id, sent=False)
-        assert(offer), 'Offer not found: {}.'.format(bid.offer_id.hex())
-        assert(xmr_offer), 'XMR offer not found: {}.'.format(bid.offer_id.hex())
+        ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
+        ensure(xmr_offer, 'XMR offer not found: {}.'.format(bid.offer_id.hex()))
         coin_from = Coins(offer.coin_from)
         coin_to = Coins(offer.coin_to)
 
@@ -4213,12 +4217,12 @@ class BasicSwap(BaseApp):
         self.log.debug('Redeeming coin A lock tx for xmr bid %s', bid_id.hex())
 
         bid, xmr_swap = self.getXmrBidFromSession(session, bid_id)
-        assert(bid), 'Bid not found: {}.'.format(bid_id.hex())
-        assert(xmr_swap), 'XMR swap not found: {}.'.format(bid_id.hex())
+        ensure(bid, 'Bid not found: {}.'.format(bid_id.hex()))
+        ensure(xmr_swap, 'XMR swap not found: {}.'.format(bid_id.hex()))
 
         offer, xmr_offer = self.getXmrOfferFromSession(session, bid.offer_id, sent=False)
-        assert(offer), 'Offer not found: {}.'.format(bid.offer_id.hex())
-        assert(xmr_offer), 'XMR offer not found: {}.'.format(bid.offer_id.hex())
+        ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
+        ensure(xmr_offer, 'XMR offer not found: {}.'.format(bid.offer_id.hex()))
         coin_from = Coins(offer.coin_from)
         coin_to = Coins(offer.coin_to)
         ci_from = self.ci(coin_from)
@@ -4230,11 +4234,11 @@ class BasicSwap(BaseApp):
 
         al_lock_spend_sig = ci_from.decryptOtVES(kbsf, xmr_swap.al_lock_spend_tx_esig)
         v = ci_from.verifyTxSig(xmr_swap.a_lock_spend_tx, al_lock_spend_sig, xmr_swap.pkal, 0, xmr_swap.a_lock_tx_script, bid.amount)
-        assert(v)
+        ensure(v, 'Invalid coin A lock tx spend tx leader sig')
 
         af_lock_spend_sig = ci_from.signTx(kaf, xmr_swap.a_lock_spend_tx, 0, xmr_swap.a_lock_tx_script, bid.amount)
         v = ci_from.verifyTxSig(xmr_swap.a_lock_spend_tx, af_lock_spend_sig, xmr_swap.pkaf, 0, xmr_swap.a_lock_tx_script, bid.amount)
-        assert(v)
+        ensure(v, 'Invalid coin A lock tx spend tx follower sig')
 
         witness_stack = [
             b'',
@@ -4262,12 +4266,12 @@ class BasicSwap(BaseApp):
         self.log.debug('Redeeming coin B lock tx for xmr bid %s', bid_id.hex())
 
         bid, xmr_swap = self.getXmrBidFromSession(session, bid_id)
-        assert(bid), 'Bid not found: {}.'.format(bid_id.hex())
-        assert(xmr_swap), 'XMR swap not found: {}.'.format(bid_id.hex())
+        ensure(bid, 'Bid not found: {}.'.format(bid_id.hex()))
+        ensure(xmr_swap, 'XMR swap not found: {}.'.format(bid_id.hex()))
 
         offer, xmr_offer = self.getXmrOfferFromSession(session, bid.offer_id, sent=False)
-        assert(offer), 'Offer not found: {}.'.format(bid.offer_id.hex())
-        assert(xmr_offer), 'XMR offer not found: {}.'.format(bid.offer_id.hex())
+        ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
+        ensure(xmr_offer, 'XMR offer not found: {}.'.format(bid.offer_id.hex()))
         coin_from = Coins(offer.coin_from)
         coin_to = Coins(offer.coin_to)
         ci_from = self.ci(coin_from)
@@ -4318,12 +4322,12 @@ class BasicSwap(BaseApp):
         self.log.debug('Recovering coin B lock tx for xmr bid %s', bid_id.hex())
 
         bid, xmr_swap = self.getXmrBidFromSession(session, bid_id)
-        assert(bid), 'Bid not found: {}.'.format(bid_id.hex())
-        assert(xmr_swap), 'XMR swap not found: {}.'.format(bid_id.hex())
+        ensure(bid, 'Bid not found: {}.'.format(bid_id.hex()))
+        ensure(xmr_swap, 'XMR swap not found: {}.'.format(bid_id.hex()))
 
         offer, xmr_offer = self.getXmrOfferFromSession(session, bid.offer_id, sent=False)
-        assert(offer), 'Offer not found: {}.'.format(bid.offer_id.hex())
-        assert(xmr_offer), 'XMR offer not found: {}.'.format(bid.offer_id.hex())
+        ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
+        ensure(xmr_offer, 'XMR offer not found: {}.'.format(bid.offer_id.hex()))
         coin_from = Coins(offer.coin_from)
         coin_to = Coins(offer.coin_to)
         ci_from = self.ci(coin_from)
@@ -4377,16 +4381,16 @@ class BasicSwap(BaseApp):
         msg_data = XmrBidLockTxSigsMessage()
         msg_data.ParseFromString(msg_bytes)
 
-        assert(len(msg_data.bid_msg_id) == 28), 'Bad bid_msg_id length'
+        ensure(len(msg_data.bid_msg_id) == 28, 'Bad bid_msg_id length')
         bid_id = msg_data.bid_msg_id
 
         bid, xmr_swap = self.getXmrBid(bid_id)
-        assert(bid), 'Bid not found: {}.'.format(bid_id.hex())
-        assert(xmr_swap), 'XMR swap not found: {}.'.format(bid_id.hex())
+        ensure(bid, 'Bid not found: {}.'.format(bid_id.hex()))
+        ensure(xmr_swap, 'XMR swap not found: {}.'.format(bid_id.hex()))
 
         offer, xmr_offer = self.getXmrOffer(bid.offer_id, sent=False)
-        assert(offer), 'Offer not found: {}.'.format(bid.offer_id.hex())
-        assert(xmr_offer), 'XMR offer not found: {}.'.format(bid.offer_id.hex())
+        ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
+        ensure(xmr_offer, 'XMR offer not found: {}.'.format(bid.offer_id.hex()))
         coin_from = Coins(offer.coin_from)
         coin_to = Coins(offer.coin_to)
         ci_from = self.ci(coin_from)
@@ -4412,11 +4416,11 @@ class BasicSwap(BaseApp):
                 xmr_swap.a_lock_refund_tx_script,
             ]
             signed_tx = ci_from.setTxSignature(xmr_swap.a_lock_refund_spend_tx, witness_stack)
-            assert(signed_tx), 'setTxSignature failed'
+            ensure(signed_tx, 'setTxSignature failed')
             xmr_swap.a_lock_refund_spend_tx = signed_tx
 
             v = ci_from.verifyTxSig(xmr_swap.a_lock_refund_spend_tx, xmr_swap.af_lock_refund_spend_tx_sig, xmr_swap.pkaf, 0, xmr_swap.a_lock_refund_tx_script, xmr_swap.a_swap_refund_value)
-            assert(v), 'Invalid signature for lock refund spend txn'
+            ensure(v, 'Invalid signature for lock refund spend txn')
             self.addLockRefundSigs(xmr_swap, ci_from)
 
             delay = random.randrange(self.min_delay_event, self.max_delay_event)
@@ -4438,16 +4442,16 @@ class BasicSwap(BaseApp):
         msg_data = XmrBidLockSpendTxMessage()
         msg_data.ParseFromString(msg_bytes)
 
-        assert(len(msg_data.bid_msg_id) == 28), 'Bad bid_msg_id length'
+        ensure(len(msg_data.bid_msg_id) == 28, 'Bad bid_msg_id length')
         bid_id = msg_data.bid_msg_id
 
         bid, xmr_swap = self.getXmrBid(bid_id)
-        assert(bid), 'Bid not found: {}.'.format(bid_id.hex())
-        assert(xmr_swap), 'XMR swap not found: {}.'.format(bid_id.hex())
+        ensure(bid, 'Bid not found: {}.'.format(bid_id.hex()))
+        ensure(xmr_swap, 'XMR swap not found: {}.'.format(bid_id.hex()))
 
         offer, xmr_offer = self.getXmrOffer(bid.offer_id, sent=False)
-        assert(offer), 'Offer not found: {}.'.format(bid.offer_id.hex())
-        assert(xmr_offer), 'XMR offer not found: {}.'.format(bid.offer_id.hex())
+        ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
+        ensure(xmr_offer, 'XMR offer not found: {}.'.format(bid.offer_id.hex()))
         ci_from = self.ci(Coins(offer.coin_from))
         ci_to = self.ci(Coins(offer.coin_to))
 
@@ -4481,7 +4485,7 @@ class BasicSwap(BaseApp):
         msg_data.ParseFromString(msg_bytes)
 
         # Validate data
-        assert(len(msg_data.msg_id) == 28), 'Bad msg_id length'
+        ensure(len(msg_data.msg_id) == 28, 'Bad msg_id length')
 
         if msg_data.msg_type == XmrSplitMsgTypes.BID or msg_data.msg_type == XmrSplitMsgTypes.BID_ACCEPT:
             try:
@@ -4512,16 +4516,16 @@ class BasicSwap(BaseApp):
         msg_data.ParseFromString(msg_bytes)
 
         # Validate data
-        assert(len(msg_data.bid_msg_id) == 28), 'Bad msg_id length'
+        ensure(len(msg_data.bid_msg_id) == 28, 'Bad msg_id length')
 
         bid_id = msg_data.bid_msg_id
         bid, xmr_swap = self.getXmrBid(bid_id)
-        assert(bid), 'Bid not found: {}.'.format(bid_id.hex())
-        assert(xmr_swap), 'XMR swap not found: {}.'.format(bid_id.hex())
+        ensure(bid, 'Bid not found: {}.'.format(bid_id.hex()))
+        ensure(xmr_swap, 'XMR swap not found: {}.'.format(bid_id.hex()))
 
         offer, xmr_offer = self.getXmrOffer(bid.offer_id, sent=False)
-        assert(offer), 'Offer not found: {}.'.format(bid.offer_id.hex())
-        assert(xmr_offer), 'XMR offer not found: {}.'.format(bid.offer_id.hex())
+        ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
+        ensure(xmr_offer, 'XMR offer not found: {}.'.format(bid.offer_id.hex()))
         ci_from = self.ci(Coins(offer.coin_from))
 
         xmr_swap.al_lock_spend_tx_esig = msg_data.al_lock_spend_tx_esig
@@ -4530,7 +4534,7 @@ class BasicSwap(BaseApp):
             v = ci_from.verifyTxOtVES(
                 xmr_swap.a_lock_spend_tx, xmr_swap.al_lock_spend_tx_esig,
                 xmr_swap.pkal, xmr_swap.pkasf, 0, xmr_swap.a_lock_tx_script, bid.amount)
-            assert(v), 'verifyTxOtVES failed'
+            ensure(v, 'verifyTxOtVES failed')
         except Exception as ex:
             if self.debug:
                 traceback.print_exc()
@@ -4671,8 +4675,8 @@ class BasicSwap(BaseApp):
         self.mxDB.acquire()
         try:
             bid, offer = self.getBidAndOffer(bid_id)
-            assert(bid), 'Bid not found {}'.format(bid_id.hex())
-            assert(offer), 'Offer not found {}'.format(bid.offer_id.hex())
+            ensure(bid, 'Bid not found {}'.format(bid_id.hex()))
+            ensure(offer, 'Offer not found {}'.format(bid.offer_id.hex()))
 
             has_changed = False
             if bid.state != data['bid_state']:
@@ -4724,7 +4728,7 @@ class BasicSwap(BaseApp):
 
             if 'fee_priority' in data:
                 new_fee_priority = data['fee_priority']
-                assert(new_fee_priority >= 0 and new_fee_priority < 4), 'Invalid priority'
+                ensure(new_fee_priority >= 0 and new_fee_priority < 4, 'Invalid priority')
 
                 if settings_cc.get('fee_priority', 0) != new_fee_priority:
                     settings_changed = True
@@ -4737,7 +4741,7 @@ class BasicSwap(BaseApp):
 
             if 'conf_target' in data:
                 new_conf_target = data['conf_target']
-                assert(new_conf_target >= 1 and new_conf_target < 33), 'Invalid conf_target'
+                ensure(new_conf_target >= 1 and new_conf_target < 33, 'Invalid conf_target')
 
                 if settings_cc.get('conf_target', 2) != new_conf_target:
                     settings_changed = True
@@ -5186,7 +5190,7 @@ class BasicSwap(BaseApp):
         ]
 
         signed_tx = ci.setTxSignature(xmr_swap.a_lock_refund_tx, witness_stack)
-        assert(signed_tx), 'setTxSignature failed'
+        ensure(signed_tx, 'setTxSignature failed')
         xmr_swap.a_lock_refund_tx = signed_tx
 
     def createCoinALockRefundSwipeTx(self, ci, bid, offer, xmr_swap, xmr_offer):

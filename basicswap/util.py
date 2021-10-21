@@ -337,3 +337,8 @@ def encodeStealthAddress(prefix_byte, scan_pubkey, spend_pubkey):
     b = bytes((prefix_byte,)) + data
     b += hashlib.sha256(hashlib.sha256(b).digest()).digest()[:4]
     return b58encode(b)
+
+
+def ensure(passed, err_string):
+    if not passed:
+        raise ValueError(err_string)
