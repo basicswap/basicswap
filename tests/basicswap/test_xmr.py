@@ -33,6 +33,7 @@ from basicswap.util import (
     COIN,
     toWIF,
     make_int,
+    format_amount,
 )
 from basicswap.rpc import (
     callrpc,
@@ -279,7 +280,6 @@ class Test(unittest.TestCase):
         cls.xmr_daemons = []
         cls.xmr_wallet_auth = []
 
-        cls.part_stakelimit = 0
         cls.xmr_addr = None
         cls.btc_addr = None
 
@@ -394,6 +394,14 @@ class Test(unittest.TestCase):
                 logging.info('Mining %d Monero blocks to %s.', num_blocks, cls.xmr_addr)
                 callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'generateblocks', {'wallet_address': cls.xmr_addr, 'amount_of_blocks': num_blocks})
             logging.info('XMR blocks: %d', callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'get_block_count')['count'])
+
+            logging.info('Adding anon outputs')
+            outputs = []
+            for i in range(8):
+                sx_addr = callnoderpc(1, 'getnewstealthaddress')
+                outputs.append({'address': sx_addr, 'amount': 0.5})
+            for i in range(6):
+                callnoderpc(0, 'sendtypeto', ['part', 'anon', outputs])
 
             logging.info('Starting update thread.')
             signal.signal(signal.SIGINT, signal_handler)
@@ -805,9 +813,12 @@ class Test(unittest.TestCase):
 
         js_0 = json.loads(urlopen('http://127.0.0.1:1800/json/wallets/part').read())
         assert(float(js_0['anon_balance']) == 0.0)
+        node0_anon_before = js_0['anon_balance'] + js_0['anon_pending']
 
+        wait_for_balance(test_delay_event, 'http://127.0.0.1:1801/json/wallets/part', 'balance', 200.0)
         js_1 = json.loads(urlopen('http://127.0.0.1:1801/json/wallets/part').read())
         assert(float(js_1['balance']) > 200.0)
+        node1_anon_before = js_1['anon_balance'] + js_1['anon_pending']
 
         callnoderpc(1, 'reservebalance', [True, 1000000])  # Stop staking to avoid conflicts (input used by tx->anon staked before tx gets in the chain)
         post_json = {
@@ -819,17 +830,10 @@ class Test(unittest.TestCase):
         json_rv = json.loads(post_json_req('http://127.0.0.1:1801/json/wallets/part/withdraw', post_json))
         assert(len(json_rv['txid']) == 64)
 
-        post_json['value'] = 0.5
-        for i in range(22):
-            json_rv = json.loads(post_json_req('http://127.0.0.1:1801/json/wallets/part/withdraw', post_json))
-            assert(len(json_rv['txid']) == 64)
-
         logging.info('Waiting for anon balance')
-        try:
-            wait_for_balance(test_delay_event, 'http://127.0.0.1:1801/json/wallets/part', 'anon_balance', 110.0)
-        except Exception as e:
-            ft = callnoderpc(0, 'filtertransactions', [{'count': 0}])
-            raise e
+        wait_for_balance(test_delay_event, 'http://127.0.0.1:1801/json/wallets/part', 'anon_balance', 100.0 + node1_anon_before)
+        js_1 = json.loads(urlopen('http://127.0.0.1:1801/json/wallets/part').read())
+        node1_anon_before = js_1['anon_balance'] + js_1['anon_pending']
 
         callnoderpc(1, 'reservebalance', [False])
         post_json = {
@@ -847,8 +851,6 @@ class Test(unittest.TestCase):
         if float(js_0['blind_balance']) >= 10.0:
             raise ValueError('Expect blind balance < 10')
 
-        return  # TODO
-
         amt_swap = make_int(random.uniform(0.1, 2.0), scale=8, r=1)
         rate_swap = make_int(random.uniform(2.0, 20.0), scale=8, r=1)
         offer_id = swap_clients[0].postOffer(Coins.BTC, Coins.PART_ANON, amt_swap, rate_swap, amt_swap, SwapTypes.XMR_SWAP)
@@ -862,6 +864,7 @@ class Test(unittest.TestCase):
 
         bid, xmr_swap = swap_clients[0].getXmrBid(bid_id)
         assert(xmr_swap)
+        amount_to = float(format_amount(bid.amount_to, 8))
 
         swap_clients[0].acceptXmrBid(bid_id)
 
@@ -869,7 +872,13 @@ class Test(unittest.TestCase):
         wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True)
 
         js_1 = json.loads(urlopen('http://127.0.0.1:1801/json/wallets/part').read())
-        print('[rm] js_1', js_1)
+        assert(js_1['anon_balance'] < node1_anon_before - amount_to)
+
+        js_0 = json.loads(urlopen('http://127.0.0.1:1800/json/wallets/part').read())
+        assert(js_0['anon_balance'] + js_0['anon_pending'] > node0_anon_before + (amount_to - 0.1))
+
+    def test_12_particl_blind(self):
+        return  # TODO
 
     def test_98_withdraw_all(self):
         logging.info('---------- Test XMR withdrawal all')

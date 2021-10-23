@@ -1756,7 +1756,7 @@ class BasicSwap(BaseApp):
                 script = atomic_swap_1.buildContractScript(sequence, secret_hash, bid.pkhash_buyer, pkhash_refund)
             else:
                 if offer.lock_type == ABS_LOCK_BLOCKS:
-                    lock_value = self.callcoinrpc(coin_from, 'getblockchaininfo')['blocks'] + offer.lock_value
+                    lock_value = self.callcoinrpc(coin_from, 'getblockcount') + offer.lock_value
                 else:
                     lock_value = int(time.time()) + offer.lock_value
                 self.log.debug('Initiate %s lock_value %d %d', coin_from, offer.lock_value, lock_value)
@@ -2225,7 +2225,7 @@ class BasicSwap(BaseApp):
         refund_txn = self.createRefundTxn(coin_to, txn_signed, offer, bid, participate_script, tx_type=TxTypes.PTX_REFUND)
         bid.participate_txn_refund = bytes.fromhex(refund_txn)
 
-        chain_height = self.callcoinrpc(coin_to, 'getblockchaininfo')['blocks']
+        chain_height = self.callcoinrpc(coin_to, 'getblockcount')
         txjs = self.callcoinrpc(coin_to, 'decoderawtransaction', [txn_signed])
         txid = txjs['txid']
 
@@ -2554,7 +2554,7 @@ class BasicSwap(BaseApp):
         return self.lookupUnspentByAddress(coin_type, address, sum_output=True)
 
     def lookupChainHeight(self, coin_type):
-        return self.callcoinrpc(coin_type, 'getblockchaininfo')['blocks']
+        return self.callcoinrpc(coin_type, 'getblockcount')
 
     def lookupUnspentByAddress(self, coin_type, address, sum_output=False, assert_amount=None, assert_txid=None):
 
@@ -2589,7 +2589,7 @@ class BasicSwap(BaseApp):
             except Exception:
                 pass
 
-        num_blocks = self.callcoinrpc(coin_type, 'getblockchaininfo')['blocks']
+        num_blocks = self.callcoinrpc(coin_type, 'getblockcount')
 
         sum_unspent = 0
         self.log.debug('[rm] scantxoutset start')  # scantxoutset is slow
@@ -2782,7 +2782,7 @@ class BasicSwap(BaseApp):
 
                 bid_changed = False
                 # Have to use findTxB instead of relying on the first seen height to detect chain reorgs
-                found_tx = ci_to.findTxB(xmr_swap.vkbv, xmr_swap.pkbs, bid.amount_to, ci_to.blocks_confirmed, xmr_swap.b_restore_height)
+                found_tx = ci_to.findTxB(xmr_swap.vkbv, xmr_swap.pkbs, bid.amount_to, ci_to.blocks_confirmed, xmr_swap.b_restore_height, bid.was_sent)
 
                 if isinstance(found_tx, int) and found_tx == -1:
                     if self.countBidEvents(bid, EventLogTypes.LOCK_TX_B_INVALID, session) < 1:
@@ -3249,7 +3249,7 @@ class BasicSwap(BaseApp):
                     spend_txn = self.callcoinrpc(Coins.PART, 'getrawtransaction', [spend_txid, True])
                     self.processSpentOutput(coin_type, o, spend_txid, spend_n, spend_txn)
         else:
-            chain_blocks = self.callcoinrpc(coin_type, 'getblockchaininfo')['blocks']
+            chain_blocks = self.callcoinrpc(coin_type, 'getblockcount')
             last_height_checked = c['last_height_checked']
             self.log.debug('chain_blocks, last_height_checked %s %s', chain_blocks, last_height_checked)
             while last_height_checked < chain_blocks:
@@ -4288,8 +4288,11 @@ class BasicSwap(BaseApp):
         vkbs = ci_to.sumKeys(kbsl, kbsf)
 
         try:
-            address_to = self.getCachedMainWalletAddress(ci_to)
-            txid = ci_to.spendBLockTx(address_to, xmr_swap.vkbv, vkbs, bid.amount_to, xmr_offer.b_fee_rate, xmr_swap.b_restore_height)
+            if coin_to == Coins.XMR:
+                address_to = self.getCachedMainWalletAddress(ci_to)
+            else:
+                address_to = self.getCachedStealthAddressForCoin(coin_to)
+            txid = ci_to.spendBLockTx(xmr_swap.b_lock_tx_id, address_to, xmr_swap.vkbv, vkbs, bid.amount_to, xmr_offer.b_fee_rate, xmr_swap.b_restore_height)
             self.log.debug('Submitted lock B spend txn %s to %s chain for bid %s', txid.hex(), ci_to.coin_name(), bid_id.hex())
             self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_B_SPEND_TX_PUBLISHED, '', session)
         except Exception as ex:
@@ -4345,7 +4348,7 @@ class BasicSwap(BaseApp):
 
         try:
             address_to = self.getCachedMainWalletAddress(ci_to)
-            txid = ci_to.spendBLockTx(address_to, xmr_swap.vkbv, vkbs, bid.amount_to, xmr_offer.b_fee_rate, xmr_swap.b_restore_height)
+            txid = ci_to.spendBLockTx(xmr_swap.b_lock_tx_id, address_to, xmr_swap.vkbv, vkbs, bid.amount_to, xmr_offer.b_fee_rate, xmr_swap.b_restore_height)
             self.log.debug('Submitted lock B refund txn %s to %s chain for bid %s', txid.hex(), ci_to.coin_name(), bid_id.hex())
             self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_B_REFUND_TX_PUBLISHED, '', session)
         except Exception as ex:

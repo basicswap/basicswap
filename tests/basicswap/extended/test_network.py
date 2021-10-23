@@ -171,7 +171,6 @@ class Test(unittest.TestCase):
         cls.part_daemons = []
         cls.btc_daemons = []
 
-        cls.part_stakelimit = 0
         cls.btc_addr = None
 
         logger.propagate = False

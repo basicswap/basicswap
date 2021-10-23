@@ -27,6 +27,8 @@ from .util import (
     dumpj,
     make_int,
     format_amount)
+from .basicswap_util import (
+    TemporaryError)
 from .rpc_xmr import (
     make_xmr_rpc_func,
     make_xmr_rpc2_func,
@@ -232,7 +234,7 @@ class XMRInterface(CoinInterface):
 
             return tx_hash
 
-    def findTxB(self, kbv, Kbs, cb_swap_value, cb_block_confirmed, restore_height):
+    def findTxB(self, kbv, Kbs, cb_swap_value, cb_block_confirmed, restore_height, bid_sender):
         with self._mx_wallet:
             Kbv = self.getPubkey(kbv)
             address_b58 = xmr_util.encode_address(Kbv, Kbs)
@@ -363,7 +365,7 @@ class XMRInterface(CoinInterface):
 
             return None
 
-    def spendBLockTx(self, address_to, kbv, kbs, cb_swap_value, b_fee_rate, restore_height):
+    def spendBLockTx(self, chain_b_lock_txid, address_to, kbv, kbs, cb_swap_value, b_fee_rate, restore_height):
         with self._mx_wallet:
             Kbv = self.getPubkey(kbv)
             Kbs = self.getPubkey(kbs)
@@ -401,10 +403,10 @@ class XMRInterface(CoinInterface):
                 time.sleep(1 + i)
             if rv['balance'] < cb_swap_value:
                 self._log.error('wallet {} balance {}, expected {}'.format(wallet_filename, rv['balance'], cb_swap_value))
-                raise ValueError('Invalid balance')
+                raise TemporaryError('Invalid balance')
             if rv['unlocked_balance'] < cb_swap_value:
                 self._log.error('wallet {} balance {}, expected {}, blocks_to_unlock {}'.format(wallet_filename, rv['unlocked_balance'], cb_swap_value, rv['blocks_to_unlock']))
-                raise ValueError('Invalid unlocked_balance')
+                raise TemporaryError('Invalid unlocked_balance')
 
             params = {'address': address_to}
             if self._fee_priority > 0:

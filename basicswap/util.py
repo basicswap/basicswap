@@ -246,6 +246,10 @@ def make_int(v, scale=8, r=0):  # r = 0, no rounding, fail, r > 0 round up, r < 
     elif type(v) == int:
         return v * 10 ** scale
 
+    sign = 1
+    if v[0] == '-':
+        v = v[1:]
+        sign = -1
     ep = 10 ** scale
     have_dp = False
     rv = 0
@@ -255,7 +259,6 @@ def make_int(v, scale=8, r=0):  # r = 0, no rounding, fail, r > 0 round up, r < 
             have_dp = True
             continue
         if not c.isdigit():
-
             raise ValueError('Invalid char: ' + c)
         if have_dp:
             ep //= 10
@@ -267,13 +270,12 @@ def make_int(v, scale=8, r=0):  # r = 0, no rounding, fail, r > 0 round up, r < 
                     if int(c) > 4:
                         rv += 1
                 break
-
             rv += ep * int(c)
         else:
             rv = rv * 10 + int(c)
     if not have_dp:
         rv *= ep
-    return rv
+    return rv * sign
 
 
 def validate_amount(amount, scale=8) -> bool:

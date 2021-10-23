@@ -175,7 +175,7 @@ class BTCInterface(CoinInterface):
         return self.rpc_callback('getblockchaininfo')
 
     def getChainHeight(self):
-        return self.rpc_callback('getblockchaininfo')['blocks']
+        return self.rpc_callback('getblockcount')
 
     def getMempoolTx(self, txid):
         return self.rpc_callback('getrawtransaction', [txid.hex()])
@@ -866,7 +866,7 @@ class BTCInterface(CoinInterface):
         weight = len_nwit * (wsf - 1) + len_full
         return (weight + wsf - 1) // wsf
 
-    def findTxB(self, kbv, Kbs, cb_swap_value, cb_block_confirmed, restore_height):
+    def findTxB(self, kbv, Kbs, cb_swap_value, cb_block_confirmed, restore_height, bid_sender):
         raw_dest = self.getPkDest(Kbs)
 
         rv = self.scanTxOutset(raw_dest)
@@ -898,7 +898,7 @@ class BTCInterface(CoinInterface):
                         return True
         return False
 
-    def spendBLockTx(self, address_to, kbv, kbs, cb_swap_value, b_fee, restore_height):
+    def spendBLockTx(self, chain_b_lock_txid, address_to, kbv, kbs, cb_swap_value, b_fee, restore_height):
         print('TODO: spendBLockTx')
 
     def getOutput(self, txid, dest_script, expect_value):

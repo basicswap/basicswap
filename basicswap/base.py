@@ -18,6 +18,9 @@ from .rpc import (
 from .util import (
     pubkeyToAddress,
 )
+from .basicswap_util import (
+    TemporaryError,
+)
 from .chainparams import (
     Coins,
     chainparams,
@@ -136,5 +139,7 @@ class BaseApp:
         return out[0].decode('utf-8').strip()
 
     def is_transient_error(self, ex):
+        if isinstance(ex, TemporaryError):
+            return True
         str_error = str(ex).lower()
         return 'read timed out' in str_error or 'no connection to daemon' in str_error
