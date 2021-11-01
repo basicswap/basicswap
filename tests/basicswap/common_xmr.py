@@ -149,9 +149,19 @@ class XmrTestBase(unittest.TestCase):
 
         waitForServer(self.delay_event, 12701)
 
-        wallets = json.loads(urlopen('http://127.0.0.1:12701/json/wallets').read())
+        def waitForDepositAddress():
+            for i in range(20):
+                if self.delay_event.is_set():
+                    raise ValueError('Test stopped.')
+                try:
+                    wallets = json.loads(urlopen('http://127.0.0.1:12701/json/wallets').read())
+                    return wallets['6']['deposit_address']
+                except Exception as e:
+                    print('Waiting for deposit address {}'.format(str(e)))
+                self.delay_event.wait(1)
+            raise ValueError('waitForDepositAddress timedout')
+        xmr_addr1 = waitForDepositAddress()
 
-        xmr_addr1 = wallets['6']['deposit_address']
         num_blocks = 100
 
         if callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'get_block_count')['count'] < num_blocks:

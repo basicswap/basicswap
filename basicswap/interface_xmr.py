@@ -118,15 +118,18 @@ class XMRInterface(CoinInterface):
 
         # get_block_count returns "Internal error" if bootstrap-daemon is active
         # rv['blocks'] = self.rpc_cb('get_block_count')['count']
-        rv['blocks'] = self.rpc_cb2('get_height')['height']
-        rv['verificationprogress'] = 0  # TODO
+        rv['blocks'] = self.rpc_cb2('get_height', timeout=30)['height']
+
+        sync_info = self.rpc_cb('sync_info', timeout=30)
+        rv['verificationprogress'] = 0.0 if 'spans' in sync_info else 1.0
+
         return rv
 
     def getChainHeight(self):
         # get_block_count returns "Internal error" if bootstrap-daemon is active
         # return self.rpc_cb('get_info')['height']
         # return self.rpc_cb('get_block_count')['count']
-        return self.rpc_cb2('get_height')['height']
+        return self.rpc_cb2('get_height', timeout=30)['height']
 
     def getWalletInfo(self):
         with self._mx_wallet:
@@ -348,7 +351,7 @@ class XMRInterface(CoinInterface):
             self.rpc_wallet_cb('refresh')
 
             try:
-                current_height = self.rpc_cb2('get_height')['height']
+                current_height = self.rpc_cb2('get_height', timeout=30)['height']
                 self._log.info('findTxnByHash XMR current_height %d\nhash: %s', current_height, txid)
             except Exception as e:
                 self._log.info('rpc_cb failed %s', str(e))
