@@ -120,8 +120,9 @@ class XMRInterface(CoinInterface):
         # rv['blocks'] = self.rpc_cb('get_block_count')['count']
         rv['blocks'] = self.rpc_cb2('get_height', timeout=30)['height']
 
-        sync_info = self.rpc_cb('sync_info', timeout=30)
-        rv['verificationprogress'] = 0.0 if 'spans' in sync_info else 1.0
+        # sync_info = self.rpc_cb('sync_info', timeout=30)
+        # rv['verificationprogress'] = 0.0 if 'spans' in sync_info else 1.0
+        rv['verificationprogress'] = 0.0
 
         return rv
 

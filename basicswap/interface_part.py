@@ -116,6 +116,9 @@ class PARTInterfaceBlind(PARTInterface):
     def balance_type():
         return BalanceTypes.BLIND
 
+    def coin_name(self):
+        return super().coin_name() + ' Blind'
+
     def encodeSegwitP2WSH(self, p2wsh):
         return segwit_addr.encode(self.chainparams_network()['hrp'], 0, p2wsh[2:])
 
@@ -607,6 +610,9 @@ class PARTInterfaceAnon(PARTInterface):
     @staticmethod
     def balance_type():
         return BalanceTypes.ANON
+
+    def coin_name(self):
+        return super().coin_name() + ' Anon'
 
     def publishBLockTx(self, Kbv, Kbs, output_amount, feerate):
         sx_addr = self.formatStealthAddress(Kbv, Kbs)

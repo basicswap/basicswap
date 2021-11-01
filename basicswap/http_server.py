@@ -66,8 +66,10 @@ def value_or_none(v):
 
 
 def getCoinName(c):
-    if c == Coins.PART_ANON or c == Coins.PART_BLIND:
+    if c == Coins.PART_ANON:
         return chainparams[Coins.PART]['name'].capitalize() + 'Anon'
+    if c == Coins.PART_BLIND:
+        return chainparams[Coins.PART]['name'].capitalize() + 'Blind'
     return chainparams[c]['name'].capitalize()
 
 
@@ -79,9 +81,8 @@ def listAvailableCoins(swap_client):
         if v['connection_type'] == 'rpc':
             coins.append((int(k), getCoinName(k)))
             if k == Coins.PART:
-                pass
-                # TODO: Uncomment
-                # coins.append((int(Coins.PART_ANON), getCoinName(k)))
+                coins.append((int(Coins.PART_ANON), getCoinName(Coins.PART_ANON)))
+                coins.append((int(Coins.PART_BLIND), getCoinName(Coins.PART_BLIND)))
     return coins
 
 
