@@ -371,7 +371,3 @@ def isActiveBidState(state):
     if state == BidStates.XMR_SWAP_SCRIPT_TX_REDEEMED:
         return True
     return False
-
-
-class TemporaryError(ValueError):
-    pass

@@ -16,10 +16,8 @@ from .rpc import (
     callrpc,
 )
 from .util import (
-    pubkeyToAddress,
-)
-from .basicswap_util import (
     TemporaryError,
+    pubkeyToAddress,
 )
 from .chainparams import (
     Coins,

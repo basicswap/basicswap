@@ -301,9 +301,9 @@ class XmrSwap(Base):
     kbsl_dleag = sa.Column(sa.LargeBinary)
     kbsf_dleag = sa.Column(sa.LargeBinary)
 
-    vkbv = sa.Column(sa.LargeBinary)
-    pkbv = sa.Column(sa.LargeBinary)
-    pkbs = sa.Column(sa.LargeBinary)
+    vkbv = sa.Column(sa.LargeBinary)        # chain b view private key
+    pkbv = sa.Column(sa.LargeBinary)        # chain b view public key
+    pkbs = sa.Column(sa.LargeBinary)        # chain b view spend key
 
     a_lock_tx = sa.Column(sa.LargeBinary)
     a_lock_tx_script = sa.Column(sa.LargeBinary)

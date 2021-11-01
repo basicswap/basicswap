@@ -66,7 +66,7 @@ def value_or_none(v):
 
 
 def getCoinName(c):
-    if c == Coins.PART_ANON:
+    if c == Coins.PART_ANON or c == Coins.PART_BLIND:
         return chainparams[Coins.PART]['name'].capitalize() + 'Anon'
     return chainparams[c]['name'].capitalize()
 

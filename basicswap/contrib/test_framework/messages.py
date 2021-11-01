@@ -340,7 +340,7 @@ class CTxIn:
                self.nSequence)
 
 class CTxOutPart:
-    __slots__ = ("nVersion", "nValue", "scriptPubKey")
+    __slots__ = ("nVersion", "nValue", "scriptPubKey", "commitment", "data", "rangeproof")
 
     def __init__(self, nValue=0, scriptPubKey=b""):
         self.nVersion = OUTPUT_TYPE_STANDARD
@@ -348,13 +348,37 @@ class CTxOutPart:
         self.scriptPubKey = scriptPubKey
 
     def deserialize(self, f):
-        self.nValue = struct.unpack("<q", f.read(8))[0]
-        self.scriptPubKey = deser_string(f)
+        if self.nVersion == OUTPUT_TYPE_STANDARD:
+            self.nValue = struct.unpack("<q", f.read(8))[0]
+            self.scriptPubKey = deser_string(f)
+        elif self.nVersion == OUTPUT_TYPE_DATA:
+            self.data = deser_string(f)
+        elif self.nVersion == OUTPUT_TYPE_CT:
+            self.commitment = f.read(33)
+            self.data = deser_string(f)
+            self.scriptPubKey = deser_string(f)
+            self.rangeproof = deser_string(f)
+        else:
+            raise ValueError(f'Unknown output type {self.nVersion}')
 
-    def serialize(self):
+    def serialize(self, with_witness=True):
         r = b""
-        r += struct.pack("<q", self.nValue)
-        r += ser_string(self.scriptPubKey)
+        if self.nVersion == OUTPUT_TYPE_STANDARD:
+            r += struct.pack("<q", self.nValue)
+            r += ser_string(self.scriptPubKey)
+        elif self.nVersion == OUTPUT_TYPE_DATA:
+            r += ser_string(self.data)
+        elif self.nVersion == OUTPUT_TYPE_CT:
+            assert(len(self.commitment) == 33)
+            r += self.commitment
+            r += ser_string(self.data)
+            r += ser_string(self.scriptPubKey)
+            if with_witness:
+                r += ser_string(self.rangeproof)
+            else:
+                r += ser_compact_size(0)  # rangeproof stub
+        else:
+            raise ValueError(f'Unknown output type {self.nVersion}')
         return r
 
     def __repr__(self):
@@ -521,7 +545,7 @@ class CTransaction:
         self.sha256 = None
         self.hash = None
 
-    def serialize_without_witness(self):
+    def serialize_without_witness(self, include_rangeproof=False):
         if self.nVersion == PARTICL_TX_VERSION:
             r = struct.pack("<H", self.nVersion)
             r += struct.pack("<I", self.nLockTime)
@@ -529,7 +553,7 @@ class CTransaction:
             r += ser_compact_size(len(self.vout))
             for txo in self.vout:
                 r += bytes((txo.nVersion,))
-                r += txo.serialize()
+                r += txo.serialize(with_witness=include_rangeproof)
             return r
         r = b""
         r += struct.pack("<i", self.nVersion)
@@ -541,7 +565,7 @@ class CTransaction:
     # Only serialize with witness when explicitly called for
     def serialize_with_witness(self):
         if self.nVersion == PARTICL_TX_VERSION:
-            r = self.serialize_without_witness()
+            r = self.serialize_without_witness(include_rangeproof=True)
             while len(self.wit.vtxinwit) < len(self.vin):
                 self.wit.vtxinwit.append(CTxInWitness())
             r += self.wit.serialize()

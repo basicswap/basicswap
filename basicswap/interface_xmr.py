@@ -26,8 +26,7 @@ from .util import (
     ensure,
     dumpj,
     make_int,
-    format_amount)
-from .basicswap_util import (
+    format_amount,
     TemporaryError)
 from .rpc_xmr import (
     make_xmr_rpc_func,

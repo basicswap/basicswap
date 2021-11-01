@@ -13,16 +13,16 @@ from io import BytesIO
 from basicswap.contrib.test_framework import segwit_addr
 
 from .util import (
+    dumpj,
+    toWIF,
+    ensure,
+    make_int,
     b58encode,
+    decodeAddress,
     decodeScriptNum,
     getCompactSizeLen,
     SerialiseNumCompact,
-    dumpj,
-    format_amount,
-    make_int,
-    toWIF,
-    assert_cond,
-    decodeAddress)
+    getWitnessElementLen)
 from coincurve.keys import (
     PrivateKey,
     PublicKey)
@@ -50,11 +50,9 @@ from .contrib.test_framework.messages import (
     FromHex)
 
 from .contrib.test_framework.script import (
-    CScript,
-    CScriptOp,
+    CScript, CScriptOp,
     OP_IF, OP_ELSE, OP_ENDIF,
-    OP_0,
-    OP_2,
+    OP_0, OP_2,
     OP_CHECKSIG,
     OP_CHECKMULTISIG,
     OP_CHECKSEQUENCEVERIFY,
@@ -67,13 +65,17 @@ from .basicswap_util import (
     SEQUENCE_LOCK_BLOCKS,
     SEQUENCE_LOCK_TIME)
 
-from .chainparams import CoinInterface, Coins, chainparams
+from .chainparams import CoinInterface, Coins
 from .rpc import make_rpc_func
 
 
 SEQUENCE_LOCKTIME_GRANULARITY = 9  # 512 seconds
 SEQUENCE_LOCKTIME_TYPE_FLAG = (1 << 22)
 SEQUENCE_LOCKTIME_MASK = 0x0000ffff
+
+
+def ensure_op(v, err_string='Bad opcode'):
+    ensure(v, err_string)
 
 
 def findOutput(tx, script_pk):
@@ -188,7 +190,7 @@ class BTCInterface(CoinInterface):
         return self.rpc_callback('getblockheader', [block_hash])
 
     def initialiseWallet(self, key_bytes):
-        wif_prefix = chainparams[self.coin_type()][self._network]['key_prefix']
+        wif_prefix = self.chainparams_network()['key_prefix']
         key_wif = toWIF(wif_prefix, key_bytes)
 
         try:
@@ -211,7 +213,7 @@ class BTCInterface(CoinInterface):
 
         chain_synced = round(blockchaininfo['verificationprogress'], 3)
         if chain_synced < 1.0:
-            raise ValueError('{} chain isn\'t synced.'.format(self.chain_name()))
+            raise ValueError('{} chain isn\'t synced.'.format(self.coin_name()))
 
         block_hash = best_block
         while True:
@@ -241,23 +243,34 @@ class BTCInterface(CoinInterface):
                 return self.rpc_callback('getnetworkinfo')['relayfee'], 'relayfee'
 
     def decodeAddress(self, address):
-        bech32_prefix = chainparams[self.coin_type()][self._network]['hrp']
+        bech32_prefix = self.chainparams_network()['hrp']
         if address.startswith(bech32_prefix):
             return bytes(segwit_addr.decode(bech32_prefix, address)[1])
         return decodeAddress(address)[1:]
 
     def pubkey_to_segwit_address(self, pk):
-        bech32_prefix = chainparams[self.coin_type()][self._network]['hrp']
+        bech32_prefix = self.chainparams_network()['hrp']
         version = 0
         pkh = hash160(pk)
         return segwit_addr.encode(bech32_prefix, version, pkh)
 
-    def pubkey_to_address(self, pk):
-        assert(len(pk) == 33)
-        prefix = chainparams[self.coin_type()][self._network]['pubkey_address']
-        data = bytes((prefix,)) + hash160(pk)
+    def pkh_to_address(self, pkh):
+        # pkh is hash160(pk)
+        assert(len(pkh) == 20)
+        prefix = self.chainparams_network()['pubkey_address']
+        data = bytes((prefix,)) + pkh
         checksum = hashlib.sha256(hashlib.sha256(data).digest()).digest()
         return b58encode(data + checksum[0:4])
+
+    def encode_p2wsh(self, script):
+        bech32_prefix = self.chainparams_network()['hrp']
+        version = 0
+        program = script[2:]  # strip version and length
+        return segwit_addr.encode(bech32_prefix, version, program)
+
+    def pubkey_to_address(self, pk):
+        assert(len(pk) == 33)
+        return self.pkh_to_address(hash160(pk))
 
     def getNewSecretKey(self):
         return getSecretInt()
@@ -299,19 +312,19 @@ class BTCInterface(CoinInterface):
 
     def extractScriptLockScriptValues(self, script_bytes):
         script_len = len(script_bytes)
-        assert_cond(script_len == 71, 'Bad script length')
+        ensure(script_len == 71, 'Bad script length')
         o = 0
-        assert_cond(script_bytes[o] == OP_2)
-        assert_cond(script_bytes[o + 1] == 33)
+        ensure_op(script_bytes[o] == OP_2)
+        ensure_op(script_bytes[o + 1] == 33)
         o += 2
         pk1 = script_bytes[o: o + 33]
         o += 33
-        assert_cond(script_bytes[o] == 33)
+        ensure_op(script_bytes[o] == 33)
         o += 1
         pk2 = script_bytes[o: o + 33]
         o += 33
-        assert_cond(script_bytes[o] == OP_2)
-        assert_cond(script_bytes[o + 1] == OP_CHECKMULTISIG)
+        ensure_op(script_bytes[o] == OP_2)
+        ensure_op(script_bytes[o + 1] == OP_CHECKMULTISIG)
 
         return pk1, pk2
 
@@ -321,7 +334,7 @@ class BTCInterface(CoinInterface):
 
         return CScript([2, Kal_enc, Kaf_enc, 2, CScriptOp(OP_CHECKMULTISIG)])
 
-    def createScriptLockTx(self, value, Kal, Kaf):
+    def createScriptLockTx(self, value, Kal, Kaf, vkbv=None):
         script = self.genScriptLockTxScript(Kal, Kaf)
         tx = CTransaction()
         tx.nVersion = self.txVersion()
@@ -329,34 +342,37 @@ class BTCInterface(CoinInterface):
 
         return tx.serialize(), script
 
+    def fundScriptLockTx(self, tx_bytes, feerate, vkbv=None):
+        return self.fundTx(tx_bytes, feerate)
+
     def extractScriptLockRefundScriptValues(self, script_bytes):
         script_len = len(script_bytes)
-        assert_cond(script_len > 73, 'Bad script length')
-        assert_cond(script_bytes[0] == OP_IF)
-        assert_cond(script_bytes[1] == OP_2)
-        assert_cond(script_bytes[2] == 33)
+        ensure(script_len > 73, 'Bad script length')
+        ensure_op(script_bytes[0] == OP_IF)
+        ensure_op(script_bytes[1] == OP_2)
+        ensure_op(script_bytes[2] == 33)
         pk1 = script_bytes[3: 3 + 33]
-        assert_cond(script_bytes[36] == 33)
+        ensure_op(script_bytes[36] == 33)
         pk2 = script_bytes[37: 37 + 33]
-        assert_cond(script_bytes[70] == OP_2)
-        assert_cond(script_bytes[71] == OP_CHECKMULTISIG)
-        assert_cond(script_bytes[72] == OP_ELSE)
+        ensure_op(script_bytes[70] == OP_2)
+        ensure_op(script_bytes[71] == OP_CHECKMULTISIG)
+        ensure_op(script_bytes[72] == OP_ELSE)
         o = 73
         csv_val, nb = decodeScriptNum(script_bytes, o)
         o += nb
 
-        assert_cond(script_len == o + 5 + 33, 'Bad script length')  # Fails if script too long
-        assert_cond(script_bytes[o] == OP_CHECKSEQUENCEVERIFY)
+        ensure(script_len == o + 5 + 33, 'Bad script length')  # Fails if script too long
+        ensure_op(script_bytes[o] == OP_CHECKSEQUENCEVERIFY)
         o += 1
-        assert_cond(script_bytes[o] == OP_DROP)
+        ensure_op(script_bytes[o] == OP_DROP)
         o += 1
-        assert_cond(script_bytes[o] == 33)
+        ensure_op(script_bytes[o] == 33)
         o += 1
         pk3 = script_bytes[o: o + 33]
         o += 33
-        assert_cond(script_bytes[o] == OP_CHECKSIG)
+        ensure_op(script_bytes[o] == OP_CHECKSIG)
         o += 1
-        assert_cond(script_bytes[o] == OP_ENDIF)
+        ensure_op(script_bytes[o] == OP_ENDIF)
 
         return pk1, pk2, csv_val, pk3
 
@@ -373,30 +389,28 @@ class BTCInterface(CoinInterface):
             Kaf_enc, CScriptOp(OP_CHECKSIG),
             CScriptOp(OP_ENDIF)])
 
-    def createScriptLockRefundTx(self, tx_lock_bytes, script_lock, Kal, Kaf, lock1_value, csv_val, tx_fee_rate):
+    def createScriptLockRefundTx(self, tx_lock_bytes, script_lock, Kal, Kaf, lock1_value, csv_val, tx_fee_rate, vkbv=None):
         tx_lock = CTransaction()
         tx_lock = FromHex(tx_lock, tx_lock_bytes.hex())
 
         output_script = CScript([OP_0, hashlib.sha256(script_lock).digest()])
         locked_n = findOutput(tx_lock, output_script)
-        assert_cond(locked_n is not None, 'Output not found in tx')
+        ensure(locked_n is not None, 'Output not found in tx')
         locked_coin = tx_lock.vout[locked_n].nValue
 
         tx_lock.rehash()
-        tx_lock_hash_int = tx_lock.sha256
+        tx_lock_id_int = tx_lock.sha256
 
         refund_script = self.genScriptLockRefundTxScript(Kal, Kaf, csv_val)
         tx = CTransaction()
         tx.nVersion = self.txVersion()
-        tx.vin.append(CTxIn(COutPoint(tx_lock_hash_int, locked_n), nSequence=lock1_value))
+        tx.vin.append(CTxIn(COutPoint(tx_lock_id_int, locked_n), nSequence=lock1_value))
         tx.vout.append(self.txoType()(locked_coin, CScript([OP_0, hashlib.sha256(refund_script).digest()])))
 
-        witness_bytes = len(script_lock)
-        witness_bytes += 74 * 2  # 2 signatures (72 + 1 byte sighashtype + 1 byte size) - Use maximum txn size for estimate
-        witness_bytes += 2  # 2 empty witness stack values
-        witness_bytes += getCompactSizeLen(witness_bytes)
+        dummy_witness_stack = self.getScriptLockTxDummyWitness(script_lock)
+        witness_bytes = self.getWitnessStackSerialisedLength(dummy_witness_stack)
         vsize = self.getTxVSize(tx, add_witness_bytes=witness_bytes)
-        pay_fee = int(tx_fee_rate * vsize / 1000)
+        pay_fee = int(tx_fee_rate * vsize // 1000)
         tx.vout[0].nValue = locked_coin - pay_fee
 
         tx.rehash()
@@ -405,7 +419,7 @@ class BTCInterface(CoinInterface):
 
         return tx.serialize(), refund_script, tx.vout[0].nValue
 
-    def createScriptLockRefundSpendTx(self, tx_lock_refund_bytes, script_lock_refund, pkh_refund_to, tx_fee_rate):
+    def createScriptLockRefundSpendTx(self, tx_lock_refund_bytes, script_lock_refund, pkh_refund_to, tx_fee_rate, vkbv=None):
         # Returns the coinA locked coin to the leader
         # The follower will sign the multisig path with a signature encumbered by the leader's coinB spend pubkey
         # If the leader publishes the decrypted signature the leader's coinB spend privatekey will be revealed to the follower
@@ -414,7 +428,7 @@ class BTCInterface(CoinInterface):
 
         output_script = CScript([OP_0, hashlib.sha256(script_lock_refund).digest()])
         locked_n = findOutput(tx_lock_refund, output_script)
-        assert_cond(locked_n is not None, 'Output not found in tx')
+        ensure(locked_n is not None, 'Output not found in tx')
         locked_coin = tx_lock_refund.vout[locked_n].nValue
 
         tx_lock_refund.rehash()
@@ -426,12 +440,10 @@ class BTCInterface(CoinInterface):
 
         tx.vout.append(self.txoType()(locked_coin, self.getScriptForPubkeyHash(pkh_refund_to)))
 
-        witness_bytes = len(script_lock_refund)
-        witness_bytes += 74 * 2  # 2 signatures (72 + 1 byte sighashtype + 1 byte size) - Use maximum txn size for estimate
-        witness_bytes += 4  # 1 empty, 1 true witness stack values
-        witness_bytes += getCompactSizeLen(witness_bytes)
+        dummy_witness_stack = self.getScriptLockRefundSpendTxDummyWitness(script_lock_refund)
+        witness_bytes = self.getWitnessStackSerialisedLength(dummy_witness_stack)
         vsize = self.getTxVSize(tx, add_witness_bytes=witness_bytes)
-        pay_fee = int(tx_fee_rate * vsize / 1000)
+        pay_fee = int(tx_fee_rate * vsize // 1000)
         tx.vout[0].nValue = locked_coin - pay_fee
 
         tx.rehash()
@@ -440,14 +452,15 @@ class BTCInterface(CoinInterface):
 
         return tx.serialize()
 
-    def createScriptLockRefundSpendToFTx(self, tx_lock_refund_bytes, script_lock_refund, pkh_dest, tx_fee_rate):
+    def createScriptLockRefundSpendToFTx(self, tx_lock_refund_bytes, script_lock_refund, pkh_dest, tx_fee_rate, vkbv=None):
+        # lock refund swipe tx
         # Sends the coinA locked coin to the follower
 
         tx_lock_refund = self.loadTx(tx_lock_refund_bytes)
 
         output_script = CScript([OP_0, hashlib.sha256(script_lock_refund).digest()])
         locked_n = findOutput(tx_lock_refund, output_script)
-        assert_cond(locked_n is not None, 'Output not found in tx')
+        ensure(locked_n is not None, 'Output not found in tx')
         locked_coin = tx_lock_refund.vout[locked_n].nValue
 
         A, B, lock2_value, C = self.extractScriptLockRefundScriptValues(script_lock_refund)
@@ -461,12 +474,10 @@ class BTCInterface(CoinInterface):
 
         tx.vout.append(self.txoType()(locked_coin, self.getScriptForPubkeyHash(pkh_dest)))
 
-        witness_bytes = len(script_lock_refund)
-        witness_bytes += 74  # 2 signatures (72 + 1 byte sighashtype + 1 byte size) - Use maximum txn size for estimate
-        witness_bytes += 1  # 1 empty stack value
-        witness_bytes += getCompactSizeLen(witness_bytes)
+        dummy_witness_stack = self.getScriptLockRefundSwipeTxDummyWitness(script_lock_refund)
+        witness_bytes = self.getWitnessStackSerialisedLength(dummy_witness_stack)
         vsize = self.getTxVSize(tx, add_witness_bytes=witness_bytes)
-        pay_fee = int(tx_fee_rate * vsize / 1000)
+        pay_fee = int(tx_fee_rate * vsize // 1000)
         tx.vout[0].nValue = locked_coin - pay_fee
 
         tx.rehash()
@@ -475,29 +486,26 @@ class BTCInterface(CoinInterface):
 
         return tx.serialize()
 
-    def createScriptLockSpendTx(self, tx_lock_bytes, script_lock, pkh_dest, tx_fee_rate):
+    def createScriptLockSpendTx(self, tx_lock_bytes, script_lock, pkh_dest, tx_fee_rate, vkbv=None):
         tx_lock = self.loadTx(tx_lock_bytes)
         output_script = CScript([OP_0, hashlib.sha256(script_lock).digest()])
         locked_n = findOutput(tx_lock, output_script)
-        assert_cond(locked_n is not None, 'Output not found in tx')
+        ensure(locked_n is not None, 'Output not found in tx')
         locked_coin = tx_lock.vout[locked_n].nValue
 
         tx_lock.rehash()
-        tx_lock_hash_int = tx_lock.sha256
+        tx_lock_id_int = tx_lock.sha256
 
         tx = CTransaction()
         tx.nVersion = self.txVersion()
-        tx.vin.append(CTxIn(COutPoint(tx_lock_hash_int, locked_n)))
+        tx.vin.append(CTxIn(COutPoint(tx_lock_id_int, locked_n)))
 
         tx.vout.append(self.txoType()(locked_coin, self.getScriptForPubkeyHash(pkh_dest)))
 
-        witness_bytes = len(script_lock)
-        witness_bytes += 33  # sv, size
-        witness_bytes += 74 * 2  # 2 signatures (72 + 1 byte sighashtype + 1 byte size) - Use maximum txn size for estimate
-        witness_bytes += 4  # 1 empty, 1 true witness stack values
-        witness_bytes += getCompactSizeLen(witness_bytes)
+        dummy_witness_stack = self.getScriptLockTxDummyWitness(script_lock)
+        witness_bytes = self.getWitnessStackSerialisedLength(dummy_witness_stack)
         vsize = self.getTxVSize(tx, add_witness_bytes=witness_bytes)
-        pay_fee = int(tx_fee_rate * vsize / 1000)
+        pay_fee = int(tx_fee_rate * vsize // 1000)
         tx.vout[0].nValue = locked_coin - pay_fee
 
         tx.rehash()
@@ -510,7 +518,7 @@ class BTCInterface(CoinInterface):
                      swap_value,
                      Kal, Kaf,
                      feerate,
-                     check_lock_tx_inputs):
+                     check_lock_tx_inputs, vkbv=None):
         # Verify:
         #
 
@@ -519,26 +527,28 @@ class BTCInterface(CoinInterface):
         # Check fee is reasonable
 
         tx = self.loadTx(tx_bytes)
-        tx_hash = self.getTxHash(tx)
-        self._log.info('Verifying lock tx: {}.'.format(b2h(tx_hash)))
+        txid = self.getTxid(tx)
+        self._log.info('Verifying lock tx: {}.'.format(b2h(txid)))
 
-        assert_cond(tx.nVersion == self.txVersion(), 'Bad version')
-        assert_cond(tx.nLockTime == 0, 'Bad nLockTime')
+        ensure(tx.nVersion == self.txVersion(), 'Bad version')
+        ensure(tx.nLockTime == 0, 'Bad nLockTime')  # TODO match txns created by cores
 
         script_pk = CScript([OP_0, hashlib.sha256(script_out).digest()])
         locked_n = findOutput(tx, script_pk)
-        assert_cond(locked_n is not None, 'Output not found in tx')
+        ensure(locked_n is not None, 'Output not found in tx')
         locked_coin = tx.vout[locked_n].nValue
 
-        assert_cond(locked_coin == swap_value, 'Bad locked value')
+        # Check value
+        ensure(locked_coin == swap_value, 'Bad locked value')
 
-        # Check script and values
+        # Check script
         A, B = self.extractScriptLockScriptValues(script_out)
-        assert_cond(A == Kal, 'Bad script pubkey')
-        assert_cond(B == Kaf, 'Bad script pubkey')
+        ensure(A == Kal, 'Bad script pubkey')
+        ensure(B == Kaf, 'Bad script pubkey')
 
         if check_lock_tx_inputs:
-            # Check that inputs are unspent and verify fee rate
+            # TODO: Check that inputs are unspent
+            # Verify fee rate
             inputs_value = 0
             add_bytes = 0
             add_witness_bytes = getCompactSizeLen(len(tx.vin))
@@ -562,7 +572,7 @@ class BTCInterface(CoinInterface):
             assert(fee_paid > 0)
 
             vsize = self.getTxVSize(tx, add_bytes, add_witness_bytes)
-            fee_rate_paid = fee_paid * 1000 / vsize
+            fee_rate_paid = fee_paid * 1000 // vsize
 
             self._log.info('tx amount, vsize, feerate: %ld, %ld, %ld', locked_coin, vsize, fee_rate_paid)
 
@@ -570,97 +580,93 @@ class BTCInterface(CoinInterface):
                 self._log.warning('feerate paid doesn\'t match expected: %ld, %ld', fee_rate_paid, feerate)
                 # TODO: Display warning to user
 
-        return tx_hash, locked_n
+        return txid, locked_n
 
-    def verifyLockRefundTx(self, tx_bytes, script_out,
+    def verifyLockRefundTx(self, tx_bytes, lock_tx_bytes, script_out,
                            prevout_id, prevout_n, prevout_seq, prevout_script,
-                           Kal, Kaf, csv_val_expect, swap_value, feerate):
+                           Kal, Kaf, csv_val_expect, swap_value, feerate, vkbv=None):
         # Verify:
         #   Must have only one input with correct prevout and sequence
         #   Must have only one output to the p2wsh of the lock refund script
         #   Output value must be locked_coin - lock tx fee
 
         tx = self.loadTx(tx_bytes)
-        tx_hash = self.getTxHash(tx)
-        self._log.info('Verifying lock refund tx: {}.'.format(b2h(tx_hash)))
+        txid = self.getTxid(tx)
+        self._log.info('Verifying lock refund tx: {}.'.format(b2h(txid)))
 
-        assert_cond(tx.nVersion == self.txVersion(), 'Bad version')
-        assert_cond(tx.nLockTime == 0, 'nLockTime not 0')
-        assert_cond(len(tx.vin) == 1, 'tx doesn\'t have one input')
+        ensure(tx.nVersion == self.txVersion(), 'Bad version')
+        ensure(tx.nLockTime == 0, 'nLockTime not 0')
+        ensure(len(tx.vin) == 1, 'tx doesn\'t have one input')
 
-        assert_cond(tx.vin[0].nSequence == prevout_seq, 'Bad input nSequence')
-        assert_cond(len(tx.vin[0].scriptSig) == 0, 'Input scriptsig not empty')
-        assert_cond(tx.vin[0].prevout.hash == b2i(prevout_id) and tx.vin[0].prevout.n == prevout_n, 'Input prevout mismatch')
+        ensure(tx.vin[0].nSequence == prevout_seq, 'Bad input nSequence')
+        ensure(len(tx.vin[0].scriptSig) == 0, 'Input scriptsig not empty')
+        ensure(tx.vin[0].prevout.hash == b2i(prevout_id) and tx.vin[0].prevout.n == prevout_n, 'Input prevout mismatch')
 
-        assert_cond(len(tx.vout) == 1, 'tx doesn\'t have one output')
+        ensure(len(tx.vout) == 1, 'tx doesn\'t have one output')
 
         script_pk = CScript([OP_0, hashlib.sha256(script_out).digest()])
         locked_n = findOutput(tx, script_pk)
-        assert_cond(locked_n is not None, 'Output not found in tx')
+        ensure(locked_n is not None, 'Output not found in tx')
         locked_coin = tx.vout[locked_n].nValue
 
         # Check script and values
         A, B, csv_val, C = self.extractScriptLockRefundScriptValues(script_out)
-        assert_cond(A == Kal, 'Bad script pubkey')
-        assert_cond(B == Kaf, 'Bad script pubkey')
-        assert_cond(csv_val == csv_val_expect, 'Bad script csv value')
-        assert_cond(C == Kaf, 'Bad script pubkey')
+        ensure(A == Kal, 'Bad script pubkey')
+        ensure(B == Kaf, 'Bad script pubkey')
+        ensure(csv_val == csv_val_expect, 'Bad script csv value')
+        ensure(C == Kaf, 'Bad script pubkey')
 
         fee_paid = swap_value - locked_coin
         assert(fee_paid > 0)
 
-        witness_bytes = len(prevout_script)
-        witness_bytes += 74 * 2  # 2 signatures (72 + 1 byte sighashtype + 1 byte size) - Use maximum txn size for estimate
-        witness_bytes += 2  # 2 empty witness stack values
-        witness_bytes += getCompactSizeLen(witness_bytes)
+        dummy_witness_stack = self.getScriptLockTxDummyWitness(prevout_script)
+        witness_bytes = self.getWitnessStackSerialisedLength(dummy_witness_stack)
         vsize = self.getTxVSize(tx, add_witness_bytes=witness_bytes)
-        fee_rate_paid = fee_paid * 1000 / vsize
+        fee_rate_paid = fee_paid * 1000 // vsize
 
         self._log.info('tx amount, vsize, feerate: %ld, %ld, %ld', locked_coin, vsize, fee_rate_paid)
 
         if not self.compareFeeRates(fee_rate_paid, feerate):
             raise ValueError('Bad fee rate, expected: {}'.format(feerate))
 
-        return tx_hash, locked_coin
+        return txid, locked_coin, locked_n
 
-    def verifyLockRefundSpendTx(self, tx_bytes,
+    def verifyLockRefundSpendTx(self, tx_bytes, lock_refund_tx_bytes,
                                 lock_refund_tx_id, prevout_script,
                                 Kal,
-                                prevout_value, feerate):
+                                prevout_n, prevout_value, feerate, vkbv=None):
         # Verify:
         #   Must have only one input with correct prevout (n is always 0) and sequence
         #   Must have only one output sending lock refund tx value - fee to leader's address, TODO: follower shouldn't need to verify destination addr
         tx = self.loadTx(tx_bytes)
-        tx_hash = self.getTxHash(tx)
-        self._log.info('Verifying lock refund spend tx: {}.'.format(b2h(tx_hash)))
+        txid = self.getTxid(tx)
+        self._log.info('Verifying lock refund spend tx: {}.'.format(b2h(txid)))
 
-        assert_cond(tx.nVersion == self.txVersion(), 'Bad version')
-        assert_cond(tx.nLockTime == 0, 'nLockTime not 0')
-        assert_cond(len(tx.vin) == 1, 'tx doesn\'t have one input')
+        ensure(tx.nVersion == self.txVersion(), 'Bad version')
+        ensure(tx.nLockTime == 0, 'nLockTime not 0')
+        ensure(len(tx.vin) == 1, 'tx doesn\'t have one input')
 
-        assert_cond(tx.vin[0].nSequence == 0, 'Bad input nSequence')
-        assert_cond(len(tx.vin[0].scriptSig) == 0, 'Input scriptsig not empty')
-        assert_cond(tx.vin[0].prevout.hash == b2i(lock_refund_tx_id) and tx.vin[0].prevout.n == 0, 'Input prevout mismatch')
+        ensure(tx.vin[0].nSequence == 0, 'Bad input nSequence')
+        ensure(len(tx.vin[0].scriptSig) == 0, 'Input scriptsig not empty')
+        ensure(tx.vin[0].prevout.hash == b2i(lock_refund_tx_id) and tx.vin[0].prevout.n == 0, 'Input prevout mismatch')
 
-        assert_cond(len(tx.vout) == 1, 'tx doesn\'t have one output')
+        ensure(len(tx.vout) == 1, 'tx doesn\'t have one output')
 
         # Destination doesn't matter to the follower
         '''
         p2wpkh = CScript([OP_0, hash160(Kal)])
         locked_n = findOutput(tx, p2wpkh)
-        assert_cond(locked_n is not None, 'Output not found in lock refund spend tx')
+        ensure(locked_n is not None, 'Output not found in lock refund spend tx')
         '''
         tx_value = tx.vout[0].nValue
 
         fee_paid = prevout_value - tx_value
         assert(fee_paid > 0)
 
-        witness_bytes = len(prevout_script)
-        witness_bytes += 74 * 2  # 2 signatures (72 + 1 byte sighashtype + 1 byte size) - Use maximum txn size for estimate
-        witness_bytes += 4  # 1 empty, 1 true witness stack values
-        witness_bytes += getCompactSizeLen(witness_bytes)
+        dummy_witness_stack = self.getScriptLockRefundSpendTxDummyWitness(prevout_script)
+        witness_bytes = self.getWitnessStackSerialisedLength(dummy_witness_stack)
         vsize = self.getTxVSize(tx, add_witness_bytes=witness_bytes)
-        fee_rate_paid = fee_paid * 1000 / vsize
+        fee_rate_paid = fee_paid * 1000 // vsize
 
         self._log.info('tx amount, vsize, feerate: %ld, %ld, %ld', tx_value, vsize, fee_rate_paid)
 
@@ -671,45 +677,43 @@ class BTCInterface(CoinInterface):
 
     def verifyLockSpendTx(self, tx_bytes,
                           lock_tx_bytes, lock_tx_script,
-                          a_pkhash_f, feerate):
+                          a_pkhash_f, feerate, vkbv=None):
         # Verify:
         #   Must have only one input with correct prevout (n is always 0) and sequence
         #   Must have only one output with destination and amount
 
         tx = self.loadTx(tx_bytes)
-        tx_hash = self.getTxHash(tx)
-        self._log.info('Verifying lock spend tx: {}.'.format(b2h(tx_hash)))
+        txid = self.getTxid(tx)
+        self._log.info('Verifying lock spend tx: {}.'.format(b2h(txid)))
 
-        assert_cond(tx.nVersion == self.txVersion(), 'Bad version')
-        assert_cond(tx.nLockTime == 0, 'nLockTime not 0')
-        assert_cond(len(tx.vin) == 1, 'tx doesn\'t have one input')
+        ensure(tx.nVersion == self.txVersion(), 'Bad version')
+        ensure(tx.nLockTime == 0, 'nLockTime not 0')
+        ensure(len(tx.vin) == 1, 'tx doesn\'t have one input')
 
         lock_tx = self.loadTx(lock_tx_bytes)
-        lock_tx_id = self.getTxHash(lock_tx)
+        lock_tx_id = self.getTxid(lock_tx)
 
         output_script = CScript([OP_0, hashlib.sha256(lock_tx_script).digest()])
         locked_n = findOutput(lock_tx, output_script)
-        assert_cond(locked_n is not None, 'Output not found in tx')
+        ensure(locked_n is not None, 'Output not found in tx')
         locked_coin = lock_tx.vout[locked_n].nValue
 
-        assert_cond(tx.vin[0].nSequence == 0, 'Bad input nSequence')
-        assert_cond(len(tx.vin[0].scriptSig) == 0, 'Input scriptsig not empty')
-        assert_cond(tx.vin[0].prevout.hash == b2i(lock_tx_id) and tx.vin[0].prevout.n == locked_n, 'Input prevout mismatch')
+        ensure(tx.vin[0].nSequence == 0, 'Bad input nSequence')
+        ensure(len(tx.vin[0].scriptSig) == 0, 'Input scriptsig not empty')
+        ensure(tx.vin[0].prevout.hash == b2i(lock_tx_id) and tx.vin[0].prevout.n == locked_n, 'Input prevout mismatch')
 
-        assert_cond(len(tx.vout) == 1, 'tx doesn\'t have one output')
+        ensure(len(tx.vout) == 1, 'tx doesn\'t have one output')
         p2wpkh = self.getScriptForPubkeyHash(a_pkhash_f)
-        assert_cond(tx.vout[0].scriptPubKey == p2wpkh, 'Bad output destination')
+        ensure(tx.vout[0].scriptPubKey == p2wpkh, 'Bad output destination')
 
+        # The value of the lock tx output should already be verified, if the fee is as expected the difference will be the correct amount
         fee_paid = locked_coin - tx.vout[0].nValue
         assert(fee_paid > 0)
 
-        witness_bytes = len(lock_tx_script)
-        witness_bytes += 33  # sv, size
-        witness_bytes += 74 * 2  # 2 signatures (72 + 1 byte sighashtype + 1 byte size) - Use maximum txn size for estimate
-        witness_bytes += 4  # 1 empty, 1 true witness stack values
-        witness_bytes += getCompactSizeLen(witness_bytes)
+        dummy_witness_stack = self.getScriptLockTxDummyWitness(lock_tx_script)
+        witness_bytes = self.getWitnessStackSerialisedLength(dummy_witness_stack)
         vsize = self.getTxVSize(tx, add_witness_bytes=witness_bytes)
-        fee_rate_paid = fee_paid * 1000 / vsize
+        fee_rate_paid = fee_paid * 1000 // vsize
 
         self._log.info('tx amount, vsize, feerate: %ld, %ld, %ld', tx.vout[0].nValue, vsize, fee_rate_paid)
 
@@ -718,30 +722,30 @@ class BTCInterface(CoinInterface):
 
         return True
 
-    def signTx(self, key_bytes, tx_bytes, prevout_n, prevout_script, prevout_value):
+    def signTx(self, key_bytes, tx_bytes, input_n, prevout_script, prevout_value):
         tx = self.loadTx(tx_bytes)
-        sig_hash = SegwitV0SignatureHash(prevout_script, tx, prevout_n, SIGHASH_ALL, prevout_value)
+        sig_hash = SegwitV0SignatureHash(prevout_script, tx, input_n, SIGHASH_ALL, prevout_value)
 
         eck = PrivateKey(key_bytes)
         return eck.sign(sig_hash, hasher=None) + bytes((SIGHASH_ALL,))
 
-    def signTxOtVES(self, key_sign, pubkey_encrypt, tx_bytes, prevout_n, prevout_script, prevout_value):
+    def signTxOtVES(self, key_sign, pubkey_encrypt, tx_bytes, input_n, prevout_script, prevout_value):
         tx = self.loadTx(tx_bytes)
-        sig_hash = SegwitV0SignatureHash(prevout_script, tx, prevout_n, SIGHASH_ALL, prevout_value)
+        sig_hash = SegwitV0SignatureHash(prevout_script, tx, input_n, SIGHASH_ALL, prevout_value)
 
         return ecdsaotves_enc_sign(key_sign, pubkey_encrypt, sig_hash)
 
-    def verifyTxOtVES(self, tx_bytes, ct, Ks, Ke, prevout_n, prevout_script, prevout_value):
+    def verifyTxOtVES(self, tx_bytes, ct, Ks, Ke, input_n, prevout_script, prevout_value):
         tx = self.loadTx(tx_bytes)
-        sig_hash = SegwitV0SignatureHash(prevout_script, tx, prevout_n, SIGHASH_ALL, prevout_value)
+        sig_hash = SegwitV0SignatureHash(prevout_script, tx, input_n, SIGHASH_ALL, prevout_value)
         return ecdsaotves_enc_verify(Ks, Ke, sig_hash, ct)
 
     def decryptOtVES(self, k, esig):
         return ecdsaotves_dec_sig(k, esig) + bytes((SIGHASH_ALL,))
 
-    def verifyTxSig(self, tx_bytes, sig, K, prevout_n, prevout_script, prevout_value):
+    def verifyTxSig(self, tx_bytes, sig, K, input_n, prevout_script, prevout_value):
         tx = self.loadTx(tx_bytes)
-        sig_hash = SegwitV0SignatureHash(prevout_script, tx, prevout_n, SIGHASH_ALL, prevout_value)
+        sig_hash = SegwitV0SignatureHash(prevout_script, tx, input_n, SIGHASH_ALL, prevout_value)
 
         pubkey = PublicKey(K)
         return pubkey.verify(sig[: -1], sig_hash, hasher=None)  # Pop the hashtype byte
@@ -751,7 +755,7 @@ class BTCInterface(CoinInterface):
         return pubkey.verify(sig, signed_hash, hasher=None)
 
     def fundTx(self, tx, feerate):
-        feerate_str = format_amount(feerate, self.exp())
+        feerate_str = self.format_amount(feerate)
         # TODO: unlock unspents if bid cancelled
         options = {
             'lockUnspents': True,
@@ -784,7 +788,9 @@ class BTCInterface(CoinInterface):
         tx.deserialize(BytesIO(tx_bytes))
         return tx
 
-    def getTxHash(self, tx):
+    def getTxid(self, tx):
+        if isinstance(tx, str):
+            tx = bytes.fromhex(tx)
         if isinstance(tx, bytes):
             tx = self.loadTx(tx)
         tx.rehash()
@@ -829,6 +835,11 @@ class BTCInterface(CoinInterface):
         tx.wit.vtxinwit[0].scriptWitness.stack = stack
         return tx.serialize()
 
+    def stripTxSignature(self, tx_bytes):
+        tx = self.loadTx(tx_bytes)
+        tx.wit.vtxinwit.clear()
+        return tx.serialize()
+
     def extractLeaderSig(self, tx_bytes):
         tx = self.loadTx(tx_bytes)
         return tx.wit.vtxinwit[0].scriptWitness.stack[1]
@@ -851,7 +862,7 @@ class BTCInterface(CoinInterface):
         b_lock_tx = self.createBLockTx(Kbs, output_amount)
 
         b_lock_tx = self.fundTx(b_lock_tx, feerate)
-        b_lock_tx_id = self.getTxHash(b_lock_tx)
+        b_lock_tx_id = self.getTxid(b_lock_tx)
         b_lock_tx = self.signTxWithWallet(b_lock_tx)
 
         return self.publishTx(b_lock_tx)
@@ -881,7 +892,6 @@ class BTCInterface(CoinInterface):
         return None
 
     def waitForLockTxB(self, kbv, Kbs, cb_swap_value, cb_block_confirmed):
-
         raw_dest = self.getPkDest(Kbs)
 
         for i in range(20):
@@ -899,9 +909,36 @@ class BTCInterface(CoinInterface):
         return False
 
     def spendBLockTx(self, chain_b_lock_txid, address_to, kbv, kbs, cb_swap_value, b_fee, restore_height):
-        print('TODO: spendBLockTx')
+        raise ValueError('TODO')
 
-    def getOutput(self, txid, dest_script, expect_value):
+    def getLockTxHeight(self, txid, dest_script, bid_amount, xmr_swap):
+        rv = None
+        p2wsh_addr = self.encode_p2wsh(dest_script)
+
+        addr_info = self.rpc_callback('getaddressinfo', [p2wsh_addr])
+        if not addr_info['iswatchonly']:
+            ro = self.rpc_callback('importaddress', [p2wsh_addr, 'bid', False])
+            self._log.info('Imported watch-only addr: {}'.format(p2wsh_addr))
+            self._log.info('Rescanning chain from height: {}'.format(xmr_swap.start_chain_a_height))
+            self.rpc_callback('rescanblockchain', [xmr_swap.start_chain_a_height])
+
+        try:
+            tx = self.rpc_callback('gettransaction', [txid.hex()])
+
+            block_height = 0
+            if 'blockhash' in tx:
+                block_header = self.rpc_callback('getblockheader', [tx['blockhash']])
+                block_height = block_header['height']
+
+            rv = {
+                'depth': 0 if 'confirmations' not in tx else tx['confirmations'],
+                'height': block_height}
+        except Exception as e:
+            pass
+
+        return rv
+
+    def getOutput(self, txid, dest_script, expect_value, xmr_swap=None):
         # TODO: Use getrawtransaction if txindex is active
         utxos = self.rpc_callback('scantxoutset', ['start', ['raw({})'.format(dest_script.hex())]])
         if 'height' in utxos:  # chain_height not returned by v18 codebase
@@ -942,7 +979,7 @@ class BTCInterface(CoinInterface):
 
     def verifyMessage(self, address, message, signature, message_magic=None) -> bool:
         if message_magic is None:
-            message_magic = chainparams[self.coin_type()]['message_magic']
+            message_magic = self.chainparams_network()['message_magic']
 
         message_bytes = SerialiseNumCompact(len(message_magic)) + bytes(message_magic, 'utf-8') + SerialiseNumCompact(len(message)) + bytes(message, 'utf-8')
         message_hash = hashlib.sha256(hashlib.sha256(message_bytes).digest()).digest()
@@ -961,7 +998,51 @@ class BTCInterface(CoinInterface):
         return True if address_hash == pubkey_hash else False
 
     def showLockTransfers(self, Kbv, Kbs):
-        return 'Unimplemented'
+        raise ValueError('Unimplemented')
+
+    def getLockTxSwapOutputValue(self, bid, xmr_swap):
+        return bid.amount
+
+    def getLockRefundTxSwapOutputValue(self, bid, xmr_swap):
+        return xmr_swap.a_swap_refund_value
+
+    def getLockRefundTxSwapOutput(self, xmr_swap):
+        # Only one prevout exists
+        return 0
+
+    def getScriptLockTxDummyWitness(self, script):
+        return [
+            b''.hex(),
+            bytes(72).hex(),
+            bytes(72).hex(),
+            bytes(len(script)).hex()
+        ]
+
+    def getScriptLockRefundSpendTxDummyWitness(self, script):
+        return [
+            b''.hex(),
+            bytes(72).hex(),
+            bytes(72).hex(),
+            bytes((1,)).hex(),
+            bytes(len(script)).hex()
+        ]
+
+    def getScriptLockRefundSwipeTxDummyWitness(self, script):
+        return [
+            bytes(72).hex(),
+            b''.hex(),
+            bytes(len(script)).hex()
+        ]
+
+    def getWitnessStackSerialisedLength(self, witness_stack):
+        length = getCompactSizeLen(len(witness_stack))
+        for e in witness_stack:
+            length += getWitnessElementLen(len(e) // 2)  # hex -> bytes
+
+        # See core SerializeTransaction
+        length += 32 + 4 + 1 + 4  # vinDummy
+        length += 1  # flags
+        return length
 
 
 def testBTCInterface():

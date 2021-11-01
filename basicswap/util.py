@@ -22,9 +22,13 @@ decimal_ctx = decimal.Context()
 decimal_ctx.prec = 20
 
 
-def assert_cond(v, err='Bad opcode'):
+class TemporaryError(ValueError):
+    pass
+
+
+def ensure(v, err_string):
     if not v:
-        raise ValueError(err)
+        raise ValueError(err_string)
 
 
 def toBool(s) -> bool:
@@ -222,6 +226,10 @@ def getCompactSizeLen(v):
     raise ValueError('Value too large')
 
 
+def getWitnessElementLen(v):
+    return getCompactSizeLen(v) + v
+
+
 def SerialiseNumCompact(v):
     if v < 253:
         return bytes((v,))
@@ -339,8 +347,3 @@ def encodeStealthAddress(prefix_byte, scan_pubkey, spend_pubkey):
     b = bytes((prefix_byte,)) + data
     b += hashlib.sha256(hashlib.sha256(b).digest()).digest()[:4]
     return b58encode(b)
-
-
-def ensure(passed, err_string):
-    if not passed:
-        raise ValueError(err_string)

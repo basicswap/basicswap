@@ -11,6 +11,7 @@ from .util import (
     COIN,
     make_int,
     format_amount,
+    TemporaryError,
 )
 
 XMR_COIN = 10 ** 12
@@ -248,3 +249,21 @@ class CoinInterface:
 
     def knownWalletSeed(self):
         return not self._unknown_wallet_seed
+
+    def chainparams(self):
+        return chainparams[self.coin_type()]
+
+    def chainparams_network(self):
+        return chainparams[self.coin_type()][self._network]
+
+    def is_transient_error(self, ex):
+        if isinstance(ex, TemporaryError):
+            return True
+        str_error = str(ex).lower()
+        if 'not enough unlocked money' in str_error:
+            return True
+        if 'transaction was rejected by daemon' in str_error:
+            return True
+        if 'invalid unlocked_balance' in str_error:
+            return True
+        return False
