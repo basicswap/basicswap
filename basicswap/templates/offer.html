@@ -65,7 +65,7 @@
 {% else %}
 <input type="submit" name="newbid" value="New Bid">
 {% if data.sent == 'True' and data.was_revoked != true %}
-<input name="revoke_offer" type="submit" value="Revoke Offer" onclick="confirmPopup()">
+<input name="revoke_offer" type="submit" value="Revoke Offer" onclick="return confirmPopup();">
 {% endif %}
 {% endif %}
 <input type="hidden" name="formid" value="{{ form_id }}">
@@ -83,7 +83,7 @@
 
 <script>
 function confirmPopup() {
-    confirm("Are you sure?");
+    return confirm("Are you sure?");
 }
 </script>
 </body></html>

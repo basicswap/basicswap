@@ -38,10 +38,10 @@
 {% endif %}
 <tr><td><input type="submit" name="apply_{{ c.name }}" value="Apply">
 {% if c.can_disable == true %}
-<input type="submit" name="disable_{{ c.name }}" value="Disable" onclick="confirmPopup('Disable', '{{ c.name|capitalize }}')">
+<input type="submit" name="disable_{{ c.name }}" value="Disable" onclick="return confirmPopup('Disable', '{{ c.name|capitalize }}');">
 {% endif %}
 {% if c.can_reenable == true %}
-<input type="submit" name="enable_{{ c.name }}" value="Enable" onclick="confirmPopup('Enable', '{{ c.name|capitalize }}')">
+<input type="submit" name="enable_{{ c.name }}" value="Enable" onclick="return confirmPopup('Enable', '{{ c.name|capitalize }}');">
 {% endif %}
 </td></tr>
 </table>
@@ -54,7 +54,7 @@
 <p><a href="/">home</a></p>
 <script>
 function confirmPopup(action, coin_name) {
-    confirm(action + " " + coin_name + "?\nWill shutdown basicswap.");
+    return confirm(action + " " + coin_name + "?\nWill shutdown basicswap.");
 }
 </script>
 </body></html>

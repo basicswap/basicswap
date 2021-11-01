@@ -58,7 +58,7 @@
 <input name="accept_bid" type="submit" value="Accept Bid"><br/>
 {% endif %}
 {% if data.can_abandon == true %}
-<input name="abandon_bid" type="submit" value="Abandon Bid" onclick="confirmPopup()">
+<input name="abandon_bid" type="submit" value="Abandon Bid" onclick="return confirmPopup();">
 {% endif %}
 {% if data.show_txns %}
 <input name="hide_txns" type="submit" value="Hide Info">
@@ -90,7 +90,7 @@
 <p><a href="/">home</a></p>
 <script>
 function confirmPopup() {
-    confirm("Are you sure?");
+    return confirm("Are you sure?");
 }
 </script>
 </body></html>

@@ -35,12 +35,12 @@
 
 <tr><td>Blocks:</td><td>{{ w.blocks }}</td></tr>
 <tr><td>Synced:</td><td>{{ w.synced }}</td></tr>
-<tr><td>Expected Seed:</td><td>{{ w.expected_seed }}</td>{% if w.expected_seed != true %}<td><input type="submit" name="reseed_{{ w.cid }}" value="Reseed wallet" onclick="confirmReseed()"></td>{% endif %}</tr>
+<tr><td>Expected Seed:</td><td>{{ w.expected_seed }}</td>{% if w.expected_seed != true %}<td><input type="submit" name="reseed_{{ w.cid }}" value="Reseed wallet" onclick="return confirmReseed();"></td>{% endif %}</tr>
 {% if w.cid == '1' %}
 <tr><td>Stealth Address</td><td colspan=2>{{ w.stealth_address }}</td></tr>
 {% endif %}
 <tr><td><input type="submit" name="newaddr_{{ w.cid }}" value="Deposit Address"></td><td colspan=2>{{ w.deposit_address }}</td></tr>
-<tr><td><input type="submit" name="withdraw_{{ w.cid }}" value="Withdraw"></td><td>Amount: <input type="text" name="amt_{{ w.cid }}" value="{{ w.wd_value }}"></td><td>Address: <input type="text" name="to_{{ w.cid }}" value="{{ w.wd_address }}"></td><td>Subtract fee: <input type="checkbox" name="subfee_{{ w.cid }}" {% if w.wd_subfee==true %} checked="true"{% endif %}></td></tr>
+<tr><td><input type="submit" name="withdraw_{{ w.cid }}" value="Withdraw" onclick="return confirmWithdrawal();"></td><td>Amount: <input type="text" name="amt_{{ w.cid }}" value="{{ w.wd_value }}"></td><td>Address: <input type="text" name="to_{{ w.cid }}" value="{{ w.wd_address }}"></td><td>Subtract fee: <input type="checkbox" name="subfee_{{ w.cid }}" {% if w.wd_subfee==true %} checked="true"{% endif %}></td></tr>
 {% if w.cid == '1' %}
 <tr><td>Type From, To</td><td>
 <select name="withdraw_type_from_{{ w.cid }}">
@@ -67,7 +67,10 @@
 
 <script>
 function confirmReseed() {
-    confirm("Are you sure?\nBackup your wallet before and after.\nWon't detect used keys.\nShould only be used for new wallets.");
+    return confirm("Are you sure?\nBackup your wallet before and after.\nWon't detect used keys.\nShould only be used for new wallets.");
+}
+function confirmWithdrawal() {
+    return confirm("Are you sure?");
 }
 </script>
 </body></html>
