@@ -1044,6 +1044,9 @@ class BTCInterface(CoinInterface):
         length += 1  # flags
         return length
 
+    def describeTx(self, tx_hex):
+        return self.rpc_callback('decoderawtransaction', [tx_hex])
+
 
 def testBTCInterface():
     print('testBTCInterface')

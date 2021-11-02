@@ -203,6 +203,8 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
             state_description = f'Waiting for {ticker_to} lock tx spend tx to confirm in chain'
 
     data = {
+        'coin_from': ci_from.coin_name(),
+        'coin_to': ci_to.coin_name(),
         'amt_from': ci_from.format_amount(bid.amount),
         'amt_to': ci_to.format_amount((bid.amount * offer.rate) // ci_from.COIN()),
         'ticker_from': ticker_from,
@@ -291,5 +293,10 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
                     data['view_tx_hex'] = xmr_swap.a_lock_refund_tx.hex()
                 if view_tx_id == xmr_swap.a_lock_refund_spend_tx_id and xmr_swap.a_lock_refund_spend_tx:
                     data['view_tx_hex'] = xmr_swap.a_lock_refund_spend_tx.hex()
+                if view_tx_id == xmr_swap.a_lock_spend_tx_id and xmr_swap.a_lock_spend_tx:
+                    data['view_tx_hex'] = xmr_swap.a_lock_spend_tx.hex()
+
+                if 'view_tx_hex' in data:
+                    data['view_tx_desc'] = json.dumps(ci_from.describeTx(data['view_tx_hex']), indent=4)
 
     return data

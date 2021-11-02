@@ -15,6 +15,8 @@
 {% else %}
 <tr><td>Swap</td><td>{{ data.amt_from }} {{ data.ticker_from }} for {{ data.amt_to }} {{ data.ticker_to }}</td></tr>
 {% endif %}
+<tr><td>Coin From</td><td>{{ data.coin_from }}</td></tr>
+<tr><td>Coin To</td><td>{{ data.coin_to }}</td></tr>
 <tr><td>Bid State</td><td>{{ data.bid_state }}</td></tr>
 <tr><td>State Description </td><td>{{ data.state_description }}</td></tr>
 <tr><td>Offer</td><td><a href="/offer/{{ data.offer_id }}">{{ data.offer_id }}</a></td></tr>
@@ -83,6 +85,9 @@
 
 {% if data.view_tx_hex %}
 <p>{{ data.view_tx_hex }}</p>
+<textarea id="tx_view" rows="10" cols="150" readonly>
+{{ data.view_tx_desc }}
+</textarea>
 {% endif %}
 
 {% if data.lock_transfers %}
