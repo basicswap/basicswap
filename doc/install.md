@@ -8,9 +8,9 @@
 
 Docker must be installed and started:
 
-    $ sudo systemctl status docker | grep Active
+    $ docker -v
 
-Should return a line containing `active (running)`
+Should return a line containing `Docker version`...
 
 
 #### Create the images:
@@ -27,7 +27,7 @@ Adjust `--withcoins` and `--withoutcoins` as desired, eg: `--withcoins=monero,bi
 
     $ export COINDATA_PATH=/var/data/coinswaps
     $ docker run --rm -e XMR_RPC_HOST="node.xmr.to" -e BASE_XMR_RPC_PORT=18081 -t --name swap_prepare -v $COINDATA_PATH:/coindata i_swapclient \
-    basicswap-prepare --datadir=/coindata --withcoins=monero --htmlhost="0.0.0.0" --xmrrestoreheight=2245107
+    basicswap-prepare --datadir=/coindata --withcoins=monero --htmlhost="0.0.0.0" --xmrrestoreheight=2485205
 
 **Record the mnemonic from the output of the above command.**
 
@@ -57,35 +57,31 @@ You can copy an existing pruned datadir (excluding bitcoin.conf and any wallets)
 Remove any existing wallets after copying over a pruned chain or the Bitcoin daemon won't start.
 
 
+
 ## Windows
+
+#### Setup WSL 2 and Docker Desktop
+[docs.docker.com/docker-for-windows/wsl](https://docs.docker.com/docker-for-windows/wsl/)
+
+
+Open a wsl terminal
+Windows key + R -> "wsl" -> Enter
+
 
 Install Git:
 
-    https://gitforwindows.org/
+    $ sudo apt update
+    $ sudo apt install git
 
-Right click in the directory you want the source code and select 'Git Bash Here':
+
+Download the BasicSwap code:
 
     $ git clone https://github.com/tecnovert/basicswap.git
-
-Setup Docker Desktop on the WSL 2 backend.
-[docs.docker.com/docker-for-windows/wsl](https://docs.docker.com/docker-for-windows/wsl/)
-
-Launch the docker commands through a WSL terminal.
+    $ cd basicswap/docker/
 
 
-Open cmd-prompt with windows key + R -> "cmd" -> Enter
-
-    > wsl
-
-Go to the directory containing the source code:
-
-    cd /mnt/c/tmp/basicswap/docker/
-
-It's significantly faster to keep COINDATA_PATH in the linux filesystem.
-You can access it from the windows side at: `\\wsl$\Ubuntu-20.04`
-
-    export COINDATA_PATH=/home/$USER/coinswaps
-
+It's significantly faster to set COINDATA_PATH in the linux filesystem.
+You can access it from the windows side at: `\\wsl$\Ubuntu`
 
 Continue from the [Run Using Docker](#run-using-docker) section.
 

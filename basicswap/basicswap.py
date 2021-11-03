@@ -3278,6 +3278,8 @@ class BasicSwap(BaseApp):
         # assert(self.mxDB.locked())
         self.log.debug('checkForSpends %s', coin_type)
 
+        # TODO: Check for spends on watchonly txns where possible
+
         if 'have_spent_index' in self.coin_clients[coin_type] and self.coin_clients[coin_type]['have_spent_index']:
             # TODO: batch getspentinfo
             for o in c['watched_outputs']:

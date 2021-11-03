@@ -1,0 +1,4 @@
+
+# Ensure Docker related files always have unix (LF) line endings.
+Dockerfile      eol=lf
+docker/*        eol=lf
