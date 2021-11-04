@@ -85,6 +85,17 @@ def findOutput(tx, script_pk):
     return None
 
 
+def find_vout_for_address_from_txobj(tx_obj, addr):
+    """
+    Locate the vout index of the given transaction sending to the
+    given address. Raises runtime error exception if not found.
+    """
+    for i in range(len(tx_obj["vout"])):
+        if any([addr == a for a in tx_obj["vout"][i]["scriptPubKey"]["addresses"]]):
+            return i
+    raise RuntimeError("Vout not found for address: txid=%s, addr=%s" % (txid, addr))
+
+
 class BTCInterface(CoinInterface):
     @staticmethod
     def coin_type():
@@ -911,16 +922,30 @@ class BTCInterface(CoinInterface):
     def spendBLockTx(self, chain_b_lock_txid, address_to, kbv, kbs, cb_swap_value, b_fee, restore_height):
         raise ValueError('TODO')
 
-    def getLockTxHeight(self, txid, dest_script, bid_amount, xmr_swap):
-        rv = None
-        p2wsh_addr = self.encode_p2wsh(dest_script)
-
-        addr_info = self.rpc_callback('getaddressinfo', [p2wsh_addr])
+    def getLockTxHeight(self, txid, dest_address, bid_amount, rescan_from, find_index=False):
+        # Add watchonly address and rescan if required
+        addr_info = self.rpc_callback('getaddressinfo', [dest_address])
         if not addr_info['iswatchonly']:
-            ro = self.rpc_callback('importaddress', [p2wsh_addr, 'bid', False])
-            self._log.info('Imported watch-only addr: {}'.format(p2wsh_addr))
-            self._log.info('Rescanning chain from height: {}'.format(xmr_swap.start_chain_a_height))
-            self.rpc_callback('rescanblockchain', [xmr_swap.start_chain_a_height])
+            ro = self.rpc_callback('importaddress', [dest_address, 'bid', False])
+            self._log.info('Imported watch-only addr: {}'.format(dest_address))
+            self._log.info('Rescanning chain from height: {}'.format(rescan_from))
+            self.rpc_callback('rescanblockchain', [rescan_from])
+
+        return_txid = True if txid is None else False
+        if txid is None:
+            txns = self.rpc_callback('listunspent', [0, 9999999, [dest_address, ]])
+            import json
+            print('txns', json.dumps(txns, indent=4))
+
+            for tx in txns:
+                print('bid_amount', bid_amount)
+                print('self.make_int(tx[amount])', self.make_int(tx['amount']))
+                if self.make_int(tx['amount']) == bid_amount:
+                    txid = bytes.fromhex(tx['txid'])
+                    break
+
+        if txid is None:
+            return None
 
         try:
             tx = self.rpc_callback('gettransaction', [txid.hex()])
@@ -933,8 +958,16 @@ class BTCInterface(CoinInterface):
             rv = {
                 'depth': 0 if 'confirmations' not in tx else tx['confirmations'],
                 'height': block_height}
+
         except Exception as e:
-            pass
+            return None
+
+        if find_index:
+            tx_obj = self.rpc_callback('decoderawtransaction', [tx['hex']])
+            rv['index'] = find_vout_for_address_from_txobj(tx_obj, dest_address)
+
+        if return_txid:
+            rv['txid'] = txid.hex()
 
         return rv
 

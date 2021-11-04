@@ -12,7 +12,7 @@ from enum import IntEnum, auto
 from sqlalchemy.ext.declarative import declarative_base
 
 
-CURRENT_DB_VERSION = 11
+CURRENT_DB_VERSION = 12
 Base = declarative_base()
 
 
@@ -41,6 +41,7 @@ class Offer(Base):
     offer_id = sa.Column(sa.LargeBinary, primary_key=True)
     active_ind = sa.Column(sa.Integer)
 
+    protocol_version = sa.Column(sa.Integer)
     coin_from = sa.Column(sa.Integer)
     coin_to = sa.Column(sa.Integer)
     amount_from = sa.Column(sa.BigInteger)
@@ -89,6 +90,7 @@ class Bid(Base):
     offer_id = sa.Column(sa.LargeBinary, sa.ForeignKey('offers.offer_id'))
     active_ind = sa.Column(sa.Integer)
 
+    protocol_version = sa.Column(sa.Integer)
     was_sent = sa.Column(sa.Boolean)
     was_received = sa.Column(sa.Boolean)
     contract_count = sa.Column(sa.Integer)
@@ -122,6 +124,9 @@ class Bid(Base):
 
     debug_ind = sa.Column(sa.Integer)
     security_token = sa.Column(sa.LargeBinary)
+
+    chain_a_height_start = sa.Column(sa.Integer)  # Height of script chain before the swap
+    chain_b_height_start = sa.Column(sa.Integer)  # Height of scriptless chain before the swap
 
     initiate_tx = None
     participate_tx = None
@@ -331,9 +336,6 @@ class XmrSwap(Base):
     a_lock_refund_swipe_tx = sa.Column(sa.LargeBinary)  # Follower spends script coin lock refund tx
 
     b_lock_tx_id = sa.Column(sa.LargeBinary)
-
-    start_chain_a_height = sa.Column(sa.Integer)  # Height of script chain before the swap
-    b_restore_height = sa.Column(sa.Integer)  # Height of scriptless chain before the swap
 
 
 class XmrSplitData(Base):

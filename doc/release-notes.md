@@ -1,4 +1,12 @@
 
+0.0.26
+==============
+
+- Added protocol version to order and bid messages
+- Moved chain start heights to bid.
+- Avoid scantxoutset for decred style swaps
+
+
 0.0.25
 ==============
 

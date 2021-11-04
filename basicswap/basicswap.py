@@ -584,6 +584,12 @@ class BasicSwap(BaseApp):
                 session.execute('ALTER TABLE offers ADD COLUMN addr_to VARCHAR')
                 session.execute(f'UPDATE offers SET addr_to = "{self.network_addr}"')
                 db_version += 1
+            elif current_version == 11:
+                session.execute('ALTER TABLE bids ADD COLUMN chain_a_height_start INTEGER')
+                session.execute('ALTER TABLE bids ADD COLUMN chain_b_height_start INTEGER')
+                session.execute('ALTER TABLE bids ADD COLUMN protocol_version INTEGER')
+                session.execute('ALTER TABLE offers ADD COLUMN protocol_version INTEGER')
+                db_version += 1
 
             if current_version != db_version:
                 self.db_version = db_version
@@ -919,6 +925,7 @@ class BasicSwap(BaseApp):
 
             msg_buf = OfferMessage()
 
+            msg_buf.protocol_version = 1
             msg_buf.coin_from = int(coin_from)
             msg_buf.coin_to = int(coin_to)
             msg_buf.amount_from = int(amount)
@@ -989,6 +996,7 @@ class BasicSwap(BaseApp):
             offer = Offer(
                 offer_id=offer_id,
                 active_ind=1,
+                protocol_version=msg_buf.protocol_version,
 
                 coin_from=msg_buf.coin_from,
                 coin_to=msg_buf.coin_to,
@@ -1516,12 +1524,15 @@ class BasicSwap(BaseApp):
         self.mxDB.acquire()
         try:
             msg_buf = BidMessage()
+            msg_buf.protocol_version = 1
             msg_buf.offer_msg_id = offer_id
             msg_buf.time_valid = valid_for_seconds
             msg_buf.amount = int(amount)  # amount of coin_from
 
             coin_from = Coins(offer.coin_from)
             coin_to = Coins(offer.coin_to)
+            ci_from = self.ci(coin_from)
+            ci_to = self.ci(coin_to)
 
             self.checkSynced(coin_from, coin_to)
 
@@ -1554,6 +1565,7 @@ class BasicSwap(BaseApp):
 
             bid_id = bytes.fromhex(msg_id)
             bid = Bid(
+                protocol_version=msg_buf.protocol_version,
                 active_ind=1,
                 bid_id=bid_id,
                 offer_id=offer_id,
@@ -1567,6 +1579,8 @@ class BasicSwap(BaseApp):
                 expire_at=now + msg_buf.time_valid,
                 bid_addr=bid_addr,
                 was_sent=True,
+                chain_a_height_start=ci_from.getChainHeight(),
+                chain_b_height_start=ci_to.getChainHeight(),
             )
             bid.setState(BidStates.BID_SENT)
 
@@ -1842,6 +1856,7 @@ class BasicSwap(BaseApp):
             self.checkSynced(coin_from, coin_to)
 
             msg_buf = XmrBidMessage()
+            msg_buf.protocol_version = 1
             msg_buf.offer_msg_id = offer_id
             msg_buf.time_valid = valid_for_seconds
             msg_buf.amount = int(amount)  # Amount of coin_from
@@ -1861,13 +1876,6 @@ class BasicSwap(BaseApp):
             xmr_swap = XmrSwap()
             xmr_swap.contract_count = self.getNewContractId()
             xmr_swap.dest_af = msg_buf.dest_af
-            xmr_swap.start_chain_a_height = ci_from.getChainHeight()
-            xmr_swap.b_restore_height = ci_to.getChainHeight()
-
-            wallet_restore_height = self.getWalletRestoreHeight(ci_to)
-            if xmr_swap.b_restore_height < wallet_restore_height:
-                xmr_swap.b_restore_height = wallet_restore_height
-                self.log.warning('XMR swap restore height clamped to {}'.format(wallet_restore_height))
 
             for_ed25519 = True if coin_to == Coins.XMR else False
             kbvf = self.getPathKey(coin_from, coin_to, bid_created_at, xmr_swap.contract_count, 1, for_ed25519)
@@ -1932,6 +1940,7 @@ class BasicSwap(BaseApp):
                 xmr_swap.bid_msg_id3 = bytes.fromhex(ro['msgid'])
 
             bid = Bid(
+                protocol_version=msg_buf.protocol_version,
                 active_ind=1,
                 bid_id=xmr_swap.bid_id,
                 offer_id=offer_id,
@@ -1943,6 +1952,15 @@ class BasicSwap(BaseApp):
                 bid_addr=bid_addr,
                 was_sent=True,
             )
+
+            bid.chain_a_height_start = ci_from.getChainHeight()
+            bid.chain_b_height_start = ci_to.getChainHeight()
+
+            wallet_restore_height = self.getWalletRestoreHeight(ci_to)
+            if bid.chain_b_height_start < wallet_restore_height:
+                bid.chain_b_height_start = wallet_restore_height
+                self.log.warning('XMR swap restore height clamped to {}'.format(wallet_restore_height))
+
             bid.setState(BidStates.BID_SENT)
 
             try:
@@ -2786,7 +2804,8 @@ class BasicSwap(BaseApp):
                 a_lock_tx_dest = ci_from.getScriptDest(xmr_swap.a_lock_tx_script)
                 # Changed from ci_from.getOutput(bid.xmr_a_lock_tx.txid, a_lock_tx_dest, bid.amount, xmr_swap)
 
-                lock_tx_chain_info = ci_from.getLockTxHeight(bid.xmr_a_lock_tx.txid, a_lock_tx_dest, bid.amount, xmr_swap)
+                p2wsh_addr = ci_from.encode_p2wsh(a_lock_tx_dest)
+                lock_tx_chain_info = ci_from.getLockTxHeight(bid.xmr_a_lock_tx.txid, p2wsh_addr, bid.amount, bid.chain_a_height_start)
 
                 if lock_tx_chain_info is None:
                     return rv
@@ -2827,7 +2846,7 @@ class BasicSwap(BaseApp):
 
                 bid_changed = False
                 # Have to use findTxB instead of relying on the first seen height to detect chain reorgs
-                found_tx = ci_to.findTxB(xmr_swap.vkbv, xmr_swap.pkbs, bid.amount_to, ci_to.blocks_confirmed, xmr_swap.b_restore_height, bid.was_sent)
+                found_tx = ci_to.findTxB(xmr_swap.vkbv, xmr_swap.pkbs, bid.amount_to, ci_to.blocks_confirmed, bid.chain_b_height_start, bid.was_sent)
 
                 if isinstance(found_tx, int) and found_tx == -1:
                     if self.countBidEvents(bid, EventLogTypes.LOCK_TX_B_INVALID, session) < 1:
@@ -2945,9 +2964,11 @@ class BasicSwap(BaseApp):
                     addr = self.encodeSegwitP2WSH(coin_from, getP2WSH(bid.initiate_tx.script))
                 else:
                     addr = p2sh
-                found = self.lookupUnspentByAddress(coin_from, addr, assert_amount=bid.amount, assert_txid=initiate_txnid_hex)
+
+                ci_from = self.ci(coin_from)
+                found = ci_from.getLockTxHeight(bytes.fromhex(initiate_txnid_hex), addr, bid.amount, bid.chain_a_height_start, find_index=True)
                 if found:
-                    bid.initiate_tx.conf = found['n_conf']
+                    bid.initiate_tx.conf = found['depth']
                     index = found['index']
                     tx_height = found['height']
 
@@ -2984,11 +3005,12 @@ class BasicSwap(BaseApp):
             else:
                 addr = self.getScriptAddress(coin_to, bid.participate_tx.script)
 
-            found = self.lookupUnspentByAddress(coin_to, addr, assert_amount=bid.amount_to)
+            ci_to = self.ci(coin_to)
+            found = ci_to.getLockTxHeight(None, addr, bid.amount_to, bid.chain_b_height_start, find_index=True)
             if found:
-                if bid.participate_tx.conf != found['n_conf']:
+                if bid.participate_tx.conf != found['depth']:
                     save_bid = True
-                bid.participate_tx.conf = found['n_conf']
+                bid.participate_tx.conf = found['depth']
                 index = found['index']
                 if bid.participate_tx is None or bid.participate_tx.txid is None:
                     self.log.debug('Found bid %s participate txn %s in chain %s', bid_id.hex(), found['txid'], coin_to)
@@ -3506,6 +3528,7 @@ class BasicSwap(BaseApp):
                     offer_id=offer_id,
                     active_ind=1,
 
+                    protocol_version=offer_data.protocol_version,
                     coin_from=offer_data.coin_from,
                     coin_to=offer_data.coin_to,
                     amount_from=offer_data.amount_from,
@@ -3613,8 +3636,10 @@ class BasicSwap(BaseApp):
         # assert(bid_data.rate != offer['data'].rate), 'Bid rate mismatch'
 
         coin_to = Coins(offer.coin_to)
+        ci_from = self.ci(offer.coin_from)
+        ci_to = self.ci(coin_to)
 
-        amount_to = int((bid_data.amount * offer.rate) // self.ci(offer.coin_from).COIN())
+        amount_to = int((bid_data.amount * offer.rate) // ci_from.COIN())
         swap_type = offer.swap_type
         if swap_type == SwapTypes.SELLER_FIRST:
             ensure(len(bid_data.pkhash_buyer) == 20, 'Bad pkhash_buyer length')
@@ -3647,6 +3672,7 @@ class BasicSwap(BaseApp):
                 active_ind=1,
                 bid_id=bid_id,
                 offer_id=offer_id,
+                protocol_version=bid_data.protocol_version,
                 amount=bid_data.amount,
                 pkhash_buyer=bid_data.pkhash_buyer,
 
@@ -3655,6 +3681,8 @@ class BasicSwap(BaseApp):
                 expire_at=msg['sent'] + bid_data.time_valid,
                 bid_addr=msg['from'],
                 was_received=True,
+                chain_a_height_start=ci_from.getChainHeight(),
+                chain_b_height_start=ci_to.getChainHeight(),
             )
         else:
             ensure(bid.state == BidStates.BID_SENT, 'Wrong bid state: {}'.format(str(BidStates(bid.state))))
@@ -3903,12 +3931,15 @@ class BasicSwap(BaseApp):
                 active_ind=1,
                 bid_id=bid_id,
                 offer_id=offer_id,
+                protocol_version=bid_data.protocol_version,
                 amount=bid_data.amount,
                 created_at=msg['sent'],
                 amount_to=(bid_data.amount * offer.rate) // ci_from.COIN(),
                 expire_at=msg['sent'] + bid_data.time_valid,
                 bid_addr=msg['from'],
                 was_received=True,
+                chain_a_height_start=ci_from.getChainHeight(),
+                chain_b_height_start=ci_to.getChainHeight(),
             )
 
             xmr_swap = XmrSwap(
@@ -3918,12 +3949,10 @@ class BasicSwap(BaseApp):
                 vkbvf=bid_data.kbvf,
                 pkbvf=ci_to.getPubkey(bid_data.kbvf),
                 kbsf_dleag=bid_data.kbsf_dleag,
-                b_restore_height=ci_to.getChainHeight(),
-                start_chain_a_height=ci_from.getChainHeight(),
             )
             wallet_restore_height = self.getWalletRestoreHeight(ci_to)
-            if xmr_swap.b_restore_height < wallet_restore_height:
-                xmr_swap.b_restore_height = wallet_restore_height
+            if bid.chain_b_height_start < wallet_restore_height:
+                bid.chain_b_height_start = wallet_restore_height
                 self.log.warning('XMR swap restore height clamped to {}'.format(wallet_restore_height))
         else:
             ensure(bid.state == BidStates.BID_SENT, 'Wrong bid state: {}'.format(str(BidStates(bid.state))))
@@ -4035,7 +4064,7 @@ class BasicSwap(BaseApp):
         self.swaps_in_progress[bid.bid_id] = (bid, offer)
 
         coin_from = Coins(offer.coin_from)
-        self.setLastHeightChecked(coin_from, xmr_swap.start_chain_a_height)
+        self.setLastHeightChecked(coin_from, bid.chain_a_height_start)
         self.addWatchedOutput(coin_from, bid.bid_id, bid.xmr_a_lock_tx.txid.hex(), bid.xmr_a_lock_tx.vout, TxTypes.XMR_SWAP_A_LOCK, SwapTypes.XMR_SWAP)
 
         lock_refund_vout = self.ci(coin_from).getLockRefundTxSwapOutput(xmr_swap)
@@ -4340,7 +4369,7 @@ class BasicSwap(BaseApp):
                 address_to = self.getCachedMainWalletAddress(ci_to)
             else:
                 address_to = self.getCachedStealthAddressForCoin(coin_to)
-            txid = ci_to.spendBLockTx(xmr_swap.b_lock_tx_id, address_to, xmr_swap.vkbv, vkbs, bid.amount_to, xmr_offer.b_fee_rate, xmr_swap.b_restore_height)
+            txid = ci_to.spendBLockTx(xmr_swap.b_lock_tx_id, address_to, xmr_swap.vkbv, vkbs, bid.amount_to, xmr_offer.b_fee_rate, bid.chain_b_height_start)
             self.log.debug('Submitted lock B spend txn %s to %s chain for bid %s', txid.hex(), ci_to.coin_name(), bid_id.hex())
             self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_B_SPEND_TX_PUBLISHED, '', session)
         except Exception as ex:
@@ -4395,7 +4424,7 @@ class BasicSwap(BaseApp):
 
         try:
             address_to = self.getCachedMainWalletAddress(ci_to)
-            txid = ci_to.spendBLockTx(xmr_swap.b_lock_tx_id, address_to, xmr_swap.vkbv, vkbs, bid.amount_to, xmr_offer.b_fee_rate, xmr_swap.b_restore_height)
+            txid = ci_to.spendBLockTx(xmr_swap.b_lock_tx_id, address_to, xmr_swap.vkbv, vkbs, bid.amount_to, xmr_offer.b_fee_rate, bid.chain_b_height_start)
             self.log.debug('Submitted lock B refund txn %s to %s chain for bid %s', txid.hex(), ci_to.coin_name(), bid_id.hex())
             self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_B_REFUND_TX_PUBLISHED, '', session)
         except Exception as ex:
