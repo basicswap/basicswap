@@ -589,6 +589,7 @@ class BasicSwap(BaseApp):
                 session.execute('ALTER TABLE bids ADD COLUMN chain_b_height_start INTEGER')
                 session.execute('ALTER TABLE bids ADD COLUMN protocol_version INTEGER')
                 session.execute('ALTER TABLE offers ADD COLUMN protocol_version INTEGER')
+                session.execute('ALTER TABLE transactions ADD COLUMN tx_data BLOB')
                 db_version += 1
 
             if current_version != db_version:
@@ -781,9 +782,11 @@ class BasicSwap(BaseApp):
                     try:
                         self.ci(offer.coin_from).unlockInputs(xmr_swap.a_lock_tx)
                     except Exception as e:
-                        if self.debug:
-                            self.log.info('unlockInputs failed {}'.format(str(e)))
+                        self.log.debug('unlockInputs failed {}'.format(str(e)))
                         pass  # Invalid parameter, unknown transaction
+            elif SwapTypes.SELLER_FIRST:
+                pass  # No prevouts are locked
+
         finally:
             if session is None:
                 use_session.commit()
@@ -1796,6 +1799,7 @@ class BasicSwap(BaseApp):
                 bid_id=bid_id,
                 tx_type=TxTypes.ITX,
                 txid=bytes.fromhex(txid),
+                tx_data=bytes.fromhex(txn),
                 script=script,
             )
             bid.setITxState(TxStates.TX_SENT)
@@ -2298,6 +2302,7 @@ class BasicSwap(BaseApp):
             vout = getVoutByAddress(txjs, addr_to)
         self.addParticipateTxn(bid_id, bid, coin_to, txid, vout, chain_height)
         bid.participate_tx.script = participate_script
+        bid.participate_tx.tx_data = bytes.fromhex(txn_signed)
 
         return txn_signed
 

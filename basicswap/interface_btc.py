@@ -779,6 +779,17 @@ class BTCInterface(CoinInterface):
         rv = self.rpc_callback('fundrawtransaction', [tx.hex(), options])
         return bytes.fromhex(rv['hex'])
 
+    def listInputs(self, tx_bytes):
+        tx = self.loadTx(tx_bytes)
+
+        all_locked = self.rpc_callback('listlockunspent')
+        inputs = []
+        for pi in tx.vin:
+            txid_hex = i2h(pi.prevout.hash)
+            islocked = any([txid_hex == a['txid'] and pi.prevout.n == a['vout'] for a in all_locked])
+            inputs.append({'txid': txid_hex, 'vout': pi.prevout.n, 'islocked': islocked})
+        return inputs
+
     def unlockInputs(self, tx_bytes):
         tx = self.loadTx(tx_bytes)
 
@@ -938,8 +949,6 @@ class BTCInterface(CoinInterface):
         return_txid = True if txid is None else False
         if txid is None:
             txns = self.rpc_callback('listunspent', [0, 9999999, [dest_address, ]])
-            import json
-            print('txns', json.dumps(txns, indent=4))
 
             for tx in txns:
                 print('bid_amount', bid_amount)

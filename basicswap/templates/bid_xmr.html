@@ -101,6 +101,16 @@
 {% endif %}
 </form>
 
+{% if data.chain_a_lock_tx_inputs %}
+<h5>Chain A Lock TX Inputs:</h5>
+<table>
+<tr><th>txid</th><th>vout</th><th>locked</th></tr>
+{% for txi in data.chain_a_lock_tx_inputs %}
+<tr><td>{{ txi.txid }}</td><td>{{ txi.vout }}</td><td>{% if txi.islocked %} true {% else %} false {% endif %}</td></tr>
+{% endfor %}
+</table>
+{% endif %}
+
 
 <h4>Old States</h4>
 <table>

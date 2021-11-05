@@ -273,6 +273,11 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
             data['initiate_tx_spend'] = getTxSpendHex(bid, TxTypes.ITX)
             data['participate_tx_spend'] = getTxSpendHex(bid, TxTypes.PTX)
 
+            if bid.initiate_tx and bid.initiate_tx.tx_data is not None:
+                data['initiate_tx_inputs'] = ci_from.listInputs(bid.initiate_tx.tx_data)
+            if bid.participate_tx and bid.participate_tx.tx_data is not None:
+                data['initiate_tx_inputs'] = ci_from.listInputs(bid.participate_tx.tx_data)
+
     if offer.swap_type == SwapTypes.XMR_SWAP:
         data['coin_a_lock_refund_tx_est_final'] = 'None'
         if bid.xmr_a_lock_tx and bid.xmr_a_lock_tx.block_time:
@@ -289,6 +294,7 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
             if xmr_swap:
                 if view_tx_id == xmr_swap.a_lock_tx_id and xmr_swap.a_lock_tx:
                     data['view_tx_hex'] = xmr_swap.a_lock_tx.hex()
+                    data['chain_a_lock_tx_inputs'] = ci_from.listInputs(xmr_swap.a_lock_tx)
                 if view_tx_id == xmr_swap.a_lock_refund_tx_id and xmr_swap.a_lock_refund_tx:
                     data['view_tx_hex'] = xmr_swap.a_lock_refund_tx.hex()
                 if view_tx_id == xmr_swap.a_lock_refund_spend_tx_id and xmr_swap.a_lock_refund_spend_tx:

@@ -179,6 +179,7 @@ class SwapTx(Base):
 
     txid = sa.Column(sa.LargeBinary)
     vout = sa.Column(sa.Integer)
+    tx_data = sa.Column(sa.LargeBinary)
 
     script = sa.Column(sa.LargeBinary)
 
