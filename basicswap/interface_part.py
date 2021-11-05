@@ -6,7 +6,6 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import hashlib
-import basicswap.contrib.segwit_addr as segwit_addr
 from enum import IntEnum
 
 from .contrib.test_framework.messages import (
@@ -119,9 +118,6 @@ class PARTInterfaceBlind(PARTInterface):
     def coin_name(self):
         return super().coin_name() + ' Blind'
 
-    def encodeSegwitP2WSH(self, p2wsh):
-        return segwit_addr.encode(self.chainparams_network()['hrp'], 0, p2wsh[2:])
-
     def getScriptLockTxNonce(self, data):
         return hashlib.sha256(data + bytes('locktx', 'utf-8')).digest()
 
@@ -156,7 +152,7 @@ class PARTInterfaceBlind(PARTInterface):
         ephemeral_pubkey = self.getPubkey(ephemeral_key)
         assert(len(ephemeral_pubkey) == 33)
         nonce = self.getScriptLockTxNonce(vkbv)
-        p2wsh_addr = self.encodeSegwitP2WSH(getP2WSH(script))
+        p2wsh_addr = self.encode_p2wsh(getP2WSH(script))
         inputs = []
         outputs = [{'type': 'blind', 'amount': self.format_amount(value), 'address': p2wsh_addr, 'nonce': nonce.hex(), 'data': ephemeral_pubkey.hex()}]
         params = [inputs, outputs]
@@ -204,7 +200,7 @@ class PARTInterfaceBlind(PARTInterface):
         locked_coin = input_blinded_info['amount']
         tx_lock_id = lock_tx_obj['txid']
         refund_script = self.genScriptLockRefundTxScript(Kal, Kaf, csv_val)
-        p2wsh_addr = self.encodeSegwitP2WSH(getP2WSH(refund_script))
+        p2wsh_addr = self.encode_p2wsh(getP2WSH(refund_script))
 
         inputs = [{'txid': tx_lock_id, 'vout': spend_n, 'sequence': lock1_value, 'blindingfactor': input_blinded_info['blind']}]
         outputs = [{'type': 'blind', 'amount': locked_coin, 'address': p2wsh_addr, 'nonce': output_nonce.hex(), 'data': ephemeral_pubkey.hex()}]

@@ -20,6 +20,7 @@ from .util import (
     b58encode,
     decodeAddress,
     decodeScriptNum,
+    pubkeyToAddress,
     getCompactSizeLen,
     SerialiseNumCompact,
     getWitnessElementLen)
@@ -93,7 +94,7 @@ def find_vout_for_address_from_txobj(tx_obj, addr):
     for i in range(len(tx_obj["vout"])):
         if any([addr == a for a in tx_obj["vout"][i]["scriptPubKey"]["addresses"]]):
             return i
-    raise RuntimeError("Vout not found for address: txid=%s, addr=%s" % (txid, addr))
+    raise RuntimeError("Vout not found for address: txid={}, addr={}".format(tx_obj['txid'], addr))
 
 
 class BTCInterface(CoinInterface):
@@ -278,6 +279,9 @@ class BTCInterface(CoinInterface):
         version = 0
         program = script[2:]  # strip version and length
         return segwit_addr.encode(bech32_prefix, version, program)
+
+    def encode_p2sh(self, script):
+        return pubkeyToAddress(self.chainparams_network()['script_address'], script)
 
     def pubkey_to_address(self, pk):
         assert(len(pk) == 33)

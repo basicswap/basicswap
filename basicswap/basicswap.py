@@ -2189,9 +2189,9 @@ class BasicSwap(BaseApp):
         ci = self.ci(coin_type)
 
         if self.coin_clients[coin_type]['use_segwit']:
-            addr_to = self.encodeSegwitP2WSH(coin_type, getP2WSH(initiate_script))
+            addr_to = ci.encode_p2wsh(getP2WSH(initiate_script))
         else:
-            addr_to = self.getScriptAddress(coin_type, initiate_script)
+            addr_to = ci.encode_p2sh(initiate_script)
         self.log.debug('Create initiate txn for coin %s to %s for bid %s', str(coin_type), addr_to, bid_id.hex())
         txn = self.callcoinrpc(coin_type, 'createrawtransaction', [[], {addr_to: ci.format_amount(bid.amount)}])
 
@@ -2273,9 +2273,9 @@ class BasicSwap(BaseApp):
 
         if self.coin_clients[coin_to]['use_segwit']:
             p2wsh = getP2WSH(participate_script)
-            addr_to = self.encodeSegwitP2WSH(coin_to, p2wsh)
+            addr_to = ci.encode_p2wsh(p2wsh)
         else:
-            addr_to = self.getScriptAddress(coin_to, participate_script)
+            addr_to = ci.encode_p2sh(participate_script)
 
         txn = self.callcoinrpc(coin_to, 'createrawtransaction', [[], {addr_to: ci.format_amount(amount_to)}])
         options = {
@@ -2429,7 +2429,7 @@ class BasicSwap(BaseApp):
             p2wsh = getP2WSH(txn_script)
             vout = getVoutByP2WSH(txjs, p2wsh.hex())
         else:
-            addr_to = self.getScriptAddress(Coins.PART, txn_script)
+            addr_to = self.ci(Coins.PART).encode_p2sh(txn_script)
             vout = getVoutByAddress(txjs, addr_to)
 
         bid_date = dt.datetime.fromtimestamp(bid.created_at).date()
@@ -2930,6 +2930,9 @@ class BasicSwap(BaseApp):
         save_bid = False
         coin_from = Coins(offer.coin_from)
         coin_to = Coins(offer.coin_to)
+        ci_from = self.ci(coin_from)
+        ci_to = self.ci(coin_to)
+
         # TODO: Batch calls to scantxoutset
         # TODO: timeouts
         if state == BidStates.BID_ABANDONED:
@@ -2938,7 +2941,7 @@ class BasicSwap(BaseApp):
         if state == BidStates.BID_ACCEPTED:
             # Waiting for initiate txn to be confirmed in 'from' chain
             initiate_txnid_hex = bid.initiate_tx.txid.hex()
-            p2sh = self.getScriptAddress(coin_from, bid.initiate_tx.script)
+            p2sh = ci_from.encode_p2sh(bid.initiate_tx.script)
             index = None
             tx_height = None
             last_initiate_txn_conf = bid.initiate_tx.conf
@@ -2961,7 +2964,7 @@ class BasicSwap(BaseApp):
                     pass
             else:
                 if self.coin_clients[coin_from]['use_segwit']:
-                    addr = self.encodeSegwitP2WSH(coin_from, getP2WSH(bid.initiate_tx.script))
+                    addr = ci_from.encode_p2wsh(getP2WSH(bid.initiate_tx.script))
                 else:
                     addr = p2sh
 
@@ -3001,9 +3004,9 @@ class BasicSwap(BaseApp):
         elif state == BidStates.SWAP_INITIATED:
             # Waiting for participate txn to be confirmed in 'to' chain
             if self.coin_clients[coin_to]['use_segwit']:
-                addr = self.encodeSegwitP2WSH(coin_to, getP2WSH(bid.participate_tx.script))
+                addr = ci_to.encode_p2wsh(getP2WSH(bid.participate_tx.script))
             else:
-                addr = self.getScriptAddress(coin_to, bid.participate_tx.script)
+                addr = ci_to.encode_p2sh(bid.participate_tx.script)
 
             ci_to = self.ci(coin_to)
             found = ci_to.getLockTxHeight(None, addr, bid.amount_to, bid.chain_b_height_start, find_index=True)
