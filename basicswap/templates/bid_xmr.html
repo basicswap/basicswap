@@ -19,8 +19,8 @@
 <tr><td>Coin To</td><td>{{ data.coin_to }}</td></tr>
 <tr><td>Bid State</td><td>{{ data.bid_state }}</td></tr>
 <tr><td>State Description </td><td>{{ data.state_description }}</td></tr>
-<tr><td>Offer</td><td><a href="/offer/{{ data.offer_id }}">{{ data.offer_id }}</a></td></tr>
-<tr><td>Address From</td><td>{{ data.addr_from }}</td></tr>
+<tr><td>Offer</td><td><a class="monospace" href="/offer/{{ data.offer_id }}">{{ data.offer_id }}</a></td></tr>
+<tr><td>Address From</td><td class="monospace">{{ data.addr_from }}</td></tr>
 <tr><td>Created At</td><td>{{ data.created_at }}</td></tr>
 <tr><td>Expired At</td><td>{{ data.expired_at }}</td></tr>
 <tr><td>Sent</td><td>{{ data.was_sent }}</td></tr>
@@ -63,13 +63,13 @@
 
 {% if data.show_txns %}
 {% if data.xmr_b_shared_address %}
-<p>Shared Address: {{ data.xmr_b_shared_address }}</p>
+<p class="monospace">Shared Address: {{ data.xmr_b_shared_address }}</p>
 {% endif %}
 <h4>Transactions</h4>
 <table>
 <tr><th>Tx Type</th><th>Tx ID</th><th>Blocks Deep</th></tr>
 {% for tx in data.txns %}
-<tr><td>{{ tx.type }}</td><td>{{ tx.txid }}</td><td>{{ tx.confirms }}</td></tr>
+<tr><td>{{ tx.type }}</td><td class="monospace">{{ tx.txid }}</td><td>{{ tx.confirms }}</td></tr>
 {% endfor %}
 </table>
 <table>
@@ -85,7 +85,7 @@
 
 {% if data.view_tx_hex %}
 <p>{{ data.view_tx_hex }}</p>
-<textarea id="tx_view" rows="10" cols="150" readonly>
+<textarea class="monospace" id="tx_view" rows="10" cols="150" readonly>
 {{ data.view_tx_desc }}
 </textarea>
 {% endif %}
@@ -93,7 +93,7 @@
 {% if data.lock_transfers %}
 <p>
 <label for="transfers_view">Lock wallet transfers:</label><br/>
-<textarea id="transfers_view" rows="10" cols="150" readonly>
+<textarea class="monospace" id="transfers_view" rows="10" cols="150" readonly>
 {{ data.lock_transfers }}
 </textarea>
 </p>

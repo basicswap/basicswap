@@ -75,7 +75,7 @@
 <table>
 <tr><th>Bid ID</th><th>Bid Amount</th><th>Bid Status</th><th>ITX Status</th><th>PTX Status</th></tr>
 {% for b in bids %}
-<tr><td><a href=/bid/{{ b[0] }}>{{ b[0] }}</a></td><td>{{ b[1] }}</td><td>{{ b[2] }}</td><td>{{ b[3] }}</td><td>{{ b[4] }}</td></tr>
+<tr><td><a class="monospace" href=/bid/{{ b[0] }}>{{ b[0] }}</a></td><td>{{ b[1] }}</td><td>{{ b[2] }}</td><td>{{ b[3] }}</td><td>{{ b[4] }}</td></tr>
 {% endfor %}
 </table>
 

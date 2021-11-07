@@ -19,22 +19,22 @@
 <tr><td>State Description </td><td>{{ data.state_description }}</td></tr>
 <tr><td>ITX State</td><td>{{ data.itx_state }}</td></tr>
 <tr><td>PTX State</td><td>{{ data.ptx_state }}</td></tr>
-<tr><td>Offer</td><td><a href="/offer/{{ data.offer_id }}">{{ data.offer_id }}</a></td></tr>
-<tr><td>Address From</td><td>{{ data.addr_from }}</td></tr>
+<tr><td>Offer</td><td><a class="monospace" href="/offer/{{ data.offer_id }}">{{ data.offer_id }}</a></td></tr>
+<tr><td>Address From</td><td class="monospace">{{ data.addr_from }}</td></tr>
 <tr><td>Proof of Funds</td><td>{{ data.proof_address }}</td></tr>
 <tr><td>Created At</td><td>{{ data.created_at }}</td></tr>
 <tr><td>Expired At</td><td>{{ data.expired_at }}</td></tr>
 <tr><td>Sent</td><td>{{ data.was_sent }}</td></tr>
 <tr><td>Received</td><td>{{ data.was_received }}</td></tr>
-<tr><td>Initiate Tx</td><td>{{ data.initiate_tx }}</td></tr>
+<tr><td>Initiate Tx</td><td class="monospace">{{ data.initiate_tx }}</td></tr>
 <tr><td>Initiate Conf</td><td>{{ data.initiate_conf }}</td></tr>
-<tr><td>Participate Tx</td><td>{{ data.participate_tx }}</td></tr>
+<tr><td>Participate Tx</td><td class="monospace">{{ data.participate_tx }}</td></tr>
 <tr><td>Participate Conf</td><td>{{ data.participate_conf }}</td></tr>
 {% if data.show_txns %}
-<tr><td>Initiate Tx Refund</td><td>{{ data.initiate_tx_refund }}</td></tr>
-<tr><td>Participate Tx Refund</td><td>{{ data.participate_tx_refund }}</td></tr>
-<tr><td>Initiate Tx Spend Tx</td><td>{{ data.initiate_tx_spend }}</td></tr>
-<tr><td>Participate Tx Spend Tx</td><td>{{ data.participate_tx_spend }}</td></tr>
+<tr><td>Initiate Tx Refund</td><td class="monospace">{{ data.initiate_tx_refund }}</td></tr>
+<tr><td>Participate Tx Refund</td><td class="monospace">{{ data.participate_tx_refund }}</td></tr>
+<tr><td>Initiate Tx Spend Tx</td><td class="monospace">{{ data.initiate_tx_spend }}</td></tr>
+<tr><td>Participate Tx Spend Tx</td><td class="monospace">{{ data.participate_tx_spend }}</td></tr>
 {% endif %}
 </table>
 

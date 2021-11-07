@@ -41,9 +41,9 @@
 {% else %}
 <table>
 <tr><th>Address</th><th>Type</th><th>Active</th><th>Created At</th><th>Note</th><th>Action</th></tr>
-<tr><td><b>{{ network_addr }}</b></td><td>Network Address<td/></tr>
+<tr><td><b class="monospace">{{ network_addr }}</b></td><td>Network Address<td/></tr>
 {% for sa in smsgaddresses %}
-<tr><td>{{ sa.addr }}</td><td>{{ sa.type }}</td><td>{{ sa.active_ind }}</td><td>{{ sa.created_at | formatts }}</td><td>{{ sa.note }}</td><td><input type="submit" name="editaddr_{{ sa.id }}" value="Edit"></td></tr>
+<tr><td class="monospace">{{ sa.addr }}</td><td>{{ sa.type }}</td><td>{{ sa.active_ind }}</td><td>{{ sa.created_at | formatts }}</td><td>{{ sa.note }}</td><td><input type="submit" name="editaddr_{{ sa.id }}" value="Edit"></td></tr>
 {% endfor %}
 </table>
 
