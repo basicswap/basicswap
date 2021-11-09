@@ -5021,6 +5021,11 @@ class BasicSwap(BaseApp):
             q = session.execute(query_str)
             for row in q:
                 coin_id = row[0]
+
+                if self.coin_clients[coin_id]['connection_type'] != 'rpc':
+                    # Skip cached info if coin was disabled
+                    continue
+
                 wallet_data = json.loads(row[1])
                 wallet_data['lastupdated'] = row[2]
                 wallet_data['updating'] = self._updating_wallets_info.get(coin_id, False)
