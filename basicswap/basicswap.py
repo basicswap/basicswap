@@ -187,6 +187,7 @@ class BasicSwap(BaseApp):
         self.check_expired_seconds = self.settings.get('check_expired_seconds', 60 * 5)
         self.check_events_seconds = self.settings.get('check_events_seconds', 10)
         self.check_xmr_swaps_seconds = self.settings.get('check_xmr_swaps_seconds', 20)
+        self.startup_tries = self.settings.get('startup_tries', 21)  # Seconds waited for will be (x(1 + x+1) / 2
         self._last_checked_progress = 0
         self._last_checked_watched = 0
         self._last_checked_expired = 0
@@ -195,6 +196,7 @@ class BasicSwap(BaseApp):
         self._possibly_revoked_offers = collections.deque([], maxlen=48)  # TODO: improve
         self._updating_wallets_info = {}
         self._last_updated_wallets_info = 0
+
 
         # TODO: Adjust ranges
         self.min_delay_event = self.settings.get('min_delay_event', 10)
@@ -606,7 +608,7 @@ class BasicSwap(BaseApp):
             raise ValueError('Unable to upgrade database.')
 
     def waitForDaemonRPC(self, coin_type):
-        for i in range(21):
+        for i in range(self.startup_tries):
             if not self.is_running:
                 return
             try:
@@ -616,7 +618,7 @@ class BasicSwap(BaseApp):
                 self.log.warning('Can\'t connect to %s RPC: %s.  Trying again in %d second/s.', coin_type, str(ex), (1 + i))
                 time.sleep(1 + i)
         self.log.error('Can\'t connect to %s RPC, exiting.', coin_type)
-        self.stopRunning(1)  # systemd will try restart if fail_code != 0
+        self.stopRunning(1)  # systemd will try to restart the process if fail_code != 0
 
     def checkSynced(self, coin_from, coin_to):
         check_coins = (coin_from, coin_to)
