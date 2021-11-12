@@ -5,6 +5,10 @@
 - Added protocol version to order and bid messages
 - Moved chain start heights to bid.
 - Avoid scantxoutset for decred style swaps
+- xmr: spend chain B lock tx will look for existing spends
+- xmrswaps:
+  - Setting state to 'Script tx redeemed' will trigger an attempt to redeem the scriptless lock tx.
+  - Node will wait for the chain B lock tx to reach a spendable depth before attempting to spend.
 
 
 0.0.25

@@ -607,6 +607,10 @@ class PARTInterfaceAnon(PARTInterface):
     def balance_type():
         return BalanceTypes.ANON
 
+    @staticmethod
+    def depth_spendable() -> int:
+        return 12
+
     def coin_name(self):
         return super().coin_name() + ' Anon'
 

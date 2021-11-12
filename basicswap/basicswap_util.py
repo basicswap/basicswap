@@ -73,6 +73,7 @@ class BidStates(IntEnum):
     XMR_SWAP_NOSCRIPT_COIN_LOCKED = auto()
     XMR_SWAP_LOCK_RELEASED = auto()
     XMR_SWAP_SCRIPT_TX_REDEEMED = auto()
+    XMR_SWAP_SCRIPT_TX_PREREFUND = auto()  # script txo moved into pre-refund tx
     XMR_SWAP_NOSCRIPT_TX_REDEEMED = auto()
     XMR_SWAP_NOSCRIPT_TX_RECOVERED = auto()
     XMR_SWAP_FAILED_REFUNDED = auto()
@@ -279,7 +280,7 @@ def describeEventEntry(event_type, event_msg):
     if event_type == EventLogTypes.LOCK_TX_B_PUBLISHED:
         return 'Lock tx B published'
     if event_type == EventLogTypes.FAILED_TX_B_SPEND:
-        return 'Failed to publish lock tx B spend'
+        return 'Failed to publish lock tx B spend: ' + event_msg
     if event_type == EventLogTypes.LOCK_TX_A_SEEN:
         return 'Lock tx A seen in chain'
     if event_type == EventLogTypes.LOCK_TX_A_CONFIRMED:
@@ -369,5 +370,7 @@ def isActiveBidState(state):
     if state == BidStates.XMR_SWAP_NOSCRIPT_TX_REDEEMED:
         return True
     if state == BidStates.XMR_SWAP_SCRIPT_TX_REDEEMED:
+        return True
+    if state == BidStates.XMR_SWAP_SCRIPT_TX_PREREFUND:
         return True
     return False

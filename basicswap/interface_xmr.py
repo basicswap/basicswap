@@ -60,6 +60,10 @@ class XMRInterface(CoinInterface):
     def nbK() -> int:  # No. of bytes requires to encode a public key
         return 32
 
+    @staticmethod
+    def depth_spendable() -> int:
+        return 10
+
     def __init__(self, coin_settings, network, swap_client=None):
         super().__init__(network)
         self.rpc_cb = make_xmr_rpc_func(coin_settings['rpcport'], host=coin_settings.get('rpchost', '127.0.0.1'))
@@ -396,15 +400,18 @@ class XMRInterface(CoinInterface):
                 self._log.info('generate_from_keys %s', dumpj(rv))
                 self.rpc_wallet_cb('open_wallet', {'filename': wallet_filename})
 
-            # For a while after opening the wallet rpc cmds return empty data
-            for i in range(10):
-                rv = self.rpc_wallet_cb('get_balance')
-                print('get_balance', rv)
-                if rv['balance'] >= cb_swap_value:
-                    break
-
-                time.sleep(1 + i)
+            self.rpc_wallet_cb('refresh')
+            rv = self.rpc_wallet_cb('get_balance')
             if rv['balance'] < cb_swap_value:
+                self._log.warning('Balance is too low, checking for existing spend.')
+                txns = self.rpc_wallet_cb('get_transfers', {'out': True})['out']
+                print(txns, txns)
+                if len(txns) > 0:
+                    txid = txns[0]['txid']
+                    self._log.warning(f'spendBLockTx detected spending tx: {txid}.')
+                    if txns[0]['address'] == address_b58:
+                        return bytes.fromhex(txid)
+
                 self._log.error('wallet {} balance {}, expected {}'.format(wallet_filename, rv['balance'], cb_swap_value))
                 raise TemporaryError('Invalid balance')
             if rv['unlocked_balance'] < cb_swap_value:
@@ -414,6 +421,7 @@ class XMRInterface(CoinInterface):
             params = {'address': address_to}
             if self._fee_priority > 0:
                 params['priority'] = self._fee_priority
+
             rv = self.rpc_wallet_cb('sweep_all', params)
             print('sweep_all', rv)
 

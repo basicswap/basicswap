@@ -35,6 +35,7 @@ from .interface_passthrough_btc import PassthroughBTCInterface
 
 from . import __version__
 from .util import (
+    TemporaryError,
     pubkeyToAddress,
     format_amount,
     format_timestamp,
@@ -196,7 +197,6 @@ class BasicSwap(BaseApp):
         self._possibly_revoked_offers = collections.deque([], maxlen=48)  # TODO: improve
         self._updating_wallets_info = {}
         self._last_updated_wallets_info = 0
-
 
         # TODO: Adjust ranges
         self.min_delay_event = self.settings.get('min_delay_event', 10)
@@ -2903,6 +2903,14 @@ class BasicSwap(BaseApp):
                         self.process_XMR_SWAP_A_LOCK_tx_spend(bid_id, xmr_swap.a_lock_spend_tx_id.hex(), txn_hex)
                     except Exception as e:
                         self.log.debug('getrawtransaction lock spend tx failed: %s', str(e))
+            elif state == BidStates.XMR_SWAP_SCRIPT_TX_REDEEMED:
+                if bid.was_received and self.countQueuedEvents(session, bid_id, EventTypes.REDEEM_XMR_SWAP_LOCK_TX_B) < 1:
+                    bid.setState(BidStates.SWAP_DELAYING)
+                    delay = random.randrange(self.min_delay_event, self.max_delay_event)
+                    self.log.info('Redeeming coin b lock tx for bid %s in %d seconds', bid_id.hex(), delay)
+                    self.createEventInSession(delay, EventTypes.REDEEM_XMR_SWAP_LOCK_TX_B, bid_id, session)
+                    self.saveBidInSession(bid_id, bid, session, xmr_swap)
+                    session.commit()
             elif state == BidStates.XMR_SWAP_NOSCRIPT_TX_REDEEMED:
                 txid_hex = bid.xmr_b_lock_tx.spend_txid.hex()
 
@@ -3210,18 +3218,13 @@ class BasicSwap(BaseApp):
 
                     if not bid.was_received:
                         bid.setState(BidStates.SWAP_COMPLETED)
-                    if bid.was_received:
-                        bid.setState(BidStates.SWAP_DELAYING)
-                        delay = random.randrange(self.min_delay_event, self.max_delay_event)
-                        self.log.info('Redeeming coin b lock tx for bid %s in %d seconds', bid_id.hex(), delay)
-                        self.createEventInSession(delay, EventTypes.REDEEM_XMR_SWAP_LOCK_TX_B, bid_id, session)
                 else:
                     # Could already be processed if spend was detected in the mempool
                     self.log.warning('Coin a lock tx spend ignored due to bid state for bid {}'.format(bid_id.hex()))
 
             elif spending_txid == xmr_swap.a_lock_refund_tx_id:
                 self.log.debug('Coin a lock tx spent by lock refund tx.')
-                pass
+                bid.setState(BidStates.XMR_SWAP_SCRIPT_TX_PREREFUND)
             else:
                 self.setBidError(bid.bid_id, bid, 'Unexpected txn spent coin a lock tx: {}'.format(spend_txid_hex), save_bid=False)
 
@@ -3380,6 +3383,10 @@ class BasicSwap(BaseApp):
 
         finally:
             self.mxDB.release()
+
+    def countQueuedEvents(self, session, bid_id, event_type):
+        q = session.query(EventQueue).filter(sa.and_(EventQueue.active_ind == 1, EventQueue.linked_id == bid_id, EventQueue.event_type == event_type))
+        return q.count()
 
     def checkEvents(self):
         self.mxDB.acquire()
@@ -4364,17 +4371,22 @@ class BasicSwap(BaseApp):
         ci_from = self.ci(coin_from)
         ci_to = self.ci(coin_to)
 
-        # Extract the leader's decrypted signature and use it to recover the follower's privatekey
-        xmr_swap.al_lock_spend_tx_sig = ci_from.extractLeaderSig(xmr_swap.a_lock_spend_tx)
-
-        kbsf = ci_from.recoverEncKey(xmr_swap.al_lock_spend_tx_esig, xmr_swap.al_lock_spend_tx_sig, xmr_swap.pkasf)
-        assert(kbsf is not None)
-
-        for_ed25519 = True if coin_to == Coins.XMR else False
-        kbsl = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, 2, for_ed25519)
-        vkbs = ci_to.sumKeys(kbsl, kbsf)
-
         try:
+            chain_height = ci_to.getChainHeight()
+            lock_tx_depth = (chain_height - bid.xmr_b_lock_tx.chain_height) + 1
+            if lock_tx_depth < ci_to.depth_spendable():
+                raise TemporaryError(f'Chain B lock tx depth {lock_tx_depth} < required for spending.')
+
+            # Extract the leader's decrypted signature and use it to recover the follower's privatekey
+            xmr_swap.al_lock_spend_tx_sig = ci_from.extractLeaderSig(xmr_swap.a_lock_spend_tx)
+
+            kbsf = ci_from.recoverEncKey(xmr_swap.al_lock_spend_tx_esig, xmr_swap.al_lock_spend_tx_sig, xmr_swap.pkasf)
+            assert(kbsf is not None)
+
+            for_ed25519 = True if coin_to == Coins.XMR else False
+            kbsl = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, 2, for_ed25519)
+            vkbs = ci_to.sumKeys(kbsl, kbsf)
+
             if coin_to == Coins.XMR:
                 address_to = self.getCachedMainWalletAddress(ci_to)
             else:
@@ -4383,7 +4395,6 @@ class BasicSwap(BaseApp):
             self.log.debug('Submitted lock B spend txn %s to %s chain for bid %s', txid.hex(), ci_to.coin_name(), bid_id.hex())
             self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_B_SPEND_TX_PUBLISHED, '', session)
         except Exception as ex:
-            # TODO: Make min-conf 10?
             error_msg = 'spendBLockTx failed for bid {} with error {}'.format(bid_id.hex(), str(ex))
             num_retries = self.countBidEvents(bid, EventLogTypes.FAILED_TX_B_SPEND, session)
             if num_retries > 0:
