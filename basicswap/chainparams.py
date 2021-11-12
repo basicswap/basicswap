@@ -266,4 +266,6 @@ class CoinInterface:
             return True
         if 'invalid unlocked_balance' in str_error:
             return True
+        if 'daemon is busy' in str_error:
+            return True
         return False
