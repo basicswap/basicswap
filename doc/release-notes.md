@@ -9,6 +9,8 @@
 - xmrswaps:
   - Setting state to 'Script tx redeemed' will trigger an attempt to redeem the scriptless lock tx.
   - Node will wait for the chain B lock tx to reach a spendable depth before attempting to spend.
+- ui: Sort settings page by coin name.
+- ui, xmr: List of candidate remote XMR daemon urls can be set through the http ui
 
 
 0.0.25

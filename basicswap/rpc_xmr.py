@@ -7,7 +7,10 @@ import requests
 def callrpc_xmr(rpc_port, auth, method, params=[], rpc_host='127.0.0.1', path='json_rpc', timeout=120):
     # auth is a tuple: (username, password)
     try:
-        url = 'http://{}:{}/{}'.format(rpc_host, rpc_port, path)
+        if rpc_host.count('://') > 0:
+            url = '{}:{}/{}'.format(rpc_host, rpc_port, path)
+        else:
+            url = 'http://{}:{}/{}'.format(rpc_host, rpc_port, path)
         request_body = {
             'method': method,
             'params': params,
@@ -30,7 +33,10 @@ def callrpc_xmr(rpc_port, auth, method, params=[], rpc_host='127.0.0.1', path='j
 
 def callrpc_xmr_na(rpc_port, method, params=[], rpc_host='127.0.0.1', path='json_rpc', timeout=120):
     try:
-        url = 'http://{}:{}/{}'.format(rpc_host, rpc_port, path)
+        if rpc_host.count('://') > 0:
+            url = '{}:{}/{}'.format(rpc_host, rpc_port, path)
+        else:
+            url = 'http://{}:{}/{}'.format(rpc_host, rpc_port, path)
         request_body = {
             'method': method,
             'params': params,
@@ -53,7 +59,10 @@ def callrpc_xmr_na(rpc_port, method, params=[], rpc_host='127.0.0.1', path='json
 
 def callrpc_xmr2(rpc_port, method, params=None, rpc_host='127.0.0.1', timeout=120):
     try:
-        url = 'http://{}:{}/{}'.format(rpc_host, rpc_port, method)
+        if rpc_host.count('://') > 0:
+            url = '{}:{}/{}'.format(rpc_host, rpc_port, method)
+        else:
+            url = 'http://{}:{}/{}'.format(rpc_host, rpc_port, method)
         headers = {
             'Content-Type': 'application/json'
         }

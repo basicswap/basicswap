@@ -34,6 +34,7 @@ from .interface_xmr import XMRInterface
 from .interface_passthrough_btc import PassthroughBTCInterface
 
 from . import __version__
+from .rpc_xmr import make_xmr_rpc2_func
 from .util import (
     TemporaryError,
     pubkeyToAddress,
@@ -377,12 +378,50 @@ class BasicSwap(BaseApp):
 
         if self.coin_clients[coin]['connection_type'] == 'rpc':
             if coin == Coins.XMR:
+                if chain_client_settings.get('automatically_select_daemon', False):
+                    self.selectXMRRemoteDaemon(coin)
+
                 self.coin_clients[coin]['walletrpchost'] = chain_client_settings.get('walletrpchost', '127.0.0.1')
                 self.coin_clients[coin]['walletrpcport'] = chain_client_settings.get('walletrpcport', chainparams[coin][self.chain]['walletrpcport'])
                 if 'walletrpcpassword' in chain_client_settings:
                     self.coin_clients[coin]['walletrpcauth'] = (chain_client_settings['walletrpcuser'], chain_client_settings['walletrpcpassword'])
                 else:
                     raise ValueError('Missing XMR wallet rpc credentials.')
+
+    def selectXMRRemoteDaemon(self, coin):
+        self.log.info('Selecting remote XMR daemon.')
+        chain_client_settings = self.getChainClientSettings(coin)
+        remote_daemon_urls = chain_client_settings.get('remote_daemon_urls', [])
+        rpchost = self.coin_clients[coin]['rpchost']
+        rpcport = self.coin_clients[coin]['rpcport']
+        current_daemon_url = f'{rpchost}:{rpcport}'
+        if current_daemon_url in remote_daemon_urls:
+            self.log.info(f'Trying last used url {rpchost}:{rpcport}.')
+            try:
+                rpc_cb2 = make_xmr_rpc2_func(rpcport, rpchost)
+                test = rpc_cb2('get_height', timeout=20)['height']
+                return True
+            except Exception as e:
+                self.log.warning(f'Failed to set XMR remote daemon to {rpchost}:{rpcport}, {e}')
+        random.shuffle(remote_daemon_urls)
+        for url in remote_daemon_urls:
+            self.log.info(f'Trying url {url}.')
+            try:
+                rpchost, rpcport = url.rsplit(':', 1)
+                rpc_cb2 = make_xmr_rpc2_func(rpcport, rpchost)
+                test = rpc_cb2('get_height', timeout=20)['height']
+                self.coin_clients[coin]['rpchost'] = rpchost
+                self.coin_clients[coin]['rpcport'] = rpcport
+                data = {
+                    'rpchost': rpchost,
+                    'rpcport': rpcport,
+                }
+                self.editSettings(self.coin_clients[coin]['name'], data)
+                return True
+            except Exception as e:
+                self.log.warning(f'Failed to set XMR remote daemon to {url}, {e}')
+
+        raise ValueError('Failed to select a working XMR daemon url.')
 
     def ci(self, coin):  # Coin interface
         if coin == Coins.PART_ANON:
@@ -4818,6 +4857,7 @@ class BasicSwap(BaseApp):
         with self.mxDB:
             settings_cc = self.settings['chainclients'][coin_name]
             settings_changed = False
+            suggest_reboot = False
             if 'lookups' in data:
                 if settings_cc.get('chain_lookups', 'local') != data['lookups']:
                     settings_changed = True
@@ -4826,6 +4866,26 @@ class BasicSwap(BaseApp):
                         if cc['name'] == coin_name:
                             cc['chain_lookups'] = data['lookups']
                             break
+
+            for setting in ('manage_daemon', 'rpchost', 'rpcport', 'automatically_select_daemon'):
+                if setting not in data:
+                    continue
+                if settings_cc.get(setting) != data[setting]:
+                    settings_changed = True
+                    suggest_reboot = True
+                    settings_cc[setting] = data[setting]
+
+            if 'remotedaemonurls' in data:
+                remotedaemonurls_in = data['remotedaemonurls'].split('\n')
+                remotedaemonurls = set()
+                for url in remotedaemonurls_in:
+                    if url.count(':') > 0:
+                        remotedaemonurls.add(url.strip())
+
+                if set(settings_cc.get('remote_daemon_urls', [])) != remotedaemonurls:
+                    settings_cc['remote_daemon_urls'] = list(remotedaemonurls)
+                    settings_changed = True
+                    suggest_reboot = True
 
             if 'fee_priority' in data:
                 new_fee_priority = data['fee_priority']
@@ -4858,7 +4918,7 @@ class BasicSwap(BaseApp):
                 shutil.copyfile(settings_path, settings_path + '.last')
                 with open(settings_path, 'w') as fp:
                     json.dump(self.settings, fp, indent=4)
-        return settings_changed
+        return settings_changed, suggest_reboot
 
     def enableCoin(self, coin_name):
         self.log.info('Enabling coin %s', coin_name)

@@ -388,26 +388,36 @@ class HttpHandler(BaseHTTPRequestHandler):
         form_data = self.checkForm(post_string, 'settings', messages)
         if form_data:
             for name, c in swap_client.settings['chainclients'].items():
-                if bytes('apply_' + name, 'utf-8') in form_data:
-                    data = {'lookups': form_data[bytes('lookups_' + name, 'utf-8')][0].decode('utf-8')}
+                if have_data_entry(form_data, 'apply_' + name):
+                    data = {'lookups': get_data_entry(form_data, 'lookups_' + name)}
                     if name == 'monero':
-                        data['fee_priority'] = int(form_data[bytes('fee_priority_' + name, 'utf-8')][0])
+                        data['fee_priority'] = int(get_data_entry(form_data, 'fee_priority_' + name))
+                        data['manage_daemon'] = True if get_data_entry(form_data, 'managedaemon_' + name) == 'true' else False
+                        data['rpchost'] = get_data_entry(form_data, 'rpchost_' + name)
+                        data['rpcport'] = int(get_data_entry(form_data, 'rpcport_' + name))
+                        data['remotedaemonurls'] = get_data_entry(form_data, 'remotedaemonurls_' + name)
+                        data['automatically_select_daemon'] = True if get_data_entry(form_data, 'autosetdaemon_' + name) == 'true' else False
                     else:
-                        data['conf_target'] = int(form_data[bytes('conf_target_' + name, 'utf-8')][0])
+                        data['conf_target'] = int(get_data_entry(form_data, 'conf_target_' + name))
 
-                    if swap_client.editSettings(name, data) is True:
+                    settings_changed, suggest_reboot = swap_client.editSettings(name, data)
+                    if settings_changed is True:
                         messages.append('Settings applied.')
-                elif bytes('enable_' + name, 'utf-8') in form_data:
+                    if suggest_reboot is True:
+                        messages.append('Please restart BasicSwap.')
+                elif have_data_entry(form_data, 'enable_' + name):
                     swap_client.enableCoin(name)
                     messages.append(name.capitalize() + ' enabled, shutting down.')
                     swap_client.stopRunning()
-                elif bytes('disable_' + name, 'utf-8') in form_data:
+                elif have_data_entry(form_data, 'disable_' + name):
                     swap_client.disableCoin(name)
                     messages.append(name.capitalize() + ' disabled, shutting down.')
                     swap_client.stopRunning()
         chains_formatted = []
 
-        for name, c in swap_client.settings['chainclients'].items():
+        sorted_names = sorted(swap_client.settings['chainclients'].keys())
+        for name in sorted_names:
+            c = swap_client.settings['chainclients'][name]
             chains_formatted.append({
                 'name': name,
                 'lookups': c.get('chain_lookups', 'local'),
@@ -417,6 +427,10 @@ class HttpHandler(BaseHTTPRequestHandler):
             if name == 'monero':
                 chains_formatted[-1]['fee_priority'] = c.get('fee_priority', 0)
                 chains_formatted[-1]['manage_wallet_daemon'] = c.get('manage_wallet_daemon', 'Unknown')
+                chains_formatted[-1]['rpchost'] = c.get('rpchost', 'localhost')
+                chains_formatted[-1]['rpcport'] = int(c.get('rpcport', 18081))
+                chains_formatted[-1]['remotedaemonurls'] = '\n'.join(c.get('remote_daemon_urls', []))
+                chains_formatted[-1]['autosetdaemon'] = c.get('automatically_select_daemon', False)
             else:
                 chains_formatted[-1]['conf_target'] = c.get('conf_target', 2)
             if name != 'particl':

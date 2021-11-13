@@ -15,7 +15,30 @@
 <tr><td>Connection Type</td><td>{{ c.connection_type }}</td></tr>
 {% endif %}
 {% if c.manage_daemon is defined %}
+{% if c.name == 'monero' %}
+<tr><td>Manage Daemon</td><td>
+<select name="managedaemon_{{ c.name }}">
+<option value="true"{% if c.manage_daemon==true %} selected{% endif %}>True</option>
+<option value="false"{% if c.manage_daemon==false %} selected{% endif %}>False</option>
+</select></td></tr>
+<tr><td>Daemon RPC Host</td><td><input type="text" name="rpchost_{{ c.name }}" value="{{ c.rpchost }}"></td></tr>
+<tr><td>Daemon RPC Port</td><td><input type="text" name="rpcport_{{ c.name }}" value="{{ c.rpcport }}"></td></tr>
+<tr><td colspan=2>Remote Daemon Urls<br/>
+List of public nodes to use if "Automatically Select Daemon" is true.<br/>
+Add one entry per line, eg:<br/>
+node.xmr.to:18081<br/>
+<textarea class="monospace" name="remotedaemonurls_{{ c.name }}" rows="10" cols="100">
+{{ c.remotedaemonurls }}
+</textarea>
+</td></tr>
+<tr><td>Automatically Select Daemon</td><td>
+<select name="autosetdaemon_{{ c.name }}">
+<option value="true"{% if c.autosetdaemon==true %} selected{% endif %}>True</option>
+<option value="false"{% if c.autosetdaemon==false %} selected{% endif %}>False</option>
+</select></td></tr>
+{% else %}
 <tr><td>Manage Daemon</td><td>{{ c.manage_daemon }}</td></tr>
+{% endif %}
 {% endif %}
 {% if c.manage_wallet_daemon is defined %}
 <tr><td>Manage Wallet Daemon</td><td>{{ c.manage_wallet_daemon }}</td></tr>
