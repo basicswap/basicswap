@@ -1,0 +1,23 @@
+{% include 'header.html' %}
+
+<h3>Identity {{ data.identity_address }}</h3>
+
+{% for m in messages %}
+<p>{{ m }}</p>
+{% endfor %}
+
+<form method="post">
+
+<table>
+<tr><td>Successful Sent Bids</td><td>{{ data.num_sent_bids_successful }}</td></tr>
+<tr><td>Successful Received Bids</td><td>{{ data.num_recv_bids_successful }}</td></tr>
+<tr><td>Rejected Sent Bids</td><td>{{ data.num_sent_bids_rejected }}</td></tr>
+<tr><td>Rejected Received Bids</td><td>{{ data.num_recv_bids_rejected }}</td></tr>
+<tr><td>Failed Sent Bids</td><td>{{ data.num_sent_bids_failed }}</td></tr>
+<tr><td>Failed Received Bids</td><td>{{ data.num_recv_bids_failed }}</td></tr>
+</table>
+<input type="hidden" name="formid" value="{{ form_id }}">
+</form>
+
+<p><a href="/">home</a></p>
+</body></html>

@@ -12,7 +12,7 @@ from enum import IntEnum, auto
 from sqlalchemy.ext.declarative import declarative_base
 
 
-CURRENT_DB_VERSION = 12
+CURRENT_DB_VERSION = 13
 Base = declarative_base()
 
 
@@ -66,6 +66,9 @@ class Offer(Base):
     from_feerate = sa.Column(sa.BigInteger)
     to_feerate = sa.Column(sa.BigInteger)
 
+    amount_negotiable = sa.Column(sa.Boolean)
+    rate_negotiable = sa.Column(sa.Boolean)
+
     # Local fields
     auto_accept_bids = sa.Column(sa.Boolean)
     withdraw_to_addr = sa.Column(sa.String)  # Address to spend lock tx to - address from wallet if empty TODO
@@ -105,6 +108,7 @@ class Bid(Base):
 
     pkhash_buyer = sa.Column(sa.LargeBinary)
     amount = sa.Column(sa.BigInteger)
+    rate = sa.Column(sa.BigInteger)
 
     accept_msg_id = sa.Column(sa.LargeBinary)
     pkhash_seller = sa.Column(sa.LargeBinary)
@@ -127,6 +131,8 @@ class Bid(Base):
 
     chain_a_height_start = sa.Column(sa.Integer)  # Height of script chain before the swap
     chain_b_height_start = sa.Column(sa.Integer)  # Height of scriptless chain before the swap
+
+    reject_code = sa.Column(sa.Integer)
 
     initiate_tx = None
     participate_tx = None
@@ -371,5 +377,23 @@ class Wallets(Base):
     wallet_data = sa.Column(sa.String)
     balance_type = sa.Column(sa.Integer)
     amount = sa.Column(sa.BigInteger)
+    updated_at = sa.Column(sa.BigInteger)
+    created_at = sa.Column(sa.BigInteger)
+
+
+class KnownIdentity(Base):
+    __tablename__ = 'knownidentities'
+
+    record_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
+    address = sa.Column(sa.String)
+    label = sa.Column(sa.String)
+    publickey = sa.Column(sa.LargeBinary)
+    num_sent_bids_successful = sa.Column(sa.Integer)
+    num_recv_bids_successful = sa.Column(sa.Integer)
+    num_sent_bids_rejected = sa.Column(sa.Integer)
+    num_recv_bids_rejected = sa.Column(sa.Integer)
+    num_sent_bids_failed = sa.Column(sa.Integer)
+    num_recv_bids_failed = sa.Column(sa.Integer)
+    note = sa.Column(sa.String)
     updated_at = sa.Column(sa.BigInteger)
     created_at = sa.Column(sa.BigInteger)

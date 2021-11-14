@@ -84,6 +84,7 @@ class BidStates(IntEnum):
     BID_ABANDONED = auto()          # Bid will no longer be processed
     BID_ERROR = auto()              # An error occurred
     BID_STALLED_FOR_TEST = auto()
+    BID_REJECTED = auto()
     BID_STATE_UNKNOWN = auto()
 
 
@@ -192,6 +193,8 @@ def strBidState(state):
         return 'Stalled (debug)'
     if state == BidStates.BID_ERROR:
         return 'Error'
+    if state == BidStates.BID_REJECTED:
+        return 'Rejected'
     if state == BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED:
         return 'Script coin locked'
     if state == BidStates.XMR_SWAP_HAVE_SCRIPT_COIN_SPEND_TX:

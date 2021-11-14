@@ -1,4 +1,10 @@
 
+0.0.27
+==============
+
+- Track failed and successful swaps by address
+
+
 0.0.26
 ==============
 

@@ -20,10 +20,12 @@
 <tr><td>Amount From</td><td>{{ data.amt_from }} {{ data.tla_from }}</td></tr>
 <tr><td>Amount To</td><td>{{ data.amt_to }} {{ data.tla_to }}</td></tr>
 <tr><td>Rate</td><td>{{ data.rate }} {{ data.amt_from }}/{{ data.tla_from }}</td></tr>
+<tr><td>Amount Variable</td><td>{{ data.amount_negotiable }}</td></tr>
+<tr><td>Rate Variable</td><td>{{ data.rate_negotiable }}</td></tr>
 <tr><td>Script Lock Type</td><td>{{ data.lock_type }}</td></tr>
 <tr><td>Script Lock Value</td><td>{{ data.lock_value }}</td></tr>
 <tr><td>Address To</td><td>{{ data.addr_to }}</td></tr>
-<tr><td>Address From</td><td>{{ data.addr_from }}</td></tr>
+<tr><td>Address From</td><td><a class="monospace" href="/identity/{{ data.addr_from }}">{{ data.addr_from }}</a></td></tr>
 <tr><td>Created At</td><td>{{ data.created_at | formatts }}</td></tr>
 <tr><td>Expired At</td><td>{{ data.expired_at | formatts }}</td></tr>
 <tr><td>Sent</td><td>{{ data.sent }}</td></tr>
@@ -73,9 +75,9 @@
 
 <h4>Bids</h4>
 <table>
-<tr><th>Bid ID</th><th>Bid Amount</th><th>Bid Status</th><th>ITX Status</th><th>PTX Status</th></tr>
+<tr><th>Bid ID</th><th>Bid Amount</th><th>Bid Rate</th><th>Bid Status</th><th>Identity From</th></tr>
 {% for b in bids %}
-<tr><td><a class="monospace" href=/bid/{{ b[0] }}>{{ b[0] }}</a></td><td>{{ b[1] }}</td><td>{{ b[2] }}</td><td>{{ b[3] }}</td><td>{{ b[4] }}</td></tr>
+<tr><td><a class="monospace" href=/bid/{{ b[0] }}>{{ b[0] }}</a></td><td>{{ b[1] }}</td><td>{{ b[3] }}</td><td>{{ b[2] }}</td><td><a class="monospace" href=/identity/{{ b[4] }}>{{ b[4] }}</a></td></tr>
 {% endfor %}
 </table>
 

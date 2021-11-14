@@ -15,12 +15,13 @@
 {% else %}
 <tr><td>Swap</td><td>{{ data.amt_from }} {{ data.ticker_from }} for {{ data.amt_to }} {{ data.ticker_to }}</td></tr>
 {% endif %}
+<tr><td>Bid Rate</td><td>{{ data.bid_rate }}</td></tr>
 <tr><td>Coin From</td><td>{{ data.coin_from }}</td></tr>
 <tr><td>Coin To</td><td>{{ data.coin_to }}</td></tr>
 <tr><td>Bid State</td><td>{{ data.bid_state }}</td></tr>
 <tr><td>State Description </td><td>{{ data.state_description }}</td></tr>
 <tr><td>Offer</td><td><a class="monospace" href="/offer/{{ data.offer_id }}">{{ data.offer_id }}</a></td></tr>
-<tr><td>Address From</td><td class="monospace">{{ data.addr_from }}</td></tr>
+<tr><td>Address From</td><td><a class="monospace" href="/identity/{{ data.addr_from }}">{{ data.addr_from }}</a></td></tr>
 <tr><td>Created At</td><td>{{ data.created_at }}</td></tr>
 <tr><td>Expired At</td><td>{{ data.expired_at }}</td></tr>
 <tr><td>Sent</td><td>{{ data.was_sent }}</td></tr>

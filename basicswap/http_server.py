@@ -752,6 +752,8 @@ class HttpHandler(BaseHTTPRequestHandler):
             'sent': 'True' if offer.was_sent else 'False',
             'was_revoked': 'True' if offer.active_ind == 2 else 'False',
             'show_bid_form': show_bid_form,
+            'amount_negotiable': offer.amount_negotiable,
+            'rate_negotiable': offer.rate_negotiable,
         }
         data.update(extend_data)
 
@@ -780,7 +782,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             sent_bid_id=sent_bid_id,
             messages=messages,
             data=data,
-            bids=[(b[2].hex(), ci_from.format_amount(b[4]), strBidState(b[5]), strTxState(b[7]), strTxState(b[8])) for b in bids],
+            bids=[(b[2].hex(), ci_from.format_amount(b[4]), strBidState(b[5]), ci_to.format_amount(b[10]), b[11]) for b in bids],
             addrs=None if show_bid_form is None else swap_client.listSmsgAddresses('bid'),
             form_id=os.urandom(8).hex(),
         ), 'UTF-8')
@@ -960,7 +962,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             h2=self.server.title,
             page_type='Sent' if sent else 'Received',
             bids=[(format_timestamp(b[0]),
-                   b[2].hex(), b[3].hex(), strBidState(b[5]), strTxState(b[7]), strTxState(b[8])) for b in bids],
+                   b[2].hex(), b[3].hex(), strBidState(b[5]), strTxState(b[7]), strTxState(b[8]), b[11]) for b in bids],
         ), 'UTF-8')
 
     def page_watched(self, url_split, post_string):
@@ -1048,6 +1050,36 @@ class HttpHandler(BaseHTTPRequestHandler):
             form_id=os.urandom(8).hex(),
             smsgaddresses=smsgaddresses,
             network_addr=network_addr,
+        ), 'UTF-8')
+
+    def page_identity(self, url_split, post_string):
+        assert(len(url_split) > 2), 'Address not specified'
+        identity_address = url_split[2]
+        swap_client = self.server.swap_client
+
+        page_data = {'identity_address': identity_address}
+        messages = []
+
+        try:
+            identity = swap_client.getIdentity(identity_address)
+            if identity is None:
+                raise ValueError('Unknown address')
+            page_data['num_sent_bids_successful'] = identity.num_sent_bids_successful
+            page_data['num_recv_bids_successful'] = identity.num_recv_bids_successful
+            page_data['num_sent_bids_rejected'] = identity.num_sent_bids_rejected
+            page_data['num_recv_bids_rejected'] = identity.num_recv_bids_rejected
+            page_data['num_sent_bids_failed'] = identity.num_sent_bids_failed
+            page_data['num_recv_bids_failed'] = identity.num_recv_bids_failed
+        except Exception as e:
+            messages.append(e)
+
+        template = env.get_template('identity.html')
+        return bytes(template.render(
+            title=self.server.title,
+            h2=self.server.title,
+            messages=messages,
+            data=page_data,
+            form_id=os.urandom(8).hex(),
         ), 'UTF-8')
 
     def page_shutdown(self, url_split, post_string):
@@ -1158,6 +1190,8 @@ class HttpHandler(BaseHTTPRequestHandler):
                     return self.page_watched(url_split, post_string)
                 if url_split[1] == 'smsgaddresses':
                     return self.page_smsgaddresses(url_split, post_string)
+                if url_split[1] == 'identity':
+                    return self.page_identity(url_split, post_string)
                 if url_split[1] == 'shutdown':
                     return self.page_shutdown(url_split, post_string)
             return self.page_index(url_split)

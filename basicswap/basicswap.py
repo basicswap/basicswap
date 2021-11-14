@@ -88,6 +88,7 @@ from .db import (
     XmrSwap,
     XmrSplitData,
     Wallets,
+    KnownIdentity,
 )
 from .base import BaseApp
 from .explorers import (
@@ -131,6 +132,12 @@ def validOfferStateToReceiveBid(offer_state):
     if offer_state == OfferStates.OFFER_SENT:
         return True
     return False
+
+
+def zeroIfNone(value):
+    if value is None:
+        return 0
+    return value
 
 
 def threadPollChainState(swap_client, coin_type):
@@ -632,6 +639,28 @@ class BasicSwap(BaseApp):
                 session.execute('ALTER TABLE offers ADD COLUMN protocol_version INTEGER')
                 session.execute('ALTER TABLE transactions ADD COLUMN tx_data BLOB')
                 db_version += 1
+            elif current_version == 12:
+                session.execute('''
+                    CREATE TABLE knownidentities (
+                        record_id INTEGER NOT NULL,
+                        address VARCHAR,
+                        label VARCHAR,
+                        publickey BLOB,
+                        num_sent_bids_successful INTEGER,
+                        num_recv_bids_successful INTEGER,
+                        num_sent_bids_rejected INTEGER,
+                        num_recv_bids_rejected INTEGER,
+                        num_sent_bids_failed INTEGER,
+                        num_recv_bids_failed INTEGER,
+                        note VARCHAR,
+                        updated_at BIGINT,
+                        created_at BIGINT,
+                        PRIMARY KEY (record_id))''')
+                session.execute('ALTER TABLE bids ADD COLUMN reject_code INTEGER')
+                session.execute('ALTER TABLE bids ADD COLUMN rate INTEGER')
+                session.execute('ALTER TABLE offers ADD COLUMN amount_negotiable INTEGER')
+                session.execute('ALTER TABLE offers ADD COLUMN rate_negotiable INTEGER')
+                db_version += 1
 
             if current_version != db_version:
                 self.db_version = db_version
@@ -692,6 +721,25 @@ class BasicSwap(BaseApp):
 
         key_str = 'main_wallet_seedid_' + ci.coin_name().lower()
         self.setStringKV(key_str, root_hash.hex())
+
+    def updateIdentityBidState(self, session, address, bid):
+        identity_stats = session.query(KnownIdentity).filter_by(address=address).first()
+        if not identity_stats:
+            identity_stats = KnownIdentity(address=address, created_at=int(time.time()))
+
+        if bid.state == BidStates.SWAP_COMPLETED:
+            if bid.was_sent:
+                identity_stats.num_sent_bids_successful = zeroIfNone(identity_stats.num_sent_bids_successful) + 1
+            else:
+                identity_stats.num_recv_bids_successful = zeroIfNone(identity_stats.num_recv_bids_successful) + 1
+        elif bid.state in (BidStates.BID_ERROR, BidStates.XMR_SWAP_FAILED_REFUNDED, BidStates.XMR_SWAP_FAILED_SWIPED, BidStates.XMR_SWAP_FAILED):
+            if bid.was_sent:
+                identity_stats.num_sent_bids_failed = zeroIfNone(identity_stats.num_sent_bids_failed) + 1
+            else:
+                identity_stats.num_recv_bids_failed = zeroIfNone(identity_stats.num_recv_bids_failed) + 1
+
+        identity_stats.updated_at = int(time.time())
+        session.add(identity_stats)
 
     def setIntKVInSession(self, str_key, int_val, session):
         kv = session.query(DBKVInt).filter_by(key=str_key).first()
@@ -827,6 +875,11 @@ class BasicSwap(BaseApp):
                         pass  # Invalid parameter, unknown transaction
             elif SwapTypes.SELLER_FIRST:
                 pass  # No prevouts are locked
+
+            # Update identity stats
+            if bid.state in (BidStates.BID_ERROR, BidStates.XMR_SWAP_FAILED_REFUNDED, BidStates.XMR_SWAP_FAILED_SWIPED, BidStates.XMR_SWAP_FAILED, BidStates.SWAP_COMPLETED):
+                peer_address = offer.addr_from if bid.was_sent else bid.bid_addr
+                self.updateIdentityBidState(use_session, peer_address, bid)
 
         finally:
             if session is None:
@@ -980,6 +1033,8 @@ class BasicSwap(BaseApp):
             msg_buf.lock_type = lock_type
             msg_buf.lock_value = lock_value
             msg_buf.swap_type = swap_type
+            msg_buf.amount_negotiable = extra_options.get('amount_negotiable', False)
+            msg_buf.rate_negotiable = extra_options.get('rate_negotiable', False)
 
             if 'from_fee_override' in extra_options:
                 msg_buf.fee_rate_from = make_int(extra_options['from_fee_override'], self.ci(coin_from).exp())
@@ -1051,6 +1106,8 @@ class BasicSwap(BaseApp):
                 lock_type=int(msg_buf.lock_type),
                 lock_value=msg_buf.lock_value,
                 swap_type=msg_buf.swap_type,
+                amount_negotiable=msg_buf.amount_negotiable,
+                rate_negotiable=msg_buf.rate_negotiable,
 
                 addr_to=offer_addr_to,
                 addr_from=offer_addr,
@@ -1565,6 +1622,12 @@ class BasicSwap(BaseApp):
         valid_for_seconds = extra_options.get('valid_for_seconds', 60 * 10)
         self.validateBidValidTime(offer.swap_type, offer.coin_from, offer.coin_to, valid_for_seconds)
 
+        bid_rate = extra_options.get('bid_rate', offer.rate)
+        if not offer.amount_negotiable:
+            ensure(offer.amount_from == int(amount), 'Bid amount must match offer amount.')
+        if not offer.rate_negotiable:
+            ensure(offer.rate == bid_rate, 'Bid rate must match offer rate.')
+
         self.mxDB.acquire()
         try:
             msg_buf = BidMessage()
@@ -1572,6 +1635,7 @@ class BasicSwap(BaseApp):
             msg_buf.offer_msg_id = offer_id
             msg_buf.time_valid = valid_for_seconds
             msg_buf.amount = int(amount)  # amount of coin_from
+            msg_buf.rate = bid_rate
 
             coin_from = Coins(offer.coin_from)
             coin_to = Coins(offer.coin_to)
@@ -1614,6 +1678,7 @@ class BasicSwap(BaseApp):
                 bid_id=bid_id,
                 offer_id=offer_id,
                 amount=msg_buf.amount,
+                rate=msg_buf.rate,
                 pkhash_buyer=msg_buf.pkhash_buyer,
                 proof_address=msg_buf.proof_address,
 
@@ -1764,6 +1829,17 @@ class BasicSwap(BaseApp):
             session.remove()
             self.mxDB.release()
 
+    def getIdentity(self, address):
+        self.mxDB.acquire()
+        try:
+            session = scoped_session(self.session_factory)
+            identity = session.query(KnownIdentity).filter_by(address=address).first()
+            return identity
+        finally:
+            session.close()
+            session.remove()
+            self.mxDB.release()
+
     def list_bid_events(self, bid_id, session):
         query_str = 'SELECT created_at, event_type, event_msg FROM eventlog ' + \
                     'WHERE active_ind = 1 AND linked_type = {} AND linked_id = x\'{}\' '.format(TableTypes.BID, bid_id.hex())
@@ -1898,6 +1974,12 @@ class BasicSwap(BaseApp):
             ci_from = self.ci(coin_from)
             ci_to = self.ci(coin_to)
 
+            bid_rate = extra_options.get('bid_rate', offer.rate)
+            if not offer.amount_negotiable:
+                ensure(offer.amount_from == int(amount), 'Bid amount must match offer amount.')
+            if not offer.rate_negotiable:
+                ensure(offer.rate == bid_rate, 'Bid rate must match offer rate.')
+
             self.checkSynced(coin_from, coin_to)
 
             msg_buf = XmrBidMessage()
@@ -1905,6 +1987,7 @@ class BasicSwap(BaseApp):
             msg_buf.offer_msg_id = offer_id
             msg_buf.time_valid = valid_for_seconds
             msg_buf.amount = int(amount)  # Amount of coin_from
+            msg_buf.rate = bid_rate
 
             address_out = self.getReceiveAddressFromPool(coin_from, offer_id, TxTypes.XMR_SWAP_A_LOCK)
             if coin_from == Coins.PART_BLIND:
@@ -1990,6 +2073,7 @@ class BasicSwap(BaseApp):
                 bid_id=xmr_swap.bid_id,
                 offer_id=offer_id,
                 amount=msg_buf.amount,
+                rate=msg_buf.rate,
                 created_at=bid_created_at,
                 contract_count=xmr_swap.contract_count,
                 amount_to=(msg_buf.amount * offer.rate) // ci_from.COIN(),
@@ -3594,6 +3678,8 @@ class BasicSwap(BaseApp):
                     lock_type=int(offer_data.lock_type),
                     lock_value=offer_data.lock_value,
                     swap_type=offer_data.swap_type,
+                    amount_negotiable=offer_data.amount_negotiable,
+                    rate_negotiable=offer_data.rate_negotiable,
 
                     addr_to=msg['to'],
                     addr_from=msg['from'],
@@ -3688,6 +3774,11 @@ class BasicSwap(BaseApp):
         self.validateBidValidTime(offer.swap_type, offer.coin_from, offer.coin_to, bid_data.time_valid)
         ensure(now <= msg['sent'] + bid_data.time_valid, 'Bid expired')
 
+        if not offer.amount_negotiable:
+            ensure(offer.amount_from == bid_data.amount, 'Bid amount must match offer amount.')
+        if not offer.rate_negotiable:
+            ensure(offer.rate == bid_data.rate, 'Bid rate must match offer rate.')
+
         # TODO: Allow higher bids
         # assert(bid_data.rate != offer['data'].rate), 'Bid rate mismatch'
 
@@ -3730,6 +3821,7 @@ class BasicSwap(BaseApp):
                 offer_id=offer_id,
                 protocol_version=bid_data.protocol_version,
                 amount=bid_data.amount,
+                rate=bid_data.rate,
                 pkhash_buyer=bid_data.pkhash_buyer,
 
                 created_at=msg['sent'],
@@ -3976,6 +4068,11 @@ class BasicSwap(BaseApp):
         self.validateBidValidTime(offer.swap_type, offer.coin_from, offer.coin_to, bid_data.time_valid)
         ensure(now <= msg['sent'] + bid_data.time_valid, 'Bid expired')
 
+        if not offer.amount_negotiable:
+            ensure(offer.amount_from == bid_data.amount, 'Bid amount must match offer amount.')
+        if not offer.rate_negotiable:
+            ensure(offer.rate == bid_data.rate, 'Bid rate must match offer rate.')
+
         ensure(ci_to.verifyKey(bid_data.kbvf), 'Invalid chain B follower view key')
         ensure(ci_from.verifyPubkey(bid_data.pkaf), 'Invalid chain A follower public key')
 
@@ -3989,6 +4086,7 @@ class BasicSwap(BaseApp):
                 offer_id=offer_id,
                 protocol_version=bid_data.protocol_version,
                 amount=bid_data.amount,
+                rate=bid_data.rate,
                 created_at=msg['sent'],
                 amount_to=(bid_data.amount * offer.rate) // ci_from.COIN(),
                 expire_at=msg['sent'] + bid_data.time_valid,
@@ -5190,14 +5288,15 @@ class BasicSwap(BaseApp):
             session.remove()
             self.mxDB.release()
 
-    def listBids(self, sent=False, offer_id=None, for_html=False, filters={}):
+    def listBids(self, sent=False, offer_id=None, for_html=False, filters={}, with_identity_info=False):
         self.mxDB.acquire()
         try:
             rv = []
             now = int(time.time())
             session = scoped_session(self.session_factory)
 
-            query_str = 'SELECT bids.created_at, bids.expire_at, bids.bid_id, bids.offer_id, bids.amount, bids.state, bids.was_received, tx1.state, tx2.state, offers.coin_from FROM bids ' + \
+            identity_fields = ''
+            query_str = 'SELECT bids.created_at, bids.expire_at, bids.bid_id, bids.offer_id, bids.amount, bids.state, bids.was_received, tx1.state, tx2.state, offers.coin_from, bids.rate, bids.bid_addr {} FROM bids '.format(identity_fields) + \
                         'LEFT JOIN offers ON offers.offer_id = bids.offer_id ' + \
                         'LEFT JOIN transactions AS tx1 ON tx1.bid_id = bids.bid_id AND tx1.tx_type = {} '.format(TxTypes.ITX) + \
                         'LEFT JOIN transactions AS tx2 ON tx2.bid_id = bids.bid_id AND tx2.tx_type = {} '.format(TxTypes.PTX)

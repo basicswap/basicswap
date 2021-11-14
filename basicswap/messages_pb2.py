@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\x0emessages.proto\x12\tbasicswap\"\xf2\x03\n\x0cOfferMessage\x12\x11\n\tcoin_from\x18\x01 \x01(\r\x12\x0f\n\x07\x63oin_to\x18\x02 \x01(\r\x12\x13\n\x0b\x61mount_from\x18\x03 \x01(\x04\x12\x0c\n\x04rate\x18\x04 \x01(\x04\x12\x16\n\x0emin_bid_amount\x18\x05 \x01(\x04\x12\x12\n\ntime_valid\x18\x06 \x01(\x04\x12\x33\n\tlock_type\x18\x07 \x01(\x0e\x32 .basicswap.OfferMessage.LockType\x12\x12\n\nlock_value\x18\x08 \x01(\r\x12\x11\n\tswap_type\x18\t \x01(\r\x12\x15\n\rproof_address\x18\n \x01(\t\x12\x17\n\x0fproof_signature\x18\x0b \x01(\t\x12\x15\n\rpkhash_seller\x18\x0c \x01(\x0c\x12\x13\n\x0bsecret_hash\x18\r \x01(\x0c\x12\x15\n\rfee_rate_from\x18\x0e \x01(\x04\x12\x13\n\x0b\x66\x65\x65_rate_to\x18\x0f \x01(\x04\x12\x18\n\x10protocol_version\x18\x10 \x01(\r\"q\n\x08LockType\x12\x0b\n\x07NOT_SET\x10\x00\x12\x18\n\x14SEQUENCE_LOCK_BLOCKS\x10\x01\x12\x16\n\x12SEQUENCE_LOCK_TIME\x10\x02\x12\x13\n\x0f\x41\x42S_LOCK_BLOCKS\x10\x03\x12\x11\n\rABS_LOCK_TIME\x10\x04\"\xa6\x01\n\nBidMessage\x12\x14\n\x0coffer_msg_id\x18\x01 \x01(\x0c\x12\x12\n\ntime_valid\x18\x02 \x01(\x04\x12\x0e\n\x06\x61mount\x18\x03 \x01(\x04\x12\x14\n\x0cpkhash_buyer\x18\x04 \x01(\x0c\x12\x15\n\rproof_address\x18\x05 \x01(\t\x12\x17\n\x0fproof_signature\x18\x06 \x01(\t\x12\x18\n\x10protocol_version\x18\x07 \x01(\r\"V\n\x10\x42idAcceptMessage\x12\x12\n\nbid_msg_id\x18\x01 \x01(\x0c\x12\x15\n\rinitiate_txid\x18\x02 \x01(\x0c\x12\x17\n\x0f\x63ontract_script\x18\x03 \x01(\x0c\"=\n\x12OfferRevokeMessage\x12\x14\n\x0coffer_msg_id\x18\x01 \x01(\x0c\x12\x11\n\tsignature\x18\x02 \x01(\x0c\"\xa4\x01\n\rXmrBidMessage\x12\x14\n\x0coffer_msg_id\x18\x01 \x01(\x0c\x12\x12\n\ntime_valid\x18\x02 \x01(\x04\x12\x0e\n\x06\x61mount\x18\x03 \x01(\x04\x12\x0c\n\x04pkaf\x18\x04 \x01(\x0c\x12\x0c\n\x04kbvf\x18\x05 \x01(\x0c\x12\x12\n\nkbsf_dleag\x18\x06 \x01(\x0c\x12\x0f\n\x07\x64\x65st_af\x18\x07 \x01(\x0c\x12\x18\n\x10protocol_version\x18\x08 \x01(\r\"T\n\x0fXmrSplitMessage\x12\x0e\n\x06msg_id\x18\x01 \x01(\x0c\x12\x10\n\x08msg_type\x18\x02 \x01(\r\x12\x10\n\x08sequence\x18\x03 \x01(\r\x12\r\n\x05\x64leag\x18\x04 \x01(\x0c\"\x80\x02\n\x13XmrBidAcceptMessage\x12\x12\n\nbid_msg_id\x18\x01 \x01(\x0c\x12\x0c\n\x04pkal\x18\x03 \x01(\x0c\x12\x0c\n\x04kbvl\x18\x04 \x01(\x0c\x12\x12\n\nkbsl_dleag\x18\x05 \x01(\x0c\x12\x11\n\ta_lock_tx\x18\x06 \x01(\x0c\x12\x18\n\x10\x61_lock_tx_script\x18\x07 \x01(\x0c\x12\x18\n\x10\x61_lock_refund_tx\x18\x08 \x01(\x0c\x12\x1f\n\x17\x61_lock_refund_tx_script\x18\t \x01(\x0c\x12\x1e\n\x16\x61_lock_refund_spend_tx\x18\n \x01(\x0c\x12\x1d\n\x15\x61l_lock_refund_tx_sig\x18\x0b \x01(\x0c\"r\n\x17XmrBidLockTxSigsMessage\x12\x12\n\nbid_msg_id\x18\x01 \x01(\x0c\x12$\n\x1c\x61\x66_lock_refund_spend_tx_esig\x18\x02 \x01(\x0c\x12\x1d\n\x15\x61\x66_lock_refund_tx_sig\x18\x03 \x01(\x0c\"X\n\x18XmrBidLockSpendTxMessage\x12\x12\n\nbid_msg_id\x18\x01 \x01(\x0c\x12\x17\n\x0f\x61_lock_spend_tx\x18\x02 \x01(\x0c\x12\x0f\n\x07kal_sig\x18\x03 \x01(\x0c\"M\n\x18XmrBidLockReleaseMessage\x12\x12\n\nbid_msg_id\x18\x01 \x01(\x0c\x12\x1d\n\x15\x61l_lock_spend_tx_esig\x18\x02 \x01(\x0c\x62\x06proto3'
+  serialized_pb=b'\n\x0emessages.proto\x12\tbasicswap\"\xa6\x04\n\x0cOfferMessage\x12\x11\n\tcoin_from\x18\x01 \x01(\r\x12\x0f\n\x07\x63oin_to\x18\x02 \x01(\r\x12\x13\n\x0b\x61mount_from\x18\x03 \x01(\x04\x12\x0c\n\x04rate\x18\x04 \x01(\x04\x12\x16\n\x0emin_bid_amount\x18\x05 \x01(\x04\x12\x12\n\ntime_valid\x18\x06 \x01(\x04\x12\x33\n\tlock_type\x18\x07 \x01(\x0e\x32 .basicswap.OfferMessage.LockType\x12\x12\n\nlock_value\x18\x08 \x01(\r\x12\x11\n\tswap_type\x18\t \x01(\r\x12\x15\n\rproof_address\x18\n \x01(\t\x12\x17\n\x0fproof_signature\x18\x0b \x01(\t\x12\x15\n\rpkhash_seller\x18\x0c \x01(\x0c\x12\x13\n\x0bsecret_hash\x18\r \x01(\x0c\x12\x15\n\rfee_rate_from\x18\x0e \x01(\x04\x12\x13\n\x0b\x66\x65\x65_rate_to\x18\x0f \x01(\x04\x12\x18\n\x10protocol_version\x18\x10 \x01(\r\x12\x19\n\x11\x61mount_negotiable\x18\x11 \x01(\x08\x12\x17\n\x0frate_negotiable\x18\x12 \x01(\x08\"q\n\x08LockType\x12\x0b\n\x07NOT_SET\x10\x00\x12\x18\n\x14SEQUENCE_LOCK_BLOCKS\x10\x01\x12\x16\n\x12SEQUENCE_LOCK_TIME\x10\x02\x12\x13\n\x0f\x41\x42S_LOCK_BLOCKS\x10\x03\x12\x11\n\rABS_LOCK_TIME\x10\x04\"\xb4\x01\n\nBidMessage\x12\x14\n\x0coffer_msg_id\x18\x01 \x01(\x0c\x12\x12\n\ntime_valid\x18\x02 \x01(\x04\x12\x0e\n\x06\x61mount\x18\x03 \x01(\x04\x12\x0c\n\x04rate\x18\x04 \x01(\x04\x12\x14\n\x0cpkhash_buyer\x18\x05 \x01(\x0c\x12\x15\n\rproof_address\x18\x06 \x01(\t\x12\x17\n\x0fproof_signature\x18\x07 \x01(\t\x12\x18\n\x10protocol_version\x18\x08 \x01(\r\"V\n\x10\x42idAcceptMessage\x12\x12\n\nbid_msg_id\x18\x01 \x01(\x0c\x12\x15\n\rinitiate_txid\x18\x02 \x01(\x0c\x12\x17\n\x0f\x63ontract_script\x18\x03 \x01(\x0c\"=\n\x12OfferRevokeMessage\x12\x14\n\x0coffer_msg_id\x18\x01 \x01(\x0c\x12\x11\n\tsignature\x18\x02 \x01(\x0c\";\n\x10\x42idRejectMessage\x12\x12\n\nbid_msg_id\x18\x01 \x01(\x0c\x12\x13\n\x0breject_code\x18\x02 \x01(\r\"\xb2\x01\n\rXmrBidMessage\x12\x14\n\x0coffer_msg_id\x18\x01 \x01(\x0c\x12\x12\n\ntime_valid\x18\x02 \x01(\x04\x12\x0e\n\x06\x61mount\x18\x03 \x01(\x04\x12\x0c\n\x04rate\x18\x04 \x01(\x04\x12\x0c\n\x04pkaf\x18\x05 \x01(\x0c\x12\x0c\n\x04kbvf\x18\x06 \x01(\x0c\x12\x12\n\nkbsf_dleag\x18\x07 \x01(\x0c\x12\x0f\n\x07\x64\x65st_af\x18\x08 \x01(\x0c\x12\x18\n\x10protocol_version\x18\t \x01(\r\"T\n\x0fXmrSplitMessage\x12\x0e\n\x06msg_id\x18\x01 \x01(\x0c\x12\x10\n\x08msg_type\x18\x02 \x01(\r\x12\x10\n\x08sequence\x18\x03 \x01(\r\x12\r\n\x05\x64leag\x18\x04 \x01(\x0c\"\x80\x02\n\x13XmrBidAcceptMessage\x12\x12\n\nbid_msg_id\x18\x01 \x01(\x0c\x12\x0c\n\x04pkal\x18\x03 \x01(\x0c\x12\x0c\n\x04kbvl\x18\x04 \x01(\x0c\x12\x12\n\nkbsl_dleag\x18\x05 \x01(\x0c\x12\x11\n\ta_lock_tx\x18\x06 \x01(\x0c\x12\x18\n\x10\x61_lock_tx_script\x18\x07 \x01(\x0c\x12\x18\n\x10\x61_lock_refund_tx\x18\x08 \x01(\x0c\x12\x1f\n\x17\x61_lock_refund_tx_script\x18\t \x01(\x0c\x12\x1e\n\x16\x61_lock_refund_spend_tx\x18\n \x01(\x0c\x12\x1d\n\x15\x61l_lock_refund_tx_sig\x18\x0b \x01(\x0c\"r\n\x17XmrBidLockTxSigsMessage\x12\x12\n\nbid_msg_id\x18\x01 \x01(\x0c\x12$\n\x1c\x61\x66_lock_refund_spend_tx_esig\x18\x02 \x01(\x0c\x12\x1d\n\x15\x61\x66_lock_refund_tx_sig\x18\x03 \x01(\x0c\"X\n\x18XmrBidLockSpendTxMessage\x12\x12\n\nbid_msg_id\x18\x01 \x01(\x0c\x12\x17\n\x0f\x61_lock_spend_tx\x18\x02 \x01(\x0c\x12\x0f\n\x07kal_sig\x18\x03 \x01(\x0c\"M\n\x18XmrBidLockReleaseMessage\x12\x12\n\nbid_msg_id\x18\x01 \x01(\x0c\x12\x1d\n\x15\x61l_lock_spend_tx_esig\x18\x02 \x01(\x0c\x62\x06proto3'
 )
 
 
@@ -59,8 +59,8 @@ _OFFERMESSAGE_LOCKTYPE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=415,
-  serialized_end=528,
+  serialized_start=467,
+  serialized_end=580,
 )
 _sym_db.RegisterEnumDescriptor(_OFFERMESSAGE_LOCKTYPE)
 
@@ -185,6 +185,20 @@ _OFFERMESSAGE = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='amount_negotiable', full_name='basicswap.OfferMessage.amount_negotiable', index=16,
+      number=17, type=8, cpp_type=7, label=1,
+      has_default_value=False, default_value=False,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='rate_negotiable', full_name='basicswap.OfferMessage.rate_negotiable', index=17,
+      number=18, type=8, cpp_type=7, label=1,
+      has_default_value=False, default_value=False,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
@@ -199,7 +213,7 @@ _OFFERMESSAGE = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=30,
-  serialized_end=528,
+  serialized_end=580,
 )
 
 
@@ -233,29 +247,36 @@ _BIDMESSAGE = _descriptor.Descriptor(
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='pkhash_buyer', full_name='basicswap.BidMessage.pkhash_buyer', index=3,
-      number=4, type=12, cpp_type=9, label=1,
+      name='rate', full_name='basicswap.BidMessage.rate', index=3,
+      number=4, type=4, cpp_type=4, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='pkhash_buyer', full_name='basicswap.BidMessage.pkhash_buyer', index=4,
+      number=5, type=12, cpp_type=9, label=1,
       has_default_value=False, default_value=b"",
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='proof_address', full_name='basicswap.BidMessage.proof_address', index=4,
-      number=5, type=9, cpp_type=9, label=1,
-      has_default_value=False, default_value=b"".decode('utf-8'),
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
-    _descriptor.FieldDescriptor(
-      name='proof_signature', full_name='basicswap.BidMessage.proof_signature', index=5,
+      name='proof_address', full_name='basicswap.BidMessage.proof_address', index=5,
       number=6, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=b"".decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='protocol_version', full_name='basicswap.BidMessage.protocol_version', index=6,
-      number=7, type=13, cpp_type=3, label=1,
+      name='proof_signature', full_name='basicswap.BidMessage.proof_signature', index=6,
+      number=7, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='protocol_version', full_name='basicswap.BidMessage.protocol_version', index=7,
+      number=8, type=13, cpp_type=3, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -272,8 +293,8 @@ _BIDMESSAGE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=531,
-  serialized_end=697,
+  serialized_start=583,
+  serialized_end=763,
 )
 
 
@@ -318,8 +339,8 @@ _BIDACCEPTMESSAGE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=699,
-  serialized_end=785,
+  serialized_start=765,
+  serialized_end=851,
 )
 
 
@@ -357,8 +378,47 @@ _OFFERREVOKEMESSAGE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=787,
-  serialized_end=848,
+  serialized_start=853,
+  serialized_end=914,
+)
+
+
+_BIDREJECTMESSAGE = _descriptor.Descriptor(
+  name='BidRejectMessage',
+  full_name='basicswap.BidRejectMessage',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='bid_msg_id', full_name='basicswap.BidRejectMessage.bid_msg_id', index=0,
+      number=1, type=12, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"",
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='reject_code', full_name='basicswap.BidRejectMessage.reject_code', index=1,
+      number=2, type=13, cpp_type=3, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=916,
+  serialized_end=975,
 )
 
 
@@ -392,36 +452,43 @@ _XMRBIDMESSAGE = _descriptor.Descriptor(
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='pkaf', full_name='basicswap.XmrBidMessage.pkaf', index=3,
-      number=4, type=12, cpp_type=9, label=1,
-      has_default_value=False, default_value=b"",
+      name='rate', full_name='basicswap.XmrBidMessage.rate', index=3,
+      number=4, type=4, cpp_type=4, label=1,
+      has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='kbvf', full_name='basicswap.XmrBidMessage.kbvf', index=4,
+      name='pkaf', full_name='basicswap.XmrBidMessage.pkaf', index=4,
       number=5, type=12, cpp_type=9, label=1,
       has_default_value=False, default_value=b"",
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='kbsf_dleag', full_name='basicswap.XmrBidMessage.kbsf_dleag', index=5,
+      name='kbvf', full_name='basicswap.XmrBidMessage.kbvf', index=5,
       number=6, type=12, cpp_type=9, label=1,
       has_default_value=False, default_value=b"",
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='dest_af', full_name='basicswap.XmrBidMessage.dest_af', index=6,
+      name='kbsf_dleag', full_name='basicswap.XmrBidMessage.kbsf_dleag', index=6,
       number=7, type=12, cpp_type=9, label=1,
       has_default_value=False, default_value=b"",
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='protocol_version', full_name='basicswap.XmrBidMessage.protocol_version', index=7,
-      number=8, type=13, cpp_type=3, label=1,
+      name='dest_af', full_name='basicswap.XmrBidMessage.dest_af', index=7,
+      number=8, type=12, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"",
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='protocol_version', full_name='basicswap.XmrBidMessage.protocol_version', index=8,
+      number=9, type=13, cpp_type=3, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -438,8 +505,8 @@ _XMRBIDMESSAGE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=851,
-  serialized_end=1015,
+  serialized_start=978,
+  serialized_end=1156,
 )
 
 
@@ -491,8 +558,8 @@ _XMRSPLITMESSAGE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1017,
-  serialized_end=1101,
+  serialized_start=1158,
+  serialized_end=1242,
 )
 
 
@@ -586,8 +653,8 @@ _XMRBIDACCEPTMESSAGE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1104,
-  serialized_end=1360,
+  serialized_start=1245,
+  serialized_end=1501,
 )
 
 
@@ -632,8 +699,8 @@ _XMRBIDLOCKTXSIGSMESSAGE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1362,
-  serialized_end=1476,
+  serialized_start=1503,
+  serialized_end=1617,
 )
 
 
@@ -678,8 +745,8 @@ _XMRBIDLOCKSPENDTXMESSAGE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1478,
-  serialized_end=1566,
+  serialized_start=1619,
+  serialized_end=1707,
 )
 
 
@@ -717,8 +784,8 @@ _XMRBIDLOCKRELEASEMESSAGE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1568,
-  serialized_end=1645,
+  serialized_start=1709,
+  serialized_end=1786,
 )
 
 _OFFERMESSAGE.fields_by_name['lock_type'].enum_type = _OFFERMESSAGE_LOCKTYPE
@@ -727,6 +794,7 @@ DESCRIPTOR.message_types_by_name['OfferMessage'] = _OFFERMESSAGE
 DESCRIPTOR.message_types_by_name['BidMessage'] = _BIDMESSAGE
 DESCRIPTOR.message_types_by_name['BidAcceptMessage'] = _BIDACCEPTMESSAGE
 DESCRIPTOR.message_types_by_name['OfferRevokeMessage'] = _OFFERREVOKEMESSAGE
+DESCRIPTOR.message_types_by_name['BidRejectMessage'] = _BIDREJECTMESSAGE
 DESCRIPTOR.message_types_by_name['XmrBidMessage'] = _XMRBIDMESSAGE
 DESCRIPTOR.message_types_by_name['XmrSplitMessage'] = _XMRSPLITMESSAGE
 DESCRIPTOR.message_types_by_name['XmrBidAcceptMessage'] = _XMRBIDACCEPTMESSAGE
@@ -762,6 +830,13 @@ OfferRevokeMessage = _reflection.GeneratedProtocolMessageType('OfferRevokeMessag
   # @@protoc_insertion_point(class_scope:basicswap.OfferRevokeMessage)
   })
 _sym_db.RegisterMessage(OfferRevokeMessage)
+
+BidRejectMessage = _reflection.GeneratedProtocolMessageType('BidRejectMessage', (_message.Message,), {
+  'DESCRIPTOR' : _BIDREJECTMESSAGE,
+  '__module__' : 'messages_pb2'
+  # @@protoc_insertion_point(class_scope:basicswap.BidRejectMessage)
+  })
+_sym_db.RegisterMessage(BidRejectMessage)
 
 XmrBidMessage = _reflection.GeneratedProtocolMessageType('XmrBidMessage', (_message.Message,), {
   'DESCRIPTOR' : _XMRBIDMESSAGE,
