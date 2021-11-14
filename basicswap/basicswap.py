@@ -5073,6 +5073,8 @@ class BasicSwap(BaseApp):
     def getSummary(self, opts=None):
         num_watched_outputs = 0
         for c, v in self.coin_clients.items():
+            if c in (Coins.PART_ANON, Coins.PART_BLIND):
+                continue
             num_watched_outputs += len(v['watched_outputs'])
 
         bids_sent = 0
@@ -5338,6 +5340,8 @@ class BasicSwap(BaseApp):
             rv = []
             rv_heights = []
             for c, v in self.coin_clients.items():
+                if c in (Coins.PART_ANON, Coins.PART_BLIND):  # exclude duplicates
+                    continue
                 if self.coin_clients[c]['connection_type'] == 'rpc':
                     rv_heights.append((c, v['last_height_checked']))
                 for o in v['watched_outputs']:
