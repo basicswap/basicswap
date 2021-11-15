@@ -313,7 +313,7 @@ def prepareCore(coin, version_pair, settings, data_dir):
     extractCore(coin, version_pair, settings, bin_dir, release_path)
 
 
-def prepareDataDir(coin, settings, chain, particl_mnemonic):
+def prepareDataDir(coin, settings, chain, particl_mnemonic, use_containers=False)):
     core_settings = settings['chainclients'][coin]
     bin_dir = core_settings['bindir']
     data_dir = core_settings['datadir']
@@ -350,6 +350,8 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic):
         if os.path.exists(wallet_conf_path):
             exitWithError('{} exists'.format(wallet_conf_path))
         with open(wallet_conf_path, 'w') as fp:
+            if use_containers:
+                fp.write('daemon-address={}:{}\n'.format(core_settings['rpchost'], core_settings['rpcport']))
             fp.write('untrusted-daemon=1\n')
             fp.write('no-dns=1\n')
             fp.write('rpc-bind-port={}\n'.format(core_settings['walletrpcport']))
@@ -439,6 +441,7 @@ def printHelp():
     logger.info('--disablecoin=           Make coin inactive.')
     logger.info('--preparebinonly         Don\'t prepare settings or datadirs.')
     logger.info('--nocores                Don\'t download and extract any coin clients.')
+    logger.info('--usecontainers          Expect each core to run in a unique container.')
     logger.info('--portoffset=n           Raise all ports by n.')
     logger.info('--htmlhost=              Interface to host on, default:127.0.0.1.')
     logger.info('--xmrrestoreheight=n     Block height to restore Monero wallet from, default:{}.'.format(DEFAULT_XMR_RESTORE_HEIGHT))
@@ -475,7 +478,8 @@ def main():
     particl_wallet_mnemonic = None
     prepare_bin_only = False
     no_cores = False
-    with_coins = {'particl'}
+    use_containers = False
+    with_coins = {'particl', }
     add_coin = ''
     disable_coin = ''
     htmlhost = '127.0.0.1'
@@ -511,6 +515,9 @@ def main():
             continue
         if name == 'nocores':
             no_cores = True
+            continue
+        if name == 'usecontainers':
+            use_containers = True
             continue
         if name == 'noextractover':
             extract_core_overwrite = False
@@ -707,7 +714,7 @@ def main():
             prepareCore(add_coin, known_coins[add_coin], settings, data_dir)
 
         if not prepare_bin_only:
-            prepareDataDir(add_coin, settings, chain, particl_wallet_mnemonic)
+            prepareDataDir(add_coin, settings, chain, particl_wallet_mnemonic, use_containers=use_containers)
             with open(config_path, 'w') as fp:
                 json.dump(settings, fp, indent=4)
 
@@ -750,7 +757,7 @@ def main():
         return 0
 
     for c in with_coins:
-        prepareDataDir(c, settings, chain, particl_wallet_mnemonic)
+        prepareDataDir(c, settings, chain, particl_wallet_mnemonic, use_containers=use_containers)
 
     with open(config_path, 'w') as fp:
         json.dump(settings, fp, indent=4)
