@@ -350,7 +350,7 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic):
         if os.path.exists(wallet_conf_path):
             exitWithError('{} exists'.format(wallet_conf_path))
         with open(wallet_conf_path, 'w') as fp:
-            fp.write('daemon-address={}:{}\n'.format(core_settings['rpchost'], core_settings['rpcport']))
+            fp.write('untrusted-daemon=1\n')
             fp.write('no-dns=1\n')
             fp.write('rpc-bind-port={}\n'.format(core_settings['walletrpcport']))
             fp.write('rpc-bind-ip={}\n'.format(COINS_BIND_IP))

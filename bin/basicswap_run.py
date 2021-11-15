@@ -9,6 +9,7 @@ import os
 import sys
 import json
 import time
+import shutil
 import signal
 import logging
 import traceback
@@ -60,9 +61,29 @@ def startXmrWalletDaemon(node_dir, bin_dir, wallet_bin, opts=[]):
     daemon_bin = os.path.expanduser(os.path.join(bin_dir, wallet_bin))
 
     data_dir = os.path.expanduser(node_dir)
-    args = [daemon_bin, '--non-interactive', '--config-file=' + os.path.join(data_dir, 'monero_wallet.conf')] + opts
+    config_path = os.path.join(data_dir, 'monero_wallet.conf')
+    args = [daemon_bin, '--non-interactive', '--config-file=' + config_path] + opts
 
-    args += opts
+    # TODO: Remove
+    # Remove daemon-address
+    has_daemon_address = False
+    has_untrusted = False
+    with open(config_path) as fp:
+        for line in fp:
+            if line.startswith('daemon-address'):
+                has_daemon_address = True
+            if line.startswith('untrusted-daemon'):
+                has_untrusted = True
+    if has_daemon_address:
+        logging.info('Rewriting monero_wallet.conf')
+        shutil.copyfile(config_path, config_path + '.last')
+        with open(config_path + '.last') as fp_from, open(config_path, 'w') as fp_to:
+            for line in fp_from:
+                if not line.startswith('daemon-address'):
+                    fp_to.write(line)
+            if not has_untrusted:
+                fp_to.write('untrusted-daemon=1\n')
+
     logging.info('Starting wallet daemon {} --wallet-dir={}'.format(daemon_bin, node_dir))
 
     # TODO: return subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=data_dir)
@@ -109,7 +130,10 @@ def runClient(fp, data_dir, chain):
 
                 if v['manage_wallet_daemon'] is True:
                     logger.info('Starting {} wallet daemon'.format(c.capitalize()))
-                    daemons.append(startXmrWalletDaemon(v['datadir'], v['bindir'], 'monero-wallet-rpc'))
+                    daemon_addr = '{}:{}'.format(v['rpchost'], v['rpcport'])
+                    logger.info('daemon-address: {}'.format(daemon_addr))
+                    opts = ['--daemon-address', daemon_addr, ]
+                    daemons.append(startXmrWalletDaemon(v['datadir'], v['bindir'], 'monero-wallet-rpc', opts))
                     pid = daemons[-1].pid
                     logger.info('Started {} {}'.format('monero-wallet-rpc', pid))
 
