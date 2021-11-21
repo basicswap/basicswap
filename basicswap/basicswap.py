@@ -14,6 +14,7 @@ import base64
 import random
 import shutil
 import struct
+import urllib.request
 import hashlib
 import secrets
 import datetime as dt
@@ -1035,6 +1036,9 @@ class BasicSwap(BaseApp):
             msg_buf.swap_type = swap_type
             msg_buf.amount_negotiable = extra_options.get('amount_negotiable', False)
             msg_buf.rate_negotiable = extra_options.get('rate_negotiable', False)
+
+            if msg_buf.amount_negotiable or msg_buf.rate_negotiable:
+                ensure(auto_accept_bids is False, 'Auto-accept unavailable when amount or rate are variable')
 
             if 'from_fee_override' in extra_options:
                 msg_buf.fee_rate_from = make_int(extra_options['from_fee_override'], self.ci(coin_from).exp())
@@ -5519,3 +5523,26 @@ class BasicSwap(BaseApp):
         if not self._network:
             return {'Error': 'Not Initialised'}
         return self._network.get_info()
+
+    def lookupRates(self, coin_from, coin_to):
+        rv = {}
+        ci_from = self.ci(int(coin_from))
+        ci_to = self.ci(int(coin_to))
+
+        name_from = ci_from.coin_name().lower()
+        name_to = ci_to.coin_name().lower()
+        url = 'https://api.coingecko.com/api/v3/simple/price?ids={},{}&vs_currencies=usd'.format(name_from, name_to)
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        req = urllib.request.Request(url, headers=headers)
+        js = json.loads(urllib.request.urlopen(req).read())
+        rate = float(js[name_from]['usd']) / float(js[name_to]['usd'])
+        js['rate'] = ci_to.format_amount(rate, conv_int=True, r=1)
+        rv['coingecko'] = js
+
+        url = 'https://api.bittrex.com/api/v1.1/public/getticker?market={}-{}'.format(ci_from.ticker(), ci_to.ticker())
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        req = urllib.request.Request(url, headers=headers)
+        js = json.loads(urllib.request.urlopen(req).read())
+        rv['bittrex'] = js
+
+        return rv

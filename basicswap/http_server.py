@@ -42,6 +42,8 @@ from .js_server import (
     js_network,
     js_revokeoffer,
     js_smsgaddresses,
+    js_rates,
+    js_rate,
     js_index,
 )
 from .ui import (
@@ -507,6 +509,12 @@ class HttpHandler(BaseHTTPRequestHandler):
 
         if 'amt_to' in parsed_data and 'amt_from' in parsed_data:
             parsed_data['rate'] = ci_from.make_int(parsed_data['amt_to'] / parsed_data['amt_from'], r=1)
+            page_data['rate'] = ci_to.format_amount(parsed_data['rate'])
+
+        page_data['amt_var'] = True if have_data_entry(form_data, 'amt_var') else False
+        parsed_data['amt_var'] = page_data['amt_var']
+        page_data['rate_var'] = True if have_data_entry(form_data, 'rate_var') else False
+        parsed_data['rate_var'] = page_data['rate_var']
 
         if b'step1' in form_data:
             if len(errors) == 0 and b'continue' in form_data:
@@ -615,6 +623,11 @@ class HttpHandler(BaseHTTPRequestHandler):
 
         if 'addr_to' in parsed_data:
             extra_options['addr_send_to'] = parsed_data['addr_to']
+
+        if parsed_data.get('amt_var', False):
+            extra_options['amount_negotiable'] = parsed_data['amt_var']
+        if parsed_data.get('rate_var', False):
+            extra_options['rate_negotiable'] = parsed_data['rate_var']
 
         offer_id = swap_client.postOffer(
             parsed_data['coin_from'],
@@ -1129,6 +1142,8 @@ class HttpHandler(BaseHTTPRequestHandler):
                             'network': js_network,
                             'revokeoffer': js_revokeoffer,
                             'smsgaddresses': js_smsgaddresses,
+                            'rate': js_rate,
+                            'rates': js_rates,
                             }.get(url_split[2], js_index)
                 return func(self, url_split, post_string, is_json)
             except Exception as ex:

@@ -29,10 +29,10 @@ from basicswap.basicswap_util import (
     SEQUENCE_LOCK_BLOCKS,
     SEQUENCE_LOCK_TIME)
 from basicswap.util import (
-    SerialiseNum,
-    DeserialiseNum,
     make_int,
+    SerialiseNum,
     format_amount,
+    DeserialiseNum,
     validate_amount)
 
 

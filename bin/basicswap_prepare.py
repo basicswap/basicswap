@@ -313,7 +313,7 @@ def prepareCore(coin, version_pair, settings, data_dir):
     extractCore(coin, version_pair, settings, bin_dir, release_path)
 
 
-def prepareDataDir(coin, settings, chain, particl_mnemonic, use_containers=False)):
+def prepareDataDir(coin, settings, chain, particl_mnemonic, use_containers=False):
     core_settings = settings['chainclients'][coin]
     bin_dir = core_settings['bindir']
     data_dir = core_settings['datadir']

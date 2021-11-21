@@ -60,8 +60,15 @@
 <option value="-1" {% if data.nb_addr_from=="-1" %} selected{% endif %}>-- New Address --</option>
 </select>
 </td></tr>
-<tr><td>Minutes valid</td><td><input type="number" name="validmins" min="10" max="1440" value="{{ data.nb_validmins }}"></td></tr>
 
+{% if data.amount_negotiable == true %}
+<tr><td>Amount</td><td><input type="text" name="bid_amount" value="{{ data.amt_from }}"></td></tr>
+{% endif %}
+{% if data.rate_negotiable == true %}
+<tr><td>Rate</td><td><input type="text" name="bid_rate" value="{{ data.rate }}"></td></tr>
+{% endif %}
+
+<tr><td>Minutes valid</td><td><input type="number" name="validmins" min="10" max="1440" value="{{ data.nb_validmins }}"></td></tr>
 <tr><td><input type="submit" name="sendbid" value="Send Bid"><input type="submit" name="cancel" value="Cancel"></td></tr>
 </table>
 {% else %}

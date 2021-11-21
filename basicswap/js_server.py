@@ -19,6 +19,7 @@ from .chainparams import (
 )
 from .ui import (
     PAGE_LIMIT,
+    getCoinType,
     inputAmount,
     describeBid,
     setCoinFilter,
@@ -245,10 +246,6 @@ def js_revokeoffer(self, url_split, post_string, is_json):
     return bytes(json.dumps({'revoked_offer': offer_id.hex()}), 'UTF-8')
 
 
-def js_index(self, url_split, post_string, is_json):
-    return bytes(json.dumps(self.server.swap_client.getSummary()), 'UTF-8')
-
-
 def js_smsgaddresses(self, url_split, post_string, is_json):
     swap_client = self.server.swap_client
     if len(url_split) > 3:
@@ -276,3 +273,61 @@ def js_smsgaddresses(self, url_split, post_string, is_json):
             return bytes(json.dumps({'edited_address': address}), 'UTF-8')
 
     return bytes(json.dumps(swap_client.listAllSMSGAddresses()), 'UTF-8')
+
+
+def js_rates(self, url_split, post_string, is_json):
+    if post_string == '':
+        raise ValueError('No post data')
+    if is_json:
+        post_data = json.loads(post_string)
+        post_data['is_json'] = True
+    else:
+        post_data = urllib.parse.parse_qs(post_string)
+
+    sc = self.server.swap_client
+    coin_from = get_data_entry(post_data, 'coin_from')
+    coin_to = get_data_entry(post_data, 'coin_to')
+    return bytes(json.dumps(sc.lookupRates(coin_from, coin_to)), 'UTF-8')
+
+
+def js_rate(self, url_split, post_string, is_json):
+    if post_string == '':
+        raise ValueError('No post data')
+    if is_json:
+        post_data = json.loads(post_string)
+        post_data['is_json'] = True
+    else:
+        post_data = urllib.parse.parse_qs(post_string)
+
+    sc = self.server.swap_client
+    coin_from = getCoinType(get_data_entry(post_data, 'coin_from'))
+    ci_from = sc.ci(coin_from)
+    coin_to = getCoinType(get_data_entry(post_data, 'coin_to'))
+    ci_to = sc.ci(coin_to)
+
+    # Set amount to if rate is provided
+    rate = get_data_entry_or(post_data, 'rate', None)
+    if rate is not None:
+        amt_from_str = get_data_entry_or(post_data, 'amt_from', None)
+        amt_to_str = get_data_entry_or(post_data, 'amt_to', None)
+
+        if amt_from_str is not None:
+            rate = ci_to.make_int(rate, r=1)
+            amt_from = inputAmount(amt_from_str, ci_from)
+            amount_to = ci_to.format_amount(int((amt_from * rate) // ci_from.COIN()), r=1)
+            return bytes(json.dumps({'amount_to': amount_to}), 'UTF-8')
+        if amt_to_str is not None:
+            rate = ci_from.make_int(1.0 / float(rate), r=1)
+            amt_to = inputAmount(amt_to_str, ci_to)
+            amount_from = ci_from.format_amount(int((amt_to * rate) // ci_to.COIN()), r=1)
+            return bytes(json.dumps({'amount_from': amount_from}), 'UTF-8')
+
+    amt_from = inputAmount(get_data_entry(post_data, 'amt_from'), ci_from)
+    amt_to = inputAmount(get_data_entry(post_data, 'amt_to'), ci_to)
+
+    rate = ci_to.format_amount(ci_from.make_int(amt_to / amt_from, r=1))
+    return bytes(json.dumps({'rate': rate}), 'UTF-8')
+
+
+def js_index(self, url_split, post_string, is_json):
+    return bytes(json.dumps(self.server.swap_client.getSummary()), 'UTF-8')
