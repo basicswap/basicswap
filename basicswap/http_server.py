@@ -497,7 +497,9 @@ class HttpHandler(BaseHTTPRequestHandler):
         try:
             page_data['amt_from'] = get_data_entry(form_data, 'amt_from')
             parsed_data['amt_from'] = inputAmount(page_data['amt_from'], ci_from)
-            parsed_data['min_bid'] = int(parsed_data['amt_from'])
+
+            # TODO: Add min_bid to the ui
+            parsed_data['min_bid'] = ci_from.chainparams_network()['min_amount']
         except Exception:
             errors.append('Amount From')
 
@@ -515,6 +517,10 @@ class HttpHandler(BaseHTTPRequestHandler):
         parsed_data['amt_var'] = page_data['amt_var']
         page_data['rate_var'] = True if have_data_entry(form_data, 'rate_var') else False
         parsed_data['rate_var'] = page_data['rate_var']
+
+        # Change default autoaccept to false
+        if page_data['amt_var'] or page_data['rate_var']:
+            page_data['autoaccept'] = False
 
         if b'step1' in form_data:
             if len(errors) == 0 and b'continue' in form_data:
@@ -717,6 +723,14 @@ class HttpHandler(BaseHTTPRequestHandler):
         sent_bid_id = None
         show_bid_form = None
         form_data = self.checkForm(post_string, 'offer', messages)
+
+        ci_from = swap_client.ci(Coins(offer.coin_from))
+        ci_to = swap_client.ci(Coins(offer.coin_to))
+
+        # Set defaults
+        bid_amount = ci_from.format_amount(offer.amount_from)
+        bid_rate = ci_to.format_amount(offer.rate)
+
         if form_data:
             if b'revoke_offer' in form_data:
                 try:
@@ -739,13 +753,20 @@ class HttpHandler(BaseHTTPRequestHandler):
                     extra_options = {
                         'valid_for_seconds': minutes_valid * 60,
                     }
-                    sent_bid_id = swap_client.postBid(offer_id, offer.amount_from, addr_send_from=addr_from, extra_options=extra_options).hex()
+                    if have_data_entry(form_data, 'bid_rate'):
+                        bid_rate = get_data_entry(form_data, 'bid_rate')
+                        extra_options['bid_rate'] = ci_to.make_int(bid_rate, r=1)
+
+                    if have_data_entry(form_data, 'bid_amount'):
+                        bid_amount = get_data_entry(form_data, 'bid_amount')
+                        amount_from = inputAmount(bid_amount, ci_from)
+                    else:
+                        amount_from = offer.amount_from
+
+                    sent_bid_id = swap_client.postBid(offer_id, amount_from, addr_send_from=addr_from, extra_options=extra_options).hex()
                 except Exception as ex:
                     messages.append('Error: Send bid failed: ' + str(ex))
                     show_bid_form = True
-
-        ci_from = swap_client.ci(Coins(offer.coin_from))
-        ci_to = swap_client.ci(Coins(offer.coin_to))
 
         data = {
             'tla_from': ci_from.ticker(),
@@ -753,6 +774,8 @@ class HttpHandler(BaseHTTPRequestHandler):
             'state': strOfferState(offer.state),
             'coin_from': ci_from.coin_name(),
             'coin_to': ci_to.coin_name(),
+            'coin_from_ind': int(ci_from.coin_type()),
+            'coin_to_ind': int(ci_to.coin_type()),
             'amt_from': ci_from.format_amount(offer.amount_from),
             'amt_to': ci_to.format_amount((offer.amount_from * offer.rate) // ci_from.COIN()),
             'rate': ci_to.format_amount(offer.rate),
@@ -767,6 +790,8 @@ class HttpHandler(BaseHTTPRequestHandler):
             'show_bid_form': show_bid_form,
             'amount_negotiable': offer.amount_negotiable,
             'rate_negotiable': offer.rate_negotiable,
+            'bid_amount': bid_amount,
+            'bid_rate': bid_rate,
         }
         data.update(extend_data)
 
@@ -1097,6 +1122,13 @@ class HttpHandler(BaseHTTPRequestHandler):
 
     def page_shutdown(self, url_split, post_string):
         swap_client = self.server.swap_client
+
+        if len(url_split) > 2:
+            token = url_split[2]
+            expect_token = self.server.session_tokens.get('shutdown', None)
+            if token != expect_token:
+                return self.page_info('Unexpected token, still running.')
+
         swap_client.stopRunning()
 
         return self.page_info('Shutting down')
@@ -1105,13 +1137,17 @@ class HttpHandler(BaseHTTPRequestHandler):
         swap_client = self.server.swap_client
         summary = swap_client.getSummary()
 
+        shutdown_token = os.urandom(8).hex()
+        self.server.session_tokens['shutdown'] = shutdown_token
+
         template = env.get_template('index.html')
         return bytes(template.render(
             title=self.server.title,
             refresh=30,
             h2=self.server.title,
             version=__version__,
-            summary=summary
+            summary=summary,
+            shutdown_token=shutdown_token
         ), 'UTF-8')
 
     def page_404(self, url_split):
@@ -1249,6 +1285,7 @@ class HttpThread(threading.Thread, HTTPServer):
         self.swap_client = swap_client
         self.title = 'BasicSwap, ' + self.swap_client.chain
         self.last_form_id = dict()
+        self.session_tokens = dict()
 
         self.timeout = 60
         HTTPServer.__init__(self, (self.host_name, self.port_no), HttpHandler)

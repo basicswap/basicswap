@@ -497,6 +497,9 @@ class BaseTest(unittest.TestCase):
 class Test(BaseTest):
     __test__ = True
 
+    def notest_00_delay(self):
+        test_delay_event.wait(100000)
+
     def test_01_part_xmr(self):
         logging.info('---------- Test PART to XMR')
         swap_clients = self.swap_clients

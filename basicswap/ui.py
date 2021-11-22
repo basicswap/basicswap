@@ -206,7 +206,7 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
         'coin_from': ci_from.coin_name(),
         'coin_to': ci_to.coin_name(),
         'amt_from': ci_from.format_amount(bid.amount),
-        'amt_to': ci_to.format_amount((bid.amount * offer.rate) // ci_from.COIN()),
+        'amt_to': ci_to.format_amount((bid.amount * bid.rate) // ci_from.COIN()),
         'bid_rate': ci_to.format_amount(bid.rate),
         'ticker_from': ticker_from,
         'ticker_to': ticker_to,

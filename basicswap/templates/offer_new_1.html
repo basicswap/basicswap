@@ -57,7 +57,7 @@ xhr_rates.onload = () => {
     if (xhr_rates.status == 200) {
         const obj = JSON.parse(xhr_rates.response);
 
-        inner_html = '<pre><code>' + JSON.stringify(obj, null, '  ') + '</code></pre>';
+        inner_html = '<h4>Rates</h4><pre><code>' + JSON.stringify(obj, null, '  ') + '</code></pre>';
         document.getElementById('rates_display').innerHTML = inner_html;
     }
 }
@@ -88,6 +88,9 @@ function lookup_rates() {
         return;
     }
 
+    inner_html = '<h4>Rates</h4><p>Updating...</p>';
+    document.getElementById('rates_display').innerHTML = inner_html;
+
     xhr_rates.open('POST', '/json/rates');
     xhr_rates.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
     xhr_rates.send('coin_from='+coin_from+'&coin_to='+coin_to);
@@ -106,7 +109,7 @@ function set_rate(value_changed) {
     }
 
     params = 'coin_from='+coin_from+'&coin_to='+coin_to;
-    if (value_changed == 'rate' || (lock_rate && value_changed == 'amt_from')) {
+    if (value_changed == 'rate' || (lock_rate && value_changed == 'amt_from') || (amt_to == '' && value_changed == 'amt_from')) {
         if (amt_from == '' || rate == '') {
             return;
         }

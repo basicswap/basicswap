@@ -984,6 +984,14 @@ class BasicSwap(BaseApp):
         if valid_for_seconds > 24 * 60 * 60:
             raise ValueError('Bid TTL too high')
 
+    def validateBidAmount(self, offer, bid_amount, bid_rate):
+        ensure(bid_amount >= offer.min_bid_amount, 'Bid amount below minimum')
+        ensure(bid_amount <= offer.amount_from, 'Bid amount above offer amount')
+        if not offer.amount_negotiable:
+            ensure(offer.amount_from == bid_amount, 'Bid amount must match offer amount.')
+        if not offer.rate_negotiable:
+            ensure(offer.rate == bid_rate, 'Bid rate must match offer rate.')
+
     def getOfferAddressTo(self, extra_options):
         if 'addr_send_to' in extra_options:
             return extra_options['addr_send_to']
@@ -1613,7 +1621,7 @@ class BasicSwap(BaseApp):
         return q[0]
 
     def postBid(self, offer_id, amount, addr_send_from=None, extra_options={}):
-        # Bid to send bid.amount * offer.rate of coin_to in exchange for bid.amount of coin_from
+        # Bid to send bid.amount * bid.rate of coin_to in exchange for bid.amount of coin_from
         self.log.debug('postBid %s', offer_id.hex())
 
         offer = self.getOffer(offer_id)
@@ -1627,10 +1635,7 @@ class BasicSwap(BaseApp):
         self.validateBidValidTime(offer.swap_type, offer.coin_from, offer.coin_to, valid_for_seconds)
 
         bid_rate = extra_options.get('bid_rate', offer.rate)
-        if not offer.amount_negotiable:
-            ensure(offer.amount_from == int(amount), 'Bid amount must match offer amount.')
-        if not offer.rate_negotiable:
-            ensure(offer.rate == bid_rate, 'Bid rate must match offer rate.')
+        self.validateBidAmount(offer, amount, bid_rate)
 
         self.mxDB.acquire()
         try:
@@ -1650,7 +1655,7 @@ class BasicSwap(BaseApp):
 
             contract_count = self.getNewContractId()
 
-            amount_to = int((msg_buf.amount * offer.rate) // self.ci(coin_from).COIN())
+            amount_to = int((msg_buf.amount * bid_rate) // self.ci(coin_from).COIN())
 
             now = int(time.time())
             if offer.swap_type == SwapTypes.SELLER_FIRST:
@@ -1958,7 +1963,7 @@ class BasicSwap(BaseApp):
             self.swaps_in_progress[bid_id] = (bid, offer)
 
     def postXmrBid(self, offer_id, amount, addr_send_from=None, extra_options={}):
-        # Bid to send bid.amount * offer.rate of coin_to in exchange for bid.amount of coin_from
+        # Bid to send bid.amount * bid.rate of coin_to in exchange for bid.amount of coin_from
         # Send MSG1L F -> L
         self.log.debug('postXmrBid %s', offer_id.hex())
 
@@ -1979,10 +1984,7 @@ class BasicSwap(BaseApp):
             ci_to = self.ci(coin_to)
 
             bid_rate = extra_options.get('bid_rate', offer.rate)
-            if not offer.amount_negotiable:
-                ensure(offer.amount_from == int(amount), 'Bid amount must match offer amount.')
-            if not offer.rate_negotiable:
-                ensure(offer.rate == bid_rate, 'Bid rate must match offer rate.')
+            self.validateBidAmount(offer, amount, bid_rate)
 
             self.checkSynced(coin_from, coin_to)
 
@@ -2080,7 +2082,7 @@ class BasicSwap(BaseApp):
                 rate=msg_buf.rate,
                 created_at=bid_created_at,
                 contract_count=xmr_swap.contract_count,
-                amount_to=(msg_buf.amount * offer.rate) // ci_from.COIN(),
+                amount_to=(msg_buf.amount * msg_buf.rate) // ci_from.COIN(),
                 expire_at=bid_created_at + msg_buf.time_valid,
                 bid_addr=bid_addr,
                 was_sent=True,
@@ -2397,7 +2399,7 @@ class BasicSwap(BaseApp):
 
         amount_to = bid.amount_to
         # Check required?
-        assert(amount_to == (bid.amount * offer.rate) // self.ci(offer.coin_from).COIN())
+        assert(amount_to == (bid.amount * bid.rate) // self.ci(offer.coin_from).COIN())
 
         if bid.debug_ind == DebugTypes.MAKE_INVALID_PTX:
             amount_to -= 1
@@ -3773,15 +3775,9 @@ class BasicSwap(BaseApp):
         ensure(offer.state == OfferStates.OFFER_RECEIVED, 'Bad offer state')
         ensure(msg['to'] == offer.addr_from, 'Received on incorrect address')
         ensure(now <= offer.expire_at, 'Offer expired')
-        ensure(bid_data.amount >= offer.min_bid_amount, 'Bid amount below minimum')
-        ensure(bid_data.amount <= offer.amount_from, 'Bid amount above offer amount')
         self.validateBidValidTime(offer.swap_type, offer.coin_from, offer.coin_to, bid_data.time_valid)
         ensure(now <= msg['sent'] + bid_data.time_valid, 'Bid expired')
-
-        if not offer.amount_negotiable:
-            ensure(offer.amount_from == bid_data.amount, 'Bid amount must match offer amount.')
-        if not offer.rate_negotiable:
-            ensure(offer.rate == bid_data.rate, 'Bid rate must match offer rate.')
+        self.validateBidAmount(offer, bid_data.amount, bid_data.rate)
 
         # TODO: Allow higher bids
         # assert(bid_data.rate != offer['data'].rate), 'Bid rate mismatch'
@@ -3790,7 +3786,7 @@ class BasicSwap(BaseApp):
         ci_from = self.ci(offer.coin_from)
         ci_to = self.ci(coin_to)
 
-        amount_to = int((bid_data.amount * offer.rate) // ci_from.COIN())
+        amount_to = int((bid_data.amount * bid_data.rate) // ci_from.COIN())
         swap_type = offer.swap_type
         if swap_type == SwapTypes.SELLER_FIRST:
             ensure(len(bid_data.pkhash_buyer) == 20, 'Bad pkhash_buyer length')
@@ -4067,15 +4063,10 @@ class BasicSwap(BaseApp):
             raise ValueError('Bad offer state')
         ensure(msg['to'] == offer.addr_from, 'Received on incorrect address')
         ensure(now <= offer.expire_at, 'Offer expired')
-        ensure(bid_data.amount >= offer.min_bid_amount, 'Bid amount below minimum')
-        ensure(bid_data.amount <= offer.amount_from, 'Bid amount above offer amount')
         self.validateBidValidTime(offer.swap_type, offer.coin_from, offer.coin_to, bid_data.time_valid)
         ensure(now <= msg['sent'] + bid_data.time_valid, 'Bid expired')
 
-        if not offer.amount_negotiable:
-            ensure(offer.amount_from == bid_data.amount, 'Bid amount must match offer amount.')
-        if not offer.rate_negotiable:
-            ensure(offer.rate == bid_data.rate, 'Bid rate must match offer rate.')
+        self.validateBidAmount(offer, bid_data.amount, bid_data.rate)
 
         ensure(ci_to.verifyKey(bid_data.kbvf), 'Invalid chain B follower view key')
         ensure(ci_from.verifyPubkey(bid_data.pkaf), 'Invalid chain A follower public key')
@@ -4092,7 +4083,7 @@ class BasicSwap(BaseApp):
                 amount=bid_data.amount,
                 rate=bid_data.rate,
                 created_at=msg['sent'],
-                amount_to=(bid_data.amount * offer.rate) // ci_from.COIN(),
+                amount_to=(bid_data.amount * bid_data.rate) // ci_from.COIN(),
                 expire_at=msg['sent'] + bid_data.time_valid,
                 bid_addr=msg['from'],
                 was_received=True,
@@ -5525,24 +5516,75 @@ class BasicSwap(BaseApp):
         return self._network.get_info()
 
     def lookupRates(self, coin_from, coin_to):
+        self.log.debug('lookupRates {}, {}'.format(coin_from, coin_to))
         rv = {}
         ci_from = self.ci(int(coin_from))
         ci_to = self.ci(int(coin_to))
 
-        name_from = ci_from.coin_name().lower()
-        name_to = ci_to.coin_name().lower()
+        headers = {'Connection': 'close'}
+        name_from = ci_from.chainparams()['name']
+        name_to = ci_to.chainparams()['name']
         url = 'https://api.coingecko.com/api/v3/simple/price?ids={},{}&vs_currencies=usd'.format(name_from, name_to)
-        headers = {'User-Agent': 'Mozilla/5.0'}
+        start = time.time()
         req = urllib.request.Request(url, headers=headers)
-        js = json.loads(urllib.request.urlopen(req).read())
+        js = json.loads(urllib.request.urlopen(req, timeout=10).read())
+        js['time_taken'] = time.time() - start
         rate = float(js[name_from]['usd']) / float(js[name_to]['usd'])
-        js['rate'] = ci_to.format_amount(rate, conv_int=True, r=1)
+        js['rate_inferred'] = ci_to.format_amount(rate, conv_int=True, r=1)
         rv['coingecko'] = js
 
-        url = 'https://api.bittrex.com/api/v1.1/public/getticker?market={}-{}'.format(ci_from.ticker(), ci_to.ticker())
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        req = urllib.request.Request(url, headers=headers)
-        js = json.loads(urllib.request.urlopen(req).read())
-        rv['bittrex'] = js
+        ticker_from = ci_from.chainparams()['ticker']
+        ticker_to = ci_to.chainparams()['ticker']
+        if ci_from.coin_type() == Coins.BTC:
+            pair = '{}-{}'.format(ticker_from, ticker_to)
+            url = 'https://api.bittrex.com/api/v1.1/public/getticker?market=' + pair
+            start = time.time()
+            req = urllib.request.Request(url, headers=headers)
+            js = json.loads(urllib.request.urlopen(req, timeout=10).read())
+            js['time_taken'] = time.time() - start
+            js['pair'] = pair
+
+            try:
+                rate_inverted = ci_from.make_int(1.0 / float(js['result']['Last']), r=1)
+                js['rate_inferred'] = ci_to.format_amount(rate_inverted)
+            except Exception as e:
+                self.log.warning('lookupRates error: %s', str(e))
+                js['rate_inferred'] = 'error'
+
+            rv['bittrex'] = js
+        elif ci_to.coin_type() == Coins.BTC:
+            pair = '{}-{}'.format(ticker_to, ticker_from)
+            url = 'https://api.bittrex.com/api/v1.1/public/getticker?market=' + pair
+            start = time.time()
+            req = urllib.request.Request(url, headers=headers)
+            js = json.loads(urllib.request.urlopen(req, timeout=10).read())
+            js['time_taken'] = time.time() - start
+            js['pair'] = pair
+            js['rate_last'] = js['result']['Last']
+            rv['bittrex'] = js
+        else:
+            pair = 'BTC-{}'.format(ticker_from)
+            url = 'https://api.bittrex.com/api/v1.1/public/getticker?market=' + pair
+            start = time.time()
+            req = urllib.request.Request(url, headers=headers)
+            js_from = json.loads(urllib.request.urlopen(req, timeout=10).read())
+            js_from['time_taken'] = time.time() - start
+            js_from['pair'] = pair
+
+            pair = 'BTC-{}'.format(ticker_to)
+            url = 'https://api.bittrex.com/api/v1.1/public/getticker?market=' + pair
+            start = time.time()
+            req = urllib.request.Request(url, headers=headers)
+            js_to = json.loads(urllib.request.urlopen(req, timeout=10).read())
+            js_to['time_taken'] = time.time() - start
+            js_to['pair'] = pair
+
+            try:
+                rate_inferred = float(js_from['result']['Last']) / float(js_to['result']['Last'])
+                rate_inferred = ci_to.format_amount(rate, conv_int=True, r=1)
+            except Exception as e:
+                rate_inferred = 'error'
+
+            rv['bittrex'] = {'from': js_from, 'to': js_to, 'rate_inferred': rate_inferred}
 
         return rv

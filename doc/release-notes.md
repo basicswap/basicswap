@@ -4,6 +4,7 @@
 
 - Track failed and successful swaps by address.
 - Added rate lookup helper when creating offer.
+- Prevent old shutdown link from shutting down a new session.
 
 
 0.0.26

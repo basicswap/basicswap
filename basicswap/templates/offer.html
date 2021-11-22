@@ -43,7 +43,7 @@
 <form method="post">
 {% if data.show_bid_form %}
 <br/><h4>New Bid</h4>
-<p>You will send {{ data.amt_to }} {{ data.tla_to }} and receive {{ data.amt_from }} {{ data.tla_from }}
+<p>You will send <span id="bid_amt_to">{{ data.amt_to }}</span> {{ data.tla_to }} and receive <span id="bid_amt_from">{{ data.amt_from }}</span> {{ data.tla_from }}
 {% if data.xmr_type == true %}
  (excluding {{ data.amt_from_lock_spend_tx_fee }} {{ data.tla_from }} in tx fees).
 {% else %}
@@ -62,23 +62,36 @@
 </td></tr>
 
 {% if data.amount_negotiable == true %}
-<tr><td>Amount</td><td><input type="text" name="bid_amount" value="{{ data.amt_from }}"></td></tr>
+<tr><td>Amount</td><td><input type="text" id="bid_amount" name="bid_amount" value="{{ data.bid_amount }}" onchange="updateBidParams('amount');"></td></tr>
 {% endif %}
 {% if data.rate_negotiable == true %}
-<tr><td>Rate</td><td><input type="text" name="bid_rate" value="{{ data.rate }}"></td></tr>
+<tr><td>Rate</td><td><input type="text" id="bid_rate" name="bid_rate" value="{{ data.bid_rate }}" onchange="updateBidParams('rate');"></td></tr>
 {% endif %}
 
 <tr><td>Minutes valid</td><td><input type="number" name="validmins" min="10" max="1440" value="{{ data.nb_validmins }}"></td></tr>
-<tr><td><input type="submit" name="sendbid" value="Send Bid"><input type="submit" name="cancel" value="Cancel"></td></tr>
+<tr><td>
+    <input type="submit" name="sendbid" value="Send Bid">
+    <input type="submit" name="cancel" value="Cancel">
+    <input name="check_rates" type="button" value="Lookup Rates" onclick='lookup_rates();'>
+</td></tr>
 </table>
 {% else %}
 <input type="submit" name="newbid" value="New Bid">
 {% if data.sent == 'True' and data.was_revoked != true %}
 <input name="revoke_offer" type="submit" value="Revoke Offer" onclick="return confirmPopup();">
 {% endif %}
+<input name="check_rates" type="button" value="Lookup Rates" onclick='lookup_rates();'>
 {% endif %}
+<input type="hidden" id="coin_from" value="{{ data.coin_from_ind }}">
+<input type="hidden" id="coin_to" value="{{ data.coin_to_ind }}">
+<input type="hidden" id="amt_var" value="{{ data.amount_negotiable }}">
+<input type="hidden" id="rate_var" value="{{ data.rate_negotiable }}">
+<input type="hidden" id="amount_from" value="{{ data.amt_from }}">
+<input type="hidden" id="offer_rate" value="{{ data.rate }}">
 <input type="hidden" name="formid" value="{{ form_id }}">
 </form>
+
+<p id="rates_display"></p>
 
 <h4>Bids</h4>
 <table>
@@ -91,8 +104,72 @@
 <p><a href="/">home</a></p>
 
 <script>
+const xhr_rates = new XMLHttpRequest();
+xhr_rates.onload = () => {
+    if (xhr_rates.status == 200) {
+        const obj = JSON.parse(xhr_rates.response);
+
+        inner_html = '<h4>Rates</h4><pre><code>' + JSON.stringify(obj, null, '  ') + '</code></pre>';
+        document.getElementById('rates_display').innerHTML = inner_html;
+    }
+}
+
+function lookup_rates() {
+    const coin_from = document.getElementById('coin_from').value;
+    const coin_to = document.getElementById('coin_to').value;
+
+    if (coin_from == '-1' || coin_to == '-1') {
+        alert('Coins from and to must be set first.');
+        return;
+    }
+
+    inner_html = '<h4>Rates</h4><p>Updating...</p>';
+    document.getElementById('rates_display').innerHTML = inner_html;
+
+    xhr_rates.open('POST', '/json/rates');
+    xhr_rates.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+    xhr_rates.send('coin_from='+coin_from+'&coin_to='+coin_to);
+}
+
+const xhr_bid_params = new XMLHttpRequest();
+xhr_bid_params.onload = () => {
+    if (xhr_bid_params.status == 200) {
+        const obj = JSON.parse(xhr_bid_params.response);
+        document.getElementById('bid_amt_to').innerHTML = obj['amount_to'];
+    }
+}
+
+function updateBidParams(value_changed) {
+    const coin_from = document.getElementById('coin_from').value;
+    const coin_to = document.getElementById('coin_to').value;
+    const amt_var = document.getElementById('amt_var').value;
+    const rate_var = document.getElementById('rate_var').value;
+
+    let amt_from = '';
+    let rate = '';
+    if (amt_var) {
+        amt_from = document.getElementById('bid_amount').value;
+    } else {
+        amt_from = document.getElementById('amount_from').value;
+    }
+    if (rate_var) {
+        rate = document.getElementById('bid_rate').value;
+    } else {
+        rate = document.getElementById('offer_rate').value;
+    }
+
+    if (value_changed == 'amount') {
+        document.getElementById('bid_amt_from').innerHTML = amt_from;
+    }
+
+    xhr_bid_params.open('POST', '/json/rate');
+    xhr_bid_params.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+    xhr_bid_params.send('coin_from='+coin_from+'&coin_to='+coin_to+'&rate='+rate+'&amt_from='+amt_from);
+}
+
 function confirmPopup() {
     return confirm("Are you sure?");
 }
+
 </script>
 </body></html>
