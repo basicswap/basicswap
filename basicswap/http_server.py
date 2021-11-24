@@ -5,6 +5,7 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import os
+import json
 import struct
 import traceback
 import threading
@@ -214,8 +215,16 @@ class HttpHandler(BaseHTTPRequestHandler):
                 raise ValueError('Unknown Coin Type')
 
             cmd = form_data[b'cmd'][0].decode('utf-8')
+
             try:
-                result = cmd + '\n' + swap_client.callcoincli(coin_type, cmd)
+                if coin_type == Coins.XMR:
+                    ci = swap_client.ci(coin_type)
+                    arr = cmd.split(None, 1)
+                    method = arr[0]
+                    params = json.loads(arr[1]) if len(arr) > 1 else []
+                    result = json.dumps(ci.rpc_wallet_cb(method, params), indent=4)
+                else:
+                    result = cmd + '\n' + swap_client.callcoincli(coin_type, cmd)
             except Exception as ex:
                 result = str(ex)
 

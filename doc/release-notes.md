@@ -5,6 +5,7 @@
 - Track failed and successful swaps by address.
 - Added rate lookup helper when creating offer.
 - Prevent old shutdown link from shutting down a new session.
+- ui: Connected XMR wallet to rpc page.
 
 
 0.0.26
