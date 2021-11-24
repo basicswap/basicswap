@@ -1,0 +1,22 @@
+{% include 'header.html' %}
+
+<h3>Debug</h3>
+{% for m in messages %}
+<p>{{ m }}</p>
+{% endfor %}
+
+<form method="post">
+<p>
+<input name="reinit_xmr" type="submit" value="Reinitialise XMR wallet" >
+<input type="hidden" name="formid" value="{{ form_id }}">
+</p>
+</form>
+
+{% if result %}
+<textarea class="monospace" rows="40" cols="160">
+{{ result }}
+</textarea>
+{% endif %}
+
+<p><a href="/">home</a></p>
+</body></html>

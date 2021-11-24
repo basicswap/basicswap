@@ -36,7 +36,7 @@
 {% endfor %}
 </select>
 </td><td>Amount To</td><td><input type="text" id="amt_to" name="amt_to" value="{{ data.amt_to }}" onchange="set_rate('amt_to');"></td><td>The amount you will receive.</td></tr>
-</td><td>Rate</td><td><input type="text" id="rate" name="rate" value="{{ data.rate }}" onchange="set_rate('rate');"></td><td>Lock Rate: <input type="checkbox" id="rate_lock" name="rate_lock" value="rl"></td></tr>
+</td><td>Rate</td><td><input type="text" id="rate" name="rate" value="{{ data.rate }}" onchange="set_rate('rate');"></td><td>Lock Rate: <input type="checkbox" id="rate_lock" name="rate_lock" value="rl" checked="true"></td></tr>
 
 <tr><td>Amount Variable</td><td><input type="checkbox" id="amt_var" name="amt_var" value="av" {% if data.amt_var==true %} checked="true"{% endif %}></td></tr>
 <tr><td>Rate Variable</td><td><input type="checkbox" id="rate_var" name="rate_var" value="rv" {% if data.rate_var==true %} checked="true"{% endif %}></td></tr>

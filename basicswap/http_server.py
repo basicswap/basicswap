@@ -76,14 +76,14 @@ def getCoinName(c):
     return chainparams[c]['name'].capitalize()
 
 
-def listAvailableCoins(swap_client):
+def listAvailableCoins(swap_client, with_variants=True):
     coins = []
     for k, v in swap_client.coin_clients.items():
         if k not in chainparams:
             continue
         if v['connection_type'] == 'rpc':
             coins.append((int(k), getCoinName(k)))
-            if k == Coins.PART:
+            if with_variants and k == Coins.PART:
                 coins.append((int(Coins.PART_ANON), getCoinName(Coins.PART_ANON)))
                 coins.append((int(Coins.PART_BLIND), getCoinName(Coins.PART_BLIND)))
     return coins
@@ -232,8 +232,32 @@ class HttpHandler(BaseHTTPRequestHandler):
         return bytes(template.render(
             title=self.server.title,
             h2=self.server.title,
-            coins=listAvailableCoins(swap_client),
+            coins=listAvailableCoins(swap_client, with_variants=False),
             coin_type=coin_type,
+            result=result,
+            messages=messages,
+            form_id=os.urandom(8).hex(),
+        ), 'UTF-8')
+
+    def page_debug(self, url_split, post_string):
+        swap_client = self.server.swap_client
+
+        result = None
+        messages = []
+        form_data = self.checkForm(post_string, 'wallets', messages)
+        if form_data:
+            if have_data_entry(form_data, 'reinit_xmr'):
+                try:
+                    swap_client.initialiseWallet(Coins.XMR)
+                    messages.append('Done.')
+                except Exception as a:
+                    messages.append('Failed.')
+
+        template = env.get_template('debug.html')
+        return bytes(template.render(
+            title=self.server.title,
+            h2=self.server.title,
+            messages=messages,
             result=result,
             form_id=os.urandom(8).hex(),
         ), 'UTF-8')
@@ -1228,6 +1252,8 @@ class HttpHandler(BaseHTTPRequestHandler):
                     return self.page_settings(url_split, post_string)
                 if url_split[1] == 'rpc':
                     return self.page_rpc(url_split, post_string)
+                if url_split[1] == 'debug':
+                    return self.page_debug(url_split, post_string)
                 if url_split[1] == 'explorers':
                     return self.page_explorers(url_split, post_string)
                 if url_split[1] == 'offer':

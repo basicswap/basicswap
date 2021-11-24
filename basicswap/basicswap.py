@@ -1360,7 +1360,14 @@ class BasicSwap(BaseApp):
         return addr
 
     def getCachedMainWalletAddress(self, ci):
-        return self.getStringKV('main_wallet_addr_' + ci.coin_name().lower())
+        db_key = 'main_wallet_addr_' + ci.coin_name().lower()
+        cached_addr = self.getStringKV(db_key)
+        if cached_addr is not None:
+            return cached_addr
+        self.log.warning(f'Setting {db_key}')
+        main_address = ci.getMainWalletAddress()
+        self.setStringKV(db_key, main_address)
+        return main_address
 
     def checkWalletSeed(self, c):
         ci = self.ci(c)
