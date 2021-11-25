@@ -5315,7 +5315,17 @@ class BasicSwap(BaseApp):
                 query_str += 'AND bids.was_sent = 1 '
             else:
                 query_str += 'AND bids.was_received = 1 '
-            query_str += ' ORDER BY bids.created_at DESC'
+
+            sort_dir = filters.get('sort_dir', 'DESC').upper()
+            sort_by = filters.get('sort_by', 'created_at')
+            query_str += f' ORDER BY bids.{sort_by} {sort_dir}'
+
+            limit = filters.get('limit', None)
+            if limit is not None:
+                query_str += f' LIMIT {limit}'
+            offset = filters.get('offset', None)
+            if offset is not None:
+                query_str += f' OFFSET {offset}'
 
             q = session.execute(query_str)
             for row in q:

@@ -871,24 +871,24 @@ class HttpHandler(BaseHTTPRequestHandler):
         }
         messages = []
         form_data = self.checkForm(post_string, 'offers', messages)
-        if form_data and b'applyfilters' in form_data:
+        if form_data and have_data_entry(form_data, 'applyfilters'):
             filters['coin_from'] = setCoinFilter(form_data, 'coin_from')
             filters['coin_to'] = setCoinFilter(form_data, 'coin_to')
 
-            if b'sort_by' in form_data:
-                sort_by = form_data[b'sort_by'][0].decode('utf-8')
+            if have_data_entry(form_data, 'sort_by'):
+                sort_by = get_data_entry(form_data, 'sort_by')
                 assert(sort_by in ['created_at', 'rate']), 'Invalid sort by'
                 filters['sort_by'] = sort_by
-            if b'sort_dir' in form_data:
-                sort_dir = form_data[b'sort_dir'][0].decode('utf-8')
+            if have_data_entry(form_data, 'sort_dir'):
+                sort_dir = get_data_entry(form_data, 'sort_dir')
                 assert(sort_dir in ['asc', 'desc']), 'Invalid sort dir'
                 filters['sort_dir'] = sort_dir
 
-        if form_data and b'pageback' in form_data:
+        if form_data and have_data_entry(form_data, 'pageback'):
             filters['page_no'] = int(form_data[b'pageno'][0]) - 1
             if filters['page_no'] < 1:
                 filters['page_no'] = 1
-        elif form_data and b'pageforwards' in form_data:
+        elif form_data and have_data_entry(form_data, 'pageforwards'):
             filters['page_no'] = int(form_data[b'pageno'][0]) + 1
 
         if filters['page_no'] > 1:
@@ -919,22 +919,6 @@ class HttpHandler(BaseHTTPRequestHandler):
             filters=filters,
             offers=formatted_offers,
             form_id=os.urandom(8).hex(),
-        ), 'UTF-8')
-
-    def page_advance(self, url_split, post_string):
-        assert(len(url_split) > 2), 'Bid ID not specified'
-        try:
-            bid_id = bytes.fromhex(url_split[2])
-            assert(len(bid_id) == 28)
-        except Exception:
-            raise ValueError('Bad bid ID')
-        swap_client = self.server.swap_client
-
-        template = env.get_template('advance.html')
-        return bytes(template.render(
-            title=self.server.title,
-            h2=self.server.title,
-            bid_id=bid_id.hex(),
         ), 'UTF-8')
 
     def page_bid(self, url_split, post_string):
@@ -1025,15 +1009,47 @@ class HttpHandler(BaseHTTPRequestHandler):
 
     def page_bids(self, url_split, post_string, sent=False):
         swap_client = self.server.swap_client
-        bids = swap_client.listBids(sent=sent)
+
+        filters = {
+            'page_no': 1,
+            'limit': PAGE_LIMIT,
+            'sort_by': 'created_at',
+            'sort_dir': 'desc',
+        }
+        messages = []
+        form_data = self.checkForm(post_string, 'bids', messages)
+        if form_data and have_data_entry(form_data, 'applyfilters'):
+            if have_data_entry(form_data, 'sort_by'):
+                sort_by = get_data_entry(form_data, 'sort_by')
+                assert(sort_by in ['created_at', ]), 'Invalid sort by'
+                filters['sort_by'] = sort_by
+            if have_data_entry(form_data, 'sort_dir'):
+                sort_dir = get_data_entry(form_data, 'sort_dir')
+                assert(sort_dir in ['asc', 'desc']), 'Invalid sort dir'
+                filters['sort_dir'] = sort_dir
+
+        if form_data and have_data_entry(form_data, 'pageback'):
+            filters['page_no'] = int(form_data[b'pageno'][0]) - 1
+            if filters['page_no'] < 1:
+                filters['page_no'] = 1
+        elif form_data and have_data_entry(form_data, 'pageforwards'):
+            filters['page_no'] = int(form_data[b'pageno'][0]) + 1
+
+        if filters['page_no'] > 1:
+            filters['offset'] = (filters['page_no'] - 1) * PAGE_LIMIT
+
+        bids = swap_client.listBids(sent=sent, filters=filters)
 
         template = env.get_template('bids.html')
         return bytes(template.render(
             title=self.server.title,
             h2=self.server.title,
             page_type='Sent' if sent else 'Received',
+            messages=messages,
+            filters=filters,
             bids=[(format_timestamp(b[0]),
                    b[2].hex(), b[3].hex(), strBidState(b[5]), strTxState(b[7]), strTxState(b[8]), b[11]) for b in bids],
+            form_id=os.urandom(8).hex(),
         ), 'UTF-8')
 
     def page_watched(self, url_split, post_string):
@@ -1264,8 +1280,6 @@ class HttpHandler(BaseHTTPRequestHandler):
                     return self.page_newoffer(url_split, post_string)
                 if url_split[1] == 'sentoffers':
                     return self.page_offers(url_split, post_string, sent=True)
-                if url_split[1] == 'advance':
-                    return self.page_advance(url_split, post_string)
                 if url_split[1] == 'bid':
                     return self.page_bid(url_split, post_string)
                 if url_split[1] == 'bids':
