@@ -1026,7 +1026,7 @@ class BasicSwap(BaseApp):
         session = None
         try:
             self.checkSynced(coin_from_t, coin_to_t)
-            offer_addr = self.callrpc('getnewaddress') if addr_send_from is None else addr_send_from
+            offer_addr = self.newSMSGAddress(use_type=AddressTypes.OFFER)[0] if addr_send_from is None else addr_send_from
             offer_created_at = int(time.time())
 
             msg_buf = OfferMessage()
@@ -1091,7 +1091,6 @@ class BasicSwap(BaseApp):
             offer_bytes = msg_buf.SerializeToString()
             payload_hex = str.format('{:02x}', MessageTypes.OFFER) + offer_bytes.hex()
 
-            self.callrpc('smsgaddlocaladdress', [offer_addr])  # Enable receiving smsg
             options = {'decodehex': True, 'ttl_is_seconds': True}
             msg_valid = max(self.SMSG_SECONDS_IN_HOUR * 1, valid_for_seconds)
             ro = self.callrpc('smsgsend', [offer_addr, offer_addr_to, payload_hex, False, msg_valid, False, options])
@@ -1136,8 +1135,6 @@ class BasicSwap(BaseApp):
 
             session.add(offer)
             session.add(SentOffer(offer_id=offer_id))
-            if addr_send_from is None:
-                session.add(SmsgAddress(addr=offer_addr, use_type=AddressTypes.OFFER, active_ind=1, created_at=offer_created_at))
             session.commit()
 
         finally:
@@ -1677,11 +1674,7 @@ class BasicSwap(BaseApp):
             bid_bytes = msg_buf.SerializeToString()
             payload_hex = str.format('{:02x}', MessageTypes.BID) + bid_bytes.hex()
 
-            if addr_send_from is None:
-                bid_addr = self.callrpc('getnewaddress')
-            else:
-                bid_addr = addr_send_from
-            self.callrpc('smsgaddlocaladdress', [bid_addr])  # Enable receiving smsg
+            bid_addr = self.newSMSGAddress(use_type=AddressTypes.BID)[0] if addr_send_from is None else addr_send_from
             options = {'decodehex': True, 'ttl_is_seconds': True}
             msg_valid = max(self.SMSG_SECONDS_IN_HOUR * 1, valid_for_seconds)
             ro = self.callrpc('smsgsend', [bid_addr, offer.addr_from, payload_hex, False, msg_valid, False, options])
@@ -1712,8 +1705,6 @@ class BasicSwap(BaseApp):
             try:
                 session = scoped_session(self.session_factory)
                 self.saveBidInSession(bid_id, bid, session)
-                if addr_send_from is None:
-                    session.add(SmsgAddress(addr=bid_addr, use_type=AddressTypes.BID, active_ind=1, created_at=now))
                 session.commit()
             finally:
                 session.close()
@@ -2047,11 +2038,7 @@ class BasicSwap(BaseApp):
             bid_bytes = msg_buf.SerializeToString()
             payload_hex = str.format('{:02x}', MessageTypes.XMR_BID_FL) + bid_bytes.hex()
 
-            if addr_send_from is None:
-                bid_addr = self.callrpc('getnewaddress')
-            else:
-                bid_addr = addr_send_from
-            self.callrpc('smsgaddlocaladdress', [bid_addr])  # Enable receiving smsg
+            bid_addr = self.newSMSGAddress(use_type=AddressTypes.BID)[0] if addr_send_from is None else addr_send_from
             options = {'decodehex': True, 'ttl_is_seconds': True}
             msg_valid = max(self.SMSG_SECONDS_IN_HOUR * 1, valid_for_seconds)
             ro = self.callrpc('smsgsend', [bid_addr, offer.addr_from, payload_hex, False, msg_valid, False, options])
@@ -2108,8 +2095,6 @@ class BasicSwap(BaseApp):
             try:
                 session = scoped_session(self.session_factory)
                 self.saveBidInSession(xmr_swap.bid_id, bid, session, xmr_swap)
-                if addr_send_from is None:
-                    session.add(SmsgAddress(addr=bid_addr, use_type=AddressTypes.BID, active_ind=1, created_at=bid_created_at))
                 session.commit()
             finally:
                 session.close()
@@ -5389,23 +5374,58 @@ class BasicSwap(BaseApp):
             session.remove()
             self.mxDB.release()
 
-    def newSMSGAddress(self, addressnote=None):
-        # TODO: smsg addresses should be generated from a unique chain
-        self.mxDB.acquire()
+    def newSMSGAddress(self, use_type=AddressTypes.RECV_OFFER, addressnote=None, session=None):
+        now = int(time.time())
+        use_session = None
         try:
-            session = scoped_session(self.session_factory)
-            now = int(time.time())
-            new_addr = self.callrpc('getnewaddress')
+            if session:
+                use_session = session
+            else:
+                self.mxDB.acquire()
+                use_session = scoped_session(self.session_factory)
+
+            v = use_session.query(DBKVString).filter_by(key='smsg_chain_id').first()
+            if not v:
+                smsg_account = self.callrpc('extkey', ['deriveAccount', 'smsg keys', '78900'])
+                smsg_account_id = smsg_account['account']
+                self.log.info(f'Creating smsg keys account {smsg_account_id}')
+                extkey = self.callrpc('extkey')
+
+                # Disable receiving on all chains
+                smsg_chain_id = None
+                extkey = self.callrpc('extkey', ['account', smsg_account_id])
+                for c in extkey['chains']:
+                    rv = self.callrpc('extkey', ['options', c['id'], 'receive_on', 'false'])
+                    if c['function'] == 'active_external':
+                        smsg_chain_id = c['id']
+
+                if not smsg_chain_id:
+                    raise ValueError('External chain not found.')
+
+                use_session.add(DBKVString(
+                    key='smsg_chain_id',
+                    value=smsg_chain_id))
+            else:
+                smsg_chain_id = v.value
+
+            smsg_chain = self.callrpc('extkey', ['key', smsg_chain_id])
+            num_derives = int(smsg_chain['num_derives'])
+
+            new_addr = self.callrpc('deriverangekeys', [num_derives, num_derives, smsg_chain_id, False, True])[0]
+            num_derives += 1
+            rv = self.callrpc('extkey', ['options', smsg_chain_id, 'num_derives', str(num_derives)])
+
             addr_info = self.callrpc('getaddressinfo', [new_addr])
             self.callrpc('smsgaddlocaladdress', [new_addr])  # Enable receiving smsgs
 
-            session.add(SmsgAddress(addr=new_addr, use_type=AddressTypes.RECV_OFFER, active_ind=1, created_at=now, note=addressnote, pubkey=addr_info['pubkey']))
-            session.commit()
+            use_session.add(SmsgAddress(addr=new_addr, use_type=use_type, active_ind=1, created_at=now, note=addressnote, pubkey=addr_info['pubkey']))
             return new_addr, addr_info['pubkey']
         finally:
-            session.close()
-            session.remove()
-            self.mxDB.release()
+            if session is None:
+                use_session.commit()
+                use_session.close()
+                use_session.remove()
+                self.mxDB.release()
 
     def addSMSGAddress(self, pubkey_hex, addressnote=None):
         self.mxDB.acquire()
