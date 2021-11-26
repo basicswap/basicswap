@@ -69,6 +69,14 @@
 {% endif %}
 
 <tr><td>Minutes valid</td><td><input type="number" name="validmins" min="10" max="1440" value="{{ data.nb_validmins }}"></td></tr>
+{% if data.debug_ui == true %}
+<tr><td>Debug Option</td><td><select name="debugind">
+<option{% if data.debug_ind=="-1" %} selected{% endif %} value="-1">-- None --</option>
+{% for a in data.debug_options %}
+<option{% if data.debug_ind==a[0] %} selected{% endif %} value="{{ a[0] }}">{{ a[1] }}</option>
+{% endfor %}
+</select></td></tr>
+{% endif %}
 <tr><td>
     <input type="submit" name="sendbid" value="Send Bid">
     <input type="submit" name="cancel" value="Cancel">

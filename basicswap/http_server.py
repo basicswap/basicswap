@@ -25,6 +25,7 @@ from .chainparams import (
 )
 from .basicswap_util import (
     SwapTypes,
+    DebugTypes,
     strOfferState,
     strBidState,
     strTxState,
@@ -55,6 +56,7 @@ from .ui import (
     setCoinFilter,
     get_data_entry,
     have_data_entry,
+    get_data_entry_or,
 )
 
 
@@ -759,6 +761,7 @@ class HttpHandler(BaseHTTPRequestHandler):
 
         ci_from = swap_client.ci(Coins(offer.coin_from))
         ci_to = swap_client.ci(Coins(offer.coin_to))
+        debugind = -1
 
         # Set defaults
         bid_amount = ci_from.format_amount(offer.amount_from)
@@ -795,9 +798,15 @@ class HttpHandler(BaseHTTPRequestHandler):
                         amount_from = inputAmount(bid_amount, ci_from)
                     else:
                         amount_from = offer.amount_from
+                    debugind = int(get_data_entry_or(form_data, 'debugind', -1))
 
                     sent_bid_id = swap_client.postBid(offer_id, amount_from, addr_send_from=addr_from, extra_options=extra_options).hex()
+
+                    if debugind > -1:
+                        swap_client.setBidDebugInd(bytes.fromhex(sent_bid_id), debugind)
                 except Exception as ex:
+                    if self.server.swap_client.debug is True:
+                        traceback.print_exc()
                     messages.append('Error: Send bid failed: ' + str(ex))
                     show_bid_form = True
 
@@ -825,8 +834,13 @@ class HttpHandler(BaseHTTPRequestHandler):
             'rate_negotiable': offer.rate_negotiable,
             'bid_amount': bid_amount,
             'bid_rate': bid_rate,
+            'debug_ui': swap_client.debug_ui,
         }
         data.update(extend_data)
+
+        if swap_client.debug_ui:
+            data['debug_ind'] = debugind
+            data['debug_options'] = [(int(t), t.name) for t in DebugTypes]
 
         if xmr_offer:
             int_fee_rate_now, fee_source = ci_from.get_fee_rate()
@@ -975,7 +989,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         data = describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, events, edit_bid, show_txns, view_tx_ind, show_lock_transfers=show_lock_transfers)
 
         if bid.debug_ind is not None and bid.debug_ind > 0:
-            messages.append('Debug flag set: {}'.format(bid.debug_ind))
+            messages.append('Debug flag set: {}, {}'.format(bid.debug_ind, DebugTypes(bid.debug_ind).name))
 
         old_states = []
         num_states = len(bid.states) // 12

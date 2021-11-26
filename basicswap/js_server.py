@@ -186,6 +186,11 @@ def js_bids(self, url_split, post_string, is_json):
             extra_options = {
                 'valid_for_seconds': valid_for_seconds,
             }
+            if have_data_entry(form_data, 'bid_rate'):
+                extra_options['bid_rate'] = ci_to.make_int(get_data_entry(form_data, 'bid_rate'), r=1)
+            if have_data_entry(form_data, 'bid_amount'):
+                amount_from = inputAmount(get_data_entry(form_data, 'bid_amount'), ci_from)
+
             if offer.swap_type == SwapTypes.XMR_SWAP:
                 bid_id = swap_client.postXmrBid(offer_id, amount_from, addr_send_from=addr_from, extra_options=extra_options)
             else:
@@ -258,7 +263,7 @@ def js_smsgaddresses(self, url_split, post_string, is_json):
             post_data = urllib.parse.parse_qs(post_string)
         if url_split[3] == 'new':
             addressnote = get_data_entry_or(post_data, 'addressnote', '')
-            new_addr, pubkey = swap_client.newSMSGAddress(addressnote)
+            new_addr, pubkey = swap_client.newSMSGAddress(addressnote=addressnote)
             return bytes(json.dumps({'new_address': new_addr, 'pubkey': pubkey}), 'UTF-8')
         if url_split[3] == 'add':
             addressnote = get_data_entry_or(post_data, 'addressnote', '')

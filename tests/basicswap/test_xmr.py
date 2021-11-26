@@ -188,7 +188,6 @@ def prepare_swapclient_dir(datadir, node_id, network_key, network_pubkey, with_l
                 'bindir': cfg.BITCOIN_BINDIR,
                 'use_segwit': True,
             }
-
         },
         'check_progress_seconds': 2,
         'check_watched_seconds': 4,
@@ -198,7 +197,8 @@ def prepare_swapclient_dir(datadir, node_id, network_key, network_pubkey, with_l
         'min_delay_event': 1,
         'max_delay_event': 5,
         'min_delay_retry': 2,
-        'max_delay_retry': 10
+        'max_delay_retry': 10,
+        'debug_ui': True,
     }
 
     if with_ltc:

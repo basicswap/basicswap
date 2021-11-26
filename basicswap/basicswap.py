@@ -198,6 +198,7 @@ class BasicSwap(BaseApp):
         self.check_events_seconds = self.settings.get('check_events_seconds', 10)
         self.check_xmr_swaps_seconds = self.settings.get('check_xmr_swaps_seconds', 20)
         self.startup_tries = self.settings.get('startup_tries', 21)  # Seconds waited for will be (x(1 + x+1) / 2
+        self.debug_ui = self.settings.get('debug_ui', False)
         self._last_checked_progress = 0
         self._last_checked_watched = 0
         self._last_checked_expired = 0
