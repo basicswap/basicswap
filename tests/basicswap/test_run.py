@@ -13,20 +13,13 @@ $ pytest -v -s tests/basicswap/test_run.py::Test::test_04_ltc_btc
 
 """
 
-import os
-import sys
 import json
 import random
-import shutil
-import signal
 import logging
 import unittest
-import threading
 from urllib.request import urlopen
 
-import basicswap.config as cfg
 from basicswap.basicswap import (
-    BasicSwap,
     Coins,
     SwapTypes,
     BidStates,
@@ -38,345 +31,52 @@ from basicswap.basicswap_util import (
 )
 from basicswap.util import (
     COIN,
-    toWIF,
-    dumpje,
     make_int,
     format_amount,
 )
-from basicswap.rpc import (
-    callrpc_cli,
-    waitForRPC,
-)
-from basicswap.contrib.key import (
-    ECKey,
-)
-from basicswap.http_server import (
-    HttpThread,
-)
 from tests.basicswap.common import (
-    checkForks,
-    stopDaemons,
     wait_for_offer,
     wait_for_bid,
+    wait_for_balance,
     wait_for_bid_tx_state,
     wait_for_in_progress,
     post_json_req,
-    TEST_HTTP_HOST,
     TEST_HTTP_PORT,
-    BASE_PORT,
-    BASE_RPC_PORT,
-    BASE_ZMQ_PORT,
-    PREFIX_SECRET_KEY_REGTEST,
+    LTC_BASE_RPC_PORT,
+    BTC_BASE_RPC_PORT,
 )
-from bin.basicswap_run import startDaemon
-
-
-NUM_NODES = 3
-LTC_NODE = 3
-BTC_NODE = 4
-
-test_delay_event = threading.Event()
+from .test_xmr import BaseTest, test_delay_event, callnoderpc
 
 
 logger = logging.getLogger()
-logger.level = logging.DEBUG
-if not len(logger.handlers):
-    logger.addHandler(logging.StreamHandler(sys.stdout))
 
 
-def prepareOtherDir(datadir, nodeId, conf_file='litecoin.conf'):
-    node_dir = os.path.join(datadir, str(nodeId))
-    if not os.path.exists(node_dir):
-        os.makedirs(node_dir)
-    filePath = os.path.join(node_dir, conf_file)
-
-    with open(filePath, 'w+') as fp:
-        fp.write('regtest=1\n')
-        fp.write('[regtest]\n')
-        fp.write('port=' + str(BASE_PORT + nodeId) + '\n')
-        fp.write('rpcport=' + str(BASE_RPC_PORT + nodeId) + '\n')
-
-        fp.write('daemon=0\n')
-        fp.write('printtoconsole=0\n')
-        fp.write('server=1\n')
-        fp.write('discover=0\n')
-        fp.write('listenonion=0\n')
-        fp.write('bind=127.0.0.1\n')
-        fp.write('findpeers=0\n')
-        fp.write('debug=1\n')
-        fp.write('debugexclude=libevent\n')
-        fp.write('fallbackfee=0.0002\n')
-        fp.write('wallet=wallet.dat\n')
-
-        fp.write('acceptnonstdtxn=0\n')
-    return node_dir
-
-
-def prepareDir(datadir, nodeId, network_key, network_pubkey):
-    node_dir = os.path.join(datadir, str(nodeId))
-    if not os.path.exists(node_dir):
-        os.makedirs(node_dir)
-    filePath = os.path.join(node_dir, 'particl.conf')
-
-    with open(filePath, 'w+') as fp:
-        fp.write('regtest=1\n')
-        fp.write('[regtest]\n')
-        fp.write('port=' + str(BASE_PORT + nodeId) + '\n')
-        fp.write('rpcport=' + str(BASE_RPC_PORT + nodeId) + '\n')
-
-        fp.write('daemon=0\n')
-        fp.write('printtoconsole=0\n')
-        fp.write('server=1\n')
-        fp.write('discover=0\n')
-        fp.write('listenonion=0\n')
-        fp.write('bind=127.0.0.1\n')
-        fp.write('findpeers=0\n')
-        fp.write('debug=1\n')
-        fp.write('debugexclude=libevent\n')
-        fp.write('zmqpubsmsg=tcp://127.0.0.1:' + str(BASE_ZMQ_PORT + nodeId) + '\n')
-        fp.write('wallet=wallet.dat\n')
-
-        fp.write('acceptnonstdtxn=0\n')
-        fp.write('minstakeinterval=2\n')
-        fp.write('smsgsregtestadjust=0\n')
-        fp.write('stakethreadconddelayms=1000\n')
-
-        for i in range(0, NUM_NODES):
-            if nodeId == i:
-                continue
-            fp.write('addnode=127.0.0.1:%d\n' % (BASE_PORT + i))
-
-        if nodeId < 2:
-            fp.write('spentindex=1\n')
-            fp.write('txindex=1\n')
-
-    basicswap_dir = os.path.join(datadir, str(nodeId), 'basicswap')
-    if not os.path.exists(basicswap_dir):
-        os.makedirs(basicswap_dir)
-
-    ltcdatadir = os.path.join(datadir, str(LTC_NODE))
-    btcdatadir = os.path.join(datadir, str(BTC_NODE))
-    settings_path = os.path.join(basicswap_dir, cfg.CONFIG_FILENAME)
-    settings = {
-        'debug': True,
-        'zmqhost': 'tcp://127.0.0.1',
-        'zmqport': BASE_ZMQ_PORT + nodeId,
-        'htmlhost': '127.0.0.1',
-        'htmlport': 12700 + nodeId,
-        'network_key': network_key,
-        'network_pubkey': network_pubkey,
-        'chainclients': {
-            'particl': {
-                'connection_type': 'rpc',
-                'manage_daemon': False,
-                'rpcport': BASE_RPC_PORT + nodeId,
-                'datadir': node_dir,
-                'bindir': cfg.PARTICL_BINDIR,
-                'blocks_confirmed': 2,  # Faster testing
-            },
-            'litecoin': {
-                'connection_type': 'rpc',
-                'manage_daemon': False,
-                'rpcport': BASE_RPC_PORT + LTC_NODE,
-                'datadir': ltcdatadir,
-                'bindir': cfg.LITECOIN_BINDIR,
-                # 'use_segwit': True,
-            },
-            'bitcoin': {
-                'connection_type': 'rpc',
-                'manage_daemon': False,
-                'rpcport': BASE_RPC_PORT + BTC_NODE,
-                'datadir': btcdatadir,
-                'bindir': cfg.BITCOIN_BINDIR,
-                'use_segwit': True,
-            }
-        },
-        'check_progress_seconds': 2,
-        'check_watched_seconds': 4,
-        'check_expired_seconds': 60,
-        'check_events_seconds': 1,
-        'min_delay_event': 1,
-        'max_delay_event': 5
-    }
-    with open(settings_path, 'w') as fp:
-        json.dump(settings, fp, indent=4)
-
-    return node_dir
-
-
-def partRpc(cmd, node_id=0):
-    return callrpc_cli(cfg.PARTICL_BINDIR, os.path.join(cfg.TEST_DATADIRS, str(node_id)), 'regtest', cmd, cfg.PARTICL_CLI)
-
-
-def btcRpc(cmd):
-    return callrpc_cli(cfg.BITCOIN_BINDIR, os.path.join(cfg.TEST_DATADIRS, str(BTC_NODE)), 'regtest', cmd, cfg.BITCOIN_CLI)
-
-
-def ltcRpc(cmd):
-    return callrpc_cli(cfg.LITECOIN_BINDIR, os.path.join(cfg.TEST_DATADIRS, str(LTC_NODE)), 'regtest', cmd, cfg.LITECOIN_CLI)
-
-
-def signal_handler(sig, frame):
-    print('signal {} detected.'.format(sig))
-    test_delay_event.set()
-
-
-def run_coins_loop(cls):
-    while not test_delay_event.is_set():
-        try:
-            ltcRpc('generatetoaddress 1 {}'.format(cls.ltc_addr))
-            btcRpc('generatetoaddress 1 {}'.format(cls.btc_addr))
-        except Exception as e:
-            logging.warning('run_coins_loop ' + str(e))
-        test_delay_event.wait(1.0)
-
-
-def run_loop(cls):
-    while not test_delay_event.is_set():
-        for c in cls.swap_clients:
-            c.update()
-        test_delay_event.wait(1)
-
-
-def make_part_cli_rpc_func(node_id):
-    node_id = node_id
-
-    def rpc_func(method, params=None, wallet=None):
-        nonlocal node_id
-        cmd = method
-        if params:
-            for p in params:
-                if isinstance(p, dict) or isinstance(p, list):
-                    cmd += ' "' + dumpje(p) + '"'
-                elif isinstance(p, int):
-                    cmd += ' ' + str(p)
-                else:
-                    cmd += ' "' + p + '"'
-        return partRpc(cmd, node_id)
-    return rpc_func
-
-
-class Test(unittest.TestCase):
+class Test(BaseTest):
+    __test__ = True
 
     @classmethod
     def setUpClass(cls):
+        cls.start_ltc_nodes = True
+        cls.start_xmr_nodes = False
         super(Test, cls).setUpClass()
 
-        eckey = ECKey()
-        eckey.generate()
-        cls.network_key = toWIF(PREFIX_SECRET_KEY_REGTEST, eckey.get_bytes())
-        cls.network_pubkey = eckey.get_pubkey().get_bytes().hex()
+        btc_addr1 = callnoderpc(1, 'getnewaddress', ['initial funds', 'bech32'], base_rpc_port=BTC_BASE_RPC_PORT)
+        ltc_addr1 = callnoderpc(1, 'getnewaddress', ['initial funds', 'bech32'], base_rpc_port=LTC_BASE_RPC_PORT)
 
-        if os.path.isdir(cfg.TEST_DATADIRS):
-            logging.info('Removing ' + cfg.TEST_DATADIRS)
-            shutil.rmtree(cfg.TEST_DATADIRS)
+        callnoderpc(0, 'sendtoaddress', [btc_addr1, 1000], base_rpc_port=BTC_BASE_RPC_PORT)
+        callnoderpc(0, 'sendtoaddress', [ltc_addr1, 1000], base_rpc_port=LTC_BASE_RPC_PORT)
 
-        for i in range(NUM_NODES):
-            data_dir = prepareDir(cfg.TEST_DATADIRS, i, cls.network_key, cls.network_pubkey)
-            callrpc_cli(cfg.PARTICL_BINDIR, data_dir, 'regtest', '-wallet=wallet.dat create', 'particl-wallet')  # Necessary for 0.21
-
-        prepareOtherDir(cfg.TEST_DATADIRS, LTC_NODE)
-        data_dir = prepareOtherDir(cfg.TEST_DATADIRS, BTC_NODE, 'bitcoin.conf')
-        callrpc_cli(cfg.BITCOIN_BINDIR, data_dir, 'regtest', '-wallet=wallet.dat create', 'bitcoin-wallet')  # Necessary for 0.21
-
-        cls.daemons = []
-        cls.swap_clients = []
-        cls.http_threads = []
-
-        cls.daemons.append(startDaemon(os.path.join(cfg.TEST_DATADIRS, str(BTC_NODE)), cfg.BITCOIN_BINDIR, cfg.BITCOIND))
-        logging.info('Started %s %d', cfg.BITCOIND, cls.daemons[-1].pid)
-        cls.daemons.append(startDaemon(os.path.join(cfg.TEST_DATADIRS, str(LTC_NODE)), cfg.LITECOIN_BINDIR, cfg.LITECOIND))
-        logging.info('Started %s %d', cfg.LITECOIND, cls.daemons[-1].pid)
-
-        for i in range(NUM_NODES):
-            cls.daemons.append(startDaemon(os.path.join(cfg.TEST_DATADIRS, str(i)), cfg.PARTICL_BINDIR, cfg.PARTICLD))
-            logging.info('Started %s %d', cfg.PARTICLD, cls.daemons[-1].pid)
-
-        for i in range(NUM_NODES):
-            # Load mnemonics after all nodes have started to avoid staking getting stuck in TryToSync
-            rpc = make_part_cli_rpc_func(i)
-            waitForRPC(rpc)
-            if i == 0:
-                rpc('extkeyimportmaster', ['abandon baby cabbage dad eager fabric gadget habit ice kangaroo lab absorb'])
-            elif i == 1:
-                rpc('extkeyimportmaster', ['pact mammal barrel matrix local final lecture chunk wasp survey bid various book strong spread fall ozone daring like topple door fatigue limb olympic', '', 'true'])
-                rpc('getnewextaddress', ['lblExtTest'])
-                rpc('rescanblockchain')
-            else:
-                rpc('extkeyimportmaster', [rpc('mnemonic', ['new'])['master']])
-            # Lower output split threshold for more stakeable outputs
-            rpc('walletsettings', ['stakingoptions', {'stakecombinethreshold': 100, 'stakesplitthreshold': 200}])
-
-            basicswap_dir = os.path.join(os.path.join(cfg.TEST_DATADIRS, str(i)), 'basicswap')
-            settings_path = os.path.join(basicswap_dir, cfg.CONFIG_FILENAME)
-            with open(settings_path) as fs:
-                settings = json.load(fs)
-            fp = open(os.path.join(basicswap_dir, 'basicswap.log'), 'w')
-            sc = BasicSwap(fp, basicswap_dir, settings, 'regtest', log_name='BasicSwap{}'.format(i))
-            sc.setDaemonPID(Coins.BTC, cls.daemons[0].pid)
-            sc.setDaemonPID(Coins.LTC, cls.daemons[1].pid)
-            sc.setDaemonPID(Coins.PART, cls.daemons[2 + i].pid)
-            sc.start()
-            cls.swap_clients.append(sc)
-
-            t = HttpThread(cls.swap_clients[i].fp, TEST_HTTP_HOST, TEST_HTTP_PORT + i, False, cls.swap_clients[i])
-            cls.http_threads.append(t)
-            t.start()
-
-        waitForRPC(ltcRpc)
-        num_blocks = 500
-        logging.info('Mining %d litecoin blocks', num_blocks)
-        cls.ltc_addr = ltcRpc('getnewaddress mining_addr legacy')
-        ltcRpc('generatetoaddress {} {}'.format(num_blocks, cls.ltc_addr))
-
-        ro = ltcRpc('getblockchaininfo')
-        checkForks(ro)
-
-        waitForRPC(btcRpc)
-        cls.btc_addr = btcRpc('getnewaddress mining_addr bech32')
-        logging.info('Mining %d Bitcoin blocks to %s', num_blocks, cls.btc_addr)
-        btcRpc('generatetoaddress {} {}'.format(num_blocks, cls.btc_addr))
-
-        ro = btcRpc('getblockchaininfo')
-        checkForks(ro)
-
-        ro = ltcRpc('getwalletinfo')
-        print('ltcRpc', ro)
-
-        signal.signal(signal.SIGINT, signal_handler)
-        cls.update_thread = threading.Thread(target=run_loop, args=(cls,))
-        cls.update_thread.start()
-
-        cls.coins_update_thread = threading.Thread(target=run_coins_loop, args=(cls,))
-        cls.coins_update_thread.start()
-
-        # Wait for height, or sequencelock is thrown off by genesis blocktime
-        num_blocks = 3
-        logging.info('Waiting for Particl chain height %d', num_blocks)
-        for i in range(60):
-            particl_blocks = cls.swap_clients[0].callrpc('getblockchaininfo')['blocks']
-            print('particl_blocks', particl_blocks)
-            if particl_blocks >= num_blocks:
-                break
-            test_delay_event.wait(1)
-        assert(particl_blocks >= num_blocks)
+        wait_for_balance(test_delay_event, 'http://127.0.0.1:1801/json/wallets/btc', 'balance', 1000.0)
+        wait_for_balance(test_delay_event, 'http://127.0.0.1:1801/json/wallets/ltc', 'balance', 1000.0)
 
     @classmethod
     def tearDownClass(cls):
-        logging.info('Finalising')
-        test_delay_event.set()
-        cls.update_thread.join()
-        cls.coins_update_thread.join()
-        for t in cls.http_threads:
-            t.stop()
-            t.join()
-        for c in cls.swap_clients:
-            c.finalise()
-            c.fp.close()
-
-        stopDaemons(cls.daemons)
-
+        logging.info('Finalising test')
         super(Test, cls).tearDownClass()
+
+    def getBalance(self, js_wallets, coin_type):
+        ci = self.swap_clients[0].ci(coin_type)
+        return ci.make_int(float(js_wallets[str(int(coin_type))]['balance']) + float(js_wallets[str(int(coin_type))]['unconfirmed']))
 
     def test_01_verifyrawtransaction(self):
         txn = '0200000001eb6e5c4ebba4efa32f40c7314cad456a64008e91ee30b2dd0235ab9bb67fbdbb01000000ee47304402200956933242dde94f6cf8f195a470f8d02aef21ec5c9b66c5d3871594bdb74c9d02201d7e1b440de8f4da672d689f9e37e98815fb63dbc1706353290887eb6e8f7235012103dc1b24feb32841bc2f4375da91fa97834e5983668c2a39a6b7eadb60e7033f9d205a803b28fe2f86c17db91fa99d7ed2598f79b5677ffe869de2e478c0d1c02cc7514c606382012088a8201fe90717abb84b481c2a59112414ae56ec8acc72273642ca26cc7a5812fdc8f68876a914225fbfa4cb725b75e511810ac4d6f74069bdded26703520140b27576a914207eb66b2fd6ed9924d6217efc7fa7b38dfabe666888acffffffff01e0167118020000001976a9140044e188928710cecba8311f1cf412135b98145c88ac00000000'
@@ -386,12 +86,12 @@ class Test(unittest.TestCase):
             'scriptPubKey': 'a9143d37191e8b864222d14952a14c85504677a0581d87',
             'redeemScript': '6382012088a8201fe90717abb84b481c2a59112414ae56ec8acc72273642ca26cc7a5812fdc8f68876a914225fbfa4cb725b75e511810ac4d6f74069bdded26703520140b27576a914207eb66b2fd6ed9924d6217efc7fa7b38dfabe666888ac',
             'amount': 1.0}
-        ro = partRpc('verifyrawtransaction {} "{}"'.format(txn, dumpje([prevout, ])))
+        ro = callnoderpc(0, 'verifyrawtransaction', [txn, [prevout, ]])
         assert(ro['inputs_valid'] is False)
         assert(ro['validscripts'] == 1)
 
         prevout['amount'] = 100.0
-        ro = partRpc('verifyrawtransaction {} "{}"'.format(txn, dumpje([prevout, ])))
+        ro = callnoderpc(0, 'verifyrawtransaction', [txn, [prevout, ]])
         assert(ro['inputs_valid'] is True)
         assert(ro['validscripts'] == 1)
 
@@ -402,12 +102,12 @@ class Test(unittest.TestCase):
             'scriptPubKey': 'a914129aee070317bbbd57062288849e85cf57d15c2687',
             'redeemScript': '6382012088a8201fe90717abb84b481c2a59112414ae56ec8acc72273642ca26cc7a5812fdc8f68876a914207eb66b2fd6ed9924d6217efc7fa7b38dfabe666703a90040b27576a914225fbfa4cb725b75e511810ac4d6f74069bdded26888ac',
             'amount': 1.0}
-        ro = partRpc('verifyrawtransaction {} "{}"'.format(txn, dumpje([prevout, ])))
+        ro = callnoderpc(0, 'verifyrawtransaction', [txn, [prevout, ]])
         assert(ro['inputs_valid'] is False)
         assert(ro['validscripts'] == 0)  # Amount covered by signature
 
         prevout['amount'] = 90.0
-        ro = partRpc('verifyrawtransaction {} "{}"'.format(txn, dumpje([prevout, ])))
+        ro = callnoderpc(0, 'verifyrawtransaction', [txn, [prevout, ]])
         assert(ro['inputs_valid'] is True)
         assert(ro['validscripts'] == 1)
 
@@ -653,7 +353,7 @@ class Test(unittest.TestCase):
     def test_12_withdrawal(self):
         logging.info('---------- Test LTC withdrawals')
 
-        ltc_addr = ltcRpc('getnewaddress "Withdrawal test" legacy')
+        ltc_addr = callnoderpc(0, 'getnewaddress', ['Withdrawal test', 'legacy'], base_rpc_port=LTC_BASE_RPC_PORT)
         wallets0 = json.loads(urlopen('http://127.0.0.1:{}/json/wallets'.format(TEST_HTTP_PORT + 0)).read())
         assert(float(wallets0['3']['balance']) > 100)
 
@@ -664,6 +364,54 @@ class Test(unittest.TestCase):
         }
         json_rv = json.loads(post_json_req('http://127.0.0.1:{}/json/wallets/ltc/withdraw'.format(TEST_HTTP_PORT + 0), post_json))
         assert(len(json_rv['txid']) == 64)
+
+    def test_13_itx_refund(self):
+        logging.info('---------- Test ITX refunded')
+        # Initiator claims PTX and refunds ITX after lock expires
+        # Participant loses PTX value without gaining ITX value
+        swap_clients = self.swap_clients
+
+        js_w0_before = json.loads(urlopen('http://127.0.0.1:1800/json/wallets').read())
+        js_w1_before = json.loads(urlopen('http://127.0.0.1:1801/json/wallets').read())
+
+        swap_value = make_int(random.uniform(2.0, 20.0), scale=8, r=1)
+        logging.info('swap_value {}'.format(format_amount(swap_value, 8)))
+        offer_id = swap_clients[0].postOffer(Coins.LTC, Coins.BTC, swap_value, 0.5 * COIN, swap_value, SwapTypes.SELLER_FIRST,
+                                             SEQUENCE_LOCK_BLOCKS, 10)
+
+        wait_for_offer(test_delay_event, swap_clients[1], offer_id)
+        offer = swap_clients[1].getOffer(offer_id)
+        bid_id = swap_clients[1].postBid(offer_id, offer.amount_from)
+        swap_clients[1].setBidDebugInd(bid_id, DebugTypes.DONT_SPEND_ITX)
+
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id)
+        swap_clients[0].acceptBid(bid_id)
+
+        wait_for_bid_tx_state(test_delay_event, swap_clients[0], bid_id, TxStates.TX_REFUNDED, TxStates.TX_REDEEMED, wait_for=60)
+
+        js_w0_after = json.loads(urlopen('http://127.0.0.1:1800/json/wallets').read())
+        js_w1_after = json.loads(urlopen('http://127.0.0.1:1801/json/wallets').read())
+
+        ltc_swap_value = swap_value
+        btc_swap_value = swap_value // 2
+        node0_btc_before = self.getBalance(js_w0_before, Coins.BTC)
+        node0_btc_after = self.getBalance(js_w0_after, Coins.BTC)
+        node0_ltc_before = self.getBalance(js_w0_before, Coins.LTC)
+        node0_ltc_after = self.getBalance(js_w0_after, Coins.LTC)
+
+        node1_btc_before = self.getBalance(js_w1_before, Coins.BTC)
+        node1_btc_after = self.getBalance(js_w1_after, Coins.BTC)
+        node1_ltc_before = self.getBalance(js_w1_before, Coins.LTC)
+        node1_ltc_after = self.getBalance(js_w1_after, Coins.LTC)
+
+        high_fee_value_btc = int(0.001 * COIN)
+        high_fee_value_ltc = int(0.01 * COIN)  # TODO Set fees directly, see listtransactions
+
+        assert(node0_btc_after > node0_btc_before + btc_swap_value - high_fee_value_btc)
+        assert(node0_ltc_after > node0_ltc_before - high_fee_value_ltc)
+
+        assert(node1_btc_after < node1_btc_before - btc_swap_value)
+        assert(node1_ltc_before == node1_ltc_after)
 
     def pass_99_delay(self):
         logging.info('Delay')

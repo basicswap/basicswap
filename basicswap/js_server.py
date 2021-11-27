@@ -168,6 +168,7 @@ def js_bids(self, url_split, post_string, is_json):
             assert(offer), 'Offer not found.'
 
             ci_from = swap_client.ci(offer.coin_from)
+            ci_to = swap_client.ci(offer.coin_to)
             amount_from = inputAmount(get_data_entry(post_data, 'amount_from'), ci_from)
 
             addr_from = None
@@ -186,10 +187,10 @@ def js_bids(self, url_split, post_string, is_json):
             extra_options = {
                 'valid_for_seconds': valid_for_seconds,
             }
-            if have_data_entry(form_data, 'bid_rate'):
-                extra_options['bid_rate'] = ci_to.make_int(get_data_entry(form_data, 'bid_rate'), r=1)
-            if have_data_entry(form_data, 'bid_amount'):
-                amount_from = inputAmount(get_data_entry(form_data, 'bid_amount'), ci_from)
+            if have_data_entry(post_data, 'bid_rate'):
+                extra_options['bid_rate'] = ci_to.make_int(get_data_entry(post_data, 'bid_rate'), r=1)
+            if have_data_entry(post_data, 'bid_amount'):
+                amount_from = inputAmount(get_data_entry(post_data, 'bid_amount'), ci_from)
 
             if offer.swap_type == SwapTypes.XMR_SWAP:
                 bid_id = swap_client.postXmrBid(offer_id, amount_from, addr_send_from=addr_from, extra_options=extra_options)

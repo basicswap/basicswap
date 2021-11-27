@@ -142,7 +142,7 @@ def startXmrWalletRPC(node_dir, bin_dir, wallet_bin, node_id, opts=[]):
     return subprocess.Popen(args, stdin=subprocess.PIPE, stdout=wallet_stdout, stderr=wallet_stderr, cwd=data_dir)
 
 
-def prepare_swapclient_dir(datadir, node_id, network_key, network_pubkey, with_ltc=False):
+def prepare_swapclient_dir(datadir, node_id, network_key, network_pubkey, with_ltc=False, with_xmr=False):
     basicswap_dir = os.path.join(datadir, 'basicswap_' + str(node_id))
     if not os.path.exists(basicswap_dir):
         os.makedirs(basicswap_dir)
@@ -167,17 +167,6 @@ def prepare_swapclient_dir(datadir, node_id, network_key, network_pubkey, with_l
                 'bindir': cfg.PARTICL_BINDIR,
                 'blocks_confirmed': 2,  # Faster testing
             },
-            'monero': {
-                'connection_type': 'rpc',
-                'manage_daemon': False,
-                'rpcport': XMR_BASE_RPC_PORT + node_id,
-                'walletrpcport': XMR_BASE_WALLET_RPC_PORT + node_id,
-                'walletrpcuser': 'test' + str(node_id),
-                'walletrpcpassword': 'test_pass' + str(node_id),
-                'walletfile': 'testwallet',
-                'datadir': os.path.join(datadir, 'xmr_' + str(node_id)),
-                'bindir': cfg.XMR_BINDIR,
-            },
             'bitcoin': {
                 'connection_type': 'rpc',
                 'manage_daemon': False,
@@ -200,6 +189,19 @@ def prepare_swapclient_dir(datadir, node_id, network_key, network_pubkey, with_l
         'max_delay_retry': 10,
         'debug_ui': True,
     }
+
+    if with_xmr:
+        settings['chainclients']['monero'] = {
+            'connection_type': 'rpc',
+            'manage_daemon': False,
+            'rpcport': XMR_BASE_RPC_PORT + node_id,
+            'walletrpcport': XMR_BASE_WALLET_RPC_PORT + node_id,
+            'walletrpcuser': 'test' + str(node_id),
+            'walletrpcpassword': 'test_pass' + str(node_id),
+            'walletfile': 'testwallet',
+            'datadir': os.path.join(datadir, 'xmr_' + str(node_id)),
+            'bindir': cfg.XMR_BINDIR,
+        }
 
     if with_ltc:
         settings['chainclients']['litecoin'] = {
@@ -291,6 +293,9 @@ class BaseTest(unittest.TestCase):
     def setUpClass(cls):
         if not hasattr(cls, 'start_ltc_nodes'):
             cls.start_ltc_nodes = False
+        if not hasattr(cls, 'start_xmr_nodes'):
+            cls.start_xmr_nodes = True
+
         random.seed(time.time())
 
         cls.update_thread = None
@@ -371,23 +376,24 @@ class BaseTest(unittest.TestCase):
 
                     waitForRPC(make_rpc_func(i, base_rpc_port=LTC_BASE_RPC_PORT))
 
-            for i in range(NUM_XMR_NODES):
-                prepareXmrDataDir(TEST_DIR, i, 'monerod.conf')
+            if cls.start_xmr_nodes:
+                for i in range(NUM_XMR_NODES):
+                    prepareXmrDataDir(TEST_DIR, i, 'monerod.conf')
 
-                cls.xmr_daemons.append(startXmrDaemon(os.path.join(TEST_DIR, 'xmr_' + str(i)), cfg.XMR_BINDIR, cfg.XMRD))
-                logging.info('Started %s %d', cfg.XMRD, cls.xmr_daemons[-1].pid)
-                waitForXMRNode(i)
+                    cls.xmr_daemons.append(startXmrDaemon(os.path.join(TEST_DIR, 'xmr_' + str(i)), cfg.XMR_BINDIR, cfg.XMRD))
+                    logging.info('Started %s %d', cfg.XMRD, cls.xmr_daemons[-1].pid)
+                    waitForXMRNode(i)
 
-                cls.xmr_daemons.append(startXmrWalletRPC(os.path.join(TEST_DIR, 'xmr_' + str(i)), cfg.XMR_BINDIR, cfg.XMR_WALLET_RPC, i))
+                    cls.xmr_daemons.append(startXmrWalletRPC(os.path.join(TEST_DIR, 'xmr_' + str(i)), cfg.XMR_BINDIR, cfg.XMR_WALLET_RPC, i))
 
-            for i in range(NUM_XMR_NODES):
-                cls.xmr_wallet_auth.append(('test{0}'.format(i), 'test_pass{0}'.format(i)))
-                logging.info('Creating XMR wallet %i', i)
+                for i in range(NUM_XMR_NODES):
+                    cls.xmr_wallet_auth.append(('test{0}'.format(i), 'test_pass{0}'.format(i)))
+                    logging.info('Creating XMR wallet %i', i)
 
-                waitForXMRWallet(i, cls.xmr_wallet_auth[i])
+                    waitForXMRWallet(i, cls.xmr_wallet_auth[i])
 
-                cls.callxmrnodewallet(cls, i, 'create_wallet', {'filename': 'testwallet', 'language': 'English'})
-                cls.callxmrnodewallet(cls, i, 'open_wallet', {'filename': 'testwallet'})
+                    cls.callxmrnodewallet(cls, i, 'create_wallet', {'filename': 'testwallet', 'language': 'English'})
+                    cls.callxmrnodewallet(cls, i, 'open_wallet', {'filename': 'testwallet'})
 
             logging.info('Preparing swap clients.')
             eckey = ECKey()
@@ -396,7 +402,7 @@ class BaseTest(unittest.TestCase):
             cls.network_pubkey = eckey.get_pubkey().get_bytes().hex()
 
             for i in range(NUM_NODES):
-                prepare_swapclient_dir(TEST_DIR, i, cls.network_key, cls.network_pubkey, cls.start_ltc_nodes)
+                prepare_swapclient_dir(TEST_DIR, i, cls.network_key, cls.network_pubkey, cls.start_ltc_nodes, cls.start_xmr_nodes)
                 basicswap_dir = os.path.join(os.path.join(TEST_DIR, 'basicswap_' + str(i)))
                 settings_path = os.path.join(basicswap_dir, cfg.CONFIG_FILENAME)
                 with open(settings_path) as fs:
@@ -410,35 +416,53 @@ class BaseTest(unittest.TestCase):
                     sc.setDaemonPID(Coins.LTC, cls.ltc_daemons[i].pid)
 
                 sc.start()
-                # Set XMR main wallet address
-                xmr_ci = sc.ci(Coins.XMR)
-                sc.setStringKV('main_wallet_addr_' + xmr_ci.coin_name().lower(), xmr_ci.getMainWalletAddress())
+                if cls.start_xmr_nodes:
+                    # Set XMR main wallet address
+                    xmr_ci = sc.ci(Coins.XMR)
+                    sc.setStringKV('main_wallet_addr_' + xmr_ci.coin_name().lower(), xmr_ci.getMainWalletAddress())
                 cls.swap_clients.append(sc)
 
                 t = HttpThread(cls.swap_clients[i].fp, TEST_HTTP_HOST, TEST_HTTP_PORT + i, False, cls.swap_clients[i])
                 cls.http_threads.append(t)
                 t.start()
 
-            cls.btc_addr = callnoderpc(0, 'getnewaddress', ['mining_addr', 'bech32'], base_rpc_port=BTC_BASE_RPC_PORT)
-            cls.xmr_addr = cls.callxmrnodewallet(cls, 1, 'get_address')['address']
+            # Set future block rewards to nowhere (a random address)
+            eckey = ECKey()
+            eckey.generate()
+            void_block_rewards_pubkey = eckey.get_pubkey().get_bytes()
 
-            num_blocks = 500  # Mine enough to activate segwit
+            cls.btc_addr = callnoderpc(0, 'getnewaddress', ['mining_addr', 'bech32'], base_rpc_port=BTC_BASE_RPC_PORT)
+            num_blocks = 400  # Mine enough to activate segwit
+            logging.info('Mining %d Bitcoin blocks to %s', num_blocks, cls.btc_addr)
+            callnoderpc(0, 'generatetoaddress', [num_blocks, cls.btc_addr], base_rpc_port=BTC_BASE_RPC_PORT)
+
+            num_blocks = 100
+            cls.btc_addr = cls.swap_clients[0].ci(Coins.BTC).pubkey_to_segwit_address(void_block_rewards_pubkey)
             logging.info('Mining %d Bitcoin blocks to %s', num_blocks, cls.btc_addr)
             callnoderpc(0, 'generatetoaddress', [num_blocks, cls.btc_addr], base_rpc_port=BTC_BASE_RPC_PORT)
 
             checkForks(callnoderpc(0, 'getblockchaininfo', base_rpc_port=BTC_BASE_RPC_PORT))
 
             if cls.start_ltc_nodes:
+                num_blocks = 400
                 cls.ltc_addr = callnoderpc(0, 'getnewaddress', ['mining_addr', 'bech32'], base_rpc_port=LTC_BASE_RPC_PORT)
                 logging.info('Mining %d Litecoin blocks to %s', num_blocks, cls.ltc_addr)
                 callnoderpc(0, 'generatetoaddress', [num_blocks, cls.ltc_addr], base_rpc_port=LTC_BASE_RPC_PORT)
+
+                num_blocks = 100
+                cls.ltc_addr = cls.swap_clients[0].ci(Coins.LTC).pubkey_to_address(void_block_rewards_pubkey)
+                logging.info('Mining %d Litecoin blocks to %s', num_blocks, cls.ltc_addr)
+                callnoderpc(0, 'generatetoaddress', [num_blocks, cls.ltc_addr], base_rpc_port=LTC_BASE_RPC_PORT)
+
                 checkForks(callnoderpc(0, 'getblockchaininfo', base_rpc_port=LTC_BASE_RPC_PORT))
 
             num_blocks = 100
-            if callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'get_block_count')['count'] < num_blocks:
-                logging.info('Mining %d Monero blocks to %s.', num_blocks, cls.xmr_addr)
-                callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'generateblocks', {'wallet_address': cls.xmr_addr, 'amount_of_blocks': num_blocks})
-            logging.info('XMR blocks: %d', callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'get_block_count')['count'])
+            if cls.start_xmr_nodes:
+                cls.xmr_addr = cls.callxmrnodewallet(cls, 1, 'get_address')['address']
+                if callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'get_block_count')['count'] < num_blocks:
+                    logging.info('Mining %d Monero blocks to %s.', num_blocks, cls.xmr_addr)
+                    callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'generateblocks', {'wallet_address': cls.xmr_addr, 'amount_of_blocks': num_blocks})
+                logging.info('XMR blocks: %d', callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'get_block_count')['count'])
 
             logging.info('Adding anon outputs')
             outputs = []
@@ -456,6 +480,7 @@ class BaseTest(unittest.TestCase):
             pause_event.set()
             cls.coins_update_thread = threading.Thread(target=run_coins_loop, args=(cls,))
             cls.coins_update_thread.start()
+
         except Exception:
             traceback.print_exc()
             Test.tearDownClass()

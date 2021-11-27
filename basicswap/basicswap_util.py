@@ -156,6 +156,7 @@ class DebugTypes(IntEnum):
     CREATE_INVALID_COIN_B_LOCK = auto()
     BUYER_STOP_AFTER_ITX = auto()
     MAKE_INVALID_PTX = auto()
+    DONT_SPEND_ITX = auto()
 
 
 def strOfferState(state):

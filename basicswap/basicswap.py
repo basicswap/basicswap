@@ -1521,12 +1521,13 @@ class BasicSwap(BaseApp):
         ensure(sign_for_addr is not None, 'Could not find address with enough funds for proof')
 
         self.log.debug('sign_for_addr %s', sign_for_addr)
-        if self.coin_clients[coin_type]['use_segwit']:
+        if self.coin_clients[coin_type]['use_segwit']:  # TODO: Use isSegwitAddress when scantxoutset can use combo
             # 'Address does not refer to key' for non p2pkh
             addrinfo = self.callcoinrpc(coin_type, 'getaddressinfo', [sign_for_addr])
             pkh = addrinfo['scriptPubKey'][4:]
             sign_for_addr = encodeAddress(bytes((chainparams[coin_type][self.chain]['pubkey_address'],)) + bytes.fromhex(pkh))
             self.log.debug('sign_for_addr converted %s', sign_for_addr)
+
         signature = self.callcoinrpc(coin_type, 'signmessage', [sign_for_addr, sign_for_addr + '_swap_proof_' + extra_commit_bytes.hex()])
 
         return (sign_for_addr, signature)
@@ -2549,7 +2550,7 @@ class BasicSwap(BaseApp):
         return redeem_txn
 
     def createRefundTxn(self, coin_type, txn, offer, bid, txn_script, addr_refund_out=None, tx_type=TxTypes.ITX_REFUND):
-        self.log.debug('createRefundTxn')
+        self.log.debug('createRefundTxn for coin %s', Coins(coin_type).name)
         if self.coin_clients[coin_type]['connection_type'] != 'rpc':
             return None
 
@@ -2662,7 +2663,7 @@ class BasicSwap(BaseApp):
         bid.setITxState(TxStates.TX_CONFIRMED)
 
         if bid.debug_ind == DebugTypes.BUYER_STOP_AFTER_ITX:
-            self.log.debug('bid %s: Abandoning bid for testing: %d.', bid_id.hex(), bid.debug_ind)
+            self.log.debug('bid %s: Abandoning bid for testing: %d, %s.', bid_id.hex(), bid.debug_ind, DebugTypes(bid.debug_ind).name)
             bid.setState(BidStates.BID_ABANDONED)
             self.logBidEvent(bid.bid_id, EventLogTypes.DEBUG_TWEAK_APPLIED, 'ind {}'.format(bid.debug_ind), None)
             return  # Bid saved in checkBidState
@@ -2787,7 +2788,7 @@ class BasicSwap(BaseApp):
 
         sum_unspent = 0
         self.log.debug('[rm] scantxoutset start')  # scantxoutset is slow
-        ro = self.callcoinrpc(coin_type, 'scantxoutset', ['start', ['addr({})'.format(address)]])
+        ro = self.callcoinrpc(coin_type, 'scantxoutset', ['start', ['addr({})'.format(address)]])  # TODO: Use combo(address) where possible
         self.log.debug('[rm] scantxoutset end')
         for o in ro['unspents']:
             if assert_txid and o['txid'] != assert_txid:
@@ -3304,11 +3305,17 @@ class BasicSwap(BaseApp):
 
                 if bid.was_sent:
                     txn = self.createRedeemTxn(coin_from, bid, for_txn_type='initiate')
-                    txid = self.submitTxn(coin_from, txn)
 
-                    bid.initiate_tx.spend_txid = bytes.fromhex(txid)
-                    # bid.initiate_txn_redeem = bytes.fromhex(txn)  # Worth keeping?
-                    self.log.debug('Submitted initiate redeem txn %s to %s chain for bid %s', txid, chainparams[coin_from]['name'], bid_id.hex())
+                    if bid.debug_ind == DebugTypes.DONT_SPEND_ITX:
+                        self.log.debug('bid %s: Abandoning bid for testing: %d, %s.', bid_id.hex(), bid.debug_ind, DebugTypes(bid.debug_ind).name)
+                        bid.setState(BidStates.BID_ABANDONED)
+                        self.logBidEvent(bid.bid_id, EventLogTypes.DEBUG_TWEAK_APPLIED, 'ind {}'.format(bid.debug_ind), None)
+                    else:
+                        txid = self.submitTxn(coin_from, txn)
+
+                        bid.initiate_tx.spend_txid = bytes.fromhex(txid)
+                        # bid.initiate_txn_redeem = bytes.fromhex(txn)  # Worth keeping?
+                        self.log.debug('Submitted initiate redeem txn %s to %s chain for bid %s', txid, chainparams[coin_from]['name'], bid_id.hex())
 
                 # TODO: Wait for depth? new state SWAP_TXI_REDEEM_SENT?
 

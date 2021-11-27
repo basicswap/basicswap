@@ -254,9 +254,12 @@ class BTCInterface(CoinInterface):
             except Exception:
                 return self.rpc_callback('getnetworkinfo')['relayfee'], 'relayfee'
 
+    def isSegwitAddress(self, address):
+        return address.startswith(self.chainparams_network()['hrp'] + '1')
+
     def decodeAddress(self, address):
         bech32_prefix = self.chainparams_network()['hrp']
-        if address.startswith(bech32_prefix):
+        if address.startswith(bech32_prefix + '1'):
             return bytes(segwit_addr.decode(bech32_prefix, address)[1])
         return decodeAddress(address)[1:]
 
