@@ -12,8 +12,9 @@ import logging
 import traceback
 import subprocess
 from xmlrpc.client import (
-    Transport,
     Fault,
+    Transport,
+    SafeTransport,
 )
 from .util import jsonDecimal
 
@@ -39,15 +40,15 @@ class Jsonrpc():
 
         # get the url
         parsed = urllib.parse.urlparse(uri)
-        if parsed.scheme not in ("http", "https"):
-            raise OSError("unsupported XML-RPC protocol")
+        if parsed.scheme not in ('http', 'https'):
+            raise OSError('unsupported XML-RPC protocol')
         self.__host = parsed.netloc
         self.__handler = parsed.path
         if not self.__handler:
-            self.__handler = "/RPC2"
+            self.__handler = '/RPC2'
 
         if transport is None:
-            handler = Transport
+            handler = SafeTransport if parsed.scheme == 'https' else Transport
             extra_kwargs = {}
             transport = handler(use_datetime=use_datetime,
                                 use_builtin_types=use_builtin_types,
@@ -57,6 +58,8 @@ class Jsonrpc():
         self.__encoding = encoding or 'utf-8'
         self.__verbose = verbose
         self.__allow_none = allow_none
+
+        self.__request_id = 1
 
     def close(self):
         if self.__transport is not None:
@@ -70,14 +73,15 @@ class Jsonrpc():
             request_body = {
                 'method': method,
                 'params': params,
-                'id': 2
+                'id': self.__request_id
             }
 
-            connection.putrequest("POST", self.__handler)
-            headers.append(("Content-Type", "application/json"))
-            headers.append(("User-Agent", 'jsonrpc'))
+            connection.putrequest('POST', self.__handler)
+            headers.append(('Content-Type', 'application/json'))
+            headers.append(('User-Agent', 'jsonrpc'))
             self.__transport.send_headers(connection, headers)
             self.__transport.send_content(connection, json.dumps(request_body, default=jsonDecimal).encode('utf-8'))
+            self.__request_id += 1
 
             resp = connection.getresponse()
             return resp.read()
