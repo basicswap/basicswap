@@ -7,6 +7,7 @@
 - Prevent old shutdown link from shutting down a new session.
 - ui: Connected XMR wallet to rpc page.
 - Separate chain to generate smsg addresses.
+- ui: Display XMR subaddress on wallets page.
 
 
 0.0.26

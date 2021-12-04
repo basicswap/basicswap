@@ -5123,6 +5123,8 @@ class BasicSwap(BaseApp):
             rv['anon_pending'] = walletinfo['unconfirmed_anon'] + walletinfo['immature_anon_balance']
             rv['blind_balance'] = walletinfo['blind_balance']
             rv['blind_unconfirmed'] = walletinfo['unconfirmed_blind']
+        elif coin == Coins.XMR:
+            rv['main_address'] = self.getCachedMainWalletAddress(ci)
 
         return rv
 

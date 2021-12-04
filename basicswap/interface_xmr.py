@@ -158,7 +158,7 @@ class XMRInterface(CoinInterface):
         with self._mx_wallet:
             self._log.warning('TODO - subaddress?')
             self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
-            return self.rpc_wallet_cb('get_address')['address']
+            return self.rpc_wallet_cb('create_address', {'account_index': 0})['address']
 
     def get_fee_rate(self, conf_target=2):
         self._log.warning('TODO - estimate fee rate?')

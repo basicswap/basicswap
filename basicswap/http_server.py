@@ -386,7 +386,6 @@ class HttpHandler(BaseHTTPRequestHandler):
                 wf['unconfirmed'] = w['unconfirmed']
 
             if k == Coins.PART:
-
                 wf['stealth_address'] = w['stealth_address']
                 wf['blind_balance'] = w['blind_balance']
                 if float(w['blind_unconfirmed']) > 0.0:
@@ -394,6 +393,9 @@ class HttpHandler(BaseHTTPRequestHandler):
                 wf['anon_balance'] = w['anon_balance']
                 if float(w['anon_pending']) > 0.0:
                     wf['anon_pending'] = w['anon_pending']
+
+            elif k == Coins.XMR:
+                wf['main_address'] = w.get('main_address', 'Refresh necessary')
 
             if 'wd_type_from_' + cid in page_data:
                 wf['wd_type_from'] = page_data['wd_type_from_' + cid]
