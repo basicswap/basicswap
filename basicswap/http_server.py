@@ -840,6 +840,12 @@ class HttpHandler(BaseHTTPRequestHandler):
         }
         data.update(extend_data)
 
+        addr_from_label, addr_to_label = swap_client.getAddressLabel([offer.addr_from, offer.addr_to])
+        if len(addr_from_label) > 0:
+            data['addr_from_label'] = '(' + addr_from_label + ')'
+        if len(addr_to_label) > 0:
+            data['addr_to_label'] = '(' + addr_to_label + ')'
+
         if swap_client.debug_ui:
             data['debug_ind'] = debugind
             data['debug_options'] = [(int(t), t.name) for t in DebugTypes]
@@ -1011,6 +1017,9 @@ class HttpHandler(BaseHTTPRequestHandler):
         if len(old_states) > 0:
             old_states.sort(key=lambda x: x[0])
 
+        if len(data['addr_from_label']) > 0:
+            data['addr_from_label'] = '(' + data['addr_from_label'] + ')'
+
         template = env.get_template('bid_xmr.html') if offer.swap_type == SwapTypes.XMR_SWAP else env.get_template('bid.html')
         return bytes(template.render(
             title=self.server.title,
@@ -1162,11 +1171,24 @@ class HttpHandler(BaseHTTPRequestHandler):
 
         page_data = {'identity_address': identity_address}
         messages = []
+        form_data = self.checkForm(post_string, 'identity', messages)
+        if form_data:
+            if have_data_entry(form_data, 'edit'):
+                page_data['show_edit_form'] = True
+            if have_data_entry(form_data, 'apply'):
+                new_label = get_data_entry(form_data, 'label')
+
+                try:
+                    swap_client.updateIdentity(identity_address, new_label)
+                    messages.append('Updated')
+                except Exception as e:
+                    messages.append('Error')\
 
         try:
             identity = swap_client.getIdentity(identity_address)
             if identity is None:
                 raise ValueError('Unknown address')
+            page_data['label'] = identity.label
             page_data['num_sent_bids_successful'] = identity.num_sent_bids_successful
             page_data['num_recv_bids_successful'] = identity.num_recv_bids_successful
             page_data['num_sent_bids_rejected'] = identity.num_sent_bids_rejected

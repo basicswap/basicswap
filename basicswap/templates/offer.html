@@ -24,8 +24,12 @@
 <tr><td>Rate Variable</td><td>{{ data.rate_negotiable }}</td></tr>
 <tr><td>Script Lock Type</td><td>{{ data.lock_type }}</td></tr>
 <tr><td>Script Lock Value</td><td>{{ data.lock_value }}</td></tr>
+{% if data.addr_to == "Public" %}
 <tr><td>Address To</td><td>{{ data.addr_to }}</td></tr>
-<tr><td>Address From</td><td><a class="monospace" href="/identity/{{ data.addr_from }}">{{ data.addr_from }}</a></td></tr>
+{% else %}
+<tr><td>Address To</td><td><a class="monospace" href="/identity/{{ data.addr_to }}">{{ data.addr_to }}</a> {{ data.addr_to_label }}</td></tr>
+{% endif %}
+<tr><td>Address From</td><td><a class="monospace" href="/identity/{{ data.addr_from }}">{{ data.addr_from }}</a> {{ data.addr_from_label }}</td></tr>
 <tr><td>Created At</td><td>{{ data.created_at | formatts }}</td></tr>
 <tr><td>Expired At</td><td>{{ data.expired_at | formatts }}</td></tr>
 <tr><td>Sent</td><td>{{ data.sent }}</td></tr>
@@ -55,7 +59,7 @@
 <tr><td>Send From Address</td><td>
 <select name="addr_from">
 {% for a in addrs %}
-<option value="{{ a }}" {% if data.nb_addr_from==a %} selected{% endif %}>{{ a }}</option>
+<option value="{{ a[0] }}" {% if data.nb_addr_from==a[0] %} selected{% endif %}>{{ a[0] }} {{ a[1] }}</option>
 {% endfor %}
 <option value="-1" {% if data.nb_addr_from=="-1" %} selected{% endif %}>-- New Address --</option>
 </select>

@@ -202,6 +202,8 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
         elif bid.state == BidStates.XMR_SWAP_NOSCRIPT_TX_REDEEMED:
             state_description = f'Waiting for {ticker_to} lock tx spend tx to confirm in chain'
 
+    addr_label = swap_client.getAddressLabel([bid.bid_addr, ])[0]
+
     data = {
         'coin_from': ci_from.coin_name(),
         'coin_to': ci_to.coin_name(),
@@ -216,6 +218,7 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
         'ptx_state': strTxState(bid.getPTxState()),
         'offer_id': bid.offer_id.hex(),
         'addr_from': bid.bid_addr,
+        'addr_from_label': addr_label,
         'addr_fund_proof': bid.proof_address,
         'created_at': bid.created_at if for_api else format_timestamp(bid.created_at, with_seconds=True),
         'expired_at': bid.expire_at if for_api else format_timestamp(bid.expire_at, with_seconds=True),

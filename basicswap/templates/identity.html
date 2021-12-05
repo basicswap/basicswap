@@ -9,6 +9,13 @@
 <form method="post">
 
 <table>
+
+{% if data.show_edit_form %}
+<tr><td>Label</td><td><input type="text" id="label" name="label" value="{{ data.label }}"></td></tr>
+{% else %}
+<tr><td>Label</td><td>{{ data.label }}</td></tr>
+{% endif %}
+
 <tr><td>Successful Sent Bids</td><td>{{ data.num_sent_bids_successful }}</td></tr>
 <tr><td>Successful Received Bids</td><td>{{ data.num_recv_bids_successful }}</td></tr>
 <tr><td>Rejected Sent Bids</td><td>{{ data.num_sent_bids_rejected }}</td></tr>
@@ -16,6 +23,14 @@
 <tr><td>Failed Sent Bids</td><td>{{ data.num_sent_bids_failed }}</td></tr>
 <tr><td>Failed Received Bids</td><td>{{ data.num_recv_bids_failed }}</td></tr>
 </table>
+
+{% if data.show_edit_form %}
+<input type="submit" name="apply" value="Apply">
+<input type="submit" name="cancel" value="Cancel">
+{% else %}
+<input type="submit" name="edit" value="Edit">
+{% endif %}
+
 <input type="hidden" name="formid" value="{{ form_id }}">
 </form>
 

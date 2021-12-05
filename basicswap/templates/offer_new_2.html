@@ -11,12 +11,12 @@
 <tr><td>Send To</td><td><select name="addr_to_" disabled>
 <option{% if data.addr_to=="-1" %} selected{% endif %} value="-1">-- Public Network --</option>
 {% for a in addrs_to %}
-<option{% if data.addr_to==a %} selected{% endif %} value="{{ a }}">{{ a }}</option>
+<option{% if data.addr_to==a[0] %} selected{% endif %} value="{{ a[0] }}">{{ a[0] }} {{ a[1] }}</option>
 {% endfor %}
 </select></td></tr>
 <tr><td>Send From Address</td><td><select name="addr_from_" disabled>
 {% for a in addrs %}
-<option{% if data.addr_from==a %} selected{% endif %} value="{{ a }}">{{ a }}</option>
+<option{% if data.addr_from==a[0] %} selected{% endif %} value="{{ a[0] }}">{{ a[0] }} {{ a[1] }}</option>
 {% endfor %}
 <option{% if data.addr_from=="-1" %} selected{% endif %} value="-1">-- New Address --</option>
 </select></td></tr>

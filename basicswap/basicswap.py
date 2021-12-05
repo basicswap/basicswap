@@ -1849,6 +1849,21 @@ class BasicSwap(BaseApp):
             session.remove()
             self.mxDB.release()
 
+    def updateIdentity(self, address, label):
+        self.mxDB.acquire()
+        try:
+            session = scoped_session(self.session_factory)
+            identity = session.query(KnownIdentity).filter_by(address=address).first()
+            if identity is None:
+                identity = KnownIdentity(address=address)
+            identity.label = label
+            session.add(identity)
+            session.commit()
+        finally:
+            session.close()
+            session.remove()
+            self.mxDB.release()
+
     def list_bid_events(self, bid_id, session):
         query_str = 'SELECT created_at, event_type, event_msg FROM eventlog ' + \
                     'WHERE active_ind = 1 AND linked_type = {} AND linked_id = x\'{}\' '.format(TableTypes.BID, bid_id.hex())
@@ -5482,9 +5497,9 @@ class BasicSwap(BaseApp):
         try:
             session = scoped_session(self.session_factory)
             rv = []
-            q = session.execute('SELECT addr FROM smsgaddresses WHERE use_type = {} AND active_ind = 1 ORDER BY addr_id DESC'.format(use_type))
+            q = session.execute('SELECT sa.addr, ki.label FROM smsgaddresses AS sa LEFT JOIN knownidentities AS ki ON sa.addr = ki.address WHERE sa.use_type = {} AND sa.active_ind = 1 ORDER BY sa.addr_id DESC'.format(use_type))
             for row in q:
-                rv.append(row[0])
+                rv.append((row[0], row[1]))
             return rv
         finally:
             session.close()
@@ -5552,6 +5567,20 @@ class BasicSwap(BaseApp):
         if swap_in_progress is None:
             return
         self.swaps_in_progress[bid.bid_id] = (bid, swap_in_progress[1])
+
+    def getAddressLabel(self, addresses):
+        self.mxDB.acquire()
+        try:
+            session = scoped_session(self.session_factory)
+            rv = []
+            for a in addresses:
+                v = session.query(KnownIdentity).filter_by(address=a).first()
+                rv.append('' if not v else v.label)
+            return rv
+        finally:
+            session.close()
+            session.remove()
+            self.mxDB.release()
 
     def add_connection(self, host, port, peer_pubkey):
         self.log.info('add_connection %s %d %s', host, port, peer_pubkey.hex())
