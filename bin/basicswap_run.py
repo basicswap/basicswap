@@ -39,22 +39,23 @@ def signal_handler(sig, frame):
 def startDaemon(node_dir, bin_dir, daemon_bin, opts=[]):
     daemon_bin = os.path.expanduser(os.path.join(bin_dir, daemon_bin))
 
-    args = [daemon_bin, '-datadir=' + os.path.expanduser(node_dir)] + opts
+    datadir_path = os.path.expanduser(node_dir)
+    args = [daemon_bin, '-datadir=' + datadir_path] + opts
     logging.info('Starting node ' + daemon_bin + ' ' + '-datadir=' + node_dir)
-    return subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    return subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=datadir_path)
 
 
 def startXmrDaemon(node_dir, bin_dir, daemon_bin, opts=[]):
     daemon_bin = os.path.expanduser(os.path.join(bin_dir, daemon_bin))
 
-    data_dir = os.path.expanduser(node_dir)
-    args = [daemon_bin, '--non-interactive', '--config-file=' + os.path.join(data_dir, 'monerod.conf')] + opts
+    datadir_path = os.path.expanduser(node_dir)
+    args = [daemon_bin, '--non-interactive', '--config-file=' + os.path.join(datadir_path, 'monerod.conf')] + opts
     logging.info('Starting node {} --data-dir={}'.format(daemon_bin, node_dir))
 
     # return subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    file_stdout = open(os.path.join(data_dir, 'core_stdout.log'), 'w')
-    file_stderr = open(os.path.join(data_dir, 'core_stderr.log'), 'w')
-    return subprocess.Popen(args, stdin=subprocess.PIPE, stdout=file_stdout, stderr=file_stderr)
+    file_stdout = open(os.path.join(datadir_path, 'core_stdout.log'), 'w')
+    file_stderr = open(os.path.join(datadir_path, 'core_stderr.log'), 'w')
+    return subprocess.Popen(args, stdin=subprocess.PIPE, stdout=file_stdout, stderr=file_stderr, cwd=datadir_path)
 
 
 def startXmrWalletDaemon(node_dir, bin_dir, wallet_bin, opts=[]):

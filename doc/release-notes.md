@@ -1,4 +1,9 @@
 
+0.0.x
+==============
+- Set working dir to datadir for daemons.
+
+
 0.0.27
 ==============
 
