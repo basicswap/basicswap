@@ -938,9 +938,15 @@ class BasicSwap(BaseApp):
 
     def validateSwapType(self, coin_from, coin_to, swap_type):
         if coin_from == Coins.XMR:
-            raise ValueError('TODO: xmr coin_from')
+            raise ValueError('TODO: XMR coin_from')
         if coin_to == Coins.XMR and swap_type != SwapTypes.XMR_SWAP:
             raise ValueError('Invalid swap type for XMR')
+        if coin_from == Coins.PART_ANON:
+            raise ValueError('TODO: PART_ANON coin_from')
+        if coin_to == Coins.PART_ANON and swap_type != SwapTypes.XMR_SWAP:
+            raise ValueError('Invalid swap type for PART_ANON')
+        if (coin_from == Coins.PART_BLIND or coin_to == Coins.PART_BLIND) and swap_type != SwapTypes.XMR_SWAP:
+            raise ValueError('Invalid swap type for PART_BLIND')
 
     def validateOfferAmounts(self, coin_from, coin_to, amount, rate, min_bid_amount):
         ci_from = self.ci(coin_from)
@@ -5575,7 +5581,7 @@ class BasicSwap(BaseApp):
             rv = []
             for a in addresses:
                 v = session.query(KnownIdentity).filter_by(address=a).first()
-                rv.append('' if not v else v.label)
+                rv.append('' if (not v or not v.label) else v.label)
             return rv
         finally:
             session.close()
