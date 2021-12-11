@@ -63,6 +63,8 @@ from .ui import (
 env = Environment(loader=PackageLoader('basicswap', 'templates'))
 env.filters['formatts'] = format_timestamp
 
+invalid_coins_from = (Coins.XMR, Coins.PART_ANON)
+
 
 def value_or_none(v):
     if v == -1 or v == '-1':
@@ -78,16 +80,23 @@ def getCoinName(c):
     return chainparams[c]['name'].capitalize()
 
 
-def listAvailableCoins(swap_client, with_variants=True):
+def listAvailableCoins(swap_client, with_variants=True, split_from=False):
+    coins_from = []
     coins = []
     for k, v in swap_client.coin_clients.items():
         if k not in chainparams:
             continue
         if v['connection_type'] == 'rpc':
             coins.append((int(k), getCoinName(k)))
+            if split_from and k not in invalid_coins_from:
+                coins_from.append(coins[-1])
             if with_variants and k == Coins.PART:
-                coins.append((int(Coins.PART_ANON), getCoinName(Coins.PART_ANON)))
-                coins.append((int(Coins.PART_BLIND), getCoinName(Coins.PART_BLIND)))
+                for v in (Coins.PART_ANON, Coins.PART_BLIND):
+                    coins.append((int(v), getCoinName(v)))
+                    if split_from and v not in invalid_coins_from:
+                        coins_from.append(coins[-1])
+    if split_from:
+        return coins_from, coins
     return coins
 
 
@@ -731,11 +740,13 @@ class HttpHandler(BaseHTTPRequestHandler):
         else:
             template = env.get_template('offer_new_1.html')
 
+        coins_from, coins_to = listAvailableCoins(swap_client, split_from=True)
         return bytes(template.render(
             title=self.server.title,
             h2=self.server.title,
             messages=messages,
-            coins=listAvailableCoins(swap_client),
+            coins_from=coins_from,
+            coins=coins_to,
             addrs=swap_client.listSmsgAddresses('offer_send_from'),
             addrs_to=swap_client.listSmsgAddresses('offer_send_to'),
             data=page_data,

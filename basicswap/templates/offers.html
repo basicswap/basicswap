@@ -12,7 +12,7 @@
 <table>
 <tr><td>Coin From</td><td>
 <select name="coin_from"><option value="-1"{% if filters.coin_from==-1 %} selected{% endif %}>-- Any Coin --</option>
-{% for c in coins %}
+{% for c in coins_from %}
 <option value="{{ c[0] }}"{% if filters.coin_from==c[0] %} selected{% endif %}>{{ c[1] }}</option>
 {% endfor %}
 </select>

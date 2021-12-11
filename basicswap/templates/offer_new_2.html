@@ -23,7 +23,7 @@
 
 <tr class="padded_row"><td class="bold">Coin From</td><td>
 <select name="coin_from_" disabled><option value="-1">-- Select Coin --</option>
-{% for c in coins %}
+{% for c in coins_from %}
 <option{% if data.coin_from==c[0] %} selected{% endif %} value="{{ c[0] }}">{{ c[1] }}</option>
 {% endfor %}
 </select>

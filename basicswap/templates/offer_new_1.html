@@ -23,7 +23,7 @@
 
 <tr><td>Coin From</td><td>
 <select id="coin_from" name="coin_from" onchange="set_rate('coin_from');"><option value="-1">-- Select Coin --</option>
-{% for c in coins %}
+{% for c in coins_from %}
 <option{% if data.coin_from==c[0] %} selected{% endif %} value="{{ c[0] }}">{{ c[1] }}</option>
 {% endfor %}
 </select>
@@ -102,7 +102,7 @@ function set_rate(value_changed) {
     const amt_from = document.getElementById('amt_from').value;
     const amt_to = document.getElementById('amt_to').value;
     const rate = document.getElementById('rate').value;
-    const lock_rate = document.getElementById('rate_lock').checked;
+    const lock_rate = rate == '' ? false : document.getElementById('rate_lock').checked;
 
     if (coin_from == '-1' || coin_to == '-1') {
         return;
