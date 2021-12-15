@@ -27,7 +27,7 @@ from basicswap.basicswap import (
     DebugTypes,
 )
 from basicswap.basicswap_util import (
-    SEQUENCE_LOCK_BLOCKS,
+    TxLockTypes,
 )
 from basicswap.util import (
     COIN,
@@ -193,7 +193,7 @@ class Test(BaseTest):
         swap_clients = self.swap_clients
 
         offer_id = swap_clients[0].postOffer(Coins.LTC, Coins.BTC, 10 * COIN, 0.1 * COIN, 10 * COIN, SwapTypes.SELLER_FIRST,
-                                             SEQUENCE_LOCK_BLOCKS, 10)
+                                             TxLockTypes.SEQUENCE_LOCK_BLOCKS, 10)
 
         wait_for_offer(test_delay_event, swap_clients[1], offer_id)
         offer = swap_clients[1].getOffer(offer_id)
@@ -294,7 +294,7 @@ class Test(BaseTest):
         swap_value = make_int(random.uniform(0.001, 10.0), scale=8, r=1)
         logging.info('swap_value {}'.format(format_amount(swap_value, 8)))
         offer_id = swap_clients[0].postOffer(Coins.LTC, Coins.BTC, swap_value, 0.1 * COIN, swap_value, SwapTypes.SELLER_FIRST,
-                                             SEQUENCE_LOCK_BLOCKS, 10)
+                                             TxLockTypes.SEQUENCE_LOCK_BLOCKS, 10)
 
         wait_for_offer(test_delay_event, swap_clients[1], offer_id)
         offer = swap_clients[1].getOffer(offer_id)
@@ -326,7 +326,7 @@ class Test(BaseTest):
         swap_value = make_int(random.uniform(0.001, 10.0), scale=8, r=1)
         logging.info('swap_value {}'.format(format_amount(swap_value, 8)))
         offer_id = swap_clients[0].postOffer(Coins.LTC, Coins.BTC, swap_value, 0.1 * COIN, swap_value, SwapTypes.SELLER_FIRST,
-                                             SEQUENCE_LOCK_BLOCKS, 10)
+                                             TxLockTypes.SEQUENCE_LOCK_BLOCKS, 10)
 
         wait_for_offer(test_delay_event, swap_clients[1], offer_id)
         offer = swap_clients[1].getOffer(offer_id)
@@ -377,7 +377,7 @@ class Test(BaseTest):
         swap_value = make_int(random.uniform(2.0, 20.0), scale=8, r=1)
         logging.info('swap_value {}'.format(format_amount(swap_value, 8)))
         offer_id = swap_clients[0].postOffer(Coins.LTC, Coins.BTC, swap_value, 0.5 * COIN, swap_value, SwapTypes.SELLER_FIRST,
-                                             SEQUENCE_LOCK_BLOCKS, 10)
+                                             TxLockTypes.SEQUENCE_LOCK_BLOCKS, 10)
 
         wait_for_offer(test_delay_event, swap_clients[1], offer_id)
         offer = swap_clients[1].getOffer(offer_id)

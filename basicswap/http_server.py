@@ -31,8 +31,7 @@ from .basicswap_util import (
     strTxState,
     strAddressType,
     getLockName,
-    SEQUENCE_LOCK_TIME,
-    ABS_LOCK_TIME,
+    TxLockTypes,
 )
 from .js_server import (
     js_error,
@@ -599,6 +598,9 @@ class HttpHandler(BaseHTTPRequestHandler):
         if have_data_entry(form_data, 'lockhrs'):
             page_data['lockhrs'] = int(get_data_entry(form_data, 'lockhrs'))
             parsed_data['lock_seconds'] = page_data['lockhrs'] * 60 * 60
+        elif have_data_entry(form_data, 'lockmins'):
+            page_data['lockmins'] = int(get_data_entry(form_data, 'lockmins'))
+            parsed_data['lock_seconds'] = page_data['lockmins'] * 60
         elif have_data_entry(form_data, 'lockseconds'):
             parsed_data['lock_seconds'] = int(get_data_entry(form_data, 'lockseconds'))
 
@@ -651,9 +653,9 @@ class HttpHandler(BaseHTTPRequestHandler):
             swap_type = SwapTypes.XMR_SWAP
 
         if swap_client.coin_clients[parsed_data['coin_from']]['use_csv'] and swap_client.coin_clients[parsed_data['coin_to']]['use_csv']:
-            lock_type = SEQUENCE_LOCK_TIME
+            lock_type = TxLockTypes.SEQUENCE_LOCK_TIME
         else:
-            lock_type = ABS_LOCK_TIME
+            lock_type = TxLockTypes.ABS_LOCK_TIME
 
         extra_options = {}
 
@@ -713,7 +715,9 @@ class HttpHandler(BaseHTTPRequestHandler):
             'fee_to_conf': 2,
             'validhrs': 1,
             'lockhrs': 32,
-            'autoaccept': True
+            'lockmins': 30,  # used in debug mode
+            'autoaccept': True,
+            'debug_ui': swap_client.debug_ui,
         }
         form_data = self.checkForm(post_string, 'newoffer', messages)
 
@@ -740,6 +744,8 @@ class HttpHandler(BaseHTTPRequestHandler):
         else:
             template = env.get_template('offer_new_1.html')
 
+        if swap_client.debug_ui:
+            messages.append('Debug mode active.')
         coins_from, coins_to = listAvailableCoins(swap_client, split_from=True)
         return bytes(template.render(
             title=self.server.title,
@@ -768,6 +774,8 @@ class HttpHandler(BaseHTTPRequestHandler):
             'nb_validmins': 10,
         }
         messages = []
+        if swap_client.debug_ui:
+            messages.append('Debug mode active.')
         sent_bid_id = None
         show_bid_form = None
         form_data = self.checkForm(post_string, 'offer', messages)
@@ -850,6 +858,12 @@ class HttpHandler(BaseHTTPRequestHandler):
             'debug_ui': swap_client.debug_ui,
         }
         data.update(extend_data)
+
+        if offer.lock_type == TxLockTypes.SEQUENCE_LOCK_TIME or offer.lock_type == TxLockTypes.ABS_LOCK_TIME:
+            if offer.lock_value > 60 * 60:
+                data['lock_value_hr'] = ' ({} hours)'.format(offer.lock_value / (60 * 60))
+            else:
+                data['lock_value_hr'] = ' ({} minutes)'.format(offer.lock_value / 60)
 
         addr_from_label, addr_to_label = swap_client.getAddressLabel([offer.addr_from, offer.addr_to])
         if len(addr_from_label) > 0:
@@ -988,7 +1002,8 @@ class HttpHandler(BaseHTTPRequestHandler):
                 edit_bid = True
             elif b'edit_bid_submit' in form_data:
                 data = {
-                    'bid_state': int(form_data[b'new_state'][0])
+                    'bid_state': int(form_data[b'new_state'][0]),
+                    'debug_ind': int(get_data_entry_or(form_data, 'debugind', -1))
                 }
                 try:
                     swap_client.manualBidUpdate(bid_id, data)

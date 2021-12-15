@@ -17,10 +17,11 @@ from .chainparams import (
 )
 
 
-SEQUENCE_LOCK_BLOCKS = 1
-SEQUENCE_LOCK_TIME = 2
-ABS_LOCK_BLOCKS = 3
-ABS_LOCK_TIME = 4
+class TxLockTypes(IntEnum):
+    SEQUENCE_LOCK_BLOCKS = 1
+    SEQUENCE_LOCK_TIME = 2
+    ABS_LOCK_BLOCKS = 3
+    ABS_LOCK_TIME = 4
 
 
 class MessageTypes(IntEnum):
@@ -264,13 +265,13 @@ def strAddressType(addr_type):
 
 
 def getLockName(lock_type):
-    if lock_type == SEQUENCE_LOCK_BLOCKS:
+    if lock_type == TxLockTypes.SEQUENCE_LOCK_BLOCKS:
         return 'Sequence lock, blocks'
-    if lock_type == SEQUENCE_LOCK_TIME:
+    if lock_type == TxLockTypes.SEQUENCE_LOCK_TIME:
         return 'Sequence lock, time'
-    if lock_type == ABS_LOCK_BLOCKS:
+    if lock_type == TxLockTypes.ABS_LOCK_BLOCKS:
         return 'blocks'
-    if lock_type == ABS_LOCK_TIME:
+    if lock_type == TxLockTypes.ABS_LOCK_TIME:
         return 'time'
 
 

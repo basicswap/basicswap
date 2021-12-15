@@ -13,7 +13,8 @@ from .chainparams import (
     Coins,
 )
 from .basicswap_util import (
-    SEQUENCE_LOCK_TIME,
+    TxLockTypes,
+    DebugTypes,
     SwapTypes,
     BidStates,
     TxStates,
@@ -192,7 +193,10 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
         elif bid.state == BidStates.XMR_SWAP_HAVE_SCRIPT_COIN_SPEND_TX:
             state_description = f'Waiting for {ticker_from} lock tx to confirm in chain ({ci_from.blocks_confirmed} blocks)'
         elif bid.state == BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED:
-            state_description = f'Waiting for {ticker_to} lock tx to confirm in chain ({ci_to.blocks_confirmed} blocks)'
+            if xmr_swap.b_lock_tx_id is None:
+                state_description = f'Waiting for {ticker_to} lock tx'
+            else:
+                state_description = f'Waiting for {ticker_to} lock tx to confirm in chain ({ci_to.blocks_confirmed} blocks)'
         elif bid.state == BidStates.XMR_SWAP_NOSCRIPT_COIN_LOCKED:
             state_description = f'Waiting for offerer to unlock {ticker_from} lock tx'
         elif bid.state == BidStates.XMR_SWAP_LOCK_RELEASED:
@@ -203,13 +207,14 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
             state_description = f'Waiting for {ticker_to} lock tx spend tx to confirm in chain'
 
     addr_label = swap_client.getAddressLabel([bid.bid_addr, ])[0]
+    bid_rate = offer.rate if bid.rate is None else bid.rate
 
     data = {
         'coin_from': ci_from.coin_name(),
         'coin_to': ci_to.coin_name(),
         'amt_from': ci_from.format_amount(bid.amount),
-        'amt_to': ci_to.format_amount((bid.amount * bid.rate) // ci_from.COIN()),
-        'bid_rate': ci_to.format_amount(bid.rate),
+        'amt_to': ci_to.format_amount((bid.amount * bid_rate) // ci_from.COIN()),
+        'bid_rate': ci_to.format_amount(bid_rate),
         'ticker_from': ticker_from,
         'ticker_to': ticker_to,
         'bid_state': strBidState(bid.state),
@@ -231,11 +236,16 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
         'show_txns': show_txns,
         'can_abandon': True if bid.state not in (BidStates.BID_ABANDONED, BidStates.SWAP_COMPLETED) else False,
         'events': bid_events,
+        'debug_ui': swap_client.debug_ui,
     }
 
     if edit_bid:
         data['bid_state_ind'] = int(bid.state)
         data['bid_states'] = listBidStates()
+
+        if swap_client.debug_ui:
+            data['debug_ind'] = bid.debug_ind
+            data['debug_options'] = [(int(t), t.name) for t in DebugTypes]
 
     if show_txns:
         if offer.swap_type == SwapTypes.XMR_SWAP:
@@ -285,7 +295,7 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
     if offer.swap_type == SwapTypes.XMR_SWAP:
         data['coin_a_lock_refund_tx_est_final'] = 'None'
         if bid.xmr_a_lock_tx and bid.xmr_a_lock_tx.block_time:
-            if offer.lock_type == SEQUENCE_LOCK_TIME:
+            if offer.lock_type == TxLockTypes.SEQUENCE_LOCK_TIME:
                 raw_sequence = ci_from.getExpectedSequence(offer.lock_type, offer.lock_value)
                 seconds_locked = ci_from.decodeSequence(raw_sequence)
                 data['coin_a_lock_refund_tx_est_final'] = bid.xmr_a_lock_tx.block_time + seconds_locked

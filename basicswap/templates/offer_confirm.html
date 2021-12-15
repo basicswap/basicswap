@@ -64,7 +64,11 @@
 <tr><td>Rate Variable</td><td colspan=3><input type="checkbox" id="rate_var" name="rate_var_" value="rv" {% if data.rate_var==true %} checked="true"{% endif %} disabled></td></tr>
 
 <tr class="padded_row"><td>Offer valid (hrs)</td><td><input type="number" name="validhrs" min="1" max="48" value="{{ data.validhrs }}" readonly></td></tr>
+{% if data.debug_ui == true %}
+<tr><td>Contract locked (mins)</td><td><input type="number" name="lockmins" min="10" max="5000" value="{{ data.lockmins }}" readonly></td>{% if data.swap_style != 'xmr' %}<td colspan=2>Participate txn will be locked for half the time.</td>{% endif %}</tr>
+{% else %}
 <tr><td>Contract locked (hrs)</td><td><input type="number" name="lockhrs" min="1" max="64" value="{{ data.lockhrs }}" readonly></td>{% if data.swap_style != 'xmr' %}<td colspan=2>Participate txn will be locked for half the time.</td>{% endif %}</tr>
+{% endif %}
 <tr><td>Auto Accept Bids</td><td colspan=3><input type="checkbox" id="autoaccept" name="autoaccept_" value="aa" {% if data.autoaccept==true %} checked="true"{% endif %} disabled></td></tr>
 </table>
 

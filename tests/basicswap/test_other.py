@@ -26,8 +26,7 @@ from basicswap.interface_btc import BTCInterface
 from basicswap.interface_xmr import XMRInterface
 
 from basicswap.basicswap_util import (
-    SEQUENCE_LOCK_BLOCKS,
-    SEQUENCE_LOCK_TIME)
+    TxLockTypes)
 from basicswap.util import (
     make_int,
     SerialiseNum,
@@ -59,19 +58,19 @@ class Test(unittest.TestCase):
         ci = BTCInterface(coin_settings, 'regtest')
 
         time_val = 48 * 60 * 60
-        encoded = ci.getExpectedSequence(SEQUENCE_LOCK_TIME, time_val)
+        encoded = ci.getExpectedSequence(TxLockTypes.SEQUENCE_LOCK_TIME, time_val)
         decoded = ci.decodeSequence(encoded)
         assert(decoded >= time_val)
         assert(decoded <= time_val + 512)
 
         time_val = 24 * 60
-        encoded = ci.getExpectedSequence(SEQUENCE_LOCK_TIME, time_val)
+        encoded = ci.getExpectedSequence(TxLockTypes.SEQUENCE_LOCK_TIME, time_val)
         decoded = ci.decodeSequence(encoded)
         assert(decoded >= time_val)
         assert(decoded <= time_val + 512)
 
         blocks_val = 123
-        encoded = ci.getExpectedSequence(SEQUENCE_LOCK_BLOCKS, blocks_val)
+        encoded = ci.getExpectedSequence(TxLockTypes.SEQUENCE_LOCK_BLOCKS, blocks_val)
         decoded = ci.decodeSequence(encoded)
         assert(decoded == blocks_val)
 

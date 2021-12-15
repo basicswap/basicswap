@@ -23,7 +23,7 @@
 <tr><td>Amount Variable</td><td>{{ data.amount_negotiable }}</td></tr>
 <tr><td>Rate Variable</td><td>{{ data.rate_negotiable }}</td></tr>
 <tr><td>Script Lock Type</td><td>{{ data.lock_type }}</td></tr>
-<tr><td>Script Lock Value</td><td>{{ data.lock_value }}</td></tr>
+<tr><td>Script Lock Value</td><td>{{ data.lock_value }} {{ data.lock_value_hr }}</td></tr>
 {% if data.addr_to == "Public" %}
 <tr><td>Address To</td><td>{{ data.addr_to }}</td></tr>
 {% else %}

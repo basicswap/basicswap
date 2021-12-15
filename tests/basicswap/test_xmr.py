@@ -27,7 +27,7 @@ from basicswap.basicswap import (
     DebugTypes,
 )
 from basicswap.basicswap_util import (
-    SEQUENCE_LOCK_BLOCKS,
+    TxLockTypes,
 )
 from basicswap.util import (
     COIN,
@@ -660,7 +660,7 @@ class Test(BaseTest):
 
         offer_id = swap_clients[0].postOffer(
             Coins.PART, Coins.XMR, 101 * COIN, 0.12 * XMR_COIN, 101 * COIN, SwapTypes.XMR_SWAP,
-            lock_type=SEQUENCE_LOCK_BLOCKS, lock_value=12)
+            lock_type=TxLockTypes.SEQUENCE_LOCK_BLOCKS, lock_value=12)
         wait_for_offer(test_delay_event, swap_clients[1], offer_id)
         offer = swap_clients[1].getOffer(offer_id)
 
@@ -688,7 +688,7 @@ class Test(BaseTest):
 
         offer_id = swap_clients[0].postOffer(
             Coins.PART, Coins.XMR, 101 * COIN, 0.13 * XMR_COIN, 101 * COIN, SwapTypes.XMR_SWAP,
-            lock_type=SEQUENCE_LOCK_BLOCKS, lock_value=12)
+            lock_type=TxLockTypes.SEQUENCE_LOCK_BLOCKS, lock_value=12)
         wait_for_offer(test_delay_event, swap_clients[1], offer_id)
         offer = swap_clients[1].getOffer(offer_id)
 
@@ -719,7 +719,7 @@ class Test(BaseTest):
 
         offer_id = swap_clients[0].postOffer(
             Coins.PART, Coins.XMR, 101 * COIN, 0.14 * XMR_COIN, 101 * COIN, SwapTypes.XMR_SWAP,
-            lock_type=SEQUENCE_LOCK_BLOCKS, lock_value=18)
+            lock_type=TxLockTypes.SEQUENCE_LOCK_BLOCKS, lock_value=18)
         wait_for_offer(test_delay_event, swap_clients[1], offer_id)
         offer = swap_clients[1].getOffer(offer_id)
 

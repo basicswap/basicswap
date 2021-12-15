@@ -101,9 +101,7 @@ import basicswap.config as cfg
 import basicswap.network as bsn
 import basicswap.protocols.atomic_swap_1 as atomic_swap_1
 from .basicswap_util import (
-    SEQUENCE_LOCK_TIME,
-    ABS_LOCK_BLOCKS,
-    ABS_LOCK_TIME,
+    TxLockTypes,
     AddressTypes,
     MessageTypes,
     SwapTypes,
@@ -966,11 +964,11 @@ class BasicSwap(BaseApp):
         elif lock_type == OfferMessage.SEQUENCE_LOCK_BLOCKS:
             ensure(lock_value >= 5 and lock_value <= 1000, 'Invalid lock_value blocks')
             ensure(self.coin_clients[coin_from]['use_csv'] and self.coin_clients[coin_to]['use_csv'], 'Both coins need CSV activated.')
-        elif lock_type == ABS_LOCK_TIME:
+        elif lock_type == TxLockTypes.ABS_LOCK_TIME:
             # TODO: range?
             ensure(not self.coin_clients[coin_from]['use_csv'] or not self.coin_clients[coin_to]['use_csv'], 'Should use CSV.')
             ensure(lock_value >= 4 * 60 * 60 and lock_value <= 96 * 60 * 60, 'Invalid lock_value time')
-        elif lock_type == ABS_LOCK_BLOCKS:
+        elif lock_type == TxLockTypes.ABS_LOCK_BLOCKS:
             # TODO: range?
             ensure(not self.coin_clients[coin_from]['use_csv'] or not self.coin_clients[coin_to]['use_csv'], 'Should use CSV.')
             ensure(lock_value >= 10 and lock_value <= 1000, 'Invalid lock_value blocks')
@@ -1005,7 +1003,7 @@ class BasicSwap(BaseApp):
         return self.network_addr
 
     def postOffer(self, coin_from, coin_to, amount, rate, min_bid_amount, swap_type,
-                  lock_type=SEQUENCE_LOCK_TIME, lock_value=48 * 60 * 60, auto_accept_bids=False, addr_send_from=None, extra_options={}):
+                  lock_type=TxLockTypes.SEQUENCE_LOCK_TIME, lock_value=48 * 60 * 60, auto_accept_bids=False, addr_send_from=None, extra_options={}):
         # Offer to send offer.amount_from of coin_from in exchange for offer.amount_from * offer.rate of coin_to
 
         ensure(coin_from != coin_to, 'coin_from == coin_to')
@@ -1919,11 +1917,11 @@ class BasicSwap(BaseApp):
             txid = bid.initiate_tx.txid
             script = bid.initiate_tx.script
         else:
-            if offer.lock_type < ABS_LOCK_BLOCKS:
+            if offer.lock_type < TxLockTypes.ABS_LOCK_BLOCKS:
                 sequence = ci_from.getExpectedSequence(offer.lock_type, offer.lock_value)
                 script = atomic_swap_1.buildContractScript(sequence, secret_hash, bid.pkhash_buyer, pkhash_refund)
             else:
-                if offer.lock_type == ABS_LOCK_BLOCKS:
+                if offer.lock_type == TxLockTypes.ABS_LOCK_BLOCKS:
                     lock_value = self.callcoinrpc(coin_from, 'getblockcount') + offer.lock_value
                 else:
                     lock_value = int(time.time()) + offer.lock_value
@@ -2367,7 +2365,7 @@ class BasicSwap(BaseApp):
 
         # Participate txn is locked for half the time of the initiate txn
         lock_value = offer.lock_value // 2
-        if offer.lock_type < ABS_LOCK_BLOCKS:
+        if offer.lock_type < TxLockTypes.ABS_LOCK_BLOCKS:
             sequence = ci_to.getExpectedSequence(offer.lock_type, lock_value)
             participate_script = atomic_swap_1.buildContractScript(sequence, secret_hash, pkhash_seller, pkhash_buyer_refund)
         else:
@@ -2375,7 +2373,7 @@ class BasicSwap(BaseApp):
             coin_from = Coins(offer.coin_from)
             initiate_tx_block_hash = self.callcoinrpc(coin_from, 'getblockhash', [bid.initiate_tx.chain_height, ])
             initiate_tx_block_time = int(self.callcoinrpc(coin_from, 'getblock', [initiate_tx_block_hash, ])['time'])
-            if offer.lock_type == ABS_LOCK_BLOCKS:
+            if offer.lock_type == TxLockTypes.ABS_LOCK_BLOCKS:
                 # Walk the coin_to chain back until block time matches
                 blockchaininfo = self.callcoinrpc(coin_to, 'getblockchaininfo')
                 cblock_hash = blockchaininfo['bestblockhash']
@@ -2597,7 +2595,7 @@ class BasicSwap(BaseApp):
             'amount': prev_amount}
 
         lock_value = DeserialiseNum(txn_script, 64)
-        if offer.lock_type < ABS_LOCK_BLOCKS:
+        if offer.lock_type < TxLockTypes.ABS_LOCK_BLOCKS:
             sequence = lock_value
         else:
             sequence = 1
@@ -2631,7 +2629,7 @@ class BasicSwap(BaseApp):
         else:
             refund_txn = self.calltx('-btcmode -create nversion=2' + prevout_s + output_to)
 
-        if offer.lock_type == ABS_LOCK_BLOCKS or offer.lock_type == ABS_LOCK_TIME:
+        if offer.lock_type == TxLockTypes.ABS_LOCK_BLOCKS or offer.lock_type == TxLockTypes.ABS_LOCK_TIME:
             refund_txn = self.calltx('{} locktime={}'.format(refund_txn, lock_value))
 
         options = {}
@@ -3168,7 +3166,8 @@ class BasicSwap(BaseApp):
                 addr = ci_to.encode_p2sh(bid.participate_tx.script)
 
             ci_to = self.ci(coin_to)
-            found = ci_to.getLockTxHeight(None, addr, bid.amount_to, bid.chain_b_height_start, find_index=True)
+            participate_txid = None if bid.participate_tx is None or bid.participate_tx.txid is None else bid.participate_tx.txid
+            found = ci_to.getLockTxHeight(participate_txid, addr, bid.amount_to, bid.chain_b_height_start, find_index=True)
             if found:
                 if bid.participate_tx.conf != found['depth']:
                     save_bid = True
@@ -3224,8 +3223,9 @@ class BasicSwap(BaseApp):
                 self.log.debug('Submitted initiate refund txn %s to %s chain for bid %s', txid, chainparams[coin_from]['name'], bid_id.hex())
                 # State will update when spend is detected
             except Exception as ex:
-                if 'non-BIP68-final (code 64)' not in str(ex) and 'non-final' not in str(ex):
+                if 'non-BIP68-final' not in str(ex) and 'non-final' not in str(ex):
                     self.log.warning('Error trying to submit initiate refund txn: %s', str(ex))
+
         if (bid.getPTxState() == TxStates.TX_SENT or bid.getPTxState() == TxStates.TX_CONFIRMED) \
            and bid.participate_txn_refund is not None:
             try:
@@ -3233,7 +3233,7 @@ class BasicSwap(BaseApp):
                 self.log.debug('Submitted participate refund txn %s to %s chain for bid %s', txid, chainparams[coin_to]['name'], bid_id.hex())
                 # State will update when spend is detected
             except Exception as ex:
-                if 'non-BIP68-final (code 64)' not in str(ex) and 'non-final' not in str(ex):
+                if 'non-BIP68-final' not in str(ex) and 'non-final' not in str(ex):
                     self.log.warning('Error trying to submit participate refund txn: %s', str(ex))
         return False  # Bid is still active
 
@@ -3905,7 +3905,7 @@ class BasicSwap(BaseApp):
                 return
             raise ValueError('Wrong bid state: {}'.format(str(BidStates(bid.state))))
 
-        use_csv = True if offer.lock_type < ABS_LOCK_BLOCKS else False
+        use_csv = True if offer.lock_type < TxLockTypes.ABS_LOCK_BLOCKS else False
 
         # TODO: Verify script without decoding?
         decoded_script = self.callcoinrpc(Coins.PART, 'decodescript', [bid_accept_data.contract_script.hex()])
@@ -3924,7 +3924,7 @@ class BasicSwap(BaseApp):
             expect_sequence = ci_from.getExpectedSequence(offer.lock_type, offer.lock_value)
             ensure(script_lock_value == expect_sequence, 'sequence mismatch')
         else:
-            if offer.lock_type == ABS_LOCK_BLOCKS:
+            if offer.lock_type == TxLockTypes.ABS_LOCK_BLOCKS:
                 self.log.warning('TODO: validate absolute lock values')
             else:
                 ensure(script_lock_value <= bid.created_at + offer.lock_value + atomic_swap_1.INITIATE_TX_TIMEOUT, 'script lock time too high')
@@ -4937,6 +4937,14 @@ class BasicSwap(BaseApp):
                 bid.setState(data['bid_state'])
                 self.log.debug('Set state to %s', strBidState(bid.state))
                 has_changed = True
+
+            if bid.debug_ind != data['debug_ind']:
+                if bid.debug_ind is None and data['debug_ind'] == -1:
+                    pass  # Already unset
+                else:
+                    self.log.debug('Bid %s Setting debug flag: %s', bid_id.hex(), data['debug_ind'])
+                    bid.debug_ind = data['debug_ind']
+                    has_changed = True
 
             if has_changed:
                 session = scoped_session(self.session_factory)

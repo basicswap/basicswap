@@ -43,6 +43,14 @@
 <option value="{{ s[0] }}"{% if data.bid_state_ind==s[0] %} selected{% endif %}>{{ s[1] }}</option>
 {% endfor %}
 </select></td></tr>
+{% if data.debug_ui == true %}
+<tr><td>Debug Option</td><td><select name="debugind">
+<option{% if data.debug_ind=="-1" %} selected{% endif %} value="-1">-- None --</option>
+{% for a in data.debug_options %}
+<option{% if data.debug_ind==a[0] %} selected{% endif %} value="{{ a[0] }}">{{ a[1] }}</option>
+{% endfor %}
+</select></td></tr>
+{% endif %}
 </table>
 <input name="edit_bid_cancel" type="submit" value="Cancel">
 <input name="edit_bid_submit" type="submit" value="Submit">

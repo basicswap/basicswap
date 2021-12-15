@@ -63,8 +63,7 @@ from .contrib.test_framework.script import (
     hash160)
 
 from .basicswap_util import (
-    SEQUENCE_LOCK_BLOCKS,
-    SEQUENCE_LOCK_TIME)
+    TxLockTypes)
 
 from .chainparams import CoinInterface, Coins
 from .rpc import make_rpc_func
@@ -148,9 +147,9 @@ class BTCInterface(CoinInterface):
     @staticmethod
     def getExpectedSequence(lockType, lockVal):
         assert(lockVal >= 1), 'Bad lockVal'
-        if lockType == SEQUENCE_LOCK_BLOCKS:
+        if lockType == TxLockTypes.SEQUENCE_LOCK_BLOCKS:
             return lockVal
-        if lockType == SEQUENCE_LOCK_TIME:
+        if lockType == TxLockTypes.SEQUENCE_LOCK_TIME:
             secondsLocked = lockVal
             # Ensure the locked time is never less than lockVal
             if secondsLocked % (1 << SEQUENCE_LOCKTIME_GRANULARITY) != 0:
@@ -954,8 +953,6 @@ class BTCInterface(CoinInterface):
             txns = self.rpc_callback('listunspent', [0, 9999999, [dest_address, ]])
 
             for tx in txns:
-                print('bid_amount', bid_amount)
-                print('self.make_int(tx[amount])', self.make_int(tx['amount']))
                 if self.make_int(tx['amount']) == bid_amount:
                     txid = bytes.fromhex(tx['txid'])
                     break
