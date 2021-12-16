@@ -577,7 +577,7 @@ class BasicSwap(BaseApp):
                     time.sleep(4)  # Extra time to settle
                 return
             self.log.error('stopDaemon %s', str(ex))
-            traceback.print_exc()
+            self.log.error(traceback.format_exc())
         raise ValueError('Could not stop {}'.format(str(coin)))
 
     def stopDaemons(self):
@@ -3383,7 +3383,7 @@ class BasicSwap(BaseApp):
         except Exception as ex:
             self.log.error('process_XMR_SWAP_A_LOCK_tx_spend %s', str(ex))
             if self.debug:
-                traceback.print_exc()
+                self.log.error(traceback.format_exc())
         finally:
             session.close()
             session.remove()
@@ -3438,7 +3438,7 @@ class BasicSwap(BaseApp):
         except Exception as ex:
             self.log.error('process_XMR_SWAP_A_LOCK_REFUND_tx_spend %s', str(ex))
             if self.debug:
-                traceback.print_exc()
+                self.log.error(traceback.format_exc())
         finally:
             session.close()
             session.remove()
@@ -3570,7 +3570,7 @@ class BasicSwap(BaseApp):
                         self.log.warning('Unknown event type: %d', row.event_type)
                 except Exception as ex:
                     if self.debug:
-                        traceback.print_exc()
+                        self.log.error(traceback.format_exc())
                     self.log.error('checkEvents failed: {}'.format(str(ex)))
 
             if self.debug:
@@ -4226,7 +4226,7 @@ class BasicSwap(BaseApp):
                         session.remove()
         except Exception as ex:
             if self.debug:
-                traceback.print_exc()
+                self.log.error(traceback.format_exc())
             self.setBidError(bid.bid_id, bid, str(ex), xmr_swap=xmr_swap)
 
     def watchXmrSwap(self, bid, offer, xmr_swap):
@@ -4300,7 +4300,7 @@ class BasicSwap(BaseApp):
             self.saveBidInSession(bid_id, bid, session, xmr_swap)
         except Exception as ex:
             if self.debug:
-                traceback.print_exc()
+                self.log.error(traceback.format_exc())
 
     def sendXmrBidCoinALockTx(self, bid_id, session):
         # Send coin A lock tx and MSG4F L -> F
@@ -4685,7 +4685,7 @@ class BasicSwap(BaseApp):
             self.saveBid(bid_id, bid, xmr_swap=xmr_swap)
         except Exception as ex:
             if self.debug:
-                traceback.print_exc()
+                self.log.error(traceback.format_exc())
             self.setBidError(bid_id, bid, str(ex))
 
     def processXmrBidLockSpendTx(self, msg):
@@ -4725,7 +4725,7 @@ class BasicSwap(BaseApp):
             self.saveBid(bid_id, bid, xmr_swap=xmr_swap)
         except Exception as ex:
             if self.debug:
-                traceback.print_exc()
+                self.log.error(traceback.format_exc())
             self.setBidError(bid_id, bid, str(ex))
 
         # Update copy of bid in swaps_in_progress
@@ -4791,7 +4791,7 @@ class BasicSwap(BaseApp):
             ensure(v, 'verifyTxOtVES failed for chain a lock tx leader esig')
         except Exception as ex:
             if self.debug:
-                traceback.print_exc()
+                self.log.error(traceback.format_exc())
             self.setBidError(bid_id, bid, str(ex))
             self.swaps_in_progress[bid_id] = (bid, offer)
             return
@@ -4834,7 +4834,7 @@ class BasicSwap(BaseApp):
         except Exception as ex:
             self.log.error('processMsg %s', str(ex))
             if self.debug:
-                traceback.print_exc()
+                self.log.error(traceback.format_exc())
         finally:
             self.mxDB.release()
 
@@ -4871,7 +4871,7 @@ class BasicSwap(BaseApp):
         except Exception as ex:
             self.log.error('smsg zmq %s', str(ex))
             if self.debug:
-                traceback.print_exc()
+                self.log.error(traceback.format_exc())
 
         self.mxDB.acquire()
         try:
@@ -4885,7 +4885,7 @@ class BasicSwap(BaseApp):
                             to_remove.append((bid_id, v[0], v[1]))
                     except Exception as ex:
                         if self.debug:
-                            traceback.print_exc()
+                            self.log.error('checkBidState %s', traceback.format_exc())
                         if self.is_transient_error(ex):
                             self.log.warning('checkBidState %s %s', bid_id.hex(), str(ex))
                             self.logBidEvent(bid_id, EventLogTypes.SYSTEM_WARNING, 'No connection to daemon', session=None)
@@ -4920,7 +4920,7 @@ class BasicSwap(BaseApp):
         except Exception as ex:
             self.log.error('update %s', str(ex))
             if self.debug:
-                traceback.print_exc()
+                self.log.error(traceback.format_exc())
         finally:
             self.mxDB.release()
 

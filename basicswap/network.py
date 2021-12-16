@@ -204,7 +204,7 @@ def msg_thread(cls):
                 except Exception as e:
                     logging.warning('process message error %s', str(e))
                     if cls._sc.debug:
-                        traceback.print_exc()
+                        logging.error(traceback.format_exc())
 
         if processed is False:
             time.sleep(timeout)

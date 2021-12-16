@@ -827,7 +827,7 @@ class HttpHandler(BaseHTTPRequestHandler):
                         swap_client.setBidDebugInd(bytes.fromhex(sent_bid_id), debugind)
                 except Exception as ex:
                     if self.server.swap_client.debug is True:
-                        traceback.print_exc()
+                        self.server.swap_client.log.error(traceback.format_exc())
                     messages.append('Error: Send bid failed: ' + str(ex))
                     show_bid_form = True
 
@@ -1297,7 +1297,7 @@ class HttpHandler(BaseHTTPRequestHandler):
                 return func(self, url_split, post_string, is_json)
             except Exception as ex:
                 if self.server.swap_client.debug is True:
-                    traceback.print_exc()
+                    self.server.swap_client.log.error(traceback.format_exc())
                 return js_error(self, str(ex))
 
         if len(url_split) > 1 and url_split[1] == 'static':
@@ -1318,7 +1318,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             except Exception as ex:
                 self.putHeaders(status_code, 'text/html')
                 if self.server.swap_client.debug is True:
-                    traceback.print_exc()
+                    self.server.swap_client.log.error(traceback.format_exc())
                 return self.page_error(str(ex))
 
         try:
@@ -1361,7 +1361,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             return self.page_index(url_split)
         except Exception as ex:
             if self.server.swap_client.debug is True:
-                traceback.print_exc()
+                self.server.swap_client.log.error(traceback.format_exc())
             return self.page_error(str(ex))
 
     def do_GET(self):
