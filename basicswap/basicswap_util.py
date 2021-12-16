@@ -144,6 +144,8 @@ class EventLogTypes(IntEnum):
     SYSTEM_WARNING = auto()
     LOCK_TX_A_SPEND_TX_PUBLISHED = auto()
     LOCK_TX_B_SPEND_TX_PUBLISHED = auto()
+    LOCK_TX_A_REFUND_TX_SEEN = auto()
+    LOCK_TX_A_REFUND_SPEND_TX_SEEN = auto()
 
 
 class XmrSplitMsgTypes(IntEnum):
@@ -207,6 +209,8 @@ def strBidState(state):
         return 'Script coin lock released'
     if state == BidStates.XMR_SWAP_SCRIPT_TX_REDEEMED:
         return 'Script tx redeemed'
+    if state == BidStates.XMR_SWAP_SCRIPT_TX_PREREFUND:
+        return 'Script pre-refund tx in chain'
     if state == BidStates.XMR_SWAP_NOSCRIPT_TX_REDEEMED:
         return 'Scriptless tx redeemed'
     if state == BidStates.XMR_SWAP_NOSCRIPT_TX_RECOVERED:
@@ -219,7 +223,7 @@ def strBidState(state):
         return 'Failed'
     if state == BidStates.SWAP_DELAYING:
         return 'Delaying'
-    return 'Unknown'
+    return 'Unknown' + ' ' + str(state)
 
 
 def strTxState(state):
@@ -312,6 +316,10 @@ def describeEventEntry(event_type, event_msg):
         return 'Lock tx A spend tx published'
     if event_type == EventLogTypes.LOCK_TX_B_SPEND_TX_PUBLISHED:
         return 'Lock tx B spend tx published'
+    if event_type == EventLogTypes.LOCK_TX_A_REFUND_TX_SEEN:
+        return 'Lock tx A refund tx seen in chain'
+    if event_type == EventLogTypes.LOCK_TX_A_REFUND_SPEND_TX_SEEN:
+        return 'Lock tx A refund spend tx seen in chain'
     if event_type == EventLogTypes.SYSTEM_WARNING:
         return 'Warning: ' + event_msg
 

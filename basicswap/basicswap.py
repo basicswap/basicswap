@@ -3375,6 +3375,7 @@ class BasicSwap(BaseApp):
             elif spending_txid == xmr_swap.a_lock_refund_tx_id:
                 self.log.debug('Coin a lock tx spent by lock refund tx.')
                 bid.setState(BidStates.XMR_SWAP_SCRIPT_TX_PREREFUND)
+                self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_A_REFUND_TX_SEEN, '', session)
             else:
                 self.setBidError(bid.bid_id, bid, 'Unexpected txn spent coin a lock tx: {}'.format(spend_txid_hex), save_bid=False)
 
@@ -3409,6 +3410,7 @@ class BasicSwap(BaseApp):
 
             if spending_txid == xmr_swap.a_lock_refund_spend_tx_id:
                 self.log.info('Found coin a lock refund spend tx, bid {}'.format(bid_id.hex()))
+                self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_A_REFUND_SPEND_TX_SEEN, '', session)
 
                 if bid.was_sent:
                     xmr_swap.a_lock_refund_spend_tx = bytes.fromhex(spend_txn['hex'])  # Replace with fully signed tx

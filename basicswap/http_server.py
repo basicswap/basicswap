@@ -567,8 +567,8 @@ class HttpHandler(BaseHTTPRequestHandler):
         if page_data['amt_var'] or page_data['rate_var']:
             page_data['autoaccept'] = False
 
-        if b'step1' in form_data:
-            if len(errors) == 0 and b'continue' in form_data:
+        if have_data_entry(form_data, 'step1'):
+            if len(errors) == 0 and have_data_entry(form_data, 'continue'):
                 page_data['step2'] = True
             return parsed_data, errors
 
@@ -727,6 +727,8 @@ class HttpHandler(BaseHTTPRequestHandler):
                 for e in errors:
                     messages.append('Error: {}'.format(str(e)))
             except Exception as e:
+                if swap_client.debug is True:
+                    swap_client.log.error(traceback.format_exc())
                 messages.append('Error: {}'.format(str(e)))
 
         if len(messages) == 0 and 'submit_offer' in page_data:
@@ -735,6 +737,8 @@ class HttpHandler(BaseHTTPRequestHandler):
                 messages.append('<a href="/offer/' + offer_id.hex() + '">Sent Offer {}</a>'.format(offer_id.hex()))
                 page_data = {}
             except Exception as e:
+                if swap_client.debug is True:
+                    swap_client.log.error(traceback.format_exc())
                 messages.append('Error: {}'.format(str(e)))
 
         if len(messages) == 0 and 'check_offer' in page_data:
