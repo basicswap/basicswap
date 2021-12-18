@@ -1007,7 +1007,8 @@ class HttpHandler(BaseHTTPRequestHandler):
             elif b'edit_bid_submit' in form_data:
                 data = {
                     'bid_state': int(form_data[b'new_state'][0]),
-                    'debug_ind': int(get_data_entry_or(form_data, 'debugind', -1))
+                    'debug_ind': int(get_data_entry_or(form_data, 'debugind', -1)),
+                    'kbs_other': get_data_entry_or(form_data, 'kbs_other', None),
                 }
                 try:
                     swap_client.manualBidUpdate(bid_id, data)

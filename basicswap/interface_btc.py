@@ -18,6 +18,7 @@ from .util import (
     ensure,
     make_int,
     b58encode,
+    decodeWif,
     decodeAddress,
     decodeScriptNum,
     pubkeyToAddress,
@@ -201,8 +202,7 @@ class BTCInterface(CoinInterface):
         return self.rpc_callback('getblockheader', [block_hash])
 
     def initialiseWallet(self, key_bytes):
-        wif_prefix = self.chainparams_network()['key_prefix']
-        key_wif = toWIF(wif_prefix, key_bytes)
+        key_wif = self.encodeKey(key_bytes)
 
         try:
             self.rpc_callback('sethdseed', [True, key_wif])
@@ -306,6 +306,10 @@ class BTCInterface(CoinInterface):
     def verifyPubkey(self, pubkey_bytes):
         return verify_secp256k1_point(pubkey_bytes)
 
+    def encodeKey(self, key_bytes):
+        wif_prefix = self.chainparams_network()['key_prefix']
+        return toWIF(wif_prefix, key_bytes)
+
     def encodePubkey(self, pk):
         return pointToCPK(pk)
 
@@ -313,9 +317,7 @@ class BTCInterface(CoinInterface):
         return CPKToPoint(pke)
 
     def decodeKey(self, k):
-        i = b2i(k)
-        assert(i < ep.o)
-        return i
+        return decodeWif(k)
 
     def sumKeys(self, ka, kb):
         # TODO: Add to coincurve

@@ -100,8 +100,8 @@ def b58encode(v):
     return (__b58chars[0] * nPad) + result
 
 
-def decodeWif(network_key):
-    key = b58decode(network_key)[1:-4]
+def decodeWif(encoded_key):
+    key = b58decode(encoded_key)[1:-4]
     if len(key) == 33:
         return key[:-1]
     return key

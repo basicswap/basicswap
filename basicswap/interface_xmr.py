@@ -170,6 +170,9 @@ class XMRInterface(CoinInterface):
     def pubkey(self, key):
         return edf.scalarmult_B(key)
 
+    def encodeKey(self, vk):
+        return vk.hex()
+
     def encodePubkey(self, pk):
         return edu.encodepoint(pk)
 
@@ -203,10 +206,8 @@ class XMRInterface(CoinInterface):
     def lengthDLEAG(self):
         return dleag_proof_len()
 
-    def decodeKey(self, k):
-        i = b2i(k)
-        assert(i < edf.l and i > 8)
-        return i
+    def decodeKey(self, k_hex):
+        return bytes.fromhex(k_hex)
 
     def sumKeys(self, ka, kb):
         return ed25519_scalar_add(ka, kb)

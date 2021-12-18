@@ -166,7 +166,7 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
             state_description = bid.state_note
     elif offer.swap_type == SwapTypes.XMR_SWAP:
         if bid.state == BidStates.BID_SENT:
-            tate_description = 'Waiting for offerer to accept'
+            state_description = 'Waiting for offerer to accept'
         if bid.state == BidStates.BID_RECEIVING:
             # Offerer receiving bid from bidder
             state_description = 'Waiting for bid to be fully received'
@@ -205,6 +205,12 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
             state_description = f'Waiting for offerer to spend from {ticker_to} lock tx'
         elif bid.state == BidStates.XMR_SWAP_NOSCRIPT_TX_REDEEMED:
             state_description = f'Waiting for {ticker_to} lock tx spend tx to confirm in chain'
+        elif bid.state == BidStates.XMR_SWAP_SCRIPT_TX_PREREFUND:
+            if bid.was_sent:
+                state_description = f'Waiting for offerer to redeem or locktime to expire'
+            else:
+                state_description = f'Redeeming output'
+
 
     addr_label = swap_client.getAddressLabel([bid.bid_addr, ])[0]
     bid_rate = offer.rate if bid.rate is None else bid.rate
@@ -275,6 +281,9 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
             data['txns'] = txns
 
             data['xmr_b_shared_address'] = ci_to.encodeSharedAddress(xmr_swap.pkbv, xmr_swap.pkbs) if xmr_swap.pkbs else None
+
+            if swap_client.debug_ui:
+                data['xmr_b_half_privatekey'] = ci_to.encodeKey(swap_client.getPathKey(offer.coin_from, offer.coin_to, bid.created_at, xmr_swap.contract_count, 2, True if offer.coin_to == Coins.XMR else False))
 
             if show_lock_transfers:
                 if xmr_swap.pkbs:
