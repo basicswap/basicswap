@@ -1213,7 +1213,7 @@ class HttpHandler(BaseHTTPRequestHandler):
                     swap_client.updateIdentity(identity_address, new_label)
                     messages.append('Updated')
                 except Exception as e:
-                    messages.append('Error')\
+                    messages.append('Error')
 
         try:
             identity = swap_client.getIdentity(identity_address)

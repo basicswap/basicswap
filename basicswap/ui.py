@@ -5,6 +5,7 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import json
+import traceback
 from .util import (
     make_int,
     format_timestamp,
@@ -284,7 +285,10 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
             data['xmr_b_shared_address'] = ci_to.encodeSharedAddress(xmr_swap.pkbv, xmr_swap.pkbs) if xmr_swap.pkbs else None
 
             if swap_client.debug_ui:
-                data['xmr_b_half_privatekey'] = getChainBSplitKey(swap_client, bid, xmr_swap, offer)
+                try:
+                    data['xmr_b_half_privatekey'] = getChainBSplitKey(swap_client, bid, xmr_swap, offer)
+                except Exception as e:
+                    swap_client.log.error(traceback.format_exc())
 
             if show_lock_transfers:
                 if xmr_swap.pkbs:

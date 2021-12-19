@@ -664,7 +664,7 @@ class PARTInterfaceAnon(PARTInterface):
                 return -1
         return None
 
-    def spendBLockTx(self, chain_b_lock_txid, address_to, kbv, kbs, cb_swap_value, b_fee, restore_height):
+    def spendBLockTx(self, chain_b_lock_txid, address_to, kbv, kbs, cb_swap_value, b_fee, restore_height, spend_actual_balance=False):
         Kbv = self.getPubkey(kbv)
         Kbs = self.getPubkey(kbs)
         sx_addr = self.formatStealthAddress(Kbv, Kbs)
@@ -678,13 +678,18 @@ class PARTInterfaceAnon(PARTInterface):
             self._log.info('Rescanning chain from height: {}'.format(restore_height))
             self.rpc_callback('rescanblockchain', [restore_height])
 
-        autxos = self.rpc_callback('listunspentanon')
+        autxos = self.rpc_callback('listunspentanon', [1, 9999999, [sx_addr]])
+
         if len(autxos) < 1:
             raise TemporaryError('No spendable outputs')
         elif len(autxos) > 1:
             raise ValueError('Too many spendable outputs')
 
         utxo = autxos[0]
+        utxo_sats = make_int(utxo['amount'])
+        if spend_actual_balance and utxo_sats != cb_swap_value:
+            self._log.warning('Spending actual balance {}, not swap value {}.'.format(utxo_sats, cb_swap_value))
+            cb_swap_value = utxo_sats
 
         inputs = [{'tx': utxo['txid'], 'n': utxo['vout']}, ]
         params = ['anon', 'anon',
