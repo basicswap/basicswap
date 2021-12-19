@@ -18,6 +18,20 @@ from basicswap.basicswap_util import (
 )
 
 
+def addLockRefundSigs(self, xmr_swap, ci):
+    self.log.debug('Setting lock refund tx sigs')
+    witness_stack = [
+        b'',
+        xmr_swap.al_lock_refund_tx_sig,
+        xmr_swap.af_lock_refund_tx_sig,
+        xmr_swap.a_lock_tx_script,
+    ]
+
+    signed_tx = ci.setTxSignature(xmr_swap.a_lock_refund_tx, witness_stack)
+    ensure(signed_tx, 'setTxSignature failed')
+    xmr_swap.a_lock_refund_tx = signed_tx
+
+
 def recoverNoScriptTxnWithKey(self, bid_id, encoded_key):
     # Manually recover txn if  other key is known
     session = scoped_session(self.session_factory)

@@ -304,12 +304,21 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
 
     if offer.swap_type == SwapTypes.XMR_SWAP:
         data['coin_a_lock_refund_tx_est_final'] = 'None'
-        if bid.xmr_a_lock_tx and bid.xmr_a_lock_tx.block_time:
-            if offer.lock_type == TxLockTypes.SEQUENCE_LOCK_TIME:
+        data['coin_a_lock_refund_swipe_tx_est_final'] = 'None'
+
+        if offer.lock_type == TxLockTypes.SEQUENCE_LOCK_TIME:
+            if bid.xmr_a_lock_tx and bid.xmr_a_lock_tx.block_time:
                 raw_sequence = ci_from.getExpectedSequence(offer.lock_type, offer.lock_value)
                 seconds_locked = ci_from.decodeSequence(raw_sequence)
                 data['coin_a_lock_refund_tx_est_final'] = bid.xmr_a_lock_tx.block_time + seconds_locked
                 data['coin_a_last_median_time'] = swap_client.coin_clients[offer.coin_from]['chain_median_time']
+
+            if TxTypes.XMR_SWAP_A_LOCK_REFUND in bid.txns:
+                refund_tx = bid.txns[TxTypes.XMR_SWAP_A_LOCK_REFUND]
+                if refund_tx.block_time is not None:
+                    raw_sequence = ci_from.getExpectedSequence(offer.lock_type, offer.lock_value)
+                    seconds_locked = ci_from.decodeSequence(raw_sequence)
+                    data['coin_a_lock_refund_swipe_tx_est_final'] = refund_tx.block_time + seconds_locked
 
         if view_tx_ind:
             data['view_tx_ind'] = view_tx_ind

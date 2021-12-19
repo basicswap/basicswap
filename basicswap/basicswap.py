@@ -122,7 +122,9 @@ from .basicswap_util import (
     getOfferProofOfFundsHash,
     getLastBidState,
     isActiveBidState)
-from .protocols.xmr_swap_1 import recoverNoScriptTxnWithKey
+from .protocols.xmr_swap_1 import (
+    addLockRefundSigs,
+    recoverNoScriptTxnWithKey)
 
 non_script_type_coins = (Coins.XMR, Coins.PART_ANON)
 
@@ -2965,7 +2967,6 @@ class BasicSwap(BaseApp):
                     self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_A_SEEN, '', session)
 
                     block_header = ci_from.getBlockHeaderFromHeight(lock_tx_chain_info['height'])
-
                     bid.xmr_a_lock_tx.block_hash = bytes.fromhex(block_header['hash'])
                     bid.xmr_a_lock_tx.block_height = block_header['height']
                     bid.xmr_a_lock_tx.block_time = block_header['time']  # Or median_time?
@@ -3065,6 +3066,21 @@ class BasicSwap(BaseApp):
                     bid.setState(BidStates.SWAP_COMPLETED)
                     self.saveBidInSession(bid_id, bid, session, xmr_swap)
                     session.commit()
+            elif state == BidStates.XMR_SWAP_SCRIPT_TX_PREREFUND:
+                if TxTypes.XMR_SWAP_A_LOCK_REFUND in bid.txns:
+                    refund_tx = bid.txns[TxTypes.XMR_SWAP_A_LOCK_REFUND]
+                    if refund_tx.block_time is None:
+                        a_lock_refund_tx_dest = ci_from.getScriptDest(xmr_swap.a_lock_refund_tx_script)
+                        p2wsh_addr = ci_from.encode_p2wsh(a_lock_refund_tx_dest)
+                        lock_refund_tx_chain_info = ci_from.getLockTxHeight(refund_tx.txid, p2wsh_addr, 0, bid.chain_a_height_start)
+
+                        block_header = ci_from.getBlockHeaderFromHeight(lock_refund_tx_chain_info['height'])
+                        refund_tx.block_hash = bytes.fromhex(block_header['hash'])
+                        refund_tx.block_height = block_header['height']
+                        refund_tx.block_time = block_header['time']  # Or median_time?
+
+                        self.saveBidInSession(bid_id, bid, session, xmr_swap)
+                        session.commit()
 
         except Exception as ex:
             raise ex
@@ -4269,7 +4285,7 @@ class BasicSwap(BaseApp):
             prevout_amount = ci_from.getLockTxSwapOutputValue(bid, xmr_swap)
             xmr_swap.af_lock_refund_tx_sig = ci_from.signTx(kaf, xmr_swap.a_lock_refund_tx, 0, xmr_swap.a_lock_tx_script, prevout_amount)
 
-            self.addLockRefundSigs(xmr_swap, ci_from)
+            addLockRefundSigs(self, xmr_swap, ci_from)
 
             msg_buf = XmrBidLockTxSigsMessage(
                 bid_msg_id=bid_id,
@@ -4679,7 +4695,7 @@ class BasicSwap(BaseApp):
 
             v = ci_from.verifyTxSig(xmr_swap.a_lock_refund_spend_tx, xmr_swap.af_lock_refund_spend_tx_sig, xmr_swap.pkaf, 0, xmr_swap.a_lock_refund_tx_script, prevout_amount)
             ensure(v, 'Invalid signature for lock refund spend txn')
-            self.addLockRefundSigs(xmr_swap, ci_from)
+            addLockRefundSigs(self, xmr_swap, ci_from)
 
             delay = random.randrange(self.min_delay_event, self.max_delay_event)
             self.log.info('Sending coin A lock tx for xmr bid %s in %d seconds', bid_id.hex(), delay)
@@ -5526,19 +5542,6 @@ class BasicSwap(BaseApp):
             session.close()
             session.remove()
             self.mxDB.release()
-
-    def addLockRefundSigs(self, xmr_swap, ci):
-        self.log.debug('Setting lock refund tx sigs')
-        witness_stack = [
-            b'',
-            xmr_swap.al_lock_refund_tx_sig,
-            xmr_swap.af_lock_refund_tx_sig,
-            xmr_swap.a_lock_tx_script,
-        ]
-
-        signed_tx = ci.setTxSignature(xmr_swap.a_lock_refund_tx, witness_stack)
-        ensure(signed_tx, 'setTxSignature failed')
-        xmr_swap.a_lock_refund_tx = signed_tx
 
     def createCoinALockRefundSwipeTx(self, ci, bid, offer, xmr_swap, xmr_offer):
         self.log.debug('Creating %s lock refund swipe tx', ci.coin_name())
