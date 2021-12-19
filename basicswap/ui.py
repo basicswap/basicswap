@@ -13,15 +13,16 @@ from .chainparams import (
     Coins,
 )
 from .basicswap_util import (
-    TxLockTypes,
-    DebugTypes,
-    SwapTypes,
-    BidStates,
-    TxStates,
     TxTypes,
+    KeyTypes,
+    TxStates,
+    BidStates,
+    SwapTypes,
     strTxType,
-    strBidState,
+    DebugTypes,
     strTxState,
+    strBidState,
+    TxLockTypes,
     getLastBidState,
 )
 
@@ -207,10 +208,9 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
             state_description = f'Waiting for {ticker_to} lock tx spend tx to confirm in chain'
         elif bid.state == BidStates.XMR_SWAP_SCRIPT_TX_PREREFUND:
             if bid.was_sent:
-                state_description = f'Waiting for offerer to redeem or locktime to expire'
+                state_description = 'Waiting for offerer to redeem or locktime to expire'
             else:
-                state_description = f'Redeeming output'
-
+                state_description = 'Redeeming output'
 
     addr_label = swap_client.getAddressLabel([bid.bid_addr, ])[0]
     bid_rate = offer.rate if bid.rate is None else bid.rate
@@ -283,7 +283,8 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
             data['xmr_b_shared_address'] = ci_to.encodeSharedAddress(xmr_swap.pkbv, xmr_swap.pkbs) if xmr_swap.pkbs else None
 
             if swap_client.debug_ui:
-                data['xmr_b_half_privatekey'] = ci_to.encodeKey(swap_client.getPathKey(offer.coin_from, offer.coin_to, bid.created_at, xmr_swap.contract_count, 2, True if offer.coin_to == Coins.XMR else False))
+                key_type = KeyTypes.KBSF if bid.was_sent else KeyTypes.KBSL
+                data['xmr_b_half_privatekey'] = ci_to.encodeKey(swap_client.getPathKey(offer.coin_from, offer.coin_to, bid.created_at, xmr_swap.contract_count, key_type, True if offer.coin_to == Coins.XMR else False))
 
             if show_lock_transfers:
                 if xmr_swap.pkbs:

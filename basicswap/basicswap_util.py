@@ -24,6 +24,15 @@ class TxLockTypes(IntEnum):
     ABS_LOCK_TIME = 4
 
 
+class KeyTypes(IntEnum):
+    KBVL = 1
+    KBSL = 2
+    KAL = 3
+    KBVF = 4
+    KBSF = 5
+    KAF = 6
+
+
 class MessageTypes(IntEnum):
     OFFER = auto()
     BID = auto()

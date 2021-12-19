@@ -171,7 +171,7 @@ class Test(BaseTest):
         bid, xmr_swap = swap_clients[0].getXmrBid(bid_id)
         assert(xmr_swap)
 
-        swap_clients[1].setBidDebugInd(bid_id, DebugTypes.BID_STOP_AFTER_COIN_A_LOCK)
+        swap_clients[1].setBidDebugInd(bid_id, DebugTypes.CREATE_INVALID_COIN_B_LOCK)
         swap_clients[0].setBidDebugInd(bid_id, DebugTypes.BID_DONT_SPEND_COIN_A_LOCK_REFUND)
 
         swap_clients[0].acceptXmrBid(bid_id)

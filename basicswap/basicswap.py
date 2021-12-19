@@ -101,6 +101,7 @@ import basicswap.config as cfg
 import basicswap.network as bsn
 import basicswap.protocols.atomic_swap_1 as atomic_swap_1
 from .basicswap_util import (
+    KeyTypes,
     TxLockTypes,
     AddressTypes,
     MessageTypes,
@@ -2031,10 +2032,10 @@ class BasicSwap(BaseApp):
             xmr_swap.dest_af = msg_buf.dest_af
 
             for_ed25519 = True if coin_to == Coins.XMR else False
-            kbvf = self.getPathKey(coin_from, coin_to, bid_created_at, xmr_swap.contract_count, 1, for_ed25519)
-            kbsf = self.getPathKey(coin_from, coin_to, bid_created_at, xmr_swap.contract_count, 2, for_ed25519)
+            kbvf = self.getPathKey(coin_from, coin_to, bid_created_at, xmr_swap.contract_count, KeyTypes.KBVF, for_ed25519)
+            kbsf = self.getPathKey(coin_from, coin_to, bid_created_at, xmr_swap.contract_count, KeyTypes.KBSF, for_ed25519)
 
-            kaf = self.getPathKey(coin_from, coin_to, bid_created_at, xmr_swap.contract_count, 3)
+            kaf = self.getPathKey(coin_from, coin_to, bid_created_at, xmr_swap.contract_count, KeyTypes.KAF)
 
             xmr_swap.vkbvf = kbvf
             xmr_swap.pkbvf = ci_to.getPubkey(kbvf)
@@ -2158,10 +2159,10 @@ class BasicSwap(BaseApp):
                 xmr_swap.contract_count = self.getNewContractId()
 
             for_ed25519 = True if coin_to == Coins.XMR else False
-            kbvl = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, 1, for_ed25519)
-            kbsl = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, 2, for_ed25519)
+            kbvl = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, KeyTypes.KBVL, for_ed25519)
+            kbsl = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, KeyTypes.KBSL, for_ed25519)
 
-            kal = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, 3)
+            kal = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, KeyTypes.KAL)
 
             xmr_swap.vkbvl = kbvl
             xmr_swap.pkbvl = ci_to.getPubkey(kbvl)
@@ -4260,7 +4261,7 @@ class BasicSwap(BaseApp):
         ci_to = self.ci(coin_to)
 
         try:
-            kaf = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, 3)
+            kaf = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, KeyTypes.KAF)
 
             prevout_amount = ci_from.getLockRefundTxSwapOutputValue(bid, xmr_swap)
             xmr_swap.af_lock_refund_spend_tx_esig = ci_from.signTxOtVES(kaf, xmr_swap.pkasl, xmr_swap.a_lock_refund_spend_tx, 0, xmr_swap.a_lock_refund_tx_script, prevout_amount)
@@ -4320,7 +4321,7 @@ class BasicSwap(BaseApp):
         ci_from = self.ci(coin_from)
         ci_to = self.ci(coin_to)
 
-        kal = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, 3)
+        kal = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, KeyTypes.KAL)
 
         xmr_swap.a_lock_spend_tx = ci_from.createScriptLockSpendTx(
             xmr_swap.a_lock_tx, xmr_swap.a_lock_tx_script,
@@ -4477,8 +4478,8 @@ class BasicSwap(BaseApp):
         ci_to = self.ci(coin_to)
 
         for_ed25519 = True if coin_to == Coins.XMR else False
-        kbsf = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, 2, for_ed25519)
-        kaf = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, 3)
+        kbsf = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, KeyTypes.KBSF, for_ed25519)
+        kaf = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, KeyTypes.KAF)
 
         al_lock_spend_sig = ci_from.decryptOtVES(kbsf, xmr_swap.al_lock_spend_tx_esig)
         prevout_amount = ci_from.getLockTxSwapOutputValue(bid, xmr_swap)
@@ -4539,7 +4540,7 @@ class BasicSwap(BaseApp):
             assert(kbsf is not None)
 
             for_ed25519 = True if coin_to == Coins.XMR else False
-            kbsl = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, 2, for_ed25519)
+            kbsl = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, KeyTypes.KBSL, for_ed25519)
             vkbs = ci_to.sumKeys(kbsl, kbsf)
 
             if coin_to == Coins.XMR:
@@ -4595,7 +4596,7 @@ class BasicSwap(BaseApp):
         assert(kbsl is not None)
 
         for_ed25519 = True if coin_to == Coins.XMR else False
-        kbsf = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, 2, for_ed25519)
+        kbsf = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, KeyTypes.KBSF, for_ed25519)
         vkbs = ci_to.sumKeys(kbsl, kbsf)
 
         try:
@@ -4656,8 +4657,8 @@ class BasicSwap(BaseApp):
             xmr_swap.af_lock_refund_tx_sig = msg_data.af_lock_refund_tx_sig
 
             for_ed25519 = True if coin_to == Coins.XMR else False
-            kbsl = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, 2, for_ed25519)
-            kal = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, 3)
+            kbsl = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, KeyTypes.KBSL, for_ed25519)
+            kal = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, KeyTypes.KAL)
 
             xmr_swap.af_lock_refund_spend_tx_sig = ci_from.decryptOtVES(kbsl, xmr_swap.af_lock_refund_spend_tx_esig)
             prevout_amount = ci_from.getLockRefundTxSwapOutputValue(bid, xmr_swap)
@@ -4941,9 +4942,9 @@ class BasicSwap(BaseApp):
             for_ed25519 = True if Coins(offer.coin_to) == Coins.XMR else False
             if bid.was_sent:
                 kbsl = ci_to.decodeKey(encoded_key)
-                kbsf = self.getPathKey(offer.coin_from, offer.coin_to, bid.created_at, xmr_swap.contract_count, 2, for_ed25519)
+                kbsf = self.getPathKey(offer.coin_from, offer.coin_to, bid.created_at, xmr_swap.contract_count, KeyTypes.KBSF, for_ed25519)
             else:
-                kbsl = self.getPathKey(offer.coin_from, offer.coin_to, bid.created_at, xmr_swap.contract_count, 2, for_ed25519)
+                kbsl = self.getPathKey(offer.coin_from, offer.coin_to, bid.created_at, xmr_swap.contract_count, KeyTypes.KBSL, for_ed25519)
                 kbsf = ci_to.decodeKey(encoded_key)
             ensure(ci_to.verifyKey(kbsl), 'Invalid kbsl')
             ensure(ci_to.verifyKey(kbsf), 'Invalid kbsf')
@@ -5581,7 +5582,7 @@ class BasicSwap(BaseApp):
             pkh_dest,
             xmr_offer.a_fee_rate, xmr_swap.vkbv)
 
-        vkaf = self.getPathKey(offer.coin_from, offer.coin_to, bid.created_at, xmr_swap.contract_count, 3)
+        vkaf = self.getPathKey(offer.coin_from, offer.coin_to, bid.created_at, xmr_swap.contract_count, KeyTypes.KAF)
         prevout_amount = ci.getLockRefundTxSwapOutputValue(bid, xmr_swap)
         sig = ci.signTx(vkaf, spend_tx, 0, xmr_swap.a_lock_refund_tx_script, prevout_amount)
 

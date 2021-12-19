@@ -1,7 +1,24 @@
 
 0.0.x
 ==============
+
+
+0.0.29
+==============
+
+- Use unique key path per key type.
+  - Incompatible with previous versions.
+- XMR swaps: Can manually spend chain B lock tx if both keys are known.
+
+
+0.0.28
+==============
+
 - Set working dir to datadir for daemons.
+- Remove requests module dependency by implementing HTTP digest authentication client.
+  - Reduces log messages
+- New 'debug_ui' mode, locktime can be specified in minutes.
+  - Must also reduce the 'min_sequence_lock_seconds' setting.
 
 
 0.0.27
