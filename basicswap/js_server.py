@@ -28,6 +28,7 @@ from .ui import (
     have_data_entry,
     tickerToCoinId,
 )
+from .protocols.xmr_swap_1 import recoverNoScriptTxnWithKey, getChainBSplitKey
 
 
 def js_error(self, error_str):
@@ -219,6 +220,13 @@ def js_bids(self, url_split, post_string, is_json):
 
         bid, xmr_swap, offer, xmr_offer, events = swap_client.getXmrBidAndOffer(bid_id)
         assert(bid), 'Unknown bid ID'
+
+        if post_string != '':
+            if have_data_entry(post_data, 'chainbkeysplit'):
+                return bytes(json.dumps({'splitkey': getChainBSplitKey(swap_client, bid, xmr_swap, offer)}), 'UTF-8')
+            elif have_data_entry(post_data, 'spendchainblocktx'):
+                remote_key = get_data_entry(post_data, 'remote_key')
+                return bytes(json.dumps({'txid': recoverNoScriptTxnWithKey(swap_client, bid_id, remote_key).hex()}), 'UTF-8')
 
         edit_bid = False
         show_txns = False

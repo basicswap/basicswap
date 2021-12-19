@@ -14,7 +14,6 @@ from .chainparams import (
 )
 from .basicswap_util import (
     TxTypes,
-    KeyTypes,
     TxStates,
     BidStates,
     SwapTypes,
@@ -25,6 +24,8 @@ from .basicswap_util import (
     TxLockTypes,
     getLastBidState,
 )
+
+from .protocols.xmr_swap_1 import getChainBSplitKey
 
 PAGE_LIMIT = 50
 
@@ -283,8 +284,7 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
             data['xmr_b_shared_address'] = ci_to.encodeSharedAddress(xmr_swap.pkbv, xmr_swap.pkbs) if xmr_swap.pkbs else None
 
             if swap_client.debug_ui:
-                key_type = KeyTypes.KBSF if bid.was_sent else KeyTypes.KBSL
-                data['xmr_b_half_privatekey'] = ci_to.encodeKey(swap_client.getPathKey(offer.coin_from, offer.coin_to, bid.created_at, xmr_swap.contract_count, key_type, True if offer.coin_to == Coins.XMR else False))
+                data['xmr_b_half_privatekey'] = getChainBSplitKey(swap_client, bid, xmr_swap, offer)
 
             if show_lock_transfers:
                 if xmr_swap.pkbs:

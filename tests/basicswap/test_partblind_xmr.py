@@ -9,6 +9,7 @@ import json
 import random
 import logging
 import unittest
+from urllib import parse
 from urllib.request import urlopen
 
 from basicswap.basicswap import (
@@ -188,6 +189,18 @@ class Test(BaseTest):
 
         wait_for_none_active(test_delay_event, 1800)
         wait_for_none_active(test_delay_event, 1801)
+
+        data = parse.urlencode({
+            'chainbkeysplit': True
+        }).encode()
+        offerer_key = json.loads(urlopen('http://127.0.0.1:1800/json/bids/{}'.format(bid_id.hex()), data=data).read())['splitkey']
+
+        data = parse.urlencode({
+            'spendchainblocktx': True,
+            'remote_key': offerer_key
+        }).encode()
+        redeemed_txid = json.loads(urlopen('http://127.0.0.1:1801/json/bids/{}'.format(bid_id.hex()), data=data).read())['txid']
+        assert(len(redeemed_txid) == 64)
 
     def test_04_follower_recover_b_lock_tx(self):
         logging.info('---------- Test PARTct to XMR follower recovers coin b lock tx')
