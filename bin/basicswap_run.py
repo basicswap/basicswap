@@ -124,30 +124,30 @@ def runClient(fp, data_dir, chain):
         for c, v in settings['chainclients'].items():
             if c == 'monero':
                 if v['manage_daemon'] is True:
-                    logger.info('Starting {} daemon'.format(c.capitalize()))
+                    swap_client.log.info('Starting {} daemon'.format(c.capitalize()))
                     daemons.append(startXmrDaemon(v['datadir'], v['bindir'], 'monerod'))
                     pid = daemons[-1].pid
-                    logger.info('Started {} {}'.format('monerod', pid))
+                    swap_client.log.info('Started {} {}'.format('monerod', pid))
 
                 if v['manage_wallet_daemon'] is True:
-                    logger.info('Starting {} wallet daemon'.format(c.capitalize()))
+                    swap_client.log.info('Starting {} wallet daemon'.format(c.capitalize()))
                     daemon_addr = '{}:{}'.format(v['rpchost'], v['rpcport'])
-                    logger.info('daemon-address: {}'.format(daemon_addr))
+                    swap_client.log.info('daemon-address: {}'.format(daemon_addr))
                     opts = ['--daemon-address', daemon_addr, ]
                     daemons.append(startXmrWalletDaemon(v['datadir'], v['bindir'], 'monero-wallet-rpc', opts))
                     pid = daemons[-1].pid
-                    logger.info('Started {} {}'.format('monero-wallet-rpc', pid))
+                    swap_client.log.info('Started {} {}'.format('monero-wallet-rpc', pid))
 
                 continue
             if v['manage_daemon'] is True:
-                logger.info('Starting {} daemon'.format(c.capitalize()))
+                swap_client.log.info('Starting {} daemon'.format(c.capitalize()))
 
                 filename = c + 'd' + ('.exe' if os.name == 'nt' else '')
                 daemons.append(startDaemon(v['datadir'], v['bindir'], filename))
                 pid = daemons[-1].pid
                 pids.append((c, pid))
                 swap_client.setDaemonPID(c, pid)
-                logger.info('Started {} {}'.format(filename, pid))
+                swap_client.log.info('Started {} {}'.format(filename, pid))
         if len(pids) > 0:
             with open(pids_path, 'w') as fd:
                 for p in pids:
@@ -179,11 +179,11 @@ def runClient(fp, data_dir, chain):
 
     closed_pids = []
     for d in daemons:
-        logging.info('Interrupting {}'.format(d.pid))
+        swap_client.log.info('Interrupting {}'.format(d.pid))
         try:
             d.send_signal(signal.SIGINT)
         except Exception as e:
-            logging.info('Interrupting %d, error %s', d.pid, str(e))
+            swap_client.log.info('Interrupting %d, error %s', d.pid, str(e))
     for d in daemons:
         try:
             d.wait(timeout=120)
@@ -192,7 +192,7 @@ def runClient(fp, data_dir, chain):
                     fp.close()
             closed_pids.append(d.pid)
         except Exception as ex:
-            logger.error('Error: {}'.format(ex))
+            swap_client.log.error('Error: {}'.format(ex))
 
     if os.path.exists(pids_path):
         with open(pids_path) as fd:
