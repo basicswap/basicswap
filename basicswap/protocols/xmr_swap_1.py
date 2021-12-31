@@ -33,7 +33,8 @@ def addLockRefundSigs(self, xmr_swap, ci):
 
 
 def recoverNoScriptTxnWithKey(self, bid_id, encoded_key):
-    # Manually recover txn if  other key is known
+    self.log.info('Manually recovering %s', bid_id.hex())
+    # Manually recover txn if other key is known
     session = scoped_session(self.session_factory)
     try:
         bid, xmr_swap = self.getXmrBidFromSession(session, bid_id)

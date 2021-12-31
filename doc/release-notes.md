@@ -3,6 +3,13 @@
 ==============
 
 
+0.0.30
+==============
+
+- Core launch log messages are written to disk.
+- Fixed bug when manually redeeming noscript lock tx with invalid amount.
+
+
 0.0.29
 ==============
 

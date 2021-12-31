@@ -3074,13 +3074,14 @@ class BasicSwap(BaseApp):
                         p2wsh_addr = ci_from.encode_p2wsh(a_lock_refund_tx_dest)
                         lock_refund_tx_chain_info = ci_from.getLockTxHeight(refund_tx.txid, p2wsh_addr, 0, bid.chain_a_height_start)
 
-                        block_header = ci_from.getBlockHeaderFromHeight(lock_refund_tx_chain_info['height'])
-                        refund_tx.block_hash = bytes.fromhex(block_header['hash'])
-                        refund_tx.block_height = block_header['height']
-                        refund_tx.block_time = block_header['time']  # Or median_time?
+                        if lock_refund_tx_chain_info is not None:
+                            block_header = ci_from.getBlockHeaderFromHeight(lock_refund_tx_chain_info['height'])
+                            refund_tx.block_hash = bytes.fromhex(block_header['hash'])
+                            refund_tx.block_height = block_header['height']
+                            refund_tx.block_time = block_header['time']  # Or median_time?
 
-                        self.saveBidInSession(bid_id, bid, session, xmr_swap)
-                        session.commit()
+                            self.saveBidInSession(bid_id, bid, session, xmr_swap)
+                            session.commit()
 
         except Exception as ex:
             raise ex

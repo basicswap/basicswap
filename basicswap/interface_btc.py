@@ -975,6 +975,7 @@ class BTCInterface(CoinInterface):
                 'height': block_height}
 
         except Exception as e:
+            self._log.debug('getLockTxHeight gettransaction failed: %s, %s', txid.hex(), str(e))
             return None
 
         if find_index:

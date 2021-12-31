@@ -406,13 +406,14 @@ class XMRInterface(CoinInterface):
 
             if rv['balance'] < cb_swap_value:
                 self._log.warning('Balance is too low, checking for existing spend.')
-                txns = self.rpc_wallet_cb('get_transfers', {'out': True})['out']
-                print(txns, txns)
-                if len(txns) > 0:
-                    txid = txns[0]['txid']
-                    self._log.warning(f'spendBLockTx detected spending tx: {txid}.')
-                    if txns[0]['address'] == address_b58:
-                        return bytes.fromhex(txid)
+                txns = self.rpc_wallet_cb('get_transfers', {'out': True})
+                if 'out' in txns:
+                    txns = txns['out']
+                    if len(txns) > 0:
+                        txid = txns[0]['txid']
+                        self._log.warning(f'spendBLockTx detected spending tx: {txid}.')
+                        if txns[0]['address'] == address_b58:
+                            return bytes.fromhex(txid)
 
                 self._log.error('wallet {} balance {}, expected {}'.format(wallet_filename, rv['balance'], cb_swap_value))
 
