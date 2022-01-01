@@ -899,7 +899,18 @@ class BasicSwap(BaseApp):
             session = scoped_session(self.session_factory)
             for bid in session.query(Bid):
                 if bid.in_progress == 1 or (bid.state and bid.state > BidStates.BID_RECEIVED and bid.state < BidStates.SWAP_COMPLETED):
-                    self.activateBid(session, bid)
+                    try:
+                        self.activateBid(session, bid)
+                    except Exception as ex:
+                        self.log.error('Failed to activate bid! Error: %s', str(ex))
+                        if self.debug:
+                            self.log.error(traceback.format_exc())
+                        try:
+                            self.deactivateBid(session, bid)
+                        except Exception as ex:
+                            self.log.error('Further error deactivating: %s', str(ex))
+                            if self.debug:
+                                self.log.error(traceback.format_exc())
         finally:
             session.close()
             session.remove()
