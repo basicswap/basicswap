@@ -26,7 +26,6 @@ from .util import (
     ensure,
     dumpj,
     make_int,
-    format_amount,
     TemporaryError)
 from .rpc_xmr import (
     make_xmr_rpc_func,
@@ -142,8 +141,8 @@ class XMRInterface(CoinInterface):
             rv = {}
             self.rpc_wallet_cb('refresh')
             balance_info = self.rpc_wallet_cb('get_balance')
-            rv['balance'] = format_amount(balance_info['unlocked_balance'], XMRInterface.exp())
-            rv['unconfirmed_balance'] = format_amount(balance_info['balance'] - balance_info['unlocked_balance'], XMRInterface.exp())
+            rv['balance'] = self.format_amount(balance_info['unlocked_balance'])
+            rv['unconfirmed_balance'] = self.format_amount(balance_info['balance'] - balance_info['unlocked_balance'])
             return rv
 
     def walletRestoreHeight(self):
@@ -477,3 +476,11 @@ class XMRInterface(CoinInterface):
                 return rv
             except Exception as e:
                 return {'error': str(e)}
+
+    def getSpendableBalance(self):
+        with self._mx_wallet:
+            self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
+
+            self.rpc_wallet_cb('refresh')
+            balance_info = self.rpc_wallet_cb('get_balance')
+            return balance_info['unlocked_balance']

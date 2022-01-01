@@ -1096,6 +1096,9 @@ class BTCInterface(CoinInterface):
     def describeTx(self, tx_hex):
         return self.rpc_callback('decoderawtransaction', [tx_hex])
 
+    def getSpendableBalance(self):
+        return self.make_int(self.rpc_callback('getbalances')['mine']['trusted'])
+
 
 def testBTCInterface():
     print('testBTCInterface')

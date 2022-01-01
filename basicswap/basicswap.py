@@ -1667,17 +1667,16 @@ class BasicSwap(BaseApp):
 
             self.checkSynced(coin_from, coin_to)
 
-            contract_count = self.getNewContractId()
-
-            amount_to = int((msg_buf.amount * bid_rate) // self.ci(coin_from).COIN())
+            amount_to = int((msg_buf.amount * bid_rate) // ci_from.COIN())
 
             now = int(time.time())
             if offer.swap_type == SwapTypes.SELLER_FIRST:
-                msg_buf.pkhash_buyer = getKeyID(self.getContractPubkey(dt.datetime.fromtimestamp(now).date(), contract_count))
-
                 proof_addr, proof_sig = self.getProofOfFunds(coin_to, amount_to, offer_id)
                 msg_buf.proof_address = proof_addr
                 msg_buf.proof_signature = proof_sig
+
+                contract_count = self.getNewContractId()
+                msg_buf.pkhash_buyer = getKeyID(self.getContractPubkey(dt.datetime.fromtimestamp(now).date(), contract_count))
             else:
                 raise ValueError('TODO')
 
@@ -2010,6 +2009,11 @@ class BasicSwap(BaseApp):
             self.validateBidAmount(offer, amount, bid_rate)
 
             self.checkSynced(coin_from, coin_to)
+
+            amount_to = int((int(amount) * bid_rate) // ci_from.COIN())
+
+            balance_to = ci_to.getSpendableBalance()
+            ensure(balance_to > amount_to, '{} spendable balance is too low: {}'.format(ci_to.coin_name(), ci_to.format_amount(balance_to)))
 
             msg_buf = XmrBidMessage()
             msg_buf.protocol_version = 1

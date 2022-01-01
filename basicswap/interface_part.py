@@ -601,6 +601,9 @@ class PARTInterfaceBlind(PARTInterface):
 
         return bytes.fromhex(lock_refund_swipe_tx_hex)
 
+    def getSpendableBalance(self):
+        return self.make_int(self.rpc_callback('getbalances')['mine']['blind_trusted'])
+
 
 class PARTInterfaceAnon(PARTInterface):
     @staticmethod
@@ -712,3 +715,6 @@ class PARTInterfaceAnon(PARTInterface):
             return {'txid': txid_hex, 'amount': 0, 'height': rv['height']}
 
         return None
+
+    def getSpendableBalance(self):
+        return self.make_int(self.rpc_callback('getbalances')['mine']['anon_trusted'])
