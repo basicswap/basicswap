@@ -5,10 +5,12 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
+import json
 import time
 import base64
 import hashlib
 import logging
+import traceback
 from io import BytesIO
 from basicswap.contrib.test_framework import segwit_addr
 
@@ -67,7 +69,7 @@ from .basicswap_util import (
     TxLockTypes)
 
 from .chainparams import CoinInterface, Coins
-from .rpc import make_rpc_func
+from .rpc import make_rpc_func, openrpc
 
 
 SEQUENCE_LOCKTIME_GRANULARITY = 9  # 512 seconds
@@ -168,12 +170,33 @@ class BTCInterface(CoinInterface):
 
     def __init__(self, coin_settings, network, swap_client=None):
         super().__init__(network)
-        rpc_host = coin_settings.get('rpchost', '127.0.0.1')
-        self.rpc_callback = make_rpc_func(coin_settings['rpcport'], coin_settings['rpcauth'], host=rpc_host)
+        self._rpc_host = coin_settings.get('rpchost', '127.0.0.1')
+        self._rpcport = coin_settings['rpcport']
+        self._rpcauth = coin_settings['rpcauth']
+        self.rpc_callback = make_rpc_func(self._rpcport, self._rpcauth, host=self._rpc_host)
         self.blocks_confirmed = coin_settings['blocks_confirmed']
         self.setConfTarget(coin_settings['conf_target'])
         self._sc = swap_client
         self._log = self._sc.log if self._sc and self._sc.log else logging
+
+    def open_rpc(self, wallet=None):
+        return openrpc(self._rpcport, self._rpcauth, wallet=wallet, host=self._rpc_host)
+
+    def json_request(self, rpc_conn, method, params):
+        try:
+            v = rpc_conn.json_request(method, params)
+            r = json.loads(v.decode('utf-8'))
+        except Exception as ex:
+            traceback.print_exc()
+            raise ValueError('RPC Server Error ' + str(ex))
+
+        if 'error' in r and r['error'] is not None:
+            raise ValueError('RPC error ' + str(r['error']))
+
+        return r['result']
+
+    def close_rpc(self, rpc_conn):
+        rpc_conn.close()
 
     def setConfTarget(self, new_conf_target):
         assert(new_conf_target >= 1 and new_conf_target < 33), 'Invalid conf_target value'
@@ -226,12 +249,18 @@ class BTCInterface(CoinInterface):
         if chain_synced < 1.0:
             raise ValueError('{} chain isn\'t synced.'.format(self.coin_name()))
 
-        block_hash = best_block
-        while True:
-            block_header = self.rpc_callback('getblockheader', [block_hash])
-            if block_header['time'] < start_time:
-                return block_header['height']
-            block_hash = block_header['previousblockhash']
+        self._log.debug('Finding block at time: {}'.format(start_time))
+
+        rpc_conn = self.open_rpc()
+        try:
+            block_hash = best_block
+            while True:
+                block_header = self.json_request(rpc_conn, 'getblockheader', [block_hash])
+                if block_header['time'] < start_time:
+                    return block_header['height']
+                block_hash = block_header['previousblockhash']
+        finally:
+            self.close_rpc(rpc_conn)
 
     def getWalletSeedID(self):
         return self.rpc_callback('getwalletinfo')['hdseedid']

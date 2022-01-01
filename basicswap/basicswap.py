@@ -1474,7 +1474,7 @@ class BasicSwap(BaseApp):
                 wrh = session.query(DBKVInt).filter_by(key=key_str).first().value
             except Exception:
                 wrh = ci.getWalletRestoreHeight()
-                self.log.info('Found restore height for %s', ci.coin_name())
+                self.log.info('Found restore height for %s, block %d', ci.coin_name(), wrh)
                 session.add(DBKVInt(
                     key=key_str,
                     value=wrh

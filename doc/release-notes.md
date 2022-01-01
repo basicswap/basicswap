@@ -3,6 +3,15 @@
 ==============
 
 
+0.0.31
+==============
+
+- XMR swaps: Coin to balance is checked before sending a bid.
+- Use getblockhashafter command in getWalletRestoreHeight where possible.
+  - Avoids rpc Errno 49 issue
+  - Reuse rpc connection when getblockhashafter is not available.
+
+
 0.0.30
 ==============
 

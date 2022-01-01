@@ -109,6 +109,21 @@ class PARTInterface(BTCInterface):
             length += getWitnessElementLen(len(e) // 2)  # hex -> bytes
         return length
 
+    def getWalletRestoreHeight(self):
+        start_time = self.rpc_callback('getwalletinfo')['keypoololdest']
+
+        blockchaininfo = self.rpc_callback('getblockchaininfo')
+        best_block = blockchaininfo['bestblockhash']
+
+        chain_synced = round(blockchaininfo['verificationprogress'], 3)
+        if chain_synced < 1.0:
+            raise ValueError('{} chain isn\'t synced.'.format(self.coin_name()))
+
+        self._log.debug('Finding block at time: {}'.format(start_time))
+        block_hash = self.rpc_callback('getblockhashafter', [start_time])
+        block_header = self.rpc_callback('getblockheader', [block_hash])
+        return block_header['height']
+
 
 class PARTInterfaceBlind(PARTInterface):
     @staticmethod

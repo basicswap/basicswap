@@ -107,12 +107,23 @@ def callrpc(rpc_port, auth, method, params=[], wallet=None, host='127.0.0.1'):
         r = json.loads(v.decode('utf-8'))
     except Exception as ex:
         traceback.print_exc()
-        raise ValueError('RPC Server Error ' + str(ex))
+        raise ValueError('RPC server error ' + str(ex))
 
     if 'error' in r and r['error'] is not None:
         raise ValueError('RPC error ' + str(r['error']))
 
     return r['result']
+
+
+def openrpc(rpc_port, auth, wallet=None, host='127.0.0.1'):
+    try:
+        url = 'http://{}@{}:{}/'.format(auth, host, rpc_port)
+        if wallet is not None:
+            url += 'wallet/' + urllib.parse.quote(wallet)
+        return Jsonrpc(url)
+    except Exception as ex:
+        traceback.print_exc()
+        raise ValueError('RPC error ' + str(ex))
 
 
 def callrpc_cli(bindir, datadir, chain, cmd, cli_bin='particl-cli'):
