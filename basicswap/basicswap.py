@@ -4635,7 +4635,10 @@ class BasicSwap(BaseApp):
         vkbs = ci_to.sumKeys(kbsl, kbsf)
 
         try:
-            address_to = self.getCachedMainWalletAddress(ci_to)
+            if offer.coin_to == Coins.XMR:
+                address_to = self.getCachedMainWalletAddress(ci_to)
+            else:
+                address_to = self.getCachedStealthAddressForCoin(coin_to)
             txid = ci_to.spendBLockTx(xmr_swap.b_lock_tx_id, address_to, xmr_swap.vkbv, vkbs, bid.amount_to, xmr_offer.b_fee_rate, bid.chain_b_height_start)
             self.log.debug('Submitted lock B refund txn %s to %s chain for bid %s', txid.hex(), ci_to.coin_name(), bid_id.hex())
             self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_B_REFUND_TX_PUBLISHED, '', session)
