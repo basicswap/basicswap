@@ -906,7 +906,9 @@ class BasicSwap(BaseApp):
                         if self.debug:
                             self.log.error(traceback.format_exc())
                         try:
-                            self.deactivateBid(session, bid)
+                            bid.setState(BidStates.BID_ERROR, 'Failed to activate')
+                            offer = session.query(Offer).filter_by(offer_id=bid.offer_id).first()
+                            self.deactivateBid(session, offer, bid)
                         except Exception as ex:
                             self.log.error('Further error deactivating: %s', str(ex))
                             if self.debug:
