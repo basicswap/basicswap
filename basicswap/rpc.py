@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2020 tecnovert
+# Copyright (c) 2020-2022 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import os
 import time
 import json
+import shlex
 import urllib
 import logging
 import traceback
@@ -129,8 +130,13 @@ def openrpc(rpc_port, auth, wallet=None, host='127.0.0.1'):
 def callrpc_cli(bindir, datadir, chain, cmd, cli_bin='particl-cli'):
     cli_bin = os.path.join(bindir, cli_bin)
 
-    args = cli_bin + ('' if chain == 'mainnet' else (' -' + chain)) + ' -datadir=' + datadir + ' ' + cmd
-    p = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+    args = [cli_bin, ]
+    if chain != 'mainnet':
+        args.append('-' + chain)
+    args.append('-datadir=' + datadir)
+    args += shlex.split(cmd)
+
+    p = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out = p.communicate()
 
     if len(out[1]) > 0:
