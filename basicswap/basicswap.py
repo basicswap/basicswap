@@ -1531,6 +1531,8 @@ class BasicSwap(BaseApp):
         unspent_addr = dict()
         unspent = self.callcoinrpc(coin_type, 'listunspent')
         for u in unspent:
+            if u['spendable'] is not True:
+                continue
             unspent_addr[u['address']] = unspent_addr.get(u['address'], 0) + ci.make_int(u['amount'], r=1)
 
         sign_for_addr = None
