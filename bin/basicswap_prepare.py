@@ -42,7 +42,7 @@ else:
     FILE_EXT = 'tar.gz'
 
 known_coins = {
-    'particl': ('0.21.2.5', ''),
+    'particl': ('0.21.2.6', ''),
     'litecoin': ('0.18.1', ''),
     'bitcoin': ('0.21.1', ''),
     'namecoin': ('0.18.0', ''),

@@ -8,7 +8,7 @@
 """
 export TEST_RELOAD_PATH=/tmp/test_basicswap
 mkdir -p ${TEST_RELOAD_PATH}/bin/{particl,monero}
-cp ~/tmp/particl-0.21.2.5-x86_64-linux-gnu.tar.gz ${TEST_RELOAD_PATH}/bin/particl
+cp ~/tmp/particl-0.21.2.6-x86_64-linux-gnu.tar.gz ${TEST_RELOAD_PATH}/bin/particl
 cp ~/tmp/monero-linux-x64-v0.17.2.3.tar.bz2 ${TEST_RELOAD_PATH}/bin/monero/monero-0.17.2.3-x86_64-linux-gnu.tar.bz2
 export PYTHONPATH=$(pwd)
 python tests/basicswap/test_xmr_bids_offline.py
