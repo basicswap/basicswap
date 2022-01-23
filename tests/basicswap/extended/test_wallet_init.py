@@ -9,7 +9,7 @@
 export TEST_PATH=/tmp/test_basicswap_wallet_init
 mkdir -p ${TEST_PATH}/bin/{particl,monero,bitcoin}
 cp ~/tmp/particl-0.21.2.6-x86_64-linux-gnu.tar.gz ${TEST_PATH}/bin/particl
-cp ~/tmp/monero-linux-x64-v0.17.2.3.tar.bz2 ${TEST_PATH}/bin/monero/monero-0.17.2.3-x86_64-linux-gnu.tar.bz2
+cp ~/tmp/monero-linux-x64-v0.17.3.0.tar.bz2 ${TEST_PATH}/bin/monero/monero-0.17.3.0-x86_64-linux-gnu.tar.bz2
 cp ~/tmp/bitcoin-0.21.1-x86_64-linux-gnu.tar.gz ${TEST_PATH}/bin/bitcoin
 export PYTHONPATH=$(pwd)
 python tests/basicswap/extended/test_wallet_init.py
