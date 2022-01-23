@@ -1,6 +1,6 @@
 {% include 'header.html' %}
 
-<p><a href="/wallets">refresh</a></p>
+<p><a id="refresh" href="/wallets">refresh</a></p>
 
 <h3>Wallets</h3>
 {% if refresh %}
@@ -35,31 +35,8 @@
 
 <tr><td>Blocks:</td><td>{{ w.blocks }}</td></tr>
 <tr><td>Synced:</td><td>{{ w.synced }}</td></tr>
-<tr><td>Expected Seed:</td><td>{{ w.expected_seed }}</td>{% if w.expected_seed != true %}<td><input type="submit" name="reseed_{{ w.cid }}" value="Reseed wallet" onclick="return confirmReseed();"></td>{% endif %}</tr>
-{% if w.cid == '1' %}
-<tr><td>Stealth Address</td><td colspan=2>{{ w.stealth_address }}</td></tr>
-{% endif %}
-{% if w.cid == '6' %}
-<tr><td>Main Address</td><td colspan=2>{{ w.main_address }}</td></tr>
-<tr><td><input type="submit" name="newaddr_{{ w.cid }}" value="New Subaddress"></td><td colspan=2>{{ w.deposit_address }}</td></tr>
-{% else %}
-<tr><td><input type="submit" name="newaddr_{{ w.cid }}" value="New Deposit Address"></td><td colspan=2>{{ w.deposit_address }}</td></tr>
-{% endif %}
-<tr><td><input type="submit" name="withdraw_{{ w.cid }}" value="Withdraw" onclick="return confirmWithdrawal();"></td><td>Amount: <input type="text" name="amt_{{ w.cid }}" value="{{ w.wd_value }}"></td><td>Address: <input type="text" name="to_{{ w.cid }}" value="{{ w.wd_address }}"></td><td>Subtract fee: <input type="checkbox" name="subfee_{{ w.cid }}" {% if w.wd_subfee==true %} checked="true"{% endif %}></td></tr>
-{% if w.cid == '1' %}
-<tr><td>Type From, To</td><td>
-<select name="withdraw_type_from_{{ w.cid }}">
-<option value="plain"{% if w.wd_type_from == 'plain' %} selected{% endif %}>Plain</option>
-<option value="blind"{% if w.wd_type_from == 'blind' %} selected{% endif %}>Blind</option>
-<option value="anon"{% if w.wd_type_from == 'anon' %} selected{% endif %}>Anon</option>
-</select>
-<select name="withdraw_type_to_{{ w.cid }}">
-<option value="plain"{% if w.wd_type_to == 'plain' %} selected{% endif %}>Plain</option>
-<option value="blind"{% if w.wd_type_to == 'blind' %} selected{% endif %}>Blind</option>
-<option value="anon"{% if w.wd_type_to == 'anon' %} selected{% endif %}>Anon</option>
-</select></td></tr>
-{% endif %}
-<tr><td>Fee Rate:</td><td>{{ w.fee_rate }}</td><td>Est Fee:</td><td>{{ w.est_fee }}</td></tr>
+<tr><td>Expected Seed:</td><td>{{ w.expected_seed }}</td></tr>
+<tr><td><a href="/wallet/{{ w.ticker }}">Manage</a></td></tr>
 </table>
 {% endif %}
 {% endif %} <!-- havedata -->

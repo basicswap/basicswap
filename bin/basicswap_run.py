@@ -158,7 +158,7 @@ def runClient(fp, data_dir, chain):
         swap_client.start()
 
         if 'htmlhost' in settings:
-            swap_client.log.info('Starting server at %s:%d.' % (settings['htmlhost'], settings['htmlport']))
+            swap_client.log.info('Starting server at http://%s:%d.' % (settings['htmlhost'], settings['htmlport']))
             allow_cors = settings['allowcors'] if 'allowcors' in settings else cfg.DEFAULT_ALLOW_CORS
             tS1 = HttpThread(fp, settings['htmlhost'], settings['htmlport'], allow_cors, swap_client)
             threads.append(tS1)

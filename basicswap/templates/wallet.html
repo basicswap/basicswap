@@ -1,0 +1,82 @@
+{% include 'header.html' %}
+
+
+<p><a id="refresh" href="/wallet/{{ w.ticker }}">refresh</a></p>
+<p><a id="back" href="/wallets">back</a></p>
+
+<h3>{{ w.name }} Wallet</h3>
+{% if refresh %}
+<p>Page Refresh: {{ refresh }} seconds</p>
+{% endif %}
+
+{% for m in messages %}
+<p>{{ m }}</p>
+{% endfor %}
+
+<form method="post">
+
+
+{% if w.updating %}
+<h5>Updating</h5>
+{% endif %}
+{% if w.havedata %}
+{% if w.error %}
+<p>Error: {{ w.error }}</p>
+{% else %}
+<table>
+
+<tr><td>Last updated:</td><td>{{ w.lastupdated }}</td></tr>
+<tr><td>Version:</td><td>{{ w.version }}</td></tr>
+<tr><td>Balance:</td><td>{{ w.balance }}</td>{% if w.unconfirmed %}<td>Unconfirmed:</td><td>{{ w.unconfirmed }}</td>{% endif %}</tr>
+
+{% if w.cid == '1' %}
+<tr><td>Blind Balance:</td><td>{{ w.blind_balance }}</td>{% if w.blind_unconfirmed %}<td>Blind Unconfirmed:</td><td>{{ w.blind_unconfirmed }}</td>{% endif %}</tr>
+<tr><td>Anon Balance:</td><td>{{ w.anon_balance }}</td>{% if w.anon_pending %}<td>Anon Pending:</td><td>{{ w.anon_pending }}</td>{% endif %}</tr>
+{% endif %}
+
+
+<tr><td>Blocks:</td><td>{{ w.blocks }}</td></tr>
+<tr><td>Synced:</td><td>{{ w.synced }}</td></tr>
+<tr><td>Expected Seed:</td><td>{{ w.expected_seed }}</td>{% if w.expected_seed != true %}<td><input type="submit" name="reseed_{{ w.cid }}" value="Reseed wallet" onclick="return confirmReseed();"></td>{% endif %}</tr>
+{% if w.cid == '1' %}
+<tr><td>Stealth Address</td><td colspan=2>{{ w.stealth_address }}</td></tr>
+{% endif %}
+{% if w.cid == '6' %}
+<tr><td>Main Address</td><td colspan=2>{{ w.main_address }}</td></tr>
+<tr><td><input type="submit" name="newaddr_{{ w.cid }}" value="New Subaddress"></td><td colspan=2>{{ w.deposit_address }}</td></tr>
+{% else %}
+<tr><td><input type="submit" name="newaddr_{{ w.cid }}" value="New Deposit Address"></td><td colspan=2>{{ w.deposit_address }}</td></tr>
+{% endif %}
+<tr><td><input type="submit" name="withdraw_{{ w.cid }}" value="Withdraw" onclick="return confirmWithdrawal();"></td><td>Amount: <input type="text" name="amt_{{ w.cid }}" value="{{ w.wd_value }}"></td><td>Address: <input type="text" name="to_{{ w.cid }}" value="{{ w.wd_address }}"></td><td>Subtract fee: <input type="checkbox" name="subfee_{{ w.cid }}" {% if w.wd_subfee==true %} checked="true"{% endif %}></td></tr>
+{% if w.cid == '1' %}
+<tr><td>Type From, To</td><td>
+<select name="withdraw_type_from_{{ w.cid }}">
+<option value="plain"{% if w.wd_type_from == 'plain' %} selected{% endif %}>Plain</option>
+<option value="blind"{% if w.wd_type_from == 'blind' %} selected{% endif %}>Blind</option>
+<option value="anon"{% if w.wd_type_from == 'anon' %} selected{% endif %}>Anon</option>
+</select>
+<select name="withdraw_type_to_{{ w.cid }}">
+<option value="plain"{% if w.wd_type_to == 'plain' %} selected{% endif %}>Plain</option>
+<option value="blind"{% if w.wd_type_to == 'blind' %} selected{% endif %}>Blind</option>
+<option value="anon"{% if w.wd_type_to == 'anon' %} selected{% endif %}>Anon</option>
+</select></td></tr>
+{% endif %}
+<tr><td>Fee Rate:</td><td>{{ w.fee_rate }}</td><td>Est Fee:</td><td>{{ w.est_fee }}</td></tr>
+</table>
+{% endif %}
+{% endif %} <!-- havedata -->
+
+<input type="hidden" name="formid" value="{{ form_id }}">
+</form>
+
+<p><a href="/">home</a></p>
+
+<script>
+function confirmReseed() {
+    return confirm("Are you sure?\nBackup your wallet before and after.\nWon't detect used keys.\nShould only be used for new wallets.");
+}
+function confirmWithdrawal() {
+    return confirm("Are you sure?");
+}
+</script>
+</body></html>

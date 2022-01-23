@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019-2021 tecnovert
+# Copyright (c) 2019-2022 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -207,6 +207,20 @@ chainparams = {
 }
 
 
+ticker_map = {}
+
+
+for c, params in chainparams.items():
+    ticker_map[params['ticker'].lower()] = c
+
+
+def getCoinIdFromTicker(ticker):
+    try:
+        return ticker_map[ticker.lower()]
+    except Exception:
+        raise ValueError('Unknown coin')
+
+
 class CoinInterface:
     def __init__(self, network):
         self.setDefaults()
@@ -233,6 +247,10 @@ class CoinInterface:
             ticker = 't' + ticker
         elif self._network == 'regtest':
             ticker = 'rt' + ticker
+        return ticker
+
+    def ticker_mainnet(self):
+        ticker = chainparams[self.coin_type()]['ticker']
         return ticker
 
     def min_amount(self):

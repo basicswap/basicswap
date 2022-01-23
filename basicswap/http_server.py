@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019-2021 tecnovert
+# Copyright (c) 2019-2022 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -17,11 +17,13 @@ from jinja2 import Environment, PackageLoader
 from . import __version__
 from .util import (
     dumpj,
+    ensure,
     format_timestamp,
 )
 from .chainparams import (
-    chainparams,
     Coins,
+    chainparams,
+    getCoinIdFromTicker,
 )
 from .basicswap_util import (
     SwapTypes,
@@ -370,16 +372,12 @@ class HttpHandler(BaseHTTPRequestHandler):
                 continue
 
             ci = swap_client.ci(k)
-            fee_rate, fee_src = swap_client.getFeeRateForCoin(k)
-            est_fee = swap_client.estimateWithdrawFee(k, fee_rate)
             cid = str(int(k))
             wf = {
                 'name': w['name'],
                 'version': w['version'],
+                'ticker': ci.ticker_mainnet(),
                 'cid': cid,
-                'fee_rate': ci.format_amount(int(fee_rate * ci.COIN())),
-                'fee_rate_src': fee_src,
-                'est_fee': 'Unknown' if est_fee is None else ci.format_amount(int(est_fee * ci.COIN())),
                 'balance': w['balance'],
                 'blocks': w['blocks'],
                 'synced': w['synced'],
@@ -402,21 +400,6 @@ class HttpHandler(BaseHTTPRequestHandler):
                 if float(w['anon_pending']) > 0.0:
                     wf['anon_pending'] = w['anon_pending']
 
-            elif k == Coins.XMR:
-                wf['main_address'] = w.get('main_address', 'Refresh necessary')
-
-            if 'wd_type_from_' + cid in page_data:
-                wf['wd_type_from'] = page_data['wd_type_from_' + cid]
-            if 'wd_type_to_' + cid in page_data:
-                wf['wd_type_to'] = page_data['wd_type_to_' + cid]
-
-            if 'wd_value_' + cid in page_data:
-                wf['wd_value'] = page_data['wd_value_' + cid]
-            if 'wd_address_' + cid in page_data:
-                wf['wd_address'] = page_data['wd_address_' + cid]
-            if 'wd_subfee_' + cid in page_data:
-                wf['wd_subfee'] = page_data['wd_subfee_' + cid]
-
             wallets_formatted.append(wf)
 
         template = env.get_template('wallets.html')
@@ -425,6 +408,146 @@ class HttpHandler(BaseHTTPRequestHandler):
             h2=self.server.title,
             messages=messages,
             wallets=wallets_formatted,
+            form_id=os.urandom(8).hex(),
+        ), 'UTF-8')
+
+    def page_wallet(self, url_split, post_string):
+        ensure(len(url_split) > 2, 'Wallet not specified')
+        wallet_ticker = url_split[2]
+        swap_client = self.server.swap_client
+
+        coin_id = getCoinIdFromTicker(wallet_ticker)
+
+        page_data = {}
+        messages = []
+        form_data = self.checkForm(post_string, 'settings', messages)
+        if form_data:
+            cid = str(int(coin_id))
+
+            if bytes('newaddr_' + cid, 'utf-8') in form_data:
+                swap_client.cacheNewAddressForCoin(coin_id)
+            elif bytes('reseed_' + cid, 'utf-8') in form_data:
+                try:
+                    swap_client.reseedWallet(coin_id)
+                    messages.append('Reseed complete ' + str(coin_id))
+                except Exception as ex:
+                    messages.append('Reseed failed ' + str(ex))
+                swap_client.updateWalletsInfo(True, coin_id)
+            elif bytes('withdraw_' + cid, 'utf-8') in form_data:
+                try:
+                    value = form_data[bytes('amt_' + cid, 'utf-8')][0].decode('utf-8')
+                    page_data['wd_value_' + cid] = value
+                except Exception as e:
+                    messages.append('Error: Missing value')
+                try:
+                    address = form_data[bytes('to_' + cid, 'utf-8')][0].decode('utf-8')
+                    page_data['wd_address_' + cid] = address
+                except Exception as e:
+                    messages.append('Error: Missing address')
+
+                subfee = True if bytes('subfee_' + cid, 'utf-8') in form_data else False
+                page_data['wd_subfee_' + cid] = subfee
+
+                if coin_id == Coins.PART:
+                    try:
+                        type_from = form_data[bytes('withdraw_type_from_' + cid, 'utf-8')][0].decode('utf-8')
+                        type_to = form_data[bytes('withdraw_type_to_' + cid, 'utf-8')][0].decode('utf-8')
+                        page_data['wd_type_from_' + cid] = type_from
+                        page_data['wd_type_to_' + cid] = type_to
+                    except Exception as e:
+                        messages.append('Error: Missing type')
+
+                if len(messages) == 0:
+                    ci = swap_client.ci(coin_id)
+                    ticker = ci.ticker()
+                    if coin_id == Coins.PART:
+                        try:
+                            txid = swap_client.withdrawParticl(type_from, type_to, value, address, subfee)
+                            messages.append('Withdrew {} {} ({} to {}) to address {}<br/>In txid: {}'.format(value, ticker, type_from, type_to, address, txid))
+                        except Exception as e:
+                            messages.append('Error: {}'.format(str(e)))
+                    else:
+                        try:
+                            txid = swap_client.withdrawCoin(coin_id, value, address, subfee)
+                            messages.append('Withdrew {} {} to address {}<br/>In txid: {}'.format(value, ticker, address, txid))
+                        except Exception as e:
+                            messages.append('Error: {}'.format(str(e)))
+                    swap_client.updateWalletsInfo(True, coin_id)
+
+        swap_client.updateWalletsInfo()
+        wallets = swap_client.getCachedWalletsInfo({'coin_id': coin_id})
+        for k in wallets.keys():
+            w = wallets[k]
+            if 'error' in w:
+                wallet_data = {
+                    'cid': str(int(k)),
+                    'error': w['error']
+                }
+                continue
+
+            if 'balance' not in w:
+                wallet_data = {
+                    'name': w['name'],
+                    'havedata': False,
+                    'updating': w['updating'],
+                }
+                continue
+
+            ci = swap_client.ci(k)
+            fee_rate, fee_src = swap_client.getFeeRateForCoin(k)
+            est_fee = swap_client.estimateWithdrawFee(k, fee_rate)
+            cid = str(int(k))
+            wallet_data = {
+                'name': w['name'],
+                'version': w['version'],
+                'ticker': ci.ticker_mainnet(),
+                'cid': cid,
+                'fee_rate': ci.format_amount(int(fee_rate * ci.COIN())),
+                'fee_rate_src': fee_src,
+                'est_fee': 'Unknown' if est_fee is None else ci.format_amount(int(est_fee * ci.COIN())),
+                'balance': w['balance'],
+                'blocks': w['blocks'],
+                'synced': w['synced'],
+                'deposit_address': w['deposit_address'],
+                'expected_seed': w['expected_seed'],
+                'balance_all': float(w['balance']) + float(w['unconfirmed']),
+                'updating': w['updating'],
+                'lastupdated': format_timestamp(w['lastupdated']),
+                'havedata': True,
+            }
+            if float(w['unconfirmed']) > 0.0:
+                wallet_data['unconfirmed'] = w['unconfirmed']
+
+            if k == Coins.PART:
+                wallet_data['stealth_address'] = w['stealth_address']
+                wallet_data['blind_balance'] = w['blind_balance']
+                if float(w['blind_unconfirmed']) > 0.0:
+                    wallet_data['blind_unconfirmed'] = w['blind_unconfirmed']
+                wallet_data['anon_balance'] = w['anon_balance']
+                if float(w['anon_pending']) > 0.0:
+                    wallet_data['anon_pending'] = w['anon_pending']
+
+            elif k == Coins.XMR:
+                wallet_data['main_address'] = w.get('main_address', 'Refresh necessary')
+
+            if 'wd_type_from_' + cid in page_data:
+                wallet_data['wd_type_from'] = page_data['wd_type_from_' + cid]
+            if 'wd_type_to_' + cid in page_data:
+                wallet_data['wd_type_to'] = page_data['wd_type_to_' + cid]
+
+            if 'wd_value_' + cid in page_data:
+                wallet_data['wd_value'] = page_data['wd_value_' + cid]
+            if 'wd_address_' + cid in page_data:
+                wallet_data['wd_address'] = page_data['wd_address_' + cid]
+            if 'wd_subfee_' + cid in page_data:
+                wallet_data['wd_subfee'] = page_data['wd_subfee_' + cid]
+
+        template = env.get_template('wallet.html')
+        return bytes(template.render(
+            title=self.server.title,
+            h2=self.server.title,
+            messages=messages,
+            w=wallet_data,
             form_id=os.urandom(8).hex(),
         ), 'UTF-8')
 
@@ -764,7 +887,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         ), 'UTF-8')
 
     def page_offer(self, url_split, post_string):
-        assert(len(url_split) > 2), 'Offer ID not specified'
+        ensure(len(url_split) > 2, 'Offer ID not specified')
         try:
             offer_id = bytes.fromhex(url_split[2])
             assert(len(offer_id) == 28)
@@ -772,7 +895,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             raise ValueError('Bad offer ID')
         swap_client = self.server.swap_client
         offer, xmr_offer = swap_client.getXmrOffer(offer_id)
-        assert(offer), 'Unknown offer ID'
+        ensure(offer, 'Unknown offer ID')
 
         extend_data = {  # Defaults
             'nb_validmins': 10,
@@ -928,11 +1051,11 @@ class HttpHandler(BaseHTTPRequestHandler):
 
             if have_data_entry(form_data, 'sort_by'):
                 sort_by = get_data_entry(form_data, 'sort_by')
-                assert(sort_by in ['created_at', 'rate']), 'Invalid sort by'
+                ensure(sort_by in ['created_at', 'rate'], 'Invalid sort by')
                 filters['sort_by'] = sort_by
             if have_data_entry(form_data, 'sort_dir'):
                 sort_dir = get_data_entry(form_data, 'sort_dir')
-                assert(sort_dir in ['asc', 'desc']), 'Invalid sort dir'
+                ensure(sort_dir in ['asc', 'desc'], 'Invalid sort dir')
                 filters['sort_dir'] = sort_dir
 
         if form_data and have_data_entry(form_data, 'pageback'):
@@ -973,7 +1096,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         ), 'UTF-8')
 
     def page_bid(self, url_split, post_string):
-        assert(len(url_split) > 2), 'Bid ID not specified'
+        ensure(len(url_split) > 2, 'Bid ID not specified')
         try:
             bid_id = bytes.fromhex(url_split[2])
             assert(len(bid_id) == 28)
@@ -1023,7 +1146,7 @@ class HttpHandler(BaseHTTPRequestHandler):
                 show_lock_transfers = True
 
         bid, xmr_swap, offer, xmr_offer, events = swap_client.getXmrBidAndOffer(bid_id)
-        assert(bid), 'Unknown bid ID'
+        ensure(bid, 'Unknown bid ID')
 
         data = describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, events, edit_bid, show_txns, view_tx_ind, show_lock_transfers=show_lock_transfers)
 
@@ -1077,11 +1200,11 @@ class HttpHandler(BaseHTTPRequestHandler):
         if form_data and have_data_entry(form_data, 'applyfilters'):
             if have_data_entry(form_data, 'sort_by'):
                 sort_by = get_data_entry(form_data, 'sort_by')
-                assert(sort_by in ['created_at', ]), 'Invalid sort by'
+                ensure(sort_by in ['created_at', ], 'Invalid sort by')
                 filters['sort_by'] = sort_by
             if have_data_entry(form_data, 'sort_dir'):
                 sort_dir = get_data_entry(form_data, 'sort_dir')
-                assert(sort_dir in ['asc', 'desc']), 'Invalid sort dir'
+                ensure(sort_dir in ['asc', 'desc'], 'Invalid sort dir')
                 filters['sort_dir'] = sort_dir
 
         if form_data and have_data_entry(form_data, 'pageback'):
@@ -1144,7 +1267,7 @@ class HttpHandler(BaseHTTPRequestHandler):
                 edit_address_id = int(form_data[b'edit_address_id'][0].decode('utf-8'))
                 edit_addr = form_data[b'edit_address'][0].decode('utf-8')
                 active_ind = int(form_data[b'active_ind'][0].decode('utf-8'))
-                assert(active_ind == 0 or active_ind == 1), 'Invalid sort by'
+                ensure(active_ind in (0, 1), 'Invalid sort by')
                 addressnote = '' if b'addressnote' not in form_data else form_data[b'addressnote'][0].decode('utf-8')
                 if not validateTextInput(addressnote, 'Address note', messages, max_length=30):
                     listaddresses = False
@@ -1196,7 +1319,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         ), 'UTF-8')
 
     def page_identity(self, url_split, post_string):
-        assert(len(url_split) > 2), 'Address not specified'
+        ensure(len(url_split) > 2, 'Address not specified')
         identity_address = url_split[2]
         swap_client = self.server.swap_client
 
@@ -1333,6 +1456,8 @@ class HttpHandler(BaseHTTPRequestHandler):
                     return self.page_active(url_split, post_string)
                 if url_split[1] == 'wallets':
                     return self.page_wallets(url_split, post_string)
+                if url_split[1] == 'wallet':
+                    return self.page_wallet(url_split, post_string)
                 if url_split[1] == 'settings':
                     return self.page_settings(url_split, post_string)
                 if url_split[1] == 'rpc':

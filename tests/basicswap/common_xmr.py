@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2020-2021 tecnovert
+# Copyright (c) 2020-2022 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -149,18 +149,18 @@ class XmrTestBase(unittest.TestCase):
 
         waitForServer(self.delay_event, 12701)
 
-        def waitForDepositAddress():
+        def waitForMainAddress():
             for i in range(20):
                 if self.delay_event.is_set():
                     raise ValueError('Test stopped.')
                 try:
                     wallets = json.loads(urlopen('http://127.0.0.1:12701/json/wallets').read())
-                    return wallets['6']['deposit_address']
+                    return wallets['6']['main_address']
                 except Exception as e:
-                    print('Waiting for deposit address {}'.format(str(e)))
+                    print('Waiting for main address {}'.format(str(e)))
                 self.delay_event.wait(1)
-            raise ValueError('waitForDepositAddress timedout')
-        xmr_addr1 = waitForDepositAddress()
+            raise ValueError('waitForMainAddress timedout')
+        xmr_addr1 = waitForMainAddress()
 
         num_blocks = 100
 
@@ -178,11 +178,15 @@ class XmrTestBase(unittest.TestCase):
         for i in range(60):
             if self.delay_event.is_set():
                 raise ValueError('Test stopped.')
-            wallets = json.loads(urlopen('http://127.0.0.1:12701/json/wallets').read())
-            particl_blocks = wallets['1']['blocks']
-            print('particl_blocks', particl_blocks)
-            if particl_blocks >= num_blocks:
-                break
+            try:
+                wallets = json.loads(urlopen('http://127.0.0.1:12701/json/wallets').read())
+                particl_blocks = wallets['1']['blocks']
+                print('particl_blocks', particl_blocks)
+                if particl_blocks >= num_blocks:
+                    break
+            except Exception as e:
+                print('Error reading wallets', str(e))
+
             self.delay_event.wait(1)
         assert(particl_blocks >= num_blocks)
 

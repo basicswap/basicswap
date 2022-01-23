@@ -12,6 +12,7 @@ import mmap
 import stat
 import gnupg
 import signal
+import socket
 import hashlib
 import tarfile
 import zipfile
@@ -114,7 +115,12 @@ def downloadFile(url, path):
     opener = urllib.request.build_opener()
     opener.addheaders = [('User-agent', 'Mozilla/5.0')]
     urllib.request.install_opener(opener)
+
+    # Set one second timeout for urlretrieve connections
+    old_timeout = socket.getdefaulttimeout()
+    socket.setdefaulttimeout(1)
     urlretrieve(url, path, make_reporthook())
+    socket.setdefaulttimeout(old_timeout)
 
 
 def extractCore(coin, version_pair, settings, bin_dir, release_path):

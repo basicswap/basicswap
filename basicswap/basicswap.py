@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019-2021 tecnovert
+# Copyright (c) 2019-2022 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -325,6 +325,8 @@ class BasicSwap(BaseApp):
             self.thread_pool.shutdown(cancel_futures=True)
         else:
             self.thread_pool.shutdown()
+
+        self.zmqContext.destroy()
 
         close_all_sessions()
         self.engine.dispose()
@@ -5260,7 +5262,10 @@ class BasicSwap(BaseApp):
         # Requires? self.mxDB.acquire()
         try:
             session = scoped_session(self.session_factory)
-            inner_str = 'SELECT coin_id, MAX(created_at) as max_created_at FROM wallets GROUP BY coin_id'
+            where_str = ''
+            if opts is not None and 'coin_id' in opts:
+                where_str = 'WHERE coin_id = {}'.format(opts['coin_id'])
+            inner_str = f'SELECT coin_id, MAX(created_at) as max_created_at FROM wallets {where_str} GROUP BY coin_id'
             query_str = 'SELECT a.coin_id, wallet_data, created_at FROM wallets a, ({}) b WHERE a.coin_id = b.coin_id AND a.created_at = b.max_created_at'.format(inner_str)
 
             q = session.execute(query_str)
@@ -5284,6 +5289,9 @@ class BasicSwap(BaseApp):
         finally:
             session.close()
             session.remove()
+
+        if opts is not None and 'coin_id' in opts:
+            return rv
 
         for c in Coins:
             if c not in chainparams:

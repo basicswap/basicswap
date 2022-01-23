@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2021 tecnovert
+# Copyright (c) 2021-2022 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -266,7 +266,7 @@ class Test(unittest.TestCase):
 
         wallets = json.loads(urlopen('http://127.0.0.1:{}/json/wallets'.format(UI_PORT + 1)).read())
 
-        self.xmr_addr = wallets['6']['deposit_address']
+        self.xmr_addr = wallets['6']['main_address']
         num_blocks = 100
         if callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'get_block_count')['count'] < num_blocks:
             logging.info('Mining {} Monero blocks to {}.'.format(num_blocks, self.xmr_addr))

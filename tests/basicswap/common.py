@@ -7,9 +7,9 @@
 
 import os
 import json
+import urllib
 import signal
 import logging
-import urllib
 from urllib.request import urlopen
 
 from basicswap.rpc import callrpc
