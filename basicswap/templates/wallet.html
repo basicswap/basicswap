@@ -15,7 +15,6 @@
 
 <form method="post">
 
-
 {% if w.updating %}
 <h5>Updating</h5>
 {% endif %}
@@ -62,7 +61,25 @@
 </select></td></tr>
 {% endif %}
 <tr><td>Fee Rate:</td><td>{{ w.fee_rate }}</td><td>Est Fee:</td><td>{{ w.est_fee }}</td></tr>
+
+{% if w.cid != '6' %}
+{% if w.show_utxo_groups %}
+<tr><td colspan=3>
+<textarea class="monospace" id="tx_view" rows="10" cols="150" readonly>
+{{ w.utxo_groups }}
+</textarea>
+</td></tr>
+<tr><td><input type="submit" id="create_utxo" name="create_utxo" value="Create UTXO" onclick="return confirmUTXOResize();"></td><td>Amount: <input type="text" name="utxo_value" value="{{ w.utxo_value }}"></td></tr>
+<tr><td>
+  <input type="submit" id="closeutxogroups" name="closeutxogroups" value="Close UTXO Groups">
+</td></tr>
+{% else %}
+<tr><td>
+  <input type="submit" id="showutxogroups" name="showutxogroups" value="Show UTXO Groups">
+</td></tr>
+{% endif %}
 </table>
+{% endif %}
 {% endif %}
 {% endif %} <!-- havedata -->
 
@@ -76,6 +93,9 @@ function confirmReseed() {
     return confirm("Are you sure?\nBackup your wallet before and after.\nWon't detect used keys.\nShould only be used for new wallets.");
 }
 function confirmWithdrawal() {
+    return confirm("Are you sure?");
+}
+function confirmUTXOResize() {
     return confirm("Are you sure?");
 }
 </script>

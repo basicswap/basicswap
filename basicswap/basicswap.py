@@ -1522,6 +1522,18 @@ class BasicSwap(BaseApp):
             self.mxDB.release()
         return self._contract_count
 
+    def getUnspentsByAddr(self, coin_type):
+        ci = self.ci(coin_type)
+
+        unspent_addr = dict()
+        unspent = self.callcoinrpc(coin_type, 'listunspent')
+        for u in unspent:
+            if u['spendable'] is not True:
+                continue
+            unspent_addr[u['address']] = unspent_addr.get(u['address'], 0) + ci.make_int(u['amount'], r=1)
+
+        return unspent_addr
+
     def getProofOfFunds(self, coin_type, amount_for, extra_commit_bytes):
         ci = self.ci(coin_type)
         self.log.debug('getProofOfFunds %s %s', ci.coin_name(), ci.format_amount(amount_for))
@@ -1530,12 +1542,7 @@ class BasicSwap(BaseApp):
             return (None, None)
 
         # TODO: Lock unspent and use same output/s to fund bid
-        unspent_addr = dict()
-        unspent = self.callcoinrpc(coin_type, 'listunspent')
-        for u in unspent:
-            if u['spendable'] is not True:
-                continue
-            unspent_addr[u['address']] = unspent_addr.get(u['address'], 0) + ci.make_int(u['amount'], r=1)
+        unspent_addr = self.getUnspentsByAddr(coin_type)
 
         sign_for_addr = None
         for addr, value in unspent_addr.items():

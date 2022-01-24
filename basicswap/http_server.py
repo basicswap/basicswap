@@ -421,6 +421,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         page_data = {}
         messages = []
         form_data = self.checkForm(post_string, 'settings', messages)
+        show_utxo_groups = False
         if form_data:
             cid = str(int(coin_id))
 
@@ -473,6 +474,25 @@ class HttpHandler(BaseHTTPRequestHandler):
                         except Exception as e:
                             messages.append('Error: {}'.format(str(e)))
                     swap_client.updateWalletsInfo(True, coin_id)
+            elif have_data_entry(form_data, 'showutxogroups'):
+                show_utxo_groups = True
+            elif have_data_entry(form_data, 'create_utxo'):
+                show_utxo_groups = True
+                try:
+                    value = get_data_entry(form_data, 'utxo_value')
+                    page_data['utxo_value'] = value
+
+                    ci = swap_client.ci(coin_id)
+
+                    value_sats = ci.make_int(value)
+
+                    txid, address = ci.createUTXO(value_sats)
+                    messages.append('Created new utxo of value {} and address {}<br/>In txid: {}'.format(value, address, txid))
+                except Exception as e:
+                    messages.append('Error: {}'.format(str(e)))
+                    if swap_client.debug is True:
+                        swap_client.log.error(traceback.format_exc())
+
 
         swap_client.updateWalletsInfo()
         wallets = swap_client.getCachedWalletsInfo({'coin_id': coin_id})
@@ -541,6 +561,20 @@ class HttpHandler(BaseHTTPRequestHandler):
                 wallet_data['wd_address'] = page_data['wd_address_' + cid]
             if 'wd_subfee_' + cid in page_data:
                 wallet_data['wd_subfee'] = page_data['wd_subfee_' + cid]
+            if 'utxo_value' in page_data:
+                wallet_data['utxo_value'] = page_data['utxo_value']
+
+            if show_utxo_groups:
+                utxo_groups = ''
+
+                unspent_by_addr = swap_client.getUnspentsByAddr(k)
+
+                sorted_unspent_by_addr = sorted(unspent_by_addr.items(), key=lambda x:x[1], reverse=True)
+                for kv in sorted_unspent_by_addr:
+                    utxo_groups += kv[0] + ' ' + ci.format_amount(kv[1]) + '\n'
+
+                wallet_data['show_utxo_groups'] = True
+                wallet_data['utxo_groups'] = utxo_groups
 
         template = env.get_template('wallet.html')
         return bytes(template.render(

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2020-2021 tecnovert
+# Copyright (c) 2020-2022 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -176,6 +176,7 @@ class BTCInterface(CoinInterface):
         self.rpc_callback = make_rpc_func(self._rpcport, self._rpcauth, host=self._rpc_host)
         self.blocks_confirmed = coin_settings['blocks_confirmed']
         self.setConfTarget(coin_settings['conf_target'])
+        self._use_segwit = coin_settings['use_segwit']
         self._sc = swap_client
         self._log = self._sc.log if self._sc and self._sc.log else logging
 
@@ -265,8 +266,8 @@ class BTCInterface(CoinInterface):
     def getWalletSeedID(self):
         return self.rpc_callback('getwalletinfo')['hdseedid']
 
-    def getNewAddress(self, use_segwit):
-        args = ['swap_receive']
+    def getNewAddress(self, use_segwit, label='swap_receive'):
+        args = [label]
         if use_segwit:
             args.append('bech32')
         return self.rpc_callback('getnewaddress', args)
@@ -1127,6 +1128,16 @@ class BTCInterface(CoinInterface):
 
     def getSpendableBalance(self):
         return self.make_int(self.rpc_callback('getbalances')['mine']['trusted'])
+
+    def createUTXO(self, value_sats):
+        # Create a new address and send value_sats to it
+
+        spendable_balance = self.getSpendableBalance()
+        if spendable_balance < value_sats:
+            raise ValueError('Balance too low')
+
+        address = self.getNewAddress(self._use_segwit, 'create_utxo')
+        return self.withdrawCoin(self.format_amount(value_sats), address, False), address
 
 
 def testBTCInterface():

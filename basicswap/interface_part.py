@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2020-2021 tecnovert
+# Copyright (c) 2020-2022 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -70,11 +70,11 @@ class PARTInterface(BTCInterface):
         # TODO: Double check
         return True
 
-    def getNewAddress(self, use_segwit):
-        return self.rpc_callback('getnewaddress', ['swap_receive'])
+    def getNewAddress(self, use_segwit, label='swap_receive'):
+        return self.rpc_callback('getnewaddress', [label])
 
-    def getNewStealthAddress(self):
-        return self.rpc_callback('getnewstealthaddress', ['swap_stealth'])
+    def getNewStealthAddress(self, label='swap_stealth'):
+        return self.rpc_callback('getnewstealthaddress', [label])
 
     def haveSpentIndex(self):
         version = self.getDaemonVersion()
