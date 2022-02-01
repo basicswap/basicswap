@@ -186,6 +186,8 @@ class Test(unittest.TestCase):
                     for ip in range(NUM_NODES):
                         if ip != i:
                             fp.write('connect=127.0.0.1:{}\n'.format(PARTICL_PORT_BASE + ip + PORT_OFS))
+                    for opt in EXTRA_CONFIG_JSON.get('part{}'.format(i), []):
+                        fp.write(opt + '\n')
 
                 # Pruned nodes don't provide blocks
                 with open(os.path.join(client_path, 'bitcoin', 'bitcoin.conf'), 'r') as fp:
