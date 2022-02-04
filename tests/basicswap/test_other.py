@@ -36,6 +36,8 @@ from basicswap.util import (
 
 
 class Test(unittest.TestCase):
+    REQUIRED_SETTINGS = {'blocks_confirmed': 1, 'conf_target': 1, 'use_segwit': True}
+
     def test_serialise_num(self):
         def test_case(v, nb=None):
             b = SerialiseNum(v)
@@ -54,7 +56,9 @@ class Test(unittest.TestCase):
         test_case(4194642)
 
     def test_sequence(self):
-        coin_settings = {'rpcport': 0, 'rpcauth': 'none', 'blocks_confirmed': 1, 'conf_target': 1}
+        coin_settings = {'rpcport': 0, 'rpcauth': 'none'}
+        coin_settings.update(self.REQUIRED_SETTINGS)
+
         ci = BTCInterface(coin_settings, 'regtest')
 
         time_val = 48 * 60 * 60
@@ -160,7 +164,8 @@ class Test(unittest.TestCase):
         assert(pubkey == pubkey_test)
 
     def test_ecdsa_otves(self):
-        coin_settings = {'rpcport': 0, 'rpcauth': 'none', 'blocks_confirmed': 1, 'conf_target': 1}
+        coin_settings = {'rpcport': 0, 'rpcauth': 'none'}
+        coin_settings.update(self.REQUIRED_SETTINGS)
         ci = BTCInterface(coin_settings, 'regtest')
         vk_sign = i2b(ci.getNewSecretKey())
         vk_encrypt = i2b(ci.getNewSecretKey())
@@ -182,7 +187,8 @@ class Test(unittest.TestCase):
         assert(vk_encrypt == recovered_key)
 
     def test_sign(self):
-        coin_settings = {'rpcport': 0, 'rpcauth': 'none', 'blocks_confirmed': 1, 'conf_target': 1}
+        coin_settings = {'rpcport': 0, 'rpcauth': 'none'}
+        coin_settings.update(self.REQUIRED_SETTINGS)
         ci = BTCInterface(coin_settings, 'regtest')
 
         vk = i2b(ci.getNewSecretKey())
@@ -196,7 +202,8 @@ class Test(unittest.TestCase):
         ci.verifySig(pk, message_hash, sig)
 
     def test_sign_compact(self):
-        coin_settings = {'rpcport': 0, 'rpcauth': 'none', 'blocks_confirmed': 1, 'conf_target': 1}
+        coin_settings = {'rpcport': 0, 'rpcauth': 'none'}
+        coin_settings.update(self.REQUIRED_SETTINGS)
         ci = BTCInterface(coin_settings, 'regtest')
 
         vk = i2b(ci.getNewSecretKey())
@@ -206,14 +213,17 @@ class Test(unittest.TestCase):
         ci.verifyCompact(pk, 'test signing message', sig)
 
     def test_pubkey_to_address(self):
-        coin_settings = {'rpcport': 0, 'rpcauth': 'none', 'blocks_confirmed': 1, 'conf_target': 1}
+        coin_settings = {'rpcport': 0, 'rpcauth': 'none'}
+        coin_settings.update(self.REQUIRED_SETTINGS)
         ci = BTCInterface(coin_settings, 'regtest')
         pk = h2b('02c26a344e7d21bcc6f291532679559f2fd234c881271ff98714855edc753763a6')
         addr = ci.pubkey_to_address(pk)
         assert(addr == 'mj6SdSxmWRmdDqR5R3FfZmRiLmQfQAsLE8')
 
     def test_dleag(self):
-        coin_settings = {'rpcport': 0, 'walletrpcport': 0, 'walletrpcauth': 'none', 'blocks_confirmed': 1, 'conf_target': 1}
+        coin_settings = {'rpcport': 0, 'walletrpcport': 0, 'walletrpcauth': 'none'}
+        coin_settings.update(self.REQUIRED_SETTINGS)
+
         ci = XMRInterface(coin_settings, 'regtest')
 
         key = i2b(ci.getNewSecretKey())

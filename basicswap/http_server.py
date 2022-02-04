@@ -493,7 +493,6 @@ class HttpHandler(BaseHTTPRequestHandler):
                     if swap_client.debug is True:
                         swap_client.log.error(traceback.format_exc())
 
-
         swap_client.updateWalletsInfo()
         wallets = swap_client.getCachedWalletsInfo({'coin_id': coin_id})
         for k in wallets.keys():
@@ -569,7 +568,7 @@ class HttpHandler(BaseHTTPRequestHandler):
 
                 unspent_by_addr = swap_client.getUnspentsByAddr(k)
 
-                sorted_unspent_by_addr = sorted(unspent_by_addr.items(), key=lambda x:x[1], reverse=True)
+                sorted_unspent_by_addr = sorted(unspent_by_addr.items(), key=lambda x: x[1], reverse=True)
                 for kv in sorted_unspent_by_addr:
                     utxo_groups += kv[0] + ' ' + ci.format_amount(kv[1]) + '\n'
 
