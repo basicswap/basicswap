@@ -43,7 +43,7 @@ else:
     FILE_EXT = 'tar.gz'
 
 known_coins = {
-    'particl': ('0.21.2.6', ''),
+    'particl': ('0.21.2.7', ''),
     'litecoin': ('0.18.1', ''),
     'bitcoin': ('0.21.1', ''),
     'namecoin': ('0.18.0', ''),
@@ -118,7 +118,7 @@ def downloadFile(url, path):
 
     # Set one second timeout for urlretrieve connections
     old_timeout = socket.getdefaulttimeout()
-    socket.setdefaulttimeout(1)
+    socket.setdefaulttimeout(5)
     urlretrieve(url, path, make_reporthook())
     socket.setdefaulttimeout(old_timeout)
 
