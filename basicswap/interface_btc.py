@@ -16,17 +16,26 @@ from basicswap.contrib.test_framework import segwit_addr
 
 from .util import (
     dumpj,
-    toWIF,
     ensure,
     make_int,
+    b2h, i2b, b2i, i2h)
+from .util.ecc import (
+    ep,
+    pointToCPK, CPKToPoint,
+    getSecretInt)
+from .util.script import (
+    decodeScriptNum,
+    getCompactSizeLen,
+    SerialiseNumCompact,
+    getWitnessElementLen,
+)
+from .util.address import (
+    toWIF,
     b58encode,
     decodeWif,
     decodeAddress,
-    decodeScriptNum,
     pubkeyToAddress,
-    getCompactSizeLen,
-    SerialiseNumCompact,
-    getWitnessElementLen)
+)
 from coincurve.keys import (
     PrivateKey,
     PublicKey)
@@ -37,12 +46,6 @@ from coincurve.ecdsaotves import (
     ecdsaotves_enc_verify,
     ecdsaotves_dec_sig,
     ecdsaotves_rec_enc_key)
-
-from .ecc_util import (
-    ep,
-    pointToCPK, CPKToPoint,
-    getSecretInt,
-    b2h, i2b, b2i, i2h)
 
 from .contrib.test_framework.messages import (
     COIN,

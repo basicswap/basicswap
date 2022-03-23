@@ -16,17 +16,20 @@ from .contrib.test_framework.script import (
     OP_0,
     OP_DUP, OP_HASH160, OP_EQUALVERIFY, OP_CHECKSIG
 )
-from .ecc_util import i2b
-
 from .util import (
-    toWIF,
+    i2b,
     ensure,
     make_int,
-    getP2WSH,
     TemporaryError,
+)
+from .util.script import (
+    getP2WSH,
     getCompactSizeLen,
-    encodeStealthAddress,
-    getWitnessElementLen)
+    getWitnessElementLen,
+)
+from .util.address import (
+    toWIF,
+    encodeStealthAddress)
 from .chainparams import Coins, chainparams
 from .interface_btc import BTCInterface
 

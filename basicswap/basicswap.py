@@ -38,23 +38,27 @@ from . import __version__
 from .rpc_xmr import make_xmr_rpc2_func
 from .util import (
     TemporaryError,
-    pubkeyToAddress,
     format_amount,
     format_timestamp,
-    encodeAddress,
-    decodeAddress,
     DeserialiseNum,
-    decodeWif,
-    toWIF,
-    getKeyID,
     make_int,
-    getP2SHScriptForHash,
-    getP2WSH,
     ensure,
 )
+from .util.script import (
+    getP2WSH,
+    getP2SHScriptForHash,
+)
+from .util.address import (
+    toWIF,
+    getKeyID,
+    decodeWif,
+    decodeAddress,
+    encodeAddress,
+    pubkeyToAddress,
+)
 from .chainparams import (
-    chainparams,
     Coins,
+    chainparams,
 )
 from .script import (
     OpCodes,

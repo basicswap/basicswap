@@ -24,8 +24,10 @@ from basicswap.basicswap import (
 )
 from basicswap.util import (
     COIN,
-    toWIF,
     dumpj,
+)
+from basicswap.util.address import (
+    toWIF,
 )
 from basicswap.rpc import (
     callrpc,

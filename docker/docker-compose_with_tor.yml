@@ -1,0 +1,44 @@
+version: '3.4'
+services:
+
+    swapclient:
+        image: i_swapclient
+        container_name: swapclient
+        stop_grace_period: 5m
+        build:
+            context: ../
+        volumes:
+            - ${COINDATA_PATH}:/coindata
+        ports:
+            - "${HTML_PORT}"  # Expose only to localhost, see .env
+        environment:
+            - TZ
+            - TOR_PROXY_HOST
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "5"
+
+    tor:
+        image: i_tor
+        container_name: tor
+        build:
+            context: ./tor
+        volumes:
+            - ${COINDATA_PATH}/tor/data:/var/lib/tor/
+            - ${COINDATA_PATH}/tor/torrc:/etc/tor/torrc
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "5"
+
+volumes:
+    coindata:
+        driver: local
+
+networks:
+    default:
+        external:
+            name: coinswap_network

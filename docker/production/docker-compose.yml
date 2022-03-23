@@ -18,7 +18,7 @@ services:
             options:
                 max-size: "10m"
                 max-file: "3"
-        restart: unless-stopped
+        #restart: unless-stopped
     #bitcoin_core:
         #image: i_bitcoin
         #build:
@@ -50,7 +50,7 @@ services:
             options:
                 max-size: "10m"
                 max-file: "3"
-        restart: unless-stopped
+        #restart: unless-stopped
     #monero_daemon:
         #image: i_monero_daemon
         #build:
@@ -147,7 +147,7 @@ services:
             - BTC_DATA_DIR
             - XMR_DATA_DIR
             - XMR_WALLETS_DIR
-            - COINS_BIND_IP
+            - COINS_RPCBIND_IP
         restart: "no"
 networks:
     default:

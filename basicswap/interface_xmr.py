@@ -31,7 +31,7 @@ from .rpc_xmr import (
     make_xmr_rpc_func,
     make_xmr_rpc2_func,
     make_xmr_wallet_rpc_func)
-from .ecc_util import (
+from .util import (
     b2i, b2h)
 from .chainparams import CoinInterface, Coins
 

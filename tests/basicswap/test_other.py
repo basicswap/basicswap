@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019-2021 tecnovert
+# Copyright (c) 2019-2022 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -21,7 +21,8 @@ from coincurve.ecdsaotves import (
 from coincurve.keys import (
     PrivateKey)
 
-from basicswap.ecc_util import i2b, h2b
+from basicswap.util import i2b, h2b
+from basicswap.util.rfc2440 import rfc2440_hash_password
 from basicswap.interface_btc import BTCInterface
 from basicswap.interface_xmr import XMRInterface
 
@@ -278,6 +279,13 @@ class Test(unittest.TestCase):
         rate = make_int(amount_to / amount_from, scale_from, r=1)
         amount_to_recreate = int((amount_from * rate) // (10 ** scale_from))
         assert('10.00000000' == format_amount(amount_to_recreate, scale_to))
+
+    def test_rfc2440(self):
+        password = 'test'
+        salt = bytes.fromhex('B7A94A7E4988630E')
+        password_hash = rfc2440_hash_password(password, salt=salt)
+
+        assert(password_hash == '16:B7A94A7E4988630E6095334BA67F06FBA509B2A7136A04C9C1B430F539')
 
 
 if __name__ == '__main__':

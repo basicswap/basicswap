@@ -39,6 +39,7 @@ setuptools.setup(
         "Jinja2",
         "requests",
         "pycryptodome",
+        "PySocks",
     ],
     entry_points={
         "console_scripts": [

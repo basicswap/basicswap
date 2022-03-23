@@ -31,9 +31,11 @@ from basicswap.basicswap_util import (
 )
 from basicswap.util import (
     COIN,
-    toWIF,
     make_int,
     format_amount,
+)
+from basicswap.util.address import (
+    toWIF,
 )
 from basicswap.rpc import (
     callrpc,

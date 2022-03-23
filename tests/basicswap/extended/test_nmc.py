@@ -33,6 +33,8 @@ from basicswap.basicswap import (
 )
 from basicswap.util import (
     COIN,
+)
+from basicswap.util.address import (
     toWIF,
 )
 from basicswap.rpc import (

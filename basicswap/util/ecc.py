@@ -2,11 +2,11 @@
 # -*- coding: utf-8 -*-
 
 import os
-import codecs
 import hashlib
 import secrets
 
-from .contrib.ellipticcurve import CurveFp, Point, INFINITY, jacobi_symbol
+from basicswap.contrib.ellipticcurve import CurveFp, Point, INFINITY, jacobi_symbol
+from . import i2b
 
 
 class ECCParameters():
@@ -37,31 +37,9 @@ def ToDER(P) -> bytes:
     return bytes((4, )) + int(P.x()).to_bytes(32, byteorder='big') + int(P.y()).to_bytes(32, byteorder='big')
 
 
-def bytes32ToInt(b) -> int:
-    return int.from_bytes(b, byteorder='big')
-
-
-def intToBytes32(i: int) -> bytes:
-    return i.to_bytes(32, byteorder='big')
-
-
-def intToBytes32_le(i: int) -> bytes:
-    return i.to_bytes(32, byteorder='little')
-
-
-def bytesToHexStr(b: bytes) -> str:
-    return codecs.encode(b, 'hex').decode('utf-8')
-
-
-def hexStrToBytes(h: str) -> bytes:
-    if h.startswith('0x'):
-        h = h[2:]
-    return bytes.fromhex(h)
-
-
 def getSecretBytes() -> bytes:
     i = 1 + secrets.randbelow(ep.o - 1)
-    return intToBytes32(i)
+    return i2b(i)
 
 
 def getSecretInt() -> int:
@@ -187,16 +165,6 @@ def hashToCurve(pubkey):
 
 def hash256(inb):
     return hashlib.sha256(inb).digest()
-
-
-i2b = intToBytes32
-b2i = bytes32ToInt
-b2h = bytesToHexStr
-h2b = hexStrToBytes
-
-
-def i2h(x):
-    return b2h(i2b(x))
 
 
 def testEccUtils():

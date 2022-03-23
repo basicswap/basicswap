@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019-2021 tecnovert
+# Copyright (c) 2019-2022 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -11,6 +11,8 @@ import json
 import mmap
 import stat
 import gnupg
+import socks
+import shutil
 import signal
 import socket
 import hashlib
@@ -28,6 +30,8 @@ from basicswap.rpc import (
 )
 from basicswap.basicswap import BasicSwap
 from basicswap.chainparams import Coins
+from basicswap.util import toBool
+from basicswap.util.rfc2440 import rfc2440_hash_password
 from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
 from bin.basicswap_run import startDaemon, startXmrWalletDaemon
 
@@ -79,6 +83,10 @@ LTC_RPC_PORT = int(os.getenv('LTC_RPC_PORT', 19795))
 BTC_RPC_PORT = int(os.getenv('BTC_RPC_PORT', 19796))
 NMC_RPC_PORT = int(os.getenv('NMC_RPC_PORT', 19798))
 
+PART_ONION_PORT = int(os.getenv('PART_ONION_PORT', 51734))
+LTC_ONION_PORT = int(os.getenv('LTC_ONION_PORT', 19795))  # Still on 0.18 codebase, same port
+BTC_ONION_PORT = int(os.getenv('BTC_ONION_PORT', 8334))
+
 PART_RPC_USER = os.getenv('PART_RPC_USER', '')
 PART_RPC_PWD = os.getenv('PART_RPC_PWD', '')
 BTC_RPC_USER = os.getenv('BTC_RPC_USER', '')
@@ -86,9 +94,21 @@ BTC_RPC_PWD = os.getenv('BTC_RPC_PWD', '')
 LTC_RPC_USER = os.getenv('LTC_RPC_USER', '')
 LTC_RPC_PWD = os.getenv('LTC_RPC_PWD', '')
 
-COINS_BIND_IP = os.getenv('COINS_BIND_IP', '127.0.0.1')
+COINS_RPCBIND_IP = os.getenv('COINS_RPCBIND_IP', '127.0.0.1')
+
+TOR_PROXY_HOST = os.getenv('TOR_PROXY_HOST', '127.0.0.1')
+TOR_PROXY_PORT = int(os.getenv('TOR_PROXY_PORT', 9050))
+TOR_CONTROL_PORT = int(os.getenv('TOR_CONTROL_PORT', 9051))
+TOR_DNS_PORT = int(os.getenv('TOR_DNS_PORT', 5353))
+TEST_TOR_PROXY = toBool(os.getenv('TEST_TOR_PROXY', 'true'))  # Expects a known exit node
+TEST_ONION_LINK = toBool(os.getenv('TEST_ONION_LINK', 'false'))
 
 extract_core_overwrite = True
+use_tor_proxy = False
+
+default_socket = socket.socket
+default_socket_timeout = socket.getdefaulttimeout()
+default_socket_getaddrinfo = socket.getaddrinfo
 
 
 def make_reporthook():
@@ -109,18 +129,64 @@ def make_reporthook():
     return reporthook
 
 
-def downloadFile(url, path):
-    logger.info('Downloading file %s', url)
-    logger.info('To %s', path)
+def getaddrinfo(*args):
+    return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (args[0], args[1]))]
+
+
+def setConnectionParameters():
     opener = urllib.request.build_opener()
     opener.addheaders = [('User-agent', 'Mozilla/5.0')]
     urllib.request.install_opener(opener)
 
-    # Set one second timeout for urlretrieve connections
-    old_timeout = socket.getdefaulttimeout()
+    if use_tor_proxy:
+        socks.setdefaultproxy(socks.PROXY_TYPE_SOCKS5, TOR_PROXY_HOST, TOR_PROXY_PORT, rdns=True)
+        socket.socket = socks.socksocket
+        socket.getaddrinfo = getaddrinfo  # Without this accessing .onion links would fail
+
+    # Set low timeout for urlretrieve connections
     socket.setdefaulttimeout(5)
-    urlretrieve(url, path, make_reporthook())
-    socket.setdefaulttimeout(old_timeout)
+
+
+def popConnectionParameters():
+    if use_tor_proxy:
+        socket.socket = default_socket
+        socket.getaddrinfo = default_socket_getaddrinfo
+    socket.setdefaulttimeout(default_socket_timeout)
+
+
+def downloadFile(url, path):
+    logger.info('Downloading file %s', url)
+    logger.info('To %s', path)
+    try:
+        setConnectionParameters()
+        urlretrieve(url, path, make_reporthook())
+    finally:
+        popConnectionParameters()
+
+
+def downloadBytes(url):
+    try:
+        setConnectionParameters()
+        return urllib.request.urlopen(url).read()
+    finally:
+        popConnectionParameters()
+
+
+def testTorConnection():
+    test_url = 'https://check.torproject.org/'
+    logger.info('Testing TOR connection at: ' + test_url)
+
+    test_response = downloadBytes(test_url).decode('utf-8')
+    assert('Congratulations. This browser is configured to use Tor.' in test_response)
+    logger.info('TOR is working.')
+
+
+def testOnionLink():
+    test_url = 'http://jqyzxhjk6psc6ul5jnfwloamhtyh7si74b4743k2qgpskwwxrzhsxmad.onion'
+    logger.info('Testing onion site: ' + test_url)
+    test_response = downloadBytes(test_url).decode('utf-8')
+    assert('The Tor Project\'s free software protects your privacy online.' in test_response)
+    logger.info('Onion links work.')
 
 
 def extractCore(coin, version_pair, settings, bin_dir, release_path):
@@ -289,7 +355,7 @@ def prepareCore(coin, version_pair, settings, data_dir):
 
             pubkeyurl = 'https://raw.githubusercontent.com/monero-project/monero/master/utils/gpg_keys/binaryfate.asc'
             logger.info('Importing public key from url: ' + pubkeyurl)
-            rv = gpg.import_keys(urllib.request.urlopen(pubkeyurl).read())
+            rv = gpg.import_keys(downloadBytes(pubkeyurl))
             print('import_keys', rv)
             assert('F0AF4D462A0BDF92' in rv.fingerprints[0])
             gpg.trust_keys(rv.fingerprints[0], 'TRUST_FULLY')
@@ -304,7 +370,8 @@ def prepareCore(coin, version_pair, settings, data_dir):
 
             pubkeyurl = 'https://raw.githubusercontent.com/tecnovert/basicswap/master/gitianpubkeys/{}_{}.pgp'.format(coin, signing_key_name)
             logger.info('Importing public key from url: ' + pubkeyurl)
-            rv = gpg.import_keys(urllib.request.urlopen(pubkeyurl).read())
+
+            rv = gpg.import_keys(downloadBytes(pubkeyurl))
 
             for key in rv.fingerprints:
                 gpg.trust_keys(key, 'TRUST_FULLY')
@@ -319,7 +386,7 @@ def prepareCore(coin, version_pair, settings, data_dir):
     extractCore(coin, version_pair, settings, bin_dir, release_path)
 
 
-def prepareDataDir(coin, settings, chain, particl_mnemonic, use_containers=False):
+def prepareDataDir(coin, settings, chain, particl_mnemonic, use_containers=False, tor_control_password=None):
     core_settings = settings['chainclients'][coin]
     bin_dir = core_settings['bindir']
     data_dir = core_settings['datadir']
@@ -343,10 +410,15 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, use_containers=False
                 fp.write('testnet=1\n')
             fp.write('data-dir={}\n'.format(data_dir))
             fp.write('rpc-bind-port={}\n'.format(core_settings['rpcport']))
-            fp.write('rpc-bind-ip={}\n'.format(COINS_BIND_IP))
+            fp.write('rpc-bind-ip={}\n'.format(COINS_RPCBIND_IP))
             fp.write('zmq-rpc-bind-port={}\n'.format(core_settings['zmqport']))
-            fp.write('zmq-rpc-bind-ip={}\n'.format(COINS_BIND_IP))
+            fp.write('zmq-rpc-bind-ip={}\n'.format(COINS_RPCBIND_IP))
             fp.write('prune-blockchain=1\n')
+
+            if tor_control_password is not None:
+                fp.write(f'proxy={TOR_PROXY_HOST}:{TOR_PROXY_PORT}\n')
+                fp.write('proxy-allow-dns-leaks=0\n')
+                fp.write('no-igd=1\n')
 
         wallets_dir = core_settings.get('walletsdir', data_dir)
         if not os.path.exists(wallets_dir):
@@ -361,11 +433,15 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, use_containers=False
             fp.write('untrusted-daemon=1\n')
             fp.write('no-dns=1\n')
             fp.write('rpc-bind-port={}\n'.format(core_settings['walletrpcport']))
-            fp.write('rpc-bind-ip={}\n'.format(COINS_BIND_IP))
+            fp.write('rpc-bind-ip={}\n'.format(COINS_RPCBIND_IP))
             fp.write('wallet-dir={}\n'.format(os.path.join(data_dir, 'wallets')))
             fp.write('log-file={}\n'.format(os.path.join(data_dir, 'wallet.log')))
             fp.write('shared-ringdb-dir={}\n'.format(os.path.join(data_dir, 'shared-ringdb')))
             fp.write('rpc-login={}:{}\n'.format(core_settings['walletrpcuser'], core_settings['walletrpcpassword']))
+
+            if tor_control_password is not None:
+                if not core_settings['manage_daemon']:
+                    fp.write(f'proxy={TOR_PROXY_HOST}:{TOR_PROXY_PORT}\n')
         return
     core_conf_path = os.path.join(data_dir, coin + '.conf')
     if os.path.exists(core_conf_path):
@@ -380,20 +456,28 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, use_containers=False
             else:
                 logger.warning('Unknown chain %s', chain)
 
-        if COINS_BIND_IP != '127.0.0.1':
+        if COINS_RPCBIND_IP != '127.0.0.1':
             fp.write('rpcallowip=127.0.0.1\n')
             fp.write('rpcallowip=172.0.0.0/8\n')  # Allow 172.x.x.x, range used by docker
-            fp.write('rpcbind={}\n'.format(COINS_BIND_IP))
+            fp.write('rpcbind={}\n'.format(COINS_RPCBIND_IP))
 
         fp.write('rpcport={}\n'.format(core_settings['rpcport']))
         fp.write('printtoconsole=0\n')
         fp.write('daemon=0\n')
         fp.write('wallet=wallet.dat\n')
 
+        if tor_control_password is not None:
+            onionport = core_settings['onionport']
+            fp.write(f'proxy={TOR_PROXY_HOST}:{TOR_PROXY_PORT}\n')
+            fp.write(f'torpassword={tor_control_password}\n')
+            fp.write(f'torcontrol={TOR_PROXY_HOST}:{TOR_CONTROL_PORT}\n')
+            # -listen is automatically set in InitParameterInteraction when bind is set
+            fp.write(f'bind=0.0.0.0:{onionport}=onion\n')
+
         salt = generate_salt(16)
         if coin == 'particl':
             fp.write('debugexclude=libevent\n')
-            fp.write('zmqpubsmsg=tcp://{}:{}\n'.format(COINS_BIND_IP, settings['zmqport']))
+            fp.write('zmqpubsmsg=tcp://{}:{}\n'.format(COINS_RPCBIND_IP, settings['zmqport']))
             fp.write('spentindex=1\n')
             fp.write('txindex=1\n')
             fp.write('staking=0\n')
@@ -419,6 +503,140 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, use_containers=False
     if os.path.exists(os.path.join(bin_dir, wallet_util)):
         logger.info('Creating wallet.dat for {}.'.format(wallet_util.capitalize()))
         callrpc_cli(bin_dir, data_dir, chain, '-wallet=wallet.dat create', wallet_util)
+
+
+def write_torrc(data_dir, tor_control_password):
+    tor_dir = os.path.join(data_dir, 'tor')
+    if not os.path.exists(tor_dir):
+        os.makedirs(tor_dir)
+    torrc_path = os.path.join(tor_dir, 'torrc')
+    if os.path.exists(torrc_path):
+        logger.info(f'torrc file exists at {torrc_path}.')
+        return
+
+    tor_control_hash = rfc2440_hash_password(tor_control_password)
+    with open(torrc_path, 'w') as fp:
+        fp.write(f'SocksPort 0.0.0.0:{TOR_PROXY_PORT}\n')
+        fp.write(f'ControlPort 0.0.0.0:{TOR_CONTROL_PORT}\n')
+        fp.write(f'DNSPort 0.0.0.0:{TOR_DNS_PORT}\n')
+        fp.write(f'HashedControlPassword {tor_control_hash}\n')
+
+
+def addTorSettings(settings, tor_control_password):
+    settings['tor_control_password'] = tor_control_password
+    settings['use_tor'] = True
+    settings['tor_proxy_host'] = TOR_PROXY_HOST
+    settings['tor_proxy_port'] = TOR_PROXY_PORT
+    settings['tor_control_port'] = TOR_CONTROL_PORT
+
+
+def modify_tor_config(settings, coin, tor_control_password=None, enable=False):
+    coin_settings = settings['chainclients'][coin]
+    data_dir = coin_settings['datadir']
+
+    if coin == 'monero':
+        core_conf_path = os.path.join(data_dir, coin + 'd.conf')
+        if not os.path.exists(core_conf_path):
+            exitWithError('{} does not exist'.format(core_conf_path))
+        wallets_dir = coin_settings.get('walletsdir', data_dir)
+        wallet_conf_path = os.path.join(wallets_dir, coin + '_wallet.conf')
+        if not os.path.exists(wallet_conf_path):
+            exitWithError('{} does not exist'.format(wallet_conf_path))
+
+        # Backup
+        shutil.copyfile(core_conf_path, core_conf_path + '.last')
+        shutil.copyfile(wallet_conf_path, wallet_conf_path + '.last')
+
+        daemon_tor_settings = ('proxy=', 'proxy-allow-dns-leak=', 'no-igd=')
+        with open(core_conf_path, 'w') as fp:
+            with open(core_conf_path + '.last') as fp_in:
+                # Disable tor first
+                for line in fp_in:
+                    skip_line = False
+                    for setting in daemon_tor_settings:
+                        if line.startswith(setting):
+                            skip_line = True
+                            break
+                    if not skip_line:
+                        fp.write(line)
+            if enable:
+                fp.write(f'proxy={TOR_PROXY_HOST}:{TOR_PROXY_PORT}\n')
+                fp.write('proxy-allow-dns-leaks=0\n')
+                fp.write('no-igd=1\n')
+
+        wallet_tor_settings = ('proxy=')
+        with open(wallet_conf_path, 'w') as fp:
+            with open(wallet_conf_path + '.last') as fp_in:
+                # Disable tor first
+                for line in fp_in:
+                    skip_line = False
+                    for setting in wallet_tor_settings:
+                        if line.startswith(setting):
+                            skip_line = True
+                            break
+                    if not skip_line:
+                        fp.write(line)
+            if enable:
+                if not coin_settings['manage_daemon']:
+                    fp.write(f'proxy={TOR_PROXY_HOST}:{TOR_PROXY_PORT}\n')
+        return
+
+    config_path = os.path.join(data_dir, coin + '.conf')
+    if not os.path.exists(config_path):
+        exitWithError('{} does not exist'.format(config_path))
+
+    if 'onionport' not in coin_settings:
+        default_onionport = 0
+        if coin == 'bitcoin':
+            default_onionport = BTC_ONION_PORT
+        elif coin == 'particl':
+            default_onionport = PART_ONION_PORT
+        elif coin == 'litecoin':
+            default_onionport = LTC_ONION_PORT
+        else:
+            exitWithError('Unknown default onion listening port for {}'.format(coin))
+        coin_settings['onionport'] = default_onionport
+
+    # Backup
+    shutil.copyfile(config_path, config_path + '.last')
+
+    tor_settings = ('proxy=', 'torpassword=', 'torcontrol=', 'bind=')
+    with open(config_path, 'w') as fp:
+        with open(config_path + '.last') as fp_in:
+            # Disable tor first
+            for line in fp_in:
+                skip_line = False
+                for setting in tor_settings:
+                    if line.startswith(setting):
+                        skip_line = True
+                        break
+                if not skip_line:
+                    fp.write(line)
+        if enable:
+            onionport = coin_settings['onionport']
+            fp.write(f'proxy={TOR_PROXY_HOST}:{TOR_PROXY_PORT}\n')
+            fp.write(f'torpassword={tor_control_password}\n')
+            fp.write(f'torcontrol={TOR_PROXY_HOST}:{TOR_CONTROL_PORT}\n')
+            fp.write(f'bind=0.0.0.0:{onionport}=onion\n')
+
+
+def make_rpc_func(bin_dir, data_dir, chain):
+    bin_dir = bin_dir
+    data_dir = data_dir
+    chain = chain
+
+    def rpc_func(cmd):
+        nonlocal bin_dir
+        nonlocal data_dir
+        nonlocal chain
+
+        return callrpc_cli(bin_dir, data_dir, chain, cmd, cfg.PARTICL_CLI)
+    return rpc_func
+
+
+def exitWithError(error_msg):
+    sys.stderr.write('Error: {}, exiting.\n'.format(error_msg))
+    sys.exit(1)
 
 
 def printVersion():
@@ -452,31 +670,14 @@ def printHelp():
     logger.info('--htmlhost=              Interface to host on, default:127.0.0.1.')
     logger.info('--xmrrestoreheight=n     Block height to restore Monero wallet from, default:{}.'.format(DEFAULT_XMR_RESTORE_HEIGHT))
     logger.info('--noextractover          Prevent extracting cores if files exist.  Speeds up tests')
+    logger.info('--usetorproxy            Use TOR proxy.  Note that some download links may be inaccessible over TOR.')
 
     logger.info('\n' + 'Known coins: %s', ', '.join(known_coins.keys()))
 
 
-def make_rpc_func(bin_dir, data_dir, chain):
-    bin_dir = bin_dir
-    data_dir = data_dir
-    chain = chain
-
-    def rpc_func(cmd):
-        nonlocal bin_dir
-        nonlocal data_dir
-        nonlocal chain
-
-        return callrpc_cli(bin_dir, data_dir, chain, cmd, cfg.PARTICL_CLI)
-    return rpc_func
-
-
-def exitWithError(error_msg):
-    sys.stderr.write('Error: {}, exiting.\n'.format(error_msg))
-    sys.exit(1)
-
-
 def main():
     global extract_core_overwrite
+    global use_tor_proxy
     data_dir = None
     bin_dir = None
     port_offset = None
@@ -490,6 +691,9 @@ def main():
     disable_coin = ''
     htmlhost = '127.0.0.1'
     xmr_restore_height = DEFAULT_XMR_RESTORE_HEIGHT
+    enable_tor = False
+    disable_tor = False
+    tor_control_password = None
 
     for v in sys.argv[1:]:
         if len(v) < 2 or v[0] != '-':
@@ -527,6 +731,15 @@ def main():
             continue
         if name == 'noextractover':
             extract_core_overwrite = False
+            continue
+        if name == 'usetorproxy':
+            use_tor_proxy = True
+            continue
+        if name == 'enabletor':
+            enable_tor = True
+            continue
+        if name == 'disabletor':
+            disable_tor = True
             continue
         if len(s) == 2:
             if name == 'datadir':
@@ -575,6 +788,14 @@ def main():
 
         exitWithError('Unknown argument {}'.format(v))
 
+    setConnectionParameters()
+
+    if use_tor_proxy and TEST_TOR_PROXY:
+        testTorConnection()
+
+    if use_tor_proxy and TEST_ONION_LINK:
+        testOnionLink()
+
     if data_dir is None:
         data_dir = os.path.join(os.path.expanduser(cfg.DEFAULT_DATADIR))
     if bin_dir is None:
@@ -598,6 +819,7 @@ def main():
             'manage_daemon': True if ('particl' in with_coins and PART_RPC_HOST == '127.0.0.1') else False,
             'rpchost': PART_RPC_HOST,
             'rpcport': PART_RPC_PORT + port_offset,
+            'onionport': PART_ONION_PORT + port_offset,
             'datadir': os.getenv('PART_DATA_DIR', os.path.join(data_dir, 'particl')),
             'bindir': os.path.join(bin_dir, 'particl'),
             'blocks_confirmed': 2,
@@ -611,6 +833,7 @@ def main():
             'manage_daemon': True if ('litecoin' in with_coins and LTC_RPC_HOST == '127.0.0.1') else False,
             'rpchost': LTC_RPC_HOST,
             'rpcport': LTC_RPC_PORT + port_offset,
+            'onionport': LTC_ONION_PORT + port_offset,
             'datadir': os.getenv('LTC_DATA_DIR', os.path.join(data_dir, 'litecoin')),
             'bindir': os.path.join(bin_dir, 'litecoin'),
             'use_segwit': True,
@@ -624,6 +847,7 @@ def main():
             'manage_daemon': True if ('bitcoin' in with_coins and BTC_RPC_HOST == '127.0.0.1') else False,
             'rpchost': BTC_RPC_HOST,
             'rpcport': BTC_RPC_PORT + port_offset,
+            'onionport': BTC_ONION_PORT + port_offset,
             'datadir': os.getenv('BTC_DATA_DIR', os.path.join(data_dir, 'bitcoin')),
             'bindir': os.path.join(bin_dir, 'bitcoin'),
             'use_segwit': True,
@@ -677,6 +901,48 @@ def main():
 
     chainclients['monero']['walletsdir'] = os.getenv('XMR_WALLETS_DIR', chainclients['monero']['datadir'])
 
+    if enable_tor:
+        logger.info('Enabling TOR')
+
+        if not os.path.exists(config_path):
+            exitWithError('{} does not exist'.format(config_path))
+        with open(config_path) as fs:
+            settings = json.load(fs)
+
+        tor_control_password = settings.get('tor_control_password', None)
+        if tor_control_password is None:
+            tor_control_password = generate_salt(24)
+            settings['tor_control_password'] = tor_control_password
+        write_torrc(data_dir, tor_control_password)
+
+        addTorSettings(settings, tor_control_password)
+        for coin in settings['chainclients']:
+            modify_tor_config(settings, coin, tor_control_password, enable=True)
+
+        with open(config_path, 'w') as fp:
+            json.dump(settings, fp, indent=4)
+
+        logger.info('Done.')
+        return 0
+
+    if disable_tor:
+        logger.info('Disabling TOR')
+
+        if not os.path.exists(config_path):
+            exitWithError('{} does not exist'.format(config_path))
+        with open(config_path) as fs:
+            settings = json.load(fs)
+
+        settings['use_tor'] = False
+        for coin in settings['chainclients']:
+            modify_tor_config(settings, coin, tor_control_password=None, enable=False)
+
+        with open(config_path, 'w') as fp:
+            json.dump(settings, fp, indent=4)
+
+        logger.info('Done.')
+        return 0
+
     if disable_coin != '':
         logger.info('Disabling coin: %s', disable_coin)
         if not os.path.exists(config_path):
@@ -715,6 +981,7 @@ def main():
             exitWithError('{} is already in the settings file'.format(add_coin))
 
         settings['chainclients'][add_coin] = chainclients[add_coin]
+        settings['use_tor_proxy'] = use_tor_proxy
 
         if not no_cores:
             prepareCore(add_coin, known_coins[add_coin], settings, data_dir)
@@ -754,6 +1021,10 @@ def main():
             'check_expired_seconds': 60
         }
 
+    if use_tor_proxy:
+        tor_control_password = generate_salt(24)
+        addTorSettings(settings, tor_control_password)
+
     if not no_cores:
         for c in with_coins:
             prepareCore(c, known_coins[c], settings, data_dir)
@@ -763,7 +1034,7 @@ def main():
         return 0
 
     for c in with_coins:
-        prepareDataDir(c, settings, chain, particl_wallet_mnemonic, use_containers=use_containers)
+        prepareDataDir(c, settings, chain, particl_wallet_mnemonic, use_containers=use_containers, tor_control_password=tor_control_password)
 
     with open(config_path, 'w') as fp:
         json.dump(settings, fp, indent=4)
@@ -778,7 +1049,11 @@ def main():
     partRpc = make_rpc_func(particl_settings['bindir'], particl_settings['datadir'], chain)
 
     daemons = []
-    daemons.append(startDaemon(particl_settings['datadir'], particl_settings['bindir'], cfg.PARTICLD, ['-noconnect', '-nofindpeers', '-nostaking', '-nodnsseed', '-nolisten']))
+    daemon_args = ['-noconnect', '-nodnsseed']
+    if not use_tor_proxy:
+        # Cannot set -bind or -whitebind together with -listen=0
+        daemon_args.append('-nolisten')
+    daemons.append(startDaemon(particl_settings['datadir'], particl_settings['bindir'], cfg.PARTICLD, daemon_args + ['-nofindpeers', '-nostaking']))
     try:
         waitForRPC(partRpc)
 
@@ -811,7 +1086,7 @@ def main():
                     if not coin_settings['manage_daemon']:
                         continue
                     filename = coin_name + 'd' + ('.exe' if os.name == 'nt' else '')
-                    daemons.append(startDaemon(coin_settings['datadir'], coin_settings['bindir'], filename, ['-noconnect', '-nodnsseed', '-nolisten']))
+                    daemons.append(startDaemon(coin_settings['datadir'], coin_settings['bindir'], filename, daemon_args))
                 swap_client.setDaemonPID(c, daemons[-1].pid)
                 swap_client.setCoinRunParams(c)
                 swap_client.createCoinInterface(c)

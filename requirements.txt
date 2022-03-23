@@ -6,3 +6,4 @@ python-gnupg
 Jinja2
 requests
 pycryptodome
+PySocks
