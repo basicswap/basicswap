@@ -5659,74 +5659,78 @@ class BasicSwap(BaseApp):
 
     def lookupRates(self, coin_from, coin_to):
         self.log.debug('lookupRates {}, {}'.format(coin_from, coin_to))
-        rv = {}
-        ci_from = self.ci(int(coin_from))
-        ci_to = self.ci(int(coin_to))
+        try:
+            self.setConnectionParameters()
+            rv = {}
+            ci_from = self.ci(int(coin_from))
+            ci_to = self.ci(int(coin_to))
 
-        headers = {'Connection': 'close'}
-        name_from = ci_from.chainparams()['name']
-        name_to = ci_to.chainparams()['name']
-        url = 'https://api.coingecko.com/api/v3/simple/price?ids={},{}&vs_currencies=usd'.format(name_from, name_to)
-        start = time.time()
-        req = urllib.request.Request(url, headers=headers)
-        js = json.loads(urllib.request.urlopen(req, timeout=10).read())
-        js['time_taken'] = time.time() - start
-        rate = float(js[name_from]['usd']) / float(js[name_to]['usd'])
-        js['rate_inferred'] = ci_to.format_amount(rate, conv_int=True, r=1)
-        rv['coingecko'] = js
-
-        ticker_from = ci_from.chainparams()['ticker']
-        ticker_to = ci_to.chainparams()['ticker']
-        if ci_from.coin_type() == Coins.BTC:
-            pair = '{}-{}'.format(ticker_from, ticker_to)
-            url = 'https://api.bittrex.com/api/v1.1/public/getticker?market=' + pair
+            headers = {'Connection': 'close'}
+            name_from = ci_from.chainparams()['name']
+            name_to = ci_to.chainparams()['name']
+            url = 'https://api.coingecko.com/api/v3/simple/price?ids={},{}&vs_currencies=usd'.format(name_from, name_to)
             start = time.time()
             req = urllib.request.Request(url, headers=headers)
             js = json.loads(urllib.request.urlopen(req, timeout=10).read())
             js['time_taken'] = time.time() - start
-            js['pair'] = pair
+            rate = float(js[name_from]['usd']) / float(js[name_to]['usd'])
+            js['rate_inferred'] = ci_to.format_amount(rate, conv_int=True, r=1)
+            rv['coingecko'] = js
 
-            try:
-                rate_inverted = ci_from.make_int(1.0 / float(js['result']['Last']), r=1)
-                js['rate_inferred'] = ci_to.format_amount(rate_inverted)
-            except Exception as e:
-                self.log.warning('lookupRates error: %s', str(e))
-                js['rate_inferred'] = 'error'
+            ticker_from = ci_from.chainparams()['ticker']
+            ticker_to = ci_to.chainparams()['ticker']
+            if ci_from.coin_type() == Coins.BTC:
+                pair = '{}-{}'.format(ticker_from, ticker_to)
+                url = 'https://api.bittrex.com/api/v1.1/public/getticker?market=' + pair
+                start = time.time()
+                req = urllib.request.Request(url, headers=headers)
+                js = json.loads(urllib.request.urlopen(req, timeout=10).read())
+                js['time_taken'] = time.time() - start
+                js['pair'] = pair
 
-            rv['bittrex'] = js
-        elif ci_to.coin_type() == Coins.BTC:
-            pair = '{}-{}'.format(ticker_to, ticker_from)
-            url = 'https://api.bittrex.com/api/v1.1/public/getticker?market=' + pair
-            start = time.time()
-            req = urllib.request.Request(url, headers=headers)
-            js = json.loads(urllib.request.urlopen(req, timeout=10).read())
-            js['time_taken'] = time.time() - start
-            js['pair'] = pair
-            js['rate_last'] = js['result']['Last']
-            rv['bittrex'] = js
-        else:
-            pair = 'BTC-{}'.format(ticker_from)
-            url = 'https://api.bittrex.com/api/v1.1/public/getticker?market=' + pair
-            start = time.time()
-            req = urllib.request.Request(url, headers=headers)
-            js_from = json.loads(urllib.request.urlopen(req, timeout=10).read())
-            js_from['time_taken'] = time.time() - start
-            js_from['pair'] = pair
+                try:
+                    rate_inverted = ci_from.make_int(1.0 / float(js['result']['Last']), r=1)
+                    js['rate_inferred'] = ci_to.format_amount(rate_inverted)
+                except Exception as e:
+                    self.log.warning('lookupRates error: %s', str(e))
+                    js['rate_inferred'] = 'error'
 
-            pair = 'BTC-{}'.format(ticker_to)
-            url = 'https://api.bittrex.com/api/v1.1/public/getticker?market=' + pair
-            start = time.time()
-            req = urllib.request.Request(url, headers=headers)
-            js_to = json.loads(urllib.request.urlopen(req, timeout=10).read())
-            js_to['time_taken'] = time.time() - start
-            js_to['pair'] = pair
+                rv['bittrex'] = js
+            elif ci_to.coin_type() == Coins.BTC:
+                pair = '{}-{}'.format(ticker_to, ticker_from)
+                url = 'https://api.bittrex.com/api/v1.1/public/getticker?market=' + pair
+                start = time.time()
+                req = urllib.request.Request(url, headers=headers)
+                js = json.loads(urllib.request.urlopen(req, timeout=10).read())
+                js['time_taken'] = time.time() - start
+                js['pair'] = pair
+                js['rate_last'] = js['result']['Last']
+                rv['bittrex'] = js
+            else:
+                pair = 'BTC-{}'.format(ticker_from)
+                url = 'https://api.bittrex.com/api/v1.1/public/getticker?market=' + pair
+                start = time.time()
+                req = urllib.request.Request(url, headers=headers)
+                js_from = json.loads(urllib.request.urlopen(req, timeout=10).read())
+                js_from['time_taken'] = time.time() - start
+                js_from['pair'] = pair
 
-            try:
-                rate_inferred = float(js_from['result']['Last']) / float(js_to['result']['Last'])
-                rate_inferred = ci_to.format_amount(rate, conv_int=True, r=1)
-            except Exception as e:
-                rate_inferred = 'error'
+                pair = 'BTC-{}'.format(ticker_to)
+                url = 'https://api.bittrex.com/api/v1.1/public/getticker?market=' + pair
+                start = time.time()
+                req = urllib.request.Request(url, headers=headers)
+                js_to = json.loads(urllib.request.urlopen(req, timeout=10).read())
+                js_to['time_taken'] = time.time() - start
+                js_to['pair'] = pair
 
-            rv['bittrex'] = {'from': js_from, 'to': js_to, 'rate_inferred': rate_inferred}
+                try:
+                    rate_inferred = float(js_from['result']['Last']) / float(js_to['result']['Last'])
+                    rate_inferred = ci_to.format_amount(rate, conv_int=True, r=1)
+                except Exception as e:
+                    rate_inferred = 'error'
 
-        return rv
+                rv['bittrex'] = {'from': js_from, 'to': js_to, 'rate_inferred': rate_inferred}
+
+            return rv
+        finally:
+            self.popConnectionParameters()

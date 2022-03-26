@@ -17,7 +17,7 @@ from .basicswap_util import (
 from .chainparams import (
     Coins,
 )
-from .ui import (
+from .ui.util import (
     PAGE_LIMIT,
     getCoinType,
     inputAmount,

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019-2021 tecnovert
+# Copyright (c) 2019-2022 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -17,9 +17,12 @@ class Explorer():
 
     def readURL(self, url):
         self.log.debug('Explorer url: {}'.format(url))
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        req = urllib.request.Request(url, headers=headers)
-        return urllib.request.urlopen(req).read()
+        try:
+            self.swapclient.setConnectionParameters()
+            req = urllib.request.Request(url)
+            return urllib.request.urlopen(req).read()
+        finally:
+            self.swapclient.popConnectionParameters()
 
 
 class ExplorerInsight(Explorer):

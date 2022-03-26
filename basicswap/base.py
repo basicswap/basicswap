@@ -1,11 +1,14 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019-2021 tecnovert
+# Copyright (c) 2019-2022 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import os
 import shlex
+import socks
+import socket
+import urllib
 import logging
 import threading
 import subprocess
@@ -23,6 +26,10 @@ from .chainparams import (
     Coins,
     chainparams,
 )
+
+
+def getaddrinfo_tor(*args):
+    return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (args[0], args[1]))]
 
 
 class BaseApp:
@@ -43,6 +50,15 @@ class BaseApp:
         self._network = None
         self.prepareLogging()
         self.log.info('Network: {}'.format(self.chain))
+
+        self.use_tor_proxy = self.settings.get('use_tor', False)
+        self.tor_proxy_host = self.settings.get('tor_proxy_host', '127.0.0.1')
+        self.tor_proxy_port = self.settings.get('tor_proxy_port', 9050)
+        self.tor_control_password = self.settings.get('tor_control_password', None)
+        self.tor_control_port = self.settings.get('tor_control_port', 9051)
+        self.default_socket = socket.socket
+        self.default_socket_timeout = socket.getdefaulttimeout()
+        self.default_socket_getaddrinfo = socket.getaddrinfo
 
     def stopRunning(self, with_code=0):
         self.fail_code = with_code
@@ -139,3 +155,38 @@ class BaseApp:
             return True
         str_error = str(ex).lower()
         return 'read timed out' in str_error or 'no connection to daemon' in str_error
+
+    def setConnectionParameters(self, timeout=120):
+        opener = urllib.request.build_opener()
+        opener.addheaders = [('User-agent', 'Mozilla/5.0')]
+        urllib.request.install_opener(opener)
+
+        if self.use_tor_proxy:
+            socks.setdefaultproxy(socks.PROXY_TYPE_SOCKS5, self.tor_proxy_host, self.tor_proxy_port, rdns=True)
+            socket.socket = socks.socksocket
+            socket.getaddrinfo = getaddrinfo_tor  # Without this accessing .onion links would fail
+
+        socket.setdefaulttimeout(timeout)
+
+    def popConnectionParameters(self):
+        if self.use_tor_proxy:
+            socket.socket = self.default_socket
+            socket.getaddrinfo = self.default_socket_getaddrinfo
+        socket.setdefaulttimeout(self.default_socket_timeout)
+
+    def torControl(self, query):
+        try:
+            command = 'AUTHENTICATE "{}"\r\n{}\r\nQUIT\r\n'.format(self.tor_control_password, query).encode('utf-8')
+            c = socket.create_connection((self.tor_proxy_host, self.tor_control_port))
+            c.send(command)
+            response = bytearray()
+            while True:
+                rv = c.recv(1024)
+                if not rv:
+                    break
+                response += rv
+            c.close()
+            return response
+        except Exception as e:
+            self.log.error(f'torControl {e}')
+            return

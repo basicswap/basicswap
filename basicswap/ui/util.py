@@ -1,19 +1,19 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2020-2021 tecnovert
+# Copyright (c) 2020-2022 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import json
 import traceback
-from .util import (
+from basicswap.util import (
     make_int,
     format_timestamp,
 )
-from .chainparams import (
+from basicswap.chainparams import (
     Coins,
 )
-from .basicswap_util import (
+from basicswap.basicswap_util import (
     TxTypes,
     TxStates,
     BidStates,
@@ -26,7 +26,7 @@ from .basicswap_util import (
     getLastBidState,
 )
 
-from .protocols.xmr_swap_1 import getChainBSplitKey
+from basicswap.protocols.xmr_swap_1 import getChainBSplitKey
 
 PAGE_LIMIT = 50
 

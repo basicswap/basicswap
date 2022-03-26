@@ -1,0 +1,15 @@
+{% include 'header.html' %}
+
+<h3>TOR Information</h3>
+{% if refresh %}
+<p>Page Refresh: {{ refresh }} seconds</p>
+{% endif %}
+
+<table>
+<tr><td>Circuit Established</td><td>{{ data.circuit_established }}</td></tr>
+<tr><td>Bytes Written</td><td>{{ data.bytes_written }}</td></tr>
+<tr><td>Bytes Read</td><td>{{ data.bytes_read }}</td></tr>
+</table>
+
+<p><a href="/">home</a></p>
+</body></html>

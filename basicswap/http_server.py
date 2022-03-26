@@ -49,7 +49,7 @@ from .js_server import (
     js_rate,
     js_index,
 )
-from .ui import (
+from .ui.util import (
     PAGE_LIMIT,
     inputAmount,
     describeBid,
@@ -59,6 +59,7 @@ from .ui import (
     have_data_entry,
     get_data_entry_or,
 )
+from .ui.page_tor import page_tor
 
 
 env = Environment(loader=PackageLoader('basicswap', 'templates'))
@@ -1421,6 +1422,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             h2=self.server.title,
             version=__version__,
             summary=summary,
+            use_tor_proxy=swap_client.use_tor_proxy,
             shutdown_token=shutdown_token
         ), 'UTF-8')
 
@@ -1519,6 +1521,8 @@ class HttpHandler(BaseHTTPRequestHandler):
                     return self.page_smsgaddresses(url_split, post_string)
                 if url_split[1] == 'identity':
                     return self.page_identity(url_split, post_string)
+                if url_split[1] == 'tor':
+                    return page_tor(self, url_split, post_string)
                 if url_split[1] == 'shutdown':
                     return self.page_shutdown(url_split, post_string)
             return self.page_index(url_split)
@@ -1562,6 +1566,7 @@ class HttpThread(threading.Thread, HTTPServer):
         self.title = 'BasicSwap, ' + self.swap_client.chain
         self.last_form_id = dict()
         self.session_tokens = dict()
+        self.env = env
 
         self.timeout = 60
         HTTPServer.__init__(self, (self.host_name, self.port_no), HttpHandler)

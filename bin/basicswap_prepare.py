@@ -28,6 +28,7 @@ from basicswap.rpc import (
     callrpc_cli,
     waitForRPC,
 )
+from basicswap.base import getaddrinfo_tor
 from basicswap.basicswap import BasicSwap
 from basicswap.chainparams import Coins
 from basicswap.util import toBool
@@ -84,7 +85,7 @@ BTC_RPC_PORT = int(os.getenv('BTC_RPC_PORT', 19796))
 NMC_RPC_PORT = int(os.getenv('NMC_RPC_PORT', 19798))
 
 PART_ONION_PORT = int(os.getenv('PART_ONION_PORT', 51734))
-LTC_ONION_PORT = int(os.getenv('LTC_ONION_PORT', 19795))  # Still on 0.18 codebase, same port
+LTC_ONION_PORT = int(os.getenv('LTC_ONION_PORT', 9333))  # Still on 0.18 codebase, same port
 BTC_ONION_PORT = int(os.getenv('BTC_ONION_PORT', 8334))
 
 PART_RPC_USER = os.getenv('PART_RPC_USER', '')
@@ -129,10 +130,6 @@ def make_reporthook():
     return reporthook
 
 
-def getaddrinfo(*args):
-    return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (args[0], args[1]))]
-
-
 def setConnectionParameters():
     opener = urllib.request.build_opener()
     opener.addheaders = [('User-agent', 'Mozilla/5.0')]
@@ -141,7 +138,7 @@ def setConnectionParameters():
     if use_tor_proxy:
         socks.setdefaultproxy(socks.PROXY_TYPE_SOCKS5, TOR_PROXY_HOST, TOR_PROXY_PORT, rdns=True)
         socket.socket = socks.socksocket
-        socket.getaddrinfo = getaddrinfo  # Without this accessing .onion links would fail
+        socket.getaddrinfo = getaddrinfo_tor  # Without this accessing .onion links would fail
 
     # Set low timeout for urlretrieve connections
     socket.setdefaulttimeout(5)
@@ -386,6 +383,21 @@ def prepareCore(coin, version_pair, settings, data_dir):
     extractCore(coin, version_pair, settings, bin_dir, release_path)
 
 
+def writeTorSettings(fp, coin, coin_settings, tor_control_password):
+    onionport = coin_settings['onionport']
+    fp.write(f'proxy={TOR_PROXY_HOST}:{TOR_PROXY_PORT}\n')
+    if coin == 'particl':
+        # TODO: lookuptorcontrolhost is default behaviour in later BTC versions
+        fp.write(f'torpassword={tor_control_password}\n')
+        fp.write(f'torcontrol={TOR_PROXY_HOST}:{TOR_CONTROL_PORT}\n')
+        fp.write('lookuptorcontrolhost=any\n')  # Particl only option
+
+    if coin == 'litecoin':
+        fp.write(f'bind=0.0.0.0:{onionport}\n')
+    else:
+        fp.write(f'bind=0.0.0.0:{onionport}=onion\n')
+
+
 def prepareDataDir(coin, settings, chain, particl_mnemonic, use_containers=False, tor_control_password=None):
     core_settings = settings['chainclients'][coin]
     bin_dir = core_settings['bindir']
@@ -467,12 +479,7 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, use_containers=False
         fp.write('wallet=wallet.dat\n')
 
         if tor_control_password is not None:
-            onionport = core_settings['onionport']
-            fp.write(f'proxy={TOR_PROXY_HOST}:{TOR_PROXY_PORT}\n')
-            fp.write(f'torpassword={tor_control_password}\n')
-            fp.write(f'torcontrol={TOR_PROXY_HOST}:{TOR_CONTROL_PORT}\n')
-            # -listen is automatically set in InitParameterInteraction when bind is set
-            fp.write(f'bind=0.0.0.0:{onionport}=onion\n')
+            writeTorSettings(fp, coin, core_settings, tor_control_password)
 
         salt = generate_salt(16)
         if coin == 'particl':
@@ -523,10 +530,10 @@ def write_torrc(data_dir, tor_control_password):
 
 
 def addTorSettings(settings, tor_control_password):
-    settings['tor_control_password'] = tor_control_password
     settings['use_tor'] = True
     settings['tor_proxy_host'] = TOR_PROXY_HOST
     settings['tor_proxy_port'] = TOR_PROXY_PORT
+    settings['tor_control_password'] = tor_control_password
     settings['tor_control_port'] = TOR_CONTROL_PORT
 
 
@@ -547,7 +554,7 @@ def modify_tor_config(settings, coin, tor_control_password=None, enable=False):
         shutil.copyfile(core_conf_path, core_conf_path + '.last')
         shutil.copyfile(wallet_conf_path, wallet_conf_path + '.last')
 
-        daemon_tor_settings = ('proxy=', 'proxy-allow-dns-leak=', 'no-igd=')
+        daemon_tor_settings = ('proxy=', 'proxy-allow-dns-leaks=', 'no-igd=')
         with open(core_conf_path, 'w') as fp:
             with open(core_conf_path + '.last') as fp_in:
                 # Disable tor first
@@ -613,11 +620,7 @@ def modify_tor_config(settings, coin, tor_control_password=None, enable=False):
                 if not skip_line:
                     fp.write(line)
         if enable:
-            onionport = coin_settings['onionport']
-            fp.write(f'proxy={TOR_PROXY_HOST}:{TOR_PROXY_PORT}\n')
-            fp.write(f'torpassword={tor_control_password}\n')
-            fp.write(f'torcontrol={TOR_PROXY_HOST}:{TOR_CONTROL_PORT}\n')
-            fp.write(f'bind=0.0.0.0:{onionport}=onion\n')
+            writeTorSettings(fp, coin, coin_settings, tor_control_password)
 
 
 def make_rpc_func(bin_dir, data_dir, chain):
