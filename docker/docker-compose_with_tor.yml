@@ -19,6 +19,8 @@ services:
             options:
                 max-size: "10m"
                 max-file: "5"
+        networks:
+          - tor_net
 
     tor:
         image: i_tor
@@ -33,12 +35,17 @@ services:
             options:
                 max-size: "10m"
                 max-file: "5"
+        networks:
+            tor_net:
+                ipv4_address: 172.16.238.200
 
 volumes:
     coindata:
         driver: local
 
 networks:
-    default:
-        external:
-            name: coinswap_network
+    tor_net:
+        ipam:
+            driver: default
+            config:
+                - subnet: "172.16.238.0/24"

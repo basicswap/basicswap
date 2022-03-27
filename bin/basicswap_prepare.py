@@ -385,12 +385,13 @@ def prepareCore(coin, version_pair, settings, data_dir):
 
 def writeTorSettings(fp, coin, coin_settings, tor_control_password):
     onionport = coin_settings['onionport']
+    '''
+    TOR_PROXY_HOST must be an ip address.
+    BTC versions >21 and Particl with lookuptorcontrolhost=any can accept hostnames, XMR and LTC cannot
+    '''
     fp.write(f'proxy={TOR_PROXY_HOST}:{TOR_PROXY_PORT}\n')
-    if coin == 'particl':
-        # TODO: lookuptorcontrolhost is default behaviour in later BTC versions
-        fp.write(f'torpassword={tor_control_password}\n')
-        fp.write(f'torcontrol={TOR_PROXY_HOST}:{TOR_CONTROL_PORT}\n')
-        fp.write('lookuptorcontrolhost=any\n')  # Particl only option
+    fp.write(f'torpassword={tor_control_password}\n')
+    fp.write(f'torcontrol={TOR_PROXY_HOST}:{TOR_CONTROL_PORT}\n')
 
     if coin == 'litecoin':
         fp.write(f'bind=0.0.0.0:{onionport}\n')
@@ -517,9 +518,6 @@ def write_torrc(data_dir, tor_control_password):
     if not os.path.exists(tor_dir):
         os.makedirs(tor_dir)
     torrc_path = os.path.join(tor_dir, 'torrc')
-    if os.path.exists(torrc_path):
-        logger.info(f'torrc file exists at {torrc_path}.')
-        return
 
     tor_control_hash = rfc2440_hash_password(tor_control_password)
     with open(torrc_path, 'w') as fp:
@@ -571,7 +569,7 @@ def modify_tor_config(settings, coin, tor_control_password=None, enable=False):
                 fp.write('proxy-allow-dns-leaks=0\n')
                 fp.write('no-igd=1\n')
 
-        wallet_tor_settings = ('proxy=')
+        wallet_tor_settings = ('proxy=',)
         with open(wallet_conf_path, 'w') as fp:
             with open(wallet_conf_path + '.last') as fp_in:
                 # Disable tor first
