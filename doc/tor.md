@@ -2,6 +2,9 @@
 
 Basicswap can be configured to route all traffic through a tor proxy.
 
+Note that TOR integration is experimental and should not yet be relied upon.
+
+
 
 ### basicswap-prepare
 
@@ -22,7 +25,7 @@ Note that some download links, notably for Litecoin, are unreachable when using 
 If running through docker start the tor container with the following command as the torrc configuration file won't exist yet.
 
     docker compose -f docker-compose_with_tor.yml run --name tor --rm tor \
-        tor --allow-missing-torrc --SocksPort 0.0.0.0:9050
+            tor --allow-missing-torrc --SocksPort 0.0.0.0:9050
 
     docker compose -f docker-compose_with_tor.yml run -e TOR_PROXY_HOST=172.16.238.200 --rm swapclient \
             basicswap-prepare --usetorproxy --datadir=/coindata --withcoins=monero,particl
@@ -41,3 +44,11 @@ Start Basicswap with:
 
     docker compose -f docker-compose_with_tor.yml run --rm swapclient \
             basicswap-prepare --datadir=/coindata --disabletor
+
+
+#### Update coin release
+
+    docker compose -f docker-compose_with_tor.yml up -d tor
+    docker compose -f docker-compose_with_tor.yml run -e TOR_PROXY_HOST=172.16.238.200 --rm swapclient \
+            basicswap-prepare --usetorproxy --datadir=/coindata --preparebinonly --withcoins=bitcoin
+    docker compose -f docker-compose_with_tor.yml stop

@@ -37,6 +37,15 @@ from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
 from bin.basicswap_run import startDaemon, startXmrWalletDaemon
 
 
+# version, version tag eg. "rc1", signers
+known_coins = {
+    'particl': ('0.21.2.7', '', ('tecnovert',)),
+    'litecoin': ('0.18.1', '', ('thrasher',)),
+    'bitcoin': ('22.0', '', ('laanwj',)),
+    'namecoin': ('0.18.0', '', ('JeremyRand',)),
+    'monero': ('0.17.3.0', '', ('',)),
+}
+
 if platform.system() == 'Darwin':
     BIN_ARCH = 'osx64'
     FILE_EXT = 'tar.gz'
@@ -46,14 +55,6 @@ elif platform.system() == 'Windows':
 else:
     BIN_ARCH = 'x86_64-linux-gnu'
     FILE_EXT = 'tar.gz'
-
-known_coins = {
-    'particl': ('0.21.2.7', ''),
-    'litecoin': ('0.18.1', ''),
-    'bitcoin': ('0.21.1', ''),
-    'namecoin': ('0.18.0', ''),
-    'monero': ('0.17.3.0', ''),
-}
 
 logger = logging.getLogger()
 logger.level = logging.DEBUG
@@ -186,8 +187,8 @@ def testOnionLink():
     logger.info('Onion links work.')
 
 
-def extractCore(coin, version_pair, settings, bin_dir, release_path):
-    version, version_tag = version_pair
+def extractCore(coin, version_data, settings, bin_dir, release_path):
+    version, version_tag, signers = version_data
     logger.info('extractCore %s v%s%s', coin, version, version_tag)
 
     if coin == 'monero':
@@ -220,7 +221,7 @@ def extractCore(coin, version_pair, settings, bin_dir, release_path):
 
     bins = [coin + 'd', coin + '-cli', coin + '-tx']
     versions = version.split('.')
-    if int(versions[1]) >= 19:
+    if int(versions[0]) >= 22 or int(versions[1]) >= 19:
         bins.append(coin + '-wallet')
     if 'win32' in BIN_ARCH or 'win64' in BIN_ARCH:
         with zipfile.ZipFile(release_path) as fz:
@@ -247,8 +248,8 @@ def extractCore(coin, version_pair, settings, bin_dir, release_path):
                         logging.warning('Unable to set file permissions: %s, for %s', str(e), out_path)
 
 
-def prepareCore(coin, version_pair, settings, data_dir):
-    version, version_tag = version_pair
+def prepareCore(coin, version_data, settings, data_dir):
+    version, version_tag, signers = version_data
     logger.info('prepareCore %s v%s%s', coin, version, version_tag)
 
     bin_dir = os.path.expanduser(settings['chainclients'][coin]['bindir'])
@@ -282,24 +283,25 @@ def prepareCore(coin, version_pair, settings, data_dir):
         if not os.path.exists(assert_path):
             downloadFile(assert_url, assert_path)
     else:
+        major_version = int(version.split('.')[0])
+        signing_key_name = signers[0]
         release_filename = '{}-{}-{}.{}'.format(coin, version + version_tag, BIN_ARCH, FILE_EXT)
         if coin == 'particl':
-            signing_key_name = 'tecnovert'
             release_url = 'https://github.com/particl/particl-core/releases/download/v{}/{}'.format(version + version_tag, release_filename)
             assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, version)
             assert_url = 'https://raw.githubusercontent.com/particl/gitian.sigs/master/%s-%s/%s/%s' % (version + version_tag, os_dir_name, signing_key_name, assert_filename)
         elif coin == 'litecoin':
-            signing_key_name = 'thrasher'
             release_url = 'https://download.litecoin.org/litecoin-{}/{}/{}'.format(version, os_name, release_filename)
             assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, version.rsplit('.', 1)[0])
             assert_url = 'https://raw.githubusercontent.com/litecoin-project/gitian.sigs.ltc/master/%s-%s/%s/%s' % (version, os_dir_name, signing_key_name, assert_filename)
         elif coin == 'bitcoin':
-            signing_key_name = 'laanwj'
             release_url = 'https://bitcoincore.org/bin/bitcoin-core-{}/{}'.format(version, release_filename)
             assert_filename = '{}-core-{}-{}-build.assert'.format(coin, os_name, '.'.join(version.split('.')[:2]))
-            assert_url = 'https://raw.githubusercontent.com/bitcoin-core/gitian.sigs/master/%s-%s/%s/%s' % (version, os_dir_name, signing_key_name, assert_filename)
+            if major_version >= 22:
+                assert_url = f'https://raw.githubusercontent.com/bitcoin-core/guix.sigs/main/{version}/{signing_key_name}/all.SHA256SUMS'
+            else:
+                assert_url = 'https://raw.githubusercontent.com/bitcoin-core/gitian.sigs/master/%s-%s/%s/%s' % (version, os_dir_name, signing_key_name, assert_filename)
         elif coin == 'namecoin':
-            signing_key_name = 'JeremyRand'
             release_url = 'https://beta.namecoin.org/files/namecoin-core/namecoin-core-{}/{}'.format(version, release_filename)
             assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, version.rsplit('.', 1)[0])
             assert_url = 'https://raw.githubusercontent.com/namecoin/gitian.sigs/master/%s-%s/%s/%s' % (version, os_dir_name, signing_key_name, assert_filename)
@@ -307,19 +309,19 @@ def prepareCore(coin, version_pair, settings, data_dir):
             raise ValueError('Unknown coin')
 
         assert_sig_filename = assert_filename + '.sig'
-        assert_sig_url = assert_url + '.sig'
+        assert_sig_url = assert_url + ('.asc' if major_version >= 22 else '.sig')
 
         release_path = os.path.join(bin_dir, release_filename)
         if not os.path.exists(release_path):
             downloadFile(release_url, release_path)
 
         # Rename assert files with full version
-        assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, version)
+        assert_filename = '{}-{}-{}-build-{}.assert'.format(coin, os_name, version, signing_key_name)
         assert_path = os.path.join(bin_dir, assert_filename)
         if not os.path.exists(assert_path):
             downloadFile(assert_url, assert_path)
 
-        assert_sig_filename = '{}-{}-{}-build.assert.sig'.format(coin, os_name, version)
+        assert_sig_filename = '{}-{}-{}-build-{}.assert.sig'.format(coin, os_name, version, signing_key_name)
         assert_sig_path = os.path.join(bin_dir, assert_sig_filename)
         if not os.path.exists(assert_sig_path):
             downloadFile(assert_sig_url, assert_sig_path)
@@ -380,7 +382,7 @@ def prepareCore(coin, version_pair, settings, data_dir):
        and not (verified.status == 'signature valid' and verified.key_status == 'signing key has expired'):
         raise ValueError('Signature verification failed.')
 
-    extractCore(coin, version_pair, settings, bin_dir, release_path)
+    extractCore(coin, version_data, settings, bin_dir, release_path)
 
 
 def writeTorSettings(fp, coin, coin_settings, tor_control_password):

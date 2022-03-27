@@ -97,8 +97,13 @@ def find_vout_for_address_from_txobj(tx_obj, addr):
     given address. Raises runtime error exception if not found.
     """
     for i in range(len(tx_obj["vout"])):
-        if any([addr == a for a in tx_obj["vout"][i]["scriptPubKey"]["addresses"]]):
-            return i
+        scriptPubKey = tx_obj["vout"][i]["scriptPubKey"]
+        if "addresses" in scriptPubKey:
+            if any([addr == a for a in scriptPubKey["addresses"]]):
+                return i
+        elif "address" in scriptPubKey:
+            if addr == scriptPubKey["address"]:
+                return i
     raise RuntimeError("Vout not found for address: txid={}, addr={}".format(tx_obj['txid'], addr))
 
 
