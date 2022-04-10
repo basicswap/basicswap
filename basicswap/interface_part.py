@@ -65,9 +65,13 @@ class PARTInterface(BTCInterface):
     def txoType():
         return CTxOutPart
 
-    def setDefaults(self) -> None:
-        super().setDefaults()
-        self._anon_tx_ring_size = 8  # TODO: Make option
+    def __init__(self, coin_settings, network, swap_client=None):
+        super().__init__(coin_settings, network, swap_client)
+        self.setAnonTxRingSize(int(coin_settings.get('anon_tx_ring_size', 12)))
+
+    def setAnonTxRingSize(self, value):
+        ensure(value >= 3 and value < 33, 'Invalid anon_tx_ring_size value')
+        self._anon_tx_ring_size = value
 
     def knownWalletSeed(self):
         # TODO: Double check
@@ -708,6 +712,7 @@ class PARTInterfaceAnon(PARTInterface):
 
         utxo = autxos[0]
         utxo_sats = make_int(utxo['amount'])
+
         if spend_actual_balance and utxo_sats != cb_swap_value:
             self._log.warning('Spending actual balance {}, not swap value {}.'.format(utxo_sats, cb_swap_value))
             cb_swap_value = utxo_sats

@@ -59,6 +59,9 @@ node.xmr.to:18081<br/>
 {% else %}
 <tr><td>Blocks Confirmed Target</td><td><input type="number" name="conf_target_{{ c.name }}" min="1" max="32" value="{{ c.conf_target }}"></td></tr>
 {% endif %}
+{% if c.name == 'particl' %}
+<tr><td>Anon Tx Ring Size</td><td><input type="number" name="rct_ring_size_{{ c.name }}" min="3" max="32" value="{{ c.anon_tx_ring_size }}"></td></tr>
+{% endif %}
 <tr><td><input type="submit" name="apply_{{ c.name }}" value="Apply">
 {% if c.can_disable == true %}
 <input type="submit" name="disable_{{ c.name }}" value="Disable" onclick="return confirmPopup('Disable', '{{ c.name|capitalize }}');">

@@ -575,6 +575,8 @@ class HttpHandler(BaseHTTPRequestHandler):
                         data['automatically_select_daemon'] = True if get_data_entry(form_data, 'autosetdaemon_' + name) == 'true' else False
                     else:
                         data['conf_target'] = int(get_data_entry(form_data, 'conf_target_' + name))
+                        if name == 'particl':
+                            data['anon_tx_ring_size'] = int(get_data_entry(form_data, 'rct_ring_size_' + name))
 
                     settings_changed, suggest_reboot = swap_client.editSettings(name, data)
                     if settings_changed is True:
@@ -609,7 +611,10 @@ class HttpHandler(BaseHTTPRequestHandler):
                 chains_formatted[-1]['autosetdaemon'] = c.get('automatically_select_daemon', False)
             else:
                 chains_formatted[-1]['conf_target'] = c.get('conf_target', 2)
-            if name != 'particl':
+
+            if name == 'particl':
+                chains_formatted[-1]['anon_tx_ring_size'] = c.get('anon_tx_ring_size', 12)
+            else:
                 if c.get('connection_type', 'Unknown') == 'none':
                     if 'connection_type_prev' in c:
                         chains_formatted[-1]['can_reenable'] = True

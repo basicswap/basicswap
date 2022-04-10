@@ -390,6 +390,7 @@ class BasicSwap(BaseApp):
         }
 
         if coin == Coins.PART:
+            self.coin_clients[coin]['anon_tx_ring_size'] = chain_client_settings.get('anon_tx_ring_size', 12)
             self.coin_clients[Coins.PART_ANON] = self.coin_clients[coin]
             self.coin_clients[Coins.PART_BLIND] = self.coin_clients[coin]
 
@@ -5092,6 +5093,19 @@ class BasicSwap(BaseApp):
                         if cc['name'] == coin_name:
                             cc['conf_target'] = new_conf_target
                             self.ci(coin).setConfTarget(new_conf_target)
+                            break
+
+            if 'anon_tx_ring_size' in data:
+                new_anon_tx_ring_size = data['anon_tx_ring_size']
+                ensure(new_anon_tx_ring_size >= 3 and new_anon_tx_ring_size < 33, 'Invalid anon_tx_ring_size')
+
+                if settings_cc.get('anon_tx_ring_size', 12) != new_anon_tx_ring_size:
+                    settings_changed = True
+                    settings_cc['anon_tx_ring_size'] = new_anon_tx_ring_size
+                    for coin, cc in self.coin_clients.items():
+                        if cc['name'] == coin_name:
+                            cc['anon_tx_ring_size'] = new_anon_tx_ring_size
+                            self.ci(coin).setAnonTxRingSize(new_anon_tx_ring_size)
                             break
 
             if settings_changed:

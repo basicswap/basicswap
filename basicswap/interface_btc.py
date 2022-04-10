@@ -208,7 +208,7 @@ class BTCInterface(CoinInterface):
         rpc_conn.close()
 
     def setConfTarget(self, new_conf_target):
-        assert(new_conf_target >= 1 and new_conf_target < 33), 'Invalid conf_target value'
+        ensure(new_conf_target >= 1 and new_conf_target < 33, 'Invalid conf_target value')
         self._conf_target = new_conf_target
 
     def testDaemonRPC(self):

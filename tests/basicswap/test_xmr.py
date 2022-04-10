@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2020-2021 tecnovert
+# Copyright (c) 2020-2022 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -168,6 +168,7 @@ def prepare_swapclient_dir(datadir, node_id, network_key, network_pubkey, with_l
                 'datadir': os.path.join(datadir, 'part_' + str(node_id)),
                 'bindir': cfg.PARTICL_BINDIR,
                 'blocks_confirmed': 2,  # Faster testing
+                'anon_tx_ring_size': 5,  # Faster testing
             },
             'bitcoin': {
                 'connection_type': 'rpc',
