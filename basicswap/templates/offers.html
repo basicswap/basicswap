@@ -1,6 +1,6 @@
 {% include 'header.html' %}
 
-<h3>{{ page_type }} Offers</h3>
+<h3>Network Offers</h3>
 {% if refresh %}
 <p>Page Refresh: {{ refresh }} seconds</p>
 {% endif %}
@@ -33,6 +33,12 @@
 <select name="sort_dir">
 <option value="asc"{% if filters.sort_dir=='asc' %} selected{% endif %}>Ascending</option>
 <option value="desc"{% if filters.sort_dir=='desc' %} selected{% endif %}>Descending</option>
+</select>
+</td></tr>
+<tr><td>Sent From Node</td><td>
+<select name="sent_from">
+<option value="any"{% if filters.sent_from=='any' %} selected{% endif %}>Any</option>
+<option value="only"{% if filters.sent_from=='only' %} selected{% endif %}>Only</option>
 </select>
 </td></tr>
 

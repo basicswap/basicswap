@@ -32,6 +32,7 @@ def page_offers(self, url_split, post_string, sent=False):
         'limit': PAGE_LIMIT,
         'sort_by': 'created_at',
         'sort_dir': 'desc',
+        'sent_from': 'any' if sent is False else 'only',
     }
     messages = []
     form_data = self.checkForm(post_string, 'offers', messages)
@@ -47,6 +48,10 @@ def page_offers(self, url_split, post_string, sent=False):
             sort_dir = get_data_entry(form_data, 'sort_dir')
             ensure(sort_dir in ['asc', 'desc'], 'Invalid sort dir')
             filters['sort_dir'] = sort_dir
+        if have_data_entry(form_data, 'sent_from'):
+            sent_from = get_data_entry(form_data, 'sent_from')
+            ensure(sent_from in ['any', 'only'], 'Invalid sent filter')
+            filters['sent_from'] = sent_from
 
     if form_data and have_data_entry(form_data, 'pageback'):
         filters['page_no'] = int(form_data[b'pageno'][0]) - 1
@@ -58,6 +63,10 @@ def page_offers(self, url_split, post_string, sent=False):
     if filters['page_no'] > 1:
         filters['offset'] = (filters['page_no'] - 1) * PAGE_LIMIT
 
+    if filters['sent_from'] == 'only':
+        sent = True
+    else:
+        sent = False
     offers = swap_client.listOffers(sent, filters)
 
     formatted_offers = []
@@ -79,7 +88,6 @@ def page_offers(self, url_split, post_string, sent=False):
     return bytes(template.render(
         title=self.server.title,
         h2=self.server.title,
-        page_type='Sent' if sent else 'Received',
         coins=listAvailableCoins(swap_client),
         messages=messages,
         filters=filters,
