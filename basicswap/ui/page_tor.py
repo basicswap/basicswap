@@ -20,7 +20,6 @@ def extract_data(bytes_in):
 
 
 def page_tor(self, url_split, post_string):
-    template = self.server.env.get_template('tor.html')
 
     swap_client = self.server.swap_client
 
@@ -37,6 +36,7 @@ def page_tor(self, url_split, post_string):
 
     messages = []
 
+    template = self.server.env.get_template('tor.html')
     return bytes(template.render(
         title=self.server.title,
         h2=self.server.title,

@@ -12,6 +12,7 @@ from basicswap.util import (
 )
 from basicswap.chainparams import (
     Coins,
+    chainparams,
 )
 from basicswap.basicswap_util import (
     TxTypes,
@@ -29,6 +30,7 @@ from basicswap.basicswap_util import (
 from basicswap.protocols.xmr_swap_1 import getChainBSplitKey
 
 PAGE_LIMIT = 50
+invalid_coins_from = (Coins.XMR, Coins.PART_ANON)
 
 
 def tickerToCoinId(ticker):
@@ -343,3 +345,31 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
                     data['view_tx_desc'] = json.dumps(ci_from.describeTx(data['view_tx_hex']), indent=4)
 
     return data
+
+
+def getCoinName(c):
+    if c == Coins.PART_ANON:
+        return chainparams[Coins.PART]['name'].capitalize() + 'Anon'
+    if c == Coins.PART_BLIND:
+        return chainparams[Coins.PART]['name'].capitalize() + 'Blind'
+    return chainparams[c]['name'].capitalize()
+
+
+def listAvailableCoins(swap_client, with_variants=True, split_from=False):
+    coins_from = []
+    coins = []
+    for k, v in swap_client.coin_clients.items():
+        if k not in chainparams:
+            continue
+        if v['connection_type'] == 'rpc':
+            coins.append((int(k), getCoinName(k)))
+            if split_from and k not in invalid_coins_from:
+                coins_from.append(coins[-1])
+            if with_variants and k == Coins.PART:
+                for v in (Coins.PART_ANON, Coins.PART_BLIND):
+                    coins.append((int(v), getCoinName(v)))
+                    if split_from and v not in invalid_coins_from:
+                        coins_from.append(coins[-1])
+    if split_from:
+        return coins_from, coins
+    return coins
