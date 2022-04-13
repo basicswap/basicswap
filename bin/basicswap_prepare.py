@@ -39,7 +39,7 @@ from bin.basicswap_run import startDaemon, startXmrWalletDaemon
 
 # version, version tag eg. "rc1", signers
 known_coins = {
-    'particl': ('0.21.2.7', '', ('tecnovert',)),
+    'particl': ('0.21.2.8', '', ('tecnovert',)),
     'litecoin': ('0.18.1', '', ('thrasher',)),
     'bitcoin': ('22.0', '', ('laanwj',)),
     'namecoin': ('0.18.0', '', ('JeremyRand',)),
