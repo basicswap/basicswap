@@ -94,7 +94,10 @@ from .db import (
     XmrSplitData,
     Wallets,
     KnownIdentity,
+    AutomationLink,
+    AutomationStrategy,
 )
+from .db_upgrades import upgradeDatabase, upgradeDatabaseData
 from .base import BaseApp
 from .explorers import (
     ExplorerInsight,
@@ -129,6 +132,7 @@ from .basicswap_util import (
 from .protocols.xmr_swap_1 import (
     addLockRefundSigs,
     recoverNoScriptTxnWithKey)
+
 
 non_script_type_coins = (Coins.XMR, Coins.PART_ANON)
 
@@ -266,6 +270,10 @@ class BasicSwap(BaseApp):
                 value=self.db_version
             ))
             session.commit()
+        try:
+            self.db_data_version = session.query(DBKVInt).filter_by(key='db_data_version').first().value
+        except Exception:
+            self.db_data_version = 0
         try:
             self._contract_count = session.query(DBKVInt).filter_by(key='contract_count').first().value
         except Exception:
@@ -518,7 +526,8 @@ class BasicSwap(BaseApp):
         self.log.info('sqlalchemy version %s', sa.__version__)
         self.log.info('timezone offset: %d (%s)', time.timezone, time.tzname[0])
 
-        self.upgradeDatabase(self.db_version)
+        upgradeDatabase(self, self.db_version)
+        upgradeDatabaseData(self, self.db_data_version)
 
         for c in Coins:
             if c not in chainparams:
@@ -598,93 +607,6 @@ class BasicSwap(BaseApp):
             chain_client_settings = self.getChainClientSettings(c)
             if self.coin_clients[c]['connection_type'] == 'rpc' and chain_client_settings['manage_daemon'] is True:
                 self.stopDaemon(c)
-
-    def upgradeDatabase(self, db_version):
-        if db_version >= CURRENT_DB_VERSION:
-            return
-
-        self.log.info('Upgrading database from version %d to %d.', db_version, CURRENT_DB_VERSION)
-
-        while True:
-            session = scoped_session(self.session_factory)
-
-            current_version = db_version
-            if current_version == 6:
-                session.execute('ALTER TABLE bids ADD COLUMN security_token BLOB')
-                session.execute('ALTER TABLE offers ADD COLUMN security_token BLOB')
-                db_version += 1
-            elif current_version == 7:
-                session.execute('ALTER TABLE transactions ADD COLUMN block_hash BLOB')
-                session.execute('ALTER TABLE transactions ADD COLUMN block_height INTEGER')
-                session.execute('ALTER TABLE transactions ADD COLUMN block_time INTEGER')
-                db_version += 1
-            elif current_version == 8:
-                session.execute('''
-                    CREATE TABLE wallets (
-                        record_id INTEGER NOT NULL,
-                        coin_id INTEGER,
-                        wallet_name VARCHAR,
-                        balance_type INTEGER,
-                        amount BIGINT,
-                        updated_at BIGINT,
-                        created_at BIGINT,
-                        PRIMARY KEY (record_id))''')
-                db_version += 1
-            elif current_version == 9:
-                session.execute('ALTER TABLE wallets ADD COLUMN wallet_data VARCHAR')
-                db_version += 1
-            elif current_version == 10:
-                session.execute('ALTER TABLE smsgaddresses ADD COLUMN active_ind INTEGER')
-                session.execute('ALTER TABLE smsgaddresses ADD COLUMN created_at INTEGER')
-                session.execute('ALTER TABLE smsgaddresses ADD COLUMN note VARCHAR')
-                session.execute('ALTER TABLE smsgaddresses ADD COLUMN pubkey VARCHAR')
-                session.execute('UPDATE smsgaddresses SET active_ind = 1, created_at = 1')
-
-                session.execute('ALTER TABLE offers ADD COLUMN addr_to VARCHAR')
-                session.execute(f'UPDATE offers SET addr_to = "{self.network_addr}"')
-                db_version += 1
-            elif current_version == 11:
-                session.execute('ALTER TABLE bids ADD COLUMN chain_a_height_start INTEGER')
-                session.execute('ALTER TABLE bids ADD COLUMN chain_b_height_start INTEGER')
-                session.execute('ALTER TABLE bids ADD COLUMN protocol_version INTEGER')
-                session.execute('ALTER TABLE offers ADD COLUMN protocol_version INTEGER')
-                session.execute('ALTER TABLE transactions ADD COLUMN tx_data BLOB')
-                db_version += 1
-            elif current_version == 12:
-                session.execute('''
-                    CREATE TABLE knownidentities (
-                        record_id INTEGER NOT NULL,
-                        address VARCHAR,
-                        label VARCHAR,
-                        publickey BLOB,
-                        num_sent_bids_successful INTEGER,
-                        num_recv_bids_successful INTEGER,
-                        num_sent_bids_rejected INTEGER,
-                        num_recv_bids_rejected INTEGER,
-                        num_sent_bids_failed INTEGER,
-                        num_recv_bids_failed INTEGER,
-                        note VARCHAR,
-                        updated_at BIGINT,
-                        created_at BIGINT,
-                        PRIMARY KEY (record_id))''')
-                session.execute('ALTER TABLE bids ADD COLUMN reject_code INTEGER')
-                session.execute('ALTER TABLE bids ADD COLUMN rate INTEGER')
-                session.execute('ALTER TABLE offers ADD COLUMN amount_negotiable INTEGER')
-                session.execute('ALTER TABLE offers ADD COLUMN rate_negotiable INTEGER')
-                db_version += 1
-
-            if current_version != db_version:
-                self.db_version = db_version
-                self.setIntKVInSession('db_version', db_version, session)
-                session.commit()
-                session.close()
-                session.remove()
-                self.log.info('Upgraded database to version {}'.format(self.db_version))
-                continue
-            break
-
-        if db_version != CURRENT_DB_VERSION:
-            raise ValueError('Unable to upgrade database.')
 
     def waitForDaemonRPC(self, coin_type):
         for i in range(self.startup_tries):
@@ -1154,13 +1076,24 @@ class BasicSwap(BaseApp):
                 created_at=offer_created_at,
                 expire_at=offer_created_at + msg_buf.time_valid,
                 was_sent=True,
-                auto_accept_bids=auto_accept_bids,
                 security_token=security_token)
             offer.setState(OfferStates.OFFER_SENT)
 
             if swap_type == SwapTypes.XMR_SWAP:
                 xmr_offer.offer_id = offer_id
                 session.add(xmr_offer)
+
+            if auto_accept_bids:
+                # Use default strategy
+                auto_link = AutomationLink(
+                    active_ind=1,
+                    linked_type=TableTypes.OFFER,
+                    linked_id=offer_id,
+                    strategy_id=1,
+                    created_at=offer_created_at,
+                    repeat_limit=1,
+                    repeat_count=0)
+                session.add(auto_link)
 
             session.add(offer)
             session.add(SentOffer(offer_id=offer_id))
@@ -3833,6 +3766,54 @@ class BasicSwap(BaseApp):
                 session.remove()
             self.mxDB.release()
 
+    def shouldAutoAcceptBid(self, offer, bid, session=None):
+        use_session = None
+        try:
+            if session:
+                use_session = session
+            else:
+                self.mxDB.acquire()
+                use_session = scoped_session(self.session_factory)
+
+            link = session.query(AutomationLink).filter_by(active_ind=1, linked_type=TableTypes.OFFER, linked_id=offer.offer_id).first()
+
+            if not link:
+                return False
+
+            strategy = session.query(AutomationStrategy).filter_by(active_ind=1, record_id=link.strategy_id).first()
+            opts = json.loads(strategy.data.decode('utf-8'))
+
+            self.log.debug('Evaluating against strategy {}'.format(strategy.record_id))
+
+            if opts.get('full_amount_only', False) is True:
+                if bid.amount != offer.amount_from:
+                    self.log.info('Not auto accepting bid %s, want exact amount match', bid.bid_id.hex())
+                    return False
+
+            max_bids = opts.get('max_bids', 1)
+            # Auto accept bid if set and no other non-abandoned bid for this order exists
+            if self.countAcceptedBids(offer.offer_id) >= max_bids:
+                self.log.info('Not auto accepting bid %s, already have', bid.bid_id.hex())
+                return False
+
+            if strategy.only_known_identities:
+                identity_stats = session.query(KnownIdentity).filter_by(address=bid.bid_addr).first()
+                if not identity_stats:
+                    return False
+
+                # TODO: More options
+                if identity_stats.num_recv_bids_successful < 1:
+                    return False
+                if identity_stats.num_recv_bids_successful <= identity_stats.num_recv_bids_failed:
+                    return False
+
+            return True
+        finally:
+            if session is None:
+                use_session.close()
+                use_session.remove()
+                self.mxDB.release()
+
     def processBid(self, msg):
         self.log.debug('Processing bid msg %s', msg['msgid'])
         now = int(time.time())
@@ -3920,16 +3901,10 @@ class BasicSwap(BaseApp):
         self.log.info('Received valid bid %s for offer %s', bid_id.hex(), bid_data.offer_msg_id.hex())
         self.saveBid(bid_id, bid)
 
-        # Auto accept bid if set and no other non-abandoned bid for this order exists
-        if offer.auto_accept_bids:
-            if self.countAcceptedBids(offer_id) > 0:
-                self.log.info('Not auto accepting bid %s, already have', bid_id.hex())
-            elif bid_data.amount != offer.amount_from:
-                self.log.info('Not auto accepting bid %s, want exact amount match', bid_id.hex())
-            else:
-                delay = random.randrange(self.min_delay_event, self.max_delay_event)
-                self.log.info('Auto accepting bid %s in %d seconds', bid_id.hex(), delay)
-                self.createEvent(delay, EventTypes.ACCEPT_BID, bid_id)
+        if self.shouldAutoAcceptBid(offer, bid):
+            delay = random.randrange(self.min_delay_event, self.max_delay_event)
+            self.log.info('Auto accepting bid %s in %d seconds', bid_id.hex(), delay)
+            self.createEvent(delay, EventTypes.ACCEPT_BID, bid_id)
 
     def processBidAccept(self, msg):
         self.log.debug('Processing bid accepted msg %s', msg['msgid'])
@@ -4046,17 +4021,11 @@ class BasicSwap(BaseApp):
 
         bid.setState(BidStates.BID_RECEIVED)
 
-        # Auto accept bid if set and no other non-abandoned bid for this order exists
-        if offer.auto_accept_bids:
-            if self.countAcceptedBids(bid.offer_id) > 0:
-                self.log.info('Not auto accepting bid %s, already have', bid.bid_id.hex())
-            elif bid.amount != offer.amount_from:
-                self.log.info('Not auto accepting bid %s, want exact amount match', bid.bid_id.hex())
-            else:
-                delay = random.randrange(self.min_delay_event, self.max_delay_event)
-                self.log.info('Auto accepting xmr bid %s in %d seconds', bid.bid_id.hex(), delay)
-                self.createEventInSession(delay, EventTypes.ACCEPT_XMR_BID, bid.bid_id, session)
-                bid.setState(BidStates.SWAP_DELAYING)
+        if self.shouldAutoAcceptBid(offer, bid, session):
+            delay = random.randrange(self.min_delay_event, self.max_delay_event)
+            self.log.info('Auto accepting xmr bid %s in %d seconds', bid.bid_id.hex(), delay)
+            self.createEventInSession(delay, EventTypes.ACCEPT_XMR_BID, bid.bid_id, session)
+            bid.setState(BidStates.SWAP_DELAYING)
 
         self.saveBidInSession(bid.bid_id, bid, session, xmr_swap)
 
@@ -5487,6 +5456,46 @@ class BasicSwap(BaseApp):
                     'pubkey': row[6],
                 })
             return rv
+        finally:
+            session.close()
+            session.remove()
+            self.mxDB.release()
+
+    def listAutomationStrategies(self, filters={}):
+        self.mxDB.acquire()
+        try:
+            rv = []
+            session = scoped_session(self.session_factory)
+
+            query_str = 'SELECT strats.record_id, strats.label, strats.type_ind FROM automationstrategies AS strats'
+            query_str += ' WHERE strats.active_ind = 1 '
+
+            sort_dir = filters.get('sort_dir', 'DESC').upper()
+            sort_by = filters.get('sort_by', 'created_at')
+            query_str += f' ORDER BY strats.{sort_by} {sort_dir}'
+
+            limit = filters.get('limit', None)
+            if limit is not None:
+                query_str += f' LIMIT {limit}'
+            offset = filters.get('offset', None)
+            if offset is not None:
+                query_str += f' OFFSET {offset}'
+
+            q = session.execute(query_str)
+            for row in q:
+                rv.append(row)
+            return rv
+        finally:
+            session.close()
+            session.remove()
+            self.mxDB.release()
+
+    def getAutomationStrategy(self, strategy_id):
+        self.mxDB.acquire()
+        try:
+            rv = []
+            session = scoped_session(self.session_factory)
+            return session.query(AutomationStrategy).filter_by(record_id=strategy_id).first()
         finally:
             session.close()
             session.remove()

@@ -12,6 +12,7 @@ from .util import (
     get_data_entry,
     have_data_entry,
     listAvailableCoins,
+    set_pagination_filters,
 )
 from basicswap.util import (
     ensure,
@@ -23,7 +24,8 @@ from basicswap.chainparams import (
 
 
 def page_offers(self, url_split, post_string, sent=False):
-    swap_client = self.server.swap_client
+    server = self.server
+    swap_client = server.swap_client
 
     filters = {
         'coin_from': -1,
@@ -53,15 +55,7 @@ def page_offers(self, url_split, post_string, sent=False):
             ensure(sent_from in ['any', 'only'], 'Invalid sent filter')
             filters['sent_from'] = sent_from
 
-    if form_data and have_data_entry(form_data, 'pageback'):
-        filters['page_no'] = int(form_data[b'pageno'][0]) - 1
-        if filters['page_no'] < 1:
-            filters['page_no'] = 1
-    elif form_data and have_data_entry(form_data, 'pageforwards'):
-        filters['page_no'] = int(form_data[b'pageno'][0]) + 1
-
-    if filters['page_no'] > 1:
-        filters['offset'] = (filters['page_no'] - 1) * PAGE_LIMIT
+    set_pagination_filters(form_data, filters)
 
     if filters['sent_from'] == 'only':
         sent = True
@@ -84,10 +78,10 @@ def page_offers(self, url_split, post_string, sent=False):
             o.addr_from,
             o.was_sent))
 
-    template = self.server.env.get_template('offers.html')
+    template = server.env.get_template('offers.html')
     return bytes(template.render(
-        title=self.server.title,
-        h2=self.server.title,
+        title=server.title,
+        h2=server.title,
         coins=listAvailableCoins(swap_client),
         messages=messages,
         filters=filters,

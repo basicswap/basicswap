@@ -1,0 +1,27 @@
+{% include 'header.html' %}
+
+<h3>Automation Strategy {{ strategy_id }}</h3>
+
+{% for m in messages %}
+<p>{{ m }}</p>
+{% endfor %}
+
+<table>
+<tr><td>Label</td><td>{{ strategy.label }}</td></tr>
+<tr><td>Type</td><td>{{ strategy.type }}</td></tr>
+<tr><td>Only known identities</td><td>{{ strategy.only_known_identities }}</td></tr>
+
+<tr><td>Data</td><td>
+<textarea class="monospace" rows="10" cols="150" readonly>
+{{ strategy.data }}
+</textarea>
+<tr><td>Notes</td><td>
+<textarea rows="10" cols="150" readonly>
+{{ strategy.note }}
+</textarea>
+</td></tr>
+</table>
+
+
+<p><a href="/">home</a></p>
+</body></html>

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019-2021 tecnovert
+# Copyright (c) 2019-2022 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -12,13 +12,22 @@ from enum import IntEnum, auto
 from sqlalchemy.ext.declarative import declarative_base
 
 
-CURRENT_DB_VERSION = 13
+CURRENT_DB_VERSION = 14
+CURRENT_DB_DATA_VERSION = 1
 Base = declarative_base()
 
 
 class TableTypes(IntEnum):
     OFFER = auto()
     BID = auto()
+
+
+def strTableTypes(state):
+    if state == TableTypes.OFFER:
+        return 'Offer'
+    if state == TableTypes.BID:
+        return 'Bid'
+    return 'Unknown'
 
 
 class DBKVInt(Base):
@@ -372,6 +381,7 @@ class Wallets(Base):
     __tablename__ = 'wallets'
 
     record_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
+    active_ind = sa.Column(sa.Integer)
     coin_id = sa.Column(sa.Integer)
     wallet_name = sa.Column(sa.String)
     wallet_data = sa.Column(sa.String)
@@ -385,6 +395,7 @@ class KnownIdentity(Base):
     __tablename__ = 'knownidentities'
 
     record_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
+    active_ind = sa.Column(sa.Integer)
     address = sa.Column(sa.String)
     label = sa.Column(sa.String)
     publickey = sa.Column(sa.LargeBinary)
@@ -396,4 +407,52 @@ class KnownIdentity(Base):
     num_recv_bids_failed = sa.Column(sa.Integer)
     note = sa.Column(sa.String)
     updated_at = sa.Column(sa.BigInteger)
+    created_at = sa.Column(sa.BigInteger)
+
+
+class AutomationStrategy(Base):
+    __tablename__ = 'automationstrategies'
+
+    record_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
+    active_ind = sa.Column(sa.Integer)
+
+    label = sa.Column(sa.String)
+    type_ind = sa.Column(sa.Integer)
+    only_known_identities = sa.Column(sa.Integer)
+    num_concurrent = sa.Column(sa.Integer)
+    data = sa.Column(sa.LargeBinary)
+
+    note = sa.Column(sa.String)
+    created_at = sa.Column(sa.BigInteger)
+
+
+class AutomationLink(Base):
+    __tablename__ = 'automationlinks'
+    # Contains per order/bid options
+
+    record_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
+    active_ind = sa.Column(sa.Integer)
+
+    linked_type = sa.Column(sa.Integer)
+    linked_id = sa.Column(sa.LargeBinary)
+    strategy_id = sa.Column(sa.Integer)
+
+    data = sa.Column(sa.LargeBinary)
+    repeat_limit = sa.Column(sa.Integer)
+    repeat_count = sa.Column(sa.Integer)
+
+    note = sa.Column(sa.String)
+    created_at = sa.Column(sa.BigInteger)
+
+    __table_args__ = (sa.Index('linked_index', 'linked_type', 'linked_id'), )
+
+
+class History(Base):
+    __tablename__ = 'history'
+
+    record_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
+    concept_type = sa.Column(sa.Integer)
+    concept_id = sa.Column(sa.Integer)
+
+    changed_data = sa.Column(sa.LargeBinary)
     created_at = sa.Column(sa.BigInteger)

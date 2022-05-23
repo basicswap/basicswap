@@ -96,6 +96,17 @@ def setCoinFilter(form_data, field_name):
         raise ValueError('Unknown Coin Type {}'.format(str(field_name)))
 
 
+def set_pagination_filters(form_data, filters):
+    if form_data and have_data_entry(form_data, 'pageback'):
+        filters['page_no'] = int(form_data[b'pageno'][0]) - 1
+        if filters['page_no'] < 1:
+            filters['page_no'] = 1
+    elif form_data and have_data_entry(form_data, 'pageforwards'):
+        filters['page_no'] = int(form_data[b'pageno'][0]) + 1
+    if filters['page_no'] > 1:
+        filters['offset'] = (filters['page_no'] - 1) * PAGE_LIMIT
+
+
 def getTxIdHex(bid, tx_type, suffix):
     if tx_type == TxTypes.ITX:
         obj = bid.initiate_tx

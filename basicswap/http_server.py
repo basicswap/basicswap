@@ -59,9 +59,15 @@ from .ui.util import (
     have_data_entry,
     get_data_entry_or,
     listAvailableCoins,
+    set_pagination_filters,
 )
 from .ui.page_tor import page_tor
 from .ui.page_offers import page_offers
+from .ui.page_automation import (
+    page_automation_strategies,
+    page_automation_strategy,
+    page_automation_strategy_new
+)
 
 
 env = Environment(loader=PackageLoader('basicswap', 'templates'))
@@ -1155,15 +1161,7 @@ class HttpHandler(BaseHTTPRequestHandler):
                 ensure(sort_dir in ['asc', 'desc'], 'Invalid sort dir')
                 filters['sort_dir'] = sort_dir
 
-        if form_data and have_data_entry(form_data, 'pageback'):
-            filters['page_no'] = int(form_data[b'pageno'][0]) - 1
-            if filters['page_no'] < 1:
-                filters['page_no'] = 1
-        elif form_data and have_data_entry(form_data, 'pageforwards'):
-            filters['page_no'] = int(form_data[b'pageno'][0]) + 1
-
-        if filters['page_no'] > 1:
-            filters['offset'] = (filters['page_no'] - 1) * PAGE_LIMIT
+        set_pagination_filters(form_data, filters)
 
         bids = swap_client.listBids(sent=sent, filters=filters)
 
@@ -1437,6 +1435,12 @@ class HttpHandler(BaseHTTPRequestHandler):
                     return self.page_identity(url_split, post_string)
                 if url_split[1] == 'tor':
                     return page_tor(self, url_split, post_string)
+                if url_split[1] == 'automation':
+                    return page_automation_strategies(self, url_split, post_string)
+                if url_split[1] == 'automationstrategy':
+                    return page_automation_strategy(self, url_split, post_string)
+                if url_split[1] == 'newautomationstrategy':
+                    return page_automation_strategy_new(self, url_split, post_string)
                 if url_split[1] == 'shutdown':
                     return self.page_shutdown(url_split, post_string)
             return self.page_index(url_split)

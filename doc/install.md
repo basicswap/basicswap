@@ -13,6 +13,11 @@ Docker must be installed and started:
 Should return a line containing `Docker version`...
 
 
+It's recommended to setup docker to work without sudo:
+
+    https://docs.docker.com/engine/install/linux-postinstall/
+
+
 #### Create the images:
 
     $ cd basicswap/docker

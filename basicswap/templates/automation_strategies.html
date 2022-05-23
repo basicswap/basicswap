@@ -1,0 +1,38 @@
+{% include 'header.html' %}
+
+<h3>Automation Strategies</h3>
+{% for m in messages %}
+<p>{{ m }}</p>
+{% endfor %}
+
+<form method="post">
+<table>
+
+<tr><td>Sort By</td><td>
+<select name="sort_by">
+<option value="created_at"{% if filters.sort_by=='created_at' %} selected{% endif %}>Created At</option>
+</select>
+<select name="sort_dir">
+<option value="asc"{% if filters.sort_dir=='asc' %} selected{% endif %}>Ascending</option>
+<option value="desc"{% if filters.sort_dir=='desc' %} selected{% endif %}>Descending</option>
+</select>
+</td></tr>
+
+<tr><td><input type="submit" name='applyfilters' value="Apply Filters"></td><td><input type="submit" name='clearfilters' value="Clear Filters"></td></tr>
+<tr><td><input type="submit" name='pageback' value="Page Back"></td><td>Page: {{ filters.page_no }}</td><td><input type="submit" name='pageforwards' value="Page Forwards"></td></tr>
+</table>
+<input type="hidden" name="formid" value="{{ form_id }}">
+<input type="hidden" name="pageno" value="{{ filters.page_no }}">
+</form>
+
+<p><a href="/newautomationstrategy">Create New Strategy</a></p>
+
+<table>
+<tr><th>Name</th><th>Type</th></tr>
+{% for s in strategies %}
+<tr><td><a class="monospace" href=/automationstrategy/{{ s[0] }}>{{ s[1] }}</td><td>{{ s[2] }}</td></tr>
+{% endfor %}
+</table>
+
+<p><a href="/">home</a></p>
+</body></html>
