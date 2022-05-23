@@ -8,7 +8,7 @@
 """
 export TEST_RELOAD_PATH=/tmp/test_basicswap
 mkdir -p ${TEST_RELOAD_PATH}/bin/{particl,bitcoin}
-cp ~/tmp/particl-0.21.2.8-x86_64-linux-gnu.tar.gz ${TEST_RELOAD_PATH}/bin/particl
+cp ~/tmp/particl-0.21.2.9-x86_64-linux-gnu.tar.gz ${TEST_RELOAD_PATH}/bin/particl
 cp ~/tmp/bitcoin-0.21.1-x86_64-linux-gnu.tar.gz ${TEST_RELOAD_PATH}/bin/bitcoin
 export PYTHONPATH=$(pwd)
 python tests/basicswap/test_reload.py
