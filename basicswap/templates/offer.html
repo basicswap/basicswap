@@ -35,7 +35,14 @@
 <tr><td>Sent</td><td>{{ data.sent }}</td></tr>
 <tr><td>Revoked</td><td>{{ data.was_revoked }}</td></tr>
 {% if data.sent == 'True' %}
-<tr><td>Auto Accept Bids</td><td>{{ data.auto_accept }}</td></tr>
+<tr><td>Auto Accept Strategy</td>
+<td>
+{% if data.automation_strat_id == -1 %}
+None
+{% else %}
+<a class="monospace" href="/automationstrategy/{{ data.automation_strat_id }}">{{ data.automation_strat_label }}</a>
+{% endif %}
+</td></tr>
 {% endif %}
 
 {% if data.xmr_type == true %}

@@ -59,7 +59,7 @@
 <option value="100"{% if data.fee_to_extra==100 %} selected{% endif %}>100%</option>
 </select></td></tr>
 {% endif %}
-</td><td>Rate</td><td><input type="text" id="rate" name="rate" value="{{ data.rate }}" readonly></td></tr>
+<tr><td>Rate</td><td><input type="text" id="rate" name="rate" value="{{ data.rate }}" readonly></td></tr>
 <tr><td>Amount Variable</td><td colspan=3><input type="checkbox" id="amt_var" name="amt_var_" value="av" {% if data.amt_var==true %} checked="true"{% endif %} disabled></td></tr>
 <tr><td>Rate Variable</td><td colspan=3><input type="checkbox" id="rate_var" name="rate_var_" value="rv" {% if data.rate_var==true %} checked="true"{% endif %} disabled></td></tr>
 
@@ -69,7 +69,13 @@
 {% else %}
 <tr><td>Contract locked (hrs)</td><td><input type="number" name="lockhrs" min="1" max="64" value="{{ data.lockhrs }}" readonly></td>{% if data.swap_style != 'xmr' %}<td colspan=2>Participate txn will be locked for half the time.</td>{% endif %}</tr>
 {% endif %}
-<tr><td>Auto Accept Bids</td><td colspan=3><input type="checkbox" id="autoaccept" name="autoaccept_" value="aa" {% if data.autoaccept==true %} checked="true"{% endif %} disabled></td></tr>
+<tr><td>Auto Accept Strategy</td><td colspan=3>
+<select name="automation_strat_id_" disabled><option value="-1"{% if data.automation_strat_id==-1 %} selected{% endif %}>-- None --</option>
+{% for a in automation_strategies %}
+<option value="{{ a[0] }}"{% if data.automation_strat_id==a[0] %} selected{% endif %}>{{ a[1] }}</option>
+{% endfor %}
+</select>
+</td></tr>
 </table>
 
 <input name="submit_offer" type="submit" value="Confirm Offer">
@@ -81,8 +87,8 @@
 <input type="hidden" name="fee_from_extra" value="{{ data.fee_from_extra }}">
 <input type="hidden" name="coin_to" value="{{ data.coin_to }}">
 <input type="hidden" name="fee_to_extra" value="{{ data.fee_to_extra }}">
-{% if data.autoaccept==true %}
-<input type="hidden" name="autoaccept" value="aa">
+{% if data.automation_strat_id != -1 %}
+<input type="hidden" name="automation_strat_id" value="{{ data.automation_strat_id }}">
 {% endif %}
 {% if data.amt_var==true %}
 <input type="hidden" name="amt_var" value="av">

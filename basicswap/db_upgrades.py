@@ -27,14 +27,14 @@ def upgradeDatabaseData(self, data_version):
                 session.add(AutomationStrategy(
                     active_ind=1,
                     label='Accept All',
-                    type_ind=TableTypes.BID,
+                    type_ind=TableTypes.OFFER,
                     data=json.dumps({'full_amount_only': True,
                                      'max_bids': 1}).encode('utf-8'),
                     only_known_identities=False))
                 session.add(AutomationStrategy(
                     active_ind=1,
                     label='Accept Known',
-                    type_ind=TableTypes.BID,
+                    type_ind=TableTypes.OFFER,
                     data=json.dumps({'full_amount_only': True,
                                      'max_bids': 1}).encode('utf-8'),
                     only_known_identities=True,

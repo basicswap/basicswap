@@ -28,6 +28,7 @@ from .ui.util import (
     have_data_entry,
     tickerToCoinId,
 )
+from .ui.page_offers import postNewOffer
 from .protocols.xmr_swap_1 import recoverNoScriptTxnWithKey, getChainBSplitKey
 
 
@@ -74,6 +75,7 @@ def js_wallets(self, url_split, post_string, is_json):
 
 
 def js_offers(self, url_split, post_string, is_json, sent=False):
+    swap_client = self.server.swap_client
     offer_id = None
     if len(url_split) > 3:
         if url_split[3] == 'new':
@@ -84,7 +86,7 @@ def js_offers(self, url_split, post_string, is_json, sent=False):
                 form_data['is_json'] = True
             else:
                 form_data = urllib.parse.parse_qs(post_string)
-            offer_id = self.postNewOffer(form_data)
+            offer_id = postNewOffer(swap_client, form_data)
             rv = {'offer_id': offer_id.hex()}
             return bytes(json.dumps(rv), 'UTF-8')
         offer_id = bytes.fromhex(url_split[3])

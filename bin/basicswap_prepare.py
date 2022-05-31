@@ -367,10 +367,18 @@ def prepareCore(coin, version_data, settings, data_dir):
         if verified.username is None:
             logger.warning('Signature not verified.')
 
-            pubkeyurl = 'https://raw.githubusercontent.com/tecnovert/basicswap/master/gitianpubkeys/{}_{}.pgp'.format(coin, signing_key_name)
-            logger.info('Importing public key from url: ' + pubkeyurl)
-
-            rv = gpg.import_keys(downloadBytes(pubkeyurl))
+            filename = '{}_{}.pgp'.format(coin, signing_key_name)
+            pubkeyurls = (
+                'https://raw.githubusercontent.com/tecnovert/basicswap/master/gitianpubkeys/' + filename,
+                'https://gitlab.com/particl/basicswap/-/raw/master/gitianpubkeys/' + filename,
+            )
+            for url in pubkeyurls:
+                try:
+                    logger.info('Importing public key from url: ' + url)
+                    rv = gpg.import_keys(downloadBytes(url))
+                    break
+                except Exception as e:
+                    print('Import from url failed', e)
 
             for key in rv.fingerprints:
                 gpg.trust_keys(key, 'TRUST_FULLY')

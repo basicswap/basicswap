@@ -1083,13 +1083,16 @@ class BasicSwap(BaseApp):
                 xmr_offer.offer_id = offer_id
                 session.add(xmr_offer)
 
-            if auto_accept_bids:
+            automation_id = extra_options.get('automation_id', -1)
+            if automation_id == -1 and auto_accept_bids:
                 # Use default strategy
+                automation_id = 1
+            if automation_id != -1:
                 auto_link = AutomationLink(
                     active_ind=1,
                     linked_type=TableTypes.OFFER,
                     linked_id=offer_id,
-                    strategy_id=1,
+                    strategy_id=automation_id,
                     created_at=offer_created_at,
                     repeat_limit=1,
                     repeat_count=0)
@@ -5470,6 +5473,10 @@ class BasicSwap(BaseApp):
             query_str = 'SELECT strats.record_id, strats.label, strats.type_ind FROM automationstrategies AS strats'
             query_str += ' WHERE strats.active_ind = 1 '
 
+            type_ind = filters.get('type_ind', None)
+            if type_ind is not None:
+                query_str += f' AND strats.type_ind = {type_ind} '
+
             sort_dir = filters.get('sort_dir', 'DESC').upper()
             sort_by = filters.get('sort_by', 'created_at')
             query_str += f' ORDER BY strats.{sort_by} {sort_dir}'
@@ -5496,6 +5503,21 @@ class BasicSwap(BaseApp):
             rv = []
             session = scoped_session(self.session_factory)
             return session.query(AutomationStrategy).filter_by(record_id=strategy_id).first()
+        finally:
+            session.close()
+            session.remove()
+            self.mxDB.release()
+
+    def getLinkedStrategy(self, linked_type, linked_id):
+        self.mxDB.acquire()
+        try:
+            rv = []
+            session = scoped_session(self.session_factory)
+            query_str = 'SELECT links.strategy_id, strats.label FROM automationlinks links' + \
+                        ' LEFT JOIN automationstrategies strats ON strats.record_id = links.strategy_id' + \
+                        ' WHERE links.linked_type = {} AND links.linked_id = x\'{}\' AND links.active_ind = 1'.format(int(linked_type), linked_id.hex())
+            q = session.execute(query_str).first()
+            return q
         finally:
             session.close()
             session.remove()
