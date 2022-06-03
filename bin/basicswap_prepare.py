@@ -36,14 +36,26 @@ from basicswap.util.rfc2440 import rfc2440_hash_password
 from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
 from bin.basicswap_run import startDaemon, startXmrWalletDaemon
 
+PARTICL_VERSION = os.getenv('PARTICL_VERSION', '0.21.2.9')
+PARTICL_VERSION_TAG = os.getenv('PARTICL_VERSION_TAG', '')
+PARTICL_LINUX_EXTRA = os.getenv('PARTICL_LINUX_EXTRA', '_nousb')
+
+LITECOIN_VERSION = os.getenv('LITECOIN_VERSION', '0.18.1')
+LITECOIN_VERSION_TAG = os.getenv('LITECOIN_VERSION_TAG', '')
+
+BITCOIN_VERSION = os.getenv('BITCOIN_VERSION', '22.0')
+BITCOIN_VERSION_TAG = os.getenv('BITCOIN_VERSION_TAG', '')
+
+MONERO_VERSION = os.getenv('MONERO_VERSION', '0.17.3.0')
+MONERO_VERSION_TAG = os.getenv('MONERO_VERSION_TAG', '')
 
 # version, version tag eg. "rc1", signers
 known_coins = {
-    'particl': ('0.21.2.9', '', ('tecnovert',)),
-    'litecoin': ('0.18.1', '', ('thrasher',)),
-    'bitcoin': ('22.0', '', ('laanwj',)),
+    'particl': (PARTICL_VERSION, PARTICL_VERSION_TAG, ('tecnovert',)),
+    'litecoin': (LITECOIN_VERSION, LITECOIN_VERSION_TAG, ('thrasher',)),
+    'bitcoin': (BITCOIN_VERSION, BITCOIN_VERSION_TAG, ('laanwj',)),
     'namecoin': ('0.18.0', '', ('JeremyRand',)),
-    'monero': ('0.17.3.0', '', ('',)),
+    'monero': (MONERO_VERSION, MONERO_VERSION_TAG, ('',)),
 }
 
 if platform.system() == 'Darwin':
@@ -256,6 +268,7 @@ def prepareCore(coin, version_data, settings, data_dir):
     if not os.path.exists(bin_dir):
         os.makedirs(bin_dir)
 
+    filename_extra = ''
     if 'osx' in BIN_ARCH:
         os_dir_name = 'osx-unsigned'
         os_name = 'osx'
@@ -265,6 +278,8 @@ def prepareCore(coin, version_data, settings, data_dir):
     else:
         os_dir_name = 'linux'
         os_name = 'linux'
+        if coin == 'particl':
+            filename_extra = PARTICL_LINUX_EXTRA
 
     if coin == 'monero':
         use_file_ext = 'tar.bz2' if FILE_EXT == 'tar.gz' else FILE_EXT
@@ -285,7 +300,7 @@ def prepareCore(coin, version_data, settings, data_dir):
     else:
         major_version = int(version.split('.')[0])
         signing_key_name = signers[0]
-        release_filename = '{}-{}-{}.{}'.format(coin, version + version_tag, BIN_ARCH, FILE_EXT)
+        release_filename = '{}-{}-{}{}.{}'.format(coin, version + version_tag, BIN_ARCH, filename_extra, FILE_EXT)
         if coin == 'particl':
             release_url = 'https://github.com/particl/particl-core/releases/download/v{}/{}'.format(version + version_tag, release_filename)
             assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, version)
