@@ -117,7 +117,9 @@ TOR_DNS_PORT = int(os.getenv('TOR_DNS_PORT', 5353))
 TEST_TOR_PROXY = toBool(os.getenv('TEST_TOR_PROXY', 'true'))  # Expects a known exit node
 TEST_ONION_LINK = toBool(os.getenv('TEST_ONION_LINK', 'false'))
 
-extract_core_overwrite = True
+BITCOIN_FASTSYNC_URL = os.getenv('BITCOIN_FASTSYNC_URL', 'http://utxosets.blob.core.windows.net/public/')
+BITCOIN_FASTSYNC_FILE = os.getenv('BITCOIN_FASTSYNC_FILE', 'utxo-snapshot-bitcoin-mainnet-720179.tar')
+
 use_tor_proxy = False
 
 default_socket = socket.socket
@@ -199,9 +201,10 @@ def testOnionLink():
     logger.info('Onion links work.')
 
 
-def extractCore(coin, version_data, settings, bin_dir, release_path):
+def extractCore(coin, version_data, settings, bin_dir, release_path, extra_opts={}):
     version, version_tag, signers = version_data
     logger.info('extractCore %s v%s%s', coin, version, version_tag)
+    extract_core_overwrite = extra_opts.get('extract_core_overwrite', True)
 
     if coin == 'monero':
         bins = ['monerod', 'monero-wallet-rpc']
@@ -260,7 +263,7 @@ def extractCore(coin, version_data, settings, bin_dir, release_path):
                         logging.warning('Unable to set file permissions: %s, for %s', str(e), out_path)
 
 
-def prepareCore(coin, version_data, settings, data_dir):
+def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
     version, version_tag, signers = version_data
     logger.info('prepareCore %s v%s%s', coin, version, version_tag)
 
@@ -384,8 +387,8 @@ def prepareCore(coin, version_data, settings, data_dir):
 
             filename = '{}_{}.pgp'.format(coin, signing_key_name)
             pubkeyurls = (
-                'https://raw.githubusercontent.com/tecnovert/basicswap/master/gitianpubkeys/' + filename,
-                'https://gitlab.com/particl/basicswap/-/raw/master/gitianpubkeys/' + filename,
+                'https://raw.githubusercontent.com/tecnovert/basicswap/master/pgp/keys/' + filename,
+                'https://gitlab.com/particl/basicswap/-/raw/master/pgp/keys/' + filename,
             )
             for url in pubkeyurls:
                 try:
@@ -405,7 +408,7 @@ def prepareCore(coin, version_data, settings, data_dir):
        and not (verified.status == 'signature valid' and verified.key_status == 'signing key has expired'):
         raise ValueError('Signature verification failed.')
 
-    extractCore(coin, version_data, settings, bin_dir, release_path)
+    extractCore(coin, version_data, settings, bin_dir, release_path, extra_opts)
 
 
 def writeTorSettings(fp, coin, coin_settings, tor_control_password):
@@ -424,10 +427,11 @@ def writeTorSettings(fp, coin, coin_settings, tor_control_password):
         fp.write(f'bind=0.0.0.0:{onionport}=onion\n')
 
 
-def prepareDataDir(coin, settings, chain, particl_mnemonic, use_containers=False, tor_control_password=None):
+def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
     core_settings = settings['chainclients'][coin]
     bin_dir = core_settings['bindir']
     data_dir = core_settings['datadir']
+    tor_control_password = extra_opts.get('tor_control_password', None)
 
     if not os.path.exists(data_dir):
         os.makedirs(data_dir)
@@ -466,7 +470,7 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, use_containers=False
         if os.path.exists(wallet_conf_path):
             exitWithError('{} exists'.format(wallet_conf_path))
         with open(wallet_conf_path, 'w') as fp:
-            if use_containers:
+            if extra_opts.get('use_containers', False) is True:
                 fp.write('daemon-address={}:{}\n'.format(core_settings['rpchost'], core_settings['rpcport']))
             fp.write('untrusted-daemon=1\n')
             fp.write('no-dns=1\n')
@@ -481,6 +485,7 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, use_containers=False
                 if not core_settings['manage_daemon']:
                     fp.write(f'proxy={TOR_PROXY_HOST}:{TOR_PROXY_PORT}\n')
         return
+
     core_conf_path = os.path.join(data_dir, coin + '.conf')
     if os.path.exists(core_conf_path):
         exitWithError('{} exists'.format(core_conf_path))
@@ -532,10 +537,43 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, use_containers=False
         else:
             logger.warning('Unknown coin %s', coin)
 
-    wallet_util = coin + '-wallet'
-    if os.path.exists(os.path.join(bin_dir, wallet_util)):
-        logger.info('Creating wallet.dat for {}.'.format(wallet_util.capitalize()))
-        callrpc_cli(bin_dir, data_dir, chain, '-wallet=wallet.dat create', wallet_util)
+    if coin == 'bitcoin' and extra_opts.get('use_btc_fastsync', False) is True:
+        logger.info('Initialising BTC chain with fastsync %s', BITCOIN_FASTSYNC_FILE)
+        base_dir = extra_opts['data_dir']
+        sync_file_path = os.path.join(base_dir, BITCOIN_FASTSYNC_FILE)
+        if not os.path.exists(sync_file_path):
+            sync_file_url = os.path.join(BITCOIN_FASTSYNC_URL, BITCOIN_FASTSYNC_FILE)
+            downloadFile(sync_file_url, sync_file_path)
+
+        asc_filename = BITCOIN_FASTSYNC_FILE + '.asc'
+        asc_file_path = os.path.join(base_dir, asc_filename)
+        if not os.path.exists(asc_file_path):
+            asc_file_urls = (
+                'https://raw.githubusercontent.com/tecnovert/basicswap/master/pgp/sigs/' + asc_filename,
+                'https://gitlab.com/particl/basicswap/-/raw/master/pgp/sigs/' + asc_filename,
+            )
+            for url in asc_file_urls:
+                try:
+                    downloadFile(url, asc_file_path)
+                    break
+                except Exception as e:
+                    print('Download failed', e)
+        gpg = gnupg.GPG()
+        with open(asc_file_path, 'rb') as fp:
+            verified = gpg.verify_file(fp, sync_file_path)
+
+        if verified.valid is False \
+           and not (verified.status == 'signature valid' and verified.key_status == 'signing key has expired'):
+            raise ValueError('Signature verification failed.')
+
+        with tarfile.open(sync_file_path) as ft:
+            ft.extractall(path=data_dir)
+        # Create the wallet later, no option to set bestblock through wallet_util
+    else:
+        wallet_util = coin + '-wallet'
+        if os.path.exists(os.path.join(bin_dir, wallet_util)):
+            logger.info('Creating wallet.dat for {}.'.format(wallet_util.capitalize()))
+            callrpc_cli(bin_dir, data_dir, chain, '-wallet=wallet.dat create', wallet_util)
 
 
 def write_torrc(data_dir, tor_control_password):
@@ -696,13 +734,16 @@ def printHelp():
     logger.info('--htmlhost=              Interface to host on, default:127.0.0.1.')
     logger.info('--xmrrestoreheight=n     Block height to restore Monero wallet from, default:{}.'.format(DEFAULT_XMR_RESTORE_HEIGHT))
     logger.info('--noextractover          Prevent extracting cores if files exist.  Speeds up tests')
-    logger.info('--usetorproxy            Use TOR proxy.  Note that some download links may be inaccessible over TOR.')
+    logger.info('--usetorproxy            Use TOR proxy during setup.  Note that some download links may be inaccessible over TOR.')
+    logger.info('--enabletor              Setup Basicswap instance to use TOR.')
+    logger.info('--disabletor             Setup Basicswap instance to not use TOR.')
+    logger.info('--usebtcfastsync         Initialise the BTC chain with a snapshot from btcpayserver FastSync.\n'
+                + '                         See https://github.com/btcpayserver/btcpayserver-docker/blob/master/contrib/FastSync/README.md')
 
     logger.info('\n' + 'Known coins: %s', ', '.join(known_coins.keys()))
 
 
 def main():
-    global extract_core_overwrite
     global use_tor_proxy
     data_dir = None
     bin_dir = None
@@ -720,6 +761,8 @@ def main():
     enable_tor = False
     disable_tor = False
     tor_control_password = None
+    use_btc_fastsync = False
+    extract_core_overwrite = True
 
     for v in sys.argv[1:]:
         if len(v) < 2 or v[0] != '-':
@@ -766,6 +809,9 @@ def main():
             continue
         if name == 'disabletor':
             disable_tor = True
+            continue
+        if name == 'usebtcfastsync':
+            use_btc_fastsync = True
             continue
         if len(s) == 2:
             if name == 'datadir':
@@ -987,6 +1033,14 @@ def main():
         logger.info('Done.')
         return 0
 
+    extra_opts = {
+        'use_btc_fastsync': use_btc_fastsync,
+        'extract_core_overwrite': extract_core_overwrite,
+        'data_dir': data_dir,
+        'use_containers': use_containers,
+        'tor_control_password': tor_control_password,
+    }
+
     if add_coin != '':
         logger.info('Adding coin: %s', add_coin)
         if not os.path.exists(config_path):
@@ -1010,10 +1064,10 @@ def main():
         settings['use_tor_proxy'] = use_tor_proxy
 
         if not no_cores:
-            prepareCore(add_coin, known_coins[add_coin], settings, data_dir)
+            prepareCore(add_coin, known_coins[add_coin], settings, data_dir, extra_opts)
 
         if not prepare_bin_only:
-            prepareDataDir(add_coin, settings, chain, particl_wallet_mnemonic, use_containers=use_containers)
+            prepareDataDir(add_coin, settings, chain, particl_wallet_mnemonic, extra_opts)
             with open(config_path, 'w') as fp:
                 json.dump(settings, fp, indent=4)
 
@@ -1053,14 +1107,14 @@ def main():
 
     if not no_cores:
         for c in with_coins:
-            prepareCore(c, known_coins[c], settings, data_dir)
+            prepareCore(c, known_coins[c], settings, data_dir, extra_opts)
 
     if prepare_bin_only:
         logger.info('Done.')
         return 0
 
     for c in with_coins:
-        prepareDataDir(c, settings, chain, particl_wallet_mnemonic, use_containers=use_containers, tor_control_password=tor_control_password)
+        prepareDataDir(c, settings, chain, particl_wallet_mnemonic, extra_opts)
 
     with open(config_path, 'w') as fp:
         json.dump(settings, fp, indent=4)
@@ -1116,6 +1170,14 @@ def main():
                 swap_client.setDaemonPID(c, daemons[-1].pid)
                 swap_client.setCoinRunParams(c)
                 swap_client.createCoinInterface(c)
+
+                # Create wallet if it doesn't exist yet
+                if c == Coins.BTC:
+                    swap_client.waitForDaemonRPC(c, with_wallet=False)
+                    wallets = swap_client.callcoinrpc(c, 'listwallets')
+                    if 'wallet.dat' not in wallets:
+                        swap_client.callcoinrpc(c, 'createwallet', ['wallet.dat'])
+
                 swap_client.waitForDaemonRPC(c)
                 swap_client.initialiseWallet(c)
             swap_client.finalise()

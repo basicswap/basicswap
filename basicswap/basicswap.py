@@ -608,12 +608,12 @@ class BasicSwap(BaseApp):
             if self.coin_clients[c]['connection_type'] == 'rpc' and chain_client_settings['manage_daemon'] is True:
                 self.stopDaemon(c)
 
-    def waitForDaemonRPC(self, coin_type):
+    def waitForDaemonRPC(self, coin_type, with_wallet=True):
         for i in range(self.startup_tries):
             if not self.is_running:
                 return
             try:
-                self.coin_clients[coin_type]['interface'].testDaemonRPC()
+                self.coin_clients[coin_type]['interface'].testDaemonRPC(with_wallet)
                 return
             except Exception as ex:
                 self.log.warning('Can\'t connect to %s RPC: %s.  Trying again in %d second/s.', coin_type, str(ex), (1 + i))
@@ -3778,12 +3778,11 @@ class BasicSwap(BaseApp):
                 self.mxDB.acquire()
                 use_session = scoped_session(self.session_factory)
 
-            link = session.query(AutomationLink).filter_by(active_ind=1, linked_type=TableTypes.OFFER, linked_id=offer.offer_id).first()
-
+            link = use_session.query(AutomationLink).filter_by(active_ind=1, linked_type=TableTypes.OFFER, linked_id=offer.offer_id).first()
             if not link:
                 return False
 
-            strategy = session.query(AutomationStrategy).filter_by(active_ind=1, record_id=link.strategy_id).first()
+            strategy = use_session.query(AutomationStrategy).filter_by(active_ind=1, record_id=link.strategy_id).first()
             opts = json.loads(strategy.data.decode('utf-8'))
 
             self.log.debug('Evaluating against strategy {}'.format(strategy.record_id))
@@ -3800,7 +3799,7 @@ class BasicSwap(BaseApp):
                 return False
 
             if strategy.only_known_identities:
-                identity_stats = session.query(KnownIdentity).filter_by(address=bid.bid_addr).first()
+                identity_stats = use_session.query(KnownIdentity).filter_by(address=bid.bid_addr).first()
                 if not identity_stats:
                     return False
 
@@ -3811,6 +3810,9 @@ class BasicSwap(BaseApp):
                     return False
 
             return True
+        except Exception as e:
+            self.log.error('shouldAutoAcceptBid: %s', str(e))
+            return False
         finally:
             if session is None:
                 use_session.close()

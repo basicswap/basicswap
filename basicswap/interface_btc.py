@@ -211,8 +211,11 @@ class BTCInterface(CoinInterface):
         ensure(new_conf_target >= 1 and new_conf_target < 33, 'Invalid conf_target value')
         self._conf_target = new_conf_target
 
-    def testDaemonRPC(self):
-        self.rpc_callback('getwalletinfo', [])
+    def testDaemonRPC(self, with_wallet=True):
+        if with_wallet:
+            self.rpc_callback('getwalletinfo', [])
+        else:
+            self.rpc_callback('getblockchaininfo', [])
 
     def getDaemonVersion(self):
         return self.rpc_callback('getnetworkinfo')['version']

@@ -37,6 +37,12 @@ Adjust `--withcoins` and `--withoutcoins` as desired, eg: `--withcoins=monero,bi
 **Record the mnemonic from the output of the above command.**
 
 
+##### FastSync
+
+Use `--usebtcfastsync` to optionally initialise the Bitcoin datadir with a chain snapshot from btcpayserver FastSync.
+[FastSync README.md](https://github.com/btcpayserver/btcpayserver-docker/blob/master/contrib/FastSync/README.md)
+
+
 #### Set the timezone (optional):
 
 Edit the `.env` file in the docker directory, set TZ to your local timezone.

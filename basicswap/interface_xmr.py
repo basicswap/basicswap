@@ -110,7 +110,7 @@ class XMRInterface(CoinInterface):
         with self._mx_wallet:
             self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
 
-    def testDaemonRPC(self):
+    def testDaemonRPC(self, with_wallet=True):
         self.rpc_wallet_cb('get_languages')
 
     def getDaemonVersion(self):
