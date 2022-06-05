@@ -55,7 +55,15 @@ known_coins = {
     'litecoin': (LITECOIN_VERSION, LITECOIN_VERSION_TAG, ('thrasher',)),
     'bitcoin': (BITCOIN_VERSION, BITCOIN_VERSION_TAG, ('laanwj',)),
     'namecoin': ('0.18.0', '', ('JeremyRand',)),
-    'monero': (MONERO_VERSION, MONERO_VERSION_TAG, ('',)),
+    'monero': (MONERO_VERSION, MONERO_VERSION_TAG, ('binaryfate',)),
+}
+
+expected_key_ids = {
+    'tecnovert': ('13F13651C9CF0D6B',),
+    'thrasher': ('FE3348877809386C',),
+    'laanwj': ('1E4AED62986CD25D',),
+    'JeremyRand': ('2DBE339E29F6294C',),
+    'binaryfate': ('F0AF4D462A0BDF92',),
 }
 
 if platform.system() == 'Darwin':
@@ -201,6 +209,15 @@ def testOnionLink():
     logger.info('Onion links work.')
 
 
+def ensureValidSignatureBy(result, signing_key_name):
+    if result.valid is False \
+       and not (result.status == 'signature valid' and result.key_status == 'signing key has expired'):
+        raise ValueError('Signature verification failed.')
+
+    if result.key_id not in expected_key_ids[signing_key_name]:
+        raise ValueError('Signature made by unexpected keyid: ' + result.key_id)
+
+
 def extractCore(coin, version_data, settings, bin_dir, release_path, extra_opts={}):
     version, version_tag, signers = version_data
     logger.info('extractCore %s v%s%s', coin, version, version_tag)
@@ -284,6 +301,7 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
         if coin == 'particl':
             filename_extra = PARTICL_LINUX_EXTRA
 
+    signing_key_name = signers[0]
     if coin == 'monero':
         use_file_ext = 'tar.bz2' if FILE_EXT == 'tar.gz' else FILE_EXT
         release_filename = '{}-{}-{}.{}'.format(coin, version, BIN_ARCH, use_file_ext)
@@ -302,7 +320,6 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
             downloadFile(assert_url, assert_path)
     else:
         major_version = int(version.split('.')[0])
-        signing_key_name = signers[0]
         release_filename = '{}-{}-{}{}.{}'.format(coin, version + version_tag, BIN_ARCH, filename_extra, FILE_EXT)
         if coin == 'particl':
             release_url = 'https://github.com/particl/particl-core/releases/download/v{}/{}'.format(version + version_tag, release_filename)
@@ -368,12 +385,11 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
             verified = gpg.verify_file(fp)
 
         if verified.username is None:
-            logger.warning('Signature not verified.')
+            logger.warning('Signature made by unknown key.')
 
             pubkeyurl = 'https://raw.githubusercontent.com/monero-project/monero/master/utils/gpg_keys/binaryfate.asc'
             logger.info('Importing public key from url: ' + pubkeyurl)
             rv = gpg.import_keys(downloadBytes(pubkeyurl))
-            print('import_keys', rv)
             assert('F0AF4D462A0BDF92' in rv.fingerprints[0])
             gpg.trust_keys(rv.fingerprints[0], 'TRUST_FULLY')
             with open(assert_path, 'rb') as fp:
@@ -383,7 +399,7 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
             verified = gpg.verify_file(fp, assert_path)
 
         if verified.username is None:
-            logger.warning('Signature not verified.')
+            logger.warning('Signature made by unknown key.')
 
             filename = '{}_{}.pgp'.format(coin, signing_key_name)
             pubkeyurls = (
@@ -396,7 +412,7 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
                     rv = gpg.import_keys(downloadBytes(url))
                     break
                 except Exception as e:
-                    print('Import from url failed', e)
+                    logging.warning('Import from url failed: %s', str(e))
 
             for key in rv.fingerprints:
                 gpg.trust_keys(key, 'TRUST_FULLY')
@@ -404,9 +420,7 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
             with open(assert_sig_path, 'rb') as fp:
                 verified = gpg.verify_file(fp, assert_path)
 
-    if verified.valid is False \
-       and not (verified.status == 'signature valid' and verified.key_status == 'signing key has expired'):
-        raise ValueError('Signature verification failed.')
+    ensureValidSignatureBy(verified, signing_key_name)
 
     extractCore(coin, version_data, settings, bin_dir, release_path, extra_opts)
 
@@ -540,6 +554,11 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
     if coin == 'bitcoin' and extra_opts.get('use_btc_fastsync', False) is True:
         logger.info('Initialising BTC chain with fastsync %s', BITCOIN_FASTSYNC_FILE)
         base_dir = extra_opts['data_dir']
+
+        for dirname in ('blocks', 'chainstate'):
+            if os.path.exists(os.path.join(data_dir, dirname)):
+                raise ValueError(f'{dirname} directory already exists, not overwriting.')
+
         sync_file_path = os.path.join(base_dir, BITCOIN_FASTSYNC_FILE)
         if not os.path.exists(sync_file_path):
             sync_file_url = os.path.join(BITCOIN_FASTSYNC_URL, BITCOIN_FASTSYNC_FILE)
@@ -557,14 +576,12 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
                     downloadFile(url, asc_file_path)
                     break
                 except Exception as e:
-                    print('Download failed', e)
+                    logging.warning('Download failed: %s', str(e))
         gpg = gnupg.GPG()
         with open(asc_file_path, 'rb') as fp:
             verified = gpg.verify_file(fp, sync_file_path)
 
-        if verified.valid is False \
-           and not (verified.status == 'signature valid' and verified.key_status == 'signing key has expired'):
-            raise ValueError('Signature verification failed.')
+        ensureValidSignatureBy(verified, 'tecnovert')
 
         with tarfile.open(sync_file_path) as ft:
             ft.extractall(path=data_dir)
