@@ -19,6 +19,9 @@ import subprocess
 from urllib.request import urlopen
 
 import basicswap.config as cfg
+from basicswap.db import (
+    Concepts,
+)
 from basicswap.basicswap import (
     BasicSwap,
     Coins,
@@ -61,6 +64,7 @@ from tests.basicswap.common import (
     checkForks,
     stopDaemons,
     wait_for_bid,
+    wait_for_event,
     wait_for_offer,
     wait_for_no_offer,
     wait_for_none_active,
@@ -845,13 +849,44 @@ class Test(BaseTest):
     def test_09_auto_accept(self):
         logging.info('---------- Test BTC to XMR auto accept')
         swap_clients = self.swap_clients
-        offer_id = swap_clients[0].postOffer(Coins.BTC, Coins.XMR, 11 * COIN, 101 * XMR_COIN, 10 * COIN, SwapTypes.XMR_SWAP, auto_accept_bids=True)
+        amt_swap = make_int(random.uniform(0.01, 11.0), scale=8, r=1)
+        rate_swap = make_int(random.uniform(10.0, 101.0), scale=12, r=1)
+        offer_id = swap_clients[0].postOffer(Coins.BTC, Coins.XMR, amt_swap, rate_swap, amt_swap, SwapTypes.XMR_SWAP, auto_accept_bids=True)
         wait_for_offer(test_delay_event, swap_clients[1], offer_id)
         offer = swap_clients[1].listOffers(filters={'offer_id': offer_id})[0]
 
         bid_id = swap_clients[1].postXmrBid(offer_id, offer.amount_from)
         wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=180)
         wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True)
+
+    def test_09_1_auto_accept_multiple(self):
+        logging.info('---------- Test BTC to XMR auto accept multiple bids')
+        swap_clients = self.swap_clients
+        amt_swap = make_int(10, scale=8, r=1)
+        rate_swap = make_int(100, scale=12, r=1)
+        min_bid = make_int(1, scale=8, r=1)
+
+        extra_options = {
+            'amount_negotiable': True,
+            'automation_id': 1,
+        }
+        offer_id = swap_clients[0].postOffer(Coins.BTC, Coins.XMR, amt_swap, rate_swap, min_bid, SwapTypes.XMR_SWAP, extra_options=extra_options)
+        wait_for_offer(test_delay_event, swap_clients[1], offer_id)
+        offer = swap_clients[1].listOffers(filters={'offer_id': offer_id})[0]
+
+        below_min_bid = min_bid - 1
+        try:
+            bid_id = swap_clients[1].postBid(offer_id, below_min_bid)
+        except Exception as e:
+            assert('Bid amount below minimum' in str(e))
+        extra_bid_options = {
+            'debug_skip_validation': True,
+        }
+        bid_id = swap_clients[1].postBid(offer_id, below_min_bid, extra_options=extra_bid_options)
+
+        events = wait_for_event(test_delay_event, swap_clients[0], Concepts.NETWORK_MESSAGE, bid_id)
+        assert('Bid amount below minimum' in events[0].event_msg)
+        # TODO
 
     def test_10_locked_refundtx(self):
         logging.info('---------- Test Refund tx is locked')

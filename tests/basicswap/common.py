@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2020-2021 tecnovert
+# Copyright (c) 2020-2022 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE.txt or http://www.opensource.org/licenses/mit-license.php.
 
@@ -138,6 +138,19 @@ def wait_for_bid_tx_state(delay_event, swap_client, bid_id, initiate_state, part
            and (participate_state is None or bid.getPTxState() == participate_state):
             return
     raise ValueError('wait_for_bid_tx_state timed out.')
+
+
+def wait_for_event(delay_event, swap_client, linked_type, linked_id, wait_for=20):
+    logging.info('wait_for_event')
+
+    for i in range(wait_for):
+        if delay_event.is_set():
+            raise ValueError('Test stopped.')
+        delay_event.wait(1)
+        rv = swap_client.getEvents(linked_type, linked_id)
+        if len(rv) > 0:
+            return rv
+    raise ValueError('wait_for_event timed out.')
 
 
 def wait_for_offer(delay_event, swap_client, offer_id, wait_for=20):

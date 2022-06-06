@@ -16,7 +16,7 @@ from basicswap.util import (
     ensure,
 )
 from basicswap.db import (
-    strTableTypes,
+    strConcepts,
 )
 
 
@@ -48,7 +48,7 @@ def page_automation_strategies(self, url_split, post_string):
 
     formatted_strategies = []
     for s in swap_client.listAutomationStrategies(filters):
-        formatted_strategies.append((s[0], s[1], strTableTypes(s[2])))
+        formatted_strategies.append((s[0], s[1], strConcepts(s[2])))
 
     template = server.env.get_template('automation_strategies.html')
     return bytes(template.render(
@@ -93,7 +93,7 @@ def page_automation_strategy(self, url_split, post_string):
 
     formatted_strategy = {
         'label': strategy.label,
-        'type': strTableTypes(strategy.type_ind),
+        'type': strConcepts(strategy.type_ind),
         'only_known_identities': 'True' if strategy.only_known_identities is True else 'False',
         'data': strategy.data,
         'note': strategy.note,

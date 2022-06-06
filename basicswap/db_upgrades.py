@@ -8,7 +8,7 @@ import json
 
 from sqlalchemy.orm import scoped_session
 from .db import (
-    TableTypes,
+    Concepts,
     AutomationStrategy,
     CURRENT_DB_VERSION,
     CURRENT_DB_DATA_VERSION)
@@ -27,15 +27,15 @@ def upgradeDatabaseData(self, data_version):
                 session.add(AutomationStrategy(
                     active_ind=1,
                     label='Accept All',
-                    type_ind=TableTypes.OFFER,
-                    data=json.dumps({'full_amount_only': True,
+                    type_ind=Concepts.OFFER,
+                    data=json.dumps({'exact_rate_only': True,
                                      'max_bids': 1}).encode('utf-8'),
                     only_known_identities=False))
                 session.add(AutomationStrategy(
                     active_ind=1,
                     label='Accept Known',
-                    type_ind=TableTypes.OFFER,
-                    data=json.dumps({'full_amount_only': True,
+                    type_ind=Concepts.OFFER,
+                    data=json.dumps({'exact_rate_only': True,
                                      'max_bids': 1}).encode('utf-8'),
                     only_known_identities=True,
                     note='Accept bids from identities with previously successful swaps only'))
@@ -168,6 +168,7 @@ def upgradeDatabase(self, db_version):
 
             session.execute('ALTER TABLE wallets ADD COLUMN active_ind INTEGER')
             session.execute('ALTER TABLE knownidentities ADD COLUMN active_ind INTEGER')
+            session.execute('ALTER TABLE eventqueue RENAME TO actions')
 
         if current_version != db_version:
             self.db_version = db_version

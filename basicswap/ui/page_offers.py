@@ -19,7 +19,7 @@ from .util import (
     set_pagination_filters,
 )
 from basicswap.db import (
-    TableTypes,
+    Concepts,
 )
 from basicswap.util import (
     ensure,
@@ -305,7 +305,7 @@ def page_newoffer(self, url_split, post_string):
 
     automation_filters = {}
     automation_filters['sort_by'] = 'label'
-    automation_filters['type_ind'] = TableTypes.OFFER
+    automation_filters['type_ind'] = Concepts.OFFER
     automation_strategies = swap_client.listAutomationStrategies(automation_filters)
 
     return bytes(template.render(
@@ -454,7 +454,7 @@ def page_offer(self, url_split, post_string):
 
     if offer.was_sent:
         try:
-            strategy = swap_client.getLinkedStrategy(TableTypes.OFFER, offer_id)
+            strategy = swap_client.getLinkedStrategy(Concepts.OFFER, offer_id)
             data['automation_strat_id'] = strategy[0]
             data['automation_strat_label'] = strategy[1]
         except Exception:

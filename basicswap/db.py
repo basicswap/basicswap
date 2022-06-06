@@ -17,16 +17,19 @@ CURRENT_DB_DATA_VERSION = 1
 Base = declarative_base()
 
 
-class TableTypes(IntEnum):
+class Concepts(IntEnum):
     OFFER = auto()
     BID = auto()
+    NETWORK_MESSAGE = auto()
 
 
-def strTableTypes(state):
-    if state == TableTypes.OFFER:
+def strConcepts(state):
+    if state == Concepts.OFFER:
         return 'Offer'
-    if state == TableTypes.BID:
+    if state == Concepts.BID:
         return 'Bid'
+    if state == Concepts.NETWORK_MESSAGE:
+        return 'Network Message'
     return 'Unknown'
 
 
@@ -245,16 +248,16 @@ class SmsgAddress(Base):
     note = sa.Column(sa.String)
 
 
-class EventQueue(Base):
-    __tablename__ = 'eventqueue'
+class Action(Base):
+    __tablename__ = 'actions'
 
-    event_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
+    action_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
     active_ind = sa.Column(sa.Integer)
     created_at = sa.Column(sa.BigInteger)
     trigger_at = sa.Column(sa.BigInteger)
     linked_id = sa.Column(sa.LargeBinary)
-    event_type = sa.Column(sa.Integer)
-    event_data = sa.Column(sa.LargeBinary)
+    action_type = sa.Column(sa.Integer)
+    action_data = sa.Column(sa.LargeBinary)
 
 
 class EventLog(Base):

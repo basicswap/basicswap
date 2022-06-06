@@ -122,7 +122,7 @@ class TxTypes(IntEnum):
     XMR_SWAP_B_LOCK = auto()
 
 
-class EventTypes(IntEnum):
+class ActionTypes(IntEnum):
     ACCEPT_BID = auto()
     ACCEPT_XMR_BID = auto()
     SIGN_XMR_SWAP_LOCK_TX_A = auto()
@@ -155,6 +155,7 @@ class EventLogTypes(IntEnum):
     LOCK_TX_B_SPEND_TX_PUBLISHED = auto()
     LOCK_TX_A_REFUND_TX_SEEN = auto()
     LOCK_TX_A_REFUND_SPEND_TX_SEEN = auto()
+    ERROR = auto()
 
 
 class XmrSplitMsgTypes(IntEnum):
@@ -331,6 +332,8 @@ def describeEventEntry(event_type, event_msg):
         return 'Lock tx A refund spend tx seen in chain'
     if event_type == EventLogTypes.SYSTEM_WARNING:
         return 'Warning: ' + event_msg
+    if event_type == EventLogTypes.ERROR:
+        return 'Error: ' + event_msg
 
 
 def getVoutByAddress(txjs, p2sh):
