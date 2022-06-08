@@ -38,6 +38,7 @@ from . import __version__
 from .rpc_xmr import make_xmr_rpc2_func
 from .util import (
     TemporaryError,
+    AutomationConstraint,
     format_amount,
     format_timestamp,
     DeserialiseNum,
@@ -3541,7 +3542,11 @@ class BasicSwap(BaseApp):
             self.mxDB.release()
 
     def countQueuedActions(self, session, bid_id, action_type):
-        q = session.query(Action).filter(sa.and_(Action.active_ind == 1, Action.linked_id == bid_id, Action.action_type == action_type))
+        q = session.query(Action).filter(sa.and_(Action.active_ind == 1, Action.linked_id == bid_id, Action.action_type == int(action_type)))
+        return q.count()
+
+    def countQueuedAcceptActions(self, session, bid_id):
+        q = session.query(Action).filter(sa.and_(Action.active_ind == 1, Action.linked_id == bid_id, sa.or_(Action.action_type == int(ActionTypes.ACCEPT_XMR_BID), Action.action_type == int(ActionTypes.ACCEPT_BID))))
         return q.count()
 
     def checkQueuedActions(self):
@@ -3607,6 +3612,8 @@ class BasicSwap(BaseApp):
                         self.receiveXmrBid(bid, session)
                     except Exception as ex:
                         self.log.info('Verify xmr bid {} failed: {}'.format(bid.bid_id.hex(), str(ex)))
+                        if self.debug:
+                            self.log.error(traceback.format_exc())
                         bid.setState(BidStates.BID_ERROR, 'Failed validation: ' + str(ex))
                         session.add(bid)
                         self.updateBidInProgress(bid)
@@ -3675,7 +3682,10 @@ class BasicSwap(BaseApp):
         elif offer_data.swap_type == SwapTypes.XMR_SWAP:
             ensure(coin_from not in non_script_type_coins, 'Invalid coin from type')
             ensure(coin_to in non_script_type_coins, 'Invalid coin to type')
-            self.log.debug('TODO - More restrictions')
+            ensure(len(offer_data.proof_address) == 0, 'Unexpected data')
+            ensure(len(offer_data.proof_signature) == 0, 'Unexpected data')
+            ensure(len(offer_data.pkhash_seller) == 0, 'Unexpected data')
+            ensure(len(offer_data.secret_hash) == 0, 'Unexpected data')
         else:
             raise ValueError('Unknown swap type {}.'.format(offer_data.swap_type))
 
@@ -3785,6 +3795,30 @@ class BasicSwap(BaseApp):
                 session.remove()
             self.mxDB.release()
 
+    def getCompletedAndActiveBidsValue(self, offer, session):
+        bids = []
+        total_value = 0
+        q = session.execute('SELECT bid_id, amount, state FROM bids WHERE active_ind = 1 AND offer_id = x\'{}\''.format(offer.offer_id.hex()))
+        for row in q:
+            bid_id, amount, state = row
+            if state == BidStates.SWAP_COMPLETED:
+                bids.append((bid_id, amount, state, 1))
+                total_value += amount
+                continue
+            if state == BidStates.BID_ACCEPTED:
+                bids.append((bid_id, amount, state, 2))
+                total_value += amount
+                continue
+            if bid_id in self.swaps_in_progress:
+                bids.append((bid_id, amount, state, 3))
+                total_value += amount
+                continue
+            if self.countQueuedAcceptActions(session, bid_id) > 0:
+                bids.append((bid_id, amount, state, 4))
+                total_value += amount
+                continue
+        return bids, total_value
+
     def shouldAutoAcceptBid(self, offer, bid, session=None):
         use_session = None
         try:
@@ -3805,36 +3839,49 @@ class BasicSwap(BaseApp):
 
             if not offer.amount_negotiable:
                 if bid.amount != offer.amount_from:
-                    self.log.info('Not auto accepting bid %s, want exact amount match', bid.bid_id.hex())
-                    return False
+                    raise AutomationConstraint('Need exact amount match')
 
             if bid.amount < offer.min_bid_amount:
-                self.log.info('Not auto accepting bid %s, bid amount below minimum', bid.bid_id.hex())
-                return False
+                raise AutomationConstraint('Bid amount below offer minimum')
 
             if opts.get('exact_rate_only', False) is True:
                 if bid.rate != offer.rate:
-                    self.log.info('Not auto accepting bid %s, want exact rate match', bid.bid_id.hex())
-                    return False
+                    raise AutomationConstraint('Need exact rate match')
 
-            max_bids = opts.get('max_bids', 1)
-            # Auto accept bid if set and no other non-abandoned bid for this order exists
-            if self.countAcceptedBids(offer.offer_id) >= max_bids:
-                self.log.info('Not auto accepting bid %s, already have', bid.bid_id.hex())
-                return False
+            active_bids, total_bids_value = self.getCompletedAndActiveBidsValue(offer, session)
+
+            if total_bids_value + bid.amount > offer.amount_from:
+                raise AutomationConstraint('Over remaining offer value {}'.format(offer.amount_from - total_bids_value))
+
+            num_not_completed = 0
+            for active_bid in active_bids:
+                if active_bid[3] != 1:
+                    num_not_completed += 1
+            max_concurrent_bids = opts.get('max_concurrent_bids', 1)
+            if num_not_completed >= max_concurrent_bids:
+                raise AutomationConstraint('Already have {} bids to complete'.format(num_not_completed))
 
             if strategy.only_known_identities:
                 identity_stats = use_session.query(KnownIdentity).filter_by(address=bid.bid_addr).first()
                 if not identity_stats:
-                    return False
+                    raise AutomationConstraint('Unknown bidder')
 
                 # TODO: More options
                 if identity_stats.num_recv_bids_successful < 1:
-                    return False
+                    raise AutomationConstraint('Bidder has too few successful swaps')
                 if identity_stats.num_recv_bids_successful <= identity_stats.num_recv_bids_failed:
-                    return False
+                    raise AutomationConstraint('Bidder has too many failed swaps')
 
             return True
+        except AutomationConstraint as e:
+            self.log.info('Not auto accepting bid {}, {}'.format(bid.bid_id.hex(), str(e)))
+            if self.debug:
+                self.logEvent(Concepts.AUTOMATION,
+                              bid.bid_id,
+                              EventLogTypes.AUTOMATION_CONSTRAINT,
+                              str(e),
+                              use_session)
+            return False
         except Exception as e:
             self.log.error('shouldAutoAcceptBid: %s', str(e))
             return False

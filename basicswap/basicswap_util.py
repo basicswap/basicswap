@@ -156,6 +156,7 @@ class EventLogTypes(IntEnum):
     LOCK_TX_A_REFUND_TX_SEEN = auto()
     LOCK_TX_A_REFUND_SPEND_TX_SEEN = auto()
     ERROR = auto()
+    AUTOMATION_CONSTRAINT = auto()
 
 
 class XmrSplitMsgTypes(IntEnum):

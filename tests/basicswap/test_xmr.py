@@ -875,6 +875,8 @@ class Test(BaseTest):
         offer = swap_clients[1].listOffers(filters={'offer_id': offer_id})[0]
 
         below_min_bid = min_bid - 1
+
+        # Ensure bids below the minimum amount fails on sender and recipient.
         try:
             bid_id = swap_clients[1].postBid(offer_id, below_min_bid)
         except Exception as e:
@@ -886,7 +888,34 @@ class Test(BaseTest):
 
         events = wait_for_event(test_delay_event, swap_clients[0], Concepts.NETWORK_MESSAGE, bid_id)
         assert('Bid amount below minimum' in events[0].event_msg)
-        # TODO
+
+        bid_ids = []
+        for i in range(5):
+            bid_ids.append(swap_clients[1].postBid(offer_id, min_bid))
+
+        # Should fail > max concurrent
+        test_delay_event.wait(1.0)
+        bid_id = swap_clients[1].postBid(offer_id, min_bid)
+        events = wait_for_event(test_delay_event, swap_clients[0], Concepts.AUTOMATION, bid_id)
+        assert('Already have 5 bids to complete' in events[0].event_msg)
+
+        for bid_id in bid_ids:
+            wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=180)
+            wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True)
+
+        amt_bid = make_int(5, scale=8, r=1)
+
+        # Should fail > total value
+        amt_bid += 1
+        bid_id = swap_clients[1].postBid(offer_id, amt_bid)
+        events = wait_for_event(test_delay_event, swap_clients[0], Concepts.AUTOMATION, bid_id)
+        assert('Over remaining offer value' in events[0].event_msg)
+
+        # Should pass
+        amt_bid -= 1
+        bid_id = swap_clients[1].postBid(offer_id, amt_bid)
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=180)
+        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True)
 
     def test_10_locked_refundtx(self):
         logging.info('---------- Test Refund tx is locked')

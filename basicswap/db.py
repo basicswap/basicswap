@@ -21,6 +21,7 @@ class Concepts(IntEnum):
     OFFER = auto()
     BID = auto()
     NETWORK_MESSAGE = auto()
+    AUTOMATION = auto()
 
 
 def strConcepts(state):

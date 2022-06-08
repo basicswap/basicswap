@@ -21,6 +21,10 @@ class TemporaryError(ValueError):
     pass
 
 
+class AutomationConstraint(ValueError):
+    pass
+
+
 def ensure(v, err_string):
     if not v:
         raise ValueError(err_string)
