@@ -5,7 +5,7 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-import time
+import json
 import logging
 
 import basicswap.contrib.ed25519_fast as edf
@@ -217,7 +217,7 @@ class XMRInterface(CoinInterface):
     def encodeSharedAddress(self, Kbv, Kbs):
         return xmr_util.encode_address(Kbv, Kbs)
 
-    def publishBLockTx(self, Kbv, Kbs, output_amount, feerate):
+    def publishBLockTx(self, Kbv, Kbs, output_amount, feerate, delay_for=10):
         with self._mx_wallet:
             self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
 
@@ -230,14 +230,17 @@ class XMRInterface(CoinInterface):
             self._log.info('publishBLockTx %s to address_b58 %s', rv['tx_hash'], shared_addr)
             tx_hash = bytes.fromhex(rv['tx_hash'])
 
-            # Debug
-            for i in range(10):
-                params = {'out': True, 'pending': True, 'failed': True, 'pool': True, }
-                rv = self.rpc_wallet_cb('get_transfers', params)
-                self._log.info('[rm] get_transfers {}'.format(dumpj(rv)))
-                if 'pending' not in rv:
-                    break
-                time.sleep(1)
+            if self._sc.debug:
+                i = 0
+                while not self._sc.delay_event.is_set():
+                    params = {'out': True, 'pending': True, 'failed': True, 'pool': True, }
+                    rv = self.rpc_wallet_cb('get_transfers', params)
+                    self._log.debug('get_transfers {}'.format(dumpj(rv)))
+                    if 'pending' not in rv:
+                        break
+                    if i >= delay_for:
+                        break
+                    self._sc.delay_event.wait(1.0)
 
             return tx_hash
 
@@ -333,7 +336,6 @@ class XMRInterface(CoinInterface):
                             return True
 
                 # TODO: Is it necessary to check the address?
-
                 '''
                 rv = self.rpc_wallet_cb('get_balance')
                 print('get_balance', rv)
@@ -346,7 +348,9 @@ class XMRInterface(CoinInterface):
 
                 if i >= num_tries:
                     raise ValueError('Balance not confirming on node')
-                time.sleep(1)
+                self._sc.delay_event.wait(1.0)
+                if self._sc.delay_event.is_set():
+                    raise ValueError('Stopped')
 
             return False
 
@@ -431,7 +435,7 @@ class XMRInterface(CoinInterface):
                 params['priority'] = self._fee_priority
 
             rv = self.rpc_wallet_cb('sweep_all', params)
-            print('sweep_all', rv)
+            self._log.debug('sweep_all {}'.format(json.dumps(rv)))
 
             return bytes.fromhex(rv['tx_hash_list'][0])
 

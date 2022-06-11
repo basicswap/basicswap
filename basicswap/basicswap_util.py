@@ -64,38 +64,38 @@ class SwapTypes(IntEnum):
 
 
 class OfferStates(IntEnum):
-    OFFER_SENT = auto()
-    OFFER_RECEIVED = auto()
-    OFFER_ABANDONED = auto()
+    OFFER_SENT = 1
+    OFFER_RECEIVED = 2
+    OFFER_ABANDONED = 3
 
 
 class BidStates(IntEnum):
-    BID_SENT = auto()
-    BID_RECEIVING = auto()          # Partially received
-    BID_RECEIVED = auto()
-    BID_RECEIVING_ACC = auto()      # Partially received accept message
-    BID_ACCEPTED = auto()           # BidAcceptMessage received/sent
-    SWAP_INITIATED = auto()         # Initiate txn validated
-    SWAP_PARTICIPATING = auto()     # Participate txn validated
-    SWAP_COMPLETED = auto()         # All swap txns spent
-    XMR_SWAP_SCRIPT_COIN_LOCKED = auto()
-    XMR_SWAP_HAVE_SCRIPT_COIN_SPEND_TX = auto()
-    XMR_SWAP_NOSCRIPT_COIN_LOCKED = auto()
-    XMR_SWAP_LOCK_RELEASED = auto()
-    XMR_SWAP_SCRIPT_TX_REDEEMED = auto()
-    XMR_SWAP_SCRIPT_TX_PREREFUND = auto()  # script txo moved into pre-refund tx
-    XMR_SWAP_NOSCRIPT_TX_REDEEMED = auto()
-    XMR_SWAP_NOSCRIPT_TX_RECOVERED = auto()
-    XMR_SWAP_FAILED_REFUNDED = auto()
-    XMR_SWAP_FAILED_SWIPED = auto()
-    XMR_SWAP_FAILED = auto()
-    SWAP_DELAYING = auto()
-    SWAP_TIMEDOUT = auto()
-    BID_ABANDONED = auto()          # Bid will no longer be processed
-    BID_ERROR = auto()              # An error occurred
-    BID_STALLED_FOR_TEST = auto()
-    BID_REJECTED = auto()
-    BID_STATE_UNKNOWN = auto()
+    BID_SENT = 1
+    BID_RECEIVING = 2               # Partially received
+    BID_RECEIVED = 3
+    BID_RECEIVING_ACC = 4           # Partially received accept message
+    BID_ACCEPTED = 5                # BidAcceptMessage received/sent
+    SWAP_INITIATED = 6              # Initiate txn validated
+    SWAP_PARTICIPATING = 7          # Participate txn validated
+    SWAP_COMPLETED = 8              # All swap txns spent
+    XMR_SWAP_SCRIPT_COIN_LOCKED = 9
+    XMR_SWAP_HAVE_SCRIPT_COIN_SPEND_TX = 10
+    XMR_SWAP_NOSCRIPT_COIN_LOCKED = 11
+    XMR_SWAP_LOCK_RELEASED = 12
+    XMR_SWAP_SCRIPT_TX_REDEEMED = 13
+    XMR_SWAP_SCRIPT_TX_PREREFUND = 14  # script txo moved into pre-refund tx
+    XMR_SWAP_NOSCRIPT_TX_REDEEMED = 15
+    XMR_SWAP_NOSCRIPT_TX_RECOVERED = 16
+    XMR_SWAP_FAILED_REFUNDED = 17
+    XMR_SWAP_FAILED_SWIPED = 18
+    XMR_SWAP_FAILED = 19
+    SWAP_DELAYING = 20
+    SWAP_TIMEDOUT = 21
+    BID_ABANDONED = 22          # Bid will no longer be processed
+    BID_ERROR = 23              # An error occurred
+    BID_STALLED_FOR_TEST = 24
+    BID_REJECTED = 25
+    BID_STATE_UNKNOWN = 26
 
 
 class TxStates(IntEnum):
@@ -385,6 +385,10 @@ def getLastBidState(packed_states):
 
 
 def isActiveBidState(state):
+    if state >= BidStates.BID_ACCEPTED and state < BidStates.SWAP_COMPLETED:
+        return True
+    if state == BidStates.SWAP_DELAYING:
+        return True
     if state == BidStates.XMR_SWAP_HAVE_SCRIPT_COIN_SPEND_TX:
         return True
     if state == BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED:

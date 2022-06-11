@@ -731,7 +731,6 @@ class Test(BaseTest):
         offer = swap_clients[1].getOffer(offer_id)
 
         bid_id = swap_clients[1].postXmrBid(offer_id, offer.amount_from)
-
         wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.BID_RECEIVED)
 
         bid, xmr_swap = swap_clients[0].getXmrBid(bid_id)

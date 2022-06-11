@@ -3545,10 +3545,6 @@ class BasicSwap(BaseApp):
         q = session.query(Action).filter(sa.and_(Action.active_ind == 1, Action.linked_id == bid_id, Action.action_type == int(action_type)))
         return q.count()
 
-    def countQueuedAcceptActions(self, session, bid_id):
-        q = session.query(Action).filter(sa.and_(Action.active_ind == 1, Action.linked_id == bid_id, sa.or_(Action.action_type == int(ActionTypes.ACCEPT_XMR_BID), Action.action_type == int(ActionTypes.ACCEPT_BID))))
-        return q.count()
-
     def checkQueuedActions(self):
         self.mxDB.acquire()
         now = int(time.time())
@@ -3798,25 +3794,19 @@ class BasicSwap(BaseApp):
     def getCompletedAndActiveBidsValue(self, offer, session):
         bids = []
         total_value = 0
-        q = session.execute('SELECT bid_id, amount, state FROM bids WHERE active_ind = 1 AND offer_id = x\'{}\''.format(offer.offer_id.hex()))
+        q = session.execute(
+            '''SELECT bid_id, amount, state FROM bids
+               JOIN bidstates ON bidstates.state_id = bids.state AND (bidstates.state_id = {1} OR bidstates.in_progress > 0)
+               WHERE bids.active_ind = 1 AND bids.offer_id = x\'{0}\'
+               UNION
+               SELECT bid_id, amount, state FROM bids
+               JOIN actions ON actions.linked_id = bids.bid_id AND actions.active_ind = 1 AND (actions.action_type = {2} OR actions.action_type = {3})
+               WHERE bids.active_ind = 1 AND bids.offer_id = x\'{0}\'
+            '''.format(offer.offer_id.hex(), BidStates.SWAP_COMPLETED, ActionTypes.ACCEPT_XMR_BID, ActionTypes.ACCEPT_BID))
         for row in q:
             bid_id, amount, state = row
-            if state == BidStates.SWAP_COMPLETED:
-                bids.append((bid_id, amount, state, 1))
-                total_value += amount
-                continue
-            if state == BidStates.BID_ACCEPTED:
-                bids.append((bid_id, amount, state, 2))
-                total_value += amount
-                continue
-            if bid_id in self.swaps_in_progress:
-                bids.append((bid_id, amount, state, 3))
-                total_value += amount
-                continue
-            if self.countQueuedAcceptActions(session, bid_id) > 0:
-                bids.append((bid_id, amount, state, 4))
-                total_value += amount
-                continue
+            bids.append((bid_id, amount, state))
+            total_value += amount
         return bids, total_value
 
     def shouldAutoAcceptBid(self, offer, bid, session=None):
@@ -3855,7 +3845,7 @@ class BasicSwap(BaseApp):
 
             num_not_completed = 0
             for active_bid in active_bids:
-                if active_bid[3] != 1:
+                if active_bid[2] != BidStates.SWAP_COMPLETED:
                     num_not_completed += 1
             max_concurrent_bids = opts.get('max_concurrent_bids', 1)
             if num_not_completed >= max_concurrent_bids:
@@ -5062,14 +5052,8 @@ class BasicSwap(BaseApp):
                 session = scoped_session(self.session_factory)
                 try:
                     activate_bid = False
-                    if offer.swap_type == SwapTypes.SELLER_FIRST:
-                        if bid.state and bid.state > BidStates.BID_RECEIVED and bid.state < BidStates.SWAP_COMPLETED:
-                            activate_bid = True
-                    else:
-                        self.log.debug('TODO - determine in-progress for manualBidUpdate')
-                        if offer.swap_type == SwapTypes.XMR_SWAP:
-                            if bid.state and isActiveBidState(bid.state):
-                                activate_bid = True
+                    if bid.state and isActiveBidState(bid.state):
+                        activate_bid = True
 
                     if activate_bid:
                         self.activateBid(session, bid)

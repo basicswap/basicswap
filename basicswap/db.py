@@ -460,3 +460,16 @@ class History(Base):
 
     changed_data = sa.Column(sa.LargeBinary)
     created_at = sa.Column(sa.BigInteger)
+
+
+class BidState(Base):
+    __tablename__ = 'bidstates'
+
+    record_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
+    active_ind = sa.Column(sa.Integer)
+    state_id = sa.Column(sa.Integer)
+    label = sa.Column(sa.String)
+    in_progress = sa.Column(sa.Integer)
+
+    note = sa.Column(sa.String)
+    created_at = sa.Column(sa.BigInteger)

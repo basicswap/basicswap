@@ -5,13 +5,20 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import json
+import time
 
 from sqlalchemy.orm import scoped_session
 from .db import (
+    BidState,
     Concepts,
     AutomationStrategy,
     CURRENT_DB_VERSION,
     CURRENT_DB_DATA_VERSION)
+
+from .basicswap_util import (
+    BidStates,
+    strBidState,
+    isActiveBidState)
 
 
 def upgradeDatabaseData(self, data_version):
@@ -23,6 +30,8 @@ def upgradeDatabaseData(self, data_version):
         try:
             session = scoped_session(self.session_factory)
 
+            now = int(time.time())
+
             if data_version < 1:
                 session.add(AutomationStrategy(
                     active_ind=1,
@@ -30,7 +39,8 @@ def upgradeDatabaseData(self, data_version):
                     type_ind=Concepts.OFFER,
                     data=json.dumps({'exact_rate_only': True,
                                      'max_concurrent_bids': 5}).encode('utf-8'),
-                    only_known_identities=False))
+                    only_known_identities=False,
+                    created_at=now))
                 session.add(AutomationStrategy(
                     active_ind=1,
                     label='Accept Known',
@@ -38,7 +48,16 @@ def upgradeDatabaseData(self, data_version):
                     data=json.dumps({'exact_rate_only': True,
                                      'max_concurrent_bids': 5}).encode('utf-8'),
                     only_known_identities=True,
-                    note='Accept bids from identities with previously successful swaps only'))
+                    note='Accept bids from identities with previously successful swaps only',
+                    created_at=now))
+
+                for state in BidStates:
+                    session.add(BidState(
+                        active_ind=1,
+                        state_id=int(state),
+                        in_progress=isActiveBidState(state),
+                        label=strBidState(state),
+                        created_at=now))
 
             self.db_data_version = CURRENT_DB_DATA_VERSION
             self.setIntKVInSession('db_data_version', self.db_data_version, session)
@@ -161,6 +180,17 @@ def upgradeDatabase(self, db_version):
                     concept_type INTEGER,
                     concept_id INTEGER,
                     changed_data BLOB,
+
+                    note VARCHAR,
+                    created_at BIGINT,
+                    PRIMARY KEY (record_id))''')
+
+            session.execute('''
+                CREATE TABLE bidstates (
+                    record_id INTEGER NOT NULL,
+                    state_id INTEGER,
+                    label VARCHAR,
+                    in_progress INTEGER,
 
                     note VARCHAR,
                     created_at BIGINT,
