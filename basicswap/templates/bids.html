@@ -20,6 +20,19 @@
 <option value="desc"{% if filters.sort_dir=='desc' %} selected{% endif %}>Descending</option>
 </select>
 </td></tr>
+<tr><td>State</td><td>
+<select name="state">
+<option value="-1"{% if filters.bid_state_ind==-1 %} selected{% endif %}>-- Any --</option>
+{% for s in data.bid_states %}
+<option value="{{ s[0] }}"{% if filters.bid_state_ind==s[0] %} selected{% endif %}>{{ s[1] }}</option>
+{% endfor %}
+</select>
+<tr><td>Include Expired</td><td>
+<select name="with_expired">
+<option value="true"{% if filters.with_expired==true %} selected{% endif %}>Include</option>
+<option value="false"{% if filters.with_expired==false %} selected{% endif %}>Exclude</option>
+</select>
+</td></tr>
 
 <tr><td><input type="submit" name='applyfilters' value="Apply Filters"></td><td><input type="submit" name='clearfilters' value="Clear Filters"></td></tr>
 <tr><td><input type="submit" name='pageback' value="Page Back"></td><td>Page: {{ filters.page_no }}</td><td><input type="submit" name='pageforwards' value="Page Forwards"></td></tr>

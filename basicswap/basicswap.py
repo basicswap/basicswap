@@ -5210,21 +5210,24 @@ class BasicSwap(BaseApp):
                 continue
             num_watched_outputs += len(v['watched_outputs'])
 
-        bids_sent = 0
-        bids_received = 0
-        q = self.engine.execute('SELECT was_sent, was_received, COUNT(*) FROM bids GROUP BY was_sent, was_received ')
-        for r in q:
-            if r[0]:
-                bids_sent += r[2]
-            if r[1]:
-                bids_received += r[2]
-
         now = int(time.time())
-        q = self.engine.execute('SELECT COUNT(*) FROM offers WHERE active_ind = 1 AND expire_at > {}'.format(now)).first()
-        num_offers = q[0]
+        q_str = '''SELECT
+                   COUNT(CASE WHEN was_sent THEN 1 ELSE NULL END) AS count_sent,
+                   COUNT(CASE WHEN was_received THEN 1 ELSE NULL END) AS count_received,
+                   COUNT(CASE WHEN was_received AND state = {} AND expire_at > {} THEN 1 ELSE NULL END) AS count_available
+                   FROM bids WHERE active_ind = 1'''.format(BidStates.BID_RECEIVED, now)
+        q = self.engine.execute(q_str).first()
+        bids_sent = q[0]
+        bids_received = q[1]
+        bids_available = q[2]
 
-        q = self.engine.execute('SELECT COUNT(*) FROM offers WHERE was_sent = 1').first()
-        num_sent_offers = q[0]
+        q_str = '''SELECT
+                   COUNT(CASE WHEN expire_at > {} THEN 1 ELSE NULL END) AS count_active,
+                   COUNT(CASE WHEN was_sent THEN 1 ELSE NULL END) AS count_sent
+                   FROM offers WHERE active_ind = 1'''.format(now)
+        q = self.engine.execute(q_str).first()
+        num_offers = q[0]
+        num_sent_offers = q[1]
 
         rv = {
             'network': self.chain,
@@ -5233,6 +5236,7 @@ class BasicSwap(BaseApp):
             'num_sent_offers': num_sent_offers,
             'num_recv_bids': bids_received,
             'num_sent_bids': bids_sent,
+            'num_available_bids': bids_available,
             'num_watched_outputs': num_watched_outputs,
         }
         return rv
@@ -5454,6 +5458,13 @@ class BasicSwap(BaseApp):
                 query_str += 'AND bids.was_sent = 1 '
             else:
                 query_str += 'AND bids.was_received = 1 '
+
+            bid_state_ind = filters.get('bid_state_ind', -1)
+            if bid_state_ind != -1:
+                query_str += 'AND bids.state = {} '.format(bid_state_ind)
+            with_expired = filters.get('with_expired', True)
+            if with_expired is not True:
+                query_str += 'AND bids.expire_at > {} '.format(now)
 
             sort_dir = filters.get('sort_dir', 'DESC').upper()
             sort_by = filters.get('sort_by', 'created_at')

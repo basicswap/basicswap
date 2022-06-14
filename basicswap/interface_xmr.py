@@ -12,19 +12,21 @@ import basicswap.contrib.ed25519_fast as edf
 import basicswap.ed25519_fast_util as edu
 import basicswap.util_xmr as xmr_util
 from coincurve.ed25519 import (
+    ed25519_add,
     ed25519_get_pubkey,
     ed25519_scalar_add,
-    ed25519_add)
+)
 from coincurve.keys import PrivateKey
 from coincurve.dleag import (
-    verify_ed25519_point,
-    dleag_proof_len,
+    dleag_prove,
     dleag_verify,
-    dleag_prove)
+    dleag_proof_len,
+    verify_ed25519_point,
+)
 
 from .util import (
-    ensure,
     dumpj,
+    ensure,
     make_int,
     TemporaryError)
 from .rpc_xmr import (
@@ -33,9 +35,7 @@ from .rpc_xmr import (
     make_xmr_wallet_rpc_func)
 from .util import (
     b2i, b2h)
-from .chainparams import CoinInterface, Coins
-
-XMR_COIN = 10 ** 12
+from .chainparams import XMR_COIN, CoinInterface, Coins
 
 
 class XMRInterface(CoinInterface):
@@ -155,7 +155,6 @@ class XMRInterface(CoinInterface):
 
     def getNewAddress(self, placeholder):
         with self._mx_wallet:
-            self._log.warning('TODO - subaddress?')
             self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
             return self.rpc_wallet_cb('create_address', {'account_index': 0})['address']
 

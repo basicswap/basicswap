@@ -18,6 +18,7 @@ from . import __version__
 from .util import (
     dumpj,
     ensure,
+    toBool,
     format_timestamp,
 )
 from .chainparams import (
@@ -26,6 +27,7 @@ from .chainparams import (
     getCoinIdFromTicker,
 )
 from .basicswap_util import (
+    BidStates,
     SwapTypes,
     DebugTypes,
     strBidState,
@@ -50,6 +52,7 @@ from .ui.util import (
     PAGE_LIMIT,
     describeBid,
     getCoinName,
+    listBidStates,
     get_data_entry,
     have_data_entry,
     get_data_entry_or,
@@ -716,15 +719,21 @@ class HttpHandler(BaseHTTPRequestHandler):
             old_states=old_states,
         ), 'UTF-8')
 
-    def page_bids(self, url_split, post_string, sent=False):
+    def page_bids(self, url_split, post_string, sent=False, available=False):
         swap_client = self.server.swap_client
 
         filters = {
             'page_no': 1,
+            'bid_state_ind': -1,
+            'with_expired': True,
             'limit': PAGE_LIMIT,
             'sort_by': 'created_at',
             'sort_dir': 'desc',
         }
+        if available:
+            filters['bid_state_ind'] = BidStates.BID_RECEIVED
+            filters['with_expired'] = False
+
         messages = []
         form_data = self.checkForm(post_string, 'bids', messages)
         if form_data and have_data_entry(form_data, 'applyfilters'):
@@ -736,10 +745,25 @@ class HttpHandler(BaseHTTPRequestHandler):
                 sort_dir = get_data_entry(form_data, 'sort_dir')
                 ensure(sort_dir in ['asc', 'desc'], 'Invalid sort dir')
                 filters['sort_dir'] = sort_dir
+            if have_data_entry(form_data, 'state'):
+                state_ind = get_data_entry(form_data, 'state')
+                if state_ind != -1:
+                    try:
+                        state = BidStates(state_ind)
+                    except Exception:
+                        raise ValueError('Invalid state')
+                filters['bid_state_ind'] = state_ind
+            if have_data_entry(form_data, 'with_expired'):
+                with_expired = toBool(get_data_entry(form_data, 'with_expired'))
+                filters['with_expired'] = with_expired
 
         set_pagination_filters(form_data, filters)
 
         bids = swap_client.listBids(sent=sent, filters=filters)
+
+        page_data = {
+            'bid_states': listBidStates()
+        }
 
         template = env.get_template('bids.html')
         return bytes(template.render(
@@ -748,6 +772,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             page_type='Sent' if sent else 'Received',
             messages=messages,
             filters=filters,
+            data=page_data,
             bids=[(format_timestamp(b[0]),
                    b[2].hex(), b[3].hex(), strBidState(b[5]), strTxState(b[7]), strTxState(b[8]), b[11]) for b in bids],
             form_id=os.urandom(8).hex(),
@@ -1003,6 +1028,8 @@ class HttpHandler(BaseHTTPRequestHandler):
                     return self.page_bids(url_split, post_string)
                 if url_split[1] == 'sentbids':
                     return self.page_bids(url_split, post_string, sent=True)
+                if url_split[1] == 'availablebids':
+                    return self.page_bids(url_split, post_string, available=True)
                 if url_split[1] == 'watched':
                     return self.page_watched(url_split, post_string)
                 if url_split[1] == 'smsgaddresses':
