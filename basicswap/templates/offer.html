@@ -20,8 +20,9 @@
 <tr><td>Amount From</td><td>{{ data.amt_from }} {{ data.tla_from }}</td></tr>
 <tr><td>Amount To</td><td>{{ data.amt_to }} {{ data.tla_to }}</td></tr>
 <tr><td>Rate</td><td>{{ data.rate }}</td></tr>
-<tr><td>Amount Variable</td><td>{{ data.amount_negotiable }}</td></tr>
-<tr><td>Rate Variable</td><td>{{ data.rate_negotiable }}</td></tr>
+<tr><td title="Total coin-from value of completed bids, that this node is involved in">Amount Swapped</td><td>{{ data.amt_swapped }} {{ data.tla_from }}</td></tr>
+<tr><td title="If bids can be sent with a different amount">Amount Variable</td><td>{{ data.amount_negotiable }}</td></tr>
+<tr><td title="If bids can be sent with a different amount">Rate Variable</td><td>{{ data.rate_negotiable }}</td></tr>
 <tr><td>Script Lock Type</td><td>{{ data.lock_type }}</td></tr>
 <tr><td>Script Lock Value</td><td>{{ data.lock_value }} {{ data.lock_value_hr }}</td></tr>
 {% if data.addr_to == "Public" %}

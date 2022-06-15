@@ -245,6 +245,7 @@ class BasicSwap(BaseApp):
         self.network_pubkey = self.settings['network_pubkey']
         self.network_addr = pubkeyToAddress(chainparams[Coins.PART][self.chain]['pubkey_address'], bytes.fromhex(self.network_pubkey))
 
+        self.db_echo = self.settings.get('db_echo', False)
         self.sqlite_file = os.path.join(self.data_dir, 'db{}.sqlite'.format('' if self.chain == 'mainnet' else ('_' + self.chain)))
         db_exists = os.path.exists(self.sqlite_file)
 
@@ -257,7 +258,8 @@ class BasicSwap(BaseApp):
             close_all_sessions()
             Base.metadata.create_all(self.engine)
             self.engine.dispose()
-        self.engine = sa.create_engine('sqlite:///' + self.sqlite_file)
+
+        self.engine = sa.create_engine('sqlite:///' + self.sqlite_file, echo=self.db_echo)
         self.session_factory = sessionmaker(bind=self.engine, expire_on_commit=False)
 
         session = scoped_session(self.session_factory)
@@ -5392,10 +5394,13 @@ class BasicSwap(BaseApp):
             now = int(time.time())
             session = scoped_session(self.session_factory)
 
+            subquery = session.query(sa.func.sum(Bid.amount).label('completed_bid_amount')).filter(sa.and_(Bid.offer_id == Offer.offer_id, Bid.state == BidStates.SWAP_COMPLETED)).correlate(Offer).scalar_subquery()
+            q = session.query(Offer, subquery)
+
             if sent:
-                q = session.query(Offer).filter(Offer.was_sent == True)  # noqa: E712
+                q = q.filter(Offer.was_sent == True)  # noqa: E712
             else:
-                q = session.query(Offer).filter(sa.and_(Offer.expire_at > now, Offer.active_ind == 1))
+                q = q.filter(sa.and_(Offer.expire_at > now, Offer.active_ind == 1))
 
             filter_offer_id = filters.get('offer_id', None)
             if filter_offer_id is not None:
@@ -5424,11 +5429,11 @@ class BasicSwap(BaseApp):
             for row in q:
                 # Show offers for enabled coins only
                 try:
-                    ci_from = self.ci(row.coin_from)
-                    ci_to = self.ci(row.coin_to)
+                    ci_from = self.ci(row[0].coin_from)
+                    ci_to = self.ci(row[0].coin_to)
                 except Exception as e:
                     continue
-                rv.append(row)
+                rv.append((row[0], 0 if row[1] is None else row[1]))
             return rv
         finally:
             session.close()

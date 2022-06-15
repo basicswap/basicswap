@@ -129,7 +129,8 @@ def js_offers(self, url_split, post_string, is_json, sent=False):
 
     offers = self.server.swap_client.listOffers(sent, filters)
     rv = []
-    for o in offers:
+    for row in offers:
+        o, _ = row
         ci_from = self.server.swap_client.ci(o.coin_from)
         ci_to = self.server.swap_client.ci(o.coin_to)
         rv.append({

@@ -461,6 +461,12 @@ def page_offer(self, url_split, post_string):
             pass  # None found
 
     bids = swap_client.listBids(offer_id=offer_id)
+    formatted_bids = []
+    amt_swapped = 0
+    for b in bids:
+        amt_swapped += b[4]
+        formatted_bids.append((b[2].hex(), ci_from.format_amount(b[4]), strBidState(b[5]), ci_to.format_amount(b[10]), b[11]))
+    data['amt_swapped'] = ci_from.format_amount(amt_swapped)
 
     template = server.env.get_template('offer.html')
     return bytes(template.render(
@@ -470,7 +476,7 @@ def page_offer(self, url_split, post_string):
         sent_bid_id=sent_bid_id,
         messages=messages,
         data=data,
-        bids=[(b[2].hex(), ci_from.format_amount(b[4]), strBidState(b[5]), ci_to.format_amount(b[10]), b[11]) for b in bids],
+        bids=formatted_bids,
         addrs=None if show_bid_form is None else swap_client.listSmsgAddresses('bid'),
         form_id=os.urandom(8).hex(),
     ), 'UTF-8')
@@ -517,7 +523,8 @@ def page_offers(self, url_split, post_string, sent=False):
     offers = swap_client.listOffers(sent, filters)
 
     formatted_offers = []
-    for o in offers:
+    for row in offers:
+        o, completed_amount = row
         ci_from = swap_client.ci(Coins(o.coin_from))
         ci_to = swap_client.ci(Coins(o.coin_to))
         formatted_offers.append((
@@ -529,7 +536,8 @@ def page_offers(self, url_split, post_string, sent=False):
             ci_to.format_amount(o.rate),
             'Public' if o.addr_to == swap_client.network_addr else o.addr_to,
             o.addr_from,
-            o.was_sent))
+            o.was_sent,
+            ci_from.format_amount(completed_amount)))
 
     template = server.env.get_template('offers.html')
     return bytes(template.render(

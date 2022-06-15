@@ -51,9 +51,9 @@
 
 
 <table>
-<tr><th>At</th><th>From</th><th>Recipient</th><th>Offer ID</th><th>Coin From</th><th>Coin To</th><th>Amount From</th><th>Amount To</th><th>Rate</th></tr>
+<tr><th>At</th><th>From</th><th>Recipient</th><th>Offer ID</th><th>Coin From</th><th>Coin To</th><th>Amount From</th><th>Amount To</th><th>Rate</th><th>Amount From Swapped</th></tr>
 {% for o in offers %}
-<tr><td>{{ o[0] }}</td><td class="monospace">{{ o[8]|truncate(12, True) }}{% if o[9]==true %} <b>Sent</b>{% endif %}</td><td class="monospace">{{ o[7] }}</td><td><a class="monospace" href=/offer/{{ o[1] }}>{{ o[1] }}</a></td><td>{{ o[2] }}</td><td>{{ o[3] }}</td><td>{{ o[4] }}</td><td>{{ o[5] }}</td><td>{{ o[6] }}</td></tr>
+<tr><td>{{ o[0] }}</td><td class="monospace">{{ o[8]|truncate(12, True) }}{% if o[9]==true %} <b>Sent</b>{% endif %}</td><td class="monospace">{{ o[7] }}</td><td><a class="monospace" href=/offer/{{ o[1] }}>{{ o[1] }}</a></td><td>{{ o[2] }}</td><td>{{ o[3] }}</td><td>{{ o[4] }}</td><td>{{ o[5] }}</td><td>{{ o[6] }}</td><td>{{ o[10] }}</td></tr>
 {% endfor %}
 </table>
 
