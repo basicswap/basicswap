@@ -1,11 +1,19 @@
-FROM ubuntu:20.04
+FROM ubuntu:22.04
 
 ENV LANG=C.UTF-8 \
     DEBIAN_FRONTEND=noninteractive \
     DATADIRS="/coindata"
 
 RUN apt-get update; \
-    apt-get install -y wget python3-pip gnupg unzip protobuf-compiler automake libtool pkg-config gosu tzdata;
+    apt-get install -y wget python3-pip gnupg unzip make g++ autoconf automake libtool pkg-config gosu tzdata;
+
+# Must install protoc directly as latest package is only on 3.12
+RUN wget -O protobuf_src.tar.gz https://github.com/protocolbuffers/protobuf/releases/download/v21.1/protobuf-python-4.21.1.tar.gz && \
+    tar xvf protobuf_src.tar.gz && \
+    cd protobuf-3.21.1 && \
+    ./configure --prefix=/usr && \
+    make install && \
+    ldconfig
 
 RUN wget -O coincurve-anonswap.zip https://github.com/tecnovert/coincurve/archive/anonswap.zip && \
     unzip coincurve-anonswap.zip && \

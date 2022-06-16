@@ -188,6 +188,7 @@ def upgradeDatabase(self, db_version):
             session.execute('''
                 CREATE TABLE bidstates (
                     record_id INTEGER NOT NULL,
+                    active_ind INTEGER,
                     state_id INTEGER,
                     label VARCHAR,
                     in_progress INTEGER,
@@ -199,6 +200,9 @@ def upgradeDatabase(self, db_version):
             session.execute('ALTER TABLE wallets ADD COLUMN active_ind INTEGER')
             session.execute('ALTER TABLE knownidentities ADD COLUMN active_ind INTEGER')
             session.execute('ALTER TABLE eventqueue RENAME TO actions')
+            session.execute('ALTER TABLE actions RENAME COLUMN event_id TO action_id')
+            session.execute('ALTER TABLE actions RENAME COLUMN event_type TO action_type')
+            session.execute('ALTER TABLE actions RENAME COLUMN event_data TO action_data')
 
         if current_version != db_version:
             self.db_version = db_version

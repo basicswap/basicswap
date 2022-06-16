@@ -520,7 +520,7 @@ def page_offers(self, url_split, post_string, sent=False):
         sent = True
     else:
         sent = False
-    offers = swap_client.listOffers(sent, filters)
+    offers = swap_client.listOffers(sent, filters, with_bid_info=True)
 
     formatted_offers = []
     for row in offers:

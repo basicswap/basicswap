@@ -10,6 +10,7 @@ import hashlib
 import struct
 import unittest
 from typing import List, Dict
+from basicswap.util.crypto import ripemd160
 
 from .messages import (
     CTransaction,
@@ -25,7 +26,7 @@ MAX_SCRIPT_ELEMENT_SIZE = 520
 OPCODE_NAMES = {}  # type: Dict[CScriptOp, str]
 
 def hash160(s):
-    return hashlib.new('ripemd160', sha256(s)).digest()
+    return ripemd160(sha256(s))
 
 def bn2vch(v):
     """Convert number to bitcoin-specific little endian format."""

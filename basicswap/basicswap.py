@@ -156,22 +156,25 @@ def threadPollChainState(swap_client, coin_type):
     while not swap_client.delay_event.is_set():
         try:
             ci = swap_client.ci(coin_type)
+            cc = swap_client.coin_clients[coin_type]
             if coin_type == Coins.XMR:
                 new_height = ci.getChainHeight()
-                if new_height != swap_client.coin_clients[coin_type]['chain_height']:
+                if new_height != cc['chain_height']:
                     swap_client.log.debug('New {} block at height: {}'.format(str(coin_type), new_height))
                     with swap_client.mxDB:
-                        swap_client.coin_clients[coin_type]['chain_height'] = new_height
-            else:
-                chain_state = ci.getBlockchainInfo()
-                if chain_state['bestblockhash'] != swap_client.coin_clients[coin_type]['chain_best_block']:
-                    swap_client.log.debug('New {} block at height: {}'.format(str(coin_type), chain_state['blocks']))
-                    with swap_client.mxDB:
-                        swap_client.coin_clients[coin_type]['chain_height'] = chain_state['blocks']
-                        swap_client.coin_clients[coin_type]['chain_best_block'] = chain_state['bestblockhash']
-                        swap_client.coin_clients[coin_type]['chain_median_time'] = chain_state['mediantime']
+                        cc['chain_height'] = new_height
+                continue
+
+            # Not XMR
+            chain_state = ci.getBlockchainInfo()
+            if chain_state['bestblockhash'] != cc['chain_best_block']:
+                swap_client.log.debug('New {} block at height: {}'.format(str(coin_type), chain_state['blocks']))
+                with swap_client.mxDB:
+                    cc['chain_height'] = chain_state['blocks']
+                    cc['chain_best_block'] = chain_state['bestblockhash']
+                    cc['chain_median_time'] = chain_state['mediantime']
         except Exception as e:
-            swap_client.log.warning('threadPollChainState error: {}'.format(str(e)))
+            swap_client.log.warning('threadPollChainState {}, error: {}'.format(str(coin_type), str(e)))
         swap_client.delay_event.wait(random.randrange(20, 30))  # random to stagger updates
 
 
@@ -5387,15 +5390,18 @@ class BasicSwap(BaseApp):
             session.remove()
             self.mxDB.release()
 
-    def listOffers(self, sent=False, filters={}):
+    def listOffers(self, sent=False, filters={}, with_bid_info=False):
         self.mxDB.acquire()
         try:
             rv = []
             now = int(time.time())
             session = scoped_session(self.session_factory)
 
-            subquery = session.query(sa.func.sum(Bid.amount).label('completed_bid_amount')).filter(sa.and_(Bid.offer_id == Offer.offer_id, Bid.state == BidStates.SWAP_COMPLETED)).correlate(Offer).scalar_subquery()
-            q = session.query(Offer, subquery)
+            if with_bid_info:
+                subquery = session.query(sa.func.sum(Bid.amount).label('completed_bid_amount')).filter(sa.and_(Bid.offer_id == Offer.offer_id, Bid.state == BidStates.SWAP_COMPLETED)).correlate(Offer).scalar_subquery()
+                q = session.query(Offer, subquery)
+            else:
+                q = session.query(Offer)
 
             if sent:
                 q = q.filter(Offer.was_sent == True)  # noqa: E712
@@ -5427,13 +5433,17 @@ class BasicSwap(BaseApp):
             if offset is not None:
                 q = q.offset(offset)
             for row in q:
+                offer = row[0] if with_bid_info else row
                 # Show offers for enabled coins only
                 try:
-                    ci_from = self.ci(row[0].coin_from)
-                    ci_to = self.ci(row[0].coin_to)
+                    ci_from = self.ci(offer.coin_from)
+                    ci_to = self.ci(offer.coin_to)
                 except Exception as e:
                     continue
-                rv.append((row[0], 0 if row[1] is None else row[1]))
+                if with_bid_info:
+                    rv.append((offer, 0 if row[1] is None else row[1]))
+                else:
+                    rv.append(offer)
             return rv
         finally:
             session.close()

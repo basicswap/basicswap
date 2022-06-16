@@ -6,7 +6,7 @@
 
 import hashlib
 from basicswap.contrib.segwit_addr import bech32_decode, convertbits, bech32_encode
-
+from basicswap.util.crypto import ripemd160
 
 __b58chars = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
 
@@ -89,7 +89,7 @@ def toWIF(prefix_byte, b, compressed=True):
 
 def getKeyID(bytes):
     data = hashlib.sha256(bytes).digest()
-    return hashlib.new('ripemd160', data).digest()
+    return ripemd160(data)
 
 
 def bech32Decode(hrp, addr):
