@@ -116,7 +116,8 @@ chainparams = {
         'mainnet': {
             'rpcport': 9332,
             'pubkey_address': 48,
-            'script_address': 50,
+            'script_address': 5,
+            'script_address2': 50,
             'key_prefix': 176,
             'hrp': 'ltc',
             'bip44': 2,
@@ -126,7 +127,8 @@ chainparams = {
         'testnet': {
             'rpcport': 19332,
             'pubkey_address': 111,
-            'script_address': 58,
+            'script_address': 196,
+            'script_address2': 58,
             'key_prefix': 239,
             'hrp': 'tltc',
             'bip44': 1,
@@ -137,7 +139,8 @@ chainparams = {
         'regtest': {
             'rpcport': 19443,
             'pubkey_address': 111,
-            'script_address': 58,
+            'script_address': 196,
+            'script_address2': 58,
             'key_prefix': 239,
             'hrp': 'rltc',
             'bip44': 1,

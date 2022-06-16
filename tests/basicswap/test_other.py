@@ -22,6 +22,7 @@ from coincurve.keys import (
     PrivateKey)
 
 from basicswap.util import i2b, h2b
+from basicswap.util.crypto import ripemd160
 from basicswap.util.rfc2440 import rfc2440_hash_password
 from basicswap.interface_btc import BTCInterface
 from basicswap.interface_xmr import XMRInterface
@@ -286,6 +287,10 @@ class Test(unittest.TestCase):
         password_hash = rfc2440_hash_password(password, salt=salt)
 
         assert(password_hash == '16:B7A94A7E4988630E6095334BA67F06FBA509B2A7136A04C9C1B430F539')
+
+    def test_ripemd160(self):
+        input_data = b'hash this'
+        assert(ripemd160(input_data).hex() == 'd5443a154f167e2c1332f6de72cfb4c6ab9c8c17')
 
 
 if __name__ == '__main__':

@@ -40,7 +40,7 @@ PARTICL_VERSION = os.getenv('PARTICL_VERSION', '0.21.2.9')
 PARTICL_VERSION_TAG = os.getenv('PARTICL_VERSION_TAG', '')
 PARTICL_LINUX_EXTRA = os.getenv('PARTICL_LINUX_EXTRA', '_nousb')
 
-LITECOIN_VERSION = os.getenv('LITECOIN_VERSION', '0.18.1')
+LITECOIN_VERSION = os.getenv('LITECOIN_VERSION', '0.21.2')
 LITECOIN_VERSION_TAG = os.getenv('LITECOIN_VERSION_TAG', '')
 
 BITCOIN_VERSION = os.getenv('BITCOIN_VERSION', '22.0')
@@ -52,7 +52,7 @@ MONERO_VERSION_TAG = os.getenv('MONERO_VERSION_TAG', '')
 # version, version tag eg. "rc1", signers
 known_coins = {
     'particl': (PARTICL_VERSION, PARTICL_VERSION_TAG, ('tecnovert',)),
-    'litecoin': (LITECOIN_VERSION, LITECOIN_VERSION_TAG, ('thrasher',)),
+    'litecoin': (LITECOIN_VERSION, LITECOIN_VERSION_TAG, ('davidburkett38',)),
     'bitcoin': (BITCOIN_VERSION, BITCOIN_VERSION_TAG, ('laanwj',)),
     'namecoin': ('0.18.0', '', ('JeremyRand',)),
     'monero': (MONERO_VERSION, MONERO_VERSION_TAG, ('binaryfate',)),
@@ -64,6 +64,7 @@ expected_key_ids = {
     'laanwj': ('1E4AED62986CD25D',),
     'JeremyRand': ('2DBE339E29F6294C',),
     'binaryfate': ('F0AF4D462A0BDF92',),
+    'davidburkett38': ('3620E9D387E55666',),
 }
 
 if platform.system() == 'Darwin':
@@ -327,7 +328,7 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
             assert_url = 'https://raw.githubusercontent.com/particl/gitian.sigs/master/%s-%s/%s/%s' % (version + version_tag, os_dir_name, signing_key_name, assert_filename)
         elif coin == 'litecoin':
             release_url = 'https://download.litecoin.org/litecoin-{}/{}/{}'.format(version, os_name, release_filename)
-            assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, version.rsplit('.', 1)[0])
+            assert_filename = '{}-core-{}-{}-build.assert'.format(coin, os_name, version.rsplit('.', 1)[0])
             assert_url = 'https://raw.githubusercontent.com/litecoin-project/gitian.sigs.ltc/master/%s-%s/%s/%s' % (version, os_dir_name, signing_key_name, assert_filename)
         elif coin == 'bitcoin':
             release_url = 'https://bitcoincore.org/bin/bitcoin-core-{}/{}'.format(version, release_filename)

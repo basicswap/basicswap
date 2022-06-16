@@ -496,6 +496,7 @@ class BasicSwap(BaseApp):
             pidfilename = cc['name']
             if cc['name'] == 'bitcoin' or cc['name'] == 'litecoin' or cc['name'] == 'namecoin':
                 pidfilename += 'd'
+
             pidfilepath = os.path.join(self.getChainDatadirPath(coin), pidfilename + '.pid')
             self.log.debug('Reading %s rpc credentials from auth cookie %s', coin, authcookiepath)
             # Wait for daemon to start
@@ -503,6 +504,12 @@ class BasicSwap(BaseApp):
             datadir_pid = -1
             for i in range(20):
                 try:
+                    # Workaround for mismatched pid file name in litecoin 0.21.2
+                    # TODO: Remove
+                    if cc['name'] == 'litecoin' and not os.path.exists(pidfilepath) and \
+                       os.path.exists(os.path.join(self.getChainDatadirPath(coin), 'bitcoind.pid')):
+                        pidfilepath = os.path.join(self.getChainDatadirPath(coin), 'bitcoind.pid')
+
                     with open(pidfilepath, 'rb') as fp:
                         datadir_pid = int(fp.read().decode('utf-8'))
                     assert(datadir_pid == cc['pid']), 'Mismatched pid'
