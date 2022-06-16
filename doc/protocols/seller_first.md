@@ -34,7 +34,7 @@ Both coin types must support scripts.
     - submits participate tx in coin-to network
 
 5. Seller redeems:
-    - constructs participatescript
+    - constructs participate script
     - inspects participate tx in coin-to network
     - redeems from participate tx revealing secret
 

@@ -539,7 +539,7 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
             if particl_mnemonic == 'none':
                 fp.write('createdefaultmasterkey=1')
         elif coin == 'litecoin':
-            fp.write('prune=2000\n')
+            fp.write('prune=4000\n')
             if LTC_RPC_USER != '':
                 fp.write('rpcauth={}:{}${}\n'.format(LTC_RPC_USER, salt, password_to_hmac(salt, LTC_RPC_PWD)))
         elif coin == 'bitcoin':

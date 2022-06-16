@@ -2,7 +2,9 @@
 
 <h3>Offer {{ offer_id }}</h3>
 {% if refresh %}
-<p>Page Refresh: {{ refresh }} seconds</p>
+<p><a href=/offer/{{ offer_id }}>Page Refresh: {{ refresh }} second</a></p>
+{% else %}
+<p><a href=/offer/{{ offer_id }}>refresh</a></p>
 {% endif %}
 
 {% for m in messages %}
