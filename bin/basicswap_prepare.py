@@ -46,7 +46,7 @@ LITECOIN_VERSION_TAG = os.getenv('LITECOIN_VERSION_TAG', '')
 BITCOIN_VERSION = os.getenv('BITCOIN_VERSION', '22.0')
 BITCOIN_VERSION_TAG = os.getenv('BITCOIN_VERSION_TAG', '')
 
-MONERO_VERSION = os.getenv('MONERO_VERSION', '0.17.3.0')
+MONERO_VERSION = os.getenv('MONERO_VERSION', '0.17.3.2')
 MONERO_VERSION_TAG = os.getenv('MONERO_VERSION_TAG', '')
 
 # version, version tag eg. "rc1", signers
@@ -88,7 +88,7 @@ BASE_XMR_WALLET_PORT = int(os.getenv('BASE_XMR_WALLET_PORT', 29998))
 XMR_WALLET_RPC_HOST = os.getenv('XMR_WALLET_RPC_HOST', '127.0.0.1')
 XMR_WALLET_RPC_USER = os.getenv('XMR_WALLET_RPC_USER', 'xmr_wallet_user')
 XMR_WALLET_RPC_PWD = os.getenv('XMR_WALLET_RPC_PWD', 'xmr_wallet_pwd')
-XMR_SITE_COMMIT = 'be137696c3a1d93bfaddf619da0d05a3e6cee4f2'  # Lock hashes.txt to monero version
+XMR_SITE_COMMIT = 'abcf12c4ccac3e48bb4ff178f18bb8a95d94b029'  # Lock hashes.txt to monero version
 
 DEFAULT_XMR_RESTORE_HEIGHT = 2245107
 
