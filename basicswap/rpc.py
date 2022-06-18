@@ -20,10 +20,13 @@ from xmlrpc.client import (
 from .util import jsonDecimal
 
 
-def waitForRPC(rpc_func, wallet=None, max_tries=7):
+def waitForRPC(rpc_func, expect_wallet=True, max_tries=7):
     for i in range(max_tries + 1):
         try:
-            rpc_func('getwalletinfo')
+            if expect_wallet:
+                rpc_func('getwalletinfo')
+            else:
+                rpc_func('getblockchaininfo')
             return
         except Exception as ex:
             if i < max_tries:

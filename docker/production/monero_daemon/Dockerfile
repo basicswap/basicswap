@@ -2,7 +2,7 @@ FROM i_swapclient as install_stage
 
 RUN basicswap-prepare --preparebinonly --bindir=/coin_bin --withcoin=monero --withoutcoins=particl
 
-FROM debian:buster-slim
+FROM debian:bullseye-slim
 
 COPY --from=install_stage /coin_bin .
 

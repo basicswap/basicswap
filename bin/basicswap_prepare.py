@@ -702,7 +702,7 @@ def modify_tor_config(settings, coin, tor_control_password=None, enable=False):
             writeTorSettings(fp, coin, coin_settings, tor_control_password)
 
 
-def make_rpc_func(bin_dir, data_dir, chain):
+def make_rpc_func(bin_dir, data_dir, chain, cli_binary=cfg.PARTICL_CLI):
     bin_dir = bin_dir
     data_dir = data_dir
     chain = chain
@@ -712,7 +712,7 @@ def make_rpc_func(bin_dir, data_dir, chain):
         nonlocal data_dir
         nonlocal chain
 
-        return callrpc_cli(bin_dir, data_dir, chain, cmd, cfg.PARTICL_CLI)
+        return callrpc_cli(bin_dir, data_dir, chain, cmd, cli_binary)
     return rpc_func
 
 
@@ -759,6 +759,15 @@ def printHelp():
                 + '                         See https://github.com/btcpayserver/btcpayserver-docker/blob/master/contrib/FastSync/README.md')
 
     logger.info('\n' + 'Known coins: %s', ', '.join(known_coins.keys()))
+
+
+def finalise_daemon(d):
+    logging.info('Interrupting {}'.format(d.pid))
+    d.send_signal(signal.SIGINT)
+    d.wait(timeout=120)
+    for fp in (d.stdout, d.stderr, d.stdin):
+        if fp:
+            fp.close()
 
 
 def main():
@@ -1086,6 +1095,22 @@ def main():
 
         if not prepare_bin_only:
             prepareDataDir(add_coin, settings, chain, particl_wallet_mnemonic, extra_opts)
+
+            if use_btc_fastsync and add_coin == 'bitcoin':
+                # Need to create wallet file through daemon
+                logger.info('Creating wallet.dat for {}.'.format(add_coin.capitalize()))
+                bitcoin_settings = settings['chainclients']['bitcoin']
+                try:
+                    btcRpc = make_rpc_func(bitcoin_settings['bindir'], bitcoin_settings['datadir'], chain, cli_binary=cfg.BITCOIN_CLI)
+                    filename = 'bitcoind' + ('.exe' if os.name == 'nt' else '')
+                    daemon_args = ['-noconnect', '-nodnsseed', '-nolisten']
+                    btcd = startDaemon(bitcoin_settings['datadir'], bitcoin_settings['bindir'], filename, daemon_args)
+                    waitForRPC(btcRpc, expect_wallet=False, max_tries=12)
+                    btcRpc('createwallet wallet.dat')
+                    logger.info('createwallet succeeded.')
+                finally:
+                    finalise_daemon(btcd)
+
             with open(config_path, 'w') as fp:
                 json.dump(settings, fp, indent=4)
 
@@ -1202,12 +1227,7 @@ def main():
             del swap_client
     finally:
         for d in daemons:
-            logging.info('Interrupting {}'.format(d.pid))
-            d.send_signal(signal.SIGINT)
-            d.wait(timeout=120)
-            for fp in (d.stdout, d.stderr, d.stdin):
-                if fp:
-                    fp.close()
+            finalise_daemon(d)
 
     logger.info('IMPORTANT - Save your particl wallet recovery phrase:\n{}\n'.format(particl_wallet_mnemonic))
     logger.info('Done.')

@@ -3,7 +3,7 @@ FROM i_swapclient as install_stage
 RUN basicswap-prepare --preparebinonly --bindir=/coin_bin --withcoin=particl && \
     find /coin_bin -name *.tar.gz -delete
 
-FROM debian:buster-slim
+FROM debian:bullseye-slim
 COPY --from=install_stage /coin_bin .
 
 ENV PARTICL_DATA /data

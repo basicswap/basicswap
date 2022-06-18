@@ -5,7 +5,7 @@ FROM i_swapclient as install_stage
 RUN basicswap-prepare --preparebinonly --bindir=/coin_bin --withcoin=bitcoin --withoutcoins=particl && \
     find /coin_bin -name *.tar.gz -delete
 
-FROM debian:buster-slim
+FROM debian:bullseye-slim
 COPY --from=install_stage /coin_bin .
 
 ENV BITCOIN_DATA /data
