@@ -3874,6 +3874,12 @@ class BasicSwap(BaseApp):
                 if identity_stats.num_recv_bids_successful <= identity_stats.num_recv_bids_failed:
                     raise AutomationConstraint('Bidder has too many failed swaps')
 
+            self.logEvent(Concepts.BID,
+                          bid.bid_id,
+                          EventLogTypes.AUTOMATION_ACCEPTING_BID,
+                          '',
+                          use_session)
+
             return True
         except AutomationConstraint as e:
             self.log.info('Not auto accepting bid {}, {}'.format(bid.bid_id.hex(), str(e)))
@@ -3889,6 +3895,7 @@ class BasicSwap(BaseApp):
             return False
         finally:
             if session is None:
+                use_session.commit()
                 use_session.close()
                 use_session.remove()
                 self.mxDB.release()

@@ -46,12 +46,18 @@ def recoverNoScriptTxnWithKey(self, bid_id, encoded_key):
         ci_to = self.ci(offer.coin_to)
 
         for_ed25519 = True if Coins(offer.coin_to) == Coins.XMR else False
+
+        try:
+            decoded_key_half = ci_to.decodeKey(encoded_key)
+        except Exception as e:
+            raise ValueError('Failed to decode provided key-half: ', str(e))
+
         if bid.was_sent:
-            kbsl = ci_to.decodeKey(encoded_key)
+            kbsl = decoded_key_half
             kbsf = self.getPathKey(offer.coin_from, offer.coin_to, bid.created_at, xmr_swap.contract_count, KeyTypes.KBSF, for_ed25519)
         else:
             kbsl = self.getPathKey(offer.coin_from, offer.coin_to, bid.created_at, xmr_swap.contract_count, KeyTypes.KBSL, for_ed25519)
-            kbsf = ci_to.decodeKey(encoded_key)
+            kbsf = decoded_key_half
         ensure(ci_to.verifyKey(kbsl), 'Invalid kbsl')
         ensure(ci_to.verifyKey(kbsf), 'Invalid kbsf')
         vkbs = ci_to.sumKeys(kbsl, kbsf)

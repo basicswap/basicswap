@@ -157,6 +157,7 @@ class EventLogTypes(IntEnum):
     LOCK_TX_A_REFUND_SPEND_TX_SEEN = auto()
     ERROR = auto()
     AUTOMATION_CONSTRAINT = auto()
+    AUTOMATION_ACCEPTING_BID = auto()
 
 
 class XmrSplitMsgTypes(IntEnum):
@@ -335,6 +336,10 @@ def describeEventEntry(event_type, event_msg):
         return 'Warning: ' + event_msg
     if event_type == EventLogTypes.ERROR:
         return 'Error: ' + event_msg
+    if event_type == EventLogTypes.AUTOMATION_CONSTRAINT:
+        return 'Failed auto accepting'
+    if event_type == EventLogTypes.AUTOMATION_ACCEPTING_BID:
+        return 'Auto accepting'
 
 
 def getVoutByAddress(txjs, p2sh):
