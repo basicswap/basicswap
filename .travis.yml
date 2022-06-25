@@ -51,8 +51,8 @@ jobs:
         - travis_retry pip install codespell==1.15.0
       before_script:
       script:
-        - PYTHONWARNINGS="ignore" flake8 --ignore=E501,F841,W503 --exclude=basicswap/contrib,messages_pb2.py,.eggs,.tox
-        - codespell --check-filenames --disable-colors --quiet-level=7 --ignore-words=tests/lint/spelling.ignore-words.txt -S .git,.eggs,.tox,pgp,*.pyc,*basicswap/contrib,*mnemonics.py
+        - PYTHONWARNINGS="ignore" flake8 --ignore=E501,F841,W503 --exclude=basicswap/contrib,messages_pb2.py,.eggs,.tox,bin/install_certifi.py
+        - codespell --check-filenames --disable-colors --quiet-level=7 --ignore-words=tests/lint/spelling.ignore-words.txt -S .git,.eggs,.tox,pgp,*.pyc,*basicswap/contrib,*mnemonics.py,bin/install_certifi.py
       after_success:
         - echo "End lint"
     - stage: test

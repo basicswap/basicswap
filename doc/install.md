@@ -114,17 +114,11 @@ Install Homebrew (See https://brew.sh/):
 
     /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
-Command Line Tools:
-
-    xcode-select --install
-
 Dependencies:
 
-    brew install wget unzip python3 git protobuf gnupg automake libtool pkg-config curl jq
+    brew install wget unzip python git protobuf gnupg automake libtool pkg-config curl jq
 
-Install python SSL Certificates:
-
-    sudo "/Applications/Python 3.9/Install Certificates.command"
+Close the terminal and open a new one to update the python symlinks.
 
 
 ### Basicswap:
@@ -143,8 +137,18 @@ Install python SSL Certificates:
     cd $SWAP_DATADIR
     git clone https://github.com/tecnovert/basicswap.git
     cd $SWAP_DATADIR/basicswap
+
+If installed on OSX, you may need to install additional root ssl certificates for the ssl module.
+From https://pypi.org/project/certifi/
+
+    sudo python3 bin/install_certifi.py
+
+
+Continue installing Basicswap
+
     protoc -I=basicswap --python_out=basicswap basicswap/messages.proto
     pip3 install .
+
 
 Prepare the datadir:
 
