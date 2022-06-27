@@ -6,6 +6,12 @@
 
 ## Run Using Docker
 
+
+Install dependencies:
+
+    apt-get curl jq
+
+
 Docker must be installed and started:
 
     docker -v
@@ -13,20 +19,28 @@ Docker must be installed and started:
 Should return a line containing `Docker version`...
 
 
-It's recommended to setup docker to work without sudo:
+To install docker engine on your platform see:
+
+    https://docs.docker.com/engine/install/#server
+
+
+It's recommended to setup docker to work without sudo.<br>
+Without this step you will need to preface each `docker-compose` command with `sudo`:
 
     https://docs.docker.com/engine/install/linux-postinstall/
 
 
 #### Create the images:
 
+COINDATA_PATH can be set to your preferance but must be exported each time you launch Basicswap.<br>
+Consider adding COINDATA_PATH to the `.env` file in the docker directory file so it's always set.
+
+    export COINDATA_PATH=/var/data/coinswaps
     cd basicswap/docker
     docker-compose build
 
 
 #### Prepare the datadir:
-
-Set XMR_RPC_HOST and BASE_XMR_RPC_PORT to a public XMR node or exclude to run a local node.
 
 Set xmrrestoreheight to the current xmr chain height.
 
@@ -34,17 +48,27 @@ Set xmrrestoreheight to the current xmr chain height.
 
 Adjust `--withcoins` and `--withoutcoins` as desired, eg: `--withcoins=monero,bitcoin`.  By default only Particl is loaded.
 
-    export COINDATA_PATH=/var/data/coinswaps
-    docker run --rm -e XMR_RPC_HOST="node.xmr.to" -e BASE_XMR_RPC_PORT=18081 -t --name swap_prepare -v $COINDATA_PATH:/coindata i_swapclient \
-        basicswap-prepare --datadir=/coindata --withcoins=monero --htmlhost="0.0.0.0" --xmrrestoreheight=$CURRENT_XMR_HEIGHT
-
-**Record the mnemonic from the output of the above command.**
-
-
 ##### FastSync
 
-Use `--usebtcfastsync` to optionally initialise the Bitcoin datadir with a chain snapshot from btcpayserver FastSync.
+Append `--usebtcfastsync` to the below command to optionally initialise the Bitcoin datadir with a chain snapshot from btcpayserver FastSync.<br>
 [FastSync README.md](https://github.com/btcpayserver/btcpayserver-docker/blob/master/contrib/FastSync/README.md)
+
+
+Setup with a local Monero daemon (recommended):
+
+    export COINDATA_PATH=/var/data/coinswaps
+    docker run --rm -t --name swap_prepare -v $COINDATA_PATH:/coindata i_swapclient basicswap-prepare --datadir=/coindata --withcoins=monero --htmlhost="0.0.0.0" --xmrrestoreheight=$CURRENT_XMR_HEIGHT
+
+
+To instead use Monero public nodes and not run a local Monero daemon<br>(it can be difficult to find reliable public nodes):
+
+    Set XMR_RPC_HOST and BASE_XMR_RPC_PORT to a public XMR node.
+    export COINDATA_PATH=/var/data/coinswaps
+    docker run --rm -e XMR_RPC_HOST="node.xmr.to" -e BASE_XMR_RPC_PORT=18081 -t --name swap_prepare -v $COINDATA_PATH:/coindata i_swapclient basicswap-prepare --datadir=/coindata --withcoins=monero --htmlhost="0.0.0.0" --xmrrestoreheight=$CURRENT_XMR_HEIGHT
+
+
+**Record the mnemonic from the output of the above command.**
+And the output of `echo $CURRENT_XMR_HEIGHT` for use if you need to later restore your wallet.
 
 
 #### Set the timezone (optional):
@@ -169,7 +193,8 @@ Open in browser: `http://localhost:12700`
 It may take a few minutes to start as the coin daemons are started before the http interface.
 
 
-Add a coin:
+Add a coin (Stop basicswap first):
+
     export SWAP_DATADIR=/Users/$USER/coinswaps
     basicswap-prepare --usebtcfastsync --datadir=/$SWAP_DATADIR --addcoin=bitcoin
 
