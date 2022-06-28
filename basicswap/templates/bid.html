@@ -77,8 +77,28 @@
 {% endif %}
 <input name="edit_bid" type="submit" value="Edit Bid">
 {% endif %}
+<br/>
+{% if data.show_bidder_seq_diagram %}
+<input name="hide_bidder_seq_diagram" type="submit" value="Hide Bidder Sequence Diagram">
+{% else %}
+<input name="show_bidder_seq_diagram" type="submit" value="Show Bidder Sequence Diagram">
+{% endif %}
+{% if data.show_offerer_seq_diagram %}
+<input name="hide_offerer_seq_diagram" type="submit" value="Hide Offerer Sequence Diagram">
+{% else %}
+<input name="show_offerer_seq_diagram" type="submit" value="Show Offerer Sequence Diagram">
+{% endif %}
 <input type="hidden" name="formid" value="{{ form_id }}">
 </form>
+
+{% if data.show_bidder_seq_diagram %}
+<img src="/static/sequence_diagrams/bidder.alt.xu.min.svg" />
+{% endif %}
+
+{% if data.show_offerer_seq_diagram %}
+<img src="/static/sequence_diagrams/offerer.alt.xu.min.svg" />
+{% endif %}
+
 
 
 <h4>Old States</h4>

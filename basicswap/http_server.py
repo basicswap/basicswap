@@ -639,6 +639,8 @@ class HttpHandler(BaseHTTPRequestHandler):
 
         messages = []
         show_txns = False
+        show_offerer_seq_diagram = False
+        show_bidder_seq_diagram = False
         show_lock_transfers = False
         edit_bid = False
         view_tx_ind = None
@@ -658,6 +660,10 @@ class HttpHandler(BaseHTTPRequestHandler):
                     messages.append('Accept failed ' + str(ex))
             elif b'show_txns' in form_data:
                 show_txns = True
+            elif b'show_offerer_seq_diagram' in form_data:
+                show_offerer_seq_diagram = True
+            elif b'show_bidder_seq_diagram' in form_data:
+                show_bidder_seq_diagram = True
             elif b'edit_bid' in form_data:
                 edit_bid = True
             elif b'edit_bid_submit' in form_data:
@@ -685,6 +691,9 @@ class HttpHandler(BaseHTTPRequestHandler):
 
         if bid.debug_ind is not None and bid.debug_ind > 0:
             messages.append('Debug flag set: {}, {}'.format(bid.debug_ind, DebugTypes(bid.debug_ind).name))
+
+        data['show_bidder_seq_diagram'] = show_bidder_seq_diagram
+        data['show_offerer_seq_diagram'] = show_offerer_seq_diagram
 
         old_states = []
         num_states = len(bid.states) // 12
@@ -987,6 +996,10 @@ class HttpHandler(BaseHTTPRequestHandler):
                 elif url_split[2] == 'style.css':
                     self.putHeaders(status_code, 'text/css')
                     with open(os.path.join(static_path, 'style.css'), 'rb') as fp:
+                        return fp.read()
+                elif len(url_split) > 3 and url_split[2] == 'sequence_diagrams':
+                    self.putHeaders(status_code, 'image/svg+xml')
+                    with open(os.path.join(static_path, 'sequence_diagrams', url_split[3]), 'rb') as fp:
                         return fp.read()
                 else:
                     self.putHeaders(status_code, 'text/html')

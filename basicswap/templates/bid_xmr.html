@@ -74,6 +74,17 @@
 {% endif %}
 <input name="edit_bid" type="submit" value="Edit Bid">
 {% endif %}
+<br/>
+{% if data.show_bidder_seq_diagram %}
+<input name="hide_bidder_seq_diagram" type="submit" value="Hide Bidder Sequence Diagram">
+{% else %}
+<input name="show_bidder_seq_diagram" type="submit" value="Show Bidder Sequence Diagram">
+{% endif %}
+{% if data.show_offerer_seq_diagram %}
+<input name="hide_offerer_seq_diagram" type="submit" value="Hide Offerer Sequence Diagram">
+{% else %}
+<input name="show_offerer_seq_diagram" type="submit" value="Show Offerer Sequence Diagram">
+{% endif %}
 <input type="hidden" name="formid" value="{{ form_id }}">
 
 {% if data.show_txns %}
@@ -118,6 +129,14 @@
 {% endif %}
 {% endif %}
 </form>
+
+{% if data.show_bidder_seq_diagram %}
+<img src="/static/sequence_diagrams/xmr.bidder.alt.xu.min.svg" />
+{% endif %}
+
+{% if data.show_offerer_seq_diagram %}
+<img src="/static/sequence_diagrams/xmr.offerer.alt.xu.min.svg" />
+{% endif %}
 
 {% if data.chain_a_lock_tx_inputs %}
 <h5>Chain A Lock TX Inputs:</h5>

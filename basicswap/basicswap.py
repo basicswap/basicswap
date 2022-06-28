@@ -2865,14 +2865,14 @@ class BasicSwap(BaseApp):
 
                     if TxTypes.XMR_SWAP_A_LOCK_REFUND_SPEND not in bid.txns:
                         try:
-                            txid = ci_from.publishTx(xmr_swap.a_lock_refund_spend_tx)
+                            txid_str = ci_from.publishTx(xmr_swap.a_lock_refund_spend_tx)
                             self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_A_REFUND_SPEND_TX_PUBLISHED, '', session)
 
-                            self.log.info('Submitted coin a lock refund spend tx for bid {}, txid {}'.format(bid_id.hex(), txid.hex()))
+                            self.log.info('Submitted coin a lock refund spend tx for bid {}, txid {}'.format(bid_id.hex(), txid_str))
                             bid.txns[TxTypes.XMR_SWAP_A_LOCK_REFUND_SPEND] = SwapTx(
                                 bid_id=bid_id,
                                 tx_type=TxTypes.XMR_SWAP_A_LOCK_REFUND_SPEND,
-                                txid=bytes.fromhex(txid),
+                                txid=bytes.fromhex(txid_str),
                             )
                             self.saveBidInSession(bid_id, bid, session, xmr_swap)
                             session.commit()
