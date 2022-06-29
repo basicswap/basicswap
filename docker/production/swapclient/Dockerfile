@@ -15,8 +15,9 @@ RUN wget -O protobuf_src.tar.gz https://github.com/protocolbuffers/protobuf/rele
     make install && \
     ldconfig
 
-RUN wget -O coincurve-anonswap.zip https://github.com/tecnovert/coincurve/archive/anonswap.zip && \
-    unzip coincurve-anonswap.zip && \
+RUN wget -O coincurve-anonswap.zip https://github.com/tecnovert/coincurve/archive/refs/tags/anonswap_v0.1.zip && \
+    unzip -d coincurve-anonswap coincurve-anonswap.zip && \
+    mv ./coincurve-anonswap/*/{.,}* ./coincurve-anonswap || true && \
     cd coincurve-anonswap && \
     python3 setup.py install --force
 

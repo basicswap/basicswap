@@ -152,8 +152,9 @@ Close the terminal and open a new one to update the python symlinks.
     python3 -m venv "$SWAP_DATADIR/venv"
     . $SWAP_DATADIR/venv/bin/activate && python -V
     cd $SWAP_DATADIR
-    wget -O coincurve-anonswap.zip https://github.com/tecnovert/coincurve/archive/anonswap.zip
-    unzip coincurve-anonswap.zip
+    wget -O coincurve-anonswap.zip https://github.com/tecnovert/coincurve/archive/refs/tags/anonswap_v0.1.zip
+    unzip -d coincurve-anonswap coincurve-anonswap.zip
+    mv ./coincurve-anonswap/*/{.,}* ./coincurve-anonswap || true
     cd $SWAP_DATADIR/coincurve-anonswap
     pip3 install .
 
