@@ -3850,7 +3850,7 @@ class BasicSwap(BaseApp):
                 if bid.rate != offer.rate:
                     raise AutomationConstraint('Need exact rate match')
 
-            active_bids, total_bids_value = self.getCompletedAndActiveBidsValue(offer, session)
+            active_bids, total_bids_value = self.getCompletedAndActiveBidsValue(offer, use_session)
 
             if total_bids_value + bid.amount > offer.amount_from:
                 raise AutomationConstraint('Over remaining offer value {}'.format(offer.amount_from - total_bids_value))
@@ -3892,6 +3892,8 @@ class BasicSwap(BaseApp):
             return False
         except Exception as e:
             self.log.error('shouldAutoAcceptBid: %s', str(e))
+            if self.debug:
+                self.log.error(traceback.format_exc())
             return False
         finally:
             if session is None:
