@@ -59,6 +59,15 @@ def upgradeDatabaseData(self, data_version):
                         label=strBidState(state),
                         created_at=now))
 
+            if data_version < 2:
+                for state in (BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_TX_SIGS, BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX):
+                    session.add(BidState(
+                        active_ind=1,
+                        state_id=int(state),
+                        in_progress=isActiveBidState(state),
+                        label=strBidState(state),
+                        created_at=now))
+
             self.db_data_version = CURRENT_DB_DATA_VERSION
             self.setIntKVInSession('db_data_version', self.db_data_version, session)
             session.commit()
@@ -203,7 +212,10 @@ def upgradeDatabase(self, db_version):
             session.execute('ALTER TABLE actions RENAME COLUMN event_id TO action_id')
             session.execute('ALTER TABLE actions RENAME COLUMN event_type TO action_type')
             session.execute('ALTER TABLE actions RENAME COLUMN event_data TO action_data')
-
+        elif current_version == 14:
+            db_version += 1
+            session.execute('ALTER TABLE xmr_swaps ADD COLUMN coin_a_lock_release_msg_id BLOB')
+            session.execute('ALTER TABLE xmr_swaps RENAME COLUMN coin_a_lock_refund_spend_tx_msg_id TO coin_a_lock_spend_tx_msg_id')
         if current_version != db_version:
             self.db_version = db_version
             self.setIntKVInSession('db_version', db_version, session)

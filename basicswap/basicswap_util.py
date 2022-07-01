@@ -96,6 +96,8 @@ class BidStates(IntEnum):
     BID_STALLED_FOR_TEST = 24
     BID_REJECTED = 25
     BID_STATE_UNKNOWN = 26
+    XMR_SWAP_MSG_SCRIPT_LOCK_TX_SIGS = 27      # XmrBidLockTxSigsMessage
+    XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX = 28     # XmrBidLockSpendTxMessage
 
 
 class TxStates(IntEnum):
@@ -132,6 +134,7 @@ class ActionTypes(IntEnum):
     REDEEM_XMR_SWAP_LOCK_TX_A = auto()  # Follower
     REDEEM_XMR_SWAP_LOCK_TX_B = auto()  # Leader
     RECOVER_XMR_SWAP_LOCK_TX_B = auto()
+    SEND_XMR_SWAP_LOCK_SPEND_MSG = auto()
 
 
 class EventLogTypes(IntEnum):
@@ -235,6 +238,10 @@ def strBidState(state):
         return 'Failed'
     if state == BidStates.SWAP_DELAYING:
         return 'Delaying'
+    if state == BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_TX_SIGS:
+        return 'Exchanged script lock tx sigs msg'
+    if state == BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX:
+        return 'Exchanged script lock spend tx msg'
     return 'Unknown' + ' ' + str(state)
 
 
@@ -407,5 +414,9 @@ def isActiveBidState(state):
     if state == BidStates.XMR_SWAP_SCRIPT_TX_REDEEMED:
         return True
     if state == BidStates.XMR_SWAP_SCRIPT_TX_PREREFUND:
+        return True
+    if state == BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_TX_SIGS:
+        return True
+    if state == BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX:
         return True
     return False

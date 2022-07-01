@@ -12,8 +12,8 @@ from enum import IntEnum, auto
 from sqlalchemy.ext.declarative import declarative_base
 
 
-CURRENT_DB_VERSION = 14
-CURRENT_DB_DATA_VERSION = 1
+CURRENT_DB_VERSION = 15
+CURRENT_DB_DATA_VERSION = 2
 Base = declarative_base()
 
 
@@ -301,7 +301,8 @@ class XmrSwap(Base):
     bid_accept_msg_id3 = sa.Column(sa.LargeBinary)
 
     coin_a_lock_tx_sigs_l_msg_id = sa.Column(sa.LargeBinary)  # MSG3L F -> L
-    coin_a_lock_refund_spend_tx_msg_id = sa.Column(sa.LargeBinary)  # MSG4F L -> F
+    coin_a_lock_spend_tx_msg_id = sa.Column(sa.LargeBinary)  # MSG4F L -> F
+    coin_a_lock_release_msg_id = sa.Column(sa.LargeBinary)  # MSG5F L -> F
 
     contract_count = sa.Column(sa.Integer)
 

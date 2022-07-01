@@ -21,12 +21,15 @@ xu {
             C note C2
                 [label="The XmrBidLockTxSigsMessage contains the bidder's signatures for the script-coin-lock-refund and script-coin-lock-refund-spend txns.",
                  textbgcolor="#FFFFCC"];
+    O abox O [label="Exchanged script lock tx sigs msg"];
+    O =>> N [label="Sends script-coin-lock-tx"];
+    O abox O [label="Bid Script coin spend tx valid"];
     O =>> B [label="Sends XmrBidLockSpendTxMessage"],
             C note C2
                 [label="The XmrBidLockSpendTxMessage contains the script-coin-lock-tx and the offerer's signature for it.",
                  textbgcolor="#FFFFCC"];
-    O =>> N [label="Sends script-coin-lock-tx"],
-    O abox O [label="Bid Script coin spend tx valid"];
+    O abox O [label="Exchanged script lock spend tx msg"];
+
     |||;
     B => B [label="Wait for script-coin-lock-tx to confirm"], O => O [label="Wait for script-coin-lock-tx to confirm"];
     O abox O [label="Bid Script coin locked"];

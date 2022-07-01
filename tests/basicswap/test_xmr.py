@@ -192,6 +192,8 @@ def prepare_swapclient_dir(datadir, node_id, network_key, network_pubkey, with_l
         'check_xmr_swaps_seconds': 1,
         'min_delay_event': 1,
         'max_delay_event': 5,
+        'min_delay_event_short': 1,
+        'max_delay_event_short': 5,
         'min_delay_retry': 2,
         'max_delay_retry': 10,
         'debug_ui': True,

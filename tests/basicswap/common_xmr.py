@@ -116,6 +116,8 @@ class XmrTestBase(unittest.TestCase):
 
             settings['min_delay_event'] = 1
             settings['max_delay_event'] = 4
+            settings['min_delay_event_short'] = 1
+            settings['max_delay_event_short'] = 4
             settings['min_delay_retry'] = 10
             settings['max_delay_retry'] = 20
 
