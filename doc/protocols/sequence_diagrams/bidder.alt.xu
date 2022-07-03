@@ -26,6 +26,7 @@ xu {
     N >> B [label="Detects Initiate Tx"];
     B abox B [label="ITX Sent", textbgcolor="#4bdbf1"];
     B => B [label="Wait for ITX to confirm"], O => O [label="Wait for ITX to confirm"];
+    B abox B [label="Bid Initiated"];
     B abox B [label="ITX Confirmed", textbgcolor="#4bdbf1"];
     B =>> N [label="Sends Participate Tx"],
     C note C2

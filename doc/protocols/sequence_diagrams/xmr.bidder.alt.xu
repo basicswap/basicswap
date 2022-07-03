@@ -28,6 +28,7 @@ xu {
                  textbgcolor="#FFFFCC"];
     O =>> N [label="Sends script-coin-lock-tx"],
     B abox B [label="Bid Script coin spend tx valid"];
+    B abox B [label="Exchanged script lock spend tx msg"];
     B => B [label="Wait for script-coin-lock-tx to confirm"];
     B abox B [label="Bid Script coin locked"];
     CB alt C [label="success path"] {

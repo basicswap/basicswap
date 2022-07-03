@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019-2021 tecnovert
+# Copyright (c) 2019-2022 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -13,11 +13,11 @@ $ pytest -v -s tests/basicswap/test_run.py::Test::test_04_ltc_btc
 
 """
 
+import os
 import json
 import random
 import logging
 import unittest
-from urllib.request import urlopen
 
 from basicswap.basicswap import (
     Coins,
@@ -41,9 +41,12 @@ from tests.basicswap.common import (
     wait_for_bid_tx_state,
     wait_for_in_progress,
     post_json_req,
+    read_json_api,
     TEST_HTTP_PORT,
     LTC_BASE_RPC_PORT,
     BTC_BASE_RPC_PORT,
+    compare_bid_states,
+    extract_states_from_xu_file,
 )
 from .test_xmr import BaseTest, test_delay_event, callnoderpc
 
@@ -68,6 +71,10 @@ class Test(BaseTest):
 
         wait_for_balance(test_delay_event, 'http://127.0.0.1:1801/json/wallets/btc', 'balance', 1000.0)
         wait_for_balance(test_delay_event, 'http://127.0.0.1:1801/json/wallets/ltc', 'balance', 1000.0)
+
+        diagrams_dir = 'doc/protocols/sequence_diagrams'
+        cls.states_bidder = extract_states_from_xu_file(os.path.join(diagrams_dir, 'bidder.alt.xu'))
+        cls.states_offerer = extract_states_from_xu_file(os.path.join(diagrams_dir, 'offerer.alt.xu'))
 
     @classmethod
     def tearDownClass(cls):
@@ -133,10 +140,18 @@ class Test(BaseTest):
         wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=60)
         wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=60)
 
-        js_0 = json.loads(urlopen('http://127.0.0.1:1800/json').read())
-        js_1 = json.loads(urlopen('http://127.0.0.1:1801/json').read())
+        js_0 = read_json_api(1800)
+        js_1 = read_json_api(1801)
         assert(js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
         assert(js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
+
+        bid_id_hex = bid_id.hex()
+        path = f'bids/{bid_id_hex}/states'
+        offerer_states = read_json_api(1800, path)
+        bidder_states = read_json_api(1801, path)
+
+        assert(compare_bid_states(offerer_states, self.states_offerer[0]) is True)
+        assert(compare_bid_states(bidder_states, self.states_bidder[0]) is True)
 
     def test_03_ltc_part(self):
         logging.info('---------- Test LTC to PART')
@@ -156,8 +171,8 @@ class Test(BaseTest):
         wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=60)
         wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, wait_for=60)
 
-        js_0 = json.loads(urlopen('http://127.0.0.1:1800/json').read())
-        js_1 = json.loads(urlopen('http://127.0.0.1:1801/json').read())
+        js_0 = read_json_api(1800)
+        js_1 = read_json_api(1801)
         assert(js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
         assert(js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
 
@@ -179,11 +194,8 @@ class Test(BaseTest):
         wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=60)
         wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=60)
 
-        js_0bid = json.loads(urlopen('http://127.0.0.1:1800/json/bids/{}'.format(bid_id.hex())).read())
-
-        js_0 = json.loads(urlopen('http://127.0.0.1:1800/json').read())
-        js_1 = json.loads(urlopen('http://127.0.0.1:1801/json').read())
-
+        js_0 = read_json_api(1800)
+        js_1 = read_json_api(1801)
         assert(js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
         assert(js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
 
@@ -206,13 +218,13 @@ class Test(BaseTest):
         wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=60)
         wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.BID_ABANDONED, sent=True, wait_for=60)
 
-        js_0_bid = json.loads(urlopen('http://127.0.0.1:1800/json/bids/{}'.format(bid_id.hex())).read())
-        js_1_bid = json.loads(urlopen('http://127.0.0.1:1801/json/bids/{}'.format(bid_id.hex())).read())
+        js_0_bid = read_json_api(1800, 'bids/{}'.format(bid_id.hex()))
+        js_1_bid = read_json_api(1801, 'bids/{}'.format(bid_id.hex()))
         assert(js_0_bid['itx_state'] == 'Refunded')
         assert(js_1_bid['ptx_state'] == 'Unknown')
 
-        js_0 = json.loads(urlopen('http://127.0.0.1:1800/json').read())
-        js_1 = json.loads(urlopen('http://127.0.0.1:1801/json').read())
+        js_0 = read_json_api(1800)
+        js_1 = read_json_api(1801)
         assert(js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
         assert(js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
 
@@ -220,7 +232,7 @@ class Test(BaseTest):
         logging.info('---------- Test same client, BTC to LTC')
         swap_clients = self.swap_clients
 
-        js_0_before = json.loads(urlopen('http://127.0.0.1:1800/json').read())
+        js_0_before = read_json_api(1800)
 
         offer_id = swap_clients[0].postOffer(Coins.BTC, Coins.LTC, 10 * COIN, 10 * COIN, 10 * COIN, SwapTypes.SELLER_FIRST)
 
@@ -235,7 +247,7 @@ class Test(BaseTest):
         wait_for_bid_tx_state(test_delay_event, swap_clients[0], bid_id, TxStates.TX_REDEEMED, TxStates.TX_REDEEMED, wait_for=60)
         wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=60)
 
-        js_0 = json.loads(urlopen('http://127.0.0.1:1800/json').read())
+        js_0 = read_json_api(1800)
         assert(js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
         assert(js_0['num_recv_bids'] == js_0_before['num_recv_bids'] + 1 and js_0['num_sent_bids'] == js_0_before['num_sent_bids'] + 1)
 
@@ -243,7 +255,7 @@ class Test(BaseTest):
         logging.info('---------- Test error, BTC to LTC, set fee above bid value')
         swap_clients = self.swap_clients
 
-        js_0_before = json.loads(urlopen('http://127.0.0.1:1800/json').read())
+        js_0_before = read_json_api(1800)
 
         offer_id = swap_clients[0].postOffer(Coins.BTC, Coins.LTC, 0.001 * COIN, 1.0 * COIN, 0.001 * COIN, SwapTypes.SELLER_FIRST)
 
@@ -307,13 +319,13 @@ class Test(BaseTest):
         wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=120)
         wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=120)
 
-        js_0_bid = json.loads(urlopen('http://127.0.0.1:1800/json/bids/{}'.format(bid_id.hex())).read())
-        js_1_bid = json.loads(urlopen('http://127.0.0.1:1801/json/bids/{}'.format(bid_id.hex())).read())
+        js_0_bid = read_json_api(1800, 'bids/{}'.format(bid_id.hex()))
+        js_1_bid = read_json_api(1801, 'bids/{}'.format(bid_id.hex()))
         assert(js_0_bid['itx_state'] == 'Refunded')
         assert(js_1_bid['ptx_state'] == 'Refunded')
 
-        js_0 = json.loads(urlopen('http://127.0.0.1:1800/json').read())
-        js_1 = json.loads(urlopen('http://127.0.0.1:1801/json').read())
+        js_0 = read_json_api(1800)
+        js_1 = read_json_api(1801)
         assert(js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
         assert(js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
 
@@ -339,13 +351,13 @@ class Test(BaseTest):
         wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=120)
         wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.BID_ABANDONED, sent=True, wait_for=120)
 
-        js_0_bid = json.loads(urlopen('http://127.0.0.1:1800/json/bids/{}'.format(bid_id.hex())).read())
-        js_1_bid = json.loads(urlopen('http://127.0.0.1:1801/json/bids/{}'.format(bid_id.hex())).read())
+        js_0_bid = read_json_api(1800, 'bids/{}'.format(bid_id.hex()))
+        js_1_bid = read_json_api(1801, 'bids/{}'.format(bid_id.hex()))
         assert(js_0_bid['itx_state'] == 'Refunded')
         assert(js_1_bid['ptx_state'] == 'Unknown')
 
-        js_0 = json.loads(urlopen('http://127.0.0.1:1800/json').read())
-        js_1 = json.loads(urlopen('http://127.0.0.1:1801/json').read())
+        js_0 = read_json_api(1800)
+        js_1 = read_json_api(1801)
         assert(js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
         assert(js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
     '''
@@ -354,7 +366,7 @@ class Test(BaseTest):
         logging.info('---------- Test LTC withdrawals')
 
         ltc_addr = callnoderpc(0, 'getnewaddress', ['Withdrawal test', 'legacy'], base_rpc_port=LTC_BASE_RPC_PORT)
-        wallets0 = json.loads(urlopen('http://127.0.0.1:{}/json/wallets'.format(TEST_HTTP_PORT + 0)).read())
+        wallets0 = read_json_api(TEST_HTTP_PORT + 0, 'wallets')
         assert(float(wallets0['3']['balance']) > 100)
 
         post_json = {
@@ -371,8 +383,8 @@ class Test(BaseTest):
         # Participant loses PTX value without gaining ITX value
         swap_clients = self.swap_clients
 
-        js_w0_before = json.loads(urlopen('http://127.0.0.1:1800/json/wallets').read())
-        js_w1_before = json.loads(urlopen('http://127.0.0.1:1801/json/wallets').read())
+        js_w0_before = read_json_api(1800, 'wallets')
+        js_w1_before = read_json_api(1801, 'wallets')
 
         swap_value = make_int(random.uniform(2.0, 20.0), scale=8, r=1)
         logging.info('swap_value {}'.format(format_amount(swap_value, 8)))
@@ -389,8 +401,8 @@ class Test(BaseTest):
 
         wait_for_bid_tx_state(test_delay_event, swap_clients[0], bid_id, TxStates.TX_REFUNDED, TxStates.TX_REDEEMED, wait_for=60)
 
-        js_w0_after = json.loads(urlopen('http://127.0.0.1:1800/json/wallets').read())
-        js_w1_after = json.loads(urlopen('http://127.0.0.1:1801/json/wallets').read())
+        js_w0_after = read_json_api(1800, 'wallets')
+        js_w1_after = read_json_api(1801, 'wallets')
 
         ltc_swap_value = swap_value
         btc_swap_value = swap_value // 2

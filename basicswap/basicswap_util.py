@@ -135,6 +135,7 @@ class ActionTypes(IntEnum):
     REDEEM_XMR_SWAP_LOCK_TX_B = auto()  # Leader
     RECOVER_XMR_SWAP_LOCK_TX_B = auto()
     SEND_XMR_SWAP_LOCK_SPEND_MSG = auto()
+    REDEEM_ITX = auto()
 
 
 class EventLogTypes(IntEnum):

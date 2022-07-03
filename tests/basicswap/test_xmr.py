@@ -16,7 +16,6 @@ import unittest
 import traceback
 import threading
 import subprocess
-from urllib.request import urlopen
 
 import basicswap.config as cfg
 from basicswap.db import (
@@ -70,6 +69,9 @@ from tests.basicswap.common import (
     wait_for_none_active,
     wait_for_balance,
     post_json_req,
+    read_json_api,
+    compare_bid_states,
+    extract_states_from_xu_file,
     TEST_HTTP_HOST,
     TEST_HTTP_PORT,
     BASE_RPC_PORT,
@@ -339,6 +341,10 @@ class BaseTest(unittest.TestCase):
         cls.stream_fp.setFormatter(formatter)
         logger.addHandler(cls.stream_fp)
 
+        diagrams_dir = 'doc/protocols/sequence_diagrams'
+        cls.states_bidder = extract_states_from_xu_file(os.path.join(diagrams_dir, 'xmr.bidder.alt.xu'))
+        cls.states_offerer = extract_states_from_xu_file(os.path.join(diagrams_dir, 'xmr.offerer.alt.xu'))
+
         try:
             logging.info('Preparing coin nodes.')
             for i in range(NUM_NODES):
@@ -547,7 +553,7 @@ class Test(BaseTest):
         logging.info('---------- Test PART to XMR')
         swap_clients = self.swap_clients
 
-        js_1 = json.loads(urlopen('http://127.0.0.1:1801/json/wallets').read())
+        js_1 = read_json_api(1801, 'wallets')
         assert(make_int(js_1[str(int(Coins.XMR))]['balance'], scale=12) > 0)
         assert(make_int(js_1[str(int(Coins.XMR))]['unconfirmed'], scale=12) > 0)
 
@@ -569,14 +575,22 @@ class Test(BaseTest):
         wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=180)
         wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True)
 
-        js_0_end = json.loads(urlopen('http://127.0.0.1:1800/json/wallets').read())
+        js_0_end = read_json_api(1800, 'wallets')
         end_xmr = float(js_0_end['6']['balance']) + float(js_0_end['6']['unconfirmed'])
         assert(end_xmr > 10.9 and end_xmr < 11.0)
+
+        bid_id_hex = bid_id.hex()
+        path = f'bids/{bid_id_hex}/states'
+        offerer_states = read_json_api(1800, path)
+        bidder_states = read_json_api(1801, path)
+
+        assert(compare_bid_states(offerer_states, self.states_offerer[0]) is True)
+        assert(compare_bid_states(bidder_states, self.states_bidder[0]) is True)
 
     def test_011_smsgaddresses(self):
         logging.info('---------- Test address management and private offers')
         swap_clients = self.swap_clients
-        js_1 = json.loads(urlopen('http://127.0.0.1:1801/json/smsgaddresses').read())
+        js_1 = read_json_api(1801, 'smsgaddresses')
 
         post_json = {
             'addressnote': 'testing',
@@ -585,7 +599,7 @@ class Test(BaseTest):
         new_address = json_rv['new_address']
         new_address_pk = json_rv['pubkey']
 
-        js_2 = json.loads(urlopen('http://127.0.0.1:1801/json/smsgaddresses').read())
+        js_2 = read_json_api(1801, 'smsgaddresses')
         assert(len(js_2) == len(js_1) + 1)
         found = False
         for addr in js_2:
@@ -611,7 +625,7 @@ class Test(BaseTest):
         json_rv = json.loads(post_json_req('http://127.0.0.1:1801/json/smsgaddresses/edit', post_json))
         assert(json_rv['edited_address'] == new_address)
 
-        js_3 = json.loads(urlopen('http://127.0.0.1:1801/json/smsgaddresses').read())
+        js_3 = read_json_api(1801, 'smsgaddresses')
         found = False
         for addr in js_3:
             if addr['addr'] == new_address:
@@ -664,17 +678,17 @@ class Test(BaseTest):
 
         wait_for_offer(test_delay_event, swap_clients[1], bytes.fromhex(offer_id_hex))
 
-        rv = json.loads(urlopen(f'http://127.0.0.1:1801/json/offers/{offer_id_hex}').read())
+        rv = read_json_api(1801, f'offers/{offer_id_hex}')
         assert(rv[0]['addr_to'] == new_address)
 
-        rv = json.loads(urlopen(f'http://127.0.0.1:1800/json/offers/{offer_id_hex}').read())
+        rv = read_json_api(1800, f'offers/{offer_id_hex}')
         assert(rv[0]['addr_to'] == new_address)
 
     def test_02_leader_recover_a_lock_tx(self):
         logging.info('---------- Test PART to XMR leader recovers coin a lock tx')
         swap_clients = self.swap_clients
 
-        js_w0_before = json.loads(urlopen('http://127.0.0.1:1800/json/wallets').read())
+        js_w0_before = read_json_api(1800, 'wallets')
 
         offer_id = swap_clients[0].postOffer(
             Coins.PART, Coins.XMR, 101 * COIN, 0.12 * XMR_COIN, 101 * COIN, SwapTypes.XMR_SWAP,
@@ -696,13 +710,13 @@ class Test(BaseTest):
         wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.XMR_SWAP_FAILED_REFUNDED, wait_for=180)
         wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.XMR_SWAP_FAILED_REFUNDED, sent=True)
 
-        js_w0_after = json.loads(urlopen('http://127.0.0.1:1800/json/wallets').read())
+        js_w0_after = read_json_api(1800, 'wallets')
 
     def test_03_follower_recover_a_lock_tx(self):
         logging.info('---------- Test PART to XMR follower recovers coin a lock tx')
         swap_clients = self.swap_clients
 
-        js_w0_before = json.loads(urlopen('http://127.0.0.1:1800/json/wallets').read())
+        js_w0_before = read_json_api(1800, 'wallets')
 
         offer_id = swap_clients[0].postOffer(
             Coins.PART, Coins.XMR, 101 * COIN, 0.13 * XMR_COIN, 101 * COIN, SwapTypes.XMR_SWAP,
@@ -725,7 +739,7 @@ class Test(BaseTest):
         wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.BID_STALLED_FOR_TEST, wait_for=180)
         wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.XMR_SWAP_FAILED_SWIPED, wait_for=80, sent=True)
 
-        js_w0_after = json.loads(urlopen('http://127.0.0.1:1800/json/wallets').read())
+        js_w0_after = read_json_api(1800, 'wallets')
 
         wait_for_none_active(test_delay_event, 1800)
         wait_for_none_active(test_delay_event, 1801)
@@ -782,8 +796,8 @@ class Test(BaseTest):
         logging.info('---------- Test Multiple concurrent swaps')
         swap_clients = self.swap_clients
 
-        js_w0_before = json.loads(urlopen('http://127.0.0.1:1800/json/wallets').read())
-        js_w1_before = json.loads(urlopen('http://127.0.0.1:1801/json/wallets').read())
+        js_w0_before = read_json_api(1800, 'wallets')
+        js_w1_before = read_json_api(1801, 'wallets')
 
         amt_1 = make_int(random.uniform(0.001, 49.0), scale=8, r=1)
         amt_2 = make_int(random.uniform(0.001, 49.0), scale=8, r=1)
@@ -831,8 +845,8 @@ class Test(BaseTest):
         wait_for_none_active(test_delay_event, 1800)
         wait_for_none_active(test_delay_event, 1801)
 
-        js_w0_after = json.loads(urlopen('http://127.0.0.1:1800/json/wallets').read())
-        js_w1_after = json.loads(urlopen('http://127.0.0.1:1801/json/wallets').read())
+        js_w0_after = read_json_api(1800, 'wallets')
+        js_w1_after = read_json_api(1801, 'wallets')
         assert(make_int(js_w1_after['2']['balance'], scale=8, r=1) - (make_int(js_w1_before['2']['balance'], scale=8, r=1) + amt_1) < 1000)
 
     def test_07_revoke_offer(self):
@@ -848,10 +862,10 @@ class Test(BaseTest):
     def test_08_withdraw(self):
         logging.info('---------- Test XMR withdrawals')
         swap_clients = self.swap_clients
-        js_0 = json.loads(urlopen('http://127.0.0.1:1800/json/wallets').read())
+        js_0 = read_json_api(1800, 'wallets')
         address_to = js_0[str(int(Coins.XMR))]['deposit_address']
 
-        js_1 = json.loads(urlopen('http://127.0.0.1:1801/json/wallets').read())
+        js_1 = read_json_api(1801, 'wallets')
         assert(float(js_1[str(int(Coins.XMR))]['balance']) > 0.0)
 
         swap_clients[1].withdrawCoin(Coins.XMR, 1.1, address_to, False)
@@ -961,12 +975,12 @@ class Test(BaseTest):
         logging.info('---------- Test Particl anon transactions')
         swap_clients = self.swap_clients
 
-        js_0 = json.loads(urlopen('http://127.0.0.1:1800/json/wallets/part').read())
+        js_0 = read_json_api(1800, 'wallets/part')
         assert(float(js_0['anon_balance']) == 0.0)
         node0_anon_before = js_0['anon_balance'] + js_0['anon_pending']
 
         wait_for_balance(test_delay_event, 'http://127.0.0.1:1801/json/wallets/part', 'balance', 200.0)
-        js_1 = json.loads(urlopen('http://127.0.0.1:1801/json/wallets/part').read())
+        js_1 = read_json_api(1801, 'wallets/part')
         assert(float(js_1['balance']) > 200.0)
         node1_anon_before = js_1['anon_balance'] + js_1['anon_pending']
 
@@ -982,7 +996,7 @@ class Test(BaseTest):
 
         logging.info('Waiting for anon balance')
         wait_for_balance(test_delay_event, 'http://127.0.0.1:1801/json/wallets/part', 'anon_balance', 100.0 + node1_anon_before)
-        js_1 = json.loads(urlopen('http://127.0.0.1:1801/json/wallets/part').read())
+        js_1 = read_json_api(1801, 'wallets/part')
         node1_anon_before = js_1['anon_balance'] + js_1['anon_pending']
 
         callnoderpc(1, 'reservebalance', [False])
@@ -1021,21 +1035,21 @@ class Test(BaseTest):
         wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=180)
         wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True)
 
-        js_1 = json.loads(urlopen('http://127.0.0.1:1801/json/wallets/part').read())
+        js_1 = read_json_api(1801, 'wallets/part')
         assert(js_1['anon_balance'] < node1_anon_before - amount_to)
 
-        js_0 = json.loads(urlopen('http://127.0.0.1:1800/json/wallets/part').read())
+        js_0 = read_json_api(1800, 'wallets/part')
         assert(js_0['anon_balance'] + js_0['anon_pending'] > node0_anon_before + (amount_to - 0.05))
 
     def test_12_particl_blind(self):
         logging.info('---------- Test Particl blind transactions')
         swap_clients = self.swap_clients
 
-        js_0 = json.loads(urlopen('http://127.0.0.1:1800/json/wallets/part').read())
+        js_0 = read_json_api(1800, 'wallets/part')
         node0_blind_before = js_0['blind_balance'] + js_0['blind_unconfirmed']
 
         wait_for_balance(test_delay_event, 'http://127.0.0.1:1801/json/wallets/part', 'balance', 200.0)
-        js_1 = json.loads(urlopen('http://127.0.0.1:1801/json/wallets/part').read())
+        js_1 = read_json_api(1801, 'wallets/part')
         assert(float(js_1['balance']) > 200.0)
         node1_blind_before = js_1['blind_balance'] + js_1['blind_unconfirmed']
 
@@ -1050,7 +1064,7 @@ class Test(BaseTest):
 
         logging.info('Waiting for blind balance')
         wait_for_balance(test_delay_event, 'http://127.0.0.1:1800/json/wallets/part', 'blind_balance', 100.0 + node0_blind_before)
-        js_0 = json.loads(urlopen('http://127.0.0.1:1800/json/wallets/part').read())
+        js_0 = read_json_api(1800, 'wallets/part')
         node0_blind_before = js_0['blind_balance'] + js_0['blind_unconfirmed']
 
         amt_swap = make_int(random.uniform(0.1, 2.0), scale=8, r=1)
@@ -1070,11 +1084,11 @@ class Test(BaseTest):
         wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True)
 
         amount_from = float(format_amount(amt_swap, 8))
-        js_1 = json.loads(urlopen('http://127.0.0.1:1801/json/wallets/part').read())
+        js_1 = read_json_api(1801, 'wallets/part')
         node1_blind_after = js_1['blind_balance'] + js_1['blind_unconfirmed']
         assert(node1_blind_after > node1_blind_before + (amount_from - 0.05))
 
-        js_0 = json.loads(urlopen('http://127.0.0.1:1800/json/wallets/part').read())
+        js_0 = read_json_api(1800, 'wallets/part')
         node0_blind_after = js_0['blind_balance'] + js_0['blind_unconfirmed']
         assert(node0_blind_after < node0_blind_before - amount_from)
 
@@ -1084,10 +1098,10 @@ class Test(BaseTest):
             logging.info('Disabling XMR mining')
             pause_event.clear()
 
-            js_0 = json.loads(urlopen('http://127.0.0.1:1800/json/wallets').read())
+            js_0 = read_json_api(1800, 'wallets')
             address_to = js_0[str(int(Coins.XMR))]['deposit_address']
 
-            wallets1 = json.loads(urlopen('http://127.0.0.1:{}/json/wallets'.format(TEST_HTTP_PORT + 1)).read())
+            wallets1 = read_json_api(TEST_HTTP_PORT + 1, 'wallets')
             xmr_total = float(wallets1[str(int(Coins.XMR))]['balance'])
             assert(xmr_total > 10)
 

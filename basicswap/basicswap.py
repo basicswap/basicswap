@@ -746,14 +746,11 @@ class BasicSwap(BaseApp):
         if not offer:
             raise ValueError('Offer not found')
 
+        self.loadBidTxns(bid, session)
         if offer.swap_type == SwapTypes.XMR_SWAP:
             xmr_swap = session.query(XmrSwap).filter_by(bid_id=bid.bid_id).first()
-            self.loadBidTxns(bid, session)
             self.watchXmrSwap(bid, offer, xmr_swap)
         else:
-            bid.initiate_tx = session.query(SwapTx).filter(sa.and_(SwapTx.bid_id == bid.bid_id, SwapTx.tx_type == TxTypes.ITX)).first()
-            bid.participate_tx = session.query(SwapTx).filter(sa.and_(SwapTx.bid_id == bid.bid_id, SwapTx.tx_type == TxTypes.PTX)).first()
-
             self.swaps_in_progress[bid.bid_id] = (bid, offer)
 
             coin_from = Coins(offer.coin_from)
@@ -1787,37 +1784,42 @@ class BasicSwap(BaseApp):
             session.remove()
             self.mxDB.release()
 
-    def getBid(self, bid_id):
-        self.mxDB.acquire()
+    def getBid(self, bid_id, session=None):
+        use_session = None
         try:
-            session = scoped_session(self.session_factory)
-            bid = session.query(Bid).filter_by(bid_id=bid_id).first()
+            if session:
+                use_session = session
+            else:
+                self.mxDB.acquire()
+                use_session = scoped_session(self.session_factory)
+            bid = use_session.query(Bid).filter_by(bid_id=bid_id).first()
             if bid:
-                self.loadBidTxns(bid, session)
+                self.loadBidTxns(bid, use_session)
             return bid
         finally:
-            session.close()
-            session.remove()
-            self.mxDB.release()
+            if session is None:
+                use_session.close()
+                use_session.remove()
+                self.mxDB.release()
 
-    def getBidAndOffer(self, bid_id):
-        self.mxDB.acquire()
+    def getBidAndOffer(self, bid_id, session=None):
         try:
-            session = scoped_session(self.session_factory)
-            bid = session.query(Bid).filter_by(bid_id=bid_id).first()
+            if session:
+                use_session = session
+            else:
+                self.mxDB.acquire()
+                use_session = scoped_session(self.session_factory)
+            bid = use_session.query(Bid).filter_by(bid_id=bid_id).first()
             offer = None
             if bid:
-                offer = session.query(Offer).filter_by(offer_id=bid.offer_id).first()
-                if offer and offer.swap_type == SwapTypes.XMR_SWAP:
-                    self.loadBidTxns(bid, session)
-                else:
-                    bid.initiate_tx = session.query(SwapTx).filter(sa.and_(SwapTx.bid_id == bid_id, SwapTx.tx_type == TxTypes.ITX)).first()
-                    bid.participate_tx = session.query(SwapTx).filter(sa.and_(SwapTx.bid_id == bid_id, SwapTx.tx_type == TxTypes.PTX)).first()
+                offer = use_session.query(Offer).filter_by(offer_id=bid.offer_id).first()
+                self.loadBidTxns(bid, use_session)
             return bid, offer
         finally:
-            session.close()
-            session.remove()
-            self.mxDB.release()
+            if session is None:
+                use_session.close()
+                use_session.remove()
+                self.mxDB.release()
 
     def getXmrBidAndOffer(self, bid_id, list_events=True):
         self.mxDB.acquire()
@@ -1834,10 +1836,7 @@ class BasicSwap(BaseApp):
                 if offer and offer.swap_type == SwapTypes.XMR_SWAP:
                     xmr_swap = session.query(XmrSwap).filter_by(bid_id=bid.bid_id).first()
                     xmr_offer = session.query(XmrOffer).filter_by(offer_id=bid.offer_id).first()
-                    self.loadBidTxns(bid, session)
-                else:
-                    bid.initiate_tx = session.query(SwapTx).filter(sa.and_(SwapTx.bid_id == bid_id, SwapTx.tx_type == TxTypes.ITX)).first()
-                    bid.participate_tx = session.query(SwapTx).filter(sa.and_(SwapTx.bid_id == bid_id, SwapTx.tx_type == TxTypes.PTX)).first()
+                self.loadBidTxns(bid, session)
                 if list_events:
                     events = self.list_bid_events(bid.bid_id, session)
 
@@ -2941,7 +2940,7 @@ class BasicSwap(BaseApp):
                 rv = True  # Remove from swaps_in_progress
             elif state == BidStates.XMR_SWAP_FAILED_SWIPED:
                 rv = True  # Remove from swaps_in_progress
-            elif state in (BidStates.XMR_SWAP_HAVE_SCRIPT_COIN_SPEND_TX, BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX):
+            elif state == BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX:
                 if bid.xmr_a_lock_tx is None:
                     return rv
 
@@ -3337,19 +3336,14 @@ class BasicSwap(BaseApp):
                 bid.setPTxState(TxStates.TX_REDEEMED)
 
                 if bid.was_sent:
-                    txn = self.createRedeemTxn(coin_from, bid, for_txn_type='initiate')
-
                     if bid.debug_ind == DebugTypes.DONT_SPEND_ITX:
                         self.log.debug('bid %s: Abandoning bid for testing: %d, %s.', bid_id.hex(), bid.debug_ind, DebugTypes(bid.debug_ind).name)
                         bid.setState(BidStates.BID_ABANDONED)
                         self.logBidEvent(bid.bid_id, EventLogTypes.DEBUG_TWEAK_APPLIED, 'ind {}'.format(bid.debug_ind), None)
                     else:
-                        txid = self.submitTxn(coin_from, txn)
-
-                        bid.initiate_tx.spend_txid = bytes.fromhex(txid)
-                        # bid.initiate_txn_redeem = bytes.fromhex(txn)  # Worth keeping?
-                        self.log.debug('Submitted initiate redeem txn %s to %s chain for bid %s', txid, chainparams[coin_from]['name'], bid_id.hex())
-
+                        delay = random.randrange(self.min_delay_event_short, self.max_delay_event_short)
+                        self.log.info('Redeeming ITX for bid %s in %d seconds', bid_id.hex(), delay)
+                        self.createAction(delay, ActionTypes.REDEEM_ITX, bid_id)
                 # TODO: Wait for depth? new state SWAP_TXI_REDEEM_SENT?
 
             self.removeWatchedOutput(coin_to, bid_id, bid.participate_tx.txid.hex())
@@ -3582,6 +3576,8 @@ class BasicSwap(BaseApp):
                         self.recoverXmrBidCoinBLockTx(row.linked_id, session)
                     elif row.action_type == ActionTypes.SEND_XMR_SWAP_LOCK_SPEND_MSG:
                         self.sendXmrBidCoinALockSpendTxMsg(row.linked_id, session)
+                    elif row.action_type == ActionTypes.REDEEM_ITX:
+                        atomic_swap_1.redeemITx(self, row.linked_id, session)
                     else:
                         self.log.warning('Unknown event type: %d', row.event_type)
                 except Exception as ex:
@@ -4843,6 +4839,7 @@ class BasicSwap(BaseApp):
             ci_from.verifyCompact(xmr_swap.pkal, 'proof key owned for swap', xmr_swap.kal_sig)
 
             bid.setState(BidStates.XMR_SWAP_HAVE_SCRIPT_COIN_SPEND_TX)
+            bid.setState(BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX)
             self.saveBid(bid_id, bid, xmr_swap=xmr_swap)
         except Exception as ex:
             if self.debug:

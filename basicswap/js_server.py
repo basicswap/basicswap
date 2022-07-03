@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2020-2021 tecnovert
+# Copyright (c) 2020-2022 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -27,6 +27,7 @@ from .ui.util import (
     get_data_entry_or,
     have_data_entry,
     tickerToCoinId,
+    listOldBidStates,
 )
 from .ui.page_offers import postNewOffer
 from .protocols.xmr_swap_1 import recoverNoScriptTxnWithKey, getChainBSplitKey
@@ -229,6 +230,10 @@ def js_bids(self, url_split, post_string, is_json):
             elif have_data_entry(post_data, 'spendchainblocktx'):
                 remote_key = get_data_entry(post_data, 'remote_key')
                 return bytes(json.dumps({'txid': recoverNoScriptTxnWithKey(swap_client, bid_id, remote_key).hex()}), 'UTF-8')
+
+        if len(url_split) > 4 and url_split[4] == 'states':
+            old_states = listOldBidStates(bid)
+            return bytes(json.dumps(old_states), 'UTF-8')
 
         edit_bid = False
         show_txns = False

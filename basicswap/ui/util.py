@@ -5,6 +5,7 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import json
+import struct
 import traceback
 from basicswap.util import (
     make_int,
@@ -356,6 +357,29 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
                     data['view_tx_desc'] = json.dumps(ci_from.describeTx(data['view_tx_hex']), indent=4)
 
     return data
+
+
+def listOldBidStates(bid):
+    old_states = []
+    num_states = len(bid.states) // 12
+    for i in range(num_states):
+        up = struct.unpack_from('<iq', bid.states[i * 12:(i + 1) * 12])
+        old_states.append((up[1], 'Bid ' + strBidState(up[0])))
+    if bid.initiate_tx and bid.initiate_tx.states is not None:
+        num_states = len(bid.initiate_tx.states) // 12
+        for i in range(num_states):
+            up = struct.unpack_from('<iq', bid.initiate_tx.states[i * 12:(i + 1) * 12])
+            if up[0] != TxStates.TX_NONE:
+                old_states.append((up[1], 'ITX ' + strTxState(up[0])))
+    if bid.participate_tx and bid.participate_tx.states is not None:
+        num_states = len(bid.participate_tx.states) // 12
+        for i in range(num_states):
+            up = struct.unpack_from('<iq', bid.participate_tx.states[i * 12:(i + 1) * 12])
+            if up[0] != TxStates.TX_NONE:
+                old_states.append((up[1], 'PTX ' + strTxState(up[0])))
+    if len(old_states) > 0:
+        old_states.sort(key=lambda x: x[0])
+    return old_states
 
 
 def getCoinName(c):

@@ -6,7 +6,6 @@
 
 import os
 import json
-import struct
 import traceback
 import threading
 import http.client
@@ -55,6 +54,7 @@ from .ui.util import (
     listBidStates,
     get_data_entry,
     have_data_entry,
+    listOldBidStates,
     get_data_entry_or,
     listAvailableCoins,
     set_pagination_filters,
@@ -695,23 +695,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         data['show_bidder_seq_diagram'] = show_bidder_seq_diagram
         data['show_offerer_seq_diagram'] = show_offerer_seq_diagram
 
-        old_states = []
-        num_states = len(bid.states) // 12
-        for i in range(num_states):
-            up = struct.unpack_from('<iq', bid.states[i * 12:(i + 1) * 12])
-            old_states.append((up[1], 'Bid ' + strBidState(up[0])))
-        if bid.initiate_tx and bid.initiate_tx.states is not None:
-            num_states = len(bid.initiate_tx.states) // 12
-            for i in range(num_states):
-                up = struct.unpack_from('<iq', bid.initiate_tx.states[i * 12:(i + 1) * 12])
-                old_states.append((up[1], 'ITX ' + strTxState(up[0])))
-        if bid.participate_tx and bid.participate_tx.states is not None:
-            num_states = len(bid.participate_tx.states) // 12
-            for i in range(num_states):
-                up = struct.unpack_from('<iq', bid.participate_tx.states[i * 12:(i + 1) * 12])
-                old_states.append((up[1], 'PTX ' + strTxState(up[0])))
-        if len(old_states) > 0:
-            old_states.sort(key=lambda x: x[0])
+        old_states = listOldBidStates(bid)
 
         if len(data['addr_from_label']) > 0:
             data['addr_from_label'] = '(' + data['addr_from_label'] + ')'

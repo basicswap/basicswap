@@ -286,3 +286,92 @@ def make_rpc_func(node_id, base_rpc_port=BASE_RPC_PORT):
         nonlocal node_id, auth
         return callrpc(base_rpc_port + node_id, auth, method, params, wallet)
     return rpc_func
+
+
+def extract_states_from_xu_file(file_path):
+    states = {}
+
+    alt_counter = 0
+    active_path = 0
+    states[active_path] = []
+    path_stack = [active_path, ]
+    with open(file_path) as fp:
+        for line in fp:
+            line = line.strip()
+            if line.startswith('#'):
+                continue
+
+            if line == '};':
+                if len(path_stack) > 1:
+                    path_stack.pop()
+                    active_path = path_stack[-1]
+                continue
+
+            split_line = line.split('[')
+            if len(split_line) < 2:
+                continue
+
+            definitions = split_line[0].split(' ')
+            if len(definitions) < 2:
+                continue
+
+            if definitions[1] == 'alt':
+                alt_counter += 1
+                path_stack.append(alt_counter)
+
+                states[alt_counter] = [s for s in states[active_path]]
+                continue
+
+            if definitions[0] == '---':
+                active_path = path_stack[-1]
+                continue
+
+            if definitions[1] != 'abox':
+                continue
+
+            tag_start = 'label="'
+            tag_end = '"'
+            pos_start = split_line[1].find(tag_start)
+            if pos_start < 0:
+                continue
+            pos_start += len(tag_start)
+            pos_end = split_line[1].find(tag_end, pos_start)
+            if pos_end < 0:
+                continue
+            label = split_line[1][pos_start:pos_end]
+
+            if line.find('textbgcolor') > 0:
+                # transaction status
+                pass
+
+            states[active_path].append(label)
+
+    return states
+
+
+def compare_bid_states(states, expect_states):
+
+    for i in range(len(states) - 1, -1, -1):
+        if states[i][1] == 'Bid Delaying':
+            del states[i]
+
+    assert(len(states) == len(expect_states))
+
+    for i, s in enumerate(states):
+        if s[1] != expect_states[i]:
+            if 'Bid ' + expect_states[i] == s[1]:
+                logging.warning(f'Expected state {expect_states[i]} not an exact match to {s[1]}.')
+                continue
+            if [s[0], expect_states[i]] in states:
+                logging.warning(f'Expected state {expect_states[i]} found out of order at the same time as {s[1]}.')
+                continue
+            raise ValueError(f'Expected state {expect_states[i]}, found {s[1]}')
+        assert(s[1] == expect_states[i])
+    return True
+
+
+def read_json_api(port, path=None):
+    url = f'http://127.0.0.1:{port}/json'
+    if path is not None:
+        url += '/' + path
+    return json.loads(urlopen(url).read())
