@@ -14,7 +14,6 @@ import logging
 import unittest
 import traceback
 import threading
-from urllib.request import urlopen
 
 import basicswap.config as cfg
 from basicswap.basicswap import (
@@ -46,6 +45,7 @@ from tests.basicswap.common import (
     checkForks,
     stopDaemons,
     delay_for,
+    read_json_api,
     TEST_HTTP_HOST,
     TEST_HTTP_PORT,
     BASE_P2P_PORT,
@@ -305,7 +305,7 @@ class Test(unittest.TestCase):
         for i in range(wait_for):
             if delay_event.is_set():
                 raise ValueError('Test stopped.')
-            js = json.loads(urlopen('http://127.0.0.1:{}/json/network'.format(port)).read())
+            js = read_json_api(port, 'network')
             num_nodes = 0
             for p in js['peers']:
                 if p['ready'] is True:
@@ -320,7 +320,7 @@ class Test(unittest.TestCase):
         logging.info('---------- Test Network')
         swap_clients = self.swap_clients
 
-        js_1 = json.loads(urlopen('http://127.0.0.1:1801/json/wallets').read())
+        js_1 = read_json_api(1801, 'wallets')
 
         offer_id = swap_clients[0].postOffer(Coins.PART, Coins.BTC, 100 * COIN, 0.1 * COIN, 100 * COIN, SwapTypes.SELLER_FIRST)
 
@@ -329,7 +329,7 @@ class Test(unittest.TestCase):
 
         self.wait_for_num_nodes(1800, 2)
 
-        js_n0 = json.loads(urlopen('http://127.0.0.1:1800/json/network').read())
+        js_n0 = read_json_api(1800, 'network')
         print(dumpj(js_n0))
 
         path = [swap_clients[0]._network._network_pubkey, swap_clients[2]._network._network_pubkey]

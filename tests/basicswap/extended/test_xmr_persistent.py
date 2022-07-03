@@ -29,7 +29,6 @@ import logging
 import unittest
 import threading
 import multiprocessing
-from urllib.request import urlopen
 from unittest.mock import patch
 
 from basicswap.rpc_xmr import (
@@ -40,6 +39,7 @@ from basicswap.rpc import (
 )
 from tests.basicswap.mnemonics import mnemonics as test_mnemonics
 from tests.basicswap.common import (
+    read_json_api,
     waitForServer,
 )
 from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
@@ -268,7 +268,7 @@ class Test(unittest.TestCase):
         for i in range(NUM_NODES):
             waitForServer(self.delay_event, UI_PORT + i)
 
-        wallets = json.loads(urlopen('http://127.0.0.1:{}/json/wallets'.format(UI_PORT + 1)).read())
+        wallets = read_json_api(UI_PORT + 1, 'wallets')
 
         self.xmr_addr = wallets['6']['main_address']
         num_blocks = 100

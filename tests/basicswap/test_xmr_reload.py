@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2020-2021 tecnovert
+# Copyright (c) 2020-2022 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -25,6 +25,7 @@ from urllib import parse
 from urllib.request import urlopen
 
 from tests.basicswap.common import (
+    read_json_api,
     waitForServer,
     waitForNumOffers,
     waitForNumBids,
@@ -47,7 +48,7 @@ class Test(XmrTestBase):
 
         waitForServer(self.delay_event, 12700)
         waitForServer(self.delay_event, 12701)
-        wallets1 = json.loads(urlopen('http://127.0.0.1:12701/json/wallets').read())
+        wallets1 = read_json_api(12701, 'wallets')
         assert(float(wallets1['6']['balance']) > 0.0)
 
         data = parse.urlencode({
@@ -59,13 +60,13 @@ class Test(XmrTestBase):
             'lockhrs': '24'}).encode()
 
         offer_id = json.loads(urlopen('http://127.0.0.1:12700/json/offers/new', data=data).read())['offer_id']
-        summary = json.loads(urlopen('http://127.0.0.1:12700/json').read())
+        summary = read_json_api(12700)
         assert(summary['num_sent_offers'] == 1)
 
         logger.info('Waiting for offer')
         waitForNumOffers(self.delay_event, 12701, 1)
 
-        offers = json.loads(urlopen('http://127.0.0.1:12701/json/offers').read())
+        offers = read_json_api(12701, 'offers')
         offer = offers[0]
 
         data = {
@@ -95,7 +96,7 @@ class Test(XmrTestBase):
         waitForNumBids(self.delay_event, 12700, 1)
 
         for i in range(10):
-            bids = json.loads(urlopen('http://127.0.0.1:12700/json/bids').read())
+            bids = read_json_api(12700, 'bids')
             bid = bids[0]
             if bid['bid_state'] == 'Received':
                 break
@@ -118,7 +119,7 @@ class Test(XmrTestBase):
         self.processes[1].start()
 
         waitForServer(self.delay_event, 12701)
-        rv = json.loads(urlopen('http://127.0.0.1:12701/json').read())
+        rv = read_json_api(12701)
         assert(rv['num_swapping'] == 1)
 
         rv = json.loads(urlopen('http://127.0.0.1:12700/json/revokeoffer/{}'.format(offer_id)).read())
@@ -136,7 +137,7 @@ class Test(XmrTestBase):
         assert(rv['bid_state'] == 'Completed')
 
         # Ensure offer was revoked
-        summary = json.loads(urlopen('http://127.0.0.1:12700/json').read())
+        summary = read_json_api(12700)
         assert(summary['num_network_offers'] == 0)
 
         # Wait for bid to be removed from in-progress

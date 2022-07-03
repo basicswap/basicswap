@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2021 tecnovert
+# Copyright (c) 2021-2022 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -25,6 +25,7 @@ from urllib import parse
 from urllib.request import urlopen
 
 from tests.basicswap.common import (
+    read_json_api,
     waitForServer,
     waitForNumOffers,
     waitForNumBids,
@@ -49,7 +50,7 @@ class Test(XmrTestBase):
 
         waitForServer(self.delay_event, 12700)
         waitForServer(self.delay_event, 12701)
-        wallets1 = json.loads(urlopen('http://127.0.0.1:12701/json/wallets').read())
+        wallets1 = read_json_api(12701, 'wallets')
         assert(float(wallets1['6']['balance']) > 0.0)
 
         offer_data = {
@@ -67,7 +68,7 @@ class Test(XmrTestBase):
         rv = json.loads(urlopen('http://127.0.0.1:12700/json/offers/new', data=parse.urlencode(offer_data).encode()).read())
         offer1_id = rv['offer_id']
 
-        summary = json.loads(urlopen('http://127.0.0.1:12700/json').read())
+        summary = read_json_api(12700)
         assert(summary['num_sent_offers'] > 1)
 
         logger.info('Waiting for offer')
@@ -141,8 +142,8 @@ class Test(XmrTestBase):
                 raise ValueError('Test stopped.')
             self.delay_event.wait(4)
 
-            rv0 = json.loads(urlopen('http://127.0.0.1:12700/json/bids/{}'.format(bid0_id)).read())
-            rv1 = json.loads(urlopen('http://127.0.0.1:12700/json/bids/{}'.format(bid1_id)).read())
+            rv0 = read_json_api(12700, 'bids/{}'.format(bid0_id))
+            rv1 = read_json_api(12700, 'bids/{}'.format(bid1_id))
             if rv0['bid_state'] == 'Completed' and rv1['bid_state'] == 'Completed':
                 break
         assert(rv0['bid_state'] == 'Completed')

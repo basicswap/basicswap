@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2020-2021 tecnovert
+# Copyright (c) 2020-2022 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -19,19 +19,20 @@ python tests/basicswap/extended/test_wallet_init.py
 
 import os
 import sys
-import json
 import time
 import shutil
 import logging
 import unittest
 import traceback
 import multiprocessing
-from urllib.request import urlopen
 from unittest.mock import patch
 
 from tests.basicswap.mnemonics import mnemonics
 
 import basicswap.config as cfg
+from tests.basicswap.common import (
+    read_json_api,
+)
 import bin.basicswap_prepare as prepareSystem
 import bin.basicswap_run as runSystem
 
@@ -55,7 +56,7 @@ def waitForServer(port):
     for i in range(20):
         try:
             time.sleep(1)
-            summary = json.loads(urlopen('http://127.0.0.1:{}/json'.format(port)).read())
+            summary = read_json_api(port)
             break
         except Exception as e:
             print('waitForServer, error:', str(e))
@@ -149,12 +150,12 @@ class Test(unittest.TestCase):
         try:
             waitForServer(12700)
 
-            wallets_0 = json.loads(urlopen('http://127.0.0.1:12700/json/wallets').read())
+            wallets_0 = read_json_api(12700, 'wallets')
             assert(wallets_0['1']['expected_seed'] is True)
             assert(wallets_0['6']['expected_seed'] is True)
 
             waitForServer(12701)
-            wallets_1 = json.loads(urlopen('http://127.0.0.1:12701/json/wallets').read())
+            wallets_1 = read_json_api(12701, 'wallets')
 
             assert(wallets_0['1']['expected_seed'] is True)
             assert(wallets_1['6']['expected_seed'] is True)

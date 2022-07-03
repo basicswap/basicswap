@@ -33,6 +33,7 @@ from basicswap.rpc import (
 )
 from tests.basicswap.mnemonics import mnemonics
 from tests.basicswap.common import (
+    read_json_api,
     waitForServer,
     waitForNumOffers,
     waitForNumBids,
@@ -167,7 +168,7 @@ class Test(unittest.TestCase):
                 'lockhrs': '24'}).encode()
 
             offer_id = json.loads(urlopen('http://127.0.0.1:12700/json/offers/new', data=data).read())
-            summary = json.loads(urlopen('http://127.0.0.1:12700/json').read())
+            summary = read_json_api(12700)
             assert(summary['num_sent_offers'] == 1)
         except Exception:
             traceback.print_exc()
@@ -175,7 +176,7 @@ class Test(unittest.TestCase):
         logger.info('Waiting for offer:')
         waitForNumOffers(delay_event, 12701, 1)
 
-        offers = json.loads(urlopen('http://127.0.0.1:12701/json/offers').read())
+        offers = read_json_api(12701, 'offers')
         offer = offers[0]
 
         data = parse.urlencode({
@@ -186,7 +187,7 @@ class Test(unittest.TestCase):
 
         waitForNumBids(delay_event, 12700, 1)
 
-        bids = json.loads(urlopen('http://127.0.0.1:12700/json/bids').read())
+        bids = read_json_api(12700, 'bids')
         bid = bids[0]
 
         data = parse.urlencode({
@@ -205,7 +206,7 @@ class Test(unittest.TestCase):
         processes[1].start()
 
         waitForServer(delay_event, 12701)
-        rv = json.loads(urlopen('http://127.0.0.1:12701/json').read())
+        rv = read_json_api(12701)
         assert(rv['num_swapping'] == 1)
 
         update_thread = threading.Thread(target=updateThread)
@@ -215,7 +216,7 @@ class Test(unittest.TestCase):
         for i in range(240):
             delay_event.wait(5)
 
-            rv = json.loads(urlopen('http://127.0.0.1:12700/json/bids/{}'.format(bid['bid_id'])).read())
+            rv = read_json_api(12700, 'bids/{}'.format(bid['bid_id']))
             print(rv)
             if rv['bid_state'] == 'Completed':
                 break
