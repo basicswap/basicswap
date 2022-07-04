@@ -988,7 +988,7 @@ class BTCInterface(CoinInterface):
         if not addr_info['iswatchonly']:
             ro = self.rpc_callback('importaddress', [dest_address, 'bid', False])
             self._log.info('Imported watch-only addr: {}'.format(dest_address))
-            self._log.info('Rescanning chain from height: {}'.format(rescan_from))
+            self._log.info('Rescanning {} chain from height: {}'.format(self.coin_name(), rescan_from))
             self.rpc_callback('rescanblockchain', [rescan_from])
 
         return_txid = True if txid is None else False

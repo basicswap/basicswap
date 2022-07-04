@@ -27,11 +27,12 @@ from basicswap.basicswap import (
     SwapTypes,
     BidStates,
     TxStates,
-    ABS_LOCK_BLOCKS,
-    ABS_LOCK_TIME,
 )
 from basicswap.util import (
     COIN,
+)
+from basicswap.basicswap_util import (
+    TxLockTypes,
 )
 from basicswap.util.address import (
     toWIF,
@@ -99,7 +100,11 @@ def prepareOtherDir(datadir, nodeId, conf_file='namecoin.conf'):
         fp.write('debug=1\n')
         fp.write('debugexclude=libevent\n')
 
+        fp.write('fallbackfee=0.01\n')
         fp.write('acceptnonstdtxn=0\n')
+
+        if conf_file == 'bitcoin.conf':
+            fp.write('wallet=wallet.dat\n')
 
 
 def prepareDir(datadir, nodeId, network_key, network_pubkey):
@@ -124,6 +129,8 @@ def prepareDir(datadir, nodeId, network_key, network_pubkey):
         fp.write('debug=1\n')
         fp.write('debugexclude=libevent\n')
         fp.write('zmqpubsmsg=tcp://127.0.0.1:' + str(BASE_ZMQ_PORT + nodeId) + '\n')
+        fp.write('wallet=wallet.dat\n')
+        fp.write('fallbackfee=0.01\n')
 
         fp.write('acceptnonstdtxn=0\n')
         fp.write('minstakeinterval=5\n')
@@ -262,13 +269,19 @@ class Test(unittest.TestCase):
         cls.swap_clients = []
         cls.http_threads = []
 
-        cls.daemons.append(startDaemon(os.path.join(cfg.TEST_DATADIRS, str(BTC_NODE)), cfg.BITCOIN_BINDIR, cfg.BITCOIND))
+        btc_data_dir = os.path.join(cfg.TEST_DATADIRS, str(BTC_NODE))
+        if os.path.exists(os.path.join(cfg.BITCOIN_BINDIR, 'bitcoin-wallet')):
+            callrpc_cli(cfg.BITCOIN_BINDIR, btc_data_dir, 'regtest', '-wallet=wallet.dat create', 'bitcoin-wallet')
+        cls.daemons.append(startDaemon(btc_data_dir, cfg.BITCOIN_BINDIR, cfg.BITCOIND))
         logging.info('Started %s %d', cfg.BITCOIND, cls.daemons[-1].pid)
         cls.daemons.append(startDaemon(os.path.join(cfg.TEST_DATADIRS, str(NMC_NODE)), cfg.NAMECOIN_BINDIR, cfg.NAMECOIND))
         logging.info('Started %s %d', cfg.NAMECOIND, cls.daemons[-1].pid)
 
         for i in range(NUM_NODES):
-            cls.daemons.append(startDaemon(os.path.join(cfg.TEST_DATADIRS, str(i)), cfg.PARTICL_BINDIR, cfg.PARTICLD))
+            data_dir = os.path.join(cfg.TEST_DATADIRS, str(i))
+            if os.path.exists(os.path.join(cfg.PARTICL_BINDIR, 'particl-wallet')):
+                callrpc_cli(cfg.PARTICL_BINDIR, data_dir, 'regtest', '-wallet=wallet.dat create', 'particl-wallet')
+            cls.daemons.append(startDaemon(data_dir, cfg.PARTICL_BINDIR, cfg.PARTICLD))
             logging.info('Started %s %d', cfg.PARTICLD, cls.daemons[-1].pid)
 
         for i in range(NUM_NODES):
@@ -361,11 +374,11 @@ class Test(unittest.TestCase):
 
         super(Test, cls).tearDownClass()
 
-    def test_02_part_ltc(self):
+    def test_02_part_nmc(self):
         logging.info('---------- Test PART to NMC')
         swap_clients = self.swap_clients
 
-        offer_id = swap_clients[0].postOffer(Coins.PART, Coins.NMC, 100 * COIN, 0.1 * COIN, 100 * COIN, SwapTypes.SELLER_FIRST, ABS_LOCK_TIME)
+        offer_id = swap_clients[0].postOffer(Coins.PART, Coins.NMC, 100 * COIN, 0.1 * COIN, 100 * COIN, SwapTypes.SELLER_FIRST, TxLockTypes.ABS_LOCK_TIME)
 
         wait_for_offer(delay_event, swap_clients[1], offer_id)
         offers = swap_clients[1].listOffers()
@@ -392,7 +405,7 @@ class Test(unittest.TestCase):
         logging.info('---------- Test NMC to PART')
         swap_clients = self.swap_clients
 
-        offer_id = swap_clients[1].postOffer(Coins.NMC, Coins.PART, 10 * COIN, 9.0 * COIN, 10 * COIN, SwapTypes.SELLER_FIRST, ABS_LOCK_TIME)
+        offer_id = swap_clients[1].postOffer(Coins.NMC, Coins.PART, 10 * COIN, 9.0 * COIN, 10 * COIN, SwapTypes.SELLER_FIRST, TxLockTypes.ABS_LOCK_TIME)
 
         wait_for_offer(delay_event, swap_clients[0], offer_id)
         offers = swap_clients[0].listOffers()
@@ -417,7 +430,7 @@ class Test(unittest.TestCase):
         logging.info('---------- Test NMC to BTC')
         swap_clients = self.swap_clients
 
-        offer_id = swap_clients[0].postOffer(Coins.NMC, Coins.BTC, 10 * COIN, 0.1 * COIN, 10 * COIN, SwapTypes.SELLER_FIRST, ABS_LOCK_TIME)
+        offer_id = swap_clients[0].postOffer(Coins.NMC, Coins.BTC, 10 * COIN, 0.1 * COIN, 10 * COIN, SwapTypes.SELLER_FIRST, TxLockTypes.ABS_LOCK_TIME)
 
         wait_for_offer(delay_event, swap_clients[1], offer_id)
         offers = swap_clients[1].listOffers()
@@ -447,7 +460,7 @@ class Test(unittest.TestCase):
         swap_clients = self.swap_clients
 
         offer_id = swap_clients[0].postOffer(Coins.NMC, Coins.BTC, 10 * COIN, 0.1 * COIN, 10 * COIN, SwapTypes.SELLER_FIRST,
-                                             ABS_LOCK_BLOCKS, 10)
+                                             TxLockTypes.ABS_LOCK_BLOCKS, 10)
 
         wait_for_offer(delay_event, swap_clients[1], offer_id)
         offers = swap_clients[1].listOffers()
@@ -473,7 +486,7 @@ class Test(unittest.TestCase):
 
         js_0_before = read_json_api(1800)
 
-        offer_id = swap_clients[0].postOffer(Coins.NMC, Coins.BTC, 10 * COIN, 10 * COIN, 10 * COIN, SwapTypes.SELLER_FIRST, ABS_LOCK_TIME)
+        offer_id = swap_clients[0].postOffer(Coins.NMC, Coins.BTC, 10 * COIN, 10 * COIN, 10 * COIN, SwapTypes.SELLER_FIRST, TxLockTypes.ABS_LOCK_TIME)
 
         wait_for_offer(delay_event, swap_clients[0], offer_id)
         offers = swap_clients[0].listOffers()
@@ -497,7 +510,7 @@ class Test(unittest.TestCase):
 
         js_0_before = read_json_api(1800)
 
-        offer_id = swap_clients[0].postOffer(Coins.NMC, Coins.BTC, 0.001 * COIN, 1.0 * COIN, 0.001 * COIN, SwapTypes.SELLER_FIRST, ABS_LOCK_TIME)
+        offer_id = swap_clients[0].postOffer(Coins.NMC, Coins.BTC, 0.001 * COIN, 1.0 * COIN, 0.001 * COIN, SwapTypes.SELLER_FIRST, TxLockTypes.ABS_LOCK_TIME)
 
         wait_for_offer(delay_event, swap_clients[0], offer_id)
         offers = swap_clients[0].listOffers()
@@ -507,9 +520,8 @@ class Test(unittest.TestCase):
 
         wait_for_bid(delay_event, swap_clients[0], bid_id)
         swap_clients[0].acceptBid(bid_id)
-        swap_clients[0].coin_clients[Coins.BTC]['override_feerate'] = 10.0
-        swap_clients[0].coin_clients[Coins.NMC]['override_feerate'] = 10.0
-
+        swap_clients[0].getChainClientSettings(Coins.BTC)['override_feerate'] = 10.0
+        swap_clients[0].getChainClientSettings(Coins.NMC)['override_feerate'] = 10.0
         wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.BID_ERROR, wait_for=60)
 
     def pass_99_delay(self):

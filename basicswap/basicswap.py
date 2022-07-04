@@ -1942,7 +1942,7 @@ class BasicSwap(BaseApp):
             refund_txn = self.createRefundTxn(coin_from, txn, offer, bid, script)
             bid.initiate_txn_refund = bytes.fromhex(refund_txn)
 
-            txid = self.submitTxn(coin_from, txn)
+            txid = ci_from.publishTx(bytes.fromhex(txn))
             self.log.debug('Submitted initiate txn %s to %s chain for bid %s', txid, ci_from.coin_name(), bid_id.hex())
             bid.initiate_tx = SwapTx(
                 bid_id=bid_id,
@@ -1955,7 +1955,7 @@ class BasicSwap(BaseApp):
 
             # Check non-bip68 final
             try:
-                txid = self.submitTxn(coin_from, bid.initiate_txn_refund.hex())
+                txid = ci_from.publishTx(bid.initiate_txn_refund)
                 self.log.error('Submit refund_txn unexpectedly worked: ' + txid)
             except Exception as ex:
                 if 'non-BIP68-final' not in str(ex) and 'non-final' not in str(ex):
@@ -2664,14 +2664,6 @@ class BasicSwap(BaseApp):
 
         return refund_txn
 
-    def submitTxn(self, coin_type, txn):
-        # self.log.debug('submitTxn %s', str(coin_type))
-        if txn is None:
-            return None
-        if self.coin_clients[coin_type]['connection_type'] != 'rpc':
-            return None
-        return self.callcoinrpc(coin_type, 'sendrawtransaction', [txn])
-
     def initiateTxnConfirmed(self, bid_id, bid, offer):
         self.log.debug('initiateTxnConfirmed for bid %s', bid_id.hex())
         bid.setState(BidStates.SWAP_INITIATED)
@@ -2693,7 +2685,7 @@ class BasicSwap(BaseApp):
 
                 coin_to = Coins(offer.coin_to)
                 txn = self.createParticipateTxn(bid_id, bid, offer, participate_script)
-                txid = self.submitTxn(coin_to, txn)
+                txid = self.ci(coin_to).publishTx(bytes.fromhex(txn))
                 self.log.debug('Submitted participate txn %s to %s chain for bid %s', txid, chainparams[coin_to]['name'], bid_id.hex())
                 bid.setPTxState(TxStates.TX_SENT)
         else:
@@ -2745,10 +2737,10 @@ class BasicSwap(BaseApp):
 
         # Seller redeems from participate txn
         if bid.was_received:
-            coin_to = Coins(offer.coin_to)
-            txn = self.createRedeemTxn(coin_to, bid)
-            txid = self.submitTxn(coin_to, txn)
-            self.log.debug('Submitted participate redeem txn %s to %s chain for bid %s', txid, chainparams[coin_to]['name'], bid_id.hex())
+            ci_to = self.ci(offer.coin_to)
+            txn = self.createRedeemTxn(ci_to.coin_type(), bid)
+            txid = ci_to.publishTx(bytes.fromhex(txn))
+            self.log.debug('Submitted participate redeem txn %s to %s chain for bid %s', txid, ci_to.coin_name(), bid_id.hex())
             # TX_REDEEMED will be set when spend is detected
             # TODO: Wait for depth?
 
@@ -3230,7 +3222,7 @@ class BasicSwap(BaseApp):
         if (bid.getITxState() == TxStates.TX_SENT or bid.getITxState() == TxStates.TX_CONFIRMED) \
            and bid.initiate_txn_refund is not None:
             try:
-                txid = self.submitTxn(coin_from, bid.initiate_txn_refund.hex())
+                txid = ci_from.publishTx(bid.initiate_txn_refund)
                 self.log.debug('Submitted initiate refund txn %s to %s chain for bid %s', txid, chainparams[coin_from]['name'], bid_id.hex())
                 # State will update when spend is detected
             except Exception as ex:
@@ -3240,7 +3232,7 @@ class BasicSwap(BaseApp):
         if (bid.getPTxState() == TxStates.TX_SENT or bid.getPTxState() == TxStates.TX_CONFIRMED) \
            and bid.participate_txn_refund is not None:
             try:
-                txid = self.submitTxn(coin_to, bid.participate_txn_refund.hex())
+                txid = ci_to.publishTx(bid.participate_txn_refund)
                 self.log.debug('Submitted participate refund txn %s to %s chain for bid %s', txid, chainparams[coin_to]['name'], bid_id.hex())
                 # State will update when spend is detected
             except Exception as ex:

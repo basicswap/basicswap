@@ -54,7 +54,7 @@ def redeemITx(self, bid_id, session):
     ci_from = self.ci(offer.coin_from)
 
     txn = self.createRedeemTxn(ci_from.coin_type(), bid, for_txn_type='initiate')
-    txid = self.submitTxn(ci_from.coin_type(), txn)
+    txid = ci_from.publishTx(bytes.fromhex(txn))
 
     bid.initiate_tx.spend_txid = bytes.fromhex(txid)
     self.log.debug('Submitted initiate redeem txn %s to %s chain for bid %s', txid, ci_from.coin_name(), bid_id.hex())

@@ -667,7 +667,7 @@ class PARTInterfaceAnon(PARTInterface):
                 wif_scan_key = toWIF(wif_prefix, kbv)
                 self.rpc_callback('importstealthaddress', [wif_scan_key, Kbs.hex()])
                 self._log.info('Imported watch-only sx_addr: {}'.format(sx_addr))
-                self._log.info('Rescanning chain from height: {}'.format(restore_height))
+                self._log.info('Rescanning {} chain from height: {}'.format(self.coin_name(), restore_height))
                 self.rpc_callback('rescanblockchain', [restore_height])
 
         params = [{'include_watchonly': True, 'search': sx_addr}]
@@ -700,7 +700,7 @@ class PARTInterfaceAnon(PARTInterface):
             wif_spend_key = toWIF(wif_prefix, kbs)
             self.rpc_callback('importstealthaddress', [wif_scan_key, wif_spend_key])
             self._log.info('Imported spend key for sx_addr: {}'.format(sx_addr))
-            self._log.info('Rescanning chain from height: {}'.format(restore_height))
+            self._log.info('Rescanning {} chain from height: {}'.format(self.coin_name(), restore_height))
             self.rpc_callback('rescanblockchain', [restore_height])
 
         autxos = self.rpc_callback('listunspentanon', [1, 9999999, [sx_addr]])
