@@ -5258,59 +5258,81 @@ class BasicSwap(BaseApp):
         }
         return rv
 
-    def getWalletInfo(self, coin):
-
+    def getBlockchainInfo(self, coin):
         ci = self.ci(coin)
-        blockchaininfo = ci.getBlockchainInfo()
-        walletinfo = ci.getWalletInfo()
 
-        scale = chainparams[coin]['decimal_places']
-        rv = {
-            'version': self.coin_clients[coin]['core_version'],
-            'deposit_address': self.getCachedAddressForCoin(coin),
-            'name': ci.coin_name(),
-            'blocks': blockchaininfo['blocks'],
-            'balance': format_amount(make_int(walletinfo['balance'], scale), scale),
-            'unconfirmed': format_amount(make_int(walletinfo.get('unconfirmed_balance'), scale), scale),
-            'synced': '{0:.2f}'.format(round(blockchaininfo['verificationprogress'], 2)),
-            'expected_seed': ci.knownWalletSeed(),
-        }
+        try:
+            blockchaininfo = ci.getBlockchainInfo()
 
-        if coin == Coins.PART:
-            rv['stealth_address'] = self.getCachedStealthAddressForCoin(Coins.PART)
-            rv['anon_balance'] = walletinfo['anon_balance']
-            rv['anon_pending'] = walletinfo['unconfirmed_anon'] + walletinfo['immature_anon_balance']
-            rv['blind_balance'] = walletinfo['blind_balance']
-            rv['blind_unconfirmed'] = walletinfo['unconfirmed_blind']
-        elif coin == Coins.XMR:
-            rv['main_address'] = self.getCachedMainWalletAddress(ci)
+            rv = {
+                'version': self.coin_clients[coin]['core_version'],
+                'name': ci.coin_name(),
+                'blocks': blockchaininfo['blocks'],
+                'synced': '{0:.2f}'.format(round(blockchaininfo['verificationprogress'], 2)),
+            }
 
-        return rv
+            return rv
+        except Exception as e:
+            self.log.warning('getWalletInfo failed with: %s', str(e))
 
-    def updateWalletInfo(self, coin):
-        wi = self.getWalletInfo(coin)
+    def getWalletInfo(self, coin):
+        ci = self.ci(coin)
 
-        # Store wallet info to db so it's available after startup
+        try:
+            walletinfo = ci.getWalletInfo()
+            scale = chainparams[coin]['decimal_places']
+            rv = {
+                'deposit_address': self.getCachedAddressForCoin(coin),
+                'balance': format_amount(make_int(walletinfo['balance'], scale), scale),
+                'unconfirmed': format_amount(make_int(walletinfo.get('unconfirmed_balance'), scale), scale),
+                'expected_seed': ci.knownWalletSeed(),
+            }
+
+            if coin == Coins.PART:
+                rv['stealth_address'] = self.getCachedStealthAddressForCoin(Coins.PART)
+                rv['anon_balance'] = walletinfo['anon_balance']
+                rv['anon_pending'] = walletinfo['unconfirmed_anon'] + walletinfo['immature_anon_balance']
+                rv['blind_balance'] = walletinfo['blind_balance']
+                rv['blind_unconfirmed'] = walletinfo['unconfirmed_blind']
+            elif coin == Coins.XMR:
+                rv['main_address'] = self.getCachedMainWalletAddress(ci)
+
+            return rv
+        except Exception as e:
+            self.log.warning('getWalletInfo failed with: %s', str(e))
+
+    def addWalletInfoRecord(self, coin, info_type, wi):
+        coin_id = int(coin)
         self.mxDB.acquire()
         try:
-            rv = []
             now = int(time.time())
             session = scoped_session(self.session_factory)
-
-            session.add(Wallets(coin_id=coin, wallet_data=json.dumps(wi), created_at=now))
-
-            coin_id = int(coin)
-            query_str = f'DELETE FROM wallets WHERE coin_id = {coin_id} AND record_id NOT IN (SELECT record_id FROM wallets WHERE coin_id = {coin_id} ORDER BY created_at DESC LIMIT 3 )'
+            session.add(Wallets(coin_id=coin, balance_type=info_type, wallet_data=json.dumps(wi), created_at=now))
+            query_str = f'DELETE FROM wallets WHERE (coin_id = {coin_id} AND balance_type = {info_type}) AND record_id NOT IN (SELECT record_id FROM wallets WHERE coin_id = {coin_id} AND balance_type = {info_type} ORDER BY created_at DESC LIMIT 3 )'
             session.execute(query_str)
             session.commit()
         except Exception as e:
-            self.log.error(f'updateWalletInfo {e}')
-
+            self.log.error(f'addWalletInfoRecord {e}')
         finally:
             session.close()
             session.remove()
-            self._updating_wallets_info[int(coin)] = False
             self.mxDB.release()
+
+    def updateWalletInfo(self, coin):
+        # Store wallet info to db so it's available after startup
+        try:
+            bi = self.getBlockchainInfo(coin)
+            if bi:
+                self.addWalletInfoRecord(coin, 0, bi)
+
+            # monero-wallet-rpc is slow/unresponsive while syncing
+            wi = self.getWalletInfo(coin)
+            if wi:
+                self.addWalletInfoRecord(coin, 1, wi)
+        except Exception as e:
+            self.log.error(f'updateWalletInfo {e}')
+        finally:
+            self._updating_wallets_info[int(coin)] = False
 
     def updateWalletsInfo(self, force_update=False, only_coin=None):
         now = int(time.time())
@@ -5335,6 +5357,7 @@ class BasicSwap(BaseApp):
             if self.coin_clients[c]['connection_type'] == 'rpc':
                 try:
                     rv[c] = self.getWalletInfo(c)
+                    rv[c].update(self.getBlockchainInfo(c))
                 except Exception as ex:
                     rv[c] = {'name': chainparams[c]['name'].capitalize(), 'error': str(ex)}
         return rv
@@ -5347,8 +5370,8 @@ class BasicSwap(BaseApp):
             where_str = ''
             if opts is not None and 'coin_id' in opts:
                 where_str = 'WHERE coin_id = {}'.format(opts['coin_id'])
-            inner_str = f'SELECT coin_id, MAX(created_at) as max_created_at FROM wallets {where_str} GROUP BY coin_id'
-            query_str = 'SELECT a.coin_id, wallet_data, created_at FROM wallets a, ({}) b WHERE a.coin_id = b.coin_id AND a.created_at = b.max_created_at'.format(inner_str)
+            inner_str = f'SELECT coin_id, balance_type, MAX(created_at) as max_created_at FROM wallets {where_str} GROUP BY coin_id, balance_type'
+            query_str = 'SELECT a.coin_id, a.balance_type, wallet_data, created_at FROM wallets a, ({}) b WHERE a.coin_id = b.coin_id AND a.balance_type = b.balance_type AND a.created_at = b.max_created_at'.format(inner_str)
 
             q = session.execute(query_str)
             for row in q:
@@ -5358,16 +5381,20 @@ class BasicSwap(BaseApp):
                     # Skip cached info if coin was disabled
                     continue
 
-                wallet_data = json.loads(row[1])
-                wallet_data['lastupdated'] = row[2]
-                wallet_data['updating'] = self._updating_wallets_info.get(coin_id, False)
+                wallet_data = json.loads(row[2])
+                if row[1] == 1:
+                    wallet_data['lastupdated'] = row[3]
+                    wallet_data['updating'] = self._updating_wallets_info.get(coin_id, False)
 
-                # Ensure the latest deposit address is displayed
-                q = session.execute('SELECT value FROM kv_string WHERE key = "receive_addr_{}"'.format(chainparams[coin_id]['name']))
-                for row in q:
-                    wallet_data['deposit_address'] = row[0]
+                    # Ensure the latest deposit address is displayed
+                    q = session.execute('SELECT value FROM kv_string WHERE key = "receive_addr_{}"'.format(chainparams[coin_id]['name']))
+                    for row in q:
+                        wallet_data['deposit_address'] = row[0]
 
-                rv[coin_id] = wallet_data
+                if coin_id in rv:
+                    rv[coin_id].update(wallet_data)
+                else:
+                    rv[coin_id] = wallet_data
         finally:
             session.close()
             session.remove()
@@ -5383,6 +5410,7 @@ class BasicSwap(BaseApp):
                 if coin_id not in rv:
                     rv[coin_id] = {
                         'name': chainparams[c]['name'].capitalize(),
+                        'no_data': True,
                         'updating': self._updating_wallets_info.get(coin_id, False),
                     }
 
@@ -5602,7 +5630,6 @@ class BasicSwap(BaseApp):
     def getAutomationStrategy(self, strategy_id):
         self.mxDB.acquire()
         try:
-            rv = []
             session = scoped_session(self.session_factory)
             return session.query(AutomationStrategy).filter_by(record_id=strategy_id).first()
         finally:
@@ -5613,7 +5640,6 @@ class BasicSwap(BaseApp):
     def getLinkedStrategy(self, linked_type, linked_id):
         self.mxDB.acquire()
         try:
-            rv = []
             session = scoped_session(self.session_factory)
             query_str = 'SELECT links.strategy_id, strats.label FROM automationlinks links' + \
                         ' LEFT JOIN automationstrategies strats ON strats.record_id = links.strategy_id' + \

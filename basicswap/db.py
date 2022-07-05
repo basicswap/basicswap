@@ -391,8 +391,6 @@ class Wallets(Base):
     wallet_name = sa.Column(sa.String)
     wallet_data = sa.Column(sa.String)
     balance_type = sa.Column(sa.Integer)
-    amount = sa.Column(sa.BigInteger)
-    updated_at = sa.Column(sa.BigInteger)
     created_at = sa.Column(sa.BigInteger)
 
 

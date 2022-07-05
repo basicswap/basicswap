@@ -102,9 +102,8 @@ def upgradeDatabase(self, db_version):
                     record_id INTEGER NOT NULL,
                     coin_id INTEGER,
                     wallet_name VARCHAR,
+                    wallet_data VARCHAR,
                     balance_type INTEGER,
-                    amount BIGINT,
-                    updated_at BIGINT,
                     created_at BIGINT,
                     PRIMARY KEY (record_id))''')
             db_version += 1
@@ -216,6 +215,7 @@ def upgradeDatabase(self, db_version):
             db_version += 1
             session.execute('ALTER TABLE xmr_swaps ADD COLUMN coin_a_lock_release_msg_id BLOB')
             session.execute('ALTER TABLE xmr_swaps RENAME COLUMN coin_a_lock_refund_spend_tx_msg_id TO coin_a_lock_spend_tx_msg_id')
+
         if current_version != db_version:
             self.db_version = db_version
             self.setIntKVInSession('db_version', db_version, session)

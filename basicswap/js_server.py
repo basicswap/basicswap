@@ -62,6 +62,7 @@ def withdraw_coin(swap_client, coin_type, post_string, is_json):
 
 
 def js_wallets(self, url_split, post_string, is_json):
+    swap_client = self.server.swap_client
     if len(url_split) > 3:
         ticker_str = url_split[3]
         coin_type = tickerToCoinId(ticker_str)
@@ -69,9 +70,11 @@ def js_wallets(self, url_split, post_string, is_json):
         if len(url_split) > 4:
             cmd = url_split[4]
             if cmd == 'withdraw':
-                return bytes(json.dumps(withdraw_coin(self.server.swap_client, coin_type, post_string, is_json)), 'UTF-8')
+                return bytes(json.dumps(withdraw_coin(swap_client, coin_type, post_string, is_json)), 'UTF-8')
             raise ValueError('Unknown command')
-        return bytes(json.dumps(self.server.swap_client.getWalletInfo(coin_type)), 'UTF-8')
+
+        rv = swap_client.getWalletInfo(coin_type).update(swap_client.getBlockchainInfo(coin_type))
+        return bytes(json.dumps(rv), 'UTF-8')
     return bytes(json.dumps(self.server.swap_client.getWalletsInfo()), 'UTF-8')
 
 

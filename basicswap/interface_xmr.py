@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2020-2021 tecnovert
+# Copyright (c) 2020-2022 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -117,22 +117,34 @@ class XMRInterface(CoinInterface):
         return self.rpc_wallet_cb('get_version')['version']
 
     def getBlockchainInfo(self):
-        rv = {}
+        get_height = self.rpc_cb2('get_height', timeout=30)
+        rv = {
+            'blocks': get_height['height'],
+            'verificationprogress': 0.0,
+        }
 
-        # get_block_count returns "Internal error" if bootstrap-daemon is active
-        # rv['blocks'] = self.rpc_cb('get_block_count')['count']
-        rv['blocks'] = self.rpc_cb2('get_height', timeout=30)['height']
+        try:
+            # get_block_count.block_count is how many blocks are in the longest chain known to the node.
+            # get_block_count returns "Internal error" if bootstrap-daemon is active
+            if get_height['untrusted'] is True:
+                rv['untrusted'] = True
+                get_info = self.rpc_cb2('get_info', timeout=30)
+                if 'height_without_bootstrap' in get_info:
+                    rv['blocks'] = get_info['height_without_bootstrap']
 
-        # sync_info = self.rpc_cb('sync_info', timeout=30)
-        # rv['verificationprogress'] = 0.0 if 'spans' in sync_info else 1.0
-        rv['verificationprogress'] = 0.0
+                rv['block_count'] = get_info['height']
+                if rv['block_count'] > rv['blocks']:
+                    rv['verificationprogress'] = rv['blocks'] / rv['block_count']
+            else:
+                rv['block_count'] = self.rpc_cb('get_block_count', timeout=30)['count']
+                rv['verificationprogress'] = rv['blocks'] / rv['block_count']
+        except Exception as e:
+            self._log.warning('XMR get_block_count failed with: %s', str(e))
+            rv['verificationprogress'] = 0.0
 
         return rv
 
     def getChainHeight(self):
-        # get_block_count returns "Internal error" if bootstrap-daemon is active
-        # return self.rpc_cb('get_info')['height']
-        # return self.rpc_cb('get_block_count')['count']
         return self.rpc_cb2('get_height', timeout=30)['height']
 
     def getWalletInfo(self):
