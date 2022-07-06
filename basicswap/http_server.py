@@ -189,11 +189,16 @@ class HttpHandler(BaseHTTPRequestHandler):
 
         result = None
         coin_type = -1
+        coin_id = -1
         messages = []
         form_data = self.checkForm(post_string, 'rpc', messages)
         if form_data:
             try:
-                coin_type = Coins(int(form_data[b'coin_type'][0]))
+                coin_id = int(form_data[b'coin_type'][0])
+                if coin_id in (-2, -3, -4):
+                    coin_type = Coins(Coins.XMR)
+                else:
+                    coin_type = Coins(coin_id)
             except Exception:
                 raise ValueError('Unknown Coin Type')
 
@@ -205,18 +210,37 @@ class HttpHandler(BaseHTTPRequestHandler):
                     arr = cmd.split(None, 1)
                     method = arr[0]
                     params = json.loads(arr[1]) if len(arr) > 1 else []
-                    result = json.dumps(ci.rpc_wallet_cb(method, params), indent=4)
+                    if coin_id == -4:
+                        rv = ci.rpc_wallet_cb(method, params)
+                    elif coin_id == -3:
+                        rv = ci.rpc_cb(method, params)
+                    elif coin_id == -2:
+                        if params == []:
+                            params = None
+                        rv = ci.rpc_cb2(method, params)
+                    else:
+                        raise ValueError('Unknown XMR RPC variant')
+                    result = json.dumps(rv, indent=4)
                 else:
                     result = cmd + '\n' + swap_client.callcoincli(coin_type, cmd)
             except Exception as ex:
                 result = str(ex)
+                if self.server.swap_client.debug is True:
+                    self.server.swap_client.log.error(traceback.format_exc())
 
         template = env.get_template('rpc.html')
+
+        coins = listAvailableCoins(swap_client, with_variants=False)
+        coins = [c for c in coins if c[0] != Coins.XMR]
+        coins.append((-2, 'Monero'))
+        coins.append((-3, 'Monero JSON'))
+        coins.append((-4, 'Monero Wallet'))
+
         return bytes(template.render(
             title=self.server.title,
             h2=self.server.title,
-            coins=listAvailableCoins(swap_client, with_variants=False),
-            coin_type=coin_type,
+            coins=coins,
+            coin_type=coin_id,
             result=result,
             messages=messages,
             form_id=os.urandom(8).hex(),
