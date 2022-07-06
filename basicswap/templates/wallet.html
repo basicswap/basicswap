@@ -34,8 +34,11 @@
 {% endif %}
 
 
-<tr><td>Blocks:</td><td>{{ w.blocks }}</td></tr>
+<tr><td>Blocks:</td><td>{{ w.blocks }} {% if w.known_block_count %} / {{ w.known_block_count }} {% endif %}</td></tr>
 <tr><td>Synced:</td><td>{{ w.synced }}</td></tr>
+{% if w.bootstrapping %}
+<tr><td>Bootstrapping:</td><td>{{ w.bootstrapping }}</td></tr>
+{% endif %}
 <tr><td>Expected Seed:</td><td>{{ w.expected_seed }}</td>{% if w.expected_seed != true %}<td><input type="submit" name="reseed_{{ w.cid }}" value="Reseed wallet" onclick="return confirmReseed();"></td>{% endif %}</tr>
 {% if w.cid == '1' %}
 <tr><td>Stealth Address</td><td colspan=2>{{ w.stealth_address }}</td></tr>

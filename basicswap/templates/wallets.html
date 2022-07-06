@@ -33,8 +33,11 @@
 {% endif %}
 
 
-<tr><td>Blocks:</td><td>{{ w.blocks }}</td></tr>
+<tr><td>Blocks:</td><td>{{ w.blocks }} {% if w.known_block_count %} / {{ w.known_block_count }} {% endif %}</td></tr>
 <tr><td>Synced:</td><td>{{ w.synced }}</td></tr>
+{% if w.bootstrapping %}
+<tr><td>Bootstrapping:</td><td>{{ w.bootstrapping }}</td></tr>
+{% endif %}
 <tr><td>Expected Seed:</td><td>{{ w.expected_seed }}</td></tr>
 <tr><td><a href="/wallet/{{ w.ticker }}">Manage</a></td></tr>
 </table>

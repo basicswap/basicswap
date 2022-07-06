@@ -73,7 +73,8 @@ def js_wallets(self, url_split, post_string, is_json):
                 return bytes(json.dumps(withdraw_coin(swap_client, coin_type, post_string, is_json)), 'UTF-8')
             raise ValueError('Unknown command')
 
-        rv = swap_client.getWalletInfo(coin_type).update(swap_client.getBlockchainInfo(coin_type))
+        rv = swap_client.getWalletInfo(coin_type)
+        rv.update(swap_client.getBlockchainInfo(coin_type))
         return bytes(json.dumps(rv), 'UTF-8')
     return bytes(json.dumps(self.server.swap_client.getWalletsInfo()), 'UTF-8')
 

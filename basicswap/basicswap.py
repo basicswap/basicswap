@@ -5271,6 +5271,11 @@ class BasicSwap(BaseApp):
                 'synced': '{0:.2f}'.format(round(blockchaininfo['verificationprogress'], 2)),
             }
 
+            if 'known_block_count' in blockchaininfo:
+                rv['known_block_count'] = blockchaininfo['known_block_count']
+            if 'bootstrapping' in blockchaininfo:
+                rv['bootstrapping'] = blockchaininfo['bootstrapping']
+
             return rv
         except Exception as e:
             self.log.warning('getWalletInfo failed with: %s', str(e))

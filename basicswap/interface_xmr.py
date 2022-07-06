@@ -127,17 +127,17 @@ class XMRInterface(CoinInterface):
             # get_block_count.block_count is how many blocks are in the longest chain known to the node.
             # get_block_count returns "Internal error" if bootstrap-daemon is active
             if get_height['untrusted'] is True:
-                rv['untrusted'] = True
+                rv['bootstrapping'] = True
                 get_info = self.rpc_cb2('get_info', timeout=30)
                 if 'height_without_bootstrap' in get_info:
                     rv['blocks'] = get_info['height_without_bootstrap']
 
-                rv['block_count'] = get_info['height']
-                if rv['block_count'] > rv['blocks']:
-                    rv['verificationprogress'] = rv['blocks'] / rv['block_count']
+                rv['known_block_count'] = get_info['height']
+                if rv['known_block_count'] > rv['blocks']:
+                    rv['verificationprogress'] = rv['blocks'] / rv['known_block_count']
             else:
-                rv['block_count'] = self.rpc_cb('get_block_count', timeout=30)['count']
-                rv['verificationprogress'] = rv['blocks'] / rv['block_count']
+                rv['known_block_count'] = self.rpc_cb('get_block_count', timeout=30)['count']
+                rv['verificationprogress'] = rv['blocks'] / rv['known_block_count']
         except Exception as e:
             self._log.warning('XMR get_block_count failed with: %s', str(e))
             rv['verificationprogress'] = 0.0
