@@ -1229,8 +1229,9 @@ def main():
         for d in daemons:
             finalise_daemon(d)
 
-    logger.info('IMPORTANT - Save your particl wallet recovery phrase:\n{}\n'.format(particl_wallet_mnemonic))
-    logger.info('Done.')
+    # Print directly to stdout for tests
+    print('IMPORTANT - Save your particl wallet recovery phrase:\n{}\n'.format(particl_wallet_mnemonic))
+    print('Done.')
 
 
 if __name__ == '__main__':

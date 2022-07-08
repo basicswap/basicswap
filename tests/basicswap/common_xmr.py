@@ -14,6 +14,7 @@ import logging
 import unittest
 import threading
 import multiprocessing
+from io import StringIO
 from urllib.request import urlopen
 from unittest.mock import patch
 
@@ -57,6 +58,72 @@ def updateThread(xmr_addr, delay_event):
         delay_event.wait(2)
 
 
+def run_prepare(port_offset, datadir_path, bins_path, mnemonic_in=None, num_nodes=3):
+    config_path = os.path.join(datadir_path, cfg.CONFIG_FILENAME)
+
+    testargs = [
+        'basicswap-prepare',
+        f'-datadir="{datadir_path}"',
+        f'-bindir="{bins_path}"',
+        f'-portoffset={port_offset}',
+        '-regtest',
+        '-withcoin=monero',
+        '-noextractover',
+        '-xmrrestoreheight=0']
+    if mnemonic_in:
+        testargs.append(f'-particl_mnemonic="{mnemonic_in}"')
+    with patch.object(sys, 'argv', testargs), patch('sys.stdout', new=StringIO()) as mocked_stdout:
+        prepareSystem.main()
+        lines = mocked_stdout.getvalue().split('\n')
+        mnemonic_out = lines[-4]
+
+    with open(os.path.join(datadir_path, 'particl', 'particl.conf'), 'r') as fp:
+        lines = fp.readlines()
+    with open(os.path.join(datadir_path, 'particl', 'particl.conf'), 'w') as fp:
+        for line in lines:
+            if not line.startswith('staking'):
+                fp.write(line)
+        fp.write('port={}\n'.format(PARTICL_PORT_BASE + port_offset))
+        fp.write('bind=127.0.0.1\n')
+        fp.write('dnsseed=0\n')
+        fp.write('discover=0\n')
+        fp.write('listenonion=0\n')
+        fp.write('upnp=0\n')
+        fp.write('minstakeinterval=5\n')
+        fp.write('smsgsregtestadjust=0\n')
+        for ip in range(num_nodes):
+            if ip != port_offset:
+                fp.write('connect=127.0.0.1:{}\n'.format(PARTICL_PORT_BASE + ip))
+
+    with open(os.path.join(datadir_path, 'monero', 'monerod.conf'), 'a') as fp:
+        fp.write('p2p-bind-ip=127.0.0.1\n')
+        fp.write('p2p-bind-port={}\n'.format(XMR_BASE_P2P_PORT + port_offset))
+        for ip in range(num_nodes):
+            if ip != port_offset:
+                fp.write('add-exclusive-node=127.0.0.1:{}\n'.format(XMR_BASE_P2P_PORT + ip))
+
+    with open(config_path) as fs:
+        settings = json.load(fs)
+
+    settings['min_delay_event'] = 1
+    settings['max_delay_event'] = 4
+    settings['min_delay_event_short'] = 1
+    settings['max_delay_event_short'] = 4
+    settings['min_delay_retry'] = 10
+    settings['max_delay_retry'] = 20
+
+    settings['check_progress_seconds'] = 5
+    settings['check_watched_seconds'] = 5
+    settings['check_expired_seconds'] = 60
+    settings['check_events_seconds'] = 5
+    settings['check_xmr_swaps_seconds'] = 5
+
+    with open(config_path, 'w') as fp:
+        json.dump(settings, fp, indent=4)
+
+    return mnemonic_out
+
+
 class XmrTestBase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -66,69 +133,15 @@ class XmrTestBase(unittest.TestCase):
         cls.update_thread = None
         cls.processes = []
 
+        bins_path = os.path.join(test_path, 'bin')
         for i in range(3):
             client_path = os.path.join(test_path, 'client{}'.format(i))
-            config_path = os.path.join(client_path, cfg.CONFIG_FILENAME)
             try:
                 shutil.rmtree(client_path)
             except Exception as ex:
                 logging.warning('setUpClass %s', str(ex))
-            testargs = [
-                'basicswap-prepare',
-                '-datadir="{}"'.format(client_path),
-                '-bindir="{}"'.format(os.path.join(test_path, 'bin')),
-                '-portoffset={}'.format(i),
-                '-particl_mnemonic="{}"'.format(mnemonics[i]),
-                '-regtest',
-                '-withcoin=monero',
-                '-noextractover',
-                '-xmrrestoreheight=0']
-            with patch.object(sys, 'argv', testargs):
-                prepareSystem.main()
 
-            with open(os.path.join(client_path, 'particl', 'particl.conf'), 'r') as fp:
-                lines = fp.readlines()
-            with open(os.path.join(client_path, 'particl', 'particl.conf'), 'w') as fp:
-                for line in lines:
-                    if not line.startswith('staking'):
-                        fp.write(line)
-                fp.write('port={}\n'.format(PARTICL_PORT_BASE + i))
-                fp.write('bind=127.0.0.1\n')
-                fp.write('dnsseed=0\n')
-                fp.write('discover=0\n')
-                fp.write('listenonion=0\n')
-                fp.write('upnp=0\n')
-                fp.write('minstakeinterval=5\n')
-                fp.write('smsgsregtestadjust=0\n')
-                for ip in range(3):
-                    if ip != i:
-                        fp.write('connect=127.0.0.1:{}\n'.format(PARTICL_PORT_BASE + ip))
-
-            with open(os.path.join(client_path, 'monero', 'monerod.conf'), 'a') as fp:
-                fp.write('p2p-bind-ip=127.0.0.1\n')
-                fp.write('p2p-bind-port={}\n'.format(XMR_BASE_P2P_PORT + i))
-                for ip in range(3):
-                    if ip != i:
-                        fp.write('add-exclusive-node=127.0.0.1:{}\n'.format(XMR_BASE_P2P_PORT + ip))
-
-            with open(config_path) as fs:
-                settings = json.load(fs)
-
-            settings['min_delay_event'] = 1
-            settings['max_delay_event'] = 4
-            settings['min_delay_event_short'] = 1
-            settings['max_delay_event_short'] = 4
-            settings['min_delay_retry'] = 10
-            settings['max_delay_retry'] = 20
-
-            settings['check_progress_seconds'] = 5
-            settings['check_watched_seconds'] = 5
-            settings['check_expired_seconds'] = 60
-            settings['check_events_seconds'] = 5
-            settings['check_xmr_swaps_seconds'] = 5
-
-            with open(config_path, 'w') as fp:
-                json.dump(settings, fp, indent=4)
+            run_prepare(i, client_path, bins_path, mnemonics[i])
 
         signal.signal(signal.SIGINT, lambda signal, frame: cls.signal_handler(cls, signal, frame))
 
