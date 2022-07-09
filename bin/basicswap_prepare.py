@@ -24,10 +24,6 @@ import urllib.parse
 from urllib.request import urlretrieve
 
 import basicswap.config as cfg
-from basicswap.rpc import (
-    callrpc_cli,
-    waitForRPC,
-)
 from basicswap.base import getaddrinfo_tor
 from basicswap.basicswap import BasicSwap
 from basicswap.chainparams import Coins
@@ -586,12 +582,6 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
 
         with tarfile.open(sync_file_path) as ft:
             ft.extractall(path=data_dir)
-        # Create the wallet later, no option to set bestblock through wallet_util
-    else:
-        wallet_util = coin + '-wallet'
-        if os.path.exists(os.path.join(bin_dir, wallet_util)):
-            logger.info('Creating wallet.dat for {}.'.format(wallet_util.capitalize()))
-            callrpc_cli(bin_dir, data_dir, chain, '-wallet=wallet.dat create', wallet_util)
 
 
 def write_torrc(data_dir, tor_control_password):
@@ -702,20 +692,6 @@ def modify_tor_config(settings, coin, tor_control_password=None, enable=False):
             writeTorSettings(fp, coin, coin_settings, tor_control_password)
 
 
-def make_rpc_func(bin_dir, data_dir, chain, cli_binary=cfg.PARTICL_CLI):
-    bin_dir = bin_dir
-    data_dir = data_dir
-    chain = chain
-
-    def rpc_func(cmd):
-        nonlocal bin_dir
-        nonlocal data_dir
-        nonlocal chain
-
-        return callrpc_cli(bin_dir, data_dir, chain, cmd, cli_binary)
-    return rpc_func
-
-
 def exitWithError(error_msg):
     sys.stderr.write('Error: {}, exiting.\n'.format(error_msg))
     sys.exit(1)
@@ -768,6 +744,67 @@ def finalise_daemon(d):
     for fp in (d.stdout, d.stderr, d.stdin):
         if fp:
             fp.close()
+
+
+def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, chain, use_tor_proxy):
+    daemons = []
+    daemon_args = ['-noconnect', '-nodnsseed']
+    if not use_tor_proxy:
+        # Cannot set -bind or -whitebind together with -listen=0
+        daemon_args.append('-nolisten')
+    try:
+        with open(os.path.join(data_dir, 'basicswap.log'), 'a') as fp:
+            swap_client = BasicSwap(fp, data_dir, settings, chain)
+
+            start_daemons = with_coins
+            if 'particl' not in with_coins:
+                # Particl must be running to initialise a wallet in addcoin mode
+                start_daemons.append('particl')
+
+            for coin_name in start_daemons:
+                coin_settings = settings['chainclients'][coin_name]
+                c = swap_client.getCoinIdFromName(coin_name)
+                swap_client.setCoinConnectParams(c)
+
+                if c == Coins.XMR:
+                    if coin_settings['manage_wallet_daemon']:
+                        daemons.append(startXmrWalletDaemon(coin_settings['datadir'], coin_settings['bindir'], 'monero-wallet-rpc'))
+                else:
+                    if coin_settings['manage_daemon']:
+                        filename = coin_name + 'd' + ('.exe' if os.name == 'nt' else '')
+                        coin_args = ['-nofindpeers', '-nostaking'] if c == Coins.PART else []
+                        daemons.append(startDaemon(coin_settings['datadir'], coin_settings['bindir'], filename, daemon_args + coin_args))
+                        swap_client.setDaemonPID(c, daemons[-1].pid)
+                swap_client.setCoinRunParams(c)
+                swap_client.createCoinInterface(c)
+
+                if c in (Coins.PART, Coins.BTC, Coins.LTC):
+                    swap_client.waitForDaemonRPC(c, with_wallet=False)
+                    # Create wallet if it doesn't exist yet
+                    wallets = swap_client.callcoinrpc(c, 'listwallets')
+                    if 'wallet.dat' not in wallets:
+                        logger.info('Creating wallet.dat for {}.'.format(coin_name.capitalize()))
+                        swap_client.callcoinrpc(c, 'createwallet', ['wallet.dat'])
+
+            if 'particl' in with_coins:
+                logger.info('Loading Particl mnemonic')
+                if particl_wallet_mnemonic is None:
+                    particl_wallet_mnemonic = swap_client.callcoinrpc(Coins.PART, 'mnemonic', ['new'])['mnemonic']
+                swap_client.callcoinrpc(Coins.PART, 'extkeyimportmaster', [particl_wallet_mnemonic])
+
+            for coin_name in with_coins:
+                c = swap_client.getCoinIdFromName(coin_name)
+                if c == Coins.PART:
+                    continue
+                swap_client.waitForDaemonRPC(c)
+                swap_client.initialiseWallet(c)
+
+            swap_client.finalise()
+            del swap_client
+    finally:
+        for d in daemons:
+            finalise_daemon(d)
+    return particl_wallet_mnemonic
 
 
 def main():
@@ -1095,21 +1132,7 @@ def main():
 
         if not prepare_bin_only:
             prepareDataDir(add_coin, settings, chain, particl_wallet_mnemonic, extra_opts)
-
-            if use_btc_fastsync and add_coin == 'bitcoin':
-                # Need to create wallet file through daemon
-                logger.info('Creating wallet.dat for {}.'.format(add_coin.capitalize()))
-                bitcoin_settings = settings['chainclients']['bitcoin']
-                try:
-                    btcRpc = make_rpc_func(bitcoin_settings['bindir'], bitcoin_settings['datadir'], chain, cli_binary=cfg.BITCOIN_CLI)
-                    filename = 'bitcoind' + ('.exe' if os.name == 'nt' else '')
-                    daemon_args = ['-noconnect', '-nodnsseed', '-nolisten']
-                    btcd = startDaemon(bitcoin_settings['datadir'], bitcoin_settings['bindir'], filename, daemon_args)
-                    waitForRPC(btcRpc, expect_wallet=False, max_tries=12)
-                    btcRpc('createwallet wallet.dat')
-                    logger.info('createwallet succeeded.')
-                finally:
-                    finalise_daemon(btcd)
+            initialise_wallets(None, [add_coin, ], data_dir, settings, chain, use_tor_proxy)
 
             with open(config_path, 'w') as fp:
                 json.dump(settings, fp, indent=4)
@@ -1166,71 +1189,10 @@ def main():
         logger.info('Done.')
         return 0
 
-    logger.info('Loading Particl mnemonic')
-
-    particl_settings = settings['chainclients']['particl']
-    partRpc = make_rpc_func(particl_settings['bindir'], particl_settings['datadir'], chain)
-
-    daemons = []
-    daemon_args = ['-noconnect', '-nodnsseed']
-    if not use_tor_proxy:
-        # Cannot set -bind or -whitebind together with -listen=0
-        daemon_args.append('-nolisten')
-    daemons.append(startDaemon(particl_settings['datadir'], particl_settings['bindir'], cfg.PARTICLD, daemon_args + ['-nofindpeers', '-nostaking']))
-    try:
-        waitForRPC(partRpc)
-
-        if particl_wallet_mnemonic is None:
-            particl_wallet_mnemonic = partRpc('mnemonic new')['mnemonic']
-        partRpc('extkeyimportmaster "{}"'.format(particl_wallet_mnemonic))
-
-        # Initialise wallets
-        with open(os.path.join(data_dir, 'basicswap.log'), 'a') as fp:
-            swap_client = BasicSwap(fp, data_dir, settings, chain)
-
-            swap_client.setCoinConnectParams(Coins.PART)
-            swap_client.setDaemonPID(Coins.PART, daemons[-1].pid)
-            swap_client.setCoinRunParams(Coins.PART)
-            swap_client.createCoinInterface(Coins.PART)
-
-            for coin_name in with_coins:
-                coin_settings = settings['chainclients'][coin_name]
-                c = swap_client.getCoinIdFromName(coin_name)
-                if c == Coins.PART:
-                    continue
-
-                swap_client.setCoinConnectParams(c)
-
-                if c == Coins.XMR:
-                    if not coin_settings['manage_wallet_daemon']:
-                        continue
-                    daemons.append(startXmrWalletDaemon(coin_settings['datadir'], coin_settings['bindir'], 'monero-wallet-rpc'))
-                else:
-                    if not coin_settings['manage_daemon']:
-                        continue
-                    filename = coin_name + 'd' + ('.exe' if os.name == 'nt' else '')
-                    daemons.append(startDaemon(coin_settings['datadir'], coin_settings['bindir'], filename, daemon_args))
-                swap_client.setDaemonPID(c, daemons[-1].pid)
-                swap_client.setCoinRunParams(c)
-                swap_client.createCoinInterface(c)
-
-                # Create wallet if it doesn't exist yet
-                if c == Coins.BTC:
-                    swap_client.waitForDaemonRPC(c, with_wallet=False)
-                    wallets = swap_client.callcoinrpc(c, 'listwallets')
-                    if 'wallet.dat' not in wallets:
-                        swap_client.callcoinrpc(c, 'createwallet', ['wallet.dat'])
-
-                swap_client.waitForDaemonRPC(c)
-                swap_client.initialiseWallet(c)
-            swap_client.finalise()
-            del swap_client
-    finally:
-        for d in daemons:
-            finalise_daemon(d)
-
-    # Print directly to stdout for tests
-    print('IMPORTANT - Save your particl wallet recovery phrase:\n{}\n'.format(particl_wallet_mnemonic))
+    particl_wallet_mnemonic = initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, chain, use_tor_proxy)
+    if particl_wallet_mnemonic:
+        # Print directly to stdout for tests
+        print('IMPORTANT - Save your particl wallet recovery phrase:\n{}\n'.format(particl_wallet_mnemonic))
     print('Done.')
 
 

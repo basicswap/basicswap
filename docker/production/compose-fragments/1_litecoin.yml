@@ -1,0 +1,14 @@
+    litecoin_core:
+        image: i_litecoin
+        build:
+            context: litecoin
+            dockerfile: Dockerfile
+        container_name: litecoin_core
+        volumes:
+            - ${DATA_PATH}/litecoin:/data
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "3"
+        restart: unless-stopped

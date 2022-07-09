@@ -1,0 +1,16 @@
+    monero_wallet:
+        image: i_monero_wallet
+        build:
+            context: monero_wallet
+            dockerfile: Dockerfile
+        container_name: monero_wallet
+        volumes:
+            - ${DATA_PATH}/monero_wallet:/data
+        expose:
+            - 8332
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "3"
+        restart: unless-stopped

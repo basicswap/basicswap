@@ -1,0 +1,25 @@
+version: '3.3'
+
+networks:
+    default:
+        external:
+            name: coinswap_network
+services:
+    particl_core:
+        image: i_particl
+        build:
+            context: particl
+            dockerfile: Dockerfile
+        container_name: particl_core
+        volumes:
+            - ${DATA_PATH}/particl:/data
+        #ports:
+        #    - "51738:51738"
+        expose:
+            - 51735
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "3"
+        restart: unless-stopped
