@@ -6,10 +6,8 @@
         container_name: bitcoin_core
         volumes:
             - ${DATA_PATH}/bitcoin:/data
-        #ports:
-        #    - "8333:8333"
         expose:
-            - 8332
+            - ${BTC_RPC_PORT}
         logging:
             driver: "json-file"
             options:

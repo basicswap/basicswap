@@ -118,10 +118,12 @@ class BaseApp:
         return bytes(segwit_addr.decode(chainparams[coin_type][self.chain]['hrp'], addr)[1])
 
     def callrpc(self, method, params=[], wallet=None):
-        return callrpc(self.coin_clients[Coins.PART]['rpcport'], self.coin_clients[Coins.PART]['rpcauth'], method, params, wallet)
+        cc = self.coin_clients[Coins.PART]
+        return callrpc(cc['rpcport'], cc['rpcauth'], method, params, wallet, cc['rpchost'])
 
     def callcoinrpc(self, coin, method, params=[], wallet=None):
-        return callrpc(self.coin_clients[coin]['rpcport'], self.coin_clients[coin]['rpcauth'], method, params, wallet)
+        cc = self.coin_clients[coin]
+        return callrpc(cc['rpcport'], cc['rpcauth'], method, params, wallet, cc['rpchost'])
 
     def calltx(self, cmd):
         bindir = self.coin_clients[Coins.PART]['bindir']

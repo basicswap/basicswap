@@ -216,7 +216,7 @@ def printHelp():
     logger.info('Usage: basicswap-run ')
     logger.info('\n--help, -h               Print help.')
     logger.info('--version, -v            Print version.')
-    logger.info('--datadir=PATH           Path to basicswap data directory, default:{}.'.format(cfg.DEFAULT_DATADIR))
+    logger.info('--datadir=PATH           Path to basicswap data directory, default:{}.'.format(cfg.BASICSWAP_DATADIR))
     logger.info('--mainnet                Run in mainnet mode.')
     logger.info('--testnet                Run in testnet mode.')
     logger.info('--regtest                Run in regtest mode.')
@@ -260,7 +260,7 @@ def main():
         logger.warning('Unknown argument %s', v)
 
     if data_dir is None:
-        data_dir = os.path.join(os.path.expanduser(cfg.DEFAULT_DATADIR))
+        data_dir = os.path.join(os.path.expanduser(cfg.BASICSWAP_DATADIR))
     logger.info('Using datadir: %s', data_dir)
     logger.info('Chain: %s', chain)
 

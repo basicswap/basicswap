@@ -13,5 +13,4 @@ VOLUME $MONERO_DATA
 COPY entrypoint.sh /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
 
-EXPOSE 18080
-CMD ["monero-wallet-rpc", "--non-interactive", "--config-file=/data/monero_wallet.conf"]
+CMD ["/monero/monero-wallet-rpc", "--non-interactive", "--config-file=/data/monero_wallet.conf", "--confirm-external-bind"]

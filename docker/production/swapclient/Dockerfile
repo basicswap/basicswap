@@ -12,7 +12,7 @@ RUN wget -O protobuf_src.tar.gz https://github.com/protocolbuffers/protobuf/rele
     tar xvf protobuf_src.tar.gz && \
     cd protobuf-3.21.1 && \
     ./configure --prefix=/usr && \
-    make install && \
+    make -j$(nproc) install && \
     ldconfig
 
 ARG COINCURVE_VERSION=v0.1

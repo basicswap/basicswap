@@ -2,8 +2,7 @@ version: '3.3'
 
 networks:
     default:
-        external:
-            name: coinswap_network
+        name: coinswap_network
 services:
     particl_core:
         image: i_particl
@@ -13,10 +12,9 @@ services:
         container_name: particl_core
         volumes:
             - ${DATA_PATH}/particl:/data
-        #ports:
-        #    - "51738:51738"
         expose:
-            - 51735
+            - ${PART_RPC_PORT}
+            - ${PART_ZMQ_PORT}
         logging:
             driver: "json-file"
             options:

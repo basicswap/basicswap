@@ -6,10 +6,8 @@
         container_name: monero_daemon
         volumes:
             - ${DATA_PATH}/monero_daemon:/data
-        #ports:
-        #    - "18080:18080"
         expose:
-            - 8332
+            - ${BASE_XMR_RPC_PORT}
         logging:
             driver: "json-file"
             options:

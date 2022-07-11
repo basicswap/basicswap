@@ -67,7 +67,7 @@ class XMRInterface(CoinInterface):
         super().__init__(network)
         self.rpc_cb = make_xmr_rpc_func(coin_settings['rpcport'], host=coin_settings.get('rpchost', '127.0.0.1'))
         self.rpc_cb2 = make_xmr_rpc2_func(coin_settings['rpcport'], host=coin_settings.get('rpchost', '127.0.0.1'))  # non-json endpoint
-        self.rpc_wallet_cb = make_xmr_wallet_rpc_func(coin_settings['walletrpcport'], coin_settings['walletrpcauth'])
+        self.rpc_wallet_cb = make_xmr_wallet_rpc_func(coin_settings['walletrpcport'], coin_settings['walletrpcauth'], host=coin_settings.get('walletrpchost', '127.0.0.1'))
 
         self.blocks_confirmed = coin_settings['blocks_confirmed']
         self._restore_height = coin_settings.get('restore_height', 0)

@@ -6,6 +6,8 @@
         container_name: litecoin_core
         volumes:
             - ${DATA_PATH}/litecoin:/data
+        expose:
+            - ${LTC_RPC_PORT}
         logging:
             driver: "json-file"
             options:

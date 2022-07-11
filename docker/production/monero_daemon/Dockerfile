@@ -21,5 +21,4 @@ VOLUME $MONERO_DATA
 COPY entrypoint.sh /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
 
-EXPOSE 18080
-CMD ["monerod", "--non-interactive", "--config-file=/home/monero/.monero/monerod.conf"]
+CMD ["/monero/monerod", "--non-interactive", "--config-file=/home/monero/.monero/monerod.conf", "--confirm-external-bind"]

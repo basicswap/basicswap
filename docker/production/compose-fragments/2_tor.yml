@@ -1,0 +1,16 @@
+    tor:
+        image: i_tor
+        container_name: tor
+        build:
+            context: ./tor
+        volumes:
+            - ${DATA_PATH}/tor/data:/var/lib/tor/
+            - ${DATA_PATH}/tor/torrc:/etc/tor/torrc
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "5"
+        networks:
+            tor_net:
+                coinswap_network: 172.16.238.200

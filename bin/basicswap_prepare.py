@@ -87,7 +87,7 @@ XMR_WALLET_RPC_USER = os.getenv('XMR_WALLET_RPC_USER', 'xmr_wallet_user')
 XMR_WALLET_RPC_PWD = os.getenv('XMR_WALLET_RPC_PWD', 'xmr_wallet_pwd')
 XMR_SITE_COMMIT = 'abcf12c4ccac3e48bb4ff178f18bb8a95d94b029'  # Lock hashes.txt to monero version
 
-DEFAULT_XMR_RESTORE_HEIGHT = 2245107
+DEFAULT_XMR_RESTORE_HEIGHT = int(os.getenv('DEFAULT_XMR_RESTORE_HEIGHT', 2245107))
 
 UI_HTML_PORT = int(os.getenv('UI_HTML_PORT', 12700))
 PART_ZMQ_PORT = int(os.getenv('PART_ZMQ_PORT', 20792))
@@ -124,6 +124,7 @@ TEST_ONION_LINK = toBool(os.getenv('TEST_ONION_LINK', 'false'))
 
 BITCOIN_FASTSYNC_URL = os.getenv('BITCOIN_FASTSYNC_URL', 'http://utxosets.blob.core.windows.net/public/')
 BITCOIN_FASTSYNC_FILE = os.getenv('BITCOIN_FASTSYNC_FILE', 'utxo-snapshot-bitcoin-mainnet-720179.tar')
+
 
 use_tor_proxy = False
 
@@ -461,7 +462,11 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
                 fp.write('restricted-rpc=1\n')
             if chain == 'testnet':
                 fp.write('testnet=1\n')
-            fp.write('data-dir={}\n'.format(data_dir))
+            config_datadir = data_dir
+            if core_settings['manage_daemon'] is False:
+                # Assume conf file is for isolated coin docker setup
+                config_datadir = '/data'
+            fp.write(f'data-dir={config_datadir}\n')
             fp.write('rpc-bind-port={}\n'.format(core_settings['rpcport']))
             fp.write('rpc-bind-ip={}\n'.format(COINS_RPCBIND_IP))
             fp.write('zmq-rpc-bind-port={}\n'.format(core_settings['zmqport']))
@@ -487,9 +492,13 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
             fp.write('no-dns=1\n')
             fp.write('rpc-bind-port={}\n'.format(core_settings['walletrpcport']))
             fp.write('rpc-bind-ip={}\n'.format(COINS_RPCBIND_IP))
-            fp.write('wallet-dir={}\n'.format(os.path.join(data_dir, 'wallets')))
-            fp.write('log-file={}\n'.format(os.path.join(data_dir, 'wallet.log')))
-            fp.write('shared-ringdb-dir={}\n'.format(os.path.join(data_dir, 'shared-ringdb')))
+            config_datadir = os.path.join(data_dir, 'wallets')
+            if core_settings['manage_wallet_daemon'] is False:
+                # Assume conf file is for isolated coin docker setup
+                config_datadir = '/data'
+            fp.write(f'wallet-dir={config_datadir}\n')
+            fp.write('log-file={}\n'.format(os.path.join(config_datadir, 'wallet.log')))
+            fp.write('shared-ringdb-dir={}\n'.format(os.path.join(config_datadir, 'shared-ringdb')))
             fp.write('rpc-login={}:{}\n'.format(core_settings['walletrpcuser'], core_settings['walletrpcpassword']))
 
             if tor_control_password is not None:
@@ -532,7 +541,7 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
             fp.write('staking=0\n')
             if PART_RPC_USER != '':
                 fp.write('rpcauth={}:{}${}\n'.format(PART_RPC_USER, salt, password_to_hmac(salt, PART_RPC_PWD)))
-            if particl_mnemonic == 'none':
+            if particl_mnemonic == 'auto':
                 fp.write('createdefaultmasterkey=1')
         elif coin == 'litecoin':
             fp.write('prune=4000\n')
@@ -710,13 +719,14 @@ def printHelp():
     logger.info('Usage: basicswap-prepare ')
     logger.info('\n--help, -h               Print help.')
     logger.info('--version, -v            Print version.')
-    logger.info('--datadir=PATH           Path to basicswap data directory, default:{}.'.format(cfg.DEFAULT_DATADIR))
+    logger.info('--datadir=PATH           Path to basicswap data directory, default:{}.'.format(cfg.BASICSWAP_DATADIR))
     logger.info('--bindir=PATH            Path to cores directory, default:datadir/bin.')
     logger.info('--mainnet                Run in mainnet mode.')
     logger.info('--testnet                Run in testnet mode.')
     logger.info('--regtest                Run in regtest mode.')
     logger.info('--particl_mnemonic=      Recovery phrase to use for the Particl wallet, default is randomly generated,\n'
-                + '                         "none" to set autogenerate account mode.')
+                + '                         "auto" to create a wallet automatically - No mnemonic.'
+                + '                         "none" to disable wallet initialisation.')
     logger.info('--withcoin=              Prepare system to run daemon for coin.')
     logger.info('--withoutcoin=           Do not prepare system to run daemon for coin.')
     logger.info('--addcoin=               Add coin to existing setup.')
@@ -733,6 +743,7 @@ def printHelp():
     logger.info('--disabletor             Setup Basicswap instance to not use TOR.')
     logger.info('--usebtcfastsync         Initialise the BTC chain with a snapshot from btcpayserver FastSync.\n'
                 + '                         See https://github.com/btcpayserver/btcpayserver-docker/blob/master/contrib/FastSync/README.md')
+    logger.info('--initwalletsonly        Setup coin wallets only.')
 
     logger.info('\n' + 'Known coins: %s', ', '.join(known_coins.keys()))
 
@@ -764,7 +775,6 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
             for coin_name in start_daemons:
                 coin_settings = settings['chainclients'][coin_name]
                 c = swap_client.getCoinIdFromName(coin_name)
-                swap_client.setCoinConnectParams(c)
 
                 if c == Coins.XMR:
                     if coin_settings['manage_wallet_daemon']:
@@ -804,7 +814,18 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
     finally:
         for d in daemons:
             finalise_daemon(d)
-    return particl_wallet_mnemonic
+
+    if particl_wallet_mnemonic is not None:
+        if particl_wallet_mnemonic:
+            # Print directly to stdout for tests
+            print('IMPORTANT - Save your particl wallet recovery phrase:\n{}\n'.format(particl_wallet_mnemonic))
+
+
+def load_config(config_path):
+    if not os.path.exists(config_path):
+        exitWithError('{} does not exist'.format(config_path))
+    with open(config_path) as fs:
+        return json.load(fs)
 
 
 def main():
@@ -814,19 +835,20 @@ def main():
     port_offset = None
     chain = 'mainnet'
     particl_wallet_mnemonic = None
-    prepare_bin_only = False
-    no_cores = False
-    use_containers = False
     with_coins = {'particl', }
     add_coin = ''
     disable_coin = ''
     htmlhost = '127.0.0.1'
     xmr_restore_height = DEFAULT_XMR_RESTORE_HEIGHT
+    prepare_bin_only = False
+    no_cores = False
+    use_containers = False
     enable_tor = False
     disable_tor = False
     tor_control_password = None
     use_btc_fastsync = False
     extract_core_overwrite = True
+    initwalletsonly = False
 
     for v in sys.argv[1:]:
         if len(v) < 2 or v[0] != '-':
@@ -876,6 +898,9 @@ def main():
             continue
         if name == 'usebtcfastsync':
             use_btc_fastsync = True
+            continue
+        if name == 'initwalletsonly':
+            initwalletsonly = True
             continue
         if len(s) == 2:
             if name == 'datadir':
@@ -933,7 +958,7 @@ def main():
         testOnionLink()
 
     if data_dir is None:
-        data_dir = os.path.join(os.path.expanduser(cfg.DEFAULT_DATADIR))
+        data_dir = os.path.join(os.path.expanduser(cfg.BASICSWAP_DATADIR))
     if bin_dir is None:
         bin_dir = os.path.join(data_dir, 'bin')
 
@@ -1037,13 +1062,20 @@ def main():
 
     chainclients['monero']['walletsdir'] = os.getenv('XMR_WALLETS_DIR', chainclients['monero']['datadir'])
 
+    if initwalletsonly:
+        logger.info('Initialising wallets')
+        settings = load_config(config_path)
+
+        init_coins = settings['chainclients'].keys()
+        logger.info('Active coins: %s', ', '.join(init_coins))
+        initialise_wallets(particl_wallet_mnemonic, init_coins, data_dir, settings, chain, use_tor_proxy)
+
+        print('Done.')
+        return 0
+
     if enable_tor:
         logger.info('Enabling TOR')
-
-        if not os.path.exists(config_path):
-            exitWithError('{} does not exist'.format(config_path))
-        with open(config_path) as fs:
-            settings = json.load(fs)
+        settings = load_config(config_path)
 
         tor_control_password = settings.get('tor_control_password', None)
         if tor_control_password is None:
@@ -1063,12 +1095,7 @@ def main():
 
     if disable_tor:
         logger.info('Disabling TOR')
-
-        if not os.path.exists(config_path):
-            exitWithError('{} does not exist'.format(config_path))
-        with open(config_path) as fs:
-            settings = json.load(fs)
-
+        settings = load_config(config_path)
         settings['use_tor'] = False
         for coin in settings['chainclients']:
             modify_tor_config(settings, coin, tor_control_password=None, enable=False)
@@ -1081,10 +1108,7 @@ def main():
 
     if disable_coin != '':
         logger.info('Disabling coin: %s', disable_coin)
-        if not os.path.exists(config_path):
-            exitWithError('{} does not exist'.format(config_path))
-        with open(config_path) as fs:
-            settings = json.load(fs)
+        settings = load_config(config_path)
 
         if disable_coin not in settings['chainclients']:
             exitWithError('{} has not been prepared'.format(disable_coin))
@@ -1107,10 +1131,7 @@ def main():
 
     if add_coin != '':
         logger.info('Adding coin: %s', add_coin)
-        if not os.path.exists(config_path):
-            exitWithError('{} does not exist'.format(config_path))
-        with open(config_path) as fs:
-            settings = json.load(fs)
+        settings = load_config(config_path)
 
         if add_coin in settings['chainclients']:
             coin_settings = settings['chainclients'][add_coin]
@@ -1132,7 +1153,9 @@ def main():
 
         if not prepare_bin_only:
             prepareDataDir(add_coin, settings, chain, particl_wallet_mnemonic, extra_opts)
-            initialise_wallets(None, [add_coin, ], data_dir, settings, chain, use_tor_proxy)
+
+            if particl_wallet_mnemonic not in ('none', 'auto'):
+                initialise_wallets(None, [add_coin, ], data_dir, settings, chain, use_tor_proxy)
 
             with open(config_path, 'w') as fp:
                 json.dump(settings, fp, indent=4)
@@ -1153,7 +1176,7 @@ def main():
 
         settings = {
             'debug': True,
-            'zmqhost': 'tcp://127.0.0.1',
+            'zmqhost': f'tcp://{PART_RPC_HOST}',
             'zmqport': PART_ZMQ_PORT + port_offset,
             'htmlhost': htmlhost,
             'htmlport': UI_HTML_PORT + port_offset,
@@ -1185,14 +1208,11 @@ def main():
     with open(config_path, 'w') as fp:
         json.dump(settings, fp, indent=4)
 
-    if particl_wallet_mnemonic == 'none':
+    if particl_wallet_mnemonic in ('none', 'auto'):
         logger.info('Done.')
         return 0
 
-    particl_wallet_mnemonic = initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, chain, use_tor_proxy)
-    if particl_wallet_mnemonic:
-        # Print directly to stdout for tests
-        print('IMPORTANT - Save your particl wallet recovery phrase:\n{}\n'.format(particl_wallet_mnemonic))
+    initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, chain, use_tor_proxy)
     print('Done.')
 
 

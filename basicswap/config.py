@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019 tecnovert
+# Copyright (c) 2019-2022 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import os
 
 CONFIG_FILENAME = 'basicswap.json'
-DEFAULT_DATADIR = '~/.basicswap'
+BASICSWAP_DATADIR = os.getenv('BASICSWAP_DATADIR', '~/.basicswap')
 DEFAULT_ALLOW_CORS = False
 TEST_DATADIRS = os.path.expanduser(os.getenv('DATADIRS', '/tmp/basicswap'))
 DEFAULT_TEST_BINDIR = os.path.expanduser(os.getenv('DEFAULT_TEST_BINDIR', '~/tmp/bin'))

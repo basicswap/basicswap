@@ -13,32 +13,33 @@
             - ${DATA_PATH}/litecoin:/data/litecoin
         environment:
             - TZ
-            - PART_RPC_HOST
-            - LTC_RPC_HOST
-            - BTC_RPC_HOST
-            - PART_RPC_PORT
-            - LTC_RPC_PORT
-            - BTC_RPC_PORT
-            - XMR_RPC_HOST
-            - BASE_XMR_RPC_PORT
-            - BASE_XMR_ZMQ_PORT
-            - BASE_XMR_WALLET_PORT
-            - XMR_WALLET_RPC_HOST
-            - XMR_WALLET_RPC_USER
-            - XMR_WALLET_RPC_PWD
-            - DEFAULT_XMR_RESTORE_HEIGHT
             - UI_HTML_PORT
+            - COINS_RPCBIND_IP
+            - BASICSWAP_DATADIR
+            - PART_DATA_DIR
+            - PART_RPC_HOST
             - PART_ZMQ_PORT
             - PART_RPC_USER
             - PART_RPC_PWD
+            - PART_RPC_PORT
+            - BTC_DATA_DIR
+            - BTC_RPC_HOST
+            - BTC_RPC_PORT
             - BTC_RPC_USER
             - BTC_RPC_PWD
+            - LTC_DATA_DIR
+            - LTC_RPC_HOST
+            - LTC_RPC_PORT
             - LTC_RPC_USER
             - LTC_RPC_PWD
-            - PART_DATA_DIR
-            - LTC_DATA_DIR
-            - BTC_DATA_DIR
             - XMR_DATA_DIR
+            - XMR_RPC_HOST
+            - BASE_XMR_RPC_PORT
+            - BASE_XMR_ZMQ_PORT
             - XMR_WALLETS_DIR
-            - COINS_RPCBIND_IP
+            - XMR_WALLET_RPC_HOST
+            - BASE_XMR_WALLET_PORT
+            - XMR_WALLET_RPC_USER
+            - XMR_WALLET_RPC_PWD
+            - DEFAULT_XMR_RESTORE_HEIGHT
         restart: "no"
