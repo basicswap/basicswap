@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019-2021 tecnovert
+# Copyright (c) 2019-2022 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 """
-export TEST_RELOAD_PATH=/tmp/test_basicswap
-mkdir -p ${TEST_RELOAD_PATH}/bin/{particl,bitcoin}
-cp ~/tmp/particl-0.21.2.9-x86_64-linux-gnu.tar.gz ${TEST_RELOAD_PATH}/bin/particl
-cp ~/tmp/bitcoin-0.21.1-x86_64-linux-gnu.tar.gz ${TEST_RELOAD_PATH}/bin/bitcoin
+export TEST_PATH=/tmp/test_basicswap
+mkdir -p ${TEST_PATH}/bin
+cp -r ~/tmp/basicswap_bin/* ${TEST_PATH}/bin
 export PYTHONPATH=$(pwd)
 python tests/basicswap/test_reload.py
 
@@ -18,7 +17,6 @@ python tests/basicswap/test_reload.py
 import os
 import sys
 import json
-import shutil
 import logging
 import unittest
 import traceback
@@ -31,7 +29,6 @@ from unittest.mock import patch
 from basicswap.rpc import (
     callrpc_cli,
 )
-from tests.basicswap.mnemonics import mnemonics
 from tests.basicswap.common import (
     read_json_api,
     waitForServer,
@@ -39,12 +36,12 @@ from tests.basicswap.common import (
     waitForNumBids,
     waitForNumSwapping,
 )
-
-import basicswap.config as cfg
-import bin.basicswap_prepare as prepareSystem
+from tests.basicswap.common_xmr import (
+    prepare_nodes,
+)
 import bin.basicswap_run as runSystem
 
-test_path = os.path.expanduser(os.getenv('TEST_RELOAD_PATH', '~/test_basicswap1'))
+TEST_PATH = os.path.expanduser(os.getenv('TEST_PATH', '~/test_basicswap1'))
 PARTICL_PORT_BASE = int(os.getenv('PARTICL_PORT_BASE', '11938'))
 BITCOIN_PORT_BASE = int(os.getenv('BITCOIN_PORT_BASE', '10938'))
 delay_event = threading.Event()
@@ -56,8 +53,8 @@ if not len(logger.handlers):
 
 
 def btcRpc(client_no, cmd):
-    bin_path = os.path.join(test_path, 'bin', 'bitcoin')
-    data_path = os.path.join(test_path, 'client{}'.format(client_no), 'bitcoin')
+    bin_path = os.path.join(TEST_PATH, 'bin', 'bitcoin')
+    data_path = os.path.join(TEST_PATH, 'client{}'.format(client_no), 'bitcoin')
     return callrpc_cli(bin_path, data_path, 'regtest', cmd, 'bitcoin-cli')
 
 
@@ -74,62 +71,10 @@ class Test(unittest.TestCase):
     def setUpClass(cls):
         super(Test, cls).setUpClass()
 
-        for i in range(3):
-            client_path = os.path.join(test_path, 'client{}'.format(i))
-            config_path = os.path.join(client_path, cfg.CONFIG_FILENAME)
-            try:
-                shutil.rmtree(client_path)
-            except Exception as ex:
-                logger.warning('setUpClass %s', str(ex))
-            testargs = [
-                'basicswap-prepare',
-                '-datadir="{}"'.format(client_path),
-                '-bindir="{}"'.format(os.path.join(test_path, 'bin')),
-                '-portoffset={}'.format(i),
-                '-particl_mnemonic="{}"'.format(mnemonics[i]),
-                '-regtest', '-withoutcoin=litecoin', '-withcoin=bitcoin']
-            with patch.object(sys, 'argv', testargs):
-                prepareSystem.main()
-
-            with open(os.path.join(client_path, 'particl', 'particl.conf'), 'r') as fp:
-                lines = fp.readlines()
-            with open(os.path.join(client_path, 'particl', 'particl.conf'), 'w') as fp:
-                for line in lines:
-                    if not line.startswith('staking'):
-                        fp.write(line)
-                fp.write('port={}\n'.format(PARTICL_PORT_BASE + i))
-                fp.write('bind=127.0.0.1\n')
-                fp.write('dnsseed=0\n')
-                fp.write('discover=0\n')
-                fp.write('listenonion=0\n')
-                fp.write('upnp=0\n')
-                fp.write('minstakeinterval=5\n')
-                fp.write('smsgsregtestadjust=0\n')
-                for ip in range(3):
-                    if ip != i:
-                        fp.write('connect=127.0.0.1:{}\n'.format(PARTICL_PORT_BASE + ip))
-
-            # Pruned nodes don't provide blocks
-            with open(os.path.join(client_path, 'bitcoin', 'bitcoin.conf'), 'r') as fp:
-                lines = fp.readlines()
-            with open(os.path.join(client_path, 'bitcoin', 'bitcoin.conf'), 'w') as fp:
-                for line in lines:
-                    if not line.startswith('prune'):
-                        fp.write(line)
-                fp.write('port={}\n'.format(BITCOIN_PORT_BASE + i))
-                fp.write('bind=127.0.0.1\n')
-                fp.write('dnsseed=0\n')
-                fp.write('discover=0\n')
-                fp.write('listenonion=0\n')
-                fp.write('upnp=0\n')
-                for ip in range(3):
-                    if ip != i:
-                        fp.write('connect=127.0.0.1:{}\n'.format(BITCOIN_PORT_BASE + ip))
-
-            assert(os.path.exists(config_path))
+        prepare_nodes(3, 'bitcoin')
 
     def run_thread(self, client_id):
-        client_path = os.path.join(test_path, 'client{}'.format(client_id))
+        client_path = os.path.join(TEST_PATH, 'client{}'.format(client_id))
         testargs = ['basicswap-run', '-datadir=' + client_path, '-regtest']
         with patch.object(sys, 'argv', testargs):
             runSystem.main()

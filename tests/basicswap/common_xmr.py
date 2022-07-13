@@ -25,17 +25,21 @@ from tests.basicswap.mnemonics import mnemonics
 from tests.basicswap.common import (
     waitForServer,
 )
+from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
 
 import basicswap.config as cfg
 import bin.basicswap_prepare as prepareSystem
 import bin.basicswap_run as runSystem
 
-test_path = os.path.expanduser(os.getenv('TEST_RELOAD_PATH', '~/test_basicswap1'))
+TEST_PATH = os.path.expanduser(os.getenv('TEST_PATH', '~/test_basicswap1'))
 PARTICL_PORT_BASE = int(os.getenv('PARTICL_PORT_BASE', '11938'))
+BITCOIN_PORT_BASE = int(os.getenv('BITCOIN_PORT_BASE', '10938'))
 
 XMR_BASE_P2P_PORT = 17792
 XMR_BASE_RPC_PORT = 29798
 XMR_BASE_WALLET_RPC_PORT = 29998
+
+EXTRA_CONFIG_JSON = json.loads(os.getenv('EXTRA_CONFIG_JSON', '{}'))
 
 
 def waitForBidState(delay_event, port, bid_id, state_str, wait_for=60):
@@ -58,16 +62,27 @@ def updateThread(xmr_addr, delay_event):
         delay_event.wait(2)
 
 
-def run_prepare(port_offset, datadir_path, bins_path, mnemonic_in=None, num_nodes=3):
+def recursive_update_dict(base, new_vals):
+    for key, value in new_vals.items():
+        if key in base and isinstance(value, dict):
+            recursive_update_dict(base[key], value)
+        else:
+            base[key] = value
+
+
+def run_prepare(node_id, datadir_path, bins_path, with_coins, mnemonic_in=None, num_nodes=3, use_rpcauth=False, extra_settings={}, port_ofs=0):
     config_path = os.path.join(datadir_path, cfg.CONFIG_FILENAME)
+
+    os.environ['PART_RPC_PORT'] = str(PARTICL_PORT_BASE)
+    os.environ['BTC_RPC_PORT'] = str(BITCOIN_PORT_BASE)
 
     testargs = [
         'basicswap-prepare',
         f'-datadir="{datadir_path}"',
         f'-bindir="{bins_path}"',
-        f'-portoffset={port_offset}',
+        f'-portoffset={(node_id + port_ofs)}',
         '-regtest',
-        '-withcoin=monero',
+        f'-withcoins={with_coins}',
         '-noextractover',
         '-xmrrestoreheight=0']
     if mnemonic_in:
@@ -77,13 +92,16 @@ def run_prepare(port_offset, datadir_path, bins_path, mnemonic_in=None, num_node
         lines = mocked_stdout.getvalue().split('\n')
         mnemonic_out = lines[-4]
 
+    with open(config_path) as fs:
+        settings = json.load(fs)
+
     with open(os.path.join(datadir_path, 'particl', 'particl.conf'), 'r') as fp:
         lines = fp.readlines()
     with open(os.path.join(datadir_path, 'particl', 'particl.conf'), 'w') as fp:
         for line in lines:
             if not line.startswith('staking'):
                 fp.write(line)
-        fp.write('port={}\n'.format(PARTICL_PORT_BASE + port_offset))
+        fp.write('port={}\n'.format(PARTICL_PORT_BASE + node_id + port_ofs))
         fp.write('bind=127.0.0.1\n')
         fp.write('dnsseed=0\n')
         fp.write('discover=0\n')
@@ -91,16 +109,55 @@ def run_prepare(port_offset, datadir_path, bins_path, mnemonic_in=None, num_node
         fp.write('upnp=0\n')
         fp.write('minstakeinterval=5\n')
         fp.write('smsgsregtestadjust=0\n')
+        if use_rpcauth:
+            salt = generate_salt(16)
+            rpc_user = 'test_part_' + str(node_id)
+            rpc_pass = 'test_part_pwd_' + str(node_id)
+            fp.write('rpcauth={}:{}${}\n'.format(rpc_user, salt, password_to_hmac(salt, rpc_pass)))
+            settings['chainclients']['particl']['rpcuser'] = rpc_user
+            settings['chainclients']['particl']['rpcpassword'] = rpc_pass
         for ip in range(num_nodes):
-            if ip != port_offset:
+            if ip != node_id:
                 fp.write('connect=127.0.0.1:{}\n'.format(PARTICL_PORT_BASE + ip))
+        for opt in EXTRA_CONFIG_JSON.get('part{}'.format(node_id), []):
+            fp.write(opt + '\n')
 
-    with open(os.path.join(datadir_path, 'monero', 'monerod.conf'), 'a') as fp:
-        fp.write('p2p-bind-ip=127.0.0.1\n')
-        fp.write('p2p-bind-port={}\n'.format(XMR_BASE_P2P_PORT + port_offset))
-        for ip in range(num_nodes):
-            if ip != port_offset:
-                fp.write('add-exclusive-node=127.0.0.1:{}\n'.format(XMR_BASE_P2P_PORT + ip))
+    coins_array = with_coins.split(',')
+
+    if 'bitcoin' in coins_array:
+        # Pruned nodes don't provide blocks
+        with open(os.path.join(datadir_path, 'bitcoin', 'bitcoin.conf'), 'r') as fp:
+            lines = fp.readlines()
+        with open(os.path.join(datadir_path, 'bitcoin', 'bitcoin.conf'), 'w') as fp:
+            for line in lines:
+                if not line.startswith('prune'):
+                    fp.write(line)
+            fp.write('port={}\n'.format(BITCOIN_PORT_BASE + node_id + port_ofs))
+            fp.write('bind=127.0.0.1\n')
+            fp.write('dnsseed=0\n')
+            fp.write('discover=0\n')
+            fp.write('listenonion=0\n')
+            fp.write('upnp=0\n')
+            if use_rpcauth:
+                salt = generate_salt(16)
+                rpc_user = 'test_btc_' + str(node_id)
+                rpc_pass = 'test_btc_pwd_' + str(node_id)
+                fp.write('rpcauth={}:{}${}\n'.format(rpc_user, salt, password_to_hmac(salt, rpc_pass)))
+                settings['chainclients']['bitcoin']['rpcuser'] = rpc_user
+                settings['chainclients']['bitcoin']['rpcpassword'] = rpc_pass
+            for ip in range(num_nodes):
+                if ip != node_id:
+                    fp.write('connect=127.0.0.1:{}\n'.format(BITCOIN_PORT_BASE + ip))
+            for opt in EXTRA_CONFIG_JSON.get('btc{}'.format(node_id), []):
+                fp.write(opt + '\n')
+
+    if 'monero' in coins_array:
+        with open(os.path.join(datadir_path, 'monero', 'monerod.conf'), 'a') as fp:
+            fp.write('p2p-bind-ip=127.0.0.1\n')
+            fp.write('p2p-bind-port={}\n'.format(XMR_BASE_P2P_PORT + node_id + port_ofs))
+            for ip in range(num_nodes):
+                if ip != node_id:
+                    fp.write('add-exclusive-node=127.0.0.1:{}\n'.format(XMR_BASE_P2P_PORT + ip))
 
     with open(config_path) as fs:
         settings = json.load(fs)
@@ -118,10 +175,29 @@ def run_prepare(port_offset, datadir_path, bins_path, mnemonic_in=None, num_node
     settings['check_events_seconds'] = 5
     settings['check_xmr_swaps_seconds'] = 5
 
+    recursive_update_dict(settings, extra_settings)
+
+    extra_config = EXTRA_CONFIG_JSON.get('sc{}'.format(node_id), {})
+    recursive_update_dict(settings, extra_config)
+
     with open(config_path, 'w') as fp:
         json.dump(settings, fp, indent=4)
 
     return mnemonic_out
+
+
+def prepare_nodes(num_nodes, extra_coins, use_rpcauth=False, extra_settings={}, port_ofs=0):
+    bins_path = os.path.join(TEST_PATH, 'bin')
+    for i in range(num_nodes):
+        logging.info('Preparing node: %d.', i)
+        client_path = os.path.join(TEST_PATH, 'client{}'.format(i))
+        try:
+            shutil.rmtree(client_path)
+        except Exception as ex:
+            logging.warning('setUpClass %s', str(ex))
+
+        run_prepare(i, client_path, bins_path, extra_coins, mnemonics[i] if i < len(mnemonics) else None,
+                    num_nodes=num_nodes, use_rpcauth=use_rpcauth, extra_settings=extra_settings, port_ofs=port_ofs)
 
 
 class XmrTestBase(unittest.TestCase):
@@ -133,15 +209,7 @@ class XmrTestBase(unittest.TestCase):
         cls.update_thread = None
         cls.processes = []
 
-        bins_path = os.path.join(test_path, 'bin')
-        for i in range(3):
-            client_path = os.path.join(test_path, 'client{}'.format(i))
-            try:
-                shutil.rmtree(client_path)
-            except Exception as ex:
-                logging.warning('setUpClass %s', str(ex))
-
-            run_prepare(i, client_path, bins_path, mnemonics[i])
+        prepare_nodes(3, 'monero')
 
         signal.signal(signal.SIGINT, lambda signal, frame: cls.signal_handler(cls, signal, frame))
 
@@ -150,7 +218,7 @@ class XmrTestBase(unittest.TestCase):
         self.delay_event.set()
 
     def run_thread(self, client_id):
-        client_path = os.path.join(test_path, 'client{}'.format(client_id))
+        client_path = os.path.join(TEST_PATH, 'client{}'.format(client_id))
         testargs = ['basicswap-run', '-datadir=' + client_path, '-regtest']
         with patch.object(sys, 'argv', testargs):
             runSystem.main()

@@ -7,10 +7,8 @@
 
 """
 export TEST_PATH=/tmp/test_basicswap_wallet_init
-mkdir -p ${TEST_PATH}/bin/{particl,monero,bitcoin}
-cp ~/tmp/particl-0.21.2.9-x86_64-linux-gnu.tar.gz ${TEST_PATH}/bin/particl
-cp ~/tmp/monero-linux-x64-v0.17.3.2.tar.bz2 ${TEST_PATH}/bin/monero/monero-0.17.3.2-x86_64-linux-gnu.tar.bz2
-cp ~/tmp/bitcoin-0.21.1-x86_64-linux-gnu.tar.gz ${TEST_PATH}/bin/bitcoin
+mkdir -p ${TEST_PATH}/bin
+cp -r ~/tmp/basicswap_bin/* ${TEST_PATH}/bin
 export PYTHONPATH=$(pwd)
 python tests/basicswap/extended/test_wallet_init.py
 
@@ -28,21 +26,16 @@ import multiprocessing
 from unittest.mock import patch
 
 from tests.basicswap.mnemonics import mnemonics
-
-import basicswap.config as cfg
 from tests.basicswap.common import (
     read_json_api,
+    waitForServer,
 )
-import bin.basicswap_prepare as prepareSystem
+from tests.basicswap.common_xmr import (
+    run_prepare,
+)
 import bin.basicswap_run as runSystem
 
-test_path = os.path.expanduser(os.getenv('TEST_PATH', '~/test_basicswap1'))
-PARTICL_PORT_BASE = int(os.getenv('PARTICL_PORT_BASE', '11938'))
-BITCOIN_PORT_BASE = int(os.getenv('BITCOIN_PORT_BASE', '10938'))
-XMR_BASE_P2P_PORT = 17792
-XMR_BASE_RPC_PORT = 21792
-XMR_BASE_ZMQ_PORT = 22792
-XMR_BASE_WALLET_RPC_PORT = 23792
+TEST_PATH = os.path.expanduser(os.getenv('TEST_PATH', '~/test_basicswap1'))
 
 stop_test = False
 
@@ -52,87 +45,25 @@ if not len(logger.handlers):
     logger.addHandler(logging.StreamHandler(sys.stdout))
 
 
-def waitForServer(port):
-    for i in range(20):
-        try:
-            time.sleep(1)
-            summary = read_json_api(port)
-            break
-        except Exception as e:
-            print('waitForServer, error:', str(e))
-
-
 class Test(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         super(Test, cls).setUpClass()
 
-        for i in range(2):
-            client_path = os.path.join(test_path, 'client{}'.format(i))
-            config_path = os.path.join(client_path, cfg.CONFIG_FILENAME)
-            try:
-                shutil.rmtree(client_path)
-            except Exception as ex:
-                logger.warning('setUpClass %s', str(ex))
-            testargs = [
-                'basicswap-prepare',
-                '-datadir="{}"'.format(client_path),
-                '-bindir="{}"'.format(os.path.join(test_path, 'bin')),
-                '-portoffset={}'.format(i),
-                '-particl_mnemonic="{}"'.format(mnemonics[0]),
-                '-regtest',
-                '-withcoin=monero,bitcoin',
-                '-noextractover',
-                '-xmrrestoreheight=0']
-            with patch.object(sys, 'argv', testargs):
-                prepareSystem.main()
+    # Load both wallets from the same mnemonic
+    bins_path = os.path.join(TEST_PATH, 'bin')
+    for i in range(2):
+        logging.info('Preparing node: %d.', i)
+        client_path = os.path.join(TEST_PATH, 'client{}'.format(i))
+        try:
+            shutil.rmtree(client_path)
+        except Exception as ex:
+            logging.warning('setUpClass %s', str(ex))
 
-            with open(os.path.join(client_path, 'particl', 'particl.conf'), 'r') as fp:
-                lines = fp.readlines()
-            with open(os.path.join(client_path, 'particl', 'particl.conf'), 'w') as fp:
-                for line in lines:
-                    if not line.startswith('staking'):
-                        fp.write(line)
-                fp.write('port={}\n'.format(PARTICL_PORT_BASE + i))
-                fp.write('bind=127.0.0.1\n')
-                fp.write('dnsseed=0\n')
-                fp.write('discover=0\n')
-                fp.write('listenonion=0\n')
-                fp.write('upnp=0\n')
-                fp.write('minstakeinterval=5\n')
-                fp.write('smsgsregtestadjust=0\n')
-                for ip in range(3):
-                    if ip != i:
-                        fp.write('connect=127.0.0.1:{}\n'.format(PARTICL_PORT_BASE + ip))
-
-            # Pruned nodes don't provide blocks
-            with open(os.path.join(client_path, 'bitcoin', 'bitcoin.conf'), 'r') as fp:
-                lines = fp.readlines()
-            with open(os.path.join(client_path, 'bitcoin', 'bitcoin.conf'), 'w') as fp:
-                for line in lines:
-                    if not line.startswith('prune'):
-                        fp.write(line)
-                fp.write('port={}\n'.format(BITCOIN_PORT_BASE + i))
-                fp.write('bind=127.0.0.1\n')
-                fp.write('dnsseed=0\n')
-                fp.write('discover=0\n')
-                fp.write('listenonion=0\n')
-                fp.write('upnp=0\n')
-                for ip in range(3):
-                    if ip != i:
-                        fp.write('connect=127.0.0.1:{}\n'.format(BITCOIN_PORT_BASE + ip))
-
-            with open(os.path.join(client_path, 'monero', 'monerod.conf'), 'a') as fp:
-                fp.write('p2p-bind-ip=127.0.0.1\n')
-                fp.write('p2p-bind-port={}\n'.format(XMR_BASE_P2P_PORT + i))
-                for ip in range(3):
-                    if ip != i:
-                        fp.write('add-exclusive-node=127.0.0.1:{}\n'.format(XMR_BASE_P2P_PORT + ip))
-
-            assert(os.path.exists(config_path))
+        run_prepare(i, client_path, bins_path, 'monero,bitcoin', mnemonics[0])
 
     def run_thread(self, client_id):
-        client_path = os.path.join(test_path, 'client{}'.format(client_id))
+        client_path = os.path.join(TEST_PATH, 'client{}'.format(client_id))
         testargs = ['basicswap-run', '-datadir=' + client_path, '-regtest']
         with patch.object(sys, 'argv', testargs):
             runSystem.main()

@@ -8,10 +8,8 @@
 """
 export RESET_TEST=true
 export TEST_PATH=/tmp/test_persistent
-mkdir -p ${TEST_PATH}/bin/{particl,monero,bitcoin}
-cp ~/tmp/particl-0.21.2.9-x86_64-linux-gnu_nousb.tar.gz ${TEST_PATH}/bin/particl
-cp ~/tmp/bitcoin-22.0-x86_64-linux-gnu.tar.gz ${TEST_PATH}/bin/bitcoin
-XMR_VERSION=0.17.3.2 cp ~/tmp/monero-linux-x64-v${XMR_VERSION}.tar.bz2 ${TEST_RELOAD_PATH}/bin/monero/monero-${XMR_VERSION}-x86_64-linux-gnu.tar.bz2
+mkdir -p ${TEST_PATH}/bin
+cp -r ~/tmp/basicswap_bin/* ${TEST_PATH}/bin
 export PYTHONPATH=$(pwd)
 python tests/basicswap/extended/test_xmr_persistent.py
 
@@ -23,7 +21,6 @@ import sys
 import json
 import time
 import random
-import shutil
 import signal
 import logging
 import unittest
@@ -37,15 +34,13 @@ from basicswap.rpc_xmr import (
 from basicswap.rpc import (
     callrpc,
 )
-from tests.basicswap.mnemonics import mnemonics as test_mnemonics
 from tests.basicswap.common import (
     read_json_api,
     waitForServer,
 )
-from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
-
-import basicswap.config as cfg
-import bin.basicswap_prepare as prepareSystem
+from tests.basicswap.common_xmr import (
+    prepare_nodes,
+)
 import bin.basicswap_run as runSystem
 
 
@@ -54,8 +49,6 @@ def make_boolean(s):
 
 
 test_path = os.path.expanduser(os.getenv('TEST_PATH', '/tmp/test_persistent'))
-PARTICL_PORT_BASE = int(os.getenv('PARTICL_PORT_BASE', '11938'))
-BITCOIN_PORT_BASE = int(os.getenv('BITCOIN_PORT_BASE', '10938'))
 RESET_TEST = make_boolean(os.getenv('RESET_TEST', 'false'))
 
 XMR_BASE_P2P_PORT = 17792
@@ -71,19 +64,10 @@ BASE_BTC_RPC_PORT = 19796
 NUM_NODES = int(os.getenv('NUM_NODES', 3))
 EXTRA_CONFIG_JSON = json.loads(os.getenv('EXTRA_CONFIG_JSON', '{}'))
 
-
 logger = logging.getLogger()
 logger.level = logging.DEBUG
 if not len(logger.handlers):
     logger.addHandler(logging.StreamHandler(sys.stdout))
-
-
-def recursive_update_dict(base, new_vals):
-    for key, value in new_vals.items():
-        if key in base and isinstance(value, dict):
-            recursive_update_dict(base[key], value)
-        else:
-            base[key] = value
 
 
 def callpartrpc(node_id, method, params=[], wallet=None, base_rpc_port=BASE_PART_RPC_PORT + PORT_OFS):
@@ -136,115 +120,10 @@ class Test(unittest.TestCase):
 
         random.seed(time.time())
 
+        os.environ['PARTICL_PORT_BASE'] = str(BASE_PART_RPC_PORT)
+        os.environ['BITCOIN_PORT_BASE'] = str(BASE_BTC_RPC_PORT)
         logging.info('Preparing %d nodes.', NUM_NODES)
-        for i in range(NUM_NODES):
-            logging.info('Preparing node: %d.', i)
-            client_path = os.path.join(test_path, 'client{}'.format(i))
-            config_path = os.path.join(client_path, cfg.CONFIG_FILENAME)
-            if RESET_TEST:
-                try:
-                    logging.info('Removing dir %s', client_path)
-                    shutil.rmtree(client_path)
-                except Exception as ex:
-                    logging.warning('setUpClass %s', str(ex))
-
-            if not os.path.exists(config_path):
-
-                os.environ['PART_RPC_PORT'] = str(BASE_PART_RPC_PORT)
-                os.environ['BTC_RPC_PORT'] = str(BASE_BTC_RPC_PORT)
-
-                testargs = [
-                    'basicswap-prepare',
-                    '-datadir="{}"'.format(client_path),
-                    '-bindir="{}"'.format(os.path.join(test_path, 'bin')),
-                    '-portoffset={}'.format(i + PORT_OFS),
-                    '-regtest',
-                    '-withcoins=monero,bitcoin',
-                    '-noextractover',
-                    '-xmrrestoreheight=0']
-                if i < len(test_mnemonics):
-                    testargs.append('-particl_mnemonic="{}"'.format(test_mnemonics[i]))
-                with patch.object(sys, 'argv', testargs):
-                    prepareSystem.main()
-
-                with open(os.path.join(client_path, 'particl', 'particl.conf'), 'r') as fp:
-                    lines = fp.readlines()
-                with open(os.path.join(client_path, 'particl', 'particl.conf'), 'w') as fp:
-                    for line in lines:
-                        if not line.startswith('staking'):
-                            fp.write(line)
-                    fp.write('port={}\n'.format(PARTICL_PORT_BASE + i + PORT_OFS))
-                    fp.write('bind=127.0.0.1\n')
-                    fp.write('dnsseed=0\n')
-                    fp.write('discover=0\n')
-                    fp.write('listenonion=0\n')
-                    fp.write('upnp=0\n')
-                    fp.write('minstakeinterval=5\n')
-                    fp.write('smsgsregtestadjust=0\n')
-                    salt = generate_salt(16)
-                    fp.write('rpcauth={}:{}${}\n'.format('test_part_' + str(i), salt, password_to_hmac(salt, 'test_part_pwd_' + str(i))))
-                    for ip in range(NUM_NODES):
-                        if ip != i:
-                            fp.write('connect=127.0.0.1:{}\n'.format(PARTICL_PORT_BASE + ip + PORT_OFS))
-                    for opt in EXTRA_CONFIG_JSON.get('part{}'.format(i), []):
-                        fp.write(opt + '\n')
-
-                # Pruned nodes don't provide blocks
-                with open(os.path.join(client_path, 'bitcoin', 'bitcoin.conf'), 'r') as fp:
-                    lines = fp.readlines()
-                with open(os.path.join(client_path, 'bitcoin', 'bitcoin.conf'), 'w') as fp:
-                    for line in lines:
-                        if not line.startswith('prune'):
-                            fp.write(line)
-                    fp.write('port={}\n'.format(BITCOIN_PORT_BASE + i + PORT_OFS))
-                    fp.write('bind=127.0.0.1\n')
-                    fp.write('dnsseed=0\n')
-                    fp.write('discover=0\n')
-                    fp.write('listenonion=0\n')
-                    fp.write('upnp=0\n')
-                    salt = generate_salt(16)
-                    fp.write('rpcauth={}:{}${}\n'.format('test_btc_' + str(i), salt, password_to_hmac(salt, 'test_btc_pwd_' + str(i))))
-                    for ip in range(NUM_NODES):
-                        if ip != i:
-                            fp.write('connect=127.0.0.1:{}\n'.format(BITCOIN_PORT_BASE + ip + PORT_OFS))
-                    for opt in EXTRA_CONFIG_JSON.get('btc{}'.format(i), []):
-                        fp.write(opt + '\n')
-
-                with open(os.path.join(client_path, 'monero', 'monerod.conf'), 'a') as fp:
-                    fp.write('p2p-bind-ip=127.0.0.1\n')
-                    fp.write('p2p-bind-port={}\n'.format(XMR_BASE_P2P_PORT + i + PORT_OFS))
-                    for ip in range(NUM_NODES):
-                        if ip != i:
-                            fp.write('add-exclusive-node=127.0.0.1:{}\n'.format(XMR_BASE_P2P_PORT + ip + PORT_OFS))
-
-                with open(config_path) as fs:
-                    settings = json.load(fs)
-
-                settings['min_delay_event'] = 1
-                settings['max_delay_event'] = 4
-                settings['min_delay_event_short'] = 1
-                settings['max_delay_event_short'] = 4
-                settings['min_delay_retry'] = 15
-                settings['max_delay_retry'] = 30
-                settings['min_sequence_lock_seconds'] = 60
-
-                settings['check_progress_seconds'] = 5
-                settings['check_watched_seconds'] = 5
-                settings['check_expired_seconds'] = 60
-                settings['check_events_seconds'] = 5
-                settings['check_xmr_swaps_seconds'] = 5
-
-                settings['chainclients']['particl']['rpcuser'] = 'test_part_' + str(i)
-                settings['chainclients']['particl']['rpcpassword'] = 'test_part_pwd_' + str(i)
-
-                settings['chainclients']['bitcoin']['rpcuser'] = 'test_btc_' + str(i)
-                settings['chainclients']['bitcoin']['rpcpassword'] = 'test_btc_pwd_' + str(i)
-
-                extra_config = EXTRA_CONFIG_JSON.get('sc{}'.format(i), {})
-                recursive_update_dict(settings, extra_config)
-
-                with open(config_path, 'w') as fp:
-                    json.dump(settings, fp, indent=4)
+        prepare_nodes(NUM_NODES, 'bitcoin,monero', True, {'min_sequence_lock_seconds': 60}, PORT_OFS)
 
         signal.signal(signal.SIGINT, lambda signal, frame: cls.signal_handler(cls, signal, frame))
 
