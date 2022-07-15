@@ -39,6 +39,11 @@ XMR_BASE_P2P_PORT = 17792
 XMR_BASE_RPC_PORT = 29798
 XMR_BASE_WALLET_RPC_PORT = 29998
 
+LTC_BASE_PORT = 34792
+LTC_BASE_RPC_PORT = 35792
+LTC_BASE_ZMQ_PORT = 36792
+
+
 EXTRA_CONFIG_JSON = json.loads(os.getenv('EXTRA_CONFIG_JSON', '{}'))
 
 
@@ -118,7 +123,7 @@ def run_prepare(node_id, datadir_path, bins_path, with_coins, mnemonic_in=None, 
             settings['chainclients']['particl']['rpcpassword'] = rpc_pass
         for ip in range(num_nodes):
             if ip != node_id:
-                fp.write('connect=127.0.0.1:{}\n'.format(PARTICL_PORT_BASE + ip))
+                fp.write('connect=127.0.0.1:{}\n'.format(PARTICL_PORT_BASE + ip + port_ofs))
         for opt in EXTRA_CONFIG_JSON.get('part{}'.format(node_id), []):
             fp.write(opt + '\n')
 
@@ -147,8 +152,35 @@ def run_prepare(node_id, datadir_path, bins_path, with_coins, mnemonic_in=None, 
                 settings['chainclients']['bitcoin']['rpcpassword'] = rpc_pass
             for ip in range(num_nodes):
                 if ip != node_id:
-                    fp.write('connect=127.0.0.1:{}\n'.format(BITCOIN_PORT_BASE + ip))
+                    fp.write('connect=127.0.0.1:{}\n'.format(BITCOIN_PORT_BASE + ip + port_ofs))
             for opt in EXTRA_CONFIG_JSON.get('btc{}'.format(node_id), []):
+                fp.write(opt + '\n')
+
+    if 'litecoin' in coins_array:
+        # Pruned nodes don't provide blocks
+        with open(os.path.join(datadir_path, 'litecoin', 'litecoin.conf'), 'r') as fp:
+            lines = fp.readlines()
+        with open(os.path.join(datadir_path, 'litecoin', 'litecoin.conf'), 'w') as fp:
+            for line in lines:
+                if not line.startswith('prune'):
+                    fp.write(line)
+            fp.write('port={}\n'.format(LTC_BASE_PORT + node_id + port_ofs))
+            fp.write('bind=127.0.0.1\n')
+            fp.write('dnsseed=0\n')
+            fp.write('discover=0\n')
+            fp.write('listenonion=0\n')
+            fp.write('upnp=0\n')
+            if use_rpcauth:
+                salt = generate_salt(16)
+                rpc_user = 'test_ltc_' + str(node_id)
+                rpc_pass = 'test_ltc_pwd_' + str(node_id)
+                fp.write('rpcauth={}:{}${}\n'.format(rpc_user, salt, password_to_hmac(salt, rpc_pass)))
+                settings['chainclients']['litecoin']['rpcuser'] = rpc_user
+                settings['chainclients']['litecoin']['rpcpassword'] = rpc_pass
+            for ip in range(num_nodes):
+                if ip != node_id:
+                    fp.write('connect=127.0.0.1:{}\n'.format(LTC_BASE_PORT + ip + port_ofs))
+            for opt in EXTRA_CONFIG_JSON.get('ltc{}'.format(node_id), []):
                 fp.write(opt + '\n')
 
     if 'monero' in coins_array:
@@ -157,7 +189,7 @@ def run_prepare(node_id, datadir_path, bins_path, with_coins, mnemonic_in=None, 
             fp.write('p2p-bind-port={}\n'.format(XMR_BASE_P2P_PORT + node_id + port_ofs))
             for ip in range(num_nodes):
                 if ip != node_id:
-                    fp.write('add-exclusive-node=127.0.0.1:{}\n'.format(XMR_BASE_P2P_PORT + ip))
+                    fp.write('add-exclusive-node=127.0.0.1:{}\n'.format(XMR_BASE_P2P_PORT + ip + port_ofs))
 
     with open(config_path) as fs:
         settings = json.load(fs)
@@ -200,22 +232,32 @@ def prepare_nodes(num_nodes, extra_coins, use_rpcauth=False, extra_settings={}, 
                     num_nodes=num_nodes, use_rpcauth=use_rpcauth, extra_settings=extra_settings, port_ofs=port_ofs)
 
 
-class XmrTestBase(unittest.TestCase):
-    @classmethod
+class TestBase(unittest.TestCase):
     def setUpClass(cls):
-        super(XmrTestBase, cls).setUpClass()
+        super(TestBase, cls).setUpClass()
 
         cls.delay_event = threading.Event()
-        cls.update_thread = None
-        cls.processes = []
-
-        prepare_nodes(3, 'monero')
-
         signal.signal(signal.SIGINT, lambda signal, frame: cls.signal_handler(cls, signal, frame))
 
     def signal_handler(self, sig, frame):
         logging.info('signal {} detected.'.format(sig))
         self.delay_event.set()
+
+    def wait_seconds(self, seconds):
+        self.delay_event.wait(seconds)
+        if self.delay_event.is_set():
+            raise ValueError('Test stopped.')
+
+
+class XmrTestBase(TestBase):
+    @classmethod
+    def setUpClass(cls):
+        super(XmrTestBase, cls).setUpClass(cls)
+
+        cls.update_thread = None
+        cls.processes = []
+
+        prepare_nodes(3, 'monero')
 
     def run_thread(self, client_id):
         client_path = os.path.join(TEST_PATH, 'client{}'.format(client_id))

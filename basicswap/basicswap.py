@@ -507,8 +507,9 @@ class BasicSwap(BaseApp):
             for i in range(20):
                 try:
                     # Workaround for mismatched pid file name in litecoin 0.21.2
+                    # Also set with pid= in .conf
                     # TODO: Remove
-                    if cc['name'] == 'litecoin' and not os.path.exists(pidfilepath) and \
+                    if cc['name'] == 'litecoin' and (not os.path.exists(pidfilepath)) and \
                        os.path.exists(os.path.join(self.getChainDatadirPath(coin), 'bitcoind.pid')):
                         pidfilepath = os.path.join(self.getChainDatadirPath(coin), 'bitcoind.pid')
 
@@ -517,7 +518,7 @@ class BasicSwap(BaseApp):
                     assert(datadir_pid == cc['pid']), 'Mismatched pid'
                     assert(os.path.exists(authcookiepath))
                 except Exception:
-                    time.sleep(0.5)
+                    self.delay_event.wait(0.5)
             try:
                 if os.name != 'nt' or cc['core_version_group'] > 17:  # Litecoin on windows doesn't write a pid file
                     assert(datadir_pid == cc['pid']), 'Mismatched pid'

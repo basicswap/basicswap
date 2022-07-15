@@ -22,10 +22,10 @@ from basicswap.db import (
     Concepts,
 )
 from basicswap.basicswap import (
-    BasicSwap,
     Coins,
-    SwapTypes,
+    BasicSwap,
     BidStates,
+    SwapTypes,
     DebugTypes,
 )
 from basicswap.basicswap_util import (

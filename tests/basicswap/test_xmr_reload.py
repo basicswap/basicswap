@@ -16,15 +16,13 @@ python tests/basicswap/test_xmr_reload.py
 """
 
 import sys
-import json
 import logging
 import unittest
 import multiprocessing
-from urllib import parse
-from urllib.request import urlopen
 
 from tests.basicswap.common import (
     read_json_api,
+    post_json_api,
     waitForServer,
     waitForNumOffers,
     waitForNumBids,
@@ -50,15 +48,15 @@ class Test(XmrTestBase):
         wallets1 = read_json_api(12701, 'wallets')
         assert(float(wallets1['6']['balance']) > 0.0)
 
-        data = parse.urlencode({
+        data = {
             'addr_from': '-1',
             'coin_from': 'part',
             'coin_to': 'xmr',
             'amt_from': '1',
             'amt_to': '1',
-            'lockhrs': '24'}).encode()
+            'lockhrs': '24'}
 
-        offer_id = json.loads(urlopen('http://127.0.0.1:12700/json/offers/new', data=data).read())['offer_id']
+        offer_id = post_json_api(12700, 'offers/new', data)['offer_id']
         summary = read_json_api(12700)
         assert(summary['num_sent_offers'] == 1)
 
@@ -73,24 +71,24 @@ class Test(XmrTestBase):
             'amount_from': offer['amount_from']}
 
         data['valid_for_seconds'] = 24 * 60 * 60 + 1
-        bid = json.loads(urlopen('http://127.0.0.1:12701/json/bids/new', data=parse.urlencode(data).encode()).read())
+        bid = post_json_api(12701, 'bids/new', data)
         assert(bid['error'] == 'Bid TTL too high')
         del data['valid_for_seconds']
         data['validmins'] = 24 * 60 + 1
-        bid = json.loads(urlopen('http://127.0.0.1:12701/json/bids/new', data=parse.urlencode(data).encode()).read())
+        bid = post_json_api(12701, 'bids/new', data)
         assert(bid['error'] == 'Bid TTL too high')
 
         del data['validmins']
         data['valid_for_seconds'] = 10
-        bid = json.loads(urlopen('http://127.0.0.1:12701/json/bids/new', data=parse.urlencode(data).encode()).read())
+        bid = post_json_api(12701, 'bids/new', data)
         assert(bid['error'] == 'Bid TTL too low')
         del data['valid_for_seconds']
         data['validmins'] = 1
-        bid = json.loads(urlopen('http://127.0.0.1:12701/json/bids/new', data=parse.urlencode(data).encode()).read())
+        bid = post_json_api(12701, 'bids/new', data)
         assert(bid['error'] == 'Bid TTL too low')
 
         data['validmins'] = 60
-        bid_id = json.loads(urlopen('http://127.0.0.1:12701/json/bids/new', data=parse.urlencode(data).encode()).read())
+        bid_id = post_json_api(12701, 'bids/new', data)
 
         waitForNumBids(self.delay_event, 12700, 1)
 
@@ -102,10 +100,10 @@ class Test(XmrTestBase):
             self.delay_event.wait(1)
         assert(bid['expire_at'] == bid['created_at'] + data['validmins'] * 60)
 
-        data = parse.urlencode({
+        data = {
             'accept': True
-        }).encode()
-        rv = json.loads(urlopen('http://127.0.0.1:12700/json/bids/{}'.format(bid['bid_id']), data=data).read())
+        }
+        rv = post_json_api(12700, 'bids/{}'.format(bid['bid_id']), data)
         assert(rv['bid_state'] == 'Accepted')
 
         waitForNumSwapping(self.delay_event, 12701, 1)
@@ -121,7 +119,7 @@ class Test(XmrTestBase):
         rv = read_json_api(12701)
         assert(rv['num_swapping'] == 1)
 
-        rv = json.loads(urlopen('http://127.0.0.1:12700/json/revokeoffer/{}'.format(offer_id)).read())
+        rv = read_json_api(12700, 'revokeoffer/{}'.format(offer_id))
         assert(rv['revoked_offer'] == offer_id)
 
         logger.info('Completing swap')
@@ -130,7 +128,7 @@ class Test(XmrTestBase):
                 raise ValueError('Test stopped.')
             self.delay_event.wait(4)
 
-            rv = json.loads(urlopen('http://127.0.0.1:12700/json/bids/{}'.format(bid['bid_id'])).read())
+            rv = read_json_api(12700, 'bids/{}'.format(bid['bid_id']))
             if rv['bid_state'] == 'Completed':
                 break
         assert(rv['bid_state'] == 'Completed')

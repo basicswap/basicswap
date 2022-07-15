@@ -16,14 +16,11 @@ python tests/basicswap/test_reload.py
 
 import os
 import sys
-import json
 import logging
 import unittest
 import traceback
 import threading
 import multiprocessing
-from urllib import parse
-from urllib.request import urlopen
 from unittest.mock import patch
 
 from basicswap.rpc import (
@@ -31,6 +28,7 @@ from basicswap.rpc import (
 )
 from tests.basicswap.common import (
     read_json_api,
+    post_json_api,
     waitForServer,
     waitForNumOffers,
     waitForNumBids,
@@ -104,15 +102,15 @@ class Test(unittest.TestCase):
                 delay_event.wait(2)
             assert(blocks >= num_blocks)
 
-            data = parse.urlencode({
+            data = {
                 'addr_from': '-1',
                 'coin_from': '1',
                 'coin_to': '2',
                 'amt_from': '1',
                 'amt_to': '1',
-                'lockhrs': '24'}).encode()
+                'lockhrs': '24'}
 
-            offer_id = json.loads(urlopen('http://127.0.0.1:12700/json/offers/new', data=data).read())
+            offer_id = post_json_api(12700, 'offers/new', data)
             summary = read_json_api(12700)
             assert(summary['num_sent_offers'] == 1)
         except Exception:
@@ -124,21 +122,21 @@ class Test(unittest.TestCase):
         offers = read_json_api(12701, 'offers')
         offer = offers[0]
 
-        data = parse.urlencode({
+        data = {
             'offer_id': offer['offer_id'],
-            'amount_from': offer['amount_from']}).encode()
+            'amount_from': offer['amount_from']}
 
-        bid_id = json.loads(urlopen('http://127.0.0.1:12701/json/bids/new', data=data).read())
+        bid_id = post_json_api(12701, 'bids/new', data)
 
         waitForNumBids(delay_event, 12700, 1)
 
         bids = read_json_api(12700, 'bids')
         bid = bids[0]
 
-        data = parse.urlencode({
+        data = {
             'accept': True
-        }).encode()
-        rv = json.loads(urlopen('http://127.0.0.1:12700/json/bids/{}'.format(bid['bid_id']), data=data).read())
+        }
+        rv = post_json_api(12700, 'bids/{}'.format(bid['bid_id']), data)
         assert(rv['bid_state'] == 'Accepted')
 
         waitForNumSwapping(delay_event, 12701, 1)
@@ -162,7 +160,6 @@ class Test(unittest.TestCase):
             delay_event.wait(5)
 
             rv = read_json_api(12700, 'bids/{}'.format(bid['bid_id']))
-            print(rv)
             if rv['bid_state'] == 'Completed':
                 break
         assert(rv['bid_state'] == 'Completed')

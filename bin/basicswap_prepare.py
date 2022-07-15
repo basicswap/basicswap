@@ -98,12 +98,12 @@ BTC_RPC_HOST = os.getenv('BTC_RPC_HOST', '127.0.0.1')
 NMC_RPC_HOST = os.getenv('NMC_RPC_HOST', '127.0.0.1')
 
 PART_RPC_PORT = int(os.getenv('PART_RPC_PORT', 19792))
-LTC_RPC_PORT = int(os.getenv('LTC_RPC_PORT', 19795))
-BTC_RPC_PORT = int(os.getenv('BTC_RPC_PORT', 19796))
-NMC_RPC_PORT = int(os.getenv('NMC_RPC_PORT', 19798))
+LTC_RPC_PORT = int(os.getenv('LTC_RPC_PORT', 19895))
+BTC_RPC_PORT = int(os.getenv('BTC_RPC_PORT', 19996))
+NMC_RPC_PORT = int(os.getenv('NMC_RPC_PORT', 19698))
 
 PART_ONION_PORT = int(os.getenv('PART_ONION_PORT', 51734))
-LTC_ONION_PORT = int(os.getenv('LTC_ONION_PORT', 9333))  # Still on 0.18 codebase, same port
+LTC_ONION_PORT = int(os.getenv('LTC_ONION_PORT', 9333))
 BTC_ONION_PORT = int(os.getenv('BTC_ONION_PORT', 8334))
 
 PART_RPC_USER = os.getenv('PART_RPC_USER', '')
@@ -433,10 +433,10 @@ def writeTorSettings(fp, coin, coin_settings, tor_control_password):
     fp.write(f'torpassword={tor_control_password}\n')
     fp.write(f'torcontrol={TOR_PROXY_HOST}:{TOR_CONTROL_PORT}\n')
 
-    if coin == 'litecoin':
-        fp.write(f'bind=0.0.0.0:{onionport}\n')
-    else:
+    if coin_settings['core_version_group'] >= 21:
         fp.write(f'bind=0.0.0.0:{onionport}=onion\n')
+    else:
+        fp.write(f'bind=0.0.0.0:{onionport}\n')
 
 
 def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
@@ -545,6 +545,7 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
                 fp.write('createdefaultmasterkey=1')
         elif coin == 'litecoin':
             fp.write('prune=4000\n')
+            fp.write('pid=litecoind.pid\n')
             if LTC_RPC_USER != '':
                 fp.write('rpcauth={}:{}${}\n'.format(LTC_RPC_USER, salt, password_to_hmac(salt, LTC_RPC_PWD)))
         elif coin == 'bitcoin':
@@ -986,7 +987,7 @@ def main():
             'blocks_confirmed': 2,
             'override_feerate': 0.002,
             'conf_target': 2,
-            'core_version_group': 18,
+            'core_version_group': 21,
             'chain_lookups': 'local',
         },
         'litecoin': {
@@ -1000,7 +1001,7 @@ def main():
             'use_segwit': True,
             'blocks_confirmed': 2,
             'conf_target': 2,
-            'core_version_group': 18,
+            'core_version_group': 21,
             'chain_lookups': 'local',
         },
         'bitcoin': {
@@ -1014,7 +1015,7 @@ def main():
             'use_segwit': True,
             'blocks_confirmed': 1,
             'conf_target': 2,
-            'core_version_group': 18,
+            'core_version_group': 22,
             'chain_lookups': 'local',
         },
         'namecoin': {

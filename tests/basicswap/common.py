@@ -196,11 +196,26 @@ def wait_for_in_progress(delay_event, swap_client, bid_id, sent=False):
     raise ValueError('wait_for_in_progress timed out.')
 
 
+def post_json_req(url, json_data):
+    req = urllib.request.Request(url)
+    req.add_header('Content-Type', 'application/json; charset=utf-8')
+    post_bytes = json.dumps(json_data).encode('utf-8')
+    req.add_header('Content-Length', len(post_bytes))
+    return urlopen(req, post_bytes).read()
+
+
 def read_json_api(port, path=None):
     url = f'http://127.0.0.1:{port}/json'
     if path is not None:
         url += '/' + path
     return json.loads(urlopen(url).read())
+
+
+def post_json_api(port, path, json_data):
+    url = f'http://127.0.0.1:{port}/json'
+    if path is not None:
+        url += '/' + path
+    return json.loads(post_json_req(url, json_data))
 
 
 def wait_for_none_active(delay_event, port, wait_for=30):
@@ -270,14 +285,6 @@ def wait_for_balance(delay_event, url, balance_key, expect_amount, iterations=20
         i += 1
         if i > iterations:
             raise ValueError('Expect {} {}'.format(balance_key, expect_amount))
-
-
-def post_json_req(url, json_data):
-    req = urllib.request.Request(url)
-    req.add_header('Content-Type', 'application/json; charset=utf-8')
-    post_bytes = json.dumps(json_data).encode('utf-8')
-    req.add_header('Content-Length', len(post_bytes))
-    return urlopen(req, post_bytes).read()
 
 
 def delay_for(delay_event, delay_for=60):
