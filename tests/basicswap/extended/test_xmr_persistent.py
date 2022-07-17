@@ -120,8 +120,8 @@ class Test(unittest.TestCase):
 
         random.seed(time.time())
 
-        os.environ['PARTICL_PORT_BASE'] = str(BASE_PART_RPC_PORT)
-        os.environ['BITCOIN_PORT_BASE'] = str(BASE_BTC_RPC_PORT)
+        os.environ['PARTICL_RPC_PORT_BASE'] = str(BASE_PART_RPC_PORT)
+        os.environ['BITCOIN_RPC_PORT_BASE'] = str(BASE_BTC_RPC_PORT)
         logging.info('Preparing %d nodes.', NUM_NODES)
         prepare_nodes(NUM_NODES, 'bitcoin,monero', True, {'min_sequence_lock_seconds': 60}, PORT_OFS)
 

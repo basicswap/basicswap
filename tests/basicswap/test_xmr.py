@@ -441,7 +441,7 @@ class BaseTest(unittest.TestCase):
                 cls.http_threads.append(t)
                 t.start()
 
-            # Set future block rewards to nowhere (a random address)
+            # Set future block rewards to nowhere (a random address), so wallet amounts stay constant
             eckey = ECKey()
             eckey.generate()
             void_block_rewards_pubkey = eckey.get_pubkey().get_bytes()
@@ -451,6 +451,7 @@ class BaseTest(unittest.TestCase):
             logging.info('Mining %d Bitcoin blocks to %s', num_blocks, cls.btc_addr)
             callnoderpc(0, 'generatetoaddress', [num_blocks, cls.btc_addr], base_rpc_port=BTC_BASE_RPC_PORT)
 
+            # Switch addresses so wallet amounts stay constant
             num_blocks = 100
             cls.btc_addr = cls.swap_clients[0].ci(Coins.BTC).pubkey_to_segwit_address(void_block_rewards_pubkey)
             logging.info('Mining %d Bitcoin blocks to %s', num_blocks, cls.btc_addr)

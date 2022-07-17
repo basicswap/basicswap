@@ -92,6 +92,10 @@ def run_prepare(node_id, datadir_path, bins_path, with_coins, mnemonic_in=None, 
         '-xmrrestoreheight=0']
     if mnemonic_in:
         testargs.append(f'-particl_mnemonic="{mnemonic_in}"')
+
+    keysdirpath = os.getenv('PGP_KEYS_DIR_PATH', None)
+    if keysdirpath is not None:
+        testargs.append('-keysdirpath="' + os.path.expanduser(keysdirpath) + '"')
     with patch.object(sys, 'argv', testargs), patch('sys.stdout', new=StringIO()) as mocked_stdout:
         prepareSystem.main()
         lines = mocked_stdout.getvalue().split('\n')

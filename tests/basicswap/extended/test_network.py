@@ -12,8 +12,8 @@ import shutil
 import signal
 import logging
 import unittest
-import traceback
 import threading
+import traceback
 
 import basicswap.config as cfg
 from basicswap.basicswap import (

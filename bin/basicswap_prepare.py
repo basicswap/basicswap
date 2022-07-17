@@ -78,6 +78,16 @@ logger.level = logging.DEBUG
 if not len(logger.handlers):
     logger.addHandler(logging.StreamHandler(sys.stdout))
 
+UI_HTML_PORT = int(os.getenv('UI_HTML_PORT', 12700))
+COINS_RPCBIND_IP = os.getenv('COINS_RPCBIND_IP', '127.0.0.1')
+
+PART_ZMQ_PORT = int(os.getenv('PART_ZMQ_PORT', 20792))
+PART_RPC_HOST = os.getenv('PART_RPC_HOST', '127.0.0.1')
+PART_RPC_PORT = int(os.getenv('PART_RPC_PORT', 19792))
+PART_ONION_PORT = int(os.getenv('PART_ONION_PORT', 51734))
+PART_RPC_USER = os.getenv('PART_RPC_USER', '')
+PART_RPC_PWD = os.getenv('PART_RPC_PWD', '')
+
 XMR_RPC_HOST = os.getenv('XMR_RPC_HOST', '127.0.0.1')
 BASE_XMR_RPC_PORT = int(os.getenv('BASE_XMR_RPC_PORT', 29798))
 BASE_XMR_ZMQ_PORT = int(os.getenv('BASE_XMR_ZMQ_PORT', 30898))
@@ -86,34 +96,22 @@ XMR_WALLET_RPC_HOST = os.getenv('XMR_WALLET_RPC_HOST', '127.0.0.1')
 XMR_WALLET_RPC_USER = os.getenv('XMR_WALLET_RPC_USER', 'xmr_wallet_user')
 XMR_WALLET_RPC_PWD = os.getenv('XMR_WALLET_RPC_PWD', 'xmr_wallet_pwd')
 XMR_SITE_COMMIT = 'abcf12c4ccac3e48bb4ff178f18bb8a95d94b029'  # Lock hashes.txt to monero version
-
 DEFAULT_XMR_RESTORE_HEIGHT = int(os.getenv('DEFAULT_XMR_RESTORE_HEIGHT', 2245107))
 
-UI_HTML_PORT = int(os.getenv('UI_HTML_PORT', 12700))
-PART_ZMQ_PORT = int(os.getenv('PART_ZMQ_PORT', 20792))
-
-PART_RPC_HOST = os.getenv('PART_RPC_HOST', '127.0.0.1')
 LTC_RPC_HOST = os.getenv('LTC_RPC_HOST', '127.0.0.1')
-BTC_RPC_HOST = os.getenv('BTC_RPC_HOST', '127.0.0.1')
-NMC_RPC_HOST = os.getenv('NMC_RPC_HOST', '127.0.0.1')
-
-PART_RPC_PORT = int(os.getenv('PART_RPC_PORT', 19792))
 LTC_RPC_PORT = int(os.getenv('LTC_RPC_PORT', 19895))
-BTC_RPC_PORT = int(os.getenv('BTC_RPC_PORT', 19996))
-NMC_RPC_PORT = int(os.getenv('NMC_RPC_PORT', 19698))
-
-PART_ONION_PORT = int(os.getenv('PART_ONION_PORT', 51734))
 LTC_ONION_PORT = int(os.getenv('LTC_ONION_PORT', 9333))
-BTC_ONION_PORT = int(os.getenv('BTC_ONION_PORT', 8334))
-
-PART_RPC_USER = os.getenv('PART_RPC_USER', '')
-PART_RPC_PWD = os.getenv('PART_RPC_PWD', '')
-BTC_RPC_USER = os.getenv('BTC_RPC_USER', '')
-BTC_RPC_PWD = os.getenv('BTC_RPC_PWD', '')
 LTC_RPC_USER = os.getenv('LTC_RPC_USER', '')
 LTC_RPC_PWD = os.getenv('LTC_RPC_PWD', '')
 
-COINS_RPCBIND_IP = os.getenv('COINS_RPCBIND_IP', '127.0.0.1')
+BTC_RPC_HOST = os.getenv('BTC_RPC_HOST', '127.0.0.1')
+BTC_RPC_PORT = int(os.getenv('BTC_RPC_PORT', 19996))
+BTC_ONION_PORT = int(os.getenv('BTC_ONION_PORT', 8334))
+BTC_RPC_USER = os.getenv('BTC_RPC_USER', '')
+BTC_RPC_PWD = os.getenv('BTC_RPC_PWD', '')
+
+NMC_RPC_HOST = os.getenv('NMC_RPC_HOST', '127.0.0.1')
+NMC_RPC_PORT = int(os.getenv('NMC_RPC_PORT', 19698))
 
 TOR_PROXY_HOST = os.getenv('TOR_PROXY_HOST', '127.0.0.1')
 TOR_PROXY_PORT = int(os.getenv('TOR_PROXY_PORT', 9050))
@@ -124,7 +122,6 @@ TEST_ONION_LINK = toBool(os.getenv('TEST_ONION_LINK', 'false'))
 
 BITCOIN_FASTSYNC_URL = os.getenv('BITCOIN_FASTSYNC_URL', 'http://utxosets.blob.core.windows.net/public/')
 BITCOIN_FASTSYNC_FILE = os.getenv('BITCOIN_FASTSYNC_FILE', 'utxo-snapshot-bitcoin-mainnet-720179.tar')
-
 
 use_tor_proxy = False
 
@@ -207,9 +204,15 @@ def testOnionLink():
     logger.info('Onion links work.')
 
 
-def ensureValidSignatureBy(result, signing_key_name):
+def isValidSignature(result):
     if result.valid is False \
-       and not (result.status == 'signature valid' and result.key_status == 'signing key has expired'):
+       and (result.status == 'signature valid' and result.key_status == 'signing key has expired'):
+        return True
+    return result.valid
+
+
+def ensureValidSignatureBy(result, signing_key_name):
+    if not isValidSignature(result):
         raise ValueError('Signature verification failed.')
 
     if result.key_id not in expected_key_ids[signing_key_name]:
@@ -378,17 +381,26 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
     """
     gpg = gnupg.GPG()
 
+    keysdirpath = extra_opts.get('keysdirpath', None)
+    if keysdirpath is not None:
+        logger.info(f'Loading PGP keys from: {keysdirpath}.')
+        for path in os.scandir(keysdirpath):
+            if path.is_file():
+                with open(path, 'rb') as fp:
+                    rv = gpg.import_keys(fp.read())
+                    for key in rv.fingerprints:
+                        gpg.trust_keys(rv.fingerprints[0], 'TRUST_FULLY')
+
     if coin == 'monero':
         with open(assert_path, 'rb') as fp:
             verified = gpg.verify_file(fp)
 
-        if verified.username is None:
+        if not isValidSignature(verified) and verified.username is None:
             logger.warning('Signature made by unknown key.')
 
             pubkeyurl = 'https://raw.githubusercontent.com/monero-project/monero/master/utils/gpg_keys/binaryfate.asc'
             logger.info('Importing public key from url: ' + pubkeyurl)
             rv = gpg.import_keys(downloadBytes(pubkeyurl))
-            assert('F0AF4D462A0BDF92' in rv.fingerprints[0])
             gpg.trust_keys(rv.fingerprints[0], 'TRUST_FULLY')
             with open(assert_path, 'rb') as fp:
                 verified = gpg.verify_file(fp)
@@ -396,7 +408,7 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
         with open(assert_sig_path, 'rb') as fp:
             verified = gpg.verify_file(fp, assert_path)
 
-        if verified.username is None:
+        if not isValidSignature(verified) and verified.username is None:
             logger.warning('Signature made by unknown key.')
 
             filename = '{}_{}.pgp'.format(coin, signing_key_name)
@@ -745,6 +757,7 @@ def printHelp():
     logger.info('--usebtcfastsync         Initialise the BTC chain with a snapshot from btcpayserver FastSync.\n'
                 + '                         See https://github.com/btcpayserver/btcpayserver-docker/blob/master/contrib/FastSync/README.md')
     logger.info('--initwalletsonly        Setup coin wallets only.')
+    logger.info('--keysdirpath            Speed up tests by preloading all PGP keys in directory.')
 
     logger.info('\n' + 'Known coins: %s', ', '.join(known_coins.keys()))
 
@@ -843,13 +856,11 @@ def main():
     xmr_restore_height = DEFAULT_XMR_RESTORE_HEIGHT
     prepare_bin_only = False
     no_cores = False
-    use_containers = False
     enable_tor = False
     disable_tor = False
-    tor_control_password = None
-    use_btc_fastsync = False
-    extract_core_overwrite = True
     initwalletsonly = False
+    tor_control_password = None
+    extra_opts = {}
 
     for v in sys.argv[1:]:
         if len(v) < 2 or v[0] != '-':
@@ -883,10 +894,10 @@ def main():
             no_cores = True
             continue
         if name == 'usecontainers':
-            use_containers = True
+            extra_opts['use_containers'] = True
             continue
         if name == 'noextractover':
-            extract_core_overwrite = False
+            extra_opts['extract_core_overwrite'] = False
             continue
         if name == 'usetorproxy':
             use_tor_proxy = True
@@ -898,7 +909,7 @@ def main():
             disable_tor = True
             continue
         if name == 'usebtcfastsync':
-            use_btc_fastsync = True
+            extra_opts['use_btc_fastsync'] = True
             continue
         if name == 'initwalletsonly':
             initwalletsonly = True
@@ -946,6 +957,9 @@ def main():
                 continue
             if name == 'xmrrestoreheight':
                 xmr_restore_height = int(s[1])
+                continue
+            if name == 'keysdirpath':
+                extra_opts['keysdirpath'] = os.path.expanduser(s[1].strip('"'))
                 continue
 
         exitWithError('Unknown argument {}'.format(v))
@@ -1122,13 +1136,8 @@ def main():
         logger.info('Done.')
         return 0
 
-    extra_opts = {
-        'use_btc_fastsync': use_btc_fastsync,
-        'extract_core_overwrite': extract_core_overwrite,
-        'data_dir': data_dir,
-        'use_containers': use_containers,
-        'tor_control_password': tor_control_password,
-    }
+    extra_opts['data_dir'] = data_dir
+    extra_opts['tor_control_password'] = tor_control_password
 
     if add_coin != '':
         logger.info('Adding coin: %s', add_coin)
