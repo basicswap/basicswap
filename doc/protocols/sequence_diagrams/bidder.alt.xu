@@ -39,11 +39,11 @@ xu {
     B => B [label="Wait for PTX to confirm"], O => O [label="Wait for PTX to confirm"];
     B abox B [label="PTX Confirmed", textbgcolor="#f1db4b"];
     B abox B [label="Bid Participating"];
-    O =>> N [label="Sends Participate Redeem Tx"],
-    C note C2
-        [label="Reveals secret_value",
-         textbgcolor="#FFFFCC"];
     CB alt C [label="success path"] {
+        O =>> N [label="Sends Participate Redeem Tx"],
+        C note C2
+            [label="Reveals secret_value",
+             textbgcolor="#FFFFCC"];
         N >> B [label="Detects Participate Redeem Tx"];
         B abox B [label="PTX Redeemed", textbgcolor="#f1db4b"];
         B =>> N [label="Sends Initiate Redeem Tx"];
@@ -51,10 +51,17 @@ xu {
         B abox B [label="ITX Redeemed", textbgcolor="#4bdbf1"];
         B abox B [label="Bid Completed"];
     --- [label="fail path"];
+        CB alt C [label="offerer may reclaim ITX"] {
+            O => O [label="Wait for ITX locktime to expire"];
+            O =>> N [label="ITX Refund Tx"];
+            N >> B [label="Detects Initiate Tx refund Tx"];
+            B abox B [label="ITX Refunded", textbgcolor="#4bdbf1"];
+        };
         B => B [label="Wait for PTX locktime to expire"];
         B =>> N [label="PTX Refund Tx"];
         B => B [label="Wait for PTX Refund to confirm"];
         B abox B [label="PTX Refunded", textbgcolor="#f1db4b"];
+        B abox B [label="Bid Completed"];
     };
 }
 

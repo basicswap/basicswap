@@ -228,6 +228,14 @@ class Test(BaseTest):
         assert(js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
         assert(js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
 
+        bid_id_hex = bid_id.hex()
+        path = f'bids/{bid_id_hex}/states'
+        offerer_states = read_json_api(1800, path)
+        bidder_states = read_json_api(1801, path)
+
+        assert(compare_bid_states(offerer_states, self.states_offerer[1]) is True)
+        assert(bidder_states[-1][1] == 'Bid Abandoned')
+
     def test_06_self_bid(self):
         logging.info('---------- Test same client, BTC to LTC')
         swap_clients = self.swap_clients
@@ -329,6 +337,14 @@ class Test(BaseTest):
         assert(js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
         assert(js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
 
+        bid_id_hex = bid_id.hex()
+        path = f'bids/{bid_id_hex}/states'
+        offerer_states = read_json_api(1800, path)
+        bidder_states = read_json_api(1801, path)
+
+        assert(compare_bid_states(offerer_states, self.states_offerer[1]) is True)
+        assert(compare_bid_states(bidder_states, self.states_bidder[1]) is True)
+
     '''
     def test_11_refund(self):
         # Seller submits initiate txn, buyer doesn't respond, repeat of test 5 using debug_ind
@@ -389,7 +405,7 @@ class Test(BaseTest):
         swap_value = make_int(random.uniform(2.0, 20.0), scale=8, r=1)
         logging.info('swap_value {}'.format(format_amount(swap_value, 8)))
         offer_id = swap_clients[0].postOffer(Coins.LTC, Coins.BTC, swap_value, 0.5 * COIN, swap_value, SwapTypes.SELLER_FIRST,
-                                             TxLockTypes.SEQUENCE_LOCK_BLOCKS, 10)
+                                             TxLockTypes.SEQUENCE_LOCK_BLOCKS, 16)
 
         wait_for_offer(test_delay_event, swap_clients[1], offer_id)
         offer = swap_clients[1].getOffer(offer_id)
@@ -424,6 +440,16 @@ class Test(BaseTest):
 
         assert(node1_btc_after < node1_btc_before - btc_swap_value)
         assert(node1_ltc_before == node1_ltc_after)
+
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=60)
+
+        bid_id_hex = bid_id.hex()
+        path = f'bids/{bid_id_hex}/states'
+        offerer_states = read_json_api(1800, path)
+        bidder_states = read_json_api(1801, path)
+
+        assert(compare_bid_states(offerer_states, self.states_offerer[2]) is True)
+        assert(compare_bid_states(bidder_states, self.states_bidder[2], exact_match=False) is True)
 
     def pass_99_delay(self):
         logging.info('Delay')

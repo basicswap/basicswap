@@ -3199,8 +3199,8 @@ class BasicSwap(BaseApp):
 
         if state > BidStates.BID_ACCEPTED:
             # Wait for spend of all known swap txns
-            if (bid.getITxState() is None or bid.getITxState() >= TxStates.TX_REDEEMED) \
-               and (bid.getPTxState() is None or bid.getPTxState() >= TxStates.TX_REDEEMED):
+            if (bid.getITxState() is None or bid.getITxState() >= TxStates.TX_REDEEMED) and \
+               (bid.getPTxState() is None or bid.getPTxState() >= TxStates.TX_REDEEMED):
                 self.log.info('Swap completed for bid %s', bid_id.hex())
 
                 if bid.getITxState() == TxStates.TX_REDEEMED:

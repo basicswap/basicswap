@@ -363,15 +363,19 @@ def extract_states_from_xu_file(file_path):
     return states
 
 
-def compare_bid_states(states, expect_states):
+def compare_bid_states(states, expect_states, exact_match=True):
 
     for i in range(len(states) - 1, -1, -1):
         if states[i][1] == 'Bid Delaying':
             del states[i]
 
-    assert(len(states) == len(expect_states))
+    if exact_match:
+        assert(len(states) == len(expect_states))
+    else:
+        assert(len(states) >= len(expect_states))
 
-    for i, s in enumerate(states):
+    for i in range(len(expect_states)):
+        s = states[i]
         if s[1] != expect_states[i]:
             if 'Bid ' + expect_states[i] == s[1]:
                 logging.warning(f'Expected state {expect_states[i]} not an exact match to {s[1]}.')
