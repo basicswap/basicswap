@@ -121,7 +121,12 @@ def wait_for_bid(delay_event, swap_client, bid_id, state=None, sent=False, wait_
         assert(len(bids) < 2)
         for bid in bids:
             if bid[2] == bid_id:
-                if state is not None and state != bid[5]:
+                if type(state) == list:
+                    if bid[5] in state:
+                        return
+                    else:
+                        continue
+                elif state is not None and state != bid[5]:
                     continue
                 return
     raise ValueError('wait_for_bid timed out.')
@@ -302,7 +307,7 @@ def make_rpc_func(node_id, base_rpc_port=BASE_RPC_PORT):
     return rpc_func
 
 
-def extract_states_from_xu_file(file_path):
+def extract_states_from_xu_file(file_path, prefix):
     states = {}
 
     alt_counter = 0
@@ -341,6 +346,8 @@ def extract_states_from_xu_file(file_path):
                 continue
 
             if definitions[1] != 'abox':
+                continue
+            if definitions[0] != prefix:
                 continue
 
             tag_start = 'label="'

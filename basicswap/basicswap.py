@@ -3424,7 +3424,8 @@ class BasicSwap(BaseApp):
                         self.log.info('Recovering xmr swap chain B lock tx for bid %s in %d seconds', bid_id.hex(), delay)
                         self.createActionInSession(delay, ActionTypes.RECOVER_XMR_SWAP_LOCK_TX_B, bid_id, session)
                     else:
-                        bid.setState(BidStates.XMR_SWAP_FAILED_REFUNDED)
+                        # Other side refunded before swap lock tx was sent
+                        bid.setState(BidStates.XMR_SWAP_FAILED)
 
                 if bid.was_received:
                     if not bid.was_sent:
@@ -4472,8 +4473,8 @@ class BasicSwap(BaseApp):
         if bid.debug_ind == DebugTypes.BID_STOP_AFTER_COIN_A_LOCK:
             self.log.debug('XMR bid %s: Stalling bid for testing: %d.', bid_id.hex(), bid.debug_ind)
             bid.setState(BidStates.BID_STALLED_FOR_TEST)
-            self.saveBidInSession(bid_id, bid, session, xmr_swap, save_in_progress=offer)
             self.logBidEvent(bid.bid_id, EventLogTypes.DEBUG_TWEAK_APPLIED, 'ind {}'.format(bid.debug_ind), session)
+            self.saveBidInSession(bid_id, bid, session, xmr_swap, save_in_progress=offer)
             return
 
         if bid.debug_ind == DebugTypes.CREATE_INVALID_COIN_B_LOCK:

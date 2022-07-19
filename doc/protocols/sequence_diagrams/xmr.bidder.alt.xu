@@ -31,10 +31,11 @@ xu {
     B abox B [label="Exchanged script lock spend tx msg"];
     B => B [label="Wait for script-coin-lock-tx to confirm"];
     B abox B [label="Bid Script coin locked"];
+    # Bidder would only send noscript-coin-lock-tx if script-coin-lock-tx validates
+    B =>> N [label="Sends noscript-coin-lock-tx"];
+    B => B [label="Wait for noscript-coin-lock-tx to confirm"], O => O [label="Wait for noscript-coin-lock-tx to confirm"];
+    B abox B [label="Bid Scriptless coin locked"];
     CB alt C [label="success path"] {
-        B =>> N [label="Sends noscript-coin-lock-tx"];
-        B => B [label="Wait for noscript-coin-lock-tx to confirm"], O => O [label="Wait for noscript-coin-lock-tx to confirm"];
-        B abox B [label="Bid Scriptless coin locked"];
         O => B [label="Sends script-coin-lock-tx release message"],
                 C note C2
                     [label="The XmrBidLockReleaseMessage contains the offerer's OTVES for it.
@@ -78,4 +79,3 @@ xu {
         };
     };
 }
-

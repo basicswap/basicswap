@@ -342,8 +342,8 @@ class BaseTest(unittest.TestCase):
         logger.addHandler(cls.stream_fp)
 
         diagrams_dir = 'doc/protocols/sequence_diagrams'
-        cls.states_bidder = extract_states_from_xu_file(os.path.join(diagrams_dir, 'xmr.bidder.alt.xu'))
-        cls.states_offerer = extract_states_from_xu_file(os.path.join(diagrams_dir, 'xmr.offerer.alt.xu'))
+        cls.states_bidder = extract_states_from_xu_file(os.path.join(diagrams_dir, 'xmr.bidder.alt.xu'), 'B')
+        cls.states_offerer = extract_states_from_xu_file(os.path.join(diagrams_dir, 'xmr.offerer.alt.xu'), 'O')
 
         try:
             logging.info('Preparing coin nodes.')
@@ -689,8 +689,6 @@ class Test(BaseTest):
         logging.info('---------- Test PART to XMR leader recovers coin a lock tx')
         swap_clients = self.swap_clients
 
-        js_w0_before = read_json_api(1800, 'wallets')
-
         offer_id = swap_clients[0].postOffer(
             Coins.PART, Coins.XMR, 101 * COIN, 0.12 * XMR_COIN, 101 * COIN, SwapTypes.XMR_SWAP,
             lock_type=TxLockTypes.SEQUENCE_LOCK_BLOCKS, lock_value=12)
@@ -709,15 +707,17 @@ class Test(BaseTest):
         swap_clients[0].acceptXmrBid(bid_id)
 
         wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.XMR_SWAP_FAILED_REFUNDED, wait_for=180)
-        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.XMR_SWAP_FAILED_REFUNDED, sent=True)
+        wait_for_bid(test_delay_event, swap_clients[1], bid_id, [BidStates.BID_STALLED_FOR_TEST, BidStates.XMR_SWAP_FAILED_REFUNDED], sent=True)
 
-        js_w0_after = read_json_api(1800, 'wallets')
+        bid_id_hex = bid_id.hex()
+        path = f'bids/{bid_id_hex}/states'
+        offerer_states = read_json_api(1800, path)
+
+        assert(compare_bid_states(offerer_states, self.states_offerer[1]) is True)
 
     def test_03_follower_recover_a_lock_tx(self):
         logging.info('---------- Test PART to XMR follower recovers coin a lock tx')
         swap_clients = self.swap_clients
-
-        js_w0_before = read_json_api(1800, 'wallets')
 
         offer_id = swap_clients[0].postOffer(
             Coins.PART, Coins.XMR, 101 * COIN, 0.13 * XMR_COIN, 101 * COIN, SwapTypes.XMR_SWAP,
@@ -740,10 +740,15 @@ class Test(BaseTest):
         wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.BID_STALLED_FOR_TEST, wait_for=180)
         wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.XMR_SWAP_FAILED_SWIPED, wait_for=80, sent=True)
 
-        js_w0_after = read_json_api(1800, 'wallets')
-
         wait_for_none_active(test_delay_event, 1800)
         wait_for_none_active(test_delay_event, 1801)
+
+        bid_id_hex = bid_id.hex()
+        path = f'bids/{bid_id_hex}/states'
+        bidder_states = read_json_api(1801, path)
+
+        bidder_states = [s for s in bidder_states if s[1] != 'Bid Stalled (debug)']
+        assert(compare_bid_states(bidder_states, self.states_bidder[2]) is True)
 
     def test_04_follower_recover_b_lock_tx(self):
         logging.info('---------- Test PART to XMR follower recovers coin b lock tx')
@@ -752,7 +757,7 @@ class Test(BaseTest):
 
         offer_id = swap_clients[0].postOffer(
             Coins.PART, Coins.XMR, 101 * COIN, 0.14 * XMR_COIN, 101 * COIN, SwapTypes.XMR_SWAP,
-            lock_type=TxLockTypes.SEQUENCE_LOCK_BLOCKS, lock_value=18)
+            lock_type=TxLockTypes.SEQUENCE_LOCK_BLOCKS, lock_value=28)
         wait_for_offer(test_delay_event, swap_clients[1], offer_id)
         offer = swap_clients[1].getOffer(offer_id)
 
@@ -768,6 +773,14 @@ class Test(BaseTest):
 
         wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.XMR_SWAP_FAILED_REFUNDED, wait_for=180)
         wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.XMR_SWAP_FAILED_REFUNDED, sent=True)
+
+        bid_id_hex = bid_id.hex()
+        path = f'bids/{bid_id_hex}/states'
+        offerer_states = read_json_api(1800, path)
+        bidder_states = read_json_api(1801, path)
+
+        assert(compare_bid_states(offerer_states, self.states_offerer[1]) is True)
+        assert(compare_bid_states(bidder_states, self.states_bidder[1]) is True)
 
     def test_05_btc_xmr(self):
         logging.info('---------- Test BTC to XMR')

@@ -73,8 +73,8 @@ class Test(BaseTest):
         wait_for_balance(test_delay_event, 'http://127.0.0.1:1801/json/wallets/ltc', 'balance', 1000.0)
 
         diagrams_dir = 'doc/protocols/sequence_diagrams'
-        cls.states_bidder = extract_states_from_xu_file(os.path.join(diagrams_dir, 'bidder.alt.xu'))
-        cls.states_offerer = extract_states_from_xu_file(os.path.join(diagrams_dir, 'offerer.alt.xu'))
+        cls.states_bidder = extract_states_from_xu_file(os.path.join(diagrams_dir, 'bidder.alt.xu'), 'B')
+        cls.states_offerer = extract_states_from_xu_file(os.path.join(diagrams_dir, 'offerer.alt.xu'), 'O')
 
     @classmethod
     def tearDownClass(cls):
