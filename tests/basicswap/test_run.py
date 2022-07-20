@@ -314,7 +314,7 @@ class Test(BaseTest):
         swap_value = make_int(random.uniform(0.001, 10.0), scale=8, r=1)
         logging.info('swap_value {}'.format(format_amount(swap_value, 8)))
         offer_id = swap_clients[0].postOffer(Coins.LTC, Coins.BTC, swap_value, 0.1 * COIN, swap_value, SwapTypes.SELLER_FIRST,
-                                             TxLockTypes.SEQUENCE_LOCK_BLOCKS, 10)
+                                             TxLockTypes.SEQUENCE_LOCK_BLOCKS, 18)
 
         wait_for_offer(test_delay_event, swap_clients[1], offer_id)
         offer = swap_clients[1].getOffer(offer_id)
@@ -405,7 +405,7 @@ class Test(BaseTest):
         swap_value = make_int(random.uniform(2.0, 20.0), scale=8, r=1)
         logging.info('swap_value {}'.format(format_amount(swap_value, 8)))
         offer_id = swap_clients[0].postOffer(Coins.LTC, Coins.BTC, swap_value, 0.5 * COIN, swap_value, SwapTypes.SELLER_FIRST,
-                                             TxLockTypes.SEQUENCE_LOCK_BLOCKS, 16)
+                                             TxLockTypes.SEQUENCE_LOCK_BLOCKS, 18)
 
         wait_for_offer(test_delay_event, swap_clients[1], offer_id)
         offer = swap_clients[1].getOffer(offer_id)
@@ -413,7 +413,12 @@ class Test(BaseTest):
         swap_clients[1].setBidDebugInd(bid_id, DebugTypes.DONT_SPEND_ITX)
 
         wait_for_bid(test_delay_event, swap_clients[0], bid_id)
+
+        # For testing: Block refunding the ITX until PTX has been redeemed, else ITX refund can become spendable before PTX confirms
+        swap_clients[0].setBidDebugInd(bid_id, DebugTypes.SKIP_LOCK_TX_REFUND)
         swap_clients[0].acceptBid(bid_id)
+        wait_for_bid_tx_state(test_delay_event, swap_clients[0], bid_id, TxStates.TX_CONFIRMED, TxStates.TX_REDEEMED, wait_for=60)
+        swap_clients[0].setBidDebugInd(bid_id, DebugTypes.NONE)
 
         wait_for_bid_tx_state(test_delay_event, swap_clients[0], bid_id, TxStates.TX_REFUNDED, TxStates.TX_REDEEMED, wait_for=60)
 

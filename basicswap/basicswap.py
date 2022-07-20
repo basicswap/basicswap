@@ -3199,18 +3199,14 @@ class BasicSwap(BaseApp):
 
         if state > BidStates.BID_ACCEPTED:
             # Wait for spend of all known swap txns
-            if (bid.getITxState() is None or bid.getITxState() >= TxStates.TX_REDEEMED) and \
-               (bid.getPTxState() is None or bid.getPTxState() >= TxStates.TX_REDEEMED):
+            itx_state = bid.getITxState()
+            ptx_state = bid.getPTxState()
+            if (itx_state is None or itx_state >= TxStates.TX_REDEEMED) and \
+               (ptx_state is None or ptx_state >= TxStates.TX_REDEEMED):
                 self.log.info('Swap completed for bid %s', bid_id.hex())
 
-                if bid.getITxState() == TxStates.TX_REDEEMED:
-                    self.returnAddressToPool(bid_id, TxTypes.ITX_REFUND)
-                else:
-                    self.returnAddressToPool(bid_id, TxTypes.ITX_REDEEM)
-                if bid.getPTxState() == TxStates.TX_REDEEMED:
-                    self.returnAddressToPool(bid_id, TxTypes.PTX_REFUND)
-                else:
-                    self.returnAddressToPool(bid_id, TxTypes.PTX_REDEEM)
+                self.returnAddressToPool(bid_id, TxTypes.ITX_REFUND if itx_state == TxStates.TX_REDEEMED else TxTypes.PTX_REDEEM)
+                self.returnAddressToPool(bid_id, TxTypes.ITX_REFUND if ptx_state == TxStates.TX_REDEEMED else TxTypes.PTX_REDEEM)
 
                 bid.setState(BidStates.SWAP_COMPLETED)
                 self.saveBid(bid_id, bid)
@@ -3219,8 +3215,11 @@ class BasicSwap(BaseApp):
         if save_bid:
             self.saveBid(bid_id, bid)
 
+        if bid.debug_ind == DebugTypes.SKIP_LOCK_TX_REFUND:
+            return False  # Bid is still active
+
         # Try refund, keep trying until sent tx is spent
-        if (bid.getITxState() == TxStates.TX_SENT or bid.getITxState() == TxStates.TX_CONFIRMED) \
+        if bid.getITxState() in (TxStates.TX_SENT, TxStates.TX_CONFIRMED) \
            and bid.initiate_txn_refund is not None:
             try:
                 txid = ci_from.publishTx(bid.initiate_txn_refund)
@@ -3230,7 +3229,7 @@ class BasicSwap(BaseApp):
                 if 'non-BIP68-final' not in str(ex) and 'non-final' not in str(ex):
                     self.log.warning('Error trying to submit initiate refund txn: %s', str(ex))
 
-        if (bid.getPTxState() == TxStates.TX_SENT or bid.getPTxState() == TxStates.TX_CONFIRMED) \
+        if bid.getPTxState() in (TxStates.TX_SENT, TxStates.TX_CONFIRMED) \
            and bid.participate_txn_refund is not None:
             try:
                 txid = ci_to.publishTx(bid.participate_txn_refund)
@@ -5790,6 +5789,12 @@ class BasicSwap(BaseApp):
         self.log.debug('Bid %s Setting debug flag: %s', bid_id.hex(), debug_ind)
         bid = self.getBid(bid_id)
         bid.debug_ind = debug_ind
+
+        # Update in memory copy.  TODO: Improve
+        bid_in_progress = self.swaps_in_progress.get(bid_id, None)
+        if bid_in_progress:
+            bid_in_progress[0].debug_ind = debug_ind
+
         self.saveBid(bid_id, bid)
 
     def storeOfferRevoke(self, offer_id, sig):

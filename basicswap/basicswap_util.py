@@ -170,12 +170,14 @@ class XmrSplitMsgTypes(IntEnum):
 
 
 class DebugTypes(IntEnum):
+    NONE = 0
     BID_STOP_AFTER_COIN_A_LOCK = auto()
     BID_DONT_SPEND_COIN_A_LOCK_REFUND = auto()
     CREATE_INVALID_COIN_B_LOCK = auto()
     BUYER_STOP_AFTER_ITX = auto()
     MAKE_INVALID_PTX = auto()
     DONT_SPEND_ITX = auto()
+    SKIP_LOCK_TX_REFUND = auto()
 
 
 def strOfferState(state):
