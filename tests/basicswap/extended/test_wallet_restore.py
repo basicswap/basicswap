@@ -164,12 +164,23 @@ class Test(TestBase):
             processes[-1].start()
             waitForServer(self.delay_event, 12703)
 
-            # TODO: Try detect past swaps
+            self.wait_seconds(5)
 
-            ltc_orig = read_json_api(12700, 'wallets/ltc')
+            # TODO: Attempt to detect past swaps
+
+            ltc_original = read_json_api(12700, 'wallets/ltc')
             ltc_restored = read_json_api(12703, 'wallets/ltc')
-            assert(float(ltc_orig['balance']) + float(ltc_orig['unconfirmed']) > 0.0)
-            assert(float(ltc_orig['balance']) + float(ltc_orig['unconfirmed']) == float(ltc_restored['balance']) + float(ltc_restored['unconfirmed']))
+            assert(float(ltc_original['balance']) + float(ltc_original['unconfirmed']) > 0.0)
+            assert(float(ltc_original['balance']) + float(ltc_original['unconfirmed']) == float(ltc_restored['balance']) + float(ltc_restored['unconfirmed']))
+
+            wallets_original = read_json_api(12700, 'wallets')
+            # TODO: After restoring a new deposit address should be generated, should be automated
+            #       Swaps should use a new key path, not the external path
+            next_addr = read_json_api(12703, 'wallets/part/nextdepositaddr')
+            next_addr = read_json_api(12703, 'wallets/part/nextdepositaddr')
+            wallets_restored = read_json_api(12703, 'wallets')
+            for k, w in wallets_original.items():
+                assert(w['deposit_address'] == wallets_restored[k]['deposit_address'])
 
             logging.info('Test passed.')
 

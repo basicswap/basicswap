@@ -149,7 +149,7 @@ class Test(unittest.TestCase):
 
         wallets = read_json_api(UI_PORT + 1, 'wallets')
 
-        self.xmr_addr = wallets['6']['main_address']
+        self.xmr_addr = wallets['XMR']['main_address']
         num_blocks = 100
         if callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'get_block_count')['count'] < num_blocks:
             logging.info('Mining {} Monero blocks to {}.'.format(num_blocks, self.xmr_addr))

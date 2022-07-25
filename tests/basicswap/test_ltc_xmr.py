@@ -72,10 +72,10 @@ class Test(BaseTest):
         super(Test, cls).tearDownClass()
 
     def getBalance(self, js_wallets):
-        return float(js_wallets[str(int(self.test_coin_from))]['balance']) + float(js_wallets[str(int(self.test_coin_from))]['unconfirmed'])
+        return float(js_wallets[self.test_coin_from.name]['balance']) + float(js_wallets[self.test_coin_from.name]['unconfirmed'])
 
     def getXmrBalance(self, js_wallets):
-        return float(js_wallets[str(int(Coins.XMR))]['unconfirmed']) + float(js_wallets[str(int(Coins.XMR))]['balance'])
+        return float(js_wallets[Coins.XMR.name]['unconfirmed']) + float(js_wallets[Coins.XMR.name]['balance'])
 
     def test_01_full_swap(self):
         logging.info('---------- Test {} to XMR'.format(str(self.test_coin_from)))

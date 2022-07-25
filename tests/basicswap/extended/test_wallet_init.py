@@ -82,19 +82,19 @@ class Test(unittest.TestCase):
             waitForServer(self.delay_event, 12700)
 
             wallets_0 = read_json_api(12700, 'wallets')
-            assert(wallets_0['1']['expected_seed'] is True)
-            assert(wallets_0['6']['expected_seed'] is True)
+            assert(wallets_0['PART']['expected_seed'] is True)
+            assert(wallets_0['XMR']['expected_seed'] is True)
 
             waitForServer(self.delay_event, 12701)
             wallets_1 = read_json_api(12701, 'wallets')
 
-            assert(wallets_0['1']['expected_seed'] is True)
-            assert(wallets_1['6']['expected_seed'] is True)
+            assert(wallets_0['PART']['expected_seed'] is True)
+            assert(wallets_1['XMR']['expected_seed'] is True)
 
             # TODO: Check other coins
 
-            assert(wallets_0['1']['deposit_address'] == wallets_1['1']['deposit_address'])
-            assert(wallets_0['6']['deposit_address'] == wallets_1['6']['deposit_address'])
+            assert(wallets_0['PART']['deposit_address'] == wallets_1['1']['deposit_address'])
+            assert(wallets_0['XMR']['deposit_address'] == wallets_1['6']['deposit_address'])
         except Exception:
             traceback.print_exc()
 

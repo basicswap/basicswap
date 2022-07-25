@@ -555,8 +555,8 @@ class Test(BaseTest):
         swap_clients = self.swap_clients
 
         js_1 = read_json_api(1801, 'wallets')
-        assert(make_int(js_1[str(int(Coins.XMR))]['balance'], scale=12) > 0)
-        assert(make_int(js_1[str(int(Coins.XMR))]['unconfirmed'], scale=12) > 0)
+        assert(make_int(js_1[Coins.XMR.name]['balance'], scale=12) > 0)
+        assert(make_int(js_1[Coins.XMR.name]['unconfirmed'], scale=12) > 0)
 
         offer_id = swap_clients[0].postOffer(Coins.PART, Coins.XMR, 100 * COIN, 0.11 * XMR_COIN, 100 * COIN, SwapTypes.XMR_SWAP)
         wait_for_offer(test_delay_event, swap_clients[1], offer_id)
@@ -577,7 +577,7 @@ class Test(BaseTest):
         wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True)
 
         js_0_end = read_json_api(1800, 'wallets')
-        end_xmr = float(js_0_end['6']['balance']) + float(js_0_end['6']['unconfirmed'])
+        end_xmr = float(js_0_end['XMR']['balance']) + float(js_0_end['XMR']['unconfirmed'])
         assert(end_xmr > 10.9 and end_xmr < 11.0)
 
         bid_id_hex = bid_id.hex()
@@ -861,7 +861,7 @@ class Test(BaseTest):
 
         js_w0_after = read_json_api(1800, 'wallets')
         js_w1_after = read_json_api(1801, 'wallets')
-        assert(make_int(js_w1_after['2']['balance'], scale=8, r=1) - (make_int(js_w1_before['2']['balance'], scale=8, r=1) + amt_1) < 1000)
+        assert(make_int(js_w1_after['BTC']['balance'], scale=8, r=1) - (make_int(js_w1_before['BTC']['balance'], scale=8, r=1) + amt_1) < 1000)
 
     def test_07_revoke_offer(self):
         logging.info('---------- Test offer revocaction')
@@ -877,10 +877,10 @@ class Test(BaseTest):
         logging.info('---------- Test XMR withdrawals')
         swap_clients = self.swap_clients
         js_0 = read_json_api(1800, 'wallets')
-        address_to = js_0[str(int(Coins.XMR))]['deposit_address']
+        address_to = js_0[Coins.XMR.name]['deposit_address']
 
         js_1 = read_json_api(1801, 'wallets')
-        assert(float(js_1[str(int(Coins.XMR))]['balance']) > 0.0)
+        assert(float(js_1[Coins.XMR.name]['balance']) > 0.0)
 
         swap_clients[1].withdrawCoin(Coins.XMR, 1.1, address_to, False)
 
@@ -1113,10 +1113,10 @@ class Test(BaseTest):
             pause_event.clear()
 
             js_0 = read_json_api(1800, 'wallets')
-            address_to = js_0[str(int(Coins.XMR))]['deposit_address']
+            address_to = js_0[Coins.XMR.name]['deposit_address']
 
             wallets1 = read_json_api(TEST_HTTP_PORT + 1, 'wallets')
-            xmr_total = float(wallets1[str(int(Coins.XMR))]['balance'])
+            xmr_total = float(wallets1[Coins.XMR.name]['balance'])
             assert(xmr_total > 10)
 
             post_json = {

@@ -213,7 +213,7 @@ def read_json_api(port, path=None):
     url = f'http://127.0.0.1:{port}/json'
     if path is not None:
         url += '/' + path
-    return json.loads(urlopen(url).read())
+    return json.loads(urlopen(url, timeout=30).read())
 
 
 def post_json_api(port, path, json_data):

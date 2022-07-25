@@ -46,7 +46,7 @@ class Test(XmrTestBase):
         waitForServer(self.delay_event, 12700)
         waitForServer(self.delay_event, 12701)
         wallets1 = read_json_api(12701, 'wallets')
-        assert(float(wallets1['6']['balance']) > 0.0)
+        assert(float(wallets1['XMR']['balance']) > 0.0)
 
         data = {
             'addr_from': '-1',

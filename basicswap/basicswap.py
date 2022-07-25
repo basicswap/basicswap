@@ -5361,11 +5361,12 @@ class BasicSwap(BaseApp):
             if c not in chainparams:
                 continue
             if self.coin_clients[c]['connection_type'] == 'rpc':
+                key = chainparams[c]['ticker'] if opts.get('ticker_key', False) else c
                 try:
-                    rv[c] = self.getWalletInfo(c)
-                    rv[c].update(self.getBlockchainInfo(c))
+                    rv[key] = self.getWalletInfo(c)
+                    rv[key].update(self.getBlockchainInfo(c))
                 except Exception as ex:
-                    rv[c] = {'name': chainparams[c]['name'].capitalize(), 'error': str(ex)}
+                    rv[key] = {'name': chainparams[c]['name'].capitalize(), 'error': str(ex)}
         return rv
 
     def getCachedWalletsInfo(self, opts=None):

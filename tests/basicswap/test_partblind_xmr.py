@@ -64,10 +64,10 @@ class Test(BaseTest):
         node0_blind_before = js_0['blind_balance'] + js_0['blind_unconfirmed']
 
     def getBalance(self, js_wallets):
-        return float(js_wallets[str(int(Coins.PART))]['blind_balance']) + float(js_wallets[str(int(Coins.PART))]['blind_unconfirmed'])
+        return float(js_wallets[Coins.PART.name]['blind_balance']) + float(js_wallets[Coins.PART.name]['blind_unconfirmed'])
 
     def getXmrBalance(self, js_wallets):
-        return float(js_wallets[str(int(Coins.XMR))]['unconfirmed']) + float(js_wallets[str(int(Coins.XMR))]['balance'])
+        return float(js_wallets[Coins.XMR.name]['unconfirmed']) + float(js_wallets[Coins.XMR.name]['balance'])
 
     def test_01_part_xmr(self):
         logging.info('---------- Test PARTct to XMR')

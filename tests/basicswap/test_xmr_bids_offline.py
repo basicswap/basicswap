@@ -50,12 +50,12 @@ class Test(XmrTestBase):
         waitForServer(self.delay_event, 12700)
         waitForServer(self.delay_event, 12701)
         wallets1 = read_json_api(12701, 'wallets')
-        assert(float(wallets1['6']['balance']) > 0.0)
+        assert(float(wallets1['XMR']['balance']) > 0.0)
 
         offer_data = {
             'addr_from': -1,
-            'coin_from': 1,
-            'coin_to': 6,
+            'coin_from': 'PART',
+            'coin_to': 'XMR',
             'amt_from': 1,
             'amt_to': 1,
             'lockhrs': 24,
@@ -83,7 +83,7 @@ class Test(XmrTestBase):
         offer0 = offers[0]
 
         post_data = {
-            'coin_from': '1'
+            'coin_from': 'PART'
         }
         test_post_offers = json.loads(urlopen('http://127.0.0.1:12701/json/offers', data=parse.urlencode(post_data).encode()).read())
         assert(len(test_post_offers) == 2)

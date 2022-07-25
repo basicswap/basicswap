@@ -104,7 +104,7 @@ class Test(unittest.TestCase):
 
             data = {
                 'addr_from': '-1',
-                'coin_from': '1',
+                'coin_from': 'PART',
                 'coin_to': '2',
                 'amt_from': '1',
                 'amt_to': '1',

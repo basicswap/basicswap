@@ -284,7 +284,7 @@ class XmrTestBase(TestBase):
                     raise ValueError('Test stopped.')
                 try:
                     wallets = json.loads(urlopen('http://127.0.0.1:12701/json/wallets').read())
-                    return wallets['6']['main_address']
+                    return wallets['XMR']['main_address']
                 except Exception as e:
                     print('Waiting for main address {}'.format(str(e)))
                 self.delay_event.wait(1)
@@ -309,7 +309,7 @@ class XmrTestBase(TestBase):
                 raise ValueError('Test stopped.')
             try:
                 wallets = json.loads(urlopen('http://127.0.0.1:12701/json/wallets').read())
-                particl_blocks = wallets['1']['blocks']
+                particl_blocks = wallets['PART']['blocks']
                 print('particl_blocks', particl_blocks)
                 if particl_blocks >= num_blocks:
                     break

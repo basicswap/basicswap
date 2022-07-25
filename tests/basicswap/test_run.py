@@ -29,6 +29,9 @@ from basicswap.basicswap import (
 from basicswap.basicswap_util import (
     TxLockTypes,
 )
+from basicswap.chainparams import (
+    chainparams,
+)
 from basicswap.util import (
     COIN,
     make_int,
@@ -83,7 +86,8 @@ class Test(BaseTest):
 
     def getBalance(self, js_wallets, coin_type):
         ci = self.swap_clients[0].ci(coin_type)
-        return ci.make_int(float(js_wallets[str(int(coin_type))]['balance']) + float(js_wallets[str(int(coin_type))]['unconfirmed']))
+        ticker = chainparams[coin_type]['ticker']
+        return ci.make_int(float(js_wallets[ticker]['balance']) + float(js_wallets[ticker]['unconfirmed']))
 
     def test_001_js_coins(self):
         js_coins = read_json_api(1800, 'coins')
@@ -395,7 +399,7 @@ class Test(BaseTest):
 
         ltc_addr = callnoderpc(0, 'getnewaddress', ['Withdrawal test', 'legacy'], base_rpc_port=LTC_BASE_RPC_PORT)
         wallets0 = read_json_api(TEST_HTTP_PORT + 0, 'wallets')
-        assert(float(wallets0['3']['balance']) > 100)
+        assert(float(wallets0['LTC']['balance']) > 100)
 
         post_json = {
             'value': 100,
