@@ -33,6 +33,7 @@ from .basicswap_util import (
     strAddressType,
 )
 from .js_server import (
+    js_coins,
     js_error,
     js_wallets,
     js_offers,
@@ -678,7 +679,8 @@ class HttpHandler(BaseHTTPRequestHandler):
                 self.putHeaders(status_code, 'text/plain')
                 func = js_index
                 if len(url_split) > 2:
-                    func = {'wallets': js_wallets,
+                    func = {'coins': js_coins,
+                            'wallets': js_wallets,
                             'offers': js_offers,
                             'sentoffers': js_sentoffers,
                             'bids': js_bids,

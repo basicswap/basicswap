@@ -16,6 +16,7 @@ from .basicswap_util import (
 )
 from .chainparams import (
     Coins,
+    chainparams,
 )
 from .ui.util import (
     PAGE_LIMIT,
@@ -59,6 +60,27 @@ def withdraw_coin(swap_client, coin_type, post_string, is_json):
         txid_hex = swap_client.withdrawCoin(coin_type, value, address, subfee)
 
     return {'txid': txid_hex}
+
+
+def js_coins(self, url_split, post_string, is_json):
+    swap_client = self.server.swap_client
+
+    coins = []
+    for coin in Coins:
+        cc = swap_client.coin_clients[coin]
+        entry = {
+            'id': int(coin),
+            'ticker': chainparams[cc['coin']]['ticker'],
+            'name': cc['name'].capitalize(),
+            'active': False if cc['connection_type'] == 'none' else True,
+        }
+        if coin == Coins.PART_ANON:
+            entry['variant'] = 'Anon'
+        elif coin == Coins.PART_BLIND:
+            entry['variant'] = 'Blind'
+        coins.append(entry)
+
+    return bytes(json.dumps(coins), 'UTF-8')
 
 
 def js_wallets(self, url_split, post_string, is_json):
