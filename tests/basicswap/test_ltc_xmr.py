@@ -153,7 +153,7 @@ class Test(BaseTest):
         swap_clients[0].acceptXmrBid(bid_id)
 
         wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.XMR_SWAP_FAILED_REFUNDED, wait_for=180)
-        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.XMR_SWAP_FAILED_REFUNDED, sent=True)
+        wait_for_bid(test_delay_event, swap_clients[1], bid_id, [BidStates.BID_STALLED_FOR_TEST, BidStates.XMR_SWAP_FAILED], sent=True)
 
         js_w0_after = read_json_api(1800, 'wallets')
         node0_from_after = self.getBalance(js_w0_after)
@@ -198,6 +198,8 @@ class Test(BaseTest):
         # TODO: Discard block rewards
         # assert(node1_from_after - node1_from_before > (amount_from - 0.02))
 
+        swap_clients[0].abandonBid(bid_id)
+
         wait_for_none_active(test_delay_event, 1800)
         wait_for_none_active(test_delay_event, 1801)
 
@@ -213,7 +215,7 @@ class Test(BaseTest):
         rate_swap = make_int(random.uniform(0.2, 20.0), scale=12, r=1)
         offer_id = swap_clients[0].postOffer(
             self.test_coin_from, Coins.XMR, amt_swap, rate_swap, amt_swap, SwapTypes.XMR_SWAP,
-            lock_type=TxLockTypes.SEQUENCE_LOCK_BLOCKS, lock_value=18)
+            lock_type=TxLockTypes.SEQUENCE_LOCK_BLOCKS, lock_value=28)
         wait_for_offer(test_delay_event, swap_clients[1], offer_id)
         offer = swap_clients[1].getOffer(offer_id)
 

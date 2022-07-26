@@ -707,7 +707,7 @@ class Test(BaseTest):
         swap_clients[0].acceptXmrBid(bid_id)
 
         wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.XMR_SWAP_FAILED_REFUNDED, wait_for=180)
-        wait_for_bid(test_delay_event, swap_clients[1], bid_id, [BidStates.BID_STALLED_FOR_TEST, BidStates.XMR_SWAP_FAILED_REFUNDED], sent=True)
+        wait_for_bid(test_delay_event, swap_clients[1], bid_id, [BidStates.BID_STALLED_FOR_TEST, BidStates.XMR_SWAP_FAILED], sent=True)
 
         bid_id_hex = bid_id.hex()
         path = f'bids/{bid_id_hex}/states'
