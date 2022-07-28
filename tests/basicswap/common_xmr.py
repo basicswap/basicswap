@@ -24,16 +24,21 @@ from basicswap.rpc_xmr import (
 from tests.basicswap.mnemonics import mnemonics
 from tests.basicswap.common import (
     waitForServer,
+    BASE_PORT, BASE_RPC_PORT,
+    BTC_BASE_PORT, BTC_BASE_RPC_PORT,
 )
 from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
 
 import basicswap.config as cfg
-import bin.basicswap_prepare as prepareSystem
 import bin.basicswap_run as runSystem
 
 TEST_PATH = os.path.expanduser(os.getenv('TEST_PATH', '~/test_basicswap1'))
-PARTICL_PORT_BASE = int(os.getenv('PARTICL_PORT_BASE', '11938'))
-BITCOIN_PORT_BASE = int(os.getenv('BITCOIN_PORT_BASE', '10938'))
+
+PARTICL_PORT_BASE = int(os.getenv('PARTICL_PORT_BASE', BASE_PORT))
+PARTICL_RPC_PORT_BASE = int(os.getenv('PARTICL_RPC_PORT_BASE', BASE_RPC_PORT))
+
+BITCOIN_PORT_BASE = int(os.getenv('BITCOIN_PORT_BASE', BTC_BASE_PORT))
+BITCOIN_RPC_PORT_BASE = int(os.getenv('BITCOIN_RPC_PORT_BASE', BTC_BASE_RPC_PORT))
 
 XMR_BASE_P2P_PORT = 17792
 XMR_BASE_RPC_PORT = 29798
@@ -42,7 +47,6 @@ XMR_BASE_WALLET_RPC_PORT = 29998
 LTC_BASE_PORT = 34792
 LTC_BASE_RPC_PORT = 35792
 LTC_BASE_ZMQ_PORT = 36792
-
 
 EXTRA_CONFIG_JSON = json.loads(os.getenv('EXTRA_CONFIG_JSON', '{}'))
 
@@ -78,8 +82,9 @@ def recursive_update_dict(base, new_vals):
 def run_prepare(node_id, datadir_path, bins_path, with_coins, mnemonic_in=None, num_nodes=3, use_rpcauth=False, extra_settings={}, port_ofs=0):
     config_path = os.path.join(datadir_path, cfg.CONFIG_FILENAME)
 
-    os.environ['PART_RPC_PORT'] = str(PARTICL_PORT_BASE)
-    os.environ['BTC_RPC_PORT'] = str(BITCOIN_PORT_BASE)
+    os.environ['PART_RPC_PORT'] = str(PARTICL_RPC_PORT_BASE)
+    os.environ['BTC_RPC_PORT'] = str(BITCOIN_RPC_PORT_BASE)
+    import bin.basicswap_prepare as prepareSystem
 
     testargs = [
         'basicswap-prepare',

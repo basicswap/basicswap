@@ -13,7 +13,6 @@ cp -r ~/tmp/basicswap_bin/* ${TEST_PATH}/bin
 export PYTHONPATH=$(pwd)
 python tests/basicswap/extended/test_xmr_persistent.py
 
-
 """
 
 import os
@@ -37,9 +36,12 @@ from basicswap.rpc import (
 from tests.basicswap.common import (
     read_json_api,
     waitForServer,
+    BASE_RPC_PORT,
+    BTC_BASE_RPC_PORT,
 )
 from tests.basicswap.common_xmr import (
     prepare_nodes,
+    XMR_BASE_RPC_PORT,
 )
 import bin.basicswap_run as runSystem
 
@@ -51,15 +53,13 @@ def make_boolean(s):
 test_path = os.path.expanduser(os.getenv('TEST_PATH', '/tmp/test_persistent'))
 RESET_TEST = make_boolean(os.getenv('RESET_TEST', 'false'))
 
-XMR_BASE_P2P_PORT = 17792
-XMR_BASE_RPC_PORT = 29798
-XMR_BASE_WALLET_RPC_PORT = 29998
-
-PORT_OFS = 1
+PORT_OFS = int(os.getenv('PORT_OFS', 1))
 UI_PORT = 12700 + PORT_OFS
 
-BASE_PART_RPC_PORT = 19792
-BASE_BTC_RPC_PORT = 19796
+PARTICL_RPC_PORT_BASE = int(os.getenv('PARTICL_RPC_PORT_BASE', BASE_RPC_PORT))
+BITCOIN_RPC_PORT_BASE = int(os.getenv('BITCOIN_RPC_PORT_BASE', BTC_BASE_RPC_PORT))
+XMR_BASE_RPC_PORT = int(os.getenv('XMR_BASE_RPC_PORT', XMR_BASE_RPC_PORT))
+
 
 NUM_NODES = int(os.getenv('NUM_NODES', 3))
 EXTRA_CONFIG_JSON = json.loads(os.getenv('EXTRA_CONFIG_JSON', '{}'))
@@ -70,12 +70,12 @@ if not len(logger.handlers):
     logger.addHandler(logging.StreamHandler(sys.stdout))
 
 
-def callpartrpc(node_id, method, params=[], wallet=None, base_rpc_port=BASE_PART_RPC_PORT + PORT_OFS):
+def callpartrpc(node_id, method, params=[], wallet=None, base_rpc_port=PARTICL_RPC_PORT_BASE + PORT_OFS):
     auth = 'test_part_{0}:test_part_pwd_{0}'.format(node_id)
     return callrpc(base_rpc_port + node_id, auth, method, params, wallet)
 
 
-def callbtcrpc(node_id, method, params=[], wallet=None, base_rpc_port=BASE_BTC_RPC_PORT + PORT_OFS):
+def callbtcrpc(node_id, method, params=[], wallet=None, base_rpc_port=BITCOIN_RPC_PORT_BASE + PORT_OFS):
     auth = 'test_btc_{0}:test_btc_pwd_{0}'.format(node_id)
     return callrpc(base_rpc_port + node_id, auth, method, params, wallet)
 
@@ -120,8 +120,6 @@ class Test(unittest.TestCase):
 
         random.seed(time.time())
 
-        os.environ['PARTICL_RPC_PORT_BASE'] = str(BASE_PART_RPC_PORT)
-        os.environ['BITCOIN_RPC_PORT_BASE'] = str(BASE_BTC_RPC_PORT)
         logging.info('Preparing %d nodes.', NUM_NODES)
         prepare_nodes(NUM_NODES, 'bitcoin,monero', True, {'min_sequence_lock_seconds': 60}, PORT_OFS)
 

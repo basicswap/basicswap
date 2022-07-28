@@ -169,12 +169,12 @@ function updateBidParams(value_changed) {
 
     let amt_from = '';
     let rate = '';
-    if (amt_var) {
+    if (amt_var == 'True') {
         amt_from = document.getElementById('bid_amount').value;
     } else {
         amt_from = document.getElementById('amount_from').value;
     }
-    if (rate_var) {
+    if (rate_var == 'True') {
         rate = document.getElementById('bid_rate').value;
     } else {
         rate = document.getElementById('offer_rate').value;

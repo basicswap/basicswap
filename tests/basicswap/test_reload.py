@@ -40,8 +40,6 @@ from tests.basicswap.common_xmr import (
 import bin.basicswap_run as runSystem
 
 TEST_PATH = os.path.expanduser(os.getenv('TEST_PATH', '~/test_basicswap1'))
-PARTICL_PORT_BASE = int(os.getenv('PARTICL_PORT_BASE', '11938'))
-BITCOIN_PORT_BASE = int(os.getenv('BITCOIN_PORT_BASE', '10938'))
 delay_event = threading.Event()
 
 logger = logging.getLogger()
