@@ -60,8 +60,8 @@
 </select></td></tr>
 {% endif %}
 <tr><td>Rate</td><td><input type="text" id="rate" name="rate" value="{{ data.rate }}" readonly></td></tr>
-<tr><td>Amount Variable</td><td colspan=3><input type="checkbox" id="amt_var" name="amt_var_" value="av" {% if data.amt_var==true %} checked="true"{% endif %} disabled></td></tr>
-<tr><td>Rate Variable</td><td colspan=3><input type="checkbox" id="rate_var" name="rate_var_" value="rv" {% if data.rate_var==true %} checked="true"{% endif %} disabled></td></tr>
+<tr><td>Amount Variable</td><td colspan=3><input type="checkbox" id="amt_var" name="amt_var_" value="av" {% if data.amt_var==true %} checked=checked{% endif %} disabled></td></tr>
+<tr><td>Rate Variable</td><td colspan=3><input type="checkbox" id="rate_var" name="rate_var_" value="rv" {% if data.rate_var==true %} checked=checked{% endif %} disabled></td></tr>
 
 <tr class="padded_row"><td>Offer valid (hrs)</td><td><input type="number" name="validhrs" min="1" max="48" value="{{ data.validhrs }}" readonly></td></tr>
 {% if data.debug_ui == true %}

@@ -701,25 +701,37 @@ class HttpHandler(BaseHTTPRequestHandler):
             try:
                 static_path = os.path.join(os.path.dirname(__file__), 'static')
 
-                if url_split[2] == 'favicon-32.png':
-                    self.putHeaders(status_code, 'image/png')
-                    with open(os.path.join(static_path, 'favicon-32.png'), 'rb') as fp:
-                        return fp.read()
-                elif url_split[2] == 'style.css':
-                    self.putHeaders(status_code, 'text/css')
-                    with open(os.path.join(static_path, 'style.css'), 'rb') as fp:
-                        return fp.read()
-                elif len(url_split) > 3 and url_split[2] == 'sequence_diagrams':
-                    self.putHeaders(status_code, 'image/svg+xml')
+                if len(url_split) > 3 and url_split[2] == 'sequence_diagrams':
                     with open(os.path.join(static_path, 'sequence_diagrams', url_split[3]), 'rb') as fp:
+                        self.putHeaders(status_code, 'image/svg+xml')
+                        return fp.read()
+                elif len(url_split) > 3 and url_split[2] == 'images':
+                    filename = os.path.join(*url_split[3:])
+                    _, extension = os.path.splitext(filename)
+                    mime_type = {'.svg': 'image/svg+xml',
+                                 '.png': 'image/png',
+                                 '.jpg': 'image/jpeg',
+                                }.get(extension, '')
+                    if mime_type == '':
+                        raise ValueError('Unknown file type ' + filename)
+                    with open(os.path.join(static_path, 'images', filename), 'rb') as fp:
+                        self.putHeaders(status_code, mime_type)
+                        return fp.read()
+                elif len(url_split) > 3 and url_split[2] == 'css':
+                    filename = os.path.join(*url_split[3:])
+                    with open(os.path.join(static_path, 'css', filename), 'rb') as fp:
+                        self.putHeaders(status_code, 'text/css; charset=utf-8')
                         return fp.read()
                 else:
                     self.putHeaders(status_code, 'text/html')
                     return self.page_404(url_split)
-            except Exception as ex:
+            except FileNotFoundError:
                 self.putHeaders(status_code, 'text/html')
+                return self.page_404(url_split)
+            except Exception as ex:
                 if self.server.swap_client.debug is True:
                     self.server.swap_client.log.error(traceback.format_exc())
+                self.putHeaders(status_code, 'text/html')
                 return self.page_error(str(ex))
 
         try:
