@@ -34,8 +34,10 @@ RUN cd basicswap-master; \
 RUN useradd -ms /bin/bash swap_user && \
     mkdir /coindata && chown swap_user -R /coindata
 
-# Expose html port
+# html port
 EXPOSE 12700
+# websocket port
+EXPOSE 11700
 
 VOLUME /coindata
 

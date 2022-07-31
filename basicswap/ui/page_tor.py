@@ -4,9 +4,6 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-import os
-
-
 def extract_data(bytes_in):
     str_in = bytes_in.decode('utf-8')
     start = str_in.find('=')
@@ -37,10 +34,7 @@ def page_tor(self, url_split, post_string):
     messages = []
 
     template = self.server.env.get_template('tor.html')
-    return bytes(template.render(
-        title=self.server.title,
-        h2=self.server.title,
-        messages=messages,
-        data=page_data,
-        form_id=os.urandom(8).hex(),
-    ), 'UTF-8')
+    return self.render_template(template, {
+        'messages': messages,
+        'data': page_data,
+    })

@@ -129,7 +129,9 @@ from .basicswap_util import (
     replaceAddrPrefix,
     getOfferProofOfFundsHash,
     getLastBidState,
-    isActiveBidState)
+    isActiveBidState,
+    NotificationTypes as NT,
+)
 from .protocols.xmr_swap_1 import (
     addLockRefundSigs,
     recoverNoScriptTxnWithKey)
@@ -200,6 +202,8 @@ class WatchedTransaction():
 
 
 class BasicSwap(BaseApp):
+    ws_server = None
+
     def __init__(self, fp, data_dir, settings, chain, log_name='BasicSwap'):
         super().__init__(fp, data_dir, settings, chain, log_name)
 
@@ -919,6 +923,25 @@ class BasicSwap(BaseApp):
             raise ValueError('Invalid swap type for PART_ANON')
         if (coin_from == Coins.PART_BLIND or coin_to == Coins.PART_BLIND) and swap_type != SwapTypes.XMR_SWAP:
             raise ValueError('Invalid swap type for PART_BLIND')
+
+    def notify(self, event_type, event_data):
+        if event_type == NT.OFFER_RECEIVED:
+            self.log.debug('Received new offer %s', event_data['offer_id'])
+            if self.ws_server:
+                event_data['event'] = 'new_offer'
+                self.ws_server.send_message_to_all(json.dumps(event_data))
+        elif event_type == NT.BID_RECEIVED:
+            self.log.info('Received valid bid %s for %s offer %s', event_data['bid_id'], event_data['type'], event_data['offer_id'])
+            if self.ws_server:
+                event_data['event'] = 'new_bid'
+                self.ws_server.send_message_to_all(json.dumps(event_data))
+        elif event_type == NT.BID_ACCEPTED:
+            self.log.info('Received valid bid accept for %s', event_data['bid_id'])
+            if self.ws_server:
+                event_data['event'] = 'bid_accepted'
+                self.ws_server.send_message_to_all(json.dumps(event_data))
+        else:
+            self.log.warning(f'Unknown notification {event_type}')
 
     def validateOfferAmounts(self, coin_from, coin_to, amount, rate, min_bid_amount):
         ci_from = self.ci(coin_from)
@@ -3625,6 +3648,8 @@ class BasicSwap(BaseApp):
                     try:
                         self.receiveXmrBidAccept(bid, session)
                     except Exception as ex:
+                        if self.debug:
+                            self.log.error(traceback.format_exc())
                         self.log.info('Verify xmr bid accept {} failed: {}'.format(bid.bid_id.hex(), str(ex)))
                         bid.setState(BidStates.BID_ERROR, 'Failed accept validation: ' + str(ex))
                         session.add(bid)
@@ -3738,7 +3763,7 @@ class BasicSwap(BaseApp):
 
                     session.add(xmr_offer)
 
-                self.log.debug('Received new offer %s', offer_id.hex())
+                self.notify(NT.OFFER_RECEIVED, {'offer_id': offer_id.hex()})
             else:
                 existing_offer.setState(OfferStates.OFFER_RECEIVED)
                 session.add(existing_offer)
@@ -3972,8 +3997,8 @@ class BasicSwap(BaseApp):
 
         bid.setState(BidStates.BID_RECEIVED)
 
-        self.log.info('Received valid bid %s for offer %s', bid_id.hex(), bid_data.offer_msg_id.hex())
         self.saveBid(bid_id, bid)
+        self.notify(NT.BID_RECEIVED, {'type': 'atomic', 'bid_id': bid_id.hex(), 'offer_id': bid_data.offer_msg_id.hex()})
 
         if self.shouldAutoAcceptBid(offer, bid):
             delay = random.randrange(self.min_delay_event, self.max_delay_event)
@@ -4048,10 +4073,11 @@ class BasicSwap(BaseApp):
         bid.setState(BidStates.BID_ACCEPTED)
         bid.setITxState(TxStates.TX_NONE)
 
-        self.log.info('Received valid bid accept %s for bid %s', bid.accept_msg_id.hex(), bid_id.hex())
+        bid.offer_id.hex()
 
         self.saveBid(bid_id, bid)
         self.swaps_in_progress[bid_id] = (bid, offer)
+        self.notify(NT.BID_ACCEPTED, {'bid_id': bid_id.hex()})
 
     def receiveXmrBid(self, bid, session):
         self.log.debug('Receiving xmr bid %s', bid.bid_id.hex())
@@ -4091,7 +4117,7 @@ class BasicSwap(BaseApp):
         ensure(ci_to.verifyKey(xmr_swap.vkbvf), 'Invalid key, vkbvf')
         ensure(ci_from.verifyPubkey(xmr_swap.pkaf), 'Invalid pubkey, pkaf')
 
-        self.log.info('Received valid bid %s for xmr offer %s', bid.bid_id.hex(), bid.offer_id.hex())
+        self.notify(NT.BID_RECEIVED, {'type': 'xmr', 'bid_id': bid.bid_id.hex(), 'offer_id': bid.offer_id.hex()})
 
         bid.setState(BidStates.BID_RECEIVED)
 
@@ -4153,6 +4179,7 @@ class BasicSwap(BaseApp):
 
         bid.setState(BidStates.BID_ACCEPTED)  # XMR
         self.saveBidInSession(bid.bid_id, bid, session, xmr_swap)
+        self.notify(NT.BID_ACCEPTED, {'bid_id': bid.bid_id.hex()})
 
         delay = random.randrange(self.min_delay_event, self.max_delay_event)
         self.log.info('Responding to xmr bid accept %s in %d seconds', bid.bid_id.hex(), delay)

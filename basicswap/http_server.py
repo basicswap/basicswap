@@ -141,6 +141,17 @@ class HttpHandler(BaseHTTPRequestHandler):
             self.server.last_form_id[name] = form_id
         return form_data
 
+    def render_template(self, template, args_dict):
+        swap_client = self.server.swap_client
+        if swap_client.ws_server:
+            args_dict['ws_url'] = swap_client.ws_server.url
+        return bytes(template.render(
+            title=self.server.title,
+            h2=self.server.title,
+            form_id=os.urandom(8).hex(),
+            **args_dict,
+        ), 'UTF-8')
+
     def page_explorers(self, url_split, post_string):
         swap_client = self.server.swap_client
 
@@ -174,16 +185,13 @@ class HttpHandler(BaseHTTPRequestHandler):
                 result = str(ex)
 
         template = env.get_template('explorers.html')
-        return bytes(template.render(
-            title=self.server.title,
-            h2=self.server.title,
-            explorers=listAvailableExplorers(swap_client),
-            explorer=explorer,
-            actions=listExplorerActions(swap_client),
-            action=action,
-            result=result,
-            form_id=os.urandom(8).hex(),
-        ), 'UTF-8')
+        return self.render_template(template, {
+            'explorers': listAvailableExplorers(swap_client),
+            'explorer': explorer,
+            'actions': listExplorerActions(swap_client),
+            'action': action,
+            'result': result
+        })
 
     def page_rpc(self, url_split, post_string):
         swap_client = self.server.swap_client
@@ -237,15 +245,12 @@ class HttpHandler(BaseHTTPRequestHandler):
         coins.append((-3, 'Monero JSON'))
         coins.append((-4, 'Monero Wallet'))
 
-        return bytes(template.render(
-            title=self.server.title,
-            h2=self.server.title,
-            coins=coins,
-            coin_type=coin_id,
-            result=result,
-            messages=messages,
-            form_id=os.urandom(8).hex(),
-        ), 'UTF-8')
+        return self.render_template(template, {
+            'coins': coins,
+            'coin_type': coin_id,
+            'result': result,
+            'messages': messages,
+        })
 
     def page_debug(self, url_split, post_string):
         swap_client = self.server.swap_client
@@ -262,25 +267,20 @@ class HttpHandler(BaseHTTPRequestHandler):
                     messages.append('Failed.')
 
         template = env.get_template('debug.html')
-        return bytes(template.render(
-            title=self.server.title,
-            h2=self.server.title,
-            messages=messages,
-            result=result,
-            form_id=os.urandom(8).hex(),
-        ), 'UTF-8')
+        return self.render_template(template, {
+            'messages': messages,
+            'result': result,
+        })
 
     def page_active(self, url_split, post_string):
         swap_client = self.server.swap_client
         active_swaps = swap_client.listSwapsInProgress()
 
         template = env.get_template('active.html')
-        return bytes(template.render(
-            title=self.server.title,
-            refresh=30,
-            h2=self.server.title,
-            active_swaps=[(s[0].hex(), s[1], strBidState(s[2]), strTxState(s[3]), strTxState(s[4])) for s in active_swaps],
-        ), 'UTF-8')
+        return self.render_template(template, {
+            'refresh': 30,
+            'active_swaps': [(s[0].hex(), s[1], strBidState(s[2]), strTxState(s[3]), strTxState(s[4])) for s in active_swaps],
+        })
 
     def page_settings(self, url_split, post_string):
         swap_client = self.server.swap_client
@@ -347,13 +347,10 @@ class HttpHandler(BaseHTTPRequestHandler):
                     chains_formatted[-1]['can_disable'] = True
 
         template = env.get_template('settings.html')
-        return bytes(template.render(
-            title=self.server.title,
-            h2=self.server.title,
-            messages=messages,
-            chains=chains_formatted,
-            form_id=os.urandom(8).hex(),
-        ), 'UTF-8')
+        return self.render_template(template, {
+            'messages': messages,
+            'chains': chains_formatted,
+        })
 
     def page_bid(self, url_split, post_string):
         ensure(len(url_split) > 2, 'Bid ID not specified')
@@ -428,16 +425,13 @@ class HttpHandler(BaseHTTPRequestHandler):
             data['addr_from_label'] = '(' + data['addr_from_label'] + ')'
 
         template = env.get_template('bid_xmr.html') if offer.swap_type == SwapTypes.XMR_SWAP else env.get_template('bid.html')
-        return bytes(template.render(
-            title=self.server.title,
-            h2=self.server.title,
-            bid_id=bid_id.hex(),
-            messages=messages,
-            data=data,
-            edit_bid=edit_bid,
-            form_id=os.urandom(8).hex(),
-            old_states=old_states,
-        ), 'UTF-8')
+        return self.render_template(template, {
+            'bid_id': bid_id.hex(),
+            'messages': messages,
+            'data': data,
+            'edit_bid': edit_bid,
+            'old_states': old_states,
+        })
 
     def page_bids(self, url_split, post_string, sent=False, available=False):
         swap_client = self.server.swap_client
@@ -486,30 +480,25 @@ class HttpHandler(BaseHTTPRequestHandler):
         }
 
         template = env.get_template('bids.html')
-        return bytes(template.render(
-            title=self.server.title,
-            h2=self.server.title,
-            page_type='Sent' if sent else 'Received',
-            messages=messages,
-            filters=filters,
-            data=page_data,
-            bids=[(format_timestamp(b[0]),
-                   b[2].hex(), b[3].hex(), strBidState(b[5]), strTxState(b[7]), strTxState(b[8]), b[11]) for b in bids],
-            form_id=os.urandom(8).hex(),
-        ), 'UTF-8')
+        return self.render_template(template, {
+            'page_type': 'Sent' if sent else 'Received',
+            'messages': messages,
+            'filters': filters,
+            'data': page_data,
+            'bids': [(format_timestamp(b[0]),
+                     b[2].hex(), b[3].hex(), strBidState(b[5]), strTxState(b[7]), strTxState(b[8]), b[11]) for b in bids],
+        })
 
     def page_watched(self, url_split, post_string):
         swap_client = self.server.swap_client
         watched_outputs, last_scanned = swap_client.listWatchedOutputs()
 
         template = env.get_template('watched.html')
-        return bytes(template.render(
-            title=self.server.title,
-            refresh=30,
-            h2=self.server.title,
-            last_scanned=[(getCoinName(ls[0]), ls[1]) for ls in last_scanned],
-            watched_outputs=[(wo[1].hex(), getCoinName(wo[0]), wo[2], wo[3], int(wo[4])) for wo in watched_outputs],
-        ), 'UTF-8')
+        return self.render_template(template, {
+            'refresh': 30,
+            'last_scanned': [(getCoinName(ls[0]), ls[1]) for ls in last_scanned],
+            'watched_outputs': [(wo[1].hex(), getCoinName(wo[0]), wo[2], wo[3], int(wo[4])) for wo in watched_outputs],
+        })
 
     def page_smsgaddresses(self, url_split, post_string):
         swap_client = self.server.swap_client
@@ -575,15 +564,12 @@ class HttpHandler(BaseHTTPRequestHandler):
             addr['type'] = strAddressType(addr['type'])
 
         template = env.get_template('smsgaddresses.html')
-        return bytes(template.render(
-            title=self.server.title,
-            h2=self.server.title,
-            messages=messages,
-            data=page_data,
-            form_id=os.urandom(8).hex(),
-            smsgaddresses=smsgaddresses,
-            network_addr=network_addr,
-        ), 'UTF-8')
+        return self.render_template(template, {
+            'messages': messages,
+            'data': page_data,
+            'smsgaddresses': smsgaddresses,
+            'network_addr': network_addr,
+        })
 
     def page_identity(self, url_split, post_string):
         ensure(len(url_split) > 2, 'Address not specified')
@@ -620,13 +606,10 @@ class HttpHandler(BaseHTTPRequestHandler):
             messages.append(e)
 
         template = env.get_template('identity.html')
-        return bytes(template.render(
-            title=self.server.title,
-            h2=self.server.title,
-            messages=messages,
-            data=page_data,
-            form_id=os.urandom(8).hex(),
-        ), 'UTF-8')
+        return self.render_template(template, {
+            'messages': messages,
+            'data': page_data,
+        })
 
     def page_shutdown(self, url_split, post_string):
         swap_client = self.server.swap_client
@@ -649,15 +632,13 @@ class HttpHandler(BaseHTTPRequestHandler):
         self.server.session_tokens['shutdown'] = shutdown_token
 
         template = env.get_template('index.html')
-        return bytes(template.render(
-            title=self.server.title,
-            refresh=30,
-            h2=self.server.title,
-            version=__version__,
-            summary=summary,
-            use_tor_proxy=swap_client.use_tor_proxy,
-            shutdown_token=shutdown_token
-        ), 'UTF-8')
+        return self.render_template(template, {
+            'refresh': 30,
+            'version': __version__,
+            'summary': summary,
+            'use_tor_proxy': swap_client.use_tor_proxy,
+            'shutdown_token': shutdown_token
+        })
 
     def page_404(self, url_split):
         template = env.get_template('404.html')
@@ -708,10 +689,11 @@ class HttpHandler(BaseHTTPRequestHandler):
                 elif len(url_split) > 3 and url_split[2] == 'images':
                     filename = os.path.join(*url_split[3:])
                     _, extension = os.path.splitext(filename)
-                    mime_type = {'.svg': 'image/svg+xml',
-                                 '.png': 'image/png',
-                                 '.jpg': 'image/jpeg',
-                                }.get(extension, '')
+                    mime_type = {
+                        '.svg': 'image/svg+xml',
+                        '.png': 'image/png',
+                        '.jpg': 'image/jpeg',
+                    }.get(extension, '')
                     if mime_type == '':
                         raise ValueError('Unknown file type ' + filename)
                     with open(os.path.join(static_path, 'images', filename), 'rb') as fp:
@@ -737,51 +719,52 @@ class HttpHandler(BaseHTTPRequestHandler):
         try:
             self.putHeaders(status_code, 'text/html')
             if len(url_split) > 1:
-                if url_split[1] == 'active':
+                page = url_split[1]
+                if page == 'active':
                     return self.page_active(url_split, post_string)
-                if url_split[1] == 'wallets':
+                if page == 'wallets':
                     return page_wallets(self, url_split, post_string)
-                if url_split[1] == 'wallet':
+                if page == 'wallet':
                     return page_wallet(self, url_split, post_string)
-                if url_split[1] == 'settings':
+                if page == 'settings':
                     return self.page_settings(url_split, post_string)
-                if url_split[1] == 'rpc':
+                if page == 'rpc':
                     return self.page_rpc(url_split, post_string)
-                if url_split[1] == 'debug':
+                if page == 'debug':
                     return self.page_debug(url_split, post_string)
-                if url_split[1] == 'explorers':
+                if page == 'explorers':
                     return self.page_explorers(url_split, post_string)
-                if url_split[1] == 'offer':
+                if page == 'offer':
                     return page_offer(self, url_split, post_string)
-                if url_split[1] == 'offers':
+                if page == 'offers':
                     return page_offers(self, url_split, post_string)
-                if url_split[1] == 'newoffer':
+                if page == 'newoffer':
                     return page_newoffer(self, url_split, post_string)
-                if url_split[1] == 'sentoffers':
+                if page == 'sentoffers':
                     return page_offers(self, url_split, post_string, sent=True)
-                if url_split[1] == 'bid':
+                if page == 'bid':
                     return self.page_bid(url_split, post_string)
-                if url_split[1] == 'bids':
+                if page == 'bids':
                     return self.page_bids(url_split, post_string)
-                if url_split[1] == 'sentbids':
+                if page == 'sentbids':
                     return self.page_bids(url_split, post_string, sent=True)
-                if url_split[1] == 'availablebids':
+                if page == 'availablebids':
                     return self.page_bids(url_split, post_string, available=True)
-                if url_split[1] == 'watched':
+                if page == 'watched':
                     return self.page_watched(url_split, post_string)
-                if url_split[1] == 'smsgaddresses':
+                if page == 'smsgaddresses':
                     return self.page_smsgaddresses(url_split, post_string)
-                if url_split[1] == 'identity':
+                if page == 'identity':
                     return self.page_identity(url_split, post_string)
-                if url_split[1] == 'tor':
+                if page == 'tor':
                     return page_tor(self, url_split, post_string)
-                if url_split[1] == 'automation':
+                if page == 'automation':
                     return page_automation_strategies(self, url_split, post_string)
-                if url_split[1] == 'automationstrategy':
+                if page == 'automationstrategy':
                     return page_automation_strategy(self, url_split, post_string)
-                if url_split[1] == 'newautomationstrategy':
+                if page == 'newautomationstrategy':
                     return page_automation_strategy_new(self, url_split, post_string)
-                if url_split[1] == 'shutdown':
+                if page == 'shutdown':
                     return self.page_shutdown(url_split, post_string)
             return self.page_index(url_split)
         except Exception as ex:

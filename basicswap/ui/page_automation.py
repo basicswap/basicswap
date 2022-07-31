@@ -4,8 +4,6 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-import os
-
 from .util import (
     PAGE_LIMIT,
     get_data_entry,
@@ -51,14 +49,11 @@ def page_automation_strategies(self, url_split, post_string):
         formatted_strategies.append((s[0], s[1], strConcepts(s[2])))
 
     template = server.env.get_template('automation_strategies.html')
-    return bytes(template.render(
-        title=server.title,
-        h2=server.title,
-        messages=messages,
-        filters=filters,
-        strategies=formatted_strategies,
-        form_id=os.urandom(8).hex(),
-    ), 'UTF-8')
+    return self.render_template(template, {
+        'messages': messages,
+        'filters': filters,
+        'strategies': formatted_strategies,
+    })
 
 
 def page_automation_strategy_new(self, url_split, post_string):
@@ -69,12 +64,9 @@ def page_automation_strategy_new(self, url_split, post_string):
     form_data = self.checkForm(post_string, 'automationstrategynew', messages)
 
     template = server.env.get_template('automation_strategy_new.html')
-    return bytes(template.render(
-        title=server.title,
-        h2=server.title,
-        messages=messages,
-        form_id=os.urandom(8).hex(),
-    ), 'UTF-8')
+    return self.render_template(template, {
+        'messages': messages,
+    })
 
 
 def page_automation_strategy(self, url_split, post_string):
@@ -101,10 +93,7 @@ def page_automation_strategy(self, url_split, post_string):
     }
 
     template = server.env.get_template('automation_strategy.html')
-    return bytes(template.render(
-        title=server.title,
-        h2=server.title,
-        messages=messages,
-        strategy=formatted_strategy,
-        form_id=os.urandom(8).hex(),
-    ), 'UTF-8')
+    return self.render_template(template, {
+        'messages': messages,
+        'strategy': formatted_strategy,
+    })

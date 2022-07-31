@@ -190,6 +190,13 @@ def strOfferState(state):
     return 'Unknown'
 
 
+class NotificationTypes(IntEnum):
+    NONE = 0
+    OFFER_RECEIVED = auto()
+    BID_RECEIVED = auto()
+    BID_ACCEPTED = auto()
+
+
 def strBidState(state):
     if state == BidStates.BID_SENT:
         return 'Sent'

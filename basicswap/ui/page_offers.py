@@ -4,7 +4,6 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-import os
 import traceback
 
 from .util import (
@@ -308,18 +307,15 @@ def page_newoffer(self, url_split, post_string):
     automation_filters['type_ind'] = Concepts.OFFER
     automation_strategies = swap_client.listAutomationStrategies(automation_filters)
 
-    return bytes(template.render(
-        title=server.title,
-        h2=server.title,
-        messages=messages,
-        coins_from=coins_from,
-        coins=coins_to,
-        addrs=swap_client.listSmsgAddresses('offer_send_from'),
-        addrs_to=swap_client.listSmsgAddresses('offer_send_to'),
-        data=page_data,
-        automation_strategies=automation_strategies,
-        form_id=os.urandom(8).hex(),
-    ), 'UTF-8')
+    return self.render_template(template, {
+        'messages': messages,
+        'coins_from': coins_from,
+        'coins': coins_to,
+        'addrs': swap_client.listSmsgAddresses('offer_send_from'),
+        'addrs_to': swap_client.listSmsgAddresses('offer_send_to'),
+        'data': page_data,
+        'automation_strategies': automation_strategies,
+    })
 
 
 def page_offer(self, url_split, post_string):
@@ -469,17 +465,14 @@ def page_offer(self, url_split, post_string):
     data['amt_swapped'] = ci_from.format_amount(amt_swapped)
 
     template = server.env.get_template('offer.html')
-    return bytes(template.render(
-        title=server.title,
-        h2=server.title,
-        offer_id=offer_id.hex(),
-        sent_bid_id=sent_bid_id,
-        messages=messages,
-        data=data,
-        bids=formatted_bids,
-        addrs=None if show_bid_form is None else swap_client.listSmsgAddresses('bid'),
-        form_id=os.urandom(8).hex(),
-    ), 'UTF-8')
+    return self.render_template(template, {
+        'offer_id': offer_id.hex(),
+        'sent_bid_id': sent_bid_id,
+        'messages': messages,
+        'data': data,
+        'bids': formatted_bids,
+        'addrs': None if show_bid_form is None else swap_client.listSmsgAddresses('bid'),
+    })
 
 
 def page_offers(self, url_split, post_string, sent=False):
@@ -540,12 +533,10 @@ def page_offers(self, url_split, post_string, sent=False):
             ci_from.format_amount(completed_amount)))
 
     template = server.env.get_template('offers.html')
-    return bytes(template.render(
-        title=server.title,
-        h2=server.title,
-        coins=listAvailableCoins(swap_client),
-        messages=messages,
-        filters=filters,
-        offers=formatted_offers,
-        form_id=os.urandom(8).hex(),
-    ), 'UTF-8')
+    return self.render_template(template, {
+        'messages': messages,
+        'coins': listAvailableCoins(swap_client),
+        'messages': messages,
+        'filters': filters,
+        'offers': formatted_offers,
+    })

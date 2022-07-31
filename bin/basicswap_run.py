@@ -19,6 +19,7 @@ import basicswap.config as cfg
 from basicswap import __version__
 from basicswap.basicswap import BasicSwap
 from basicswap.http_server import HttpThread
+from basicswap.contrib.websocket_server import WebsocketServer
 
 
 logger = logging.getLogger()
@@ -93,6 +94,25 @@ def startXmrWalletDaemon(node_dir, bin_dir, wallet_bin, opts=[]):
     return subprocess.Popen(args, stdin=subprocess.PIPE, stdout=wallet_stdout, stderr=wallet_stderr, cwd=data_dir)
 
 
+def ws_new_client(client, server):
+    if swap_client:
+        swap_client.log.debug(f'ws_new_client {client["id"]}')
+
+
+def ws_client_left(client, server):
+    if client is None:
+        return
+    if swap_client:
+        swap_client.log.debug(f'ws_client_left {client["id"]}')
+
+
+def ws_message_received(client, server, message):
+    if len(message) > 200:
+        message = message[:200] + '..'
+    if swap_client:
+        swap_client.log.debug(f'ws_message_received {client["id"]} {message}')
+
+
 def runClient(fp, data_dir, chain):
     global swap_client
     settings_path = os.path.join(data_dir, cfg.CONFIG_FILENAME)
@@ -158,24 +178,45 @@ def runClient(fp, data_dir, chain):
         swap_client.start()
 
         if 'htmlhost' in settings:
-            swap_client.log.info('Starting server at http://%s:%d.' % (settings['htmlhost'], settings['htmlport']))
+            swap_client.log.info('Starting http server at http://%s:%d.' % (settings['htmlhost'], settings['htmlport']))
             allow_cors = settings['allowcors'] if 'allowcors' in settings else cfg.DEFAULT_ALLOW_CORS
-            tS1 = HttpThread(fp, settings['htmlhost'], settings['htmlport'], allow_cors, swap_client)
-            threads.append(tS1)
-            tS1.start()
+            thread_http = HttpThread(fp, settings['htmlhost'], settings['htmlport'], allow_cors, swap_client)
+            threads.append(thread_http)
+            thread_http.start()
+
+        if 'wshost' in settings:
+            ws_url = 'ws://{}:{}'.format(settings['wshost'], settings['wsport'])
+            swap_client.log.info(f'Starting ws server at {ws_url}.')
+
+            swap_client.ws_server = WebsocketServer(host=settings['wshost'], port=settings['wsport'])
+            swap_client.ws_server.set_fn_new_client(ws_new_client)
+            swap_client.ws_server.set_fn_client_left(ws_client_left)
+            swap_client.ws_server.set_fn_message_received(ws_message_received)
+            swap_client.ws_server.run_forever(threaded=True)
 
         logger.info('Exit with Ctrl + c.')
         while swap_client.is_running:
             time.sleep(0.5)
             swap_client.update()
+
     except Exception as ex:
         traceback.print_exc()
+
+    if swap_client.ws_server:
+        try:
+            swap_client.log.info('Stopping websocket server.')
+            swap_client.ws_server.shutdown_gracefully()
+        except Exception as ex:
+            traceback.print_exc()
 
     swap_client.finalise()
     swap_client.log.info('Stopping HTTP threads.')
     for t in threads:
-        t.stop()
-        t.join()
+        try:
+            t.stop()
+            t.join()
+        except Exception as ex:
+            traceback.print_exc()
 
     closed_pids = []
     for d in daemons:

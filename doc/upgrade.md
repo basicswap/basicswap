@@ -7,16 +7,16 @@ Update only the code:
 
     basicswap]$ git pull
     $ cd docker
-    $ docker-compose build
     $ export COINDATA_PATH=[PATH_TO]
+    $ docker-compose build
     $ docker-compose up
 
 If the dependencies have changed the container must be built with `--no-cache`:
 
     basicswap]$ git pull
     $ cd docker
-    $ docker-compose build --no-cache
     $ export COINDATA_PATH=[PATH_TO]
+    $ docker-compose build --no-cache
     $ docker-compose up
 
 

@@ -80,6 +80,7 @@ if not len(logger.handlers):
     logger.addHandler(logging.StreamHandler(sys.stdout))
 
 UI_HTML_PORT = int(os.getenv('UI_HTML_PORT', 12700))
+UI_WS_PORT = int(os.getenv('UI_WS_PORT', 11700))
 COINS_RPCBIND_IP = os.getenv('COINS_RPCBIND_IP', '127.0.0.1')
 
 PART_ZMQ_PORT = int(os.getenv('PART_ZMQ_PORT', 20792))
@@ -748,7 +749,8 @@ def printHelp():
     logger.info('--nocores                Don\'t download and extract any coin clients.')
     logger.info('--usecontainers          Expect each core to run in a unique container.')
     logger.info('--portoffset=n           Raise all ports by n.')
-    logger.info('--htmlhost=              Interface to host on, default:127.0.0.1.')
+    logger.info('--htmlhost=              Interface to host html server on, default:127.0.0.1.')
+    logger.info('--wshost=                Interface to host websocket server on, disable by setting to "none", default:127.0.0.1.')
     logger.info('--xmrrestoreheight=n     Block height to restore Monero wallet from, default:{}.'.format(DEFAULT_XMR_RESTORE_HEIGHT))
     logger.info('--noextractover          Prevent extracting cores if files exist.  Speeds up tests')
     logger.info('--usetorproxy            Use TOR proxy during setup.  Note that some download links may be inaccessible over TOR.')
@@ -853,6 +855,7 @@ def main():
     add_coin = ''
     disable_coin = ''
     htmlhost = '127.0.0.1'
+    wshost = '127.0.0.1'
     xmr_restore_height = DEFAULT_XMR_RESTORE_HEIGHT
     prepare_bin_only = False
     no_cores = False
@@ -954,6 +957,9 @@ def main():
                 continue
             if name == 'htmlhost':
                 htmlhost = s[1].strip('"')
+                continue
+            if name == 'wshost':
+                wshost = s[1].strip('"')
                 continue
             if name == 'xmrrestoreheight':
                 xmr_restore_height = int(s[1])
@@ -1199,6 +1205,10 @@ def main():
             'check_watched_seconds': 60,
             'check_expired_seconds': 60
         }
+
+        if wshost != 'none':
+            settings['wshost'] = wshost
+            settings['wsport'] = UI_WS_PORT + port_offset
 
     if use_tor_proxy:
         tor_control_password = generate_salt(24)

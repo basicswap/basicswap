@@ -4,7 +4,6 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-import os
 import traceback
 
 from .util import (
@@ -151,13 +150,10 @@ def page_wallets(self, url_split, post_string):
         wallets_formatted.append(wf)
 
     template = server.env.get_template('wallets.html')
-    return bytes(template.render(
-        title=server.title,
-        h2=server.title,
-        messages=messages,
-        wallets=wallets_formatted,
-        form_id=os.urandom(8).hex(),
-    ), 'UTF-8')
+    return self.render_template(template, {
+        'messages': messages,
+        'wallets': wallets_formatted,
+    })
 
 
 def page_wallet(self, url_split, post_string):
@@ -304,10 +300,7 @@ def page_wallet(self, url_split, post_string):
             wallet_data['utxo_groups'] = utxo_groups
 
     template = server.env.get_template('wallet.html')
-    return bytes(template.render(
-        title=server.title,
-        h2=server.title,
-        messages=messages,
-        w=wallet_data,
-        form_id=os.urandom(8).hex(),
-    ), 'UTF-8')
+    return self.render_template(template, {
+        'messages': messages,
+        'w': wallet_data,
+    })
