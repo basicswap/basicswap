@@ -704,6 +704,11 @@ class HttpHandler(BaseHTTPRequestHandler):
                     with open(os.path.join(static_path, 'css', filename), 'rb') as fp:
                         self.putHeaders(status_code, 'text/css; charset=utf-8')
                         return fp.read()
+                elif len(url_split) > 3 and url_split[2] == 'js':
+                    filename = os.path.join(*url_split[3:])
+                    with open(os.path.join(static_path, 'js', filename), 'rb') as fp:
+                        self.putHeaders(status_code, 'application/javascript')
+                        return fp.read()
                 else:
                     self.putHeaders(status_code, 'text/html')
                     return self.page_404(url_split)

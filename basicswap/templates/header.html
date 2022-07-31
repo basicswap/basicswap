@@ -19,6 +19,7 @@
         floating_div = document.createElement('div');
         floating_div.classList.add('floatright');
         messages = document.createElement('ul');
+        messages.setAttribute('id', 'ul_updates');
     ws.onmessage = function (event) {
         let json = JSON.parse(event.data);
 
@@ -33,7 +34,7 @@
             event_message = '<a href=/bid/' + json['bid_id'] + '>Bid accepted</a>';
         }
 
-        let messages = document.getElementsByTagName('ul')[0],
+        let messages = document.getElementById('ul_updates'),
             message = document.createElement('li');
         message.innerHTML = event_message;
         messages.appendChild(message);

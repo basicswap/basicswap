@@ -10,6 +10,9 @@
 {% for m in messages %}
 <p>{{ m }}</p>
 {% endfor %}
+{% for m in err_messages %}
+<p class="error_msg">Error: {{ m }}</p>
+{% endfor %}
 
 {% if sent_bid_id %}
 <p><a href="/bid/{{ sent_bid_id }}">Sent Bid {{ sent_bid_id }}</a></p>
@@ -21,6 +24,7 @@
 <tr><td>Coin To</td><td>{{ data.coin_to }}</td></tr>
 <tr><td>Amount From</td><td>{{ data.amt_from }} {{ data.tla_from }}</td></tr>
 <tr><td>Amount To</td><td>{{ data.amt_to }} {{ data.tla_to }}</td></tr>
+<tr><td>Minimum Bid Amount</td><td>{{ data.amt_bid_min }} {{ data.tla_from }}</td></tr>
 <tr><td>Rate</td><td>{{ data.rate }}</td></tr>
 <tr><td title="Total coin-from value of completed bids, that this node is involved in">Amount Swapped</td><td>{{ data.amt_swapped }} {{ data.tla_from }}</td></tr>
 <tr><td title="If bids can be sent with a different amount">Amount Variable</td><td>{{ data.amount_negotiable }}</td></tr>

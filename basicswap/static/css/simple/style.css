@@ -22,3 +22,13 @@
   margin: 0;
   width:calc(33.33% - 25px);
 }
+
+.error
+{
+  background:#ff5b5b;
+}
+
+.error_msg
+{
+  color:red;
+}

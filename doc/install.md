@@ -57,14 +57,14 @@ Append `--usebtcfastsync` to the below command to optionally initialise the Bitc
 Setup with a local Monero daemon (recommended):
 
     export COINDATA_PATH=/var/data/coinswaps
-    docker run --rm -t --name swap_prepare -v $COINDATA_PATH:/coindata i_swapclient basicswap-prepare --datadir=/coindata --withcoins=monero --htmlhost="0.0.0.0" --xmrrestoreheight=$CURRENT_XMR_HEIGHT
+    docker run --rm -t --name swap_prepare -v $COINDATA_PATH:/coindata i_swapclient basicswap-prepare --datadir=/coindata --withcoins=monero --htmlhost="0.0.0.0" --wshost="0.0.0.0" --xmrrestoreheight=$CURRENT_XMR_HEIGHT
 
 
 To instead use Monero public nodes and not run a local Monero daemon<br>(it can be difficult to find reliable public nodes):
 
     Set XMR_RPC_HOST and BASE_XMR_RPC_PORT to a public XMR node.
     export COINDATA_PATH=/var/data/coinswaps
-    docker run --rm -e XMR_RPC_HOST="node.xmr.to" -e BASE_XMR_RPC_PORT=18081 -t --name swap_prepare -v $COINDATA_PATH:/coindata i_swapclient basicswap-prepare --datadir=/coindata --withcoins=monero --htmlhost="0.0.0.0" --xmrrestoreheight=$CURRENT_XMR_HEIGHT
+    docker run --rm -e XMR_RPC_HOST="node.xmr.to" -e BASE_XMR_RPC_PORT=18081 -t --name swap_prepare -v $COINDATA_PATH:/coindata i_swapclient basicswap-prepare --datadir=/coindata --withcoins=monero --htmlhost="0.0.0.0" --wshost="0.0.0.0" --xmrrestoreheight=$CURRENT_XMR_HEIGHT
 
 
 **Record the mnemonic from the output of the above command.**

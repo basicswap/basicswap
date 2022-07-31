@@ -22,6 +22,7 @@ from basicswap.db import (
 )
 from basicswap.util import (
     ensure,
+    format_amount,
     format_timestamp,
 )
 from basicswap.basicswap_util import (
@@ -44,7 +45,7 @@ def value_or_none(v):
     return v
 
 
-def parseOfferFormData(swap_client, form_data, page_data):
+def parseOfferFormData(swap_client, form_data, page_data, options={}):
     errors = []
     parsed_data = {}
 
@@ -88,11 +89,23 @@ def parseOfferFormData(swap_client, form_data, page_data):
     try:
         page_data['amt_from'] = get_data_entry(form_data, 'amt_from')
         parsed_data['amt_from'] = inputAmount(page_data['amt_from'], ci_from)
-
-        # TODO: Add min_bid to the ui
-        parsed_data['min_bid'] = ci_from.chainparams_network()['min_amount']
     except Exception:
         errors.append('Amount From')
+
+    try:
+        if 'amt_bid_min' not in page_data:
+            if options.get('add_min_bid_amt', False) is True:
+                parsed_data['amt_bid_min'] = ci_from.chainparams_network()['min_amount']
+            else:
+                raise ValueError('missing')
+        else:
+            page_data['amt_bid_min'] = get_data_entry(form_data, 'amt_bid_min')
+            parsed_data['amt_bid_min'] = inputAmount(page_data['amt_bid_min'], ci_from)
+
+            if parsed_data['amt_bid_min'] < 0 or parsed_data['amt_bid_min'] > parsed_data['amt_from']:
+                errors.append('Minimum Bid Amount out of range')
+    except Exception:
+        errors.append('Minimum Bid Amount')
 
     try:
         page_data['amt_to'] = get_data_entry(form_data, 'amt_to')
@@ -235,7 +248,7 @@ def postNewOfferFromParsed(swap_client, parsed_data):
         parsed_data['coin_to'],
         parsed_data['amt_from'],
         parsed_data['rate'],
-        parsed_data['min_bid'],
+        parsed_data['amt_bid_min'],
         swap_type,
         lock_type=lock_type,
         lock_value=parsed_data['lock_seconds'],
@@ -246,7 +259,7 @@ def postNewOfferFromParsed(swap_client, parsed_data):
 
 def postNewOffer(swap_client, form_data):
     page_data = {}
-    parsed_data, errors = parseOfferFormData(swap_client, form_data, page_data)
+    parsed_data, errors = parseOfferFormData(swap_client, form_data, page_data, options={'add_min_bid_amt': True})
     if len(errors) > 0:
         raise ValueError('Parse errors: ' + ' '.join(errors))
     return postNewOfferFromParsed(swap_client, parsed_data)
@@ -257,6 +270,7 @@ def page_newoffer(self, url_split, post_string):
     swap_client = server.swap_client
 
     messages = []
+    err_messages = []
     page_data = {
         # Set defaults
         'addr_to': -1,
@@ -267,20 +281,21 @@ def page_newoffer(self, url_split, post_string):
         'lockmins': 30,  # used in debug mode
         'debug_ui': swap_client.debug_ui,
         'automation_strat_id': -1,
+        'amt_bid_min': format_amount(1000, 8),
     }
-    form_data = self.checkForm(post_string, 'newoffer', messages)
+    form_data = self.checkForm(post_string, 'newoffer', err_messages)
 
     if form_data:
         try:
             parsed_data, errors = parseOfferFormData(swap_client, form_data, page_data)
             for e in errors:
-                messages.append('Error: {}'.format(str(e)))
+                err_messages.append(str(e))
         except Exception as e:
             if swap_client.debug is True:
                 swap_client.log.error(traceback.format_exc())
-            messages.append('Error: {}'.format(str(e)))
+            err_messages.append(str(e))
 
-    if len(messages) == 0 and 'submit_offer' in page_data:
+    if len(err_messages) == 0 and 'submit_offer' in page_data:
         try:
             offer_id = postNewOfferFromParsed(swap_client, parsed_data)
             messages.append('<a href="/offer/' + offer_id.hex() + '">Sent Offer {}</a>'.format(offer_id.hex()))
@@ -288,9 +303,9 @@ def page_newoffer(self, url_split, post_string):
         except Exception as e:
             if swap_client.debug is True:
                 swap_client.log.error(traceback.format_exc())
-            messages.append('Error: {}'.format(str(e)))
+            err_messages.append(str(e))
 
-    if len(messages) == 0 and 'check_offer' in page_data:
+    if len(err_messages) == 0 and 'check_offer' in page_data:
         template = server.env.get_template('offer_confirm.html')
     elif 'step2' in page_data:
         template = server.env.get_template('offer_new_2.html')
@@ -309,6 +324,7 @@ def page_newoffer(self, url_split, post_string):
 
     return self.render_template(template, {
         'messages': messages,
+        'err_messages': err_messages,
         'coins_from': coins_from,
         'coins': coins_to,
         'addrs': swap_client.listSmsgAddresses('offer_send_from'),
@@ -401,6 +417,7 @@ def page_offer(self, url_split, post_string):
         'coin_to_ind': int(ci_to.coin_type()),
         'amt_from': ci_from.format_amount(offer.amount_from),
         'amt_to': ci_to.format_amount((offer.amount_from * offer.rate) // ci_from.COIN()),
+        'amt_bid_min': ci_from.format_amount(offer.min_bid_amount),
         'rate': ci_to.format_amount(offer.rate),
         'lock_type': getLockName(offer.lock_type),
         'lock_value': offer.lock_value,

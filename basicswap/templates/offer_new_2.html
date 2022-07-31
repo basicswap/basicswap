@@ -4,6 +4,9 @@
 {% for m in messages %}
 <p>{{ m }}</p>
 {% endfor %}
+{% for m in err_messages %}
+<p class="error_msg">Error: {{ m }}</p>
+{% endfor %}
 
 <form method="post">
 
@@ -56,6 +59,7 @@
 <option value="100"{% if data.fee_to_extra==100 %} selected{% endif %}>100%</option>
 </select></td></tr>
 {% endif %}
+<tr><td>Minimum Bid Amount</td><td><input type="text" id="amt_bid_min" name="amt_bid_min" value="{{ data.amt_bid_min }}" title="Bids with an amount below the minimum bid value will be discarded" readonly></td></tr>
 <tr><td>Rate</td><td><input type="text" id="rate" name="rate" value="{{ data.rate }}" readonly></td></tr>
 <tr><td>Amount Variable</td><td colspan=3><input type="checkbox" id="amt_var" name="amt_var_" value="av" {% if data.amt_var==true %} checked=checked{% endif %} disabled></td></tr>
 <tr><td>Rate Variable</td><td colspan=3><input type="checkbox" id="rate_var" name="rate_var_" value="rv" {% if data.rate_var==true %} checked=checked{% endif %} disabled></td></tr>
@@ -92,4 +96,5 @@
 {% endif %}
 </form>
 
+<script src="static/js/new_offer.js"></script>
 </body></html>
