@@ -356,7 +356,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         ensure(len(url_split) > 2, 'Bid ID not specified')
         try:
             bid_id = bytes.fromhex(url_split[2])
-            assert(len(bid_id) == 28)
+            assert len(bid_id) == 28
         except Exception:
             raise ValueError('Bad bid ID')
         swap_client = self.server.swap_client

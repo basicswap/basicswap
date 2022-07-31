@@ -183,7 +183,7 @@ class Test(unittest.TestCase):
             self.delay_event.wait(1)
 
         logging.info('PART blocks: %d', callpartrpc(0, 'getblockchaininfo')['blocks'])
-        assert(particl_blocks >= num_blocks)
+        assert particl_blocks >= num_blocks
 
     @classmethod
     def tearDownClass(cls):

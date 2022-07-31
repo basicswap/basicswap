@@ -193,7 +193,7 @@ def testTorConnection():
     logger.info('Testing TOR connection at: ' + test_url)
 
     test_response = downloadBytes(test_url).decode('utf-8')
-    assert('Congratulations. This browser is configured to use Tor.' in test_response)
+    assert ('Congratulations. This browser is configured to use Tor.' in test_response)
     logger.info('TOR is working.')
 
 
@@ -201,7 +201,7 @@ def testOnionLink():
     test_url = 'http://jqyzxhjk6psc6ul5jnfwloamhtyh7si74b4743k2qgpskwwxrzhsxmad.onion'
     logger.info('Testing onion site: ' + test_url)
     test_response = downloadBytes(test_url).decode('utf-8')
-    assert('The Tor Project\'s free software protects your privacy online.' in test_response)
+    assert ('The Tor Project\'s free software protects your privacy online.' in test_response)
     logger.info('Onion links work.')
 
 

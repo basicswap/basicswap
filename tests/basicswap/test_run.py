@@ -95,24 +95,24 @@ class Test(BaseTest):
         for c in Coins:
             coin = next((x for x in js_coins if x['id'] == int(c)), None)
             if c in (Coins.PART, Coins.BTC, Coins.LTC, Coins.PART_ANON, Coins.PART_BLIND):
-                assert(coin['active'] is True)
+                assert (coin['active'] is True)
             else:
-                assert(coin['active'] is False)
+                assert (coin['active'] is False)
             if c in (Coins.PART_ANON, Coins.PART_BLIND):
-                assert(coin['ticker'] == 'PART')
+                assert (coin['ticker'] == 'PART')
 
     def test_002_lookup_rates(self):
         rv = self.swap_clients[0].lookupRates(Coins.BTC, Coins.PART)
-        assert('coingecko' in rv)
-        assert('bittrex' in rv)
+        assert ('coingecko' in rv)
+        assert ('bittrex' in rv)
 
         rv = self.swap_clients[0].lookupRates(Coins.LTC, Coins.BTC)
-        assert('coingecko' in rv)
-        assert('bittrex' in rv)
+        assert ('coingecko' in rv)
+        assert ('bittrex' in rv)
 
         rv = self.swap_clients[0].lookupRates(Coins.LTC, Coins.PART)
-        assert('coingecko' in rv)
-        assert('bittrex' in rv)
+        assert ('coingecko' in rv)
+        assert ('bittrex' in rv)
 
     def test_01_verifyrawtransaction(self):
         txn = '0200000001eb6e5c4ebba4efa32f40c7314cad456a64008e91ee30b2dd0235ab9bb67fbdbb01000000ee47304402200956933242dde94f6cf8f195a470f8d02aef21ec5c9b66c5d3871594bdb74c9d02201d7e1b440de8f4da672d689f9e37e98815fb63dbc1706353290887eb6e8f7235012103dc1b24feb32841bc2f4375da91fa97834e5983668c2a39a6b7eadb60e7033f9d205a803b28fe2f86c17db91fa99d7ed2598f79b5677ffe869de2e478c0d1c02cc7514c606382012088a8201fe90717abb84b481c2a59112414ae56ec8acc72273642ca26cc7a5812fdc8f68876a914225fbfa4cb725b75e511810ac4d6f74069bdded26703520140b27576a914207eb66b2fd6ed9924d6217efc7fa7b38dfabe666888acffffffff01e0167118020000001976a9140044e188928710cecba8311f1cf412135b98145c88ac00000000'
@@ -123,13 +123,13 @@ class Test(BaseTest):
             'redeemScript': '6382012088a8201fe90717abb84b481c2a59112414ae56ec8acc72273642ca26cc7a5812fdc8f68876a914225fbfa4cb725b75e511810ac4d6f74069bdded26703520140b27576a914207eb66b2fd6ed9924d6217efc7fa7b38dfabe666888ac',
             'amount': 1.0}
         ro = callnoderpc(0, 'verifyrawtransaction', [txn, [prevout, ]])
-        assert(ro['inputs_valid'] is False)
-        assert(ro['validscripts'] == 1)
+        assert (ro['inputs_valid'] is False)
+        assert (ro['validscripts'] == 1)
 
         prevout['amount'] = 100.0
         ro = callnoderpc(0, 'verifyrawtransaction', [txn, [prevout, ]])
-        assert(ro['inputs_valid'] is True)
-        assert(ro['validscripts'] == 1)
+        assert (ro['inputs_valid'] is True)
+        assert (ro['validscripts'] == 1)
 
         txn = 'a000000000000128e8ba6a28673f2ebb5fd983b27a791fd1888447a47638b3cd8bfdd3f54a6f1e0100000000a90040000101e0c69a3b000000001976a9146c0f1ea47ca2bf84ed87bf3aa284e18748051f5788ac04473044022026b01f3a90e46883949404141467b741cd871722a4aaae8ddc8c4d6ab6fb1c77022047a2f3be2dcbe4c51837d2d5e0329aaa8a13a8186b03186b127cc51185e4f3ab012103dc1b24feb32841bc2f4375da91fa97834e5983668c2a39a6b7eadb60e7033f9d0100606382012088a8201fe90717abb84b481c2a59112414ae56ec8acc72273642ca26cc7a5812fdc8f68876a914207eb66b2fd6ed9924d6217efc7fa7b38dfabe666703a90040b27576a914225fbfa4cb725b75e511810ac4d6f74069bdded26888ac'
         prevout = {
@@ -139,13 +139,13 @@ class Test(BaseTest):
             'redeemScript': '6382012088a8201fe90717abb84b481c2a59112414ae56ec8acc72273642ca26cc7a5812fdc8f68876a914207eb66b2fd6ed9924d6217efc7fa7b38dfabe666703a90040b27576a914225fbfa4cb725b75e511810ac4d6f74069bdded26888ac',
             'amount': 1.0}
         ro = callnoderpc(0, 'verifyrawtransaction', [txn, [prevout, ]])
-        assert(ro['inputs_valid'] is False)
-        assert(ro['validscripts'] == 0)  # Amount covered by signature
+        assert (ro['inputs_valid'] is False)
+        assert (ro['validscripts'] == 0)  # Amount covered by signature
 
         prevout['amount'] = 90.0
         ro = callnoderpc(0, 'verifyrawtransaction', [txn, [prevout, ]])
-        assert(ro['inputs_valid'] is True)
-        assert(ro['validscripts'] == 1)
+        assert (ro['inputs_valid'] is True)
+        assert (ro['validscripts'] == 1)
 
     def test_02_part_ltc(self):
         logging.info('---------- Test PART to LTC')
@@ -155,7 +155,7 @@ class Test(BaseTest):
 
         wait_for_offer(test_delay_event, swap_clients[1], offer_id)
         offers = swap_clients[1].listOffers()
-        assert(len(offers) == 1)
+        assert (len(offers) == 1)
         for offer in offers:
             if offer.offer_id == offer_id:
                 bid_id = swap_clients[1].postBid(offer_id, offer.amount_from)
@@ -171,16 +171,16 @@ class Test(BaseTest):
 
         js_0 = read_json_api(1800)
         js_1 = read_json_api(1801)
-        assert(js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
-        assert(js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
+        assert (js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
+        assert (js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
 
         bid_id_hex = bid_id.hex()
         path = f'bids/{bid_id_hex}/states'
         offerer_states = read_json_api(1800, path)
         bidder_states = read_json_api(1801, path)
 
-        assert(compare_bid_states(offerer_states, self.states_offerer[0]) is True)
-        assert(compare_bid_states(bidder_states, self.states_bidder[0]) is True)
+        assert (compare_bid_states(offerer_states, self.states_offerer[0]) is True)
+        assert (compare_bid_states(bidder_states, self.states_bidder[0]) is True)
 
     def test_03_ltc_part(self):
         logging.info('---------- Test LTC to PART')
@@ -202,8 +202,8 @@ class Test(BaseTest):
 
         js_0 = read_json_api(1800)
         js_1 = read_json_api(1801)
-        assert(js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
-        assert(js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
+        assert (js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
+        assert (js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
 
     def test_04_ltc_btc(self):
         logging.info('---------- Test LTC to BTC')
@@ -225,8 +225,8 @@ class Test(BaseTest):
 
         js_0 = read_json_api(1800)
         js_1 = read_json_api(1801)
-        assert(js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
-        assert(js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
+        assert (js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
+        assert (js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
 
     def test_05_refund(self):
         # Seller submits initiate txn, buyer doesn't respond
@@ -249,21 +249,21 @@ class Test(BaseTest):
 
         js_0_bid = read_json_api(1800, 'bids/{}'.format(bid_id.hex()))
         js_1_bid = read_json_api(1801, 'bids/{}'.format(bid_id.hex()))
-        assert(js_0_bid['itx_state'] == 'Refunded')
-        assert(js_1_bid['ptx_state'] == 'Unknown')
+        assert (js_0_bid['itx_state'] == 'Refunded')
+        assert (js_1_bid['ptx_state'] == 'Unknown')
 
         js_0 = read_json_api(1800)
         js_1 = read_json_api(1801)
-        assert(js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
-        assert(js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
+        assert (js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
+        assert (js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
 
         bid_id_hex = bid_id.hex()
         path = f'bids/{bid_id_hex}/states'
         offerer_states = read_json_api(1800, path)
         bidder_states = read_json_api(1801, path)
 
-        assert(compare_bid_states(offerer_states, self.states_offerer[1]) is True)
-        assert(bidder_states[-1][1] == 'Bid Abandoned')
+        assert (compare_bid_states(offerer_states, self.states_offerer[1]) is True)
+        assert (bidder_states[-1][1] == 'Bid Abandoned')
 
     def test_06_self_bid(self):
         logging.info('---------- Test same client, BTC to LTC')
@@ -285,8 +285,8 @@ class Test(BaseTest):
         wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=60)
 
         js_0 = read_json_api(1800)
-        assert(js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
-        assert(js_0['num_recv_bids'] == js_0_before['num_recv_bids'] + 1 and js_0['num_sent_bids'] == js_0_before['num_sent_bids'] + 1)
+        assert (js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
+        assert (js_0['num_recv_bids'] == js_0_before['num_recv_bids'] + 1 and js_0['num_sent_bids'] == js_0_before['num_sent_bids'] + 1)
 
     def test_07_error(self):
         logging.info('---------- Test error, BTC to LTC, set fee above bid value')
@@ -327,7 +327,7 @@ class Test(BaseTest):
 
         wait_for_offer(test_delay_event, swap_clients[1], offer_id)
         offers = swap_clients[1].listOffers()
-        assert(len(offers) >= 1)
+        assert (len(offers) >= 1)
         for offer in offers:
             if offer.offer_id == offer_id:
                 bid_id = swap_clients[1].postBid(offer_id, offer.amount_from)
@@ -358,21 +358,21 @@ class Test(BaseTest):
 
         js_0_bid = read_json_api(1800, 'bids/{}'.format(bid_id.hex()))
         js_1_bid = read_json_api(1801, 'bids/{}'.format(bid_id.hex()))
-        assert(js_0_bid['itx_state'] == 'Refunded')
-        assert(js_1_bid['ptx_state'] == 'Refunded')
+        assert (js_0_bid['itx_state'] == 'Refunded')
+        assert (js_1_bid['ptx_state'] == 'Refunded')
 
         js_0 = read_json_api(1800)
         js_1 = read_json_api(1801)
-        assert(js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
-        assert(js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
+        assert (js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
+        assert (js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
 
         bid_id_hex = bid_id.hex()
         path = f'bids/{bid_id_hex}/states'
         offerer_states = read_json_api(1800, path)
         bidder_states = read_json_api(1801, path)
 
-        assert(compare_bid_states(offerer_states, self.states_offerer[1]) is True)
-        assert(compare_bid_states(bidder_states, self.states_bidder[1]) is True)
+        assert (compare_bid_states(offerer_states, self.states_offerer[1]) is True)
+        assert (compare_bid_states(bidder_states, self.states_bidder[1]) is True)
 
     '''
     def test_11_refund(self):
@@ -398,13 +398,13 @@ class Test(BaseTest):
 
         js_0_bid = read_json_api(1800, 'bids/{}'.format(bid_id.hex()))
         js_1_bid = read_json_api(1801, 'bids/{}'.format(bid_id.hex()))
-        assert(js_0_bid['itx_state'] == 'Refunded')
-        assert(js_1_bid['ptx_state'] == 'Unknown')
+        assert (js_0_bid['itx_state'] == 'Refunded')
+        assert (js_1_bid['ptx_state'] == 'Unknown')
 
         js_0 = read_json_api(1800)
         js_1 = read_json_api(1801)
-        assert(js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
-        assert(js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
+        assert (js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
+        assert (js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
     '''
 
     def test_12_withdrawal(self):
@@ -412,7 +412,7 @@ class Test(BaseTest):
 
         ltc_addr = callnoderpc(0, 'getnewaddress', ['Withdrawal test', 'legacy'], base_rpc_port=LTC_BASE_RPC_PORT)
         wallets0 = read_json_api(TEST_HTTP_PORT + 0, 'wallets')
-        assert(float(wallets0['LTC']['balance']) > 100)
+        assert (float(wallets0['LTC']['balance']) > 100)
 
         post_json = {
             'value': 100,
@@ -420,7 +420,7 @@ class Test(BaseTest):
             'subfee': False,
         }
         json_rv = json.loads(post_json_req('http://127.0.0.1:{}/json/wallets/ltc/withdraw'.format(TEST_HTTP_PORT + 0), post_json))
-        assert(len(json_rv['txid']) == 64)
+        assert (len(json_rv['txid']) == 64)
 
     def test_13_itx_refund(self):
         logging.info('---------- Test ITX refunded')
@@ -469,11 +469,11 @@ class Test(BaseTest):
         high_fee_value_btc = int(0.001 * COIN)
         high_fee_value_ltc = int(0.01 * COIN)  # TODO Set fees directly, see listtransactions
 
-        assert(node0_btc_after > node0_btc_before + btc_swap_value - high_fee_value_btc)
-        assert(node0_ltc_after > node0_ltc_before - high_fee_value_ltc)
+        assert (node0_btc_after > node0_btc_before + btc_swap_value - high_fee_value_btc)
+        assert (node0_ltc_after > node0_ltc_before - high_fee_value_ltc)
 
-        assert(node1_btc_after < node1_btc_before - btc_swap_value)
-        assert(node1_ltc_before == node1_ltc_after)
+        assert (node1_btc_after < node1_btc_before - btc_swap_value)
+        assert (node1_ltc_before == node1_ltc_after)
 
         wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=60)
 
@@ -482,8 +482,8 @@ class Test(BaseTest):
         offerer_states = read_json_api(1800, path)
         bidder_states = read_json_api(1801, path)
 
-        assert(compare_bid_states(offerer_states, self.states_offerer[2]) is True)
-        assert(compare_bid_states(bidder_states, self.states_bidder[2], exact_match=False) is True)
+        assert (compare_bid_states(offerer_states, self.states_offerer[2]) is True)
+        assert (compare_bid_states(bidder_states, self.states_bidder[2], exact_match=False) is True)
 
     def pass_99_delay(self):
         logging.info('Delay')

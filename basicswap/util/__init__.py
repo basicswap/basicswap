@@ -56,7 +56,7 @@ def SerialiseNum(n):
     rv = bytearray()
     neg = n < 0
     absvalue = -n if neg else n
-    while(absvalue):
+    while (absvalue):
         rv.append(absvalue & 0xff)
         absvalue >>= 8
     if rv[-1] & 0x80:

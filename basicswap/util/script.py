@@ -13,7 +13,7 @@ def decodeScriptNum(script_bytes, o):
     v = 0
     num_len = script_bytes[o]
     if num_len >= OpCodes.OP_1 and num_len <= OpCodes.OP_16:
-        return((num_len - OpCodes.OP_1) + 1, 1)
+        return ((num_len - OpCodes.OP_1) + 1, 1)
 
     if num_len > 4:
         raise ValueError('Bad scriptnum length')  # Max 4 bytes
@@ -29,7 +29,7 @@ def decodeScriptNum(script_bytes, o):
             v *= -1
         else:
             v += int(b) << 8 * i
-    return(v, 1 + num_len)
+    return (v, 1 + num_len)
 
 
 def getP2SHScriptForHash(p2sh):

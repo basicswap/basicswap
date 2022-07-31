@@ -114,7 +114,7 @@ def decodeAddress(address_str):
     if b58_addr is not None:
         address = b58_addr[:-4]
         checksum = b58_addr[-4:]
-        assert(hashlib.sha256(hashlib.sha256(address).digest()).digest()[:4] == checksum), 'Checksum mismatch'
+        assert (hashlib.sha256(hashlib.sha256(address).digest()).digest()[:4] == checksum), 'Checksum mismatch'
         return b58_addr[:-4]
     return None
 

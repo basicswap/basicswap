@@ -143,18 +143,18 @@ def js_offers(self, url_split, post_string, is_json, sent=False):
 
         if have_data_entry(post_data, 'sort_by'):
             sort_by = get_data_entry(post_data, 'sort_by')
-            assert(sort_by in ['created_at', 'rate']), 'Invalid sort by'
+            assert (sort_by in ['created_at', 'rate']), 'Invalid sort by'
             filters['sort_by'] = sort_by
         if have_data_entry(post_data, 'sort_dir'):
             sort_dir = get_data_entry(post_data, 'sort_dir')
-            assert(sort_dir in ['asc', 'desc']), 'Invalid sort dir'
+            assert (sort_dir in ['asc', 'desc']), 'Invalid sort dir'
             filters['sort_dir'] = sort_dir
 
         if b'offset' in post_data:
             filters['offset'] = int(get_data_entry(post_data, 'offset'))
         if b'limit' in post_data:
             filters['limit'] = int(get_data_entry(post_data, 'limit'))
-            assert(filters['limit'] > 0 and filters['limit'] <= PAGE_LIMIT), 'Invalid limit'
+            assert (filters['limit'] > 0 and filters['limit'] <= PAGE_LIMIT), 'Invalid limit'
 
     offers = self.server.swap_client.listOffers(sent, filters)
     rv = []
@@ -194,10 +194,10 @@ def js_bids(self, url_split, post_string, is_json):
                 post_data = urllib.parse.parse_qs(post_string)
 
             offer_id = bytes.fromhex(get_data_entry(post_data, 'offer_id'))
-            assert(len(offer_id) == 28)
+            assert (len(offer_id) == 28)
 
             offer = swap_client.getOffer(offer_id)
-            assert(offer), 'Offer not found.'
+            assert (offer), 'Offer not found.'
 
             ci_from = swap_client.ci(offer.coin_from)
             ci_to = swap_client.ci(offer.coin_to)
@@ -236,7 +236,7 @@ def js_bids(self, url_split, post_string, is_json):
             return bytes(json.dumps(rv), 'UTF-8')
 
         bid_id = bytes.fromhex(url_split[3])
-        assert(len(bid_id) == 28)
+        assert (len(bid_id) == 28)
 
         if post_string != '':
             if is_json:
@@ -250,7 +250,7 @@ def js_bids(self, url_split, post_string, is_json):
                 swap_client.setBidDebugInd(bid_id, int(get_data_entry(post_data, 'debugind')))
 
         bid, xmr_swap, offer, xmr_offer, events = swap_client.getXmrBidAndOffer(bid_id)
-        assert(bid), 'Unknown bid ID'
+        assert (bid), 'Unknown bid ID'
 
         if post_string != '':
             if have_data_entry(post_data, 'chainbkeysplit'):
@@ -290,7 +290,7 @@ def js_network(self, url_split, post_string, is_json):
 
 def js_revokeoffer(self, url_split, post_string, is_json):
     offer_id = bytes.fromhex(url_split[3])
-    assert(len(offer_id) == 28)
+    assert (len(offer_id) == 28)
     self.server.swap_client.revokeOffer(offer_id)
     return bytes(json.dumps({'revoked_offer': offer_id.hex()}), 'UTF-8')
 

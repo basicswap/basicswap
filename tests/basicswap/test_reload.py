@@ -98,7 +98,7 @@ class Test(unittest.TestCase):
                 if blocks >= num_blocks:
                     break
                 delay_event.wait(2)
-            assert(blocks >= num_blocks)
+            assert (blocks >= num_blocks)
 
             data = {
                 'addr_from': '-1',
@@ -110,7 +110,7 @@ class Test(unittest.TestCase):
 
             offer_id = post_json_api(12700, 'offers/new', data)
             summary = read_json_api(12700)
-            assert(summary['num_sent_offers'] == 1)
+            assert (summary['num_sent_offers'] == 1)
         except Exception:
             traceback.print_exc()
 
@@ -135,7 +135,7 @@ class Test(unittest.TestCase):
             'accept': True
         }
         rv = post_json_api(12700, 'bids/{}'.format(bid['bid_id']), data)
-        assert(rv['bid_state'] == 'Accepted')
+        assert (rv['bid_state'] == 'Accepted')
 
         waitForNumSwapping(delay_event, 12701, 1)
 
@@ -148,7 +148,7 @@ class Test(unittest.TestCase):
 
         waitForServer(delay_event, 12701)
         rv = read_json_api(12701)
-        assert(rv['num_swapping'] == 1)
+        assert (rv['num_swapping'] == 1)
 
         update_thread = threading.Thread(target=updateThread)
         update_thread.start()
@@ -160,7 +160,7 @@ class Test(unittest.TestCase):
             rv = read_json_api(12700, 'bids/{}'.format(bid['bid_id']))
             if rv['bid_state'] == 'Completed':
                 break
-        assert(rv['bid_state'] == 'Completed')
+        assert (rv['bid_state'] == 'Completed')
 
         delay_event.set()
         update_thread.join()

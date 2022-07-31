@@ -46,7 +46,7 @@ class Test(XmrTestBase):
         waitForServer(self.delay_event, 12700)
         waitForServer(self.delay_event, 12701)
         wallets1 = read_json_api(12701, 'wallets')
-        assert(float(wallets1['XMR']['balance']) > 0.0)
+        assert (float(wallets1['XMR']['balance']) > 0.0)
 
         data = {
             'addr_from': '-1',
@@ -58,7 +58,7 @@ class Test(XmrTestBase):
 
         offer_id = post_json_api(12700, 'offers/new', data)['offer_id']
         summary = read_json_api(12700)
-        assert(summary['num_sent_offers'] == 1)
+        assert (summary['num_sent_offers'] == 1)
 
         logger.info('Waiting for offer')
         waitForNumOffers(self.delay_event, 12701, 1)
@@ -72,20 +72,20 @@ class Test(XmrTestBase):
 
         data['valid_for_seconds'] = 24 * 60 * 60 + 1
         bid = post_json_api(12701, 'bids/new', data)
-        assert(bid['error'] == 'Bid TTL too high')
+        assert (bid['error'] == 'Bid TTL too high')
         del data['valid_for_seconds']
         data['validmins'] = 24 * 60 + 1
         bid = post_json_api(12701, 'bids/new', data)
-        assert(bid['error'] == 'Bid TTL too high')
+        assert (bid['error'] == 'Bid TTL too high')
 
         del data['validmins']
         data['valid_for_seconds'] = 10
         bid = post_json_api(12701, 'bids/new', data)
-        assert(bid['error'] == 'Bid TTL too low')
+        assert (bid['error'] == 'Bid TTL too low')
         del data['valid_for_seconds']
         data['validmins'] = 1
         bid = post_json_api(12701, 'bids/new', data)
-        assert(bid['error'] == 'Bid TTL too low')
+        assert (bid['error'] == 'Bid TTL too low')
 
         data['validmins'] = 60
         bid_id = post_json_api(12701, 'bids/new', data)
@@ -98,13 +98,13 @@ class Test(XmrTestBase):
             if bid['bid_state'] == 'Received':
                 break
             self.delay_event.wait(1)
-        assert(bid['expire_at'] == bid['created_at'] + data['validmins'] * 60)
+        assert (bid['expire_at'] == bid['created_at'] + data['validmins'] * 60)
 
         data = {
             'accept': True
         }
         rv = post_json_api(12700, 'bids/{}'.format(bid['bid_id']), data)
-        assert(rv['bid_state'] == 'Accepted')
+        assert (rv['bid_state'] == 'Accepted')
 
         waitForNumSwapping(self.delay_event, 12701, 1)
 
@@ -117,10 +117,10 @@ class Test(XmrTestBase):
 
         waitForServer(self.delay_event, 12701)
         rv = read_json_api(12701)
-        assert(rv['num_swapping'] == 1)
+        assert (rv['num_swapping'] == 1)
 
         rv = read_json_api(12700, 'revokeoffer/{}'.format(offer_id))
-        assert(rv['revoked_offer'] == offer_id)
+        assert (rv['revoked_offer'] == offer_id)
 
         logger.info('Completing swap')
         for i in range(240):
@@ -131,11 +131,11 @@ class Test(XmrTestBase):
             rv = read_json_api(12700, 'bids/{}'.format(bid['bid_id']))
             if rv['bid_state'] == 'Completed':
                 break
-        assert(rv['bid_state'] == 'Completed')
+        assert (rv['bid_state'] == 'Completed')
 
         # Ensure offer was revoked
         summary = read_json_api(12700)
-        assert(summary['num_network_offers'] == 0)
+        assert (summary['num_network_offers'] == 0)
 
         # Wait for bid to be removed from in-progress
         waitForNumBids(self.delay_event, 12700, 0)

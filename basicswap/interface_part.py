@@ -172,7 +172,7 @@ class PARTInterfaceBlind(PARTInterface):
         # Nonce is derived from vkbv, ephemeral_key isn't used
         ephemeral_key = i2b(self.getNewSecretKey())
         ephemeral_pubkey = self.getPubkey(ephemeral_key)
-        assert(len(ephemeral_pubkey) == 33)
+        assert (len(ephemeral_pubkey) == 33)
         nonce = self.getScriptLockTxNonce(vkbv)
         p2wsh_addr = self.encode_p2wsh(getP2WSH(script))
         inputs = []
@@ -192,7 +192,7 @@ class PARTInterfaceBlind(PARTInterface):
 
         tx_obj = self.rpc_callback('decoderawtransaction', [tx_hex])
 
-        assert(len(tx_obj['vout']) == 1)
+        assert (len(tx_obj['vout']) == 1)
         txo = tx_obj['vout'][0]
         blinded_info = self.rpc_callback('rewindrangeproof', [txo['rangeproof'], txo['valueCommitment'], nonce.hex()])
 
@@ -207,11 +207,11 @@ class PARTInterfaceBlind(PARTInterface):
 
     def createScriptLockRefundTx(self, tx_lock_bytes, script_lock, Kal, Kaf, lock1_value, csv_val, tx_fee_rate, vkbv):
         lock_tx_obj = self.rpc_callback('decoderawtransaction', [tx_lock_bytes.hex()])
-        assert(self.getTxid(tx_lock_bytes).hex() == lock_tx_obj['txid'])
+        assert (self.getTxid(tx_lock_bytes).hex() == lock_tx_obj['txid'])
         # Nonce is derived from vkbv, ephemeral_key isn't used
         ephemeral_key = i2b(self.getNewSecretKey())
         ephemeral_pubkey = self.getPubkey(ephemeral_key)
-        assert(len(ephemeral_pubkey) == 33)
+        assert (len(ephemeral_pubkey) == 33)
         nonce = self.getScriptLockTxNonce(vkbv)
         output_nonce = self.getScriptLockRefundTxNonce(vkbv)
 
@@ -675,7 +675,7 @@ class PARTInterfaceAnon(PARTInterface):
 
         if len(txns) == 1:
             tx = txns[0]
-            assert(tx['outputs'][0]['stealth_address'] == sx_addr)  # Should not be possible
+            assert (tx['outputs'][0]['stealth_address'] == sx_addr)  # Should not be possible
             ensure(tx['outputs'][0]['type'] == 'anon', 'Output is not anon')
 
             if make_int(tx['outputs'][0]['amount']) == cb_swap_value:

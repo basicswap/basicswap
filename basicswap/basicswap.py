@@ -519,13 +519,13 @@ class BasicSwap(BaseApp):
 
                     with open(pidfilepath, 'rb') as fp:
                         datadir_pid = int(fp.read().decode('utf-8'))
-                    assert(datadir_pid == cc['pid']), 'Mismatched pid'
-                    assert(os.path.exists(authcookiepath))
+                    assert (datadir_pid == cc['pid']), 'Mismatched pid'
+                    assert (os.path.exists(authcookiepath))
                 except Exception:
                     self.delay_event.wait(0.5)
             try:
                 if os.name != 'nt' or cc['core_version_group'] > 17:  # Litecoin on windows doesn't write a pid file
-                    assert(datadir_pid == cc['pid']), 'Mismatched pid'
+                    assert (datadir_pid == cc['pid']), 'Mismatched pid'
                 with open(authcookiepath, 'rb') as fp:
                     cc['rpcauth'] = fp.read().decode('utf-8')
             except Exception as e:
@@ -2074,7 +2074,7 @@ class BasicSwap(BaseApp):
             else:
                 xmr_swap.kbsf_dleag = xmr_swap.pkbsf
             xmr_swap.pkasf = xmr_swap.kbsf_dleag[0: 33]
-            assert(xmr_swap.pkasf == ci_from.getPubkey(kbsf))
+            assert (xmr_swap.pkasf == ci_from.getPubkey(kbsf))
 
             msg_buf.pkaf = xmr_swap.pkaf
             msg_buf.kbvf = kbvf
@@ -2432,7 +2432,7 @@ class BasicSwap(BaseApp):
 
         amount_to = bid.amount_to
         # Check required?
-        assert(amount_to == (bid.amount * bid.rate) // self.ci(offer.coin_from).COIN())
+        assert (amount_to == (bid.amount * bid.rate) // self.ci(offer.coin_from).COIN())
 
         if bid.debug_ind == DebugTypes.MAKE_INVALID_PTX:
             amount_to -= 1
@@ -2536,7 +2536,7 @@ class BasicSwap(BaseApp):
 
         if addr_redeem_out is None:
             addr_redeem_out = self.getReceiveAddressFromPool(coin_type, bid.bid_id, TxTypes.PTX_REDEEM if for_txn_type == 'participate' else TxTypes.ITX_REDEEM)
-        assert(addr_redeem_out is not None)
+        assert (addr_redeem_out is not None)
 
         if self.coin_clients[coin_type]['use_segwit']:
             # Change to btc hrp
@@ -3102,7 +3102,7 @@ class BasicSwap(BaseApp):
         return rv
 
     def checkBidState(self, bid_id, bid, offer):
-        # assert(self.mxDB.locked())
+        # assert (self.mxDB.locked())
         # Return True to remove bid from in-progress list
 
         state = BidStates(bid.state)
@@ -3484,7 +3484,7 @@ class BasicSwap(BaseApp):
             self.initiateTxnSpent(watched_output.bid_id, spend_txid_hex, spend_n, spend_txn)
 
     def checkForSpends(self, coin_type, c):
-        # assert(self.mxDB.locked())
+        # assert (self.mxDB.locked())
         self.log.debug('checkForSpends %s', coin_type)
 
         # TODO: Check for spends on watchonly txns where possible
@@ -3935,7 +3935,7 @@ class BasicSwap(BaseApp):
         self.validateBidAmount(offer, bid_data.amount, bid_data.rate)
 
         # TODO: Allow higher bids
-        # assert(bid_data.rate != offer['data'].rate), 'Bid rate mismatch'
+        # assert (bid_data.rate != offer['data'].rate), 'Bid rate mismatch'
 
         coin_to = Coins(offer.coin_to)
         ci_from = self.ci(offer.coin_from)
@@ -4641,7 +4641,7 @@ class BasicSwap(BaseApp):
             xmr_swap.al_lock_spend_tx_sig = ci_from.extractLeaderSig(xmr_swap.a_lock_spend_tx)
 
             kbsf = ci_from.recoverEncKey(xmr_swap.al_lock_spend_tx_esig, xmr_swap.al_lock_spend_tx_sig, xmr_swap.pkasf)
-            assert(kbsf is not None)
+            assert (kbsf is not None)
 
             for_ed25519 = True if coin_to == Coins.XMR else False
             kbsl = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, KeyTypes.KBSL, for_ed25519)
@@ -4697,7 +4697,7 @@ class BasicSwap(BaseApp):
         af_lock_refund_spend_tx_sig = ci_from.extractFollowerSig(xmr_swap.a_lock_refund_spend_tx)
 
         kbsl = ci_from.recoverEncKey(xmr_swap.af_lock_refund_spend_tx_esig, af_lock_refund_spend_tx_sig, xmr_swap.pkasl)
-        assert(kbsl is not None)
+        assert (kbsl is not None)
 
         for_ed25519 = True if coin_to == Coins.XMR else False
         kbsf = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, KeyTypes.KBSF, for_ed25519)

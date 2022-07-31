@@ -157,7 +157,7 @@ class BTCInterface(CoinInterface):
 
     @staticmethod
     def getExpectedSequence(lockType, lockVal):
-        assert(lockVal >= 1), 'Bad lockVal'
+        assert (lockVal >= 1), 'Bad lockVal'
         if lockType == TxLockTypes.SEQUENCE_LOCK_BLOCKS:
             return lockVal
         if lockType == TxLockTypes.SEQUENCE_LOCK_TIME:
@@ -289,7 +289,7 @@ class BTCInterface(CoinInterface):
         except Exception:
             try:
                 fee_rate = self.rpc_callback('getwalletinfo')['paytxfee'], 'paytxfee'
-                assert(fee_rate > 0.0), '0 feerate'
+                assert (fee_rate > 0.0), '0 feerate'
                 return fee_rate
             except Exception:
                 return self.rpc_callback('getnetworkinfo')['relayfee'], 'relayfee'
@@ -311,7 +311,7 @@ class BTCInterface(CoinInterface):
 
     def pkh_to_address(self, pkh):
         # pkh is hash160(pk)
-        assert(len(pkh) == 20)
+        assert (len(pkh) == 20)
         prefix = self.chainparams_network()['pubkey_address']
         data = bytes((prefix,)) + pkh
         checksum = hashlib.sha256(hashlib.sha256(data).digest()).digest()
@@ -327,7 +327,7 @@ class BTCInterface(CoinInterface):
         return pubkeyToAddress(self.chainparams_network()['script_address'], script)
 
     def pubkey_to_address(self, pk):
-        assert(len(pk) == 33)
+        assert (len(pk) == 33)
         return self.pkh_to_address(hash160(pk))
 
     def getNewSecretKey(self):
@@ -342,7 +342,7 @@ class BTCInterface(CoinInterface):
 
     def verifyKey(self, k):
         i = b2i(k)
-        return(i < ep.o and i > 0)
+        return (i < ep.o and i > 0)
 
     def verifyPubkey(self, pubkey_bytes):
         return verify_secp256k1_point(pubkey_bytes)
@@ -629,7 +629,7 @@ class BTCInterface(CoinInterface):
             for txo in tx.vout:
                 outputs_value += txo.nValue
             fee_paid = inputs_value - outputs_value
-            assert(fee_paid > 0)
+            assert (fee_paid > 0)
 
             vsize = self.getTxVSize(tx, add_bytes, add_witness_bytes)
             fee_rate_paid = fee_paid * 1000 // vsize
@@ -677,7 +677,7 @@ class BTCInterface(CoinInterface):
         ensure(C == Kaf, 'Bad script pubkey')
 
         fee_paid = swap_value - locked_coin
-        assert(fee_paid > 0)
+        assert (fee_paid > 0)
 
         dummy_witness_stack = self.getScriptLockTxDummyWitness(prevout_script)
         witness_bytes = self.getWitnessStackSerialisedLength(dummy_witness_stack)
@@ -721,7 +721,7 @@ class BTCInterface(CoinInterface):
         tx_value = tx.vout[0].nValue
 
         fee_paid = prevout_value - tx_value
-        assert(fee_paid > 0)
+        assert (fee_paid > 0)
 
         dummy_witness_stack = self.getScriptLockRefundSpendTxDummyWitness(prevout_script)
         witness_bytes = self.getWitnessStackSerialisedLength(dummy_witness_stack)
@@ -768,7 +768,7 @@ class BTCInterface(CoinInterface):
 
         # The value of the lock tx output should already be verified, if the fee is as expected the difference will be the correct amount
         fee_paid = locked_coin - tx.vout[0].nValue
-        assert(fee_paid > 0)
+        assert (fee_paid > 0)
 
         dummy_witness_stack = self.getScriptLockTxDummyWitness(lock_tx_script)
         witness_bytes = self.getWitnessStackSerialisedLength(dummy_witness_stack)
@@ -1065,7 +1065,7 @@ class BTCInterface(CoinInterface):
         message_hash = hashlib.sha256(bytes(message, 'utf-8')).digest()
         pubkey = PublicKey(K)
         rv = pubkey.verify_compact(sig, message_hash, hasher=None)
-        assert(rv is True)
+        assert (rv is True)
 
     def verifyMessage(self, address, message, signature, message_magic=None) -> bool:
         if message_magic is None:

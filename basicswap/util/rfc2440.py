@@ -14,7 +14,7 @@ def rfc2440_hash_password(password, salt=None):
 
     if salt is None:
         salt = secrets.token_bytes(8)
-    assert(len(salt) == 8)
+    assert len(salt) == 8
 
     hashbytes = salt + password.encode('utf-8')
     len_hashbytes = len(hashbytes)

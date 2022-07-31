@@ -59,7 +59,7 @@ def run_test():
     driver.get(base_url)
     link = driver.find_element_by_xpath('//a[@href="/offers"]')
     num_offers_end = int(link.text.split(':')[1].strip())
-    assert(num_offers_end == num_offers_start + 1)
+    assert num_offers_end == num_offers_start + 1
 
     driver.quit()
 

@@ -50,7 +50,7 @@ class Test(XmrTestBase):
         waitForServer(self.delay_event, 12700)
         waitForServer(self.delay_event, 12701)
         wallets1 = read_json_api(12701, 'wallets')
-        assert(float(wallets1['XMR']['balance']) > 0.0)
+        assert (float(wallets1['XMR']['balance']) > 0.0)
 
         offer_data = {
             'addr_from': -1,
@@ -68,7 +68,7 @@ class Test(XmrTestBase):
         offer1_id = rv['offer_id']
 
         summary = read_json_api(12700)
-        assert(summary['num_sent_offers'] > 1)
+        assert (summary['num_sent_offers'] > 1)
 
         logger.info('Waiting for offer')
         waitForNumOffers(self.delay_event, 12701, 2)
@@ -79,17 +79,17 @@ class Test(XmrTestBase):
         c0.join()
 
         offers = json.loads(urlopen('http://127.0.0.1:12701/json/offers/{}'.format(offer0_id)).read())
-        assert(len(offers) == 1)
+        assert (len(offers) == 1)
         offer0 = offers[0]
 
         post_data = {
             'coin_from': 'PART'
         }
         test_post_offers = json.loads(urlopen('http://127.0.0.1:12701/json/offers', data=parse.urlencode(post_data).encode()).read())
-        assert(len(test_post_offers) == 2)
+        assert (len(test_post_offers) == 2)
         post_data['coin_from'] = '2'
         test_post_offers = json.loads(urlopen('http://127.0.0.1:12701/json/offers', data=parse.urlencode(post_data).encode()).read())
-        assert(len(test_post_offers) == 0)
+        assert (len(test_post_offers) == 0)
 
         bid_data = {
             'offer_id': offer0_id,
@@ -98,7 +98,7 @@ class Test(XmrTestBase):
         bid0_id = json.loads(urlopen('http://127.0.0.1:12701/json/bids/new', data=parse.urlencode(bid_data).encode()).read())['bid_id']
 
         offers = json.loads(urlopen('http://127.0.0.1:12701/json/offers/{}'.format(offer1_id)).read())
-        assert(len(offers) == 1)
+        assert (len(offers) == 1)
         offer1 = offers[0]
 
         bid_data = {
@@ -126,12 +126,12 @@ class Test(XmrTestBase):
         }).encode()
         try:
             rv = json.loads(urlopen('http://127.0.0.1:12700/json/bids/{}'.format(bid0_id), data=data).read())
-            assert(rv['bid_state'] == 'Accepted')
+            assert rv['bid_state'] == 'Accepted'
         except Exception as e:
             print('Accept bid failed', str(e), rv)
         try:
             rv = json.loads(urlopen('http://127.0.0.1:12700/json/bids/{}'.format(bid1_id), data=data).read())
-            assert(rv['bid_state'] == 'Accepted')
+            assert (rv['bid_state'] == 'Accepted')
         except Exception as e:
             print('Accept bid failed', str(e), rv)
 
@@ -145,8 +145,8 @@ class Test(XmrTestBase):
             rv1 = read_json_api(12700, 'bids/{}'.format(bid1_id))
             if rv0['bid_state'] == 'Completed' and rv1['bid_state'] == 'Completed':
                 break
-        assert(rv0['bid_state'] == 'Completed')
-        assert(rv1['bid_state'] == 'Completed')
+        assert rv0['bid_state'] == 'Completed'
+        assert rv1['bid_state'] == 'Completed'
 
 
 if __name__ == '__main__':

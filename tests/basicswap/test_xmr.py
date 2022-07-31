@@ -555,13 +555,13 @@ class Test(BaseTest):
         swap_clients = self.swap_clients
 
         js_1 = read_json_api(1801, 'wallets')
-        assert(make_int(js_1[Coins.XMR.name]['balance'], scale=12) > 0)
-        assert(make_int(js_1[Coins.XMR.name]['unconfirmed'], scale=12) > 0)
+        assert (make_int(js_1[Coins.XMR.name]['balance'], scale=12) > 0)
+        assert (make_int(js_1[Coins.XMR.name]['unconfirmed'], scale=12) > 0)
 
         offer_id = swap_clients[0].postOffer(Coins.PART, Coins.XMR, 100 * COIN, 0.11 * XMR_COIN, 100 * COIN, SwapTypes.XMR_SWAP)
         wait_for_offer(test_delay_event, swap_clients[1], offer_id)
         offers = swap_clients[1].listOffers(filters={'offer_id': offer_id})
-        assert(len(offers) == 1)
+        assert (len(offers) == 1)
         offer = offers[0]
 
         bid_id = swap_clients[1].postXmrBid(offer_id, offer.amount_from)
@@ -569,7 +569,7 @@ class Test(BaseTest):
         wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.BID_RECEIVED)
 
         bid, xmr_swap = swap_clients[0].getXmrBid(bid_id)
-        assert(xmr_swap)
+        assert (xmr_swap)
 
         swap_clients[0].acceptXmrBid(bid_id)
 
@@ -578,15 +578,15 @@ class Test(BaseTest):
 
         js_0_end = read_json_api(1800, 'wallets')
         end_xmr = float(js_0_end['XMR']['balance']) + float(js_0_end['XMR']['unconfirmed'])
-        assert(end_xmr > 10.9 and end_xmr < 11.0)
+        assert (end_xmr > 10.9 and end_xmr < 11.0)
 
         bid_id_hex = bid_id.hex()
         path = f'bids/{bid_id_hex}/states'
         offerer_states = read_json_api(1800, path)
         bidder_states = read_json_api(1801, path)
 
-        assert(compare_bid_states(offerer_states, self.states_offerer[0]) is True)
-        assert(compare_bid_states(bidder_states, self.states_bidder[0]) is True)
+        assert (compare_bid_states(offerer_states, self.states_offerer[0]) is True)
+        assert (compare_bid_states(bidder_states, self.states_bidder[0]) is True)
 
     def test_011_smsgaddresses(self):
         logging.info('---------- Test address management and private offers')
@@ -601,21 +601,21 @@ class Test(BaseTest):
         new_address_pk = json_rv['pubkey']
 
         js_2 = read_json_api(1801, 'smsgaddresses')
-        assert(len(js_2) == len(js_1) + 1)
+        assert (len(js_2) == len(js_1) + 1)
         found = False
         for addr in js_2:
             if addr['addr'] == new_address:
-                assert(addr['note'] == 'testing')
+                assert (addr['note'] == 'testing')
                 found = True
-        assert(found is True)
+        assert (found is True)
 
         found = False
         lks = callnoderpc(1, 'smsglocalkeys')
         for key in lks['wallet_keys']:
             if key['address'] == new_address:
-                assert(key['receive'] == '1')
+                assert (key['receive'] == '1')
                 found = True
-        assert(found is True)
+        assert (found is True)
 
         # Disable
         post_json = {
@@ -624,23 +624,23 @@ class Test(BaseTest):
             'active_ind': '0',
         }
         json_rv = json.loads(post_json_req('http://127.0.0.1:1801/json/smsgaddresses/edit', post_json))
-        assert(json_rv['edited_address'] == new_address)
+        assert (json_rv['edited_address'] == new_address)
 
         js_3 = read_json_api(1801, 'smsgaddresses')
         found = False
         for addr in js_3:
             if addr['addr'] == new_address:
-                assert(addr['note'] == 'testing2')
-                assert(addr['active_ind'] == 0)
+                assert (addr['note'] == 'testing2')
+                assert (addr['active_ind'] == 0)
                 found = True
-        assert(found is True)
+        assert (found is True)
 
         found = False
         lks = callnoderpc(1, 'smsglocalkeys')
         for key in lks['wallet_keys']:
             if key['address'] == new_address:
                 found = True
-        assert(found is False)
+        assert (found is False)
 
         # Re-enable
         post_json = {
@@ -648,22 +648,22 @@ class Test(BaseTest):
             'active_ind': '1',
         }
         json_rv = json.loads(post_json_req('http://127.0.0.1:1801/json/smsgaddresses/edit', post_json))
-        assert(json_rv['edited_address'] == new_address)
+        assert (json_rv['edited_address'] == new_address)
 
         found = False
         lks = callnoderpc(1, 'smsglocalkeys')
         for key in lks['wallet_keys']:
             if key['address'] == new_address:
-                assert(key['receive'] == '1')
+                assert (key['receive'] == '1')
                 found = True
-        assert(found is True)
+        assert (found is True)
 
         post_json = {
             'addresspubkey': new_address_pk,
             'addressnote': 'testing_add_addr',
         }
         json_rv = json.loads(post_json_req('http://127.0.0.1:1800/json/smsgaddresses/add', post_json))
-        assert(json_rv['added_address'] == new_address)
+        assert (json_rv['added_address'] == new_address)
 
         post_json = {
             'addr_to': new_address,
@@ -680,10 +680,10 @@ class Test(BaseTest):
         wait_for_offer(test_delay_event, swap_clients[1], bytes.fromhex(offer_id_hex))
 
         rv = read_json_api(1801, f'offers/{offer_id_hex}')
-        assert(rv[0]['addr_to'] == new_address)
+        assert (rv[0]['addr_to'] == new_address)
 
         rv = read_json_api(1800, f'offers/{offer_id_hex}')
-        assert(rv[0]['addr_to'] == new_address)
+        assert (rv[0]['addr_to'] == new_address)
 
     def test_02_leader_recover_a_lock_tx(self):
         logging.info('---------- Test PART to XMR leader recovers coin a lock tx')
@@ -700,7 +700,7 @@ class Test(BaseTest):
         wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.BID_RECEIVED)
 
         bid, xmr_swap = swap_clients[0].getXmrBid(bid_id)
-        assert(xmr_swap)
+        assert (xmr_swap)
 
         swap_clients[1].setBidDebugInd(bid_id, DebugTypes.BID_STOP_AFTER_COIN_A_LOCK)
 
@@ -713,7 +713,7 @@ class Test(BaseTest):
         path = f'bids/{bid_id_hex}/states'
         offerer_states = read_json_api(1800, path)
 
-        assert(compare_bid_states(offerer_states, self.states_offerer[1]) is True)
+        assert (compare_bid_states(offerer_states, self.states_offerer[1]) is True)
 
     def test_03_follower_recover_a_lock_tx(self):
         logging.info('---------- Test PART to XMR follower recovers coin a lock tx')
@@ -730,7 +730,7 @@ class Test(BaseTest):
         wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.BID_RECEIVED)
 
         bid, xmr_swap = swap_clients[0].getXmrBid(bid_id)
-        assert(xmr_swap)
+        assert (xmr_swap)
 
         swap_clients[1].setBidDebugInd(bid_id, DebugTypes.BID_STOP_AFTER_COIN_A_LOCK)
         swap_clients[0].setBidDebugInd(bid_id, DebugTypes.BID_DONT_SPEND_COIN_A_LOCK_REFUND)
@@ -748,7 +748,7 @@ class Test(BaseTest):
         bidder_states = read_json_api(1801, path)
 
         bidder_states = [s for s in bidder_states if s[1] != 'Bid Stalled (debug)']
-        assert(compare_bid_states(bidder_states, self.states_bidder[2]) is True)
+        assert (compare_bid_states(bidder_states, self.states_bidder[2]) is True)
 
     def test_04_follower_recover_b_lock_tx(self):
         logging.info('---------- Test PART to XMR follower recovers coin b lock tx')
@@ -765,7 +765,7 @@ class Test(BaseTest):
         wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.BID_RECEIVED)
 
         bid, xmr_swap = swap_clients[0].getXmrBid(bid_id)
-        assert(xmr_swap)
+        assert (xmr_swap)
 
         swap_clients[1].setBidDebugInd(bid_id, DebugTypes.CREATE_INVALID_COIN_B_LOCK)
 
@@ -779,8 +779,8 @@ class Test(BaseTest):
         offerer_states = read_json_api(1800, path)
         bidder_states = read_json_api(1801, path)
 
-        assert(compare_bid_states(offerer_states, self.states_offerer[1]) is True)
-        assert(compare_bid_states(bidder_states, self.states_bidder[1]) is True)
+        assert (compare_bid_states(offerer_states, self.states_offerer[1]) is True)
+        assert (compare_bid_states(bidder_states, self.states_bidder[1]) is True)
 
     def test_05_btc_xmr(self):
         logging.info('---------- Test BTC to XMR')
@@ -797,7 +797,7 @@ class Test(BaseTest):
         wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.BID_RECEIVED)
 
         bid, xmr_swap = swap_clients[0].getXmrBid(bid_id)
-        assert(xmr_swap)
+        assert (xmr_swap)
 
         swap_clients[0].acceptXmrBid(bid_id)
 
@@ -861,7 +861,7 @@ class Test(BaseTest):
 
         js_w0_after = read_json_api(1800, 'wallets')
         js_w1_after = read_json_api(1801, 'wallets')
-        assert(make_int(js_w1_after['BTC']['balance'], scale=8, r=1) - (make_int(js_w1_before['BTC']['balance'], scale=8, r=1) + amt_1) < 1000)
+        assert (make_int(js_w1_after['BTC']['balance'], scale=8, r=1) - (make_int(js_w1_before['BTC']['balance'], scale=8, r=1) + amt_1) < 1000)
 
     def test_07_revoke_offer(self):
         logging.info('---------- Test offer revocaction')
@@ -880,7 +880,7 @@ class Test(BaseTest):
         address_to = js_0[Coins.XMR.name]['deposit_address']
 
         js_1 = read_json_api(1801, 'wallets')
-        assert(float(js_1[Coins.XMR.name]['balance']) > 0.0)
+        assert (float(js_1[Coins.XMR.name]['balance']) > 0.0)
 
         swap_clients[1].withdrawCoin(Coins.XMR, 1.1, address_to, False)
 
@@ -918,14 +918,14 @@ class Test(BaseTest):
         try:
             bid_id = swap_clients[1].postBid(offer_id, below_min_bid)
         except Exception as e:
-            assert('Bid amount below minimum' in str(e))
+            assert ('Bid amount below minimum' in str(e))
         extra_bid_options = {
             'debug_skip_validation': True,
         }
         bid_id = swap_clients[1].postBid(offer_id, below_min_bid, extra_options=extra_bid_options)
 
         events = wait_for_event(test_delay_event, swap_clients[0], Concepts.NETWORK_MESSAGE, bid_id)
-        assert('Bid amount below minimum' in events[0].event_msg)
+        assert ('Bid amount below minimum' in events[0].event_msg)
 
         bid_ids = []
         for i in range(5):
@@ -935,7 +935,7 @@ class Test(BaseTest):
         test_delay_event.wait(1.0)
         bid_id = swap_clients[1].postBid(offer_id, min_bid)
         events = wait_for_event(test_delay_event, swap_clients[0], Concepts.AUTOMATION, bid_id)
-        assert('Already have 5 bids to complete' in events[0].event_msg)
+        assert ('Already have 5 bids to complete' in events[0].event_msg)
 
         for bid_id in bid_ids:
             wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=180)
@@ -947,7 +947,7 @@ class Test(BaseTest):
         amt_bid += 1
         bid_id = swap_clients[1].postBid(offer_id, amt_bid)
         events = wait_for_event(test_delay_event, swap_clients[0], Concepts.AUTOMATION, bid_id)
-        assert('Over remaining offer value' in events[0].event_msg)
+        assert ('Over remaining offer value' in events[0].event_msg)
 
         # Should pass
         amt_bid -= 1
@@ -968,7 +968,7 @@ class Test(BaseTest):
         wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.BID_RECEIVED)
 
         bid, xmr_swap = swap_clients[0].getXmrBid(bid_id)
-        assert(xmr_swap)
+        assert (xmr_swap)
 
         swap_clients[1].setBidDebugInd(bid_id, DebugTypes.BID_STOP_AFTER_COIN_A_LOCK)
 
@@ -977,25 +977,25 @@ class Test(BaseTest):
         wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED, wait_for=180)
 
         bid, xmr_swap = swap_clients[0].getXmrBid(bid_id)
-        assert(xmr_swap)
+        assert (xmr_swap)
 
         try:
             swap_clients[0].ci(Coins.BTC).publishTx(xmr_swap.a_lock_refund_tx)
-            assert(False), 'Lock refund tx should be locked'
+            assert (False), 'Lock refund tx should be locked'
         except Exception as e:
-            assert('non-BIP68-final' in str(e))
+            assert ('non-BIP68-final' in str(e))
 
     def test_11_particl_anon(self):
         logging.info('---------- Test Particl anon transactions')
         swap_clients = self.swap_clients
 
         js_0 = read_json_api(1800, 'wallets/part')
-        assert(float(js_0['anon_balance']) == 0.0)
+        assert (float(js_0['anon_balance']) == 0.0)
         node0_anon_before = js_0['anon_balance'] + js_0['anon_pending']
 
         wait_for_balance(test_delay_event, 'http://127.0.0.1:1801/json/wallets/part', 'balance', 200.0)
         js_1 = read_json_api(1801, 'wallets/part')
-        assert(float(js_1['balance']) > 200.0)
+        assert (float(js_1['balance']) > 200.0)
         node1_anon_before = js_1['anon_balance'] + js_1['anon_pending']
 
         callnoderpc(1, 'reservebalance', [True, 1000000])  # Stop staking to avoid conflicts (input used by tx->anon staked before tx gets in the chain)
@@ -1006,7 +1006,7 @@ class Test(BaseTest):
             'type_to': 'anon',
         }
         json_rv = json.loads(post_json_req('http://127.0.0.1:1801/json/wallets/part/withdraw', post_json))
-        assert(len(json_rv['txid']) == 64)
+        assert (len(json_rv['txid']) == 64)
 
         logging.info('Waiting for anon balance')
         wait_for_balance(test_delay_event, 'http://127.0.0.1:1801/json/wallets/part', 'anon_balance', 100.0 + node1_anon_before)
@@ -1022,7 +1022,7 @@ class Test(BaseTest):
             'type_to': 'blind',
         }
         json_rv = json.loads(post_json_req('http://127.0.0.1:1801/json/wallets/part/withdraw', post_json))
-        assert(len(json_rv['txid']) == 64)
+        assert (len(json_rv['txid']) == 64)
 
         logging.info('Waiting for blind balance')
         wait_for_balance(test_delay_event, 'http://127.0.0.1:1800/json/wallets/part', 'blind_balance', 9.8)
@@ -1041,7 +1041,7 @@ class Test(BaseTest):
         wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.BID_RECEIVED)
 
         bid, xmr_swap = swap_clients[0].getXmrBid(bid_id)
-        assert(xmr_swap)
+        assert (xmr_swap)
         amount_to = float(format_amount(bid.amount_to, 8))
 
         swap_clients[0].acceptXmrBid(bid_id)
@@ -1050,10 +1050,10 @@ class Test(BaseTest):
         wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True)
 
         js_1 = read_json_api(1801, 'wallets/part')
-        assert(js_1['anon_balance'] < node1_anon_before - amount_to)
+        assert (js_1['anon_balance'] < node1_anon_before - amount_to)
 
         js_0 = read_json_api(1800, 'wallets/part')
-        assert(js_0['anon_balance'] + js_0['anon_pending'] > node0_anon_before + (amount_to - 0.05))
+        assert (js_0['anon_balance'] + js_0['anon_pending'] > node0_anon_before + (amount_to - 0.05))
 
     def test_12_particl_blind(self):
         logging.info('---------- Test Particl blind transactions')
@@ -1064,7 +1064,7 @@ class Test(BaseTest):
 
         wait_for_balance(test_delay_event, 'http://127.0.0.1:1801/json/wallets/part', 'balance', 200.0)
         js_1 = read_json_api(1801, 'wallets/part')
-        assert(float(js_1['balance']) > 200.0)
+        assert (float(js_1['balance']) > 200.0)
         node1_blind_before = js_1['blind_balance'] + js_1['blind_unconfirmed']
 
         post_json = {
@@ -1074,7 +1074,7 @@ class Test(BaseTest):
             'type_to': 'blind',
         }
         json_rv = json.loads(post_json_req('http://127.0.0.1:1800/json/wallets/part/withdraw', post_json))
-        assert(len(json_rv['txid']) == 64)
+        assert (len(json_rv['txid']) == 64)
 
         logging.info('Waiting for blind balance')
         wait_for_balance(test_delay_event, 'http://127.0.0.1:1800/json/wallets/part', 'blind_balance', 100.0 + node0_blind_before)
@@ -1100,11 +1100,11 @@ class Test(BaseTest):
         amount_from = float(format_amount(amt_swap, 8))
         js_1 = read_json_api(1801, 'wallets/part')
         node1_blind_after = js_1['blind_balance'] + js_1['blind_unconfirmed']
-        assert(node1_blind_after > node1_blind_before + (amount_from - 0.05))
+        assert (node1_blind_after > node1_blind_before + (amount_from - 0.05))
 
         js_0 = read_json_api(1800, 'wallets/part')
         node0_blind_after = js_0['blind_balance'] + js_0['blind_unconfirmed']
-        assert(node0_blind_after < node0_blind_before - amount_from)
+        assert (node0_blind_after < node0_blind_before - amount_from)
 
     def test_98_withdraw_all(self):
         logging.info('---------- Test XMR withdrawal all')
@@ -1117,7 +1117,7 @@ class Test(BaseTest):
 
             wallets1 = read_json_api(TEST_HTTP_PORT + 1, 'wallets')
             xmr_total = float(wallets1[Coins.XMR.name]['balance'])
-            assert(xmr_total > 10)
+            assert (xmr_total > 10)
 
             post_json = {
                 'value': 10,
@@ -1125,11 +1125,11 @@ class Test(BaseTest):
                 'subfee': True,
             }
             json_rv = json.loads(post_json_req('http://127.0.0.1:{}/json/wallets/xmr/withdraw'.format(TEST_HTTP_PORT + 1), post_json))
-            assert(json_rv['error'] == 'Withdraw value must be close to total to use subfee/sweep_all.')
+            assert (json_rv['error'] == 'Withdraw value must be close to total to use subfee/sweep_all.')
 
             post_json['value'] = xmr_total
             json_rv = json.loads(post_json_req('http://127.0.0.1:{}/json/wallets/xmr/withdraw'.format(TEST_HTTP_PORT + 1), post_json))
-            assert(len(json_rv['txid']) == 64)
+            assert (len(json_rv['txid']) == 64)
         finally:
             logging.info('Restoring XMR mining')
             pause_event.set()

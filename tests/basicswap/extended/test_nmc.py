@@ -319,11 +319,11 @@ class Test(unittest.TestCase):
 
         ro = nmcRpc('getblockchaininfo')
         try:
-            assert(ro['bip9_softforks']['csv']['status'] == 'active')
+            assert (ro['bip9_softforks']['csv']['status'] == 'active')
         except Exception:
             logging.info('nmc: csv is not active')
         try:
-            assert(ro['bip9_softforks']['segwit']['status'] == 'active')
+            assert (ro['bip9_softforks']['segwit']['status'] == 'active')
         except Exception:
             logging.info('nmc: segwit is not active')
 
@@ -354,7 +354,7 @@ class Test(unittest.TestCase):
             if particl_blocks >= num_blocks:
                 break
             delay_event.wait(1)
-        assert(particl_blocks >= num_blocks)
+        assert (particl_blocks >= num_blocks)
 
     @classmethod
     def tearDownClass(cls):
@@ -382,7 +382,7 @@ class Test(unittest.TestCase):
 
         wait_for_offer(delay_event, swap_clients[1], offer_id)
         offers = swap_clients[1].listOffers()
-        assert(len(offers) == 1)
+        assert (len(offers) == 1)
         for offer in offers:
             if offer.offer_id == offer_id:
                 bid_id = swap_clients[1].postBid(offer_id, offer.amount_from)
@@ -398,8 +398,8 @@ class Test(unittest.TestCase):
 
         js_0 = read_json_api(1800)
         js_1 = read_json_api(1801)
-        assert(js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
-        assert(js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
+        assert (js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
+        assert (js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
 
     def test_03_nmc_part(self):
         logging.info('---------- Test NMC to PART')
@@ -423,8 +423,8 @@ class Test(unittest.TestCase):
 
         js_0 = read_json_api(1800)
         js_1 = read_json_api(1801)
-        assert(js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
-        assert(js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
+        assert (js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
+        assert (js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
 
     def test_04_nmc_btc(self):
         logging.info('---------- Test NMC to BTC')
@@ -451,8 +451,8 @@ class Test(unittest.TestCase):
         js_0 = read_json_api(1800)
         js_1 = read_json_api(1801)
 
-        assert(js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
-        assert(js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
+        assert (js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
+        assert (js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
 
     def test_05_refund(self):
         # Seller submits initiate txn, buyer doesn't respond
@@ -477,8 +477,8 @@ class Test(unittest.TestCase):
 
         js_0 = read_json_api(1800)
         js_1 = read_json_api(1801)
-        assert(js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
-        assert(js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
+        assert (js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
+        assert (js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
 
     def test_06_self_bid(self):
         logging.info('---------- Test same client, BTC to NMC')
@@ -501,8 +501,8 @@ class Test(unittest.TestCase):
         wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=60)
 
         js_0 = read_json_api(1800)
-        assert(js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
-        assert(js_0['num_recv_bids'] == js_0_before['num_recv_bids'] + 1 and js_0['num_sent_bids'] == js_0_before['num_sent_bids'] + 1)
+        assert (js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
+        assert (js_0['num_recv_bids'] == js_0_before['num_recv_bids'] + 1 and js_0['num_sent_bids'] == js_0_before['num_sent_bids'] + 1)
 
     def test_07_error(self):
         logging.info('---------- Test error, BTC to NMC, set fee above bid value')

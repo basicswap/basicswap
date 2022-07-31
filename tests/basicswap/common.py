@@ -83,11 +83,11 @@ def prepareDataDir(datadir, node_id, conf_file, dir_prefix, base_p2p_port=BASE_P
 
 def checkForks(ro):
     if 'bip9_softforks' in ro:
-        assert(ro['bip9_softforks']['csv']['status'] == 'active')
-        assert(ro['bip9_softforks']['segwit']['status'] == 'active')
+        assert (ro['bip9_softforks']['csv']['status'] == 'active')
+        assert (ro['bip9_softforks']['segwit']['status'] == 'active')
     else:
-        assert(ro['softforks']['csv']['active'])
-        assert(ro['softforks']['segwit']['active'])
+        assert (ro['softforks']['csv']['active'])
+        assert (ro['softforks']['segwit']['active'])
 
 
 def stopDaemons(daemons):
@@ -118,7 +118,7 @@ def wait_for_bid(delay_event, swap_client, bid_id, state=None, sent=False, wait_
             'bid_id': bid_id,
         }
         bids = swap_client.listBids(sent=sent, filters=filters)
-        assert(len(bids) < 2)
+        assert (len(bids) < 2)
         for bid in bids:
             if bid[2] == bid_id:
                 if type(state) == list:
@@ -377,9 +377,9 @@ def compare_bid_states(states, expect_states, exact_match=True):
             del states[i]
 
     if exact_match:
-        assert(len(states) == len(expect_states))
+        assert (len(states) == len(expect_states))
     else:
-        assert(len(states) >= len(expect_states))
+        assert (len(states) >= len(expect_states))
 
     for i in range(len(expect_states)):
         s = states[i]
@@ -391,5 +391,5 @@ def compare_bid_states(states, expect_states, exact_match=True):
                 logging.warning(f'Expected state {expect_states[i]} found out of order at the same time as {s[1]}.')
                 continue
             raise ValueError(f'Expected state {expect_states[i]}, found {s[1]}')
-        assert(s[1] == expect_states[i])
+        assert (s[1] == expect_states[i])
     return True

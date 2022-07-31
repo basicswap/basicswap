@@ -322,7 +322,7 @@ class XmrTestBase(TestBase):
                 print('Error reading wallets', str(e))
 
             self.delay_event.wait(1)
-        assert(particl_blocks >= num_blocks)
+        assert particl_blocks >= num_blocks
 
     @classmethod
     def tearDownClass(cls):

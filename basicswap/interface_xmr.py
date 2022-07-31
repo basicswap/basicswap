@@ -199,7 +199,7 @@ class XMRInterface(CoinInterface):
 
     def verifyKey(self, k):
         i = b2i(k)
-        return(i < edf.l and i > 8)
+        return (i < edf.l and i > 8)
 
     def verifyPubkey(self, pubkey_bytes):
         # Calls ed25519_decode_check_point() in secp256k1

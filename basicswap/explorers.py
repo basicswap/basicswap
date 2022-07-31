@@ -75,7 +75,7 @@ class ExplorerBitAps(Explorer):
         # Can't get unspents return only if exactly one transaction exists
         data = json.loads(self.readURL(self.base_url + '/address/transactions/' + address))
         try:
-            assert(data['data']['list'] == 1)
+            assert data['data']['list'] == 1
         except Exception as ex:
             self.log.debug('Explorer error: {}'.format(str(ex)))
             return None

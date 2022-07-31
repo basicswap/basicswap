@@ -44,8 +44,8 @@ class Test(unittest.TestCase):
         def test_case(v, nb=None):
             b = SerialiseNum(v)
             if nb is not None:
-                assert(len(b) == nb)
-            assert(v == DeserialiseNum(b))
+                assert (len(b) == nb)
+            assert (v == DeserialiseNum(b))
         test_case(0, 1)
         test_case(1, 1)
         test_case(16, 1)
@@ -66,35 +66,35 @@ class Test(unittest.TestCase):
         time_val = 48 * 60 * 60
         encoded = ci.getExpectedSequence(TxLockTypes.SEQUENCE_LOCK_TIME, time_val)
         decoded = ci.decodeSequence(encoded)
-        assert(decoded >= time_val)
-        assert(decoded <= time_val + 512)
+        assert (decoded >= time_val)
+        assert (decoded <= time_val + 512)
 
         time_val = 24 * 60
         encoded = ci.getExpectedSequence(TxLockTypes.SEQUENCE_LOCK_TIME, time_val)
         decoded = ci.decodeSequence(encoded)
-        assert(decoded >= time_val)
-        assert(decoded <= time_val + 512)
+        assert (decoded >= time_val)
+        assert (decoded <= time_val + 512)
 
         blocks_val = 123
         encoded = ci.getExpectedSequence(TxLockTypes.SEQUENCE_LOCK_BLOCKS, blocks_val)
         decoded = ci.decodeSequence(encoded)
-        assert(decoded == blocks_val)
+        assert (decoded == blocks_val)
 
     def test_make_int(self):
         def test_case(vs, vf, expect_int):
             i = make_int(vs)
-            assert(i == expect_int and isinstance(i, int))
+            assert (i == expect_int and isinstance(i, int))
             i = make_int(vf)
-            assert(i == expect_int and isinstance(i, int))
+            assert (i == expect_int and isinstance(i, int))
             vs_out = format_amount(i, 8)
             # Strip
             for i in range(7):
                 if vs_out[-1] == '0':
                     vs_out = vs_out[:-1]
             if '.' in vs:
-                assert(vs_out == vs)
+                assert (vs_out == vs)
             else:
-                assert(vs_out[:-2] == vs)
+                assert (vs_out[:-2] == vs)
         test_case('0', 0, 0)
         test_case('1', 1, 100000000)
         test_case('10', 10, 1000000000)
@@ -113,49 +113,49 @@ class Test(unittest.TestCase):
 
         try:
             make_int('0.123456789')
-            assert(False)
+            assert (False)
         except Exception as e:
-            assert(str(e) == 'Mantissa too long')
+            assert (str(e) == 'Mantissa too long')
         validate_amount('0.12345678')
 
         # floor
-        assert(make_int('0.123456789', r=-1) == 12345678)
+        assert (make_int('0.123456789', r=-1) == 12345678)
         # Round up
-        assert(make_int('0.123456789', r=1) == 12345679)
+        assert (make_int('0.123456789', r=1) == 12345679)
 
     def test_make_int12(self):
         def test_case(vs, vf, expect_int):
             i = make_int(vs, 12)
-            assert(i == expect_int and isinstance(i, int))
+            assert (i == expect_int and isinstance(i, int))
             i = make_int(vf, 12)
-            assert(i == expect_int and isinstance(i, int))
+            assert (i == expect_int and isinstance(i, int))
             vs_out = format_amount(i, 12)
             # Strip
             for i in range(7):
                 if vs_out[-1] == '0':
                     vs_out = vs_out[:-1]
             if '.' in vs:
-                assert(vs_out == vs)
+                assert (vs_out == vs)
             else:
-                assert(vs_out[:-2] == vs)
+                assert (vs_out[:-2] == vs)
         test_case('0.123456789', 0.123456789, 123456789000)
         test_case('0.123456789123', 0.123456789123, 123456789123)
         try:
             make_int('0.1234567891234', 12)
-            assert(False)
+            assert (False)
         except Exception as e:
-            assert(str(e) == 'Mantissa too long')
+            assert (str(e) == 'Mantissa too long')
         validate_amount('0.123456789123', 12)
         try:
             validate_amount('0.1234567891234', 12)
-            assert(False)
+            assert (False)
         except Exception as e:
-            assert('Too many decimal places' in str(e))
+            assert ('Too many decimal places' in str(e))
         try:
             validate_amount(0.1234567891234, 12)
-            assert(False)
+            assert (False)
         except Exception as e:
-            assert('Too many decimal places' in str(e))
+            assert ('Too many decimal places' in str(e))
 
     def test_ed25519(self):
         privkey = edu.get_secret()
@@ -163,7 +163,7 @@ class Test(unittest.TestCase):
 
         privkey_bytes = i2b(privkey)
         pubkey_test = ed25519_get_pubkey(privkey_bytes)
-        assert(pubkey == pubkey_test)
+        assert (pubkey == pubkey_test)
 
     def test_ecdsa_otves(self):
         coin_settings = {'rpcport': 0, 'rpcauth': 'none'}
@@ -178,15 +178,15 @@ class Test(unittest.TestCase):
 
         cipher_text = ecdsaotves_enc_sign(vk_sign, pk_encrypt, sign_hash)
 
-        assert(ecdsaotves_enc_verify(pk_sign, pk_encrypt, sign_hash, cipher_text))
+        assert (ecdsaotves_enc_verify(pk_sign, pk_encrypt, sign_hash, cipher_text))
 
         sig = ecdsaotves_dec_sig(vk_encrypt, cipher_text)
 
-        assert(ci.verifySig(pk_sign, sign_hash, sig))
+        assert (ci.verifySig(pk_sign, sign_hash, sig))
 
         recovered_key = ecdsaotves_rec_enc_key(pk_encrypt, cipher_text, sig)
 
-        assert(vk_encrypt == recovered_key)
+        assert (vk_encrypt == recovered_key)
 
     def test_sign(self):
         coin_settings = {'rpcport': 0, 'rpcauth': 'none'}
@@ -211,7 +211,7 @@ class Test(unittest.TestCase):
         vk = i2b(ci.getNewSecretKey())
         pk = ci.getPubkey(vk)
         sig = ci.signCompact(vk, 'test signing message')
-        assert(len(sig) == 64)
+        assert (len(sig) == 64)
         ci.verifyCompact(pk, 'test signing message', sig)
 
     def test_pubkey_to_address(self):
@@ -220,7 +220,7 @@ class Test(unittest.TestCase):
         ci = BTCInterface(coin_settings, 'regtest')
         pk = h2b('02c26a344e7d21bcc6f291532679559f2fd234c881271ff98714855edc753763a6')
         addr = ci.pubkey_to_address(pk)
-        assert(addr == 'mj6SdSxmWRmdDqR5R3FfZmRiLmQfQAsLE8')
+        assert (addr == 'mj6SdSxmWRmdDqR5R3FfZmRiLmQfQAsLE8')
 
     def test_dleag(self):
         coin_settings = {'rpcport': 0, 'walletrpcport': 0, 'walletrpcauth': 'none'}
@@ -230,7 +230,7 @@ class Test(unittest.TestCase):
 
         key = i2b(ci.getNewSecretKey())
         proof = ci.proveDLEAG(key)
-        assert(ci.verifyDLEAG(proof))
+        assert (ci.verifyDLEAG(proof))
 
     def test_rate(self):
         scale_from = 8
@@ -239,11 +239,11 @@ class Test(unittest.TestCase):
         rate = make_int(0.1, scale_to)
 
         amount_to = int((amount_from * rate) // (10 ** scale_from))
-        assert('100.00000000' == format_amount(amount_from, scale_from))
-        assert('10.000000000000' == format_amount(amount_to, scale_to))
+        assert ('100.00000000' == format_amount(amount_from, scale_from))
+        assert ('10.000000000000' == format_amount(amount_to, scale_to))
 
         rate_check = make_int((amount_to / amount_from), scale_from)
-        assert(rate == rate_check)
+        assert (rate == rate_check)
 
         scale_from = 12
         scale_to = 8
@@ -251,11 +251,11 @@ class Test(unittest.TestCase):
         rate = make_int(12, scale_to)
 
         amount_to = int((amount_from * rate) // (10 ** scale_from))
-        assert('1.000000000000' == format_amount(amount_from, scale_from))
-        assert('12.00000000' == format_amount(amount_to, scale_to))
+        assert ('1.000000000000' == format_amount(amount_from, scale_from))
+        assert ('12.00000000' == format_amount(amount_to, scale_to))
 
         rate_check = make_int((amount_to / amount_from), scale_from)
-        assert(rate == rate_check)
+        assert (rate == rate_check)
 
         scale_from = 8
         scale_to = 8
@@ -263,7 +263,7 @@ class Test(unittest.TestCase):
         amount_to = make_int(10, scale_to)
         rate = make_int(amount_to / amount_from, scale_to, r=1)
         amount_to_recreate = int((amount_from * rate) // (10 ** scale_from))
-        assert('10.00000000' == format_amount(amount_to_recreate, scale_to))
+        assert ('10.00000000' == format_amount(amount_to_recreate, scale_to))
 
         scale_from = 8
         scale_to = 12
@@ -271,7 +271,7 @@ class Test(unittest.TestCase):
         amount_to = make_int(0.06935, scale_to)
         rate = make_int(amount_to / amount_from, scale_from, r=1)
         amount_to_recreate = int((amount_from * rate) // (10 ** scale_from))
-        assert('0.069350000000' == format_amount(amount_to_recreate, scale_to))
+        assert ('0.069350000000' == format_amount(amount_to_recreate, scale_to))
 
         scale_from = 12
         scale_to = 8
@@ -279,18 +279,18 @@ class Test(unittest.TestCase):
         amount_to = make_int(10.0, scale_to)
         rate = make_int(amount_to / amount_from, scale_from, r=1)
         amount_to_recreate = int((amount_from * rate) // (10 ** scale_from))
-        assert('10.00000000' == format_amount(amount_to_recreate, scale_to))
+        assert ('10.00000000' == format_amount(amount_to_recreate, scale_to))
 
     def test_rfc2440(self):
         password = 'test'
         salt = bytes.fromhex('B7A94A7E4988630E')
         password_hash = rfc2440_hash_password(password, salt=salt)
 
-        assert(password_hash == '16:B7A94A7E4988630E6095334BA67F06FBA509B2A7136A04C9C1B430F539')
+        assert (password_hash == '16:B7A94A7E4988630E6095334BA67F06FBA509B2A7136A04C9C1B430F539')
 
     def test_ripemd160(self):
         input_data = b'hash this'
-        assert(ripemd160(input_data).hex() == 'd5443a154f167e2c1332f6de72cfb4c6ab9c8c17')
+        assert (ripemd160(input_data).hex() == 'd5443a154f167e2c1332f6de72cfb4c6ab9c8c17')
 
 
 if __name__ == '__main__':

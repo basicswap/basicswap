@@ -139,7 +139,7 @@ class Test(TestBase):
 
             offer_id = post_json_api(12700, 'offers/new', data)['offer_id']
             summary = read_json_api(12700)
-            assert(summary['num_sent_offers'] == 1)
+            assert (summary['num_sent_offers'] == 1)
 
             logger.info('Waiting for offer')
             waitForNumOffers(self.delay_event, 12701, 1)
@@ -170,8 +170,8 @@ class Test(TestBase):
 
             ltc_original = read_json_api(12700, 'wallets/ltc')
             ltc_restored = read_json_api(12703, 'wallets/ltc')
-            assert(float(ltc_original['balance']) + float(ltc_original['unconfirmed']) > 0.0)
-            assert(float(ltc_original['balance']) + float(ltc_original['unconfirmed']) == float(ltc_restored['balance']) + float(ltc_restored['unconfirmed']))
+            assert (float(ltc_original['balance']) + float(ltc_original['unconfirmed']) > 0.0)
+            assert (float(ltc_original['balance']) + float(ltc_original['unconfirmed']) == float(ltc_restored['balance']) + float(ltc_restored['unconfirmed']))
 
             wallets_original = read_json_api(12700, 'wallets')
             # TODO: After restoring a new deposit address should be generated, should be automated
@@ -180,7 +180,7 @@ class Test(TestBase):
             next_addr = read_json_api(12703, 'wallets/part/nextdepositaddr')
             wallets_restored = read_json_api(12703, 'wallets')
             for k, w in wallets_original.items():
-                assert(w['deposit_address'] == wallets_restored[k]['deposit_address'])
+                assert (w['deposit_address'] == wallets_restored[k]['deposit_address'])
 
             logging.info('Test passed.')
 
