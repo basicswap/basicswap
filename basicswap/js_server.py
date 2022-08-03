@@ -17,6 +17,7 @@ from .basicswap_util import (
 from .chainparams import (
     Coins,
     chainparams,
+    getCoinIdFromTicker,
 )
 from .ui.util import (
     PAGE_LIMIT,
@@ -337,6 +338,15 @@ def js_rates(self, url_split, post_string, is_json):
     coin_from = get_data_entry(post_data, 'coin_from')
     coin_to = get_data_entry(post_data, 'coin_to')
     return bytes(json.dumps(sc.lookupRates(coin_from, coin_to)), 'UTF-8')
+
+
+def js_rates_list(self, url_split, query_string, is_json):
+    get_data = urllib.parse.parse_qs(query_string)
+
+    sc = self.server.swap_client
+    coin_from = getCoinIdFromTicker(get_data['from'][0])
+    coin_to = getCoinIdFromTicker(get_data['to'][0])
+    return bytes(json.dumps(sc.lookupRates(coin_from, coin_to, True)), 'UTF-8')
 
 
 def js_rate(self, url_split, post_string, is_json):

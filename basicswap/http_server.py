@@ -43,6 +43,7 @@ from .js_server import (
     js_network,
     js_revokeoffer,
     js_smsgaddresses,
+    js_rates_list,
     js_rates,
     js_rate,
     js_index,
@@ -654,24 +655,29 @@ class HttpHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def handle_http(self, status_code, path, post_string='', is_json=False):
-        url_split = self.path.split('/')
+        parsed = urllib.parse.urlparse(self.path)
+        url_split = parsed.path.split('/')
+        if post_string == '' and len(parsed.query) > 0:
+            post_string = parsed.query
         if len(url_split) > 1 and url_split[1] == 'json':
             try:
                 self.putHeaders(status_code, 'text/plain')
                 func = js_index
                 if len(url_split) > 2:
-                    func = {'coins': js_coins,
-                            'wallets': js_wallets,
-                            'offers': js_offers,
-                            'sentoffers': js_sentoffers,
-                            'bids': js_bids,
-                            'sentbids': js_sentbids,
-                            'network': js_network,
-                            'revokeoffer': js_revokeoffer,
-                            'smsgaddresses': js_smsgaddresses,
-                            'rate': js_rate,
-                            'rates': js_rates,
-                            }.get(url_split[2], js_index)
+                    func = {
+                        'coins': js_coins,
+                        'wallets': js_wallets,
+                        'offers': js_offers,
+                        'sentoffers': js_sentoffers,
+                        'bids': js_bids,
+                        'sentbids': js_sentbids,
+                        'network': js_network,
+                        'revokeoffer': js_revokeoffer,
+                        'smsgaddresses': js_smsgaddresses,
+                        'rate': js_rate,
+                        'rates': js_rates,
+                        'rateslist': js_rates_list,
+                    }.get(url_split[2], js_index)
                 return func(self, url_split, post_string, is_json)
             except Exception as ex:
                 if self.server.swap_client.debug is True:
