@@ -5993,7 +5993,16 @@ class BasicSwap(BaseApp):
                 if 'bittrex' in rv:
                     js = rv['bittrex']
                     rate = js['rate_last'] if 'rate_last' in js else js['rate_inferred']
-                    rv_array.append(('bittrex.com', ticker_from, ticker_to, '', '', js['from_btc'], js['to_btc'], format_float(float(rate))))
+                    rv_array.append((
+                        'bittrex.com',
+                        ticker_from,
+                        ticker_to,
+                        '',
+                        '',
+                        format_float(float(js['from_btc'])),
+                        format_float(float(js['to_btc'])),
+                        format_float(float(rate))
+                    ))
                 return rv_array
 
             return rv
