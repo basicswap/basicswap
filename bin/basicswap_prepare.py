@@ -786,7 +786,7 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
             start_daemons = with_coins
             if 'particl' not in with_coins:
                 # Particl must be running to initialise a wallet in addcoin mode
-                start_daemons.append('particl')
+                start_daemons.add('particl')
 
             for coin_name in start_daemons:
                 coin_settings = settings['chainclients'][coin_name]
@@ -948,7 +948,7 @@ def main():
                 if s[1] not in known_coins:
                     exitWithError('Unknown coin {}'.format(s[1]))
                 add_coin = s[1]
-                with_coins = [add_coin, ]
+                with_coins = {add_coin, }
                 continue
             if name == 'disablecoin':
                 if s[1] not in known_coins:
