@@ -24,18 +24,18 @@ from coincurve.dleag import (
     verify_ed25519_point,
 )
 
-from .util import (
+from basicswap.util import (
     dumpj,
     ensure,
     make_int,
     TemporaryError)
-from .rpc_xmr import (
+from basicswap.rpc_xmr import (
     make_xmr_rpc_func,
     make_xmr_rpc2_func,
     make_xmr_wallet_rpc_func)
-from .util import (
+from basicswap.util import (
     b2i, b2h)
-from .chainparams import XMR_COIN, CoinInterface, Coins
+from basicswap.chainparams import XMR_COIN, CoinInterface, Coins
 
 
 class XMRInterface(CoinInterface):

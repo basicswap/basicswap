@@ -48,7 +48,7 @@ from basicswap.rpc_xmr import (
     callrpc_xmr,
     callrpc_xmr_na,
 )
-from basicswap.interface_xmr import (
+from basicswap.interface.xmr import (
     XMR_COIN,
 )
 from basicswap.contrib.key import (

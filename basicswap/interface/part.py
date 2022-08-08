@@ -8,30 +8,30 @@
 import hashlib
 from enum import IntEnum
 
-from .contrib.test_framework.messages import (
+from basicswap.contrib.test_framework.messages import (
     CTxOutPart,
 )
-from .contrib.test_framework.script import (
+from basicswap.contrib.test_framework.script import (
     CScript,
     OP_0,
     OP_DUP, OP_HASH160, OP_EQUALVERIFY, OP_CHECKSIG
 )
-from .util import (
+from basicswap.util import (
     i2b,
     ensure,
     make_int,
     TemporaryError,
 )
-from .util.script import (
+from basicswap.util.script import (
     getP2WSH,
     getCompactSizeLen,
     getWitnessElementLen,
 )
-from .util.address import (
+from basicswap.util.address import (
     toWIF,
     encodeStealthAddress)
-from .chainparams import Coins, chainparams
-from .interface_btc import BTCInterface
+from basicswap.chainparams import Coins, chainparams
+from .btc import BTCInterface
 
 
 class BalanceTypes(IntEnum):

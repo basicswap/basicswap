@@ -24,8 +24,8 @@ from coincurve.keys import (
 from basicswap.util import i2b, h2b
 from basicswap.util.crypto import ripemd160
 from basicswap.util.rfc2440 import rfc2440_hash_password
-from basicswap.interface_btc import BTCInterface
-from basicswap.interface_xmr import XMRInterface
+from basicswap.interface.btc import BTCInterface
+from basicswap.interface.xmr import XMRInterface
 
 from basicswap.basicswap_util import (
     TxLockTypes)

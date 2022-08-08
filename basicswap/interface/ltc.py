@@ -5,8 +5,8 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-from .interface_btc import BTCInterface
-from .chainparams import Coins
+from .btc import BTCInterface
+from basicswap.chainparams import Coins
 
 
 class LTCInterface(BTCInterface):

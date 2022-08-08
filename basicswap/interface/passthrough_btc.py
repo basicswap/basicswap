@@ -5,8 +5,8 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-from .interface_btc import BTCInterface
-from .contrib.test_framework.messages import (
+from .btc import BTCInterface
+from basicswap.contrib.test_framework.messages import (
     CTxOut)
 
 

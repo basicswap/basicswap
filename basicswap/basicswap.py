@@ -27,12 +27,12 @@ import concurrent.futures
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.orm.session import close_all_sessions
 
-from .interface_part import PARTInterface, PARTInterfaceAnon, PARTInterfaceBlind
-from .interface_btc import BTCInterface
-from .interface_ltc import LTCInterface
-from .interface_nmc import NMCInterface
-from .interface_xmr import XMRInterface
-from .interface_passthrough_btc import PassthroughBTCInterface
+from .interface.part import PARTInterface, PARTInterfaceAnon, PARTInterfaceBlind
+from .interface.btc import BTCInterface
+from .interface.ltc import LTCInterface
+from .interface.nmc import NMCInterface
+from .interface.xmr import XMRInterface
+from .interface.passthrough_btc import PassthroughBTCInterface
 
 from . import __version__
 from .rpc_xmr import make_xmr_rpc2_func

@@ -14,22 +14,22 @@ import traceback
 from io import BytesIO
 from basicswap.contrib.test_framework import segwit_addr
 
-from .util import (
+from basicswap.util import (
     dumpj,
     ensure,
     make_int,
     b2h, i2b, b2i, i2h)
-from .util.ecc import (
+from basicswap.util.ecc import (
     ep,
     pointToCPK, CPKToPoint,
     getSecretInt)
-from .util.script import (
+from basicswap.util.script import (
     decodeScriptNum,
     getCompactSizeLen,
     SerialiseNumCompact,
     getWitnessElementLen,
 )
-from .util.address import (
+from basicswap.util.address import (
     toWIF,
     b58encode,
     decodeWif,
@@ -47,7 +47,7 @@ from coincurve.ecdsaotves import (
     ecdsaotves_dec_sig,
     ecdsaotves_rec_enc_key)
 
-from .contrib.test_framework.messages import (
+from basicswap.contrib.test_framework.messages import (
     COIN,
     COutPoint,
     CTransaction,
@@ -56,7 +56,7 @@ from .contrib.test_framework.messages import (
     CTxOut,
     FromHex)
 
-from .contrib.test_framework.script import (
+from basicswap.contrib.test_framework.script import (
     CScript, CScriptOp,
     OP_IF, OP_ELSE, OP_ENDIF,
     OP_0, OP_2,
@@ -68,11 +68,11 @@ from .contrib.test_framework.script import (
     SegwitV0SignatureHash,
     hash160)
 
-from .basicswap_util import (
+from basicswap.basicswap_util import (
     TxLockTypes)
 
-from .chainparams import CoinInterface, Coins
-from .rpc import make_rpc_func, openrpc
+from basicswap.chainparams import CoinInterface, Coins
+from basicswap.rpc import make_rpc_func, openrpc
 
 
 SEQUENCE_LOCKTIME_GRANULARITY = 9  # 512 seconds
