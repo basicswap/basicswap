@@ -14,6 +14,7 @@ from urllib.request import urlopen
 
 from basicswap.rpc import callrpc
 from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
+from bin.basicswap_prepare import downloadPIVXParams
 
 
 TEST_HTTP_HOST = os.getenv('TEST_HTTP_HOST', '127.0.0.1')  # Set to 0.0.0.0 when used in docker
@@ -32,6 +33,10 @@ BTC_BASE_ZMQ_PORT = 33792
 LTC_BASE_PORT = 34792
 LTC_BASE_RPC_PORT = 35792
 LTC_BASE_ZMQ_PORT = 36792
+
+PIVX_BASE_PORT = 34892
+PIVX_BASE_RPC_PORT = 35892
+PIVX_BASE_ZMQ_PORT = 36892
 
 PREFIX_SECRET_KEY_REGTEST = 0x2e
 
@@ -72,6 +77,11 @@ def prepareDataDir(datadir, node_id, conf_file, dir_prefix, base_p2p_port=BASE_P
             # minstakeinterval=5  # Using walletsettings stakelimit instead
             fp.write('stakethreadconddelayms=1000\n')
             fp.write('smsgsregtestadjust=0\n')
+
+        if conf_file == 'pivx.conf':
+            params_dir = os.path.join(datadir, 'pivx-params')
+            downloadPIVXParams(params_dir)
+            fp.write(f'paramsdir={params_dir}\n')
 
         for i in range(0, num_nodes):
             if node_id == i:

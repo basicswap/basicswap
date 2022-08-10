@@ -36,3 +36,8 @@ NAMECOIN_TX = os.getenv('NAMECOIN_TX', 'namecoin-tx' + bin_suffix)
 XMR_BINDIR = os.path.expanduser(os.getenv('XMR_BINDIR', os.path.join(DEFAULT_TEST_BINDIR, 'monero')))
 XMRD = os.getenv('XMRD', 'monerod' + bin_suffix)
 XMR_WALLET_RPC = os.getenv('XMR_WALLET_RPC', 'monero-wallet-rpc' + bin_suffix)
+
+PIVX_BINDIR = os.path.expanduser(os.getenv('PIVX_BINDIR', os.path.join(DEFAULT_TEST_BINDIR, 'namecoin')))
+PIVXD = os.getenv('PIVXD', 'pivxd' + bin_suffix)
+PIVX_CLI = os.getenv('PIVX_CLI', 'pivx-cli' + bin_suffix)
+PIVX_TX = os.getenv('PIVX_TX', 'pivx-tx' + bin_suffix)

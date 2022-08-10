@@ -185,8 +185,15 @@ class BTCInterface(CoinInterface):
         self.blocks_confirmed = coin_settings['blocks_confirmed']
         self.setConfTarget(coin_settings['conf_target'])
         self._use_segwit = coin_settings['use_segwit']
+        self._connection_type = coin_settings['connection_type']
         self._sc = swap_client
         self._log = self._sc.log if self._sc and self._sc.log else logging
+
+    def using_segwit(self):
+        return self._use_segwit
+
+    def get_connection_type(self):
+        return self._connection_type
 
     def open_rpc(self, wallet=None):
         return openrpc(self._rpcport, self._rpcauth, wallet=wallet, host=self._rpc_host)
@@ -285,12 +292,14 @@ class BTCInterface(CoinInterface):
 
     def get_fee_rate(self, conf_target=2):
         try:
-            return self.rpc_callback('estimatesmartfee', [conf_target])['feerate'], 'estimatesmartfee'
+            fee_rate = self.rpc_callback('estimatesmartfee', [conf_target])['feerate']
+            assert (fee_rate > 0.0), 'Non positive feerate'
+            return fee_rate, 'estimatesmartfee'
         except Exception:
             try:
-                fee_rate = self.rpc_callback('getwalletinfo')['paytxfee'], 'paytxfee'
-                assert (fee_rate > 0.0), '0 feerate'
-                return fee_rate
+                fee_rate = self.rpc_callback('getwalletinfo')['paytxfee']
+                assert (fee_rate > 0.0), 'Non positive feerate'
+                return fee_rate, 'paytxfee'
             except Exception:
                 return self.rpc_callback('getnetworkinfo')['relayfee'], 'relayfee'
 
@@ -1160,6 +1169,9 @@ class BTCInterface(CoinInterface):
         txn_funded = self.rpc_callback('fundrawtransaction', [txn, options])['hex']
         txn_signed = self.rpc_callback('signrawtransactionwithwallet', [txn_funded])['hex']
         return txn_signed
+
+    def getBlockWithTxns(self, block_hash):
+        return self.rpc_callback('getblock', [block_hash, 2])
 
 
 def testBTCInterface():

@@ -38,7 +38,7 @@ from basicswap.util import (
 
 
 class Test(unittest.TestCase):
-    REQUIRED_SETTINGS = {'blocks_confirmed': 1, 'conf_target': 1, 'use_segwit': True}
+    REQUIRED_SETTINGS = {'blocks_confirmed': 1, 'conf_target': 1, 'use_segwit': True, 'connection_type': 'rpc'}
 
     def test_serialise_num(self):
         def test_case(v, nb=None):

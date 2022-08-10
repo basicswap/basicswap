@@ -26,6 +26,9 @@ class Coins(IntEnum):
     XMR = 6
     PART_BLIND = 7
     PART_ANON = 8
+    # ZANO = 9
+    # NDAU = 10
+    PIVX = 11
 
 
 chainparams = {
@@ -206,10 +209,45 @@ chainparams = {
             'min_amount': 100000,
             'max_amount': 10000 * XMR_COIN,
         }
-    }
+    },
+    Coins.PIVX: {
+        'name': 'pivx',
+        'ticker': 'PIVX',
+        'message_magic': 'DarkNet Signed Message:\n',
+        'blocks_target': 60 * 1,
+        'decimal_places': 8,
+        'has_csv': False,
+        'has_segwit': False,
+        'mainnet': {
+            'rpcport': 51473,
+            'pubkey_address': 30,
+            'script_address': 13,
+            'key_prefix': 212,
+            'bip44': 119,
+            'min_amount': 1000,
+            'max_amount': 100000 * COIN,
+        },
+        'testnet': {
+            'rpcport': 51475,
+            'pubkey_address': 139,
+            'script_address': 19,
+            'key_prefix': 239,
+            'bip44': 1,
+            'min_amount': 1000,
+            'max_amount': 100000 * COIN,
+            'name': 'testnet4',
+        },
+        'regtest': {
+            'rpcport': 51477,
+            'pubkey_address': 139,
+            'script_address': 19,
+            'key_prefix': 239,
+            'bip44': 1,
+            'min_amount': 1000,
+            'max_amount': 100000 * COIN,
+        }
+    },
 }
-
-
 ticker_map = {}
 
 

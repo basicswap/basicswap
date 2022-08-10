@@ -32,6 +32,7 @@ from .interface.btc import BTCInterface
 from .interface.ltc import LTCInterface
 from .interface.nmc import NMCInterface
 from .interface.xmr import XMRInterface
+from .interface.pivx import PIVXInterface
 from .interface.passthrough_btc import PassthroughBTCInterface
 
 from . import __version__
@@ -174,7 +175,8 @@ def threadPollChainState(swap_client, coin_type):
                 with swap_client.mxDB:
                     cc['chain_height'] = chain_state['blocks']
                     cc['chain_best_block'] = chain_state['bestblockhash']
-                    cc['chain_median_time'] = chain_state['mediantime']
+                    if 'mediantime' in chain_state:
+                        cc['chain_median_time'] = chain_state['mediantime']
         except Exception as e:
             swap_client.log.warning('threadPollChainState {}, error: {}'.format(str(coin_type), str(e)))
         swap_client.delay_event.wait(random.randrange(20, 30))  # random to stagger updates
@@ -380,21 +382,24 @@ class BasicSwap(BaseApp):
         session.close()
         session.remove()
 
+        coin_chainparams = chainparams[coin]
+        default_segwit = coin_chainparams.get('has_segwit', False)
+        default_csv = coin_chainparams.get('has_csv', True)
         self.coin_clients[coin] = {
             'coin': coin,
-            'name': chainparams[coin]['name'],
+            'name': coin_chainparams['name'],
             'connection_type': connection_type,
             'bindir': bindir,
             'datadir': datadir,
             'rpchost': chain_client_settings.get('rpchost', '127.0.0.1'),
-            'rpcport': chain_client_settings.get('rpcport', chainparams[coin][self.chain]['rpcport']),
+            'rpcport': chain_client_settings.get('rpcport', coin_chainparams[self.chain]['rpcport']),
             'rpcauth': rpcauth,
             'blocks_confirmed': chain_client_settings.get('blocks_confirmed', 6),
             'conf_target': chain_client_settings.get('conf_target', 2),
             'watched_outputs': [],
             'last_height_checked': last_height_checked,
-            'use_segwit': chain_client_settings.get('use_segwit', False),
-            'use_csv': chain_client_settings.get('use_csv', True),
+            'use_segwit': chain_client_settings.get('use_segwit', default_segwit),
+            'use_csv': chain_client_settings.get('use_csv', default_csv),
             'core_version_group': chain_client_settings.get('core_version_group', 0),
             'pid': None,
             'core_version': None,
@@ -482,6 +487,8 @@ class BasicSwap(BaseApp):
             chain_client_settings = self.getChainClientSettings(coin)
             xmr_i.setWalletFilename(chain_client_settings['walletfile'])
             return xmr_i
+        elif coin == Coins.PIVX:
+            return PIVXInterface(self.coin_clients[coin], self.chain, self)
         else:
             raise ValueError('Unknown coin type')
 
@@ -926,6 +933,8 @@ class BasicSwap(BaseApp):
             raise ValueError('Invalid swap type for PART_ANON')
         if (coin_from == Coins.PART_BLIND or coin_to == Coins.PART_BLIND) and swap_type != SwapTypes.XMR_SWAP:
             raise ValueError('Invalid swap type for PART_BLIND')
+        if coin_from == Coins.PIVX and swap_type == SwapTypes.XMR_SWAP:
+            raise ValueError('TODO: PIVX -> XMR')
 
     def notify(self, event_type, event_data):
         if event_type == NT.OFFER_RECEIVED:
@@ -958,19 +967,23 @@ class BasicSwap(BaseApp):
         ensure(amount_to < ci_to.max_amount(), 'To amount above max value for chain')
 
     def validateOfferLockValue(self, coin_from, coin_to, lock_type, lock_value):
+
+        coin_from_has_csv = self.coin_clients[coin_from]['use_csv']
+        coin_to_has_csv = self.coin_clients[coin_to]['use_csv']
+
         if lock_type == OfferMessage.SEQUENCE_LOCK_TIME:
             ensure(lock_value >= self.min_sequence_lock_seconds and lock_value <= self.max_sequence_lock_seconds, 'Invalid lock_value time')
-            ensure(self.coin_clients[coin_from]['use_csv'] and self.coin_clients[coin_to]['use_csv'], 'Both coins need CSV activated.')
+            ensure(coin_from_has_csv and coin_to_has_csv, 'Both coins need CSV activated.')
         elif lock_type == OfferMessage.SEQUENCE_LOCK_BLOCKS:
             ensure(lock_value >= 5 and lock_value <= 1000, 'Invalid lock_value blocks')
-            ensure(self.coin_clients[coin_from]['use_csv'] and self.coin_clients[coin_to]['use_csv'], 'Both coins need CSV activated.')
+            ensure(coin_from_has_csv and coin_to_has_csv, 'Both coins need CSV activated.')
         elif lock_type == TxLockTypes.ABS_LOCK_TIME:
             # TODO: range?
-            ensure(not self.coin_clients[coin_from]['use_csv'] or not self.coin_clients[coin_to]['use_csv'], 'Should use CSV.')
+            ensure(not coin_from_has_csv or not coin_to_has_csv, 'Should use CSV.')
             ensure(lock_value >= 4 * 60 * 60 and lock_value <= 96 * 60 * 60, 'Invalid lock_value time')
         elif lock_type == TxLockTypes.ABS_LOCK_BLOCKS:
             # TODO: range?
-            ensure(not self.coin_clients[coin_from]['use_csv'] or not self.coin_clients[coin_to]['use_csv'], 'Should use CSV.')
+            ensure(not coin_from_has_csv or not coin_to_has_csv, 'Should use CSV.')
             ensure(lock_value >= 10 and lock_value <= 1000, 'Invalid lock_value blocks')
         else:
             raise ValueError('Unknown locktype')
@@ -2569,10 +2582,14 @@ class BasicSwap(BaseApp):
 
         if self.debug:
             # Check fee
-            if self.coin_clients[coin_type]['connection_type'] == 'rpc':
+            if ci.get_connection_type() == 'rpc':
                 redeem_txjs = self.callcoinrpc(coin_type, 'decoderawtransaction', [redeem_txn])
-                self.log.debug('vsize paid, actual vsize %d %d', tx_vsize, redeem_txjs['vsize'])
-                ensure(tx_vsize >= redeem_txjs['vsize'], 'Underpaid fee')
+                if ci.using_segwit():
+                    self.log.debug('vsize paid, actual vsize %d %d', tx_vsize, redeem_txjs['vsize'])
+                    ensure(tx_vsize >= redeem_txjs['vsize'], 'underpaid fee')
+                else:
+                    self.log.debug('size paid, actual size %d %d', tx_vsize, redeem_txjs['size'])
+                    ensure(tx_vsize >= redeem_txjs['size'], 'underpaid fee')
 
             redeem_txjs = self.callcoinrpc(Coins.PART, 'decoderawtransaction', [redeem_txn])
             self.log.debug('Have valid redeem txn %s for contract %s tx %s', redeem_txjs['txid'], for_txn_type, prev_txnid)
@@ -2669,10 +2686,14 @@ class BasicSwap(BaseApp):
 
         if self.debug:
             # Check fee
-            if self.coin_clients[coin_type]['connection_type'] == 'rpc':
+            if ci.get_connection_type() == 'rpc':
                 refund_txjs = self.callcoinrpc(coin_type, 'decoderawtransaction', [refund_txn])
-                self.log.debug('vsize paid, actual vsize %d %d', tx_vsize, refund_txjs['vsize'])
-                ensure(tx_vsize >= refund_txjs['vsize'], 'underpaid fee')
+                if ci.using_segwit():
+                    self.log.debug('vsize paid, actual vsize %d %d', tx_vsize, refund_txjs['vsize'])
+                    ensure(tx_vsize >= refund_txjs['vsize'], 'underpaid fee')
+                else:
+                    self.log.debug('size paid, actual size %d %d', tx_vsize, refund_txjs['size'])
+                    ensure(tx_vsize >= refund_txjs['size'], 'underpaid fee')
 
             refund_txjs = self.callcoinrpc(Coins.PART, 'decoderawtransaction', [refund_txn])
             self.log.debug('Have valid refund txn %s for contract tx %s', refund_txjs['txid'], txjs['txid'])
@@ -3496,13 +3517,14 @@ class BasicSwap(BaseApp):
                     spend_txn = self.callcoinrpc(Coins.PART, 'getrawtransaction', [spend_txid, True])
                     self.processSpentOutput(coin_type, o, spend_txid, spend_n, spend_txn)
         else:
-            chain_blocks = self.callcoinrpc(coin_type, 'getblockcount')
+            ci = self.ci(coin_type)
+            chain_blocks = ci.getChainHeight()
             last_height_checked = c['last_height_checked']
             self.log.debug('chain_blocks, last_height_checked %s %s', chain_blocks, last_height_checked)
             while last_height_checked < chain_blocks:
                 block_hash = self.callcoinrpc(coin_type, 'getblockhash', [last_height_checked + 1])
                 try:
-                    block = self.callcoinrpc(coin_type, 'getblock', [block_hash, 2])
+                    block = ci.getBlockWithTxns(block_hash)
                 except Exception as e:
                     if 'Block not available (pruned data)' in str(e):
                         # TODO: Better solution?
@@ -3510,6 +3532,9 @@ class BasicSwap(BaseApp):
                         self.log.error('Coin %s last_height_checked %d set to pruneheight %d', self.ci(coin_type).coin_name(), last_height_checked, bci['pruneheight'])
                         last_height_checked = bci['pruneheight']
                         continue
+                    else:
+                        self.log.error(f'getblock error {e}')
+                        break
 
                 for tx in block['tx']:
                     for i, inp in enumerate(tx['vin']):

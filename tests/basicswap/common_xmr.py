@@ -27,6 +27,7 @@ from tests.basicswap.common import (
     BASE_PORT, BASE_RPC_PORT,
     BTC_BASE_PORT, BTC_BASE_RPC_PORT,
     LTC_BASE_PORT,
+    PIVX_BASE_PORT,
 )
 from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
 
@@ -44,9 +45,6 @@ BITCOIN_RPC_PORT_BASE = int(os.getenv('BITCOIN_RPC_PORT_BASE', BTC_BASE_RPC_PORT
 XMR_BASE_P2P_PORT = 17792
 XMR_BASE_RPC_PORT = 29798
 XMR_BASE_WALLET_RPC_PORT = 29998
-
-LTC_BASE_RPC_PORT = 35792
-LTC_BASE_ZMQ_PORT = 36792
 
 EXTRA_CONFIG_JSON = json.loads(os.getenv('EXTRA_CONFIG_JSON', '{}'))
 
@@ -190,6 +188,33 @@ def run_prepare(node_id, datadir_path, bins_path, with_coins, mnemonic_in=None, 
                 if ip != node_id:
                     fp.write('connect=127.0.0.1:{}\n'.format(LTC_BASE_PORT + ip + port_ofs))
             for opt in EXTRA_CONFIG_JSON.get('ltc{}'.format(node_id), []):
+                fp.write(opt + '\n')
+
+    if 'pivx' in coins_array:
+        # Pruned nodes don't provide blocks
+        with open(os.path.join(datadir_path, 'pivx', 'pivx.conf'), 'r') as fp:
+            lines = fp.readlines()
+        with open(os.path.join(datadir_path, 'pivx', 'pivx.conf'), 'w') as fp:
+            for line in lines:
+                if not line.startswith('prune'):
+                    fp.write(line)
+            fp.write('port={}\n'.format(PIVX_BASE_PORT + node_id + port_ofs))
+            fp.write('bind=127.0.0.1\n')
+            fp.write('dnsseed=0\n')
+            fp.write('discover=0\n')
+            fp.write('listenonion=0\n')
+            fp.write('upnp=0\n')
+            if use_rpcauth:
+                salt = generate_salt(16)
+                rpc_user = 'test_pivx_' + str(node_id)
+                rpc_pass = 'test_pivx_pwd_' + str(node_id)
+                fp.write('rpcauth={}:{}${}\n'.format(rpc_user, salt, password_to_hmac(salt, rpc_pass)))
+                settings['chainclients']['pivx']['rpcuser'] = rpc_user
+                settings['chainclients']['pivx']['rpcpassword'] = rpc_pass
+            for ip in range(num_nodes):
+                if ip != node_id:
+                    fp.write('connect=127.0.0.1:{}\n'.format(PIVX_BASE_PORT + ip + port_ofs))
+            for opt in EXTRA_CONFIG_JSON.get('pivx{}'.format(node_id), []):
                 fp.write(opt + '\n')
 
     if 'monero' in coins_array:
