@@ -500,7 +500,7 @@ class BasicSwap(BaseApp):
             authcookiepath = os.path.join(self.getChainDatadirPath(coin), '.cookie')
 
             pidfilename = cc['name']
-            if cc['name'] == 'bitcoin' or cc['name'] == 'litecoin' or cc['name'] == 'namecoin':
+            if cc['name'] in ('bitcoin', 'litecoin', 'namecoin'):
                 pidfilename += 'd'
 
             pidfilepath = os.path.join(self.getChainDatadirPath(coin), pidfilename + '.pid')
@@ -521,7 +521,10 @@ class BasicSwap(BaseApp):
                         datadir_pid = int(fp.read().decode('utf-8'))
                     assert (datadir_pid == cc['pid']), 'Mismatched pid'
                     assert (os.path.exists(authcookiepath))
-                except Exception:
+                    break
+                except Exception as e:
+                    if self.debug:
+                        self.log.warning('Error, iteration %d: %s', i, str(e))
                     self.delay_event.wait(0.5)
             try:
                 if os.name != 'nt' or cc['core_version_group'] > 17:  # Litecoin on windows doesn't write a pid file

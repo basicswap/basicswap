@@ -549,10 +549,13 @@ def page_offers(self, url_split, post_string, sent=False):
             o.was_sent,
             ci_from.format_amount(completed_amount)))
 
+    coins_from, coins_to = listAvailableCoins(swap_client, split_from=True)
+
     template = server.env.get_template('offers.html')
     return self.render_template(template, {
         'messages': messages,
-        'coins': listAvailableCoins(swap_client),
+        'coins_from': coins_from,
+        'coins': coins_to,
         'messages': messages,
         'filters': filters,
         'offers': formatted_offers,

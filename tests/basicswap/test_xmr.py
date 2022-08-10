@@ -230,11 +230,11 @@ def prepare_swapclient_dir(datadir, node_id, network_key, network_pubkey, with_l
         json.dump(settings, fp, indent=4)
 
 
-def btcRpc(cmd, node_id=0):
+def btcCli(cmd, node_id=0):
     return callrpc_cli(cfg.BITCOIN_BINDIR, os.path.join(TEST_DIR, 'btc_' + str(node_id)), 'regtest', cmd, cfg.BITCOIN_CLI)
 
 
-def ltcRpc(cmd, node_id=0):
+def ltcCli(cmd, node_id=0):
     return callrpc_cli(cfg.LITECOIN_BINDIR, os.path.join(TEST_DIR, 'ltc_' + str(node_id)), 'regtest', cmd, cfg.LITECOIN_CLI)
 
 
@@ -280,9 +280,9 @@ def run_coins_loop(cls):
         pause_event.wait()
         try:
             if cls.btc_addr is not None:
-                btcRpc('generatetoaddress 1 {}'.format(cls.btc_addr))
+                btcCli('generatetoaddress 1 {}'.format(cls.btc_addr))
             if cls.ltc_addr is not None:
-                ltcRpc('generatetoaddress 1 {}'.format(cls.ltc_addr))
+                ltcCli('generatetoaddress 1 {}'.format(cls.ltc_addr))
             if cls.xmr_addr is not None:
                 callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'generateblocks', {'wallet_address': cls.xmr_addr, 'amount_of_blocks': 1})
         except Exception as e:
