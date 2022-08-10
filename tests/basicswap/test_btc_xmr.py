@@ -43,6 +43,8 @@ class Test(BaseTest):
             cls.test_coin_from = Coins.BTC
         if not hasattr(cls, 'start_ltc_nodes'):
             cls.start_ltc_nodes = False
+        if not hasattr(cls, 'start_pivx_nodes'):
+            cls.start_pivx_nodes = False
         super(Test, cls).setUpClass()
 
     @classmethod

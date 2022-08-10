@@ -46,6 +46,9 @@ MONERO_VERSION = os.getenv('MONERO_VERSION', '0.18.0.0')
 MONERO_VERSION_TAG = os.getenv('MONERO_VERSION_TAG', '')
 XMR_SITE_COMMIT = 'f093c0da2219d94e6bef5f3948ac61b4ecdcb95b'  # Lock hashes.txt to monero version
 
+PIVX_VERSION = os.getenv('PIVX_VERSION', '5.4.0')
+PIVX_VERSION_TAG = os.getenv('PIVX_VERSION_TAG', '')
+
 # version, version tag eg. "rc1", signers
 known_coins = {
     'particl': (PARTICL_VERSION, PARTICL_VERSION_TAG, ('tecnovert',)),
@@ -53,6 +56,7 @@ known_coins = {
     'bitcoin': (BITCOIN_VERSION, BITCOIN_VERSION_TAG, ('laanwj',)),
     'namecoin': ('0.18.0', '', ('JeremyRand',)),
     'monero': (MONERO_VERSION, MONERO_VERSION_TAG, ('binaryfate',)),
+    'pivx': (PIVX_VERSION, PIVX_VERSION_TAG, ('fuzzbawls',)),
 }
 
 expected_key_ids = {
@@ -62,6 +66,7 @@ expected_key_ids = {
     'JeremyRand': ('2DBE339E29F6294C',),
     'binaryfate': ('F0AF4D462A0BDF92',),
     'davidburkett38': ('3620E9D387E55666',),
+    'fuzzbawls': ('3BDCDA2D87A881D9',),
 }
 
 if platform.system() == 'Darwin':
@@ -113,6 +118,12 @@ BTC_RPC_PWD = os.getenv('BTC_RPC_PWD', '')
 
 NMC_RPC_HOST = os.getenv('NMC_RPC_HOST', '127.0.0.1')
 NMC_RPC_PORT = int(os.getenv('NMC_RPC_PORT', 19698))
+
+PIVX_RPC_HOST = os.getenv('PIVX_RPC_HOST', '127.0.0.1')
+PIVX_RPC_PORT = int(os.getenv('PIVX_RPC_PORT', 51473))
+PIVX_ONION_PORT = int(os.getenv('PIVX_ONION_PORT', 51472))  # nDefaultPort
+PIVX_RPC_USER = os.getenv('PIVX_RPC_USER', '')
+PIVX_RPC_PWD = os.getenv('PIVX_RPC_PWD', '')
 
 TOR_PROXY_HOST = os.getenv('TOR_PROXY_HOST', '127.0.0.1')
 TOR_PROXY_PORT = int(os.getenv('TOR_PROXY_PORT', 9050))
@@ -203,6 +214,36 @@ def testOnionLink():
     test_response = downloadBytes(test_url).decode('utf-8')
     assert ('The Tor Project\'s free software protects your privacy online.' in test_response)
     logger.info('Onion links work.')
+
+
+def downloadPIVXParams(output_dir):
+    # util/fetch-params.sh
+
+    if os.path.exists(output_dir):
+        logger.info(f'Skipping PIVX params download, path exists: {output_dir}')
+        return
+    os.makedirs(output_dir)
+
+    source_url = 'https://download.z.cash/downloads/'
+    files = {
+        'sapling-spend.params': '8e48ffd23abb3a5fd9c5589204f32d9c31285a04b78096ba40a79b75677efc13',
+        'sapling-output.params': '2f0ebbcbb9bb0bcffe95a397e7eba89c29eb4dde6191c339db88570e3f3fb0e4',
+    }
+
+    try:
+        setConnectionParameters()
+        for k, v in files.items():
+            url = urllib.parse.urljoin(source_url, k)
+            path = os.path.join(output_dir, k)
+            downloadFile(url, path)
+        hasher = hashlib.sha256()
+        with open(path, 'rb') as fp:
+            hasher.update(fp.read())
+        file_hash = hasher.hexdigest()
+        logger.info('%s hash: %s', k, file_hash)
+        assert file_hash == v
+    finally:
+        popConnectionParameters()
 
 
 def isValidSignature(result):
@@ -342,6 +383,10 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
             release_url = 'https://beta.namecoin.org/files/namecoin-core/namecoin-core-{}/{}'.format(version, release_filename)
             assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, version.rsplit('.', 1)[0])
             assert_url = 'https://raw.githubusercontent.com/namecoin/gitian.sigs/master/%s-%s/%s/%s' % (version, os_dir_name, signing_key_name, assert_filename)
+        elif coin == 'pivx':
+            release_url = 'https://github.com/PIVX-Project/PIVX/releases/download/v{}/{}'.format(version + version_tag, release_filename)
+            assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, '.'.join(version.split('.')[:2]))
+            assert_url = 'https://raw.githubusercontent.com/PIVX-Project/gitian.sigs/master/%s-%s/%s/%s' % (version + version_tag, os_dir_name, signing_key_name.capitalize(), assert_filename)
         else:
             raise ValueError('Unknown coin')
 
@@ -568,6 +613,14 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
                 fp.write('rpcauth={}:{}${}\n'.format(BTC_RPC_USER, salt, password_to_hmac(salt, BTC_RPC_PWD)))
         elif coin == 'namecoin':
             fp.write('prune=2000\n')
+        elif coin == 'pivx':
+            base_dir = extra_opts.get('data_dir', data_dir)
+            params_dir = os.path.join(base_dir, 'pivx-params')
+            downloadPIVXParams(params_dir)
+            fp.write('prune=4000\n')
+            fp.write(f'paramsdir={params_dir}\n')
+            if PIVX_RPC_USER != '':
+                fp.write('rpcauth={}:{}${}\n'.format(PIVX_RPC_USER, salt, password_to_hmac(salt, PIVX_RPC_PWD)))
         else:
             logger.warning('Unknown coin %s', coin)
 
@@ -804,7 +857,7 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
                 swap_client.setCoinRunParams(c)
                 swap_client.createCoinInterface(c)
 
-                if c in (Coins.PART, Coins.BTC, Coins.LTC):
+                if c in (Coins.PART, Coins.BTC, Coins.LTC, Coins.PIVX):
                     swap_client.waitForDaemonRPC(c, with_wallet=False)
                     # Create wallet if it doesn't exist yet
                     wallets = swap_client.callcoinrpc(c, 'listwallets')
@@ -1068,6 +1121,21 @@ def main():
             'bindir': os.path.join(bin_dir, 'monero'),
             'restore_height': xmr_restore_height,
             'blocks_confirmed': 7,  # TODO: 10?
+        },
+        'pivx': {
+            'connection_type': 'rpc' if 'pivx' in with_coins else 'none',
+            'manage_daemon': True if ('pivx' in with_coins and PIVX_RPC_HOST == '127.0.0.1') else False,
+            'rpchost': PIVX_RPC_HOST,
+            'rpcport': PIVX_RPC_PORT + port_offset,
+            'onionport': PIVX_ONION_PORT + port_offset,
+            'datadir': os.getenv('PIVX_DATA_DIR', os.path.join(data_dir, 'pivx')),
+            'bindir': os.path.join(bin_dir, 'pivx'),
+            'use_segwit': False,
+            'use_csv': False,
+            'blocks_confirmed': 1,
+            'conf_target': 2,
+            'core_version_group': 20,
+            'chain_lookups': 'local',
         }
     }
 
@@ -1080,6 +1148,9 @@ def main():
     if BTC_RPC_USER != '':
         chainclients['bitcoin']['rpcuser'] = BTC_RPC_USER
         chainclients['bitcoin']['rpcpassword'] = BTC_RPC_PWD
+    if PIVX_RPC_USER != '':
+        chainclients['pivx']['rpcuser'] = PIVX_RPC_USER
+        chainclients['pivx']['rpcpassword'] = PIVX_RPC_PWD
 
     chainclients['monero']['walletsdir'] = os.getenv('XMR_WALLETS_DIR', chainclients['monero']['datadir'])
 
