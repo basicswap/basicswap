@@ -2364,14 +2364,8 @@ class BasicSwap(BaseApp):
         else:
             addr_to = ci.encode_p2sh(initiate_script)
         self.log.debug('Create initiate txn for coin %s to %s for bid %s', str(coin_type), addr_to, bid_id.hex())
-        txn = self.callcoinrpc(coin_type, 'createrawtransaction', [[], {addr_to: ci.format_amount(bid.amount)}])
 
-        options = {
-            'lockUnspents': True,
-            'conf_target': self.coin_clients[coin_type]['conf_target'],
-        }
-        txn_funded = self.callcoinrpc(coin_type, 'fundrawtransaction', [txn, options])['hex']
-        txn_signed = self.callcoinrpc(coin_type, 'signrawtransactionwithwallet', [txn_funded])['hex']
+        txn_signed = ci.createRawSignedTransaction(addr_to, bid.amount)
         return txn_signed
 
     def deriveParticipateScript(self, bid_id, bid, offer):
@@ -2448,13 +2442,7 @@ class BasicSwap(BaseApp):
         else:
             addr_to = ci.encode_p2sh(participate_script)
 
-        txn = self.callcoinrpc(coin_to, 'createrawtransaction', [[], {addr_to: ci.format_amount(amount_to)}])
-        options = {
-            'lockUnspents': True,
-            'conf_target': self.coin_clients[coin_to]['conf_target'],
-        }
-        txn_funded = self.callcoinrpc(coin_to, 'fundrawtransaction', [txn, options])['hex']
-        txn_signed = self.callcoinrpc(coin_to, 'signrawtransactionwithwallet', [txn_funded])['hex']
+        txn_signed = ci.createRawSignedTransaction(addr_to, amount_to)
 
         refund_txn = self.createRefundTxn(coin_to, txn_signed, offer, bid, participate_script, tx_type=TxTypes.PTX_REFUND)
         bid.participate_txn_refund = bytes.fromhex(refund_txn)

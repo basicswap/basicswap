@@ -1150,6 +1150,17 @@ class BTCInterface(CoinInterface):
         address = self.getNewAddress(self._use_segwit, 'create_utxo')
         return self.withdrawCoin(self.format_amount(value_sats), address, False), address
 
+    def createRawSignedTransaction(self, addr_to, amount):
+        txn = self.rpc_callback('createrawtransaction', [[], {addr_to: self.format_amount(amount)}])
+
+        options = {
+            'lockUnspents': True,
+            'conf_target': self._conf_target,
+        }
+        txn_funded = self.rpc_callback('fundrawtransaction', [txn, options])['hex']
+        txn_signed = self.rpc_callback('signrawtransactionwithwallet', [txn_funded])['hex']
+        return txn_signed
+
 
 def testBTCInterface():
     print('testBTCInterface')

@@ -26,6 +26,7 @@ from tests.basicswap.common import (
     waitForServer,
     BASE_PORT, BASE_RPC_PORT,
     BTC_BASE_PORT, BTC_BASE_RPC_PORT,
+    LTC_BASE_PORT,
 )
 from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
 
@@ -44,7 +45,6 @@ XMR_BASE_P2P_PORT = 17792
 XMR_BASE_RPC_PORT = 29798
 XMR_BASE_WALLET_RPC_PORT = 29998
 
-LTC_BASE_PORT = 34792
 LTC_BASE_RPC_PORT = 35792
 LTC_BASE_ZMQ_PORT = 36792
 
