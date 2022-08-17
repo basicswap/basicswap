@@ -46,8 +46,8 @@ MONERO_VERSION = os.getenv('MONERO_VERSION', '0.18.0.0')
 MONERO_VERSION_TAG = os.getenv('MONERO_VERSION_TAG', '')
 XMR_SITE_COMMIT = 'f093c0da2219d94e6bef5f3948ac61b4ecdcb95b'  # Lock hashes.txt to monero version
 
-PIVX_VERSION = os.getenv('PIVX_VERSION', '5.4.0')
-PIVX_VERSION_TAG = os.getenv('PIVX_VERSION_TAG', '')
+PIVX_VERSION = os.getenv('PIVX_VERSION', '5.4.99')
+PIVX_VERSION_TAG = os.getenv('PIVX_VERSION_TAG', '_scantxoutset')
 
 # version, version tag eg. "rc1", signers
 known_coins = {
@@ -56,7 +56,7 @@ known_coins = {
     'bitcoin': (BITCOIN_VERSION, BITCOIN_VERSION_TAG, ('laanwj',)),
     'namecoin': ('0.18.0', '', ('JeremyRand',)),
     'monero': (MONERO_VERSION, MONERO_VERSION_TAG, ('binaryfate',)),
-    'pivx': (PIVX_VERSION, PIVX_VERSION_TAG, ('fuzzbawls',)),
+    'pivx': (PIVX_VERSION, PIVX_VERSION_TAG, ('tecnovert',)),
 }
 
 expected_key_ids = {
@@ -315,7 +315,13 @@ def extractCore(coin, version_data, settings, bin_dir, release_path, extra_opts=
             for b in bins:
                 out_path = os.path.join(bin_dir, b)
                 if not os.path.exists(out_path) or extract_core_overwrite:
-                    with open(out_path, 'wb') as fout, ft.extractfile('{}-{}/bin/{}'.format(coin, version + version_tag, b)) as fi:
+
+                    if coin == 'pivx':
+                        filename = '{}-{}/bin/{}'.format(coin, version, b)
+                    else:
+                        filename = '{}-{}/bin/{}'.format(coin, version + version_tag, b)
+
+                    with open(out_path, 'wb') as fout, ft.extractfile(filename) as fi:
                         fout.write(fi.read())
                     try:
                         os.chmod(out_path, stat.S_IRWXU | stat.S_IXGRP | stat.S_IXOTH)
@@ -384,9 +390,10 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
             assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, version.rsplit('.', 1)[0])
             assert_url = 'https://raw.githubusercontent.com/namecoin/gitian.sigs/master/%s-%s/%s/%s' % (version, os_dir_name, signing_key_name, assert_filename)
         elif coin == 'pivx':
-            release_url = 'https://github.com/PIVX-Project/PIVX/releases/download/v{}/{}'.format(version + version_tag, release_filename)
-            assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, '.'.join(version.split('.')[:2]))
-            assert_url = 'https://raw.githubusercontent.com/PIVX-Project/gitian.sigs/master/%s-%s/%s/%s' % (version + version_tag, os_dir_name, signing_key_name.capitalize(), assert_filename)
+            release_filename = '{}-{}-{}{}.{}'.format(coin, version, BIN_ARCH, filename_extra, FILE_EXT)
+            release_url = 'https://github.com/tecnovert/particl-core/releases/download/v{}/{}'.format(version + version_tag, release_filename)
+            assert_filename = 'pivx-linux-6.0-build.assert'
+            assert_url = 'https://raw.githubusercontent.com/tecnovert/gitian.sigs/pivx/5.4.99_scantxoutset-linux/tecnovert/{}'.format(assert_filename)
         else:
             raise ValueError('Unknown coin')
 
@@ -457,7 +464,10 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
         if not isValidSignature(verified) and verified.username is None:
             logger.warning('Signature made by unknown key.')
 
-            filename = '{}_{}.pgp'.format(coin, signing_key_name)
+            if coin == 'pivx':
+                filename = '{}_{}.pgp'.format('particl', signing_key_name)
+            else:
+                filename = '{}_{}.pgp'.format(coin, signing_key_name)
             pubkeyurls = (
                 'https://raw.githubusercontent.com/tecnovert/basicswap/master/pgp/keys/' + filename,
                 'https://gitlab.com/particl/basicswap/-/raw/master/pgp/keys/' + filename,
@@ -836,7 +846,7 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
         with open(os.path.join(data_dir, 'basicswap.log'), 'a') as fp:
             swap_client = BasicSwap(fp, data_dir, settings, chain)
 
-            start_daemons = with_coins
+            start_daemons = {c for c in with_coins}
             if 'particl' not in with_coins:
                 # Particl must be running to initialise a wallet in addcoin mode
                 start_daemons.add('particl')
@@ -861,7 +871,7 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
                     swap_client.waitForDaemonRPC(c, with_wallet=False)
                     # Create wallet if it doesn't exist yet
                     wallets = swap_client.callcoinrpc(c, 'listwallets')
-                    if 'wallet.dat' not in wallets:
+                    if len(wallets) < 1:
                         logger.info('Creating wallet.dat for {}.'.format(coin_name.capitalize()))
                         swap_client.callcoinrpc(c, 'createwallet', ['wallet.dat'])
 
@@ -1242,7 +1252,7 @@ def main():
             prepareDataDir(add_coin, settings, chain, particl_wallet_mnemonic, extra_opts)
 
             if particl_wallet_mnemonic not in ('none', 'auto'):
-                initialise_wallets(None, [add_coin, ], data_dir, settings, chain, use_tor_proxy)
+                initialise_wallets(None, {add_coin, }, data_dir, settings, chain, use_tor_proxy)
 
             with open(config_path, 'w') as fp:
                 json.dump(settings, fp, indent=4)
