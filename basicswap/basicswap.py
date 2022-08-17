@@ -608,7 +608,8 @@ class BasicSwap(BaseApp):
                 stopping = True
                 time.sleep(i + 1)
         except Exception as ex:
-            if 'Could not connect' in str(ex):
+            str_ex = str(ex)
+            if 'Could not connect' in str_ex or 'Could not locate RPC credentials' in str_ex:
                 if stopping:
                     for i in range(30):
                         # The lock file doesn't get deleted
