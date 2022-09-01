@@ -32,7 +32,7 @@ from basicswap.util.rfc2440 import rfc2440_hash_password
 from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
 from bin.basicswap_run import startDaemon, startXmrWalletDaemon
 
-PARTICL_VERSION = os.getenv('PARTICL_VERSION', '0.21.2.9')
+PARTICL_VERSION = os.getenv('PARTICL_VERSION', '0.21.2.11')
 PARTICL_VERSION_TAG = os.getenv('PARTICL_VERSION_TAG', '')
 PARTICL_LINUX_EXTRA = os.getenv('PARTICL_LINUX_EXTRA', '_nousb')
 
