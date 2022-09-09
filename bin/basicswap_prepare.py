@@ -392,8 +392,8 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
         elif coin == 'pivx':
             release_filename = '{}-{}-{}{}.{}'.format(coin, version, BIN_ARCH, filename_extra, FILE_EXT)
             release_url = 'https://github.com/tecnovert/particl-core/releases/download/v{}/{}'.format(version + version_tag, release_filename)
-            assert_filename = 'pivx-linux-6.0-build.assert'
-            assert_url = 'https://raw.githubusercontent.com/tecnovert/gitian.sigs/pivx/5.4.99_scantxoutset-linux/tecnovert/{}'.format(assert_filename)
+            assert_filename = 'pivx-{}-6.0-build.assert'.format(os_name)
+            assert_url = 'https://raw.githubusercontent.com/tecnovert/gitian.sigs/pivx/5.4.99_scantxoutset-{}/tecnovert/{}'.format(os_dir_name, assert_filename)
         else:
             raise ValueError('Unknown coin')
 
