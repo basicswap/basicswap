@@ -25,7 +25,7 @@ from tests.basicswap.mnemonics import mnemonics
 from tests.basicswap.common import (
     waitForServer,
     BASE_PORT, BASE_RPC_PORT,
-    BTC_BASE_PORT, BTC_BASE_RPC_PORT,
+    BTC_BASE_PORT, BTC_BASE_RPC_PORT, BTC_BASE_TOR_PORT,
     LTC_BASE_PORT,
     PIVX_BASE_PORT,
 )
@@ -41,6 +41,7 @@ PARTICL_RPC_PORT_BASE = int(os.getenv('PARTICL_RPC_PORT_BASE', BASE_RPC_PORT))
 
 BITCOIN_PORT_BASE = int(os.getenv('BITCOIN_PORT_BASE', BTC_BASE_PORT))
 BITCOIN_RPC_PORT_BASE = int(os.getenv('BITCOIN_RPC_PORT_BASE', BTC_BASE_RPC_PORT))
+BITCOIN_TOR_PORT_BASE = int(os.getenv('BITCOIN_TOR_PORT_BASE', BTC_BASE_TOR_PORT))
 
 XMR_BASE_P2P_PORT = 17792
 XMR_BASE_RPC_PORT = 29798
@@ -83,6 +84,9 @@ def run_prepare(node_id, datadir_path, bins_path, with_coins, mnemonic_in=None, 
     os.environ['PART_RPC_PORT'] = str(PARTICL_RPC_PORT_BASE)
     os.environ['BTC_RPC_PORT'] = str(BITCOIN_RPC_PORT_BASE)
     import bin.basicswap_prepare as prepareSystem
+    # Hack: Reload module to set env vars as the basicswap_prepare module is initialised if imported from elsewhere earlier
+    from importlib import reload
+    prepareSystem = reload(prepareSystem)
 
     testargs = [
         'basicswap-prepare',
@@ -146,6 +150,9 @@ def run_prepare(node_id, datadir_path, bins_path, with_coins, mnemonic_in=None, 
                     fp.write(line)
             fp.write('port={}\n'.format(BITCOIN_PORT_BASE + node_id + port_ofs))
             fp.write('bind=127.0.0.1\n')
+            # listenonion=0 does not stop the node from trying to bind to the tor port
+            # https://github.com/bitcoin/bitcoin/issues/22726
+            fp.write('bind=127.0.0.1:{}=onion\n'.format(BITCOIN_TOR_PORT_BASE + node_id + port_ofs))
             fp.write('dnsseed=0\n')
             fp.write('discover=0\n')
             fp.write('listenonion=0\n')
