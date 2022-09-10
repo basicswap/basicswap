@@ -461,7 +461,7 @@ class HttpHandler(BaseHTTPRequestHandler):
                 ensure(sort_dir in ['asc', 'desc'], 'Invalid sort dir')
                 filters['sort_dir'] = sort_dir
             if have_data_entry(form_data, 'state'):
-                state_ind = get_data_entry(form_data, 'state')
+                state_ind = int(get_data_entry(form_data, 'state'))
                 if state_ind != -1:
                     try:
                         state = BidStates(state_ind)
