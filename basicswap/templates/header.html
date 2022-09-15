@@ -13,6 +13,13 @@
 <h2>{{ h2 }}</h2>
 {% endif %}
 
+{% if debug_mode == true %}
+<p>Debug mode: Active</p>
+{% endif %}
+{% if debug_ui_mode == true %}
+<p>Debug UI mode: Active</p>
+{% endif %}
+
 {% if ws_url %}
 <script>
     var ws = new WebSocket("{{ ws_url }}"),

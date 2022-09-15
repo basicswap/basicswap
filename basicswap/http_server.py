@@ -107,29 +107,7 @@ def listExplorerActions(swap_client):
     return actions
 
 
-def html_content_start(title, h2=None, refresh=None):
-    content = '<!DOCTYPE html><html lang="en">\n<head>' \
-        + '<meta charset="UTF-8">' \
-        + ('' if not refresh else '<meta http-equiv="refresh" content="{}">'.format(refresh)) \
-        + '<title>' + title + '</title></head>\n' \
-        + '<body>'
-    if h2 is not None:
-        content += '<h2>' + h2 + '</h2>'
-    return content
-
-
 class HttpHandler(BaseHTTPRequestHandler):
-    def page_info(self, info_str):
-        content = html_content_start('BasicSwap Info') \
-            + '<p>Info: ' + info_str + '</p>' \
-            + '<p><a href=\'/\'>home</a></p></body></html>'
-        return bytes(content, 'UTF-8')
-
-    def page_error(self, error_str):
-        content = html_content_start('BasicSwap Error') \
-            + '<p>Error: ' + error_str + '</p>' \
-            + '<p><a href=\'/\'>home</a></p></body></html>'
-        return bytes(content, 'UTF-8')
 
     def checkForm(self, post_string, name, messages):
         if post_string == '':
@@ -146,12 +124,37 @@ class HttpHandler(BaseHTTPRequestHandler):
         swap_client = self.server.swap_client
         if swap_client.ws_server:
             args_dict['ws_url'] = swap_client.ws_server.url
+        if swap_client.debug:
+            args_dict['debug_mode'] = True
+        if swap_client.debug_ui:
+            args_dict['debug_ui_mode'] = True
         return bytes(template.render(
             title=self.server.title,
             h2=self.server.title,
             form_id=os.urandom(8).hex(),
             **args_dict,
         ), 'UTF-8')
+
+    def render_simple_template(self, template, args_dict):
+        swap_client = self.server.swap_client
+        return bytes(template.render(
+            title=self.server.title,
+            **args_dict,
+        ), 'UTF-8')
+
+    def page_info(self, info_str):
+        template = env.get_template('info.html')
+        return self.render_simple_template(template, {
+            'title_str': 'BasicSwap Info',
+            'message_str': error_str,
+        })
+
+    def page_error(self, error_str):
+        template = env.get_template('error.html')
+        return self.render_simple_template(template, {
+            'title_str': 'BasicSwap Error',
+            'message_str': error_str,
+        })
 
     def page_explorers(self, url_split, post_string):
         swap_client = self.server.swap_client
