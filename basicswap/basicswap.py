@@ -5398,7 +5398,7 @@ class BasicSwap(BaseApp):
         finally:
             self._updating_wallets_info[int(coin)] = False
 
-    def updateWalletsInfo(self, force_update=False, only_coin=None):
+    def updateWalletsInfo(self, force_update=False, only_coin=None, wait_for_complete=False):
         now = int(time.time())
         if not force_update and now - self._last_updated_wallets_info < 30:
             return
@@ -5407,11 +5407,18 @@ class BasicSwap(BaseApp):
                 continue
             if c not in chainparams:
                 continue
-            if self.coin_clients[c]['connection_type'] == 'rpc':
+            cc = self.coin_clients[c]
+            if cc['connection_type'] == 'rpc':
+                if not force_update and now - cc.get('last_updated_wallet_info', 0) < 30:
+                    return
+                cc['last_updated_wallet_info'] = int(time.time())
                 self._updating_wallets_info[int(c)] = True
-                self.thread_pool.submit(self.updateWalletInfo, c)
-        if only_coin is None:
-            self._last_updated_wallets_info = int(time.time())
+                handle = self.thread_pool.submit(self.updateWalletInfo, c)
+                if wait_for_complete:
+                    try:
+                        handle.result(timeout=10)
+                    except Exception as e:
+                        self.log.error(f'updateWalletInfo {e}')
 
     def getWalletsInfo(self, opts=None):
         rv = {}

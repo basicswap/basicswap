@@ -146,7 +146,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         template = env.get_template('info.html')
         return self.render_simple_template(template, {
             'title_str': 'BasicSwap Info',
-            'message_str': error_str,
+            'message_str': info_str,
         })
 
     def page_error(self, error_str):
@@ -780,6 +780,8 @@ class HttpHandler(BaseHTTPRequestHandler):
                     return page_automation_strategy_new(self, url_split, post_string)
                 if page == 'shutdown':
                     return self.page_shutdown(url_split, post_string)
+                if page != '':
+                    return self.page_404(url_split)
             return self.page_index(url_split)
         except Exception as ex:
             if self.server.swap_client.debug is True:

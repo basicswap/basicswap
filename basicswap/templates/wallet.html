@@ -1,6 +1,5 @@
 {% include 'header.html' %}
 
-
 <p><a id="refresh" href="/wallet/{{ w.ticker }}">refresh</a></p>
 <p><a id="back" href="/wallets">back</a></p>
 
@@ -10,7 +9,7 @@
 {% endif %}
 
 {% for m in messages %}
-<p>{{ m }}</p>
+<p class="infomsg">{{ m }}</p>
 {% endfor %}
 
 <form method="post">
@@ -47,7 +46,7 @@
 <tr><td>Main Address</td><td colspan=2>{{ w.main_address }}</td></tr>
 <tr><td><input type="submit" name="newaddr_{{ w.cid }}" value="New Subaddress"></td><td colspan=2>{{ w.deposit_address }}</td></tr>
 {% else %}
-<tr><td><input type="submit" name="newaddr_{{ w.cid }}" value="New Deposit Address"></td><td colspan=2>{{ w.deposit_address }}</td></tr>
+<tr><td><input type="submit" name="newaddr_{{ w.cid }}" value="New Deposit Address"></td><td colspan=2 id="deposit_address">{{ w.deposit_address }}</td></tr>
 {% endif %}
 <tr><td><input type="submit" name="withdraw_{{ w.cid }}" value="Withdraw" onclick="return confirmWithdrawal();"></td><td>Amount: <input type="text" name="amt_{{ w.cid }}" value="{{ w.wd_value }}"></td><td>Address: <input type="text" name="to_{{ w.cid }}" value="{{ w.wd_address }}"></td><td>Subtract fee: <input type="checkbox" name="subfee_{{ w.cid }}" {% if w.wd_subfee==true %} checked=checked{% endif %}></td></tr>
 {% if w.cid == '1' %}
