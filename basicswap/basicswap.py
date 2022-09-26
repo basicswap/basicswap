@@ -2415,21 +2415,9 @@ class BasicSwap(BaseApp):
             initiate_tx_block_time = int(self.callcoinrpc(coin_from, 'getblock', [initiate_tx_block_hash, ])['time'])
             if offer.lock_type == TxLockTypes.ABS_LOCK_BLOCKS:
                 # Walk the coin_to chain back until block time matches
-                blockchaininfo = self.callcoinrpc(coin_to, 'getblockchaininfo')
-                cblock_hash = blockchaininfo['bestblockhash']
-                cblock_height = blockchaininfo['blocks']
-                max_tries = 1000
-                for i in range(max_tries):
-                    prev_block = self.callcoinrpc(coin_to, 'getblock', [cblock_hash, ])
-                    self.log.debug('prev_block %s', str(prev_block))
-
-                    if prev_block['time'] <= initiate_tx_block_time:
-                        break
-                    # cblock_hash and height are out of step unless loop breaks
-                    cblock_hash = prev_block['previousblockhash']
-                    cblock_height = prev_block['height']
-
-                ensure(prev_block['time'] <= initiate_tx_block_time, 'Block not found for lock height')
+                block_header_at = ci_to.getBlockHeaderAt(initiate_tx_block_time, block_after=True)
+                cblock_hash = block_header_at['hash']
+                cblock_height = block_header_at['height']
 
                 self.log.debug('Setting lock value from height of block %s %s', coin_to, cblock_hash)
                 contract_lock_value = cblock_height + lock_value
@@ -4084,7 +4072,10 @@ class BasicSwap(BaseApp):
             ensure(script_lock_value == expect_sequence, 'sequence mismatch')
         else:
             if offer.lock_type == TxLockTypes.ABS_LOCK_BLOCKS:
-                self.log.warning('TODO: validate absolute lock values')
+                block_header_from = ci_from.getBlockHeaderAt(bid.created_at)
+                chain_height_at_bid_creation = block_header_from['height']
+                ensure(script_lock_value <= chain_height_at_bid_creation + offer.lock_value + atomic_swap_1.ABS_LOCK_BLOCKS_LEEWAY, 'script lock height too high')
+                ensure(script_lock_value >= chain_height_at_bid_creation + offer.lock_value - atomic_swap_1.ABS_LOCK_BLOCKS_LEEWAY, 'script lock height too low')
             else:
                 ensure(script_lock_value <= bid.created_at + offer.lock_value + atomic_swap_1.INITIATE_TX_TIMEOUT, 'script lock time too high')
                 ensure(script_lock_value >= bid.created_at + offer.lock_value, 'script lock time too low')
