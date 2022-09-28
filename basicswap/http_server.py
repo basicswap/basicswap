@@ -33,20 +33,8 @@ from .basicswap_util import (
     strAddressType,
 )
 from .js_server import (
-    js_coins,
     js_error,
-    js_wallets,
-    js_offers,
-    js_sentoffers,
-    js_bids,
-    js_sentbids,
-    js_network,
-    js_revokeoffer,
-    js_smsgaddresses,
-    js_rates_list,
-    js_rates,
-    js_rate,
-    js_index,
+    js_url_to_function,
 )
 from .ui.util import (
     PAGE_LIMIT,
@@ -665,22 +653,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         if len(url_split) > 1 and url_split[1] == 'json':
             try:
                 self.putHeaders(status_code, 'text/plain')
-                func = js_index
-                if len(url_split) > 2:
-                    func = {
-                        'coins': js_coins,
-                        'wallets': js_wallets,
-                        'offers': js_offers,
-                        'sentoffers': js_sentoffers,
-                        'bids': js_bids,
-                        'sentbids': js_sentbids,
-                        'network': js_network,
-                        'revokeoffer': js_revokeoffer,
-                        'smsgaddresses': js_smsgaddresses,
-                        'rate': js_rate,
-                        'rates': js_rates,
-                        'rateslist': js_rates_list,
-                    }.get(url_split[2], js_index)
+                func = js_url_to_function(url_split)
                 return func(self, url_split, post_string, is_json)
             except Exception as ex:
                 if self.server.swap_client.debug is True:

@@ -389,3 +389,22 @@ def js_rate(self, url_split, post_string, is_json):
 
 def js_index(self, url_split, post_string, is_json):
     return bytes(json.dumps(self.server.swap_client.getSummary()), 'UTF-8')
+
+
+def js_url_to_function(url_split):
+    if len(url_split) > 2:
+        return {
+            'coins': js_coins,
+            'wallets': js_wallets,
+            'offers': js_offers,
+            'sentoffers': js_sentoffers,
+            'bids': js_bids,
+            'sentbids': js_sentbids,
+            'network': js_network,
+            'revokeoffer': js_revokeoffer,
+            'smsgaddresses': js_smsgaddresses,
+            'rate': js_rate,
+            'rates': js_rates,
+            'rateslist': js_rates_list,
+        }.get(url_split[2], js_index)
+    return js_index

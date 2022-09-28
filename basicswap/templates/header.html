@@ -22,31 +22,31 @@
 
 {% if ws_url %}
 <script>
-    var ws = new WebSocket("{{ ws_url }}"),
-        floating_div = document.createElement('div');
-        floating_div.classList.add('floatright');
-        messages = document.createElement('ul');
-        messages.setAttribute('id', 'ul_updates');
-    ws.onmessage = function (event) {
-        let json = JSON.parse(event.data);
+var ws = new WebSocket("{{ ws_url }}"),
+    floating_div = document.createElement('div');
+    floating_div.classList.add('floatright');
+    messages = document.createElement('ul');
+    messages.setAttribute('id', 'ul_updates');
+ws.onmessage = function (event) {
+    let json = JSON.parse(event.data);
 
-        let event_message = 'Unknown event';
-        if (json['event'] == 'new_offer') {
-            event_message = '<a href=/offer/' + json['offer_id'] + '>New offer</a>';
-        } else
-        if (json['event'] == 'new_bid') {
-            event_message = '<a href=/bid/' + json['bid_id'] + '>New bid</a> on offer <a href=/offer/' + json['offer_id'] + '>' + json['offer_id'] + '</a>';
-        } else
-        if (json['event'] == 'bid_accepted') {
-            event_message = '<a href=/bid/' + json['bid_id'] + '>Bid accepted</a>';
-        }
+    let event_message = 'Unknown event';
+    if (json['event'] == 'new_offer') {
+        event_message = '<a href=/offer/' + json['offer_id'] + '>New offer</a>';
+    } else
+    if (json['event'] == 'new_bid') {
+        event_message = '<a href=/bid/' + json['bid_id'] + '>New bid</a> on offer <a href=/offer/' + json['offer_id'] + '>' + json['offer_id'] + '</a>';
+    } else
+    if (json['event'] == 'bid_accepted') {
+        event_message = '<a href=/bid/' + json['bid_id'] + '>Bid accepted</a>';
+    }
 
-        let messages = document.getElementById('ul_updates'),
-            message = document.createElement('li');
-        message.innerHTML = event_message;
-        messages.appendChild(message);
-    };
-    floating_div.appendChild(messages);
-    document.body.appendChild(floating_div);
+    let messages = document.getElementById('ul_updates'),
+        message = document.createElement('li');
+    message.innerHTML = event_message;
+    messages.appendChild(message);
+};
+floating_div.appendChild(messages);
+document.body.appendChild(floating_div);
 </script>
 {% endif %}
