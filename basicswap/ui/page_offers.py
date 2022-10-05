@@ -32,7 +32,6 @@ from basicswap.basicswap_util import (
     strBidState,
     TxLockTypes,
     strOfferState,
-
 )
 from basicswap.chainparams import (
     Coins,
