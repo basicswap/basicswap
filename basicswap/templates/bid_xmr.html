@@ -10,6 +10,9 @@
 {% for m in messages %}
 <p>{{ m }}</p>
 {% endfor %}
+{% for m in err_messages %}
+<p class="error_msg">Error: {{ m }}</p>
+{% endfor %}
 
 <table>
 {% if data.was_sent == 'True' %}
@@ -104,9 +107,13 @@
 <table>
 <tr><td>View Transaction</td><td>
 <select name="view_tx">
+{% if data.txns|length %}
 {% for tx in data.txns %}
 <option value="{{ tx.txid }}"{% if data.view_tx_ind==tx.txid %} selected{% endif %}>{{ tx.type }} {{ tx.txid }}</option>
 {% endfor %}
+{% else %}
+<option value="0">--- None exist yet ---</option>
+{% endif %}
 </select></td></tr>
 </table>
 <input name="view_tx_submit" type="submit" value="View Tx">

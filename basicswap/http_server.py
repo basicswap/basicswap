@@ -354,26 +354,27 @@ class HttpHandler(BaseHTTPRequestHandler):
         swap_client = self.server.swap_client
 
         messages = []
+        err_messages = []
         show_txns = False
         show_offerer_seq_diagram = False
         show_bidder_seq_diagram = False
         show_lock_transfers = False
         edit_bid = False
         view_tx_ind = None
-        form_data = self.checkForm(post_string, 'bid', messages)
+        form_data = self.checkForm(post_string, 'bid', err_messages)
         if form_data:
             if b'abandon_bid' in form_data:
                 try:
                     swap_client.abandonBid(bid_id)
                     messages.append('Bid abandoned')
                 except Exception as ex:
-                    messages.append('Abandon failed ' + str(ex))
+                    err_messages.append('Abandon failed ' + str(ex))
             elif b'accept_bid' in form_data:
                 try:
                     swap_client.acceptBid(bid_id)
                     messages.append('Bid accepted')
                 except Exception as ex:
-                    messages.append('Accept failed ' + str(ex))
+                    err_messages.append('Accept failed ' + str(ex))
             elif b'show_txns' in form_data:
                 show_txns = True
             elif b'show_offerer_seq_diagram' in form_data:
@@ -392,10 +393,13 @@ class HttpHandler(BaseHTTPRequestHandler):
                     swap_client.manualBidUpdate(bid_id, data)
                     messages.append('Bid edited')
                 except Exception as ex:
-                    messages.append('Edit failed ' + str(ex))
+                    err_messages.append('Edit failed ' + str(ex))
             elif b'view_tx_submit' in form_data:
                 show_txns = True
                 view_tx_ind = form_data[b'view_tx'][0].decode('utf-8')
+                if len(view_tx_ind) != 64:
+                    err_messages.append('Invalid transaction selected.')
+                    view_tx_ind = None
             elif b'view_lock_transfers' in form_data:
                 show_txns = True
                 show_lock_transfers = True
@@ -420,6 +424,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         return self.render_template(template, {
             'bid_id': bid_id.hex(),
             'messages': messages,
+            'err_messages': err_messages,
             'data': data,
             'edit_bid': edit_bid,
             'old_states': old_states,
