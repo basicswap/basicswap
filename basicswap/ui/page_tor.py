@@ -16,20 +16,33 @@ def extract_data(bytes_in):
     return str_in[start: end]
 
 
+def get_tor_established_state(swap_client):
+    rv = swap_client.torControl('GETINFO status/circuit-established')
+    return extract_data(rv)
+
+
 def page_tor(self, url_split, post_string):
 
     swap_client = self.server.swap_client
 
     page_data = {}
 
-    rv = swap_client.torControl('GETINFO status/circuit-established')
-    page_data['circuit_established'] = extract_data(rv)
+    try:
+        page_data['circuit_established'] = get_tor_established_state(swap_client)
+    except Exception:
+        page_data['circuit_established'] = 'error'
 
-    rv = swap_client.torControl('GETINFO traffic/read')
-    page_data['bytes_written'] = extract_data(rv)
+    try:
+        rv = swap_client.torControl('GETINFO traffic/read')
+        page_data['bytes_written'] = extract_data(rv)
+    except Exception:
+        page_data['bytes_written'] = 'error'
 
-    rv = swap_client.torControl('GETINFO traffic/written')
-    page_data['bytes_read'] = extract_data(rv)
+    try:
+        rv = swap_client.torControl('GETINFO traffic/written')
+        page_data['bytes_read'] = extract_data(rv)
+    except Exception:
+        page_data['bytes_read'] = 'error'
 
     messages = []
 

@@ -45,7 +45,7 @@ from .ui.page_automation import (
 )
 from .ui.page_bids import page_bids, page_bid
 from .ui.page_offers import page_offers, page_offer, page_newoffer
-from .ui.page_tor import page_tor
+from .ui.page_tor import page_tor, get_tor_established_state
 from .ui.page_wallet import page_wallets, page_wallet
 
 
@@ -107,6 +107,15 @@ class HttpHandler(BaseHTTPRequestHandler):
             args_dict['debug_mode'] = True
         if swap_client.debug_ui:
             args_dict['debug_ui_mode'] = True
+        if swap_client.use_tor_proxy:
+            args_dict['use_tor_proxy'] = True
+            # TODO: Cache value?
+            try:
+                args_dict['tor_established'] = True if get_tor_established_state(swap_client) == '1' else False
+            except Exception:
+                if swap_client.debug:
+                    swap_client.log.error(traceback.format_exc())
+
         return bytes(template.render(
             title=self.server.title,
             h2=self.server.title,

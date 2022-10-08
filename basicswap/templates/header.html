@@ -19,6 +19,9 @@
 {% if debug_ui_mode == true %}
 <p>Debug UI mode: Active</p>
 {% endif %}
+{% if use_tor_proxy == true %}
+<p>Tor mode: Active{% if tor_established == true %}, Connected{% endif %}</p>
+{% endif %}
 
 {% if ws_url %}
 <script>
