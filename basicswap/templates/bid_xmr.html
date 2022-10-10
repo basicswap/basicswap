@@ -272,7 +272,8 @@
                   </thead>
 
                   {% for e in data.events %}
-                  <tr class="bg-white border-t hover:bg-gray-50" <td class="py-4 px-6">{{ e.at | formatts }}</td>
+                  <tr class="bg-white border-t hover:bg-gray-50">
+                    <td class="py-4 px-6">{{ e.at | formatts }}</td>
                     <td>{{ e.desc }}</td>
                   </tr>
                   {% endfor %}
@@ -282,7 +283,6 @@
             </div>
             {% else %}
             {% endif %}
-
 
             <form method="post">
 
