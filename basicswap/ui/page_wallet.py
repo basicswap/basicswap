@@ -61,6 +61,7 @@ def format_wallet_data(ci, w):
 def page_wallets(self, url_split, post_string):
     server = self.server
     swap_client = server.swap_client
+    summary = swap_client.getSummary()
 
     page_data = {}
     messages = []
@@ -153,6 +154,7 @@ def page_wallets(self, url_split, post_string):
     return self.render_template(template, {
         'messages': messages,
         'wallets': wallets_formatted,
+        'summary': summary,
     })
 
 
@@ -161,6 +163,7 @@ def page_wallet(self, url_split, post_string):
     wallet_ticker = url_split[2]
     server = self.server
     swap_client = server.swap_client
+    summary = swap_client.getSummary()
 
     coin_id = getCoinIdFromTicker(wallet_ticker)
 
@@ -240,7 +243,6 @@ def page_wallet(self, url_split, post_string):
                     swap_client.log.error(traceback.format_exc())
 
     swap_client.updateWalletsInfo(only_coin=coin_id, wait_for_complete=True)
-
     wallets = swap_client.getCachedWalletsInfo({'coin_id': coin_id})
     for k in wallets.keys():
         w = wallets[k]
@@ -304,4 +306,5 @@ def page_wallet(self, url_split, post_string):
     return self.render_template(template, {
         'messages': messages,
         'w': wallet_data,
+        'summary': summary,
     })

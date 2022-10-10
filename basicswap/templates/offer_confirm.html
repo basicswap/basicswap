@@ -1,106 +1,743 @@
 {% include 'header.html' %}
+<div class="container mx-auto">
+ <section class="bg-white p-5 mt-5">
+  <div class="flex flex-wrap items-center -m-2">
+   <div class="w-full md:w-1/2 p-2">
+    <ul class="flex flex-wrap items-center gap-x-3 mb-2">
+     <li>
+      <a class="flex font-medium text-xs text-coolGray-500 hover:text-coolGray-700" href="/">
+       <p>Home</p>
+      </a>
+     </li>
+     <li>
+      <svg width="6" height="15" viewBox="0 0 6 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+       <path d="M5.34 0.671999L2.076 14.1H0.732L3.984 0.671999H5.34Z" fill="#BBC3CF"></path>
+      </svg>
+     </li>
+     <li><a class="flex font-medium text-xs text-coolGray-500 hover:text-coolGray-700" href="/newoffer">Place an new Offer</a></li>
+     <li>
+      <svg width="6" height="15" viewBox="0 0 6 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+       <path d="M5.34 0.671999L2.076 14.1H0.732L3.984 0.671999H5.34Z" fill="#BBC3CF"></path>
+      </svg>
+     </li>
+     <li><a class="flex font-medium text-xs text-coolGray-500 hover:text-coolGray-700" href="#">Step 1</a></li>
+     <li>
+      <svg width="6" height="15" viewBox="0 0 6 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+       <path d="M5.34 0.671999L2.076 14.1H0.732L3.984 0.671999H5.34Z" fill="#BBC3CF"></path>
+      </svg>
+     </li>
+     <li><a class="flex font-medium text-xs text-coolGray-500 hover:text-coolGray-700" href="#">Step 2</a></li>
+     <li>
+      <svg width="6" height="15" viewBox="0 0 6 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+       <path d="M5.34 0.671999L2.076 14.1H0.732L3.984 0.671999H5.34Z" fill="#BBC3CF"></path>
+      </svg>
+     </li>
+     <li><a class="flex font-medium text-xs text-coolGray-500 hover:text-coolGray-700" href="#">Confirm</a></li>
+     <li>
+    </ul>
+   </div>
+  </div>
+ </section>
 
-<h3>Confirm New Offer</h3>
-{% for m in messages %}
-<p>{{ m }}</p>
-{% endfor %}
-{% for m in err_messages %}
-<p class="error_msg">Error: {{ m }}</p>
-{% endfor %}
+ <section class="py-4">
+  <div class="container px-4 mx-auto">
+   <div class="relative py-11 px-16 bg-coolGray-900 rounded-md overflow-hidden"> <img class="absolute z-10 left-4 top-4" src="/static/images/elements/dots-red.svg" alt=""> <img class="absolute z-10 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt=""> <img class="absolute h-64 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" src="/static/images/elements/wave-basic.svg" alt="">
+    <div class="relative z-20 flex flex-wrap items-center -m-3">
+     <div class="w-full md:w-1/2 p-3">
+      <h2 class="mb-6 text-4xl font-bold text-white tracking-tighter">Place an new Offer (Confirm)</h2>
+      <p class="font-semibold text-coolGray-200">Place an order on the network order book.</p>
+     </div>
+    </div>
+   </div>
+  </div>
+ </section <section class="bg-white">
+ <div class="pl-6 pr-6 pt-0 pb-0 h-full overflow-hidden bg-white rounded-t-md">
+  <div class="pb-6 border-coolGray-100">
+   <div class="flex flex-wrap items-center justify-between -m-2">
+    <div class="w-full p-2">
 
-<form method="post">
+     {% for m in messages %}
 
-<table>
-<tr><td>Send To</td><td><select name="addr_to_" disabled>
-<option{% if data.addr_to=="-1" %} selected{% endif %} value="-1">-- Public Network --</option>
-{% for a in addrs_to %}
-<option{% if data.addr_to==a[0] %} selected{% endif %} value="{{ a[0] }}">{{ a[0] }} {{ a[1] }}</option>
-{% endfor %}
-</select></td></tr>
-<tr><td>Send From Address</td><td><select name="addr_from_" disabled>
-{% for a in addrs %}
-<option{% if data.addr_from==a[0] %} selected{% endif %} value="{{ a[0] }}">{{ a[0] }} {{ a[1] }}</option>
-{% endfor %}
-<option{% if data.addr_from=="-1" %} selected{% endif %} value="-1">-- New Address --</option>
-</select></td></tr>
+     <section class="py-4">
+      <div class="container px-4 mx-auto">
+       <div class="p-6 bg-green-100 border border-green-200 rounded-md">
+        <div class="flex flex-wrap justify-between items-center -m-2">
+         <div class="flex-1 p-2">
+          <div class="flex flex-wrap -m-1">
+           <div class="w-auto p-1">
+            <svg class="relative top-0.5" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+             <path d="M12.4732 4.80667C12.4112 4.74418 12.3375 4.69458 12.2563 4.66074C12.175 4.62689 12.0879 4.60947 11.9999 4.60947C11.9119 4.60947 11.8247 4.62689 11.7435 4.66074C11.6623 4.69458 11.5885 4.74418 11.5266 4.80667L6.55989 9.78L4.47322 7.68667C4.40887 7.62451 4.33291 7.57563 4.24967 7.54283C4.16644 7.51003 4.07755 7.49394 3.9881 7.49549C3.89865 7.49703 3.81037 7.51619 3.72832 7.55185C3.64627 7.58751 3.57204 7.63898 3.50989 7.70333C3.44773 7.76768 3.39885 7.84364 3.36605 7.92688C3.33324 8.01011 3.31716 8.099 3.31871 8.18845C3.32025 8.2779 3.3394 8.36618 3.37507 8.44823C3.41073 8.53028 3.4622 8.60451 3.52655 8.66667L6.08655 11.2267C6.14853 11.2892 6.22226 11.3387 6.3035 11.3726C6.38474 11.4064 6.47188 11.4239 6.55989 11.4239C6.64789 11.4239 6.73503 11.4064 6.81627 11.3726C6.89751 11.3387 6.97124 11.2892 7.03322 11.2267L12.4732 5.78667C12.5409 5.72424 12.5949 5.64847 12.6318 5.56414C12.6688 5.4798 12.6878 5.38873 12.6878 5.29667C12.6878 5.2046 12.6688 5.11353 12.6318 5.02919C12.5949 4.94486 12.5409 4.86909 12.4732 4.80667Z" fill="#2AD168"></path>
+            </svg>
+           </div>
+           <div class="flex-1 p-1">
+            <h3 class="font-medium text-sm text-green-900">{{ m }}</h3>
+           </div>
+          </div>
+         </div>
+         <div class="w-auto p-2">
+          <a href="#">
+           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M8.94004 8L13.14 3.80667C13.2656 3.68113 13.3361 3.51087 13.3361 3.33333C13.3361 3.1558 13.2656 2.98554 13.14 2.86C13.0145 2.73447 12.8442 2.66394 12.6667 2.66394C12.4892 2.66394 12.3189 2.73447 12.1934 2.86L8.00004 7.06L3.80671 2.86C3.68117 2.73447 3.51091 2.66394 3.33337 2.66394C3.15584 2.66394 2.98558 2.73447 2.86004 2.86C2.7345 2.98554 2.66398 3.1558 2.66398 3.33333C2.66398 3.51087 2.7345 3.68113 2.86004 3.80667L7.06004 8L2.86004 12.1933C2.79756 12.2553 2.74796 12.329 2.71411 12.4103C2.68027 12.4915 2.66284 12.5787 2.66284 12.6667C2.66284 12.7547 2.68027 12.8418 2.71411 12.9231C2.74796 13.0043 2.79756 13.078 2.86004 13.14C2.92202 13.2025 2.99575 13.2521 3.07699 13.2859C3.15823 13.3198 3.24537 13.3372 3.33337 13.3372C3.42138 13.3372 3.50852 13.3198 3.58976 13.2859C3.671 13.2521 3.74473 13.2025 3.80671 13.14L8.00004 8.94L12.1934 13.14C12.2554 13.2025 12.3291 13.2521 12.4103 13.2859C12.4916 13.3198 12.5787 13.3372 12.6667 13.3372C12.7547 13.3372 12.8419 13.3198 12.9231 13.2859C13.0043 13.2521 13.0781 13.2025 13.14 13.14C13.2025 13.078 13.2521 13.0043 13.286 12.9231C13.3198 12.8418 13.3372 12.7547 13.3372 12.6667C13.3372 12.5787 13.3198 12.4915 13.286 12.4103C13.2521 12.329 13.2025 12.2553 13.14 12.1933L8.94004 8Z" fill="#156633"></path>
+           </svg>
+          </a>
+         </div>
+        </div>
+       </div>
+      </div>
+     </section>
 
-<tr class="padded_row"><td class="bold">Coin From</td><td>
-<select name="coin_from_" disabled><option value="-1">-- Select Coin --</option>
-{% for c in coins_from %}
-<option{% if data.coin_from==c[0] %} selected{% endif %} value="{{ c[0] }}">{{ c[1] }}</option>
-{% endfor %}
-</select>
-</td><td>Amount From</td><td><input type="text" name="amt_from" value="{{ data.amt_from }}" readonly></td><td>The amount you will send.</td></tr>
-{% if data.swap_style == 'xmr' %}
-<tr><td>Fee Rate From</td><td><input name="fee_rate_from" value="{{ data.from_fee_override }}" readonly></td><td>Fee Rate Source</td><td>{{ data.from_fee_src }}</td></tr>
-<tr><td>Fee From Confirm Target</td><td><input type="number" name="fee_from_conf" min="1" max="32" value="{{ data.fee_from_conf }}" readonly></td></tr>
-<tr><td>Fee From Increase By</td><td>
-<select name="fee_from_extra_" disabled>
-<option value="0">None</option>
-<option value="10"{% if data.fee_from_extra==10 %} selected{% endif %}>10%</option>
-<option value="50"{% if data.fee_from_extra==50 %} selected{% endif %}>50%</option>
-<option value="100"{% if data.fee_from_extra==100 %} selected{% endif %}>100%</option>
-</select></td></tr>
-<tr><td>Lock Tx Spend Fee</td><td>{{ data.amt_from_lock_spend_tx_fee }} {{ data.tla_from }}</td></tr>
-{% endif %}
+     {% endfor %}
+     {% for m in err_messages %}
 
-<tr class="padded_row"><td class="bold">Coin To</td><td>
-<select name="coin_to_" disabled><option value="-1">-- Select Coin --</option>
-{% for c in coins %}
-<option{% if data.coin_to==c[0] %} selected{% endif %} value="{{ c[0] }}">{{ c[1] }}</option>
-{% endfor %}
-</select>
-</td><td>Amount To</td><td><input type="text" name="amt_to" value="{{ data.amt_to }}" readonly></td><td>The amount you will receive.</td></tr>
-{% if data.swap_style == 'xmr' and coin_to != '6' %}
-<tr><td>Fee Rate To</td><td><input name="fee_rate_to" value="{{ data.to_fee_override }}" readonly></td><td>Fee Rate Source</td><td>{{ data.to_fee_src }}</td></tr>
-<tr><td>Fee To Confirm Target</td><td><input type="number" name="fee_to_conf" min="1" max="32" value="{{ data.fee_to_conf }}" readonly></td></tr>
-<tr><td>Fee To Increase By</td><td>
-<select name="fee_to_extra_" disabled>
-<option value="0">None</option>
-<option value="10"{% if data.fee_to_extra==10 %} selected{% endif %}>10%</option>
-<option value="50"{% if data.fee_to_extra==50 %} selected{% endif %}>50%</option>
-<option value="100"{% if data.fee_to_extra==100 %} selected{% endif %}>100%</option>
-</select></td></tr>
-{% endif %}
-<tr><td>Minimum Bid Amount</td><td><input type="text" id="amt_bid_min" name="amt_bid_min" value="{{ data.amt_bid_min }}" title="Bids with an amount below the minimum bid value will be discarded" readonly></td></tr>
-<tr><td>Rate</td><td><input type="text" id="rate" name="rate" value="{{ data.rate }}" readonly></td></tr>
-<tr><td>Amount Variable</td><td colspan=3><input type="checkbox" id="amt_var" name="amt_var_" value="av" {% if data.amt_var==true %} checked=checked{% endif %} disabled></td></tr>
-<tr><td>Rate Variable</td><td colspan=3><input type="checkbox" id="rate_var" name="rate_var_" value="rv" {% if data.rate_var==true %} checked=checked{% endif %} disabled></td></tr>
+     <section class="py-4">
+      <div class="container px-4 mx-auto">
+       <div class="p-6 bg-red-100 border border-red-200 rounded-md">
+        <div class="flex flex-wrap justify-between items-center -m-2">
+         <div class="flex-1 p-2">
+          <div class="flex flex-wrap -m-1">
+           <div class="w-auto p-1">
+            <svg class="relative top-0.5" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+             <path d="M10.4733 5.52667C10.4114 5.46419 10.3376 5.41459 10.2564 5.38075C10.1751 5.3469 10.088 5.32947 9.99999 5.32947C9.91198 5.32947 9.82485 5.3469 9.74361 5.38075C9.66237 5.41459 9.58863 5.46419 9.52666 5.52667L7.99999 7.06001L6.47333 5.52667C6.34779 5.40114 6.17753 5.33061 5.99999 5.33061C5.82246 5.33061 5.65219 5.40114 5.52666 5.52667C5.40112 5.65221 5.3306 5.82247 5.3306 6.00001C5.3306 6.17754 5.40112 6.3478 5.52666 6.47334L7.05999 8.00001L5.52666 9.52667C5.46417 9.58865 5.41458 9.66238 5.38073 9.74362C5.34689 9.82486 5.32946 9.912 5.32946 10C5.32946 10.088 5.34689 10.1752 5.38073 10.2564C5.41458 10.3376 5.46417 10.4114 5.52666 10.4733C5.58863 10.5358 5.66237 10.5854 5.74361 10.6193C5.82485 10.6531 5.91198 10.6705 5.99999 10.6705C6.088 10.6705 6.17514 10.6531 6.25638 10.6193C6.33762 10.5854 6.41135 10.5358 6.47333 10.4733L7.99999 8.94001L9.52666 10.4733C9.58863 10.5358 9.66237 10.5854 9.74361 10.6193C9.82485 10.6531 9.91198 10.6705 9.99999 10.6705C10.088 10.6705 10.1751 10.6531 10.2564 10.6193C10.3376 10.5854 10.4114 10.5358 10.4733 10.4733C10.5358 10.4114 10.5854 10.3376 10.6193 10.2564C10.6531 10.1752 10.6705 10.088 10.6705 10C10.6705 9.912 10.6531 9.82486 10.6193 9.74362C10.5854 9.66238 10.5358 9.58865 10.4733 9.52667L8.93999 8.00001L10.4733 6.47334C10.5358 6.41137 10.5854 6.33763 10.6193 6.25639C10.6531 6.17515 10.6705 6.08802 10.6705 6.00001C10.6705 5.912 10.6531 5.82486 10.6193 5.74362C10.5854 5.66238 10.5358 5.58865 10.4733 5.52667ZM12.7133 3.28667C12.0983 2.64994 11.3627 2.14206 10.5494 1.79266C9.736 1.44327 8.8612 1.25936 7.976 1.25167C7.0908 1.24398 6.21294 1.41266 5.39363 1.74786C4.57432 2.08307 3.82998 2.57809 3.20403 3.20404C2.57807 3.82999 2.08305 4.57434 1.74785 5.39365C1.41264 6.21296 1.24396 7.09082 1.25166 7.97602C1.25935 8.86121 1.44326 9.73601 1.79265 10.5494C2.14204 11.3627 2.64992 12.0984 3.28666 12.7133C3.90164 13.3501 4.63727 13.858 5.45063 14.2074C6.26399 14.5567 7.13879 14.7407 8.02398 14.7483C8.90918 14.756 9.78704 14.5874 10.6064 14.2522C11.4257 13.9169 12.17 13.4219 12.796 12.796C13.4219 12.17 13.9169 11.4257 14.2521 10.6064C14.5873 9.78706 14.756 8.90919 14.7483 8.024C14.7406 7.1388 14.5567 6.264 14.2073 5.45064C13.8579 4.63728 13.3501 3.90165 12.7133 3.28667ZM11.7733 11.7733C10.9014 12.6463 9.75368 13.1899 8.52585 13.3115C7.29802 13.4332 6.066 13.1254 5.03967 12.4405C4.01335 11.7557 3.25623 10.7361 2.89731 9.55566C2.53838 8.37518 2.59986 7.10677 3.07127 5.96653C3.54267 4.82629 4.39484 3.88477 5.48259 3.30238C6.57033 2.71999 7.82635 2.53276 9.03666 2.77259C10.247 3.01242 11.3367 3.66447 12.1202 4.61765C12.9036 5.57083 13.3324 6.76617 13.3333 8.00001C13.3357 8.70087 13.1991 9.39524 12.9313 10.0429C12.6635 10.6906 12.2699 11.2788 11.7733 11.7733Z" fill="#EF5944"></path>
+            </svg>
+           </div>
+           <div class="flex-1 p-1">
+            <h3 class="font-medium text-sm text-red-900 error_msg">
+             <p class="error_msg">Error: {{ m }}</p>
+            </h3>
+           </div>
+          </div>
+         </div>
+         <div class="w-auto p-2">
+          <a href="#">
+           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M8.94004 8L13.14 3.80667C13.2656 3.68113 13.3361 3.51087 13.3361 3.33333C13.3361 3.1558 13.2656 2.98554 13.14 2.86C13.0145 2.73447 12.8442 2.66394 12.6667 2.66394C12.4892 2.66394 12.3189 2.73447 12.1934 2.86L8.00004 7.06L3.80671 2.86C3.68117 2.73447 3.51091 2.66394 3.33337 2.66394C3.15584 2.66394 2.98558 2.73447 2.86004 2.86C2.7345 2.98554 2.66398 3.1558 2.66398 3.33333C2.66398 3.51087 2.7345 3.68113 2.86004 3.80667L7.06004 8L2.86004 12.1933C2.79756 12.2553 2.74796 12.329 2.71411 12.4103C2.68027 12.4915 2.66284 12.5787 2.66284 12.6667C2.66284 12.7547 2.68027 12.8418 2.71411 12.9231C2.74796 13.0043 2.79756 13.078 2.86004 13.14C2.92202 13.2025 2.99575 13.2521 3.07699 13.2859C3.15823 13.3198 3.24537 13.3372 3.33337 13.3372C3.42138 13.3372 3.50852 13.3198 3.58976 13.2859C3.671 13.2521 3.74473 13.2025 3.80671 13.14L8.00004 8.94L12.1934 13.14C12.2554 13.2025 12.3291 13.2521 12.4103 13.2859C12.4916 13.3198 12.5787 13.3372 12.6667 13.3372C12.7547 13.3372 12.8419 13.3198 12.9231 13.2859C13.0043 13.2521 13.0781 13.2025 13.14 13.14C13.2025 13.078 13.2521 13.0043 13.286 12.9231C13.3198 12.8418 13.3372 12.7547 13.3372 12.6667C13.3372 12.5787 13.3198 12.4915 13.286 12.4103C13.2521 12.329 13.2025 12.2553 13.14 12.1933L8.94004 8Z" fill="#752C21"></path>
+           </svg>
+          </a>
+         </div>
+        </div>
+       </div>
+      </div>
+     </section>
 
-<tr class="padded_row"><td>Offer valid (hrs)</td><td><input type="number" name="validhrs" min="1" max="48" value="{{ data.validhrs }}" readonly></td></tr>
-{% if data.debug_ui == true %}
-<tr><td>Contract locked (mins)</td><td><input type="number" name="lockmins" min="10" max="5000" value="{{ data.lockmins }}" readonly></td>{% if data.swap_style != 'xmr' %}<td colspan=2>Participate txn will be locked for half the time.</td>{% endif %}</tr>
-{% else %}
-<tr><td>Contract locked (hrs)</td><td><input type="number" name="lockhrs" min="1" max="64" value="{{ data.lockhrs }}" readonly></td>{% if data.swap_style != 'xmr' %}<td colspan=2>Participate txn will be locked for half the time.</td>{% endif %}</tr>
-{% endif %}
-<tr><td>Auto Accept Strategy</td><td colspan=3>
-<select name="automation_strat_id_" disabled><option value="-1"{% if data.automation_strat_id==-1 %} selected{% endif %}>-- None --</option>
-{% for a in automation_strategies %}
-<option value="{{ a[0] }}"{% if data.automation_strat_id==a[0] %} selected{% endif %}>{{ a[1] }}</option>
-{% endfor %}
-</select>
-</td></tr>
-</table>
+     {% endfor %}
 
-<input name="submit_offer" type="submit" value="Confirm Offer">
-<input name="step2" type="submit" value="Back">
-<input type="hidden" name="formid" value="{{ form_id }}">
-<input type="hidden" name="addr_to" value="{{ data.addr_to }}">
-<input type="hidden" name="addr_from" value="{{ data.addr_from }}">
-<input type="hidden" name="coin_from" value="{{ data.coin_from }}">
-<input type="hidden" name="fee_from_extra" value="{{ data.fee_from_extra }}">
-<input type="hidden" name="coin_to" value="{{ data.coin_to }}">
-<input type="hidden" name="fee_to_extra" value="{{ data.fee_to_extra }}">
-{% if data.automation_strat_id != -1 %}
-<input type="hidden" name="automation_strat_id" value="{{ data.automation_strat_id }}">
-{% endif %}
-{% if data.amt_var==true %}
-<input type="hidden" name="amt_var" value="av">
-{% endif %}
-{% if data.rate_var==true %}
-<input type="hidden" name="rate_var" value="rv">
-{% endif %}
-</form>
-<script src="static/js/new_offer.js"></script>
+     <form method="post">
+      <div class="py-6 border-b border-coolGray-100">
+       <div class="w-full md:w-10/12">
+        <div class="flex flex-wrap -m-3">
+         <div class="w-full md:w-1/3 p-3">
+          <p class="text-sm text-coolGray-800 font-semibold">Select network</p>
+         </div>
+         <div class="w-full md:flex-1 p-3">
+          <div class="relative">
+           <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"> </path>
+           </svg>
+           <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
+            <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
+             <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3b82f6" stroke-linejoin="round" class="nc-icon-wrapper">
+              <line data-cap="butt" x1="7.6" y1="10.5" x2="16.4" y2="5.5" stroke="#3b82f6"></line>
+              <line data-cap="butt" x1="7.6" y1="13.5" x2="16.4" y2="18.5" stroke="#3b82f6"></line>
+              <circle cx="5" cy="12" r="3"></circle>
+              <circle cx="19" cy="4" r="3"></circle>
+              <circle cx="19" cy="20" r="3"></circle>
+             </g>
+            </svg>
+           </div>
+           <select class="pl-10 appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" name="addr_to" disabled>
+            <option{% if data.addr_to=="-1" %} selected{% endif %} value="-1">Public Network</option>
+             {% for a in addrs_to %}
+             <option{% if data.addr_to==a[0] %} selected{% endif %} value="{{ a[0] }}" class="">{{ a[0] }} {{ a[1] }}</option>
+              {% endfor %}
+           </select>
+          </div>
+         </div>
+        </div>
+       </div>
+      </div>
 
-</body></html>
+      <div class="py-6 border-b border-coolGray-100">
+       <div class="w-full md:w-10/12">
+        <div class="flex flex-wrap -m-3">
+         <div class="w-full md:w-1/3 p-3">
+          <p class="text-sm text-coolGray-800 font-semibold">Select address</p>
+         </div>
+         <div class="w-full md:flex-1 p-3">
+          <div class="relative">
+           <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"> </path>
+           </svg>
+           <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
+            <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
+             <title>contacts 2</title>
+             <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3b82f6" stroke-linejoin="round" class="nc-icon-wrapper">
+              <path data-cap="butt" d="M11.992,11.737,14.2,13.4A2,2,0,0,1,15,15v1H7V15a2,2,0,0,1,.8-1.6l2.208-1.663" stroke="#3b82f6"></path>
+              <rect x="9" y="7" width="4" height="5" rx="2" ry="2" stroke="#3b82f6"></rect>
+              <path d="M2,1H18a2,2,0,0,1,2,2V21a2,2,0,0,1-2,2H2Z"></path>
+              <line x1="23" y1="5" x2="23" y2="9" stroke="#3b82f6"></line>
+             </g>
+            </svg>
+           </div>
+           <select class="pl-10 appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" name="addr_from" disabled>
+            {% for a in addrs %}
+            <option{% if data.addr_from==a[0] %} selected{% endif %} value="{{ a[0] }}">{{ a[0] }} {{ a[1] }}</option>
+             {% endfor %}
+             <option{% if data.addr_from=="-1" %} selected{% endif %} value="-1">New Address</option>
+           </select>
+          </div>
+         </div>
+        </div>
+       </div>
+      </div>
+
+      <div class="py-6 border-b border-coolGray-100">
+       <div class="w-full md:w-10/12">
+        <div class="flex flex-wrap -m-3">
+         <div class="w-full md:w-1/3 p-3">
+          <p class="text-sm text-coolGray-800 font-semibold">Coins from</p>
+         </div>
+         <div class="w-full md:flex-1 p-3">
+          <div class="flex flex-wrap -m-3">
+           <div class="w-full md:w-1/2 p-3">
+            <p class="mb-1.5 font-medium text-base text-coolGray-800">Coin From</p>
+            <div class="relative">
+             <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"> </path>
+             </svg>
+             <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
+              <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
+               <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3b82f6" stroke-linejoin="round" class="nc-icon-wrapper">
+                <circle cx="12" cy="12" r="5" stroke="#3b82f6" data-cap="butt"></circle>
+                <polygon points="5 6 2 4 5 2 5 6" fill="#3b82f6" stroke="none"></polygon>
+                <polygon points="19 18 22 20 19 22 19 18" fill="#3b82f6" stroke="none"></polygon>
+                <polygon points="5 6 2 4 5 2 5 6"></polygon>
+                <line x1="5" y1="4" x2="9" y2="4"></line>
+                <polygon points="19 18 22 20 19 22 19 18"></polygon>
+                <line x1="19" y1="20" x2="15" y2="20"></line>
+               </g>
+              </svg>
+             </div>
+             <select class="pl-10 appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" id="coin_from" name="coin_from" onchange="set_rate('coin_from');" disabled>
+              <option value="-1">Coin From</option>
+              {% for c in coins_from %}
+              <option{% if data.coin_from==c[0] %} selected{% endif %} value="{{ c[0] }}">{{ c[1] }}</option>
+               {% endfor %}
+             </select>
+            </div>
+           </div>
+           <div class="w-full md:w-1/2 p-3">
+            <p class="mb-1.5 font-medium text-base text-coolGray-800">Amount From (The amount you will send)</p>
+            <div class="relative">
+             <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
+              <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
+               <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3b82f6" stroke-linejoin="round" class="nc-icon-wrapper">
+                <path d="M15.6,13.873a2.273,2.273,0,0,1-.825,1.833,4.1,4.1,0,0,1-2.31.829v1.47h-.982V16.563a7.95,7.95,0,0,1-3.07-.617V14.053a8.328,8.328,0,0,0,1.5.545,8.019,8.019,0,0,0,1.568.28V12.654L11,12.468a5.357,5.357,0,0,1-2.012-1.216A2.332,2.332,0,0,1,8.4,9.627a2.123,2.123,0,0,1,.814-1.71,4.143,4.143,0,0,1,2.27-.812v-1.1h.982V7.074a8.126,8.126,0,0,1,2.97.66l-.674,1.678a7.768,7.768,0,0,0-2.3-.559v2.116a11.073,11.073,0,0,1,1.991.932,2.733,2.733,0,0,1,.867.868A2.146,2.146,0,0,1,15.6,13.873ZM10.558,9.627a.678.678,0,0,0,.219.52,2.569,2.569,0,0,0,.707.42V8.881Q10.559,9.017,10.558,9.627Zm2.884,4.354a.646.646,0,0,0-.244-.509,3.173,3.173,0,0,0-.732-.431v1.786Q13.441,14.662,13.442,13.981Z" stroke="none" fill="#3b82f6"></path>
+                <polyline points="5.346 7.929 6.932 2.237 1.135 2.966"></polyline>
+                <path data-cap="butt" d="M11.789,23A11,11,0,0,1,6.932,2.237"></path>
+                <polyline points="18.654 16.071 17.068 21.763 22.865 21.034"></polyline>
+                <path data-cap="butt" d="M12.211,1a11,11,0,0,1,4.857,20.763"></path>
+               </g>
+              </svg>
+             </div>
+             <input class="pl-10 appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none block w-full p-2.5 opacity-70" type="text" id="amt_from" name="amt_from" value="{{ data.amt_from }}" onchange="set_rate('amt_from');" readonly>
+            </div>
+           </div>
+
+           {% if data.swap_style == 'xmr' %}
+
+           <div class="w-full md:w-1/2 p-3">
+            <p class="mb-1.5 font-medium text-base text-coolGray-800">Fee From Confirm Target</p>
+            <div class="relative">
+             <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
+              <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
+               <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3b82f6" stroke-linejoin="round" class="nc-icon-wrapper">
+                <path d="M15.6,13.873a2.273,2.273,0,0,1-.825,1.833,4.1,4.1,0,0,1-2.31.829v1.47h-.982V16.563a7.95,7.95,0,0,1-3.07-.617V14.053a8.328,8.328,0,0,0,1.5.545,8.019,8.019,0,0,0,1.568.28V12.654L11,12.468a5.357,5.357,0,0,1-2.012-1.216A2.332,2.332,0,0,1,8.4,9.627a2.123,2.123,0,0,1,.814-1.71,4.143,4.143,0,0,1,2.27-.812v-1.1h.982V7.074a8.126,8.126,0,0,1,2.97.66l-.674,1.678a7.768,7.768,0,0,0-2.3-.559v2.116a11.073,11.073,0,0,1,1.991.932,2.733,2.733,0,0,1,.867.868A2.146,2.146,0,0,1,15.6,13.873ZM10.558,9.627a.678.678,0,0,0,.219.52,2.569,2.569,0,0,0,.707.42V8.881Q10.559,9.017,10.558,9.627Zm2.884,4.354a.646.646,0,0,0-.244-.509,3.173,3.173,0,0,0-.732-.431v1.786Q13.441,14.662,13.442,13.981Z" stroke="none" fill="#3b82f6"></path>
+                <polyline points="5.346 7.929 6.932 2.237 1.135 2.966"></polyline>
+                <path data-cap="butt" d="M11.789,23A11,11,0,0,1,6.932,2.237"></path>
+                <polyline points="18.654 16.071 17.068 21.763 22.865 21.034"></polyline>
+                <path data-cap="butt" d="M12.211,1a11,11,0,0,1,4.857,20.763"></path>
+               </g>
+              </svg>
+             </div>
+             <input class="pl-10 appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none block w-full p-2.5 opacity-70" type="number" name="fee_from_conf" min="1" max="32" value="{{ data.fee_from_conf }}" readonly>
+            </div>
+           </div>
+
+           <div class="w-full md:w-1/2 p-3">
+            <p class="mb-1.5 font-medium text-base text-coolGray-800">Fee Rate From</p>
+            <div class="relative">
+             <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
+              <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
+               <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3b82f6" stroke-linejoin="round" class="nc-icon-wrapper">
+                <path d="M15.6,13.873a2.273,2.273,0,0,1-.825,1.833,4.1,4.1,0,0,1-2.31.829v1.47h-.982V16.563a7.95,7.95,0,0,1-3.07-.617V14.053a8.328,8.328,0,0,0,1.5.545,8.019,8.019,0,0,0,1.568.28V12.654L11,12.468a5.357,5.357,0,0,1-2.012-1.216A2.332,2.332,0,0,1,8.4,9.627a2.123,2.123,0,0,1,.814-1.71,4.143,4.143,0,0,1,2.27-.812v-1.1h.982V7.074a8.126,8.126,0,0,1,2.97.66l-.674,1.678a7.768,7.768,0,0,0-2.3-.559v2.116a11.073,11.073,0,0,1,1.991.932,2.733,2.733,0,0,1,.867.868A2.146,2.146,0,0,1,15.6,13.873ZM10.558,9.627a.678.678,0,0,0,.219.52,2.569,2.569,0,0,0,.707.42V8.881Q10.559,9.017,10.558,9.627Zm2.884,4.354a.646.646,0,0,0-.244-.509,3.173,3.173,0,0,0-.732-.431v1.786Q13.441,14.662,13.442,13.981Z" stroke="none" fill="#3b82f6"></path>
+                <polyline points="5.346 7.929 6.932 2.237 1.135 2.966"></polyline>
+                <path data-cap="butt" d="M11.789,23A11,11,0,0,1,6.932,2.237"></path>
+                <polyline points="18.654 16.071 17.068 21.763 22.865 21.034"></polyline>
+                <path data-cap="butt" d="M12.211,1a11,11,0,0,1,4.857,20.763"></path>
+               </g>
+              </svg>
+             </div>
+             <input class="pl-10 appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none block w-full p-2.5 opacity-70" name="fee_rate_from" value="{{ data.from_fee_override }}" readonly>
+            </div>
+            Fee Rate Source: {{ data.from_fee_src }}
+           </div>
+
+           <div class="w-full md:w-1/2 p-3">
+            <p class="mb-1.5 font-medium text-base text-coolGray-800">Fee From Increase By</p>
+            <div class="relative">
+             <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"> </path>
+             </svg>
+             <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
+              <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
+               <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3b82f6" stroke-linejoin="round" class="nc-icon-wrapper">
+                <path d="M15.6,13.873a2.273,2.273,0,0,1-.825,1.833,4.1,4.1,0,0,1-2.31.829v1.47h-.982V16.563a7.95,7.95,0,0,1-3.07-.617V14.053a8.328,8.328,0,0,0,1.5.545,8.019,8.019,0,0,0,1.568.28V12.654L11,12.468a5.357,5.357,0,0,1-2.012-1.216A2.332,2.332,0,0,1,8.4,9.627a2.123,2.123,0,0,1,.814-1.71,4.143,4.143,0,0,1,2.27-.812v-1.1h.982V7.074a8.126,8.126,0,0,1,2.97.66l-.674,1.678a7.768,7.768,0,0,0-2.3-.559v2.116a11.073,11.073,0,0,1,1.991.932,2.733,2.733,0,0,1,.867.868A2.146,2.146,0,0,1,15.6,13.873ZM10.558,9.627a.678.678,0,0,0,.219.52,2.569,2.569,0,0,0,.707.42V8.881Q10.559,9.017,10.558,9.627Zm2.884,4.354a.646.646,0,0,0-.244-.509,3.173,3.173,0,0,0-.732-.431v1.786Q13.441,14.662,13.442,13.981Z" stroke="none" fill="#3b82f6"></path>
+                <polyline points="5.346 7.929 6.932 2.237 1.135 2.966"></polyline>
+                <path data-cap="butt" d="M11.789,23A11,11,0,0,1,6.932,2.237"></path>
+                <polyline points="18.654 16.071 17.068 21.763 22.865 21.034"></polyline>
+                <path data-cap="butt" d="M12.211,1a11,11,0,0,1,4.857,20.763"></path>
+               </g>
+              </svg>
+             </div>
+             <select class="pl-10 appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" name="fee_from_extra_" disabled>
+              <option value="0">None</option>
+              <option value="10" {% if data.fee_from_extra==10 %} selected{% endif %}>10%</option>
+              <option value="50" {% if data.fee_from_extra==50 %} selected{% endif %}>50%</option>
+              <option value="100" {% if data.fee_from_extra==100 %} selected{% endif %}>100%</option>
+             </select>
+            </div>
+            Lock Tx Spend Fee: {{ data.amt_from_lock_spend_tx_fee }} {{ data.tla_from }}
+           </div>
+
+           {% endif %}
+
+          </div>
+         </div>
+        </div>
+       </div>
+      </div>
+
+      <div class="py-6 border-b border-coolGray-100">
+       <div class="w-full md:w-10/12">
+        <div class="flex flex-wrap -m-3">
+         <div class="w-full md:w-1/3 p-3">
+          <p class="text-sm text-coolGray-800 font-semibold">Coins to</p>
+         </div>
+         <div class="w-full md:flex-1 p-3">
+          <div class="flex flex-wrap -m-3">
+
+           <div class="w-full md:w-1/2 p-3">
+            <p class="mb-1.5 font-medium text-base text-coolGray-800">Coin To</p>
+            <div class="relative">
+             <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"> </path>
+             </svg>
+             <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
+              <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
+               <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3b82f6" stroke-linejoin="round" class="nc-icon-wrapper">
+                <circle cx="12" cy="12" r="5" stroke="#3b82f6" data-cap="butt"></circle>
+                <polygon points="5 6 2 4 5 2 5 6" fill="#3b82f6" stroke="none"></polygon>
+                <polygon points="19 18 22 20 19 22 19 18" fill="#3b82f6" stroke="none"></polygon>
+                <polygon points="5 6 2 4 5 2 5 6"></polygon>
+                <line x1="5" y1="4" x2="9" y2="4"></line>
+                <polygon points="19 18 22 20 19 22 19 18"></polygon>
+                <line x1="19" y1="20" x2="15" y2="20"></line>
+               </g>
+              </svg>
+             </div>
+             <select class="pl-10 appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" id="coin_to" name="coin_to" onchange="set_rate('coin_to');" disabled>
+              <option value="-1">Coin To</option>
+              {% for c in coins %}
+              <option{% if data.coin_to==c[0] %} selected{% endif %} value="{{ c[0] }}">{{ c[1] }}</option>
+               {% endfor %}
+             </select>
+            </div>
+           </div>
+           <div class="w-full md:w-1/2 p-3">
+            <p class="mb-1.5 font-medium text-base text-coolGray-800">Amount to (The amount you will receive)</p>
+            <div class="relative">
+             <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
+              <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
+               <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3b82f6" stroke-linejoin="round" class="nc-icon-wrapper">
+                <path d="M15.6,13.873a2.273,2.273,0,0,1-.825,1.833,4.1,4.1,0,0,1-2.31.829v1.47h-.982V16.563a7.95,7.95,0,0,1-3.07-.617V14.053a8.328,8.328,0,0,0,1.5.545,8.019,8.019,0,0,0,1.568.28V12.654L11,12.468a5.357,5.357,0,0,1-2.012-1.216A2.332,2.332,0,0,1,8.4,9.627a2.123,2.123,0,0,1,.814-1.71,4.143,4.143,0,0,1,2.27-.812v-1.1h.982V7.074a8.126,8.126,0,0,1,2.97.66l-.674,1.678a7.768,7.768,0,0,0-2.3-.559v2.116a11.073,11.073,0,0,1,1.991.932,2.733,2.733,0,0,1,.867.868A2.146,2.146,0,0,1,15.6,13.873ZM10.558,9.627a.678.678,0,0,0,.219.52,2.569,2.569,0,0,0,.707.42V8.881Q10.559,9.017,10.558,9.627Zm2.884,4.354a.646.646,0,0,0-.244-.509,3.173,3.173,0,0,0-.732-.431v1.786Q13.441,14.662,13.442,13.981Z" stroke="none" fill="#3b82f6"></path>
+                <polyline points="5.346 7.929 6.932 2.237 1.135 2.966"></polyline>
+                <path data-cap="butt" d="M11.789,23A11,11,0,0,1,6.932,2.237"></path>
+                <polyline points="18.654 16.071 17.068 21.763 22.865 21.034"></polyline>
+                <path data-cap="butt" d="M12.211,1a11,11,0,0,1,4.857,20.763"></path>
+               </g>
+              </svg>
+             </div>
+             <input class="pl-10 pl-10 appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none block w-full p-2.5 opacity-70" type="text" id="amt_to" name="amt_to" value="{{ data.amt_to }}" onchange="set_rate('amt_to');" readonly>
+            </div>
+           </div>
+
+           {% if data.swap_style == 'xmr' %}
+
+           <div class="w-full md:w-1/2 p-3">
+            <p class="mb-1.5 font-medium text-base text-coolGray-800">Fee To Confirm Target</p>
+            <div class="relative">
+             <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
+              <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
+               <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3b82f6" stroke-linejoin="round" class="nc-icon-wrapper">
+                <path d="M15.6,13.873a2.273,2.273,0,0,1-.825,1.833,4.1,4.1,0,0,1-2.31.829v1.47h-.982V16.563a7.95,7.95,0,0,1-3.07-.617V14.053a8.328,8.328,0,0,0,1.5.545,8.019,8.019,0,0,0,1.568.28V12.654L11,12.468a5.357,5.357,0,0,1-2.012-1.216A2.332,2.332,0,0,1,8.4,9.627a2.123,2.123,0,0,1,.814-1.71,4.143,4.143,0,0,1,2.27-.812v-1.1h.982V7.074a8.126,8.126,0,0,1,2.97.66l-.674,1.678a7.768,7.768,0,0,0-2.3-.559v2.116a11.073,11.073,0,0,1,1.991.932,2.733,2.733,0,0,1,.867.868A2.146,2.146,0,0,1,15.6,13.873ZM10.558,9.627a.678.678,0,0,0,.219.52,2.569,2.569,0,0,0,.707.42V8.881Q10.559,9.017,10.558,9.627Zm2.884,4.354a.646.646,0,0,0-.244-.509,3.173,3.173,0,0,0-.732-.431v1.786Q13.441,14.662,13.442,13.981Z" stroke="none" fill="#3b82f6"></path>
+                <polyline points="5.346 7.929 6.932 2.237 1.135 2.966"></polyline>
+                <path data-cap="butt" d="M11.789,23A11,11,0,0,1,6.932,2.237"></path>
+                <polyline points="18.654 16.071 17.068 21.763 22.865 21.034"></polyline>
+                <path data-cap="butt" d="M12.211,1a11,11,0,0,1,4.857,20.763"></path>
+               </g>
+              </svg>
+             </div>
+             <input class="pl-10 appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none block w-full p-2.5 opacity-70" type="number" name="fee_to_conf" min="1" max="32" value="{{ data.fee_to_conf }}" readonly>
+            </div>
+           </div>
+
+           <div class="w-full md:w-1/2 p-3">
+            <p class="mb-1.5 font-medium text-base text-coolGray-800">Fee Rate To</p>
+            <div class="relative">
+             <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
+              <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
+               <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3b82f6" stroke-linejoin="round" class="nc-icon-wrapper">
+                <path d="M15.6,13.873a2.273,2.273,0,0,1-.825,1.833,4.1,4.1,0,0,1-2.31.829v1.47h-.982V16.563a7.95,7.95,0,0,1-3.07-.617V14.053a8.328,8.328,0,0,0,1.5.545,8.019,8.019,0,0,0,1.568.28V12.654L11,12.468a5.357,5.357,0,0,1-2.012-1.216A2.332,2.332,0,0,1,8.4,9.627a2.123,2.123,0,0,1,.814-1.71,4.143,4.143,0,0,1,2.27-.812v-1.1h.982V7.074a8.126,8.126,0,0,1,2.97.66l-.674,1.678a7.768,7.768,0,0,0-2.3-.559v2.116a11.073,11.073,0,0,1,1.991.932,2.733,2.733,0,0,1,.867.868A2.146,2.146,0,0,1,15.6,13.873ZM10.558,9.627a.678.678,0,0,0,.219.52,2.569,2.569,0,0,0,.707.42V8.881Q10.559,9.017,10.558,9.627Zm2.884,4.354a.646.646,0,0,0-.244-.509,3.173,3.173,0,0,0-.732-.431v1.786Q13.441,14.662,13.442,13.981Z" stroke="none" fill="#3b82f6"></path>
+                <polyline points="5.346 7.929 6.932 2.237 1.135 2.966"></polyline>
+                <path data-cap="butt" d="M11.789,23A11,11,0,0,1,6.932,2.237"></path>
+                <polyline points="18.654 16.071 17.068 21.763 22.865 21.034"></polyline>
+                <path data-cap="butt" d="M12.211,1a11,11,0,0,1,4.857,20.763"></path>
+               </g>
+              </svg>
+             </div>
+             <input class="pl-10 appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none block w-full p-2.5 opacity-70" name="fee_rate_to" value="{{ data.to_fee_override }}" readonly>
+            </div>
+            Fee Rate Source: {{ data.to_fee_src }}
+           </div>
+
+           <div class="w-full md:w-1/2 p-3">
+            <p class="mb-1.5 font-medium text-base text-coolGray-800">Fee To Increase By</p>
+            <div class="relative">
+             <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"> </path>
+             </svg>
+             <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
+              <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
+               <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3b82f6" stroke-linejoin="round" class="nc-icon-wrapper">
+                <path d="M15.6,13.873a2.273,2.273,0,0,1-.825,1.833,4.1,4.1,0,0,1-2.31.829v1.47h-.982V16.563a7.95,7.95,0,0,1-3.07-.617V14.053a8.328,8.328,0,0,0,1.5.545,8.019,8.019,0,0,0,1.568.28V12.654L11,12.468a5.357,5.357,0,0,1-2.012-1.216A2.332,2.332,0,0,1,8.4,9.627a2.123,2.123,0,0,1,.814-1.71,4.143,4.143,0,0,1,2.27-.812v-1.1h.982V7.074a8.126,8.126,0,0,1,2.97.66l-.674,1.678a7.768,7.768,0,0,0-2.3-.559v2.116a11.073,11.073,0,0,1,1.991.932,2.733,2.733,0,0,1,.867.868A2.146,2.146,0,0,1,15.6,13.873ZM10.558,9.627a.678.678,0,0,0,.219.52,2.569,2.569,0,0,0,.707.42V8.881Q10.559,9.017,10.558,9.627Zm2.884,4.354a.646.646,0,0,0-.244-.509,3.173,3.173,0,0,0-.732-.431v1.786Q13.441,14.662,13.442,13.981Z" stroke="none" fill="#3b82f6"></path>
+                <polyline points="5.346 7.929 6.932 2.237 1.135 2.966"></polyline>
+                <path data-cap="butt" d="M11.789,23A11,11,0,0,1,6.932,2.237"></path>
+                <polyline points="18.654 16.071 17.068 21.763 22.865 21.034"></polyline>
+                <path data-cap="butt" d="M12.211,1a11,11,0,0,1,4.857,20.763"></path>
+               </g>
+              </svg>
+             </div>
+             <select class="pl-10 appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" name="fee_to_extra_" disabled>
+              <option value="0">None</option>
+              <option value="10" {% if data.fee_from_extra==10 %} selected{% endif %}>10%</option>
+              <option value="50" {% if data.fee_from_extra==50 %} selected{% endif %}>50%</option>
+              <option value="100" {% if data.fee_from_extra==100 %} selected{% endif %}>100%</option>
+             </select>
+            </div>
+           </div>
+
+           {% endif %}
+
+           {% if data.swap_style == 'xmr' and coin_to != '6' %}
+
+           <div class="w-full md:w-1/2 p-3">
+            <p class="mb-1.5 font-medium text-base text-coolGray-800">Fee To Confirm Target</p>
+            <div class="relative">
+             <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
+              <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
+               <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3b82f6" stroke-linejoin="round" class="nc-icon-wrapper">
+                <path d="M15.6,13.873a2.273,2.273,0,0,1-.825,1.833,4.1,4.1,0,0,1-2.31.829v1.47h-.982V16.563a7.95,7.95,0,0,1-3.07-.617V14.053a8.328,8.328,0,0,0,1.5.545,8.019,8.019,0,0,0,1.568.28V12.654L11,12.468a5.357,5.357,0,0,1-2.012-1.216A2.332,2.332,0,0,1,8.4,9.627a2.123,2.123,0,0,1,.814-1.71,4.143,4.143,0,0,1,2.27-.812v-1.1h.982V7.074a8.126,8.126,0,0,1,2.97.66l-.674,1.678a7.768,7.768,0,0,0-2.3-.559v2.116a11.073,11.073,0,0,1,1.991.932,2.733,2.733,0,0,1,.867.868A2.146,2.146,0,0,1,15.6,13.873ZM10.558,9.627a.678.678,0,0,0,.219.52,2.569,2.569,0,0,0,.707.42V8.881Q10.559,9.017,10.558,9.627Zm2.884,4.354a.646.646,0,0,0-.244-.509,3.173,3.173,0,0,0-.732-.431v1.786Q13.441,14.662,13.442,13.981Z" stroke="none" fill="#3b82f6"></path>
+                <polyline points="5.346 7.929 6.932 2.237 1.135 2.966"></polyline>
+                <path data-cap="butt" d="M11.789,23A11,11,0,0,1,6.932,2.237"></path>
+                <polyline points="18.654 16.071 17.068 21.763 22.865 21.034"></polyline>
+                <path data-cap="butt" d="M12.211,1a11,11,0,0,1,4.857,20.763"></path>
+               </g>
+              </svg>
+             </div>
+             <input class="pl-10 appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none block w-full p-2.5 opacity-70" type="number" name="fee_to_conf" min="1" max="32" value="{{ data.fee_from_conf }}" readonly>
+            </div>
+           </div>
+
+           <div class="w-full md:w-1/2 p-3">
+            <p class="mb-1.5 font-medium text-base text-coolGray-800">Fee To Increase By</p>
+            <div class="relative">
+             <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"> </path>
+             </svg>
+             <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
+              <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
+               <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3b82f6" stroke-linejoin="round" class="nc-icon-wrapper">
+                <path d="M15.6,13.873a2.273,2.273,0,0,1-.825,1.833,4.1,4.1,0,0,1-2.31.829v1.47h-.982V16.563a7.95,7.95,0,0,1-3.07-.617V14.053a8.328,8.328,0,0,0,1.5.545,8.019,8.019,0,0,0,1.568.28V12.654L11,12.468a5.357,5.357,0,0,1-2.012-1.216A2.332,2.332,0,0,1,8.4,9.627a2.123,2.123,0,0,1,.814-1.71,4.143,4.143,0,0,1,2.27-.812v-1.1h.982V7.074a8.126,8.126,0,0,1,2.97.66l-.674,1.678a7.768,7.768,0,0,0-2.3-.559v2.116a11.073,11.073,0,0,1,1.991.932,2.733,2.733,0,0,1,.867.868A2.146,2.146,0,0,1,15.6,13.873ZM10.558,9.627a.678.678,0,0,0,.219.52,2.569,2.569,0,0,0,.707.42V8.881Q10.559,9.017,10.558,9.627Zm2.884,4.354a.646.646,0,0,0-.244-.509,3.173,3.173,0,0,0-.732-.431v1.786Q13.441,14.662,13.442,13.981Z" stroke="none" fill="#3b82f6"></path>
+                <polyline points="5.346 7.929 6.932 2.237 1.135 2.966"></polyline>
+                <path data-cap="butt" d="M11.789,23A11,11,0,0,1,6.932,2.237"></path>
+                <polyline points="18.654 16.071 17.068 21.763 22.865 21.034"></polyline>
+                <path data-cap="butt" d="M12.211,1a11,11,0,0,1,4.857,20.763"></path>
+               </g>
+              </svg>
+             </div>
+             <select class="pl-10 appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" name="fee_to_extra" disabled>
+              <option value="0">None</option>
+              <option value="10" {% if data.fee_from_extra==10 %} selected{% endif %}>10%</option>
+              <option value="50" {% if data.fee_from_extra==50 %} selected{% endif %}>50%</option>
+              <option value="100" {% if data.fee_from_extra==100 %} selected{% endif %}>100%</option>
+             </select>
+            </div>
+           </div>
+           {% endif %}
+
+          </div>
+         </div>
+        </div>
+       </div>
+      </div>
+
+      <div class="py-6 border-b border-coolGray-100">
+       <div class="w-full md:w-10/12">
+        <div class="flex flex-wrap -m-3">
+         <div class="w-full md:w-1/3 p-3">
+          <p class="text-sm text-coolGray-800 font-semibold">Bid amount</p>
+         </div>
+         <div class="w-full md:flex-1 p-3">
+          <div class="flex flex-wrap -m-3">
+
+           <div class="w-full md:w-1/2 p-3">
+            <p class="mb-1.5 font-medium text-base text-coolGray-800">Minimum Bid Amount</p>
+            <div class="relative">
+             <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
+              <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
+               <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3b82f6" stroke-linejoin="round" class="nc-icon-wrapper">
+                <rect x="9.843" y="5.379" transform="matrix(0.7071 -0.7071 0.7071 0.7071 -0.7635 13.1569)" width="11.314" height="4.243"></rect>
+                <polyline points="3,23 3,19 15,19 15,23 "></polyline>
+                <line x1="4" y1="15" x2="1" y2="15" stroke="#3b82f6"></line>
+                <line x1="5.757" y1="10.757" x2="3.636" y2="8.636" stroke="#3b82f6"></line>
+                <line x1="1" y1="23" x2="17" y2="23"></line>
+                <line x1="17" y1="9" x2="23" y2="15"></line>
+               </g>
+              </svg>
+             </div>
+             <input class="pl-10 appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none block w-full p-2.5 opacity-70" type="text" id="amt_bid_min" name="amt_bid_min" value="{{ data.amt_bid_min }}" title="Bids with an amount below the minimum bid value will be discarded" readonly>
+            </div>
+           </div>
+           <div class="w-full md:w-1/2 p-3">
+            <p class="mb-1.5 font-medium text-base text-coolGray-800">Rate</p>
+            <div class="relative">
+             <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
+              <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
+               <g fill="#3b82f6" class="nc-icon-wrapper">
+                <path d="M9,9h5L7,0,0,9H5V23a1,1,0,0,0,1,1H8a1,1,0,0,0,1-1Z" fill="#3b82f6"></path>
+                <path d="M14,17a3,3,0,1,1,3-3A3,3,0,0,1,14,17Zm0-4a1,1,0,1,0,1,1A1,1,0,0,0,14,13Z" data-color="color-2"></path>
+                <path d="M21,24a3,3,0,1,1,3-3A3,3,0,0,1,21,24Zm0-4a1,1,0,1,0,1,1A1,1,0,0,0,21,20Z" data-color="color-2"></path>
+                <path d="M13,23a1,1,0,0,1-.707-1.707l9-9a1,1,0,0,1,1.414,1.414l-9,9A1,1,0,0,1,13,23Z" data-color="color-2"></path>
+               </g>
+              </svg>
+             </div>
+             <input class="pl-10 appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none block w-full p-2.5 opacity-70" type="text" id="rate" name="rate" value="{{ data.rate }}" onchange="set_rate('rate');" readonly>
+            </div>
+           </div>
+          </div>
+         </div>
+        </div>
+       </div>
+      </div>
+
+      <div class="py-6 border-b border-coolGray-100">
+       <div class="w-full md:w-10/12">
+        <div class="flex flex-wrap -m-3">
+         <div class="w-full md:w-1/3 p-3">
+          <p class="text-sm text-coolGray-800 font-semibold">Time</p>
+         </div>
+         <div class="w-full md:flex-1 p-3">
+          <div class="flex flex-wrap -m-3">
+
+           <div class="w-full md:w-1/2 p-3">
+            <p class="mb-1.5 font-medium text-base text-coolGray-800">Offer valid (hrs)</p>
+            <div class="relative">
+             <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
+              <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
+               <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3b82f6" stroke-linejoin="round" class="nc-icon-wrapper">
+                <path d="M15.6,13.873a2.273,2.273,0,0,1-.825,1.833,4.1,4.1,0,0,1-2.31.829v1.47h-.982V16.563a7.95,7.95,0,0,1-3.07-.617V14.053a8.328,8.328,0,0,0,1.5.545,8.019,8.019,0,0,0,1.568.28V12.654L11,12.468a5.357,5.357,0,0,1-2.012-1.216A2.332,2.332,0,0,1,8.4,9.627a2.123,2.123,0,0,1,.814-1.71,4.143,4.143,0,0,1,2.27-.812v-1.1h.982V7.074a8.126,8.126,0,0,1,2.97.66l-.674,1.678a7.768,7.768,0,0,0-2.3-.559v2.116a11.073,11.073,0,0,1,1.991.932,2.733,2.733,0,0,1,.867.868A2.146,2.146,0,0,1,15.6,13.873ZM10.558,9.627a.678.678,0,0,0,.219.52,2.569,2.569,0,0,0,.707.42V8.881Q10.559,9.017,10.558,9.627Zm2.884,4.354a.646.646,0,0,0-.244-.509,3.173,3.173,0,0,0-.732-.431v1.786Q13.441,14.662,13.442,13.981Z" stroke="none" fill="#3b82f6"></path>
+                <polyline points="5.346 7.929 6.932 2.237 1.135 2.966"></polyline>
+                <path data-cap="butt" d="M11.789,23A11,11,0,0,1,6.932,2.237"></path>
+                <polyline points="18.654 16.071 17.068 21.763 22.865 21.034"></polyline>
+                <path data-cap="butt" d="M12.211,1a11,11,0,0,1,4.857,20.763"></path>
+               </g>
+              </svg>
+             </div>
+             <input class="pl-10 appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none block w-full p-2.5 opacity-70" type="number" name="validhrs" min="1" max="48" value="{{ data.validhrs }}" readonly>
+            </div>
+           </div>
+
+           {% if data.debug_ui == true %}
+
+           <div class="w-full md:w-1/2 p-3">
+            <p class="mb-1.5 font-medium text-base text-coolGray-800">Contract Locked (Mins)</p>
+            <div class="relative">
+             <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
+              <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
+               <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3b82f6" stroke-linejoin="round" class="nc-icon-wrapper">
+                <path d="M15.6,13.873a2.273,2.273,0,0,1-.825,1.833,4.1,4.1,0,0,1-2.31.829v1.47h-.982V16.563a7.95,7.95,0,0,1-3.07-.617V14.053a8.328,8.328,0,0,0,1.5.545,8.019,8.019,0,0,0,1.568.28V12.654L11,12.468a5.357,5.357,0,0,1-2.012-1.216A2.332,2.332,0,0,1,8.4,9.627a2.123,2.123,0,0,1,.814-1.71,4.143,4.143,0,0,1,2.27-.812v-1.1h.982V7.074a8.126,8.126,0,0,1,2.97.66l-.674,1.678a7.768,7.768,0,0,0-2.3-.559v2.116a11.073,11.073,0,0,1,1.991.932,2.733,2.733,0,0,1,.867.868A2.146,2.146,0,0,1,15.6,13.873ZM10.558,9.627a.678.678,0,0,0,.219.52,2.569,2.569,0,0,0,.707.42V8.881Q10.559,9.017,10.558,9.627Zm2.884,4.354a.646.646,0,0,0-.244-.509,3.173,3.173,0,0,0-.732-.431v1.786Q13.441,14.662,13.442,13.981Z" stroke="none" fill="#3b82f6"></path>
+                <polyline points="5.346 7.929 6.932 2.237 1.135 2.966"></polyline>
+                <path data-cap="butt" d="M11.789,23A11,11,0,0,1,6.932,2.237"></path>
+                <polyline points="18.654 16.071 17.068 21.763 22.865 21.034"></polyline>
+                <path data-cap="butt" d="M12.211,1a11,11,0,0,1,4.857,20.763"></path>
+               </g>
+              </svg>
+             </div>
+             <input class="pl-10 appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none block w-full p-2.5 opacity-70" type="number" name="lockmins" min="10" max="5000" value="{{ data.lockmins }}" readonly>
+            </div>
+            {% if data.swap_style != 'xmr' %}
+            <div class="text-sm text-gray-500 mt-1.5">(Participate txn will be locked for half the time.)</div>
+            {% endif %}
+           </div>
+
+           {% else %}
+
+           <div class="w-full md:w-1/2 p-3">
+            <p class="mb-1.5 font-medium text-base text-coolGray-800">Contract locked (Hours)</p>
+            <div class="relative">
+             <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
+              <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
+               <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3b82f6" stroke-linejoin="round" class="nc-icon-wrapper">
+                <path d="M15.6,13.873a2.273,2.273,0,0,1-.825,1.833,4.1,4.1,0,0,1-2.31.829v1.47h-.982V16.563a7.95,7.95,0,0,1-3.07-.617V14.053a8.328,8.328,0,0,0,1.5.545,8.019,8.019,0,0,0,1.568.28V12.654L11,12.468a5.357,5.357,0,0,1-2.012-1.216A2.332,2.332,0,0,1,8.4,9.627a2.123,2.123,0,0,1,.814-1.71,4.143,4.143,0,0,1,2.27-.812v-1.1h.982V7.074a8.126,8.126,0,0,1,2.97.66l-.674,1.678a7.768,7.768,0,0,0-2.3-.559v2.116a11.073,11.073,0,0,1,1.991.932,2.733,2.733,0,0,1,.867.868A2.146,2.146,0,0,1,15.6,13.873ZM10.558,9.627a.678.678,0,0,0,.219.52,2.569,2.569,0,0,0,.707.42V8.881Q10.559,9.017,10.558,9.627Zm2.884,4.354a.646.646,0,0,0-.244-.509,3.173,3.173,0,0,0-.732-.431v1.786Q13.441,14.662,13.442,13.981Z" stroke="none" fill="#3b82f6"></path>
+                <polyline points="5.346 7.929 6.932 2.237 1.135 2.966"></polyline>
+                <path data-cap="butt" d="M11.789,23A11,11,0,0,1,6.932,2.237"></path>
+                <polyline points="18.654 16.071 17.068 21.763 22.865 21.034"></polyline>
+                <path data-cap="butt" d="M12.211,1a11,11,0,0,1,4.857,20.763"></path>
+               </g>
+              </svg>
+             </div>
+
+             <input class="pl-10 appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none block w-full p-2.5 opacity-70" type="number" name="lockhrs" min="1" max="96" value="{{ data.lockhrs }}" readonly>
+
+            </div>
+            {% if data.swap_style != 'xmr' %}
+            <div class="text-sm text-gray-500 mt-1.5">(Participate txn will be locked for half the time.)</div>
+            {% endif %}
+           </div>
+
+           {% endif %}
+
+          </div>
+         </div>
+        </div>
+       </div>
+      </div>
+
+      <div class="py-6 border-b border-coolGray-100">
+       <div class="w-full md:w-10/12">
+        <div class="flex flex-wrap -m-3">
+         <div class="w-full md:w-1/3 p-3">
+          <p class="text-sm text-coolGray-800 font-semibold">Strategy (BETA)</p>
+         </div>
+         <div class="w-full md:flex-1 p-3">
+          <div class="flex flex-wrap -m-3">
+
+           <div class="w-full md:w-1/2 p-3">
+            <p class="mb-1.5 font-medium text-base text-coolGray-800">Auto Accept Strategy</p>
+            <div class="relative">
+             <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"> </path>
+             </svg>
+             <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
+              <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
+               <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3b82f6" stroke-linejoin="round" class="nc-icon-wrapper">
+                <circle cx="12" cy="12" r="5" stroke="#3b82f6" data-cap="butt"></circle>
+                <polygon points="5 6 2 4 5 2 5 6" fill="#3b82f6" stroke="none"></polygon>
+                <polygon points="19 18 22 20 19 22 19 18" fill="#3b82f6" stroke="none"></polygon>
+                <polygon points="5 6 2 4 5 2 5 6"></polygon>
+                <line x1="5" y1="4" x2="9" y2="4"></line>
+                <polygon points="19 18 22 20 19 22 19 18"></polygon>
+                <line x1="19" y1="20" x2="15" y2="20"></line>
+               </g>
+              </svg>
+             </div>
+             <select class="pl-10 appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" name="automation_strat_id" disabled>
+              <option value="-1" {% if data.automation_strat_id==-1 %} selected{% endif %}>None</option>
+              {% for a in automation_strategies %}
+              <option value="{{ a[0] }}" {% if data.automation_strat_id==a[0] %} selected{% endif %}>{{ a[1] }}</option>
+              {% endfor %}
+             </select>
+            </div>
+           </div>
+
+          </div>
+         </div>
+        </div>
+       </div>
+      </div>
+
+      <div class="py-6 border-coolGray-100">
+       <div class="w-full md:w-10/12">
+        <div class="flex flex-wrap -m-3">
+         <div class="w-full md:w-1/3 p-3">
+          <p class="text-sm text-coolGray-800 font-semibold">Options</p>
+         </div>
+         <div class="w-full md:flex-1 p-3">
+          <div class="form-check form-check-inline">
+           <input class="form-check-input h-4 w-4 border border-gray-300 rounded-sm bg-gray-50 checked:bg-blue-600 checked:border-blue-600 focus:outline-none transition duration-200 mt-1 align-top bg-no-repeat bg-center bg-contain float-left mr-2 cursor-pointer" type="checkbox" id="amt_var" name="amt_var" value="av" {% if data.amt_var==true %} checked="checked" {% endif %} disabled>
+           <label class="form-check-label inline-block text-gray-800" for="inlineCheckbox2">Amount Variable</label>
+          </div>
+          <div class="form-check form-check-inline">
+           <input class="form-check-input h-4 w-4 border border-gray-300 rounded-sm bg-gray-50 checked:bg-blue-600 checked:border-blue-600 focus:outline-none transition duration-200 mt-1 align-top bg-no-repeat bg-center bg-contain float-left mr-2 cursor-pointer" type="checkbox" id="rate_var" name="rate_var" value="rv" {% if data.rate_var==true %} checked="checked" {% endif %} disabled>
+           <label class="form-check-label bg-gray-50inline-block text-gray-800" for="inlineCheckbox3">Rate Variable</label>
+          </div>
+         </div>
+        </div>
+       </div>
+      </div>
+
+      <div class="p-6 pt-10 bg-white bg-opacity-60 rounded-b-md">
+       <div class="w-full md:w-0/12">
+        <div class="flex flex-wrap justify-end -m-1.5">
+         <div class="w-full md:w-auto p-1.5">
+          <button name="step2" type="submit" value="Back" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none">
+           <svg class="mr-2" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
+            <g fill="#556987">
+             <path fill="#556987" d="M12,3c1.989,0,3.873,0.65,5.43,1.833l-3.604,3.393l9.167,0.983L22.562,0l-3.655,3.442 C16.957,1.862,14.545,1,12,1C5.935,1,1,5.935,1,12h2C3,7.037,7.037,3,12,3z"></path>
+             <path data-color="#556987" d="M12,21c-1.989,0-3.873-0.65-5.43-1.833l3.604-3.393l-9.167-0.983L1.438,24l3.655-3.442 C7.043,22.138,9.455,23,12,23c6.065,0,11-4.935,11-11h-2C21,16.963,16.963,21,12,21z"></path>
+            </g>
+           </svg> <span>Back</span> </button>
+         </div>
+
+         <div class="w-full md:w-auto p-1.5">
+          <button name="submit_offer" value="Continue" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+           <svg class="mr-2" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
+            <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round">
+             <circle cx="12" cy="12" r="11"></circle>
+             <polyline points="11 8 15 12 11 16" stroke="#ffffff"></polyline>
+            </g>
+           </svg> <span>Confirm Offer</span> </button>
+         </div>
+        </div>
+       </div>
+      </div>
+
+      <input type="hidden" name="formid" value="{{ form_id }}">
+      <input type="hidden" name="addr_to" value="{{ data.addr_to }}">
+      <input type="hidden" name="addr_from" value="{{ data.addr_from }}">
+      <input type="hidden" name="coin_from" value="{{ data.coin_from }}">
+      <input type="hidden" name="fee_from_extra" value="{{ data.fee_from_extra }}">
+      <input type="hidden" name="coin_to" value="{{ data.coin_to }}">
+      <input type="hidden" name="fee_to_extra" value="{{ data.fee_to_extra }}">
+      {% if data.automation_strat_id != -1 %}
+      <input type="hidden" name="automation_strat_id" value="{{ data.automation_strat_id }}">
+      {% endif %}
+      {% if data.amt_var==true %}
+      <input type="hidden" name="amt_var" value="av">
+      {% endif %}
+      {% if data.rate_var==true %}
+      <input type="hidden" name="rate_var" value="rv">
+      {% endif %}
+     </form>
+
+     <script src="static/js/new_offer.js"></script>
+    </div>
+   </div>
+  </div>
+ </div>
+</div>
+{% include 'footer.html' %}
+
+</body>
+
+</html>

@@ -5,6 +5,7 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import json
+import random
 import urllib.parse
 
 from .util import (
@@ -13,6 +14,7 @@ from .util import (
 from .basicswap_util import (
     strBidState,
     SwapTypes,
+    NotificationTypes as NT,
 )
 from .chainparams import (
     Coins,
@@ -406,5 +408,20 @@ def js_url_to_function(url_split):
             'rate': js_rate,
             'rates': js_rates,
             'rateslist': js_rates_list,
+            'generatenotification': js_generatenotification,
         }.get(url_split[2], js_index)
     return js_index
+
+def js_generatenotification(self, url_split, post_string, is_json):
+    swap_client = self.server.swap_client
+    r = random.randint(0, 3)
+    if r == 0:
+        swap_client.notify(NT.OFFER_RECEIVED, {'offer_id': random.randbytes(28).hex()})
+    elif r == 1:
+        swap_client.notify(NT.BID_RECEIVED, {'type': 'atomic', 'bid_id': random.randbytes(28).hex(), 'offer_id': random.randbytes(28).hex()})
+    elif r == 2:
+        swap_client.notify(NT.BID_ACCEPTED, {'bid_id': random.randbytes(28).hex()})
+    elif r == 3:
+        swap_client.notify(NT.BID_RECEIVED, {'type': 'xmr', 'bid_id': random.randbytes(28).hex(), 'offer_id': random.randbytes(28).hex()})
+
+    return bytes(json.dumps({'type': r}), 'UTF-8')

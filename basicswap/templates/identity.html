@@ -1,38 +1,184 @@
 {% include 'header.html' %}
 
-<h3>Identity {{ data.identity_address }}</h3>
+<div class="container mx-auto">
+  <section class="bg-white p-5 mt-5">
+    <div class="flex flex-wrap items-center -m-2">
+      <div class="w-full md:w-1/2 p-2">
+        <ul class="flex flex-wrap items-center gap-x-3 mb-2">
+          <li>
+            <a class="flex font-medium text-xs text-coolGray-500 hover:text-coolGray-700" href="/">
+              <p>Home</p>
+            </a>
+          </li>
+          <li>
+            <svg width="6" height="15" viewBox="0 0 6 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M5.34 0.671999L2.076 14.1H0.732L3.984 0.671999H5.34Z" fill="#BBC3CF"></path>
+            </svg>
+          </li>
+          <li><a class="flex font-medium text-xs text-coolGray-500 hover:text-coolGray-700" href="#">Identity</a></li>
+          <li>
+            <svg width="6" height="15" viewBox="0 0 6 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M5.34 0.671999L2.076 14.1H0.732L3.984 0.671999H5.34Z" fill="#BBC3CF"></path>
+            </svg>
+          </li>
+          <li><a class="flex font-medium text-xs text-coolGray-500 hover:text-coolGray-700" href="/identity/{{ data.identity_address }}">ADDRESS: {{ data.identity_address }}</a></li>
+        </ul>
+      </div>
+    </div>
+  </section>
 
-{% for m in messages %}
-<p>{{ m }}</p>
-{% endfor %}
+  <section class="py-4">
+    <div class="container px-4 mx-auto">
+      <div class="relative py-11 px-16 bg-coolGray-900 rounded-md overflow-hidden">
+        <img class="absolute z-10 left-4 top-4" src="/static/images/elements/dots-red.svg" alt="">
+        <img class="absolute z-10 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt="">
+        <img class="absolute h-64 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" src="/static/images/elements/wave.svg" alt="">
+        <div class="relative z-20 flex flex-wrap items-center -m-3">
+          <div class="w-full md:w-1/2 p-3">
+            <h2 class="mb-6 text-4xl font-bold text-white tracking-tighter">Identity</h2>
+            <p class="font-semibold text-coolGray-200">Address: {{ data.identity_address }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
 
-<form method="post">
+  {% for m in messages %}
 
-<table>
+  <section class="py-4">
+    <div class="container px-4 mx-auto">
+      <div class="p-6 bg-green-100 border border-green-200 rounded-md">
+        <div class="flex flex-wrap justify-between items-center -m-2">
+          <div class="flex-1 p-2">
+            <div class="flex flex-wrap -m-1">
+              <div class="w-auto p-1">
+                <svg class="relative top-0.5" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12.4732 4.80667C12.4112 4.74418 12.3375 4.69458 12.2563 4.66074C12.175 4.62689 12.0879 4.60947 11.9999 4.60947C11.9119 4.60947 11.8247 4.62689 11.7435 4.66074C11.6623 4.69458 11.5885 4.74418 11.5266 4.80667L6.55989 9.78L4.47322 7.68667C4.40887 7.62451 4.33291 7.57563 4.24967 7.54283C4.16644 7.51003 4.07755 7.49394 3.9881 7.49549C3.89865 7.49703 3.81037 7.51619 3.72832 7.55185C3.64627 7.58751 3.57204 7.63898 3.50989 7.70333C3.44773 7.76768 3.39885 7.84364 3.36605 7.92688C3.33324 8.01011 3.31716 8.099 3.31871 8.18845C3.32025 8.2779 3.3394 8.36618 3.37507 8.44823C3.41073 8.53028 3.4622 8.60451 3.52655 8.66667L6.08655 11.2267C6.14853 11.2892 6.22226 11.3387 6.3035 11.3726C6.38474 11.4064 6.47188 11.4239 6.55989 11.4239C6.64789 11.4239 6.73503 11.4064 6.81627 11.3726C6.89751 11.3387 6.97124 11.2892 7.03322 11.2267L12.4732 5.78667C12.5409 5.72424 12.5949 5.64847 12.6318 5.56414C12.6688 5.4798 12.6878 5.38873 12.6878 5.29667C12.6878 5.2046 12.6688 5.11353 12.6318 5.02919C12.5949 4.94486 12.5409 4.86909 12.4732 4.80667Z" fill="#2AD168"></path>
+                </svg>
+              </div>
+              <div class="flex-1 p-1">
+                <h3 class="font-medium text-sm text-green-900">{{ m }}</h3>
+              </div>
+            </div>
+          </div>
+          <div class="w-auto p-2">
+            <a href="#">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M8.94004 8L13.14 3.80667C13.2656 3.68113 13.3361 3.51087 13.3361 3.33333C13.3361 3.1558 13.2656 2.98554 13.14 2.86C13.0145 2.73447 12.8442 2.66394 12.6667 2.66394C12.4892 2.66394 12.3189 2.73447 12.1934 2.86L8.00004 7.06L3.80671 2.86C3.68117 2.73447 3.51091 2.66394 3.33337 2.66394C3.15584 2.66394 2.98558 2.73447 2.86004 2.86C2.7345 2.98554 2.66398 3.1558 2.66398 3.33333C2.66398 3.51087 2.7345 3.68113 2.86004 3.80667L7.06004 8L2.86004 12.1933C2.79756 12.2553 2.74796 12.329 2.71411 12.4103C2.68027 12.4915 2.66284 12.5787 2.66284 12.6667C2.66284 12.7547 2.68027 12.8418 2.71411 12.9231C2.74796 13.0043 2.79756 13.078 2.86004 13.14C2.92202 13.2025 2.99575 13.2521 3.07699 13.2859C3.15823 13.3198 3.24537 13.3372 3.33337 13.3372C3.42138 13.3372 3.50852 13.3198 3.58976 13.2859C3.671 13.2521 3.74473 13.2025 3.80671 13.14L8.00004 8.94L12.1934 13.14C12.2554 13.2025 12.3291 13.2521 12.4103 13.2859C12.4916 13.3198 12.5787 13.3372 12.6667 13.3372C12.7547 13.3372 12.8419 13.3198 12.9231 13.2859C13.0043 13.2521 13.0781 13.2025 13.14 13.14C13.2025 13.078 13.2521 13.0043 13.286 12.9231C13.3198 12.8418 13.3372 12.7547 13.3372 12.6667C13.3372 12.5787 13.3198 12.4915 13.286 12.4103C13.2521 12.329 13.2025 12.2553 13.14 12.1933L8.94004 8Z" fill="#156633"></path>
+              </svg>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
 
-{% if data.show_edit_form %}
-<tr><td>Label</td><td><input type="text" id="label" name="label" value="{{ data.label }}"></td></tr>
-{% else %}
-<tr><td>Label</td><td>{{ data.label }}</td></tr>
-{% endif %}
+  {% endfor %}
 
-<tr><td>Successful Sent Bids</td><td>{{ data.num_sent_bids_successful }}</td></tr>
-<tr><td>Successful Received Bids</td><td>{{ data.num_recv_bids_successful }}</td></tr>
-<tr><td>Rejected Sent Bids</td><td>{{ data.num_sent_bids_rejected }}</td></tr>
-<tr><td>Rejected Received Bids</td><td>{{ data.num_recv_bids_rejected }}</td></tr>
-<tr><td>Failed Sent Bids</td><td>{{ data.num_sent_bids_failed }}</td></tr>
-<tr><td>Failed Received Bids</td><td>{{ data.num_recv_bids_failed }}</td></tr>
-</table>
+  <section class="bg-white">
+    <div class="pl-6 pr-6 pt-0 pb-0 mt-5 h-full overflow-hidden bg-white ">
+      <div class="pb-6 border-coolGray-100">
+        <div class="flex flex-wrap items-center justify-between -m-2">
+          <div class="w-full pt-2">
 
-{% if data.show_edit_form %}
-<input type="submit" name="apply" value="Apply">
-<input type="submit" name="cancel" value="Cancel">
-{% else %}
-<input type="submit" name="edit" value="Edit">
-{% endif %}
+            <div class="container px-0 mx-auto mt-5">
+              <div class="overflow-x-auto relative border sm:rounded-lg">
 
-<input type="hidden" name="formid" value="{{ form_id }}">
-</form>
+                <form method="post">
 
-<p><a href="/">home</a></p>
-</body></html>
+                  <table class="w-full text-sm text-left text-gray-500 outline-none border-gray-300">
+
+                    <thead class="text-xs text-gray-700 border-b uppercase bg-gray-50 outline-none border-gray-300">
+                      <tr>
+                        <th scope="col" class="py-3 px-6">Item</th>
+                        <th scope="col">Data </th>
+                      </tr>
+                    </thead>
+
+                    {% if data.show_edit_form %}
+                    <tr>
+                      <td class="py-4 px-6 bold">Label</td>
+                      <td class="py-4"><input class="appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block p-2.5" type="text" id="label" name="label" value="{{ data.label }}"></td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                      <td class="py-4 px-6 bold">Label</td>
+                      <td class="py-4">{{ data.label }}</td>
+                    </tr>
+                    {% endif %}
+
+                    <tr class="bg-white border-t hover:bg-gray-50">
+                      <td class="py-4 px-6 bold w-96">Successful Sent Bids</td>
+                      <td>{{ data.num_sent_bids_successful }}</td>
+                    </tr>
+                    <tr class="bg-white border-t hover:bg-gray-50">
+                      <td class="py-4 px-6 bold">Successful Received Bids</td>
+                      <td>{{ data.num_recv_bids_successful }}</td>
+                    </tr>
+                    <tr class="bg-white border-t hover:bg-gray-50">
+                      <td class="py-4 px-6 bold">Rejected Sent Bids</td>
+                      <td>{{ data.num_sent_bids_rejected }}</td>
+                    </tr>
+                    <tr class="bg-white border-t hover:bg-gray-50">
+                      <td class="py-4 px-6 bold">Rejected Received Bids</td>
+                      <td>{{ data.num_recv_bids_rejected }}</td>
+                    </tr>
+                    <tr class="bg-white border-t hover:bg-gray-50">
+                      <td class="py-4 px-6 bold">Failed Sent Bids</td>
+                      <td>{{ data.num_sent_bids_failed }}</td>
+                    </tr>
+                    <tr class="bg-white border-t hover:bg-gray-50">
+                      <td class="py-4 px-6 bold">Failed Received Bids</td>
+                      <td>{{ data.num_recv_bids_failed }}</td>
+                    </tr>
+
+                  </table>
+              </div>
+            </div>
+
+            <div class="p-6 pt-10 bg-white bg-opacity-60 rounded-b-md">
+              <div class="w-full md:w-0/12">
+                <div class="flex flex-wrap justify-end -m-1.5">
+
+                  {% if data.show_edit_form  %}
+
+                  <div class="w-full md:w-auto p-1.5 ml-2">
+                    <button name="apply" value="Apply" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+                      <span>Apply</span> </button>
+                  </div>
+
+                  <div class="w-full md:w-auto p-1.5 ml-2">
+                    <button name="cancel" value="Cancel" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none">
+                      <span>Cancel</span> </button>
+                  </div>
+
+                  {% else %}
+                  <div class="w-full md:w-auto p-1.5 ml-2">
+                    <button name="edit" value="edit" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+                      <span>Edit</span> </button>
+                  </div>
+
+                  {% endif %}
+
+                </div>
+              </div>
+            </div>
+
+            <input type="hidden" name="formid" value="{{ form_id }}">
+
+            </form>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </section>
+
+
+</div>
+{% include 'footer.html' %}
+</div>
+</body>
+
+</html>

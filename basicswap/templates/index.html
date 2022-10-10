@@ -1,32 +1,40 @@
 {% include 'header.html' %}
-
-<p>
-{% if refresh %}
-Page Refresh: {{ refresh }} seconds<br/>
-{% endif %}
-Version: {{ version }}
-</p>
-<p>
-<a href="/wallets">View Wallets</a><br/>
-<a href="/settings">Settings</a><br/>
-<a href="/rpc">RPC Console</a><br/>
-<a href="/explorers">Explorers</a><br/>
-<a href="/smsgaddresses">SMSG Addresses</a><br/>
-<br/>
-<a href="/active">Swaps in Progress: {{ summary.num_swapping }}</a><br/>
-<a href="/offers">Network Offers: {{ summary.num_network_offers }}</a><br/>
-<a href="/sentoffers">Sent Offers: {{ summary.num_sent_offers }}</a><br/>
-<a href="/availablebids">Available Bids: {{ summary.num_available_bids }}</a><br/>
-<a href="/bids">Received Bids: {{ summary.num_recv_bids }}</a><br/>
-<a href="/sentbids">Sent Bids: {{ summary.num_sent_bids }}</a><br/>
-<a href="/watched">Watched Outputs: {{ summary.num_watched_outputs }}</a><br/>
-<a href="/automation">Automation Strategies</a><br/>
-{% if use_tor_proxy %} <a href="/tor">TOR Information</a><br/> {% endif %}
-</p>
-
-<p><a href="/newoffer">New Offer</a></p>
-
-<p><a href="/shutdown/{{ shutdown_token }}">Shutdown</a></p>
-
+<div class="container mx-auto">
+	<section class="py-24 bg-white">
+		<div class="container px-4 mx-auto">
+			<div class="text-center">
+				<div class="inline-block mb-6 px-3 py-1 font-semibold bg-blue-100 rounded-full">
+					<div class="flex flex-wrap items-center-m-1">
+						<div class="w-auto p-1"><a class="text-sm" href="">BasicSwap version: {{ version }}</a></div>
+					</div>
+				</div>
+				<h3 class="mb-10 mx-auto text-3xl md:text-4xl leading-tight text-coolGray-900 font-bold tracking-tighter max-w-5xl">Welcome to BasicSwap DEX</h3>
+				<div class="relative mb-10 mx-auto max-w-max">
+					<img class="absolute top-1/2 transform -translate-y-1/2 w-1/2 md:w-auto text-yellow-400" src="/static/images/elements/circle-violet.svg" alt="">
+					<img class="absolute top-1/2 right-0 transform -translate-y-1/2 w-1/4 md:w-auto text-blue-500" src="/static/images/elements/dots-blue.svg" alt="">
+					<img class="absolute p-7 -mt-1 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-10/12 z-20" src="/static/images/gfx/dashboard.png" alt="">
+					<img class="relative z-10" src="/static/images/gfx/macbook.png" alt=""> 
+				</div>
+				<p class="mb-6 mx-auto text-lg md:text-xl text-coolGray-500 font-medium max-w-4xl">Swap cryptocurrencies in a distributed trading environment with <b>no restrictions</b> and <b>no fees.</b></p>
+				<div class="p-6 pt-10 bg-white bg-opacity-60 rounded-b-md">
+					<div class="w-full md:w-0/12">
+						<div class="flex flex-wrap justify-center -m-1.5">
+							<div class="w-full md:w-auto py-1 md:py-0 md:mr-6">
+								<button name="" value="Apply" type="submit" class="text-center justify-center md:text-lg w-full md:text-lg flex flex-wrap py-4 px-4 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none"> <span>Top your Wallets</span> </button>
+							</div>
+							<div class="w-full md:w-auto py-1 md:py-0 md:mr-6">
+								<button name="" value="Apply" type="submit" class="text-center justify-center md:text-lg w-full md:text-lg flex flex-wrap py-4 px-4 text-coolGray-800 font-medium text-sm bg-white hover:bg-coolGray-100 border border-coolGray-200 rounded-md shadow-button focus:ring-0 focus:outline-none"> <span>Start Trading</span> </button>
+							</div>
+							<div class="w-full md:w-auto py-1 md:py-0 md:mr-6">
+								<button name="" value="Apply" type="submit" class="text-center justify-center md:text-lg w-full md:text-lg flex flex-wrap py-4 px-4 text-coolGray-800 font-medium text-sm bg-white hover:bg-coolGray-100 border border-coolGray-200 rounded-md shadow-button focus:ring-0 focus:outline-none"> <span>Help (Wiki)</span> </button>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</section>
+</div>
+{% include 'footer.html' %}
 </body>
 </html>

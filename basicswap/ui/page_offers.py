@@ -267,6 +267,7 @@ def postNewOffer(swap_client, form_data):
 def page_newoffer(self, url_split, post_string):
     server = self.server
     swap_client = server.swap_client
+    summary = swap_client.getSummary()
 
     messages = []
     err_messages = []
@@ -330,6 +331,7 @@ def page_newoffer(self, url_split, post_string):
         'addrs_to': swap_client.listSmsgAddresses('offer_send_to'),
         'data': page_data,
         'automation_strategies': automation_strategies,
+        'summary': summary,
     })
 
 
@@ -342,6 +344,7 @@ def page_offer(self, url_split, post_string):
         raise ValueError('Bad offer ID')
     server = self.server
     swap_client = server.swap_client
+    summary = swap_client.getSummary()
     offer, xmr_offer = swap_client.getXmrOffer(offer_id)
     ensure(offer, 'Unknown offer ID')
 
@@ -488,12 +491,14 @@ def page_offer(self, url_split, post_string):
         'data': data,
         'bids': formatted_bids,
         'addrs': None if show_bid_form is None else swap_client.listSmsgAddresses('bid'),
+        'summary': summary,
     })
 
 
 def page_offers(self, url_split, post_string, sent=False):
     server = self.server
     swap_client = server.swap_client
+    summary = swap_client.getSummary()
 
     filters = {
         'coin_from': -1,
@@ -552,10 +557,13 @@ def page_offers(self, url_split, post_string, sent=False):
 
     template = server.env.get_template('offers.html')
     return self.render_template(template, {
+        'page_type': 'Sent Offers' if sent else 'Network Offers',
+        'page_type_description': 'Sent Offers description' if sent else 'Network Offers description',
         'messages': messages,
         'coins_from': coins_from,
         'coins': coins_to,
         'messages': messages,
         'filters': filters,
         'offers': formatted_offers,
+        'summary': summary,
     })

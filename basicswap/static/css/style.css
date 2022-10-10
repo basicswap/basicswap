@@ -1,0 +1,35 @@
+
+.padded_row td
+{
+  padding-top:1.5em;
+}
+
+.bold
+{
+  font-weight:bold;
+}
+
+.monospace
+{
+  font-family:monospace;
+}
+
+.floatright
+{
+  position:fixed;
+  top:50px;
+  right:18px;
+  margin: 0;
+  width:calc(33.33% - 25px);
+  z-index: 50;
+}
+
+.error
+{
+  border: 1px solid red;
+}
+
+.error_msg
+{
+  color:red;
+}

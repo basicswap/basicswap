@@ -37,6 +37,7 @@ def page_bid(self, url_split, post_string):
         raise ValueError('Bad bid ID')
     server = self.server
     swap_client = server.swap_client
+    summary = swap_client.getSummary()
 
     messages = []
     err_messages = []
@@ -113,12 +114,14 @@ def page_bid(self, url_split, post_string):
         'data': data,
         'edit_bid': edit_bid,
         'old_states': old_states,
+        'summary': summary,
     })
 
 
-def page_bids(self, url_split, post_string, sent=False, available=False):
+def page_bids(self, url_split, post_string, sent=False, available=False, received=False):
     server = self.server
     swap_client = server.swap_client
+    summary = swap_client.getSummary()
 
     filters = {
         'page_no': 1,
@@ -165,10 +168,16 @@ def page_bids(self, url_split, post_string, sent=False, available=False):
 
     template = server.env.get_template('bids.html')
     return self.render_template(template, {
-        'page_type': 'Sent' if sent else 'Received',
+        'page_type_sent': 'Sent' if sent else '',
+        'page_type_available': 'Available' if available else '',
+        'page_type_received': 'Received' if received else '',
+        'page_type_sent_description': 'Sent description' if sent else '',
+        'page_type_available_description': 'Available description' if available else '',
+        'page_type_received_description': 'Received description' if received else '',
         'messages': messages,
         'filters': filters,
         'data': page_data,
+        'summary': summary,
         'bids': [(format_timestamp(b[0]),
                  b[2].hex(), b[3].hex(), strBidState(b[5]), strTxState(b[7]), strTxState(b[8]), b[11]) for b in bids],
     })

@@ -1,184 +1,642 @@
 {% include 'header.html' %}
 
-<h3>Bid {{ bid_id }}</h3>
-{% if refresh %}
-<p><a href=/bid/{{ bid_id }}>Page Refresh: {{ refresh }} second</a></p>
-{% else %}
-<p><a href=/bid/{{ bid_id }}>refresh</a></p>
-{% endif %}
+<div class="container mx-auto">
+  <section class="bg-white p-5 mt-5">
+    <div class="flex flex-wrap items-center -m-2">
+      <div class="w-full md:w-1/2 p-2">
+        <ul class="flex flex-wrap items-center gap-x-3 mb-2">
+          <li>
+            <a class="flex font-medium text-xs text-coolGray-500 hover:text-coolGray-700" href="/">
+              <p>Home</p>
+            </a>
+          </li>
+          <li>
+            <svg width="6" height="15" viewBox="0 0 6 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M5.34 0.671999L2.076 14.1H0.732L3.984 0.671999H5.34Z" fill="#BBC3CF"></path>
+            </svg>
+          </li>
+          <li><a class="flex font-medium text-xs text-coolGray-500 hover:text-coolGray-700" href="#">Bids</a></li>
+          <li>
+            <svg width="6" height="15" viewBox="0 0 6 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M5.34 0.671999L2.076 14.1H0.732L3.984 0.671999H5.34Z" fill="#BBC3CF"></path>
+            </svg>
+          </li>
+          <li><a class="flex font-medium text-xs text-coolGray-500 hover:text-coolGray-700" href="{{ bid_id }}">BID ID: {{ bid_id }}</a></li>
+        </ul>
+      </div>
+    </div>
+  </section>
 
-{% for m in messages %}
-<p>{{ m }}</p>
-{% endfor %}
-{% for m in err_messages %}
-<p class="error_msg">Error: {{ m }}</p>
-{% endfor %}
+  <section class="py-4">
+    <div class="container px-4 mx-auto">
+      <div class="relative py-11 px-16 bg-coolGray-900 rounded-md overflow-hidden">
+        <img class="absolute z-10 left-4 top-4" src="/static/images/elements/dots-red.svg" alt="">
+        <img class="absolute z-10 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt="">
+        <img class="absolute h-64 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" src="/static/images/elements/wave.svg" alt="">
+        <div class="relative z-20 flex flex-wrap items-center -m-3">
+          <div class="w-full md:w-1/2 p-3">
+            <h2 class="mb-6 text-4xl font-bold text-white tracking-tighter">Bid
+              {% if debug_mode == true %}
+              (Debug: bid_xmr template)
+              {% endif %}
+            </h2>
+            <p class="font-semibold text-coolGray-200">Bid ID: {{ bid_id }}</p>
+          </div>
+          <div class="w-full md:w-1/2 p-3">
+            {% if refresh %}
+            <a id="refresh" href=/bid/{{ bid_id }}><button class="block md:ml-auto px-5 py-3 font-medium text-lcg text-white bg-blue-500 hover:bg-blue-600 rounded-md focus:ring-0 focus:outline-none">Refresh {{ refresh }} seconds</button></a>
+            {% else %}
+            <a id="refresh" href=/bid/{{ bid_id }}><button class="block md:ml-auto px-5 py-3 font-medium text-lcg text-white bg-blue-500 hover:bg-blue-600 rounded-md focus:ring-0 focus:outline-none">Refresh</button></a>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
 
-<table>
-{% if data.was_sent == 'True' %}
-<tr><td>Swap</td><td>{{ data.amt_to }} {{ data.ticker_to }} for {{ data.amt_from }} {{ data.ticker_from }}</td></tr>
-{% else %}
-<tr><td>Swap</td><td>{{ data.amt_from }} {{ data.ticker_from }} for {{ data.amt_to }} {{ data.ticker_to }}</td></tr>
-{% endif %}
-<tr><td>Bid Rate</td><td>{{ data.bid_rate }}</td></tr>
-<tr><td>Coin From</td><td>{{ data.coin_from }}</td></tr>
-<tr><td>Coin To</td><td>{{ data.coin_to }}</td></tr>
-<tr><td>Bid State</td><td>{{ data.bid_state }}</td></tr>
-<tr><td>State Description </td><td>{{ data.state_description }}</td></tr>
-<tr><td>Offer</td><td><a class="monospace" href="/offer/{{ data.offer_id }}">{{ data.offer_id }}</a></td></tr>
-<tr><td>Address From</td><td><a class="monospace" href="/identity/{{ data.addr_from }}">{{ data.addr_from }}</a> {{ data.addr_from_label }}</td></tr>
-<tr><td>Created At</td><td>{{ data.created_at }}</td></tr>
-<tr><td>Expired At</td><td>{{ data.expired_at }}</td></tr>
-<tr><td>Sent</td><td>{{ data.was_sent }}</td></tr>
-<tr><td>Received</td><td>{{ data.was_received }}</td></tr>
-{% if data.coin_a_lock_refund_tx_est_final != 'None' %}
-<tr><td>{{ data.ticker_from }} lock refund tx valid at</td><td>{{ data.coin_a_lock_refund_tx_est_final | formatts }}</td></tr>
-{% if data.coin_a_lock_refund_swipe_tx_est_final != 'None' %}
-<tr><td>{{ data.ticker_from }} lock refund tx swipeable at</td><td>{{ data.coin_a_lock_refund_swipe_tx_est_final | formatts }}</td></tr>
-{% endif %}
-<tr><td>{{ data.ticker_from }} chain median time</td><td>{{ data.coin_a_last_median_time | formatts }}</td></tr>
-{% endif %}
+  {% for m in messages %}
 
-</table>
+  <section class="py-4">
+    <div class="container px-4 mx-auto">
+      <div class="p-6 bg-green-100 border border-green-200 rounded-md">
+        <div class="flex flex-wrap justify-between items-center -m-2">
+          <div class="flex-1 p-2">
+            <div class="flex flex-wrap -m-1">
+              <div class="w-auto p-1">
+                <svg class="relative top-0.5" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12.4732 4.80667C12.4112 4.74418 12.3375 4.69458 12.2563 4.66074C12.175 4.62689 12.0879 4.60947 11.9999 4.60947C11.9119 4.60947 11.8247 4.62689 11.7435 4.66074C11.6623 4.69458 11.5885 4.74418 11.5266 4.80667L6.55989 9.78L4.47322 7.68667C4.40887 7.62451 4.33291 7.57563 4.24967 7.54283C4.16644 7.51003 4.07755 7.49394 3.9881 7.49549C3.89865 7.49703 3.81037 7.51619 3.72832 7.55185C3.64627 7.58751 3.57204 7.63898 3.50989 7.70333C3.44773 7.76768 3.39885 7.84364 3.36605 7.92688C3.33324 8.01011 3.31716 8.099 3.31871 8.18845C3.32025 8.2779 3.3394 8.36618 3.37507 8.44823C3.41073 8.53028 3.4622 8.60451 3.52655 8.66667L6.08655 11.2267C6.14853 11.2892 6.22226 11.3387 6.3035 11.3726C6.38474 11.4064 6.47188 11.4239 6.55989 11.4239C6.64789 11.4239 6.73503 11.4064 6.81627 11.3726C6.89751 11.3387 6.97124 11.2892 7.03322 11.2267L12.4732 5.78667C12.5409 5.72424 12.5949 5.64847 12.6318 5.56414C12.6688 5.4798 12.6878 5.38873 12.6878 5.29667C12.6878 5.2046 12.6688 5.11353 12.6318 5.02919C12.5949 4.94486 12.5409 4.86909 12.4732 4.80667Z" fill="#2AD168"></path>
+                </svg>
+              </div>
+              <div class="flex-1 p-1">
+                <h3 class="font-medium text-sm text-green-900">{{ m }}</h3>
+              </div>
+            </div>
+          </div>
+          <div class="w-auto p-2">
+            <a href="#">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M8.94004 8L13.14 3.80667C13.2656 3.68113 13.3361 3.51087 13.3361 3.33333C13.3361 3.1558 13.2656 2.98554 13.14 2.86C13.0145 2.73447 12.8442 2.66394 12.6667 2.66394C12.4892 2.66394 12.3189 2.73447 12.1934 2.86L8.00004 7.06L3.80671 2.86C3.68117 2.73447 3.51091 2.66394 3.33337 2.66394C3.15584 2.66394 2.98558 2.73447 2.86004 2.86C2.7345 2.98554 2.66398 3.1558 2.66398 3.33333C2.66398 3.51087 2.7345 3.68113 2.86004 3.80667L7.06004 8L2.86004 12.1933C2.79756 12.2553 2.74796 12.329 2.71411 12.4103C2.68027 12.4915 2.66284 12.5787 2.66284 12.6667C2.66284 12.7547 2.68027 12.8418 2.71411 12.9231C2.74796 13.0043 2.79756 13.078 2.86004 13.14C2.92202 13.2025 2.99575 13.2521 3.07699 13.2859C3.15823 13.3198 3.24537 13.3372 3.33337 13.3372C3.42138 13.3372 3.50852 13.3198 3.58976 13.2859C3.671 13.2521 3.74473 13.2025 3.80671 13.14L8.00004 8.94L12.1934 13.14C12.2554 13.2025 12.3291 13.2521 12.4103 13.2859C12.4916 13.3198 12.5787 13.3372 12.6667 13.3372C12.7547 13.3372 12.8419 13.3198 12.9231 13.2859C13.0043 13.2521 13.0781 13.2025 13.14 13.14C13.2025 13.078 13.2521 13.0043 13.286 12.9231C13.3198 12.8418 13.3372 12.7547 13.3372 12.6667C13.3372 12.5787 13.3198 12.4915 13.286 12.4103C13.2521 12.329 13.2025 12.2553 13.14 12.1933L8.94004 8Z" fill="#156633"></path>
+              </svg>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
 
-<form method="post">
-{% if edit_bid %}
-<h4>Edit Bid</h4>
-<table>
-<tr><td>Change Bid State</td><td>
-<select name="new_state">
-{% for s in data.bid_states %}
-<option value="{{ s[0] }}"{% if data.bid_state_ind==s[0] %} selected{% endif %}>{{ s[1] }}</option>
-{% endfor %}
-</select></td></tr>
-{% if data.debug_ui == true %}
-<tr><td>Debug Option</td><td><select name="debugind">
-<option{% if data.debug_ind=="-1" %} selected{% endif %} value="-1">-- None --</option>
-{% for a in data.debug_options %}
-<option{% if data.debug_ind==a[0] %} selected{% endif %} value="{{ a[0] }}">{{ a[1] }}</option>
-{% endfor %}
-</select></td></tr>
-<tr><td>Sweep No-Script TX</td><td><input type="text" id="kbs_other" name="kbs_other"></td></tr>
-{% endif %}
-</table>
-<input name="edit_bid_cancel" type="submit" value="Cancel">
-<input name="edit_bid_submit" type="submit" value="Submit">
-{% else %}
-{% if data.was_received == 'True' %}
-<input name="accept_bid" type="submit" value="Accept Bid" onclick='return confirmPopup("Accept");'><br/>
-{% endif %}
-{% if data.can_abandon == true %}
-<input name="abandon_bid" type="submit" value="Abandon Bid" onclick='return confirmPopup("Abandon");'>
-{% endif %}
-{% if data.show_txns %}
-<input name="hide_txns" type="submit" value="Hide Info">
-{% else %}
-<input name="show_txns" type="submit" value="Show More Info">
-{% endif %}
-<input name="edit_bid" type="submit" value="Edit Bid">
-{% endif %}
-<br/>
-{% if data.show_bidder_seq_diagram %}
-<input name="hide_bidder_seq_diagram" type="submit" value="Hide Bidder Sequence Diagram">
-{% else %}
-<input name="show_bidder_seq_diagram" type="submit" value="Show Bidder Sequence Diagram">
-{% endif %}
-{% if data.show_offerer_seq_diagram %}
-<input name="hide_offerer_seq_diagram" type="submit" value="Hide Offerer Sequence Diagram">
-{% else %}
-<input name="show_offerer_seq_diagram" type="submit" value="Show Offerer Sequence Diagram">
-{% endif %}
-<input type="hidden" name="formid" value="{{ form_id }}">
+  {% endfor %}
 
-{% if data.show_txns %}
-{% if data.xmr_b_shared_address %}
-<p class="monospace">Shared Address: {{ data.xmr_b_shared_address }}</p>
-{% endif %}
-{% if data.xmr_b_shared_viewkey %}
-<p class="monospace">Shared View Key: {{ data.xmr_b_shared_viewkey }}</p>
-{% endif %}
-{% if data.xmr_b_half_privatekey %}
-<p class="monospace">Key Half: {{ data.xmr_b_half_privatekey }}</p>
-{% endif %}
-<h4>Transactions</h4>
-<table>
-<tr><th>Tx Type</th><th>Tx ID</th><th>Blocks Deep</th></tr>
-{% for tx in data.txns %}
-<tr><td>{{ tx.type }}</td><td class="monospace">{{ tx.txid }}</td><td>{{ tx.confirms }}</td></tr>
-{% endfor %}
-</table>
-<table>
-<tr><td>View Transaction</td><td>
-<select name="view_tx">
-{% if data.txns|length %}
-{% for tx in data.txns %}
-<option value="{{ tx.txid }}"{% if data.view_tx_ind==tx.txid %} selected{% endif %}>{{ tx.type }} {{ tx.txid }}</option>
-{% endfor %}
-{% else %}
-<option value="0">--- None exist yet ---</option>
-{% endif %}
-</select></td></tr>
-</table>
-<input name="view_tx_submit" type="submit" value="View Tx">
-<input name="view_lock_transfers" type="submit" value="View Lock Wallet Transfers">
+  {% for m in err_messages %}
 
-{% if data.view_tx_hex %}
-<p>{{ data.view_tx_hex }}</p>
-<textarea class="monospace" id="tx_view" rows="10" cols="150" readonly>
-{{ data.view_tx_desc }}
-</textarea>
-{% endif %}
+  <section class="py-4">
+    <div class="container px-4 mx-auto">
+      <div class="p-6 bg-red-100 border border-red-200 rounded-md">
+        <div class="flex flex-wrap justify-between items-center -m-2">
+          <div class="flex-1 p-2">
+            <div class="flex flex-wrap -m-1">
+              <div class="w-auto p-1">
+                <svg class="relative top-0.5" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M10.4733 5.52667C10.4114 5.46419 10.3376 5.41459 10.2564 5.38075C10.1751 5.3469 10.088 5.32947 9.99999 5.32947C9.91198 5.32947 9.82485 5.3469 9.74361 5.38075C9.66237 5.41459 9.58863 5.46419 9.52666 5.52667L7.99999 7.06001L6.47333 5.52667C6.34779 5.40114 6.17753 5.33061 5.99999 5.33061C5.82246 5.33061 5.65219 5.40114 5.52666 5.52667C5.40112 5.65221 5.3306 5.82247 5.3306 6.00001C5.3306 6.17754 5.40112 6.3478 5.52666 6.47334L7.05999 8.00001L5.52666 9.52667C5.46417 9.58865 5.41458 9.66238 5.38073 9.74362C5.34689 9.82486 5.32946 9.912 5.32946 10C5.32946 10.088 5.34689 10.1752 5.38073 10.2564C5.41458 10.3376 5.46417 10.4114 5.52666 10.4733C5.58863 10.5358 5.66237 10.5854 5.74361 10.6193C5.82485 10.6531 5.91198 10.6705 5.99999 10.6705C6.088 10.6705 6.17514 10.6531 6.25638 10.6193C6.33762 10.5854 6.41135 10.5358 6.47333 10.4733L7.99999 8.94001L9.52666 10.4733C9.58863 10.5358 9.66237 10.5854 9.74361 10.6193C9.82485 10.6531 9.91198 10.6705 9.99999 10.6705C10.088 10.6705 10.1751 10.6531 10.2564 10.6193C10.3376 10.5854 10.4114 10.5358 10.4733 10.4733C10.5358 10.4114 10.5854 10.3376 10.6193 10.2564C10.6531 10.1752 10.6705 10.088 10.6705 10C10.6705 9.912 10.6531 9.82486 10.6193 9.74362C10.5854 9.66238 10.5358 9.58865 10.4733 9.52667L8.93999 8.00001L10.4733 6.47334C10.5358 6.41137 10.5854 6.33763 10.6193 6.25639C10.6531 6.17515 10.6705 6.08802 10.6705 6.00001C10.6705 5.912 10.6531 5.82486 10.6193 5.74362C10.5854 5.66238 10.5358 5.58865 10.4733 5.52667ZM12.7133 3.28667C12.0983 2.64994 11.3627 2.14206 10.5494 1.79266C9.736 1.44327 8.8612 1.25936 7.976 1.25167C7.0908 1.24398 6.21294 1.41266 5.39363 1.74786C4.57432 2.08307 3.82998 2.57809 3.20403 3.20404C2.57807 3.82999 2.08305 4.57434 1.74785 5.39365C1.41264 6.21296 1.24396 7.09082 1.25166 7.97602C1.25935 8.86121 1.44326 9.73601 1.79265 10.5494C2.14204 11.3627 2.64992 12.0984 3.28666 12.7133C3.90164 13.3501 4.63727 13.858 5.45063 14.2074C6.26399 14.5567 7.13879 14.7407 8.02398 14.7483C8.90918 14.756 9.78704 14.5874 10.6064 14.2522C11.4257 13.9169 12.17 13.4219 12.796 12.796C13.4219 12.17 13.9169 11.4257 14.2521 10.6064C14.5873 9.78706 14.756 8.90919 14.7483 8.024C14.7406 7.1388 14.5567 6.264 14.2073 5.45064C13.8579 4.63728 13.3501 3.90165 12.7133 3.28667ZM11.7733 11.7733C10.9014 12.6463 9.75368 13.1899 8.52585 13.3115C7.29802 13.4332 6.066 13.1254 5.03967 12.4405C4.01335 11.7557 3.25623 10.7361 2.89731 9.55566C2.53838 8.37518 2.59986 7.10677 3.07127 5.96653C3.54267 4.82629 4.39484 3.88477 5.48259 3.30238C6.57033 2.71999 7.82635 2.53276 9.03666 2.77259C10.247 3.01242 11.3367 3.66447 12.1202 4.61765C12.9036 5.57083 13.3324 6.76617 13.3333 8.00001C13.3357 8.70087 13.1991 9.39524 12.9313 10.0429C12.6635 10.6906 12.2699 11.2788 11.7733 11.7733Z" fill="#EF5944"></path>
+                </svg>
+              </div>
+              <div class="flex-1 p-1">
+                <h3 class="font-medium text-sm text-red-900 error_msg">
+                  <p class="error_msg">Error: {{ m }}</p>
+                </h3>
+              </div>
+            </div>
+          </div>
+          <div class="w-auto p-2">
+            <a href="#">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M8.94004 8L13.14 3.80667C13.2656 3.68113 13.3361 3.51087 13.3361 3.33333C13.3361 3.1558 13.2656 2.98554 13.14 2.86C13.0145 2.73447 12.8442 2.66394 12.6667 2.66394C12.4892 2.66394 12.3189 2.73447 12.1934 2.86L8.00004 7.06L3.80671 2.86C3.68117 2.73447 3.51091 2.66394 3.33337 2.66394C3.15584 2.66394 2.98558 2.73447 2.86004 2.86C2.7345 2.98554 2.66398 3.1558 2.66398 3.33333C2.66398 3.51087 2.7345 3.68113 2.86004 3.80667L7.06004 8L2.86004 12.1933C2.79756 12.2553 2.74796 12.329 2.71411 12.4103C2.68027 12.4915 2.66284 12.5787 2.66284 12.6667C2.66284 12.7547 2.68027 12.8418 2.71411 12.9231C2.74796 13.0043 2.79756 13.078 2.86004 13.14C2.92202 13.2025 2.99575 13.2521 3.07699 13.2859C3.15823 13.3198 3.24537 13.3372 3.33337 13.3372C3.42138 13.3372 3.50852 13.3198 3.58976 13.2859C3.671 13.2521 3.74473 13.2025 3.80671 13.14L8.00004 8.94L12.1934 13.14C12.2554 13.2025 12.3291 13.2521 12.4103 13.2859C12.4916 13.3198 12.5787 13.3372 12.6667 13.3372C12.7547 13.3372 12.8419 13.3198 12.9231 13.2859C13.0043 13.2521 13.0781 13.2025 13.14 13.14C13.2025 13.078 13.2521 13.0043 13.286 12.9231C13.3198 12.8418 13.3372 12.7547 13.3372 12.6667C13.3372 12.5787 13.3198 12.4915 13.286 12.4103C13.2521 12.329 13.2025 12.2553 13.14 12.1933L8.94004 8Z" fill="#752C21"></path>
+              </svg>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
 
-{% if data.lock_transfers %}
-<p>
-<label for="transfers_view">Lock wallet transfers:</label><br/>
-<textarea class="monospace" id="transfers_view" rows="10" cols="150" readonly>
-{{ data.lock_transfers }}
-</textarea>
-</p>
-{% endif %}
-{% endif %}
-</form>
+  {% endfor %}
 
-{% if data.show_bidder_seq_diagram %}
-<img src="/static/sequence_diagrams/xmr.bidder.alt.xu.min.svg" />
-{% endif %}
+  <section class="bg-white">
+    <div class="pl-6 pr-6 pt-0 pb-0 mt-5 h-full overflow-hidden bg-white ">
+      <div class="pb-6 border-coolGray-100">
+        <div class="flex flex-wrap items-center justify-between -m-2">
+          <div class="w-full pt-2">
 
-{% if data.show_offerer_seq_diagram %}
-<img src="/static/sequence_diagrams/xmr.offerer.alt.xu.min.svg" />
-{% endif %}
+            <div class="container px-0 mx-auto mt-5">
+              <div class="overflow-x-auto relative border sm:rounded-lg">
 
-{% if data.chain_a_lock_tx_inputs %}
-<h5>Chain A Lock TX Inputs:</h5>
-<table>
-<tr><th>txid</th><th>vout</th><th>locked</th></tr>
-{% for txi in data.chain_a_lock_tx_inputs %}
-<tr><td>{{ txi.txid }}</td><td>{{ txi.vout }}</td><td>{% if txi.islocked %} true {% else %} false {% endif %}</td></tr>
-{% endfor %}
-</table>
-{% endif %}
+                <table class="w-full text-sm text-left text-gray-500 outline-none border-gray-300">
+
+                  <thead class="text-xs text-gray-700 border-b uppercase bg-gray-50 outline-none border-gray-300">
+                    <tr>
+                      <th scope="col" class="py-3 px-6">Item</th>
+                      <th scope="col">Data </th>
+
+                    </tr>
+                  </thead>
+
+                  {% if data.was_sent == 'True' %}
+                  <tr class="bg-white border-t hover:bg-gray-50">
+                    <td class="py-4 px-6 bold">Swap</td>
+                    <td>{{ data.amt_to }} {{ data.ticker_to }} for {{ data.amt_from }} {{ data.ticker_from }}</td>
+                  </tr>
+                  {% else %}
+                  <tr class="bg-white border-t hover:bg-gray-50">
+                    <td class="py-4 px-6 bold">Swap</td>
+                    <td>{{ data.amt_from }} {{ data.ticker_from }} for {{ data.amt_to }} {{ data.ticker_to }}</td>
+                  </tr>
+                  {% endif %}
+                  <tr class="bg-white border-t hover:bg-gray-50">
+                    <td class="py-4 px-6 bold">Bid Rate</td>
+                    <td>{{ data.bid_rate }}</td>
+                  </tr>
+                  <tr class="bg-white border-t hover:bg-gray-50">
+                    <td class="py-4 px-6 bold">Coin From</td>
+                    <td>{{ data.coin_from }}</td>
+                  </tr>
+                  <tr class="bg-white border-t hover:bg-gray-50">
+                    <td class="py-4 px-6 bold">Coin To</td>
+                    <td>{{ data.coin_to }}</td>
+                  </tr>
+                  <tr class="bg-white border-t hover:bg-gray-50">
+                    <td class="py-4 px-6 bold">Bid State</td>
+                    <td>{{ data.bid_state }}</td>
+                  </tr>
+                  <tr class="bg-white border-t hover:bg-gray-50">
+                    <td class="py-4 px-6 bold">State Description </td>
+                    <td>{{ data.state_description }}</td>
+                  </tr>
+                  <tr class="bg-white border-t hover:bg-gray-50">
+                    <td class="py-4 px-6 bold">Offer</td>
+                    <td><a class="monospace" href="/offer/{{ data.offer_id }}">{{ data.offer_id }}</a></td>
+                  </tr>
+                  <tr class="bg-white border-t hover:bg-gray-50">
+                    <td class="py-4 px-6 bold">Address From</td>
+                    <td><a class="monospace" href="/identity/{{ data.addr_from }}">{{ data.addr_from }}</a> {{ data.addr_from_label }}</td>
+                  </tr>
+                  <tr class="bg-white border-t hover:bg-gray-50">
+                    <td class="py-4 px-6 bold">Created At</td>
+                    <td>{{ data.created_at }}</td>
+                  </tr>
+                  <tr class="bg-white border-t hover:bg-gray-50">
+                    <td class="py-4 px-6 bold">Expired At</td>
+                    <td>{{ data.expired_at }}</td>
+                  </tr>
+                  <tr class="bg-white border-t hover:bg-gray-50">
+                    <td class="py-4 px-6 bold">Sent</td>
+                    <td>{{ data.was_sent }}</td>
+                  </tr>
+                  <tr class="bg-white border-t hover:bg-gray-50">
+                    <td class="py-4 px-6 bold">Received</td>
+                    <td>{{ data.was_received }}</td>
+                  </tr>
+                  {% if data.coin_a_lock_refund_tx_est_final != 'None' %}
+                  <tr class="bg-white border-t hover:bg-gray-50">
+                    <td class="py-4 px-6 bold">{{ data.ticker_from }} lock refund tx valid at</td>
+                    <td>{{ data.coin_a_lock_refund_tx_est_final | formatts }}</td>
+                  </tr>
+                  {% if data.coin_a_lock_refund_swipe_tx_est_final != 'None' %}
+                  <tr class="bg-white border-t hover:bg-gray-50">
+                    <td class="py-4 px-6 bold">{{ data.ticker_from }} lock refund tx swipeable at</td>
+                    <td>{{ data.coin_a_lock_refund_swipe_tx_est_final | formatts }}</td>
+                  </tr>
+                  {% endif %}
+                  <tr class="bg-white border-t hover:bg-gray-50">
+                    <td class="py-4 px-6 bold">{{ data.ticker_from }} chain median time</td>
+                    <td>{{ data.coin_a_last_median_time | formatts }}</td>
+                  </tr>
+                  {% endif %}
+                </table>
+
+              </div>
+            </div>
+
+            <section class="bg-white p-6">
+              <div class="flex flex-wrap items-center">
+                <div class="w-full">
+                  <h4 class="font-semibold text-black text-2xl">Old states</h4>
+                </div>
+              </div>
+            </section>
+
+            <div class="container px-0 mx-auto mt-5">
+              <div class="overflow-x-auto relative border sm:rounded-lg">
 
 
-<h4>Old States</h4>
-<table>
-<tr><th>State</th><th>Set At</th></tr>
-{% for s in old_states %}
-<tr><td>{{ s[1] }}</td><td>{{ s[0] | formatts }}</td></tr>
-{% endfor %}
-</table>
+                <table class="w-full text-sm text-left text-gray-500 outline-none border-gray-300">
 
-<h4>Events</h4>
-<table>
-<tr><th>At</th><th>Event</th></tr>
-{% for e in data.events %}
-<tr><td>{{ e.at | formatts }}</td><td>{{ e.desc }}</td></tr>
-{% endfor %}
-</table>
+                  <thead class="text-xs text-gray-700 border-b uppercase bg-gray-50 outline-none border-gray-300">
+                    <tr>
+                      <th scope="col" class="py-3 px-6">Old States</th>
+                      <th scope="col">Set at Time</th>
 
-<p><a href="/">home</a></p>
-<script>
-function confirmPopup(name) {
-    return confirm(name + " Bid - Are you sure?");
-}
-</script>
-</body></html>
+                    </tr>
+                  </thead>
+
+                  {% for s in old_states %}
+                  <tr class="bg-white border-t hover:bg-gray-50">
+                    <td class="py-4 px-6">{{ s[1] }}</td>
+                    <td>{{ s[0] | formatts }} </td>
+                  </tr>
+                  {% endfor %}
+                </table>
+
+              </div>
+            </div>
+
+            {% if data.events %}
+
+            <section class="bg-white p-6">
+              <div class="flex flex-wrap items-center">
+                <div class="w-full">
+                  <h4 class="font-semibold text-black text-2xl">Events</h4>
+                </div>
+              </div>
+            </section>
+
+            <div class="container px-0 mx-auto mt-5">
+              <div class="overflow-x-auto relative border sm:rounded-lg">
+
+                <table class="w-full text-sm text-left text-gray-500 outline-none border-gray-300">
+
+                  <thead class="text-xs text-gray-700 border-b uppercase bg-gray-50 outline-none border-gray-300">
+                    <tr>
+                      <th scope="col" class="py-3 px-6">Time</th>
+                      <th scope="col">Events</th>
+
+                    </tr>
+                  </thead>
+
+                  {% for e in data.events %}
+                  <tr class="bg-white border-t hover:bg-gray-50" <td class="py-4 px-6">{{ e.at | formatts }}</td>
+                    <td>{{ e.desc }}</td>
+                  </tr>
+                  {% endfor %}
+                </table>
+
+              </div>
+            </div>
+            {% else %}
+            {% endif %}
+
+
+            <form method="post">
+
+              {% if data.show_txns %}
+              {% if data.xmr_b_shared_address %}
+
+              <section class="bg-white p-6">
+                <div class="flex flex-wrap items-center">
+                  <div class="w-full">
+                    <h4 class="font-semibold text-black text-2xl">View keys/Shared Address:</h4>
+                  </div>
+                </div>
+              </section>
+
+              <div class="container px-0 mx-auto mt-5">
+                <div class="overflow-x-auto relative border sm:rounded-lg">
+                  <table class="w-full text-sm text-left text-gray-500 outline-none border-gray-300">
+                    <thead class="text-xs text-gray-700 border-b uppercase bg-gray-50 outline-none border-gray-300">
+                      <tr>
+                        <th scope="col" class="py-3 px-6 w-96">Type</th>
+                        <th scope="col">Output</th>
+                      </tr>
+                    </thead>
+                    <tr class="bg-white border-t hover:bg-gray-50">
+                      <td class="py-4 px-6 bold">Shared Address:</td>
+                      <td class="py-4 monospace">{{ data.xmr_b_shared_address }}</td>
+                    </tr>
+                  </table>
+                </div>
+              </div>
+
+              {% endif %}
+              {% if data.xmr_b_shared_viewkey %}
+
+              <section class="bg-white p-6">
+                <div class="flex flex-wrap items-center">
+                  <div class="w-full">
+                    <h4 class="font-semibold text-black text-2xl">View keys/Shared Address:</h4>
+                  </div>
+                </div>
+              </section>
+
+              <div class="container px-0 mx-auto mt-5">
+                <div class="overflow-x-auto relative border sm:rounded-lg">
+                  <table class="w-full text-sm text-left text-gray-500 outline-none border-gray-300">
+                    <thead class="text-xs text-gray-700 border-b uppercase bg-gray-50 outline-none border-gray-300">
+                      <tr>
+                        <th scope="col" class="py-3 px-6 w-96">Type</th>
+                        <th scope="col">Output</th>
+                      </tr>
+                    </thead>
+                    <tr class="bg-white border-t hover:bg-gray-50">
+                      <td class="py-4 px-6 bold">Shared View Key:</td>
+                      <td class="py-4 monospace">{{ data.xmr_b_shared_viewkey }}</td>
+                    </tr>
+                  </table>
+                </div>
+              </div>
+
+              {% endif %}
+              {% if data.xmr_b_half_privatekey %}
+
+              <section class="bg-white p-6">
+                <div class="flex flex-wrap items-center">
+                  <div class="w-full">
+                    <h4 class="font-semibold text-black text-2xl">View keys/Shared Address:</h4>
+                  </div>
+                </div>
+              </section>
+
+              <div class="container px-0 mx-auto mt-5">
+                <div class="overflow-x-auto relative border sm:rounded-lg">
+                  <table class="w-full text-sm text-left text-gray-500 outline-none border-gray-300">
+                    <thead class="text-xs text-gray-700 border-b uppercase bg-gray-50 outline-none border-gray-300">
+                      <tr>
+                        <th scope="col" class="py-3 px-6 w-96">Type</th>
+                        <th scope="col">Output</th>
+                      </tr>
+                    </thead>
+                    <tr class="bg-white border-t hover:bg-gray-50">
+                      <td class="py-4 px-6 bold">Key Half:</td>
+                      <td class="py-4 monospace">{{ data.xmr_b_half_privatekey }}</td>
+                    </tr>
+                  </table>
+                </div>
+              </div>
+              {% endif %}
+
+
+              <section class="bg-white p-6">
+                <div class="flex flex-wrap items-center">
+                  <div class="w-full">
+                    <h4 class="font-semibold text-black text-2xl">Transactions</h4>
+                  </div>
+                </div>
+              </section>
+
+              <div class="container px-0 mx-auto mt-5">
+                <div class="overflow-x-auto relative border sm:rounded-lg">
+
+
+                  <table class="w-full text-sm text-left text-gray-500 outline-none border-gray-300">
+
+                    <thead class="text-xs text-gray-700 border-b uppercase bg-gray-50 outline-none border-gray-300">
+                      <tr>
+                        <th scope="col" class="py-3 px-6">Tx Type</th>
+                        <th scope="col">Tx ID</th>
+                        <th scope="col">Blocks Deep</th>
+                      </tr>
+                    </thead>
+                    {% for tx in data.txns %}
+                    <tr class="bg-white border-t hover:bg-gray-50">
+                      <td class="py-4 px-6">{{ tx.type }}</td>
+                      <td class="py-4 px-6 monospace">{{ tx.txid }}</td>
+                      <td class="py-4 px-6">{{ tx.confirms }}</td>
+                    </tr>
+                    {% endfor %}
+                  </table>
+
+                </div>
+              </div>
+
+              <div class="p-6 pt-10 bg-white bg-opacity-60 rounded-b-md">
+                <div class="w-full md:w-0/12">
+                  <div class="flex flex-wrap justify-end -m-1.5">
+
+                    <table>
+                      <tr>
+                        <td class="bold pr-5">View Transaction:</td>
+                        <td>
+
+                          <select class="pappearance-none pr-15 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" name="view_tx">
+                            {% if data.txns|length %}
+                            {% for tx in data.txns %}
+                            <option value="{{ tx.txid }}" {% if data.view_tx_ind==tx.txid %} selected{% endif %}>{{ tx.type }} {{ tx.txid }}</option>
+                            {% endfor %}
+                            {% else %}
+                            <option value="0">None exist yet</option>
+                            {% endif %}
+                          </select>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <div class="w-full md:w-auto p-1.5 ml-2">
+                      <button name="view_tx_submit" value="View Tx" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none">
+                        <svg class="mr-2" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
+                          <g fill="#556987">
+                            <path fill="#556987" d="M12,3c1.989,0,3.873,0.65,5.43,1.833l-3.604,3.393l9.167,0.983L22.562,0l-3.655,3.442 C16.957,1.862,14.545,1,12,1C5.935,1,1,5.935,1,12h2C3,7.037,7.037,3,12,3z"></path>
+                            <path data-color="#556987" d="M12,21c-1.989,0-3.873-0.65-5.43-1.833l3.604-3.393l-9.167-0.983L1.438,24l3.655-3.442 C7.043,22.138,9.455,23,12,23c6.065,0,11-4.935,11-11h-2C21,16.963,16.963,21,12,21z"></path>
+                          </g>
+                        </svg> <span>View Tx</span> </button>
+                    </div>
+
+                    <div class="w-full md:w-auto p-1.5 ml-2">
+                      <button name="view_lock_transfers" value="View Lock Wallet Transfers" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none">
+                        <svg class="mr-2" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
+                          <g fill="#556987">
+                            <path fill="#556987" d="M12,3c1.989,0,3.873,0.65,5.43,1.833l-3.604,3.393l9.167,0.983L22.562,0l-3.655,3.442 C16.957,1.862,14.545,1,12,1C5.935,1,1,5.935,1,12h2C3,7.037,7.037,3,12,3z"></path>
+                            <path data-color="#556987" d="M12,21c-1.989,0-3.873-0.65-5.43-1.833l3.604-3.393l-9.167-0.983L1.438,24l3.655-3.442 C7.043,22.138,9.455,23,12,23c6.065,0,11-4.935,11-11h-2C21,16.963,16.963,21,12,21z"></path>
+                          </g>
+                        </svg> <span>View Lock Wallet Transfers</span> </button>
+                    </div>
+
+                  </div>
+                </div>
+              </div>
+
+              {% if data.view_tx_hex %}
+
+              <label for="transfers_view" class="bold block mb-2 text-sm font-medium text-gray-900">{{ data.view_tx_hex }}</label>
+              <textarea rows="4" class="block p-2.5 w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 monospace" id="tx_view" readonly>
+              {{ data.view_tx_desc }}
+              </textarea>
+
+              {% endif %}
+
+              {% if data.lock_transfers %}
+
+              <label for="transfers_view" class="bold block mb-2 text-sm font-medium text-gray-900">Lock wallet transfers:</label>
+              <textarea rows="4" class="block p-2.5 w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 monospace" id="transfers_view" readonly>
+              {{ data.lock_transfers }}
+              </textarea>
+
+              {% endif %}
+              {% endif %}
+
+              {% if data.show_bidder_seq_diagram %}
+              <!--<img src="/static/sequence_diagrams/xmr.bidder.alt.xu.min.svg" />-->
+              {% endif %}
+
+              {% if data.show_offerer_seq_diagram %}
+              <!--<img src="/static/sequence_diagrams/xmr.offerer.alt.xu.min.svg" />-->
+              {% endif %}
+
+              {% if data.chain_a_lock_tx_inputs %}
+              <section class="bg-white p-6">
+                <div class="flex flex-wrap items-center">
+                  <div class="w-full">
+                    <h4 class="font-semibold text-black text-2xl">Chain A Lock TX Inputs:</h4>
+                  </div>
+                </div>
+              </section>
+
+              <div class="container px-0 mx-auto mt-5">
+                <div class="overflow-x-auto relative border sm:rounded-lg">
+
+
+                  <table class="w-full text-sm text-left text-gray-500 outline-none border-gray-300">
+
+                    <thead class="text-xs text-gray-700 border-b uppercase bg-gray-50 outline-none border-gray-300">
+                      <tr>
+                        <th scope="col" class="py-3 px-6">txid</th>
+                        <th scope="col">vout</th>
+                        <th scope="col">locked</th>
+                      </tr>
+                    </thead>
+
+                    {% for txi in data.chain_a_lock_tx_inputs %}
+                    <tr class="bg-white border-t hover:bg-gray-50">
+                      <td class="py-4 px-6">{{ txi.txid }}</td>
+                      <td class="py-4 px-6 monospace">{{ txi.vout }}</td>
+                      <td class="py-4 px-6">{% if txi.islocked %} true {% else %} false {% endif %}</td>
+                    </tr>
+                    {% endfor %}
+
+                  </table>
+
+                </div>
+              </div>
+
+              {% endif %}
+
+              <div class="p-6 pt-10 bg-white bg-opacity-60 rounded-b-md">
+                <div class="w-full md:w-0/12">
+                  <div class="flex flex-wrap justify-end -m-1.5">
+
+                    {% if edit_bid %}
+
+                    <table class="mt-1">
+                      <tr>
+                        <td class="bold pr-5 ">Change Bid State:</td>
+                        <td>
+                          <select class="pappearance-none pr-15 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" name="new_state">
+                            {% for s in data.bid_states %}
+                            <option value="{{ s[0] }}" {% if data.bid_state_ind==s[0] %} selected{% endif %}>{{ s[1] }}</option>
+                            {% endfor %}
+                          </select>
+                        </td>
+                      </tr>
+
+                      {% if data.debug_ui == true %}
+                      <tr>
+                        <td class="bold pr-5">Debug Option</td>
+                        <td>
+                          <select class="pappearance-none pr-15 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" name="debugind">
+                            <option{% if data.debug_ind=="-1" %} selected{% endif %} value="-1">-- None --</option>
+                              {% for a in data.debug_options %}
+                              <option{% if data.debug_ind==a[0] %} selected{% endif %} value="{{ a[0] }}">{{ a[1] }}</option>
+                                {% endfor %}
+                          </select>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td class="bold pr-5">Sweep No-Script TX</td>
+                        <td><input class="appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block p-2.5" type="text" id="kbs_other" name="kbs_other"></td>
+                      </tr>
+                      {% endif %}
+                    </table>
+
+                    <div class="w-full md:w-auto p-1.5 ml-2">
+                      <button name="edit_bid_cancel" value="Cancel" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none">
+                        <span>Cancel</span> </button>
+                    </div>
+
+                    <div class="w-full md:w-auto p-1.5">
+                      <button name="edit_bid_submit" value="Submit" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+                        <span>Submit Edit Bid</span> </button>
+                    </div>
+
+                    {% else %}
+
+                    {% if data.was_received == 'True' %}
+
+                    <div class="w-full md:w-auto p-1.5">
+                      <button name="accept_bid" value="Accept Bid" onclick='return confirmPopup("Accept");' type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+                        <span>Accept Bid</span> </button>
+                    </div>
+
+                    {% endif %}
+                    {% if data.can_abandon == true %}
+
+                    <div class="w-full md:w-auto p-1.5">
+                      <button name="abandon_bid" value="Abandon Bid" onclick='return confirmPopup("Abandon");' type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none">
+                        <span>Abandon Bid</span> </button>
+                    </div>
+
+                    {% endif %}
+                    {% if data.show_txns %}
+
+                    <div class="w-full md:w-auto p-1.5">
+                      <button name="hide_txns" type="submit" value="Hide Info" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none">
+                        <span>Hide info</span> </button>
+                    </div>
+
+                    {% else %}
+
+                    <div class="w-full md:w-auto p-1.5">
+                      <button name="show_txns" type="submit" value="Show More Info" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none">
+                        <span>Show More Info</span> </button>
+                    </div>
+
+                    {% endif %}
+
+                    <div class="w-full md:w-auto p-1.5">
+                      <button name="edit_bid" type="submit" value="Edit Bid" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none">
+                        <span>Edit bid</span> </button>
+                    </div>
+
+                    {% endif %}
+
+                    {% if data.show_bidder_seq_diagram %}
+                    <!--<input name="hide_bidder_seq_diagram" type="submit" value="Hide Bidder Sequence Diagram">-->
+                    {% else %}
+                    <!--<input name="show_bidder_seq_diagram" type="submit" value="Show Bidder Sequence Diagram">-->
+                    {% endif %}
+                    {% if data.show_offerer_seq_diagram %}
+                    <!--<input name="hide_offerer_seq_diagram" type="submit" value="Hide Offerer Sequence Diagram">-->
+                    {% else %}
+                    <!--<input name="show_offerer_seq_diagram" type="submit" value="Show Offerer Sequence Diagram">-->
+                    {% endif %}
+
+                  </div>
+                </div>
+              </div>
+
+              <input type="hidden" name="formid" value="{{ form_id }}">
+
+
+          </div>
+        </div>
+      </div>
+    </div> <!-- todo double check -->
+
+    </form>
+
+    <script>
+      function confirmPopup(name) {
+          return confirm(name + " Bid - Are you sure?");
+      }
+    </script>
+
+</div>
+{% include 'footer.html' %}
+</body>
+
+</html>

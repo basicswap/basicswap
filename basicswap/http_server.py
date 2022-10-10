@@ -28,9 +28,11 @@ from .basicswap_util import (
     strTxState,
     strAddressType,
 )
+
 from .js_server import (
     js_error,
     js_url_to_function,
+    js_generatenotification,
 )
 from .ui.util import (
     getCoinName,
@@ -43,6 +45,7 @@ from .ui.page_automation import (
     page_automation_strategy,
     page_automation_strategy_new,
 )
+
 from .ui.page_bids import page_bids, page_bid
 from .ui.page_offers import page_offers, page_offer, page_newoffer
 from .ui.page_tor import page_tor, get_tor_established_state
@@ -84,7 +87,6 @@ def listExplorerActions(swap_client):
                ('balance', 'Address Balance'),
                ('unspent', 'List Unspent')]
     return actions
-
 
 class HttpHandler(BaseHTTPRequestHandler):
 
@@ -130,22 +132,29 @@ class HttpHandler(BaseHTTPRequestHandler):
             **args_dict,
         ), 'UTF-8')
 
-    def page_info(self, info_str):
+    def page_info(self, info_str, post_string):
         template = env.get_template('info.html')
-        return self.render_simple_template(template, {
+        swap_client = self.server.swap_client
+        summary = swap_client.getSummary()
+        return self.render_template(template, {
             'title_str': 'BasicSwap Info',
             'message_str': info_str,
+            'summary': summary,
         })
 
-    def page_error(self, error_str):
+    def page_error(self, error_str, post_string):
         template = env.get_template('error.html')
-        return self.render_simple_template(template, {
+        swap_client = self.server.swap_client
+        summary = swap_client.getSummary()
+        return self.render_template(template, {
             'title_str': 'BasicSwap Error',
             'message_str': error_str,
+            'summary': summary,
         })
 
     def page_explorers(self, url_split, post_string):
         swap_client = self.server.swap_client
+        summary = swap_client.getSummary()
 
         result = None
         explorer = -1
@@ -182,11 +191,13 @@ class HttpHandler(BaseHTTPRequestHandler):
             'explorer': explorer,
             'actions': listExplorerActions(swap_client),
             'action': action,
-            'result': result
+            'result': result,
+            'summary': summary,
         })
 
     def page_rpc(self, url_split, post_string):
         swap_client = self.server.swap_client
+        summary = swap_client.getSummary()
 
         result = None
         coin_type = -1
@@ -242,10 +253,12 @@ class HttpHandler(BaseHTTPRequestHandler):
             'coin_type': coin_id,
             'result': result,
             'messages': messages,
+            'summary': summary,
         })
 
     def page_debug(self, url_split, post_string):
         swap_client = self.server.swap_client
+        summary = swap_client.getSummary()
 
         result = None
         messages = []
@@ -262,20 +275,24 @@ class HttpHandler(BaseHTTPRequestHandler):
         return self.render_template(template, {
             'messages': messages,
             'result': result,
+            'summary': summary,
         })
 
     def page_active(self, url_split, post_string):
         swap_client = self.server.swap_client
         active_swaps = swap_client.listSwapsInProgress()
+        summary = swap_client.getSummary()
 
         template = env.get_template('active.html')
         return self.render_template(template, {
             'refresh': 30,
             'active_swaps': [(s[0].hex(), s[1], strBidState(s[2]), strTxState(s[3]), strTxState(s[4])) for s in active_swaps],
+            'summary': summary,
         })
 
     def page_settings(self, url_split, post_string):
         swap_client = self.server.swap_client
+        summary = swap_client.getSummary()
 
         messages = []
         form_data = self.checkForm(post_string, 'settings', messages)
@@ -342,21 +359,25 @@ class HttpHandler(BaseHTTPRequestHandler):
         return self.render_template(template, {
             'messages': messages,
             'chains': chains_formatted,
+            'summary': summary,
         })
 
     def page_watched(self, url_split, post_string):
         swap_client = self.server.swap_client
         watched_outputs, last_scanned = swap_client.listWatchedOutputs()
+        summary = swap_client.getSummary()
 
         template = env.get_template('watched.html')
         return self.render_template(template, {
             'refresh': 30,
             'last_scanned': [(getCoinName(ls[0]), ls[1]) for ls in last_scanned],
             'watched_outputs': [(wo[1].hex(), getCoinName(wo[0]), wo[2], wo[3], int(wo[4])) for wo in watched_outputs],
+            'summary': summary,
         })
 
     def page_smsgaddresses(self, url_split, post_string):
         swap_client = self.server.swap_client
+        summary = swap_client.getSummary()
 
         page_data = {}
         messages = []
@@ -424,12 +445,14 @@ class HttpHandler(BaseHTTPRequestHandler):
             'data': page_data,
             'smsgaddresses': smsgaddresses,
             'network_addr': network_addr,
+            'summary': summary,
         })
 
     def page_identity(self, url_split, post_string):
         ensure(len(url_split) > 2, 'Address not specified')
         identity_address = url_split[2]
         swap_client = self.server.swap_client
+        summary = swap_client.getSummary()
 
         page_data = {'identity_address': identity_address}
         messages = []
@@ -464,6 +487,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         return self.render_template(template, {
             'messages': messages,
             'data': page_data,
+            'summary': summary,
         })
 
     def page_shutdown(self, url_split, post_string):
@@ -538,6 +562,8 @@ class HttpHandler(BaseHTTPRequestHandler):
                         '.svg': 'image/svg+xml',
                         '.png': 'image/png',
                         '.jpg': 'image/jpeg',
+                        '.gif': 'image/gif',
+                        '.ico': 'image/x-icon',
                     }.get(extension, '')
                     if mime_type == '':
                         raise ValueError('Unknown file type ' + filename)
@@ -578,6 +604,10 @@ class HttpHandler(BaseHTTPRequestHandler):
                     return page_wallet(self, url_split, post_string)
                 if page == 'settings':
                     return self.page_settings(url_split, post_string)
+                if page == 'error':
+                    return self.page_error(url_split, post_string)
+                if page == 'info':
+                    return self.page_info(url_split, post_string)
                 if page == 'rpc':
                     return self.page_rpc(url_split, post_string)
                 if page == 'debug':
@@ -594,8 +624,8 @@ class HttpHandler(BaseHTTPRequestHandler):
                     return page_offers(self, url_split, post_string, sent=True)
                 if page == 'bid':
                     return page_bid(self, url_split, post_string)
-                if page == 'bids':
-                    return page_bids(self, url_split, post_string)
+                if page == 'receivedbids':
+                    return page_bids(self, url_split, post_string, received=True)
                 if page == 'sentbids':
                     return page_bids(self, url_split, post_string, sent=True)
                 if page == 'availablebids':
@@ -656,7 +686,7 @@ class HttpThread(threading.Thread, HTTPServer):
         self.port_no = port_no
         self.allow_cors = allow_cors
         self.swap_client = swap_client
-        self.title = 'BasicSwap, ' + self.swap_client.chain
+        self.title = 'BasicSwap - ' + __version__
         self.last_form_id = dict()
         self.session_tokens = dict()
         self.env = env

@@ -243,19 +243,6 @@ class BTCInterface(CoinInterface):
     def getBlockHeader(self, block_hash):
         return self.rpc_callback('getblockheader', [block_hash])
 
-    def getBlockHeaderAt(self, time, block_after=False):
-        blockchaininfo = self.rpc_callback('getblockchaininfo')
-        last_block_header = self.rpc_callback('getblockheader', [blockchaininfo['bestblockhash']])
-
-        max_tries = 5000
-        for i in range(max_tries):
-            prev_block_header = self.rpc_callback('getblock', [last_block_header['previousblockhash']])
-            if prev_block_header['time'] <= time:
-                return last_block_header if block_after else prev_block_header
-
-            last_block_header = prev_block_header
-        raise ValueError(f'Block header not found at time: {time}')
-
     def initialiseWallet(self, key_bytes):
         key_wif = self.encodeKey(key_bytes)
 

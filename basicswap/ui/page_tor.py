@@ -22,8 +22,8 @@ def get_tor_established_state(swap_client):
 
 
 def page_tor(self, url_split, post_string):
-
     swap_client = self.server.swap_client
+    summary = swap_client.getSummary()
 
     page_data = {}
 
@@ -50,4 +50,5 @@ def page_tor(self, url_split, post_string):
     return self.render_template(template, {
         'messages': messages,
         'data': page_data,
+        'summary': summary,
     })

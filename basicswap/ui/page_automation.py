@@ -17,10 +17,10 @@ from basicswap.db import (
     strConcepts,
 )
 
-
 def page_automation_strategies(self, url_split, post_string):
     server = self.server
     swap_client = server.swap_client
+    summary = swap_client.getSummary()
 
     filters = {
         'page_no': 1,
@@ -53,12 +53,14 @@ def page_automation_strategies(self, url_split, post_string):
         'messages': messages,
         'filters': filters,
         'strategies': formatted_strategies,
+        'summary': summary,
     })
 
 
 def page_automation_strategy_new(self, url_split, post_string):
     server = self.server
     swap_client = self.server.swap_client
+    summary = swap_client.getSummary()
 
     messages = []
     form_data = self.checkForm(post_string, 'automationstrategynew', messages)
@@ -66,6 +68,7 @@ def page_automation_strategy_new(self, url_split, post_string):
     template = server.env.get_template('automation_strategy_new.html')
     return self.render_template(template, {
         'messages': messages,
+        'summary': summary,
     })
 
 
@@ -78,6 +81,7 @@ def page_automation_strategy(self, url_split, post_string):
 
     server = self.server
     swap_client = self.server.swap_client
+    summary = swap_client.getSummary()
 
     messages = []
 
@@ -96,4 +100,5 @@ def page_automation_strategy(self, url_split, post_string):
     return self.render_template(template, {
         'messages': messages,
         'strategy': formatted_strategy,
+        'summary': summary,
     })
