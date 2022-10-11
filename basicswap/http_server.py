@@ -32,7 +32,6 @@ from .basicswap_util import (
 from .js_server import (
     js_error,
     js_url_to_function,
-    js_generatenotification,
 )
 from .ui.util import (
     getCoinName,
@@ -88,6 +87,7 @@ def listExplorerActions(swap_client):
                ('unspent', 'List Unspent')]
     return actions
 
+
 class HttpHandler(BaseHTTPRequestHandler):
 
     def checkForm(self, post_string, name, messages):
@@ -132,7 +132,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             **args_dict,
         ), 'UTF-8')
 
-    def page_info(self, info_str, post_string):
+    def page_info(self, info_str, post_string=None):
         template = env.get_template('info.html')
         swap_client = self.server.swap_client
         summary = swap_client.getSummary()
@@ -142,7 +142,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             'summary': summary,
         })
 
-    def page_error(self, error_str, post_string):
+    def page_error(self, error_str, post_string=None):
         template = env.get_template('error.html')
         swap_client = self.server.swap_client
         summary = swap_client.getSummary()
