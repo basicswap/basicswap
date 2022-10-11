@@ -32,7 +32,6 @@ from .basicswap_util import (
 from .js_server import (
     js_error,
     js_url_to_function,
-    js_generatenotification,
 )
 from .ui.util import (
     getCoinName,
@@ -87,6 +86,7 @@ def listExplorerActions(swap_client):
                ('balance', 'Address Balance'),
                ('unspent', 'List Unspent')]
     return actions
+
 
 class HttpHandler(BaseHTTPRequestHandler):
 

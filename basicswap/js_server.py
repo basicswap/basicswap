@@ -412,6 +412,7 @@ def js_url_to_function(url_split):
         }.get(url_split[2], js_index)
     return js_index
 
+
 def js_generatenotification(self, url_split, post_string, is_json):
     swap_client = self.server.swap_client
     r = random.randint(0, 3)

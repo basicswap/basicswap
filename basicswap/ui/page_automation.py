@@ -17,6 +17,7 @@ from basicswap.db import (
     strConcepts,
 )
 
+
 def page_automation_strategies(self, url_split, post_string):
     server = self.server
     swap_client = server.swap_client
