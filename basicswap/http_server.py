@@ -132,7 +132,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             **args_dict,
         ), 'UTF-8')
 
-    def page_info(self, info_str, post_string):
+    def page_info(self, info_str, post_string=None):
         template = env.get_template('info.html')
         swap_client = self.server.swap_client
         summary = swap_client.getSummary()
@@ -142,7 +142,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             'summary': summary,
         })
 
-    def page_error(self, error_str, post_string):
+    def page_error(self, error_str, post_string=None):
         template = env.get_template('error.html')
         swap_client = self.server.swap_client
         summary = swap_client.getSummary()
