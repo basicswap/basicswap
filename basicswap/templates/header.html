@@ -658,21 +658,23 @@
 
       let event_message = 'Unknown event';
       if (json['event'] == 'new_offer') {
-          event_message = '<a href=/offer/' + json['offer_id'] + '>New offer</a>';
+          event_message = '<div class="p-4 w-full mt-5 text-gray-500 bg-white rounded-lg shadow"> <div class="flex"> <div class="text-sm font-normal"> <div class="mb-1 text-sm font-semibold text-gray-900"> <a href=/offer/' + json['offer_id'] + '>New offer</a></div></div></div></div>';
       } else
       if (json['event'] == 'new_bid') {
-          event_message = '<a href=/bid/' + json['bid_id'] + '>New bid</a> on offer <a href=/offer/' + json['offer_id'] + '>' + json['offer_id'] + '</a>';
+          event_message = '<div class="p-4 w-full mt-5 text-gray-500 bg-white rounded-lg shadow"> <div class="flex"> <div class="text-sm font-normal"> <div class="mb-1 text-sm font-semibold text-gray-900 "> <a href=/bid/' + json['bid_id'] + '>New bid</a> on offer</div><div class="mb-2 mt-2 text-sm"><a class="inline-flex px-2.5 py-1.5 text-xs font-small monospace text-center text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:outline-none focus:ring-blue-300" href=/offer/' + json['offer_id'] + '>' + json['offer_id'] + '</a></div></div>';
       } else
       if (json['event'] == 'bid_accepted') {
-          event_message = '<a href=/bid/' + json['bid_id'] + '>Bid accepted</a>';
+          event_message = '<div class="p-4 w-full mt-5 text-gray-500 bg-white rounded-lg shadow"><div class="flex"><div class="text-sm font-normal"><div class="mb-1 text-sm font-semibold text-gray-900"><a href=/bid/' + json['bid_id'] + '>Bid accepted</a></div></div></div></div>';
       }
 
       let messages = document.getElementById('ul_updates'),
-          message = document.createElement('li');
+      message = document.createElement('li');
+
       message.innerHTML = event_message;
       messages.appendChild(message);
   };
   floating_div.appendChild(messages);
   document.body.appendChild(floating_div);
+
   </script>
   {% endif %}

@@ -16,11 +16,10 @@
 
 .floatright
 {
-  position:fixed;
-  top:50px;
-  right:18px;
+  position: fixed;
+  top: 2em;
+  right: 2em;
   margin: 0;
-  width:calc(33.33% - 25px);
   z-index: 50;
 }
 
