@@ -115,6 +115,34 @@
         <div class="flex flex-wrap items-center justify-between -m-2">
           <div class="w-full pt-2">
 
+
+            <!-- TradingView Widget BEGIN -->
+            <div class="tradingview-widget-container">
+              <div id="tradingview_wrapper" class="h-96 mb-10"></div>
+              <script type="text/javascript" src="/static/js/libs/TV.js"></script>
+              <script type="text/javascript">
+              new TradingView.widget(
+              {
+              "autosize": true,
+              "symbol": "COINBASE:BTCUSD",
+              "interval": "D",
+              "timezone": "Etc/UTC",
+              "theme": "light",
+              "style": "1",
+              "locale": "en",
+              "toolbar_bg": "#f1f3f6",
+              "enable_publishing": false,
+              "allow_symbol_change": true,
+              "save_image": false,
+              "container_id": "tradingview_wrapper"
+            }
+              );
+              </script>
+            </div>
+            <!-- TradingView Widget END -->
+
+
+
             <form method="post">
 
               <div class="flex justify-between items-center pb-4 bg-white">
