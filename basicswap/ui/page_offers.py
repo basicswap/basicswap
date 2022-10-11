@@ -297,8 +297,6 @@ def offer_to_post_string(self, swap_client, offer_id):
         'validhrs': offer.time_valid // (60 * 60),
     }
 
-    swap_client.log.error('[rm] offer.amount_negotiable {}'.format(offer.amount_negotiable))
-    swap_client.log.error('[rm] offer.rate_negotiable {}'.format(offer.rate_negotiable))
     if offer.amount_negotiable:
         offer_data['amt_var'] = True
     if offer.rate_negotiable:
@@ -311,7 +309,6 @@ def offer_to_post_string(self, swap_client, offer_id):
             offer_data['lockhrs'] = offer.lock_value // 60
     try:
         strategy = swap_client.getLinkedStrategy(Concepts.OFFER, offer.offer_id)
-        swap_client.log.error('[rm] strategy {}'.format(strategy))
         offer_data['automation_strat_id'] = strategy[0]
     except Exception:
         pass  # None found

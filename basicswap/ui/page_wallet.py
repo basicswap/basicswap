@@ -65,7 +65,8 @@ def page_wallets(self, url_split, post_string):
 
     page_data = {}
     messages = []
-    form_data = self.checkForm(post_string, 'wallets', messages)
+    err_messages = []
+    form_data = self.checkForm(post_string, 'wallets', err_messages)
     if form_data:
         for c in Coins:
             if c not in chainparams:
@@ -79,19 +80,19 @@ def page_wallets(self, url_split, post_string):
                     swap_client.reseedWallet(c)
                     messages.append('Reseed complete ' + str(c))
                 except Exception as ex:
-                    messages.append('Reseed failed ' + str(ex))
+                    err_messages.append('Reseed failed ' + str(ex))
                 swap_client.updateWalletsInfo(True, c)
             elif bytes('withdraw_' + cid, 'utf-8') in form_data:
                 try:
                     value = form_data[bytes('amt_' + cid, 'utf-8')][0].decode('utf-8')
                     page_data['wd_value_' + cid] = value
                 except Exception as e:
-                    messages.append('Error: Missing value')
+                    err_messages.append('Missing value')
                 try:
                     address = form_data[bytes('to_' + cid, 'utf-8')][0].decode('utf-8')
                     page_data['wd_address_' + cid] = address
                 except Exception as e:
-                    messages.append('Error: Missing address')
+                    err_messages.append('Missing address')
 
                 subfee = True if bytes('subfee_' + cid, 'utf-8') in form_data else False
                 page_data['wd_subfee_' + cid] = subfee
@@ -103,7 +104,7 @@ def page_wallets(self, url_split, post_string):
                         page_data['wd_type_from_' + cid] = type_from
                         page_data['wd_type_to_' + cid] = type_to
                     except Exception as e:
-                        messages.append('Error: Missing type')
+                        err_messages.append('Missing type')
 
                 if len(messages) == 0:
                     ci = swap_client.ci(c)
@@ -113,13 +114,13 @@ def page_wallets(self, url_split, post_string):
                             txid = swap_client.withdrawParticl(type_from, type_to, value, address, subfee)
                             messages.append('Withdrew {} {} ({} to {}) to address {}<br/>In txid: {}'.format(value, ticker, type_from, type_to, address, txid))
                         except Exception as e:
-                            messages.append('Error: {}'.format(str(e)))
+                            err_messages.append(str(e))
                     else:
                         try:
                             txid = swap_client.withdrawCoin(c, value, address, subfee)
                             messages.append('Withdrew {} {} to address {}<br/>In txid: {}'.format(value, ticker, address, txid))
                         except Exception as e:
-                            messages.append('Error: {}'.format(str(e)))
+                            err_messages.append(str(e))
                     swap_client.updateWalletsInfo(True, c)
 
     swap_client.updateWalletsInfo()
@@ -153,6 +154,7 @@ def page_wallets(self, url_split, post_string):
     template = server.env.get_template('wallets.html')
     return self.render_template(template, {
         'messages': messages,
+        'err_messages': err_messages,
         'wallets': wallets_formatted,
         'summary': summary,
     })
@@ -169,7 +171,8 @@ def page_wallet(self, url_split, post_string):
 
     page_data = {}
     messages = []
-    form_data = self.checkForm(post_string, 'settings', messages)
+    err_messages = []
+    form_data = self.checkForm(post_string, 'wallet', err_messages)
     show_utxo_groups = False
     if form_data:
         cid = str(int(coin_id))
@@ -181,19 +184,19 @@ def page_wallet(self, url_split, post_string):
                 swap_client.reseedWallet(coin_id)
                 messages.append('Reseed complete ' + str(coin_id))
             except Exception as ex:
-                messages.append('Reseed failed ' + str(ex))
+                err_messages.append('Reseed failed ' + str(ex))
             swap_client.updateWalletsInfo(True, coin_id)
         elif bytes('withdraw_' + cid, 'utf-8') in form_data:
             try:
                 value = form_data[bytes('amt_' + cid, 'utf-8')][0].decode('utf-8')
                 page_data['wd_value_' + cid] = value
             except Exception as e:
-                messages.append('Error: Missing value')
+                err_messages.append('Missing value')
             try:
                 address = form_data[bytes('to_' + cid, 'utf-8')][0].decode('utf-8')
                 page_data['wd_address_' + cid] = address
             except Exception as e:
-                messages.append('Error: Missing address')
+                err_messages.append('Missing address')
 
             subfee = True if bytes('subfee_' + cid, 'utf-8') in form_data else False
             page_data['wd_subfee_' + cid] = subfee
@@ -205,7 +208,7 @@ def page_wallet(self, url_split, post_string):
                     page_data['wd_type_from_' + cid] = type_from
                     page_data['wd_type_to_' + cid] = type_to
                 except Exception as e:
-                    messages.append('Error: Missing type')
+                    err_messages.append('Missing type')
 
             if len(messages) == 0:
                 ci = swap_client.ci(coin_id)
@@ -215,13 +218,13 @@ def page_wallet(self, url_split, post_string):
                         txid = swap_client.withdrawParticl(type_from, type_to, value, address, subfee)
                         messages.append('Withdrew {} {} ({} to {}) to address {}<br/>In txid: {}'.format(value, ticker, type_from, type_to, address, txid))
                     except Exception as e:
-                        messages.append('Error: {}'.format(str(e)))
+                        err_messages.append(str(e))
                 else:
                     try:
                         txid = swap_client.withdrawCoin(coin_id, value, address, subfee)
                         messages.append('Withdrew {} {} to address {}<br/>In txid: {}'.format(value, ticker, address, txid))
                     except Exception as e:
-                        messages.append('Error: {}'.format(str(e)))
+                        err_messages.append(str(e))
                 swap_client.updateWalletsInfo(True, coin_id)
         elif have_data_entry(form_data, 'showutxogroups'):
             show_utxo_groups = True
@@ -238,7 +241,7 @@ def page_wallet(self, url_split, post_string):
                 txid, address = ci.createUTXO(value_sats)
                 messages.append('Created new utxo of value {} and address {}<br/>In txid: {}'.format(value, address, txid))
             except Exception as e:
-                messages.append('Error: {}'.format(str(e)))
+                err_messages.append(str(e))
                 if swap_client.debug is True:
                     swap_client.log.error(traceback.format_exc())
 
@@ -305,6 +308,7 @@ def page_wallet(self, url_split, post_string):
     template = server.env.get_template('wallet.html')
     return self.render_template(template, {
         'messages': messages,
+        'err_messages': err_messages,
         'w': wallet_data,
         'summary': summary,
     })

@@ -54,3 +54,7 @@ class PIVXInterface(BTCInterface):
         }
 
         return block_rv
+
+    def withdrawCoin(self, value, addr_to, subfee):
+        params = [addr_to, value, '', '', subfee]
+        return self.rpc_callback('sendtoaddress', params)
