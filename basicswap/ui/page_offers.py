@@ -410,11 +410,12 @@ def page_offer(self, url_split, post_string):
         'nb_validmins': 10,
     }
     messages = []
+    err_messages = []
     if swap_client.debug_ui:
         messages.append('Debug mode active.')
     sent_bid_id = None
     show_bid_form = None
-    form_data = self.checkForm(post_string, 'offer', messages)
+    form_data = self.checkForm(post_string, 'offer', err_messages)
 
     ci_from = swap_client.ci(Coins(offer.coin_from))
     ci_to = swap_client.ci(Coins(offer.coin_to))
@@ -430,7 +431,7 @@ def page_offer(self, url_split, post_string):
                 swap_client.revokeOffer(offer_id)
                 messages.append('Offer revoked')
             except Exception as ex:
-                messages.append('Revoke offer failed: ' + str(ex))
+                err_messages.append('Revoke offer failed: ' + str(ex))
         elif b'repeat_offer' in form_data:
             # Can't set the post data here as browsers will always resend the original post data when responding to redirects
             self.send_response(302)
@@ -470,7 +471,7 @@ def page_offer(self, url_split, post_string):
             except Exception as ex:
                 if self.server.swap_client.debug is True:
                     self.server.swap_client.log.error(traceback.format_exc())
-                messages.append('Error: Send bid failed: ' + str(ex))
+                err_messages.append('Send bid failed: ' + str(ex))
                 show_bid_form = True
 
     data = {
@@ -552,6 +553,7 @@ def page_offer(self, url_split, post_string):
         'offer_id': offer_id.hex(),
         'sent_bid_id': sent_bid_id,
         'messages': messages,
+        'err_messages': err_messages,
         'data': data,
         'bids': formatted_bids,
         'addrs': None if show_bid_form is None else swap_client.listSmsgAddresses('bid'),
