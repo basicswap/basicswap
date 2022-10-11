@@ -558,7 +558,7 @@ def page_offers(self, url_split, post_string, sent=False):
     template = server.env.get_template('offers.html')
     return self.render_template(template, {
         'page_type': 'Sent Offers' if sent else 'Network Offers',
-        'page_type_description': 'Sent Offers description' if sent else 'Network Offers description',
+        'page_type_description': '' if sent else '',
         'messages': messages,
         'coins_from': coins_from,
         'coins': coins_to,

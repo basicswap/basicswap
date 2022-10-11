@@ -520,10 +520,12 @@ class HttpHandler(BaseHTTPRequestHandler):
         })
 
     def page_404(self, url_split):
+        swap_client = self.server.swap_client
+        summary = swap_client.getSummary()
         template = env.get_template('404.html')
-        return bytes(template.render(
-            title=self.server.title,
-        ), 'UTF-8')
+        return self.render_template(template, {
+            'summary': summary,
+        })
 
     def putHeaders(self, status_code, content_type):
         self.send_response(status_code)
