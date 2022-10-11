@@ -9,7 +9,7 @@ import json
 import traceback
 import threading
 import http.client
-import urllib.parse
+from urllib import parse
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from jinja2 import Environment, PackageLoader
 
@@ -90,10 +90,13 @@ def listExplorerActions(swap_client):
 
 class HttpHandler(BaseHTTPRequestHandler):
 
+    def generate_form_id(self):
+        return os.urandom(8).hex()
+
     def checkForm(self, post_string, name, messages):
         if post_string == '':
             return None
-        form_data = urllib.parse.parse_qs(post_string)
+        form_data = parse.parse_qs(post_string)
         form_id = form_data[b'formid'][0].decode('utf-8')
         if self.server.last_form_id.get(name, None) == form_id:
             messages.append('Prevented double submit for form {}.'.format(form_id))
@@ -118,10 +121,11 @@ class HttpHandler(BaseHTTPRequestHandler):
                 if swap_client.debug:
                     swap_client.log.error(traceback.format_exc())
 
+        self.putHeaders(200, 'text/html')
         return bytes(template.render(
             title=self.server.title,
             h2=self.server.title,
-            form_id=os.urandom(8).hex(),
+            form_id=self.generate_form_id(),
             **args_dict,
         ), 'UTF-8')
 
@@ -535,7 +539,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def handle_http(self, status_code, path, post_string='', is_json=False):
-        parsed = urllib.parse.urlparse(self.path)
+        parsed = parse.urlparse(self.path)
         url_split = parsed.path.split('/')
         if post_string == '' and len(parsed.query) > 0:
             post_string = parsed.query
@@ -595,7 +599,6 @@ class HttpHandler(BaseHTTPRequestHandler):
                 return self.page_error(str(ex))
 
         try:
-            self.putHeaders(status_code, 'text/html')
             if len(url_split) > 1:
                 page = url_split[1]
                 if page == 'active':

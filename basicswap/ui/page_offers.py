@@ -6,6 +6,7 @@
 
 import traceback
 
+from urllib import parse
 from .util import (
     PAGE_LIMIT,
     getCoinType,
@@ -42,6 +43,15 @@ def value_or_none(v):
     if v == -1 or v == '-1':
         return None
     return v
+
+
+def decode_offer_id(v):
+    try:
+        offer_id = bytes.fromhex(v)
+        ensure(len(offer_id) == 28, 'Bad offer ID')
+        return offer_id
+    except Exception:
+        raise ValueError('Bad offer ID')
 
 
 def parseOfferFormData(swap_client, form_data, page_data, options={}):
@@ -264,6 +274,51 @@ def postNewOffer(swap_client, form_data):
     return postNewOfferFromParsed(swap_client, parsed_data)
 
 
+def offer_to_post_string(self, swap_client, offer_id):
+
+    offer, xmr_offer = swap_client.getXmrOffer(offer_id)
+    ensure(offer, 'Unknown offer ID')
+
+    ci_from = swap_client.ci(offer.coin_from)
+    ci_to = swap_client.ci(offer.coin_to)
+    offer_data = {
+        'formid': self.generate_form_id(),
+        'addr_to': offer.addr_to,
+        'addr_from': offer.addr_from,
+        'coin_from': offer.coin_from,
+        'coin_to': offer.coin_to,
+        # TODO store fee conf, or pass directly
+        # 'fee_from_conf'
+        # 'fee_to_conf'
+        'amt_from': ci_from.format_amount(offer.amount_from),
+        'amt_bid_min': ci_from.format_amount(offer.min_bid_amount),
+        'rate': ci_to.format_amount(offer.rate),
+        'amt_to': ci_to.format_amount((offer.amount_from * offer.rate) // ci_from.COIN()),
+        'validhrs': offer.time_valid // (60 * 60),
+    }
+
+    swap_client.log.error('[rm] offer.amount_negotiable {}'.format(offer.amount_negotiable))
+    swap_client.log.error('[rm] offer.rate_negotiable {}'.format(offer.rate_negotiable))
+    if offer.amount_negotiable:
+        offer_data['amt_var'] = True
+    if offer.rate_negotiable:
+        offer_data['rate_var'] = True
+
+    if offer.lock_type == TxLockTypes.SEQUENCE_LOCK_TIME or offer.lock_type == TxLockTypes.ABS_LOCK_TIME:
+        if offer.lock_value > 60 * 60:
+            offer_data['lockhrs'] = offer.lock_value // (60 * 60)
+        else:
+            offer_data['lockhrs'] = offer.lock_value // 60
+    try:
+        strategy = swap_client.getLinkedStrategy(Concepts.OFFER, offer.offer_id)
+        swap_client.log.error('[rm] strategy {}'.format(strategy))
+        offer_data['automation_strat_id'] = strategy[0]
+    except Exception:
+        pass  # None found
+
+    return parse.urlencode(offer_data).encode()
+
+
 def page_newoffer(self, url_split, post_string):
     server = self.server
     swap_client = server.swap_client
@@ -283,6 +338,13 @@ def page_newoffer(self, url_split, post_string):
         'automation_strat_id': -1,
         'amt_bid_min': format_amount(1000, 8),
     }
+
+    post_data = parse.parse_qs(post_string)
+    if 'offer_from' in post_data:
+        offer_from_id_hex = post_data['offer_from'][0]
+        offer_from_id = decode_offer_id(offer_from_id_hex)
+        post_string = offer_to_post_string(self, swap_client, offer_from_id)
+
     form_data = self.checkForm(post_string, 'newoffer', err_messages)
 
     if form_data:
@@ -337,11 +399,7 @@ def page_newoffer(self, url_split, post_string):
 
 def page_offer(self, url_split, post_string):
     ensure(len(url_split) > 2, 'Offer ID not specified')
-    try:
-        offer_id = bytes.fromhex(url_split[2])
-        ensure(len(offer_id) == 28, 'Bad offer ID')
-    except Exception:
-        raise ValueError('Bad offer ID')
+    offer_id = decode_offer_id(url_split[2])
     server = self.server
     swap_client = server.swap_client
     summary = swap_client.getSummary()
@@ -373,6 +431,12 @@ def page_offer(self, url_split, post_string):
                 messages.append('Offer revoked')
             except Exception as ex:
                 messages.append('Revoke offer failed: ' + str(ex))
+        elif b'repeat_offer' in form_data:
+            # Can't set the post data here as browsers will always resend the original post data when responding to redirects
+            self.send_response(302)
+            self.send_header('Location', '/newoffer?offer_from=' + offer_id.hex())
+            self.end_headers()
+            return bytes()
         elif b'newbid' in form_data:
             show_bid_form = True
         elif b'sendbid' in form_data:
