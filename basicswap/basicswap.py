@@ -3560,12 +3560,17 @@ class BasicSwap(BaseApp):
             num_messages = 0
             num_removed = 0
             for msg in ro['messages']:
-                num_messages += 1
-                expire_at = msg['sent'] + msg['ttl']
-                if expire_at < now:
-                    options = {'encoding': 'none', 'delete': True}
-                    del_msg = ci_part.json_request(rpc_conn, 'smsg', [msg['msgid'], options])
-                    num_removed += 1
+                try:
+                    num_messages += 1
+                    expire_at = msg['sent'] + msg['ttl']
+                    if expire_at < now:
+                        options = {'encoding': 'none', 'delete': True}
+                        del_msg = ci_part.json_request(rpc_conn, 'smsg', [msg['msgid'], options])
+                        num_removed += 1
+                except Exception as e:
+                    if self.debug:
+                        self.log.error(traceback.format_exc())
+                    continue
 
             if num_messages + num_removed > 0:
                 self.log.info('Expired {} / {} messages.'.format(num_removed, num_messages))
