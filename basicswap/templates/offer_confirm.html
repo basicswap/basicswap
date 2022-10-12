@@ -144,7 +144,7 @@
              </g>
             </svg>
            </div>
-           <select class="pl-10 appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" name="addr_to" disabled>
+           <select class="pl-10 appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 opacity-70" name="addr_to" disabled>
             <option{% if data.addr_to=="-1" %} selected{% endif %} value="-1">Public Network</option>
              {% for a in addrs_to %}
              <option{% if data.addr_to==a[0] %} selected{% endif %} value="{{ a[0] }}" class="">{{ a[0] }} {{ a[1] }}</option>
@@ -178,7 +178,7 @@
              </g>
             </svg>
            </div>
-           <select class="pl-10 appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" name="addr_from" disabled>
+           <select class="pl-10 appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 opacity-70" name="addr_from" disabled>
             {% for a in addrs %}
             <option{% if data.addr_from==a[0] %} selected{% endif %} value="{{ a[0] }}">{{ a[0] }} {{ a[1] }}</option>
              {% endfor %}
@@ -217,7 +217,7 @@
                </g>
               </svg>
              </div>
-             <select class="pl-10 appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" id="coin_from" name="coin_from" onchange="set_rate('coin_from');" disabled>
+             <select class="pl-10 appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 opacity-70" id="coin_from" name="coin_from" onchange="set_rate('coin_from');" disabled>
               <option value="-1">Coin From</option>
               {% for c in coins_from %}
               <option{% if data.coin_from==c[0] %} selected{% endif %} value="{{ c[0] }}">{{ c[1] }}</option>
@@ -299,7 +299,7 @@
                </g>
               </svg>
              </div>
-             <select class="pl-10 appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" name="fee_from_extra_" disabled>
+             <select class="pl-10 appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 opacity-70" name="fee_from_extra_" disabled>
               <option value="0">None</option>
               <option value="10" {% if data.fee_from_extra==10 %} selected{% endif %}>10%</option>
               <option value="50" {% if data.fee_from_extra==50 %} selected{% endif %}>50%</option>
@@ -345,7 +345,7 @@
                </g>
               </svg>
              </div>
-             <select class="pl-10 appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" id="coin_to" name="coin_to" onchange="set_rate('coin_to');" disabled>
+             <select class="pl-10 appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 opacity-70" id="coin_to" name="coin_to" onchange="set_rate('coin_to');" disabled>
               <option value="-1">Coin To</option>
               {% for c in coins %}
               <option{% if data.coin_to==c[0] %} selected{% endif %} value="{{ c[0] }}">{{ c[1] }}</option>
@@ -427,7 +427,7 @@
                </g>
               </svg>
              </div>
-             <select class="pl-10 appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" name="fee_to_extra_" disabled>
+             <select class="pl-10 appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 opacity-70" name="fee_to_extra_" disabled>
               <option value="0">None</option>
               <option value="10" {% if data.fee_from_extra==10 %} selected{% endif %}>10%</option>
               <option value="50" {% if data.fee_from_extra==50 %} selected{% endif %}>50%</option>
@@ -475,7 +475,7 @@
                </g>
               </svg>
              </div>
-             <select class="pl-10 appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" name="fee_to_extra" disabled>
+             <select class="pl-10 appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 opacity-70" name="fee_to_extra" disabled>
               <option value="0">None</option>
               <option value="10" {% if data.fee_from_extra==10 %} selected{% endif %}>10%</option>
               <option value="50" {% if data.fee_from_extra==50 %} selected{% endif %}>50%</option>
@@ -651,7 +651,7 @@
                </g>
               </svg>
              </div>
-             <select class="pl-10 appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" name="automation_strat_id" disabled>
+             <select class="pl-10 appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 opacity-70" name="automation_strat_id" disabled>
               <option value="-1" {% if data.automation_strat_id==-1 %} selected{% endif %}>None</option>
               {% for a in automation_strategies %}
               <option value="{{ a[0] }}" {% if data.automation_strat_id==a[0] %} selected{% endif %}>{{ a[1] }}</option>
@@ -674,11 +674,11 @@
          </div>
          <div class="w-full md:flex-1 p-3">
           <div class="form-check form-check-inline">
-           <input class="form-check-input h-4 w-4 border border-gray-300 rounded-sm bg-gray-50 checked:bg-blue-600 checked:border-blue-600 focus:outline-none transition duration-200 mt-1 align-top bg-no-repeat bg-center bg-contain float-left mr-2 cursor-pointer" type="checkbox" id="amt_var" name="amt_var" value="av" {% if data.amt_var==true %} checked="checked" {% endif %} disabled>
+           <input class="form-check-input h-4 w-4 border border-gray-300 rounded-sm bg-gray-50 checked:bg-blue-600 checked:border-blue-600 focus:outline-none transition duration-200 mt-1 align-top bg-no-repeat bg-center bg-contain float-left mr-2 cursor-pointer opacity-70" type="checkbox" id="amt_var" name="amt_var" value="av" {% if data.amt_var==true %} checked="checked" {% endif %} disabled>
            <label class="form-check-label inline-block text-gray-800" for="inlineCheckbox2">Amount Variable</label>
           </div>
           <div class="form-check form-check-inline">
-           <input class="form-check-input h-4 w-4 border border-gray-300 rounded-sm bg-gray-50 checked:bg-blue-600 checked:border-blue-600 focus:outline-none transition duration-200 mt-1 align-top bg-no-repeat bg-center bg-contain float-left mr-2 cursor-pointer" type="checkbox" id="rate_var" name="rate_var" value="rv" {% if data.rate_var==true %} checked="checked" {% endif %} disabled>
+           <input class="form-check-input h-4 w-4 border border-gray-300 rounded-sm bg-gray-50 checked:bg-blue-600 checked:border-blue-600 focus:outline-none transition duration-200 mt-1 align-top bg-no-repeat bg-center bg-contain float-left mr-2 cursor-pointer opacity-70" type="checkbox" id="rate_var" name="rate_var" value="rv" {% if data.rate_var==true %} checked="checked" {% endif %} disabled>
            <label class="form-check-label bg-gray-50inline-block text-gray-800" for="inlineCheckbox3">Rate Variable</label>
           </div>
          </div>
