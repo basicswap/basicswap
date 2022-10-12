@@ -623,6 +623,7 @@ def page_offers(self, url_split, post_string, sent=False):
         'page_type': 'Sent Offers' if sent else 'Network Offers',
         'page_type_description': '' if sent else '',
         'messages': messages,
+        'chart': 'hidden' if sent else '',
         'coins_from': coins_from,
         'coins': coins_to,
         'messages': messages,

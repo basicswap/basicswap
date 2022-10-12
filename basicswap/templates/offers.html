@@ -116,8 +116,9 @@
           <div class="w-full pt-2">
 
 
+
             <!-- TradingView (todo: only on network offers page) -->
-            <div class="tradingview-widget-container">
+            <div class="tradingview-widget-container {{ chart }}">
               <div id="tradingview_wrapper" class="h-96 mb-10"></div>
               <script type="text/javascript" src="/static/js/libs/tv-chart.js"></script>
               <script type="text/javascript">
@@ -140,8 +141,6 @@
               </script>
             </div>
             <!-- TradingView -->
-
-
 
             <form method="post">
 
@@ -282,8 +281,8 @@
                         <th scope="col" class="py-3 px-6"> From </th>
                         <th scope="col" class="py-3 px-6"> Recipient </th>
                         <!--<th scope="col" class="py-3 px-6">ID</th>-->
-                        <th scope="col" class="py-4 px-7"> BUYING </th>
-                        <th scope="col" class="py-3 px-7"> SELLING </th>
+                        <th scope="col" class="py-4"> BUYING </th>
+                        <th scope="col" class="py-3 px-6"> SELLING </th>
                         <th scope="col" class="py-3 px-6"> Amount From </th>
                         <th scope="col" class="py-3 px-6"> Amount To </th>
                         <th scope="col" class="py-3 px-6"> Rate </th>
@@ -312,9 +311,9 @@
                         <!--<td class="py-4 px-6 text-xs monospace">{{ o[8] }}{% if o[9]==true %} <b>Sent</b>{% endif %}</td>-->
                         <!--Todo: Add link back -->
                         <td class="py-4 px-6 monospace">{{ o[7] }} </td>
-                        <td class="py-4 px-6 text-xs monospace">{{ o[8] }}{% if o[9]==true %} <b></b>{% endif %}</td>
-                        <td class="py-4 px-6"><span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"><img class="h-6" src="/static/images/coins/{{ o[3] }}.png" alt=""></span> {{ o[3] }}</td>
-                        <td class="py-4 px-6"><span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"><img class="h-6" src="/static/images/coins/{{ o[2] }}.png" alt=""></span> {{ o[2] }}</td>
+                        <td class="py-4 px-6 text-xs monospace">{{ o[8] }}{% if o[9]==true %} {% endif %}</td>
+                        <td class="py-4"><span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"><img class="h-6" src="/static/images/coins/{{ o[3] }}.png" alt=""></span> {{ o[3] }}</td>
+                        <td class="py-4"><span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"><img class="h-6" src="/static/images/coins/{{ o[2] }}.png" alt=""></span> {{ o[2] }}</td>
                         <td class="py-4 px-6">{{ o[4] }}</td>
                         <td class="py-4 px-6">{{ o[5] }}</td>
                         <td class="py-4 px-6">{{ o[6] }}</td>
