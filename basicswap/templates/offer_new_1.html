@@ -83,6 +83,8 @@
 
             {% for m in err_messages %}
 
+
+
             <section class="py-4">
               <div class="container px-4 mx-auto">
                 <div class="p-6 bg-red-100 border border-red-200 rounded-md">
@@ -115,8 +117,46 @@
 
             {% endfor %}
 
+            <div class="p-5 mb-10">
+                <div class="mx-4 p-4">
+                    <div class="flex items-center">
+                        <div class="flex items-center text-teal-600 relative">
+                            <div class="rounded-full h-12 w-12 py-3 border-2 border-blue-500">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 24 24">
+                                    <g fill="#3b82f6"><polygon points="14.5 23.5 11.5 23.5 11.5 4.321 6.766 8.108 4.892 5.766 11.474 0.5 14.5 0.5 14.5 23.5" fill="#3b82f6"></polygon>
+                                    </g>
+                                </svg>
+                            </div>
+                            <div class="absolute top-0 -ml-10 text-center mt-16 w-32 text-xs font-medium uppercase text-gray-500">Step 1</div>
+                        </div>
+                        <div class="flex-auto border-t-2 border-teal-600"></div>
+                        <div class="flex items-center text-teal-600 relative">
+                            <div class="rounded-full transition duration-500 ease-in-out h-12 w-12 py-3 border-2 border-teal-600">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 24 24">
+                                <g fill="#3b82f6">
+                                <path d="M19.5,23.5H4.5V20.2l.667-.445C9.549,16.828,16.5,10.78,16.5,7c0-2.654-1.682-4-5-4A9.108,9.108,0,0,0,7.333,4.248L6.084,5.08,4.42,2.584l1.247-.832A11.963,11.963,0,0,1,11.5,0c4.935,0,8,2.683,8,7,0,5-6.5,10.662-10.232,13.5H19.5ZM6,21H6Z" fill="#d1d5db"></path>
+                              </g>
+                            </svg>
+                            </div>
+                            <div class="absolute top-0 -ml-10 text-center mt-16 w-32 text-xs font-medium uppercase text-gray-500">Step 2</div>
+                        </div>
+                        <div class="flex-auto border-t-2 border-teal-600"></div>
+                        <div class="flex items-center text-gray-500 relative">
+                            <div class="rounded-full transition duration-500 ease-in-out h-12 w-12 py-3 border-2 border-teal-600">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 24 24">
+                                  <g fill="#3b82f6" class="nc-icon-wrapper">
+                                    <polygon points="9 21 1 13 4 10 9 15 21 3 24 6 9 21" fill="#d1d5db"></polygon>
+                                  </g>
+                                </svg>
+                            </div>
+                            <div class="absolute top-0 -ml-10 text-center mt-16 w-32 text-xs font-medium uppercase text-gray-500">Confirm</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <form method="post">
-              <div class="py-6 border-b border-coolGray-100">
+              <div class="py-6 border-b border-t border-coolGray-100">
                 <div class="w-full md:w-10/12">
                   <div class="flex flex-wrap -m-3">
                     <div class="w-full md:w-1/3 p-3">
