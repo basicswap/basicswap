@@ -55,6 +55,7 @@ from tests.basicswap.common import (
     wait_for_bid_tx_state,
     wait_for_in_progress,
     read_json_api,
+    post_json_req,
     TEST_HTTP_HOST,
     TEST_HTTP_PORT,
     BASE_PORT,
@@ -536,6 +537,21 @@ class Test(unittest.TestCase):
         swap_clients[0].getChainClientSettings(Coins.BTC)['override_feerate'] = 10.0
         swap_clients[0].getChainClientSettings(Coins.PIVX)['override_feerate'] = 10.0
         wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.BID_ERROR, wait_for=60)
+
+    def test_08_withdrawal(self):
+        logging.info('---------- Test PIVX withdrawals')
+
+        pivx_addr = pivxRpc('getnewaddress \"Withdrawal test\"')
+        wallets0 = read_json_api(TEST_HTTP_PORT + 0, 'wallets')
+        assert (float(wallets0['PIVX']['balance']) > 100)
+
+        post_json = {
+            'value': 100,
+            'address': pivx_addr,
+            'subfee': False,
+        }
+        json_rv = json.loads(post_json_req('http://127.0.0.1:{}/json/wallets/pivx/withdraw'.format(TEST_HTTP_PORT + 0), post_json))
+        assert (len(json_rv['txid']) == 64)
 
     def pass_99_delay(self):
         global stop_test
