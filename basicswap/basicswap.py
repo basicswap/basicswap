@@ -39,6 +39,7 @@ from . import __version__
 from .rpc_xmr import make_xmr_rpc2_func
 from .util import (
     TemporaryError,
+    InactiveCoin,
     AutomationConstraint,
     format_amount,
     format_timestamp,
@@ -473,11 +474,21 @@ class BasicSwap(BaseApp):
         raise ValueError('Failed to select a working XMR daemon url.')
 
     def ci(self, coin):  # Coin interface
+        use_coinid = coin
+        interface_ind = 'interface'
         if coin == Coins.PART_ANON:
-            return self.coin_clients[Coins.PART]['interface_anon']
+            use_coinid = Coins.PART
+            interface_ind = 'interface_anon'
         if coin == Coins.PART_BLIND:
-            return self.coin_clients[Coins.PART]['interface_blind']
-        return self.coin_clients[coin]['interface']
+            use_coinid = Coins.PART
+            interface_ind = 'interface_blind'
+
+        if use_coinid not in self.coin_clients:
+            raise ValueError('Unknown coinid {}'.format(int(coin)))
+        if interface_ind not in self.coin_clients[use_coinid]:
+            raise InactiveCoin(int(coin))
+
+        return self.coin_clients[use_coinid][interface_ind]
 
     def createInterface(self, coin):
         if coin == Coins.PART:
@@ -4996,6 +5007,8 @@ class BasicSwap(BaseApp):
             if msg_type == MessageTypes.OFFER_REVOKE:
                 self.processOfferRevoke(msg)
 
+        except InactiveCoin as ex:
+            self.log.info('Ignoring message involving inactive coin {}, type {}'.format(Coins(ex.coinid).name, MessageTypes(msg_type).name))
         except Exception as ex:
             self.log.error('processMsg %s', str(ex))
             if self.debug:
