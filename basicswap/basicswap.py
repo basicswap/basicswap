@@ -657,7 +657,7 @@ class BasicSwap(BaseApp):
                 time.sleep(i + 1)
         except Exception as ex:
             str_ex = str(ex)
-            if 'Could not connect' in str_ex or 'Could not locate RPC credentials' in str_ex:
+            if 'Could not connect' in str_ex or 'Could not locate RPC credentials' in str_ex or 'couldn\'t connect to server' in str_ex:
                 if stopping:
                     for i in range(30):
                         # The lock file doesn't get deleted
@@ -727,7 +727,7 @@ class BasicSwap(BaseApp):
             ci.initialiseWallet(root_key)
         except Exception as e:
             # <  0.21: sethdseed cannot set a new HD seed while still in Initial Block Download.
-            self._log.error('initialiseWallet failed: {}'.format(str(e)))
+            self.log.error('initialiseWallet failed: {}'.format(str(e)))
             if raise_errors:
                 raise e
 
