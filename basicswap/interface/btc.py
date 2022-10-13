@@ -259,11 +259,7 @@ class BTCInterface(CoinInterface):
     def initialiseWallet(self, key_bytes):
         key_wif = self.encodeKey(key_bytes)
 
-        try:
-            self.rpc_callback('sethdseed', [True, key_wif])
-        except Exception as e:
-            # <  0.21: Cannot set a new HD seed while still in Initial Block Download.
-            self._log.error('sethdseed failed: {}'.format(str(e)))
+        self.rpc_callback('sethdseed', [True, key_wif])
 
     def getWalletInfo(self):
         return self.rpc_callback('getwalletinfo')

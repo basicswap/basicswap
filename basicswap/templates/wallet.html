@@ -177,7 +177,7 @@
                       <td>{{ w.expected_seed }}</td>{% if w.expected_seed != true %}
                       <td>
                         <input class="appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block p-2.5" type="submit" name="reseed_{{ w.cid }}" value="Reseed wallet" onclick="return confirmReseed();">
-                      </td>{% endif %}
+                      </td> </tr></table> {% else %}
                     </tr> {% if w.cid == '1' %}
                     <tr class="bg-white border-t hover:bg-gray-50">
                       <td class="py-4 px-6 bold">Stealth Address</td>
@@ -317,7 +317,7 @@
                     </div>
                   </div>
                 </div>
-              </div> {% endif %} {% endif %} {% endif %} {% endif %}
+              </div> {% endif %} {% endif %} {% endif %} {% endif %} {% endif %}
               <!-- havedata -->
               <input type="hidden" name="formid" value="{{ form_id }}">
   </form>

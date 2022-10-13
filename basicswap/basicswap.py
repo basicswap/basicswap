@@ -704,7 +704,7 @@ class BasicSwap(BaseApp):
             if synced < 1.0:
                 raise ValueError('{} chain is still syncing, currently at {}.'.format(self.coin_clients[c]['name'], synced))
 
-    def initialiseWallet(self, coin_type):
+    def initialiseWallet(self, coin_type, raise_errors=False):
         if coin_type == Coins.PART:
             return
         ci = self.ci(coin_type)
@@ -722,7 +722,14 @@ class BasicSwap(BaseApp):
 
         root_key = self.getWalletKey(coin_type, 1)
         root_hash = ci.getAddressHashFromKey(root_key)[::-1]
-        ci.initialiseWallet(root_key)
+
+        try:
+            ci.initialiseWallet(root_key)
+        except Exception as e:
+            # <  0.21: sethdseed cannot set a new HD seed while still in Initial Block Download.
+            self._log.error('initialiseWallet failed: {}'.format(str(e)))
+            if raise_errors:
+                raise e
 
         key_str = 'main_wallet_seedid_' + ci.coin_name().lower()
         self.setStringKV(key_str, root_hash.hex())
@@ -1499,7 +1506,7 @@ class BasicSwap(BaseApp):
         if ci.knownWalletSeed():
             raise ValueError('{} wallet seed is already derived from the particl mnemonic'.format(ci.coin_name()))
 
-        self.initialiseWallet(coin_type)
+        self.initialiseWallet(coin_type, raise_errors=True)
 
         # TODO: How to scan pruned blocks?
 
