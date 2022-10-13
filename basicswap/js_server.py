@@ -393,6 +393,39 @@ def js_index(self, url_split, post_string, is_json):
     return bytes(json.dumps(self.server.swap_client.getSummary()), 'UTF-8')
 
 
+def js_generatenotification(self, url_split, post_string, is_json):
+    swap_client = self.server.swap_client
+
+    if not swap_client.debug:
+        raise ValueError('Debug mode not active.')
+
+    r = random.randint(0, 3)
+    if r == 0:
+        swap_client.notify(NT.OFFER_RECEIVED, {'offer_id': random.randbytes(28).hex()})
+    elif r == 1:
+        swap_client.notify(NT.BID_RECEIVED, {'type': 'atomic', 'bid_id': random.randbytes(28).hex(), 'offer_id': random.randbytes(28).hex()})
+    elif r == 2:
+        swap_client.notify(NT.BID_ACCEPTED, {'bid_id': random.randbytes(28).hex()})
+    elif r == 3:
+        swap_client.notify(NT.BID_RECEIVED, {'type': 'xmr', 'bid_id': random.randbytes(28).hex(), 'offer_id': random.randbytes(28).hex()})
+
+    return bytes(json.dumps({'type': r}), 'UTF-8')
+
+
+def js_notifications(self, url_split, post_string, is_json):
+    swap_client = self.server.swap_client
+    swap_client.getNotifications()
+
+    return bytes(json.dumps(swap_client.getNotifications()), 'UTF-8')
+
+
+def js_vacuumdb(self, url_split, post_string, is_json):
+    swap_client = self.server.swap_client
+    swap_client.vacuumDB()
+
+    return bytes(json.dumps({'completed': True}), 'UTF-8')
+
+
 def js_url_to_function(url_split):
     if len(url_split) > 2:
         return {
@@ -409,20 +442,7 @@ def js_url_to_function(url_split):
             'rates': js_rates,
             'rateslist': js_rates_list,
             'generatenotification': js_generatenotification,
+            'notifications': js_notifications,
+            'vacuumdb': js_vacuumdb,
         }.get(url_split[2], js_index)
     return js_index
-
-
-def js_generatenotification(self, url_split, post_string, is_json):
-    swap_client = self.server.swap_client
-    r = random.randint(0, 3)
-    if r == 0:
-        swap_client.notify(NT.OFFER_RECEIVED, {'offer_id': random.randbytes(28).hex()})
-    elif r == 1:
-        swap_client.notify(NT.BID_RECEIVED, {'type': 'atomic', 'bid_id': random.randbytes(28).hex(), 'offer_id': random.randbytes(28).hex()})
-    elif r == 2:
-        swap_client.notify(NT.BID_ACCEPTED, {'bid_id': random.randbytes(28).hex()})
-    elif r == 3:
-        swap_client.notify(NT.BID_RECEIVED, {'type': 'xmr', 'bid_id': random.randbytes(28).hex(), 'offer_id': random.randbytes(28).hex()})
-
-    return bytes(json.dumps({'type': r}), 'UTF-8')

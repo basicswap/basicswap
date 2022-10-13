@@ -121,6 +121,9 @@ class HttpHandler(BaseHTTPRequestHandler):
                 if swap_client.debug:
                     swap_client.log.error(traceback.format_exc())
 
+        if swap_client._show_notifications:
+            args_dict['notifications'] = swap_client.getNotifications()
+
         self.putHeaders(200, 'text/html')
         return bytes(template.render(
             title=self.server.title,

@@ -12,7 +12,7 @@ from enum import IntEnum, auto
 from sqlalchemy.ext.declarative import declarative_base
 
 
-CURRENT_DB_VERSION = 15
+CURRENT_DB_VERSION = 16
 CURRENT_DB_DATA_VERSION = 2
 Base = declarative_base()
 
@@ -472,3 +472,13 @@ class BidState(Base):
 
     note = sa.Column(sa.String)
     created_at = sa.Column(sa.BigInteger)
+
+
+class Notification(Base):
+    __tablename__ = 'notifications'
+
+    record_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
+    active_ind = sa.Column(sa.Integer)
+    created_at = sa.Column(sa.BigInteger)
+    event_type = sa.Column(sa.Integer)
+    event_data = sa.Column(sa.LargeBinary)

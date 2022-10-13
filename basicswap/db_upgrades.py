@@ -215,6 +215,16 @@ def upgradeDatabase(self, db_version):
             db_version += 1
             session.execute('ALTER TABLE xmr_swaps ADD COLUMN coin_a_lock_release_msg_id BLOB')
             session.execute('ALTER TABLE xmr_swaps RENAME COLUMN coin_a_lock_refund_spend_tx_msg_id TO coin_a_lock_spend_tx_msg_id')
+        elif current_version == 15:
+            db_version += 1
+            session.execute('''
+                CREATE TABLE notifications (
+                    record_id INTEGER NOT NULL,
+                    active_ind INTEGER,
+                    event_type INTEGER,
+                    event_data BLOB,
+                    created_at BIGINT,
+                    PRIMARY KEY (record_id))''')
 
         if current_version != db_version:
             self.db_version = db_version

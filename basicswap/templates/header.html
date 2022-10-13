@@ -680,5 +680,8 @@
   floating_div.appendChild(messages);
   document.body.appendChild(floating_div);
 
+  {% for entry in notifications %}
+    console.log({{ entry[0] }}, {{ entry[1] }}, {{ entry[2] }});
+  {% endfor %}
   </script>
   {% endif %}

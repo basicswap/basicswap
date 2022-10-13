@@ -28,6 +28,7 @@ class AutomationConstraint(ValueError):
 class InactiveCoin(Exception):
     def __init__(self, coinid):
         self.coinid = coinid
+
     def __str__(self):
         return str(self.coinid)
 
