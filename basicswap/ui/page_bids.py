@@ -168,9 +168,9 @@ def page_bids(self, url_split, post_string, sent=False, available=False, receive
 
     template = server.env.get_template('bids.html')
     return self.render_template(template, {
-        'page_type_sent': 'Sent' if sent else '',
-        'page_type_available': 'Available' if available else '',
-        'page_type_received': 'Received' if received else '',
+        'page_type_sent': 'Bids Sent' if sent else '',
+        'page_type_available': 'Bids Available' if available else '',
+        'page_type_received': 'Received Bids' if received else '',
         'page_type_sent_description': '' if sent else '',
         'page_type_available_description': '' if available else '',
         'page_type_received_description': '' if received else '',

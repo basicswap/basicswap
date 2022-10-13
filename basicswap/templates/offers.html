@@ -179,7 +179,7 @@
                           <select name="coin_from " class="appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
                             <!--<option value="-1 "{% if filters.coin_from==-1 %} selected{% endif %}>SELLING</option>-->
                             {% for c in coins_from %}
-                            <option value="{{ c[0] }}" "{% if filters.coin_from==c[0] %} selected{% endif %}">SELLING: {{ c[1] }}</option>
+                            <option value="{{ c[0] }}" "{% if filters.coin_from==c[0] %} selected{% endif %}">WITH: {{ c[1] }}</option>
                             {% endfor %}
                           </select>
                         </div>
@@ -270,7 +270,6 @@
                 </div>
               </div>
 
-
               <div class="container px-0 mx-auto mt-5">
                 <div class="overflow-x-auto relative border sm:rounded-lg">
                   <table class="w-full text-sm text-left text-gray-500 outline-none border-gray-300">
@@ -281,10 +280,10 @@
                         <th scope="col" class="py-3 px-6"> From </th>
                         <th scope="col" class="py-3 px-6"> Recipient </th>
                         <!--<th scope="col" class="py-3 px-6">ID</th>-->
-                        <th scope="col" class="py-4"> BUYING </th>
-                        <th scope="col" class="py-3 px-6"> SELLING </th>
-                        <th scope="col" class="py-3 px-6"> Amount From </th>
-                        <th scope="col" class="py-3 px-6"> Amount To </th>
+                        <th scope="col" class="py-3"> You Get </th>
+                        <th scope="col" class="py-3"></th>
+                        <th scope="col" class="py-3"> You Send </th>
+                        <th scope="col" class="py-3"></th>
                         <th scope="col" class="py-3 px-6"> Rate </th>
                         <!--Todo: Add swap + id back -->
                         <!--<th scope="col" class="py-3 px-6">Amount From Swapped </th>-->
@@ -312,13 +311,13 @@
                         <!--Todo: Add link back -->
                         <td class="py-4 px-6 monospace">{{ o[7] }} </td>
                         <td class="py-4 px-6 text-xs monospace">{{ o[8] }}{% if o[9]==true %} {% endif %}</td>
-                        <td class="py-4"><span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"><img class="h-6" src="/static/images/coins/{{ o[3] }}.png" alt=""></span> {{ o[3] }}</td>
-                        <td class="py-4"><span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"><img class="h-6" src="/static/images/coins/{{ o[2] }}.png" alt=""></span> {{ o[2] }}</td>
-                        <td class="py-4 px-6">{{ o[4] }}</td>
-                        <td class="py-4 px-6">{{ o[5] }}</td>
+                        <td class="py-4"><span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"><img class="h-6" src="/static/images/coins/{{ o[3] }}.png" alt=""></span> {{ o[3] }}:</td>
+                        <td class="py-4">{{ o[4] }}</td>
+                        <td class="py-4"><span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"><img class="h-6" src="/static/images/coins/{{ o[2] }}.png" alt=""></span> {{ o[2] }}:</td>
+                        <td class="py-4">{{ o[5] }}</td>
                         <td class="py-4 px-6">{{ o[6] }}</td>
                         <!--  <td class="py-4 px-6">{{ o[10] }}</td>-->
-                        <td class="py-4 px-6"> <a class="inline-block w-20 py-1 px-2 font-medium text-center text-sm rounded-md shadow-button {% if o[9]==true %} bg-white text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 {% else %} bg-blue-500 text-white {% endif %}" href="/offer/{{ o[1] }}">{% if o[9]==true %}Edit {% else %} Trade {% endif %}</a>
+                        <td class="py-4 px-6"> <a class="inline-block w-20 py-1 px-2 font-medium text-center text-sm rounded-md shadow-button {% if o[9]==true %} bg-white text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 {% else %} bg-blue-500 text-white {% endif %}" href="/offer/{{ o[1] }}">{% if o[9]==true %}Edit {% else %} Swap {% endif %}</a>
                         </td>
                       </tr>
                     </tbody>
