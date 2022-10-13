@@ -311,11 +311,11 @@
                         <!--Todo: Add link back -->
                         <td class="py-4 px-6 monospace">{{ o[7] }} </td>
                         <td class="py-4 px-6 text-xs monospace">{{ o[8] }}{% if o[9]==true %} {% endif %}</td>
-                        <td class="py-4"><span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"><img class="h-6" src="/static/images/coins/{{ o[3] }}.png" alt=""></span> {{ o[3] }}:</td>
-                        <td class="py-4">{{ o[4] }}</td>
-                        <td class="py-4"><span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"><img class="h-6" src="/static/images/coins/{{ o[2] }}.png" alt=""></span> {{ o[2] }}:</td>
-                        <td class="py-4">{{ o[5] }}</td>
-                        <td class="py-4 px-6">{{ o[6] }}</td>
+                        <td class="py-4"><span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"><img class="h-7" src="/static/images/coins/{{ o[2] }}.png" alt=""></span> {{ o[2] }}</td>
+                        <td class="py-4 text-xs">{{ o[4] }}</td>
+                        <td class="py-4"><span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"><img class="h-7" src="/static/images/coins/{{ o[3] }}.png" alt=""></span> {{ o[3] }}</td>
+                        <td class="py-4 text-xs">{{ o[5] }}</td>
+                        <td class="py-4 text-xs px-6">{{ o[6] }}</td>
                         <!--  <td class="py-4 px-6">{{ o[10] }}</td>-->
                         <td class="py-4 px-6"> <a class="inline-block w-20 py-1 px-2 font-medium text-center text-sm rounded-md shadow-button {% if o[9]==true %} bg-white text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 {% else %} bg-blue-500 text-white {% endif %}" href="/offer/{{ o[1] }}">{% if o[9]==true %}Edit {% else %} Swap {% endif %}</a>
                         </td>

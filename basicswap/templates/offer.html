@@ -301,20 +301,20 @@ None
 {% if data.amount_negotiable == true %}
   <tr class="bg-white border-t hover:bg-gray-50">
   <td class="py-4 px-6 bold">Amount</td>
-  <td class="py-4 px-6"><input type="text" id="bid_amount" name="bid_amount" value="{{ data.bid_amount }}" onchange="updateBidParams('amount');"></td>
+  <td class="py-4 px-6"><input type="text" class="appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block p-2.5" id="bid_amount" name="bid_amount" value="{{ data.bid_amount }}" onchange="updateBidParams('amount');"></td>
 </tr>
 {% endif %}
 
 {% if data.rate_negotiable == true %}
   <tr class="bg-white border-t hover:bg-gray-50">
   <td class="py-4 px-6 bold">Rate</td>
-  <td class="py-4"><input type="text" id="bid_rate" name="bid_rate" value="{{ data.bid_rate }}" onchange="updateBidParams('rate');"></td>
+  <td class="py-4"><input type="text" class="appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block p-2.5" id="bid_rate" name="bid_rate" value="{{ data.bid_rate }}" onchange="updateBidParams('rate');"></td>
 </tr>
 {% endif %}
 
   <tr class="bg-white border-t hover:bg-gray-50">
   <td class="py-4 px-6 bold">Minutes valid</td>
-  <td class="py-4"><input type="number" name="validmins" min="10" max="1440" value="{{ data.nb_validmins }}">
+  <td class="py-4"><input type="number" class="appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block p-2.5" name="validmins" min="10" max="1440" value="{{ data.nb_validmins }}">
   </td>
 </tr>
 
