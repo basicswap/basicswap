@@ -124,6 +124,22 @@ class HttpHandler(BaseHTTPRequestHandler):
         if swap_client._show_notifications:
             args_dict['notifications'] = swap_client.getNotifications()
 
+        if 'messages' in args_dict:
+            messages_with_ids = []
+            for msg in args_dict['messages']:
+                messages_with_ids.append((self.server.msg_id_counter, msg))
+                self.server.msg_id_counter += 1
+            args_dict['messages'] = messages_with_ids
+        if 'err_messages' in args_dict:
+            err_messages_with_ids = []
+            for msg in args_dict['err_messages']:
+                err_messages_with_ids.append((self.server.msg_id_counter, msg))
+                self.server.msg_id_counter += 1
+            args_dict['err_messages'] = err_messages_with_ids
+
+        if self.server.msg_id_counter >= 0x7FFFFFFF:
+            self.server.msg_id_counter = 0
+
         self.putHeaders(200, 'text/html')
         return bytes(template.render(
             title=self.server.title,
@@ -698,6 +714,7 @@ class HttpThread(threading.Thread, HTTPServer):
         self.last_form_id = dict()
         self.session_tokens = dict()
         self.env = env
+        self.msg_id_counter = 0
 
         self.timeout = 60
         HTTPServer.__init__(self, (self.host_name, self.port_no), HttpHandler)
