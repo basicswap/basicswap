@@ -251,7 +251,7 @@ class BasicSwap(BaseApp):
         self.min_delay_retry = self.settings.get('min_delay_retry', 60)
         self.max_delay_retry = self.settings.get('max_delay_retry', 5 * 60)
 
-        self.min_sequence_lock_seconds = self.settings.get('min_sequence_lock_seconds', 1 * 60 * 60)
+        self.min_sequence_lock_seconds = self.settings.get('min_sequence_lock_seconds', 60 if self.debug else (1 * 60 * 60))
         self.max_sequence_lock_seconds = self.settings.get('max_sequence_lock_seconds', 96 * 60 * 60)
 
         self._bid_expired_leeway = 5

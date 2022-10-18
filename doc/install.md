@@ -32,7 +32,7 @@ Without this step you will need to preface each `docker-compose` command with `s
 
 #### Create the images:
 
-COINDATA_PATH can be set to your preferance but must be exported each time you launch Basicswap.<br>
+COINDATA_PATH can be set to your preference but must be exported each time you launch Basicswap.<br>
 Consider adding COINDATA_PATH to the `.env` file in the docker directory file so it's always set.
 
     export COINDATA_PATH=/var/data/coinswaps
