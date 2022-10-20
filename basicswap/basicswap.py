@@ -1034,7 +1034,7 @@ class BasicSwap(BaseApp):
     def getNotifications(self):
         rv = []
         for k, v in self._notifications_cache.items():
-            rv.append((time.strftime('%d-%m-%y %H:%M:%S', time.localtime(k)), int(v[0]), json.dumps(v[1])))
+            rv.append((time.strftime('%d-%m-%y %H:%M:%S', time.localtime(k)), int(v[0]), v[1]))
         return rv
 
     def vacuumDB(self):

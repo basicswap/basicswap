@@ -682,6 +682,15 @@
 
   {% for entry in notifications %}
     console.log({{ entry[0] }}, {{ entry[1] }}, {{ entry[2] }});
+    {% if entry[1] == 1 %}
+    console.log('new_offer {{ entry[2].offer_id }}');
+    {% elif entry[1] == 2 %}
+    console.log('new_bid {{ entry[2].bid_id }}  on  {{ entry[2].offer_id }}');
+    {% elif entry[1] == 3 %}
+    console.log('bid_accepted {{ entry[2].bid_id }}');
+    {% else %}
+    console.log('Unknown event {{ entry[1] }}');
+    {% endif %}
   {% endfor %}
   </script>
   {% endif %}
