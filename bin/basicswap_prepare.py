@@ -49,7 +49,10 @@ XMR_SITE_COMMIT = 'f093c0da2219d94e6bef5f3948ac61b4ecdcb95b'  # Lock hashes.txt 
 PIVX_VERSION = os.getenv('PIVX_VERSION', '5.4.99')
 PIVX_VERSION_TAG = os.getenv('PIVX_VERSION_TAG', '_scantxoutset')
 
-# version, version tag eg. "rc1", signers
+DASH_VERSION = os.getenv('DASH_VERSION', '18.1.0')
+DASH_VERSION_TAG = os.getenv('DASH_VERSION_TAG', '')
+
+
 known_coins = {
     'particl': (PARTICL_VERSION, PARTICL_VERSION_TAG, ('tecnovert',)),
     'litecoin': (LITECOIN_VERSION, LITECOIN_VERSION_TAG, ('davidburkett38',)),
@@ -57,6 +60,7 @@ known_coins = {
     'namecoin': ('0.18.0', '', ('JeremyRand',)),
     'monero': (MONERO_VERSION, MONERO_VERSION_TAG, ('binaryfate',)),
     'pivx': (PIVX_VERSION, PIVX_VERSION_TAG, ('tecnovert',)),
+    'dash': (DASH_VERSION, DASH_VERSION_TAG, ('pasta',)),
 }
 
 expected_key_ids = {
@@ -67,6 +71,7 @@ expected_key_ids = {
     'binaryfate': ('F0AF4D462A0BDF92',),
     'davidburkett38': ('3620E9D387E55666',),
     'fuzzbawls': ('3BDCDA2D87A881D9',),
+    'pasta': ('52527BEDABE87984',),
 }
 
 if platform.system() == 'Darwin':
@@ -124,6 +129,12 @@ PIVX_RPC_PORT = int(os.getenv('PIVX_RPC_PORT', 51473))
 PIVX_ONION_PORT = int(os.getenv('PIVX_ONION_PORT', 51472))  # nDefaultPort
 PIVX_RPC_USER = os.getenv('PIVX_RPC_USER', '')
 PIVX_RPC_PWD = os.getenv('PIVX_RPC_PWD', '')
+
+DASH_RPC_HOST = os.getenv('DASH_RPC_HOST', '127.0.0.1')
+DASH_RPC_PORT = int(os.getenv('DASH_RPC_PORT', 9998))
+DASH_ONION_PORT = int(os.getenv('DASH_ONION_PORT', 9999))  # nDefaultPort
+DASH_RPC_USER = os.getenv('DASH_RPC_USER', '')
+DASH_RPC_PWD = os.getenv('DASH_RPC_PWD', '')
 
 TOR_PROXY_HOST = os.getenv('TOR_PROXY_HOST', '127.0.0.1')
 TOR_PROXY_PORT = int(os.getenv('TOR_PROXY_PORT', 9050))
@@ -296,6 +307,7 @@ def extractCore(coin, version_data, settings, bin_dir, release_path, extra_opts=
 
     bins = [coin + 'd', coin + '-cli', coin + '-tx']
     versions = version.split('.')
+    dir_name = 'dashcore' if coin == 'dash' else coin
     if int(versions[0]) >= 22 or int(versions[1]) >= 19:
         bins.append(coin + '-wallet')
     if 'win32' in BIN_ARCH or 'win64' in BIN_ARCH:
@@ -305,7 +317,7 @@ def extractCore(coin, version_data, settings, bin_dir, release_path, extra_opts=
                 out_path = os.path.join(bin_dir, b)
                 if (not os.path.exists(out_path)) or extract_core_overwrite:
                     with open(out_path, 'wb') as fout:
-                        fout.write(fz.read('{}-{}/bin/{}'.format(coin, version, b)))
+                        fout.write(fz.read('{}-{}/bin/{}'.format(dir_name, version, b)))
                     try:
                         os.chmod(out_path, stat.S_IRWXU | stat.S_IXGRP | stat.S_IXOTH)
                     except Exception as e:
@@ -317,9 +329,9 @@ def extractCore(coin, version_data, settings, bin_dir, release_path, extra_opts=
                 if not os.path.exists(out_path) or extract_core_overwrite:
 
                     if coin == 'pivx':
-                        filename = '{}-{}/bin/{}'.format(coin, version, b)
+                        filename = '{}-{}/bin/{}'.format(dir_name, version, b)
                     else:
-                        filename = '{}-{}/bin/{}'.format(coin, version + version_tag, b)
+                        filename = '{}-{}/bin/{}'.format(dir_name, version + version_tag, b)
 
                     with open(out_path, 'wb') as fout, ft.extractfile(filename) as fi:
                         fout.write(fi.read())
@@ -394,6 +406,11 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
             release_url = 'https://github.com/tecnovert/particl-core/releases/download/v{}/{}'.format(version + version_tag, release_filename)
             assert_filename = 'pivx-{}-6.0-build.assert'.format(os_name)
             assert_url = 'https://raw.githubusercontent.com/tecnovert/gitian.sigs/pivx/5.4.99_scantxoutset-{}/tecnovert/{}'.format(os_dir_name, assert_filename)
+        elif coin == 'dash':
+            release_filename = '{}-{}-{}{}.{}'.format('dashcore', version + version_tag, BIN_ARCH, filename_extra, FILE_EXT)
+            release_url = 'https://github.com/dashpay/dash/releases/download/v{}/{}'.format(version + version_tag, release_filename)
+            assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, major_version)
+            assert_url = 'https://raw.githubusercontent.com/dashpay/gitian.sigs/master/%s-%s/%s/%s' % (version + version_tag, os_dir_name, signing_key_name, assert_filename)
         else:
             raise ValueError('Unknown coin')
 
@@ -468,10 +485,12 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
                 filename = '{}_{}.pgp'.format('particl', signing_key_name)
             else:
                 filename = '{}_{}.pgp'.format(coin, signing_key_name)
-            pubkeyurls = (
+            pubkeyurls = [
                 'https://raw.githubusercontent.com/tecnovert/basicswap/master/pgp/keys/' + filename,
                 'https://gitlab.com/particl/basicswap/-/raw/master/pgp/keys/' + filename,
-            )
+            ]
+            if coin == 'dash':
+                pubkeyurls.append('https://raw.githubusercontent.com/dashpay/dash/master/contrib/gitian-keys/pasta.pgp')
             for url in pubkeyurls:
                 try:
                     logger.info('Importing public key from url: ' + url)
@@ -631,6 +650,11 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
             fp.write(f'paramsdir={params_dir}\n')
             if PIVX_RPC_USER != '':
                 fp.write('rpcauth={}:{}${}\n'.format(PIVX_RPC_USER, salt, password_to_hmac(salt, PIVX_RPC_PWD)))
+        elif coin == 'dash':
+            fp.write('prune=4000\n')
+            fp.write('fallbackfee=0.0002\n')
+            if DASH_RPC_USER != '':
+                fp.write('rpcauth={}:{}${}\n'.format(DASH_RPC_USER, salt, password_to_hmac(salt, DASH_RPC_PWD)))
         else:
             logger.warning('Unknown coin %s', coin)
 
@@ -846,11 +870,9 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
         with open(os.path.join(data_dir, 'basicswap.log'), 'a') as fp:
             swap_client = BasicSwap(fp, data_dir, settings, chain)
 
-            start_daemons = {c for c in with_coins}
-            if 'particl' not in with_coins:
-                # Particl must be running to initialise a wallet in addcoin mode
-                start_daemons.add('particl')
-
+            # Always start Particl, it must be running to initialise a wallet in addcoin mode
+            # Particl must be loaded first as subsequent coins are initialised from the Particl mnemonic
+            start_daemons = ['particl', ] + [c for c in with_coins if c != 'particl']
             for coin_name in start_daemons:
                 coin_settings = settings['chainclients'][coin_name]
                 c = swap_client.getCoinIdFromName(coin_name)
@@ -862,6 +884,10 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
                     if coin_settings['manage_daemon']:
                         filename = coin_name + 'd' + ('.exe' if os.name == 'nt' else '')
                         coin_args = ['-nofindpeers', '-nostaking'] if c == Coins.PART else []
+
+                        if c == Coins.DASH:
+                            coin_args += ['-hdseed={}'.format(swap_client.getWalletKey(Coins.DASH, 1).hex())]
+
                         daemons.append(startDaemon(coin_settings['datadir'], coin_settings['bindir'], filename, daemon_args + coin_args))
                         swap_client.setDaemonPID(c, daemons[-1].pid)
                 swap_client.setCoinRunParams(c)
@@ -875,15 +901,15 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
                         logger.info('Creating wallet.dat for {}.'.format(coin_name.capitalize()))
                         swap_client.callcoinrpc(c, 'createwallet', ['wallet.dat'])
 
-            if 'particl' in with_coins:
-                logger.info('Loading Particl mnemonic')
-                if particl_wallet_mnemonic is None:
-                    particl_wallet_mnemonic = swap_client.callcoinrpc(Coins.PART, 'mnemonic', ['new'])['mnemonic']
-                swap_client.callcoinrpc(Coins.PART, 'extkeyimportmaster', [particl_wallet_mnemonic])
+                    if 'particl' in with_coins and c == Coins.PART:
+                        logger.info('Loading Particl mnemonic')
+                        if particl_wallet_mnemonic is None:
+                            particl_wallet_mnemonic = swap_client.callcoinrpc(Coins.PART, 'mnemonic', ['new'])['mnemonic']
+                        swap_client.callcoinrpc(Coins.PART, 'extkeyimportmaster', [particl_wallet_mnemonic])
 
             for coin_name in with_coins:
                 c = swap_client.getCoinIdFromName(coin_name)
-                if c == Coins.PART:
+                if c in (Coins.PART, Coins.DASH):
                     continue
                 swap_client.waitForDaemonRPC(c)
                 swap_client.initialiseWallet(c)
@@ -1146,6 +1172,21 @@ def main():
             'conf_target': 2,
             'core_version_group': 20,
             'chain_lookups': 'local',
+        },
+        'dash': {
+            'connection_type': 'rpc' if 'dash' in with_coins else 'none',
+            'manage_daemon': True if ('dash' in with_coins and PIVX_RPC_HOST == '127.0.0.1') else False,
+            'rpchost': DASH_RPC_HOST,
+            'rpcport': DASH_RPC_PORT + port_offset,
+            'onionport': DASH_ONION_PORT + port_offset,
+            'datadir': os.getenv('DASH_DATA_DIR', os.path.join(data_dir, 'dash')),
+            'bindir': os.path.join(bin_dir, 'dash'),
+            'use_segwit': False,
+            'use_csv': True,
+            'blocks_confirmed': 1,
+            'conf_target': 2,
+            'core_version_group': 18,
+            'chain_lookups': 'local',
         }
     }
 
@@ -1161,6 +1202,9 @@ def main():
     if PIVX_RPC_USER != '':
         chainclients['pivx']['rpcuser'] = PIVX_RPC_USER
         chainclients['pivx']['rpcpassword'] = PIVX_RPC_PWD
+    if DASH_RPC_USER != '':
+        chainclients['dash']['rpcuser'] = DASH_RPC_USER
+        chainclients['dash']['rpcpassword'] = DASH_RPC_PWD
 
     chainclients['monero']['walletsdir'] = os.getenv('XMR_WALLETS_DIR', chainclients['monero']['datadir'])
 

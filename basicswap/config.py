@@ -41,3 +41,8 @@ PIVX_BINDIR = os.path.expanduser(os.getenv('PIVX_BINDIR', os.path.join(DEFAULT_T
 PIVXD = os.getenv('PIVXD', 'pivxd' + bin_suffix)
 PIVX_CLI = os.getenv('PIVX_CLI', 'pivx-cli' + bin_suffix)
 PIVX_TX = os.getenv('PIVX_TX', 'pivx-tx' + bin_suffix)
+
+DASH_BINDIR = os.path.expanduser(os.getenv('DASH_BINDIR', os.path.join(DEFAULT_TEST_BINDIR, 'dash')))
+DASHD = os.getenv('DASHD', 'dashd' + bin_suffix)
+DASH_CLI = os.getenv('DASH_CLI', 'dash-cli' + bin_suffix)
+DASH_TX = os.getenv('DASH_TX', 'dash-tx' + bin_suffix)

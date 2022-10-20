@@ -33,6 +33,7 @@ from .interface.ltc import LTCInterface
 from .interface.nmc import NMCInterface
 from .interface.xmr import XMRInterface
 from .interface.pivx import PIVXInterface
+from .interface.dash import DASHInterface
 from .interface.passthrough_btc import PassthroughBTCInterface
 
 from . import __version__
@@ -527,6 +528,8 @@ class BasicSwap(BaseApp):
             return xmr_i
         elif coin == Coins.PIVX:
             return PIVXInterface(self.coin_clients[coin], self.chain, self)
+        elif coin == Coins.DASH:
+            return DASHInterface(self.coin_clients[coin], self.chain, self)
         else:
             raise ValueError('Unknown coin type')
 
@@ -545,7 +548,7 @@ class BasicSwap(BaseApp):
             authcookiepath = os.path.join(self.getChainDatadirPath(coin), '.cookie')
 
             pidfilename = cc['name']
-            if cc['name'] in ('bitcoin', 'litecoin', 'namecoin'):
+            if cc['name'] in ('bitcoin', 'litecoin', 'namecoin', 'dash'):
                 pidfilename += 'd'
 
             pidfilepath = os.path.join(self.getChainDatadirPath(coin), pidfilename + '.pid')

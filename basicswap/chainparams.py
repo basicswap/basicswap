@@ -29,6 +29,7 @@ class Coins(IntEnum):
     # ZANO = 9
     # NDAU = 10
     PIVX = 11
+    DASH = 12
 
 
 chainparams = {
@@ -247,6 +248,45 @@ chainparams = {
             'max_amount': 100000 * COIN,
         }
     },
+    Coins.DASH: {
+        'name': 'dash',
+        'ticker': 'DASH',
+        'message_magic': 'DarkCoin Signed Message:\n',
+        'blocks_target': 60 * 2.5,
+        'decimal_places': 8,
+        'has_csv': True,
+        'has_segwit': False,
+        'mainnet': {
+            'rpcport': 9998,
+            'pubkey_address': 76,
+            'script_address': 16,
+            'key_prefix': 204,
+            'hrp': '',
+            'bip44': 5,
+            'min_amount': 1000,
+            'max_amount': 100000 * COIN,
+        },
+        'testnet': {
+            'rpcport': 19998,
+            'pubkey_address': 140,
+            'script_address': 19,
+            'key_prefix': 239,
+            'hrp': '',
+            'bip44': 1,
+            'min_amount': 1000,
+            'max_amount': 100000 * COIN,
+        },
+        'regtest': {
+            'rpcport': 18332,
+            'pubkey_address': 140,
+            'script_address': 19,
+            'key_prefix': 239,
+            'hrp': '',
+            'bip44': 1,
+            'min_amount': 1000,
+            'max_amount': 100000 * COIN,
+        }
+    }
 }
 ticker_map = {}
 
