@@ -16,3 +16,7 @@ class DASHInterface(BTCInterface):
 
     def initialiseWallet(self, key):
         raise ValueError('Load seed with with -hdseed daemon argument')
+
+    def withdrawCoin(self, value, addr_to, subfee):
+        params = [addr_to, value, '', '', subfee]
+        return self.rpc_callback('sendtoaddress', params)
