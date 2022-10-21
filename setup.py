@@ -40,6 +40,7 @@ setuptools.setup(
         "requests",
         "pycryptodome",
         "PySocks",
+        "mnemonic",
     ],
     entry_points={
         "console_scripts": [

@@ -980,6 +980,8 @@ class BasicSwap(BaseApp):
             raise ValueError('Invalid swap type for PART_BLIND')
         if coin_from == Coins.PIVX and swap_type == SwapTypes.XMR_SWAP:
             raise ValueError('TODO: PIVX -> XMR')
+        if coin_from == Coins.DASH and swap_type == SwapTypes.XMR_SWAP:
+            raise ValueError('TODO: DASH -> XMR')
 
     def notify(self, event_type, event_data, session=None):
 
@@ -1497,7 +1499,7 @@ class BasicSwap(BaseApp):
         if expect_seedid is None:
             self.log.warning('Can\'t find expected wallet seed id for coin {}'.format(ci.coin_name()))
             return False
-        if expect_seedid == ci.getWalletSeedID():
+        if ci.checkExpectedSeed(expect_seedid):
             ci.setWalletSeedWarning(False)
             return True
         self.log.warning('Wallet for coin {} not derived from swap seed.'.format(ci.coin_name()))

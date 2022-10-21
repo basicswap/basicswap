@@ -885,9 +885,6 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
                         filename = coin_name + 'd' + ('.exe' if os.name == 'nt' else '')
                         coin_args = ['-nofindpeers', '-nostaking'] if c == Coins.PART else []
 
-                        if c == Coins.DASH:
-                            coin_args += ['-hdseed={}'.format(swap_client.getWalletKey(Coins.DASH, 1).hex())]
-
                         daemons.append(startDaemon(coin_settings['datadir'], coin_settings['bindir'], filename, daemon_args + coin_args))
                         swap_client.setDaemonPID(c, daemons[-1].pid)
                 swap_client.setCoinRunParams(c)
@@ -909,7 +906,7 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
 
             for coin_name in with_coins:
                 c = swap_client.getCoinIdFromName(coin_name)
-                if c in (Coins.PART, Coins.DASH):
+                if c in (Coins.PART, ):
                     continue
                 swap_client.waitForDaemonRPC(c)
                 swap_client.initialiseWallet(c)

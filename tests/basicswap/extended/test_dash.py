@@ -540,6 +540,15 @@ class Test(unittest.TestCase):
         json_rv = json.loads(post_json_req('http://127.0.0.1:{}/json/wallets/dash/withdraw'.format(TEST_HTTP_PORT + 0), post_json))
         assert (len(json_rv['txid']) == 64)
 
+    def test_09_initialise_wallet(self):
+        logging.info('---------- Test DASH initialiseWallet')
+
+        self.swap_clients[0].initialiseWallet(Coins.DASH, raise_errors=True)
+        assert self.swap_clients[0].checkWalletSeed(Coins.DASH) is True
+
+        pivx_addr = dashRpc('getnewaddress \"hd test\"')
+        assert pivx_addr == 'ybzWYJbZEhZai8kiKkTtPFKTuDNwhpiwac'
+
     def pass_99_delay(self):
         global stop_test
         logging.info('Delay')

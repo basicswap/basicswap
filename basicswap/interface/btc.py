@@ -293,6 +293,9 @@ class BTCInterface(CoinInterface):
     def getWalletSeedID(self):
         return self.rpc_callback('getwalletinfo')['hdseedid']
 
+    def checkExpectedSeed(self, expect_seedid):
+        return expect_seedid == self.getWalletSeedID()
+
     def getNewAddress(self, use_segwit, label='swap_receive'):
         args = [label]
         if use_segwit:

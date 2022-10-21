@@ -7,6 +7,7 @@
 
 from .btc import BTCInterface
 from basicswap.chainparams import Coins
+from mnemonic import Mnemonic
 
 
 class DASHInterface(BTCInterface):
@@ -15,7 +16,18 @@ class DASHInterface(BTCInterface):
         return Coins.DASH
 
     def initialiseWallet(self, key):
-        raise ValueError('Load seed with with -hdseed daemon argument')
+        words = Mnemonic('english').to_mnemonic(key)
+        self.rpc_callback('upgradetohd', [words, ])
+
+    def checkExpectedSeed(self, key_hash):
+        try:
+            rv = self.rpc_callback('dumphdinfo')
+            entropy = Mnemonic('english').to_entropy(rv['mnemonic'].split(' '))
+            entropy_hash = self.getAddressHashFromKey(entropy)[::-1].hex()
+            return entropy_hash == key_hash
+        except Exception as e:
+            self._log.warning('checkExpectedSeed failed: {}'.format(str(e)))
+        return False
 
     def withdrawCoin(self, value, addr_to, subfee):
         params = [addr_to, value, '', '', subfee]

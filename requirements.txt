@@ -7,3 +7,4 @@ Jinja2
 requests
 pycryptodome
 PySocks
+mnemonic
