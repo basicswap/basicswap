@@ -385,9 +385,9 @@ def listOldBidStates(bid):
 
 def getCoinName(c):
     if c == Coins.PART_ANON:
-        return chainparams[Coins.PART]['name'].capitalize() + 'Anon'
+        return chainparams[Coins.PART]['name'].capitalize() + ' Anon'
     if c == Coins.PART_BLIND:
-        return chainparams[Coins.PART]['name'].capitalize() + 'Blind'
+        return chainparams[Coins.PART]['name'].capitalize() + ' Blind'
     return chainparams[c]['name'].capitalize()
 
 
