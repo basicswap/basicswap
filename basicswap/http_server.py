@@ -130,13 +130,13 @@ class HttpHandler(BaseHTTPRequestHandler):
             for msg in args_dict['messages']:
                 messages_with_ids.append((self.server.msg_id_counter, msg))
                 self.server.msg_id_counter += 1
-            args_dict['messages_withids'] = messages_with_ids
+            args_dict['messages'] = messages_with_ids
         if 'err_messages' in args_dict:
             err_messages_with_ids = []
             for msg in args_dict['err_messages']:
                 err_messages_with_ids.append((self.server.msg_id_counter, msg))
                 self.server.msg_id_counter += 1
-            args_dict['err_messages_withids'] = err_messages_with_ids
+            args_dict['err_messages'] = err_messages_with_ids
 
         if self.server.msg_id_counter >= 0x7FFFFFFF:
             self.server.msg_id_counter = 0

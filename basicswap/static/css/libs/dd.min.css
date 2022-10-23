@@ -1,0 +1,179 @@
+/*! * 
+/** * * MSDropdown - dd.js * * @author: Marghoob Suleman * * @website: https://www.marghoobsuleman.com/ * * @version: 4.0.2 * * @date: Wed Oct 13 2021 15:19:38 GMT+0530 (India Standard Time) * * msDropdown is free web component: you can redistribute it and/or modify * * it under the terms of the either the MIT License or the Gnu General Public License (GPL) Version 2 * * / */
+/*! */
+ .ms-pr {
+     position: relative;
+     border-width: 1px;
+     border-color: #fff
+}
+ .blaat:active {
+     border-radius: 0.5rem;
+     border-width: 1px;
+     border-color: #3b82f6;
+     outline: none !important
+}
+ .blaat:focus {
+     border-radius: 0.5rem;
+     border-width: 1px;
+     border-color: #3b82f6;
+     outline: none !important
+}
+ .ms-dd {
+     border-radius: 0.5rem;
+     border-width: 1px;
+     border-color: #d1d5db;
+     background: none
+}
+ .ms-list-option:active {
+     border-radius: 0.5rem;
+     border-width: 1px;
+     border-color: #3b82f6;
+     outline: none !important
+}
+ .ms-dd .ms-value-input {
+     left: 20px;
+     position: absolute;
+     top: 10px;
+     width: 50% 
+}
+ .ms-dd .ms-dd-header {
+     c cursor: pointer;
+     min-height: 35px;
+     position: relative;
+     width: 100%;
+}
+ .ms-dd .ms-dd-header .option-selected {
+     color: #333f51;
+     display: block;
+     overflow: hidden;
+     padding: 9px 19px 9px 9px;
+     pointer-events: none;
+     border-radius: 0.5rem;
+     border-width: 1px;
+     border-color: #f9fafb;
+     background: none
+}
+ .ms-dd .ms-dd-header .ms-list-counter, .ms-dd .ms-dd-header input[type=checkbox] {
+     display: none 
+}
+ .ms-dd .ms-dd-header .ms-header-counter {
+     color: #0e76a8
+}
+ .ms-dd .ms-dd-header .ms-filter-box {
+     box-sizing: border-box;
+     -webkit-box-sizing: border-box;
+     -moz-box-sizing: border-box;
+     padding: 6px 10px;
+     min-height: 44px
+}
+ .ms-dd .ms-dd-option-image, .ms-dd .ms-dd-selected-img {
+     margin-right: 5px;
+     max-width: 40px;
+     vertical-align: middle 
+}
+ .ms-dd .ms-dd-arrow {
+     height: 0;
+     margin-top: -3px;
+     position: absolute;
+     right: 10px;
+     top: 50%;
+     width: 0 
+}
+ .ms-dd .ms-dd-arrow.ms-dd-pointer-down {
+     display: none 
+}
+ .ms-dd .ms-dd-arrow.ms-dd-pointer-up {
+     display: none
+}
+ .ms-dd .ms-options {
+     background: #fff;
+     border: 1px solid #767676;
+     box-shadow: 0 1px 5px #ddd;
+     display: none;
+     list-style: none;
+     margin: 0;
+     overflow: auto;
+     padding: 0;
+     position: absolute;
+     width: 100%;
+     z-index: 9999
+}
+ .ms-dd .ms-list-option, .ms-dd .ms-optgroup ul .ms-list-option {
+     align-items: center;
+     color: #333;
+     cursor: pointer;
+     display: flex;
+     justify-content: flex-start;
+     overflow: hidden;
+     padding: 10px;
+     position: relative;
+     text-decoration: none
+}
+ .ms-dd .ms-list-option input[type=checkbox], .ms-dd .ms-optgroup ul .ms-list-option input[type=checkbox] {
+     margin-right: 5px;
+     vertical-align: middle 
+}
+ .ms-dd .ms-list-option:last-child, .ms-dd .ms-optgroup ul .ms-list-option:last-child {
+     border-bottom: none 
+}
+ .ms-dd .ms-list-option:hover, .ms-dd .ms-optgroup ul .ms-list-option:hover {
+     background: #e0e0e6;
+     color: #000 
+}
+ .ms-dd .ms-list-option.option-selected, .ms-dd .ms-optgroup ul .ms-list-option.option-selected {
+     background: #f9fafb 
+}
+ .ms-dd .ms-list-option.ico-align-right .ms-dd-option-image, .ms-dd .ms-list-option.ico-align-right .ms-dd-selected-img, .ms-dd .ms-optgroup ul .ms-list-option.ico-align-right .ms-dd-option-image, .ms-dd .ms-optgroup ul .ms-list-option.ico-align-right .ms-dd-selected-img {
+     order: 2 
+}
+ .ms-dd .ms-list-option.disabled, .ms-dd .ms-list-option:disabled, .ms-dd .ms-optgroup ul .ms-list-option.disabled, .ms-dd .ms-optgroup ul .ms-list-option:disabled {
+     cursor: default;
+     opacity: .4 
+}
+ .ms-dd .ms-list-option .ms-dd-desc, .ms-dd .ms-optgroup ul .ms-list-option .ms-dd-desc {
+     color: #aaa;
+     display: block;
+     line-height: 1.5em;
+     overflow: hidden;
+     text-shadow: 0 1px .5px #fff 
+}
+ .ms-dd .ms-header-middle-content, .ms-dd .ms-middle {
+     display: -webkit-box;
+     display: -ms-flexbox;
+     display: flex;
+     -webkit-box-align: center;
+     -ms-flex-align: center;
+     align-items: center;
+     font-size: 0.875rem; 
+     min-width: 100px
+}
+ .ms-dd.disabled, .ms-dd:disabled {
+     cursor: default;
+     opacity: .4;
+     pointer-events: none 
+}
+ .ms-dd .ms-optgroup-padding {
+     padding: 10px 10px 0 
+}
+ .ms-dd .ms-optgroup {
+     display: block 
+}
+ .ms-dd .ms-optgroup:hover {
+     background: #fff;
+     color: #000 
+}
+ .ms-dd .ms-optgroup ul {
+     margin: 0;
+     padding: 0 
+}
+ .ms-dd .ms-optgroup ul .ms-list-option {
+     padding-left: 20px 
+}
+ .ms-dd .ms-optgroup ul:last-child {
+}
+ .ms-dd .ms-dd-option-content {
+     width: 100% 
+}
+ .ms-value-input {
+     display:none;
+}
