@@ -22,6 +22,7 @@ from .chainparams import (
 )
 from .ui.util import (
     PAGE_LIMIT,
+    getCoinName,
     getCoinType,
     inputAmount,
     describeBid,
@@ -73,7 +74,7 @@ def js_coins(self, url_split, post_string, is_json):
         entry = {
             'id': int(coin),
             'ticker': chainparams[cc['coin']]['ticker'],
-            'name': cc['name'].capitalize(),
+            'name': getCoinName(coin),
             'active': False if cc['connection_type'] == 'none' else True,
         }
         if coin == Coins.PART_ANON:

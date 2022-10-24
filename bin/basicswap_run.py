@@ -17,10 +17,10 @@ import subprocess
 
 import basicswap.config as cfg
 from basicswap import __version__
+from basicswap.ui.util import getCoinName
 from basicswap.basicswap import BasicSwap
 from basicswap.http_server import HttpThread
 from basicswap.contrib.websocket_server import WebsocketServer
-
 
 logger = logging.getLogger()
 logger.level = logging.DEBUG
@@ -142,15 +142,21 @@ def runClient(fp, data_dir, chain):
     try:
         # Try start daemons
         for c, v in settings['chainclients'].items():
+            try:
+                coin_id = swap_client.getCoinIdFromName(c)
+                display_name = getCoinName(coin_id)
+            except Exception as e:
+                logger.warning('Error getting coin display name for {}: {}'.format(c, str(e)))
+                display_name = 'Unknown'
             if c == 'monero':
                 if v['manage_daemon'] is True:
-                    swap_client.log.info('Starting {} daemon'.format(c.capitalize()))
+                    swap_client.log.info(f'Starting {display_name} daemon')
                     daemons.append(startXmrDaemon(v['datadir'], v['bindir'], 'monerod'))
                     pid = daemons[-1].pid
                     swap_client.log.info('Started {} {}'.format('monerod', pid))
 
                 if v['manage_wallet_daemon'] is True:
-                    swap_client.log.info('Starting {} wallet daemon'.format(c.capitalize()))
+                    swap_client.log.info(f'Starting {display_name} wallet daemon')
                     daemon_addr = '{}:{}'.format(v['rpchost'], v['rpcport'])
                     swap_client.log.info('daemon-address: {}'.format(daemon_addr))
                     opts = ['--daemon-address', daemon_addr, ]
@@ -160,7 +166,7 @@ def runClient(fp, data_dir, chain):
 
                 continue
             if v['manage_daemon'] is True:
-                swap_client.log.info('Starting {} daemon'.format(c.capitalize()))
+                swap_client.log.info(f'Starting {display_name} daemon')
 
                 filename = c + 'd' + ('.exe' if os.name == 'nt' else '')
                 daemons.append(startDaemon(v['datadir'], v['bindir'], filename))

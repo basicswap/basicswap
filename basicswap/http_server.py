@@ -75,7 +75,7 @@ def listAvailableExplorers(swap_client):
         if c not in chainparams:
             continue
         for i, e in enumerate(swap_client.coin_clients[c]['explorers']):
-            explorers.append(('{}_{}'.format(int(c), i), swap_client.coin_clients[c]['name'].capitalize() + ' - ' + extractDomain(e.base_url)))
+            explorers.append(('{}_{}'.format(int(c), i), getCoinName(c) + ' - ' + extractDomain(e.base_url)))
     return explorers
 
 
@@ -104,7 +104,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             self.server.last_form_id[name] = form_id
         return form_data
 
-    def render_template(self, template, args_dict):
+    def render_template(self, template, args_dict, status_code=200):
         swap_client = self.server.swap_client
         if swap_client.ws_server:
             args_dict['ws_url'] = swap_client.ws_server.url
@@ -141,7 +141,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         if self.server.msg_id_counter >= 0x7FFFFFFF:
             self.server.msg_id_counter = 0
 
-        self.putHeaders(200, 'text/html')
+        self.putHeaders(status_code, 'text/html')
         return bytes(template.render(
             title=self.server.title,
             h2=self.server.title,
@@ -343,19 +343,26 @@ class HttpHandler(BaseHTTPRequestHandler):
                         messages.append('Please restart BasicSwap.')
                 elif have_data_entry(form_data, 'enable_' + name):
                     swap_client.enableCoin(name)
-                    messages.append(name.capitalize() + ' enabled, shutting down.')
+                    display_name = getCoinName(swap_client.getCoinIdFromName(name))
+                    messages.append(display_name + ' enabled, shutting down.')
                     swap_client.stopRunning()
                 elif have_data_entry(form_data, 'disable_' + name):
                     swap_client.disableCoin(name)
-                    messages.append(name.capitalize() + ' disabled, shutting down.')
+                    display_name = getCoinName(swap_client.getCoinIdFromName(name))
+                    messages.append(display_name + ' disabled, shutting down.')
                     swap_client.stopRunning()
         chains_formatted = []
 
         sorted_names = sorted(swap_client.settings['chainclients'].keys())
         for name in sorted_names:
             c = swap_client.settings['chainclients'][name]
+            try:
+                display_name = getCoinName(swap_client.getCoinIdFromName(name))
+            except Exception:
+                display_name = name
             chains_formatted.append({
                 'name': name,
+                'display_name': display_name,
                 'lookups': c.get('chain_lookups', 'local'),
                 'manage_daemon': c.get('manage_daemon', 'Unknown'),
                 'connection_type': c.get('connection_type', 'Unknown'),
@@ -607,15 +614,12 @@ class HttpHandler(BaseHTTPRequestHandler):
                         self.putHeaders(status_code, 'application/javascript')
                         return fp.read()
                 else:
-                    self.putHeaders(status_code, 'text/html')
                     return self.page_404(url_split)
             except FileNotFoundError:
-                self.putHeaders(status_code, 'text/html')
                 return self.page_404(url_split)
             except Exception as ex:
                 if self.server.swap_client.debug is True:
                     self.server.swap_client.log.error(traceback.format_exc())
-                self.putHeaders(status_code, 'text/html')
                 return self.page_error(str(ex))
 
         try:

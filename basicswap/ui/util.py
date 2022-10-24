@@ -388,7 +388,11 @@ def getCoinName(c):
         return chainparams[Coins.PART]['name'].capitalize() + ' Anon'
     if c == Coins.PART_BLIND:
         return chainparams[Coins.PART]['name'].capitalize() + ' Blind'
-    return chainparams[c]['name'].capitalize()
+
+    coin_chainparams = chainparams[c]
+    if coin_chainparams.get('use_ticker_as_name', False):
+        return coin_chainparams['ticker']
+    return coin_chainparams['name'].capitalize()
 
 
 def listAvailableCoins(swap_client, with_variants=True, split_from=False):

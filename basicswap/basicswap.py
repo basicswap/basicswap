@@ -38,6 +38,7 @@ from .interface.passthrough_btc import PassthroughBTCInterface
 
 from . import __version__
 from .rpc_xmr import make_xmr_rpc2_func
+from .ui.util import getCoinName
 from .util import (
     TemporaryError,
     InactiveCoin,
@@ -165,11 +166,11 @@ def threadPollXMRChainState(swap_client, coin_type):
         try:
             new_height = ci.getChainHeight()
             if new_height != cc['chain_height']:
-                swap_client.log.debug('New {} block at height: {}'.format(str(coin_type), new_height))
+                swap_client.log.debug('New {} block at height: {}'.format(ci.ticker(), new_height))
                 with swap_client.mxDB:
                     cc['chain_height'] = new_height
         except Exception as e:
-            swap_client.log.warning('threadPollXMRChainState {}, error: {}'.format(str(coin_type), str(e)))
+            swap_client.log.warning('threadPollXMRChainState {}, error: {}'.format(ci.ticker(), str(e)))
         swap_client.delay_event.wait(random.randrange(20, 30))  # random to stagger updates
 
 
@@ -180,14 +181,14 @@ def threadPollChainState(swap_client, coin_type):
         try:
             chain_state = ci.getBlockchainInfo()
             if chain_state['bestblockhash'] != cc['chain_best_block']:
-                swap_client.log.debug('New {} block at height: {}'.format(str(coin_type), chain_state['blocks']))
+                swap_client.log.debug('New {} block at height: {}'.format(ci.ticker(), chain_state['blocks']))
                 with swap_client.mxDB:
                     cc['chain_height'] = chain_state['blocks']
                     cc['chain_best_block'] = chain_state['bestblockhash']
                     if 'mediantime' in chain_state:
                         cc['chain_median_time'] = chain_state['mediantime']
         except Exception as e:
-            swap_client.log.warning('threadPollChainState {}, error: {}'.format(str(coin_type), str(e)))
+            swap_client.log.warning('threadPollChainState {}, error: {}'.format(ci.ticker(), str(e)))
         swap_client.delay_event.wait(random.randrange(20, 30))  # random to stagger updates
 
 
@@ -5487,7 +5488,7 @@ class BasicSwap(BaseApp):
                     rv[key] = self.getWalletInfo(c)
                     rv[key].update(self.getBlockchainInfo(c))
                 except Exception as ex:
-                    rv[key] = {'name': chainparams[c]['name'].capitalize(), 'error': str(ex)}
+                    rv[key] = {'name': getCoinName(c), 'error': str(ex)}
         return rv
 
     def getCachedWalletsInfo(self, opts=None):
@@ -5537,7 +5538,7 @@ class BasicSwap(BaseApp):
                 coin_id = int(c)
                 if coin_id not in rv:
                     rv[coin_id] = {
-                        'name': chainparams[c]['name'].capitalize(),
+                        'name': getCoinName(c),
                         'no_data': True,
                         'updating': self._updating_wallets_info.get(coin_id, False),
                     }

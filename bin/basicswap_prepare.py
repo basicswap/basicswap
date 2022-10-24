@@ -27,6 +27,7 @@ import basicswap.config as cfg
 from basicswap.base import getaddrinfo_tor
 from basicswap.basicswap import BasicSwap
 from basicswap.chainparams import Coins
+from basicswap.ui.util import getCoinName
 from basicswap.util import toBool
 from basicswap.util.rfc2440 import rfc2440_hash_password
 from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
@@ -895,7 +896,7 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
                     # Create wallet if it doesn't exist yet
                     wallets = swap_client.callcoinrpc(c, 'listwallets')
                     if len(wallets) < 1:
-                        logger.info('Creating wallet.dat for {}.'.format(coin_name.capitalize()))
+                        logger.info('Creating wallet.dat for {}.'.format(getCoinName(c)))
                         swap_client.callcoinrpc(c, 'createwallet', ['wallet.dat'])
 
                     if 'particl' in with_coins and c == Coins.PART:

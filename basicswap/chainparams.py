@@ -219,6 +219,7 @@ chainparams = {
         'decimal_places': 8,
         'has_csv': False,
         'has_segwit': False,
+        'use_ticker_as_name': True,
         'mainnet': {
             'rpcport': 51473,
             'pubkey_address': 30,
@@ -320,7 +321,10 @@ class CoinInterface:
         return format_amount(amount_int, self.exp())
 
     def coin_name(self):
-        return chainparams[self.coin_type()]['name'].capitalize()
+        coin_chainparams = chainparams[self.coin_type()]
+        if coin_chainparams.get('use_ticker_as_name', False):
+            return coin_chainparams['ticker']
+        return coin_chainparams['name'].capitalize()
 
     def ticker(self):
         ticker = chainparams[self.coin_type()]['ticker']
