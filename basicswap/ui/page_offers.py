@@ -4,6 +4,7 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
+import time
 import traceback
 
 from urllib import parse
@@ -471,6 +472,7 @@ def page_offer(self, url_split, post_string):
                 err_messages.append('Send bid failed: ' + str(ex))
                 show_bid_form = True
 
+    now = int(time.time())
     data = {
         'tla_from': ci_from.ticker(),
         'tla_to': ci_to.ticker(),
@@ -498,6 +500,7 @@ def page_offer(self, url_split, post_string):
         'bid_rate': bid_rate,
         'debug_ui': swap_client.debug_ui,
         'automation_strat_id': -1,
+        'is_expired': offer.expire_at <= now
     }
     data.update(extend_data)
 
@@ -599,22 +602,26 @@ def page_offers(self, url_split, post_string, sent=False):
         sent = False
     offers = swap_client.listOffers(sent, filters, with_bid_info=True)
 
+    now = int(time.time())
     formatted_offers = []
     for row in offers:
         o, completed_amount = row
         ci_from = swap_client.ci(Coins(o.coin_from))
         ci_to = swap_client.ci(Coins(o.coin_to))
+        is_expired = o.expire_at <= now
         formatted_offers.append((
             format_timestamp(o.created_at),
             o.offer_id.hex(),
-            ci_from.coin_name(), ci_to.coin_name(),
+            ci_from.coin_name(),
+            ci_to.coin_name(),
             ci_from.format_amount(o.amount_from),
             ci_to.format_amount((o.amount_from * o.rate) // ci_from.COIN()),
             ci_to.format_amount(o.rate),
             'Public' if o.addr_to == swap_client.network_addr else o.addr_to,
             o.addr_from,
             o.was_sent,
-            ci_from.format_amount(completed_amount)))
+            ci_from.format_amount(completed_amount),
+            is_expired))
 
     coins_from, coins_to = listAvailableCoins(swap_client, split_from=True)
 
