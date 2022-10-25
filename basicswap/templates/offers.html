@@ -51,12 +51,6 @@
         <div class="flex flex-wrap items-center justify-between -m-2">
           <div class="w-full pt-2">
 
-            <!-- TradingView (todo: only on network offers page) -->
-            <div class="tradingview-widget-container hidden {{ chart }}">
-
-            </div>
-            <!-- TradingView -->
-
             <form method="post">
 
               <div class="flex justify-between items-center pb-4 bg-white">
@@ -212,20 +206,20 @@
 
                         <td scope="row" class="flex items-center py-7 px-46 text-gray-900 whitespace-nowrap">
                           <svg class="w-5 h-5 rounded-full ml-5" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-                            <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3B82F6" stroke-linejoin="round" class="nc-icon-wrapper">
+                            <g stroke-linecap="round" stroke-width="2" fill="none" stroke="{% if o[11]==true %}#6b7280{% else %}#3B82F6{% endif %}" stroke-linejoin="round" class="nc-icon-wrapper">
                               <circle cx="12" cy="12" r="11"></circle>
-                              <polyline points=" 12,6 12,12 18,12 " stroke="#3B82F6"></polyline>
+                              <polyline points=" 12,6 12,12 18,12 " stroke="{% if o[11]==true %}#6b7280{% else %}#3B82F6{% endif %}"></polyline>
                             </g>
                           </svg>
                           <div class="pl-3">
-                            <div class="font-semibold text-xs {% if o[11]==true %} px-6 {% endif %}">{{ o[0] }}</div>
+                            <div class="{% if o[11]==true %}text-coolGray-500{% else %}font-semibold{% endif %} text-xs">{{ o[0] }}</div>
                           </div>
                         </td>
                         <!--<td class="py-4 px-6 text-xs"><a class="monospace text-xs" href=/offer/{{ o[1] }}>{{ o[1]|truncate(6, True) }}</a></td>-->
                         <!--<td class="py-4 px-6 text-xs monospace">{{ o[8] }}{% if o[9]==true %} <b>Sent</b>{% endif %}</td>-->
                         <!--Todo: Add link back -->
                         <td class="py-4 px-6 monospace">{{ o[7] }} </td>
-                        <td class="py-4 px-6 text-xs monospace">{{ o[8] }}{% if o[9]==true %} {% endif %}</td>
+                        <td class="py-4 px-6 text-xs monospace"><a href="/identity/{{ o[8] }}{% if o[9]==true %}{% endif %}">{{ o[8] }}</a></td>
                         <td class="py-4"><span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"><img class="h-7" src="/static/images/coins/{{ o[2]|replace(" ", "-") }}.png" alt=""></span> {{ o[2] }}</td>
                         <td class="py-4 text-xs">{{ o[4] }}</td>
                         <td class="py-4"><span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"><img class="h-7" src="/static/images/coins/{{ o[3]|replace(" ", "-") }}.png" alt=""></span> {{ o[3] }}</td>
