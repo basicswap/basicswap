@@ -621,7 +621,8 @@ def page_offers(self, url_split, post_string, sent=False):
             o.addr_from,
             o.was_sent,
             ci_from.format_amount(completed_amount),
-            is_expired))
+            is_expired,
+            o.active_ind))
 
     coins_from, coins_to = listAvailableCoins(swap_client, split_from=True)
 
