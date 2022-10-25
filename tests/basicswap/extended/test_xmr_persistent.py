@@ -120,8 +120,11 @@ class Test(unittest.TestCase):
 
         random.seed(time.time())
 
-        logging.info('Preparing %d nodes.', NUM_NODES)
-        prepare_nodes(NUM_NODES, 'bitcoin,monero', True, {'min_sequence_lock_seconds': 60}, PORT_OFS)
+        if os.path.exists(test_path) and not RESET_TEST:
+            logging.info(f'Continuing with existing directory: {test_path}')
+        else:
+            logging.info('Preparing %d nodes.', NUM_NODES)
+            prepare_nodes(NUM_NODES, 'bitcoin,monero', True, {'min_sequence_lock_seconds': 60}, PORT_OFS)
 
         signal.signal(signal.SIGINT, lambda signal, frame: cls.signal_handler(cls, signal, frame))
 

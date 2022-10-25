@@ -1299,7 +1299,7 @@ def main():
             with open(config_path, 'w') as fp:
                 json.dump(settings, fp, indent=4)
 
-        logger.info('Done.')
+        logger.info(f'Done. Coin {add_coin} successfully added.')
         return 0
 
     logger.info('With coins: %s', ', '.join(with_coins))
