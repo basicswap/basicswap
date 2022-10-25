@@ -4136,13 +4136,13 @@ class BasicSwap(BaseApp):
             ensure(script_lock_value == expect_sequence, 'sequence mismatch')
         else:
             if offer.lock_type == TxLockTypes.ABS_LOCK_BLOCKS:
-                block_header_from = ci_from.getBlockHeaderAt(bid.created_at)
+                block_header_from = ci_from.getBlockHeaderAt(now)
                 chain_height_at_bid_creation = block_header_from['height']
                 ensure(script_lock_value <= chain_height_at_bid_creation + offer.lock_value + atomic_swap_1.ABS_LOCK_BLOCKS_LEEWAY, 'script lock height too high')
                 ensure(script_lock_value >= chain_height_at_bid_creation + offer.lock_value - atomic_swap_1.ABS_LOCK_BLOCKS_LEEWAY, 'script lock height too low')
             else:
-                ensure(script_lock_value <= bid.created_at + offer.lock_value + atomic_swap_1.INITIATE_TX_TIMEOUT, 'script lock time too high')
-                ensure(script_lock_value >= bid.created_at + offer.lock_value, 'script lock time too low')
+                ensure(script_lock_value <= now + offer.lock_value + atomic_swap_1.INITIATE_TX_TIMEOUT, 'script lock time too high')
+                ensure(script_lock_value >= now + offer.lock_value - atomic_swap_1.ABS_LOCK_TIME_LEEWAY, 'script lock time too low')
 
         ensure(len(scriptvalues[3]) == 40, 'pkhash_refund bad length')
 
