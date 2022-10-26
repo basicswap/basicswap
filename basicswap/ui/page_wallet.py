@@ -172,8 +172,8 @@ def page_wallet(self, url_split, post_string):
     page_data = {}
     messages = []
     err_messages = []
-    form_data = self.checkForm(post_string, 'wallet', err_messages)
     show_utxo_groups = False
+    form_data = self.checkForm(post_string, 'wallet', err_messages)
     if form_data:
         cid = str(int(coin_id))
 

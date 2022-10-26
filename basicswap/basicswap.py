@@ -903,17 +903,13 @@ class BasicSwap(BaseApp):
                     try:
                         self.activateBid(session, bid)
                     except Exception as ex:
-                        self.log.error('Failed to activate bid! Error: %s', str(ex))
-                        if self.debug:
-                            self.log.error(traceback.format_exc())
+                        self.logException(f'Failed to activate bid! Error: {ex}')
                         try:
                             bid.setState(BidStates.BID_ERROR, 'Failed to activate')
                             offer = session.query(Offer).filter_by(offer_id=bid.offer_id).first()
                             self.deactivateBid(session, offer, bid)
                         except Exception as ex:
-                            self.log.error('Further error deactivating: %s', str(ex))
-                            if self.debug:
-                                self.log.error(traceback.format_exc())
+                            self.logException(f'Further error deactivating: {ex}')
             self.buildNotificationsCache(session)
         finally:
             session.close()
@@ -2464,8 +2460,6 @@ class BasicSwap(BaseApp):
         coin_to = Coins(offer.coin_to)
         ci_to = self.ci(coin_to)
 
-        bid_date = dt.datetime.fromtimestamp(bid.created_at).date()
-
         secret_hash = atomic_swap_1.extractScriptSecretHash(bid.initiate_tx.script)
         pkhash_seller = bid.pkhash_seller
         pkhash_buyer_refund = bid.pkhash_buyer
@@ -3242,7 +3236,7 @@ class BasicSwap(BaseApp):
             if bid.initiate_tx.conf is not None:
                 self.log.debug('initiate_txnid %s confirms %d', initiate_txnid_hex, bid.initiate_tx.conf)
 
-                if bid.initiate_tx.vout is None:
+                if bid.initiate_tx.vout is None and tx_height > 0:
                     bid.initiate_tx.vout = index
                     # Start checking for spends of initiate_txn before fully confirmed
                     bid.initiate_tx.chain_height = self.setLastHeightChecked(coin_from, tx_height)
@@ -3480,9 +3474,7 @@ class BasicSwap(BaseApp):
             self.saveBidInSession(bid_id, bid, session, xmr_swap, save_in_progress=offer)
             session.commit()
         except Exception as ex:
-            self.log.error('process_XMR_SWAP_A_LOCK_tx_spend %s', str(ex))
-            if self.debug:
-                self.log.error(traceback.format_exc())
+            self.logException(f'process_XMR_SWAP_A_LOCK_tx_spend {ex}')
         finally:
             session.close()
             session.remove()
@@ -3537,9 +3529,7 @@ class BasicSwap(BaseApp):
             self.saveBidInSession(bid_id, bid, session, xmr_swap, save_in_progress=offer)
             session.commit()
         except Exception as ex:
-            self.log.error('process_XMR_SWAP_A_LOCK_REFUND_tx_spend %s', str(ex))
-            if self.debug:
-                self.log.error(traceback.format_exc())
+            self.logException(f'process_XMR_SWAP_A_LOCK_REFUND_tx_spend {ex}')
         finally:
             session.close()
             session.remove()
@@ -3598,7 +3588,7 @@ class BasicSwap(BaseApp):
                         last_height_checked = bci['pruneheight']
                         continue
                     else:
-                        self.log.error(f'getblock error {e}')
+                        self.logException(f'getblock error {e}')
                         break
 
                 for tx in block['tx']:
@@ -3688,9 +3678,7 @@ class BasicSwap(BaseApp):
                     else:
                         self.log.warning('Unknown event type: %d', row.event_type)
                 except Exception as ex:
-                    if self.debug:
-                        self.log.error(traceback.format_exc())
-                    self.log.error('checkQueuedActions failed: {}'.format(str(ex)))
+                    self.logException(f'checkQueuedActions failed: {ex}')
 
             if self.debug:
                 session.execute('UPDATE actions SET active_ind = 2 WHERE trigger_at <= {}'.format(now))
@@ -3988,9 +3976,7 @@ class BasicSwap(BaseApp):
                               use_session)
             return False
         except Exception as e:
-            self.log.error('shouldAutoAcceptBid: %s', str(e))
-            if self.debug:
-                self.log.error(traceback.format_exc())
+            self.logException(f'shouldAutoAcceptBid {e}')
             return False
         finally:
             if session is None:
@@ -5101,9 +5087,7 @@ class BasicSwap(BaseApp):
         except zmq.Again as ex:
             pass
         except Exception as ex:
-            self.log.error('smsg zmq %s', str(ex))
-            if self.debug:
-                self.log.error(traceback.format_exc())
+            self.logException(f'smsg zmq {ex}')
 
         self.mxDB.acquire()
         try:
@@ -5150,9 +5134,7 @@ class BasicSwap(BaseApp):
                 self._last_checked_xmr_swaps = now
 
         except Exception as ex:
-            self.log.error('update %s', str(ex))
-            if self.debug:
-                self.log.error(traceback.format_exc())
+            self.logException(f'update {ex}')
         finally:
             self.mxDB.release()
 

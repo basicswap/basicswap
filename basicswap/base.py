@@ -11,6 +11,7 @@ import socket
 import urllib
 import logging
 import threading
+import traceback
 import subprocess
 
 import basicswap.config as cfg
@@ -175,6 +176,11 @@ class BaseApp:
             socket.socket = self.default_socket
             socket.getaddrinfo = self.default_socket_getaddrinfo
         socket.setdefaulttimeout(self.default_socket_timeout)
+
+    def logException(self, message):
+        self.log.error(message)
+        if self.debug:
+            self.log.error(traceback.format_exc())
 
     def torControl(self, query):
         try:

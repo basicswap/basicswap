@@ -418,43 +418,114 @@ class CTxOut:
                bytes_to_hex_str(self.scriptPubKey))
 
 
+class SpendDescription:
+    def deserialize(self, f):
+        self.cv = deser_uint256(f)
+        self.anchor = deser_uint256(f)
+        self.nullifier = deser_uint256(f)
+        self.rk = deser_uint256(f)
+        self.zkproof = f.read(192)
+        self.spendAuthSig = f.read(64)
+
+    def serialize(self):
+        r = b""
+        r += ser_uint256(self.cv)
+        r += ser_uint256(self.anchor)
+        r += ser_uint256(self.nullifier)
+        r += ser_uint256(self.rk)
+        r += self.zkproof
+        r += self.spendAuthSig
+        return r
+
+
+class OutputDescription:
+    def deserialize(self, f):
+        self.cv = deser_uint256(f)
+        self.cmu = deser_uint256(f)
+        self.ephemeralKey = deser_uint256(f)
+        self.encCiphertext = f.read(580)
+        self.outCiphertext = f.read(80)
+        self.zkproof = f.read(192)
+
+    def serialize(self):
+        r = b""
+        r += ser_uint256(self.cv)
+        r += ser_uint256(self.cmu)
+        r += ser_uint256(self.ephemeralKey)
+        r += self.encCiphertext
+        r += self.outCiphertext
+        r += self.zkproof
+        return r
+
+
+class SaplingTxData:
+    def deserialize(self, f):
+        self.pre = f.read(1)
+        self.valueBalance = struct.unpack("<q", f.read(8))[0]
+
+        self.vShieldedSpend = deser_vector(f, SpendDescription)
+        self.vShieldedOutput = deser_vector(f, OutputDescription)
+
+        self.bindingSig = f.read(64)
+
+    def serialize(self):
+        r = b""
+        r += self.pre
+        r += struct.pack("<q", self.valueBalance)
+        r += ser_vector(self.vShieldedSpend)
+        r += ser_vector(self.vShieldedOutput)
+        r += self.bindingSig
+        return r
+
+
 class CTransaction:
     def __init__(self, tx=None):
         if tx is None:
             self.nVersion = 1
+            self.nType = 0
             self.vin = []
             self.vout = []
-            self.sapData = b""
+            self.sapData = None
+            self.extraData = b""
             self.nLockTime = 0
             self.sha256 = None
             self.hash = None
         else:
             self.nVersion = tx.nVersion
+            self.nType = tx.nType
             self.vin = copy.deepcopy(tx.vin)
             self.vout = copy.deepcopy(tx.vout)
             self.nLockTime = tx.nLockTime
             self.sapData = tx.sapData
+            self.extraData = tx.extraData
             self.sha256 = tx.sha256
             self.hash = tx.hash
 
     def deserialize(self, f):
-        self.nVersion = struct.unpack("<i", f.read(4))[0]
+        self.nVersion = struct.unpack("<h", f.read(2))[0]
+        self.nType = struct.unpack("<h", f.read(2))[0]
         self.vin = deser_vector(f, CTxIn)
         self.vout = deser_vector(f, CTxOut)
         self.nLockTime = struct.unpack("<I", f.read(4))[0]
-        if self.nVersion >= 2:
-            self.sapData = deser_string(f)
+        if self.nVersion >= 3:
+            self.sapData = SaplingTxData()
+            self.sapData.deserialize(f)
+            if self.nType != 0:
+                self.extraData = deser_string(f)
         self.sha256 = None
         self.hash = None
 
     def serialize_without_witness(self):
         r = b""
-        r += struct.pack("<i", self.nVersion)
+        r += struct.pack("<h", self.nVersion)
+        r += struct.pack("<h", self.nType)
         r += ser_vector(self.vin)
         r += ser_vector(self.vout)
         r += struct.pack("<I", self.nLockTime)
-        if self.nVersion >= 2:
-            r += ser_string(self.sapData)
+        if self.nVersion >= 3:
+            r += self.sapData.serialize()
+            if self.nType != 0:
+                r += ser_string(self.extraData)
         return r
 
     # Regular serialization is with witness -- must explicitly
@@ -504,8 +575,8 @@ class CTransaction:
                     x.prevout.hash == outpoint.hash and x.prevout.n == outpoint.n]) > 0
 
     def __repr__(self):
-        return "CTransaction(nVersion=%i vin=%s vout=%s nLockTime=%i)" \
-            % (self.nVersion, repr(self.vin), repr(self.vout), self.nLockTime)
+        return "CTransaction(nVersion=%i nType=%i vin=%s vout=%s nLockTime=%i)" \
+            % (self.nVersion, self.nType, repr(self.vin), repr(self.vout), self.nLockTime)
 
 
 class CBlockHeader:

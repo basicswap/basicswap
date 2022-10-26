@@ -100,8 +100,8 @@ class HttpHandler(BaseHTTPRequestHandler):
         form_id = form_data[b'formid'][0].decode('utf-8')
         if self.server.last_form_id.get(name, None) == form_id:
             messages.append('Prevented double submit for form {}.'.format(form_id))
-        else:
-            self.server.last_form_id[name] = form_id
+            return None
+        self.server.last_form_id[name] = form_id
         return form_data
 
     def render_template(self, template, args_dict, status_code=200):
@@ -184,7 +184,8 @@ class HttpHandler(BaseHTTPRequestHandler):
         explorer = -1
         action = -1
         messages = []
-        form_data = self.checkForm(post_string, 'explorers', messages)
+        err_messages = []
+        form_data = self.checkForm(post_string, 'explorers', err_messages)
         if form_data:
 
             explorer = form_data[b'explorer'][0].decode('utf-8')
@@ -211,6 +212,8 @@ class HttpHandler(BaseHTTPRequestHandler):
 
         template = env.get_template('explorers.html')
         return self.render_template(template, {
+            'messages': messages,
+            'err_messages': err_messages,
             'explorers': listAvailableExplorers(swap_client),
             'explorer': explorer,
             'actions': listExplorerActions(swap_client),
@@ -227,7 +230,8 @@ class HttpHandler(BaseHTTPRequestHandler):
         coin_type = -1
         coin_id = -1
         messages = []
-        form_data = self.checkForm(post_string, 'rpc', messages)
+        err_messages = []
+        form_data = self.checkForm(post_string, 'rpc', err_messages)
         if form_data:
             try:
                 coin_id = int(form_data[b'coin_type'][0])
@@ -273,6 +277,8 @@ class HttpHandler(BaseHTTPRequestHandler):
         coins.append((-4, 'Monero Wallet'))
 
         return self.render_template(template, {
+            'messages': messages,
+            'err_messages': err_messages,
             'coins': coins,
             'coin_type': coin_id,
             'result': result,
@@ -286,18 +292,20 @@ class HttpHandler(BaseHTTPRequestHandler):
 
         result = None
         messages = []
-        form_data = self.checkForm(post_string, 'wallets', messages)
+        err_messages = []
+        form_data = self.checkForm(post_string, 'wallets', err_messages)
         if form_data:
             if have_data_entry(form_data, 'reinit_xmr'):
                 try:
                     swap_client.initialiseWallet(Coins.XMR)
                     messages.append('Done.')
                 except Exception as a:
-                    messages.append('Failed.')
+                    err_messages.append('Failed.')
 
         template = env.get_template('debug.html')
         return self.render_template(template, {
             'messages': messages,
+            'err_messages': err_messages,
             'result': result,
             'summary': summary,
         })
@@ -319,7 +327,8 @@ class HttpHandler(BaseHTTPRequestHandler):
         summary = swap_client.getSummary()
 
         messages = []
-        form_data = self.checkForm(post_string, 'settings', messages)
+        err_messages = []
+        form_data = self.checkForm(post_string, 'settings', err_messages)
         if form_data:
             for name, c in swap_client.settings['chainclients'].items():
                 if have_data_entry(form_data, 'apply_' + name):
@@ -389,6 +398,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         template = env.get_template('settings.html')
         return self.render_template(template, {
             'messages': messages,
+            'err_messages': err_messages,
             'chains': chains_formatted,
             'summary': summary,
         })
@@ -412,10 +422,11 @@ class HttpHandler(BaseHTTPRequestHandler):
 
         page_data = {}
         messages = []
+        err_messages = []
         smsgaddresses = []
 
         listaddresses = True
-        form_data = self.checkForm(post_string, 'smsgaddresses', messages)
+        form_data = self.checkForm(post_string, 'smsgaddresses', err_messages)
         if form_data:
             edit_address_id = None
             for key in form_data:
@@ -473,6 +484,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         template = env.get_template('smsgaddresses.html')
         return self.render_template(template, {
             'messages': messages,
+            'err_messages': err_messages,
             'data': page_data,
             'smsgaddresses': smsgaddresses,
             'network_addr': network_addr,
@@ -487,7 +499,8 @@ class HttpHandler(BaseHTTPRequestHandler):
 
         page_data = {'identity_address': identity_address}
         messages = []
-        form_data = self.checkForm(post_string, 'identity', messages)
+        err_messages = []
+        form_data = self.checkForm(post_string, 'identity', err_messages)
         if form_data:
             if have_data_entry(form_data, 'edit'):
                 page_data['show_edit_form'] = True
@@ -498,7 +511,7 @@ class HttpHandler(BaseHTTPRequestHandler):
                     swap_client.updateIdentity(identity_address, new_label)
                     messages.append('Updated')
                 except Exception as e:
-                    messages.append('Error')
+                    err_messages.append(str(e))
 
         try:
             identity = swap_client.getIdentity(identity_address)
@@ -517,6 +530,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         template = env.get_template('identity.html')
         return self.render_template(template, {
             'messages': messages,
+            'err_messages': err_messages,
             'data': page_data,
             'summary': summary,
         })

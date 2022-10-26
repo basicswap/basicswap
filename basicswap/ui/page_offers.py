@@ -417,9 +417,9 @@ def page_offer(self, url_split, post_string):
 
     ci_from = swap_client.ci(Coins(offer.coin_from))
     ci_to = swap_client.ci(Coins(offer.coin_to))
-    debugind = -1
 
     # Set defaults
+    debugind = -1
     bid_amount = ci_from.format_amount(offer.amount_from)
     bid_rate = ci_to.format_amount(offer.rate)
 

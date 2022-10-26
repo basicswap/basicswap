@@ -349,9 +349,6 @@ class Test(unittest.TestCase):
         ro = btcRpc('getblockchaininfo')
         checkForks(ro)
 
-        ro = pivxRpc('getwalletinfo')
-        print('pivxRpc', ro)
-
         signal.signal(signal.SIGINT, signal_handler)
         cls.update_thread = threading.Thread(target=run_loop, args=(cls,))
         cls.update_thread.start()
@@ -552,6 +549,32 @@ class Test(unittest.TestCase):
         }
         json_rv = json.loads(post_json_req('http://127.0.0.1:{}/json/wallets/pivx/withdraw'.format(TEST_HTTP_PORT + 0), post_json))
         assert (len(json_rv['txid']) == 64)
+
+    def test_09_v3_tx(self):
+        logging.info('---------- Test PIVX v3 txns')
+
+        generate_addr = pivxRpc('getnewaddress \"generate test\"')
+        pivx_addr = pivxRpc('getnewaddress \"Sapling test\"')
+        pivx_sapling_addr = pivxRpc('getnewshieldaddress \"shield addr\"')
+
+        pivxRpc(f'sendtoaddress \"{pivx_addr}\" 6.0')
+        pivxRpc(f'generatetoaddress 1 \"{generate_addr}\"')
+
+        txid = pivxRpc('shieldsendmany "{}" "[{{\\"address\\": \\"{}\\", \\"amount\\": 1}}]"'.format(pivx_addr, pivx_sapling_addr))
+        rtx = pivxRpc(f'getrawtransaction \"{txid}\" true')
+        assert(rtx['version'] == 3)
+
+        block_hash = pivxRpc(f'generatetoaddress 1 \"{generate_addr}\"')[0]
+
+        ci = self.swap_clients[0].ci(Coins.PIVX)
+        block = ci.getBlockWithTxns(block_hash)
+
+        found = False
+        for tx in block['tx']:
+            if txid == tx['txid']:
+                found = True
+                break
+        assert found
 
     def pass_99_delay(self):
         global stop_test
