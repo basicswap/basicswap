@@ -223,7 +223,7 @@
             <form method="post">
 
               {% if data.show_txns %}
-              {% if data.xmr_b_shared_address %}
+              {% if data.xmr_b_shared_address or data.xmr_b_shared_viewkey or data.xmr_b_half_privatekey %}
 
               <section class="bg-white p-6">
                 <div class="flex flex-wrap items-center">
@@ -242,66 +242,24 @@
                         <th scope="col">Output</th>
                       </tr>
                     </thead>
+                    {% if data.xmr_b_shared_address %}
                     <tr class="bg-white border-t hover:bg-gray-50">
                       <td class="py-4 px-6 bold">Shared Address:</td>
                       <td class="py-4 monospace">{{ data.xmr_b_shared_address }}</td>
                     </tr>
-                  </table>
-                </div>
-              </div>
-
-              {% endif %}
-              {% if data.xmr_b_shared_viewkey %}
-
-              <section class="bg-white p-6">
-                <div class="flex flex-wrap items-center">
-                  <div class="w-full">
-                    <h4 class="font-semibold text-black text-2xl">View keys/Shared Address:</h4>
-                  </div>
-                </div>
-              </section>
-
-              <div class="container px-0 mx-auto mt-5">
-                <div class="overflow-x-auto relative border sm:rounded-lg">
-                  <table class="w-full text-sm text-left text-gray-500 outline-none border-gray-300">
-                    <thead class="text-xs text-gray-700 border-b uppercase bg-gray-50 outline-none border-gray-300">
-                      <tr>
-                        <th scope="col" class="py-3 px-6 w-96">Type</th>
-                        <th scope="col">Output</th>
-                      </tr>
-                    </thead>
+                    {% endif %}
+                    {% if data.xmr_b_shared_viewkey %}
                     <tr class="bg-white border-t hover:bg-gray-50">
                       <td class="py-4 px-6 bold">Shared View Key:</td>
                       <td class="py-4 monospace">{{ data.xmr_b_shared_viewkey }}</td>
                     </tr>
-                  </table>
-                </div>
-              </div>
-
-              {% endif %}
-              {% if data.xmr_b_half_privatekey %}
-
-              <section class="bg-white p-6">
-                <div class="flex flex-wrap items-center">
-                  <div class="w-full">
-                    <h4 class="font-semibold text-black text-2xl">View keys/Shared Address:</h4>
-                  </div>
-                </div>
-              </section>
-
-              <div class="container px-0 mx-auto mt-5">
-                <div class="overflow-x-auto relative border sm:rounded-lg">
-                  <table class="w-full text-sm text-left text-gray-500 outline-none border-gray-300">
-                    <thead class="text-xs text-gray-700 border-b uppercase bg-gray-50 outline-none border-gray-300">
-                      <tr>
-                        <th scope="col" class="py-3 px-6 w-96">Type</th>
-                        <th scope="col">Output</th>
-                      </tr>
-                    </thead>
+                    {% endif %}
+                    {% if data.xmr_b_half_privatekey %}
                     <tr class="bg-white border-t hover:bg-gray-50">
                       <td class="py-4 px-6 bold">Key Half:</td>
                       <td class="py-4 monospace">{{ data.xmr_b_half_privatekey }}</td>
                     </tr>
+                    {% endif %}
                   </table>
                 </div>
               </div>
