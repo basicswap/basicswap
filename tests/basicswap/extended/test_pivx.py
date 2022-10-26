@@ -562,7 +562,7 @@ class Test(unittest.TestCase):
 
         txid = pivxRpc('shieldsendmany "{}" "[{{\\"address\\": \\"{}\\", \\"amount\\": 1}}]"'.format(pivx_addr, pivx_sapling_addr))
         rtx = pivxRpc(f'getrawtransaction \"{txid}\" true')
-        assert(rtx['version'] == 3)
+        assert (rtx['version'] == 3)
 
         block_hash = pivxRpc(f'generatetoaddress 1 \"{generate_addr}\"')[0]
 

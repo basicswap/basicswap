@@ -90,6 +90,13 @@ def listExplorerActions(swap_client):
 
 class HttpHandler(BaseHTTPRequestHandler):
 
+    def log_error(self, format, *args):
+        super().log_message(format, *args)
+
+    def log_message(self, format, *args):
+        # TODO: Add debug flag to re-enable.
+        pass
+
     def generate_form_id(self):
         return os.urandom(8).hex()
 
