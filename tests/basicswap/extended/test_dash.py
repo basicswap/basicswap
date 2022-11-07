@@ -528,13 +528,13 @@ class Test(unittest.TestCase):
     def test_08_withdrawal(self):
         logging.info('---------- Test DASH withdrawals')
 
-        pivx_addr = dashRpc('getnewaddress \"Withdrawal test\"')
-        wallets0 = read_json_api(TEST_HTTP_PORT + 0, 'wallets')
-        assert (float(wallets0['DASH']['balance']) > 100)
+        addr = dashRpc('getnewaddress \"Withdrawal test\"')
+        wallets = read_json_api(TEST_HTTP_PORT + 0, 'wallets')
+        assert (float(wallets['DASH']['balance']) > 100)
 
         post_json = {
             'value': 100,
-            'address': pivx_addr,
+            'address': addr,
             'subfee': False,
         }
         json_rv = json.loads(post_json_req('http://127.0.0.1:{}/json/wallets/dash/withdraw'.format(TEST_HTTP_PORT + 0), post_json))

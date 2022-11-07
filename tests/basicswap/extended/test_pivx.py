@@ -538,13 +538,13 @@ class Test(unittest.TestCase):
     def test_08_withdrawal(self):
         logging.info('---------- Test PIVX withdrawals')
 
-        pivx_addr = pivxRpc('getnewaddress \"Withdrawal test\"')
-        wallets0 = read_json_api(TEST_HTTP_PORT + 0, 'wallets')
-        assert (float(wallets0['PIVX']['balance']) > 100)
+        addr = pivxRpc('getnewaddress \"Withdrawal test\"')
+        wallets = read_json_api(TEST_HTTP_PORT + 0, 'wallets')
+        assert (float(wallets['PIVX']['balance']) > 100)
 
         post_json = {
             'value': 100,
-            'address': pivx_addr,
+            'address': addr,
             'subfee': False,
         }
         json_rv = json.loads(post_json_req('http://127.0.0.1:{}/json/wallets/pivx/withdraw'.format(TEST_HTTP_PORT + 0), post_json))

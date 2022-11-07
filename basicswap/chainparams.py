@@ -30,6 +30,7 @@ class Coins(IntEnum):
     # NDAU = 10
     PIVX = 11
     DASH = 12
+    FIRO = 13
 
 
 chainparams = {
@@ -282,6 +283,45 @@ chainparams = {
             'pubkey_address': 140,
             'script_address': 19,
             'key_prefix': 239,
+            'hrp': '',
+            'bip44': 1,
+            'min_amount': 1000,
+            'max_amount': 100000 * COIN,
+        }
+    },
+    Coins.FIRO: {
+        'name': 'firo',
+        'ticker': 'FIRO',
+        'message_magic': 'Zcoin Signed Message:\n',
+        'blocks_target': 60 * 10,
+        'decimal_places': 8,
+        'has_csv': True,
+        'has_segwit': True,
+        'mainnet': {
+            'rpcport': 8888,
+            'pubkey_address': 82,
+            'script_address': 7,
+            'key_prefix': 210,
+            'hrp': '',
+            'bip44': 136,
+            'min_amount': 1000,
+            'max_amount': 100000 * COIN,
+        },
+        'testnet': {
+            'rpcport': 18888,
+            'pubkey_address': 65,
+            'script_address': 178,
+            'key_prefix': 185,
+            'hrp': '',
+            'bip44': 1,
+            'min_amount': 1000,
+            'max_amount': 100000 * COIN,
+        },
+        'regtest': {
+            'rpcport': 28888,
+            'pubkey_address': 65,
+            'script_address': 178,
+            'key_prefix': 185,
             'hrp': '',
             'bip44': 1,
             'min_amount': 1000,

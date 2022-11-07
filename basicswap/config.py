@@ -46,3 +46,8 @@ DASH_BINDIR = os.path.expanduser(os.getenv('DASH_BINDIR', os.path.join(DEFAULT_T
 DASHD = os.getenv('DASHD', 'dashd' + bin_suffix)
 DASH_CLI = os.getenv('DASH_CLI', 'dash-cli' + bin_suffix)
 DASH_TX = os.getenv('DASH_TX', 'dash-tx' + bin_suffix)
+
+FIRO_BINDIR = os.path.expanduser(os.getenv('FIRO_BINDIR', os.path.join(DEFAULT_TEST_BINDIR, 'firo')))
+FIROD = os.getenv('FIROD', 'firod' + bin_suffix)
+FIRO_CLI = os.getenv('FIRO_CLI', 'firo-cli' + bin_suffix)
+FIRO_TX = os.getenv('FIRO_TX', 'firo-tx' + bin_suffix)

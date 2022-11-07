@@ -27,39 +27,217 @@ from tests.basicswap.common import (
     read_json_api,
     wait_for_offer,
     wait_for_none_active,
+    BTC_BASE_RPC_PORT,
 )
-
-from .test_xmr import BaseTest, test_delay_event
+from basicswap.contrib.test_framework.messages import (
+    ToHex,
+    FromHex,
+    CTxIn,
+    COutPoint,
+    CTransaction,
+    CTxInWitness,
+)
+from basicswap.contrib.test_framework.script import (
+    CScript,
+    OP_CHECKLOCKTIMEVERIFY,
+    OP_CHECKSEQUENCEVERIFY,
+)
+from .test_xmr import BaseTest, test_delay_event, callnoderpc
 
 logger = logging.getLogger()
 
 
 class Test(BaseTest):
     __test__ = True
-
-    @classmethod
-    def setUpClass(cls):
-        if not hasattr(cls, 'test_coin_from'):
-            cls.test_coin_from = Coins.BTC
-        if not hasattr(cls, 'start_ltc_nodes'):
-            cls.start_ltc_nodes = False
-        if not hasattr(cls, 'start_pivx_nodes'):
-            cls.start_pivx_nodes = False
-        super(Test, cls).setUpClass()
-
-    @classmethod
-    def tearDownClass(cls):
-        logging.info('Finalising BTC Test')
-        super(Test, cls).tearDownClass()
+    test_coin_from = Coins.BTC
+    start_ltc_nodes = False
 
     def getBalance(self, js_wallets):
         return float(js_wallets[self.test_coin_from.name]['balance']) + float(js_wallets[self.test_coin_from.name]['unconfirmed'])
 
-    def getXmrBalance(self, js_wallets):
-        return float(js_wallets[Coins.XMR.name]['unconfirmed']) + float(js_wallets[Coins.XMR.name]['balance'])
+    def callnoderpc(self, method, params=[], wallet=None, node_id=0):
+        return callnoderpc(node_id, method, params, wallet, base_rpc_port=BTC_BASE_RPC_PORT)
+
+    def test_001_nested_segwit(self):
+        logging.info('---------- Test {} p2sh nested segwit'.format(self.test_coin_from.name))
+
+        addr_p2sh_segwit = self.callnoderpc('getnewaddress', ['segwit test', 'p2sh-segwit'])
+        addr_info = self.callnoderpc('getaddressinfo', [addr_p2sh_segwit, ])
+        assert addr_info['script'] == 'witness_v0_keyhash'
+
+        txid = self.callnoderpc('sendtoaddress', [addr_p2sh_segwit, 1.0])
+        assert len(txid) == 64
+
+        self.callnoderpc('generatetoaddress', [1, self.btc_addr])
+        ro = self.callnoderpc('scantxoutset', ['start', ['addr({})'.format(addr_p2sh_segwit)]])
+        assert (len(ro['unspents']) == 1)
+        assert (ro['unspents'][0]['txid'] == txid)
+
+        tx_wallet = self.callnoderpc('gettransaction', [txid, ])['hex']
+        tx = self.callnoderpc('decoderawtransaction', [tx_wallet, ])
+
+        prevout_n = -1
+        for txo in tx['vout']:
+            if addr_p2sh_segwit == txo['scriptPubKey']['address']:
+                prevout_n = txo['n']
+                break
+        assert prevout_n > -1
+
+        tx_funded = self.callnoderpc('createrawtransaction', [[{'txid': txid, 'vout': prevout_n}], {addr_p2sh_segwit: 0.99}])
+        tx_signed = self.callnoderpc('signrawtransactionwithwallet', [tx_funded, ])['hex']
+        tx_funded_decoded = self.callnoderpc('decoderawtransaction', [tx_funded, ])
+        tx_signed_decoded = self.callnoderpc('decoderawtransaction', [tx_signed, ])
+        assert tx_funded_decoded['txid'] != tx_signed_decoded['txid']
+
+        # Add scriptsig for txids to match
+        addr_p2sh_segwit_info = self.callnoderpc('getaddressinfo', [addr_p2sh_segwit, ])
+        decoded_tx = FromHex(CTransaction(), tx_funded)
+        decoded_tx.vin[0].scriptSig = bytes.fromhex('16' + addr_p2sh_segwit_info['hex'])
+        txid_with_scriptsig = decoded_tx.rehash()
+        assert txid_with_scriptsig == tx_signed_decoded['txid']
+
+    def test_002_native_segwit(self):
+        logging.info('---------- Test {} p2sh native segwit'.format(self.test_coin_from.name))
+
+        addr_segwit = self.callnoderpc('getnewaddress', ['segwit test', 'bech32'])
+        addr_info = self.callnoderpc('getaddressinfo', [addr_segwit, ])
+        assert addr_info['iswitness'] is True
+
+        txid = self.callnoderpc('sendtoaddress', [addr_segwit, 1.0])
+        assert len(txid) == 64
+        tx_wallet = self.callnoderpc('gettransaction', [txid, ])['hex']
+        tx = self.callnoderpc('decoderawtransaction', [tx_wallet, ])
+
+        self.callnoderpc('generatetoaddress', [1, self.btc_addr])
+        ro = self.callnoderpc('scantxoutset', ['start', ['addr({})'.format(addr_segwit)]])
+        assert (len(ro['unspents']) == 1)
+        assert (ro['unspents'][0]['txid'] == txid)
+
+        prevout_n = -1
+        for txo in tx['vout']:
+            if addr_segwit == txo['scriptPubKey']['address']:
+                prevout_n = txo['n']
+                break
+        assert prevout_n > -1
+
+        tx_funded = self.callnoderpc('createrawtransaction', [[{'txid': txid, 'vout': prevout_n}], {addr_segwit: 0.99}])
+        tx_signed = self.callnoderpc('signrawtransactionwithwallet', [tx_funded, ])['hex']
+        tx_funded_decoded = self.callnoderpc('decoderawtransaction', [tx_funded, ])
+        tx_signed_decoded = self.callnoderpc('decoderawtransaction', [tx_signed, ])
+        assert tx_funded_decoded['txid'] == tx_signed_decoded['txid']
+
+    def test_003_cltv(self):
+        logging.info('---------- Test {} cltv'.format(self.test_coin_from.name))
+        ci = self.swap_clients[0].ci(self.test_coin_from)
+
+        chain_height = self.callnoderpc('getblockcount')
+        script = CScript([chain_height + 3, OP_CHECKLOCKTIMEVERIFY, ])
+
+        script_dest = ci.getScriptDest(script)
+        tx = CTransaction()
+        tx.nVersion = ci.txVersion()
+        tx.vout.append(ci.txoType()(ci.make_int(1.1), script_dest))
+        tx_hex = ToHex(tx)
+        tx_funded = self.callnoderpc('fundrawtransaction', [tx_hex])
+        utxo_pos = 0 if tx_funded['changepos'] == 1 else 1
+        tx_signed = self.callnoderpc('signrawtransactionwithwallet', [tx_funded['hex'], ])['hex']
+        txid = self.callnoderpc('sendrawtransaction', [tx_signed, ])
+
+        addr_out = self.callnoderpc('getnewaddress', ['csv test', 'bech32'])
+        pkh = ci.decodeSegwitAddress(addr_out)
+        script_out = ci.getScriptForPubkeyHash(pkh)
+
+        tx_spend = CTransaction()
+        tx_spend.nVersion = ci.txVersion()
+        tx_spend.nLockTime = chain_height + 3
+        tx_spend.vin.append(CTxIn(COutPoint(int(txid, 16), utxo_pos)))
+        tx_spend.vout.append(ci.txoType()(ci.make_int(1.0999), script_out))
+        tx_spend.wit.vtxinwit.append(CTxInWitness())
+        tx_spend.wit.vtxinwit[0].scriptWitness.stack = [script, ]
+        tx_spend_hex = ToHex(tx_spend)
+        try:
+            txid = self.callnoderpc('sendrawtransaction', [tx_spend_hex, ])
+            assert False, 'Should fail'
+        except Exception as e:
+            assert ('non-final' in str(e))
+
+        self.callnoderpc('generatetoaddress', [49, self.btc_addr])
+        txid = self.callnoderpc('sendrawtransaction', [tx_spend_hex, ])
+        self.callnoderpc('generatetoaddress', [1, self.btc_addr])
+        ro = self.callnoderpc('listreceivedbyaddress', [0, ])
+        sum_addr = 0
+        for entry in ro:
+            if entry['address'] == addr_out:
+                sum_addr += entry['amount']
+        assert (sum_addr == 1.0999)
+
+    def test_004_csv(self):
+        logging.info('---------- Test {} csv'.format(self.test_coin_from.name))
+        swap_clients = self.swap_clients
+        ci = self.swap_clients[0].ci(self.test_coin_from)
+
+        script = CScript([3, OP_CHECKSEQUENCEVERIFY, ])
+
+        script_dest = ci.getScriptDest(script)
+        tx = CTransaction()
+        tx.nVersion = ci.txVersion()
+        tx.vout.append(ci.txoType()(ci.make_int(1.1), script_dest))
+        tx_hex = ToHex(tx)
+        tx_funded = self.callnoderpc('fundrawtransaction', [tx_hex])
+        utxo_pos = 0 if tx_funded['changepos'] == 1 else 1
+        tx_signed = self.callnoderpc('signrawtransactionwithwallet', [tx_funded['hex'], ])['hex']
+        txid = self.callnoderpc('sendrawtransaction', [tx_signed, ])
+
+        addr_out = self.callnoderpc('getnewaddress', ['csv test', 'bech32'])
+        pkh = ci.decodeSegwitAddress(addr_out)
+        script_out = ci.getScriptForPubkeyHash(pkh)
+
+        tx_spend = CTransaction()
+        tx_spend.nVersion = ci.txVersion()
+        tx_spend.vin.append(CTxIn(COutPoint(int(txid, 16), utxo_pos),
+                            nSequence=3))
+        tx_spend.vout.append(ci.txoType()(ci.make_int(1.0999), script_out))
+        tx_spend.wit.vtxinwit.append(CTxInWitness())
+        tx_spend.wit.vtxinwit[0].scriptWitness.stack = [script, ]
+        tx_spend_hex = ToHex(tx_spend)
+        try:
+            txid = self.callnoderpc('sendrawtransaction', [tx_spend_hex, ])
+            assert False, 'Should fail'
+        except Exception as e:
+            assert ('non-BIP68-final' in str(e))
+
+        self.callnoderpc('generatetoaddress', [3, self.btc_addr])
+        txid = self.callnoderpc('sendrawtransaction', [tx_spend_hex, ])
+        self.callnoderpc('generatetoaddress', [1, self.btc_addr])
+        ro = self.callnoderpc('listreceivedbyaddress', [0, ])
+        sum_addr = 0
+        for entry in ro:
+            if entry['address'] == addr_out:
+                sum_addr += entry['amount']
+        assert (sum_addr == 1.0999)
+
+    def test_005_watchonly(self):
+        logging.info('---------- Test {} watchonly'.format(self.test_coin_from.name))
+
+        addr = self.callnoderpc('getnewaddress', ['watchonly test', 'bech32'])
+        ro = self.callnoderpc('importaddress', [addr, '', False], node_id=1)
+        txid = self.callnoderpc('sendtoaddress', [addr, 1.0])
+        tx_hex = self.callnoderpc('getrawtransaction', [txid, ])
+        self.callnoderpc('sendrawtransaction', [tx_hex, ], node_id=1)
+        ro = self.callnoderpc('gettransaction', [txid, ], node_id=1)
+        assert (ro['txid'] == txid)
+        balances = self.callnoderpc('getbalances', node_id=1)
+        assert (balances['watchonly']['trusted'] + balances['watchonly']['untrusted_pending'] >= 1.0)
+
+    def test_006_getblock_verbosity(self):
+        logging.info('---------- Test {} getblock verbosity'.format(self.test_coin_from.name))
+
+        best_hash = self.callnoderpc('getbestblockhash')
+        block = self.callnoderpc('getblock', [best_hash, 2])
+        assert ('vin' in block['tx'][0])
 
     def test_01_full_swap(self):
-        logging.info('---------- Test {} to XMR'.format(str(self.test_coin_from)))
+        logging.info('---------- Test {} to XMR'.format(self.test_coin_from.name))
         swap_clients = self.swap_clients
 
         js_0 = read_json_api(1800, 'wallets')
@@ -108,7 +286,7 @@ class Test(BaseTest):
         assert (node1_xmr_after > node1_xmr_before + (amount_to_float - 0.02))
 
     def test_02_leader_recover_a_lock_tx(self):
-        logging.info('---------- Test {} to XMR leader recovers coin a lock tx'.format(str(self.test_coin_from)))
+        logging.info('---------- Test {} to XMR leader recovers coin a lock tx'.format(self.test_coin_from.name))
         swap_clients = self.swap_clients
 
         js_w0_before = read_json_api(1800, 'wallets')
@@ -143,7 +321,7 @@ class Test(BaseTest):
         # assert (node0_from_before - node0_from_after < 0.02)
 
     def test_03_follower_recover_a_lock_tx(self):
-        logging.info('---------- Test {} to XMR follower recovers coin a lock tx'.format(str(self.test_coin_from)))
+        logging.info('---------- Test {} to XMR follower recovers coin a lock tx'.format(self.test_coin_from.name))
         swap_clients = self.swap_clients
 
         js_w0_before = read_json_api(1800, 'wallets')
@@ -186,7 +364,7 @@ class Test(BaseTest):
         wait_for_none_active(test_delay_event, 1801)
 
     def test_04_follower_recover_b_lock_tx(self):
-        logging.info('---------- Test {} to XMR follower recovers coin b lock tx'.format(str(self.test_coin_from)))
+        logging.info('---------- Test {} to XMR follower recovers coin b lock tx'.format(self.test_coin_from.name))
 
         swap_clients = self.swap_clients
 

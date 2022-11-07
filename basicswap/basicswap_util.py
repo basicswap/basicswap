@@ -9,8 +9,8 @@ import struct
 import hashlib
 from enum import IntEnum, auto
 from .util.address import (
-    decodeAddress,
     encodeAddress,
+    decodeAddress,
 )
 from .chainparams import (
     chainparams,

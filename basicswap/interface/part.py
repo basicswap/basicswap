@@ -166,7 +166,7 @@ class PARTInterfaceBlind(PARTInterface):
             ensure(v['result'] is True, 'verifycommitment failed')
         return output_n, blinded_info
 
-    def createScriptLockTx(self, value, Kal, Kaf, vkbv):
+    def createSCLockTx(self, value, Kal, Kaf, vkbv):
         script = self.genScriptLockTxScript(Kal, Kaf)
 
         # Nonce is derived from vkbv, ephemeral_key isn't used
@@ -183,7 +183,7 @@ class PARTInterfaceBlind(PARTInterface):
         tx_bytes = bytes.fromhex(rv['hex'])
         return tx_bytes, script
 
-    def fundScriptLockTx(self, tx_bytes, feerate, vkbv):
+    def fundSCLockTx(self, tx_bytes, feerate, vkbv):
         feerate_str = self.format_amount(feerate)
         # TODO: unlock unspents if bid cancelled
 
@@ -205,7 +205,7 @@ class PARTInterfaceBlind(PARTInterface):
         rv = self.rpc_callback('fundrawtransactionfrom', ['blind', tx_hex, {}, outputs_info, options])
         return bytes.fromhex(rv['hex'])
 
-    def createScriptLockRefundTx(self, tx_lock_bytes, script_lock, Kal, Kaf, lock1_value, csv_val, tx_fee_rate, vkbv):
+    def createSCLockRefundTx(self, tx_lock_bytes, script_lock, Kal, Kaf, lock1_value, csv_val, tx_fee_rate, vkbv):
         lock_tx_obj = self.rpc_callback('decoderawtransaction', [tx_lock_bytes.hex()])
         assert (self.getTxid(tx_lock_bytes).hex() == lock_tx_obj['txid'])
         # Nonce is derived from vkbv, ephemeral_key isn't used
@@ -252,7 +252,7 @@ class PARTInterfaceBlind(PARTInterface):
 
         return bytes.fromhex(lock_refund_tx_hex), refund_script, refunded_value
 
-    def createScriptLockRefundSpendTx(self, tx_lock_refund_bytes, script_lock_refund, pkh_refund_to, tx_fee_rate, vkbv):
+    def createSCLockRefundSpendTx(self, tx_lock_refund_bytes, script_lock_refund, pkh_refund_to, tx_fee_rate, vkbv):
         # Returns the coinA locked coin to the leader
         # The follower will sign the multisig path with a signature encumbered by the leader's coinB spend pubkey
         # If the leader publishes the decrypted signature the leader's coinB spend privatekey will be revealed to the follower
@@ -297,11 +297,11 @@ class PARTInterfaceBlind(PARTInterface):
 
         return bytes.fromhex(lock_refund_spend_tx_hex)
 
-    def verifyLockTx(self, tx_bytes, script_out,
-                     swap_value,
-                     Kal, Kaf,
-                     feerate,
-                     check_lock_tx_inputs, vkbv):
+    def verifySCLockTx(self, tx_bytes, script_out,
+                       swap_value,
+                       Kal, Kaf,
+                       feerate,
+                       check_lock_tx_inputs, vkbv):
         lock_tx_obj = self.rpc_callback('decoderawtransaction', [tx_bytes.hex()])
         lock_txid_hex = lock_tx_obj['txid']
         self._log.info('Verifying lock tx: {}.'.format(lock_txid_hex))
@@ -341,9 +341,9 @@ class PARTInterfaceBlind(PARTInterface):
 
         return bytes.fromhex(lock_txid_hex), lock_output_n
 
-    def verifyLockRefundTx(self, tx_bytes, lock_tx_bytes, script_out,
-                           prevout_id, prevout_n, prevout_seq, prevout_script,
-                           Kal, Kaf, csv_val_expect, swap_value, feerate, vkbv):
+    def verifySCLockRefundTx(self, tx_bytes, lock_tx_bytes, script_out,
+                             prevout_id, prevout_n, prevout_seq, prevout_script,
+                             Kal, Kaf, csv_val_expect, swap_value, feerate, vkbv):
         lock_refund_tx_obj = self.rpc_callback('decoderawtransaction', [tx_bytes.hex()])
         lock_refund_txid_hex = lock_refund_tx_obj['txid']
         self._log.info('Verifying lock refund tx: {}.'.format(lock_refund_txid_hex))
@@ -399,10 +399,10 @@ class PARTInterfaceBlind(PARTInterface):
 
         return bytes.fromhex(lock_refund_txid_hex), lock_refund_txo_value, lock_refund_output_n
 
-    def verifyLockRefundSpendTx(self, tx_bytes, lock_refund_tx_bytes,
-                                lock_refund_tx_id, prevout_script,
-                                Kal,
-                                prevout_n, prevout_value, feerate, vkbv):
+    def verifySCLockRefundSpendTx(self, tx_bytes, lock_refund_tx_bytes,
+                                  lock_refund_tx_id, prevout_script,
+                                  Kal,
+                                  prevout_n, prevout_value, feerate, vkbv):
         lock_refund_spend_tx_obj = self.rpc_callback('decoderawtransaction', [tx_bytes.hex()])
         lock_refund_spend_txid_hex = lock_refund_spend_tx_obj['txid']
         self._log.info('Verifying lock refund spend tx: {}.'.format(lock_refund_spend_txid_hex))
@@ -460,7 +460,7 @@ class PARTInterfaceBlind(PARTInterface):
         ensure(output_n is not None, 'Output not found in tx')
         return output_n
 
-    def createScriptLockSpendTx(self, tx_lock_bytes, script_lock, pk_dest, tx_fee_rate, vkbv):
+    def createSCLockSpendTx(self, tx_lock_bytes, script_lock, pk_dest, tx_fee_rate, vkbv):
         lock_tx_obj = self.rpc_callback('decoderawtransaction', [tx_lock_bytes.hex()])
         lock_txid_hex = lock_tx_obj['txid']
 
@@ -501,14 +501,14 @@ class PARTInterfaceBlind(PARTInterface):
         vsize = lock_spend_tx_obj['vsize']
         pay_fee = make_int(lock_spend_tx_obj['vout'][0]['ct_fee'])
         actual_tx_fee_rate = pay_fee * 1000 // vsize
-        self._log.info('createScriptLockSpendTx %s:\n    fee_rate, vsize, fee: %ld, %ld, %ld.',
+        self._log.info('createSCLockSpendTx %s:\n    fee_rate, vsize, fee: %ld, %ld, %ld.',
                        lock_spend_tx_obj['txid'], actual_tx_fee_rate, vsize, pay_fee)
 
         return bytes.fromhex(lock_spend_tx_hex)
 
-    def verifyLockSpendTx(self, tx_bytes,
-                          lock_tx_bytes, lock_tx_script,
-                          a_pk_f, feerate, vkbv):
+    def verifySCLockSpendTx(self, tx_bytes,
+                            lock_tx_bytes, lock_tx_script,
+                            a_pk_f, feerate, vkbv):
         lock_spend_tx_obj = self.rpc_callback('decoderawtransaction', [tx_bytes.hex()])
         lock_spend_txid_hex = lock_spend_tx_obj['txid']
         self._log.info('Verifying lock spend tx: {}.'.format(lock_spend_txid_hex))
@@ -578,7 +578,7 @@ class PARTInterfaceBlind(PARTInterface):
 
         return True
 
-    def createScriptLockRefundSpendToFTx(self, tx_lock_refund_bytes, script_lock_refund, pkh_dest, tx_fee_rate, vkbv):
+    def createSCLockRefundSpendToFTx(self, tx_lock_refund_bytes, script_lock_refund, pkh_dest, tx_fee_rate, vkbv):
         # lock refund swipe tx
         # Sends the coinA locked coin to the follower
         lock_refund_tx_obj = self.rpc_callback('decoderawtransaction', [tx_lock_refund_bytes.hex()])
