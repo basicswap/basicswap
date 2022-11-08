@@ -2040,6 +2040,7 @@ class BasicSwap(BaseApp):
                 script=script,
             )
             bid.setITxState(TxStates.TX_SENT)
+            self.logEvent(Concepts.BID, bid.bid_id, EventLogTypes.ITX_PUBLISHED, '', None)
 
             # Check non-bip68 final
             try:
@@ -2758,6 +2759,7 @@ class BasicSwap(BaseApp):
                 txid = self.ci(coin_to).publishTx(bytes.fromhex(txn))
                 self.log.debug('Submitted participate txn %s to %s chain for bid %s', txid, chainparams[coin_to]['name'], bid_id.hex())
                 bid.setPTxState(TxStates.TX_SENT)
+                self.logEvent(Concepts.BID, bid.bid_id, EventLogTypes.PTX_PUBLISHED, '', None)
         else:
             bid.participate_tx = SwapTx(
                 bid_id=bid_id,
@@ -2811,6 +2813,7 @@ class BasicSwap(BaseApp):
             txn = self.createRedeemTxn(ci_to.coin_type(), bid)
             txid = ci_to.publishTx(bytes.fromhex(txn))
             self.log.debug('Submitted participate redeem txn %s to %s chain for bid %s', txid, ci_to.coin_name(), bid_id.hex())
+            self.logEvent(Concepts.BID, bid.bid_id, EventLogTypes.PTX_REDEEM_PUBLISHED, '', None)
             # TX_REDEEMED will be set when spend is detected
             # TODO: Wait for depth?
 
@@ -3291,6 +3294,7 @@ class BasicSwap(BaseApp):
             try:
                 txid = ci_from.publishTx(bid.initiate_txn_refund)
                 self.log.debug('Submitted initiate refund txn %s to %s chain for bid %s', txid, chainparams[coin_from]['name'], bid_id.hex())
+                self.logEvent(Concepts.BID, bid.bid_id, EventLogTypes.ITX_REFUND_PUBLISHED, '', None)
                 # State will update when spend is detected
             except Exception as ex:
                 if 'non-BIP68-final' not in str(ex) and 'non-final' not in str(ex):
@@ -3301,6 +3305,7 @@ class BasicSwap(BaseApp):
             try:
                 txid = ci_to.publishTx(bid.participate_txn_refund)
                 self.log.debug('Submitted participate refund txn %s to %s chain for bid %s', txid, chainparams[coin_to]['name'], bid_id.hex())
+                self.logEvent(Concepts.BID, bid.bid_id, EventLogTypes.PTX_REFUND_PUBLISHED, '', None)
                 # State will update when spend is detected
             except Exception as ex:
                 if 'non-BIP68-final' not in str(ex) and 'non-final' not in str(ex):
