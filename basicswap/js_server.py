@@ -241,6 +241,7 @@ def js_bids(self, url_split, post_string, is_json):
         bid_id = bytes.fromhex(url_split[3])
         assert (len(bid_id) == 28)
 
+        show_txns = False
         if post_string != '':
             if is_json:
                 post_data = json.loads(post_string)
@@ -251,6 +252,9 @@ def js_bids(self, url_split, post_string, is_json):
                 swap_client.acceptBid(bid_id)
             elif have_data_entry(post_data, 'debugind'):
                 swap_client.setBidDebugInd(bid_id, int(get_data_entry(post_data, 'debugind')))
+
+            if have_data_entry(post_data, 'show_extra'):
+                show_txns = True
 
         bid, xmr_swap, offer, xmr_offer, events = swap_client.getXmrBidAndOffer(bid_id)
         assert (bid), 'Unknown bid ID'
@@ -267,7 +271,6 @@ def js_bids(self, url_split, post_string, is_json):
             return bytes(json.dumps(old_states), 'UTF-8')
 
         edit_bid = False
-        show_txns = False
         data = describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, events, edit_bid, show_txns, for_api=True)
         return bytes(json.dumps(data), 'UTF-8')
 

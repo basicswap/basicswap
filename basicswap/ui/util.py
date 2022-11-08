@@ -356,6 +356,16 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
 
                 if 'view_tx_hex' in data:
                     data['view_tx_desc'] = json.dumps(ci_from.describeTx(data['view_tx_hex']), indent=4)
+    else:
+        if offer.lock_type == TxLockTypes.SEQUENCE_LOCK_TIME:
+            if bid.initiate_tx and bid.initiate_tx.block_time is not None:
+                raw_sequence = ci_from.getExpectedSequence(offer.lock_type, offer.lock_value)
+                seconds_locked = ci_from.decodeSequence(raw_sequence)
+                data['itx_refund_tx_est_final'] = bid.initiate_tx.block_time + seconds_locked
+            if bid.participate_tx and bid.participate_tx.block_time is not None:
+                raw_sequence = ci_to.getExpectedSequence(offer.lock_type, offer.lock_value // 2)
+                seconds_locked = ci_to.decodeSequence(raw_sequence)
+                data['ptx_refund_tx_est_final'] = bid.participate_tx.block_time + seconds_locked
 
     return data
 

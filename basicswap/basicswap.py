@@ -1825,6 +1825,15 @@ class BasicSwap(BaseApp):
             session.remove()
             self.mxDB.release()
 
+    def setTxBlockInfoFromHeight(self, ci, tx, height):
+        try:
+            tx.block_height = height
+            block_header = ci.getBlockHeaderFromHeight(height)
+            tx.block_hash = bytes.fromhex(block_header['hash'])
+            tx.block_time = block_header['time']  # Or median_time?
+        except Exception as e:
+            self.log.warning(f'setTxBlockInfoFromHeight failed {e}')
+
     def loadBidTxns(self, bid, session):
         bid.txns = {}
         for stx in session.query(SwapTx).filter(sa.and_(SwapTx.bid_id == bid.bid_id)):
@@ -3009,11 +3018,7 @@ class BasicSwap(BaseApp):
 
                 if not bid.xmr_a_lock_tx.chain_height and lock_tx_chain_info['height'] != 0:
                     self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_A_SEEN, '', session)
-
-                    block_header = ci_from.getBlockHeaderFromHeight(lock_tx_chain_info['height'])
-                    bid.xmr_a_lock_tx.block_hash = bytes.fromhex(block_header['hash'])
-                    bid.xmr_a_lock_tx.block_height = block_header['height']
-                    bid.xmr_a_lock_tx.block_time = block_header['time']  # Or median_time?
+                    self.setTxBlockInfoFromHeight(ci_from, bid.xmr_a_lock_tx, lock_tx_chain_info['height'])
 
                     bid_changed = True
                 if bid.xmr_a_lock_tx.chain_height != lock_tx_chain_info['height'] and lock_tx_chain_info['height'] != 0:
@@ -3121,10 +3126,7 @@ class BasicSwap(BaseApp):
                             lock_refund_tx_chain_info = ci_from.getLockTxHeight(refund_tx.txid, refund_tx_addr, 0, bid.chain_a_height_start)
 
                         if lock_refund_tx_chain_info is not None and lock_refund_tx_chain_info.get('height', 0) > 0:
-                            block_header = ci_from.getBlockHeaderFromHeight(lock_refund_tx_chain_info['height'])
-                            refund_tx.block_hash = bytes.fromhex(block_header['hash'])
-                            refund_tx.block_height = block_header['height']
-                            refund_tx.block_time = block_header['time']  # Or median_time?
+                            self.setTxBlockInfoFromHeight(ci_from, refund_tx, lock_refund_tx_chain_info['height'])
 
                             self.saveBidInSession(bid_id, bid, session, xmr_swap)
                             session.commit()
@@ -3167,6 +3169,7 @@ class BasicSwap(BaseApp):
             index = None
             tx_height = None
             last_initiate_txn_conf = bid.initiate_tx.conf
+            ci_from = self.ci(coin_from)
             if coin_from == Coins.PART:  # Has txindex
                 try:
                     initiate_txn = self.callcoinrpc(coin_from, 'getrawtransaction', [initiate_txnid_hex, True])
@@ -3190,7 +3193,6 @@ class BasicSwap(BaseApp):
                 else:
                     addr = p2sh
 
-                ci_from = self.ci(coin_from)
                 found = ci_from.getLockTxHeight(bytes.fromhex(initiate_txnid_hex), addr, bid.amount, bid.chain_a_height_start, find_index=True)
                 if found:
                     bid.initiate_tx.conf = found['depth']
@@ -3207,6 +3209,8 @@ class BasicSwap(BaseApp):
                     bid.initiate_tx.vout = index
                     # Start checking for spends of initiate_txn before fully confirmed
                     bid.initiate_tx.chain_height = self.setLastHeightChecked(coin_from, tx_height)
+                    self.setTxBlockInfoFromHeight(ci_from, bid.initiate_tx, tx_height)
+
                     self.addWatchedOutput(coin_from, bid_id, initiate_txnid_hex, bid.initiate_tx.vout, BidStates.SWAP_INITIATED)
                     if bid.getITxState() is None or bid.getITxState() < TxStates.TX_SENT:
                         bid.setITxState(TxStates.TX_SENT)
@@ -3243,6 +3247,8 @@ class BasicSwap(BaseApp):
                     self.addParticipateTxn(bid_id, bid, coin_to, found['txid'], found['index'], found['height'])
                     bid.setPTxState(TxStates.TX_SENT)
                     save_bid = True
+                if found['height'] > 0 and bid.participate_tx.block_height is None:
+                    self.setTxBlockInfoFromHeight(ci_to, bid.participate_tx, found['height'])
 
             if bid.participate_tx.conf is not None:
                 self.log.debug('participate txid %s confirms %d', bid.participate_tx.txid.hex(), bid.participate_tx.conf)
