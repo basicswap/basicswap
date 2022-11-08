@@ -727,7 +727,7 @@ class BasicSwap(BaseApp):
             return
 
         root_key = self.getWalletKey(coin_type, 1)
-        root_hash = ci.getAddressHashFromKey(root_key)[::-1]
+        root_hash = ci.getSeedHash(root_key)
 
         try:
             ci.initialiseWallet(root_key)

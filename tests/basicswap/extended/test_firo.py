@@ -112,6 +112,13 @@ class Test(BaseTest):
     test_atomic = True
     test_xmr = False
 
+    # Particl node mnemonics are set in test/basicswap/mnemonics.py
+    firo_seeds = [
+        'd90b7ed1be614e1c172653aee1f3b6230f43b7fa99cf07fa984a17966ad81de7',
+        '6c81d6d74ba33a0db9e41518c2b6789fbe938e98018a4597dac661cfc5f2dfc1',
+        'c5de2be44834e7e47ad7dc8e35c6b77c79f17c6bb40d5509a00fc3dff384a865',
+    ]
+
     @classmethod
     def setUpClass(cls):
         cls.start_ltc_nodes = False
@@ -121,11 +128,13 @@ class Test(BaseTest):
     @classmethod
     def prepareExtraDataDir(cls, i):
         if not cls.restore_instance:
+            seed_hex = cls.firo_seeds[i]
+            extra_opts = [f'-hdseed={seed_hex}', ]
             data_dir = prepareDataDir(cfg.TEST_DATADIRS, i, 'firo.conf', 'firo_', base_p2p_port=FIRO_BASE_PORT, base_rpc_port=FIRO_BASE_RPC_PORT)
             if os.path.exists(os.path.join(cfg.FIRO_BINDIR, 'firo-wallet')):
                 callrpc_cli(cfg.FIRO_BINDIR, data_dir, 'regtest', '-wallet=wallet.dat create', 'firo-wallet')
 
-        cls.firo_daemons.append(startDaemon(os.path.join(cfg.TEST_DATADIRS, 'firo_' + str(i)), cfg.FIRO_BINDIR, cfg.FIROD))
+        cls.firo_daemons.append(startDaemon(os.path.join(cfg.TEST_DATADIRS, 'firo_' + str(i)), cfg.FIRO_BINDIR, cfg.FIROD, opts=extra_opts))
         logging.info('Started %s %d', cfg.FIROD, cls.part_daemons[-1].pid)
 
         waitForRPC(make_rpc_func(i, base_rpc_port=FIRO_BASE_RPC_PORT))
@@ -193,7 +202,7 @@ class Test(BaseTest):
     def callnoderpc(self, method, params=[], wallet=None, node_id=0):
         return callnoderpc(node_id, method, params, wallet, base_rpc_port=FIRO_BASE_RPC_PORT)
 
-    def test_01_firo(self):
+    def test_001_firo(self):
         logging.info('---------- Test {} segwit'.format(self.test_coin_from.name))
 
         '''
@@ -243,6 +252,16 @@ class Test(BaseTest):
         tx_signed_decoded = firoCli(f'decoderawtransaction {tx_signed}')
         assert tx_funded_decoded['txid'] != tx_signed_decoded['txid']
         assert txid_with_scriptsig == tx_signed_decoded['txid']
+
+    def test_007_hdwallet(self):
+        logging.info('---------- Test {} hdwallet'.format(self.test_coin_from.name))
+
+        swap_client = self.swap_clients[0]
+        # Run initialiseWallet to set 'main_wallet_seedid_'
+        swap_client.initialiseWallet(self.test_coin_from)
+        ci = swap_client.ci(self.test_coin_from)
+        assert ('490ba1e2c3894d5534c467141ee3cdf77292c362' == ci.getWalletSeedID())
+        assert swap_client.checkWalletSeed(self.test_coin_from) is True
 
     def test_02_part_coin(self):
         logging.info('---------- Test PART to {}'.format(self.test_coin_from.name))

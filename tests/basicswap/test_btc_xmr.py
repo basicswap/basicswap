@@ -236,6 +236,18 @@ class Test(BaseTest):
         block = self.callnoderpc('getblock', [best_hash, 2])
         assert ('vin' in block['tx'][0])
 
+    def test_007_hdwallet(self):
+        logging.info('---------- Test {} hdwallet'.format(self.test_coin_from.name))
+
+        test_seed = '8e54a313e6df8918df6d758fafdbf127a115175fdd2238d0e908dd8093c9ac3b'
+        test_wif = self.swap_clients[0].ci(self.test_coin_from).encodeKey(bytes.fromhex(test_seed))
+        new_wallet_name = random.randbytes(10).hex()
+        self.callnoderpc('createwallet', [new_wallet_name])
+        self.callnoderpc('sethdseed', [True, test_wif], wallet=new_wallet_name)
+        addr = self.callnoderpc('getnewaddress', wallet=new_wallet_name)
+        self.callnoderpc('unloadwallet', [new_wallet_name])
+        assert (addr == 'bcrt1qps7hnjd866e9ynxadgseprkc2l56m00dvwargr')
+
     def test_01_full_swap(self):
         logging.info('---------- Test {} to XMR'.format(self.test_coin_from.name))
         swap_clients = self.swap_clients

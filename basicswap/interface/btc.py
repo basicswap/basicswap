@@ -371,6 +371,9 @@ class BTCInterface(CoinInterface):
         pk = self.getPubkey(key)
         return hash160(pk)
 
+    def getSeedHash(self, seed):
+        return self.getAddressHashFromKey(seed)[::-1]
+
     def verifyKey(self, k):
         i = b2i(k)
         return (i < ep.o and i > 0)
