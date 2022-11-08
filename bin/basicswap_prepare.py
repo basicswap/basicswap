@@ -53,7 +53,7 @@ PIVX_VERSION_TAG = os.getenv('PIVX_VERSION_TAG', '_scantxoutset')
 DASH_VERSION = os.getenv('DASH_VERSION', '18.1.0')
 DASH_VERSION_TAG = os.getenv('DASH_VERSION_TAG', '')
 
-FIRO_VERSION = os.getenv('FIRO_VERSION', '0.14.11.1')
+FIRO_VERSION = os.getenv('FIRO_VERSION', '0.14.99.1')
 FIRO_VERSION_TAG = os.getenv('FIRO_VERSION_TAG', '')
 
 
@@ -65,7 +65,8 @@ known_coins = {
     'monero': (MONERO_VERSION, MONERO_VERSION_TAG, ('binaryfate',)),
     'pivx': (PIVX_VERSION, PIVX_VERSION_TAG, ('tecnovert',)),
     'dash': (DASH_VERSION, DASH_VERSION_TAG, ('pasta',)),
-    'firo': (FIRO_VERSION, FIRO_VERSION_TAG, ('reuben',)),
+    # 'firo': (FIRO_VERSION, FIRO_VERSION_TAG, ('reuben',)),
+    'firo': (FIRO_VERSION, FIRO_VERSION_TAG, ('tecnovert',)),
 }
 
 expected_key_ids = {
@@ -443,7 +444,7 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
             assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, major_version)
             assert_url = 'https://raw.githubusercontent.com/dashpay/gitian.sigs/master/%s-%s/%s/%s' % (version + version_tag, os_dir_name, signing_key_name, assert_filename)
         elif coin == 'firo':
-            raise ValueError('TODO: scantxoutset release')
+            '''
             if BIN_ARCH == 'x86_64-linux-gnu':
                 arch_name = 'linux64'
                 file_ext = 'tar.gz'
@@ -454,8 +455,17 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
             else:
                 raise ValueError('Firo: Unknown architecture')
             release_filename = '{}-{}-{}{}.{}'.format('firo', version + version_tag, arch_name, filename_extra, file_ext)
-            release_url = 'https://github.com/firoorg/firo/releases/download/v{}/{}'.format(version + version_tag, release_filename)
-            assert_url = 'https://github.com/firoorg/firo/releases/download/v%s/SHA256SUMS' % (version + version_tag)
+            # release_url = 'https://github.com/firoorg/firo/releases/download/v{}/{}'.format(version + version_tag, release_filename)
+            # assert_url = 'https://github.com/firoorg/firo/releases/download/v%s/SHA256SUMS' % (version + version_tag)
+            '''
+            if BIN_ARCH == 'x86_64-linux-gnu':
+                release_filename = 'firo-0.14.99.1-x86_64-linux-gnu.tar.gz'
+            elif BIN_ARCH == 'osx64':
+                release_filename = 'firo-0.14.99.1-osx-unsigned.tar.gz'
+            else:
+                raise ValueError('Firo: Unknown architecture')
+            release_url = 'https://github.com/tecnovert/particl-core/releases/download/v{}/{}'.format(version + version_tag, release_filename)
+            assert_url = 'https://github.com/tecnovert/particl-core/releases/download/v%s/SHA256SUMS.asc' % (version + version_tag)
         else:
             raise ValueError('Unknown coin')
 
@@ -505,7 +515,7 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
                     for key in rv.fingerprints:
                         gpg.trust_keys(rv.fingerprints[0], 'TRUST_FULLY')
 
-    if coin == 'pivx':
+    if coin in ('pivx', 'firo'):
         pubkey_filename = '{}_{}.pgp'.format('particl', signing_key_name)
     else:
         pubkey_filename = '{}_{}.pgp'.format(coin, signing_key_name)
