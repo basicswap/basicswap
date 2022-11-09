@@ -1,0 +1,16 @@
+    dash_core:
+        image: i_dash
+        build:
+            context: dash
+            dockerfile: Dockerfile
+        container_name: dash_core
+        volumes:
+            - ${DATA_PATH}/dash:/data
+        expose:
+            - ${DASH_RPC_PORT}
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "3"
+        restart: unless-stopped

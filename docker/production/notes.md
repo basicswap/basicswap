@@ -8,6 +8,16 @@ Copy and edit .env config:
     cp example.env .env
 
 
+Optionally set random RPC passwords:
+
+    for KEY in $(grep -o '^.*_RPC_PWD' .env)
+    do
+        echo "Replacing: $KEY"
+        NEW_PWD=$(cat /dev/random | base16 | head -c 48)
+        sed -i "s/${KEY}=.*$/${KEY}=${NEW_PWD}/g" .env
+    done
+
+
 Set the latest Monero chain height, or the height your wallet must restore from:
 
     echo "DEFAULT_XMR_RESTORE_HEIGHT=$(curl https://localmonero.co/blocks/api/get_stats | jq .height)" >> .env
@@ -21,6 +31,9 @@ Create docker-compose config:
     cat compose-fragments/1_bitcoin.yml >> docker-compose.yml
     cat compose-fragments/1_litecoin.yml >> docker-compose.yml
     cat compose-fragments/1_monero-wallet.yml >> docker-compose.yml
+    cat compose-fragments/1_pivx.yml >> docker-compose.yml
+    cat compose-fragments/1_dash.yml >> docker-compose.yml
+    cat compose-fragments/1_firo.yml >> docker-compose.yml
 
     # Copy for prepare script config
     cp docker-compose.yml docker-compose-prepare.yml
@@ -28,6 +41,7 @@ Create docker-compose config:
 
     # Add the Monero daemon if required (should not go in docker-compose-prepare.yml)
     cat compose-fragments/8_monero-daemon.yml >> docker-compose.yml
+
     # Add the swapclient
     cat compose-fragments/8_swapclient.yml >> docker-compose.yml
 

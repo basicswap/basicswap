@@ -159,6 +159,9 @@ TEST_ONION_LINK = toBool(os.getenv('TEST_ONION_LINK', 'false'))
 BITCOIN_FASTSYNC_URL = os.getenv('BITCOIN_FASTSYNC_URL', 'http://utxosets.blob.core.windows.net/public/')
 BITCOIN_FASTSYNC_FILE = os.getenv('BITCOIN_FASTSYNC_FILE', 'utxo-snapshot-bitcoin-mainnet-720179.tar')
 
+# Set to false when running individual docker containers
+START_DAEMONS = toBool(os.getenv('START_DAEMONS', 'true'))
+
 use_tor_proxy = False
 
 default_socket = socket.socket
@@ -688,11 +691,11 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
         elif coin == 'namecoin':
             fp.write('prune=2000\n')
         elif coin == 'pivx':
-            base_dir = extra_opts.get('data_dir', data_dir)
-            params_dir = os.path.join(base_dir, 'pivx-params')
+            params_dir = os.path.join(data_dir, 'pivx-params')
             downloadPIVXParams(params_dir)
             fp.write('prune=4000\n')
-            fp.write(f'paramsdir={params_dir}\n')
+            PIVX_PARAMSDIR = os.getenv('PIVX_PARAMSDIR', params_dir)
+            fp.write(f'paramsdir={PIVX_PARAMSDIR}\n')
             if PIVX_RPC_USER != '':
                 fp.write('rpcauth={}:{}${}\n'.format(PIVX_RPC_USER, salt, password_to_hmac(salt, PIVX_RPC_PWD)))
         elif coin == 'dash':
@@ -929,19 +932,20 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
                 coin_settings = settings['chainclients'][coin_name]
                 c = swap_client.getCoinIdFromName(coin_name)
 
-                if c == Coins.XMR:
-                    if coin_settings['manage_wallet_daemon']:
-                        daemons.append(startXmrWalletDaemon(coin_settings['datadir'], coin_settings['bindir'], 'monero-wallet-rpc'))
-                else:
-                    if coin_settings['manage_daemon']:
-                        filename = coin_name + 'd' + ('.exe' if os.name == 'nt' else '')
-                        coin_args = ['-nofindpeers', '-nostaking'] if c == Coins.PART else []
+                if START_DAEMONS:
+                    if c == Coins.XMR:
+                        if coin_settings['manage_wallet_daemon']:
+                            daemons.append(startXmrWalletDaemon(coin_settings['datadir'], coin_settings['bindir'], 'monero-wallet-rpc'))
+                    else:
+                        if coin_settings['manage_daemon']:
+                            filename = coin_name + 'd' + ('.exe' if os.name == 'nt' else '')
+                            coin_args = ['-nofindpeers', '-nostaking'] if c == Coins.PART else []
 
-                        if c == Coins.FIRO:
-                            coin_args += ['-hdseed={}'.format(swap_client.getWalletKey(Coins.FIRO, 1).hex())]
+                            if c == Coins.FIRO:
+                                coin_args += ['-hdseed={}'.format(swap_client.getWalletKey(Coins.FIRO, 1).hex())]
 
-                        daemons.append(startDaemon(coin_settings['datadir'], coin_settings['bindir'], filename, daemon_args + coin_args))
-                        swap_client.setDaemonPID(c, daemons[-1].pid)
+                            daemons.append(startDaemon(coin_settings['datadir'], coin_settings['bindir'], filename, daemon_args + coin_args))
+                            swap_client.setDaemonPID(c, daemons[-1].pid)
                 swap_client.setCoinRunParams(c)
                 swap_client.createCoinInterface(c)
 
