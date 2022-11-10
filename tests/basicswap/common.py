@@ -308,6 +308,10 @@ def delay_for(delay_event, delay_for=60):
     delay_event.wait(delay_for)
 
 
+def make_boolean(s):
+    return s.lower() in ['1', 'true']
+
+
 def make_rpc_func(node_id, base_rpc_port=BASE_RPC_PORT):
     node_id = node_id
     auth = 'test{0}:test_pass{0}'.format(node_id)

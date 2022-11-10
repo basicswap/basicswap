@@ -1,0 +1,16 @@
+    firo_core:
+        image: i_firo
+        build:
+            context: firo
+            dockerfile: Dockerfile
+        container_name: firo_core
+        volumes:
+            - ${DATA_PATH}/firo:/data
+        expose:
+            - ${FIRO_RPC_PORT}
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "3"
+        restart: unless-stopped

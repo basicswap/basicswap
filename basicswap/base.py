@@ -15,7 +15,6 @@ import traceback
 import subprocess
 
 import basicswap.config as cfg
-import basicswap.contrib.segwit_addr as segwit_addr
 
 from .rpc import (
     callrpc,
@@ -111,12 +110,6 @@ class BaseApp:
             if coin_name.lower() == params['name'].lower():
                 return c
         raise ValueError('Unknown coin: {}'.format(coin_name))
-
-    def encodeSegwit(self, coin_type, raw):
-        return segwit_addr.encode(chainparams[coin_type][self.chain]['hrp'], 0, raw)
-
-    def decodeSegwit(self, coin_type, addr):
-        return bytes(segwit_addr.decode(chainparams[coin_type][self.chain]['hrp'], addr)[1])
 
     def callrpc(self, method, params=[], wallet=None):
         cc = self.coin_clients[Coins.PART]

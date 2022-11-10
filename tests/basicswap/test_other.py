@@ -212,7 +212,7 @@ class Test(unittest.TestCase):
         pk = ci.getPubkey(vk)
         sig = ci.signCompact(vk, 'test signing message')
         assert (len(sig) == 64)
-        ci.verifyCompact(pk, 'test signing message', sig)
+        ci.verifyCompactSig(pk, 'test signing message', sig)
 
     def test_pubkey_to_address(self):
         coin_settings = {'rpcport': 0, 'rpcauth': 'none'}

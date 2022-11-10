@@ -53,6 +53,9 @@ PIVX_VERSION_TAG = os.getenv('PIVX_VERSION_TAG', '_scantxoutset')
 DASH_VERSION = os.getenv('DASH_VERSION', '18.1.0')
 DASH_VERSION_TAG = os.getenv('DASH_VERSION_TAG', '')
 
+FIRO_VERSION = os.getenv('FIRO_VERSION', '0.14.99.1')
+FIRO_VERSION_TAG = os.getenv('FIRO_VERSION_TAG', '')
+
 
 known_coins = {
     'particl': (PARTICL_VERSION, PARTICL_VERSION_TAG, ('tecnovert',)),
@@ -62,6 +65,8 @@ known_coins = {
     'monero': (MONERO_VERSION, MONERO_VERSION_TAG, ('binaryfate',)),
     'pivx': (PIVX_VERSION, PIVX_VERSION_TAG, ('tecnovert',)),
     'dash': (DASH_VERSION, DASH_VERSION_TAG, ('pasta',)),
+    # 'firo': (FIRO_VERSION, FIRO_VERSION_TAG, ('reuben',)),
+    'firo': (FIRO_VERSION, FIRO_VERSION_TAG, ('tecnovert',)),
 }
 
 expected_key_ids = {
@@ -73,6 +78,7 @@ expected_key_ids = {
     'davidburkett38': ('3620E9D387E55666',),
     'fuzzbawls': ('3BDCDA2D87A881D9',),
     'pasta': ('52527BEDABE87984',),
+    'reuben': ('1290A1D0FA7EE109',),
 }
 
 if platform.system() == 'Darwin':
@@ -137,6 +143,12 @@ DASH_ONION_PORT = int(os.getenv('DASH_ONION_PORT', 9999))  # nDefaultPort
 DASH_RPC_USER = os.getenv('DASH_RPC_USER', '')
 DASH_RPC_PWD = os.getenv('DASH_RPC_PWD', '')
 
+FIRO_RPC_HOST = os.getenv('FIRO_RPC_HOST', '127.0.0.1')
+FIRO_RPC_PORT = int(os.getenv('FIRO_RPC_PORT', 8888))
+FIRO_ONION_PORT = int(os.getenv('FIRO_ONION_PORT', 8168))  # nDefaultPort
+FIRO_RPC_USER = os.getenv('FIRO_RPC_USER', '')
+FIRO_RPC_PWD = os.getenv('FIRO_RPC_PWD', '')
+
 TOR_PROXY_HOST = os.getenv('TOR_PROXY_HOST', '127.0.0.1')
 TOR_PROXY_PORT = int(os.getenv('TOR_PROXY_PORT', 9050))
 TOR_CONTROL_PORT = int(os.getenv('TOR_CONTROL_PORT', 9051))
@@ -146,6 +158,9 @@ TEST_ONION_LINK = toBool(os.getenv('TEST_ONION_LINK', 'false'))
 
 BITCOIN_FASTSYNC_URL = os.getenv('BITCOIN_FASTSYNC_URL', 'http://utxosets.blob.core.windows.net/public/')
 BITCOIN_FASTSYNC_FILE = os.getenv('BITCOIN_FASTSYNC_FILE', 'utxo-snapshot-bitcoin-mainnet-720179.tar')
+
+# Set to false when running individual docker containers
+START_DAEMONS = toBool(os.getenv('START_DAEMONS', 'true'))
 
 use_tor_proxy = False
 
@@ -209,6 +224,19 @@ def downloadBytes(url):
         return urllib.request.urlopen(url).read()
     finally:
         popConnectionParameters()
+
+
+def importPubkeyFromUrls(gpg, pubkeyurls):
+    for url in pubkeyurls:
+        try:
+            logger.info('Importing public key from url: ' + url)
+            rv = gpg.import_keys(downloadBytes(url))
+            break
+        except Exception as e:
+            logging.warning('Import from url failed: %s', str(e))
+
+    for key in rv.fingerprints:
+        gpg.trust_keys(key, 'TRUST_FULLY')
 
 
 def testTorConnection():
@@ -278,8 +306,14 @@ def extractCore(coin, version_data, settings, bin_dir, release_path, extra_opts=
     logger.info('extractCore %s v%s%s', coin, version, version_tag)
     extract_core_overwrite = extra_opts.get('extract_core_overwrite', True)
 
-    if coin == 'monero':
-        bins = ['monerod', 'monero-wallet-rpc']
+    if coin in ('monero', 'firo'):
+        if coin == 'monero':
+            bins = ['monerod', 'monero-wallet-rpc']
+        elif coin == 'firo':
+            bins = [coin + 'd', coin + '-cli', coin + '-tx']
+        else:
+            raise ValueError('Unknown coin')
+
         num_exist = 0
         for b in bins:
             out_path = os.path.join(bin_dir, b)
@@ -412,11 +446,31 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
             release_url = 'https://github.com/dashpay/dash/releases/download/v{}/{}'.format(version + version_tag, release_filename)
             assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, major_version)
             assert_url = 'https://raw.githubusercontent.com/dashpay/gitian.sigs/master/%s-%s/%s/%s' % (version + version_tag, os_dir_name, signing_key_name, assert_filename)
+        elif coin == 'firo':
+            '''
+            if BIN_ARCH == 'x86_64-linux-gnu':
+                arch_name = 'linux64'
+                file_ext = 'tar.gz'
+            elif BIN_ARCH == 'osx64':
+                arch_name = 'macos'
+                file_ext = 'dmg'
+                raise ValueError('TODO: Firo - Extract .dmg')
+            else:
+                raise ValueError('Firo: Unknown architecture')
+            release_filename = '{}-{}-{}{}.{}'.format('firo', version + version_tag, arch_name, filename_extra, file_ext)
+            # release_url = 'https://github.com/firoorg/firo/releases/download/v{}/{}'.format(version + version_tag, release_filename)
+            # assert_url = 'https://github.com/firoorg/firo/releases/download/v%s/SHA256SUMS' % (version + version_tag)
+            '''
+            if BIN_ARCH == 'x86_64-linux-gnu':
+                release_filename = 'firo-0.14.99.1-x86_64-linux-gnu.tar.gz'
+            elif BIN_ARCH == 'osx64':
+                release_filename = 'firo-0.14.99.1-osx-unsigned.tar.gz'
+            else:
+                raise ValueError('Firo: Unknown architecture')
+            release_url = 'https://github.com/tecnovert/particl-core/releases/download/v{}/{}'.format(version + version_tag, release_filename)
+            assert_url = 'https://github.com/tecnovert/particl-core/releases/download/v%s/SHA256SUMS.asc' % (version + version_tag)
         else:
             raise ValueError('Unknown coin')
-
-        assert_sig_filename = assert_filename + '.sig'
-        assert_sig_url = assert_url + ('.asc' if major_version >= 22 else '.sig')
 
         release_path = os.path.join(bin_dir, release_filename)
         if not os.path.exists(release_path):
@@ -428,10 +482,12 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
         if not os.path.exists(assert_path):
             downloadFile(assert_url, assert_path)
 
-        assert_sig_filename = '{}-{}-{}-build-{}.assert.sig'.format(coin, os_name, version, signing_key_name)
-        assert_sig_path = os.path.join(bin_dir, assert_sig_filename)
-        if not os.path.exists(assert_sig_path):
-            downloadFile(assert_sig_url, assert_sig_path)
+        if coin not in ('firo', ):
+            assert_sig_url = assert_url + ('.asc' if major_version >= 22 else '.sig')
+            assert_sig_filename = '{}-{}-{}-build-{}.assert.sig'.format(coin, os_name, version, signing_key_name)
+            assert_sig_path = os.path.join(bin_dir, assert_sig_filename)
+            if not os.path.exists(assert_sig_path):
+                downloadFile(assert_sig_url, assert_sig_path)
 
     hasher = hashlib.sha256()
     with open(release_path, 'rb') as fp:
@@ -462,17 +518,28 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
                     for key in rv.fingerprints:
                         gpg.trust_keys(rv.fingerprints[0], 'TRUST_FULLY')
 
+    if coin in ('pivx', 'firo'):
+        pubkey_filename = '{}_{}.pgp'.format('particl', signing_key_name)
+    else:
+        pubkey_filename = '{}_{}.pgp'.format(coin, signing_key_name)
+    pubkeyurls = [
+        'https://raw.githubusercontent.com/tecnovert/basicswap/master/pgp/keys/' + pubkey_filename,
+        'https://gitlab.com/particl/basicswap/-/raw/master/pgp/keys/' + pubkey_filename,
+    ]
+    if coin == 'dash':
+        pubkeyurls.append('https://raw.githubusercontent.com/dashpay/dash/master/contrib/gitian-keys/pasta.pgp')
     if coin == 'monero':
+        pubkeyurls.append('https://raw.githubusercontent.com/monero-project/monero/master/utils/gpg_keys/binaryfate.asc')
+    if coin == 'firo':
+        pubkeyurls.append('https://firo.org/reuben.asc')
+
+    if coin in ('monero', 'firo'):
         with open(assert_path, 'rb') as fp:
             verified = gpg.verify_file(fp)
 
         if not isValidSignature(verified) and verified.username is None:
             logger.warning('Signature made by unknown key.')
-
-            pubkeyurl = 'https://raw.githubusercontent.com/monero-project/monero/master/utils/gpg_keys/binaryfate.asc'
-            logger.info('Importing public key from url: ' + pubkeyurl)
-            rv = gpg.import_keys(downloadBytes(pubkeyurl))
-            gpg.trust_keys(rv.fingerprints[0], 'TRUST_FULLY')
+            importPubkeyFromUrls(gpg, pubkeyurls)
             with open(assert_path, 'rb') as fp:
                 verified = gpg.verify_file(fp)
     else:
@@ -481,28 +548,7 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
 
         if not isValidSignature(verified) and verified.username is None:
             logger.warning('Signature made by unknown key.')
-
-            if coin == 'pivx':
-                filename = '{}_{}.pgp'.format('particl', signing_key_name)
-            else:
-                filename = '{}_{}.pgp'.format(coin, signing_key_name)
-            pubkeyurls = [
-                'https://raw.githubusercontent.com/tecnovert/basicswap/master/pgp/keys/' + filename,
-                'https://gitlab.com/particl/basicswap/-/raw/master/pgp/keys/' + filename,
-            ]
-            if coin == 'dash':
-                pubkeyurls.append('https://raw.githubusercontent.com/dashpay/dash/master/contrib/gitian-keys/pasta.pgp')
-            for url in pubkeyurls:
-                try:
-                    logger.info('Importing public key from url: ' + url)
-                    rv = gpg.import_keys(downloadBytes(url))
-                    break
-                except Exception as e:
-                    logging.warning('Import from url failed: %s', str(e))
-
-            for key in rv.fingerprints:
-                gpg.trust_keys(key, 'TRUST_FULLY')
-
+            importPubkeyFromUrls(gpg, pubkeyurls)
             with open(assert_sig_path, 'rb') as fp:
                 verified = gpg.verify_file(fp, assert_path)
 
@@ -600,12 +646,13 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
     with open(core_conf_path, 'w') as fp:
         if chain != 'mainnet':
             fp.write(chain + '=1\n')
-            if chain == 'testnet':
-                fp.write('[test]\n\n')
-            if chain == 'regtest':
-                fp.write('[regtest]\n\n')
-            else:
-                logger.warning('Unknown chain %s', chain)
+            if coin != 'firo':
+                if chain == 'testnet':
+                    fp.write('[test]\n\n')
+                elif chain == 'regtest':
+                    fp.write('[regtest]\n\n')
+                else:
+                    logger.warning('Unknown chain %s', chain)
 
         if COINS_RPCBIND_IP != '127.0.0.1':
             fp.write('rpcallowip=127.0.0.1\n')
@@ -644,11 +691,11 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
         elif coin == 'namecoin':
             fp.write('prune=2000\n')
         elif coin == 'pivx':
-            base_dir = extra_opts.get('data_dir', data_dir)
-            params_dir = os.path.join(base_dir, 'pivx-params')
+            params_dir = os.path.join(data_dir, 'pivx-params')
             downloadPIVXParams(params_dir)
             fp.write('prune=4000\n')
-            fp.write(f'paramsdir={params_dir}\n')
+            PIVX_PARAMSDIR = os.getenv('PIVX_PARAMSDIR', params_dir)
+            fp.write(f'paramsdir={PIVX_PARAMSDIR}\n')
             if PIVX_RPC_USER != '':
                 fp.write('rpcauth={}:{}${}\n'.format(PIVX_RPC_USER, salt, password_to_hmac(salt, PIVX_RPC_PWD)))
         elif coin == 'dash':
@@ -656,6 +703,13 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
             fp.write('fallbackfee=0.0002\n')
             if DASH_RPC_USER != '':
                 fp.write('rpcauth={}:{}${}\n'.format(DASH_RPC_USER, salt, password_to_hmac(salt, DASH_RPC_PWD)))
+        elif coin == 'firo':
+            fp.write('prune=4000\n')
+            fp.write('fallbackfee=0.0002\n')
+            fp.write('txindex=0\n')
+            fp.write('usehd=1\n')
+            if FIRO_RPC_USER != '':
+                fp.write('rpcauth={}:{}${}\n'.format(FIRO_RPC_USER, salt, password_to_hmac(salt, FIRO_RPC_PWD)))
         else:
             logger.warning('Unknown coin %s', coin)
 
@@ -878,16 +932,20 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
                 coin_settings = settings['chainclients'][coin_name]
                 c = swap_client.getCoinIdFromName(coin_name)
 
-                if c == Coins.XMR:
-                    if coin_settings['manage_wallet_daemon']:
-                        daemons.append(startXmrWalletDaemon(coin_settings['datadir'], coin_settings['bindir'], 'monero-wallet-rpc'))
-                else:
-                    if coin_settings['manage_daemon']:
-                        filename = coin_name + 'd' + ('.exe' if os.name == 'nt' else '')
-                        coin_args = ['-nofindpeers', '-nostaking'] if c == Coins.PART else []
+                if START_DAEMONS:
+                    if c == Coins.XMR:
+                        if coin_settings['manage_wallet_daemon']:
+                            daemons.append(startXmrWalletDaemon(coin_settings['datadir'], coin_settings['bindir'], 'monero-wallet-rpc'))
+                    else:
+                        if coin_settings['manage_daemon']:
+                            filename = coin_name + 'd' + ('.exe' if os.name == 'nt' else '')
+                            coin_args = ['-nofindpeers', '-nostaking'] if c == Coins.PART else []
 
-                        daemons.append(startDaemon(coin_settings['datadir'], coin_settings['bindir'], filename, daemon_args + coin_args))
-                        swap_client.setDaemonPID(c, daemons[-1].pid)
+                            if c == Coins.FIRO:
+                                coin_args += ['-hdseed={}'.format(swap_client.getWalletKey(Coins.FIRO, 1).hex())]
+
+                            daemons.append(startDaemon(coin_settings['datadir'], coin_settings['bindir'], filename, daemon_args + coin_args))
+                            swap_client.setDaemonPID(c, daemons[-1].pid)
                 swap_client.setCoinRunParams(c)
                 swap_client.createCoinInterface(c)
 
@@ -1173,12 +1231,27 @@ def main():
         },
         'dash': {
             'connection_type': 'rpc' if 'dash' in with_coins else 'none',
-            'manage_daemon': True if ('dash' in with_coins and PIVX_RPC_HOST == '127.0.0.1') else False,
+            'manage_daemon': True if ('dash' in with_coins and DASH_RPC_HOST == '127.0.0.1') else False,
             'rpchost': DASH_RPC_HOST,
             'rpcport': DASH_RPC_PORT + port_offset,
             'onionport': DASH_ONION_PORT + port_offset,
             'datadir': os.getenv('DASH_DATA_DIR', os.path.join(data_dir, 'dash')),
             'bindir': os.path.join(bin_dir, 'dash'),
+            'use_segwit': False,
+            'use_csv': True,
+            'blocks_confirmed': 1,
+            'conf_target': 2,
+            'core_version_group': 18,
+            'chain_lookups': 'local',
+        },
+        'firo': {
+            'connection_type': 'rpc' if 'firo' in with_coins else 'none',
+            'manage_daemon': True if ('firo' in with_coins and FIRO_RPC_HOST == '127.0.0.1') else False,
+            'rpchost': FIRO_RPC_HOST,
+            'rpcport': FIRO_RPC_PORT + port_offset,
+            'onionport': FIRO_ONION_PORT + port_offset,
+            'datadir': os.getenv('FIRO_DATA_DIR', os.path.join(data_dir, 'firo')),
+            'bindir': os.path.join(bin_dir, 'firo'),
             'use_segwit': False,
             'use_csv': True,
             'blocks_confirmed': 1,
@@ -1203,6 +1276,9 @@ def main():
     if DASH_RPC_USER != '':
         chainclients['dash']['rpcuser'] = DASH_RPC_USER
         chainclients['dash']['rpcpassword'] = DASH_RPC_PWD
+    if FIRO_RPC_USER != '':
+        chainclients['firo']['rpcuser'] = FIRO_RPC_USER
+        chainclients['firo']['rpcpassword'] = FIRO_RPC_PWD
 
     chainclients['monero']['walletsdir'] = os.getenv('XMR_WALLETS_DIR', chainclients['monero']['datadir'])
 
