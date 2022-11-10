@@ -464,7 +464,7 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
             if BIN_ARCH == 'x86_64-linux-gnu':
                 release_filename = 'firo-0.14.99.1-x86_64-linux-gnu.tar.gz'
             elif BIN_ARCH == 'osx64':
-                release_filename = 'firo-0.14.99.1-osx-unsigned.tar.gz'
+                release_filename = 'firo-0.14.99.1-x86_64-apple-darwin18.tar.gz'
             else:
                 raise ValueError('Firo: Unknown architecture')
             release_url = 'https://github.com/tecnovert/particl-core/releases/download/v{}/{}'.format(version + version_tag, release_filename)
