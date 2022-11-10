@@ -392,11 +392,8 @@ class Test(unittest.TestCase):
         offer_id = swap_clients[0].postOffer(Coins.PART, Coins.PIVX, 100 * COIN, 0.1 * COIN, 100 * COIN, SwapTypes.SELLER_FIRST, TxLockTypes.ABS_LOCK_TIME)
 
         wait_for_offer(delay_event, swap_clients[1], offer_id)
-        offers = swap_clients[1].listOffers()
-        assert (len(offers) == 1)
-        for offer in offers:
-            if offer.offer_id == offer_id:
-                bid_id = swap_clients[1].postBid(offer_id, offer.amount_from)
+        offer = swap_clients[1].getOffer(offer_id)
+        bid_id = swap_clients[1].postBid(offer_id, offer.amount_from)
 
         wait_for_bid(delay_event, swap_clients[0], bid_id)
 
@@ -419,10 +416,8 @@ class Test(unittest.TestCase):
         offer_id = swap_clients[1].postOffer(Coins.PIVX, Coins.PART, 10 * COIN, 9.0 * COIN, 10 * COIN, SwapTypes.SELLER_FIRST, TxLockTypes.ABS_LOCK_TIME)
 
         wait_for_offer(delay_event, swap_clients[0], offer_id)
-        offers = swap_clients[0].listOffers()
-        for offer in offers:
-            if offer.offer_id == offer_id:
-                bid_id = swap_clients[0].postBid(offer_id, offer.amount_from)
+        offer = swap_clients[0].getOffer(offer_id)
+        bid_id = swap_clients[0].postBid(offer_id, offer.amount_from)
 
         wait_for_bid(delay_event, swap_clients[1], bid_id)
         swap_clients[1].acceptBid(bid_id)
@@ -444,10 +439,8 @@ class Test(unittest.TestCase):
         offer_id = swap_clients[0].postOffer(Coins.PIVX, Coins.BTC, 10 * COIN, 0.1 * COIN, 10 * COIN, SwapTypes.SELLER_FIRST, TxLockTypes.ABS_LOCK_TIME)
 
         wait_for_offer(delay_event, swap_clients[1], offer_id)
-        offers = swap_clients[1].listOffers()
-        for offer in offers:
-            if offer.offer_id == offer_id:
-                bid_id = swap_clients[1].postBid(offer_id, offer.amount_from)
+        offer = swap_clients[1].getOffer(offer_id)
+        bid_id = swap_clients[1].postBid(offer_id, offer.amount_from)
 
         wait_for_bid(delay_event, swap_clients[0], bid_id)
         swap_clients[0].acceptBid(bid_id)
@@ -474,10 +467,8 @@ class Test(unittest.TestCase):
                                              TxLockTypes.ABS_LOCK_BLOCKS, 10)
 
         wait_for_offer(delay_event, swap_clients[1], offer_id)
-        offers = swap_clients[1].listOffers()
-        for offer in offers:
-            if offer.offer_id == offer_id:
-                bid_id = swap_clients[1].postBid(offer_id, offer.amount_from)
+        offer = swap_clients[1].getOffer(offer_id)
+        bid_id = swap_clients[1].postBid(offer_id, offer.amount_from)
 
         wait_for_bid(delay_event, swap_clients[0], bid_id)
         swap_clients[1].abandonBid(bid_id)
@@ -500,10 +491,8 @@ class Test(unittest.TestCase):
         offer_id = swap_clients[0].postOffer(Coins.PIVX, Coins.BTC, 10 * COIN, 10 * COIN, 10 * COIN, SwapTypes.SELLER_FIRST, TxLockTypes.ABS_LOCK_TIME)
 
         wait_for_offer(delay_event, swap_clients[0], offer_id)
-        offers = swap_clients[0].listOffers()
-        for offer in offers:
-            if offer.offer_id == offer_id:
-                bid_id = swap_clients[0].postBid(offer_id, offer.amount_from)
+        offer = swap_clients[0].getOffer(offer_id)
+        bid_id = swap_clients[0].postBid(offer_id, offer.amount_from)
 
         wait_for_bid(delay_event, swap_clients[0], bid_id)
         swap_clients[0].acceptBid(bid_id)
@@ -524,10 +513,8 @@ class Test(unittest.TestCase):
         offer_id = swap_clients[0].postOffer(Coins.PIVX, Coins.BTC, 0.001 * COIN, 1.0 * COIN, 0.001 * COIN, SwapTypes.SELLER_FIRST, TxLockTypes.ABS_LOCK_TIME)
 
         wait_for_offer(delay_event, swap_clients[0], offer_id)
-        offers = swap_clients[0].listOffers()
-        for offer in offers:
-            if offer.offer_id == offer_id:
-                bid_id = swap_clients[0].postBid(offer_id, offer.amount_from)
+        offer = swap_clients[0].getOffer(offer_id)
+        bid_id = swap_clients[0].postBid(offer_id, offer.amount_from)
 
         wait_for_bid(delay_event, swap_clients[0], bid_id)
         swap_clients[0].acceptBid(bid_id)

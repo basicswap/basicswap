@@ -47,16 +47,17 @@ from .test_xmr import BaseTest, test_delay_event, callnoderpc
 logger = logging.getLogger()
 
 
-class Test(BaseTest):
-    __test__ = True
-    test_coin_from = Coins.BTC
-    start_ltc_nodes = False
+class BasicSwapTest(BaseTest):
+    base_rpc_port = None
 
     def getBalance(self, js_wallets):
         return float(js_wallets[self.test_coin_from.name]['balance']) + float(js_wallets[self.test_coin_from.name]['unconfirmed'])
 
     def callnoderpc(self, method, params=[], wallet=None, node_id=0):
-        return callnoderpc(node_id, method, params, wallet, base_rpc_port=BTC_BASE_RPC_PORT)
+        return callnoderpc(node_id, method, params, wallet, self.base_rpc_port)
+
+    def mineBlock(self, num_blocks=1):
+        self.callnoderpc('generatetoaddress', [num_blocks, self.btc_addr])
 
     def test_001_nested_segwit(self):
         logging.info('---------- Test {} p2sh nested segwit'.format(self.test_coin_from.name))
@@ -68,7 +69,7 @@ class Test(BaseTest):
         txid = self.callnoderpc('sendtoaddress', [addr_p2sh_segwit, 1.0])
         assert len(txid) == 64
 
-        self.callnoderpc('generatetoaddress', [1, self.btc_addr])
+        self.mineBlock()
         ro = self.callnoderpc('scantxoutset', ['start', ['addr({})'.format(addr_p2sh_segwit)]])
         assert (len(ro['unspents']) == 1)
         assert (ro['unspents'][0]['txid'] == txid)
@@ -108,7 +109,7 @@ class Test(BaseTest):
         tx_wallet = self.callnoderpc('gettransaction', [txid, ])['hex']
         tx = self.callnoderpc('decoderawtransaction', [tx_wallet, ])
 
-        self.callnoderpc('generatetoaddress', [1, self.btc_addr])
+        self.mineBlock()
         ro = self.callnoderpc('scantxoutset', ['start', ['addr({})'.format(addr_segwit)]])
         assert (len(ro['unspents']) == 1)
         assert (ro['unspents'][0]['txid'] == txid)
@@ -161,9 +162,9 @@ class Test(BaseTest):
         except Exception as e:
             assert ('non-final' in str(e))
 
-        self.callnoderpc('generatetoaddress', [49, self.btc_addr])
+        self.mineBlock(5)
         txid = self.callnoderpc('sendrawtransaction', [tx_spend_hex, ])
-        self.callnoderpc('generatetoaddress', [1, self.btc_addr])
+        self.mineBlock()
         ro = self.callnoderpc('listreceivedbyaddress', [0, ])
         sum_addr = 0
         for entry in ro:
@@ -206,9 +207,9 @@ class Test(BaseTest):
         except Exception as e:
             assert ('non-BIP68-final' in str(e))
 
-        self.callnoderpc('generatetoaddress', [3, self.btc_addr])
+        self.mineBlock(3)
         txid = self.callnoderpc('sendrawtransaction', [tx_spend_hex, ])
-        self.callnoderpc('generatetoaddress', [1, self.btc_addr])
+        self.mineBlock(1)
         ro = self.callnoderpc('listreceivedbyaddress', [0, ])
         sum_addr = 0
         for entry in ro:
@@ -416,6 +417,13 @@ class Test(BaseTest):
         node1_xmr_before = self.getXmrBalance(js_w1_before)
         node1_xmr_after = self.getXmrBalance(js_w1_after)
         assert (node1_xmr_before - node1_xmr_after < 0.02)
+
+
+class TestBTC(BasicSwapTest):
+    __test__ = True
+    test_coin_from = Coins.BTC
+    start_ltc_nodes = False
+    base_rpc_port = BTC_BASE_RPC_PORT
 
 
 if __name__ == '__main__':

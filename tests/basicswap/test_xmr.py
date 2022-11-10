@@ -518,6 +518,10 @@ class BaseTest(unittest.TestCase):
                     mweb_addr = callnoderpc(2, 'getnewaddress', ['mweb_addr', 'mweb'], base_rpc_port=LTC_BASE_RPC_PORT)
                     callnoderpc(0, 'sendtoaddress', [mweb_addr, 1], base_rpc_port=LTC_BASE_RPC_PORT)
 
+                    ltc_addr1 = callnoderpc(1, 'getnewaddress', ['initial addr'], base_rpc_port=LTC_BASE_RPC_PORT)
+                    for i in range(5):
+                        callnoderpc(0, 'sendtoaddress', [ltc_addr1, 100], base_rpc_port=LTC_BASE_RPC_PORT)
+
                     num_blocks = 69
                     cls.ltc_addr = cls.swap_clients[0].ci(Coins.LTC).pubkey_to_address(void_block_rewards_pubkey)
                     callnoderpc(0, 'generatetoaddress', [num_blocks, cls.ltc_addr], base_rpc_port=LTC_BASE_RPC_PORT)
