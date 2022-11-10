@@ -1,7 +1,5 @@
 {% include 'header.html' %}
-
 <div class="container mx-auto">
-
   <section class="bg-white p-5 mt-5">
     <div class="flex flex-wrap items-center -m-2">
       <div class="w-full md:w-1/2 p-2">
@@ -26,13 +24,9 @@
       </div>
     </div>
   </section>
-
   <section class="py-4">
     <div class="container px-4 mx-auto">
-      <div class="relative py-11 px-16 bg-coolGray-900 rounded-md overflow-hidden">
-         <img class="absolute z-10 left-4 top-4" src="/static/images/elements/dots-red.svg" alt="">
-         <img class="absolute z-10 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt="">
-         <img class="absolute h-64 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" src="/static/images/elements/wave.svg" alt="">
+      <div class="relative py-11 px-16 bg-coolGray-900 rounded-md overflow-hidden"> <img class="absolute z-10 left-4 top-4" src="/static/images/elements/dots-red.svg" alt=""> <img class="absolute z-10 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt=""> <img class="absolute h-64 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" src="/static/images/elements/wave.svg" alt="">
         <div class="relative z-20 flex flex-wrap items-center -m-3">
           <div class="w-full md:w-1/2 p-3">
             <h2 class="mb-6 text-4xl font-bold text-white tracking-tighter">{{ page_type_available }} {{ page_type_received }} {{ page_type_sent }}</h2>
@@ -42,50 +36,39 @@
       </div>
     </div>
   </section>
-
-<!-- todo -->
-  {% if refresh %}
+  <!-- todo -->{% if refresh %}
   <p>Page Refresh: {{ refresh }} seconds</p> {% endif %} {% for m in messages %}
-  <p>{{ m }}</p>
-  {% endfor %}
-<!-- todo -->
-
+  <p>{{ m }}</p> {% endfor %}
+  <!-- todo -->
   <section class="bg-white">
     <div class="pl-6 pr-6 pt-0 pb-0 mt-5 h-full overflow-hidden bg-white">
       <div class="pb-6 border-coolGray-100">
         <div class="flex flex-wrap items-center justify-between -m-2">
           <div class="w-full pt-2">
-
             <form method="post">
-
               <div class="flex justify-between items-center pb-4 bg-white">
                 <div class="bg-white bg-opacity-60 rounded-b-md">
                   <div class="w-full md:w-0/12">
                     <div class="flex flex-wrap justify-end -m-1.5">
-
                       <div class="flex items-center">
                         <div class="w-full md:w-auto p-1.5">
                           <p class="text-sm font-heading bold">Sort By:</p>
                         </div>
                       </div>
-
                       <div class="w-full md:w-auto p-1.5">
                         <div class="relative">
                           <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB">
-                            </path>
+                            <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"> </path>
                           </svg>
                           <select name="sort_by" class="appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
                             <option value="created_at" {% if filters.sort_by=='created_at' %} selected{% endif %}>Time At</option>
                           </select>
                         </div>
                       </div>
-
                       <div class="w-full md:w-auto p-1.5">
                         <div class="relative">
                           <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB">
-                            </path>
+                            <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"> </path>
                           </svg>
                           <select name="sort_dir" class="appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
                             <option value="asc" {% if filters.sort_dir=='asc' %} selected{% endif %}>Ascending</option>
@@ -93,39 +76,33 @@
                           </select>
                         </div>
                       </div>
-
                       <div class="flex items-center">
                         <div class="w-full md:w-auto p-1.5">
                           <p class="text-sm font-heading bold">State:</p>
                         </div>
                       </div>
-
                       <div class="w-full md:w-auto p-1.5">
                         <div class="relative">
                           <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB">
-                            </path>
+                            <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"> </path>
                           </svg>
                           <select name="state" class="appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
                             <option value="-1" {% if filters.bid_state_ind==-1 %} selected{% endif %}>Any</option>
                             {% for s in data.bid_states %}
                             <option value="{{ s[0] }}" {% if filters.bid_state_ind==s[0] %} selected{% endif %}>{{ s[1] }}</option>
-                            {% endfor %}
-                          </select>
+                          {% endfor %}
+                        </select>
                         </div>
                       </div>
-
                       <div class="flex items-center">
                         <div class="w-full md:w-auto p-1.5">
                           <p class="text-sm font-heading bold">Include Expired:</p>
                         </div>
                       </div>
-
                       <div class="w-full md:w-auto p-1.5">
                         <div class="relative">
                           <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB">
-                            </path>
+                            <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"> </path>
                           </svg>
                           <select name="with_expired" class="appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
                             <option value="true" {% if filters.with_expired==true %} selected{% endif %}>Include</option>
@@ -133,7 +110,6 @@
                           </select>
                         </div>
                       </div>
-
                       <div class="w-full md:w-auto p-1.5">
                         <div class="relative">
                           <button type="submit" name='clearfilters' value="Clear Filters" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none">
@@ -151,7 +127,6 @@
                             </svg> <span>Clear</span> </button>
                         </div>
                       </div>
-
                       <div class="w-full md:w-auto p-1.5">
                         <div class="relative">
                           <button type="submit" name='applyfilters' value="Apply Filters" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm  bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
@@ -165,17 +140,13 @@
                             </svg> <span>Apply Filters</span> </button>
                         </div>
                       </div>
-
                     </div>
                   </div>
                 </div>
               </div>
-
-
               <div class="container px-0 mx-auto mt-5">
                 <div class="overflow-x-auto relative border sm:rounded-lg">
                   <table class="w-full text-sm text-left text-gray-500 outline-none border-gray-300">
-
                     <thead class="text-xs text-gray-700 border-b uppercase bg-gray-50 outline-none border-gray-300">
                       <tr>
                         <th scope="col" class="py-3 px-6"> Time At </th>
@@ -187,7 +158,6 @@
                         <th scope="col" class="py-3 px-6"> PTX Status </th>
                       </tr>
                     </thead>
-
                     <tbody>
                       {% for b in bids %}
                       <tr class="bg-white border-t hover:bg-gray-50">
@@ -210,57 +180,41 @@
                         <td class="py-4 px-6">{{ b[5] }}</td>
                       </tr>
                     </tbody>
-                    {% endfor %}
-
-                  </table>
-
+                  {% endfor %}
+                </table>
                   <input type="hidden" name="formid" value="{{ form_id }}">
-                  <input type="hidden" name="pageno" value="{{ filters.page_no }}">
-
-
-                  </div>
-                </div>
-
-                <div class="pt-10 bg-white bg-opacity-60 rounded-b-md">
-                  <div class="w-full md:w-0/12">
-
-                    <div class="flex flex-wrap justify-end -m-1.5">
-
-                      <div class="w-full md:w-auto p-1.5">
-                        <button type="submit" name='pageback' value="Page Back" class="outline-none flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none">
-                          <svg aria-hidden="true" class="mr-2 w-5 h-5" fill="#556987" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                            <path fill-rule="evenodd" d="M7.707 14.707a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l2.293 2.293a1 1 0 010 1.414z" clip-rule="evenodd"></path>
-                          </svg> <span>Page Back</span> </button>
-                      </div>
-
-                      <div class="flex items-center">
-                        <div class="w-full md:w-auto p-1.5">
-                          <p class="text-sm font-heading">Page: {{ filters.page_no }}</p>
-                        </div>
-                      </div>
-
-                      <div class="w-full md:w-auto p-1.5">
-                        <button type="submit" name='pageforwards' value="Page Forwards" class="outline-none flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none"> <span>Page Forwards</span>
-                          <svg aria-hidden="true" class="ml-2 w-5 h-5" fill="#556987" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                            <path fill-rule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd"></path>
-                          </svg>
-                        </button>
-                      </div>
-
+                  <input type="hidden" name="pageno" value="{{ filters.page_no }}"> </div>
+              </div>
+              <div class="pt-10 bg-white bg-opacity-60 rounded-b-md">
+                <div class="w-full md:w-0/12">
+                  <div class="flex flex-wrap justify-end -m-1.5">
+                    <div class="w-full md:w-auto p-1.5">
+                      <button type="submit" name='pageback' value="Page Back" class="outline-none flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none">
+                        <svg aria-hidden="true" class="mr-2 w-5 h-5" fill="#556987" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                          <path fill-rule="evenodd" d="M7.707 14.707a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l2.293 2.293a1 1 0 010 1.414z" clip-rule="evenodd"></path>
+                        </svg> <span>Page Back</span> </button>
                     </div>
-
+                    <div class="flex items-center">
+                      <div class="w-full md:w-auto p-1.5">
+                        <p class="text-sm font-heading">Page: {{ filters.page_no }}</p>
+                      </div>
+                    </div>
+                    <div class="w-full md:w-auto p-1.5">
+                      <button type="submit" name='pageforwards' value="Page Forwards" class="outline-none flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none"> <span>Page Forwards</span>
+                        <svg aria-hidden="true" class="ml-2 w-5 h-5" fill="#556987" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                          <path fill-rule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                        </svg>
+                      </button>
+                    </div>
                   </div>
                 </div>
-
-              </form>
-
-            </div>
+              </div>
+            </form>
           </div>
         </div>
       </div>
-
-</section>
-
+    </div>
+  </section>
 </div>
 {% include 'footer.html' %}
 </body>

@@ -16,16 +16,16 @@
 
 .floatright
 {
-  position: fixed;
-  top: 2em;
-  right: 2em;
+  position:fixed;
+  top:10px;
+  right:18px;
   margin: 0;
-  z-index: 50;
+  width:calc(33.33% - 25px);
 }
 
 .error
 {
-  border: 1px solid red;
+  background:#ff5b5b;
 }
 
 .error_msg

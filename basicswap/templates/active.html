@@ -1,6 +1,5 @@
 {% include 'header.html' %}
 <div class="container mx-auto">
-
   <section class="bg-white p-5 mt-5">
     <div class="flex flex-wrap items-center -m-2">
       <div class="w-full md:w-1/2 p-2">
@@ -25,40 +24,31 @@
       </div>
     </div>
   </section>
-
   <section class="py-4">
     <div class="container px-4 mx-auto">
-      <div class="relative py-11 px-16 bg-coolGray-900 rounded-md overflow-hidden">
-        <img class="absolute z-10 left-4 top-4" src="/static/images/elements/dots-red.svg" alt="">
-        <img class="absolute z-10 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt="">
-        <img class="absolute h-64 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" src="/static/images/elements/wave.svg" alt="">
+      <div class="relative py-11 px-16 bg-coolGray-900 rounded-md overflow-hidden"> <img class="absolute z-10 left-4 top-4" src="/static/images/elements/dots-red.svg" alt=""> <img class="absolute z-10 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt=""> <img class="absolute h-64 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" src="/static/images/elements/wave.svg" alt="">
         <div class="relative z-20 flex flex-wrap items-center">
           <div class="w-full md:w-1/2 p-3">
             <h2 class="mb-6 text-4xl font-bold text-white tracking-tighter">Swaps in Progress / Active Swaps</h2>
-            <p class="font-semibold text-coolGray-200">
-              {% if refresh %}
-              Page Refresh {{ refresh }} seconds
-              {% endif %}
-            </p>
+            <p class="font-semibold text-coolGray-200"> {% if refresh %} Page Refresh {{ refresh }} seconds {% endif %} </p>
           </div>
           <div class="w-full md:w-1/2 p-3">
-            <a id="refresh" href="/active"><button class="block md:ml-auto px-5 py-3 font-medium text-lcg text-white bg-blue-500 hover:bg-blue-600 rounded-md focus:ring-0 focus:outline-none">Refresh</button></a>
+            <a id="refresh" href="/active">
+              <button class="block md:ml-auto px-5 py-3 font-medium text-lcg text-white bg-blue-500 hover:bg-blue-600 rounded-md focus:ring-0 focus:outline-none">Refresh</button>
+            </a>
           </div>
         </div>
       </div>
     </div>
   </section>
-
   <section class="bg-white">
     <div class="pl-6 pr-6 pt-0 pb-0 mt-5 h-full overflow-hidden bg-white">
       <div class="pb-6 border-coolGray-100">
         <div class="flex flex-wrap items-center justify-between -m-2">
           <div class="w-full pt-2">
-
             <div class="container px-0 mx-auto mt-5">
               <div class="overflow-x-auto relative border sm:rounded-lg">
                 <table class="w-full text-sm text-left text-gray-500 outline-none border-gray-300">
-
                   <thead class="text-xs text-gray-700 border-b uppercase bg-gray-50 outline-none border-gray-300">
                     <tr>
                       <th scope="col" class="py-3 px-6"> Bid ID </th>
@@ -68,8 +58,7 @@
                       <th scope="col" class="py-3 px-7"> PTX Status </th>
                     </tr>
                   </thead>
-
-                  <tbody>
+                  <tbody> 
                     {% for s in active_swaps %}
                     <tr class="bg-white border-t hover:bg-gray-50">
                       <td class="py-4 px-6 text-xs monospace"><a href=/bid/{{ s[0] }}>{{ s[0] }}</a></td>
@@ -77,9 +66,9 @@
                       <td class="py-4 px-6">{{ s[2] }}</td>
                       <td class="py-4 px-6">{{ s[3] }}</td>
                       <td class="py-4 px-6">{{ s[4] }}</td>
-                    </tr>
-                    {% endfor %}
-                  </tbody>
+                    </tr> 
+                  {% endfor %} 
+                </tbody>
                 </table>
               </div>
             </div>
@@ -87,11 +76,8 @@
         </div>
       </div>
     </div>
-
   </section>
-
 </div>
 {% include 'footer.html' %}
 </body>
-
 </html>

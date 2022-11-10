@@ -1,5 +1,4 @@
 {% include 'header.html' %}
-
 <div class="container mx-auto">
   <section class="bg-white p-5 mt-5">
     <div class="flex flex-wrap items-center -m-2">
@@ -26,269 +25,272 @@
       </div>
     </div>
   </section>
-
   <section class="py-4">
     <div class="container px-4 mx-auto">
-      <div class="relative py-11 px-16 bg-coolGray-900 rounded-md overflow-hidden">
-        <img class="absolute z-10 left-4 top-4" src="/static/images/elements/dots-red.svg" alt="">
-        <img class="absolute z-10 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt="">
-        <img class="absolute h-64 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" src="/static/images/elements/wave.svg" alt="">
+      <div class="relative py-11 px-16 bg-coolGray-900 rounded-md overflow-hidden"> <img class="absolute z-10 left-4 top-4" src="/static/images/elements/dots-red.svg" alt=""> <img class="absolute z-10 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt=""> <img class="absolute h-64 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" src="/static/images/elements/wave.svg" alt="">
         <div class="relative z-20 flex flex-wrap items-center -m-3">
           <div class="w-full md:w-1/2 p-3">
             <h2 class="mb-6 text-4xl font-bold text-white tracking-tighter">Offer (normal)</h2>
             <p class="font-semibold text-coolGray-200">Offer ID: {{ offer_id }}</p>
           </div>
-          <div class="w-full md:w-1/2 p-3">
-            {% if refresh %}
-            <a id="refresh" href=/offer/{{ offer_id }}><button class="block md:ml-auto px-5 py-3 font-medium text-lcg text-white bg-blue-500 hover:bg-blue-600 rounded-md focus:ring-0 focus:outline-none">Refresh {{ refresh }} seconds</button></a>
+          <div class="w-full md:w-1/2 p-3"> {% if refresh %}
+            <a id="refresh" href=/offer/{{ offer_id }}>
+              <button class="block md:ml-auto px-5 py-3 font-medium text-lcg text-white bg-blue-500 hover:bg-blue-600 rounded-md focus:ring-0 focus:outline-none">Refresh {{ refresh }} seconds</button>
+            </a>
             {% else %}
-            <a id="refresh" href=/offer/{{ offer_id }}><button class="block md:ml-auto px-5 py-3 font-medium text-lcg text-white bg-blue-500 hover:bg-blue-600 rounded-md focus:ring-0 focus:outline-none">Refresh</button></a>
-            {% endif %}
+            <a id="refresh" href=/offer/{{ offer_id }}>
+              <button class="block md:ml-auto px-5 py-3 font-medium text-lcg text-white bg-blue-500 hover:bg-blue-600 rounded-md focus:ring-0 focus:outline-none">Refresh</button>
+            </a>
+          {% endif %} </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  {% include 'inc_messages.html' %} 
+  {% if sent_bid_id %}
+  <section class="py-4">
+    <div class="container px-4 mx-auto">
+      <div class="p-6 bg-green-100 border border-green-200 rounded-md">
+        <div class="flex flex-wrap justify-between items-center -m-2">
+          <div class="flex-1 p-2">
+            <div class="flex flex-wrap -m-1">
+              <div class="w-auto p-1">
+                <svg class="relative top-0.5" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12.4732 4.80667C12.4112 4.74418 12.3375 4.69458 12.2563 4.66074C12.175 4.62689 12.0879 4.60947 11.9999 4.60947C11.9119 4.60947 11.8247 4.62689 11.7435 4.66074C11.6623 4.69458 11.5885 4.74418 11.5266 4.80667L6.55989 9.78L4.47322 7.68667C4.40887 7.62451 4.33291 7.57563 4.24967 7.54283C4.16644 7.51003 4.07755 7.49394 3.9881 7.49549C3.89865 7.49703 3.81037 7.51619 3.72832 7.55185C3.64627 7.58751 3.57204 7.63898 3.50989 7.70333C3.44773 7.76768 3.39885 7.84364 3.36605 7.92688C3.33324 8.01011 3.31716 8.099 3.31871 8.18845C3.32025 8.2779 3.3394 8.36618 3.37507 8.44823C3.41073 8.53028 3.4622 8.60451 3.52655 8.66667L6.08655 11.2267C6.14853 11.2892 6.22226 11.3387 6.3035 11.3726C6.38474 11.4064 6.47188 11.4239 6.55989 11.4239C6.64789 11.4239 6.73503 11.4064 6.81627 11.3726C6.89751 11.3387 6.97124 11.2892 7.03322 11.2267L12.4732 5.78667C12.5409 5.72424 12.5949 5.64847 12.6318 5.56414C12.6688 5.4798 12.6878 5.38873 12.6878 5.29667C12.6878 5.2046 12.6688 5.11353 12.6318 5.02919C12.5949 4.94486 12.5409 4.86909 12.4732 4.80667Z" fill="#2AD168"></path>
+                </svg>
+              </div>
+              <div class="flex-1 p-1">
+                <h3 class="font-medium text-sm text-green-900"><a href="/bid/{{ sent_bid_id }}">Sent Bid {{ sent_bid_id }}</a></h3> </div>
+            </div>
+          </div>
+          <div class="w-auto p-2">
+            <a href="#">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M8.94004 8L13.14 3.80667C13.2656 3.68113 13.3361 3.51087 13.3361 3.33333C13.3361 3.1558 13.2656 2.98554 13.14 2.86C13.0145 2.73447 12.8442 2.66394 12.6667 2.66394C12.4892 2.66394 12.3189 2.73447 12.1934 2.86L8.00004 7.06L3.80671 2.86C3.68117 2.73447 3.51091 2.66394 3.33337 2.66394C3.15584 2.66394 2.98558 2.73447 2.86004 2.86C2.7345 2.98554 2.66398 3.1558 2.66398 3.33333C2.66398 3.51087 2.7345 3.68113 2.86004 3.80667L7.06004 8L2.86004 12.1933C2.79756 12.2553 2.74796 12.329 2.71411 12.4103C2.68027 12.4915 2.66284 12.5787 2.66284 12.6667C2.66284 12.7547 2.68027 12.8418 2.71411 12.9231C2.74796 13.0043 2.79756 13.078 2.86004 13.14C2.92202 13.2025 2.99575 13.2521 3.07699 13.2859C3.15823 13.3198 3.24537 13.3372 3.33337 13.3372C3.42138 13.3372 3.50852 13.3198 3.58976 13.2859C3.671 13.2521 3.74473 13.2025 3.80671 13.14L8.00004 8.94L12.1934 13.14C12.2554 13.2025 12.3291 13.2521 12.4103 13.2859C12.4916 13.3198 12.5787 13.3372 12.6667 13.3372C12.7547 13.3372 12.8419 13.3198 12.9231 13.2859C13.0043 13.2521 13.0781 13.2025 13.14 13.14C13.2025 13.078 13.2521 13.0043 13.286 12.9231C13.3198 12.8418 13.3372 12.7547 13.3372 12.6667C13.3372 12.5787 13.3198 12.4915 13.286 12.4103C13.2521 12.329 13.2025 12.2553 13.14 12.1933L8.94004 8Z" fill="#156633"></path>
+              </svg>
+            </a>
           </div>
         </div>
       </div>
     </div>
   </section>
-
-{% include 'inc_messages.html' %}
-
-{% if sent_bid_id %}
-<section class="py-4">
- <div class="container px-4 mx-auto">
-   <div class="p-6 bg-green-100 border border-green-200 rounded-md">
-     <div class="flex flex-wrap justify-between items-center -m-2">
-       <div class="flex-1 p-2">
-         <div class="flex flex-wrap -m-1">
-           <div class="w-auto p-1">
-             <svg class="relative top-0.5" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-               <path d="M12.4732 4.80667C12.4112 4.74418 12.3375 4.69458 12.2563 4.66074C12.175 4.62689 12.0879 4.60947 11.9999 4.60947C11.9119 4.60947 11.8247 4.62689 11.7435 4.66074C11.6623 4.69458 11.5885 4.74418 11.5266 4.80667L6.55989 9.78L4.47322 7.68667C4.40887 7.62451 4.33291 7.57563 4.24967 7.54283C4.16644 7.51003 4.07755 7.49394 3.9881 7.49549C3.89865 7.49703 3.81037 7.51619 3.72832 7.55185C3.64627 7.58751 3.57204 7.63898 3.50989 7.70333C3.44773 7.76768 3.39885 7.84364 3.36605 7.92688C3.33324 8.01011 3.31716 8.099 3.31871 8.18845C3.32025 8.2779 3.3394 8.36618 3.37507 8.44823C3.41073 8.53028 3.4622 8.60451 3.52655 8.66667L6.08655 11.2267C6.14853 11.2892 6.22226 11.3387 6.3035 11.3726C6.38474 11.4064 6.47188 11.4239 6.55989 11.4239C6.64789 11.4239 6.73503 11.4064 6.81627 11.3726C6.89751 11.3387 6.97124 11.2892 7.03322 11.2267L12.4732 5.78667C12.5409 5.72424 12.5949 5.64847 12.6318 5.56414C12.6688 5.4798 12.6878 5.38873 12.6878 5.29667C12.6878 5.2046 12.6688 5.11353 12.6318 5.02919C12.5949 4.94486 12.5409 4.86909 12.4732 4.80667Z" fill="#2AD168"></path>
-             </svg>
-           </div>
-           <div class="flex-1 p-1">
-             <h3 class="font-medium text-sm text-green-900"><a href="/bid/{{ sent_bid_id }}">Sent Bid {{ sent_bid_id }}</a></h3>
-           </div>
-         </div>
-       </div>
-       <div class="w-auto p-2">
-         <a href="#">
-           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-             <path d="M8.94004 8L13.14 3.80667C13.2656 3.68113 13.3361 3.51087 13.3361 3.33333C13.3361 3.1558 13.2656 2.98554 13.14 2.86C13.0145 2.73447 12.8442 2.66394 12.6667 2.66394C12.4892 2.66394 12.3189 2.73447 12.1934 2.86L8.00004 7.06L3.80671 2.86C3.68117 2.73447 3.51091 2.66394 3.33337 2.66394C3.15584 2.66394 2.98558 2.73447 2.86004 2.86C2.7345 2.98554 2.66398 3.1558 2.66398 3.33333C2.66398 3.51087 2.7345 3.68113 2.86004 3.80667L7.06004 8L2.86004 12.1933C2.79756 12.2553 2.74796 12.329 2.71411 12.4103C2.68027 12.4915 2.66284 12.5787 2.66284 12.6667C2.66284 12.7547 2.68027 12.8418 2.71411 12.9231C2.74796 13.0043 2.79756 13.078 2.86004 13.14C2.92202 13.2025 2.99575 13.2521 3.07699 13.2859C3.15823 13.3198 3.24537 13.3372 3.33337 13.3372C3.42138 13.3372 3.50852 13.3198 3.58976 13.2859C3.671 13.2521 3.74473 13.2025 3.80671 13.14L8.00004 8.94L12.1934 13.14C12.2554 13.2025 12.3291 13.2521 12.4103 13.2859C12.4916 13.3198 12.5787 13.3372 12.6667 13.3372C12.7547 13.3372 12.8419 13.3198 12.9231 13.2859C13.0043 13.2521 13.0781 13.2025 13.14 13.14C13.2025 13.078 13.2521 13.0043 13.286 12.9231C13.3198 12.8418 13.3372 12.7547 13.3372 12.6667C13.3372 12.5787 13.3198 12.4915 13.286 12.4103C13.2521 12.329 13.2025 12.2553 13.14 12.1933L8.94004 8Z" fill="#156633"></path>
-           </svg>
-         </a>
-       </div>
-     </div>
-   </div>
- </div>
-</section>
-{% endif %}
-
-<section class="bg-white">
-  <div class="pl-6 pr-6 pt-0 pb-0 mt-5 h-full overflow-hidden bg-white ">
-    <div class="pb-6 border-coolGray-100">
-      <div class="flex flex-wrap items-center justify-between -m-2">
-        <div class="w-full pt-2">
-
-  <div class="container px-0 mx-auto mt-5">
-    <div class="overflow-x-auto relative border sm:rounded-lg">
-
-<table class="w-full text-sm text-left text-gray-500 outline-none border-gray-300">
-
-<thead class="text-xs text-gray-700 border-b uppercase bg-gray-50 outline-none border-gray-300">
-  <tr>
-    <th scope="col" class="py-3 px-6">Item</th>
-    <th scope="col">Data</th>
-
-  </tr>
-</thead>
-
-<tr class="bg-white border-t hover:bg-gray-50"><td class="py-4 px-6 bold">Offer State</td><td>{{ data.state }}</td></tr>
-<tr class="bg-white border-t hover:bg-gray-50"><td class="py-4 px-6 bold">Coin From</td><td>{{ data.coin_from }}</td></tr>
-<tr class="bg-white border-t hover:bg-gray-50"><td class="py-4 px-6 bold">Coin To</td><td>{{ data.coin_to }}</td></tr>
-<tr class="bg-white border-t hover:bg-gray-50"><td class="py-4 px-6 bold">Amount From</td><td>{{ data.amt_from }} {{ data.tla_from }}</td></tr>
-<tr class="bg-white border-t hover:bg-gray-50"><td class="py-4 px-6 bold">Amount To</td><td>{{ data.amt_to }} {{ data.tla_to }}</td></tr>
-<tr class="bg-white border-t hover:bg-gray-50"><td class="py-4 px-6 bold">Minimum Bid Amount</td><td>{{ data.amt_bid_min }} {{ data.tla_from }}</td></tr>
-<tr class="bg-white border-t hover:bg-gray-50"><td class="py-4 px-6 bold">Rate</td><td>{{ data.rate }}</td></tr>
-<tr class="bg-white border-t hover:bg-gray-50"><td class="py-4 px-6 bold" title="Total coin-from value of completed bids, that this node is involved in">Amount Swapped</td><td>{{ data.amt_swapped }} {{ data.tla_from }}</td></tr>
-<tr class="bg-white border-t hover:bg-gray-50"><td class="py-4 px-6 bold" title="If bids can be sent with a different amount">Amount Variable</td><td>{{ data.amount_negotiable }}</td></tr>
-<tr class="bg-white border-t hover:bg-gray-50"><td class="py-4 px-6 bold" title="If bids can be sent with a different amount">Rate Variable</td><td>{{ data.rate_negotiable }}</td></tr>
-<tr class="bg-white border-t hover:bg-gray-50"><td class="py-4 px-6 bold">Script Lock Type</td><td>{{ data.lock_type }}</td></tr>
-<tr class="bg-white border-t hover:bg-gray-50"><td class="py-4 px-6 bold">Script Lock Value</td><td>{{ data.lock_value }} {{ data.lock_value_hr }}</td></tr>
-
-{% if data.addr_to == "Public" %}
-<tr class="bg-white border-t hover:bg-gray-50"><td class="py-4 px-6 bold">Address To</td><td>{{ data.addr_to }}</td></tr>
-{% else %}
-<tr class="bg-white border-t hover:bg-gray-50"><td class="py-4 px-6 bold">Address To</td><td><a class="monospace" href="/identity/{{ data.addr_to }}">{{ data.addr_to }}</a> {{ data.addr_to_label }}</td></tr>
-{% endif %}
-
-<tr class="bg-white border-t hover:bg-gray-50"><td class="py-4 px-6 bold">Address From</td><td><a class="monospace" href="/identity/{{ data.addr_from }}">{{ data.addr_from }}</a> {{ data.addr_from_label }}</td></tr>
-<tr class="bg-white border-t hover:bg-gray-50"><td class="py-4 px-6 bold">Created At</td><td>{{ data.created_at | formatts }}</td></tr>
-<tr class="bg-white border-t hover:bg-gray-50"><td class="py-4 px-6 bold">Expired At</td><td>{{ data.expired_at | formatts }}</td></tr>
-<tr class="bg-white border-t hover:bg-gray-50"><td class="py-4 px-6 bold">Sent</td><td>{{ data.sent }}</td></tr>
-<tr class="bg-white border-t hover:bg-gray-50"><td class="py-4 px-6 bold">Revoked</td><td>{{ data.was_revoked }}</td></tr>
-
-{% if data.sent == 'True' %}
-<tr class="bg-white border-t hover:bg-gray-50"><td class="py-4 px-6 bold">Auto Accept Strategy</td><td>
-{% if data.automation_strat_id == -1 %}
-None
-{% else %}
-<a class="monospace" href="/automationstrategy/{{ data.automation_strat_id }}">{{ data.automation_strat_label }}</a>
-{% endif %}
-</td></tr>
-{% endif %}
-
-{% if data.xmr_type == true %}
-<tr class="bg-white border-t hover:bg-gray-50"><td class="py-4 px-6 bold">Chain A offer fee rate</td><td>{{ data.a_fee_rate }}</td></tr>
-<tr class="bg-white border-t hover:bg-gray-50"><td class="py-4 px-6 bold">Chain A local fee rate</td><td>{{ data.a_fee_rate_verify }}, fee source: {{ data.a_fee_rate_verify_src }} {% if data.a_fee_warn == true %} WARNING {% endif %}</td></tr>
-{% endif %}
-
-</table>
-</div>
-</div>
-
-<section class="bg-white p-6">
-  <div class="flex flex-wrap items-center">
-    <div class="w-full">
-      <h4 class="font-semibold text-black text-2xl">Bids</h4>
-    </div>
-  </div>
-</section>
-
-<div class="container px-0 mx-auto mt-5">
-<div class="overflow-x-auto relative border sm:rounded-lg">
-
-<table class="w-full text-sm text-left text-gray-500 outline-none border-gray-300">
-
-<thead class="text-xs text-gray-700 border-b uppercase bg-gray-50 outline-none border-gray-300">
-<tr>
-<th scope="col" class="py-3 px-6">Bid ID</th>
-<th scope="col" class="py-3 px-6">Bid Amount</th>
-<th scope="col" class="py-3 px-6">Bid Rate</th>
-<th scope="col" class="py-3 px-6">Bid Status</th>
-<th scope="col" class="py-3 px-6">Identity From</th>
-
-</tr>
-</thead>
-
-{% for b in bids %}
-<tr class="bg-white border-t hover:bg-gray-50">
-  <td class="py-4 px-6"><a class="monospace" href=/bid/{{ b[0] }}>{{ b[0] }}</a></td>
-  <td class="py-4 px-6">{{ b[1] }}</td>
-  <td class="py-4 px-6">{{ b[3] }}</td>
-  <td class="py-4 px-6">{{ b[2] }}</td>
-  <td class="py-4 px-6"><a class="monospace" href=/identity/{{ b[4] }}>{{ b[4] }}</a></td>
-</tr>
-{% endfor %}
-</table>
-
-</div>
-</div>
-
-<form method="post">
-
-{% if data.show_bid_form %}
-
-<section class="bg-white p-6">
-  <div class="flex flex-wrap items-center">
-    <div class="w-full">
-      <h4 class="font-semibold text-black text-2xl">New Bid</h4>
-    </div>
-  </div>
-</section>
-
-<div class="container px-0 mx-auto mt-5">
-<div class="overflow-x-auto relative border sm:rounded-lg">
-
-<table class="w-full text-sm text-left text-gray-500 outline-none border-gray-300">
-
-  <thead class="text-xs text-gray-700 border-b uppercase bg-gray-50 outline-none border-gray-300">
-  <tr>
-  <th scope="col" class="py-3 px-6">Input</th>
-  <th scope="col" class="">Output</th>
-
-  </tr>
-  </thead>
-
-
-  <tr class="bg-white border-t hover:bg-gray-50">
-    <td class="py-4 px-6">You will send  <span class="bold" id="bid_amt_to">{{ data.amt_to }}</span> {{ data.tla_to }}</td>
-  <td class="py-4">And receive <span class="bold" id="bid_amt_from">{{ data.amt_from }}</span> {{ data.tla_from }}
-    {% if data.xmr_type == true %}
-     (excluding {{ data.amt_from_lock_spend_tx_fee }} {{ data.tla_from }} in tx fees).
-    {% else %}
-     (excluding a tx fee).
-    {% endif %}</td>
-  </tr>
-
-  <tr class="bg-white border-t hover:bg-gray-50">
-  <td class="py-10 px-6 bold">Send From Address</td>
-<td>
-
-
-<select class="appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block p-2.5" name="addr_from">
-{% for a in addrs %}
-<option value="{{ a[0] }}" {% if data.nb_addr_from==a[0] %} selected{% endif %}>{{ a[0] }} {{ a[1] }}</option>
-{% endfor %}
-<option value="-1" {% if data.nb_addr_from=="-1" %} selected{% endif %}>New Address</option>
-</select>
-
-</td>
-</tr>
-
-{% if data.amount_negotiable == true %}
-  <tr class="bg-white border-t hover:bg-gray-50">
-  <td class="py-4 px-6 bold">Amount</td>
-  <td class="py-4 px-6"><input type="text" class="appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block p-2.5" id="bid_amount" name="bid_amount" value="{{ data.bid_amount }}" onchange="updateBidParams('amount');"></td>
-</tr>
-{% endif %}
-
-{% if data.rate_negotiable == true %}
-  <tr class="bg-white border-t hover:bg-gray-50">
-  <td class="py-4 px-6 bold">Rate</td>
-  <td class="py-4"><input type="text" class="appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block p-2.5" id="bid_rate" name="bid_rate" value="{{ data.bid_rate }}" onchange="updateBidParams('rate');"></td>
-</tr>
-{% endif %}
-
-  <tr class="bg-white border-t hover:bg-gray-50">
-  <td class="py-4 px-6 bold">Minutes valid</td>
-  <td class="py-4"><input type="number" class="appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block p-2.5" name="validmins" min="10" max="1440" value="{{ data.nb_validmins }}">
-  </td>
-</tr>
-
-{% if data.debug_ui == true %}
-
-  <tr class="bg-white border-t hover:bg-gray-50">
-  <td class="py-4 px-6 bold">Debug Option:</td>
-  <td class="py-4">
-  <select class="appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block p-2.5" name="debugind">
-<option{% if data.debug_ind=="-1" %} selected{% endif %} value="-1">None</option>
-{% for a in data.debug_options %}
-<option{% if data.debug_ind==a[0] %} selected{% endif %} value="{{ a[0] }}">{{ a[1] }}</option>
-{% endfor %}
-</select>
-</td>
-</tr>
-{% endif %}
-
-</table>
-
-</div>
-</div>
-
-<div class="p-6 pt-10 bg-white bg-opacity-60 rounded-b-md">
-  <div class="w-full md:w-0/12">
-    <div class="flex flex-wrap justify-end -m-1.5">
-
-      <div class="w-full md:w-auto p-1.5 ml-2">
-        <button name="sendbid" value="Send Bid" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
-          <span>Send Bid</span> </button>
-      </div>
-
-      <div class="w-full md:w-auto p-1.5 ml-2">
-        <button name="cancel" value="Cancel" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none">
-          <span>Cancel</span> </button>
-      </div>
-
-      <!-- TODO:
+  {% endif %}
+  <section class="bg-white">
+    <div class="pl-6 pr-6 pt-0 pb-0 mt-5 h-full overflow-hidden bg-white ">
+      <div class="pb-6 border-coolGray-100">
+        <div class="flex flex-wrap items-center justify-between -m-2">
+          <div class="w-full pt-2">
+            <div class="container px-0 mx-auto mt-5">
+              <div class="overflow-x-auto relative border sm:rounded-lg">
+                <table class="w-full text-sm text-left text-gray-500 outline-none border-gray-300">
+                  <thead class="text-xs text-gray-700 border-b uppercase bg-gray-50 outline-none border-gray-300">
+                    <tr>
+                      <th scope="col" class="py-3 px-6">Item</th>
+                      <th scope="col">Data</th>
+                    </tr>
+                  </thead>
+                  <tr class="bg-white border-t hover:bg-gray-50">
+                    <td class="py-4 px-6 bold">Offer State</td>
+                    <td>{{ data.state }}</td>
+                  </tr>
+                  <tr class="bg-white border-t hover:bg-gray-50">
+                    <td class="py-4 px-6 bold">Coin From</td>
+                    <td>{{ data.coin_from }}</td>
+                  </tr>
+                  <tr class="bg-white border-t hover:bg-gray-50">
+                    <td class="py-4 px-6 bold">Coin To</td>
+                    <td>{{ data.coin_to }}</td>
+                  </tr>
+                  <tr class="bg-white border-t hover:bg-gray-50">
+                    <td class="py-4 px-6 bold">Amount From</td>
+                    <td>{{ data.amt_from }} {{ data.tla_from }}</td>
+                  </tr>
+                  <tr class="bg-white border-t hover:bg-gray-50">
+                    <td class="py-4 px-6 bold">Amount To</td>
+                    <td>{{ data.amt_to }} {{ data.tla_to }}</td>
+                  </tr>
+                  <tr class="bg-white border-t hover:bg-gray-50">
+                    <td class="py-4 px-6 bold">Minimum Bid Amount</td>
+                    <td>{{ data.amt_bid_min }} {{ data.tla_from }}</td>
+                  </tr>
+                  <tr class="bg-white border-t hover:bg-gray-50">
+                    <td class="py-4 px-6 bold">Rate</td>
+                    <td>{{ data.rate }}</td>
+                  </tr>
+                  <tr class="bg-white border-t hover:bg-gray-50">
+                    <td class="py-4 px-6 bold" title="Total coin-from value of completed bids, that this node is involved in">Amount Swapped</td>
+                    <td>{{ data.amt_swapped }} {{ data.tla_from }}</td>
+                  </tr>
+                  <tr class="bg-white border-t hover:bg-gray-50">
+                    <td class="py-4 px-6 bold" title="If bids can be sent with a different amount">Amount Variable</td>
+                    <td>{{ data.amount_negotiable }}</td>
+                  </tr>
+                  <tr class="bg-white border-t hover:bg-gray-50">
+                    <td class="py-4 px-6 bold" title="If bids can be sent with a different amount">Rate Variable</td>
+                    <td>{{ data.rate_negotiable }}</td>
+                  </tr>
+                  <tr class="bg-white border-t hover:bg-gray-50">
+                    <td class="py-4 px-6 bold">Script Lock Type</td>
+                    <td>{{ data.lock_type }}</td>
+                  </tr>
+                  <tr class="bg-white border-t hover:bg-gray-50">
+                    <td class="py-4 px-6 bold">Script Lock Value</td>
+                    <td>{{ data.lock_value }} {{ data.lock_value_hr }}</td>
+                  </tr> {% if data.addr_to == "Public" %}
+                  <tr class="bg-white border-t hover:bg-gray-50">
+                    <td class="py-4 px-6 bold">Address To</td>
+                    <td>{{ data.addr_to }}</td>
+                  </tr> {% else %}
+                  <tr class="bg-white border-t hover:bg-gray-50">
+                    <td class="py-4 px-6 bold">Address To</td>
+                    <td><a class="monospace" href="/identity/{{ data.addr_to }}">{{ data.addr_to }}</a> {{ data.addr_to_label }}</td>
+                  </tr> {% endif %}
+                  <tr class="bg-white border-t hover:bg-gray-50">
+                    <td class="py-4 px-6 bold">Address From</td>
+                    <td><a class="monospace" href="/identity/{{ data.addr_from }}">{{ data.addr_from }}</a> {{ data.addr_from_label }}</td>
+                  </tr>
+                  <tr class="bg-white border-t hover:bg-gray-50">
+                    <td class="py-4 px-6 bold">Created At</td>
+                    <td>{{ data.created_at | formatts }}</td>
+                  </tr>
+                  <tr class="bg-white border-t hover:bg-gray-50">
+                    <td class="py-4 px-6 bold">Expired At</td>
+                    <td>{{ data.expired_at | formatts }}</td>
+                  </tr>
+                  <tr class="bg-white border-t hover:bg-gray-50">
+                    <td class="py-4 px-6 bold">Sent</td>
+                    <td>{{ data.sent }}</td>
+                  </tr>
+                  <tr class="bg-white border-t hover:bg-gray-50">
+                    <td class="py-4 px-6 bold">Revoked</td>
+                    <td>{{ data.was_revoked }}</td>
+                  </tr>
+                  {% if data.sent == 'True' %}
+                  <tr class="bg-white border-t hover:bg-gray-50">
+                    <td class="py-4 px-6 bold">Auto Accept Strategy</td>
+                    <td>
+                      {% if data.automation_strat_id == -1 %} None {% else %}<a class="monospace" href="/automationstrategy/{{ data.automation_strat_id }}">{{ data.automation_strat_label }}</a> {% endif %} 
+                    </td>
+                  </tr>
+                  {% endif %}
+                  {% if data.xmr_type == true %}
+                  <tr class="bg-white border-t hover:bg-gray-50">
+                    <td class="py-4 px-6 bold">Chain A offer fee rate</td>
+                    <td>{{ data.a_fee_rate }}</td>
+                  </tr>
+                  <tr class="bg-white border-t hover:bg-gray-50">
+                    <td class="py-4 px-6 bold">Chain A local fee rate</td>
+                    <td>{{ data.a_fee_rate_verify }}, fee source: {{ data.a_fee_rate_verify_src }} {% if data.a_fee_warn == true %} WARNING {% endif %}</td>
+                  </tr> {% endif %} </table>
+              </div>
+            </div>
+            <section class="bg-white p-6">
+              <div class="flex flex-wrap items-center">
+                <div class="w-full">
+                  <h4 class="font-semibold text-black text-2xl">Bids</h4> </div>
+              </div>
+            </section>
+            <div class="container px-0 mx-auto mt-5">
+              <div class="overflow-x-auto relative border sm:rounded-lg">
+                <table class="w-full text-sm text-left text-gray-500 outline-none border-gray-300">
+                  <thead class="text-xs text-gray-700 border-b uppercase bg-gray-50 outline-none border-gray-300">
+                    <tr>
+                      <th scope="col" class="py-3 px-6">Bid ID</th>
+                      <th scope="col" class="py-3 px-6">Bid Amount</th>
+                      <th scope="col" class="py-3 px-6">Bid Rate</th>
+                      <th scope="col" class="py-3 px-6">Bid Status</th>
+                      <th scope="col" class="py-3 px-6">Identity From</th>
+                    </tr>
+                  </thead> 
+                  {% for b in bids %}
+                  <tr class="bg-white border-t hover:bg-gray-50">
+                    <td class="py-4 px-6"><a class="monospace" href=/bid/{{ b[0] }}>{{ b[0] }}</a></td>
+                    <td class="py-4 px-6">{{ b[1] }}</td>
+                    <td class="py-4 px-6">{{ b[3] }}</td>
+                    <td class="py-4 px-6">{{ b[2] }}</td>
+                    <td class="py-4 px-6"><a class="monospace" href=/identity/{{ b[4] }}>{{ b[4] }}</a></td>
+                  </tr>
+                {% endfor %}
+              </table>
+              </div>
+            </div>
+            <form method="post">
+              {% if data.show_bid_form %}
+              <section class="bg-white p-6">
+                <div class="flex flex-wrap items-center">
+                  <div class="w-full">
+                    <h4 class="font-semibold text-black text-2xl">New Bid</h4> </div>
+                </div>
+              </section>
+              <div class="container px-0 mx-auto mt-5">
+                <div class="overflow-x-auto relative border sm:rounded-lg">
+                  <table class="w-full text-sm text-left text-gray-500 outline-none border-gray-300">
+                    <thead class="text-xs text-gray-700 border-b uppercase bg-gray-50 outline-none border-gray-300">
+                      <tr>
+                        <th scope="col" class="py-3 px-6">Input</th>
+                        <th scope="col" class="">Output</th>
+                      </tr>
+                    </thead>
+                    <tr class="bg-white border-t hover:bg-gray-50">
+                      <td class="py-4 px-6">You will send <span class="bold" id="bid_amt_to">{{ data.amt_to }}</span> {{ data.tla_to }}</td>
+                      <td class="py-4">And receive <span class="bold" id="bid_amt_from">{{ data.amt_from }}</span> {{ data.tla_from }} {% if data.xmr_type == true %} (excluding {{ data.amt_from_lock_spend_tx_fee }} {{ data.tla_from }} in tx fees). {% else %} (excluding a tx fee). {% endif %}</td>
+                    </tr>
+                    <tr class="bg-white border-t hover:bg-gray-50">
+                      <td class="py-10 px-6 bold">Send From Address</td>
+                      <td>
+                        <select class="appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block p-2.5" name="addr_from"> {% for a in addrs %}
+                          <option value="{{ a[0] }}" {% if data.nb_addr_from==a[0] %} selected{% endif %}>{{ a[0] }} {{ a[1] }}</option> {% endfor %}
+                          <option value="-1" {% if data.nb_addr_from=="-1" %} selected{% endif %}>New Address</option>
+                        </select>
+                      </td>
+                    </tr>
+                    {% if data.amount_negotiable == true %}
+                    <tr class="bg-white border-t hover:bg-gray-50">
+                      <td class="py-4 px-6 bold">Amount</td>
+                      <td class="py-4 px-6">
+                        <input type="text" class="appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block p-2.5" id="bid_amount" name="bid_amount" value="{{ data.bid_amount }}" onchange="updateBidParams('amount');">
+                      </td>
+                    </tr>
+                    {% endif %}
+                    {% if data.rate_negotiable == true %}
+                    <tr class="bg-white border-t hover:bg-gray-50">
+                      <td class="py-4 px-6 bold">Rate</td>
+                      <td class="py-4">
+                        <input type="text" class="appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block p-2.5" id="bid_rate" name="bid_rate" value="{{ data.bid_rate }}" onchange="updateBidParams('rate');">
+                      </td>
+                    </tr>
+                    {% endif %}
+                    <tr class="bg-white border-t hover:bg-gray-50">
+                      <td class="py-4 px-6 bold">Minutes valid</td>
+                      <td class="py-4">
+                        <input type="number" class="appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block p-2.5" name="validmins" min="10" max="1440" value="{{ data.nb_validmins }}"> </td>
+                    </tr>
+                    {% if data.debug_ui == true %}
+                    <tr class="bg-white border-t hover:bg-gray-50">
+                      <td class="py-4 px-6 bold">Debug Option:</td>
+                      <td class="py-4">
+                        <select class="appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block p-2.5" name="debugind">
+                          <option{% if data.debug_ind=="-1" %} selected{% endif %} value="-1">None</option>
+                            {% for a in data.debug_options %}
+                            <option{% if data.debug_ind==a[0] %} selected{% endif %} value="{{ a[0] }}">{{ a[1] }}</option>
+                            {% endfor %}
+                          </select>
+                      </td>
+                    </tr>
+                    {% endif %}
+                  </table>
+                </div>
+              </div>
+              <div class="p-6 pt-10 bg-white bg-opacity-60 rounded-b-md">
+                <div class="w-full md:w-0/12">
+                  <div class="flex flex-wrap justify-end -m-1.5">
+                    <div class="w-full md:w-auto p-1.5 ml-2">
+                      <button name="sendbid" value="Send Bid" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none"> <span>Send Bid</span> </button>
+                    </div>
+                    <div class="w-full md:w-auto p-1.5 ml-2">
+                      <button name="cancel" value="Cancel" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none"> <span>Cancel</span> </button>
+                    </div>
+                    <!-- TODO:
        <div class="w-full md:w-auto p-1.5 ml-2">
         <button name="check_rates" value="Lookup Rates"  type="button" onclick='lookup_rates();' class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none">
           <svg class="mr-2" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
@@ -298,42 +300,27 @@ None
             </g>
           </svg> <span>Lookup Rates</span> </button>
       </div>
-      -->
-
-</div>
-</div>
-</div>
-
-{% else %}
-
-<div class="p-6 pt-10 bg-white bg-opacity-60 rounded-b-md">
-  <div class="w-full md:w-0/12">
-    <div class="flex flex-wrap justify-end -m-1.5">
-
-<div class="w-full md:w-auto p-1.5 ml-2">
-  <button name="newbid" value="New Bid" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
-    <span>New Bid</span> </button>
-</div>
-
-
-{% if data.sent == 'True' %}
-
-<div class="w-full md:w-auto p-1.5 ml-2">
-  <button name="repeat_offer"  value="Repeat Offer" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none">
-    <span>Repeat Offer</span> </button>
-</div>
-
-{% if data.was_revoked != true %}
-
-<div class="w-full md:w-auto p-1.5 ml-2">
-  <button name="revoke_offer"  value="Revoke Offer" type="submit" onclick="return confirmPopup();" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none">
-    <span>Revoke Offer</span> </button>
-</div>
-
-{% endif %}
-{% endif %}
-
-<!-- todo
+      --></div>
+                </div>
+              </div>
+              {% else %}
+              <div class="p-6 pt-10 bg-white bg-opacity-60 rounded-b-md">
+                <div class="w-full md:w-0/12">
+                  <div class="flex flex-wrap justify-end -m-1.5">
+                    <div class="w-full md:w-auto p-1.5 ml-2">
+                      <button name="newbid" value="New Bid" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none"> <span>New Bid</span> </button>
+                    </div>
+                    {% if data.sent == 'True' %}
+                    <div class="w-full md:w-auto p-1.5 ml-2">
+                      <button name="repeat_offer" value="Repeat Offer" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none"> <span>Repeat Offer</span> </button>
+                    </div>
+                    {% if data.was_revoked != true %}
+                    <div class="w-full md:w-auto p-1.5 ml-2">
+                      <button name="revoke_offer" value="Revoke Offer" type="submit" onclick="return confirmPopup();" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none"> <span>Revoke Offer</span> </button>
+                    </div>
+                    {% endif %}
+                    {% endif %}
+                    <!-- todo
 <div class="w-full md:w-auto p-1.5 ml-2">
   <button name="check_rates" type="button"  value="Lookup Rates" onclick='lookup_rates();' class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none">
     <svg class="mr-2" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
@@ -343,102 +330,85 @@ None
       </g>
     </svg> <span>Lookup Rates</span> </button>
 </div>
--->
-
-</div>
-</div>
-</div>
-
-{% endif %}
-
-<input type="hidden" id="coin_from" value="{{ data.coin_from_ind }}">
-<input type="hidden" id="coin_to" value="{{ data.coin_to_ind }}">
-<input type="hidden" id="amt_var" value="{{ data.amount_negotiable }}">
-<input type="hidden" id="rate_var" value="{{ data.rate_negotiable }}">
-<input type="hidden" id="amount_from" value="{{ data.amt_from }}">
-<input type="hidden" id="offer_rate" value="{{ data.rate }}">
-<input type="hidden" name="formid" value="{{ form_id }}">
-</form>
-
-<p id="rates_display"></p>
-
-</div>
-</div>
-</div>
-</div>
-
-</section>
-
-<script>
-const xhr_rates = new XMLHttpRequest();
-xhr_rates.onload = () => {
-    if (xhr_rates.status == 200) {
+--></div>
+                </div>
+              </div>
+              {% endif %}
+              <input type="hidden" id="coin_from" value="{{ data.coin_from_ind }}">
+              <input type="hidden" id="coin_to" value="{{ data.coin_to_ind }}">
+              <input type="hidden" id="amt_var" value="{{ data.amount_negotiable }}">
+              <input type="hidden" id="rate_var" value="{{ data.rate_negotiable }}">
+              <input type="hidden" id="amount_from" value="{{ data.amt_from }}">
+              <input type="hidden" id="offer_rate" value="{{ data.rate }}">
+              <input type="hidden" name="formid" value="{{ form_id }}"> </form>
+            <p id="rates_display"></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <script>
+    const xhr_rates = new XMLHttpRequest();
+    xhr_rates.onload = () => {
+      if (xhr_rates.status == 200) {
         const obj = JSON.parse(xhr_rates.response);
-
         inner_html = '<h4 class="bold>Rates</h4><pre><code>' + JSON.stringify(obj, null, '  ') + '</code></pre>';
         document.getElementById('rates_display').innerHTML = inner_html;
+      }
     }
-}
 
-function lookup_rates() {
-    const coin_from = document.getElementById('coin_from').value;
-    const coin_to = document.getElementById('coin_to').value;
-
-    if (coin_from == '-1' || coin_to == '-1') {
+    function lookup_rates() {
+      const coin_from = document.getElementById('coin_from').value;
+      const coin_to = document.getElementById('coin_to').value;
+      if (coin_from == '-1' || coin_to == '-1') {
         alert('Coins from and to must be set first.');
         return;
+      }
+      inner_html = '<h4>Rates</h4><p>Updating...</p>';
+      document.getElementById('rates_display').innerHTML = inner_html;
+      xhr_rates.open('POST', '/json/rates');
+      xhr_rates.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+      xhr_rates.send('coin_from=' + coin_from + '&coin_to=' + coin_to);
     }
-
-    inner_html = '<h4>Rates</h4><p>Updating...</p>';
-    document.getElementById('rates_display').innerHTML = inner_html;
-
-    xhr_rates.open('POST', '/json/rates');
-    xhr_rates.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
-    xhr_rates.send('coin_from='+coin_from+'&coin_to='+coin_to);
-}
-
-const xhr_bid_params = new XMLHttpRequest();
-xhr_bid_params.onload = () => {
-    if (xhr_bid_params.status == 200) {
+    const xhr_bid_params = new XMLHttpRequest();
+    xhr_bid_params.onload = () => {
+      if (xhr_bid_params.status == 200) {
         const obj = JSON.parse(xhr_bid_params.response);
         document.getElementById('bid_amt_to').innerHTML = obj['amount_to'];
+      }
     }
-}
 
-function updateBidParams(value_changed) {
-    const coin_from = document.getElementById('coin_from').value;
-    const coin_to = document.getElementById('coin_to').value;
-    const amt_var = document.getElementById('amt_var').value;
-    const rate_var = document.getElementById('rate_var').value;
-
-    let amt_from = '';
-    let rate = '';
-    if (amt_var == 'True') {
+    function updateBidParams(value_changed) {
+      const coin_from = document.getElementById('coin_from').value;
+      const coin_to = document.getElementById('coin_to').value;
+      const amt_var = document.getElementById('amt_var').value;
+      const rate_var = document.getElementById('rate_var').value;
+      let amt_from = '';
+      let rate = '';
+      if (amt_var == 'True') {
         amt_from = document.getElementById('bid_amount').value;
-    } else {
+      }
+      else {
         amt_from = document.getElementById('amount_from').value;
-    }
-    if (rate_var == 'True') {
+      }
+      if (rate_var == 'True') {
         rate = document.getElementById('bid_rate').value;
-    } else {
+      }
+      else {
         rate = document.getElementById('offer_rate').value;
-    }
-
-    if (value_changed == 'amount') {
+      }
+      if (value_changed == 'amount') {
         document.getElementById('bid_amt_from').innerHTML = amt_from;
+      }
+      xhr_bid_params.open('POST', '/json/rate');
+      xhr_bid_params.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+      xhr_bid_params.send('coin_from=' + coin_from + '&coin_to=' + coin_to + '&rate=' + rate + '&amt_from=' + amt_from);
     }
 
-    xhr_bid_params.open('POST', '/json/rate');
-    xhr_bid_params.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
-    xhr_bid_params.send('coin_from='+coin_from+'&coin_to='+coin_to+'&rate='+rate+'&amt_from='+amt_from);
-}
-
-function confirmPopup() {
-    return confirm("Are you sure?");
-}
-
-</script>
-
+    function confirmPopup() {
+      return confirm("Are you sure?");
+    }
+  </script>
 </div>
 {% include 'footer.html' %}
 </body>
