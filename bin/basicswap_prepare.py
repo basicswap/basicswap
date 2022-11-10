@@ -81,10 +81,11 @@ expected_key_ids = {
     'reuben': ('1290A1D0FA7EE109',),
 }
 
-if platform.system() == 'Darwin':
+USE_PLATFORM = os.getenv('USE_PLATFORM', platform.system())
+if USE_PLATFORM == 'Darwin':
     BIN_ARCH = 'osx64'
     FILE_EXT = 'tar.gz'
-elif platform.system() == 'Windows':
+elif USE_PLATFORM == 'Windows':
     BIN_ARCH = 'win64'
     FILE_EXT = 'zip'
 else:
@@ -1076,29 +1077,27 @@ def main():
                 particl_wallet_mnemonic = s[1].strip('"')
                 continue
             if name == 'withcoin' or name == 'withcoins':
-                coins = s[1].split(',')
-                for coin in coins:
+                for coin in [s.lower() for s in s[1].split(',')]:
                     if coin not in known_coins:
                         exitWithError('Unknown coin {}'.format(coin))
                     with_coins.add(coin)
                 continue
             if name == 'withoutcoin' or name == 'withoutcoins':
-                coins = s[1].split(',')
-                for coin in coins:
+                for coin in [s.lower() for s in s[1].split(',')]:
                     if coin not in known_coins:
                         exitWithError('Unknown coin {}'.format(coin))
                     with_coins.discard(coin)
                 continue
             if name == 'addcoin':
-                if s[1] not in known_coins:
+                add_coin = s[1].lower()
+                if add_coin not in known_coins:
                     exitWithError('Unknown coin {}'.format(s[1]))
-                add_coin = s[1]
                 with_coins = {add_coin, }
                 continue
             if name == 'disablecoin':
-                if s[1] not in known_coins:
+                disable_coin = s[1].lower()
+                if disable_coin not in known_coins:
                     exitWithError('Unknown coin {}'.format(s[1]))
-                disable_coin = s[1]
                 continue
             if name == 'htmlhost':
                 htmlhost = s[1].strip('"')
