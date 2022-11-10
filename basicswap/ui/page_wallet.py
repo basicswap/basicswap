@@ -296,7 +296,7 @@ def page_wallet(self, url_split, post_string):
         if show_utxo_groups:
             utxo_groups = ''
 
-            unspent_by_addr = swap_client.getUnspentsByAddr(k)
+            unspent_by_addr = ci.getUnspentsByAddr()
 
             sorted_unspent_by_addr = sorted(unspent_by_addr.items(), key=lambda x: x[1], reverse=True)
             for kv in sorted_unspent_by_addr:

@@ -34,6 +34,7 @@ from basicswap.rpc import (
     callrpc,
 )
 from tests.basicswap.common import (
+    make_boolean,
     read_json_api,
     waitForServer,
     BASE_RPC_PORT,
@@ -44,10 +45,6 @@ from tests.basicswap.common_xmr import (
     XMR_BASE_RPC_PORT,
 )
 import bin.basicswap_run as runSystem
-
-
-def make_boolean(s):
-    return s.lower() in ['1', 'true']
 
 
 test_path = os.path.expanduser(os.getenv('TEST_PATH', '/tmp/test_persistent'))

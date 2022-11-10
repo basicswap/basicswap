@@ -4,11 +4,17 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
+from basicswap.db import (
+    Concepts,
+)
 from basicswap.util import (
     SerialiseNum,
 )
 from basicswap.script import (
     OpCodes,
+)
+from basicswap.basicswap_util import (
+    EventLogTypes,
 )
 
 INITIATE_TX_TIMEOUT = 40 * 60  # TODO: make variable per coin
@@ -59,3 +65,4 @@ def redeemITx(self, bid_id, session):
 
     bid.initiate_tx.spend_txid = bytes.fromhex(txid)
     self.log.debug('Submitted initiate redeem txn %s to %s chain for bid %s', txid, ci_from.coin_name(), bid_id.hex())
+    self.logEvent(Concepts.BID, bid_id, EventLogTypes.ITX_REDEEM_PUBLISHED, '', session)

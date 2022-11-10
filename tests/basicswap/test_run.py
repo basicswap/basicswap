@@ -154,11 +154,8 @@ class Test(BaseTest):
         offer_id = swap_clients[0].postOffer(Coins.PART, Coins.LTC, 100 * COIN, 0.1 * COIN, 100 * COIN, SwapTypes.SELLER_FIRST)
 
         wait_for_offer(test_delay_event, swap_clients[1], offer_id)
-        offers = swap_clients[1].listOffers()
-        assert (len(offers) == 1)
-        for offer in offers:
-            if offer.offer_id == offer_id:
-                bid_id = swap_clients[1].postBid(offer_id, offer.amount_from)
+        offer = swap_clients[1].getOffer(offer_id)
+        bid_id = swap_clients[1].postBid(offer_id, offer.amount_from)
 
         wait_for_bid(test_delay_event, swap_clients[0], bid_id)
 
@@ -275,7 +272,6 @@ class Test(BaseTest):
 
         wait_for_offer(test_delay_event, swap_clients[0], offer_id)
         offer = swap_clients[0].getOffer(offer_id)
-        offers = swap_clients[0].listOffers()
         bid_id = swap_clients[0].postBid(offer_id, offer.amount_from)
 
         wait_for_bid(test_delay_event, swap_clients[0], bid_id)
@@ -326,11 +322,8 @@ class Test(BaseTest):
         offer_id = swap_clients[0].postOffer(Coins.PART, Coins.LTC, 100 * COIN, 0.1 * COIN, 100 * COIN, SwapTypes.SELLER_FIRST, auto_accept_bids=True)
 
         wait_for_offer(test_delay_event, swap_clients[1], offer_id)
-        offers = swap_clients[1].listOffers()
-        assert (len(offers) >= 1)
-        for offer in offers:
-            if offer.offer_id == offer_id:
-                bid_id = swap_clients[1].postBid(offer_id, offer.amount_from)
+        offer = swap_clients[1].getOffer(offer_id)
+        bid_id = swap_clients[1].postBid(offer_id, offer.amount_from)
 
         wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=60)
         wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=60)

@@ -9,8 +9,8 @@ import struct
 import hashlib
 from enum import IntEnum, auto
 from .util.address import (
-    decodeAddress,
     encodeAddress,
+    decodeAddress,
 )
 from .chainparams import (
     chainparams,
@@ -162,6 +162,12 @@ class EventLogTypes(IntEnum):
     ERROR = auto()
     AUTOMATION_CONSTRAINT = auto()
     AUTOMATION_ACCEPTING_BID = auto()
+    ITX_PUBLISHED = auto()
+    ITX_REDEEM_PUBLISHED = auto()
+    ITX_REFUND_PUBLISHED = auto()
+    PTX_PUBLISHED = auto()
+    PTX_REDEEM_PUBLISHED = auto()
+    PTX_REFUND_PUBLISHED = auto()
 
 
 class XmrSplitMsgTypes(IntEnum):
@@ -357,6 +363,18 @@ def describeEventEntry(event_type, event_msg):
         return 'Failed auto accepting'
     if event_type == EventLogTypes.AUTOMATION_ACCEPTING_BID:
         return 'Auto accepting'
+    if event_type == EventLogTypes.ITX_PUBLISHED:
+        return 'Initiate tx published'
+    if event_type == EventLogTypes.ITX_REDEEM_PUBLISHED:
+        return 'Initiate tx redeem tx published'
+    if event_type == EventLogTypes.ITX_REFUND_PUBLISHED:
+        return 'Initiate tx refund tx published'
+    if event_type == EventLogTypes.PTX_PUBLISHED:
+        return 'Participate tx published'
+    if event_type == EventLogTypes.PTX_REDEEM_PUBLISHED:
+        return 'Participate tx redeem tx published'
+    if event_type == EventLogTypes.PTX_REFUND_PUBLISHED:
+        return 'Participate tx refund tx published'
 
 
 def getVoutByAddress(txjs, p2sh):
