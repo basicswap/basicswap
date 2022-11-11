@@ -37,7 +37,7 @@
     </div>
   </section>
   <section class="bg-white">
-    <div class="pl-6 pr-6 pt-0 pb-0 h-full overflow-hidden bg-white rounded-t-md">
+    <div class="pl-6 pr-6 pt-0 pb-20 h-full overflow-hidden bg-white rounded-t-md">
       <div class="pb-6 border-coolGray-100">
         <div class="flex flex-wrap items-center justify-between -m-2">
           <div class="w-full p-2">
@@ -159,10 +159,10 @@
                             <svg class="absolute right-4 top-1/2 transform -translate-y-1/2 z-50" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                               <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"> </path>
                             </svg>
-                            <select is="ms-dropdown" class="pl-10 appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-5" id="coin_from" name="coin_from" onchange="set_rate('coin_from');">
-                              <option value="-1" data-image="/static/images/other/placeholder-line.png">You Send</option>
+                            <select is="ms-dropdown" class="pl-10 appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" id="coin_from" name="coin_from" onchange="set_rate('coin_from');">
+                              <option value="-1">Select coin you send:</option>
                               {% for c in coins_from %}
-                             <option{% if data.coin_to==c[0] %} selected{% endif %} value="{{ c[0] }}" data-image="/static/images/coins/{{ c[1]|replace(" ", "-") }}.png">{{ c[1] }}</option>
+                             <option{% if data.coin_to==c[0] %} selected{% endif %} value="{{ c[0] }}" data-image="/static/images/coins/{{ c[1]|replace(" ", "-") }}-20.png">{{ c[1] }}</option>
                               {% endfor %}
                             </select>
                           </div>
@@ -170,7 +170,7 @@
                         <div class="w-full md:w-1/2 p-3">
                           <div class="relative">
                             <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-                              <svg xmlns="http://www.w3.org/2000/svg" height="30" width="30" viewBox="0 0 24 24">
+                              <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
                                 <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3b82f6" stroke-linejoin="round">
                                   <path d="M15.6,13.873a2.273,2.273,0,0,1-.825,1.833,4.1,4.1,0,0,1-2.31.829v1.47h-.982V16.563a7.95,7.95,0,0,1-3.07-.617V14.053a8.328,8.328,0,0,0,1.5.545,8.019,8.019,0,0,0,1.568.28V12.654L11,12.468a5.357,5.357,0,0,1-2.012-1.216A2.332,2.332,0,0,1,8.4,9.627a2.123,2.123,0,0,1,.814-1.71,4.143,4.143,0,0,1,2.27-.812v-1.1h.982V7.074a8.126,8.126,0,0,1,2.97.66l-.674,1.678a7.768,7.768,0,0,0-2.3-.559v2.116a11.073,11.073,0,0,1,1.991.932,2.733,2.733,0,0,1,.867.868A2.146,2.146,0,0,1,15.6,13.873ZM10.558,9.627a.678.678,0,0,0,.219.52,2.569,2.569,0,0,0,.707.42V8.881Q10.559,9.017,10.558,9.627Zm2.884,4.354a.646.646,0,0,0-.244-.509,3.173,3.173,0,0,0-.732-.431v1.786Q13.441,14.662,13.442,13.981Z" stroke="none" fill="#3b82f6"></path>
                                   <polyline points="5.346 7.929 6.932 2.237 1.135 2.966"></polyline>
@@ -180,7 +180,7 @@
                                 </g>
                               </svg>
                             </div>
-                            <input class="pl-14 appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-5" placeholder="Amount you Send" type="text" id="amt_from" name="amt_from" value="{{ data.amt_from }}"> </div>
+                            <input class="pl-10 appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" placeholder="Amount you send" type="text" id="amt_from" name="amt_from" value="{{ data.amt_from }}"> </div>
                         </div>
                       </div>
                     </div>
@@ -201,9 +201,9 @@
                               <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"> </path>
                             </svg>
                             <select is="ms-dropdown" class="pl-10 appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-5" id="coin_to" name="coin_to" onchange="set_rate('coin_to');">
-                              <option value="-1" data-image="/static/images/other/placeholder-line.png">You Get</option>
+                              <option value="-1">Select coin you get:</option>
                               {% for c in coins %}
-                              <option{% if data.coin_to==c[0] %} selected{% endif %} value="{{ c[0] }}" data-image="/static/images/coins/{{ c[1]|replace(" ", "-") }}.png">{{ c[1] }}</option>
+                              <option{% if data.coin_to==c[0] %} selected{% endif %} value="{{ c[0] }}" data-image="/static/images/coins/{{ c[1]|replace(" ", "-") }}-20.png">{{ c[1] }}</option>
                               {% endfor %}
                             </select>
                           </div>
@@ -211,7 +211,7 @@
                         <div class="w-full md:w-1/2 p-3">
                           <div class="relative">
                             <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-                              <svg xmlns="http://www.w3.org/2000/svg" height="30" width="30" viewBox="0 0 24 24">
+                              <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
                                 <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3b82f6" stroke-linejoin="round">
                                   <path d="M15.6,13.873a2.273,2.273,0,0,1-.825,1.833,4.1,4.1,0,0,1-2.31.829v1.47h-.982V16.563a7.95,7.95,0,0,1-3.07-.617V14.053a8.328,8.328,0,0,0,1.5.545,8.019,8.019,0,0,0,1.568.28V12.654L11,12.468a5.357,5.357,0,0,1-2.012-1.216A2.332,2.332,0,0,1,8.4,9.627a2.123,2.123,0,0,1,.814-1.71,4.143,4.143,0,0,1,2.27-.812v-1.1h.982V7.074a8.126,8.126,0,0,1,2.97.66l-.674,1.678a7.768,7.768,0,0,0-2.3-.559v2.116a11.073,11.073,0,0,1,1.991.932,2.733,2.733,0,0,1,.867.868A2.146,2.146,0,0,1,15.6,13.873ZM10.558,9.627a.678.678,0,0,0,.219.52,2.569,2.569,0,0,0,.707.42V8.881Q10.559,9.017,10.558,9.627Zm2.884,4.354a.646.646,0,0,0-.244-.509,3.173,3.173,0,0,0-.732-.431v1.786Q13.441,14.662,13.442,13.981Z" stroke="none" fill="#3b82f6"></path>
                                   <polyline points="5.346 7.929 6.932 2.237 1.135 2.966"></polyline>
@@ -221,7 +221,7 @@
                                 </g>
                               </svg>
                             </div>
-                            <input class="pl-14 appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-5 " placeholder="Amount you Get" type="text" id="amt_to" name="amt_to" value="{{ data.amt_to }}" onchange="set_rate('amt_to');"> </div>
+                            <input class="pl-10 appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" placeholder="Amount you get" type="text" id="amt_to" name="amt_to" value="{{ data.amt_to }}" onchange="set_rate('amt_to');"> </div>
                         </div>
                       </div>
                     </div>
@@ -241,7 +241,6 @@
                           <div class="relative">
                             <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
                               <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-                                <title>law</title>
                                 <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3b82f6" stroke-linejoin="round">
                                   <rect x="9.843" y="5.379" transform="matrix(0.7071 -0.7071 0.7071 0.7071 -0.7635 13.1569)" width="11.314" height="4.243"></rect>
                                   <polyline points="3,23 3,19 15,19 15,23 "></polyline>

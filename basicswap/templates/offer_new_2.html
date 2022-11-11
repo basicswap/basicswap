@@ -132,7 +132,6 @@
                       </svg>
                       <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
                         <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-                          <title>contacts 2</title>
                           <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3b82f6" stroke-linejoin="round">
                             <path data-cap="butt" d="M11.992,11.737,14.2,13.4A2,2,0,0,1,15,15v1H7V15a2,2,0,0,1,.8-1.6l2.208-1.663" stroke="#3b82f6"></path>
                             <rect x="9" y="7" width="4" height="5" rx="2" ry="2" stroke="#3b82f6"></rect>
@@ -164,9 +163,9 @@
                             <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"> </path>
                           </svg>
                           <select is="ms-dropdown" class="pl-10 appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-5" id="coin_from" name="coin_from" onchange="set_rate('coin_from');" disabled>
-                            <option value="-1" data-image="/static/images/other/placeholder-line.png">Coin</option>
+                            <option value="-1">Coin</option>
                             {% for c in coins_from %}
-                            <option{% if data.coin_from==c[0] %} selected{% endif %} value="{{ c[0] }}" data-image="/static/images/coins/{{ c[1]|replace(" ", "-") }}.png">{{ c[1] }}</option>
+                            <option{% if data.coin_from==c[0] %} selected{% endif %} value="{{ c[0] }}" data-image="/static/images/coins/{{ c[1]|replace(" ", "-") }}-20.png">{{ c[1] }}</option>
                             {% endfor %}
                           </select>
                         </div>
@@ -184,7 +183,7 @@
                               </g>
                             </svg>
                           </div>
-                          <input class="pl-10 appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none block w-full p-5 opacity-70" type="text" id="amt_from" name="amt_from" value="{{ data.amt_from }}" onchange="set_rate('amt_from');" readonly> </div>
+                          <input class="pl-10 appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none block w-full p-2.5 opacity-70" type="text" id="amt_from" name="amt_from" value="{{ data.amt_from }}" onchange="set_rate('amt_from');" readonly> </div>
                       </div>
                       {% if data.swap_style == 'xmr' %}
                       <div class="w-full md:w-1/2 p-3">
@@ -248,9 +247,9 @@
                             <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"> </path>
                           </svg>
                           <select is="ms-dropdown" class="pl-10 appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-5" id="coin_to" name="coin_to" onchange="set_rate('coin_to');" disabled>
-                            <option value="-1" data-image="/static/images/other/placeholder-line.png">Coin</option>
+                            <option value="-1">Coin</option>
                             {% for c in coins %}
-                            <option{% if data.coin_to==c[0] %} selected{% endif %} value="{{ c[0] }}" data-image="/static/images/coins/{{ c[1]|replace(" ", "-") }}.png">{{ c[1] }}</option>
+                            <option{% if data.coin_to==c[0] %} selected{% endif %} value="{{ c[0] }}" data-image="/static/images/coins/{{ c[1]|replace(" ", "-") }}-20.png">{{ c[1] }}</option>
                             {% endfor %}
                           </select>
                         </div>
@@ -268,7 +267,7 @@
                               </g>
                             </svg>
                           </div>
-                          <input class="pl-10 pl-10 appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none block w-full p-5 opacity-70" type="text" id="amt_to" name="amt_to" value="{{ data.amt_to }}" onchange="set_rate('amt_to');" readonly> </div>
+                          <input class="pl-10 pl-10 appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none block w-full p-2.5 opacity-70" type="text" id="amt_to" name="amt_to" value="{{ data.amt_to }}" onchange="set_rate('amt_to');" readonly> </div>
                       </div>
                       {% if data.swap_style == 'xmr' and coin_to != '6' %}
                       <div class="w-full md:w-1/2 p-3">
