@@ -15,8 +15,11 @@ class DASHInterface(BTCInterface):
     def coin_type():
         return Coins.DASH
 
+    def seedToMnemonic(self, key):
+        return Mnemonic('english').to_mnemonic(key)
+
     def initialiseWallet(self, key):
-        words = Mnemonic('english').to_mnemonic(key)
+        words = self.seedToMnemonic(key)
         self.rpc_callback('upgradetohd', [words, ])
 
     def checkExpectedSeed(self, key_hash):

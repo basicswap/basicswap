@@ -108,6 +108,8 @@ class Test(BaseTest):
     firo_daemons = []
     firo_addr = None
     test_coin_from = Coins.FIRO
+    start_ltc_nodes = False
+    start_xmr_nodes = False
 
     test_atomic = True
     test_xmr = False
@@ -120,12 +122,6 @@ class Test(BaseTest):
     ]
 
     @classmethod
-    def setUpClass(cls):
-        cls.start_ltc_nodes = False
-        cls.start_xmr_nodes = False
-        super(Test, cls).setUpClass()
-
-    @classmethod
     def prepareExtraDataDir(cls, i):
         if not cls.restore_instance:
             seed_hex = cls.firo_seeds[i]
@@ -135,7 +131,7 @@ class Test(BaseTest):
                 callrpc_cli(cfg.FIRO_BINDIR, data_dir, 'regtest', '-wallet=wallet.dat create', 'firo-wallet')
 
         cls.firo_daemons.append(startDaemon(os.path.join(cfg.TEST_DATADIRS, 'firo_' + str(i)), cfg.FIRO_BINDIR, cfg.FIROD, opts=extra_opts))
-        logging.info('Started %s %d', cfg.FIROD, cls.part_daemons[-1].pid)
+        logging.info('Started %s %d', cfg.FIROD, cls.firo_daemons[-1].pid)
 
         waitForRPC(make_rpc_func(i, base_rpc_port=FIRO_BASE_RPC_PORT))
 

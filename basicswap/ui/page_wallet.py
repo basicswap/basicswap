@@ -61,6 +61,7 @@ def format_wallet_data(ci, w):
 def page_wallets(self, url_split, post_string):
     server = self.server
     swap_client = server.swap_client
+    swap_client.checkSystemStatus()
     summary = swap_client.getSummary()
 
     page_data = {}
@@ -165,6 +166,7 @@ def page_wallet(self, url_split, post_string):
     wallet_ticker = url_split[2]
     server = self.server
     swap_client = server.swap_client
+    swap_client.checkSystemStatus()
     summary = swap_client.getSummary()
 
     coin_id = getCoinIdFromTicker(wallet_ticker)

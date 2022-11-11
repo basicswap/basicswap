@@ -1,3 +1,3 @@
 name = "basicswap"
 
-__version__ = "0.11.45"
+__version__ = "0.11.46"

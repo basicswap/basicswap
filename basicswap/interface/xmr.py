@@ -74,6 +74,7 @@ class XMRInterface(CoinInterface):
         self.setFeePriority(coin_settings.get('fee_priority', 0))
         self._sc = swap_client
         self._log = self._sc.log if self._sc and self._sc.log else logging
+        self._wallet_password = None
 
     def setFeePriority(self, new_priority):
         ensure(new_priority >= 0 and new_priority < 4, 'Invalid fee_priority value')
@@ -82,10 +83,22 @@ class XMRInterface(CoinInterface):
     def setWalletFilename(self, wallet_filename):
         self._wallet_filename = wallet_filename
 
+    def createWallet(self, params):
+        if self._wallet_password is not None:
+            params['password'] = self._wallet_password
+        rv = self.rpc_wallet_cb('generate_from_keys', params)
+        self._log.info('generate_from_keys %s', dumpj(rv))
+
+    def openWallet(self, filename):
+        params = {'filename': filename}
+        if self._wallet_password is not None:
+            params['password'] = self._wallet_password
+        self.rpc_wallet_cb('open_wallet', params)
+
     def initialiseWallet(self, key_view, key_spend, restore_height=None):
         with self._mx_wallet:
             try:
-                self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
+                self.openWallet(self._wallet_filename)
                 # TODO: Check address
                 return  # Wallet exists
             except Exception as e:
@@ -102,13 +115,12 @@ class XMRInterface(CoinInterface):
                 'spendkey': b2h(key_spend[::-1]),
                 'restore_height': self._restore_height,
             }
-            rv = self.rpc_wallet_cb('generate_from_keys', params)
-            self._log.info('generate_from_keys %s', dumpj(rv))
-            self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
+            self.createWallet(params)
+            self.openWallet(self._wallet_filename)
 
     def ensureWalletExists(self):
         with self._mx_wallet:
-            self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
+            self.openWallet(self._wallet_filename)
 
     def testDaemonRPC(self, with_wallet=True):
         self.rpc_wallet_cb('get_languages')
@@ -149,12 +161,21 @@ class XMRInterface(CoinInterface):
 
     def getWalletInfo(self):
         with self._mx_wallet:
-            self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
+            try:
+                self.openWallet(self._wallet_filename)
+            except Exception as e:
+                if 'Failed to open wallet' in str(e):
+                    rv = {'encrypted': True, 'locked': True, 'balance': 0, 'unconfirmed_balance': 0}
+                    return rv
+                raise e
+
             rv = {}
             self.rpc_wallet_cb('refresh')
             balance_info = self.rpc_wallet_cb('get_balance')
             rv['balance'] = self.format_amount(balance_info['unlocked_balance'])
             rv['unconfirmed_balance'] = self.format_amount(balance_info['balance'] - balance_info['unlocked_balance'])
+            rv['encrypted'] = False if self._wallet_password is None else True
+            rv['locked'] = False
             return rv
 
     def walletRestoreHeight(self):
@@ -162,12 +183,12 @@ class XMRInterface(CoinInterface):
 
     def getMainWalletAddress(self):
         with self._mx_wallet:
-            self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
+            self.openWallet(self._wallet_filename)
             return self.rpc_wallet_cb('get_address')['address']
 
     def getNewAddress(self, placeholder):
         with self._mx_wallet:
-            self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
+            self.openWallet(self._wallet_filename)
             return self.rpc_wallet_cb('create_address', {'account_index': 0})['address']
 
     def get_fee_rate(self, conf_target=2):
@@ -230,7 +251,7 @@ class XMRInterface(CoinInterface):
 
     def publishBLockTx(self, Kbv, Kbs, output_amount, feerate, delay_for=10):
         with self._mx_wallet:
-            self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
+            self.openWallet(self._wallet_filename)
 
             shared_addr = xmr_util.encode_address(Kbv, Kbs)
 
@@ -275,10 +296,10 @@ class XMRInterface(CoinInterface):
 
             try:
                 rv = self.rpc_wallet_cb('open_wallet', {'filename': address_b58})
+                self.openWallet(address_b58)
             except Exception as e:
-                rv = self.rpc_wallet_cb('generate_from_keys', params)
-                self._log.info('generate_from_keys %s', dumpj(rv))
-                rv = self.rpc_wallet_cb('open_wallet', {'filename': address_b58})
+                self.createWallet(params)
+                self.openWallet(address_b58)
 
             self.rpc_wallet_cb('refresh', timeout=600)
 
@@ -319,9 +340,8 @@ class XMRInterface(CoinInterface):
                 'viewkey': b2h(kbv[::-1]),
                 'restore_height': restore_height,
             }
-            self.rpc_wallet_cb('generate_from_keys', params)
-
-            self.rpc_wallet_cb('open_wallet', {'filename': address_b58})
+            self.createWallet(params)
+            self.openWallet(address_b58)
             # For a while after opening the wallet rpc cmds return empty data
 
             num_tries = 40
@@ -367,7 +387,7 @@ class XMRInterface(CoinInterface):
 
     def findTxnByHash(self, txid):
         with self._mx_wallet:
-            self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
+            self.openWallet(self._wallet_filename)
             self.rpc_wallet_cb('refresh')
 
             try:
@@ -409,11 +429,10 @@ class XMRInterface(CoinInterface):
             }
 
             try:
-                self.rpc_wallet_cb('open_wallet', {'filename': wallet_filename})
+                self.openWallet(wallet_filename)
             except Exception as e:
-                rv = self.rpc_wallet_cb('generate_from_keys', params)
-                self._log.info('generate_from_keys %s', dumpj(rv))
-                self.rpc_wallet_cb('open_wallet', {'filename': wallet_filename})
+                self.createWallet(params)
+                self.openWallet(wallet_filename)
 
             self.rpc_wallet_cb('refresh')
             rv = self.rpc_wallet_cb('get_balance')
@@ -454,7 +473,7 @@ class XMRInterface(CoinInterface):
         with self._mx_wallet:
             value_sats = make_int(value, self.exp())
 
-            self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
+            self.openWallet(self._wallet_filename)
 
             if subfee:
                 balance = self.rpc_wallet_cb('get_balance')
@@ -479,10 +498,10 @@ class XMRInterface(CoinInterface):
                 address_b58 = xmr_util.encode_address(Kbv, Kbs)
                 wallet_file = address_b58 + '_spend'
                 try:
-                    self.rpc_wallet_cb('open_wallet', {'filename': wallet_file})
+                    self.openWallet(wallet_file)
                 except Exception:
                     wallet_file = address_b58
-                    self.rpc_wallet_cb('open_wallet', {'filename': wallet_file})
+                    self.openWallet(wallet_file)
 
                 self.rpc_wallet_cb('refresh')
 
@@ -494,8 +513,25 @@ class XMRInterface(CoinInterface):
 
     def getSpendableBalance(self):
         with self._mx_wallet:
-            self.rpc_wallet_cb('open_wallet', {'filename': self._wallet_filename})
+            self.openWallet(self._wallet_filename)
 
             self.rpc_wallet_cb('refresh')
             balance_info = self.rpc_wallet_cb('get_balance')
             return balance_info['unlocked_balance']
+
+    def changeWalletPassword(self, old_password, new_password):
+        orig_password = self._wallet_password
+        if old_password != '':
+            self._wallet_password = old_password
+        try:
+            self.openWallet(self._wallet_filename)
+            self.rpc_wallet_cb('change_wallet_password', {'old_password': old_password, 'new_password': new_password})
+        except Exception as e:
+            self._wallet_password = orig_password
+            raise e
+
+    def unlockWallet(self, password):
+        self._wallet_password = password
+
+    def lockWallet(self):
+        self._wallet_password = None

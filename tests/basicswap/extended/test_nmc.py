@@ -349,7 +349,7 @@ class Test(unittest.TestCase):
         num_blocks = 3
         logging.info('Waiting for Particl chain height %d', num_blocks)
         for i in range(60):
-            particl_blocks = cls.swap_clients[0].callrpc('getblockchaininfo')['blocks']
+            particl_blocks = cls.swap_clients[0].callrpc('getblockcount')
             print('particl_blocks', particl_blocks)
             if particl_blocks >= num_blocks:
                 break

@@ -21,6 +21,7 @@ from basicswap.db import (
 def page_automation_strategies(self, url_split, post_string):
     server = self.server
     swap_client = server.swap_client
+    swap_client.checkSystemStatus()
     summary = swap_client.getSummary()
 
     filters = {
@@ -61,6 +62,7 @@ def page_automation_strategies(self, url_split, post_string):
 def page_automation_strategy_new(self, url_split, post_string):
     server = self.server
     swap_client = self.server.swap_client
+    swap_client.checkSystemStatus()
     summary = swap_client.getSummary()
 
     messages = []
@@ -82,6 +84,7 @@ def page_automation_strategy(self, url_split, post_string):
 
     server = self.server
     swap_client = self.server.swap_client
+    swap_client.checkSystemStatus()
     summary = swap_client.getSummary()
 
     messages = []

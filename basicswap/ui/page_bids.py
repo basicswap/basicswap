@@ -37,6 +37,7 @@ def page_bid(self, url_split, post_string):
         raise ValueError('Bad bid ID')
     server = self.server
     swap_client = server.swap_client
+    swap_client.checkSystemStatus()
     summary = swap_client.getSummary()
 
     messages = []
@@ -121,6 +122,7 @@ def page_bid(self, url_split, post_string):
 def page_bids(self, url_split, post_string, sent=False, available=False, received=False):
     server = self.server
     swap_client = server.swap_client
+    swap_client.checkSystemStatus()
     summary = swap_client.getSummary()
 
     filters = {

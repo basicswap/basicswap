@@ -319,7 +319,8 @@ def offer_to_post_string(self, swap_client, offer_id):
 
 def page_newoffer(self, url_split, post_string):
     server = self.server
-    swap_client = server.swap_client
+    swap_client = self.server.swap_client
+    swap_client.checkSystemStatus()
     summary = swap_client.getSummary()
 
     messages = []
@@ -400,6 +401,7 @@ def page_offer(self, url_split, post_string):
     offer_id = decode_offer_id(url_split[2])
     server = self.server
     swap_client = server.swap_client
+    swap_client.checkSystemStatus()
     summary = swap_client.getSummary()
     offer, xmr_offer = swap_client.getXmrOffer(offer_id)
     ensure(offer, 'Unknown offer ID')
@@ -564,6 +566,7 @@ def page_offer(self, url_split, post_string):
 def page_offers(self, url_split, post_string, sent=False):
     server = self.server
     swap_client = server.swap_client
+    swap_client.checkSystemStatus()
     summary = swap_client.getSummary()
 
     filters = {

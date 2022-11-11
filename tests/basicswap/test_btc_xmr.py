@@ -425,6 +425,39 @@ class TestBTC(BasicSwapTest):
     start_ltc_nodes = False
     base_rpc_port = BTC_BASE_RPC_PORT
 
+    def test_009_wallet_encryption(self):
+
+        for coin in ('btc', 'part', 'xmr'):
+            jsw = read_json_api(1800, f'wallets/{coin}')
+            assert (jsw['encrypted'] is False)
+            assert (jsw['locked'] is False)
+
+        rv = read_json_api(1800, 'setpassword', {'oldpassword': '', 'newpassword': 'notapassword123'})
+
+        # Entire system is locked with Particl wallet
+        jsw = read_json_api(1800, 'wallets/btc')
+        assert ('Coin must be unlocked' in jsw['error'])
+
+        read_json_api(1800, 'unlock', {'coin': 'part', 'password': 'notapassword123'})
+
+        for coin in ('btc', 'xmr'):
+            jsw = read_json_api(1800, f'wallets/{coin}')
+            assert (jsw['encrypted'] is True)
+            assert (jsw['locked'] is True)
+
+        read_json_api(1800, 'lock', {'coin': 'part'})
+        jsw = read_json_api(1800, 'wallets/part')
+        assert ('Coin must be unlocked' in jsw['error'])
+
+        read_json_api(1800, 'setpassword', {'oldpassword': 'notapassword123', 'newpassword': 'notapassword456'})
+
+        read_json_api(1800, 'unlock', {'password': 'notapassword456'})
+
+        for coin in ('part', 'btc', 'xmr'):
+            jsw = read_json_api(1800, f'wallets/{coin}')
+            assert (jsw['encrypted'] is True)
+            assert (jsw['locked'] is False)
+
 
 if __name__ == '__main__':
     unittest.main()

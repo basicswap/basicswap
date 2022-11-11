@@ -41,9 +41,10 @@ from . import __version__
 from .rpc_xmr import make_xmr_rpc2_func
 from .ui.util import getCoinName
 from .util import (
+    AutomationConstraint,
+    LockedCoinError,
     TemporaryError,
     InactiveCoin,
-    AutomationConstraint,
     format_amount,
     format_timestamp,
     DeserialiseNum,
@@ -679,11 +680,9 @@ class BasicSwap(BaseApp):
         raise ValueError('Could not stop {}'.format(str(coin)))
 
     def stopDaemons(self):
-        for c in Coins:
-            if c not in chainparams:
-                continue
+        for c in self.activeCoins():
             chain_client_settings = self.getChainClientSettings(c)
-            if self.coin_clients[c]['connection_type'] == 'rpc' and chain_client_settings['manage_daemon'] is True:
+            if chain_client_settings['manage_daemon'] is True:
                 self.stopDaemon(c)
 
     def waitForDaemonRPC(self, coin_type, with_wallet=True):
@@ -709,6 +708,39 @@ class BasicSwap(BaseApp):
             synced = round(self.ci(c).getBlockchainInfo()['verificationprogress'], 3)
             if synced < 1.0:
                 raise ValueError('{} chain is still syncing, currently at {}.'.format(self.coin_clients[c]['name'], synced))
+
+    def checkSystemStatus(self):
+        ci = self.ci(Coins.PART)
+        if ci.isWalletLocked():
+            raise LockedCoinError(Coins.PART)
+
+    def activeCoins(self):
+        for c in Coins:
+            if c not in chainparams:
+                continue
+            chain_client_settings = self.getChainClientSettings(c)
+            if self.coin_clients[c]['connection_type'] == 'rpc':
+                yield c
+
+    def changeWalletPasswords(self, old_password, new_password):
+        # Unlock all wallets to ensure they all have the same password.
+        for c in self.activeCoins():
+            ci = self.ci(c)
+            try:
+                ci.unlockWallet(old_password)
+            except Exception as e:
+                raise ValueError('Failed to unlock {}'.format(ci.coin_name()))
+
+        for c in self.activeCoins():
+            self.ci(c).changeWalletPassword(old_password, new_password)
+
+    def unlockWallets(self, password):
+        for c in self.activeCoins():
+            self.ci(c).unlockWallet(password)
+
+    def lockWallets(self):
+        for c in self.activeCoins():
+            self.ci(c).lockWallet()
 
     def initialiseWallet(self, coin_type, raise_errors=False):
         if coin_type == Coins.PART:
@@ -5356,6 +5388,8 @@ class BasicSwap(BaseApp):
                 'balance': format_amount(make_int(walletinfo['balance'], scale), scale),
                 'unconfirmed': format_amount(make_int(walletinfo.get('unconfirmed_balance'), scale), scale),
                 'expected_seed': ci.knownWalletSeed(),
+                'encrypted': walletinfo['encrypted'],
+                'locked': walletinfo['locked'],
             }
 
             if coin == Coins.PART:
@@ -5428,16 +5462,13 @@ class BasicSwap(BaseApp):
 
     def getWalletsInfo(self, opts=None):
         rv = {}
-        for c in Coins:
-            if c not in chainparams:
-                continue
-            if self.coin_clients[c]['connection_type'] == 'rpc':
-                key = chainparams[c]['ticker'] if opts.get('ticker_key', False) else c
-                try:
-                    rv[key] = self.getWalletInfo(c)
-                    rv[key].update(self.getBlockchainInfo(c))
-                except Exception as ex:
-                    rv[key] = {'name': getCoinName(c), 'error': str(ex)}
+        for c in self.activeCoins():
+            key = chainparams[c]['ticker'] if opts.get('ticker_key', False) else c
+            try:
+                rv[key] = self.getWalletInfo(c)
+                rv[key].update(self.getBlockchainInfo(c))
+            except Exception as ex:
+                rv[key] = {'name': getCoinName(c), 'error': str(ex)}
         return rv
 
     def getCachedWalletsInfo(self, opts=None):
@@ -5480,17 +5511,14 @@ class BasicSwap(BaseApp):
         if opts is not None and 'coin_id' in opts:
             return rv
 
-        for c in Coins:
-            if c not in chainparams:
-                continue
-            if self.coin_clients[c]['connection_type'] == 'rpc':
-                coin_id = int(c)
-                if coin_id not in rv:
-                    rv[coin_id] = {
-                        'name': getCoinName(c),
-                        'no_data': True,
-                        'updating': self._updating_wallets_info.get(coin_id, False),
-                    }
+        for c in self.activeCoins():
+            coin_id = int(c)
+            if coin_id not in rv:
+                rv[coin_id] = {
+                    'name': getCoinName(c),
+                    'no_data': True,
+                    'updating': self._updating_wallets_info.get(coin_id, False),
+                }
 
         return rv
 

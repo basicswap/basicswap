@@ -262,7 +262,10 @@ class BTCInterface(CoinInterface):
         self.rpc_callback('sethdseed', [True, key_wif])
 
     def getWalletInfo(self):
-        return self.rpc_callback('getwalletinfo')
+        rv = self.rpc_callback('getwalletinfo')
+        rv['encrypted'] = 'unlocked_until' in rv
+        rv['locked'] = rv.get('unlocked_until', 1) <= 0
+        return rv
 
     def walletRestoreHeight(self):
         return self._restore_height
@@ -1276,6 +1279,30 @@ class BTCInterface(CoinInterface):
             address = self.encodeSegwitAddress(decodeAddress(address)[1:])
 
         return self.getUTXOBalance(address)
+
+    def isWalletEncrypted(self):
+        wallet_info = self.rpc_callback('getwalletinfo')
+        return 'unlocked_until' in wallet_info
+
+    def isWalletLocked(self):
+        wallet_info = self.rpc_callback('getwalletinfo')
+        if 'unlocked_until' in wallet_info and wallet_info['unlocked_until'] <= 0:
+            return True
+        return False
+
+    def changeWalletPassword(self, old_password, new_password):
+        if old_password == '':
+            return self.rpc_callback('encryptwallet', [new_password])
+        self.rpc_callback('walletpassphrasechange', [old_password, new_password])
+
+    def unlockWallet(self, password):
+        if password == '':
+            return
+        # Max timeout value, ~3 years
+        self.rpc_callback('walletpassphrase', [password, 100000000])
+
+    def lockWallet(self):
+        self.rpc_callback('walletlock')
 
 
 def testBTCInterface():

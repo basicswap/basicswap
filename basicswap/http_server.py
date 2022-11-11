@@ -185,6 +185,7 @@ class HttpHandler(BaseHTTPRequestHandler):
 
     def page_explorers(self, url_split, post_string):
         swap_client = self.server.swap_client
+        swap_client.checkSystemStatus()
         summary = swap_client.getSummary()
 
         result = None
@@ -231,6 +232,7 @@ class HttpHandler(BaseHTTPRequestHandler):
 
     def page_rpc(self, url_split, post_string):
         swap_client = self.server.swap_client
+        swap_client.checkSystemStatus()
         summary = swap_client.getSummary()
 
         result = None
@@ -295,6 +297,7 @@ class HttpHandler(BaseHTTPRequestHandler):
 
     def page_debug(self, url_split, post_string):
         swap_client = self.server.swap_client
+        swap_client.checkSystemStatus()
         summary = swap_client.getSummary()
 
         result = None
@@ -319,6 +322,7 @@ class HttpHandler(BaseHTTPRequestHandler):
 
     def page_active(self, url_split, post_string):
         swap_client = self.server.swap_client
+        swap_client.checkSystemStatus()
         active_swaps = swap_client.listSwapsInProgress()
         summary = swap_client.getSummary()
 
@@ -331,6 +335,7 @@ class HttpHandler(BaseHTTPRequestHandler):
 
     def page_settings(self, url_split, post_string):
         swap_client = self.server.swap_client
+        swap_client.checkSystemStatus()
         summary = swap_client.getSummary()
 
         messages = []
@@ -412,6 +417,7 @@ class HttpHandler(BaseHTTPRequestHandler):
 
     def page_watched(self, url_split, post_string):
         swap_client = self.server.swap_client
+        swap_client.checkSystemStatus()
         watched_outputs, last_scanned = swap_client.listWatchedOutputs()
         summary = swap_client.getSummary()
 
@@ -425,6 +431,7 @@ class HttpHandler(BaseHTTPRequestHandler):
 
     def page_smsgaddresses(self, url_split, post_string):
         swap_client = self.server.swap_client
+        swap_client.checkSystemStatus()
         summary = swap_client.getSummary()
 
         page_data = {}
@@ -502,6 +509,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         ensure(len(url_split) > 2, 'Address not specified')
         identity_address = url_split[2]
         swap_client = self.server.swap_client
+        swap_client.checkSystemStatus()
         summary = swap_client.getSummary()
 
         page_data = {'identity_address': identity_address}
@@ -557,6 +565,7 @@ class HttpHandler(BaseHTTPRequestHandler):
 
     def page_index(self, url_split):
         swap_client = self.server.swap_client
+        swap_client.checkSystemStatus()
         summary = swap_client.getSummary()
 
         shutdown_token = os.urandom(8).hex()
@@ -587,6 +596,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def handle_http(self, status_code, path, post_string='', is_json=False):
+        swap_client = self.server.swap_client
         parsed = parse.urlparse(self.path)
         url_split = parsed.path.split('/')
         if post_string == '' and len(parsed.query) > 0:
@@ -597,14 +607,13 @@ class HttpHandler(BaseHTTPRequestHandler):
                 func = js_url_to_function(url_split)
                 return func(self, url_split, post_string, is_json)
             except Exception as ex:
-                if self.server.swap_client.debug is True:
-                    self.server.swap_client.log.error(traceback.format_exc())
+                if swap_client.debug is True:
+                    swap_client.log.error(traceback.format_exc())
                 return js_error(self, str(ex))
 
         if len(url_split) > 1 and url_split[1] == 'static':
             try:
                 static_path = os.path.join(os.path.dirname(__file__), 'static')
-
                 if len(url_split) > 3 and url_split[2] == 'sequence_diagrams':
                     with open(os.path.join(static_path, 'sequence_diagrams', url_split[3]), 'rb') as fp:
                         self.putHeaders(status_code, 'image/svg+xml')
@@ -639,13 +648,14 @@ class HttpHandler(BaseHTTPRequestHandler):
             except FileNotFoundError:
                 return self.page_404(url_split)
             except Exception as ex:
-                if self.server.swap_client.debug is True:
-                    self.server.swap_client.log.error(traceback.format_exc())
+                if swap_client.debug is True:
+                    swap_client.log.error(traceback.format_exc())
                 return self.page_error(str(ex))
 
         try:
             if len(url_split) > 1:
                 page = url_split[1]
+
                 if page == 'active':
                     return self.page_active(url_split, post_string)
                 if page == 'wallets':
@@ -700,8 +710,8 @@ class HttpHandler(BaseHTTPRequestHandler):
                     return self.page_404(url_split)
             return self.page_index(url_split)
         except Exception as ex:
-            if self.server.swap_client.debug is True:
-                self.server.swap_client.log.error(traceback.format_exc())
+            if swap_client.debug is True:
+                swap_client.log.error(traceback.format_exc())
             return self.page_error(str(ex))
 
     def do_GET(self):

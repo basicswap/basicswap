@@ -14,6 +14,7 @@ import os
 import sys
 import json
 import time
+import random
 import shutil
 import signal
 import logging
@@ -204,8 +205,8 @@ def btcRpc(cmd):
     return callrpc_cli(cfg.BITCOIN_BINDIR, os.path.join(cfg.TEST_DATADIRS, str(BTC_NODE)), 'regtest', cmd, cfg.BITCOIN_CLI)
 
 
-def dashRpc(cmd):
-    return callrpc_cli(cfg.DASH_BINDIR, os.path.join(cfg.TEST_DATADIRS, str(DASH_NODE)), 'regtest', cmd, cfg.DASH_CLI)
+def dashRpc(cmd, wallet=None):
+    return callrpc_cli(cfg.DASH_BINDIR, os.path.join(cfg.TEST_DATADIRS, str(DASH_NODE)), 'regtest', cmd, cfg.DASH_CLI, wallet=wallet)
 
 
 def signal_handler(sig, frame):
@@ -533,18 +534,17 @@ class Test(unittest.TestCase):
         self.swap_clients[0].initialiseWallet(Coins.DASH, raise_errors=True)
         assert self.swap_clients[0].checkWalletSeed(Coins.DASH) is True
 
-        pivx_addr = dashRpc('getnewaddress \"hd test\"')
-        assert pivx_addr == 'ybzWYJbZEhZai8kiKkTtPFKTuDNwhpiwac'
+        addr = dashRpc('getnewaddress \"hd wallet test\"')
+        assert addr == 'ybzWYJbZEhZai8kiKkTtPFKTuDNwhpiwac'
 
-    def pass_99_delay(self):
-        global stop_test
-        logging.info('Delay')
-        for i in range(60 * 5):
-            if stop_test:
-                break
-            time.sleep(1)
-            print('delay', i)
-        stop_test = True
+        logging.info('Test that getcoinseed returns a mnemonic for Dash')
+        mnemonic = read_json_api(1800, 'getcoinseed', {'coin': 'DASH'})['mnemonic']
+        new_wallet_name = random.randbytes(10).hex()
+        dashRpc(f'createwallet \"{new_wallet_name}\"')
+        dashRpc(f'upgradetohd \"{mnemonic}\"', wallet=new_wallet_name)
+        addr_test = dashRpc('getnewaddress', wallet=new_wallet_name)
+        dashRpc('unloadwallet', wallet=new_wallet_name)
+        assert (addr_test == addr)
 
 
 if __name__ == '__main__':

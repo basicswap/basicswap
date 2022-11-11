@@ -33,6 +33,14 @@ class InactiveCoin(Exception):
         return str(self.coinid)
 
 
+class LockedCoinError(Exception):
+    def __init__(self, coinid):
+        self.coinid = coinid
+
+    def __str__(self):
+        return 'Coin must be unlocked: ' + str(self.coinid)
+
+
 def ensure(v, err_string):
     if not v:
         raise ValueError(err_string)

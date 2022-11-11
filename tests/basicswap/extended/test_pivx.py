@@ -360,7 +360,7 @@ class Test(unittest.TestCase):
         num_blocks = 3
         logging.info('Waiting for Particl chain height %d', num_blocks)
         for i in range(60):
-            particl_blocks = cls.swap_clients[0].callrpc('getblockchaininfo')['blocks']
+            particl_blocks = cls.swap_clients[0].callrpc('getblockcount')
             print('particl_blocks', particl_blocks)
             if particl_blocks >= num_blocks:
                 break
@@ -562,16 +562,6 @@ class Test(unittest.TestCase):
                 found = True
                 break
         assert found
-
-    def pass_99_delay(self):
-        global stop_test
-        logging.info('Delay')
-        for i in range(60 * 5):
-            if stop_test:
-                break
-            time.sleep(1)
-            print('delay', i)
-        stop_test = True
 
 
 if __name__ == '__main__':

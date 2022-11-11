@@ -88,6 +88,7 @@ def js_coins(self, url_split, post_string, is_json):
 
 def js_wallets(self, url_split, post_string, is_json):
     swap_client = self.server.swap_client
+    swap_client.checkSystemStatus()
     if len(url_split) > 3:
         ticker_str = url_split[3]
         coin_type = tickerToCoinId(ticker_str)
@@ -108,6 +109,7 @@ def js_wallets(self, url_split, post_string, is_json):
 
 def js_offers(self, url_split, post_string, is_json, sent=False):
     swap_client = self.server.swap_client
+    swap_client.checkSystemStatus()
     offer_id = None
     if len(url_split) > 3:
         if url_split[3] == 'new':
@@ -186,6 +188,7 @@ def js_sentoffers(self, url_split, post_string, is_json):
 
 def js_bids(self, url_split, post_string, is_json):
     swap_client = self.server.swap_client
+    swap_client.checkSystemStatus()
     if len(url_split) > 3:
         if url_split[3] == 'new':
             if post_string == '':
@@ -287,22 +290,29 @@ def js_bids(self, url_split, post_string, is_json):
 
 
 def js_sentbids(self, url_split, post_string, is_json):
-    return bytes(json.dumps(self.server.swap_client.listBids(sent=True)), 'UTF-8')
+    swap_client = self.server.swap_client
+    swap_client.checkSystemStatus()
+    return bytes(json.dumps(swap_client.listBids(sent=True)), 'UTF-8')
 
 
 def js_network(self, url_split, post_string, is_json):
-    return bytes(json.dumps(self.server.swap_client.get_network_info()), 'UTF-8')
+    swap_client = self.server.swap_client
+    swap_client.checkSystemStatus()
+    return bytes(json.dumps(swap_client.get_network_info()), 'UTF-8')
 
 
 def js_revokeoffer(self, url_split, post_string, is_json):
+    swap_client = self.server.swap_client
+    swap_client.checkSystemStatus()
     offer_id = bytes.fromhex(url_split[3])
     assert (len(offer_id) == 28)
-    self.server.swap_client.revokeOffer(offer_id)
+    swap_client.revokeOffer(offer_id)
     return bytes(json.dumps({'revoked_offer': offer_id.hex()}), 'UTF-8')
 
 
 def js_smsgaddresses(self, url_split, post_string, is_json):
     swap_client = self.server.swap_client
+    swap_client.checkSystemStatus()
     if len(url_split) > 3:
         if post_string == '':
             raise ValueError('No post data')
@@ -394,7 +404,9 @@ def js_rate(self, url_split, post_string, is_json):
 
 
 def js_index(self, url_split, post_string, is_json):
-    return bytes(json.dumps(self.server.swap_client.getSummary()), 'UTF-8')
+    swap_client = self.server.swap_client
+    swap_client.checkSystemStatus()
+    return bytes(json.dumps(swap_client.getSummary()), 'UTF-8')
 
 
 def js_generatenotification(self, url_split, post_string, is_json):
@@ -418,6 +430,7 @@ def js_generatenotification(self, url_split, post_string, is_json):
 
 def js_notifications(self, url_split, post_string, is_json):
     swap_client = self.server.swap_client
+    swap_client.checkSystemStatus()
     swap_client.getNotifications()
 
     return bytes(json.dumps(swap_client.getNotifications()), 'UTF-8')
@@ -425,28 +438,140 @@ def js_notifications(self, url_split, post_string, is_json):
 
 def js_vacuumdb(self, url_split, post_string, is_json):
     swap_client = self.server.swap_client
+    swap_client.checkSystemStatus()
     swap_client.vacuumDB()
 
     return bytes(json.dumps({'completed': True}), 'UTF-8')
 
 
+def js_getcoinseed(self, url_split, post_string, is_json):
+    swap_client = self.server.swap_client
+    swap_client.checkSystemStatus()
+    if post_string == '':
+        raise ValueError('No post data')
+    if is_json:
+        post_data = json.loads(post_string)
+        post_data['is_json'] = True
+    else:
+        post_data = urllib.parse.parse_qs(post_string)
+
+    coin = getCoinType(get_data_entry(post_data, 'coin'))
+    if coin in (Coins.PART, Coins.PART_ANON, Coins.PART_BLIND):
+        raise ValueError('Particl wallet seed is set from the Basicswap mnemonic.')
+
+    ci = swap_client.ci(coin)
+    seed = swap_client.getWalletKey(coin, 1)
+    if coin == Coins.DASH:
+        return bytes(json.dumps({'coin': ci.ticker(), 'seed': seed.hex(), 'mnemonic': ci.seedToMnemonic(seed)}), 'UTF-8')
+    return bytes(json.dumps({'coin': ci.ticker(), 'seed': seed.hex()}), 'UTF-8')
+
+
+def js_setpassword(self, url_split, post_string, is_json):
+    # Set or change wallet passwords
+    # Only works with currently enabled coins
+    # Will fail if any coin does not unlock on the old password
+    swap_client = self.server.swap_client
+    if post_string == '':
+        raise ValueError('No post data')
+    if is_json:
+        post_data = json.loads(post_string)
+        post_data['is_json'] = True
+    else:
+        post_data = urllib.parse.parse_qs(post_string)
+
+    old_password = get_data_entry(post_data, 'oldpassword')
+    new_password = get_data_entry(post_data, 'newpassword')
+
+    if have_data_entry(post_data, 'coin'):
+        # Set password for one coin
+        coin = getCoinType(get_data_entry(post_data, 'coin'))
+        if coin in (Coins.PART_ANON, Coins.PART_BLIND):
+            raise ValueError('Invalid coin.')
+        swap_client.ci(coin).changeWalletPassword(old_password, new_password)
+        return bytes(json.dumps({'success': True}), 'UTF-8')
+
+    # Set password for all coins
+    swap_client.changeWalletPasswords(old_password, new_password)
+    return bytes(json.dumps({'success': True}), 'UTF-8')
+
+
+def js_unlock(self, url_split, post_string, is_json):
+    swap_client = self.server.swap_client
+    if post_string == '':
+        raise ValueError('No post data')
+    if is_json:
+        post_data = json.loads(post_string)
+        post_data['is_json'] = True
+    else:
+        post_data = urllib.parse.parse_qs(post_string)
+
+    password = get_data_entry(post_data, 'password')
+
+    if have_data_entry(post_data, 'coin'):
+        coin = getCoinType(str(get_data_entry(post_data, 'coin')))
+        if coin in (Coins.PART_ANON, Coins.PART_BLIND):
+            raise ValueError('Invalid coin.')
+        swap_client.ci(coin).unlockWallet(password)
+        return bytes(json.dumps({'success': True}), 'UTF-8')
+
+    swap_client.unlockWallets(password)
+    return bytes(json.dumps({'success': True}), 'UTF-8')
+
+
+def js_lock(self, url_split, post_string, is_json):
+    swap_client = self.server.swap_client
+    if post_string == '':
+        raise ValueError('No post data')
+    if is_json:
+        post_data = json.loads(post_string)
+        post_data['is_json'] = True
+    else:
+        post_data = urllib.parse.parse_qs(post_string)
+
+    if have_data_entry(post_data, 'coin'):
+        coin = getCoinType(get_data_entry(post_data, 'coin'))
+        if coin in (Coins.PART_ANON, Coins.PART_BLIND):
+            raise ValueError('Invalid coin.')
+        swap_client.ci(coin).lockWallet()
+        return bytes(json.dumps({'success': True}), 'UTF-8')
+
+    swap_client.lockWallets()
+    return bytes(json.dumps({'success': True}), 'UTF-8')
+
+
+def js_help(self, url_split, post_string, is_json):
+    # TODO: Add details and examples
+    commands = []
+    for k in pages:
+        commands.append(k)
+    return bytes(json.dumps({'commands': commands}), 'UTF-8')
+
+
+pages = {
+    'coins': js_coins,
+    'wallets': js_wallets,
+    'offers': js_offers,
+    'sentoffers': js_sentoffers,
+    'bids': js_bids,
+    'sentbids': js_sentbids,
+    'network': js_network,
+    'revokeoffer': js_revokeoffer,
+    'smsgaddresses': js_smsgaddresses,
+    'rate': js_rate,
+    'rates': js_rates,
+    'rateslist': js_rates_list,
+    'generatenotification': js_generatenotification,
+    'notifications': js_notifications,
+    'vacuumdb': js_vacuumdb,
+    'getcoinseed': js_getcoinseed,
+    'setpassword': js_setpassword,
+    'unlock': js_unlock,
+    'lock': js_lock,
+    'help': js_help,
+}
+
+
 def js_url_to_function(url_split):
     if len(url_split) > 2:
-        return {
-            'coins': js_coins,
-            'wallets': js_wallets,
-            'offers': js_offers,
-            'sentoffers': js_sentoffers,
-            'bids': js_bids,
-            'sentbids': js_sentbids,
-            'network': js_network,
-            'revokeoffer': js_revokeoffer,
-            'smsgaddresses': js_smsgaddresses,
-            'rate': js_rate,
-            'rates': js_rates,
-            'rateslist': js_rates_list,
-            'generatenotification': js_generatenotification,
-            'notifications': js_notifications,
-            'vacuumdb': js_vacuumdb,
-        }.get(url_split[2], js_index)
+        return pages.get(url_split[2], js_index)
     return js_index

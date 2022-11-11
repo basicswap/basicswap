@@ -217,13 +217,23 @@ def post_json_req(url, json_data):
     req.add_header('Content-Type', 'application/json; charset=utf-8')
     post_bytes = json.dumps(json_data).encode('utf-8')
     req.add_header('Content-Length', len(post_bytes))
-    return urlopen(req, post_bytes).read()
+    return urlopen(req, post_bytes, timeout=300).read()
 
 
-def read_json_api(port, path=None):
+def read_text_api(port, path=None):
     url = f'http://127.0.0.1:{port}/json'
     if path is not None:
         url += '/' + path
+    return urlopen(url, timeout=300).read().decode('utf-8')
+
+
+def read_json_api(port, path=None, json_data=None):
+    url = f'http://127.0.0.1:{port}/json'
+    if path is not None:
+        url += '/' + path
+
+    if json_data is not None:
+        return json.loads(post_json_req(url, json_data))
     return json.loads(urlopen(url, timeout=300).read())
 
 

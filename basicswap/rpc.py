@@ -130,13 +130,15 @@ def openrpc(rpc_port, auth, wallet=None, host='127.0.0.1'):
         raise ValueError('RPC error ' + str(ex))
 
 
-def callrpc_cli(bindir, datadir, chain, cmd, cli_bin='particl-cli'):
+def callrpc_cli(bindir, datadir, chain, cmd, cli_bin='particl-cli', wallet=None):
     cli_bin = os.path.join(bindir, cli_bin)
 
     args = [cli_bin, ]
     if chain != 'mainnet':
         args.append('-' + chain)
     args.append('-datadir=' + datadir)
+    if wallet is not None:
+        args.append('-rpcwallet=' + wallet)
     args += shlex.split(cmd)
 
     p = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)

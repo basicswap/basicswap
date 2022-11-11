@@ -176,7 +176,7 @@ class Test(unittest.TestCase):
         for i in range(60):
             if self.delay_event.is_set():
                 raise ValueError('Test stopped.')
-            particl_blocks = callpartrpc(0, 'getblockchaininfo')['blocks']
+            particl_blocks = callpartrpc(0, 'getblockcount')
             print('particl_blocks', particl_blocks)
             if particl_blocks >= num_blocks:
                 break
