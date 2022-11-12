@@ -93,12 +93,15 @@ def prepareDataDir(datadir, node_id, conf_file, dir_prefix, base_p2p_port=BASE_P
 
 
 def checkForks(ro):
-    if 'bip9_softforks' in ro:
-        assert (ro['bip9_softforks']['csv']['status'] == 'active')
-        assert (ro['bip9_softforks']['segwit']['status'] == 'active')
-    else:
-        assert (ro['softforks']['csv']['active'])
-        assert (ro['softforks']['segwit']['active'])
+    try:
+        if 'bip9_softforks' in ro:
+            assert (ro['bip9_softforks']['csv']['status'] == 'active')
+            assert (ro['bip9_softforks']['segwit']['status'] == 'active')
+        else:
+            assert (ro['softforks']['csv']['active'])
+            assert (ro['softforks']['segwit']['active'])
+    except Exception as e:
+        logging.warning('Could not parse deployment info')
 
 
 def stopDaemons(daemons):

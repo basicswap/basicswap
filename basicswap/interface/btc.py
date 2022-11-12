@@ -1261,6 +1261,7 @@ class BTCInterface(CoinInterface):
         ensure(sign_for_addr is not None, 'Could not find address with enough funds for proof')
 
         self._log.debug('sign_for_addr %s', sign_for_addr)
+
         if self._use_segwit:  # TODO: Use isSegwitAddress when scantxoutset can use combo
             # 'Address does not refer to key' for non p2pkh
             pkh = self.decodeAddress(sign_for_addr)
@@ -1291,6 +1292,7 @@ class BTCInterface(CoinInterface):
         return False
 
     def changeWalletPassword(self, old_password, new_password):
+        self._log.info('changeWalletPassword - {}'.format(self.ticker()))
         if old_password == '':
             return self.rpc_callback('encryptwallet', [new_password])
         self.rpc_callback('walletpassphrasechange', [old_password, new_password])
@@ -1298,10 +1300,12 @@ class BTCInterface(CoinInterface):
     def unlockWallet(self, password):
         if password == '':
             return
+        self._log.info('unlockWallet - {}'.format(self.ticker()))
         # Max timeout value, ~3 years
         self.rpc_callback('walletpassphrase', [password, 100000000])
 
     def lockWallet(self):
+        self._log.info('lockWallet - {}'.format(self.ticker()))
         self.rpc_callback('walletlock')
 
 

@@ -285,7 +285,7 @@ class Test(unittest.TestCase):
 
         btc_data_dir = os.path.join(cfg.TEST_DATADIRS, str(BTC_NODE))
         if os.path.exists(os.path.join(cfg.BITCOIN_BINDIR, 'bitcoin-wallet')):
-            callrpc_cli(cfg.BITCOIN_BINDIR, btc_data_dir, 'regtest', '-wallet=wallet.dat create', 'bitcoin-wallet')
+            callrpc_cli(cfg.BITCOIN_BINDIR, btc_data_dir, 'regtest', '-wallet=wallet.dat -legacy create', 'bitcoin-wallet')
         cls.daemons.append(startDaemon(btc_data_dir, cfg.BITCOIN_BINDIR, cfg.BITCOIND))
         logging.info('Started %s %d', cfg.BITCOIND, cls.daemons[-1].pid)
         cls.daemons.append(startDaemon(os.path.join(cfg.TEST_DATADIRS, str(PIVX_NODE)), cfg.PIVX_BINDIR, cfg.PIVXD))
@@ -294,7 +294,7 @@ class Test(unittest.TestCase):
         for i in range(NUM_NODES):
             data_dir = os.path.join(cfg.TEST_DATADIRS, str(i))
             if os.path.exists(os.path.join(cfg.PARTICL_BINDIR, 'particl-wallet')):
-                callrpc_cli(cfg.PARTICL_BINDIR, data_dir, 'regtest', '-wallet=wallet.dat create', 'particl-wallet')
+                callrpc_cli(cfg.PARTICL_BINDIR, data_dir, 'regtest', '-wallet=wallet.dat -legacy create', 'particl-wallet')
             cls.daemons.append(startDaemon(data_dir, cfg.PARTICL_BINDIR, cfg.PARTICLD))
             logging.info('Started %s %d', cfg.PARTICLD, cls.daemons[-1].pid)
 
@@ -346,7 +346,7 @@ class Test(unittest.TestCase):
         logging.info('Mining %d Bitcoin blocks to %s', num_blocks, cls.btc_addr)
         btcRpc('generatetoaddress {} {}'.format(num_blocks, cls.btc_addr))
 
-        ro = btcRpc('getblockchaininfo')
+        ro = btcRpc('getdeploymentinfo')
         checkForks(ro)
 
         signal.signal(signal.SIGINT, signal_handler)

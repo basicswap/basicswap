@@ -295,7 +295,6 @@ class XMRInterface(CoinInterface):
             }
 
             try:
-                rv = self.rpc_wallet_cb('open_wallet', {'filename': address_b58})
                 self.openWallet(address_b58)
             except Exception as e:
                 self.createWallet(params)
@@ -520,6 +519,7 @@ class XMRInterface(CoinInterface):
             return balance_info['unlocked_balance']
 
     def changeWalletPassword(self, old_password, new_password):
+        self._log.info('changeWalletPassword - {}'.format(self.ticker()))
         orig_password = self._wallet_password
         if old_password != '':
             self._wallet_password = old_password
@@ -531,7 +531,9 @@ class XMRInterface(CoinInterface):
             raise e
 
     def unlockWallet(self, password):
+        self._log.info('unlockWallet - {}'.format(self.ticker()))
         self._wallet_password = password
 
     def lockWallet(self):
+        self._log.info('lockWallet - {}'.format(self.ticker()))
         self._wallet_password = None

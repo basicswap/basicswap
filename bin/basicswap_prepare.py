@@ -973,7 +973,12 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
                     wallets = swap_client.callcoinrpc(c, 'listwallets')
                     if len(wallets) < 1:
                         logger.info('Creating wallet.dat for {}.'.format(getCoinName(c)))
-                        swap_client.callcoinrpc(c, 'createwallet', ['wallet.dat'])
+
+                        if c == Coins.BTC:
+                            # wallet_name, wallet_name, blank, passphrase, avoid_reuse, descriptors
+                            swap_client.callcoinrpc(c, 'createwallet', ['wallet.dat', False, True, '', False, False])
+                        else:
+                            swap_client.callcoinrpc(c, 'createwallet', ['wallet.dat'])
 
                     if 'particl' in with_coins and c == Coins.PART:
                         logger.info('Loading Particl mnemonic')

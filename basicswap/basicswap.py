@@ -723,6 +723,10 @@ class BasicSwap(BaseApp):
                 yield c
 
     def changeWalletPasswords(self, old_password, new_password):
+
+        if len(self.swaps_in_progress) > 0:
+            raise ValueError('Can\'t change passwords while swaps are in progress')
+
         # Unlock all wallets to ensure they all have the same password.
         for c in self.activeCoins():
             ci = self.ci(c)

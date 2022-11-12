@@ -243,7 +243,8 @@ class BasicSwapTest(BaseTest):
         test_seed = '8e54a313e6df8918df6d758fafdbf127a115175fdd2238d0e908dd8093c9ac3b'
         test_wif = self.swap_clients[0].ci(self.test_coin_from).encodeKey(bytes.fromhex(test_seed))
         new_wallet_name = random.randbytes(10).hex()
-        self.callnoderpc('createwallet', [new_wallet_name])
+        # wallet_name, wallet_name, blank, passphrase, avoid_reuse, descriptors
+        self.callnoderpc('createwallet', [new_wallet_name, False, True, '', False, False])
         self.callnoderpc('sethdseed', [True, test_wif], wallet=new_wallet_name)
         addr = self.callnoderpc('getnewaddress', wallet=new_wallet_name)
         self.callnoderpc('unloadwallet', [new_wallet_name])
@@ -432,7 +433,7 @@ class TestBTC(BasicSwapTest):
             assert (jsw['encrypted'] is False)
             assert (jsw['locked'] is False)
 
-        rv = read_json_api(1800, 'setpassword', {'oldpassword': '', 'newpassword': 'notapassword123'})
+        read_json_api(1800, 'setpassword', {'oldpassword': '', 'newpassword': 'notapassword123'})
 
         # Entire system is locked with Particl wallet
         jsw = read_json_api(1800, 'wallets/btc')
@@ -450,13 +451,23 @@ class TestBTC(BasicSwapTest):
         assert ('Coin must be unlocked' in jsw['error'])
 
         read_json_api(1800, 'setpassword', {'oldpassword': 'notapassword123', 'newpassword': 'notapassword456'})
-
         read_json_api(1800, 'unlock', {'password': 'notapassword456'})
 
         for coin in ('part', 'btc', 'xmr'):
             jsw = read_json_api(1800, f'wallets/{coin}')
             assert (jsw['encrypted'] is True)
             assert (jsw['locked'] is False)
+
+    def test_01_full_swap(self):
+        js_0 = read_json_api(1800, 'wallets')
+        if not js_0['PART']['encrypted']:
+            read_json_api(1800, 'setpassword', {'oldpassword': '', 'newpassword': 'notapassword123'})
+            read_json_api(1800, 'unlock', {'password': 'notapassword123'})
+        js_0 = read_json_api(1800, 'wallets')
+        assert (js_0['PART']['encrypted'] is True)
+        assert (js_0['PART']['locked'] is False)
+
+        super().test_01_full_swap()
 
 
 if __name__ == '__main__':

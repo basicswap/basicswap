@@ -143,6 +143,7 @@ def startXmrWalletRPC(node_dir, bin_dir, wallet_bin, node_id, opts=[]):
     args += ['--log-file={}'.format(os.path.join(data_dir, 'wallet.log'))]
     args += ['--rpc-login=test{0}:test_pass{0}'.format(node_id)]
     args += ['--shared-ringdb-dir={}'.format(os.path.join(data_dir, 'shared-ringdb'))]
+    args += ['--allow-mismatched-daemon-version']
 
     args += opts
     logging.info('Starting daemon {} --wallet-dir={}'.format(daemon_bin, node_dir))
@@ -366,7 +367,7 @@ class BaseTest(unittest.TestCase):
                 if not cls.restore_instance:
                     data_dir = prepareDataDir(TEST_DIR, i, 'particl.conf', 'part_')
                     if os.path.exists(os.path.join(cfg.PARTICL_BINDIR, 'particl-wallet')):
-                        callrpc_cli(cfg.PARTICL_BINDIR, data_dir, 'regtest', '-wallet=wallet.dat create', 'particl-wallet')
+                        callrpc_cli(cfg.PARTICL_BINDIR, data_dir, 'regtest', '-wallet=wallet.dat -legacy create', 'particl-wallet')
 
                 cls.part_daemons.append(startDaemon(os.path.join(TEST_DIR, 'part_' + str(i)), cfg.PARTICL_BINDIR, cfg.PARTICLD))
                 logging.info('Started %s %d', cfg.PARTICLD, cls.part_daemons[-1].pid)
@@ -391,7 +392,7 @@ class BaseTest(unittest.TestCase):
                 if not cls.restore_instance:
                     data_dir = prepareDataDir(TEST_DIR, i, 'bitcoin.conf', 'btc_', base_p2p_port=BTC_BASE_PORT, base_rpc_port=BTC_BASE_RPC_PORT)
                     if os.path.exists(os.path.join(cfg.BITCOIN_BINDIR, 'bitcoin-wallet')):
-                        callrpc_cli(cfg.BITCOIN_BINDIR, data_dir, 'regtest', '-wallet=wallet.dat create', 'bitcoin-wallet')
+                        callrpc_cli(cfg.BITCOIN_BINDIR, data_dir, 'regtest', '-wallet=wallet.dat -legacy create', 'bitcoin-wallet')
 
                 cls.btc_daemons.append(startDaemon(os.path.join(TEST_DIR, 'btc_' + str(i)), cfg.BITCOIN_BINDIR, cfg.BITCOIND))
                 logging.info('Started %s %d', cfg.BITCOIND, cls.part_daemons[-1].pid)
@@ -500,7 +501,7 @@ class BaseTest(unittest.TestCase):
                 logging.info('Mining %d Bitcoin blocks to %s', num_blocks, cls.btc_addr)
                 callnoderpc(0, 'generatetoaddress', [num_blocks, cls.btc_addr], base_rpc_port=BTC_BASE_RPC_PORT)
 
-                checkForks(callnoderpc(0, 'getblockchaininfo', base_rpc_port=BTC_BASE_RPC_PORT))
+                checkForks(callnoderpc(0, 'getdeploymentinfo', base_rpc_port=BTC_BASE_RPC_PORT))
 
                 if cls.start_ltc_nodes:
                     num_blocks = 400
