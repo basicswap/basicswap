@@ -33,19 +33,19 @@ from basicswap.util.rfc2440 import rfc2440_hash_password
 from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
 from bin.basicswap_run import startDaemon, startXmrWalletDaemon
 
-PARTICL_VERSION = os.getenv('PARTICL_VERSION', '0.21.2.11')
+PARTICL_VERSION = os.getenv('PARTICL_VERSION', '23.0.3.0')
 PARTICL_VERSION_TAG = os.getenv('PARTICL_VERSION_TAG', '')
-PARTICL_LINUX_EXTRA = os.getenv('PARTICL_LINUX_EXTRA', '_nousb')
+PARTICL_LINUX_EXTRA = os.getenv('PARTICL_LINUX_EXTRA', 'nousb')
 
 LITECOIN_VERSION = os.getenv('LITECOIN_VERSION', '0.21.2')
 LITECOIN_VERSION_TAG = os.getenv('LITECOIN_VERSION_TAG', '')
 
-BITCOIN_VERSION = os.getenv('BITCOIN_VERSION', '22.0')
+BITCOIN_VERSION = os.getenv('BITCOIN_VERSION', '23.0')
 BITCOIN_VERSION_TAG = os.getenv('BITCOIN_VERSION_TAG', '')
 
-MONERO_VERSION = os.getenv('MONERO_VERSION', '0.18.0.0')
+MONERO_VERSION = os.getenv('MONERO_VERSION', '0.18.1.2')
 MONERO_VERSION_TAG = os.getenv('MONERO_VERSION_TAG', '')
-XMR_SITE_COMMIT = 'f093c0da2219d94e6bef5f3948ac61b4ecdcb95b'  # Lock hashes.txt to monero version
+XMR_SITE_COMMIT = '4624278f68135d2e3eeea58fe53d07340e58c480'  # Lock hashes.txt to monero version
 
 PIVX_VERSION = os.getenv('PIVX_VERSION', '5.4.99')
 PIVX_VERSION_TAG = os.getenv('PIVX_VERSION_TAG', '_scantxoutset')
@@ -417,11 +417,28 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
             downloadFile(assert_url, assert_path)
     else:
         major_version = int(version.split('.')[0])
-        release_filename = '{}-{}-{}{}.{}'.format(coin, version + version_tag, BIN_ARCH, filename_extra, FILE_EXT)
+        arch_name = BIN_ARCH
+        if major_version >= 23:
+            if os_name == 'osx':
+                arch_name = 'x86_64-apple-darwin'
+                if coin == 'particl':
+                    arch_name += '18'
+
+        release_filename = '{}-{}-{}.{}'.format(coin, version + version_tag, arch_name, FILE_EXT)
+        if filename_extra != '':
+            if major_version >= 23:
+                release_filename = '{}-{}_{}-{}.{}'.format(coin, version + version_tag, filename_extra, arch_name, FILE_EXT)
+            else:
+                release_filename = '{}-{}-{}_{}.{}'.format(coin, version + version_tag, arch_name, filename_extra, FILE_EXT)
+
+        release_filename = '{}-{}-{}.{}'.format(coin, version + version_tag, arch_name, FILE_EXT)
         if coin == 'particl':
             release_url = 'https://github.com/particl/particl-core/releases/download/v{}/{}'.format(version + version_tag, release_filename)
             assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, version)
-            assert_url = 'https://raw.githubusercontent.com/particl/gitian.sigs/master/%s-%s/%s/%s' % (version + version_tag, os_dir_name, signing_key_name, assert_filename)
+            if major_version >= 22:
+                assert_url = f'https://raw.githubusercontent.com/particl/guix.sigs/master/{version}/{signing_key_name}/all.SHA256SUMS'
+            else:
+                assert_url = 'https://raw.githubusercontent.com/particl/gitian.sigs/master/%s-%s/%s/%s' % (version + version_tag, os_dir_name, signing_key_name, assert_filename)
         elif coin == 'litecoin':
             release_url = 'https://download.litecoin.org/litecoin-{}/{}/{}'.format(version, os_name, release_filename)
             assert_filename = '{}-core-{}-{}-build.assert'.format(coin, os_name, version.rsplit('.', 1)[0])
@@ -438,12 +455,12 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
             assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, version.rsplit('.', 1)[0])
             assert_url = 'https://raw.githubusercontent.com/namecoin/gitian.sigs/master/%s-%s/%s/%s' % (version, os_dir_name, signing_key_name, assert_filename)
         elif coin == 'pivx':
-            release_filename = '{}-{}-{}{}.{}'.format(coin, version, BIN_ARCH, filename_extra, FILE_EXT)
+            release_filename = '{}-{}-{}.{}'.format(coin, version, BIN_ARCH, FILE_EXT)
             release_url = 'https://github.com/tecnovert/particl-core/releases/download/v{}/{}'.format(version + version_tag, release_filename)
             assert_filename = 'pivx-{}-6.0-build.assert'.format(os_name)
             assert_url = 'https://raw.githubusercontent.com/tecnovert/gitian.sigs/pivx/5.4.99_scantxoutset-{}/tecnovert/{}'.format(os_dir_name, assert_filename)
         elif coin == 'dash':
-            release_filename = '{}-{}-{}{}.{}'.format('dashcore', version + version_tag, BIN_ARCH, filename_extra, FILE_EXT)
+            release_filename = '{}-{}-{}.{}'.format('dashcore', version + version_tag, BIN_ARCH, FILE_EXT)
             release_url = 'https://github.com/dashpay/dash/releases/download/v{}/{}'.format(version + version_tag, release_filename)
             assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, major_version)
             assert_url = 'https://raw.githubusercontent.com/dashpay/gitian.sigs/master/%s-%s/%s/%s' % (version + version_tag, os_dir_name, signing_key_name, assert_filename)
