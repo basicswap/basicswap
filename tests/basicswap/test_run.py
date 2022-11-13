@@ -425,7 +425,7 @@ class Test(BaseTest):
             'address': ltc_addr,
             'subfee': False,
         }
-        json_rv = read_json_api('json/wallets/ltc/withdraw', TEST_HTTP_PORT + 0, post_json)
+        json_rv = read_json_api(TEST_HTTP_PORT + 0, 'wallets/ltc/withdraw', post_json)
         assert (len(json_rv['txid']) == 64)
 
     def test_13_itx_refund(self):

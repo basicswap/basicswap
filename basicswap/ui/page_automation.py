@@ -83,12 +83,12 @@ def page_automation_strategy(self, url_split, post_string):
         raise ValueError('Bad strategy ID')
 
     server = self.server
-    swap_client = self.server.swap_client
+    swap_client = server.swap_client
     swap_client.checkSystemStatus()
     summary = swap_client.getSummary()
 
     messages = []
-
+    err_messages = []
     strategy = swap_client.getAutomationStrategy(strategy_id)
 
     formatted_strategy = {
@@ -103,6 +103,7 @@ def page_automation_strategy(self, url_split, post_string):
     template = server.env.get_template('automation_strategy.html')
     return self.render_template(template, {
         'messages': messages,
+        'err_messages': err_messages,
         'strategy': formatted_strategy,
         'summary': summary,
     })

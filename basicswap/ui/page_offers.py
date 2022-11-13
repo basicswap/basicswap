@@ -629,12 +629,18 @@ def page_offers(self, url_split, post_string, sent=False):
 
     coins_from, coins_to = listAvailableCoins(swap_client, split_from=True)
 
+    chart_api_key = swap_client.settings.get('chart_api_key', '')
+    if chart_api_key == '':
+        chart_api_key_enc = swap_client.settings.get('chart_api_key_enc', '')
+        chart_api_key = 'cd7600e7b5fdd99c6f900673ff0ee8f64d6d4219a4bb87191ad4a2e3fc65d7f4' if chart_api_key_enc == '' else bytes.fromhex(chart_api_key_enc).decode('utf-8')
+
     template = server.env.get_template('offers.html')
     return self.render_template(template, {
         'page_type': 'Your Offers' if sent else 'Network Order Book',
         'page_type_description': '' if sent else '',
         'messages': messages,
-        'chart': 'hidden' if sent else '',
+        'show_chart': False if sent else swap_client.settings.get('show_chart', True),
+        'chart_api_key': chart_api_key,
         'coins_from': coins_from,
         'coins': coins_to,
         'messages': messages,

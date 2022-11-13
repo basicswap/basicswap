@@ -42,9 +42,9 @@
           <div class="w-full pt-2">
             <div class="mb-10 border-b border-gray-200">
               <ul class="flex flex-wrap -mb-px text-sm font-medium text-center" id="myTab" data-tabs-toggle="#settingstab" role="tablist">
-                <li class="mr-2" role="presentation"> <a class="cursor-pointer inline-block p-4 rounded-t-lg border-b-2" id="profile-tab" data-tabs-target="#coins" role="tab" aria-controls="coins" aria-selected="false">Coins</a> </li>
-                <li class="mr-2" role="presentation"> <a class="cursor-pointer inline-block p-4 rounded-t-lg border-b-2 border-transparent hover:text-gray-600 hover:border-gray-300" id="general-tab" data-tabs-target="#general" role="tab" aria-controls="general" aria-selected="false">General</a> </li>
-                <li class="mr-2" role="presentation"> <a class="cursor-pointer inline-block p-4 rounded-t-lg border-b-2 border-transparent hover:text-gray-600 hover:border-gray-300" id="tor-tab" data-tabs-target="#tor" role="tab" aria-controls="tor" aria-selected="false">Tor</a> </li>
+                <li class="mr-2" role="presentation"> <a class="cursor-pointer inline-block p-4 rounded-t-lg border-b-2" id="profile-tab" data-tabs-target="#coins" role="tab" aria-controls="coins" aria-selected={% if active_tab == 'default' %}"true"{% else %}"false"{% endif %}>Coins</a> </li>
+                <li class="mr-2" role="presentation"> <a class="cursor-pointer inline-block p-4 rounded-t-lg border-b-2 border-transparent hover:text-gray-600 hover:border-gray-300" id="general-tab" data-tabs-target="#general" role="tab" aria-controls="general" aria-selected={% if active_tab == 'general' %}"true"{% else %}"false"{% endif %}>General</a> </li>
+                <li class="mr-2" role="presentation"> <a class="cursor-pointer inline-block p-4 rounded-t-lg border-b-2 border-transparent hover:text-gray-600 hover:border-gray-300" id="tor-tab" data-tabs-target="#tor" role="tab" aria-controls="tor" aria-selected={% if active_tab == 'tor' %}"true"{% else %}"false"{% endif %}>Tor</a> </li>
               </ul>
             </div>
             <div id="settingstab">
@@ -69,12 +69,12 @@
                             <th scope="col" class="py-3 px-6">Settings</th>
                             <th scope="col">Value</th>
                           </tr>
-                        </thead> 
+                        </thead>
                         {% if c.connection_type %}
                         <tr>
                           <td class="py-4 px-6 bold w-96 bold">Connection Type</td>
                           <td class="py-4">{{ c.connection_type }}</td>
-                        </tr> {% endif %} 
+                        </tr> {% endif %}
                         {% if c.manage_daemon is defined %} {% if c.name == 'monero' %}
                         <tr class="bg-white border-t hover:bg-gray-50">
                           <td class="py-4 px-6 bold">Manage Daemon</td>
@@ -207,9 +207,6 @@
                         </div>
 
 
-
-
-
                       {% endif %}
                     </div>
                     </div>
@@ -229,10 +226,10 @@
                                 <h4 class="font-semibold text-black text-2xl align-middle">
              <span class="mr-2 inline-block align-middle items-center justify-center w-8 h-7 bg-white-50 rounded">
               <svg class="text-gray-500 w-7 h-7" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3b82f6" stroke-linejoin="round" class="nc-icon-wrapper"><circle cx="12" cy="12" r="3" stroke="#3b82f6"></circle> <path d="M20,12a8.049,8.049,0,0,0-.188-1.713l2.714-2.055-2-3.464L17.383,6.094a7.987,7.987,0,0,0-2.961-1.719L14,1H10L9.578,4.375A7.987,7.987,0,0,0,6.617,6.094L3.474,4.768l-2,3.464,2.714,2.055a7.9,7.9,0,0,0,0,3.426L1.474,15.768l2,3.464,3.143-1.326a7.987,7.987,0,0,0,2.961,1.719L10,23h4l.422-3.375a7.987,7.987,0,0,0,2.961-1.719l3.143,1.326,2-3.464-2.714-2.055A8.049,8.049,0,0,0,20,12Z"></path></g></svg>
-             </span>General (todo)
+             </span>General
             </h4> </div>
                             </div>
-                          </section> 
+                          </section>
                           <div class="container px-0 mx-auto mt-5">
                             <div class="overflow-x-auto relative border sm:rounded-lg">
                               <table class="w-full text-sm text-left text-gray-500 outline-none border-gray-300">
@@ -250,9 +247,9 @@
                                         <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                                           <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"></path>
                                         </svg>
-                                        <select class="appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
-                                          <option value="true">True</option>
-                                          <option value="false">False</option>
+                                        <select name="debugmode" class="appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
+                                          <option {% if general_settings.debug %}selected{% endif %} value="true">True</option>
+                                          <option {% if not general_settings.debug %}selected{% endif %} value="false">False</option>
                                         </select>
                                       </div>
                                     </div>
@@ -266,9 +263,9 @@
                                         <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                                           <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"></path>
                                         </svg>
-                                        <select class="appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
-                                          <option value="true">True</option>
-                                          <option value="false">False</option>
+                                        <select name="debugui" class="appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
+                                          <option {% if general_settings.debug_ui %}selected{% endif %} value="true">True</option>
+                                          <option {% if not general_settings.debug_ui %}selected{% endif %} value="false">False</option>
                                         </select>
                                       </div>
                                     </div>
@@ -281,7 +278,7 @@
                             <div class="w-full md:w-0/12">
                               <div class="flex flex-wrap justify-end -m-1.5">
                               <div class="w-full md:w-auto p-1.5 ml-2">
-                          <button name="" value="Apply" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none"><svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round" ><polyline points=" 6,12 10,16 18,8 " stroke="#ffffff"></polyline> <circle cx="12" cy="12" r="11"></circle></g></svg>  Apply</button>
+                          <button name="apply_general" value="Apply" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none"><svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round" ><polyline points=" 6,12 10,16 18,8 " stroke="#ffffff"></polyline> <circle cx="12" cy="12" r="11"></circle></g></svg>  Apply</button>
                         </div>
                               </div>
                             </div>
@@ -292,7 +289,7 @@
                                 <h4 class="font-semibold text-black text-2xl align-middle">
              <span class="mr-2 inline-block align-middle items-center justify-center w-9 h-8 bg-white-50 rounded">
               <svg class="text-gray-500 w-7 h-7" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3b82f6" stroke-linejoin="round" class="nc-icon-wrapper"><rect x="10" y="14" width="4" height="9"></rect> <rect x="1" y="18" width="4" height="5"></rect> <rect x="19" y="10" width="4" height="13"></rect> <polyline data-cap="butt" points="3,10 8,5 12,9 20,1 " stroke="#3b82f6"></polyline> <polyline points=" 15,1 20,1 20,6 " stroke="#3b82f6"></polyline></g></svg>
-             </span>Chart (todo)
+             </span>Chart
             </h4> </div>
                             </div>
                           </section>
@@ -313,18 +310,18 @@
                                         <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                                           <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"></path>
                                         </svg>
-                                        <select class="appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
-                                          <option value="true">True</option>
-                                          <option value="false">False</option>
+                                        <select name="showchart" class="appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
+                                          <option {% if chart_settings.show_chart %}selected{% endif %} value="true">True</option>
+                                          <option {% if not chart_settings.show_chart %}selected{% endif %} value="false">False</option>
                                         </select>
                                       </div>
                                     </div>
                                   </td>
                                 </tr>
                                 <tr class="bg-white border-t hover:bg-gray-50">
-                                  <td class="py-4 px-6 bold">Chart API Key (URL)</td>
+                                  <td class="py-4 px-6 bold">Chart API Key</td>
                                   <td class="py-4 pr-5">
-                                    <input type="text" class="w-52 appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block p-2.5" name="" min="3" max="32" value=""> </td>
+                                    <input name="chartapikey" type="text" class="w-52 appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block p-2.5" name="" min="3" max="32" value="{{chart_settings.chart_api_key}}"> </td>
                                 </tr>
                               </table>
                             </div>
@@ -333,7 +330,7 @@
                             <div class="w-full md:w-0/12">
                               <div class="flex flex-wrap justify-end -m-1.5">
                               <div class="w-full md:w-auto p-1.5 ml-2">
-                          <button name="" value="Apply" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none"><svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round" ><polyline points=" 6,12 10,16 18,8 " stroke="#ffffff"></polyline> <circle cx="12" cy="12" r="11"></circle></g></svg>  Apply</button>
+                          <button name="apply_chart" value="Apply" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none"><svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round" ><polyline points=" 6,12 10,16 18,8 " stroke="#ffffff"></polyline> <circle cx="12" cy="12" r="11"></circle></g></svg>  Apply</button>
                         </div>
                               </div>
                             </div>
@@ -361,7 +358,7 @@
                             <path d="M14,2.256V1H10V2.256A3.949,3.949,0,0,1,7.658,5.891,8.979,8.979,0,0,0,2,14c0,4.971,4.477,9,10,9s10-4.029,10-9a8.978,8.978,0,0,0-5.658-8.109A3.95,3.95,0,0,1,14,2.256Z"></path>
                           </g>
                         </svg>
-             </span>Tor (todo)
+             </span>Tor
             </h4> </div>
                             </div>
                           </section>
@@ -374,22 +371,6 @@
                                     <th scope="col">Value</th>
                                   </tr>
                                 </thead>
-                                <tr>
-                                  <td class="py-4 px-6 bold w-96 bold">Use Tor</td>
-                                  <td class="py-4 pr-5">
-                                    <div class="w-1/5 md:flex-1">
-                                      <div class="relative">
-                                        <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                          <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"></path>
-                                        </svg>
-                                        <select class="appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
-                                          <option value="true">True</option>
-                                          <option value="false">False</option>
-                                        </select>
-                                      </div>
-                                    </div>
-                                  </td>
-                                </tr>
                                 <tr class="bg-white border-t hover:bg-gray-50">
                                   <td class="py-4 px-6 bold w-96">Use Tor Proxy</td>
                                   <td class="py-4 pr-5">
@@ -398,9 +379,9 @@
                                         <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                                           <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"></path>
                                         </svg>
-                                        <select class="appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
-                                          <option value="true">True</option>
-                                          <option value="false">False</option>
+                                        <select name="usetorproxy" class="appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
+                                          <option {% if tor_settings.use_tor %}selected{% endif %} value="true">True</option>
+                                          <option {% if not tor_settings.use_tor %}selected{% endif %} value="false">False</option>
                                         </select>
                                       </div>
                                     </div>
@@ -409,17 +390,22 @@
                                 <tr class="bg-white border-t hover:bg-gray-50">
                                   <td class="py-4 px-6 bold w-96">Tor Proxy Host</td>
                                   <td class="py-4 pr-5">
-                                    <input type="text" class="w-1/5 appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block p-2.5" name="" min="3" max="32" value=""> </td>
+                                    <input name="proxyhost" type="text" class="w-1/5 appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block p-2.5" name="" min="3" max="32" value="{{tor_settings.proxy_host}}"> </td>
                                 </tr>
                                 <tr class="bg-white border-t hover:bg-gray-50">
                                   <td class="py-4 px-6 bold w-96">Tor Proxy Port</td>
                                   <td class="py-4 pr-5">
-                                    <input type="text" class="w-1/5 appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block p-2.5" name="" min="3" max="32" value=""> </td>
+                                    <input name="proxyport" type="text" class="w-1/5 appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block p-2.5" name="" min="3" max="32" value="{{tor_settings.proxy_port}}"> </td>
                                 </tr>
                                 <tr class="bg-white border-t hover:bg-gray-50">
                                   <td class="py-4 px-6 bold w-96">Tor Control Port</td>
                                   <td class="py-4 pr-5">
-                                    <input type="text" class="w-1/5 appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block p-2.5" name="" min="3" max="32" value=""> </td>
+                                    <input name="controlport" type="text" class="w-1/5 appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block p-2.5" name="" min="3" max="32" value="{{tor_settings.control_port}}"> </td>
+                                </tr>
+                                <tr class="bg-white border-t hover:bg-gray-50">
+                                  <td class="py-4 px-6 bold w-96">Tor Control Password</td>
+                                  <td class="py-4 pr-5">
+                                    <input name="controlpwd" type="text" class="w-1/5 appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block p-2.5" name="" min="3" max="32" value="{{tor_settings.control_password}}"> </td>
                                 </tr>
                               </table>
                             </div>
@@ -428,7 +414,7 @@
                             <div class="w-full md:w-0/12">
                               <div class="flex flex-wrap justify-end -m-1.5">
                                <div class="w-full md:w-auto p-1.5 ml-2">
-                          <button name="" value="Apply" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none"><svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round" ><polyline points=" 6,12 10,16 18,8 " stroke="#ffffff"></polyline> <circle cx="12" cy="12" r="11"></circle></g></svg>  Apply</button>
+                          <button name="apply_tor" value="Apply" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none"><svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round" ><polyline points=" 6,12 10,16 18,8 " stroke="#ffffff"></polyline> <circle cx="12" cy="12" r="11"></circle></g></svg>  Apply</button>
                         </div>
                               </div>
                             </div>

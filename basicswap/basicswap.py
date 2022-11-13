@@ -8,11 +8,13 @@ import os
 import re
 import sys
 import zmq
+import copy
 import json
 import time
 import base64
 import random
 import shutil
+import string
 import struct
 import urllib.request
 import hashlib
@@ -496,6 +498,20 @@ class BasicSwap(BaseApp):
                 self.log.warning(f'Failed to set XMR remote daemon to {url}, {e}')
 
         raise ValueError('Failed to select a working XMR daemon url.')
+
+    def isCoinActive(self, coin):
+        use_coinid = coin
+        interface_ind = 'interface'
+        if coin == Coins.PART_ANON:
+            use_coinid = Coins.PART
+            interface_ind = 'interface_anon'
+        if coin == Coins.PART_BLIND:
+            use_coinid = Coins.PART
+            interface_ind = 'interface_blind'
+
+        if use_coinid not in self.coin_clients:
+            raise ValueError('Unknown coinid {}'.format(int(coin)))
+        return interface_ind in self.coin_clients[use_coinid]
 
     def ci(self, coin):  # Coin interface
         use_coinid = coin
@@ -5188,12 +5204,72 @@ class BasicSwap(BaseApp):
         finally:
             self.mxDB.release()
 
-    def editSettings(self, coin_name, data):
-        self.log.info('Updating settings %s', coin_name)
+    def editGeneralSettings(self, data):
+        self.log.info('Updating general settings')
+        settings_changed = False
+        suggest_reboot = False
+        settings_copy = copy.deepcopy(self.settings)
         with self.mxDB:
-            settings_cc = self.settings['chainclients'][coin_name]
-            settings_changed = False
-            suggest_reboot = False
+            if 'debug' in data:
+                new_value = data['debug']
+                ensure(type(new_value) == bool, 'New debug value not boolean')
+                if settings_copy.get('debug', False) != new_value:
+                    self.debug = new_value
+                    settings_copy['debug'] = new_value
+                    settings_changed = True
+
+            if 'debug_ui' in data:
+                new_value = data['debug_ui']
+                ensure(type(new_value) == bool, 'New debug_ui value not boolean')
+                if settings_copy.get('debug_ui', False) != new_value:
+                    self.debug_ui = new_value
+                    settings_copy['debug_ui'] = new_value
+                    settings_changed = True
+
+            if 'show_chart' in data:
+                new_value = data['show_chart']
+                ensure(type(new_value) == bool, 'New show_chart value not boolean')
+                if settings_copy.get('show_chart', True) != new_value:
+                    settings_copy['show_chart'] = new_value
+                    settings_changed = True
+
+            if 'chart_api_key' in data:
+                new_value = data['chart_api_key']
+                ensure(type(new_value) == str, 'New chart_api_key value not a string')
+                ensure(len(new_value) <= 128, 'New chart_api_key value too long')
+                if all(c in string.hexdigits for c in new_value):
+                    if settings_copy.get('chart_api_key', '') != new_value:
+                        settings_copy['chart_api_key'] = new_value
+                        if 'chart_api_key_enc' in settings_copy:
+                            settings_copy.pop('chart_api_key_enc')
+                        settings_changed = True
+                else:
+                    # Encode value as hex to avoid escaping
+                    new_value = new_value.encode('utf-8').hex()
+                    if settings_copy.get('chart_api_key_enc', '') != new_value:
+                        settings_copy['chart_api_key_enc'] = new_value
+                        if 'chart_api_key' in settings_copy:
+                            settings_copy.pop('chart_api_key')
+                        settings_changed = True
+
+            if settings_changed:
+
+                settings_path = os.path.join(self.data_dir, cfg.CONFIG_FILENAME)
+                settings_path_new = settings_path + '.new'
+                shutil.copyfile(settings_path, settings_path + '.last')
+                with open(settings_path_new, 'w') as fp:
+                    json.dump(settings_copy, fp, indent=4)
+                shutil.move(settings_path_new, settings_path)
+                self.settings = settings_copy
+        return settings_changed, suggest_reboot
+
+    def editSettings(self, coin_name, data):
+        self.log.info(f'Updating settings {coin_name}')
+        settings_changed = False
+        suggest_reboot = False
+        settings_copy = copy.deepcopy(self.settings)
+        with self.mxDB:
+            settings_cc = settings_copy['chainclients'][coin_name]
             if 'lookups' in data:
                 if settings_cc.get('chain_lookups', 'local') != data['lookups']:
                     settings_changed = True
@@ -5233,7 +5309,8 @@ class BasicSwap(BaseApp):
                     for coin, cc in self.coin_clients.items():
                         if cc['name'] == coin_name:
                             cc['fee_priority'] = new_fee_priority
-                            self.ci(coin).setFeePriority(new_fee_priority)
+                            if self.isCoinActive(coin):
+                                self.ci(coin).setFeePriority(new_fee_priority)
                             break
 
             if 'conf_target' in data:
@@ -5246,7 +5323,8 @@ class BasicSwap(BaseApp):
                     for coin, cc in self.coin_clients.items():
                         if cc['name'] == coin_name:
                             cc['conf_target'] = new_conf_target
-                            self.ci(coin).setConfTarget(new_conf_target)
+                            if self.isCoinActive(coin):
+                                self.ci(coin).setConfTarget(new_conf_target)
                             break
 
             if 'anon_tx_ring_size' in data:
@@ -5259,14 +5337,18 @@ class BasicSwap(BaseApp):
                     for coin, cc in self.coin_clients.items():
                         if cc['name'] == coin_name:
                             cc['anon_tx_ring_size'] = new_anon_tx_ring_size
-                            self.ci(coin).setAnonTxRingSize(new_anon_tx_ring_size)
+                            if self.isCoinActive(coin):
+                                self.ci(coin).setAnonTxRingSize(new_anon_tx_ring_size)
                             break
 
             if settings_changed:
                 settings_path = os.path.join(self.data_dir, cfg.CONFIG_FILENAME)
+                settings_path_new = settings_path + '.new'
                 shutil.copyfile(settings_path, settings_path + '.last')
-                with open(settings_path, 'w') as fp:
-                    json.dump(self.settings, fp, indent=4)
+                with open(settings_path_new, 'w') as fp:
+                    json.dump(settings_copy, fp, indent=4)
+                shutil.move(settings_path_new, settings_path)
+                self.settings = settings_copy
         return settings_changed, suggest_reboot
 
     def enableCoin(self, coin_name):

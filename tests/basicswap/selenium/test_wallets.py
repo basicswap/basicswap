@@ -7,7 +7,7 @@
 
 """
 cd /tmp
-wget -4 https://chromedriver.storage.googleapis.com/105.0.5195.52/chromedriver_linux64.zip
+wget -4 https://chromedriver.storage.googleapis.com/107.0.5304.62/chromedriver_linux64.zip
 7z x chromedriver_linux64.zip
 sudo mv chromedriver /opt/chromedriver96
 

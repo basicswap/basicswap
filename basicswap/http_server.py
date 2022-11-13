@@ -49,7 +49,7 @@ from .ui.page_bids import page_bids, page_bid
 from .ui.page_offers import page_offers, page_offer, page_newoffer
 from .ui.page_tor import page_tor, get_tor_established_state
 from .ui.page_wallet import page_wallets, page_wallet
-
+from .ui.page_settings import page_settings
 
 env = Environment(loader=PackageLoader('basicswap', 'templates'))
 env.filters['formatts'] = format_timestamp
@@ -333,88 +333,6 @@ class HttpHandler(BaseHTTPRequestHandler):
             'summary': summary,
         })
 
-    def page_settings(self, url_split, post_string):
-        swap_client = self.server.swap_client
-        swap_client.checkSystemStatus()
-        summary = swap_client.getSummary()
-
-        messages = []
-        err_messages = []
-        form_data = self.checkForm(post_string, 'settings', err_messages)
-        if form_data:
-            for name, c in swap_client.settings['chainclients'].items():
-                if have_data_entry(form_data, 'apply_' + name):
-                    data = {'lookups': get_data_entry(form_data, 'lookups_' + name)}
-                    if name == 'monero':
-                        data['fee_priority'] = int(get_data_entry(form_data, 'fee_priority_' + name))
-                        data['manage_daemon'] = True if get_data_entry(form_data, 'managedaemon_' + name) == 'true' else False
-                        data['rpchost'] = get_data_entry(form_data, 'rpchost_' + name)
-                        data['rpcport'] = int(get_data_entry(form_data, 'rpcport_' + name))
-                        data['remotedaemonurls'] = get_data_entry(form_data, 'remotedaemonurls_' + name)
-                        data['automatically_select_daemon'] = True if get_data_entry(form_data, 'autosetdaemon_' + name) == 'true' else False
-                    else:
-                        data['conf_target'] = int(get_data_entry(form_data, 'conf_target_' + name))
-                        if name == 'particl':
-                            data['anon_tx_ring_size'] = int(get_data_entry(form_data, 'rct_ring_size_' + name))
-
-                    settings_changed, suggest_reboot = swap_client.editSettings(name, data)
-                    if settings_changed is True:
-                        messages.append('Settings applied.')
-                    if suggest_reboot is True:
-                        messages.append('Please restart BasicSwap.')
-                elif have_data_entry(form_data, 'enable_' + name):
-                    swap_client.enableCoin(name)
-                    display_name = getCoinName(swap_client.getCoinIdFromName(name))
-                    messages.append(display_name + ' enabled, shutting down.')
-                    swap_client.stopRunning()
-                elif have_data_entry(form_data, 'disable_' + name):
-                    swap_client.disableCoin(name)
-                    display_name = getCoinName(swap_client.getCoinIdFromName(name))
-                    messages.append(display_name + ' disabled, shutting down.')
-                    swap_client.stopRunning()
-        chains_formatted = []
-
-        sorted_names = sorted(swap_client.settings['chainclients'].keys())
-        for name in sorted_names:
-            c = swap_client.settings['chainclients'][name]
-            try:
-                display_name = getCoinName(swap_client.getCoinIdFromName(name))
-            except Exception:
-                display_name = name
-            chains_formatted.append({
-                'name': name,
-                'display_name': display_name,
-                'lookups': c.get('chain_lookups', 'local'),
-                'manage_daemon': c.get('manage_daemon', 'Unknown'),
-                'connection_type': c.get('connection_type', 'Unknown'),
-            })
-            if name == 'monero':
-                chains_formatted[-1]['fee_priority'] = c.get('fee_priority', 0)
-                chains_formatted[-1]['manage_wallet_daemon'] = c.get('manage_wallet_daemon', 'Unknown')
-                chains_formatted[-1]['rpchost'] = c.get('rpchost', 'localhost')
-                chains_formatted[-1]['rpcport'] = int(c.get('rpcport', 18081))
-                chains_formatted[-1]['remotedaemonurls'] = '\n'.join(c.get('remote_daemon_urls', []))
-                chains_formatted[-1]['autosetdaemon'] = c.get('automatically_select_daemon', False)
-            else:
-                chains_formatted[-1]['conf_target'] = c.get('conf_target', 2)
-
-            if name == 'particl':
-                chains_formatted[-1]['anon_tx_ring_size'] = c.get('anon_tx_ring_size', 12)
-            else:
-                if c.get('connection_type', 'Unknown') == 'none':
-                    if 'connection_type_prev' in c:
-                        chains_formatted[-1]['can_reenable'] = True
-                else:
-                    chains_formatted[-1]['can_disable'] = True
-
-        template = env.get_template('settings.html')
-        return self.render_template(template, {
-            'messages': messages,
-            'err_messages': err_messages,
-            'chains': chains_formatted,
-            'summary': summary,
-        })
-
     def page_watched(self, url_split, post_string):
         swap_client = self.server.swap_client
         swap_client.checkSystemStatus()
@@ -663,7 +581,7 @@ class HttpHandler(BaseHTTPRequestHandler):
                 if page == 'wallet':
                     return page_wallet(self, url_split, post_string)
                 if page == 'settings':
-                    return self.page_settings(url_split, post_string)
+                    return page_settings(self, url_split, post_string)
                 if page == 'error':
                     return self.page_error(url_split, post_string)
                 if page == 'info':

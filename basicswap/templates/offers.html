@@ -43,14 +43,16 @@
       <div class="pb-6 border-coolGray-100">
         <div class="flex flex-wrap items-center justify-between -m-2">
           <div class="w-full pt-2">
+
             <!-- Chart-->
-            <div class="mb-10 mt-8 {{ chart }}">
+            {% if show_chart %}
+            <div class="mb-10 mt-8">
               <div id="price-chart"></div>
               <script src="/static/js/chart.js"></script>
               <script>
                 CryptoCharts.roiComparison({
                   chart_id: "price-chart",
-                  cryptocompare_api_key: "cd7600e7b5fdd99c6f900673ff0ee8f64d6d4219a4bb87191ad4a2e3fc65d7f4", // Todo @ in settings/general user can set api_key
+                  cryptocompare_api_key: "{{chart_api_key}}",
                   cryptocompare_tickers: ["BTC", "PART", "DASH", "PIVX", "XMR", "LTC", "FIRO"],
                   last_days: 30,
                   axes: true,
@@ -210,6 +212,7 @@
               </script>
             </div>
             <!-- Chart -->
+            {% endif %}
             <form method="post">
               <div class="flex justify-between items-center pb-4 bg-white">
                 <div class="bg-white bg-opacity-60 rounded-b-md">

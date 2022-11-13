@@ -380,6 +380,8 @@ def describeEventEntry(event_type, event_msg):
 def getVoutByAddress(txjs, p2sh):
     for o in txjs['vout']:
         try:
+            if 'address' in o['scriptPubKey'] and o['scriptPubKey']['address'] == p2sh:
+                return o['n']
             if p2sh in o['scriptPubKey']['addresses']:
                 return o['n']
         except Exception:
