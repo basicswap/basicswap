@@ -419,6 +419,18 @@ class BasicSwapTest(BaseTest):
         node1_xmr_after = self.getXmrBalance(js_w1_after)
         assert (node1_xmr_before - node1_xmr_after < 0.02)
 
+    def test_05_self_bid(self):
+        logging.info('---------- Test {} to XMR same client'.format(self.test_coin_from.name))
+        swap_clients = self.swap_clients
+
+        amt_swap = make_int(random.uniform(0.1, 2.0), scale=8, r=1)
+        rate_swap = make_int(random.uniform(0.2, 20.0), scale=12, r=1)
+
+        offer_id = swap_clients[1].postOffer(self.test_coin_from, Coins.XMR, amt_swap, rate_swap, amt_swap, SwapTypes.XMR_SWAP, auto_accept_bids=True)
+        bid_id = swap_clients[1].postXmrBid(offer_id, amt_swap)
+
+        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, wait_for=180)
+
 
 class TestBTC(BasicSwapTest):
     __test__ = True

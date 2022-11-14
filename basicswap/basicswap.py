@@ -374,6 +374,7 @@ class BasicSwap(BaseApp):
 
         self.zmqContext.destroy()
 
+        self.swaps_in_progress.clear()
         close_all_sessions()
         self.engine.dispose()
 
@@ -1076,6 +1077,7 @@ class BasicSwap(BaseApp):
                 self.closeSession(use_session)
 
     def buildNotificationsCache(self, session):
+        self._notifications_cache.clear()
         q = session.execute(f'SELECT created_at, event_type, event_data FROM notifications WHERE active_ind=1 ORDER BY created_at ASC LIMIT {self._show_notifications}')
         for entry in q:
             self._notifications_cache[entry[0]] = (entry[1], json.loads(entry[2].decode('UTF-8')))
@@ -3040,11 +3042,12 @@ class BasicSwap(BaseApp):
                         if 'Transaction already in block chain' in str(ex):
                             self.log.info('Found coin a lock refund tx for bid {}'.format(bid_id.hex()))
                             txid = ci_from.getTxid(xmr_swap.a_lock_refund_tx)
-                            bid.txns[TxTypes.XMR_SWAP_A_LOCK_REFUND] = SwapTx(
-                                bid_id=bid_id,
-                                tx_type=TxTypes.XMR_SWAP_A_LOCK_REFUND,
-                                txid=txid,
-                            )
+                            if TxTypes.XMR_SWAP_A_LOCK_REFUND not in bid.txns:
+                                bid.txns[TxTypes.XMR_SWAP_A_LOCK_REFUND] = SwapTx(
+                                    bid_id=bid_id,
+                                    tx_type=TxTypes.XMR_SWAP_A_LOCK_REFUND,
+                                    txid=txid,
+                                )
                             self.saveBidInSession(bid_id, bid, session, xmr_swap)
                             session.commit()
                             return rv
@@ -4341,7 +4344,7 @@ class BasicSwap(BaseApp):
                 self.log.warning('XMR swap restore height clamped to {}'.format(wallet_restore_height))
         else:
             ensure(bid.state == BidStates.BID_SENT, 'Wrong bid state: {}'.format(str(BidStates(bid.state))))
-            bid.created_at = msg['sent']
+            # Don't update bid.created_at, it's been used to derive kaf
             bid.expire_at = msg['sent'] + bid_data.time_valid
             bid.was_received = True
 
@@ -4477,6 +4480,7 @@ class BasicSwap(BaseApp):
 
             prevout_amount = ci_from.getLockRefundTxSwapOutputValue(bid, xmr_swap)
             xmr_swap.af_lock_refund_spend_tx_esig = ci_from.signTxOtVES(kaf, xmr_swap.pkasl, xmr_swap.a_lock_refund_spend_tx, 0, xmr_swap.a_lock_refund_tx_script, prevout_amount)
+
             prevout_amount = ci_from.getLockTxSwapOutputValue(bid, xmr_swap)
             xmr_swap.af_lock_refund_tx_sig = ci_from.signTx(kaf, xmr_swap.a_lock_refund_tx, 0, xmr_swap.a_lock_tx_script, prevout_amount)
 
@@ -4499,12 +4503,13 @@ class BasicSwap(BaseApp):
             a_lock_tx_id = ci_from.getTxid(xmr_swap.a_lock_tx)
             a_lock_tx_vout = ci_from.getTxOutputPos(xmr_swap.a_lock_tx, xmr_swap.a_lock_tx_script)
             self.log.debug('Waiting for lock txn %s to %s chain for bid %s', a_lock_tx_id.hex(), ci_from.coin_name(), bid_id.hex())
-            bid.xmr_a_lock_tx = SwapTx(
-                bid_id=bid_id,
-                tx_type=TxTypes.XMR_SWAP_A_LOCK,
-                txid=a_lock_tx_id,
-                vout=a_lock_tx_vout,
-            )
+            if bid.xmr_a_lock_tx is None:
+                bid.xmr_a_lock_tx = SwapTx(
+                    bid_id=bid_id,
+                    tx_type=TxTypes.XMR_SWAP_A_LOCK,
+                    txid=a_lock_tx_id,
+                    vout=a_lock_tx_vout,
+                )
             bid.xmr_a_lock_tx.setState(TxStates.TX_NONE)
 
             bid.setState(BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_TX_SIGS)
@@ -4557,12 +4562,13 @@ class BasicSwap(BaseApp):
 
         self.log.debug('Submitted lock txn %s to %s chain for bid %s', txid_hex, ci_from.coin_name(), bid_id.hex())
 
-        bid.xmr_a_lock_tx = SwapTx(
-            bid_id=bid_id,
-            tx_type=TxTypes.XMR_SWAP_A_LOCK,
-            txid=bytes.fromhex(txid_hex),
-            vout=vout_pos,
-        )
+        if bid.xmr_a_lock_tx is None:
+            bid.xmr_a_lock_tx = SwapTx(
+                bid_id=bid_id,
+                tx_type=TxTypes.XMR_SWAP_A_LOCK,
+                txid=bytes.fromhex(txid_hex),
+                vout=vout_pos,
+            )
         bid.xmr_a_lock_tx.setState(TxStates.TX_SENT)
 
         bid.setState(BidStates.XMR_SWAP_HAVE_SCRIPT_COIN_SPEND_TX)
@@ -4582,10 +4588,8 @@ class BasicSwap(BaseApp):
         offer, xmr_offer = self.getXmrOfferFromSession(session, bid.offer_id, sent=False)
         ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
         ensure(xmr_offer, 'XMR offer not found: {}.'.format(bid.offer_id.hex()))
-        coin_from = Coins(offer.coin_from)
-        coin_to = Coins(offer.coin_to)
-        ci_from = self.ci(coin_from)
-        ci_to = self.ci(coin_to)
+        ci_from = self.ci(Coins(offer.coin_from))
+        ci_to = self.ci(Coins(offer.coin_to))
 
         if bid.debug_ind == DebugTypes.BID_STOP_AFTER_COIN_A_LOCK:
             self.log.debug('XMR bid %s: Stalling bid for testing: %d.', bid_id.hex(), bid.debug_ind)
@@ -4949,8 +4953,11 @@ class BasicSwap(BaseApp):
 
             ci_from.verifyCompactSig(xmr_swap.pkal, 'proof key owned for swap', xmr_swap.kal_sig)
 
-            bid.setState(BidStates.XMR_SWAP_HAVE_SCRIPT_COIN_SPEND_TX)
-            bid.setState(BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX)
+            if bid.state == BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_TX_SIGS:
+                bid.setState(BidStates.XMR_SWAP_HAVE_SCRIPT_COIN_SPEND_TX)
+                bid.setState(BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX)
+            else:
+                self.log.warning('processXmrBidLockSpendTx bid {} unexpected state {}'.format(bid_id.hex(), bid.state))
             self.saveBid(bid_id, bid, xmr_swap=xmr_swap)
         except Exception as ex:
             if self.debug:
