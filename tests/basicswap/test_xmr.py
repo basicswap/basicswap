@@ -367,7 +367,11 @@ class BaseTest(unittest.TestCase):
                 if not cls.restore_instance:
                     data_dir = prepareDataDir(TEST_DIR, i, 'particl.conf', 'part_')
                     if os.path.exists(os.path.join(cfg.PARTICL_BINDIR, 'particl-wallet')):
-                        callrpc_cli(cfg.PARTICL_BINDIR, data_dir, 'regtest', '-wallet=wallet.dat -legacy create', 'particl-wallet')
+                        try:
+                            callrpc_cli(cfg.PARTICL_BINDIR, data_dir, 'regtest', '-wallet=wallet.dat -legacy create', 'particl-wallet')
+                        except Exception as e:
+                            logging.warning('particl-wallet create failed, retrying without -legacy')
+                            callrpc_cli(cfg.PARTICL_BINDIR, data_dir, 'regtest', '-wallet=wallet.dat create', 'particl-wallet')
 
                 cls.part_daemons.append(startDaemon(os.path.join(TEST_DIR, 'part_' + str(i)), cfg.PARTICL_BINDIR, cfg.PARTICLD))
                 logging.info('Started %s %d', cfg.PARTICLD, cls.part_daemons[-1].pid)
@@ -392,7 +396,11 @@ class BaseTest(unittest.TestCase):
                 if not cls.restore_instance:
                     data_dir = prepareDataDir(TEST_DIR, i, 'bitcoin.conf', 'btc_', base_p2p_port=BTC_BASE_PORT, base_rpc_port=BTC_BASE_RPC_PORT)
                     if os.path.exists(os.path.join(cfg.BITCOIN_BINDIR, 'bitcoin-wallet')):
-                        callrpc_cli(cfg.BITCOIN_BINDIR, data_dir, 'regtest', '-wallet=wallet.dat -legacy create', 'bitcoin-wallet')
+                        try:
+                            callrpc_cli(cfg.BITCOIN_BINDIR, data_dir, 'regtest', '-wallet=wallet.dat -legacy create', 'bitcoin-wallet')
+                        except Exception as e:
+                            logging.warning('bitcoin-wallet create failed, retrying without -legacy')
+                            callrpc_cli(cfg.BITCOIN_BINDIR, data_dir, 'regtest', '-wallet=wallet.dat create', 'bitcoin-wallet')
 
                 cls.btc_daemons.append(startDaemon(os.path.join(TEST_DIR, 'btc_' + str(i)), cfg.BITCOIN_BINDIR, cfg.BITCOIND))
                 logging.info('Started %s %d', cfg.BITCOIND, cls.part_daemons[-1].pid)
@@ -501,7 +509,11 @@ class BaseTest(unittest.TestCase):
                 logging.info('Mining %d Bitcoin blocks to %s', num_blocks, cls.btc_addr)
                 callnoderpc(0, 'generatetoaddress', [num_blocks, cls.btc_addr], base_rpc_port=BTC_BASE_RPC_PORT)
 
-                checkForks(callnoderpc(0, 'getdeploymentinfo', base_rpc_port=BTC_BASE_RPC_PORT))
+                major_version = int(str(callnoderpc(0, 'getnetworkinfo', base_rpc_port=BTC_BASE_RPC_PORT)['version'])[:2])
+                if major_version >= 23:
+                    checkForks(callnoderpc(0, 'getdeploymentinfo', base_rpc_port=BTC_BASE_RPC_PORT))
+                else:
+                    checkForks(callnoderpc(0, 'getblockchaininfo', base_rpc_port=BTC_BASE_RPC_PORT))
 
                 if cls.start_ltc_nodes:
                     num_blocks = 400
@@ -618,6 +630,20 @@ class BaseTest(unittest.TestCase):
             ltcCli('generatetoaddress 1 {}'.format(cls.ltc_addr))
         if cls.xmr_addr is not None:
             callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'generateblocks', {'wallet_address': cls.xmr_addr, 'amount_of_blocks': 1})
+
+    @classmethod
+    def waitForParticlHeight(cls, num_blocks, node_id=0):
+        logging.info(f'Waiting for Particl chain height {num_blocks}', )
+        for i in range(60):
+            if test_delay_event.is_set():
+                raise ValueError('Test stopped.')
+            particl_blocks = callnoderpc(0, 'getblockcount')
+            print('particl_blocks', particl_blocks)
+            if particl_blocks >= num_blocks:
+                break
+            test_delay_event.wait(1)
+        logging.info('PART blocks: %d', callnoderpc(0, 'getblockcount'))
+        assert particl_blocks >= num_blocks
 
     def callxmrnodewallet(self, node_id, method, params=None):
         return callrpc_xmr(XMR_BASE_WALLET_RPC_PORT + node_id, self.xmr_wallet_auth[node_id], method, params)

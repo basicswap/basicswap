@@ -78,6 +78,9 @@ class Test(BaseTest):
         cls.states_bidder = extract_states_from_xu_file(os.path.join(diagrams_dir, 'bidder.alt.xu'), 'B')
         cls.states_offerer = extract_states_from_xu_file(os.path.join(diagrams_dir, 'offerer.alt.xu'), 'O')
 
+        # Wait for height, or sequencelock is thrown off by genesis blocktime
+        cls.waitForParticlHeight(3)
+
     @classmethod
     def tearDownClass(cls):
         logging.info('Finalising test')

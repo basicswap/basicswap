@@ -124,6 +124,7 @@ def run_prepare(node_id, datadir_path, bins_path, with_coins, mnemonic_in=None, 
         fp.write('listenonion=0\n')
         fp.write('upnp=0\n')
         fp.write('minstakeinterval=5\n')
+        fp.write('stakethreadconddelayms=2000\n')
         fp.write('smsgsregtestadjust=0\n')
         if use_rpcauth:
             salt = generate_salt(16)

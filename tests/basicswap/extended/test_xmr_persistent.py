@@ -181,8 +181,7 @@ class Test(unittest.TestCase):
             if particl_blocks >= num_blocks:
                 break
             self.delay_event.wait(1)
-
-        logging.info('PART blocks: %d', callpartrpc(0, 'getblockchaininfo')['blocks'])
+        logging.info('PART blocks: %d', callpartrpc(0, 'getblockcount'))
         assert particl_blocks >= num_blocks
 
     @classmethod
