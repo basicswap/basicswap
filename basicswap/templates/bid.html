@@ -78,28 +78,45 @@
                   {% if data.was_sent == 'True' %}
                   <tr class="bg-white border-t hover:bg-gray-50">
                     <td class="py-4 px-6 bold">Swap</td>
-                    <td><span class="bold">{{ data.amt_to }} {{ data.ticker_to }}</span> for <span class="bold">{{ data.amt_from }} {{ data.ticker_from }}</span></td>
-                  </tr> {% else %}
+                    <td><span class="bold">(To) {{ data.amt_to }} {{ data.ticker_to }}</span> for <span class="bold">(From) {{ data.amt_from }} {{ data.ticker_from }}</span></td>
+                  </tr>
+                  {% else %}
                   <tr class="bg-white border-t hover:bg-gray-50">
                     <td class="py-4 px-6 bold">Swap</td>
-                    <td><span class="bold">{{ data.amt_from }} {{ data.ticker_from }}</span> for <span class="bold">{{ data.amt_to }} {{ data.ticker_to }}</span></td>
-                  </tr> {% endif %}
+                    <td><span class="bold">(From) {{ data.amt_from }} {{ data.ticker_from }}</span> for <span class="bold">(To) {{ data.amt_to }} {{ data.ticker_to }}</span></td>
+                  </tr>
+                  {% endif %}
                   <tr class="bg-white border-t hover:bg-gray-50">
                     <td class="py-4 px-6 bold">Bid Rate</td>
                     <td>{{ data.bid_rate }}</td>
                   </tr>
+                  {% if data.was_sent == 'True' %}
+                   <tr class="bg-white border-t hover:bg-gray-50">
+                    <td class="py-4 px-6 bold">You Send (To) </td>
+                    <td> <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded">
+                      <img class="h-7" src="/static/images/coins/{{ data.coin_to }}.png" alt="{{ data.coin_to }}">
+                    </span> {{ data.coin_to }} </td>
+                  </tr>
                   <tr class="bg-white border-t hover:bg-gray-50">
-                    <td class="py-4 px-6 bold">Coin From (You Send) </td>
+                    <td class="py-4 px-6 bold">You Get (From)</td>
+                    <td> <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded">
+                      <img class="h-7" src="/static/images/coins/{{ data.coin_from }}.png" alt="{{ data.coin_from }}">
+                    </span> {{ data.coin_from }} </td>
+                  </tr>
+                  {% else %}
+                  <tr class="bg-white border-t hover:bg-gray-50">
+                    <td class="py-4 px-6 bold">You Send (From)</td>
                     <td> <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded">
                       <img class="h-7" src="/static/images/coins/{{ data.coin_from }}.png" alt="{{ data.coin_from }}">
                     </span> {{ data.coin_from }} </td>
                   </tr>
                   <tr class="bg-white border-t hover:bg-gray-50">
-                    <td class="py-4 px-6 bold">Coin To (You Get)</td>
+                    <td class="py-4 px-6 bold">You Get (To)</td>
                     <td> <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded">
                       <img class="h-7" src="/static/images/coins/{{ data.coin_to }}.png" alt="{{ data.coin_to }}">
                     </span> {{ data.coin_to }} </td>
                   </tr>
+                  {% endif %}
                   <tr class="bg-white border-t hover:bg-gray-50">
                     <td class="py-4 px-6 bold">Bid State</td>
                     <td>{{ data.bid_state }}</td>
