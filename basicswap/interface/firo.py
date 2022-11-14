@@ -9,9 +9,7 @@ import hashlib
 from .btc import BTCInterface, find_vout_for_address_from_txobj
 from basicswap.chainparams import Coins
 
-from basicswap.util.address import (
-    decodeAddress,
-)
+from basicswap.util.address import decodeAddress
 from basicswap.contrib.test_framework.script import (
     CScript,
     OP_0,

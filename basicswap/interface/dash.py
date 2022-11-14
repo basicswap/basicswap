@@ -7,6 +7,7 @@
 
 from .btc import BTCInterface
 from basicswap.chainparams import Coins
+from basicswap.util.address import decodeAddress
 from mnemonic import Mnemonic
 
 
@@ -21,6 +22,9 @@ class DASHInterface(BTCInterface):
     def initialiseWallet(self, key):
         words = self.seedToMnemonic(key)
         self.rpc_callback('upgradetohd', [words, ])
+
+    def decodeAddress(self, address):
+        return decodeAddress(address)[1:]
 
     def checkExpectedSeed(self, key_hash):
         try:

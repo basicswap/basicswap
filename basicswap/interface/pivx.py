@@ -7,6 +7,7 @@
 
 from .btc import BTCInterface
 from basicswap.chainparams import Coins
+from basicswap.util.address import decodeAddress
 from .contrib.pivx_test_framework.messages import (
     CBlock,
     ToHex,
@@ -31,6 +32,9 @@ class PIVXInterface(BTCInterface):
         txn_funded = self.rpc_callback('fundrawtransaction', [txn, options])['hex']
         txn_signed = self.rpc_callback('signrawtransaction', [txn_funded])['hex']
         return txn_signed
+
+    def decodeAddress(self, address):
+        return decodeAddress(address)[1:]
 
     def getBlockWithTxns(self, block_hash):
         # TODO: Bypass decoderawtransaction and getblockheader
