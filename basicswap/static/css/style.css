@@ -21,11 +21,11 @@
   right:18px;
   margin: 0;
   width:calc(33.33% - 25px);
+  z-index: 9999;
 }
 
 .error
 {
-  background:#ff5b5b;
 }
 
 .error_msg
