@@ -241,21 +241,28 @@
                   <table class="w-full text-sm text-left text-gray-500 outline-none border-gray-300">
                     <thead class="text-xs text-gray-700 border-b uppercase bg-gray-50 outline-none border-gray-300">
                       <tr>
-                        <th scope="col" class="py-3 px-6">Input</th>
-                        <th scope="col" class="">Output</th>
+                        <th scope="col" class="py-3 px-6 w-1/3">Details</th>
+                        <th scope="col" class=""></th>
                       </tr>
                     </thead>
                     <tr class="bg-white border-t hover:bg-gray-50">
-                      <td class="py-4 px-6">You will send <span class="bold" id="bid_amt_to">{{ data.amt_to }}</span> {{ data.tla_to }}</td>
-                      <td class="py-4">And receive <span class="bold" id="bid_amt_from">{{ data.amt_from }}</span> {{ data.tla_from }} {% if data.xmr_type == true %} (excluding {{ data.amt_from_lock_spend_tx_fee }} {{ data.tla_from }} in tx fees). {% else %} (excluding a tx fee). {% endif %}</td>
+                      <td class="py-4 px-6 ">Receive (From) <span class="bold" id="bid_amt_from">{{ data.amt_from }}</span> {{ data.tla_from }} {% if data.xmr_type == true %} (excluding {{ data.amt_from_lock_spend_tx_fee }} {{ data.tla_from }} in tx fees). {% else %} (excluding a tx fee). {% endif %}</td>
+                      <td class="">You will send  (To) <span class="bold" id="bid_amt_to">{{ data.amt_to }}</span> {{ data.tla_to }}</td>
                     </tr>
                     <tr class="bg-white border-t hover:bg-gray-50">
-                      <td class="py-10 px-6 bold">Send From Address</td>
-                      <td>
-                        <select class="appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block p-2.5" name="addr_from"> {% for a in addrs %}
+                      <td class="py-4 px-6 bold bold">Send From Address</td>
+                      <td class="py-4 pr-5">
+                            <div class="w-full md:flex-1">
+                        <div class="relative">
+                                <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                  <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"></path>
+                                </svg>
+                        <select class="appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" name="addr_from"> {% for a in addrs %}
                           <option value="{{ a[0] }}" {% if data.nb_addr_from==a[0] %} selected{% endif %}>{{ a[0] }} {{ a[1] }}</option> {% endfor %}
                           <option value="-1" {% if data.nb_addr_from=="-1" %} selected{% endif %}>New Address</option>
                         </select>
+                      </div>
+                      </div>
                       </td>
                     </tr>
                     {% if data.amount_negotiable == true %}
@@ -282,13 +289,20 @@
                     {% if data.debug_ui == true %}
                     <tr class="bg-white border-t hover:bg-gray-50">
                       <td class="py-4 px-6 bold">Debug Option:</td>
-                      <td class="py-4">
-                        <select class="appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block p-2.5" name="debugind">
+                      <td class="py-4 pr-5">
+                            <div class="w-full md:flex-1">
+                        <div class="relative">
+                        <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                  <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"></path>
+                                </svg>                          
+                        <select class="appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" name="debugind">
                           <option{% if data.debug_ind=="-1" %} selected{% endif %} value="-1">None</option>
                             {% for a in data.debug_options %}
                             <option{% if data.debug_ind==a[0] %} selected{% endif %} value="{{ a[0] }}">{{ a[1] }}</option>
                             {% endfor %}
                           </select>
+                      </div>
+                      </div>
                       </td>
                     </tr>
                     {% endif %}
@@ -298,11 +312,21 @@
               <div class="p-6 pt-10 bg-white bg-opacity-60 rounded-b-md">
                 <div class="w-full md:w-0/12">
                   <div class="flex flex-wrap justify-end -m-1.5">
-                    <div class="w-full md:w-auto p-1.5 ml-2">
-                      <button name="sendbid" value="Send Bid" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none"> <span>Send Bid</span> </button>
-                    </div>
-                    <div class="w-full md:w-auto p-1.5 ml-2">
-                      <button name="cancel" value="Cancel" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none"> <span>Cancel</span> </button>
+                        <div class="w-full md:w-auto p-1.5 ml-2">
+                          <button name="sendbid" value="Send Bid" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+              <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
+                <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round">
+                  <circle cx="5" cy="5" r="4"></circle>
+                  <circle cx="19" cy="19" r="4"></circle>
+                  <polyline data-cap="butt" points="13,5 21,5 21,11 " stroke="#ffffff"></polyline>
+                  <polyline data-cap="butt" points="11,19 3,19 3,13 " stroke="#ffffff"></polyline>
+                  <polyline points=" 16,2 13,5 16,8 " stroke="#ffffff"></polyline>
+                  <polyline points=" 8,16 11,19 8,22 " stroke="#ffffff"></polyline>
+                </g>
+              </svg>Send Bid</button>
+                        </div>
+                     <div class="w-full md:w-auto p-1.5">
+                          <button name="cancel" value="Cancel" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-red-500 hover:text-red-600 border border-red-400 hover:border-red-500 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none"><svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ef5844" stroke-linejoin="round" ><line x1="16" y1="8" x2="8" y2="16" stroke="#ef5844"></line> <line x1="16" y1="16" x2="8" y2="8" stroke="#ef5844"></line> <circle cx="12" cy="12" r="11"></circle></g></svg> Cancel </button>
                     </div>
                     <!-- TODO:
        <div class="w-full md:w-auto p-1.5 ml-2">
@@ -322,7 +346,7 @@
                 <div class="w-full md:w-0/12">
                   <div class="flex flex-wrap justify-end -m-1.5">
                         <div class="w-full md:w-auto p-1.5 ml-2">
-                          <button name="newbid" value="New Bid" type="submit"class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+                          <button name="newbid" value="New Bid" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
               <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
                 <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round">
                   <circle cx="5" cy="5" r="4"></circle>
@@ -346,7 +370,7 @@
                     </div>
                     {% if data.was_revoked != true %}
                        <div class="w-full md:w-auto p-1.5">
-                          <button name="revoke_offer" value="Revoke Offer" type="submit" onclick="return confirmPopup();" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-red-500 hover:text-red-600 border border-red-400 hover:border-red-500 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none"><svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ef5844" stroke-linejoin="round" ><line x1="16" y1="8" x2="8" y2="16" stroke="#ef5844"></line> <line x1="16" y1="16" x2="8" y2="8" stroke="#ef5844"></line> <circle cx="12" cy="12" r="11"></circle></g></svg> Revoke Offer </button>
+                          <button name="revoke_offer" value="Revoke Offer" type="submit" onclick="return confirmPopup();" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-red-500 hover:text-red-600 border border-red-400 hover:border-red-500 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none"><svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ef5844" stroke-linejoin="round" ><line x1="16" y1="8" x2="8" y2="16" stroke="#ef5844"></line> <line x1="16" y1="16" x2="8" y2="8" stroke="#ef5844"></line> <circle cx="12" cy="12" r="11"></circle></g></svg> Revoke Offer </button>
                         </div>
                     {% endif %}
                     {% endif %}
