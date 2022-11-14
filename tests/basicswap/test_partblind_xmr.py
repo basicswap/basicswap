@@ -162,7 +162,7 @@ class Test(BaseTest):
         rate_swap = make_int(random.uniform(0.2, 20.0), scale=12, r=1)
         offer_id = swap_clients[0].postOffer(
             Coins.PART_BLIND, Coins.XMR, amt_swap, rate_swap, amt_swap, SwapTypes.XMR_SWAP,
-            lock_type=TxLockTypes.SEQUENCE_LOCK_BLOCKS, lock_value=12)
+            lock_type=TxLockTypes.SEQUENCE_LOCK_BLOCKS, lock_value=32)
         wait_for_offer(test_delay_event, swap_clients[1], offer_id)
         offer = swap_clients[1].getOffer(offer_id)
 

@@ -131,7 +131,6 @@ class HttpHandler(BaseHTTPRequestHandler):
         if swap_client._show_notifications:
             args_dict['notifications'] = swap_client.getNotifications()
 
-        # TODO: Remove _withids
         if 'messages' in args_dict:
             messages_with_ids = []
             for msg in args_dict['messages']:
@@ -144,6 +143,10 @@ class HttpHandler(BaseHTTPRequestHandler):
                 err_messages_with_ids.append((self.server.msg_id_counter, msg))
                 self.server.msg_id_counter += 1
             args_dict['err_messages'] = err_messages_with_ids
+
+        shutdown_token = os.urandom(8).hex()
+        self.server.session_tokens['shutdown'] = shutdown_token
+        args_dict['shutdown_token'] = shutdown_token
 
         if self.server.msg_id_counter >= 0x7FFFFFFF:
             self.server.msg_id_counter = 0
@@ -486,16 +489,12 @@ class HttpHandler(BaseHTTPRequestHandler):
         swap_client.checkSystemStatus()
         summary = swap_client.getSummary()
 
-        shutdown_token = os.urandom(8).hex()
-        self.server.session_tokens['shutdown'] = shutdown_token
-
         template = env.get_template('index.html')
         return self.render_template(template, {
             'refresh': 30,
             'version': __version__,
             'summary': summary,
-            'use_tor_proxy': swap_client.use_tor_proxy,
-            'shutdown_token': shutdown_token
+            'use_tor_proxy': swap_client.use_tor_proxy
         })
 
     def page_404(self, url_split):
