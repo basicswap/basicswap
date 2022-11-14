@@ -194,19 +194,17 @@
                     <div class="w-full md:w-0/12">
                       <div class="flex flex-wrap justify-end -m-1.5">
                         <div class="w-full md:w-auto p-1.5 ml-2">
-                          <button name="apply_{{ c.name }}" value="Apply" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none"><svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round" ><polyline points=" 6,12 10,16 18,8 " stroke="#ffffff"></polyline> <circle cx="12" cy="12" r="11"></circle></g></svg>  Apply</button>
+                          <button name="apply_{{ c.name }}" value="Apply" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none"><svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round" ><polyline points=" 6,12 10,16 18,8 " stroke="#ffffff"></polyline> <circle cx="12" cy="12" r="11"></circle></g></svg>Apply</button>
                         </div>
                         {% if c.can_disable == true %}
                         <div class="w-full md:w-auto p-1.5 ml-2">
-                          <button name="disable_{{ c.name }}" value="Disable" onclick="return confirmPopup('Disable', '{{ c.display_name }}');" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-red-500 hover:text-red-600 border border-red-400 hover:border-red-500 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none"><svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ef5844" stroke-linejoin="round" ><line x1="16" y1="8" x2="8" y2="16" stroke="#ef5844"></line> <line x1="16" y1="16" x2="8" y2="8" stroke="#ef5844"></line> <circle cx="12" cy="12" r="11"></circle></g></svg> Disable Coin </button>
+                          <button name="disable_{{ c.name }}" value="Disable" onclick="return confirmPopup('Disable', '{{ c.display_name }}');" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-red-500 hover:text-red-600 border border-red-400 hover:border-red-500 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none"><svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ef5844" stroke-linejoin="round" ><line x1="16" y1="8" x2="8" y2="16" stroke="#ef5844"></line> <line x1="16" y1="16" x2="8" y2="8" stroke="#ef5844"></line> <circle cx="12" cy="12" r="11"></circle></g></svg>Disable Coin </button>
                         </div>
                         {% endif %}
                         {% if c.can_reenable == true %}
                         <div class="w-full md:w-auto p-1.5 ml-2">
-                          <button name="enable_{{ c.name }}" value="Enable" onclick="return confirmPopup('Enable', '{{ c.display_name }}');" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-white hover:bg-white font-medium text-sm text-green-500 border border-green-500 hover:text-green-600 hover:border-green-600 rounded-md shadow-button focus:ring-0 focus:outline-none"><svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#2ad167" stroke-linejoin="round" ><polyline points=" 6,12 10,16 18,8 " stroke="#2ad167"></polyline> <circle cx="12" cy="12" r="11"></circle></g></svg> Enable</button>
+                          <button name="enable_{{ c.name }}" value="Enable" onclick="return confirmPopup('Enable', '{{ c.display_name }}');" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-white hover:bg-white font-medium text-sm text-green-500 border border-green-500 hover:text-green-600 hover:border-green-600 rounded-md shadow-button focus:ring-0 focus:outline-none"><svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#2ad167" stroke-linejoin="round" ><polyline points=" 6,12 10,16 18,8 " stroke="#2ad167"></polyline> <circle cx="12" cy="12" r="11"></circle></g></svg>Enable</button>
                         </div>
-
-
                       {% endif %}
                     </div>
                     </div>
@@ -319,9 +317,11 @@
                                   </td>
                                 </tr>
                                 <tr class="bg-white border-t hover:bg-gray-50">
-                                  <td class="py-4 px-6 bold">Chart API Key</td>
+                                  <td class="py-4 px-6 bold">Chart API Key</td>                                 
                                   <td class="py-4 pr-5">
-                                    <input name="chartapikey" type="text" class="w-52 appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block p-2.5" name="" min="3" max="32" value="{{chart_settings.chart_api_key}}"> </td>
+                                 <label for="message" class="block mb-2 text-sm font-medium text-gray-900">Chart API (free) Key at <a class="inline-block text-coolGray-500 hover:text-coolGray-600 font-medium" href="https://min-api.cryptocompare.com/" target="_blank">CryptoCompare.com</a>
+                                 <br /> </label>
+                                    <input name="chartapikey" type="text" class="w-full appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block p-2.5" name="" min="3" max="32" value="{{chart_settings.chart_api_key}}"> </td>
                                 </tr>
                               </table>
                             </div>
