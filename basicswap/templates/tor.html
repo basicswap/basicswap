@@ -14,7 +14,7 @@
               <path d="M5.34 0.671999L2.076 14.1H0.732L3.984 0.671999H5.34Z" fill="#BBC3CF"></path>
             </svg>
           </li>
-          <li><a class="flex font-medium text-xs text-coolGray-500 hover:text-coolGray-700" href="/tor">TOR</a></li>
+          <li><a class="flex font-medium text-xs text-coolGray-500 hover:text-coolGray-700" href="/tor">Tor</a></li>
           <li>
             <svg width="6" height="15" viewBox="0 0 6 15" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M5.34 0.671999L2.076 14.1H0.732L3.984 0.671999H5.34Z" fill="#BBC3CF"></path>
@@ -29,13 +29,27 @@
       <div class="relative py-11 px-16 bg-coolGray-900 rounded-md overflow-hidden"> <img class="absolute z-10 left-4 top-4" src="/static/images/elements/dots-red.svg" alt=""> <img class="absolute z-10 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt=""> <img class="absolute h-64 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" src="/static/images/elements/wave.svg" alt="">
         <div class="relative z-20 flex flex-wrap items-center -m-3">
           <div class="w-full md:w-1/2 p-3">
-            <h2 class="mb-6 text-4xl font-bold text-white tracking-tighter">TOR</h2>
-            <p class="font-semibold text-coolGray-200">TOR connection information</p>
+            <h2 class="mb-6 text-4xl font-bold text-white tracking-tighter">Tor</h2>
+            <p class="font-semibold text-coolGray-200">Tor connection information</p>
           </div>
-          <div class="w-full md:w-1/2 p-3">
-            <a id="refresh" href="/tor">
-              <button class="block md:ml-auto px-5 py-3 font-medium text-lcg text-white bg-blue-500 hover:bg-blue-600 rounded-md focus:ring-0 focus:outline-none">Refresh</button>
-            </a>
+          <div class="w-full md:w-1/2 p-3 p-6 container flex flex-wrap items-center justify-end items-center mx-auto"> 
+            {% if refresh %}
+            <a id="refresh" href="/tor" class="flex flex-wrap justify-center px-5 py-4 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+              <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
+                <g fill="#ffffff">
+                  <path fill="#ffffff" d="M12,3c1.989,0,3.873,0.65,5.43,1.833l-3.604,3.393l9.167,0.983L22.562,0l-3.655,3.442 C16.957,1.862,14.545,1,12,1C5.935,1,1,5.935,1,12h2C3,7.037,7.037,3,12,3z"></path>
+                  <path data-color="color-2" d="M12,21c-1.989,0-3.873-0.65-5.43-1.833l3.604-3.393l-9.167-0.983L1.438,24l3.655-3.442 C7.043,22.138,9.455,23,12,23c6.065,0,11-4.935,11-11h-2C21,16.963,16.963,21,12,21z"></path>
+                </g>
+              </svg> <span>Refresh {{ refresh }} seconds</span> </a>
+              {% else %}
+            <a id="refresh" href="/tor" class="flex flex-wrap justify-center px-5 py-4 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+              <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
+                <g fill="#ffffff">
+                  <path fill="#ffffff" d="M12,3c1.989,0,3.873,0.65,5.43,1.833l-3.604,3.393l9.167,0.983L22.562,0l-3.655,3.442 C16.957,1.862,14.545,1,12,1C5.935,1,1,5.935,1,12h2C3,7.037,7.037,3,12,3z"></path>
+                  <path data-color="color-2" d="M12,21c-1.989,0-3.873-0.65-5.43-1.833l3.604-3.393l-9.167-0.983L1.438,24l3.655-3.442 C7.043,22.138,9.455,23,12,23c6.065,0,11-4.935,11-11h-2C21,16.963,16.963,21,12,21z"></path>
+                </g>
+              </svg> <span>Refresh</span> </a> 
+            {% endif %} 
           </div>
         </div>
       </div>
@@ -52,12 +66,12 @@
                 <table class="w-full text-sm text-left text-gray-500 outline-none border-gray-300">
                   <thead class="text-xs text-gray-700 border-b uppercase bg-gray-50 outline-none border-gray-300">
                     <tr>
-                      <th scope="col" class="py-3 px-6 w-80">Name:</th>
-                      <th scope="col" class="py-3">Output:</th>
+                      <th scope="col" class="py-3 px-6 w-80">Tor</th>
+                      <th scope="col" class="py-3"></th>
                     </tr>
                   </thead>
                   <tr class="bg-white border-t hover:bg-gray-50">
-                    <td class="py-4 pl-5 pr-5 w-80 bold">TOR Mode</td>
+                    <td class="py-4 pl-5 pr-5 w-80 bold">Tor Mode</td>
                     <td td class="py-4">{% if use_tor_proxy == true %} Active {% if tor_established == true %} & Connected{% endif %} {% endif %}</td>
                   </tr>
                   <tr class="bg-white border-t hover:bg-gray-50">

@@ -113,7 +113,7 @@
                   </g>
                 </svg> Debug </a>
             </li>
-            {% endif %}
+            {% endif %}           
             {% if debug_mode == true %}
             <li>
               <a href="/explorers" class="flex items-center block py-4 px-4 hover:bg-gray-100"> <span class="sr-only">Explorers</span>
@@ -125,6 +125,19 @@
                 </svg> Explorers </a>
             </li>
             {% endif %}
+            {% if use_tor_proxy == true %}
+            <li>
+              <a href="/tor" class="flex items-center block py-4 px-4 hover:bg-gray-100"> <span class="sr-only">Debug</span>
+                <svg class="text-gray-500 w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
+                          <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
+                            <path d="M9,18.8A6.455,6.455,0,0,1,7,14,6.455,6.455,0,0,1,9,9.2" stroke="#6b7280"></path>
+                            <path d="M15,18.8A6.455,6.455,0,0,0,17,14a6.455,6.455,0,0,0-2-4.8" stroke="#6b7280"></path>
+                            <path d="M14,2.256V1H10V2.256A3.949,3.949,0,0,1,7.658,5.891,8.979,8.979,0,0,0,2,14c0,4.971,4.477,9,10,9s10-4.029,10-9a8.978,8.978,0,0,0-5.658-8.109A3.95,3.95,0,0,1,14,2.256Z"></path>
+                          </g>
+                        </svg>
+                </svg> Tor </a>
+            </li>
+            {% endif %}                
             <li>
               <a href="/smsgaddresses" class="flex items-center block py-4 px-4 hover:bg-gray-100"> <span class="sr-only">Settings</span>
                 <svg class="text-gray-500 w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
@@ -135,7 +148,7 @@
                     <line x1="23" y1="5" x2="23" y2="9" stroke="#6b7280"></line>
                   </g>
                 </svg> SMSG Addresses </a>
-            </li>
+            </li>          
             <li>
               <a href="/watched" class="flex items-center block py-4 px-4 hover:bg-gray-100"> <span class="sr-only">Automation Strategies</span>
                 <svg class="text-gray-500 w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
@@ -163,7 +176,7 @@
                   </g>
                 </svg> Automation Strategies</a>
             </li>
-          {% endif %}
+          {% endif %}        
         </ul>
           <div class="text-sm text-gray-700">
             <a href="/shutdown/{{ shutdown_token }}" class="flex items-center block py-4 px-4 hover:bg-gray-100"> <span class="sr-only">Shutdown</span>
@@ -194,49 +207,49 @@
           <div class="divide-y divide-gray-100">
             {% for entry in notifications %} {% if entry[1] == 1 %}
             <div class="flex py-3 px-4 hover:bg-gray-100">
-              <div class="flex-shrink-0"> <img class="w-11 h-11 rounded-full" src="/static/images/other/new_offer.png" alt="New Offer"> </div>
+              <div class="inline-flex flex-shrink-0 justify-center items-center w-8 h-8 bg-blue-500 rounded-lg"><svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" height="18" width="18" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round"><circle cx="5" cy="5" r="4"></circle> <circle cx="19" cy="19" r="4"></circle> <polyline data-cap="butt" points="13,5 21,5 21,11 " stroke="#ffffff"></polyline> <polyline data-cap="butt" points="11,19 3,19 3,13 " stroke="#ffffff"></polyline> <polyline points=" 16,2 13,5 16,8 " stroke="#ffffff"></polyline> <polyline points=" 8,16 11,19 8,22 " stroke="#ffffff"></polyline></g></svg></div>
               <div class="pl-3 w-full">
                 <div class="text-gray-500 text-sm mb-1.5"> <span class="font-semibold text-gray-900">
-                    NEW NETWORK OFFER</span>
-                  <br/> <span class="mt-2 mb-2 inline-flex px-2.5 py-1.5 text-xs font-small monospace text-center text-white bg-gray-900 rounded-lg hover:bg-gray-700 focus:ring-4 focus:outline-none focus:ring-gray-300">
-                  <a href="/offer/{{ entry[2].offer_id }}">{{ entry[2].offer_id|truncate(37, True) }}</a>
+                    NEW NETWORK <a class="underline" href="/offer/{{ entry[2].offer_id }}">OFFER</a></span>
+                  <br/> <span class="mt-2 inline-flex text-xs font-small monospace text-center">
+                  <a href="/offer/{{ entry[2].offer_id }}">{{ entry[2].offer_id|truncate(42, True) }}</a>
                   </span></div>
-                <div class="text-xs text-blue-600">{{ entry[0] }}</div>
+                <div class="text-xs text-gray-600">{{ entry[0] }}</div>
               </div>
             </div>
             {% elif entry[1] == 2 %}
             <div class="flex py-3 px-4 hover:bg-gray-100">
-              <div class="flex-shrink-0"> <img class="w-11 h-11 rounded-full" src="/static/images/other/bid_accepted.png" alt="New Accepted"> </div>
+              <div class="inline-flex flex-shrink-0 justify-center items-center w-8 h-8 bg-blue-500 rounded-lg"><svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" height="18" width="18" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round"><rect x="9.843" y="5.379" transform="matrix(0.7071 -0.7071 0.7071 0.7071 -0.7635 13.1569)" width="11.314" height="4.243"></rect> <polyline points="3,23 3,19 15,19 15,23 "></polyline> <line x1="4" y1="15" x2="1" y2="15" stroke="#ffffff"></line> <line x1="5.757" y1="10.757" x2="3.636" y2="8.636" stroke="#ffffff"></line> <line x1="1" y1="23" x2="17" y2="23"></line> <line x1="17" y1="9" x2="23" y2="15"></line></g></svg></div>
               <div class="pl-3 w-full">
                 <div class="text-gray-500 text-sm mb-1.5"> <span class="font-semibold text-gray-900">
-                    <a href="/bid/{{ entry[2].bid_id }}">NEW BID</a> ON OFFER</span>
-                  <br/> <span class="mt-2 mb-2 inline-flex px-2.5 py-1.5 text-xs font-small monospace text-center text-white bg-gray-800 rounded-lg hover:bg-gray-700 focus:ring-4 focus:outline-none focus:ring-gray-300">
-                      <a href="/offer/{{ entry[2].offer_id }}">{{ entry[2].offer_id|truncate(37, True) }}</a>
+                    <a class="underline" href="/bid/{{ entry[2].bid_id }}">NEW BID</a> ON <a class="underline" href="/offer/{{ entry[2].offer_id }}">OFFER</a></span>
+                  <br/> <span class="mt-2 inline-flex text-xs font-small monospace text-center">
+                      <a href="/offer/{{ entry[2].offer_id }}">{{ entry[2].offer_id|truncate(42, True) }}</a>
                     </span></div>
-                <div class="text-xs text-blue-600">{{ entry[0] }}</div>
+                <div class="text-xs text-gray-600">{{ entry[0] }}</div>
               </div>
             </div>
             {% elif entry[1] == 3 %}
             <div class="flex py-3 px-4 hover:bg-gray-100">
-              <div class="flex-shrink-0"> <img class="w-11 h-11 rounded-full" src="/static/images/other/new_offer.png" alt="New Offer"> </div>
+              <div class="inline-flex flex-shrink-0 justify-center items-center w-8 h-8 bg-violet-500 rounded-lg"><svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" height="18" width="18" viewBox="0 0 24 24"><g fill="#ffffff"><path d="M8.5,20a1.5,1.5,0,0,1-1.061-.439L.379,12.5,2.5,10.379l6,6,13-13L23.621,5.5,9.561,19.561A1.5,1.5,0,0,1,8.5,20Z" fill="#ffffff"></path></g></svg></div>
               <div class="pl-3 w-full">
                 <div class="text-gray-500 text-sm mb-1.5"> <span class="font-semibold text-gray-900">
-                    BID ACCEPTED</span>
-                  <br/> <span class="mt-2 mb-2 inline-flex px-2.5 py-1.5 text-xs font-small monospace text-center text-white bg-gray-800 rounded-lg hover:bg-gray-700 focus:ring-4 focus:outline-none focus:ring-gray-300">
-                  <a href="/bid/{{ entry[2].bid_id }}">{{ entry[2].bid_id|truncate(37, True) }}</a>
+                    <a class="underline" href="/bid/{{ entry[2].bid_id }}">BID</a> ACCEPTED</span>
+                  <br/> <span class="mt-2 inline-flex text-xs font-small monospace text-center">
+                  <a href="/bid/{{ entry[2].bid_id }}">{{ entry[2].bid_id|truncate(42, True) }}</a>
                   </span></div>
-                <div class="text-xs text-blue-600">{{ entry[0] }}</div>
+                <div class="text-xs text-gray-600">{{ entry[0] }}</div>
               </div>
             </div>
             {% else %}
             <div class="flex py-3 px-4 hover:bg-gray-100">
-              <div class="flex-shrink-0"> <img class="w-11 h-11 rounded-full" src="/static/images/other/new_offer.png" alt="New Offer"> </div>
+              <div class="inline-flex flex-shrink-0 justify-center items-center w-8 h-8 bg-blue-500 rounded-lg"><svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" height="18" width="18" viewBox="0 0 24 24"><g fill="#ffffff"><path d="M8.5,20a1.5,1.5,0,0,1-1.061-.439L.379,12.5,2.5,10.379l6,6,13-13L23.621,5.5,9.561,19.561A1.5,1.5,0,0,1,8.5,20Z" fill="#ffffff"></path></g></svg></div>
               <div class="pl-3 w-full">
                 <div class="text-gray-500 text-sm mb-1.5"> <span class="font-semibold text-gray-900">
                     UNKNOWN EVENT</span>
-                  <br/> <span class="mt-2 mb-2 inline-flex px-2.5 py-1.5 text-xs font-small monospace text-center text-white bg-gray-800 rounded-lg hover:bg-gray-700 focus:ring-4 focus:outline-none focus:ring-gray-300">
+                  <br/> <span class="mt-2 inline-flex text-xs font-small monospace text-center">
                   {{ entry[1] }}
-                  <div class="text-xs text-blue-600">{{ entry[0] }}</div>
+                  <div class="text-xs text-gray-600">{{ entry[0] }}</div>
                 </div>
               </div>
                {% endif %}
@@ -265,7 +278,7 @@
               <li>
                 <div data-tooltip-target="tooltip-DEV" class="ml-5 flex items-center text-gray-50 hover:text-gray-100 text-sm">
                     <svg class="text-gray-500 w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" height="18" width="18" viewBox="0 0 24 24">
-                    <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#2ad167" stroke-linejoin="round" class="nc-icon-wrapper">
+                    <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#2ad167" stroke-linejoin="round">
                       <circle cx="12" cy="12" r="11"></circle>
                       <path data-cap="butt" d="M9,16a3,3,0,0,0,6,0" stroke="#2ad167"></path>
                       <circle cx="17" cy="10" r="3" stroke="#2ad167"></circle>
@@ -296,18 +309,18 @@
                   <p> </p> </div>
                 </li>                
                 </ul>
-                <!-- else wallets unlocked -->
+                <!-- else wallets unlocked
                 <ul class="xl:flex">
               <li>
                 <div data-tooltip-target="tooltip-unlocked-wallets" class="ml-5 flex items-center text-gray-50 hover:text-gray-100 text-sm">
-                   <svg class="text-gray-500 w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#f80b0b" stroke-linejoin="round" class="nc-icon-wrapper"><rect x="3" y="11" width="18" height="12"></rect><circle cx="12" cy="17" r="2" stroke="#f80b0b"></circle><path data-cap="butt" d="M17,6a4.951,4.951,0,0,0-4.9-5H12A4.951,4.951,0,0,0,7,5.9V11"></path></g></svg>        
+                   <svg class="text-gray-500 w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#f80b0b" stroke-linejoin="round"><rect x="3" y="11" width="18" height="12"></rect><circle cx="12" cy="17" r="2" stroke="#f80b0b"></circle><path data-cap="butt" d="M17,6a4.951,4.951,0,0,0-4.9-5H12A4.951,4.951,0,0,0,7,5.9V11"></path></g></svg>        
                   <span data-tooltip-target="tooltip-unlocked-wallets" ></span> </div>
                 <div class="tooltip-arrow" data-popper-arrow></div>
                 <div id="tooltip-unlocked-wallets" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
                   <p>Wallets unlocked </p>
                   <p> </p> </div>
                 </li>                
-                </ul>
+                </ul>-->
                  <!-- end wallets locked/unlock -->
                 {% endif %}
                 {% if use_tor_proxy == true %}
@@ -550,7 +563,7 @@
             <li>
               <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded" href="/debug"> <span class="inline-block mr-3">
               <svg class="text-gray-500 w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
-              <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round" class="nc-icon-wrapper">
+              <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
               <path data-cap="butt" d="M5.29,10H4A3,3,0,0,1,1,7V6" stroke="#6b7280"></path>
               <path data-cap="butt" d="M5.29,18H4a3,3,0,0,0-3,3v1" stroke="#6b7280"></path>
               <path data-cap="butt" d="M8,6.255V5a4,4,0,0,1,4-4h0a4,4,0,0,1,4,4V6.255" stroke="#6b7280"></path>
@@ -559,7 +572,7 @@
               <path d="M19,16A7,7,0,0,1,5,16V12a7,7,0,0,1,14,0Z"></path></g></svg>
             </span> <span>Debug</span> </a>
             </li>
-            {% endif %}
+            {% endif %}          
             {% if debug_mode == true %}
             <li>
               <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded" href="/explorers"> <span class="inline-block mr-3">
@@ -624,7 +637,7 @@
                      <path d="M14,2.256V1H10V2.256A3.949,3.949,0,0,1,7.658,5.891,8.979,8.979,0,0,0,2,14c0,4.971,4.477,9,10,9s10-4.029,10-9a8.978,8.978,0,0,0-5.658-8.109A3.95,3.95,0,0,1,14,2.256Z"></path>
                    </g>
                  </svg>
-              </span> <span>TOR</span> </a>
+              </span> <span>Tor</span> </a>
             </li>
           {% endif %}
         </ul>
@@ -648,7 +661,7 @@
   {% if ws_url %}
   <script>
     var ws = new WebSocket("{{ ws_url }}"),
-      floating_div = document.createElement('div');
+    floating_div = document.createElement('div');
     floating_div.classList.add('floatright');
     messages = document.createElement('ul');
     messages.setAttribute('id', 'ul_updates');
@@ -656,15 +669,15 @@
       let json = JSON.parse(event.data);
       let event_message = 'Unknown event';
       if (json['event'] == 'new_offer') {
-        event_message = '<div class="p-4 w-full mt-5 text-gray-500 bg-white rounded-lg shadow"> <div class="flex"> <div class="text-sm font-normal"> <div class="mb-1 text-sm font-semibold text-gray-900"> <a href=/offer/' + json['offer_id'] + '>New offer</a></div></div></div></div>';
+        event_message = '<div id="hide"><div id="toast-success" class="flex items-center p-4 mb-4 w-full max-w-xs text-gray-500 bg-white rounded-lg shadow" role="alert"><div class="inline-flex flex-shrink-0 justify-center items-center w-10 h-10 bg-blue-500 rounded-lg"><svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" height="18" width="18" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round"><circle cx="5" cy="5" r="4"></circle> <circle cx="19" cy="19" r="4"></circle> <polyline data-cap="butt" points="13,5 21,5 21,11 " stroke="#ffffff"></polyline> <polyline data-cap="butt" points="11,19 3,19 3,13 " stroke="#ffffff"></polyline> <polyline points=" 16,2 13,5 16,8 " stroke="#ffffff"></polyline> <polyline points=" 8,16 11,19 8,22 " stroke="#ffffff"></polyline></g></svg></div><div class="uppercase w-40 ml-3 text-sm font-semibold text-gray-900 dark:text-white">New network <a class="underline" href=/offer/' + json['offer_id'] + '>offer</a></div><button type="button" onclick="closeAlert(event)" class="ml-auto -mx-1.5 -my-1.5 bg-white text-gray-400 hover:text-gray-900 rounded-lg focus:ring-0 focus:outline-none focus:ring-gray-300 p-1.5 hover:bg-gray-100 inline-flex h-8 w-8" data-dismiss="#toast-success" aria-label="Close"><span class="sr-only">Close</span><svg aria-hidden="true" class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg></button></div></div>';
       }
       else
       if (json['event'] == 'new_bid') {
-        event_message = '<div class="p-4 w-full mt-5 text-gray-500 bg-white rounded-lg shadow"> <div class="flex"> <div class="text-sm font-normal"> <div class="mb-1 text-sm font-semibold text-gray-900"> <a href=/bid/' + json['bid_id'] + '>New bid</a> on offer</div><div class="mt-2 mb-2 inline-flex px-2.5 py-1.5 text-xs font-small monospace text-center text-white bg-gray-800 rounded-lg hover:bg-gray-700 focus:ring-4 focus:outline-none focus:ring-gray-300" href=/offer/' + json['offer_id'] + '>' + json['offer_id'] + '</a></div></div>';
+        event_message = '<div id="hide"><div id="toast-success" class="flex items-center p-4 mb-4 w-full max-w-xs text-gray-500 bg-white rounded-lg shadow" role="alert"><div class="inline-flex flex-shrink-0 justify-center items-center w-10 h-10 bg-violet-500 rounded-lg"><svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" height="18" width="18" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round"><rect x="9.843" y="5.379" transform="matrix(0.7071 -0.7071 0.7071 0.7071 -0.7635 13.1569)" width="11.314" height="4.243"></rect> <polyline points="3,23 3,19 15,19 15,23 "></polyline> <line x1="4" y1="15" x2="1" y2="15" stroke="#ffffff"></line> <line x1="5.757" y1="10.757" x2="3.636" y2="8.636" stroke="#ffffff"></line> <line x1="1" y1="23" x2="17" y2="23"></line> <line x1="17" y1="9" x2="23" y2="15"></line></g></svg></div><div class="uppercase w-40 ml-3 text-sm font-normal"><span class="mb-1 text-sm font-semibold text-gray-900"><a class="underline" href=/bid/' + json['bid_id'] + '>New bid</a> on <a class="underline" href=/offer/' + json['offer_id'] + '>offer</a></span></div><button type="button" onclick="closeAlert(event)" class="ml-auto -mx-1.5 -my-1.5 bg-white text-gray-400 hover:text-gray-900 rounded-lg focus:ring-0 focus:outline-nonefocus:ring-gray-300 p-1.5 hover:bg-gray-100 inline-flex h-8 w-8" data-dismiss="#toast-success" aria-label="Close"><svg aria-hidden="true" class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg></button></div></div>';
       }
       else
       if (json['event'] == 'bid_accepted') {
-        event_message = '<div class="p-4 w-full mt-5 text-gray-500 bg-white rounded-lg shadow"><div class="flex"><div class="text-sm font-normal"><div class="mb-1 text-sm font-semibold text-gray-900"><a href=/bid/' + json['bid_id'] + '>Bid accepted</a></div></div></div></div>';
+        event_message = '<div id="hide"><div id="toast-success" class="flex items-center p-4 mb-4 w-full max-w-xs text-gray-500 bg-white rounded-lg shadow" role="alert"><div class="inline-flex flex-shrink-0 justify-center items-center w-10 h-10 bg-green-500 rounded-lg"><svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" height="18" width="18" viewBox="0 0 24 24"><g fill="#ffffff"><path d="M8.5,20a1.5,1.5,0,0,1-1.061-.439L.379,12.5,2.5,10.379l6,6,13-13L23.621,5.5,9.561,19.561A1.5,1.5,0,0,1,8.5,20Z" fill="#ffffff"></path></g></svg></div><div class="uppercase w-40 ml-3 text-sm font-semibold text-gray-900 dark:text-white"><a class="underline" href=/bid/' + json['bid_id'] + '>Bid</a> accepted</div><button type="button" onclick="closeAlert(event)" class="ml-auto -mx-1.5 -my-1.5 bg-white text-gray-400 hover:text-gray-900 rounded-lg focus:ring-0 focus:outline-none focus:ring-gray-300 p-1.5 hover:bg-gray-100 inline-flex h-8 w-8" data-dismiss="#toast-success" aria-label="Close"><span class="sr-only">Close</span><svg aria-hidden="true" class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg></button></div></div>';
       }
       let messages = document.getElementById('ul_updates'),
         message = document.createElement('li');
@@ -673,5 +686,12 @@
     };
     floating_div.appendChild(messages);
     document.body.appendChild(floating_div);
+      function closeAlert(event){
+    let element = event.target;
+    while(element.nodeName !== "BUTTON"){
+      element = element.parentNode;
+    }
+    element.parentNode.parentNode.removeChild(element.parentNode);
+  }
   </script>
   {% endif %}

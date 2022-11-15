@@ -16,11 +16,9 @@
 
 .floatright
 {
-  position:fixed;
-  top:10px;
-  right:18px;
-  margin: 0;
-  width:calc(33.33% - 25px);
+  position: absolute;
+  top:1.25rem;
+  right:1.25rem;
   z-index: 9999;
 }
 
@@ -31,4 +29,30 @@
 .error_msg
 {
   color:red;
+}
+
+#hide {
+    -moz-animation: cssAnimation 0s ease-in 15s forwards;
+    /* Firefox */
+    -webkit-animation: cssAnimation 0s ease-in 15s forwards;
+    /* Safari and Chrome */
+    -o-animation: cssAnimation 0s ease-in 15s forwards;
+    /* Opera */
+    animation: cssAnimation 0s ease-in 15s forwards;
+    -webkit-animation-fill-mode: forwards;
+    animation-fill-mode: forwards;
+}
+@keyframes cssAnimation {
+    to {
+        width:0;
+        height:0;
+        overflow:hidden;
+    }
+}
+@-webkit-keyframes cssAnimation {
+    to {
+        width:0;
+        height:0;
+        visibility:hidden;
+    }
 }
