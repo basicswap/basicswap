@@ -55,7 +55,6 @@ from tests.basicswap.common import (
     wait_for_bid_tx_state,
     wait_for_in_progress,
     read_json_api,
-    post_json_req,
     TEST_HTTP_HOST,
     TEST_HTTP_PORT,
     BASE_PORT,
@@ -252,6 +251,7 @@ def make_part_cli_rpc_func(node_id):
 
 
 class Test(unittest.TestCase):
+    test_coin_from = Coins.PIVX
 
     @classmethod
     def setUpClass(cls):
@@ -285,7 +285,10 @@ class Test(unittest.TestCase):
 
         btc_data_dir = os.path.join(cfg.TEST_DATADIRS, str(BTC_NODE))
         if os.path.exists(os.path.join(cfg.BITCOIN_BINDIR, 'bitcoin-wallet')):
-            callrpc_cli(cfg.BITCOIN_BINDIR, btc_data_dir, 'regtest', '-wallet=wallet.dat -legacy create', 'bitcoin-wallet')
+            try:
+                callrpc_cli(cfg.BITCOIN_BINDIR, btc_data_dir, 'regtest', '-wallet=wallet.dat -legacy create', 'bitcoin-wallet')
+            except Exception:
+                callrpc_cli(cfg.BITCOIN_BINDIR, btc_data_dir, 'regtest', '-wallet=wallet.dat create', 'bitcoin-wallet')
         cls.daemons.append(startDaemon(btc_data_dir, cfg.BITCOIN_BINDIR, cfg.BITCOIND))
         logging.info('Started %s %d', cfg.BITCOIND, cls.daemons[-1].pid)
         cls.daemons.append(startDaemon(os.path.join(cfg.TEST_DATADIRS, str(PIVX_NODE)), cfg.PIVX_BINDIR, cfg.PIVXD))
@@ -294,7 +297,10 @@ class Test(unittest.TestCase):
         for i in range(NUM_NODES):
             data_dir = os.path.join(cfg.TEST_DATADIRS, str(i))
             if os.path.exists(os.path.join(cfg.PARTICL_BINDIR, 'particl-wallet')):
-                callrpc_cli(cfg.PARTICL_BINDIR, data_dir, 'regtest', '-wallet=wallet.dat -legacy create', 'particl-wallet')
+                try:
+                    callrpc_cli(cfg.PARTICL_BINDIR, data_dir, 'regtest', '-wallet=wallet.dat -legacy create', 'particl-wallet')
+                except Exception:
+                    callrpc_cli(cfg.PARTICL_BINDIR, data_dir, 'regtest', '-wallet=wallet.dat create', 'particl-wallet')
             cls.daemons.append(startDaemon(data_dir, cfg.PARTICL_BINDIR, cfg.PARTICLD))
             logging.info('Started %s %d', cfg.PARTICLD, cls.daemons[-1].pid)
 
@@ -346,7 +352,7 @@ class Test(unittest.TestCase):
         logging.info('Mining %d Bitcoin blocks to %s', num_blocks, cls.btc_addr)
         btcRpc('generatetoaddress {} {}'.format(num_blocks, cls.btc_addr))
 
-        ro = btcRpc('getdeploymentinfo')
+        ro = btcRpc('getblockchaininfo')
         checkForks(ro)
 
         signal.signal(signal.SIGINT, signal_handler)
@@ -522,19 +528,27 @@ class Test(unittest.TestCase):
         swap_clients[0].getChainClientSettings(Coins.PIVX)['override_feerate'] = 10.0
         wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.BID_ERROR, wait_for=60)
 
-    def test_08_withdrawal(self):
-        logging.info('---------- Test PIVX withdrawals')
+    def test_08_wallet(self):
+        logging.info('---------- Test {} wallet'.format(self.test_coin_from.name))
 
+        logging.info('Test withdrawal')
         addr = pivxRpc('getnewaddress \"Withdrawal test\"')
         wallets = read_json_api(TEST_HTTP_PORT + 0, 'wallets')
-        assert (float(wallets['PIVX']['balance']) > 100)
+        assert (float(wallets[self.test_coin_from.name]['balance']) > 100)
 
         post_json = {
             'value': 100,
             'address': addr,
             'subfee': False,
         }
-        json_rv = json.loads(post_json_req('http://127.0.0.1:{}/json/wallets/pivx/withdraw'.format(TEST_HTTP_PORT + 0), post_json))
+        json_rv = read_json_api(TEST_HTTP_PORT + 0, 'wallets/{}/withdraw'.format(self.test_coin_from.name.lower()), post_json)
+        assert (len(json_rv['txid']) == 64)
+
+        logging.info('Test createutxo')
+        post_json = {
+            'value': 10,
+        }
+        json_rv = read_json_api(TEST_HTTP_PORT + 0, 'wallets/{}/createutxo'.format(self.test_coin_from.name.lower()), post_json)
         assert (len(json_rv['txid']) == 64)
 
     def test_09_v3_tx(self):

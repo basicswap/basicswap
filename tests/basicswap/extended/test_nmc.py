@@ -332,7 +332,7 @@ class Test(unittest.TestCase):
         logging.info('Mining %d Bitcoin blocks to %s', num_blocks, cls.btc_addr)
         btcRpc('generatetoaddress {} {}'.format(num_blocks, cls.btc_addr))
 
-        ro = btcRpc('getdeploymentinfo')
+        ro = btcRpc('getblockchaininfo')
         checkForks(ro)
 
         ro = nmcRpc('getwalletinfo')

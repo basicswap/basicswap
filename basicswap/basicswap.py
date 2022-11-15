@@ -6035,6 +6035,8 @@ class BasicSwap(BaseApp):
         ci_to = self.ci(int(coin_to))
         name_from = ci_from.chainparams()['name']
         name_to = ci_to.chainparams()['name']
+        exchange_name_from = ci_from.getExchangeName('coingecko.com')
+        exchange_name_to = ci_to.getExchangeName('coingecko.com')
         ticker_from = ci_from.chainparams()['ticker']
         ticker_to = ci_to.chainparams()['ticker']
         headers = {'Connection': 'close'}
@@ -6044,23 +6046,42 @@ class BasicSwap(BaseApp):
 
             if rate_sources.get('coingecko.com', True):
                 try:
-                    url = 'https://api.coingecko.com/api/v3/simple/price?ids={},{}&vs_currencies=usd,btc'.format(name_from, name_to)
+                    url = 'https://api.coingecko.com/api/v3/simple/price?ids={},{}&vs_currencies=usd,btc'.format(exchange_name_from, exchange_name_to)
                     self.log.debug(f'lookupRates: {url}')
                     start = time.time()
                     req = urllib.request.Request(url, headers=headers)
                     js = json.loads(urllib.request.urlopen(req, timeout=10).read())
                     js['time_taken'] = time.time() - start
-                    rate = float(js[name_from]['usd']) / float(js[name_to]['usd'])
+                    rate = float(js[exchange_name_from]['usd']) / float(js[exchange_name_to]['usd'])
                     js['rate_inferred'] = ci_to.format_amount(rate, conv_int=True, r=1)
                     rv['coingecko'] = js
                 except Exception as e:
                     rv['coingecko_error'] = str(e)
+                    if self.debug:
+                        self.log.error(traceback.format_exc())
+
+                if exchange_name_from != name_from:
+                    js[name_from] = js[exchange_name_from]
+                    js.pop(exchange_name_from)
+                if exchange_name_to != name_to:
+                    js[name_to] = js[exchange_name_to]
+                    js.pop(exchange_name_to)
 
             if rate_sources.get('bittrex.com', True):
                 bittrex_api_v3 = 'https://api.bittrex.com/v3'
                 try:
+                    exchange_ticker_to = ci_to.getExchangeTicker('bittrex.com')
+                    exchange_ticker_from = ci_from.getExchangeTicker('bittrex.com')
+
+                    USDT_coins = (Coins.FIRO,)
+                    # TODO: How to compare USDT pairs with BTC pairs
+                    if ci_from.coin_type() in USDT_coins:
+                        raise ValueError('No BTC pair')
+                    if ci_to.coin_type() in USDT_coins:
+                        raise ValueError('No BTC pair')
+
                     if ci_from.coin_type() == Coins.BTC:
-                        pair = f'{ticker_to}-{ticker_from}'
+                        pair = f'{exchange_ticker_to}-{exchange_ticker_from}'
                         url = f'{bittrex_api_v3}/markets/{pair}/ticker'
                         self.log.debug(f'lookupRates: {url}')
                         start = time.time()
@@ -6078,7 +6099,7 @@ class BasicSwap(BaseApp):
                         js['to_btc'] = js['lastTradeRate']
                         rv['bittrex'] = js
                     elif ci_to.coin_type() == Coins.BTC:
-                        pair = f'{ticker_from}-{ticker_to}'
+                        pair = f'{exchange_ticker_from}-{exchange_ticker_to}'
                         url = f'{bittrex_api_v3}/markets/{pair}/ticker'
                         self.log.debug(f'lookupRates: {url}')
                         start = time.time()
@@ -6091,7 +6112,7 @@ class BasicSwap(BaseApp):
                         js['to_btc'] = 1.0
                         rv['bittrex'] = js
                     else:
-                        pair = f'{ticker_from}-BTC'
+                        pair = f'{exchange_ticker_from}-BTC'
                         url = f'{bittrex_api_v3}/markets/{pair}/ticker'
                         self.log.debug(f'lookupRates: {url}')
                         start = time.time()
@@ -6100,7 +6121,7 @@ class BasicSwap(BaseApp):
                         js_from['time_taken'] = time.time() - start
                         js_from['pair'] = pair
 
-                        pair = f'{ticker_to}-BTC'
+                        pair = f'{exchange_ticker_to}-BTC'
                         url = f'{bittrex_api_v3}/markets/{pair}/ticker'
                         self.log.debug(f'lookupRates: {url}')
                         start = time.time()
@@ -6124,6 +6145,8 @@ class BasicSwap(BaseApp):
                         }
                 except Exception as e:
                     rv['bittrex_error'] = str(e)
+                    if self.debug:
+                        self.log.error(traceback.format_exc())
 
             if output_array:
 

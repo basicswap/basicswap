@@ -39,3 +39,6 @@ class DASHInterface(BTCInterface):
     def withdrawCoin(self, value, addr_to, subfee):
         params = [addr_to, value, '', '', subfee]
         return self.rpc_callback('sendtoaddress', params)
+
+    def getSpendableBalance(self):
+        return self.make_int(self.rpc_callback('getwalletinfo')['balance'])

@@ -6,7 +6,6 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import os
-import json
 import random
 import logging
 import unittest
@@ -35,7 +34,6 @@ from tests.basicswap.common import (
     wait_for_bid,
     make_rpc_func,
     read_json_api,
-    post_json_req,
     TEST_HTTP_PORT,
     wait_for_offer,
     wait_for_in_progress,
@@ -105,9 +103,9 @@ def prepareDataDir(datadir, node_id, conf_file, dir_prefix, base_p2p_port, base_
 
 class Test(BaseTest):
     __test__ = True
+    test_coin_from = Coins.FIRO
     firo_daemons = []
     firo_addr = None
-    test_coin_from = Coins.FIRO
     start_ltc_nodes = False
     start_xmr_nodes = False
 
@@ -397,9 +395,10 @@ class Test(BaseTest):
         swap_clients[0].getChainClientSettings(Coins.FIRO)['override_feerate'] = 10.0
         wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.BID_ERROR, wait_for=60)
 
-    def test_08_withdrawal(self):
-        logging.info('---------- Test {} withdrawals'.format(self.test_coin_from.name))
+    def test_08_wallet(self):
+        logging.info('---------- Test {} wallet'.format(self.test_coin_from.name))
 
+        logging.info('Test withdrawal')
         addr = self.callnoderpc('getnewaddress', ['Withdrawal test', ])
         wallets = read_json_api(TEST_HTTP_PORT + 0, 'wallets')
         assert (float(wallets[self.test_coin_from.name]['balance']) > 100)
@@ -409,7 +408,14 @@ class Test(BaseTest):
             'address': addr,
             'subfee': False,
         }
-        json_rv = json.loads(post_json_req('http://127.0.0.1:{}/json/wallets/{}/withdraw'.format(TEST_HTTP_PORT + 0, self.test_coin_from.name.lower()), post_json))
+        json_rv = read_json_api(TEST_HTTP_PORT + 0, 'wallets/{}/withdraw'.format(self.test_coin_from.name.lower()), post_json)
+        assert (len(json_rv['txid']) == 64)
+
+        logging.info('Test createutxo')
+        post_json = {
+            'value': 10,
+        }
+        json_rv = read_json_api(TEST_HTTP_PORT + 0, 'wallets/{}/createutxo'.format(self.test_coin_from.name.lower()), post_json)
         assert (len(json_rv['txid']) == 64)
 
     def test_101_full_swap(self):

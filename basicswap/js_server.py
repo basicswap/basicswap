@@ -37,17 +37,24 @@ from .ui.page_offers import postNewOffer
 from .protocols.xmr_swap_1 import recoverNoScriptTxnWithKey, getChainBSplitKey
 
 
+def getFormData(post_string, is_json):
+    if post_string == '':
+        raise ValueError('No post data')
+    if is_json:
+        form_data = json.loads(post_string)
+        form_data['is_json'] = True
+    else:
+        form_data = urllib.parse.parse_qs(post_string)
+    return form_data
+
+
 def js_error(self, error_str):
     error_str_json = json.dumps({'error': error_str})
     return bytes(error_str_json, 'UTF-8')
 
 
 def withdraw_coin(swap_client, coin_type, post_string, is_json):
-    if is_json:
-        post_data = json.loads(post_string)
-        post_data['is_json'] = True
-    else:
-        post_data = urllib.parse.parse_qs(post_string)
+    post_data = getFormData(post_string, is_json)
 
     value = get_data_entry(post_data, 'value')
     address = get_data_entry(post_data, 'address')
@@ -99,6 +106,13 @@ def js_wallets(self, url_split, post_string, is_json):
                 return bytes(json.dumps(withdraw_coin(swap_client, coin_type, post_string, is_json)), 'UTF-8')
             if cmd == 'nextdepositaddr':
                 return bytes(json.dumps(swap_client.cacheNewAddressForCoin(coin_type)), 'UTF-8')
+            if cmd == 'createutxo':
+                post_data = getFormData(post_string, is_json)
+                ci = swap_client.ci(coin_type)
+                value = ci.make_int(get_data_entry(post_data, 'value'))
+                txid_hex, new_addr = ci.createUTXO(value)
+                return bytes(json.dumps({'txid': txid_hex, 'address': new_addr}), 'UTF-8')
+
             raise ValueError('Unknown command')
 
         rv = swap_client.getWalletInfo(coin_type)
@@ -113,13 +127,7 @@ def js_offers(self, url_split, post_string, is_json, sent=False):
     offer_id = None
     if len(url_split) > 3:
         if url_split[3] == 'new':
-            if post_string == '':
-                raise ValueError('No post data')
-            if is_json:
-                form_data = json.loads(post_string)
-                form_data['is_json'] = True
-            else:
-                form_data = urllib.parse.parse_qs(post_string)
+            form_data = getFormData(post_string, is_json)
             offer_id = postNewOffer(swap_client, form_data)
             rv = {'offer_id': offer_id.hex()}
             return bytes(json.dumps(rv), 'UTF-8')
@@ -138,11 +146,7 @@ def js_offers(self, url_split, post_string, is_json, sent=False):
         filters['offer_id'] = offer_id
 
     if post_string != '':
-        if is_json:
-            post_data = json.loads(post_string)
-            post_data['is_json'] = True
-        else:
-            post_data = urllib.parse.parse_qs(post_string)
+        post_data = getFormData(post_string, is_json)
         filters['coin_from'] = setCoinFilter(post_data, 'coin_from')
         filters['coin_to'] = setCoinFilter(post_data, 'coin_to')
 
@@ -191,13 +195,7 @@ def js_bids(self, url_split, post_string, is_json):
     swap_client.checkSystemStatus()
     if len(url_split) > 3:
         if url_split[3] == 'new':
-            if post_string == '':
-                raise ValueError('No post data')
-            if is_json:
-                post_data = json.loads(post_string)
-                post_data['is_json'] = True
-            else:
-                post_data = urllib.parse.parse_qs(post_string)
+            post_data = getFormData(post_string, is_json)
 
             offer_id = bytes.fromhex(get_data_entry(post_data, 'offer_id'))
             assert (len(offer_id) == 28)
@@ -246,11 +244,7 @@ def js_bids(self, url_split, post_string, is_json):
 
         show_txns = False
         if post_string != '':
-            if is_json:
-                post_data = json.loads(post_string)
-                post_data['is_json'] = True
-            else:
-                post_data = urllib.parse.parse_qs(post_string)
+            post_data = getFormData(post_string, is_json)
             if have_data_entry(post_data, 'accept'):
                 swap_client.acceptBid(bid_id)
             elif have_data_entry(post_data, 'debugind'):
@@ -314,13 +308,7 @@ def js_smsgaddresses(self, url_split, post_string, is_json):
     swap_client = self.server.swap_client
     swap_client.checkSystemStatus()
     if len(url_split) > 3:
-        if post_string == '':
-            raise ValueError('No post data')
-        if is_json:
-            post_data = json.loads(post_string)
-            post_data['is_json'] = True
-        else:
-            post_data = urllib.parse.parse_qs(post_string)
+        post_data = getFormData(post_string, is_json)
         if url_split[3] == 'new':
             addressnote = get_data_entry_or(post_data, 'addressnote', '')
             new_addr, pubkey = swap_client.newSMSGAddress(addressnote=addressnote)
@@ -341,13 +329,7 @@ def js_smsgaddresses(self, url_split, post_string, is_json):
 
 
 def js_rates(self, url_split, post_string, is_json):
-    if post_string == '':
-        raise ValueError('No post data')
-    if is_json:
-        post_data = json.loads(post_string)
-        post_data['is_json'] = True
-    else:
-        post_data = urllib.parse.parse_qs(post_string)
+    post_data = getFormData(post_string, is_json)
 
     sc = self.server.swap_client
     coin_from = get_data_entry(post_data, 'coin_from')
@@ -365,13 +347,7 @@ def js_rates_list(self, url_split, query_string, is_json):
 
 
 def js_rate(self, url_split, post_string, is_json):
-    if post_string == '':
-        raise ValueError('No post data')
-    if is_json:
-        post_data = json.loads(post_string)
-        post_data['is_json'] = True
-    else:
-        post_data = urllib.parse.parse_qs(post_string)
+    post_data = getFormData(post_string, is_json)
 
     sc = self.server.swap_client
     coin_from = getCoinType(get_data_entry(post_data, 'coin_from'))
@@ -447,13 +423,7 @@ def js_vacuumdb(self, url_split, post_string, is_json):
 def js_getcoinseed(self, url_split, post_string, is_json):
     swap_client = self.server.swap_client
     swap_client.checkSystemStatus()
-    if post_string == '':
-        raise ValueError('No post data')
-    if is_json:
-        post_data = json.loads(post_string)
-        post_data['is_json'] = True
-    else:
-        post_data = urllib.parse.parse_qs(post_string)
+    post_data = getFormData(post_string, is_json)
 
     coin = getCoinType(get_data_entry(post_data, 'coin'))
     if coin in (Coins.PART, Coins.PART_ANON, Coins.PART_BLIND):
@@ -471,13 +441,7 @@ def js_setpassword(self, url_split, post_string, is_json):
     # Only works with currently enabled coins
     # Will fail if any coin does not unlock on the old password
     swap_client = self.server.swap_client
-    if post_string == '':
-        raise ValueError('No post data')
-    if is_json:
-        post_data = json.loads(post_string)
-        post_data['is_json'] = True
-    else:
-        post_data = urllib.parse.parse_qs(post_string)
+    post_data = getFormData(post_string, is_json)
 
     old_password = get_data_entry(post_data, 'oldpassword')
     new_password = get_data_entry(post_data, 'newpassword')
@@ -497,13 +461,7 @@ def js_setpassword(self, url_split, post_string, is_json):
 
 def js_unlock(self, url_split, post_string, is_json):
     swap_client = self.server.swap_client
-    if post_string == '':
-        raise ValueError('No post data')
-    if is_json:
-        post_data = json.loads(post_string)
-        post_data['is_json'] = True
-    else:
-        post_data = urllib.parse.parse_qs(post_string)
+    post_data = getFormData(post_string, is_json)
 
     password = get_data_entry(post_data, 'password')
 
@@ -520,13 +478,7 @@ def js_unlock(self, url_split, post_string, is_json):
 
 def js_lock(self, url_split, post_string, is_json):
     swap_client = self.server.swap_client
-    if post_string == '':
-        raise ValueError('No post data')
-    if is_json:
-        post_data = json.loads(post_string)
-        post_data['is_json'] = True
-    else:
-        post_data = urllib.parse.parse_qs(post_string)
+    post_data = getFormData(post_string, is_json)
 
     if have_data_entry(post_data, 'coin'):
         coin = getCoinType(get_data_entry(post_data, 'coin'))

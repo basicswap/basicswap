@@ -30,6 +30,9 @@ class FIROInterface(BTCInterface):
     def coin_type():
         return Coins.FIRO
 
+    def getExchangeName(self, exchange_name):
+        return 'zcoin'
+
     def initialiseWallet(self, key):
         # load with -hdseed= parameter
         pass
@@ -171,3 +174,6 @@ class FIROInterface(BTCInterface):
 
     def getWalletSeedID(self):
         return self.rpc_callback('getwalletinfo')['hdmasterkeyid']
+
+    def getSpendableBalance(self):
+        return self.make_int(self.rpc_callback('getwalletinfo')['balance'])
