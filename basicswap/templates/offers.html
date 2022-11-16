@@ -117,7 +117,7 @@
                     },
                     legend: {
                       show: true,
-                      showForSingleSeries: false,
+                      showForSingleSeries: true,
                       showForNullSeries: true,
                       showForZeroSeries: true,
                       position: "right",
@@ -337,9 +337,9 @@
                         <th scope="col" class="py-3 px-6"> Network </th>
                         <th scope="col" class="py-3 px-6"> Recipient </th>
                         <!--<th scope="col" class="py-3 px-6">ID</th>-->
-                        <th scope="col" class="py-3"> You Get (From) </th>
+                        <th scope="col" class="py-3"> You Get</th>
                         <th scope="col" class="py-3"></th>
-                        <th scope="col" class="py-3"> You Send (To)</th>
+                        <th scope="col" class="py-3"> You Send</th>
                         <th scope="col" class="py-3"></th>
                         <th scope="col" class="py-3 px-6"> Rate </th>
                         <!--Todo: Add swap + id back -->
@@ -363,7 +363,7 @@
                         <!--<td class="py-4 px-6 text-xs"><a class="monospace text-xs" href=/offer/{{ o[1] }}>{{ o[1]|truncate(6, True) }}</a></td>-->
                         <!--<td class="py-4 px-6 text-xs monospace">{{ o[8] }}{% if o[9]==true %} <b>Sent</b>{% endif %}</td>-->
                         <!--Todo: Add link back -->
-                        <td class="py-4 px-6 monospace">{{ o[7] }} {% if o[12]==2 %}(Revoked){% elif o[11]==true %}(Not Active){% else %}(Active){% endif %}</td>
+                        <td class="py-4 px-6">{{ o[7] }} {% if o[12]==2 %}(Revoked){% elif o[11]==true %}(Not Active){% else %}(Active){% endif %}</td>
                         <td class="py-4 px-6 text-xs monospace"><a href="/identity/{{ o[8] }}{% if o[9]==true %}{% endif %}">{{ o[8] }}</a></td>
                         <td class="py-4"><span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"><img class="h-7" src="/static/images/coins/{{ o[2]|replace(" ", "-") }}.png" alt=""></span> {{ o[2] }}</td>
                         <td class="py-4 text-xs">{{ o[4] }}</td>

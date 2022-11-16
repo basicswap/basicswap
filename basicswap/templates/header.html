@@ -214,7 +214,7 @@
                   <br/> <span class="mt-2 inline-flex text-xs font-small monospace text-center">
                   <a href="/offer/{{ entry[2].offer_id }}">{{ entry[2].offer_id|truncate(42, True) }}</a>
                   </span></div>
-                <div class="text-xs text-gray-600">{{ entry[0] }}</div>
+                <div class="text-xs text-gray-600 bold">{{ entry[0] }}</div>
               </div>
             </div>
             {% elif entry[1] == 2 %}
@@ -226,7 +226,7 @@
                   <br/> <span class="mt-2 inline-flex text-xs font-small monospace text-center">
                       <a href="/offer/{{ entry[2].offer_id }}">{{ entry[2].offer_id|truncate(42, True) }}</a>
                     </span></div>
-                <div class="text-xs text-gray-600">{{ entry[0] }}</div>
+                <div class="text-xs text-gray-600 bold">{{ entry[0] }}</div>
               </div>
             </div>
             {% elif entry[1] == 3 %}
@@ -238,7 +238,7 @@
                   <br/> <span class="mt-2 inline-flex text-xs font-small monospace text-center">
                   <a href="/bid/{{ entry[2].bid_id }}">{{ entry[2].bid_id|truncate(42, True) }}</a>
                   </span></div>
-                <div class="text-xs text-gray-600">{{ entry[0] }}</div>
+                <div class="text-xs text-gray-600 bold">{{ entry[0] }}</div>
               </div>
             </div>
             {% else %}
@@ -249,7 +249,7 @@
                     UNKNOWN EVENT</span>
                   <br/> <span class="mt-2 inline-flex text-xs font-small monospace text-center">
                   {{ entry[1] }}
-                  <div class="text-xs text-gray-600">{{ entry[0] }}</div>
+                  <div class="text-xs text-gray-600 bold">{{ entry[0] }}</div>
                 </div>
               </div>
                {% endif %}

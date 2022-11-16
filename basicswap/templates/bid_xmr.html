@@ -77,12 +77,26 @@
                   {% if data.was_sent == 'True' %}
                   <tr class="bg-white border-t hover:bg-gray-50">
                     <td class="py-4 px-6 bold">Swap</td>
-                    <td><span class="bold">(To) {{ data.amt_to }} {{ data.ticker_to }}</span> for <span class="bold">(From) {{ data.amt_from }} {{ data.ticker_from }}</span></td>
+                    <td>
+                      <div class="content flex py-2">
+                      <span class="bold">{{ data.amt_to }} {{ data.ticker_to }}</span>          
+                      <svg aria-hidden="true " class="w-5 h-5 ml-3 mr-3" fill="currentColor " viewBox="0 0 20 20 " xmlns="http://www.w3.org/2000/svg ">
+                      <path fill-rule="evenodd " d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z " clip-rule="evenodd "></path></svg>
+                       <span class="bold">{{ data.amt_from }} {{ data.ticker_from }}</span>
+                      </div>
+                    </td>
                   </tr>
                   {% else %}
                   <tr class="bg-white border-t hover:bg-gray-50">
                     <td class="py-4 px-6 bold">Swap</td>
-                    <td><span class="bold">(From) {{ data.amt_from }} {{ data.ticker_from }}</span> for <span class="bold">(To) {{ data.amt_to }} {{ data.ticker_to }}</span></td>
+                    <td>
+                      <div class="content flex py-2">
+                      <span class="bold">{{ data.amt_from }} {{ data.ticker_from }}</span>          
+                      <svg aria-hidden="true " class="w-5 h-5 ml-3 mr-3" fill="currentColor " viewBox="0 0 20 20 " xmlns="http://www.w3.org/2000/svg ">
+                      <path fill-rule="evenodd " d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z " clip-rule="evenodd "></path></svg>
+                       <span class="bold">{{ data.amt_to }} {{ data.ticker_to }}</span>
+                      </div>
+                    </td>
                   </tr>
                   {% endif %}
                   <tr class="bg-white border-t hover:bg-gray-50">
@@ -91,26 +105,26 @@
                   </tr>
                   {% if data.was_sent == 'True' %}
                    <tr class="bg-white border-t hover:bg-gray-50">
-                    <td class="py-4 px-6 bold">You Send (To) </td>
+                    <td class="py-4 px-6 bold">You Send</td>
                     <td> <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded">
                       <img class="h-7" src="/static/images/coins/{{ data.coin_to }}.png" alt="{{ data.coin_to }}">
                     </span> {{ data.coin_to }} </td>
                   </tr>
                   <tr class="bg-white border-t hover:bg-gray-50">
-                    <td class="py-4 px-6 bold">You Get (From)</td>
+                    <td class="py-4 px-6 bold">You Get</td>
                     <td> <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded">
                       <img class="h-7" src="/static/images/coins/{{ data.coin_from }}.png" alt="{{ data.coin_from }}">
                     </span> {{ data.coin_from }} </td>
                   </tr>
                   {% else %}
                   <tr class="bg-white border-t hover:bg-gray-50">
-                    <td class="py-4 px-6 bold">You Send (From)</td>
+                    <td class="py-4 px-6 bold">You Send</td>
                     <td> <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded">
                       <img class="h-7" src="/static/images/coins/{{ data.coin_from }}.png" alt="{{ data.coin_from }}">
                     </span> {{ data.coin_from }} </td>
                   </tr>
                   <tr class="bg-white border-t hover:bg-gray-50">
-                    <td class="py-4 px-6 bold">You Get (To)</td>
+                    <td class="py-4 px-6 bold">You Get</td>
                     <td> <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded">
                       <img class="h-7" src="/static/images/coins/{{ data.coin_to }}.png" alt="{{ data.coin_to }}">
                     </span> {{ data.coin_to }} </td>
@@ -353,7 +367,7 @@
                             <path fill="#556987" d="M12,3c1.989,0,3.873,0.65,5.43,1.833l-3.604,3.393l9.167,0.983L22.562,0l-3.655,3.442 C16.957,1.862,14.545,1,12,1C5.935,1,1,5.935,1,12h2C3,7.037,7.037,3,12,3z"></path>
                             <path data-color="#556987" d="M12,21c-1.989,0-3.873-0.65-5.43-1.833l3.604-3.393l-9.167-0.983L1.438,24l3.655-3.442 C7.043,22.138,9.455,23,12,23c6.065,0,11-4.935,11-11h-2C21,16.963,16.963,21,12,21z"></path>
                           </g>
-                        </svg> <span>View Tx</span> </button>
+                        </svg> <span>View Tx</span></button>
                     </div>
                     <div class="w-full md:w-auto p-1.5 ml-2">
                       <button name="view_lock_transfers" value="View Lock Wallet Transfers" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none">
@@ -362,7 +376,7 @@
                             <path fill="#556987" d="M12,3c1.989,0,3.873,0.65,5.43,1.833l-3.604,3.393l9.167,0.983L22.562,0l-3.655,3.442 C16.957,1.862,14.545,1,12,1C5.935,1,1,5.935,1,12h2C3,7.037,7.037,3,12,3z"></path>
                             <path data-color="#556987" d="M12,21c-1.989,0-3.873-0.65-5.43-1.833l3.604-3.393l-9.167-0.983L1.438,24l3.655-3.442 C7.043,22.138,9.455,23,12,23c6.065,0,11-4.935,11-11h-2C21,16.963,16.963,21,12,21z"></path>
                           </g>
-                        </svg> <span>View Lock Wallet Transfers</span> </button>
+                        </svg><span>View Lock Wallet Transfers</span></button>
                     </div>
                   </div>
                 </div>
@@ -377,14 +391,11 @@
               <textarea rows="15" class="outline-none block p-2.5 w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 monospace" id="transfers_view" readonly>{{ data.lock_transfers }}</textarea>
               {% endif %}
               {% endif %}
-
-
-
               {% if data.show_bidder_seq_diagram %}
             <section class="bg-white p-6">
               <div class="flex flex-wrap items-center">
                 <div class="w-full">
-                  <h4 class="font-semibold text-black text-2xl">Bidder Sequence Diagram</h4> </div>
+                  <h4 class="font-semibold text-black text-2xl">Bidder Sequence Diagram</h4></div>
               </div>
             </section>
             <section>
@@ -412,9 +423,6 @@
                 </div>
             </section>
           {% endif %}
-
-
-
               {% if data.chain_a_lock_tx_inputs %}
               <section class="bg-white p-6">
                 <div class="flex flex-wrap items-center">
@@ -464,9 +472,9 @@
                       {% if data.debug_ui == true %}
                       <tr>
                         <td class="py-6 pr-2 bold"">Debug Option</td>
-                        <td>
+                        <td>  
                           <div class="relative">
-                                                      <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                                   <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"></path>
                                 </svg>
                           <select class="appearance-none pr-15 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" name="debugind">
@@ -481,7 +489,6 @@
                       <tr>
                         <td class="pr-2 bold">Sweep No-Script TX</td>
                         <td>
-
                           <input class="appearance-none pr-15 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" type="text" id="kbs_other" name="kbs_other">
                         </td>
                       </tr>
@@ -493,7 +500,7 @@
                     </div>
                     <div class="w-full md:w-auto p-1.5">
                       <button name="edit_bid_submit" value="Submit" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none">
- <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#556987" stroke-linejoin="round" ><line x1="2" y1="23" x2="22" y2="23" stroke="#556987"></line> <line data-cap="butt" x1="13" y1="5" x2="17" y2="9"></line> <polygon points="8 18 3 19 4 14 16 2 20 6 8 18"></polygon></g></svg> Submit Edit </button>
+ <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#556987" stroke-linejoin="round" ><line x1="2" y1="23" x2="22" y2="23" stroke="#556987"></line> <line data-cap="butt" x1="13" y1="5" x2="17" y2="9"></line> <polygon points="8 18 3 19 4 14 16 2 20 6 8 18"></polygon></g></svg> Submit Edit Bid </button>
                     </div>
                     {% else %}
                     {% if data.show_bidder_seq_diagram %}
@@ -537,14 +544,14 @@
                     {% endif %}
                     <div class="w-full md:w-auto p-1.5">
                       <button name="edit_bid" type="submit" value="Edit Bid" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none">
- <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#556987" stroke-linejoin="round" ><line x1="2" y1="23" x2="22" y2="23" stroke="#556987"></line> <line data-cap="butt" x1="13" y1="5" x2="17" y2="9"></line> <polygon points="8 18 3 19 4 14 16 2 20 6 8 18"></polygon></g></svg> Edit bid </button>
+ <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#556987" stroke-linejoin="round" ><line x1="2" y1="23" x2="22" y2="23" stroke="#556987"></line> <line data-cap="butt" x1="13" y1="5" x2="17" y2="9"></line> <polygon points="8 18 3 19 4 14 16 2 20 6 8 18"></polygon></g></svg> Edit bit </button>
                     </div>
                     {% endif %}
                     {% if data.was_received == 'True' %}
                     <div class="w-full md:w-auto p-1.5">
                       <button name="accept_bid" value="Accept Bid" type="submit" onclick='return confirmPopup("Accept");' class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
 <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round" ><polyline points=" 6,12 10,16 18,8 " stroke="#ffffff"></polyline> <circle cx="12" cy="12" r="11"></circle></g></svg> Accept Bid </button>
-                    </div>
+                  </div>
                   {% endif %}
                 </div>
                 </div>
