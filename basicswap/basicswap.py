@@ -656,7 +656,11 @@ class BasicSwap(BaseApp):
                         self.log.error('Sanity checks failed: %s', str(e))
 
                 elif c == Coins.XMR:
-                    ci.ensureWalletExists()
+                    try:
+                        ci.ensureWalletExists()
+                    except Exception as e:
+                        self.log.warning('Can\'t open XMR wallet, could be locked.')
+                        continue
 
                 self.checkWalletSeed(c)
 
@@ -740,7 +744,7 @@ class BasicSwap(BaseApp):
                 yield c
 
     def changeWalletPasswords(self, old_password, new_password):
-
+        # Only the main wallet password is changed for monero, avoid issues by preventing until active swaps are complete
         if len(self.swaps_in_progress) > 0:
             raise ValueError('Can\'t change passwords while swaps are in progress')
 
@@ -767,6 +771,7 @@ class BasicSwap(BaseApp):
         if coin_type == Coins.PART:
             return
         ci = self.ci(coin_type)
+        db_key_coin_name = ci.coin_name().lower()
         self.log.info('Initialising {} wallet.'.format(ci.coin_name()))
 
         if coin_type == Coins.XMR:
@@ -775,7 +780,7 @@ class BasicSwap(BaseApp):
             ci.initialiseWallet(key_view, key_spend)
             root_address = ci.getAddressFromKeys(key_view, key_spend)
 
-            key_str = 'main_wallet_addr_' + ci.coin_name().lower()
+            key_str = 'main_wallet_addr_' + db_key_coin_name
             self.setStringKV(key_str, root_address)
             return
 
@@ -789,9 +794,23 @@ class BasicSwap(BaseApp):
             self.log.error('initialiseWallet failed: {}'.format(str(e)))
             if raise_errors:
                 raise e
+            return
 
-        key_str = 'main_wallet_seedid_' + ci.coin_name().lower()
-        self.setStringKV(key_str, root_hash.hex())
+        try:
+            session = self.openSession()
+            key_str = 'main_wallet_seedid_' + db_key_coin_name
+            self.setStringKV(key_str, root_hash.hex(), session)
+
+            # Clear any saved addresses
+            self.clearStringKV('receive_addr_' + db_key_coin_name, session)
+            self.clearStringKV('stealth_addr_' + db_key_coin_name, session)
+
+            coin_id = int(coin_type)
+            info_type = 1  # wallet
+            query_str = f'DELETE FROM wallets WHERE coin_id = {coin_id} AND balance_type = {info_type}'
+            session.execute(query_str)
+        finally:
+            self.closeSession(session)
 
     def updateIdentityBidState(self, session, address, bid):
         identity_stats = session.query(KnownIdentity).filter_by(address=address).first()
@@ -831,20 +850,18 @@ class BasicSwap(BaseApp):
             session.remove()
             self.mxDB.release()
 
-    def setStringKV(self, str_key, str_val):
-        with self.mxDB:
-            try:
-                session = scoped_session(self.session_factory)
-                kv = session.query(DBKVString).filter_by(key=str_key).first()
-                if not kv:
-                    kv = DBKVString(key=str_key, value=str_val)
-                else:
-                    kv.value = str_val
-                session.add(kv)
-                session.commit()
-            finally:
-                session.close()
-                session.remove()
+    def setStringKV(self, str_key, str_val, session=None):
+        try:
+            use_session = self.openSession(session)
+            kv = use_session.query(DBKVString).filter_by(key=str_key).first()
+            if not kv:
+                kv = DBKVString(key=str_key, value=str_val)
+            else:
+                kv.value = str_val
+            use_session.add(kv)
+        finally:
+            if session is None:
+                self.closeSession(use_session)
 
     def getStringKV(self, str_key):
         self.mxDB.acquire()
@@ -858,6 +875,16 @@ class BasicSwap(BaseApp):
             session.close()
             session.remove()
             self.mxDB.release()
+
+    def clearStringKV(self, str_key, str_val):
+        with self.mxDB:
+            try:
+                session = scoped_session(self.session_factory)
+                session.execute('DELETE FROM kv_string WHERE key = "{}" '.format(str_key))
+                session.commit()
+            finally:
+                session.close()
+                session.remove()
 
     def activateBid(self, session, bid):
         if bid.bid_id in self.swaps_in_progress:
@@ -1442,6 +1469,7 @@ class BasicSwap(BaseApp):
             record.bid_id = bid_id
             record.tx_type = tx_type
             addr = record.addr
+            ensure(self.ci(coin_type).isAddressMine(addr), 'Pool address not owned by wallet!')
             session.add(record)
             session.commit()
         finally:
@@ -1539,6 +1567,7 @@ class BasicSwap(BaseApp):
             if expect_address is None:
                 self.log.warning('Can\'t find expected main wallet address for coin {}'.format(ci.coin_name()))
                 return False
+            ci._have_checked_seed = True
             if expect_address == ci.getMainWalletAddress():
                 ci.setWalletSeedWarning(False)
                 return True

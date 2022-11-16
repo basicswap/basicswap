@@ -115,8 +115,14 @@ def ws_message_received(client, server, message):
 
 def runClient(fp, data_dir, chain):
     global swap_client
+    daemons = []
+    pids = []
+    threads = []
     settings_path = os.path.join(data_dir, cfg.CONFIG_FILENAME)
     pids_path = os.path.join(data_dir, '.pids')
+
+    if os.getenv('WALLET_ENCRYPTION_PWD', '') != '':
+        raise ValueError('Please unset the WALLET_ENCRYPTION_PWD environment variable.')
 
     if not os.path.exists(settings_path):
         raise ValueError('Settings file not found: ' + str(settings_path))
@@ -125,10 +131,6 @@ def runClient(fp, data_dir, chain):
         settings = json.load(fs)
 
     swap_client = BasicSwap(fp, data_dir, settings, chain)
-
-    daemons = []
-    pids = []
-    threads = []
 
     if os.path.exists(pids_path):
         with open(pids_path) as fd:

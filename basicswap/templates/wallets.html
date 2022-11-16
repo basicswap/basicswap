@@ -82,7 +82,9 @@
               <div class="flex mb-2 justify-between items-center">
                 <h4 class="text-xs font-medium">Last Updated:</h4> <span class="inline-block py-1 px-2 rounded-full bg-blue-100 text-xs text-black-500">{{ w.lastupdated }}</span></div>{% if w.bootstrapping %}
               <div class="flex mb-2 justify-between items-center">
-                <h4 class="text-xs font-medium">Bootstrapping:</h4> <span class="inline-block py-1 px-2 rounded-full bg-blue-100 text-xs text-black-500">{{ w.bootstrapping }}</span></div>{% endif %}
+                <h4 class="text-xs font-medium">Bootstrapping:</h4> <span class="inline-block py-1 px-2 rounded-full bg-blue-100 text-xs text-black-500">{{ w.bootstrapping }}</span></div>{% endif %}{% if w.encrypted %}
+              <div class="flex mb-2 justify-between items-center">
+                <h4 class="text-xs font-medium">Locked:</h4> <span class="inline-block py-1 px-2 rounded-full bg-blue-100 text-xs text-black-500">{{ w.locked }}</span></div>{% endif %}
               <div class="flex mb-2 justify-between items-center">
                 <h4 class="text-xs font-medium">Expected Seed:</h4> <span class="inline-block py-1 px-2 rounded-full bg-blue-100 text-xs text-black-500">{{ w.expected_seed }}</span></div>
               <div class="flex justify-between mb-1 mt-10"> <span class="text-xs font-medium text-blue-700">Blockchain</span> <span class="text-xs font-medium text-blue-700">{{ w.synced }}%</span></div>

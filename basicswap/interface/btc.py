@@ -188,6 +188,7 @@ class BTCInterface(CoinInterface):
         self._connection_type = coin_settings['connection_type']
         self._sc = swap_client
         self._log = self._sc.log if self._sc and self._sc.log else logging
+        self._expect_seedid_hex = None
 
     def using_segwit(self):
         return self._use_segwit
@@ -297,6 +298,7 @@ class BTCInterface(CoinInterface):
         return self.rpc_callback('getwalletinfo')['hdseedid']
 
     def checkExpectedSeed(self, expect_seedid):
+        self._expect_seedid_hex = expect_seedid
         return expect_seedid == self.getWalletSeedID()
 
     def getNewAddress(self, use_segwit, label='swap_receive'):
@@ -304,6 +306,15 @@ class BTCInterface(CoinInterface):
         if use_segwit:
             args.append('bech32')
         return self.rpc_callback('getnewaddress', args)
+
+    def isAddressMine(self, address):
+        addr_info = self.rpc_callback('getaddressinfo', [address])
+        return addr_info['ismine']
+
+    def checkAddressMine(self, address):
+        addr_info = self.rpc_callback('getaddressinfo', [address])
+        ensure(addr_info['ismine'], 'ismine is false')
+        ensure(addr_info['hdseedid'] == self._expect_seedid_hex, 'unexpected seedid')
 
     def get_fee_rate(self, conf_target=2):
         try:

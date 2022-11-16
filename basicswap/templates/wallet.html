@@ -170,12 +170,18 @@
                     <tr class="bg-white border-t hover:bg-gray-50">
                       <td class="py-4 px-6 bold">Bootstrapping:</td>
                       <td>{{ w.bootstrapping }}</td>
-                    </tr> 
+                    </tr>
+                    {% endif %}
+                    {% if w.encrypted %}
+                    <tr class="bg-white border-t hover:bg-gray-50">
+                      <td class="py-4 px-6 bold">Locked:</td>
+                      <td>{{ w.locked }}</td>
+                    </tr>
                     {% endif %}
                     <tr class="bg-white border-t hover:bg-gray-50">
                       <td class="py-4 px-6 bold">Expected Seed:</td>
                       <td>{{ w.expected_seed }}</td>
-                    {% if w.expected_seed != true %}
+                    {% if w.expected_seed != true %}  {# Only show addresses if wallet seed is correct #}
                   </tr>
                   </table>
                 </div>

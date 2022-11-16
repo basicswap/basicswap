@@ -32,6 +32,7 @@ from .ui.util import (
     have_data_entry,
     tickerToCoinId,
     listOldBidStates,
+    checkAddressesOwned,
 )
 from .ui.page_offers import postNewOffer
 from .protocols.xmr_swap_1 import recoverNoScriptTxnWithKey, getChainBSplitKey
@@ -117,8 +118,10 @@ def js_wallets(self, url_split, post_string, is_json):
 
         rv = swap_client.getWalletInfo(coin_type)
         rv.update(swap_client.getBlockchainInfo(coin_type))
+        ci = swap_client.ci(coin_type)
+        checkAddressesOwned(ci, rv)
         return bytes(json.dumps(rv), 'UTF-8')
-    return bytes(json.dumps(self.server.swap_client.getWalletsInfo({'ticker_key': True})), 'UTF-8')
+    return bytes(json.dumps(swap_client.getWalletsInfo({'ticker_key': True})), 'UTF-8')
 
 
 def js_offers(self, url_split, post_string, is_json, sent=False):

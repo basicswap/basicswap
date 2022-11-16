@@ -160,8 +160,8 @@ TEST_ONION_LINK = toBool(os.getenv('TEST_ONION_LINK', 'false'))
 BITCOIN_FASTSYNC_URL = os.getenv('BITCOIN_FASTSYNC_URL', 'http://utxosets.blob.core.windows.net/public/')
 BITCOIN_FASTSYNC_FILE = os.getenv('BITCOIN_FASTSYNC_FILE', 'utxo-snapshot-bitcoin-mainnet-720179.tar')
 
-# Set to false when running individual docker containers
-START_DAEMONS = toBool(os.getenv('START_DAEMONS', 'true'))
+# Encrypt new wallets with this password, must match the Particl wallet password when adding coins
+WALLET_ENCRYPTION_PWD = os.getenv('WALLET_ENCRYPTION_PWD', '')
 
 use_tor_proxy = False
 
@@ -933,14 +933,49 @@ def finalise_daemon(d):
             fp.close()
 
 
+def test_particl_encryption(data_dir, settings, chain, use_tor_proxy):
+    swap_client = None
+    daemons = []
+    daemon_args = ['-noconnect', '-nodnsseed', '-nofindpeers', '-nostaking']
+    if not use_tor_proxy:
+        # Cannot set -bind or -whitebind together with -listen=0
+        daemon_args.append('-nolisten')
+    with open(os.path.join(data_dir, 'basicswap.log'), 'a') as fp:
+        try:
+            swap_client = BasicSwap(fp, data_dir, settings, chain)
+            c = Coins.PART
+            coin_name = 'particl'
+            coin_settings = settings['chainclients'][coin_name]
+            if coin_settings['manage_daemon']:
+                filename = coin_name + 'd' + ('.exe' if os.name == 'nt' else '')
+                daemons.append(startDaemon(coin_settings['datadir'], coin_settings['bindir'], filename, daemon_args))
+                swap_client.setDaemonPID(c, daemons[-1].pid)
+            swap_client.setCoinRunParams(c)
+            swap_client.createCoinInterface(c)
+
+            if swap_client.ci(c).isWalletEncrypted():
+                logger.info('Particl Wallet is encrypted')
+                if WALLET_ENCRYPTION_PWD == '':
+                    raise ValueError('Must set WALLET_ENCRYPTION_PWD to add coin when Particl wallet is encrypted')
+                swap_client.ci(c).unlockWallet(WALLET_ENCRYPTION_PWD)
+        finally:
+            if swap_client:
+                swap_client.finalise()
+                del swap_client
+            for d in daemons:
+                finalise_daemon(d)
+
+
 def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, chain, use_tor_proxy):
+    swap_client = None
     daemons = []
     daemon_args = ['-noconnect', '-nodnsseed']
     if not use_tor_proxy:
         # Cannot set -bind or -whitebind together with -listen=0
         daemon_args.append('-nolisten')
-    try:
-        with open(os.path.join(data_dir, 'basicswap.log'), 'a') as fp:
+
+    with open(os.path.join(data_dir, 'basicswap.log'), 'a') as fp:
+        try:
             swap_client = BasicSwap(fp, data_dir, settings, chain)
 
             # Always start Particl, it must be running to initialise a wallet in addcoin mode
@@ -950,20 +985,19 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
                 coin_settings = settings['chainclients'][coin_name]
                 c = swap_client.getCoinIdFromName(coin_name)
 
-                if START_DAEMONS:
-                    if c == Coins.XMR:
-                        if coin_settings['manage_wallet_daemon']:
-                            daemons.append(startXmrWalletDaemon(coin_settings['datadir'], coin_settings['bindir'], 'monero-wallet-rpc'))
-                    else:
-                        if coin_settings['manage_daemon']:
-                            filename = coin_name + 'd' + ('.exe' if os.name == 'nt' else '')
-                            coin_args = ['-nofindpeers', '-nostaking'] if c == Coins.PART else []
+                if c == Coins.XMR:
+                    if coin_settings['manage_wallet_daemon']:
+                        daemons.append(startXmrWalletDaemon(coin_settings['datadir'], coin_settings['bindir'], 'monero-wallet-rpc'))
+                else:
+                    if coin_settings['manage_daemon']:
+                        filename = coin_name + 'd' + ('.exe' if os.name == 'nt' else '')
+                        coin_args = ['-nofindpeers', '-nostaking'] if c == Coins.PART else []
 
-                            if c == Coins.FIRO:
-                                coin_args += ['-hdseed={}'.format(swap_client.getWalletKey(Coins.FIRO, 1).hex())]
+                        if c == Coins.FIRO:
+                            coin_args += ['-hdseed={}'.format(swap_client.getWalletKey(Coins.FIRO, 1).hex())]
 
-                            daemons.append(startDaemon(coin_settings['datadir'], coin_settings['bindir'], filename, daemon_args + coin_args))
-                            swap_client.setDaemonPID(c, daemons[-1].pid)
+                        daemons.append(startDaemon(coin_settings['datadir'], coin_settings['bindir'], filename, daemon_args + coin_args))
+                        swap_client.setDaemonPID(c, daemons[-1].pid)
                 swap_client.setCoinRunParams(c)
                 swap_client.createCoinInterface(c)
 
@@ -975,16 +1009,22 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
                         logger.info('Creating wallet.dat for {}.'.format(getCoinName(c)))
 
                         if c == Coins.BTC:
-                            # wallet_name, wallet_name, blank, passphrase, avoid_reuse, descriptors
+                            # wallet_name, disable_private_keys, blank, passphrase, avoid_reuse, descriptors
                             swap_client.callcoinrpc(c, 'createwallet', ['wallet.dat', False, True, '', False, False])
                         else:
                             swap_client.callcoinrpc(c, 'createwallet', ['wallet.dat'])
 
-                    if 'particl' in with_coins and c == Coins.PART:
-                        logger.info('Loading Particl mnemonic')
-                        if particl_wallet_mnemonic is None:
-                            particl_wallet_mnemonic = swap_client.callcoinrpc(Coins.PART, 'mnemonic', ['new'])['mnemonic']
-                        swap_client.callcoinrpc(Coins.PART, 'extkeyimportmaster', [particl_wallet_mnemonic])
+                    if c == Coins.PART:
+                        if 'particl' in with_coins:
+                            logger.info('Loading Particl mnemonic')
+                            if particl_wallet_mnemonic is None:
+                                particl_wallet_mnemonic = swap_client.callcoinrpc(Coins.PART, 'mnemonic', ['new'])['mnemonic']
+                            swap_client.callcoinrpc(Coins.PART, 'extkeyimportmaster', [particl_wallet_mnemonic])
+                            if WALLET_ENCRYPTION_PWD != '':
+                                swap_client.ci(c).changeWalletPassword('', WALLET_ENCRYPTION_PWD)
+                        # Particl wallet must be unlocked to call getWalletKey
+                        if WALLET_ENCRYPTION_PWD != '':
+                            swap_client.ci(c).unlockWallet(WALLET_ENCRYPTION_PWD)
 
             for coin_name in with_coins:
                 c = swap_client.getCoinIdFromName(coin_name)
@@ -992,12 +1032,15 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
                     continue
                 swap_client.waitForDaemonRPC(c)
                 swap_client.initialiseWallet(c)
+                if WALLET_ENCRYPTION_PWD != '':
+                    swap_client.ci(c).changeWalletPassword('', WALLET_ENCRYPTION_PWD)
 
-            swap_client.finalise()
-            del swap_client
-    finally:
-        for d in daemons:
-            finalise_daemon(d)
+        finally:
+            if swap_client:
+                swap_client.finalise()
+                del swap_client
+            for d in daemons:
+                finalise_daemon(d)
 
     if particl_wallet_mnemonic is not None:
         if particl_wallet_mnemonic:
@@ -1368,6 +1411,9 @@ def main():
     if add_coin != '':
         logger.info('Adding coin: %s', add_coin)
         settings = load_config(config_path)
+
+        # Ensure Particl wallet is unencrypted or correct password is supplied
+        test_particl_encryption(data_dir, settings, chain, use_tor_proxy)
 
         if add_coin in settings['chainclients']:
             coin_settings = settings['chainclients'][add_coin]

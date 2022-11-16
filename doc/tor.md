@@ -15,6 +15,7 @@ basicswap-prepare can be configured to download all binaries through tor and to 
 
 Docker will create directories instead of files if these don't exist.
 
+    mkdir -p $COINDATA_PATH/tor
     touch $COINDATA_PATH/tor/torrc
 
 

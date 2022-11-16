@@ -75,6 +75,7 @@ class XMRInterface(CoinInterface):
         self._sc = swap_client
         self._log = self._sc.log if self._sc and self._sc.log else logging
         self._wallet_password = None
+        self._have_checked_seed = False
 
     def setFeePriority(self, new_priority):
         ensure(new_priority >= 0 and new_priority < 4, 'Invalid fee_priority value')
@@ -534,6 +535,13 @@ class XMRInterface(CoinInterface):
         self._log.info('unlockWallet - {}'.format(self.ticker()))
         self._wallet_password = password
 
+        if not self._have_checked_seed:
+            self._sc.checkWalletSeed(self.coin_type())
+
     def lockWallet(self):
         self._log.info('lockWallet - {}'.format(self.ticker()))
         self._wallet_password = None
+
+    def isAddressMine(self, address):
+        # TODO
+        return True

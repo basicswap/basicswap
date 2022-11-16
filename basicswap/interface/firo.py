@@ -55,6 +55,10 @@ class FIROInterface(BTCInterface):
         addr_info = self.rpc_callback('validateaddress', [address])
         return addr_info['iswatchonly']
 
+    def isAddressMine(self, address):
+        addr_info = self.rpc_callback('validateaddress', [address])
+        return addr_info['ismine']
+
     def getSCLockScriptAddress(self, lock_script):
         lock_tx_dest = self.getScriptDest(lock_script)
         address = self.encodeScriptDest(lock_tx_dest)

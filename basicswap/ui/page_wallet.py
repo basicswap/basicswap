@@ -9,6 +9,7 @@ import traceback
 from .util import (
     get_data_entry,
     have_data_entry,
+    checkAddressesOwned,
 )
 from basicswap.util import (
     ensure,
@@ -31,6 +32,8 @@ def format_wallet_data(ci, w):
         'blocks': w.get('blocks', '?'),
         'synced': w.get('synced', '?'),
         'expected_seed': w.get('expected_seed', '?'),
+        'encrypted': w.get('encrypted', '?'),
+        'locked': w.get('locked', '?'),
         'updating': w.get('updating', '?'),
         'havedata': True,
     }
@@ -55,6 +58,8 @@ def format_wallet_data(ci, w):
         wf['anon_balance'] = w.get('anon_balance', '?')
         if 'anon_pending' in w and float(w['anon_pending']) > 0.0:
             wf['anon_pending'] = w['anon_pending']
+
+    checkAddressesOwned(ci, wf)
     return wf
 
 
@@ -297,7 +302,6 @@ def page_wallet(self, url_split, post_string):
 
         if show_utxo_groups:
             utxo_groups = ''
-
             unspent_by_addr = ci.getUnspentsByAddr()
 
             sorted_unspent_by_addr = sorted(unspent_by_addr.items(), key=lambda x: x[1], reverse=True)
@@ -306,6 +310,8 @@ def page_wallet(self, url_split, post_string):
 
             wallet_data['show_utxo_groups'] = True
             wallet_data['utxo_groups'] = utxo_groups
+
+        checkAddressesOwned(ci, wallet_data)
 
     template = server.env.get_template('wallet.html')
     return self.render_template(template, {
