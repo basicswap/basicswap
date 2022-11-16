@@ -36,7 +36,7 @@
             <h2 class="mb-6 text-4xl font-bold text-white tracking-tighter">Offer (normal)</h2>
             <p class="font-semibold text-coolGray-200">Offer ID: {{ offer_id }}</p>
           </div>
-          <div class="w-full md:w-1/2 p-3 p-6 container flex flex-wrap items-center justify-end items-center mx-auto"> 
+          <div class="w-full md:w-1/2 p-3 p-6 container flex flex-wrap items-center justify-end items-center mx-auto">
             {% if refresh %}
             <a id="refresh" href="/offer/{{ offer_id }}" class="flex flex-wrap justify-center px-5 py-4 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
               <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
@@ -107,13 +107,13 @@
                     <td>{{ data.state }}</td>
                   </tr>
                   <tr class="bg-white border-t hover:bg-gray-50">
-                  <td class="py-4 px-6 bold">You Get</td>
+                  <td class="py-4 px-6 bold">{% if data.sent %}You Send{% else %}You Send{% endif %}</td>
                   <td><span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded">
                       <img class="h-7" src="/static/images/coins/{{ data.coin_from }}.png" alt="{{ data.coin_from }}">
                     </span> {{ data.coin_from }} </td>
                   </tr>
                   <tr class="bg-white border-t hover:bg-gray-50">
-                    <td class="py-4 px-6 bold">You Send</td>
+                    <td class="py-4 px-6 bold">{% if data.sent %}You Get{% else %}You Get{% endif %}</td>
                   <td><span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded">
                       <img class="h-7" src="/static/images/coins/{{ data.coin_to }}.png" alt="{{ data.coin_to }}">
                     </span> {{ data.coin_to }} </td>
@@ -270,7 +270,7 @@
                     </thead>
                     <tr class="bg-white border-t hover:bg-gray-50">
                       <td class="py-4 px-6 ">Amount you will get <span class="bold" id="bid_amt_from">{{ data.amt_from }}</span> {{ data.tla_from }} {% if data.xmr_type == true %} (excluding {{ data.amt_from_lock_spend_tx_fee }} {{ data.tla_from }} in tx fees). {% else %} (excluding a tx fee). {% endif %}</td>
-                      <td class="">Anount you will send <span class="bold" id="bid_amt_to">{{ data.amt_to }}</span> {{ data.tla_to }}</td>
+                      <td class="">Amount you will send <span class="bold" id="bid_amt_to">{{ data.amt_to }}</span> {{ data.tla_to }}</td>
                     </tr>
                     <tr class="bg-white border-t hover:bg-gray-50">
                       <td class="py-4 px-6 bold bold">Send From Address</td>
@@ -317,7 +317,7 @@
                         <div class="relative">
                         <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                                   <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"></path>
-                                </svg>                          
+                                </svg>
                         <select class="appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" name="debugind">
                           <option{% if data.debug_ind=="-1" %} selected{% endif %} value="-1">None</option>
                             {% for a in data.debug_options %}
