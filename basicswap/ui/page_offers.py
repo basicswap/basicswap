@@ -637,7 +637,7 @@ def page_offers(self, url_split, post_string, sent=False):
     template = server.env.get_template('offers.html')
     return self.render_template(template, {
         'page_type': 'Your Offers' if sent else 'Network Order Book',
-        'page_type_description': '' if sent else '',
+        'page_type_description': 'Your entire offer history.' if sent else 'Consult available offers in the order book and initiate a coin swap.',
         'messages': messages,
         'show_chart': False if sent else swap_client.settings.get('show_chart', True),
         'chart_api_key': chart_api_key,
