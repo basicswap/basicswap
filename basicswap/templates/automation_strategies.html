@@ -26,7 +26,10 @@
   </section>
   <section class="py-4">
     <div class="container px-4 mx-auto">
-      <div class="relative py-11 px-16 bg-coolGray-900 rounded-md overflow-hidden"> <img class="absolute z-10 left-4 top-4" src="/static/images/elements/dots-red.svg" alt=""> <img class="absolute z-10 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt=""> <img class="absolute h-64 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" src="/static/elements/wave.svg" alt="">
+      <div class="relative py-11 px-16 bg-coolGray-900 rounded-md overflow-hidden">
+        <img class="absolute z-10 left-4 top-4" src="/static/images/elements/dots-red.svg" alt="">
+        <img class="absolute z-10 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt="">
+        <img class="absolute h-64 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" src="/static/elements/wave.svg" alt="">
         <div class="relative z-20 flex flex-wrap items-center -m-3">
           <div class="w-full md:w-1/2 p-3">
             <h2 class="mb-6 text-4xl font-bold text-white tracking-tighter">Automation Strategies</h2>
@@ -121,13 +124,13 @@
                       <th scope="col" class="py-3 px-6">Name</th>
                       <th scope="col" class="py-3">Type</th>
                     </tr>
-                  </thead> 
+                  </thead>
                   {% for s in strategies %}
                   <tr class="bg-white border-t hover:bg-gray-50">
                     <td class="py-4 px-6 bold w-96"> <a class="monospace bolder-t" href=/automationstrategy/{{ s[0] }}>{{ s[1] }}</a> </td>
                     <td class="py-4 pr-5">{{ s[2] }} </td>
-                  </tr> 
-                {% endfor %} 
+                  </tr>
+                {% endfor %}
               </table>
               </div>
             </div>

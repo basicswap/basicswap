@@ -27,7 +27,10 @@
   </section>
   <section class="py-4">
     <div class="container px-4 mx-auto">
-      <div class="relative py-11 px-16 bg-coolGray-900 rounded-md overflow-hidden"> <img class="absolute z-10 left-4 top-4" src="/static/images/elements/dots-red.svg" alt=""> <img class="absolute z-10 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt=""> <img class="absolute h-64 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" src="/static/images/elements/wave.svg" alt="">
+      <div class="relative py-11 px-16 bg-coolGray-900 rounded-md overflow-hidden">
+        <img class="absolute z-10 left-4 top-4" src="/static/images/elements/dots-red.svg" alt="">
+        <img class="absolute z-10 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt="">
+        <img class="absolute h-64 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" src="/static/images/elements/wave.svg" alt="">
         <div class="relative z-20 flex flex-wrap items-center -m-3">
           <div class="w-full md:w-1/2 p-3">
             <h2 class="mb-6 text-4xl font-bold text-white tracking-tighter">Bid
@@ -44,7 +47,7 @@
                   <path fill="#ffffff" d="M12,3c1.989,0,3.873,0.65,5.43,1.833l-3.604,3.393l9.167,0.983L22.562,0l-3.655,3.442 C16.957,1.862,14.545,1,12,1C5.935,1,1,5.935,1,12h2C3,7.037,7.037,3,12,3z"></path>
                   <path data-color="color-2" d="M12,21c-1.989,0-3.873-0.65-5.43-1.833l3.604-3.393l-9.167-0.983L1.438,24l3.655-3.442 C7.043,22.138,9.455,23,12,23c6.065,0,11-4.935,11-11h-2C21,16.963,16.963,21,12,21z"></path>
                 </g>
-              </svg> <span>Refresh {{ refresh }} seconds</span> </a>
+              </svg><span>Refresh {{ refresh }} seconds</span></a>
               {% else %}
             <a id="refresh" href="/bid/{{ bid_id }}" class="flex flex-wrap justify-center px-5 py-4 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
               <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
@@ -52,7 +55,7 @@
                   <path fill="#ffffff" d="M12,3c1.989,0,3.873,0.65,5.43,1.833l-3.604,3.393l9.167,0.983L22.562,0l-3.655,3.442 C16.957,1.862,14.545,1,12,1C5.935,1,1,5.935,1,12h2C3,7.037,7.037,3,12,3z"></path>
                   <path data-color="color-2" d="M12,21c-1.989,0-3.873-0.65-5.43-1.833l3.604-3.393l-9.167-0.983L1.438,24l3.655-3.442 C7.043,22.138,9.455,23,12,23c6.065,0,11-4.935,11-11h-2C21,16.963,16.963,21,12,21z"></path>
                 </g>
-              </svg> <span>Refresh</span> </a>
+              </svg><span>Refresh</span></a>
             {% endif %}
           </div>
         </div>
@@ -91,7 +94,7 @@
                     <td class="py-4 px-6 bold">Swap</td>
                     <td>
                       <div class="content flex py-2">
-                      <span class="bold">{{ data.amt_from }} {{ data.ticker_from }}</span>          
+                      <span class="bold">{{ data.amt_from }} {{ data.ticker_from }}</span>
                       <svg aria-hidden="true " class="w-5 h-5 ml-3 mr-3" fill="currentColor " viewBox="0 0 20 20 " xmlns="http://www.w3.org/2000/svg ">
                       <path fill-rule="evenodd " d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z " clip-rule="evenodd "></path></svg>
                        <span class="bold">{{ data.amt_to }} {{ data.ticker_to }}</span>
@@ -204,7 +207,7 @@
             <section class="bg-white p-6">
               <div class="flex flex-wrap items-center">
                 <div class="w-full">
-                  <h4 class="font-semibold text-black text-2xl">Old states</h4> </div>
+                  <h4 class="font-semibold text-black text-2xl">Old states</h4></div>
               </div>
             </section>
             <div class="container px-0 mx-auto">
@@ -496,61 +499,61 @@
                   </table>
                     <div class="w-full md:w-auto p-1.5 ml-2">
                       <button name="edit_bid_cancel" value="Cancel" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-red-500 hover:text-red-600 border border-red-400 hover:border-red-500 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none">
-<svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ef5844" stroke-linejoin="round" ><line x1="16" y1="8" x2="8" y2="16" stroke="#ef5844"></line> <line x1="16" y1="16" x2="8" y2="8" stroke="#ef5844"></line> <circle cx="12" cy="12" r="11"></circle></g></svg> Cancel </button>
+                      <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ef5844" stroke-linejoin="round" ><line x1="16" y1="8" x2="8" y2="16" stroke="#ef5844"></line> <line x1="16" y1="16" x2="8" y2="8" stroke="#ef5844"></line> <circle cx="12" cy="12" r="11"></circle></g></svg> Cancel </button>
                     </div>
                     <div class="w-full md:w-auto p-1.5">
                       <button name="edit_bid_submit" value="Submit" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none">
- <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#556987" stroke-linejoin="round" ><line x1="2" y1="23" x2="22" y2="23" stroke="#556987"></line> <line data-cap="butt" x1="13" y1="5" x2="17" y2="9"></line> <polygon points="8 18 3 19 4 14 16 2 20 6 8 18"></polygon></g></svg> Submit Edit Bid </button>
+                      <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#556987" stroke-linejoin="round" ><line x1="2" y1="23" x2="22" y2="23" stroke="#556987"></line> <line data-cap="butt" x1="13" y1="5" x2="17" y2="9"></line> <polygon points="8 18 3 19 4 14 16 2 20 6 8 18"></polygon></g></svg> Submit Edit Bid </button>
                     </div>
                     {% else %}
                     {% if data.show_bidder_seq_diagram %}
                     <div class="w-full md:w-auto p-1.5">
                       <button name="hide_bidder_seq_diagram" type="submit" value="Hide Bidder Sequence Diagram" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none">
-<svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#556987" stroke-linejoin="round" ><rect x="2" y="2" width="8" height="4"></rect><rect x="2" y="18" width="8" height="4"></rect><line x1="6" y1="9" x2="6" y2="15"></line><polyline points="13 4 17 4 17 6"></polyline><polyline points="13 20 17 20 17 18"></polyline><polygon points="12 12 17 9 22 12 17 15 12 12" stroke="#556987"></polygon></g></svg> Hide Bidder Sequence Diagram </button>
+                      <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#556987" stroke-linejoin="round" ><rect x="2" y="2" width="8" height="4"></rect><rect x="2" y="18" width="8" height="4"></rect><line x1="6" y1="9" x2="6" y2="15"></line><polyline points="13 4 17 4 17 6"></polyline><polyline points="13 20 17 20 17 18"></polyline><polygon points="12 12 17 9 22 12 17 15 12 12" stroke="#556987"></polygon></g></svg> Hide Bidder Sequence Diagram </button>
                     </div>
                     {% else %}
                     <div class="w-full md:w-auto p-1.5">
                       <button name="show_bidder_seq_diagram" type="submit" value="Show Bidder Sequence Diagram" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none">
-<svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#556987" stroke-linejoin="round" ><rect x="2" y="2" width="8" height="4"></rect><rect x="2" y="18" width="8" height="4"></rect><line x1="6" y1="9" x2="6" y2="15"></line><polyline points="13 4 17 4 17 6"></polyline><polyline points="13 20 17 20 17 18"></polyline><polygon points="12 12 17 9 22 12 17 15 12 12" stroke="#556987"></polygon></g></svg> Show Bidder Sequence Diagram </button>
+                      <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#556987" stroke-linejoin="round" ><rect x="2" y="2" width="8" height="4"></rect><rect x="2" y="18" width="8" height="4"></rect><line x1="6" y1="9" x2="6" y2="15"></line><polyline points="13 4 17 4 17 6"></polyline><polyline points="13 20 17 20 17 18"></polyline><polygon points="12 12 17 9 22 12 17 15 12 12" stroke="#556987"></polygon></g></svg> Show Bidder Sequence Diagram </button>
                     </div>
                     {% endif %}
                     {% if data.show_offerer_seq_diagram %}
                     <div class="w-full md:w-auto p-1.5">
                       <button name="hide_offerer_seq_diagram" type="submit" value="Hide Offerer Sequence Diagram" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none">
-<svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#556987" stroke-linejoin="round" ><rect x="2" y="2" width="8" height="4"></rect><rect x="2" y="18" width="8" height="4"></rect><line x1="6" y1="9" x2="6" y2="15"></line><polyline points="13 4 17 4 17 6"></polyline><polyline points="13 20 17 20 17 18"></polyline><polygon points="12 12 17 9 22 12 17 15 12 12" stroke="#556987"></polygon></g></svg> Hide Offerer Sequence Diagram </button>
+                      <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#556987" stroke-linejoin="round" ><rect x="2" y="2" width="8" height="4"></rect><rect x="2" y="18" width="8" height="4"></rect><line x1="6" y1="9" x2="6" y2="15"></line><polyline points="13 4 17 4 17 6"></polyline><polyline points="13 20 17 20 17 18"></polyline><polygon points="12 12 17 9 22 12 17 15 12 12" stroke="#556987"></polygon></g></svg> Hide Offerer Sequence Diagram </button>
                     </div>
                     {% else %}
                     <div class="w-full md:w-auto p-1.5">
                       <button name="show_offerer_seq_diagram" type="submit" value="Show Offerer Sequence Diagram" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none">
-<svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#556987" stroke-linejoin="round" ><rect x="2" y="2" width="8" height="4"></rect><rect x="2" y="18" width="8" height="4"></rect><line x1="6" y1="9" x2="6" y2="15"></line><polyline points="13 4 17 4 17 6"></polyline><polyline points="13 20 17 20 17 18"></polyline><polygon points="12 12 17 9 22 12 17 15 12 12" stroke="#556987"></polygon></g></svg> Show Offerer Sequence Diagram </button>
+                      <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#556987" stroke-linejoin="round" ><rect x="2" y="2" width="8" height="4"></rect><rect x="2" y="18" width="8" height="4"></rect><line x1="6" y1="9" x2="6" y2="15"></line><polyline points="13 4 17 4 17 6"></polyline><polyline points="13 20 17 20 17 18"></polyline><polygon points="12 12 17 9 22 12 17 15 12 12" stroke="#556987"></polygon></g></svg> Show Offerer Sequence Diagram </button>
                     </div>
                     {% endif %}
                     {% if data.can_abandon == true %}
                     <div class="w-full md:w-auto p-1.5">
                       <button name="abandon_bid" type="submit" value="Abandon Bid" onclick="return confirmPopup();" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-red-500 hover:text-red-600 border border-red-400 hover:border-red-500 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none">
-<svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ef5844" stroke-linejoin="round" ><line x1="16" y1="8" x2="8" y2="16" stroke="#ef5844"></line> <line x1="16" y1="16" x2="8" y2="8" stroke="#ef5844"></line> <circle cx="12" cy="12" r="11"></circle></g></svg> Abandon Bid </button>
+                      <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ef5844" stroke-linejoin="round" ><line x1="16" y1="8" x2="8" y2="16" stroke="#ef5844"></line> <line x1="16" y1="16" x2="8" y2="8" stroke="#ef5844"></line> <circle cx="12" cy="12" r="11"></circle></g></svg> Abandon Bid </button>
                     </div>
                     {% endif %}
                     {% if data.show_txns %}
                     <div class="w-full md:w-auto p-1.5">
                       <button name="hide_txns" type="submit" value="Hide Info" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none">
-<svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#556987" stroke-linejoin="round" ><circle cx="12" cy="12" r="11"></circle><line x1="12" y1="11" x2="12" y2="17" stroke="#556987"></line><circle cx="12" cy="7" r="1" stroke="none" fill="#556987"></circle></g></svg> Hide info </button>
+                      <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#556987" stroke-linejoin="round" ><circle cx="12" cy="12" r="11"></circle><line x1="12" y1="11" x2="12" y2="17" stroke="#556987"></line><circle cx="12" cy="7" r="1" stroke="none" fill="#556987"></circle></g></svg> Hide info </button>
                     </div>
                     {% else %}
                     <div class="w-full md:w-auto p-1.5">
                       <button name="show_txns" type="submit" value="Show More Info" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none">
-<svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#556987" stroke-linejoin="round" ><circle cx="12" cy="12" r="11"></circle><line x1="12" y1="11" x2="12" y2="17" stroke="#556987"></line><circle cx="12" cy="7" r="1" stroke="none" fill="#556987"></circle></g></svg> Show More Info </button>
+                      <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#556987" stroke-linejoin="round" ><circle cx="12" cy="12" r="11"></circle><line x1="12" y1="11" x2="12" y2="17" stroke="#556987"></line><circle cx="12" cy="7" r="1" stroke="none" fill="#556987"></circle></g></svg> Show More Info </button>
                     </div>
                     {% endif %}
                     <div class="w-full md:w-auto p-1.5">
                       <button name="edit_bid" type="submit" value="Edit Bid" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none">
- <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#556987" stroke-linejoin="round" ><line x1="2" y1="23" x2="22" y2="23" stroke="#556987"></line> <line data-cap="butt" x1="13" y1="5" x2="17" y2="9"></line> <polygon points="8 18 3 19 4 14 16 2 20 6 8 18"></polygon></g></svg> Edit bit </button>
+                      <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#556987" stroke-linejoin="round" ><line x1="2" y1="23" x2="22" y2="23" stroke="#556987"></line> <line data-cap="butt" x1="13" y1="5" x2="17" y2="9"></line> <polygon points="8 18 3 19 4 14 16 2 20 6 8 18"></polygon></g></svg> Edit bit </button>
                     </div>
                     {% endif %}
                     {% if data.was_received == 'True' %}
                     <div class="w-full md:w-auto p-1.5">
                       <button name="accept_bid" value="Accept Bid" type="submit" onclick='return confirmPopup("Accept");' class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
-<svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round" ><polyline points=" 6,12 10,16 18,8 " stroke="#ffffff"></polyline> <circle cx="12" cy="12" r="11"></circle></g></svg> Accept Bid </button>
+                      <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round" ><polyline points=" 6,12 10,16 18,8 " stroke="#ffffff"></polyline> <circle cx="12" cy="12" r="11"></circle></g></svg> Accept Bid </button>
                   </div>
                   {% endif %}
                 </div>

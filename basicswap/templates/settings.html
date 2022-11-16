@@ -14,7 +14,7 @@
               <path d="M5.34 0.671999L2.076 14.1H0.732L3.984 0.671999H5.34Z" fill="#BBC3CF"></path>
             </svg>
           </li>
-          <li> <a class="flex font-medium text-xs text-coolGray-500 hover:text-coolGray-700" href="/settings">Settings</a> </li>
+          <li><a class="flex font-medium text-xs text-coolGray-500 hover:text-coolGray-700" href="/settings">Settings</a></li>
           <svg width="6" height="15" viewBox="0 0 6 15" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M5.34 0.671999L2.076 14.1H0.732L3.984 0.671999H5.34Z" fill="#BBC3CF"></path>
           </svg>
@@ -24,7 +24,10 @@
   </section>
   <section class="py-4">
     <div class="container px-4 mx-auto">
-      <div class="relative py-11 px-16 bg-coolGray-900 rounded-md overflow-hidden"> <img class="absolute z-10 left-4 top-4" src="/static/images/elements/dots-red.svg" alt=""> <img class="absolute z-10 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt=""> <img class="absolute h-64 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" src="/static/images/elements/wave.svg" alt="">
+      <div class="relative py-11 px-16 bg-coolGray-900 rounded-md overflow-hidden">
+        <img class="absolute z-10 left-4 top-4" src="/static/images/elements/dots-red.svg" alt="">
+        <img class="absolute z-10 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt="">
+        <img class="absolute h-64 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" src="/static/images/elements/wave.svg" alt="">
         <div class="relative z-20 flex flex-wrap items-center -m-3">
           <div class="w-full md:w-1/2 p-3">
             <h2 class="mb-6 text-4xl font-bold text-white tracking-tighter">Settings</h2>
@@ -106,7 +109,7 @@
                           <td class="py-4 px-6" colspan=2>
                             <label for="message" class="block mb-2 text-sm font-medium text-gray-900">List trusted public nodes to use if “Automatically Select Daemon” is set as “True”.
                               <br /> </label>
-                            <textarea class="outline-none block p-2.5 w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 monospace" placeholder="(Add one entry per line) eg: node.xmr.to:18081" name="remotedaemonurls_{{ c.name }}" rows="4" cols="100"> {{ c.remotedaemonurls }} </textarea>
+                            <textarea class="outline-none block p-2.5 w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 monospace" placeholder="(Add one entry per line) eg: node.xmr.to:18081" name="remotedaemonurls_{{ c.name }}" rows="4" cols="100">{{ c.remotedaemonurls }}</textarea>
                           </td>
                         </tr>
                         <tr class="bg-white border-t hover:bg-gray-50">
@@ -177,14 +180,14 @@
                         <tr class="bg-white border-t hover:bg-gray-50">
                           <td class="py-4 px-6 bold bold">Blocks Confirmed Target</td>
                           <td class="py-4 pr-5">
-                            <input type="number" class="w-52 appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block p-2.5" name="conf_target_{{ c.name }}" min="1" max="32" value="{{ c.conf_target }}"> </td>
+                            <input type="number" class="w-52 appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block p-2.5" name="conf_target_{{ c.name }}" min="1" max="32" value="{{ c.conf_target }}"></td>
                         </tr>
                         {% endif %}
                         {% if c.name == 'particl' %}
                         <tr class="bg-white border-t hover:bg-gray-50">
                           <td class="py-4 px-6 bold bold">Anon Tx Ring Size</td>
                           <td class="py-4 pr-5">
-                            <input type="number" class="w-52 appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block p-2.5" name="rct_ring_size_{{ c.name }}" min="3" max="32" value="{{ c.anon_tx_ring_size }}"> </td>
+                            <input type="number" class="w-52 appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block p-2.5" name="rct_ring_size_{{ c.name }}" min="3" max="32" value="{{ c.anon_tx_ring_size }}"></td>
                         </tr>
                       {% endif %}
                     </table>
@@ -198,7 +201,7 @@
                         </div>
                         {% if c.can_disable == true %}
                         <div class="w-full md:w-auto p-1.5 ml-2">
-                          <button name="disable_{{ c.name }}" value="Disable" onclick="return confirmPopup('Disable', '{{ c.display_name }}');" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-red-500 hover:text-red-600 border border-red-400 hover:border-red-500 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none"><svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ef5844" stroke-linejoin="round" ><line x1="16" y1="8" x2="8" y2="16" stroke="#ef5844"></line> <line x1="16" y1="16" x2="8" y2="8" stroke="#ef5844"></line> <circle cx="12" cy="12" r="11"></circle></g></svg>Disable Coin </button>
+                          <button name="disable_{{ c.name }}" value="Disable" onclick="return confirmPopup('Disable', '{{ c.display_name }}');" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-red-500 hover:text-red-600 border border-red-400 hover:border-red-500 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none"><svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ef5844" stroke-linejoin="round" ><line x1="16" y1="8" x2="8" y2="16" stroke="#ef5844"></line> <line x1="16" y1="16" x2="8" y2="8" stroke="#ef5844"></line> <circle cx="12" cy="12" r="11"></circle></g></svg>Disable Coin</button>
                         </div>
                         {% endif %}
                         {% if c.can_reenable == true %}
@@ -225,7 +228,7 @@
              <span class="mr-2 inline-block align-middle items-center justify-center w-8 h-7 bg-white-50 rounded">
               <svg class="text-gray-500 w-7 h-7" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3b82f6" stroke-linejoin="round" class="nc-icon-wrapper"><circle cx="12" cy="12" r="3" stroke="#3b82f6"></circle> <path d="M20,12a8.049,8.049,0,0,0-.188-1.713l2.714-2.055-2-3.464L17.383,6.094a7.987,7.987,0,0,0-2.961-1.719L14,1H10L9.578,4.375A7.987,7.987,0,0,0,6.617,6.094L3.474,4.768l-2,3.464,2.714,2.055a7.9,7.9,0,0,0,0,3.426L1.474,15.768l2,3.464,3.143-1.326a7.987,7.987,0,0,0,2.961,1.719L10,23h4l.422-3.375a7.987,7.987,0,0,0,2.961-1.719l3.143,1.326,2-3.464-2.714-2.055A8.049,8.049,0,0,0,20,12Z"></path></g></svg>
              </span>General
-            </h4> </div>
+            </h4></div>
                             </div>
                           </section>
                           <div class="container px-0 mx-auto mt-5">
@@ -276,7 +279,7 @@
                             <div class="w-full md:w-0/12">
                               <div class="flex flex-wrap justify-end -m-1.5">
                               <div class="w-full md:w-auto p-1.5 ml-2">
-                          <button name="apply_general" value="Apply" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none"><svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round" ><polyline points=" 6,12 10,16 18,8 " stroke="#ffffff"></polyline> <circle cx="12" cy="12" r="11"></circle></g></svg>  Apply</button>
+                          <button name="apply_general" value="Apply" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none"><svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round" ><polyline points=" 6,12 10,16 18,8 " stroke="#ffffff"></polyline> <circle cx="12" cy="12" r="11"></circle></g></svg>Apply</button>
                         </div>
                               </div>
                             </div>
@@ -317,7 +320,7 @@
                                   </td>
                                 </tr>
                                 <tr class="bg-white border-t hover:bg-gray-50">
-                                  <td class="py-4 px-6 bold">Chart API Key</td>                                 
+                                  <td class="py-4 px-6 bold">Chart API Key</td>
                                   <td class="py-4 pr-5">
                                  <label for="message" class="block mb-2 text-sm font-medium text-gray-900">Chart API (free) Key at <a class="inline-block text-coolGray-500 hover:text-coolGray-600 font-medium" href="https://min-api.cryptocompare.com/" target="_blank">CryptoCompare.com</a>
                                  <br /> </label>
@@ -330,7 +333,7 @@
                             <div class="w-full md:w-0/12">
                               <div class="flex flex-wrap justify-end -m-1.5">
                               <div class="w-full md:w-auto p-1.5 ml-2">
-                          <button name="apply_chart" value="Apply" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none"><svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round" ><polyline points=" 6,12 10,16 18,8 " stroke="#ffffff"></polyline> <circle cx="12" cy="12" r="11"></circle></g></svg>  Apply</button>
+                          <button name="apply_chart" value="Apply" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none"><svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round" ><polyline points=" 6,12 10,16 18,8 " stroke="#ffffff"></polyline> <circle cx="12" cy="12" r="11"></circle></g></svg>Apply</button>
                         </div>
                               </div>
                             </div>
@@ -390,22 +393,22 @@
                                 <tr class="bg-white border-t hover:bg-gray-50">
                                   <td class="py-4 px-6 bold w-96">Tor Proxy Host</td>
                                   <td class="py-4 pr-5">
-                                    <input name="proxyhost" type="text" class="w-1/5 appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block p-2.5" name="" min="3" max="32" value="{{tor_settings.proxy_host}}"> </td>
+                                    <input name="proxyhost" type="text" class="w-1/5 appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block p-2.5" name="" min="3" max="32" value="{{tor_settings.proxy_host}}"></td>
                                 </tr>
                                 <tr class="bg-white border-t hover:bg-gray-50">
                                   <td class="py-4 px-6 bold w-96">Tor Proxy Port</td>
                                   <td class="py-4 pr-5">
-                                    <input name="proxyport" type="text" class="w-1/5 appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block p-2.5" name="" min="3" max="32" value="{{tor_settings.proxy_port}}"> </td>
+                                    <input name="proxyport" type="text" class="w-1/5 appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block p-2.5" name="" min="3" max="32" value="{{tor_settings.proxy_port}}"></td>
                                 </tr>
                                 <tr class="bg-white border-t hover:bg-gray-50">
                                   <td class="py-4 px-6 bold w-96">Tor Control Port</td>
                                   <td class="py-4 pr-5">
-                                    <input name="controlport" type="text" class="w-1/5 appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block p-2.5" name="" min="3" max="32" value="{{tor_settings.control_port}}"> </td>
+                                    <input name="controlport" type="text" class="w-1/5 appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block p-2.5" name="" min="3" max="32" value="{{tor_settings.control_port}}"></td>
                                 </tr>
                                 <tr class="bg-white border-t hover:bg-gray-50">
                                   <td class="py-4 px-6 bold w-96">Tor Control Password</td>
                                   <td class="py-4 pr-5">
-                                    <input name="controlpwd" type="text" class="w-1/5 appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block p-2.5" name="" min="3" max="32" value="{{tor_settings.control_password}}"> </td>
+                                    <input name="controlpwd" type="text" class="w-1/5 appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block p-2.5" name="" min="3" max="32" value="{{tor_settings.control_password}}"></td>
                                 </tr>
                               </table>
                             </div>
@@ -414,7 +417,7 @@
                             <div class="w-full md:w-0/12">
                               <div class="flex flex-wrap justify-end -m-1.5">
                                <div class="w-full md:w-auto p-1.5 ml-2">
-                          <button name="apply_tor" value="Apply" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none"><svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round" ><polyline points=" 6,12 10,16 18,8 " stroke="#ffffff"></polyline> <circle cx="12" cy="12" r="11"></circle></g></svg>  Apply</button>
+                          <button name="apply_tor" value="Apply" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none"><svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round" ><polyline points=" 6,12 10,16 18,8 " stroke="#ffffff"></polyline> <circle cx="12" cy="12" r="11"></circle></g></svg>Apply</button>
                         </div>
                               </div>
                             </div>

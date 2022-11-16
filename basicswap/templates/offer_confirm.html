@@ -38,7 +38,10 @@
   </section>
   <section class="py-4">
     <div class="container px-4 mx-auto">
-      <div class="relative py-11 px-16 bg-coolGray-900 rounded-md overflow-hidden"> <img class="absolute z-10 left-4 top-4" src="/static/images/elements/dots-red.svg" alt=""> <img class="absolute z-10 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt=""> <img class="absolute h-64 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" src="/static/images/elements/wave.svg" alt="">
+      <div class="relative py-11 px-16 bg-coolGray-900 rounded-md overflow-hidden">
+        <img class="absolute z-10 left-4 top-4" src="/static/images/elements/dots-red.svg" alt="">
+        <img class="absolute z-10 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt="">
+        <img class="absolute h-64 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" src="/static/images/elements/wave.svg" alt="">
         <div class="relative z-20 flex flex-wrap items-center -m-3">
           <div class="w-full md:w-1/2 p-3">
             <h2 class="mb-6 text-4xl font-bold text-white tracking-tighter">Confirm your offer information</h2>
@@ -225,7 +228,7 @@
                               </g>
                             </svg>
                           </div>
-                          <input class="pl-10 appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none block w-full p-2.5 opacity-70" name="fee_rate_from" value="{{ data.from_fee_override }}" readonly> </div> <span class="text-sm mt-2 block"><b>Fee Rate Source:</b> {{ data.from_fee_src }}</span> </div>
+                          <input class="pl-10 appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none block w-full p-2.5 opacity-70" name="fee_rate_from" value="{{ data.from_fee_override }}" readonly> </div><span class="text-sm mt-2 block"><b>Fee Rate Source:</b> {{ data.from_fee_src }}</span> </div>
                       <div class="w-full md:w-1/2 p-3">
                         <p class="mb-1.5 font-medium text-base text-coolGray-800">Fee From Increase By</p>
                         <div class="relative">
@@ -249,7 +252,7 @@
                             <option value="50" {% if data.fee_from_extra==50 %} selected{% endif %}>50%</option>
                             <option value="100" {% if data.fee_from_extra==100 %} selected{% endif %}>100%</option>
                           </select>
-                        </div> <span class="text-sm mt-2 block"><b>Lock Tx Spend Fee:</b> {{ data.amt_from_lock_spend_tx_fee }} {{ data.tla_from }}</span> </div>
+                        </div> <span class="text-sm mt-2 block"><b>Lock Tx Spend Fee:</b> {{ data.amt_from_lock_spend_tx_fee }} {{ data.tla_from }}</span></div>
                       {% endif %}
                     </div>
                   </div>
@@ -436,7 +439,7 @@
                               </g>
                             </svg>
                           </div>
-                          <input class="pl-10 appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none block w-full p-2.5 opacity-70" type="text" id="rate" name="rate" value="{{ data.rate }}" onchange="set_rate('rate');" readonly> </div>
+                          <input class="pl-10 appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none block w-full p-2.5 opacity-70" type="text" id="rate" name="rate" value="{{ data.rate }}" onchange="set_rate('rate');" readonly></div>
                       </div>
                     </div>
                   </div>
@@ -587,7 +590,7 @@
                           <circle cx="12" cy="12" r="11"></circle>
                           <polyline points="11 8 15 12 11 16" stroke="#ffffff"></polyline>
                         </g>
-                      </svg> <span>Confirm Offer</span> </button>
+                      </svg> <span>Confirm Offer</span></button>
                   </div>
                 </div>
               </div>
@@ -601,7 +604,7 @@
             <input type="hidden" name="fee_to_extra" value="{{ data.fee_to_extra }}">
             {% if data.automation_strat_id != -1 %}
             <input type="hidden" name="automation_strat_id" value="{{ data.automation_strat_id }}">
-            {% endif %} 
+            {% endif %}
             {% if data.amt_var==true %}
             <input type="hidden" name="amt_var" value="av">
             {% endif %}
