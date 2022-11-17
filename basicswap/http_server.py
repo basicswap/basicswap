@@ -17,6 +17,7 @@ from . import __version__
 from .util import (
     dumpj,
     ensure,
+    LockedCoinError,
     format_timestamp,
 )
 from .chainparams import (
@@ -50,6 +51,7 @@ from .ui.page_offers import page_offers, page_offer, page_newoffer
 from .ui.page_tor import page_tor, get_tor_established_state
 from .ui.page_wallet import page_wallets, page_wallet
 from .ui.page_settings import page_settings
+from .ui.page_encryption import page_changepassword, page_unlock, page_lock
 
 env = Environment(loader=PackageLoader('basicswap', 'templates'))
 env.filters['formatts'] = format_timestamp
@@ -623,9 +625,17 @@ class HttpHandler(BaseHTTPRequestHandler):
                     return page_automation_strategy_new(self, url_split, post_string)
                 if page == 'shutdown':
                     return self.page_shutdown(url_split, post_string)
+                if page == 'changepassword':
+                    return page_changepassword(self, url_split, post_string)
+                if page == 'unlock':
+                    return page_unlock(self, url_split, post_string)
+                if page == 'lock':
+                    return page_lock(self, url_split, post_string)
                 if page != '':
                     return self.page_404(url_split)
             return self.page_index(url_split)
+        except LockedCoinError:
+            return page_unlock(self, url_split, post_string)
         except Exception as ex:
             if swap_client.debug is True:
                 swap_client.log.error(traceback.format_exc())

@@ -47,6 +47,9 @@ from basicswap.contrib.key import (
 from basicswap.http_server import (
     HttpThread,
 )
+from tests.basicswap.util import (
+    read_json_api,
+)
 from tests.basicswap.common import (
     checkForks,
     stopDaemons,
@@ -54,7 +57,6 @@ from tests.basicswap.common import (
     wait_for_bid,
     wait_for_bid_tx_state,
     wait_for_in_progress,
-    read_json_api,
     TEST_HTTP_HOST,
     TEST_HTTP_PORT,
     BASE_PORT,

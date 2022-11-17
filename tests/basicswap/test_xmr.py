@@ -57,9 +57,15 @@ from basicswap.contrib.key import (
 from basicswap.http_server import (
     HttpThread,
 )
+from tests.basicswap.util import (
+    make_boolean,
+    post_json_req,
+)
+from tests.basicswap.util import (
+    read_json_api,
+)
 from tests.basicswap.common import (
     prepareDataDir,
-    make_boolean,
     make_rpc_func,
     checkForks,
     stopDaemons,
@@ -69,8 +75,6 @@ from tests.basicswap.common import (
     wait_for_no_offer,
     wait_for_none_active,
     wait_for_balance,
-    post_json_req,
-    read_json_api,
     compare_bid_states,
     extract_states_from_xu_file,
     TEST_HTTP_HOST,

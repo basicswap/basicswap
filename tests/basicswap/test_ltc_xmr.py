@@ -17,9 +17,11 @@ from basicswap.basicswap import (
 from basicswap.util import (
     COIN,
 )
+from tests.basicswap.util import (
+    read_json_api,
+)
 from tests.basicswap.common import (
     wait_for_bid,
-    read_json_api,
     wait_for_offer,
     wait_for_in_progress,
     LTC_BASE_RPC_PORT,

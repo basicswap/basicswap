@@ -23,9 +23,11 @@ import multiprocessing
 from urllib import parse
 from urllib.request import urlopen
 
-from tests.basicswap.common import (
+from tests.basicswap.util import (
     read_json_api,
     waitForServer,
+)
+from tests.basicswap.common import (
     waitForNumOffers,
     waitForNumBids,
 )

@@ -25,13 +25,15 @@ from basicswap.util import (
     make_int,
     format_amount,
 )
+from tests.basicswap.util import (
+    post_json_req,
+    read_json_api,
+)
 from tests.basicswap.common import (
     wait_for_bid,
-    read_json_api,
     wait_for_offer,
     wait_for_none_active,
     wait_for_balance,
-    post_json_req,
 )
 
 from .test_xmr import BaseTest, test_delay_event

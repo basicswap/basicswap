@@ -7,11 +7,11 @@
 
 import os
 import json
-import urllib
 import signal
 import logging
 from urllib.request import urlopen
 
+from .util import read_json_api
 from basicswap.rpc import callrpc
 from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
 from bin.basicswap_prepare import downloadPIVXParams
@@ -215,38 +215,6 @@ def wait_for_in_progress(delay_event, swap_client, bid_id, sent=False):
     raise ValueError('wait_for_in_progress timed out.')
 
 
-def post_json_req(url, json_data):
-    req = urllib.request.Request(url)
-    req.add_header('Content-Type', 'application/json; charset=utf-8')
-    post_bytes = json.dumps(json_data).encode('utf-8')
-    req.add_header('Content-Length', len(post_bytes))
-    return urlopen(req, post_bytes, timeout=300).read()
-
-
-def read_text_api(port, path=None):
-    url = f'http://127.0.0.1:{port}/json'
-    if path is not None:
-        url += '/' + path
-    return urlopen(url, timeout=300).read().decode('utf-8')
-
-
-def read_json_api(port, path=None, json_data=None):
-    url = f'http://127.0.0.1:{port}/json'
-    if path is not None:
-        url += '/' + path
-
-    if json_data is not None:
-        return json.loads(post_json_req(url, json_data))
-    return json.loads(urlopen(url, timeout=300).read())
-
-
-def post_json_api(port, path, json_data):
-    url = f'http://127.0.0.1:{port}/json'
-    if path is not None:
-        url += '/' + path
-    return json.loads(post_json_req(url, json_data))
-
-
 def wait_for_none_active(delay_event, port, wait_for=30):
     for i in range(wait_for):
         if delay_event.is_set():
@@ -256,19 +224,6 @@ def wait_for_none_active(delay_event, port, wait_for=30):
         if js['num_swapping'] == 0 and js['num_watched_outputs'] == 0:
             return
     raise ValueError('wait_for_none_active timed out.')
-
-
-def waitForServer(delay_event, port, wait_for=20):
-    for i in range(wait_for):
-        if delay_event.is_set():
-            raise ValueError('Test stopped.')
-        try:
-            delay_event.wait(1)
-            summary = read_json_api(port)
-            return
-        except Exception as e:
-            print('waitForServer, error:', str(e))
-    raise ValueError('waitForServer failed')
 
 
 def waitForNumOffers(delay_event, port, offers, wait_for=20):
@@ -319,10 +274,6 @@ def wait_for_balance(delay_event, url, balance_key, expect_amount, iterations=20
 def delay_for(delay_event, delay_for=60):
     logging.info('Delaying for {} seconds.'.format(delay_for))
     delay_event.wait(delay_for)
-
-
-def make_boolean(s):
-    return s.lower() in ['1', 'true']
 
 
 def make_rpc_func(node_id, base_rpc_port=BASE_RPC_PORT):

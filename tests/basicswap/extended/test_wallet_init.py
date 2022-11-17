@@ -27,7 +27,7 @@ import multiprocessing
 from unittest.mock import patch
 
 from tests.basicswap.mnemonics import mnemonics
-from tests.basicswap.common import (
+from tests.basicswap.util import (
     read_json_api,
     waitForServer,
 )

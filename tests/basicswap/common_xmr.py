@@ -22,8 +22,10 @@ from basicswap.rpc_xmr import (
     callrpc_xmr_na,
 )
 from tests.basicswap.mnemonics import mnemonics
-from tests.basicswap.common import (
+from tests.basicswap.util import (
     waitForServer,
+)
+from tests.basicswap.common import (
     BASE_PORT, BASE_RPC_PORT,
     BTC_BASE_PORT, BTC_BASE_RPC_PORT, BTC_BASE_TOR_PORT,
     LTC_BASE_PORT,

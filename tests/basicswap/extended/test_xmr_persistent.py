@@ -34,11 +34,13 @@ from basicswap.rpc import (
     callrpc,
 )
 from tests.basicswap.common import (
+    BASE_RPC_PORT,
+    BTC_BASE_RPC_PORT,
+)
+from tests.basicswap.util import (
     make_boolean,
     read_json_api,
     waitForServer,
-    BASE_RPC_PORT,
-    BTC_BASE_RPC_PORT,
 )
 from tests.basicswap.common_xmr import (
     prepare_nodes,

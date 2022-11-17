@@ -39,13 +39,15 @@ from basicswap.contrib.key import (
 from basicswap.http_server import (
     HttpThread,
 )
+from tests.basicswap.util import (
+    read_json_api,
+)
 from tests.basicswap.common import (
     prepareDataDir,
     make_rpc_func,
     checkForks,
     stopDaemons,
     delay_for,
-    read_json_api,
     TEST_HTTP_HOST,
     TEST_HTTP_PORT,
     BASE_P2P_PORT,

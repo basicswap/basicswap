@@ -29,11 +29,13 @@ from basicswap.rpc import (
     callrpc_cli,
     waitForRPC,
 )
+from tests.basicswap.util import (
+    read_json_api,
+)
 from tests.basicswap.common import (
     stopDaemons,
     wait_for_bid,
     make_rpc_func,
-    read_json_api,
     TEST_HTTP_PORT,
     wait_for_offer,
     wait_for_in_progress,

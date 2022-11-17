@@ -20,10 +20,12 @@ import logging
 import unittest
 import multiprocessing
 
-from tests.basicswap.common import (
+from tests.basicswap.util import (
     read_json_api,
     post_json_api,
     waitForServer,
+)
+from tests.basicswap.common import (
     waitForNumOffers,
     waitForNumBids,
     waitForNumSwapping,

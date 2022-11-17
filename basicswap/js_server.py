@@ -481,7 +481,7 @@ def js_unlock(self, url_split, post_string, is_json):
 
 def js_lock(self, url_split, post_string, is_json):
     swap_client = self.server.swap_client
-    post_data = getFormData(post_string, is_json)
+    post_data = {} if post_string == '' else getFormData(post_string, is_json)
 
     if have_data_entry(post_data, 'coin'):
         coin = getCoinType(get_data_entry(post_data, 'coin'))

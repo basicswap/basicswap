@@ -1305,6 +1305,8 @@ class BTCInterface(CoinInterface):
     def changeWalletPassword(self, old_password, new_password):
         self._log.info('changeWalletPassword - {}'.format(self.ticker()))
         if old_password == '':
+            if self.isWalletEncrypted():
+                raise ValueError('Old password must be set')
             return self.rpc_callback('encryptwallet', [new_password])
         self.rpc_callback('walletpassphrasechange', [old_password, new_password])
 

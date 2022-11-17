@@ -26,10 +26,12 @@ import traceback
 import multiprocessing
 from unittest.mock import patch
 
-from tests.basicswap.common import (
+from tests.basicswap.util import (
     read_json_api,
     post_json_api,
     waitForServer,
+)
+from tests.basicswap.common import (
     waitForNumOffers,
     waitForNumBids,
 )

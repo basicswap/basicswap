@@ -375,7 +375,7 @@ class CoinInterface:
         return ticker
 
     def getExchangeTicker(self, exchange_name):
-        return self.ticker()
+        return chainparams[self.coin_type()]['ticker']
 
     def getExchangeName(self, exchange_name):
         return chainparams[self.coin_type()]['name']

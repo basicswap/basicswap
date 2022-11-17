@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <link rel=icon sizes="32x32" type="image/png" href="/static/images/favicon-32.png">
+  <title>{{ title }}</title>
+</head>
+<body>
+<h2>Unlock wallet</h2>
+{% for m in messages %}
+<p>{{ m }}</p>
+{% endfor %}
+{% for m in err_messages %}
+<p class="error_msg">Error: {{ m }}</p>
+{% endfor %}
+<form method="post">
+<input type="text" name="password"><br/>
+<input type="submit" name="unlock" value="Unlock">
+<input type="hidden" name="formid" value="{{ form_id }}">
+</form>
+<p><a href="/">home</a></p>
+</body>
+</html>
