@@ -37,6 +37,7 @@ def page_changepassword(self, url_split, post_string):
     return self.render_template(template, {
         'messages': messages,
         'err_messages': err_messages,
+        'summary': swap_client.getSummary(),
     })
 
 
