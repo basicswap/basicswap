@@ -5697,6 +5697,14 @@ class BasicSwap(BaseApp):
 
             if sent:
                 q = q.filter(Offer.was_sent == True)  # noqa: E712
+
+                active_state = filters.get('active', 'any')
+                if active_state == 'active':
+                    q = q.filter(Offer.expire_at > now, Offer.active_ind == 1)
+                elif active_state == 'expired':
+                    q = q.filter(Offer.expire_at <= now)
+                elif active_state == 'revoked':
+                    q = q.filter(Offer.active_ind != 1)
             else:
                 q = q.filter(sa.and_(Offer.expire_at > now, Offer.active_ind == 1))
 

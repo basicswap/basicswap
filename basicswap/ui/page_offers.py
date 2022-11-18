@@ -577,6 +577,7 @@ def page_offers(self, url_split, post_string, sent=False):
         'sort_by': 'created_at',
         'sort_dir': 'desc',
         'sent_from': 'any' if sent is False else 'only',
+        'active': 'any',
     }
     messages = []
     form_data = self.checkForm(post_string, 'offers', messages)
@@ -596,6 +597,10 @@ def page_offers(self, url_split, post_string, sent=False):
             sent_from = get_data_entry(form_data, 'sent_from')
             ensure(sent_from in ['any', 'only'], 'Invalid sent filter')
             filters['sent_from'] = sent_from
+        if have_data_entry(form_data, 'active'):
+            active_filter = get_data_entry(form_data, 'active')
+            ensure(active_filter in ['any', 'active', 'expired', 'revoked'], 'Invalid active filter')
+            filters['active'] = active_filter
 
     set_pagination_filters(form_data, filters)
 
@@ -648,4 +653,5 @@ def page_offers(self, url_split, post_string, sent=False):
         'filters': filters,
         'offers': formatted_offers,
         'summary': summary,
+        'sent_offers': sent,
     })
