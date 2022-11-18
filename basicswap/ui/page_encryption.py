@@ -76,13 +76,7 @@ def page_lock(self, url_split, post_string):
     swap_client.checkSystemStatus()
 
     swap_client.lockWallets()
-
-    messages = []
-    err_messages = []
-
-    template = server.env.get_template('info.html')
-    return self.render_template(template, {
-        'messages': messages,
-        'err_messages': err_messages,
-        'message_str': 'Wallets locked'
-    })
+    self.send_response(302)
+    self.send_header('Location', '/')
+    self.end_headers()
+    return bytes()

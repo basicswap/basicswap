@@ -150,6 +150,10 @@ class HttpHandler(BaseHTTPRequestHandler):
         self.server.session_tokens['shutdown'] = shutdown_token
         args_dict['shutdown_token'] = shutdown_token
 
+        encrypted, locked = swap_client.getLockedState()
+        args_dict['encrypted'] = encrypted
+        args_dict['locked'] = locked
+
         if self.server.msg_id_counter >= 0x7FFFFFFF:
             self.server.msg_id_counter = 0
 

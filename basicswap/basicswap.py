@@ -246,6 +246,8 @@ class BasicSwap(BaseApp):
         self._keep_notifications = self.settings.get('keep_notifications', 50)
         self._show_notifications = self.settings.get('show_notifications', 10)
         self._notifications_cache = {}
+        self._is_encrypted = None
+        self._is_locked = None
 
         # TODO: Adjust ranges
         self.min_delay_event = self.settings.get('min_delay_event', 10)
@@ -743,7 +745,7 @@ class BasicSwap(BaseApp):
             if self.coin_clients[c]['connection_type'] == 'rpc':
                 yield c
 
-    def changeWalletPasswords(self, old_password, new_password):
+    def changeWalletPasswords(self, old_password, new_password, coin=None):
         # Only the main wallet password is changed for monero, avoid issues by preventing until active swaps are complete
         if len(self.swaps_in_progress) > 0:
             raise ValueError('Can\'t change passwords while swaps are in progress')
@@ -751,8 +753,13 @@ class BasicSwap(BaseApp):
         if old_password == new_password:
             raise ValueError('Passwords must differ')
 
-        # Unlock all wallets to ensure they all have the same password.
+        if len(new_password) < 4:
+            raise ValueError('New password is too short')
+
+        # Unlock wallets to ensure they all have the same password.
         for c in self.activeCoins():
+            if coin and c != coin:
+                continue
             ci = self.ci(c)
             try:
                 ci.unlockWallet(old_password)
@@ -760,15 +767,29 @@ class BasicSwap(BaseApp):
                 raise ValueError('Failed to unlock {}'.format(ci.coin_name()))
 
         for c in self.activeCoins():
+            if coin and c != coin:
+                continue
             self.ci(c).changeWalletPassword(old_password, new_password)
 
-    def unlockWallets(self, password):
-        for c in self.activeCoins():
-            self.ci(c).unlockWallet(password)
+        # Update cached state
+        if coin is None or coin == Coins.PART:
+            self._is_encrypted, self._is_locked = self.ci(Coins.PART).isWalletEncryptedLocked()
 
-    def lockWallets(self):
+    def unlockWallets(self, password, coin=None):
         for c in self.activeCoins():
+            if coin and c != coin:
+                continue
+            self.ci(c).unlockWallet(password)
+            if c == Coins.PART:
+                self._is_locked = False
+
+    def lockWallets(self, coin=None):
+        for c in self.activeCoins():
+            if coin and c != coin:
+                continue
             self.ci(c).lockWallet()
+            if c == Coins.PART:
+                self._is_locked = True
 
     def initialiseWallet(self, coin_type, raise_errors=False):
         if coin_type == Coins.PART:
@@ -6058,6 +6079,11 @@ class BasicSwap(BaseApp):
         if not self._network:
             return {'Error': 'Not Initialised'}
         return self._network.get_info()
+
+    def getLockedState(self):
+        if self._is_encrypted is None or self._is_locked is None:
+            self._is_encrypted, self._is_locked = self.ci(Coins.PART).isWalletEncryptedLocked()
+        return self._is_encrypted, self._is_locked
 
     def lookupRates(self, coin_from, coin_to, output_array=False):
         self.log.debug('lookupRates {}, {}'.format(coin_from, coin_to))

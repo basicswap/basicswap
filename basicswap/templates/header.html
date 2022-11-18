@@ -290,11 +290,10 @@
                 </ul>
                 <!-- dev mode icons on/off -->
                 {% endif %}
-              
-              {% if debug_mode == true %}
-                <!-- if wallets locked -->
-               <!--  <ul class="xl:flex hidden">
-              <li>
+
+                {% if encrypted == true %}
+                <ul class="xl:flex"><li>
+                {% if locked == true %}
                 <div data-tooltip-target="tooltip-locked-wallets" class="ml-5 flex items-center text-gray-50 hover:text-gray-100 text-sm">
                    <svg class="text-gray-500 w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#2ad167" stroke-linejoin="round"><rect x="3" y="11" width="18" height="12" rx="2"></rect><circle cx="12" cy="17" r="2" stroke="#2ad167"></circle><path d="M17,7V6a4.951,4.951,0,0,0-4.9-5H12A4.951,4.951,0,0,0,7,5.9V7" stroke="#2ad167"></path></g></svg>
                   <span data-tooltip-target="tooltip-locked-wallets" ></span> </div>
@@ -302,19 +301,18 @@
                 <div id="tooltip-locked-wallets" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
                   <p>Wallets locked </p>
                   <p> </p> </div>
-                </li>
-                </ul>
-                <ul class="xl:flex hidden">
-              <li>
+                {% else %}
+                <a href='/lock'>
                 <div data-tooltip-target="tooltip-unlocked-wallets" class="ml-5 flex items-center text-gray-50 hover:text-gray-100 text-sm">
-                   <svg class="text-gray-500 w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#f80b0b" stroke-linejoin="round"><rect x="3" y="11" width="18" height="12"></rect><circle cx="12" cy="17" r="2" stroke="#f80b0b"></circle><path data-cap="butt" d="M17,6a4.951,4.951,0,0,0-4.9-5H12A4.951,4.951,0,0,0,7,5.9V11"></path></g></svg>        
+                   <svg class="text-gray-500 w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#f80b0b" stroke-linejoin="round"><rect x="3" y="11" width="18" height="12"></rect><circle cx="12" cy="17" r="2" stroke="#f80b0b"></circle><path data-cap="butt" d="M17,6a4.951,4.951,0,0,0-4.9-5H12A4.951,4.951,0,0,0,7,5.9V11"></path></g></svg>
                   <span data-tooltip-target="tooltip-unlocked-wallets" ></span> </div>
                 <div class="tooltip-arrow" data-popper-arrow></div>
                 <div id="tooltip-unlocked-wallets" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
                   <p>Wallets unlocked </p>
                   <p> </p> </div>
-                </li>
-                </ul> -->
+                </a>
+                {% endif %}
+                </li></ul>
                 {% endif %}
                 {% if use_tor_proxy == true %}
                 <!-- tor -->
@@ -650,7 +648,7 @@
       </nav>
     </div>
     <!-- mobile sidebar -->
-  </section> 
+  </section>
   {% if ws_url %}
   <script>
     var ws = new WebSocket("{{ ws_url }}"),

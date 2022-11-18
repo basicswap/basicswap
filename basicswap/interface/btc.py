@@ -1302,6 +1302,12 @@ class BTCInterface(CoinInterface):
             return True
         return False
 
+    def isWalletEncryptedLocked(self):
+        wallet_info = self.rpc_callback('getwalletinfo')
+        encrypted = 'unlocked_until' in wallet_info
+        locked = encrypted and wallet_info['unlocked_until'] <= 0
+        return encrypted, locked
+
     def changeWalletPassword(self, old_password, new_password):
         self._log.info('changeWalletPassword - {}'.format(self.ticker()))
         if old_password == '':

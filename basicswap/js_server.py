@@ -454,7 +454,7 @@ def js_setpassword(self, url_split, post_string, is_json):
         coin = getCoinType(get_data_entry(post_data, 'coin'))
         if coin in (Coins.PART_ANON, Coins.PART_BLIND):
             raise ValueError('Invalid coin.')
-        swap_client.ci(coin).changeWalletPassword(old_password, new_password)
+        swap_client.changeWalletPasswords(old_password, new_password, coin)
         return bytes(json.dumps({'success': True}), 'UTF-8')
 
     # Set password for all coins
@@ -472,7 +472,7 @@ def js_unlock(self, url_split, post_string, is_json):
         coin = getCoinType(str(get_data_entry(post_data, 'coin')))
         if coin in (Coins.PART_ANON, Coins.PART_BLIND):
             raise ValueError('Invalid coin.')
-        swap_client.ci(coin).unlockWallet(password)
+        swap_client.unlockWallets(password, coin)
         return bytes(json.dumps({'success': True}), 'UTF-8')
 
     swap_client.unlockWallets(password)
@@ -487,7 +487,7 @@ def js_lock(self, url_split, post_string, is_json):
         coin = getCoinType(get_data_entry(post_data, 'coin'))
         if coin in (Coins.PART_ANON, Coins.PART_BLIND):
             raise ValueError('Invalid coin.')
-        swap_client.ci(coin).lockWallet()
+        swap_client.lockWallets(coin)
         return bytes(json.dumps({'success': True}), 'UTF-8')
 
     swap_client.lockWallets()
