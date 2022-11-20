@@ -37,7 +37,6 @@ setuptools.setup(
         "sqlalchemy==1.4.39",
         "python-gnupg",
         "Jinja2",
-        "requests",
         "pycryptodome",
         "PySocks",
         "mnemonic",

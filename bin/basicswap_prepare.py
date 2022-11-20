@@ -890,38 +890,38 @@ def printVersion():
 
 
 def printHelp():
-    logger.info('Usage: basicswap-prepare ')
-    logger.info('\n--help, -h               Print help.')
-    logger.info('--version, -v            Print version.')
-    logger.info('--datadir=PATH           Path to basicswap data directory, default:{}.'.format(cfg.BASICSWAP_DATADIR))
-    logger.info('--bindir=PATH            Path to cores directory, default:datadir/bin.')
-    logger.info('--mainnet                Run in mainnet mode.')
-    logger.info('--testnet                Run in testnet mode.')
-    logger.info('--regtest                Run in regtest mode.')
-    logger.info('--particl_mnemonic=      Recovery phrase to use for the Particl wallet, default is randomly generated,\n'
-                + '                         "auto" to create a wallet automatically - No mnemonic.'
-                + '                         "none" to disable wallet initialisation.')
-    logger.info('--withcoin=              Prepare system to run daemon for coin.')
-    logger.info('--withoutcoin=           Do not prepare system to run daemon for coin.')
-    logger.info('--addcoin=               Add coin to existing setup.')
-    logger.info('--disablecoin=           Make coin inactive.')
-    logger.info('--preparebinonly         Don\'t prepare settings or datadirs.')
-    logger.info('--nocores                Don\'t download and extract any coin clients.')
-    logger.info('--usecontainers          Expect each core to run in a unique container.')
-    logger.info('--portoffset=n           Raise all ports by n.')
-    logger.info('--htmlhost=              Interface to host html server on, default:127.0.0.1.')
-    logger.info('--wshost=                Interface to host websocket server on, disable by setting to "none", default:127.0.0.1.')
-    logger.info('--xmrrestoreheight=n     Block height to restore Monero wallet from, default:{}.'.format(DEFAULT_XMR_RESTORE_HEIGHT))
-    logger.info('--noextractover          Prevent extracting cores if files exist.  Speeds up tests')
-    logger.info('--usetorproxy            Use TOR proxy during setup.  Note that some download links may be inaccessible over TOR.')
-    logger.info('--enabletor              Setup Basicswap instance to use TOR.')
-    logger.info('--disabletor             Setup Basicswap instance to not use TOR.')
-    logger.info('--usebtcfastsync         Initialise the BTC chain with a snapshot from btcpayserver FastSync.\n'
-                + '                         See https://github.com/btcpayserver/btcpayserver-docker/blob/master/contrib/FastSync/README.md')
-    logger.info('--initwalletsonly        Setup coin wallets only.')
-    logger.info('--keysdirpath            Speed up tests by preloading all PGP keys in directory.')
+    print('Usage: basicswap-prepare ')
+    print('\n--help, -h               Print help.')
+    print('--version, -v            Print version.')
+    print('--datadir=PATH           Path to basicswap data directory, default:{}.'.format(cfg.BASICSWAP_DATADIR))
+    print('--bindir=PATH            Path to cores directory, default:datadir/bin.')
+    print('--mainnet                Run in mainnet mode.')
+    print('--testnet                Run in testnet mode.')
+    print('--regtest                Run in regtest mode.')
+    print('--particl_mnemonic=      Recovery phrase to use for the Particl wallet, default is randomly generated,\n'
+          + '                         "auto" to create a wallet automatically - No mnemonic.'
+          + '                         "none" to disable wallet initialisation.')
+    print('--withcoin=              Prepare system to run daemon for coin.')
+    print('--withoutcoin=           Do not prepare system to run daemon for coin.')
+    print('--addcoin=               Add coin to existing setup.')
+    print('--disablecoin=           Make coin inactive.')
+    print('--preparebinonly         Don\'t prepare settings or datadirs.')
+    print('--nocores                Don\'t download and extract any coin clients.')
+    print('--usecontainers          Expect each core to run in a unique container.')
+    print('--portoffset=n           Raise all ports by n.')
+    print('--htmlhost=              Interface to host html server on, default:127.0.0.1.')
+    print('--wshost=                Interface to host websocket server on, disable by setting to "none", default:127.0.0.1.')
+    print('--xmrrestoreheight=n     Block height to restore Monero wallet from, default:{}.'.format(DEFAULT_XMR_RESTORE_HEIGHT))
+    print('--noextractover          Prevent extracting cores if files exist.  Speeds up tests')
+    print('--usetorproxy            Use TOR proxy during setup.  Note that some download links may be inaccessible over TOR.')
+    print('--enabletor              Setup Basicswap instance to use TOR.')
+    print('--disabletor             Setup Basicswap instance to not use TOR.')
+    print('--usebtcfastsync         Initialise the BTC chain with a snapshot from btcpayserver FastSync.\n'
+          + '                         See https://github.com/btcpayserver/btcpayserver-docker/blob/master/contrib/FastSync/README.md')
+    print('--initwalletsonly        Setup coin wallets only.')
+    print('--keysdirpath            Speed up tests by preloading all PGP keys in directory.')
 
-    logger.info('\n' + 'Known coins: %s', ', '.join(known_coins.keys()))
+    print('\n' + 'Known coins: {}'.format(', '.join(known_coins.keys())))
 
 
 def finalise_daemon(d):
@@ -1452,6 +1452,11 @@ def main():
         else:
             with open(config_path) as fs:
                 settings = json.load(fs)
+
+                # Add temporary default config for any coins that have not been added
+                for c in with_coins:
+                    if c not in settings['chainclients']:
+                        settings['chainclients'][c] = chainclients[c]
     else:
         for c in with_coins:
             withchainclients[c] = chainclients[c]

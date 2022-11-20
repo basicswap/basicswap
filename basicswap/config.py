@@ -10,7 +10,7 @@ CONFIG_FILENAME = 'basicswap.json'
 BASICSWAP_DATADIR = os.getenv('BASICSWAP_DATADIR', '~/.basicswap')
 DEFAULT_ALLOW_CORS = False
 TEST_DATADIRS = os.path.expanduser(os.getenv('DATADIRS', '/tmp/basicswap'))
-DEFAULT_TEST_BINDIR = os.path.expanduser(os.getenv('DEFAULT_TEST_BINDIR', '~/tmp/bin'))
+DEFAULT_TEST_BINDIR = os.path.expanduser(os.getenv('DEFAULT_TEST_BINDIR', '~/.basicswap/bin'))
 
 bin_suffix = ('.exe' if os.name == 'nt' else '')
 PARTICL_BINDIR = os.path.expanduser(os.getenv('PARTICL_BINDIR', os.path.join(DEFAULT_TEST_BINDIR, 'particl')))

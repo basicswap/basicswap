@@ -1,6 +1,7 @@
 
 # Simple Atomic Swap Network - Proof of Concept
 
+
 ## Overview
 
 Simple atomic swap experiment, doesn't have many interesting features yet.
@@ -13,8 +14,27 @@ Other nodes can be run in pruned mode.
 A node must be run for each coin type traded.
 In the future it should be possible to use data from explorers instead of running a node.
 
+
 ## Currently a work in progress
 
 Not ready for real-world use.
 
 Discuss development and help with testing in the matrix channel [#basicswap:matrix.org](https://riot.im/app/#/room/#basicswap:matrix.org)
+
+
+## Guix
+
+Start a development environment
+
+    guix shell --pure -D -f guix.scm
+
+
+Run tests
+
+    export PYTHONPATH=$(pwd)
+
+    # Prepare coin binaries - required once
+    python ./bin/basicswap-prepare.py -preparebinonly --withcoins=monero,bitcoin,particl,litecoin
+
+    pytest -vs tests/basicswap/test_run.py::Test::test_02_part_ltc
+
