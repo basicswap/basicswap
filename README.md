@@ -22,19 +22,7 @@ Not ready for real-world use.
 Discuss development and help with testing in the matrix channel [#basicswap:matrix.org](https://riot.im/app/#/room/#basicswap:matrix.org)
 
 
-## Guix
+## Install notes
 
-Start a development environment
-
-    guix shell --pure -D -f guix.scm
-
-
-Run tests
-
-    export PYTHONPATH=$(pwd)
-
-    # Prepare coin binaries - required once
-    python ./bin/basicswap-prepare.py -preparebinonly --withcoins=monero,bitcoin,particl,litecoin
-
-    pytest -vs tests/basicswap/test_run.py::Test::test_02_part_ltc
+Please see [doc/install.md](doc/install.md)
 
