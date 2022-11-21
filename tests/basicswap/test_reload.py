@@ -56,6 +56,12 @@ def btcRpc(client_no, cmd):
     return callrpc_cli(bin_path, data_path, 'regtest', cmd, 'bitcoin-cli')
 
 
+def partRpc(client_no, cmd):
+    bin_path = os.path.join(TEST_PATH, 'bin', 'particl')
+    data_path = os.path.join(TEST_PATH, 'client{}'.format(client_no), 'particl')
+    return callrpc_cli(bin_path, data_path, 'regtest', cmd, 'particl-cli')
+
+
 def updateThread():
     btc_addr = btcRpc(0, 'getnewaddress mining_addr bech32')
 
@@ -77,6 +83,23 @@ class Test(unittest.TestCase):
         with patch.object(sys, 'argv', testargs):
             runSystem.main()
 
+    def wait_for_node_height(self, port=12701, wallet_ticker='part', wait_for_blocks=3):
+        # Wait for height, or sequencelock is thrown off by genesis blocktime
+        logging.info(f'Waiting for {wallet_ticker} chain height {wait_for_blocks} at port {port}', )
+        for i in range(60):
+            if delay_event.is_set():
+                raise ValueError('Test stopped.')
+            try:
+                wallet = read_json_api(port, f'wallets/{wallet_ticker}')
+                node_blocks = wallet['blocks']
+                print(f'{wallet_ticker} node_blocks {node_blocks}')
+                if node_blocks >= wait_for_blocks:
+                    return
+            except Exception as e:
+                print('Error reading wallets', str(e))
+            delay_event.wait(1)
+        raise ValueError(f'wait_for_node_height timed out, {wallet_ticker}, {wait_for_blocks}, {port}')
+
     def test_reload(self):
         global stop_test
         processes = []
@@ -87,20 +110,14 @@ class Test(unittest.TestCase):
 
         try:
             waitForServer(delay_event, 12700)
+            partRpc(0, 'reservebalance false')  # WakeThreadStakeMiner
+            self.wait_for_node_height()
 
             num_blocks = 500
             btc_addr = btcRpc(1, 'getnewaddress mining_addr bech32')
             logging.info('Mining %d Bitcoin blocks to %s', num_blocks, btc_addr)
             btcRpc(1, 'generatetoaddress {} {}'.format(num_blocks, btc_addr))
-
-            for i in range(20):
-                if delay_event.is_set():
-                    raise ValueError('Test stopped.')
-                blocks = btcRpc(0, 'getblockchaininfo')['blocks']
-                if blocks >= num_blocks:
-                    break
-                delay_event.wait(2)
-            assert (blocks >= num_blocks)
+            self.wait_for_node_height(12700, 'btc', num_blocks)
 
             data = {
                 'addr_from': '-1',

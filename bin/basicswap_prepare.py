@@ -653,6 +653,9 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
             fp.write('shared-ringdb-dir={}\n'.format(os.path.join(config_datadir, 'shared-ringdb')))
             fp.write('rpc-login={}:{}\n'.format(core_settings['walletrpcuser'], core_settings['walletrpcpassword']))
 
+            if chain == 'regtest':
+                fp.write('allow-mismatched-daemon-version=1\n')
+
             if tor_control_password is not None:
                 if not core_settings['manage_daemon']:
                     fp.write(f'proxy={TOR_PROXY_HOST}:{TOR_PROXY_PORT}\n')
