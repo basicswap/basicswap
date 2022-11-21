@@ -395,6 +395,7 @@ class BaseTest(unittest.TestCase):
                         rpc('extkeyimportmaster', [rpc('mnemonic', ['new'])['master']])
                     # Lower output split threshold for more stakeable outputs
                     rpc('walletsettings', ['stakingoptions', {'stakecombinethreshold': 100, 'stakesplitthreshold': 200}])
+                    rpc('reservebalance', [False])
 
             for i in range(NUM_BTC_NODES):
                 if not cls.restore_instance:

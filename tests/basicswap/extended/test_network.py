@@ -221,6 +221,7 @@ class Test(unittest.TestCase):
                     rpc('extkeyimportmaster', [rpc('mnemonic', ['new'])['master']])
                 # Lower output split threshold for more stakeable outputs
                 rpc('walletsettings', ['stakingoptions', {'stakecombinethreshold': 100, 'stakesplitthreshold': 200}])
+                rpc('reservebalance', [False])
 
             for i in range(NUM_BTC_NODES):
                 data_dir = prepareDataDir(TEST_DIR, i, 'bitcoin.conf', 'btc_', base_p2p_port=BTC_BASE_PORT, base_rpc_port=BTC_BASE_RPC_PORT)
