@@ -24,6 +24,7 @@ import urllib.parse
 from urllib.request import urlretrieve
 
 import basicswap.config as cfg
+from basicswap import __version__
 from basicswap.base import getaddrinfo_tor
 from basicswap.basicswap import BasicSwap
 from basicswap.chainparams import Coins
@@ -884,8 +885,7 @@ def exitWithError(error_msg):
 
 
 def printVersion():
-    from basicswap import __version__
-    logger.info('Basicswap version: %s', __version__)
+    logger.info(f'Basicswap version: {__version__}')
 
     logger.info('Core versions:')
     for coin, version in known_coins.items():
@@ -1195,9 +1195,11 @@ def main():
     if bin_dir is None:
         bin_dir = os.path.join(data_dir, 'bin')
 
-    logger.info('datadir: %s', data_dir)
-    logger.info('bindir:  %s', bin_dir)
-    logger.info('Chain: %s', chain)
+    logger.info(f'BasicSwap prepare script {__version__}\n')
+    logger.info(f'Data dir: {data_dir}')
+    logger.info(f'Bin dir: {bin_dir}')
+    logger.info(f'Chain: {chain}')
+    logger.info('WALLET_ENCRYPTION_PWD is {}set'.format('not ' if WALLET_ENCRYPTION_PWD == '' else ''))
 
     if port_offset is None:
         port_offset = 300 if chain == 'testnet' else 0

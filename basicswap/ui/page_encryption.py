@@ -45,7 +45,7 @@ def page_unlock(self, url_split, post_string):
     server = self.server
     swap_client = server.swap_client
 
-    messages = []
+    messages = ['Warning: This will unlock the system for all users!', ]
     err_messages = []
 
     form_data = self.checkForm(post_string, 'unlock', err_messages)

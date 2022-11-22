@@ -1,8 +1,9 @@
 ## Guix
 
 Start a development environment
+(openssl is included only to set SSL_CERTS_DIRS)
 
-    guix shell --pure -L. -D basicswap
+    guix shell --pure -L. openssl -D basicswap
 
 
 Run tests
@@ -15,7 +16,7 @@ Run tests
     pytest -vs tests/basicswap/test_run.py::Test::test_02_part_ltc
 
 
-Install package
+Install basicswap package
 
     guix package --install -L. basicswap
 
