@@ -28,7 +28,7 @@ import multiprocessing
 from unittest.mock import patch
 
 from basicswap.rpc_xmr import (
-    callrpc_xmr_na,
+    callrpc_xmr,
 )
 from basicswap.rpc import (
     callrpc,
@@ -93,7 +93,7 @@ def updateThreadXmr(cls):
     while not cls.delay_event.is_set():
         try:
             if cls.xmr_addr is not None:
-                callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'generateblocks', {'wallet_address': cls.xmr_addr, 'amount_of_blocks': 1})
+                callrpc_xmr(XMR_BASE_RPC_PORT + 1, 'generateblocks', {'wallet_address': cls.xmr_addr, 'amount_of_blocks': 1})
         except Exception as e:
             print('updateThreadXmr error', str(e))
         cls.delay_event.wait(random.randrange(cls.xmr_update_min, cls.xmr_update_max))
@@ -151,10 +151,10 @@ class Test(unittest.TestCase):
 
         self.xmr_addr = wallets['XMR']['main_address']
         num_blocks = 100
-        if callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'get_block_count')['count'] < num_blocks:
+        if callrpc_xmr(XMR_BASE_RPC_PORT + 1, 'get_block_count')['count'] < num_blocks:
             logging.info('Mining {} Monero blocks to {}.'.format(num_blocks, self.xmr_addr))
-            callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'generateblocks', {'wallet_address': self.xmr_addr, 'amount_of_blocks': num_blocks})
-        logging.info('XMR blocks: %d', callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'get_block_count')['count'])
+            callrpc_xmr(XMR_BASE_RPC_PORT + 1, 'generateblocks', {'wallet_address': self.xmr_addr, 'amount_of_blocks': num_blocks})
+        logging.info('XMR blocks: %d', callrpc_xmr(XMR_BASE_RPC_PORT + 1, 'get_block_count')['count'])
 
         self.btc_addr = callbtcrpc(0, 'getnewaddress', ['mining_addr', 'bech32'])
         num_blocks = 500  # Mine enough to activate segwit

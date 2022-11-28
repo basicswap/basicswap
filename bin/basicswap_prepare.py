@@ -116,6 +116,8 @@ BASE_XMR_WALLET_PORT = int(os.getenv('BASE_XMR_WALLET_PORT', 29998))
 XMR_WALLET_RPC_HOST = os.getenv('XMR_WALLET_RPC_HOST', '127.0.0.1')
 XMR_WALLET_RPC_USER = os.getenv('XMR_WALLET_RPC_USER', 'xmr_wallet_user')
 XMR_WALLET_RPC_PWD = os.getenv('XMR_WALLET_RPC_PWD', 'xmr_wallet_pwd')
+XMR_RPC_USER = os.getenv('XMR_RPC_USER', '')
+XMR_RPC_PWD = os.getenv('XMR_RPC_PWD', '')
 DEFAULT_XMR_RESTORE_HEIGHT = int(os.getenv('DEFAULT_XMR_RESTORE_HEIGHT', 2245107))
 
 LTC_RPC_HOST = os.getenv('LTC_RPC_HOST', '127.0.0.1')
@@ -630,6 +632,9 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
                 fp.write(f'proxy={TOR_PROXY_HOST}:{TOR_PROXY_PORT}\n')
                 fp.write('proxy-allow-dns-leaks=0\n')
                 fp.write('no-igd=1\n')
+
+            if XMR_RPC_USER != '':
+                fp.write(f'rpc-login={XMR_RPC_USER}:{XMR_RPC_PWD}\n')
 
         wallets_dir = core_settings.get('walletsdir', data_dir)
         if not os.path.exists(wallets_dir):
@@ -1339,6 +1344,9 @@ def main():
     if BTC_RPC_USER != '':
         chainclients['bitcoin']['rpcuser'] = BTC_RPC_USER
         chainclients['bitcoin']['rpcpassword'] = BTC_RPC_PWD
+    if XMR_RPC_USER != '':
+        chainclients['monero']['rpcuser'] = XMR_RPC_USER
+        chainclients['monero']['rpcpassword'] = XMR_RPC_PWD
     if PIVX_RPC_USER != '':
         chainclients['pivx']['rpcuser'] = PIVX_RPC_USER
         chainclients['pivx']['rpcpassword'] = PIVX_RPC_PWD

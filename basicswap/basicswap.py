@@ -467,17 +467,25 @@ class BasicSwap(BaseApp):
                 else:
                     raise ValueError('Missing XMR wallet rpc credentials.')
 
+                self.coin_clients[coin]['rpcuser'] = chain_client_settings.get('rpcuser', '')
+                self.coin_clients[coin]['rpcpassword'] = chain_client_settings.get('rpcpassword', '')
+
     def selectXMRRemoteDaemon(self, coin):
         self.log.info('Selecting remote XMR daemon.')
         chain_client_settings = self.getChainClientSettings(coin)
         remote_daemon_urls = chain_client_settings.get('remote_daemon_urls', [])
-        rpchost = self.coin_clients[coin]['rpchost']
-        rpcport = self.coin_clients[coin]['rpcport']
+
+        coin_settings = self.coin_clients[coin]
+        rpchost = coin_settings['rpchost']
+        rpcport = coin_settings['rpcport']
+        daemon_login = None
+        if coin_settings.get('rpcuser', '') != '':
+            daemon_login = (coin_settings.get('rpcuser', ''), coin_settings.get('rpcpassword', ''))
         current_daemon_url = f'{rpchost}:{rpcport}'
         if current_daemon_url in remote_daemon_urls:
             self.log.info(f'Trying last used url {rpchost}:{rpcport}.')
             try:
-                rpc_cb2 = make_xmr_rpc2_func(rpcport, rpchost)
+                rpc_cb2 = make_xmr_rpc2_func(rpcport, daemon_login, rpchost)
                 test = rpc_cb2('get_height', timeout=20)['height']
                 return True
             except Exception as e:
@@ -487,10 +495,10 @@ class BasicSwap(BaseApp):
             self.log.info(f'Trying url {url}.')
             try:
                 rpchost, rpcport = url.rsplit(':', 1)
-                rpc_cb2 = make_xmr_rpc2_func(rpcport, rpchost)
+                rpc_cb2 = make_xmr_rpc2_func(rpcport, daemon_login, rpchost)
                 test = rpc_cb2('get_height', timeout=20)['height']
-                self.coin_clients[coin]['rpchost'] = rpchost
-                self.coin_clients[coin]['rpcport'] = rpcport
+                coin_settings['rpchost'] = rpchost
+                coin_settings['rpcport'] = rpcport
                 data = {
                     'rpchost': rpchost,
                     'rpcport': rpcport,

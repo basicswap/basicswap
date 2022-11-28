@@ -31,8 +31,7 @@ from basicswap.util import (
     TemporaryError)
 from basicswap.rpc_xmr import (
     make_xmr_rpc_func,
-    make_xmr_rpc2_func,
-    make_xmr_wallet_rpc_func)
+    make_xmr_rpc2_func)
 from basicswap.util import (
     b2i, b2h)
 from basicswap.chainparams import XMR_COIN, CoinInterface, Coins
@@ -65,9 +64,12 @@ class XMRInterface(CoinInterface):
 
     def __init__(self, coin_settings, network, swap_client=None):
         super().__init__(network)
-        self.rpc_cb = make_xmr_rpc_func(coin_settings['rpcport'], host=coin_settings.get('rpchost', '127.0.0.1'))
-        self.rpc_cb2 = make_xmr_rpc2_func(coin_settings['rpcport'], host=coin_settings.get('rpchost', '127.0.0.1'))  # non-json endpoint
-        self.rpc_wallet_cb = make_xmr_wallet_rpc_func(coin_settings['walletrpcport'], coin_settings['walletrpcauth'], host=coin_settings.get('walletrpchost', '127.0.0.1'))
+        daemon_login = None
+        if coin_settings.get('rpcuser', '') != '':
+            daemon_login = (coin_settings.get('rpcuser', ''), coin_settings.get('rpcpassword', ''))
+        self.rpc_cb = make_xmr_rpc_func(coin_settings['rpcport'], daemon_login, host=coin_settings.get('rpchost', '127.0.0.1'))
+        self.rpc_cb2 = make_xmr_rpc2_func(coin_settings['rpcport'], daemon_login, host=coin_settings.get('rpchost', '127.0.0.1'))  # non-json endpoint
+        self.rpc_wallet_cb = make_xmr_rpc_func(coin_settings['walletrpcport'], coin_settings['walletrpcauth'], host=coin_settings.get('walletrpchost', '127.0.0.1'))
 
         self.blocks_confirmed = coin_settings['blocks_confirmed']
         self._restore_height = coin_settings.get('restore_height', 0)

@@ -46,7 +46,6 @@ from basicswap.rpc import (
 )
 from basicswap.rpc_xmr import (
     callrpc_xmr,
-    callrpc_xmr_na,
 )
 from basicswap.interface.xmr import (
     XMR_COIN,
@@ -256,7 +255,7 @@ def signal_handler(sig, frame):
 def waitForXMRNode(rpc_offset, max_tries=7):
     for i in range(max_tries + 1):
         try:
-            callrpc_xmr_na(XMR_BASE_RPC_PORT + rpc_offset, 'get_block_count')
+            callrpc_xmr(XMR_BASE_RPC_PORT + rpc_offset, 'get_block_count')
             return
         except Exception as ex:
             if i < max_tries:
@@ -268,7 +267,7 @@ def waitForXMRNode(rpc_offset, max_tries=7):
 def waitForXMRWallet(rpc_offset, auth, max_tries=7):
     for i in range(max_tries + 1):
         try:
-            callrpc_xmr(XMR_BASE_WALLET_RPC_PORT + rpc_offset, auth, 'get_languages')
+            callrpc_xmr(XMR_BASE_WALLET_RPC_PORT + rpc_offset, 'get_languages', auth=auth)
             return
         except Exception as ex:
             if i < max_tries:
@@ -549,10 +548,10 @@ class BaseTest(unittest.TestCase):
                 num_blocks = 100
                 if cls.start_xmr_nodes:
                     cls.xmr_addr = cls.callxmrnodewallet(cls, 1, 'get_address')['address']
-                    if callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'get_block_count')['count'] < num_blocks:
+                    if callrpc_xmr(XMR_BASE_RPC_PORT + 1, 'get_block_count')['count'] < num_blocks:
                         logging.info('Mining %d Monero blocks to %s.', num_blocks, cls.xmr_addr)
-                        callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'generateblocks', {'wallet_address': cls.xmr_addr, 'amount_of_blocks': num_blocks})
-                    logging.info('XMR blocks: %d', callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'get_block_count')['count'])
+                        callrpc_xmr(XMR_BASE_RPC_PORT + 1, 'generateblocks', {'wallet_address': cls.xmr_addr, 'amount_of_blocks': num_blocks})
+                    logging.info('XMR blocks: %d', callrpc_xmr(XMR_BASE_RPC_PORT + 1, 'get_block_count')['count'])
 
                 logging.info('Adding anon outputs')
                 outputs = []
@@ -634,7 +633,7 @@ class BaseTest(unittest.TestCase):
         if cls.ltc_addr is not None:
             ltcCli('generatetoaddress 1 {}'.format(cls.ltc_addr))
         if cls.xmr_addr is not None:
-            callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'generateblocks', {'wallet_address': cls.xmr_addr, 'amount_of_blocks': 1})
+            callrpc_xmr(XMR_BASE_RPC_PORT + 1, 'generateblocks', {'wallet_address': cls.xmr_addr, 'amount_of_blocks': 1})
 
     @classmethod
     def waitForParticlHeight(cls, num_blocks, node_id=0):
@@ -651,7 +650,7 @@ class BaseTest(unittest.TestCase):
         assert particl_blocks >= num_blocks
 
     def callxmrnodewallet(self, node_id, method, params=None):
-        return callrpc_xmr(XMR_BASE_WALLET_RPC_PORT + node_id, self.xmr_wallet_auth[node_id], method, params)
+        return callrpc_xmr(XMR_BASE_WALLET_RPC_PORT + node_id, method, params, auth=self.xmr_wallet_auth[node_id])
 
     def getXmrBalance(self, js_wallets):
         return float(js_wallets[Coins.XMR.name]['unconfirmed']) + float(js_wallets[Coins.XMR.name]['balance'])

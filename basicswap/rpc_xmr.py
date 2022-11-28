@@ -159,7 +159,7 @@ class JsonrpcDigest():
             raise
 
 
-def callrpc_xmr(rpc_port, auth, method, params=[], rpc_host='127.0.0.1', path='json_rpc', timeout=120):
+def callrpc_xmr(rpc_port, method, params=[], rpc_host='127.0.0.1', path='json_rpc', auth=None, timeout=120):
     # auth is a tuple: (username, password)
     try:
         if rpc_host.count('://') > 0:
@@ -168,27 +168,10 @@ def callrpc_xmr(rpc_port, auth, method, params=[], rpc_host='127.0.0.1', path='j
             url = 'http://{}:{}/{}'.format(rpc_host, rpc_port, path)
 
         x = JsonrpcDigest(url)
-        v = x.json_request(method, params, username=auth[0], password=auth[1], timeout=timeout)
-        x.close()
-        r = json.loads(v.decode('utf-8'))
-    except Exception as ex:
-        raise ValueError('RPC Server Error: {}'.format(str(ex)))
-
-    if 'error' in r and r['error'] is not None:
-        raise ValueError('RPC error ' + str(r['error']))
-
-    return r['result']
-
-
-def callrpc_xmr_na(rpc_port, method, params=[], rpc_host='127.0.0.1', path='json_rpc', timeout=120):
-    try:
-        if rpc_host.count('://') > 0:
-            url = '{}:{}/{}'.format(rpc_host, rpc_port, path)
+        if auth:
+            v = x.json_request(method, params, username=auth[0], password=auth[1], timeout=timeout)
         else:
-            url = 'http://{}:{}/{}'.format(rpc_host, rpc_port, path)
-
-        x = JsonrpcDigest(url)
-        v = x.json_request(method, params, timeout=timeout)
+            v = x.json_request(method, params, timeout=timeout)
         x.close()
         r = json.loads(v.decode('utf-8'))
     except Exception as ex:
@@ -200,7 +183,7 @@ def callrpc_xmr_na(rpc_port, method, params=[], rpc_host='127.0.0.1', path='json
     return r['result']
 
 
-def callrpc_xmr2(rpc_port, method, params=None, rpc_host='127.0.0.1', timeout=120):
+def callrpc_xmr2(rpc_port, method, params=None, auth=None, rpc_host='127.0.0.1', timeout=120):
     try:
         if rpc_host.count('://') > 0:
             url = '{}:{}/{}'.format(rpc_host, rpc_port, method)
@@ -208,7 +191,10 @@ def callrpc_xmr2(rpc_port, method, params=None, rpc_host='127.0.0.1', timeout=12
             url = 'http://{}:{}/{}'.format(rpc_host, rpc_port, method)
 
         x = JsonrpcDigest(url)
-        v = x.post_request(method, params, timeout=timeout)
+        if auth:
+            v = x.json_request(method, params, username=auth[0], password=auth[1], timeout=timeout)
+        else:
+            v = x.json_request(method, params, timeout=timeout)
         x.close()
         r = json.loads(v.decode('utf-8'))
     except Exception as ex:
@@ -217,34 +203,23 @@ def callrpc_xmr2(rpc_port, method, params=None, rpc_host='127.0.0.1', timeout=12
     return r
 
 
-def make_xmr_rpc_func(port, host='127.0.0.1'):
-    port = port
-    host = host
-
-    def rpc_func(method, params=None, wallet=None, timeout=120):
-        nonlocal port
-        nonlocal host
-        return callrpc_xmr_na(port, method, params, rpc_host=host, timeout=timeout)
-    return rpc_func
-
-
-def make_xmr_rpc2_func(port, host='127.0.0.1'):
-    port = port
-    host = host
-
-    def rpc_func(method, params=None, wallet=None, timeout=120):
-        nonlocal port
-        nonlocal host
-        return callrpc_xmr2(port, method, params, rpc_host=host, timeout=timeout)
-    return rpc_func
-
-
-def make_xmr_wallet_rpc_func(port, auth, host='127.0.0.1'):
+def make_xmr_rpc2_func(port, auth, host='127.0.0.1'):
     port = port
     auth = auth
     host = host
 
     def rpc_func(method, params=None, wallet=None, timeout=120):
         nonlocal port, auth, host
-        return callrpc_xmr(port, auth, method, params, rpc_host=host, timeout=timeout)
+        return callrpc_xmr2(port, method, params, auth=auth, rpc_host=host, timeout=timeout)
+    return rpc_func
+
+
+def make_xmr_rpc_func(port, auth, host='127.0.0.1'):
+    port = port
+    auth = auth
+    host = host
+
+    def rpc_func(method, params=None, wallet=None, timeout=120):
+        nonlocal port, auth, host
+        return callrpc_xmr(port, method, params, rpc_host=host, auth=auth, timeout=timeout)
     return rpc_func

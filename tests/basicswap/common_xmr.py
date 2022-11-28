@@ -19,7 +19,7 @@ from urllib.request import urlopen
 from unittest.mock import patch
 
 from basicswap.rpc_xmr import (
-    callrpc_xmr_na,
+    callrpc_xmr,
 )
 from tests.basicswap.mnemonics import mnemonics
 from tests.basicswap.util import (
@@ -63,10 +63,10 @@ def waitForBidState(delay_event, port, bid_id, state_str, wait_for=60):
     raise ValueError('waitForBidState failed')
 
 
-def updateThread(xmr_addr, delay_event):
+def updateThread(xmr_addr, delay_event, xmr_auth):
     while not delay_event.is_set():
         try:
-            callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'generateblocks', {'wallet_address': xmr_addr, 'amount_of_blocks': 1})
+            callrpc_xmr(XMR_BASE_RPC_PORT + 1, 'generateblocks', {'wallet_address': xmr_addr, 'amount_of_blocks': 1}, auth=xmr_auth)
         except Exception as e:
             print('updateThread error', str(e))
         delay_event.wait(2)
@@ -85,6 +85,10 @@ def run_prepare(node_id, datadir_path, bins_path, with_coins, mnemonic_in=None, 
 
     os.environ['PART_RPC_PORT'] = str(PARTICL_RPC_PORT_BASE)
     os.environ['BTC_RPC_PORT'] = str(BITCOIN_RPC_PORT_BASE)
+
+    os.environ['XMR_RPC_USER'] = 'xmr_user'
+    os.environ['XMR_RPC_PWD'] = 'xmr_pwd'
+
     import bin.basicswap_prepare as prepareSystem
     # Hack: Reload module to set env vars as the basicswap_prepare module is initialised if imported from elsewhere earlier
     from importlib import reload
@@ -333,12 +337,16 @@ class XmrTestBase(TestBase):
 
         num_blocks = 100
 
-        if callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'get_block_count')['count'] < num_blocks:
-            logging.info('Mining {} Monero blocks to {}.'.format(num_blocks, xmr_addr1))
-            callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'generateblocks', {'wallet_address': xmr_addr1, 'amount_of_blocks': num_blocks})
-        logging.info('XMR blocks: %d', callrpc_xmr_na(XMR_BASE_RPC_PORT + 1, 'get_block_count')['count'])
+        xmr_auth = None
+        if os.getenv('XMR_RPC_USER', '') != '':
+            xmr_auth = (os.getenv('XMR_RPC_USER', ''), os.getenv('XMR_RPC_PWD', ''))
 
-        self.update_thread = threading.Thread(target=updateThread, args=(xmr_addr1, self.delay_event))
+        if callrpc_xmr(XMR_BASE_RPC_PORT + 1, 'get_block_count', auth=xmr_auth)['count'] < num_blocks:
+            logging.info('Mining {} Monero blocks to {}.'.format(num_blocks, xmr_addr1))
+            callrpc_xmr(XMR_BASE_RPC_PORT + 1, 'generateblocks', {'wallet_address': xmr_addr1, 'amount_of_blocks': num_blocks}, auth=xmr_auth)
+        logging.info('XMR blocks: %d', callrpc_xmr(XMR_BASE_RPC_PORT + 1, 'get_block_count', auth=xmr_auth)['count'])
+
+        self.update_thread = threading.Thread(target=updateThread, args=(xmr_addr1, self.delay_event, xmr_auth))
         self.update_thread.start()
 
         # Wait for height, or sequencelock is thrown off by genesis blocktime

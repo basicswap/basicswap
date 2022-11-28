@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019-2020 tecnovert
+# Copyright (c) 2019-2022 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -162,6 +162,11 @@ def runClient(fp, data_dir, chain):
                     daemon_addr = '{}:{}'.format(v['rpchost'], v['rpcport'])
                     swap_client.log.info('daemon-address: {}'.format(daemon_addr))
                     opts = ['--daemon-address', daemon_addr, ]
+                    daemon_rpcuser = v.get('rpcuser', '')
+                    daemon_rpcpass = v.get('rpcpassword', '')
+                    if daemon_rpcuser != '':
+                        opts.append('--daemon-login')
+                        opts.append(daemon_rpcuser + ':' + daemon_rpcpass)
                     daemons.append(startXmrWalletDaemon(v['datadir'], v['bindir'], 'monero-wallet-rpc', opts))
                     pid = daemons[-1].pid
                     swap_client.log.info('Started {} {}'.format('monero-wallet-rpc', pid))

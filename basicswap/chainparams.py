@@ -411,6 +411,8 @@ class CoinInterface:
         str_error = str(ex).lower()
         if 'not enough unlocked money' in str_error:
             return True
+        if 'No unlocked balance' in str_error:
+            return True
         if 'transaction was rejected by daemon' in str_error:
             return True
         if 'invalid unlocked_balance' in str_error:
