@@ -393,6 +393,13 @@ class BasicSwap(BaseApp):
         use_session.remove()
         self.mxDB.release()
 
+    def handleSessionErrors(self, e, session, tag):
+        if self.debug:
+            self.log.error(traceback.format_exc())
+
+        self.log.error(f'Error: {tag} - {e}')
+        session.rollback()
+
     def setCoinConnectParams(self, coin):
         # Set anything that does not require the daemon to be running
         chain_client_settings = self.getChainClientSettings(coin)
@@ -1010,6 +1017,7 @@ class BasicSwap(BaseApp):
     def loadFromDB(self):
         self.log.info('Loading data from db')
         self.mxDB.acquire()
+        self.swaps_in_progress.clear()
         try:
             session = scoped_session(self.session_factory)
             for bid in session.query(Bid):
@@ -3741,6 +3749,7 @@ class BasicSwap(BaseApp):
         self.mxDB.acquire()
         now = int(time.time())
         session = None
+        reload_in_progress = False
         try:
             session = scoped_session(self.session_factory)
 
@@ -3780,11 +3789,17 @@ class BasicSwap(BaseApp):
                 session.execute('DELETE FROM actions WHERE trigger_at <= {}'.format(now))
 
             session.commit()
+        except Exception as ex:
+            self.handleSessionErrors(ex, session, 'checkQueuedActions')
+            reload_in_progress = True
         finally:
             if session:
                 session.close()
                 session.remove()
             self.mxDB.release()
+
+        if reload_in_progress:
+            self.loadFromDB()
 
     def checkXmrSwaps(self):
         self.mxDB.acquire()
