@@ -184,6 +184,7 @@ class DebugTypes(IntEnum):
     MAKE_INVALID_PTX = auto()
     DONT_SPEND_ITX = auto()
     SKIP_LOCK_TX_REFUND = auto()
+    SEND_LOCKED_XMR = auto()
 
 
 def strOfferState(state):

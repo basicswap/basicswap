@@ -3,6 +3,11 @@
 This will setup Basicswap so that each coin runs in it's own container.
 
 
+Install dependencies:
+
+    sudo apt install basez docker-compose
+
+
 Copy and edit .env config:
 
     cp example.env .env

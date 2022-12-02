@@ -30,6 +30,7 @@ from basicswap.basicswap import (
 )
 from basicswap.basicswap_util import (
     TxLockTypes,
+    EventLogTypes,
 )
 from basicswap.util import (
     COIN,
@@ -1037,8 +1038,8 @@ class Test(BaseTest):
         }
         bid_id = swap_clients[1].postBid(offer_id, below_min_bid, extra_options=extra_bid_options)
 
-        events = wait_for_event(test_delay_event, swap_clients[0], Concepts.NETWORK_MESSAGE, bid_id)
-        assert ('Bid amount below minimum' in events[0].event_msg)
+        event = wait_for_event(test_delay_event, swap_clients[0], Concepts.NETWORK_MESSAGE, bid_id)
+        assert ('Bid amount below minimum' in event.event_msg)
 
         bid_ids = []
         for i in range(5):
@@ -1047,8 +1048,8 @@ class Test(BaseTest):
         # Should fail > max concurrent
         test_delay_event.wait(1.0)
         bid_id = swap_clients[1].postBid(offer_id, min_bid)
-        events = wait_for_event(test_delay_event, swap_clients[0], Concepts.AUTOMATION, bid_id)
-        assert ('Already have 5 bids to complete' in events[0].event_msg)
+        event = wait_for_event(test_delay_event, swap_clients[0], Concepts.AUTOMATION, bid_id)
+        assert ('Already have 5 bids to complete' in event.event_msg)
 
         for bid_id in bid_ids:
             wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=180)
@@ -1059,8 +1060,8 @@ class Test(BaseTest):
         # Should fail > total value
         amt_bid += 1
         bid_id = swap_clients[1].postBid(offer_id, amt_bid)
-        events = wait_for_event(test_delay_event, swap_clients[0], Concepts.AUTOMATION, bid_id)
-        assert ('Over remaining offer value' in events[0].event_msg)
+        event = wait_for_event(test_delay_event, swap_clients[0], Concepts.AUTOMATION, bid_id)
+        assert ('Over remaining offer value' in event.event_msg)
 
         # Should pass
         amt_bid -= 1
@@ -1218,6 +1219,30 @@ class Test(BaseTest):
         js_0 = read_json_api(1800, 'wallets/part')
         node0_blind_after = js_0['blind_balance'] + js_0['blind_unconfirmed']
         assert (node0_blind_after < node0_blind_before - amount_from)
+
+    def test_13_locked_xmr(self):
+        logging.info('---------- Test PART to XMR leader recovers coin a lock tx')
+        swap_clients = self.swap_clients
+
+        amt_swap = make_int(random.uniform(0.1, 10.0), scale=8, r=1)
+        rate_swap = make_int(random.uniform(2.0, 20.0), scale=12, r=1)
+        offer_id = swap_clients[0].postOffer(Coins.PART, Coins.XMR, amt_swap, rate_swap, amt_swap, SwapTypes.XMR_SWAP)
+
+        wait_for_offer(test_delay_event, swap_clients[1], offer_id)
+        offer = swap_clients[1].getOffer(offer_id)
+        bid_id = swap_clients[1].postXmrBid(offer_id, offer.amount_from)
+
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.BID_RECEIVED)
+        swap_clients[1].setBidDebugInd(bid_id, DebugTypes.SEND_LOCKED_XMR)
+        swap_clients[0].acceptXmrBid(bid_id)
+
+        wait_for_event(test_delay_event, swap_clients[0], Concepts.BID, bid_id, event_type=EventLogTypes.LOCK_TX_B_INVALID, wait_for=180)
+
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED, wait_for=180)
+        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED, sent=True)
+
+        swap_clients[0].abandonBid(bid_id)
+        swap_clients[1].abandonBid(bid_id)
 
     def test_98_withdraw_all(self):
         logging.info('---------- Test XMR withdrawal all')

@@ -159,7 +159,7 @@ def wait_for_bid_tx_state(delay_event, swap_client, bid_id, initiate_state, part
     raise ValueError('wait_for_bid_tx_state timed out.')
 
 
-def wait_for_event(delay_event, swap_client, linked_type, linked_id, wait_for=20):
+def wait_for_event(delay_event, swap_client, linked_type, linked_id, event_type=None, wait_for=20):
     logging.info('wait_for_event')
 
     for i in range(wait_for):
@@ -167,8 +167,10 @@ def wait_for_event(delay_event, swap_client, linked_type, linked_id, wait_for=20
             raise ValueError('Test stopped.')
         delay_event.wait(1)
         rv = swap_client.getEvents(linked_type, linked_id)
-        if len(rv) > 0:
-            return rv
+
+        for event in rv:
+            if event_type is None or event.event_type == event_type:
+                return event
     raise ValueError('wait_for_event timed out.')
 
 

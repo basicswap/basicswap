@@ -993,7 +993,7 @@ class BTCInterface(CoinInterface):
     def encodeSharedAddress(self, Kbv, Kbs):
         return self.pubkey_to_segwit_address(Kbs)
 
-    def publishBLockTx(self, Kbv, Kbs, output_amount, feerate):
+    def publishBLockTx(self, Kbv, Kbs, output_amount, feerate, delay_for=10, unlock_time=0):
         b_lock_tx = self.createBLockTx(Kbs, output_amount)
 
         b_lock_tx = self.fundTx(b_lock_tx, feerate)

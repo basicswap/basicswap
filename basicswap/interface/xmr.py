@@ -252,13 +252,13 @@ class XMRInterface(CoinInterface):
     def encodeSharedAddress(self, Kbv, Kbs):
         return xmr_util.encode_address(Kbv, Kbs)
 
-    def publishBLockTx(self, Kbv, Kbs, output_amount, feerate, delay_for=10):
+    def publishBLockTx(self, Kbv, Kbs, output_amount, feerate, delay_for=10, unlock_time=0):
         with self._mx_wallet:
             self.openWallet(self._wallet_filename)
 
             shared_addr = xmr_util.encode_address(Kbv, Kbs)
 
-            params = {'destinations': [{'amount': output_amount, 'address': shared_addr}]}
+            params = {'destinations': [{'amount': output_amount, 'address': shared_addr}], 'unlock_time': unlock_time}
             if self._fee_priority > 0:
                 params['priority'] = self._fee_priority
             rv = self.rpc_wallet_cb('transfer', params)
@@ -316,15 +316,20 @@ class XMRInterface(CoinInterface):
                 #   and (current_height is None or current_height - transfer['block_height'] > cb_block_confirmed):
             '''
             params = {'transfer_type': 'available'}
-            rv = self.rpc_wallet_cb('incoming_transfers', params)
-            if 'transfers' in rv:
-                for transfer in rv['transfers']:
+            transfers = self.rpc_wallet_cb('incoming_transfers', params)
+            rv = None
+            if 'transfers' in transfers:
+                for transfer in transfers['transfers']:
+                    if not transfer['unlocked']:
+                        self._log.warning('Coin b lock txn is locked: {}'.format(transfer['tx_hash']))
+                        rv = -1
+                        continue
                     if transfer['amount'] == cb_swap_value:
                         return {'txid': transfer['tx_hash'], 'amount': transfer['amount'], 'height': 0 if 'block_height' not in transfer else transfer['block_height']}
                     else:
                         self._log.warning('Incorrect amount detected for coin b lock txn: {}'.format(transfer['tx_hash']))
-                        return -1
-            return None
+                        rv = -1
+            return rv
 
     def waitForLockTxB(self, kbv, Kbs, cb_swap_value, cb_block_confirmed, restore_height):
         with self._mx_wallet:
