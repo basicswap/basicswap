@@ -153,9 +153,10 @@ def runClient(fp, data_dir, chain):
             if c == 'monero':
                 if v['manage_daemon'] is True:
                     swap_client.log.info(f'Starting {display_name} daemon')
-                    daemons.append(startXmrDaemon(v['datadir'], v['bindir'], 'monerod'))
+                    filename = 'monerod' + ('.exe' if os.name == 'nt' else '')
+                    daemons.append(startXmrDaemon(v['datadir'], v['bindir'], filename))
                     pid = daemons[-1].pid
-                    swap_client.log.info('Started {} {}'.format('monerod', pid))
+                    swap_client.log.info('Started {} {}'.format(filename, pid))
 
                 if v['manage_wallet_daemon'] is True:
                     swap_client.log.info(f'Starting {display_name} wallet daemon')
@@ -167,9 +168,10 @@ def runClient(fp, data_dir, chain):
                     if daemon_rpcuser != '':
                         opts.append('--daemon-login')
                         opts.append(daemon_rpcuser + ':' + daemon_rpcpass)
-                    daemons.append(startXmrWalletDaemon(v['datadir'], v['bindir'], 'monero-wallet-rpc', opts))
+                    filename = 'monero-wallet-rpc' + ('.exe' if os.name == 'nt' else '')
+                    daemons.append(startXmrWalletDaemon(v['datadir'], v['bindir'], filename, opts))
                     pid = daemons[-1].pid
-                    swap_client.log.info('Started {} {}'.format('monero-wallet-rpc', pid))
+                    swap_client.log.info('Started {} {}'.format(filename, pid))
 
                 continue
             if v['manage_daemon'] is True:
@@ -235,7 +237,7 @@ def runClient(fp, data_dir, chain):
     for d in daemons:
         swap_client.log.info('Interrupting {}'.format(d.pid))
         try:
-            d.send_signal(signal.SIGINT)
+            d.send_signal(signal.CTRL_C_EVENT if os.name == 'nt' else signal.SIGINT)
         except Exception as e:
             swap_client.log.info('Interrupting %d, error %s', d.pid, str(e))
     for d in daemons:

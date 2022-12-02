@@ -318,6 +318,24 @@ def extractCore(coin, version_data, settings, bin_dir, release_path, extra_opts=
         else:
             raise ValueError('Unknown coin')
 
+        if 'win32' in BIN_ARCH or 'win64' in BIN_ARCH:
+            with zipfile.ZipFile(release_path) as fz:
+                namelist = fz.namelist()
+                for b in bins:
+                    b += '.exe'
+                    out_path = os.path.join(bin_dir, b)
+                    if (not os.path.exists(out_path)) or extract_core_overwrite:
+                        for entry in namelist:
+                            if entry.endswith(b):
+                                with open(out_path, 'wb') as fout:
+                                    fout.write(fz.read(entry))
+                                try:
+                                    os.chmod(out_path, stat.S_IRWXU | stat.S_IXGRP | stat.S_IXOTH)
+                                except Exception as e:
+                                    logging.warning('Unable to set file permissions: %s, for %s', str(e), out_path)
+                                break
+            return
+
         num_exist = 0
         for b in bins:
             out_path = os.path.join(bin_dir, b)
@@ -934,8 +952,11 @@ def printHelp():
 
 def finalise_daemon(d):
     logging.info('Interrupting {}'.format(d.pid))
-    d.send_signal(signal.SIGINT)
-    d.wait(timeout=120)
+    try:
+        d.send_signal(signal.CTRL_C_EVENT if os.name == 'nt' else signal.SIGINT)
+        d.wait(timeout=120)
+    except Exception as e:
+        logging.info(f'Error {e}'.format(d.pid))
     for fp in (d.stdout, d.stderr, d.stdin):
         if fp:
             fp.close()
@@ -995,7 +1016,8 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
 
                 if c == Coins.XMR:
                     if coin_settings['manage_wallet_daemon']:
-                        daemons.append(startXmrWalletDaemon(coin_settings['datadir'], coin_settings['bindir'], 'monero-wallet-rpc'))
+                        filename = 'monero-wallet-rpc' + ('.exe' if os.name == 'nt' else '')
+                        daemons.append(startXmrWalletDaemon(coin_settings['datadir'], coin_settings['bindir'], filename))
                 else:
                     if coin_settings['manage_daemon']:
                         filename = coin_name + 'd' + ('.exe' if os.name == 'nt' else '')
@@ -1063,6 +1085,10 @@ def load_config(config_path):
         return json.load(fs)
 
 
+def signal_handler(sig, frame):
+    logger.info('Signal %d detected' % (sig))
+
+
 def main():
     global use_tor_proxy
     data_dir = None
@@ -1083,6 +1109,10 @@ def main():
     initwalletsonly = False
     tor_control_password = None
     extra_opts = {}
+
+    if os.name == 'nt':
+        # On windows sending signal.CTRL_C_EVENT to a subprocess causes it to be sent to the parent process too
+        signal.signal(signal.SIGINT, signal_handler)
 
     for v in sys.argv[1:]:
         if len(v) < 2 or v[0] != '-':

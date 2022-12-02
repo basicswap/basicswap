@@ -55,6 +55,44 @@ On the remote machine open an ssh tunnel to port 18081:
 And start monerod
 
 
+## Installing on windows natively
+
+This is not a supported installation method!
+
+Install prerequisites:
+- https://gitforwindows.org/
+- https://www.python.org/downloads/windows/
+
+
+In the start menu find Git / Git Bash
+Right click Git Bash -> More -> run as administrator
+
+
+Create and activate a venv
+
+    python -m venv c:\bsx_venv
+    c:/bsx_venv/scripts/activate
+
+
+Install coincurve
+
+    git clone https://github.com/tecnovert/coincurve.git -b bsx_windows
+    cd coincurve/
+    pip3 install .
+
+
+Install basicswap
+
+    git clone https://github.com/tecnovert/basicswap.git
+    cd basicswap
+    pip3 install .
+
+
+Test:
+
+    basicswap-prepare.exe --help
+
+
 ## Run One Test
 
 ```

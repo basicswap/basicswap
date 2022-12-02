@@ -5,6 +5,7 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
+import os
 import json
 import logging
 
@@ -96,6 +97,13 @@ class XMRInterface(CoinInterface):
         params = {'filename': filename}
         if self._wallet_password is not None:
             params['password'] = self._wallet_password
+
+        try:
+            # Can't reopen the same wallet in windows, !is_keys_file_locked()
+            if os.name == 'nt':
+                self.rpc_wallet_cb('close_wallet')
+        except Exception:
+            pass
         self.rpc_wallet_cb('open_wallet', params)
 
     def initialiseWallet(self, key_view, key_spend, restore_height=None):
