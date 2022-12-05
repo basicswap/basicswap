@@ -444,19 +444,11 @@ class BTCInterface(CoinInterface):
 
         return pk1, pk2
 
-    def genScriptLockTxScript(self, Kal, Kaf):
-        Kal_enc = Kal if len(Kal) == 33 else self.encodePubkey(Kal)
-        Kaf_enc = Kaf if len(Kaf) == 33 else self.encodePubkey(Kaf)
-
-        return CScript([2, Kal_enc, Kaf_enc, 2, CScriptOp(OP_CHECKMULTISIG)])
-
-    def createSCLockTx(self, value, Kal, Kaf, vkbv=None):
-        script = self.genScriptLockTxScript(Kal, Kaf)
+    def createSCLockTx(self, value: int, script: bytearray, vkbv=None) -> bytes:
         tx = CTransaction()
         tx.nVersion = self.txVersion()
         tx.vout.append(self.txoType()(value, self.getScriptDest(script)))
-
-        return tx.serialize(), script
+        return tx.serialize()
 
     def fundSCLockTx(self, tx_bytes, feerate, vkbv=None):
         return self.fundTx(tx_bytes, feerate)
@@ -1271,6 +1263,7 @@ class BTCInterface(CoinInterface):
 
         sign_for_addr = None
         for addr, value in unspent_addr.items():
+            print('[rm]', value, amount_for)
             if value >= amount_for:
                 sign_for_addr = addr
                 break

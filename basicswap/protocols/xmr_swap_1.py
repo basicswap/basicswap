@@ -9,6 +9,9 @@ from sqlalchemy.orm import scoped_session
 from basicswap.util import (
     ensure,
 )
+from basicswap.util.script import (
+    getP2WSH,
+)
 from basicswap.chainparams import (
     Coins,
 )
@@ -18,6 +21,9 @@ from basicswap.basicswap_util import (
     EventLogTypes,
 )
 from . import ProtocolInterface
+from basicswap.contrib.test_framework.script import (
+    CScript, CScriptOp,
+    OP_CHECKMULTISIG)
 
 
 def addLockRefundSigs(self, xmr_swap, ci):
@@ -90,3 +96,35 @@ def getChainBSplitKey(swap_client, bid, xmr_swap, offer):
 
 class XmrSwapInterface(ProtocolInterface):
     swap_type = SwapTypes.XMR_SWAP
+
+    def genScriptLockTxScript(self, ci, Kal: bytes, Kaf: bytes) -> CScript:
+        Kal_enc = Kal if len(Kal) == 33 else ci.encodePubkey(Kal)
+        Kaf_enc = Kaf if len(Kaf) == 33 else ci.encodePubkey(Kaf)
+
+        return CScript([2, Kal_enc, Kaf_enc, 2, CScriptOp(OP_CHECKMULTISIG)])
+
+    def getFundedInitiateTxTemplate(self, ci, amount: int, sub_fee: bool) -> bytes:
+        script = self.getMockScript()
+        addr_to = ci.encode_p2wsh(getP2WSH(script)) if ci._use_segwit else ci.encode_p2sh(script)
+        funded_tx = ci.createRawFundedTransaction(addr_to, amount, sub_fee, lock_unspents=False)
+
+        return bytes.fromhex(funded_tx)
+
+    def promoteMockTx(self, ci, mock_tx: bytes, script: bytearray) -> bytearray:
+        mock_txo_script = self.getMockScriptScriptPubkey(ci)
+        real_txo_script = ci.getScriptDest(script)
+
+        found: int = 0
+        ctx = ci.loadTx(mock_tx)
+        for txo in ctx.vout:
+            if txo.scriptPubKey == mock_txo_script:
+                txo.scriptPubKey = real_txo_script
+                found += 1
+
+        if found < 1:
+            raise ValueError('Mocked output not found')
+        if found > 1:
+            raise ValueError('Too many mocked outputs found')
+        ctx.nLockTime = 0
+
+        return ctx.serialize()

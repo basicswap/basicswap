@@ -2424,11 +2424,17 @@ class BasicSwap(BaseApp):
                 xmr_swap.kbsl_dleag = xmr_swap.pkbsl
 
             # MSG2F
-            xmr_swap.a_lock_tx, xmr_swap.a_lock_tx_script = ci_from.createSCLockTx(
-                bid.amount,
-                xmr_swap.pkal, xmr_swap.pkaf, xmr_swap.vkbv
-            )
-            xmr_swap.a_lock_tx = ci_from.fundSCLockTx(xmr_swap.a_lock_tx, xmr_offer.a_fee_rate, xmr_swap.vkbv)
+            pi = self.pi(SwapTypes.XMR_SWAP)
+            xmr_swap.a_lock_tx_script = pi.genScriptLockTxScript(ci_from, xmr_swap.pkal, xmr_swap.pkaf)
+            prefunded_tx = self.getPreFundedTx(Concepts.OFFER, bid.offer_id, TxTypes.ITX_PRE_FUNDED)
+            if prefunded_tx:
+                xmr_swap.a_lock_tx = pi.promoteMockTx(ci_from, prefunded_tx, xmr_swap.a_lock_tx_script)
+            else:
+                xmr_swap.a_lock_tx = ci_from.createSCLockTx(
+                    bid.amount,
+                    xmr_swap.a_lock_tx_script, xmr_swap.vkbv
+                )
+                xmr_swap.a_lock_tx = ci_from.fundSCLockTx(xmr_swap.a_lock_tx, xmr_offer.a_fee_rate, xmr_swap.vkbv)
 
             xmr_swap.a_lock_tx_id = ci_from.getTxid(xmr_swap.a_lock_tx)
             a_lock_tx_dest = ci_from.getScriptDest(xmr_swap.a_lock_tx_script)

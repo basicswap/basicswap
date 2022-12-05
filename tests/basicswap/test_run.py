@@ -560,6 +560,16 @@ class Test(BaseTest):
         wait_for_bid(test_delay_event, swap_clients[2], bid_id, BidStates.SWAP_COMPLETED, wait_for=60)
         wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=60)
 
+        # Verify expected inputs were used
+        bid, offer = swap_clients[2].getBidAndOffer(bid_id)
+        assert (bid.initiate_tx)
+        wtx = ci.rpc_callback('gettransaction', [bid.initiate_tx.txid.hex(),])
+        itx_after = ci.describeTx(wtx['hex'])
+        assert (len(itx_after['vin']) == len(itx_decoded['vin']))
+        for i, txin in enumerate(itx_decoded['vin']):
+            assert (txin['txid'] == itx_after['vin'][i]['txid'])
+            assert (txin['vout'] == itx_after['vin'][i]['vout'])
+
     def pass_99_delay(self):
         logging.info('Delay')
         for i in range(60 * 10):

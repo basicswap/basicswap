@@ -75,6 +75,7 @@ from tests.basicswap.common import (
     wait_for_no_offer,
     wait_for_none_active,
     wait_for_balance,
+    wait_for_unspent,
     compare_bid_states,
     extract_states_from_xu_file,
     TEST_HTTP_HOST,
@@ -1243,6 +1244,78 @@ class Test(BaseTest):
 
         swap_clients[0].abandonBid(bid_id)
         swap_clients[1].abandonBid(bid_id)
+
+    def test_14_sweep_balance(self):
+        logging.info('---------- Test sweep balance offer')
+        swap_clients = self.swap_clients
+
+        # Disable staking
+        walletsettings = callnoderpc(2, 'walletsettings', ['stakingoptions', ])
+        walletsettings['enabled'] = False
+        walletsettings = callnoderpc(2, 'walletsettings', ['stakingoptions', walletsettings])
+        walletsettings = callnoderpc(2, 'walletsettings', ['stakingoptions', ])
+        assert (walletsettings['stakingoptions']['enabled'] is False)
+
+        # Prepare balance
+        js_w2 = read_json_api(1802, 'wallets')
+        if float(js_w2['PART']['balance']) < 100.0:
+            post_json = {
+                'value': 100,
+                'address': js_w2['PART']['deposit_address'],
+                'subfee': False,
+            }
+            json_rv = read_json_api(TEST_HTTP_PORT + 0, 'wallets/part/withdraw', post_json)
+            assert (len(json_rv['txid']) == 64)
+            wait_for_balance(test_delay_event, 'http://127.0.0.1:1802/json/wallets/part', 'balance', 100.0)
+
+        js_w2 = read_json_api(1802, 'wallets')
+        assert (float(js_w2['PART']['balance']) >= 100.0)
+
+        js_w2 = read_json_api(1802, 'wallets')
+        post_json = {
+            'value': float(js_w2['PART']['balance']),
+            'address': read_json_api(1802, 'wallets/part/nextdepositaddr'),
+            'subfee': True,
+        }
+        json_rv = read_json_api(TEST_HTTP_PORT + 2, 'wallets/part/withdraw', post_json)
+        wait_for_balance(test_delay_event, 'http://127.0.0.1:1802/json/wallets/part', 'balance', 10.0)
+        assert (len(json_rv['txid']) == 64)
+
+        # Create prefunded ITX
+        ci = swap_clients[2].ci(Coins.PART)
+        pi = swap_clients[2].pi(SwapTypes.XMR_SWAP)
+        js_w2 = read_json_api(1802, 'wallets')
+        swap_value = ci.make_int(js_w2['PART']['balance'])
+
+        itx = pi.getFundedInitiateTxTemplate(ci, swap_value, True)
+        itx_decoded = ci.describeTx(itx.hex())
+        value_after_subfee = ci.make_int(itx_decoded['vout'][0]['value'])
+        assert (value_after_subfee < swap_value)
+        swap_value = value_after_subfee
+        wait_for_unspent(test_delay_event, ci, swap_value)
+
+        extra_options = {'prefunded_itx': itx}
+        offer_id = swap_clients[2].postOffer(Coins.PART, Coins.XMR, swap_value, 2 * COIN, swap_value, SwapTypes.XMR_SWAP, extra_options=extra_options)
+
+        wait_for_offer(test_delay_event, swap_clients[1], offer_id)
+        offer = swap_clients[1].getOffer(offer_id)
+        bid_id = swap_clients[1].postBid(offer_id, offer.amount_from)
+
+        wait_for_bid(test_delay_event, swap_clients[2], bid_id, BidStates.BID_RECEIVED)
+        swap_clients[2].acceptBid(bid_id)
+
+        wait_for_bid(test_delay_event, swap_clients[2], bid_id, BidStates.SWAP_COMPLETED, wait_for=120)
+        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=120)
+
+        # Verify expected inputs were used
+        bid, _, _, _, _ = swap_clients[2].getXmrBidAndOffer(bid_id)
+        assert (bid.xmr_a_lock_tx)
+        wtx = ci.rpc_callback('gettransaction', [bid.xmr_a_lock_tx.txid.hex(),])
+        itx_after = ci.describeTx(wtx['hex'])
+        assert (len(itx_after['vin']) == len(itx_decoded['vin']))
+        for i, txin in enumerate(itx_decoded['vin']):
+            assert (txin['txid'] == itx_after['vin'][i]['txid'])
+            assert (txin['vout'] == itx_after['vin'][i]['vout'])
 
     def test_98_withdraw_all(self):
         logging.info('---------- Test XMR withdrawal all')

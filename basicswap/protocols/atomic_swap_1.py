@@ -76,13 +76,12 @@ def redeemITx(self, bid_id, session):
 class AtomicSwapInterface(ProtocolInterface):
     swap_type = SwapTypes.SELLER_FIRST
 
-    def getMockScript(self) -> bytearray:
-        return bytearray([
-            OpCodes.OP_RETURN, OpCodes.OP_1])
-
-    def getMockScriptScriptPubkey(self, ci) -> bytearray:
+    def getFundedInitiateTxTemplate(self, ci, amount: int, sub_fee: bool) -> bytes:
         script = self.getMockScript()
-        return ci.get_p2wsh_script_pubkey(script) if ci._use_segwit else ci.get_p2sh_script_pubkey(script)
+        addr_to = ci.encode_p2wsh(getP2WSH(script)) if ci._use_segwit else ci.encode_p2sh(script)
+        funded_tx = ci.createRawFundedTransaction(addr_to, amount, sub_fee, lock_unspents=False)
+
+        return bytes.fromhex(funded_tx)
 
     def promoteMockTx(self, ci, mock_tx: bytes, script: bytearray) -> bytearray:
         mock_txo_script = self.getMockScriptScriptPubkey(ci)
@@ -103,11 +102,3 @@ class AtomicSwapInterface(ProtocolInterface):
 
         funded_tx = ctx.serialize()
         return ci.signTxWithWallet(funded_tx)
-
-    def getFundedInitiateTxTemplate(self, ci, amount: int, sub_fee: bool) -> bytes:
-
-        script = self.getMockScript()
-        addr_to = ci.encode_p2wsh(getP2WSH(script)) if ci._use_segwit else ci.encode_p2sh(script)
-        funded_tx = ci.createRawFundedTransaction(addr_to, amount, sub_fee, lock_unspents=False)
-
-        return bytes.fromhex(funded_tx)

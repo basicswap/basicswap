@@ -166,8 +166,7 @@ class PARTInterfaceBlind(PARTInterface):
             ensure(v['result'] is True, 'verifycommitment failed')
         return output_n, blinded_info
 
-    def createSCLockTx(self, value, Kal, Kaf, vkbv):
-        script = self.genScriptLockTxScript(Kal, Kaf)
+    def createSCLockTx(self, value: int, script: bytearray, vkbv) -> bytes:
 
         # Nonce is derived from vkbv, ephemeral_key isn't used
         ephemeral_key = i2b(self.getNewSecretKey())
@@ -181,7 +180,7 @@ class PARTInterfaceBlind(PARTInterface):
         rv = self.rpc_callback('createrawparttransaction', params)
 
         tx_bytes = bytes.fromhex(rv['hex'])
-        return tx_bytes, script
+        return tx_bytes
 
     def fundSCLockTx(self, tx_bytes, feerate, vkbv):
         feerate_str = self.format_amount(feerate)
