@@ -123,6 +123,8 @@ class TxTypes(IntEnum):
     XMR_SWAP_A_LOCK_REFUND_SWIPE = auto()
     XMR_SWAP_B_LOCK = auto()
 
+    ITX_PRE_FUNDED = auto()
+
 
 class ActionTypes(IntEnum):
     ACCEPT_BID = auto()
@@ -289,6 +291,8 @@ def strTxType(tx_type):
         return 'Chain A Lock Refund Swipe Tx'
     if tx_type == TxTypes.XMR_SWAP_B_LOCK:
         return 'Chain B Lock Tx'
+    if tx_type == TxTypes.ITX_PRE_FUNDED:
+        return 'Funded mock initiate tx'
     return 'Unknown'
 
 

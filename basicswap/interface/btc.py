@@ -12,6 +12,7 @@ import hashlib
 import logging
 import traceback
 from io import BytesIO
+
 from basicswap.contrib.test_framework import segwit_addr
 
 from basicswap.util import (
@@ -64,6 +65,7 @@ from basicswap.contrib.test_framework.script import (
     OP_CHECKMULTISIG,
     OP_CHECKSEQUENCEVERIFY,
     OP_DROP,
+    OP_HASH160, OP_EQUAL,
     SIGHASH_ALL,
     SegwitV0SignatureHash,
     hash160)
@@ -244,7 +246,7 @@ class BTCInterface(CoinInterface):
     def getBlockHeader(self, block_hash):
         return self.rpc_callback('getblockheader', [block_hash])
 
-    def getBlockHeaderAt(self, time, block_after=False):
+    def getBlockHeaderAt(self, time: int, block_after=False):
         blockchaininfo = self.rpc_callback('getblockchaininfo')
         last_block_header = self.rpc_callback('getblockheader', [blockchaininfo['bestblockhash']])
 
@@ -294,24 +296,24 @@ class BTCInterface(CoinInterface):
         finally:
             self.close_rpc(rpc_conn)
 
-    def getWalletSeedID(self):
+    def getWalletSeedID(self) -> str:
         return self.rpc_callback('getwalletinfo')['hdseedid']
 
-    def checkExpectedSeed(self, expect_seedid):
+    def checkExpectedSeed(self, expect_seedid) -> bool:
         self._expect_seedid_hex = expect_seedid
         return expect_seedid == self.getWalletSeedID()
 
-    def getNewAddress(self, use_segwit, label='swap_receive'):
+    def getNewAddress(self, use_segwit: bool, label: str = 'swap_receive') -> str:
         args = [label]
         if use_segwit:
             args.append('bech32')
         return self.rpc_callback('getnewaddress', args)
 
-    def isAddressMine(self, address):
+    def isAddressMine(self, address: str) -> bool:
         addr_info = self.rpc_callback('getaddressinfo', [address])
         return addr_info['ismine']
 
-    def checkAddressMine(self, address):
+    def checkAddressMine(self, address: str) -> None:
         addr_info = self.rpc_callback('getaddressinfo', [address])
         ensure(addr_info['ismine'], 'ismine is false')
         ensure(addr_info['hdseedid'] == self._expect_seedid_hex, 'unexpected seedid')
@@ -914,7 +916,7 @@ class BTCInterface(CoinInterface):
     def encodeTx(self, tx):
         return tx.serialize()
 
-    def loadTx(self, tx_bytes):
+    def loadTx(self, tx_bytes) -> CTransaction:
         # Load tx from bytes to internal representation
         tx = CTransaction()
         tx.deserialize(BytesIO(tx_bytes))
@@ -963,23 +965,23 @@ class BTCInterface(CoinInterface):
             # TODO: filter errors
             return None
 
-    def setTxSignature(self, tx_bytes, stack):
+    def setTxSignature(self, tx_bytes, stack) -> bytes:
         tx = self.loadTx(tx_bytes)
         tx.wit.vtxinwit.clear()
         tx.wit.vtxinwit.append(CTxInWitness())
         tx.wit.vtxinwit[0].scriptWitness.stack = stack
         return tx.serialize()
 
-    def stripTxSignature(self, tx_bytes):
+    def stripTxSignature(self, tx_bytes) -> bytes:
         tx = self.loadTx(tx_bytes)
         tx.wit.vtxinwit.clear()
         return tx.serialize()
 
-    def extractLeaderSig(self, tx_bytes):
+    def extractLeaderSig(self, tx_bytes) -> bytes:
         tx = self.loadTx(tx_bytes)
         return tx.wit.vtxinwit[0].scriptWitness.stack[1]
 
-    def extractFollowerSig(self, tx_bytes):
+    def extractFollowerSig(self, tx_bytes) -> bytes:
         tx = self.loadTx(tx_bytes)
         return tx.wit.vtxinwit[0].scriptWitness.stack[2]
 
@@ -1142,7 +1144,7 @@ class BTCInterface(CoinInterface):
         rv = pubkey.verify_compact(sig, message_hash, hasher=None)
         assert (rv is True)
 
-    def verifyMessage(self, address, message, signature, message_magic=None) -> bool:
+    def verifyMessage(self, address: str, message: str, signature: str, message_magic: str = None) -> bool:
         if message_magic is None:
             message_magic = self.chainparams()['message_magic']
 
@@ -1209,13 +1211,13 @@ class BTCInterface(CoinInterface):
         length += 1  # flags
         return length
 
-    def describeTx(self, tx_hex):
+    def describeTx(self, tx_hex: str):
         return self.rpc_callback('decoderawtransaction', [tx_hex])
 
     def getSpendableBalance(self):
         return self.make_int(self.rpc_callback('getbalances')['mine']['trusted'])
 
-    def createUTXO(self, value_sats):
+    def createUTXO(self, value_sats: int):
         # Create a new address and send value_sats to it
 
         spendable_balance = self.getSpendableBalance()
@@ -1225,18 +1227,22 @@ class BTCInterface(CoinInterface):
         address = self.getNewAddress(self._use_segwit, 'create_utxo')
         return self.withdrawCoin(self.format_amount(value_sats), address, False), address
 
-    def createRawSignedTransaction(self, addr_to, amount):
+    def createRawFundedTransaction(self, addr_to: str, amount: int, sub_fee: bool = False, lock_unspents: bool = True) -> str:
         txn = self.rpc_callback('createrawtransaction', [[], {addr_to: self.format_amount(amount)}])
 
         options = {
-            'lockUnspents': True,
+            'lockUnspents': lock_unspents,
             'conf_target': self._conf_target,
         }
-        txn_funded = self.rpc_callback('fundrawtransaction', [txn, options])['hex']
-        txn_signed = self.rpc_callback('signrawtransactionwithwallet', [txn_funded])['hex']
-        return txn_signed
+        if sub_fee:
+            options['subtractFeeFromOutputs'] = [0,]
+        return self.rpc_callback('fundrawtransaction', [txn, options])['hex']
 
-    def getBlockWithTxns(self, block_hash):
+    def createRawSignedTransaction(self, addr_to, amount) -> str:
+        txn_funded = self.createRawFundedTransaction(addr_to, amount)
+        return self.rpc_callback('signrawtransactionwithwallet', [txn_funded])['hex']
+
+    def getBlockWithTxns(self, block_hash: str):
         return self.rpc_callback('getblock', [block_hash, 2])
 
     def getUnspentsByAddr(self):
@@ -1248,7 +1254,7 @@ class BTCInterface(CoinInterface):
             unspent_addr[u['address']] = unspent_addr.get(u['address'], 0) + self.make_int(u['amount'], r=1)
         return unspent_addr
 
-    def getUTXOBalance(self, address):
+    def getUTXOBalance(self, address: str):
         num_blocks = self.rpc_callback('getblockcount')
 
         sum_unspent = 0
@@ -1292,11 +1298,11 @@ class BTCInterface(CoinInterface):
 
         return self.getUTXOBalance(address)
 
-    def isWalletEncrypted(self):
+    def isWalletEncrypted(self) -> bool:
         wallet_info = self.rpc_callback('getwalletinfo')
         return 'unlocked_until' in wallet_info
 
-    def isWalletLocked(self):
+    def isWalletLocked(self) -> bool:
         wallet_info = self.rpc_callback('getwalletinfo')
         if 'unlocked_until' in wallet_info and wallet_info['unlocked_until'] <= 0:
             return True
@@ -1308,7 +1314,7 @@ class BTCInterface(CoinInterface):
         locked = encrypted and wallet_info['unlocked_until'] <= 0
         return encrypted, locked
 
-    def changeWalletPassword(self, old_password, new_password):
+    def changeWalletPassword(self, old_password: str, new_password: str):
         self._log.info('changeWalletPassword - {}'.format(self.ticker()))
         if old_password == '':
             if self.isWalletEncrypted():
@@ -1316,7 +1322,7 @@ class BTCInterface(CoinInterface):
             return self.rpc_callback('encryptwallet', [new_password])
         self.rpc_callback('walletpassphrasechange', [old_password, new_password])
 
-    def unlockWallet(self, password):
+    def unlockWallet(self, password: str):
         if password == '':
             return
         self._log.info('unlockWallet - {}'.format(self.ticker()))
@@ -1326,6 +1332,14 @@ class BTCInterface(CoinInterface):
     def lockWallet(self):
         self._log.info('lockWallet - {}'.format(self.ticker()))
         self.rpc_callback('walletlock')
+
+    def get_p2sh_script_pubkey(self, script: bytearray) -> bytearray:
+        script_hash = hash160(script)
+        assert len(script_hash) == 20
+        return CScript([OP_HASH160, script_hash, OP_EQUAL])
+
+    def get_p2wsh_script_pubkey(self, script: bytearray) -> bytearray:
+        return CScript([OP_0, hashlib.sha256(script).digest()])
 
 
 def testBTCInterface():

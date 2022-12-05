@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2020 tecnovert
+# Copyright (c) 2020-2022 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -14,8 +14,10 @@ from basicswap.chainparams import (
 )
 from basicswap.basicswap_util import (
     KeyTypes,
+    SwapTypes,
     EventLogTypes,
 )
+from . import ProtocolInterface
 
 
 def addLockRefundSigs(self, xmr_swap, ci):
@@ -84,3 +86,7 @@ def getChainBSplitKey(swap_client, bid, xmr_swap, offer):
 
     key_type = KeyTypes.KBSF if bid.was_sent else KeyTypes.KBSL
     return ci_to.encodeKey(swap_client.getPathKey(offer.coin_from, offer.coin_to, bid.created_at, xmr_swap.contract_count, key_type, True if offer.coin_to == Coins.XMR else False))
+
+
+class XmrSwapInterface(ProtocolInterface):
+    swap_type = SwapTypes.XMR_SWAP

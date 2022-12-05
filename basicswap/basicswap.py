@@ -26,6 +26,8 @@ import sqlalchemy as sa
 import collections
 import concurrent.futures
 
+from typing import Optional
+
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.orm.session import close_all_sessions
 
@@ -92,6 +94,7 @@ from .db import (
     Offer,
     Bid,
     SwapTx,
+    PrefundedTx,
     PooledAddress,
     SentOffer,
     SmsgAddress,
@@ -116,6 +119,7 @@ from .explorers import (
 import basicswap.config as cfg
 import basicswap.network as bsn
 import basicswap.protocols.atomic_swap_1 as atomic_swap_1
+import basicswap.protocols.xmr_swap_1 as xmr_swap_1
 from .basicswap_util import (
     KeyTypes,
     TxLockTypes,
@@ -140,9 +144,6 @@ from .basicswap_util import (
     isActiveBidState,
     NotificationTypes as NT,
 )
-from .protocols.xmr_swap_1 import (
-    addLockRefundSigs,
-    recoverNoScriptTxnWithKey)
 
 
 non_script_type_coins = (Coins.XMR, Coins.PART_ANON)
@@ -218,6 +219,10 @@ class WatchedTransaction():
 
 class BasicSwap(BaseApp):
     ws_server = None
+    protocolInterfaces = {
+        SwapTypes.SELLER_FIRST: atomic_swap_1.AtomicSwapInterface(),
+        SwapTypes.XMR_SWAP: xmr_swap_1.XmrSwapInterface(),
+    }
 
     def __init__(self, fp, data_dir, settings, chain, log_name='BasicSwap'):
         super().__init__(fp, data_dir, settings, chain, log_name)
@@ -548,6 +553,11 @@ class BasicSwap(BaseApp):
 
         return self.coin_clients[use_coinid][interface_ind]
 
+    def pi(self, protocol_ind):
+        if protocol_ind not in self.protocolInterfaces:
+            raise ValueError('Unknown protocol_ind {}'.format(int(protocol_ind)))
+        return self.protocolInterfaces[protocol_ind]
+
     def createInterface(self, coin):
         if coin == Coins.PART:
             return PARTInterface(self.coin_clients[coin], self.chain, self)
@@ -651,10 +661,8 @@ class BasicSwap(BaseApp):
                 self.log.info('%s Core version %d', ci.coin_name(), core_version)
                 self.coin_clients[c]['core_version'] = core_version
 
-                if c == Coins.XMR:
-                    t = threading.Thread(target=threadPollXMRChainState, args=(self, c))
-                else:
-                    t = threading.Thread(target=threadPollChainState, args=(self, c))
+                thread_func = threadPollXMRChainState if c == Coins.XMR else threadPollChainState
+                t = threading.Thread(target=thread_func, args=(self, c))
                 self.threads.append(t)
                 t.start()
 
@@ -851,7 +859,7 @@ class BasicSwap(BaseApp):
         finally:
             self.closeSession(session)
 
-    def updateIdentityBidState(self, session, address, bid):
+    def updateIdentityBidState(self, session, address: str, bid) -> None:
         identity_stats = session.query(KnownIdentity).filter_by(address=address).first()
         if not identity_stats:
             identity_stats = KnownIdentity(address=address, created_at=int(time.time()))
@@ -870,7 +878,7 @@ class BasicSwap(BaseApp):
         identity_stats.updated_at = int(time.time())
         session.add(identity_stats)
 
-    def setIntKVInSession(self, str_key, int_val, session):
+    def setIntKVInSession(self, str_key: str, int_val: int, session) -> None:
         kv = session.query(DBKVInt).filter_by(key=str_key).first()
         if not kv:
             kv = DBKVInt(key=str_key, value=int_val)
@@ -878,7 +886,7 @@ class BasicSwap(BaseApp):
             kv.value = int_val
         session.add(kv)
 
-    def setIntKV(self, str_key, int_val):
+    def setIntKV(self, str_key: str, int_val: int) -> None:
         self.mxDB.acquire()
         try:
             session = scoped_session(self.session_factory)
@@ -889,7 +897,7 @@ class BasicSwap(BaseApp):
             session.remove()
             self.mxDB.release()
 
-    def setStringKV(self, str_key, str_val, session=None):
+    def setStringKV(self, str_key: str, str_val: str, session=None) -> None:
         try:
             use_session = self.openSession(session)
             kv = use_session.query(DBKVString).filter_by(key=str_key).first()
@@ -902,7 +910,7 @@ class BasicSwap(BaseApp):
             if session is None:
                 self.closeSession(use_session)
 
-    def getStringKV(self, str_key):
+    def getStringKV(self, str_key: str) -> Optional[str]:
         self.mxDB.acquire()
         try:
             session = scoped_session(self.session_factory)
@@ -915,7 +923,7 @@ class BasicSwap(BaseApp):
             session.remove()
             self.mxDB.release()
 
-    def clearStringKV(self, str_key, str_val):
+    def clearStringKV(self, str_key: str, str_val: str) -> None:
         with self.mxDB:
             try:
                 session = scoped_session(self.session_factory)
@@ -924,6 +932,19 @@ class BasicSwap(BaseApp):
             finally:
                 session.close()
                 session.remove()
+
+    def getPreFundedTx(self, linked_type: int, linked_id: bytes, tx_type: int, session=None) -> Optional[bytes]:
+        try:
+            use_session = self.openSession(session)
+            tx = use_session.query(PrefundedTx).filter_by(linked_type=linked_type, linked_id=linked_id, tx_type=tx_type, used_by=None).first()
+            if not tx:
+                return None
+            tx.used_by = linked_id
+            use_session.add(tx)
+            return tx.tx_data
+        finally:
+            if session is None:
+                self.closeSession(use_session)
 
     def activateBid(self, session, bid):
         if bid.bid_id in self.swaps_in_progress:
@@ -1365,6 +1386,16 @@ class BasicSwap(BaseApp):
                     repeat_limit=1,
                     repeat_count=0)
                 session.add(auto_link)
+
+            if 'prefunded_itx' in extra_options:
+                prefunded_tx = PrefundedTx(
+                    active_ind=1,
+                    created_at=offer_created_at,
+                    linked_type=Concepts.OFFER,
+                    linked_id=offer_id,
+                    tx_type=TxTypes.ITX_PRE_FUNDED,
+                    tx_data=extra_options['prefunded_itx'])
+                session.add(prefunded_tx)
 
             session.add(offer)
             session.add(SentOffer(offer_id=offer_id))
@@ -2147,7 +2178,8 @@ class BasicSwap(BaseApp):
 
             bid.pkhash_seller = pkhash_refund
 
-            txn = self.createInitiateTxn(coin_from, bid_id, bid, script)
+            prefunded_tx = self.getPreFundedTx(Concepts.OFFER, offer.offer_id, TxTypes.ITX_PRE_FUNDED)
+            txn = self.createInitiateTxn(coin_from, bid_id, bid, script, prefunded_tx)
 
             # Store the signed refund txn in case wallet is locked when refund is possible
             refund_txn = self.createRefundTxn(coin_from, txn, offer, bid, script)
@@ -2532,14 +2564,14 @@ class BasicSwap(BaseApp):
             session.remove()
             self.mxDB.release()
 
-    def setBidError(self, bid_id, bid, error_str, save_bid=True, xmr_swap=None):
+    def setBidError(self, bid_id, bid, error_str, save_bid=True, xmr_swap=None) -> None:
         self.log.error('Bid %s - Error: %s', bid_id.hex(), error_str)
         bid.setState(BidStates.BID_ERROR)
         bid.state_note = 'error msg: ' + error_str
         if save_bid:
             self.saveBid(bid_id, bid, xmr_swap=xmr_swap)
 
-    def createInitiateTxn(self, coin_type, bid_id, bid, initiate_script):
+    def createInitiateTxn(self, coin_type, bid_id, bid, initiate_script, prefunded_tx=None) -> Optional[str]:
         if self.coin_clients[coin_type]['connection_type'] != 'rpc':
             return None
         ci = self.ci(coin_type)
@@ -2550,7 +2582,11 @@ class BasicSwap(BaseApp):
             addr_to = ci.encode_p2sh(initiate_script)
         self.log.debug('Create initiate txn for coin %s to %s for bid %s', str(coin_type), addr_to, bid_id.hex())
 
-        txn_signed = ci.createRawSignedTransaction(addr_to, bid.amount)
+        if prefunded_tx:
+            pi = self.pi(SwapTypes.SELLER_FIRST)
+            txn_signed = pi.promoteMockTx(ci, prefunded_tx, initiate_script).hex()
+        else:
+            txn_signed = ci.createRawSignedTransaction(addr_to, bid.amount)
         return txn_signed
 
     def deriveParticipateScript(self, bid_id, bid, offer):
@@ -4560,7 +4596,7 @@ class BasicSwap(BaseApp):
             prevout_amount = ci_from.getLockTxSwapOutputValue(bid, xmr_swap)
             xmr_swap.af_lock_refund_tx_sig = ci_from.signTx(kaf, xmr_swap.a_lock_refund_tx, 0, xmr_swap.a_lock_tx_script, prevout_amount)
 
-            addLockRefundSigs(self, xmr_swap, ci_from)
+            xmr_swap_1.addLockRefundSigs(self, xmr_swap, ci_from)
 
             msg_buf = XmrBidLockTxSigsMessage(
                 bid_msg_id=bid_id,
@@ -4988,7 +5024,7 @@ class BasicSwap(BaseApp):
 
             v = ci_from.verifyTxSig(xmr_swap.a_lock_refund_spend_tx, xmr_swap.af_lock_refund_spend_tx_sig, xmr_swap.pkaf, 0, xmr_swap.a_lock_refund_tx_script, prevout_amount)
             ensure(v, 'Invalid signature for lock refund spend txn')
-            addLockRefundSigs(self, xmr_swap, ci_from)
+            xmr_swap_1.addLockRefundSigs(self, xmr_swap, ci_from)
 
             delay = random.randrange(self.min_delay_event, self.max_delay_event)
             self.log.info('Sending coin A lock tx for xmr bid %s in %d seconds', bid_id.hex(), delay)
@@ -5268,7 +5304,7 @@ class BasicSwap(BaseApp):
                     has_changed = True
 
             if data['kbs_other'] is not None:
-                return recoverNoScriptTxnWithKey(self, bid_id, data['kbs_other'])
+                return xmr_swap_1.recoverNoScriptTxnWithKey(self, bid_id, data['kbs_other'])
 
             if has_changed:
                 session = scoped_session(self.session_factory)

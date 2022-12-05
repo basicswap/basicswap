@@ -225,6 +225,19 @@ def upgradeDatabase(self, db_version):
                     event_data BLOB,
                     created_at BIGINT,
                     PRIMARY KEY (record_id))''')
+        elif current_version == 16:
+            db_version += 1
+            session.execute('''
+                CREATE TABLE prefunded_transactions (
+                    record_id INTEGER NOT NULL,
+                    active_ind INTEGER,
+                    created_at BIGINT,
+                    linked_type INTEGER,
+                    linked_id BLOB,
+                    tx_type INTEGER,
+                    tx_data BLOB,
+                    used_by BLOB,
+                    PRIMARY KEY (record_id))''')
 
         if current_version != db_version:
             self.db_version = db_version

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019 tecnovert
+# Copyright (c) 2019-2022 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -15,6 +15,7 @@ class OpCodes(IntEnum):
     OP_IF = 0x63,
     OP_ELSE = 0x67,
     OP_ENDIF = 0x68,
+    OP_RETURN = 0x6a,
     OP_DROP = 0x75,
     OP_DUP = 0x76,
     OP_SIZE = 0x82,

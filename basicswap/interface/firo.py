@@ -132,26 +132,28 @@ class FIROInterface(BTCInterface):
         rv = self.rpc_callback('signrawtransaction', [tx.hex()])
         return bytes.fromhex(rv['hex'])
 
-    def createRawSignedTransaction(self, addr_to, amount):
+    def createRawFundedTransaction(self, addr_to: str, amount: int, sub_fee: bool = False, lock_unspents: bool = True) -> str:
         txn = self.rpc_callback('createrawtransaction', [[], {addr_to: self.format_amount(amount)}])
-
         fee_rate, fee_src = self.get_fee_rate(self._conf_target)
         self._log.debug(f'Fee rate: {fee_rate}, source: {fee_src}, block target: {self._conf_target}')
-
         options = {
-            'lockUnspents': True,
+            'lockUnspents': lock_unspents,
             'feeRate': fee_rate,
         }
-        txn_funded = self.rpc_callback('fundrawtransaction', [txn, options])['hex']
-        txn_signed = self.rpc_callback('signrawtransaction', [txn_funded])['hex']
-        return txn_signed
+        if sub_fee:
+            options['subtractFeeFromOutputs'] = [0,]
+        return self.rpc_callback('fundrawtransaction', [txn, options])['hex']
 
-    def getScriptForPubkeyHash(self, pkh):
-        # Return P2WPKH nested in BIP16 P2SH
+    def createRawSignedTransaction(self, addr_to, amount) -> str:
+        txn_funded = self.createRawFundedTransaction(addr_to, amount)
+        return self.rpc_callback('signrawtransaction', [txn_funded])['hex']
+
+    def getScriptForPubkeyHash(self, pkh: bytes) -> bytearray:
+        # Return P2PKH
 
         return CScript([OP_DUP, OP_HASH160, pkh, OP_EQUALVERIFY, OP_CHECKSIG])
 
-    def getScriptDest(self, script):
+    def getScriptDest(self, script: bytearray) -> bytearray:
         # P2WSH nested in BIP16_P2SH
 
         script_hash = hashlib.sha256(script).digest()

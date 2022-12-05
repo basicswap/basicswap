@@ -261,16 +261,30 @@ def waitForNumSwapping(delay_event, port, bids, wait_for=60):
     raise ValueError('waitForNumSwapping failed')
 
 
-def wait_for_balance(delay_event, url, balance_key, expect_amount, iterations=20, delay_time=3):
+def wait_for_balance(delay_event, url, balance_key, expect_amount, iterations=20, delay_time=3) -> None:
     i = 0
     while not delay_event.is_set():
         rv_js = json.loads(urlopen(url).read())
         if float(rv_js[balance_key]) >= expect_amount:
-            break
+            return
         delay_event.wait(delay_time)
         i += 1
         if i > iterations:
             raise ValueError('Expect {} {}'.format(balance_key, expect_amount))
+
+
+def wait_for_unspent(delay_event, ci, expect_amount, iterations=20, delay_time=1) -> None:
+    logging.info(f'Waiting for unspent balance: {expect_amount}')
+    i = 0
+    while not delay_event.is_set():
+        unspent_addr = ci.getUnspentsByAddr()
+        for _, value in unspent_addr.items():
+            if value >= expect_amount:
+                return
+        delay_event.wait(delay_time)
+        i += 1
+        if i > iterations:
+            raise ValueError('wait_for_unspent {}'.format(expect_amount))
 
 
 def delay_for(delay_event, delay_for=60):

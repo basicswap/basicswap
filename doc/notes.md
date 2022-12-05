@@ -50,12 +50,28 @@ In chainclients.monero:
 
 On the remote machine open an ssh tunnel to port 18081:
 
-    ssh -R 18081:localhost:18081 -N user@LOCAL_NODE_IP
+    ssh -N -R 18081:localhost:18081 user@LOCAL_NODE_IP
 
 And start monerod
 
 
-## Installing on windows natively
+## SSH Tunnel to Remote BasicSwap Node
+
+While basicswap can be configured to host on an external interface:
+
+If not using docker by changing 'htmlhost' and 'wshost' in basicswap.json
+For docker change 'HTML_PORT' and 'WS_PORT' in the .env file in the same dir as docker-compose.yml
+
+A better solution is to use ssh to forward the required ports from the machine running bascswap to the client.
+
+    ssh -N -L 5555:localhost:12700 -L 11700:localhost:11700 BASICSWAP_HOST
+
+Run from the client machine (not running basicswap) will forward the basicswap ui on port 12700 to port 5555
+on the local machine and also the websocket port at 11700.
+The ui port on the client machine can be anything but the websocket port must match 'wsport' in basicswap.json.
+
+
+## Installing on Windows Natively
 
 This is not a supported installation method!
 

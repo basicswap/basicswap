@@ -1,9 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2020 tecnovert
+# Copyright (c) 2022 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
+
+from io import BytesIO
 
 from .btc import BTCInterface
 from basicswap.chainparams import Coins
@@ -11,7 +13,8 @@ from basicswap.util.address import decodeAddress
 from .contrib.pivx_test_framework.messages import (
     CBlock,
     ToHex,
-    FromHex)
+    FromHex,
+    CTransaction)
 
 
 class PIVXInterface(BTCInterface):
@@ -19,19 +22,25 @@ class PIVXInterface(BTCInterface):
     def coin_type():
         return Coins.PIVX
 
-    def createRawSignedTransaction(self, addr_to, amount):
-        txn = self.rpc_callback('createrawtransaction', [[], {addr_to: self.format_amount(amount)}])
+    def signTxWithWallet(self, tx):
+        rv = self.rpc_callback('signrawtransaction', [tx.hex()])
+        return bytes.fromhex(rv['hex'])
 
+    def createRawFundedTransaction(self, addr_to: str, amount: int, sub_fee: bool = False, lock_unspents: bool = True) -> str:
+        txn = self.rpc_callback('createrawtransaction', [[], {addr_to: self.format_amount(amount)}])
         fee_rate, fee_src = self.get_fee_rate(self._conf_target)
         self._log.debug(f'Fee rate: {fee_rate}, source: {fee_src}, block target: {self._conf_target}')
-
         options = {
-            'lockUnspents': True,
+            'lockUnspents': lock_unspents,
             'feeRate': fee_rate,
         }
-        txn_funded = self.rpc_callback('fundrawtransaction', [txn, options])['hex']
-        txn_signed = self.rpc_callback('signrawtransaction', [txn_funded])['hex']
-        return txn_signed
+        if sub_fee:
+            options['subtractFeeFromOutputs'] = [0,]
+        return self.rpc_callback('fundrawtransaction', [txn, options])['hex']
+
+    def createRawSignedTransaction(self, addr_to, amount) -> str:
+        txn_funded = self.createRawFundedTransaction(addr_to, amount)
+        return self.rpc_callback('signrawtransaction', [txn_funded])['hex']
 
     def decodeAddress(self, address):
         return decodeAddress(address)[1:]
@@ -65,3 +74,9 @@ class PIVXInterface(BTCInterface):
 
     def getSpendableBalance(self):
         return self.make_int(self.rpc_callback('getwalletinfo')['balance'])
+
+    def loadTx(self, tx_bytes):
+        # Load tx from bytes to internal representation
+        tx = CTransaction()
+        tx.deserialize(BytesIO(tx_bytes))
+        return tx

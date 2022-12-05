@@ -12,7 +12,7 @@ from enum import IntEnum, auto
 from sqlalchemy.ext.declarative import declarative_base
 
 
-CURRENT_DB_VERSION = 16
+CURRENT_DB_VERSION = 17
 CURRENT_DB_DATA_VERSION = 2
 Base = declarative_base()
 
@@ -219,6 +219,19 @@ class SwapTx(Base):
     def setState(self, new_state):
         self.state = new_state
         self.states = (self.states if self.states is not None else bytes()) + struct.pack('<iq', new_state, int(time.time()))
+
+
+class PrefundedTx(Base):
+    __tablename__ = 'prefunded_transactions'
+
+    record_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
+    active_ind = sa.Column(sa.Integer)
+    created_at = sa.Column(sa.BigInteger)
+    linked_type = sa.Column(sa.Integer)
+    linked_id = sa.Column(sa.LargeBinary)
+    tx_type = sa.Column(sa.Integer)  # TxTypes
+    tx_data = sa.Column(sa.LargeBinary)
+    used_by = sa.Column(sa.LargeBinary)
 
 
 class PooledAddress(Base):

@@ -184,10 +184,17 @@ def ser_string_vector(l):
     return r
 
 
+# Deserialize from bytes
+def FromBytes(obj, tx_bytes):
+    obj.deserialize(BytesIO(tx_bytes))
+    return obj
+
+
 # Deserialize from a hex string representation (eg from RPC)
 def FromHex(obj, hex_string):
     obj.deserialize(BytesIO(hex_str_to_bytes(hex_string)))
     return obj
+
 
 # Convert a binary-serializable object to hex (eg for submission via RPC)
 def ToHex(obj):
