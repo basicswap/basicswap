@@ -9,7 +9,7 @@
 
 Install dependencies:
 
-    apt-get install curl jq
+    apt-get install curl jq git
 
 
 Docker must be installed and started:
