@@ -162,7 +162,7 @@
                             <select is="ms-dropdown" class="pl-10 appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" id="coin_from" name="coin_from" onchange="set_rate('coin_from');">
                               <option value="-1">Select coin you send</option>
                               {% for c in coins_from %}
-                             <option{% if data.coin_to==c[0] %} selected{% endif %} value="{{ c[0] }}" data-image="/static/images/coins/{{ c[1]|replace(" ", "-") }}-20.png">{{ c[1] }}</option>
+                             <option{% if data.coin_from==c[0] %} selected{% endif %} value="{{ c[0] }}" data-image="/static/images/coins/{{ c[1]|replace(" ", "-") }}-20.png">{{ c[1] }}</option>
                               {% endfor %}
                             </select>
                           </div>
