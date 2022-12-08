@@ -3227,11 +3227,11 @@ class BasicSwap(BaseApp):
                         self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_B_SEEN, '', session)
                     if bid.xmr_b_lock_tx is None:
                         self.log.debug('Found {} lock tx in chain'.format(ci_to.coin_name()))
-                        b_lock_tx_id = bytes.fromhex(found_tx['txid'])
+                        xmr_swap.b_lock_tx_id = bytes.fromhex(found_tx['txid'])
                         bid.xmr_b_lock_tx = SwapTx(
                             bid_id=bid_id,
                             tx_type=TxTypes.XMR_SWAP_B_LOCK,
-                            txid=b_lock_tx_id,
+                            txid=xmr_swap.b_lock_tx_id,
                             chain_height=found_tx['height'],
                         )
                         bid_changed = True
@@ -3930,7 +3930,7 @@ class BasicSwap(BaseApp):
             raise ValueError('TODO')
         elif offer_data.swap_type == SwapTypes.XMR_SWAP:
             ensure(coin_from not in non_script_type_coins, 'Invalid coin from type')
-            ensure(coin_to in non_script_type_coins, 'Invalid coin to type')
+            ensure(ci_from.has_segwit(), 'Coin from must support segwit')
             ensure(len(offer_data.proof_address) == 0, 'Unexpected data')
             ensure(len(offer_data.proof_signature) == 0, 'Unexpected data')
             ensure(len(offer_data.pkhash_seller) == 0, 'Unexpected data')
@@ -4728,6 +4728,8 @@ class BasicSwap(BaseApp):
         try:
             b_lock_tx_id = ci_to.publishBLockTx(xmr_swap.pkbv, xmr_swap.pkbs, bid.amount_to, xmr_offer.b_fee_rate, unlock_time=unlock_time)
         except Exception as ex:
+            if self.debug:
+                self.log.error(traceback.format_exc())
             error_msg = 'publishBLockTx failed for bid {} with error {}'.format(bid_id.hex(), str(ex))
             num_retries = self.countBidEvents(bid, EventLogTypes.FAILED_TX_B_LOCK_PUBLISH, session)
             if num_retries > 0:
@@ -4751,6 +4753,7 @@ class BasicSwap(BaseApp):
             tx_type=TxTypes.XMR_SWAP_B_LOCK,
             txid=b_lock_tx_id,
         )
+        xmr_swap.b_lock_tx_id = b_lock_tx_id
         bid.xmr_b_lock_tx.setState(TxStates.TX_NONE)
         self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_B_PUBLISHED, '', session)
 
@@ -4867,8 +4870,11 @@ class BasicSwap(BaseApp):
 
             if coin_to == Coins.XMR:
                 address_to = self.getCachedMainWalletAddress(ci_to)
-            else:
+            elif coin_to == Coins.PART_BLIND:
                 address_to = self.getCachedStealthAddressForCoin(coin_to)
+            else:
+                address_to = self.getReceiveAddressFromPool(coin_to, bid_id, TxTypes.XMR_SWAP_B_LOCK_SPEND)
+
             txid = ci_to.spendBLockTx(xmr_swap.b_lock_tx_id, address_to, xmr_swap.vkbv, vkbs, bid.amount_to, xmr_offer.b_fee_rate, bid.chain_b_height_start)
             self.log.debug('Submitted lock B spend txn %s to %s chain for bid %s', txid.hex(), ci_to.coin_name(), bid_id.hex())
             self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_B_SPEND_TX_PUBLISHED, '', session)
@@ -4924,8 +4930,10 @@ class BasicSwap(BaseApp):
         try:
             if offer.coin_to == Coins.XMR:
                 address_to = self.getCachedMainWalletAddress(ci_to)
-            else:
+            elif coin_to == Coins.PART_BLIND:
                 address_to = self.getCachedStealthAddressForCoin(coin_to)
+            else:
+                address_to = self.getReceiveAddressFromPool(coin_to, bid_id, TxTypes.XMR_SWAP_B_LOCK_REFUND)
             txid = ci_to.spendBLockTx(xmr_swap.b_lock_tx_id, address_to, xmr_swap.vkbv, vkbs, bid.amount_to, xmr_offer.b_fee_rate, bid.chain_b_height_start)
             self.log.debug('Submitted lock B refund txn %s to %s chain for bid %s', txid.hex(), ci_to.coin_name(), bid_id.hex())
             self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_B_REFUND_TX_PUBLISHED, '', session)

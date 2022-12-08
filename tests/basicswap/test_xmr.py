@@ -318,6 +318,7 @@ class BaseTest(unittest.TestCase):
 
     start_ltc_nodes = False
     start_xmr_nodes = True
+    has_segwit = True
 
     xmr_addr = None
     btc_addr = None

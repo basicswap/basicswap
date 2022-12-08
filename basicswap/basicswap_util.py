@@ -122,6 +122,8 @@ class TxTypes(IntEnum):
     XMR_SWAP_A_LOCK_REFUND_SPEND = auto()
     XMR_SWAP_A_LOCK_REFUND_SWIPE = auto()
     XMR_SWAP_B_LOCK = auto()
+    XMR_SWAP_B_LOCK_SPEND = auto()
+    XMR_SWAP_B_LOCK_REFUND = auto()
 
     ITX_PRE_FUNDED = auto()
 

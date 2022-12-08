@@ -55,15 +55,17 @@ class FIROInterface(BTCInterface):
         addr_info = self.rpc_callback('validateaddress', [address])
         return addr_info['iswatchonly']
 
-    def isAddressMine(self, address):
+    def isAddressMine(self, address: str, or_watch_only: bool = False) -> bool:
         addr_info = self.rpc_callback('validateaddress', [address])
-        return addr_info['ismine']
+        if not or_watch_only:
+            return addr_info['ismine']
+        return addr_info['ismine'] or addr_info['iswatchonly']
 
     def getSCLockScriptAddress(self, lock_script):
         lock_tx_dest = self.getScriptDest(lock_script)
         address = self.encodeScriptDest(lock_tx_dest)
 
-        if not self.isWatchOnlyAddress(address):
+        if not self.isAddressMine(address, or_watch_only=True):
             # Expects P2WSH nested in BIP16_P2SH
             ro = self.rpc_callback('importaddress', [lock_tx_dest.hex(), 'bid lock', False, True])
             addr_info = self.rpc_callback('validateaddress', [address])
@@ -74,7 +76,7 @@ class FIROInterface(BTCInterface):
         # Add watchonly address and rescan if required
         lock_tx_dest = self.getScriptDest(lock_script)
         dest_address = self.encodeScriptDest(lock_tx_dest)
-        if not self.isWatchOnlyAddress(dest_address):
+        if not self.isAddressMine(dest_address, or_watch_only=True):
             self.rpc_callback('importaddress', [lock_tx_dest.hex(), 'bid lock', False, True])
             self._log.info('Imported watch-only addr: {}'.format(dest_address))
             self._log.info('Rescanning {} chain from height: {}'.format(self.coin_name(), rescan_from))

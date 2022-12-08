@@ -260,7 +260,7 @@ class XMRInterface(CoinInterface):
     def encodeSharedAddress(self, Kbv, Kbs):
         return xmr_util.encode_address(Kbv, Kbs)
 
-    def publishBLockTx(self, Kbv, Kbs, output_amount, feerate, delay_for=10, unlock_time=0):
+    def publishBLockTx(self, Kbv, Kbs, output_amount, feerate, delay_for: int = 10, unlock_time: int = 0) -> bytes:
         with self._mx_wallet:
             self.openWallet(self._wallet_filename)
 
@@ -338,67 +338,6 @@ class XMRInterface(CoinInterface):
                         self._log.warning('Incorrect amount detected for coin b lock txn: {}'.format(transfer['tx_hash']))
                         rv = -1
             return rv
-
-    def waitForLockTxB(self, kbv, Kbs, cb_swap_value, cb_block_confirmed, restore_height):
-        with self._mx_wallet:
-            Kbv_enc = self.encodePubkey(self.pubkey(kbv))
-            address_b58 = xmr_util.encode_address(Kbv_enc, self.encodePubkey(Kbs))
-
-            try:
-                self.rpc_wallet_cb('close_wallet')
-            except Exception as e:
-                self._log.warning('close_wallet failed %s', str(e))
-
-            params = {
-                'filename': address_b58,
-                'address': address_b58,
-                'viewkey': b2h(kbv[::-1]),
-                'restore_height': restore_height,
-            }
-            self.createWallet(params)
-            self.openWallet(address_b58)
-            # For a while after opening the wallet rpc cmds return empty data
-
-            num_tries = 40
-            for i in range(num_tries + 1):
-                try:
-                    current_height = self.rpc_cb2('get_height')['height']
-                    print('current_height', current_height)
-                except Exception as e:
-                    self._log.warning('rpc_cb failed %s', str(e))
-                    current_height = None  # If the transfer is available it will be deep enough
-
-                # TODO: Make accepting current_height == None a user selectable option
-                #       Or look for all transfers and check height
-
-                params = {'transfer_type': 'available'}
-                rv = self.rpc_wallet_cb('incoming_transfers', params)
-                print('rv', rv)
-
-                if 'transfers' in rv:
-                    for transfer in rv['transfers']:
-                        if transfer['amount'] == cb_swap_value \
-                           and (current_height is None or current_height - transfer['block_height'] > cb_block_confirmed):
-                            return True
-
-                # TODO: Is it necessary to check the address?
-                '''
-                rv = self.rpc_wallet_cb('get_balance')
-                print('get_balance', rv)
-
-                if 'per_subaddress' in rv:
-                    for sub_addr in rv['per_subaddress']:
-                        if sub_addr['address'] == address_b58:
-
-                '''
-
-                if i >= num_tries:
-                    raise ValueError('Balance not confirming on node')
-                self._sc.delay_event.wait(1.0)
-                if self._sc.delay_event.is_set():
-                    raise ValueError('Stopped')
-
-            return False
 
     def findTxnByHash(self, txid):
         with self._mx_wallet:

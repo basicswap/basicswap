@@ -638,7 +638,7 @@ class PARTInterfaceAnon(PARTInterface):
     def coin_name(self):
         return super().coin_name() + ' Anon'
 
-    def publishBLockTx(self, Kbv, Kbs, output_amount, feerate, delay_for=10, unlock_time=0):
+    def publishBLockTx(self, Kbv, Kbs, output_amount, feerate, delay_for: int = 10, unlock_time: int = 0) -> bytes:
         sx_addr = self.formatStealthAddress(Kbv, Kbs)
         self._log.debug('sx_addr: {}'.format(sx_addr))
 

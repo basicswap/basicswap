@@ -296,7 +296,7 @@ chainparams = {
         'blocks_target': 60 * 10,
         'decimal_places': 8,
         'has_csv': True,
-        'has_segwit': True,
+        'has_segwit': False,
         'mainnet': {
             'rpcport': 8888,
             'pubkey_address': 82,
@@ -353,20 +353,20 @@ class CoinInterface:
         self._unknown_wallet_seed = True
         self._restore_height = None
 
-    def make_int(self, amount_in, r=0):
+    def make_int(self, amount_in: int, r: int = 0) -> int:
         return make_int(amount_in, self.exp(), r=r)
 
     def format_amount(self, amount_in, conv_int=False, r=0):
         amount_int = make_int(amount_in, self.exp(), r=r) if conv_int else amount_in
         return format_amount(amount_int, self.exp())
 
-    def coin_name(self):
+    def coin_name(self) -> str:
         coin_chainparams = chainparams[self.coin_type()]
         if coin_chainparams.get('use_ticker_as_name', False):
             return coin_chainparams['ticker']
         return coin_chainparams['name'].capitalize()
 
-    def ticker(self):
+    def ticker(self) -> str:
         ticker = chainparams[self.coin_type()]['ticker']
         if self._network == 'testnet':
             ticker = 't' + ticker
@@ -404,6 +404,9 @@ class CoinInterface:
 
     def chainparams_network(self):
         return chainparams[self.coin_type()][self._network]
+
+    def has_segwit(self) -> bool:
+        return chainparams[self.coin_type()].get('has_segwit', True)
 
     def is_transient_error(self, ex):
         if isinstance(ex, TemporaryError):

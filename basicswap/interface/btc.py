@@ -6,7 +6,6 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import json
-import time
 import base64
 import hashlib
 import logging
@@ -16,7 +15,6 @@ from io import BytesIO
 from basicswap.contrib.test_framework import segwit_addr
 
 from basicswap.util import (
-    dumpj,
     ensure,
     make_int,
     b2h, i2b, b2i, i2h)
@@ -55,7 +53,8 @@ from basicswap.contrib.test_framework.messages import (
     CTxIn,
     CTxInWitness,
     CTxOut,
-    FromHex)
+    FromHex,
+    uint256_from_str)
 
 from basicswap.contrib.test_framework.script import (
     CScript, CScriptOp,
@@ -86,14 +85,14 @@ def ensure_op(v, err_string='Bad opcode'):
     ensure(v, err_string)
 
 
-def findOutput(tx, script_pk):
+def findOutput(tx, script_pk: bytes):
     for i in range(len(tx.vout)):
         if tx.vout[i].scriptPubKey == script_pk:
             return i
     return None
 
 
-def find_vout_for_address_from_txobj(tx_obj, addr):
+def find_vout_for_address_from_txobj(tx_obj, addr) -> int:
     """
     Locate the vout index of the given transaction sending to the
     given address. Raises runtime error exception if not found.
@@ -139,7 +138,7 @@ class BTCInterface(CoinInterface):
         return 2
 
     @staticmethod
-    def getTxOutputValue(tx):
+    def getTxOutputValue(tx) -> int:
         rv = 0
         for output in tx.vout:
             rv += output.nValue
@@ -158,7 +157,7 @@ class BTCInterface(CoinInterface):
         return CTxOut
 
     @staticmethod
-    def getExpectedSequence(lockType, lockVal):
+    def getExpectedSequence(lockType: int, lockVal: int) -> int:
         assert (lockVal >= 1), 'Bad lockVal'
         if lockType == TxLockTypes.SEQUENCE_LOCK_BLOCKS:
             return lockVal
@@ -172,11 +171,15 @@ class BTCInterface(CoinInterface):
         raise ValueError('Unknown lock type')
 
     @staticmethod
-    def decodeSequence(lock_value):
+    def decodeSequence(lock_value: int) -> int:
         # Return the raw value
         if lock_value & SEQUENCE_LOCKTIME_TYPE_FLAG:
             return (lock_value & SEQUENCE_LOCKTIME_MASK) << SEQUENCE_LOCKTIME_GRANULARITY
         return lock_value & SEQUENCE_LOCKTIME_MASK
+
+    @staticmethod
+    def depth_spendable() -> int:
+        return 0
 
     def __init__(self, coin_settings, network, swap_client=None):
         super().__init__(network)
@@ -192,7 +195,8 @@ class BTCInterface(CoinInterface):
         self._log = self._sc.log if self._sc and self._sc.log else logging
         self._expect_seedid_hex = None
 
-    def using_segwit(self):
+    def using_segwit(self) -> bool:
+        # Using btc native segwit
         return self._use_segwit
 
     def get_connection_type(self):
@@ -217,15 +221,12 @@ class BTCInterface(CoinInterface):
     def close_rpc(self, rpc_conn):
         rpc_conn.close()
 
-    def setConfTarget(self, new_conf_target):
+    def setConfTarget(self, new_conf_target: int) -> None:
         ensure(new_conf_target >= 1 and new_conf_target < 33, 'Invalid conf_target value')
         self._conf_target = new_conf_target
 
-    def testDaemonRPC(self, with_wallet=True):
-        if with_wallet:
-            self.rpc_callback('getwalletinfo', [])
-        else:
-            self.rpc_callback('getblockchaininfo', [])
+    def testDaemonRPC(self, with_wallet=True) -> None:
+        self.rpc_callback('getwalletinfo' if with_wallet else 'getblockchaininfo')
 
     def getDaemonVersion(self):
         return self.rpc_callback('getnetworkinfo')['version']
@@ -233,7 +234,7 @@ class BTCInterface(CoinInterface):
     def getBlockchainInfo(self):
         return self.rpc_callback('getblockchaininfo')
 
-    def getChainHeight(self):
+    def getChainHeight(self) -> int:
         return self.rpc_callback('getblockcount')
 
     def getMempoolTx(self, txid):
@@ -259,7 +260,7 @@ class BTCInterface(CoinInterface):
             last_block_header = prev_block_header
         raise ValueError(f'Block header not found at time: {time}')
 
-    def initialiseWallet(self, key_bytes):
+    def initialiseWallet(self, key_bytes: bytes):
         key_wif = self.encodeKey(key_bytes)
 
         self.rpc_callback('sethdseed', [True, key_wif])
@@ -270,10 +271,10 @@ class BTCInterface(CoinInterface):
         rv['locked'] = rv.get('unlocked_until', 1) <= 0
         return rv
 
-    def walletRestoreHeight(self):
+    def walletRestoreHeight(self) -> int:
         return self._restore_height
 
-    def getWalletRestoreHeight(self):
+    def getWalletRestoreHeight(self) -> int:
         start_time = self.rpc_callback('getwalletinfo')['keypoololdest']
 
         blockchaininfo = self.rpc_callback('getblockchaininfo')
@@ -295,6 +296,7 @@ class BTCInterface(CoinInterface):
                 block_hash = block_header['previousblockhash']
         finally:
             self.close_rpc(rpc_conn)
+        raise ValueError('{} wallet restore height not found.'.format(self.coin_name()))
 
     def getWalletSeedID(self) -> str:
         return self.rpc_callback('getwalletinfo')['hdseedid']
@@ -309,9 +311,11 @@ class BTCInterface(CoinInterface):
             args.append('bech32')
         return self.rpc_callback('getnewaddress', args)
 
-    def isAddressMine(self, address: str) -> bool:
+    def isAddressMine(self, address: str, or_watch_only: bool = False) -> bool:
         addr_info = self.rpc_callback('getaddressinfo', [address])
-        return addr_info['ismine']
+        if not or_watch_only:
+            return addr_info['ismine']
+        return addr_info['ismine'] or addr_info['iswatchonly']
 
     def checkAddressMine(self, address: str) -> None:
         addr_info = self.rpc_callback('getaddressinfo', [address])
@@ -331,22 +335,22 @@ class BTCInterface(CoinInterface):
             except Exception:
                 return self.rpc_callback('getnetworkinfo')['relayfee'], 'relayfee'
 
-    def isSegwitAddress(self, address):
+    def isSegwitAddress(self, address: str) -> bool:
         return address.startswith(self.chainparams_network()['hrp'] + '1')
 
-    def decodeAddress(self, address):
+    def decodeAddress(self, address: str) -> bytes:
         bech32_prefix = self.chainparams_network()['hrp']
         if len(bech32_prefix) > 0 and address.startswith(bech32_prefix + '1'):
             return bytes(segwit_addr.decode(bech32_prefix, address)[1])
         return decodeAddress(address)[1:]
 
-    def pubkey_to_segwit_address(self, pk):
+    def pubkey_to_segwit_address(self, pk: bytes) -> str:
         bech32_prefix = self.chainparams_network()['hrp']
         version = 0
         pkh = hash160(pk)
         return segwit_addr.encode(bech32_prefix, version, pkh)
 
-    def pkh_to_address(self, pkh):
+    def pkh_to_address(self, pkh: bytes) -> str:
         # pkh is hash160(pk)
         assert (len(pkh) == 20)
         prefix = self.chainparams_network()['pubkey_address']
@@ -354,26 +358,26 @@ class BTCInterface(CoinInterface):
         checksum = hashlib.sha256(hashlib.sha256(data).digest()).digest()
         return b58encode(data + checksum[0:4])
 
-    def sh_to_address(self, sh):
+    def sh_to_address(self, sh: bytes) -> str:
         assert (len(sh) == 20)
         prefix = self.chainparams_network()['script_address']
         data = bytes((prefix,)) + sh
         checksum = hashlib.sha256(hashlib.sha256(data).digest()).digest()
         return b58encode(data + checksum[0:4])
 
-    def encode_p2wsh(self, script):
+    def encode_p2wsh(self, script: bytes) -> str:
         bech32_prefix = self.chainparams_network()['hrp']
         version = 0
         program = script[2:]  # strip version and length
         return segwit_addr.encode(bech32_prefix, version, program)
 
-    def encodeScriptDest(self, script):
+    def encodeScriptDest(self, script: bytes) -> str:
         return self.encode_p2wsh(script)
 
-    def encode_p2sh(self, script):
+    def encode_p2sh(self, script: bytes) -> str:
         return pubkeyToAddress(self.chainparams_network()['script_address'], script)
 
-    def pubkey_to_address(self, pk):
+    def pubkey_to_address(self, pk: bytes) -> str:
         assert (len(pk) == 33)
         return self.pkh_to_address(hash160(pk))
 
@@ -383,31 +387,31 @@ class BTCInterface(CoinInterface):
     def getPubkey(self, privkey):
         return PublicKey.from_secret(privkey).format()
 
-    def getAddressHashFromKey(self, key):
+    def getAddressHashFromKey(self, key) -> bytes:
         pk = self.getPubkey(key)
         return hash160(pk)
 
     def getSeedHash(self, seed):
         return self.getAddressHashFromKey(seed)[::-1]
 
-    def verifyKey(self, k):
+    def verifyKey(self, k: bytes) -> bool:
         i = b2i(k)
         return (i < ep.o and i > 0)
 
-    def verifyPubkey(self, pubkey_bytes):
+    def verifyPubkey(self, pubkey_bytes: bytes) -> bool:
         return verify_secp256k1_point(pubkey_bytes)
 
-    def encodeKey(self, key_bytes):
+    def encodeKey(self, key_bytes: bytes) -> str:
         wif_prefix = self.chainparams_network()['key_prefix']
         return toWIF(wif_prefix, key_bytes)
 
-    def encodePubkey(self, pk):
+    def encodePubkey(self, pk: bytes) -> bytes:
         return pointToCPK(pk)
 
-    def encodeSegwitAddress(self, key_hash):
+    def encodeSegwitAddress(self, key_hash: bytes) -> str:
         return segwit_addr.encode(self.chainparams_network()['hrp'], 0, key_hash)
 
-    def decodeSegwitAddress(self, addr):
+    def decodeSegwitAddress(self, addr: str) -> bytes:
         return bytes(segwit_addr.decode(self.chainparams_network()['hrp'], addr)[1])
 
     def decodePubkey(self, pke):
@@ -423,10 +427,10 @@ class BTCInterface(CoinInterface):
     def sumPubkeys(self, Ka, Kb):
         return PublicKey.combine_keys([PublicKey(Ka), PublicKey(Kb)]).format()
 
-    def getScriptForPubkeyHash(self, pkh):
+    def getScriptForPubkeyHash(self, pkh: bytes) -> CScript:
         return CScript([OP_0, pkh])
 
-    def extractScriptLockScriptValues(self, script_bytes):
+    def extractScriptLockScriptValues(self, script_bytes: bytes):
         script_len = len(script_bytes)
         ensure(script_len == 71, 'Bad script length')
         o = 0
@@ -444,7 +448,7 @@ class BTCInterface(CoinInterface):
 
         return pk1, pk2
 
-    def createSCLockTx(self, value: int, script: bytearray, vkbv=None) -> bytes:
+    def createSCLockTx(self, value: int, script: bytearray, vkbv: bytes = None) -> bytes:
         tx = CTransaction()
         tx.nVersion = self.txVersion()
         tx.vout.append(self.txoType()(value, self.getScriptDest(script)))
@@ -898,23 +902,28 @@ class BTCInterface(CoinInterface):
             inputs.append({'txid': i2h(pi.prevout.hash), 'vout': pi.prevout.n})
         self.rpc_callback('lockunspent', [True, inputs])
 
-    def signTxWithWallet(self, tx):
+    def signTxWithWallet(self, tx: bytes) -> bytes:
         rv = self.rpc_callback('signrawtransactionwithwallet', [tx.hex()])
         return bytes.fromhex(rv['hex'])
 
-    def publishTx(self, tx):
+    def signTxWithKey(self, tx: bytes, key: bytes) -> bytes:
+        key_wif = self.encodeKey(key)
+        rv = self.rpc_callback('signrawtransactionwithkey', [tx.hex(), [key_wif, ]])
+        return bytes.fromhex(rv['hex'])
+
+    def publishTx(self, tx: bytes):
         return self.rpc_callback('sendrawtransaction', [tx.hex()])
 
-    def encodeTx(self, tx):
+    def encodeTx(self, tx) -> bytes:
         return tx.serialize()
 
-    def loadTx(self, tx_bytes) -> CTransaction:
+    def loadTx(self, tx_bytes: bytes) -> CTransaction:
         # Load tx from bytes to internal representation
         tx = CTransaction()
         tx.deserialize(BytesIO(tx_bytes))
         return tx
 
-    def getTxid(self, tx):
+    def getTxid(self, tx) -> bytes:
         if isinstance(tx, str):
             tx = bytes.fromhex(tx)
         if isinstance(tx, bytes):
@@ -928,16 +937,16 @@ class BTCInterface(CoinInterface):
         script_pk = self.getScriptDest(script)
         return findOutput(tx, script_pk)
 
-    def getPubkeyHash(self, K):
-        return hash160(self.encodePubkey(K))
+    def getPubkeyHash(self, K: bytes) -> bytes:
+        return hash160(K)
 
     def getScriptDest(self, script):
         return CScript([OP_0, hashlib.sha256(script).digest()])
 
-    def getScriptScriptSig(self, script):
+    def getScriptScriptSig(self, script: bytes) -> bytes:
         return bytes()
 
-    def getPkDest(self, K):
+    def getPkDest(self, K: bytes) -> bytearray:
         return self.getScriptForPubkeyHash(self.getPubkeyHash(K))
 
     def scanTxOutset(self, dest):
@@ -980,26 +989,26 @@ class BTCInterface(CoinInterface):
     def createBLockTx(self, Kbs, output_amount):
         tx = CTransaction()
         tx.nVersion = self.txVersion()
-        p2wpkh = self.getPkDest(Kbs)
-        tx.vout.append(self.txoType()(output_amount, p2wpkh))
+        p2wpkh_script_pk = self.getPkDest(Kbs)
+        tx.vout.append(self.txoType()(output_amount, p2wpkh_script_pk))
         return tx.serialize()
 
     def encodeSharedAddress(self, Kbv, Kbs):
         return self.pubkey_to_segwit_address(Kbs)
 
-    def publishBLockTx(self, Kbv, Kbs, output_amount, feerate, delay_for=10, unlock_time=0):
+    def publishBLockTx(self, Kbv, Kbs, output_amount, feerate, delay_for: int = 10, unlock_time: int = 0) -> bytes:
         b_lock_tx = self.createBLockTx(Kbs, output_amount)
 
         b_lock_tx = self.fundTx(b_lock_tx, feerate)
         b_lock_tx_id = self.getTxid(b_lock_tx)
         b_lock_tx = self.signTxWithWallet(b_lock_tx)
 
-        return self.publishTx(b_lock_tx)
+        return bytes.fromhex(self.publishTx(b_lock_tx))
 
     def recoverEncKey(self, esig, sig, K):
         return ecdsaotves_rec_enc_key(K, esig, sig[:-1])  # Strip sighash type
 
-    def getTxVSize(self, tx, add_bytes=0, add_witness_bytes=0):
+    def getTxVSize(self, tx, add_bytes: int = 0, add_witness_bytes: int = 0) -> int:
         wsf = self.witnessScaleFactor()
         len_full = len(tx.serialize_with_witness()) + add_bytes + add_witness_bytes
         len_nwit = len(tx.serialize_without_witness()) + add_bytes
@@ -1007,10 +1016,13 @@ class BTCInterface(CoinInterface):
         return (weight + wsf - 1) // wsf
 
     def findTxB(self, kbv, Kbs, cb_swap_value, cb_block_confirmed, restore_height, bid_sender):
+        dest_address = self.pubkey_to_segwit_address(Kbs) if self.using_segwit() else self.pubkey_to_address(Kbs)
+        return self.getLockTxHeight(None, dest_address, cb_swap_value, restore_height)
+
+        '''
         raw_dest = self.getPkDest(Kbs)
 
         rv = self.scanTxOutset(raw_dest)
-        print('scanTxOutset', dumpj(rv))
 
         for utxo in rv['unspents']:
             if 'height' in utxo and utxo['height'] > 0 and rv['height'] - utxo['height'] > cb_block_confirmed:
@@ -1019,31 +1031,45 @@ class BTCInterface(CoinInterface):
                 else:
                     return {'txid': utxo['txid'], 'vout': utxo['vout'], 'amount': utxo['amount'], 'height': utxo['height']}
         return None
+        '''
 
-    def waitForLockTxB(self, kbv, Kbs, cb_swap_value, cb_block_confirmed):
-        raw_dest = self.getPkDest(Kbs)
+    def spendBLockTx(self, chain_b_lock_txid: bytes, address_to: str, kbv: bytes, kbs: bytes, cb_swap_value: int, b_fee: int, restore_height: int) -> bytes:
+        wtx = self.rpc_callback('gettransaction', [chain_b_lock_txid.hex(), ])
+        lock_tx = self.loadTx(bytes.fromhex(wtx['hex']))
 
-        for i in range(20):
-            time.sleep(1)
-            rv = self.scanTxOutset(raw_dest)
-            print('scanTxOutset', dumpj(rv))
+        Kbs = self.getPubkey(kbs)
+        script_pk = self.getPkDest(Kbs)
+        locked_n = findOutput(lock_tx, script_pk)
+        ensure(locked_n is not None, 'Output not found in tx')
+        pkh_to = self.decodeAddress(address_to)
 
-            for utxo in rv['unspents']:
-                if 'height' in utxo and utxo['height'] > 0 and rv['height'] - utxo['height'] > cb_block_confirmed:
+        tx = CTransaction()
+        tx.nVersion = self.txVersion()
 
-                    if self.make_int(utxo['amount']) != cb_swap_value:
-                        self._log.warning('Found output to lock tx pubkey of incorrect value: %s', str(utxo['amount']))
-                    else:
-                        return True
-        return False
+        script_lock = self.getScriptForPubkeyHash(Kbs)
+        chain_b_lock_txid_int = uint256_from_str(chain_b_lock_txid[::-1])
 
-    def spendBLockTx(self, chain_b_lock_txid, address_to, kbv, kbs, cb_swap_value, b_fee, restore_height):
-        raise ValueError('TODO')
+        tx.vin.append(CTxIn(COutPoint(chain_b_lock_txid_int, locked_n),
+                            nSequence=0,
+                            scriptSig=self.getScriptScriptSig(script_lock)))
+        tx.vout.append(self.txoType()(cb_swap_value, self.getScriptForPubkeyHash(pkh_to)))
 
-    def importWatchOnlyAddress(self, address, label):
+        witness_bytes = 109
+        vsize = self.getTxVSize(tx, add_witness_bytes=witness_bytes)
+        pay_fee = int(b_fee * vsize // 1000)
+        tx.vout[0].nValue = cb_swap_value - pay_fee
+        self._log.info('spendBLockTx %s:\n    fee_rate, vsize, fee: %ld, %ld, %ld.',
+                       chain_b_lock_txid.hex(), b_fee, vsize, pay_fee)
+
+        b_lock_spend_tx = tx.serialize()
+        b_lock_spend_tx = self.signTxWithKey(b_lock_spend_tx, kbs)
+
+        return bytes.fromhex(self.publishTx(b_lock_spend_tx))
+
+    def importWatchOnlyAddress(self, address: str, label: str):
         self.rpc_callback('importaddress', [address, label, False])
 
-    def isWatchOnlyAddress(self, address):
+    def isWatchOnlyAddress(self, address: str):
         addr_info = self.rpc_callback('getaddressinfo', [address])
         return addr_info['iswatchonly']
 
@@ -1051,10 +1077,10 @@ class BTCInterface(CoinInterface):
         lock_tx_dest = self.getScriptDest(lock_script)
         return self.encodeScriptDest(lock_tx_dest)
 
-    def getLockTxHeight(self, txid, dest_address, bid_amount, rescan_from, find_index=False):
+    def getLockTxHeight(self, txid, dest_address, bid_amount, rescan_from, find_index: bool = False):
         # Add watchonly address and rescan if required
 
-        if not self.isWatchOnlyAddress(dest_address):
+        if not self.isAddressMine(dest_address, or_watch_only=True):
             self.importWatchOnlyAddress(dest_address, 'bid')
             self._log.info('Imported watch-only addr: {}'.format(dest_address))
             self._log.info('Rescanning {} chain from height: {}'.format(self.coin_name(), rescan_from))
@@ -1263,7 +1289,6 @@ class BTCInterface(CoinInterface):
 
         sign_for_addr = None
         for addr, value in unspent_addr.items():
-            print('[rm]', value, amount_for)
             if value >= amount_for:
                 sign_for_addr = addr
                 break
@@ -1272,7 +1297,7 @@ class BTCInterface(CoinInterface):
 
         self._log.debug('sign_for_addr %s', sign_for_addr)
 
-        if self._use_segwit:  # TODO: Use isSegwitAddress when scantxoutset can use combo
+        if self.using_segwit():  # TODO: Use isSegwitAddress when scantxoutset can use combo
             # 'Address does not refer to key' for non p2pkh
             pkh = self.decodeAddress(sign_for_addr)
             sign_for_addr = self.pkh_to_address(pkh)
@@ -1286,7 +1311,7 @@ class BTCInterface(CoinInterface):
         passed = self.verifyMessage(address, address + '_swap_proof_' + extra_commit_bytes.hex(), signature)
         ensure(passed is True, 'Proof of funds signature invalid')
 
-        if self._use_segwit:
+        if self.using_segwit():
             address = self.encodeSegwitAddress(decodeAddress(address)[1:])
 
         return self.getUTXOBalance(address)
@@ -1333,6 +1358,19 @@ class BTCInterface(CoinInterface):
 
     def get_p2wsh_script_pubkey(self, script: bytearray) -> bytearray:
         return CScript([OP_0, hashlib.sha256(script).digest()])
+
+    def findTxnByHash(self, txid_hex: str):
+        # Only works for wallet txns
+        try:
+            rv = self.rpc_callback('gettransaction', [txid_hex])
+        except Exception as ex:
+            self._log.debug('findTxnByHash getrawtransaction failed: {}'.format(txid_hex))
+            return None
+
+        if 'confirmations' in rv and rv['confirmations'] >= self.blocks_confirmed:
+            return {'txid': txid_hex, 'amount': 0, 'height': rv['blockheight']}
+
+        return None
 
 
 def testBTCInterface():
