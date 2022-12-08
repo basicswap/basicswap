@@ -1,0 +1,21 @@
+    swapclient:
+        image: i_swapclient
+        build:
+            context: swapclient
+            dockerfile: Dockerfile
+        container_name: swapclient
+        volumes:
+            - ${DATA_PATH}/swapclient:/data
+        ports:
+            - "${HTML_PORT}"  # Expose only to localhost, see .env
+            - "${WS_PORT}"    # Expose only to localhost, see .env
+        environment:
+            - TZ
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "5"
+        depends_on:
+            - particl_core
+        restart: unless-stopped

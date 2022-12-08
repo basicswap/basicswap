@@ -1,0 +1,66 @@
+xu {
+    hscale = "1.2";
+
+    CB [label=" ", linecolor="transparent"],
+    N [label="Network", linecolor="#008800", textbgcolor="#CCFFCC", arclinecolor="#008800"],
+    O [label="Offerer", linecolor="#FF0000", textbgcolor="#FFCCCC", arclinecolor="#FF0000"],
+    B [label="Bidder", linecolor="#0000FF", textbgcolor="#CCCCFF", arclinecolor="#0000FF"],
+    C [label=" ", linecolor="transparent"], C2 [label=" ", linecolor="transparent"];
+    O =>> N [label="Sends Offer"];
+    N >> B [label="Detects Offer"];
+    B =>> O [label="Sends Bid"];
+    B abox B [label="Bid Sent"];
+    O box O [label="User accepts bid"];
+    O =>> N [label="Sends Initiate Tx"],
+    C note C2
+        [label="Offerer generates secret_value and sends Hash(secret_value) to the Bidder",
+         textbgcolor="#FFFFCC"];
+    O =>> B [label="Sends BidAccept"],
+    C note C2
+        [label="ITX can be spent by
+                knowledge of the secret_value and the bidder_redeem_key or
+                after a timeout by the offerer_refund_key",
+         textbgcolor="#FFFFCC"];
+
+    B abox B [label="Bid Accepted"];
+    N >> B [label="Detects Initiate Tx"];
+    B abox B [label="ITX Sent", textbgcolor="#4bdbf1"];
+    B => B [label="Wait for ITX to confirm"], O => O [label="Wait for ITX to confirm"];
+    B abox B [label="Bid Initiated"];
+    B abox B [label="ITX Confirmed", textbgcolor="#4bdbf1"];
+    B =>> N [label="Sends Participate Tx"],
+    C note C2
+        [label="PTX can be spent by
+                knowledge of the secret_value and the offerer_redeem_key or
+                after a timeout by the bidder_refund_key",
+         textbgcolor="#FFFFCC"];
+    B abox B [label="PTX Sent", textbgcolor="#f1db4b"];
+    N >> O [label="Detects Participate Tx"];
+    B => B [label="Wait for PTX to confirm"], O => O [label="Wait for PTX to confirm"];
+    B abox B [label="PTX Confirmed", textbgcolor="#f1db4b"];
+    B abox B [label="Bid Participating"];
+    CB alt C [label="success path"] {
+        O =>> N [label="Sends Participate Redeem Tx"],
+        C note C2
+            [label="Reveals secret_value",
+             textbgcolor="#FFFFCC"];
+        N >> B [label="Detects Participate Redeem Tx"];
+        B abox B [label="PTX Redeemed", textbgcolor="#f1db4b"];
+        B =>> N [label="Sends Initiate Redeem Tx"];
+        B => B [label="Wait for ITX Redeem to confirm"];
+        B abox B [label="ITX Redeemed", textbgcolor="#4bdbf1"];
+        B abox B [label="Bid Completed"];
+    --- [label="fail path"];
+        CB alt C [label="offerer may reclaim ITX"] {
+            O => O [label="Wait for ITX locktime to expire"];
+            O =>> N [label="ITX Refund Tx"];
+            N >> B [label="Detects Initiate Tx refund Tx"];
+            B abox B [label="ITX Refunded", textbgcolor="#4bdbf1"];
+        };
+        B => B [label="Wait for PTX locktime to expire"];
+        B =>> N [label="PTX Refund Tx"];
+        B => B [label="Wait for PTX Refund to confirm"];
+        B abox B [label="PTX Refunded", textbgcolor="#f1db4b"];
+        B abox B [label="Bid Completed"];
+    };
+}

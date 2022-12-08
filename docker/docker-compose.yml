@@ -1,6 +1,5 @@
-version: '3'
+version: '3.4'
 services:
-
     swapclient:
         image: i_swapclient
         stop_grace_period: 5m
@@ -10,8 +9,16 @@ services:
             - ${COINDATA_PATH}:/coindata
         ports:
             - "${HTML_PORT}"  # Expose only to localhost, see .env
+            - "${WS_PORT}"    # Expose only to localhost, see .env
+        environment:
+            - TZ
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "5"
 
 volumes:
-  coindata:
-    driver: local
+    coindata:
+        driver: local
 

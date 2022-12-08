@@ -1,28 +1,90 @@
 {% include 'header.html' %}
-
-<p>
-{% if refresh %}
-Page Refresh: {{ refresh }} seconds<br/>
-{% endif %}
-Version: {{ version }}
-</p>
-<p>
-<a href="/wallets">View Wallets</a><br/>
-<a href="/settings">Settings</a><br/>
-<a href="/rpc">RPC Console</a><br/>
-<a href="/explorers">Explorers</a><br/>
-<br/>
-<a href="/active">Swaps in progress: {{ summary.num_swapping }}</a><br/>
-<a href="/offers">Network Offers: {{ summary.num_network_offers }}</a><br/>
-<a href="/sentoffers">Sent Offers: {{ summary.num_sent_offers }}</a><br/>
-<a href="/bids">Received Bids: {{ summary.num_recv_bids }}</a><br/>
-<a href="/sentbids">Sent Bids: {{ summary.num_sent_bids }}</a><br/>
-<a href="/watched">Watched Outputs: {{ summary.num_watched_outputs }}</a><br/>
-</p>
-
-<p><a href="/newoffer">New Offer</a></p>
-
-<p><a href="/shutdown">Shutdown</a></p>
-
+<div class="container mx-auto">
+      <section class="relative py-24 bg-white overflow-hidden" style="background-image: url('flex-ui-assets/elements/pattern-white.svg'); background-position: center;">
+        <div class="container px-4 mx-auto mb-16 md:mb-0">
+          <div class="md:w-1/2 pl-4">
+            <span class="inline-block py-px px-2 mb-4 text-xs leading-5 text-blue-500 bg-blue-100 font-medium rounded-full shadow-sm">BasicSwap version: {{ version }}</span>
+            <h3 class="mb-6 text-4xl md:text-5xl leading-tight text-coolGray-900 font-bold tracking-tighter">Welcome to BasicSwap DEX</h3>
+            <p class="mb-12 text-lg md:text-xl text-coolGray-500 font-medium">Swap cryptocurrencies in <span class="underline">total privacy</span> with no middlemen, fees,<br> or restrictions.</p>
+            <div class="flex flex-wrap mb-10 text-center md:text-left">
+              <div class="w-full md:w-auto mb-6 md:mb-0 md:pr-6">
+                <a href="/wallets">
+                <div class="inline-flex h-14 w-14 mx-auto items-center justify-center text-white bg-blue-500 rounded-lg">
+                  <svg width="21" height="21" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                  <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round">
+                    <path d="M6,3H3C1.895,3,1,3.895,1,5 v0c0,1.105,0.895,2,2,2"></path>
+                    <polyline points=" 6,7 6,1 20,1 20,7 " stroke="#ffffff"></polyline>
+                    <path d="M23,7H3 C1.895,7,1,6.105,1,5v15c0,1.657,1.343,3,3,3h19V7z"></path>
+                    <circle cx="17" cy="15" r="2"></circle>
+                  </g>
+                </svg>
+                </div>
+              </div>
+              <div class="w-full md:flex-1 md:pt-3">
+                <div class="md:max-w-sm">
+                  <h3 class="mb-4 text-xl md:text-2xl leading-tight text-coolGray-900 font-bold">Your Wallet</h3>
+                  <p class="text-coolGray-500 font-medium">Manage your cryptocurrency wallets.</p>
+                 </a>
+                </div>
+              </div>
+            </div>
+            <div class="flex flex-wrap mb-10 text-center md:text-left">
+              <div class="w-full md:w-auto mb-6 md:mb-0 md:pr-6">
+                <a href="/offers">
+                <div class="inline-flex h-14 w-14 mx-auto items-center justify-center text-white bg-blue-500 rounded-lg">
+                  <svg width="21" height="21" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                  <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round">
+                    <circle cx="5" cy="5" r="4"></circle>
+                    <circle cx="19" cy="19" r="4"></circle>
+                    <polyline data-cap="butt" points="13,5 21,5 21,11 " stroke="#ffffff"></polyline>
+                    <polyline data-cap="butt" points="11,19 3,19 3,13 " stroke="#ffffff"></polyline>
+                    <polyline points=" 16,2 13,5 16,8 " stroke="#ffffff"></polyline>
+                    <polyline points=" 8,16 11,19 8,22 " stroke="#ffffff"></polyline>
+                  </g>
+                </svg>
+                </div>
+              </div>
+              <div class="w-full md:flex-1 md:pt-3">
+                <div class="md:max-w-sm">
+                  <h3 class="mb-4 text-xl md:text-2xl leading-tight text-coolGray-900 font-bold">Start Trading</h3>
+                  <p class="text-coolGray-500 font-medium">Browse available swap offers placed by others.</p>
+                </a>
+                </div>
+              </div>
+            </div>
+            <div class="flex flex-wrap text-center md:text-left">
+              <div class="w-full md:w-auto mb-6 md:mb-0 md:pr-6">
+               <a href="https://academy.particl.io/en/latest/faq/get_support.html" target="_blank">
+                <div class="inline-flex h-14 w-14 mx-auto items-center justify-center text-white bg-blue-500 rounded-lg">
+                  <svg width="22" height="22" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round">
+                      <line x1="23" y1="11" x2="23" y2="16" stroke="#ffffff"></line> <polygon points="12,13 2,8 12,3 22,8 "></polygon> 
+                      <path data-cap="butt" d="M5,9.5V18c0,1.657,3.134,3,7,3 s7-1.343,7-3V9.5"></path>
+                    </g>
+                  </svg>     
+                </div>
+              </div>
+              <div class="w-full md:flex-1 md:pt-3">
+                <div class="md:max-w-sm">
+                  <h3 class="mb-4 text-xl md:text-2xl leading-tight text-coolGray-900 font-bold">Help / Tutorials</h3>
+                  <p class="text-coolGray-500 font-medium">Learn how to use BasicSwap with the Particl Academy.</p>
+                </div>
+              </div>
+              </a>
+            </div>
+          </div>
+        </div>
+        <div class="md:absolute md:top-28 lg:top-1/2 md:-right-96 xl:-right-80 md:-mr-56 lg:-mr-20 xl:-mr-0 md:transform lg:-translate-y-1/2 px-4 mb-16 md:mb-0">
+          <div class="relative max-w-max">
+            <img class="absolute p-7 -mt-1 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-10/12 z-20" src="/static/images/gfx/dashboard.jpg" alt="">
+            <img class="relative z-10" src="/static/images/gfx/macbook.png" alt="">
+            <img class="absolute -top-24 right-0 md:mt-px md:right-96 md:mr-52 lg:mr-16 xl:-mr-20 w-28 md:w-auto text-blue-500" src="/static/images/elements/dots2-red.svg">
+            <img class="absolute -bottom-24 left-0 md:left-auto md:mt-px md:right-96 md:mr-52 lg:mr-16 xl:-mr-20 w-28 md:w-auto text-red-500" src="/static/images/elements/dots2-red.svg">
+            <img class="absolute left-0 top-1/2 transform -translate-y-1/2 w-28 md:w-auto text-yellow-400" src="/static/images/elements/circle2-violet.svg">
+          </div>
+        </div>
+      </section>
+</div>
+{% include 'footer.html' %}
 </body>
 </html>

@@ -1,72 +1,70 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019 tecnovert
+# Copyright (c) 2019-2022 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import os
-import time
-import struct
+import json
 import traceback
 import threading
 import http.client
-import urllib.parse
+from urllib import parse
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from jinja2 import Environment, PackageLoader
 
 from . import __version__
 from .util import (
     dumpj,
+    ensure,
+    LockedCoinError,
+    format_timestamp,
 )
 from .chainparams import (
-    chainparams,
     Coins,
+    chainparams,
 )
-from .basicswap import (
-    SwapTypes,
-    strOfferState,
+from .basicswap_util import (
     strBidState,
     strTxState,
-    getLockName,
-    SEQUENCE_LOCK_TIME,
-    ABS_LOCK_TIME,
+    strAddressType,
 )
+
 from .js_server import (
     js_error,
-    js_wallets,
-    js_offers,
-    js_sentoffers,
-    js_bids,
-    js_sentbids,
-    js_network,
-    js_index,
+    js_url_to_function,
 )
-from .ui import (
-    PAGE_LIMIT,
-    inputAmount,
-    describeBid,
-    setCoinFilter,
+from .ui.util import (
+    getCoinName,
+    get_data_entry,
+    have_data_entry,
+    listAvailableCoins,
+)
+from .ui.page_automation import (
+    page_automation_strategies,
+    page_automation_strategy,
+    page_automation_strategy_new,
 )
 
-
-def format_timestamp(value):
-    return time.strftime('%Y-%m-%d %H:%M', time.localtime(value))
-
+from .ui.page_bids import page_bids, page_bid
+from .ui.page_offers import page_offers, page_offer, page_newoffer
+from .ui.page_tor import page_tor, get_tor_established_state
+from .ui.page_wallet import page_wallets, page_wallet
+from .ui.page_settings import page_settings
+from .ui.page_encryption import page_changepassword, page_unlock, page_lock
 
 env = Environment(loader=PackageLoader('basicswap', 'templates'))
 env.filters['formatts'] = format_timestamp
 
 
-def getCoinName(c):
-    return chainparams[c]['name'].capitalize()
-
-
-def listAvailableCoins(swap_client):
-    coins = []
-    for k, v in swap_client.coin_clients.items():
-        if v['connection_type'] == 'rpc':
-            coins.append((int(k), getCoinName(k)))
-    return coins
+def validateTextInput(text, name, messages, max_length=None):
+    if max_length is not None and len(text) > max_length:
+        messages.append(f'Error: {name} is too long')
+        return False
+    if len(text) > 0 and all(c.isalnum() or c.isspace() for c in text) is False:
+        messages.append(f'Error: {name} must consist of only letters and digits')
+        return False
+    return True
 
 
 def extractDomain(url):
@@ -76,8 +74,10 @@ def extractDomain(url):
 def listAvailableExplorers(swap_client):
     explorers = []
     for c in Coins:
+        if c not in chainparams:
+            continue
         for i, e in enumerate(swap_client.coin_clients[c]['explorers']):
-            explorers.append(('{}_{}'.format(int(c), i), swap_client.coin_clients[c]['name'].capitalize() + ' - ' + extractDomain(e.base_url)))
+            explorers.append(('{}_{}'.format(int(c), i), getCoinName(c) + ' - ' + extractDomain(e.base_url)))
     return explorers
 
 
@@ -90,49 +90,119 @@ def listExplorerActions(swap_client):
     return actions
 
 
-def html_content_start(title, h2=None, refresh=None):
-    content = '<!DOCTYPE html><html lang="en">\n<head>' \
-        + '<meta charset="UTF-8">' \
-        + ('' if not refresh else '<meta http-equiv="refresh" content="{}">'.format(refresh)) \
-        + '<title>' + title + '</title></head>\n' \
-        + '<body>'
-    if h2 is not None:
-        content += '<h2>' + h2 + '</h2>'
-    return content
-
-
 class HttpHandler(BaseHTTPRequestHandler):
-    def page_info(self, info_str):
-        content = html_content_start('BasicSwap Info') \
-            + '<p>Info: ' + info_str + '</p>' \
-            + '<p><a href=\'/\'>home</a></p></body></html>'
-        return bytes(content, 'UTF-8')
 
-    def page_error(self, error_str):
-        content = html_content_start('BasicSwap Error') \
-            + '<p>Error: ' + error_str + '</p>' \
-            + '<p><a href=\'/\'>home</a></p></body></html>'
-        return bytes(content, 'UTF-8')
+    def log_error(self, format, *args):
+        super().log_message(format, *args)
+
+    def log_message(self, format, *args):
+        # TODO: Add debug flag to re-enable.
+        pass
+
+    def generate_form_id(self):
+        return os.urandom(8).hex()
 
     def checkForm(self, post_string, name, messages):
         if post_string == '':
             return None
-        form_data = urllib.parse.parse_qs(post_string)
+        form_data = parse.parse_qs(post_string)
         form_id = form_data[b'formid'][0].decode('utf-8')
         if self.server.last_form_id.get(name, None) == form_id:
             messages.append('Prevented double submit for form {}.'.format(form_id))
-        else:
-            self.server.last_form_id[name] = form_id
+            return None
+        self.server.last_form_id[name] = form_id
         return form_data
+
+    def render_template(self, template, args_dict, status_code=200):
+        swap_client = self.server.swap_client
+        if swap_client.ws_server:
+            args_dict['ws_url'] = swap_client.ws_server.url
+        if swap_client.debug:
+            args_dict['debug_mode'] = True
+        if swap_client.debug_ui:
+            args_dict['debug_ui_mode'] = True
+        if swap_client.use_tor_proxy:
+            args_dict['use_tor_proxy'] = True
+            # TODO: Cache value?
+            try:
+                args_dict['tor_established'] = True if get_tor_established_state(swap_client) == '1' else False
+            except Exception:
+                if swap_client.debug:
+                    swap_client.log.error(traceback.format_exc())
+
+        if swap_client._show_notifications:
+            args_dict['notifications'] = swap_client.getNotifications()
+
+        if 'messages' in args_dict:
+            messages_with_ids = []
+            for msg in args_dict['messages']:
+                messages_with_ids.append((self.server.msg_id_counter, msg))
+                self.server.msg_id_counter += 1
+            args_dict['messages'] = messages_with_ids
+        if 'err_messages' in args_dict:
+            err_messages_with_ids = []
+            for msg in args_dict['err_messages']:
+                err_messages_with_ids.append((self.server.msg_id_counter, msg))
+                self.server.msg_id_counter += 1
+            args_dict['err_messages'] = err_messages_with_ids
+
+        shutdown_token = os.urandom(8).hex()
+        self.server.session_tokens['shutdown'] = shutdown_token
+        args_dict['shutdown_token'] = shutdown_token
+
+        encrypted, locked = swap_client.getLockedState()
+        args_dict['encrypted'] = encrypted
+        args_dict['locked'] = locked
+
+        if self.server.msg_id_counter >= 0x7FFFFFFF:
+            self.server.msg_id_counter = 0
+
+        self.putHeaders(status_code, 'text/html')
+        return bytes(template.render(
+            title=self.server.title,
+            h2=self.server.title,
+            form_id=self.generate_form_id(),
+            **args_dict,
+        ), 'UTF-8')
+
+    def render_simple_template(self, template, args_dict):
+        swap_client = self.server.swap_client
+        return bytes(template.render(
+            title=self.server.title,
+            **args_dict,
+        ), 'UTF-8')
+
+    def page_info(self, info_str, post_string=None):
+        template = env.get_template('info.html')
+        swap_client = self.server.swap_client
+        summary = swap_client.getSummary()
+        return self.render_template(template, {
+            'title_str': 'BasicSwap Info',
+            'message_str': info_str,
+            'summary': summary,
+        })
+
+    def page_error(self, error_str, post_string=None):
+        template = env.get_template('error.html')
+        swap_client = self.server.swap_client
+        summary = swap_client.getSummary()
+        return self.render_template(template, {
+            'title_str': 'BasicSwap Error',
+            'message_str': error_str,
+            'summary': summary,
+        })
 
     def page_explorers(self, url_split, post_string):
         swap_client = self.server.swap_client
+        swap_client.checkSystemStatus()
+        summary = swap_client.getSummary()
 
         result = None
         explorer = -1
         action = -1
         messages = []
-        form_data = self.checkForm(post_string, 'explorers', messages)
+        err_messages = []
+        form_data = self.checkForm(post_string, 'explorers', err_messages)
         if form_data:
 
             explorer = form_data[b'explorer'][0].decode('utf-8')
@@ -158,691 +228,421 @@ class HttpHandler(BaseHTTPRequestHandler):
                 result = str(ex)
 
         template = env.get_template('explorers.html')
-        return bytes(template.render(
-            title=self.server.title,
-            h2=self.server.title,
-            explorers=listAvailableExplorers(swap_client),
-            explorer=explorer,
-            actions=listExplorerActions(swap_client),
-            action=action,
-            result=result,
-            form_id=os.urandom(8).hex(),
-        ), 'UTF-8')
+        return self.render_template(template, {
+            'messages': messages,
+            'err_messages': err_messages,
+            'explorers': listAvailableExplorers(swap_client),
+            'explorer': explorer,
+            'actions': listExplorerActions(swap_client),
+            'action': action,
+            'result': result,
+            'summary': summary,
+        })
 
     def page_rpc(self, url_split, post_string):
         swap_client = self.server.swap_client
+        swap_client.checkSystemStatus()
+        summary = swap_client.getSummary()
 
         result = None
         coin_type = -1
+        coin_id = -1
         messages = []
-        form_data = self.checkForm(post_string, 'rpc', messages)
+        err_messages = []
+        form_data = self.checkForm(post_string, 'rpc', err_messages)
         if form_data:
             try:
-                coin_type = Coins(int(form_data[b'coin_type'][0]))
+                coin_id = int(form_data[b'coin_type'][0])
+                if coin_id in (-2, -3, -4):
+                    coin_type = Coins(Coins.XMR)
+                else:
+                    coin_type = Coins(coin_id)
             except Exception:
                 raise ValueError('Unknown Coin Type')
 
             cmd = form_data[b'cmd'][0].decode('utf-8')
+
             try:
-                result = cmd + '\n' + swap_client.callcoincli(coin_type, cmd)
+                if coin_type == Coins.XMR:
+                    ci = swap_client.ci(coin_type)
+                    arr = cmd.split(None, 1)
+                    method = arr[0]
+                    params = json.loads(arr[1]) if len(arr) > 1 else []
+                    if coin_id == -4:
+                        rv = ci.rpc_wallet_cb(method, params)
+                    elif coin_id == -3:
+                        rv = ci.rpc_cb(method, params)
+                    elif coin_id == -2:
+                        if params == []:
+                            params = None
+                        rv = ci.rpc_cb2(method, params)
+                    else:
+                        raise ValueError('Unknown XMR RPC variant')
+                    result = json.dumps(rv, indent=4)
+                else:
+                    result = cmd + '\n' + swap_client.callcoincli(coin_type, cmd)
             except Exception as ex:
                 result = str(ex)
+                if self.server.swap_client.debug is True:
+                    self.server.swap_client.log.error(traceback.format_exc())
 
         template = env.get_template('rpc.html')
-        return bytes(template.render(
-            title=self.server.title,
-            h2=self.server.title,
-            coins=listAvailableCoins(swap_client),
-            coin_type=coin_type,
-            result=result,
-            form_id=os.urandom(8).hex(),
-        ), 'UTF-8')
+
+        coins = listAvailableCoins(swap_client, with_variants=False)
+        coins = [c for c in coins if c[0] != Coins.XMR]
+        coins.append((-2, 'Monero'))
+        coins.append((-3, 'Monero JSON'))
+        coins.append((-4, 'Monero Wallet'))
+
+        return self.render_template(template, {
+            'messages': messages,
+            'err_messages': err_messages,
+            'coins': coins,
+            'coin_type': coin_id,
+            'result': result,
+            'messages': messages,
+            'summary': summary,
+        })
+
+    def page_debug(self, url_split, post_string):
+        swap_client = self.server.swap_client
+        swap_client.checkSystemStatus()
+        summary = swap_client.getSummary()
+
+        result = None
+        messages = []
+        err_messages = []
+        form_data = self.checkForm(post_string, 'wallets', err_messages)
+        if form_data:
+            if have_data_entry(form_data, 'reinit_xmr'):
+                try:
+                    swap_client.initialiseWallet(Coins.XMR)
+                    messages.append('Done.')
+                except Exception as a:
+                    err_messages.append('Failed.')
+
+        template = env.get_template('debug.html')
+        return self.render_template(template, {
+            'messages': messages,
+            'err_messages': err_messages,
+            'result': result,
+            'summary': summary,
+        })
 
     def page_active(self, url_split, post_string):
         swap_client = self.server.swap_client
+        swap_client.checkSystemStatus()
         active_swaps = swap_client.listSwapsInProgress()
+        summary = swap_client.getSummary()
 
         template = env.get_template('active.html')
-        return bytes(template.render(
-            title=self.server.title,
-            refresh=30,
-            h2=self.server.title,
-            active_swaps=[(s[0].hex(), s[1], strBidState(s[2]), strTxState(s[3]), strTxState(s[4])) for s in active_swaps],
-        ), 'UTF-8')
-
-    def page_wallets(self, url_split, post_string):
-        swap_client = self.server.swap_client
-
-        messages = []
-        form_data = self.checkForm(post_string, 'wallets', messages)
-        if form_data:
-            for c in Coins:
-                cid = str(int(c))
-
-                if bytes('newaddr_' + cid, 'utf-8') in form_data:
-                    swap_client.cacheNewAddressForCoin(c)
-                elif bytes('reseed_' + cid, 'utf-8') in form_data:
-                    try:
-                        swap_client.reseedWallet(c)
-                        messages.append('Reseed complete ' + str(c))
-                    except Exception as ex:
-                        messages.append('Reseed failed ' + str(ex))
-                elif bytes('withdraw_' + cid, 'utf-8') in form_data:
-                    value = form_data[bytes('amt_' + cid, 'utf-8')][0].decode('utf-8')
-                    address = form_data[bytes('to_' + cid, 'utf-8')][0].decode('utf-8')
-                    subfee = True if bytes('subfee_' + cid, 'utf-8') in form_data else False
-                    txid = swap_client.withdrawCoin(c, value, address, subfee)
-                    ticker = swap_client.getTicker(c)
-                    messages.append('Withdrew {} {} to address {}<br/>In txid: {}'.format(value, ticker, address, txid))
-
-        wallets = swap_client.getWalletsInfo()
-
-        wallets_formatted = []
-        for k, w in wallets.items():
-            if 'error' in w:
-                wallets_formatted.append({
-                    'cid': str(int(k)),
-                    'error': w['error']
-                })
-                continue
-
-            ci = swap_client.ci(k)
-            fee_rate, fee_src = swap_client.getFeeRateForCoin(k)
-            est_fee = swap_client.estimateWithdrawFee(k, fee_rate)
-            wallets_formatted.append({
-                'name': w['name'],
-                'version': w['version'],
-                'cid': str(int(k)),
-                'fee_rate': ci.format_amount(int(fee_rate * ci.COIN())),
-                'fee_rate_src': fee_src,
-                'est_fee': 'Unknown' if est_fee is None else ci.format_amount(int(est_fee * ci.COIN())),
-                'balance': w['balance'],
-                'blocks': w['blocks'],
-                'synced': w['synced'],
-                'deposit_address': w['deposit_address'],
-                'expected_seed': w['expected_seed'],
-                'balance_all': float(w['balance']) + float(w['unconfirmed']),
-            })
-            if float(w['unconfirmed']) > 0.0:
-                wallets_formatted[-1]['unconfirmed'] = w['unconfirmed']
-
-        template = env.get_template('wallets.html')
-        return bytes(template.render(
-            title=self.server.title,
-            h2=self.server.title,
-            messages=messages,
-            wallets=wallets_formatted,
-            form_id=os.urandom(8).hex(),
-        ), 'UTF-8')
-
-    def page_settings(self, url_split, post_string):
-        swap_client = self.server.swap_client
-
-        messages = []
-        form_data = self.checkForm(post_string, 'settings', messages)
-        if form_data:
-            for name, c in swap_client.settings['chainclients'].items():
-                if bytes('apply_' + name, 'utf-8') in form_data:
-                    data = {'lookups': form_data[bytes('lookups_' + name, 'utf-8')][0].decode('utf-8')}
-                    swap_client.editSettings(name, data)
-        chains_formatted = []
-
-        for name, c in swap_client.settings['chainclients'].items():
-            chains_formatted.append({
-                'name': name,
-                'lookups': c.get('chain_lookups', 'local')
-            })
-
-        template = env.get_template('settings.html')
-        return bytes(template.render(
-            title=self.server.title,
-            h2=self.server.title,
-            chains=chains_formatted,
-            form_id=os.urandom(8).hex(),
-        ), 'UTF-8')
-
-    def parseOfferFormData(self, form_data, page_data):
-        swap_client = self.server.swap_client
-
-        errors = []
-        parsed_data = {}
-
-        if b'addr_from' in form_data:
-            page_data['addr_from'] = form_data[b'addr_from'][0].decode('utf-8')
-            parsed_data['addr_from'] = None if page_data['addr_from'] == '-1' else page_data['addr_from']
-
-        try:
-            page_data['coin_from'] = int(form_data[b'coin_from'][0])
-            coin_from = Coins(page_data['coin_from'])
-            ci_from = swap_client.ci(coin_from)
-            parsed_data['coin_from'] = coin_from
-        except Exception:
-            errors.append('Unknown Coin From')
-
-        try:
-            page_data['coin_to'] = int(form_data[b'coin_to'][0])
-            coin_to = Coins(page_data['coin_to'])
-            ci_to = swap_client.ci(coin_to)
-            parsed_data['coin_to'] = coin_to
-            if coin_to == Coins.XMR:
-                page_data['swap_style'] = 'xmr'
-            else:
-                page_data['swap_style'] = 'atomic'
-        except Exception:
-            errors.append('Unknown Coin To')
-
-        try:
-            page_data['amt_from'] = form_data[b'amt_from'][0].decode('utf-8')
-            parsed_data['amt_from'] = inputAmount(page_data['amt_from'], ci_from)
-            parsed_data['min_bid'] = int(parsed_data['amt_from'])
-        except Exception as e:
-            errors.append('Amount From')
-
-        try:
-            page_data['amt_to'] = form_data[b'amt_to'][0].decode('utf-8')
-            parsed_data['amt_to'] = inputAmount(page_data['amt_to'], ci_to)
-        except Exception as e:
-            errors.append('Amount To')
-
-        if 'amt_to' in parsed_data and 'amt_from' in parsed_data:
-            parsed_data['rate'] = int((parsed_data['amt_to'] / parsed_data['amt_from']) * ci_from.COIN())
-
-        if b'step1' in form_data:
-            if len(errors) == 0 and b'continue' in form_data:
-                page_data['step2'] = True
-            return parsed_data, errors
-
-        page_data['step2'] = True
-
-        if b'fee_from_conf' in form_data:
-            page_data['fee_from_conf'] = int(form_data[b'fee_from_conf'][0])
-            parsed_data['fee_from_conf'] = page_data['fee_from_conf']
-
-        if b'fee_from_extra' in form_data:
-            page_data['fee_from_extra'] = int(form_data[b'fee_from_extra'][0])
-            parsed_data['fee_from_extra'] = page_data['fee_from_extra']
-
-        if b'fee_to_conf' in form_data:
-            page_data['fee_to_conf'] = int(form_data[b'fee_to_conf'][0])
-            parsed_data['fee_to_conf'] = page_data['fee_to_conf']
-
-        if b'fee_to_extra' in form_data:
-            page_data['fee_to_extra'] = int(form_data[b'fee_to_extra'][0])
-            parsed_data['fee_to_extra'] = page_data['fee_to_extra']
-
-        if b'check_offer' in form_data:
-            page_data['check_offer'] = True
-        if b'submit_offer' in form_data:
-            page_data['submit_offer'] = True
-
-        if b'lockhrs' in form_data:
-            page_data['lockhrs'] = int(form_data[b'lockhrs'][0])
-            parsed_data['lock_seconds'] = page_data['lockhrs'] * 60 * 60
-
-        page_data['autoaccept'] = True if b'autoaccept' in form_data else False
-        parsed_data['autoaccept'] = page_data['autoaccept']
-
-        if len(errors) == 0 and page_data['swap_style'] == 'xmr':
-            if b'fee_rate_from' in form_data:
-                page_data['from_fee_override'] = form_data[b'fee_rate_from'][0].decode('utf-8')
-                parsed_data['from_fee_override'] = page_data['from_fee_override']
-            else:
-                from_fee_override, page_data['from_fee_src'] = swap_client.getFeeRateForCoin(parsed_data['coin_from'], page_data['fee_from_conf'])
-                if page_data['fee_from_extra'] > 0:
-                    from_fee_override += from_fee_override * (float(page_data['fee_from_extra']) / 100.0)
-                page_data['from_fee_override'] = ci_from.format_amount(ci_from.make_int(from_fee_override, r=1))
-                parsed_data['from_fee_override'] = page_data['from_fee_override']
-
-            if coin_to == Coins.XMR:
-                if b'fee_rate_to' in form_data:
-                    page_data['to_fee_override'] = form_data[b'fee_rate_to'][0].decode('utf-8')
-                    parsed_data['to_fee_override'] = page_data['to_fee_override']
-                else:
-                    to_fee_override, page_data['to_fee_src'] = swap_client.getFeeRateForCoin(parsed_data['coin_to'], page_data['fee_to_conf'])
-                    if page_data['fee_to_extra'] > 0:
-                        to_fee_override += to_fee_override * (float(page_data['fee_to_extra']) / 100.0)
-                    page_data['to_fee_override'] = ci_to.format_amount(ci_to.make_int(to_fee_override, r=1))
-                    parsed_data['to_fee_override'] = page_data['to_fee_override']
-
-        return parsed_data, errors
-
-    def postNewOfferFromParsed(self, parsed_data):
-        swap_client = self.server.swap_client
-
-        swap_type = SwapTypes.SELLER_FIRST
-        if parsed_data['coin_to'] == Coins.XMR:
-            swap_type = SwapTypes.XMR_SWAP
-
-        if swap_client.coin_clients[parsed_data['coin_from']]['use_csv'] and swap_client.coin_clients[parsed_data['coin_to']]['use_csv']:
-            lock_type = SEQUENCE_LOCK_TIME
-        else:
-            lock_type = ABS_LOCK_TIME
-
-        extra_options = {}
-
-        if 'fee_from_conf' in parsed_data:
-            extra_options['from_fee_conf_target'] = parsed_data['fee_from_conf']
-        if 'from_fee_multiplier_percent' in parsed_data:
-            extra_options['from_fee_multiplier_percent'] = parsed_data['fee_from_extra']
-        if 'from_fee_override' in parsed_data:
-            extra_options['from_fee_override'] = parsed_data['from_fee_override']
-
-        if 'fee_to_conf' in parsed_data:
-            extra_options['to_fee_conf_target'] = parsed_data['fee_to_conf']
-        if 'to_fee_multiplier_percent' in parsed_data:
-            extra_options['to_fee_multiplier_percent'] = parsed_data['fee_to_extra']
-        if 'to_fee_override' in parsed_data:
-            extra_options['to_fee_override'] = parsed_data['to_fee_override']
-
-        offer_id = swap_client.postOffer(
-            parsed_data['coin_from'],
-            parsed_data['coin_to'],
-            parsed_data['amt_from'],
-            parsed_data['rate'],
-            parsed_data['min_bid'],
-            swap_type,
-            lock_type=lock_type,
-            lock_value=parsed_data['lock_seconds'],
-            auto_accept_bids=parsed_data['autoaccept'],
-            addr_send_from=parsed_data['addr_from'],
-            extra_options=extra_options)
-        return offer_id
-
-    def postNewOffer(self, form_data):
-        page_data = {}
-        parsed_data = self.parseOfferFormData(form_data, page_data)
-        return self.postNewOfferFromParsed(parsed_data)
-
-    def page_newoffer(self, url_split, post_string):
-        swap_client = self.server.swap_client
-
-        messages = []
-        page_data = {
-            # Set defaults
-            'fee_from_conf': 2,
-            'fee_to_conf': 2,
-            'lockhrs': 32,
-            'autoaccept': True
-        }
-        form_data = self.checkForm(post_string, 'newoffer', messages)
-
-        if form_data:
-            try:
-                parsed_data, errors = self.parseOfferFormData(form_data, page_data)
-                for e in errors:
-                    messages.append('Error: {}'.format(str(e)))
-            except Exception as e:
-                messages.append('Error: {}'.format(str(e)))
-
-        if len(messages) == 0 and 'submit_offer' in page_data:
-            try:
-                offer_id = self.postNewOfferFromParsed(parsed_data)
-                messages.append('<a href="/offer/' + offer_id.hex() + '">Sent Offer {}</a>'.format(offer_id.hex()))
-                page_data = {}
-            except Exception as e:
-                messages.append('Error: {}'.format(str(e)))
-
-        if len(messages) == 0 and 'check_offer' in page_data:
-            template = env.get_template('offer_confirm.html')
-        elif 'step2' in page_data:
-            template = env.get_template('offer_new_2.html')
-        else:
-            template = env.get_template('offer_new_1.html')
-
-        return bytes(template.render(
-            title=self.server.title,
-            h2=self.server.title,
-            messages=messages,
-            coins=listAvailableCoins(swap_client),
-            addrs=swap_client.listSmsgAddresses('offer'),
-            data=page_data,
-            form_id=os.urandom(8).hex(),
-        ), 'UTF-8')
-
-    def page_offer(self, url_split, post_string):
-        assert(len(url_split) > 2), 'Offer ID not specified'
-        try:
-            offer_id = bytes.fromhex(url_split[2])
-            assert(len(offer_id) == 28)
-        except Exception:
-            raise ValueError('Bad offer ID')
-        swap_client = self.server.swap_client
-        offer, xmr_offer = swap_client.getXmrOffer(offer_id)
-        assert(offer), 'Unknown offer ID'
-
-        messages = []
-        sent_bid_id = None
-        show_bid_form = None
-        form_data = self.checkForm(post_string, 'offer', messages)
-        if form_data:
-            if b'revoke_offer' in form_data:
-                try:
-                    swap_client.revokeOffer(offer_id)
-                    messages.append('Offer revoked')
-                except Exception as ex:
-                    messages.append('Revoke offer failed ' + str(ex))
-            elif b'newbid' in form_data:
-                show_bid_form = True
-            else:
-                addr_from = form_data[b'addr_from'][0].decode('utf-8')
-                if addr_from == '-1':
-                    addr_from = None
-
-                sent_bid_id = swap_client.postBid(offer_id, offer.amount_from, addr_send_from=addr_from).hex()
-
-        ci_from = swap_client.ci(Coins(offer.coin_from))
-        ci_to = swap_client.ci(Coins(offer.coin_to))
-
-        data = {
-            'tla_from': ci_from.ticker(),
-            'tla_to': ci_to.ticker(),
-            'state': strOfferState(offer.state),
-            'coin_from': ci_from.coin_name(),
-            'coin_to': ci_to.coin_name(),
-            'amt_from': ci_from.format_amount(offer.amount_from),
-            'amt_to': ci_to.format_amount((offer.amount_from * offer.rate) // ci_from.COIN()),
-            'rate': ci_to.format_amount(offer.rate),
-            'lock_type': getLockName(offer.lock_type),
-            'lock_value': offer.lock_value,
-            'addr_from': offer.addr_from,
-            'created_at': offer.created_at,
-            'expired_at': offer.expire_at,
-            'sent': 'True' if offer.was_sent else 'False',
-            'was_revoked': 'True' if offer.active_ind == 2 else 'False',
-            'show_bid_form': show_bid_form,
-        }
-
-        if xmr_offer:
-            int_fee_rate_now, fee_source = ci_from.get_fee_rate()
-            data['xmr_type'] = True
-            data['a_fee_rate'] = ci_from.format_amount(xmr_offer.a_fee_rate)
-            data['a_fee_rate_verify'] = ci_from.format_amount(int_fee_rate_now, conv_int=True)
-            data['a_fee_rate_verify_src'] = fee_source
-            data['a_fee_warn'] = xmr_offer.a_fee_rate < int_fee_rate_now
-
-        if offer.was_sent:
-            data['auto_accept'] = 'True' if offer.auto_accept_bids else 'False'
-
-        bids = swap_client.listBids(offer_id=offer_id)
-
-        template = env.get_template('offer.html')
-        return bytes(template.render(
-            title=self.server.title,
-            h2=self.server.title,
-            offer_id=offer_id.hex(),
-            sent_bid_id=sent_bid_id,
-            messages=messages,
-            data=data,
-            bids=[(b[1].hex(), ci_from.format_amount(b[3]), strBidState(b[4]), strTxState(b[6]), strTxState(b[7])) for b in bids],
-            addrs=None if show_bid_form is None else swap_client.listSmsgAddresses('bid'),
-            form_id=os.urandom(8).hex(),
-        ), 'UTF-8')
-
-    def page_offers(self, url_split, post_string, sent=False):
-        swap_client = self.server.swap_client
-
-        filters = {
-            'coin_from': -1,
-            'coin_to': -1,
-            'page_no': 1,
-            'limit': PAGE_LIMIT,
-            'sort_by': 'created_at',
-            'sort_dir': 'desc',
-        }
-        messages = []
-        form_data = self.checkForm(post_string, 'offers', messages)
-        if form_data and b'applyfilters' in form_data:
-            filters['coin_from'] = setCoinFilter(form_data, b'coin_from')
-            filters['coin_to'] = setCoinFilter(form_data, b'coin_to')
-
-            if b'sort_by' in form_data:
-                sort_by = form_data[b'sort_by'][0].decode('utf-8')
-                assert(sort_by in ['created_at', 'rate']), 'Invalid sort by'
-                filters['sort_by'] = sort_by
-            if b'sort_dir' in form_data:
-                sort_dir = form_data[b'sort_dir'][0].decode('utf-8')
-                assert(sort_dir in ['asc', 'desc']), 'Invalid sort dir'
-                filters['sort_dir'] = sort_dir
-
-        if form_data and b'pageback' in form_data:
-            filters['page_no'] = int(form_data[b'pageno'][0]) - 1
-            if filters['page_no'] < 1:
-                filters['page_no'] = 1
-        elif form_data and b'pageforwards' in form_data:
-            filters['page_no'] = int(form_data[b'pageno'][0]) + 1
-
-        if filters['page_no'] > 1:
-            filters['offset'] = (filters['page_no'] - 1) * PAGE_LIMIT
-
-        offers = swap_client.listOffers(sent, filters)
-
-        formatted_offers = []
-        for o in offers:
-            ci_from = swap_client.ci(Coins(o.coin_from))
-            ci_to = swap_client.ci(Coins(o.coin_to))
-            formatted_offers.append((
-                time.strftime('%Y-%m-%d %H:%M', time.localtime(o.created_at)),
-                o.offer_id.hex(),
-                ci_from.coin_name(), ci_to.coin_name(),
-                ci_from.format_amount(o.amount_from),
-                ci_to.format_amount((o.amount_from * o.rate) // ci_from.COIN()),
-                ci_to.format_amount(o.rate)))
-
-        template = env.get_template('offers.html')
-        return bytes(template.render(
-            title=self.server.title,
-            h2=self.server.title,
-            page_type='Sent' if sent else 'Received',
-            coins=listAvailableCoins(swap_client),
-            messages=messages,
-            filters=filters,
-            offers=formatted_offers,
-            form_id=os.urandom(8).hex(),
-        ), 'UTF-8')
-
-    def page_advance(self, url_split, post_string):
-        assert(len(url_split) > 2), 'Bid ID not specified'
-        try:
-            bid_id = bytes.fromhex(url_split[2])
-            assert(len(bid_id) == 28)
-        except Exception:
-            raise ValueError('Bad bid ID')
-        swap_client = self.server.swap_client
-
-        template = env.get_template('advance.html')
-        return bytes(template.render(
-            title=self.server.title,
-            h2=self.server.title,
-            bid_id=bid_id.hex(),
-        ), 'UTF-8')
-
-    def page_bid(self, url_split, post_string):
-        assert(len(url_split) > 2), 'Bid ID not specified'
-        try:
-            bid_id = bytes.fromhex(url_split[2])
-            assert(len(bid_id) == 28)
-        except Exception:
-            raise ValueError('Bad bid ID')
-        swap_client = self.server.swap_client
-
-        messages = []
-        show_txns = False
-        edit_bid = False
-        view_tx_ind = None
-        form_data = self.checkForm(post_string, 'bid', messages)
-        if form_data:
-            if b'abandon_bid' in form_data:
-                try:
-                    swap_client.abandonBid(bid_id)
-                    messages.append('Bid abandoned')
-                except Exception as ex:
-                    messages.append('Abandon failed ' + str(ex))
-            elif b'accept_bid' in form_data:
-                try:
-                    swap_client.acceptBid(bid_id)
-                    messages.append('Bid accepted')
-                except Exception as ex:
-                    messages.append('Accept failed ' + str(ex))
-            elif b'show_txns' in form_data:
-                show_txns = True
-            elif b'edit_bid' in form_data:
-                edit_bid = True
-            elif b'edit_bid_submit' in form_data:
-                data = {
-                    'bid_state': int(form_data[b'new_state'][0])
-                }
-                try:
-                    swap_client.manualBidUpdate(bid_id, data)
-                    messages.append('Bid edited')
-                except Exception as ex:
-                    messages.append('Edit failed ' + str(ex))
-            elif b'view_tx_submit' in form_data:
-                show_txns = True
-                view_tx_ind = form_data[b'view_tx'][0].decode('utf-8')
-
-        bid, xmr_swap, offer, xmr_offer, events = swap_client.getXmrBidAndOffer(bid_id)
-        assert(bid), 'Unknown bid ID'
-
-        data = describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, events, edit_bid, show_txns, view_tx_ind)
-
-        old_states = []
-        num_states = len(bid.states) // 12
-        for i in range(num_states):
-            up = struct.unpack_from('<iq', bid.states[i * 12:(i + 1) * 12])
-            old_states.append((up[1], 'Bid ' + strBidState(up[0])))
-        if bid.initiate_tx and bid.initiate_tx.states is not None:
-            num_states = len(bid.initiate_tx.states) // 12
-            for i in range(num_states):
-                up = struct.unpack_from('<iq', bid.initiate_tx.states[i * 12:(i + 1) * 12])
-                old_states.append((up[1], 'ITX ' + strTxState(up[0])))
-        if bid.participate_tx and bid.participate_tx.states is not None:
-            num_states = len(bid.participate_tx.states) // 12
-            for i in range(num_states):
-                up = struct.unpack_from('<iq', bid.participate_tx.states[i * 12:(i + 1) * 12])
-                old_states.append((up[1], 'PTX ' + strTxState(up[0])))
-        if len(old_states) > 0:
-            old_states.sort(key=lambda x: x[0])
-
-        template = env.get_template('bid_xmr.html') if offer.swap_type == SwapTypes.XMR_SWAP else env.get_template('bid.html')
-        return bytes(template.render(
-            title=self.server.title,
-            h2=self.server.title,
-            bid_id=bid_id.hex(),
-            messages=messages,
-            data=data,
-            edit_bid=edit_bid,
-            form_id=os.urandom(8).hex(),
-            old_states=old_states,
-        ), 'UTF-8')
-
-    def page_bids(self, url_split, post_string, sent=False):
-        swap_client = self.server.swap_client
-        bids = swap_client.listBids(sent=sent)
-
-        template = env.get_template('bids.html')
-        return bytes(template.render(
-            title=self.server.title,
-            h2=self.server.title,
-            page_type='Sent' if sent else 'Received',
-            bids=[(time.strftime('%Y-%m-%d %H:%M', time.localtime(b[0])),
-                   b[1].hex(), b[2].hex(), strBidState(b[4]), strTxState(b[6]), strTxState(b[7])) for b in bids],
-        ), 'UTF-8')
+        return self.render_template(template, {
+            'refresh': 30,
+            'active_swaps': [(s[0].hex(), s[1], strBidState(s[2]), strTxState(s[3]), strTxState(s[4])) for s in active_swaps],
+            'summary': summary,
+        })
 
     def page_watched(self, url_split, post_string):
         swap_client = self.server.swap_client
+        swap_client.checkSystemStatus()
         watched_outputs, last_scanned = swap_client.listWatchedOutputs()
+        summary = swap_client.getSummary()
 
         template = env.get_template('watched.html')
-        return bytes(template.render(
-            title=self.server.title,
-            refresh=30,
-            h2=self.server.title,
-            last_scanned=[(getCoinName(ls[0]), ls[1]) for ls in last_scanned],
-            watched_outputs=[(wo[1].hex(), getCoinName(wo[0]), wo[2], wo[3], int(wo[4])) for wo in watched_outputs],
-        ), 'UTF-8')
+        return self.render_template(template, {
+            'refresh': 30,
+            'last_scanned': [(getCoinName(ls[0]), ls[1]) for ls in last_scanned],
+            'watched_outputs': [(wo[1].hex(), getCoinName(wo[0]), wo[2], wo[3], int(wo[4])) for wo in watched_outputs],
+            'summary': summary,
+        })
+
+    def page_smsgaddresses(self, url_split, post_string):
+        swap_client = self.server.swap_client
+        swap_client.checkSystemStatus()
+        summary = swap_client.getSummary()
+
+        page_data = {}
+        messages = []
+        err_messages = []
+        smsgaddresses = []
+
+        listaddresses = True
+        form_data = self.checkForm(post_string, 'smsgaddresses', err_messages)
+        if form_data:
+            edit_address_id = None
+            for key in form_data:
+                if key.startswith(b'editaddr_'):
+                    edit_address_id = int(key.split(b'_')[1])
+                    break
+            if edit_address_id is not None:
+                listaddresses = False
+                page_data['edit_address'] = edit_address_id
+                page_data['addr_data'] = swap_client.listAllSMSGAddresses(addr_id=edit_address_id)[0]
+            elif b'saveaddr' in form_data:
+                edit_address_id = int(form_data[b'edit_address_id'][0].decode('utf-8'))
+                edit_addr = form_data[b'edit_address'][0].decode('utf-8')
+                active_ind = int(form_data[b'active_ind'][0].decode('utf-8'))
+                ensure(active_ind in (0, 1), 'Invalid sort by')
+                addressnote = '' if b'addressnote' not in form_data else form_data[b'addressnote'][0].decode('utf-8')
+                if not validateTextInput(addressnote, 'Address note', messages, max_length=30):
+                    listaddresses = False
+                    page_data['edit_address'] = edit_address_id
+                else:
+                    swap_client.editSMSGAddress(edit_addr, active_ind=active_ind, addressnote=addressnote)
+                    messages.append(f'Edited address {edit_addr}')
+            elif b'shownewaddr' in form_data:
+                listaddresses = False
+                page_data['new_address'] = True
+            elif b'showaddaddr' in form_data:
+                listaddresses = False
+                page_data['new_send_address'] = True
+            elif b'createnewaddr' in form_data:
+                addressnote = '' if b'addressnote' not in form_data else form_data[b'addressnote'][0].decode('utf-8')
+                if not validateTextInput(addressnote, 'Address note', messages, max_length=30):
+                    listaddresses = False
+                    page_data['new_address'] = True
+                else:
+                    new_addr, pubkey = swap_client.newSMSGAddress(addressnote=addressnote)
+                    messages.append(f'Created address {new_addr}, pubkey {pubkey}')
+            elif b'createnewsendaddr' in form_data:
+                pubkey_hex = form_data[b'addresspubkey'][0].decode('utf-8')
+                addressnote = '' if b'addressnote' not in form_data else form_data[b'addressnote'][0].decode('utf-8')
+                if not validateTextInput(addressnote, 'Address note', messages, max_length=30) or \
+                   not validateTextInput(pubkey_hex, 'Pubkey', messages, max_length=66):
+                    listaddresses = False
+                    page_data['new_send_address'] = True
+                else:
+                    new_addr = swap_client.addSMSGAddress(pubkey_hex, addressnote=addressnote)
+                    messages.append(f'Added address {new_addr}')
+
+        if listaddresses is True:
+            smsgaddresses = swap_client.listAllSMSGAddresses()
+        network_addr = swap_client.network_addr
+
+        for addr in smsgaddresses:
+            addr['type'] = strAddressType(addr['type'])
+
+        template = env.get_template('smsgaddresses.html')
+        return self.render_template(template, {
+            'messages': messages,
+            'err_messages': err_messages,
+            'data': page_data,
+            'smsgaddresses': smsgaddresses,
+            'network_addr': network_addr,
+            'summary': summary,
+        })
+
+    def page_identity(self, url_split, post_string):
+        ensure(len(url_split) > 2, 'Address not specified')
+        identity_address = url_split[2]
+        swap_client = self.server.swap_client
+        swap_client.checkSystemStatus()
+        summary = swap_client.getSummary()
+
+        page_data = {'identity_address': identity_address}
+        messages = []
+        err_messages = []
+        form_data = self.checkForm(post_string, 'identity', err_messages)
+        if form_data:
+            if have_data_entry(form_data, 'edit'):
+                page_data['show_edit_form'] = True
+            if have_data_entry(form_data, 'apply'):
+                new_label = get_data_entry(form_data, 'label')
+
+                try:
+                    swap_client.updateIdentity(identity_address, new_label)
+                    messages.append('Updated')
+                except Exception as e:
+                    err_messages.append(str(e))
+
+        try:
+            identity = swap_client.getIdentity(identity_address)
+            if identity is None:
+                raise ValueError('Unknown address')
+            page_data['label'] = identity.label
+            page_data['num_sent_bids_successful'] = identity.num_sent_bids_successful
+            page_data['num_recv_bids_successful'] = identity.num_recv_bids_successful
+            page_data['num_sent_bids_rejected'] = identity.num_sent_bids_rejected
+            page_data['num_recv_bids_rejected'] = identity.num_recv_bids_rejected
+            page_data['num_sent_bids_failed'] = identity.num_sent_bids_failed
+            page_data['num_recv_bids_failed'] = identity.num_recv_bids_failed
+        except Exception as e:
+            messages.append(e)
+
+        template = env.get_template('identity.html')
+        return self.render_template(template, {
+            'messages': messages,
+            'err_messages': err_messages,
+            'data': page_data,
+            'summary': summary,
+        })
 
     def page_shutdown(self, url_split, post_string):
         swap_client = self.server.swap_client
+
+        if len(url_split) > 2:
+            token = url_split[2]
+            expect_token = self.server.session_tokens.get('shutdown', None)
+            if token != expect_token:
+                return self.page_info('Unexpected token, still running.')
+
         swap_client.stopRunning()
 
         return self.page_info('Shutting down')
 
     def page_index(self, url_split):
         swap_client = self.server.swap_client
+        swap_client.checkSystemStatus()
         summary = swap_client.getSummary()
 
         template = env.get_template('index.html')
-        return bytes(template.render(
-            title=self.server.title,
-            refresh=30,
-            h2=self.server.title,
-            version=__version__,
-            summary=summary
-        ), 'UTF-8')
+        return self.render_template(template, {
+            'refresh': 30,
+            'version': __version__,
+            'summary': summary,
+            'use_tor_proxy': swap_client.use_tor_proxy
+        })
+
+    def page_404(self, url_split):
+        swap_client = self.server.swap_client
+        summary = swap_client.getSummary()
+        template = env.get_template('404.html')
+        return self.render_template(template, {
+            'summary': summary,
+        })
 
     def putHeaders(self, status_code, content_type):
         self.send_response(status_code)
         if self.server.allow_cors:
             self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Content-type', content_type)
+        self.send_header('Content-Type', content_type)
         self.end_headers()
 
-    def handle_http(self, status_code, path, post_string=''):
-        url_split = self.path.split('/')
+    def handle_http(self, status_code, path, post_string='', is_json=False):
+        swap_client = self.server.swap_client
+        parsed = parse.urlparse(self.path)
+        url_split = parsed.path.split('/')
+        if post_string == '' and len(parsed.query) > 0:
+            post_string = parsed.query
         if len(url_split) > 1 and url_split[1] == 'json':
             try:
                 self.putHeaders(status_code, 'text/plain')
-                func = js_index
-                if len(url_split) > 2:
-                    func = {'wallets': js_wallets,
-                            'offers': js_offers,
-                            'sentoffers': js_sentoffers,
-                            'bids': js_bids,
-                            'sentbids': js_sentbids,
-                            'network': js_network,
-                            }.get(url_split[2], js_index)
-                return func(self, url_split, post_string)
+                func = js_url_to_function(url_split)
+                return func(self, url_split, post_string, is_json)
             except Exception as ex:
-                if self.server.swap_client.debug is True:
-                    traceback.print_exc()
+                if swap_client.debug is True:
+                    swap_client.log.error(traceback.format_exc())
                 return js_error(self, str(ex))
+
+        if len(url_split) > 1 and url_split[1] == 'static':
+            try:
+                static_path = os.path.join(os.path.dirname(__file__), 'static')
+                if len(url_split) > 3 and url_split[2] == 'sequence_diagrams':
+                    with open(os.path.join(static_path, 'sequence_diagrams', url_split[3]), 'rb') as fp:
+                        self.putHeaders(status_code, 'image/svg+xml')
+                        return fp.read()
+                elif len(url_split) > 3 and url_split[2] == 'images':
+                    filename = os.path.join(*url_split[3:])
+                    _, extension = os.path.splitext(filename)
+                    mime_type = {
+                        '.svg': 'image/svg+xml',
+                        '.png': 'image/png',
+                        '.jpg': 'image/jpeg',
+                        '.gif': 'image/gif',
+                        '.ico': 'image/x-icon',
+                    }.get(extension, '')
+                    if mime_type == '':
+                        raise ValueError('Unknown file type ' + filename)
+                    with open(os.path.join(static_path, 'images', filename), 'rb') as fp:
+                        self.putHeaders(status_code, mime_type)
+                        return fp.read()
+                elif len(url_split) > 3 and url_split[2] == 'css':
+                    filename = os.path.join(*url_split[3:])
+                    with open(os.path.join(static_path, 'css', filename), 'rb') as fp:
+                        self.putHeaders(status_code, 'text/css; charset=utf-8')
+                        return fp.read()
+                elif len(url_split) > 3 and url_split[2] == 'js':
+                    filename = os.path.join(*url_split[3:])
+                    with open(os.path.join(static_path, 'js', filename), 'rb') as fp:
+                        self.putHeaders(status_code, 'application/javascript')
+                        return fp.read()
+                else:
+                    return self.page_404(url_split)
+            except FileNotFoundError:
+                return self.page_404(url_split)
+            except Exception as ex:
+                if swap_client.debug is True:
+                    swap_client.log.error(traceback.format_exc())
+                return self.page_error(str(ex))
+
         try:
-            self.putHeaders(status_code, 'text/html')
             if len(url_split) > 1:
-                if url_split[1] == 'active':
+                page = url_split[1]
+
+                if page == 'active':
                     return self.page_active(url_split, post_string)
-                if url_split[1] == 'wallets':
-                    return self.page_wallets(url_split, post_string)
-                if url_split[1] == 'settings':
-                    return self.page_settings(url_split, post_string)
-                if url_split[1] == 'rpc':
+                if page == 'wallets':
+                    return page_wallets(self, url_split, post_string)
+                if page == 'wallet':
+                    return page_wallet(self, url_split, post_string)
+                if page == 'settings':
+                    return page_settings(self, url_split, post_string)
+                if page == 'error':
+                    return self.page_error(url_split, post_string)
+                if page == 'info':
+                    return self.page_info(url_split, post_string)
+                if page == 'rpc':
                     return self.page_rpc(url_split, post_string)
-                if url_split[1] == 'explorers':
+                if page == 'debug':
+                    return self.page_debug(url_split, post_string)
+                if page == 'explorers':
                     return self.page_explorers(url_split, post_string)
-                if url_split[1] == 'offer':
-                    return self.page_offer(url_split, post_string)
-                if url_split[1] == 'offers':
-                    return self.page_offers(url_split, post_string)
-                if url_split[1] == 'newoffer':
-                    return self.page_newoffer(url_split, post_string)
-                if url_split[1] == 'sentoffers':
-                    return self.page_offers(url_split, post_string, sent=True)
-                if url_split[1] == 'advance':
-                    return self.page_advance(url_split, post_string)
-                if url_split[1] == 'bid':
-                    return self.page_bid(url_split, post_string)
-                if url_split[1] == 'bids':
-                    return self.page_bids(url_split, post_string)
-                if url_split[1] == 'sentbids':
-                    return self.page_bids(url_split, post_string, sent=True)
-                if url_split[1] == 'watched':
+                if page == 'offer':
+                    return page_offer(self, url_split, post_string)
+                if page == 'offers':
+                    return page_offers(self, url_split, post_string)
+                if page == 'newoffer':
+                    return page_newoffer(self, url_split, post_string)
+                if page == 'sentoffers':
+                    return page_offers(self, url_split, post_string, sent=True)
+                if page == 'bid':
+                    return page_bid(self, url_split, post_string)
+                if page == 'receivedbids':
+                    return page_bids(self, url_split, post_string, received=True)
+                if page == 'sentbids':
+                    return page_bids(self, url_split, post_string, sent=True)
+                if page == 'availablebids':
+                    return page_bids(self, url_split, post_string, available=True)
+                if page == 'watched':
                     return self.page_watched(url_split, post_string)
-                if url_split[1] == 'shutdown':
+                if page == 'smsgaddresses':
+                    return self.page_smsgaddresses(url_split, post_string)
+                if page == 'identity':
+                    return self.page_identity(url_split, post_string)
+                if page == 'tor':
+                    return page_tor(self, url_split, post_string)
+                if page == 'automation':
+                    return page_automation_strategies(self, url_split, post_string)
+                if page == 'automationstrategy':
+                    return page_automation_strategy(self, url_split, post_string)
+                if page == 'newautomationstrategy':
+                    return page_automation_strategy_new(self, url_split, post_string)
+                if page == 'shutdown':
                     return self.page_shutdown(url_split, post_string)
+                if page == 'changepassword':
+                    return page_changepassword(self, url_split, post_string)
+                if page == 'unlock':
+                    return page_unlock(self, url_split, post_string)
+                if page == 'lock':
+                    return page_lock(self, url_split, post_string)
+                if page != '':
+                    return self.page_404(url_split)
             return self.page_index(url_split)
+        except LockedCoinError:
+            return page_unlock(self, url_split, post_string)
         except Exception as ex:
-            if self.server.swap_client.debug is True:
-                traceback.print_exc()
+            if swap_client.debug is True:
+                swap_client.log.error(traceback.format_exc())
             return self.page_error(str(ex))
 
     def do_GET(self):
@@ -850,8 +650,10 @@ class HttpHandler(BaseHTTPRequestHandler):
         self.wfile.write(response)
 
     def do_POST(self):
-        post_string = self.rfile.read(int(self.headers['Content-Length']))
-        response = self.handle_http(200, self.path, post_string)
+        post_string = self.rfile.read(int(self.headers.get('Content-Length')))
+
+        is_json = True if 'json' in self.headers.get('Content-Type', '') else False
+        response = self.handle_http(200, self.path, post_string, is_json)
         self.wfile.write(response)
 
     def do_HEAD(self):
@@ -875,8 +677,11 @@ class HttpThread(threading.Thread, HTTPServer):
         self.port_no = port_no
         self.allow_cors = allow_cors
         self.swap_client = swap_client
-        self.title = 'Simple Atomic Swap Demo, ' + self.swap_client.chain
+        self.title = 'BasicSwap - ' + __version__
         self.last_form_id = dict()
+        self.session_tokens = dict()
+        self.env = env
+        self.msg_id_counter = 0
 
         self.timeout = 60
         HTTPServer.__init__(self, (self.host_name, self.port_no), HttpHandler)

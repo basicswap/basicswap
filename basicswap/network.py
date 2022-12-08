@@ -15,6 +15,8 @@
         node1 send_ping  - With a version field
         node0 recv_ping
             Both nodes are initialised
+
+    XChaCha20_Poly1305 mac is 16bytes
 '''
 
 import time
@@ -33,7 +35,7 @@ from enum import IntEnum, auto
 from collections import OrderedDict
 from Crypto.Cipher import ChaCha20_Poly1305  # TODO: Add to libsecp256k1/coincurve fork
 from coincurve.keys import PrivateKey, PublicKey
-from basicswap.rfc6979 import (
+from basicswap.contrib.rfc6979 import (
     rfc6979_hmac_sha256_initialize,
     rfc6979_hmac_sha256_generate)
 
@@ -55,6 +57,7 @@ class NetMessageTypes(IntEnum):
     PING = auto()
     PONG = auto()
     DATA = auto()
+    ONION_PACKET = auto()
 
     @classmethod
     def has_value(cls, value):
@@ -201,7 +204,7 @@ def msg_thread(cls):
                 except Exception as e:
                     logging.warning('process message error %s', str(e))
                     if cls._sc.debug:
-                        traceback.print_exc()
+                        logging.error(traceback.format_exc())
 
         if processed is False:
             time.sleep(timeout)
@@ -579,8 +582,6 @@ class Network:
 
     def test_onion(self, path):
         self._sc.log.debug('test_onion packet')
-
-        plaintext = 'test'
 
     def get_info(self):
         rv = {}

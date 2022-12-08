@@ -1,41 +1,121 @@
 {% include 'header.html' %}
+<div class="container mx-auto">
+  <section class="bg-white p-5 mt-5">
+    <div class="flex flex-wrap items-center -m-2">
+      <div class="w-full md:w-1/2 p-2">
+        <ul class="flex flex-wrap items-center gap-x-3 mb-2">
+          <li>
+            <a class="flex font-medium text-xs text-coolGray-500 hover:text-coolGray-700" href="/">
+              <p>Home</p>
+            </a>
+          </li>
+          <li>
+            <svg width="6" height="15" viewBox="0 0 6 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M5.34 0.671999L2.076 14.1H0.732L3.984 0.671999H5.34Z" fill="#BBC3CF"></path>
+            </svg>
+          </li>
+          <li><a class="flex font-medium text-xs text-coolGray-500 hover:text-coolGray-700" href="/wallets">Wallets</a></li>
+          <li>
+            <svg width="6" height="15" viewBox="0 0 6 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M5.34 0.671999L2.076 14.1H0.732L3.984 0.671999H5.34Z" fill="#BBC3CF"></path>
+            </svg>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </section>
+  <section class="py-4">
+    <div class="container px-4 mx-auto">
+      <div class="relative py-11 px-16 bg-coolGray-900 rounded-md overflow-hidden">
+        <img class="absolute z-10 left-4 top-4" src="/static/images/elements/dots-red.svg" alt="">
+        <img class="absolute z-10 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt="">
+        <img class="absolute h-64 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" src="/static/images/elements/wave.svg" alt="">
+        <div class="relative z-20 flex flex-wrap items-center -m-3">
+          <div class="w-full md:w-1/2 p-3">
+            <h2 class="mb-6 text-4xl font-bold text-white tracking-tighter">Wallets</h2>
+            <p class="font-semibold text-coolGray-200">Check your coin balances and manage your wallets. {% if refresh %} (Page Refresh: {{ refresh }} seconds) {% endif %}</p>
+          </div>
+          <div class="w-full md:w-1/2 p-3 p-6 container flex flex-wrap items-center justify-end items-center mx-auto">
+            <a class="mr-5 flex flex-wrap justify-center px-5 py-4 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" id="refresh" href="/changepassword">
+              <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
+                <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round">
+                <rect x="3" y="11" width="18" height="12" rx="2"></rect><circle cx="12" cy="17" r="2" stroke="#ffffff"></circle>
+                <path d="M17,7V6a4.951,4.951,0,0,0-4.9-5H12A4.951,4.951,0,0,0,7,5.9V7" stroke="#ffffff"></path></g></svg>
+                <span>Change Password</span></a>
+             <a class="flex flex-wrap justify-center px-5 py-4 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" id="refresh" href="/wallets">
+              <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
+                <g fill="#ffffff" class="nc-icon-wrapper">
+                  <path fill="#ffffff" d="M12,3c1.989,0,3.873,0.65,5.43,1.833l-3.604,3.393l9.167,0.983L22.562,0l-3.655,3.442 C16.957,1.862,14.545,1,12,1C5.935,1,1,5.935,1,12h2C3,7.037,7.037,3,12,3z"></path>
+                  <path data-color="color-2" d="M12,21c-1.989,0-3.873-0.65-5.43-1.833l3.604-3.393l-9.167-0.983L1.438,24l3.655-3.442 C7.043,22.138,9.455,23,12,23c6.065,0,11-4.935,11-11h-2C21,16.963,16.963,21,12,21z"></path>
+                </g>
+              </svg><span>Refresh</span></a>             
+          </div>
 
-<h3>Wallets</h3>
-{% if refresh %}
-<p>Page Refresh: {{ refresh }} seconds</p>
-{% endif %}
-
-{% for m in messages %}
-<p>{{ m }}</p>
-{% endfor %}
-
-<form method="post">
-
-{% for w in wallets %}
-<h4>{{ w.name }} {{ w.version }}</h4>
-{% if w.error %}
-<p>Error: {{ w.error }}</p>
-{% else %}
-<table>
-<tr><td>Balance:</td><td>{{ w.balance }}</td>{% if w.unconfirmed %}<td>Unconfirmed:</td><td>{{ w.unconfirmed }}</td>{% endif %}</tr>
-<tr><td>Blocks:</td><td>{{ w.blocks }}</td></tr>
-<tr><td>Synced:</td><td>{{ w.synced }}</td></tr>
-<tr><td>Expected Seed:</td><td>{{ w.expected_seed }}</td>{% if w.expected_seed != true %}<td><input type="submit" name="reseed_{{ w.cid }}" value="Reseed wallet" onclick="confirmReseed()"></td>{% endif %}</tr>
-<tr><td><input type="submit" name="newaddr_{{ w.cid }}" value="Deposit Address"></td><td>{{ w.deposit_address }}</td></tr>
-<tr><td><input type="submit" name="withdraw_{{ w.cid }}" value="Withdraw"></td><td>Amount: <input type="text" name="amt_{{ w.cid }}"></td><td>Address: <input type="text" name="to_{{ w.cid }}"></td><td>Subtract fee: <input type="checkbox" name="subfee_{{ w.cid }}"></td></tr>
-<tr><td>Fee Rate:</td><td>{{ w.fee_rate }}</td><td>Est Fee:</td><td>{{ w.est_fee }}</td></tr>
-</table>
-{% endif %}
-{% endfor %}
-
-<input type="hidden" name="formid" value="{{ form_id }}">
-</form>
-
-<p><a href="/">home</a></p>
-
-<script>
-function confirmReseed() {
-    confirm("Are you sure?\nBackup your wallet before and after.\nWon't detect used keys.\nShould only be used for new wallets.");
-}
-</script>
-</body></html>
+        </div>
+      </div>
+    </div>
+  </section>
+  {% include 'inc_messages.html' %}
+  <section class="bg-white py-4">
+    <div class="container px-4 mx-auto">
+      <div class="flex flex-wrap -m-4">
+        {% for w in wallets %}
+        {% if w.havedata %}
+        {% if w.error %}
+        <p>Error: {{ w.error }}</p>
+        {% else %}
+        <div class="w-full lg:w-1/3 p-4">
+          <div class="bg-white shadow rounded overflow-hidden">
+            <div class="pt-6 px-6 mb-10 flex justify-between items-center"> <span class="inline-flex items-center justify-center w-9 h-10 bg-white-50 rounded">
+                <img class="h-9" src="/static/images/coins/{{ w.name }}.png" alt=""></span> <a class="py-2 px-3 bg-blue-500 text-xs text-white rounded-full hover:bg-blue-600" href="/wallet/{{ w.ticker }}">Manage</a></div>
+            <div class="px-6 mb-6">
+              <h4 class="text-xl font-bold">{{ w.name }} <span class="inline-block font-medium text-xs text-gray-500">({{ w.ticker }})</span></h4>
+              <p class="text-xs text-gray-500">Version: {{ w.version }} {% if w.updating %} <span class="inline-block py-1 px-2 rounded-full bg-blue-100 text-xs text-black-500">Updating</span></p>{% endif %}</div>
+            <div class="p-6 bg-gray-50">
+              <div class="flex mb-2 justify-between items-center">
+                <h4 class="text-xs font-medium">Balance:</h4> <span class="bold inline-block py-1 px-2 rounded-full bg-blue-100 text-xs text-black-500">{{ w.balance }}</span></div>{% if w.unconfirmed %}
+              <div class="flex mb-2 justify-between items-center">
+                <h4 class="text-xs font-medium">Unconfirmed:</h4> <span class="inline-block py-1 px-2 rounded-full bg-blue-100 text-xs text-black-500">{{ w.unconfirmed }}</span></div>{% endif %}{% if w.cid == '1' %}
+              <div class="flex mb-2 justify-between items-center">
+                <h4 class="text-xs font-medium">Blind Balance:</h4> <span class="bold inline-block py-1 px-2 rounded-full bg-blue-100 text-xs text-black-500">{{ w.blind_balance }}</span></div>{% if w.blind_unconfirmed %}
+              <div class="flex mb-2 justify-between items-center">
+                <h4 class="text-xs font-medium">Blind Unconfirmed:</h4> <span class="inline-block py-1 px-2 rounded-full bg-blue-100 text-xs text-black-500">{{ w.blind_unconfirmed }}</span></div>{% endif %}
+              <div class="flex mb-2 justify-between items-center">
+                <h4 class="text-xs font-medium">Anon Balance:</h4> <span class="bold inline-block py-1 px-2 rounded-full bg-blue-100 text-xs text-black-500">{{ w.anon_balance }}</span></div>{% if w.anon_pending %}
+              <div class="flex mb-2 justify-between items-center">
+                <h4 class="text-xs font-medium">Anon Pending:</h4> <span class="inline-block py-1 px-2 rounded-full bg-blue-100 text-xs text-black-500">{{ w.anon_pending }}</span></div>{% endif %}{% endif %}
+              <div class="flex mb-2 justify-between items-center">
+                <h4 class="text-xs font-medium">Blocks:</h4> <span class="inline-block py-1 px-2 rounded-full bg-blue-100 text-xs text-black-500">{{ w.blocks }}{% if w.known_block_count %} / {{ w.known_block_count }}{% endif %}</span></div>
+              <div class="flex mb-2 justify-between items-center">
+                <h4 class="text-xs font-medium">Last Updated:</h4> <span class="inline-block py-1 px-2 rounded-full bg-blue-100 text-xs text-black-500">{{ w.lastupdated }}</span></div>{% if w.bootstrapping %}
+              <div class="flex mb-2 justify-between items-center">
+                <h4 class="text-xs font-medium">Bootstrapping:</h4> <span class="inline-block py-1 px-2 rounded-full bg-blue-100 text-xs text-black-500">{{ w.bootstrapping }}</span></div>{% endif %}{% if w.encrypted %}
+              <div class="flex mb-2 justify-between items-center">
+                <h4 class="text-xs font-medium">Locked:</h4> <span class="inline-block py-1 px-2 rounded-full bg-blue-100 text-xs text-black-500">{{ w.locked }}</span></div>{% endif %}
+              <div class="flex mb-2 justify-between items-center">
+                <h4 class="text-xs font-medium">Expected Seed:</h4> <span class="inline-block py-1 px-2 rounded-full bg-blue-100 text-xs text-black-500">{{ w.expected_seed }}</span></div>
+              <div class="flex justify-between mb-1 mt-10"> <span class="text-xs font-medium text-blue-700">Blockchain</span> <span class="text-xs font-medium text-blue-700">{{ w.synced }}%</span></div>
+              <div class="w-full bg-gray-200 rounded-full h-1">
+                <div class="bg-blue-500 h-1 rounded-full" style="width: {{ w.synced }}%"></div>
+              </div>
+            </div>
+          </div>
+          {% endif %}
+          {% endif %}
+          <!-- havedata -->
+        </div>
+        {% endfor %}
+        <script>
+          function confirmReseed() {
+            return confirm("Are you sure?\nBackup your wallet before and after.\nWon't detect used keys.\nShould only be used for new wallets.");
+          }
+          function confirmWithdrawal() {
+            return confirm("Are you sure?");
+          }
+        </script>
+      </div>
+  </section>
+  </div>
+{% include 'footer.html' %}
+</body>
+</html>

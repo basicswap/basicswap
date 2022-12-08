@@ -1,0 +1,16 @@
+    bitcoin_core:
+        image: i_bitcoin
+        build:
+            context: bitcoin
+            dockerfile: Dockerfile
+        container_name: bitcoin_core
+        volumes:
+            - ${DATA_PATH}/bitcoin:/data
+        expose:
+            - ${BTC_RPC_PORT}
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "3"
+        restart: unless-stopped

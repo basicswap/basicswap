@@ -1,147 +1,207 @@
 
 ## Source code
 
-    $ git clone https://github.com/tecnovert/basicswap.git
+    git clone https://github.com/tecnovert/basicswap.git
 
 
 ## Run Using Docker
 
+
+Install dependencies:
+
+    apt-get install curl jq
+
+
 Docker must be installed and started:
 
-    $ sudo systemctl status docker | grep Active
+    docker -v
 
-Should return a line containing `active (running)`
+Should return a line containing `Docker version`...
 
 
-Create the images:
+To install docker engine on your platform see:
 
-    $ cd basicswap/docker
-    $ docker-compose build
+    https://docs.docker.com/engine/install/#server
 
-Prepare the datadir:
-Set XMR_RPC_HOST and BASE_XMR_RPC_PORT to a public XMR node or exclude to run a local node.
+
+It's recommended to setup docker to work without sudo.<br>
+Without this step you will need to preface each `docker-compose` command with `sudo`:
+
+    https://docs.docker.com/engine/install/linux-postinstall/
+
+
+#### Create the images:
+
+COINDATA_PATH can be set to your preference but must be exported each time you launch Basicswap.<br>
+Consider adding COINDATA_PATH to the `.env` file in the docker directory file so it's always set.
+
+    export COINDATA_PATH=/var/data/coinswaps
+    cd basicswap/docker
+    docker-compose build
+
+
+#### Prepare the datadir:
+
 Set xmrrestoreheight to the current xmr chain height.
-Adjust `--withcoins` and `--withoutcoins` as desired, eg: `--withcoins=monero,bitcoin`.  By default Particl and Litecoin are loaded.
 
-    $ export COINDATA_PATH=/var/data/coinswaps
-    $ docker run -e XMR_RPC_HOST="node.xmr.to" -e BASE_XMR_RPC_PORT=18081 -t --name swap_prepare -v $COINDATA_PATH:/coindata i_swapclient \
-    basicswap-prepare --datadir=/coindata --withcoins=monero --withoutcoins=litecoin --htmlhost="0.0.0.0" --xmrrestoreheight=2245107
+    CURRENT_XMR_HEIGHT=$(curl https://localmonero.co/blocks/api/get_stats | jq .height)
 
-Record the mnemonic from the output of the above command.
+Adjust `--withcoins` and `--withoutcoins` as desired, eg: `--withcoins=monero,bitcoin`.  By default only Particl is loaded.
 
-Remove swap_prepare container (and logs):
+##### FastSync
 
-    $ docker rm swap_prepare
+Append `--usebtcfastsync` to the below command to optionally initialise the Bitcoin datadir with a chain snapshot from btcpayserver FastSync.<br>
+[FastSync README.md](https://github.com/btcpayserver/btcpayserver-docker/blob/master/contrib/FastSync/README.md)
 
 
-Start the container
+Setup with a local Monero daemon (recommended):
 
-    $ export COINDATA_PATH=/var/data/coinswaps
-    $ docker-compose up
+    export COINDATA_PATH=/var/data/coinswaps
+    docker run --rm -t --name swap_prepare -v $COINDATA_PATH:/coindata i_swapclient basicswap-prepare --datadir=/coindata --withcoins=monero --htmlhost="0.0.0.0" --wshost="0.0.0.0" --xmrrestoreheight=$CURRENT_XMR_HEIGHT
+
+
+To instead use Monero public nodes and not run a local Monero daemon<br>(it can be difficult to find reliable public nodes):
+
+    Set XMR_RPC_HOST and BASE_XMR_RPC_PORT to a public XMR node.
+    export COINDATA_PATH=/var/data/coinswaps
+    docker run --rm -e XMR_RPC_HOST="node.xmr.to" -e BASE_XMR_RPC_PORT=18081 -t --name swap_prepare -v $COINDATA_PATH:/coindata i_swapclient basicswap-prepare --datadir=/coindata --withcoins=monero --htmlhost="0.0.0.0" --wshost="0.0.0.0" --xmrrestoreheight=$CURRENT_XMR_HEIGHT
+
+
+**Record the mnemonic from the output of the above command.**
+And the output of `echo $CURRENT_XMR_HEIGHT` for use if you need to later restore your wallet.
+
+
+#### Set the timezone (optional):
+
+Edit the `.env` file in the docker directory, set TZ to your local timezone.
+Valid options can be listed with: `timedatectl list-timezones`
+
+
+#### Start the container:
+
+    export COINDATA_PATH=/var/data/coinswaps
+    docker-compose up
 
 Open in browser: `http://localhost:12700`
 
+
+
 ### Add a coin
 
-    $ docker-compose stop
-    $ export COINDATA_PATH=/var/data/coinswaps
-    $ docker run -t --name swap_prepare -v $COINDATA_PATH:/coindata i_swapclient basicswap-prepare --datadir=/coindata --addcoin=bitcoin
+    docker-compose stop
+    export COINDATA_PATH=/var/data/coinswaps
+    docker run --rm -t --name swap_prepare -v $COINDATA_PATH:/coindata i_swapclient basicswap-prepare --datadir=/coindata --addcoin=bitcoin
 
 You can copy an existing pruned datadir (excluding bitcoin.conf and any wallets) over to `$COINDATA_PATH/bitcoin`
 Remove any existing wallets after copying over a pruned chain or the Bitcoin daemon won't start.
 
 
+
+## Windows
+
+#### Setup WSL 2 and Docker Desktop
+[docs.docker.com/docker-for-windows/wsl](https://docs.docker.com/docker-for-windows/wsl/)
+
+
+Open a wsl terminal
+Windows key + R -> "wsl" -> Enter
+
+
+Install Git:
+
+    sudo apt update
+    sudo apt install git
+
+
+Download the BasicSwap code:
+
+    git clone https://github.com/tecnovert/basicswap.git
+    cd basicswap/docker/
+
+
+It's significantly faster to set COINDATA_PATH in the linux filesystem.
+You can access it from the windows side at: `\\wsl$\Ubuntu`
+
+Continue from the [Run Using Docker](#run-using-docker) section.
+
+
 ## Run Without Docker:
 
-    $ apt-get install -y wget python3-pip gnupg unzip protobuf-compiler automake libtool pkg-config
 
-    $ export SWAP_DATADIR=/var/data/coinswaps
-    $ mkdirs -p "$SWAP_DATADIR/venv"
-    $ python3 -m venv "$SWAP_DATADIR/venv"
-    $ . $SWAP_DATADIR/venv/bin/activate && python -V
-    $ wget -O coincurve-anonswap.zip https://github.com/tecnovert/coincurve/archive/anonswap.zip
-    $ unzip coincurve-anonswap.zip
-    $ cd coincurve-anonswap
-    $ python3 setup.py install --force
+### Ubuntu Setup:
 
+    apt-get install -y wget python3-pip gnupg unzip protobuf-compiler automake libtool pkg-config curl jq
 
-    $ cd $SWAP_DATADIR
-    $ git clone https://github.com/tecnovert/basicswap.git
-    $ cd basicswap
-    $ protoc -I=basicswap --python_out=basicswap basicswap/messages.proto
-    $ pip3 install .
+### OSX Setup:
 
-Prepare the datadir:
+Install Homebrew (See https://brew.sh/):
 
-    XMR_RPC_HOST="node.xmr.to" BASE_XMR_RPC_PORT=18081 basicswap-prepare --datadir=$SWAP_DATADIR --withcoins=monero --withoutcoins=litecoin --xmrrestoreheight=2245107
-
-Record the mnemonic from the output of the above command.
-
-Start the app
-
-    $ basicswap-run --datadir=$SWAP_DATADIR
-
-Open in browser: `http://localhost:12700`
-
-
-Old notes
-=============
-
-## Run Without Installing
-
-    $ cd basicswap
-    $ pip install sqlalchemy protobuf pyzmq
-    $ protoc -I=basicswap --python_out=basicswap basicswap/messages.proto
-    $ export PYTHONPATH=$(pwd)
-    $ python bin/basicswap-prepare.py
-    $ python bin/basicswap-run.py
-
-
-## OSX
-
-Install Homebrew:
-
-    https://brew.sh/
-
-Command Line Tools:
-
-    $ xcode-select --install
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
 Dependencies:
 
-    $ brew install python git protobuf gnupg
+    brew install wget unzip python git protobuf gnupg automake libtool pkg-config curl jq
 
-Python certificates:
-
-    $ /Applications/Python\ 3.7/Install\ Certificates.command
-
-Basicswap
-
-    $ git clone https://github.com/tecnovert/basicswap.git
-    $ cd basicswap
-    $ protoc -I=basicswap --python_out=basicswap basicswap/messages.proto
-    $ pip3 install .
-    $ basicswap-prepare
-    $ basicswap-run
+Close the terminal and open a new one to update the python symlinks.
 
 
-# Windows
+### Basicswap:
 
-Install git and python3:
+    export SWAP_DATADIR=/Users/$USER/coinswaps
+    mkdir -p "$SWAP_DATADIR/venv"
+    python3 -m venv "$SWAP_DATADIR/venv"
+    . $SWAP_DATADIR/venv/bin/activate && python -V
+    cd $SWAP_DATADIR
+    wget -O coincurve-anonswap.zip https://github.com/tecnovert/coincurve/archive/refs/tags/anonswap_v0.1.zip
+    unzip -d coincurve-anonswap coincurve-anonswap.zip
+    mv ./coincurve-anonswap/*/{.,}* ./coincurve-anonswap || true
+    cd $SWAP_DATADIR/coincurve-anonswap
+    pip3 install .
 
-    https://gitforwindows.org/
-    https://www.python.org/downloads/windows/
-        Remember to select the 'Add Python to environment variables' option.
 
-Right click in the directory you want to install into and select 'Git Bash Here':
+    cd $SWAP_DATADIR
+    git clone https://github.com/tecnovert/basicswap.git
+    cd $SWAP_DATADIR/basicswap
 
-    $ git clone https://github.com/tecnovert/basicswap.git
-    $ cd basicswap
-    $ pip3 install .
-    $ basicswap-prepare
-    $ basicswap-run
+If installed on OSX, you may need to install additional root ssl certificates for the ssl module.
+From https://pypi.org/project/certifi/
 
-Open url in browser:
-http://localhost:12700
+    sudo python3 bin/install_certifi.py
 
-Shutdown by pressing ctrl + c in the Git Bash console window.
+
+Continue installing Basicswap
+
+    protoc -I=basicswap --python_out=basicswap basicswap/messages.proto
+    pip3 install .
+
+
+Prepare the datadir:
+
+    CURRENT_XMR_HEIGHT=$(curl https://localmonero.co/blocks/api/get_stats | jq .height)
+
+    XMR_RPC_HOST="node.xmr.to" BASE_XMR_RPC_PORT=18081 basicswap-prepare --datadir=$SWAP_DATADIR --withcoins=monero --xmrrestoreheight=$CURRENT_XMR_HEIGHT
+
+    OR using a local XMR daemon:
+    basicswap-prepare --datadir=$SWAP_DATADIR --withcoins=monero --xmrrestoreheight=$CURRENT_XMR_HEIGHT
+
+Record the mnemonic from the output of the above command.
+
+Start Basicswap:
+
+    basicswap-run --datadir=$SWAP_DATADIR
+
+Open in browser: `http://localhost:12700`
+It may take a few minutes to start as the coin daemons are started before the http interface.
+
+
+Add a coin (Stop basicswap first):
+
+    export SWAP_DATADIR=/Users/$USER/coinswaps
+    basicswap-prepare --usebtcfastsync --datadir=/$SWAP_DATADIR --addcoin=bitcoin
+
+
+Start after installed:
+
+    export SWAP_DATADIR=/Users/$USER/coinswaps
+    . $SWAP_DATADIR/venv/bin/activate && python -V
+    basicswap-run --datadir=$SWAP_DATADIR

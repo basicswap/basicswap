@@ -1,14 +1,17 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019-2020 tecnovert
+# Copyright (c) 2019-2022 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
+
+import threading
 
 from enum import IntEnum
 from .util import (
     COIN,
+    make_int,
     format_amount,
-    make_int
+    TemporaryError,
 )
 
 XMR_COIN = 10 ** 12
@@ -21,6 +24,13 @@ class Coins(IntEnum):
     # DCR = 4
     NMC = 5
     XMR = 6
+    PART_BLIND = 7
+    PART_ANON = 8
+    # ZANO = 9
+    # NDAU = 10
+    PIVX = 11
+    DASH = 12
+    FIRO = 13
 
 
 chainparams = {
@@ -35,6 +45,7 @@ chainparams = {
             'pubkey_address': 0x38,
             'script_address': 0x3c,
             'key_prefix': 0x6c,
+            'stealth_key_prefix': 0x14,
             'hrp': 'pw',
             'bip44': 44,
             'min_amount': 1000,
@@ -45,6 +56,7 @@ chainparams = {
             'pubkey_address': 0x76,
             'script_address': 0x7a,
             'key_prefix': 0x2e,
+            'stealth_key_prefix': 0x15,
             'hrp': 'tpw',
             'bip44': 1,
             'min_amount': 1000,
@@ -55,6 +67,7 @@ chainparams = {
             'pubkey_address': 0x76,
             'script_address': 0x7a,
             'key_prefix': 0x2e,
+            'stealth_key_prefix': 0x15,
             'hrp': 'rtpw',
             'bip44': 1,
             'min_amount': 1000,
@@ -108,7 +121,8 @@ chainparams = {
         'mainnet': {
             'rpcport': 9332,
             'pubkey_address': 48,
-            'script_address': 50,
+            'script_address': 5,
+            'script_address2': 50,
             'key_prefix': 176,
             'hrp': 'ltc',
             'bip44': 2,
@@ -118,7 +132,8 @@ chainparams = {
         'testnet': {
             'rpcport': 19332,
             'pubkey_address': 111,
-            'script_address': 58,
+            'script_address': 196,
+            'script_address2': 58,
             'key_prefix': 239,
             'hrp': 'tltc',
             'bip44': 1,
@@ -129,7 +144,8 @@ chainparams = {
         'regtest': {
             'rpcport': 19443,
             'pubkey_address': 111,
-            'script_address': 58,
+            'script_address': 196,
+            'script_address2': 58,
             'key_prefix': 239,
             'hrp': 'rltc',
             'bip44': 1,
@@ -195,29 +211,215 @@ chainparams = {
             'min_amount': 100000,
             'max_amount': 10000 * XMR_COIN,
         }
+    },
+    Coins.PIVX: {
+        'name': 'pivx',
+        'ticker': 'PIVX',
+        'message_magic': 'DarkNet Signed Message:\n',
+        'blocks_target': 60 * 1,
+        'decimal_places': 8,
+        'has_csv': False,
+        'has_segwit': False,
+        'use_ticker_as_name': True,
+        'mainnet': {
+            'rpcport': 51473,
+            'pubkey_address': 30,
+            'script_address': 13,
+            'key_prefix': 212,
+            'bip44': 119,
+            'min_amount': 1000,
+            'max_amount': 100000 * COIN,
+        },
+        'testnet': {
+            'rpcport': 51475,
+            'pubkey_address': 139,
+            'script_address': 19,
+            'key_prefix': 239,
+            'bip44': 1,
+            'min_amount': 1000,
+            'max_amount': 100000 * COIN,
+            'name': 'testnet4',
+        },
+        'regtest': {
+            'rpcport': 51477,
+            'pubkey_address': 139,
+            'script_address': 19,
+            'key_prefix': 239,
+            'bip44': 1,
+            'min_amount': 1000,
+            'max_amount': 100000 * COIN,
+        }
+    },
+    Coins.DASH: {
+        'name': 'dash',
+        'ticker': 'DASH',
+        'message_magic': 'DarkCoin Signed Message:\n',
+        'blocks_target': 60 * 2.5,
+        'decimal_places': 8,
+        'has_csv': True,
+        'has_segwit': False,
+        'mainnet': {
+            'rpcport': 9998,
+            'pubkey_address': 76,
+            'script_address': 16,
+            'key_prefix': 204,
+            'hrp': '',
+            'bip44': 5,
+            'min_amount': 1000,
+            'max_amount': 100000 * COIN,
+        },
+        'testnet': {
+            'rpcport': 19998,
+            'pubkey_address': 140,
+            'script_address': 19,
+            'key_prefix': 239,
+            'hrp': '',
+            'bip44': 1,
+            'min_amount': 1000,
+            'max_amount': 100000 * COIN,
+        },
+        'regtest': {
+            'rpcport': 18332,
+            'pubkey_address': 140,
+            'script_address': 19,
+            'key_prefix': 239,
+            'hrp': '',
+            'bip44': 1,
+            'min_amount': 1000,
+            'max_amount': 100000 * COIN,
+        }
+    },
+    Coins.FIRO: {
+        'name': 'firo',
+        'ticker': 'FIRO',
+        'message_magic': 'Zcoin Signed Message:\n',
+        'blocks_target': 60 * 10,
+        'decimal_places': 8,
+        'has_csv': True,
+        'has_segwit': False,
+        'mainnet': {
+            'rpcport': 8888,
+            'pubkey_address': 82,
+            'script_address': 7,
+            'key_prefix': 210,
+            'hrp': '',
+            'bip44': 136,
+            'min_amount': 1000,
+            'max_amount': 100000 * COIN,
+        },
+        'testnet': {
+            'rpcport': 18888,
+            'pubkey_address': 65,
+            'script_address': 178,
+            'key_prefix': 185,
+            'hrp': '',
+            'bip44': 1,
+            'min_amount': 1000,
+            'max_amount': 100000 * COIN,
+        },
+        'regtest': {
+            'rpcport': 28888,
+            'pubkey_address': 65,
+            'script_address': 178,
+            'key_prefix': 185,
+            'hrp': '',
+            'bip44': 1,
+            'min_amount': 1000,
+            'max_amount': 100000 * COIN,
+        }
     }
 }
+ticker_map = {}
+
+
+for c, params in chainparams.items():
+    ticker_map[params['ticker'].lower()] = c
+
+
+def getCoinIdFromTicker(ticker):
+    try:
+        return ticker_map[ticker.lower()]
+    except Exception:
+        raise ValueError('Unknown coin')
 
 
 class CoinInterface:
-    def __init__(self):
-        self._unknown_wallet_seed = True
+    def __init__(self, network):
+        self.setDefaults()
+        self._network = network
+        self._mx_wallet = threading.Lock()
 
-    def make_int(self, amount_in, r=0):
+    def setDefaults(self):
+        self._unknown_wallet_seed = True
+        self._restore_height = None
+
+    def make_int(self, amount_in: int, r: int = 0) -> int:
         return make_int(amount_in, self.exp(), r=r)
 
-    def format_amount(self, amount_in, conv_int=False):
-        amount_int = make_int(amount_in, self.exp()) if conv_int else amount_in
+    def format_amount(self, amount_in, conv_int=False, r=0):
+        amount_int = make_int(amount_in, self.exp(), r=r) if conv_int else amount_in
         return format_amount(amount_int, self.exp())
 
-    def coin_name(self):
-        return chainparams[self.coin_type()]['name'].capitalize()
+    def coin_name(self) -> str:
+        coin_chainparams = chainparams[self.coin_type()]
+        if coin_chainparams.get('use_ticker_as_name', False):
+            return coin_chainparams['ticker']
+        return coin_chainparams['name'].capitalize()
 
-    def ticker(self):
+    def ticker(self) -> str:
+        ticker = chainparams[self.coin_type()]['ticker']
+        if self._network == 'testnet':
+            ticker = 't' + ticker
+        elif self._network == 'regtest':
+            ticker = 'rt' + ticker
+        return ticker
+
+    def getExchangeTicker(self, exchange_name):
         return chainparams[self.coin_type()]['ticker']
+
+    def getExchangeName(self, exchange_name):
+        return chainparams[self.coin_type()]['name']
+
+    def ticker_mainnet(self):
+        ticker = chainparams[self.coin_type()]['ticker']
+        return ticker
+
+    def min_amount(self):
+        return chainparams[self.coin_type()][self._network]['min_amount']
+
+    def max_amount(self):
+        return chainparams[self.coin_type()][self._network]['max_amount']
 
     def setWalletSeedWarning(self, value):
         self._unknown_wallet_seed = value
 
+    def setWalletRestoreHeight(self, value):
+        self._restore_height = value
+
     def knownWalletSeed(self):
         return not self._unknown_wallet_seed
+
+    def chainparams(self):
+        return chainparams[self.coin_type()]
+
+    def chainparams_network(self):
+        return chainparams[self.coin_type()][self._network]
+
+    def has_segwit(self) -> bool:
+        return chainparams[self.coin_type()].get('has_segwit', True)
+
+    def is_transient_error(self, ex):
+        if isinstance(ex, TemporaryError):
+            return True
+        str_error = str(ex).lower()
+        if 'not enough unlocked money' in str_error:
+            return True
+        if 'No unlocked balance' in str_error:
+            return True
+        if 'transaction was rejected by daemon' in str_error:
+            return True
+        if 'invalid unlocked_balance' in str_error:
+            return True
+        if 'daemon is busy' in str_error:
+            return True
+        return False

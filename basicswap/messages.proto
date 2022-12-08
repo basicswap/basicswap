@@ -29,6 +29,10 @@ message OfferMessage {
 
     uint64 fee_rate_from = 14;
     uint64 fee_rate_to = 15;
+
+    uint32 protocol_version = 16;
+    bool amount_negotiable = 17;
+    bool rate_negotiable = 18;
 }
 
 /* Step 2, buyer -> seller */
@@ -38,9 +42,12 @@ message BidMessage {
     uint64 amount = 3;              /* amount of amount_from bid is for */
 
     /* optional */
-    bytes pkhash_buyer = 4;         /* buyer's address to receive amount_from */
-    string proof_address = 5;
-    string proof_signature = 6;
+    uint64 rate = 4;
+    bytes pkhash_buyer = 5;         /* buyer's address to receive amount_from */
+    string proof_address = 6;
+    string proof_signature = 7;
+
+    uint32 protocol_version = 8;
 }
 
 /* Step 3, seller -> buyer */
@@ -55,18 +62,27 @@ message OfferRevokeMessage {
     bytes signature = 2;
 }
 
+message BidRejectMessage {
+    bytes bid_msg_id = 1;
+
+    uint32 reject_code = 2;
+}
+
 message XmrBidMessage {
     /* MSG1L, F -> L */
     bytes offer_msg_id = 1;
     uint64 time_valid = 2;          /* seconds bid is valid for */
     uint64 amount = 3;              /* amount of amount_from bid is for */
+    uint64 rate = 4;
 
-    bytes pkaf = 4;
+    bytes pkaf = 5;
 
-    bytes kbvf = 5;
-    bytes kbsf_dleag = 6;
+    bytes kbvf = 6;
+    bytes kbsf_dleag = 7;
 
-    bytes dest_af = 7;
+    bytes dest_af = 8;
+
+    uint32 protocol_version = 9;
 }
 
 message XmrSplitMessage {

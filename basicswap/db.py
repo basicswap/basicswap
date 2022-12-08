@@ -1,19 +1,37 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019-2020 tecnovert
+# Copyright (c) 2019-2022 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-import struct
 import time
+import struct
 import sqlalchemy as sa
 
-from sqlalchemy.ext.declarative import declarative_base
 from enum import IntEnum, auto
+from sqlalchemy.ext.declarative import declarative_base
 
 
-CURRENT_DB_VERSION = 6
+CURRENT_DB_VERSION = 17
+CURRENT_DB_DATA_VERSION = 2
 Base = declarative_base()
+
+
+class Concepts(IntEnum):
+    OFFER = auto()
+    BID = auto()
+    NETWORK_MESSAGE = auto()
+    AUTOMATION = auto()
+
+
+def strConcepts(state):
+    if state == Concepts.OFFER:
+        return 'Offer'
+    if state == Concepts.BID:
+        return 'Bid'
+    if state == Concepts.NETWORK_MESSAGE:
+        return 'Network Message'
+    return 'Unknown'
 
 
 class DBKVInt(Base):
@@ -36,6 +54,7 @@ class Offer(Base):
     offer_id = sa.Column(sa.LargeBinary, primary_key=True)
     active_ind = sa.Column(sa.Integer)
 
+    protocol_version = sa.Column(sa.Integer)
     coin_from = sa.Column(sa.Integer)
     coin_to = sa.Column(sa.Integer)
     amount_from = sa.Column(sa.BigInteger)
@@ -52,6 +71,7 @@ class Offer(Base):
     secret_hash = sa.Column(sa.LargeBinary)
 
     addr_from = sa.Column(sa.String)
+    addr_to = sa.Column(sa.String)
     created_at = sa.Column(sa.BigInteger)
     expire_at = sa.Column(sa.BigInteger)
     was_sent = sa.Column(sa.Boolean)
@@ -59,9 +79,13 @@ class Offer(Base):
     from_feerate = sa.Column(sa.BigInteger)
     to_feerate = sa.Column(sa.BigInteger)
 
+    amount_negotiable = sa.Column(sa.Boolean)
+    rate_negotiable = sa.Column(sa.Boolean)
+
     # Local fields
     auto_accept_bids = sa.Column(sa.Boolean)
     withdraw_to_addr = sa.Column(sa.String)  # Address to spend lock tx to - address from wallet if empty TODO
+    security_token = sa.Column(sa.LargeBinary)
 
     state = sa.Column(sa.Integer)
     states = sa.Column(sa.LargeBinary)  # Packed states and times
@@ -82,6 +106,7 @@ class Bid(Base):
     offer_id = sa.Column(sa.LargeBinary, sa.ForeignKey('offers.offer_id'))
     active_ind = sa.Column(sa.Integer)
 
+    protocol_version = sa.Column(sa.Integer)
     was_sent = sa.Column(sa.Boolean)
     was_received = sa.Column(sa.Boolean)
     contract_count = sa.Column(sa.Integer)
@@ -96,6 +121,7 @@ class Bid(Base):
 
     pkhash_buyer = sa.Column(sa.LargeBinary)
     amount = sa.Column(sa.BigInteger)
+    rate = sa.Column(sa.BigInteger)
 
     accept_msg_id = sa.Column(sa.LargeBinary)
     pkhash_seller = sa.Column(sa.LargeBinary)
@@ -114,6 +140,12 @@ class Bid(Base):
     state_note = sa.Column(sa.String)
 
     debug_ind = sa.Column(sa.Integer)
+    security_token = sa.Column(sa.LargeBinary)
+
+    chain_a_height_start = sa.Column(sa.Integer)  # Height of script chain before the swap
+    chain_b_height_start = sa.Column(sa.Integer)  # Height of scriptless chain before the swap
+
+    reject_code = sa.Column(sa.Integer)
 
     initiate_tx = None
     participate_tx = None
@@ -166,6 +198,7 @@ class SwapTx(Base):
 
     txid = sa.Column(sa.LargeBinary)
     vout = sa.Column(sa.Integer)
+    tx_data = sa.Column(sa.LargeBinary)
 
     script = sa.Column(sa.LargeBinary)
 
@@ -176,12 +209,29 @@ class SwapTx(Base):
     spend_txid = sa.Column(sa.LargeBinary)
     spend_n = sa.Column(sa.Integer)
 
+    block_hash = sa.Column(sa.LargeBinary)
+    block_height = sa.Column(sa.Integer)
+    block_time = sa.Column(sa.BigInteger)
+
     state = sa.Column(sa.Integer)
     states = sa.Column(sa.LargeBinary)  # Packed states and times
 
     def setState(self, new_state):
         self.state = new_state
         self.states = (self.states if self.states is not None else bytes()) + struct.pack('<iq', new_state, int(time.time()))
+
+
+class PrefundedTx(Base):
+    __tablename__ = 'prefunded_transactions'
+
+    record_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
+    active_ind = sa.Column(sa.Integer)
+    created_at = sa.Column(sa.BigInteger)
+    linked_type = sa.Column(sa.Integer)
+    linked_id = sa.Column(sa.LargeBinary)
+    tx_type = sa.Column(sa.Integer)  # TxTypes
+    tx_data = sa.Column(sa.LargeBinary)
+    used_by = sa.Column(sa.LargeBinary)
 
 
 class PooledAddress(Base):
@@ -204,20 +254,24 @@ class SmsgAddress(Base):
     __tablename__ = 'smsgaddresses'
 
     addr_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
-    addr = sa.Column(sa.String)
+    active_ind = sa.Column(sa.Integer)
+    created_at = sa.Column(sa.BigInteger)
+    addr = sa.Column(sa.String, unique=True)
+    pubkey = sa.Column(sa.String)
     use_type = sa.Column(sa.Integer)
+    note = sa.Column(sa.String)
 
 
-class EventQueue(Base):
-    __tablename__ = 'eventqueue'
+class Action(Base):
+    __tablename__ = 'actions'
 
-    event_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
+    action_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
     active_ind = sa.Column(sa.Integer)
     created_at = sa.Column(sa.BigInteger)
     trigger_at = sa.Column(sa.BigInteger)
     linked_id = sa.Column(sa.LargeBinary)
-    event_type = sa.Column(sa.Integer)
-    event_data = sa.Column(sa.LargeBinary)
+    action_type = sa.Column(sa.Integer)
+    action_data = sa.Column(sa.LargeBinary)
 
 
 class EventLog(Base):
@@ -260,7 +314,8 @@ class XmrSwap(Base):
     bid_accept_msg_id3 = sa.Column(sa.LargeBinary)
 
     coin_a_lock_tx_sigs_l_msg_id = sa.Column(sa.LargeBinary)  # MSG3L F -> L
-    coin_a_lock_refund_spend_tx_msg_id = sa.Column(sa.LargeBinary)  # MSG4F L -> F
+    coin_a_lock_spend_tx_msg_id = sa.Column(sa.LargeBinary)  # MSG4F L -> F
+    coin_a_lock_release_msg_id = sa.Column(sa.LargeBinary)  # MSG5F L -> F
 
     contract_count = sa.Column(sa.Integer)
 
@@ -285,9 +340,9 @@ class XmrSwap(Base):
     kbsl_dleag = sa.Column(sa.LargeBinary)
     kbsf_dleag = sa.Column(sa.LargeBinary)
 
-    vkbv = sa.Column(sa.LargeBinary)
-    pkbv = sa.Column(sa.LargeBinary)
-    pkbs = sa.Column(sa.LargeBinary)
+    vkbv = sa.Column(sa.LargeBinary)        # chain b view private key
+    pkbv = sa.Column(sa.LargeBinary)        # chain b view public key
+    pkbs = sa.Column(sa.LargeBinary)        # chain b view spend key
 
     a_lock_tx = sa.Column(sa.LargeBinary)
     a_lock_tx_script = sa.Column(sa.LargeBinary)
@@ -316,9 +371,6 @@ class XmrSwap(Base):
 
     b_lock_tx_id = sa.Column(sa.LargeBinary)
 
-    start_chain_a_height = sa.Column(sa.Integer)  # Height of script chain before the swap
-    b_restore_height = sa.Column(sa.Integer)  # Height of scriptless chain before the swap
-
 
 class XmrSplitData(Base):
     __tablename__ = 'xmr_split_data'
@@ -329,6 +381,8 @@ class XmrSplitData(Base):
     msg_sequence = sa.Column(sa.Integer)
     dleag = sa.Column(sa.LargeBinary)
     created_at = sa.Column(sa.BigInteger)
+
+    __table_args__ = (sa.UniqueConstraint('bid_id', 'msg_type', 'msg_sequence', name='uc_1'),)
 
 
 class RevokedMessage(Base):
@@ -341,6 +395,103 @@ class RevokedMessage(Base):
     expires_at = sa.Column(sa.BigInteger)
 
 
-class TableTypes(IntEnum):
-    OFFER = auto()
-    BID = auto()
+class Wallets(Base):
+    __tablename__ = 'wallets'
+
+    record_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
+    active_ind = sa.Column(sa.Integer)
+    coin_id = sa.Column(sa.Integer)
+    wallet_name = sa.Column(sa.String)
+    wallet_data = sa.Column(sa.String)
+    balance_type = sa.Column(sa.Integer)
+    created_at = sa.Column(sa.BigInteger)
+
+
+class KnownIdentity(Base):
+    __tablename__ = 'knownidentities'
+
+    record_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
+    active_ind = sa.Column(sa.Integer)
+    address = sa.Column(sa.String)
+    label = sa.Column(sa.String)
+    publickey = sa.Column(sa.LargeBinary)
+    num_sent_bids_successful = sa.Column(sa.Integer)
+    num_recv_bids_successful = sa.Column(sa.Integer)
+    num_sent_bids_rejected = sa.Column(sa.Integer)
+    num_recv_bids_rejected = sa.Column(sa.Integer)
+    num_sent_bids_failed = sa.Column(sa.Integer)
+    num_recv_bids_failed = sa.Column(sa.Integer)
+    note = sa.Column(sa.String)
+    updated_at = sa.Column(sa.BigInteger)
+    created_at = sa.Column(sa.BigInteger)
+
+
+class AutomationStrategy(Base):
+    __tablename__ = 'automationstrategies'
+
+    record_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
+    active_ind = sa.Column(sa.Integer)
+
+    label = sa.Column(sa.String)
+    type_ind = sa.Column(sa.Integer)
+    only_known_identities = sa.Column(sa.Integer)
+    num_concurrent = sa.Column(sa.Integer)
+    data = sa.Column(sa.LargeBinary)
+
+    note = sa.Column(sa.String)
+    created_at = sa.Column(sa.BigInteger)
+
+
+class AutomationLink(Base):
+    __tablename__ = 'automationlinks'
+    # Contains per order/bid options
+
+    record_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
+    active_ind = sa.Column(sa.Integer)
+
+    linked_type = sa.Column(sa.Integer)
+    linked_id = sa.Column(sa.LargeBinary)
+    strategy_id = sa.Column(sa.Integer)
+
+    data = sa.Column(sa.LargeBinary)
+    repeat_limit = sa.Column(sa.Integer)
+    repeat_count = sa.Column(sa.Integer)
+
+    note = sa.Column(sa.String)
+    created_at = sa.Column(sa.BigInteger)
+
+    __table_args__ = (sa.Index('linked_index', 'linked_type', 'linked_id'), )
+
+
+class History(Base):
+    __tablename__ = 'history'
+
+    record_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
+    concept_type = sa.Column(sa.Integer)
+    concept_id = sa.Column(sa.Integer)
+
+    changed_data = sa.Column(sa.LargeBinary)
+    created_at = sa.Column(sa.BigInteger)
+
+
+class BidState(Base):
+    __tablename__ = 'bidstates'
+
+    record_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
+    active_ind = sa.Column(sa.Integer)
+    state_id = sa.Column(sa.Integer)
+    label = sa.Column(sa.String)
+    in_progress = sa.Column(sa.Integer)
+
+    note = sa.Column(sa.String)
+    created_at = sa.Column(sa.BigInteger)
+
+
+class Notification(Base):
+    __tablename__ = 'notifications'
+
+    record_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
+    active_ind = sa.Column(sa.Integer)
+    created_at = sa.Column(sa.BigInteger)
+    event_type = sa.Column(sa.Integer)
+    event_data = sa.Column(sa.LargeBinary)

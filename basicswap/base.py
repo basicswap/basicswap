@@ -1,27 +1,35 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019 tecnovert
+# Copyright (c) 2019-2022 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import os
-import threading
+import shlex
+import socks
+import socket
+import urllib
 import logging
+import threading
+import traceback
 import subprocess
 
 import basicswap.config as cfg
-import basicswap.contrib.segwit_addr as segwit_addr
 
-from .chainparams import (
-    chainparams,
-    Coins,
-)
-from .util import (
-    pubkeyToAddress,
-)
 from .rpc import (
     callrpc,
 )
+from .util import (
+    TemporaryError,
+)
+from .chainparams import (
+    Coins,
+    chainparams,
+)
+
+
+def getaddrinfo_tor(*args):
+    return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (args[0], args[1]))]
 
 
 class BaseApp:
@@ -35,16 +43,28 @@ class BaseApp:
         self.chain = chain
         self.settings = settings
         self.coin_clients = {}
+        self.coin_interfaces = {}
         self.mxDB = threading.RLock()
         self.debug = self.settings.get('debug', False)
+        self.delay_event = threading.Event()
         self._network = None
-
         self.prepareLogging()
         self.log.info('Network: {}'.format(self.chain))
 
+        self.use_tor_proxy = self.settings.get('use_tor', False)
+        self.tor_proxy_host = self.settings.get('tor_proxy_host', '127.0.0.1')
+        self.tor_proxy_port = self.settings.get('tor_proxy_port', 9050)
+        self.tor_control_password = self.settings.get('tor_control_password', None)
+        self.tor_control_port = self.settings.get('tor_control_port', 9051)
+        self.default_socket = socket.socket
+        self.default_socket_timeout = socket.getdefaulttimeout()
+        self.default_socket_getaddrinfo = socket.getaddrinfo
+
     def stopRunning(self, with_code=0):
         self.fail_code = with_code
-        self.is_running = False
+        with self.mxDB:
+            self.is_running = False
+            self.delay_event.set()
 
     def prepareLogging(self):
         self.log = logging.getLogger(self.log_name)
@@ -91,38 +111,21 @@ class BaseApp:
                 return c
         raise ValueError('Unknown coin: {}'.format(coin_name))
 
-    def getTicker(self, coin_type):
-        ticker = chainparams[coin_type]['ticker']
-        if self.chain == 'testnet':
-            ticker = 't' + ticker
-        if self.chain == 'regtest':
-            ticker = 'rt' + ticker
-        return ticker
-
-    def encodeSegwitP2WSH(self, coin_type, p2wsh):
-        return segwit_addr.encode(chainparams[coin_type][self.chain]['hrp'], 0, p2wsh[2:])
-
-    def encodeSegwit(self, coin_type, raw):
-        return segwit_addr.encode(chainparams[coin_type][self.chain]['hrp'], 0, raw)
-
-    def decodeSegwit(self, coin_type, addr):
-        return bytes(segwit_addr.decode(chainparams[coin_type][self.chain]['hrp'], addr)[1])
-
-    def getScriptAddress(self, coin_type, script):
-        return pubkeyToAddress(chainparams[coin_type][self.chain]['script_address'], script)
-
     def callrpc(self, method, params=[], wallet=None):
-        return callrpc(self.coin_clients[Coins.PART]['rpcport'], self.coin_clients[Coins.PART]['rpcauth'], method, params, wallet)
+        cc = self.coin_clients[Coins.PART]
+        return callrpc(cc['rpcport'], cc['rpcauth'], method, params, wallet, cc['rpchost'])
 
     def callcoinrpc(self, coin, method, params=[], wallet=None):
-        return callrpc(self.coin_clients[coin]['rpcport'], self.coin_clients[coin]['rpcauth'], method, params, wallet)
+        cc = self.coin_clients[coin]
+        return callrpc(cc['rpcport'], cc['rpcauth'], method, params, wallet, cc['rpchost'])
 
     def calltx(self, cmd):
         bindir = self.coin_clients[Coins.PART]['bindir']
-        command_tx = os.path.join(bindir, cfg.PARTICL_TX)
-        chainname = '' if self.chain == 'mainnet' else (' -' + self.chain)
-        args = command_tx + chainname + ' ' + cmd
-        p = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+        args = [os.path.join(bindir, cfg.PARTICL_TX), ]
+        if self.chain != 'mainnet':
+            args.append('-' + self.chain)
+        args += shlex.split(cmd)
+        p = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out = p.communicate()
         if len(out[1]) > 0:
             raise ValueError('TX error ' + str(out[1]))
@@ -132,10 +135,59 @@ class BaseApp:
         bindir = self.coin_clients[coin_type]['bindir']
         datadir = self.coin_clients[coin_type]['datadir']
         command_cli = os.path.join(bindir, chainparams[coin_type]['name'] + '-cli' + ('.exe' if os.name == 'nt' else ''))
-        chainname = '' if self.chain == 'mainnet' else (' -' + self.chain)
-        args = command_cli + chainname + ' ' + '-datadir=' + datadir + ' ' + params
-        p = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+        args = [command_cli, ]
+        if self.chain != 'mainnet':
+            args.append('-' + self.chain)
+        args.append('-datadir=' + datadir)
+        args += shlex.split(params)
+        p = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out = p.communicate(timeout=timeout)
         if len(out[1]) > 0:
             raise ValueError('CLI error ' + str(out[1]))
         return out[0].decode('utf-8').strip()
+
+    def is_transient_error(self, ex):
+        if isinstance(ex, TemporaryError):
+            return True
+        str_error = str(ex).lower()
+        return 'read timed out' in str_error or 'no connection to daemon' in str_error
+
+    def setConnectionParameters(self, timeout=120):
+        opener = urllib.request.build_opener()
+        opener.addheaders = [('User-agent', 'Mozilla/5.0')]
+        urllib.request.install_opener(opener)
+
+        if self.use_tor_proxy:
+            socks.setdefaultproxy(socks.PROXY_TYPE_SOCKS5, self.tor_proxy_host, self.tor_proxy_port, rdns=True)
+            socket.socket = socks.socksocket
+            socket.getaddrinfo = getaddrinfo_tor  # Without this accessing .onion links would fail
+
+        socket.setdefaulttimeout(timeout)
+
+    def popConnectionParameters(self):
+        if self.use_tor_proxy:
+            socket.socket = self.default_socket
+            socket.getaddrinfo = self.default_socket_getaddrinfo
+        socket.setdefaulttimeout(self.default_socket_timeout)
+
+    def logException(self, message):
+        self.log.error(message)
+        if self.debug:
+            self.log.error(traceback.format_exc())
+
+    def torControl(self, query):
+        try:
+            command = 'AUTHENTICATE "{}"\r\n{}\r\nQUIT\r\n'.format(self.tor_control_password, query).encode('utf-8')
+            c = socket.create_connection((self.tor_proxy_host, self.tor_control_port))
+            c.send(command)
+            response = bytearray()
+            while True:
+                rv = c.recv(1024)
+                if not rv:
+                    break
+                response += rv
+            c.close()
+            return response
+        except Exception as e:
+            self.log.error(f'torControl {e}')
+            return

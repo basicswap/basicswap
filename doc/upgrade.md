@@ -7,27 +7,41 @@ Update only the code:
 
     basicswap]$ git pull
     $ cd docker
-    $ docker-compose build
     $ export COINDATA_PATH=[PATH_TO]
+    $ docker-compose build
     $ docker-compose up
 
-If the dependencies and db format have changed the container must be built with `--no-cache` and the db file moved to a backup.
+If the dependencies have changed the container must be built with `--no-cache`:
 
     basicswap]$ git pull
     $ cd docker
-    $ docker-compose build --no-cache
     $ export COINDATA_PATH=[PATH_TO]
-    $ mv --backup=numbered $COINDATA_PATH/db.sqlite $COINDATA_PATH/db_bkp.sqlite
+    $ docker-compose build --no-cache
     $ docker-compose up
 
 
-### If installed through pip:
+#### Update core versions
 
-    cd basicswap
-    git pull
-    pip3 install .
+After updating the code and rebuilding the container run:
+
+    basicswap/docker]$ export COINDATA_PATH=[PATH_TO]
+    $ docker-compose run --rm swapclient \
+        basicswap-prepare --datadir=/coindata --preparebinonly --withcoins=monero,bitcoin
 
 
-## Update core versions
+Specify all required coins after `--withcoins=`, separated by commas.
+If updating from versions below 0.21, you may need to add `wallet=wallet.dat` to the core config files.
 
-    basicswap-prepare -preparebinonly
+
+## If installed through pip:
+
+    $ export SWAP_DATADIR=/Users/$USER/coinswaps
+    $ . $SWAP_DATADIR/venv/bin/activate && python -V
+    $ cd $SWAP_DATADIR/basicswap
+    $ git pull
+    $ pip3 install .
+
+
+#### Update core versions
+
+    basicswap-prepare --datadir=$SWAP_DATADIR -preparebinonly --withcoins=monero,bitcoin

@@ -1,7 +1,11 @@
 old/
+build/
 *.pyc
 __pycache__
 /dist/
 /*.egg-info
 /*.egg
 /*.eggs
+.tox
+.eggs
+*~

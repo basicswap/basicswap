@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019 tecnovert
+# Copyright (c) 2019-2022 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-import urllib.request
 import json
+import urllib.request
 
 
 class Explorer():
@@ -14,13 +14,15 @@ class Explorer():
         self.coin_type = coin_type
         self.base_url = base_url
         self.log = self.swapclient.log
-        self.coin_settings = self.swapclient.coin_clients[self.coin_type]
 
     def readURL(self, url):
         self.log.debug('Explorer url: {}'.format(url))
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        req = urllib.request.Request(url, headers=headers)
-        return urllib.request.urlopen(req).read()
+        try:
+            self.swapclient.setConnectionParameters()
+            req = urllib.request.Request(url)
+            return urllib.request.urlopen(req).read()
+        finally:
+            self.swapclient.popConnectionParameters()
 
 
 class ExplorerInsight(Explorer):
@@ -73,7 +75,7 @@ class ExplorerBitAps(Explorer):
         # Can't get unspents return only if exactly one transaction exists
         data = json.loads(self.readURL(self.base_url + '/address/transactions/' + address))
         try:
-            assert(data['data']['list'] == 1)
+            assert data['data']['list'] == 1
         except Exception as ex:
             self.log.debug('Explorer error: {}'.format(str(ex)))
             return None

@@ -10,6 +10,7 @@ import hashlib
 import struct
 import unittest
 from typing import List, Dict
+from basicswap.util.crypto import ripemd160
 
 from .messages import (
     CTransaction,
@@ -25,7 +26,7 @@ MAX_SCRIPT_ELEMENT_SIZE = 520
 OPCODE_NAMES = {}  # type: Dict[CScriptOp, str]
 
 def hash160(s):
-    return hashlib.new('ripemd160', sha256(s)).digest()
+    return ripemd160(sha256(s))
 
 def bn2vch(v):
     """Convert number to bitcoin-specific little endian format."""
@@ -671,7 +672,6 @@ def LegacySignatureHash(script, txTo, inIdx, hashtype):
 # Note that this corresponds to sigversion == 1 in EvalScript, which is used
 # for version 0 witnesses.
 def SegwitV0SignatureHash(script, txTo, inIdx, hashtype, amount):
-
     hashPrevouts = 0
     hashSequence = 0
     hashOutputs = 0
@@ -703,7 +703,12 @@ def SegwitV0SignatureHash(script, txTo, inIdx, hashtype, amount):
     ss += ser_uint256(hashSequence)
     ss += txTo.vin[inIdx].prevout.serialize()
     ss += ser_string(script)
-    ss += struct.pack("<q", amount)
+    if isinstance(amount, int):
+        ss += struct.pack("<q", amount)
+    elif isinstance(amount, bytes):
+        ss += amount
+    else:
+        raise ValueError('Unknown amount type')
     ss += struct.pack("<I", txTo.vin[inIdx].nSequence)
     ss += ser_uint256(hashOutputs)
     ss += struct.pack("<i", txTo.nLockTime)

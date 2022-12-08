@@ -1,0 +1,16 @@
+    monero_daemon:
+        image: i_monero_daemon
+        build:
+            context: monero_daemon
+            dockerfile: Dockerfile
+        container_name: monero_daemon
+        volumes:
+            - ${DATA_PATH}/monero_daemon:/data
+        expose:
+            - ${BASE_XMR_RPC_PORT}
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "3"
+        restart: unless-stopped
