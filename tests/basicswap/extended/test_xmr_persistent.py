@@ -11,6 +11,8 @@ export TEST_PATH=/tmp/test_persistent
 mkdir -p ${TEST_PATH}/bin
 cp -r ~/tmp/basicswap_bin/* ${TEST_PATH}/bin
 export PYTHONPATH=$(pwd)
+export XMR_RPC_USER=xmr_user
+export XMR_RPC_PWD=xmr_pwd
 python tests/basicswap/extended/test_xmr_persistent.py
 
 """

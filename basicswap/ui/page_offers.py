@@ -493,7 +493,7 @@ def page_offer(self, url_split, post_string):
         'addr_to': 'Public' if offer.addr_to == swap_client.network_addr else offer.addr_to,
         'created_at': offer.created_at,
         'expired_at': offer.expire_at,
-        'sent': 'True' if offer.was_sent else 'False',
+        'sent': offer.was_sent,
         'was_revoked': 'True' if offer.active_ind == 2 else 'False',
         'show_bid_form': show_bid_form,
         'amount_negotiable': offer.amount_negotiable,
