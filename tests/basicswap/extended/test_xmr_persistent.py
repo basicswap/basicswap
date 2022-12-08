@@ -90,10 +90,14 @@ def updateThread(cls):
 
 
 def updateThreadXmr(cls):
+    xmr_auth = None
+    if os.getenv('XMR_RPC_USER', '') != '':
+        xmr_auth = (os.getenv('XMR_RPC_USER', ''), os.getenv('XMR_RPC_PWD', ''))
+
     while not cls.delay_event.is_set():
         try:
             if cls.xmr_addr is not None:
-                callrpc_xmr(XMR_BASE_RPC_PORT + 1, 'generateblocks', {'wallet_address': cls.xmr_addr, 'amount_of_blocks': 1})
+                callrpc_xmr(XMR_BASE_RPC_PORT + 1, 'generateblocks', {'wallet_address': cls.xmr_addr, 'amount_of_blocks': 1}, auth=xmr_auth)
         except Exception as e:
             print('updateThreadXmr error', str(e))
         cls.delay_event.wait(random.randrange(cls.xmr_update_min, cls.xmr_update_max))
@@ -149,12 +153,16 @@ class Test(unittest.TestCase):
 
         wallets = read_json_api(UI_PORT + 1, 'wallets')
 
+        xmr_auth = None
+        if os.getenv('XMR_RPC_USER', '') != '':
+            xmr_auth = (os.getenv('XMR_RPC_USER', ''), os.getenv('XMR_RPC_PWD', ''))
+
         self.xmr_addr = wallets['XMR']['main_address']
         num_blocks = 100
-        if callrpc_xmr(XMR_BASE_RPC_PORT + 1, 'get_block_count')['count'] < num_blocks:
+        if callrpc_xmr(XMR_BASE_RPC_PORT + 1, 'get_block_count', auth=xmr_auth)['count'] < num_blocks:
             logging.info('Mining {} Monero blocks to {}.'.format(num_blocks, self.xmr_addr))
-            callrpc_xmr(XMR_BASE_RPC_PORT + 1, 'generateblocks', {'wallet_address': self.xmr_addr, 'amount_of_blocks': num_blocks})
-        logging.info('XMR blocks: %d', callrpc_xmr(XMR_BASE_RPC_PORT + 1, 'get_block_count')['count'])
+            callrpc_xmr(XMR_BASE_RPC_PORT + 1, 'generateblocks', {'wallet_address': self.xmr_addr, 'amount_of_blocks': num_blocks}, auth=xmr_auth)
+        logging.info('XMR blocks: %d', callrpc_xmr(XMR_BASE_RPC_PORT + 1, 'get_block_count', auth=xmr_auth)['count'])
 
         self.btc_addr = callbtcrpc(0, 'getnewaddress', ['mining_addr', 'bech32'])
         num_blocks = 500  # Mine enough to activate segwit
