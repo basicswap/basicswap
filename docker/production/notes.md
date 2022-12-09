@@ -106,3 +106,45 @@ Start BasicSwap:
     docker-compose up
 
 
+## Update code
+
+    docker-compose stop
+
+    pushd .
+    cd ../../
+    git pull
+    popd
+
+    docker-compose build monero_daemon
+    docker-compose build
+
+    docker-compose build --no-cache swapclient
+    docker-compose up
+
+
+## Add a coin
+
+    cat compose-fragments/1_monero-wallet.yml >> docker-compose.yml
+    cat compose-fragments/1_monero-wallet.yml >> docker-compose-prepare.yml
+
+    # Add the Monero daemon if required (should not go in docker-compose-prepare.yml)
+    cat compose-fragments/8_monero-daemon.yml >> docker-compose.yml
+
+
+
+    export ADD_COIN=monero
+    docker-compose -f docker-compose-prepare.yml run --rm swapprepare \
+        basicswap-prepare --nocores --addcoin=${ADD_COIN} --htmlhost="0.0.0.0" --particl_mnemonic=none
+
+    docker-compose build monero_daemon
+    docker-compose build
+
+    docker-compose -f docker-compose-prepare.yml up -d --scale swapprepare=0
+
+    docker-compose -f docker-compose-prepare.yml run -e WALLET_ENCRYPTION_PWD=walletpass \
+        --rm swapprepare \
+        basicswap-prepare --initwalletsonly --withoutcoin=particl --withcoin=monero
+
+    docker-compose -f docker-compose-prepare.yml stop
+
+    docker-compose up

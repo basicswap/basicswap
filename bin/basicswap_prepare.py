@@ -721,8 +721,6 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
             fp.write('staking=0\n')
             if PART_RPC_USER != '':
                 fp.write('rpcauth={}:{}${}\n'.format(PART_RPC_USER, salt, password_to_hmac(salt, PART_RPC_PWD)))
-            if particl_mnemonic == 'auto':
-                fp.write('createdefaultmasterkey=1')
         elif coin == 'litecoin':
             fp.write('prune=4000\n')
             fp.write('pid=litecoind.pid\n')
@@ -1100,6 +1098,7 @@ def main():
     with_coins = {'particl', }
     add_coin = ''
     disable_coin = ''
+    coins_changed = False
     htmlhost = '127.0.0.1'
     wshost = '127.0.0.1'
     xmr_restore_height = DEFAULT_XMR_RESTORE_HEIGHT
@@ -1185,12 +1184,14 @@ def main():
                     if coin not in known_coins:
                         exitWithError('Unknown coin {}'.format(coin))
                     with_coins.add(coin)
+                coins_changed = True
                 continue
             if name == 'withoutcoin' or name == 'withoutcoins':
                 for coin in [s.lower() for s in s[1].split(',')]:
                     if coin not in known_coins:
                         exitWithError('Unknown coin {}'.format(coin))
                     with_coins.discard(coin)
+                coins_changed = True
                 continue
             if name == 'addcoin':
                 add_coin = s[1].lower()
@@ -1396,6 +1397,9 @@ def main():
 
         init_coins = settings['chainclients'].keys()
         logger.info('Active coins: %s', ', '.join(init_coins))
+        if coins_changed:
+            init_coins = with_coins
+            logger.info('Initialising coins: %s', ', '.join(init_coins))
         initialise_wallets(particl_wallet_mnemonic, init_coins, data_dir, settings, chain, use_tor_proxy)
 
         print('Done.')
@@ -1456,8 +1460,9 @@ def main():
         logger.info('Adding coin: %s', add_coin)
         settings = load_config(config_path)
 
-        # Ensure Particl wallet is unencrypted or correct password is supplied
-        test_particl_encryption(data_dir, settings, chain, use_tor_proxy)
+        if particl_wallet_mnemonic != 'none':
+            # Ensure Particl wallet is unencrypted or correct password is supplied
+            test_particl_encryption(data_dir, settings, chain, use_tor_proxy)
 
         if add_coin in settings['chainclients']:
             coin_settings = settings['chainclients'][add_coin]
@@ -1480,7 +1485,7 @@ def main():
         if not prepare_bin_only:
             prepareDataDir(add_coin, settings, chain, particl_wallet_mnemonic, extra_opts)
 
-            if particl_wallet_mnemonic not in ('none', 'auto'):
+            if particl_wallet_mnemonic != 'none':
                 initialise_wallets(None, {add_coin, }, data_dir, settings, chain, use_tor_proxy)
 
             with open(config_path, 'w') as fp:
@@ -1543,7 +1548,7 @@ def main():
     with open(config_path, 'w') as fp:
         json.dump(settings, fp, indent=4)
 
-    if particl_wallet_mnemonic in ('none', 'auto'):
+    if particl_wallet_mnemonic == 'none':
         logger.info('Done.')
         return 0
 
