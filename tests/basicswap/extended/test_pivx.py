@@ -14,6 +14,7 @@ import os
 import sys
 import json
 import time
+import random
 import shutil
 import signal
 import logging
@@ -27,6 +28,7 @@ from basicswap.basicswap import (
     SwapTypes,
     BidStates,
     TxStates,
+    DebugTypes,
 )
 from basicswap.util import (
     COIN,
@@ -47,16 +49,21 @@ from basicswap.contrib.key import (
 from basicswap.http_server import (
     HttpThread,
 )
+from basicswap.interface.btc import (
+    find_vout_for_address_from_txobj,
+)
 from tests.basicswap.util import (
     read_json_api,
 )
 from tests.basicswap.common import (
     checkForks,
     stopDaemons,
-    wait_for_offer,
     wait_for_bid,
-    wait_for_bid_tx_state,
+    wait_for_offer,
+    wait_for_balance,
+    wait_for_unspent,
     wait_for_in_progress,
+    wait_for_bid_tx_state,
     TEST_HTTP_HOST,
     TEST_HTTP_PORT,
     BASE_PORT,
@@ -197,7 +204,15 @@ def prepareDir(datadir, nodeId, network_key, network_pubkey):
         },
         'check_progress_seconds': 2,
         'check_watched_seconds': 4,
-        'check_expired_seconds': 60
+        'check_expired_seconds': 60,
+        'check_events_seconds': 1,
+        'check_xmr_swaps_seconds': 1,
+        'min_delay_event': 1,
+        'max_delay_event': 3,
+        'min_delay_event_short': 1,
+        'max_delay_event_short': 3,
+        'min_delay_retry': 2,
+        'max_delay_retry': 10
     }
     with open(settings_path, 'w') as fp:
         json.dump(settings, fp, indent=4)
@@ -317,8 +332,8 @@ class Test(unittest.TestCase):
                 rpc('rescanblockchain')
             else:
                 rpc('extkeyimportmaster', [rpc('mnemonic', ['new'])['master']])
-            rpc('walletsettings', ['stakingoptions', {'stakecombinethreshold': 100, 'stakesplitthreshold': 200}])
-            rpc('reservebalance', [False])
+            rpc('walletsettings', ['stakingoptions', json.dumps({'stakecombinethreshold': 100, 'stakesplitthreshold': 200}).replace('"', '\\"')])
+            rpc('reservebalance', ['false'])
 
             basicswap_dir = os.path.join(os.path.join(cfg.TEST_DATADIRS, str(i)), 'basicswap')
             settings_path = os.path.join(basicswap_dir, cfg.CONFIG_FILENAME)
@@ -580,6 +595,138 @@ class Test(unittest.TestCase):
                 found = True
                 break
         assert found
+
+    def ensure_balance(self, coin_type, node_id, amount):
+        tla = coin_type.name
+        js_w = read_json_api(1800 + node_id, 'wallets')
+        if float(js_w[tla]['balance']) < amount:
+            post_json = {
+                'value': amount,
+                'address': js_w[tla]['deposit_address'],
+                'subfee': False,
+            }
+            json_rv = read_json_api(1800, 'wallets/{}/withdraw'.format(tla.lower()), post_json)
+            assert (len(json_rv['txid']) == 64)
+            wait_for_balance(delay_event, 'http://127.0.0.1:{}/json/wallets/{}'.format(1800 + node_id, tla.lower()), 'balance', amount)
+
+    def test_10_prefunded_itx(self):
+        logging.info('---------- Test prefunded itx offer')
+
+        swap_clients = self.swap_clients
+        coin_from = Coins.PIVX
+        coin_to = Coins.BTC
+        swap_type = SwapTypes.SELLER_FIRST
+        ci_from = swap_clients[2].ci(coin_from)
+        ci_to = swap_clients[1].ci(coin_to)
+        tla_from = coin_from.name
+
+        # Prepare balance
+        self.ensure_balance(coin_from, 2, 10.0)
+        self.ensure_balance(coin_to, 1, 100.0)
+
+        js_w2 = read_json_api(1802, 'wallets')
+        post_json = {
+            'value': 10.0,
+            'address': read_json_api(1802, 'wallets/{}/nextdepositaddr'.format(tla_from.lower())),
+            'subfee': True,
+        }
+        json_rv = read_json_api(1802, 'wallets/{}/withdraw'.format(tla_from.lower()), post_json)
+        wait_for_balance(delay_event, 'http://127.0.0.1:1802/json/wallets/{}'.format(tla_from.lower()), 'balance', 9.0)
+        assert (len(json_rv['txid']) == 64)
+
+        # Create prefunded ITX
+        pi = swap_clients[2].pi(SwapTypes.XMR_SWAP)
+        js_w2 = read_json_api(1802, 'wallets')
+        swap_value = 10.0
+        if float(js_w2[tla_from]['balance']) < swap_value:
+            swap_value = js_w2[tla_from]['balance']
+        swap_value = ci_from.make_int(swap_value)
+        assert (swap_value > ci_from.make_int(9))
+
+        itx = pi.getFundedInitiateTxTemplate(ci_from, swap_value, True)
+        itx_decoded = ci_from.describeTx(itx.hex())
+
+        mock_addr = pi.getMockAddrTo(ci_from)
+        n = find_vout_for_address_from_txobj(itx_decoded, mock_addr)
+        value_after_subfee = ci_from.make_int(itx_decoded['vout'][n]['value'])
+        assert (value_after_subfee < swap_value)
+        swap_value = value_after_subfee
+        wait_for_unspent(delay_event, ci_from, swap_value)
+
+        extra_options = {'prefunded_itx': itx}
+        rate_swap = ci_to.make_int(random.uniform(0.2, 10.0), r=1)
+        offer_id = swap_clients[2].postOffer(coin_from, coin_to, swap_value, rate_swap, swap_value, swap_type, TxLockTypes.ABS_LOCK_TIME, extra_options=extra_options)
+
+        wait_for_offer(delay_event, swap_clients[1], offer_id)
+        offer = swap_clients[1].getOffer(offer_id)
+        bid_id = swap_clients[1].postBid(offer_id, offer.amount_from)
+
+        wait_for_bid(delay_event, swap_clients[2], bid_id, BidStates.BID_RECEIVED)
+        swap_clients[2].acceptBid(bid_id)
+
+        wait_for_bid(delay_event, swap_clients[2], bid_id, BidStates.SWAP_COMPLETED, wait_for=120)
+        wait_for_bid(delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=120)
+
+        # Verify expected inputs were used
+        bid, offer = swap_clients[2].getBidAndOffer(bid_id)
+        assert (bid.initiate_tx)
+        wtx = ci_from.rpc_callback('gettransaction', [bid.initiate_tx.txid.hex(),])
+        itx_after = ci_from.describeTx(wtx['hex'])
+        assert (len(itx_after['vin']) == len(itx_decoded['vin']))
+        for i, txin in enumerate(itx_decoded['vin']):
+            assert (txin['txid'] == itx_after['vin'][i]['txid'])
+            assert (txin['vout'] == itx_after['vin'][i]['vout'])
+
+    def test_11_xmrswap_to(self):
+        logging.info('---------- Test xmr swap protocol to')
+
+        swap_clients = self.swap_clients
+        coin_from = Coins.BTC
+        coin_to = Coins.PIVX
+        swap_type = SwapTypes.XMR_SWAP
+        ci_from = swap_clients[0].ci(coin_from)
+        ci_to = swap_clients[1].ci(coin_to)
+
+        swap_value = ci_from.make_int(random.uniform(0.2, 20.0), r=1)
+        rate_swap = ci_to.make_int(random.uniform(0.2, 20.0), r=1)
+        offer_id = swap_clients[0].postOffer(coin_from, coin_to, swap_value, rate_swap, swap_value, swap_type)
+
+        wait_for_offer(delay_event, swap_clients[1], offer_id)
+        offer = swap_clients[1].getOffer(offer_id)
+        bid_id = swap_clients[1].postBid(offer_id, offer.amount_from)
+
+        wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.BID_RECEIVED)
+        swap_clients[0].acceptBid(bid_id)
+
+        wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=120)
+        wait_for_bid(delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=120)
+
+    def test_12_xmrswap_to_recover_b_lock_tx(self):
+        coin_from = Coins.BTC
+        coin_to = Coins.PIVX
+        logging.info('---------- Test {} to {} follower recovers coin b lock tx'.format(coin_from.name, coin_to.name))
+
+        swap_clients = self.swap_clients
+        ci_from = swap_clients[0].ci(coin_from)
+        ci_to = swap_clients[1].ci(coin_to)
+
+        amt_swap = ci_from.make_int(random.uniform(0.1, 2.0), r=1)
+        rate_swap = ci_to.make_int(random.uniform(0.2, 20.0), r=1)
+        offer_id = swap_clients[0].postOffer(
+            coin_from, coin_to, amt_swap, rate_swap, amt_swap, SwapTypes.XMR_SWAP,
+            lock_type=TxLockTypes.SEQUENCE_LOCK_BLOCKS, lock_value=32)
+        wait_for_offer(delay_event, swap_clients[1], offer_id)
+        offer = swap_clients[1].getOffer(offer_id)
+
+        bid_id = swap_clients[1].postXmrBid(offer_id, offer.amount_from)
+        wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.BID_RECEIVED)
+
+        bid, xmr_swap = swap_clients[0].getXmrBid(bid_id)
+        swap_clients[1].setBidDebugInd(bid_id, DebugTypes.CREATE_INVALID_COIN_B_LOCK)
+        swap_clients[0].acceptXmrBid(bid_id)
+
+        wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.XMR_SWAP_FAILED_REFUNDED, wait_for=180)
+        wait_for_bid(delay_event, swap_clients[1], bid_id, BidStates.XMR_SWAP_FAILED_REFUNDED, sent=True)
 
 
 if __name__ == '__main__':

@@ -1,0 +1,15 @@
+nvm use 14
+npm install -g mscgenjs-cli
+
+mscgenjs -T svg -i bidder.alt.xu -o bidder.alt.xu.svg
+mscgenjs -T svg -i offerer.alt.xu -o offerer.alt.xu.svg
+mscgenjs -T svg -i xmr.bidder.alt.xu -o xmr.bidder.alt.xu.svg
+mscgenjs -T svg -i xmr.offerer.alt.xu -o xmr.offerer.alt.xu.svg
+
+
+npm -g install svgo
+
+svgo --pretty bidder.alt.xu.svg -o bidder.alt.xu.min.svg
+svgo --pretty offerer.alt.xu.svg -o offerer.alt.xu.min.svg
+svgo --pretty xmr.bidder.alt.xu.svg -o xmr.bidder.alt.xu.min.svg
+svgo --pretty xmr.offerer.alt.xu.svg -o xmr.offerer.alt.xu.min.svg

@@ -321,7 +321,7 @@ chainparams = {
             'rpcport': 28888,
             'pubkey_address': 65,
             'script_address': 178,
-            'key_prefix': 185,
+            'key_prefix': 239,
             'hrp': '',
             'bip44': 1,
             'min_amount': 1000,

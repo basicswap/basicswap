@@ -297,8 +297,8 @@ class Test(unittest.TestCase):
                 rpc('rescanblockchain')
             else:
                 rpc('extkeyimportmaster', [rpc('mnemonic', ['new'])['master']])
-            rpc('walletsettings', ['stakingoptions', {'stakecombinethreshold': 100, 'stakesplitthreshold': 200}])
-            rpc('reservebalance', [False])
+            rpc('walletsettings', ['stakingoptions', json.dumps({'stakecombinethreshold': 100, 'stakesplitthreshold': 200}).replace('"', '\\"')])
+            rpc('reservebalance', ['false'])
 
             basicswap_dir = os.path.join(os.path.join(cfg.TEST_DATADIRS, str(i)), 'basicswap')
             settings_path = os.path.join(basicswap_dir, cfg.CONFIG_FILENAME)

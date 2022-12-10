@@ -1194,16 +1194,22 @@ class BasicSwap(BaseApp):
         ensure(amount_to > ci_to.min_amount(), 'To amount below min value for chain')
         ensure(amount_to < ci_to.max_amount(), 'To amount above max value for chain')
 
-    def validateOfferLockValue(self, coin_from, coin_to, lock_type, lock_value):
+    def validateOfferLockValue(self, swap_type, coin_from, coin_to, lock_type, lock_value):
         coin_from_has_csv = self.coin_clients[coin_from]['use_csv']
         coin_to_has_csv = self.coin_clients[coin_to]['use_csv']
 
         if lock_type == OfferMessage.SEQUENCE_LOCK_TIME:
             ensure(lock_value >= self.min_sequence_lock_seconds and lock_value <= self.max_sequence_lock_seconds, 'Invalid lock_value time')
-            ensure(coin_from_has_csv and coin_to_has_csv, 'Both coins need CSV activated.')
+            if swap_type == SwapTypes.XMR_SWAP:
+                ensure(coin_from_has_csv, 'Coin from needs CSV activated.')
+            else:
+                ensure(coin_from_has_csv and coin_to_has_csv, 'Both coins need CSV activated.')
         elif lock_type == OfferMessage.SEQUENCE_LOCK_BLOCKS:
             ensure(lock_value >= 5 and lock_value <= 1000, 'Invalid lock_value blocks')
-            ensure(coin_from_has_csv and coin_to_has_csv, 'Both coins need CSV activated.')
+            if swap_type == SwapTypes.XMR_SWAP:
+                ensure(coin_from_has_csv, 'Coin from needs CSV activated.')
+            else:
+                ensure(coin_from_has_csv and coin_to_has_csv, 'Both coins need CSV activated.')
         elif lock_type == TxLockTypes.ABS_LOCK_TIME:
             # TODO: range?
             ensure(not coin_from_has_csv or not coin_to_has_csv, 'Should use CSV.')
@@ -1262,7 +1268,7 @@ class BasicSwap(BaseApp):
 
         self.validateSwapType(coin_from_t, coin_to_t, swap_type)
         self.validateOfferAmounts(coin_from_t, coin_to_t, amount, rate, min_bid_amount)
-        self.validateOfferLockValue(coin_from_t, coin_to_t, lock_type, lock_value)
+        self.validateOfferLockValue(swap_type, coin_from_t, coin_to_t, lock_type, lock_value)
         self.validateOfferValidTime(swap_type, coin_from_t, coin_to_t, valid_for_seconds)
 
         offer_addr_to = self.getOfferAddressTo(extra_options)
@@ -3916,7 +3922,7 @@ class BasicSwap(BaseApp):
 
         self.validateSwapType(coin_from, coin_to, offer_data.swap_type)
         self.validateOfferAmounts(coin_from, coin_to, offer_data.amount_from, offer_data.rate, offer_data.min_bid_amount)
-        self.validateOfferLockValue(coin_from, coin_to, offer_data.lock_type, offer_data.lock_value)
+        self.validateOfferLockValue(offer_data.swap_type, coin_from, coin_to, offer_data.lock_type, offer_data.lock_value)
         self.validateOfferValidTime(offer_data.swap_type, coin_from, coin_to, offer_data.time_valid)
 
         ensure(msg['sent'] + offer_data.time_valid >= now, 'Offer expired')

@@ -15,6 +15,13 @@ from .contrib.pivx_test_framework.messages import (
     ToHex,
     FromHex,
     CTransaction)
+from basicswap.contrib.test_framework.script import (
+    CScript,
+    OP_DUP,
+    OP_HASH160,
+    OP_CHECKSIG,
+    OP_EQUALVERIFY,
+)
 
 
 class PIVXInterface(BTCInterface):
@@ -80,3 +87,31 @@ class PIVXInterface(BTCInterface):
         tx = CTransaction()
         tx.deserialize(BytesIO(tx_bytes))
         return tx
+
+    def getScriptForPubkeyHash(self, pkh: bytes) -> bytearray:
+        # Return P2PKH
+        return CScript([OP_DUP, OP_HASH160, pkh, OP_EQUALVERIFY, OP_CHECKSIG])
+
+    def getBLockSpendTxFee(self, tx, fee_rate: int) -> int:
+        add_bytes = 107
+        size = len(tx.serialize_with_witness()) + add_bytes
+        pay_fee = int(fee_rate * size // 1000)
+        self._log.info(f'BLockSpendTx  fee_rate, size, fee: {fee_rate}, {size}, {pay_fee}.')
+        return pay_fee
+
+    def signTxWithKey(self, tx: bytes, key: bytes) -> bytes:
+        key_wif = self.encodeKey(key)
+        rv = self.rpc_callback('signrawtransaction', [tx.hex(), [], [key_wif, ]])
+        return bytes.fromhex(rv['hex'])
+
+    def findTxnByHash(self, txid_hex: str):
+        # Only works for wallet txns
+        try:
+            rv = self.rpc_callback('gettransaction', [txid_hex])
+        except Exception as ex:
+            self._log.debug('findTxnByHash getrawtransaction failed: {}'.format(txid_hex))
+            return None
+        if 'confirmations' in rv and rv['confirmations'] >= self.blocks_confirmed:
+            block_height = self.getBlockHeader(rv['blockhash'])['height']
+            return {'txid': txid_hex, 'amount': 0, 'height': block_height}
+        return None

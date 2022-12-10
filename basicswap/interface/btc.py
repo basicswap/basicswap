@@ -92,7 +92,7 @@ def findOutput(tx, script_pk: bytes):
     return None
 
 
-def find_vout_for_address_from_txobj(tx_obj, addr) -> int:
+def find_vout_for_address_from_txobj(tx_obj, addr: str) -> int:
     """
     Locate the vout index of the given transaction sending to the
     given address. Raises runtime error exception if not found.
@@ -1033,7 +1033,15 @@ class BTCInterface(CoinInterface):
         return None
         '''
 
+    def getBLockSpendTxFee(self, tx, fee_rate: int) -> int:
+        witness_bytes = 109
+        vsize = self.getTxVSize(tx, add_witness_bytes=witness_bytes)
+        pay_fee = int(fee_rate * vsize // 1000)
+        self._log.info(f'BLockSpendTx  fee_rate, vsize, fee: {fee_rate}, {vsize}, {pay_fee}.')
+        return pay_fee
+
     def spendBLockTx(self, chain_b_lock_txid: bytes, address_to: str, kbv: bytes, kbs: bytes, cb_swap_value: int, b_fee: int, restore_height: int) -> bytes:
+        self._log.info('spendBLockTx %s:\n', chain_b_lock_txid.hex())
         wtx = self.rpc_callback('gettransaction', [chain_b_lock_txid.hex(), ])
         lock_tx = self.loadTx(bytes.fromhex(wtx['hex']))
 
@@ -1054,12 +1062,8 @@ class BTCInterface(CoinInterface):
                             scriptSig=self.getScriptScriptSig(script_lock)))
         tx.vout.append(self.txoType()(cb_swap_value, self.getScriptForPubkeyHash(pkh_to)))
 
-        witness_bytes = 109
-        vsize = self.getTxVSize(tx, add_witness_bytes=witness_bytes)
-        pay_fee = int(b_fee * vsize // 1000)
+        pay_fee = self.getBLockSpendTxFee(tx, b_fee)
         tx.vout[0].nValue = cb_swap_value - pay_fee
-        self._log.info('spendBLockTx %s:\n    fee_rate, vsize, fee: %ld, %ld, %ld.',
-                       chain_b_lock_txid.hex(), b_fee, vsize, pay_fee)
 
         b_lock_spend_tx = tx.serialize()
         b_lock_spend_tx = self.signTxWithKey(b_lock_spend_tx, kbs)
@@ -1366,10 +1370,8 @@ class BTCInterface(CoinInterface):
         except Exception as ex:
             self._log.debug('findTxnByHash getrawtransaction failed: {}'.format(txid_hex))
             return None
-
         if 'confirmations' in rv and rv['confirmations'] >= self.blocks_confirmed:
             return {'txid': txid_hex, 'amount': 0, 'height': rv['blockheight']}
-
         return None
 
 

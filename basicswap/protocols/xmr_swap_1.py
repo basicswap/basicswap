@@ -9,9 +9,6 @@ from sqlalchemy.orm import scoped_session
 from basicswap.util import (
     ensure,
 )
-from basicswap.util.script import (
-    getP2WSH,
-)
 from basicswap.chainparams import (
     Coins,
 )
@@ -104,8 +101,7 @@ class XmrSwapInterface(ProtocolInterface):
         return CScript([2, Kal_enc, Kaf_enc, 2, CScriptOp(OP_CHECKMULTISIG)])
 
     def getFundedInitiateTxTemplate(self, ci, amount: int, sub_fee: bool) -> bytes:
-        script = self.getMockScript()
-        addr_to = ci.encode_p2wsh(getP2WSH(script)) if ci._use_segwit else ci.encode_p2sh(script)
+        addr_to = self.getMockAddrTo(ci)
         funded_tx = ci.createRawFundedTransaction(addr_to, amount, sub_fee, lock_unspents=False)
 
         return bytes.fromhex(funded_tx)

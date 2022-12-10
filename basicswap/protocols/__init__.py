@@ -7,6 +7,9 @@
 from basicswap.script import (
     OpCodes,
 )
+from basicswap.util.script import (
+    getP2WSH,
+)
 
 
 class ProtocolInterface:
@@ -22,3 +25,7 @@ class ProtocolInterface:
     def getMockScriptScriptPubkey(self, ci) -> bytearray:
         script = self.getMockScript()
         return ci.get_p2wsh_script_pubkey(script) if ci._use_segwit else ci.get_p2sh_script_pubkey(script)
+
+    def getMockAddrTo(self, ci):
+        script = self.getMockScript()
+        return ci.encode_p2wsh(getP2WSH(script)) if ci._use_segwit else ci.encode_p2sh(script)
