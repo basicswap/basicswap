@@ -90,11 +90,16 @@ Open in browser: `http://localhost:12700`
 
     docker-compose stop
     export COINDATA_PATH=/var/data/coinswaps
-    docker run --rm -t --name swap_prepare -v $COINDATA_PATH:/coindata i_swapclient basicswap-prepare --datadir=/coindata --addcoin=bitcoin
+    docker run --rm -t --name swap_prepare -v $COINDATA_PATH:/coindata i_swapclient basicswap-prepare --datadir=/coindata --addcoin=bitcoin --usebtcfastsync
 
 You can copy an existing pruned datadir (excluding bitcoin.conf and any wallets) over to `$COINDATA_PATH/bitcoin`
 Remove any existing wallets after copying over a pruned chain or the Bitcoin daemon won't start.
 
+
+With Encryption
+
+    export COINDATA_PATH=/var/data/coinswaps
+    docker run -e WALLET_ENCRYPTION_PWD=passwordhere --rm -t --name swap_prepare -v $COINDATA_PATH:/coindata i_swapclient basicswap-prepare --datadir=/coindata --addcoin=bitcoin --usebtcfastsync
 
 
 ## Windows

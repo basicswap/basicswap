@@ -23,6 +23,7 @@ class DASHInterface(BTCInterface):
     def __init__(self, coin_settings, network, swap_client=None):
         super().__init__(coin_settings, network, swap_client)
         self._wallet_passphrase = ''
+        self._have_checked_seed = False
 
     def seedToMnemonic(self, key):
         return Mnemonic('english').to_mnemonic(key)
@@ -32,6 +33,9 @@ class DASHInterface(BTCInterface):
 
         mnemonic_passphrase = ''
         self.rpc_callback('upgradetohd', [words, mnemonic_passphrase, self._wallet_passphrase])
+        self._have_checked_seed = False
+        if self._wallet_passphrase != '':
+            self.unlockWallet(self._wallet_passphrase)
 
     def decodeAddress(self, address):
         return decodeAddress(address)[1:]
@@ -41,6 +45,7 @@ class DASHInterface(BTCInterface):
             rv = self.rpc_callback('dumphdinfo')
             entropy = Mnemonic('english').to_entropy(rv['mnemonic'].split(' '))
             entropy_hash = self.getAddressHashFromKey(entropy)[::-1].hex()
+            self._have_checked_seed = True
             return entropy_hash == key_hash
         except Exception as e:
             self._log.warning('checkExpectedSeed failed: {}'.format(str(e)))
@@ -81,6 +86,8 @@ class DASHInterface(BTCInterface):
         super().unlockWallet(password)
         # Store password for initialiseWallet
         self._wallet_passphrase = password
+        if not self._have_checked_seed:
+            self._sc.checkWalletSeed(self.coin_type())
 
     def lockWallet(self):
         super().lockWallet()

@@ -10,6 +10,9 @@ from basicswap.script import (
 from basicswap.util.script import (
     getP2WSH,
 )
+from basicswap.interface.btc import (
+    find_vout_for_address_from_txobj,
+)
 
 
 class ProtocolInterface:
@@ -29,3 +32,7 @@ class ProtocolInterface:
     def getMockAddrTo(self, ci):
         script = self.getMockScript()
         return ci.encode_p2wsh(getP2WSH(script)) if ci._use_segwit else ci.encode_p2sh(script)
+
+    def findMockVout(self, ci, itx_decoded):
+        mock_addr = self.getMockAddrTo(ci)
+        return find_vout_for_address_from_txobj(itx_decoded, mock_addr)

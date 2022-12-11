@@ -472,7 +472,8 @@ class Test(BaseTest):
 
         itx = pi.getFundedInitiateTxTemplate(ci_from, swap_value, True)
         itx_decoded = ci_from.describeTx(itx.hex())
-        value_after_subfee = ci_from.make_int(itx_decoded['vout'][0]['value'])
+        n = pi.findMockVout(ci_from, itx_decoded)
+        value_after_subfee = ci_from.make_int(itx_decoded['vout'][n]['value'])
         assert (value_after_subfee < swap_value)
         swap_value = value_after_subfee
         wait_for_unspent(test_delay_event, ci_from, swap_value)

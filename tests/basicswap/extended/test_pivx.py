@@ -49,9 +49,6 @@ from basicswap.contrib.key import (
 from basicswap.http_server import (
     HttpThread,
 )
-from basicswap.interface.btc import (
-    find_vout_for_address_from_txobj,
-)
 from tests.basicswap.util import (
     read_json_api,
 )
@@ -646,8 +643,7 @@ class Test(unittest.TestCase):
         itx = pi.getFundedInitiateTxTemplate(ci_from, swap_value, True)
         itx_decoded = ci_from.describeTx(itx.hex())
 
-        mock_addr = pi.getMockAddrTo(ci_from)
-        n = find_vout_for_address_from_txobj(itx_decoded, mock_addr)
+        n = pi.findMockVout(ci_from, itx_decoded)
         value_after_subfee = ci_from.make_int(itx_decoded['vout'][n]['value'])
         assert (value_after_subfee < swap_value)
         swap_value = value_after_subfee

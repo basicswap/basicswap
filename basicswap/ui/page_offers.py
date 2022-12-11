@@ -177,6 +177,10 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
 
     page_data['automation_strat_id'] = int(get_data_entry_or(form_data, 'automation_strat_id', -1))
     parsed_data['automation_strat_id'] = page_data['automation_strat_id']
+    if have_data_entry(form_data, 'swap_type'):
+        parsed_data['swap_type'] = get_data_entry(form_data, 'swap_type')
+    if have_data_entry(form_data, 'subfee'):
+        parsed_data['subfee'] = True
 
     try:
         if len(errors) == 0 and page_data['swap_style'] == 'xmr':
@@ -214,7 +218,7 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
 def postNewOfferFromParsed(swap_client, parsed_data):
     swap_type = SwapTypes.SELLER_FIRST
 
-    if swap_type in parsed_data:
+    if 'swap_type' in parsed_data:
         str_swap_type = parsed_data['swap_type'].lower()
         if str_swap_type == 'seller_first':
             swap_type = SwapTypes.SELLER_FIRST
@@ -262,10 +266,20 @@ def postNewOfferFromParsed(swap_client, parsed_data):
     if parsed_data.get('automation_strat_id', None) is not None:
         extra_options['automation_id'] = parsed_data['automation_strat_id']
 
+    swap_value = parsed_data['amt_from']
+    if parsed_data.get('subfee', False):
+        ci_from = swap_client.ci(parsed_data['coin_from'])
+        pi = swap_client.pi(swap_type)
+        itx = pi.getFundedInitiateTxTemplate(ci_from, swap_value, True)
+        itx_decoded = ci_from.describeTx(itx.hex())
+        n = pi.findMockVout(ci_from, itx_decoded)
+        swap_value = ci_from.make_int(itx_decoded['vout'][n]['value'])
+        extra_options = {'prefunded_itx': itx}
+
     offer_id = swap_client.postOffer(
         parsed_data['coin_from'],
         parsed_data['coin_to'],
-        parsed_data['amt_from'],
+        swap_value,
         parsed_data['rate'],
         parsed_data['amt_bid_min'],
         swap_type,
