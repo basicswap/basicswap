@@ -213,7 +213,16 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
 
 def postNewOfferFromParsed(swap_client, parsed_data):
     swap_type = SwapTypes.SELLER_FIRST
-    if parsed_data['coin_to'] in (Coins.XMR, Coins.PART_ANON):
+
+    if swap_type in parsed_data:
+        str_swap_type = parsed_data['swap_type'].lower()
+        if str_swap_type == 'seller_first':
+            swap_type = SwapTypes.SELLER_FIRST
+        elif str_swap_type == 'xmr_swap':
+            swap_type = SwapTypes.XMR_SWAP
+        else:
+            raise ValueError('Unknown swap type')
+    elif parsed_data['coin_to'] in (Coins.XMR, Coins.PART_ANON):
         swap_type = SwapTypes.XMR_SWAP
 
     if swap_client.coin_clients[parsed_data['coin_from']]['use_csv'] and swap_client.coin_clients[parsed_data['coin_to']]['use_csv']:

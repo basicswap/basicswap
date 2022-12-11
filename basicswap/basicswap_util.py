@@ -189,6 +189,7 @@ class DebugTypes(IntEnum):
     DONT_SPEND_ITX = auto()
     SKIP_LOCK_TX_REFUND = auto()
     SEND_LOCKED_XMR = auto()
+    B_LOCK_TX_MISSED_SEND = auto()
 
 
 def strOfferState(state):
@@ -324,8 +325,6 @@ def getLockName(lock_type):
 def describeEventEntry(event_type, event_msg):
     if event_type == EventLogTypes.FAILED_TX_B_LOCK_PUBLISH:
         return 'Failed to publish lock tx B'
-    if event_type == EventLogTypes.FAILED_TX_B_LOCK_PUBLISH:
-        return 'Failed to publish lock tx B'
     if event_type == EventLogTypes.LOCK_TX_A_PUBLISHED:
         return 'Lock tx A published'
     if event_type == EventLogTypes.LOCK_TX_B_PUBLISHED:
@@ -455,5 +454,7 @@ def isActiveBidState(state):
     if state == BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_TX_SIGS:
         return True
     if state == BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX:
+        return True
+    if state == BidStates.XMR_SWAP_FAILED:
         return True
     return False

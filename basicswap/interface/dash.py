@@ -20,12 +20,18 @@ class DASHInterface(BTCInterface):
     def coin_type():
         return Coins.DASH
 
+    def __init__(self, coin_settings, network, swap_client=None):
+        super().__init__(coin_settings, network, swap_client)
+        self._wallet_passphrase = ''
+
     def seedToMnemonic(self, key):
         return Mnemonic('english').to_mnemonic(key)
 
     def initialiseWallet(self, key):
         words = self.seedToMnemonic(key)
-        self.rpc_callback('upgradetohd', [words, ])
+
+        mnemonic_passphrase = ''
+        self.rpc_callback('upgradetohd', [words, mnemonic_passphrase, self._wallet_passphrase])
 
     def decodeAddress(self, address):
         return decodeAddress(address)[1:]
@@ -70,3 +76,12 @@ class DASHInterface(BTCInterface):
             return {'txid': txid_hex, 'amount': 0, 'height': block_height}
 
         return None
+
+    def unlockWallet(self, password: str):
+        super().unlockWallet(password)
+        # Store password for initialiseWallet
+        self._wallet_passphrase = password
+
+    def lockWallet(self):
+        super().lockWallet()
+        self._wallet_passphrase = ''

@@ -3065,6 +3065,33 @@ class BasicSwap(BaseApp):
             return sum_unspent
         return None
 
+    def findTxB(self, ci_to, xmr_swap, bid, session) -> bool:
+        bid_changed = False
+        # Have to use findTxB instead of relying on the first seen height to detect chain reorgs
+        found_tx = ci_to.findTxB(xmr_swap.vkbv, xmr_swap.pkbs, bid.amount_to, ci_to.blocks_confirmed, bid.chain_b_height_start, bid.was_sent)
+
+        if isinstance(found_tx, int) and found_tx == -1:
+            if self.countBidEvents(bid, EventLogTypes.LOCK_TX_B_INVALID, session) < 1:
+                self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_B_INVALID, 'Detected invalid lock tx B', session)
+                bid_changed = True
+        elif found_tx is not None:
+            if bid.xmr_b_lock_tx is None or not bid.xmr_b_lock_tx.chain_height:
+                self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_B_SEEN, '', session)
+            if bid.xmr_b_lock_tx is None:
+                self.log.debug('Found {} lock tx in chain'.format(ci_to.coin_name()))
+                xmr_swap.b_lock_tx_id = bytes.fromhex(found_tx['txid'])
+                bid.xmr_b_lock_tx = SwapTx(
+                    bid_id=bid.bid_id,
+                    tx_type=TxTypes.XMR_SWAP_B_LOCK,
+                    txid=xmr_swap.b_lock_tx_id,
+                    chain_height=found_tx['height'],
+                )
+                bid_changed = True
+            else:
+                bid.xmr_b_lock_tx.chain_height = found_tx['height']
+                bid_changed = True
+        return bid_changed
+
     def checkXmrBidState(self, bid_id, bid, offer):
         rv = False
 
@@ -3176,6 +3203,13 @@ class BasicSwap(BaseApp):
                 rv = True  # Remove from swaps_in_progress
             elif state == BidStates.XMR_SWAP_FAILED_SWIPED:
                 rv = True  # Remove from swaps_in_progress
+            elif state == BidStates.XMR_SWAP_FAILED:
+                if bid.was_sent and bid.xmr_b_lock_tx:
+                    if self.countQueuedActions(session, bid_id, ActionTypes.RECOVER_XMR_SWAP_LOCK_TX_B) < 1:
+                        delay = random.randrange(self.min_delay_event, self.max_delay_event)
+                        self.log.info('Recovering xmr swap chain B lock tx for bid %s in %d seconds', bid_id.hex(), delay)
+                        self.createActionInSession(delay, ActionTypes.RECOVER_XMR_SWAP_LOCK_TX_B, bid_id, session)
+                        session.commit()
             elif state == BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX:
                 if bid.xmr_a_lock_tx is None:
                     return rv
@@ -3217,33 +3251,7 @@ class BasicSwap(BaseApp):
                     session.commit()
 
             elif state == BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED:
-                if bid.was_sent and bid.xmr_b_lock_tx is None:
-                    return rv
-
-                bid_changed = False
-                # Have to use findTxB instead of relying on the first seen height to detect chain reorgs
-                found_tx = ci_to.findTxB(xmr_swap.vkbv, xmr_swap.pkbs, bid.amount_to, ci_to.blocks_confirmed, bid.chain_b_height_start, bid.was_sent)
-
-                if isinstance(found_tx, int) and found_tx == -1:
-                    if self.countBidEvents(bid, EventLogTypes.LOCK_TX_B_INVALID, session) < 1:
-                        self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_B_INVALID, 'Detected invalid lock tx B', session)
-                        bid_changed = True
-                elif found_tx is not None:
-                    if bid.xmr_b_lock_tx is None or not bid.xmr_b_lock_tx.chain_height:
-                        self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_B_SEEN, '', session)
-                    if bid.xmr_b_lock_tx is None:
-                        self.log.debug('Found {} lock tx in chain'.format(ci_to.coin_name()))
-                        xmr_swap.b_lock_tx_id = bytes.fromhex(found_tx['txid'])
-                        bid.xmr_b_lock_tx = SwapTx(
-                            bid_id=bid_id,
-                            tx_type=TxTypes.XMR_SWAP_B_LOCK,
-                            txid=xmr_swap.b_lock_tx_id,
-                            chain_height=found_tx['height'],
-                        )
-                        bid_changed = True
-                    else:
-                        bid.xmr_b_lock_tx.chain_height = found_tx['height']
-                        bid_changed = True
+                bid_changed = self.findTxB(ci_to, xmr_swap, bid, session)
 
                 if bid.xmr_b_lock_tx and bid.xmr_b_lock_tx.chain_height is not None and bid.xmr_b_lock_tx.chain_height > 0:
                     chain_height = ci_to.getChainHeight()
@@ -4715,6 +4723,14 @@ class BasicSwap(BaseApp):
         ci_from = self.ci(Coins(offer.coin_from))
         ci_to = self.ci(Coins(offer.coin_to))
 
+        if self.findTxB(ci_to, xmr_swap, bid, session) is True:
+            self.saveBidInSession(bid_id, bid, session, xmr_swap, save_in_progress=offer)
+            return
+
+        if bid.xmr_b_lock_tx:
+            self.log.warning('Coin B lock tx {} exists for xmr bid {}'.format(bid.xmr_b_lock_tx.b_lock_tx_id, bid_id.hex()))
+            return
+
         if bid.debug_ind == DebugTypes.BID_STOP_AFTER_COIN_A_LOCK:
             self.log.debug('XMR bid %s: Stalling bid for testing: %d.', bid_id.hex(), bid.debug_ind)
             bid.setState(BidStates.BID_STALLED_FOR_TEST)
@@ -4723,7 +4739,7 @@ class BasicSwap(BaseApp):
             return
 
         unlock_time = 0
-        if bid.debug_ind == DebugTypes.CREATE_INVALID_COIN_B_LOCK:
+        if bid.debug_ind in (DebugTypes.CREATE_INVALID_COIN_B_LOCK, DebugTypes.B_LOCK_TX_MISSED_SEND):
             bid.amount_to -= int(bid.amount_to * 0.1)
             self.log.debug('XMR bid %s: Debug %d - Reducing lock b txn amount by 10%% to %s.', bid_id.hex(), bid.debug_ind, ci_to.format_amount(bid.amount_to))
             self.logBidEvent(bid.bid_id, EventLogTypes.DEBUG_TWEAK_APPLIED, 'ind {}'.format(bid.debug_ind), session)
@@ -4731,8 +4747,13 @@ class BasicSwap(BaseApp):
             unlock_time = 10000
             self.log.debug('XMR bid %s: Debug %d - Sending locked XMR.', bid_id.hex(), bid.debug_ind)
             self.logBidEvent(bid.bid_id, EventLogTypes.DEBUG_TWEAK_APPLIED, 'ind {}'.format(bid.debug_ind), session)
+
         try:
             b_lock_tx_id = ci_to.publishBLockTx(xmr_swap.pkbv, xmr_swap.pkbs, bid.amount_to, xmr_offer.b_fee_rate, unlock_time=unlock_time)
+            if bid.debug_ind == DebugTypes.B_LOCK_TX_MISSED_SEND:
+                self.log.debug('XMR bid %s: Debug %d - Losing xmr lock tx %s.', bid_id.hex(), bid.debug_ind, b_lock_tx_id.hex())
+                self.logBidEvent(bid.bid_id, EventLogTypes.DEBUG_TWEAK_APPLIED, 'ind {}'.format(bid.debug_ind), session)
+                raise TemporaryError('Fail for debug event')
         except Exception as ex:
             if self.debug:
                 self.log.error(traceback.format_exc())

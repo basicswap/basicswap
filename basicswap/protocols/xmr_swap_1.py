@@ -91,6 +91,24 @@ def getChainBSplitKey(swap_client, bid, xmr_swap, offer):
     return ci_to.encodeKey(swap_client.getPathKey(offer.coin_from, offer.coin_to, bid.created_at, xmr_swap.contract_count, key_type, True if offer.coin_to == Coins.XMR else False))
 
 
+def getChainBRemoteSplitKey(swap_client, bid, xmr_swap, offer):
+    ci_from = swap_client.ci(offer.coin_from)
+    ci_to = swap_client.ci(offer.coin_to)
+
+    if bid.was_sent:
+        if xmr_swap.a_lock_refund_spend_tx:
+            af_lock_refund_spend_tx_sig = ci_from.extractFollowerSig(xmr_swap.a_lock_refund_spend_tx)
+            kbsl = ci_from.recoverEncKey(xmr_swap.af_lock_refund_spend_tx_esig, af_lock_refund_spend_tx_sig, xmr_swap.pkasl)
+            return ci_to.encodeKey(kbsl)
+    else:
+        if xmr_swap.a_lock_spend_tx:
+            al_lock_spend_tx_sig = ci_from.extractLeaderSig(xmr_swap.a_lock_spend_tx)
+            kbsf = ci_from.recoverEncKey(xmr_swap.al_lock_spend_tx_esig, al_lock_spend_tx_sig, xmr_swap.pkasf)
+            return ci_to.encodeKey(kbsf)
+
+    return None
+
+
 class XmrSwapInterface(ProtocolInterface):
     swap_type = SwapTypes.XMR_SWAP
 

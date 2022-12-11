@@ -3,6 +3,24 @@
 ==============
 
 
+0.0.54
+==============
+
+- If the XMR daemon is busy the wallet can fail a transfer, later sending the tx unknown to bsx.
+  - Check for existing transfers before trying to send the chain b lock tx.
+  - Check for transfers in XMR_SWAP_SCRIPT_COIN_LOCKED state when bid is sent.
+  - Continually try refund noscript lock tx in XMR_SWAP_FAILED state.
+- showLockTransfers will attempt to create a wallet if none exists.
+- tests:
+  - Add B_LOCK_TX_MISSED_SEND debug event and test.
+- Store the Dash wallet password in memory for use in upgradetohd
+- Remove false positive warning.  Check for unlock_time transfer is not unlocked.
+- ui:
+  - Add 'Remote Key Half' to Show More Info section (with debug_ui on)
+- api:
+  - An unknown path will return an error instead of the default/index data.
+
+
 0.0.32
 ==============
 

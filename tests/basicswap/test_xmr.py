@@ -1318,6 +1318,26 @@ class Test(BaseTest):
             assert (txin['txid'] == itx_after['vin'][i]['txid'])
             assert (txin['vout'] == itx_after['vin'][i]['vout'])
 
+    def test_15_missed_xmr_send(self):
+        logging.info('---------- Test PART to XMR B lock tx is lost')
+        swap_clients = self.swap_clients
+
+        amt_swap = make_int(random.uniform(0.1, 10.0), scale=8, r=1)
+        rate_swap = make_int(random.uniform(2.0, 20.0), scale=12, r=1)
+        offer_id = swap_clients[0].postOffer(Coins.PART, Coins.XMR, amt_swap, rate_swap, amt_swap, SwapTypes.XMR_SWAP,
+                                             lock_type=TxLockTypes.SEQUENCE_LOCK_BLOCKS, lock_value=28)
+
+        wait_for_offer(test_delay_event, swap_clients[1], offer_id)
+        offer = swap_clients[1].getOffer(offer_id)
+        bid_id = swap_clients[1].postXmrBid(offer_id, offer.amount_from)
+
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.BID_RECEIVED)
+        swap_clients[1].setBidDebugInd(bid_id, DebugTypes.B_LOCK_TX_MISSED_SEND)
+        swap_clients[0].acceptXmrBid(bid_id)
+
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.XMR_SWAP_FAILED_REFUNDED, wait_for=1800)
+        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.XMR_SWAP_FAILED_REFUNDED, wait_for=1800, sent=True)
+
     def test_98_withdraw_all(self):
         logging.info('---------- Test XMR withdrawal all')
         try:

@@ -1186,7 +1186,7 @@ class BTCInterface(CoinInterface):
 
         return True if address_hash == pubkey_hash else False
 
-    def showLockTransfers(self, Kbv, Kbs):
+    def showLockTransfers(self, kbv, Kbs, restore_height):
         raise ValueError('Unimplemented')
 
     def getLockTxSwapOutputValue(self, bid, xmr_swap):

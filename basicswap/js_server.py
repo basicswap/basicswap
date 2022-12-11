@@ -168,11 +168,11 @@ def js_offers(self, url_split, post_string, is_json, sent=False):
             filters['limit'] = int(get_data_entry(post_data, 'limit'))
             assert (filters['limit'] > 0 and filters['limit'] <= PAGE_LIMIT), 'Invalid limit'
 
-    offers = self.server.swap_client.listOffers(sent, filters)
+    offers = swap_client.listOffers(sent, filters)
     rv = []
     for o in offers:
-        ci_from = self.server.swap_client.ci(o.coin_from)
-        ci_to = self.server.swap_client.ci(o.coin_to)
+        ci_from = swap_client.ci(o.coin_from)
+        ci_to = swap_client.ci(o.coin_to)
         rv.append({
             'addr_from': o.addr_from,
             'addr_to': o.addr_to,
@@ -494,6 +494,10 @@ def js_lock(self, url_split, post_string, is_json):
     return bytes(json.dumps({'success': True}), 'UTF-8')
 
 
+def js_404(self, url_split, post_string, is_json):
+    return bytes(json.dumps({'Error': 'path unknown'}), 'UTF-8')
+
+
 def js_help(self, url_split, post_string, is_json):
     # TODO: Add details and examples
     commands = []
@@ -528,5 +532,5 @@ pages = {
 
 def js_url_to_function(url_split):
     if len(url_split) > 2:
-        return pages.get(url_split[2], js_index)
+        return pages.get(url_split[2], js_404)
     return js_index

@@ -5,7 +5,6 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-import os
 import json
 import logging
 
@@ -100,8 +99,7 @@ class XMRInterface(CoinInterface):
 
         try:
             # Can't reopen the same wallet in windows, !is_keys_file_locked()
-            if os.name == 'nt':
-                self.rpc_wallet_cb('close_wallet')
+            self.rpc_wallet_cb('close_wallet')
         except Exception:
             pass
         self.rpc_wallet_cb('open_wallet', params)
@@ -263,6 +261,7 @@ class XMRInterface(CoinInterface):
     def publishBLockTx(self, Kbv, Kbs, output_amount, feerate, delay_for: int = 10, unlock_time: int = 0) -> bytes:
         with self._mx_wallet:
             self.openWallet(self._wallet_filename)
+            self.rpc_wallet_cb('refresh')
 
             shared_addr = xmr_util.encode_address(Kbv, Kbs)
 
@@ -276,8 +275,8 @@ class XMRInterface(CoinInterface):
             if self._sc.debug:
                 i = 0
                 while not self._sc.delay_event.is_set():
-                    params = {'out': True, 'pending': True, 'failed': True, 'pool': True, }
-                    rv = self.rpc_wallet_cb('get_transfers', params)
+                    gt_params = {'out': True, 'pending': True, 'failed': True, 'pool': True, }
+                    rv = self.rpc_wallet_cb('get_transfers', gt_params)
                     self._log.debug('get_transfers {}'.format(dumpj(rv)))
                     if 'pending' not in rv:
                         break
@@ -291,11 +290,6 @@ class XMRInterface(CoinInterface):
         with self._mx_wallet:
             Kbv = self.getPubkey(kbv)
             address_b58 = xmr_util.encode_address(Kbv, Kbs)
-
-            try:
-                self.rpc_wallet_cb('close_wallet')
-            except Exception as e:
-                self._log.warning('close_wallet failed %s', str(e))
 
             kbv_le = kbv[::-1]
             params = {
@@ -328,10 +322,14 @@ class XMRInterface(CoinInterface):
             rv = None
             if 'transfers' in transfers:
                 for transfer in transfers['transfers']:
+                    # unlocked <- wallet->is_transfer_unlocked() checks unlock_time and CRYPTONOTE_DEFAULT_TX_SPENDABLE_AGE
                     if not transfer['unlocked']:
-                        self._log.warning('Coin b lock txn is locked: {}'.format(transfer['tx_hash']))
-                        rv = -1
-                        continue
+                        full_tx = self.rpc_wallet_cb('get_transfer_by_txid', {'txid': transfer['tx_hash']})
+                        unlock_time = full_tx['transfer']['unlock_time']
+                        if unlock_time != 0:
+                            self._log.warning('Coin b lock txn is locked: {}, unlock_time {}'.format(transfer['tx_hash'], unlock_time))
+                            rv = -1
+                            continue
                     if transfer['amount'] == cb_swap_value:
                         return {'txid': transfer['tx_hash'], 'amount': transfer['amount'], 'height': 0 if 'block_height' not in transfer else transfer['block_height']}
                     else:
@@ -366,11 +364,6 @@ class XMRInterface(CoinInterface):
             Kbv = self.getPubkey(kbv)
             Kbs = self.getPubkey(kbs)
             address_b58 = xmr_util.encode_address(Kbv, Kbs)
-
-            try:
-                self.rpc_wallet_cb('close_wallet')
-            except Exception as e:
-                self._log.warning('close_wallet failed %s', str(e))
 
             wallet_filename = address_b58 + '_spend'
 
@@ -446,16 +439,29 @@ class XMRInterface(CoinInterface):
             rv = self.rpc_wallet_cb('transfer', params)
             return rv['tx_hash']
 
-    def showLockTransfers(self, Kbv, Kbs):
+    def showLockTransfers(self, kbv, Kbs, restore_height):
         with self._mx_wallet:
             try:
+                Kbv = self.getPubkey(kbv)
                 address_b58 = xmr_util.encode_address(Kbv, Kbs)
                 wallet_file = address_b58 + '_spend'
                 try:
                     self.openWallet(wallet_file)
                 except Exception:
                     wallet_file = address_b58
-                    self.openWallet(wallet_file)
+                    try:
+                        self.openWallet(wallet_file)
+                    except Exception:
+                        self._log.info(f'showLockTransfers trying to create wallet for address {address_b58}.')
+                        kbv_le = kbv[::-1]
+                        params = {
+                            'restore_height': restore_height,
+                            'filename': address_b58,
+                            'address': address_b58,
+                            'viewkey': b2h(kbv_le),
+                        }
+                        self.createWallet(params)
+                        self.openWallet(address_b58)
 
                 self.rpc_wallet_cb('refresh')
 

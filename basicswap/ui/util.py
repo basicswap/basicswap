@@ -28,7 +28,7 @@ from basicswap.basicswap_util import (
     getLastBidState,
 )
 
-from basicswap.protocols.xmr_swap_1 import getChainBSplitKey
+from basicswap.protocols.xmr_swap_1 import getChainBSplitKey, getChainBRemoteSplitKey
 
 PAGE_LIMIT = 50
 invalid_coins_from = (Coins.XMR, Coins.PART_ANON)
@@ -302,12 +302,16 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
             if swap_client.debug_ui:
                 try:
                     data['xmr_b_half_privatekey'] = getChainBSplitKey(swap_client, bid, xmr_swap, offer)
+
+                    remote_split_key = getChainBRemoteSplitKey(swap_client, bid, xmr_swap, offer)
+                    if remote_split_key:
+                        data['xmr_b_half_privatekey_remote'] = remote_split_key
                 except Exception as e:
                     swap_client.log.error(traceback.format_exc())
 
             if show_lock_transfers:
                 if xmr_swap.pkbs:
-                    data['lock_transfers'] = json.dumps(ci_to.showLockTransfers(xmr_swap.pkbv, xmr_swap.pkbs), indent=4)
+                    data['lock_transfers'] = json.dumps(ci_to.showLockTransfers(xmr_swap.vkbv, xmr_swap.pkbs, bid.chain_b_height_start), indent=4)
                 else:
                     data['lock_transfers'] = 'Shared address not yet known.'
         else:
