@@ -655,7 +655,12 @@ class BasicSwap(BaseApp):
             self.createCoinInterface(c)
 
             if self.coin_clients[c]['connection_type'] == 'rpc':
-                self.waitForDaemonRPC(c)
+                if c == Coins.BTC:
+                    self.waitForDaemonRPC(c, with_wallet=False)
+                    if len(self.callcoinrpc(c, 'listwallets')) >= 1:
+                        self.waitForDaemonRPC(c)
+                else:
+                    self.waitForDaemonRPC(c)
                 ci = self.ci(c)
                 core_version = ci.getDaemonVersion()
                 self.log.info('%s Core version %d', ci.coin_name(), core_version)
@@ -1654,6 +1659,9 @@ class BasicSwap(BaseApp):
         expect_seedid = self.getStringKV('main_wallet_seedid_' + ci.coin_name().lower())
         if expect_seedid is None:
             self.log.warning('Can\'t find expected wallet seed id for coin {}'.format(ci.coin_name()))
+            return False
+        if len(ci.rpc_callback('listwallets')) < 1:
+            self.log.warning('Missing wallet for coin {}'.format(ci.coin_name()))
             return False
         if ci.checkExpectedSeed(expect_seedid):
             ci.setWalletSeedWarning(False)

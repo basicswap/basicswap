@@ -299,7 +299,8 @@ class BTCInterface(CoinInterface):
         raise ValueError('{} wallet restore height not found.'.format(self.coin_name()))
 
     def getWalletSeedID(self) -> str:
-        return self.rpc_callback('getwalletinfo')['hdseedid']
+        wi = self.rpc_callback('getwalletinfo')
+        return 'Not found' if 'hdseedid' not in wi else wi['hdseedid']
 
     def checkExpectedSeed(self, expect_seedid) -> bool:
         self._expect_seedid_hex = expect_seedid
@@ -1348,8 +1349,21 @@ class BTCInterface(CoinInterface):
         if password == '':
             return
         self._log.info('unlockWallet - {}'.format(self.ticker()))
+
+        if self.coin_type() == Coins.BTC:
+            # Recreate wallet if none found
+            # Required when encrypting an existing btc wallet, workaround is to delete the btc wallet and recreate
+            wallets = self.rpc_callback('listwallets')
+            if len(wallets) < 1:
+                self._log.info('Creating wallet.dat for {}.'.format(self.coin_name()))
+                # wallet_name, disable_private_keys, blank, passphrase, avoid_reuse, descriptors
+                self.rpc_callback('createwallet', ['wallet.dat', False, True, '', False, False])
+                self.rpc_callback('encryptwallet', [password])
+
         # Max timeout value, ~3 years
         self.rpc_callback('walletpassphrase', [password, 100000000])
+
+        self._sc.checkWalletSeed(self.coin_type())
 
     def lockWallet(self):
         self._log.info('lockWallet - {}'.format(self.ticker()))

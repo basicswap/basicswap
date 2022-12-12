@@ -1006,6 +1006,7 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
         try:
             swap_client = BasicSwap(fp, data_dir, settings, chain)
 
+            coins_to_create_wallets_for = (Coins.PART, Coins.BTC, Coins.LTC, Coins.PIVX)
             # Always start Particl, it must be running to initialise a wallet in addcoin mode
             # Particl must be loaded first as subsequent coins are initialised from the Particl mnemonic
             start_daemons = ['particl', ] + [c for c in with_coins if c != 'particl']
@@ -1030,7 +1031,7 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
                 swap_client.setCoinRunParams(c)
                 swap_client.createCoinInterface(c)
 
-                if c in (Coins.PART, Coins.BTC, Coins.LTC, Coins.PIVX):
+                if c in coins_to_create_wallets_for:
                     swap_client.waitForDaemonRPC(c, with_wallet=False)
                     # Create wallet if it doesn't exist yet
                     wallets = swap_client.callcoinrpc(c, 'listwallets')
@@ -1043,17 +1044,20 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
                         else:
                             swap_client.callcoinrpc(c, 'createwallet', ['wallet.dat'])
 
-                    if c == Coins.PART:
-                        if 'particl' in with_coins:
-                            logger.info('Loading Particl mnemonic')
-                            if particl_wallet_mnemonic is None:
-                                particl_wallet_mnemonic = swap_client.callcoinrpc(Coins.PART, 'mnemonic', ['new'])['mnemonic']
-                            swap_client.callcoinrpc(Coins.PART, 'extkeyimportmaster', [particl_wallet_mnemonic])
-                            if WALLET_ENCRYPTION_PWD != '':
-                                swap_client.ci(c).changeWalletPassword('', WALLET_ENCRYPTION_PWD)
-                        # Particl wallet must be unlocked to call getWalletKey
                         if WALLET_ENCRYPTION_PWD != '':
-                            swap_client.ci(c).unlockWallet(WALLET_ENCRYPTION_PWD)
+                            ci = swap_client.ci(c)
+                            ci.changeWalletPassword('', WALLET_ENCRYPTION_PWD)
+                            ci.unlockWallet(WALLET_ENCRYPTION_PWD)
+
+                if c == Coins.PART:
+                    if 'particl' in with_coins:
+                        logger.info('Loading Particl mnemonic')
+                        if particl_wallet_mnemonic is None:
+                            particl_wallet_mnemonic = swap_client.callcoinrpc(Coins.PART, 'mnemonic', ['new'])['mnemonic']
+                        swap_client.callcoinrpc(Coins.PART, 'extkeyimportmaster', [particl_wallet_mnemonic])
+                    # Particl wallet must be unlocked to call getWalletKey
+                    if WALLET_ENCRYPTION_PWD != '':
+                        swap_client.ci(c).unlockWallet(WALLET_ENCRYPTION_PWD)
 
             for coin_name in with_coins:
                 c = swap_client.getCoinIdFromName(coin_name)
@@ -1061,7 +1065,7 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
                     continue
                 swap_client.waitForDaemonRPC(c)
                 swap_client.initialiseWallet(c)
-                if WALLET_ENCRYPTION_PWD != '':
+                if WALLET_ENCRYPTION_PWD != '' and c not in coins_to_create_wallets_for:
                     swap_client.ci(c).changeWalletPassword('', WALLET_ENCRYPTION_PWD)
 
         finally:
