@@ -8,6 +8,7 @@
 import os
 import sys
 import json
+import time
 import mmap
 import stat
 import gnupg
@@ -20,8 +21,11 @@ import tarfile
 import zipfile
 import logging
 import platform
+import contextlib
 import urllib.parse
-from urllib.request import urlretrieve
+from urllib.error import ContentTooShortError
+from urllib.request import Request, urlopen
+from urllib.parse import _splittype
 
 import basicswap.config as cfg
 from basicswap import __version__
@@ -173,25 +177,118 @@ default_socket_timeout = socket.getdefaulttimeout()
 default_socket_getaddrinfo = socket.getaddrinfo
 
 
-def make_reporthook():
-    read = 0  # Number of bytes read so far
+def make_reporthook(read_start=0):
+    read = read_start  # Number of bytes read so far
     last_percent_str = ''
+    time_last = time.time()
+    read_last = read_start
+    display_last = time_last
+    abo = 7
+    average_buffer = [-1] * 8
 
     def reporthook(blocknum, blocksize, totalsize):
-        nonlocal read
-        nonlocal last_percent_str
+        nonlocal read, last_percent_str, time_last, read_last, display_last, read_start
+        nonlocal average_buffer, abo
         read += blocksize
-        if totalsize > 0:
-            percent_str = '%5.0f%%' % (read * 1e2 / totalsize)
-            if percent_str != last_percent_str:
-                logger.info(percent_str)
-                last_percent_str = percent_str
+
+        # totalsize excludes read_start
+        use_size = totalsize + read_start
+        dl_complete: bool = totalsize > 0 and read >= use_size
+        time_now = time.time()
+        time_delta = time_now - time_last
+        if time_delta < 4 and not dl_complete:
+            return
+
+        bytes_delta = read - read_last
+        time_last = time_now
+        read_last = read
+        bits_per_second = (bytes_delta * 8) / time_delta
+
+        abo = 0 if abo >= 7 else abo + 1
+        average_buffer[abo] = bits_per_second
+
+        samples = 0
+        average_bits_per_second = 0
+        for sample in average_buffer:
+            if sample < 0:
+                continue
+            average_bits_per_second += sample
+            samples += 1
+        average_bits_per_second /= samples
+
+        speed_str: str
+        if average_bits_per_second > 1000 ** 3:
+            speed_str = '{:.2f} Gbps'.format(average_bits_per_second / (1000 ** 3))
+        elif average_bits_per_second > 1000 ** 2:
+            speed_str = '{:.2f} Mbps'.format(average_bits_per_second / (1000 ** 2))
         else:
-            logger.info('read %d' % (read,))
+            speed_str = '{:.2f} kbps'.format(average_bits_per_second / 1000)
+
+        if totalsize > 0:
+            percent_str = '%5.0f%%' % (read * 1e2 / use_size)
+            if percent_str != last_percent_str or time_now - display_last > 10:
+                logger.info(percent_str + '  ' + speed_str)
+                last_percent_str = percent_str
+                display_last = time_now
+        else:
+            logger.info(f'Read {read}, {speed_str}')
     return reporthook
 
 
-def setConnectionParameters():
+def urlretrieve(url, filename, reporthook=None, data=None, resume_from=0):
+    # urlretrieve with resume
+    url_type, path = _splittype(url)
+
+    req = Request(url)
+    if resume_from > 0:
+        logger.info(f'Attempting to resume from byte {resume_from}')
+        req.add_header('Range', f'bytes={resume_from}-')
+    with contextlib.closing(urlopen(req)) as fp:
+        headers = fp.info()
+
+        # Just return the local path and the "headers" for file://
+        # URLs. No sense in performing a copy unless requested.
+        if url_type == "file" and not filename:
+            return os.path.normpath(path), headers
+
+        with open(filename, 'ab' if resume_from > 0 else 'wb') as tfp:
+            result = filename, headers
+            bs = 1024 * 8
+            size = -1
+            read = resume_from
+            blocknum = 0
+            range_from = 0
+            if "content-length" in headers:
+                size = int(headers["Content-Length"])
+            if "Content-Range" in headers:
+                range_str = headers["Content-Range"]
+                offset = range_str.find('-')
+                range_from = int(range_str[6:offset])
+            if resume_from != range_from:
+                raise ValueError('Download is not resuming from the expected byte')
+
+            if reporthook:
+                reporthook(blocknum, bs, size)
+
+            while True:
+                block = fp.read(bs)
+                if not block:
+                    break
+                read += len(block)
+                tfp.write(block)
+                blocknum += 1
+                if reporthook:
+                    reporthook(blocknum, bs, size)
+
+    if size >= 0 and read < size:
+        raise ContentTooShortError(
+            "retrieval incomplete: got only %i out of %i bytes"
+            % (read, size), result)
+
+    return result
+
+
+def setConnectionParameters(timeout=5):
     opener = urllib.request.build_opener()
     opener.addheaders = [('User-agent', 'Mozilla/5.0')]
     urllib.request.install_opener(opener)
@@ -202,7 +299,7 @@ def setConnectionParameters():
         socket.getaddrinfo = getaddrinfo_tor  # Without this accessing .onion links would fail
 
     # Set low timeout for urlretrieve connections
-    socket.setdefaulttimeout(5)
+    socket.setdefaulttimeout(timeout)
 
 
 def popConnectionParameters():
@@ -212,12 +309,12 @@ def popConnectionParameters():
     socket.setdefaulttimeout(default_socket_timeout)
 
 
-def downloadFile(url, path):
+def downloadFile(url, path, timeout=5, resume_from=0):
     logger.info('Downloading file %s', url)
     logger.info('To %s', path)
     try:
-        setConnectionParameters()
-        urlretrieve(url, path, make_reporthook())
+        setConnectionParameters(timeout=timeout)
+        urlretrieve(url, path, make_reporthook(resume_from), resume_from=resume_from)
     finally:
         popConnectionParameters()
 
@@ -766,27 +863,10 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
 
         sync_file_path = os.path.join(base_dir, BITCOIN_FASTSYNC_FILE)
         if not os.path.exists(sync_file_path):
-            sync_file_url = os.path.join(BITCOIN_FASTSYNC_URL, BITCOIN_FASTSYNC_FILE)
-            downloadFile(sync_file_url, sync_file_path)
+            raise ValueError(f'BTC fastsync file not found: {sync_file_path}')
 
-        asc_filename = BITCOIN_FASTSYNC_FILE + '.asc'
-        asc_file_path = os.path.join(base_dir, asc_filename)
-        if not os.path.exists(asc_file_path):
-            asc_file_urls = (
-                'https://raw.githubusercontent.com/tecnovert/basicswap/master/pgp/sigs/' + asc_filename,
-                'https://gitlab.com/particl/basicswap/-/raw/master/pgp/sigs/' + asc_filename,
-            )
-            for url in asc_file_urls:
-                try:
-                    downloadFile(url, asc_file_path)
-                    break
-                except Exception as e:
-                    logging.warning('Download failed: %s', str(e))
-        gpg = gnupg.GPG()
-        with open(asc_file_path, 'rb') as fp:
-            verified = gpg.verify_file(fp, sync_file_path)
-
-        ensureValidSignatureBy(verified, 'tecnovert')
+        # Double check
+        check_btc_fastsync_data(base_dir, sync_file_path)
 
         with tarfile.open(sync_file_path) as ft:
             ft.extractall(path=data_dir)
@@ -1092,6 +1172,27 @@ def signal_handler(sig, frame):
     logger.info('Signal %d detected' % (sig))
 
 
+def check_btc_fastsync_data(base_dir, sync_file_path):
+    asc_filename = BITCOIN_FASTSYNC_FILE + '.asc'
+    asc_file_path = os.path.join(base_dir, asc_filename)
+    if not os.path.exists(asc_file_path):
+        asc_file_urls = (
+            'https://raw.githubusercontent.com/tecnovert/basicswap/master/pgp/sigs/' + asc_filename,
+            'https://gitlab.com/particl/basicswap/-/raw/master/pgp/sigs/' + asc_filename,
+        )
+        for url in asc_file_urls:
+            try:
+                downloadFile(url, asc_file_path)
+                break
+            except Exception as e:
+                logging.warning('Download failed: %s', str(e))
+    gpg = gnupg.GPG()
+    with open(asc_file_path, 'rb') as fp:
+        verified = gpg.verify_file(fp, sync_file_path)
+
+    ensureValidSignatureBy(verified, 'tecnovert')
+
+
 def main():
     global use_tor_proxy
     data_dir = None
@@ -1248,6 +1349,29 @@ def main():
     if not os.path.exists(data_dir):
         os.makedirs(data_dir)
     config_path = os.path.join(data_dir, cfg.CONFIG_FILENAME)
+
+    if extra_opts.get('use_btc_fastsync', False) is True:
+        logger.info(f'Preparing BTC Fastsync file {BITCOIN_FASTSYNC_FILE}')
+        sync_file_path = os.path.join(data_dir, BITCOIN_FASTSYNC_FILE)
+        sync_file_url = os.path.join(BITCOIN_FASTSYNC_URL, BITCOIN_FASTSYNC_FILE)
+        try:
+            check_sig = False
+            remote_file = urlopen(sync_file_url)
+            if not os.path.exists(sync_file_path):
+                downloadFile(sync_file_url, sync_file_path, timeout=50)
+                check_sig = True
+            else:
+                file_size = os.stat(sync_file_path).st_size
+                if file_size < remote_file.length:
+                    logger.warning(f'{BITCOIN_FASTSYNC_FILE} is an unexpected size, {file_size} < {remote_file.length}')
+                    downloadFile(sync_file_url, sync_file_path, timeout=50, resume_from=file_size)
+                    check_sig = True
+
+            if check_sig:
+                check_btc_fastsync_data(data_dir, sync_file_path)
+        except Exception as e:
+            logger.error(f'Failed to download BTC fastsync file: {e}\nTry manually downloading from {sync_file_url}')
+            return 1
 
     withchainclients = {}
     chainclients = {

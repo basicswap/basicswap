@@ -449,6 +449,12 @@ def page_offer(self, url_split, post_string):
     bid_rate = ci_to.format_amount(offer.rate)
 
     if form_data:
+        if b'archive_offer' in form_data:
+            try:
+                swap_client.archiveOffer(offer_id)
+                messages.append('Offer archived')
+            except Exception as ex:
+                err_messages.append('Archive offer failed: ' + str(ex))
         if b'revoke_offer' in form_data:
             try:
                 swap_client.revokeOffer(offer_id)
@@ -525,7 +531,8 @@ def page_offer(self, url_split, post_string):
         'bid_rate': bid_rate,
         'debug_ui': swap_client.debug_ui,
         'automation_strat_id': -1,
-        'is_expired': offer.expire_at <= now
+        'is_expired': offer.expire_at <= now,
+        'active_ind': offer.active_ind
     }
     data.update(extend_data)
 
@@ -622,7 +629,7 @@ def page_offers(self, url_split, post_string, sent=False):
             filters['sent_from'] = sent_from
         if have_data_entry(form_data, 'active'):
             active_filter = get_data_entry(form_data, 'active')
-            ensure(active_filter in ['any', 'active', 'expired', 'revoked'], 'Invalid active filter')
+            ensure(active_filter in ['any', 'active', 'expired', 'revoked', 'archived'], 'Invalid active filter')
             filters['active'] = active_filter
 
     set_pagination_filters(form_data, filters)

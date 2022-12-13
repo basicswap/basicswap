@@ -1423,11 +1423,8 @@ class BasicSwap(BaseApp):
     def revokeOffer(self, offer_id, security_token=None):
         self.log.info('Revoking offer %s', offer_id.hex())
 
-        session = None
-        self.mxDB.acquire()
+        session = self.openSession()
         try:
-            session = scoped_session(self.session_factory)
-
             offer = session.query(Offer).filter_by(offer_id=offer_id).first()
 
             if offer.security_token is not None and offer.security_token != security_token:
@@ -1445,10 +1442,21 @@ class BasicSwap(BaseApp):
             msg_id = self.sendSmsg(offer.addr_from, self.network_addr, payload_hex, offer.time_valid)
             self.log.debug('Revoked offer %s in msg %s', offer_id.hex(), msg_id.hex())
         finally:
-            if session:
-                session.close()
-                session.remove()
-            self.mxDB.release()
+            self.closeSession(session, commit=False)
+
+    def archiveOffer(self, offer_id):
+        self.log.info('Archiving offer %s', offer_id.hex())
+        session = self.openSession()
+        try:
+            offer = session.query(Offer).filter_by(offer_id=offer_id).first()
+
+            if offer.active_ind != 1:
+                raise ValueError('Offer is not active')
+
+            offer.active_ind = 3
+
+        finally:
+            self.closeSession(session)
 
     def grindForEd25519Key(self, coin_type, evkey, key_path_base):
         ci = self.ci(coin_type)
