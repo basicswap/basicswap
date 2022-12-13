@@ -1660,7 +1660,7 @@ class BasicSwap(BaseApp):
         if expect_seedid is None:
             self.log.warning('Can\'t find expected wallet seed id for coin {}'.format(ci.coin_name()))
             return False
-        if len(ci.rpc_callback('listwallets')) < 1:
+        if c == Coins.BTC and len(ci.rpc_callback('listwallets')) < 1:
             self.log.warning('Missing wallet for coin {}'.format(ci.coin_name()))
             return False
         if ci.checkExpectedSeed(expect_seedid):
