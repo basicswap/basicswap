@@ -61,6 +61,8 @@ DASH_VERSION_TAG = os.getenv('DASH_VERSION_TAG', '')
 FIRO_VERSION = os.getenv('FIRO_VERSION', '0.14.99.1')
 FIRO_VERSION_TAG = os.getenv('FIRO_VERSION_TAG', '')
 
+GUIX_SSL_CERT_DIR = None
+
 
 known_coins = {
     'particl': (PARTICL_VERSION, PARTICL_VERSION_TAG, ('tecnovert',)),
@@ -1214,6 +1216,9 @@ def main():
     initwalletsonly = False
     tor_control_password = None
     extra_opts = {}
+
+    if os.getenv('SSL_CERT_DIR', '') == '' and GUIX_SSL_CERT_DIR is not None:
+        os.environ['SSL_CERT_DIR'] = GUIX_SSL_CERT_DIR
 
     if os.name == 'nt':
         # On windows sending signal.CTRL_C_EVENT to a subprocess causes it to be sent to the parent process too

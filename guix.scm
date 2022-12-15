@@ -5,6 +5,7 @@
 #:use-module (guix build-system gnu)
 #:use-module (guix git-download)
 #:use-module (guix download)
+#:use-module (guix search-paths)
 #:use-module (gnu packages)
 #:use-module (gnu packages pkg-config)
 #:use-module (gnu packages autotools)
@@ -20,6 +21,7 @@
 #:use-module (gnu packages python-xyz)
 #:use-module (gnu packages libffi)
 #:use-module (gnu packages license))
+
 
 (define libsecp256k1-anonswap
   (package
@@ -126,7 +128,18 @@
         "023yhncqhp22h7wmkmkj0wc0627vbwlbr6mp5cpjwccalvxziskv"))
     (file-name (git-file-name name version))))
   (build-system python-build-system)
-  (arguments `(#:tests? #f)) ; TODO: Add coin binaries
+
+  (native-search-paths (list $SSL_CERT_DIR $SSL_CERT_FILE))
+  (arguments
+     '(#:tests? #f ; TODO: Add coin binaries
+       #:phases (modify-phases %standard-phases
+                  (add-after 'unpack 'patch-env
+                    (lambda* (#:key inputs #:allow-other-keys)
+                      (substitute* "bin/basicswap_prepare.py"
+                        (("GUIX_SSL_CERT_DIR = None")
+                         (string-append "GUIX_SSL_CERT_DIR = \"" (search-input-directory inputs "etc/ssl/certs") "\"")))
+                        )
+                        ))))
   (propagated-inputs
    (list
     gnupg
