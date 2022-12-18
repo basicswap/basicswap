@@ -174,6 +174,7 @@ def js_offers(self, url_split, post_string, is_json, sent=False):
         ci_from = swap_client.ci(o.coin_from)
         ci_to = swap_client.ci(o.coin_to)
         rv.append({
+            'swap_type': o.swap_type,
             'addr_from': o.addr_from,
             'addr_to': o.addr_to,
             'offer_id': o.offer_id.hex(),

@@ -458,3 +458,19 @@ def isActiveBidState(state):
     if state == BidStates.XMR_SWAP_FAILED:
         return True
     return False
+
+
+def strSwapType(swap_type):
+    if swap_type == SwapTypes.SELLER_FIRST:
+        return 'seller_first'
+    if swap_type == SwapTypes.XMR_SWAP:
+        return 'xmr_swap'
+    return None
+
+
+def strSwapDesc(swap_type):
+    if swap_type == SwapTypes.SELLER_FIRST:
+        return 'Secret Hash'
+    if swap_type == SwapTypes.XMR_SWAP:
+        return 'Adaptor Sig'
+    return None

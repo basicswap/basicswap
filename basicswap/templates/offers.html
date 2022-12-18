@@ -374,6 +374,7 @@
                         <th scope="col" class="py-3 px-6"> Network </th>
                         <th scope="col" class="py-3 px-6"> Recipient </th>
                         <!--<th scope="col" class="py-3 px-6">ID</th>-->
+                        <th scope="col" class="py-3">Swap Type</th>
                         <th scope="col" class="py-3"> You Get</th>
                         <th scope="col" class="py-3"></th>
                         <th scope="col" class="py-3"> You Send</th>
@@ -402,6 +403,7 @@
                         <!--Todo: Add link back -->
                         <td class="py-4 px-6">{{ o[7] }} {% if o[12]==2 %}(Revoked){% elif o[11]==true %}(Not Active){% else %}(Active){% endif %}</td>
                         <td class="py-4 px-6 text-xs monospace"><a href="/identity/{{ o[8] }}{% if o[9]==true %}{% endif %}">{{ o[8] }}</a></td>
+                        <td class="py-4 text-xs">{{ o[13] }}</td>
                         <td class="py-4"><span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded">
                         {% if o[9]==true %}
                         <img class="h-7" src="/static/images/coins/{{ o[3]|replace(" ", "-") }}.png" alt=""></span> {{ o[3] }}</td>

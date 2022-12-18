@@ -107,6 +107,10 @@
                     <td>{{ data.state }}</td>
                   </tr>
                   <tr class="bg-white border-t hover:bg-gray-50">
+                    <td class="py-4 px-6 bold">Swap Type</td>
+                    <td>{{ data.swap_type }}</td>
+                  </tr>
+                  <tr class="bg-white border-t hover:bg-gray-50">
                   <td class="py-4 px-6 bold">{% if data.sent %}You Send{% else %}You Get{% endif %}</td>
                   <td><span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded">
                       <img class="h-7" src="/static/images/coins/{{ data.coin_from }}.png" alt="{{ data.coin_from }}">

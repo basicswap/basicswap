@@ -32,6 +32,8 @@ from basicswap.basicswap_util import (
     DebugTypes,
     getLockName,
     strBidState,
+    strSwapDesc,
+    strSwapType,
     TxLockTypes,
     strOfferState,
 )
@@ -53,6 +55,15 @@ def decode_offer_id(v):
         return offer_id
     except Exception:
         raise ValueError('Bad offer ID')
+
+
+def swap_type_from_string(str_swap_type: str) -> SwapTypes:
+    if str_swap_type == 'seller_first':
+        return SwapTypes.SELLER_FIRST
+    elif str_swap_type == 'xmr_swap':
+        return SwapTypes.XMR_SWAP
+    else:
+        raise ValueError('Unknown swap type')
 
 
 def parseOfferFormData(swap_client, form_data, page_data, options={}):
@@ -91,11 +102,6 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
     except Exception:
         errors.append('Unknown Coin To')
 
-    if parsed_data['coin_to'] in (Coins.XMR, Coins.PART_ANON):
-        page_data['swap_style'] = 'xmr'
-    else:
-        page_data['swap_style'] = 'atomic'
-
     try:
         page_data['amt_from'] = get_data_entry(form_data, 'amt_from')
         parsed_data['amt_from'] = inputAmount(page_data['amt_from'], ci_from)
@@ -131,6 +137,29 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
     parsed_data['amt_var'] = page_data['amt_var']
     page_data['rate_var'] = True if have_data_entry(form_data, 'rate_var') else False
     parsed_data['rate_var'] = page_data['rate_var']
+
+    page_data['automation_strat_id'] = int(get_data_entry_or(form_data, 'automation_strat_id', -1))
+    parsed_data['automation_strat_id'] = page_data['automation_strat_id']
+    swap_type = -1
+    if have_data_entry(form_data, 'swap_type'):
+        page_data['swap_type'] = get_data_entry(form_data, 'swap_type')
+        parsed_data['swap_type'] = page_data['swap_type']
+        swap_type = swap_type_from_string(parsed_data['swap_type'])
+    if have_data_entry(form_data, 'subfee'):
+        parsed_data['subfee'] = True
+
+    if parsed_data['coin_to'] in (Coins.XMR, Coins.PART_ANON) or swap_type == SwapTypes.XMR_SWAP:
+        page_data['swap_style'] = 'xmr'
+        parsed_data['swap_type'] = strSwapType(SwapTypes.XMR_SWAP)
+    else:
+        page_data['swap_style'] = 'atomic'
+        parsed_data['swap_type'] = strSwapType(SwapTypes.SELLER_FIRST)
+
+    if 'swap_type' in parsed_data:
+        try:
+            swap_client.validateSwapType(coin_from, coin_to, swap_type)
+        except Exception as e:
+            errors.append(f'Invalid Swap type {e}')
 
     if have_data_entry(form_data, 'step1'):
         if len(errors) == 0 and have_data_entry(form_data, 'continue'):
@@ -175,13 +204,6 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
     elif have_data_entry(form_data, 'valid_for_seconds'):
         parsed_data['valid_for_seconds'] = int(get_data_entry(form_data, 'valid_for_seconds'))
 
-    page_data['automation_strat_id'] = int(get_data_entry_or(form_data, 'automation_strat_id', -1))
-    parsed_data['automation_strat_id'] = page_data['automation_strat_id']
-    if have_data_entry(form_data, 'swap_type'):
-        parsed_data['swap_type'] = get_data_entry(form_data, 'swap_type')
-    if have_data_entry(form_data, 'subfee'):
-        parsed_data['subfee'] = True
-
     try:
         if len(errors) == 0 and page_data['swap_style'] == 'xmr':
             if have_data_entry(form_data, 'fee_rate_from'):
@@ -220,12 +242,7 @@ def postNewOfferFromParsed(swap_client, parsed_data):
 
     if 'swap_type' in parsed_data:
         str_swap_type = parsed_data['swap_type'].lower()
-        if str_swap_type == 'seller_first':
-            swap_type = SwapTypes.SELLER_FIRST
-        elif str_swap_type == 'xmr_swap':
-            swap_type = SwapTypes.XMR_SWAP
-        else:
-            raise ValueError('Unknown swap type')
+        swap_type = swap_type_from_string(str_swap_type)
     elif parsed_data['coin_to'] in (Coins.XMR, Coins.PART_ANON):
         swap_type = SwapTypes.XMR_SWAP
 
@@ -319,6 +336,7 @@ def offer_to_post_string(self, swap_client, offer_id):
         'rate': ci_to.format_amount(offer.rate),
         'amt_to': ci_to.format_amount((offer.amount_from * offer.rate) // ci_from.COIN()),
         'validhrs': offer.time_valid // (60 * 60),
+        'swap_type': strSwapType(offer.swap_type),
     }
 
     if offer.amount_negotiable:
@@ -359,6 +377,7 @@ def page_newoffer(self, url_split, post_string):
         'debug_ui': swap_client.debug_ui,
         'automation_strat_id': -1,
         'amt_bid_min': format_amount(1000, 8),
+        'swap_type': strSwapType(SwapTypes.SELLER_FIRST),
     }
 
     post_data = parse.parse_qs(post_string)
@@ -416,6 +435,7 @@ def page_newoffer(self, url_split, post_string):
         'data': page_data,
         'automation_strategies': automation_strategies,
         'summary': summary,
+        'swap_types': [(strSwapType(x), strSwapDesc(x)) for x in SwapTypes if strSwapType(x)],
     })
 
 
@@ -532,7 +552,8 @@ def page_offer(self, url_split, post_string):
         'debug_ui': swap_client.debug_ui,
         'automation_strat_id': -1,
         'is_expired': offer.expire_at <= now,
-        'active_ind': offer.active_ind
+        'active_ind': offer.active_ind,
+        'swap_type': strSwapDesc(offer.swap_type)
     }
     data.update(extend_data)
 
@@ -660,7 +681,8 @@ def page_offers(self, url_split, post_string, sent=False):
             o.was_sent,
             ci_from.format_amount(completed_amount),
             is_expired,
-            o.active_ind))
+            o.active_ind,
+            strSwapDesc(o.swap_type)))
 
     coins_from, coins_to = listAvailableCoins(swap_client, split_from=True)
 
