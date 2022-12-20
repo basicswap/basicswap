@@ -473,7 +473,7 @@
 
     function set_swap_type_enabled(coin_from, coin_to, swap_type) {
       let make_hidden = false;
-      if (coin_to == '6' /* XMR */ || coin_to == '8' /* PART_ANON */) {
+      if (coin_to == '6' /* XMR */ || coin_to == '8' /* PART_ANON */ || coin_to == '7' /* PART_BLIND */ || coin_from == '7' /* PART_BLIND */) {
         swap_type.disabled = true;
         swap_type.value = 'xmr_swap';
         make_hidden = true;
@@ -486,12 +486,8 @@
         swap_type.disabled = false;
       }
       let swap_type_hidden = document.getElementById('swap_type_hidden');
-      console.log('make_hidden', make_hidden);
-      console.log('swap_type_hidden', swap_type_hidden);
-      console.log('swap_type.value', swap_type.value);
       if (make_hidden) {
         if (!swap_type_hidden) {
-          console.log('createElement');
           swap_type_hidden = document.createElement('input');
           swap_type_hidden.setAttribute('id', 'swap_type_hidden');
           swap_type_hidden.setAttribute('type', 'hidden');
@@ -501,7 +497,6 @@
         swap_type_hidden.setAttribute('value', swap_type.value);
       } else
       if (swap_type_hidden) {
-        console.log('remove element');
         swap_type_hidden.parentNode.removeChild(swap_type_hidden);
       }
     }

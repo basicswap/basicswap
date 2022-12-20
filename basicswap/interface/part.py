@@ -625,6 +625,122 @@ class PARTInterfaceBlind(PARTInterface):
     def getSpendableBalance(self):
         return self.make_int(self.rpc_callback('getbalances')['mine']['blind_trusted'])
 
+    def publishBLockTx(self, vkbv, Kbs, output_amount, feerate, delay_for: int = 10, unlock_time: int = 0) -> bytes:
+        Kbv = self.getPubkey(vkbv)
+        sx_addr = self.formatStealthAddress(Kbv, Kbs)
+        self._log.debug('sx_addr: {}'.format(sx_addr))
+
+        # TODO: Fund from other balances
+        params = ['blind', 'blind',
+                  [{'address': sx_addr, 'amount': self.format_amount(output_amount)}, ],
+                  '', '', self._anon_tx_ring_size, 1, False,
+                  {'conf_target': self._conf_target, 'blind_watchonly_visible': True}]
+
+        txid = self.rpc_callback('sendtypeto', params)
+        return bytes.fromhex(txid)
+
+    def findTxB(self, kbv, Kbs, cb_swap_value, cb_block_confirmed, restore_height, bid_sender):
+        Kbv = self.getPubkey(kbv)
+        sx_addr = self.formatStealthAddress(Kbv, Kbs)
+
+        # Tx recipient must import the stealth address as watch only
+        if bid_sender:
+            cb_swap_value *= -1
+        else:
+            addr_info = self.rpc_callback('getaddressinfo', [sx_addr])
+            if not addr_info['iswatchonly']:
+                wif_prefix = self.chainparams_network()['key_prefix']
+                wif_scan_key = toWIF(wif_prefix, kbv)
+                self.rpc_callback('importstealthaddress', [wif_scan_key, Kbs.hex()])
+                self._log.info('Imported watch-only sx_addr: {}'.format(sx_addr))
+                self._log.info('Rescanning {} chain from height: {}'.format(self.coin_name(), restore_height))
+                self.rpc_callback('rescanblockchain', [restore_height])
+
+        params = [{'include_watchonly': True, 'search': sx_addr}]
+        txns = self.rpc_callback('filtertransactions', params)
+
+        if len(txns) == 1:
+            tx = txns[0]
+            assert (tx['outputs'][0]['stealth_address'] == sx_addr)  # Should not be possible
+            ensure(tx['outputs'][0]['type'] == 'blind', 'Output is not anon')
+
+            if make_int(tx['outputs'][0]['amount']) == cb_swap_value:
+                height = 0
+                if tx['confirmations'] > 0:
+                    chain_height = self.rpc_callback('getblockcount')
+                    height = chain_height - (tx['confirmations'] - 1)
+                return {'txid': tx['txid'], 'amount': cb_swap_value, 'height': height}
+            else:
+                self._log.warning('Incorrect amount detected for coin b lock txn: {}'.format(tx['txid']))
+                return -1
+        return None
+
+    def spendBLockTx(self, chain_b_lock_txid, address_to, kbv, kbs, cb_swap_value, b_fee, restore_height, spend_actual_balance=False):
+        Kbv = self.getPubkey(kbv)
+        Kbs = self.getPubkey(kbs)
+        sx_addr = self.formatStealthAddress(Kbv, Kbs)
+        addr_info = self.rpc_callback('getaddressinfo', [sx_addr])
+        if not addr_info['ismine']:
+            wif_prefix = self.chainparams_network()['key_prefix']
+            wif_scan_key = toWIF(wif_prefix, kbv)
+            wif_spend_key = toWIF(wif_prefix, kbs)
+            self.rpc_callback('importstealthaddress', [wif_scan_key, wif_spend_key])
+            self._log.info('Imported spend key for sx_addr: {}'.format(sx_addr))
+            self._log.info('Rescanning {} chain from height: {}'.format(self.coin_name(), restore_height))
+            self.rpc_callback('rescanblockchain', [restore_height])
+
+        # TODO: Remove workaround
+        # utxos = self.rpc_callback('listunspentblind', [1, 9999999, [sx_addr]])
+        utxos = []
+        all_utxos = self.rpc_callback('listunspentblind', [1, 9999999])
+        for utxo in all_utxos:
+            if utxo.get('stealth_address', '_') == sx_addr:
+                utxos.append(utxo)
+        if len(utxos) < 1:
+            raise TemporaryError('No spendable outputs')
+        elif len(utxos) > 1:
+            raise ValueError('Too many spendable outputs')
+
+        utxo = utxos[0]
+        utxo_sats = make_int(utxo['amount'])
+
+        if spend_actual_balance and utxo_sats != cb_swap_value:
+            self._log.warning('Spending actual balance {}, not swap value {}.'.format(utxo_sats, cb_swap_value))
+            cb_swap_value = utxo_sats
+
+        inputs = [{'tx': utxo['txid'], 'n': utxo['vout']}, ]
+        params = ['blind', 'blind',
+                  [{'address': address_to, 'amount': self.format_amount(cb_swap_value), 'subfee': True}, ],
+                  '', '', self._anon_tx_ring_size, 1, False,
+                  {'conf_target': self._conf_target, 'inputs': inputs, 'show_fee': True}]
+        rv = self.rpc_callback('sendtypeto', params)
+        return bytes.fromhex(rv['txid'])
+
+    def findTxnByHash(self, txid_hex):
+        # txindex is enabled for Particl
+
+        try:
+            rv = self.rpc_callback('getrawtransaction', [txid_hex, True])
+        except Exception as ex:
+            self._log.debug('findTxnByHash getrawtransaction failed: {}'.format(txid_hex))
+            return None
+
+        if 'confirmations' in rv and rv['confirmations'] >= self.blocks_confirmed:
+            return {'txid': txid_hex, 'amount': 0, 'height': rv['height']}
+
+        return None
+
+    def createRawFundedTransaction(self, addr_to: str, amount: int, sub_fee: bool = False, lock_unspents: bool = True) -> str:
+        txn = self.rpc_callback('createrawtransaction', [[], {addr_to: self.format_amount(amount)}])
+
+        options = {
+            'lockUnspents': lock_unspents,
+            'conf_target': self._conf_target,
+        }
+        if sub_fee:
+            options['subtractFeeFromOutputs'] = [0,]
+        return self.rpc_callback('fundrawtransactionfrom', ['blind', txn, options])['hex']
+
 
 class PARTInterfaceAnon(PARTInterface):
     @staticmethod
@@ -638,9 +754,9 @@ class PARTInterfaceAnon(PARTInterface):
     def coin_name(self):
         return super().coin_name() + ' Anon'
 
-    def publishBLockTx(self, Kbv, Kbs, output_amount, feerate, delay_for: int = 10, unlock_time: int = 0) -> bytes:
+    def publishBLockTx(self, kbv, Kbs, output_amount, feerate, delay_for: int = 10, unlock_time: int = 0) -> bytes:
+        Kbv = self.getPubkey(kbv)
         sx_addr = self.formatStealthAddress(Kbv, Kbs)
-        self._log.debug('sx_addr: {}'.format(sx_addr))
 
         # TODO: Fund from other balances
         params = ['anon', 'anon',

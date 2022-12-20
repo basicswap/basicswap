@@ -258,11 +258,12 @@ class XMRInterface(CoinInterface):
     def encodeSharedAddress(self, Kbv, Kbs):
         return xmr_util.encode_address(Kbv, Kbs)
 
-    def publishBLockTx(self, Kbv, Kbs, output_amount, feerate, delay_for: int = 10, unlock_time: int = 0) -> bytes:
+    def publishBLockTx(self, kbv, Kbs, output_amount, feerate, delay_for: int = 10, unlock_time: int = 0) -> bytes:
         with self._mx_wallet:
             self.openWallet(self._wallet_filename)
             self.rpc_wallet_cb('refresh')
 
+            Kbv = self.getPubkey(kbv)
             shared_addr = xmr_util.encode_address(Kbv, Kbs)
 
             params = {'destinations': [{'amount': output_amount, 'address': shared_addr}], 'unlock_time': unlock_time}

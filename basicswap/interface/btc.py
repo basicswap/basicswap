@@ -987,7 +987,7 @@ class BTCInterface(CoinInterface):
         tx = self.loadTx(tx_bytes)
         return tx.wit.vtxinwit[0].scriptWitness.stack[2]
 
-    def createBLockTx(self, Kbs, output_amount):
+    def createBLockTx(self, Kbs, output_amount, vkbv=None) -> bytes:
         tx = CTransaction()
         tx.nVersion = self.txVersion()
         p2wpkh_script_pk = self.getPkDest(Kbs)
@@ -997,7 +997,7 @@ class BTCInterface(CoinInterface):
     def encodeSharedAddress(self, Kbv, Kbs):
         return self.pubkey_to_segwit_address(Kbs)
 
-    def publishBLockTx(self, Kbv, Kbs, output_amount, feerate, delay_for: int = 10, unlock_time: int = 0) -> bytes:
+    def publishBLockTx(self, kbv, Kbs, output_amount, feerate, delay_for: int = 10, unlock_time: int = 0) -> bytes:
         b_lock_tx = self.createBLockTx(Kbs, output_amount)
 
         b_lock_tx = self.fundTx(b_lock_tx, feerate)
