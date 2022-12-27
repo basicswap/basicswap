@@ -735,8 +735,7 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
             if chain == 'testnet':
                 fp.write('testnet=1\n')
             config_datadir = data_dir
-            if core_settings['manage_daemon'] is False:
-                # Assume conf file is for isolated coin docker setup
+            if extra_opts.get('use_containers', False) is True:
                 config_datadir = '/data'
             fp.write(f'data-dir={config_datadir}\n')
             fp.write('rpc-bind-port={}\n'.format(core_settings['rpcport']))
@@ -761,16 +760,14 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
         if os.path.exists(wallet_conf_path):
             exitWithError('{} exists'.format(wallet_conf_path))
         with open(wallet_conf_path, 'w') as fp:
+            config_datadir = os.path.join(data_dir, 'wallets')
             if extra_opts.get('use_containers', False) is True:
                 fp.write('daemon-address={}:{}\n'.format(core_settings['rpchost'], core_settings['rpcport']))
+                config_datadir = '/data'
             fp.write('untrusted-daemon=1\n')
             fp.write('no-dns=1\n')
             fp.write('rpc-bind-port={}\n'.format(core_settings['walletrpcport']))
             fp.write('rpc-bind-ip={}\n'.format(COINS_RPCBIND_IP))
-            config_datadir = os.path.join(data_dir, 'wallets')
-            if core_settings['manage_wallet_daemon'] is False:
-                # Assume conf file is for isolated coin docker setup
-                config_datadir = '/data'
             fp.write(f'wallet-dir={config_datadir}\n')
             fp.write('log-file={}\n'.format(os.path.join(config_datadir, 'wallet.log')))
             fp.write('shared-ringdb-dir={}\n'.format(os.path.join(config_datadir, 'shared-ringdb')))

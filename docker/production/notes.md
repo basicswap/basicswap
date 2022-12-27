@@ -82,7 +82,7 @@ Create config files:
     export WITH_COINS=bitcoin,litecoin,monero
 
     docker-compose -f docker-compose-prepare.yml run --rm swapprepare \
-        basicswap-prepare --nocores --withcoins=${WITH_COINS} --htmlhost="0.0.0.0" --particl_mnemonic=none
+        basicswap-prepare --nocores --usecontainers --withcoins=${WITH_COINS} --htmlhost="0.0.0.0" --particl_mnemonic=none
 
 
 Start coin cores only:
