@@ -11,6 +11,9 @@
             - ${DATA_PATH}/particl:/data/particl
             - ${DATA_PATH}/bitcoin:/data/bitcoin
             - ${DATA_PATH}/litecoin:/data/litecoin
+            - ${DATA_PATH}/pivx:/data/pivx
+            - ${DATA_PATH}/dash:/data/dash
+            - ${DATA_PATH}/firo:/data/firo
         environment:
             - TZ
             - UI_HTML_PORT
@@ -42,4 +45,19 @@
             - XMR_WALLET_RPC_USER
             - XMR_WALLET_RPC_PWD
             - DEFAULT_XMR_RESTORE_HEIGHT
+            - PIVX_DATA_DIR
+            - PIVX_RPC_HOST
+            - PIVX_RPC_PORT
+            - PIVX_RPC_USER
+            - PIVX_RPC_PWD
+            - DASH_DATA_DIR
+            - DASH_RPC_HOST
+            - DASH_RPC_PORT
+            - DASH_RPC_USER
+            - DASH_RPC_PWD
+            - FIRO_DATA_DIR
+            - FIRO_RPC_HOST
+            - FIRO_RPC_PORT
+            - FIRO_RPC_USER
+            - FIRO_RPC_PWD
         restart: "no"

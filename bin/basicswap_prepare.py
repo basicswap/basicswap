@@ -833,7 +833,7 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
             params_dir = os.path.join(data_dir, 'pivx-params')
             downloadPIVXParams(params_dir)
             fp.write('prune=4000\n')
-            PIVX_PARAMSDIR = os.getenv('PIVX_PARAMSDIR', params_dir)
+            PIVX_PARAMSDIR = os.getenv('PIVX_PARAMSDIR', '/data/pivx-params' if extra_opts.get('use_containers', False) else params_dir)
             fp.write(f'paramsdir={PIVX_PARAMSDIR}\n')
             if PIVX_RPC_USER != '':
                 fp.write('rpcauth={}:{}${}\n'.format(PIVX_RPC_USER, salt, password_to_hmac(salt, PIVX_RPC_PWD)))
@@ -1085,7 +1085,7 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
         try:
             swap_client = BasicSwap(fp, data_dir, settings, chain)
 
-            coins_to_create_wallets_for = (Coins.PART, Coins.BTC, Coins.LTC, Coins.PIVX)
+            coins_to_create_wallets_for = (Coins.PART, Coins.BTC, Coins.LTC)
             # Always start Particl, it must be running to initialise a wallet in addcoin mode
             # Particl must be loaded first as subsequent coins are initialised from the Particl mnemonic
             start_daemons = ['particl', ] + [c for c in with_coins if c != 'particl']
@@ -1145,7 +1145,10 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
                 swap_client.waitForDaemonRPC(c)
                 swap_client.initialiseWallet(c)
                 if WALLET_ENCRYPTION_PWD != '' and c not in coins_to_create_wallets_for:
-                    swap_client.ci(c).changeWalletPassword('', WALLET_ENCRYPTION_PWD)
+                    try:
+                        swap_client.ci(c).changeWalletPassword('', WALLET_ENCRYPTION_PWD)
+                    except Exception as e:
+                        logger.warning(f'changeWalletPassword failed for {coin_name}.')
 
         finally:
             if swap_client:
