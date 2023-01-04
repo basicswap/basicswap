@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019-2022 tecnovert
+# Copyright (c) 2019-2023 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -357,6 +357,13 @@ def testOnionLink():
     test_response = downloadBytes(test_url).decode('utf-8')
     assert ('The Tor Project\'s free software protects your privacy online.' in test_response)
     logger.info('Onion links work.')
+
+
+def havePubkey(gpg, key_id):
+    for key in gpg.list_keys():
+        if key['keyid'] == key_id:
+            return True
+    return False
 
 
 def downloadPIVXParams(output_dir):
@@ -1175,12 +1182,14 @@ def signal_handler(sig, frame):
 
 
 def check_btc_fastsync_data(base_dir, sync_file_path):
+    github_pgp_url = 'https://raw.githubusercontent.com/tecnovert/basicswap/master/pgp'
+    gitlab_pgp_url = 'https://gitlab.com/particl/basicswap/-/raw/master/pgp'
     asc_filename = BITCOIN_FASTSYNC_FILE + '.asc'
     asc_file_path = os.path.join(base_dir, asc_filename)
     if not os.path.exists(asc_file_path):
         asc_file_urls = (
-            'https://raw.githubusercontent.com/tecnovert/basicswap/master/pgp/sigs/' + asc_filename,
-            'https://gitlab.com/particl/basicswap/-/raw/master/pgp/sigs/' + asc_filename,
+            github_pgp_url + '/sigs/' + asc_filename,
+            gitlab_pgp_url + '/sigs/' + asc_filename,
         )
         for url in asc_file_urls:
             try:
@@ -1189,6 +1198,13 @@ def check_btc_fastsync_data(base_dir, sync_file_path):
             except Exception as e:
                 logging.warning('Download failed: %s', str(e))
     gpg = gnupg.GPG()
+    pubkey_filename = '{}_{}.pgp'.format('particl', 'tecnovert')
+    pubkeyurls = [
+        github_pgp_url + '/keys/' + pubkey_filename,
+        gitlab_pgp_url + '/keys/' + pubkey_filename,
+    ]
+    if not havePubkey(gpg, expected_key_ids['tecnovert'][0]):
+        importPubkeyFromUrls(gpg, pubkeyurls)
     with open(asc_file_path, 'rb') as fp:
         verified = gpg.verify_file(fp, sync_file_path)
 
