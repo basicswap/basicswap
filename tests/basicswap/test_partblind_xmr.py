@@ -313,7 +313,6 @@ class Test(BaseTest):
         self.ensure_balance(self.test_coin_from, 2, 100.0)
 
         js_w2 = read_json_api(1802, 'wallets')
-        print('[rm] js_w2', js_w2)
         post_json = {
             'value': float(js_w2['PART']['blind_balance']),
             'type_from': 'blind',

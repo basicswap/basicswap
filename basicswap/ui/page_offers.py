@@ -58,9 +58,9 @@ def decode_offer_id(v):
 
 
 def swap_type_from_string(str_swap_type: str) -> SwapTypes:
-    if str_swap_type == 'seller_first':
+    if str_swap_type == 'seller_first' or str_swap_type == 'secret_hash':
         return SwapTypes.SELLER_FIRST
-    elif str_swap_type == 'xmr_swap':
+    elif str_swap_type == 'xmr_swap' or str_swap_type == 'adaptor_sig':
         return SwapTypes.XMR_SWAP
     else:
         raise ValueError('Unknown swap type')
@@ -123,11 +123,15 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
     except Exception:
         errors.append('Minimum Bid Amount')
 
-    try:
-        page_data['amt_to'] = get_data_entry(form_data, 'amt_to')
-        parsed_data['amt_to'] = inputAmount(page_data['amt_to'], ci_to)
-    except Exception:
-        errors.append('Amount To')
+    if (have_data_entry(form_data, 'rate')):
+        parsed_data['rate'] = ci_to.make_int(form_data['rate'], r=1)
+        page_data['rate'] = ci_to.format_amount(parsed_data['rate'])
+    else:
+        try:
+            page_data['amt_to'] = get_data_entry(form_data, 'amt_to')
+            parsed_data['amt_to'] = inputAmount(page_data['amt_to'], ci_to)
+        except Exception:
+            errors.append('Amount To')
 
     if 'amt_to' in parsed_data and 'amt_from' in parsed_data:
         parsed_data['rate'] = ci_from.make_int(parsed_data['amt_to'] / parsed_data['amt_from'], r=1)
@@ -141,19 +145,24 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
     page_data['automation_strat_id'] = int(get_data_entry_or(form_data, 'automation_strat_id', -1))
     parsed_data['automation_strat_id'] = page_data['automation_strat_id']
     swap_type = -1
+
+    if have_data_entry(form_data, 'subfee'):
+        parsed_data['subfee'] = True
     if have_data_entry(form_data, 'swap_type'):
         page_data['swap_type'] = get_data_entry(form_data, 'swap_type')
         parsed_data['swap_type'] = page_data['swap_type']
         swap_type = swap_type_from_string(parsed_data['swap_type'])
-    if have_data_entry(form_data, 'subfee'):
-        parsed_data['subfee'] = True
-
-    if parsed_data['coin_to'] in (Coins.XMR, Coins.PART_ANON) or swap_type == SwapTypes.XMR_SWAP:
-        page_data['swap_style'] = 'xmr'
+    elif parsed_data['coin_to'] in (Coins.XMR, Coins.PART_ANON):
         parsed_data['swap_type'] = strSwapType(SwapTypes.XMR_SWAP)
+        swap_type = SwapTypes.XMR_SWAP
+    else:
+        parsed_data['swap_type'] = strSwapType(SwapTypes.SELLER_FIRST)
+        swap_type = SwapTypes.SELLER_FIRST
+
+    if swap_type == SwapTypes.XMR_SWAP:
+        page_data['swap_style'] = 'xmr'
     else:
         page_data['swap_style'] = 'atomic'
-        parsed_data['swap_type'] = strSwapType(SwapTypes.SELLER_FIRST)
 
     if 'swap_type' in parsed_data:
         try:

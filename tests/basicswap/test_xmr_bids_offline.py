@@ -61,7 +61,7 @@ class Test(XmrTestBase):
             'amt_from': 1,
             'amt_to': 1,
             'lockhrs': 24,
-            'autoaccept': True}
+            'automation_strat_id': 1}
         rv = json.loads(urlopen('http://127.0.0.1:12700/json/offers/new', data=parse.urlencode(offer_data).encode()).read())
         offer0_id = rv['offer_id']
 

@@ -788,8 +788,7 @@ class Test(BaseTest):
             'coin_to': 6,
             'amt_from': 1,
             'amt_to': 1,
-            'lockhrs': 24,
-            'autoaccept': True}
+            'lockhrs': 24}
         rv = json.loads(post_json_req('http://127.0.0.1:1800/json/offers/new', post_json))
         offer_id_hex = rv['offer_id']
 

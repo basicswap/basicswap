@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019-2022 tecnovert
+# Copyright (c) 2019-2023 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -127,11 +127,14 @@ class Test(unittest.TestCase):
                 'amt_to': '1',
                 'lockhrs': '24'}
 
-            offer_id = post_json_api(12700, 'offers/new', data)
+            offer_id = post_json_api(12700, 'offers/new', data)['offer_id']
             summary = read_json_api(12700)
             assert (summary['num_sent_offers'] == 1)
         except Exception:
             traceback.print_exc()
+
+        sentoffers = read_json_api(12700, 'sentoffers', {'active': True})
+        assert sentoffers[0]['offer_id'] == offer_id
 
         logger.info('Waiting for offer:')
         waitForNumOffers(delay_event, 12701, 1)
