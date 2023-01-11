@@ -123,7 +123,7 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
     except Exception:
         errors.append('Minimum Bid Amount')
 
-    if (have_data_entry(form_data, 'rate')):
+    if (have_data_entry(form_data, 'rate') and not have_data_entry(form_data, 'amt_to')):
         parsed_data['rate'] = ci_to.make_int(form_data['rate'], r=1)
         page_data['rate'] = ci_to.format_amount(parsed_data['rate'])
     else:
