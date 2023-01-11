@@ -663,7 +663,7 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
                     for key in rv.fingerprints:
                         gpg.trust_keys(rv.fingerprints[0], 'TRUST_FULLY')
 
-    if coin in ('pivx', 'firo'):
+    if coin in ('firo', ):
         pubkey_filename = '{}_{}.pgp'.format('particl', signing_key_name)
     else:
         pubkey_filename = '{}_{}.pgp'.format(coin, signing_key_name)

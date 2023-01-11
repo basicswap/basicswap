@@ -117,15 +117,15 @@
 (define-public basicswap
 (package
   (name "basicswap")
-  (version "0.11.55")
+  (version "0.11.58")
   (source (origin
     (method git-fetch)
     (uri (git-reference
       (url "https://github.com/tecnovert/basicswap")
-      (commit "ac07727da7ec0f6bf2df832843dcaafc7dd7046a")))
+      (commit "9729dcf526917eb5e128dd72b091464d1e72fe54")))
     (sha256
       (base32
-        "1xg70jyvggkcr0la7lnj96w34pxrr0sp59d174jpgmlfs625ybbk"))
+        "0sjxk4c9vzn5fr8dqxrmvgw1267njjkblajxvqf3kls5b2s7l41k"))
     (file-name (git-file-name name version))))
   (build-system python-build-system)
 

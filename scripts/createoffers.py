@@ -75,6 +75,7 @@ def readTemplates(known_coins):
                 offer_template['minrate'] = float(row_data[3])
                 offer_template['ratetweakpercent'] = float(row_data[4])
                 offer_template['amount_variable'] = row_data[5].lower() in ('true', 1)
+                offer_template['address'] = row_data[6]
                 offer_templates.append(offer_template)
             except Exception as e:
                 print(f'Warning: Skipping row {i}, {e}')
@@ -91,7 +92,8 @@ def main():
 
     if not os.path.exists('offer_rules.csv'):
         with open('offer_rules.csv', 'w') as fp:
-            fp.write('coin from,coin to,offer value,min rate,rate tweak percent,amount variable')
+            # Set address to -1 to use new addresses
+            fp.write('coin from,coin to,offer value,min rate,rate tweak percent,amount variable,address')
 
     known_coins = read_json_api(args.port, 'coins')
     coins_map = {}
@@ -104,6 +106,9 @@ def main():
         offer_templates = readTemplates(known_coins)
 
         try:
+            recieved_offers = read_json_api(args.port, 'offers', {'active': 'active', 'include_sent': False})
+            print('recieved_offers', recieved_offers)
+
             sent_offers = read_json_api(args.port, 'sentoffers', {'active': 'active'})
 
             for offer_template in offer_templates:
@@ -133,7 +138,7 @@ def main():
 
                 print('Creating offer for: {} at rate: {}'.format(offer_template, use_rate))
                 offer_data = {
-                    'addr_from': '-1',
+                    'addr_from': offer_template['address'],
                     'coin_from': coin_from_data['ticker'],
                     'coin_to': coin_to_data['ticker'],
                     'amt_from': offer_template['amount'],

@@ -171,6 +171,8 @@ def js_offers(self, url_split, post_string, is_json, sent=False) -> bytes:
             assert (filters['limit'] > 0 and filters['limit'] <= PAGE_LIMIT), 'Invalid limit'
         if have_data_entry(post_data, 'active'):
             filters['active'] = get_data_entry(post_data, 'active')
+        if have_data_entry(post_data, 'include_sent'):
+            filters['include_sent'] = toBool(get_data_entry(post_data, 'include_sent'))
 
     offers = swap_client.listOffers(sent, filters)
     rv = []
