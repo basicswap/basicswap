@@ -1391,7 +1391,7 @@ def main():
             if check_sig:
                 check_btc_fastsync_data(data_dir, sync_file_path)
         except Exception as e:
-            logger.error(f'Failed to download BTC fastsync file: {e}\nTry manually downloading from {sync_file_url}')
+            logger.error(f'Failed to download BTC fastsync file: {e}\nRe-running the command should resume the download or try manually downloading from {sync_file_url}')
             return 1
 
     withchainclients = {}
