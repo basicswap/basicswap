@@ -52,8 +52,8 @@ MONERO_VERSION = os.getenv('MONERO_VERSION', '0.18.1.2')
 MONERO_VERSION_TAG = os.getenv('MONERO_VERSION_TAG', '')
 XMR_SITE_COMMIT = '4624278f68135d2e3eeea58fe53d07340e58c480'  # Lock hashes.txt to monero version
 
-PIVX_VERSION = os.getenv('PIVX_VERSION', '5.4.99')
-PIVX_VERSION_TAG = os.getenv('PIVX_VERSION_TAG', '_scantxoutset')
+PIVX_VERSION = os.getenv('PIVX_VERSION', '5.5.0')
+PIVX_VERSION_TAG = os.getenv('PIVX_VERSION_TAG', '')
 
 DASH_VERSION = os.getenv('DASH_VERSION', '18.1.0')
 DASH_VERSION_TAG = os.getenv('DASH_VERSION_TAG', '')
@@ -70,7 +70,7 @@ known_coins = {
     'bitcoin': (BITCOIN_VERSION, BITCOIN_VERSION_TAG, ('laanwj',)),
     'namecoin': ('0.18.0', '', ('JeremyRand',)),
     'monero': (MONERO_VERSION, MONERO_VERSION_TAG, ('binaryfate',)),
-    'pivx': (PIVX_VERSION, PIVX_VERSION_TAG, ('tecnovert',)),
+    'pivx': (PIVX_VERSION, PIVX_VERSION_TAG, ('fuzzbawls',)),
     'dash': (DASH_VERSION, DASH_VERSION_TAG, ('pasta',)),
     # 'firo': (FIRO_VERSION, FIRO_VERSION_TAG, ('reuben',)),
     'firo': (FIRO_VERSION, FIRO_VERSION_TAG, ('tecnovert',)),
@@ -583,9 +583,9 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
             assert_url = 'https://raw.githubusercontent.com/namecoin/gitian.sigs/master/%s-%s/%s/%s' % (version, os_dir_name, signing_key_name, assert_filename)
         elif coin == 'pivx':
             release_filename = '{}-{}-{}.{}'.format(coin, version, BIN_ARCH, FILE_EXT)
-            release_url = 'https://github.com/tecnovert/particl-core/releases/download/v{}/{}'.format(version + version_tag, release_filename)
-            assert_filename = 'pivx-{}-6.0-build.assert'.format(os_name)
-            assert_url = 'https://raw.githubusercontent.com/tecnovert/gitian.sigs/pivx/5.4.99_scantxoutset-{}/tecnovert/{}'.format(os_dir_name, assert_filename)
+            release_url = 'https://github.com/PIVX-Project/PIVX/releases/download/v{}/{}'.format(version + version_tag, release_filename)
+            assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, version.rsplit('.', 1)[0])
+            assert_url = 'https://raw.githubusercontent.com/PIVX-Project/gitian.sigs/master/%s-%s/%s/%s' % (version + version_tag, os_dir_name, signing_key_name.capitalize(), assert_filename)
         elif coin == 'dash':
             release_filename = '{}-{}-{}.{}'.format('dashcore', version + version_tag, BIN_ARCH, FILE_EXT)
             release_url = 'https://github.com/dashpay/dash/releases/download/v{}/{}'.format(version + version_tag, release_filename)
