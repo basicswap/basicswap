@@ -39,7 +39,7 @@ Consider adding COINDATA_PATH to the `.env` file in the docker directory file so
     cd basicswap/docker
     docker-compose build
 
-Depending on your environment, the `docker-compose` may not work. If that's the case, type `docker compose` instead, without the dash.
+Depending on your environment, the `docker-compose` command may not work. If that's the case, type `docker compose` instead, without the dash.
 
 #### Prepare the datadir:
 
@@ -71,7 +71,7 @@ To instead use Monero public nodes and not run a local Monero daemon<br>(it can 
 **Record the mnemonic from the output of the above command.**
 And the output of `echo $CURRENT_XMR_HEIGHT` for use if you need to later restore your wallet.
 
-#### Make COINDATA_PATH permanent:
+#### Make COINDATA_PATH permanent (optional):
 
 Edit the `.env` file in the docker directory and uncomment COINDATA_PATH line by deleting the hashtag.
 
