@@ -45,9 +45,15 @@ from basicswap.rpc import (
 )
 from tests.basicswap.mnemonics import mnemonics
 import bin.basicswap_run as runSystem
-from bin.basicswap_prepare import LTC_RPC_PORT, BTC_RPC_PORT
+from tests.basicswap.common import (
+    BTC_BASE_RPC_PORT,
+    LTC_BASE_RPC_PORT,
+)
 
+PORT_OFS = int(os.getenv('PORT_OFS', 1))
 TEST_PATH = os.path.expanduser(os.getenv('TEST_PATH', '~/test_basicswap1'))
+LITECOIN_RPC_PORT_BASE = int(os.getenv('LITECOIN_RPC_PORT_BASE', LTC_BASE_RPC_PORT))
+BITCOIN_RPC_PORT_BASE = int(os.getenv('BITCOIN_RPC_PORT_BASE', BTC_BASE_RPC_PORT))
 
 logger = logging.getLogger()
 logger.level = logging.DEBUG
@@ -55,12 +61,12 @@ if not len(logger.handlers):
     logger.addHandler(logging.StreamHandler(sys.stdout))
 
 
-def callbtcnoderpc(node_id, method, params=[], wallet=None, base_rpc_port=BTC_RPC_PORT):
+def callbtcnoderpc(node_id, method, params=[], wallet=None, base_rpc_port=BITCOIN_RPC_PORT_BASE):
     auth = 'test_btc_{0}:test_btc_pwd_{0}'.format(node_id)
     return callrpc(base_rpc_port + node_id, auth, method, params, wallet)
 
 
-def callltcnoderpc(node_id, method, params=[], wallet=None, base_rpc_port=LTC_RPC_PORT):
+def callltcnoderpc(node_id, method, params=[], wallet=None, base_rpc_port=LITECOIN_RPC_PORT_BASE):
     auth = 'test_ltc_{0}:test_ltc_pwd_{0}'.format(node_id)
     return callrpc(base_rpc_port + node_id, auth, method, params, wallet)
 
@@ -99,10 +105,18 @@ class Test(TestBase):
         with patch.object(sys, 'argv', testargs):
             runSystem.main()
 
+    def finalise(self, processes):
+        self.delay_event.set()
+        if self.update_thread:
+            self.update_thread.join()
+        for p in processes:
+            p.terminate()
+        for p in processes:
+            p.join()
+
     def test_wallet(self):
         processes = []
 
-        self.wait_seconds(5)
         for i in range(3):
             processes.append(multiprocessing.Process(target=self.run_thread, args=(i,)))
             processes[-1].start()
@@ -129,6 +143,8 @@ class Test(TestBase):
 
             self.update_thread = threading.Thread(target=updateThread, args=(self,))
             self.update_thread.start()
+
+            self.wait_for_particl_height(12701, num_blocks=3)
 
             data = {
                 'addr_from': '-1',
@@ -157,8 +173,8 @@ class Test(TestBase):
 
             waitForNumBids(self.delay_event, 12700, 1)
 
-            waitForBidState(self.delay_event, 12700, bid_id, 'Completed')
-            waitForBidState(self.delay_event, 12701, bid_id, 'Completed')
+            waitForBidState(self.delay_event, 12700, bid_id, 'Completed', wait_for=120)
+            waitForBidState(self.delay_event, 12701, bid_id, 'Completed', wait_for=120)
 
             logging.info('Starting a new node on the same mnemonic as the first')
             prepare_node(3, self.used_mnemonics[0])
@@ -170,32 +186,29 @@ class Test(TestBase):
 
             # TODO: Attempt to detect past swaps
 
-            ltc_original = read_json_api(12700, 'wallets/ltc')
-            ltc_restored = read_json_api(12703, 'wallets/ltc')
-            assert (float(ltc_original['balance']) + float(ltc_original['unconfirmed']) > 0.0)
-            assert (float(ltc_original['balance']) + float(ltc_original['unconfirmed']) == float(ltc_restored['balance']) + float(ltc_restored['unconfirmed']))
+            for coin in ('part', 'btc', 'ltc'):
+                logging.info(f'Checking {coin} balance')
+                original = read_json_api(12700, f'wallets/{coin}')
+                restored = read_json_api(12703, f'wallets/{coin}')
+                assert (float(original['balance']) + float(original['unconfirmed']) == float(restored['balance']) + float(restored['unconfirmed']))
 
             wallets_original = read_json_api(12700, 'wallets')
             # TODO: After restoring a new deposit address should be generated, should be automated
             #       Swaps should use a new key path, not the external path
-            next_addr = read_json_api(12703, 'wallets/part/nextdepositaddr')
+            next_addr = read_json_api(12700, 'wallets/part/nextdepositaddr')
             next_addr = read_json_api(12703, 'wallets/part/nextdepositaddr')
             wallets_restored = read_json_api(12703, 'wallets')
             for k, w in wallets_original.items():
                 assert (w['deposit_address'] == wallets_restored[k]['deposit_address'])
 
-            logging.info('Test passed.')
-
-        except Exception:
+        except Exception as e:
             traceback.print_exc()
+            self.finalise(processes)
+            logging.info('Test failed.')
+            raise e
 
-        self.delay_event.set()
-        if self.update_thread:
-            self.update_thread.join()
-        for p in processes:
-            p.terminate()
-        for p in processes:
-            p.join()
+        self.finalise(processes)
+        logging.info('Test passed.')
 
 
 if __name__ == '__main__':

@@ -28,7 +28,7 @@ from tests.basicswap.util import (
 from tests.basicswap.common import (
     BASE_PORT, BASE_RPC_PORT,
     BTC_BASE_PORT, BTC_BASE_RPC_PORT, BTC_BASE_TOR_PORT,
-    LTC_BASE_PORT,
+    LTC_BASE_PORT, LTC_BASE_RPC_PORT,
     PIVX_BASE_PORT,
 )
 from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
@@ -44,6 +44,8 @@ PARTICL_RPC_PORT_BASE = int(os.getenv('PARTICL_RPC_PORT_BASE', BASE_RPC_PORT))
 BITCOIN_PORT_BASE = int(os.getenv('BITCOIN_PORT_BASE', BTC_BASE_PORT))
 BITCOIN_RPC_PORT_BASE = int(os.getenv('BITCOIN_RPC_PORT_BASE', BTC_BASE_RPC_PORT))
 BITCOIN_TOR_PORT_BASE = int(os.getenv('BITCOIN_TOR_PORT_BASE', BTC_BASE_TOR_PORT))
+
+LITECOIN_RPC_PORT_BASE = int(os.getenv('LITECOIN_RPC_PORT_BASE', LTC_BASE_RPC_PORT))
 
 XMR_BASE_P2P_PORT = 17792
 XMR_BASE_RPC_PORT = 29798
@@ -85,6 +87,7 @@ def run_prepare(node_id, datadir_path, bins_path, with_coins, mnemonic_in=None, 
 
     os.environ['PART_RPC_PORT'] = str(PARTICL_RPC_PORT_BASE)
     os.environ['BTC_RPC_PORT'] = str(BITCOIN_RPC_PORT_BASE)
+    os.environ['LTC_RPC_PORT'] = str(LITECOIN_RPC_PORT_BASE)
 
     os.environ['XMR_RPC_USER'] = 'xmr_user'
     os.environ['XMR_RPC_PWD'] = 'xmr_pwd'
@@ -296,6 +299,24 @@ class TestBase(unittest.TestCase):
         if self.delay_event.is_set():
             raise ValueError('Test stopped.')
 
+    def wait_for_particl_height(self, http_port, num_blocks=3):
+        # Wait for height, or sequencelock is thrown off by genesis blocktime
+        logging.info('Waiting for Particl chain height %d', num_blocks)
+        for i in range(60):
+            if self.delay_event.is_set():
+                raise ValueError('Test stopped.')
+            try:
+                wallets = json.loads(urlopen(f'http://127.0.0.1:{http_port}/json/wallets').read())
+                particl_blocks = wallets['PART']['blocks']
+                print('particl_blocks', particl_blocks)
+                if particl_blocks >= num_blocks:
+                    return
+            except Exception as e:
+                print('Error reading wallets', str(e))
+
+            self.delay_event.wait(1)
+        raise ValueError(f'wait_for_particl_height failed http_port: {http_port}')
+
 
 class XmrTestBase(TestBase):
     @classmethod
@@ -349,23 +370,7 @@ class XmrTestBase(TestBase):
         self.update_thread = threading.Thread(target=updateThread, args=(xmr_addr1, self.delay_event, xmr_auth))
         self.update_thread.start()
 
-        # Wait for height, or sequencelock is thrown off by genesis blocktime
-        num_blocks = 3
-        logging.info('Waiting for Particl chain height %d', num_blocks)
-        for i in range(60):
-            if self.delay_event.is_set():
-                raise ValueError('Test stopped.')
-            try:
-                wallets = json.loads(urlopen('http://127.0.0.1:12701/json/wallets').read())
-                particl_blocks = wallets['PART']['blocks']
-                print('particl_blocks', particl_blocks)
-                if particl_blocks >= num_blocks:
-                    break
-            except Exception as e:
-                print('Error reading wallets', str(e))
-
-            self.delay_event.wait(1)
-        assert particl_blocks >= num_blocks
+        self.wait_for_particl_height(12701, num_blocks=3)
 
     @classmethod
     def tearDownClass(cls):
