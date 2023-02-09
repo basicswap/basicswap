@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2020-2022 tecnovert
+# Copyright (c) 2020-2023 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -997,7 +997,24 @@ class Test(BaseTest):
         js_1 = read_json_api(1801, 'wallets')
         assert (float(js_1[Coins.XMR.name]['balance']) > 0.0)
 
-        swap_clients[1].withdrawCoin(Coins.XMR, 1.1, address_to, False)
+        post_json = {
+            'value': 0.001,
+            'address': address_to,
+            'subfee': True,
+        }
+        rv = read_json_api(1801, 'wallets/xmr/withdraw', post_json)
+        assert ('Withdraw value must be close to total to use subfee' in rv['error'])
+        post_json['value'] = 1000000000.0
+        rv = read_json_api(1801, 'wallets/xmr/withdraw', post_json)
+        assert ('Withdraw value must be close to total to use subfee' in rv['error'])
+
+        post_json = {
+            'value': 1.1,
+            'address': address_to,
+            'subfee': False,
+        }
+        rv = read_json_api(1801, 'wallets/xmr/withdraw', post_json)
+        assert (len(rv['txid']) == 64)
 
     def test_09_auto_accept(self):
         logging.info('---------- Test BTC to XMR auto accept')

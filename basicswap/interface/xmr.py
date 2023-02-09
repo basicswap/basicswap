@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2020-2022 tecnovert
+# Copyright (c) 2020-2023 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -422,10 +422,12 @@ class XMRInterface(CoinInterface):
             value_sats = make_int(value, self.exp())
 
             self.openWallet(self._wallet_filename)
+            self.rpc_wallet_cb('refresh')
 
             if subfee:
                 balance = self.rpc_wallet_cb('get_balance')
-                if balance['unlocked_balance'] - value_sats <= 10:
+                diff = balance['unlocked_balance'] - value_sats
+                if diff > 0 and diff <= 10:
                     self._log.info('subfee enabled and value close to total, using sweep_all.')
                     params = {'address': addr_to}
                     if self._fee_priority > 0:
