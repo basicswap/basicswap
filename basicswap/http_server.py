@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019-2022 tecnovert
+# Copyright (c) 2019-2023 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -697,11 +697,8 @@ class HttpThread(threading.Thread, HTTPServer):
         data = response.read()
         conn.close()
 
-    def stopped(self):
-        return self.stop_event.is_set()
-
     def serve_forever(self):
-        while not self.stopped():
+        while not self.stop_event.is_set():
             self.handle_request()
         self.socket.close()
 

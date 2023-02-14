@@ -133,6 +133,18 @@ class Test(BaseTest):
         rv = read_json_api(1800, 'getcoinseed', {'coin': 'BTC'})
         assert (rv['seed'] == '8e54a313e6df8918df6d758fafdbf127a115175fdd2238d0e908dd8093c9ac3b')
 
+        rv = read_json_api(1800, 'identities/ppCsRro5po7Yu6kyu5XjSyr3A1PPdk9j1F', {'set_label': 'test 1'})
+        assert (len(rv) == 1)
+        assert (rv[0]['address'] == 'ppCsRro5po7Yu6kyu5XjSyr3A1PPdk9j1F')
+        assert (rv[0]['label'] == 'test 1')
+        rv = read_json_api(1800, 'identities/ppCsRro5po7Yu6kyu5XjSyr3A1PPdk9j1F', {'set_label': 'test 2'})
+        assert (len(rv) == 1)
+        assert (rv[0]['address'] == 'ppCsRro5po7Yu6kyu5XjSyr3A1PPdk9j1F')
+        assert (rv[0]['label'] == 'test 2')
+
+        rv = read_json_api(1800, 'identities/pPCsRro5po7Yu6kyu5XjSyr3A1PPdk9j1F', {'set_label': 'test 3'})
+        assert (rv['error'] == 'Invalid identity address')
+
     def test_01_verifyrawtransaction(self):
         txn = '0200000001eb6e5c4ebba4efa32f40c7314cad456a64008e91ee30b2dd0235ab9bb67fbdbb01000000ee47304402200956933242dde94f6cf8f195a470f8d02aef21ec5c9b66c5d3871594bdb74c9d02201d7e1b440de8f4da672d689f9e37e98815fb63dbc1706353290887eb6e8f7235012103dc1b24feb32841bc2f4375da91fa97834e5983668c2a39a6b7eadb60e7033f9d205a803b28fe2f86c17db91fa99d7ed2598f79b5677ffe869de2e478c0d1c02cc7514c606382012088a8201fe90717abb84b481c2a59112414ae56ec8acc72273642ca26cc7a5812fdc8f68876a914225fbfa4cb725b75e511810ac4d6f74069bdded26703520140b27576a914207eb66b2fd6ed9924d6217efc7fa7b38dfabe666888acffffffff01e0167118020000001976a9140044e188928710cecba8311f1cf412135b98145c88ac00000000'
         prevout = {

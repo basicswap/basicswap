@@ -9,6 +9,7 @@ import random
 import urllib.parse
 
 from .util import (
+    ensure,
     toBool,
 )
 from .basicswap_util import (
@@ -38,7 +39,7 @@ from .ui.page_offers import postNewOffer
 from .protocols.xmr_swap_1 import recoverNoScriptTxnWithKey, getChainBSplitKey
 
 
-def getFormData(post_string, is_json):
+def getFormData(post_string: str, is_json: bool):
     if post_string == '':
         raise ValueError('No post data')
     if is_json:
@@ -138,6 +139,7 @@ def js_offers(self, url_split, post_string, is_json, sent=False) -> bytes:
             return bytes(json.dumps(rv), 'UTF-8')
         offer_id = bytes.fromhex(url_split[3])
 
+    with_extra_info = False
     filters = {
         'coin_from': -1,
         'coin_to': -1,
@@ -174,12 +176,15 @@ def js_offers(self, url_split, post_string, is_json, sent=False) -> bytes:
         if have_data_entry(post_data, 'include_sent'):
             filters['include_sent'] = toBool(get_data_entry(post_data, 'include_sent'))
 
+        if have_data_entry(post_data, 'with_extra_info'):
+            with_extra_info = toBool(get_data_entry(post_data, 'with_extra_info'))
+
     offers = swap_client.listOffers(sent, filters)
     rv = []
     for o in offers:
         ci_from = swap_client.ci(o.coin_from)
         ci_to = swap_client.ci(o.coin_to)
-        rv.append({
+        offer_data = {
             'swap_type': o.swap_type,
             'addr_from': o.addr_from,
             'addr_to': o.addr_to,
@@ -191,8 +196,11 @@ def js_offers(self, url_split, post_string, is_json, sent=False) -> bytes:
             'amount_from': ci_from.format_amount(o.amount_from),
             'amount_to': ci_to.format_amount((o.amount_from * o.rate) // ci_from.COIN()),
             'rate': ci_to.format_amount(o.rate),
-        })
-
+        }
+        if with_extra_info:
+            offer_data['amount_negotiable'] = o.amount_negotiable
+            offer_data['rate_negotiable'] = o.rate_negotiable
+        rv.append(offer_data)
     return bytes(json.dumps(rv), 'UTF-8')
 
 
@@ -200,7 +208,60 @@ def js_sentoffers(self, url_split, post_string, is_json) -> bytes:
     return js_offers(self, url_split, post_string, is_json, True)
 
 
-def js_bids(self, url_split, post_string, is_json) -> bytes:
+def parseBidFilters(post_data):
+    offer_id = None
+    filters = {}
+
+    if have_data_entry(post_data, 'offer_id'):
+        offer_id = bytes.fromhex(get_data_entry(post_data, 'offer_id'))
+        assert (len(offer_id) == 28)
+
+    if have_data_entry(post_data, 'sort_by'):
+        sort_by = get_data_entry(post_data, 'sort_by')
+        assert (sort_by in ['created_at', ]), 'Invalid sort by'
+        filters['sort_by'] = sort_by
+    if have_data_entry(post_data, 'sort_dir'):
+        sort_dir = get_data_entry(post_data, 'sort_dir')
+        assert (sort_dir in ['asc', 'desc']), 'Invalid sort dir'
+        filters['sort_dir'] = sort_dir
+
+    if have_data_entry(post_data, 'offset'):
+        filters['offset'] = int(get_data_entry(post_data, 'offset'))
+    if have_data_entry(post_data, 'limit'):
+        filters['limit'] = int(get_data_entry(post_data, 'limit'))
+        assert (filters['limit'] > 0 and filters['limit'] <= PAGE_LIMIT), 'Invalid limit'
+
+    if have_data_entry(post_data, 'with_available_or_active'):
+        filters['with_available_or_active'] = toBool(get_data_entry(post_data, 'with_available_or_active'))
+    elif have_data_entry(post_data, 'with_expired'):
+        filters['with_expired'] = toBool(get_data_entry(post_data, 'with_expired'))
+
+    if have_data_entry(post_data, 'with_extra_info'):
+        filters['with_extra_info'] = toBool(get_data_entry(post_data, 'with_extra_info'))
+
+    return offer_id, filters
+
+
+def formatBids(swap_client, bids, filters) -> bytes:
+    with_extra_info = filters.get('with_extra_info', False)
+    rv = []
+    for b in bids:
+        bid_data = {
+            'bid_id': b[2].hex(),
+            'offer_id': b[3].hex(),
+            'created_at': b[0],
+            'expire_at': b[1],
+            'coin_from': b[9],
+            'amount_from': swap_client.ci(b[9]).format_amount(b[4]),
+            'bid_state': strBidState(b[5])
+        }
+        if with_extra_info:
+            bid_data['addr_from'] = b[11]
+        rv.append(bid_data)
+    return bytes(json.dumps(rv), 'UTF-8')
+
+
+def js_bids(self, url_split, post_string: str, is_json: bool) -> bytes:
     swap_client = self.server.swap_client
     swap_client.checkSystemStatus()
     if len(url_split) > 3:
@@ -281,22 +342,21 @@ def js_bids(self, url_split, post_string, is_json) -> bytes:
         data = describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, events, edit_bid, show_txns, for_api=True)
         return bytes(json.dumps(data), 'UTF-8')
 
-    bids = swap_client.listBids()
-    return bytes(json.dumps([{
-        'bid_id': b[2].hex(),
-        'offer_id': b[3].hex(),
-        'created_at': b[0],
-        'expire_at': b[1],
-        'coin_from': b[9],
-        'amount_from': swap_client.ci(b[9]).format_amount(b[4]),
-        'bid_state': strBidState(b[5])
-    } for b in bids]), 'UTF-8')
+    post_data = getFormData(post_string, is_json)
+    offer_id, filters = parseBidFilters(post_data)
+
+    bids = swap_client.listBids(offer_id=offer_id, filters=filters)
+    return formatBids(swap_client, bids, filters)
 
 
 def js_sentbids(self, url_split, post_string, is_json) -> bytes:
     swap_client = self.server.swap_client
     swap_client.checkSystemStatus()
-    return bytes(json.dumps(swap_client.listBids(sent=True)), 'UTF-8')
+    post_data = getFormData(post_string, is_json)
+    offer_id, filters = parseBidFilters(post_data)
+
+    bids = swap_client.listBids(sent=True, offer_id=offer_id, filters=filters)
+    return formatBids(swap_client, bids, filters)
 
 
 def js_network(self, url_split, post_string, is_json) -> bytes:
@@ -318,7 +378,7 @@ def js_smsgaddresses(self, url_split, post_string, is_json) -> bytes:
     swap_client = self.server.swap_client
     swap_client.checkSystemStatus()
     if len(url_split) > 3:
-        post_data = getFormData(post_string, is_json)
+        post_data = {} if post_string == '' else getFormData(post_string, is_json)
         if url_split[3] == 'new':
             addressnote = get_data_entry_or(post_data, 'addressnote', '')
             new_addr, pubkey = swap_client.newSMSGAddress(addressnote=addressnote)
@@ -417,9 +477,52 @@ def js_generatenotification(self, url_split, post_string, is_json) -> bytes:
 def js_notifications(self, url_split, post_string, is_json) -> bytes:
     swap_client = self.server.swap_client
     swap_client.checkSystemStatus()
-    swap_client.getNotifications()
 
     return bytes(json.dumps(swap_client.getNotifications()), 'UTF-8')
+
+
+def js_identities(self, url_split, post_string: str, is_json: bool) -> bytes:
+    swap_client = self.server.swap_client
+    swap_client.checkSystemStatus()
+
+    filters = {
+        'page_no': 1,
+        'limit': PAGE_LIMIT,
+        'sort_by': 'created_at',
+        'sort_dir': 'desc',
+    }
+
+    if len(url_split) > 3:
+        address = url_split[3]
+        filters['address'] = address
+
+    if post_string != '':
+        post_data = getFormData(post_string, is_json)
+
+        if have_data_entry(post_data, 'sort_by'):
+            sort_by = get_data_entry(post_data, 'sort_by')
+            assert (sort_by in ['created_at', 'rate']), 'Invalid sort by'
+            filters['sort_by'] = sort_by
+        if have_data_entry(post_data, 'sort_dir'):
+            sort_dir = get_data_entry(post_data, 'sort_dir')
+            assert (sort_dir in ['asc', 'desc']), 'Invalid sort dir'
+            filters['sort_dir'] = sort_dir
+
+        if have_data_entry(post_data, 'offset'):
+            filters['offset'] = int(get_data_entry(post_data, 'offset'))
+        if have_data_entry(post_data, 'limit'):
+            filters['limit'] = int(get_data_entry(post_data, 'limit'))
+            assert (filters['limit'] > 0 and filters['limit'] <= PAGE_LIMIT), 'Invalid limit'
+
+        set_data = {}
+        if have_data_entry(post_data, 'set_label'):
+            set_data['label'] = get_data_entry(post_data, 'set_label')
+
+        if set_data:
+            ensure('address' in filters, 'Must provide an address to modify data')
+            swap_client.setIdentityData(filters, set_data)
+
+    return bytes(json.dumps(swap_client.listIdentities(filters)), 'UTF-8')
 
 
 def js_vacuumdb(self, url_split, post_string, is_json) -> bytes:
@@ -528,6 +631,7 @@ pages = {
     'rateslist': js_rates_list,
     'generatenotification': js_generatenotification,
     'notifications': js_notifications,
+    'identities':  js_identities,
     'vacuumdb': js_vacuumdb,
     'getcoinseed': js_getcoinseed,
     'setpassword': js_setpassword,

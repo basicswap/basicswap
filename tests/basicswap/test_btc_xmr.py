@@ -254,6 +254,12 @@ class BasicSwapTest(BaseTest):
         self.callnoderpc('unloadwallet', [new_wallet_name])
         assert (addr == 'bcrt1qps7hnjd866e9ynxadgseprkc2l56m00dvwargr')
 
+        self.swap_clients[0].initialiseWallet(Coins.BTC, raise_errors=True)
+        assert self.swap_clients[0].checkWalletSeed(Coins.BTC) is True
+        for i in range(1500):
+            self.callnoderpc('getnewaddress')
+        assert self.swap_clients[0].checkWalletSeed(Coins.BTC) is True
+
     def do_test_01_full_swap(self, coin_from, coin_to):
         logging.info('---------- Test {} to {}'.format(coin_from.name, coin_to.name))
 

@@ -1,3 +1,11 @@
+
+Rendered files can be found in:
+
+basicswap/static/sequence_diagrams
+
+
+To render:
+
 nvm use 14
 npm install -g mscgenjs-cli
 

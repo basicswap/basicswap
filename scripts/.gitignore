@@ -1,1 +1,4 @@
 *.csv
+*.json
+*.last
+*.sqlite

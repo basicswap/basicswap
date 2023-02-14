@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019-2022 tecnovert
+# Copyright (c) 2019-2023 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -867,7 +867,7 @@ class BasicSwap(BaseApp):
     def updateIdentityBidState(self, session, address: str, bid) -> None:
         identity_stats = session.query(KnownIdentity).filter_by(address=address).first()
         if not identity_stats:
-            identity_stats = KnownIdentity(address=address, created_at=int(time.time()))
+            identity_stats = KnownIdentity(active_ind=1, address=address, created_at=int(time.time()))
 
         if bid.state == BidStates.SWAP_COMPLETED:
             if bid.was_sent:
@@ -1171,7 +1171,7 @@ class BasicSwap(BaseApp):
 
     def buildNotificationsCache(self, session):
         self._notifications_cache.clear()
-        q = session.execute(f'SELECT created_at, event_type, event_data FROM notifications WHERE active_ind=1 ORDER BY created_at ASC LIMIT {self._show_notifications}')
+        q = session.execute(f'SELECT created_at, event_type, event_data FROM notifications WHERE active_ind = 1 ORDER BY created_at ASC LIMIT {self._show_notifications}')
         for entry in q:
             self._notifications_cache[entry[0]] = (entry[1], json.loads(entry[2].decode('UTF-8')))
 
@@ -1180,6 +1180,71 @@ class BasicSwap(BaseApp):
         for k, v in self._notifications_cache.items():
             rv.append((time.strftime('%d-%m-%y %H:%M:%S', time.localtime(k)), int(v[0]), v[1]))
         return rv
+
+    def setIdentityData(self, filters, data):
+        address = filters['address']
+        ci = self.ci(Coins.PART)
+        ensure(ci.isValidAddress(address), 'Invalid identity address')
+
+        try:
+            now = int(time.time())
+            session = self.openSession()
+            q = session.execute(f'SELECT COUNT(*) FROM knownidentities WHERE address = "{address}"').first()
+            if q[0] < 1:
+                q = session.execute(f'INSERT INTO knownidentities (active_ind, address, created_at) VALUES (1, "{address}", {now})')
+
+            values = []
+            pattern = ''
+            if 'label' in data:
+                pattern += (', ' if pattern != '' else '')
+                pattern += 'label = "{}"'.format(data['label'])
+            values.append(address)
+            q = session.execute(f'UPDATE knownidentities SET {pattern} WHERE address = "{address}"')
+
+        finally:
+            self.closeSession(session)
+
+    def listIdentities(self, filters):
+        try:
+            session = self.openSession()
+
+            query_str = 'SELECT address, label, num_sent_bids_successful, num_recv_bids_successful, ' + \
+                        '       num_sent_bids_rejected, num_recv_bids_rejected, num_sent_bids_failed, num_recv_bids_failed ' + \
+                        ' FROM knownidentities ' + \
+                        ' WHERE active_ind = 1 '
+
+            address = filters.get('address', None)
+            if address is not None:
+                query_str += f' AND address = "{address}" '
+
+            sort_dir = filters.get('sort_dir', 'DESC').upper()
+            sort_by = filters.get('sort_by', 'created_at')
+            query_str += f' ORDER BY {sort_by} {sort_dir}'
+
+            limit = filters.get('limit', None)
+            if limit is not None:
+                query_str += f' LIMIT {limit}'
+            offset = filters.get('offset', None)
+            if offset is not None:
+                query_str += f' OFFSET {offset}'
+
+            q = session.execute(query_str)
+            rv = []
+            for row in q:
+                identity = {
+                    'address': row[0],
+                    'label': row[1],
+                    'num_sent_bids_successful': zeroIfNone(row[2]),
+                    'num_recv_bids_successful': zeroIfNone(row[3]),
+                    'num_sent_bids_rejected': zeroIfNone(row[4]),
+                    'num_recv_bids_rejected': zeroIfNone(row[5]),
+                    'num_sent_bids_failed': zeroIfNone(row[6]),
+                    'num_recv_bids_failed': zeroIfNone(row[7]),
+                }
+                rv.append(identity)
+            return rv
+        finally:
+            self.closeSession(session)
 
     def vacuumDB(self):
         try:
@@ -2127,8 +2192,9 @@ class BasicSwap(BaseApp):
             session = scoped_session(self.session_factory)
             identity = session.query(KnownIdentity).filter_by(address=address).first()
             if identity is None:
-                identity = KnownIdentity(address=address)
+                identity = KnownIdentity(active_ind=1, address=address)
             identity.label = label
+            identity.updated_at = int(time.time())
             session.add(identity)
             session.commit()
         finally:
@@ -5434,7 +5500,6 @@ class BasicSwap(BaseApp):
                         settings_changed = True
 
             if settings_changed:
-
                 settings_path = os.path.join(self.data_dir, cfg.CONFIG_FILENAME)
                 settings_path_new = settings_path + '.new'
                 shutil.copyfile(settings_path, settings_path + '.last')
@@ -5838,8 +5903,9 @@ class BasicSwap(BaseApp):
             filter_coin_to = filters.get('coin_to', None)
             if filter_coin_to and filter_coin_to > -1:
                 q = q.filter(Offer.coin_to == int(filter_coin_to))
+
             filter_include_sent = filters.get('include_sent', None)
-            if filter_include_sent and filter_include_sent is not True:
+            if filter_include_sent is not None and filter_include_sent is not True:
                 q = q.filter(Offer.was_sent == False)  # noqa: E712
 
             order_dir = filters.get('sort_dir', 'desc')
@@ -5874,15 +5940,14 @@ class BasicSwap(BaseApp):
             session.remove()
             self.mxDB.release()
 
-    def listBids(self, sent=False, offer_id=None, for_html=False, filters={}, with_identity_info=False):
+    def listBids(self, sent=False, offer_id=None, for_html=False, filters={}):
         self.mxDB.acquire()
         try:
             rv = []
             now = int(time.time())
             session = scoped_session(self.session_factory)
 
-            identity_fields = ''
-            query_str = 'SELECT bids.created_at, bids.expire_at, bids.bid_id, bids.offer_id, bids.amount, bids.state, bids.was_received, tx1.state, tx2.state, offers.coin_from, bids.rate, bids.bid_addr {} FROM bids '.format(identity_fields) + \
+            query_str = 'SELECT bids.created_at, bids.expire_at, bids.bid_id, bids.offer_id, bids.amount, bids.state, bids.was_received, tx1.state, tx2.state, offers.coin_from, bids.rate, bids.bid_addr FROM bids ' + \
                         'LEFT JOIN offers ON offers.offer_id = bids.offer_id ' + \
                         'LEFT JOIN transactions AS tx1 ON tx1.bid_id = bids.bid_id AND tx1.tx_type = {} '.format(TxTypes.ITX) + \
                         'LEFT JOIN transactions AS tx2 ON tx2.bid_id = bids.bid_id AND tx2.tx_type = {} '.format(TxTypes.PTX)
@@ -5901,9 +5966,14 @@ class BasicSwap(BaseApp):
             bid_state_ind = filters.get('bid_state_ind', -1)
             if bid_state_ind != -1:
                 query_str += 'AND bids.state = {} '.format(bid_state_ind)
+
+            with_available_or_active = filters.get('with_available_or_active', False)
             with_expired = filters.get('with_expired', True)
-            if with_expired is not True:
-                query_str += 'AND bids.expire_at > {} '.format(now)
+            if with_available_or_active:
+                query_str += 'AND (bids.state NOT IN ({}, {}, {}, {}, {}) AND (bids.state > {} OR bids.expire_at > {})) '.format(BidStates.SWAP_COMPLETED, BidStates.BID_ERROR, BidStates.BID_REJECTED, BidStates.SWAP_TIMEDOUT, BidStates.BID_ABANDONED, BidStates.BID_RECEIVED, now)
+            else:
+                if with_expired is not True:
+                    query_str += 'AND bids.expire_at > {} '.format(now)
 
             sort_dir = filters.get('sort_dir', 'DESC').upper()
             sort_by = filters.get('sort_by', 'created_at')

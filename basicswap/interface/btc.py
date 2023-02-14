@@ -1237,7 +1237,7 @@ class BTCInterface(CoinInterface):
     def describeTx(self, tx_hex: str):
         return self.rpc_callback('decoderawtransaction', [tx_hex])
 
-    def getSpendableBalance(self):
+    def getSpendableBalance(self) -> int:
         return self.make_int(self.rpc_callback('getbalances')['mine']['trusted'])
 
     def createUTXO(self, value_sats: int):

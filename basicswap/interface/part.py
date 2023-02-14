@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2020-2022 tecnovert
+# Copyright (c) 2020-2023 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -77,10 +77,10 @@ class PARTInterface(BTCInterface):
         # TODO: Double check
         return True
 
-    def getNewAddress(self, use_segwit, label='swap_receive'):
+    def getNewAddress(self, use_segwit, label='swap_receive') -> str:
         return self.rpc_callback('getnewaddress', [label])
 
-    def getNewStealthAddress(self, label='swap_stealth'):
+    def getNewStealthAddress(self, label='swap_stealth') -> str:
         return self.rpc_callback('getnewstealthaddress', [label])
 
     def haveSpentIndex(self):
@@ -105,7 +105,7 @@ class PARTInterface(BTCInterface):
     def getScriptForPubkeyHash(self, pkh):
         return CScript([OP_DUP, OP_HASH160, pkh, OP_EQUALVERIFY, OP_CHECKSIG])
 
-    def formatStealthAddress(self, scan_pubkey, spend_pubkey):
+    def formatStealthAddress(self, scan_pubkey, spend_pubkey) -> str:
         prefix_byte = chainparams[self.coin_type()][self._network]['stealth_key_prefix']
 
         return encodeStealthAddress(prefix_byte, scan_pubkey, spend_pubkey)
@@ -116,7 +116,7 @@ class PARTInterface(BTCInterface):
             length += getWitnessElementLen(len(e) // 2)  # hex -> bytes
         return length
 
-    def getWalletRestoreHeight(self):
+    def getWalletRestoreHeight(self) -> int:
         start_time = self.rpc_callback('getwalletinfo')['keypoololdest']
 
         blockchaininfo = self.rpc_callback('getblockchaininfo')
@@ -130,6 +130,15 @@ class PARTInterface(BTCInterface):
         block_hash = self.rpc_callback('getblockhashafter', [start_time])
         block_header = self.rpc_callback('getblockheader', [block_hash])
         return block_header['height']
+
+    def isValidAddress(self, address: str) -> bool:
+        try:
+            rv = self.rpc_callback('validateaddress', [address])
+            if rv['isvalid'] is True:
+                return True
+        except Exception as ex:
+            self._log.debug('validateaddress failed: {}'.format(address))
+        return False
 
 
 class PARTInterfaceBlind(PARTInterface):
@@ -622,7 +631,7 @@ class PARTInterfaceBlind(PARTInterface):
 
         return bytes.fromhex(lock_refund_swipe_tx_hex)
 
-    def getSpendableBalance(self):
+    def getSpendableBalance(self) -> int:
         return self.make_int(self.rpc_callback('getbalances')['mine']['blind_trusted'])
 
     def publishBLockTx(self, vkbv, Kbs, output_amount, feerate, delay_for: int = 10, unlock_time: int = 0) -> bytes:
@@ -840,7 +849,7 @@ class PARTInterfaceAnon(PARTInterface):
         rv = self.rpc_callback('sendtypeto', params)
         return bytes.fromhex(rv['txid'])
 
-    def findTxnByHash(self, txid_hex):
+    def findTxnByHash(self, txid_hex: str):
         # txindex is enabled for Particl
 
         try:
@@ -854,5 +863,5 @@ class PARTInterfaceAnon(PARTInterface):
 
         return None
 
-    def getSpendableBalance(self):
+    def getSpendableBalance(self) -> int:
         return self.make_int(self.rpc_callback('getbalances')['mine']['anon_trusted'])
