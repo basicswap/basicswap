@@ -173,3 +173,9 @@ Prepare wallet:
     docker-compose -f docker-compose-prepare.yml stop
 
     docker-compose up
+
+
+# Notes
+
+Switch Basicswap repo:
+    docker-compose build swapclient --build-arg BASICSWAP_URL=https://github.com/tecnovert/basicswap/archive/refs/heads/dev.zip --build-arg BASICSWAP_DIR=basicswap-dev

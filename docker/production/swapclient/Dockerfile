@@ -22,9 +22,11 @@ RUN wget -O coincurve-anonswap.zip https://github.com/tecnovert/coincurve/archiv
     cd coincurve-anonswap && \
     python3 setup.py install --force
 
-RUN wget -O basicswap-master.zip https://github.com/tecnovert/basicswap/archive/master.zip; \
-    unzip basicswap-master.zip; \
-    cd basicswap-master; \
+ARG BASICSWAP_URL=https://github.com/tecnovert/basicswap/archive/master.zip
+ARG BASICSWAP_DIR=basicswap-master
+RUN wget -O basicswap-repo.zip $BASICSWAP_URL; \
+    unzip basicswap-repo.zip; \
+    cd $BASICSWAP_DIR; \
     protoc -I=basicswap --python_out=basicswap basicswap/messages.proto; \
     pip3 install .;
 
