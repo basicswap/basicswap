@@ -17,6 +17,7 @@ from . import __version__
 from .util import (
     dumpj,
     ensure,
+    zeroIfNone,
     LockedCoinError,
     format_timestamp,
 )
@@ -25,9 +26,11 @@ from .chainparams import (
     chainparams,
 )
 from .basicswap_util import (
-    strBidState,
     strTxState,
+    strBidState,
     strAddressType,
+    AutomationOverrideOptions,
+    strAutomationOverrideOption,
 )
 
 from .js_server import (
@@ -37,6 +40,7 @@ from .js_server import (
 from .ui.util import (
     getCoinName,
     get_data_entry,
+    get_data_entry_or,
     have_data_entry,
     listAvailableCoins,
 )
@@ -447,10 +451,13 @@ class HttpHandler(BaseHTTPRequestHandler):
             if have_data_entry(form_data, 'edit'):
                 page_data['show_edit_form'] = True
             if have_data_entry(form_data, 'apply'):
-                new_label = get_data_entry(form_data, 'label')
-
                 try:
-                    swap_client.updateIdentity(identity_address, new_label)
+                    data = {
+                        'label': get_data_entry_or(form_data, 'label', ''),
+                        'note': get_data_entry_or(form_data, 'note', ''),
+                        'automation_override': get_data_entry(form_data, 'automation_override'),
+                    }
+                    swap_client.setIdentityData({'address': identity_address}, data)
                     messages.append('Updated')
                 except Exception as e:
                     err_messages.append(str(e))
@@ -466,14 +473,19 @@ class HttpHandler(BaseHTTPRequestHandler):
             page_data['num_recv_bids_rejected'] = identity.num_recv_bids_rejected
             page_data['num_sent_bids_failed'] = identity.num_sent_bids_failed
             page_data['num_recv_bids_failed'] = identity.num_recv_bids_failed
+            automation_override = zeroIfNone(identity.automation_override)
+            page_data['automation_override'] = automation_override
+            page_data['str_automation_override'] = strAutomationOverrideOption(automation_override)
+            page_data['note'] = identity.note
         except Exception as e:
-            messages.append(e)
+            err_messages.append(e)
 
         template = env.get_template('identity.html')
         return self.render_template(template, {
             'messages': messages,
             'err_messages': err_messages,
             'data': page_data,
+            'automation_override_options': [(int(opt), strAutomationOverrideOption(opt)) for opt in AutomationOverrideOptions if opt > 0],
             'summary': summary,
         })
 

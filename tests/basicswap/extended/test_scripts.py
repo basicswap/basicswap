@@ -197,7 +197,6 @@ class Test(unittest.TestCase):
         cls.node1_statefile = os.path.join(datadir, 'node1_state.json')
         cls.node1_args = [script_path, '--port', str(UI_PORT + 1), '--configfile', cls.node1_configfile, '--statefile', cls.node1_statefile, '--oneshot', '--debug']
 
-
     @classmethod
     def tearDownClass(cls):
         logging.info('Stopping test')
@@ -333,7 +332,7 @@ class Test(unittest.TestCase):
         assert (count_lines_with(rv_stdout, 'Bid rate too low for offer') == 3)
         assert (count_lines_with(rv_stdout, 'Already bidding on offer') == 1)
 
-        logging.info(f'Modifying node1 config')
+        logging.info('Modifying node1 config')
         node1_test1_config['bids'][0]['maxrate'] = 0.07
         node1_test1_config['bids'][0]['max_coin_from_balance'] = 100
         node1_test1_config['bids'][0]['min_coin_to_balance'] = 100
@@ -418,7 +417,7 @@ class Test(unittest.TestCase):
         assert (len(possible_bids) == 1)
         assert (float(possible_bids[0]['amount_from'] < 20.0))
 
-        logging.info(f'Adding mock data to node1 db for tests')
+        logging.info('Adding mock data to node1 db for tests')
         rows = []
         offers = read_json_api(UI_PORT, 'offers')
 
@@ -522,7 +521,6 @@ class Test(unittest.TestCase):
 
         offer_ids = []
         logging.info('Create three offers')
-
 
         for i in range(3):
             if i > 0:

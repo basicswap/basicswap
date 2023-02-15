@@ -517,6 +517,12 @@ def js_identities(self, url_split, post_string: str, is_json: bool) -> bytes:
         set_data = {}
         if have_data_entry(post_data, 'set_label'):
             set_data['label'] = get_data_entry(post_data, 'set_label')
+        if have_data_entry(post_data, 'set_automation_override'):
+            set_data['automation_override'] = get_data_entry(post_data, 'set_automation_override')
+        if have_data_entry(post_data, 'set_visibility_override'):
+            set_data['visibility_override'] = get_data_entry(post_data, 'set_visibility_override')
+        if have_data_entry(post_data, 'set_note'):
+            set_data['note'] = get_data_entry(post_data, 'set_note')
 
         if set_data:
             ensure('address' in filters, 'Must provide an address to modify data')
@@ -631,7 +637,7 @@ pages = {
     'rateslist': js_rates_list,
     'generatenotification': js_generatenotification,
     'notifications': js_notifications,
-    'identities':  js_identities,
+    'identities': js_identities,
     'vacuumdb': js_vacuumdb,
     'getcoinseed': js_getcoinseed,
     'setpassword': js_setpassword,

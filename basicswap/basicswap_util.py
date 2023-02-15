@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2021-2022 tecnovert
+# Copyright (c) 2021-2023 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -192,6 +192,45 @@ class DebugTypes(IntEnum):
     B_LOCK_TX_MISSED_SEND = auto()
 
 
+class NotificationTypes(IntEnum):
+    NONE = 0
+    OFFER_RECEIVED = auto()
+    BID_RECEIVED = auto()
+    BID_ACCEPTED = auto()
+
+
+class AutomationOverrideOptions(IntEnum):
+    DEFAULT = 0
+    ALWAYS_ACCEPT = 1
+    NEVER_ACCEPT = auto()
+
+
+def strAutomationOverrideOption(option):
+    if option == AutomationOverrideOptions.DEFAULT:
+        return 'Default'
+    if option == AutomationOverrideOptions.ALWAYS_ACCEPT:
+        return 'Always Accept'
+    if option == AutomationOverrideOptions.NEVER_ACCEPT:
+        return 'Never Accept'
+    return 'Unknown'
+
+
+class VisibilityOverrideOptions(IntEnum):
+    DEFAULT = 0
+    HIDE = 1
+    BLOCK = auto()
+
+
+def strVisibilityOverrideOption(option):
+    if option == VisibilityOverrideOptions.DEFAULT:
+        return 'Default'
+    if option == VisibilityOverrideOptions.HIDE:
+        return 'Hide'
+    if option == VisibilityOverrideOptions.BLOCK:
+        return 'Block'
+    return 'Unknown'
+
+
 def strOfferState(state):
     if state == OfferStates.OFFER_SENT:
         return 'Sent'
@@ -200,13 +239,6 @@ def strOfferState(state):
     if state == OfferStates.OFFER_ABANDONED:
         return 'Abandoned'
     return 'Unknown'
-
-
-class NotificationTypes(IntEnum):
-    NONE = 0
-    OFFER_RECEIVED = auto()
-    BID_RECEIVED = auto()
-    BID_ACCEPTED = auto()
 
 
 def strBidState(state):

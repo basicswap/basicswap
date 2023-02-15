@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2022 tecnovert
+# Copyright (c) 2022-2023 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -238,6 +238,11 @@ def upgradeDatabase(self, db_version):
                     tx_data BLOB,
                     used_by BLOB,
                     PRIMARY KEY (record_id))''')
+        elif current_version == 16:
+            db_version += 1
+            session.execute('ALTER TABLE knownidentities ADD COLUMN automation_override INTEGER')
+            session.execute('ALTER TABLE knownidentities ADD COLUMN visibility_override INTEGER')
+            session.execute('UPDATE knownidentities SET active_ind = 1')
 
         if current_version != db_version:
             self.db_version = db_version

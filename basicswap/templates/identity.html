@@ -63,10 +63,37 @@
                         <input class="appearance-none bg-gray-50 border w-full border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block p-2.5" type="text" id="label" name="label" value="{{ data.label }}">
                       </td>
                     </tr>
+                    <tr>
+                      <td class="py-4 px-6 bold">Automation Override</td>
+                      <td class="py-4 pr-5">
+                        <select name="automation_override">
+                        <option{% if data.automation_override=="0" %} selected{% endif %} value="0">-- Default --</option>
+                        {% for a in automation_override_options %}
+                        <option{% if data.automation_override==a[0] %} selected{% endif %} value="{{ a[0] }}">{{ a[1] }}</option>
+                        {% endfor %}
+                        </select>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td class="py-4 px-6 bold">Notes</td>
+                      <td class="py-4 pr-5">
+                      <textarea rows="5" class="w-full" id="note" name="note">{{ data.note }}</textarea>
+                      </td>
+                    </tr>
                     {% else %}
                     <tr>
                       <td class="py-4 px-6 bold">Label</td>
                       <td class="py-4">{{ data.label }}</td>
+                    </tr>
+                    <tr>
+                      <td class="py-4 px-6 bold">Automation Override</td>
+                      <td class="py-4">{{ data.str_automation_override }}</td>
+                    </tr>
+                    <tr>
+                      <td class="py-4 px-6 bold">Notes</td>
+                      <td class="py-4">
+                      <textarea rows="5" class="w-full" readonly>{{ data.note }}</textarea></td>
+                      </td>
                     </tr>
                     {% endif %}
                     <tr class="bg-white border-t hover:bg-gray-50">

@@ -52,6 +52,7 @@ from .util import (
     format_amount,
     format_timestamp,
     DeserialiseNum,
+    zeroIfNone,
     make_int,
     ensure,
 )
@@ -143,6 +144,8 @@ from .basicswap_util import (
     getLastBidState,
     isActiveBidState,
     NotificationTypes as NT,
+    AutomationOverrideOptions,
+    VisibilityOverrideOptions,
 )
 
 
@@ -155,12 +158,6 @@ def validOfferStateToReceiveBid(offer_state):
     if offer_state == OfferStates.OFFER_SENT:
         return True
     return False
-
-
-def zeroIfNone(value):
-    if value is None:
-        return 0
-    return value
 
 
 def threadPollXMRChainState(swap_client, coin_type):
@@ -1189,17 +1186,57 @@ class BasicSwap(BaseApp):
         try:
             now = int(time.time())
             session = self.openSession()
-            q = session.execute(f'SELECT COUNT(*) FROM knownidentities WHERE address = "{address}"').first()
+            q = session.execute('SELECT COUNT(*) FROM knownidentities WHERE address = :address', {'address': address}).first()
             if q[0] < 1:
-                q = session.execute(f'INSERT INTO knownidentities (active_ind, address, created_at) VALUES (1, "{address}", {now})')
+                session.execute('INSERT INTO knownidentities (active_ind, address, created_at) VALUES (1, :address, :now)', {'address': address, 'now': now})
 
-            values = []
-            pattern = ''
             if 'label' in data:
-                pattern += (', ' if pattern != '' else '')
-                pattern += 'label = "{}"'.format(data['label'])
-            values.append(address)
-            q = session.execute(f'UPDATE knownidentities SET {pattern} WHERE address = "{address}"')
+                session.execute('UPDATE knownidentities SET label = :label WHERE address = :address', {'address': address, 'label': data['label']})
+
+            if 'automation_override' in data:
+                new_value: int = 0
+                data_value = data['automation_override']
+                if isinstance(data_value, int):
+                    new_value = data_value
+                elif isinstance(data_value, str):
+                    if data_value.isdigit():
+                        new_value = int(data_value)
+                    elif data_value == 'default':
+                        new_value = 0
+                    elif data_value == 'always_accept':
+                        new_value = int(AutomationOverrideOptions.ALWAYS_ACCEPT)
+                    elif data_value == 'never_accept':
+                        new_value = int(AutomationOverrideOptions.NEVER_ACCEPT)
+                    else:
+                        raise ValueError('Unknown automation_override value')
+                else:
+                    raise ValueError('Unknown automation_override type')
+
+                session.execute('UPDATE knownidentities SET automation_override = :new_value WHERE address = :address', {'address': address, 'new_value': new_value})
+
+            if 'visibility_override' in data:
+                new_value: int = 0
+                data_value = data['visibility_override']
+                if isinstance(data_value, int):
+                    new_value = data_value
+                elif isinstance(data_value, str):
+                    if data_value.isdigit():
+                        new_value = int(data_value)
+                    elif data_value == 'default':
+                        new_value = 0
+                    elif data_value == 'hide':
+                        new_value = int(VisibilityOverrideOptions.HIDE)
+                    elif data_value == 'block':
+                        new_value = int(VisibilityOverrideOptions.BLOCK)
+                    else:
+                        raise ValueError('Unknown visibility_override value')
+                else:
+                    raise ValueError('Unknown visibility_override type')
+
+                session.execute('UPDATE knownidentities SET visibility_override = :new_value WHERE address = :address', {'address': address, 'new_value': new_value})
+
+            if 'note' in data:
+                session.execute('UPDATE knownidentities SET note = :note WHERE address = :address', {'address': address, 'note': data['note']})
 
         finally:
             self.closeSession(session)
@@ -1209,7 +1246,8 @@ class BasicSwap(BaseApp):
             session = self.openSession()
 
             query_str = 'SELECT address, label, num_sent_bids_successful, num_recv_bids_successful, ' + \
-                        '       num_sent_bids_rejected, num_recv_bids_rejected, num_sent_bids_failed, num_recv_bids_failed ' + \
+                        '       num_sent_bids_rejected, num_recv_bids_rejected, num_sent_bids_failed, num_recv_bids_failed, ' + \
+                        '       automation_override, visibility_override, note ' + \
                         ' FROM knownidentities ' + \
                         ' WHERE active_ind = 1 '
 
@@ -1240,6 +1278,9 @@ class BasicSwap(BaseApp):
                     'num_recv_bids_rejected': zeroIfNone(row[5]),
                     'num_sent_bids_failed': zeroIfNone(row[6]),
                     'num_recv_bids_failed': zeroIfNone(row[7]),
+                    'automation_override': zeroIfNone(row[8]),
+                    'visibility_override': zeroIfNone(row[9]),
+                    'note': row[10],
                 }
                 rv.append(identity)
             return rv
@@ -2181,22 +2222,6 @@ class BasicSwap(BaseApp):
             session = scoped_session(self.session_factory)
             identity = session.query(KnownIdentity).filter_by(address=address).first()
             return identity
-        finally:
-            session.close()
-            session.remove()
-            self.mxDB.release()
-
-    def updateIdentity(self, address, label):
-        self.mxDB.acquire()
-        try:
-            session = scoped_session(self.session_factory)
-            identity = session.query(KnownIdentity).filter_by(address=address).first()
-            if identity is None:
-                identity = KnownIdentity(active_ind=1, address=address)
-            identity.label = label
-            identity.updated_at = int(time.time())
-            session.add(identity)
-            session.commit()
         finally:
             session.close()
             session.remove()
@@ -4158,6 +4183,24 @@ class BasicSwap(BaseApp):
             total_value += amount
         return bids, total_value
 
+    def evaluateKnownIdentityForAutoAccept(self, strategy, identity_stats) -> bool:
+        if identity_stats:
+            if identity_stats.automation_override == AutomationOverrideOptions.NEVER_ACCEPT:
+                raise AutomationConstraint('From address is marked never accept')
+            if identity_stats.automation_override == AutomationOverrideOptions.ALWAYS_ACCEPT:
+                return True
+
+        if strategy.only_known_identities:
+            if not identity_stats:
+                raise AutomationConstraint('Unknown bidder')
+
+            # TODO: More options
+            if identity_stats.num_recv_bids_successful < 1:
+                raise AutomationConstraint('Bidder has too few successful swaps')
+            if identity_stats.num_recv_bids_successful <= identity_stats.num_recv_bids_failed:
+                raise AutomationConstraint('Bidder has too many failed swaps')
+        return True
+
     def shouldAutoAcceptBid(self, offer, bid, session=None):
         try:
             use_session = self.openSession(session)
@@ -4195,16 +4238,8 @@ class BasicSwap(BaseApp):
             if num_not_completed >= max_concurrent_bids:
                 raise AutomationConstraint('Already have {} bids to complete'.format(num_not_completed))
 
-            if strategy.only_known_identities:
-                identity_stats = use_session.query(KnownIdentity).filter_by(address=bid.bid_addr).first()
-                if not identity_stats:
-                    raise AutomationConstraint('Unknown bidder')
-
-                # TODO: More options
-                if identity_stats.num_recv_bids_successful < 1:
-                    raise AutomationConstraint('Bidder has too few successful swaps')
-                if identity_stats.num_recv_bids_successful <= identity_stats.num_recv_bids_failed:
-                    raise AutomationConstraint('Bidder has too many failed swaps')
+            identity_stats = use_session.query(KnownIdentity).filter_by(address=bid.bid_addr).first()
+            self.evaluateKnownIdentityForAutoAccept(strategy, identity_stats)
 
             self.logEvent(Concepts.BID,
                           bid.bid_id,

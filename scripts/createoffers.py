@@ -76,27 +76,27 @@ def readConfig(args, known_coins):
     with open(config_path) as fs:
         config = json.load(fs)
 
-    if not 'offers' in config:
+    if 'offers' not in config:
         config['offers'] = []
-    if not 'bids' in config:
+    if 'bids' not in config:
         config['bids'] = []
-    if not 'stealthex' in config:
+    if 'stealthex' not in config:
         config['stealthex'] = []
 
-    if not 'min_seconds_between_offers' in config:
+    if 'min_seconds_between_offers' not in config:
         config['min_seconds_between_offers'] = 60
         print('Set min_seconds_between_offers', config['min_seconds_between_offers'])
         num_changes += 1
-    if not 'max_seconds_between_offers' in config:
+    if 'max_seconds_between_offers' not in config:
         config['max_seconds_between_offers'] = config['min_seconds_between_offers'] * 4
         print('Set max_seconds_between_offers', config['max_seconds_between_offers'])
         num_changes += 1
 
-    if not 'min_seconds_between_bids' in config:
+    if 'min_seconds_between_bids' not in config:
         config['min_seconds_between_bids'] = 60
         print('Set min_seconds_between_bids', config['min_seconds_between_bids'])
         num_changes += 1
-    if not 'max_seconds_between_bids' in config:
+    if 'max_seconds_between_bids' not in config:
         config['max_seconds_between_bids'] = config['min_seconds_between_bids'] * 4
         print('Set max_seconds_between_bids', config['max_seconds_between_bids'])
         num_changes += 1
@@ -152,7 +152,7 @@ def readConfig(args, known_coins):
         bid_template['coin_to'] = findCoin(bid_template['coin_to'], known_coins)
 
         if bid_template['name'] in bid_templates_map:
-            print('renaming bid template', offer_templates_map_template['name'])
+            print('renaming bid template', bid_template['name'])
             original_name = bid_template['name']
             offset = 2
             while f'{original_name}_{offset}' in bid_templates_map:
@@ -167,7 +167,6 @@ def readConfig(args, known_coins):
     for i, swap in enumerate(stealthex_swaps):
         num_enabled += 1 if swap.get('enabled', True) else 0
         swap['coin_from'] = findCoin(swap['coin_from'], known_coins)
-        #bid_template['coin_to'] = findCoin(bid_template['coin_to'], known_coins)
     config['num_enabled_swaps'] = num_enabled
 
     if num_changes > 0:
@@ -303,10 +302,10 @@ def main():
                 new_offer = read_json_api('offers/new', offer_data)
                 print('New offer: {}'.format(new_offer['offer_id']))
                 num_state_changes += 1
-                if not 'offers' in script_state:
+                if 'offers' not in script_state:
                     script_state['offers'] = {}
                 template_name = offer_template['name']
-                if not template_name in script_state['offers']:
+                if template_name not in script_state['offers']:
                     script_state['offers'][template_name] = []
                 script_state['offers'][template_name].append({'offer_id': new_offer['offer_id'], 'time': int(time.time())})
                 max_seconds_between_offers = config['max_seconds_between_offers']
@@ -328,10 +327,10 @@ def main():
 
                 # Check bids in progress
                 max_concurrent = bid_template.get('max_concurrent', 1)
-                if not 'bids' in script_state:
+                if 'bids' not in script_state:
                     script_state['bids'] = {}
                 template_name = bid_template['name']
-                if not template_name in script_state['bids']:
+                if template_name not in script_state['bids']:
                     script_state['bids'][template_name] = []
                 previous_bids = script_state['bids'][template_name]
 
@@ -405,12 +404,22 @@ def main():
 
                     offer_identity = read_json_api('identities/{}'.format(offer['addr_from']))
                     if len(offer_identity) > 0:
-                        successful_sent_bids = offer_identity[0]['num_sent_bids_successful']
-                        failed_sent_bids = offer_identity[0]['num_sent_bids_failed']
-                        if failed_sent_bids > 3 and failed_sent_bids > successful_sent_bids:
+                        id_offer_from = offer_identity[0]
+                        automation_override = id_offer_from['automation_override']
+                        if automation_override == 2:
                             if args.debug:
-                                print(f'Not bidding on offer {offer_id}, too many failed bids ({failed_sent_bids}).')
+                                print(f'Not bidding on offer {offer_id}, automation_override ({automation_override}).')
                             continue
+                        if automation_override == 1:
+                            if args.debug:
+                                print('Offer address from {}, set to always accept.'.format(offer['addr_from']))
+                        else:
+                            successful_sent_bids = id_offer_from['num_sent_bids_successful']
+                            failed_sent_bids = id_offer_from['num_sent_bids_failed']
+                            if failed_sent_bids > 3 and failed_sent_bids > successful_sent_bids:
+                                if args.debug:
+                                    print(f'Not bidding on offer {offer_id}, too many failed bids ({failed_sent_bids}).')
+                                continue
 
                     max_coin_from_balance = bid_template.get('max_coin_from_balance', -1)
                     if max_coin_from_balance > 0:
@@ -533,10 +542,10 @@ def main():
                         'address_to': address_to,
                         'amount_from': swap_amount,
                         'fixed': True,
-                        #'extra_id_to':
-                        #'referral':
+                        # 'extra_id_to':
+                        # 'referral':
                         'refund_address': address_refund,
-                        #'refund_extra_id':
+                        # 'refund_extra_id':
                         'rate_id': estimate_response['rate_id'],
                     }
 

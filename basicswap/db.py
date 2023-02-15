@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019-2022 tecnovert
+# Copyright (c) 2019-2023 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -12,7 +12,7 @@ from enum import IntEnum, auto
 from sqlalchemy.ext.declarative import declarative_base
 
 
-CURRENT_DB_VERSION = 17
+CURRENT_DB_VERSION = 18
 CURRENT_DB_DATA_VERSION = 2
 Base = declarative_base()
 
@@ -421,6 +421,8 @@ class KnownIdentity(Base):
     num_recv_bids_rejected = sa.Column(sa.Integer)
     num_sent_bids_failed = sa.Column(sa.Integer)
     num_recv_bids_failed = sa.Column(sa.Integer)
+    automation_override = sa.Column(sa.Integer)  # AutomationOverrideOptions
+    visibility_override = sa.Column(sa.Integer)  # VisibilityOverrideOptions
     note = sa.Column(sa.String)
     updated_at = sa.Column(sa.BigInteger)
     created_at = sa.Column(sa.BigInteger)

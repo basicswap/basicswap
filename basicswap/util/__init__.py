@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2018-2022 tecnovert
+# Copyright (c) 2018-2023 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -177,7 +177,7 @@ def format_amount(i, display_scale, scale=None):
     return rv
 
 
-def format_timestamp(value, with_seconds=False):
+def format_timestamp(value: int, with_seconds=False) -> str:
     str_format = '%Y-%m-%d %H:%M'
     if with_seconds:
         str_format += ':%S'
@@ -205,5 +205,11 @@ def h2b(h: str) -> bytes:
     return bytes.fromhex(h)
 
 
-def i2h(x):
+def i2h(x: int) -> str:
     return b2h(i2b(x))
+
+
+def zeroIfNone(value) -> int:
+    if value is None:
+        return 0
+    return value
