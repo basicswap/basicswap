@@ -4153,10 +4153,8 @@ class BasicSwap(BaseApp):
         msg_data.ParseFromString(msg_bytes)
 
         now = int(time.time())
-        self.mxDB.acquire()
-        session = None
         try:
-            session = scoped_session(self.session_factory)
+            session = self.openSession()
 
             if len(msg_data.offer_msg_id) != 28:
                 raise ValueError('Invalid msg_id length')
@@ -4166,10 +4164,14 @@ class BasicSwap(BaseApp):
             offer = session.query(Offer).filter_by(offer_id=msg_data.offer_msg_id).first()
             if offer is None:
                 self.storeOfferRevoke(msg_data.offer_msg_id, msg_data.signature)
-                raise ValueError('Offer not found: {}'.format(msg_data.offer_msg_id.hex()))
+
+                # Offer may not have been received yet, or involved an inactive coin on this node.
+                self.log.debug('Offer not found to revoke: {}'.format(msg_data.offer_msg_id.hex()))
+                return
 
             if offer.expire_at <= now:
-                raise ValueError('Offer already expired: {}'.format(msg_data.offer_msg_id.hex()))
+                self.log.debug('Offer is already expired, no need to revoke: {}'.format(msg_data.offer_msg_id.hex()))
+                return
 
             signature_enc = base64.b64encode(msg_data.signature).decode('utf-8')
 
@@ -4180,12 +4182,8 @@ class BasicSwap(BaseApp):
             # TODO: Remove message, or wait for expire
 
             session.add(offer)
-            session.commit()
         finally:
-            if session:
-                session.close()
-                session.remove()
-            self.mxDB.release()
+            self.closeSession(session)
 
     def getCompletedAndActiveBidsValue(self, offer, session):
         bids = []
