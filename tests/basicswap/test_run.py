@@ -283,7 +283,7 @@ class Test(BaseTest):
         bid_id = swap_clients[1].postBid(offer_id, offer.amount_from)
 
         wait_for_bid(test_delay_event, swap_clients[0], bid_id)
-        swap_clients[1].abandonBid(bid_id)
+        read_json_api(1801, 'bids/{}'.format(bid_id.hex()), {'abandon': True})
         swap_clients[0].acceptBid(bid_id)
 
         wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=60)

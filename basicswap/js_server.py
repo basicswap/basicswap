@@ -318,6 +318,8 @@ def js_bids(self, url_split, post_string: str, is_json: bool) -> bytes:
             post_data = getFormData(post_string, is_json)
             if have_data_entry(post_data, 'accept'):
                 swap_client.acceptBid(bid_id)
+            elif have_data_entry(post_data, 'abandon'):
+                swap_client.abandonBid(bid_id)
             elif have_data_entry(post_data, 'debugind'):
                 swap_client.setBidDebugInd(bid_id, int(get_data_entry(post_data, 'debugind')))
 
