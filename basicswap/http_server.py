@@ -6,6 +6,7 @@
 
 import os
 import json
+import shlex
 import traceback
 import threading
 import http.client
@@ -17,6 +18,7 @@ from . import __version__
 from .util import (
     dumpj,
     ensure,
+    toBool,
     zeroIfNone,
     LockedCoinError,
     format_timestamp,
@@ -92,6 +94,31 @@ def listExplorerActions(swap_client):
                ('balance', 'Address Balance'),
                ('unspent', 'List Unspent')]
     return actions
+
+
+def parse_cmd(cmd: str, type_map: str):
+    params = shlex.split(cmd)
+    if len(params) < 1:
+        return '', []
+    method = params[0]
+    typed_params = []
+    params = params[1:]
+
+    for i, param in enumerate(params):
+        if i >= len(type_map):
+            type_ind = 's'
+        else:
+            type_ind = type_map[i]
+        if type_ind == 'i':
+            typed_params.append(int(param))
+        elif type_ind == 'b':
+            typed_params.append(toBool(param))
+        elif type_ind == 'j':
+            typed_params.append(json.loads(param))
+        else:
+            typed_params.append(param)
+
+    return method, typed_params
 
 
 class HttpHandler(BaseHTTPRequestHandler):
@@ -251,22 +278,28 @@ class HttpHandler(BaseHTTPRequestHandler):
         result = None
         coin_type = -1
         coin_id = -1
+        call_type = 'cli'
+        type_map = ''
         messages = []
         err_messages = []
         form_data = self.checkForm(post_string, 'rpc', err_messages)
         if form_data:
             try:
-                coin_id = int(form_data[b'coin_type'][0])
-                if coin_id in (-2, -3, -4):
-                    coin_type = Coins(Coins.XMR)
-                else:
-                    coin_type = Coins(coin_id)
-            except Exception:
-                raise ValueError('Unknown Coin Type')
+                call_type = get_data_entry_or(form_data, 'call_type', 'cli')
+                type_map = get_data_entry_or(form_data, 'type_map', '')
+                try:
+                    coin_id = int(get_data_entry(form_data, 'coin_type'))
+                    if coin_id in (-2, -3, -4):
+                        coin_type = Coins(Coins.XMR)
+                    else:
+                        coin_type = Coins(coin_id)
+                except Exception:
+                    raise ValueError('Unknown Coin Type')
 
-            cmd = form_data[b'cmd'][0].decode('utf-8')
-
-            try:
+                try:
+                    cmd = get_data_entry(form_data, 'cmd')
+                except Exception:
+                    raise ValueError('Invalid command')
                 if coin_type == Coins.XMR:
                     ci = swap_client.ci(coin_type)
                     arr = cmd.split(None, 1)
@@ -284,7 +317,11 @@ class HttpHandler(BaseHTTPRequestHandler):
                         raise ValueError('Unknown XMR RPC variant')
                     result = json.dumps(rv, indent=4)
                 else:
-                    result = cmd + '\n' + swap_client.callcoincli(coin_type, cmd)
+                    if call_type == 'http':
+                        method, params = parse_cmd(cmd, type_map)
+                        result = cmd + '\n' + swap_client.ci(coin_type).rpc_callback(method, params)
+                    else:
+                        result = cmd + '\n' + swap_client.callcoincli(coin_type, cmd)
             except Exception as ex:
                 result = str(ex)
                 if self.server.swap_client.debug is True:
@@ -303,6 +340,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             'err_messages': err_messages,
             'coins': coins,
             'coin_type': coin_id,
+            'call_type': call_type,
             'result': result,
             'messages': messages,
             'summary': summary,

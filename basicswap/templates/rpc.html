@@ -73,6 +73,16 @@
                         <input class="w-full aappearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 w-full block p-2.5" type="text" name="cmd">
                       </td>
                     </tr>
+                    <tr>
+                      <td class="py-4 px-6 w-1/3 bold">
+                      <select class="appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" name="call_type">
+                        <option value="cli" {% if call_type=="cli" %} selected{% endif %}>CLI</option>
+                        <option value="http" {% if call_type=="http" %} selected{% endif %}>HTTP</option>
+                      </select>
+                      </td>
+                      <td class="py-4 pr-5 w-2/3">
+                        <input class="w-full aappearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 w-full block p-2.5" type="text" name="type_map">
+                      </td>
                   </table>
               </div>
             </div>
