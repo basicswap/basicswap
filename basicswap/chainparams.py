@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019-2022 tecnovert
+# Copyright (c) 2019-2023 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -374,29 +374,29 @@ class CoinInterface:
             ticker = 'rt' + ticker
         return ticker
 
-    def getExchangeTicker(self, exchange_name):
+    def getExchangeTicker(self, exchange_name: str) -> str:
         return chainparams[self.coin_type()]['ticker']
 
-    def getExchangeName(self, exchange_name):
+    def getExchangeName(self, exchange_name: str) -> str:
         return chainparams[self.coin_type()]['name']
 
-    def ticker_mainnet(self):
+    def ticker_mainnet(self) -> str:
         ticker = chainparams[self.coin_type()]['ticker']
         return ticker
 
-    def min_amount(self):
+    def min_amount(self) -> int:
         return chainparams[self.coin_type()][self._network]['min_amount']
 
-    def max_amount(self):
+    def max_amount(self) -> int:
         return chainparams[self.coin_type()][self._network]['max_amount']
 
-    def setWalletSeedWarning(self, value):
+    def setWalletSeedWarning(self, value: bool) -> None:
         self._unknown_wallet_seed = value
 
-    def setWalletRestoreHeight(self, value):
+    def setWalletRestoreHeight(self, value: int) -> None:
         self._restore_height = value
 
-    def knownWalletSeed(self):
+    def knownWalletSeed(self) -> bool:
         return not self._unknown_wallet_seed
 
     def chainparams(self):
@@ -408,13 +408,13 @@ class CoinInterface:
     def has_segwit(self) -> bool:
         return chainparams[self.coin_type()].get('has_segwit', True)
 
-    def is_transient_error(self, ex):
+    def is_transient_error(self, ex) -> bool:
         if isinstance(ex, TemporaryError):
             return True
-        str_error = str(ex).lower()
+        str_error: str = str(ex).lower()
         if 'not enough unlocked money' in str_error:
             return True
-        if 'No unlocked balance' in str_error:
+        if 'no unlocked balance' in str_error:
             return True
         if 'transaction was rejected by daemon' in str_error:
             return True

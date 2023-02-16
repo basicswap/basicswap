@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2022 tecnovert
+# Copyright (c) 2022-2023 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -59,7 +59,7 @@ def b58encode(v):
     return (__b58chars[0] * nPad) + result
 
 
-def encodeStealthAddress(prefix_byte, scan_pubkey, spend_pubkey):
+def encodeStealthAddress(prefix_byte: int, scan_pubkey: bytes, spend_pubkey: bytes) -> str:
     data = bytes((0x00,))
     data += scan_pubkey
     data += bytes((0x01,))
@@ -72,14 +72,14 @@ def encodeStealthAddress(prefix_byte, scan_pubkey, spend_pubkey):
     return b58encode(b)
 
 
-def decodeWif(encoded_key):
+def decodeWif(encoded_key: str) -> bytes:
     key = b58decode(encoded_key)[1:-4]
     if len(key) == 33:
         return key[:-1]
     return key
 
 
-def toWIF(prefix_byte, b, compressed=True):
+def toWIF(prefix_byte: int, b: bytes, compressed: bool = True) -> str:
     b = bytes((prefix_byte,)) + b
     if compressed:
         b += bytes((0x01,))
@@ -87,9 +87,9 @@ def toWIF(prefix_byte, b, compressed=True):
     return b58encode(b)
 
 
-def getKeyID(bytes):
-    data = hashlib.sha256(bytes).digest()
-    return ripemd160(data)
+def getKeyID(key_data: bytes) -> str:
+    sha256_hash = hashlib.sha256(key_data).digest()
+    return ripemd160(sha256_hash)
 
 
 def bech32Decode(hrp, addr):
@@ -109,7 +109,7 @@ def bech32Encode(hrp, data):
     return ret
 
 
-def decodeAddress(address_str):
+def decodeAddress(address_str: str):
     b58_addr = b58decode(address_str)
     if b58_addr is not None:
         address = b58_addr[:-4]
@@ -119,10 +119,10 @@ def decodeAddress(address_str):
     return None
 
 
-def encodeAddress(address):
+def encodeAddress(address: bytes) -> str:
     checksum = hashlib.sha256(hashlib.sha256(address).digest()).digest()
     return b58encode(address + checksum[0:4])
 
 
-def pubkeyToAddress(prefix, pubkey):
+def pubkeyToAddress(prefix: int, pubkey: bytes) -> str:
     return encodeAddress(bytes((prefix,)) + getKeyID(pubkey))

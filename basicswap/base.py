@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019-2022 tecnovert
+# Copyright (c) 2019-2023 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -92,7 +92,7 @@ class BaseApp:
         except Exception:
             return {}
 
-    def setDaemonPID(self, name, pid):
+    def setDaemonPID(self, name, pid) -> None:
         if isinstance(name, Coins):
             self.coin_clients[name]['pid'] = pid
             return
@@ -100,12 +100,12 @@ class BaseApp:
             if v['name'] == name:
                 v['pid'] = pid
 
-    def getChainDatadirPath(self, coin):
+    def getChainDatadirPath(self, coin) -> str:
         datadir = self.coin_clients[coin]['datadir']
         testnet_name = '' if self.chain == 'mainnet' else chainparams[coin][self.chain].get('name', self.chain)
         return os.path.join(datadir, testnet_name)
 
-    def getCoinIdFromName(self, coin_name):
+    def getCoinIdFromName(self, coin_name: str):
         for c, params in chainparams.items():
             if coin_name.lower() == params['name'].lower():
                 return c
@@ -146,7 +146,7 @@ class BaseApp:
             raise ValueError('CLI error ' + str(out[1]))
         return out[0].decode('utf-8').strip()
 
-    def is_transient_error(self, ex):
+    def is_transient_error(self, ex) -> bool:
         if isinstance(ex, TemporaryError):
             return True
         str_error = str(ex).lower()
@@ -164,13 +164,13 @@ class BaseApp:
 
         socket.setdefaulttimeout(timeout)
 
-    def popConnectionParameters(self):
+    def popConnectionParameters(self) -> None:
         if self.use_tor_proxy:
             socket.socket = self.default_socket
             socket.getaddrinfo = self.default_socket_getaddrinfo
         socket.setdefaulttimeout(self.default_socket_timeout)
 
-    def logException(self, message):
+    def logException(self, message) -> None:
         self.log.error(message)
         if self.debug:
             self.log.error(traceback.format_exc())

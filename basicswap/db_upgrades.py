@@ -238,10 +238,11 @@ def upgradeDatabase(self, db_version):
                     tx_data BLOB,
                     used_by BLOB,
                     PRIMARY KEY (record_id))''')
-        elif current_version == 16:
+        elif current_version == 17:
             db_version += 1
             session.execute('ALTER TABLE knownidentities ADD COLUMN automation_override INTEGER')
             session.execute('ALTER TABLE knownidentities ADD COLUMN visibility_override INTEGER')
+            session.execute('ALTER TABLE knownidentities ADD COLUMN data BLOB')
             session.execute('UPDATE knownidentities SET active_ind = 1')
 
         if current_version != db_version:

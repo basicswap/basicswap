@@ -344,7 +344,7 @@ def js_bids(self, url_split, post_string: str, is_json: bool) -> bytes:
         data = describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, events, edit_bid, show_txns, for_api=True)
         return bytes(json.dumps(data), 'UTF-8')
 
-    post_data = getFormData(post_string, is_json)
+    post_data = {} if post_string == '' else getFormData(post_string, is_json)
     offer_id, filters = parseBidFilters(post_data)
 
     bids = swap_client.listBids(offer_id=offer_id, filters=filters)

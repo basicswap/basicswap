@@ -684,7 +684,7 @@ class PARTInterfaceBlind(PARTInterface):
                 return -1
         return None
 
-    def spendBLockTx(self, chain_b_lock_txid, address_to, kbv, kbs, cb_swap_value, b_fee, restore_height, spend_actual_balance=False):
+    def spendBLockTx(self, chain_b_lock_txid: bytes, address_to: str, kbv: bytes, kbs: bytes, cb_swap_value: int, b_fee: int, restore_height: int, spend_actual_balance: bool = False) -> bytes:
         Kbv = self.getPubkey(kbv)
         Kbs = self.getPubkey(kbs)
         sx_addr = self.formatStealthAddress(Kbv, Kbs)
@@ -813,7 +813,7 @@ class PARTInterfaceAnon(PARTInterface):
                 return -1
         return None
 
-    def spendBLockTx(self, chain_b_lock_txid, address_to, kbv, kbs, cb_swap_value, b_fee, restore_height, spend_actual_balance=False):
+    def spendBLockTx(self, chain_b_lock_txid: bytes, address_to: str, kbv: bytes, kbs: bytes, cb_swap_value: int, b_fee: int, restore_height: int, spend_actual_balance: bool = False) -> bytes:
         Kbv = self.getPubkey(kbv)
         Kbs = self.getPubkey(kbs)
         sx_addr = self.formatStealthAddress(Kbv, Kbs)

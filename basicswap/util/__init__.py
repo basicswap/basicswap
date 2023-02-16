@@ -66,7 +66,7 @@ def dumpje(jin):
     return json.dumps(jin, default=jsonDecimal).replace('"', '\\"')
 
 
-def SerialiseNum(n):
+def SerialiseNum(n: int) -> bytes:
     if n == 0:
         return bytes((0x00,))
     if n > 0 and n <= 16:
@@ -84,7 +84,7 @@ def SerialiseNum(n):
     return bytes((len(rv),)) + rv
 
 
-def DeserialiseNum(b, o=0) -> int:
+def DeserialiseNum(b: bytes, o: int = 0) -> int:
     if b[o] == 0:
         return 0
     if b[o] > 0x50 and b[o] <= 0x50 + 16:
@@ -100,13 +100,13 @@ def DeserialiseNum(b, o=0) -> int:
     return v
 
 
-def float_to_str(f):
+def float_to_str(f: float) -> str:
     # stackoverflow.com/questions/38847690
     d1 = decimal_ctx.create_decimal(repr(f))
     return format(d1, 'f')
 
 
-def make_int(v, scale=8, r=0):  # r = 0, no rounding, fail, r > 0 round up, r < 0 floor
+def make_int(v, scale=8, r=0) -> int:  # r = 0, no rounding, fail, r > 0 round up, r < 0 floor
     if type(v) == float:
         v = float_to_str(v)
     elif type(v) == int:
@@ -177,7 +177,7 @@ def format_amount(i, display_scale, scale=None):
     return rv
 
 
-def format_timestamp(value: int, with_seconds=False) -> str:
+def format_timestamp(value: int, with_seconds: bool = False) -> str:
     str_format = '%Y-%m-%d %H:%M'
     if with_seconds:
         str_format += ':%S'
@@ -185,7 +185,7 @@ def format_timestamp(value: int, with_seconds=False) -> str:
     return time.strftime(str_format, time.localtime(value))
 
 
-def b2i(b) -> int:
+def b2i(b: bytes) -> int:
     # bytes32ToInt
     return int.from_bytes(b, byteorder='big')
 

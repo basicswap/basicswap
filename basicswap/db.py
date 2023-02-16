@@ -423,6 +423,7 @@ class KnownIdentity(Base):
     num_recv_bids_failed = sa.Column(sa.Integer)
     automation_override = sa.Column(sa.Integer)  # AutomationOverrideOptions
     visibility_override = sa.Column(sa.Integer)  # VisibilityOverrideOptions
+    data = sa.Column(sa.LargeBinary)
     note = sa.Column(sa.String)
     updated_at = sa.Column(sa.BigInteger)
     created_at = sa.Column(sa.BigInteger)
