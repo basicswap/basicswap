@@ -733,7 +733,7 @@ class BasicSwap(BaseApp):
             nm += 1
         self.log.info('Scanned %d unread messages.', nm)
 
-    def stopDaemon(self, coin):
+    def stopDaemon(self, coin) -> None:
         if coin == Coins.XMR:
             return
         num_tries = 10
@@ -762,13 +762,13 @@ class BasicSwap(BaseApp):
             self.log.error(traceback.format_exc())
         raise ValueError('Could not stop {}'.format(str(coin)))
 
-    def stopDaemons(self):
+    def stopDaemons(self) -> None:
         for c in self.activeCoins():
             chain_client_settings = self.getChainClientSettings(c)
             if chain_client_settings['manage_daemon'] is True:
                 self.stopDaemon(c)
 
-    def waitForDaemonRPC(self, coin_type, with_wallet=True):
+    def waitForDaemonRPC(self, coin_type, with_wallet=True) -> None:
         for i in range(self.startup_tries):
             if not self.is_running:
                 return
@@ -781,7 +781,7 @@ class BasicSwap(BaseApp):
         self.log.error('Can\'t connect to %s RPC, exiting.', coin_type)
         self.stopRunning(1)  # systemd will try to restart the process if fail_code != 0
 
-    def checkSynced(self, coin_from, coin_to):
+    def checkSynced(self, coin_from, coin_to) -> None:
         check_coins = (coin_from, coin_to)
         for c in check_coins:
             if self.coin_clients[c]['connection_type'] != 'rpc':
@@ -792,12 +792,12 @@ class BasicSwap(BaseApp):
             if synced < 1.0:
                 raise ValueError('{} chain is still syncing, currently at {}.'.format(self.coin_clients[c]['name'], synced))
 
-    def isSystemUnlocked(self):
+    def isSystemUnlocked(self) -> bool:
         # TODO - Check all active coins
         ci = self.ci(Coins.PART)
         return not ci.isWalletLocked()
 
-    def checkSystemStatus(self):
+    def checkSystemStatus(self) -> None:
         ci = self.ci(Coins.PART)
         if ci.isWalletLocked():
             raise LockedCoinError(Coins.PART)
@@ -810,7 +810,7 @@ class BasicSwap(BaseApp):
             if self.coin_clients[c]['connection_type'] == 'rpc':
                 yield c
 
-    def changeWalletPasswords(self, old_password, new_password, coin=None):
+    def changeWalletPasswords(self, old_password, new_password, coin=None) -> None:
         # Only the main wallet password is changed for monero, avoid issues by preventing until active swaps are complete
         if len(self.swaps_in_progress) > 0:
             raise ValueError('Can\'t change passwords while swaps are in progress')
@@ -840,7 +840,7 @@ class BasicSwap(BaseApp):
         if coin is None or coin == Coins.PART:
             self._is_encrypted, self._is_locked = self.ci(Coins.PART).isWalletEncryptedLocked()
 
-    def unlockWallets(self, password, coin=None):
+    def unlockWallets(self, password, coin=None) -> None:
         self._read_zmq_queue = False
         for c in self.activeCoins():
             if coin and c != coin:
@@ -852,7 +852,7 @@ class BasicSwap(BaseApp):
         self.loadFromDB()
         self._read_zmq_queue = True
 
-    def lockWallets(self, coin=None):
+    def lockWallets(self, coin=None) -> None:
         self._read_zmq_queue = False
         self.swaps_in_progress.clear()
 
@@ -864,7 +864,7 @@ class BasicSwap(BaseApp):
                 self._is_locked = True
         self._read_zmq_queue = True
 
-    def initialiseWallet(self, coin_type, raise_errors=False):
+    def initialiseWallet(self, coin_type, raise_errors=False) -> None:
         if coin_type == Coins.PART:
             return
         ci = self.ci(coin_type)
@@ -1544,7 +1544,7 @@ class BasicSwap(BaseApp):
         self.log.info('Sent OFFER %s', offer_id.hex())
         return offer_id
 
-    def revokeOffer(self, offer_id, security_token=None):
+    def revokeOffer(self, offer_id, security_token=None) -> None:
         self.log.info('Revoking offer %s', offer_id.hex())
 
         session = self.openSession()
@@ -1568,7 +1568,7 @@ class BasicSwap(BaseApp):
         finally:
             self.closeSession(session, commit=False)
 
-    def archiveOffer(self, offer_id):
+    def archiveOffer(self, offer_id) -> None:
         self.log.info('Archiving offer %s', offer_id.hex())
         session = self.openSession()
         try:
@@ -1582,7 +1582,7 @@ class BasicSwap(BaseApp):
         finally:
             self.closeSession(session)
 
-    def grindForEd25519Key(self, coin_type, evkey, key_path_base):
+    def grindForEd25519Key(self, coin_type, evkey, key_path_base) -> bytes:
         ci = self.ci(coin_type)
         nonce = 1
         while True:
@@ -1596,7 +1596,7 @@ class BasicSwap(BaseApp):
             if nonce > 1000:
                 raise ValueError('grindForEd25519Key failed')
 
-    def getWalletKey(self, coin_type, key_num, for_ed25519=False):
+    def getWalletKey(self, coin_type, key_num, for_ed25519=False) -> bytes:
         evkey = self.callcoinrpc(Coins.PART, 'extkey', ['account', 'default', 'true'])['evkey']
 
         key_path_base = '44445555h/1h/{}/{}'.format(int(coin_type), key_num)
@@ -1607,7 +1607,7 @@ class BasicSwap(BaseApp):
 
         return self.grindForEd25519Key(coin_type, evkey, key_path_base)
 
-    def getPathKey(self, coin_from, coin_to, offer_created_at, contract_count, key_no, for_ed25519=False):
+    def getPathKey(self, coin_from, coin_to, offer_created_at: int, contract_count: int, key_no: int, for_ed25519: bool = False) -> bytes:
         evkey = self.callcoinrpc(Coins.PART, 'extkey', ['account', 'default', 'true'])['evkey']
         ci = self.ci(coin_to)
 
@@ -4250,7 +4250,7 @@ class BasicSwap(BaseApp):
             total_bids_value_multiplier = opts.get('total_bids_value_multiplier', 1.0)
             if total_bids_value_multiplier > 0.0:
                 if total_bids_value + bid.amount > offer.amount_from * total_bids_value_multiplier:
-                    raise AutomationConstraint('Over remaining offer value {}'.format(offer.amount_from * total_bids_value_multiplie - total_bids_value))
+                    raise AutomationConstraint('Over remaining offer value {}'.format(offer.amount_from * total_bids_value_multiplier - total_bids_value))
 
             num_not_completed = 0
             for active_bid in active_bids:
@@ -5716,10 +5716,12 @@ class BasicSwap(BaseApp):
 
         now = int(time.time())
         q_str = '''SELECT
-                   COUNT(CASE WHEN was_sent THEN 1 ELSE NULL END) AS count_sent,
-                   COUNT(CASE WHEN was_received THEN 1 ELSE NULL END) AS count_received,
-                   COUNT(CASE WHEN was_received AND state = {} AND expire_at > {} THEN 1 ELSE NULL END) AS count_available
-                   FROM bids WHERE active_ind = 1'''.format(BidStates.BID_RECEIVED, now)
+                   COUNT(CASE WHEN b.was_sent THEN 1 ELSE NULL END) AS count_sent,
+                   COUNT(CASE WHEN b.was_received THEN 1 ELSE NULL END) AS count_received,
+                   COUNT(CASE WHEN b.was_received AND b.state = {} AND b.expire_at > {} AND o.expire_at > {} THEN 1 ELSE NULL END) AS count_available
+                   FROM bids b
+                   JOIN offers o ON b.offer_id = o.offer_id
+                   WHERE b.active_ind = 1'''.format(BidStates.BID_RECEIVED, now, now)
         q = self.engine.execute(q_str).first()
         bids_sent = q[0]
         bids_received = q[1]
@@ -6028,10 +6030,10 @@ class BasicSwap(BaseApp):
             with_available_or_active = filters.get('with_available_or_active', False)
             with_expired = filters.get('with_expired', True)
             if with_available_or_active:
-                query_str += 'AND (bids.state NOT IN ({}, {}, {}, {}, {}) AND (bids.state > {} OR bids.expire_at > {})) '.format(BidStates.SWAP_COMPLETED, BidStates.BID_ERROR, BidStates.BID_REJECTED, BidStates.SWAP_TIMEDOUT, BidStates.BID_ABANDONED, BidStates.BID_RECEIVED, now)
+                query_str += 'AND (bids.state NOT IN ({}, {}, {}, {}, {}) AND (bids.state > {} OR (bids.expire_at > {} AND offers.expire_at > {}))) '.format(BidStates.SWAP_COMPLETED, BidStates.BID_ERROR, BidStates.BID_REJECTED, BidStates.SWAP_TIMEDOUT, BidStates.BID_ABANDONED, BidStates.BID_RECEIVED, now, now)
             else:
                 if with_expired is not True:
-                    query_str += 'AND bids.expire_at > {} '.format(now)
+                    query_str += 'AND bids.expire_at > {} AND offers.expire_at > {} '.format(now, now)
 
             sort_dir = filters.get('sort_dir', 'DESC').upper()
             sort_by = filters.get('sort_by', 'created_at')

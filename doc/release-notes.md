@@ -17,6 +17,7 @@
 - api: Can abandon bids.
 - If wallets are encrypted the system will only load in-progress bids when unlocked rather than at startup.
 - Can set overrides for automation strategies per identity.
+- ui: bids on expired offers won't show as available
 
 
 0.0.54
