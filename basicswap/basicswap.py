@@ -4273,7 +4273,7 @@ class BasicSwap(BaseApp):
         except AutomationConstraint as e:
             self.log.info('Not auto accepting bid {}, {}'.format(bid.bid_id.hex(), str(e)))
             if self.debug:
-                self.logEvent(Concepts.AUTOMATION,
+                self.logEvent(Concepts.BID,
                               bid.bid_id,
                               EventLogTypes.AUTOMATION_CONSTRAINT,
                               str(e),
@@ -5814,7 +5814,7 @@ class BasicSwap(BaseApp):
             session.remove()
             self.mxDB.release()
 
-    def updateWalletInfo(self, coin):
+    def updateWalletInfo(self, coin) -> None:
         # Store wallet info to db so it's available after startup
         try:
             bi = self.getBlockchainInfo(coin)
@@ -6141,15 +6141,22 @@ class BasicSwap(BaseApp):
             session.remove()
             self.mxDB.release()
 
-    def getAutomationStrategy(self, strategy_id):
-        self.mxDB.acquire()
+    def getAutomationStrategy(self, strategy_id: int):
         try:
-            session = scoped_session(self.session_factory)
+            session = self.openSession()
             return session.query(AutomationStrategy).filter_by(record_id=strategy_id).first()
         finally:
-            session.close()
-            session.remove()
-            self.mxDB.release()
+            self.closeSession(session, commit=False)
+
+    def updateAutomationStrategy(self, strategy_id: int, data, note: str) -> None:
+        try:
+            session = self.openSession()
+            strategy = session.query(AutomationStrategy).filter_by(record_id=strategy_id).first()
+            strategy.data = json.dumps(data).encode('utf-8')
+            strategy.note = note
+            session.add(strategy)
+        finally:
+            self.closeSession(session)
 
     def getLinkedStrategy(self, linked_type, linked_id):
         self.mxDB.acquire()
@@ -6211,7 +6218,7 @@ class BasicSwap(BaseApp):
             if session is None:
                 self.closeSession(use_session)
 
-    def addSMSGAddress(self, pubkey_hex, addressnote=None):
+    def addSMSGAddress(self, pubkey_hex: str, addressnote: str = None) -> None:
         self.mxDB.acquire()
         try:
             session = scoped_session(self.session_factory)
@@ -6229,7 +6236,7 @@ class BasicSwap(BaseApp):
             session.remove()
             self.mxDB.release()
 
-    def editSMSGAddress(self, address, active_ind, addressnote):
+    def editSMSGAddress(self, address: str, active_ind: int, addressnote: str) -> None:
         self.mxDB.acquire()
         try:
             session = scoped_session(self.session_factory)

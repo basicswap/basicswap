@@ -44,6 +44,7 @@
       <div class="pb-6 border-coolGray-100">
         <div class="flex flex-wrap items-center justify-between -m-2">
           <div class="w-full pt-2 text-center ">
+            <form method="post" autocomplete="off">
             <div class="container px-0 mx-auto mt-5">
               <div class="overflow-x-auto relative border sm:rounded-lg">
                 <table class="w-full text-sm text-left text-gray-500 outline-none border-gray-300">
@@ -69,11 +70,11 @@
                   <tr class="bg-white border-t hover:bg-gray-50">
                     <td class="py-4 px-6 bold w-96">Data</td>
                     <td class="py-4 pr-5">
-                      <textarea class="outline-none block p-2.5 text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 w-full monospace" rows="5" readonly>{{ strategy.data }}</textarea>
+                      <textarea name="data" class="outline-none block p-2.5 text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 w-full monospace" rows="5" {% if not show_edit_form %}readonly{% endif %}>{{ strategy.data }}</textarea>
                       <tr class="bg-white border-t hover:bg-gray-50">
                         <td class="py-4 px-6 bold w-96">Notes</td>
                         <td class="py-4 pr-5">
-                          <textarea class="outline-none block p-2.5 text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 w-full monospace" rows="5" readonly>{{ strategy.note }}</textarea>
+                          <textarea name="note" class="outline-none block p-2.5 text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 w-full monospace" rows="5" {% if not show_edit_form %}readonly{% endif %}>{{ strategy.note }}</textarea>
                         </td>
                       </tr>
                 </table>
@@ -82,18 +83,33 @@
             <div class="p-6 pt-10 bg-white bg-opacity-60 rounded-b-md">
               <div class="w-full md:w-0/12">
                 <div class="flex flex-wrap justify-end -m-1.5">
+                  {% if show_edit_form %}
+                  <div class="w-full md:w-auto p-1.5 ml-2">
+                    <button name="apply" value="Apply" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none"><svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round" ><polyline points=" 6,12 10,16 18,8 " stroke="#ffffff"></polyline> <circle cx="12" cy="12" r="11"></circle></g></svg>Apply</button>
+                  </div>
+                  <div class="w-full md:w-auto p-1.5 ml-2">
+                    <button name="cancel" value="Cancel" type="submit"class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-red-500 hover:text-red-600 border border-red-400 hover:border-red-500 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none"><svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ef5844" stroke-linejoin="round" ><line x1="16" y1="8" x2="8" y2="16" stroke="#ef5844"></line> <line x1="16" y1="16" x2="8" y2="8" stroke="#ef5844"></line> <circle cx="12" cy="12" r="11"></circle></g></svg>Cancel</button>
+                  </div>
+                  {% else %}
+                  <div class="w-full md:w-auto p-1.5">
+                    <button name="edit" value="edit" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+                    <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round" ><line x1="2" y1="23" x2="22" y2="23" stroke="#ffffff"></line> <line data-cap="butt" x1="13" y1="5" x2="17" y2="9"></line> <polygon points="8 18 3 19 4 14 16 2 20 6 8 18"></polygon></g></svg>Edit</button>
+                  </div>
                   <div class="w-full md:w-auto p-1.5 ml-2">
                     <a href="/automation" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md shadow-button focus:ring-0 focus:outline-non"><svg class="text-gray-500 w-5 h-5 mr-2" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="square" stroke-width="2" fill="none" stroke="#556987" stroke-linejoin="miter" class="nc-icon-wrapper" stroke-miterlimit="10"><line data-cap="butt" x1="18" y1="12" x2="7" y2="12" stroke-linecap="butt" stroke="#556987"></line> <polyline points=" 11,16 7,12 11,8 " stroke="#5569878"></polyline> <circle cx="12" cy="12" r="11"></circle></g></svg> <span>Back</span> </a>
                   </div>
+                  {% endif %}
                 </div>
               </div>
             </div>
+            <input type="hidden" name="formid" value="{{ form_id }}">
+            </form>
           </div>
         </div>
       </div>
     </div>
   </section>
-</div> 
+</div>
 {% include 'footer.html' %}
 </div>
 </body>

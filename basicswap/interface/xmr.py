@@ -127,7 +127,7 @@ class XMRInterface(CoinInterface):
             self.createWallet(params)
             self.openWallet(self._wallet_filename)
 
-    def ensureWalletExists(self):
+    def ensureWalletExists(self) -> None:
         with self._mx_wallet:
             self.openWallet(self._wallet_filename)
 
@@ -190,12 +190,12 @@ class XMRInterface(CoinInterface):
     def walletRestoreHeight(self):
         return self._restore_height
 
-    def getMainWalletAddress(self):
+    def getMainWalletAddress(self) -> str:
         with self._mx_wallet:
             self.openWallet(self._wallet_filename)
             return self.rpc_wallet_cb('get_address')['address']
 
-    def getNewAddress(self, placeholder):
+    def getNewAddress(self, placeholder) -> str:
         with self._mx_wallet:
             self.openWallet(self._wallet_filename)
             return self.rpc_wallet_cb('create_address', {'account_index': 0})['address']
@@ -204,19 +204,19 @@ class XMRInterface(CoinInterface):
         self._log.warning('TODO - estimate fee rate?')
         return 0.0, 'unused'
 
-    def getNewSecretKey(self):
+    def getNewSecretKey(self) -> bytes:
         return edu.get_secret()
 
-    def pubkey(self, key):
+    def pubkey(self, key: bytes) -> bytes:
         return edf.scalarmult_B(key)
 
-    def encodeKey(self, vk):
+    def encodeKey(self, vk: bytes) -> str:
         return vk[::-1].hex()
 
-    def decodeKey(self, k_hex):
+    def decodeKey(self, k_hex: str) -> bytes:
         return bytes.fromhex(k_hex)[::-1]
 
-    def encodePubkey(self, pk):
+    def encodePubkey(self, pk: bytes) -> str:
         return edu.encodepoint(pk)
 
     def decodePubkey(self, pke):
@@ -225,12 +225,12 @@ class XMRInterface(CoinInterface):
     def getPubkey(self, privkey):
         return ed25519_get_pubkey(privkey)
 
-    def getAddressFromKeys(self, key_view, key_spend):
+    def getAddressFromKeys(self, key_view: bytes, key_spend: bytes) -> str:
         pk_view = self.getPubkey(key_view)
         pk_spend = self.getPubkey(key_spend)
         return xmr_util.encode_address(pk_view, pk_spend)
 
-    def verifyKey(self, k):
+    def verifyKey(self, k: int) -> bool:
         i = b2i(k)
         return (i < edf.l and i > 8)
 
@@ -239,23 +239,23 @@ class XMRInterface(CoinInterface):
         # Checks for small order
         return verify_ed25519_point(pubkey_bytes)
 
-    def proveDLEAG(self, key):
+    def proveDLEAG(self, key: bytes) -> bytes:
         privkey = PrivateKey(key)
         return dleag_prove(privkey)
 
-    def verifyDLEAG(self, dleag_bytes):
+    def verifyDLEAG(self, dleag_bytes: bytes) -> bool:
         return dleag_verify(dleag_bytes)
 
-    def lengthDLEAG(self):
+    def lengthDLEAG(self) -> int:
         return dleag_proof_len()
 
-    def sumKeys(self, ka, kb):
+    def sumKeys(self, ka: bytes, kb: bytes) -> bytes:
         return ed25519_scalar_add(ka, kb)
 
-    def sumPubkeys(self, Ka, Kb):
+    def sumPubkeys(self, Ka: bytes, Kb: bytes) -> bytes:
         return ed25519_add(Ka, Kb)
 
-    def encodeSharedAddress(self, Kbv, Kbs):
+    def encodeSharedAddress(self, Kbv: bytes, Kbs: bytes) -> str:
         return xmr_util.encode_address(Kbv, Kbs)
 
     def publishBLockTx(self, kbv, Kbs, output_amount, feerate, delay_for: int = 10, unlock_time: int = 0) -> bytes:
@@ -494,14 +494,14 @@ class XMRInterface(CoinInterface):
             self._wallet_password = orig_password
             raise e
 
-    def unlockWallet(self, password):
+    def unlockWallet(self, password: str) -> None:
         self._log.info('unlockWallet - {}'.format(self.ticker()))
         self._wallet_password = password
 
         if not self._have_checked_seed:
             self._sc.checkWalletSeed(self.coin_type())
 
-    def lockWallet(self):
+    def lockWallet(self) -> None:
         self._log.info('lockWallet - {}'.format(self.ticker()))
         self._wallet_password = None
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2020-2022 tecnovert
+# Copyright (c) 2020-2023 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -260,7 +260,7 @@ class BTCInterface(CoinInterface):
             last_block_header = prev_block_header
         raise ValueError(f'Block header not found at time: {time}')
 
-    def initialiseWallet(self, key_bytes: bytes):
+    def initialiseWallet(self, key_bytes: bytes) -> None:
         key_wif = self.encodeKey(key_bytes)
 
         self.rpc_callback('sethdseed', [True, key_wif])
@@ -388,11 +388,11 @@ class BTCInterface(CoinInterface):
     def getPubkey(self, privkey):
         return PublicKey.from_secret(privkey).format()
 
-    def getAddressHashFromKey(self, key) -> bytes:
+    def getAddressHashFromKey(self, key: bytes) -> bytes:
         pk = self.getPubkey(key)
         return hash160(pk)
 
-    def getSeedHash(self, seed):
+    def getSeedHash(self, seed) -> bytes:
         return self.getAddressHashFromKey(seed)[::-1]
 
     def verifyKey(self, k: bytes) -> bool:

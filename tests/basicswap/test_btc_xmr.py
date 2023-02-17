@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2021-2022 tecnovert
+# Copyright (c) 2021-2023 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -259,6 +259,9 @@ class BasicSwapTest(BaseTest):
         for i in range(1500):
             self.callnoderpc('getnewaddress')
         assert self.swap_clients[0].checkWalletSeed(Coins.BTC) is True
+
+        rv = read_json_api(1800, 'getcoinseed', {'coin': 'XMR'})
+        assert (rv['address'] == '47H7UDLzYEsR28BWttxp59SP1UVSxs4VKDJYSfmz7Wd4Fue5VWuoV9x9eejunwzVSmHWN37gBkaAPNf9VD4bTvwQKsBVWyK')
 
     def do_test_01_full_swap(self, coin_from, coin_to):
         logging.info('---------- Test {} to {}'.format(coin_from.name, coin_to.name))

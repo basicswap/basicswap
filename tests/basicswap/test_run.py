@@ -132,6 +132,7 @@ class Test(BaseTest):
 
         rv = read_json_api(1800, 'getcoinseed', {'coin': 'BTC'})
         assert (rv['seed'] == '8e54a313e6df8918df6d758fafdbf127a115175fdd2238d0e908dd8093c9ac3b')
+        assert (rv['seed_id'] == '3da5c0af91879e8ce97d9a843874601c08688078')
 
         rv = read_json_api(1800, 'identities/ppCsRro5po7Yu6kyu5XjSyr3A1PPdk9j1F', {'set_label': 'test 1'})
         assert (len(rv) == 1)

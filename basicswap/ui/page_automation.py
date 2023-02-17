@@ -1,12 +1,15 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2022 tecnovert
+# Copyright (c) 2022-2023 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
+
+import json
 
 from .util import (
     PAGE_LIMIT,
     get_data_entry,
+    get_data_entry_or,
     have_data_entry,
     set_pagination_filters,
 )
@@ -89,14 +92,29 @@ def page_automation_strategy(self, url_split, post_string):
 
     messages = []
     err_messages = []
+    form_data = self.checkForm(post_string, 'automation_strategy', err_messages)
+    show_edit_form = False
+    if form_data:
+        if have_data_entry(form_data, 'edit'):
+            show_edit_form = True
+        if have_data_entry(form_data, 'apply'):
+            try:
+                data = json.loads(get_data_entry_or(form_data, 'data', ''))
+                note = get_data_entry_or(form_data, 'note', '')
+                swap_client.updateAutomationStrategy(strategy_id, data, note)
+                messages.append('Updated')
+            except Exception as e:
+                err_messages.append(str(e))
+                show_edit_form = True
+
     strategy = swap_client.getAutomationStrategy(strategy_id)
 
     formatted_strategy = {
         'label': strategy.label,
         'type': strConcepts(strategy.type_ind),
         'only_known_identities': 'True' if strategy.only_known_identities is True else 'False',
-        'data': strategy.data,
-        'note': strategy.note,
+        'data': strategy.data.decode('utf-8'),
+        'note': '' if not strategy.note else strategy.note,
         'created_at': strategy.created_at,
     }
 
@@ -105,5 +123,6 @@ def page_automation_strategy(self, url_split, post_string):
         'messages': messages,
         'err_messages': err_messages,
         'strategy': formatted_strategy,
+        'show_edit_form': show_edit_form,
         'summary': summary,
     })

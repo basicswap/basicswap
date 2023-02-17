@@ -163,7 +163,7 @@ class FIROInterface(BTCInterface):
 
         return CScript([OP_HASH160, script_hash_hash, OP_EQUAL])
 
-    def getSeedHash(self, seed):
+    def getSeedHash(self, seed) -> bytes:
         return hash160(seed)[::-1]
 
     def encodeScriptDest(self, script):
