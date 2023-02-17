@@ -2,6 +2,22 @@
 0.0.x
 ==============
 
+0.0.59
+==============
+
+- Added total_bids_value_multiplier option to automation strategies.
+  - System won't automatically accept a bid for an offer if the sum of the values of all completed
+    and in-porgress bids and the candidate bid exceeds total_bids_value_multiplier times the offer value.
+  - default is 1.0.
+- ui: The rpc page can send commands over http.
+  - Must manually specify the argument types bsij for (bool, string, int, json).
+- Removed error message for unprocessed revoke messages.
+  - Some nodes won't have all messages.
+- Started test framework for scripts.
+- api: Can abandon bids.
+- If wallets are encrypted the system will only load in-progress bids when unlocked rather than at startup.
+- Can set overrides for automation strategies per identity.
+
 
 0.0.54
 ==============

@@ -4247,8 +4247,10 @@ class BasicSwap(BaseApp):
 
             active_bids, total_bids_value = self.getCompletedAndActiveBidsValue(offer, use_session)
 
-            if total_bids_value + bid.amount > offer.amount_from:
-                raise AutomationConstraint('Over remaining offer value {}'.format(offer.amount_from - total_bids_value))
+            total_bids_value_multiplier = opts.get('total_bids_value_multiplier', 1.0)
+            if total_bids_value_multiplier > 0.0:
+                if total_bids_value + bid.amount > offer.amount_from * total_bids_value_multiplier:
+                    raise AutomationConstraint('Over remaining offer value {}'.format(offer.amount_from * total_bids_value_multiplie - total_bids_value))
 
             num_not_completed = 0
             for active_bid in active_bids:
