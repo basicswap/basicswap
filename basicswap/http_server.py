@@ -19,7 +19,6 @@ from .util import (
     dumpj,
     ensure,
     toBool,
-    zeroIfNone,
     LockedCoinError,
     format_timestamp,
 )
@@ -31,8 +30,6 @@ from .basicswap_util import (
     strTxState,
     strBidState,
     strAddressType,
-    AutomationOverrideOptions,
-    strAutomationOverrideOption,
 )
 
 from .js_server import (
@@ -58,6 +55,7 @@ from .ui.page_tor import page_tor, get_tor_established_state
 from .ui.page_wallet import page_wallets, page_wallet
 from .ui.page_settings import page_settings
 from .ui.page_encryption import page_changepassword, page_unlock, page_lock
+from .ui.page_identity import page_identity
 
 env = Environment(loader=PackageLoader('basicswap', 'templates'))
 env.filters['formatts'] = format_timestamp
@@ -474,59 +472,6 @@ class HttpHandler(BaseHTTPRequestHandler):
             'summary': summary,
         })
 
-    def page_identity(self, url_split, post_string):
-        ensure(len(url_split) > 2, 'Address not specified')
-        identity_address = url_split[2]
-        swap_client = self.server.swap_client
-        swap_client.checkSystemStatus()
-        summary = swap_client.getSummary()
-
-        page_data = {'identity_address': identity_address}
-        messages = []
-        err_messages = []
-        form_data = self.checkForm(post_string, 'identity', err_messages)
-        if form_data:
-            if have_data_entry(form_data, 'edit'):
-                page_data['show_edit_form'] = True
-            if have_data_entry(form_data, 'apply'):
-                try:
-                    data = {
-                        'label': get_data_entry_or(form_data, 'label', ''),
-                        'note': get_data_entry_or(form_data, 'note', ''),
-                        'automation_override': get_data_entry(form_data, 'automation_override'),
-                    }
-                    swap_client.setIdentityData({'address': identity_address}, data)
-                    messages.append('Updated')
-                except Exception as e:
-                    err_messages.append(str(e))
-
-        try:
-            identity = swap_client.getIdentity(identity_address)
-            if identity is None:
-                raise ValueError('Unknown address')
-            page_data['label'] = identity.label
-            page_data['num_sent_bids_successful'] = identity.num_sent_bids_successful
-            page_data['num_recv_bids_successful'] = identity.num_recv_bids_successful
-            page_data['num_sent_bids_rejected'] = identity.num_sent_bids_rejected
-            page_data['num_recv_bids_rejected'] = identity.num_recv_bids_rejected
-            page_data['num_sent_bids_failed'] = identity.num_sent_bids_failed
-            page_data['num_recv_bids_failed'] = identity.num_recv_bids_failed
-            automation_override = zeroIfNone(identity.automation_override)
-            page_data['automation_override'] = automation_override
-            page_data['str_automation_override'] = strAutomationOverrideOption(automation_override)
-            page_data['note'] = identity.note
-        except Exception as e:
-            err_messages.append(e)
-
-        template = env.get_template('identity.html')
-        return self.render_template(template, {
-            'messages': messages,
-            'err_messages': err_messages,
-            'data': page_data,
-            'automation_override_options': [(int(opt), strAutomationOverrideOption(opt)) for opt in AutomationOverrideOptions if opt > 0],
-            'summary': summary,
-        })
-
     def page_shutdown(self, url_split, post_string):
         swap_client = self.server.swap_client
 
@@ -668,7 +613,7 @@ class HttpHandler(BaseHTTPRequestHandler):
                 if page == 'smsgaddresses':
                     return self.page_smsgaddresses(url_split, post_string)
                 if page == 'identity':
-                    return self.page_identity(url_split, post_string)
+                    return page_identity(self, url_split, post_string)
                 if page == 'tor':
                     return page_tor(self, url_split, post_string)
                 if page == 'automation':
