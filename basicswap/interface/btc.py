@@ -321,7 +321,8 @@ class BTCInterface(CoinInterface):
     def checkAddressMine(self, address: str) -> None:
         addr_info = self.rpc_callback('getaddressinfo', [address])
         ensure(addr_info['ismine'], 'ismine is false')
-        ensure(addr_info['hdseedid'] == self._expect_seedid_hex, 'unexpected seedid')
+        if self.sc._restrict_unknown_seed_wallets:
+            ensure(addr_info['hdseedid'] == self._expect_seedid_hex, 'unexpected seedid')
 
     def get_fee_rate(self, conf_target=2):
         try:

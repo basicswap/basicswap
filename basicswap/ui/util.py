@@ -429,15 +429,20 @@ def listAvailableCoins(swap_client, with_variants=True, split_from=False):
     return coins
 
 
-def checkAddressesOwned(ci, wallet_info):
+def checkAddressesOwned(swap_client, ci, wallet_info):
     if 'stealth_address' in wallet_info:
-        if wallet_info['stealth_address'] != '?' and \
-           not ci.isAddressMine(wallet_info['stealth_address']):
-            ci._log.error('Unowned stealth address: {}'.format(wallet_info['stealth_address']))
-            wallet_info['stealth_address'] = 'Error: unowned address'
+
+        if wallet_info['stealth_address'] != '?':
+            if not ci.isAddressMine(wallet_info['stealth_address']):
+                ci._log.error('Unowned stealth address: {}'.format(wallet_info['stealth_address']))
+                wallet_info['stealth_address'] = 'Error: unowned address'
+            elif swap_client._restrict_unknown_seed_wallets and not ci.knownWalletSeed():
+                wallet_info['stealth_address'] = 'WARNING: Unknown wallet seed'
 
     if 'deposit_address' in wallet_info:
-        if wallet_info['deposit_address'] != 'Refresh necessary' and \
-           not ci.isAddressMine(wallet_info['deposit_address']):
-            ci._log.error('Unowned deposit address: {}'.format(wallet_info['deposit_address']))
-            wallet_info['deposit_address'] = 'Error: unowned address'
+        if wallet_info['deposit_address'] != 'Refresh necessary':
+            if not ci.isAddressMine(wallet_info['deposit_address']):
+                ci._log.error('Unowned deposit address: {}'.format(wallet_info['deposit_address']))
+                wallet_info['deposit_address'] = 'Error: unowned address'
+            elif swap_client._restrict_unknown_seed_wallets and not ci.knownWalletSeed():
+                wallet_info['deposit_address'] = 'WARNING: Unknown wallet seed'

@@ -264,6 +264,8 @@ class BasicSwap(BaseApp):
         self.min_sequence_lock_seconds = self.settings.get('min_sequence_lock_seconds', 60 if self.debug else (1 * 60 * 60))
         self.max_sequence_lock_seconds = self.settings.get('max_sequence_lock_seconds', 96 * 60 * 60)
 
+        self._restrict_unknown_seed_wallets = self.settings.get('restrict_unknown_seed_wallets', True)
+
         self._bid_expired_leeway = 5
 
         self.swaps_in_progress = dict()
@@ -781,16 +783,19 @@ class BasicSwap(BaseApp):
         self.log.error('Can\'t connect to %s RPC, exiting.', coin_type)
         self.stopRunning(1)  # systemd will try to restart the process if fail_code != 0
 
-    def checkSynced(self, coin_from, coin_to) -> None:
+    def checkCoinsReady(self, coin_from, coin_to) -> None:
         check_coins = (coin_from, coin_to)
         for c in check_coins:
+            ci = self.ci(c)
+            if self._restrict_unknown_seed_wallets and not ci.knownWalletSeed():
+                raise ValueError('{} has an unexpected wallet seed and "restrict_unknown_seed_wallets" is enabled.'.format(ci.coin_name()))
             if self.coin_clients[c]['connection_type'] != 'rpc':
                 continue
             if c == Coins.XMR:
                 continue  # TODO
-            synced = round(self.ci(c).getBlockchainInfo()['verificationprogress'], 3)
+            synced = round(ci.getBlockchainInfo()['verificationprogress'], 3)
             if synced < 1.0:
-                raise ValueError('{} chain is still syncing, currently at {}.'.format(self.coin_clients[c]['name'], synced))
+                raise ValueError('{} chain is still syncing, currently at {}.'.format(ci.coin_name(), synced))
 
     def isSystemUnlocked(self) -> bool:
         # TODO - Check all active coins
@@ -1405,7 +1410,7 @@ class BasicSwap(BaseApp):
         self.mxDB.acquire()
         session = None
         try:
-            self.checkSynced(coin_from_t, coin_to_t)
+            self.checkCoinsReady(coin_from_t, coin_to_t)
             offer_addr = self.newSMSGAddress(use_type=AddressTypes.OFFER)[0] if addr_send_from is None else addr_send_from
             offer_created_at = int(time.time())
 
@@ -1775,6 +1780,7 @@ class BasicSwap(BaseApp):
     def checkWalletSeed(self, c):
         ci = self.ci(c)
         if c == Coins.PART:
+            ci.setWalletSeedWarning(False)  # All keys should be be derived from the Particl mnemonic
             return True  # TODO
         if c == Coins.XMR:
             expect_address = self.getCachedMainWalletAddress(ci)
@@ -1782,10 +1788,11 @@ class BasicSwap(BaseApp):
                 self.log.warning('Can\'t find expected main wallet address for coin {}'.format(ci.coin_name()))
                 return False
             ci._have_checked_seed = True
-            if expect_address == ci.getMainWalletAddress():
+            wallet_address: str = ci.getMainWalletAddress()
+            if expect_address == wallet_address:
                 ci.setWalletSeedWarning(False)
                 return True
-            self.log.warning('Wallet for coin {} not derived from swap seed.'.format(ci.coin_name()))
+            self.log.warning('Wallet for coin {} not derived from swap seed.\n  Expected {}\n  Have     {}'.format(ci.coin_name(), expect_address, wallet_address))
             return False
 
         expect_seedid = self.getStringKV('main_wallet_seedid_' + ci.coin_name().lower())
@@ -2058,7 +2065,7 @@ class BasicSwap(BaseApp):
             ci_from = self.ci(coin_from)
             ci_to = self.ci(coin_to)
 
-            self.checkSynced(coin_from, coin_to)
+            self.checkCoinsReady(coin_from, coin_to)
 
             amount_to = int((msg_buf.amount * bid_rate) // ci_from.COIN())
 
@@ -2380,7 +2387,7 @@ class BasicSwap(BaseApp):
                 self.validateBidValidTime(offer.swap_type, offer.coin_from, offer.coin_to, valid_for_seconds)
                 self.validateBidAmount(offer, amount, bid_rate)
 
-            self.checkSynced(coin_from, coin_to)
+            self.checkCoinsReady(coin_from, coin_to)
 
             balance_to = ci_to.getSpendableBalance()
             ensure(balance_to > amount_to, '{} spendable balance is too low: {}'.format(ci_to.coin_name(), ci_to.format_amount(balance_to)))

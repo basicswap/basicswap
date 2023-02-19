@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2022 tecnovert
+# Copyright (c) 2022-2023 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -17,12 +17,11 @@ from basicswap.util import (
 )
 from basicswap.chainparams import (
     Coins,
-    chainparams,
     getCoinIdFromTicker,
 )
 
 
-def format_wallet_data(ci, w):
+def format_wallet_data(swap_client, ci, w):
     wf = {
         'name': ci.coin_name(),
         'version': w.get('version', '?'),
@@ -59,7 +58,7 @@ def format_wallet_data(ci, w):
         if 'anon_pending' in w and float(w['anon_pending']) > 0.0:
             wf['anon_pending'] = w['anon_pending']
 
-    checkAddressesOwned(ci, wf)
+    checkAddressesOwned(swap_client, ci, wf)
     return wf
 
 
@@ -69,65 +68,8 @@ def page_wallets(self, url_split, post_string):
     swap_client.checkSystemStatus()
     summary = swap_client.getSummary()
 
-    page_data = {}
     messages = []
     err_messages = []
-    form_data = self.checkForm(post_string, 'wallets', err_messages)
-    if form_data:
-        for c in Coins:
-            if c not in chainparams:
-                continue
-            cid = str(int(c))
-
-            if bytes('newaddr_' + cid, 'utf-8') in form_data:
-                swap_client.cacheNewAddressForCoin(c)
-            elif bytes('reseed_' + cid, 'utf-8') in form_data:
-                try:
-                    swap_client.reseedWallet(c)
-                    messages.append('Reseed complete ' + str(c))
-                except Exception as ex:
-                    err_messages.append('Reseed failed ' + str(ex))
-                swap_client.updateWalletsInfo(True, c)
-            elif bytes('withdraw_' + cid, 'utf-8') in form_data:
-                try:
-                    value = form_data[bytes('amt_' + cid, 'utf-8')][0].decode('utf-8')
-                    page_data['wd_value_' + cid] = value
-                except Exception as e:
-                    err_messages.append('Missing value')
-                try:
-                    address = form_data[bytes('to_' + cid, 'utf-8')][0].decode('utf-8')
-                    page_data['wd_address_' + cid] = address
-                except Exception as e:
-                    err_messages.append('Missing address')
-
-                subfee = True if bytes('subfee_' + cid, 'utf-8') in form_data else False
-                page_data['wd_subfee_' + cid] = subfee
-
-                if c == Coins.PART:
-                    try:
-                        type_from = form_data[bytes('withdraw_type_from_' + cid, 'utf-8')][0].decode('utf-8')
-                        type_to = form_data[bytes('withdraw_type_to_' + cid, 'utf-8')][0].decode('utf-8')
-                        page_data['wd_type_from_' + cid] = type_from
-                        page_data['wd_type_to_' + cid] = type_to
-                    except Exception as e:
-                        err_messages.append('Missing type')
-
-                if len(messages) == 0:
-                    ci = swap_client.ci(c)
-                    ticker = ci.ticker()
-                    if c == Coins.PART:
-                        try:
-                            txid = swap_client.withdrawParticl(type_from, type_to, value, address, subfee)
-                            messages.append('Withdrew {} {} ({} to {}) to address {}<br/>In txid: {}'.format(value, ticker, type_from, type_to, address, txid))
-                        except Exception as e:
-                            err_messages.append(str(e))
-                    else:
-                        try:
-                            txid = swap_client.withdrawCoin(c, value, address, subfee)
-                            messages.append('Withdrew {} {} to address {}<br/>In txid: {}'.format(value, ticker, address, txid))
-                        except Exception as e:
-                            err_messages.append(str(e))
-                    swap_client.updateWalletsInfo(True, c)
 
     swap_client.updateWalletsInfo()
     wallets = swap_client.getCachedWalletsInfo()
@@ -153,7 +95,7 @@ def page_wallets(self, url_split, post_string):
             continue
 
         ci = swap_client.ci(k)
-        wf = format_wallet_data(ci, w)
+        wf = format_wallet_data(swap_client, ci, w)
 
         wallets_formatted.append(wf)
 
@@ -274,7 +216,7 @@ def page_wallet(self, url_split, post_string):
         ci = swap_client.ci(k)
         cid = str(int(coin_id))
 
-        wallet_data = format_wallet_data(ci, w)
+        wallet_data = format_wallet_data(swap_client, ci, w)
 
         fee_rate, fee_src = swap_client.getFeeRateForCoin(k)
         est_fee = swap_client.estimateWithdrawFee(k, fee_rate)
@@ -311,7 +253,7 @@ def page_wallet(self, url_split, post_string):
             wallet_data['show_utxo_groups'] = True
             wallet_data['utxo_groups'] = utxo_groups
 
-        checkAddressesOwned(ci, wallet_data)
+        checkAddressesOwned(swap_client, ci, wallet_data)
 
     template = server.env.get_template('wallet.html')
     return self.render_template(template, {
@@ -319,4 +261,5 @@ def page_wallet(self, url_split, post_string):
         'err_messages': err_messages,
         'w': wallet_data,
         'summary': summary,
+        'block_unknown_seeds': swap_client._restrict_unknown_seed_wallets,
     })

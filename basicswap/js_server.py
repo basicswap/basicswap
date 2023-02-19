@@ -116,14 +116,17 @@ def js_wallets(self, url_split, post_string, is_json):
                 value = ci.make_int(get_data_entry(post_data, 'value'))
                 txid_hex, new_addr = ci.createUTXO(value)
                 return bytes(json.dumps({'txid': txid_hex, 'address': new_addr}), 'UTF-8')
-
+            if cmd == 'reseed':
+                swap_client.reseedWallet(coin_type)
+                return bytes(json.dumps({'reseeded': True}), 'UTF-8')
             raise ValueError('Unknown command')
 
         rv = swap_client.getWalletInfo(coin_type)
         rv.update(swap_client.getBlockchainInfo(coin_type))
         ci = swap_client.ci(coin_type)
-        checkAddressesOwned(ci, rv)
+        checkAddressesOwned(swap_client, ci, rv)
         return bytes(json.dumps(rv), 'UTF-8')
+
     return bytes(json.dumps(swap_client.getWalletsInfo({'ticker_key': True})), 'UTF-8')
 
 

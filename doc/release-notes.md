@@ -21,6 +21,8 @@
 - api: getcoinseed shows seed id.
 - ui: Can edit automation strategy data.
 - ui: Fix pagination clearing filters
+- Added restrict_unknown_seed_wallets option.
+  - Set to false to disable unknown seed warnings.
 
 
 0.0.54

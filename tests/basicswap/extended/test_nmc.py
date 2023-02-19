@@ -191,7 +191,8 @@ def prepareDir(datadir, nodeId, network_key, network_pubkey):
         },
         'check_progress_seconds': 2,
         'check_watched_seconds': 4,
-        'check_expired_seconds': 60
+        'check_expired_seconds': 60,
+        'restrict_unknown_seed_wallets': False,
     }
     with open(settings_path, 'w') as fp:
         json.dump(settings, fp, indent=4)

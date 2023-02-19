@@ -181,7 +181,7 @@
                     <tr class="bg-white border-t hover:bg-gray-50">
                       <td class="py-4 px-6 bold">Expected Seed:</td>
                       <td>{{ w.expected_seed }}</td>
-                    {% if w.expected_seed != true %}  {# Only show addresses if wallet seed is correct #}
+                    {% if block_unknown_seeds and w.expected_seed != true %}  {# Only show addresses if wallet seed is correct #}
                   </tr>
                   </table>
                 </div>
