@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2022 tecnovert
+# Copyright (c) 2022-2023 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -641,7 +641,7 @@ def page_offers(self, url_split, post_string, sent=False):
     }
     messages = []
     form_data = self.checkForm(post_string, 'offers', messages)
-    if form_data and have_data_entry(form_data, 'applyfilters'):
+    if form_data and not have_data_entry(form_data, 'clearfilters'):
         filters['coin_from'] = setCoinFilter(form_data, 'coin_from')
         filters['coin_to'] = setCoinFilter(form_data, 'coin_to')
 
@@ -662,7 +662,7 @@ def page_offers(self, url_split, post_string, sent=False):
             ensure(active_filter in ['any', 'active', 'expired', 'revoked', 'archived'], 'Invalid active filter')
             filters['active'] = active_filter
 
-    set_pagination_filters(form_data, filters)
+        set_pagination_filters(form_data, filters)
 
     if filters['sent_from'] == 'only':
         sent = True

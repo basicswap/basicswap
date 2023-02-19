@@ -20,6 +20,7 @@
 - ui: Bids on expired offers won't show as available.
 - api: getcoinseed shows seed id.
 - ui: Can edit automation strategy data.
+- ui: Fix pagination clearing filters
 
 
 0.0.54

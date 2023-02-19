@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2022 tecnovert
+# Copyright (c) 2022-2023 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -139,7 +139,7 @@ def page_bids(self, url_split, post_string, sent=False, available=False, receive
 
     messages = []
     form_data = self.checkForm(post_string, 'bids', messages)
-    if form_data and have_data_entry(form_data, 'applyfilters'):
+    if form_data and not have_data_entry(form_data, 'clearfilters'):
         if have_data_entry(form_data, 'sort_by'):
             sort_by = get_data_entry(form_data, 'sort_by')
             ensure(sort_by in ['created_at', ], 'Invalid sort by')
@@ -160,7 +160,7 @@ def page_bids(self, url_split, post_string, sent=False, available=False, receive
             with_expired = toBool(get_data_entry(form_data, 'with_expired'))
             filters['with_expired'] = with_expired
 
-    set_pagination_filters(form_data, filters)
+        set_pagination_filters(form_data, filters)
 
     bids = swap_client.listBids(sent=sent, filters=filters)
 

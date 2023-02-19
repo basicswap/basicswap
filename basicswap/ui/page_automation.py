@@ -37,7 +37,7 @@ def page_automation_strategies(self, url_split, post_string):
     messages = []
     form_data = self.checkForm(post_string, 'automationstrategies', messages)
 
-    if form_data and have_data_entry(form_data, 'applyfilters'):
+    if form_data and not have_data_entry(form_data, 'clearfilters'):
         if have_data_entry(form_data, 'sort_by'):
             sort_by = get_data_entry(form_data, 'sort_by')
             ensure(sort_by in ['created_at', 'rate'], 'Invalid sort by')
@@ -47,7 +47,7 @@ def page_automation_strategies(self, url_split, post_string):
             ensure(sort_dir in ['asc', 'desc'], 'Invalid sort dir')
             filters['sort_dir'] = sort_dir
 
-    set_pagination_filters(form_data, filters)
+        set_pagination_filters(form_data, filters)
 
     formatted_strategies = []
     for s in swap_client.listAutomationStrategies(filters):

@@ -294,7 +294,7 @@ def main():
                     'amt_var': offer_template['amount_variable'],
                     'valid_for_seconds': offer_template.get('offer_valid_seconds', config.get('offer_valid_seconds', 3600)),
                     'rate': use_rate,
-                    'swap_type': 'adaptor_sig',
+                    'swap_type': offer_template.get('swap_type', 'adaptor_sig'),
                     'lockhrs': '24',
                     'automation_strat_id': 1}
                 if args.debug:
