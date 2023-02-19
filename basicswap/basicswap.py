@@ -1259,7 +1259,7 @@ class BasicSwap(BaseApp):
         finally:
             self.closeSession(session)
 
-    def listIdentities(self, filters):
+    def listIdentities(self, filters={}):
         try:
             session = self.openSession()
 
@@ -1303,7 +1303,7 @@ class BasicSwap(BaseApp):
                 rv.append(identity)
             return rv
         finally:
-            self.closeSession(session)
+            self.closeSession(session, commit=False)
 
     def vacuumDB(self):
         try:
@@ -6109,10 +6109,9 @@ class BasicSwap(BaseApp):
             self.mxDB.release()
 
     def listAutomationStrategies(self, filters={}):
-        self.mxDB.acquire()
         try:
+            session = self.openSession()
             rv = []
-            session = scoped_session(self.session_factory)
 
             query_str = 'SELECT strats.record_id, strats.label, strats.type_ind FROM automationstrategies AS strats'
             query_str += ' WHERE strats.active_ind = 1 '
@@ -6137,9 +6136,7 @@ class BasicSwap(BaseApp):
                 rv.append(row)
             return rv
         finally:
-            session.close()
-            session.remove()
-            self.mxDB.release()
+            self.closeSession(session, commit=False)
 
     def getAutomationStrategy(self, strategy_id: int):
         try:
@@ -6158,19 +6155,16 @@ class BasicSwap(BaseApp):
         finally:
             self.closeSession(session)
 
-    def getLinkedStrategy(self, linked_type, linked_id):
-        self.mxDB.acquire()
+    def getLinkedStrategy(self, linked_type: int, linked_id):
         try:
-            session = scoped_session(self.session_factory)
+            session = self.openSession()
             query_str = 'SELECT links.strategy_id, strats.label FROM automationlinks links' + \
                         ' LEFT JOIN automationstrategies strats ON strats.record_id = links.strategy_id' + \
                         ' WHERE links.linked_type = {} AND links.linked_id = x\'{}\' AND links.active_ind = 1'.format(int(linked_type), linked_id.hex())
             q = session.execute(query_str).first()
             return q
         finally:
-            session.close()
-            session.remove()
-            self.mxDB.release()
+            self.closeSession(session, commit=False)
 
     def newSMSGAddress(self, use_type=AddressTypes.RECV_OFFER, addressnote=None, session=None):
         now = int(time.time())

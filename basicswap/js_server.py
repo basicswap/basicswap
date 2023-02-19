@@ -533,6 +533,56 @@ def js_identities(self, url_split, post_string: str, is_json: bool) -> bytes:
     return bytes(json.dumps(swap_client.listIdentities(filters)), 'UTF-8')
 
 
+def js_automationstrategies(self, url_split, post_string: str, is_json: bool) -> bytes:
+    swap_client = self.server.swap_client
+    swap_client.checkSystemStatus()
+
+    filters = {
+        'page_no': 1,
+        'limit': PAGE_LIMIT,
+        'sort_by': 'created_at',
+        'sort_dir': 'desc',
+    }
+
+    if post_string != '':
+        post_data = getFormData(post_string, is_json)
+
+        if have_data_entry(post_data, 'sort_by'):
+            sort_by = get_data_entry(post_data, 'sort_by')
+            assert (sort_by in ['created_at', 'rate']), 'Invalid sort by'
+            filters['sort_by'] = sort_by
+        if have_data_entry(post_data, 'sort_dir'):
+            sort_dir = get_data_entry(post_data, 'sort_dir')
+            assert (sort_dir in ['asc', 'desc']), 'Invalid sort dir'
+            filters['sort_dir'] = sort_dir
+
+        if have_data_entry(post_data, 'offset'):
+            filters['offset'] = int(get_data_entry(post_data, 'offset'))
+        if have_data_entry(post_data, 'limit'):
+            filters['limit'] = int(get_data_entry(post_data, 'limit'))
+            assert (filters['limit'] > 0 and filters['limit'] <= PAGE_LIMIT), 'Invalid limit'
+
+    if len(url_split) > 3:
+        strat_id = int(url_split[3])
+        strat_data = swap_client.getAutomationStrategy(strat_id)
+        rv = {
+            'record_id': strat_data.record_id,
+            'label': strat_data.label,
+            'type_ind': strat_data.type_ind,
+            'only_known_identities': strat_data.only_known_identities,
+            'num_concurrent': strat_data.num_concurrent,
+            'data': json.loads(strat_data.data.decode('utf-8')),
+            'note': '' if strat_data.note is None else strat_data.note,
+        }
+        return bytes(json.dumps(rv), 'UTF-8')
+
+    rv = []
+    strats = swap_client.listAutomationStrategies(filters)
+    for row in strats:
+        rv.append((row[0], row[1], row[2]))
+    return bytes(json.dumps(rv), 'UTF-8')
+
+
 def js_vacuumdb(self, url_split, post_string, is_json) -> bytes:
     swap_client = self.server.swap_client
     swap_client.checkSystemStatus()
@@ -647,6 +697,7 @@ pages = {
     'generatenotification': js_generatenotification,
     'notifications': js_notifications,
     'identities': js_identities,
+    'automationstrategies': js_automationstrategies,
     'vacuumdb': js_vacuumdb,
     'getcoinseed': js_getcoinseed,
     'setpassword': js_setpassword,
