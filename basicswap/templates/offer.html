@@ -256,7 +256,45 @@
               </div>
             </div>
             <form method="post">
-              {% if data.show_bid_form %}
+              {% if data.show_edit_form %}
+            <section class="bg-white p-6">
+                <div class="flex flex-wrap items-center">
+                  <div class="w-full">
+                    <h4 class="font-semibold text-black text-2xl">Edit Offer</h4> </div>
+                </div>
+              </section>
+              <div class="container px-0 mx-auto">
+                <div class="overflow-x-auto relative border sm:rounded-lg">
+                  <table class="w-full text-sm text-left text-gray-500 outline-none border-gray-300">
+                  <tr>
+                    <td class="pr-2 bold">Auto Accept Strategy:</td>
+                    <td>
+                        <select name="automation_strat_id" class="pl-10 appearance-none pr-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
+                            <option value="-1" {% if data.automation_strat_id==-1 %} selected{% endif %}>None</option>
+                            {% for a in data.automation_strategies %}
+                            <option value="{{ a[0] }}" {% if data.automation_strat_id==a[0] %} selected{% endif %}>{{ a[1] }}</option>
+                          {% endfor %}
+                        </select>
+                    </td>
+                    </tr>
+                  </table>
+                </div>
+              </div>
+              <div class="p-6 pt-10 bg-white bg-opacity-60 rounded-b-md">
+                <div class="w-full md:w-0/12">
+                  <div class="flex flex-wrap justify-end -m-1.5">
+                        <div class="w-full md:w-auto p-1.5 ml-2">
+                          <button name="edit_offer_cancel" value="Cancel" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-red-500 hover:text-red-600 border border-red-400 hover:border-red-500 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none">
+                          <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ef5844" stroke-linejoin="round" ><line x1="16" y1="8" x2="8" y2="16" stroke="#ef5844"></line> <line x1="16" y1="16" x2="8" y2="8" stroke="#ef5844"></line> <circle cx="12" cy="12" r="11"></circle></g></svg> Cancel </button>
+                        </div>
+                        <div class="w-full md:w-auto p-1.5">
+                          <button name="edit_offer_submit" value="Submit" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none">
+                          <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#556987" stroke-linejoin="round" ><line x1="2" y1="23" x2="22" y2="23" stroke="#556987"></line> <line data-cap="butt" x1="13" y1="5" x2="17" y2="9"></line> <polygon points="8 18 3 19 4 14 16 2 20 6 8 18"></polygon></g></svg> Submit Edit </button>
+                        </div>
+                    </div>
+                </div>
+              </div>
+              {% elif data.show_bid_form %}
               <section class="bg-white p-6">
                 <div class="flex flex-wrap items-center">
                   <div class="w-full">
@@ -398,8 +436,11 @@
                     {% if data.was_revoked != true %}
                        <div class="w-full md:w-auto p-1.5">
                           <button name="revoke_offer" value="Revoke Offer" type="submit" onclick="return confirmPopup();" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-red-500 hover:text-red-600 border border-red-400 hover:border-red-500 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none"><svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ef5844" stroke-linejoin="round" ><line x1="16" y1="8" x2="8" y2="16" stroke="#ef5844"></line> <line x1="16" y1="16" x2="8" y2="8" stroke="#ef5844"></line> <circle cx="12" cy="12" r="11"></circle></g></svg> Revoke Offer </button>
-                        </div>
+                       </div>
                     {% endif %}
+                    <div class="w-full md:w-auto p-1.5">
+                        <button name="edit_offer" value="Edit Offer" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-red-500 hover:text-red-600 border border-red-400 hover:border-red-500 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none">Edit Offer</button>
+                    </div>
                     <!-- todo
                     {% if data.active_ind == 1 %}
                        <div class="w-full md:w-auto p-1.5">

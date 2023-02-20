@@ -429,9 +429,7 @@ def page_newoffer(self, url_split, post_string):
 
     coins_from, coins_to = listAvailableCoins(swap_client, split_from=True)
 
-    automation_filters = {}
-    automation_filters['sort_by'] = 'label'
-    automation_filters['type_ind'] = Concepts.OFFER
+    automation_filters = {'type_ind': Concepts.OFFER, 'sort_by': 'label'}
     automation_strategies = swap_client.listAutomationStrategies(automation_filters)
 
     return self.render_template(template, {
@@ -467,6 +465,7 @@ def page_offer(self, url_split, post_string):
         messages.append('Debug mode active.')
     sent_bid_id = None
     show_bid_form = None
+    show_edit_form = None
     form_data = self.checkForm(post_string, 'offer', err_messages)
 
     ci_from = swap_client.ci(Coins(offer.coin_from))
@@ -496,6 +495,14 @@ def page_offer(self, url_split, post_string):
             self.send_header('Location', '/newoffer?offer_from=' + offer_id.hex())
             self.end_headers()
             return bytes()
+        elif b'edit_offer' in form_data:
+            show_edit_form = True
+            automation_filters = {'type_ind': Concepts.OFFER, 'sort_by': 'label'}
+            extend_data['automation_strategies'] = swap_client.listAutomationStrategies(automation_filters)
+        elif b'edit_offer_submit' in form_data:
+            change_data = {}
+            change_data['automation_strat_id'] = int(get_data_entry_or(form_data, 'automation_strat_id', -1))
+            swap_client.editOffer(offer_id, change_data)
         elif b'newbid' in form_data:
             show_bid_form = True
         elif b'sendbid' in form_data:
@@ -554,6 +561,7 @@ def page_offer(self, url_split, post_string):
         'sent': offer.was_sent,
         'was_revoked': 'True' if offer.active_ind == 2 else 'False',
         'show_bid_form': show_bid_form,
+        'show_edit_form': show_edit_form,
         'amount_negotiable': offer.amount_negotiable,
         'rate_negotiable': offer.rate_negotiable,
         'bid_amount': bid_amount,

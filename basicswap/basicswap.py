@@ -1587,6 +1587,33 @@ class BasicSwap(BaseApp):
         finally:
             self.closeSession(session)
 
+    def editOffer(self, offer_id, data) -> None:
+        self.log.info('Editing offer %s', offer_id.hex())
+        session = self.openSession()
+        try:
+            offer = session.query(Offer).filter_by(offer_id=offer_id).first()
+            if 'automation_strat_id' in data:
+                new_automation_strat_id = data['automation_strat_id']
+                link = session.query(AutomationLink).filter_by(linked_type=Concepts.OFFER, linked_id=offer.offer_id).first()
+                if not link:
+                    if new_automation_strat_id > 0:
+                        link = AutomationLink(
+                            active_ind=1,
+                            linked_type=Concepts.OFFER,
+                            linked_id=offer_id,
+                            strategy_id=new_automation_strat_id,
+                            created_at=int(time.time()))
+                        session.add(link)
+                else:
+                    if new_automation_strat_id < 1:
+                        link.active_ind = 0
+                    else:
+                        link.strategy_id = new_automation_strat_id
+                        link.active_ind = 1
+                    session.add(link)
+        finally:
+            self.closeSession(session)
+
     def grindForEd25519Key(self, coin_type, evkey, key_path_base) -> bytes:
         ci = self.ci(coin_type)
         nonce = 1

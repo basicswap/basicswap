@@ -373,6 +373,19 @@ class Test(unittest.TestCase):
             }
         }
 
+        logging.info('Check max bid value')
+        result = subprocess.run(self.node1_args, stdout=subprocess.PIPE)
+        rv_stdout = result.stdout.decode().split('\n')
+        possible_bids = get_possible_bids(rv_stdout)
+        assert (len(possible_bids) == 1)
+        assert (float(possible_bids[0]['amount_from']) == 10.0)
+
+        logging.info('Raise node1 bid0 value')
+        node1_test1_config['bids'][0]['amount'] = 50
+        with open(self.node1_configfile, 'w') as fp:
+            json.dump(node1_test1_config, fp, indent=4)
+        delete_file(self.node1_statefile)
+
         # Check max_coin_from_balance (bids increase coin_from)
         result = subprocess.run(self.node1_args, stdout=subprocess.PIPE)
         rv_stdout = result.stdout.decode().split('\n')
@@ -570,7 +583,7 @@ class Test(unittest.TestCase):
         result = subprocess.run(self.node1_args, stdout=subprocess.PIPE)
         rv_stdout = result.stdout.decode().split('\n')
         assert (len(get_created_bids(rv_stdout)) == 0)
-        assert (count_lines_with(rv_stdout, 'Offer amount too low for bid') == 3)
+        assert (count_lines_with(rv_stdout, 'Bid amount too high for offer') == 3)
 
         node1_test1_config['bids'][0]['amount_variable'] = True
         with open(self.node1_configfile, 'w') as fp:

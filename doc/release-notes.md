@@ -23,6 +23,7 @@
 - ui: Fix pagination clearing filters
 - Added restrict_unknown_seed_wallets option.
   - Set to false to disable unknown seed warnings.
+- ui: Can edit offer automation strategy.
 
 
 0.0.54

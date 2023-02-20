@@ -378,18 +378,30 @@ def main():
                     offer_id = offer['offer_id']
                     offer_amount = float(offer['amount_from'])
                     offer_rate = float(offer['rate'])
-                    bid_amount = offer_amount
+                    bid_amount = bid_template['amount']
 
                     min_swap_amount = bid_template.get('min_swap_amount', 0.01)  # TODO: Make default vary per coin
-                    can_adjust_amount: bool = offer['amount_negotiable'] and bid_template.get('amount_variable', True)
-                    if can_adjust_amount is False and offer_amount > bid_template['amount']:
+                    can_adjust_offer_amount: bool = offer['amount_negotiable']
+                    can_adjust_bid_amount: bool = bid_template.get('amount_variable', True)
+                    can_adjust_amount: bool = can_adjust_offer_amount and can_adjust_bid_amount
+
+                    if offer_amount < min_swap_amount:
+                        if args.debug:
+                            print(f'Offer amount below min swap amount bid {offer_id}')
+                        continue
+
+                    if can_adjust_offer_amount is False and offer_amount > bid_amount:
                         if args.debug:
                             print(f'Bid amount too low for offer {offer_id}')
                         continue
-                    if (can_adjust_amount is False and offer_amount < bid_template['amount']) or offer_amount < min_swap_amount:
-                        if args.debug:
-                            print(f'Offer amount too low for bid {offer_id}')
-                        continue
+
+                    if bid_amount > offer_amount:
+                        if can_adjust_bid_amount:
+                            bid_amount = offer_amount
+                        else:
+                            if args.debug:
+                                print(f'Bid amount too high for offer {offer_id}')
+                            continue
 
                     if offer_rate > bid_template['maxrate']:
                         if args.debug:
