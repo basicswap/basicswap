@@ -107,7 +107,7 @@ def readConfig(args, known_coins):
     for i, offer_template in enumerate(offer_templates):
         num_enabled += 1 if offer_template.get('enabled', True) else 0
         if 'name' not in offer_template:
-            print('naming offer template', i)
+            print('Naming offer template', i)
             offer_template['name'] = f'Offer {i}'
             num_changes += 1
         if offer_template.get('min_coin_from_amt', 0) < offer_template['amount']:
@@ -121,7 +121,7 @@ def readConfig(args, known_coins):
         offer_template['coin_to'] = findCoin(offer_template['coin_to'], known_coins)
 
         if offer_template['name'] in offer_templates_map:
-            print('renaming offer template', offer_template['name'])
+            print('Renaming offer template', offer_template['name'])
             original_name = offer_template['name']
             offset = 2
             while f'{original_name}_{offset}' in offer_templates_map:
@@ -137,7 +137,7 @@ def readConfig(args, known_coins):
     for i, bid_template in enumerate(bid_templates):
         num_enabled += 1 if bid_template.get('enabled', True) else 0
         if 'name' not in bid_template:
-            print('naming bid template', i)
+            print('Naming bid template', i)
             bid_template['name'] = f'Bid {i}'
             num_changes += 1
 
@@ -152,7 +152,7 @@ def readConfig(args, known_coins):
         bid_template['coin_to'] = findCoin(bid_template['coin_to'], known_coins)
 
         if bid_template['name'] in bid_templates_map:
-            print('renaming bid template', bid_template['name'])
+            print('Renaming bid template', bid_template['name'])
             original_name = bid_template['name']
             offset = 2
             while f'{original_name}_{offset}' in bid_templates_map:
@@ -230,8 +230,10 @@ def main():
             sent_offers = read_json_api('sentoffers', {'active': 'active'})
 
             if args.debug and len(offer_templates) > 0:
-                print('Processing {} offer templates'.format(config['num_enabled_offers']))
+                print('Processing {} offer template{}'.format(config['num_enabled_offers'], 's' if config['num_enabled_offers'] != 1 else ''))
             for offer_template in offer_templates:
+                if offer_template.get('enabled', True) is False:
+                    continue
                 offers_found = 0
 
                 coin_from_data = coins_map[offer_template['coin_from']]
@@ -317,9 +319,10 @@ def main():
                 script_state['delay_next_offer_before'] = int(time.time()) + time_between_offers
 
             if args.debug and len(bid_templates) > 0:
-                print('Processing {} bid templates'.format(config['num_enabled_bids']))
+                print('Processing {} bid template{}'.format(config['num_enabled_bids'], 's' if config['num_enabled_bids'] != 1 else ''))
             for bid_template in bid_templates:
-
+                if bid_template.get('enabled', True) is False:
+                    continue
                 delay_next_bid_before = script_state.get('delay_next_bid_before', 0)
                 if delay_next_bid_before > int(time.time()):
                     print('Delaying bids until {}'.format(delay_next_bid_before))
@@ -372,7 +375,8 @@ def main():
                 }
 
                 recieved_offers = read_json_api('offers', offers_options)
-                print('recieved_offers', recieved_offers)
+                if args.debug:
+                    print('Recieved Offers', recieved_offers)
 
                 for offer in recieved_offers:
                     offer_id = offer['offer_id']
@@ -504,7 +508,7 @@ def main():
                     break  # Create max one bid per iteration
 
             if args.debug and len(stealthex_swaps) > 0:
-                print('Processing {} stealthex templates'.format(config['num_enabled_swaps']))
+                print('Processing {} stealthex template{}'.format(config['num_enabled_swaps'], 's' if config['num_enabled_swaps'] != 1 else ''))
             for stealthex_swap in stealthex_swaps:
                 if stealthex_swap.get('enabled', True) is False:
                     continue

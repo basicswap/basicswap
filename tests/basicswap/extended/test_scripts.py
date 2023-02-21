@@ -202,6 +202,85 @@ class Test(unittest.TestCase):
         logging.info('Stopping test')
         cls.thread_http.stop()
 
+    def test_enabled(self):
+
+        waitForServer(self.delay_event, UI_PORT + 0)
+        waitForServer(self.delay_event, UI_PORT + 1)
+
+        # Test no 'Processing...' messages are shown without config
+        node0_test_config = {}
+        with open(self.node0_configfile, 'w') as fp:
+            json.dump(node0_test_config, fp, indent=4)
+        result = subprocess.run(self.node0_args, stdout=subprocess.PIPE)
+        rv_stdout = result.stdout.decode().split('\n')
+        assert (count_lines_with(rv_stdout, 'Processing') == 0)
+
+        # Test that enabled templates are processed
+        node0_test_config = {
+            'test_mode': True,
+            'offers': [
+                {
+                    'name': 'offer example 1',
+                    'coin_from': 'Particl',
+                    'coin_to': 'Monero',
+                    'amount': 20,
+                    'minrate': 0.05,
+                    'ratetweakpercent': 5,
+                    'amount_variable': True,
+                    'address': -1,
+                    'min_coin_from_amt': 20,
+                    'max_coin_to_amt': -1
+                },
+            ],
+            'bids': [
+                {
+                    'coin_from': 'PART',
+                    'coin_to': 'XMR',
+                    'amount': 10,
+                    'maxrate': 0.04,
+                    'amount_variable': True,
+                    'address': -1,
+                    'min_swap_amount': 0.1,
+                    'max_coin_from_balance': -1,
+                    'min_coin_to_balance': -1,
+                },
+            ],
+            'stealthex': [
+                {
+                    'coin_from': 'XMR',
+                    'coin_to': 'BTC',
+                    'min_balance_from': 1,
+                    'min_amount_tx': 1,
+                    'max_amount_tx': 5,
+                    'min_rate': 0.01,
+                    'refund_address': 'auto',
+                    'receive_address': 'auto',
+                    'api_key': 'API_KEY_HERE'
+                }
+            ],
+        }
+        with open(self.node0_configfile, 'w') as fp:
+            json.dump(node0_test_config, fp, indent=4)
+
+        result = subprocess.run(self.node0_args, stdout=subprocess.PIPE)
+        rv_stdout = result.stdout.decode().split('\n')
+        assert (count_lines_with(rv_stdout, 'Processing 1 offer template') == 1)
+        assert (count_lines_with(rv_stdout, 'Processing 1 bid template') == 1)
+        assert (count_lines_with(rv_stdout, 'Processing 1 stealthex template') == 1)
+
+        # Test that disabled templates are not processed
+        node0_test_config['offers'][0]['enabled'] = False
+        node0_test_config['bids'][0]['enabled'] = False
+        node0_test_config['stealthex'][0]['enabled'] = False
+        with open(self.node0_configfile, 'w') as fp:
+            json.dump(node0_test_config, fp, indent=4)
+
+        result = subprocess.run(self.node0_args, stdout=subprocess.PIPE)
+        rv_stdout = result.stdout.decode().split('\n')
+        assert (count_lines_with(rv_stdout, 'Processing 0 offer templates') == 1)
+        assert (count_lines_with(rv_stdout, 'Processing 0 bid templates') == 1)
+        assert (count_lines_with(rv_stdout, 'Processing 0 stealthex templates') == 1)
+
     def test_offers(self):
 
         waitForServer(self.delay_event, UI_PORT + 0)
