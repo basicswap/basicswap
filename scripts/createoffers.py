@@ -177,6 +177,13 @@ def readConfig(args, known_coins):
     return config
 
 
+def write_state(statefile, script_state):
+    if os.path.exists(statefile):
+        shutil.copyfile(statefile, statefile + '.last')
+    with open(statefile, 'w') as fp:
+        json.dump(script_state, fp, indent=4)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('-v', '--version', action='version',
@@ -225,7 +232,6 @@ def main():
         else:
             read_json_api_wallet = read_json_api
 
-        num_state_changes: int = 0
         try:
             sent_offers = read_json_api('sentoffers', {'active': 'active'})
 
@@ -303,7 +309,6 @@ def main():
                     print('offer data {}'.format(offer_data))
                 new_offer = read_json_api('offers/new', offer_data)
                 print('New offer: {}'.format(new_offer['offer_id']))
-                num_state_changes += 1
                 if 'offers' not in script_state:
                     script_state['offers'] = {}
                 template_name = offer_template['name']
@@ -317,6 +322,7 @@ def main():
                 else:
                     time_between_offers = min_seconds_between_offers
                 script_state['delay_next_offer_before'] = int(time.time()) + time_between_offers
+                write_state(args.statefile, script_state)
 
             if args.debug and len(bid_templates) > 0:
                 print('Processing {} bid template{}'.format(config['num_enabled_bids'], 's' if config['num_enabled_bids'] != 1 else ''))
@@ -347,12 +353,12 @@ def main():
                     if bid_state in ('Completed', 'Timed-out', 'Abandoned', 'Error', 'Rejected'):
                         print(f'Marking bid inactive {previous_bid_id}, state {bid_state}')
                         previous_bid['active'] = False
-                        num_state_changes += 1
+                        write_state(args.statefile, script_state)
                         continue
                     if bid_state in ('Sent', 'Received') and previous_bid_info['expired_at'] < int(time.time()):
                         print(f'Marking bid inactive {previous_bid_id}, expired')
                         previous_bid['active'] = False
-                        num_state_changes += 1
+                        write_state(args.statefile, script_state)
                         continue
                     bids_in_progress += 1
 
@@ -495,7 +501,6 @@ def main():
                         print('New bid: {} on offer {}'.format(new_bid['bid_id'], offer['offer_id']))
                         bid_id = new_bid['bid_id']
 
-                    num_state_changes += 1
                     script_state['bids'][template_name].append({'bid_id': bid_id, 'time': int(time.time()), 'active': True})
 
                     max_seconds_between_bids = config['max_seconds_between_bids']
@@ -505,6 +510,7 @@ def main():
                     else:
                         time_between_bids = min_seconds_between_bids
                     script_state['delay_next_bid_before'] = int(time.time()) + time_between_bids
+                    write_state(args.statefile, script_state)
                     break  # Create max one bid per iteration
 
             if args.debug and len(stealthex_swaps) > 0:
@@ -575,12 +581,6 @@ def main():
                         raise ValueError('Exchange error ' + estimate_response)
 
                     raise ValueError('TODO')
-
-            if num_state_changes > 0:
-                if os.path.exists(args.statefile):
-                    shutil.copyfile(args.statefile, args.statefile + '.last')
-                with open(args.statefile, 'w') as fp:
-                    json.dump(script_state, fp, indent=4)
 
         except Exception as e:
             print(f'Error: {e}.')
