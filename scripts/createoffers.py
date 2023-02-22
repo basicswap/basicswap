@@ -110,16 +110,6 @@ def readConfig(args, known_coins):
             print('Naming offer template', i)
             offer_template['name'] = f'Offer {i}'
             num_changes += 1
-        if offer_template.get('min_coin_from_amt', 0) < offer_template['amount']:
-            print('Setting min_coin_from_amt for', offer_template['name'])
-            offer_template['min_coin_from_amt'] = offer_template['amount']
-            num_changes += 1
-
-        if offer_template.get('enabled', True) is False:
-            continue
-        offer_template['coin_from'] = findCoin(offer_template['coin_from'], known_coins)
-        offer_template['coin_to'] = findCoin(offer_template['coin_to'], known_coins)
-
         if offer_template['name'] in offer_templates_map:
             print('Renaming offer template', offer_template['name'])
             original_name = offer_template['name']
@@ -129,6 +119,29 @@ def readConfig(args, known_coins):
             offer_template['name'] = f'{original_name}_{offset}'
             num_changes += 1
         offer_templates_map[offer_template['name']] = offer_template
+
+        if offer_template.get('min_coin_from_amt', 0) < offer_template['amount']:
+            print('Setting min_coin_from_amt for', offer_template['name'])
+            offer_template['min_coin_from_amt'] = offer_template['amount']
+            num_changes += 1
+
+        if 'address' not in offer_template:
+            print('Setting address to auto for offer', offer_template['name'])
+            offer_template['address'] = 'auto'
+            num_changes += 1
+        if 'ratetweakpercent' not in offer_template:
+            print('Setting ratetweakpercent to 0 for offer', offer_template['name'])
+            offer_template['ratetweakpercent'] = 0
+            num_changes += 1
+        if 'amount_variable' not in offer_template:
+            print('Setting amount_variable to True for offer', offer_template['name'])
+            offer_template['amount_variable'] = True
+            num_changes += 1
+
+        if offer_template.get('enabled', True) is False:
+            continue
+        offer_template['coin_from'] = findCoin(offer_template['coin_from'], known_coins)
+        offer_template['coin_to'] = findCoin(offer_template['coin_to'], known_coins)
     config['num_enabled_offers'] = num_enabled
 
     bid_templates = config['bids']
@@ -140,17 +153,6 @@ def readConfig(args, known_coins):
             print('Naming bid template', i)
             bid_template['name'] = f'Bid {i}'
             num_changes += 1
-
-        if bid_template.get('enabled', True) is False:
-            continue
-
-        if bid_template.get('min_swap_amount', 0.0) < 0.00001:
-            print('Setting min_swap_amount for bid template', bid_template['name'])
-            bid_template['min_swap_amount'] = 0.00001
-
-        bid_template['coin_from'] = findCoin(bid_template['coin_from'], known_coins)
-        bid_template['coin_to'] = findCoin(bid_template['coin_to'], known_coins)
-
         if bid_template['name'] in bid_templates_map:
             print('Renaming bid template', bid_template['name'])
             original_name = bid_template['name']
@@ -160,12 +162,28 @@ def readConfig(args, known_coins):
             bid_template['name'] = f'{original_name}_{offset}'
             num_changes += 1
         bid_templates_map[bid_template['name']] = bid_template
+
+        if bid_template.get('min_swap_amount', 0.0) < 0.00001:
+            print('Setting min_swap_amount for bid template', bid_template['name'])
+            bid_template['min_swap_amount'] = 0.00001
+
+        if 'address' not in bid_template:
+            print('Setting address to auto for bid', bid_template['name'])
+            bid_template['address'] = 'auto'
+            num_changes += 1
+
+        if bid_template.get('enabled', True) is False:
+            continue
+        bid_template['coin_from'] = findCoin(bid_template['coin_from'], known_coins)
+        bid_template['coin_to'] = findCoin(bid_template['coin_to'], known_coins)
     config['num_enabled_bids'] = num_enabled
 
     num_enabled = 0
     stealthex_swaps = config['stealthex']
     for i, swap in enumerate(stealthex_swaps):
         num_enabled += 1 if swap.get('enabled', True) else 0
+        if swap.get('enabled', True) is False:
+            continue
         swap['coin_from'] = findCoin(swap['coin_from'], known_coins)
     config['num_enabled_swaps'] = num_enabled
 
