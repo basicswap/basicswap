@@ -4,7 +4,6 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-import time
 import traceback
 
 from urllib import parse
@@ -539,7 +538,7 @@ def page_offer(self, url_split, post_string):
                 err_messages.append('Send bid failed: ' + str(ex))
                 show_bid_form = True
 
-    now = int(time.time())
+    now: int = swap_client.getTime()
     data = {
         'tla_from': ci_from.ticker(),
         'tla_to': ci_to.ticker(),
@@ -678,7 +677,7 @@ def page_offers(self, url_split, post_string, sent=False):
         sent = False
     offers = swap_client.listOffers(sent, filters, with_bid_info=True)
 
-    now = int(time.time())
+    now: int = swap_client.getTime()
     formatted_offers = []
     for row in offers:
         o, completed_amount = row

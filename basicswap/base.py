@@ -5,6 +5,7 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import os
+import time
 import shlex
 import socks
 import socket
@@ -38,6 +39,7 @@ class BaseApp:
         self.fp = fp
         self.is_running = True
         self.fail_code = 0
+        self.mock_time_offset = 0
 
         self.data_dir = data_dir
         self.chain = chain
@@ -191,3 +193,6 @@ class BaseApp:
         except Exception as e:
             self.log.error(f'torControl {e}')
             return
+
+    def getTime(self) -> int:
+        return int(time.time()) + self.mock_time_offset

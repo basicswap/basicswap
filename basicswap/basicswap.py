@@ -917,7 +917,7 @@ class BasicSwap(BaseApp):
     def updateIdentityBidState(self, session, address: str, bid) -> None:
         identity_stats = session.query(KnownIdentity).filter_by(address=address).first()
         if not identity_stats:
-            identity_stats = KnownIdentity(active_ind=1, address=address, created_at=int(time.time()))
+            identity_stats = KnownIdentity(active_ind=1, address=address, created_at=self.getTime())
 
         if bid.state == BidStates.SWAP_COMPLETED:
             if bid.was_sent:
@@ -930,7 +930,7 @@ class BasicSwap(BaseApp):
             else:
                 identity_stats.num_recv_bids_failed = zeroIfNone(identity_stats.num_recv_bids_failed) + 1
 
-        identity_stats.updated_at = int(time.time())
+        identity_stats.updated_at = self.getTime()
         session.add(identity_stats)
 
     def setIntKVInSession(self, str_key: str, int_val: int, session) -> None:
@@ -1121,7 +1121,7 @@ class BasicSwap(BaseApp):
         return self.SMSG_SECONDS_IN_HOUR * 48
 
     def getAcceptBidMsgValidTime(self, bid):
-        now = int(time.time())
+        now: int = self.getTime()
         smsg_max_valid = self.SMSG_SECONDS_IN_HOUR * 48
         smsg_min_valid = self.SMSG_SECONDS_IN_HOUR * 1
         bid_valid = (bid.expire_at - now) + 10 * 60  # Add 10 minute buffer
@@ -1168,7 +1168,7 @@ class BasicSwap(BaseApp):
             self.log.warning(f'Unknown notification {event_type}')
 
         try:
-            now = int(time.time())
+            now: int = self.getTime()
             use_session = self.openSession(session)
             use_session.add(Notification(
                 active_ind=1,
@@ -1207,7 +1207,7 @@ class BasicSwap(BaseApp):
         ensure(ci.isValidAddress(address), 'Invalid identity address')
 
         try:
-            now = int(time.time())
+            now: int = self.getTime()
             session = self.openSession()
             q = session.execute('SELECT COUNT(*) FROM knownidentities WHERE address = :address', {'address': address}).first()
             if q[0] < 1:
@@ -1412,7 +1412,7 @@ class BasicSwap(BaseApp):
         try:
             self.checkCoinsReady(coin_from_t, coin_to_t)
             offer_addr = self.newSMSGAddress(use_type=AddressTypes.OFFER)[0] if addr_send_from is None else addr_send_from
-            offer_created_at = int(time.time())
+            offer_created_at = self.getTime()
 
             msg_buf = OfferMessage()
 
@@ -1602,7 +1602,7 @@ class BasicSwap(BaseApp):
                             linked_type=Concepts.OFFER,
                             linked_id=offer_id,
                             strategy_id=new_automation_strat_id,
-                            created_at=int(time.time()))
+                            created_at=self.getTime())
                         session.add(link)
                 else:
                     if new_automation_strat_id < 1:
@@ -1997,7 +1997,7 @@ class BasicSwap(BaseApp):
 
     def createActionInSession(self, delay, action_type, linked_id, session):
         self.log.debug('createAction %d %s', action_type, linked_id.hex())
-        now = int(time.time())
+        now: int = self.getTime()
         action = Action(
             active_ind=1,
             created_at=now,
@@ -2021,7 +2021,7 @@ class BasicSwap(BaseApp):
     def logEvent(self, linked_type, linked_id, event_type, event_msg, session):
         entry = EventLog(
             active_ind=1,
-            created_at=int(time.time()),
+            created_at=self.getTime(),
             linked_type=linked_type,
             linked_id=linked_id,
             event_type=int(event_type),
@@ -2067,7 +2067,7 @@ class BasicSwap(BaseApp):
 
         offer = self.getOffer(offer_id)
         ensure(offer, 'Offer not found: {}.'.format(offer_id.hex()))
-        ensure(offer.expire_at > int(time.time()), 'Offer has expired')
+        ensure(offer.expire_at > self.getTime(), 'Offer has expired')
 
         if offer.swap_type == SwapTypes.XMR_SWAP:
             return self.postXmrBid(offer_id, amount, addr_send_from, extra_options)
@@ -2096,7 +2096,7 @@ class BasicSwap(BaseApp):
 
             amount_to = int((msg_buf.amount * bid_rate) // ci_from.COIN())
 
-            now = int(time.time())
+            now: int = self.getTime()
             if offer.swap_type == SwapTypes.SELLER_FIRST:
                 proof_addr, proof_sig = self.getProofOfFunds(coin_to, amount_to, offer_id)
                 msg_buf.proof_address = proof_addr
@@ -2303,7 +2303,7 @@ class BasicSwap(BaseApp):
         ensure(offer, 'Offer not found')
 
         # Ensure bid is still valid
-        now = int(time.time())
+        now: int = self.getTime()
         ensure(bid.expire_at > now, 'Bid expired')
         ensure(bid.state == BidStates.BID_RECEIVED, 'Wrong bid state: {}'.format(str(BidStates(bid.state))))
 
@@ -2335,7 +2335,7 @@ class BasicSwap(BaseApp):
                 if offer.lock_type == TxLockTypes.ABS_LOCK_BLOCKS:
                     lock_value = self.callcoinrpc(coin_from, 'getblockcount') + offer.lock_value
                 else:
-                    lock_value = int(time.time()) + offer.lock_value
+                    lock_value = self.getTime() + offer.lock_value
                 self.log.debug('Initiate %s lock_value %d %d', coin_from, offer.lock_value, lock_value)
                 script = atomic_swap_1.buildContractScript(lock_value, secret_hash, bid.pkhash_buyer, pkhash_refund, OpCodes.OP_CHECKLOCKTIMEVERIFY)
 
@@ -2399,7 +2399,7 @@ class BasicSwap(BaseApp):
 
             ensure(offer, 'Offer not found: {}.'.format(offer_id.hex()))
             ensure(xmr_offer, 'XMR offer not found: {}.'.format(offer_id.hex()))
-            ensure(offer.expire_at > int(time.time()), 'Offer has expired')
+            ensure(offer.expire_at > self.getTime(), 'Offer has expired')
 
             coin_from = Coins(offer.coin_from)
             coin_to = Coins(offer.coin_to)
@@ -2433,7 +2433,7 @@ class BasicSwap(BaseApp):
             else:
                 msg_buf.dest_af = ci_from.decodeAddress(address_out)
 
-            bid_created_at = int(time.time())
+            bid_created_at = self.getTime()
             if offer.swap_type != SwapTypes.XMR_SWAP:
                 raise ValueError('TODO')
 
@@ -2539,7 +2539,7 @@ class BasicSwap(BaseApp):
         # MSG1F and MSG2F L -> F
         self.log.info('Accepting xmr bid %s', bid_id.hex())
 
-        now = int(time.time())
+        now: int = self.getTime()
         self.mxDB.acquire()
         try:
             bid, xmr_swap = self.getXmrBid(bid_id)
@@ -3564,7 +3564,7 @@ class BasicSwap(BaseApp):
 
             # Bid times out if buyer doesn't see tx in chain within INITIATE_TX_TIMEOUT seconds
             if bid.initiate_tx is None and \
-               bid.state_time + atomic_swap_1.INITIATE_TX_TIMEOUT < int(time.time()):
+               bid.state_time + atomic_swap_1.INITIATE_TX_TIMEOUT < self.getTime():
                 self.log.info('Swap timed out waiting for initiate tx for bid %s', bid_id.hex())
                 bid.setState(BidStates.SWAP_TIMEDOUT, 'Timed out waiting for initiate tx')
                 self.saveBid(bid_id, bid)
@@ -3932,7 +3932,7 @@ class BasicSwap(BaseApp):
         try:
             ci_part = self.ci(Coins.PART)
             rpc_conn = ci_part.open_rpc()
-            now = int(time.time())
+            now: int = self.getTime()
             options = {'encoding': 'none'}
             ro = ci_part.json_request(rpc_conn, 'smsginbox', ['all', '', options])
             num_messages = 0
@@ -3966,7 +3966,7 @@ class BasicSwap(BaseApp):
 
     def checkQueuedActions(self):
         self.mxDB.acquire()
-        now = int(time.time())
+        now: int = self.getTime()
         session = None
         reload_in_progress = False
         try:
@@ -4022,7 +4022,7 @@ class BasicSwap(BaseApp):
 
     def checkXmrSwaps(self):
         self.mxDB.acquire()
-        now = int(time.time())
+        now: int = self.getTime()
         ttl_xmr_split_messages = 60 * 60
         session = None
         try:
@@ -4084,7 +4084,7 @@ class BasicSwap(BaseApp):
         offer_data.ParseFromString(offer_bytes)
 
         # Validate data
-        now = int(time.time())
+        now: int = self.getTime()
         coin_from = Coins(offer_data.coin_from)
         ci_from = self.ci(coin_from)
         coin_to = Coins(offer_data.coin_to)
@@ -4186,7 +4186,7 @@ class BasicSwap(BaseApp):
         msg_data = OfferRevokeMessage()
         msg_data.ParseFromString(msg_bytes)
 
-        now = int(time.time())
+        now: int = self.getTime()
         try:
             session = self.openSession()
 
@@ -4322,7 +4322,7 @@ class BasicSwap(BaseApp):
 
     def processBid(self, msg):
         self.log.debug('Processing bid msg %s', msg['msgid'])
-        now = int(time.time())
+        now: int = self.getTime()
         bid_bytes = bytes.fromhex(msg['hex'][2:-2])
         bid_data = BidMessage()
         bid_data.ParseFromString(bid_bytes)
@@ -4403,7 +4403,7 @@ class BasicSwap(BaseApp):
 
     def processBidAccept(self, msg):
         self.log.debug('Processing bid accepted msg %s', msg['msgid'])
-        now = int(time.time())
+        now: int = self.getTime()
         bid_accept_bytes = bytes.fromhex(msg['hex'][2:-2])
         bid_accept_data = BidAcceptMessage()
         bid_accept_data.ParseFromString(bid_accept_bytes)
@@ -4480,7 +4480,7 @@ class BasicSwap(BaseApp):
 
     def receiveXmrBid(self, bid, session):
         self.log.debug('Receiving xmr bid %s', bid.bid_id.hex())
-        now = int(time.time())
+        now: int = self.getTime()
 
         offer, xmr_offer = self.getXmrOfferFromSession(session, bid.offer_id, sent=True)
         ensure(offer and offer.was_sent, 'Offer not found: {}.'.format(bid.offer_id.hex()))
@@ -4531,7 +4531,7 @@ class BasicSwap(BaseApp):
     def receiveXmrBidAccept(self, bid, session):
         # Follower receiving MSG1F and MSG2F
         self.log.debug('Receiving xmr bid accept %s', bid.bid_id.hex())
-        now = int(time.time())
+        now: int = self.getTime()
 
         offer, xmr_offer = self.getXmrOffer(bid.offer_id, sent=True)
         ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
@@ -4587,7 +4587,7 @@ class BasicSwap(BaseApp):
     def processXmrBid(self, msg):
         # MSG1L
         self.log.debug('Processing xmr bid msg %s', msg['msgid'])
-        now = int(time.time())
+        now: int = self.getTime()
         bid_bytes = bytes.fromhex(msg['hex'][2:-2])
         bid_data = XmrBidMessage()
         bid_data.ParseFromString(bid_bytes)
@@ -4671,7 +4671,7 @@ class BasicSwap(BaseApp):
     def processXmrBidAccept(self, msg):
         # F receiving MSG1F and MSG2F
         self.log.debug('Processing xmr bid accept msg %s', msg['msgid'])
-        now = int(time.time())
+        now: int = self.getTime()
         msg_bytes = bytes.fromhex(msg['hex'][2:-2])
         msg_data = XmrBidAcceptMessage()
         msg_data.ParseFromString(msg_bytes)
@@ -5192,7 +5192,7 @@ class BasicSwap(BaseApp):
     def processXmrBidCoinALockSigs(self, msg):
         # Leader processing MSG3L
         self.log.debug('Processing xmr coin a follower lock sigs msg %s', msg['msgid'])
-        now = int(time.time())
+        now: int = self.getTime()
         msg_bytes = bytes.fromhex(msg['hex'][2:-2])
         msg_data = XmrBidLockTxSigsMessage()
         msg_data.ParseFromString(msg_bytes)
@@ -5254,7 +5254,7 @@ class BasicSwap(BaseApp):
     def processXmrBidLockSpendTx(self, msg):
         # Follower receiving MSG4F
         self.log.debug('Processing xmr bid lock spend tx msg %s', msg['msgid'])
-        now = int(time.time())
+        now: int = self.getTime()
         msg_bytes = bytes.fromhex(msg['hex'][2:-2])
         msg_data = XmrBidLockSpendTxMessage()
         msg_data.ParseFromString(msg_bytes)
@@ -5300,7 +5300,7 @@ class BasicSwap(BaseApp):
 
     def processXmrSplitMessage(self, msg):
         self.log.debug('Processing xmr split msg %s', msg['msgid'])
-        now = int(time.time())
+        now: int = self.getTime()
         msg_bytes = bytes.fromhex(msg['hex'][2:-2])
         msg_data = XmrSplitMessage()
         msg_data.ParseFromString(msg_bytes)
@@ -5331,7 +5331,7 @@ class BasicSwap(BaseApp):
 
     def processXmrLockReleaseMessage(self, msg):
         self.log.debug('Processing xmr secret msg %s', msg['msgid'])
-        now = int(time.time())
+        now: int = self.getTime()
         msg_bytes = bytes.fromhex(msg['hex'][2:-2])
         msg_data = XmrBidLockReleaseMessage()
         msg_data.ParseFromString(msg_bytes)
@@ -5450,7 +5450,7 @@ class BasicSwap(BaseApp):
         self.mxDB.acquire()
         try:
             # TODO: Wait for blocks / txns, would need to check multiple coins
-            now = int(time.time())
+            now: int = self.getTime()
             if now - self._last_checked_progress >= self.check_progress_seconds:
                 to_remove = []
                 for bid_id, v in self.swaps_in_progress.items():
@@ -5748,7 +5748,7 @@ class BasicSwap(BaseApp):
                 continue
             num_watched_outputs += len(v['watched_outputs'])
 
-        now = int(time.time())
+        now: int = self.getTime()
         q_str = '''SELECT
                    COUNT(CASE WHEN b.was_sent THEN 1 ELSE NULL END) AS count_sent,
                    COUNT(CASE WHEN b.was_received THEN 1 ELSE NULL END) AS count_received,
@@ -5835,7 +5835,7 @@ class BasicSwap(BaseApp):
         coin_id = int(coin)
         self.mxDB.acquire()
         try:
-            now = int(time.time())
+            now: int = self.getTime()
             session = scoped_session(self.session_factory)
             session.add(Wallets(coin_id=coin, balance_type=info_type, wallet_data=json.dumps(wi), created_at=now))
             query_str = f'DELETE FROM wallets WHERE (coin_id = {coin_id} AND balance_type = {info_type}) AND record_id NOT IN (SELECT record_id FROM wallets WHERE coin_id = {coin_id} AND balance_type = {info_type} ORDER BY created_at DESC LIMIT 3 )'
@@ -5865,7 +5865,7 @@ class BasicSwap(BaseApp):
             self._updating_wallets_info[int(coin)] = False
 
     def updateWalletsInfo(self, force_update=False, only_coin=None, wait_for_complete=False):
-        now = int(time.time())
+        now: int = self.getTime()
         if not force_update and now - self._last_updated_wallets_info < 30:
             return
         for c in Coins:
@@ -5877,7 +5877,7 @@ class BasicSwap(BaseApp):
             if cc['connection_type'] == 'rpc':
                 if not force_update and now - cc.get('last_updated_wallet_info', 0) < 30:
                     return
-                cc['last_updated_wallet_info'] = int(time.time())
+                cc['last_updated_wallet_info'] = self.getTime()
                 self._updating_wallets_info[int(c)] = True
                 handle = self.thread_pool.submit(self.updateWalletInfo, c)
                 if wait_for_complete:
@@ -5966,7 +5966,7 @@ class BasicSwap(BaseApp):
         self.mxDB.acquire()
         try:
             rv = []
-            now = int(time.time())
+            now: int = self.getTime()
             session = scoped_session(self.session_factory)
 
             if with_bid_info:
@@ -6038,7 +6038,7 @@ class BasicSwap(BaseApp):
         self.mxDB.acquire()
         try:
             rv = []
-            now = int(time.time())
+            now: int = self.getTime()
             session = scoped_session(self.session_factory)
 
             query_str = 'SELECT bids.created_at, bids.expire_at, bids.bid_id, bids.offer_id, bids.amount, bids.state, bids.was_received, tx1.state, tx2.state, offers.coin_from, bids.rate, bids.bid_addr FROM bids ' + \
@@ -6201,7 +6201,7 @@ class BasicSwap(BaseApp):
             self.closeSession(session, commit=False)
 
     def newSMSGAddress(self, use_type=AddressTypes.RECV_OFFER, addressnote=None, session=None):
-        now = int(time.time())
+        now: int = self.getTime()
         try:
             use_session = self.openSession(session)
 
@@ -6250,7 +6250,7 @@ class BasicSwap(BaseApp):
         self.mxDB.acquire()
         try:
             session = scoped_session(self.session_factory)
-            now = int(time.time())
+            now: int = self.getTime()
             ci = self.ci(Coins.PART)
             add_addr = ci.pubkey_to_address(bytes.fromhex(pubkey_hex))
             self.callrpc('smsgaddaddress', [add_addr, pubkey_hex])
