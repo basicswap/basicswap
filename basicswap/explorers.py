@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019-2022 tecnovert
+# Copyright (c) 2019-2023 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import json
-import urllib.request
 
 
 class Explorer():
@@ -17,12 +16,7 @@ class Explorer():
 
     def readURL(self, url):
         self.log.debug('Explorer url: {}'.format(url))
-        try:
-            self.swapclient.setConnectionParameters()
-            req = urllib.request.Request(url)
-            return urllib.request.urlopen(req).read()
-        finally:
-            self.swapclient.popConnectionParameters()
+        return self.swapclient.readURL(url)
 
 
 class ExplorerInsight(Explorer):
