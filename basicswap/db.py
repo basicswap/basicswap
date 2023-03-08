@@ -12,7 +12,7 @@ from enum import IntEnum, auto
 from sqlalchemy.ext.declarative import declarative_base
 
 
-CURRENT_DB_VERSION = 18
+CURRENT_DB_VERSION = 19
 CURRENT_DB_DATA_VERSION = 2
 Base = declarative_base()
 
@@ -376,6 +376,8 @@ class XmrSplitData(Base):
     __tablename__ = 'xmr_split_data'
 
     record_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
+    addr_from = sa.Column(sa.String)
+    addr_to = sa.Column(sa.String)
     bid_id = sa.Column(sa.LargeBinary)
     msg_type = sa.Column(sa.Integer)
     msg_sequence = sa.Column(sa.Integer)

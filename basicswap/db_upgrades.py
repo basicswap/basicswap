@@ -244,6 +244,10 @@ def upgradeDatabase(self, db_version):
             session.execute('ALTER TABLE knownidentities ADD COLUMN visibility_override INTEGER')
             session.execute('ALTER TABLE knownidentities ADD COLUMN data BLOB')
             session.execute('UPDATE knownidentities SET active_ind = 1')
+        elif current_version == 18:
+            db_version += 1
+            session.execute('ALTER TABLE xmr_split_data ADD COLUMN addr_from STRING')
+            session.execute('ALTER TABLE xmr_split_data ADD COLUMN addr_to STRING')
 
         if current_version != db_version:
             self.db_version = db_version

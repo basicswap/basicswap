@@ -290,8 +290,8 @@ def main():
                     break
 
                 """
-                recieved_offers = read_json_api(args.port, 'offers', {'active': 'active', 'include_sent': False, 'coin_from': coin_from_data['id'], 'coin_to': coin_to_data['id']})
-                print('recieved_offers', recieved_offers)
+                received_offers = read_json_api(args.port, 'offers', {'active': 'active', 'include_sent': False, 'coin_from': coin_from_data['id'], 'coin_to': coin_to_data['id']})
+                print('received_offers', received_offers)
 
                 TODO - adjust rates based on extisting offers
                 """
@@ -398,11 +398,11 @@ def main():
                     'sort_dir': 'asc',
                 }
 
-                recieved_offers = read_json_api('offers', offers_options)
+                received_offers = read_json_api('offers', offers_options)
                 if args.debug:
-                    print('Recieved Offers', recieved_offers)
+                    print('Received Offers', received_offers)
 
-                for offer in recieved_offers:
+                for offer in received_offers:
                     offer_id = offer['offer_id']
                     offer_amount = float(offer['amount_from'])
                     offer_rate = float(offer['rate'])

@@ -4443,10 +4443,13 @@ class BasicSwap(BaseApp):
         bid, offer = self.getBidAndOffer(bid_id)
         ensure(bid is not None and bid.was_sent is True, 'Unknown bidid')
         ensure(offer, 'Offer not found ' + bid.offer_id.hex())
-        coin_from = Coins(offer.coin_from)
-        ci_from = self.ci(coin_from)
 
         ensure(bid.expire_at > now + self._bid_expired_leeway, 'Bid expired')
+        ensure(msg['to'] == bid.bid_addr, 'Received on incorrect address')
+        ensure(msg['from'] == offer.addr_from, 'Sent from incorrect address')
+
+        coin_from = Coins(offer.coin_from)
+        ci_from = self.ci(coin_from)
 
         if bid.state >= BidStates.BID_ACCEPTED:
             if bid.was_received:  # Sent to self
@@ -4520,6 +4523,8 @@ class BasicSwap(BaseApp):
             if len(xmr_swap.kbsf_dleag) < ci_to.lengthDLEAG():
                 q = session.query(XmrSplitData).filter(sa.and_(XmrSplitData.bid_id == bid.bid_id, XmrSplitData.msg_type == XmrSplitMsgTypes.BID)).order_by(XmrSplitData.msg_sequence.asc())
                 for row in q:
+                    ensure(row.addr_to == offer.addr_from, 'Received on incorrect address, segment_id {}'.format(row.record_id))
+                    ensure(row.addr_from == bid.bid_addr, 'Sent from incorrect address, segment_id {}'.format(row.record_id))
                     xmr_swap.kbsf_dleag += row.dleag
 
             if not ci_to.verifyDLEAG(xmr_swap.kbsf_dleag):
@@ -4570,6 +4575,8 @@ class BasicSwap(BaseApp):
             if len(xmr_swap.kbsl_dleag) < ci_to.lengthDLEAG():
                 q = session.query(XmrSplitData).filter(sa.and_(XmrSplitData.bid_id == bid.bid_id, XmrSplitData.msg_type == XmrSplitMsgTypes.BID_ACCEPT)).order_by(XmrSplitData.msg_sequence.asc())
                 for row in q:
+                    ensure(row.addr_to == bid.bid_addr, 'Received on incorrect address, segment_id {}'.format(row.record_id))
+                    ensure(row.addr_from == offer.addr_from, 'Sent from incorrect address, segment_id {}'.format(row.record_id))
                     xmr_swap.kbsl_dleag += row.dleag
             if not ci_to.verifyDLEAG(xmr_swap.kbsl_dleag):
                 raise ValueError('Invalid DLEAG proof.')
@@ -4711,6 +4718,10 @@ class BasicSwap(BaseApp):
         offer, xmr_offer = self.getXmrOffer(bid.offer_id, sent=True)
         ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
         ensure(xmr_offer, 'XMR offer not found: {}.'.format(bid.offer_id.hex()))
+
+        ensure(msg['to'] == bid.bid_addr, 'Received on incorrect address')
+        ensure(msg['from'] == offer.addr_from, 'Sent from incorrect address')
+
         ci_from = self.ci(offer.coin_from)
         ci_to = self.ci(offer.coin_to)
 
@@ -4762,7 +4773,7 @@ class BasicSwap(BaseApp):
 
             allowed_states = [BidStates.BID_SENT, BidStates.BID_RECEIVED]
             if bid.was_sent and offer.was_sent:
-                allowed_states.append(BidStates.BID_ACCEPTED)  # TODO: Split BID_ACCEPTED into recieved and sent
+                allowed_states.append(BidStates.BID_ACCEPTED)  # TODO: Split BID_ACCEPTED into received and sent
             ensure(bid.state in allowed_states, 'Invalid state for bid {}'.format(bid.state))
             bid.setState(BidStates.BID_RECEIVING_ACC)
             self.saveBid(bid.bid_id, bid, xmr_swap=xmr_swap)
@@ -5240,6 +5251,10 @@ class BasicSwap(BaseApp):
         offer, xmr_offer = self.getXmrOffer(bid.offer_id, sent=False)
         ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
         ensure(xmr_offer, 'XMR offer not found: {}.'.format(bid.offer_id.hex()))
+
+        ensure(msg['to'] == offer.addr_from, 'Received on incorrect address')
+        ensure(msg['from'] == bid.bid_addr, 'Sent from incorrect address')
+
         coin_from = Coins(offer.coin_from)
         coin_to = Coins(offer.coin_to)
         ci_from = self.ci(coin_from)
@@ -5306,6 +5321,10 @@ class BasicSwap(BaseApp):
         offer, xmr_offer = self.getXmrOffer(bid.offer_id, sent=False)
         ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
         ensure(xmr_offer, 'XMR offer not found: {}.'.format(bid.offer_id.hex()))
+
+        ensure(msg['to'] == bid.bid_addr, 'Received on incorrect address')
+        ensure(msg['from'] == offer.addr_from, 'Sent from incorrect address')
+
         ci_from = self.ci(Coins(offer.coin_from))
         ci_to = self.ci(Coins(offer.coin_to))
 
@@ -5355,6 +5374,8 @@ class BasicSwap(BaseApp):
                     return
 
                 dbr = XmrSplitData()
+                dbr.addr_from = msg['from']
+                dbr.addr_to = msg['to']
                 dbr.bid_id = msg_data.msg_id
                 dbr.msg_type = msg_data.msg_type
                 dbr.msg_sequence = msg_data.sequence
@@ -5384,6 +5405,10 @@ class BasicSwap(BaseApp):
         offer, xmr_offer = self.getXmrOffer(bid.offer_id, sent=False)
         ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
         ensure(xmr_offer, 'XMR offer not found: {}.'.format(bid.offer_id.hex()))
+
+        ensure(msg['to'] == bid.bid_addr, 'Received on incorrect address')
+        ensure(msg['from'] == offer.addr_from, 'Sent from incorrect address')
+
         ci_from = self.ci(Coins(offer.coin_from))
 
         xmr_swap.al_lock_spend_tx_esig = msg_data.al_lock_spend_tx_esig
