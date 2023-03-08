@@ -570,7 +570,7 @@ class BasicSwapTest(BaseTest):
         wait_for_unspent(test_delay_event, ci, swap_value)
 
         extra_options = {'prefunded_itx': itx}
-        rate_swap = ci_to.make_int(random.uniform(0.2, 20.0))
+        rate_swap = ci_to.make_int(random.uniform(0.2, 20.0), r=1)
         offer_id = swap_clients[2].postOffer(self.test_coin_from, Coins.XMR, swap_value, rate_swap, swap_value, SwapTypes.XMR_SWAP, extra_options=extra_options)
 
         wait_for_offer(test_delay_event, swap_clients[1], offer_id)
@@ -593,6 +593,32 @@ class BasicSwapTest(BaseTest):
             txin_after = itx_after['vin'][i]
             assert (txin['txid'] == txin_after['txid'])
             assert (txin['vout'] == txin_after['vout'])
+
+    def test_07_expire_stuck_accepted(self):
+        coin_from, coin_to = (self.test_coin_from, Coins.XMR)
+        logging.info('---------- Test {} to {} expires bid stuck on accepted'.format(coin_from.name, coin_to.name))
+
+        swap_clients = self.swap_clients
+        ci_to = swap_clients[0].ci(coin_to)
+
+        amt_swap = make_int(random.uniform(0.1, 2.0), scale=8, r=1)
+        rate_swap = ci_to.make_int(random.uniform(0.2, 20.0), r=1)
+
+        offer_id = swap_clients[0].postOffer(coin_from, coin_to, amt_swap, rate_swap, amt_swap, SwapTypes.XMR_SWAP, auto_accept_bids=True)
+        wait_for_offer(test_delay_event, swap_clients[1], offer_id)
+        bid_id = swap_clients[1].postXmrBid(offer_id, amt_swap)
+        swap_clients[1].abandonBid(bid_id)
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.BID_ACCEPTED)
+
+        try:
+            swap_clients[0].setMockTimeOffset(7200)
+            old_check_expired_seconds = swap_clients[0].check_expired_seconds
+            swap_clients[0].check_expired_seconds = 1
+
+            wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_TIMEDOUT, wait_for=180)
+        finally:
+            swap_clients[0].check_expired_seconds = old_check_expired_seconds
+            swap_clients[0].setMockTimeOffset(0)
 
 
 class TestBTC(BasicSwapTest):

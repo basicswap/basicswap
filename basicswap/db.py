@@ -74,7 +74,7 @@ class Offer(Base):
     addr_to = sa.Column(sa.String)
     created_at = sa.Column(sa.BigInteger)
     expire_at = sa.Column(sa.BigInteger)
-    was_sent = sa.Column(sa.Boolean)
+    was_sent = sa.Column(sa.Boolean)  # Sent by node
 
     from_feerate = sa.Column(sa.BigInteger)
     to_feerate = sa.Column(sa.BigInteger)
@@ -107,7 +107,7 @@ class Bid(Base):
     active_ind = sa.Column(sa.Integer)
 
     protocol_version = sa.Column(sa.Integer)
-    was_sent = sa.Column(sa.Boolean)
+    was_sent = sa.Column(sa.Boolean)  # Sent by node
     was_received = sa.Column(sa.Boolean)
     contract_count = sa.Column(sa.Integer)
     created_at = sa.Column(sa.BigInteger)

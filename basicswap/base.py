@@ -207,3 +207,7 @@ class BaseApp:
 
     def getTime(self) -> int:
         return int(time.time()) + self.mock_time_offset
+
+    def setMockTimeOffset(self, new_offset: int) -> None:
+        self.log.warning(f'Setting mocktime to {new_offset}')
+        self.mock_time_offset = new_offset

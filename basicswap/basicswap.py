@@ -923,7 +923,7 @@ class BasicSwap(BaseApp):
                 identity_stats.num_sent_bids_successful = zeroIfNone(identity_stats.num_sent_bids_successful) + 1
             else:
                 identity_stats.num_recv_bids_successful = zeroIfNone(identity_stats.num_recv_bids_successful) + 1
-        elif bid.state in (BidStates.BID_ERROR, BidStates.XMR_SWAP_FAILED_REFUNDED, BidStates.XMR_SWAP_FAILED_SWIPED, BidStates.XMR_SWAP_FAILED):
+        elif bid.state in (BidStates.BID_ERROR, BidStates.XMR_SWAP_FAILED_REFUNDED, BidStates.XMR_SWAP_FAILED_SWIPED, BidStates.XMR_SWAP_FAILED, BidStates.SWAP_TIMEDOUT):
             if bid.was_sent:
                 identity_stats.num_sent_bids_failed = zeroIfNone(identity_stats.num_sent_bids_failed) + 1
             else:
@@ -1081,7 +1081,7 @@ class BasicSwap(BaseApp):
                 pass  # No prevouts are locked
 
             # Update identity stats
-            if bid.state in (BidStates.BID_ERROR, BidStates.XMR_SWAP_FAILED_REFUNDED, BidStates.XMR_SWAP_FAILED_SWIPED, BidStates.XMR_SWAP_FAILED, BidStates.SWAP_COMPLETED):
+            if bid.state in (BidStates.BID_ERROR, BidStates.XMR_SWAP_FAILED_REFUNDED, BidStates.XMR_SWAP_FAILED_SWIPED, BidStates.XMR_SWAP_FAILED, BidStates.SWAP_COMPLETED, BidStates.SWAP_TIMEDOUT):
                 peer_address = offer.addr_from if bid.was_sent else bid.bid_addr
                 self.updateIdentityBidState(use_session, peer_address, bid)
 
@@ -2714,25 +2714,29 @@ class BasicSwap(BaseApp):
         finally:
             self.mxDB.release()
 
-    def abandonBid(self, bid_id):
-        self.log.info('Abandoning Bid %s', bid_id.hex())
-        self.mxDB.acquire()
+    def deactivateBidForReason(self, bid_id, new_state, session_in=None) -> None:
         try:
-            session = scoped_session(self.session_factory)
+            session = self.openSession(session_in)
             bid = session.query(Bid).filter_by(bid_id=bid_id).first()
             ensure(bid, 'Bid not found')
             offer = session.query(Offer).filter_by(offer_id=bid.offer_id).first()
             ensure(offer, 'Offer not found')
 
-            # Mark bid as abandoned, no further processing will be done
-            bid.setState(BidStates.BID_ABANDONED)
+            bid.setState(new_state)
             self.deactivateBid(session, offer, bid)
             session.add(bid)
             session.commit()
         finally:
-            session.close()
-            session.remove()
-            self.mxDB.release()
+            if session_in is None:
+                self.closeSession(session)
+
+    def abandonBid(self, bid_id: bytes) -> None:
+        self.log.info('Abandoning Bid %s', bid_id.hex())
+        self.deactivateBidForReason(bid_id, BidStates.BID_ABANDONED)
+
+    def timeoutBid(self, bid_id: bytes, session_in=None) -> None:
+        self.log.info('Bid %s timed-out', bid_id.hex())
+        self.deactivateBidForReason(bid_id, BidStates.SWAP_TIMEDOUT)
 
     def setBidError(self, bid_id, bid, error_str, save_bid=True, xmr_swap=None) -> None:
         self.log.error('Bid %s - Error: %s', bid_id.hex(), error_str)
@@ -3959,7 +3963,29 @@ class BasicSwap(BaseApp):
                 ci_part.close_rpc(rpc_conn)
             self.mxDB.release()
 
-    def countQueuedActions(self, session, bid_id, action_type):
+    def checkAcceptedBids(self) -> None:
+        # Check for bids stuck as accepted (not yet in-progress)
+        if self._is_locked is True:
+            self.log.debug('Not checking accepted bids while system locked')
+            return
+
+        now: int = self.getTime()
+        session = self.openSession()
+
+        grace_period: int = 60 * 60
+        try:
+            query_str = 'SELECT bid_id FROM bids ' + \
+                        'WHERE active_ind = 1 AND state = :accepted_state AND expire_at + :grace_period <= :now '
+            q = session.execute(query_str, {'accepted_state': int(BidStates.BID_ACCEPTED), 'now': now, 'grace_period': grace_period})
+            for row in q:
+                bid_id = row[0]
+                self.log.info('Timing out bid {}.'.format(bid_id.hex()))
+                self.timeoutBid(bid_id, session)
+
+        finally:
+            self.closeSession(session)
+
+    def countQueuedActions(self, session, bid_id, action_type) -> int:
         q = session.query(Action).filter(sa.and_(Action.active_ind == 1, Action.linked_id == bid_id, Action.action_type == int(action_type)))
         return q.count()
 
@@ -4734,6 +4760,10 @@ class BasicSwap(BaseApp):
             v = ci_from.verifyTxSig(xmr_swap.a_lock_refund_tx, xmr_swap.al_lock_refund_tx_sig, xmr_swap.pkal, 0, xmr_swap.a_lock_tx_script, prevout_amount)
             ensure(v, 'Invalid coin A lock refund tx leader sig')
 
+            allowed_states = [BidStates.BID_SENT, BidStates.BID_RECEIVED]
+            if bid.was_sent and offer.was_sent:
+                allowed_states.append(BidStates.BID_ACCEPTED)  # TODO: Split BID_ACCEPTED into recieved and sent
+            ensure(bid.state in allowed_states, 'Invalid state for bid {}'.format(bid.state))
             bid.setState(BidStates.BID_RECEIVING_ACC)
             self.saveBid(bid.bid_id, bid, xmr_swap=xmr_swap)
 
@@ -4859,6 +4889,10 @@ class BasicSwap(BaseApp):
         self.createActionInSession(delay, ActionTypes.SEND_XMR_SWAP_LOCK_SPEND_MSG, bid_id, session)
 
         # publishalocktx
+        if bid.xmr_a_lock_tx and bid.xmr_a_lock_tx.state:
+            if bid.xmr_a_lock_tx.state >= TxStates.TX_SENT:
+                raise ValueError('Lock tx has already been sent {}'.format(bid.xmr_a_lock_tx.txid.hex()))
+
         lock_tx_signed = ci_from.signTxWithWallet(xmr_swap.a_lock_tx)
         txid_hex = ci_from.publishTx(lock_tx_signed)
 
@@ -5212,6 +5246,10 @@ class BasicSwap(BaseApp):
         ci_to = self.ci(coin_to)
 
         try:
+            allowed_states = [BidStates.BID_ACCEPTED, ]
+            if bid.was_sent and offer.was_sent:
+                allowed_states.append(BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_TX_SIGS)
+            ensure(bid.state in allowed_states, 'Invalid state for bid {}'.format(bid.state))
             xmr_swap.af_lock_refund_spend_tx_esig = msg_data.af_lock_refund_spend_tx_esig
             xmr_swap.af_lock_refund_tx_sig = msg_data.af_lock_refund_tx_sig
 
@@ -5480,6 +5518,7 @@ class BasicSwap(BaseApp):
 
             if now - self._last_checked_expired >= self.check_expired_seconds:
                 self.expireMessages()
+                self.checkAcceptedBids()
                 self._last_checked_expired = now
 
             if now - self._last_checked_actions >= self.check_actions_seconds:

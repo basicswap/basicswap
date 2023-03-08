@@ -24,6 +24,7 @@
 - Added restrict_unknown_seed_wallets option.
   - Set to false to disable unknown seed warnings.
 - ui: Can edit offer automation strategy.
+- Accepted bids will timeout if the peer does not respond within an hour after the bid expires.
 
 
 0.0.54
