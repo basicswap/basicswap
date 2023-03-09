@@ -26,20 +26,18 @@ ARG BASICSWAP_URL=https://github.com/tecnovert/basicswap/archive/master.zip
 ARG BASICSWAP_DIR=basicswap-master
 RUN wget -O basicswap-repo.zip $BASICSWAP_URL; \
     unzip basicswap-repo.zip; \
-    cd $BASICSWAP_DIR; \
+    mv $BASICSWAP_DIR /basicswap; \
+    cd /basicswap; \
     protoc -I=basicswap --python_out=basicswap basicswap/messages.proto; \
     pip3 install .;
 
-#COPY ./test_code basicswap-master
-#RUN cd basicswap-master; \
+#COPY ./test_code basicswap
+#RUN cd basicswap; \
 #    protoc -I=basicswap --python_out=basicswap basicswap/messages.proto; \
 #    pip3 install .;
 
 RUN groupadd -r swap_user && useradd -g swap_user -ms /bin/bash swap_user && \
     mkdir /data && chown swap_user -R /data
-
-# Expose html port
-EXPOSE 12700
 
 VOLUME /data
 

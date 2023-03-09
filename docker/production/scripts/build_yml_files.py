@@ -27,6 +27,7 @@ def main():
     parser.add_argument('-v', '--version', action='version',
                         version='%(prog)s {version}'.format(version=__version__))
     parser.add_argument('-c', '--coins', nargs='+', help='<Required> Select coins', required=True)
+    parser.add_argument('--withscript', dest='withscript', help='Add container to run createoffers.py (default=false)', required=False, action='store_true')
     args = parser.parse_args()
 
     with_coins = ['particl', ]
@@ -73,6 +74,12 @@ def main():
         with open(os.path.join(fragments_dir, '8_swapclient.yml'), 'rb') as fp_in:
             for line in fp_in:
                 fp.write(line)
+
+        if args.withscript:
+            with open(os.path.join(fragments_dir, '8_script.yml'), 'rb') as fp_in:
+                for line in fp_in:
+                    fp.write(line)
+
         with open(os.path.join(fragments_dir, '9_swapprepare.yml'), 'rb') as fp_in:
             for line in fp_in:
                 fpp.write(line)

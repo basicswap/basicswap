@@ -6,9 +6,12 @@
         container_name: swapclient
         volumes:
             - ${DATA_PATH}/swapclient:/data
+        expose:
+            - "${HTML_PORT}"
+            - "${WS_PORT}"
         ports:
-            - "${HTML_PORT}"  # Expose only to localhost, see .env
-            - "${WS_PORT}"    # Expose only to localhost, see .env
+            - "127.0.0.1:${HTML_PORT}:${HTML_PORT}"  # Expose only to localhost
+            - "127.0.0.1:${WS_PORT}:${WS_PORT}"      # Expose only to localhost
         environment:
             - TZ
         logging:

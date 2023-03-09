@@ -1,0 +1,23 @@
+    swapscript:
+        image: i_swapclient
+        build:
+            context: swapclient
+            dockerfile: Dockerfile
+        container_name: swapscript
+        volumes:
+            - ${DATA_PATH}/scripts:/data
+        environment:
+            - TZ
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "5"
+        depends_on:
+            - swapclient
+        restart: unless-stopped
+        command: ["/usr/bin/python3", "basicswap/scripts/createoffers.py",
+                  "--host", "swapclient",
+                  "--port", "${HTML_PORT}",
+                  "--configfile", "/data/createoffers.json",
+                  "--statefile", "/data/createoffers_state.json"]
