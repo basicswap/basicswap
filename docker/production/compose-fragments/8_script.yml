@@ -16,7 +16,7 @@
         depends_on:
             - swapclient
         restart: unless-stopped
-        command: ["/usr/bin/python3", "basicswap/scripts/createoffers.py",
+        command: ["/usr/bin/python3", "-u", "basicswap/scripts/createoffers.py",
                   "--host", "swapclient",
                   "--port", "${HTML_PORT}",
                   "--configfile", "/data/createoffers.json",
