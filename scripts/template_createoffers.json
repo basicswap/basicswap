@@ -10,6 +10,7 @@
             "address": "-1",
             "name": "Offer 0",
             "min_coin_from_amt": 25
+            "offer_valid_seconds": 3600
         },
         {
             "coin_from": "Particl",
@@ -21,6 +22,7 @@
             "address": "-1",
             "name": "Offer 1",
             "min_coin_from_amt": 25
+            "offer_valid_seconds": 3600
         },
         {
             "coin_from": "Particl",
@@ -32,6 +34,7 @@
             "address": "-1",
             "name": "Offer 2",
             "min_coin_from_amt": 25
+            "offer_valid_seconds": 3600
         },
         {
             "coin_from": "Particl",
@@ -43,5 +46,6 @@
             "address": "-1",
             "name": "Offer 3",
             "min_coin_from_amt": 25
+            "offer_valid_seconds": 3600
         }
 }
