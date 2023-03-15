@@ -1,0 +1,47 @@
+{
+    "offers": [
+        {
+            "coin_from": "Particl",
+            "coin_to": "Monero",
+            "amount": 100,
+            "minrate": 0.01,
+            "ratetweakpercent": 2,
+            "amount_variable": true,
+            "address": "-1",
+            "name": "Offer 0",
+            "min_coin_from_amt": 25
+        },
+        {
+            "coin_from": "Particl",
+            "coin_to": "PIVX",
+            "amount": 100,
+            "minrate": 0.01,
+            "ratetweakpercent": 5,
+            "amount_variable": true,
+            "address": "-1",
+            "name": "Offer 1",
+            "min_coin_from_amt": 25
+        },
+        {
+            "coin_from": "Particl",
+            "coin_to": "Firo",
+            "amount": 100,
+            "minrate": 0.5,
+            "ratetweakpercent": 1,
+            "amount_variable": true,
+            "address": "-1",
+            "name": "Offer 2",
+            "min_coin_from_amt": 25
+        },
+        {
+            "coin_from": "Particl",
+            "coin_to": "Bitcoin",
+            "amount": 100,
+            "minrate": 2.5,
+            "ratetweakpercent": 4,
+            "amount_variable": true,
+            "address": "-1",
+            "name": "Offer 3",
+            "min_coin_from_amt": 25
+        }
+}
