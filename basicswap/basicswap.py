@@ -6178,17 +6178,35 @@ class BasicSwap(BaseApp):
         finally:
             self.mxDB.release()
 
-    def listAllSMSGAddresses(self, addr_id=None):
-        filters = ''
-        if addr_id is not None:
-            filters += f' WHERE addr_id = {addr_id} '
-        self.mxDB.acquire()
-        try:
-            session = scoped_session(self.session_factory)
-            rv = []
-            query_str = f'SELECT addr_id, addr, use_type, active_ind, created_at, note, pubkey FROM smsgaddresses {filters} ORDER BY created_at'
+    def listAllSMSGAddresses(self, filters={}):
+        query_str = 'SELECT addr_id, addr, use_type, active_ind, created_at, note, pubkey FROM smsgaddresses'
+        query_str += ' WHERE active_ind = 1 '
+        query_data = {}
 
-            q = session.execute(query_str)
+        if 'addr_id' in filters:
+            query_str += ' AND addr_id = :addr_id '
+            query_data['addr_id'] = filters['addr_id']
+        if 'addressnote' in filters:
+            query_str += ' AND note LIKE :note '
+            query_data['note'] = '%' + filters['addressnote'] + '%'
+        if 'addr_type' in filters and filters['addr_type'] > -1:
+            query_str += ' AND use_type = :addr_type '
+            query_data['addr_type'] = filters['addr_type']
+
+        sort_dir = filters.get('sort_dir', 'DESC').upper()
+        sort_by = filters.get('sort_by', 'created_at')
+        query_str += f' ORDER BY {sort_by} {sort_dir}'
+        limit = filters.get('limit', None)
+        if limit is not None:
+            query_str += f' LIMIT {limit}'
+        offset = filters.get('offset', None)
+        if offset is not None:
+            query_str += f' OFFSET {offset}'
+
+        try:
+            session = self.openSession()
+            rv = []
+            q = session.execute(query_str, query_data)
             for row in q:
                 rv.append({
                     'id': row[0],
@@ -6201,9 +6219,27 @@ class BasicSwap(BaseApp):
                 })
             return rv
         finally:
-            session.close()
-            session.remove()
-            self.mxDB.release()
+            self.closeSession(session, commit=False)
+
+    def listSmsgAddresses(self, use_type_str):
+        if use_type_str == 'offer_send_from':
+            use_type = AddressTypes.OFFER
+        elif use_type_str == 'offer_send_to':
+            use_type = AddressTypes.SEND_OFFER
+        elif use_type_str == 'bid':
+            use_type = AddressTypes.BID
+        else:
+            raise ValueError('Unknown address type')
+
+        try:
+            session = self.openSession()
+            rv = []
+            q = session.execute('SELECT sa.addr, ki.label FROM smsgaddresses AS sa LEFT JOIN knownidentities AS ki ON sa.addr = ki.address WHERE sa.use_type = {} AND sa.active_ind = 1 ORDER BY sa.addr_id DESC'.format(use_type))
+            for row in q:
+                rv.append((row[0], row[1]))
+            return rv
+        finally:
+            self.closeSession(session, commit=False)
 
     def listAutomationStrategies(self, filters={}):
         try:
@@ -6336,29 +6372,6 @@ class BasicSwap(BaseApp):
 
             session.execute('UPDATE smsgaddresses SET active_ind = :active_ind, note = :note WHERE addr = :addr', {'active_ind': active_ind, 'note': addressnote, 'addr': address})
             session.commit()
-        finally:
-            session.close()
-            session.remove()
-            self.mxDB.release()
-
-    def listSmsgAddresses(self, use_type_str):
-        if use_type_str == 'offer_send_from':
-            use_type = AddressTypes.OFFER
-        elif use_type_str == 'offer_send_to':
-            use_type = AddressTypes.SEND_OFFER
-        elif use_type_str == 'bid':
-            use_type = AddressTypes.BID
-        else:
-            raise ValueError('Unknown address type')
-
-        self.mxDB.acquire()
-        try:
-            session = scoped_session(self.session_factory)
-            rv = []
-            q = session.execute('SELECT sa.addr, ki.label FROM smsgaddresses AS sa LEFT JOIN knownidentities AS ki ON sa.addr = ki.address WHERE sa.use_type = {} AND sa.active_ind = 1 ORDER BY sa.addr_id DESC'.format(use_type))
-            for row in q:
-                rv.append((row[0], row[1]))
-            return rv
         finally:
             session.close()
             session.remove()

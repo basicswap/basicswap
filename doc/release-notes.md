@@ -7,6 +7,7 @@
 
 - Accepted bids will timeout if the peer does not respond within an hour after the bid expires.
 - Ensure messages are always sent from and to the expected addresses.
+- ui: Add pagination and filters to smsgaddresses page
 
 
 0.0.59

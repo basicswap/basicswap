@@ -97,7 +97,7 @@
                 <div class="w-full md:w-0/12">
                   <div class="flex flex-wrap justify-end -m-1.5">
                     <div class="w-full md:w-auto p-1.5 ml-2">
-                    <button name="saveaddr" value="Save Address" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none "><svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="square" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="miter" class="nc-icon-wrapper" stroke-miterlimit="10"><line x1="12" y1="7" x2="12" y2="17" stroke="#ffffff"></line> <line x1="17" y1="12" x2="7" y2="12" stroke="#ffffff"></line> <circle cx="12" cy="12" r="11"></circle></g></svg>Create Address</button>
+                    <button name="saveaddr" value="Save Address" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none "><svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="square" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="miter" class="nc-icon-wrapper" stroke-miterlimit="10"><line x1="12" y1="7" x2="12" y2="17" stroke="#ffffff"></line> <line x1="17" y1="12" x2="7" y2="12" stroke="#ffffff"></line> <circle cx="12" cy="12" r="11"></circle></g></svg>Save Address</button>
                     </div>
                   <div class="w-full md:w-auto p-1.5 ml-2">
                    <button name="cancel" value="Cancel" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none"><svg class="text-gray-500 w-5 h-5 mr-2" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="square" stroke-width="2" fill="none" stroke="#556987" stroke-linejoin="miter" class="nc-icon-wrapper" stroke-miterlimit="10"><line data-cap="butt" x1="18" y1="12" x2="7" y2="12" stroke-linecap="butt" stroke="#556987"></line> <polyline points=" 11,16 7,12 11,8 " stroke="#5569878"></polyline> <circle cx="12" cy="12" r="11"></circle></g></svg>Go Back</button>
@@ -187,6 +187,85 @@
               </div>
               {% else %}
               <div class="container px-0 mx-auto mt-5">
+              <div class="overflow-x-auto relative border sm:rounded-lg">
+                  <table class="w-full text-sm text-left text-gray-500 outline-none border-gray-300">
+                    <thead class="text-xs text-gray-700 border-b uppercase bg-gray-50 outline-none border-gray-300">
+                      <tr>
+                        <th scope="col" class="py-3 px-6">Filter</th>
+                        <th scope="col" class="py-3 px-6"></th>
+                        <th scope="col"></th>
+                      </tr>
+                    </thead>
+                    <tr class="bg-white border-t hover:bg-gray-50">
+                      <td class="py-4 px-6 bold w-96"> Sort by: </td>
+                      <td class="py-4 bold w-96">
+                        <select class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" name="sort_by">
+                          <option value="created_at" {% if filters.sort_by=='created_at' %} selected{% endif %}>Created At</option>
+                        </select>
+                      </td>
+                      <td class="py-4 px-6 pr-5">
+                        <select class="pr-15 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" name="sort_dir">
+                          <option value="asc" {% if filters.sort_dir=='asc' %} selected{% endif %}>Ascending</option>
+                          <option value="desc" {% if filters.sort_dir=='desc' %} selected{% endif %}>Descending</option>
+                        </select>
+                      </td>
+                    </tr>
+                    <tr class="bg-white border-t hover:bg-gray-50">
+                      <td class="py-4 px-6 bold w-96">Note</td>
+                      <td class="py-4 pr-5">
+                        <input class="appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block p-2.5 w-full" name="filter_addressnote" type="text" value="{{ filters.addressnote }}" maxlength="30"> </td>
+                    </tr>
+                    <tr class="bg-white border-t hover:bg-gray-50">
+                      <td class="py-4 px-6 bold w-96">Type</td>
+                      <td class="py-4 pr-5">
+                        <select class="appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" name="filter_addr_type">
+                          <option{% if filters.addr_type=="-1" %} selected{% endif %} value="-1">Any</option>
+                            {% for a in page_data.addr_types %}
+                            <option{% if filters.addr_type==a[0] %} selected{% endif %} value="{{ a[0] }}">{{ a[1] }}</option>
+                            {% endfor %}
+                          </select>
+                    </tr>
+                  </table>
+              </div>
+            </div>
+            <div class="pt-10 bg-white bg-opacity-60 rounded-b-md">
+              <div class="w-full md:w-0/12">
+                <div class="flex flex-wrap justify-end -m-1.5">
+                  <div class="w-full md:w-auto p-1.5">
+                    <button type="submit" name='pageback' value="Page Back" class="outline-none flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none">
+                      <svg aria-hidden="true" class="mr-2 w-5 h-5" fill="#556987" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                        <path fill-rule="evenodd" d="M7.707 14.707a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l2.293 2.293a1 1 0 010 1.414z" clip-rule="evenodd"></path>
+                      </svg> <span>Page Back</span> </button>
+                  </div>
+                  <div class="flex items-center">
+                    <div class="w-full md:w-auto p-1.5">
+                      <p class="text-sm font-heading">Page: {{ filters.page_no }}</p>
+                    </div>
+                  </div>
+                  <div class="w-full md:w-auto p-1.5">
+                    <button type="submit" name='pageforwards' value="Page Forwards" class="outline-none flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none"> <span>Page Forwards</span>
+                      <svg aria-hidden="true" class="ml-2 w-5 h-5" fill="#556987" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                        <path fill-rule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                      </svg>
+                    </button>
+                  </div>
+                  <div class="w-full md:w-auto p-1.5 ml-2">
+                    <button name='clearfilters' value="Clear Filters" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none">        <svg class="mr-2 w-5 h-5" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
+                              <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#556987" stroke-linejoin="round" class="nc-icon-wrapper">
+                                <rect x="2" y="2" width="7" height="7"></rect>
+                                <rect x="15" y="15" width="7" height="7"></rect>
+                                <rect x="2" y="15" width="7" height="7"></rect>
+                                <polyline points="15 6 17 8 22 3" stroke="#556987"></polyline>
+                              </g>
+                            </svg>  Clear Filters</button>
+                  </div>
+                               <div class="w-full md:w-auto p-1.5 ml-2">
+                          <button name="" value="Submit" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none"><svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round" ><polyline points=" 6,12 10,16 18,8 " stroke="#ffffff"></polyline> <circle cx="12" cy="12" r="11"></circle></g></svg>  Apply</button>
+                        </div>
+                </div>
+              </div>
+            </div>
+              <div class="container px-0 mx-auto mt-5">
                 <div class="overflow-x-auto relative border sm:rounded-lg">
                   <table class="w-full text-sm text-left text-gray-500 outline-none border-gray-300">
                     <thead class="text-xs text-gray-700 border-b uppercase bg-gray-50 outline-none border-gray-300">
@@ -200,7 +279,7 @@
                       </tr>
                     </thead>
                     <tr class="bg-white border-t hover:bg-gray-50">
-                      <td class="py-6 px-6"><b class="monospace">{{ network_addr }}</b></td>
+                      <td class="py-6 px-6"><b class="monospace">{{ page_data.network_addr }}</b></td>
                       <td class="py-4">Network Address
                         <td />
                         <td class="py-4">
@@ -233,6 +312,7 @@
                   </div>
                 </div>
               </div>
+              <input type="hidden" name="pageno" value="{{ filters.page_no }}">
               {% endif %}
               <input type="hidden" name="formid" value="{{ form_id }}"></form>
           </div>

@@ -17,7 +17,6 @@ from jinja2 import Environment, PackageLoader
 from . import __version__
 from .util import (
     dumpj,
-    ensure,
     toBool,
     LockedCoinError,
     format_timestamp,
@@ -29,7 +28,6 @@ from .chainparams import (
 from .basicswap_util import (
     strTxState,
     strBidState,
-    strAddressType,
 )
 
 from .js_server import (
@@ -56,19 +54,10 @@ from .ui.page_wallet import page_wallets, page_wallet
 from .ui.page_settings import page_settings
 from .ui.page_encryption import page_changepassword, page_unlock, page_lock
 from .ui.page_identity import page_identity
+from .ui.page_smsgaddresses import page_smsgaddresses
 
 env = Environment(loader=PackageLoader('basicswap', 'templates'))
 env.filters['formatts'] = format_timestamp
-
-
-def validateTextInput(text, name, messages, max_length=None):
-    if max_length is not None and len(text) > max_length:
-        messages.append(f'Error: {name} is too long')
-        return False
-    if len(text) > 0 and all(c.isalnum() or c.isspace() for c in text) is False:
-        messages.append(f'Error: {name} must consist of only letters and digits')
-        return False
-    return True
 
 
 def extractDomain(url):
@@ -396,82 +385,6 @@ class HttpHandler(BaseHTTPRequestHandler):
             'summary': summary,
         })
 
-    def page_smsgaddresses(self, url_split, post_string):
-        swap_client = self.server.swap_client
-        swap_client.checkSystemStatus()
-        summary = swap_client.getSummary()
-
-        page_data = {}
-        messages = []
-        err_messages = []
-        smsgaddresses = []
-
-        listaddresses = True
-        form_data = self.checkForm(post_string, 'smsgaddresses', err_messages)
-        if form_data:
-            edit_address_id = None
-            for key in form_data:
-                if key.startswith(b'editaddr_'):
-                    edit_address_id = int(key.split(b'_')[1])
-                    break
-            if edit_address_id is not None:
-                listaddresses = False
-                page_data['edit_address'] = edit_address_id
-                page_data['addr_data'] = swap_client.listAllSMSGAddresses(addr_id=edit_address_id)[0]
-            elif b'saveaddr' in form_data:
-                edit_address_id = int(form_data[b'edit_address_id'][0].decode('utf-8'))
-                edit_addr = form_data[b'edit_address'][0].decode('utf-8')
-                active_ind = int(form_data[b'active_ind'][0].decode('utf-8'))
-                ensure(active_ind in (0, 1), 'Invalid sort by')
-                addressnote = '' if b'addressnote' not in form_data else form_data[b'addressnote'][0].decode('utf-8')
-                if not validateTextInput(addressnote, 'Address note', messages, max_length=30):
-                    listaddresses = False
-                    page_data['edit_address'] = edit_address_id
-                else:
-                    swap_client.editSMSGAddress(edit_addr, active_ind=active_ind, addressnote=addressnote)
-                    messages.append(f'Edited address {edit_addr}')
-            elif b'shownewaddr' in form_data:
-                listaddresses = False
-                page_data['new_address'] = True
-            elif b'showaddaddr' in form_data:
-                listaddresses = False
-                page_data['new_send_address'] = True
-            elif b'createnewaddr' in form_data:
-                addressnote = '' if b'addressnote' not in form_data else form_data[b'addressnote'][0].decode('utf-8')
-                if not validateTextInput(addressnote, 'Address note', messages, max_length=30):
-                    listaddresses = False
-                    page_data['new_address'] = True
-                else:
-                    new_addr, pubkey = swap_client.newSMSGAddress(addressnote=addressnote)
-                    messages.append(f'Created address {new_addr}, pubkey {pubkey}')
-            elif b'createnewsendaddr' in form_data:
-                pubkey_hex = form_data[b'addresspubkey'][0].decode('utf-8')
-                addressnote = '' if b'addressnote' not in form_data else form_data[b'addressnote'][0].decode('utf-8')
-                if not validateTextInput(addressnote, 'Address note', messages, max_length=30) or \
-                   not validateTextInput(pubkey_hex, 'Pubkey', messages, max_length=66):
-                    listaddresses = False
-                    page_data['new_send_address'] = True
-                else:
-                    new_addr = swap_client.addSMSGAddress(pubkey_hex, addressnote=addressnote)
-                    messages.append(f'Added address {new_addr}')
-
-        if listaddresses is True:
-            smsgaddresses = swap_client.listAllSMSGAddresses()
-        network_addr = swap_client.network_addr
-
-        for addr in smsgaddresses:
-            addr['type'] = strAddressType(addr['type'])
-
-        template = env.get_template('smsgaddresses.html')
-        return self.render_template(template, {
-            'messages': messages,
-            'err_messages': err_messages,
-            'data': page_data,
-            'smsgaddresses': smsgaddresses,
-            'network_addr': network_addr,
-            'summary': summary,
-        })
-
     def page_shutdown(self, url_split, post_string):
         swap_client = self.server.swap_client
 
@@ -611,7 +524,7 @@ class HttpHandler(BaseHTTPRequestHandler):
                 if page == 'watched':
                     return self.page_watched(url_split, post_string)
                 if page == 'smsgaddresses':
-                    return self.page_smsgaddresses(url_split, post_string)
+                    return page_smsgaddresses(self, url_split, post_string)
                 if page == 'identity':
                     return page_identity(self, url_split, post_string)
                 if page == 'tor':

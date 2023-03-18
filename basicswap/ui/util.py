@@ -446,3 +446,13 @@ def checkAddressesOwned(swap_client, ci, wallet_info):
                 wallet_info['deposit_address'] = 'Error: unowned address'
             elif swap_client._restrict_unknown_seed_wallets and not ci.knownWalletSeed():
                 wallet_info['deposit_address'] = 'WARNING: Unknown wallet seed'
+
+
+def validateTextInput(text, name, messages, max_length=None):
+    if max_length is not None and len(text) > max_length:
+        messages.append(f'Error: {name} is too long')
+        return False
+    if len(text) > 0 and all(c.isalnum() or c.isspace() for c in text) is False:
+        messages.append(f'Error: {name} must consist of only letters and digits')
+        return False
+    return True
