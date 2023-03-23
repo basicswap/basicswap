@@ -531,9 +531,14 @@ class Test(unittest.TestCase):
 
         wait_for_bid(delay_event, swap_clients[0], bid_id)
         swap_clients[0].acceptBid(bid_id)
-        swap_clients[0].getChainClientSettings(Coins.BTC)['override_feerate'] = 10.0
-        swap_clients[0].getChainClientSettings(Coins.DASH)['override_feerate'] = 10.0
-        wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.BID_ERROR, wait_for=60)
+        try:
+            swap_clients[0].getChainClientSettings(Coins.BTC)['override_feerate'] = 10.0
+            swap_clients[0].getChainClientSettings(Coins.DASH)['override_feerate'] = 10.0
+            wait_for_bid(delay_event, swap_clients[0], bid_id, BidStates.BID_ERROR, wait_for=60)
+            swap_clients[0].abandonBid(bid_id)
+        finally:
+            del swap_clients[0].getChainClientSettings(Coins.BTC)['override_feerate']
+            del swap_clients[0].getChainClientSettings(Coins.DASH)['override_feerate']
 
     def test_08_wallet(self):
         logging.info('---------- Test {} wallet'.format(self.test_coin_from.name))

@@ -968,11 +968,16 @@ class BTCInterface(CoinInterface):
             # TODO: filter errors
             return None
 
-    def setTxSignature(self, tx_bytes, stack) -> bytes:
+    def setTxSignature(self, tx_bytes: bytes, stack) -> bytes:
         tx = self.loadTx(tx_bytes)
         tx.wit.vtxinwit.clear()
         tx.wit.vtxinwit.append(CTxInWitness())
         tx.wit.vtxinwit[0].scriptWitness.stack = stack
+        return tx.serialize()
+
+    def setTxScriptSig(self, tx_bytes: bytes, input_no: int, script_sig: bytes) -> bytes:
+        tx = self.loadTx(tx_bytes)
+        tx.vin[0].scriptSig = script_sig
         return tx.serialize()
 
     def stripTxSignature(self, tx_bytes) -> bytes:
@@ -1388,6 +1393,29 @@ class BTCInterface(CoinInterface):
         if 'confirmations' in rv and rv['confirmations'] >= self.blocks_confirmed:
             return {'txid': txid_hex, 'amount': 0, 'height': rv['blockheight']}
         return None
+
+    def createRedeemTxn(self, prevout, output_addr: str, output_value: int) -> str:
+        tx = CTransaction()
+        tx.nVersion = self.txVersion()
+        prev_txid = uint256_from_str(bytes.fromhex(prevout['txid'])[::-1])
+        tx.vin.append(CTxIn(COutPoint(prev_txid, prevout['vout'])))
+        pkh = self.decodeAddress(output_addr)
+        script = self.getScriptForPubkeyHash(pkh)
+        tx.vout.append(self.txoType()(output_value, script))
+        tx.rehash()
+        return tx.serialize().hex()
+
+    def createRefundTxn(self, prevout, output_addr: str, output_value: int, locktime: int, sequence: int) -> str:
+        tx = CTransaction()
+        tx.nVersion = self.txVersion()
+        tx.nLockTime = locktime
+        prev_txid = uint256_from_str(bytes.fromhex(prevout['txid'])[::-1])
+        tx.vin.append(CTxIn(COutPoint(prev_txid, prevout['vout']), nSequence=sequence,))
+        pkh = self.decodeAddress(output_addr)
+        script = self.getScriptForPubkeyHash(pkh)
+        tx.vout.append(self.txoType()(output_value, script))
+        tx.rehash()
+        return tx.serialize().hex()
 
 
 def testBTCInterface():

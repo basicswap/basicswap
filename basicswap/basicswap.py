@@ -138,7 +138,6 @@ from .basicswap_util import (
     describeEventEntry,
     getVoutByAddress,
     getVoutByP2WSH,
-    replaceAddrPrefix,
     getOfferProofOfFundsHash,
     getLastBidState,
     isActiveBidState,
@@ -2893,8 +2892,6 @@ class BasicSwap(BaseApp):
         if self.coin_clients[coin_type]['connection_type'] != 'rpc':
             return None
 
-        prevout_s = ' in={}:{}'.format(prev_txnid, prev_n)
-
         if fee_rate is None:
             fee_rate, fee_src = self.getFeeRateForCoin(coin_type)
 
@@ -2910,37 +2907,30 @@ class BasicSwap(BaseApp):
             addr_redeem_out = self.getReceiveAddressFromPool(coin_type, bid.bid_id, TxTypes.PTX_REDEEM if for_txn_type == 'participate' else TxTypes.ITX_REDEEM)
         assert (addr_redeem_out is not None)
 
-        if self.coin_clients[coin_type]['use_segwit']:
-            # Change to part hrp
-            addr_redeem_out = self.ci(Coins.PART).encodeSegwitAddress(ci.decodeSegwitAddress(addr_redeem_out))
-        else:
-            addr_redeem_out = replaceAddrPrefix(addr_redeem_out, Coins.PART, self.chain)
         self.log.debug('addr_redeem_out %s', addr_redeem_out)
-        output_to = ' outaddr={}:{}'.format(ci.format_amount(amount_out), addr_redeem_out)
-        if coin_type == Coins.PART:
-            redeem_txn = self.calltx('-create' + prevout_s + output_to)
-        else:
-            redeem_txn = self.calltx('-btcmode -create nversion=2' + prevout_s + output_to)
 
+        redeem_txn = ci.createRedeemTxn(prevout, addr_redeem_out, amount_out)
         options = {}
         if self.coin_clients[coin_type]['use_segwit']:
             options['force_segwit'] = True
+
         redeem_sig = self.callcoinrpc(Coins.PART, 'createsignaturewithkey', [redeem_txn, prevout, privkey, 'ALL', options])
+
         if coin_type == Coins.PART or self.coin_clients[coin_type]['use_segwit']:
             witness_stack = [
-                redeem_sig,
-                pubkey.hex(),
-                secret.hex(),
-                '01',
-                txn_script.hex()]
-            redeem_txn = self.calltx(redeem_txn + ' witness=0:' + ':'.join(witness_stack))
+                bytes.fromhex(redeem_sig),
+                pubkey,
+                secret,
+                bytes((1,)),
+                txn_script]
+            redeem_txn = ci.setTxSignature(bytes.fromhex(redeem_txn), witness_stack).hex()
         else:
             script = format(len(redeem_sig) // 2, '02x') + redeem_sig
             script += format(33, '02x') + pubkey.hex()
             script += format(32, '02x') + secret.hex()
             script += format(OpCodes.OP_1, '02x')
             script += format(OpCodes.OP_PUSHDATA1, '02x') + format(len(txn_script), '02x') + txn_script.hex()
-            redeem_txn = self.calltx(redeem_txn + ' scriptsig=0:' + script)
+            redeem_txn = ci.setTxScriptSig(bytes.fromhex(redeem_txn), 0, bytes.fromhex(script)).hex()
 
         ro = self.callcoinrpc(Coins.PART, 'verifyrawtransaction', [redeem_txn, [prevout]])
         ensure(ro['inputs_valid'] is True, 'inputs_valid is false')
@@ -2991,11 +2981,9 @@ class BasicSwap(BaseApp):
             'amount': prev_amount}
 
         lock_value = DeserialiseNum(txn_script, 64)
+        sequence: int = 1
         if offer.lock_type < TxLockTypes.ABS_LOCK_BLOCKS:
             sequence = lock_value
-        else:
-            sequence = 1
-        prevout_s = ' in={}:{}:{}'.format(txjs['txid'], vout, sequence)
 
         fee_rate, fee_src = self.getFeeRateForCoin(coin_type)
 
@@ -3012,21 +3000,12 @@ class BasicSwap(BaseApp):
         if addr_refund_out is None:
             addr_refund_out = self.getReceiveAddressFromPool(coin_type, bid.bid_id, tx_type)
         ensure(addr_refund_out is not None, 'addr_refund_out is null')
-        if self.coin_clients[coin_type]['use_segwit']:
-            # Change to part hrp
-            addr_refund_out = self.ci(Coins.PART).encodeSegwitAddress(ci.decodeSegwitAddress(addr_refund_out))
-        else:
-            addr_refund_out = replaceAddrPrefix(addr_refund_out, Coins.PART, self.chain)
         self.log.debug('addr_refund_out %s', addr_refund_out)
 
-        output_to = ' outaddr={}:{}'.format(ci.format_amount(amount_out), addr_refund_out)
-        if coin_type == Coins.PART:
-            refund_txn = self.calltx('-create' + prevout_s + output_to)
-        else:
-            refund_txn = self.calltx('-btcmode -create nversion=2' + prevout_s + output_to)
-
+        locktime: int = 0
         if offer.lock_type == TxLockTypes.ABS_LOCK_BLOCKS or offer.lock_type == TxLockTypes.ABS_LOCK_TIME:
-            refund_txn = self.calltx('{} locktime={}'.format(refund_txn, lock_value))
+            locktime = lock_value
+        refund_txn = ci.createRefundTxn(prevout, addr_refund_out, amount_out, locktime, sequence)
 
         options = {}
         if self.coin_clients[coin_type]['use_segwit']:
@@ -3034,17 +3013,17 @@ class BasicSwap(BaseApp):
         refund_sig = self.callcoinrpc(Coins.PART, 'createsignaturewithkey', [refund_txn, prevout, privkey, 'ALL', options])
         if coin_type == Coins.PART or self.coin_clients[coin_type]['use_segwit']:
             witness_stack = [
-                refund_sig,
-                pubkey.hex(),
-                '',  # SCRIPT_VERIFY_MINIMALIF
-                txn_script.hex()]
-            refund_txn = self.calltx(refund_txn + ' witness=0:' + ':'.join(witness_stack))
+                bytes.fromhex(refund_sig),
+                pubkey,
+                b'',
+                txn_script]
+            refund_txn = ci.setTxSignature(bytes.fromhex(refund_txn), witness_stack).hex()
         else:
             script = format(len(refund_sig) // 2, '02x') + refund_sig
             script += format(33, '02x') + pubkey.hex()
             script += format(OpCodes.OP_0, '02x')
             script += format(OpCodes.OP_PUSHDATA1, '02x') + format(len(txn_script), '02x') + txn_script.hex()
-            refund_txn = self.calltx(refund_txn + ' scriptsig=0:' + script)
+            refund_txn = ci.setTxScriptSig(bytes.fromhex(refund_txn), 0, bytes.fromhex(script)).hex()
 
         ro = self.callcoinrpc(Coins.PART, 'verifyrawtransaction', [refund_txn, [prevout]])
         ensure(ro['inputs_valid'] is True, 'inputs_valid is false')

@@ -102,7 +102,7 @@ class PARTInterface(BTCInterface):
                   {'conf_target': self._conf_target}]
         return self.rpc_callback('sendtypeto', params)
 
-    def getScriptForPubkeyHash(self, pkh):
+    def getScriptForPubkeyHash(self, pkh: bytes) -> CScript:
         return CScript([OP_DUP, OP_HASH160, pkh, OP_EQUALVERIFY, OP_CHECKSIG])
 
     def formatStealthAddress(self, scan_pubkey, spend_pubkey) -> str:
