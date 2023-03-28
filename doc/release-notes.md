@@ -9,6 +9,9 @@
 - Ensure messages are always sent from and to the expected addresses.
 - ui: Add pagination and filters to smsgaddresses page.
 - Removed dependency on particl-tx.
+- Updated btcfastsync urls and signatures, added --skipbtcfastsyncchecks option to basicswap-prepare
+  - If --skipbtcfastsyncchecks is set the script will use any file with a name matching the
+    BITCOIN_FASTSYNC_FILE env var in the datadir without checking it's size or signature.
 
 
 0.0.59

@@ -166,8 +166,8 @@ TOR_DNS_PORT = int(os.getenv('TOR_DNS_PORT', 5353))
 TEST_TOR_PROXY = toBool(os.getenv('TEST_TOR_PROXY', 'true'))  # Expects a known exit node
 TEST_ONION_LINK = toBool(os.getenv('TEST_ONION_LINK', 'false'))
 
-BITCOIN_FASTSYNC_URL = os.getenv('BITCOIN_FASTSYNC_URL', 'http://utxosets.blob.core.windows.net/public/')
-BITCOIN_FASTSYNC_FILE = os.getenv('BITCOIN_FASTSYNC_FILE', 'utxo-snapshot-bitcoin-mainnet-720179.tar')
+BITCOIN_FASTSYNC_URL = os.getenv('BITCOIN_FASTSYNC_URL', 'https://eu2.contabostorage.com/1f50a74c9dc14888a8664415dad3d020:utxosets/')
+BITCOIN_FASTSYNC_FILE = os.getenv('BITCOIN_FASTSYNC_FILE', 'utxo-snapshot-bitcoin-mainnet-769818.tar')
 
 # Encrypt new wallets with this password, must match the Particl wallet password when adding coins
 WALLET_ENCRYPTION_PWD = os.getenv('WALLET_ENCRYPTION_PWD', '')
@@ -872,7 +872,8 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
             raise ValueError(f'BTC fastsync file not found: {sync_file_path}')
 
         # Double check
-        check_btc_fastsync_data(base_dir, sync_file_path)
+        if extra_opts.get('check_btc_fastsync', True):
+            check_btc_fastsync_data(base_dir, sync_file_path)
 
         with tarfile.open(sync_file_path) as ft:
             ft.extractall(path=data_dir)
@@ -1028,6 +1029,7 @@ def printHelp():
     print('--disabletor             Setup Basicswap instance to not use TOR.')
     print('--usebtcfastsync         Initialise the BTC chain with a snapshot from btcpayserver FastSync.\n'
           + '                         See https://github.com/btcpayserver/btcpayserver-docker/blob/master/contrib/FastSync/README.md')
+    print('--skipbtcfastsyncchecks  Use the provided btcfastsync file without checking it\'s size or signature .')
     print('--initwalletsonly        Setup coin wallets only.')
     print('--keysdirpath            Speed up tests by preloading all PGP keys in directory.')
 
@@ -1289,6 +1291,9 @@ def main():
         if name == 'usebtcfastsync':
             extra_opts['use_btc_fastsync'] = True
             continue
+        if name == 'skipbtcfastsyncchecks':
+            extra_opts['check_btc_fastsync'] = False
+            continue
         if name == 'initwalletsonly':
             initwalletsonly = True
             continue
@@ -1376,13 +1381,14 @@ def main():
         sync_file_path = os.path.join(data_dir, BITCOIN_FASTSYNC_FILE)
         sync_file_url = os.path.join(BITCOIN_FASTSYNC_URL, BITCOIN_FASTSYNC_FILE)
         try:
+            check_btc_fastsync = extra_opts.get('check_btc_fastsync', True)
             check_sig = False
-            remote_file = urlopen(sync_file_url)
             if not os.path.exists(sync_file_path):
                 downloadFile(sync_file_url, sync_file_path, timeout=50)
-                check_sig = True
-            else:
+                check_sig = check_btc_fastsync
+            elif check_btc_fastsync:
                 file_size = os.stat(sync_file_path).st_size
+                remote_file = urlopen(sync_file_url)
                 if file_size < remote_file.length:
                     logger.warning(f'{BITCOIN_FASTSYNC_FILE} is an unexpected size, {file_size} < {remote_file.length}')
                     downloadFile(sync_file_url, sync_file_path, timeout=50, resume_from=file_size)
