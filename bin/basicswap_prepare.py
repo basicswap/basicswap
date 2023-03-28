@@ -100,7 +100,7 @@ else:
     FILE_EXT = 'tar.gz'
 
 logger = logging.getLogger()
-logger.level = logging.DEBUG
+logger.level = logging.INFO
 if not len(logger.handlers):
     logger.addHandler(logging.StreamHandler(sys.stdout))
 
@@ -1029,7 +1029,7 @@ def printHelp():
     print('--disabletor             Setup Basicswap instance to not use TOR.')
     print('--usebtcfastsync         Initialise the BTC chain with a snapshot from btcpayserver FastSync.\n'
           + '                         See https://github.com/btcpayserver/btcpayserver-docker/blob/master/contrib/FastSync/README.md')
-    print('--skipbtcfastsyncchecks  Use the provided btcfastsync file without checking it\'s size or signature .')
+    print('--skipbtcfastsyncchecks  Use the provided btcfastsync file without checking it\'s size or signature.')
     print('--initwalletsonly        Setup coin wallets only.')
     print('--keysdirpath            Speed up tests by preloading all PGP keys in directory.')
 
