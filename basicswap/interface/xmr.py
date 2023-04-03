@@ -341,7 +341,7 @@ class XMRInterface(CoinInterface):
     def findTxnByHash(self, txid):
         with self._mx_wallet:
             self.openWallet(self._wallet_filename)
-            self.rpc_wallet_cb('refresh')
+            self.rpc_wallet_cb('refresh', timeout=600)
 
             try:
                 current_height = self.rpc_cb2('get_height', timeout=30)['height']
