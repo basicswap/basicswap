@@ -51,7 +51,7 @@ def format_wallet_data(swap_client, ci, w):
 
     if ci.coin_type() == Coins.PART:
         wf['stealth_address'] = w.get('stealth_address', '?')
-        wf['blind_balance'] = w.get('blind_balance', '?')
+        wf['blind_balance'] = "{:.8f}".format(float(w['blind_balance']))
         if 'blind_unconfirmed' in w and float(w['blind_unconfirmed']) > 0.0:
             wf['blind_unconfirmed'] = w['blind_unconfirmed']
         wf['anon_balance'] = w.get('anon_balance', '?')
