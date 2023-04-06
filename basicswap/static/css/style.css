@@ -16,14 +16,10 @@
 
 .floatright
 {
-  position: absolute;
+  position: fixed;
   top:1.25rem;
   right:1.25rem;
   z-index: 9999;
-}
-
-.error
-{
 }
 
 .error_msg
@@ -55,4 +51,64 @@
         height:0;
         visibility:hidden;
     }
+}
+
+.custom-select .select {
+    appearance: none;
+    background-image: url('/static/images/other/coin.png');
+    background-position: 10px center;
+    background-repeat: no-repeat;
+    position: relative;
+  }
+
+.custom-select select::-webkit-scrollbar {
+  width: 0;
+}
+
+.custom-select .select option {
+  padding-left: 0;
+  text-indent: 0;
+  background-repeat: no-repeat;
+  background-position: 0 50%;
+}
+
+.custom-select .select option.no-space {
+  padding-left: 0;
+}
+
+.custom-select .select option[data-image] {
+  background-image: url('');
+}
+
+.custom-select .select-icon {
+  position: absolute;
+  top: 50%;
+  left: 10px;
+  transform: translateY(-50%);
+}
+
+.custom-select .select-image {
+  display: none;
+  margin-top: 10px;
+}
+
+.custom-select .select:focus + .select-dropdown .select-image {
+  display: block;
+}
+
+
+/* Disable opacity on disabled form elements in Chrome */
+@media screen and (-webkit-min-device-pixel-ratio:0) {
+  select:disabled,
+  input:disabled,
+  textarea:disabled {
+    opacity: 1 !important;
+  }
+}
+
+
+
+/* Add this to your existing CSS file */
+.error {
+  border: 1px solid red !important;
 }
