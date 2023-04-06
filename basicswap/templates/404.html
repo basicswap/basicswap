@@ -1,39 +1,41 @@
 {% include 'header.html' %}
 <div class="container mx-auto">
-  <section class="bg-white p-5 mt-5">
-    <div class="flex flex-wrap items-center -m-2">
-      <div class="w-full md:w-1/2 p-2">
-        <ul class="flex flex-wrap items-center gap-x-3 mb-2">
-          <li>
-            <a class="flex font-medium text-xs text-coolGray-500 hover:text-coolGray-700" href="/">
-              <p>Home</p>
-            </a>
-          </li>
-          <li>
-            <svg width="6" height="15" viewBox="0 0 6 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M5.34 0.671999L2.076 14.1H0.732L3.984 0.671999H5.34Z" fill="#BBC3CF"></path>
-            </svg>
-          </li>
-          <li><a class="flex font-medium text-xs text-coolGray-500 hover:text-coolGray-700" href="/404">404</a></li>
-          <li>
-            <svg width="6" height="15" viewBox="0 0 6 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M5.34 0.671999L2.076 14.1H0.732L3.984 0.671999H5.34Z" fill="#BBC3CF"></path>
-            </svg>
-          </li>
-        </ul>
-      </div>
-    </div>
-  </section>
-  {% include 'inc_messages.html' %}
-  <section class="relative py-24 md:py-40 bg-white">
+ <section class="p-5 mt-5">
+  <div class="flex flex-wrap items-center -m-2">
+   <div class="w-full md:w-1/2 p-2">
+    <ul class="flex flex-wrap items-center gap-x-3 mb-2">
+     <li>
+      <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/">
+       <p>Home</p>
+      </a>
+     </li>
+     <li>
+      <svg width="6" height="15" viewBox="0 0 6 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+       <path d="M5.34 0.671999L2.076 14.1H0.732L3.984 0.671999H5.34Z" fill="#BBC3CF"></path>
+      </svg>
+     </li>
+     <li>
+      <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/404">404</a>
+     </li>
+     <li>
+      <svg width="6" height="15" viewBox="0 0 6 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+       <path d="M5.34 0.671999L2.076 14.1H0.732L3.984 0.671999H5.34Z" fill="#BBC3CF"></path>
+      </svg>
+     </li>
+    </ul>
+   </div>
+  </div>
+ </section>
+{% include 'inc_messages.html' %}
+  <section class="relative py-24 md:py-40">
     <div class="relative z-10 container px-4 mx-auto">
       <div class="flex flex-wrap items-center -mx-4">
         <div class="w-full md:w-1/2 px-4 mb-16 md:mb-0">
-          <div class="md:max-w-xl md:mx-auto text-center md:text-left"> <span class="inline-block mb-6 px-3 py-1 font-semibold bg-blue-100 rounded-full text-sm">Error 404</span>
-            <h2 class="mb-4 text-4xl md:text-5xl leading-tight font-bold tracking-tighter">Oh no! Error 404</h2>
-            <p class="mb-6 text-lg md:text-xl text-coolGray-500">Something went wrong, so this page is broken.</p>
+          <div class="md:max-w-xl md:mx-auto text-center md:text-left"> <span class="inline-block py-1 px-3 mb-4 text-xs leading-5 bg-blue-500 text-white font-medium rounded-full shadow-sm">Error 404</span>
+            <h2 class="mb-4 text-4xl md:text-5xl leading-tight font-bold tracking-tighter dark:text-white">Oh no! Error 404</h2>
+            <p class="mb-6 text-lg md:text-xl text-coolGray-500 dark:text-gray-300 ">Something went wrong, so this page is broken.</p>
             <div class="flex flex-wrap">
-              <div class="w-full lg:w-auto py-1 lg:py-0 lg:mr-6"><a class="inline-block py-5 px-7 w-full text-base md:text-lg leading-4 text-blue-50 font-medium text-center bg-blue-500 hover:bg-blue-600 border border-blue-500 rounded-md shadow-sm focus:ring-0 focus:outline-none" href="/">Go back to Homepage</a></div>
+              <div class="w-full lg:w-auto py-1 lg:py-0 lg:mr-6"><a class="inline-block py-5 px-7 w-full text-base md:text-lg leading-4 text-blue-50 font-medium text-center bg-blue-500 hover:bg-blue-600 border border-blue-500 rounded-md shadow-sm focus:ring-0 focus:outline-none" href="/">Go Back</a></div>
               <div class="w-full lg:w-auto py-1 lg:py-0"><a class="inline-block py-5 px-7 w-full text-base md:text-lg leading-4 text-coolGray-800 font-medium text-center bg-white hover:bg-coolGray-100 border border-coolGray-200 rounded-md shadow-sm focus:ring-0 focus:outline-none" href="/refresh">Try Again</a></div>
               <!-- todo add last URL page visit -->
             </div>

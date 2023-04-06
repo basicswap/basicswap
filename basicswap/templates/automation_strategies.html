@@ -1,145 +1,241 @@
 {% include 'header.html' %}
 <div class="container mx-auto">
-  <section class="bg-white p-5 mt-5">
-    <div class="flex flex-wrap items-center -m-2">
-      <div class="w-full md:w-1/2 p-2">
-        <ul class="flex flex-wrap items-center gap-x-3 mb-2">
-          <li>
-            <a class="flex font-medium text-xs text-coolGray-500 hover:text-coolGray-700" href="/">
-              <p>Home</p>
-            </a>
-          </li>
-          <li>
-            <svg width="6" height="15" viewBox="0 0 6 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M5.34 0.671999L2.076 14.1H0.732L3.984 0.671999H5.34Z" fill="#BBC3CF"></path>
-            </svg>
-          </li>
-          <li><a class="flex font-medium text-xs text-coolGray-500 hover:text-coolGray-700" href="/automation">Automation Strategies</a></li>
-          <li>
-            <svg width="6" height="15" viewBox="0 0 6 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M5.34 0.671999L2.076 14.1H0.732L3.984 0.671999H5.34Z" fill="#BBC3CF"></path>
-            </svg>
-          </li>
-        </ul>
-      </div>
+ <section class="p-5 mt-5">
+  <div class="flex flex-wrap items-center -m-2">
+   <div class="w-full md:w-1/2 p-2">
+    <ul class="flex flex-wrap items-center gap-x-3 mb-2">
+     <li>
+      <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/">
+       <p>Home</p>
+      </a>
+     <li>
+      <svg width="6" height="15" viewBox="0 0 6 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+       <path d="M5.34 0.671999L2.076 14.1H0.732L3.984 0.671999H5.34Z" fill="#BBC3CF"></path>
+      </svg>
+     </li>
+     <li>
+      <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/automation">Automation Strategies</a>
+     </li>
+     <li>
+      <svg width="6" height="15" viewBox="0 0 6 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+       <path d="M5.34 0.671999L2.076 14.1H0.732L3.984 0.671999H5.34Z" fill="#BBC3CF"></path>
+      </svg>
+     </li>
+    </ul>
+    </ul>
+   </div>
+  </div>
+ </section>
+ <section class="py-4">
+  <div class="container px-4 mx-auto">
+   <div class="relative py-11 px-16 bg-coolGray-900 dark:bg-blue-500 rounded-md overflow-hidden">
+    <img class="absolute z-10 left-4 top-4" src="/static/images/elements/dots-red.svg" alt="">
+    <img class="absolute z-10 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt="">
+    <img class="absolute h-64 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" src="/static/images/elements/wave.svg" alt="">
+    <div class="relative z-20 flex flex-wrap items-center -m-3">
+     <div class="w-full md:w-1/2 p-3">
+      <h2 class="mb-6 text-4xl font-bold text-white tracking-tighter">Automation Strategies</h2>
+      <p class="font-normal text-coolGray-200 dark:text-white"></p>
+     </div>
+     <div class="w-full md:w-1/2 p-3 p-6 container flex flex-wrap items-center justify-end items-center mx-auto">
+      <a href="/newautomationstrategy" class="flex flex-wrap justify-center px-5 py-4 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white borderdark:text-white dark:hover:text-white dark:bg-gray-600 dark:hover:bg-gray-700 dark:border-gray-600 dark:hover:border-gray-600 border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+       <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
+        <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round">
+         <line data-cap="butt" x1="5" y1="1" x2="5" y2="6" stroke="#ffffff"></line>
+         <line x1="3" y1="1" x2="7" y2="1" stroke="#fffffwww"></line>
+         <line data-cap="butt" x1="19" y1="1" x2="19" y2="6" stroke="#ffffff"></line>
+         <line x1="17" y1="1" x2="21" y2="1" stroke="#ffffff"></line>
+         <rect x="6" y="15" width="12" height="4" stroke="#ffffff"></rect>
+         <line data-cap="butt" x1="10" y1="19" x2="10" y2="15" stroke="#ffffff"></line>
+         <line data-cap="butt" x1="14" y1="19" x2="14" y2="15" stroke="#ffffff"></line>
+         <line x1="6" y1="11" x2="8" y2="11" stroke="#ffffff"></line>
+         <line x1="16" y1="11" x2="18" y2="11" stroke="#fff"></line>
+         <polygon points="23 6 5 6 1 6 1 23 23 23 23 6"></polygon>
+        </g>
+       </svg>
+       <span>Create New Strategy</span>
+      </a>
+     </div>
     </div>
-  </section>
-  <section class="py-4">
-    <div class="container px-4 mx-auto">
-      <div class="relative py-11 px-16 bg-coolGray-900 rounded-md overflow-hidden">
-        <img class="absolute z-10 left-4 top-4" src="/static/images/elements/dots-red.svg" alt="">
-        <img class="absolute z-10 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt="">
-        <img class="absolute h-64 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" src="/static/elements/wave.svg" alt="">
-        <div class="relative z-20 flex flex-wrap items-center -m-3">
-          <div class="w-full md:w-1/2 p-3">
-            <h2 class="mb-6 text-4xl font-bold text-white tracking-tighter">Automation Strategies</h2>
-            <p class="font-semibold text-coolGray-200"></p>
+   </div>
+  </div>
+ </section>
+ {% include 'inc_messages.html' %}
+ <section>
+  <form method="post">
+   <div class="pl-6 pr-6 pt-0 pb-0 h-full overflow-hidden">
+    <div class="border-coolGray-100">
+     <div class="flex flex-wrap items-center justify-between -m-2">
+      <div class="w-full pt-2">
+       <div class="container mt-5 mx-auto">
+        <div class="pt-6 pb-8 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
+         <div class="px-6">
+          <div class="w-full mt-6 pb-6 overflow-x-auto">
+           <table class="w-full min-w-max text-sm">
+            <thead class="uppercase">
+             <tr class="text-left">
+              <th class="p-0">
+               <div class="py-3 px-6 rounded-tl-xl bg-coolGray-200 dark:bg-gray-600">
+                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Filters</span>
+               </div>
+              </th>
+              <th class="p-0">
+               <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
+                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold py-3 px-6"></span>
+               </div>
+              </th>
+              <th class="p-0">
+               <div class="py-3 px-6 rounded-tr-xl bg-coolGray-200 dark:bg-gray-600">
+                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold py-3 px-6"></span>
+               </div>
+              </th>
+             </tr>
+            </thead>
+            <tr class="opacity-100 text-gray-500 dark:text-gray-100">
+             <td class="py-3 px-6 bold">Sort by:</td>
+             <td class="py-3 px-6">
+              <select class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="sort_by">
+               <option value="created_at" {% if filters.sort_by=='created_at' %} selected{% endif %}>Created At</option>
+              </select>
+             </td>
+             <td class="py-3 px-6">
+              <select class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="sort_dir">
+               <option value="asc" {% if filters.sort_dir=='asc' %} selected{% endif %}>Ascending</option>
+               <option value="desc" {% if filters.sort_dir=='desc' %} selected{% endif %}>Descending</option>
+              </select>
+             </td>
+            </tr>
+           </table>
           </div>
-          <div class="w-full md:w-1/2 p-3">
-            <a id="refresh" href="/newautomationstrategy">
-              <button class="block md:ml-auto px-5 py-3 font-medium text-lcg text-white bg-blue-500 hover:bg-blue-600 rounded-md focus:ring-0 focus:outline-none">Create New Strategy</button>
-            </a>
-          </div>
+         </div>
         </div>
-      </div>
-    </div>
-  </section> {% include 'inc_messages.html' %}
-  <section class="bg-white">
-    <div class="pl-6 pr-6 pt-0 pb-0 mt-5 h-full overflow-hidden bg-white ">
-      <div class="pb-6 border-coolGray-100">
-        <div class="flex flex-wrap items-center justify-between -m-2">
-          <div class="w-full pt-2">
-            <div class="container px-0 mx-auto mt-5">
-              <div class="overflow-x-auto relative border sm:rounded-lg">
-                <form method="post">
-                  <table class="w-full text-sm text-left text-gray-500 outline-none border-gray-300">
-                    <thead class="text-xs text-gray-700 border-b uppercase bg-gray-50 outline-none border-gray-300">
-                      <tr>
-                        <th scope="col" class="py-3 px-6">Filter</th>
-                        <th scope="col" class="py-3 px-6"></th>
-                        <th scope="col"></th>
-                      </tr>
-                    </thead>
-                    <tr class="bg-white border-t hover:bg-gray-50">
-                      <td class="py-4 px-6 bold w-96"> Sort by: </td>
-                      <td class="py-4 bold w-96">
-                        <select class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" name="sort_by">
-                          <option value="created_at" {% if filters.sort_by=='created_at' %} selected{% endif %}>Created At</option>
-                        </select>
-                      </td>
-                      <td class="py-4 px-6 pr-5">
-                        <select class="pr-15 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" name="sort_dir">
-                          <option value="asc" {% if filters.sort_dir=='asc' %} selected{% endif %}>Ascending</option>
-                          <option value="desc" {% if filters.sort_dir=='desc' %} selected{% endif %}>Descending</option>
-                        </select>
-                      </td>
-                    </tr>
-                  </table>
-              </div>
-            </div>
-            <div class="pt-10 bg-white bg-opacity-60 rounded-b-md">
-              <div class="w-full md:w-0/12">
-                <div class="flex flex-wrap justify-end -m-1.5">
-                  <div class="w-full md:w-auto p-1.5">
-                    <button type="submit" name='pageback' value="Page Back" class="outline-none flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none">
-                      <svg aria-hidden="true" class="mr-2 w-5 h-5" fill="#556987" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                        <path fill-rule="evenodd" d="M7.707 14.707a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l2.293 2.293a1 1 0 010 1.414z" clip-rule="evenodd"></path>
-                      </svg> <span>Page Back</span> </button>
-                  </div>
-                  <div class="flex items-center">
-                    <div class="w-full md:w-auto p-1.5">
-                      <p class="text-sm font-heading">Page: {{ filters.page_no }}</p>
-                    </div>
-                  </div>
-                  <div class="w-full md:w-auto p-1.5">
-                    <button type="submit" name='pageforwards' value="Page Forwards" class="outline-none flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none"> <span>Page Forwards</span>
-                      <svg aria-hidden="true" class="ml-2 w-5 h-5" fill="#556987" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                        <path fill-rule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd"></path>
-                      </svg>
-                    </button>
-                  </div>
-                  <div class="w-full md:w-auto p-1.5 ml-2">
-                    <button name='clearfilters' value="Clear Filters" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none">        <svg class="mr-2 w-5 h-5" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
-                              <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#556987" stroke-linejoin="round" class="nc-icon-wrapper">
-                                <rect x="2" y="2" width="7" height="7"></rect>
-                                <rect x="15" y="15" width="7" height="7"></rect>
-                                <rect x="2" y="15" width="7" height="7"></rect>
-                                <polyline points="15 6 17 8 22 3" stroke="#556987"></polyline>
-                              </g>
-                            </svg>  Clear Filters</button>
-                  </div>
-                               <div class="w-full md:w-auto p-1.5 ml-2">
-                          <button name="" value="Submit" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none"><svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round" ><polyline points=" 6,12 10,16 18,8 " stroke="#ffffff"></polyline> <circle cx="12" cy="12" r="11"></circle></g></svg>  Apply</button>
-                        </div>
-                </div>
-              </div>
-            </div>
-            <input type="hidden" name="formid" value="{{ form_id }}">
-            <input type="hidden" name="pageno" value="{{ filters.page_no }}"> </form>
-            <div class="container px-0 mx-auto mt-10">
-              <div class="overflow-x-auto relative border sm:rounded-lg">
-                <table class="w-full text-sm text-left text-gray-500 outline-none border-gray-300">
-                  <thead class="text-xs text-gray-700 border-b uppercase bg-gray-50 outline-none border-gray-300">
-                    <tr>
-                      <th scope="col" class="py-3 px-6">Name</th>
-                      <th scope="col" class="py-3">Type</th>
-                    </tr>
-                  </thead>
-                  {% for s in strategies %}
-                  <tr class="bg-white border-t hover:bg-gray-50">
-                    <td class="py-4 px-6 bold w-96"> <a class="monospace bolder-t" href=/automationstrategy/{{ s[0] }}>{{ s[1] }}</a> </td>
-                    <td class="py-4 pr-5">{{ s[2] }} </td>
-                  </tr>
-                {% endfor %}
-              </table>
-              </div>
-            </div>
+       </div>
+ </section>
+ <section>
+  <div class="pl-6 pr-6 pt-0 pb-0 h-full overflow-hidden ">
+   <div class="pb-6 ">
+    <div class="flex flex-wrap items-center justify-between -m-2">
+     <div class="w-full pt-2">
+      <div class="container mx-auto">
+       <div class="pt-6 pb-6 bg-coolGray-100 border-t border-gray-100 dark:border-gray-400 dark:bg-gray-500 rounded-bl-xl rounded-br-xl">
+        <div class="px-6">
+         <div class="flex flex-wrap justify-end">
+          <div class="w-full md:w-auto p-1.5 ml-2">
+           <button name='clearfilters' value="Clear Filters" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+            <svg class="mr-2 w-5 h-5" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
+             <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round">
+              <line x1="20" y1="2" x2="12.329" y2="11.506"></line>
+              <path d="M11,11a2,2,0,0,1,2,2,3.659,3.659,0,0,1-.2.891A9.958,9.958,0,0,0,13.258,23H1C1,16.373,4.373,11,11,11Z"></path>
+              <line x1="18" y1="15" x2="23" y2="15" stroke="#ffffff"></line>
+              <line x1="17" y1="19" x2="23" y2="19" stroke="#ffffff"></line>
+              <line x1="19" y1="23" x2="23" y2="23" stroke="#ffffff"></line>
+              <path d="M8.059,11.415A3.9,3.9,0,0,0,12,16c.041,0,.079-.011.12-.012" data-cap="butt"></path>
+              <path d="M5,23a13.279,13.279,0,0,1,.208-3.4" data-cap="butt"></path>
+              <path d="M9.042,23c-.688-1.083-.313-3.4-.313-3.4" data-cap="butt"></path>
+             </g>
+            </svg> Clear</button>
           </div>
+          <div class="w-full md:w-auto p-1.5 ml-2">
+           <button name="" value="Submit" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+            <svg class="mr-2 w-5 h-5" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
+             <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round">
+              <rect x="2" y="2" width="7" height="7"></rect>
+              <rect x="15" y="15" width="7" height="7"></rect>
+              <rect x="2" y="15" width="7" height="7"></rect>
+              <polyline points="15 6 17 8 22 3" stroke="#ffffff"></polyline>
+             </g>
+            </svg>Apply Filters</button>
+          </div>
+         </div>
         </div>
+       </div>
       </div>
+     </div>
     </div>
-  </section>
-</div> 
+   </div>
+  </div>
+ </section>
+ <section>
+  <div class="pl-6 pr-6 pt-0 pb-0 h-full overflow-hidden">
+   <div class="border-coolGray-100">
+    <div class="flex flex-wrap items-center justify-between -m-2">
+     <div class="w-full pt-2">
+      <div class="container mt-5 mx-auto">
+       <div class="pt-6 pb-8 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
+        <div class="px-6">
+         <div class="w-full mt-6 pb-6 overflow-x-auto">
+          <table class="w-full min-w-max text-sm">
+           <thead class="uppercase">
+            <tr class="text-left">
+             <th class="p-0">
+              <div class="py-3 px-6 rounded-tl-xl bg-coolGray-200 dark:bg-gray-600">
+               <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Name</span>
+              </div>
+             </th>
+             <th class="p-0">
+              <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
+               <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Type</span>
+              </div>
+             </th>
+            </tr>
+           </thead>
+           {% for s in strategies %}
+           <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
+            <td class="py-3 px-6 bold monospace">
+             <a href=/automationstrategy/{{ s[0] }}>{{ s[1] }}</a>
+            </td>
+            <td class="py-3 px-6">{{ s[2] }}</td>
+           </tr>
+           {% endfor %}
+          </table>
+         </div>
+        </div>
+       </div>
+      </div>
+ </section>
+ <section>
+  <div class="pl-6 pr-6 pt-0 pb-0 h-full overflow-hidden ">
+   <div class="pb-6 ">
+    <div class="flex flex-wrap items-center justify-between -m-2">
+     <div class="w-full pt-2">
+      <div class="container mx-auto">
+       <div class="pt-6 pb-6 bg-coolGray-100 border-t border-gray-100 dark:border-gray-400 dark:bg-gray-500 rounded-bl-xl rounded-br-xl">
+        <div class="px-6">
+         <div class="flex flex-wrap justify-end">
+          <div class="w-full md:w-auto p-1.5">
+           <button type="submit" name='pageback' value="Page Back" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-blue-600 rounded-lg transition duration-200 focus:ring-0 focus:outline-none">
+            <svg aria-hidden="true" class="mr-2 w-5 h-5" fill="#ffffff" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+             <path fill-rule="evenodd" d="M7.707 14.707a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l2.293 2.293a1 1 0 010 1.414z" clip-rule="evenodd"></path>
+            </svg>
+            <span>Page Back</span>
+           </button>
+          </div>
+          <div class="flex items-center">
+           <div class="w-full md:w-auto p-1.5">
+            <p class="text-sm font-heading dark:text-white">Page: {{ filters.page_no }}</p>
+           </div>
+          </div>
+          <div class="w-full md:w-auto p-1.5">
+           <button type="submit" name='pageforwards' value="Page Forwards" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-blue-600 rounded-lg transition duration-200 focus:ring-0 focus:outline-none">
+            <span>Page Forwards</span>
+            <svg aria-hidden="true" class="ml-2 w-5 h-5" fill="#ffffff" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+             <path fill-rule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+            </svg>
+           </button>
+          </div>
+         </div>
+        </div>
+       </div>
+      </div>
+     </div>
+    </div>
+   </div>
+  </div>
+ </section>
+ <input type="hidden" name="formid" value="{{ form_id }}">
+ <input type="hidden" name="pageno" value="{{ filters.page_no }}">
+ </form>
+</div>
 {% include 'footer.html' %}
 </div>
 </body>
