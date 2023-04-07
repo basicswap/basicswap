@@ -14,7 +14,7 @@ function updateSelectCache(select) {
 
 function setSelectData(select) {
   const selectedOption = select.options[select.selectedIndex];
-  const image = selectedOption.getAttribute('data-image') || 'https://dummyimage.com/20x20/000/fff'; // set a default image URL
+  const image = selectedOption.getAttribute('data-image') || '/static/images/other/coin.png'; // set a default image URL
   const name = selectedOption.textContent.trim();
   if (image) {
     select.style.backgroundImage = `url(${image})`;

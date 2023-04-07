@@ -252,9 +252,10 @@
          <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"></path>
         </svg>
         <select class="select hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0"" id="coin_to" name="coin_to" onchange="set_rate('coin_to');">
-         <option class="no-space" value="-1">Select coin you get</option>
+         <option value="-1">Select coin you get</option>
          {% for c in coins %}
-         <option{% if data.coin_to==c[0] %} selected{% endif %} value="{{ c[0] }}" data-image="/static/images/coins/{{ c[1]|replace(" ", "-") }}-20.png">{{ c[1] }}</option>{% endfor %}
+         <option{% if data.coin_to==c[0] %} selected{% endif %} value="{{ c[0] }}" data-image="/static/images/coins/{{ c[1]|replace(" ", "-") }}-20.png">{{ c[1] }}</option>
+          {% endfor %}
         </select>
         <div class="select-dropdown">
          <img class="select-icon" src="" alt="">
@@ -354,15 +355,48 @@
   </div>
  </div>
 </div>
-<div class="py-3 border-b items-center justify-between -mx-4 mb-6 pb-6 border-gray-400 border-opacity-20">
+<div class="pricejsonhidden hidden py-3 border-b items-center justify-between -mx-4 mb-6 pb-6 border-gray-400 border-opacity-20">
  <div class="w-full md:w-10/12">
   <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
    <div class="w-full md:w-1/3 p-3">
-    <p class="text-sm text-coolGray-800 dark:text-white font-semibold">Rates</p>
+    <p class="text-sm text-coolGray-800 dark:text-white font-semibold">Coin Prices/Rates (JSON)</p>
    </div>
    <div class="w-full md:flex-1 p-3 dark:text-white text-sm monospace">
     <p id="rates_display"></p>
-    <!-- todo adjust font-size -->
+   </div>
+  </div>
+ </div>
+</div>
+<div class="pricetablehidden hidden py-3 border-b items-center justify-between -mx-4 mb-6 pb-6 border-gray-400 border-opacity-20">
+ <div class="w-full md:w-10/12">
+  <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
+   <div class="w-full md:w-1/3 p-3">
+    <p class="text-sm text-coolGray-800 dark:text-white font-semibold">Coin Prices/Rates (Table)</p>
+   </div>
+   <div class="w-full md:flex-1 p-3 dark:text-white text-sm">
+           <table id="priceTable" class="hidden w-full min-w-max text-sm">
+            <thead class="uppercase">
+             <tr class="text-left">
+              <th class="p-0">
+               <div class="py-3 px-6 rounded-tl-xl bg-coolGray-200 dark:bg-gray-600">
+                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Coin</span>
+               </div>
+              </th>
+              <th class="p-0">
+               <div class="py-3 bg-coolGray-200 dark:bg-gray-600">
+                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Price in USD</span>
+               </div>
+              </th>
+               <th class="p-0">
+               <div class="py-3 rounded-tr-xl bg-coolGray-200 dark:bg-gray-600">
+                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Price in BTC (Rate)</span>
+               </div>
+              </th>             
+             </tr>
+            </thead>
+       <tbody id="priceTableBody" class="text-gray-700">
+      </tbody>
+    </table>
    </div>
   </div>
  </div>
@@ -381,8 +415,15 @@
         <div class="flex flex-wrap justify-end">
          <!--<div class="w-full md:w-auto p-1.5"><button name="show_rates_table" type="button" value="Show Rates Table" onclick='lookup_rates_table();' class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none"><svg class="mr-2"
           xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24"><g fill="#556987"><path fill="#556987" d="M12,3c1.989,0,3.873,0.65,5.43,1.833l-3.604,3.393l9.167,0.983L22.562,0l-3.655,3.442 C16.957,1.862,14.545,1,12,1C5.935,1,1,5.935,1,12h2C3,7.037,7.037,3,12,3z"></path><path data-color="#556987" d="M12,21c-1.989,0-3.873-0.65-5.43-1.833l3.604-3.393l-9.167-0.983L1.438,24l3.655-3.442 C7.043,22.138,9.455,23,12,23c6.065,0,11-4.935,11-11h-2C21,16.963,16.963,21,12,21z"></path></g></svg><span>Show Rates Table</span></button></div>-->
+           {% if show_chart %}
+          <div class="w-full md:w-auto p-1.5">
+            <button name="loadPrices" type="button" value="Lookup Rates (RAW)" onclick="loadPrices();" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md focus:ring-0 focus:outline-none dark:text-white dark:hover:text-white dark:bg-gray-600 dark:hover:bg-gray-700 dark:border-gray-600 dark:hover:border-gray-600">
+          <span>Check Current Prices/Rates (TABLE)</span>
+          </button>
+          </div>
+          {% endif %}
          <div class="w-full md:w-auto p-1.5">
-          <button name="check_rates" type="button" value="Lookup Rates (RAW)" onclick='lookup_rates();' class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md focus:ring-0 focus:outline-none dark:text-white dark:hover:text-white dark:bg-gray-600 dark:hover:bg-gray-700 dark:border-gray-600 dark:hover:border-gray-600"><span>Check Current Rates</span>
+          <button name="check_rates" type="button" value="Lookup Rates (RAW)" onclick='lookup_rates();' class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md focus:ring-0 focus:outline-none dark:text-white dark:hover:text-white dark:bg-gray-600 dark:hover:bg-gray-700 dark:border-gray-600 dark:hover:border-gray-600"><span>Check Current Prices/Rates (JSON)</span>
           </button>
          </div>
          <div class="w-full md:w-auto p-1.5">
@@ -413,35 +454,34 @@ select.select-disabled {
 opacity: 0.50 !important;
 }
 </style>
+
 <script>
-    const xhr_rates = new XMLHttpRequest();
-    xhr_rates.onload = () => {
-      if (xhr_rates.status == 200) {
+const xhr_rates = new XMLHttpRequest();
+xhr_rates.onload = () => {
+    if (xhr_rates.status == 200) {
         const obj = JSON.parse(xhr_rates.response);
         inner_html = '<pre><code>' + JSON.stringify(obj, null, '  ') + '</code></pre>';
         document.getElementById('rates_display').innerHTML = inner_html;
-      }
     }
-    const xhr_rate = new XMLHttpRequest();
-    xhr_rate.onload = () => {
-      if (xhr_rate.status == 200) {
+}
+const xhr_rate = new XMLHttpRequest();
+xhr_rate.onload = () => {
+    if (xhr_rate.status == 200) {
         const obj = JSON.parse(xhr_rate.response);
         if (obj.hasOwnProperty('rate')) {
-          document.getElementById('rate').value = obj['rate'];
-        }
-        else
+            document.getElementById('rate').value = obj['rate'];
+        } else
         if (obj.hasOwnProperty('amount_to')) {
-          document.getElementById('amt_to').value = obj['amount_to'];
-        }
-        else
+            document.getElementById('amt_to').value = obj['amount_to'];
+        } else
         if (obj.hasOwnProperty('amount_from')) {
-          document.getElementById('amt_from').value = obj['amount_from'];
+            document.getElementById('amt_from').value = obj['amount_from'];
         }
-      }
     }
-    const xhr_rates_table = new XMLHttpRequest();
-    xhr_rates_table.onload = () => {
-      if (xhr_rates_table.status == 200) {
+}
+const xhr_rates_table = new XMLHttpRequest();
+xhr_rates_table.onload = () => {
+    if (xhr_rates_table.status == 200) {
         const list = JSON.parse(xhr_rates_table.response);
         headings = ['Source', 'Coin From', 'Coin To', 'Coin From USD Rate', 'Coin To USD Rate', 'Coin From BTC Rate', 'Coin To BTC Rate', 'Relative Rate'];
         table = document.createElement('table');
@@ -450,135 +490,145 @@ opacity: 0.50 !important;
         headings_row = document.createElement('tr');
         data_row.setAttribute("class", "");
         for (let i = 0; i < headings.length; i++) {
-          column = document.createElement('th');
-          column.textContent = headings[i];
-          headings_row.appendChild(column);
+            column = document.createElement('th');
+            column.textContent = headings[i];
+            headings_row.appendChild(column);
         }
         table.appendChild(headings_row);
         for (let i = 0; i < list.length; i++) {
-          data_row = document.createElement('tr');
-          for (let j = 0; j < list[i].length; j++) {
-            column = document.createElement('td');
-            column.textContent = list[i][j];
-            data_row.appendChild(column);
-          }
-          table.appendChild(data_row);
+            data_row = document.createElement('tr');
+            for (let j = 0; j < list[i].length; j++) {
+                column = document.createElement('td');
+                column.textContent = list[i][j];
+                data_row.appendChild(column);
+            }
+            table.appendChild(data_row);
         }
         // Clear existing
         const display_node = document.getElementById("rates_display");
         while (display_node.lastElementChild) {
-          display_node.removeChild(display_node.lastElementChild);
+            display_node.removeChild(display_node.lastElementChild);
         }
         heading = document.createElement('h4');
         heading.textContent = ''
         display_node.appendChild(heading);
         display_node.appendChild(table);
-      }
     }
+}
 
-    function lookup_rates() {
-      const coin_from = document.getElementById('coin_from').value;
-      const coin_to = document.getElementById('coin_to').value;
-      if (coin_from == '-1' || coin_to == '-1') {
+function lookup_rates() {
+    const coin_from = document.getElementById('coin_from').value;
+    const coin_to = document.getElementById('coin_to').value;
+    if (coin_from == '-1' || coin_to == '-1') {
         alert('Coins from and to must be set first.');
         return;
-      }
-      inner_html = '<p>Updating...</p>';
-      document.getElementById('rates_display').innerHTML = inner_html;
-      xhr_rates.open('POST', '/json/rates');
-      xhr_rates.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
-      xhr_rates.send('coin_from=' + coin_from + '&coin_to=' + coin_to);
     }
+    inner_html = '<p>Updating...</p>';
+    document.getElementById('rates_display').innerHTML = inner_html;
 
-    function lookup_rates_table() {
-      const coin_from = document.getElementById('coin_from').value;
-      const coin_to = document.getElementById('coin_to').value;
-      if (coin_from == '-1' || coin_to == '-1') {
+    // Remove the 'hidden' class
+    document.querySelector(".pricejsonhidden").classList.remove("hidden");
+
+    xhr_rates.open('POST', '/json/rates');
+    xhr_rates.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+    xhr_rates.send('coin_from=' + coin_from + '&coin_to=' + coin_to);
+}
+
+
+function lookup_rates_table() {
+    const coin_from = document.getElementById('coin_from').value;
+    const coin_to = document.getElementById('coin_to').value;
+    if (coin_from == '-1' || coin_to == '-1') {
         alert('Coins from and to must be set first.');
         return;
-      }
-      inner_html = 'Updating...</p>';
-      document.getElementById('rates_display').innerHTML = inner_html;
-      xhr_rates_table.open('GET', '/json/rateslist?from=' + coin_from + '&to=' + coin_to);
-      xhr_rates_table.send();
     }
+    inner_html = 'Updating...</p>';
+    document.getElementById('rates_display').innerHTML = inner_html;
 
-    function set_swap_type_enabled(coin_from, coin_to, swap_type) {
-      let make_hidden = false;
-      if (coin_to == '6' /* XMR */ || coin_to == '8' /* PART_ANON */ || coin_to == '7' /* PART_BLIND */ || coin_from == '7' /* PART_BLIND */) {
+    // Remove the 'hidden' class
+    document.querySelector(".hidden.py-3.border-b").classList.remove("hidden");
+
+    xhr_rates_table.open('GET', '/json/rateslist?from=' + coin_from + '&to=' + coin_to);
+    xhr_rates_table.send();
+}
+
+
+function set_swap_type_enabled(coin_from, coin_to, swap_type) {
+    let make_hidden = false;
+    if (coin_to == '6' /* XMR */ || coin_to == '8' /* PART_ANON */ || coin_to == '7' /* PART_BLIND */ || coin_from == '7' /* PART_BLIND */ ) {
         swap_type.disabled = true;
         swap_type.value = 'xmr_swap';
         make_hidden = true;
         swap_type.classList.add('select-disabled'); // Add the class to the disabled select
-      } else
-      if (coin_from == '11' /* PIVX */ || coin_from == '12' /* DASH */ || coin_from == '13' /* FIRO */) {
+    } else
+    if (coin_from == '11' /* PIVX */ || coin_from == '12' /* DASH */ || coin_from == '13' /* FIRO */ ) {
         swap_type.disabled = true;
         swap_type.value = 'seller_first';
         make_hidden = true;
         swap_type.classList.add('select-disabled'); // Add the class to the disabled select
-      } else {
+    } else {
         swap_type.disabled = false;
         swap_type.classList.remove('select-disabled'); // Remove the class from the enabled select
-      }
-      let swap_type_hidden = document.getElementById('swap_type_hidden');
-      if (make_hidden) {
+    }
+    let swap_type_hidden = document.getElementById('swap_type_hidden');
+    if (make_hidden) {
         if (!swap_type_hidden) {
-          swap_type_hidden = document.createElement('input');
-          swap_type_hidden.setAttribute('id', 'swap_type_hidden');
-          swap_type_hidden.setAttribute('type', 'hidden');
-          swap_type_hidden.setAttribute('name', 'swap_type');
-          document.getElementById('form').appendChild(swap_type_hidden)
+            swap_type_hidden = document.createElement('input');
+            swap_type_hidden.setAttribute('id', 'swap_type_hidden');
+            swap_type_hidden.setAttribute('type', 'hidden');
+            swap_type_hidden.setAttribute('name', 'swap_type');
+            document.getElementById('form').appendChild(swap_type_hidden)
         }
         swap_type_hidden.setAttribute('value', swap_type.value);
-      } else
-      if (swap_type_hidden) {
+    } else
+    if (swap_type_hidden) {
         swap_type_hidden.parentNode.removeChild(swap_type_hidden);
-      }
     }
+}
 
-    function set_rate(value_changed) {
-      const coin_from = document.getElementById('coin_from').value;
-      const coin_to = document.getElementById('coin_to').value;
-      const amt_from = document.getElementById('amt_from').value;
-      const amt_to = document.getElementById('amt_to').value;
-      const rate = document.getElementById('rate').value;
-      const lock_rate = rate == '' ? false : document.getElementById('rate_lock').checked;
+function set_rate(value_changed) {
+    const coin_from = document.getElementById('coin_from').value;
+    const coin_to = document.getElementById('coin_to').value;
+    const amt_from = document.getElementById('amt_from').value;
+    const amt_to = document.getElementById('amt_to').value;
+    const rate = document.getElementById('rate').value;
+    const lock_rate = rate == '' ? false : document.getElementById('rate_lock').checked;
 
-      const swap_type = document.getElementById('swap_type');
-      set_swap_type_enabled(coin_from, coin_to, swap_type);
+    const swap_type = document.getElementById('swap_type');
+    set_swap_type_enabled(coin_from, coin_to, swap_type);
 
-      if (coin_from == '-1' || coin_to == '-1') {
+    if (coin_from == '-1' || coin_to == '-1') {
         return;
-      }
-      params = 'coin_from=' + coin_from + '&coin_to=' + coin_to;
-      if (value_changed == 'rate' || (lock_rate && value_changed == 'amt_from') || (amt_to == '' && value_changed == 'amt_from')) {
+    }
+    params = 'coin_from=' + coin_from + '&coin_to=' + coin_to;
+    if (value_changed == 'rate' || (lock_rate && value_changed == 'amt_from') || (amt_to == '' && value_changed == 'amt_from')) {
         if (amt_from == '' || rate == '') {
-          return;
+            return;
         }
         params += '&rate=' + rate + '&amt_from=' + amt_from;
-      } else
-      if (lock_rate && value_changed == 'amt_to') {
+    } else
+    if (lock_rate && value_changed == 'amt_to') {
         if (amt_to == '' || rate == '') {
-          return;
+            return;
         }
         params += '&amt_to=' + amt_to + '&rate=' + rate;
-      } else {
+    } else {
         if (amt_from == '' || amt_to == '') {
-          return;
+            return;
         }
         params += '&amt_from=' + amt_from + '&amt_to=' + amt_to;
-      }
-      xhr_rate.open('POST', '/json/rate');
-      xhr_rate.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
-      xhr_rate.send(params);
     }
+    xhr_rate.open('POST', '/json/rate');
+    xhr_rate.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+    xhr_rate.send(params);
+}
 
-    document.addEventListener("DOMContentLoaded", function() {
-      const coin_from = document.getElementById('coin_from').value;
-      const coin_to = document.getElementById('coin_to').value;
-      const swap_type = document.getElementById('swap_type');
-      set_swap_type_enabled(coin_from, coin_to, swap_type);
-    });
+document.addEventListener("DOMContentLoaded", function() {
+    const coin_from = document.getElementById('coin_from').value;
+    const coin_to = document.getElementById('coin_to').value;
+    const swap_type = document.getElementById('swap_type');
+    set_swap_type_enabled(coin_from, coin_to, swap_type);
+});
 </script>
 <script src="static/js/new_offer.js"></script>
 <script src="static/js/coin_icons.js"></script>
@@ -586,5 +636,60 @@ opacity: 0.50 !important;
 </div>
 {% include 'footer.html' %}
 </div>
+{% if show_chart %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelector("button[name='loadPrices']").addEventListener("click", loadPrices);
+
+    function loadPrices() {
+        const api_key = '{{chart_api_key}}';
+        const coins = ['BTC', 'PART', 'XMR', 'LTC', 'FIRO', 'DASH', 'PIVX'];
+
+        document.getElementById("priceTable").classList.remove("hidden");
+
+        coins.forEach(coin => {
+            fetch(`https://min-api.cryptocompare.com/data/pricemultifull?fsyms=${coin}&tsyms=USD,BTC&api_key=${api_key}`)
+                .then(response => response.json())
+                .then(data => {
+                    const priceUSD = data.RAW[coin].USD.PRICE;
+                    const priceBTC = data.RAW[coin].BTC.PRICE;
+
+                    const tableRow = document.createElement("tr");
+                    tableRow.classList.add("opacity-100", "text-gray-500", "dark:text-gray-100", "dark:text-gray-100", "hover:bg-coolGray-200", "dark:hover:bg-gray-600");
+
+                    const coinCell = document.createElement("td", "py-3", "px-6");
+                    coinCell.textContent = coin;
+                    coinCell.classList.add("py-3", "px-6", "bold");
+                    tableRow.appendChild(coinCell);
+
+                    const usdPriceCell = document.createElement("td", "py-3", "px-6");
+                    usdPriceCell.textContent = priceUSD.toFixed(2) + ' USD';
+                    coinCell.classList.add("py-3", "px-6");
+                    tableRow.appendChild(usdPriceCell);
+
+                    const btcPriceCell = document.createElement("td");
+                    if (coin !== 'BTC') {
+                        btcPriceCell.textContent = priceBTC.toFixed(8) + ' BTC';
+                    } else {
+                        btcPriceCell.textContent = '-';
+                    }
+                    coinCell.classList.add("py-3", "px-6");
+                    tableRow.appendChild(btcPriceCell);
+
+                    document.getElementById("priceTableBody").appendChild(tableRow);
+                })
+                .catch(error => console.error(`Error fetching ${coin} data:`, error));
+        });
+
+        // Remove the 'hidden' class from the section when the button is clicked
+        document.querySelector(".pricetablehidden").classList.remove("hidden");
+
+        // Disable the button to prevent multiple clicks
+        const button = document.querySelector("button[name='loadPrices']");
+        button.disabled = true;
+    }
+});
+</script>
+{% endif %}
 </body>
 </html>

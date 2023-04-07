@@ -571,13 +571,6 @@
          <div class="flex flex-wrap justify-end">
           <div class="w-full md:w-auto p-1.5">
            <button name="step1" type="submit" value="Back" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md focus:ring-0 focus:outline-none dark:text-white dark:hover:text-white dark:bg-gray-600 dark:hover:bg-gray-700 dark:border-gray-600 dark:hover:border-gray-600">
-            <svg class="mr-2" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-             <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="11"></circle>
-              <polyline points="13 16 9 12 13 8" stroke="#ffffff"></polyline>
-             </g>
-            </svg>
-            </svg>
             <span>Back</span>
            </button>
           </div>
@@ -615,25 +608,25 @@
 {% endif %}
 </form>
 <script>
-      const selects = document.querySelectorAll('select.disabled-select');
-      for (const select of selects) {
-       if (select.disabled) {
+const selects = document.querySelectorAll('select.disabled-select');
+for (const select of selects) {
+    if (select.disabled) {
         select.classList.add('disabled-select-enabled');
-       } else {
+    } else {
         select.classList.remove('disabled-select-enabled');
-       }
-      }
+    }
+}
 </script>
 
 <script>
-          const inputs = document.querySelectorAll('input.disabled-input, input[type="checkbox"].disabled-input');
-           for (const input of inputs) {
-            if (input.readOnly) {
-             input.classList.add('disabled-input-enabled');
-            } else {
-             input.classList.remove('disabled-input-enabled');
-            }
-           }
+const inputs = document.querySelectorAll('input.disabled-input, input[type="checkbox"].disabled-input');
+for (const input of inputs) {
+    if (input.readOnly) {
+        input.classList.add('disabled-input-enabled');
+    } else {
+        input.classList.remove('disabled-input-enabled');
+    }
+}
 </script>
 
 <style>
