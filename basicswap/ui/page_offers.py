@@ -431,6 +431,11 @@ def page_newoffer(self, url_split, post_string):
     automation_filters = {'type_ind': Concepts.OFFER, 'sort_by': 'label'}
     automation_strategies = swap_client.listAutomationStrategies(automation_filters)
 
+    chart_api_key = swap_client.settings.get('chart_api_key', '')
+    if chart_api_key == '':
+        chart_api_key_enc = swap_client.settings.get('chart_api_key_enc', '')
+        chart_api_key = 'cd7600e7b5fdd99c6f900673ff0ee8f64d6d4219a4bb87191ad4a2e3fc65d7f4' if chart_api_key_enc == '' else bytes.fromhex(chart_api_key_enc).decode('utf-8')
+
     return self.render_template(template, {
         'messages': messages,
         'err_messages': err_messages,
@@ -442,8 +447,9 @@ def page_newoffer(self, url_split, post_string):
         'automation_strategies': automation_strategies,
         'summary': summary,
         'swap_types': [(strSwapType(x), strSwapDesc(x)) for x in SwapTypes if strSwapType(x)],
+        'show_chart': swap_client.settings.get('show_chart', True),
+        'chart_api_key': chart_api_key,
     })
-
 
 def page_offer(self, url_split, post_string):
     ensure(len(url_split) > 2, 'Offer ID not specified')
