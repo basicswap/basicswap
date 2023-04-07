@@ -549,7 +549,7 @@ window.addEventListener('load', function() {
                 {% if o[9]==true %} <img class="h-7" src="/static/images/coins/{{ o[3]|replace(" ", "-") }}.png" alt="">
                </span>{{ o[3] }}
               </td>
-              <td class="py-3 px-6 text-xs">{{ o[5] }}</td>
+              <td class="py-3 px-6 text-xs">{{ o[5]|truncate(8,true,'',0) }}</td>
               {% else %}
               <img class="h-7" src="/static/images/coins/{{ o[2]|replace(" ", "-") }}.png" alt="">
               </span>{{ o[2] }}
@@ -560,7 +560,7 @@ window.addEventListener('load', function() {
                <span class="inline-flex align-middle items-center justify-center w-9 h-10 rounded"> {% if o[9]==true %} <img class="h-7" src="/static/images/coins/{{ o[2]|replace(" ", "-") }}.png" alt="">
                </span>{{ o[2] }}
               </td>
-              <td class="py-3 px-6 text-xs">{{ o[4] }}</td>
+              <td class="py-3 px-6 text-xs">{{ o[4]|truncate(8,true,'',0) }}</td>
               {% else %}
               <img class="h-7" src="/static/images/coins/{{ o[3]|replace(" ", "-") }}.png" alt="">
               </span>{{ o[3] }}
