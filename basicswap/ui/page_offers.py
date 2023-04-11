@@ -691,6 +691,7 @@ def page_offers(self, url_split, post_string, sent=False):
         ci_from = swap_client.ci(Coins(o.coin_from))
         ci_to = swap_client.ci(Coins(o.coin_to))
         is_expired = o.expire_at <= now
+        amount_negotiable = "Yes" if o.amount_negotiable else "No"
         formatted_offers.append((
             format_timestamp(o.created_at),
             o.offer_id.hex(),
@@ -705,7 +706,8 @@ def page_offers(self, url_split, post_string, sent=False):
             ci_from.format_amount(completed_amount),
             is_expired,
             o.active_ind,
-            strSwapDesc(o.swap_type)))
+            strSwapDesc(o.swap_type),
+            amount_negotiable))
 
     coins_from, coins_to = listAvailableCoins(swap_client, split_from=True)
 

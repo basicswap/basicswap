@@ -14,7 +14,6 @@
        <path d="M5.34 0.671999L2.076 14.1H0.732L3.984 0.671999H5.34Z" fill="#BBC3CF"></path>
       </svg>
      </li>
-     <!-- todo fix link -->
      <li>
       <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="#">{{ page_type }}</a>
      </li>
@@ -57,41 +56,78 @@
    </div>
   </div>
  </section>
- {% include 'inc_messages.html' %}
-
- {% if show_chart %}
+{% include 'inc_messages.html' %}
+{% if show_chart %}
+<section>
+ <div class="pl-6 pr-6 pt-0 pb-0 mt-5 h-full overflow-hidden">
+  <div class="pb-6 border-coolGray-100">
+   <div class="flex flex-wrap items-center justify-between -m-2">
+    <div class="w-full pt-2">
+     <div class="container mt-5 mx-auto">
+      <div class="pt-6 pb-8 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
+       <div class="px-6">
+        <div class="w-full mt-6 pb-6 overflow-x-auto">
+    <div class="chart-container" style="max-width: 100%;">
+        <canvas id="coin-chart" style="height: 280px;"></canvas>
+    </div>
+  </div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
 <section class="py-4 overflow-hidden">
   <div class="container px-4 mx-auto">
     <div class="flex flex-wrap -m-3">
 
-<div class="w-full sm:w-1/2 lg:w-1/5 p-3">
-  <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-lg dark:text-white">
-    <div class="flex items-center mb-2.5">
-      <img src="/static/images/coins/Bitcoin-20.png" height="20" width="20" class="mr-2">
-      <p class="text-sm text-neutral-500 font-medium">Bitcoin (BTC)</p>
-    </div>
-    <div class="flex flex-wrap items-center mb-2 -m-1">
-      <div class="w-auto p-1">
-        <h3 class="font-heading text-1xl font-semibold">
-          <div id="btc-price-usd"></div>
-        </h3>
-      </div>
-      <div class="w-auto p-1">
-        <div id="btc-price-change-container" class="w-auto p-1"></div>
-      </div>
-      <div class="w-auto p-1">
-        <h3 class="font-heading text-1xl font-semibold">
-          <div id="btc-price-btc"></div>
-        </h3>
-      </div>
-    </div>
-    <p class="text-xs text-neutral-400 font-medium">
-      Volume 24H:<div class="text-xs" id="btc-volume-24h"></div>
-    </p>
-  </div>
-</div>
+<style>
+  .active-container {
+    position: relative;
+    border-radius: 5px; 
+  }
 
-<div class="w-full sm:w-1/2 lg:w-1/5 p-3">
+  .active-container::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border: 1px solid rgb(77, 132, 240);
+    border-radius: inherit;
+    pointer-events: none;
+  }
+</style>
+
+<div class="w-full sm:w-1/2 lg:w-1/5 p-3" id="btc-container">
+        <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-lg dark:text-white" id="btc-active">
+            <div class="flex items-center mb-2.5">
+                <img src="/static/images/coins/Bitcoin-20.png" height="20" width="20" class="mr-2">
+                <p class="text-sm text-neutral-500 font-medium">Bitcoin (BTC)</p>
+            </div>
+            <div class="flex flex-wrap items-center mb-2 -m-1">
+                <div class="w-auto p-1">
+                    <h3 class="font-heading text-1xl font-semibold">
+                        <div id="btc-price-usd"></div>
+                    </h3>
+                </div>
+                <div class="w-auto p-1">
+                    <div id="btc-price-change-container" class="w-auto p-1"></div>
+                </div>
+                <div class="w-auto p-1">
+                    <h3 class="font-heading text-1xl font-semibold">
+                        <div id="btc-price-btc"></div>
+                    </h3>
+                </div>
+            </div>
+            <p class="text-xs text-neutral-400 font-medium">
+                Volume 24H:<div class="text-xs" id="btc-volume-24h"></div>
+            </p>
+        </div>
+    </div>
+<div class="w-full sm:w-1/2 lg:w-1/5 p-3" id="xmr-container">
   <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-lg dark:text-white">
         <div class="flex items-center mb-2.5">
       <img src="/static/images/coins/Monero-20.png" height="20" width="20" class="mr-2">
@@ -119,7 +155,7 @@
   </div>
 </div>
 
-<div class="w-full sm:w-1/2 lg:w-1/5 p-3">
+<div class="w-full sm:w-1/2 lg:w-1/5 p-3" id="part-container">
   <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-lg dark:text-white">
         <div class="flex items-center mb-2.5">
       <img src="/static/images/coins/Particl-20.png" height="20" width="20" class="mr-2">
@@ -146,9 +182,7 @@
     </p>
   </div>
 </div>
-
-
-<div class="w-full sm:w-1/2 lg:w-1/5 p-3">
+<div class="w-full sm:w-1/2 lg:w-1/5 p-3" id="pivx-container">
   <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-lg dark:text-white">
         <div class="flex items-center mb-2.5">
       <img src="/static/images/coins/PIVX-20.png" height="20" width="20" class="mr-2">
@@ -175,8 +209,7 @@
     </p>
   </div>
 </div>
-
-<div class="w-full sm:w-1/2 lg:w-1/5 p-3">
+<div class="w-full sm:w-1/2 lg:w-1/5 p-3" id="firo-container">
   <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-lg dark:text-white">
        <div class="flex items-center mb-2.5">
       <img src="/static/images/coins/Firo-20.png" height="20" width="20" class="mr-2">
@@ -203,8 +236,7 @@
     </p>
   </div>
 </div>
-
-<div class="w-full sm:w-1/2 lg:w-1/5 p-3">
+<div class="w-full sm:w-1/2 lg:w-1/5 p-3" id="ltc-container">
   <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-lg dark:text-white">
         <div class="flex items-center mb-2.5">
       <img src="/static/images/coins/Litecoin-20.png" height="20" width="20" class="mr-2">
@@ -224,15 +256,13 @@
           <div id="ltc-price-btc"></div>
         </h3>
       </div>
-
     </div>
     <p class="text-xs text-neutral-400 font-medium">
       Volume 24H:<div class="text-xs" id="ltc-volume-24h"></div>
     </p>
   </div>
 </div>
-
-<div class="w-full sm:w-1/2 lg:w-1/5 p-3">
+<div class="w-full sm:w-1/2 lg:w-1/5 p-3" id="dash-container">
   <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-lg dark:text-white">
         <div class="flex items-center mb-2.5">
       <img src="/static/images/coins/Dash-20.png" height="20" width="20" class="mr-2">
@@ -252,71 +282,256 @@
           <div id="dash-price-btc"></div>
         </h3>
       </div>
-
     </div>
     <p class="text-xs text-neutral-400 font-medium">
       Volume 24H:<div class="text-xs" id="dash-volume-24h"></div>
     </p>
   </div>
 </div>
-
 </section>
-
 <script>
 window.addEventListener('load', function() {
     const api_key = '{{chart_api_key}}';
-
     const coins = ['BTC', 'PART', 'XMR', 'LTC', 'FIRO', 'DASH', 'PIVX'];
-
     coins.forEach(coin => {
         fetch(`https://min-api.cryptocompare.com/data/pricemultifull?fsyms=${coin}&tsyms=USD,BTC&api_key=${api_key}`)
             .then(response => response.json())
             .then(data => {
-                const priceUSD = data.RAW[coin].USD.PRICE;
-                const priceBTC = data.RAW[coin].BTC.PRICE;
-                const priceChange1h = data.RAW[coin].USD.CHANGEPCTHOUR;
-                const volume24h = data.RAW[coin].USD.TOTALVOLUME24HTO;
+                displayCoinData(coin, data);
+            })
+            .catch(error => console.error(`Error fetching ${coin} data:`, error));
+    });
+    updateChart('BTC');
+});
 
-
-                document.querySelector(`#${coin.toLowerCase()}-price-usd`).textContent = priceUSD.toFixed(2) + ' USD';
-                if (coin !== 'BTC') {
-                    document.querySelector(`#${coin.toLowerCase()}-price-btc`).textContent = priceBTC.toFixed(8) + ' BTC';
-                }
-                document.querySelector(`#${coin.toLowerCase()}-price-change-container`).textContent = priceChange1h.toFixed(2) + '%';
-                document.querySelector(`#${coin.toLowerCase()}-volume-24h`).textContent = volume24h.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',') + ' USD';
-
-                const priceChangeContainer = document.querySelector(`#${coin.toLowerCase()}-price-change-container`);
-                if (priceChange1h >= 0) {
-                    priceChangeContainer.innerHTML = `
+function displayCoinData(coin, data) {
+    const priceUSD = data.RAW[coin].USD.PRICE;
+    const priceBTC = data.RAW[coin].BTC.PRICE;
+    const priceChange1h = data.RAW[coin].USD.CHANGEPCTHOUR;
+    const volume24h = data.RAW[coin].USD.TOTALVOLUME24HTO;
+    document.querySelector(`#${coin.toLowerCase()}-price-usd`).textContent = priceUSD.toFixed(2) + ' USD';
+    if (coin !== 'BTC') {
+        document.querySelector(`#${coin.toLowerCase()}-price-btc`).textContent = priceBTC.toFixed(8) + ' BTC';
+    }
+    document.querySelector(`#${coin.toLowerCase()}-price-change-container`).textContent = priceChange1h.toFixed(2) + '%';
+    document.querySelector(`#${coin.toLowerCase()}-volume-24h`).textContent = volume24h.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',') + ' USD';
+    const priceChangeContainer = document.querySelector(`#${coin.toLowerCase()}-price-change-container`);
+    if (priceChange1h >= 0) {
+        priceChangeContainer.innerHTML = positivePriceChangeHTML(priceChange1h);
+    } else {
+        priceChangeContainer.innerHTML = negativePriceChangeHTML(priceChange1h);
+    }
+}
+function positivePriceChangeHTML(value) {
+    return `
     <div class="flex flex-wrap items-center py-px px-1 border border-green-500 rounded-full">
-    <svg class="mr-0.5" width="15" height="10" viewBox="0 0 15 10" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M8.16667 0.916748C7.75245 0.916748 7.41667 1.25253 7.41667 1.66675C7.41667 2.08096 7.75245 2.41675 8.16667 2.41675V0.916748ZM13.5 1.66675H14.25C14.25 1.25253 13.9142 0.916748 13.5 0.916748V1.66675ZM12.75 7.00008C12.75 7.41429 13.0858 7.75008 13.5 7.75008C13.9142 7.75008 14.25 7.41429 14.25 7.00008H12.75ZM0.96967 7.80308C0.676777 8.09598 0.676777 8.57085 0.96967 8.86374C1.26256 9.15664 1.73744 9.15664 2.03033 8.86374L0.96967 7.80308ZM5.5 4.33341L6.03033 3.80308C5.73744 3.51019 5.26256 3.51019 4.96967 3.80308L5.5 4.33341ZM8.16667 7.00008L7.63634 7.53041C7.92923 7.8233 8.4041 7.8233 8.697 7.53041L8.16667 7.00008ZM8.16667 2.41675H13.5V0.916748H8.16667V2.41675ZM12.75 1.66675V7.00008H14.25V1.66675H12.75ZM2.03033 8.86374L6.03033 4.86374L4.96967 3.80308L0.96967 7.80308L2.03033 8.86374ZM4.96967 4.86374L7.63634 7.53041L8.697 6.46975L6.03033 3.80308L4.96967 4.86374ZM8.697 7.53041L14.0303 2.19708L12.9697 1.13642L7.63634 6.46975L8.697 7.53041Z" fill="#20C43A"></path>
-    </svg>
-    <span class="text-xs text-green-500 font-medium">${priceChange1h.toFixed(2)}%</span>
+        <svg class="mr-0.5" width="15" height="10" viewBox="0 0 15 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M8.16667 0.916748C7.75245 0.916748 7.41667 1.25253 7.41667 1.66675C7.41667 2.08096 7.75245 2.41675 8.16667 2.41675V0.916748ZM13.5 1.66675H14.25C14.25 1.25253 13.9142 0.916748 13.5 0.916748V1.66675ZM12.75 7.00008C12.75 7.41429 13.0858 7.75008 13.5 7.75008C13.9142 7.75008 14.25 7.41429 14.25 7.00008H12.75ZM0.96967 7.80308C0.676777 8.09598 0.676777 8.57085 0.96967 8.86374C1.26256 9.15664 1.73744 9.15664 2.03033 8.86374L0.96967 7.80308ZM5.5 4.33341L6.03033 3.80308C5.73744 3.51019 5.26256 3.51019 4.96967 3.80308L5.5 4.33341ZM8.16667 7.00008L7.63634 7.53041C7.92923 7.8233 8.4041 7.8233 8.697 7.53041L8.16667 7.00008ZM8.16667 2.41675H13.5V0.916748H8.16667V2.41675ZM12.75 1.66675V7.00008H14.25V1.66675H12.75ZM2.03033 8.86374L6.03033 4.86374L4.96967 3.80308L0.96967 7.80308L2.03033 8.86374ZM4.96967 4.86374L7.63634 7.53041L8.697 6.46975L6.03033 3.80308L4.96967 4.86374ZM8.697 7.53041L14.0303 2.19708L12.9697 1.13642L7.63634 6.46975L8.697 7.53041Z" fill="#20C43A"></path>
+        </svg>
+        <span class="text-xs text-green-500 font-medium">${value.toFixed(2)}%</span>
     </div>`;
-                } else {
-                    priceChangeContainer.innerHTML = `
+}
+function negativePriceChangeHTML(value) {
+    return `
     <div class="flex flex-wrap items-center py-px px-1 border border-red-500 rounded-full">
     <svg class="mr-0.5" width="14" height="10" viewBox="0 0 14 10" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M7.66667 7.58341C7.25245 7.58341 6.91667 7.9192 6.91667 8.33341C6.91667 8.74763 7.25245 9.08341 7.66667 9.08341V7.58341ZM13 8.33341V9.08341C13.4142 9.08341 13.75 8.74763 13.75 8.33341H13ZM13.75 3.00008C13.75 2.58587 13.4142 2.25008 13 2.25008C12.5858 2.25008 12.25 2.58587 12.25 3.00008H13.75ZM1.53033 1.13642C1.23744 0.843525 0.762563 0.843525 0.46967 1.13642C0.176777 1.42931 0.176777 1.90418 0.46967 2.19708L1.53033 1.13642ZM5 5.66675L4.46967 6.19708C4.76256 6.48997 5.23744 6.48997 5.53033 6.19708L5 5.66675ZM7.66667 3.00008L8.197 2.46975C7.9041 2.17686 7.42923 2.17686 7.13634 2.46975L7.66667 3.00008ZM7.66667 9.08341H13V7.58341H7.66667V9.08341ZM13.75 8.33341V3.00008H12.25V8.33341H13.75ZM0.46967 2.19708L4.46967 6.19708L5.53033 5.13642L1.53033 1.13642L0.46967 2.19708ZM5.53033 6.19708L8.197 3.53041L7.13634 2.46975L4.46967 5.13642L5.53033 6.19708ZM7.13634 3.53041L12.4697 8.86374L13.5303 7.80308L8.197 2.46975L7.13634 3.53041Z" fill="#FF3131"></path>
     </svg>
-    <span class="text-xs text-red-500 font-medium">${Math.abs(priceChange1h.toFixed(2))}%</span>
+    <span class="text-xs text-red-500 font-medium">${value.toFixed(2)}%</span>
     </div>`;
-                }
+}
 
-            })
-            .catch(error => console.error(`Error fetching ${coin} data:`, error));
-    });
+function setActiveContainer(containerId) {
+  const containerIds = ['btc-container', 'xmr-container', 'part-container', 'pivx-container', 'firo-container', 'dash-container', 'ltc-container'];
+  const activeClass = 'active-container';
+  containerIds.forEach(id => {
+    const container = document.getElementById(id);
+    const innerDiv = container.querySelector('div');
+    if (id === containerId) {
+      innerDiv.classList.add(activeClass);
+    } else {
+      innerDiv.classList.remove(activeClass);
+    }
+  });
+}
+
+document.getElementById('btc-container').addEventListener('click', () => {
+  setActiveContainer('btc-container');
+  updateChart('BTC');
+});
+document.getElementById('xmr-container').addEventListener('click', () => {
+  setActiveContainer('xmr-container');
+  updateChart('XMR');
+});
+document.getElementById('part-container').addEventListener('click', () => {
+  setActiveContainer('part-container');
+  updateChart('PART');
+});
+document.getElementById('pivx-container').addEventListener('click', () => {
+  setActiveContainer('pivx-container');
+  updateChart('PIVX');
+});
+document.getElementById('firo-container').addEventListener('click', () => {
+  setActiveContainer('firo-container');
+  updateChart('FIRO');
+});
+document.getElementById('dash-container').addEventListener('click', () => {
+  setActiveContainer('dash-container');
+  updateChart('DASH');
+});
+document.getElementById('ltc-container').addEventListener('click', () => {
+  setActiveContainer('ltc-container');
+  updateChart('LTC');
+});
+
+let coin;
+const coinOptions = {
+  'BTC': {
+    lineColor: 'rgba(77, 132, 240, 1)',
+    backgroundColor: 'rgba(77, 132, 240, 0.1)'
+  }
+}; 
+function updateChart(coinSymbol) {
+  coin = coinSymbol;
+  const api_key = '{{chart_api_key}}';
+  fetch(`https://min-api.cryptocompare.com/data/v2/histoday?fsym=${coin}&tsym=USD&limit=30&api_key=${api_key}`)
+    .then((response) => response.json())
+    .then((data) => {
+      const coinSettings = coinOptions[coinSymbol] || {};
+      const chartData = {
+        labels: data.Data.Data.map(d => formatDate(new Date(d.time * 1000))),
+        datasets: [{
+          data: data.Data.Data.map(d => d.close),
+          borderColor: coinSettings.lineColor || 'rgba(77, 132, 240, 1)',
+          tension: 0.1,
+          fill: true,
+          backgroundColor: coinSettings.backgroundColor || 'rgba(77, 132, 240, 0.1)',
+          pointStyle: 'circle',
+          pointRadius: 5,
+          pointHoverRadius: 10
+        }]
+      };
+
+      chart.data.labels = chartData.labels;
+      chart.data.datasets = chartData.datasets;
+      chart.options.scales.y.title.text = `Price (USD) - ${coin} 30 DAYS`;
+      chart.update();
+    })
+    .catch(error => console.error(`Error updating chart for ${coin}:`, error));
+}
+function formatDate(date) {
+  const options = { day: '2-digit', month: '2-digit', year: '2-digit' };
+  return new Intl.DateTimeFormat('en-US', options).format(date);
+}
+const verticalLinePlugin = {
+  id: 'verticalLine',
+  beforeTooltipDraw: (chart, args) => {
+    const tooltip = chart.tooltip;
+    if (tooltip.opacity !== 0) {
+      const ctx = chart.ctx;
+      const x = tooltip.caretX;
+      const topY = chart.chartArea.top;
+      const bottomY = chart.chartArea.bottom;
+      const options = chart.options.plugins.verticalLine;
+
+      ctx.save();
+      ctx.setLineDash([5, 5]);
+      ctx.beginPath();
+      ctx.moveTo(x, topY);
+      ctx.lineTo(x, bottomY);
+      ctx.lineWidth = options.lineWidth || 1;
+      ctx.strokeStyle = options.lineColor || 'rgba(0, 0, 255, 1)';
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+};
+Chart.register(verticalLinePlugin);
+const ctx = document.getElementById('coin-chart').getContext('2d');
+const chart = new Chart(ctx, {
+  type: 'line',
+  data: {
+    labels: [],
+    datasets: [{
+      data: [],
+      borderColor: 'rgba(77, 132, 240, 1)',
+      tension: 0.4,
+      fill: true,
+      pointStyle: 'circle',
+      pointRadius: 5,
+      pointHoverRadius: 10
+    }]
+  },
+  options: {
+    maintainAspectRatio: false,
+    scales: {
+      x: {
+        grid: {
+          display: false,
+        },
+        display: true,
+        title: {
+          display: false,
+          text: 'Date'
+        },
+        ticks: {
+          font: {
+            size: 12,
+          },
+          callback: function(value, index, values) {
+            return chart.data.labels[index];
+          },
+        }
+      },
+      y: {
+        grid: {
+          display: false,
+        },
+        display: true,
+        title: {
+          display: true,
+          text: 'Price (USD)'
+        }
+      }
+    },
+    plugins: {
+      legend: {
+        display: false
+      },
+      tooltip: {
+        mode: 'index',
+        intersect: false,
+        displayColors: false,
+        callbacks: {
+          title: function(tooltipItems) {
+            const item = tooltipItems[0];
+            return chart.data.labels[item.dataIndex];
+          },
+          label: function(item) {
+            return `${coin}: $${item.parsed.y}`;
+          }
+        }
+      },
+      verticalLine: {
+        lineWidth: 1,
+        lineColor: 'rgba(77, 132, 240, 1)'
+      }
+    },
+    elements: {
+      line: {
+        backgroundColor: 'rgba(25, 132, 140, 0.6)',
+        borderColor: 'transparent'
+      }
+    }
+  }
 });
 </script>
 {% endif %}
-
  <section>
   <div class="pl-6 pr-6 pt-0 pb-0 mt-5 h-full overflow-hidden">
    <div class="pb-6 border-coolGray-100">
     <div class="flex flex-wrap items-center justify-between -m-2">
      <div class="w-full pt-2">
-
       <form method="post">
        <div class="flex justify-between items-center pb-4 dark:text-white">
         <div class="rounded-b-md">
@@ -327,7 +542,6 @@ window.addEventListener('load', function() {
              <svg class="absolute right-4 top-1/2 transform -translate-y-1/2 " width="16 " height="16 " viewBox="0 0 16 16 " fill="none " xmlns="http://www.w3.org/2000/svg ">
               <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z " fill="#8896AB"></path>
              </svg>
-             <!-- is="ms-dropdown" todo -->
              <select name="coin_from" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
               <option value="any" {% if filters.coin_from==-1 %} selected{% endif %}>Any</option>
               {% for c in coins_from %}
@@ -474,7 +688,7 @@ window.addEventListener('load', function() {
               </th>
               <th class="p-0">
                <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
-                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Network</span>
+                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Details</span>
                </div>
               </th>
               <th class="p-0">
@@ -483,11 +697,6 @@ window.addEventListener('load', function() {
                </div>
               </th>
               <!--<th>ID</th>-->
-              <th class="p-0">
-               <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
-                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Swap Type</span>
-               </div>
-              </th>
               <th class="p-0">
                <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
                 <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">You get</span>
@@ -512,7 +721,7 @@ window.addEventListener('load', function() {
                <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
                 <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Rate</span>
                </div>
-              </th>
+              </th>           
               <!--<th>Amount From Swapped</th>-->
               <th class="p-0">
                <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600 rounded-tr-xl">
@@ -537,37 +746,54 @@ window.addEventListener('load', function() {
               </td>
               <!--<td class="py-4 px-6 text-xs"><a class="monospace text-xs" href=/offer/{{ o[1] }}>{{ o[1]|truncate(6, True) }}</a></td>-->
               <!--<td class="py-4 px-6 text-xs monospace">{{ o[8] }}{% if o[9]==true %} <b>Sent</b>{% endif %}</td>-->
-              <td class="py-3 px-6 text-xs">{{ o[7] }}
+              <td class="py-3 px-6 text-xs">
+                <div class="network"><span class="bold">Network:</span> {{ o[7] }}</div>
+                <div class="partial pt-1"><span class="bold">Amount Variable:</span> {{ o[14] }}<div>
+                <div class="swaptype pt-1"><span class="bold">Swap Type:</span> {{ o[13] }}</div>
                <!-- {% if o[12]==2 %}(Revoked){% elif o[11]==true %}(Not Active){% else %}(Active){% endif %} -->
               </td>
               <td class="py-3 px-6 text-xs monospace">
                <a href="/identity/{{ o[8] }}{% if o[9]==true %}{% endif %}">{{ o[8] }}</a>
               </td>
-              <td class="py-3 px-6 text-xs">{{ o[13] }}</td>
               <td class="py-3 px-6 text-xs">
                <span class="inline-flex align-middle items-center justify-center w-9 h-10 rounded">
                 {% if o[9]==true %} <img class="h-7" src="/static/images/coins/{{ o[3]|replace(" ", "-") }}.png" alt="">
                </span>{{ o[3] }}
               </td>
-              <td class="py-3 px-6 text-xs">{{ o[5]|truncate(8,true,'',0) }}</td>
-              {% else %}
+              <td class="py-3 px-6 text-xs">
+                <div class="coinname-value" data-coinname="{{ o[3] }}">{{ o[5]|truncate(8,true,'',0) }}</div>
+                <div class="usd-value"></div>
+              </td>
+             {% else %}
               <img class="h-7" src="/static/images/coins/{{ o[2]|replace(" ", "-") }}.png" alt="">
               </span>{{ o[2] }}
               </td>
-              <td class="py-3 px-6 text-xs">{{ o[4]|truncate(8,true,'',0) }}</td>
+              <td class="py-3 px-6 text-xs">
+                <div class="coinname-value" data-coinname="{{ o[2] }}">{{ o[4]|truncate(8,true,'',0) }}</div>
+                <div class="usd-value"></div>
+              </td>      
               {% endif %}
               <td class="py-4 px-6 text-xs">
                <span class="inline-flex align-middle items-center justify-center w-9 h-10 rounded"> {% if o[9]==true %} <img class="h-7" src="/static/images/coins/{{ o[2]|replace(" ", "-") }}.png" alt="">
                </span>{{ o[2] }}
               </td>
-              <td class="py-3 px-6 text-xs">{{ o[4]|truncate(8,true,'',0) }}</td>
+              <td class="py-3 px-6 text-xs">
+                 <div class="coinname-value" data-coinname="{{ o[2] }}">{{ o[4]|truncate(8,true,'',0) }}</div>
+                 <div class="usd-value"></div>
+              </td>
               {% else %}
               <img class="h-7" src="/static/images/coins/{{ o[3]|replace(" ", "-") }}.png" alt="">
               </span>{{ o[3] }}
               </td>
-              <td class="py-3 px-6 text-xs">{{ o[5]|truncate(8,true,'',0) }}</td>
+              <td class="py-3 px-6 text-xs">
+                 <div class="coinname-value" data-coinname="{{ o[3] }}">{{ o[5]|truncate(8,true,'',0) }}</div>
+                 <div class="usd-value"></div>
+              </td>           
               {% endif %}
-              <td class="py-4 px-6 text-xs">{{ o[6]|truncate(8,true,'',0) }}</td>
+              <td class="py-3 px-6 text-xs">
+                <div class="coinname-value" data-coinname="{{ o[3] }}">{{ o[5]|truncate(8,true,'',0) }}</div>
+                <div class="usd-value"></div>
+              </td>
               <!--  <td class="py-4 px-6">{{ o[10] }}</td>-->
               <td class="py-3 px-6">
                <a class="inline-block w-20 py-1 px-2 font-medium text-center text-sm rounded-md {% if o[9]==true %} bg-blue-500 text-white border border-blue-500 hover:bg-blue-600 transition duration-200  {% else %} bg-blue-500 text-white hover:bg-blue-600 transition duration-200 {% endif %}" href="/offer/{{ o[1] }}">{% if o[9]==true %}Edit{% else %}Swap{% endif %}</a>
@@ -580,8 +806,56 @@ window.addEventListener('load', function() {
            <input type="hidden" name="pageno" value="{{ filters.page_no }}">
           </div>
          </div>
+<script>
+const coinNameToSymbol = {
+  'Bitcoin': 'BTC',
+  'Particl': 'PART',
+  'Particl Blind': 'PART',
+  'Particl Anon': 'PART',
+  'Monero': 'XMR',
+  'Litecoin': 'LTC',
+  'Firo': 'FIRO',
+  'Dash': 'DASH',
+  'PIVX': 'PIVX'
+};
 
-         <div class="rounded-b-md">
+  function updateUsdValue(cryptoCell, coinFullName) {
+    const coinSymbol = coinNameToSymbol[coinFullName];
+    if (!coinSymbol) {
+      console.error(`Coin symbol not found for full name: ${coinFullName}`);
+      return;
+    }
+
+    const cryptoValue = parseFloat(cryptoCell.textContent);
+    const usdCell = cryptoCell.nextElementSibling;
+    const apiUrl = `https://min-api.cryptocompare.com/data/price?fsym=${coinSymbol}&tsyms=USD`;
+
+    fetch(apiUrl)
+      .then(response => response.json())
+      .then(data => {
+        const exchangeRate = data.USD;
+        if (!isNaN(exchangeRate)) {
+          const usdValue = cryptoValue * exchangeRate;
+          usdCell.textContent = `${usdValue.toFixed(2)} USD`;
+        } else {
+          usdCell.textContent = 'Invalid exchange rate';
+        }
+      })
+      .catch(error => {
+        usdCell.textContent = 'Error retrieving exchange rate';
+      });
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const coinNameValues = document.querySelectorAll('.coinname-value');
+    for (let i = 0; i < coinNameValues.length; i++) {
+      const coinFullName = coinNameValues[i].getAttribute('data-coinname');
+      updateUsdValue(coinNameValues[i], coinFullName);
+      coinNameValues[i].addEventListener('input', () => updateUsdValue(coinNameValues[i], coinFullName));
+    }
+  });
+</script>
+        <div class="rounded-b-md">
           <div class="w-full md:w-0/12">
            <div class="flex flex-wrap justify-end pt-6 pr-6 border-t border-gray-100 dark:border-gray-400">
             <div class="w-full md:w-auto p-1.5">
@@ -616,5 +890,28 @@ window.addEventListener('load', function() {
  </section>
 </div>
 {% include 'footer.html' %}
+  <script>
+    document.getElementById('btc-container').addEventListener('click', () => {
+      updateChart('BTC');
+    });
+    document.getElementById('xmr-container').addEventListener('click', () => {
+      updateChart('XMR');
+    });
+    document.getElementById('part-container').addEventListener('click', () => {
+      updateChart('PART');
+    });
+    document.getElementById('pivx-container').addEventListener('click', () => {
+      updateChart('PIVX');
+    });
+    document.getElementById('firo-container').addEventListener('click', () => {
+      updateChart('FIRO');
+    });
+    document.getElementById('dash-container').addEventListener('click', () => {
+      updateChart('DASH');
+    });
+    document.getElementById('ltc-container').addEventListener('click', () => {
+      updateChart('LTC');
+    });        
+  </script>
 </body>
 </html>
