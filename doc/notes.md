@@ -127,6 +127,65 @@ To send a private offer:
 Nodes will ignore offers sent on keys other than the network key or keys created for offer-receiving.
 
 
+
+## FAQ
+
+### How can I double check my backup words / mnemonic phrase
+
+There's no way to get the words used during the install process as
+BSX doesn't store the mnemonic words.
+
+If you have the mnemonic words and want to double check if they're correct you can decode the mnemonic and compare the key ids.
+
+For example, if the words are:
+"abandon baby cabbage dad eager fabric gadget habit ice kangaroo lab absorb"
+
+In the rpc console:
+http://127.0.0.1:12700/rpc
+
+Select Particl and input `extkey` to get the current root_key_id
+
+    extkey
+    [
+      {
+        "type": "Loose",
+        "label": "Master Key - bip44 derived.",
+        "path": "m/44h/1h",
+        "key_type": "Master",
+        "current_master": "true",
+        "root_key_id": "xDALBKsFzxtkDPm6yoatAgNfRwavZTEheC",
+        "id": "xHRmcdjD2kssaM5ZY8Cyzj8XWJsBweydyP",
+        ...
+      },
+      {
+        "type": "Account",
+        "label": "Default Account",
+        "root_key_id": "xHRmcdjD2kssaM5ZY8Cyzj8XWJsBweydyP",
+        "path": "m/0h",
+        ...
+      }
+    ]
+
+Get the extkeys the mnemonic decodes to with `mnemonic decode` (Never share the keys!)
+
+    mnemonic decode "" "abandon baby cabbage dad eager fabric gadget habit ice kangaroo lab absorb"
+      "master": "tprv8ZgxMBicQKsPeK5mCpvMsd1cwyT1JZsrBN82XkoYuZY1EVK7EwDaiL9sDfqUU5SntTfbRfnRedFWjg5xkDG5i3iwd3yP7neX5F2dtdCojk4",
+      "derived": "xparFhz8oNupLZBVCLZCDpXnaLf2H9uWxvZEmPQm2Hdsv5YZympmJZYXjbuvE1rRK4o8TMsbbpCWrbQbNvt7CZCeDULrgeQMi536vTuxvuXpWqN",
+
+The master key should match the root_key_id of the "Master Key - bip44 derived." loose key from `extkey`
+
+    extkey tprv8ZgxMBicQKsPeK5mCpvMsd1cwyT1JZsrBN82XkoYuZY1EVK7EwDaiL9sDfqUU5SntTfbRfnRedFWjg5xkDG5i3iwd3yP7neX5F2dtdCojk4
+    "id": "xDALBKsFzxtkDPm6yoatAgNfRwavZTEheC",
+
+And/or the derived key should match the account key root_key_id from `extkey`:
+
+    extkey xparFhz8oNupLZBVCLZCDpXnaLf2H9uWxvZEmPQm2Hdsv5YZympmJZYXjbuvE1rRK4o8TMsbbpCWrbQbNvt7CZCeDULrgeQMi536vTuxvuXpWqN
+    "id": "xHRmcdjD2kssaM5ZY8Cyzj8XWJsBweydyP",
+
+
+
+
+
 ## TODO
 
 Features still required (of many):
