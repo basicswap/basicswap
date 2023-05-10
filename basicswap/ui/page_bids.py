@@ -137,30 +137,40 @@ def page_bids(self, url_split, post_string, sent=False, available=False, receive
         filters['bid_state_ind'] = BidStates.BID_RECEIVED
         filters['with_expired'] = False
 
+    filter_prefix = 'page_bids_sent' if sent else 'page_bids_available' if available else 'page_bids_received'
     messages = []
     form_data = self.checkForm(post_string, 'bids', messages)
-    if form_data and not have_data_entry(form_data, 'clearfilters'):
-        if have_data_entry(form_data, 'sort_by'):
-            sort_by = get_data_entry(form_data, 'sort_by')
-            ensure(sort_by in ['created_at', ], 'Invalid sort by')
-            filters['sort_by'] = sort_by
-        if have_data_entry(form_data, 'sort_dir'):
-            sort_dir = get_data_entry(form_data, 'sort_dir')
-            ensure(sort_dir in ['asc', 'desc'], 'Invalid sort dir')
-            filters['sort_dir'] = sort_dir
-        if have_data_entry(form_data, 'state'):
-            state_ind = int(get_data_entry(form_data, 'state'))
-            if state_ind != -1:
-                try:
-                    state = BidStates(state_ind)
-                except Exception:
-                    raise ValueError('Invalid state')
-            filters['bid_state_ind'] = state_ind
-        if have_data_entry(form_data, 'with_expired'):
-            with_expired = toBool(get_data_entry(form_data, 'with_expired'))
-            filters['with_expired'] = with_expired
+    if form_data:
+        if have_data_entry(form_data, 'clearfilters'):
+            swap_client.clearFilters(filter_prefix)
+        else:
+            if have_data_entry(form_data, 'sort_by'):
+                sort_by = get_data_entry(form_data, 'sort_by')
+                ensure(sort_by in ['created_at', ], 'Invalid sort by')
+                filters['sort_by'] = sort_by
+            if have_data_entry(form_data, 'sort_dir'):
+                sort_dir = get_data_entry(form_data, 'sort_dir')
+                ensure(sort_dir in ['asc', 'desc'], 'Invalid sort dir')
+                filters['sort_dir'] = sort_dir
+            if have_data_entry(form_data, 'state'):
+                state_ind = int(get_data_entry(form_data, 'state'))
+                if state_ind != -1:
+                    try:
+                        state = BidStates(state_ind)
+                    except Exception:
+                        raise ValueError('Invalid state')
+                filters['bid_state_ind'] = state_ind
+            if have_data_entry(form_data, 'with_expired'):
+                with_expired = toBool(get_data_entry(form_data, 'with_expired'))
+                filters['with_expired'] = with_expired
 
-        set_pagination_filters(form_data, filters)
+            set_pagination_filters(form_data, filters)
+        if have_data_entry(form_data, 'applyfilters'):
+            swap_client.setFilters(filter_prefix, filters)
+    else:
+        saved_filters = swap_client.getFilters(filter_prefix)
+        if saved_filters:
+            filters.update(saved_filters)
 
     bids = swap_client.listBids(sent=sent, filters=filters)
 

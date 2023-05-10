@@ -89,7 +89,9 @@ def page_smsgaddresses(self, url_split, post_string):
                 new_addr = swap_client.addSMSGAddress(pubkey_hex, addressnote=addressnote)
                 messages.append(f'Added address {new_addr}')
 
-        if not have_data_entry(form_data, 'clearfilters'):
+        if have_data_entry(form_data, 'clearfilters'):
+            swap_client.clearFilters('page_smsgaddresses')
+        else:
             if have_data_entry(form_data, 'sort_by'):
                 sort_by = get_data_entry(form_data, 'sort_by')
                 ensure(sort_by in ['created_at', 'rate'], 'Invalid sort by')
@@ -106,6 +108,12 @@ def page_smsgaddresses(self, url_split, post_string):
                 filters['addr_type'] = int(get_data_entry(form_data, 'filter_addr_type'))
 
             set_pagination_filters(form_data, filters)
+        if have_data_entry(form_data, 'applyfilters'):
+            swap_client.setFilters('page_smsgaddresses', filters)
+    else:
+        saved_filters = swap_client.getFilters('page_smsgaddresses')
+        if saved_filters:
+            filters.update(saved_filters)
 
     if listaddresses is True:
         smsgaddresses = swap_client.listAllSMSGAddresses(filters)

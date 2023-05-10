@@ -2,6 +2,12 @@
 0.0.x
 ==============
 
+0.0.62
+==============
+
+- ui: Persistent filters
+- ui: Show only active bid and offer counts
+
 
 0.0.61
 ==============

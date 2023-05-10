@@ -963,18 +963,16 @@ class BasicSwap(BaseApp):
             if session is None:
                 self.closeSession(use_session)
 
-    def getStringKV(self, str_key: str) -> Optional[str]:
-        self.mxDB.acquire()
+    def getStringKV(self, str_key: str, session=None) -> Optional[str]:
         try:
-            session = scoped_session(self.session_factory)
-            v = session.query(DBKVString).filter_by(key=str_key).first()
+            use_session = self.openSession(session)
+            v = use_session.query(DBKVString).filter_by(key=str_key).first()
             if not v:
                 return None
             return v.value
         finally:
-            session.close()
-            session.remove()
-            self.mxDB.release()
+            if session is None:
+                self.closeSession(use_session, commit=False)
 
     def clearStringKV(self, str_key: str, str_val: str) -> None:
         with self.mxDB:
@@ -5793,31 +5791,37 @@ class BasicSwap(BaseApp):
         now: int = self.getTime()
         q_str = '''SELECT
                    COUNT(CASE WHEN b.was_sent THEN 1 ELSE NULL END) AS count_sent,
+                   COUNT(CASE WHEN b.was_sent AND b.state = {} AND b.expire_at > {} AND o.expire_at > {} THEN 1 ELSE NULL END) AS count_sent_active,
                    COUNT(CASE WHEN b.was_received THEN 1 ELSE NULL END) AS count_received,
                    COUNT(CASE WHEN b.was_received AND b.state = {} AND b.expire_at > {} AND o.expire_at > {} THEN 1 ELSE NULL END) AS count_available
                    FROM bids b
                    JOIN offers o ON b.offer_id = o.offer_id
-                   WHERE b.active_ind = 1'''.format(BidStates.BID_RECEIVED, now, now)
+                   WHERE b.active_ind = 1'''.format(BidStates.BID_RECEIVED, now, now, BidStates.BID_RECEIVED, now, now)
         q = self.engine.execute(q_str).first()
         bids_sent = q[0]
-        bids_received = q[1]
-        bids_available = q[2]
+        bids_sent_active = q[1]
+        bids_received = q[2]
+        bids_available = q[3]
 
         q_str = '''SELECT
                    COUNT(CASE WHEN expire_at > {} THEN 1 ELSE NULL END) AS count_active,
-                   COUNT(CASE WHEN was_sent THEN 1 ELSE NULL END) AS count_sent
-                   FROM offers WHERE active_ind = 1'''.format(now)
+                   COUNT(CASE WHEN was_sent THEN 1 ELSE NULL END) AS count_sent,
+                   COUNT(CASE WHEN was_sent AND expire_at > {} THEN 1 ELSE NULL END) AS count_sent_active
+                   FROM offers WHERE active_ind = 1'''.format(now, now)
         q = self.engine.execute(q_str).first()
         num_offers = q[0]
         num_sent_offers = q[1]
+        num_sent_active_offers = q[2]
 
         rv = {
             'network': self.chain,
             'num_swapping': len(self.swaps_in_progress),
             'num_network_offers': num_offers,
             'num_sent_offers': num_sent_offers,
+            'num_sent_active_offers': num_sent_active_offers,
             'num_recv_bids': bids_received,
             'num_sent_bids': bids_sent,
+            'num_sent_active_bids': bids_sent_active,
             'num_available_bids': bids_available,
             'num_watched_outputs': num_watched_outputs,
         }
@@ -6591,3 +6595,30 @@ class BasicSwap(BaseApp):
             return rv_array
 
         return rv
+
+    def setFilters(self, prefix, filters):
+        try:
+            session = self.openSession()
+            key_str = 'saved_filters_' + prefix
+            value_str = json.dumps(filters)
+            self.setStringKV(key_str, value_str, session)
+        finally:
+            self.closeSession(session)
+
+    def getFilters(self, prefix):
+        try:
+            session = self.openSession()
+            key_str = 'saved_filters_' + prefix
+            value_str = self.getStringKV(key_str, session)
+            return None if not value_str else json.loads(value_str)
+        finally:
+            self.closeSession(session, commit=False)
+
+    def clearFilters(self, prefix):
+        try:
+            session = self.openSession()
+            key_str = 'saved_filters_' + prefix
+            query_str = 'DELETE FROM kv_string WHERE key = :key_str'
+            session.execute(query_str, {'key_str': key_str})
+        finally:
+            self.closeSession(session)

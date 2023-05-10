@@ -85,7 +85,7 @@
 <style>
   .active-container {
     position: relative;
-    border-radius: 5px; 
+    border-radius: 5px;
   }
 
   .active-container::before {
@@ -390,7 +390,7 @@ const coinOptions = {
     lineColor: 'rgba(77, 132, 240, 1)',
     backgroundColor: 'rgba(77, 132, 240, 0.1)'
   }
-}; 
+};
 function updateChart(coinSymbol) {
   coin = coinSymbol;
   const api_key = '{{chart_api_key}}';
@@ -721,7 +721,7 @@ const chart = new Chart(ctx, {
                <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
                 <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Rate</span>
                </div>
-              </th>           
+              </th>
               <!--<th>Amount From Swapped</th>-->
               <th class="p-0">
                <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600 rounded-tr-xl">
@@ -733,7 +733,7 @@ const chart = new Chart(ctx, {
             <tbody>
             {% for o in offers %}
               <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
-              <td class="flex items-center py-7 px-46 dark:text-white text-gray-900 whitespace-nowrap">
+              <td class="flex items-center py-7 px-46 dark:text-white text-gray-900 whitespace-nowrap" title="{% if o[12]==2 %}Revoked{% elif o[11]==true %}Expired{% else %}Active{% endif %}">
                <svg alt="" class="w-5 h-5 rounded-full ml-5" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
                 <g stroke-linecap="round" stroke-width="2" fill="none" stroke="{% if o[12]==2 %}#AC0000{% elif o[11]==true %}#6b7280{% else %}#3B82F6{% endif %}" stroke-linejoin="round">
                  <circle cx="12" cy="12" r="11"></circle>
@@ -771,7 +771,7 @@ const chart = new Chart(ctx, {
               <td class="py-3 px-6 text-xs">
                 <div class="coinname-value" data-coinname="{{ o[2] }}">{{ o[4]|truncate(8,true,'',0) }}</div>
                 <div class="usd-value"></div>
-              </td>      
+              </td>
               {% endif %}
               <td class="py-4 px-6 text-xs">
                <span class="inline-flex align-middle items-center justify-center w-9 h-10 rounded"> {% if o[9]==true %} <img class="h-7" src="/static/images/coins/{{ o[2]|replace(" ", "-") }}.png" alt="">
@@ -788,7 +788,7 @@ const chart = new Chart(ctx, {
               <td class="py-3 px-6 text-xs">
                  <div class="coinname-value" data-coinname="{{ o[3] }}">{{ o[5]|truncate(8,true,'',0) }}</div>
                  <div class="usd-value"></div>
-              </td>           
+              </td>
               {% endif %}
               <td class="py-3 px-6 text-xs">
                 <div class="coinname-value" data-coinname="{{ o[3] }}">{{ o[6]|truncate(8,true,'',0) }}</div>
@@ -911,7 +911,7 @@ const coinNameToSymbol = {
     });
     document.getElementById('ltc-container').addEventListener('click', () => {
       updateChart('LTC');
-    });        
+    });
   </script>
 </body>
 </html>

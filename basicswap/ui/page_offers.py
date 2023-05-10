@@ -653,30 +653,41 @@ def page_offers(self, url_split, post_string, sent=False):
         'sent_from': 'any' if sent is False else 'only',
         'active': 'any',
     }
+
+    filter_prefix = 'page_offers_sent' if sent else 'page_offers'
     messages = []
     form_data = self.checkForm(post_string, 'offers', messages)
-    if form_data and not have_data_entry(form_data, 'clearfilters'):
-        filters['coin_from'] = setCoinFilter(form_data, 'coin_from')
-        filters['coin_to'] = setCoinFilter(form_data, 'coin_to')
+    if form_data:
+        if have_data_entry(form_data, 'clearfilters'):
+            swap_client.clearFilters(filter_prefix)
+        else:
+            filters['coin_from'] = setCoinFilter(form_data, 'coin_from')
+            filters['coin_to'] = setCoinFilter(form_data, 'coin_to')
 
-        if have_data_entry(form_data, 'sort_by'):
-            sort_by = get_data_entry(form_data, 'sort_by')
-            ensure(sort_by in ['created_at', 'rate'], 'Invalid sort by')
-            filters['sort_by'] = sort_by
-        if have_data_entry(form_data, 'sort_dir'):
-            sort_dir = get_data_entry(form_data, 'sort_dir')
-            ensure(sort_dir in ['asc', 'desc'], 'Invalid sort dir')
-            filters['sort_dir'] = sort_dir
-        if have_data_entry(form_data, 'sent_from'):
-            sent_from = get_data_entry(form_data, 'sent_from')
-            ensure(sent_from in ['any', 'only'], 'Invalid sent filter')
-            filters['sent_from'] = sent_from
-        if have_data_entry(form_data, 'active'):
-            active_filter = get_data_entry(form_data, 'active')
-            ensure(active_filter in ['any', 'active', 'expired', 'revoked', 'archived'], 'Invalid active filter')
-            filters['active'] = active_filter
+            if have_data_entry(form_data, 'sort_by'):
+                sort_by = get_data_entry(form_data, 'sort_by')
+                ensure(sort_by in ['created_at', 'rate'], 'Invalid sort by')
+                filters['sort_by'] = sort_by
+            if have_data_entry(form_data, 'sort_dir'):
+                sort_dir = get_data_entry(form_data, 'sort_dir')
+                ensure(sort_dir in ['asc', 'desc'], 'Invalid sort dir')
+                filters['sort_dir'] = sort_dir
+            if have_data_entry(form_data, 'sent_from'):
+                sent_from = get_data_entry(form_data, 'sent_from')
+                ensure(sent_from in ['any', 'only'], 'Invalid sent filter')
+                filters['sent_from'] = sent_from
+            if have_data_entry(form_data, 'active'):
+                active_filter = get_data_entry(form_data, 'active')
+                ensure(active_filter in ['any', 'active', 'expired', 'revoked', 'archived'], 'Invalid active filter')
+                filters['active'] = active_filter
 
-        set_pagination_filters(form_data, filters)
+            set_pagination_filters(form_data, filters)
+        if have_data_entry(form_data, 'applyfilters'):
+            swap_client.setFilters(filter_prefix, filters)
+    else:
+        saved_filters = swap_client.getFilters(filter_prefix)
+        if saved_filters:
+            filters.update(saved_filters)
 
     if filters['sent_from'] == 'only':
         sent = True

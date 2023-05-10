@@ -37,17 +37,26 @@ def page_automation_strategies(self, url_split, post_string):
     messages = []
     form_data = self.checkForm(post_string, 'automationstrategies', messages)
 
-    if form_data and not have_data_entry(form_data, 'clearfilters'):
-        if have_data_entry(form_data, 'sort_by'):
-            sort_by = get_data_entry(form_data, 'sort_by')
-            ensure(sort_by in ['created_at', 'rate'], 'Invalid sort by')
-            filters['sort_by'] = sort_by
-        if have_data_entry(form_data, 'sort_dir'):
-            sort_dir = get_data_entry(form_data, 'sort_dir')
-            ensure(sort_dir in ['asc', 'desc'], 'Invalid sort dir')
-            filters['sort_dir'] = sort_dir
+    if form_data:
+        if have_data_entry(form_data, 'clearfilters'):
+            swap_client.clearFilters('page_automation_strategies')
+        else:
+            if have_data_entry(form_data, 'sort_by'):
+                sort_by = get_data_entry(form_data, 'sort_by')
+                ensure(sort_by in ['created_at', 'rate'], 'Invalid sort by')
+                filters['sort_by'] = sort_by
+            if have_data_entry(form_data, 'sort_dir'):
+                sort_dir = get_data_entry(form_data, 'sort_dir')
+                ensure(sort_dir in ['asc', 'desc'], 'Invalid sort dir')
+                filters['sort_dir'] = sort_dir
 
-        set_pagination_filters(form_data, filters)
+            set_pagination_filters(form_data, filters)
+        if have_data_entry(form_data, 'applyfilters'):
+            swap_client.setFilters('page_automation_strategies', filters)
+    else:
+        saved_filters = swap_client.getFilters('page_automation_strategies')
+        if saved_filters:
+            filters.update(saved_filters)
 
     formatted_strategies = []
     for s in swap_client.listAutomationStrategies(filters):
