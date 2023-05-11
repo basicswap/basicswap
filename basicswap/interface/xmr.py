@@ -24,6 +24,8 @@ from coincurve.dleag import (
     verify_ed25519_point,
 )
 
+from basicswap.interface import (
+    Curves)
 from basicswap.util import (
     dumpj,
     ensure,
@@ -38,6 +40,10 @@ from basicswap.chainparams import XMR_COIN, CoinInterface, Coins
 
 
 class XMRInterface(CoinInterface):
+    @staticmethod
+    def curve_type():
+        return Curves.ed25519
+
     @staticmethod
     def coin_type():
         return Coins.XMR

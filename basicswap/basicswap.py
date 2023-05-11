@@ -30,6 +30,7 @@ from typing import Optional
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.orm.session import close_all_sessions
 
+from .interface import Curves
 from .interface.part import PARTInterface, PARTInterfaceAnon, PARTInterfaceBlind
 from .interface.btc import BTCInterface
 from .interface.ltc import LTCInterface
@@ -2438,7 +2439,7 @@ class BasicSwap(BaseApp):
             xmr_swap.contract_count = self.getNewContractId()
             xmr_swap.dest_af = msg_buf.dest_af
 
-            for_ed25519 = True if coin_to == Coins.XMR else False
+            for_ed25519 = True if ci_to.curve_type() == Curves.ed25519 else False
             kbvf = self.getPathKey(coin_from, coin_to, bid_created_at, xmr_swap.contract_count, KeyTypes.KBVF, for_ed25519)
             kbsf = self.getPathKey(coin_from, coin_to, bid_created_at, xmr_swap.contract_count, KeyTypes.KBSF, for_ed25519)
 
@@ -2450,19 +2451,26 @@ class BasicSwap(BaseApp):
 
             xmr_swap.pkaf = ci_from.getPubkey(kaf)
 
-            if coin_to == Coins.XMR:
+            if ci_to.curve_type() == Curves.ed25519:
                 xmr_swap.kbsf_dleag = ci_to.proveDLEAG(kbsf)
+                xmr_swap.pkasf = xmr_swap.kbsf_dleag[0: 33]
+                msg_buf.kbsf_dleag = xmr_swap.kbsf_dleag[:16000]
+            elif ci_to.curve_type() == Curves.secp256k1:
+                for i in range(10):
+                    xmr_swap.kbsf_dleag = ci_to.signRecoverable(kbsf, 'proof kbsf owned for swap')
+                    pk_recovered = ci_to.verifySigAndRecover(xmr_swap.kbsf_dleag, 'proof kbsf owned for swap')
+                    if pk_recovered == xmr_swap.pkbsf:
+                        break
+                    self.log.debug('kbsl recovered pubkey mismatch, retrying.')
+                assert (pk_recovered == xmr_swap.pkbsf)
+                xmr_swap.pkasf = xmr_swap.pkbsf
+                msg_buf.kbsf_dleag = xmr_swap.kbsf_dleag
             else:
-                xmr_swap.kbsf_dleag = xmr_swap.pkbsf
-            xmr_swap.pkasf = xmr_swap.kbsf_dleag[0: 33]
+                raise ValueError('Unknown curve')
             assert (xmr_swap.pkasf == ci_from.getPubkey(kbsf))
 
             msg_buf.pkaf = xmr_swap.pkaf
             msg_buf.kbvf = kbvf
-            if coin_to == Coins.XMR:
-                msg_buf.kbsf_dleag = xmr_swap.kbsf_dleag[:16000]
-            else:
-                msg_buf.kbsf_dleag = xmr_swap.kbsf_dleag
 
             bid_bytes = msg_buf.SerializeToString()
             payload_hex = str.format('{:02x}', MessageTypes.XMR_BID_FL) + bid_bytes.hex()
@@ -2472,7 +2480,7 @@ class BasicSwap(BaseApp):
             msg_valid = max(self.SMSG_SECONDS_IN_HOUR * 1, valid_for_seconds)
             xmr_swap.bid_id = self.sendSmsg(bid_addr, offer.addr_from, payload_hex, msg_valid)
 
-            if coin_to == Coins.XMR:
+            if ci_to.curve_type() == Curves.ed25519:
                 msg_buf2 = XmrSplitMessage(
                     msg_id=xmr_swap.bid_id,
                     msg_type=XmrSplitMsgTypes.BID,
@@ -2562,7 +2570,7 @@ class BasicSwap(BaseApp):
             if xmr_swap.contract_count is None:
                 xmr_swap.contract_count = self.getNewContractId()
 
-            for_ed25519 = True if coin_to == Coins.XMR else False
+            for_ed25519 = True if ci_to.curve_type() == Curves.ed25519 else False
             kbvl = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, KeyTypes.KBVL, for_ed25519)
             kbsl = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, KeyTypes.KBSL, for_ed25519)
 
@@ -2578,11 +2586,6 @@ class BasicSwap(BaseApp):
             xmr_swap.pkbs = ci_to.sumPubkeys(xmr_swap.pkbsl, xmr_swap.pkbsf)
 
             xmr_swap.pkal = ci_from.getPubkey(kal)
-
-            if coin_to == Coins.XMR:
-                xmr_swap.kbsl_dleag = ci_to.proveDLEAG(kbsl)
-            else:
-                xmr_swap.kbsl_dleag = xmr_swap.pkbsl
 
             # MSG2F
             pi = self.pi(SwapTypes.XMR_SWAP)
@@ -2660,10 +2663,21 @@ class BasicSwap(BaseApp):
             msg_buf.bid_msg_id = bid_id
             msg_buf.pkal = xmr_swap.pkal
             msg_buf.kbvl = kbvl
-            if coin_to == Coins.XMR:
+
+            if ci_to.curve_type() == Curves.ed25519:
+                xmr_swap.kbsl_dleag = ci_to.proveDLEAG(kbsl)
                 msg_buf.kbsl_dleag = xmr_swap.kbsl_dleag[:16000]
-            else:
+            elif ci_to.curve_type() == Curves.secp256k1:
+                for i in range(10):
+                    xmr_swap.kbsl_dleag = ci_to.signRecoverable(kbsl, 'proof kbsl owned for swap')
+                    pk_recovered = ci_to.verifySigAndRecover(xmr_swap.kbsl_dleag, 'proof kbsl owned for swap')
+                    if pk_recovered == xmr_swap.pkbsl:
+                        break
+                    self.log.debug('kbsl recovered pubkey mismatch, retrying.')
+                assert (pk_recovered == xmr_swap.pkbsl)
                 msg_buf.kbsl_dleag = xmr_swap.kbsl_dleag
+            else:
+                raise ValueError('Unknown curve')
 
             # MSG2F
             msg_buf.a_lock_tx = xmr_swap.a_lock_tx
@@ -2680,7 +2694,7 @@ class BasicSwap(BaseApp):
             bid.accept_msg_id = self.sendSmsg(offer.addr_from, bid.bid_addr, payload_hex, msg_valid)
             xmr_swap.bid_accept_msg_id = bid.accept_msg_id
 
-            if coin_to == Coins.XMR:
+            if ci_to.curve_type() == Curves.ed25519:
                 msg_buf2 = XmrSplitMessage(
                     msg_id=bid_id,
                     msg_type=XmrSplitMsgTypes.BID_ACCEPT,
@@ -4496,7 +4510,7 @@ class BasicSwap(BaseApp):
         ci_from = self.ci(Coins(offer.coin_from))
         ci_to = self.ci(Coins(offer.coin_to))
 
-        if offer.coin_to == Coins.XMR:
+        if ci_to.curve_type() == Curves.ed25519:
             if len(xmr_swap.kbsf_dleag) < ci_to.lengthDLEAG():
                 q = session.query(XmrSplitData).filter(sa.and_(XmrSplitData.bid_id == bid.bid_id, XmrSplitData.msg_type == XmrSplitMsgTypes.BID)).order_by(XmrSplitData.msg_sequence.asc())
                 for row in q:
@@ -4514,11 +4528,13 @@ class BasicSwap(BaseApp):
             xmr_swap.pkbsf = xmr_swap.kbsf_dleag[33: 33 + 32]
             if not ci_to.verifyPubkey(xmr_swap.pkbsf):
                 raise ValueError('Invalid coin b pubkey.')
-        else:
-            xmr_swap.pkasf = xmr_swap.kbsf_dleag[0: 33]
+        elif ci_to.curve_type() == Curves.secp256k1:
+            xmr_swap.pkasf = ci_to.verifySigAndRecover(xmr_swap.kbsf_dleag, 'proof kbsf owned for swap')
             if not ci_from.verifyPubkey(xmr_swap.pkasf):
                 raise ValueError('Invalid coin a pubkey.')
             xmr_swap.pkbsf = xmr_swap.pkasf
+        else:
+            raise ValueError('Unknown curve')
 
         ensure(ci_to.verifyKey(xmr_swap.vkbvf), 'Invalid key, vkbvf')
         ensure(ci_from.verifyPubkey(xmr_swap.pkaf), 'Invalid pubkey, pkaf')
@@ -4548,7 +4564,7 @@ class BasicSwap(BaseApp):
         ci_from = self.ci(offer.coin_from)
         ci_to = self.ci(offer.coin_to)
 
-        if offer.coin_to == Coins.XMR:
+        if ci_to.curve_type() == Curves.ed25519:
             if len(xmr_swap.kbsl_dleag) < ci_to.lengthDLEAG():
                 q = session.query(XmrSplitData).filter(sa.and_(XmrSplitData.bid_id == bid.bid_id, XmrSplitData.msg_type == XmrSplitMsgTypes.BID_ACCEPT)).order_by(XmrSplitData.msg_sequence.asc())
                 for row in q:
@@ -4565,11 +4581,13 @@ class BasicSwap(BaseApp):
             xmr_swap.pkbsl = xmr_swap.kbsl_dleag[33: 33 + 32]
             if not ci_to.verifyPubkey(xmr_swap.pkbsl):
                 raise ValueError('Invalid coin b pubkey.')
-        else:
-            xmr_swap.pkasl = xmr_swap.kbsl_dleag[0: 33]
+        elif ci_to.curve_type() == Curves.secp256k1:
+            xmr_swap.pkasl = ci_to.verifySigAndRecover(xmr_swap.kbsl_dleag, 'proof kbsl owned for swap')
             if not ci_from.verifyPubkey(xmr_swap.pkasl):
                 raise ValueError('Invalid coin a pubkey.')
             xmr_swap.pkbsl = xmr_swap.pkasl
+        else:
+            raise ValueError('Unknown curve')
 
         # vkbv and vkbvl are verified in processXmrBidAccept
         xmr_swap.pkbv = ci_to.sumPubkeys(xmr_swap.pkbvl, xmr_swap.pkbvf)
@@ -5023,7 +5041,7 @@ class BasicSwap(BaseApp):
         ci_from = self.ci(coin_from)
         ci_to = self.ci(coin_to)
 
-        for_ed25519 = True if coin_to == Coins.XMR else False
+        for_ed25519 = True if ci_to.curve_type() == Curves.ed25519 else False
         kbsf = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, KeyTypes.KBSF, for_ed25519)
         kaf = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, KeyTypes.KAF)
 
@@ -5085,7 +5103,7 @@ class BasicSwap(BaseApp):
             kbsf = ci_from.recoverEncKey(xmr_swap.al_lock_spend_tx_esig, xmr_swap.al_lock_spend_tx_sig, xmr_swap.pkasf)
             assert (kbsf is not None)
 
-            for_ed25519 = True if coin_to == Coins.XMR else False
+            for_ed25519 = True if ci_to.curve_type() == Curves.ed25519 else False
             kbsl = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, KeyTypes.KBSL, for_ed25519)
             vkbs = ci_to.sumKeys(kbsl, kbsf)
 
@@ -5144,7 +5162,7 @@ class BasicSwap(BaseApp):
         kbsl = ci_from.recoverEncKey(xmr_swap.af_lock_refund_spend_tx_esig, af_lock_refund_spend_tx_sig, xmr_swap.pkasl)
         assert (kbsl is not None)
 
-        for_ed25519 = True if coin_to == Coins.XMR else False
+        for_ed25519 = True if ci_to.curve_type() == Curves.ed25519 else False
         kbsf = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, KeyTypes.KBSF, for_ed25519)
         vkbs = ci_to.sumKeys(kbsl, kbsf)
 
@@ -5245,7 +5263,7 @@ class BasicSwap(BaseApp):
             xmr_swap.af_lock_refund_spend_tx_esig = msg_data.af_lock_refund_spend_tx_esig
             xmr_swap.af_lock_refund_tx_sig = msg_data.af_lock_refund_tx_sig
 
-            for_ed25519 = True if coin_to == Coins.XMR else False
+            for_ed25519 = True if ci_to.curve_type() == Curves.ed25519 else False
             kbsl = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, KeyTypes.KBSL, for_ed25519)
             kal = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, KeyTypes.KAL)
 

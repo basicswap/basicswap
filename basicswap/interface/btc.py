@@ -14,6 +14,8 @@ from io import BytesIO
 
 from basicswap.contrib.test_framework import segwit_addr
 
+from basicswap.interface import (
+    Curves)
 from basicswap.util import (
     ensure,
     make_int,
@@ -109,6 +111,10 @@ def find_vout_for_address_from_txobj(tx_obj, addr: str) -> int:
 
 
 class BTCInterface(CoinInterface):
+    @staticmethod
+    def curve_type():
+        return Curves.secp256k1
+
     @staticmethod
     def coin_type():
         return Coins.BTC
@@ -1167,11 +1173,22 @@ class BTCInterface(CoinInterface):
         privkey = PrivateKey(k)
         return privkey.sign_recoverable(message_hash, hasher=None)[:64]
 
+    def signRecoverable(self, k, message):
+        message_hash = hashlib.sha256(bytes(message, 'utf-8')).digest()
+
+        privkey = PrivateKey(k)
+        return privkey.sign_recoverable(message_hash, hasher=None)
+
     def verifyCompactSig(self, K, message, sig):
         message_hash = hashlib.sha256(bytes(message, 'utf-8')).digest()
         pubkey = PublicKey(K)
         rv = pubkey.verify_compact(sig, message_hash, hasher=None)
         assert (rv is True)
+
+    def verifySigAndRecover(self, sig, message):
+        message_hash = hashlib.sha256(bytes(message, 'utf-8')).digest()
+        pubkey = PublicKey.from_signature_and_message(sig, message_hash, hasher=None)
+        return pubkey.format()
 
     def verifyMessage(self, address: str, message: str, signature: str, message_magic: str = None) -> bool:
         if message_magic is None:
