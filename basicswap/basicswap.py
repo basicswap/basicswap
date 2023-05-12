@@ -148,6 +148,12 @@ from .basicswap_util import (
 )
 
 
+PROTOCOL_VERSION_SECRET_HASH = 1
+MINPROTO_VERSION_SECRET_HASH = 1
+
+PROTOCOL_VERSION_ADAPTOR_SIG = 2
+MINPROTO_VERSION_ADAPTOR_SIG = 2
+
 non_script_type_coins = (Coins.XMR, Coins.PART_ANON)
 
 
@@ -1413,7 +1419,7 @@ class BasicSwap(BaseApp):
 
             msg_buf = OfferMessage()
 
-            msg_buf.protocol_version = 1
+            msg_buf.protocol_version = PROTOCOL_VERSION_ADAPTOR_SIG if swap_type == SwapTypes.XMR_SWAP else PROTOCOL_VERSION_SECRET_HASH
             msg_buf.coin_from = int(coin_from)
             msg_buf.coin_to = int(coin_to)
             msg_buf.amount_from = int(amount)
@@ -2078,7 +2084,7 @@ class BasicSwap(BaseApp):
         self.mxDB.acquire()
         try:
             msg_buf = BidMessage()
-            msg_buf.protocol_version = 1
+            msg_buf.protocol_version = PROTOCOL_VERSION_SECRET_HASH
             msg_buf.offer_msg_id = offer_id
             msg_buf.time_valid = valid_for_seconds
             msg_buf.amount = int(amount)  # amount of coin_from
@@ -2417,7 +2423,7 @@ class BasicSwap(BaseApp):
             ensure(balance_to > amount_to, '{} spendable balance is too low: {}'.format(ci_to.coin_name(), ci_to.format_amount(balance_to)))
 
             msg_buf = XmrBidMessage()
-            msg_buf.protocol_version = 1
+            msg_buf.protocol_version = PROTOCOL_VERSION_ADAPTOR_SIG
             msg_buf.offer_msg_id = offer_id
             msg_buf.time_valid = valid_for_seconds
             msg_buf.amount = int(amount)  # Amount of coin_from
@@ -4115,6 +4121,7 @@ class BasicSwap(BaseApp):
         ensure(msg['sent'] + offer_data.time_valid >= now, 'Offer expired')
 
         if offer_data.swap_type == SwapTypes.SELLER_FIRST:
+            ensure(offer_data.protocol_version >= MINPROTO_VERSION_SECRET_HASH, 'Invalid protocol version')
             ensure(len(offer_data.proof_address) == 0, 'Unexpected data')
             ensure(len(offer_data.proof_signature) == 0, 'Unexpected data')
             ensure(len(offer_data.pkhash_seller) == 0, 'Unexpected data')
@@ -4122,6 +4129,7 @@ class BasicSwap(BaseApp):
         elif offer_data.swap_type == SwapTypes.BUYER_FIRST:
             raise ValueError('TODO')
         elif offer_data.swap_type == SwapTypes.XMR_SWAP:
+            ensure(offer_data.protocol_version >= MINPROTO_VERSION_ADAPTOR_SIG, 'Invalid protocol version')
             ensure(coin_from not in non_script_type_coins, 'Invalid coin from type')
             ensure(ci_from.has_segwit(), 'Coin from must support segwit')
             ensure(len(offer_data.proof_address) == 0, 'Unexpected data')
@@ -4344,6 +4352,7 @@ class BasicSwap(BaseApp):
         bid_data.ParseFromString(bid_bytes)
 
         # Validate data
+        ensure(bid_data.protocol_version >= MINPROTO_VERSION_SECRET_HASH, 'Invalid protocol version')
         ensure(len(bid_data.offer_msg_id) == 28, 'Bad offer_id length')
 
         offer_id = bid_data.offer_msg_id
@@ -4620,11 +4629,13 @@ class BasicSwap(BaseApp):
         bid_data.ParseFromString(bid_bytes)
 
         # Validate data
+        ensure(bid_data.protocol_version >= MINPROTO_VERSION_ADAPTOR_SIG, 'Invalid protocol version')
         ensure(len(bid_data.offer_msg_id) == 28, 'Bad offer_id length')
 
         offer_id = bid_data.offer_msg_id
         offer, xmr_offer = self.getXmrOffer(offer_id, sent=True)
         ensure(offer and offer.was_sent, 'Offer not found: {}.'.format(offer_id.hex()))
+        ensure(offer.swap_type == SwapTypes.XMR_SWAP, 'Bid/offer swap type mismatch')
         ensure(xmr_offer, 'XMR offer not found: {}.'.format(offer_id.hex()))
 
         ci_from = self.ci(offer.coin_from)

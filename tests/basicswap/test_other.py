@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019-2022 tecnovert
+# Copyright (c) 2019-2023 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -213,6 +213,26 @@ class Test(unittest.TestCase):
         sig = ci.signCompact(vk, 'test signing message')
         assert (len(sig) == 64)
         ci.verifyCompactSig(pk, 'test signing message', sig)
+
+        # Nonce is set deterministically (using default libsecp256k1 method rfc6979)
+        sig2 = ci.signCompact(vk, 'test signing message')
+        assert (sig == sig2)
+
+    def test_sign_recoverable(self):
+        coin_settings = {'rpcport': 0, 'rpcauth': 'none'}
+        coin_settings.update(self.REQUIRED_SETTINGS)
+        ci = BTCInterface(coin_settings, 'regtest')
+
+        vk = i2b(ci.getNewSecretKey())
+        pk = ci.getPubkey(vk)
+        sig = ci.signRecoverable(vk, 'test signing message')
+        assert (len(sig) == 65)
+        pk_rec = ci.verifySigAndRecover(sig, 'test signing message')
+        assert (pk == pk_rec)
+
+        # Nonce is set deterministically (using default libsecp256k1 method rfc6979)
+        sig2 = ci.signRecoverable(vk, 'test signing message')
+        assert (sig == sig2)
 
     def test_pubkey_to_address(self):
         coin_settings = {'rpcport': 0, 'rpcauth': 'none'}
