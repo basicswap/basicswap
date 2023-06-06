@@ -506,3 +506,6 @@ def strSwapDesc(swap_type):
     if swap_type == SwapTypes.XMR_SWAP:
         return 'Adaptor Sig'
     return None
+
+
+inactive_states = [BidStates.SWAP_COMPLETED, BidStates.BID_ERROR, BidStates.BID_REJECTED, BidStates.SWAP_TIMEDOUT, BidStates.BID_ABANDONED]

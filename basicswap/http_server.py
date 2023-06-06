@@ -38,7 +38,6 @@ from .ui.util import (
     getCoinName,
     get_data_entry,
     get_data_entry_or,
-    have_data_entry,
     listAvailableCoins,
 )
 from .ui.page_automation import (
@@ -55,6 +54,7 @@ from .ui.page_settings import page_settings
 from .ui.page_encryption import page_changepassword, page_unlock, page_lock
 from .ui.page_identity import page_identity
 from .ui.page_smsgaddresses import page_smsgaddresses
+from .ui.page_debug import page_debug
 
 env = Environment(loader=PackageLoader('basicswap', 'templates'))
 env.filters['formatts'] = format_timestamp
@@ -333,31 +333,6 @@ class HttpHandler(BaseHTTPRequestHandler):
             'summary': summary,
         })
 
-    def page_debug(self, url_split, post_string):
-        swap_client = self.server.swap_client
-        swap_client.checkSystemStatus()
-        summary = swap_client.getSummary()
-
-        result = None
-        messages = []
-        err_messages = []
-        form_data = self.checkForm(post_string, 'wallets', err_messages)
-        if form_data:
-            if have_data_entry(form_data, 'reinit_xmr'):
-                try:
-                    swap_client.initialiseWallet(Coins.XMR)
-                    messages.append('Done.')
-                except Exception as a:
-                    err_messages.append('Failed.')
-
-        template = env.get_template('debug.html')
-        return self.render_template(template, {
-            'messages': messages,
-            'err_messages': err_messages,
-            'result': result,
-            'summary': summary,
-        })
-
     def page_active(self, url_split, post_string):
         swap_client = self.server.swap_client
         swap_client.checkSystemStatus()
@@ -502,7 +477,7 @@ class HttpHandler(BaseHTTPRequestHandler):
                 if page == 'rpc':
                     return self.page_rpc(url_split, post_string)
                 if page == 'debug':
-                    return self.page_debug(url_split, post_string)
+                    return page_debug(self, url_split, post_string)
                 if page == 'explorers':
                     return self.page_explorers(url_split, post_string)
                 if page == 'offer':

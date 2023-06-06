@@ -3,6 +3,7 @@
 ==============
 
 - cores: Raised Particl and Monero daemon version.
+- ui: Add debug option to remove expired offers, bids and transactions.
 
 
 0.0.62

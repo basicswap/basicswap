@@ -145,6 +145,7 @@ from .basicswap_util import (
     NotificationTypes as NT,
     AutomationOverrideOptions,
     VisibilityOverrideOptions,
+    inactive_states,
 )
 
 
@@ -6109,6 +6110,12 @@ class BasicSwap(BaseApp):
             session.remove()
             self.mxDB.release()
 
+    def activeBidsQueryStr(self, now: int, offer_table: str = 'offers', bids_table: str = 'bids'):
+        offers_inset = f' AND {offer_table}.expire_at > {now}' if offer_table != '' else ''
+
+        inactive_states_str = ', '.join([str(int(s)) for s in inactive_states])
+        return f' ({bids_table}.state NOT IN ({inactive_states_str}) AND ({bids_table}.state > {BidStates.BID_RECEIVED} OR ({bids_table}.expire_at > {now}{offers_inset}))) '
+
     def listBids(self, sent=False, offer_id=None, for_html=False, filters={}):
         self.mxDB.acquire()
         try:
@@ -6139,7 +6146,7 @@ class BasicSwap(BaseApp):
             with_available_or_active = filters.get('with_available_or_active', False)
             with_expired = filters.get('with_expired', True)
             if with_available_or_active:
-                query_str += 'AND (bids.state NOT IN ({}, {}, {}, {}, {}) AND (bids.state > {} OR (bids.expire_at > {} AND offers.expire_at > {}))) '.format(BidStates.SWAP_COMPLETED, BidStates.BID_ERROR, BidStates.BID_REJECTED, BidStates.SWAP_TIMEDOUT, BidStates.BID_ABANDONED, BidStates.BID_RECEIVED, now, now)
+                query_str += ' AND ' + self.activeBidsQueryStr(now)
             else:
                 if with_expired is not True:
                     query_str += 'AND bids.expire_at > {} AND offers.expire_at > {} '.format(now, now)
