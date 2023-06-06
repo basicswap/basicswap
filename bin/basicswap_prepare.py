@@ -38,7 +38,7 @@ from basicswap.util.rfc2440 import rfc2440_hash_password
 from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
 from bin.basicswap_run import startDaemon, startXmrWalletDaemon
 
-PARTICL_VERSION = os.getenv('PARTICL_VERSION', '23.0.3.0')
+PARTICL_VERSION = os.getenv('PARTICL_VERSION', '23.1.5.0')
 PARTICL_VERSION_TAG = os.getenv('PARTICL_VERSION_TAG', '')
 PARTICL_LINUX_EXTRA = os.getenv('PARTICL_LINUX_EXTRA', 'nousb')
 
@@ -48,9 +48,9 @@ LITECOIN_VERSION_TAG = os.getenv('LITECOIN_VERSION_TAG', '')
 BITCOIN_VERSION = os.getenv('BITCOIN_VERSION', '23.0')
 BITCOIN_VERSION_TAG = os.getenv('BITCOIN_VERSION_TAG', '')
 
-MONERO_VERSION = os.getenv('MONERO_VERSION', '0.18.1.2')
+MONERO_VERSION = os.getenv('MONERO_VERSION', '0.18.2.2')
 MONERO_VERSION_TAG = os.getenv('MONERO_VERSION_TAG', '')
-XMR_SITE_COMMIT = '4624278f68135d2e3eeea58fe53d07340e58c480'  # Lock hashes.txt to monero version
+XMR_SITE_COMMIT = 'a3b195eb90c7d5564cc9d9ec09c873783d21901b'  # Lock hashes.txt to monero version
 
 PIVX_VERSION = os.getenv('PIVX_VERSION', '5.5.0')
 PIVX_VERSION_TAG = os.getenv('PIVX_VERSION_TAG', '')

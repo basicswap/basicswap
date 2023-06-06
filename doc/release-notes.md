@@ -1,12 +1,17 @@
 
-0.0.x
+0.0.63
 ==============
+
+- cores: Raised Particl and Monero daemon version.
+
 
 0.0.62
 ==============
 
 - ui: Persistent filters
 - ui: Show only active bid and offer counts
+- protocol: Require signature for chain B key half for same chain adaptor signature swaps.
+  - Adaptor signature swaps are not backwards compatible with previous versions.
 
 
 0.0.61
