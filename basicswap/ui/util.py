@@ -231,6 +231,10 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
     addr_label = swap_client.getAddressLabel([bid.bid_addr, ])[0]
     bid_rate = offer.rate if bid.rate is None else bid.rate
 
+    can_abandon: bool = False
+    if swap_client.debug and bid.state not in (BidStates.BID_ABANDONED, BidStates.SWAP_COMPLETED):
+        can_abandon = True
+
     data = {
         'coin_from': ci_from.coin_name(),
         'coin_to': ci_to.coin_name(),
@@ -256,7 +260,7 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
         'participate_tx': getTxIdHex(bid, TxTypes.PTX, ' ' + ticker_to),
         'participate_conf': 'None' if (not bid.participate_tx or not bid.participate_tx.conf) else bid.participate_tx.conf,
         'show_txns': show_txns,
-        'can_abandon': True if bid.state not in (BidStates.BID_ABANDONED, BidStates.SWAP_COMPLETED) else False,
+        'can_abandon': can_abandon,
         'events': bid_events,
         'debug_ui': swap_client.debug_ui,
     }

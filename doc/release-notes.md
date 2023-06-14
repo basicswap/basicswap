@@ -4,6 +4,8 @@
 
 - cores: Raised Particl and Monero daemon version.
 - ui: Add debug option to remove expired offers, bids and transactions.
+- ui: The abandon bid button is hidden if not in debug mode.
+  - Abandoning a bid stops all processing.
 
 
 0.0.62

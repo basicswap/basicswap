@@ -2749,6 +2749,9 @@ class BasicSwap(BaseApp):
                 self.closeSession(session)
 
     def abandonBid(self, bid_id: bytes) -> None:
+        if not self.debug:
+            self.log.error('Can\'t abandon bid %s when not in debug mode.', bid_id.hex())
+            return
         self.log.info('Abandoning Bid %s', bid_id.hex())
         self.deactivateBidForReason(bid_id, BidStates.BID_ABANDONED)
 
