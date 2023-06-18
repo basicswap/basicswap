@@ -55,7 +55,7 @@ XMR_SITE_COMMIT = 'a3b195eb90c7d5564cc9d9ec09c873783d21901b'  # Lock hashes.txt 
 PIVX_VERSION = os.getenv('PIVX_VERSION', '5.5.0')
 PIVX_VERSION_TAG = os.getenv('PIVX_VERSION_TAG', '')
 
-DASH_VERSION = os.getenv('DASH_VERSION', '18.1.0')
+DASH_VERSION = os.getenv('DASH_VERSION', '19.1.0')
 DASH_VERSION_TAG = os.getenv('DASH_VERSION_TAG', '')
 
 FIRO_VERSION = os.getenv('FIRO_VERSION', '0.14.99.1')
@@ -1094,7 +1094,7 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
         try:
             swap_client = BasicSwap(fp, data_dir, settings, chain)
 
-            coins_to_create_wallets_for = (Coins.PART, Coins.BTC, Coins.LTC)
+            coins_to_create_wallets_for = (Coins.PART, Coins.BTC, Coins.LTC, Coins.DASH)
             # Always start Particl, it must be running to initialise a wallet in addcoin mode
             # Particl must be loaded first as subsequent coins are initialised from the Particl mnemonic
             start_daemons = ['particl', ] + [c for c in with_coins if c != 'particl']

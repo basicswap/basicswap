@@ -287,13 +287,23 @@ class Test(unittest.TestCase):
 
         btc_data_dir = os.path.join(cfg.TEST_DATADIRS, str(BTC_NODE))
         if os.path.exists(os.path.join(cfg.BITCOIN_BINDIR, 'bitcoin-wallet')):
+            logging.info('Creating BTC wallet.')
             try:
                 callrpc_cli(cfg.BITCOIN_BINDIR, btc_data_dir, 'regtest', '-wallet=wallet.dat -legacy create', 'bitcoin-wallet')
             except Exception:
                 callrpc_cli(cfg.BITCOIN_BINDIR, btc_data_dir, 'regtest', '-wallet=wallet.dat create', 'bitcoin-wallet')
         cls.daemons.append(startDaemon(btc_data_dir, cfg.BITCOIN_BINDIR, cfg.BITCOIND))
         logging.info('Started %s %d', cfg.BITCOIND, cls.daemons[-1].pid)
-        cls.daemons.append(startDaemon(os.path.join(cfg.TEST_DATADIRS, str(DASH_NODE)), cfg.DASH_BINDIR, cfg.DASHD))
+
+        dash_data_dir = os.path.join(cfg.TEST_DATADIRS, str(DASH_NODE))
+        '''
+        dash-wallet does not seem to create valid wallet files.
+
+        if os.path.exists(os.path.join(cfg.DASH_BINDIR, 'dash-wallet')):
+            logging.info('Creating DASH wallet.')
+            callrpc_cli(cfg.DASH_BINDIR, dash_data_dir, 'regtest', '-wallet=wallet.dat create', 'dash-wallet')
+        '''
+        cls.daemons.append(startDaemon(dash_data_dir, cfg.DASH_BINDIR, cfg.DASHD))
         logging.info('Started %s %d', cfg.DASHD, cls.daemons[-1].pid)
 
         for i in range(NUM_NODES):
@@ -326,12 +336,18 @@ class Test(unittest.TestCase):
                 settings = json.load(fs)
             fp = open(os.path.join(basicswap_dir, 'basicswap.log'), 'w')
             cls.swap_clients.append(BasicSwap(fp, basicswap_dir, settings, 'regtest', log_name='BasicSwap{}'.format(i)))
-            cls.swap_clients[-1].setDaemonPID(Coins.BTC, cls.daemons[0].pid)
-            cls.swap_clients[-1].setDaemonPID(Coins.DASH, cls.daemons[1].pid)
-            cls.swap_clients[-1].setDaemonPID(Coins.PART, cls.daemons[2 + i].pid)
-            cls.swap_clients[-1].start()
+            swap_client = cls.swap_clients[-1]
+            swap_client.setDaemonPID(Coins.BTC, cls.daemons[0].pid)
+            swap_client.setDaemonPID(Coins.DASH, cls.daemons[1].pid)
+            swap_client.setDaemonPID(Coins.PART, cls.daemons[2 + i].pid)
 
-            t = HttpThread(cls.swap_clients[i].fp, TEST_HTTP_HOST, TEST_HTTP_PORT + i, False, cls.swap_clients[i])
+            waitForRPC(dashRpc, expect_wallet=False)
+            if len(dashRpc('listwallets')) < 1:
+                dashRpc('createwallet wallet.dat')
+
+            swap_client.start()
+
+            t = HttpThread(cls.swap_clients[i].fp, TEST_HTTP_HOST, TEST_HTTP_PORT + i, False, swap_client)
             cls.http_threads.append(t)
             t.start()
 
