@@ -26,7 +26,7 @@ xu {
     O abox O [label="Bid Script coin spend tx valid"];
     O =>> B [label="Sends XmrBidLockSpendTxMessage"],
             C note C2
-                [label="The XmrBidLockSpendTxMessage contains the script-coin-lock-tx and the offerer's signature for it.",
+                [label="The XmrBidLockSpendTxMessage contains the script-coin-lock-tx and proof the offerer can sign it.",
                  textbgcolor="#FFFFCC"];
     O abox O [label="Exchanged script lock spend tx msg"];
 

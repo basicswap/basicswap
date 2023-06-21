@@ -1,352 +1,352 @@
-<svg version="1.1" id="mscgenjsreplaceme" class="mscgenjsreplaceme" xmlns="http://www.w3.org/2000/svg" width="1272" height="2063.3" style="font-family:Helvetica,sans-serif;font-size:12px;font-weight:400;font-style:normal;text-decoration:none;background-color:#fff;stroke:#000;stroke-width:2">
+<svg xmlns="http://www.w3.org/2000/svg" id="mscgenjsreplaceme" width="1272" height="2063.25" class="mscgenjsreplaceme" style="font-family:Helvetica,sans-serif;font-size:12px;font-weight:400;font-style:normal;text-decoration:none;background-color:#fff;stroke:#000;stroke-width:2" version="1.1">
     <defs>
-        <marker orient="auto" id="mscgenjsreplacemecallback-#0000FF" class="arrow-marker" viewBox="0 0 10 10" refX="9" refY="3" markerUnits="strokeWidth" markerWidth="10" markerHeight="10">
+        <marker id="mscgenjsreplacemecallback-#0000FF" class="arrow-marker" markerHeight="10" markerUnits="strokeWidth" markerWidth="10" orient="auto" refX="9" refY="3" viewBox="0 0 10 10">
             <path d="m1 1 8 2-8 2" class="arrow-style" style="stroke-dasharray:100,1;stroke:#00f"/>
         </marker>
-        <marker orient="auto" id="mscgenjsreplacemecallback-l-#0000FF" class="arrow-marker" viewBox="0 0 10 10" refX="9" refY="3" markerUnits="strokeWidth" markerWidth="10" markerHeight="10">
+        <marker id="mscgenjsreplacemecallback-l-#0000FF" class="arrow-marker" markerHeight="10" markerUnits="strokeWidth" markerWidth="10" orient="auto" refX="9" refY="3" viewBox="0 0 10 10">
             <path d="M17 1 9 3l8 2" class="arrow-style" style="stroke-dasharray:100,1;stroke:#00f"/>
         </marker>
-        <marker orient="auto" id="mscgenjsreplacemecallback-#008800" class="arrow-marker" viewBox="0 0 10 10" refX="9" refY="3" markerUnits="strokeWidth" markerWidth="10" markerHeight="10">
+        <marker id="mscgenjsreplacemecallback-#008800" class="arrow-marker" markerHeight="10" markerUnits="strokeWidth" markerWidth="10" orient="auto" refX="9" refY="3" viewBox="0 0 10 10">
             <path d="m1 1 8 2-8 2" class="arrow-style" style="stroke-dasharray:100,1;stroke:#080"/>
         </marker>
-        <marker orient="auto" id="mscgenjsreplacemecallback-l-#008800" class="arrow-marker" viewBox="0 0 10 10" refX="9" refY="3" markerUnits="strokeWidth" markerWidth="10" markerHeight="10">
+        <marker id="mscgenjsreplacemecallback-l-#008800" class="arrow-marker" markerHeight="10" markerUnits="strokeWidth" markerWidth="10" orient="auto" refX="9" refY="3" viewBox="0 0 10 10">
             <path d="M17 1 9 3l8 2" class="arrow-style" style="stroke-dasharray:100,1;stroke:#080"/>
         </marker>
-        <marker orient="auto" id="mscgenjsreplacemecallback-#FF0000" class="arrow-marker" viewBox="0 0 10 10" refX="9" refY="3" markerUnits="strokeWidth" markerWidth="10" markerHeight="10">
+        <marker id="mscgenjsreplacemecallback-#FF0000" class="arrow-marker" markerHeight="10" markerUnits="strokeWidth" markerWidth="10" orient="auto" refX="9" refY="3" viewBox="0 0 10 10">
             <path d="m1 1 8 2-8 2" class="arrow-style" style="stroke-dasharray:100,1;stroke:red"/>
         </marker>
-        <marker orient="auto" id="mscgenjsreplacemecallback-l-#FF0000" class="arrow-marker" viewBox="0 0 10 10" refX="9" refY="3" markerUnits="strokeWidth" markerWidth="10" markerHeight="10">
+        <marker id="mscgenjsreplacemecallback-l-#FF0000" class="arrow-marker" markerHeight="10" markerUnits="strokeWidth" markerWidth="10" orient="auto" refX="9" refY="3" viewBox="0 0 10 10">
             <path d="M17 1 9 3l8 2" class="arrow-style" style="stroke-dasharray:100,1;stroke:red"/>
         </marker>
-        <marker orient="auto" id="mscgenjsreplacememethod-#0000FF" class="arrow-marker" viewBox="0 0 10 10" refX="9" refY="3" markerUnits="strokeWidth" markerWidth="10" markerHeight="10">
-            <path class="arrow-style" stroke="#00F" fill="#00F" d="m1 1 8 2-8 2z"/>
+        <marker id="mscgenjsreplacememethod-#0000FF" class="arrow-marker" markerHeight="10" markerUnits="strokeWidth" markerWidth="10" orient="auto" refX="9" refY="3" viewBox="0 0 10 10">
+            <path fill="#00F" stroke="#00F" d="m1 1 8 2-8 2z" class="arrow-style"/>
         </marker>
-        <marker orient="auto" id="mscgenjsreplacememethod-l-#0000FF" class="arrow-marker" viewBox="0 0 10 10" refX="9" refY="3" markerUnits="strokeWidth" markerWidth="10" markerHeight="10">
-            <path class="arrow-style" stroke="#00F" fill="#00F" d="M17 1 9 3l8 2z"/>
+        <marker id="mscgenjsreplacememethod-l-#0000FF" class="arrow-marker" markerHeight="10" markerUnits="strokeWidth" markerWidth="10" orient="auto" refX="9" refY="3" viewBox="0 0 10 10">
+            <path fill="#00F" stroke="#00F" d="M17 1 9 3l8 2z" class="arrow-style"/>
         </marker>
-        <marker orient="auto" id="mscgenjsreplacememethod-#FF0000" class="arrow-marker" viewBox="0 0 10 10" refX="9" refY="3" markerUnits="strokeWidth" markerWidth="10" markerHeight="10">
-            <path class="arrow-style" stroke="red" fill="red" d="m1 1 8 2-8 2z"/>
+        <marker id="mscgenjsreplacememethod-#FF0000" class="arrow-marker" markerHeight="10" markerUnits="strokeWidth" markerWidth="10" orient="auto" refX="9" refY="3" viewBox="0 0 10 10">
+            <path fill="red" stroke="red" d="m1 1 8 2-8 2z" class="arrow-style"/>
         </marker>
-        <marker orient="auto" id="mscgenjsreplacememethod-l-#FF0000" class="arrow-marker" viewBox="0 0 10 10" refX="9" refY="3" markerUnits="strokeWidth" markerWidth="10" markerHeight="10">
-            <path class="arrow-style" stroke="red" fill="red" d="M17 1 9 3l8 2z"/>
+        <marker id="mscgenjsreplacememethod-l-#FF0000" class="arrow-marker" markerHeight="10" markerUnits="strokeWidth" markerWidth="10" orient="auto" refX="9" refY="3" viewBox="0 0 10 10">
+            <path fill="red" stroke="red" d="M17 1 9 3l8 2z" class="arrow-style"/>
         </marker>
         <style>
             .mscgenjsreplaceme path,.mscgenjsreplaceme rect{fill:none}.mscgenjsreplaceme .label-text-background{fill:#fff;stroke:#fff;stroke-width:0}.mscgenjsreplaceme .return{stroke-dasharray:5,3}.mscgenjsreplaceme .inline_expression_divider{stroke-dasharray:10,5}.mscgenjsreplaceme text{color:inherit;stroke:none;text-anchor:middle}.mscgenjsreplaceme text.anchor-start{text-anchor:start}.mscgenjsreplaceme .arrow-marker{overflow:visible}.mscgenjsreplaceme .arrow-style{stroke-width:1}.mscgenjsreplaceme .arcrow{stroke-linecap:butt}.mscgenjsreplaceme .box,.mscgenjsreplaceme .entity{fill:#fff;stroke-linejoin:round}
         </style>
     </defs>
     <g id="mscgenjsreplaceme_body" transform="translate(51 3)">
-        <path class="bglayer" style="fill:#fff;stroke:#fff;stroke-width:0" d="M-51-3h1272v2063.3H-51z" id="mscgenjsreplaceme_background"/>
+        <path id="mscgenjsreplaceme_background" d="M-51-3h1272v2063.25H-51z" class="bglayer" style="fill:#fff;stroke:#fff;stroke-width:0"/>
         <g id="mscgenjsreplaceme_arcspans">
-            <path class="box inline_expression alt" d="M-41 869.12h1044V2038.3H-41z"/>
-            <path class="box inline_expression alt" d="M-37 1410.18H999v590.12H-37z"/>
+            <path d="M-41 869.1h1044v1169.15H-41z" class="box inline_expression alt"/>
+            <path d="M-37 1410.15H999v590.1H-37z" class="box inline_expression alt"/>
         </g>
         <g id="mscgenjsreplaceme_lifelines">
-            <path class="arcrow" style="stroke:transparent" d="M65 38v38"/>
-            <path class="arcrow" style="stroke:#080" d="M273 38v38"/>
-            <path class="arcrow" style="stroke:red" d="M481 38v38"/>
-            <path class="arcrow" style="stroke:#00f" d="M689 38v38"/>
-            <path class="arcrow" style="stroke:transparent" d="M897 38v38M1105 38v38M65 76v38"/>
-            <path class="arcrow" style="stroke:#080" d="M273 76v38"/>
-            <path class="arcrow" style="stroke:red" d="M481 76v38"/>
-            <path class="arcrow" style="stroke:#00f" d="M689 76v38"/>
-            <path class="arcrow" style="stroke:transparent" d="M897 76v38M1105 76v38M65 114v38"/>
-            <path class="arcrow" style="stroke:#080" d="M273 114v38"/>
-            <path class="arcrow" style="stroke:red" d="M481 114v38"/>
-            <path class="arcrow" style="stroke:#00f" d="M689 114v38"/>
-            <path class="arcrow" style="stroke:transparent" d="M897 114v38M1105 114v38M65 152v38"/>
-            <path class="arcrow" style="stroke:#080" d="M273 152v38"/>
-            <path class="arcrow" style="stroke:red" d="M481 152v38"/>
-            <path class="arcrow" style="stroke:#00f" d="M689 152v38"/>
-            <path class="arcrow" style="stroke:transparent" d="M897 152v38M1105 152v38M65 190v38"/>
-            <path class="arcrow" style="stroke:#080" d="M273 190v38"/>
-            <path class="arcrow" style="stroke:red" d="M481 190v38"/>
-            <path class="arcrow" style="stroke:#00f" d="M689 190v38"/>
-            <path class="arcrow" style="stroke:transparent" d="M897 190v38M1105 190v38M65 228v38"/>
-            <path class="arcrow" style="stroke:#080" d="M273 228v38"/>
-            <path class="arcrow" style="stroke:red" d="M481 228v38"/>
-            <path class="arcrow" style="stroke:#00f" d="M689 228v38"/>
-            <path class="arcrow" style="stroke:transparent" d="M897 228v38M1105 228v38M65 266v54"/>
-            <path class="arcrow" style="stroke:#080" d="M273 266v54"/>
-            <path class="arcrow" style="stroke:red" d="M481 266v54"/>
-            <path class="arcrow" style="stroke:#00f" d="M689 266v54"/>
-            <path class="arcrow" style="stroke:transparent" d="M897 266v54M1105 266v54M65 320v38"/>
-            <path class="arcrow" style="stroke:#080" d="M273 320v38"/>
-            <path class="arcrow" style="stroke:red" d="M481 320v38"/>
-            <path class="arcrow" style="stroke:#00f" d="M689 320v38"/>
-            <path class="arcrow" style="stroke:transparent" d="M897 320v38M1105 320v38M65 358v38"/>
-            <path class="arcrow" style="stroke:#080" d="M273 358v38"/>
-            <path class="arcrow" style="stroke:red" d="M481 358v38"/>
-            <path class="arcrow" style="stroke:#00f" d="M689 358v38"/>
-            <path class="arcrow" style="stroke:transparent" d="M897 358v38M1105 358v38M65 396v38"/>
-            <path class="arcrow" style="stroke:#080" d="M273 396v38"/>
-            <path class="arcrow" style="stroke:red" d="M481 396v38"/>
-            <path class="arcrow" style="stroke:#00f" d="M689 396v38"/>
-            <path class="arcrow" style="stroke:transparent" d="M897 396v38M1105 396v38M65 434v38"/>
-            <path class="arcrow" style="stroke:#080" d="M273 434v38"/>
-            <path class="arcrow" style="stroke:red" d="M481 434v38"/>
-            <path class="arcrow" style="stroke:#00f" d="M689 434v38"/>
-            <path class="arcrow" style="stroke:transparent" d="M897 434v38M1105 434v38M65 472v38"/>
-            <path class="arcrow" style="stroke:#080" d="M273 472v38"/>
-            <path class="arcrow" style="stroke:red" d="M481 472v38"/>
-            <path class="arcrow" style="stroke:#00f" d="M689 472v38"/>
-            <path class="arcrow" style="stroke:transparent" d="M897 472v38M1105 472v38M65 510v38"/>
-            <path class="arcrow" style="stroke:#080" d="M273 510v38"/>
-            <path class="arcrow" style="stroke:red" d="M481 510v38"/>
-            <path class="arcrow" style="stroke:#00f" d="M689 510v38"/>
-            <path class="arcrow" style="stroke:transparent" d="M897 510v38M1105 510v38M65 548v38"/>
-            <path class="arcrow" style="stroke:#080" d="M273 548v38"/>
-            <path class="arcrow" style="stroke:red" d="M481 548v38"/>
-            <path class="arcrow" style="stroke:#00f" d="M689 548v38"/>
-            <path class="arcrow" style="stroke:transparent" d="M897 548v38M1105 548v38M65 586v75.06"/>
-            <path class="arcrow" style="stroke:#080" d="M273 586v75.06"/>
-            <path class="arcrow" style="stroke:red" d="M481 586v75.06"/>
-            <path class="arcrow" style="stroke:#00f" d="M689 586v75.06"/>
-            <path class="arcrow" style="stroke:transparent" d="M897 586v75.06M1105 586v75.06M65 661.06v38"/>
-            <path class="arcrow" style="stroke:#080" d="M273 661.06v38"/>
-            <path class="arcrow" style="stroke:red" d="M481 661.06v38"/>
-            <path class="arcrow" style="stroke:#00f" d="M689 661.06v38"/>
-            <path class="arcrow" style="stroke:transparent" d="M897 661.06v38M1105 661.06v38M65 699.06v38"/>
-            <path class="arcrow" style="stroke:#080" d="M273 699.06v38"/>
-            <path class="arcrow" style="stroke:red" d="M481 699.06v38"/>
-            <path class="arcrow" style="stroke:#00f" d="M689 699.06v38"/>
-            <path class="arcrow" style="stroke:transparent" d="M897 699.06v38M1105 699.06v38M65 737.06v75.06"/>
-            <path class="arcrow" style="stroke:#080" d="M273 737.06v75.06"/>
-            <path class="arcrow" style="stroke:red" d="M481 737.06v75.06"/>
-            <path class="arcrow" style="stroke:#00f" d="M689 737.06v75.06"/>
-            <path class="arcrow" style="stroke:transparent" d="M897 737.06v75.06M1105 737.06v75.06M65 812.12v38"/>
-            <path class="arcrow" style="stroke:#080" d="M273 812.12v38"/>
-            <path class="arcrow" style="stroke:red" d="M481 812.12v38"/>
-            <path class="arcrow" style="stroke:#00f" d="M689 812.12v38"/>
-            <path class="arcrow" style="stroke:transparent" d="M897 812.12v38M1105 812.12v38M65 850.12v38"/>
-            <path class="arcrow" style="stroke:#080" d="M273 850.12v38"/>
-            <path class="arcrow" style="stroke:red" d="M481 850.12v38"/>
-            <path class="arcrow" style="stroke:#00f" d="M689 850.12v38"/>
-            <path class="arcrow" style="stroke:transparent" d="M897 850.12v38M1105 850.12v38M65 888.12v86"/>
-            <path class="arcrow" style="stroke:#080" d="M273 888.12v86"/>
-            <path class="arcrow" style="stroke:red" d="M481 888.12v86"/>
-            <path class="arcrow" style="stroke:#00f" d="M689 888.12v86"/>
-            <path class="arcrow" style="stroke:transparent" d="M897 888.12v86M1105 888.12v86M65 974.12v38"/>
-            <path class="arcrow" style="stroke:#080" d="M273 974.12v38"/>
-            <path class="arcrow" style="stroke:red" d="M481 974.12v38"/>
-            <path class="arcrow" style="stroke:#00f" d="M689 974.12v38"/>
-            <path class="arcrow" style="stroke:transparent" d="M897 974.12v38M1105 974.12v38M65 1012.12v38"/>
-            <path class="arcrow" style="stroke:#080" d="M273 1012.12v38"/>
-            <path class="arcrow" style="stroke:red" d="M481 1012.12v38"/>
-            <path class="arcrow" style="stroke:#00f" d="M689 1012.12v38"/>
-            <path class="arcrow" style="stroke:transparent" d="M897 1012.12v38M1105 1012.12v38M65 1050.12v38"/>
-            <path class="arcrow" style="stroke:#080" d="M273 1050.12v38"/>
-            <path class="arcrow" style="stroke:red" d="M481 1050.12v38"/>
-            <path class="arcrow" style="stroke:#00f" d="M689 1050.12v38"/>
-            <path class="arcrow" style="stroke:transparent" d="M897 1050.12v38M1105 1050.12v38M65 1088.12v38"/>
-            <path class="arcrow" style="stroke:#080" d="M273 1088.12v38"/>
-            <path class="arcrow" style="stroke:red" d="M481 1088.12v38"/>
-            <path class="arcrow" style="stroke:#00f" d="M689 1088.12v38"/>
-            <path class="arcrow" style="stroke:transparent" d="M897 1088.12v38M1105 1088.12v38M65 1126.12v38"/>
-            <path class="arcrow" style="stroke:#080" d="M273 1126.12v38"/>
-            <path class="arcrow" style="stroke:red" d="M481 1126.12v38"/>
-            <path class="arcrow" style="stroke:#00f" d="M689 1126.12v38"/>
-            <path class="arcrow" style="stroke:transparent" d="M897 1126.12v38M1105 1126.12v38M65 1164.12v38"/>
-            <path class="arcrow" style="stroke:#080" d="M273 1164.12v38"/>
-            <path class="arcrow" style="stroke:red" d="M481 1164.12v38"/>
-            <path class="arcrow" style="stroke:#00f" d="M689 1164.12v38"/>
-            <path class="arcrow" style="stroke:transparent" d="M897 1164.12v38M1105 1164.12v38M65 1202.12v75.06"/>
-            <path class="arcrow" style="stroke:#080" d="M273 1202.12v75.06"/>
-            <path class="arcrow" style="stroke:red" d="M481 1202.12v75.06"/>
-            <path class="arcrow" style="stroke:#00f" d="M689 1202.12v75.06"/>
-            <path class="arcrow" style="stroke:transparent" d="M897 1202.12v75.06M1105 1202.12v75.06M65 1277.18v38"/>
-            <path class="arcrow" style="stroke:#080" d="M273 1277.18v38"/>
-            <path class="arcrow" style="stroke:red" d="M481 1277.18v38"/>
-            <path class="arcrow" style="stroke:#00f" d="M689 1277.18v38"/>
-            <path class="arcrow" style="stroke:transparent" d="M897 1277.18v38M1105 1277.18v38M65 1315.18v38"/>
-            <path class="arcrow" style="stroke:#080" d="M273 1315.18v38"/>
-            <path class="arcrow" style="stroke:red" d="M481 1315.18v38"/>
-            <path class="arcrow" style="stroke:#00f" d="M689 1315.18v38"/>
-            <path class="arcrow" style="stroke:transparent" d="M897 1315.18v38M1105 1315.18v38M65 1353.18v38"/>
-            <path class="arcrow" style="stroke:#080" d="M273 1353.18v38"/>
-            <path class="arcrow" style="stroke:red" d="M481 1353.18v38"/>
-            <path class="arcrow" style="stroke:#00f" d="M689 1353.18v38"/>
-            <path class="arcrow" style="stroke:transparent" d="M897 1353.18v38M1105 1353.18v38M65 1391.18v38"/>
-            <path class="arcrow" style="stroke:#080" d="M273 1391.18v38"/>
-            <path class="arcrow" style="stroke:red" d="M481 1391.18v38"/>
-            <path class="arcrow" style="stroke:#00f" d="M689 1391.18v38"/>
-            <path class="arcrow" style="stroke:transparent" d="M897 1391.18v38M1105 1391.18v38M65 1429.18v38"/>
-            <path class="arcrow" style="stroke:#080" d="M273 1429.18v38"/>
-            <path class="arcrow" style="stroke:red" d="M481 1429.18v38"/>
-            <path class="arcrow" style="stroke:#00f" d="M689 1429.18v38"/>
-            <path class="arcrow" style="stroke:transparent" d="M897 1429.18v38M1105 1429.18v38M65 1467.18v59.06"/>
-            <path class="arcrow" style="stroke:#080" d="M273 1467.18v59.06"/>
-            <path class="arcrow" style="stroke:red" d="M481 1467.18v59.06"/>
-            <path class="arcrow" style="stroke:#00f" d="M689 1467.18v59.06"/>
-            <path class="arcrow" style="stroke:transparent" d="M897 1467.18v59.06M1105 1467.18v59.06M65 1526.24v54"/>
-            <path class="arcrow" style="stroke:#080" d="M273 1526.24v54"/>
-            <path class="arcrow" style="stroke:red" d="M481 1526.24v54"/>
-            <path class="arcrow" style="stroke:#00f" d="M689 1526.24v54"/>
-            <path class="arcrow" style="stroke:transparent" d="M897 1526.24v54M1105 1526.24v54M65 1580.24v38"/>
-            <path class="arcrow" style="stroke:#080" d="M273 1580.24v38"/>
-            <path class="arcrow" style="stroke:red" d="M481 1580.24v38"/>
-            <path class="arcrow" style="stroke:#00f" d="M689 1580.24v38"/>
-            <path class="arcrow" style="stroke:transparent" d="M897 1580.24v38M1105 1580.24v38M65 1618.24v38"/>
-            <path class="arcrow" style="stroke:#080" d="M273 1618.24v38"/>
-            <path class="arcrow" style="stroke:red" d="M481 1618.24v38"/>
-            <path class="arcrow" style="stroke:#00f" d="M689 1618.24v38"/>
-            <path class="arcrow" style="stroke:transparent" d="M897 1618.24v38M1105 1618.24v38M65 1656.24v38"/>
-            <path class="arcrow" style="stroke:#080" d="M273 1656.24v38"/>
-            <path class="arcrow" style="stroke:red" d="M481 1656.24v38"/>
-            <path class="arcrow" style="stroke:#00f" d="M689 1656.24v38"/>
-            <path class="arcrow" style="stroke:transparent" d="M897 1656.24v38M1105 1656.24v38M65 1694.24v38"/>
-            <path class="arcrow" style="stroke:#080" d="M273 1694.24v38"/>
-            <path class="arcrow" style="stroke:red" d="M481 1694.24v38"/>
-            <path class="arcrow" style="stroke:#00f" d="M689 1694.24v38"/>
-            <path class="arcrow" style="stroke:transparent" d="M897 1694.24v38M1105 1694.24v38M65 1732.24v38"/>
-            <path class="arcrow" style="stroke:#080" d="M273 1732.24v38"/>
-            <path class="arcrow" style="stroke:red" d="M481 1732.24v38"/>
-            <path class="arcrow" style="stroke:#00f" d="M689 1732.24v38"/>
-            <path class="arcrow" style="stroke:transparent" d="M897 1732.24v38M1105 1732.24v38M65 1770.24v38"/>
-            <path class="arcrow" style="stroke:#080" d="M273 1770.24v38"/>
-            <path class="arcrow" style="stroke:red" d="M481 1770.24v38"/>
-            <path class="arcrow" style="stroke:#00f" d="M689 1770.24v38"/>
-            <path class="arcrow" style="stroke:transparent" d="M897 1770.24v38M1105 1770.24v38M65 1808.24v38"/>
-            <path class="arcrow" style="stroke:#080" d="M273 1808.24v38"/>
-            <path class="arcrow" style="stroke:red" d="M481 1808.24v38"/>
-            <path class="arcrow" style="stroke:#00f" d="M689 1808.24v38"/>
-            <path class="arcrow" style="stroke:transparent" d="M897 1808.24v38M1105 1808.24v38M65 1846.24v59.06"/>
-            <path class="arcrow" style="stroke:#080" d="M273 1846.24v59.06"/>
-            <path class="arcrow" style="stroke:red" d="M481 1846.24v59.06"/>
-            <path class="arcrow" style="stroke:#00f" d="M689 1846.24v59.06"/>
-            <path class="arcrow" style="stroke:transparent" d="M897 1846.24v59.06M1105 1846.24v59.06M65 1905.3v38"/>
-            <path class="arcrow" style="stroke:#080" d="M273 1905.3v38"/>
-            <path class="arcrow" style="stroke:red" d="M481 1905.3v38"/>
-            <path class="arcrow" style="stroke:#00f" d="M689 1905.3v38"/>
-            <path class="arcrow" style="stroke:transparent" d="M897 1905.3v38M1105 1905.3v38M65 1943.3v38"/>
-            <path class="arcrow" style="stroke:#080" d="M273 1943.3v38"/>
-            <path class="arcrow" style="stroke:red" d="M481 1943.3v38"/>
-            <path class="arcrow" style="stroke:#00f" d="M689 1943.3v38"/>
-            <path class="arcrow" style="stroke:transparent" d="M897 1943.3v38M1105 1943.3v38M65 1981.3v38"/>
-            <path class="arcrow" style="stroke:#080" d="M273 1981.3v38"/>
-            <path class="arcrow" style="stroke:red" d="M481 1981.3v38"/>
-            <path class="arcrow" style="stroke:#00f" d="M689 1981.3v38"/>
-            <path class="arcrow" style="stroke:transparent" d="M897 1981.3v38M1105 1981.3v38M65 2019.3v38"/>
-            <path class="arcrow" style="stroke:#080" d="M273 2019.3v38"/>
-            <path class="arcrow" style="stroke:red" d="M481 2019.3v38"/>
-            <path class="arcrow" style="stroke:#00f" d="M689 2019.3v38"/>
-            <path class="arcrow" style="stroke:transparent" d="M897 2019.3v38M1105 2019.3v38"/>
+            <path d="M65 38v38" class="arcrow" style="stroke:transparent"/>
+            <path d="M273 38v38" class="arcrow" style="stroke:#080"/>
+            <path d="M481 38v38" class="arcrow" style="stroke:red"/>
+            <path d="M689 38v38" class="arcrow" style="stroke:#00f"/>
+            <path d="M897 38v38M1105 38v38M65 76v38" class="arcrow" style="stroke:transparent"/>
+            <path d="M273 76v38" class="arcrow" style="stroke:#080"/>
+            <path d="M481 76v38" class="arcrow" style="stroke:red"/>
+            <path d="M689 76v38" class="arcrow" style="stroke:#00f"/>
+            <path d="M897 76v38M1105 76v38M65 114v38" class="arcrow" style="stroke:transparent"/>
+            <path d="M273 114v38" class="arcrow" style="stroke:#080"/>
+            <path d="M481 114v38" class="arcrow" style="stroke:red"/>
+            <path d="M689 114v38" class="arcrow" style="stroke:#00f"/>
+            <path d="M897 114v38M1105 114v38M65 152v38" class="arcrow" style="stroke:transparent"/>
+            <path d="M273 152v38" class="arcrow" style="stroke:#080"/>
+            <path d="M481 152v38" class="arcrow" style="stroke:red"/>
+            <path d="M689 152v38" class="arcrow" style="stroke:#00f"/>
+            <path d="M897 152v38M1105 152v38M65 190v38" class="arcrow" style="stroke:transparent"/>
+            <path d="M273 190v38" class="arcrow" style="stroke:#080"/>
+            <path d="M481 190v38" class="arcrow" style="stroke:red"/>
+            <path d="M689 190v38" class="arcrow" style="stroke:#00f"/>
+            <path d="M897 190v38M1105 190v38M65 228v38" class="arcrow" style="stroke:transparent"/>
+            <path d="M273 228v38" class="arcrow" style="stroke:#080"/>
+            <path d="M481 228v38" class="arcrow" style="stroke:red"/>
+            <path d="M689 228v38" class="arcrow" style="stroke:#00f"/>
+            <path d="M897 228v38M1105 228v38M65 266v54" class="arcrow" style="stroke:transparent"/>
+            <path d="M273 266v54" class="arcrow" style="stroke:#080"/>
+            <path d="M481 266v54" class="arcrow" style="stroke:red"/>
+            <path d="M689 266v54" class="arcrow" style="stroke:#00f"/>
+            <path d="M897 266v54M1105 266v54M65 320v38" class="arcrow" style="stroke:transparent"/>
+            <path d="M273 320v38" class="arcrow" style="stroke:#080"/>
+            <path d="M481 320v38" class="arcrow" style="stroke:red"/>
+            <path d="M689 320v38" class="arcrow" style="stroke:#00f"/>
+            <path d="M897 320v38M1105 320v38M65 358v38" class="arcrow" style="stroke:transparent"/>
+            <path d="M273 358v38" class="arcrow" style="stroke:#080"/>
+            <path d="M481 358v38" class="arcrow" style="stroke:red"/>
+            <path d="M689 358v38" class="arcrow" style="stroke:#00f"/>
+            <path d="M897 358v38M1105 358v38M65 396v38" class="arcrow" style="stroke:transparent"/>
+            <path d="M273 396v38" class="arcrow" style="stroke:#080"/>
+            <path d="M481 396v38" class="arcrow" style="stroke:red"/>
+            <path d="M689 396v38" class="arcrow" style="stroke:#00f"/>
+            <path d="M897 396v38M1105 396v38M65 434v38" class="arcrow" style="stroke:transparent"/>
+            <path d="M273 434v38" class="arcrow" style="stroke:#080"/>
+            <path d="M481 434v38" class="arcrow" style="stroke:red"/>
+            <path d="M689 434v38" class="arcrow" style="stroke:#00f"/>
+            <path d="M897 434v38M1105 434v38M65 472v38" class="arcrow" style="stroke:transparent"/>
+            <path d="M273 472v38" class="arcrow" style="stroke:#080"/>
+            <path d="M481 472v38" class="arcrow" style="stroke:red"/>
+            <path d="M689 472v38" class="arcrow" style="stroke:#00f"/>
+            <path d="M897 472v38M1105 472v38M65 510v38" class="arcrow" style="stroke:transparent"/>
+            <path d="M273 510v38" class="arcrow" style="stroke:#080"/>
+            <path d="M481 510v38" class="arcrow" style="stroke:red"/>
+            <path d="M689 510v38" class="arcrow" style="stroke:#00f"/>
+            <path d="M897 510v38M1105 510v38M65 548v38" class="arcrow" style="stroke:transparent"/>
+            <path d="M273 548v38" class="arcrow" style="stroke:#080"/>
+            <path d="M481 548v38" class="arcrow" style="stroke:red"/>
+            <path d="M689 548v38" class="arcrow" style="stroke:#00f"/>
+            <path d="M897 548v38M1105 548v38M65 586v75.05" class="arcrow" style="stroke:transparent"/>
+            <path d="M273 586v75.05" class="arcrow" style="stroke:#080"/>
+            <path d="M481 586v75.05" class="arcrow" style="stroke:red"/>
+            <path d="M689 586v75.05" class="arcrow" style="stroke:#00f"/>
+            <path d="M897 586v75.05M1105 586v75.05M65 661.05v38" class="arcrow" style="stroke:transparent"/>
+            <path d="M273 661.05v38" class="arcrow" style="stroke:#080"/>
+            <path d="M481 661.05v38" class="arcrow" style="stroke:red"/>
+            <path d="M689 661.05v38" class="arcrow" style="stroke:#00f"/>
+            <path d="M897 661.05v38M1105 661.05v38M65 699.05v38" class="arcrow" style="stroke:transparent"/>
+            <path d="M273 699.05v38" class="arcrow" style="stroke:#080"/>
+            <path d="M481 699.05v38" class="arcrow" style="stroke:red"/>
+            <path d="M689 699.05v38" class="arcrow" style="stroke:#00f"/>
+            <path d="M897 699.05v38M1105 699.05v38M65 737.05v75.05" class="arcrow" style="stroke:transparent"/>
+            <path d="M273 737.05v75.05" class="arcrow" style="stroke:#080"/>
+            <path d="M481 737.05v75.05" class="arcrow" style="stroke:red"/>
+            <path d="M689 737.05v75.05" class="arcrow" style="stroke:#00f"/>
+            <path d="M897 737.05v75.05M1105 737.05v75.05M65 812.1v38" class="arcrow" style="stroke:transparent"/>
+            <path d="M273 812.1v38" class="arcrow" style="stroke:#080"/>
+            <path d="M481 812.1v38" class="arcrow" style="stroke:red"/>
+            <path d="M689 812.1v38" class="arcrow" style="stroke:#00f"/>
+            <path d="M897 812.1v38M1105 812.1v38M65 850.1v38" class="arcrow" style="stroke:transparent"/>
+            <path d="M273 850.1v38" class="arcrow" style="stroke:#080"/>
+            <path d="M481 850.1v38" class="arcrow" style="stroke:red"/>
+            <path d="M689 850.1v38" class="arcrow" style="stroke:#00f"/>
+            <path d="M897 850.1v38M1105 850.1v38M65 888.1v86" class="arcrow" style="stroke:transparent"/>
+            <path d="M273 888.1v86" class="arcrow" style="stroke:#080"/>
+            <path d="M481 888.1v86" class="arcrow" style="stroke:red"/>
+            <path d="M689 888.1v86" class="arcrow" style="stroke:#00f"/>
+            <path d="M897 888.1v86M1105 888.1v86M65 974.1v38" class="arcrow" style="stroke:transparent"/>
+            <path d="M273 974.1v38" class="arcrow" style="stroke:#080"/>
+            <path d="M481 974.1v38" class="arcrow" style="stroke:red"/>
+            <path d="M689 974.1v38" class="arcrow" style="stroke:#00f"/>
+            <path d="M897 974.1v38M1105 974.1v38M65 1012.1v38" class="arcrow" style="stroke:transparent"/>
+            <path d="M273 1012.1v38" class="arcrow" style="stroke:#080"/>
+            <path d="M481 1012.1v38" class="arcrow" style="stroke:red"/>
+            <path d="M689 1012.1v38" class="arcrow" style="stroke:#00f"/>
+            <path d="M897 1012.1v38M1105 1012.1v38M65 1050.1v38" class="arcrow" style="stroke:transparent"/>
+            <path d="M273 1050.1v38" class="arcrow" style="stroke:#080"/>
+            <path d="M481 1050.1v38" class="arcrow" style="stroke:red"/>
+            <path d="M689 1050.1v38" class="arcrow" style="stroke:#00f"/>
+            <path d="M897 1050.1v38M1105 1050.1v38M65 1088.1v38" class="arcrow" style="stroke:transparent"/>
+            <path d="M273 1088.1v38" class="arcrow" style="stroke:#080"/>
+            <path d="M481 1088.1v38" class="arcrow" style="stroke:red"/>
+            <path d="M689 1088.1v38" class="arcrow" style="stroke:#00f"/>
+            <path d="M897 1088.1v38M1105 1088.1v38M65 1126.1v38" class="arcrow" style="stroke:transparent"/>
+            <path d="M273 1126.1v38" class="arcrow" style="stroke:#080"/>
+            <path d="M481 1126.1v38" class="arcrow" style="stroke:red"/>
+            <path d="M689 1126.1v38" class="arcrow" style="stroke:#00f"/>
+            <path d="M897 1126.1v38M1105 1126.1v38M65 1164.1v38" class="arcrow" style="stroke:transparent"/>
+            <path d="M273 1164.1v38" class="arcrow" style="stroke:#080"/>
+            <path d="M481 1164.1v38" class="arcrow" style="stroke:red"/>
+            <path d="M689 1164.1v38" class="arcrow" style="stroke:#00f"/>
+            <path d="M897 1164.1v38M1105 1164.1v38M65 1202.1v75.05" class="arcrow" style="stroke:transparent"/>
+            <path d="M273 1202.1v75.05" class="arcrow" style="stroke:#080"/>
+            <path d="M481 1202.1v75.05" class="arcrow" style="stroke:red"/>
+            <path d="M689 1202.1v75.05" class="arcrow" style="stroke:#00f"/>
+            <path d="M897 1202.1v75.05M1105 1202.1v75.05M65 1277.15v38" class="arcrow" style="stroke:transparent"/>
+            <path d="M273 1277.15v38" class="arcrow" style="stroke:#080"/>
+            <path d="M481 1277.15v38" class="arcrow" style="stroke:red"/>
+            <path d="M689 1277.15v38" class="arcrow" style="stroke:#00f"/>
+            <path d="M897 1277.15v38M1105 1277.15v38M65 1315.15v38" class="arcrow" style="stroke:transparent"/>
+            <path d="M273 1315.15v38" class="arcrow" style="stroke:#080"/>
+            <path d="M481 1315.15v38" class="arcrow" style="stroke:red"/>
+            <path d="M689 1315.15v38" class="arcrow" style="stroke:#00f"/>
+            <path d="M897 1315.15v38M1105 1315.15v38M65 1353.15v38" class="arcrow" style="stroke:transparent"/>
+            <path d="M273 1353.15v38" class="arcrow" style="stroke:#080"/>
+            <path d="M481 1353.15v38" class="arcrow" style="stroke:red"/>
+            <path d="M689 1353.15v38" class="arcrow" style="stroke:#00f"/>
+            <path d="M897 1353.15v38M1105 1353.15v38M65 1391.15v38" class="arcrow" style="stroke:transparent"/>
+            <path d="M273 1391.15v38" class="arcrow" style="stroke:#080"/>
+            <path d="M481 1391.15v38" class="arcrow" style="stroke:red"/>
+            <path d="M689 1391.15v38" class="arcrow" style="stroke:#00f"/>
+            <path d="M897 1391.15v38M1105 1391.15v38M65 1429.15v38" class="arcrow" style="stroke:transparent"/>
+            <path d="M273 1429.15v38" class="arcrow" style="stroke:#080"/>
+            <path d="M481 1429.15v38" class="arcrow" style="stroke:red"/>
+            <path d="M689 1429.15v38" class="arcrow" style="stroke:#00f"/>
+            <path d="M897 1429.15v38M1105 1429.15v38M65 1467.15v59.05" class="arcrow" style="stroke:transparent"/>
+            <path d="M273 1467.15v59.05" class="arcrow" style="stroke:#080"/>
+            <path d="M481 1467.15v59.05" class="arcrow" style="stroke:red"/>
+            <path d="M689 1467.15v59.05" class="arcrow" style="stroke:#00f"/>
+            <path d="M897 1467.15v59.05M1105 1467.15v59.05M65 1526.2v54" class="arcrow" style="stroke:transparent"/>
+            <path d="M273 1526.2v54" class="arcrow" style="stroke:#080"/>
+            <path d="M481 1526.2v54" class="arcrow" style="stroke:red"/>
+            <path d="M689 1526.2v54" class="arcrow" style="stroke:#00f"/>
+            <path d="M897 1526.2v54M1105 1526.2v54M65 1580.2v38" class="arcrow" style="stroke:transparent"/>
+            <path d="M273 1580.2v38" class="arcrow" style="stroke:#080"/>
+            <path d="M481 1580.2v38" class="arcrow" style="stroke:red"/>
+            <path d="M689 1580.2v38" class="arcrow" style="stroke:#00f"/>
+            <path d="M897 1580.2v38M1105 1580.2v38M65 1618.2v38" class="arcrow" style="stroke:transparent"/>
+            <path d="M273 1618.2v38" class="arcrow" style="stroke:#080"/>
+            <path d="M481 1618.2v38" class="arcrow" style="stroke:red"/>
+            <path d="M689 1618.2v38" class="arcrow" style="stroke:#00f"/>
+            <path d="M897 1618.2v38M1105 1618.2v38M65 1656.2v38" class="arcrow" style="stroke:transparent"/>
+            <path d="M273 1656.2v38" class="arcrow" style="stroke:#080"/>
+            <path d="M481 1656.2v38" class="arcrow" style="stroke:red"/>
+            <path d="M689 1656.2v38" class="arcrow" style="stroke:#00f"/>
+            <path d="M897 1656.2v38M1105 1656.2v38M65 1694.2v38" class="arcrow" style="stroke:transparent"/>
+            <path d="M273 1694.2v38" class="arcrow" style="stroke:#080"/>
+            <path d="M481 1694.2v38" class="arcrow" style="stroke:red"/>
+            <path d="M689 1694.2v38" class="arcrow" style="stroke:#00f"/>
+            <path d="M897 1694.2v38M1105 1694.2v38M65 1732.2v38" class="arcrow" style="stroke:transparent"/>
+            <path d="M273 1732.2v38" class="arcrow" style="stroke:#080"/>
+            <path d="M481 1732.2v38" class="arcrow" style="stroke:red"/>
+            <path d="M689 1732.2v38" class="arcrow" style="stroke:#00f"/>
+            <path d="M897 1732.2v38M1105 1732.2v38M65 1770.2v38" class="arcrow" style="stroke:transparent"/>
+            <path d="M273 1770.2v38" class="arcrow" style="stroke:#080"/>
+            <path d="M481 1770.2v38" class="arcrow" style="stroke:red"/>
+            <path d="M689 1770.2v38" class="arcrow" style="stroke:#00f"/>
+            <path d="M897 1770.2v38M1105 1770.2v38M65 1808.2v38" class="arcrow" style="stroke:transparent"/>
+            <path d="M273 1808.2v38" class="arcrow" style="stroke:#080"/>
+            <path d="M481 1808.2v38" class="arcrow" style="stroke:red"/>
+            <path d="M689 1808.2v38" class="arcrow" style="stroke:#00f"/>
+            <path d="M897 1808.2v38M1105 1808.2v38M65 1846.2v59.05" class="arcrow" style="stroke:transparent"/>
+            <path d="M273 1846.2v59.05" class="arcrow" style="stroke:#080"/>
+            <path d="M481 1846.2v59.05" class="arcrow" style="stroke:red"/>
+            <path d="M689 1846.2v59.05" class="arcrow" style="stroke:#00f"/>
+            <path d="M897 1846.2v59.05M1105 1846.2v59.05M65 1905.25v38" class="arcrow" style="stroke:transparent"/>
+            <path d="M273 1905.25v38" class="arcrow" style="stroke:#080"/>
+            <path d="M481 1905.25v38" class="arcrow" style="stroke:red"/>
+            <path d="M689 1905.25v38" class="arcrow" style="stroke:#00f"/>
+            <path d="M897 1905.25v38M1105 1905.25v38M65 1943.25v38" class="arcrow" style="stroke:transparent"/>
+            <path d="M273 1943.25v38" class="arcrow" style="stroke:#080"/>
+            <path d="M481 1943.25v38" class="arcrow" style="stroke:red"/>
+            <path d="M689 1943.25v38" class="arcrow" style="stroke:#00f"/>
+            <path d="M897 1943.25v38M1105 1943.25v38M65 1981.25v38" class="arcrow" style="stroke:transparent"/>
+            <path d="M273 1981.25v38" class="arcrow" style="stroke:#080"/>
+            <path d="M481 1981.25v38" class="arcrow" style="stroke:red"/>
+            <path d="M689 1981.25v38" class="arcrow" style="stroke:#00f"/>
+            <path d="M897 1981.25v38M1105 1981.25v38M65 2019.25v38" class="arcrow" style="stroke:transparent"/>
+            <path d="M273 2019.25v38" class="arcrow" style="stroke:#080"/>
+            <path d="M481 2019.25v38" class="arcrow" style="stroke:red"/>
+            <path d="M689 2019.25v38" class="arcrow" style="stroke:#00f"/>
+            <path d="M897 2019.25v38M1105 2019.25v38" class="arcrow" style="stroke:transparent"/>
         </g>
         <g id="mscgenjsreplaceme_sequence">
-            <path class="entity" style="stroke:transparent" d="M0 0h130v38H0z"/>
+            <path d="M0 0h130v38H0z" class="entity" style="stroke:transparent"/>
             <text x="65" y="22.75" class="entity-text"><tspan> </tspan></text>
-            <path class="entity" style="fill:#cfc;stroke:#080" d="M208 0h130v38H208z"/>
+            <path d="M208 0h130v38H208z" class="entity" style="fill:#cfc;stroke:#080"/>
             <text x="273" y="22.75" class="entity-text"><tspan>Network</tspan></text>
-            <path class="entity" style="fill:#fcc;stroke:red" d="M416 0h130v38H416z"/>
+            <path d="M416 0h130v38H416z" class="entity" style="fill:#fcc;stroke:red"/>
             <text x="481" y="22.75" class="entity-text"><tspan>Offerer</tspan></text>
-            <path class="entity" style="fill:#ccf;stroke:#00f" d="M624 0h130v38H624z"/>
+            <path d="M624 0h130v38H624z" class="entity" style="fill:#ccf;stroke:#00f"/>
             <text x="689" y="22.75" class="entity-text"><tspan>Bidder</tspan></text>
-            <path class="entity" style="stroke:transparent" d="M832 0h130v38H832z"/>
+            <path d="M832 0h130v38H832z" class="entity" style="stroke:transparent"/>
             <text x="897" y="22.75" class="entity-text"><tspan> </tspan></text>
-            <path class="entity" style="stroke:transparent" d="M1040 0h130v38h-130z"/>
+            <path d="M1040 0h130v38h-130z" class="entity" style="stroke:transparent"/>
             <text x="1105" y="22.75" class="entity-text"><tspan> </tspan></text>
-            <path class="arc directional callback" style="stroke:red" marker-end="url(#mscgenjsreplacemecallback-#FF0000)" d="M481 95H273"/>
-            <path class="label-text-background" d="M345.08 79.25h63.84v14h-63.84z"/>
+            <path marker-end="url(#mscgenjsreplacemecallback-#FF0000)" d="M481 95H273" class="arc directional callback" style="stroke:red"/>
+            <path d="M345.09 79.25h63.83v14h-63.83z" class="label-text-background"/>
             <text x="377" y="90.25" class="directional-text callback-text"><tspan>Sends Offer</tspan></text>
-            <path class="arc directional return" style="stroke:#080" marker-end="url(#mscgenjsreplacemecallback-#008800)" d="M273 133h416"/>
-            <path class="label-text-background" d="M445.75 117.25h70.5v14h-70.5z"/>
+            <path marker-end="url(#mscgenjsreplacemecallback-#008800)" d="M273 133h416" class="arc directional return" style="stroke:#080"/>
+            <path d="M445.76 117.25h70.48v14h-70.48z" class="label-text-background"/>
             <text x="481" y="128.25" class="directional-text return-text"><tspan>Detects Offer</tspan></text>
-            <path class="arc directional callback" style="stroke:#00f" marker-end="url(#mscgenjsreplacemecallback-#0000FF)" d="M689 171H481"/>
-            <path class="label-text-background" d="M557.64 155.25h54.72v14h-54.72z"/>
+            <path marker-end="url(#mscgenjsreplacemecallback-#0000FF)" d="M689 171H481" class="arc directional callback" style="stroke:#00f"/>
+            <path d="M557.65 155.25h54.7v14h-54.7z" class="label-text-background"/>
             <text x="585" y="166.25" class="directional-text callback-text"><tspan>Sends Bid</tspan></text>
-            <path class="arc directional callback" style="stroke:red" marker-end="url(#mscgenjsreplacemecallback-#FF0000)" d="M481 293h208"/>
-            <path class="label-text-background" d="M513.28 277.25h143.77v14H513.28z"/>
+            <path marker-end="url(#mscgenjsreplacemecallback-#FF0000)" d="M481 293h208" class="arc directional callback" style="stroke:red"/>
+            <path d="M513.29 277.25h143.74v14H513.29z" class="label-text-background"/>
             <text x="585" y="288.25" class="directional-text callback-text"><tspan>Sends BidAccept message</tspan></text>
-            <path class="arc directional callback" style="stroke:#00f" marker-end="url(#mscgenjsreplacemecallback-#0000FF)" d="M689 415H481"/>
-            <path class="label-text-background" d="M491.28 399.25h187.77v14H491.28z"/>
+            <path marker-end="url(#mscgenjsreplacemecallback-#0000FF)" d="M689 415H481" class="arc directional callback" style="stroke:#00f"/>
+            <path d="M491.29 399.25h187.74v14H491.29z" class="label-text-background"/>
             <text x="585" y="410.25" class="directional-text callback-text"><tspan>Sends XmrBidLockTxSigsMessage</tspan></text>
-            <path class="arc directional callback" style="stroke:red" marker-end="url(#mscgenjsreplacemecallback-#FF0000)" d="M481 491h208"/>
-            <path class="label-text-background" d="M485.61 475.25h199.11v14H485.61z"/>
+            <path marker-end="url(#mscgenjsreplacemecallback-#FF0000)" d="M481 491h208" class="arc directional callback" style="stroke:red"/>
+            <path d="M485.61 475.25H684.7v14H485.61z" class="label-text-background"/>
             <text x="585" y="486.25" class="directional-text callback-text"><tspan>Sends XmrBidLockSpendTxMessage</tspan></text>
-            <path class="arc directional callback" style="stroke:red" marker-end="url(#mscgenjsreplacemecallback-#FF0000)" d="M481 529H273"/>
-            <path class="label-text-background" d="M311.64 513.25h130.72v14H311.64z"/>
+            <path marker-end="url(#mscgenjsreplacemecallback-#FF0000)" d="M481 529H273" class="arc directional callback" style="stroke:red"/>
+            <path d="M311.64 513.25h130.72v14H311.64z" class="label-text-background"/>
             <text x="377" y="524.25" class="directional-text callback-text"><tspan>Sends script-coin-lock-tx</tspan></text>
-            <path d="M689 615.93c104 .1 104 22.8 0 22.8" class="arc directional method" style="stroke:#00f" marker-end="url(#mscgenjsreplacememethod-#0000FF)"/>
-            <path class="label-text-background" d="M692 567.67h40.91v14.02H692z"/>
-            <text x="692" y="578.68" class="directional-text method-text anchor-start"><tspan>Wait for</tspan></text>
-            <path class="label-text-background" d="M692 583.67h107.02v14.02H692z"/>
-            <text x="692" y="594.68" class="directional-text method-text anchor-start"><tspan>script-coin-lock-tx to</tspan></text>
-            <path class="label-text-background" d="M692 599.67h39.34v14.02H692z"/>
-            <text x="692" y="610.68" class="directional-text method-text anchor-start"><tspan>confirm</tspan></text>
-            <path class="arc directional callback" style="stroke:#00f" marker-end="url(#mscgenjsreplacemecallback-#0000FF)" d="M689 718.06H273"/>
-            <path class="label-text-background" d="M408.97 702.3h144.06v14.02H408.97z"/>
-            <text x="481" y="713.31" class="directional-text callback-text"><tspan>Sends noscript-coin-lock-tx</tspan></text>
-            <path d="M689 766.99c104 .1 104 22.8 0 22.8" class="arc directional method" style="stroke:#00f" marker-end="url(#mscgenjsreplacememethod-#0000FF)"/>
-            <path class="label-text-background" d="M692 718.73h40.91v14.02H692z"/>
-            <text x="692" y="729.74" class="directional-text method-text anchor-start"><tspan>Wait for</tspan></text>
-            <path class="label-text-background" d="M692 734.73h120.38v14.02H692z"/>
-            <text x="692" y="745.74" class="directional-text method-text anchor-start"><tspan>noscript-coin-lock-tx to</tspan></text>
-            <path class="label-text-background" d="M692 750.73h39.34v14.02H692z"/>
-            <text x="692" y="761.74" class="directional-text method-text anchor-start"><tspan>confirm</tspan></text>
-            <path d="M481 766.99c104 .1 104 22.8 0 22.8" class="arc directional method" style="stroke:red" marker-end="url(#mscgenjsreplacememethod-#FF0000)"/>
-            <path class="label-text-background" d="M484 718.73h40.91v14.02H484z"/>
-            <text x="484" y="729.74" class="directional-text method-text anchor-start"><tspan>Wait for</tspan></text>
-            <path class="label-text-background" d="M484 734.73h120.38v14.02H484z"/>
-            <text x="484" y="745.74" class="directional-text method-text anchor-start"><tspan>noscript-coin-lock-tx to</tspan></text>
-            <path class="label-text-background" d="M484 750.73h39.34v14.02H484z"/>
-            <text x="484" y="761.74" class="directional-text method-text anchor-start"><tspan>confirm</tspan></text>
-            <path class="arc directional method" style="stroke:red" marker-end="url(#mscgenjsreplacememethod-#FF0000)" d="M481 931.12h208"/>
-            <path class="label-text-background" d="M519.64 915.36h130.72v14.02H519.64z"/>
-            <text x="585" y="926.37" class="directional-text method-text"><tspan>Sends script-coin-lock-tx</tspan></text>
-            <path class="label-text-background" d="M539.3 933.36h91.73v14.02H539.3z"/>
-            <text x="585" y="944.37" class="directional-text method-text"><tspan>release message</tspan></text>
-            <path class="arc directional callback" style="stroke:#00f" marker-end="url(#mscgenjsreplacemecallback-#0000FF)" d="M689 1031.12H273"/>
-            <path class="label-text-background" d="M397.3 1015.36h167.41v14.02H397.3z"/>
-            <text x="481" y="1026.37" class="directional-text callback-text"><tspan>Sends script-coin-lock-spend-tx</tspan></text>
-            <path class="inline_expression_divider" d="M-41 1145.12h1044"/>
-            <path class="label-text-background" d="M459.98 1137.86h42.03v14.02h-42.03z"/>
-            <text x="481" y="1148.87" class="empty-text comment-row-text"><tspan>fail path</tspan></text>
-            <path d="M689 1232.05c104 .1 104 22.8 0 22.8" class="arc directional method" style="stroke:#00f" marker-end="url(#mscgenjsreplacememethod-#0000FF)"/>
-            <path class="label-text-background" d="M692 1183.8h40.91v14.02H692z"/>
-            <text x="692" y="1194.8" class="directional-text method-text anchor-start"><tspan>Wait for</tspan></text>
-            <path class="label-text-background" d="M692 1199.8h131.69v14.02H692z"/>
-            <text x="692" y="1210.8" class="directional-text method-text anchor-start"><tspan>script-coin-lock-tx lock to</tspan></text>
-            <path class="label-text-background" d="M692 1215.8h33.02v14.02H692z"/>
-            <text x="692" y="1226.8" class="directional-text method-text anchor-start"><tspan>expire</tspan></text>
-            <path class="arc directional callback" style="stroke:red" marker-end="url(#mscgenjsreplacemecallback-#FF0000)" d="M481 1296.18H273"/>
-            <path class="label-text-background" d="M359.98 1280.42h34.03v14.02h-34.03z"/>
-            <text x="377" y="1291.43" class="directional-text callback-text"><tspan>Sends</tspan></text>
-            <path class="label-text-background" d="M300.64 1298.42h152.72v14.02H300.64z"/>
-            <text x="377" y="1309.43" class="directional-text callback-text"><tspan>script-coin-lock-pre-refund-tx</tspan></text>
-            <path class="arc directional return" style="stroke:#080" marker-end="url(#mscgenjsreplacemecallback-#008800)" d="M273 1334.18h208"/>
-            <path class="label-text-background" d="M300.64 1318.42h152.72v14.02H300.64z"/>
-            <text x="377" y="1329.43" class="directional-text return-text"><tspan>script-coin-lock-pre-refund-tx</tspan></text>
-            <path d="M481 1489.11c104 .1 104 22.8 0 22.8" class="arc directional method" style="stroke:red" marker-end="url(#mscgenjsreplacememethod-#FF0000)"/>
-            <path class="label-text-background" d="M484 1456.86h40.91v14.02H484z"/>
-            <text x="484" y="1467.86" class="directional-text method-text anchor-start"><tspan>Wait for</tspan></text>
-            <path class="label-text-background" d="M484 1472.86h124.06v14.02H484z"/>
-            <text x="484" y="1483.86" class="directional-text method-text anchor-start"><tspan>pre-refund tx to confirm</tspan></text>
-            <path class="arc directional callback" style="stroke:red" marker-end="url(#mscgenjsreplacemecallback-#FF0000)" d="M481 1553.24H273"/>
-            <path class="label-text-background" d="M359.98 1537.48h34.03v14.02h-34.03z"/>
-            <text x="377" y="1548.49" class="directional-text callback-text"><tspan>Sends</tspan></text>
-            <path class="label-text-background" d="M282.3 1555.48h189.41v14.02H282.3z"/>
-            <text x="377" y="1566.49" class="directional-text callback-text"><tspan>script-coin-lock-pre-refund-spend-tx</tspan></text>
-            <path class="arc directional return" style="stroke:#080" marker-end="url(#mscgenjsreplacemecallback-#008800)" d="M273 1637.24h416"/>
-            <path class="label-text-background" d="M364.28 1621.48h233.44v14.02H364.28z"/>
-            <text x="481" y="1632.49" class="directional-text return-text"><tspan>Detects script-coin-lock-pre-refund-spend-tx</tspan></text>
-            <path class="arc directional callback" style="stroke:#00f" marker-end="url(#mscgenjsreplacemecallback-#0000FF)" d="M689 1675.24H273"/>
-            <path class="label-text-background" d="M382.97 1659.48h196.06v14.02H382.97z"/>
-            <text x="481" y="1670.49" class="directional-text callback-text"><tspan>Sends scriptless-coin-lock-recover-tx</tspan></text>
-            <path class="inline_expression_divider" d="M-37 1789.24H999"/>
-            <path class="label-text-background" d="M396.95 1781.98h168.09V1796H396.95z"/>
-            <text x="481" y="1792.99" class="empty-text comment-row-text"><tspan>bidder swipes script coin lock tx</tspan></text>
-            <path d="M689 1868.17c104 .1 104 22.8 0 22.8" class="arc directional method" style="stroke:#00f" marker-end="url(#mscgenjsreplacememethod-#0000FF)"/>
-            <path class="label-text-background" d="M692 1835.91h40.91v14.02H692z"/>
-            <text x="692" y="1846.92" class="directional-text method-text anchor-start"><tspan>Wait for</tspan></text>
-            <path class="label-text-background" d="M692 1851.91h142.41v14.02H692z"/>
-            <text x="692" y="1862.92" class="directional-text method-text anchor-start"><tspan>pre-refund tx lock to expire</tspan></text>
-            <path class="arc directional callback" style="stroke:#00f" marker-end="url(#mscgenjsreplacemecallback-#0000FF)" d="M689 1924.3H273"/>
-            <path class="label-text-background" d="M368.63 1908.55h224.75v14.02H368.63z"/>
-            <text x="481" y="1919.55" class="directional-text callback-text"><tspan>Sends script-coin-lock-pre-refund-swipe-tx</tspan></text>
+            <path marker-end="url(#mscgenjsreplacememethod-#0000FF)" d="M689 615.92c104 .1 104 22.8 0 22.8" class="arc directional method" style="stroke:#00f"/>
+            <path d="M692 567.67h40.91v14H692z" class="label-text-background"/>
+            <text x="692" y="578.67" class="directional-text method-text anchor-start"><tspan>Wait for</tspan></text>
+            <path d="M692 583.67h107.01v14H692z" class="label-text-background"/>
+            <text x="692" y="594.67" class="directional-text method-text anchor-start"><tspan>script-coin-lock-tx to</tspan></text>
+            <path d="M692 599.67h39.34v14H692z" class="label-text-background"/>
+            <text x="692" y="610.67" class="directional-text method-text anchor-start"><tspan>confirm</tspan></text>
+            <path marker-end="url(#mscgenjsreplacemecallback-#0000FF)" d="M689 718.05H273" class="arc directional callback" style="stroke:#00f"/>
+            <path d="M408.97 702.3h144.06v14H408.97z" class="label-text-background"/>
+            <text x="481" y="713.3" class="directional-text callback-text"><tspan>Sends noscript-coin-lock-tx</tspan></text>
+            <path marker-end="url(#mscgenjsreplacememethod-#0000FF)" d="M689 766.97c104 .1 104 22.8 0 22.8" class="arc directional method" style="stroke:#00f"/>
+            <path d="M692 718.72h40.91v14H692z" class="label-text-background"/>
+            <text x="692" y="729.72" class="directional-text method-text anchor-start"><tspan>Wait for</tspan></text>
+            <path d="M692 734.72h120.36v14H692z" class="label-text-background"/>
+            <text x="692" y="745.72" class="directional-text method-text anchor-start"><tspan>noscript-coin-lock-tx to</tspan></text>
+            <path d="M692 750.72h39.34v14H692z" class="label-text-background"/>
+            <text x="692" y="761.72" class="directional-text method-text anchor-start"><tspan>confirm</tspan></text>
+            <path marker-end="url(#mscgenjsreplacememethod-#FF0000)" d="M481 766.97c104 .1 104 22.8 0 22.8" class="arc directional method" style="stroke:red"/>
+            <path d="M484 718.72h40.91v14H484z" class="label-text-background"/>
+            <text x="484" y="729.72" class="directional-text method-text anchor-start"><tspan>Wait for</tspan></text>
+            <path d="M484 734.72h120.36v14H484z" class="label-text-background"/>
+            <text x="484" y="745.72" class="directional-text method-text anchor-start"><tspan>noscript-coin-lock-tx to</tspan></text>
+            <path d="M484 750.72h39.34v14H484z" class="label-text-background"/>
+            <text x="484" y="761.72" class="directional-text method-text anchor-start"><tspan>confirm</tspan></text>
+            <path marker-end="url(#mscgenjsreplacememethod-#FF0000)" d="M481 931.1h208" class="arc directional method" style="stroke:red"/>
+            <path d="M519.64 915.35h130.72v14H519.64z" class="label-text-background"/>
+            <text x="585" y="926.35" class="directional-text method-text"><tspan>Sends script-coin-lock-tx</tspan></text>
+            <path d="M539.3 933.35h91.71v14H539.3z" class="label-text-background"/>
+            <text x="585" y="944.35" class="directional-text method-text"><tspan>release message</tspan></text>
+            <path marker-end="url(#mscgenjsreplacemecallback-#0000FF)" d="M689 1031.1H273" class="arc directional callback" style="stroke:#00f"/>
+            <path d="M397.3 1015.35h167.41v14H397.3z" class="label-text-background"/>
+            <text x="481" y="1026.35" class="directional-text callback-text"><tspan>Sends script-coin-lock-spend-tx</tspan></text>
+            <path d="M-41 1145.1h1044" class="inline_expression_divider"/>
+            <path d="M459.98 1137.85h42.03v14h-42.03z" class="label-text-background"/>
+            <text x="481" y="1148.85" class="empty-text comment-row-text"><tspan>fail path</tspan></text>
+            <path marker-end="url(#mscgenjsreplacememethod-#0000FF)" d="M689 1232.02c104 .1 104 22.8 0 22.8" class="arc directional method" style="stroke:#00f"/>
+            <path d="M692 1183.77h40.91v14H692z" class="label-text-background"/>
+            <text x="692" y="1194.77" class="directional-text method-text anchor-start"><tspan>Wait for</tspan></text>
+            <path d="M692 1199.77h131.69v14H692z" class="label-text-background"/>
+            <text x="692" y="1210.77" class="directional-text method-text anchor-start"><tspan>script-coin-lock-tx lock to</tspan></text>
+            <path d="M692 1215.77h33.01v14H692z" class="label-text-background"/>
+            <text x="692" y="1226.77" class="directional-text method-text anchor-start"><tspan>expire</tspan></text>
+            <path marker-end="url(#mscgenjsreplacemecallback-#FF0000)" d="M481 1296.15H273" class="arc directional callback" style="stroke:red"/>
+            <path d="M359.98 1280.4h34.03v14h-34.03z" class="label-text-background"/>
+            <text x="377" y="1291.4" class="directional-text callback-text"><tspan>Sends</tspan></text>
+            <path d="M300.64 1298.4h152.72v14H300.64z" class="label-text-background"/>
+            <text x="377" y="1309.4" class="directional-text callback-text"><tspan>script-coin-lock-pre-refund-tx</tspan></text>
+            <path marker-end="url(#mscgenjsreplacemecallback-#008800)" d="M273 1334.15h208" class="arc directional return" style="stroke:#080"/>
+            <path d="M300.64 1318.4h152.72v14H300.64z" class="label-text-background"/>
+            <text x="377" y="1329.4" class="directional-text return-text"><tspan>script-coin-lock-pre-refund-tx</tspan></text>
+            <path marker-end="url(#mscgenjsreplacememethod-#FF0000)" d="M481 1489.07c104 .1 104 22.8 0 22.8" class="arc directional method" style="stroke:red"/>
+            <path d="M484 1456.82h40.91v14H484z" class="label-text-background"/>
+            <text x="484" y="1467.82" class="directional-text method-text anchor-start"><tspan>Wait for</tspan></text>
+            <path d="M484 1472.82h124.06v14H484z" class="label-text-background"/>
+            <text x="484" y="1483.82" class="directional-text method-text anchor-start"><tspan>pre-refund tx to confirm</tspan></text>
+            <path marker-end="url(#mscgenjsreplacemecallback-#FF0000)" d="M481 1553.2H273" class="arc directional callback" style="stroke:red"/>
+            <path d="M359.98 1537.45h34.03v14h-34.03z" class="label-text-background"/>
+            <text x="377" y="1548.45" class="directional-text callback-text"><tspan>Sends</tspan></text>
+            <path d="M282.3 1555.45h189.41v14H282.3z" class="label-text-background"/>
+            <text x="377" y="1566.45" class="directional-text callback-text"><tspan>script-coin-lock-pre-refund-spend-tx</tspan></text>
+            <path marker-end="url(#mscgenjsreplacemecallback-#008800)" d="M273 1637.2h416" class="arc directional return" style="stroke:#080"/>
+            <path d="M364.29 1621.45h233.42v14H364.29z" class="label-text-background"/>
+            <text x="481" y="1632.45" class="directional-text return-text"><tspan>Detects script-coin-lock-pre-refund-spend-tx</tspan></text>
+            <path marker-end="url(#mscgenjsreplacemecallback-#0000FF)" d="M689 1675.2H273" class="arc directional callback" style="stroke:#00f"/>
+            <path d="M382.97 1659.45h196.06v14H382.97z" class="label-text-background"/>
+            <text x="481" y="1670.45" class="directional-text callback-text"><tspan>Sends scriptless-coin-lock-recover-tx</tspan></text>
+            <path d="M-37 1789.2H999" class="inline_expression_divider"/>
+            <path d="M396.96 1781.95h168.08v14H396.96z" class="label-text-background"/>
+            <text x="481" y="1792.95" class="empty-text comment-row-text"><tspan>bidder swipes script coin lock tx</tspan></text>
+            <path marker-end="url(#mscgenjsreplacememethod-#0000FF)" d="M689 1868.12c104 .1 104 22.8 0 22.8" class="arc directional method" style="stroke:#00f"/>
+            <path d="M692 1835.87h40.91v14H692z" class="label-text-background"/>
+            <text x="692" y="1846.87" class="directional-text method-text anchor-start"><tspan>Wait for</tspan></text>
+            <path d="M692 1851.87h142.39v14H692z" class="label-text-background"/>
+            <text x="692" y="1862.87" class="directional-text method-text anchor-start"><tspan>pre-refund tx lock to expire</tspan></text>
+            <path marker-end="url(#mscgenjsreplacemecallback-#0000FF)" d="M689 1924.25H273" class="arc directional callback" style="stroke:#00f"/>
+            <path d="M368.63 1908.5h224.75v14H368.63z" class="label-text-background"/>
+            <text x="481" y="1919.5" class="directional-text callback-text"><tspan>Sends script-coin-lock-pre-refund-swipe-tx</tspan></text>
         </g>
         <g id="mscgenjsreplaceme_notes">
             <path d="m591 209 3-17h190l3 17-3 17H594z" class="box abox" style="stroke:#00f"/>
             <text x="689" y="212.75" class="box-text abox-text"><tspan>Bid Sent</tspan></text>
-            <path class="box" style="stroke:red" d="M383 230h196v34H383z"/>
+            <path d="M383 230h196v34H383z" class="box" style="stroke:red"/>
             <text x="481" y="250.75" class="box-text"><tspan>User accepts bid</tspan></text>
             <path d="M799 268h395v9h9m-9-9 9 9v41H799v-50z" class="box note" style="fill:#ffc"/>
             <text x="1001" y="280.75" class="box-text note-text"><tspan>The BidAccept message contains the pubkeys the offerer will use and</tspan></text>
@@ -364,51 +364,51 @@
             <text x="689" y="464.75" class="box-text abox-text"><tspan>msg</tspan></text>
             <path d="M799 474h395v9h9m-9-9 9 9v25H799v-34z" class="box note" style="fill:#ffc"/>
             <text x="1001" y="486.75" class="box-text note-text"><tspan>The XmrBidLockSpendTxMessage contains the script-coin-lock-tx and</tspan></text>
-            <text x="1001" y="502.75" class="box-text note-text"><tspan>the offerer&apos;s signature for it.</tspan></text>
+            <text x="1001" y="502.75" class="box-text note-text"><tspan>proof the offerer can sign it.</tspan></text>
             <path d="m591 529 3-17h190l3 17-3 17H594z" class="box abox" style="stroke:#00f"/>
             <text x="689" y="532.75" class="box-text abox-text"><tspan>Bid Script coin spend tx valid</tspan></text>
             <path d="m591 567 3-17h190l3 17-3 17H594z" class="box abox" style="stroke:#00f"/>
             <text x="689" y="562.75" class="box-text abox-text"><tspan>Exchanged script lock spend tx</tspan></text>
             <text x="689" y="578.75" class="box-text abox-text"><tspan>msg</tspan></text>
-            <path d="m591 680.06 3-17h190l3 17-3 17H594z" class="box abox" style="stroke:#00f"/>
-            <text x="689" y="683.81" class="box-text abox-text"><tspan>Bid Script coin locked</tspan></text>
-            <path d="m591 831.12 3-17h190l3 17-3 17H594z" class="box abox" style="stroke:#00f"/>
-            <text x="689" y="834.87" class="box-text abox-text"><tspan>Bid Scriptless coin locked</tspan></text>
-            <path d="M-40 869.12h98.39v11.02l-7 7H-40" class="box inline_expression_label"/>
-            <text x="-38" y="882.37" class="inline_expression-text alt-text anchor-start"><tspan>alt: success path</tspan></text>
-            <path d="M799 890.11h395v9h9m-9-9 9 9v73.02H799v-82.02z" class="box note" style="fill:#ffc"/>
-            <text x="1001" y="902.87" class="box-text note-text"><tspan>The XmrBidLockReleaseMessage contains the offerer&apos;s OTVES for it.   </tspan></text>
-            <text x="1001" y="918.87" class="box-text note-text"><tspan>                         The bidder decodes the offerer&apos;s signature</tspan></text>
-            <text x="1001" y="934.87" class="box-text note-text"><tspan>from the OTVES.                             When the offerer has the</tspan></text>
-            <text x="1001" y="950.87" class="box-text note-text"><tspan>plaintext signature, they can decode the bidder&apos;s noscript-coin-lock-tx</tspan></text>
-            <text x="1001" y="966.87" class="box-text note-text"><tspan>signature.</tspan></text>
-            <path d="m591 993.12 3-17h190l3 17-3 17H594z" class="box abox" style="stroke:#00f"/>
-            <text x="689" y="996.87" class="box-text abox-text"><tspan>Script coin lock released</tspan></text>
-            <path d="m591 1069.12 3-17h190l3 17-3 17H594z" class="box abox" style="stroke:#00f"/>
-            <text x="689" y="1072.87" class="box-text abox-text"><tspan>Script tx redeemed</tspan></text>
-            <path d="m591 1107.12 3-17h190l3 17-3 17H594z" class="box abox" style="stroke:#00f"/>
-            <text x="689" y="1110.87" class="box-text abox-text"><tspan>Bid Completed</tspan></text>
-            <path d="M799 1279.18h395v9h9m-9-9 9 9v25H799v-34z" class="box note" style="fill:#ffc"/>
-            <text x="1001" y="1299.93" class="box-text note-text"><tspan>tx can be sent by either party.</tspan></text>
-            <path d="m591 1372.18 3-17.01h190l3 17.01-3 17.01H594z" class="box abox" style="stroke:#00f"/>
-            <text x="689" y="1367.93" class="box-text abox-text"><tspan>Bid Script pre-refund tx in</tspan></text>
-            <text x="689" y="1383.93" class="box-text abox-text"><tspan>chain</tspan></text>
-            <path d="M-36 1410.18h200.86v11.02l-7 7H-36" class="box inline_expression_label"/>
-            <text x="-34" y="1423.43" class="inline_expression-text alt-text anchor-start"><tspan>alt: offerer refunds script coin lock tx</tspan></text>
-            <path d="M799 1528.23h395v9h9m-9-9 9 9v41.02H799v-50.02z" class="box note" style="fill:#ffc"/>
-            <text x="1001" y="1540.99" class="box-text note-text"><tspan>Refunds the script lock tx, with the offerer&apos;s cleartext signature</tspan></text>
-            <text x="1001" y="1556.99" class="box-text note-text"><tspan>the bidder can refund the noscript lock tx.                        </tspan></text>
-            <text x="1001" y="1572.99" class="box-text note-text"><tspan>Once the lock expires the pre-refund tx can be spent by the bidder.</tspan></text>
-            <path d="m383 1599.24 3-17h190l3 17-3 17H386z" class="box abox" style="stroke:red"/>
-            <text x="481" y="1602.99" class="box-text abox-text"><tspan>Bid Failed, refunded</tspan></text>
-            <path d="M799 1620.24h395v9h9m-9-9 9 9v25H799v-34z" class="box note" style="fill:#ffc"/>
-            <text x="1001" y="1640.99" class="box-text note-text"><tspan>Bidder recovers the offerer&apos;s scriptless chain key-shard.</tspan></text>
-            <path d="m591 1713.24 3-17h190l3 17-3 17H594z" class="box abox" style="stroke:#00f"/>
-            <text x="689" y="1716.99" class="box-text abox-text"><tspan>Bid Scriptless tx recovered</tspan></text>
-            <path d="m591 1751.24 3-17h190l3 17-3 17H594z" class="box abox" style="stroke:#00f"/>
-            <text x="689" y="1754.99" class="box-text abox-text"><tspan>Bid Failed, refunded</tspan></text>
-            <path d="m591 1962.3 3-17h190l3 17-3 17H594z" class="box abox" style="stroke:#00f"/>
-            <text x="689" y="1966.05" class="box-text abox-text"><tspan>Bid Failed, swiped</tspan></text>
+            <path d="m591 680.05 3-17h190l3 17-3 17H594z" class="box abox" style="stroke:#00f"/>
+            <text x="689" y="683.8" class="box-text abox-text"><tspan>Bid Script coin locked</tspan></text>
+            <path d="m591 831.1 3-17h190l3 17-3 17H594z" class="box abox" style="stroke:#00f"/>
+            <text x="689" y="834.85" class="box-text abox-text"><tspan>Bid Scriptless coin locked</tspan></text>
+            <path d="M-40 869.1h98.39v11l-7 7H-40" class="box inline_expression_label"/>
+            <text x="-38" y="882.35" class="inline_expression-text alt-text anchor-start"><tspan>alt: success path</tspan></text>
+            <path d="M799 890.1h395v9h9m-9-9 9 9v73H799v-82z" class="box note" style="fill:#ffc"/>
+            <text x="1001" y="902.85" class="box-text note-text"><tspan>The XmrBidLockReleaseMessage contains the offerer&apos;s OTVES for it.   </tspan></text>
+            <text x="1001" y="918.85" class="box-text note-text"><tspan>                         The bidder decodes the offerer&apos;s signature</tspan></text>
+            <text x="1001" y="934.85" class="box-text note-text"><tspan>from the OTVES.                             When the offerer has the</tspan></text>
+            <text x="1001" y="950.85" class="box-text note-text"><tspan>plaintext signature, they can decode the bidder&apos;s noscript-coin-lock-tx</tspan></text>
+            <text x="1001" y="966.85" class="box-text note-text"><tspan>signature.</tspan></text>
+            <path d="m591 993.1 3-17h190l3 17-3 17H594z" class="box abox" style="stroke:#00f"/>
+            <text x="689" y="996.85" class="box-text abox-text"><tspan>Script coin lock released</tspan></text>
+            <path d="m591 1069.1 3-17h190l3 17-3 17H594z" class="box abox" style="stroke:#00f"/>
+            <text x="689" y="1072.85" class="box-text abox-text"><tspan>Script tx redeemed</tspan></text>
+            <path d="m591 1107.1 3-17h190l3 17-3 17H594z" class="box abox" style="stroke:#00f"/>
+            <text x="689" y="1110.85" class="box-text abox-text"><tspan>Bid Completed</tspan></text>
+            <path d="M799 1279.15h395v9h9m-9-9 9 9v25H799v-34z" class="box note" style="fill:#ffc"/>
+            <text x="1001" y="1299.9" class="box-text note-text"><tspan>tx can be sent by either party.</tspan></text>
+            <path d="m591 1372.15 3-17h190l3 17-3 17H594z" class="box abox" style="stroke:#00f"/>
+            <text x="689" y="1367.9" class="box-text abox-text"><tspan>Bid Script pre-refund tx in</tspan></text>
+            <text x="689" y="1383.9" class="box-text abox-text"><tspan>chain</tspan></text>
+            <path d="M-36 1410.15h200.86v11l-7 7H-36" class="box inline_expression_label"/>
+            <text x="-34" y="1423.4" class="inline_expression-text alt-text anchor-start"><tspan>alt: offerer refunds script coin lock tx</tspan></text>
+            <path d="M799 1528.2h395v9h9m-9-9 9 9v41H799v-50z" class="box note" style="fill:#ffc"/>
+            <text x="1001" y="1540.95" class="box-text note-text"><tspan>Refunds the script lock tx, with the offerer&apos;s cleartext signature</tspan></text>
+            <text x="1001" y="1556.95" class="box-text note-text"><tspan>the bidder can refund the noscript lock tx.                        </tspan></text>
+            <text x="1001" y="1572.95" class="box-text note-text"><tspan>Once the lock expires the pre-refund tx can be spent by the bidder.</tspan></text>
+            <path d="m383 1599.2 3-17h190l3 17-3 17H386z" class="box abox" style="stroke:red"/>
+            <text x="481" y="1602.95" class="box-text abox-text"><tspan>Bid Failed, refunded</tspan></text>
+            <path d="M799 1620.2h395v9h9m-9-9 9 9v25H799v-34z" class="box note" style="fill:#ffc"/>
+            <text x="1001" y="1640.95" class="box-text note-text"><tspan>Bidder recovers the offerer&apos;s scriptless chain key-shard.</tspan></text>
+            <path d="m591 1713.2 3-17h190l3 17-3 17H594z" class="box abox" style="stroke:#00f"/>
+            <text x="689" y="1716.95" class="box-text abox-text"><tspan>Bid Scriptless tx recovered</tspan></text>
+            <path d="m591 1751.2 3-17h190l3 17-3 17H594z" class="box abox" style="stroke:#00f"/>
+            <text x="689" y="1754.95" class="box-text abox-text"><tspan>Bid Failed, refunded</tspan></text>
+            <path d="m591 1962.25 3-17h190l3 17-3 17H594z" class="box abox" style="stroke:#00f"/>
+            <text x="689" y="1966" class="box-text abox-text"><tspan>Bid Failed, swiped</tspan></text>
         </g>
     </g>
 </svg>
