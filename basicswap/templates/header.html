@@ -357,10 +357,12 @@
                       <path data-cap="butt" d="M10,10a2,2,0,0,1,4,0" stroke="#2ad167"></path></g>
                   </svg>
                   <span data-tooltip-target="tooltip-DEV" ></span> </div>
-                <div class="tooltip-arrow" data-popper-arrow></div>
                 <div id="tooltip-DEV" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
-                  <p>Debug mode: Active </p> {% if debug_ui_mode == true %}
-                  <p> Debug UI mode: Active </p> {% endif %} </div>
+                  <p><b>Debug mode:</b> Active</p>
+                  {% if debug_ui_mode == true %}
+                  <p><b>Debug UI mode:</b> Active</p>
+                  {% endif %}
+                </div>
                 </li>
                 </ul>
                 <!-- dev mode icons on/off -->
@@ -372,10 +374,9 @@
                 <div data-tooltip-target="tooltip-locked-wallets" class="ml-5 flex items-center text-gray-50 hover:text-gray-100 text-sm">
                    <svg class="text-gray-500 w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#2ad167" stroke-linejoin="round"><rect x="3" y="11" width="18" height="12" rx="2"></rect><circle cx="12" cy="17" r="2" stroke="#2ad167"></circle><path d="M17,7V6a4.951,4.951,0,0,0-4.9-5H12A4.951,4.951,0,0,0,7,5.9V7" stroke="#2ad167"></path></g></svg>
                   <span data-tooltip-target="tooltip-locked-wallets" ></span> </div>
-                <div class="tooltip-arrow" data-popper-arrow></div>
                 <div id="tooltip-locked-wallets" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
-                  <p>Wallets locked </p>
-                  <p> </p> </div>
+                  <p><b>Wallets:</b> Locked </p>
+                </div>
                 {% else %}
                 <a href='/lock'>
                 <div data-tooltip-target="tooltip-unlocked-wallets" class="ml-5 flex items-center text-gray-50 hover:text-gray-100 text-sm">
@@ -383,8 +384,8 @@
                   <span data-tooltip-target="tooltip-unlocked-wallets" ></span> </div>
                 <div class="tooltip-arrow" data-popper-arrow></div>
                 <div id="tooltip-unlocked-wallets" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
-                  <p>Wallets unlocked </p>
-                  <p> </p> </div>
+                  <p><b>Wallets:</b> Unlocked </p>
+                </div>
                 </a>
                 {% endif %}
                 </li></ul>
@@ -403,9 +404,8 @@
                           </g>
                         </svg>
                     </a> <span data-tooltip-target="tooltip-TOR"></span></div>
-                    <div class="tooltip-arrow" data-popper-arrow></div>
-                    <div id="tooltip-TOR" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip"> Tor mode: Active {% if tor_established == true %}
-                      <br> Tor: Connected{% endif %}</div>
+                    <div id="tooltip-TOR" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip"><b>Tor mode:</b> Active {% if tor_established == true %}
+                      <br><b>Tor:</b> Connected{% endif %}</div>
                   </li>
                 </ul>
                 <!-- tor -->
@@ -414,7 +414,6 @@
                <svg id="theme-toggle-dark-icon" class="hidden w-5 h-5" fill="#F59E0B" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"></path></svg>
                <svg id="theme-toggle-light-icon" class="hidden w-5 h-5" fill="#F59E0B" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" fill-rule="evenodd" clip-rule="evenodd"></path></svg>
                <span data-tooltip-target="tooltip-darkmode"></span>
-                  <div class="tooltip-arrow" data-popper-arrow></div>
                   <div id="tooltip-darkmode" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">Dark mode</div>
               </button>
             </div>
@@ -447,7 +446,7 @@
                   </li>
                   <div class="flex-shrink-0 w-px h-10 bg-gray-200 dark:bg-gray-400 mr-10"></div>
                   <li>
-                    <a class="flex mr-5 items-center text-sm text-gray-400 hover:text-gray-600 dark:text-gray-100 dark:hover:text-gray-100" href="/sentoffers">
+                    <a data-tooltip-target="tooltip-your-offers" class="flex mr-5 items-center text-sm text-gray-400 hover:text-gray-600 dark:text-gray-100 dark:hover:text-gray-100" href="/sentoffers">
                       <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="18" width="18" viewBox="0 0 24 24">
                         <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
                           <circle cx="5" cy="5" r="4"></circle>
@@ -458,6 +457,12 @@
                           <polyline points=" 8,16 11,19 8,22 " stroke="#6b7280"></polyline>
                         </g>
                       </svg><span>Your Offers</span> <span class="inline-flex justify-center items-center text-xs font-semibold ml-3 mr-2 px-2.5 py-1 font-small text-white bg-blue-500 rounded-full" title="Total {{ summary.num_sent_offers }}">{{ summary.num_sent_active_offers }}</span></a>
+
+                <div id="tooltip-your-offers" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+                  <p><b>Total:</b> {{ summary.num_sent_offers }}</p>
+                <div class="tooltip-arrow" data-popper-arrow></div>
+                </div>
+
                   </li>
                   <div class="flex-shrink-0 w-px h-10 bg-gray-200 dark:bg-gray-400 mr-10"></div>
                   <li>
@@ -470,7 +475,7 @@
                       </svg><span>Available Bids</span> <span class="inline-flex justify-center items-center text-xs font-semibold ml-3 mr-2 px-2.5 py-1 font-small text-white bg-blue-500 rounded-full">{{ summary.num_available_bids }}</span></a>
                   </li>
                   <li>
-                    <a class="flex mr-10 items-center text-sm text-gray-400 hover:text-gray-600 dark:text-gray-100 dark:hover:text-gray-100" href="/receivedbids">
+                    <a data-tooltip-target="tooltip-bids-received" class="flex mr-10 items-center text-sm text-gray-400 hover:text-gray-600 dark:text-gray-100 dark:hover:text-gray-100" href="/receivedbids">
                       <svg class="text-gray-100 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
                         <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
                           <path d="M2,16v4a2,2,0,0,0,2,2H20a2,2,0,0,0,2-2V16"> </path>
@@ -479,8 +484,13 @@
                         </g>
                       </svg><span>Bids Received</span> <span class="inline-flex justify-center items-center text-xs font-semibold ml-3 mr-2 px-2.5 py-1 font-small text-white bg-blue-500 rounded-full" title="Total {{ summary.num_recv_bids }}">{{ summary.num_available_bids }}</span></a>
                   </li>
+
+                <div id="tooltip-bids-received" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+                  <p><b>Total:</b>  {{ summary.num_recv_bids }}</p>
+                  <div class="tooltip-arrow" data-popper-arrow></div>
+                </div>
                   <li>
-                    <a class="flex mr-10 items-center text-sm text-gray-400 hover:text-gray-600 dark:text-gray-100 dark:hover:text-gray-100" href="/sentbids">
+                    <a data-tooltip-target="tooltip-bids-sent" class="flex mr-10 items-center text-sm text-gray-400 hover:text-gray-600 dark:text-gray-100 dark:hover:text-gray-100" href="/sentbids">
                       <svg class="text-gray-100 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
                         <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
                           <path d="M2,16v4a2,2,0,0,0,2,2H20a2,2,0,0,0,2-2V16"></path>
@@ -488,6 +498,13 @@
                           <polyline points="17 7 12 2 7 7" stroke="#6b7280"></polyline>
                         </g>
                       </svg> <span>Bids Sent</span><span class="inline-flex justify-center items-center text-xs font-semibold ml-3 mr-2 px-2.5 py-1 font-small text-white bg-blue-500 rounded-full" title="Total {{ summary.num_sent_bids }}">{{ summary.num_sent_active_bids }}</span></a>
+
+               
+                <div id="tooltip-bids-sent" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+                  <p><b>Total:</b>  {{ summary.num_sent_bids }}</p>
+                <div class="tooltip-arrow" data-popper-arrow></div>
+                </div>
+
                   </li>
                 </ul>
               </div>

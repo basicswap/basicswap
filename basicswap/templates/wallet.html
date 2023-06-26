@@ -39,8 +39,8 @@
      <div class="w-full md:w-1/2 p-3">
       <h2 class="text-4xl font-bold text-white tracking-tighter">
        <span class="inline-block align-middle">
-        <img class="h-20" src="/static/images/coins/{{ w.name }}.png" alt="{{ w.name }}">
-       </span>{{ w.name }} Wallet
+        <img class="mr-2" src="/static/images/coins/{{ w.name }}.png" alt="{{ w.name }}">
+       </span>{{ w.name }} Wallet - <span id="total-usd-value"></span>
       </h2>
       <p class="font-normal text-coolGray-200 dark:text-white pl-2 pt-5">Manage your {{ w.ticker }} wallet. {% if refresh %} (Page Refresh: {{ refresh }} seconds) {% endif %}</p>
      </div>
@@ -163,10 +163,7 @@
                <img class="h-7" src="/static/images/coins/{{ w.name }}.png" alt="{{ w.name }}">
               </span>Balance:
              </td>
-             <td class="py-3 px-6 bold">{{ w.balance }}</td>
-             {% if w.unconfirmed %}<td>Unconfirmed:</td>
-             <td>{{ w.unconfirmed }}</td>
-             {% endif %}
+             <td class="py-3 px-6 bold coinname-value" data-coinname="{{ w.name }}">{{ w.balance }} {{ w.ticker }} (<span class="usd-value"></span>){% if w.unconfirmed %} <span class="inline-block py-1 px-2 rounded-full bg-green-100 text-green-500 dark:bg-gray-500 dark:text-green-500">Unconfirmed: +{{ w.unconfirmed }} {{ w.ticker }}</span>{% endif %}</td>
             </tr>
             {% if w.cid == '1' %}
             <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
@@ -175,11 +172,7 @@
                <img class="h-7" src="/static/images/coins/{{ w.name }}.png" alt="{{ w.name }} Blind">
               </span>Blind Balance:
              </td>
-             <td class="py-3 px-6 bold">{{ w.blind_balance }}</td>
-             {% if w.blind_unconfirmed %}
-             <td>Blind Unconfirmed:</td>
-             <td>{{ w.blind_unconfirmed }}</td>
-             {% endif %}
+             <td class="py-3 px-6 bold coinname-value" data-coinname="{{ w.name }}">{{ w.blind_balance }} {{ w.ticker }} (<span class="usd-value"></span>) {% if w.blind_unconfirmed %} <span class="inline-block py-1 px-2 rounded-full bg-green-100 text-green-500 dark:bg-gray-500 dark:text-green-500">Unconfirmed: +{{ w.blind_unconfirmed }} {{ w.ticker }}</span>{% endif %}</td>
             </tr>
             <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
              <td class="py-3 px-6 bold">
@@ -187,8 +180,8 @@
                <img class="h-7" src="/static/images/coins/{{ w.name }}.png" alt="{{ w.name }} Anon">
               </span>Anon Balance:
              </td>
-             <td class="py-3 px-6 bold">{{ w.anon_balance }}</td> {% if w.anon_pending %} <td>Anon Pending:</td>
-             <td>{{ w.anon_pending }}</td>{% endif %}
+             <td class="py-3 px-6 bold coinname-value" data-coinname="{{ w.name }}">{{ w.anon_balance }} {{ w.ticker }} (<span class="usd-value"></span>) {% if w.anon_pending %} <span class="inline-block py-1 px-2 rounded-full bg-green-100 text-green-500 dark:bg-gray-500 dark:text-green-500">Pending: +{{ w.anon_pending }} {{ w.ticker }}</span>{% endif %}</td>             
+             <td class="usd-value"></td>
             </tr> {% endif %} <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
              <td class="py-3 px-6 bold">Blocks:</td>
              <td class="py-3 px-6">{{ w.blocks }} {% if w.known_block_count %} / {{ w.known_block_count }} {% endif %}</td>
@@ -237,26 +230,26 @@
          </tr>
          <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
           <td class="py-3 px-6 bold">
-           <button type="submit" class="flex flex-wrap justify-center w-52 py-2 px-4 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" name="newaddr_{{ w.cid }}" value="New Subaddress">
+           <button type="submit" class="flex flex-wrap justify-center py-2 px-4 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" name="newaddr_{{ w.cid }}" value="New Subaddress">
             <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
              <g fill="#ffffff" class="nc-icon-wrapper">
               <path fill="#ffffff" d="M12,3c1.989,0,3.873,0.65,5.43,1.833l-3.604,3.393l9.167,0.983L22.562,0l-3.655,3.442 C16.957,1.862,14.545,1,12,1C5.935,1,1,5.935,1,12h2C3,7.037,7.037,3,12,3z"></path>
               <path data-color="color-2" d="M12,21c-1.989,0-3.873-0.65-5.43-1.833l3.604-3.393l-9.167-0.983L1.438,24l3.655-3.442 C7.043,22.138,9.455,23,12,23c6.065,0,11-4.935,11-11h-2C21,16.963,16.963,21,12,21z"></path>
              </g>
-            </svg> New Subaddress </button>
+            </svg> New {{ w.ticker }} Sub Address </button>
           </td>
           <td colspan=2 class="py-3 px-6 monospace select-all">{{ w.deposit_address }}</td>
          </tr>
          {% else %}
          <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
           <td class="py-3 px-6 bold">
-           <button type="submit" class="flex flex-wrap justify-center w-52 py-2 px-4 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" name="newaddr_{{ w.cid }}" value="New Deposit Address">
+           <button type="submit" class="flex flex-wrap justify-center py-2 px-4 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" name="newaddr_{{ w.cid }}" value="New Deposit Address">
             <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
              <g fill="#ffffff" class="nc-icon-wrapper">
               <path fill="#ffffff" d="M12,3c1.989,0,3.873,0.65,5.43,1.833l-3.604,3.393l9.167,0.983L22.562,0l-3.655,3.442 C16.957,1.862,14.545,1,12,1C5.935,1,1,5.935,1,12h2C3,7.037,7.037,3,12,3z"></path>
               <path data-color="color-2" d="M12,21c-1.989,0-3.873-0.65-5.43-1.833l3.604-3.393l-9.167-0.983L1.438,24l3.655-3.442 C7.043,22.138,9.455,23,12,23c6.065,0,11-4.935,11-11h-2C21,16.963,16.963,21,12,21z"></path>
              </g>
-            </svg>New Deposit Address</button>
+            </svg>New {{ w.ticker }} Deposit Address</button>
           </td>
           <td colspan=2 class="py-3 px-6 monospace bold select-all" id="deposit_address">{{ w.deposit_address }}</td>
          </tr>
@@ -315,13 +308,13 @@
                <polygon data-color="color-2" points="6,10 12,17 18,10 13,10 13,1 11,1 11,10 "></polygon>
                <path fill="#ffffff" d="M22,21H2v-6H0v7c0,0.552,0.448,1,1,1h22c0.552,0,1-0.448,1-1v-7h-2V21z"></path>
               </g>
-             </svg>Withdraw</button>
+             </svg>Withdraw {{ w.ticker }}</button>
            </td>
            <td class="py-3 px-6">
-            <input placeholder="Address" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" name="to_{{ w.cid }}" value="{{ w.wd_address }}">
+            <input placeholder="{{ w.ticker }} Address" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" name="to_{{ w.cid }}" value="{{ w.wd_address }}">
            </td>
            <td class="py-3 px-6">
-            <input placeholder="Amount" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" name="amt_{{ w.cid }}" value="{{ w.wd_value }}">
+            <input placeholder="{{ w.ticker }} Amount" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" name="amt_{{ w.cid }}" value="{{ w.wd_value }}">
            </td>
           </tr>
           <tr class="opacity-100 text-gray-500 dark:text-gray-100">
@@ -511,6 +504,117 @@
 <input type="hidden" name="formid" value="{{ form_id }}">
 </form>
 </div>
+</div>
+</div>
+</div>
+</div>
+<script>
+const coinNameToSymbol = {
+  'Bitcoin': 'BTC',
+  'Particl': 'PART',
+  'Particl Blind': 'PART',
+  'Particl Anon': 'PART',
+  'Monero': 'XMR',
+  'Litecoin': 'LTC',
+  'Firo': 'FIRO',
+  'Dash': 'DASH',
+  'PIVX': 'PIVX'
+};
+
+const getUsdValue = (cryptoValue, coinSymbol) => fetch(`https://min-api.cryptocompare.com/data/price?fsym=${coinSymbol}&tsyms=USD`)
+  .then(response => response.json())
+  .then(data => {
+    const exchangeRate = data.USD;
+    if (!isNaN(exchangeRate)) {
+      return cryptoValue * exchangeRate;
+    } else {
+      throw new Error(`Invalid exchange rate for ${coinSymbol}`);
+    }
+  });
+
+const updateUsdValue = async (cryptoCell, coinFullName, usdValueSpan) => {
+  console.log('updateUsdValue called with:', cryptoCell, coinFullName);
+  const coinSymbol = coinNameToSymbol[coinFullName] || '';
+  if (!coinSymbol) {
+    console.error(`Coin symbol not found for full name: ${coinFullName}`);
+    return;
+  }
+
+  const cryptoValue = parseFloat(cryptoCell.textContent);
+
+  if (!isNaN(cryptoValue) && cryptoValue !== 0) {
+    try {
+      const usdValue = await getUsdValue(cryptoValue, coinSymbol);
+      console.log('usdValue:', usdValue);
+      if (usdValueSpan) {
+        usdValueSpan.textContent = `$${usdValue.toFixed(2)}`;
+      }
+    } catch (error) {
+      console.error('Error in updateUsdValue:', error);
+      if (usdValueSpan) {
+        usdValueSpan.textContent = 'Error retrieving exchange rate';
+      }
+    }
+  } else {
+    if (usdValueSpan) {
+      usdValueSpan.textContent = `$0.00`;
+    }
+  }
+};
+
+const calculateTotalUsdValue = async () => {
+  const coinNameValues = document.querySelectorAll('.coinname-value');
+  let totalUsdValue = 0;
+
+  for (const coinNameValue of coinNameValues) {
+    const coinFullName = coinNameValue.getAttribute('data-coinname');
+    const cryptoValue = parseFloat(coinNameValue.textContent);
+    const coinSymbol = coinNameToSymbol[coinFullName];
+
+    if (coinSymbol) {
+      const usdValueSpan = coinNameValue.querySelector('.usd-value');
+
+      if (!isNaN(cryptoValue) && cryptoValue !== 0) {
+        try {
+          const usdValue = await getUsdValue(cryptoValue, coinSymbol);
+          totalUsdValue += usdValue;
+          if (usdValueSpan) {
+            usdValueSpan.textContent = `$${usdValue.toFixed(2)}`;
+          }
+        } catch (error) {
+          console.error(`Error retrieving exchange rate for ${coinFullName}`);
+        }
+      } else {
+        if (usdValueSpan) {
+          usdValueSpan.textContent = `$0.00`;
+        }
+      }
+    } else {
+      console.error(`Coin symbol not found for full name: ${coinFullName}`);
+    }
+  }
+
+  const totalUsdValueElement = document.getElementById('total-usd-value');
+  if (totalUsdValueElement) {
+    totalUsdValueElement.textContent = `$${totalUsdValue.toFixed(2)}`;
+  }
+};
+
+// Call the function to calculate the USD values and total USD value when the DOM content is loaded
+document.addEventListener('DOMContentLoaded', () => {
+  const coinNameValues = document.querySelectorAll('.coinname-value');
+
+  for (const coinNameValue of coinNameValues) {
+    const coinFullName = coinNameValue.getAttribute('data-coinname');
+    const usdValueSpan = coinNameValue.querySelector('.usd-value');
+    updateUsdValue(coinNameValue, coinFullName, usdValueSpan);
+  }
+
+  calculateTotalUsdValue();
+});
+
+</script>
+{% include 'footer.html' %}
 <script>
  function confirmReseed() {
   return confirm("Are you sure?\nBackup your wallet before and after.\nWon't detect used keys.\nShould only be used for new wallets.");
@@ -524,10 +628,5 @@
   return confirm("Are you sure?");
  }
 </script>
-</div>
-</div>
-</div>
-</div>
-{% include 'footer.html' %}
 </body>
 </html>

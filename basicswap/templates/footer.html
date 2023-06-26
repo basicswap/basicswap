@@ -23,7 +23,7 @@
           <div class="flex items-center">
             <p class="mr-1 text-sm text-gray-90 dark:text-white font-medium ">© 2023~</p>
             <p class="text-sm text-coolGray-400 dark:text-white font-medium">{{ title }}</p> <span class="w-1 h-1 mx-1.5 bg-gray-500 rounded-full"></span>
-            <p class="text-sm text-coolGray-400 dark:text-white font-medium">GUI 2.0.1 </p> <span class="w-1 h-1 mx-1.5 bg-gray-500 rounded-full"></span>
+            <p class="text-sm text-coolGray-400 dark:text-white font-medium">GUI 2.0.2 </p> <span class="w-1 h-1 mx-1.5 bg-gray-500 rounded-full"></span>
             <p class="mr-2 text-sm font-bold dark:text-white text-gray-90 ">Made with </p>
             <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
               <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#f80b0b" stroke-linejoin="round">
@@ -51,35 +51,44 @@
     </div>
   </div>
 </section>
-    <script>
-      window.onload = () => {
-        toggleImages();
-      };
 
-      document.getElementById('theme-toggle').addEventListener('click', () => {
-        toggleImages();
-      });
+<script>
+  (function() {
+    var toggleImages = function() {
+      var html = document.querySelector('html');
+      var darkImages = document.querySelectorAll('.dark-image');
+      var lightImages = document.querySelectorAll('.light-image');
 
-      function toggleImages() {
-        const html = document.querySelector('html');
-        const darkImages = document.querySelectorAll('.dark-image');
-        const lightImages = document.querySelectorAll('.light-image');
-
-        if (html && html.classList.contains('dark')) {
-          toggleImageDisplay(darkImages, 'block');
-          toggleImageDisplay(lightImages, 'none');
-        } else {
-          toggleImageDisplay(darkImages, 'none');
-          toggleImageDisplay(lightImages, 'block');
-        }
+      if (html && html.classList.contains('dark')) {
+        toggleImageDisplay(darkImages, 'block');
+        toggleImageDisplay(lightImages, 'none');
+      } else {
+        toggleImageDisplay(darkImages, 'none');
+        toggleImageDisplay(lightImages, 'block');
       }
+    }
 
-      function toggleImageDisplay(images, display) {
-        images.forEach(img => {
-          img.style.display = display;
+    var toggleImageDisplay = function(images, display) {
+      images.forEach(function(img) {
+        img.style.display = display;
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      var themeToggle = document.getElementById('theme-toggle');
+
+      if (themeToggle) {
+        themeToggle.addEventListener('click', function() {
+          toggleImages();
         });
       }
-    </script>
+
+      toggleImages();
+    });
+  })();
+</script>
+
+
 
 <script>
       var themeToggleDarkIcon = document.getElementById('theme-toggle-dark-icon');
