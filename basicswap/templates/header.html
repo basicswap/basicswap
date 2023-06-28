@@ -456,7 +456,7 @@
                           <polyline points=" 16,2 13,5 16,8 " stroke="#6b7280"></polyline>
                           <polyline points=" 8,16 11,19 8,22 " stroke="#6b7280"></polyline>
                         </g>
-                      </svg><span>Your Offers</span> <span class="inline-flex justify-center items-center text-xs font-semibold ml-3 mr-2 px-2.5 py-1 font-small text-white bg-blue-500 rounded-full" title="Total {{ summary.num_sent_offers }}">{{ summary.num_sent_active_offers }}</span></a>
+                      </svg><span>Your Offers</span> <span class="inline-flex justify-center items-center text-xs font-semibold ml-3 mr-2 px-2.5 py-1 font-small text-white bg-blue-500 rounded-full">{{ summary.num_sent_active_offers }}</span></a>
 
                 <div id="tooltip-your-offers" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
                   <p><b>Total:</b> {{ summary.num_sent_offers }}</p>
@@ -482,7 +482,7 @@
                           <line data-cap="butt" x1="12" y1="1" x2="12" y2="16" stroke="#6b7280"></line>
                           <polyline points="7 11 12 16 17 11" stroke="#6b7280"></polyline>
                         </g>
-                      </svg><span>Bids Received</span> <span class="inline-flex justify-center items-center text-xs font-semibold ml-3 mr-2 px-2.5 py-1 font-small text-white bg-blue-500 rounded-full" title="Total {{ summary.num_recv_bids }}">{{ summary.num_available_bids }}</span></a>
+                      </svg><span>Bids Received</span> <span class="inline-flex justify-center items-center text-xs font-semibold ml-3 mr-2 px-2.5 py-1 font-small text-white bg-blue-500 rounded-full">{{ summary.num_available_bids }}</span></a>
                   </li>
 
                 <div id="tooltip-bids-received" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
@@ -497,9 +497,7 @@
                           <line data-cap="butt" x1="12" y1="17" x2="12" y2="2" stroke="#6b7280"></line>
                           <polyline points="17 7 12 2 7 7" stroke="#6b7280"></polyline>
                         </g>
-                      </svg> <span>Bids Sent</span><span class="inline-flex justify-center items-center text-xs font-semibold ml-3 mr-2 px-2.5 py-1 font-small text-white bg-blue-500 rounded-full" title="Total {{ summary.num_sent_bids }}">{{ summary.num_sent_active_bids }}</span></a>
-
-               
+                      </svg><span>Bids Sent</span><span class="inline-flex justify-center items-center text-xs font-semibold ml-3 mr-2 px-2.5 py-1 font-small text-white bg-blue-500 rounded-full">{{ summary.num_sent_active_bids }}</span></a>              
                 <div id="tooltip-bids-sent" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
                   <p><b>Total:</b>  {{ summary.num_sent_bids }}</p>
                 <div class="tooltip-arrow" data-popper-arrow></div>

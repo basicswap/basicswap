@@ -193,10 +193,15 @@
               </div>
              </th>
              <th class="p-0">
-              <div class="py-3 px-6 rounded-tr-xl bg-coolGray-200 dark:bg-gray-600">
+              <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">PTX Status</span>
               </div>
              </th>
+            <th class="p-0">
+              <div class="py-3 px-6 rounded-tr-xl bg-coolGray-200 dark:bg-gray-600">
+               <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Details</span>
+              </div>
+             </th>           
             </tr>
            </thead>
            <tbody>
@@ -225,6 +230,15 @@
              <td class="py-3 px-6 text-xs">{{ b[3] }}</td>
              <td class="py-3 px-6 text-xs">{{ b[4] }}</td>
              <td class="py-3 px-6 text-xs">{{ b[5] }}</td>
+             {% if page_type_received or page_type_sent %}
+              <td class="py-3 px-6 text-xs">
+               <a class="inline-block w-20 py-1 px-2 font-medium text-center text-sm rounded-md bg-blue-500 text-white border border-blue-500 hover:bg-blue-600 transition duration-200 bg-blue-500 text-white hover:bg-blue-600 transition duration-200" href="/bid/{{ b[1] }}">Details</a>
+              </td>
+             {% elif page_type_available %}
+              <td class="py-3 px-6 text-xs">
+               <a class="inline-block w-20 py-1 px-2 font-medium text-center text-sm rounded-md bg-blue-500 text-white border border-blue-500 hover:bg-blue-600 transition duration-200 bg-blue-500 text-white hover:bg-blue-600 transition duration-200" href="/bid/{{ b[1] }}">Accept</a>
+              </td>
+             {% endif %} 
             </tr>
            </tbody>
            {% endfor %}
@@ -235,7 +249,7 @@
         </div>
         <div class="rounded-b-md">
          <div class="w-full md:w-0/12">
-          <div class="flex flex-wrap justify-end pt-6 pr-6 border-t border-gray-200 dark:border-gray-400">
+          <div class="flex flex-wrap justify-end pt-6 pr-6 border-t border-gray-100 dark:border-gray-400">
            <div class="w-full md:w-auto p-1.5">
             <button type="submit" name='pageback' value="Page Back" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-blue-600 rounded-lg transition duration-200 focus:ring-0 focus:outline-none">
              <svg aria-hidden="true" class="mr-2 w-5 h-5" fill="#fff" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
