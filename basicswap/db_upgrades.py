@@ -18,7 +18,11 @@ from .db import (
 from .basicswap_util import (
     BidStates,
     strBidState,
-    isActiveBidState)
+    isActiveBidState,
+    isErrorBidState,
+    isFailingBidState,
+    isFinalBidState,
+)
 
 
 def upgradeDatabaseData(self, data_version):
@@ -56,10 +60,13 @@ def upgradeDatabaseData(self, data_version):
                         active_ind=1,
                         state_id=int(state),
                         in_progress=isActiveBidState(state),
+                        in_error=isErrorBidState(state),
+                        swap_failed=isFailingBidState(state),
+                        swap_ended=isFinalBidState(state),
                         label=strBidState(state),
                         created_at=now))
 
-            if data_version < 2:
+            if data_version > 0 and data_version < 2:
                 for state in (BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_TX_SIGS, BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX):
                     session.add(BidState(
                         active_ind=1,
@@ -67,6 +74,12 @@ def upgradeDatabaseData(self, data_version):
                         in_progress=isActiveBidState(state),
                         label=strBidState(state),
                         created_at=now))
+            if data_version > 0 and data_version < 3:
+                for state in BidStates:
+                    in_error = isErrorBidState(state)
+                    swap_failed = isFailingBidState(state)
+                    swap_ended = isFinalBidState(state)
+                    session.execute('UPDATE bidstates SET in_error = :in_error, swap_failed = :swap_failed, swap_ended = :swap_ended WHERE state_id = :state_id', {'in_error': in_error, 'swap_failed': swap_failed, 'swap_ended': swap_ended, 'state_id': int(state)})
 
             self.db_data_version = CURRENT_DB_DATA_VERSION
             self.setIntKVInSession('db_data_version', self.db_data_version, session)
@@ -248,6 +261,11 @@ def upgradeDatabase(self, db_version):
             db_version += 1
             session.execute('ALTER TABLE xmr_split_data ADD COLUMN addr_from STRING')
             session.execute('ALTER TABLE xmr_split_data ADD COLUMN addr_to STRING')
+        elif current_version == 19:
+            db_version += 1
+            session.execute('ALTER TABLE bidstates ADD COLUMN in_error INTEGER')
+            session.execute('ALTER TABLE bidstates ADD COLUMN swap_failed INTEGER')
+            session.execute('ALTER TABLE bidstates ADD COLUMN swap_ended INTEGER')
 
         if current_version != db_version:
             self.db_version = db_version

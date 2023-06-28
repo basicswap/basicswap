@@ -12,8 +12,8 @@ from enum import IntEnum, auto
 from sqlalchemy.ext.declarative import declarative_base
 
 
-CURRENT_DB_VERSION = 19
-CURRENT_DB_DATA_VERSION = 2
+CURRENT_DB_VERSION = 20
+CURRENT_DB_DATA_VERSION = 3
 Base = declarative_base()
 
 
@@ -487,6 +487,9 @@ class BidState(Base):
     state_id = sa.Column(sa.Integer)
     label = sa.Column(sa.String)
     in_progress = sa.Column(sa.Integer)
+    in_error = sa.Column(sa.Integer)
+    swap_failed = sa.Column(sa.Integer)
+    swap_ended = sa.Column(sa.Integer)
 
     note = sa.Column(sa.String)
     created_at = sa.Column(sa.BigInteger)

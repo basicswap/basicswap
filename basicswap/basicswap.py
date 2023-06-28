@@ -1051,7 +1051,7 @@ class BasicSwap(BaseApp):
         self.removeWatchedOutput(Coins(offer.coin_from), bid.bid_id, None)
         self.removeWatchedOutput(Coins(offer.coin_to), bid.bid_id, None)
 
-        if bid.state == BidStates.BID_ABANDONED or bid.state == BidStates.SWAP_COMPLETED:
+        if bid.state in (BidStates.BID_ABANDONED, BidStates.SWAP_COMPLETED):
             # Return unused addrs to pool
             itx_state = bid.getITxState()
             ptx_state = bid.getPTxState()
@@ -5824,12 +5824,13 @@ class BasicSwap(BaseApp):
         now: int = self.getTime()
         q_str = '''SELECT
                    COUNT(CASE WHEN b.was_sent THEN 1 ELSE NULL END) AS count_sent,
-                   COUNT(CASE WHEN b.was_sent AND b.state = {} AND b.expire_at > {} AND o.expire_at > {} THEN 1 ELSE NULL END) AS count_sent_active,
+                   COUNT(CASE WHEN b.was_sent AND s.swap_ended = 0 AND b.expire_at > {} AND o.expire_at > {} THEN 1 ELSE NULL END) AS count_sent_active,
                    COUNT(CASE WHEN b.was_received THEN 1 ELSE NULL END) AS count_received,
                    COUNT(CASE WHEN b.was_received AND b.state = {} AND b.expire_at > {} AND o.expire_at > {} THEN 1 ELSE NULL END) AS count_available
                    FROM bids b
                    JOIN offers o ON b.offer_id = o.offer_id
-                   WHERE b.active_ind = 1'''.format(BidStates.BID_RECEIVED, now, now, BidStates.BID_RECEIVED, now, now)
+                   JOIN bidstates s ON b.state = s.state_id
+                   WHERE b.active_ind = 1'''.format(now, now, BidStates.BID_RECEIVED, now, now)
         q = self.engine.execute(q_str).first()
         bids_sent = q[0]
         bids_sent_active = q[1]

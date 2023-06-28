@@ -464,6 +464,25 @@ def getLastBidState(packed_states):
         return BidStates.BID_STATE_UNKNOWN
 
 
+def strSwapType(swap_type):
+    if swap_type == SwapTypes.SELLER_FIRST:
+        return 'seller_first'
+    if swap_type == SwapTypes.XMR_SWAP:
+        return 'xmr_swap'
+    return None
+
+
+def strSwapDesc(swap_type):
+    if swap_type == SwapTypes.SELLER_FIRST:
+        return 'Secret Hash'
+    if swap_type == SwapTypes.XMR_SWAP:
+        return 'Adaptor Sig'
+    return None
+
+
+inactive_states = [BidStates.SWAP_COMPLETED, BidStates.BID_ERROR, BidStates.BID_REJECTED, BidStates.SWAP_TIMEDOUT, BidStates.BID_ABANDONED]
+
+
 def isActiveBidState(state):
     if state >= BidStates.BID_ACCEPTED and state < BidStates.SWAP_COMPLETED:
         return True
@@ -492,20 +511,24 @@ def isActiveBidState(state):
     return False
 
 
-def strSwapType(swap_type):
-    if swap_type == SwapTypes.SELLER_FIRST:
-        return 'seller_first'
-    if swap_type == SwapTypes.XMR_SWAP:
-        return 'xmr_swap'
-    return None
+def isErrorBidState(state):
+    return state in (
+        BidStates.BID_STALLED_FOR_TEST,
+        BidStates.BID_ERROR,
+    )
 
 
-def strSwapDesc(swap_type):
-    if swap_type == SwapTypes.SELLER_FIRST:
-        return 'Secret Hash'
-    if swap_type == SwapTypes.XMR_SWAP:
-        return 'Adaptor Sig'
-    return None
+def isFailingBidState(state):
+    return state in (
+        BidStates.BID_STALLED_FOR_TEST,
+        BidStates.BID_ERROR,
+        BidStates.XMR_SWAP_SCRIPT_TX_PREREFUND,
+        BidStates.XMR_SWAP_NOSCRIPT_TX_RECOVERED,
+        BidStates.XMR_SWAP_FAILED_REFUNDED,
+        BidStates.XMR_SWAP_FAILED_SWIPED,
+        BidStates.XMR_SWAP_FAILED,
+    )
 
 
-inactive_states = [BidStates.SWAP_COMPLETED, BidStates.BID_ERROR, BidStates.BID_REJECTED, BidStates.SWAP_TIMEDOUT, BidStates.BID_ABANDONED]
+def isFinalBidState(state):
+    return state in inactive_states
