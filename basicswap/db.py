@@ -12,7 +12,7 @@ from enum import IntEnum, auto
 from sqlalchemy.ext.declarative import declarative_base
 
 
-CURRENT_DB_VERSION = 20
+CURRENT_DB_VERSION = 21
 CURRENT_DB_DATA_VERSION = 3
 Base = declarative_base()
 
@@ -86,6 +86,7 @@ class Offer(Base):
     auto_accept_bids = sa.Column(sa.Boolean)
     withdraw_to_addr = sa.Column(sa.String)  # Address to spend lock tx to - address from wallet if empty TODO
     security_token = sa.Column(sa.LargeBinary)
+    bid_reversed = sa.Column(sa.Boolean)
 
     state = sa.Column(sa.Integer)
     states = sa.Column(sa.LargeBinary)  # Packed states and times
@@ -123,7 +124,6 @@ class Bid(Base):
     amount = sa.Column(sa.BigInteger)
     rate = sa.Column(sa.BigInteger)
 
-    accept_msg_id = sa.Column(sa.LargeBinary)
     pkhash_seller = sa.Column(sa.LargeBinary)
 
     initiate_txn_redeem = sa.Column(sa.LargeBinary)
@@ -290,6 +290,7 @@ class EventLog(Base):
 
 class XmrOffer(Base):
     __tablename__ = 'xmr_offers'
+    # TODO: Merge to Offer
 
     swap_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
     offer_id = sa.Column(sa.LargeBinary, sa.ForeignKey('offers.offer_id'))
@@ -306,16 +307,6 @@ class XmrSwap(Base):
 
     swap_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
     bid_id = sa.Column(sa.LargeBinary, sa.ForeignKey('bids.bid_id'))
-    bid_msg_id2 = sa.Column(sa.LargeBinary)
-    bid_msg_id3 = sa.Column(sa.LargeBinary)
-
-    bid_accept_msg_id = sa.Column(sa.LargeBinary)
-    bid_accept_msg_id2 = sa.Column(sa.LargeBinary)
-    bid_accept_msg_id3 = sa.Column(sa.LargeBinary)
-
-    coin_a_lock_tx_sigs_l_msg_id = sa.Column(sa.LargeBinary)  # MSG3L F -> L
-    coin_a_lock_spend_tx_msg_id = sa.Column(sa.LargeBinary)  # MSG4F L -> F
-    coin_a_lock_release_msg_id = sa.Column(sa.LargeBinary)  # MSG5F L -> F
 
     contract_count = sa.Column(sa.Integer)
 
@@ -503,3 +494,19 @@ class Notification(Base):
     created_at = sa.Column(sa.BigInteger)
     event_type = sa.Column(sa.Integer)
     event_data = sa.Column(sa.LargeBinary)
+
+
+class MessageLink(Base):
+    __tablename__ = 'message_links'
+
+    record_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
+    active_ind = sa.Column(sa.Integer)
+    created_at = sa.Column(sa.BigInteger)
+
+    linked_type = sa.Column(sa.Integer)
+    linked_id = sa.Column(sa.LargeBinary)
+    # linked_row_id = sa.Column(sa.Integer)  # TODO: Find a way to use table rowids
+
+    msg_type = sa.Column(sa.Integer)
+    msg_sequence = sa.Column(sa.Integer)
+    msg_id = sa.Column(sa.LargeBinary)

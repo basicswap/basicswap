@@ -17,8 +17,6 @@ import subprocess
 
 from sockshandler import SocksiPyHandler
 
-import basicswap.config as cfg
-
 from .rpc import (
     callrpc,
 )
@@ -122,18 +120,6 @@ class BaseApp:
     def callcoinrpc(self, coin, method, params=[], wallet=None):
         cc = self.coin_clients[coin]
         return callrpc(cc['rpcport'], cc['rpcauth'], method, params, wallet, cc['rpchost'])
-
-    def calltx(self, cmd):
-        bindir = self.coin_clients[Coins.PART]['bindir']
-        args = [os.path.join(bindir, cfg.PARTICL_TX), ]
-        if self.chain != 'mainnet':
-            args.append('-' + self.chain)
-        args += shlex.split(cmd)
-        p = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        out = p.communicate()
-        if len(out[1]) > 0:
-            raise ValueError('TX error ' + str(out[1]))
-        return out[0].decode('utf-8').strip()
 
     def callcoincli(self, coin_type, params, wallet=None, timeout=None):
         bindir = self.coin_clients[coin_type]['bindir']

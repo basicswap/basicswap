@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2020-2022 tecnovert
+# Copyright (c) 2020-2023 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -9,6 +9,7 @@ from sqlalchemy.orm import scoped_session
 from basicswap.util import (
     ensure,
 )
+from basicswap.interface import Curves
 from basicswap.chainparams import (
     Coins,
 )
@@ -37,17 +38,17 @@ def addLockRefundSigs(self, xmr_swap, ci):
     xmr_swap.a_lock_refund_tx = signed_tx
 
 
-def recoverNoScriptTxnWithKey(self, bid_id, encoded_key):
+def recoverNoScriptTxnWithKey(self, bid_id: bytes, encoded_key):
     self.log.info('Manually recovering %s', bid_id.hex())
     # Manually recover txn if other key is known
     session = scoped_session(self.session_factory)
     try:
         bid, xmr_swap = self.getXmrBidFromSession(session, bid_id)
         ensure(bid, 'Bid not found: {}.'.format(bid_id.hex()))
-        ensure(xmr_swap, 'XMR swap not found: {}.'.format(bid_id.hex()))
+        ensure(xmr_swap, 'Adaptor-sig swap not found: {}.'.format(bid_id.hex()))
         offer, xmr_offer = self.getXmrOfferFromSession(session, bid.offer_id, sent=False)
         ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
-        ensure(xmr_offer, 'XMR offer not found: {}.'.format(bid.offer_id.hex()))
+        ensure(xmr_offer, 'Adaptor-sig offer not found: {}.'.format(bid.offer_id.hex()))
         ci_to = self.ci(offer.coin_to)
 
         for_ed25519 = True if Coins(offer.coin_to) == Coins.XMR else False
@@ -107,6 +108,34 @@ def getChainBRemoteSplitKey(swap_client, bid, xmr_swap, offer):
             return ci_to.encodeKey(kbsf)
 
     return None
+
+
+def reverseBidAmountAndRate(swap_client, bid, offer) -> (int, int):
+    ci_from = swap_client.ci(offer.coin_to)
+    ci_to = swap_client.ci(offer.coin_from)
+    bid_rate = offer.rate if bid.rate is None else bid.rate
+    amount_from: int = bid.amount
+    amount_to: int = int((int(amount_from) * bid_rate) // ci_from.COIN())
+    reversed_rate: int = ci_to.make_int(amount_from / amount_to, r=1)
+
+    return amount_to, reversed_rate
+
+
+def setDLEAG(xmr_swap, ci_to, kbsf: bytes) -> None:
+    if ci_to.curve_type() == Curves.ed25519:
+        xmr_swap.kbsf_dleag = ci_to.proveDLEAG(kbsf)
+        xmr_swap.pkasf = xmr_swap.kbsf_dleag[0: 33]
+    elif ci_to.curve_type() == Curves.secp256k1:
+        for i in range(10):
+            xmr_swap.kbsf_dleag = ci_to.signRecoverable(kbsf, 'proof kbsf owned for swap')
+            pk_recovered: bytes = ci_to.verifySigAndRecover(xmr_swap.kbsf_dleag, 'proof kbsf owned for swap')
+            if pk_recovered == xmr_swap.pkbsf:
+                break
+            # self.log.debug('kbsl recovered pubkey mismatch, retrying.')
+        assert (pk_recovered == xmr_swap.pkbsf)
+        xmr_swap.pkasf = xmr_swap.pkbsf
+    else:
+        raise ValueError('Unknown curve')
 
 
 class XmrSwapInterface(ProtocolInterface):

@@ -318,6 +318,27 @@ class BTCInterface(CoinInterface):
             args.append('bech32')
         return self.rpc_callback('getnewaddress', args)
 
+    def isValidAddress(self, address: str) -> bool:
+        try:
+            rv = self.rpc_callback('validateaddress', [address])
+            if rv['isvalid'] is True:
+                return True
+        except Exception as ex:
+            self._log.debug('validateaddress failed: {}'.format(address))
+        return False
+
+    def isValidAddressHash(self, address_hash: bytes) -> bool:
+        hash_len = len(address_hash)
+        if hash_len == 20:
+            return True
+
+    def isValidPubkey(self, pubkey: bytes) -> bool:
+        try:
+            self.verifyPubkey(pubkey)
+            return True
+        except Exception:
+            return False
+
     def isAddressMine(self, address: str, or_watch_only: bool = False) -> bool:
         addr_info = self.rpc_callback('getaddressinfo', [address])
         if not or_watch_only:
@@ -1433,6 +1454,10 @@ class BTCInterface(CoinInterface):
         tx.vout.append(self.txoType()(output_value, script))
         tx.rehash()
         return tx.serialize().hex()
+
+    def ensureFunds(self, amount):
+        if self.getSpendableBalance() < amount:
+            raise ValueError('Balance too low')
 
 
 def testBTCInterface():

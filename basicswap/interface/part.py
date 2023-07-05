@@ -131,15 +131,6 @@ class PARTInterface(BTCInterface):
         block_header = self.rpc_callback('getblockheader', [block_hash])
         return block_header['height']
 
-    def isValidAddress(self, address: str) -> bool:
-        try:
-            rv = self.rpc_callback('validateaddress', [address])
-            if rv['isvalid'] is True:
-                return True
-        except Exception as ex:
-            self._log.debug('validateaddress failed: {}'.format(address))
-        return False
-
 
 class PARTInterfaceBlind(PARTInterface):
     @staticmethod
@@ -648,7 +639,7 @@ class PARTInterfaceBlind(PARTInterface):
         txid = self.rpc_callback('sendtypeto', params)
         return bytes.fromhex(txid)
 
-    def findTxB(self, kbv, Kbs, cb_swap_value, cb_block_confirmed, restore_height, bid_sender):
+    def findTxB(self, kbv, Kbs, cb_swap_value, cb_block_confirmed, restore_height: int, bid_sender: bool):
         Kbv = self.getPubkey(kbv)
         sx_addr = self.formatStealthAddress(Kbv, Kbs)
 

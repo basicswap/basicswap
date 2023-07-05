@@ -79,7 +79,7 @@ class PIVXInterface(BTCInterface):
         params = [addr_to, value, '', '', subfee]
         return self.rpc_callback('sendtoaddress', params)
 
-    def getSpendableBalance(self):
+    def getSpendableBalance(self) -> int:
         return self.make_int(self.rpc_callback('getwalletinfo')['balance'])
 
     def loadTx(self, tx_bytes):

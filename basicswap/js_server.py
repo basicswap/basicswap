@@ -382,8 +382,8 @@ def js_revokeoffer(self, url_split, post_string, is_json) -> bytes:
 def js_smsgaddresses(self, url_split, post_string, is_json) -> bytes:
     swap_client = self.server.swap_client
     swap_client.checkSystemStatus()
+    post_data = {} if post_string == '' else getFormData(post_string, is_json)
     if len(url_split) > 3:
-        post_data = {} if post_string == '' else getFormData(post_string, is_json)
         if url_split[3] == 'new':
             addressnote = get_data_entry_or(post_data, 'addressnote', '')
             new_addr, pubkey = swap_client.newSMSGAddress(addressnote=addressnote)
@@ -400,7 +400,11 @@ def js_smsgaddresses(self, url_split, post_string, is_json) -> bytes:
             new_addr = swap_client.editSMSGAddress(address, activeind, addressnote)
             return bytes(json.dumps({'edited_address': address}), 'UTF-8')
 
-    return bytes(json.dumps(swap_client.listAllSMSGAddresses()), 'UTF-8')
+    filters = {
+        'exclude_inactive': post_data.get('exclude_inactive', True),
+    }
+
+    return bytes(json.dumps(swap_client.listAllSMSGAddresses(filters)), 'UTF-8')
 
 
 def js_rates(self, url_split, post_string, is_json) -> bytes:

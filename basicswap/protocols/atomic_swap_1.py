@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2020-2022 tecnovert
+# Copyright (c) 2020-2023 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -23,7 +23,7 @@ INITIATE_TX_TIMEOUT = 40 * 60  # TODO: make variable per coin
 ABS_LOCK_TIME_LEEWAY = 10 * 60
 
 
-def buildContractScript(lock_val, secret_hash, pkh_redeem, pkh_refund, op_lock=OpCodes.OP_CHECKSEQUENCEVERIFY):
+def buildContractScript(lock_val: int, secret_hash: bytes, pkh_redeem: bytes, pkh_refund: bytes, op_lock=OpCodes.OP_CHECKSEQUENCEVERIFY) -> bytearray:
     script = bytearray([
         OpCodes.OP_IF,
         OpCodes.OP_SIZE,
@@ -58,7 +58,7 @@ def extractScriptSecretHash(script):
     return script[7:39]
 
 
-def redeemITx(self, bid_id, session):
+def redeemITx(self, bid_id: bytes, session):
     bid, offer = self.getBidAndOffer(bid_id, session)
     ci_from = self.ci(offer.coin_from)
 

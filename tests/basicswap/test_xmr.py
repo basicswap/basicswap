@@ -88,6 +88,9 @@ from tests.basicswap.common import (
     LTC_BASE_RPC_PORT,
     PREFIX_SECRET_KEY_REGTEST,
 )
+from basicswap.db_util import (
+    remove_expired_data,
+)
 from bin.basicswap_run import startDaemon, startXmrDaemon
 
 
@@ -744,6 +747,12 @@ class Test(BaseTest):
         assert (json_rv['edited_address'] == new_address)
 
         js_3 = read_json_api(1801, 'smsgaddresses')
+        assert (len(js_3) == 0)
+
+        post_json = {
+            'exclude_inactive': False,
+        }
+        js_3 = json.loads(post_json_req('http://127.0.0.1:1801/json/smsgaddresses', post_json))
         found = False
         for addr in js_3:
             if addr['addr'] == new_address:
@@ -1356,7 +1365,7 @@ class Test(BaseTest):
         wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.XMR_SWAP_FAILED_REFUNDED, wait_for=1800)
         wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.XMR_SWAP_FAILED_REFUNDED, wait_for=1800, sent=True)
 
-    def test_98_withdraw_all(self):
+    def test_97_withdraw_all(self):
         logging.info('---------- Test XMR withdrawal all')
         try:
             logging.info('Disabling XMR mining')
@@ -1383,6 +1392,9 @@ class Test(BaseTest):
         finally:
             logging.info('Restoring XMR mining')
             pause_event.set()
+
+    def test_98_remove_expired_data(self):
+        remove_expired_data(self.swap_clients[0])
 
 
 if __name__ == '__main__':

@@ -28,10 +28,10 @@ from basicswap.basicswap_util import (
     getLastBidState,
 )
 
-from basicswap.protocols.xmr_swap_1 import getChainBSplitKey, getChainBRemoteSplitKey
+from basicswap.protocols.xmr_swap_1 import getChainBSplitKey, getChainBRemoteSplitKey, reverseBidAmountAndRate
 
 PAGE_LIMIT = 50
-invalid_coins_from = (Coins.XMR, Coins.PART_ANON)
+invalid_coins_from = []
 
 
 def tickerToCoinId(ticker):
@@ -151,6 +151,15 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
     ticker_from = ci_from.ticker()
     ticker_to = ci_to.ticker()
 
+    reverse_bid: bool = ci_from.coin_type() in swap_client.scriptless_coins
+    ci_leader = ci_to if reverse_bid else ci_from
+    ci_follower = ci_from if reverse_bid else ci_to
+
+    bid_amount = bid.amount
+    bid_rate = offer.rate if bid.rate is None else bid.rate
+    if reverse_bid:
+        bid_amount, bid_rate = reverseBidAmountAndRate(swap_client, bid, offer)
+
     state_description = ''
     if offer.swap_type == SwapTypes.SELLER_FIRST:
         if bid.state == BidStates.BID_SENT:
@@ -229,7 +238,6 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
                 state_description = 'Redeeming output'
 
     addr_label = swap_client.getAddressLabel([bid.bid_addr, ])[0]
-    bid_rate = offer.rate if bid.rate is None else bid.rate
 
     can_abandon: bool = False
     if swap_client.debug and bid.state not in (BidStates.BID_ABANDONED, BidStates.SWAP_COMPLETED):
@@ -238,8 +246,8 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
     data = {
         'coin_from': ci_from.coin_name(),
         'coin_to': ci_to.coin_name(),
-        'amt_from': ci_from.format_amount(bid.amount),
-        'amt_to': ci_to.format_amount((bid.amount * bid_rate) // ci_from.COIN()),
+        'amt_from': ci_from.format_amount(bid_amount),
+        'amt_to': ci_to.format_amount((bid_amount * bid_rate) // ci_from.COIN()),
         'bid_rate': ci_to.format_amount(bid_rate),
         'ticker_from': ticker_from,
         'ticker_to': ticker_to,
@@ -335,16 +343,16 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
 
         if offer.lock_type == TxLockTypes.SEQUENCE_LOCK_TIME:
             if bid.xmr_a_lock_tx and bid.xmr_a_lock_tx.block_time:
-                raw_sequence = ci_from.getExpectedSequence(offer.lock_type, offer.lock_value)
-                seconds_locked = ci_from.decodeSequence(raw_sequence)
+                raw_sequence = ci_leader.getExpectedSequence(offer.lock_type, offer.lock_value)
+                seconds_locked = ci_leader.decodeSequence(raw_sequence)
                 data['coin_a_lock_refund_tx_est_final'] = bid.xmr_a_lock_tx.block_time + seconds_locked
                 data['coin_a_last_median_time'] = swap_client.coin_clients[offer.coin_from]['chain_median_time']
 
             if TxTypes.XMR_SWAP_A_LOCK_REFUND in bid.txns:
                 refund_tx = bid.txns[TxTypes.XMR_SWAP_A_LOCK_REFUND]
                 if refund_tx.block_time is not None:
-                    raw_sequence = ci_from.getExpectedSequence(offer.lock_type, offer.lock_value)
-                    seconds_locked = ci_from.decodeSequence(raw_sequence)
+                    raw_sequence = ci_leader.getExpectedSequence(offer.lock_type, offer.lock_value)
+                    seconds_locked = ci_leader.decodeSequence(raw_sequence)
                     data['coin_a_lock_refund_swipe_tx_est_final'] = refund_tx.block_time + seconds_locked
 
         if view_tx_ind:
@@ -367,12 +375,12 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
     else:
         if offer.lock_type == TxLockTypes.SEQUENCE_LOCK_TIME:
             if bid.initiate_tx and bid.initiate_tx.block_time is not None:
-                raw_sequence = ci_from.getExpectedSequence(offer.lock_type, offer.lock_value)
-                seconds_locked = ci_from.decodeSequence(raw_sequence)
+                raw_sequence = ci_leader.getExpectedSequence(offer.lock_type, offer.lock_value)
+                seconds_locked = ci_leader.decodeSequence(raw_sequence)
                 data['itx_refund_tx_est_final'] = bid.initiate_tx.block_time + seconds_locked
             if bid.participate_tx and bid.participate_tx.block_time is not None:
-                raw_sequence = ci_to.getExpectedSequence(offer.lock_type, offer.lock_value // 2)
-                seconds_locked = ci_to.decodeSequence(raw_sequence)
+                raw_sequence = ci_follower.getExpectedSequence(offer.lock_type, offer.lock_value // 2)
+                seconds_locked = ci_follower.decodeSequence(raw_sequence)
                 data['ptx_refund_tx_est_final'] = bid.participate_tx.block_time + seconds_locked
 
     return data

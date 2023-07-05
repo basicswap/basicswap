@@ -101,6 +101,9 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
     except Exception:
         errors.append('Unknown Coin To')
 
+    if coin_from == coin_to:
+        errors.append('Coins from and to must be different.')
+
     try:
         page_data['amt_from'] = get_data_entry(form_data, 'amt_from')
         parsed_data['amt_from'] = inputAmount(page_data['amt_from'], ci_from)
@@ -214,6 +217,10 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
 
     try:
         if len(errors) == 0 and page_data['swap_style'] == 'xmr':
+            reverse_bid: bool = ci_from.coin_type() in swap_client.scriptless_coins
+            ci_leader = ci_to if reverse_bid else ci_from
+            ci_follower = ci_from if reverse_bid else ci_to
+
             if have_data_entry(form_data, 'fee_rate_from'):
                 page_data['from_fee_override'] = get_data_entry(form_data, 'fee_rate_from')
                 parsed_data['from_fee_override'] = page_data['from_fee_override']
@@ -224,12 +231,12 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
                 page_data['from_fee_override'] = ci_from.format_amount(ci_from.make_int(from_fee_override, r=1))
                 parsed_data['from_fee_override'] = page_data['from_fee_override']
 
-                lock_spend_tx_vsize = ci_from.xmr_swap_alock_spend_tx_vsize()
-                lock_spend_tx_fee = ci_from.make_int(ci_from.make_int(from_fee_override, r=1) * lock_spend_tx_vsize / 1000, r=1)
-                page_data['amt_from_lock_spend_tx_fee'] = ci_from.format_amount(lock_spend_tx_fee // ci_from.COIN())
-                page_data['tla_from'] = ci_from.ticker()
+                lock_spend_tx_vsize = ci_leader.xmr_swap_alock_spend_tx_vsize()
+                lock_spend_tx_fee = ci_leader.make_int(ci_from.make_int(from_fee_override, r=1) * lock_spend_tx_vsize / 1000, r=1)
+                page_data['amt_from_lock_spend_tx_fee'] = ci_from.format_amount(lock_spend_tx_fee // ci_leader.COIN())
+                page_data['tla_from'] = ci_leader.ticker()
 
-            if coin_to == Coins.XMR:
+            if ci_follower == Coins.XMR:
                 if have_data_entry(form_data, 'fee_rate_to'):
                     page_data['to_fee_override'] = get_data_entry(form_data, 'fee_rate_to')
                     parsed_data['to_fee_override'] = page_data['to_fee_override']
@@ -237,7 +244,7 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
                     to_fee_override, page_data['to_fee_src'] = swap_client.getFeeRateForCoin(parsed_data['coin_to'], page_data['fee_to_conf'])
                     if page_data['fee_to_extra'] > 0:
                         to_fee_override += to_fee_override * (float(page_data['fee_to_extra']) / 100.0)
-                    page_data['to_fee_override'] = ci_to.format_amount(ci_to.make_int(to_fee_override, r=1))
+                    page_data['to_fee_override'] = ci_follower.format_amount(ci_follower.make_int(to_fee_override, r=1))
                     parsed_data['to_fee_override'] = page_data['to_fee_override']
     except Exception as e:
         print('Error setting fee', str(e))  # Expected if missing fields
@@ -596,17 +603,22 @@ def page_offer(self, url_split, post_string):
         data['debug_ind'] = debugind
         data['debug_options'] = [(int(t), t.name) for t in DebugTypes]
 
+    reverse_bid: bool = ci_from.coin_type() in swap_client.scriptless_coins
+    ci_leader = ci_to if reverse_bid else ci_from
+    ci_follower = ci_from if reverse_bid else ci_to
+
     if xmr_offer:
-        int_fee_rate_now, fee_source = ci_from.get_fee_rate()
+        int_fee_rate_now, fee_source = ci_leader.get_fee_rate()
+
         data['xmr_type'] = True
-        data['a_fee_rate'] = ci_from.format_amount(xmr_offer.a_fee_rate)
-        data['a_fee_rate_verify'] = ci_from.format_amount(int_fee_rate_now, conv_int=True)
+        data['a_fee_rate'] = ci_leader.format_amount(xmr_offer.a_fee_rate)
+        data['a_fee_rate_verify'] = ci_leader.format_amount(int_fee_rate_now, conv_int=True)
         data['a_fee_rate_verify_src'] = fee_source
         data['a_fee_warn'] = xmr_offer.a_fee_rate < int_fee_rate_now
 
-        lock_spend_tx_vsize = ci_from.xmr_swap_alock_spend_tx_vsize()
-        lock_spend_tx_fee = ci_from.make_int(xmr_offer.a_fee_rate * lock_spend_tx_vsize / 1000, r=1)
-        data['amt_from_lock_spend_tx_fee'] = ci_from.format_amount(lock_spend_tx_fee // ci_from.COIN())
+        lock_spend_tx_vsize = ci_leader.xmr_swap_alock_spend_tx_vsize()
+        lock_spend_tx_fee = ci_leader.make_int(xmr_offer.a_fee_rate * lock_spend_tx_vsize / 1000, r=1)
+        data['amt_from_lock_spend_tx_fee'] = ci_leader.format_amount(lock_spend_tx_fee // ci_leader.COIN())
 
     if offer.was_sent:
         try:
@@ -621,7 +633,7 @@ def page_offer(self, url_split, post_string):
     amt_swapped = 0
     for b in bids:
         amt_swapped += b[4]
-        formatted_bids.append((b[2].hex(), ci_from.format_amount(b[4]), strBidState(b[5]), ci_to.format_amount(b[10]), b[11]))
+        formatted_bids.append((b[2].hex(), ci_leader.format_amount(b[4]), strBidState(b[5]), ci_follower.format_amount(b[10]), b[11]))
     data['amt_swapped'] = ci_from.format_amount(amt_swapped)
 
     template = server.env.get_template('offer.html')

@@ -131,3 +131,23 @@ message XmrBidLockReleaseMessage {
 
     bytes al_lock_spend_tx_esig = 2;
 }
+
+message ADSBidIntentMessage {
+    /* L -> F Sent from bidder, construct a reverse bid */
+    bytes offer_msg_id = 1;
+    uint64 time_valid = 2;          /* seconds bid is valid for */
+    uint64 amount = 3;              /* amount of amount_from bid is for */
+    uint64 rate = 4;
+
+    uint32 protocol_version = 5;
+}
+
+message ADSBidIntentAcceptMessage {
+    /* F -> L Sent from offerer, construct a reverse bid */
+    bytes bid_msg_id = 1;
+
+    bytes pkaf = 2;
+    bytes kbvf = 3;
+    bytes kbsf_dleag = 4;
+    bytes dest_af = 5;
+}

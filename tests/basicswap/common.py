@@ -121,7 +121,7 @@ def stopDaemons(daemons):
             logging.info('Closing %d, error %s', d.pid, str(e))
 
 
-def wait_for_bid(delay_event, swap_client, bid_id, state=None, sent=False, wait_for=20):
+def wait_for_bid(delay_event, swap_client, bid_id, state=None, sent: bool = False, wait_for: int = 20) -> None:
     logging.info('wait_for_bid %s', bid_id.hex())
     for i in range(wait_for):
         if delay_event.is_set():

@@ -480,7 +480,7 @@ class XMRInterface(CoinInterface):
             except Exception as e:
                 return {'error': str(e)}
 
-    def getSpendableBalance(self):
+    def getSpendableBalance(self) -> int:
         with self._mx_wallet:
             self.openWallet(self._wallet_filename)
 
@@ -514,3 +514,7 @@ class XMRInterface(CoinInterface):
     def isAddressMine(self, address):
         # TODO
         return True
+
+    def ensureFunds(self, amount):
+        if self.getSpendableBalance() < amount:
+            raise ValueError('Balance too low')

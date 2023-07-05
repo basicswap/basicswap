@@ -85,6 +85,8 @@ from .messages_pb2 import (
     XmrBidLockSpendTxMessage,
     XmrBidLockReleaseMessage,
     OfferRevokeMessage,
+    ADSBidIntentMessage,
+    ADSBidIntentAcceptMessage,
 )
 from .db import (
     CURRENT_DB_VERSION,
@@ -109,6 +111,7 @@ from .db import (
     KnownIdentity,
     AutomationLink,
     AutomationStrategy,
+    MessageLink,
 )
 from .db_upgrades import upgradeDatabase, upgradeDatabaseData
 from .base import BaseApp
@@ -152,10 +155,8 @@ from .basicswap_util import (
 PROTOCOL_VERSION_SECRET_HASH = 1
 MINPROTO_VERSION_SECRET_HASH = 1
 
-PROTOCOL_VERSION_ADAPTOR_SIG = 2
-MINPROTO_VERSION_ADAPTOR_SIG = 2
-
-non_script_type_coins = (Coins.XMR, Coins.PART_ANON)
+PROTOCOL_VERSION_ADAPTOR_SIG = 3
+MINPROTO_VERSION_ADAPTOR_SIG = 3
 
 
 def validOfferStateToReceiveBid(offer_state):
@@ -202,7 +203,7 @@ def threadPollChainState(swap_client, coin_type):
 class WatchedOutput():  # Watch for spends
     __slots__ = ('bid_id', 'txid_hex', 'vout', 'tx_type', 'swap_type')
 
-    def __init__(self, bid_id, txid_hex, vout, tx_type, swap_type):
+    def __init__(self, bid_id: bytes, txid_hex: str, vout, tx_type, swap_type):
         self.bid_id = bid_id
         self.txid_hex = txid_hex
         self.vout = vout
@@ -213,7 +214,7 @@ class WatchedOutput():  # Watch for spends
 class WatchedTransaction():
     # TODO
     # Watch for presence in mempool (getrawtransaction)
-    def __init__(self, bid_id, txid_hex, tx_type, swap_type):
+    def __init__(self, bid_id: bytes, txid_hex: str, tx_type, swap_type):
         self.bid_id = bid_id
         self.txid_hex = txid_hex
         self.tx_type = tx_type
@@ -257,6 +258,11 @@ class BasicSwap(BaseApp):
         self._notifications_cache = {}
         self._is_encrypted = None
         self._is_locked = None
+
+        # TODO: Set dynamically
+        self.scriptless_coins = (Coins.XMR, Coins.PART_ANON)
+        self.adaptor_swap_only_coins = self.scriptless_coins + (Coins.PART_BLIND, )
+        self.secret_hash_swap_only_coins = (Coins.PIVX, Coins.DASH, Coins.FIRO, Coins.NMC)
 
         # TODO: Adjust ranges
         self.min_delay_event = self.settings.get('min_delay_event', 10)
@@ -776,7 +782,7 @@ class BasicSwap(BaseApp):
             if chain_client_settings['manage_daemon'] is True:
                 self.stopDaemon(c)
 
-    def waitForDaemonRPC(self, coin_type, with_wallet=True) -> None:
+    def waitForDaemonRPC(self, coin_type, with_wallet: bool = True) -> None:
         for i in range(self.startup_tries):
             if not self.is_running:
                 return
@@ -821,7 +827,7 @@ class BasicSwap(BaseApp):
             if self.coin_clients[c]['connection_type'] == 'rpc':
                 yield c
 
-    def changeWalletPasswords(self, old_password, new_password, coin=None) -> None:
+    def changeWalletPasswords(self, old_password: str, new_password: str, coin=None) -> None:
         # Only the main wallet password is changed for monero, avoid issues by preventing until active swaps are complete
         if len(self.swaps_in_progress) > 0:
             raise ValueError('Can\'t change passwords while swaps are in progress')
@@ -851,7 +857,7 @@ class BasicSwap(BaseApp):
         if coin is None or coin == Coins.PART:
             self._is_encrypted, self._is_locked = self.ci(Coins.PART).isWalletEncryptedLocked()
 
-    def unlockWallets(self, password, coin=None) -> None:
+    def unlockWallets(self, password: str, coin=None) -> None:
         self._read_zmq_queue = False
         for c in self.activeCoins():
             if coin and c != coin:
@@ -875,7 +881,7 @@ class BasicSwap(BaseApp):
                 self._is_locked = True
         self._read_zmq_queue = True
 
-    def initialiseWallet(self, coin_type, raise_errors=False) -> None:
+    def initialiseWallet(self, coin_type, raise_errors: bool = False) -> None:
         if coin_type == Coins.PART:
             return
         ci = self.ci(coin_type)
@@ -983,14 +989,11 @@ class BasicSwap(BaseApp):
                 self.closeSession(use_session, commit=False)
 
     def clearStringKV(self, str_key: str, str_val: str) -> None:
-        with self.mxDB:
-            try:
-                session = scoped_session(self.session_factory)
-                session.execute('DELETE FROM kv_string WHERE key = :key', {'key': str_key})
-                session.commit()
-            finally:
-                session.close()
-                session.remove()
+        try:
+            session = self.openSession()
+            session.execute('DELETE FROM kv_string WHERE key = :key', {'key': str_key})
+        finally:
+            self.closeSession(session)
 
     def getPreFundedTx(self, linked_type: int, linked_id: bytes, tx_type: int, session=None) -> Optional[bytes]:
         try:
@@ -1005,7 +1008,7 @@ class BasicSwap(BaseApp):
             if session is None:
                 self.closeSession(use_session)
 
-    def activateBid(self, session, bid):
+    def activateBid(self, session, bid) -> None:
         if bid.bid_id in self.swaps_in_progress:
             self.log.debug('Bid %s is already in progress', bid.bid_id.hex())
 
@@ -1038,7 +1041,7 @@ class BasicSwap(BaseApp):
 
         # TODO process addresspool if bid has previously been abandoned
 
-    def deactivateBid(self, session, offer, bid):
+    def deactivateBid(self, session, offer, bid) -> None:
         # Remove from in progress
         self.log.debug('Removing bid from in-progress: %s', bid.bid_id.hex())
         self.swaps_in_progress.pop(bid.bid_id, None)
@@ -1073,12 +1076,14 @@ class BasicSwap(BaseApp):
             else:
                 use_session.execute('DELETE FROM actions WHERE linked_id = x\'{}\' '.format(bid.bid_id.hex()))
 
+            reverse_bid: bool = offer.coin_from in self.scriptless_coins
             # Unlock locked inputs (TODO)
             if offer.swap_type == SwapTypes.XMR_SWAP:
+                ci_from = self.ci(offer.coin_to if reverse_bid else offer.coin_from)
                 xmr_swap = use_session.query(XmrSwap).filter_by(bid_id=bid.bid_id).first()
                 if xmr_swap:
                     try:
-                        self.ci(offer.coin_from).unlockInputs(xmr_swap.a_lock_tx)
+                        ci_from.unlockInputs(xmr_swap.a_lock_tx)
                     except Exception as e:
                         self.log.debug('unlockInputs failed {}'.format(str(e)))
                         pass  # Invalid parameter, unknown transaction
@@ -1087,7 +1092,8 @@ class BasicSwap(BaseApp):
 
             # Update identity stats
             if bid.state in (BidStates.BID_ERROR, BidStates.XMR_SWAP_FAILED_REFUNDED, BidStates.XMR_SWAP_FAILED_SWIPED, BidStates.XMR_SWAP_FAILED, BidStates.SWAP_COMPLETED, BidStates.SWAP_TIMEDOUT):
-                peer_address = offer.addr_from if bid.was_sent else bid.bid_addr
+                was_sent: bool = bid.was_received if reverse_bid else bid.was_sent
+                peer_address = offer.addr_from if was_sent else bid.bid_addr
                 self.updateIdentityBidState(use_session, peer_address, bid)
 
         finally:
@@ -1121,37 +1127,28 @@ class BasicSwap(BaseApp):
             session.remove()
             self.mxDB.release()
 
-    def getActiveBidMsgValidTime(self):
+    def getActiveBidMsgValidTime(self) -> int:
         return self.SMSG_SECONDS_IN_HOUR * 48
 
-    def getAcceptBidMsgValidTime(self, bid):
+    def getAcceptBidMsgValidTime(self, bid) -> int:
         now: int = self.getTime()
         smsg_max_valid = self.SMSG_SECONDS_IN_HOUR * 48
         smsg_min_valid = self.SMSG_SECONDS_IN_HOUR * 1
         bid_valid = (bid.expire_at - now) + 10 * 60  # Add 10 minute buffer
         return max(smsg_min_valid, min(smsg_max_valid, bid_valid))
 
-    def sendSmsg(self, addr_from, addr_to, payload_hex, msg_valid):
+    def sendSmsg(self, addr_from: str, addr_to: str, payload_hex: bytes, msg_valid: int) -> bytes:
         options = {'decodehex': True, 'ttl_is_seconds': True}
         ro = self.callrpc('smsgsend', [addr_from, addr_to, payload_hex, False, msg_valid, False, options])
         return bytes.fromhex(ro['msgid'])
 
     def validateSwapType(self, coin_from, coin_to, swap_type):
-        if coin_from == Coins.XMR:
-            raise ValueError('TODO: XMR coin_from')
-        if coin_to == Coins.XMR and swap_type != SwapTypes.XMR_SWAP:
-            raise ValueError('Invalid swap type for XMR')
-        if coin_from == Coins.PART_ANON:
-            raise ValueError('TODO: PART_ANON coin_from')
-        if coin_to == Coins.PART_ANON and swap_type != SwapTypes.XMR_SWAP:
-            raise ValueError('Invalid swap type for PART_ANON')
-        if (coin_from == Coins.PART_BLIND or coin_to == Coins.PART_BLIND) and swap_type != SwapTypes.XMR_SWAP:
-            raise ValueError('Invalid swap type for PART_BLIND')
-        if coin_from in (Coins.PIVX, Coins.DASH, Coins.FIRO, Coins.NMC) and swap_type == SwapTypes.XMR_SWAP:
-            raise ValueError('TODO: {} -> XMR'.format(coin_from.name))
+        if (coin_from in self.adaptor_swap_only_coins or coin_to in self.adaptor_swap_only_coins) and swap_type != SwapTypes.XMR_SWAP:
+            raise ValueError('Invalid swap type for: {} -> {}'.format(coin_from.name, coin_to.name))
+        if (coin_from in self.secret_hash_swap_only_coins or coin_to in self.secret_hash_swap_only_coins) and swap_type == SwapTypes.XMR_SWAP:
+            raise ValueError('Invalid swap type for: {} -> {}'.format(coin_from.name, coin_to.name))
 
-    def notify(self, event_type, event_data, session=None):
-
+    def notify(self, event_type, event_data, session=None) -> None:
         show_event = event_type not in self._disabled_notification_types
         if event_type == NT.OFFER_RECEIVED:
             self.log.debug('Received new offer %s', event_data['offer_id'])
@@ -1321,7 +1318,7 @@ class BasicSwap(BaseApp):
         finally:
             self.closeSession(session)
 
-    def validateOfferAmounts(self, coin_from, coin_to, amount, rate, min_bid_amount):
+    def validateOfferAmounts(self, coin_from, coin_to, amount: int, rate: int, min_bid_amount: int) -> None:
         ci_from = self.ci(coin_from)
         ci_to = self.ci(coin_to)
         ensure(amount >= min_bid_amount, 'amount < min_bid_amount')
@@ -1332,7 +1329,7 @@ class BasicSwap(BaseApp):
         ensure(amount_to > ci_to.min_amount(), 'To amount below min value for chain')
         ensure(amount_to < ci_to.max_amount(), 'To amount above max value for chain')
 
-    def validateOfferLockValue(self, swap_type, coin_from, coin_to, lock_type, lock_value):
+    def validateOfferLockValue(self, swap_type, coin_from, coin_to, lock_type, lock_value: int) -> None:
         coin_from_has_csv = self.coin_clients[coin_from]['use_csv']
         coin_to_has_csv = self.coin_clients[coin_to]['use_csv']
 
@@ -1359,21 +1356,21 @@ class BasicSwap(BaseApp):
         else:
             raise ValueError('Unknown locktype')
 
-    def validateOfferValidTime(self, offer_type, coin_from, coin_to, valid_for_seconds):
+    def validateOfferValidTime(self, offer_type, coin_from, coin_to, valid_for_seconds: int) -> None:
         # TODO: adjust
         if valid_for_seconds < 10 * 60:
             raise ValueError('Offer TTL too low')
         if valid_for_seconds > 48 * 60 * 60:
             raise ValueError('Offer TTL too high')
 
-    def validateBidValidTime(self, offer_type, coin_from, coin_to, valid_for_seconds):
+    def validateBidValidTime(self, offer_type, coin_from, coin_to, valid_for_seconds: int) -> None:
         # TODO: adjust
         if valid_for_seconds < 10 * 60:
             raise ValueError('Bid TTL too low')
         if valid_for_seconds > 24 * 60 * 60:
             raise ValueError('Bid TTL too high')
 
-    def validateBidAmount(self, offer, bid_amount, bid_rate):
+    def validateBidAmount(self, offer, bid_amount: int, bid_rate: int) -> None:
         ensure(bid_amount >= offer.min_bid_amount, 'Bid amount below minimum')
         ensure(bid_amount <= offer.amount_from, 'Bid amount above offer amount')
         if not offer.amount_negotiable:
@@ -1381,13 +1378,13 @@ class BasicSwap(BaseApp):
         if not offer.rate_negotiable:
             ensure(offer.rate == bid_rate, 'Bid rate must match offer rate.')
 
-    def getOfferAddressTo(self, extra_options):
+    def getOfferAddressTo(self, extra_options) -> str:
         if 'addr_send_to' in extra_options:
             return extra_options['addr_send_to']
         return self.network_addr
 
-    def postOffer(self, coin_from, coin_to, amount, rate, min_bid_amount, swap_type,
-                  lock_type=TxLockTypes.SEQUENCE_LOCK_TIME, lock_value=48 * 60 * 60, auto_accept_bids=False, addr_send_from=None, extra_options={}):
+    def postOffer(self, coin_from, coin_to, amount: int, rate, min_bid_amount: int, swap_type,
+                  lock_type=TxLockTypes.SEQUENCE_LOCK_TIME, lock_value: int = 48 * 60 * 60, auto_accept_bids: bool = False, addr_send_from: str = None, extra_options={}) -> bytes:
         # Offer to send offer.amount_from of coin_from in exchange for offer.amount_from * offer.rate of coin_to
 
         ensure(coin_from != coin_to, 'coin_from == coin_to')
@@ -1410,6 +1407,8 @@ class BasicSwap(BaseApp):
         self.validateOfferValidTime(swap_type, coin_from_t, coin_to_t, valid_for_seconds)
 
         offer_addr_to = self.getOfferAddressTo(extra_options)
+
+        reverse_bid: bool = coin_from in self.scriptless_coins
 
         self.mxDB.acquire()
         session = None
@@ -1464,22 +1463,30 @@ class BasicSwap(BaseApp):
             if swap_type == SwapTypes.XMR_SWAP:
                 xmr_offer = XmrOffer()
 
-                # Delay before the chain a lock refund tx can be mined
-                xmr_offer.lock_time_1 = ci_from.getExpectedSequence(lock_type, lock_value)
-
-                # Delay before the follower can spend from the chain a lock refund tx
-                xmr_offer.lock_time_2 = ci_from.getExpectedSequence(lock_type, lock_value)
+                if reverse_bid:
+                    # Delay before the chain a lock refund tx can be mined
+                    xmr_offer.lock_time_1 = ci_to.getExpectedSequence(lock_type, lock_value)
+                    # Delay before the follower can spend from the chain a lock refund tx
+                    xmr_offer.lock_time_2 = ci_to.getExpectedSequence(lock_type, lock_value)
+                else:
+                    # Delay before the chain a lock refund tx can be mined
+                    xmr_offer.lock_time_1 = ci_from.getExpectedSequence(lock_type, lock_value)
+                    # Delay before the follower can spend from the chain a lock refund tx
+                    xmr_offer.lock_time_2 = ci_from.getExpectedSequence(lock_type, lock_value)
 
                 xmr_offer.a_fee_rate = msg_buf.fee_rate_from
                 xmr_offer.b_fee_rate = msg_buf.fee_rate_to  # Unused: TODO - Set priority?
 
-            proof_of_funds_hash = getOfferProofOfFundsHash(msg_buf, offer_addr)
-            proof_addr, proof_sig = self.getProofOfFunds(coin_from_t, int(amount), proof_of_funds_hash)
-            # TODO: For now proof_of_funds is just a client side check, may need to be sent with offers in future however.
+            if coin_from in self.scriptless_coins:
+                ci_from.ensureFunds(msg_buf.amount_from)
+            else:
+                proof_of_funds_hash = getOfferProofOfFundsHash(msg_buf, offer_addr)
+                proof_addr, proof_sig = self.getProofOfFunds(coin_from_t, int(amount), proof_of_funds_hash)
+                # TODO: For now proof_of_funds is just a client side check, may need to be sent with offers in future however.
 
             offer_bytes = msg_buf.SerializeToString()
             payload_hex = str.format('{:02x}', MessageTypes.OFFER) + offer_bytes.hex()
-            msg_valid = max(self.SMSG_SECONDS_IN_HOUR * 1, valid_for_seconds)
+            msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR * 1, valid_for_seconds)
             offer_id = self.sendSmsg(offer_addr, offer_addr_to, payload_hex, msg_valid)
 
             security_token = extra_options.get('security_token', None)
@@ -1509,6 +1516,7 @@ class BasicSwap(BaseApp):
                 created_at=offer_created_at,
                 expire_at=offer_created_at + msg_buf.time_valid,
                 was_sent=True,
+                bid_reversed=msg_buf.coin_from in self.scriptless_coins,
                 security_token=security_token)
             offer.setState(OfferStates.OFFER_SENT)
 
@@ -1587,7 +1595,6 @@ class BasicSwap(BaseApp):
                 raise ValueError('Offer is not active')
 
             offer.active_ind = 3
-
         finally:
             self.closeSession(session)
 
@@ -1705,7 +1712,7 @@ class BasicSwap(BaseApp):
 
         return hashlib.sha256(bytes(self.callcoinrpc(Coins.PART, 'extkey', ['info', evkey, path])['key_info']['result'], 'utf-8')).digest()
 
-    def getReceiveAddressFromPool(self, coin_type, bid_id, tx_type):
+    def getReceiveAddressFromPool(self, coin_type, bid_id: bytes, tx_type):
         self.log.debug('Get address from pool bid_id {}, type {}, coin {}'.format(bid_id.hex(), tx_type, coin_type))
         self.mxDB.acquire()
         try:
@@ -1728,7 +1735,7 @@ class BasicSwap(BaseApp):
             self.mxDB.release()
         return addr
 
-    def returnAddressToPool(self, bid_id, tx_type):
+    def returnAddressToPool(self, bid_id: bytes, tx_type):
         self.log.debug('Return address to pool bid_id {}, type {}'.format(bid_id.hex(), tx_type))
         self.mxDB.acquire()
         try:
@@ -1753,7 +1760,7 @@ class BasicSwap(BaseApp):
     def getRelayFeeRateForCoin(self, coin_type):
         return self.callcoinrpc(coin_type, 'getnetworkinfo')['relayfee']
 
-    def getFeeRateForCoin(self, coin_type, conf_target=2):
+    def getFeeRateForCoin(self, coin_type, conf_target: int = 2):
         chain_client_settings = self.getChainClientSettings(coin_type)
         override_feerate = chain_client_settings.get('override_feerate', None)
         if override_feerate:
@@ -1860,9 +1867,8 @@ class BasicSwap(BaseApp):
         # TODO: auto refresh after used
 
         key_str = 'receive_addr_' + chainparams[coin_type]['name']
-        self.mxDB.acquire()
+        session = self.openSession()
         try:
-            session = scoped_session(self.session_factory)
             try:
                 addr = session.query(DBKVString).filter_by(key=key_str).first().value
             except Exception:
@@ -1871,11 +1877,8 @@ class BasicSwap(BaseApp):
                     key=key_str,
                     value=addr
                 ))
-                session.commit()
         finally:
-            session.close()
-            session.remove()
-            self.mxDB.release()
+            self.closeSession(session)
         return addr
 
     def getCachedStealthAddressForCoin(self, coin_type):
@@ -1883,9 +1886,8 @@ class BasicSwap(BaseApp):
 
         ci = self.ci(coin_type)
         key_str = 'stealth_addr_' + ci.coin_name().lower()
-        self.mxDB.acquire()
+        session = self.openSession()
         try:
-            session = scoped_session(self.session_factory)
             try:
                 addr = session.query(DBKVString).filter_by(key=key_str).first().value
             except Exception:
@@ -1895,20 +1897,16 @@ class BasicSwap(BaseApp):
                     key=key_str,
                     value=addr
                 ))
-                session.commit()
         finally:
-            session.close()
-            session.remove()
-            self.mxDB.release()
+            self.closeSession(session)
         return addr
 
     def getCachedWalletRestoreHeight(self, ci):
         self.log.debug('getCachedWalletRestoreHeight %s', ci.coin_name())
 
         key_str = 'restore_height_' + ci.coin_name().lower()
-        self.mxDB.acquire()
+        session = self.openSession()
         try:
-            session = scoped_session(self.session_factory)
             try:
                 wrh = session.query(DBKVInt).filter_by(key=key_str).first().value
             except Exception:
@@ -1918,11 +1916,8 @@ class BasicSwap(BaseApp):
                     key=key_str,
                     value=wrh
                 ))
-                session.commit()
         finally:
-            session.close()
-            session.remove()
-            self.mxDB.release()
+            self.closeSession(session)
         return wrh
 
     def getWalletRestoreHeight(self, ci):
@@ -1934,19 +1929,15 @@ class BasicSwap(BaseApp):
         return found_height
 
     def getNewContractId(self):
-        self.mxDB.acquire()
+        session = self.openSession()
         try:
             self._contract_count += 1
-            session = scoped_session(self.session_factory)
             session.execute('UPDATE kv_int SET value = :value WHERE KEY="contract_count"', {'value': self._contract_count})
-            session.commit()
         finally:
-            session.close()
-            session.remove()
-            self.mxDB.release()
+            self.closeSession(session)
         return self._contract_count
 
-    def getProofOfFunds(self, coin_type, amount_for, extra_commit_bytes):
+    def getProofOfFunds(self, coin_type, amount_for: int, extra_commit_bytes):
         ci = self.ci(coin_type)
         self.log.debug('getProofOfFunds %s %s', ci.coin_name(), ci.format_amount(amount_for))
 
@@ -1955,7 +1946,7 @@ class BasicSwap(BaseApp):
 
         return ci.getProofOfFunds(amount_for, extra_commit_bytes)
 
-    def saveBidInSession(self, bid_id, bid, session, xmr_swap=None, save_in_progress=None):
+    def saveBidInSession(self, bid_id: bytes, bid, session, xmr_swap=None, save_in_progress=None) -> None:
         session.add(bid)
         if bid.initiate_tx:
             session.add(bid.initiate_tx)
@@ -1977,29 +1968,21 @@ class BasicSwap(BaseApp):
                 raise ValueError('Must specify offer for save_in_progress')
             self.swaps_in_progress[bid_id] = (bid, save_in_progress)  # (bid, offer)
 
-    def saveBid(self, bid_id, bid, xmr_swap=None):
-        self.mxDB.acquire()
+    def saveBid(self, bid_id: bytes, bid, xmr_swap=None) -> None:
+        session = self.openSession()
         try:
-            session = scoped_session(self.session_factory)
             self.saveBidInSession(bid_id, bid, session, xmr_swap)
-            session.commit()
         finally:
-            session.close()
-            session.remove()
-            self.mxDB.release()
+            self.closeSession(session)
 
-    def saveToDB(self, db_record):
-        self.mxDB.acquire()
+    def saveToDB(self, db_record) -> None:
+        session = self.openSession()
         try:
-            session = scoped_session(self.session_factory)
             session.add(db_record)
-            session.commit()
         finally:
-            session.close()
-            session.remove()
-            self.mxDB.release()
+            self.closeSession(session)
 
-    def createActionInSession(self, delay, action_type, linked_id, session):
+    def createActionInSession(self, delay: int, action_type: int, linked_id: bytes, session) -> None:
         self.log.debug('createAction %d %s', action_type, linked_id.hex())
         now: int = self.getTime()
         action = Action(
@@ -2010,19 +1993,16 @@ class BasicSwap(BaseApp):
             linked_id=linked_id)
         session.add(action)
 
-    def createAction(self, delay, action_type, linked_id):
+    def createAction(self, delay: int, action_type: int, linked_id: bytes) -> None:
         # self.log.debug('createAction %d %s', action_type, linked_id.hex())
-        self.mxDB.acquire()
-        try:
-            session = scoped_session(self.session_factory)
-            self.createActionInSession(delay, action_type, linked_id, session)
-            session.commit()
-        finally:
-            session.close()
-            session.remove()
-            self.mxDB.release()
 
-    def logEvent(self, linked_type, linked_id, event_type, event_msg, session):
+        session = self.openSession()
+        try:
+            self.createActionInSession(delay, action_type, linked_id, session)
+        finally:
+            self.closeSession(session)
+
+    def logEvent(self, linked_type: int, linked_id: bytes, event_type: int, event_msg: str, session) -> None:
         entry = EventLog(
             active_ind=1,
             created_at=self.getTime(),
@@ -2034,17 +2014,13 @@ class BasicSwap(BaseApp):
         if session is not None:
             session.add(entry)
             return
-        self.mxDB.acquire()
+        session = self.openSession()
         try:
-            session = scoped_session(self.session_factory)
             session.add(entry)
-            session.commit()
         finally:
-            session.close()
-            session.remove()
-            self.mxDB.release()
+            self.closeSession(session)
 
-    def logBidEvent(self, bid_id, event_type, event_msg, session):
+    def logBidEvent(self, bid_id: bytes, event_type: int, event_msg: str, session) -> None:
         self.log.debug('logBidEvent %s %s', bid_id.hex(), event_type)
         self.logEvent(Concepts.BID, bid_id, event_type, event_msg, session)
 
@@ -2052,20 +2028,56 @@ class BasicSwap(BaseApp):
         q = session.execute('SELECT COUNT(*) FROM eventlog WHERE linked_type = {} AND linked_id = x\'{}\' AND event_type = {}'.format(int(Concepts.BID), bid.bid_id.hex(), int(event_type))).first()
         return q[0]
 
-    def getEvents(self, linked_type, linked_id):
+    def getEvents(self, linked_type: int, linked_id: bytes):
         events = []
-        self.mxDB.acquire()
+        session = self.openSession()
         try:
-            session = scoped_session(self.session_factory)
             for entry in session.query(EventLog).filter(sa.and_(EventLog.linked_type == linked_type, EventLog.linked_id == linked_id)):
                 events.append(entry)
             return events
         finally:
-            session.close()
-            session.remove()
-            self.mxDB.release()
+            self.closeSession(session, commit=False)
 
-    def postBid(self, offer_id, amount, addr_send_from=None, extra_options={}):
+    def addMessageLink(self, linked_type: int, linked_id: int, msg_type: int, msg_id: bytes, msg_sequence: int = 0, session=None) -> None:
+        entry = MessageLink(
+            active_ind=1,
+            created_at=self.getTime(),
+            linked_type=linked_type,
+            linked_id=linked_id,
+            msg_type=int(msg_type),
+            msg_sequence=msg_sequence,
+            msg_id=msg_id)
+
+        if session is not None:
+            session.add(entry)
+            return
+        session = self.openSession()
+        try:
+            session.add(entry)
+        finally:
+            self.closeSession(session)
+
+    def getLinkedMessageId(self, linked_type: int, linked_id: int, msg_type: int, msg_sequence: int = 0, session=None) -> bytes:
+        try:
+            use_session = self.openSession(session)
+            q = session.execute('SELECT msg_id FROM message_links WHERE linked_type = :linked_type AND linked_id = :linked_id AND msg_type = :msg_type AND msg_sequence = :msg_sequence',
+                                {'linked_type': linked_type, 'linked_id': linked_id, 'msg_type': msg_type, 'msg_sequence': msg_sequence}).first()
+            return q[0]
+        finally:
+            if session is None:
+                self.closeSession(use_session, commit=False)
+
+    def countMessageLinks(self, linked_type: int, linked_id: int, msg_type: int, msg_sequence: int = 0, session=None) -> int:
+        try:
+            use_session = self.openSession(session)
+            q = session.execute('SELECT COUNT(*) FROM message_links WHERE linked_type = :linked_type AND linked_id = :linked_id AND msg_type = :msg_type AND msg_sequence = :msg_sequence',
+                                {'linked_type': linked_type, 'linked_id': linked_id, 'msg_type': msg_type, 'msg_sequence': msg_sequence}).first()
+            return q[0]
+        finally:
+            if session is None:
+                self.closeSession(use_session, commit=False)
+
+    def postBid(self, offer_id: bytes, amount: int, addr_send_from: str = None, extra_options={}) -> bytes:
         # Bid to send bid.amount * bid.rate of coin_to in exchange for bid.amount of coin_from
         self.log.debug('postBid %s', offer_id.hex())
 
@@ -2115,10 +2127,9 @@ class BasicSwap(BaseApp):
             payload_hex = str.format('{:02x}', MessageTypes.BID) + bid_bytes.hex()
 
             bid_addr = self.newSMSGAddress(use_type=AddressTypes.BID)[0] if addr_send_from is None else addr_send_from
-            options = {'decodehex': True, 'ttl_is_seconds': True}
-            msg_valid = max(self.SMSG_SECONDS_IN_HOUR * 1, valid_for_seconds)
-
+            msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR * 1, valid_for_seconds)
             bid_id = self.sendSmsg(bid_addr, offer.addr_from, payload_hex, msg_valid)
+
             bid = Bid(
                 protocol_version=msg_buf.protocol_version,
                 active_ind=1,
@@ -2153,7 +2164,7 @@ class BasicSwap(BaseApp):
         finally:
             self.mxDB.release()
 
-    def getOffer(self, offer_id, sent=False):
+    def getOffer(self, offer_id: bytes, sent: bool = False):
         self.mxDB.acquire()
         try:
             session = scoped_session(self.session_factory)
@@ -2163,7 +2174,7 @@ class BasicSwap(BaseApp):
             session.remove()
             self.mxDB.release()
 
-    def setTxBlockInfoFromHeight(self, ci, tx, height):
+    def setTxBlockInfoFromHeight(self, ci, tx, height: int) -> None:
         try:
             tx.block_height = height
             block_header = ci.getBlockHeaderFromHeight(height)
@@ -2172,7 +2183,7 @@ class BasicSwap(BaseApp):
         except Exception as e:
             self.log.warning(f'setTxBlockInfoFromHeight failed {e}')
 
-    def loadBidTxns(self, bid, session):
+    def loadBidTxns(self, bid, session) -> None:
         bid.txns = {}
         for stx in session.query(SwapTx).filter(sa.and_(SwapTx.bid_id == bid.bid_id)):
             if stx.tx_type == TxTypes.ITX:
@@ -2188,7 +2199,7 @@ class BasicSwap(BaseApp):
             else:
                 bid.txns[stx.tx_type] = stx
 
-    def getXmrBidFromSession(self, session, bid_id, sent=False):
+    def getXmrBidFromSession(self, session, bid_id: bytes, sent: bool = False):
         bid = session.query(Bid).filter_by(bid_id=bid_id).first()
         xmr_swap = None
         if bid:
@@ -2196,7 +2207,7 @@ class BasicSwap(BaseApp):
             self.loadBidTxns(bid, session)
         return bid, xmr_swap
 
-    def getXmrBid(self, bid_id, sent=False):
+    def getXmrBid(self, bid_id: bytes, sent: bool = False):
         self.mxDB.acquire()
         try:
             session = scoped_session(self.session_factory)
@@ -2206,14 +2217,14 @@ class BasicSwap(BaseApp):
             session.remove()
             self.mxDB.release()
 
-    def getXmrOfferFromSession(self, session, offer_id, sent=False):
+    def getXmrOfferFromSession(self, session, offer_id: bytes, sent: bool = False):
         offer = session.query(Offer).filter_by(offer_id=offer_id).first()
         xmr_offer = None
         if offer:
             xmr_offer = session.query(XmrOffer).filter_by(offer_id=offer_id).first()
         return offer, xmr_offer
 
-    def getXmrOffer(self, offer_id, sent=False):
+    def getXmrOffer(self, offer_id: bytes, sent: bool = False):
         self.mxDB.acquire()
         try:
             session = scoped_session(self.session_factory)
@@ -2223,7 +2234,7 @@ class BasicSwap(BaseApp):
             session.remove()
             self.mxDB.release()
 
-    def getBid(self, bid_id, session=None):
+    def getBid(self, bid_id: bytes, session=None):
         try:
             use_session = self.openSession(session)
             bid = use_session.query(Bid).filter_by(bid_id=bid_id).first()
@@ -2234,7 +2245,7 @@ class BasicSwap(BaseApp):
             if session is None:
                 self.closeSession(use_session, commit=False)
 
-    def getBidAndOffer(self, bid_id, session=None):
+    def getBidAndOffer(self, bid_id: bytes, session=None):
         try:
             use_session = self.openSession(session)
             bid = use_session.query(Bid).filter_by(bid_id=bid_id).first()
@@ -2247,7 +2258,7 @@ class BasicSwap(BaseApp):
             if session is None:
                 self.closeSession(use_session, commit=False)
 
-    def getXmrBidAndOffer(self, bid_id, list_events=True):
+    def getXmrBidAndOffer(self, bid_id: bytes, list_events=True):
         self.mxDB.acquire()
         try:
             session = scoped_session(self.session_factory)
@@ -2272,7 +2283,7 @@ class BasicSwap(BaseApp):
             session.remove()
             self.mxDB.release()
 
-    def getIdentity(self, address):
+    def getIdentity(self, address: str):
         self.mxDB.acquire()
         try:
             session = scoped_session(self.session_factory)
@@ -2283,7 +2294,7 @@ class BasicSwap(BaseApp):
             session.remove()
             self.mxDB.release()
 
-    def list_bid_events(self, bid_id, session):
+    def list_bid_events(self, bid_id: bytes, session):
         query_str = 'SELECT created_at, event_type, event_msg FROM eventlog ' + \
                     'WHERE active_ind = 1 AND linked_type = {} AND linked_id = x\'{}\' '.format(Concepts.BID, bid_id.hex())
         q = session.execute(query_str)
@@ -2299,7 +2310,7 @@ class BasicSwap(BaseApp):
 
         return events
 
-    def acceptBid(self, bid_id):
+    def acceptBid(self, bid_id: bytes) -> None:
         self.log.info('Accepting bid %s', bid_id.hex())
 
         bid, offer = self.getBidAndOffer(bid_id)
@@ -2309,9 +2320,13 @@ class BasicSwap(BaseApp):
         # Ensure bid is still valid
         now: int = self.getTime()
         ensure(bid.expire_at > now, 'Bid expired')
-        ensure(bid.state == BidStates.BID_RECEIVED, 'Wrong bid state: {}'.format(str(BidStates(bid.state))))
+        ensure(bid.state in (BidStates.BID_RECEIVED, ), 'Wrong bid state: {}'.format(str(BidStates(bid.state))))
 
         if offer.swap_type == SwapTypes.XMR_SWAP:
+            reverse_bid: bool = Coins(offer.coin_from) in self.scriptless_coins
+            if reverse_bid:
+                return self.acceptADSReverseBid(bid_id)
+
             return self.acceptXmrBid(bid_id)
 
         if bid.contract_count is None:
@@ -2383,18 +2398,41 @@ class BasicSwap(BaseApp):
             bid_bytes = msg_buf.SerializeToString()
             payload_hex = str.format('{:02x}', MessageTypes.BID_ACCEPT) + bid_bytes.hex()
 
-            msg_valid = self.getAcceptBidMsgValidTime(bid)
-            bid.accept_msg_id = self.sendSmsg(offer.addr_from, bid.bid_addr, payload_hex, msg_valid)
+            msg_valid: int = self.getAcceptBidMsgValidTime(bid)
+            accept_msg_id = self.sendSmsg(offer.addr_from, bid.bid_addr, payload_hex, msg_valid)
 
-            self.log.info('Sent BID_ACCEPT %s', bid.accept_msg_id.hex())
+            self.addMessageLink(Concepts.BID, bid_id, MessageTypes.BID_ACCEPT, accept_msg_id)
+            self.log.info('Sent BID_ACCEPT %s', accept_msg_id.hex())
+
             bid.setState(BidStates.BID_ACCEPTED)
 
             self.saveBid(bid_id, bid)
             self.swaps_in_progress[bid_id] = (bid, offer)
 
-    def postXmrBid(self, offer_id, amount, addr_send_from=None, extra_options={}):
+    def sendXmrSplitMessages(self, msg_type, addr_from: str, addr_to: str, bid_id: bytes, dleag: bytes, msg_valid: int, bid_msg_ids) -> None:
+        msg_buf2 = XmrSplitMessage(
+            msg_id=bid_id,
+            msg_type=msg_type,
+            sequence=1,
+            dleag=dleag[16000:32000]
+        )
+        msg_bytes = msg_buf2.SerializeToString()
+        payload_hex = str.format('{:02x}', MessageTypes.XMR_BID_SPLIT) + msg_bytes.hex()
+        bid_msg_ids[1] = self.sendSmsg(addr_from, addr_to, payload_hex, msg_valid)
+
+        msg_buf3 = XmrSplitMessage(
+            msg_id=bid_id,
+            msg_type=msg_type,
+            sequence=2,
+            dleag=dleag[32000:]
+        )
+        msg_bytes = msg_buf3.SerializeToString()
+        payload_hex = str.format('{:02x}', MessageTypes.XMR_BID_SPLIT) + msg_bytes.hex()
+        bid_msg_ids[2] = self.sendSmsg(addr_from, addr_to, payload_hex, msg_valid)
+
+    def postXmrBid(self, offer_id: bytes, amount: int, addr_send_from: str = None, extra_options={}) -> bytes:
         # Bid to send bid.amount * bid.rate of coin_to in exchange for bid.amount of coin_from
-        # Send MSG1L F -> L
+        # Send MSG1L F -> L or MSG0F L -> F
         self.log.debug('postXmrBid %s', offer_id.hex())
 
         self.mxDB.acquire()
@@ -2402,7 +2440,7 @@ class BasicSwap(BaseApp):
             offer, xmr_offer = self.getXmrOffer(offer_id)
 
             ensure(offer, 'Offer not found: {}.'.format(offer_id.hex()))
-            ensure(xmr_offer, 'XMR offer not found: {}.'.format(offer_id.hex()))
+            ensure(xmr_offer, 'Adaptor-sig offer not found: {}.'.format(offer_id.hex()))
             ensure(offer.expire_at > self.getTime(), 'Offer has expired')
 
             coin_from = Coins(offer.coin_from)
@@ -2410,18 +2448,75 @@ class BasicSwap(BaseApp):
             ci_from = self.ci(coin_from)
             ci_to = self.ci(coin_to)
 
-            valid_for_seconds = extra_options.get('valid_for_seconds', 60 * 10)
-            bid_rate = extra_options.get('bid_rate', offer.rate)
-            amount_to = int((int(amount) * bid_rate) // ci_from.COIN())
+            valid_for_seconds: int = extra_options.get('valid_for_seconds', 60 * 10)
+            bid_rate: int = extra_options.get('bid_rate', offer.rate)
+            amount_to: int = int((int(amount) * bid_rate) // ci_from.COIN())
+
+            bid_created_at = self.getTime()
+            if offer.swap_type != SwapTypes.XMR_SWAP:
+                raise ValueError('TODO: Unknown swap type ' + offer.swap_type.name)
 
             if not (self.debug and extra_options.get('debug_skip_validation', False)):
-                self.validateBidValidTime(offer.swap_type, offer.coin_from, offer.coin_to, valid_for_seconds)
+                self.validateBidValidTime(offer.swap_type, coin_from, coin_to, valid_for_seconds)
                 self.validateBidAmount(offer, amount, bid_rate)
 
             self.checkCoinsReady(coin_from, coin_to)
 
             balance_to = ci_to.getSpendableBalance()
             ensure(balance_to > amount_to, '{} spendable balance is too low: {}'.format(ci_to.coin_name(), ci_to.format_amount(balance_to)))
+
+            reverse_bid: bool = coin_from in self.scriptless_coins
+            if reverse_bid:
+                reversed_rate: int = ci_to.make_int(amount / amount_to, r=1)
+
+                amount_from: int = int((int(amount_to) * reversed_rate) // ci_to.COIN())
+                ensure(abs(amount_from - amount) < 20, 'invalid bid amount')  # TODO: Tolerance?
+
+                msg_buf = ADSBidIntentMessage()
+                msg_buf.protocol_version = PROTOCOL_VERSION_ADAPTOR_SIG
+                msg_buf.offer_msg_id = offer_id
+                msg_buf.time_valid = valid_for_seconds
+                msg_buf.amount = int(amount_to)
+                msg_buf.rate = reversed_rate
+
+                bid_bytes = msg_buf.SerializeToString()
+                payload_hex = str.format('{:02x}', MessageTypes.ADS_BID_LF) + bid_bytes.hex()
+
+                xmr_swap = XmrSwap()
+                xmr_swap.contract_count = self.getNewContractId()
+
+                bid_addr = self.newSMSGAddress(use_type=AddressTypes.BID)[0] if addr_send_from is None else addr_send_from
+                msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR * 1, valid_for_seconds)
+                xmr_swap.bid_id = self.sendSmsg(bid_addr, offer.addr_from, payload_hex, msg_valid)
+
+                bid = Bid(
+                    protocol_version=msg_buf.protocol_version,
+                    active_ind=1,
+                    bid_id=xmr_swap.bid_id,
+                    offer_id=offer_id,
+                    amount=msg_buf.amount,
+                    rate=msg_buf.rate,
+                    created_at=bid_created_at,
+                    contract_count=xmr_swap.contract_count,
+                    amount_to=(msg_buf.amount * msg_buf.rate) // ci_to.COIN(),
+                    expire_at=bid_created_at + msg_buf.time_valid,
+                    bid_addr=bid_addr,
+                    was_sent=True,
+                    was_received=False,
+                )
+
+                bid.setState(BidStates.BID_REQUEST_SENT)
+
+                try:
+                    session = scoped_session(self.session_factory)
+                    self.saveBidInSession(xmr_swap.bid_id, bid, session, xmr_swap)
+                    session.commit()
+                finally:
+                    session.close()
+                    session.remove()
+
+                self.log.info('Sent XMR_BID_FL %s', xmr_swap.bid_id.hex())
+                return xmr_swap.bid_id
 
             msg_buf = XmrBidMessage()
             msg_buf.protocol_version = PROTOCOL_VERSION_ADAPTOR_SIG
@@ -2437,16 +2532,11 @@ class BasicSwap(BaseApp):
             else:
                 msg_buf.dest_af = ci_from.decodeAddress(address_out)
 
-            bid_created_at = self.getTime()
-            if offer.swap_type != SwapTypes.XMR_SWAP:
-                raise ValueError('TODO')
-
-            # Follower to leader
             xmr_swap = XmrSwap()
             xmr_swap.contract_count = self.getNewContractId()
             xmr_swap.dest_af = msg_buf.dest_af
 
-            for_ed25519 = True if ci_to.curve_type() == Curves.ed25519 else False
+            for_ed25519: bool = True if ci_to.curve_type() == Curves.ed25519 else False
             kbvf = self.getPathKey(coin_from, coin_to, bid_created_at, xmr_swap.contract_count, KeyTypes.KBVF, for_ed25519)
             kbsf = self.getPathKey(coin_from, coin_to, bid_created_at, xmr_swap.contract_count, KeyTypes.KBSF, for_ed25519)
 
@@ -2483,30 +2573,12 @@ class BasicSwap(BaseApp):
             payload_hex = str.format('{:02x}', MessageTypes.XMR_BID_FL) + bid_bytes.hex()
 
             bid_addr = self.newSMSGAddress(use_type=AddressTypes.BID)[0] if addr_send_from is None else addr_send_from
-            options = {'decodehex': True, 'ttl_is_seconds': True}
-            msg_valid = max(self.SMSG_SECONDS_IN_HOUR * 1, valid_for_seconds)
+            msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR * 1, valid_for_seconds)
             xmr_swap.bid_id = self.sendSmsg(bid_addr, offer.addr_from, payload_hex, msg_valid)
 
+            bid_msg_ids = {}
             if ci_to.curve_type() == Curves.ed25519:
-                msg_buf2 = XmrSplitMessage(
-                    msg_id=xmr_swap.bid_id,
-                    msg_type=XmrSplitMsgTypes.BID,
-                    sequence=2,
-                    dleag=xmr_swap.kbsf_dleag[16000:32000]
-                )
-                msg_bytes = msg_buf2.SerializeToString()
-                payload_hex = str.format('{:02x}', MessageTypes.XMR_BID_SPLIT) + msg_bytes.hex()
-                xmr_swap.bid_msg_id2 = self.sendSmsg(bid_addr, offer.addr_from, payload_hex, msg_valid)
-
-                msg_buf3 = XmrSplitMessage(
-                    msg_id=xmr_swap.bid_id,
-                    msg_type=XmrSplitMsgTypes.BID,
-                    sequence=3,
-                    dleag=xmr_swap.kbsf_dleag[32000:]
-                )
-                msg_bytes = msg_buf3.SerializeToString()
-                payload_hex = str.format('{:02x}', MessageTypes.XMR_BID_SPLIT) + msg_bytes.hex()
-                xmr_swap.bid_msg_id3 = self.sendSmsg(bid_addr, offer.addr_from, payload_hex, msg_valid)
+                self.sendXmrSplitMessages(XmrSplitMsgTypes.BID, bid_addr, offer.addr_from, xmr_swap.bid_id, xmr_swap.kbsf_dleag, msg_valid, bid_msg_ids)
 
             bid = Bid(
                 protocol_version=msg_buf.protocol_version,
@@ -2529,33 +2601,33 @@ class BasicSwap(BaseApp):
             wallet_restore_height = self.getWalletRestoreHeight(ci_to)
             if bid.chain_b_height_start < wallet_restore_height:
                 bid.chain_b_height_start = wallet_restore_height
-                self.log.warning('XMR swap restore height clamped to {}'.format(wallet_restore_height))
+                self.log.warning('Adaptor-sig swap restore height clamped to {}'.format(wallet_restore_height))
 
             bid.setState(BidStates.BID_SENT)
 
+            session = self.openSession()
             try:
-                session = scoped_session(self.session_factory)
                 self.saveBidInSession(xmr_swap.bid_id, bid, session, xmr_swap)
-                session.commit()
+                for k, msg_id in bid_msg_ids.items():
+                    self.addMessageLink(Concepts.BID, xmr_swap.bid_id, MessageTypes.BID, msg_id, msg_sequence=k, session=session)
             finally:
-                session.close()
-                session.remove()
+                self.closeSession(session)
 
             self.log.info('Sent XMR_BID_FL %s', xmr_swap.bid_id.hex())
             return xmr_swap.bid_id
         finally:
             self.mxDB.release()
 
-    def acceptXmrBid(self, bid_id):
+    def acceptXmrBid(self, bid_id: bytes) -> None:
         # MSG1F and MSG2F L -> F
-        self.log.info('Accepting xmr bid %s', bid_id.hex())
+        self.log.info('Accepting adaptor-sig bid %s', bid_id.hex())
 
         now: int = self.getTime()
         self.mxDB.acquire()
         try:
             bid, xmr_swap = self.getXmrBid(bid_id)
             ensure(bid, 'Bid not found: {}.'.format(bid_id.hex()))
-            ensure(xmr_swap, 'XMR swap not found: {}.'.format(bid_id.hex()))
+            ensure(xmr_swap, 'Adaptor-sig swap not found: {}.'.format(bid_id.hex()))
             ensure(bid.expire_at > now, 'Bid expired')
 
             last_bid_state = bid.state
@@ -2566,18 +2638,22 @@ class BasicSwap(BaseApp):
 
             offer, xmr_offer = self.getXmrOffer(bid.offer_id)
             ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
-            ensure(xmr_offer, 'XMR offer not found: {}.'.format(bid.offer_id.hex()))
+            ensure(xmr_offer, 'Adaptor-sig offer not found: {}.'.format(bid.offer_id.hex()))
             ensure(offer.expire_at > now, 'Offer has expired')
 
-            coin_from = Coins(offer.coin_from)
-            coin_to = Coins(offer.coin_to)
+            reverse_bid: bool = offer.coin_from in self.scriptless_coins
+            coin_from = Coins(offer.coin_to if reverse_bid else offer.coin_from)
+            coin_to = Coins(offer.coin_from if reverse_bid else offer.coin_to)
             ci_from = self.ci(coin_from)
             ci_to = self.ci(coin_to)
+
+            a_fee_rate: int = xmr_offer.b_fee_rate if reverse_bid else xmr_offer.a_fee_rate
+            b_fee_rate: int = xmr_offer.a_fee_rate if reverse_bid else xmr_offer.b_fee_rate
 
             if xmr_swap.contract_count is None:
                 xmr_swap.contract_count = self.getNewContractId()
 
-            for_ed25519 = True if ci_to.curve_type() == Curves.ed25519 else False
+            for_ed25519: bool = True if ci_to.curve_type() == Curves.ed25519 else False
             kbvl = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, KeyTypes.KBVL, for_ed25519)
             kbsl = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, KeyTypes.KBSL, for_ed25519)
 
@@ -2605,7 +2681,7 @@ class BasicSwap(BaseApp):
                     bid.amount,
                     xmr_swap.a_lock_tx_script, xmr_swap.vkbv
                 )
-                xmr_swap.a_lock_tx = ci_from.fundSCLockTx(xmr_swap.a_lock_tx, xmr_offer.a_fee_rate, xmr_swap.vkbv)
+                xmr_swap.a_lock_tx = ci_from.fundSCLockTx(xmr_swap.a_lock_tx, a_fee_rate, xmr_swap.vkbv)
 
             xmr_swap.a_lock_tx_id = ci_from.getTxid(xmr_swap.a_lock_tx)
             a_lock_tx_dest = ci_from.getScriptDest(xmr_swap.a_lock_tx_script)
@@ -2614,7 +2690,7 @@ class BasicSwap(BaseApp):
                 xmr_swap.a_lock_tx, xmr_swap.a_lock_tx_script,
                 xmr_swap.pkal, xmr_swap.pkaf,
                 xmr_offer.lock_time_1, xmr_offer.lock_time_2,
-                xmr_offer.a_fee_rate, xmr_swap.vkbv
+                a_fee_rate, xmr_swap.vkbv
             )
             xmr_swap.a_lock_refund_tx_id = ci_from.getTxid(xmr_swap.a_lock_refund_tx)
 
@@ -2627,7 +2703,7 @@ class BasicSwap(BaseApp):
             xmr_swap.a_lock_refund_spend_tx = ci_from.createSCLockRefundSpendTx(
                 xmr_swap.a_lock_refund_tx, xmr_swap.a_lock_refund_tx_script,
                 pkh_refund_to,
-                xmr_offer.a_fee_rate, xmr_swap.vkbv
+                a_fee_rate, xmr_swap.vkbv
             )
             xmr_swap.a_lock_refund_spend_tx_id = ci_from.getTxid(xmr_swap.a_lock_refund_spend_tx)
 
@@ -2640,7 +2716,7 @@ class BasicSwap(BaseApp):
                 bid.amount,
                 xmr_swap.pkal,
                 xmr_swap.pkaf,
-                xmr_offer.a_fee_rate,
+                a_fee_rate,
                 check_lock_tx_inputs,
                 xmr_swap.vkbv)
 
@@ -2656,14 +2732,14 @@ class BasicSwap(BaseApp):
                 xmr_swap.pkaf,
                 xmr_offer.lock_time_2,
                 bid.amount,
-                xmr_offer.a_fee_rate,
+                a_fee_rate,
                 xmr_swap.vkbv)
 
             ci_from.verifySCLockRefundSpendTx(
                 xmr_swap.a_lock_refund_spend_tx, xmr_swap.a_lock_refund_tx,
                 xmr_swap.a_lock_refund_tx_id, xmr_swap.a_lock_refund_tx_script,
                 xmr_swap.pkal,
-                lock_refund_vout, xmr_swap.a_swap_refund_value, xmr_offer.a_fee_rate,
+                lock_refund_vout, xmr_swap.a_swap_refund_value, a_fee_rate,
                 xmr_swap.vkbv)
 
             msg_buf = XmrBidAcceptMessage()
@@ -2697,34 +2773,25 @@ class BasicSwap(BaseApp):
             msg_bytes = msg_buf.SerializeToString()
             payload_hex = str.format('{:02x}', MessageTypes.XMR_BID_ACCEPT_LF) + msg_bytes.hex()
 
-            msg_valid = self.getAcceptBidMsgValidTime(bid)
-            bid.accept_msg_id = self.sendSmsg(offer.addr_from, bid.bid_addr, payload_hex, msg_valid)
-            xmr_swap.bid_accept_msg_id = bid.accept_msg_id
+            addr_from: str = bid.bid_addr if reverse_bid else offer.addr_from
+            addr_to: str = offer.addr_from if reverse_bid else bid.bid_addr
+
+            msg_valid: int = self.getAcceptBidMsgValidTime(bid)
+            bid_msg_ids = {}
+            bid_msg_ids[0] = self.sendSmsg(addr_from, addr_to, payload_hex, msg_valid)
 
             if ci_to.curve_type() == Curves.ed25519:
-                msg_buf2 = XmrSplitMessage(
-                    msg_id=bid_id,
-                    msg_type=XmrSplitMsgTypes.BID_ACCEPT,
-                    sequence=2,
-                    dleag=xmr_swap.kbsl_dleag[16000:32000]
-                )
-                msg_bytes = msg_buf2.SerializeToString()
-                payload_hex = str.format('{:02x}', MessageTypes.XMR_BID_SPLIT) + msg_bytes.hex()
-                xmr_swap.bid_accept_msg_id2 = self.sendSmsg(offer.addr_from, bid.bid_addr, payload_hex, msg_valid)
-
-                msg_buf3 = XmrSplitMessage(
-                    msg_id=bid_id,
-                    msg_type=XmrSplitMsgTypes.BID_ACCEPT,
-                    sequence=3,
-                    dleag=xmr_swap.kbsl_dleag[32000:]
-                )
-                msg_bytes = msg_buf3.SerializeToString()
-                payload_hex = str.format('{:02x}', MessageTypes.XMR_BID_SPLIT) + msg_bytes.hex()
-                xmr_swap.bid_accept_msg_id3 = self.sendSmsg(offer.addr_from, bid.bid_addr, payload_hex, msg_valid)
+                self.sendXmrSplitMessages(XmrSplitMsgTypes.BID_ACCEPT, addr_from, addr_to, xmr_swap.bid_id, xmr_swap.kbsl_dleag, msg_valid, bid_msg_ids)
 
             bid.setState(BidStates.BID_ACCEPTED)
 
-            self.saveBid(bid_id, bid, xmr_swap=xmr_swap)
+            session = self.openSession()
+            try:
+                self.saveBidInSession(bid_id, bid, session, xmr_swap=xmr_swap)
+                for k, msg_id in bid_msg_ids.items():
+                    self.addMessageLink(Concepts.BID, bid_id, MessageTypes.BID_ACCEPT, msg_id, msg_sequence=k, session=session)
+            finally:
+                self.closeSession(session)
 
             # Add to swaps_in_progress only when waiting on txns
             self.log.info('Sent XMR_BID_ACCEPT_LF %s', bid_id.hex())
@@ -2732,7 +2799,92 @@ class BasicSwap(BaseApp):
         finally:
             self.mxDB.release()
 
-    def deactivateBidForReason(self, bid_id, new_state, session_in=None) -> None:
+    def acceptADSReverseBid(self, bid_id: bytes) -> None:
+        self.log.info('Accepting reverse adaptor-sig bid %s', bid_id.hex())
+
+        now: int = self.getTime()
+        self.mxDB.acquire()
+        try:
+            bid, xmr_swap = self.getXmrBid(bid_id)
+            ensure(bid, 'Bid not found: {}.'.format(bid_id.hex()))
+            ensure(xmr_swap, 'Adaptor-sig swap not found: {}.'.format(bid_id.hex()))
+            ensure(bid.expire_at > now, 'Bid expired')
+
+            last_bid_state = bid.state
+            if last_bid_state == BidStates.SWAP_DELAYING:
+                last_bid_state = getLastBidState(bid.states)
+
+            ensure(last_bid_state == BidStates.BID_RECEIVED, 'Wrong bid state: {}'.format(str(BidStates(last_bid_state))))
+
+            offer, xmr_offer = self.getXmrOffer(bid.offer_id)
+            ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
+            ensure(xmr_offer, 'Adaptor-sig offer not found: {}.'.format(bid.offer_id.hex()))
+            ensure(offer.expire_at > now, 'Offer has expired')
+
+            # Bid is reversed
+            coin_from = Coins(offer.coin_to)
+            coin_to = Coins(offer.coin_from)
+            ci_from = self.ci(coin_from)
+            ci_to = self.ci(coin_to)
+
+            if xmr_swap.contract_count is None:
+                xmr_swap.contract_count = self.getNewContractId()
+
+            for_ed25519: bool = True if ci_to.curve_type() == Curves.ed25519 else False
+            kbvf = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, KeyTypes.KBVF, for_ed25519)
+            kbsf = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, KeyTypes.KBSF, for_ed25519)
+
+            kaf = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, KeyTypes.KAF)
+
+            address_out = self.getReceiveAddressFromPool(coin_from, bid.offer_id, TxTypes.XMR_SWAP_A_LOCK)
+            if coin_from == Coins.PART_BLIND:
+                addrinfo = ci_from.rpc_callback('getaddressinfo', [address_out])
+                xmr_swap.dest_af = bytes.fromhex(addrinfo['pubkey'])
+            else:
+                xmr_swap.dest_af = ci_from.decodeAddress(address_out)
+
+            xmr_swap.vkbvf = kbvf
+            xmr_swap.pkbvf = ci_to.getPubkey(kbvf)
+            xmr_swap.pkbsf = ci_to.getPubkey(kbsf)
+
+            xmr_swap.pkaf = ci_from.getPubkey(kaf)
+
+            xmr_swap_1.setDLEAG(xmr_swap, ci_to, kbsf)
+            assert (xmr_swap.pkasf == ci_from.getPubkey(kbsf))
+
+            msg_buf = ADSBidIntentAcceptMessage()
+            msg_buf.bid_msg_id = bid_id
+            msg_buf.dest_af = xmr_swap.dest_af
+            msg_buf.pkaf = xmr_swap.pkaf
+            msg_buf.kbvf = kbvf
+            msg_buf.kbsf_dleag = xmr_swap.kbsf_dleag if len(xmr_swap.kbsf_dleag) < 16000 else xmr_swap.kbsf_dleag[:16000]
+
+            bid_bytes = msg_buf.SerializeToString()
+            payload_hex = str.format('{:02x}', MessageTypes.ADS_BID_ACCEPT_FL) + bid_bytes.hex()
+
+            addr_from: str = offer.addr_from
+            addr_to: str = bid.bid_addr
+            msg_valid: int = self.getAcceptBidMsgValidTime(bid)
+            bid_accept_id = self.sendSmsg(addr_from, addr_to, payload_hex, msg_valid)
+
+            bid_msg_ids = {}
+            if ci_to.curve_type() == Curves.ed25519:
+                self.sendXmrSplitMessages(XmrSplitMsgTypes.BID, addr_from, addr_to, xmr_swap.bid_id, xmr_swap.kbsf_dleag, msg_valid, bid_msg_ids)
+
+            session = self.openSession()
+            try:
+                self.addMessageLink(Concepts.BID, bid_id, MessageTypes.ADS_BID_ACCEPT_FL, bid_accept_id, session=session)
+                for k, msg_id in bid_msg_ids.items():
+                    self.addMessageLink(Concepts.BID, bid_id, MessageTypes.BID, msg_id, msg_sequence=k, session=session)
+                self.log.info('Sent ADS_BID_ACCEPT_FL %s', bid_accept_id.hex())
+                self.saveBidInSession(bid_id, bid, session, xmr_swap=xmr_swap)
+            finally:
+                self.closeSession(session)
+
+        finally:
+            self.mxDB.release()
+
+    def deactivateBidForReason(self, bid_id: bytes, new_state, session_in=None) -> None:
         try:
             session = self.openSession(session_in)
             bid = session.query(Bid).filter_by(bid_id=bid_id).first()
@@ -2752,6 +2904,7 @@ class BasicSwap(BaseApp):
         if not self.debug:
             self.log.error('Can\'t abandon bid %s when not in debug mode.', bid_id.hex())
             return
+
         self.log.info('Abandoning Bid %s', bid_id.hex())
         self.deactivateBidForReason(bid_id, BidStates.BID_ABANDONED)
 
@@ -2759,14 +2912,14 @@ class BasicSwap(BaseApp):
         self.log.info('Bid %s timed-out', bid_id.hex())
         self.deactivateBidForReason(bid_id, BidStates.SWAP_TIMEDOUT)
 
-    def setBidError(self, bid_id, bid, error_str, save_bid=True, xmr_swap=None) -> None:
+    def setBidError(self, bid_id: bytes, bid, error_str: str, save_bid: bool = True, xmr_swap=None) -> None:
         self.log.error('Bid %s - Error: %s', bid_id.hex(), error_str)
         bid.setState(BidStates.BID_ERROR)
         bid.state_note = 'error msg: ' + error_str
         if save_bid:
             self.saveBid(bid_id, bid, xmr_swap=xmr_swap)
 
-    def createInitiateTxn(self, coin_type, bid_id, bid, initiate_script, prefunded_tx=None) -> Optional[str]:
+    def createInitiateTxn(self, coin_type, bid_id: bytes, bid, initiate_script, prefunded_tx=None) -> Optional[str]:
         if self.coin_clients[coin_type]['connection_type'] != 'rpc':
             return None
         ci = self.ci(coin_type)
@@ -2784,7 +2937,7 @@ class BasicSwap(BaseApp):
             txn_signed = ci.createRawSignedTransaction(addr_to, bid.amount)
         return txn_signed
 
-    def deriveParticipateScript(self, bid_id, bid, offer):
+    def deriveParticipateScript(self, bid_id: bytes, bid, offer) -> bytearray:
         self.log.debug('deriveParticipateScript for bid %s', bid_id.hex())
 
         coin_to = Coins(offer.coin_to)
@@ -2819,7 +2972,7 @@ class BasicSwap(BaseApp):
             participate_script = atomic_swap_1.buildContractScript(contract_lock_value, secret_hash, pkhash_seller, pkhash_buyer_refund, OpCodes.OP_CHECKLOCKTIMEVERIFY)
         return participate_script
 
-    def createParticipateTxn(self, bid_id, bid, offer, participate_script):
+    def createParticipateTxn(self, bid_id: bytes, bid, offer, participate_script: bytearray):
         self.log.debug('createParticipateTxn')
 
         offer_id = bid.offer_id
@@ -2863,7 +3016,7 @@ class BasicSwap(BaseApp):
 
         return txn_signed
 
-    def getContractSpendTxVSize(self, coin_type, redeem=True):
+    def getContractSpendTxVSize(self, coin_type, redeem: bool = True) -> int:
         tx_vsize = 5  # Add a few bytes, sequence in script takes variable amount of bytes
         if coin_type == Coins.PART:
             tx_vsize += 204 if redeem else 187
@@ -2976,7 +3129,7 @@ class BasicSwap(BaseApp):
 
         return redeem_txn
 
-    def createRefundTxn(self, coin_type, txn, offer, bid, txn_script, addr_refund_out=None, tx_type=TxTypes.ITX_REFUND):
+    def createRefundTxn(self, coin_type, txn, offer, bid, txn_script: bytearray, addr_refund_out=None, tx_type=TxTypes.ITX_REFUND):
         self.log.debug('createRefundTxn for coin %s', Coins(coin_type).name)
         if self.coin_clients[coin_type]['connection_type'] != 'rpc':
             return None
@@ -3069,7 +3222,7 @@ class BasicSwap(BaseApp):
 
         return refund_txn
 
-    def initiateTxnConfirmed(self, bid_id, bid, offer):
+    def initiateTxnConfirmed(self, bid_id: bytes, bid, offer) -> None:
         self.log.debug('initiateTxnConfirmed for bid %s', bid_id.hex())
         bid.setState(BidStates.SWAP_INITIATED)
         bid.setITxState(TxStates.TX_CONFIRMED)
@@ -3103,7 +3256,7 @@ class BasicSwap(BaseApp):
 
         # Bid saved in checkBidState
 
-    def setLastHeightChecked(self, coin_type, tx_height):
+    def setLastHeightChecked(self, coin_type, tx_height: int) -> int:
         coin_name = self.ci(coin_type).coin_name()
         if tx_height < 1:
             tx_height = self.lookupChainHeight(coin_type)
@@ -3118,7 +3271,7 @@ class BasicSwap(BaseApp):
 
         return tx_height
 
-    def addParticipateTxn(self, bid_id, bid, coin_type, txid_hex, vout, tx_height):
+    def addParticipateTxn(self, bid_id: bytes, bid, coin_type, txid_hex: str, vout, tx_height) -> None:
 
         # TODO: Check connection type
         participate_txn_height = self.setLastHeightChecked(coin_type, tx_height)
@@ -3136,7 +3289,7 @@ class BasicSwap(BaseApp):
         self.log.debug('Watching %s chain for spend of output %s %d', chainparams[coin_type]['name'], txid_hex, vout)
         self.addWatchedOutput(coin_type, bid_id, txid_hex, vout, BidStates.SWAP_PARTICIPATING)
 
-    def participateTxnConfirmed(self, bid_id, bid, offer):
+    def participateTxnConfirmed(self, bid_id: bytes, bid, offer) -> None:
         self.log.debug('participateTxnConfirmed for bid %s', bid_id.hex())
         bid.setState(BidStates.SWAP_PARTICIPATING)
         bid.setPTxState(TxStates.TX_CONFIRMED)
@@ -3153,7 +3306,7 @@ class BasicSwap(BaseApp):
 
         # bid saved in checkBidState
 
-    def getAddressBalance(self, coin_type, address):
+    def getAddressBalance(self, coin_type, address: str) -> int:
         if self.coin_clients[coin_type]['chain_lookups'] == 'explorer':
             explorers = self.coin_clients[coin_type]['explorers']
 
@@ -3162,10 +3315,10 @@ class BasicSwap(BaseApp):
                 return exp.getBalance(address)
         return self.lookupUnspentByAddress(coin_type, address, sum_output=True)
 
-    def lookupChainHeight(self, coin_type):
+    def lookupChainHeight(self, coin_type) -> int:
         return self.callcoinrpc(coin_type, 'getblockcount')
 
-    def lookupUnspentByAddress(self, coin_type, address, sum_output=False, assert_amount=None, assert_txid=None):
+    def lookupUnspentByAddress(self, coin_type, address: str, sum_output: bool = False, assert_amount=None, assert_txid=None) -> int:
 
         ci = self.ci(coin_type)
         if self.coin_clients[coin_type]['chain_lookups'] == 'explorer':
@@ -3228,10 +3381,10 @@ class BasicSwap(BaseApp):
             return sum_unspent
         return None
 
-    def findTxB(self, ci_to, xmr_swap, bid, session) -> bool:
+    def findTxB(self, ci_to, xmr_swap, bid, session, bid_sender: bool) -> bool:
         bid_changed = False
         # Have to use findTxB instead of relying on the first seen height to detect chain reorgs
-        found_tx = ci_to.findTxB(xmr_swap.vkbv, xmr_swap.pkbs, bid.amount_to, ci_to.blocks_confirmed, bid.chain_b_height_start, bid.was_sent)
+        found_tx = ci_to.findTxB(xmr_swap.vkbv, xmr_swap.pkbs, bid.amount_to, ci_to.blocks_confirmed, bid.chain_b_height_start, bid_sender)
 
         if isinstance(found_tx, int) and found_tx == -1:
             if self.countBidEvents(bid, EventLogTypes.LOCK_TX_B_INVALID, session) < 1:
@@ -3255,26 +3408,30 @@ class BasicSwap(BaseApp):
                 bid_changed = True
         return bid_changed
 
-    def checkXmrBidState(self, bid_id, bid, offer):
+    def checkXmrBidState(self, bid_id: bytes, bid, offer):
         rv = False
 
-        ci_from = self.ci(Coins(offer.coin_from))
-        ci_to = self.ci(Coins(offer.coin_to))
+        reverse_bid: bool = offer.coin_from in self.scriptless_coins
+        ci_from = self.ci(offer.coin_to if reverse_bid else offer.coin_from)
+        ci_to = self.ci(offer.coin_from if reverse_bid else offer.coin_to)
+
+        was_sent: bool = bid.was_received if reverse_bid else bid.was_sent
+        was_received: bool = bid.was_sent if reverse_bid else bid.was_received
 
         session = None
         try:
             self.mxDB.acquire()
             session = scoped_session(self.session_factory)
             xmr_offer = session.query(XmrOffer).filter_by(offer_id=offer.offer_id).first()
-            ensure(xmr_offer, 'XMR offer not found: {}.'.format(offer.offer_id.hex()))
+            ensure(xmr_offer, 'Adaptor-sig offer not found: {}.'.format(offer.offer_id.hex()))
             xmr_swap = session.query(XmrSwap).filter_by(bid_id=bid.bid_id).first()
-            ensure(xmr_swap, 'XMR swap not found: {}.'.format(bid.bid_id.hex()))
+            ensure(xmr_swap, 'Adaptor-sig swap not found: {}.'.format(bid.bid_id.hex()))
 
             if TxTypes.XMR_SWAP_A_LOCK_REFUND in bid.txns:
                 refund_tx = bid.txns[TxTypes.XMR_SWAP_A_LOCK_REFUND]
-                if bid.was_received:
+                if was_received:
                     if bid.debug_ind == DebugTypes.BID_DONT_SPEND_COIN_A_LOCK_REFUND:
-                        self.log.debug('XMR bid %s: Stalling bid for testing: %d.', bid_id.hex(), bid.debug_ind)
+                        self.log.debug('Adaptor-sig bid %s: Stalling bid for testing: %d.', bid_id.hex(), bid.debug_ind)
                         bid.setState(BidStates.BID_STALLED_FOR_TEST)
                         rv = True
                         self.saveBidInSession(bid_id, bid, session, xmr_swap)
@@ -3298,7 +3455,7 @@ class BasicSwap(BaseApp):
                         except Exception as ex:
                             self.log.debug('Trying to publish coin a lock refund spend tx: %s', str(ex))
 
-                if bid.was_sent:
+                if was_sent:
                     if xmr_swap.a_lock_refund_swipe_tx is None:
                         self.createCoinALockRefundSwipeTx(ci_from, bid, offer, xmr_swap, xmr_offer)
                         self.saveBidInSession(bid_id, bid, session, xmr_swap)
@@ -3367,10 +3524,10 @@ class BasicSwap(BaseApp):
             elif state == BidStates.XMR_SWAP_FAILED_SWIPED:
                 rv = True  # Remove from swaps_in_progress
             elif state == BidStates.XMR_SWAP_FAILED:
-                if bid.was_sent and bid.xmr_b_lock_tx:
+                if was_sent and bid.xmr_b_lock_tx:
                     if self.countQueuedActions(session, bid_id, ActionTypes.RECOVER_XMR_SWAP_LOCK_TX_B) < 1:
                         delay = random.randrange(self.min_delay_event, self.max_delay_event)
-                        self.log.info('Recovering xmr swap chain B lock tx for bid %s in %d seconds', bid_id.hex(), delay)
+                        self.log.info('Recovering adaptor-sig swap chain B lock tx for bid %s in %d seconds', bid_id.hex(), delay)
                         self.createActionInSession(delay, ActionTypes.RECOVER_XMR_SWAP_LOCK_TX_B, bid_id, session)
                         session.commit()
             elif state == BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX:
@@ -3403,9 +3560,9 @@ class BasicSwap(BaseApp):
                     bid.setState(BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED)
                     bid_changed = True
 
-                    if bid.was_sent:
+                    if was_sent:
                         delay = random.randrange(self.min_delay_event, self.max_delay_event)
-                        self.log.info('Sending xmr swap chain B lock tx for bid %s in %d seconds', bid_id.hex(), delay)
+                        self.log.info('Sending adaptor-sig swap chain B lock tx for bid %s in %d seconds', bid_id.hex(), delay)
                         self.createActionInSession(delay, ActionTypes.SEND_XMR_SWAP_LOCK_TX_B, bid_id, session)
                         # bid.setState(BidStates.SWAP_DELAYING)
 
@@ -3414,7 +3571,7 @@ class BasicSwap(BaseApp):
                     session.commit()
 
             elif state == BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED:
-                bid_changed = self.findTxB(ci_to, xmr_swap, bid, session)
+                bid_changed = self.findTxB(ci_to, xmr_swap, bid, session, was_sent)
 
                 if bid.xmr_b_lock_tx and bid.xmr_b_lock_tx.chain_height is not None and bid.xmr_b_lock_tx.chain_height > 0:
                     chain_height = ci_to.getChainHeight()
@@ -3424,7 +3581,7 @@ class BasicSwap(BaseApp):
                         bid.xmr_b_lock_tx.setState(TxStates.TX_CONFIRMED)
                         bid.setState(BidStates.XMR_SWAP_NOSCRIPT_COIN_LOCKED)
 
-                        if bid.was_received:
+                        if was_received:
                             delay = random.randrange(self.min_delay_event, self.max_delay_event)
                             self.log.info('Releasing xmr script coin lock tx for bid %s in %d seconds', bid_id.hex(), delay)
                             self.createActionInSession(delay, ActionTypes.SEND_XMR_LOCK_RELEASE, bid_id, session)
@@ -3436,7 +3593,7 @@ class BasicSwap(BaseApp):
                 # Wait for script spend tx to confirm
                 # TODO: Use explorer to get tx / block hash for getrawtransaction
 
-                if bid.was_received:
+                if was_received:
                     try:
                         txn_hex = ci_from.getMempoolTx(xmr_swap.a_lock_spend_tx_id)
                         self.log.info('Found lock spend txn in %s mempool, %s', ci_from.coin_name(), xmr_swap.a_lock_spend_tx_id.hex())
@@ -3444,7 +3601,7 @@ class BasicSwap(BaseApp):
                     except Exception as e:
                         self.log.debug('getrawtransaction lock spend tx failed: %s', str(e))
             elif state == BidStates.XMR_SWAP_SCRIPT_TX_REDEEMED:
-                if bid.was_received and self.countQueuedActions(session, bid_id, ActionTypes.REDEEM_XMR_SWAP_LOCK_TX_B) < 1:
+                if was_received and self.countQueuedActions(session, bid_id, ActionTypes.REDEEM_XMR_SWAP_LOCK_TX_B) < 1:
                     bid.setState(BidStates.SWAP_DELAYING)
                     delay = random.randrange(self.min_delay_event, self.max_delay_event)
                     self.log.info('Redeeming coin b lock tx for bid %s in %d seconds', bid_id.hex(), delay)
@@ -3487,7 +3644,7 @@ class BasicSwap(BaseApp):
 
         return rv
 
-    def checkBidState(self, bid_id, bid, offer):
+    def checkBidState(self, bid_id: bytes, bid, offer):
         # assert (self.mxDB.locked())
         # Return True to remove bid from in-progress list
 
@@ -3679,7 +3836,7 @@ class BasicSwap(BaseApp):
 
         watched.append(WatchedOutput(bid_id, txid_hex, vout, tx_type, swap_type))
 
-    def removeWatchedOutput(self, coin_type, bid_id, txid_hex):
+    def removeWatchedOutput(self, coin_type, bid_id: bytes, txid_hex: str) -> None:
         # Remove all for bid if txid is None
         self.log.debug('removeWatchedOutput %s %s %s', str(coin_type), bid_id.hex(), txid_hex)
         old_len = len(self.coin_clients[coin_type]['watched_outputs'])
@@ -3689,7 +3846,7 @@ class BasicSwap(BaseApp):
                 del self.coin_clients[coin_type]['watched_outputs'][i]
                 self.log.debug('Removed watched output %s %s %s', str(coin_type), bid_id.hex(), wo.txid_hex)
 
-    def initiateTxnSpent(self, bid_id, spend_txid, spend_n, spend_txn):
+    def initiateTxnSpent(self, bid_id: bytes, spend_txid: str, spend_n: int, spend_txn):
         self.log.debug('Bid %s initiate txn spent by %s %d', bid_id.hex(), spend_txid, spend_n)
 
         if bid_id in self.swaps_in_progress:
@@ -3716,7 +3873,7 @@ class BasicSwap(BaseApp):
             self.removeWatchedOutput(coin_from, bid_id, bid.initiate_tx.txid.hex())
             self.saveBid(bid_id, bid)
 
-    def participateTxnSpent(self, bid_id, spend_txid, spend_n, spend_txn):
+    def participateTxnSpent(self, bid_id: bytes, spend_txid: str, spend_n: int, spend_txn):
         self.log.debug('Bid %s participate txn spent by %s %d', bid_id.hex(), spend_txid, spend_n)
 
         # TODO: More SwapTypes
@@ -3756,20 +3913,23 @@ class BasicSwap(BaseApp):
             self.removeWatchedOutput(coin_to, bid_id, bid.participate_tx.txid.hex())
             self.saveBid(bid_id, bid)
 
-    def process_XMR_SWAP_A_LOCK_tx_spend(self, bid_id, spend_txid_hex, spend_txn_hex):
-        self.log.debug('Detected spend of XMR swap coin a lock tx for bid %s', bid_id.hex())
+    def process_XMR_SWAP_A_LOCK_tx_spend(self, bid_id: bytes, spend_txid_hex, spend_txn_hex) -> None:
+        self.log.debug('Detected spend of Adaptor-sig swap coin a lock tx for bid %s', bid_id.hex())
         self.mxDB.acquire()
         try:
             session = scoped_session(self.session_factory)
             bid, xmr_swap = self.getXmrBidFromSession(session, bid_id)
             ensure(bid, 'Bid not found: {}.'.format(bid_id.hex()))
-            ensure(xmr_swap, 'XMR swap not found: {}.'.format(bid_id.hex()))
+            ensure(xmr_swap, 'Adaptor-sig swap not found: {}.'.format(bid_id.hex()))
 
             offer, xmr_offer = self.getXmrOfferFromSession(session, bid.offer_id, sent=False)
             ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
-            ensure(xmr_offer, 'XMR offer not found: {}.'.format(bid.offer_id.hex()))
-            coin_from = Coins(offer.coin_from)
-            coin_to = Coins(offer.coin_to)
+            ensure(xmr_offer, 'Adaptor-sig offer not found: {}.'.format(bid.offer_id.hex()))
+
+            reverse_bid: bool = offer.coin_from in self.scriptless_coins
+            was_received: bool = bid.was_sent if reverse_bid else bid.was_received
+            coin_from = Coins(offer.coin_to if reverse_bid else offer.coin_from)
+            coin_to = Coins(offer.coin_from if reverse_bid else offer.coin_to)
 
             state = BidStates(bid.state)
             spending_txid = bytes.fromhex(spend_txid_hex)
@@ -3779,7 +3939,7 @@ class BasicSwap(BaseApp):
                     xmr_swap.a_lock_spend_tx = bytes.fromhex(spend_txn_hex)
                     bid.setState(BidStates.XMR_SWAP_SCRIPT_TX_REDEEMED)  # TODO: Wait for confirmation?
 
-                    if not bid.was_received:
+                    if not was_received:
                         bid.setState(BidStates.SWAP_COMPLETED)
                 else:
                     # Could already be processed if spend was detected in the mempool
@@ -3801,20 +3961,24 @@ class BasicSwap(BaseApp):
             session.remove()
             self.mxDB.release()
 
-    def process_XMR_SWAP_A_LOCK_REFUND_tx_spend(self, bid_id, spend_txid_hex, spend_txn):
-        self.log.debug('Detected spend of XMR swap coin a lock refund tx for bid %s', bid_id.hex())
+    def process_XMR_SWAP_A_LOCK_REFUND_tx_spend(self, bid_id: bytes, spend_txid_hex, spend_txn) -> None:
+        self.log.debug('Detected spend of Adaptor-sig swap coin a lock refund tx for bid %s', bid_id.hex())
         self.mxDB.acquire()
         try:
             session = scoped_session(self.session_factory)
             bid, xmr_swap = self.getXmrBidFromSession(session, bid_id)
             ensure(bid, 'Bid not found: {}.'.format(bid_id.hex()))
-            ensure(xmr_swap, 'XMR swap not found: {}.'.format(bid_id.hex()))
+            ensure(xmr_swap, 'Adaptor-sig swap not found: {}.'.format(bid_id.hex()))
 
             offer, xmr_offer = self.getXmrOfferFromSession(session, bid.offer_id, sent=False)
             ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
-            ensure(xmr_offer, 'XMR offer not found: {}.'.format(bid.offer_id.hex()))
-            coin_from = Coins(offer.coin_from)
-            coin_to = Coins(offer.coin_to)
+            ensure(xmr_offer, 'Adaptor-sig offer not found: {}.'.format(bid.offer_id.hex()))
+
+            reverse_bid: bool = offer.coin_from in self.scriptless_coins
+            coin_from = Coins(offer.coin_to if reverse_bid else offer.coin_from)
+            coin_to = Coins(offer.coin_from if reverse_bid else offer.coin_to)
+            was_sent: bool = bid.was_received if reverse_bid else bid.was_sent
+            was_received: bool = bid.was_sent if reverse_bid else bid.was_received
 
             state = BidStates(bid.state)
             spending_txid = bytes.fromhex(spend_txid_hex)
@@ -3823,7 +3987,7 @@ class BasicSwap(BaseApp):
                 self.log.info('Found coin a lock refund spend tx, bid {}'.format(bid_id.hex()))
                 self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_A_REFUND_SPEND_TX_SEEN, '', session)
 
-                if bid.was_sent:
+                if was_sent:
                     xmr_swap.a_lock_refund_spend_tx = bytes.fromhex(spend_txn['hex'])  # Replace with fully signed tx
                     if TxTypes.XMR_SWAP_A_LOCK_REFUND_SPEND not in bid.txns:
                         bid.txns[TxTypes.XMR_SWAP_A_LOCK_REFUND_SPEND] = SwapTx(
@@ -3833,14 +3997,14 @@ class BasicSwap(BaseApp):
                         )
                     if bid.xmr_b_lock_tx is not None:
                         delay = random.randrange(self.min_delay_event, self.max_delay_event)
-                        self.log.info('Recovering xmr swap chain B lock tx for bid %s in %d seconds', bid_id.hex(), delay)
+                        self.log.info('Recovering adaptor-sig swap chain B lock tx for bid %s in %d seconds', bid_id.hex(), delay)
                         self.createActionInSession(delay, ActionTypes.RECOVER_XMR_SWAP_LOCK_TX_B, bid_id, session)
                     else:
                         # Other side refunded before swap lock tx was sent
                         bid.setState(BidStates.XMR_SWAP_FAILED)
 
-                if bid.was_received:
-                    if not bid.was_sent:
+                if was_received:
+                    if not was_sent:
                         bid.setState(BidStates.XMR_SWAP_FAILED_REFUNDED)
 
             else:
@@ -3986,11 +4150,11 @@ class BasicSwap(BaseApp):
         finally:
             self.closeSession(session)
 
-    def countQueuedActions(self, session, bid_id, action_type) -> int:
+    def countQueuedActions(self, session, bid_id: bytes, action_type) -> int:
         q = session.query(Action).filter(sa.and_(Action.active_ind == 1, Action.linked_id == bid_id, Action.action_type == int(action_type)))
         return q.count()
 
-    def checkQueuedActions(self):
+    def checkQueuedActions(self) -> None:
         self.mxDB.acquire()
         now: int = self.getTime()
         session = None
@@ -4023,6 +4187,8 @@ class BasicSwap(BaseApp):
                         self.sendXmrBidCoinALockSpendTxMsg(row.linked_id, session)
                     elif row.action_type == ActionTypes.REDEEM_ITX:
                         atomic_swap_1.redeemITx(self, row.linked_id, session)
+                    elif row.action_type == ActionTypes.ACCEPT_AS_REV_BID:
+                        self.acceptADSReverseBid(row.linked_id)
                     else:
                         self.log.warning('Unknown event type: %d', row.event_type)
                 except Exception as ex:
@@ -4046,7 +4212,7 @@ class BasicSwap(BaseApp):
         if reload_in_progress:
             self.loadFromDB()
 
-    def checkXmrSwaps(self):
+    def checkXmrSwaps(self) -> None:
         self.mxDB.acquire()
         now: int = self.getTime()
         ttl_xmr_split_messages = 60 * 60
@@ -4061,7 +4227,7 @@ class BasicSwap(BaseApp):
                     try:
                         self.receiveXmrBid(bid, session)
                     except Exception as ex:
-                        self.log.info('Verify xmr bid {} failed: {}'.format(bid.bid_id.hex(), str(ex)))
+                        self.log.info('Verify adaptor-sig bid {} failed: {}'.format(bid.bid_id.hex(), str(ex)))
                         if self.debug:
                             self.log.error(traceback.format_exc())
                         bid.setState(BidStates.BID_ERROR, 'Failed validation: ' + str(ex))
@@ -4083,7 +4249,7 @@ class BasicSwap(BaseApp):
                     except Exception as ex:
                         if self.debug:
                             self.log.error(traceback.format_exc())
-                        self.log.info('Verify xmr bid accept {} failed: {}'.format(bid.bid_id.hex(), str(ex)))
+                        self.log.info('Verify adaptor-sig bid accept {} failed: {}'.format(bid.bid_id.hex(), str(ex)))
                         bid.setState(BidStates.BID_ERROR, 'Failed accept validation: ' + str(ex))
                         session.add(bid)
                         self.updateBidInProgress(bid)
@@ -4104,7 +4270,7 @@ class BasicSwap(BaseApp):
                 session.remove()
             self.mxDB.release()
 
-    def processOffer(self, msg):
+    def processOffer(self, msg) -> None:
         offer_bytes = bytes.fromhex(msg['hex'][2:-2])
         offer_data = OfferMessage()
         offer_data.ParseFromString(offer_bytes)
@@ -4124,6 +4290,8 @@ class BasicSwap(BaseApp):
 
         ensure(msg['sent'] + offer_data.time_valid >= now, 'Offer expired')
 
+        reverse_bid: bool = coin_from in self.scriptless_coins
+
         if offer_data.swap_type == SwapTypes.SELLER_FIRST:
             ensure(offer_data.protocol_version >= MINPROTO_VERSION_SECRET_HASH, 'Invalid protocol version')
             ensure(len(offer_data.proof_address) == 0, 'Unexpected data')
@@ -4134,8 +4302,10 @@ class BasicSwap(BaseApp):
             raise ValueError('TODO')
         elif offer_data.swap_type == SwapTypes.XMR_SWAP:
             ensure(offer_data.protocol_version >= MINPROTO_VERSION_ADAPTOR_SIG, 'Invalid protocol version')
-            ensure(coin_from not in non_script_type_coins, 'Invalid coin from type')
-            ensure(ci_from.has_segwit(), 'Coin from must support segwit')
+            if reverse_bid:
+                ensure(ci_to.has_segwit(), 'Coin-to must support segwit for reverse bid offers')
+            else:
+                ensure(ci_from.has_segwit(), 'Coin-from must support segwit')
             ensure(len(offer_data.proof_address) == 0, 'Unexpected data')
             ensure(len(offer_data.proof_signature) == 0, 'Unexpected data')
             ensure(len(offer_data.pkhash_seller) == 0, 'Unexpected data')
@@ -4182,7 +4352,8 @@ class BasicSwap(BaseApp):
                     addr_from=msg['from'],
                     created_at=msg['sent'],
                     expire_at=msg['sent'] + offer_data.time_valid,
-                    was_sent=False)
+                    was_sent=False,
+                    bid_reversed=offer_data.coin_from in self.scriptless_coins)
                 offer.setState(OfferStates.OFFER_RECEIVED)
                 session.add(offer)
 
@@ -4190,8 +4361,13 @@ class BasicSwap(BaseApp):
                     xmr_offer = XmrOffer()
 
                     xmr_offer.offer_id = offer_id
-                    xmr_offer.lock_time_1 = ci_from.getExpectedSequence(offer_data.lock_type, offer_data.lock_value)
-                    xmr_offer.lock_time_2 = ci_from.getExpectedSequence(offer_data.lock_type, offer_data.lock_value)
+
+                    if reverse_bid:
+                        xmr_offer.lock_time_1 = ci_to.getExpectedSequence(offer_data.lock_type, offer_data.lock_value)
+                        xmr_offer.lock_time_2 = ci_to.getExpectedSequence(offer_data.lock_type, offer_data.lock_value)
+                    else:
+                        xmr_offer.lock_time_1 = ci_from.getExpectedSequence(offer_data.lock_type, offer_data.lock_value)
+                        xmr_offer.lock_time_2 = ci_from.getExpectedSequence(offer_data.lock_type, offer_data.lock_value)
 
                     xmr_offer.a_fee_rate = offer_data.fee_rate_from
                     xmr_offer.b_fee_rate = offer_data.fee_rate_to
@@ -4207,7 +4383,7 @@ class BasicSwap(BaseApp):
             session.close()
             session.remove()
 
-    def processOfferRevoke(self, msg):
+    def processOfferRevoke(self, msg) -> None:
         ensure(msg['to'] == self.network_addr, 'Message received on wrong address')
 
         msg_bytes = bytes.fromhex(msg['hex'][2:-2])
@@ -4283,7 +4459,7 @@ class BasicSwap(BaseApp):
                 raise AutomationConstraint('Bidder has too many failed swaps')
         return True
 
-    def shouldAutoAcceptBid(self, offer, bid, session=None):
+    def shouldAutoAcceptBid(self, offer, bid, session=None) -> bool:
         try:
             use_session = self.openSession(session)
 
@@ -4294,17 +4470,25 @@ class BasicSwap(BaseApp):
             strategy = use_session.query(AutomationStrategy).filter_by(active_ind=1, record_id=link.strategy_id).first()
             opts = json.loads(strategy.data.decode('utf-8'))
 
+            coin_from = Coins(offer.coin_from)
+            bid_amount: int = bid.amount
+            bid_rate: int = bid.rate
+
+            reverse_bid: bool = coin_from in self.scriptless_coins
+            if reverse_bid:
+                bid_amount, bid_rate = xmr_swap_1.reverseBidAmountAndRate(self, bid, offer)
+
             self.log.debug('Evaluating against strategy {}'.format(strategy.record_id))
 
             if not offer.amount_negotiable:
                 if bid.amount != offer.amount_from:
                     raise AutomationConstraint('Need exact amount match')
 
-            if bid.amount < offer.min_bid_amount:
+            if bid_amount < offer.min_bid_amount:
                 raise AutomationConstraint('Bid amount below offer minimum')
 
             if opts.get('exact_rate_only', False) is True:
-                if bid.rate != offer.rate:
+                if bid_rate != offer.rate:
                     raise AutomationConstraint('Need exact rate match')
 
             active_bids, total_bids_value = self.getCompletedAndActiveBidsValue(offer, use_session)
@@ -4348,7 +4532,7 @@ class BasicSwap(BaseApp):
             if session is None:
                 self.closeSession(use_session)
 
-    def processBid(self, msg):
+    def processBid(self, msg) -> None:
         self.log.debug('Processing bid msg %s', msg['msgid'])
         now: int = self.getTime()
         bid_bytes = bytes.fromhex(msg['hex'][2:-2])
@@ -4430,7 +4614,7 @@ class BasicSwap(BaseApp):
             self.log.info('Auto accepting bid %s in %d seconds', bid_id.hex(), delay)
             self.createAction(delay, ActionTypes.ACCEPT_BID, bid_id)
 
-    def processBidAccept(self, msg):
+    def processBidAccept(self, msg) -> None:
         self.log.debug('Processing bid accepted msg %s', msg['msgid'])
         now: int = self.getTime()
         bid_accept_bytes = bytes.fromhex(msg['hex'][2:-2])
@@ -4457,7 +4641,9 @@ class BasicSwap(BaseApp):
 
         if bid.state >= BidStates.BID_ACCEPTED:
             if bid.was_received:  # Sent to self
-                self.log.info('Received valid bid accept %s for bid %s sent to self', bid.accept_msg_id.hex(), bid_id.hex())
+                accept_msg_id: bytes = self.getLinkedMessageId(Concepts.BID, bid_id, MessageTypes.BID_ACCEPT)
+
+                self.log.info('Received valid bid accept %s for bid %s sent to self', accept_msg_id.hex(), bid_id.hex())
                 return
             raise ValueError('Wrong bid state: {}'.format(str(BidStates(bid.state))))
 
@@ -4491,9 +4677,11 @@ class BasicSwap(BaseApp):
 
         ensure(len(scriptvalues[3]) == 40, 'pkhash_refund bad length')
 
-        ensure(bid.accept_msg_id is None, 'Bid already accepted')
+        ensure(self.countMessageLinks(Concepts.BID, bid_id, MessageTypes.BID_ACCEPT) == 0, 'Bid already accepted')
 
-        bid.accept_msg_id = bytes.fromhex(msg['msgid'])
+        bid_accept_msg_id = bytes.fromhex(msg['msgid'])
+        self.addMessageLink(Concepts.BID, bid_id, MessageTypes.BID_ACCEPT, bid_accept_msg_id)
+
         bid.initiate_tx = SwapTx(
             bid_id=bid_id,
             tx_type=TxTypes.ITX,
@@ -4510,25 +4698,37 @@ class BasicSwap(BaseApp):
         self.swaps_in_progress[bid_id] = (bid, offer)
         self.notify(NT.BID_ACCEPTED, {'bid_id': bid_id.hex()})
 
-    def receiveXmrBid(self, bid, session):
-        self.log.debug('Receiving xmr bid %s', bid.bid_id.hex())
+    def receiveXmrBid(self, bid, session) -> None:
+        self.log.debug('Receiving adaptor-sig bid %s', bid.bid_id.hex())
         now: int = self.getTime()
 
         offer, xmr_offer = self.getXmrOfferFromSession(session, bid.offer_id, sent=True)
-        ensure(offer and offer.was_sent, 'Offer not found: {}.'.format(bid.offer_id.hex()))
-        ensure(xmr_offer, 'XMR offer not found: {}.'.format(bid.offer_id.hex()))
-        xmr_swap = session.query(XmrSwap).filter_by(bid_id=bid.bid_id).first()
-        ensure(xmr_swap, 'XMR swap not found: {}.'.format(bid.bid_id.hex()))
+        ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
 
-        ci_from = self.ci(Coins(offer.coin_from))
-        ci_to = self.ci(Coins(offer.coin_to))
+        ensure(xmr_offer, 'Adaptor-sig offer not found: {}.'.format(bid.offer_id.hex()))
+        xmr_swap = session.query(XmrSwap).filter_by(bid_id=bid.bid_id).first()
+        ensure(xmr_swap, 'Adaptor-sig swap not found: {}.'.format(bid.bid_id.hex()))
+
+        reverse_bid: bool = offer.coin_from in self.scriptless_coins
+        addr_expect_from: str = ''
+        if reverse_bid:
+            ci_from = self.ci(Coins(offer.coin_to))
+            ci_to = self.ci(Coins(offer.coin_from))
+            addr_expect_from = bid.bid_addr
+            addr_expect_to = offer.addr_from
+        else:
+            ensure(offer.was_sent, 'Offer not sent: {}.'.format(bid.offer_id.hex()))
+            ci_from = self.ci(Coins(offer.coin_from))
+            ci_to = self.ci(Coins(offer.coin_to))
+            addr_expect_from = offer.addr_from
+            addr_expect_to = bid.bid_addr
 
         if ci_to.curve_type() == Curves.ed25519:
             if len(xmr_swap.kbsf_dleag) < ci_to.lengthDLEAG():
                 q = session.query(XmrSplitData).filter(sa.and_(XmrSplitData.bid_id == bid.bid_id, XmrSplitData.msg_type == XmrSplitMsgTypes.BID)).order_by(XmrSplitData.msg_sequence.asc())
                 for row in q:
-                    ensure(row.addr_to == offer.addr_from, 'Received on incorrect address, segment_id {}'.format(row.record_id))
-                    ensure(row.addr_from == bid.bid_addr, 'Sent from incorrect address, segment_id {}'.format(row.record_id))
+                    ensure(row.addr_to == addr_expect_from, 'Received on incorrect address, segment_id {}'.format(row.record_id))
+                    ensure(row.addr_from == addr_expect_to, 'Sent from incorrect address, segment_id {}'.format(row.record_id))
                     xmr_swap.kbsf_dleag += row.dleag
 
             if not ci_to.verifyDLEAG(xmr_swap.kbsf_dleag):
@@ -4552,37 +4752,42 @@ class BasicSwap(BaseApp):
         ensure(ci_to.verifyKey(xmr_swap.vkbvf), 'Invalid key, vkbvf')
         ensure(ci_from.verifyPubkey(xmr_swap.pkaf), 'Invalid pubkey, pkaf')
 
-        self.notify(NT.BID_RECEIVED, {'type': 'xmr', 'bid_id': bid.bid_id.hex(), 'offer_id': bid.offer_id.hex()}, session)
+        if not reverse_bid:  # notify already ran in processADSBidReversed
+            self.notify(NT.BID_RECEIVED, {'type': 'xmr', 'bid_id': bid.bid_id.hex(), 'offer_id': bid.offer_id.hex()}, session)
 
         bid.setState(BidStates.BID_RECEIVED)
 
-        if self.shouldAutoAcceptBid(offer, bid, session):
+        if self.shouldAutoAcceptBid(offer, bid, session) or reverse_bid:
             delay = random.randrange(self.min_delay_event, self.max_delay_event)
-            self.log.info('Auto accepting xmr bid %s in %d seconds', bid.bid_id.hex(), delay)
+            self.log.info('Auto accepting %sadaptor-sig bid %s in %d seconds', 'reverse ' if reverse_bid else '', bid.bid_id.hex(), delay)
             self.createActionInSession(delay, ActionTypes.ACCEPT_XMR_BID, bid.bid_id, session)
             bid.setState(BidStates.SWAP_DELAYING)
 
         self.saveBidInSession(bid.bid_id, bid, session, xmr_swap)
 
-    def receiveXmrBidAccept(self, bid, session):
+    def receiveXmrBidAccept(self, bid, session) -> None:
         # Follower receiving MSG1F and MSG2F
-        self.log.debug('Receiving xmr bid accept %s', bid.bid_id.hex())
+        self.log.debug('Receiving adaptor-sig bid accept %s', bid.bid_id.hex())
         now: int = self.getTime()
 
         offer, xmr_offer = self.getXmrOffer(bid.offer_id, sent=True)
         ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
-        ensure(xmr_offer, 'XMR offer not found: {}.'.format(bid.offer_id.hex()))
+        ensure(xmr_offer, 'Adaptor-sig offer not found: {}.'.format(bid.offer_id.hex()))
         xmr_swap = session.query(XmrSwap).filter_by(bid_id=bid.bid_id).first()
-        ensure(xmr_swap, 'XMR swap not found: {}.'.format(bid.bid_id.hex()))
-        ci_from = self.ci(offer.coin_from)
-        ci_to = self.ci(offer.coin_to)
+        ensure(xmr_swap, 'Adaptor-sig swap not found: {}.'.format(bid.bid_id.hex()))
+
+        reverse_bid: bool = offer.coin_from in self.scriptless_coins
+        ci_from = self.ci(offer.coin_to if reverse_bid else offer.coin_from)
+        ci_to = self.ci(offer.coin_from if reverse_bid else offer.coin_to)
+        addr_from: str = bid.bid_addr if reverse_bid else offer.addr_from
+        addr_to: str = offer.addr_from if reverse_bid else bid.bid_addr
 
         if ci_to.curve_type() == Curves.ed25519:
             if len(xmr_swap.kbsl_dleag) < ci_to.lengthDLEAG():
                 q = session.query(XmrSplitData).filter(sa.and_(XmrSplitData.bid_id == bid.bid_id, XmrSplitData.msg_type == XmrSplitMsgTypes.BID_ACCEPT)).order_by(XmrSplitData.msg_sequence.asc())
                 for row in q:
-                    ensure(row.addr_to == bid.bid_addr, 'Received on incorrect address, segment_id {}'.format(row.record_id))
-                    ensure(row.addr_from == offer.addr_from, 'Sent from incorrect address, segment_id {}'.format(row.record_id))
+                    ensure(row.addr_to == addr_to, 'Received on incorrect address, segment_id {}'.format(row.record_id))
+                    ensure(row.addr_from == addr_from, 'Sent from incorrect address, segment_id {}'.format(row.record_id))
                     xmr_swap.kbsl_dleag += row.dleag
             if not ci_to.verifyDLEAG(xmr_swap.kbsl_dleag):
                 raise ValueError('Invalid DLEAG proof.')
@@ -4621,12 +4826,12 @@ class BasicSwap(BaseApp):
         self.notify(NT.BID_ACCEPTED, {'bid_id': bid.bid_id.hex()}, session)
 
         delay = random.randrange(self.min_delay_event, self.max_delay_event)
-        self.log.info('Responding to xmr bid accept %s in %d seconds', bid.bid_id.hex(), delay)
+        self.log.info('Responding to adaptor-sig bid accept %s in %d seconds', bid.bid_id.hex(), delay)
         self.createActionInSession(delay, ActionTypes.SIGN_XMR_SWAP_LOCK_TX_A, bid.bid_id, session)
 
-    def processXmrBid(self, msg):
+    def processXmrBid(self, msg) -> None:
         # MSG1L
-        self.log.debug('Processing xmr bid msg %s', msg['msgid'])
+        self.log.debug('Processing adaptor-sig bid msg %s', msg['msgid'])
         now: int = self.getTime()
         bid_bytes = bytes.fromhex(msg['hex'][2:-2])
         bid_data = XmrBidMessage()
@@ -4640,7 +4845,7 @@ class BasicSwap(BaseApp):
         offer, xmr_offer = self.getXmrOffer(offer_id, sent=True)
         ensure(offer and offer.was_sent, 'Offer not found: {}.'.format(offer_id.hex()))
         ensure(offer.swap_type == SwapTypes.XMR_SWAP, 'Bid/offer swap type mismatch')
-        ensure(xmr_offer, 'XMR offer not found: {}.'.format(offer_id.hex()))
+        ensure(xmr_offer, 'Adaptor-sig offer not found: {}.'.format(offer_id.hex()))
 
         ci_from = self.ci(offer.coin_from)
         ci_to = self.ci(offer.coin_to)
@@ -4656,6 +4861,10 @@ class BasicSwap(BaseApp):
 
         ensure(ci_to.verifyKey(bid_data.kbvf), 'Invalid chain B follower view key')
         ensure(ci_from.verifyPubkey(bid_data.pkaf), 'Invalid chain A follower public key')
+        ensure(ci_from.isValidAddressHash(bid_data.dest_af) or ci_from.isValidPubkey(bid_data.dest_af), 'Invalid destination address')
+
+        if ci_to.curve_type() == Curves.ed25519:
+            ensure(len(bid_data.kbsf_dleag) == 16000, 'Invalid kbsf_dleag size')
 
         bid_id = bytes.fromhex(msg['msgid'])
 
@@ -4688,7 +4897,7 @@ class BasicSwap(BaseApp):
             wallet_restore_height = self.getWalletRestoreHeight(ci_to)
             if bid.chain_b_height_start < wallet_restore_height:
                 bid.chain_b_height_start = wallet_restore_height
-                self.log.warning('XMR swap restore height clamped to {}'.format(wallet_restore_height))
+                self.log.warning('Adaptor-sig swap restore height clamped to {}'.format(wallet_restore_height))
         else:
             ensure(bid.state == BidStates.BID_SENT, 'Wrong bid state: {}'.format(str(BidStates(bid.state))))
             # Don't update bid.created_at, it's been used to derive kaf
@@ -4697,22 +4906,19 @@ class BasicSwap(BaseApp):
 
         bid.setState(BidStates.BID_RECEIVING)
 
-        self.log.info('Receiving xmr bid %s for offer %s', bid_id.hex(), bid_data.offer_msg_id.hex())
+        self.log.info('Receiving adaptor-sig bid %s for offer %s', bid_id.hex(), bid_data.offer_msg_id.hex())
         self.saveBid(bid_id, bid, xmr_swap=xmr_swap)
 
-        if offer.coin_to != Coins.XMR:
-            with self.mxDB:
-                try:
-                    session = scoped_session(self.session_factory)
-                    self.receiveXmrBid(bid, session)
-                    session.commit()
-                finally:
-                    session.close()
-                    session.remove()
+        if ci_to.curve_type() != Curves.ed25519:
+            try:
+                session = self.openSession()
+                self.receiveXmrBid(bid, session)
+            finally:
+                self.closeSession(session)
 
-    def processXmrBidAccept(self, msg):
+    def processXmrBidAccept(self, msg) -> None:
         # F receiving MSG1F and MSG2F
-        self.log.debug('Processing xmr bid accept msg %s', msg['msgid'])
+        self.log.debug('Processing adaptor-sig bid accept msg %s', msg['msgid'])
         now: int = self.getTime()
         msg_bytes = bytes.fromhex(msg['hex'][2:-2])
         msg_data = XmrBidAcceptMessage()
@@ -4723,17 +4929,22 @@ class BasicSwap(BaseApp):
         self.log.debug('for bid %s', msg_data.bid_msg_id.hex())
         bid, xmr_swap = self.getXmrBid(msg_data.bid_msg_id)
         ensure(bid, 'Bid not found: {}.'.format(msg_data.bid_msg_id.hex()))
-        ensure(xmr_swap, 'XMR swap not found: {}.'.format(msg_data.bid_msg_id.hex()))
+        ensure(xmr_swap, 'Adaptor-sig swap not found: {}.'.format(msg_data.bid_msg_id.hex()))
 
         offer, xmr_offer = self.getXmrOffer(bid.offer_id, sent=True)
         ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
-        ensure(xmr_offer, 'XMR offer not found: {}.'.format(bid.offer_id.hex()))
+        ensure(xmr_offer, 'Adaptor-sig offer not found: {}.'.format(bid.offer_id.hex()))
 
-        ensure(msg['to'] == bid.bid_addr, 'Received on incorrect address')
-        ensure(msg['from'] == offer.addr_from, 'Sent from incorrect address')
+        reverse_bid: bool = offer.coin_from in self.scriptless_coins
+        ci_from = self.ci(offer.coin_to if reverse_bid else offer.coin_from)
+        ci_to = self.ci(offer.coin_from if reverse_bid else offer.coin_to)
+        addr_from: str = bid.bid_addr if reverse_bid else offer.addr_from
+        addr_to: str = offer.addr_from if reverse_bid else bid.bid_addr
+        a_fee_rate: int = xmr_offer.b_fee_rate if reverse_bid else xmr_offer.a_fee_rate
+        b_fee_rate: int = xmr_offer.a_fee_rate if reverse_bid else xmr_offer.b_fee_rate
 
-        ci_from = self.ci(offer.coin_from)
-        ci_to = self.ci(offer.coin_to)
+        ensure(msg['to'] == addr_to, 'Received on incorrect address')
+        ensure(msg['from'] == addr_from, 'Sent from incorrect address')
 
         try:
             xmr_swap.pkal = msg_data.pkal
@@ -4759,7 +4970,7 @@ class BasicSwap(BaseApp):
                 xmr_swap.a_lock_tx, xmr_swap.a_lock_tx_script,
                 bid.amount,
                 xmr_swap.pkal, xmr_swap.pkaf,
-                xmr_offer.a_fee_rate,
+                a_fee_rate,
                 check_a_lock_tx_inputs, xmr_swap.vkbv)
             a_lock_tx_dest = ci_from.getScriptDest(xmr_swap.a_lock_tx_script)
 
@@ -4768,13 +4979,13 @@ class BasicSwap(BaseApp):
                 xmr_swap.a_lock_tx_id, xmr_swap.a_lock_tx_vout, xmr_offer.lock_time_1, xmr_swap.a_lock_tx_script,
                 xmr_swap.pkal, xmr_swap.pkaf,
                 xmr_offer.lock_time_2,
-                bid.amount, xmr_offer.a_fee_rate, xmr_swap.vkbv)
+                bid.amount, a_fee_rate, xmr_swap.vkbv)
 
             ci_from.verifySCLockRefundSpendTx(
                 xmr_swap.a_lock_refund_spend_tx, xmr_swap.a_lock_refund_tx,
                 xmr_swap.a_lock_refund_tx_id, xmr_swap.a_lock_refund_tx_script,
                 xmr_swap.pkal,
-                lock_refund_vout, xmr_swap.a_swap_refund_value, xmr_offer.a_fee_rate, xmr_swap.vkbv)
+                lock_refund_vout, xmr_swap.a_swap_refund_value, a_fee_rate, xmr_swap.vkbv)
 
             self.log.info('Checking leader\'s lock refund tx signature')
             prevout_amount = ci_from.getLockTxSwapOutputValue(bid, xmr_swap)
@@ -4788,25 +4999,23 @@ class BasicSwap(BaseApp):
             bid.setState(BidStates.BID_RECEIVING_ACC)
             self.saveBid(bid.bid_id, bid, xmr_swap=xmr_swap)
 
-            if offer.coin_to != Coins.XMR:
-                with self.mxDB:
-                    try:
-                        session = scoped_session(self.session_factory)
-                        self.receiveXmrBidAccept(bid, session)
-                        session.commit()
-                    finally:
-                        session.close()
-                        session.remove()
+            if ci_to.curve_type() != Curves.ed25519:
+                try:
+                    session = self.openSession()
+                    self.receiveXmrBidAccept(bid, session)
+                finally:
+                    self.closeSession(session)
         except Exception as ex:
             if self.debug:
                 self.log.error(traceback.format_exc())
             self.setBidError(bid.bid_id, bid, str(ex), xmr_swap=xmr_swap)
 
-    def watchXmrSwap(self, bid, offer, xmr_swap):
-        self.log.debug('XMR swap in progress, bid %s', bid.bid_id.hex())
+    def watchXmrSwap(self, bid, offer, xmr_swap) -> None:
+        self.log.debug('Adaptor-sig swap in progress, bid %s', bid.bid_id.hex())
         self.swaps_in_progress[bid.bid_id] = (bid, offer)
 
-        coin_from = Coins(offer.coin_from)
+        reverse_bid: bool = offer.coin_from in self.scriptless_coins
+        coin_from = Coins(offer.coin_to if reverse_bid else offer.coin_from)
         self.setLastHeightChecked(coin_from, bid.chain_a_height_start)
         self.addWatchedOutput(coin_from, bid.bid_id, bid.xmr_a_lock_tx.txid.hex(), bid.xmr_a_lock_tx.vout, TxTypes.XMR_SWAP_A_LOCK, SwapTypes.XMR_SWAP)
 
@@ -4814,19 +5023,21 @@ class BasicSwap(BaseApp):
         self.addWatchedOutput(coin_from, bid.bid_id, xmr_swap.a_lock_refund_tx_id.hex(), lock_refund_vout, TxTypes.XMR_SWAP_A_LOCK_REFUND, SwapTypes.XMR_SWAP)
         bid.in_progress = 1
 
-    def sendXmrBidTxnSigsFtoL(self, bid_id, session):
+    def sendXmrBidTxnSigsFtoL(self, bid_id, session) -> None:
         # F -> L: Sending MSG3L
-        self.log.debug('Signing xmr bid lock txns %s', bid_id.hex())
+        self.log.debug('Signing adaptor-sig bid lock txns %s', bid_id.hex())
 
         bid, xmr_swap = self.getXmrBidFromSession(session, bid_id)
         ensure(bid, 'Bid not found: {}.'.format(bid_id.hex()))
-        ensure(xmr_swap, 'XMR swap not found: {}.'.format(bid_id.hex()))
+        ensure(xmr_swap, 'Adaptor-sig swap not found: {}.'.format(bid_id.hex()))
 
         offer, xmr_offer = self.getXmrOfferFromSession(session, bid.offer_id, sent=False)
         ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
-        ensure(xmr_offer, 'XMR offer not found: {}.'.format(bid.offer_id.hex()))
-        coin_from = Coins(offer.coin_from)
-        coin_to = Coins(offer.coin_to)
+        ensure(xmr_offer, 'Adaptor-sig offer not found: {}.'.format(bid.offer_id.hex()))
+
+        reverse_bid: bool = offer.coin_from in self.scriptless_coins
+        coin_from = Coins(offer.coin_to if reverse_bid else offer.coin_from)
+        coin_to = Coins(offer.coin_from if reverse_bid else offer.coin_to)
         ci_from = self.ci(coin_from)
         ci_to = self.ci(coin_to)
 
@@ -4850,10 +5061,12 @@ class BasicSwap(BaseApp):
             msg_bytes = msg_buf.SerializeToString()
             payload_hex = str.format('{:02x}', MessageTypes.XMR_BID_TXN_SIGS_FL) + msg_bytes.hex()
 
-            msg_valid = self.getActiveBidMsgValidTime()
-            xmr_swap.coin_a_lock_tx_sigs_l_msg_id = self.sendSmsg(bid.bid_addr, offer.addr_from, payload_hex, msg_valid)
-
-            self.log.info('Sent XMR_BID_TXN_SIGS_FL %s', xmr_swap.coin_a_lock_tx_sigs_l_msg_id.hex())
+            msg_valid: int = self.getActiveBidMsgValidTime()
+            addr_send_from: str = offer.addr_from if reverse_bid else bid.bid_addr
+            addr_send_to: str = bid.bid_addr if reverse_bid else offer.addr_from
+            coin_a_lock_tx_sigs_l_msg_id = self.sendSmsg(addr_send_from, addr_send_to, payload_hex, msg_valid)
+            self.addMessageLink(Concepts.BID, bid_id, MessageTypes.XMR_BID_TXN_SIGS_FL, coin_a_lock_tx_sigs_l_msg_id, session=session)
+            self.log.info('Sent XMR_BID_TXN_SIGS_FL %s for bid %s', coin_a_lock_tx_sigs_l_msg_id.hex(), bid_id.hex())
 
             a_lock_tx_id = ci_from.getTxid(xmr_swap.a_lock_tx)
             a_lock_tx_vout = ci_from.getTxOutputPos(xmr_swap.a_lock_tx, xmr_swap.a_lock_tx_script)
@@ -4874,21 +5087,24 @@ class BasicSwap(BaseApp):
             if self.debug:
                 self.log.error(traceback.format_exc())
 
-    def sendXmrBidCoinALockTx(self, bid_id, session):
+    def sendXmrBidCoinALockTx(self, bid_id: bytes, session) -> None:
         # Offerer/Leader. Send coin A lock tx
-        self.log.debug('Sending coin A lock tx for xmr bid %s', bid_id.hex())
+        self.log.debug('Sending coin A lock tx for adaptor-sig bid %s', bid_id.hex())
 
         bid, xmr_swap = self.getXmrBidFromSession(session, bid_id)
         ensure(bid, 'Bid not found: {}.'.format(bid_id.hex()))
-        ensure(xmr_swap, 'XMR swap not found: {}.'.format(bid_id.hex()))
+        ensure(xmr_swap, 'Adaptor-sig swap not found: {}.'.format(bid_id.hex()))
 
         offer, xmr_offer = self.getXmrOfferFromSession(session, bid.offer_id, sent=False)
         ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
-        ensure(xmr_offer, 'XMR offer not found: {}.'.format(bid.offer_id.hex()))
-        coin_from = Coins(offer.coin_from)
-        coin_to = Coins(offer.coin_to)
+        ensure(xmr_offer, 'Adaptor-sig offer not found: {}.'.format(bid.offer_id.hex()))
+
+        reverse_bid: bool = offer.coin_from in self.scriptless_coins
+        coin_from = Coins(offer.coin_to if reverse_bid else offer.coin_from)
+        coin_to = Coins(offer.coin_from if reverse_bid else offer.coin_to)
         ci_from = self.ci(coin_from)
         ci_to = self.ci(coin_to)
+        a_fee_rate: int = xmr_offer.b_fee_rate if reverse_bid else xmr_offer.a_fee_rate
 
         kal = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, KeyTypes.KAL)
 
@@ -4899,11 +5115,17 @@ class BasicSwap(BaseApp):
         xmr_swap.a_lock_spend_tx = ci_from.createSCLockSpendTx(
             xmr_swap.a_lock_tx, xmr_swap.a_lock_tx_script,
             xmr_swap.dest_af,
-            xmr_offer.a_fee_rate, xmr_swap.vkbv)
+            a_fee_rate, xmr_swap.vkbv)
 
         xmr_swap.a_lock_spend_tx_id = ci_from.getTxid(xmr_swap.a_lock_spend_tx)
         prevout_amount = ci_from.getLockTxSwapOutputValue(bid, xmr_swap)
         xmr_swap.al_lock_spend_tx_esig = ci_from.signTxOtVES(kal, xmr_swap.pkasf, xmr_swap.a_lock_spend_tx, 0, xmr_swap.a_lock_tx_script, prevout_amount)
+
+        # Double check a_lock_spend_tx is valid
+        ci_from.verifySCLockSpendTx(
+            xmr_swap.a_lock_spend_tx,
+            xmr_swap.a_lock_tx, xmr_swap.a_lock_tx_script,
+            xmr_swap.dest_af, a_fee_rate, xmr_swap.vkbv)
 
         delay = random.randrange(self.min_delay_event_short, self.max_delay_event_short)
         self.log.info('Sending lock spend tx message for bid %s in %d seconds', bid_id.hex(), delay)
@@ -4936,30 +5158,34 @@ class BasicSwap(BaseApp):
 
         self.saveBidInSession(bid_id, bid, session, xmr_swap)
 
-    def sendXmrBidCoinBLockTx(self, bid_id, session):
+    def sendXmrBidCoinBLockTx(self, bid_id: bytes, session) -> None:
         # Follower sending coin B lock tx
-        self.log.debug('Sending coin B lock tx for xmr bid %s', bid_id.hex())
+        self.log.debug('Sending coin B lock tx for adaptor-sig bid %s', bid_id.hex())
 
         bid, xmr_swap = self.getXmrBidFromSession(session, bid_id)
         ensure(bid, 'Bid not found: {}.'.format(bid_id.hex()))
-        ensure(xmr_swap, 'XMR swap not found: {}.'.format(bid_id.hex()))
+        ensure(xmr_swap, 'Adaptor-sig swap not found: {}.'.format(bid_id.hex()))
 
         offer, xmr_offer = self.getXmrOfferFromSession(session, bid.offer_id, sent=False)
         ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
-        ensure(xmr_offer, 'XMR offer not found: {}.'.format(bid.offer_id.hex()))
-        ci_from = self.ci(Coins(offer.coin_from))
-        ci_to = self.ci(Coins(offer.coin_to))
+        ensure(xmr_offer, 'Adaptor-sig offer not found: {}.'.format(bid.offer_id.hex()))
 
-        if self.findTxB(ci_to, xmr_swap, bid, session) is True:
+        reverse_bid: bool = offer.coin_from in self.scriptless_coins
+        ci_from = self.ci(offer.coin_to if reverse_bid else offer.coin_from)
+        ci_to = self.ci(offer.coin_from if reverse_bid else offer.coin_to)
+        b_fee_rate: int = xmr_offer.a_fee_rate if reverse_bid else xmr_offer.b_fee_rate
+        was_sent: bool = bid.was_received if reverse_bid else bid.was_sent
+
+        if self.findTxB(ci_to, xmr_swap, bid, session, was_sent) is True:
             self.saveBidInSession(bid_id, bid, session, xmr_swap, save_in_progress=offer)
             return
 
         if bid.xmr_b_lock_tx:
-            self.log.warning('Coin B lock tx {} exists for xmr bid {}'.format(bid.xmr_b_lock_tx.b_lock_tx_id, bid_id.hex()))
+            self.log.warning('Coin B lock tx {} exists for adaptor-sig bid {}'.format(bid.xmr_b_lock_tx.b_lock_tx_id, bid_id.hex()))
             return
 
         if bid.debug_ind == DebugTypes.BID_STOP_AFTER_COIN_A_LOCK:
-            self.log.debug('XMR bid %s: Stalling bid for testing: %d.', bid_id.hex(), bid.debug_ind)
+            self.log.debug('Adaptor-sig bid %s: Stalling bid for testing: %d.', bid_id.hex(), bid.debug_ind)
             bid.setState(BidStates.BID_STALLED_FOR_TEST)
             self.logBidEvent(bid.bid_id, EventLogTypes.DEBUG_TWEAK_APPLIED, 'ind {}'.format(bid.debug_ind), session)
             self.saveBidInSession(bid_id, bid, session, xmr_swap, save_in_progress=offer)
@@ -4968,17 +5194,17 @@ class BasicSwap(BaseApp):
         unlock_time = 0
         if bid.debug_ind in (DebugTypes.CREATE_INVALID_COIN_B_LOCK, DebugTypes.B_LOCK_TX_MISSED_SEND):
             bid.amount_to -= int(bid.amount_to * 0.1)
-            self.log.debug('XMR bid %s: Debug %d - Reducing lock b txn amount by 10%% to %s.', bid_id.hex(), bid.debug_ind, ci_to.format_amount(bid.amount_to))
+            self.log.debug('Adaptor-sig bid %s: Debug %d - Reducing lock b txn amount by 10%% to %s.', bid_id.hex(), bid.debug_ind, ci_to.format_amount(bid.amount_to))
             self.logBidEvent(bid.bid_id, EventLogTypes.DEBUG_TWEAK_APPLIED, 'ind {}'.format(bid.debug_ind), session)
         if bid.debug_ind == DebugTypes.SEND_LOCKED_XMR:
             unlock_time = 10000
-            self.log.debug('XMR bid %s: Debug %d - Sending locked XMR.', bid_id.hex(), bid.debug_ind)
+            self.log.debug('Adaptor-sig bid %s: Debug %d - Sending locked XMR.', bid_id.hex(), bid.debug_ind)
             self.logBidEvent(bid.bid_id, EventLogTypes.DEBUG_TWEAK_APPLIED, 'ind {}'.format(bid.debug_ind), session)
 
         try:
-            b_lock_tx_id = ci_to.publishBLockTx(xmr_swap.vkbv, xmr_swap.pkbs, bid.amount_to, xmr_offer.b_fee_rate, unlock_time=unlock_time)
+            b_lock_tx_id = ci_to.publishBLockTx(xmr_swap.vkbv, xmr_swap.pkbs, bid.amount_to, b_fee_rate, unlock_time=unlock_time)
             if bid.debug_ind == DebugTypes.B_LOCK_TX_MISSED_SEND:
-                self.log.debug('XMR bid %s: Debug %d - Losing xmr lock tx %s.', bid_id.hex(), bid.debug_ind, b_lock_tx_id.hex())
+                self.log.debug('Adaptor-sig bid %s: Debug %d - Losing xmr lock tx %s.', bid_id.hex(), bid.debug_ind, b_lock_tx_id.hex())
                 self.logBidEvent(bid.bid_id, EventLogTypes.DEBUG_TWEAK_APPLIED, 'ind {}'.format(bid.debug_ind), session)
                 raise TemporaryError('Fail for debug event')
         except Exception as ex:
@@ -4992,7 +5218,7 @@ class BasicSwap(BaseApp):
 
             if num_retries < 5 and (ci_to.is_transient_error(ex) or self.is_transient_error(ex)):
                 delay = random.randrange(self.min_delay_retry, self.max_delay_retry)
-                self.log.info('Retrying sending xmr swap chain B lock tx for bid %s in %d seconds', bid_id.hex(), delay)
+                self.log.info('Retrying sending adaptor-sig swap chain B lock tx for bid %s in %d seconds', bid_id.hex(), delay)
                 self.createActionInSession(delay, ActionTypes.SEND_XMR_SWAP_LOCK_TX_B, bid_id, session)
             else:
                 self.setBidError(bid_id, bid, 'publishBLockTx failed: ' + str(ex), save_bid=False)
@@ -5013,19 +5239,21 @@ class BasicSwap(BaseApp):
 
         self.saveBidInSession(bid_id, bid, session, xmr_swap, save_in_progress=offer)
 
-    def sendXmrBidLockRelease(self, bid_id, session):
+    def sendXmrBidLockRelease(self, bid_id: bytes, session) -> None:
         # Leader sending lock tx a release secret (MSG5F)
-        self.log.debug('Sending bid secret for xmr bid %s', bid_id.hex())
+        self.log.debug('Sending bid secret for adaptor-sig bid %s', bid_id.hex())
 
         bid, xmr_swap = self.getXmrBidFromSession(session, bid_id)
         ensure(bid, 'Bid not found: {}.'.format(bid_id.hex()))
-        ensure(xmr_swap, 'XMR swap not found: {}.'.format(bid_id.hex()))
+        ensure(xmr_swap, 'Adaptor-sig swap not found: {}.'.format(bid_id.hex()))
 
         offer, xmr_offer = self.getXmrOfferFromSession(session, bid.offer_id, sent=False)
         ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
-        ensure(xmr_offer, 'XMR offer not found: {}.'.format(bid.offer_id.hex()))
-        coin_from = Coins(offer.coin_from)
-        coin_to = Coins(offer.coin_to)
+        ensure(xmr_offer, 'Adaptor-sig offer not found: {}.'.format(bid.offer_id.hex()))
+
+        reverse_bid: bool = offer.coin_from in self.scriptless_coins
+        coin_from = Coins(offer.coin_to if reverse_bid else offer.coin_from)
+        coin_to = Coins(offer.coin_from if reverse_bid else offer.coin_to)
 
         msg_buf = XmrBidLockReleaseMessage(
             bid_msg_id=bid_id,
@@ -5034,29 +5262,34 @@ class BasicSwap(BaseApp):
         msg_bytes = msg_buf.SerializeToString()
         payload_hex = str.format('{:02x}', MessageTypes.XMR_BID_LOCK_RELEASE_LF) + msg_bytes.hex()
 
-        msg_valid = self.getActiveBidMsgValidTime()
-        xmr_swap.coin_a_lock_release_msg_id = self.sendSmsg(offer.addr_from, bid.bid_addr, payload_hex, msg_valid)
+        addr_send_from: str = bid.bid_addr if reverse_bid else offer.addr_from
+        addr_send_to: str = offer.addr_from if reverse_bid else bid.bid_addr
+        msg_valid: int = self.getActiveBidMsgValidTime()
+        coin_a_lock_release_msg_id = self.sendSmsg(addr_send_from, addr_send_to, payload_hex, msg_valid)
+        self.addMessageLink(Concepts.BID, bid_id, MessageTypes.XMR_BID_LOCK_RELEASE_LF, coin_a_lock_release_msg_id, session=session)
 
         bid.setState(BidStates.XMR_SWAP_LOCK_RELEASED)
         self.saveBidInSession(bid_id, bid, session, xmr_swap, save_in_progress=offer)
 
-    def redeemXmrBidCoinALockTx(self, bid_id, session):
+    def redeemXmrBidCoinALockTx(self, bid_id: bytes, session) -> None:
         # Follower redeeming A lock tx
-        self.log.debug('Redeeming coin A lock tx for xmr bid %s', bid_id.hex())
+        self.log.debug('Redeeming coin A lock tx for adaptor-sig bid %s', bid_id.hex())
 
         bid, xmr_swap = self.getXmrBidFromSession(session, bid_id)
         ensure(bid, 'Bid not found: {}.'.format(bid_id.hex()))
-        ensure(xmr_swap, 'XMR swap not found: {}.'.format(bid_id.hex()))
+        ensure(xmr_swap, 'Adaptor-sig swap not found: {}.'.format(bid_id.hex()))
 
         offer, xmr_offer = self.getXmrOfferFromSession(session, bid.offer_id, sent=False)
         ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
-        ensure(xmr_offer, 'XMR offer not found: {}.'.format(bid.offer_id.hex()))
-        coin_from = Coins(offer.coin_from)
-        coin_to = Coins(offer.coin_to)
+        ensure(xmr_offer, 'Adaptor-sig offer not found: {}.'.format(bid.offer_id.hex()))
+
+        reverse_bid: bool = offer.coin_from in self.scriptless_coins
+        coin_from = Coins(offer.coin_to if reverse_bid else offer.coin_from)
+        coin_to = Coins(offer.coin_from if reverse_bid else offer.coin_to)
         ci_from = self.ci(coin_from)
         ci_to = self.ci(coin_to)
 
-        for_ed25519 = True if ci_to.curve_type() == Curves.ed25519 else False
+        for_ed25519: bool = True if ci_to.curve_type() == Curves.ed25519 else False
         kbsf = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, KeyTypes.KBSF, for_ed25519)
         kaf = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, KeyTypes.KAF)
 
@@ -5090,21 +5323,24 @@ class BasicSwap(BaseApp):
 
         self.saveBidInSession(bid_id, bid, session, xmr_swap, save_in_progress=offer)
 
-    def redeemXmrBidCoinBLockTx(self, bid_id, session):
+    def redeemXmrBidCoinBLockTx(self, bid_id: bytes, session) -> None:
         # Leader redeeming B lock tx
-        self.log.debug('Redeeming coin B lock tx for xmr bid %s', bid_id.hex())
+        self.log.debug('Redeeming coin B lock tx for adaptor-sig bid %s', bid_id.hex())
 
         bid, xmr_swap = self.getXmrBidFromSession(session, bid_id)
         ensure(bid, 'Bid not found: {}.'.format(bid_id.hex()))
-        ensure(xmr_swap, 'XMR swap not found: {}.'.format(bid_id.hex()))
+        ensure(xmr_swap, 'Adaptor-sig swap not found: {}.'.format(bid_id.hex()))
 
         offer, xmr_offer = self.getXmrOfferFromSession(session, bid.offer_id, sent=False)
         ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
-        ensure(xmr_offer, 'XMR offer not found: {}.'.format(bid.offer_id.hex()))
-        coin_from = Coins(offer.coin_from)
-        coin_to = Coins(offer.coin_to)
+        ensure(xmr_offer, 'Adaptor-sig offer not found: {}.'.format(bid.offer_id.hex()))
+
+        reverse_bid: bool = offer.coin_from in self.scriptless_coins
+        coin_from = Coins(offer.coin_to if reverse_bid else offer.coin_from)
+        coin_to = Coins(offer.coin_from if reverse_bid else offer.coin_to)
         ci_from = self.ci(coin_from)
         ci_to = self.ci(coin_to)
+        b_fee_rate: int = xmr_offer.a_fee_rate if reverse_bid else xmr_offer.b_fee_rate
 
         try:
             chain_height = ci_to.getChainHeight()
@@ -5118,7 +5354,7 @@ class BasicSwap(BaseApp):
             kbsf = ci_from.recoverEncKey(xmr_swap.al_lock_spend_tx_esig, xmr_swap.al_lock_spend_tx_sig, xmr_swap.pkasf)
             assert (kbsf is not None)
 
-            for_ed25519 = True if ci_to.curve_type() == Curves.ed25519 else False
+            for_ed25519: bool = True if ci_to.curve_type() == Curves.ed25519 else False
             kbsl = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, KeyTypes.KBSL, for_ed25519)
             vkbs = ci_to.sumKeys(kbsl, kbsf)
 
@@ -5129,7 +5365,7 @@ class BasicSwap(BaseApp):
             else:
                 address_to = self.getReceiveAddressFromPool(coin_to, bid_id, TxTypes.XMR_SWAP_B_LOCK_SPEND)
 
-            txid = ci_to.spendBLockTx(xmr_swap.b_lock_tx_id, address_to, xmr_swap.vkbv, vkbs, bid.amount_to, xmr_offer.b_fee_rate, bid.chain_b_height_start)
+            txid = ci_to.spendBLockTx(xmr_swap.b_lock_tx_id, address_to, xmr_swap.vkbv, vkbs, bid.amount_to, b_fee_rate, bid.chain_b_height_start)
             self.log.debug('Submitted lock B spend txn %s to %s chain for bid %s', txid.hex(), ci_to.coin_name(), bid_id.hex())
             self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_B_SPEND_TX_PUBLISHED, '', session)
         except Exception as ex:
@@ -5141,7 +5377,7 @@ class BasicSwap(BaseApp):
 
             if num_retries < 100 and (ci_to.is_transient_error(ex) or self.is_transient_error(ex)):
                 delay = random.randrange(self.min_delay_retry, self.max_delay_retry)
-                self.log.info('Retrying sending xmr swap chain B spend tx for bid %s in %d seconds', bid_id.hex(), delay)
+                self.log.info('Retrying sending adaptor-sig swap chain B spend tx for bid %s in %d seconds', bid_id.hex(), delay)
                 self.createActionInSession(delay, ActionTypes.REDEEM_XMR_SWAP_LOCK_TX_B, bid_id, session)
             else:
                 self.setBidError(bid_id, bid, 'spendBLockTx failed: ' + str(ex), save_bid=False)
@@ -5155,21 +5391,24 @@ class BasicSwap(BaseApp):
         # TODO: Why does using bid.txns error here?
         self.saveBidInSession(bid_id, bid, session, xmr_swap, save_in_progress=offer)
 
-    def recoverXmrBidCoinBLockTx(self, bid_id, session):
+    def recoverXmrBidCoinBLockTx(self, bid_id: bytes, session) -> None:
         # Follower recovering B lock tx
-        self.log.debug('Recovering coin B lock tx for xmr bid %s', bid_id.hex())
+        self.log.debug('Recovering coin B lock tx for adaptor-sig bid %s', bid_id.hex())
 
         bid, xmr_swap = self.getXmrBidFromSession(session, bid_id)
         ensure(bid, 'Bid not found: {}.'.format(bid_id.hex()))
-        ensure(xmr_swap, 'XMR swap not found: {}.'.format(bid_id.hex()))
+        ensure(xmr_swap, 'Adaptor-sig swap not found: {}.'.format(bid_id.hex()))
 
         offer, xmr_offer = self.getXmrOfferFromSession(session, bid.offer_id, sent=False)
         ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
-        ensure(xmr_offer, 'XMR offer not found: {}.'.format(bid.offer_id.hex()))
-        coin_from = Coins(offer.coin_from)
-        coin_to = Coins(offer.coin_to)
+        ensure(xmr_offer, 'Adaptor-sig offer not found: {}.'.format(bid.offer_id.hex()))
+
+        reverse_bid: bool = offer.coin_from in self.scriptless_coins
+        coin_from = Coins(offer.coin_to if reverse_bid else offer.coin_from)
+        coin_to = Coins(offer.coin_from if reverse_bid else offer.coin_to)
         ci_from = self.ci(coin_from)
         ci_to = self.ci(coin_to)
+        b_fee_rate: int = xmr_offer.a_fee_rate if reverse_bid else xmr_offer.b_fee_rate
 
         # Extract the follower's decrypted signature and use it to recover the leader's privatekey
         af_lock_refund_spend_tx_sig = ci_from.extractFollowerSig(xmr_swap.a_lock_refund_spend_tx)
@@ -5177,7 +5416,7 @@ class BasicSwap(BaseApp):
         kbsl = ci_from.recoverEncKey(xmr_swap.af_lock_refund_spend_tx_esig, af_lock_refund_spend_tx_sig, xmr_swap.pkasl)
         assert (kbsl is not None)
 
-        for_ed25519 = True if ci_to.curve_type() == Curves.ed25519 else False
+        for_ed25519: bool = True if ci_to.curve_type() == Curves.ed25519 else False
         kbsf = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, KeyTypes.KBSF, for_ed25519)
         vkbs = ci_to.sumKeys(kbsl, kbsf)
 
@@ -5188,7 +5427,7 @@ class BasicSwap(BaseApp):
                 address_to = self.getCachedStealthAddressForCoin(coin_to)
             else:
                 address_to = self.getReceiveAddressFromPool(coin_to, bid_id, TxTypes.XMR_SWAP_B_LOCK_REFUND)
-            txid = ci_to.spendBLockTx(xmr_swap.b_lock_tx_id, address_to, xmr_swap.vkbv, vkbs, bid.amount_to, xmr_offer.b_fee_rate, bid.chain_b_height_start)
+            txid = ci_to.spendBLockTx(xmr_swap.b_lock_tx_id, address_to, xmr_swap.vkbv, vkbs, bid.amount_to, b_fee_rate, bid.chain_b_height_start)
             self.log.debug('Submitted lock B refund txn %s to %s chain for bid %s', txid.hex(), ci_to.coin_name(), bid_id.hex())
             self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_B_REFUND_TX_PUBLISHED, '', session)
         except Exception as ex:
@@ -5202,7 +5441,7 @@ class BasicSwap(BaseApp):
             str_error = str(ex)
             if num_retries < 100 and (ci_to.is_transient_error(ex) or self.is_transient_error(ex)):
                 delay = random.randrange(self.min_delay_retry, self.max_delay_retry)
-                self.log.info('Retrying sending xmr swap chain B refund tx for bid %s in %d seconds', bid_id.hex(), delay)
+                self.log.info('Retrying sending adaptor-sig swap chain B refund tx for bid %s in %d seconds', bid_id.hex(), delay)
                 self.createActionInSession(delay, ActionTypes.RECOVER_XMR_SWAP_LOCK_TX_B, bid_id, session)
             else:
                 self.setBidError(bid_id, bid, 'spendBLockTx for refund failed: ' + str(ex), save_bid=False)
@@ -5216,18 +5455,22 @@ class BasicSwap(BaseApp):
         bid.setState(BidStates.XMR_SWAP_NOSCRIPT_TX_RECOVERED)
         self.saveBidInSession(bid_id, bid, session, xmr_swap, save_in_progress=offer)
 
-    def sendXmrBidCoinALockSpendTxMsg(self, bid_id, session):
+    def sendXmrBidCoinALockSpendTxMsg(self, bid_id: bytes, session) -> None:
         # Send MSG4F L -> F
-        self.log.debug('Sending coin A lock spend tx msg for xmr bid %s', bid_id.hex())
+        self.log.debug('Sending coin A lock spend tx msg for adaptor-sig bid %s', bid_id.hex())
 
         bid, xmr_swap = self.getXmrBidFromSession(session, bid_id)
         ensure(bid, 'Bid not found: {}.'.format(bid_id.hex()))
-        ensure(xmr_swap, 'XMR swap not found: {}.'.format(bid_id.hex()))
+        ensure(xmr_swap, 'Adaptor-sig swap not found: {}.'.format(bid_id.hex()))
 
         offer, xmr_offer = self.getXmrOfferFromSession(session, bid.offer_id, sent=False)
         ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
-        ensure(xmr_offer, 'XMR offer not found: {}.'.format(bid.offer_id.hex()))
-        ci_from = self.ci(offer.coin_from)
+        ensure(xmr_offer, 'Adaptor-sig offer not found: {}.'.format(bid.offer_id.hex()))
+
+        reverse_bid: bool = offer.coin_from in self.scriptless_coins
+        ci_from = self.ci(offer.coin_to if reverse_bid else offer.coin_from)
+        addr_send_from: str = bid.bid_addr if reverse_bid else offer.addr_from
+        addr_send_to: str = offer.addr_from if reverse_bid else bid.bid_addr
 
         msg_buf = XmrBidLockSpendTxMessage(
             bid_msg_id=bid_id,
@@ -5237,13 +5480,13 @@ class BasicSwap(BaseApp):
         msg_bytes = msg_buf.SerializeToString()
         payload_hex = str.format('{:02x}', MessageTypes.XMR_BID_LOCK_SPEND_TX_LF) + msg_bytes.hex()
 
-        msg_valid = self.getActiveBidMsgValidTime()
-        xmr_swap.coin_a_lock_refund_spend_tx_msg_id = self.sendSmsg(offer.addr_from, bid.bid_addr, payload_hex, msg_valid)
+        msg_valid: int = self.getActiveBidMsgValidTime()
+        xmr_swap.coin_a_lock_refund_spend_tx_msg_id = self.sendSmsg(addr_send_from, addr_send_to, payload_hex, msg_valid)
 
         bid.setState(BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX)
         self.saveBidInSession(bid_id, bid, session, xmr_swap, save_in_progress=offer)
 
-    def processXmrBidCoinALockSigs(self, msg):
+    def processXmrBidCoinALockSigs(self, msg) -> None:
         # Leader processing MSG3L
         self.log.debug('Processing xmr coin a follower lock sigs msg %s', msg['msgid'])
         now: int = self.getTime()
@@ -5256,19 +5499,22 @@ class BasicSwap(BaseApp):
 
         bid, xmr_swap = self.getXmrBid(bid_id)
         ensure(bid, 'Bid not found: {}.'.format(bid_id.hex()))
-        ensure(xmr_swap, 'XMR swap not found: {}.'.format(bid_id.hex()))
+        ensure(xmr_swap, 'Adaptor-sig swap not found: {}.'.format(bid_id.hex()))
 
         offer, xmr_offer = self.getXmrOffer(bid.offer_id, sent=False)
         ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
-        ensure(xmr_offer, 'XMR offer not found: {}.'.format(bid.offer_id.hex()))
+        ensure(xmr_offer, 'Adaptor-sig offer not found: {}.'.format(bid.offer_id.hex()))
 
-        ensure(msg['to'] == offer.addr_from, 'Received on incorrect address')
-        ensure(msg['from'] == bid.bid_addr, 'Sent from incorrect address')
-
-        coin_from = Coins(offer.coin_from)
-        coin_to = Coins(offer.coin_to)
+        reverse_bid: bool = offer.coin_from in self.scriptless_coins
+        coin_from = Coins(offer.coin_to if reverse_bid else offer.coin_from)
+        coin_to = Coins(offer.coin_from if reverse_bid else offer.coin_to)
+        addr_sent_from: str = offer.addr_from if reverse_bid else bid.bid_addr
+        addr_sent_to: str = bid.bid_addr if reverse_bid else offer.addr_from
         ci_from = self.ci(coin_from)
         ci_to = self.ci(coin_to)
+
+        ensure(msg['to'] == addr_sent_to, 'Received on incorrect address')
+        ensure(msg['from'] == addr_sent_from, 'Sent from incorrect address')
 
         try:
             allowed_states = [BidStates.BID_ACCEPTED, ]
@@ -5278,7 +5524,7 @@ class BasicSwap(BaseApp):
             xmr_swap.af_lock_refund_spend_tx_esig = msg_data.af_lock_refund_spend_tx_esig
             xmr_swap.af_lock_refund_tx_sig = msg_data.af_lock_refund_tx_sig
 
-            for_ed25519 = True if ci_to.curve_type() == Curves.ed25519 else False
+            for_ed25519: bool = True if ci_to.curve_type() == Curves.ed25519 else False
             kbsl = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, KeyTypes.KBSL, for_ed25519)
             kal = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, KeyTypes.KAL)
 
@@ -5303,7 +5549,7 @@ class BasicSwap(BaseApp):
             xmr_swap_1.addLockRefundSigs(self, xmr_swap, ci_from)
 
             delay = random.randrange(self.min_delay_event, self.max_delay_event)
-            self.log.info('Sending coin A lock tx for xmr bid %s in %d seconds', bid_id.hex(), delay)
+            self.log.info('Sending coin A lock tx for adaptor-sig bid %s in %d seconds', bid_id.hex(), delay)
             self.createAction(delay, ActionTypes.SEND_XMR_SWAP_LOCK_TX_A, bid_id)
 
             bid.setState(BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_TX_SIGS)
@@ -5313,9 +5559,9 @@ class BasicSwap(BaseApp):
                 self.log.error(traceback.format_exc())
             self.setBidError(bid_id, bid, str(ex))
 
-    def processXmrBidLockSpendTx(self, msg):
+    def processXmrBidLockSpendTx(self, msg) -> None:
         # Follower receiving MSG4F
-        self.log.debug('Processing xmr bid lock spend tx msg %s', msg['msgid'])
+        self.log.debug('Processing adaptor-sig bid lock spend tx msg %s', msg['msgid'])
         now: int = self.getTime()
         msg_bytes = bytes.fromhex(msg['hex'][2:-2])
         msg_data = XmrBidLockSpendTxMessage()
@@ -5326,17 +5572,21 @@ class BasicSwap(BaseApp):
 
         bid, xmr_swap = self.getXmrBid(bid_id)
         ensure(bid, 'Bid not found: {}.'.format(bid_id.hex()))
-        ensure(xmr_swap, 'XMR swap not found: {}.'.format(bid_id.hex()))
+        ensure(xmr_swap, 'Adaptor-sig swap not found: {}.'.format(bid_id.hex()))
 
         offer, xmr_offer = self.getXmrOffer(bid.offer_id, sent=False)
         ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
-        ensure(xmr_offer, 'XMR offer not found: {}.'.format(bid.offer_id.hex()))
+        ensure(xmr_offer, 'Adaptor-sig offer not found: {}.'.format(bid.offer_id.hex()))
 
-        ensure(msg['to'] == bid.bid_addr, 'Received on incorrect address')
-        ensure(msg['from'] == offer.addr_from, 'Sent from incorrect address')
+        reverse_bid: bool = offer.coin_from in self.scriptless_coins
+        ci_from = self.ci(offer.coin_to if reverse_bid else offer.coin_from)
+        ci_to = self.ci(offer.coin_from if reverse_bid else offer.coin_to)
+        addr_sent_from: str = bid.bid_addr if reverse_bid else offer.addr_from
+        addr_sent_to: str = offer.addr_from if reverse_bid else bid.bid_addr
+        a_fee_rate: int = xmr_offer.b_fee_rate if reverse_bid else xmr_offer.a_fee_rate
 
-        ci_from = self.ci(Coins(offer.coin_from))
-        ci_to = self.ci(Coins(offer.coin_to))
+        ensure(msg['to'] == addr_sent_to, 'Received on incorrect address')
+        ensure(msg['from'] == addr_sent_from, 'Sent from incorrect address')
 
         try:
             xmr_swap.a_lock_spend_tx = msg_data.a_lock_spend_tx
@@ -5346,7 +5596,7 @@ class BasicSwap(BaseApp):
             ci_from.verifySCLockSpendTx(
                 xmr_swap.a_lock_spend_tx,
                 xmr_swap.a_lock_tx, xmr_swap.a_lock_tx_script,
-                xmr_swap.dest_af, xmr_offer.a_fee_rate, xmr_swap.vkbv)
+                xmr_swap.dest_af, a_fee_rate, xmr_swap.vkbv)
 
             ci_from.verifyCompactSig(xmr_swap.pkal, 'proof key owned for swap', xmr_swap.kal_sig)
 
@@ -5364,7 +5614,7 @@ class BasicSwap(BaseApp):
         # Update copy of bid in swaps_in_progress
         self.swaps_in_progress[bid_id] = (bid, offer)
 
-    def processXmrSplitMessage(self, msg):
+    def processXmrSplitMessage(self, msg) -> None:
         self.log.debug('Processing xmr split msg %s', msg['msgid'])
         now: int = self.getTime()
         msg_bytes = bytes.fromhex(msg['hex'][2:-2])
@@ -5374,9 +5624,11 @@ class BasicSwap(BaseApp):
         # Validate data
         ensure(len(msg_data.msg_id) == 28, 'Bad msg_id length')
 
+        # TODO: Wait for bid msg to arrive first
+
         if msg_data.msg_type == XmrSplitMsgTypes.BID or msg_data.msg_type == XmrSplitMsgTypes.BID_ACCEPT:
+            session = self.openSession()
             try:
-                session = scoped_session(self.session_factory)
                 q = session.execute('SELECT COUNT(*) FROM xmr_split_data WHERE bid_id = x\'{}\' AND msg_type = {} AND msg_sequence = {}'.format(msg_data.msg_id.hex(), msg_data.msg_type, msg_data.sequence)).first()
                 num_exists = q[0]
                 if num_exists > 0:
@@ -5392,13 +5644,11 @@ class BasicSwap(BaseApp):
                 dbr.dleag = msg_data.dleag
                 dbr.created_at = now
                 session.add(dbr)
-                session.commit()
             finally:
-                session.close()
-                session.remove()
+                self.closeSession(session)
 
-    def processXmrLockReleaseMessage(self, msg):
-        self.log.debug('Processing xmr secret msg %s', msg['msgid'])
+    def processXmrLockReleaseMessage(self, msg) -> None:
+        self.log.debug('Processing adaptor-sig swap lock release msg %s', msg['msgid'])
         now: int = self.getTime()
         msg_bytes = bytes.fromhex(msg['hex'][2:-2])
         msg_data = XmrBidLockReleaseMessage()
@@ -5410,16 +5660,19 @@ class BasicSwap(BaseApp):
         bid_id = msg_data.bid_msg_id
         bid, xmr_swap = self.getXmrBid(bid_id)
         ensure(bid, 'Bid not found: {}.'.format(bid_id.hex()))
-        ensure(xmr_swap, 'XMR swap not found: {}.'.format(bid_id.hex()))
+        ensure(xmr_swap, 'Adaptor-sig swap not found: {}.'.format(bid_id.hex()))
 
         offer, xmr_offer = self.getXmrOffer(bid.offer_id, sent=False)
         ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
-        ensure(xmr_offer, 'XMR offer not found: {}.'.format(bid.offer_id.hex()))
+        ensure(xmr_offer, 'Adaptor-sig offer not found: {}.'.format(bid.offer_id.hex()))
 
-        ensure(msg['to'] == bid.bid_addr, 'Received on incorrect address')
-        ensure(msg['from'] == offer.addr_from, 'Sent from incorrect address')
+        reverse_bid: bool = offer.coin_from in self.scriptless_coins
+        ci_from = self.ci(offer.coin_to if reverse_bid else offer.coin_from)
+        addr_sent_from: str = bid.bid_addr if reverse_bid else offer.addr_from
+        addr_sent_to: str = offer.addr_from if reverse_bid else bid.bid_addr
 
-        ci_from = self.ci(Coins(offer.coin_from))
+        ensure(msg['to'] == addr_sent_to, 'Received on incorrect address')
+        ensure(msg['from'] == addr_sent_from, 'Sent from incorrect address')
 
         xmr_swap.al_lock_spend_tx_esig = msg_data.al_lock_spend_tx_esig
         try:
@@ -5436,14 +5689,165 @@ class BasicSwap(BaseApp):
             return
 
         delay = random.randrange(self.min_delay_event, self.max_delay_event)
-        self.log.info('Redeeming coin A lock tx for xmr bid %s in %d seconds', bid_id.hex(), delay)
+        self.log.info('Redeeming coin A lock tx for adaptor-sig bid %s in %d seconds', bid_id.hex(), delay)
         self.createAction(delay, ActionTypes.REDEEM_XMR_SWAP_LOCK_TX_A, bid_id)
 
         bid.setState(BidStates.XMR_SWAP_LOCK_RELEASED)
         self.saveBid(bid_id, bid, xmr_swap=xmr_swap)
         self.swaps_in_progress[bid_id] = (bid, offer)
 
-    def processMsg(self, msg):
+    def processADSBidReversed(self, msg) -> None:
+        self.log.debug('Processing adaptor-sig reverse bid msg %s', msg['msgid'])
+
+        now: int = self.getTime()
+        bid_bytes = bytes.fromhex(msg['hex'][2:-2])
+        bid_data = ADSBidIntentMessage()
+        bid_data.ParseFromString(bid_bytes)
+
+        # Validate data
+        ensure(bid_data.protocol_version >= MINPROTO_VERSION_ADAPTOR_SIG, 'Invalid protocol version')
+        ensure(len(bid_data.offer_msg_id) == 28, 'Bad offer_id length')
+
+        offer_id = bid_data.offer_msg_id
+        offer, xmr_offer = self.getXmrOffer(offer_id, sent=True)
+        ensure(offer and offer.was_sent, 'Offer not found: {}.'.format(offer_id.hex()))
+        ensure(offer.swap_type == SwapTypes.XMR_SWAP, 'Bid/offer swap type mismatch')
+        ensure(xmr_offer, 'Adaptor-sig offer not found: {}.'.format(offer_id.hex()))
+
+        ci_from = self.ci(offer.coin_to)
+        ci_to = self.ci(offer.coin_from)
+
+        if not validOfferStateToReceiveBid(offer.state):
+            raise ValueError('Bad offer state')
+        ensure(msg['to'] == offer.addr_from, 'Received on incorrect address')
+        ensure(now <= offer.expire_at, 'Offer expired')
+        self.validateBidValidTime(offer.swap_type, offer.coin_from, offer.coin_to, bid_data.time_valid)
+        ensure(now <= msg['sent'] + bid_data.time_valid, 'Bid expired')
+
+        # Reverse the rate and amount to test against the offer
+        amount_from: int = bid_data.amount
+        amount_to: int = int((int(amount_from) * bid_data.rate) // ci_from.COIN())
+        reversed_rate: int = ci_to.make_int(amount_from / amount_to, r=1)
+
+        # Snap the amount to the offer amount if it's close enough
+        amount_to_check = amount_to
+        if abs(amount_to_check - offer.min_bid_amount) < 10:
+            amount_to_check = offer.min_bid_amount
+
+        reversed_rate_check = reversed_rate
+        # Snap the rate to the rate if it's close enough
+        if abs(reversed_rate_check - offer.rate) < 10:
+            reversed_rate_check = offer.rate
+
+        self.validateBidAmount(offer, amount_to_check, reversed_rate_check)
+
+        bid_id = bytes.fromhex(msg['msgid'])
+
+        bid, xmr_swap = self.getXmrBid(bid_id)
+        if bid is None:
+            bid = Bid(
+                active_ind=1,
+                bid_id=bid_id,
+                offer_id=offer_id,
+                protocol_version=bid_data.protocol_version,
+                amount=bid_data.amount,
+                rate=bid_data.rate,
+                created_at=msg['sent'],
+                amount_to=(bid_data.amount * bid_data.rate) // ci_from.COIN(),
+                expire_at=msg['sent'] + bid_data.time_valid,
+                bid_addr=msg['from'],
+                was_sent=False,
+                was_received=True,
+                chain_a_height_start=ci_from.getChainHeight(),
+                chain_b_height_start=ci_to.getChainHeight(),
+            )
+
+            xmr_swap = XmrSwap(
+                bid_id=bid_id,
+            )
+            wallet_restore_height = self.getWalletRestoreHeight(ci_to)
+            if bid.chain_b_height_start < wallet_restore_height:
+                bid.chain_b_height_start = wallet_restore_height
+                self.log.warning('Adaptor-sig swap restore height clamped to {}'.format(wallet_restore_height))
+        else:
+            ensure(bid.state == BidStates.BID_REQUEST_SENT, 'Wrong bid state: {}'.format(str(BidStates(bid.state))))
+            # Don't update bid.created_at, it's been used to derive kaf
+            bid.expire_at = msg['sent'] + bid_data.time_valid
+            bid.was_received = True
+
+        bid.setState(BidStates.BID_RECEIVED)  # BID_REQUEST_RECEIVED
+
+        self.log.info('Received reverse adaptor-sig bid %s for offer %s', bid_id.hex(), bid_data.offer_msg_id.hex())
+        self.saveBid(bid_id, bid, xmr_swap=xmr_swap)
+
+        try:
+            session = self.openSession()
+            self.notify(NT.BID_RECEIVED, {'type': 'as_reversed', 'bid_id': bid.bid_id.hex(), 'offer_id': bid.offer_id.hex()}, session)
+
+            if self.shouldAutoAcceptBid(offer, bid, session):
+                delay = random.randrange(self.min_delay_event, self.max_delay_event)
+                self.log.info('Auto accepting reverse adaptor-sig bid %s in %d seconds', bid.bid_id.hex(), delay)
+                self.createActionInSession(delay, ActionTypes.ACCEPT_AS_REV_BID, bid.bid_id, session)
+                bid.setState(BidStates.SWAP_DELAYING)
+        finally:
+            self.closeSession(session)
+
+    def processADSBidReversedAccept(self, msg) -> None:
+        self.log.debug('Processing adaptor-sig reverse bid accept msg %s', msg['msgid'])
+
+        now: int = self.getTime()
+        msg_bytes = bytes.fromhex(msg['hex'][2:-2])
+        msg_data = ADSBidIntentAcceptMessage()
+        msg_data.ParseFromString(msg_bytes)
+
+        bid_id = msg_data.bid_msg_id
+        bid, xmr_swap = self.getXmrBid(bid_id)
+        ensure(bid, 'Bid not found: {}.'.format(bid_id.hex()))
+        ensure(xmr_swap, 'Adaptor-sig swap not found: {}.'.format(bid_id.hex()))
+
+        offer, xmr_offer = self.getXmrOffer(bid.offer_id, sent=False)
+        ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
+        ensure(xmr_offer, 'Adaptor-sig offer not found: {}.'.format(bid.offer_id.hex()))
+
+        ensure(msg['to'] == bid.bid_addr, 'Received on incorrect address')
+        ensure(msg['from'] == offer.addr_from, 'Sent from incorrect address')
+
+        ci_from = self.ci(offer.coin_to)
+        ci_to = self.ci(offer.coin_from)
+
+        ensure(ci_to.verifyKey(msg_data.kbvf), 'Invalid chain B follower view key')
+        ensure(ci_from.verifyPubkey(msg_data.pkaf), 'Invalid chain A follower public key')
+        ensure(ci_from.isValidAddressHash(msg_data.dest_af) or ci_from.isValidPubkey(msg_data.dest_af), 'Invalid destination address')
+        if ci_to.curve_type() == Curves.ed25519:
+            ensure(len(msg_data.kbsf_dleag) == 16000, 'Invalid kbsf_dleag size')
+
+        xmr_swap.dest_af = msg_data.dest_af
+        xmr_swap.pkaf = msg_data.pkaf
+        xmr_swap.vkbvf = msg_data.kbvf
+        xmr_swap.pkbvf = ci_to.getPubkey(msg_data.kbvf)
+        xmr_swap.kbsf_dleag = msg_data.kbsf_dleag
+
+        bid.chain_a_height_start: int = ci_from.getChainHeight()
+        bid.chain_b_height_start: int = ci_to.getChainHeight()
+
+        wallet_restore_height: int = self.getWalletRestoreHeight(ci_to)
+        if bid.chain_b_height_start < wallet_restore_height:
+            bid.chain_b_height_start = wallet_restore_height
+            self.log.warning('Reverse adaptor-sig swap restore height clamped to {}'.format(wallet_restore_height))
+
+        bid.setState(BidStates.BID_RECEIVING)
+
+        self.log.info('Receiving reverse adaptor-sig bid %s for offer %s', bid_id.hex(), bid.offer_id.hex())
+        self.saveBid(bid_id, bid, xmr_swap=xmr_swap)
+
+        if ci_to.curve_type() != Curves.ed25519:
+            try:
+                session = self.openSession()
+                self.receiveXmrBid(bid, session)
+            finally:
+                self.closeSession(session)
+
+    def processMsg(self, msg) -> None:
         self.mxDB.acquire()
         try:
             msg_type = int(msg['hex'][:2], 16)
@@ -5470,6 +5874,10 @@ class BasicSwap(BaseApp):
                 self.processXmrSplitMessage(msg)
             elif msg_type == MessageTypes.XMR_BID_LOCK_RELEASE_LF:
                 self.processXmrLockReleaseMessage(msg)
+            elif msg_type == MessageTypes.ADS_BID_LF:
+                self.processADSBidReversed(msg)
+            elif msg_type == MessageTypes.ADS_BID_ACCEPT_FL:
+                self.processADSBidReversedAccept(msg)
 
         except InactiveCoin as ex:
             self.log.info('Ignoring message involving inactive coin {}, type {}'.format(Coins(ex.coinid).name, MessageTypes(msg_type).name))
@@ -5486,7 +5894,7 @@ class BasicSwap(BaseApp):
         finally:
             self.mxDB.release()
 
-    def processZmqSmsg(self):
+    def processZmqSmsg(self) -> None:
         message = self.zmqSubscriber.recv()
         clear = self.zmqSubscriber.recv()
 
@@ -5508,7 +5916,7 @@ class BasicSwap(BaseApp):
 
         self.processMsg(msg)
 
-    def update(self):
+    def update(self) -> None:
         try:
             if self._read_zmq_queue:
                 message = self.zmqSubscriber.recv(flags=zmq.NOBLOCK)
@@ -5569,7 +5977,7 @@ class BasicSwap(BaseApp):
         finally:
             self.mxDB.release()
 
-    def manualBidUpdate(self, bid_id, data):
+    def manualBidUpdate(self, bid_id: bytes, data):
         self.log.info('Manually updating bid %s', bid_id.hex())
         self.mxDB.acquire()
         try:
@@ -5674,7 +6082,7 @@ class BasicSwap(BaseApp):
                 self.settings = settings_copy
         return settings_changed, suggest_reboot
 
-    def editSettings(self, coin_name, data):
+    def editSettings(self, coin_name: str, data):
         self.log.info(f'Updating settings {coin_name}')
         settings_changed = False
         suggest_reboot = False
@@ -5762,7 +6170,7 @@ class BasicSwap(BaseApp):
                 self.settings = settings_copy
         return settings_changed, suggest_reboot
 
-    def enableCoin(self, coin_name):
+    def enableCoin(self, coin_name: str) -> None:
         self.log.info('Enabling coin %s', coin_name)
 
         coin_id = self.getCoinIdFromName(coin_name)
@@ -5787,7 +6195,7 @@ class BasicSwap(BaseApp):
             json.dump(self.settings, fp, indent=4)
         # Client must be restarted
 
-    def disableCoin(self, coin_name):
+    def disableCoin(self, coin_name: str) -> None:
         self.log.info('Disabling coin %s', coin_name)
 
         coin_id = self.getCoinIdFromName(coin_name)
@@ -5911,7 +6319,7 @@ class BasicSwap(BaseApp):
         except Exception as e:
             self.log.warning('getWalletInfo failed with: %s', str(e))
 
-    def addWalletInfoRecord(self, coin, info_type, wi):
+    def addWalletInfoRecord(self, coin, info_type, wi) -> None:
         coin_id = int(coin)
         self.mxDB.acquire()
         try:
@@ -5944,7 +6352,7 @@ class BasicSwap(BaseApp):
         finally:
             self._updating_wallets_info[int(coin)] = False
 
-    def updateWalletsInfo(self, force_update=False, only_coin=None, wait_for_complete=False):
+    def updateWalletsInfo(self, force_update: bool = False, only_coin: bool = None, wait_for_complete: bool = False) -> None:
         now: int = self.getTime()
         if not force_update and now - self._last_updated_wallets_info < 30:
             return
@@ -6028,7 +6436,7 @@ class BasicSwap(BaseApp):
 
         return rv
 
-    def countAcceptedBids(self, offer_id=None):
+    def countAcceptedBids(self, offer_id: bytes = None) -> int:
         self.mxDB.acquire()
         try:
             session = scoped_session(self.session_factory)
@@ -6042,7 +6450,7 @@ class BasicSwap(BaseApp):
             session.remove()
             self.mxDB.release()
 
-    def listOffers(self, sent=False, filters={}, with_bid_info=False):
+    def listOffers(self, sent: bool = False, filters={}, with_bid_info: bool = False):
         self.mxDB.acquire()
         try:
             rv = []
@@ -6114,13 +6522,13 @@ class BasicSwap(BaseApp):
             session.remove()
             self.mxDB.release()
 
-    def activeBidsQueryStr(self, now: int, offer_table: str = 'offers', bids_table: str = 'bids'):
+    def activeBidsQueryStr(self, now: int, offer_table: str = 'offers', bids_table: str = 'bids') -> str:
         offers_inset = f' AND {offer_table}.expire_at > {now}' if offer_table != '' else ''
 
         inactive_states_str = ', '.join([str(int(s)) for s in inactive_states])
         return f' ({bids_table}.state NOT IN ({inactive_states_str}) AND ({bids_table}.state > {BidStates.BID_RECEIVED} OR ({bids_table}.expire_at > {now}{offers_inset}))) '
 
-    def listBids(self, sent=False, offer_id=None, for_html=False, filters={}):
+    def listBids(self, sent: bool = False, offer_id: bytes = None, for_html: bool = False, filters={}):
         self.mxDB.acquire()
         try:
             rv = []
@@ -6203,9 +6611,12 @@ class BasicSwap(BaseApp):
 
     def listAllSMSGAddresses(self, filters={}):
         query_str = 'SELECT addr_id, addr, use_type, active_ind, created_at, note, pubkey FROM smsgaddresses'
-        query_str += ' WHERE active_ind = 1 '
+        query_str += ' WHERE 1 = 1 '
         query_data = {}
 
+        if filters.get('exclude_inactive', True) is True:
+            query_str += ' AND active_ind = :active_ind '
+            query_data['active_ind'] = 1
         if 'addr_id' in filters:
             query_str += ' AND addr_id = :addr_id '
             query_data['addr_id'] = filters['addr_id']
@@ -6403,13 +6814,18 @@ class BasicSwap(BaseApp):
     def createCoinALockRefundSwipeTx(self, ci, bid, offer, xmr_swap, xmr_offer):
         self.log.debug('Creating %s lock refund swipe tx', ci.coin_name())
 
+        reverse_bid: bool = offer.coin_from in self.scriptless_coins
+        a_fee_rate: int = xmr_offer.b_fee_rate if reverse_bid else xmr_offer.a_fee_rate
+        coin_from = Coins(offer.coin_to if reverse_bid else offer.coin_from)
+        coin_to = Coins(offer.coin_from if reverse_bid else offer.coin_to)
+
         pkh_dest = ci.decodeAddress(self.getReceiveAddressForCoin(ci.coin_type()))
         spend_tx = ci.createSCLockRefundSpendToFTx(
             xmr_swap.a_lock_refund_tx, xmr_swap.a_lock_refund_tx_script,
             pkh_dest,
-            xmr_offer.a_fee_rate, xmr_swap.vkbv)
+            a_fee_rate, xmr_swap.vkbv)
 
-        vkaf = self.getPathKey(offer.coin_from, offer.coin_to, bid.created_at, xmr_swap.contract_count, KeyTypes.KAF)
+        vkaf = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, KeyTypes.KAF)
         prevout_amount = ci.getLockRefundTxSwapOutputValue(bid, xmr_swap)
         sig = ci.signTx(vkaf, spend_tx, 0, xmr_swap.a_lock_refund_tx_script, prevout_amount)
 
@@ -6421,7 +6837,7 @@ class BasicSwap(BaseApp):
 
         xmr_swap.a_lock_refund_swipe_tx = ci.setTxSignature(spend_tx, witness_stack)
 
-    def setBidDebugInd(self, bid_id, debug_ind):
+    def setBidDebugInd(self, bid_id: bytes, debug_ind) -> None:
         self.log.debug('Bid %s Setting debug flag: %s', bid_id.hex(), debug_ind)
         bid = self.getBid(bid_id)
         bid.debug_ind = debug_ind
@@ -6433,7 +6849,7 @@ class BasicSwap(BaseApp):
 
         self.saveBid(bid_id, bid)
 
-    def storeOfferRevoke(self, offer_id, sig):
+    def storeOfferRevoke(self, offer_id: bytes, sig) -> bool:
         self.log.debug('Storing revoke request for offer: %s', offer_id.hex())
         for pair in self._possibly_revoked_offers:
             if offer_id == pair[0]:
@@ -6441,7 +6857,7 @@ class BasicSwap(BaseApp):
         self._possibly_revoked_offers.appendleft((offer_id, sig))
         return True
 
-    def isOfferRevoked(self, offer_id, offer_addr_from):
+    def isOfferRevoked(self, offer_id: bytes, offer_addr_from) -> bool:
         for pair in self._possibly_revoked_offers:
             if offer_id == pair[0]:
                 signature_enc = base64.b64encode(pair[1]).decode('utf-8')
@@ -6654,7 +7070,7 @@ class BasicSwap(BaseApp):
         finally:
             self.closeSession(session, commit=False)
 
-    def clearFilters(self, prefix):
+    def clearFilters(self, prefix) -> None:
         try:
             session = self.openSession()
             key_str = 'saved_filters_' + prefix

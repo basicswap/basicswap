@@ -266,6 +266,22 @@ def upgradeDatabase(self, db_version):
             session.execute('ALTER TABLE bidstates ADD COLUMN in_error INTEGER')
             session.execute('ALTER TABLE bidstates ADD COLUMN swap_failed INTEGER')
             session.execute('ALTER TABLE bidstates ADD COLUMN swap_ended INTEGER')
+        elif current_version == 20:
+            db_version += 1
+            session.execute('''
+                CREATE TABLE message_links (
+                    record_id INTEGER NOT NULL,
+                    active_ind INTEGER,
+                    created_at BIGINT,
+
+                    linked_type INTEGER,
+                    linked_id BLOB,
+
+                    msg_type INTEGER,
+                    msg_sequence INTEGER,
+                    msg_id BLOB,
+                    PRIMARY KEY (record_id))''')
+            session.execute('ALTER TABLE offers ADD COLUMN bid_reversed INTEGER')
 
         if current_version != db_version:
             self.db_version = db_version

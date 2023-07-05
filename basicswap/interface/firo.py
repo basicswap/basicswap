@@ -181,7 +181,7 @@ class FIROInterface(BTCInterface):
     def getWalletSeedID(self):
         return self.rpc_callback('getwalletinfo')['hdmasterkeyid']
 
-    def getSpendableBalance(self):
+    def getSpendableBalance(self) -> int:
         return self.make_int(self.rpc_callback('getwalletinfo')['balance'])
 
     def getBLockSpendTxFee(self, tx, fee_rate: int) -> int:

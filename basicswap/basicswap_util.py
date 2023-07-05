@@ -47,6 +47,9 @@ class MessageTypes(IntEnum):
     XMR_BID_LOCK_RELEASE_LF = auto()
     OFFER_REVOKE = auto()
 
+    ADS_BID_LF = auto()
+    ADS_BID_ACCEPT_FL = auto()
+
 
 class AddressTypes(IntEnum):
     OFFER = auto()
@@ -98,6 +101,7 @@ class BidStates(IntEnum):
     BID_STATE_UNKNOWN = 26
     XMR_SWAP_MSG_SCRIPT_LOCK_TX_SIGS = 27      # XmrBidLockTxSigsMessage
     XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX = 28     # XmrBidLockSpendTxMessage
+    BID_REQUEST_SENT = 29
 
 
 class TxStates(IntEnum):
@@ -140,6 +144,7 @@ class ActionTypes(IntEnum):
     RECOVER_XMR_SWAP_LOCK_TX_B = auto()
     SEND_XMR_SWAP_LOCK_SPEND_MSG = auto()
     REDEEM_ITX = auto()
+    ACCEPT_AS_REV_BID = auto()
 
 
 class EventLogTypes(IntEnum):
@@ -296,6 +301,9 @@ def strBidState(state):
         return 'Exchanged script lock tx sigs msg'
     if state == BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX:
         return 'Exchanged script lock spend tx msg'
+    if state == BidStates.BID_REQUEST_SENT:
+        return 'Request sent'
+
     return 'Unknown' + ' ' + str(state)
 
 

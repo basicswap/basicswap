@@ -38,6 +38,7 @@ def remove_expired_data(self):
                 session.execute('DELETE FROM addresspool WHERE addresspool.bid_id = :bid_id', {'bid_id': bid_row[0]})
                 session.execute('DELETE FROM xmr_split_data WHERE xmr_split_data.bid_id = :bid_id', {'bid_id': bid_row[0]})
                 session.execute('DELETE FROM bids WHERE bids.bid_id = :bid_id', {'bid_id': bid_row[0]})
+                session.execute('DELETE FROM message_links WHERE linked_type = :type_ind AND linked_id = :linked_id', {'type_ind': int(Concepts.BID), 'linked_id': bid_row[0]})
 
             session.execute('DELETE FROM eventlog WHERE eventlog.linked_type = :type_ind AND eventlog.linked_id = :offer_id', {'type_ind': int(Concepts.OFFER), 'offer_id': offer_row[0]})
             session.execute('DELETE FROM automationlinks WHERE automationlinks.linked_type = :type_ind AND automationlinks.linked_id = :offer_id', {'type_ind': int(Concepts.OFFER), 'offer_id': offer_row[0]})
@@ -47,6 +48,7 @@ def remove_expired_data(self):
             session.execute('DELETE FROM sentoffers WHERE sentoffers.offer_id = :offer_id', {'offer_id': offer_row[0]})
             session.execute('DELETE FROM actions WHERE actions.linked_id = :offer_id', {'offer_id': offer_row[0]})
             session.execute('DELETE FROM offers WHERE offers.offer_id = :offer_id', {'offer_id': offer_row[0]})
+            session.execute('DELETE FROM message_links WHERE linked_type = :type_ind AND linked_id = :linked_id', {'type_ind': int(Concepts.OFFER), 'offer_id': offer_row[0]})
 
         self.log.warning(f'Removed data for {num_offers} expired offers and {num_bids} bids.')
 
