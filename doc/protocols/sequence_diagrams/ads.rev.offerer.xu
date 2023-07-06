@@ -1,0 +1,86 @@
+xu {
+    hscale="1.3", wordwraparcs=on;
+
+    CB [label=" ", linecolor="transparent"],
+    N [label="Network", linecolor="#008800", textbgcolor="#CCFFCC", arclinecolor="#008800"],
+    O [label="Offerer", linecolor="#FF0000", textbgcolor="#FFCCCC", arclinecolor="#FF0000"],
+    B [label="Bidder", linecolor="#0000FF", textbgcolor="#CCCCFF", arclinecolor="#0000FF"],
+    C [label=" ", linecolor="transparent"], C2 [label=" ", linecolor="transparent"];
+    O =>> N [label="Sends Offer"];
+    N >> B [label="Detects Offer"];
+    B =>> O [label="Sends BidIntent message"];
+    O abox O [label="Bid Received"];
+    O box O [label="User accepts bid"];
+    O =>> B [label="Sends BidIntentAccept message"],
+            C note C2
+                [label="The BidAccept message contains the pubkeys the offerer will use and a DLEAG proof one key will work across both chains of the swapping coins",
+                 textbgcolor="#FFFFCC"];
+    B =>> O [label="Sends BidAccept message"],
+            C note C2
+                [label="The BidAccept message contains the pubkeys the bidder will use and a DLEAG proof one key will work across both chains of the swapping coins",
+                 textbgcolor="#FFFFCC"];
+    O abox O [label="Bid Accepted"];
+
+
+    O =>> B [label="Sends XmrBidLockTxSigsMessage"],
+            C note C2
+                [label="The XmrBidLockTxSigsMessage contains the offerer's signatures for the script-coin-lock-refund and script-coin-lock-refund-spend txns.",
+                 textbgcolor="#FFFFCC"];
+    O abox O [label="Exchanged script lock tx sigs msg"];
+    B =>> O [label="Sends XmrBidLockSpendTxMessage"],
+            C note C2
+                [label="The XmrBidLockSpendTxMessage contains the script-coin-lock-tx and proof the bidder can sign it.",
+                 textbgcolor="#FFFFCC"];
+    B =>> N [label="Sends script-coin-lock-tx"],
+    O abox O [label="Bid Script coin spend tx valid"];
+    O abox O [label="Exchanged script lock spend tx msg"];
+    O => O [label="Wait for script-coin-lock-tx to confirm"];
+    O abox O [label="Bid Script coin locked"];
+    # offerer would only send noscript-coin-lock-tx if script-coin-lock-tx validates
+    O =>> N [label="Sends noscript-coin-lock-tx"];
+    O => O [label="Wait for noscript-coin-lock-tx to confirm"], B => B [label="Wait for noscript-coin-lock-tx to confirm"];
+    O abox O [label="Bid Scriptless coin locked"];
+    CB alt C [label="success path"] {
+        B => O [label="Sends script-coin-lock-tx release message"],
+                C note C2
+                    [label="The XmrBidLockReleaseMessage contains the bidder's OTVES for it.
+                            The offerer decodes the bidder's signature from the OTVES.
+                            When the bidder has the plaintext signature, they can decode the offerer's noscript-coin-lock-tx signature.",
+                     textbgcolor="#FFFFCC"];
+        O abox O [label="Script coin lock released"];
+        O =>> N [label="Sends script-coin-lock-spend-tx"];
+        O abox O [label="Script tx redeemed"];
+        O abox O [label="Bid Completed"];
+    --- [label="fail path"];
+        |||;
+        O => O [label="Wait for script-coin-lock-tx lock to expire"];
+        B =>> N [label="Sends script-coin-lock-pre-refund-tx"],
+                C note C2
+                    [label="tx can be sent by either party.",
+                     textbgcolor="#FFFFCC"];
+        N >> B [label="script-coin-lock-pre-refund-tx"];
+        O abox O [label="Bid Script pre-refund tx in chain"];
+        CB alt C [label="bidder refunds script coin lock tx"] {
+            |||;
+            B => B [label="Wait for pre-refund tx to confirm"];
+            B =>> N [label="Sends script-coin-lock-pre-refund-spend-tx"],
+                    C note C2
+                        [label="Refunds the script lock tx, with the bidder's cleartext signature the offerer can refund the noscript lock tx.
+                        Once the lock expires the pre-refund tx can be spent by the offerer.",
+                         textbgcolor="#FFFFCC"];
+            B abox B [label="Bid Failed, refunded"];
+            N >> O [label="Detects script-coin-lock-pre-refund-spend-tx"],
+                    C note C2
+                        [label="offerer recovers the bidder's scriptless chain key-shard.",
+                         textbgcolor="#FFFFCC"];
+            O =>> N [label="Sends scriptless-coin-lock-recover-tx"];
+            O abox O [label="Bid Scriptless tx recovered"];
+            O abox O [label="Bid Failed, refunded"];
+        --- [label="offerer swipes script coin lock tx"];
+            |||;
+            O => O [label="Wait for pre-refund tx lock to expire"];
+            O =>> N [label="Sends script-coin-lock-pre-refund-swipe-tx"];
+            O abox O [label="Bid Failed, swiped"];
+        };
+    };
+}

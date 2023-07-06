@@ -155,8 +155,8 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
     ci_leader = ci_to if reverse_bid else ci_from
     ci_follower = ci_from if reverse_bid else ci_to
 
-    bid_amount = bid.amount
-    bid_rate = offer.rate if bid.rate is None else bid.rate
+    bid_amount: int = bid.amount
+    bid_rate: int = offer.rate if bid.rate is None else bid.rate
     if reverse_bid:
         bid_amount, bid_rate = reverseBidAmountAndRate(swap_client, bid, offer)
 
@@ -271,6 +271,7 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
         'can_abandon': can_abandon,
         'events': bid_events,
         'debug_ui': swap_client.debug_ui,
+        'reverse_bid': reverse_bid,
     }
 
     if edit_bid:

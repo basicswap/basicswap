@@ -2515,7 +2515,7 @@ class BasicSwap(BaseApp):
                     session.close()
                     session.remove()
 
-                self.log.info('Sent XMR_BID_FL %s', xmr_swap.bid_id.hex())
+                self.log.info('Sent ADS_BID_LF %s', xmr_swap.bid_id.hex())
                 return xmr_swap.bid_id
 
             msg_buf = XmrBidMessage()
@@ -4100,15 +4100,14 @@ class BasicSwap(BaseApp):
         try:
             ci_part = self.ci(Coins.PART)
             rpc_conn = ci_part.open_rpc()
-            now: int = self.getTime()
-            options = {'encoding': 'none'}
-            ro = ci_part.json_request(rpc_conn, 'smsginbox', ['all', '', options])
-            num_messages = 0
-            num_removed = 0
-            for msg in ro['messages']:
+            num_messages: int = 0
+            num_removed: int = 0
+
+            def remove_if_expired(msg):
+                nonlocal num_messages, num_removed
                 try:
                     num_messages += 1
-                    expire_at = msg['sent'] + msg['ttl']
+                    expire_at: int = msg['sent'] + msg['ttl']
                     if expire_at < now:
                         options = {'encoding': 'none', 'delete': True}
                         del_msg = ci_part.json_request(rpc_conn, 'smsg', [msg['msgid'], options])
@@ -4116,7 +4115,15 @@ class BasicSwap(BaseApp):
                 except Exception as e:
                     if self.debug:
                         self.log.error(traceback.format_exc())
-                    continue
+
+            now: int = self.getTime()
+            options = {'encoding': 'none'}
+            inbox_messages = ci_part.json_request(rpc_conn, 'smsginbox', ['all', '', options])['messages']
+            for msg in inbox_messages:
+                remove_if_expired(msg)
+            outbox_messages = ci_part.json_request(rpc_conn, 'smsgoutbox', ['all', '', options])['messages']
+            for msg in outbox_messages:
+                remove_if_expired(msg)
 
             if num_messages + num_removed > 0:
                 self.log.info('Expired {} / {} messages.'.format(num_removed, num_messages))
@@ -4481,15 +4488,23 @@ class BasicSwap(BaseApp):
             self.log.debug('Evaluating against strategy {}'.format(strategy.record_id))
 
             if not offer.amount_negotiable:
-                if bid.amount != offer.amount_from:
-                    raise AutomationConstraint('Need exact amount match')
+                if reverse_bid:
+                    if abs(bid_amount - offer.amount_from) >= 20:  # TODO: Tolerance?
+                        raise AutomationConstraint('Need exact amount match')
+                else:
+                    if bid_amount != offer.amount_from:
+                        raise AutomationConstraint('Need exact amount match')
 
             if bid_amount < offer.min_bid_amount:
                 raise AutomationConstraint('Bid amount below offer minimum')
 
             if opts.get('exact_rate_only', False) is True:
-                if bid_rate != offer.rate:
-                    raise AutomationConstraint('Need exact rate match')
+                if reverse_bid:
+                    if abs(bid_rate - offer.rate) >= 20:  # TODO: Tolerance?
+                        raise AutomationConstraint('Need exact rate match')
+                else:
+                    if bid_rate != offer.rate:
+                        raise AutomationConstraint('Need exact rate match')
 
             active_bids, total_bids_value = self.getCompletedAndActiveBidsValue(offer, use_session)
 

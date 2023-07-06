@@ -639,7 +639,11 @@
            <div class="overflow-x-auto items-center justify-center relative">
             <div class="flex items-center justify-center min-h-screen">
              <div class="flex items-center justify-between text-white">
-              <img class="h-full py-2 pr-4 ml-8" src="/static/sequence_diagrams/xmr.bidder.alt.xu.min.svg">
+              {% if data.reverse_bid %}
+              <img class="h-full py-2 pr-4 ml-8" src="/static/sequence_diagrams/ads.rev.bidder.xu.min.svg">
+              {% else %}
+              <img class="h-full py-2 pr-4 ml-8" src="/static/sequence_diagrams/ads.bidder.alt.xu.min.svg">
+              {% endif %}
              </div>
             </div>
            </div>
@@ -673,7 +677,11 @@
            <div class="overflow-x-auto items-center justify-center relative">
             <div class="flex items-center justify-center min-h-screen">
              <div class="flex items-center justify-between text-white">
-              <img class="h-full py-2 pr-4 ml-8" src="/static/sequence_diagrams/xmr.offerer.alt.xu.min.svg">
+              {% if data.reverse_bid %}
+              <img class="h-full py-2 pr-4 ml-8" src="/static/sequence_diagrams/ads.rev.offerer.xu.min.svg">
+              {% else %}
+              <img class="h-full py-2 pr-4 ml-8" src="/static/sequence_diagrams/ads.offerer.alt.xu.min.svg">
+              {% endif %}
              </div>
             </div>
            </div>

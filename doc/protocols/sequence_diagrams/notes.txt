@@ -11,13 +11,17 @@ npm install -g mscgenjs-cli
 
 mscgenjs -T svg -i bidder.alt.xu -o bidder.alt.xu.svg
 mscgenjs -T svg -i offerer.alt.xu -o offerer.alt.xu.svg
-mscgenjs -T svg -i xmr.bidder.alt.xu -o xmr.bidder.alt.xu.svg
-mscgenjs -T svg -i xmr.offerer.alt.xu -o xmr.offerer.alt.xu.svg
+mscgenjs -T svg -i ads.bidder.alt.xu -o ads.bidder.alt.xu.svg
+mscgenjs -T svg -i ads.offerer.alt.xu -o ads.offerer.alt.xu.svg
+mscgenjs -T svg -i ads.rev.bidder.xu -o ads.rev.bidder.xu.svg
+mscgenjs -T svg -i ads.rev.offerer.xu -o ads.rev.offerer.xu.svg
 
 
 npm -g install svgo
 
 svgo --pretty bidder.alt.xu.svg -o bidder.alt.xu.min.svg
 svgo --pretty offerer.alt.xu.svg -o offerer.alt.xu.min.svg
-svgo --pretty xmr.bidder.alt.xu.svg -o xmr.bidder.alt.xu.min.svg
-svgo --pretty xmr.offerer.alt.xu.svg -o xmr.offerer.alt.xu.min.svg
+svgo --pretty ads.bidder.alt.xu.svg -o ads.bidder.alt.xu.min.svg
+svgo --pretty ads.offerer.alt.xu.svg -o ads.offerer.alt.xu.min.svg
+svgo --pretty ads.rev.bidder.xu.svg -o ads.rev.bidder.xu.min.svg
+svgo --pretty ads.rev.offerer.xu.svg -o ads.rev.offerer.xu.min.svg

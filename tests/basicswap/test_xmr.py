@@ -347,8 +347,8 @@ class BaseTest(unittest.TestCase):
         logger.addHandler(stream_stdout)
 
         diagrams_dir = 'doc/protocols/sequence_diagrams'
-        cls.states_bidder = extract_states_from_xu_file(os.path.join(diagrams_dir, 'xmr.bidder.alt.xu'), 'B')
-        cls.states_offerer = extract_states_from_xu_file(os.path.join(diagrams_dir, 'xmr.offerer.alt.xu'), 'O')
+        cls.states_bidder = extract_states_from_xu_file(os.path.join(diagrams_dir, 'ads.bidder.alt.xu'), 'B')
+        cls.states_offerer = extract_states_from_xu_file(os.path.join(diagrams_dir, 'ads.offerer.alt.xu'), 'O')
 
         if os.path.isdir(TEST_DIR):
             if RESET_TEST:

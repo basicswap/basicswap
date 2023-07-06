@@ -279,8 +279,22 @@ class BasicSwapTest(BaseTest):
         logging.info('---------- Test {} to {}'.format(coin_from.name, coin_to.name))
 
         swap_clients = self.swap_clients
+        reverse_bid: bool = coin_from in swap_clients[0].scriptless_coins
         ci_from = swap_clients[0].ci(coin_from)
         ci_to = swap_clients[1].ci(coin_to)
+        ci_part0 = swap_clients[0].ci(Coins.PART)
+        ci_part1 = swap_clients[1].ci(Coins.PART)
+
+        # Offerer sends the offer
+        # Bidder sends the bid
+        id_offerer: int = 0
+        id_bidder: int = 1
+
+        # Leader sends the initial (chain a) lock tx.
+        # Follower sends the participate (chain b) lock tx.
+        id_leader: int = 1 if reverse_bid else 0
+        id_follower: int = 0 if reverse_bid else 1
+        logging.info(f'Offerer, bidder, leader, follower: {id_offerer}, {id_bidder}, {id_leader}, {id_follower}')
 
         js_0 = read_json_api(1800, 'wallets')
         node0_from_before = self.getBalance(js_0, coin_from)
@@ -291,20 +305,23 @@ class BasicSwapTest(BaseTest):
         js_0_to = read_json_api(1800, 'wallets/{}'.format(coin_to.name.lower()))
         js_1_to = read_json_api(1801, 'wallets/{}'.format(coin_to.name.lower()))
 
+        node0_sent_messages_before: int = ci_part0.rpc_callback('smsgoutbox', ['count',])['num_messages']
+        node1_sent_messages_before: int = ci_part1.rpc_callback('smsgoutbox', ['count',])['num_messages']
+
         amt_swap = ci_from.make_int(random.uniform(0.1, 2.0), r=1)
         rate_swap = ci_to.make_int(random.uniform(0.2, 20.0), r=1)
-        offer_id = swap_clients[0].postOffer(coin_from, coin_to, amt_swap, rate_swap, amt_swap, SwapTypes.XMR_SWAP)
-        wait_for_offer(test_delay_event, swap_clients[1], offer_id)
-        offers = swap_clients[0].listOffers(filters={'offer_id': offer_id})
-        offer = offers[0]
+        offer_id = swap_clients[id_offerer].postOffer(coin_from, coin_to, amt_swap, rate_swap, amt_swap, SwapTypes.XMR_SWAP)
+        wait_for_offer(test_delay_event, swap_clients[id_bidder], offer_id)
+        offer = swap_clients[id_bidder].listOffers(filters={'offer_id': offer_id})[0]
+        assert (offer.offer_id == offer_id)
 
         bid_id = swap_clients[1].postXmrBid(offer_id, offer.amount_from)
 
-        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.BID_RECEIVED)
-        swap_clients[0].acceptBid(bid_id)
+        wait_for_bid(test_delay_event, swap_clients[id_offerer], bid_id, BidStates.BID_RECEIVED)
+        swap_clients[id_offerer].acceptBid(bid_id)
 
-        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=180)
-        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True)
+        wait_for_bid(test_delay_event, swap_clients[id_offerer], bid_id, BidStates.SWAP_COMPLETED, wait_for=180)
+        wait_for_bid(test_delay_event, swap_clients[id_bidder], bid_id, BidStates.SWAP_COMPLETED, sent=True)
 
         amount_from = float(ci_from.format_amount(amt_swap))
         js_1 = read_json_api(1801, 'wallets')
@@ -327,6 +344,13 @@ class BasicSwapTest(BaseTest):
         node1_to_before = float(js_1_to['unconfirmed']) + float(js_1_to['balance'])
         if False:  # TODO: set stakeaddress and xmr rewards to non wallet addresses
             assert (node1_to_after < node1_to_before - amount_to_float)
+
+        node0_sent_messages_after: int = ci_part0.rpc_callback('smsgoutbox', ['count',])['num_messages']
+        node1_sent_messages_after: int = ci_part1.rpc_callback('smsgoutbox', ['count',])['num_messages']
+        node0_sent_messages: int = node0_sent_messages_after - node0_sent_messages_before
+        node1_sent_messages: int = node1_sent_messages_after - node1_sent_messages_before
+        assert (node0_sent_messages == (5 if reverse_bid else 6))
+        assert (node1_sent_messages == (6 if reverse_bid else 4))
 
     def test_01_a_full_swap(self):
         if not self.has_segwit:
@@ -355,13 +379,8 @@ class BasicSwapTest(BaseTest):
         ci_from = swap_clients[0].ci(coin_from)
         ci_to = swap_clients[0].ci(coin_to)
 
-        # Offerer sends the offer
-        # Bidder sends the bid
         id_offerer: int = 0
         id_bidder: int = 1
-
-        # Leader sends the initial (chain a) lock tx.
-        # Follower sends the participate (chain b) lock tx.
         id_leader: int = 1 if reverse_bid else 0
         id_follower: int = 0 if reverse_bid else 1
         logging.info(f'Offerer, bidder, leader, follower: {id_offerer}, {id_bidder}, {id_leader}, {id_follower}')

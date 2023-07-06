@@ -1,4 +1,13 @@
 
+0.0.64
+==============
+
+- protocol: Added reversed Adaptor sig protocol.
+  - Runs the adaptor-sig protocol with leader and follower swapped to
+    enable offers from no-script coins to script coins.
+- smsg: Outbox messages are removed when expired.
+
+
 0.0.63
 ==============
 
