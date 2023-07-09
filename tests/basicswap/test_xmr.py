@@ -565,7 +565,7 @@ class BaseTest(unittest.TestCase):
                 for i in range(8):
                     sx_addr = callnoderpc(1, 'getnewstealthaddress')
                     outputs.append({'address': sx_addr, 'amount': 0.5})
-                for i in range(6):
+                for i in range(7):
                     callnoderpc(0, 'sendtypeto', ['part', 'anon', outputs])
 
                 part_addr1 = callnoderpc(1, 'getnewaddress', ['initial addr'])

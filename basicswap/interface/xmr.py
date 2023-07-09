@@ -367,6 +367,10 @@ class XMRInterface(CoinInterface):
             return None
 
     def spendBLockTx(self, chain_b_lock_txid, address_to, kbv, kbs, cb_swap_value, b_fee_rate, restore_height, spend_actual_balance=False):
+        '''
+        Notes:
+        "Error: No unlocked balance in the specified subaddress(es)" can mean not enough funds after tx fee.
+        '''
         with self._mx_wallet:
             Kbv = self.getPubkey(kbv)
             Kbs = self.getPubkey(kbs)
@@ -390,7 +394,6 @@ class XMRInterface(CoinInterface):
 
             self.rpc_wallet_cb('refresh')
             rv = self.rpc_wallet_cb('get_balance')
-
             if rv['balance'] < cb_swap_value:
                 self._log.warning('Balance is too low, checking for existing spend.')
                 txns = self.rpc_wallet_cb('get_transfers', {'out': True})

@@ -40,8 +40,6 @@ message BidMessage {
     bytes offer_msg_id = 1;
     uint64 time_valid = 2;          /* seconds bid is valid for */
     uint64 amount = 3;              /* amount of amount_from bid is for */
-
-    /* optional */
     uint64 rate = 4;
     bytes pkhash_buyer = 5;         /* buyer's address to receive amount_from */
     string proof_address = 6;
@@ -136,10 +134,11 @@ message ADSBidIntentMessage {
     /* L -> F Sent from bidder, construct a reverse bid */
     bytes offer_msg_id = 1;
     uint64 time_valid = 2;          /* seconds bid is valid for */
-    uint64 amount = 3;              /* amount of amount_from bid is for */
-    uint64 rate = 4;
+    uint64 amount_from = 3;         /* amount of offer.coin_from bid is for */
+    uint64 amount_to = 4;           /* amount of offer.coin_to bid is for, equivalent to bid.amount */
+    uint64 rate = 5;                /* amount of offer.coin_from bid is for */
 
-    uint32 protocol_version = 5;
+    uint32 protocol_version = 6;
 }
 
 message ADSBidIntentAcceptMessage {

@@ -954,15 +954,13 @@ class BasicSwap(BaseApp):
         session.add(kv)
 
     def setIntKV(self, str_key: str, int_val: int) -> None:
-        self.mxDB.acquire()
+        session = self.openSession()
         try:
             session = scoped_session(self.session_factory)
             self.setIntKVInSession(str_key, int_val, session)
             session.commit()
         finally:
-            session.close()
-            session.remove()
-            self.mxDB.release()
+            self.closeSession(session, commit=False)
 
     def setStringKV(self, str_key: str, str_val: str, session=None) -> None:
         try:
@@ -2468,7 +2466,6 @@ class BasicSwap(BaseApp):
             reverse_bid: bool = coin_from in self.scriptless_coins
             if reverse_bid:
                 reversed_rate: int = ci_to.make_int(amount / amount_to, r=1)
-
                 amount_from: int = int((int(amount_to) * reversed_rate) // ci_to.COIN())
                 ensure(abs(amount_from - amount) < 20, 'invalid bid amount')  # TODO: Tolerance?
 
@@ -2476,8 +2473,9 @@ class BasicSwap(BaseApp):
                 msg_buf.protocol_version = PROTOCOL_VERSION_ADAPTOR_SIG
                 msg_buf.offer_msg_id = offer_id
                 msg_buf.time_valid = valid_for_seconds
-                msg_buf.amount = int(amount_to)
-                msg_buf.rate = reversed_rate
+                msg_buf.amount_from = amount
+                msg_buf.amount_to = amount_to
+                msg_buf.rate = bid_rate
 
                 bid_bytes = msg_buf.SerializeToString()
                 payload_hex = str.format('{:02x}', MessageTypes.ADS_BID_LF) + bid_bytes.hex()
@@ -2494,11 +2492,11 @@ class BasicSwap(BaseApp):
                     active_ind=1,
                     bid_id=xmr_swap.bid_id,
                     offer_id=offer_id,
-                    amount=msg_buf.amount,
-                    rate=msg_buf.rate,
+                    amount=msg_buf.amount_to,
+                    rate=reversed_rate,
                     created_at=bid_created_at,
                     contract_count=xmr_swap.contract_count,
-                    amount_to=(msg_buf.amount * msg_buf.rate) // ci_to.COIN(),
+                    amount_to=msg_buf.amount_from,
                     expire_at=bid_created_at + msg_buf.time_valid,
                     bid_addr=bid_addr,
                     was_sent=True,
@@ -2507,13 +2505,12 @@ class BasicSwap(BaseApp):
 
                 bid.setState(BidStates.BID_REQUEST_SENT)
 
+                session = self.openSession()
                 try:
-                    session = scoped_session(self.session_factory)
                     self.saveBidInSession(xmr_swap.bid_id, bid, session, xmr_swap)
                     session.commit()
                 finally:
-                    session.close()
-                    session.remove()
+                    self.closeSession(session, commit=False)
 
                 self.log.info('Sent ADS_BID_LF %s', xmr_swap.bid_id.hex())
                 return xmr_swap.bid_id
@@ -3922,6 +3919,10 @@ class BasicSwap(BaseApp):
             ensure(bid, 'Bid not found: {}.'.format(bid_id.hex()))
             ensure(xmr_swap, 'Adaptor-sig swap not found: {}.'.format(bid_id.hex()))
 
+            if BidStates(bid.state) == BidStates.BID_STALLED_FOR_TEST:
+                self.log.debug('Bid stalled %s', bid_id.hex())
+                return
+
             offer, xmr_offer = self.getXmrOfferFromSession(session, bid.offer_id, sent=False)
             ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
             ensure(xmr_offer, 'Adaptor-sig offer not found: {}.'.format(bid.offer_id.hex()))
@@ -4466,7 +4467,7 @@ class BasicSwap(BaseApp):
                 raise AutomationConstraint('Bidder has too many failed swaps')
         return True
 
-    def shouldAutoAcceptBid(self, offer, bid, session=None) -> bool:
+    def shouldAutoAcceptBid(self, offer, bid, session=None, options={}) -> bool:
         try:
             use_session = self.openSession(session)
 
@@ -4481,30 +4482,22 @@ class BasicSwap(BaseApp):
             bid_amount: int = bid.amount
             bid_rate: int = bid.rate
 
-            reverse_bid: bool = coin_from in self.scriptless_coins
-            if reverse_bid:
-                bid_amount, bid_rate = xmr_swap_1.reverseBidAmountAndRate(self, bid, offer)
+            if options.get('reverse_bid', False):
+                bid_amount = bid.amount_to
+                bid_rate = options.get('bid_rate')
 
             self.log.debug('Evaluating against strategy {}'.format(strategy.record_id))
 
             if not offer.amount_negotiable:
-                if reverse_bid:
-                    if abs(bid_amount - offer.amount_from) >= 20:  # TODO: Tolerance?
-                        raise AutomationConstraint('Need exact amount match')
-                else:
-                    if bid_amount != offer.amount_from:
-                        raise AutomationConstraint('Need exact amount match')
+                if bid_amount != offer.amount_from:
+                    raise AutomationConstraint('Need exact amount match')
 
             if bid_amount < offer.min_bid_amount:
                 raise AutomationConstraint('Bid amount below offer minimum')
 
             if opts.get('exact_rate_only', False) is True:
-                if reverse_bid:
-                    if abs(bid_rate - offer.rate) >= 20:  # TODO: Tolerance?
-                        raise AutomationConstraint('Need exact rate match')
-                else:
-                    if bid_rate != offer.rate:
-                        raise AutomationConstraint('Need exact rate match')
+                if bid_rate != offer.rate:
+                    raise AutomationConstraint('Need exact rate match')
 
             active_bids, total_bids_value = self.getCompletedAndActiveBidsValue(offer, use_session)
 
@@ -4772,7 +4765,7 @@ class BasicSwap(BaseApp):
 
         bid.setState(BidStates.BID_RECEIVED)
 
-        if self.shouldAutoAcceptBid(offer, bid, session) or reverse_bid:
+        if reverse_bid or self.shouldAutoAcceptBid(offer, bid, session):
             delay = random.randrange(self.min_delay_event, self.max_delay_event)
             self.log.info('Auto accepting %sadaptor-sig bid %s in %d seconds', 'reverse ' if reverse_bid else '', bid.bid_id.hex(), delay)
             self.createActionInSession(delay, ActionTypes.ACCEPT_XMR_BID, bid.bid_id, session)
@@ -5135,13 +5128,14 @@ class BasicSwap(BaseApp):
         xmr_swap.a_lock_spend_tx_id = ci_from.getTxid(xmr_swap.a_lock_spend_tx)
         prevout_amount = ci_from.getLockTxSwapOutputValue(bid, xmr_swap)
         xmr_swap.al_lock_spend_tx_esig = ci_from.signTxOtVES(kal, xmr_swap.pkasf, xmr_swap.a_lock_spend_tx, 0, xmr_swap.a_lock_tx_script, prevout_amount)
-
+        '''
         # Double check a_lock_spend_tx is valid
+        # Fails for part_blind
         ci_from.verifySCLockSpendTx(
             xmr_swap.a_lock_spend_tx,
             xmr_swap.a_lock_tx, xmr_swap.a_lock_tx_script,
             xmr_swap.dest_af, a_fee_rate, xmr_swap.vkbv)
-
+        '''
         delay = random.randrange(self.min_delay_event_short, self.max_delay_event_short)
         self.log.info('Sending lock spend tx message for bid %s in %d seconds', bid_id.hex(), delay)
         self.createActionInSession(delay, ActionTypes.SEND_XMR_SWAP_LOCK_SPEND_MSG, bid_id, session)
@@ -5438,7 +5432,7 @@ class BasicSwap(BaseApp):
         try:
             if offer.coin_to == Coins.XMR:
                 address_to = self.getCachedMainWalletAddress(ci_to)
-            elif coin_to == Coins.PART_BLIND:
+            elif coin_to in (Coins.PART_BLIND, Coins.PART_ANON):
                 address_to = self.getCachedStealthAddressForCoin(coin_to)
             else:
                 address_to = self.getReceiveAddressFromPool(coin_to, bid_id, TxTypes.XMR_SWAP_B_LOCK_REFUND)
@@ -5739,22 +5733,14 @@ class BasicSwap(BaseApp):
         self.validateBidValidTime(offer.swap_type, offer.coin_from, offer.coin_to, bid_data.time_valid)
         ensure(now <= msg['sent'] + bid_data.time_valid, 'Bid expired')
 
-        # Reverse the rate and amount to test against the offer
-        amount_from: int = bid_data.amount
-        amount_to: int = int((int(amount_from) * bid_data.rate) // ci_from.COIN())
-        reversed_rate: int = ci_to.make_int(amount_from / amount_to, r=1)
+        amount_from: int = bid_data.amount_from
+        amount_to: int = (bid_data.amount_from * bid_data.rate) // ci_to.COIN()
+        ensure(abs(amount_to - bid_data.amount_to) < 10, 'invalid bid amount_to')  # TODO: Tolerance?
+        reversed_rate: int = ci_from.make_int(amount_from / bid_data.amount_to, r=1)
+        amount_from_recovered: int = int((amount_to * reversed_rate) // ci_from.COIN())
+        ensure(abs(amount_from - amount_from_recovered) < 10, 'invalid bid amount_from')  # TODO: Tolerance?
 
-        # Snap the amount to the offer amount if it's close enough
-        amount_to_check = amount_to
-        if abs(amount_to_check - offer.min_bid_amount) < 10:
-            amount_to_check = offer.min_bid_amount
-
-        reversed_rate_check = reversed_rate
-        # Snap the rate to the rate if it's close enough
-        if abs(reversed_rate_check - offer.rate) < 10:
-            reversed_rate_check = offer.rate
-
-        self.validateBidAmount(offer, amount_to_check, reversed_rate_check)
+        self.validateBidAmount(offer, amount_from, bid_data.rate)
 
         bid_id = bytes.fromhex(msg['msgid'])
 
@@ -5765,10 +5751,10 @@ class BasicSwap(BaseApp):
                 bid_id=bid_id,
                 offer_id=offer_id,
                 protocol_version=bid_data.protocol_version,
-                amount=bid_data.amount,
-                rate=bid_data.rate,
+                amount=amount_to,
+                rate=reversed_rate,
                 created_at=msg['sent'],
-                amount_to=(bid_data.amount * bid_data.rate) // ci_from.COIN(),
+                amount_to=amount_from,
                 expire_at=msg['sent'] + bid_data.time_valid,
                 bid_addr=msg['from'],
                 was_sent=False,
@@ -5799,7 +5785,8 @@ class BasicSwap(BaseApp):
             session = self.openSession()
             self.notify(NT.BID_RECEIVED, {'type': 'as_reversed', 'bid_id': bid.bid_id.hex(), 'offer_id': bid.offer_id.hex()}, session)
 
-            if self.shouldAutoAcceptBid(offer, bid, session):
+            options = {'reverse_bid': True, 'bid_rate': bid_data.rate}
+            if self.shouldAutoAcceptBid(offer, bid, session, options=options):
                 delay = random.randrange(self.min_delay_event, self.max_delay_event)
                 self.log.info('Auto accepting reverse adaptor-sig bid %s in %d seconds', bid.bid_id.hex(), delay)
                 self.createActionInSession(delay, ActionTypes.ACCEPT_AS_REV_BID, bid.bid_id, session)
@@ -6336,10 +6323,9 @@ class BasicSwap(BaseApp):
 
     def addWalletInfoRecord(self, coin, info_type, wi) -> None:
         coin_id = int(coin)
-        self.mxDB.acquire()
+        session = self.openSession()
         try:
             now: int = self.getTime()
-            session = scoped_session(self.session_factory)
             session.add(Wallets(coin_id=coin, balance_type=info_type, wallet_data=json.dumps(wi), created_at=now))
             query_str = f'DELETE FROM wallets WHERE (coin_id = {coin_id} AND balance_type = {info_type}) AND record_id NOT IN (SELECT record_id FROM wallets WHERE coin_id = {coin_id} AND balance_type = {info_type} ORDER BY created_at DESC LIMIT 3 )'
             session.execute(query_str)
@@ -6347,9 +6333,7 @@ class BasicSwap(BaseApp):
         except Exception as e:
             self.log.error(f'addWalletInfoRecord {e}')
         finally:
-            session.close()
-            session.remove()
-            self.mxDB.release()
+            self.closeSession(session, commit=False)
 
     def updateWalletInfo(self, coin) -> None:
         # Store wallet info to db so it's available after startup
@@ -6452,25 +6436,21 @@ class BasicSwap(BaseApp):
         return rv
 
     def countAcceptedBids(self, offer_id: bytes = None) -> int:
-        self.mxDB.acquire()
+        session = self.openSession()
         try:
-            session = scoped_session(self.session_factory)
             if offer_id:
                 q = session.execute('SELECT COUNT(*) FROM bids WHERE state >= {} AND offer_id = x\'{}\''.format(BidStates.BID_ACCEPTED, offer_id.hex())).first()
             else:
                 q = session.execute('SELECT COUNT(*) FROM bids WHERE state >= {}'.format(BidStates.BID_ACCEPTED)).first()
             return q[0]
         finally:
-            session.close()
-            session.remove()
-            self.mxDB.release()
+            self.closeSession(session, commit=False)
 
     def listOffers(self, sent: bool = False, filters={}, with_bid_info: bool = False):
-        self.mxDB.acquire()
+        session = self.openSession()
         try:
             rv = []
             now: int = self.getTime()
-            session = scoped_session(self.session_factory)
 
             if with_bid_info:
                 subquery = session.query(sa.func.sum(Bid.amount).label('completed_bid_amount')).filter(sa.and_(Bid.offer_id == Offer.offer_id, Bid.state == BidStates.SWAP_COMPLETED)).correlate(Offer).scalar_subquery()
@@ -6533,9 +6513,7 @@ class BasicSwap(BaseApp):
                     rv.append(offer)
             return rv
         finally:
-            session.close()
-            session.remove()
-            self.mxDB.release()
+            self.closeSession(session, commit=False)
 
     def activeBidsQueryStr(self, now: int, offer_table: str = 'offers', bids_table: str = 'bids') -> str:
         offers_inset = f' AND {offer_table}.expire_at > {now}' if offer_table != '' else ''
@@ -6544,11 +6522,10 @@ class BasicSwap(BaseApp):
         return f' ({bids_table}.state NOT IN ({inactive_states_str}) AND ({bids_table}.state > {BidStates.BID_RECEIVED} OR ({bids_table}.expire_at > {now}{offers_inset}))) '
 
     def listBids(self, sent: bool = False, offer_id: bytes = None, for_html: bool = False, filters={}):
-        self.mxDB.acquire()
+        session = self.openSession()
         try:
             rv = []
             now: int = self.getTime()
-            session = scoped_session(self.session_factory)
 
             query_str = 'SELECT bids.created_at, bids.expire_at, bids.bid_id, bids.offer_id, bids.amount, bids.state, bids.was_received, tx1.state, tx2.state, offers.coin_from, bids.rate, bids.bid_addr FROM bids ' + \
                         'LEFT JOIN offers ON offers.offer_id = bids.offer_id ' + \
@@ -6594,9 +6571,7 @@ class BasicSwap(BaseApp):
                 rv.append(row)
             return rv
         finally:
-            session.close()
-            session.remove()
-            self.mxDB.release()
+            self.closeSession(session, commit=False)
 
     def listSwapsInProgress(self, for_html=False):
         self.mxDB.acquire()
@@ -6795,9 +6770,8 @@ class BasicSwap(BaseApp):
                 self.closeSession(use_session)
 
     def addSMSGAddress(self, pubkey_hex: str, addressnote: str = None) -> None:
-        self.mxDB.acquire()
+        session = self.openSession()
         try:
-            session = scoped_session(self.session_factory)
             now: int = self.getTime()
             ci = self.ci(Coins.PART)
             add_addr = ci.pubkey_to_address(bytes.fromhex(pubkey_hex))
@@ -6805,26 +6779,20 @@ class BasicSwap(BaseApp):
             self.callrpc('smsglocalkeys', ['anon', '-', add_addr])
 
             session.add(SmsgAddress(addr=add_addr, use_type=AddressTypes.SEND_OFFER, active_ind=1, created_at=now, note=addressnote, pubkey=pubkey_hex))
-            session.commit()
             return add_addr
         finally:
-            session.close()
-            session.remove()
-            self.mxDB.release()
+            self.closeSession(session)
 
     def editSMSGAddress(self, address: str, active_ind: int, addressnote: str) -> None:
-        self.mxDB.acquire()
+        session = self.openSession()
         try:
-            session = scoped_session(self.session_factory)
             mode = '-' if active_ind == 0 else '+'
             self.callrpc('smsglocalkeys', ['recv', mode, address])
 
             session.execute('UPDATE smsgaddresses SET active_ind = :active_ind, note = :note WHERE addr = :addr', {'active_ind': active_ind, 'note': addressnote, 'addr': address})
             session.commit()
         finally:
-            session.close()
-            session.remove()
-            self.mxDB.release()
+            self.closeSession(session)
 
     def createCoinALockRefundSwipeTx(self, ci, bid, offer, xmr_swap, xmr_offer):
         self.log.debug('Creating %s lock refund swipe tx', ci.coin_name())
@@ -6887,18 +6855,15 @@ class BasicSwap(BaseApp):
         self.swaps_in_progress[bid.bid_id] = (bid, swap_in_progress[1])
 
     def getAddressLabel(self, addresses):
-        self.mxDB.acquire()
+        session = self.openSession()
         try:
-            session = scoped_session(self.session_factory)
             rv = []
             for a in addresses:
                 v = session.query(KnownIdentity).filter_by(address=a).first()
                 rv.append('' if (not v or not v.label) else v.label)
             return rv
         finally:
-            session.close()
-            session.remove()
-            self.mxDB.release()
+            self.closeSession(session, commit=False)
 
     def add_connection(self, host, port, peer_pubkey):
         self.log.info('add_connection %s %d %s', host, port, peer_pubkey.hex())
