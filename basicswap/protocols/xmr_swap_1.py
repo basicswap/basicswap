@@ -110,12 +110,12 @@ def getChainBRemoteSplitKey(swap_client, bid, xmr_swap, offer):
     return None
 
 
-def reverseBidAmountAndRate(swap_client, bid, offer) -> (int, int):
+def reverseBidAmountAndRate(swap_client, offer, bid_amount: int, bid_rate: int) -> (int, int):
     ci_from = swap_client.ci(offer.coin_to)
     ci_to = swap_client.ci(offer.coin_from)
-    bid_rate = offer.rate if bid.rate is None else bid.rate
-    amount_from: int = bid.amount
-    amount_to: int = int((int(amount_from) * bid_rate) // ci_from.COIN())
+    use_rate: int = offer.rate if bid_rate is None else bid_rate
+    amount_from: int = bid_amount
+    amount_to: int = int((int(amount_from) * use_rate) // ci_from.COIN())
     reversed_rate: int = ci_to.make_int(amount_from / amount_to, r=1)
 
     return amount_to, reversed_rate

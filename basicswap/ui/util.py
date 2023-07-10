@@ -148,8 +148,6 @@ def listBidStates():
 def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_bid, show_txns, view_tx_ind=None, for_api=False, show_lock_transfers=False):
     ci_from = swap_client.ci(Coins(offer.coin_from))
     ci_to = swap_client.ci(Coins(offer.coin_to))
-    ticker_from = ci_from.ticker()
-    ticker_to = ci_to.ticker()
 
     reverse_bid: bool = ci_from.coin_type() in swap_client.scriptless_coins
     ci_leader = ci_to if reverse_bid else ci_from
@@ -157,8 +155,13 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
 
     bid_amount: int = bid.amount
     bid_rate: int = offer.rate if bid.rate is None else bid.rate
+
+    initiator_role: str = 'offerer'  # Leader
+    participant_role: str = 'bidder'  # Follower
     if reverse_bid:
-        bid_amount, bid_rate = reverseBidAmountAndRate(swap_client, bid, offer)
+        bid_amount, bid_rate = reverseBidAmountAndRate(swap_client, offer, bid.amount, bid.rate)
+        initiator_role = 'bidder'
+        participant_role = 'offerer'
 
     state_description = ''
     if offer.swap_type == SwapTypes.SELLER_FIRST:
@@ -172,12 +175,12 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
             else:
                 state_description = 'Waiting for initiate tx to confirm.'
         elif bid.state == BidStates.SWAP_INITIATED:
-            state_description = 'Waiting for participate txn to be confirmed in {} chain'.format(ticker_to)
+            state_description = 'Waiting for participate txn to be confirmed in {} chain'.format(ci_follower.ticker())
         elif bid.state == BidStates.SWAP_PARTICIPATING:
             if bid.was_sent:
-                state_description = 'Waiting for participate txn to be spent in {} chain'.format(ticker_to)
+                state_description = 'Waiting for participate txn to be spent in {} chain'.format(ci_follower.ticker())
             else:
-                state_description = 'Waiting for initiate txn to be spent in {} chain'.format(ticker_from)
+                state_description = 'Waiting for initiate txn to be spent in {} chain'.format(ci_leader.ticker())
         elif bid.state == BidStates.SWAP_COMPLETED:
             state_description = 'Swap completed'
             if bid.getITxState() == TxStates.TX_REDEEMED and bid.getPTxState() == TxStates.TX_REDEEMED:
@@ -211,29 +214,29 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
             elif last_state == BidStates.BID_RECEIVING_ACC:
                 state_description = 'Delaying before responding to accepted bid'
             elif last_state == BidStates.XMR_SWAP_SCRIPT_TX_REDEEMED:
-                state_description = f'Delaying before spending from {ticker_to} lock tx'
+                state_description = f'Delaying before spending from {ci_follower.ticker()} lock tx'
             elif last_state == BidStates.BID_ACCEPTED:
-                state_description = f'Delaying before sending {ticker_from} lock tx'
+                state_description = f'Delaying before sending {ci_leader.ticker()} lock tx'
             else:
                 state_description = 'Delaying before automated action'
         elif bid.state == BidStates.XMR_SWAP_HAVE_SCRIPT_COIN_SPEND_TX:
-            state_description = f'Waiting for {ticker_from} lock tx to confirm in chain ({ci_from.blocks_confirmed} blocks)'
+            state_description = f'Waiting for {ci_leader.ticker()} lock tx to confirm in chain ({ci_leader.blocks_confirmed} blocks)'
         elif bid.state == BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED:
             if xmr_swap.b_lock_tx_id is None:
-                state_description = f'Waiting for {ticker_to} lock tx'
+                state_description = f'Waiting for {ci_follower.ticker()} lock tx'
             else:
-                state_description = f'Waiting for {ticker_to} lock tx to confirm in chain ({ci_to.blocks_confirmed} blocks)'
+                state_description = f'Waiting for {ci_follower.ticker()} lock tx to confirm in chain ({ci_follower.blocks_confirmed} blocks)'
         elif bid.state == BidStates.XMR_SWAP_NOSCRIPT_COIN_LOCKED:
-            state_description = f'Waiting for offerer to unlock {ticker_from} lock tx'
+            state_description = f'Waiting for {initiator_role} to unlock {ci_leader.ticker()} lock tx'
         elif bid.state == BidStates.XMR_SWAP_LOCK_RELEASED:
-            state_description = f'Waiting for bidder to spend from {ticker_from} lock tx'
+            state_description = f'Waiting for {participant_role} to spend from {ci_leader.ticker()} lock tx'
         elif bid.state == BidStates.XMR_SWAP_SCRIPT_TX_REDEEMED:
-            state_description = f'Waiting for offerer to spend from {ticker_to} lock tx'
+            state_description = f'Waiting for {initiator_role} to spend from {ci_follower.ticker()} lock tx'
         elif bid.state == BidStates.XMR_SWAP_NOSCRIPT_TX_REDEEMED:
-            state_description = f'Waiting for {ticker_to} lock tx spend tx to confirm in chain'
+            state_description = f'Waiting for {ci_follower.ticker()} lock tx spend tx to confirm in chain'
         elif bid.state == BidStates.XMR_SWAP_SCRIPT_TX_PREREFUND:
             if bid.was_sent:
-                state_description = 'Waiting for offerer to redeem or locktime to expire'
+                state_description = f'Waiting for {initiator_role} to redeem or locktime to expire'
             else:
                 state_description = 'Redeeming output'
 
@@ -249,8 +252,8 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
         'amt_from': ci_from.format_amount(bid_amount),
         'amt_to': ci_to.format_amount((bid_amount * bid_rate) // ci_from.COIN()),
         'bid_rate': ci_to.format_amount(bid_rate),
-        'ticker_from': ticker_from,
-        'ticker_to': ticker_to,
+        'ticker_from': ci_from.ticker(),
+        'ticker_to': ci_to.ticker(),
         'bid_state': strBidState(bid.state),
         'state_description': state_description,
         'itx_state': strTxState(bid.getITxState()),
@@ -263,9 +266,9 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
         'expired_at': bid.expire_at if for_api else format_timestamp(bid.expire_at, with_seconds=True),
         'was_sent': 'True' if bid.was_sent else 'False',
         'was_received': 'True' if bid.was_received else 'False',
-        'initiate_tx': getTxIdHex(bid, TxTypes.ITX, ' ' + ticker_from),
+        'initiate_tx': getTxIdHex(bid, TxTypes.ITX, ' ' + ci_leader.ticker()),
         'initiate_conf': 'None' if (not bid.initiate_tx or not bid.initiate_tx.conf) else bid.initiate_tx.conf,
-        'participate_tx': getTxIdHex(bid, TxTypes.PTX, ' ' + ticker_to),
+        'participate_tx': getTxIdHex(bid, TxTypes.PTX, ' ' + ci_follower.ticker()),
         'participate_conf': 'None' if (not bid.participate_tx or not bid.participate_tx.conf) else bid.participate_tx.conf,
         'show_txns': show_txns,
         'can_abandon': can_abandon,

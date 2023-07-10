@@ -39,6 +39,7 @@ from basicswap.basicswap_util import (
 from basicswap.chainparams import (
     Coins,
 )
+from basicswap.protocols.xmr_swap_1 import reverseBidAmountAndRate
 
 
 def value_or_none(v):
@@ -484,6 +485,8 @@ def page_offer(self, url_split, post_string):
     ci_from = swap_client.ci(Coins(offer.coin_from))
     ci_to = swap_client.ci(Coins(offer.coin_to))
 
+    reverse_bid: bool = ci_from.coin_type() in swap_client.scriptless_coins
+
     # Set defaults
     debugind = -1
     bid_amount = ci_from.format_amount(offer.amount_from)
@@ -632,8 +635,14 @@ def page_offer(self, url_split, post_string):
     formatted_bids = []
     amt_swapped = 0
     for b in bids:
+
+        amount_from = b[4]
+        rate = b[10]
+        if reverse_bid:
+            amount_from, rate = reverseBidAmountAndRate(swap_client, offer, amount_from, rate)
+
         amt_swapped += b[4]
-        formatted_bids.append((b[2].hex(), ci_leader.format_amount(b[4]), strBidState(b[5]), ci_follower.format_amount(b[10]), b[11]))
+        formatted_bids.append((b[2].hex(), ci_from.format_amount(amount_from), strBidState(b[5]), ci_to.format_amount(rate), b[11]))
     data['amt_swapped'] = ci_from.format_amount(amt_swapped)
 
     template = server.env.get_template('offer.html')
