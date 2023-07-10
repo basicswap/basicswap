@@ -4503,7 +4503,7 @@ class BasicSwap(BaseApp):
 
             total_bids_value_multiplier = opts.get('total_bids_value_multiplier', 1.0)
             if total_bids_value_multiplier > 0.0:
-                if total_bids_value + bid.amount > offer.amount_from * total_bids_value_multiplier:
+                if total_bids_value + bid_amount > offer.amount_from * total_bids_value_multiplier:
                     raise AutomationConstraint('Over remaining offer value {}'.format(offer.amount_from * total_bids_value_multiplier - total_bids_value))
 
             num_not_completed = 0
