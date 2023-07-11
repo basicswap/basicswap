@@ -86,27 +86,28 @@ def recoverNoScriptTxnWithKey(self, bid_id: bytes, encoded_key):
 
 
 def getChainBSplitKey(swap_client, bid, xmr_swap, offer):
-    ci_to = swap_client.ci(offer.coin_to)
+    reverse_bid: bool = offer.bid_reversed
+    ci_follower = swap_client.ci(offer.coin_from if reverse_bid else offer.coin_to)
 
     key_type = KeyTypes.KBSF if bid.was_sent else KeyTypes.KBSL
-    return ci_to.encodeKey(swap_client.getPathKey(offer.coin_from, offer.coin_to, bid.created_at, xmr_swap.contract_count, key_type, True if offer.coin_to == Coins.XMR else False))
+    return ci_follower.encodeKey(swap_client.getPathKey(offer.coin_from, offer.coin_to, bid.created_at, xmr_swap.contract_count, key_type, True if ci_follower.coin_type() == Coins.XMR else False))
 
 
 def getChainBRemoteSplitKey(swap_client, bid, xmr_swap, offer):
-    ci_from = swap_client.ci(offer.coin_from)
-    ci_to = swap_client.ci(offer.coin_to)
+    reverse_bid: bool = offer.bid_reversed
+    ci_leader = swap_client.ci(offer.coin_to if reverse_bid else offer.coin_from)
+    ci_follower = swap_client.ci(offer.coin_from if reverse_bid else offer.coin_to)
 
     if bid.was_sent:
         if xmr_swap.a_lock_refund_spend_tx:
-            af_lock_refund_spend_tx_sig = ci_from.extractFollowerSig(xmr_swap.a_lock_refund_spend_tx)
-            kbsl = ci_from.recoverEncKey(xmr_swap.af_lock_refund_spend_tx_esig, af_lock_refund_spend_tx_sig, xmr_swap.pkasl)
-            return ci_to.encodeKey(kbsl)
+            af_lock_refund_spend_tx_sig = ci_leader.extractFollowerSig(xmr_swap.a_lock_refund_spend_tx)
+            kbsl = ci_leader.recoverEncKey(xmr_swap.af_lock_refund_spend_tx_esig, af_lock_refund_spend_tx_sig, xmr_swap.pkasl)
+            return ci_follower.encodeKey(kbsl)
     else:
         if xmr_swap.a_lock_spend_tx:
-            al_lock_spend_tx_sig = ci_from.extractLeaderSig(xmr_swap.a_lock_spend_tx)
-            kbsf = ci_from.recoverEncKey(xmr_swap.al_lock_spend_tx_esig, al_lock_spend_tx_sig, xmr_swap.pkasf)
-            return ci_to.encodeKey(kbsf)
-
+            al_lock_spend_tx_sig = ci_leader.extractLeaderSig(xmr_swap.a_lock_spend_tx)
+            kbsf = ci_leader.recoverEncKey(xmr_swap.al_lock_spend_tx_esig, al_lock_spend_tx_sig, xmr_swap.pkasf)
+            return ci_follower.encodeKey(kbsf)
     return None
 
 

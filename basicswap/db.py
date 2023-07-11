@@ -13,7 +13,7 @@ from sqlalchemy.ext.declarative import declarative_base
 
 
 CURRENT_DB_VERSION = 21
-CURRENT_DB_DATA_VERSION = 3
+CURRENT_DB_DATA_VERSION = 4
 Base = declarative_base()
 
 

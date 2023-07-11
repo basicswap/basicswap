@@ -2068,8 +2068,8 @@ class BasicSwap(BaseApp):
     def countMessageLinks(self, linked_type: int, linked_id: int, msg_type: int, msg_sequence: int = 0, session=None) -> int:
         try:
             use_session = self.openSession(session)
-            q = session.execute('SELECT COUNT(*) FROM message_links WHERE linked_type = :linked_type AND linked_id = :linked_id AND msg_type = :msg_type AND msg_sequence = :msg_sequence',
-                                {'linked_type': linked_type, 'linked_id': linked_id, 'msg_type': msg_type, 'msg_sequence': msg_sequence}).first()
+            q = use_session.execute('SELECT COUNT(*) FROM message_links WHERE linked_type = :linked_type AND linked_id = :linked_id AND msg_type = :msg_type AND msg_sequence = :msg_sequence',
+                                    {'linked_type': linked_type, 'linked_id': linked_id, 'msg_type': msg_type, 'msg_sequence': msg_sequence}).first()
             return q[0]
         finally:
             if session is None:
