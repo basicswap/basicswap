@@ -81,14 +81,14 @@ def upgradeDatabaseData(self, data_version):
                     swap_ended = isFinalBidState(state)
                     session.execute('UPDATE bidstates SET in_error = :in_error, swap_failed = :swap_failed, swap_ended = :swap_ended WHERE state_id = :state_id', {'in_error': in_error, 'swap_failed': swap_failed, 'swap_ended': swap_ended, 'state_id': int(state)})
             if data_version > 0 and data_version < 4:
-                for state in (BidStates.BID_REQUEST_SENT, ):
+                for state in (BidStates.BID_REQUEST_SENT, BidStates.BID_REQUEST_ACCEPTED):
                     session.add(BidState(
                         active_ind=1,
                         state_id=int(state),
                         in_progress=isActiveBidState(state),
                         in_error=isErrorBidState(state),
-                        swap_failed = isFailingBidState(state),
-                        swap_ended = isFinalBidState(state),
+                        swap_failed=isFailingBidState(state),
+                        swap_ended=isFinalBidState(state),
                         label=strBidState(state),
                         created_at=now))
 

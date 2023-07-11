@@ -478,7 +478,7 @@ def js_generatenotification(self, url_split, post_string, is_json) -> bytes:
     elif r == 2:
         swap_client.notify(NT.BID_ACCEPTED, {'bid_id': random.randbytes(28).hex()})
     elif r == 3:
-        swap_client.notify(NT.BID_RECEIVED, {'type': 'xmr', 'bid_id': random.randbytes(28).hex(), 'offer_id': random.randbytes(28).hex()})
+        swap_client.notify(NT.BID_RECEIVED, {'type': 'ads', 'bid_id': random.randbytes(28).hex(), 'offer_id': random.randbytes(28).hex()})
 
     return bytes(json.dumps({'type': r}), 'UTF-8')
 

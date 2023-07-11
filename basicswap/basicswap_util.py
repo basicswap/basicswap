@@ -102,6 +102,7 @@ class BidStates(IntEnum):
     XMR_SWAP_MSG_SCRIPT_LOCK_TX_SIGS = 27      # XmrBidLockTxSigsMessage
     XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX = 28     # XmrBidLockSpendTxMessage
     BID_REQUEST_SENT = 29
+    BID_REQUEST_ACCEPTED = 30
 
 
 class TxStates(IntEnum):
@@ -303,6 +304,8 @@ def strBidState(state):
         return 'Exchanged script lock spend tx msg'
     if state == BidStates.BID_REQUEST_SENT:
         return 'Request sent'
+    if state == BidStates.BID_REQUEST_ACCEPTED:
+        return 'Request accepted'
 
     return 'Unknown' + ' ' + str(state)
 
@@ -494,29 +497,20 @@ inactive_states = [BidStates.SWAP_COMPLETED, BidStates.BID_ERROR, BidStates.BID_
 def isActiveBidState(state):
     if state >= BidStates.BID_ACCEPTED and state < BidStates.SWAP_COMPLETED:
         return True
-    if state == BidStates.SWAP_DELAYING:
-        return True
-    if state == BidStates.XMR_SWAP_HAVE_SCRIPT_COIN_SPEND_TX:
-        return True
-    if state == BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED:
-        return True
-    if state == BidStates.XMR_SWAP_NOSCRIPT_COIN_LOCKED:
-        return True
-    if state == BidStates.XMR_SWAP_LOCK_RELEASED:
-        return True
-    if state == BidStates.XMR_SWAP_NOSCRIPT_TX_REDEEMED:
-        return True
-    if state == BidStates.XMR_SWAP_SCRIPT_TX_REDEEMED:
-        return True
-    if state == BidStates.XMR_SWAP_SCRIPT_TX_PREREFUND:
-        return True
-    if state == BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_TX_SIGS:
-        return True
-    if state == BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX:
-        return True
-    if state == BidStates.XMR_SWAP_FAILED:
-        return True
-    return False
+    return state in (
+        BidStates.SWAP_DELAYING,
+        BidStates.XMR_SWAP_HAVE_SCRIPT_COIN_SPEND_TX,
+        BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED,
+        BidStates.XMR_SWAP_NOSCRIPT_COIN_LOCKED,
+        BidStates.XMR_SWAP_LOCK_RELEASED,
+        BidStates.XMR_SWAP_NOSCRIPT_TX_REDEEMED,
+        BidStates.XMR_SWAP_SCRIPT_TX_REDEEMED,
+        BidStates.XMR_SWAP_SCRIPT_TX_PREREFUND,
+        BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_TX_SIGS,
+        BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX,
+        BidStates.XMR_SWAP_FAILED,
+        BidStates.BID_REQUEST_ACCEPTED,
+    )
 
 
 def isErrorBidState(state):

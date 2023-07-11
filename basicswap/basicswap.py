@@ -294,9 +294,9 @@ class BasicSwap(BaseApp):
         self.network_pubkey = self.settings['network_pubkey']
         self.network_addr = pubkeyToAddress(chainparams[Coins.PART][self.chain]['pubkey_address'], bytes.fromhex(self.network_pubkey))
 
-        self.db_echo = self.settings.get('db_echo', False)
-        self.sqlite_file = os.path.join(self.data_dir, 'db{}.sqlite'.format('' if self.chain == 'mainnet' else ('_' + self.chain)))
-        db_exists = os.path.exists(self.sqlite_file)
+        self.db_echo: bool = self.settings.get('db_echo', False)
+        self.sqlite_file: str = os.path.join(self.data_dir, 'db{}.sqlite'.format('' if self.chain == 'mainnet' else ('_' + self.chain)))
+        db_exists: bool = os.path.exists(self.sqlite_file)
 
         # HACK: create_all hangs when using tox, unless create_engine is called with echo=True
         if not db_exists:
@@ -1143,8 +1143,12 @@ class BasicSwap(BaseApp):
     def validateSwapType(self, coin_from, coin_to, swap_type):
         if (coin_from in self.adaptor_swap_only_coins or coin_to in self.adaptor_swap_only_coins) and swap_type != SwapTypes.XMR_SWAP:
             raise ValueError('Invalid swap type for: {} -> {}'.format(coin_from.name, coin_to.name))
-        if (coin_from in self.secret_hash_swap_only_coins or coin_to in self.secret_hash_swap_only_coins) and swap_type == SwapTypes.XMR_SWAP:
-            raise ValueError('Invalid swap type for: {} -> {}'.format(coin_from.name, coin_to.name))
+
+        if swap_type == SwapTypes.XMR_SWAP:
+            if (coin_from in self.secret_hash_swap_only_coins or coin_to in self.secret_hash_swap_only_coins):
+                raise ValueError('Invalid swap type for: {} -> {}'.format(coin_from.name, coin_to.name))
+            if (coin_from in self.scriptless_coins and coin_to in self.scriptless_coins):
+                raise ValueError('Invalid swap type for: {} -> {}'.format(coin_from.name, coin_to.name))
 
     def notify(self, event_type, event_data, session=None) -> None:
         show_event = event_type not in self._disabled_notification_types
@@ -2780,7 +2784,7 @@ class BasicSwap(BaseApp):
             if ci_to.curve_type() == Curves.ed25519:
                 self.sendXmrSplitMessages(XmrSplitMsgTypes.BID_ACCEPT, addr_from, addr_to, xmr_swap.bid_id, xmr_swap.kbsl_dleag, msg_valid, bid_msg_ids)
 
-            bid.setState(BidStates.BID_ACCEPTED)
+            bid.setState(BidStates.BID_ACCEPTED)  # ADS
 
             session = self.openSession()
             try:
@@ -2862,18 +2866,19 @@ class BasicSwap(BaseApp):
             addr_from: str = offer.addr_from
             addr_to: str = bid.bid_addr
             msg_valid: int = self.getAcceptBidMsgValidTime(bid)
-            bid_accept_id = self.sendSmsg(addr_from, addr_to, payload_hex, msg_valid)
-
             bid_msg_ids = {}
+            bid_msg_ids[0] = self.sendSmsg(addr_from, addr_to, payload_hex, msg_valid)
+
             if ci_to.curve_type() == Curves.ed25519:
                 self.sendXmrSplitMessages(XmrSplitMsgTypes.BID, addr_from, addr_to, xmr_swap.bid_id, xmr_swap.kbsf_dleag, msg_valid, bid_msg_ids)
 
+            bid.setState(BidStates.BID_REQUEST_ACCEPTED)
+
             session = self.openSession()
             try:
-                self.addMessageLink(Concepts.BID, bid_id, MessageTypes.ADS_BID_ACCEPT_FL, bid_accept_id, session=session)
                 for k, msg_id in bid_msg_ids.items():
-                    self.addMessageLink(Concepts.BID, bid_id, MessageTypes.BID, msg_id, msg_sequence=k, session=session)
-                self.log.info('Sent ADS_BID_ACCEPT_FL %s', bid_accept_id.hex())
+                    self.addMessageLink(Concepts.BID, bid_id, MessageTypes.ADS_BID_ACCEPT_FL, msg_id, msg_sequence=k, session=session)
+                self.log.info('Sent ADS_BID_ACCEPT_FL %s', bid_msg_ids[0].hex())
                 self.saveBidInSession(bid_id, bid, session, xmr_swap=xmr_swap)
             finally:
                 self.closeSession(session)
@@ -4615,7 +4620,7 @@ class BasicSwap(BaseApp):
         bid.setState(BidStates.BID_RECEIVED)
 
         self.saveBid(bid_id, bid)
-        self.notify(NT.BID_RECEIVED, {'type': 'atomic', 'bid_id': bid_id.hex(), 'offer_id': bid_data.offer_msg_id.hex()})
+        self.notify(NT.BID_RECEIVED, {'type': 'secrethash', 'bid_id': bid_id.hex(), 'offer_id': bid_data.offer_msg_id.hex()})
 
         if self.shouldAutoAcceptBid(offer, bid):
             delay = random.randrange(self.min_delay_event, self.max_delay_event)
@@ -4761,7 +4766,7 @@ class BasicSwap(BaseApp):
         ensure(ci_from.verifyPubkey(xmr_swap.pkaf), 'Invalid pubkey, pkaf')
 
         if not reverse_bid:  # notify already ran in processADSBidReversed
-            self.notify(NT.BID_RECEIVED, {'type': 'xmr', 'bid_id': bid.bid_id.hex(), 'offer_id': bid.offer_id.hex()}, session)
+            self.notify(NT.BID_RECEIVED, {'type': 'ads', 'bid_id': bid.bid_id.hex(), 'offer_id': bid.offer_id.hex()}, session)
 
         bid.setState(BidStates.BID_RECEIVED)
 
@@ -4829,7 +4834,7 @@ class BasicSwap(BaseApp):
         if xmr_swap.pkal == xmr_swap.pkaf:
             raise ValueError('Duplicate script spend pubkey.')
 
-        bid.setState(BidStates.BID_ACCEPTED)  # XMR
+        bid.setState(BidStates.BID_ACCEPTED)  # ADS
         self.saveBidInSession(bid.bid_id, bid, session, xmr_swap)
         self.notify(NT.BID_ACCEPTED, {'bid_id': bid.bid_id.hex()}, session)
 
@@ -5000,7 +5005,7 @@ class BasicSwap(BaseApp):
             v = ci_from.verifyTxSig(xmr_swap.a_lock_refund_tx, xmr_swap.al_lock_refund_tx_sig, xmr_swap.pkal, 0, xmr_swap.a_lock_tx_script, prevout_amount)
             ensure(v, 'Invalid coin A lock refund tx leader sig')
 
-            allowed_states = [BidStates.BID_SENT, BidStates.BID_RECEIVED]
+            allowed_states = [BidStates.BID_SENT, BidStates.BID_RECEIVED, BidStates.BID_REQUEST_ACCEPTED]
             if bid.was_sent and offer.was_sent:
                 allowed_states.append(BidStates.BID_ACCEPTED)  # TODO: Split BID_ACCEPTED into received and sent
             ensure(bid.state in allowed_states, 'Invalid state for bid {}'.format(bid.state))
@@ -5632,6 +5637,7 @@ class BasicSwap(BaseApp):
 
         # Validate data
         ensure(len(msg_data.msg_id) == 28, 'Bad msg_id length')
+        self.log.debug('for bid %s', msg_data.msg_id.hex())
 
         # TODO: Wait for bid msg to arrive first
 
@@ -5783,7 +5789,7 @@ class BasicSwap(BaseApp):
 
         try:
             session = self.openSession()
-            self.notify(NT.BID_RECEIVED, {'type': 'as_reversed', 'bid_id': bid.bid_id.hex(), 'offer_id': bid.offer_id.hex()}, session)
+            self.notify(NT.BID_RECEIVED, {'type': 'ads_reversed', 'bid_id': bid.bid_id.hex(), 'offer_id': bid.offer_id.hex()}, session)
 
             options = {'reverse_bid': True, 'bid_rate': bid_data.rate}
             if self.shouldAutoAcceptBid(offer, bid, session, options=options):
