@@ -39,7 +39,6 @@ from basicswap.basicswap_util import (
 from basicswap.chainparams import (
     Coins,
 )
-from basicswap.protocols.xmr_swap_1 import reverseBidAmountAndRate
 
 
 def value_or_none(v):
@@ -218,7 +217,7 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
 
     try:
         if len(errors) == 0 and page_data['swap_style'] == 'xmr':
-            reverse_bid: bool = ci_from.coin_type() in swap_client.scriptless_coins
+            reverse_bid: bool = coin_from in swap_client.scriptless_coins
             ci_leader = ci_to if reverse_bid else ci_from
             ci_follower = ci_from if reverse_bid else ci_to
 
@@ -485,7 +484,7 @@ def page_offer(self, url_split, post_string):
     ci_from = swap_client.ci(Coins(offer.coin_from))
     ci_to = swap_client.ci(Coins(offer.coin_to))
 
-    reverse_bid: bool = ci_from.coin_type() in swap_client.scriptless_coins
+    reverse_bid: bool = Coins(offer.coin_from) in swap_client.scriptless_coins
 
     # Set defaults
     debugind = -1
@@ -606,7 +605,6 @@ def page_offer(self, url_split, post_string):
         data['debug_ind'] = debugind
         data['debug_options'] = [(int(t), t.name) for t in DebugTypes]
 
-    reverse_bid: bool = ci_from.coin_type() in swap_client.scriptless_coins
     ci_leader = ci_to if reverse_bid else ci_from
     ci_follower = ci_from if reverse_bid else ci_to
 
@@ -635,12 +633,6 @@ def page_offer(self, url_split, post_string):
     formatted_bids = []
     amt_swapped = 0
     for b in bids:
-
-        amount_from = b[4]
-        rate = b[10]
-        if reverse_bid:
-            amount_from, rate = reverseBidAmountAndRate(swap_client, offer, amount_from, rate)
-
         amt_swapped += b[4]
         formatted_bids.append((b[2].hex(), ci_from.format_amount(amount_from), strBidState(b[5]), ci_to.format_amount(rate), b[11]))
     data['amt_swapped'] = ci_from.format_amount(amt_swapped)

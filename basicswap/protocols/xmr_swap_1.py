@@ -111,17 +111,6 @@ def getChainBRemoteSplitKey(swap_client, bid, xmr_swap, offer):
     return None
 
 
-def reverseBidAmountAndRate(swap_client, offer, bid_amount: int, bid_rate: int) -> (int, int):
-    ci_from = swap_client.ci(offer.coin_to)
-    ci_to = swap_client.ci(offer.coin_from)
-    use_rate: int = offer.rate if bid_rate is None else bid_rate
-    amount_from: int = bid_amount
-    amount_to: int = int((int(amount_from) * use_rate) // ci_from.COIN())
-    reversed_rate: int = ci_to.make_int(amount_from / amount_to, r=1)
-
-    return amount_to, reversed_rate
-
-
 def setDLEAG(xmr_swap, ci_to, kbsf: bytes) -> None:
     if ci_to.curve_type() == Curves.ed25519:
         xmr_swap.kbsf_dleag = ci_to.proveDLEAG(kbsf)

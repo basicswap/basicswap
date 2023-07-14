@@ -256,6 +256,7 @@ def formatBids(swap_client, bids, filters) -> bytes:
             'expire_at': b[1],
             'coin_from': b[9],
             'amount_from': swap_client.ci(b[9]).format_amount(b[4]),
+            'bid_rate': swap_client.ci(b[14]).format_amount(b[10]),
             'bid_state': strBidState(b[5])
         }
         if with_extra_info:

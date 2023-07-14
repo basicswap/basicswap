@@ -28,7 +28,7 @@ from basicswap.basicswap_util import (
     getLastBidState,
 )
 
-from basicswap.protocols.xmr_swap_1 import getChainBSplitKey, getChainBRemoteSplitKey, reverseBidAmountAndRate
+from basicswap.protocols.xmr_swap_1 import getChainBSplitKey, getChainBRemoteSplitKey
 
 PAGE_LIMIT = 50
 invalid_coins_from = []
@@ -149,7 +149,7 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
     ci_from = swap_client.ci(Coins(offer.coin_from))
     ci_to = swap_client.ci(Coins(offer.coin_to))
 
-    reverse_bid: bool = ci_from.coin_type() in swap_client.scriptless_coins
+    reverse_bid: bool = Coins(offer.coin_from) in swap_client.scriptless_coins
     ci_leader = ci_to if reverse_bid else ci_from
     ci_follower = ci_from if reverse_bid else ci_to
 
@@ -159,7 +159,8 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
     initiator_role: str = 'offerer'  # Leader
     participant_role: str = 'bidder'  # Follower
     if reverse_bid:
-        bid_amount, bid_rate = reverseBidAmountAndRate(swap_client, offer, bid.amount, bid.rate)
+        bid_amount = bid.amount_to
+        bid_rate = ci_from.make_int(bid.amount / bid.amount_to, r=1)
         initiator_role = 'bidder'
         participant_role = 'offerer'
 

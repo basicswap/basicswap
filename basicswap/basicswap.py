@@ -5741,10 +5741,10 @@ class BasicSwap(BaseApp):
 
         amount_from: int = bid_data.amount_from
         amount_to: int = (bid_data.amount_from * bid_data.rate) // ci_to.COIN()
-        ensure(abs(amount_to - bid_data.amount_to) < 10, 'invalid bid amount_to')  # TODO: Tolerance?
+        ensure(abs(amount_to - bid_data.amount_to) < 20, 'invalid bid amount_to')  # TODO: Tolerance?
         reversed_rate: int = ci_from.make_int(amount_from / bid_data.amount_to, r=1)
         amount_from_recovered: int = int((amount_to * reversed_rate) // ci_from.COIN())
-        ensure(abs(amount_from - amount_from_recovered) < 10, 'invalid bid amount_from')  # TODO: Tolerance?
+        ensure(abs(amount_from - amount_from_recovered) < 20, 'invalid bid amount_from')  # TODO: Tolerance?
 
         self.validateBidAmount(offer, amount_from, bid_data.rate)
 
@@ -6533,7 +6533,10 @@ class BasicSwap(BaseApp):
             rv = []
             now: int = self.getTime()
 
-            query_str = 'SELECT bids.created_at, bids.expire_at, bids.bid_id, bids.offer_id, bids.amount, bids.state, bids.was_received, tx1.state, tx2.state, offers.coin_from, bids.rate, bids.bid_addr FROM bids ' + \
+            query_str = 'SELECT ' + \
+                        'bids.created_at, bids.expire_at, bids.bid_id, bids.offer_id, bids.amount, bids.state, bids.was_received, ' + \
+                        'tx1.state, tx2.state, offers.coin_from, bids.rate, bids.bid_addr, offers.bid_reversed, bids.amount_to, offers.coin_to ' + \
+                        'FROM bids ' + \
                         'LEFT JOIN offers ON offers.offer_id = bids.offer_id ' + \
                         'LEFT JOIN transactions AS tx1 ON tx1.bid_id = bids.bid_id AND tx1.tx_type = {} '.format(TxTypes.ITX) + \
                         'LEFT JOIN transactions AS tx2 ON tx2.bid_id = bids.bid_id AND tx2.tx_type = {} '.format(TxTypes.PTX)
@@ -6574,7 +6577,16 @@ class BasicSwap(BaseApp):
 
             q = session.execute(query_str)
             for row in q:
-                rv.append(row)
+                result = [x for x in row]
+                if result[12]:  # Reversed
+                    coin_from = result[9]
+                    amount_from = result[13]
+                    amount_to = result[4]
+                    result[4] = amount_from
+                    result[13] = amount_to
+                    ci_from = self.ci(coin_from)
+                    result[10] = ci_from.make_int(amount_to / amount_from, r=1)
+                rv.append(result)
             return rv
         finally:
             self.closeSession(session, commit=False)

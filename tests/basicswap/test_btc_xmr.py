@@ -146,6 +146,35 @@ class TestFunctions(BaseTest):
         bid_id = swap_clients[1].postXmrBid(offer_id, offer.amount_from)
 
         wait_for_bid(test_delay_event, swap_clients[id_offerer], bid_id, BidStates.BID_RECEIVED)
+
+        bid0 = read_json_api(1800, f'bids/{bid_id.hex()}')
+        bid1 = read_json_api(1801, f'bids/{bid_id.hex()}')
+
+        tolerance = 20 if reverse_bid else 0
+        assert (bid0['ticker_from'] == ci_from.ticker())
+        assert (bid1['ticker_from'] == ci_from.ticker())
+        assert (bid0['ticker_to'] == ci_to.ticker())
+        assert (bid1['ticker_to'] == ci_to.ticker())
+        assert (abs(ci_from.make_int(bid0['amt_from']) - amt_swap) <= tolerance)
+        assert (abs(ci_from.make_int(bid1['amt_from']) - amt_swap) <= tolerance)
+        assert (abs(ci_to.make_int(bid0['bid_rate']) - rate_swap) <= tolerance)
+        assert (abs(ci_to.make_int(bid1['bid_rate']) - rate_swap) <= tolerance)
+        assert (bid0['reverse_bid'] == reverse_bid)
+        assert (bid1['reverse_bid'] == reverse_bid)
+
+        found: bool = False
+        bids0 = read_json_api(1800, 'bids')
+        logging.info('bids0 {} '.format(bids0))
+        for bid in bids0:
+            logging.info('bid {} '.format(bid))
+            if bid['bid_id'] != bid_id.hex():
+                continue
+            assert (bid['amount_from'] == bid1['amt_from'])
+            assert (bid['bid_rate'] == bid1['bid_rate'])
+            found = True
+            break
+        assert (found)
+
         swap_clients[id_offerer].acceptBid(bid_id)
 
         wait_for_bid(test_delay_event, swap_clients[id_offerer], bid_id, BidStates.SWAP_COMPLETED, wait_for=180)
@@ -162,7 +191,7 @@ class TestFunctions(BaseTest):
         # TODO: Discard block rewards
         # assert (node0_from_after < node0_from_before - amount_from)
 
-        scale_from = 8
+        scale_from = ci_from.exp()
         amount_to = int((amt_swap * rate_swap) // (10 ** scale_from))
         amount_to_float = float(ci_to.format_amount(amount_to))
         node1_to_after: float = self.getBalance(js_1_after, coin_to)

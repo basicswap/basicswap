@@ -42,6 +42,8 @@ class BalanceTypes(IntEnum):
 class PARTInterface(BTCInterface):
     @staticmethod
     def coin_type():
+        # Returns the base coin type
+        # ANON and BLIND PART will return Coins.PART
         return Coins.PART
 
     @staticmethod

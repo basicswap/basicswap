@@ -107,7 +107,7 @@ def page_bid(self, url_split, post_string):
     if len(data['addr_from_label']) > 0:
         data['addr_from_label'] = '(' + data['addr_from_label'] + ')'
 
-    template = server.env.get_template('bid_xmr.html') if offer.swap_type == SwapTypes.XMR_SWAP else server.env.get_template('bid.html')
+    template = server.env.get_template('bid_xmr.html' if offer.swap_type == SwapTypes.XMR_SWAP else 'bid.html')
     return self.render_template(template, {
         'bid_id': bid_id.hex(),
         'messages': messages,
