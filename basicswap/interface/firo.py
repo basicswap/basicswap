@@ -187,7 +187,7 @@ class FIROInterface(BTCInterface):
     def getBLockSpendTxFee(self, tx, fee_rate: int) -> int:
         add_bytes = 107
         size = len(tx.serialize_with_witness()) + add_bytes
-        pay_fee = int(fee_rate * size // 1000)
+        pay_fee = round(fee_rate * size / 1000)
         self._log.info(f'BLockSpendTx  fee_rate, size, fee: {fee_rate}, {size}, {pay_fee}.')
         return pay_fee
 

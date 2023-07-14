@@ -17,7 +17,6 @@ from basicswap.contrib.test_framework.script import (
     OP_DUP, OP_HASH160, OP_EQUALVERIFY, OP_CHECKSIG
 )
 from basicswap.util import (
-    i2b,
     ensure,
     make_int,
     TemporaryError,
@@ -113,7 +112,7 @@ class PARTInterface(BTCInterface):
     def getWitnessStackSerialisedLength(self, witness_stack):
         length = getCompactSizeLen(len(witness_stack))
         for e in witness_stack:
-            length += getWitnessElementLen(len(e) // 2)  # hex -> bytes
+            length += getWitnessElementLen(len(e))
         return length
 
     def getWalletRestoreHeight(self) -> int:
@@ -169,7 +168,7 @@ class PARTInterfaceBlind(PARTInterface):
     def createSCLockTx(self, value: int, script: bytearray, vkbv) -> bytes:
 
         # Nonce is derived from vkbv, ephemeral_key isn't used
-        ephemeral_key = i2b(self.getNewSecretKey())
+        ephemeral_key = self.getNewSecretKey()
         ephemeral_pubkey = self.getPubkey(ephemeral_key)
         assert (len(ephemeral_pubkey) == 33)
         nonce = self.getScriptLockTxNonce(vkbv)
@@ -208,7 +207,7 @@ class PARTInterfaceBlind(PARTInterface):
         lock_tx_obj = self.rpc_callback('decoderawtransaction', [tx_lock_bytes.hex()])
         assert (self.getTxid(tx_lock_bytes).hex() == lock_tx_obj['txid'])
         # Nonce is derived from vkbv, ephemeral_key isn't used
-        ephemeral_key = i2b(self.getNewSecretKey())
+        ephemeral_key = self.getNewSecretKey()
         ephemeral_pubkey = self.getPubkey(ephemeral_key)
         assert (len(ephemeral_pubkey) == 33)
         nonce = self.getScriptLockTxNonce(vkbv)
@@ -231,9 +230,10 @@ class PARTInterfaceBlind(PARTInterface):
 
         # Set dummy witness data for fee estimation
         dummy_witness_stack = self.getScriptLockTxDummyWitness(script_lock)
+        dummy_witness_stack = [x.hex() for x in dummy_witness_stack]
 
         # Use a junk change pubkey to avoid adding unused keys to the wallet
-        zero_change_key = i2b(self.getNewSecretKey())
+        zero_change_key = self.getNewSecretKey()
         zero_change_pubkey = self.getPubkey(zero_change_key)
         inputs_info = {'0': {'value': input_blinded_info['amount'], 'blind': input_blinded_info['blind'], 'witnessstack': dummy_witness_stack}}
         outputs_info = rv['amounts']
@@ -279,9 +279,10 @@ class PARTInterfaceBlind(PARTInterface):
 
         # Set dummy witness data for fee estimation
         dummy_witness_stack = self.getScriptLockRefundSpendTxDummyWitness(script_lock_refund)
+        dummy_witness_stack = [x.hex() for x in dummy_witness_stack]
 
         # Use a junk change pubkey to avoid adding unused keys to the wallet
-        zero_change_key = i2b(self.getNewSecretKey())
+        zero_change_key = self.getNewSecretKey()
         zero_change_pubkey = self.getPubkey(zero_change_key)
         inputs_info = {'0': {'value': input_blinded_info['amount'], 'blind': input_blinded_info['blind'], 'witnessstack': dummy_witness_stack}}
         outputs_info = rv['amounts']
@@ -483,9 +484,9 @@ class PARTInterfaceBlind(PARTInterface):
         dummy_witness_stack = self.getScriptLockTxDummyWitness(script_lock)
 
         # Use a junk change pubkey to avoid adding unused keys to the wallet
-        zero_change_key = i2b(self.getNewSecretKey())
+        zero_change_key = self.getNewSecretKey()
         zero_change_pubkey = self.getPubkey(zero_change_key)
-        inputs_info = {'0': {'value': blinded_info['amount'], 'blind': blinded_info['blind'], 'witnessstack': dummy_witness_stack}}
+        inputs_info = {'0': {'value': blinded_info['amount'], 'blind': blinded_info['blind'], 'witnessstack': [x.hex() for x in dummy_witness_stack]}}
         outputs_info = rv['amounts']
         options = {
             'changepubkey': zero_change_pubkey.hex(),
@@ -605,9 +606,10 @@ class PARTInterfaceBlind(PARTInterface):
 
         # Set dummy witness data for fee estimation
         dummy_witness_stack = self.getScriptLockRefundSwipeTxDummyWitness(script_lock_refund)
+        dummy_witness_stack = [x.hex() for x in dummy_witness_stack]
 
         # Use a junk change pubkey to avoid adding unused keys to the wallet
-        zero_change_key = i2b(self.getNewSecretKey())
+        zero_change_key = self.getNewSecretKey()
         zero_change_pubkey = self.getPubkey(zero_change_key)
         inputs_info = {'0': {'value': input_blinded_info['amount'], 'blind': input_blinded_info['blind'], 'witnessstack': dummy_witness_stack}}
         outputs_info = rv['amounts']

@@ -6,6 +6,7 @@
   - Runs the adaptor-sig protocol with leader and follower swapped to
     enable offers from no-script coins to script coins.
 - smsg: Outbox messages are removed when expired.
+- Fixed BTC witness size estimation.
 
 
 0.0.63

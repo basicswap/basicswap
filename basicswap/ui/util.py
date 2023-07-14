@@ -366,7 +366,7 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
             if xmr_swap:
                 if view_tx_id == xmr_swap.a_lock_tx_id and xmr_swap.a_lock_tx:
                     data['view_tx_hex'] = xmr_swap.a_lock_tx.hex()
-                    data['chain_a_lock_tx_inputs'] = ci_from.listInputs(xmr_swap.a_lock_tx)
+                    data['chain_a_lock_tx_inputs'] = ci_leader.listInputs(xmr_swap.a_lock_tx)
                 if view_tx_id == xmr_swap.a_lock_refund_tx_id and xmr_swap.a_lock_refund_tx:
                     data['view_tx_hex'] = xmr_swap.a_lock_refund_tx.hex()
                 if view_tx_id == xmr_swap.a_lock_refund_spend_tx_id and xmr_swap.a_lock_refund_spend_tx:
@@ -375,7 +375,7 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
                     data['view_tx_hex'] = xmr_swap.a_lock_spend_tx.hex()
 
                 if 'view_tx_hex' in data:
-                    data['view_tx_desc'] = json.dumps(ci_from.describeTx(data['view_tx_hex']), indent=4)
+                    data['view_tx_desc'] = json.dumps(ci_leader.describeTx(data['view_tx_hex']), indent=4)
     else:
         if offer.lock_type == TxLockTypes.SEQUENCE_LOCK_TIME:
             if bid.initiate_tx and bid.initiate_tx.block_time is not None:

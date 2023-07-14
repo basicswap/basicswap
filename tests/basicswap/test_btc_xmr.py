@@ -548,6 +548,85 @@ class BasicSwapTest(TestFunctions):
         rv = read_json_api(1800, 'getcoinseed', {'coin': 'XMR'})
         assert (rv['address'] == '47H7UDLzYEsR28BWttxp59SP1UVSxs4VKDJYSfmz7Wd4Fue5VWuoV9x9eejunwzVSmHWN37gBkaAPNf9VD4bTvwQKsBVWyK')
 
+    def test_010_txn_size(self):
+        logging.info('---------- Test {} txn_size'.format(self.test_coin_from.name))
+
+        swap_clients = self.swap_clients
+        ci = swap_clients[0].ci(self.test_coin_from)
+        pi = swap_clients[0].pi(SwapTypes.XMR_SWAP)
+
+        amount: int = ci.make_int(random.uniform(0.1, 2.0), r=1)
+
+        # Record unspents before createSCLockTx as the used ones will be locked
+        unspents = self.callnoderpc('listunspent')
+
+        # fee_rate is in sats/kvB
+        fee_rate: int = 1000
+
+        a = ci.getNewSecretKey()
+        b = ci.getNewSecretKey()
+
+        A = ci.getPubkey(a)
+        B = ci.getPubkey(b)
+        lock_tx_script = pi.genScriptLockTxScript(ci, A, B)
+
+        lock_tx = ci.createSCLockTx(amount, lock_tx_script)
+        lock_tx = ci.fundSCLockTx(lock_tx, fee_rate)
+        lock_tx = ci.signTxWithWallet(lock_tx)
+
+        unspents_after = self.callnoderpc('listunspent')
+        assert (len(unspents) > len(unspents_after))
+
+        tx_decoded = self.callnoderpc('decoderawtransaction', [lock_tx.hex()])
+        txid = tx_decoded['txid']
+
+        vsize = tx_decoded['vsize']
+        expect_fee_int = round(fee_rate * vsize / 1000)
+        expect_fee = ci.format_amount(expect_fee_int)
+
+        out_value: int = 0
+        for txo in tx_decoded['vout']:
+            if 'value' in txo:
+                out_value += ci.make_int(txo['value'])
+        in_value: int = 0
+        for txi in tx_decoded['vin']:
+            for utxo in unspents:
+                if 'vout' not in utxo:
+                    continue
+                if utxo['txid'] == txi['txid'] and utxo['vout'] == txi['vout']:
+                    in_value += ci.make_int(utxo['amount'])
+                    break
+        fee_value = in_value - out_value
+
+        self.callnoderpc('sendrawtransaction', [lock_tx.hex()])
+        rv = self.callnoderpc('gettransaction', [txid])
+        wallet_tx_fee = -ci.make_int(rv['fee'])
+
+        assert (wallet_tx_fee == fee_value)
+        assert (wallet_tx_fee == expect_fee_int)
+
+        addr_out = ci.getNewAddress(True)
+        pkh_out = ci.decodeAddress(addr_out)
+        fee_info = {}
+        lock_spend_tx = ci.createSCLockSpendTx(lock_tx, lock_tx_script, pkh_out, fee_rate, fee_info=fee_info)
+        vsize_estimated: int = fee_info['vsize']
+
+        tx_decoded = self.callnoderpc('decoderawtransaction', [lock_spend_tx.hex()])
+        txid = tx_decoded['txid']
+
+        witness_stack = [
+            b'',
+            ci.signTx(a, lock_spend_tx, 0, lock_tx_script, amount),
+            ci.signTx(b, lock_spend_tx, 0, lock_tx_script, amount),
+            lock_tx_script,
+        ]
+        lock_spend_tx = ci.setTxSignature(lock_spend_tx, witness_stack)
+        tx_decoded = self.callnoderpc('decoderawtransaction', [lock_spend_tx.hex()])
+        vsize_actual: int = tx_decoded['vsize']
+
+        assert (vsize_actual <= vsize_estimated and vsize_estimated - vsize_actual < 4)
+        assert (self.callnoderpc('sendrawtransaction', [lock_spend_tx.hex()]) == txid)
+
     def test_01_a_full_swap(self):
         if not self.has_segwit:
             return

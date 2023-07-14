@@ -144,7 +144,7 @@ def make_int(v, scale=8, r=0) -> int:  # r = 0, no rounding, fail, r > 0 round u
     return rv * sign
 
 
-def validate_amount(amount, scale=8) -> bool:
+def validate_amount(amount, scale: int = 8) -> bool:
     str_amount = float_to_str(amount) if type(amount) == float else str(amount)
     has_decimal = False
     for c in str_amount:
@@ -160,7 +160,7 @@ def validate_amount(amount, scale=8) -> bool:
     return True
 
 
-def format_amount(i, display_scale, scale=None):
+def format_amount(i: int, display_scale: int, scale: int = None) -> str:
     if not isinstance(i, int):
         raise ValueError('Amount must be an integer.')  # Raise error instead of converting as amounts should always be integers
     if scale is None:

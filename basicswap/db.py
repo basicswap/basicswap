@@ -295,8 +295,8 @@ class XmrOffer(Base):
     swap_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
     offer_id = sa.Column(sa.LargeBinary, sa.ForeignKey('offers.offer_id'))
 
-    a_fee_rate = sa.Column(sa.BigInteger)
-    b_fee_rate = sa.Column(sa.BigInteger)
+    a_fee_rate = sa.Column(sa.BigInteger)  # Chain a fee rate
+    b_fee_rate = sa.Column(sa.BigInteger)  # Chain b fee rate
 
     lock_time_1 = sa.Column(sa.Integer)  # Delay before the chain a lock refund tx can be mined
     lock_time_2 = sa.Column(sa.Integer)  # Delay before the follower can spend from the chain a lock refund tx

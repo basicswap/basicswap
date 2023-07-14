@@ -27,6 +27,7 @@ from coincurve.dleag import (
 from basicswap.interface import (
     Curves)
 from basicswap.util import (
+    i2b,
     dumpj,
     ensure,
     make_int,
@@ -206,12 +207,13 @@ class XMRInterface(CoinInterface):
             self.openWallet(self._wallet_filename)
             return self.rpc_wallet_cb('create_address', {'account_index': 0})['address']
 
-    def get_fee_rate(self, conf_target=2):
+    def get_fee_rate(self, conf_target: int = 2):
         self._log.warning('TODO - estimate fee rate?')
         return 0.0, 'unused'
 
     def getNewSecretKey(self) -> bytes:
-        return edu.get_secret()
+        # Note: Returned bytes are in big endian order
+        return i2b(edu.get_secret())
 
     def pubkey(self, key: bytes) -> bytes:
         return edf.scalarmult_B(key)

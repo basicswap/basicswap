@@ -351,7 +351,7 @@ class BTCInterface(CoinInterface):
         if self.sc._restrict_unknown_seed_wallets:
             ensure(addr_info['hdseedid'] == self._expect_seedid_hex, 'unexpected seedid')
 
-    def get_fee_rate(self, conf_target=2):
+    def get_fee_rate(self, conf_target: int = 2):
         try:
             fee_rate = self.rpc_callback('estimatesmartfee', [conf_target])['feerate']
             assert (fee_rate > 0.0), 'Non positive feerate'
@@ -410,8 +410,8 @@ class BTCInterface(CoinInterface):
         assert (len(pk) == 33)
         return self.pkh_to_address(hash160(pk))
 
-    def getNewSecretKey(self):
-        return getSecretInt()
+    def getNewSecretKey(self) -> bytes:
+        return i2b(getSecretInt())
 
     def getPubkey(self, privkey):
         return PublicKey.from_secret(privkey).format()
@@ -486,7 +486,7 @@ class BTCInterface(CoinInterface):
     def fundSCLockTx(self, tx_bytes, feerate, vkbv=None):
         return self.fundTx(tx_bytes, feerate)
 
-    def extractScriptLockRefundScriptValues(self, script_bytes):
+    def extractScriptLockRefundScriptValues(self, script_bytes: bytes):
         script_len = len(script_bytes)
         ensure(script_len > 73, 'Bad script length')
         ensure_op(script_bytes[0] == OP_IF)
@@ -517,7 +517,7 @@ class BTCInterface(CoinInterface):
 
         return pk1, pk2, csv_val, pk3
 
-    def genScriptLockRefundTxScript(self, Kal, Kaf, csv_val):
+    def genScriptLockRefundTxScript(self, Kal, Kaf, csv_val) -> CScript:
 
         Kal_enc = Kal if len(Kal) == 33 else self.encodePubkey(Kal)
         Kaf_enc = Kaf if len(Kaf) == 33 else self.encodePubkey(Kaf)
@@ -553,7 +553,7 @@ class BTCInterface(CoinInterface):
         dummy_witness_stack = self.getScriptLockTxDummyWitness(script_lock)
         witness_bytes = self.getWitnessStackSerialisedLength(dummy_witness_stack)
         vsize = self.getTxVSize(tx, add_witness_bytes=witness_bytes)
-        pay_fee = int(tx_fee_rate * vsize // 1000)
+        pay_fee = round(tx_fee_rate * vsize / 1000)
         tx.vout[0].nValue = locked_coin - pay_fee
 
         tx.rehash()
@@ -588,7 +588,7 @@ class BTCInterface(CoinInterface):
         dummy_witness_stack = self.getScriptLockRefundSpendTxDummyWitness(script_lock_refund)
         witness_bytes = self.getWitnessStackSerialisedLength(dummy_witness_stack)
         vsize = self.getTxVSize(tx, add_witness_bytes=witness_bytes)
-        pay_fee = int(tx_fee_rate * vsize // 1000)
+        pay_fee = round(tx_fee_rate * vsize / 1000)
         tx.vout[0].nValue = locked_coin - pay_fee
 
         tx.rehash()
@@ -624,7 +624,7 @@ class BTCInterface(CoinInterface):
         dummy_witness_stack = self.getScriptLockRefundSwipeTxDummyWitness(script_lock_refund)
         witness_bytes = self.getWitnessStackSerialisedLength(dummy_witness_stack)
         vsize = self.getTxVSize(tx, add_witness_bytes=witness_bytes)
-        pay_fee = int(tx_fee_rate * vsize // 1000)
+        pay_fee = round(tx_fee_rate * vsize / 1000)
         tx.vout[0].nValue = locked_coin - pay_fee
 
         tx.rehash()
@@ -633,7 +633,7 @@ class BTCInterface(CoinInterface):
 
         return tx.serialize()
 
-    def createSCLockSpendTx(self, tx_lock_bytes, script_lock, pkh_dest, tx_fee_rate, vkbv=None):
+    def createSCLockSpendTx(self, tx_lock_bytes, script_lock, pkh_dest, tx_fee_rate, vkbv=None, fee_info={}):
         tx_lock = self.loadTx(tx_lock_bytes)
         output_script = self.getScriptDest(script_lock)
         locked_n = findOutput(tx_lock, output_script)
@@ -653,8 +653,13 @@ class BTCInterface(CoinInterface):
         dummy_witness_stack = self.getScriptLockTxDummyWitness(script_lock)
         witness_bytes = self.getWitnessStackSerialisedLength(dummy_witness_stack)
         vsize = self.getTxVSize(tx, add_witness_bytes=witness_bytes)
-        pay_fee = int(tx_fee_rate * vsize // 1000)
+        pay_fee = round(tx_fee_rate * vsize / 1000)
         tx.vout[0].nValue = locked_coin - pay_fee
+
+        fee_info['fee_paid'] = pay_fee
+        fee_info['rate_used'] = tx_fee_rate
+        fee_info['witness_bytes'] = witness_bytes
+        fee_info['vsize'] = vsize
 
         tx.rehash()
         self._log.info('createSCLockSpendTx %s:\n    fee_rate, vsize, fee: %ld, %ld, %ld.',
@@ -1070,7 +1075,7 @@ class BTCInterface(CoinInterface):
     def getBLockSpendTxFee(self, tx, fee_rate: int) -> int:
         witness_bytes = 109
         vsize = self.getTxVSize(tx, add_witness_bytes=witness_bytes)
-        pay_fee = int(fee_rate * vsize // 1000)
+        pay_fee = round(fee_rate * vsize / 1000)
         self._log.info(f'BLockSpendTx  fee_rate, vsize, fee: {fee_rate}, {vsize}, {pay_fee}.')
         return pay_fee
 
@@ -1244,37 +1249,37 @@ class BTCInterface(CoinInterface):
         # Only one prevout exists
         return 0
 
-    def getScriptLockTxDummyWitness(self, script):
+    def getScriptLockTxDummyWitness(self, script: bytes):
         return [
-            b''.hex(),
-            bytes(72).hex(),
-            bytes(72).hex(),
-            bytes(len(script)).hex()
+            b'',
+            bytes(72),
+            bytes(72),
+            bytes(len(script))
         ]
 
-    def getScriptLockRefundSpendTxDummyWitness(self, script):
+    def getScriptLockRefundSpendTxDummyWitness(self, script: bytes):
         return [
-            b''.hex(),
-            bytes(72).hex(),
-            bytes(72).hex(),
-            bytes((1,)).hex(),
-            bytes(len(script)).hex()
+            b'',
+            bytes(72),
+            bytes(72),
+            bytes((1,)),
+            bytes(len(script))
         ]
 
-    def getScriptLockRefundSwipeTxDummyWitness(self, script):
+    def getScriptLockRefundSwipeTxDummyWitness(self, script: bytes):
         return [
-            bytes(72).hex(),
-            b''.hex(),
-            bytes(len(script)).hex()
+            bytes(72),
+            b'',
+            bytes(len(script))
         ]
 
     def getWitnessStackSerialisedLength(self, witness_stack):
         length = getCompactSizeLen(len(witness_stack))
         for e in witness_stack:
-            length += getWitnessElementLen(len(e) // 2)  # hex -> bytes
+            length += getWitnessElementLen(len(e))
 
         # See core SerializeTransaction
-        length += 32 + 4 + 1 + 4  # vinDummy
+        length += 1  # vinDummy
         length += 1  # flags
         return length
 
