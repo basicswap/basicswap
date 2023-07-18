@@ -143,6 +143,15 @@ class TestFunctions(BaseTest):
         offer = swap_clients[id_bidder].listOffers(filters={'offer_id': offer_id})[0]
         assert (offer.offer_id == offer_id)
 
+        post_json = {'with_extra_info': True}
+        offer0 = read_json_api(1800, f'offers/{offer_id.hex()}', post_json)[0]
+        offer1 = read_json_api(1800, f'offers/{offer_id.hex()}', post_json)[0]
+        from basicswap.util import dumpj
+        logging.info('offer0 {} '.format(dumpj(offer0)))
+        logging.info('offer1 {} '.format(dumpj(offer1)))
+        assert ('lock_time_1' in offer0)
+        assert ('lock_time_1' in offer1)
+
         bid_id = swap_clients[1].postXmrBid(offer_id, offer.amount_from)
 
         wait_for_bid(test_delay_event, swap_clients[id_offerer], bid_id, BidStates.BID_RECEIVED)
@@ -206,6 +215,27 @@ class TestFunctions(BaseTest):
         split_msgs: int = 2 if (ci_from.curve_type() != Curves.secp256k1 or ci_to.curve_type() != Curves.secp256k1) else 0
         assert (node0_sent_messages == (3 + split_msgs if reverse_bid else 4 + split_msgs))
         assert (node1_sent_messages == (4 + split_msgs if reverse_bid else 2 + split_msgs))
+
+        post_json = {'show_extra': True}
+        bid0 = read_json_api(1800, f'bids/{bid_id.hex()}', post_json)
+        bid1 = read_json_api(1801, f'bids/{bid_id.hex()}', post_json)
+        logging.info('bid0 {} '.format(dumpj(bid0)))
+        logging.info('bid1 {} '.format(dumpj(bid1)))
+
+        chain_a_lock_txid = None
+        chain_b_lock_txid = None
+        for tx in bid0['txns']:
+            if tx['type'] == 'Chain A Lock Spend':
+                chain_a_lock_txid = tx['txid']
+            elif tx['type'] == 'Chain B Lock Spend':
+                chain_b_lock_txid = tx['txid']
+        for tx in bid1['txns']:
+            if not chain_a_lock_txid and tx['type'] == 'Chain A Lock Spend':
+                chain_a_lock_txid = tx['txid']
+            elif not chain_b_lock_txid and tx['type'] == 'Chain B Lock Spend':
+                chain_b_lock_txid = tx['txid']
+        assert (chain_a_lock_txid is not None)
+        assert (chain_b_lock_txid is not None)
 
     def do_test_02_leader_recover_a_lock_tx(self, coin_from: Coins, coin_to: Coins) -> None:
         logging.info('---------- Test {} to {} leader recovers coin a lock tx'.format(coin_from.name, coin_to.name))
@@ -655,6 +685,27 @@ class BasicSwapTest(TestFunctions):
 
         assert (vsize_actual <= vsize_estimated and vsize_estimated - vsize_actual < 4)
         assert (self.callnoderpc('sendrawtransaction', [lock_spend_tx.hex()]) == txid)
+
+        expect_vsize: int = ci.xmr_swap_a_lock_spend_tx_vsize()
+        assert (expect_vsize >= vsize_actual)
+        assert (expect_vsize - vsize_actual < 10)
+
+        # Test chain b (no-script) lock tx size
+        v = ci.getNewSecretKey()
+        s = ci.getNewSecretKey()
+        S = ci.getPubkey(s)
+        lock_tx_b_txid = ci.publishBLockTx(v, S, amount, fee_rate)
+
+        addr_out = ci.getNewAddress(True)
+        lock_tx_b_spend_txid = ci.spendBLockTx(lock_tx_b_txid, addr_out, v, s, amount, fee_rate, 0)
+        lock_tx_b_spend = ci.getTransaction(lock_tx_b_spend_txid)
+        if lock_tx_b_spend is None:
+            lock_tx_b_spend = ci.getWalletTransaction(lock_tx_b_spend_txid)
+        lock_tx_b_spend_decoded = self.callnoderpc('decoderawtransaction', [lock_tx_b_spend.hex()])
+
+        expect_vsize: int = ci.xmr_swap_b_lock_spend_tx_vsize()
+        assert (expect_vsize >= lock_tx_b_spend_decoded['vsize'])
+        assert (expect_vsize - lock_tx_b_spend_decoded['vsize'] < 10)
 
     def test_01_a_full_swap(self):
         if not self.has_segwit:

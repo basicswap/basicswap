@@ -69,6 +69,7 @@ To instead use Monero public nodes and not run a local Monero daemon<br>(it can 
 
 
 **Record the mnemonic from the output of the above command.**
+**Mnemonics should be stored encrypted and/or air-gapped.**
 And the output of `echo $CURRENT_XMR_HEIGHT` for use if you need to later restore your wallet.
 
 #### Make COINDATA_PATH permanent (optional):

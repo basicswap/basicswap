@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2021-2022 tecnovert
+# Copyright (c) 2021-2023 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -66,7 +66,6 @@ class Test(BaseTest):
         logging.info('Waiting for blind balance')
         wait_for_balance(test_delay_event, 'http://127.0.0.1:1800/json/wallets/part', 'blind_balance', 100.0 + node0_blind_before)
         js_0 = read_json_api(1800, 'wallets/part')
-        node0_blind_before = js_0['blind_balance'] + js_0['blind_unconfirmed']
 
     def ensure_balance(self, coin_type, node_id, amount):
         tla = 'PART'
@@ -88,6 +87,122 @@ class Test(BaseTest):
 
     def getXmrBalance(self, js_wallets):
         return float(js_wallets[Coins.XMR.name]['unconfirmed']) + float(js_wallets[Coins.XMR.name]['balance'])
+
+    def test_010_txn_size(self):
+        logging.info('---------- Test {} txn_size'.format(self.test_coin_from.name))
+
+        self.ensure_balance(self.test_coin_from, 0, 100.0)
+
+        swap_clients = self.swap_clients
+        ci = swap_clients[0].ci(self.test_coin_from)
+        pi = swap_clients[0].pi(SwapTypes.XMR_SWAP)
+
+        def wait_for_unspents(delay_event, iterations=20, delay_time=0.5):
+            nonlocal ci
+            i = 0
+            while not delay_event.is_set():
+                unspents = ci.rpc_callback('listunspentblind')
+                if len(unspents) >= 1:
+                    return
+                delay_event.wait(delay_time)
+                i += 1
+                if i > iterations:
+                    raise ValueError('wait_for_unspents timed out')
+        wait_for_unspents(test_delay_event)
+
+        amount: int = ci.make_int(random.uniform(0.1, 2.0), r=1)
+
+        # Record unspents before createSCLockTx as the used ones will be locked
+        unspents = ci.rpc_callback('listunspentblind')
+        locked_utxos_before = ci.rpc_callback('listlockunspent')
+
+        # fee_rate is in sats/kvB
+        fee_rate: int = 1000
+
+        vkbv = ci.getNewSecretKey()
+        a = ci.getNewSecretKey()
+        b = ci.getNewSecretKey()
+
+        A = ci.getPubkey(a)
+        B = ci.getPubkey(b)
+        lock_tx_script = pi.genScriptLockTxScript(ci, A, B)
+
+        lock_tx = ci.createSCLockTx(amount, lock_tx_script, vkbv)
+        lock_tx = ci.fundSCLockTx(lock_tx, fee_rate, vkbv)
+        lock_tx = ci.signTxWithWallet(lock_tx)
+
+        unspents_after = ci.rpc_callback('listunspentblind')
+        locked_utxos_after = ci.rpc_callback('listlockunspent')
+
+        assert (len(unspents) > len(unspents_after))
+        assert (len(locked_utxos_after) > len(locked_utxos_before))
+        lock_tx_decoded = ci.rpc_callback('decoderawtransaction', [lock_tx.hex()])
+        txid = lock_tx_decoded['txid']
+
+        vsize = lock_tx_decoded['vsize']
+        expect_fee_int = round(fee_rate * vsize / 1000)
+        expect_fee = ci.format_amount(expect_fee_int)
+
+        ci.rpc_callback('sendrawtransaction', [lock_tx.hex()])
+        rv = ci.rpc_callback('gettransaction', [txid])
+        wallet_tx_fee = -ci.make_int(rv['details'][0]['fee'])
+
+        assert (wallet_tx_fee >= expect_fee_int)
+        assert (wallet_tx_fee - expect_fee_int < 20)
+
+        addr_out = ci.getNewAddress(True)
+        addrinfo = ci.rpc_callback('getaddressinfo', [addr_out,])
+        pk_out = bytes.fromhex(addrinfo['pubkey'])
+        fee_info = {}
+        lock_spend_tx = ci.createSCLockSpendTx(lock_tx, lock_tx_script, pk_out, fee_rate, vkbv, fee_info=fee_info)
+        vsize_estimated: int = fee_info['vsize']
+
+        spend_tx_decoded = ci.rpc_callback('decoderawtransaction', [lock_spend_tx.hex()])
+        txid = spend_tx_decoded['txid']
+
+        nonce = ci.getScriptLockTxNonce(vkbv)
+        output_n, _ = ci.findOutputByNonce(lock_tx_decoded, nonce)
+        assert (output_n is not None)
+        valueCommitment = bytes.fromhex(lock_tx_decoded['vout'][output_n]['valueCommitment'])
+
+        witness_stack = [
+            b'',
+            ci.signTx(a, lock_spend_tx, 0, lock_tx_script, valueCommitment),
+            ci.signTx(b, lock_spend_tx, 0, lock_tx_script, valueCommitment),
+            lock_tx_script,
+        ]
+        lock_spend_tx = ci.setTxSignature(lock_spend_tx, witness_stack)
+        tx_decoded = ci.rpc_callback('decoderawtransaction', [lock_spend_tx.hex()])
+        vsize_actual: int = tx_decoded['vsize']
+
+        # Note: The fee is set allowing 9 bytes for the encoded fee amount, causing a small overestimate
+        assert (vsize_actual <= vsize_estimated and vsize_estimated - vsize_actual < 10)
+        assert (ci.rpc_callback('sendrawtransaction', [lock_spend_tx.hex()]) == txid)
+
+        # Test chain b (no-script) lock tx size
+        v = ci.getNewSecretKey()
+        s = ci.getNewSecretKey()
+        S = ci.getPubkey(s)
+        lock_tx_b_txid = ci.publishBLockTx(v, S, amount, fee_rate)
+
+        addr_out = ci.getNewStealthAddress()
+        lock_tx_b_spend_txid = None
+        for i in range(20):
+            try:
+                lock_tx_b_spend_txid = ci.spendBLockTx(lock_tx_b_txid, addr_out, v, s, amount, fee_rate, 0)
+                break
+            except Exception as e:
+                print('spendBLockTx failed', str(e))
+            test_delay_event.wait(2)
+        assert (lock_tx_b_spend_txid is not None)
+        lock_tx_b_spend = ci.getTransaction(lock_tx_b_spend_txid)
+        if lock_tx_b_spend is None:
+            lock_tx_b_spend = ci.getWalletTransaction(lock_tx_b_spend_txid)
+        lock_tx_b_spend_decoded = ci.rpc_callback('decoderawtransaction', [lock_tx_b_spend.hex()])
+
+        expect_vsize: int = ci.xmr_swap_b_lock_spend_tx_vsize()
+        assert (expect_vsize >= lock_tx_b_spend_decoded['vsize'])
+        assert (expect_vsize - lock_tx_b_spend_decoded['vsize'] < 10)
 
     def test_01_part_xmr(self):
         logging.info('---------- Test PARTct to XMR')

@@ -203,6 +203,18 @@ def js_offers(self, url_split, post_string, is_json, sent=False) -> bytes:
         if with_extra_info:
             offer_data['amount_negotiable'] = o.amount_negotiable
             offer_data['rate_negotiable'] = o.rate_negotiable
+
+            if o.swap_type == SwapTypes.XMR_SWAP:
+                _, xmr_offer = swap_client.getXmrOffer(o.offer_id)
+                offer_data['lock_time_1'] = xmr_offer.lock_time_1
+                offer_data['lock_time_2'] = xmr_offer.lock_time_2
+
+                offer_data['feerate_from'] = xmr_offer.a_fee_rate
+                offer_data['feerate_to'] = xmr_offer.b_fee_rate
+            else:
+                offer_data['feerate_from'] = o.from_feerate
+                offer_data['feerate_to'] = o.to_feerate
+
         rv.append(offer_data)
     return bytes(json.dumps(rv), 'UTF-8')
 

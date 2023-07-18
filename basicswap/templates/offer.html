@@ -420,7 +420,7 @@
        </thead>
        <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600 h-20">
         <td class="py-3 px-6">Amount you will get <span class="bold" id="bid_amt_from">{{ data.amt_from }}</span> {{ data.tla_from }}
-        {% if data.xmr_type == true %} (excluding {{ data.amt_from_lock_spend_tx_fee }} {{ data.tla_from }} in tx fees).
+        {% if data.xmr_type == true %} (excluding estimated {{ data.amt_from_lock_spend_tx_fee }} {{ data.tla_from }} in tx fees).
         {% else %} (excluding a tx fee).
         {% endif %}</td>
         <td class="py-3 px-6">Amount you will send <span class="bold" id="bid_amt_to">{{ data.amt_to }}</span> {{ data.tla_to }}

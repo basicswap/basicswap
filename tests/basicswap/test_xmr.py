@@ -669,6 +669,130 @@ class Test(BaseTest):
     def notest_00_delay(self):
         test_delay_event.wait(100000)
 
+    def test_010_txn_size(self):
+        logging.info('---------- Test {} txn_size'.format(Coins.PART))
+
+        swap_clients = self.swap_clients
+        ci = swap_clients[0].ci(Coins.PART)
+        pi = swap_clients[0].pi(SwapTypes.XMR_SWAP)
+
+        amount: int = ci.make_int(random.uniform(0.1, 2.0), r=1)
+
+        # Record unspents before createSCLockTx as the used ones will be locked
+        unspents = ci.rpc_callback('listunspent')
+
+        # fee_rate is in sats/kvB
+        fee_rate: int = 1000
+
+        a = ci.getNewSecretKey()
+        b = ci.getNewSecretKey()
+
+        A = ci.getPubkey(a)
+        B = ci.getPubkey(b)
+        lock_tx_script = pi.genScriptLockTxScript(ci, A, B)
+
+        lock_tx = ci.createSCLockTx(amount, lock_tx_script)
+        lock_tx = ci.fundSCLockTx(lock_tx, fee_rate)
+        lock_tx = ci.signTxWithWallet(lock_tx)
+
+        unspents_after = ci.rpc_callback('listunspent')
+        assert (len(unspents) > len(unspents_after))
+
+        tx_decoded = ci.rpc_callback('decoderawtransaction', [lock_tx.hex()])
+        txid = tx_decoded['txid']
+
+        vsize = tx_decoded['vsize']
+        expect_fee_int = round(fee_rate * vsize / 1000)
+        expect_fee = ci.format_amount(expect_fee_int)
+
+        out_value: int = 0
+        for txo in tx_decoded['vout']:
+            if 'value' in txo:
+                out_value += ci.make_int(txo['value'])
+        in_value: int = 0
+        for txi in tx_decoded['vin']:
+            for utxo in unspents:
+                if 'vout' not in utxo:
+                    continue
+                if utxo['txid'] == txi['txid'] and utxo['vout'] == txi['vout']:
+                    in_value += ci.make_int(utxo['amount'])
+                    break
+        fee_value = in_value - out_value
+
+        ci.rpc_callback('sendrawtransaction', [lock_tx.hex()])
+        rv = ci.rpc_callback('gettransaction', [txid])
+        wallet_tx_fee = -ci.make_int(rv['fee'])
+
+        assert (wallet_tx_fee == fee_value)
+        assert (wallet_tx_fee == expect_fee_int)
+
+        addr_out = ci.getNewAddress(True)
+        pkh_out = ci.decodeAddress(addr_out)
+        fee_info = {}
+        lock_spend_tx = ci.createSCLockSpendTx(lock_tx, lock_tx_script, pkh_out, fee_rate, fee_info=fee_info)
+        vsize_estimated: int = fee_info['vsize']
+
+        tx_decoded = ci.rpc_callback('decoderawtransaction', [lock_spend_tx.hex()])
+        txid = tx_decoded['txid']
+
+        witness_stack = [
+            b'',
+            ci.signTx(a, lock_spend_tx, 0, lock_tx_script, amount),
+            ci.signTx(b, lock_spend_tx, 0, lock_tx_script, amount),
+            lock_tx_script,
+        ]
+        lock_spend_tx = ci.setTxSignature(lock_spend_tx, witness_stack)
+        tx_decoded = ci.rpc_callback('decoderawtransaction', [lock_spend_tx.hex()])
+        vsize_actual: int = tx_decoded['vsize']
+
+        assert (vsize_actual <= vsize_estimated and vsize_estimated - vsize_actual < 4)
+        assert (ci.rpc_callback('sendrawtransaction', [lock_spend_tx.hex()]) == txid)
+
+        expect_vsize: int = ci.xmr_swap_a_lock_spend_tx_vsize()
+        assert (expect_vsize >= vsize_actual)
+        assert (expect_vsize - vsize_actual < 10)
+
+        # Test chain b (no-script) lock tx size
+        v = ci.getNewSecretKey()
+        s = ci.getNewSecretKey()
+        S = ci.getPubkey(s)
+        lock_tx_b_txid = ci.publishBLockTx(v, S, amount, fee_rate)
+
+        addr_out = ci.getNewAddress(True)
+        lock_tx_b_spend_txid = ci.spendBLockTx(lock_tx_b_txid, addr_out, v, s, amount, fee_rate, 0)
+        lock_tx_b_spend = ci.getTransaction(lock_tx_b_spend_txid)
+        if lock_tx_b_spend is None:
+            lock_tx_b_spend = ci.getWalletTransaction(lock_tx_b_spend_txid)
+        lock_tx_b_spend_decoded = ci.rpc_callback('decoderawtransaction', [lock_tx_b_spend.hex()])
+
+        expect_vsize: int = ci.xmr_swap_b_lock_spend_tx_vsize()
+        assert (expect_vsize >= lock_tx_b_spend_decoded['vsize'])
+        assert (expect_vsize - lock_tx_b_spend_decoded['vsize'] < 10)
+
+    def test_010_xmr_txn_size(self):
+        logging.info('---------- Test {} txn_size'.format(Coins.XMR))
+
+        swap_clients = self.swap_clients
+        ci = swap_clients[1].ci(Coins.XMR)
+        pi = swap_clients[1].pi(SwapTypes.XMR_SWAP)
+
+        amount: int = ci.make_int(random.uniform(0.1, 2.0), r=1)
+        fee_rate: int = 1000  # TODO: How to set feerate for rpc functions?
+
+        v = ci.getNewSecretKey()
+        s = ci.getNewSecretKey()
+        S = ci.getPubkey(s)
+        lock_tx_b_txid = ci.publishBLockTx(v, S, amount, fee_rate)
+
+        addr_out = ci.getNewAddress(True)
+        lock_tx_b_spend_txid = ci.spendBLockTx(lock_tx_b_txid, addr_out, v, s, amount, fee_rate, 0)
+        lock_tx_b_spend = ci.getTransaction(lock_tx_b_spend_txid)
+
+        actual_size: int = len(lock_tx_b_spend['txs_as_hex'][0]) // 2
+        expect_size: int = ci.xmr_swap_b_lock_spend_tx_vsize()
+        assert (expect_size >= actual_size)
+        assert (expect_size - actual_size < 10)
+
     def test_01_part_xmr(self):
         logging.info('---------- Test PART to XMR')
         swap_clients = self.swap_clients
@@ -1196,6 +1320,36 @@ class Test(BaseTest):
 
         js_0 = read_json_api(1800, 'wallets/part')
         assert (js_0['anon_balance'] + js_0['anon_pending'] > node0_anon_before + (amount_to - 0.05))
+
+        # Test chain b (no-script) lock tx size
+        ci = swap_clients[1].ci(Coins.PART_ANON)
+        pi = swap_clients[1].pi(SwapTypes.XMR_SWAP)
+        amount: int = ci.make_int(random.uniform(0.1, 2.0), r=1)
+        fee_rate: int = 1000
+        v = ci.getNewSecretKey()
+        s = ci.getNewSecretKey()
+        S = ci.getPubkey(s)
+        lock_tx_b_txid = ci.publishBLockTx(v, S, amount, fee_rate)
+
+        addr_out = ci.getNewStealthAddress()
+        lock_tx_b_spend_txid = None
+        for i in range(20):
+            try:
+                lock_tx_b_spend_txid = ci.spendBLockTx(lock_tx_b_txid, addr_out, v, s, amount, fee_rate, 0)
+                break
+            except Exception as e:
+                print('spendBLockTx failed', str(e))
+            test_delay_event.wait(2)
+        assert (lock_tx_b_spend_txid is not None)
+
+        lock_tx_b_spend = ci.getTransaction(lock_tx_b_spend_txid)
+        if lock_tx_b_spend is None:
+            lock_tx_b_spend = ci.getWalletTransaction(lock_tx_b_spend_txid)
+        lock_tx_b_spend_decoded = ci.rpc_callback('decoderawtransaction', [lock_tx_b_spend.hex()])
+
+        expect_vsize: int = ci.xmr_swap_b_lock_spend_tx_vsize()
+        assert (expect_vsize >= lock_tx_b_spend_decoded['vsize'])
+        assert (expect_vsize - lock_tx_b_spend_decoded['vsize'] < 10)
 
     def test_12_particl_blind(self):
         logging.info('---------- Test Particl blind transactions')

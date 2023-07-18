@@ -119,7 +119,7 @@ class FIROInterface(BTCInterface):
 
         return rv
 
-    def createSCLockTx(self, value: int, script: bytearray, vkbv=None) -> bytes:
+    def createSCLockTx(self, value: int, script: bytearray, vkbv: bytes = None) -> bytes:
         tx = CTransaction()
         tx.nVersion = self.txVersion()
         tx.vout.append(self.txoType()(value, self.getScriptDest(script)))

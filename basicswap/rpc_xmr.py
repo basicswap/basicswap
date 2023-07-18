@@ -37,11 +37,14 @@ class JsonrpcDigest():
         self.__verbose = verbose
         self.__allow_none = allow_none
 
-        self.__request_id = 1
+        self.__request_id = 0
 
     def close(self):
         if self.__transport is not None:
             self.__transport.close()
+
+    def request_id(self):
+        return self.__request_id
 
     def post_request(self, method, params, timeout=None):
         try:
@@ -66,7 +69,7 @@ class JsonrpcDigest():
             self.__transport.close()
             raise
 
-    def json_request(self, method, params, username='', password='', timeout=None):
+    def json_request(self, request_body, username='', password='', timeout=None):
         try:
             connection = self.__transport.make_connection(self.__host)
             if timeout:
@@ -74,18 +77,11 @@ class JsonrpcDigest():
 
             headers = self.__transport._extra_headers[:]
 
-            request_body = {
-                'method': method,
-                'params': params,
-                'jsonrpc': '2.0',
-                'id': self.__request_id
-            }
-
             connection.putrequest('POST', self.__handler)
             headers.append(('Content-Type', 'application/json'))
             headers.append(('Connection', 'keep-alive'))
             self.__transport.send_headers(connection, headers)
-            self.__transport.send_content(connection, json.dumps(request_body, default=jsonDecimal).encode('utf-8'))
+            self.__transport.send_content(connection, json.dumps(request_body, default=jsonDecimal).encode('utf-8') if request_body else '')
             resp = connection.getresponse()
 
             if resp.status == 401:
@@ -135,18 +131,11 @@ class JsonrpcDigest():
                 headers = self.__transport._extra_headers[:]
                 headers.append(('Authorization', header_value))
 
-                request_body = {
-                    'method': method,
-                    'params': params,
-                    'jsonrpc': '2.0',
-                    'id': self.__request_id
-                }
-
                 connection.putrequest('POST', self.__handler)
                 headers.append(('Content-Type', 'application/json'))
                 headers.append(('Connection', 'keep-alive'))
                 self.__transport.send_headers(connection, headers)
-                self.__transport.send_content(connection, json.dumps(request_body, default=jsonDecimal).encode('utf-8'))
+                self.__transport.send_content(connection, json.dumps(request_body, default=jsonDecimal).encode('utf-8') if request_body else '')
                 resp = connection.getresponse()
 
             self.__request_id += 1
@@ -168,10 +157,16 @@ def callrpc_xmr(rpc_port, method, params=[], rpc_host='127.0.0.1', path='json_rp
             url = 'http://{}:{}/{}'.format(rpc_host, rpc_port, path)
 
         x = JsonrpcDigest(url)
+        request_body = {
+            'method': method,
+            'params': params,
+            'jsonrpc': '2.0',
+            'id': x.request_id()
+        }
         if auth:
-            v = x.json_request(method, params, username=auth[0], password=auth[1], timeout=timeout)
+            v = x.json_request(request_body, username=auth[0], password=auth[1], timeout=timeout)
         else:
-            v = x.json_request(method, params, timeout=timeout)
+            v = x.json_request(request_body, timeout=timeout)
         x.close()
         r = json.loads(v.decode('utf-8'))
     except Exception as ex:
@@ -183,7 +178,7 @@ def callrpc_xmr(rpc_port, method, params=[], rpc_host='127.0.0.1', path='json_rp
     return r['result']
 
 
-def callrpc_xmr2(rpc_port, method, params=None, auth=None, rpc_host='127.0.0.1', timeout=120):
+def callrpc_xmr2(rpc_port: int, method: str, params=None, auth=None, rpc_host='127.0.0.1', timeout=120):
     try:
         if rpc_host.count('://') > 0:
             url = '{}:{}/{}'.format(rpc_host, rpc_port, method)
@@ -192,9 +187,9 @@ def callrpc_xmr2(rpc_port, method, params=None, auth=None, rpc_host='127.0.0.1',
 
         x = JsonrpcDigest(url)
         if auth:
-            v = x.json_request(method, params, username=auth[0], password=auth[1], timeout=timeout)
+            v = x.json_request(params, username=auth[0], password=auth[1], timeout=timeout)
         else:
-            v = x.json_request(method, params, timeout=timeout)
+            v = x.json_request(params, timeout=timeout)
         x.close()
         r = json.loads(v.decode('utf-8'))
     except Exception as ex:

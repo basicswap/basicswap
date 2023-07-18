@@ -59,8 +59,12 @@ class PARTInterface(BTCInterface):
         return 0xa0
 
     @staticmethod
-    def xmr_swap_alock_spend_tx_vsize() -> int:
-        return 213
+    def xmr_swap_a_lock_spend_tx_vsize() -> int:
+        return 200
+
+    @staticmethod
+    def xmr_swap_b_lock_spend_tx_vsize() -> int:
+        return 138
 
     @staticmethod
     def txoType():
@@ -111,8 +115,8 @@ class PARTInterface(BTCInterface):
 
         return encodeStealthAddress(prefix_byte, scan_pubkey, spend_pubkey)
 
-    def getWitnessStackSerialisedLength(self, witness_stack):
-        length = getCompactSizeLen(len(witness_stack))
+    def getWitnessStackSerialisedLength(self, witness_stack) -> int:
+        length: int = getCompactSizeLen(len(witness_stack))
         for e in witness_stack:
             length += getWitnessElementLen(len(e))
         return length
@@ -138,7 +142,15 @@ class PARTInterfaceBlind(PARTInterface):
     def balance_type():
         return BalanceTypes.BLIND
 
-    def coin_name(self):
+    @staticmethod
+    def xmr_swap_a_lock_spend_tx_vsize() -> int:
+        return 1032
+
+    @staticmethod
+    def xmr_swap_b_lock_spend_tx_vsize() -> int:
+        return 980
+
+    def coin_name(self) -> str:
         return super().coin_name() + ' Blind'
 
     def getScriptLockTxNonce(self, data):
@@ -167,7 +179,7 @@ class PARTInterfaceBlind(PARTInterface):
             ensure(v['result'] is True, 'verifycommitment failed')
         return output_n, blinded_info
 
-    def createSCLockTx(self, value: int, script: bytearray, vkbv) -> bytes:
+    def createSCLockTx(self, value: int, script: bytearray, vkbv: bytes) -> bytes:
 
         # Nonce is derived from vkbv, ephemeral_key isn't used
         ephemeral_key = self.getNewSecretKey()
@@ -183,7 +195,7 @@ class PARTInterfaceBlind(PARTInterface):
         tx_bytes = bytes.fromhex(rv['hex'])
         return tx_bytes
 
-    def fundSCLockTx(self, tx_bytes, feerate, vkbv):
+    def fundSCLockTx(self, tx_bytes: bytes, feerate: int, vkbv: bytes) -> bytes:
         feerate_str = self.format_amount(feerate)
         # TODO: unlock unspents if bid cancelled
 
@@ -462,7 +474,7 @@ class PARTInterfaceBlind(PARTInterface):
         ensure(output_n is not None, 'Output not found in tx')
         return output_n
 
-    def createSCLockSpendTx(self, tx_lock_bytes, script_lock, pk_dest, tx_fee_rate, vkbv):
+    def createSCLockSpendTx(self, tx_lock_bytes: bytes, script_lock: bytes, pk_dest: bytes, tx_fee_rate: int, vkbv: bytes, fee_info={}) -> bytes:
         lock_tx_obj = self.rpc_callback('decoderawtransaction', [tx_lock_bytes.hex()])
         lock_txid_hex = lock_tx_obj['txid']
 
@@ -499,12 +511,19 @@ class PARTInterfaceBlind(PARTInterface):
         rv = self.rpc_callback('fundrawtransactionfrom', ['blind', lock_spend_tx_hex, inputs_info, outputs_info, options])
         lock_spend_tx_hex = rv['hex']
         lock_spend_tx_obj = self.rpc_callback('decoderawtransaction', [lock_spend_tx_hex])
-
-        vsize = lock_spend_tx_obj['vsize']
         pay_fee = make_int(lock_spend_tx_obj['vout'][0]['ct_fee'])
+
+        # lock_spend_tx_hex does not include the dummy witness stack
+        witness_bytes = self.getWitnessStackSerialisedLength(dummy_witness_stack)
+        vsize = self.getTxVSize(self.loadTx(bytes.fromhex(lock_spend_tx_hex)), add_witness_bytes=witness_bytes)
         actual_tx_fee_rate = pay_fee * 1000 // vsize
         self._log.info('createSCLockSpendTx %s:\n    fee_rate, vsize, fee: %ld, %ld, %ld.',
                        lock_spend_tx_obj['txid'], actual_tx_fee_rate, vsize, pay_fee)
+
+        fee_info['vsize'] = vsize
+        fee_info['fee_paid'] = pay_fee
+        fee_info['rate_input'] = tx_fee_rate
+        fee_info['rate_actual'] = actual_tx_fee_rate
 
         return bytes.fromhex(lock_spend_tx_hex)
 
@@ -629,7 +648,7 @@ class PARTInterfaceBlind(PARTInterface):
     def getSpendableBalance(self) -> int:
         return self.make_int(self.rpc_callback('getbalances')['mine']['blind_trusted'])
 
-    def publishBLockTx(self, vkbv, Kbs, output_amount, feerate, delay_for: int = 10, unlock_time: int = 0) -> bytes:
+    def publishBLockTx(self, vkbv: bytes, Kbs: bytes, output_amount: int, feerate: int, delay_for: int = 10, unlock_time: int = 0) -> bytes:
         Kbv = self.getPubkey(vkbv)
         sx_addr = self.formatStealthAddress(Kbv, Kbs)
         self._log.debug('sx_addr: {}'.format(sx_addr))
@@ -752,13 +771,22 @@ class PARTInterfaceAnon(PARTInterface):
         return BalanceTypes.ANON
 
     @staticmethod
+    def xmr_swap_a_lock_spend_tx_vsize() -> int:
+        raise ValueError('Not possible')
+
+    @staticmethod
+    def xmr_swap_b_lock_spend_tx_vsize() -> int:
+        # TODO: Estimate with ringsize
+        return 1153
+
+    @staticmethod
     def depth_spendable() -> int:
         return 12
 
-    def coin_name(self):
+    def coin_name(self) -> str:
         return super().coin_name() + ' Anon'
 
-    def publishBLockTx(self, kbv, Kbs, output_amount, feerate, delay_for: int = 10, unlock_time: int = 0) -> bytes:
+    def publishBLockTx(self, kbv: bytes, Kbs: bytes, output_amount: int, feerate: int, delay_for: int = 10, unlock_time: int = 0) -> bytes:
         Kbv = self.getPubkey(kbv)
         sx_addr = self.formatStealthAddress(Kbv, Kbs)
 

@@ -69,6 +69,15 @@ class XMRInterface(CoinInterface):
     def depth_spendable() -> int:
         return 10
 
+    @staticmethod
+    def xmr_swap_a_lock_spend_tx_vsize() -> int:
+        raise ValueError('Not possible')
+
+    @staticmethod
+    def xmr_swap_b_lock_spend_tx_vsize() -> int:
+        # TODO: Estimate with ringsize
+        return 1507
+
     def __init__(self, coin_settings, network, swap_client=None):
         super().__init__(network)
         daemon_login = None
@@ -266,7 +275,7 @@ class XMRInterface(CoinInterface):
     def encodeSharedAddress(self, Kbv: bytes, Kbs: bytes) -> str:
         return xmr_util.encode_address(Kbv, Kbs)
 
-    def publishBLockTx(self, kbv, Kbs, output_amount, feerate, delay_for: int = 10, unlock_time: int = 0) -> bytes:
+    def publishBLockTx(self, kbv: bytes, Kbs: bytes, output_amount: int, feerate: int, delay_for: int = 10, unlock_time: int = 0) -> bytes:
         with self._mx_wallet:
             self.openWallet(self._wallet_filename)
             self.rpc_wallet_cb('refresh')
@@ -368,7 +377,7 @@ class XMRInterface(CoinInterface):
 
             return None
 
-    def spendBLockTx(self, chain_b_lock_txid, address_to, kbv, kbs, cb_swap_value, b_fee_rate, restore_height, spend_actual_balance=False):
+    def spendBLockTx(self, chain_b_lock_txid: bytes, address_to: str, kbv: bytes, kbs: bytes, cb_swap_value: int, b_fee_rate: int, restore_height: int, spend_actual_balance: bool = False) -> bytes:
         '''
         Notes:
         "Error: No unlocked balance in the specified subaddress(es)" can mean not enough funds after tx fee.
@@ -520,6 +529,9 @@ class XMRInterface(CoinInterface):
         # TODO
         return True
 
-    def ensureFunds(self, amount):
+    def ensureFunds(self, amount: int) -> None:
         if self.getSpendableBalance() < amount:
             raise ValueError('Balance too low')
+
+    def getTransaction(self, txid: bytes):
+        return self.rpc_cb2('get_transactions', {'txs_hashes': [txid.hex(), ]})

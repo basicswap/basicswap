@@ -155,8 +155,12 @@ class BTCInterface(CoinInterface):
         return abs(a - b) < 20
 
     @staticmethod
-    def xmr_swap_alock_spend_tx_vsize() -> int:
+    def xmr_swap_a_lock_spend_tx_vsize() -> int:
         return 147
+
+    @staticmethod
+    def xmr_swap_b_lock_spend_tx_vsize() -> int:
+        return 110
 
     @staticmethod
     def txoType():
@@ -986,14 +990,14 @@ class BTCInterface(CoinInterface):
     def scanTxOutset(self, dest):
         return self.rpc_callback('scantxoutset', ['start', ['raw({})'.format(dest.hex())]])
 
-    def getTransaction(self, txid):
+    def getTransaction(self, txid: bytes):
         try:
             return bytes.fromhex(self.rpc_callback('getrawtransaction', [txid.hex()]))
         except Exception as ex:
             # TODO: filter errors
             return None
 
-    def getWalletTransaction(self, txid):
+    def getWalletTransaction(self, txid: bytes):
         try:
             return bytes.fromhex(self.rpc_callback('gettransaction', [txid.hex()]))
         except Exception as ex:
@@ -1460,7 +1464,7 @@ class BTCInterface(CoinInterface):
         tx.rehash()
         return tx.serialize().hex()
 
-    def ensureFunds(self, amount):
+    def ensureFunds(self, amount: int) -> None:
         if self.getSpendableBalance() < amount:
             raise ValueError('Balance too low')
 
