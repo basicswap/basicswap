@@ -3585,7 +3585,7 @@ class BasicSwap(BaseApp):
 
                         if was_received:
                             delay = random.randrange(self.min_delay_event, self.max_delay_event)
-                            self.log.info('Releasing xmr script coin lock tx for bid %s in %d seconds', bid_id.hex(), delay)
+                            self.log.info('Releasing ads script coin lock tx for bid %s in %d seconds', bid_id.hex(), delay)
                             self.createActionInSession(delay, ActionTypes.SEND_XMR_LOCK_RELEASE, bid_id, session)
 
                 if bid_changed:
@@ -6240,18 +6240,20 @@ class BasicSwap(BaseApp):
         now: int = self.getTime()
         q_str = '''SELECT
                    COUNT(CASE WHEN b.was_sent THEN 1 ELSE NULL END) AS count_sent,
-                   COUNT(CASE WHEN b.was_sent AND s.swap_ended = 0 AND b.expire_at > {} AND o.expire_at > {} THEN 1 ELSE NULL END) AS count_sent_active,
+                   COUNT(CASE WHEN b.was_sent AND (s.in_progress OR (s.swap_ended = 0 AND b.expire_at > {} AND o.expire_at > {})) THEN 1 ELSE NULL END) AS count_sent_active,
                    COUNT(CASE WHEN b.was_received THEN 1 ELSE NULL END) AS count_received,
-                   COUNT(CASE WHEN b.was_received AND b.state = {} AND b.expire_at > {} AND o.expire_at > {} THEN 1 ELSE NULL END) AS count_available
+                   COUNT(CASE WHEN b.was_received AND b.state = {} AND b.expire_at > {} AND o.expire_at > {} THEN 1 ELSE NULL END) AS count_available,
+                   COUNT(CASE WHEN b.was_received AND (s.in_progress OR (s.swap_ended = 0 AND b.expire_at > {} AND o.expire_at > {})) THEN 1 ELSE NULL END) AS count_recv_active
                    FROM bids b
                    JOIN offers o ON b.offer_id = o.offer_id
                    JOIN bidstates s ON b.state = s.state_id
-                   WHERE b.active_ind = 1'''.format(now, now, BidStates.BID_RECEIVED, now, now)
+                   WHERE b.active_ind = 1'''.format(now, now, BidStates.BID_RECEIVED, now, now, now, now)
         q = self.engine.execute(q_str).first()
         bids_sent = q[0]
         bids_sent_active = q[1]
         bids_received = q[2]
         bids_available = q[3]
+        bids_recv_active = q[4]
 
         q_str = '''SELECT
                    COUNT(CASE WHEN expire_at > {} THEN 1 ELSE NULL END) AS count_active,
@@ -6272,6 +6274,7 @@ class BasicSwap(BaseApp):
             'num_recv_bids': bids_received,
             'num_sent_bids': bids_sent,
             'num_sent_active_bids': bids_sent_active,
+            'num_recv_active_bids': bids_recv_active,
             'num_available_bids': bids_available,
             'num_watched_outputs': num_watched_outputs,
         }

@@ -585,7 +585,8 @@ def page_offer(self, url_split, post_string):
         'automation_strat_id': -1,
         'is_expired': offer.expire_at <= now,
         'active_ind': offer.active_ind,
-        'swap_type': strSwapDesc(offer.swap_type)
+        'swap_type': strSwapDesc(offer.swap_type),
+        'reverse': offer.bid_reversed
     }
     data.update(extend_data)
 
