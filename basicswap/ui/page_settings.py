@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2022 tecnovert
+# Copyright (c) 2022-2023 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -37,17 +37,17 @@ def page_settings(self, url_split, post_string):
                 data = {
                     'debug': toBool(get_data_entry(form_data, 'debugmode')),
                     'debug_ui': toBool(get_data_entry(form_data, 'debugui')),
+                    'expire_db_records': toBool(get_data_entry(form_data, 'expire_db_records')),
                 }
                 swap_client.editGeneralSettings(data)
-            if have_data_entry(form_data, 'apply_chart'):
+            elif have_data_entry(form_data, 'apply_chart'):
                 active_tab = 'general'
                 data = {
                     'show_chart': toBool(get_data_entry(form_data, 'showchart')),
                     'chart_api_key': html.unescape(get_data_entry_or(form_data, 'chartapikey', '')),
                 }
                 swap_client.editGeneralSettings(data)
-
-            if have_data_entry(form_data, 'apply_tor'):
+            elif have_data_entry(form_data, 'apply_tor'):
                 active_tab = 'tor'
                 # TODO: Detect if running in docker
                 raise ValueError('TODO: If running in docker see doc/tor.md to enable/disable tor.')
@@ -124,6 +124,7 @@ def page_settings(self, url_split, post_string):
     general_settings = {
         'debug': swap_client.debug,
         'debug_ui': swap_client.debug_ui,
+        'expire_db_records': swap_client._expire_db_records,
     }
     if 'chart_api_key_enc' in swap_client.settings:
         chart_api_key = html.escape(bytes.fromhex(swap_client.settings.get('chart_api_key_enc', '')).decode('utf-8'))

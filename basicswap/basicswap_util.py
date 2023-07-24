@@ -306,6 +306,8 @@ def strBidState(state):
         return 'Request sent'
     if state == BidStates.BID_REQUEST_ACCEPTED:
         return 'Request accepted'
+    if state == BidStates.BID_STATE_UNKNOWN:
+        return 'Unknown bid state'
 
     return 'Unknown' + ' ' + str(state)
 

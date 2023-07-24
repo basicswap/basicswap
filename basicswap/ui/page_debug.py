@@ -36,6 +36,7 @@ def page_debug(self, url_split, post_string):
 
         if have_data_entry(form_data, 'remove_expired'):
             try:
+                swap_client.log.warning('Removing expired data.')
                 remove_expired_data(swap_client)
                 messages.append('Done.')
             except Exception as e:

@@ -9,8 +9,7 @@ from .db import (
 )
 
 
-def remove_expired_data(self):
-    self.log.warning('Removing expired data')
+def remove_expired_data(self, time_offset: int = 0):
     now: int = self.getTime()
     try:
         session = self.openSession()
@@ -18,11 +17,11 @@ def remove_expired_data(self):
         active_bids_insert = self.activeBidsQueryStr(now, '', 'b2')
         query_str = f'''
                     SELECT o.offer_id FROM offers o
-                    WHERE o.expire_at <= :now AND 0 = (SELECT COUNT(*) FROM bids b2 WHERE b2.offer_id = o.offer_id AND {active_bids_insert})
+                    WHERE o.expire_at <= :expired_at AND 0 = (SELECT COUNT(*) FROM bids b2 WHERE b2.offer_id = o.offer_id AND {active_bids_insert})
                     '''
         num_offers = 0
         num_bids = 0
-        offer_rows = session.execute(query_str, {'now': now})
+        offer_rows = session.execute(query_str, {'expired_at': now - time_offset})
         for offer_row in offer_rows:
             num_offers += 1
             bid_rows = session.execute('SELECT bids.bid_id FROM bids WHERE bids.offer_id = :offer_id', {'offer_id': offer_row[0]})
@@ -48,9 +47,10 @@ def remove_expired_data(self):
             session.execute('DELETE FROM sentoffers WHERE sentoffers.offer_id = :offer_id', {'offer_id': offer_row[0]})
             session.execute('DELETE FROM actions WHERE actions.linked_id = :offer_id', {'offer_id': offer_row[0]})
             session.execute('DELETE FROM offers WHERE offers.offer_id = :offer_id', {'offer_id': offer_row[0]})
-            session.execute('DELETE FROM message_links WHERE linked_type = :type_ind AND linked_id = :linked_id', {'type_ind': int(Concepts.OFFER), 'offer_id': offer_row[0]})
+            session.execute('DELETE FROM message_links WHERE linked_type = :type_ind AND linked_id = :offer_id', {'type_ind': int(Concepts.OFFER), 'offer_id': offer_row[0]})
 
-        self.log.warning(f'Removed data for {num_offers} expired offers and {num_bids} bids.')
+        if num_offers > 0 or num_bids > 0:
+            self.log.info('Removed data for {} expired offer{} and {} bid{}.'.format(num_offers, 's' if num_offers != 1 else '', num_bids, 's' if num_bids != 1 else ''))
 
     finally:
         self.closeSession(session)

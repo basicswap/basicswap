@@ -832,6 +832,11 @@ class Test(BaseTest):
         assert (compare_bid_states(offerer_states, self.states_offerer[0]) is True)
         assert (compare_bid_states(bidder_states, self.states_bidder[0]) is True)
 
+        # Test remove_expired_data
+        remove_expired_data(swap_clients[0], -swap_clients[0]._expire_db_records_after * 2)
+        offers = swap_clients[0].listOffers(filters={'offer_id': offer_id})
+        assert (len(offers) == 0)
+
     def test_011_smsgaddresses(self):
         logging.info('---------- Test address management and private offers')
         swap_clients = self.swap_clients
@@ -1546,9 +1551,6 @@ class Test(BaseTest):
         finally:
             logging.info('Restoring XMR mining')
             pause_event.set()
-
-    def test_98_remove_expired_data(self):
-        remove_expired_data(self.swap_clients[0])
 
 
 if __name__ == '__main__':

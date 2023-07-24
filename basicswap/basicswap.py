@@ -150,7 +150,9 @@ from .basicswap_util import (
     VisibilityOverrideOptions,
     inactive_states,
 )
-
+from basicswap.db_util import (
+    remove_expired_data,
+)
 
 PROTOCOL_VERSION_SECRET_HASH = 1
 MINPROTO_VERSION_SECRET_HASH = 1
@@ -255,6 +257,8 @@ class BasicSwap(BaseApp):
         self._disabled_notification_types = self.settings.get('disabled_notification_types', [])
         self._keep_notifications = self.settings.get('keep_notifications', 50)
         self._show_notifications = self.settings.get('show_notifications', 10)
+        self._expire_db_records = self.settings.get('expire_db_records', False)
+        self._expire_db_records_after = self.settings.get('expire_db_records_after', 86400 * 7)  # Seconds
         self._notifications_cache = {}
         self._is_encrypted = None
         self._is_locked = None
@@ -4134,12 +4138,18 @@ class BasicSwap(BaseApp):
             if num_messages + num_removed > 0:
                 self.log.info('Expired {} / {} messages.'.format(num_removed, num_messages))
 
-            self.log.debug('TODO: Expire records from db')
-
         finally:
             if rpc_conn:
                 ci_part.close_rpc(rpc_conn)
             self.mxDB.release()
+
+    def expireDBRecords(self) -> None:
+        if self._is_locked is True:
+            self.log.debug('Not expiring database records while system locked')
+            return
+        if not self._expire_db_records:
+            return
+        remove_expired_data(self, self._expire_db_records_after)
 
     def checkAcceptedBids(self) -> None:
         # Check for bids stuck as accepted (not yet in-progress)
@@ -5969,6 +5979,7 @@ class BasicSwap(BaseApp):
 
             if now - self._last_checked_expired >= self.check_expired_seconds:
                 self.expireMessages()
+                self.expireDBRecords()
                 self.checkAcceptedBids()
                 self._last_checked_expired = now
 
@@ -6052,6 +6063,14 @@ class BasicSwap(BaseApp):
                 if settings_copy.get('debug_ui', False) != new_value:
                     self.debug_ui = new_value
                     settings_copy['debug_ui'] = new_value
+                    settings_changed = True
+
+            if 'expire_db_records' in data:
+                new_value = data['expire_db_records']
+                ensure(type(new_value) == bool, 'New expire_db_records value not boolean')
+                if settings_copy.get('expire_db_records', False) != new_value:
+                    self._expire_db_records = new_value
+                    settings_copy['expire_db_records'] = new_value
                     settings_changed = True
 
             if 'show_chart' in data:

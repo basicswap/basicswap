@@ -7,6 +7,9 @@
     enable offers from no-script coins to script coins.
 - smsg: Outbox messages are removed when expired.
 - Fixed BTC witness size estimation.
+- Added option to remove Offers and bids from the database automatically one week
+  after they expire if they have no active bids.
+  - Controlled by new settings: expire_db_records and expire_db_records_after
 
 
 0.0.63
