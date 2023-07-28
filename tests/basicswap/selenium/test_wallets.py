@@ -1,19 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2022 tecnovert
+# Copyright (c) 2022-2023 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 """
 cd /tmp
-wget -4 https://chromedriver.storage.googleapis.com/107.0.5304.62/chromedriver_linux64.zip
+wget -4 https://chromedriver.storage.googleapis.com/114.0.5735.90/chromedriver_linux64.zip
 7z x chromedriver_linux64.zip
-sudo mv chromedriver /opt/chromedriver96
-
+sudo mv chromedriver /opt/chromedriver114
 
 python tests/basicswap/extended/test_xmr_persistent.py
-
 python tests/basicswap/selenium/test_wallets.py
 
 """
@@ -31,7 +29,7 @@ def test_html():
     base_url = 'http://localhost:12701'
     node2_url = 'http://localhost:12702'
 
-    driver = webdriver.Chrome(service=Service('/opt/chromedriver96'))
+    driver = webdriver.Chrome(service=Service('/opt/chromedriver114'))
 
     # Check json coins data
     coins = json.loads(urlopen(base_url + '/json/coins').read())

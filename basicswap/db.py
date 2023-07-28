@@ -217,6 +217,8 @@ class SwapTx(Base):
     states = sa.Column(sa.LargeBinary)  # Packed states and times
 
     def setState(self, new_state):
+        if self.state == new_state:
+            return
         self.state = new_state
         self.states = (self.states if self.states is not None else bytes()) + struct.pack('<iq', new_state, int(time.time()))
 

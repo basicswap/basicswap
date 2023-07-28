@@ -10,6 +10,9 @@
 - Added option to remove Offers and bids from the database automatically one week
   after they expire if they have no active bids.
   - Controlled by new settings: expire_db_records and expire_db_records_after
+- Raised adaptor signature swap protocol version
+  - Not backwards compatible with previous versions.
+- ui: Show ITX and PTX status for adaptor sig type swaps.
 
 
 0.0.63

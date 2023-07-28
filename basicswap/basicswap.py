@@ -3949,6 +3949,9 @@ class BasicSwap(BaseApp):
                     xmr_swap.a_lock_spend_tx = bytes.fromhex(spend_txn_hex)
                     bid.setState(BidStates.XMR_SWAP_SCRIPT_TX_REDEEMED)  # TODO: Wait for confirmation?
 
+                    if bid.xmr_a_lock_tx:
+                        bid.xmr_a_lock_tx.setState(TxStates.TX_REDEEMED)
+
                     if not was_received:
                         bid.setState(BidStates.SWAP_COMPLETED)
                 else:
@@ -3996,6 +3999,8 @@ class BasicSwap(BaseApp):
             if spending_txid == xmr_swap.a_lock_refund_spend_tx_id:
                 self.log.info('Found coin a lock refund spend tx, bid {}'.format(bid_id.hex()))
                 self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_A_REFUND_SPEND_TX_SEEN, '', session)
+                if bid.xmr_a_lock_tx:
+                    bid.xmr_a_lock_tx.setState(TxStates.TX_REFUNDED)
 
                 if was_sent:
                     xmr_swap.a_lock_refund_spend_tx = bytes.fromhex(spend_txn['hex'])  # Replace with fully signed tx
@@ -4846,7 +4851,9 @@ class BasicSwap(BaseApp):
 
         bid.setState(BidStates.BID_ACCEPTED)  # ADS
         self.saveBidInSession(bid.bid_id, bid, session, xmr_swap)
-        self.notify(NT.BID_ACCEPTED, {'bid_id': bid.bid_id.hex()}, session)
+
+        if reverse_bid is False:
+            self.notify(NT.BID_ACCEPTED, {'bid_id': bid.bid_id.hex()}, session)
 
         delay = random.randrange(self.min_delay_event, self.max_delay_event)
         self.log.info('Responding to adaptor-sig bid accept %s in %d seconds', bid.bid_id.hex(), delay)
@@ -5412,6 +5419,9 @@ class BasicSwap(BaseApp):
 
         bid.xmr_b_lock_tx.spend_txid = txid
         bid.setState(BidStates.XMR_SWAP_NOSCRIPT_TX_REDEEMED)
+        if bid.xmr_b_lock_tx:
+            bid.xmr_b_lock_tx.setState(TxStates.TX_REDEEMED)
+
         # TODO: Why does using bid.txns error here?
         self.saveBidInSession(bid_id, bid, session, xmr_swap, save_in_progress=offer)
 
@@ -5477,6 +5487,8 @@ class BasicSwap(BaseApp):
         bid.xmr_b_lock_tx.spend_txid = txid
 
         bid.setState(BidStates.XMR_SWAP_NOSCRIPT_TX_RECOVERED)
+        if bid.xmr_b_lock_tx:
+            bid.xmr_b_lock_tx.setState(TxStates.TX_REFUNDED)
         self.saveBidInSession(bid_id, bid, session, xmr_swap, save_in_progress=offer)
 
     def sendXmrBidCoinALockSpendTxMsg(self, bid_id: bytes, session) -> None:
@@ -5858,12 +5870,13 @@ class BasicSwap(BaseApp):
         self.log.info('Receiving reverse adaptor-sig bid %s for offer %s', bid_id.hex(), bid.offer_id.hex())
         self.saveBid(bid_id, bid, xmr_swap=xmr_swap)
 
-        if ci_to.curve_type() != Curves.ed25519:
-            try:
-                session = self.openSession()
+        try:
+            session = self.openSession()
+            self.notify(NT.BID_ACCEPTED, {'bid_id': bid_id.hex()}, session)
+            if ci_to.curve_type() != Curves.ed25519:
                 self.receiveXmrBid(bid, session)
-            finally:
-                self.closeSession(session)
+        finally:
+            self.closeSession(session)
 
     def processMsg(self, msg) -> None:
         self.mxDB.acquire()
@@ -6560,8 +6573,8 @@ class BasicSwap(BaseApp):
                         'tx1.state, tx2.state, offers.coin_from, bids.rate, bids.bid_addr, offers.bid_reversed, bids.amount_to, offers.coin_to ' + \
                         'FROM bids ' + \
                         'LEFT JOIN offers ON offers.offer_id = bids.offer_id ' + \
-                        'LEFT JOIN transactions AS tx1 ON tx1.bid_id = bids.bid_id AND tx1.tx_type = {} '.format(TxTypes.ITX) + \
-                        'LEFT JOIN transactions AS tx2 ON tx2.bid_id = bids.bid_id AND tx2.tx_type = {} '.format(TxTypes.PTX)
+                        'LEFT JOIN transactions AS tx1 ON tx1.bid_id = bids.bid_id AND tx1.tx_type = CASE WHEN offers.swap_type = :ads_swap THEN :al_type ELSE :itx_type END ' + \
+                        'LEFT JOIN transactions AS tx2 ON tx2.bid_id = bids.bid_id AND tx2.tx_type = CASE WHEN offers.swap_type = :ads_swap THEN :bl_type ELSE :ptx_type END '
 
             query_str += 'WHERE bids.active_ind = 1 '
             filter_bid_id = filters.get('bid_id', None)
@@ -6597,7 +6610,7 @@ class BasicSwap(BaseApp):
             if offset is not None:
                 query_str += f' OFFSET {offset}'
 
-            q = session.execute(query_str)
+            q = session.execute(query_str, {'ads_swap': SwapTypes.XMR_SWAP, 'itx_type': TxTypes.ITX, 'ptx_type': TxTypes.PTX, 'al_type': TxTypes.XMR_SWAP_A_LOCK, 'bl_type': TxTypes.XMR_SWAP_B_LOCK})
             for row in q:
                 result = [x for x in row]
                 if result[12]:  # Reversed
@@ -6618,7 +6631,18 @@ class BasicSwap(BaseApp):
         try:
             rv = []
             for k, v in self.swaps_in_progress.items():
-                rv.append((k, v[0].offer_id.hex(), v[0].state, v[0].getITxState(), v[0].getPTxState()))
+                bid, offer = v
+                itx_state = None
+                ptx_state = None
+
+                if offer.swap_type == SwapTypes.XMR_SWAP:
+                    itx_state = bid.xmr_a_lock_tx.state if bid.xmr_a_lock_tx else None
+                    ptx_state = bid.xmr_b_lock_tx.state if bid.xmr_b_lock_tx else None
+                else:
+                    itx_state = bid.getITxState()
+                    ptx_state = bid.getPTxState()
+
+                rv.append((k, bid.offer_id.hex(), bid.state, itx_state, ptx_state))
             return rv
         finally:
             self.mxDB.release()
