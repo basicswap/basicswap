@@ -3409,6 +3409,7 @@ class BasicSwap(BaseApp):
                     chain_height=found_tx['height'],
                 )
                 bid_changed = True
+                bid.xmr_b_lock_tx.setState(TxStates.TX_IN_CHAIN)
             else:
                 bid.xmr_b_lock_tx.chain_height = found_tx['height']
                 bid_changed = True
@@ -3551,9 +3552,13 @@ class BasicSwap(BaseApp):
                 if lock_tx_chain_info is None:
                     return rv
 
+                if bid.xmr_a_lock_tx.state == TxStates.TX_NONE and lock_tx_chain_info['height'] == 0:
+                    bid.xmr_a_lock_tx.setState(TxStates.TX_IN_MEMPOOL)
+
                 if not bid.xmr_a_lock_tx.chain_height and lock_tx_chain_info['height'] != 0:
                     self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_A_SEEN, '', session)
                     self.setTxBlockInfoFromHeight(ci_from, bid.xmr_a_lock_tx, lock_tx_chain_info['height'])
+                    bid.xmr_a_lock_tx.setState(TxStates.TX_IN_CHAIN)
 
                     bid_changed = True
                 if bid.xmr_a_lock_tx.chain_height != lock_tx_chain_info['height'] and lock_tx_chain_info['height'] != 0:
@@ -5265,7 +5270,7 @@ class BasicSwap(BaseApp):
             txid=b_lock_tx_id,
         )
         xmr_swap.b_lock_tx_id = b_lock_tx_id
-        bid.xmr_b_lock_tx.setState(TxStates.TX_NONE)
+        bid.xmr_b_lock_tx.setState(TxStates.TX_SENT)
         self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_B_PUBLISHED, '', session)
 
         self.saveBidInSession(bid_id, bid, session, xmr_swap, save_in_progress=offer)

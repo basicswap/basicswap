@@ -111,6 +111,8 @@ class TxStates(IntEnum):
     TX_CONFIRMED = auto()
     TX_REDEEMED = auto()
     TX_REFUNDED = auto()
+    TX_IN_MEMPOOL = auto()
+    TX_IN_CHAIN = auto()
 
 
 class TxTypes(IntEnum):
@@ -323,6 +325,10 @@ def strTxState(state):
         return 'Redeemed'
     if state == TxStates.TX_REFUNDED:
         return 'Refunded'
+    if state == TxStates.TX_IN_MEMPOOL:
+        return 'In Mempool'
+    if state == TxStates.TX_IN_CHAIN:
+        return 'In Chain'
     return 'Unknown'
 
 
