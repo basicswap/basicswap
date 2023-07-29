@@ -12,17 +12,21 @@ function setupCustomSelect(select) {
     }
   });
 
-  // Set the selected option based on the stored value
-  const storedValue = localStorage.getItem(select.name);
-  if (storedValue) {
-    const selectedOption = select.querySelector(`option[value="${storedValue}"]`);
-    if (selectedOption) {
+  if (select.value == '-1') {
+    // Set the selected option based on the stored value
+    const storedValue = localStorage.getItem(select.name);
+    if (storedValue) {
       select.value = storedValue;
-      const image = selectedOption.getAttribute('data-image');
-      if (image) {
-        select.style.backgroundImage = `url(${image})`;
-        selectImage.src = image;
-      }
+    }
+  }
+
+  // Set the selected option image based on the selected value
+  const selectedOption = select.querySelector(`option[value="${select.value}"]`);
+  if (selectedOption) {
+    const image = selectedOption.getAttribute('data-image');
+    if (image) {
+      select.style.backgroundImage = `url(${image})`;
+      selectImage.src = image;
     }
   }
 
