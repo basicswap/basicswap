@@ -107,9 +107,9 @@ def float_to_str(f: float) -> str:
 
 
 def make_int(v, scale: int = 8, r: int = 0) -> int:  # r = 0, no rounding, fail, r > 0 round up, r < 0 floor
-    if type(v) == float:
+    if isinstance(v, float):
         v = float_to_str(v)
-    elif type(v) == int:
+    elif isinstance(v, int):
         return v * 10 ** scale
 
     sign = 1
@@ -145,7 +145,7 @@ def make_int(v, scale: int = 8, r: int = 0) -> int:  # r = 0, no rounding, fail,
 
 
 def validate_amount(amount, scale: int = 8) -> bool:
-    str_amount = float_to_str(amount) if type(amount) == float else str(amount)
+    str_amount = float_to_str(amount) if isinstance(amount, float) else str(amount)
     has_decimal = False
     for c in str_amount:
         if c == '.' and not has_decimal:

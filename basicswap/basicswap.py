@@ -6069,7 +6069,7 @@ class BasicSwap(BaseApp):
         with self.mxDB:
             if 'debug' in data:
                 new_value = data['debug']
-                ensure(type(new_value) == bool, 'New debug value not boolean')
+                ensure(isinstance(new_value, bool), 'New debug value not boolean')
                 if settings_copy.get('debug', False) != new_value:
                     self.debug = new_value
                     settings_copy['debug'] = new_value
@@ -6077,7 +6077,7 @@ class BasicSwap(BaseApp):
 
             if 'debug_ui' in data:
                 new_value = data['debug_ui']
-                ensure(type(new_value) == bool, 'New debug_ui value not boolean')
+                ensure(isinstance(new_value, bool), 'New debug_ui value not boolean')
                 if settings_copy.get('debug_ui', False) != new_value:
                     self.debug_ui = new_value
                     settings_copy['debug_ui'] = new_value
@@ -6085,7 +6085,7 @@ class BasicSwap(BaseApp):
 
             if 'expire_db_records' in data:
                 new_value = data['expire_db_records']
-                ensure(type(new_value) == bool, 'New expire_db_records value not boolean')
+                ensure(isinstance(new_value, bool), 'New expire_db_records value not boolean')
                 if settings_copy.get('expire_db_records', False) != new_value:
                     self._expire_db_records = new_value
                     settings_copy['expire_db_records'] = new_value
@@ -6093,14 +6093,14 @@ class BasicSwap(BaseApp):
 
             if 'show_chart' in data:
                 new_value = data['show_chart']
-                ensure(type(new_value) == bool, 'New show_chart value not boolean')
+                ensure(isinstance(new_value, bool), 'New show_chart value not boolean')
                 if settings_copy.get('show_chart', True) != new_value:
                     settings_copy['show_chart'] = new_value
                     settings_changed = True
 
             if 'chart_api_key' in data:
                 new_value = data['chart_api_key']
-                ensure(type(new_value) == str, 'New chart_api_key value not a string')
+                ensure(isinstance(new_value, bool), 'New chart_api_key value not a string')
                 ensure(len(new_value) <= 128, 'New chart_api_key value too long')
                 if all(c in string.hexdigits for c in new_value):
                     if settings_copy.get('chart_api_key', '') != new_value:

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2020-2022 tecnovert
+# Copyright (c) 2020-2023 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE.txt or http://www.opensource.org/licenses/mit-license.php.
 
@@ -135,7 +135,7 @@ def wait_for_bid(delay_event, swap_client, bid_id, state=None, sent: bool = Fals
         assert (len(bids) < 2)
         for bid in bids:
             if bid[2] == bid_id:
-                if type(state) == list:
+                if isinstance(state, list):
                     if bid[5] in state:
                         return
                     else:

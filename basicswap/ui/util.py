@@ -51,7 +51,7 @@ def getCoinType(coin_type_ind):
 
 
 def validateAmountString(amount, ci):
-    if type(amount) != str:
+    if not isinstance(amount, str):
         return
     ar = amount.split('.')
     if len(ar) > 1 and len(ar[1]) > ci.exp():
