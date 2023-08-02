@@ -506,9 +506,10 @@ class BasicSwapTest(TestFunctions):
         tx_spend_hex = ToHex(tx_spend)
         try:
             txid = self.callnoderpc('sendrawtransaction', [tx_spend_hex, ])
-            assert False, 'Should fail'
         except Exception as e:
             assert ('non-final' in str(e))
+        else:
+            assert False, 'Should fail'
 
         self.mineBlock(5)
         txid = self.callnoderpc('sendrawtransaction', [tx_spend_hex, ])
@@ -551,9 +552,10 @@ class BasicSwapTest(TestFunctions):
         tx_spend_hex = ToHex(tx_spend)
         try:
             txid = self.callnoderpc('sendrawtransaction', [tx_spend_hex, ])
-            assert False, 'Should fail'
         except Exception as e:
             assert ('non-BIP68-final' in str(e))
+        else:
+            assert False, 'Should fail'
 
         self.mineBlock(3)
         txid = self.callnoderpc('sendrawtransaction', [tx_spend_hex, ])
