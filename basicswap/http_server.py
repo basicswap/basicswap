@@ -379,14 +379,12 @@ class HttpHandler(BaseHTTPRequestHandler):
         swap_client = self.server.swap_client
         swap_client.checkSystemStatus()
         summary = swap_client.getSummary()
-
         template = env.get_template('index.html')
         return self.render_template(template, {
             'refresh': 30,
             'summary': summary,
             'use_tor_proxy': swap_client.use_tor_proxy
         })
-
 
     def page_404(self, url_split):
         swap_client = self.server.swap_client
