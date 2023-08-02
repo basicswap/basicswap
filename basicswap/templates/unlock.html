@@ -23,7 +23,7 @@
   document.documentElement.classList.toggle('dark', isDarkMode);
 </script>
     <link rel=icon sizes="32x32" type="image/png" href="/static/images/favicon/favicon-32.png">
-    <title>{{ title }}</title>
+  <title>(BSX) BasicSwap - v{{ version }}</title>
   </head>
   <body class="dark:bg-gray-700">
     <section class="py-24 md:py-32">
@@ -102,6 +102,9 @@
               <span class="text-xs font-medium dark:text-white" contenteditable="false">Need help?</span>
               <a class="inline-block text-xs font-medium text-blue-500 hover:text-blue-600 hover:underline" href="https://academy.particl.io/en/latest/faq/get_support.html" target="_blank" contenteditable="false">Help / Tutorials</a>
             </p>
+            <p class="text-center">
+              <span class="text-xs font-medium text-coolGray-500 dark:text-gray-500" contenteditable="false">{{ title }} - GUI 2.0.2</span>
+            </p>      
             <input type="hidden" name="formid" value="{{ form_id }}">
           </form>
         </div>

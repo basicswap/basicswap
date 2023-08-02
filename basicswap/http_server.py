@@ -131,7 +131,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         self.server.last_form_id[name] = form_id
         return form_data
 
-    def render_template(self, template, args_dict, status_code=200):
+    def render_template(self, template, args_dict, status_code=200, version=__version__):
         swap_client = self.server.swap_client
         if swap_client.ws_server:
             args_dict['ws_url'] = swap_client.ws_server.url
@@ -174,6 +174,8 @@ class HttpHandler(BaseHTTPRequestHandler):
 
         if self.server.msg_id_counter >= 0x7FFFFFFF:
             self.server.msg_id_counter = 0
+
+        args_dict['version'] = version
 
         self.putHeaders(status_code, 'text/html')
         return bytes(template.render(
@@ -381,10 +383,10 @@ class HttpHandler(BaseHTTPRequestHandler):
         template = env.get_template('index.html')
         return self.render_template(template, {
             'refresh': 30,
-            'version': __version__,
             'summary': summary,
             'use_tor_proxy': swap_client.use_tor_proxy
         })
+
 
     def page_404(self, url_split):
         swap_client = self.server.swap_client

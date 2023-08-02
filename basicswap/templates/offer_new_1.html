@@ -326,10 +326,17 @@
        </div>
        <input class="pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" id="rate" name="rate" value="{{ data.rate }}" onchange="set_rate('rate');">
       </div>
-      <div class="form-check form-check-inline mt-5">
-       <input class="form-check-input hover:border-blue-500 w-5 h-5 form-check-input text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-1 dark:bg-gray-500 dark:border-gray-400" type="checkbox" id="rate_lock" name="rate_lock" value="rl" checked=checked>
-       <label class="form-check-label ml-2 text-sm font-medium text-gray-800 dark:text-white" for="inlineCheckbox1">Lock Rate</label>
-      </div>
+
+    <div class="flex form-check form-check-inline mt-5">
+    <div class="flex items-center h-5">
+        <input class="form-check-input hover:border-blue-500 w-5 h-5 form-check-input text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-1 dark:bg-gray-500 dark:border-gray-400" type="checkbox" id="rate_lock" name="rate_lock" value="rl" checked=checked>
+    </div>
+    <div class="ml-2 text-sm">
+        <label class="form-check-label text-sm font-medium text-gray-800 dark:text-white" for="inlineCheckbox1">Lock Rate</label>
+        <p id="helper-checkbox-text" class="text-xs font-normal text-gray-500 dark:text-gray-300">Automatically adjusts the <b>You Get</b> value based on the rate you’ve entered. Without it, the rate value is automatically adjusted based on the number of coins you put in <b>You Get.</b></p>
+    </div>
+    </div>
+
      </div>
     </div>
    </div>
@@ -343,14 +350,27 @@
     <p class="text-sm text-coolGray-800 dark:text-white font-semibold">Options</p>
    </div>
    <div class="w-full md:flex-1 p-3">
-    <div class="form-check form-check-inline">
-     <input class="hover:border-blue-500 w-5 h-5 form-check-input text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-1 dark:bg-gray-500 dark:border-gray-400" type="checkbox" id="amt_var" name="amt_var" value="av" {% if data.amt_var==true %} checked="checked" {% endif %}>
-     <label class="form-check-label ml-2 text-sm font-medium text-gray-800 dark:text-white" for="inlineCheckbox2">Amount Variable</label>
+
+<div class="flex form-check form-check-inline">
+    <div class="flex items-center h-5">
+        <input class="hover:border-blue-500 w-5 h-5 form-check-input text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-1 dark:bg-gray-500 dark:border-gray-400" type="checkbox" id="amt_var" name="amt_var" value="av" {% if data.amt_var==true %} checked="checked" {% endif %}>
     </div>
-    <div class="form-check form-check-inline mt-2">
-     <input class="hover:border-blue-500 w-5 h-5 form-check-input text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-1 dark:bg-gray-500 dark:border-gray-400" type="checkbox" id="rate_var" name="rate_var" value="rv" {% if data.rate_var==true %} checked="checked" {% endif %}>
-     <label class="form-check-label ml-2 text-sm font-medium text-gray-800 dark:text-white" for="inlineCheckbox3">Rate Variable</label>
+    <div class="ml-2 text-sm">
+        <label class="form-check-label text-sm font-medium text-gray-800 dark:text-white" for="inlineCheckbox2">Amount Variable</label>
+        <p id="helper-checkbox-text" class="text-xs font-normal text-gray-500 dark:text-gray-300">Allow bids with a different amount to the offer.</p>
     </div>
+</div>
+
+<div class="flex mt-2 form-check form-check-inline">
+    <div class="flex items-center h-5">
+        <input class="hover:border-blue-500 w-5 h-5 form-check-input text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-1 dark:bg-gray-500 dark:border-gray-400" type="checkbox" id="rate_var" name="rate_var" value="rv" {% if data.rate_var==true %} checked="checked" {% endif %}>
+    </div>
+    <div class="ml-2 text-sm">
+        <label class="form-check-label text-sm font-medium text-gray-800 dark:text-white" for="inlineCheckbox3">Rate Variable</label>
+        <p id="helper-checkbox-text" class="text-xs font-normal text-gray-500 dark:text-gray-300">Allow bids with a different rate to the offer.</p>
+    </div>
+</div>
+
    </div>
   </div>
  </div>
