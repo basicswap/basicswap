@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2022 tecnovert
+# Copyright (c) 2022-2023 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -54,13 +54,18 @@ from tests.basicswap.test_xmr import BaseTest, test_delay_event, callnoderpc
 
 logger = logging.getLogger()
 
+FIRO_BINDIR = os.path.expanduser(os.getenv('FIRO_BINDIR', os.path.join(cfg.DEFAULT_TEST_BINDIR, 'firo')))
+FIROD = os.getenv('FIROD', 'firod' + cfg.bin_suffix)
+FIRO_CLI = os.getenv('FIRO_CLI', 'firo-cli' + cfg.bin_suffix)
+FIRO_TX = os.getenv('FIRO_TX', 'firo-tx' + cfg.bin_suffix)
+
 FIRO_BASE_PORT = 34832
 FIRO_BASE_RPC_PORT = 35832
 FIRO_BASE_ZMQ_PORT = 36832
 
 
 def firoCli(cmd, node_id=0):
-    return callrpc_cli(cfg.FIRO_BINDIR, os.path.join(cfg.TEST_DATADIRS, 'firo_' + str(node_id)), 'regtest', cmd, cfg.FIRO_CLI)
+    return callrpc_cli(FIRO_BINDIR, os.path.join(cfg.TEST_DATADIRS, 'firo_' + str(node_id)), 'regtest', cmd, FIRO_CLI)
 
 
 def prepareDataDir(datadir, node_id, conf_file, dir_prefix, base_p2p_port, base_rpc_port, num_nodes=3):
@@ -126,15 +131,16 @@ class Test(BaseTest):
 
     @classmethod
     def prepareExtraDataDir(cls, i):
+        extra_opts = []
         if not cls.restore_instance:
             seed_hex = cls.firo_seeds[i]
-            extra_opts = [f'-hdseed={seed_hex}', ]
+            extra_opts.append(f'-hdseed={seed_hex}')
             data_dir = prepareDataDir(cfg.TEST_DATADIRS, i, 'firo.conf', 'firo_', base_p2p_port=FIRO_BASE_PORT, base_rpc_port=FIRO_BASE_RPC_PORT)
-            if os.path.exists(os.path.join(cfg.FIRO_BINDIR, 'firo-wallet')):
-                callrpc_cli(cfg.FIRO_BINDIR, data_dir, 'regtest', '-wallet=wallet.dat create', 'firo-wallet')
+            if os.path.exists(os.path.join(FIRO_BINDIR, 'firo-wallet')):
+                callrpc_cli(FIRO_BINDIR, data_dir, 'regtest', '-wallet=wallet.dat create', 'firo-wallet')
 
-        cls.firo_daemons.append(startDaemon(os.path.join(cfg.TEST_DATADIRS, 'firo_' + str(i)), cfg.FIRO_BINDIR, cfg.FIROD, opts=extra_opts))
-        logging.info('Started %s %d', cfg.FIROD, cls.firo_daemons[-1].pid)
+        cls.firo_daemons.append(startDaemon(os.path.join(cfg.TEST_DATADIRS, 'firo_' + str(i)), FIRO_BINDIR, FIROD, opts=extra_opts))
+        logging.info('Started %s %d', FIROD, cls.firo_daemons[-1].pid)
 
         waitForRPC(make_rpc_func(i, base_rpc_port=FIRO_BASE_RPC_PORT))
 
@@ -182,7 +188,7 @@ class Test(BaseTest):
             'rpcuser': 'test' + str(node_id),
             'rpcpassword': 'test_pass' + str(node_id),
             'datadir': os.path.join(datadir, 'firo_' + str(node_id)),
-            'bindir': cfg.FIRO_BINDIR,
+            'bindir': FIRO_BINDIR,
             'use_csv': True,
             'use_segwit': False,
         }

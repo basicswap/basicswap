@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2022 tecnovert
+# Copyright (c) 2022-2023 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -82,6 +82,11 @@ BTC_NODE = 4
 
 delay_event = threading.Event()
 stop_test = False
+
+DASH_BINDIR = os.path.expanduser(os.getenv('DASH_BINDIR', os.path.join(cfg.DEFAULT_TEST_BINDIR, 'dash')))
+DASHD = os.getenv('DASHD', 'dashd' + cfg.bin_suffix)
+DASH_CLI = os.getenv('DASH_CLI', 'dash-cli' + cfg.bin_suffix)
+DASH_TX = os.getenv('DASH_TX', 'dash-tx' + cfg.bin_suffix)
 
 
 def prepareOtherDir(datadir, nodeId, conf_file='dash.conf'):
@@ -180,7 +185,7 @@ def prepareDir(datadir, nodeId, network_key, network_pubkey):
                 'manage_daemon': False,
                 'rpcport': BASE_RPC_PORT + DASH_NODE,
                 'datadir': dashdatadir,
-                'bindir': cfg.DASH_BINDIR,
+                'bindir': DASH_BINDIR,
                 'use_csv': True,
                 'use_segwit': False,
             },
@@ -219,7 +224,7 @@ def btcRpc(cmd):
 
 
 def dashRpc(cmd, wallet=None):
-    return callrpc_cli(cfg.DASH_BINDIR, os.path.join(cfg.TEST_DATADIRS, str(DASH_NODE)), 'regtest', cmd, cfg.DASH_CLI, wallet=wallet)
+    return callrpc_cli(DASH_BINDIR, os.path.join(cfg.TEST_DATADIRS, str(DASH_NODE)), 'regtest', cmd, DASH_CLI, wallet=wallet)
 
 
 def signal_handler(sig, frame):
@@ -299,12 +304,12 @@ class Test(unittest.TestCase):
         '''
         dash-wallet does not seem to create valid wallet files.
 
-        if os.path.exists(os.path.join(cfg.DASH_BINDIR, 'dash-wallet')):
+        if os.path.exists(os.path.join(DASH_BINDIR, 'dash-wallet')):
             logging.info('Creating DASH wallet.')
-            callrpc_cli(cfg.DASH_BINDIR, dash_data_dir, 'regtest', '-wallet=wallet.dat create', 'dash-wallet')
+            callrpc_cli(DASH_BINDIR, dash_data_dir, 'regtest', '-wallet=wallet.dat create', 'dash-wallet')
         '''
-        cls.daemons.append(startDaemon(dash_data_dir, cfg.DASH_BINDIR, cfg.DASHD))
-        logging.info('Started %s %d', cfg.DASHD, cls.daemons[-1].pid)
+        cls.daemons.append(startDaemon(dash_data_dir, DASH_BINDIR, DASHD))
+        logging.info('Started %s %d', DASHD, cls.daemons[-1].pid)
 
         for i in range(NUM_NODES):
             data_dir = os.path.join(cfg.TEST_DATADIRS, str(i))

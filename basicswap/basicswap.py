@@ -32,14 +32,6 @@ from sqlalchemy.orm.session import close_all_sessions
 
 from .interface import Curves
 from .interface.part import PARTInterface, PARTInterfaceAnon, PARTInterfaceBlind
-from .interface.btc import BTCInterface
-from .interface.ltc import LTCInterface
-from .interface.nmc import NMCInterface
-from .interface.xmr import XMRInterface
-from .interface.pivx import PIVXInterface
-from .interface.dash import DASHInterface
-from .interface.firo import FIROInterface
-from .interface.passthrough_btc import PassthroughBTCInterface
 
 from . import __version__
 from .rpc_xmr import make_xmr_rpc2_func
@@ -578,27 +570,35 @@ class BasicSwap(BaseApp):
         if coin == Coins.PART:
             return PARTInterface(self.coin_clients[coin], self.chain, self)
         elif coin == Coins.BTC:
+            from .interface.btc import BTCInterface
             return BTCInterface(self.coin_clients[coin], self.chain, self)
         elif coin == Coins.LTC:
+            from .interface.ltc import LTCInterface
             return LTCInterface(self.coin_clients[coin], self.chain, self)
         elif coin == Coins.NMC:
+            from .interface.nmc import NMCInterface
             return NMCInterface(self.coin_clients[coin], self.chain, self)
         elif coin == Coins.XMR:
+            from .interface.xmr import XMRInterface
             xmr_i = XMRInterface(self.coin_clients[coin], self.chain, self)
             chain_client_settings = self.getChainClientSettings(coin)
             xmr_i.setWalletFilename(chain_client_settings['walletfile'])
             return xmr_i
         elif coin == Coins.PIVX:
+            from .interface.pivx import PIVXInterface
             return PIVXInterface(self.coin_clients[coin], self.chain, self)
         elif coin == Coins.DASH:
+            from .interface.dash import DASHInterface
             return DASHInterface(self.coin_clients[coin], self.chain, self)
         elif coin == Coins.FIRO:
+            from .interface.firo import FIROInterface
             return FIROInterface(self.coin_clients[coin], self.chain, self)
         else:
             raise ValueError('Unknown coin type')
 
     def createPassthroughInterface(self, coin):
         if coin == Coins.BTC:
+            from .interface.passthrough_btc import PassthroughBTCInterface
             return PassthroughBTCInterface(self.coin_clients[coin], self.chain)
         else:
             raise ValueError('Unknown coin type')

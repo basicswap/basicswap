@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2022 tecnovert
+# Copyright (c) 2022-2023 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -83,6 +83,11 @@ BTC_NODE = 4
 
 delay_event = threading.Event()
 stop_test = False
+
+PIVX_BINDIR = os.path.expanduser(os.getenv('PIVX_BINDIR', os.path.join(cfg.DEFAULT_TEST_BINDIR, 'pivx')))
+PIVXD = os.getenv('PIVXD', 'pivxd' + cfg.bin_suffix)
+PIVX_CLI = os.getenv('PIVX_CLI', 'pivx-cli' + cfg.bin_suffix)
+PIVX_TX = os.getenv('PIVX_TX', 'pivx-tx' + cfg.bin_suffix)
 
 
 def prepareOtherDir(datadir, nodeId, conf_file='pivx.conf'):
@@ -186,7 +191,7 @@ def prepareDir(datadir, nodeId, network_key, network_pubkey):
                 'manage_daemon': False,
                 'rpcport': BASE_RPC_PORT + PIVX_NODE,
                 'datadir': pivxdatadir,
-                'bindir': cfg.PIVX_BINDIR,
+                'bindir': PIVX_BINDIR,
                 'use_csv': False,
                 'use_segwit': False,
             },
@@ -225,7 +230,7 @@ def btcRpc(cmd):
 
 
 def pivxRpc(cmd):
-    return callrpc_cli(cfg.PIVX_BINDIR, os.path.join(cfg.TEST_DATADIRS, str(PIVX_NODE)), 'regtest', cmd, cfg.PIVX_CLI)
+    return callrpc_cli(PIVX_BINDIR, os.path.join(cfg.TEST_DATADIRS, str(PIVX_NODE)), 'regtest', cmd, PIVX_CLI)
 
 
 def signal_handler(sig, frame):
@@ -306,8 +311,8 @@ class Test(unittest.TestCase):
                 callrpc_cli(cfg.BITCOIN_BINDIR, btc_data_dir, 'regtest', '-wallet=wallet.dat create', 'bitcoin-wallet')
         cls.daemons.append(startDaemon(btc_data_dir, cfg.BITCOIN_BINDIR, cfg.BITCOIND))
         logging.info('Started %s %d', cfg.BITCOIND, cls.daemons[-1].pid)
-        cls.daemons.append(startDaemon(os.path.join(cfg.TEST_DATADIRS, str(PIVX_NODE)), cfg.PIVX_BINDIR, cfg.PIVXD))
-        logging.info('Started %s %d', cfg.PIVXD, cls.daemons[-1].pid)
+        cls.daemons.append(startDaemon(os.path.join(cfg.TEST_DATADIRS, str(PIVX_NODE)), PIVX_BINDIR, PIVXD))
+        logging.info('Started %s %d', PIVXD, cls.daemons[-1].pid)
 
         for i in range(NUM_NODES):
             data_dir = os.path.join(cfg.TEST_DATADIRS, str(i))

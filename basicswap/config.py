@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019-2022 tecnovert
+# Copyright (c) 2019-2023 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -36,18 +36,3 @@ NAMECOIN_TX = os.getenv('NAMECOIN_TX', 'namecoin-tx' + bin_suffix)
 XMR_BINDIR = os.path.expanduser(os.getenv('XMR_BINDIR', os.path.join(DEFAULT_TEST_BINDIR, 'monero')))
 XMRD = os.getenv('XMRD', 'monerod' + bin_suffix)
 XMR_WALLET_RPC = os.getenv('XMR_WALLET_RPC', 'monero-wallet-rpc' + bin_suffix)
-
-PIVX_BINDIR = os.path.expanduser(os.getenv('PIVX_BINDIR', os.path.join(DEFAULT_TEST_BINDIR, 'pivx')))
-PIVXD = os.getenv('PIVXD', 'pivxd' + bin_suffix)
-PIVX_CLI = os.getenv('PIVX_CLI', 'pivx-cli' + bin_suffix)
-PIVX_TX = os.getenv('PIVX_TX', 'pivx-tx' + bin_suffix)
-
-DASH_BINDIR = os.path.expanduser(os.getenv('DASH_BINDIR', os.path.join(DEFAULT_TEST_BINDIR, 'dash')))
-DASHD = os.getenv('DASHD', 'dashd' + bin_suffix)
-DASH_CLI = os.getenv('DASH_CLI', 'dash-cli' + bin_suffix)
-DASH_TX = os.getenv('DASH_TX', 'dash-tx' + bin_suffix)
-
-FIRO_BINDIR = os.path.expanduser(os.getenv('FIRO_BINDIR', os.path.join(DEFAULT_TEST_BINDIR, 'firo')))
-FIROD = os.getenv('FIROD', 'firod' + bin_suffix)
-FIRO_CLI = os.getenv('FIRO_CLI', 'firo-cli' + bin_suffix)
-FIRO_TX = os.getenv('FIRO_TX', 'firo-tx' + bin_suffix)
