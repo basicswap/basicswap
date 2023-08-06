@@ -31,6 +31,7 @@ class Coins(IntEnum):
     PIVX = 11
     DASH = 12
     FIRO = 13
+    VEIL = 14
 
 
 chainparams = {
@@ -327,7 +328,46 @@ chainparams = {
             'min_amount': 1000,
             'max_amount': 100000 * COIN,
         }
-    }
+    },
+    Coins.VEIL: {
+        'name': 'veil',
+        'ticker': 'VEIL',
+        'message_magic': 'Veil Signed Message:\n',
+        'blocks_target': 120,
+        'decimal_places': 8,
+        'has_csv': True,
+        'has_segwit': False,
+        'mainnet': {
+            'rpcport': 58812,
+            'pubkey_address': 70,
+            'script_address': 5,
+            'key_prefix': 128,
+            'hrp': 'bv',
+            'bip44': 698,
+            'min_amount': 1000,
+            'max_amount': 100000 * COIN,
+        },
+        'testnet': {
+            'rpcport': 58813,
+            'pubkey_address': 111,
+            'script_address': 196,
+            'key_prefix': 239,
+            'hrp': 'tv',
+            'bip44': 1,
+            'min_amount': 1000,
+            'max_amount': 100000 * COIN,
+        },
+        'regtest': {
+            'rpcport': 58823,
+            'pubkey_address': 111,
+            'script_address': 196,
+            'key_prefix': 239,
+            'hrp': 'tv',
+            'bip44': 1,
+            'min_amount': 1000,
+            'max_amount': 100000 * COIN,
+        }
+    },
 }
 ticker_map = {}
 

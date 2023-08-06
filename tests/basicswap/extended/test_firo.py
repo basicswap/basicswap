@@ -126,9 +126,10 @@ class Test(BaseTest):
 
     @classmethod
     def prepareExtraDataDir(cls, i):
+        extra_opts = []
         if not cls.restore_instance:
             seed_hex = cls.firo_seeds[i]
-            extra_opts = [f'-hdseed={seed_hex}', ]
+            extra_opts.append(f'-hdseed={seed_hex}')
             data_dir = prepareDataDir(cfg.TEST_DATADIRS, i, 'firo.conf', 'firo_', base_p2p_port=FIRO_BASE_PORT, base_rpc_port=FIRO_BASE_RPC_PORT)
             if os.path.exists(os.path.join(cfg.FIRO_BINDIR, 'firo-wallet')):
                 callrpc_cli(cfg.FIRO_BINDIR, data_dir, 'regtest', '-wallet=wallet.dat create', 'firo-wallet')

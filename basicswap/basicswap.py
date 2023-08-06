@@ -594,6 +594,9 @@ class BasicSwap(BaseApp):
             return DASHInterface(self.coin_clients[coin], self.chain, self)
         elif coin == Coins.FIRO:
             return FIROInterface(self.coin_clients[coin], self.chain, self)
+        elif coin == Coins.VEIL:
+            from .interface.veil import VEILInterface
+            return VEILInterface(self.coin_clients[coin], self.chain, self)
         else:
             raise ValueError('Unknown coin type')
 
