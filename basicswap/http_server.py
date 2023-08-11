@@ -308,7 +308,10 @@ class HttpHandler(BaseHTTPRequestHandler):
                 else:
                     if call_type == 'http':
                         method, params = parse_cmd(cmd, type_map)
-                        result = cmd + '\n' + swap_client.ci(coin_type).rpc_callback(method, params)
+                        rv = swap_client.ci(coin_type).rpc_callback(method, params)
+                        if not isinstance(rv, str):
+                            rv = json.dumps(rv, indent=4)
+                        result = cmd + '\n' + rv
                     else:
                         result = cmd + '\n' + swap_client.callcoincli(coin_type, cmd)
             except Exception as ex:
