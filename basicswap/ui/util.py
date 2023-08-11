@@ -291,15 +291,15 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
             txns = []
             if bid.xmr_a_lock_tx:
                 confirms = None
-                if swap_client.coin_clients[ci_from.coin_type()]['chain_height'] and bid.xmr_a_lock_tx.chain_height:
-                    confirms = (swap_client.coin_clients[ci_from.coin_type()]['chain_height'] - bid.xmr_a_lock_tx.chain_height) + 1
+                if swap_client.coin_clients[ci_leader.coin_type()]['chain_height'] and bid.xmr_a_lock_tx.chain_height:
+                    confirms = (swap_client.coin_clients[ci_leader.coin_type()]['chain_height'] - bid.xmr_a_lock_tx.chain_height) + 1
                 txns.append({'type': 'Chain A Lock', 'txid': bid.xmr_a_lock_tx.txid.hex(), 'confirms': confirms})
             if bid.xmr_a_lock_spend_tx:
                 txns.append({'type': 'Chain A Lock Spend', 'txid': bid.xmr_a_lock_spend_tx.txid.hex()})
             if bid.xmr_b_lock_tx:
                 confirms = None
-                if swap_client.coin_clients[ci_to.coin_type()]['chain_height'] and bid.xmr_b_lock_tx.chain_height:
-                    confirms = (swap_client.coin_clients[ci_to.coin_type()]['chain_height'] - bid.xmr_b_lock_tx.chain_height) + 1
+                if swap_client.coin_clients[ci_follower.coin_type()]['chain_height'] and bid.xmr_b_lock_tx.chain_height:
+                    confirms = (swap_client.coin_clients[ci_follower.coin_type()]['chain_height'] - bid.xmr_b_lock_tx.chain_height) + 1
                 txns.append({'type': 'Chain B Lock', 'txid': bid.xmr_b_lock_tx.txid.hex(), 'confirms': confirms})
             if bid.xmr_b_lock_tx and bid.xmr_b_lock_tx.spend_txid:
                 txns.append({'type': 'Chain B Lock Spend', 'txid': bid.xmr_b_lock_tx.spend_txid.hex()})
