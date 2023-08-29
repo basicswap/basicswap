@@ -49,7 +49,6 @@ from .util import (
     ensure,
 )
 from .util.script import (
-    getP2WSH,
     getP2SHScriptForHash,
 )
 from .util.address import (
@@ -133,7 +132,7 @@ from .basicswap_util import (
     strBidState,
     describeEventEntry,
     getVoutByAddress,
-    getVoutByP2WSH,
+    getVoutByScriptPubKey,
     getOfferProofOfFundsHash,
     getLastBidState,
     isActiveBidState,
@@ -146,8 +145,8 @@ from basicswap.db_util import (
     remove_expired_data,
 )
 
-PROTOCOL_VERSION_SECRET_HASH = 1
-MINPROTO_VERSION_SECRET_HASH = 1
+PROTOCOL_VERSION_SECRET_HASH = 2
+MINPROTO_VERSION_SECRET_HASH = 2
 
 PROTOCOL_VERSION_ADAPTOR_SIG = 3
 MINPROTO_VERSION_ADAPTOR_SIG = 3
@@ -593,6 +592,9 @@ class BasicSwap(BaseApp):
         elif coin == Coins.FIRO:
             from .interface.firo import FIROInterface
             return FIROInterface(self.coin_clients[coin], self.chain, self)
+        elif coin == Coins.NAV:
+            from .interface.nav import NAVInterface
+            return NAVInterface(self.coin_clients[coin], self.chain, self)
         else:
             raise ValueError('Unknown coin type')
 
@@ -760,7 +762,7 @@ class BasicSwap(BaseApp):
         try:
             for i in range(num_tries):
                 rv = self.callcoincli(coin, 'stop', timeout=10)
-                self.log.debug('Trying to stop %s', str(coin))
+                self.log.debug('Trying to stop %s', Coins(coin).name)
                 stopping = True
                 time.sleep(i + 1)
         except Exception as ex:
@@ -772,13 +774,13 @@ class BasicSwap(BaseApp):
                         # Using .cookie is a temporary workaround, will only work if rpc password is unset.
                         # TODO: Query lock on .lock properly
                         if os.path.exists(authcookiepath):
-                            self.log.debug('Waiting on .cookie file %s', str(coin))
+                            self.log.debug('Waiting on .cookie file %s', Coins(coin).name)
                             time.sleep(i + 1)
                     time.sleep(4)  # Extra time to settle
                 return
             self.log.error('stopDaemon %s', str(ex))
             self.log.error(traceback.format_exc())
-        raise ValueError('Could not stop {}'.format(str(coin)))
+        raise ValueError('Could not stop {}'.format(Coins(coin).name))
 
     def stopDaemons(self) -> None:
         for c in self.activeCoins():
@@ -1762,7 +1764,7 @@ class BasicSwap(BaseApp):
 
     def getReceiveAddressForCoin(self, coin_type):
         new_addr = self.ci(coin_type).getNewAddress(self.coin_clients[coin_type]['use_segwit'])
-        self.log.debug('Generated new receive address %s for %s', new_addr, str(coin_type))
+        self.log.debug('Generated new receive address %s for %s', new_addr, Coins(coin_type).name)
         return new_addr
 
     def getRelayFeeRateForCoin(self, coin_type):
@@ -1772,7 +1774,7 @@ class BasicSwap(BaseApp):
         chain_client_settings = self.getChainClientSettings(coin_type)
         override_feerate = chain_client_settings.get('override_feerate', None)
         if override_feerate:
-            self.log.debug('Fee rate override used for %s: %f', str(coin_type), override_feerate)
+            self.log.debug('Fee rate override used for %s: %f', Coins(coin_type).name, override_feerate)
             return override_feerate, 'override_feerate'
 
         return self.ci(coin_type).get_fee_rate(conf_target)
@@ -1781,7 +1783,7 @@ class BasicSwap(BaseApp):
         if coin_type == Coins.XMR:
             self.log.error('TODO: estimateWithdrawFee XMR')
             return None
-        tx_vsize = self.getContractSpendTxVSize(coin_type)
+        tx_vsize = self.ci(coin_type).getHTLCSpendTxVSize()
         est_fee = (fee_rate * tx_vsize) / 1000
         return est_fee
 
@@ -2328,7 +2330,7 @@ class BasicSwap(BaseApp):
         # Ensure bid is still valid
         now: int = self.getTime()
         ensure(bid.expire_at > now, 'Bid expired')
-        ensure(bid.state in (BidStates.BID_RECEIVED, ), 'Wrong bid state: {}'.format(str(BidStates(bid.state))))
+        ensure(bid.state in (BidStates.BID_RECEIVED, ), 'Wrong bid state: {}'.format(BidStates(bid.state).name))
 
         if offer.swap_type == SwapTypes.XMR_SWAP:
             reverse_bid: bool = Coins(offer.coin_from) in self.scriptless_coins
@@ -2932,11 +2934,12 @@ class BasicSwap(BaseApp):
             return None
         ci = self.ci(coin_type)
 
-        if self.coin_clients[coin_type]['use_segwit']:
-            addr_to = ci.encode_p2wsh(getP2WSH(initiate_script))
+        if ci.using_segwit():
+            p2wsh = ci.getScriptDest(initiate_script)
+            addr_to = ci.encodeScriptDest(p2wsh)
         else:
             addr_to = ci.encode_p2sh(initiate_script)
-        self.log.debug('Create initiate txn for coin %s to %s for bid %s', str(coin_type), addr_to, bid_id.hex())
+        self.log.debug('Create initiate txn for coin %s to %s for bid %s', Coins(coin_type).name, addr_to, bid_id.hex())
 
         if prefunded_tx:
             pi = self.pi(SwapTypes.SELLER_FIRST)
@@ -2999,9 +3002,9 @@ class BasicSwap(BaseApp):
             self.log.debug('bid %s: Make invalid PTx for testing: %d.', bid_id.hex(), bid.debug_ind)
             self.logBidEvent(bid.bid_id, EventLogTypes.DEBUG_TWEAK_APPLIED, 'ind {}'.format(bid.debug_ind), None)
 
-        if self.coin_clients[coin_to]['use_segwit']:
-            p2wsh = getP2WSH(participate_script)
-            addr_to = ci.encode_p2wsh(p2wsh)
+        if ci.using_segwit():
+            p2wsh = ci.getScriptDest(participate_script)
+            addr_to = ci.encodeScriptDest(p2wsh)
         else:
             addr_to = ci.encode_p2sh(participate_script)
 
@@ -3014,8 +3017,8 @@ class BasicSwap(BaseApp):
         txjs = self.callcoinrpc(coin_to, 'decoderawtransaction', [txn_signed])
         txid = txjs['txid']
 
-        if self.coin_clients[coin_to]['use_segwit']:
-            vout = getVoutByP2WSH(txjs, p2wsh.hex())
+        if ci.using_segwit():
+            vout = getVoutByScriptPubKey(txjs, p2wsh.hex())
         else:
             vout = getVoutByAddress(txjs, addr_to)
         self.addParticipateTxn(bid_id, bid, coin_to, txid, vout, chain_height)
@@ -3024,18 +3027,8 @@ class BasicSwap(BaseApp):
 
         return txn_signed
 
-    def getContractSpendTxVSize(self, coin_type, redeem: bool = True) -> int:
-        tx_vsize = 5  # Add a few bytes, sequence in script takes variable amount of bytes
-        if coin_type == Coins.PART:
-            tx_vsize += 204 if redeem else 187
-        if self.coin_clients[coin_type]['use_segwit']:
-            tx_vsize += 143 if redeem else 134
-        else:
-            tx_vsize += 323 if redeem else 287
-        return tx_vsize
-
     def createRedeemTxn(self, coin_type, bid, for_txn_type='participate', addr_redeem_out=None, fee_rate=None):
-        self.log.debug('createRedeemTxn for coin %s', str(coin_type))
+        self.log.debug('createRedeemTxn for coin %s', Coins(coin_type).name)
         ci = self.ci(coin_type)
 
         if for_txn_type == 'participate':
@@ -3049,8 +3042,8 @@ class BasicSwap(BaseApp):
             txn_script = bid.initiate_tx.script
             prev_amount = bid.amount
 
-        if self.coin_clients[coin_type]['use_segwit']:
-            prev_p2wsh = getP2WSH(txn_script)
+        if ci.using_segwit():
+            prev_p2wsh = ci.getScriptDest(txn_script)
             script_pub_key = prev_p2wsh.hex()
         else:
             script_pub_key = getP2SHScriptForHash(getKeyID(txn_script)).hex()
@@ -3063,7 +3056,10 @@ class BasicSwap(BaseApp):
             'amount': ci.format_amount(prev_amount)}
 
         bid_date = dt.datetime.fromtimestamp(bid.created_at).date()
-        wif_prefix = chainparams[Coins.PART][self.chain]['key_prefix']
+        if coin_type in (Coins.NAV, ):
+            wif_prefix = chainparams[coin_type][self.chain]['key_prefix']
+        else:
+            wif_prefix = chainparams[Coins.PART][self.chain]['key_prefix']
         pubkey = self.getContractPubkey(bid_date, bid.contract_count)
         privkey = toWIF(wif_prefix, self.getContractPrivkey(bid_date, bid.contract_count))
 
@@ -3078,7 +3074,7 @@ class BasicSwap(BaseApp):
         if fee_rate is None:
             fee_rate, fee_src = self.getFeeRateForCoin(coin_type)
 
-        tx_vsize = self.getContractSpendTxVSize(coin_type)
+        tx_vsize = ci.getHTLCSpendTxVSize()
         tx_fee = (fee_rate * tx_vsize) / 1000
 
         self.log.debug('Redeem tx fee %s, rate %s', ci.format_amount(tx_fee, conv_int=True, r=1), str(fee_rate))
@@ -3092,14 +3088,20 @@ class BasicSwap(BaseApp):
 
         self.log.debug('addr_redeem_out %s', addr_redeem_out)
 
-        redeem_txn = ci.createRedeemTxn(prevout, addr_redeem_out, amount_out)
+        if ci.use_p2shp2wsh():
+            redeem_txn = ci.createRedeemTxn(prevout, addr_redeem_out, amount_out, txn_script)
+        else:
+            redeem_txn = ci.createRedeemTxn(prevout, addr_redeem_out, amount_out)
         options = {}
-        if self.coin_clients[coin_type]['use_segwit']:
+        if ci.using_segwit():
             options['force_segwit'] = True
 
-        redeem_sig = self.callcoinrpc(Coins.PART, 'createsignaturewithkey', [redeem_txn, prevout, privkey, 'ALL', options])
+        if coin_type in (Coins.NAV, ):
+            redeem_sig = ci.getTxSignature(redeem_txn, prevout, privkey)
+        else:
+            redeem_sig = self.callcoinrpc(Coins.PART, 'createsignaturewithkey', [redeem_txn, prevout, privkey, 'ALL', options])
 
-        if coin_type == Coins.PART or self.coin_clients[coin_type]['use_segwit']:
+        if coin_type == Coins.PART or ci.using_segwit():
             witness_stack = [
                 bytes.fromhex(redeem_sig),
                 pubkey,
@@ -3115,7 +3117,11 @@ class BasicSwap(BaseApp):
             script += format(OpCodes.OP_PUSHDATA1, '02x') + format(len(txn_script), '02x') + txn_script.hex()
             redeem_txn = ci.setTxScriptSig(bytes.fromhex(redeem_txn), 0, bytes.fromhex(script)).hex()
 
-        ro = self.callcoinrpc(Coins.PART, 'verifyrawtransaction', [redeem_txn, [prevout]])
+        if coin_type in (Coins.NAV, ):
+            # Only checks signature
+            ro = ci.verifyRawTransaction(redeem_txn, [prevout])
+        else:
+            ro = self.callcoinrpc(Coins.PART, 'verifyrawtransaction', [redeem_txn, [prevout]])
         ensure(ro['inputs_valid'] is True, 'inputs_valid is false')
         # outputs_valid will be false if not a Particl txn
         # ensure(ro['complete'] is True, 'complete is false')
@@ -3125,16 +3131,15 @@ class BasicSwap(BaseApp):
             # Check fee
             if ci.get_connection_type() == 'rpc':
                 redeem_txjs = self.callcoinrpc(coin_type, 'decoderawtransaction', [redeem_txn])
-                if ci.using_segwit():
+                if ci.using_segwit() or coin_type in (Coins.PART, ):
                     self.log.debug('vsize paid, actual vsize %d %d', tx_vsize, redeem_txjs['vsize'])
                     ensure(tx_vsize >= redeem_txjs['vsize'], 'underpaid fee')
                 else:
                     self.log.debug('size paid, actual size %d %d', tx_vsize, redeem_txjs['size'])
                     ensure(tx_vsize >= redeem_txjs['size'], 'underpaid fee')
 
-            redeem_txjs = self.callcoinrpc(Coins.PART, 'decoderawtransaction', [redeem_txn])
-            self.log.debug('Have valid redeem txn %s for contract %s tx %s', redeem_txjs['txid'], for_txn_type, prev_txnid)
-
+            redeem_txid = ci.getTxid(bytes.fromhex(redeem_txn))
+            self.log.debug('Have valid redeem txn %s for contract %s tx %s', redeem_txid.hex(), for_txn_type, prev_txnid)
         return redeem_txn
 
     def createRefundTxn(self, coin_type, txn, offer, bid, txn_script: bytearray, addr_refund_out=None, tx_type=TxTypes.ITX_REFUND):
@@ -3142,26 +3147,31 @@ class BasicSwap(BaseApp):
         if self.coin_clients[coin_type]['connection_type'] != 'rpc':
             return None
 
-        txjs = self.callcoinrpc(Coins.PART, 'decoderawtransaction', [txn])
-        if self.coin_clients[coin_type]['use_segwit']:
-            p2wsh = getP2WSH(txn_script)
-            vout = getVoutByP2WSH(txjs, p2wsh.hex())
+        ci = self.ci(coin_type)
+        if coin_type in (Coins.NAV, ):
+            wif_prefix = chainparams[coin_type][self.chain]['key_prefix']
+            prevout = ci.find_prevout_info(txn, txn_script)
         else:
-            addr_to = self.ci(Coins.PART).encode_p2sh(txn_script)
-            vout = getVoutByAddress(txjs, addr_to)
+            wif_prefix = chainparams[Coins.PART][self.chain]['key_prefix']
+            txjs = self.callcoinrpc(Coins.PART, 'decoderawtransaction', [txn])
+            if ci.using_segwit():
+                p2wsh = ci.getScriptDest(txn_script)
+                vout = getVoutByScriptPubKey(txjs, p2wsh.hex())
+            else:
+                addr_to = self.ci(Coins.PART).encode_p2sh(txn_script)
+                vout = getVoutByAddress(txjs, addr_to)
+
+            prevout = {
+                'txid': txjs['txid'],
+                'vout': vout,
+                'scriptPubKey': txjs['vout'][vout]['scriptPubKey']['hex'],
+                'redeemScript': txn_script.hex(),
+                'amount': txjs['vout'][vout]['value']
+            }
 
         bid_date = dt.datetime.fromtimestamp(bid.created_at).date()
-        wif_prefix = chainparams[Coins.PART][self.chain]['key_prefix']
         pubkey = self.getContractPubkey(bid_date, bid.contract_count)
         privkey = toWIF(wif_prefix, self.getContractPrivkey(bid_date, bid.contract_count))
-
-        prev_amount = txjs['vout'][vout]['value']
-        prevout = {
-            'txid': txjs['txid'],
-            'vout': vout,
-            'scriptPubKey': txjs['vout'][vout]['scriptPubKey']['hex'],
-            'redeemScript': txn_script.hex(),
-            'amount': prev_amount}
 
         lock_value = DeserialiseNum(txn_script, 64)
         sequence: int = 1
@@ -3170,13 +3180,12 @@ class BasicSwap(BaseApp):
 
         fee_rate, fee_src = self.getFeeRateForCoin(coin_type)
 
-        tx_vsize = self.getContractSpendTxVSize(coin_type, False)
+        tx_vsize = ci.getHTLCSpendTxVSize(False)
         tx_fee = (fee_rate * tx_vsize) / 1000
 
-        ci = self.ci(coin_type)
         self.log.debug('Refund tx fee %s, rate %s', ci.format_amount(tx_fee, conv_int=True, r=1), str(fee_rate))
 
-        amount_out = ci.make_int(prev_amount, r=1) - ci.make_int(tx_fee, r=1)
+        amount_out = ci.make_int(prevout['amount'], r=1) - ci.make_int(tx_fee, r=1)
         if amount_out <= 0:
             raise ValueError('Refund amount out <= 0')
 
@@ -3188,12 +3197,19 @@ class BasicSwap(BaseApp):
         locktime: int = 0
         if offer.lock_type == TxLockTypes.ABS_LOCK_BLOCKS or offer.lock_type == TxLockTypes.ABS_LOCK_TIME:
             locktime = lock_value
-        refund_txn = ci.createRefundTxn(prevout, addr_refund_out, amount_out, locktime, sequence)
+
+        if ci.use_p2shp2wsh():
+            refund_txn = ci.createRefundTxn(prevout, addr_refund_out, amount_out, locktime, sequence, txn_script)
+        else:
+            refund_txn = ci.createRefundTxn(prevout, addr_refund_out, amount_out, locktime, sequence)
 
         options = {}
         if self.coin_clients[coin_type]['use_segwit']:
             options['force_segwit'] = True
-        refund_sig = self.callcoinrpc(Coins.PART, 'createsignaturewithkey', [refund_txn, prevout, privkey, 'ALL', options])
+        if coin_type in (Coins.NAV, ):
+            refund_sig = ci.getTxSignature(refund_txn, prevout, privkey)
+        else:
+            refund_sig = self.callcoinrpc(Coins.PART, 'createsignaturewithkey', [refund_txn, prevout, privkey, 'ALL', options])
         if coin_type == Coins.PART or self.coin_clients[coin_type]['use_segwit']:
             witness_stack = [
                 bytes.fromhex(refund_sig),
@@ -3208,7 +3224,12 @@ class BasicSwap(BaseApp):
             script += format(OpCodes.OP_PUSHDATA1, '02x') + format(len(txn_script), '02x') + txn_script.hex()
             refund_txn = ci.setTxScriptSig(bytes.fromhex(refund_txn), 0, bytes.fromhex(script)).hex()
 
-        ro = self.callcoinrpc(Coins.PART, 'verifyrawtransaction', [refund_txn, [prevout]])
+        if coin_type in (Coins.NAV, ):
+            # Only checks signature
+            ro = ci.verifyRawTransaction(refund_txn, [prevout])
+        else:
+            ro = self.callcoinrpc(Coins.PART, 'verifyrawtransaction', [refund_txn, [prevout]])
+
         ensure(ro['inputs_valid'] is True, 'inputs_valid is false')
         # outputs_valid will be false if not a Particl txn
         # ensure(ro['complete'] is True, 'complete is false')
@@ -3218,15 +3239,16 @@ class BasicSwap(BaseApp):
             # Check fee
             if ci.get_connection_type() == 'rpc':
                 refund_txjs = self.callcoinrpc(coin_type, 'decoderawtransaction', [refund_txn])
-                if ci.using_segwit():
+                if ci.using_segwit() or coin_type in (Coins.PART, ):
                     self.log.debug('vsize paid, actual vsize %d %d', tx_vsize, refund_txjs['vsize'])
                     ensure(tx_vsize >= refund_txjs['vsize'], 'underpaid fee')
                 else:
                     self.log.debug('size paid, actual size %d %d', tx_vsize, refund_txjs['size'])
                     ensure(tx_vsize >= refund_txjs['size'], 'underpaid fee')
 
-            refund_txjs = self.callcoinrpc(Coins.PART, 'decoderawtransaction', [refund_txn])
-            self.log.debug('Have valid refund txn %s for contract tx %s', refund_txjs['txid'], txjs['txid'])
+            refund_txid = ci.getTxid(bytes.fromhex(refund_txn))
+            prev_txid = ci.getTxid(bytes.fromhex(txn))
+            self.log.debug('Have valid refund txn %s for contract tx %s', refund_txid.hex(), prev_txid.hex())
 
         return refund_txn
 
@@ -3344,10 +3366,10 @@ class BasicSwap(BaseApp):
 
                 return rv
 
-            raise ValueError('No explorer for lookupUnspentByAddress {}'.format(str(coin_type)))
+            raise ValueError('No explorer for lookupUnspentByAddress {}'.format(Coins(coin_type).name))
 
         if self.coin_clients[coin_type]['connection_type'] != 'rpc':
-            raise ValueError('No RPC connection for lookupUnspentByAddress {}'.format(str(coin_type)))
+            raise ValueError('No RPC connection for lookupUnspentByAddress {}'.format(Coins(coin_type).name))
 
         if assert_txid is not None:
             try:
@@ -3704,8 +3726,9 @@ class BasicSwap(BaseApp):
                 except Exception:
                     pass
             else:
-                if self.coin_clients[coin_from]['use_segwit']:
-                    addr = ci_from.encode_p2wsh(getP2WSH(bid.initiate_tx.script))
+                if ci_from.using_segwit():
+                    dest_script = ci_from.getScriptDest(bid.initiate_tx.script)
+                    addr = ci_from.encodeScriptDest(dest_script)
                 else:
                     addr = p2sh
 
@@ -3745,8 +3768,9 @@ class BasicSwap(BaseApp):
                 return True  # Mark bid for archiving
         elif state == BidStates.SWAP_INITIATED:
             # Waiting for participate txn to be confirmed in 'to' chain
-            if self.coin_clients[coin_to]['use_segwit']:
-                addr = ci_to.encode_p2wsh(getP2WSH(bid.participate_tx.script))
+            if ci_to.using_segwit():
+                p2wsh = ci_to.getScriptDest(bid.participate_tx.script)
+                addr = ci_to.encodeScriptDest(p2wsh)
             else:
                 addr = ci_to.encode_p2sh(bid.participate_tx.script)
 
@@ -3851,13 +3875,13 @@ class BasicSwap(BaseApp):
 
     def removeWatchedOutput(self, coin_type, bid_id: bytes, txid_hex: str) -> None:
         # Remove all for bid if txid is None
-        self.log.debug('removeWatchedOutput %s %s %s', str(coin_type), bid_id.hex(), txid_hex)
+        self.log.debug('removeWatchedOutput %s %s %s', Coins(coin_type).name, bid_id.hex(), txid_hex)
         old_len = len(self.coin_clients[coin_type]['watched_outputs'])
         for i in range(old_len - 1, -1, -1):
             wo = self.coin_clients[coin_type]['watched_outputs'][i]
             if wo.bid_id == bid_id and (txid_hex is None or wo.txid_hex == txid_hex):
                 del self.coin_clients[coin_type]['watched_outputs'][i]
-                self.log.debug('Removed watched output %s %s %s', str(coin_type), bid_id.hex(), wo.txid_hex)
+                self.log.debug('Removed watched output %s %s %s', Coins(coin_type).name, bid_id.hex(), wo.txid_hex)
 
     def initiateTxnSpent(self, bid_id: bytes, spend_txid: str, spend_n: int, spend_txn):
         self.log.debug('Bid %s initiate txn spent by %s %d', bid_id.hex(), spend_txid, spend_n)
@@ -4632,7 +4656,7 @@ class BasicSwap(BaseApp):
                 chain_b_height_start=ci_to.getChainHeight(),
             )
         else:
-            ensure(bid.state == BidStates.BID_SENT, 'Wrong bid state: {}'.format(str(BidStates(bid.state))))
+            ensure(bid.state == BidStates.BID_SENT, 'Wrong bid state: {}'.format(BidStates(bid.state).name))
             bid.created_at = msg['sent']
             bid.expire_at = msg['sent'] + bid_data.time_valid
             bid.was_received = True
@@ -4680,7 +4704,7 @@ class BasicSwap(BaseApp):
 
                 self.log.info('Received valid bid accept %s for bid %s sent to self', accept_msg_id.hex(), bid_id.hex())
                 return
-            raise ValueError('Wrong bid state: {}'.format(str(BidStates(bid.state))))
+            raise ValueError('Wrong bid state: {}'.format(BidStates(bid.state).name))
 
         use_csv = True if offer.lock_type < TxLockTypes.ABS_LOCK_BLOCKS else False
 
@@ -4936,7 +4960,7 @@ class BasicSwap(BaseApp):
                 bid.chain_b_height_start = wallet_restore_height
                 self.log.warning('Adaptor-sig swap restore height clamped to {}'.format(wallet_restore_height))
         else:
-            ensure(bid.state == BidStates.BID_SENT, 'Wrong bid state: {}'.format(str(BidStates(bid.state))))
+            ensure(bid.state == BidStates.BID_SENT, 'Wrong bid state: {}'.format(BidStates(bid.state).name))
             # Don't update bid.created_at, it's been used to derive kaf
             bid.expire_at = msg['sent'] + bid_data.time_valid
             bid.was_received = True
@@ -5178,7 +5202,6 @@ class BasicSwap(BaseApp):
         txid_hex = ci_from.publishTx(lock_tx_signed)
 
         vout_pos = ci_from.getTxOutputPos(xmr_swap.a_lock_tx, xmr_swap.a_lock_tx_script)
-
         self.log.debug('Submitted lock txn %s to %s chain for bid %s', txid_hex, ci_from.coin_name(), bid_id.hex())
 
         if bid.xmr_a_lock_tx is None:
@@ -5806,7 +5829,7 @@ class BasicSwap(BaseApp):
                 bid.chain_b_height_start = wallet_restore_height
                 self.log.warning('Adaptor-sig swap restore height clamped to {}'.format(wallet_restore_height))
         else:
-            ensure(bid.state == BidStates.BID_REQUEST_SENT, 'Wrong bid state: {}'.format(str(BidStates(bid.state))))
+            ensure(bid.state == BidStates.BID_REQUEST_SENT, 'Wrong bid state: {}'.format(BidStates(bid.state).name))
             # Don't update bid.created_at, it's been used to derive kaf
             bid.expire_at = msg['sent'] + bid_data.time_valid
             bid.was_received = True
@@ -6364,6 +6387,8 @@ class BasicSwap(BaseApp):
                 rv['blind_unconfirmed'] = walletinfo['unconfirmed_blind']
             elif coin == Coins.XMR:
                 rv['main_address'] = self.getCachedMainWalletAddress(ci)
+            elif coin == Coins.NAV:
+                rv['immature'] = walletinfo['immature_balance']
 
             return rv
         except Exception as e:

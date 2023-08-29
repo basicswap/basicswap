@@ -25,10 +25,10 @@ class DASHInterface(BTCInterface):
         self._wallet_passphrase = ''
         self._have_checked_seed = False
 
-    def seedToMnemonic(self, key):
+    def seedToMnemonic(self, key: bytes) -> str:
         return Mnemonic('english').to_mnemonic(key)
 
-    def initialiseWallet(self, key):
+    def initialiseWallet(self, key: bytes):
         words = self.seedToMnemonic(key)
 
         mnemonic_passphrase = ''
@@ -37,10 +37,10 @@ class DASHInterface(BTCInterface):
         if self._wallet_passphrase != '':
             self.unlockWallet(self._wallet_passphrase)
 
-    def decodeAddress(self, address):
+    def decodeAddress(self, address: str) -> bytes:
         return decodeAddress(address)[1:]
 
-    def checkExpectedSeed(self, key_hash):
+    def checkExpectedSeed(self, key_hash: str):
         try:
             rv = self.rpc_callback('dumphdinfo')
             entropy = Mnemonic('english').to_entropy(rv['mnemonic'].split(' '))

@@ -55,7 +55,6 @@ from basicswap.contrib.test_framework.messages import (
     CTxIn,
     CTxInWitness,
     CTxOut,
-    FromHex,
     uint256_from_str)
 
 from basicswap.contrib.test_framework.script import (
@@ -209,6 +208,10 @@ class BTCInterface(CoinInterface):
         # Using btc native segwit
         return self._use_segwit
 
+    def use_p2shp2wsh(self) -> bool:
+        # p2sh-p2wsh
+        return False
+
     def get_connection_type(self):
         return self._connection_type
 
@@ -287,7 +290,7 @@ class BTCInterface(CoinInterface):
     def getWalletRestoreHeight(self) -> int:
         start_time = self.rpc_callback('getwalletinfo')['keypoololdest']
 
-        blockchaininfo = self.rpc_callback('getblockchaininfo')
+        blockchaininfo = self.getBlockchainInfo()
         best_block = blockchaininfo['bestblockhash']
 
         chain_synced = round(blockchaininfo['verificationprogress'], 3)
@@ -450,7 +453,7 @@ class BTCInterface(CoinInterface):
     def decodePubkey(self, pke):
         return CPKToPoint(pke)
 
-    def decodeKey(self, k):
+    def decodeKey(self, k: str) -> bytes:
         return decodeWif(k)
 
     def sumKeys(self, ka, kb):
@@ -461,7 +464,14 @@ class BTCInterface(CoinInterface):
         return PublicKey.combine_keys([PublicKey(Ka), PublicKey(Kb)]).format()
 
     def getScriptForPubkeyHash(self, pkh: bytes) -> CScript:
+        # p2wpkh
         return CScript([OP_0, pkh])
+
+    def loadTx(self, tx_bytes: bytes) -> CTransaction:
+        # Load tx from bytes to internal representation
+        tx = CTransaction()
+        tx.deserialize(BytesIO(tx_bytes))
+        return tx
 
     def extractScriptLockScriptValues(self, script_bytes: bytes):
         script_len = len(script_bytes)
@@ -536,7 +546,7 @@ class BTCInterface(CoinInterface):
 
     def createSCLockRefundTx(self, tx_lock_bytes, script_lock, Kal, Kaf, lock1_value, csv_val, tx_fee_rate, vkbv=None):
         tx_lock = CTransaction()
-        tx_lock = FromHex(tx_lock, tx_lock_bytes.hex())
+        tx_lock = self.loadTx(tx_lock_bytes)
 
         output_script = self.getScriptDest(script_lock)
         locked_n = findOutput(tx_lock, output_script)
@@ -900,7 +910,7 @@ class BTCInterface(CoinInterface):
     def decryptOtVES(self, k, esig):
         return ecdsaotves_dec_sig(k, esig) + bytes((SIGHASH_ALL,))
 
-    def verifyTxSig(self, tx_bytes, sig, K, input_n, prevout_script, prevout_value):
+    def verifyTxSig(self, tx_bytes: bytes, sig: bytes, K: bytes, input_n: int, prevout_script: bytes, prevout_value: int) -> bool:
         tx = self.loadTx(tx_bytes)
         sig_hash = SegwitV0SignatureHash(prevout_script, tx, input_n, SIGHASH_ALL, prevout_value)
 
@@ -955,12 +965,6 @@ class BTCInterface(CoinInterface):
     def encodeTx(self, tx) -> bytes:
         return tx.serialize()
 
-    def loadTx(self, tx_bytes: bytes) -> CTransaction:
-        # Load tx from bytes to internal representation
-        tx = CTransaction()
-        tx.deserialize(BytesIO(tx_bytes))
-        return tx
-
     def getTxid(self, tx) -> bytes:
         if isinstance(tx, str):
             tx = bytes.fromhex(tx)
@@ -983,6 +987,18 @@ class BTCInterface(CoinInterface):
 
     def getScriptScriptSig(self, script: bytes) -> bytes:
         return bytes()
+
+    def getP2SHP2WSHDest(self, script):
+        script_hash = hashlib.sha256(script).digest()
+        assert len(script_hash) == 32
+        p2wsh_hash = hash160(CScript([OP_0, script_hash]))
+        assert len(p2wsh_hash) == 20
+        return CScript([OP_HASH160, p2wsh_hash, OP_EQUAL])
+
+    def getP2SHP2WSHScriptSig(self, script):
+        script_hash = hashlib.sha256(script).digest()
+        assert len(script_hash) == 32
+        return CScript([CScript([OP_0, script_hash, ]), ])
 
     def getPkDest(self, K: bytes) -> bytearray:
         return self.getScriptForPubkeyHash(self.getPubkeyHash(K))
@@ -1467,6 +1483,14 @@ class BTCInterface(CoinInterface):
     def ensureFunds(self, amount: int) -> None:
         if self.getSpendableBalance() < amount:
             raise ValueError('Balance too low')
+
+    def getHTLCSpendTxVSize(self, redeem: bool = True) -> int:
+        tx_vsize = 5  # Add a few bytes, sequence in script takes variable amount of bytes
+        if self.using_segwit():
+            tx_vsize += 143 if redeem else 134
+        else:
+            tx_vsize += 323 if redeem else 287
+        return tx_vsize
 
 
 def testBTCInterface():

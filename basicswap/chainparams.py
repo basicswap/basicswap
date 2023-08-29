@@ -31,6 +31,7 @@ class Coins(IntEnum):
     PIVX = 11
     DASH = 12
     FIRO = 13
+    NAV = 14
 
 
 chainparams = {
@@ -321,6 +322,45 @@ chainparams = {
             'rpcport': 28888,
             'pubkey_address': 65,
             'script_address': 178,
+            'key_prefix': 239,
+            'hrp': '',
+            'bip44': 1,
+            'min_amount': 1000,
+            'max_amount': 100000 * COIN,
+        }
+    },
+    Coins.NAV: {
+        'name': 'navcoin',
+        'ticker': 'NAV',
+        'message_magic': 'Navcoin Signed Message:\n',
+        'blocks_target': 30,
+        'decimal_places': 8,
+        'has_csv': True,
+        'has_segwit': True,
+        'mainnet': {
+            'rpcport': 44444,
+            'pubkey_address': 53,
+            'script_address': 85,
+            'key_prefix': 150,
+            'hrp': '',
+            'bip44': 130,
+            'min_amount': 1000,
+            'max_amount': 100000 * COIN,
+        },
+        'testnet': {
+            'rpcport': 44445,
+            'pubkey_address': 111,
+            'script_address': 196,
+            'key_prefix': 239,
+            'hrp': '',
+            'bip44': 1,
+            'min_amount': 1000,
+            'max_amount': 100000 * COIN,
+        },
+        'regtest': {
+            'rpcport': 44446,
+            'pubkey_address': 111,
+            'script_address': 196,
             'key_prefix': 239,
             'hrp': '',
             'bip44': 1,
