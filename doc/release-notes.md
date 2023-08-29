@@ -1,6 +1,16 @@
+0.0.67
+==============
+
+- Added support for p2sh-p2wsh coins
+- Added Navcoin
+- Fixed Particl fee estimation in secret hash swaps.
+- Raised adaptor signature swap protocol version to 2
+  - Not backwards compatible with previous versions.
+
 
 0.0.66
 ==============
+
 - Fixed bugs in getLinkedMessageId and validateSwapType.
 
 
