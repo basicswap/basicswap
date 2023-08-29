@@ -61,7 +61,12 @@ DASH_VERSION_TAG = os.getenv('DASH_VERSION_TAG', '')
 FIRO_VERSION = os.getenv('FIRO_VERSION', '0.14.99.1')
 FIRO_VERSION_TAG = os.getenv('FIRO_VERSION_TAG', '')
 
+NAV_VERSION = os.getenv('NAV_VERSION', '7.0.3')
+NAV_VERSION_TAG = os.getenv('NAV_VERSION', '')
+
 GUIX_SSL_CERT_DIR = None
+
+ADD_PUBKEY_URL = os.getenv('ADD_PUBKEY_URL', '')
 
 
 known_coins = {
@@ -74,6 +79,7 @@ known_coins = {
     'dash': (DASH_VERSION, DASH_VERSION_TAG, ('pasta',)),
     # 'firo': (FIRO_VERSION, FIRO_VERSION_TAG, ('reuben',)),
     'firo': (FIRO_VERSION, FIRO_VERSION_TAG, ('tecnovert',)),
+    'navcoin': (NAV_VERSION, NAV_VERSION_TAG, ('nav_builder',)),
 }
 
 expected_key_ids = {
@@ -86,6 +92,7 @@ expected_key_ids = {
     'fuzzbawls': ('3BDCDA2D87A881D9',),
     'pasta': ('52527BEDABE87984',),
     'reuben': ('1290A1D0FA7EE109',),
+    'nav_builder': ('2782262BF6E7FADB',),
 }
 
 USE_PLATFORM = os.getenv('USE_PLATFORM', platform.system())
@@ -158,6 +165,12 @@ FIRO_RPC_PORT = int(os.getenv('FIRO_RPC_PORT', 8888))
 FIRO_ONION_PORT = int(os.getenv('FIRO_ONION_PORT', 8168))  # nDefaultPort
 FIRO_RPC_USER = os.getenv('FIRO_RPC_USER', '')
 FIRO_RPC_PWD = os.getenv('FIRO_RPC_PWD', '')
+
+NAV_RPC_HOST = os.getenv('NAV_RPC_HOST', '127.0.0.1')
+NAV_RPC_PORT = int(os.getenv('NAV_RPC_PORT', 44444))
+NAV_ONION_PORT = int(os.getenv('NAV_ONION_PORT', 8334))  # TODO?
+NAV_RPC_USER = os.getenv('NAV_RPC_USER', '')
+NAV_RPC_PWD = os.getenv('NAV_RPC_PWD', '')
 
 TOR_PROXY_HOST = os.getenv('TOR_PROXY_HOST', '127.0.0.1')
 TOR_PROXY_PORT = int(os.getenv('TOR_PROXY_PORT', 9050))
@@ -612,8 +625,14 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
                 release_filename = 'firo-0.14.99.1-x86_64-apple-darwin18.tar.gz'
             else:
                 raise ValueError('Firo: Unknown architecture')
-            release_url = 'https://github.com/tecnovert/particl-core/releases/download/v{}/{}'.format(version + version_tag, release_filename)
+            release_url = 'https://github.com/tecnovert/particl-core/releases/download/{}/{}'.format(version + version_tag, release_filename)
             assert_url = 'https://github.com/tecnovert/particl-core/releases/download/v%s/SHA256SUMS.asc' % (version + version_tag)
+        elif coin == 'navcoin':
+            release_filename = '{}-{}-{}.{}'.format(coin, version, BIN_ARCH, FILE_EXT)
+            release_url = 'https://github.com/navcoin/navcoin-core/releases/download/{}/{}'.format(version + version_tag, release_filename)
+            assert_filename = 'SHA256SUM_7.0.3.asc'
+            assert_sig_filename = 'SHA256SUM_7.0.3.asc.sig'
+            assert_url = 'https://github.com/navcoin/navcoin-core/releases/download/{}/{}'.format(version + version_tag, assert_filename)
         else:
             raise ValueError('Unknown coin')
 
@@ -629,7 +648,8 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
 
         if coin not in ('firo', ):
             assert_sig_url = assert_url + ('.asc' if major_version >= 22 else '.sig')
-            assert_sig_filename = '{}-{}-{}-build-{}.assert.sig'.format(coin, os_name, version, signing_key_name)
+            if coin not in ('nav', ):
+                assert_sig_filename = '{}-{}-{}-build-{}.assert.sig'.format(coin, os_name, version, signing_key_name)
             assert_sig_path = os.path.join(bin_dir, assert_sig_filename)
             if not os.path.exists(assert_sig_path):
                 downloadFile(assert_sig_url, assert_sig_path)
@@ -665,6 +685,8 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
 
     if coin in ('firo', ):
         pubkey_filename = '{}_{}.pgp'.format('particl', signing_key_name)
+    elif coin in ('navcoin', ):
+        pubkey_filename = '{}_builder.pgp'.format(coin)
     else:
         pubkey_filename = '{}_{}.pgp'.format(coin, signing_key_name)
     pubkeyurls = [
@@ -678,6 +700,9 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
     if coin == 'firo':
         pubkeyurls.append('https://firo.org/reuben.asc')
 
+    if ADD_PUBKEY_URL != '':
+        pubkeyurls.append(ADD_PUBKEY_URL + '/' + pubkey_filename)
+
     if coin in ('monero', 'firo'):
         with open(assert_path, 'rb') as fp:
             verified = gpg.verify_file(fp)
@@ -687,6 +712,21 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
             importPubkeyFromUrls(gpg, pubkeyurls)
             with open(assert_path, 'rb') as fp:
                 verified = gpg.verify_file(fp)
+    elif coin in ('navcoin'):
+        with open(assert_sig_path, 'rb') as fp:
+            verified = gpg.verify_file(fp)
+
+        if not isValidSignature(verified) and verified.username is None:
+            logger.warning('Signature made by unknown key.')
+            importPubkeyFromUrls(gpg, pubkeyurls)
+            with open(assert_sig_path, 'rb') as fp:
+                verified = gpg.verify_file(fp)
+
+        # .sig file is not a detached signature, recheck release hash in decrypted data
+        logger.warning('Double checking Navcoin release hash.')
+        with open(assert_sig_path, 'rb') as fp:
+            decrypted = gpg.decrypt_file(fp)
+            assert (release_hash.hex() in str(decrypted))
     else:
         with open(assert_sig_path, 'rb') as fp:
             verified = gpg.verify_file(fp, assert_path)
@@ -793,8 +833,12 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
         exitWithError('{} exists'.format(core_conf_path))
     with open(core_conf_path, 'w') as fp:
         if chain != 'mainnet':
-            fp.write(chain + '=1\n')
-            if coin != 'firo':
+            if coin in ('navcoin',):
+                chainname = 'devnet' if chain == 'regtest' else chain
+                fp.write(chainname + '=1\n')
+            else:
+                fp.write(chain + '=1\n')
+            if coin not in ('firo', 'navcoin'):
                 if chain == 'testnet':
                     fp.write('[test]\n\n')
                 elif chain == 'regtest':
@@ -856,6 +900,11 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
             fp.write('usehd=1\n')
             if FIRO_RPC_USER != '':
                 fp.write('rpcauth={}:{}${}\n'.format(FIRO_RPC_USER, salt, password_to_hmac(salt, FIRO_RPC_PWD)))
+        elif coin == 'navcoin':
+            fp.write('prune=4000\n')
+            fp.write('fallbackfee=0.0002\n')
+            if NAV_RPC_USER != '':
+                fp.write('rpcauth={}:{}${}\n'.format(NAV_RPC_USER, salt, password_to_hmac(salt, NAV_RPC_PWD)))
         else:
             logger.warning('Unknown coin %s', coin)
 
@@ -1519,6 +1568,21 @@ def main():
             'conf_target': 2,
             'core_version_group': 18,
             'chain_lookups': 'local',
+        },
+        'navcoin': {
+            'connection_type': 'rpc' if 'navcoin' in with_coins else 'none',
+            'manage_daemon': True if ('navcoin' in with_coins and NAV_RPC_HOST == '127.0.0.1') else False,
+            'rpchost': NAV_RPC_HOST,
+            'rpcport': NAV_RPC_PORT + port_offset,
+            'onionport': NAV_ONION_PORT + port_offset,
+            'datadir': os.getenv('NAV_DATA_DIR', os.path.join(data_dir, 'navcoin')),
+            'bindir': os.path.join(bin_dir, 'navcoin'),
+            'use_segwit': True,
+            'use_csv': True,
+            'blocks_confirmed': 1,
+            'conf_target': 2,
+            'core_version_group': 18,
+            'chain_lookups': 'local',
         }
     }
 
@@ -1543,6 +1607,9 @@ def main():
     if FIRO_RPC_USER != '':
         chainclients['firo']['rpcuser'] = FIRO_RPC_USER
         chainclients['firo']['rpcpassword'] = FIRO_RPC_PWD
+    if NAV_RPC_USER != '':
+        chainclients['nav']['rpcuser'] = NAV_RPC_USER
+        chainclients['nav']['rpcpassword'] = NAV_RPC_PWD
 
     chainclients['monero']['walletsdir'] = os.getenv('XMR_WALLETS_DIR', chainclients['monero']['datadir'])
 

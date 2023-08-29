@@ -1083,8 +1083,12 @@ class TestBTC_PARTB(TestFunctions):
         self.do_test_01_full_swap(self.test_coin_from, self.test_coin_to)
 
     def test_01_b_full_swap_reverse(self):
-        self.prepare_balance(self.test_coin_to, 100.0, 1800, 1800)
-        self.do_test_01_full_swap(self.test_coin_to, self.test_coin_from)
+        self.extra_wait_time = 60
+        try:
+            self.prepare_balance(self.test_coin_to, 100.0, 1800, 1800)
+            self.do_test_01_full_swap(self.test_coin_to, self.test_coin_from)
+        finally:
+            self.extra_wait_time = 0
 
     def test_02_a_leader_recover_a_lock_tx(self):
         self.prepare_balance(self.test_coin_to, 100.0, 1801, 1800)

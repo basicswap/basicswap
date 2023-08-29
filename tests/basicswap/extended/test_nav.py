@@ -69,7 +69,7 @@ from tests.basicswap.test_btc_xmr import TestFunctions
 
 logger = logging.getLogger()
 
-NAV_BINDIR = os.path.expanduser(os.getenv('NAV_BINDIR', os.path.join(cfg.DEFAULT_TEST_BINDIR, 'nav')))
+NAV_BINDIR = os.path.expanduser(os.getenv('NAV_BINDIR', os.path.join(cfg.DEFAULT_TEST_BINDIR, 'navcoin')))
 NAVD = os.getenv('NAVD', 'navcoind' + cfg.bin_suffix)
 NAV_CLI = os.getenv('NAV_CLI', 'navcoin-cli' + cfg.bin_suffix)
 NAV_TX = os.getenv('NAV_TX', 'navcoin-tx' + cfg.bin_suffix)
