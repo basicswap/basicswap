@@ -165,3 +165,9 @@ def make_rpc_func(port, auth, wallet=None, host='127.0.0.1'):
         nonlocal port, auth, wallet, host
         return callrpc(port, auth, method, params, wallet if wallet_override is None else wallet_override, host)
     return rpc_func
+
+
+def escape_rpcauth(auth_str: str) -> str:
+    username, password = auth_str.split(':', 1)
+    password = urllib.parse.quote(password)
+    return f'{username}:{password}'

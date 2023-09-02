@@ -1583,6 +1583,7 @@ def main():
             'conf_target': 2,
             'core_version_group': 18,
             'chain_lookups': 'local',
+            'startup_tries': 40,
         }
     }
 

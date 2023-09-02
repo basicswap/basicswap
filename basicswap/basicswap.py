@@ -34,6 +34,7 @@ from .interface import Curves
 from .interface.part import PARTInterface, PARTInterfaceAnon, PARTInterfaceBlind
 
 from . import __version__
+from .rpc import escape_rpcauth
 from .rpc_xmr import make_xmr_rpc2_func
 from .ui.util import getCoinName
 from .util import (
@@ -644,9 +645,9 @@ class BasicSwap(BaseApp):
                 if os.name != 'nt' or cc['core_version_group'] > 17:  # Litecoin on windows doesn't write a pid file
                     assert (datadir_pid == cc['pid']), 'Mismatched pid'
                 with open(authcookiepath, 'rb') as fp:
-                    cc['rpcauth'] = fp.read().decode('utf-8')
+                    cc['rpcauth'] = escape_rpcauth(fp.read().decode('utf-8'))
             except Exception as e:
-                self.log.error('Unable to read authcookie for %s, %s, datadir pid %d, daemon pid %s. Error: %s', str(coin), authcookiepath, datadir_pid, cc['pid'], str(e))
+                self.log.error('Unable to read authcookie for %s, %s, datadir pid %d, daemon pid %s. Error: %s', Coins(coin).name, authcookiepath, datadir_pid, cc['pid'], str(e))
                 raise ValueError('Error, terminating')
 
     def createCoinInterface(self, coin):
@@ -673,7 +674,7 @@ class BasicSwap(BaseApp):
             self.createCoinInterface(c)
 
             if self.coin_clients[c]['connection_type'] == 'rpc':
-                if c == Coins.BTC:
+                if c in (Coins.BTC, ):
                     self.waitForDaemonRPC(c, with_wallet=False)
                     if len(self.callcoinrpc(c, 'listwallets')) >= 1:
                         self.waitForDaemonRPC(c)
@@ -764,6 +765,7 @@ class BasicSwap(BaseApp):
                 rv = self.callcoincli(coin, 'stop', timeout=10)
                 self.log.debug('Trying to stop %s', Coins(coin).name)
                 stopping = True
+                # self.delay_event will be set here
                 time.sleep(i + 1)
         except Exception as ex:
             str_ex = str(ex)
@@ -789,16 +791,20 @@ class BasicSwap(BaseApp):
                 self.stopDaemon(c)
 
     def waitForDaemonRPC(self, coin_type, with_wallet: bool = True) -> None:
-        for i in range(self.startup_tries):
+        startup_tries = self.startup_tries
+        chain_client_settings = self.getChainClientSettings(coin_type)
+        if 'startup_tries' in chain_client_settings:
+            startup_tries = chain_client_settings['startup_tries']
+        for i in range(startup_tries):
             if not self.is_running:
                 return
             try:
                 self.coin_clients[coin_type]['interface'].testDaemonRPC(with_wallet)
                 return
             except Exception as ex:
-                self.log.warning('Can\'t connect to %s RPC: %s.  Trying again in %d second/s.', coin_type, str(ex), (1 + i))
-                time.sleep(1 + i)
-        self.log.error('Can\'t connect to %s RPC, exiting.', coin_type)
+                self.log.warning('Can\'t connect to %s RPC: %s.  Trying again in %d second/s, %d/%d.', Coins(coin_type).name, str(ex), (1 + i), i + 1, startup_tries)
+                self.delay_event.wait(1 + i)
+        self.log.error('Can\'t connect to %s RPC, exiting.', Coins(coin_type).name)
         self.stopRunning(1)  # systemd will try to restart the process if fail_code != 0
 
     def checkCoinsReady(self, coin_from, coin_to) -> None:
@@ -5971,7 +5977,7 @@ class BasicSwap(BaseApp):
                 break
             except Exception as e:
                 if 'Unknown message id' in str(e) and i < num_tries:
-                    time.sleep(1)
+                    self.delay_event.wait(1)
                 else:
                     raise e
 
