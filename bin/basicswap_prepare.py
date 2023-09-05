@@ -55,7 +55,7 @@ XMR_SITE_COMMIT = 'a3b195eb90c7d5564cc9d9ec09c873783d21901b'  # Lock hashes.txt 
 PIVX_VERSION = os.getenv('PIVX_VERSION', '5.5.0')
 PIVX_VERSION_TAG = os.getenv('PIVX_VERSION_TAG', '')
 
-DASH_VERSION = os.getenv('DASH_VERSION', '19.1.0')
+DASH_VERSION = os.getenv('DASH_VERSION', '19.3.0')
 DASH_VERSION_TAG = os.getenv('DASH_VERSION_TAG', '')
 
 FIRO_VERSION = os.getenv('FIRO_VERSION', '0.14.99.1')
