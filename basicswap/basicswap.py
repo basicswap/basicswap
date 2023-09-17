@@ -164,7 +164,7 @@ def validOfferStateToReceiveBid(offer_state):
 def threadPollXMRChainState(swap_client, coin_type):
     ci = swap_client.ci(coin_type)
     cc = swap_client.coin_clients[coin_type]
-    while not swap_client.delay_event.is_set():
+    while not swap_client.chainstate_delay_event.is_set():
         try:
             new_height = ci.getChainHeight()
             if new_height != cc['chain_height']:
@@ -173,13 +173,13 @@ def threadPollXMRChainState(swap_client, coin_type):
                     cc['chain_height'] = new_height
         except Exception as e:
             swap_client.log.warning('threadPollXMRChainState {}, error: {}'.format(ci.ticker(), str(e)))
-        swap_client.delay_event.wait(random.randrange(20, 30))  # random to stagger updates
+        swap_client.chainstate_delay_event.wait(random.randrange(20, 30))  # random to stagger updates
 
 
 def threadPollChainState(swap_client, coin_type):
     ci = swap_client.ci(coin_type)
     cc = swap_client.coin_clients[coin_type]
-    while not swap_client.delay_event.is_set():
+    while not swap_client.chainstate_delay_event.is_set():
         try:
             chain_state = ci.getBlockchainInfo()
             if chain_state['bestblockhash'] != cc['chain_best_block']:
@@ -191,7 +191,7 @@ def threadPollChainState(swap_client, coin_type):
                         cc['chain_median_time'] = chain_state['mediantime']
         except Exception as e:
             swap_client.log.warning('threadPollChainState {}, error: {}'.format(ci.ticker(), str(e)))
-        swap_client.delay_event.wait(random.randrange(20, 30))  # random to stagger updates
+        swap_client.chainstate_delay_event.wait(random.randrange(20, 30))  # random to stagger updates
 
 
 class WatchedOutput():  # Watch for spends
@@ -372,7 +372,6 @@ class BasicSwap(BaseApp):
         self.log.info('Finalise')
 
         with self.mxDB:
-            self.is_running = False
             self.delay_event.set()
 
         if self._network:
@@ -796,7 +795,7 @@ class BasicSwap(BaseApp):
         if 'startup_tries' in chain_client_settings:
             startup_tries = chain_client_settings['startup_tries']
         for i in range(startup_tries):
-            if not self.is_running:
+            if self.delay_event.is_set():
                 return
             try:
                 self.coin_clients[coin_type]['interface'].testDaemonRPC(with_wallet)
