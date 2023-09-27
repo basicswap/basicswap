@@ -211,8 +211,12 @@ def make_reporthook(read_start=0):
         dl_complete: bool = totalsize > 0 and read >= use_size
         time_now = time.time()
         time_delta = time_now - time_last
-        if time_delta < 4 and not dl_complete:
+        if time_delta < 4.0 and not dl_complete:
             return
+
+        # Avoid division by zero by picking a value
+        if time_delta <= 0.0:
+            time_delta = 0.01
 
         bytes_delta = read - read_last
         time_last = time_now
@@ -1091,7 +1095,7 @@ def finalise_daemon(d):
         d.send_signal(signal.CTRL_C_EVENT if os.name == 'nt' else signal.SIGINT)
         d.wait(timeout=120)
     except Exception as e:
-        logging.info(f'Error {e}'.format(d.pid))
+        logging.info(f'Error {e} for process {d.pid}')
     for fp in (d.stdout, d.stderr, d.stdin):
         if fp:
             fp.close()
