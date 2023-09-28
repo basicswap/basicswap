@@ -1429,7 +1429,14 @@ def main():
         os.makedirs(data_dir)
     config_path = os.path.join(data_dir, cfg.CONFIG_FILENAME)
 
+    should_download_btc_fastsync = False
     if extra_opts.get('use_btc_fastsync', False) is True:
+        if 'bitcoin' in with_coins or add_coin == 'bitcoin':
+            should_download_btc_fastsync = True
+        else:
+            logger.warning('Ignoring usebtcfastsync option without Bitcoin selected.')
+
+    if should_download_btc_fastsync:
         logger.info(f'Preparing BTC Fastsync file {BITCOIN_FASTSYNC_FILE}')
         sync_file_path = os.path.join(data_dir, BITCOIN_FASTSYNC_FILE)
         sync_file_url = os.path.join(BITCOIN_FASTSYNC_URL, BITCOIN_FASTSYNC_FILE)
