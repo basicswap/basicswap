@@ -624,16 +624,20 @@ class BasicSwap(BaseApp):
             datadir_pid = -1
             for i in range(20):
                 try:
-                    # Workaround for mismatched pid file name in litecoin 0.21.2
-                    # Also set with pid= in .conf
-                    # TODO: Remove
-                    if cc['name'] == 'litecoin' and (not os.path.exists(pidfilepath)) and \
-                       os.path.exists(os.path.join(self.getChainDatadirPath(coin), 'bitcoind.pid')):
-                        pidfilepath = os.path.join(self.getChainDatadirPath(coin), 'bitcoind.pid')
+                    if os.name == 'nt' and cc['core_version_group'] <= 17:
+                        # Older core versions don't write a pid file on windows
+                        pass
+                    else:
+                        # Workaround for mismatched pid file name in litecoin 0.21.2
+                        # Also set with pid= in .conf
+                        # TODO: Remove
+                        if cc['name'] == 'litecoin' and (not os.path.exists(pidfilepath)) and \
+                           os.path.exists(os.path.join(self.getChainDatadirPath(coin), 'bitcoind.pid')):
+                            pidfilepath = os.path.join(self.getChainDatadirPath(coin), 'bitcoind.pid')
 
-                    with open(pidfilepath, 'rb') as fp:
-                        datadir_pid = int(fp.read().decode('utf-8'))
-                    assert (datadir_pid == cc['pid']), 'Mismatched pid'
+                        with open(pidfilepath, 'rb') as fp:
+                            datadir_pid = int(fp.read().decode('utf-8'))
+                        assert (datadir_pid == cc['pid']), 'Mismatched pid'
                     assert (os.path.exists(authcookiepath))
                     break
                 except Exception as e:
