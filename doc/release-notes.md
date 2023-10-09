@@ -1,3 +1,10 @@
+0.0.68
+==============
+
+- Temporarily disabled Navcoin.
+  - Untested on mainnet.
+
+
 0.0.67
 ==============
 

@@ -67,6 +67,7 @@ NAV_VERSION_TAG = os.getenv('NAV_VERSION', '')
 GUIX_SSL_CERT_DIR = None
 
 ADD_PUBKEY_URL = os.getenv('ADD_PUBKEY_URL', '')
+OVERRIDE_DISABLED_COINS = toBool(os.getenv('OVERRIDE_DISABLED_COINS', 'false'))
 
 
 known_coins = {
@@ -81,6 +82,10 @@ known_coins = {
     'firo': (FIRO_VERSION, FIRO_VERSION_TAG, ('tecnovert',)),
     'navcoin': (NAV_VERSION, NAV_VERSION_TAG, ('nav_builder',)),
 }
+
+disabled_coins = [
+    'navcoin',
+]
 
 expected_key_ids = {
     'tecnovert': ('13F13651C9CF0D6B',),
@@ -1050,7 +1055,8 @@ def printVersion():
 
     logger.info('Core versions:')
     for coin, version in known_coins.items():
-        logger.info('\t%s: %s%s', coin, version[0], version[1])
+        postfix = ' (Disabled)' if coin in disabled_coins else ''
+        logger.info('\t%s: %s%s%s', coin.capitalize(), version[0], version[1], postfix)
 
 
 def printHelp():
@@ -1086,7 +1092,11 @@ def printHelp():
     print('--initwalletsonly        Setup coin wallets only.')
     print('--keysdirpath            Speed up tests by preloading all PGP keys in directory.')
 
-    print('\n' + 'Known coins: {}'.format(', '.join(known_coins.keys())))
+    active_coins = []
+    for coin_name in known_coins.keys():
+        if coin_name not in disabled_coins:
+            active_coins.append(coin_name)
+    print('\n' + 'Known coins: {}'.format(', '.join(active_coins)))
 
 
 def finalise_daemon(d):
@@ -1266,6 +1276,13 @@ def check_btc_fastsync_data(base_dir, sync_file_path):
     ensureValidSignatureBy(verified, 'tecnovert')
 
 
+def ensure_coin_valid(coin: str, test_disabled: bool = True) -> None:
+    if coin not in known_coins:
+        exitWithError(f'Unknown coin {coin.capitalize()}')
+    if test_disabled and not OVERRIDE_DISABLED_COINS and coin in disabled_coins:
+        exitWithError(f'{coin.capitalize()} is disabled')
+
+
 def main():
     global use_tor_proxy
     data_dir = None
@@ -1365,28 +1382,24 @@ def main():
                 continue
             if name == 'withcoin' or name == 'withcoins':
                 for coin in [s.lower() for s in s[1].split(',')]:
-                    if coin not in known_coins:
-                        exitWithError('Unknown coin {}'.format(coin))
+                    ensure_coin_valid(coin)
                     with_coins.add(coin)
                 coins_changed = True
                 continue
             if name == 'withoutcoin' or name == 'withoutcoins':
                 for coin in [s.lower() for s in s[1].split(',')]:
-                    if coin not in known_coins:
-                        exitWithError('Unknown coin {}'.format(coin))
+                    ensure_coin_valid(coin, test_disabled=False)
                     with_coins.discard(coin)
                 coins_changed = True
                 continue
             if name == 'addcoin':
                 add_coin = s[1].lower()
-                if add_coin not in known_coins:
-                    exitWithError('Unknown coin {}'.format(s[1]))
+                ensure_coin_valid(add_coin)
                 with_coins = {add_coin, }
                 continue
             if name == 'disablecoin':
                 disable_coin = s[1].lower()
-                if disable_coin not in known_coins:
-                    exitWithError('Unknown coin {}'.format(s[1]))
+                ensure_coin_valid(disable_coin, test_disabled=False)
                 continue
             if name == 'htmlhost':
                 htmlhost = s[1].strip('"')
@@ -1677,9 +1690,13 @@ def main():
         settings = load_config(config_path)
 
         if disable_coin not in settings['chainclients']:
-            exitWithError('{} has not been prepared'.format(disable_coin))
-        settings['chainclients'][disable_coin]['connection_type'] = 'none'
-        settings['chainclients'][disable_coin]['manage_daemon'] = False
+            exitWithError(f'{disable_coin} not configured')
+
+        coin_settings = settings['chainclients'][disable_coin]
+        if coin_settings['connection_type'] == 'none' and coin_settings['manage_daemon'] is False:
+            exitWithError(f'{disable_coin} is already disabled')
+        coin_settings['connection_type'] = 'none'
+        coin_settings['manage_daemon'] = False
 
         with open(config_path, 'w') as fp:
             json.dump(settings, fp, indent=4)
