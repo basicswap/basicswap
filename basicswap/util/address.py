@@ -87,7 +87,7 @@ def toWIF(prefix_byte: int, b: bytes, compressed: bool = True) -> str:
     return b58encode(b)
 
 
-def getKeyID(key_data: bytes) -> str:
+def getKeyID(key_data: bytes) -> bytes:
     sha256_hash = hashlib.sha256(key_data).digest()
     return ripemd160(sha256_hash)
 

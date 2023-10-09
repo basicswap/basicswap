@@ -81,7 +81,7 @@ class AtomicSwapInterface(ProtocolInterface):
 
     def promoteMockTx(self, ci, mock_tx: bytes, script: bytearray) -> bytearray:
         mock_txo_script = self.getMockScriptScriptPubkey(ci)
-        real_txo_script = ci.get_p2wsh_script_pubkey(script) if ci._use_segwit else ci.get_p2sh_script_pubkey(script)
+        real_txo_script = ci.getScriptDest(script) if ci._use_segwit else ci.get_p2sh_script_pubkey(script)
 
         found: int = 0
         ctx = ci.loadTx(mock_tx)

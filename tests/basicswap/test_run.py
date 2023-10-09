@@ -92,7 +92,12 @@ class Test(BaseTest):
     def getBalance(self, js_wallets, coin_type):
         ci = self.swap_clients[0].ci(coin_type)
         ticker = chainparams[coin_type]['ticker']
-        return ci.make_int(float(js_wallets[ticker]['balance']) + float(js_wallets[ticker]['unconfirmed']))
+        coin_wallet = js_wallets[ticker]
+        rv = float(coin_wallet['balance'])
+        rv += float(coin_wallet['unconfirmed'])
+        if 'immature' in coin_wallet:
+            rv += float(coin_wallet['immature'])
+        return ci.make_int(rv)
 
     def test_001_js_coins(self):
         js_coins = read_json_api(1800, 'coins')

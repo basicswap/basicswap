@@ -446,14 +446,14 @@ def getVoutByAddress(txjs, p2sh):
     raise ValueError('Address output not found in txn')
 
 
-def getVoutByP2WSH(txjs, p2wsh_hex):
+def getVoutByScriptPubKey(txjs, scriptPubKey_hex: str) -> int:
     for o in txjs['vout']:
         try:
-            if p2wsh_hex == o['scriptPubKey']['hex']:
+            if scriptPubKey_hex == o['scriptPubKey']['hex']:
                 return o['n']
         except Exception:
             pass
-    raise ValueError('P2WSH output not found in txn')
+    raise ValueError('scriptPubKey output not found in txn')
 
 
 def replaceAddrPrefix(addr, coin_type, chain_name, addr_type='pubkey_address'):

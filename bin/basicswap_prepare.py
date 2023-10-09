@@ -61,7 +61,13 @@ DASH_VERSION_TAG = os.getenv('DASH_VERSION_TAG', '')
 FIRO_VERSION = os.getenv('FIRO_VERSION', '0.14.99.1')
 FIRO_VERSION_TAG = os.getenv('FIRO_VERSION_TAG', '')
 
+NAV_VERSION = os.getenv('NAV_VERSION', '7.0.3')
+NAV_VERSION_TAG = os.getenv('NAV_VERSION', '')
+
 GUIX_SSL_CERT_DIR = None
+
+ADD_PUBKEY_URL = os.getenv('ADD_PUBKEY_URL', '')
+OVERRIDE_DISABLED_COINS = toBool(os.getenv('OVERRIDE_DISABLED_COINS', 'false'))
 
 
 known_coins = {
@@ -74,7 +80,12 @@ known_coins = {
     'dash': (DASH_VERSION, DASH_VERSION_TAG, ('pasta',)),
     # 'firo': (FIRO_VERSION, FIRO_VERSION_TAG, ('reuben',)),
     'firo': (FIRO_VERSION, FIRO_VERSION_TAG, ('tecnovert',)),
+    'navcoin': (NAV_VERSION, NAV_VERSION_TAG, ('nav_builder',)),
 }
+
+disabled_coins = [
+    'navcoin',
+]
 
 expected_key_ids = {
     'tecnovert': ('13F13651C9CF0D6B',),
@@ -86,6 +97,7 @@ expected_key_ids = {
     'fuzzbawls': ('3BDCDA2D87A881D9',),
     'pasta': ('52527BEDABE87984',),
     'reuben': ('1290A1D0FA7EE109',),
+    'nav_builder': ('2782262BF6E7FADB',),
 }
 
 USE_PLATFORM = os.getenv('USE_PLATFORM', platform.system())
@@ -159,6 +171,12 @@ FIRO_ONION_PORT = int(os.getenv('FIRO_ONION_PORT', 8168))  # nDefaultPort
 FIRO_RPC_USER = os.getenv('FIRO_RPC_USER', '')
 FIRO_RPC_PWD = os.getenv('FIRO_RPC_PWD', '')
 
+NAV_RPC_HOST = os.getenv('NAV_RPC_HOST', '127.0.0.1')
+NAV_RPC_PORT = int(os.getenv('NAV_RPC_PORT', 44444))
+NAV_ONION_PORT = int(os.getenv('NAV_ONION_PORT', 8334))  # TODO?
+NAV_RPC_USER = os.getenv('NAV_RPC_USER', '')
+NAV_RPC_PWD = os.getenv('NAV_RPC_PWD', '')
+
 TOR_PROXY_HOST = os.getenv('TOR_PROXY_HOST', '127.0.0.1')
 TOR_PROXY_PORT = int(os.getenv('TOR_PROXY_PORT', 9050))
 TOR_CONTROL_PORT = int(os.getenv('TOR_CONTROL_PORT', 9051))
@@ -198,8 +216,12 @@ def make_reporthook(read_start=0):
         dl_complete: bool = totalsize > 0 and read >= use_size
         time_now = time.time()
         time_delta = time_now - time_last
-        if time_delta < 4 and not dl_complete:
+        if time_delta < 4.0 and not dl_complete:
             return
+
+        # Avoid division by zero by picking a value
+        if time_delta <= 0.0:
+            time_delta = 0.01
 
         bytes_delta = read - read_last
         time_last = time_now
@@ -612,8 +634,14 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
                 release_filename = 'firo-0.14.99.1-x86_64-apple-darwin18.tar.gz'
             else:
                 raise ValueError('Firo: Unknown architecture')
-            release_url = 'https://github.com/tecnovert/particl-core/releases/download/v{}/{}'.format(version + version_tag, release_filename)
+            release_url = 'https://github.com/tecnovert/particl-core/releases/download/{}/{}'.format(version + version_tag, release_filename)
             assert_url = 'https://github.com/tecnovert/particl-core/releases/download/v%s/SHA256SUMS.asc' % (version + version_tag)
+        elif coin == 'navcoin':
+            release_filename = '{}-{}-{}.{}'.format(coin, version, BIN_ARCH, FILE_EXT)
+            release_url = 'https://github.com/navcoin/navcoin-core/releases/download/{}/{}'.format(version + version_tag, release_filename)
+            assert_filename = 'SHA256SUM_7.0.3.asc'
+            assert_sig_filename = 'SHA256SUM_7.0.3.asc.sig'
+            assert_url = 'https://github.com/navcoin/navcoin-core/releases/download/{}/{}'.format(version + version_tag, assert_filename)
         else:
             raise ValueError('Unknown coin')
 
@@ -629,7 +657,8 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
 
         if coin not in ('firo', ):
             assert_sig_url = assert_url + ('.asc' if major_version >= 22 else '.sig')
-            assert_sig_filename = '{}-{}-{}-build-{}.assert.sig'.format(coin, os_name, version, signing_key_name)
+            if coin not in ('nav', ):
+                assert_sig_filename = '{}-{}-{}-build-{}.assert.sig'.format(coin, os_name, version, signing_key_name)
             assert_sig_path = os.path.join(bin_dir, assert_sig_filename)
             if not os.path.exists(assert_sig_path):
                 downloadFile(assert_sig_url, assert_sig_path)
@@ -665,6 +694,8 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
 
     if coin in ('firo', ):
         pubkey_filename = '{}_{}.pgp'.format('particl', signing_key_name)
+    elif coin in ('navcoin', ):
+        pubkey_filename = '{}_builder.pgp'.format(coin)
     else:
         pubkey_filename = '{}_{}.pgp'.format(coin, signing_key_name)
     pubkeyurls = [
@@ -678,6 +709,9 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
     if coin == 'firo':
         pubkeyurls.append('https://firo.org/reuben.asc')
 
+    if ADD_PUBKEY_URL != '':
+        pubkeyurls.append(ADD_PUBKEY_URL + '/' + pubkey_filename)
+
     if coin in ('monero', 'firo'):
         with open(assert_path, 'rb') as fp:
             verified = gpg.verify_file(fp)
@@ -687,6 +721,21 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
             importPubkeyFromUrls(gpg, pubkeyurls)
             with open(assert_path, 'rb') as fp:
                 verified = gpg.verify_file(fp)
+    elif coin in ('navcoin'):
+        with open(assert_sig_path, 'rb') as fp:
+            verified = gpg.verify_file(fp)
+
+        if not isValidSignature(verified) and verified.username is None:
+            logger.warning('Signature made by unknown key.')
+            importPubkeyFromUrls(gpg, pubkeyurls)
+            with open(assert_sig_path, 'rb') as fp:
+                verified = gpg.verify_file(fp)
+
+        # .sig file is not a detached signature, recheck release hash in decrypted data
+        logger.warning('Double checking Navcoin release hash.')
+        with open(assert_sig_path, 'rb') as fp:
+            decrypted = gpg.decrypt_file(fp)
+            assert (release_hash.hex() in str(decrypted))
     else:
         with open(assert_sig_path, 'rb') as fp:
             verified = gpg.verify_file(fp, assert_path)
@@ -793,8 +842,12 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
         exitWithError('{} exists'.format(core_conf_path))
     with open(core_conf_path, 'w') as fp:
         if chain != 'mainnet':
-            fp.write(chain + '=1\n')
-            if coin != 'firo':
+            if coin in ('navcoin',):
+                chainname = 'devnet' if chain == 'regtest' else chain
+                fp.write(chainname + '=1\n')
+            else:
+                fp.write(chain + '=1\n')
+            if coin not in ('firo', 'navcoin'):
                 if chain == 'testnet':
                     fp.write('[test]\n\n')
                 elif chain == 'regtest':
@@ -856,6 +909,11 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
             fp.write('usehd=1\n')
             if FIRO_RPC_USER != '':
                 fp.write('rpcauth={}:{}${}\n'.format(FIRO_RPC_USER, salt, password_to_hmac(salt, FIRO_RPC_PWD)))
+        elif coin == 'navcoin':
+            fp.write('prune=4000\n')
+            fp.write('fallbackfee=0.0002\n')
+            if NAV_RPC_USER != '':
+                fp.write('rpcauth={}:{}${}\n'.format(NAV_RPC_USER, salt, password_to_hmac(salt, NAV_RPC_PWD)))
         else:
             logger.warning('Unknown coin %s', coin)
 
@@ -997,7 +1055,8 @@ def printVersion():
 
     logger.info('Core versions:')
     for coin, version in known_coins.items():
-        logger.info('\t%s: %s%s', coin, version[0], version[1])
+        postfix = ' (Disabled)' if coin in disabled_coins else ''
+        logger.info('\t%s: %s%s%s', coin.capitalize(), version[0], version[1], postfix)
 
 
 def printHelp():
@@ -1033,7 +1092,11 @@ def printHelp():
     print('--initwalletsonly        Setup coin wallets only.')
     print('--keysdirpath            Speed up tests by preloading all PGP keys in directory.')
 
-    print('\n' + 'Known coins: {}'.format(', '.join(known_coins.keys())))
+    active_coins = []
+    for coin_name in known_coins.keys():
+        if coin_name not in disabled_coins:
+            active_coins.append(coin_name)
+    print('\n' + 'Known coins: {}'.format(', '.join(active_coins)))
 
 
 def finalise_daemon(d):
@@ -1042,7 +1105,7 @@ def finalise_daemon(d):
         d.send_signal(signal.CTRL_C_EVENT if os.name == 'nt' else signal.SIGINT)
         d.wait(timeout=120)
     except Exception as e:
-        logging.info(f'Error {e}'.format(d.pid))
+        logging.info(f'Error {e} for process {d.pid}')
     for fp in (d.stdout, d.stderr, d.stdin):
         if fp:
             fp.close()
@@ -1213,6 +1276,13 @@ def check_btc_fastsync_data(base_dir, sync_file_path):
     ensureValidSignatureBy(verified, 'tecnovert')
 
 
+def ensure_coin_valid(coin: str, test_disabled: bool = True) -> None:
+    if coin not in known_coins:
+        exitWithError(f'Unknown coin {coin.capitalize()}')
+    if test_disabled and not OVERRIDE_DISABLED_COINS and coin in disabled_coins:
+        exitWithError(f'{coin.capitalize()} is disabled')
+
+
 def main():
     global use_tor_proxy
     data_dir = None
@@ -1312,28 +1382,24 @@ def main():
                 continue
             if name == 'withcoin' or name == 'withcoins':
                 for coin in [s.lower() for s in s[1].split(',')]:
-                    if coin not in known_coins:
-                        exitWithError('Unknown coin {}'.format(coin))
+                    ensure_coin_valid(coin)
                     with_coins.add(coin)
                 coins_changed = True
                 continue
             if name == 'withoutcoin' or name == 'withoutcoins':
                 for coin in [s.lower() for s in s[1].split(',')]:
-                    if coin not in known_coins:
-                        exitWithError('Unknown coin {}'.format(coin))
+                    ensure_coin_valid(coin, test_disabled=False)
                     with_coins.discard(coin)
                 coins_changed = True
                 continue
             if name == 'addcoin':
                 add_coin = s[1].lower()
-                if add_coin not in known_coins:
-                    exitWithError('Unknown coin {}'.format(s[1]))
+                ensure_coin_valid(add_coin)
                 with_coins = {add_coin, }
                 continue
             if name == 'disablecoin':
                 disable_coin = s[1].lower()
-                if disable_coin not in known_coins:
-                    exitWithError('Unknown coin {}'.format(s[1]))
+                ensure_coin_valid(disable_coin, test_disabled=False)
                 continue
             if name == 'htmlhost':
                 htmlhost = s[1].strip('"')
@@ -1376,7 +1442,14 @@ def main():
         os.makedirs(data_dir)
     config_path = os.path.join(data_dir, cfg.CONFIG_FILENAME)
 
+    should_download_btc_fastsync = False
     if extra_opts.get('use_btc_fastsync', False) is True:
+        if 'bitcoin' in with_coins or add_coin == 'bitcoin':
+            should_download_btc_fastsync = True
+        else:
+            logger.warning('Ignoring usebtcfastsync option without Bitcoin selected.')
+
+    if should_download_btc_fastsync:
         logger.info(f'Preparing BTC Fastsync file {BITCOIN_FASTSYNC_FILE}')
         sync_file_path = os.path.join(data_dir, BITCOIN_FASTSYNC_FILE)
         sync_file_url = os.path.join(BITCOIN_FASTSYNC_URL, BITCOIN_FASTSYNC_FILE)
@@ -1487,7 +1560,7 @@ def main():
             'use_csv': False,
             'blocks_confirmed': 1,
             'conf_target': 2,
-            'core_version_group': 20,
+            'core_version_group': 17,
             'chain_lookups': 'local',
         },
         'dash': {
@@ -1519,6 +1592,22 @@ def main():
             'conf_target': 2,
             'core_version_group': 18,
             'chain_lookups': 'local',
+        },
+        'navcoin': {
+            'connection_type': 'rpc' if 'navcoin' in with_coins else 'none',
+            'manage_daemon': True if ('navcoin' in with_coins and NAV_RPC_HOST == '127.0.0.1') else False,
+            'rpchost': NAV_RPC_HOST,
+            'rpcport': NAV_RPC_PORT + port_offset,
+            'onionport': NAV_ONION_PORT + port_offset,
+            'datadir': os.getenv('NAV_DATA_DIR', os.path.join(data_dir, 'navcoin')),
+            'bindir': os.path.join(bin_dir, 'navcoin'),
+            'use_segwit': True,
+            'use_csv': True,
+            'blocks_confirmed': 1,
+            'conf_target': 2,
+            'core_version_group': 18,
+            'chain_lookups': 'local',
+            'startup_tries': 40,
         }
     }
 
@@ -1543,6 +1632,9 @@ def main():
     if FIRO_RPC_USER != '':
         chainclients['firo']['rpcuser'] = FIRO_RPC_USER
         chainclients['firo']['rpcpassword'] = FIRO_RPC_PWD
+    if NAV_RPC_USER != '':
+        chainclients['nav']['rpcuser'] = NAV_RPC_USER
+        chainclients['nav']['rpcpassword'] = NAV_RPC_PWD
 
     chainclients['monero']['walletsdir'] = os.getenv('XMR_WALLETS_DIR', chainclients['monero']['datadir'])
 
@@ -1598,9 +1690,13 @@ def main():
         settings = load_config(config_path)
 
         if disable_coin not in settings['chainclients']:
-            exitWithError('{} has not been prepared'.format(disable_coin))
-        settings['chainclients'][disable_coin]['connection_type'] = 'none'
-        settings['chainclients'][disable_coin]['manage_daemon'] = False
+            exitWithError(f'{disable_coin} not configured')
+
+        coin_settings = settings['chainclients'][disable_coin]
+        if coin_settings['connection_type'] == 'none' and coin_settings['manage_daemon'] is False:
+            exitWithError(f'{disable_coin} is already disabled')
+        coin_settings['connection_type'] = 'none'
+        coin_settings['manage_daemon'] = False
 
         with open(config_path, 'w') as fp:
             json.dump(settings, fp, indent=4)

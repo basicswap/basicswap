@@ -1,14 +1,11 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2022 tecnovert
+# Copyright (c) 2022-2023 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 from basicswap.script import (
     OpCodes,
-)
-from basicswap.util.script import (
-    getP2WSH,
 )
 from basicswap.interface.btc import (
     find_vout_for_address_from_txobj,
@@ -27,11 +24,11 @@ class ProtocolInterface:
 
     def getMockScriptScriptPubkey(self, ci) -> bytearray:
         script = self.getMockScript()
-        return ci.get_p2wsh_script_pubkey(script) if ci._use_segwit else ci.get_p2sh_script_pubkey(script)
+        return ci.getScriptDest(script) if ci._use_segwit else ci.get_p2sh_script_pubkey(script)
 
     def getMockAddrTo(self, ci):
         script = self.getMockScript()
-        return ci.encode_p2wsh(getP2WSH(script)) if ci._use_segwit else ci.encode_p2sh(script)
+        return ci.encodeScriptDest(ci.getScriptDest(script)) if ci._use_segwit else ci.encode_p2sh(script)
 
     def findMockVout(self, ci, itx_decoded):
         mock_addr = self.getMockAddrTo(ci)

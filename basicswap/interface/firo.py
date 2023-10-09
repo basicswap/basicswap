@@ -163,15 +163,15 @@ class FIROInterface(BTCInterface):
 
         return CScript([OP_HASH160, script_hash_hash, OP_EQUAL])
 
-    def getSeedHash(self, seed) -> bytes:
+    def getSeedHash(self, seed: bytes) -> bytes:
         return hash160(seed)[::-1]
 
-    def encodeScriptDest(self, script):
+    def encodeScriptDest(self, script_dest: bytes) -> str:
         # Extract hash from script
-        script_hash = script[2:-1]
+        script_hash = script_dest[2:-1]
         return self.sh_to_address(script_hash)
 
-    def getScriptScriptSig(self, script):
+    def getScriptScriptSig(self, script: bytes) -> bytearray:
         return CScript([OP_0, hashlib.sha256(script).digest()])
 
     def withdrawCoin(self, value, addr_to, subfee):

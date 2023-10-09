@@ -124,7 +124,7 @@ class PARTInterface(BTCInterface):
     def getWalletRestoreHeight(self) -> int:
         start_time = self.rpc_callback('getwalletinfo')['keypoololdest']
 
-        blockchaininfo = self.rpc_callback('getblockchaininfo')
+        blockchaininfo = self.getBlockchainInfo()
         best_block = blockchaininfo['bestblockhash']
 
         chain_synced = round(blockchaininfo['verificationprogress'], 3)
@@ -135,6 +135,11 @@ class PARTInterface(BTCInterface):
         block_hash = self.rpc_callback('getblockhashafter', [start_time])
         block_header = self.rpc_callback('getblockheader', [block_hash])
         return block_header['height']
+
+    def getHTLCSpendTxVSize(self, redeem: bool = True) -> int:
+        tx_vsize = 5  # Add a few bytes, sequence in script takes variable amount of bytes
+        tx_vsize += 204 if redeem else 187
+        return tx_vsize
 
 
 class PARTInterfaceBlind(PARTInterface):

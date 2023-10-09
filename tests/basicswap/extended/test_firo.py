@@ -122,7 +122,7 @@ class Test(BaseTest):
     test_atomic = True
     test_xmr = False
 
-    # Particl node mnemonics are set in test/basicswap/mnemonics.py
+    # Particl node mnemonics are test_xmr.py, node 2 is set randomly
     firo_seeds = [
         'd90b7ed1be614e1c172653aee1f3b6230f43b7fa99cf07fa984a17966ad81de7',
         '6c81d6d74ba33a0db9e41518c2b6789fbe938e98018a4597dac661cfc5f2dfc1',

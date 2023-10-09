@@ -37,7 +37,6 @@ class BaseApp:
     def __init__(self, fp, data_dir, settings, chain, log_name='BasicSwap'):
         self.log_name = log_name
         self.fp = fp
-        self.is_running = True
         self.fail_code = 0
         self.mock_time_offset = 0
 
@@ -49,6 +48,8 @@ class BaseApp:
         self.mxDB = threading.RLock()
         self.debug = self.settings.get('debug', False)
         self.delay_event = threading.Event()
+        self.chainstate_delay_event = threading.Event()
+
         self._network = None
         self.prepareLogging()
         self.log.info('Network: {}'.format(self.chain))
@@ -65,7 +66,7 @@ class BaseApp:
     def stopRunning(self, with_code=0):
         self.fail_code = with_code
         with self.mxDB:
-            self.is_running = False
+            self.chainstate_delay_event.set()
             self.delay_event.set()
 
     def prepareLogging(self):
