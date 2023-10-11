@@ -214,7 +214,9 @@ class XMRInterface(CoinInterface):
     def getNewAddress(self, placeholder) -> str:
         with self._mx_wallet:
             self.openWallet(self._wallet_filename)
-            return self.rpc_wallet_cb('create_address', {'account_index': 0})['address']
+            new_address = self.rpc_wallet_cb('create_address', {'account_index': 0})['address']
+            self.rpc_wallet_cb('store')
+            return new_address
 
     def get_fee_rate(self, conf_target: int = 2):
         self._log.warning('TODO - estimate fee rate?')
