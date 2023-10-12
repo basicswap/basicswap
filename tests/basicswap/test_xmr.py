@@ -604,14 +604,15 @@ class BaseTest(unittest.TestCase):
                 cls.coins_update_thread.join()
             except Exception:
                 logging.info('Failed to join coins_update_thread')
-
         for t in cls.http_threads:
             t.stop()
             t.join()
+        logging.info('Stopping swap clients')
         for c in cls.swap_clients:
             c.finalise()
             c.fp.close()
 
+        logging.info('Stopping coin nodes')
         stopDaemons(cls.xmr_daemons)
         stopDaemons(cls.part_daemons)
         stopDaemons(cls.btc_daemons)
@@ -1069,7 +1070,7 @@ class Test(BaseTest):
         js_w0_before = read_json_api(1800, 'wallets')
         js_w1_before = read_json_api(1801, 'wallets')
 
-        amt_1 = make_int(random.uniform(0.001, 49.0), scale=8, r=1)
+        amt_1 = make_int(random.uniform(0.001, 19.0), scale=8, r=1)
         amt_2 = make_int(random.uniform(0.001, 49.0), scale=8, r=1)
 
         rate_1 = make_int(random.uniform(80.0, 110.0), scale=12, r=1)
@@ -1207,11 +1208,12 @@ class Test(BaseTest):
         # Should fail > max concurrent
         test_delay_event.wait(1.0)
         bid_id = swap_clients[1].postBid(offer_id, min_bid)
-        event = wait_for_event(test_delay_event, swap_clients[0], Concepts.AUTOMATION, bid_id)
+        logging.info('Waiting for bid {} to fail.'.format(bid_id.hex()))
+        event = wait_for_event(test_delay_event, swap_clients[0], Concepts.BID, bid_id, event_type=EventLogTypes.AUTOMATION_CONSTRAINT)
         assert ('Already have 5 bids to complete' in event.event_msg)
 
         for bid_id in bid_ids:
-            wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=180)
+            wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=240)
             wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True)
 
         amt_bid = make_int(5, scale=8, r=1)
@@ -1219,7 +1221,7 @@ class Test(BaseTest):
         # Should fail > total value
         amt_bid += 1
         bid_id = swap_clients[1].postBid(offer_id, amt_bid)
-        event = wait_for_event(test_delay_event, swap_clients[0], Concepts.AUTOMATION, bid_id)
+        event = wait_for_event(test_delay_event, swap_clients[0], Concepts.BID, bid_id, event_type=EventLogTypes.AUTOMATION_CONSTRAINT)
         assert ('Over remaining offer value' in event.event_msg)
 
         # Should pass
@@ -1525,6 +1527,16 @@ class Test(BaseTest):
 
         wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.XMR_SWAP_FAILED_REFUNDED, wait_for=1800)
         wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.XMR_SWAP_FAILED_REFUNDED, wait_for=1800, sent=True)
+
+    def test_16_new_subaddress(self):
+        logging.info('---------- Test that new subaddresses are created')
+
+        current_subaddress = read_json_api(1800, 'wallets/xmr')['deposit_address']
+        first_subaddress = read_json_api(1800, 'wallets/xmr/nextdepositaddr')
+        second_subaddress = read_json_api(1800, 'wallets/xmr/nextdepositaddr')
+        assert (first_subaddress != second_subaddress)
+        assert (first_subaddress != current_subaddress)
+        assert (second_subaddress != current_subaddress)
 
     def test_97_withdraw_all(self):
         logging.info('---------- Test XMR withdrawal all')

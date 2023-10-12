@@ -373,6 +373,7 @@ class BasicSwap(BaseApp):
 
         with self.mxDB:
             self.delay_event.set()
+            self.chainstate_delay_event.set()
 
         if self._network:
             self._network.stopNetwork()

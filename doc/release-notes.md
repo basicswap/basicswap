@@ -3,6 +3,7 @@
 
 - Temporarily disabled Navcoin.
   - Untested on mainnet.
+- Fixed bug where requesting a new XMR subaddress would return an old one.
 
 
 0.0.67
