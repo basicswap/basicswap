@@ -371,20 +371,25 @@ def compare_bid_states(states, expect_states, exact_match=True):
         if states[i][1] == 'Bid Delaying':
             del states[i]
 
-    if exact_match:
-        assert (len(states) == len(expect_states))
-    else:
-        assert (len(states) >= len(expect_states))
+    try:
+        if exact_match:
+            assert (len(states) == len(expect_states))
+        else:
+            assert (len(states) >= len(expect_states))
 
-    for i in range(len(expect_states)):
-        s = states[i]
-        if s[1] != expect_states[i]:
-            if 'Bid ' + expect_states[i] == s[1]:
-                logging.warning(f'Expected state {expect_states[i]} not an exact match to {s[1]}.')
-                continue
-            if [s[0], expect_states[i]] in states:
-                logging.warning(f'Expected state {expect_states[i]} found out of order at the same time as {s[1]}.')
-                continue
-            raise ValueError(f'Expected state {expect_states[i]}, found {s[1]}')
-        assert (s[1] == expect_states[i])
+        for i in range(len(expect_states)):
+            s = states[i]
+            if s[1] != expect_states[i]:
+                if 'Bid ' + expect_states[i] == s[1]:
+                    logging.warning(f'Expected state {expect_states[i]} not an exact match to {s[1]}.')
+                    continue
+                if [s[0], expect_states[i]] in states:
+                    logging.warning(f'Expected state {expect_states[i]} found out of order at the same time as {s[1]}.')
+                    continue
+                raise ValueError(f'Expected state {expect_states[i]}, found {s[1]}')
+            assert (s[1] == expect_states[i])
+    except Exception as e:
+        logging.info('Expecting states: {}'.format(json.dumps(expect_states, indent=4)))
+        logging.info('Have states: {}'.format(json.dumps(states, indent=4)))
+        raise e
     return True

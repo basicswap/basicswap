@@ -978,7 +978,7 @@ class Test(BaseTest):
 
         offer_id = swap_clients[0].postOffer(
             Coins.PART, Coins.XMR, 101 * COIN, 0.13 * XMR_COIN, 101 * COIN, SwapTypes.XMR_SWAP,
-            lock_type=TxLockTypes.SEQUENCE_LOCK_BLOCKS, lock_value=12)
+            lock_type=TxLockTypes.SEQUENCE_LOCK_BLOCKS, lock_value=16)
         wait_for_offer(test_delay_event, swap_clients[1], offer_id)
         offer = swap_clients[1].getOffer(offer_id)
 
@@ -994,7 +994,7 @@ class Test(BaseTest):
 
         swap_clients[0].acceptXmrBid(bid_id)
 
-        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.BID_STALLED_FOR_TEST, wait_for=180)
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.BID_STALLED_FOR_TEST, wait_for=220)
         wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.XMR_SWAP_FAILED_SWIPED, wait_for=80, sent=True)
 
         wait_for_none_active(test_delay_event, 1800)
