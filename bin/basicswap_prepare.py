@@ -1430,6 +1430,7 @@ def main():
         bin_dir = os.path.join(data_dir, 'bin')
 
     logger.info(f'BasicSwap prepare script {__version__}\n')
+    logger.info(f'Python version: {platform.python_version()}')
     logger.info(f'Data dir: {data_dir}')
     logger.info(f'Bin dir: {bin_dir}')
     logger.info(f'Chain: {chain}')

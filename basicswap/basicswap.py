@@ -664,9 +664,11 @@ class BasicSwap(BaseApp):
             self.coin_clients[coin]['interface'] = self.createPassthroughInterface(coin)
 
     def start(self):
+        import platform
         self.log.info('Starting BasicSwap %s, database v%d\n\n', __version__, self.db_version)
-        self.log.info('sqlalchemy version %s', sa.__version__)
-        self.log.info('timezone offset: %d (%s)', time.timezone, time.tzname[0])
+        self.log.info(f'Python version: {platform.python_version()}')
+        self.log.info('SQLAlchemy version: %s', sa.__version__)
+        self.log.info('Timezone offset: %d (%s)', time.timezone, time.tzname[0])
 
         upgradeDatabase(self, self.db_version)
         upgradeDatabaseData(self, self.db_data_version)
