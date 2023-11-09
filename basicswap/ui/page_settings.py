@@ -60,7 +60,7 @@ def page_settings(self, url_split, post_string):
                         data['manage_daemon'] = True if get_data_entry(form_data, 'managedaemon_' + name) == 'true' else False
                         data['rpchost'] = get_data_entry(form_data, 'rpchost_' + name)
                         data['rpcport'] = int(get_data_entry(form_data, 'rpcport_' + name))
-                        data['remotedaemonurls'] = get_data_entry(form_data, 'remotedaemonurls_' + name)
+                        data['remotedaemonurls'] = get_data_entry_or(form_data, 'remotedaemonurls_' + name, '')
                         data['automatically_select_daemon'] = True if get_data_entry(form_data, 'autosetdaemon_' + name) == 'true' else False
                     else:
                         data['conf_target'] = int(get_data_entry(form_data, 'conf_target_' + name))
