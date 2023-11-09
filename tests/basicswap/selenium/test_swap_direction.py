@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2022 tecnovert
+# Copyright (c) 2022-2023 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -11,11 +11,10 @@ from tests.basicswap.util import (
     read_json_api,
 )
 
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
+from util import get_driver
 
 
-def test_html(driver):
+def test_swap_dir(driver):
     node_1_port = 12701
     node_2_port = 12702
     node1_url = f'http://localhost:{node_1_port}'
@@ -58,12 +57,16 @@ def test_html(driver):
 
     raise ValueError('TODO')
 
-    print('Done.')
+    print('Test Passed!')
+
+
+def run_tests():
+    driver = get_driver()
+    try:
+        test_swap_dir(driver)
+    finally:
+        driver.close()
 
 
 if __name__ == '__main__':
-    driver = webdriver.Chrome(service=Service('/opt/chromedriver96'))
-    try:
-        test_html(driver)
-    finally:
-        driver.close()
+    run_tests()

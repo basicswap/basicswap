@@ -5,31 +5,17 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-"""
-cd /tmp
-wget -4 https://chromedriver.storage.googleapis.com/114.0.5735.90/chromedriver_linux64.zip
-7z x chromedriver_linux64.zip
-sudo mv chromedriver /opt/chromedriver114
-
-python tests/basicswap/extended/test_xmr_persistent.py
-python tests/basicswap/selenium/test_wallets.py
-
-"""
-
 import json
 import time
 
 from urllib.request import urlopen
-from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.service import Service
+from util import get_driver
 
 
-def test_html():
+def test_wallets(driver):
     base_url = 'http://localhost:12701'
     node2_url = 'http://localhost:12702'
-
-    driver = webdriver.Chrome(service=Service('/opt/chromedriver114'))
 
     # Check json coins data
     coins = json.loads(urlopen(base_url + '/json/coins').read())
@@ -40,13 +26,13 @@ def test_html():
     # Check 404 pages
     url = base_url + '/unknown'
     driver.get(url)
-    p1 = driver.find_element(By.TAG_NAME, 'p')
-    assert ('404' in p1.text)
+    p1 = driver.find_element(By.TAG_NAME, 'body')
+    assert ('Error 404' in p1.text)
 
     url = base_url + '/static/nothing.png'
     driver.get(url)
-    p1 = driver.find_element(By.TAG_NAME, 'p')
-    assert ('404' in p1.text)
+    p1 = driver.find_element(By.TAG_NAME, 'body')
+    assert ('Error 404' in p1.text)
 
     url = base_url + '/wallet'
     driver.get(url)
@@ -81,15 +67,21 @@ def test_html():
     driver.find_element(By.NAME, f'withdraw_{part_id}').click()
     driver.switch_to.alert.accept()
     time.sleep(1)
-    elements = driver.find_elements(By.CLASS_NAME, "infomsg")
+    elements = driver.find_elements(By.CLASS_NAME, 'infomsg')
     assert (len(elements) == 1)
     e = elements[0]
     assert ('Withdrew 10 rtPART (plain to plain) to address' in e.text)
 
-    driver.close()
+    print('Test Passed!')
 
-    print('Done.')
+
+def run_tests():
+    driver = get_driver()
+    try:
+        test_wallets(driver)
+    finally:
+        driver.close()
 
 
 if __name__ == '__main__':
-    test_html()
+    run_tests()

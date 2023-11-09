@@ -293,7 +293,7 @@ def main():
                 received_offers = read_json_api(args.port, 'offers', {'active': 'active', 'include_sent': False, 'coin_from': coin_from_data['id'], 'coin_to': coin_to_data['id']})
                 print('received_offers', received_offers)
 
-                TODO - adjust rates based on extisting offers
+                TODO - adjust rates based on existing offers
                 """
 
                 rates = read_json_api('rates', {'coin_from': coin_from_data['id'], 'coin_to': coin_to_data['id']})

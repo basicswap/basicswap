@@ -5,34 +5,21 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-"""
-cd /tmp
-wget -4 https://chromedriver.storage.googleapis.com/114.0.5735.90/chromedriver_linux64.zip
-7z x chromedriver_linux64.zip
-sudo mv chromedriver /opt/chromedriver114
-
-python tests/basicswap/extended/test_xmr_persistent.py
-python tests/basicswap/selenium/test_offer.py
-
-"""
-
 import json
 import time
 
 from urllib.request import urlopen
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import Select
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
+from util import get_driver
 
-def test_html():
+
+def test_offer(driver):
     node1_url = 'http://localhost:12701'
     node2_url = 'http://localhost:12702'
-
-    driver = webdriver.Chrome(service=Service('/opt/chromedriver114'))
 
     driver.get(node1_url + '/newoffer')
     time.sleep(1)
@@ -99,10 +86,16 @@ def test_html():
     assert (offer4_json['coin_from'] == 'Particl')
     assert (offer4_json['coin_to'] == 'Monero')
 
-    driver.close()
+    print('Test Passed!')
 
-    print('Done.')
+
+def run_tests():
+    driver = get_driver()
+    try:
+        test_offer(driver)
+    finally:
+        driver.close()
 
 
 if __name__ == '__main__':
-    test_html()
+    run_tests()

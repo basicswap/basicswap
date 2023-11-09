@@ -6137,7 +6137,7 @@ class BasicSwap(BaseApp):
 
             if 'chart_api_key' in data:
                 new_value = data['chart_api_key']
-                ensure(isinstance(new_value, bool), 'New chart_api_key value not a string')
+                ensure(isinstance(new_value, str), 'New chart_api_key value not a string')
                 ensure(len(new_value) <= 128, 'New chart_api_key value too long')
                 if all(c in string.hexdigits for c in new_value):
                     if settings_copy.get('chart_api_key', '') != new_value:
@@ -6196,7 +6196,10 @@ class BasicSwap(BaseApp):
                         remotedaemonurls.add(url.strip())
 
                 if set(settings_cc.get('remote_daemon_urls', [])) != remotedaemonurls:
-                    settings_cc['remote_daemon_urls'] = list(remotedaemonurls)
+                    if len(remotedaemonurls) == 0 and 'remote_daemon_urls' in settings_cc:
+                        del settings_cc['remote_daemon_urls']
+                    else:
+                        settings_cc['remote_daemon_urls'] = list(remotedaemonurls)
                     settings_changed = True
                     suggest_reboot = True
 
