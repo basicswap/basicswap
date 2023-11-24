@@ -33,6 +33,8 @@ message OfferMessage {
     uint32 protocol_version = 16;
     bool amount_negotiable = 17;
     bool rate_negotiable = 18;
+
+    bytes proof_utxos = 19;          /* 32 byte txid 2 byte vout, repeated */
 }
 
 /* Step 2, buyer -> seller */
@@ -46,7 +48,24 @@ message BidMessage {
     string proof_signature = 7;
 
     uint32 protocol_version = 8;
+
+    bytes proof_utxos = 9;          /* 32 byte txid 2 byte vout, repeated */
 }
+
+/* For tests */
+message BidMessage_v1Deprecated {
+    bytes offer_msg_id = 1;
+    uint64 time_valid = 2;          /* seconds bid is valid for */
+    uint64 amount = 3;              /* amount of amount_from bid is for */
+    uint64 rate = 4;
+    bytes pkhash_buyer = 5;         /* buyer's address to receive amount_from */
+    string proof_address = 6;
+    string proof_signature = 7;
+
+    uint32 protocol_version = 8;
+}
+
+
 
 /* Step 3, seller -> buyer */
 message BidAcceptMessage {

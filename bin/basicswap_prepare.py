@@ -1588,7 +1588,7 @@ def main():
             'datadir': os.getenv('FIRO_DATA_DIR', os.path.join(data_dir, 'firo')),
             'bindir': os.path.join(bin_dir, 'firo'),
             'use_segwit': False,
-            'use_csv': True,
+            'use_csv': False,
             'blocks_confirmed': 1,
             'conf_target': 2,
             'core_version_group': 18,

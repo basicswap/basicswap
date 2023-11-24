@@ -24,6 +24,8 @@
 
 import struct
 import socket
+import asyncore
+from collections import namedtuple
 import time
 import sys
 import random
@@ -37,12 +39,13 @@ import logging
 import copy
 from .siphash import siphash256
 
-BIP0031_VERSION = 70029
-MY_VERSION = 70029  # past bip-31 for ping/pong
+BIP0031_VERSION = 60000
+MY_VERSION = 90030  # past bip-31 for ping/pong
 MY_SUBVERSION = b"/python-mininode-tester:0.0.3/"
+MY_RELAY = 1 # from version 70001 onwards, fRelay should be appended to version messages (BIP37)
 
 MAX_INV_SZ = 50000
-MAX_BLOCK_SIZE = 1000000
+MAX_BLOCK_BASE_SIZE = 1000000
 
 COIN = 100000000 # 1 btc in satoshis
 
@@ -50,6 +53,7 @@ NODE_NETWORK = (1 << 0)
 NODE_GETUTXO = (1 << 1)
 NODE_BLOOM = (1 << 2)
 NODE_WITNESS = (1 << 3)
+logger = logging.getLogger("TestFramework.mininode")
 
 # Keep our own socket map for asyncore, so that we can track disconnects
 # ourselves (to workaround an issue with closing an asyncore socket when
@@ -203,6 +207,31 @@ def ser_int_vector(l):
         r += struct.pack("<i", i)
     return r
 
+def deser_dyn_bitset(f, bytes_based):
+    if bytes_based:
+        nb = deser_compact_size(f)
+        n = nb * 8
+    else:
+        n = deser_compact_size(f)
+        nb = int((n + 7) / 8)
+    b = f.read(nb)
+    r = []
+    for i in range(n):
+        r.append((b[int(i / 8)] & (1 << (i % 8))) != 0)
+    return r
+
+
+def ser_dyn_bitset(l, bytes_based):
+    n = len(l)
+    nb = int((n + 7) / 8)
+    r = [0] * nb
+    for i in range(n):
+        r[int(i / 8)] |= (1 if l[i] else 0) << (i % 8)
+    if bytes_based:
+        r = ser_compact_size(nb) + bytes(r)
+    else:
+        r = ser_compact_size(n) + bytes(r)
+    return r
 # Deserialize from a hex string representation (eg from RPC)
 def FromHex(obj, hex_string):
     obj.deserialize(BytesIO(hex_str_to_bytes(hex_string)))
@@ -212,16 +241,40 @@ def FromHex(obj, hex_string):
 def ToHex(obj):
     return bytes_to_hex_str(obj.serialize())
 
+# Objects that map to dashd objects, which can be serialized/deserialized
+
+class CService(object):
+    def __init__(self):
+        self.ip = ""
+        self.port = 0
+
+    def deserialize(self, f):
+        self.ip = socket.inet_ntop(socket.AF_INET6, f.read(16))
+        self.port = struct.unpack(">H", f.read(2))[0]
+
+    def serialize(self):
+        r = b""
+        r += socket.inet_pton(socket.AF_INET6, self.ip)
+        r += struct.pack(">H", self.port)
+        return r
+
+    def __repr__(self):
+        return "CService(ip=%s port=%i)" % (self.ip, self.port)
+
 # Objects that map to bitcoind objects, which can be serialized/deserialized
 
 class CAddress(object):
     def __init__(self):
+        self.time = 0;
         self.nServices = 1
         self.pchReserved = b"\x00" * 10 + b"\xff" * 2
         self.ip = "0.0.0.0"
         self.port = 0
 
-    def deserialize(self, f):
+    def deserialize(self, f, *, with_time = True):
+        if with_time:
+            self.time = struct.unpack("<i", f.read(4))
+
         self.nServices = struct.unpack("<Q", f.read(8))[0]
         self.pchReserved = f.read(12)
         self.ip = socket.inet_ntoa(f.read(4))
@@ -229,6 +282,7 @@ class CAddress(object):
 
     def serialize(self):
         r = b""
+        r += struct.pack("<I", 0)
         r += struct.pack("<Q", self.nServices)
         r += self.pchReserved
         r += socket.inet_aton(self.ip)
@@ -249,7 +303,8 @@ class CInv(object):
         1|MSG_WITNESS_FLAG: "WitnessTx",
         2|MSG_WITNESS_FLAG : "WitnessBlock",
         4: "CompactBlock",
-        5: "DandelionTx"
+        5: "DandelionTx",
+        20: "CompactBlock"
     }
 
     def __init__(self, t=0, h=0):
@@ -439,58 +494,46 @@ class CTransaction(object):
     def __init__(self, tx=None):
         if tx is None:
             self.nVersion = 1
-            self.nTime = 0
+            self.nType = 0
             self.vin = []
             self.vout = []
             self.wit = CTxWitness()
             self.nLockTime = 0
+            self.vExtraPayload = None
             self.sha256 = None
             self.hash = None
-            self.strDZeel = b''
         else:
             self.nVersion = tx.nVersion
-            self.nTime = tx.nTime
+            self.nType = tx.nType
             self.vin = copy.deepcopy(tx.vin)
             self.vout = copy.deepcopy(tx.vout)
             self.nLockTime = tx.nLockTime
+            self.vExtraPayload = tx.vExtraPayload
             self.sha256 = tx.sha256
             self.hash = tx.hash
             self.wit = copy.deepcopy(tx.wit)
-            self.strDZeel = copy.deepcopy(tx.strDZeel)
 
     def deserialize(self, f):
-        self.nVersion = struct.unpack("<i", f.read(4))[0]
-        self.nTime = struct.unpack("<i", f.read(4))[0]
+        ver32bit = struct.unpack("<i", f.read(4))[0]
+        self.nVersion = ver32bit & 0xffff
+        self.nType = (ver32bit >> 16) & 0xffff
         self.vin = deser_vector(f, CTxIn)
-        flags = 0
-        if len(self.vin) == 0:
-            flags = struct.unpack("<B", f.read(1))[0]
-            # Not sure why flags can't be zero, but this
-            # matches the implementation in bitcoind
-            if (flags != 0):
-                self.vin = deser_vector(f, CTxIn)
-                self.vout = deser_vector(f, CTxOut)
-        else:
-            self.vout = deser_vector(f, CTxOut)
-        if flags != 0:
-            self.wit.vtxinwit = [CTxInWitness() for i in range(len(self.vin))]
-            self.wit.deserialize(f)
-
+        self.vout = deser_vector(f, CTxOut)
         self.nLockTime = struct.unpack("<I", f.read(4))[0]
+        if self.nType != 0:
+            self.vExtraPayload = deser_string(f)
         self.sha256 = None
         self.hash = None
-        if self.nVersion >= 2:
-            self.strDZeel = deser_string(f)
 
     def serialize_without_witness(self):
         r = b""
-        r += struct.pack("<i", self.nVersion)
-        r += struct.pack("<i", self.nTime)
+        ver32bit = int(self.nVersion | (self.nType << 16))
+        r += struct.pack("<i", ver32bit)
         r += ser_vector(self.vin)
         r += ser_vector(self.vout)
         r += struct.pack("<I", self.nLockTime)
-        if self.nVersion >= 2:
-            r += ser_string(self.strDZeel)
+        if self.nType != 0:
+            r += ser_string(self.vExtraPayload)
         return r
 
     # Only serialize with witness when explicitly called for
@@ -500,7 +543,6 @@ class CTransaction(object):
             flags |= 1
         r = b""
         r += struct.pack("<i", self.nVersion)
-        r += struct.pack("<i", self.nTime)
         if flags:
             dummy = []
             r += ser_vector(dummy)
@@ -515,8 +557,6 @@ class CTransaction(object):
                     self.wit.vtxinwit.append(CTxInWitness())
             r += self.wit.serialize()
         r += struct.pack("<I", self.nLockTime)
-        if self.nVersion >= 2:
-            r += ser_string(self.strDZeel)
         return r
 
     # Regular serialization is without witness -- must explicitly
@@ -548,8 +588,8 @@ class CTransaction(object):
         return True
 
     def __repr__(self):
-        return "CTransaction(nVersion=%i nTime=%i vin=%s vout=%s wit=%s nLockTime=%i)" \
-            % (self.nVersion, self.nTime, repr(self.vin), repr(self.vout), repr(self.wit), self.nLockTime)
+        return "CTransaction(nVersion=%i vin=%s vout=%s wit=%s nLockTime=%i)" \
+            % (self.nVersion, repr(self.vin), repr(self.vout), repr(self.wit), self.nLockTime)
 
 
 class msg_dandeliontx():
@@ -655,7 +695,8 @@ class CBlock(CBlockHeader):
         return r
 
     # Calculate the merkle root given a vector of transaction hashes
-    def get_merkle_root(self, hashes):
+    @staticmethod
+    def get_merkle_root(hashes):
         while len(hashes) > 1:
             newhashes = []
             for i in range(0, len(hashes), 2):
@@ -984,6 +1025,150 @@ class BlockTransactions(object):
         return "BlockTransactions(hash=%064x transactions=%s)" % (self.blockhash, repr(self.transactions))
 
 
+class CPartialMerkleTree(object):
+    def __init__(self):
+        self.nTransactions = 0
+        self.vBits = []
+        self.vHash = []
+
+    def deserialize(self, f):
+        self.nTransactions = struct.unpack("<I", f.read(4))[0]
+        self.vHash = deser_uint256_vector(f)
+        self.vBits = deser_dyn_bitset(f, True)
+
+    def serialize(self):
+        r = b""
+        r += struct.pack("<I", self.nTransactions)
+        r += ser_uint256_vector(self.vHash)
+        r += ser_dyn_bitset(self.vBits, True)
+        return r
+
+    def __repr__(self):
+        return "CPartialMerkleTree(nTransactions=%d vBits.size=%d vHash.size=%d)" % (self.nTransactions, len(self.vBits), len(self.vHash))
+
+
+class CMerkleBlock(object):
+    def __init__(self, header=CBlockHeader(), txn=CPartialMerkleTree()):
+        self.header = header
+        self.txn = txn
+
+    def deserialize(self, f):
+        self.header.deserialize(f)
+        self.txn.deserialize(f)
+
+    def serialize(self):
+        r = b""
+        r += self.header.serialize()
+        r += self.txn.serialize()
+        return r
+
+    def __repr__(self):
+        return "CMerkleBlock(header=%s txn=%s)" % (repr(self.header), repr(self.txn))
+
+
+class CCbTx(object):
+    def __init__(self, version=None, height=None, merkleRootMNList=None, merkleRootQuorums=None):
+        self.set_null()
+        if version is not None:
+            self.version = version
+        if height is not None:
+            self.height = height
+        if merkleRootMNList is not None:
+            self.merkleRootMNList = merkleRootMNList
+        if merkleRootQuorums is not None:
+            self.merkleRootQuorums = merkleRootQuorums
+
+    def set_null(self):
+        self.version = 0
+        self.height = 0
+        self.merkleRootMNList = None
+
+    def deserialize(self, f):
+        self.version = struct.unpack("<H", f.read(2))[0]
+        self.height = struct.unpack("<i", f.read(4))[0]
+        self.merkleRootMNList = deser_uint256(f)
+        if self.version >= 2:
+            self.merkleRootQuorums = deser_uint256(f)
+
+    def serialize(self):
+        r = b""
+        r += struct.pack("<H", self.version)
+        r += struct.pack("<i", self.height)
+        r += ser_uint256(self.merkleRootMNList)
+        if self.version >= 2:
+            r += ser_uint256(self.merkleRootQuorums)
+        return r
+
+
+class CSimplifiedMNListEntry(object):
+    def __init__(self):
+        self.set_null()
+
+    def set_null(self):
+        self.proRegTxHash = 0
+        self.confirmedHash = 0
+        self.service = CService()
+        self.pubKeyOperator = b'\\x0' * 48
+        self.keyIDVoting = 0
+        self.isValid = False
+
+    def deserialize(self, f):
+        self.proRegTxHash = deser_uint256(f)
+        self.confirmedHash = deser_uint256(f)
+        self.service.deserialize(f)
+        self.pubKeyOperator = f.read(48)
+        self.keyIDVoting = f.read(20)
+        self.isValid = struct.unpack("<?", f.read(1))[0]
+
+    def serialize(self):
+        r = b""
+        r += ser_uint256(self.proRegTxHash)
+        r += ser_uint256(self.confirmedHash)
+        r += self.service.serialize()
+        r += self.pubKeyOperator
+        r += self.keyIDVoting
+        r += struct.pack("<?", self.isValid)
+        return r
+
+
+class CFinalCommitment:
+    def __init__(self):
+        self.set_null()
+
+    def set_null(self):
+        self.nVersion = 0
+        self.llmqType = 0
+        self.quorumHash = 0
+        self.signers = []
+        self.validMembers = []
+        self.quorumPublicKey = b'\\x0' * 48
+        self.quorumVvecHash = 0
+        self.quorumSig = b'\\x0' * 96
+        self.membersSig = b'\\x0' * 96
+
+    def deserialize(self, f):
+        self.nVersion = struct.unpack("<H", f.read(2))[0]
+        self.llmqType = struct.unpack("<B", f.read(1))[0]
+        self.quorumHash = deser_uint256(f)
+        self.signers = deser_dyn_bitset(f, False)
+        self.validMembers = deser_dyn_bitset(f, False)
+        self.quorumPublicKey = f.read(48)
+        self.quorumVvecHash = deser_uint256(f)
+        self.quorumSig = f.read(96)
+        self.membersSig = f.read(96)
+
+    def serialize(self):
+        r = b""
+        r += struct.pack("<H", self.nVersion)
+        r += struct.pack("<B", self.llmqType)
+        r += ser_uint256(self.quorumHash)
+        r += ser_dyn_bitset(self.signers, False)
+        r += ser_dyn_bitset(self.validMembers, False)
+        r += self.quorumPublicKey
+        r += ser_uint256(self.quorumVvecHash)
+        r += self.quorumSig
+        r += self.membersSig
+        return r
 # Objects that correspond to messages on the wire
 class msg_version(object):
     command = b"version"
@@ -997,6 +1182,7 @@ class msg_version(object):
         self.nNonce = random.getrandbits(64)
         self.strSubVer = MY_SUBVERSION
         self.nStartingHeight = -1
+        self.nRelay = MY_RELAY
 
     def deserialize(self, f):
         self.nVersion = struct.unpack("<i", f.read(4))[0]
@@ -1006,20 +1192,31 @@ class msg_version(object):
         self.nTime = struct.unpack("<q", f.read(8))[0]
         self.addrTo = CAddress()
         self.addrTo.deserialize(f)
+
         if self.nVersion >= 106:
             self.addrFrom = CAddress()
             self.addrFrom.deserialize(f)
             self.nNonce = struct.unpack("<Q", f.read(8))[0]
             self.strSubVer = deser_string(f)
-            if self.nVersion >= 209:
-                self.nStartingHeight = struct.unpack("<i", f.read(4))[0]
-            else:
-                self.nStartingHeight = None
         else:
             self.addrFrom = None
             self.nNonce = None
             self.strSubVer = None
             self.nStartingHeight = None
+
+        if self.nVersion >= 209:
+            self.nStartingHeight = struct.unpack("<i", f.read(4))[0]
+        else:
+            self.nStartingHeight = None
+
+        if self.nVersion >= 70001:
+            # Relay field is optional for version 70001 onwards
+            try:
+                self.nRelay = struct.unpack("<b", f.read(1))[0]
+            except:
+                self.nRelay = 0
+        else:
+            self.nRelay = 0
 
     def serialize(self):
         r = b""
@@ -1031,13 +1228,14 @@ class msg_version(object):
         r += struct.pack("<Q", self.nNonce)
         r += ser_string(self.strSubVer)
         r += struct.pack("<i", self.nStartingHeight)
+        r += struct.pack("<b", self.nRelay)
         return r
 
     def __repr__(self):
-        return 'msg_version(nVersion=%i nServices=%i nTime=%s addrTo=%s addrFrom=%s nNonce=0x%016X strSubVer=%s nStartingHeight=%i)' \
+        return 'msg_version(nVersion=%i nServices=%i nTime=%s addrTo=%s addrFrom=%s nNonce=0x%016X strSubVer=%s nStartingHeight=%i nRelay=%i)' \
             % (self.nVersion, self.nServices, time.ctime(self.nTime),
                repr(self.addrTo), repr(self.addrFrom), self.nNonce,
-               self.strSubVer, self.nStartingHeight)
+               self.strSubVer, self.nStartingHeight, self.nRelay)
 
 
 class msg_verack(object):
@@ -1387,7 +1585,9 @@ class msg_reject(object):
             % (self.message, self.code, self.reason, self.data)
 
 # Helper function
-def wait_until(predicate, *, attempts=float('inf'), timeout=float('inf')):
+def wait_until(predicate, *, attempts=float('inf'), timeout=float('inf'), sleep=0.05):
+    if attempts == float('inf') and timeout == float('inf'):
+        timeout = 60
     attempt = 0
     elapsed = 0
 
@@ -1396,8 +1596,8 @@ def wait_until(predicate, *, attempts=float('inf'), timeout=float('inf')):
             if predicate():
                 return True
         attempt += 1
-        elapsed += 0.05
-        time.sleep(0.05)
+        elapsed += sleep
+        time.sleep(sleep)
 
     return False
 
@@ -1491,8 +1691,478 @@ class msg_blocktxn(object):
     def __repr__(self):
         return "msg_blocktxn(block_transactions=%s)" % (repr(self.block_transactions))
 
+class msg_getmnlistd(object):
+    command = b"getmnlistd"
+
+    def __init__(self, baseBlockHash=0, blockHash=0):
+        self.baseBlockHash = baseBlockHash
+        self.blockHash = blockHash
+
+    def deserialize(self, f):
+        self.baseBlockHash = deser_uint256(f)
+        self.blockHash = deser_uint256(f)
+
+    def serialize(self):
+        r = b""
+        r += ser_uint256(self.baseBlockHash)
+        r += ser_uint256(self.blockHash)
+        return r
+
+    def __repr__(self):
+        return "msg_getmnlistd(baseBlockHash=%064x, blockHash=%064x)" % (self.baseBlockHash, self.blockHash)
+
+QuorumId = namedtuple('QuorumId', ['llmqType', 'quorumHash'])
+
+class msg_mnlistdiff(object):
+    command = b"mnlistdiff"
+
+    def __init__(self):
+        self.baseBlockHash = 0
+        self.blockHash = 0
+        self.merkleProof = CPartialMerkleTree()
+        self.cbTx = None
+        self.deletedMNs = []
+        self.mnList = []
+        self.deletedQuorums = []
+        self.newQuorums = []
+
+    def deserialize(self, f):
+        self.baseBlockHash = deser_uint256(f)
+        self.blockHash = deser_uint256(f)
+        self.merkleProof.deserialize(f)
+        self.cbTx = CTransaction()
+        self.cbTx.deserialize(f)
+        self.cbTx.rehash()
+        self.deletedMNs = deser_uint256_vector(f)
+        self.mnList = []
+        for i in range(deser_compact_size(f)):
+            e = CSimplifiedMNListEntry()
+            e.deserialize(f)
+            self.mnList.append(e)
+
+        self.deletedQuorums = []
+        for i in range(deser_compact_size(f)):
+            llmqType = struct.unpack("<B", f.read(1))[0]
+            quorumHash = deser_uint256(f)
+            self.deletedQuorums.append(QuorumId(llmqType, quorumHash))
+        self.newQuorums = []
+        for i in range(deser_compact_size(f)):
+            qc = CFinalCommitment()
+            qc.deserialize(f)
+            self.newQuorums.append(qc)
+
+    def __repr__(self):
+        return "msg_mnlistdiff(baseBlockHash=%064x, blockHash=%064x)" % (self.baseBlockHash, self.blockHash)
+
+
+class msg_clsig(object):
+    command = b"clsig"
+
+    def __init__(self, height=0, blockHash=0, sig=b'\\x0' * 96):
+        self.height = height
+        self.blockHash = blockHash
+        self.sig = sig
+
+    def deserialize(self, f):
+        self.height = struct.unpack('<i', f.read(4))[0]
+        self.blockHash = deser_uint256(f)
+        self.sig = f.read(96)
+
+    def serialize(self):
+        r = b""
+        r += struct.pack('<i', self.height)
+        r += ser_uint256(self.blockHash)
+        r += self.sig
+        return r
+
+    def __repr__(self):
+        return "msg_clsig(height=%d, blockHash=%064x)" % (self.height, self.blockHash)
+
+
+class msg_islock(object):
+    command = b"islock"
+
+    def __init__(self, inputs=[], txid=0, sig=b'\\x0' * 96):
+        self.inputs = inputs
+        self.txid = txid
+        self.sig = sig
+
+    def deserialize(self, f):
+        self.inputs = deser_vector(f, COutPoint)
+        self.txid = deser_uint256(f)
+        self.sig = f.read(96)
+
+    def serialize(self):
+        r = b""
+        r += ser_vector(self.inputs)
+        r += ser_uint256(self.txid)
+        r += self.sig
+        return r
+
+    def __repr__(self):
+        return "msg_islock(inputs=%s, txid=%064x)" % (repr(self.inputs), self.txid)
+
+# This is what a callback should look like for NodeConn
+# Reimplement the on_* functions to provide handling for events
+class NodeConnCB(object):
+    def __init__(self):
+        self.verack_received = False
+        # deliver_sleep_time is helpful for debugging race conditions in p2p
+        # tests; it causes message delivery to sleep for the specified time
+        # before acquiring the global lock and delivering the next message.
+        self.deliver_sleep_time = None
+        # Remember the services our peer has advertised
+        self.peer_services = None
+
+    def set_deliver_sleep_time(self, value):
+        with mininode_lock:
+            self.deliver_sleep_time = value
+
+    def get_deliver_sleep_time(self):
+        with mininode_lock:
+            return self.deliver_sleep_time
+
+    # Spin until verack message is received from the node.
+    # Tests may want to use this as a signal that the test can begin.
+    # This can be called from the testing thread, so it needs to acquire the
+    # global lock.
+    def wait_for_verack(self):
+        tm = 0
+        while tm < 180:
+            with mininode_lock:
+                if self.verack_received:
+                    return
+            time.sleep(0.05)
+            tm += 0.05
+        assert self.verack_received
+
+    def deliver(self, conn, message):
+        deliver_sleep = self.get_deliver_sleep_time()
+        if deliver_sleep is not None:
+            time.sleep(deliver_sleep)
+        with mininode_lock:
+            try:
+                print("Delivering ", 'on_' + message.command.decode('ascii'))
+                getattr(self, 'on_' + message.command.decode('ascii'))(conn, message)
+            except:
+                print("ERROR delivering %s (%s)" % (repr(message),
+                                                    sys.exc_info()[0]))
+
+    def on_version(self, conn, message):
+        if message.nVersion >= 209:
+            conn.send_message(msg_verack())
+        conn.ver_send = min(MY_VERSION, message.nVersion)
+        if message.nVersion < 209:
+            conn.ver_recv = conn.ver_send
+        conn.nServices = message.nServices
+
+    def on_verack(self, conn, message):
+        conn.ver_recv = conn.ver_send
+        self.verack_received = True
+
+    def on_inv(self, conn, message):
+        want = msg_getdata()
+        for i in message.inv:
+            if i.type != 0:
+                want.inv.append(i)
+        if len(want.inv):
+            conn.send_message(want)
+
+    def on_addr(self, conn, message): pass
+    def on_alert(self, conn, message): pass
+    def on_getdata(self, conn, message): pass
+    def on_getblocks(self, conn, message): pass
+    def on_tx(self, conn, message): pass
+    def on_block(self, conn, message): pass
+    def on_getaddr(self, conn, message): pass
+    def on_headers(self, conn, message): pass
+    def on_getheaders(self, conn, message): pass
+    def on_ping(self, conn, message):
+        if conn.ver_send > BIP0031_VERSION:
+            conn.send_message(msg_pong(message.nonce))
+    def on_reject(self, conn, message): pass
+    def on_open(self, conn): pass
+    def on_close(self, conn): pass
+    def on_mempool(self, conn): pass
+    def on_notfound(self, message): pass
+    def on_pong(self, conn, message): pass
+    def on_feefilter(self, conn, message): pass
+    def on_sendheaders(self, conn, message): pass
+    def on_sendcmpct(self, conn, message): pass
+    def on_cmpctblock(self, conn, message): pass
+    def on_dandeliontx(self, conn, message): pass
+    def on_getblocktxn(self, conn, message): pass
+    def on_blocktxn(self, conn, message): pass
+    def on_mnlistdiff(self, conn, message): pass
+    def on_clsig(self, conn, message): pass
+    def on_islock(self, conn, message): pass
+
 class msg_witness_blocktxn(msg_blocktxn):
     def serialize(self):
         r = b""
         r += self.block_transactions.serialize(with_witness=True)
         return r
+
+
+# More useful callbacks and functions for NodeConnCB's which have a single NodeConn
+class SingleNodeConnCB(NodeConnCB):
+    def __init__(self):
+        NodeConnCB.__init__(self)
+        self.connection = None
+        self.ping_counter = 1
+        self.last_pong = msg_pong()
+
+    def add_connection(self, conn):
+        self.connection = conn
+
+    # Wrapper for the NodeConn's send_message function
+    def send_message(self, message):
+        self.connection.send_message(message)
+
+    def send_and_ping(self, message):
+        self.send_message(message)
+        self.sync_with_ping()
+
+    def on_pong(self, conn, message):
+        self.last_pong = message
+
+    # Sync up with the node
+    def sync_with_ping(self, timeout=30):
+        def received_pong():
+            return (self.last_pong.nonce == self.ping_counter)
+        self.send_message(msg_ping(nonce=self.ping_counter))
+        success = wait_until(received_pong, timeout=timeout)
+        self.ping_counter += 1
+        return success
+
+# The actual NodeConn class
+# This class provides an interface for a p2p connection to a specified node
+class NodeConn(asyncore.dispatcher):
+    messagemap = {
+        b"version": msg_version,
+        b"verack": msg_verack,
+        b"addr": msg_addr,
+        b"alert": msg_alert,
+        b"inv": msg_inv,
+        b"getdata": msg_getdata,
+        b"getblocks": msg_getblocks,
+        b"tx": msg_tx,
+        b"block": msg_block,
+        b"getaddr": msg_getaddr,
+        b"ping": msg_ping,
+        b"pong": msg_pong,
+        b"headers": msg_headers,
+        b"getheaders": msg_getheaders,
+        b"reject": msg_reject,
+        b"mempool": msg_mempool,
+        b"notfound": msg_notfound,
+        b"feefilter": msg_feefilter,
+        b"sendheaders": msg_sendheaders,
+        b"sendcmpct": msg_sendcmpct,
+        b"cmpctblock": msg_cmpctblock,
+        b"dandeliontx": msg_dandeliontx,
+        b"getblocktxn": msg_getblocktxn,
+        b"blocktxn": msg_blocktxn,
+        b"mnlistdiff": msg_mnlistdiff,
+        b"clsig": msg_clsig,
+        b"islock": msg_islock
+    }
+    MAGIC_BYTES = {
+        "mainnet": b"\xe3\xd9\xfe\xf1",   # mainnet
+        "testnet3": b"\xcf\xfc\xbe\xea",  # testnet3
+        "regtest": b"\xfa\xbf\xb5\xda",   # regtest
+    }
+
+    def __init__(self, dstaddr, dstport, rpc, callback, net="regtest", services=NODE_NETWORK, send_version=True):
+        asyncore.dispatcher.__init__(self, map=mininode_socket_map)
+        self.dstaddr = dstaddr
+        self.dstport = dstport
+        self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.sendbuf = b""
+        self.recvbuf = b""
+        self.ver_send = 209
+        self.ver_recv = 209
+        self.last_sent = 0
+        self.state = "connecting"
+        self.network = net
+        self.cb = callback
+        self.disconnect = False
+        self.nServices = 0
+
+        if send_version:
+            # stuff version msg into sendbuf
+            vt = msg_version()
+            vt.nServices = services
+            vt.addrTo.ip = self.dstaddr
+            vt.addrTo.port = self.dstport
+            vt.addrFrom.ip = "0.0.0.0"
+            vt.addrFrom.port = 0
+            self.send_message(vt, True)
+
+        print('MiniNode: Connecting to Bitcoin Node IP # ' + dstaddr + ':' \
+            + str(dstport))
+
+        try:
+            self.connect((dstaddr, dstport))
+            print("Connection to " + dstaddr + ':' + \
+                  str(dstport) + " successful. State is " + self.state)
+        except:
+            print("Connection to " + dstaddr + ':' + str(dstport) + " failed.")
+            self.handle_close()
+        self.rpc = rpc
+
+    def handle_connect(self):
+        if self.state != "connected":
+            logger.debug("MiniNode: Connected & Listening: \n")
+            self.state = "connected"
+            self.cb.on_open(self)
+
+    def handle_close(self):
+        print("MiniNode: Closing Connection to %s:%d... "
+                            % (self.dstaddr, self.dstport))
+        logger.debug("MiniNode: Closing Connection to %s:%d... "
+                            % (self.dstaddr, self.dstport))
+        self.state = "closed"
+        self.recvbuf = b""
+        self.sendbuf = b""
+        try:
+            self.close()
+        except:
+            pass
+        self.cb.on_close(self)
+
+    def handle_read(self):
+        try:
+            t = self.recv(8192)
+            if len(t) > 0:
+                self.recvbuf += t
+                self.got_data()
+        except:
+            pass
+
+    def readable(self):
+        return True
+
+    def writable(self):
+        with mininode_lock:
+            pre_connection = self.state == "connecting"
+            length = len(self.sendbuf)
+        return (length > 0 or pre_connection)
+
+    def handle_write(self):
+        with mininode_lock:
+            # asyncore does not expose socket connection, only the first read/write
+            # event, thus we must check connection manually here to know when we
+            # actually connect
+            if self.state == "connecting":
+                self.handle_connect()
+            if not self.writable():
+                return
+
+            try:
+                sent = self.send(self.sendbuf)
+            except:
+                print("Closing connection in handle_write")
+                self.handle_close()
+                return
+            self.sendbuf = self.sendbuf[sent:]
+
+    def got_data(self):
+        try:
+            while True:
+                if len(self.recvbuf) < 4:
+                    return
+                if self.recvbuf[:4] != self.MAGIC_BYTES[self.network]:
+                    raise ValueError("got garbage %s" % repr(self.recvbuf))
+                if self.ver_recv < 209:
+                    if len(self.recvbuf) < 4 + 12 + 4:
+                        return
+                    command = self.recvbuf[4:4+12].split(b"\x00", 1)[0]
+                    msglen = struct.unpack("<i", self.recvbuf[4+12:4+12+4])[0]
+                    checksum = None
+                    if len(self.recvbuf) < 4 + 12 + 4 + msglen:
+                        return
+                    msg = self.recvbuf[4+12+4:4+12+4+msglen]
+                    self.recvbuf = self.recvbuf[4+12+4+msglen:]
+                else:
+                    if len(self.recvbuf) < 4 + 12 + 4 + 4:
+                        return
+                    command = self.recvbuf[4:4+12].split(b"\x00", 1)[0]
+                    msglen = struct.unpack("<i", self.recvbuf[4+12:4+12+4])[0]
+                    checksum = self.recvbuf[4+12+4:4+12+4+4]
+                    if len(self.recvbuf) < 4 + 12 + 4 + 4 + msglen:
+                        return
+                    msg = self.recvbuf[4+12+4+4:4+12+4+4+msglen]
+                    th = sha256(msg)
+                    h = sha256(th)
+                    if checksum != h[:4]:
+                        raise ValueError("got bad checksum " + repr(self.recvbuf))
+                    self.recvbuf = self.recvbuf[4+12+4+4+msglen:]
+                if command in self.messagemap:
+                    f = BytesIO(msg)
+                    t = self.messagemap[command]()
+                    t.deserialize(f)
+                    self.got_message(t)
+                else:
+                    logger.debug("Unknown command: '%s' %s" % (command, repr(msg)))
+        except Exception as e:
+            logger.error('got_data:', repr(e))
+            # import  traceback
+            # traceback.print_tb(sys.exc_info()[2])
+
+    def send_message(self, message, pushbuf=False):
+        if self.state != "connected" and not pushbuf:
+            print("State of connection is ", self.state)
+            raise IOError('Not connected, no pushbuf')
+            logger.debug("Send %s" % repr(message))
+        command = message.command
+        data = message.serialize()
+        tmsg = self.MAGIC_BYTES[self.network]
+        tmsg += command
+        tmsg += b"\x00" * (12 - len(command))
+        tmsg += struct.pack("<I", len(data))
+        if self.ver_send >= 209:
+            th = sha256(data)
+            h = sha256(th)
+            tmsg += h[:4]
+        tmsg += data
+        with mininode_lock:
+            self.sendbuf += tmsg
+            self.last_sent = time.time()
+
+    def got_message(self, message):
+        if message.command == b"version":
+            if message.nVersion <= BIP0031_VERSION:
+                self.messagemap[b'ping'] = msg_ping_prebip31
+        if self.last_sent + 30 * 60 < time.time():
+            self.send_message(self.messagemap[b'ping']())
+            logger.debug("Recv %s" % repr(message))
+        self.cb.deliver(self, message)
+
+    def disconnect_node(self):
+        self.disconnect = True
+
+
+class NetworkThread(Thread):
+    def run(self):
+        while mininode_socket_map:
+            # We check for whether to disconnect outside of the asyncore
+            # loop to workaround the behavior of asyncore when using
+            # select
+            disconnected = []
+            for fd, obj in mininode_socket_map.items():
+                if obj.disconnect:
+                    disconnected.append(obj)
+                    print("NetworkThread:run disconnecting %s %s" % (fd, obj.disconnect))
+            [ obj.handle_close() for obj in disconnected ]
+            asyncore.loop(0.1, use_poll=True, map=mininode_socket_map, count=1)
+
+
+# An exception we can raise if we detect a potential disconnect
+# (p2p or rpc) before the test is complete
+class EarlyDisconnectError(Exception):
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        return repr(self.value)

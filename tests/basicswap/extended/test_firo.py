@@ -44,7 +44,7 @@ from tests.basicswap.common import (
     wait_for_in_progress,
     wait_for_bid_tx_state,
 )
-from basicswap.contrib.test_framework.messages import (
+from basicswap.interface.contrib.firo_test_framework.mininode import (
     FromHex,
     CTransaction,
 )
@@ -168,7 +168,8 @@ class Test(BaseTest):
             # Set future block rewards to nowhere (a random address), so wallet amounts stay constant
             void_block_rewards_pubkey = cls.getRandomPubkey()
             cls.firo_addr = cls.swap_clients[0].ci(Coins.FIRO).pubkey_to_address(void_block_rewards_pubkey)
-            num_blocks = 100
+            chain_height = callnoderpc(0, 'getblockcount', base_rpc_port=FIRO_BASE_RPC_PORT)
+            num_blocks = 1352 - chain_height  # Activate CTLV (bip65)
             logging.info('Mining %d Firo blocks to %s', num_blocks, cls.firo_addr)
             callnoderpc(0, 'generatetoaddress', [num_blocks, cls.firo_addr], base_rpc_port=FIRO_BASE_RPC_PORT)
 
@@ -189,7 +190,7 @@ class Test(BaseTest):
             'rpcpassword': 'test_pass' + str(node_id),
             'datadir': os.path.join(datadir, 'firo_' + str(node_id)),
             'bindir': FIRO_BINDIR,
-            'use_csv': True,
+            'use_csv': False,
             'use_segwit': False,
         }
 
@@ -206,6 +207,9 @@ class Test(BaseTest):
 
     def callnoderpc(self, method, params=[], wallet=None, node_id=0):
         return callnoderpc(node_id, method, params, wallet, base_rpc_port=FIRO_BASE_RPC_PORT)
+
+    def mineBlock(self, num_blocks: int = 1):
+        self.callnoderpc('generatetoaddress', [num_blocks, self.firo_addr])
 
     def test_001_firo(self):
         logging.info('---------- Test {} segwit'.format(self.test_coin_from.name))
@@ -251,7 +255,8 @@ class Test(BaseTest):
         decoded_tx = CTransaction()
         decoded_tx = FromHex(decoded_tx, tx_funded)
         decoded_tx.vin[0].scriptSig = bytes.fromhex('16' + addr_witness_info['hex'])
-        txid_with_scriptsig = decoded_tx.rehash()
+        decoded_tx.rehash()
+        txid_with_scriptsig = decoded_tx.hash
 
         tx_funded_decoded = firoCli(f'decoderawtransaction {tx_funded}')
         tx_signed_decoded = firoCli(f'decoderawtransaction {tx_signed}')
@@ -268,6 +273,55 @@ class Test(BaseTest):
         assert ('490ba1e2c3894d5534c467141ee3cdf77292c362' == ci.getWalletSeedID())
         assert swap_client.checkWalletSeed(self.test_coin_from) is True
 
+    def test_008_gettxout(self):
+        logging.info('---------- Test {} gettxout'.format(self.test_coin_from.name))
+
+        swap_client = self.swap_clients[0]
+
+        addr_plain = self.callnoderpc('getnewaddress', ['gettxout test',])
+
+        addr_plain1 = self.callnoderpc('getnewaddress', ['gettxout test 1',])
+        addr_witness = self.callnoderpc('addwitnessaddress', [addr_plain1,])
+
+        txid = self.callnoderpc('sendtoaddress', [addr_witness, 1.0])
+        assert len(txid) == 64
+
+        self.callnoderpc('generatetoaddress', [1, self.firo_addr])
+
+        unspents = self.callnoderpc('listunspent')
+
+        for u in unspents:
+            if u['spendable'] is not True:
+                continue
+            if u['address'] == addr_witness:
+                print(u)
+
+        unspents = self.callnoderpc('listunspent', [0, 999999999, [addr_witness,]])
+        assert (len(unspents) == 1)
+
+        utxo = unspents[0]
+        txout = self.callnoderpc('gettxout', [utxo['txid'], utxo['vout']])
+        assert (addr_witness in txout['scriptPubKey']['addresses'])
+        # Spend
+        addr_plain2 = self.callnoderpc('getnewaddress', ['gettxout test 2',])
+        addr_witness2 = self.callnoderpc('addwitnessaddress', [addr_plain2,])
+        tx_funded = self.callnoderpc('createrawtransaction', [[{'txid': utxo['txid'], 'vout': utxo['vout']}], {addr_witness2: 0.99}])
+        tx_signed = self.callnoderpc('signrawtransaction', [tx_funded,])['hex']
+        self.callnoderpc('sendrawtransaction', [tx_signed,])
+
+        # utxo should be unavailable when spent in the mempool
+        txout = self.callnoderpc('gettxout', [utxo['txid'], utxo['vout']])
+        assert (txout is None)
+
+        self.callnoderpc('generatetoaddress', [1, self.firo_addr])
+
+        ci = swap_client.ci(Coins.FIRO)
+        require_amount: int = ci.make_int(1)
+        funds_proof = ci.getProofOfFunds(require_amount, 'test'.encode('utf-8'))
+
+        amount_proved = ci.verifyProofOfFunds(funds_proof[0], funds_proof[1], funds_proof[2], 'test'.encode('utf-8'))
+        assert (amount_proved >= require_amount)
+
     def test_02_part_coin(self):
         logging.info('---------- Test PART to {}'.format(self.test_coin_from.name))
         if not self.test_atomic:
@@ -275,7 +329,7 @@ class Test(BaseTest):
             return
         swap_clients = self.swap_clients
 
-        offer_id = swap_clients[0].postOffer(Coins.PART, self.test_coin_from, 100 * COIN, 0.1 * COIN, 100 * COIN, SwapTypes.SELLER_FIRST)
+        offer_id = swap_clients[0].postOffer(Coins.PART, self.test_coin_from, 100 * COIN, 0.1 * COIN, 100 * COIN, SwapTypes.SELLER_FIRST, TxLockTypes.ABS_LOCK_TIME)
 
         wait_for_offer(test_delay_event, swap_clients[1], offer_id)
         offer = swap_clients[1].getOffer(offer_id)
@@ -297,7 +351,7 @@ class Test(BaseTest):
         logging.info('---------- Test {} to PART'.format(self.test_coin_from.name))
         swap_clients = self.swap_clients
 
-        offer_id = swap_clients[1].postOffer(self.test_coin_from, Coins.PART, 10 * COIN, 9.0 * COIN, 10 * COIN, SwapTypes.SELLER_FIRST)
+        offer_id = swap_clients[1].postOffer(self.test_coin_from, Coins.PART, 10 * COIN, 9.0 * COIN, 10 * COIN, SwapTypes.SELLER_FIRST, TxLockTypes.ABS_LOCK_TIME)
 
         wait_for_offer(test_delay_event, swap_clients[0], offer_id)
         offer = swap_clients[0].getOffer(offer_id)
@@ -320,7 +374,7 @@ class Test(BaseTest):
         logging.info('---------- Test {} to BTC'.format(self.test_coin_from.name))
         swap_clients = self.swap_clients
 
-        offer_id = swap_clients[0].postOffer(self.test_coin_from, Coins.BTC, 10 * COIN, 0.1 * COIN, 10 * COIN, SwapTypes.SELLER_FIRST)
+        offer_id = swap_clients[0].postOffer(self.test_coin_from, Coins.BTC, 10 * COIN, 0.1 * COIN, 10 * COIN, SwapTypes.SELLER_FIRST, TxLockTypes.ABS_LOCK_TIME)
 
         wait_for_offer(test_delay_event, swap_clients[1], offer_id)
         offer = swap_clients[1].getOffer(offer_id)
@@ -348,7 +402,7 @@ class Test(BaseTest):
         swap_clients = self.swap_clients
 
         offer_id = swap_clients[0].postOffer(self.test_coin_from, Coins.BTC, 10 * COIN, 0.1 * COIN, 10 * COIN, SwapTypes.SELLER_FIRST,
-                                             TxLockTypes.SEQUENCE_LOCK_BLOCKS, 10)
+                                             TxLockTypes.ABS_LOCK_BLOCKS, 10)
 
         wait_for_offer(test_delay_event, swap_clients[1], offer_id)
         offer = swap_clients[1].getOffer(offer_id)
@@ -372,7 +426,7 @@ class Test(BaseTest):
 
         js_0_before = read_json_api(1800)
 
-        offer_id = swap_clients[0].postOffer(self.test_coin_from, Coins.BTC, 10 * COIN, 10 * COIN, 10 * COIN, SwapTypes.SELLER_FIRST)
+        offer_id = swap_clients[0].postOffer(self.test_coin_from, Coins.BTC, 10 * COIN, 10 * COIN, 10 * COIN, SwapTypes.SELLER_FIRST, TxLockTypes.ABS_LOCK_TIME)
 
         wait_for_offer(test_delay_event, swap_clients[0], offer_id)
         offer = swap_clients[0].getOffer(offer_id)
@@ -394,7 +448,7 @@ class Test(BaseTest):
 
         js_0_before = read_json_api(1800)
 
-        offer_id = swap_clients[0].postOffer(self.test_coin_from, Coins.BTC, 0.001 * COIN, 1.0 * COIN, 0.001 * COIN, SwapTypes.SELLER_FIRST)
+        offer_id = swap_clients[0].postOffer(self.test_coin_from, Coins.BTC, 0.001 * COIN, 1.0 * COIN, 0.001 * COIN, SwapTypes.SELLER_FIRST, TxLockTypes.ABS_LOCK_TIME)
 
         wait_for_offer(test_delay_event, swap_clients[0], offer_id)
         offer = swap_clients[0].getOffer(offer_id)
@@ -491,7 +545,7 @@ class Test(BaseTest):
 
         extra_options = {'prefunded_itx': itx}
         rate_swap = ci_to.make_int(random.uniform(0.2, 10.0), r=1)
-        offer_id = swap_clients[2].postOffer(coin_from, coin_to, swap_value, rate_swap, swap_value, swap_type, extra_options=extra_options)
+        offer_id = swap_clients[2].postOffer(coin_from, coin_to, swap_value, rate_swap, swap_value, swap_type, TxLockTypes.ABS_LOCK_TIME, extra_options=extra_options)
 
         wait_for_offer(test_delay_event, swap_clients[1], offer_id)
         offer = swap_clients[1].getOffer(offer_id)

@@ -5,6 +5,9 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
+import random
+import hashlib
+
 from io import BytesIO
 from coincurve.keys import (
     PublicKey,
@@ -148,10 +151,96 @@ class NAVInterface(BTCInterface):
         tx.wit.vtxinwit[0].scriptWitness.stack = stack
         return tx.serialize_with_witness()
 
-    def verifyProofOfFunds(self, address, signature, extra_commit_bytes):
-        self._log.warning('verifyProofOfFunds TODO')
-        # TODO: Port scantxoutset or external lookup or read utxodb directly
-        return 999999 * self.COIN()
+    def getProofOfFunds(self, amount_for, extra_commit_bytes):
+        # TODO: Lock unspent and use same output/s to fund bid
+
+        unspents_by_addr = dict()
+        unspents = self.rpc_callback('listunspent')
+        for u in unspents:
+            if u['spendable'] is not True:
+                continue
+            if u['address'] not in unspents_by_addr:
+                unspents_by_addr[u['address']] = {'total': 0, 'utxos': []}
+            utxo_amount: int = self.make_int(u['amount'], r=1)
+            unspents_by_addr[u['address']]['total'] += utxo_amount
+            unspents_by_addr[u['address']]['utxos'].append((utxo_amount, u['txid'], u['vout']))
+
+        max_utxos: int = 4
+
+        viable_addrs = []
+        for addr, data in unspents_by_addr.items():
+            if data['total'] >= amount_for:
+                # Sort from largest to smallest amount
+                sorted_utxos = sorted(data['utxos'], key=lambda x: x[0])
+
+                # Max outputs required to reach amount_for
+                utxos_req: int = 0
+                sum_value: int = 0
+                for utxo in sorted_utxos:
+                    sum_value += utxo[0]
+                    utxos_req += 1
+                    if sum_value >= amount_for:
+                        break
+
+                if utxos_req <= max_utxos:
+                    viable_addrs.append(addr)
+                    continue
+
+        ensure(len(viable_addrs) > 0, 'Could not find address with enough funds for proof')
+
+        sign_for_addr: str = random.choice(viable_addrs)
+        self._log.debug('sign_for_addr %s', sign_for_addr)
+
+        prove_utxos = []
+        sorted_utxos = sorted(unspents_by_addr[sign_for_addr]['utxos'], key=lambda x: x[0])
+
+        hasher = hashlib.sha256()
+
+        sum_value: int = 0
+        for utxo in sorted_utxos:
+            sum_value += utxo[0]
+            outpoint = (bytes.fromhex(utxo[1]), utxo[2])
+            prove_utxos.append(outpoint)
+            hasher.update(outpoint[0])
+            hasher.update(outpoint[1].to_bytes(2, 'big'))
+            if sum_value >= amount_for:
+                break
+        utxos_hash = hasher.digest()
+
+        self._log.debug('sign_for_addr %s', sign_for_addr)
+
+        if self.using_segwit():  # TODO: Use isSegwitAddress when scantxoutset can use combo
+            # 'Address does not refer to key' for non p2pkh
+            addr_info = self.rpc_callback('validateaddress', [addr, ])
+            if 'isscript' in addr_info and addr_info['isscript'] and 'hex' in addr_info:
+                pkh = bytes.fromhex(addr_info['hex'])[2:]
+                sign_for_addr = self.pkh_to_address(pkh)
+                self._log.debug('sign_for_addr converted %s', sign_for_addr)
+
+        signature = self.rpc_callback('signmessage', [sign_for_addr, sign_for_addr + '_swap_proof_' + utxos_hash.hex() + extra_commit_bytes.hex()])
+
+        return (sign_for_addr, signature, prove_utxos)
+
+    def verifyProofOfFunds(self, address, signature, utxos, extra_commit_bytes):
+        hasher = hashlib.sha256()
+        sum_value: int = 0
+        for outpoint in utxos:
+            hasher.update(outpoint[0])
+            hasher.update(outpoint[1].to_bytes(2, 'big'))
+        utxos_hash = hasher.digest()
+
+        passed = self.verifyMessage(address, address + '_swap_proof_' + utxos_hash.hex() + extra_commit_bytes.hex(), signature)
+        ensure(passed is True, 'Proof of funds signature invalid')
+
+        if self.using_segwit():
+            address = self.encodeSegwitAddress(self.decodeAddress(address)[1:])
+
+        sum_value: int = 0
+        for outpoint in utxos:
+            txout = self.rpc_callback('gettxout', [outpoint[0].hex(), outpoint[1]])
+            sum_value += self.make_int(txout['value'])
+
+        return sum_value
 
     def createRawFundedTransaction(self, addr_to: str, amount: int, sub_fee: bool = False, lock_unspents: bool = True) -> str:
         txn = self.rpc_callback('createrawtransaction', [[], {addr_to: self.format_amount(amount)}])
@@ -161,7 +250,8 @@ class NAVInterface(BTCInterface):
             raise ValueError('Navcoin fundrawtransaction is missing the subtractFeeFromOutputs parameter')
             # options['subtractFeeFromOutputs'] = [0,]
 
-        return self.fundTx(txn, fee_rate, lock_unspents)
+        fee_rate = self.make_int(fee_rate, r=1)
+        return self.fundTx(txn, fee_rate, lock_unspents).hex()
 
     def isAddressMine(self, address: str, or_watch_only: bool = False) -> bool:
         addr_info = self.rpc_callback('validateaddress', [address])
@@ -198,32 +288,6 @@ class NAVInterface(BTCInterface):
             'redeemScript': txn_script.hex(),
             'amount': txjs['vout'][n]['value']
         }
-
-    def getProofOfFunds(self, amount_for, extra_commit_bytes):
-        # TODO: Lock unspent and use same output/s to fund bid
-        unspent_addr = self.getUnspentsByAddr()
-
-        sign_for_addr = None
-        for addr, value in unspent_addr.items():
-            if value >= amount_for:
-                sign_for_addr = addr
-                break
-
-        ensure(sign_for_addr is not None, 'Could not find address with enough funds for proof')
-
-        self._log.debug('sign_for_addr %s', sign_for_addr)
-
-        if self.using_segwit():  # TODO: Use isSegwitAddress when scantxoutset can use combo
-            # 'Address does not refer to key' for non p2pkh
-            addr_info = self.rpc_callback('validateaddress', [addr, ])
-            if 'isscript' in addr_info and addr_info['isscript'] and 'hex' in addr_info:
-                pkh = bytes.fromhex(addr_info['hex'])[2:]
-                sign_for_addr = self.pkh_to_address(pkh)
-                self._log.debug('sign_for_addr converted %s', sign_for_addr)
-
-        signature = self.rpc_callback('signmessage', [sign_for_addr, sign_for_addr + '_swap_proof_' + extra_commit_bytes.hex()])
-
-        return (sign_for_addr, signature)
 
     def getNewAddress(self, use_segwit: bool, label: str = 'swap_receive') -> str:
         address: str = self.rpc_callback('getnewaddress', [label,])
@@ -350,7 +414,6 @@ class NAVInterface(BTCInterface):
         if not self.isAddressMine(dest_address, or_watch_only=True):
             self.importWatchOnlyAddress(dest_address, 'bid')
             self._log.info('Imported watch-only addr: {}'.format(dest_address))
-            # Importing triggers a rescan
             self._log.info('Rescanning {} chain from height: {}'.format(self.coin_name(), rescan_from))
             self.rescanBlockchainForAddress(rescan_from, dest_address)
 
@@ -503,14 +566,14 @@ class NAVInterface(BTCInterface):
 
         return tx.serialize()
 
-    def fundTx(self, tx, feerate, lock_unspents: bool = True):
+    def fundTx(self, tx_hex: str, feerate: int, lock_unspents: bool = True):
         feerate_str = self.format_amount(feerate)
         # TODO: unlock unspents if bid cancelled
         options = {
             'lockUnspents': lock_unspents,
             'feeRate': feerate_str,
         }
-        rv = self.rpc_callback('fundrawtransaction', [tx.hex(), options])
+        rv = self.rpc_callback('fundrawtransaction', [tx_hex, options])
 
         # Sign transaction then strip witness data to fill scriptsig
         rv = self.rpc_callback('signrawtransaction', [rv['hex']])
@@ -524,8 +587,8 @@ class NAVInterface(BTCInterface):
 
         return tx_signed.serialize_without_witness()
 
-    def fundSCLockTx(self, tx_bytes: bytes, feerate, vkbv=None):
-        tx_funded = self.fundTx(tx_bytes, feerate)
+    def fundSCLockTx(self, tx_bytes: bytes, feerate, vkbv=None) -> bytes:
+        tx_funded = self.fundTx(tx_bytes.hex(), feerate)
         return tx_funded
 
     def createSCLockRefundTx(self, tx_lock_bytes, script_lock, Kal, Kaf, lock1_value, csv_val, tx_fee_rate, vkbv=None):
@@ -664,3 +727,17 @@ class NAVInterface(BTCInterface):
                        i2h(tx.sha256), tx_fee_rate, vsize, pay_fee)
 
         return tx.serialize()
+
+    def get_fee_rate(self, conf_target: int = 2):
+
+        try:
+            fee_rate = self.rpc_callback('estimatesmartfee', [conf_target])['feerate']
+            assert (fee_rate > 0.0), 'Non positive feerate'
+            return fee_rate, 'estimatesmartfee'
+        except Exception:
+            try:
+                fee_rate = self.rpc_callback('getwalletinfo')['paytxfee']
+                assert (fee_rate > 0.0), 'Non positive feerate'
+                return fee_rate, 'paytxfee'
+            except Exception:
+                return self.rpc_callback('getnetworkinfo')['relayfee'], 'relayfee'

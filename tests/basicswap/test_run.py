@@ -52,6 +52,17 @@ from tests.basicswap.common import (
     compare_bid_states,
     extract_states_from_xu_file,
 )
+from basicswap.contrib.test_framework.messages import (
+    ToHex,
+    CTxIn,
+    COutPoint,
+    CTransaction,
+    CTxInWitness,
+)
+from basicswap.contrib.test_framework.script import (
+    CScript,
+    OP_CHECKLOCKTIMEVERIFY,
+)
 from .test_xmr import BaseTest, test_delay_event, callnoderpc
 
 
@@ -195,6 +206,77 @@ class Test(BaseTest):
             sc.validateSwapType(case[0], case[1], case[2])
         for case in should_fail:
             self.assertRaises(ValueError, sc.validateSwapType, case[0], case[1], case[2])
+
+    def test_003_cltv(self):
+        test_coin_from = Coins.PART
+        logging.info('---------- Test {} cltv'.format(test_coin_from.name))
+        ci = self.swap_clients[0].ci(test_coin_from)
+
+        deploymentinfo = callnoderpc(0, 'getdeploymentinfo')
+        bip65_active = deploymentinfo['deployments']['bip65']['active']
+        assert (bip65_active)
+
+        chain_height = callnoderpc(0, 'getblockcount')
+        script = CScript([chain_height + 3, OP_CHECKLOCKTIMEVERIFY, ])
+
+        script_dest = ci.getScriptDest(script)
+        tx = CTransaction()
+        tx.nVersion = ci.txVersion()
+        tx.vout.append(ci.txoType()(ci.make_int(1.1), script_dest))
+        tx_hex = ToHex(tx)
+        tx_funded = callnoderpc(0, 'fundrawtransaction', [tx_hex])
+        utxo_pos = 0 if tx_funded['changepos'] == 1 else 1
+        tx_signed = callnoderpc(0, 'signrawtransactionwithwallet', [tx_funded['hex'], ])['hex']
+        txid = callnoderpc(0, 'sendrawtransaction', [tx_signed, ])
+
+        addr_out = callnoderpc(0, 'getnewaddress', ['cltv test', ])
+        pkh = ci.decodeAddress(addr_out)
+        script_out = ci.getScriptForPubkeyHash(pkh)
+
+        tx_spend = CTransaction()
+        tx_spend.nVersion = ci.txVersion()
+        tx_spend.nLockTime = chain_height + 3
+        tx_spend.vin.append(CTxIn(COutPoint(int(txid, 16), utxo_pos)))
+        tx_spend.vout.append(ci.txoType()(ci.make_int(1.0999), script_out))
+        tx_spend.wit.vtxinwit.append(CTxInWitness())
+        tx_spend.wit.vtxinwit[0].scriptWitness.stack = [script, ]
+        tx_spend_hex = ToHex(tx_spend)
+
+        tx_spend.nLockTime = chain_height + 2
+        tx_spend_invalid_hex = ToHex(tx_spend)
+
+        for tx_hex in [tx_spend_invalid_hex, tx_spend_hex]:
+            try:
+                txid = callnoderpc(0, 'sendrawtransaction', [tx_hex, ])
+            except Exception as e:
+                assert ('non-final' in str(e))
+            else:
+                assert False, 'Should fail'
+
+        self.waitForParticlHeight(chain_height + 3)
+        try:
+            txid = callnoderpc(0, 'sendrawtransaction', [tx_spend_invalid_hex, ])
+        except Exception as e:
+            assert ('Locktime requirement not satisfied' in str(e))
+        else:
+            assert False, 'Should fail'
+
+        chain_height = callnoderpc(0, 'getblockcount')
+        txid = callnoderpc(0, 'sendrawtransaction', [tx_spend_hex, ])
+        ro = callnoderpc(0, 'listreceivedbyaddress', [0, ])
+        sum_addr = 0
+        for entry in ro:
+            if entry['address'] == addr_out:
+                sum_addr += entry['amount']
+        assert (sum_addr == 1.0999)
+
+        # Ensure tx was mined
+        for i in range(5):
+            self.waitForParticlHeight(chain_height + i)
+            tx_wallet = callnoderpc(0, 'gettransaction', [txid, ])
+            if 'blockhash' in tx_wallet:
+                break
+        assert (len(tx_wallet['blockhash']) == 64)
 
     def test_01_verifyrawtransaction(self):
         txn = '0200000001eb6e5c4ebba4efa32f40c7314cad456a64008e91ee30b2dd0235ab9bb67fbdbb01000000ee47304402200956933242dde94f6cf8f195a470f8d02aef21ec5c9b66c5d3871594bdb74c9d02201d7e1b440de8f4da672d689f9e37e98815fb63dbc1706353290887eb6e8f7235012103dc1b24feb32841bc2f4375da91fa97834e5983668c2a39a6b7eadb60e7033f9d205a803b28fe2f86c17db91fa99d7ed2598f79b5677ffe869de2e478c0d1c02cc7514c606382012088a8201fe90717abb84b481c2a59112414ae56ec8acc72273642ca26cc7a5812fdc8f68876a914225fbfa4cb725b75e511810ac4d6f74069bdded26703520140b27576a914207eb66b2fd6ed9924d6217efc7fa7b38dfabe666888acffffffff01e0167118020000001976a9140044e188928710cecba8311f1cf412135b98145c88ac00000000'

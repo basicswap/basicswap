@@ -36,6 +36,11 @@ from basicswap.util import (
     DeserialiseNum,
     validate_amount)
 
+from basicswap.messages_pb2 import (
+    BidMessage,
+    BidMessage_v1Deprecated,
+)
+
 
 class Test(unittest.TestCase):
     REQUIRED_SETTINGS = {'blocks_confirmed': 1, 'conf_target': 1, 'use_segwit': True, 'connection_type': 'rpc'}
@@ -311,6 +316,18 @@ class Test(unittest.TestCase):
     def test_ripemd160(self):
         input_data = b'hash this'
         assert (ripemd160(input_data).hex() == 'd5443a154f167e2c1332f6de72cfb4c6ab9c8c17')
+
+    def test_protobuf(self):
+        # Ensure old protobuf templates can be read
+
+        msg_buf = BidMessage_v1Deprecated()
+        msg_buf.protocol_version = 2
+        serialised_msg = msg_buf.SerializeToString()
+
+        msg_buf_v2 = BidMessage()
+        msg_buf_v2.ParseFromString(serialised_msg)
+
+        assert (msg_buf_v2.protocol_version == 2)
 
 
 if __name__ == '__main__':

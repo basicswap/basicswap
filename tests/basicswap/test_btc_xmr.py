@@ -505,6 +505,10 @@ class BasicSwapTest(TestFunctions):
         logging.info('---------- Test {} cltv'.format(self.test_coin_from.name))
         ci = self.swap_clients[0].ci(self.test_coin_from)
 
+        deploymentinfo = self.callnoderpc('getdeploymentinfo')
+        bip65_active = deploymentinfo['deployments']['bip65']['active']
+        assert (bip65_active)
+
         chain_height = self.callnoderpc('getblockcount')
         script = CScript([chain_height + 3, OP_CHECKLOCKTIMEVERIFY, ])
 
@@ -518,7 +522,7 @@ class BasicSwapTest(TestFunctions):
         tx_signed = self.callnoderpc('signrawtransactionwithwallet', [tx_funded['hex'], ])['hex']
         txid = self.callnoderpc('sendrawtransaction', [tx_signed, ])
 
-        addr_out = self.callnoderpc('getnewaddress', ['csv test', 'bech32'])
+        addr_out = self.callnoderpc('getnewaddress', ['cltv test', 'bech32'])
         pkh = ci.decodeSegwitAddress(addr_out)
         script_out = ci.getScriptForPubkeyHash(pkh)
 
@@ -530,14 +534,26 @@ class BasicSwapTest(TestFunctions):
         tx_spend.wit.vtxinwit.append(CTxInWitness())
         tx_spend.wit.vtxinwit[0].scriptWitness.stack = [script, ]
         tx_spend_hex = ToHex(tx_spend)
+
+        tx_spend.nLockTime = chain_height + 2
+        tx_spend_invalid_hex = ToHex(tx_spend)
+
+        for tx_hex in [tx_spend_invalid_hex, tx_spend_hex]:
+            try:
+                txid = self.callnoderpc('sendrawtransaction', [tx_hex, ])
+            except Exception as e:
+                assert ('non-final' in str(e))
+            else:
+                assert False, 'Should fail'
+
+        self.mineBlock(5)
         try:
-            txid = self.callnoderpc('sendrawtransaction', [tx_spend_hex, ])
+            txid = self.callnoderpc('sendrawtransaction', [tx_spend_invalid_hex, ])
         except Exception as e:
-            assert ('non-final' in str(e))
+            assert ('Locktime requirement not satisfied' in str(e))
         else:
             assert False, 'Should fail'
 
-        self.mineBlock(5)
         txid = self.callnoderpc('sendrawtransaction', [tx_spend_hex, ])
         self.mineBlock()
         ro = self.callnoderpc('listreceivedbyaddress', [0, ])
@@ -546,6 +562,10 @@ class BasicSwapTest(TestFunctions):
             if entry['address'] == addr_out:
                 sum_addr += entry['amount']
         assert (sum_addr == 1.0999)
+
+        # Ensure tx was mined
+        tx_wallet = self.callnoderpc('gettransaction', [txid, ])
+        assert (len(tx_wallet['blockhash']) == 64)
 
     def test_004_csv(self):
         logging.info('---------- Test {} csv'.format(self.test_coin_from.name))

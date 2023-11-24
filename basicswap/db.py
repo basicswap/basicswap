@@ -12,7 +12,7 @@ from enum import IntEnum, auto
 from sqlalchemy.ext.declarative import declarative_base
 
 
-CURRENT_DB_VERSION = 21
+CURRENT_DB_VERSION = 22
 CURRENT_DB_DATA_VERSION = 4
 Base = declarative_base()
 
@@ -67,6 +67,7 @@ class Offer(Base):
 
     proof_address = sa.Column(sa.String)
     proof_signature = sa.Column(sa.LargeBinary)
+    proof_utxos = sa.Column(sa.LargeBinary)
     pkhash_seller = sa.Column(sa.LargeBinary)
     secret_hash = sa.Column(sa.LargeBinary)
 
@@ -115,6 +116,7 @@ class Bid(Base):
     expire_at = sa.Column(sa.BigInteger)
     bid_addr = sa.Column(sa.String)
     proof_address = sa.Column(sa.String)
+    proof_utxos = sa.Column(sa.LargeBinary)
     withdraw_to_addr = sa.Column(sa.String)  # Address to spend lock tx to - address from wallet if empty TODO
 
     recovered_secret = sa.Column(sa.LargeBinary)

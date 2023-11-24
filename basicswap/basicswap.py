@@ -146,7 +146,7 @@ from basicswap.db_util import (
     remove_expired_data,
 )
 
-PROTOCOL_VERSION_SECRET_HASH = 2
+PROTOCOL_VERSION_SECRET_HASH = 3
 MINPROTO_VERSION_SECRET_HASH = 2
 
 PROTOCOL_VERSION_ADAPTOR_SIG = 3
@@ -469,6 +469,9 @@ class BasicSwap(BaseApp):
             'chain_best_block': None,
             'chain_median_time': None,
         }
+
+        if coin == Coins.FIRO:
+            self.coin_clients[coin]['use_csv'] = False
 
         if coin == Coins.PART:
             self.coin_clients[coin]['anon_tx_ring_size'] = chain_client_settings.get('anon_tx_ring_size', 12)
@@ -1503,7 +1506,7 @@ class BasicSwap(BaseApp):
                 ci_from.ensureFunds(msg_buf.amount_from)
             else:
                 proof_of_funds_hash = getOfferProofOfFundsHash(msg_buf, offer_addr)
-                proof_addr, proof_sig = self.getProofOfFunds(coin_from_t, int(amount), proof_of_funds_hash)
+                proof_addr, proof_sig, proof_utxos = self.getProofOfFunds(coin_from_t, int(amount), proof_of_funds_hash)
                 # TODO: For now proof_of_funds is just a client side check, may need to be sent with offers in future however.
 
             offer_bytes = msg_buf.SerializeToString()
@@ -1964,7 +1967,7 @@ class BasicSwap(BaseApp):
         self.log.debug('getProofOfFunds %s %s', ci.coin_name(), ci.format_amount(amount_for))
 
         if self.coin_clients[coin_type]['connection_type'] != 'rpc':
-            return (None, None)
+            return (None, None, None)
 
         return ci.getProofOfFunds(amount_for, extra_commit_bytes)
 
@@ -2136,9 +2139,14 @@ class BasicSwap(BaseApp):
 
             now: int = self.getTime()
             if offer.swap_type == SwapTypes.SELLER_FIRST:
-                proof_addr, proof_sig = self.getProofOfFunds(coin_to, amount_to, offer_id)
+                proof_addr, proof_sig, proof_utxos = self.getProofOfFunds(coin_to, amount_to, offer_id)
                 msg_buf.proof_address = proof_addr
                 msg_buf.proof_signature = proof_sig
+
+                if len(proof_utxos) > 0:
+                    msg_buf.proof_utxos = bytes()
+                    for utxo in proof_utxos:
+                        msg_buf.proof_utxos += utxo[0] + utxo[1].to_bytes(2, 'big')
 
                 contract_count = self.getNewContractId()
                 msg_buf.pkhash_buyer = getKeyID(self.getContractPubkey(dt.datetime.fromtimestamp(now).date(), contract_count))
@@ -2161,6 +2169,7 @@ class BasicSwap(BaseApp):
                 rate=msg_buf.rate,
                 pkhash_buyer=msg_buf.pkhash_buyer,
                 proof_address=msg_buf.proof_address,
+                proof_utxos=msg_buf.proof_utxos,
 
                 created_at=now,
                 contract_count=contract_count,
@@ -3579,11 +3588,8 @@ class BasicSwap(BaseApp):
 
                 # TODO: Timeout waiting for transactions
                 bid_changed = False
-                if offer.coin_from == Coins.FIRO:
-                    lock_tx_chain_info = ci_from.getLockTxHeightFiro(bid.xmr_a_lock_tx.txid, xmr_swap.a_lock_tx_script, bid.amount, bid.chain_a_height_start)
-                else:
-                    a_lock_tx_addr = ci_from.getSCLockScriptAddress(xmr_swap.a_lock_tx_script)
-                    lock_tx_chain_info = ci_from.getLockTxHeight(bid.xmr_a_lock_tx.txid, a_lock_tx_addr, bid.amount, bid.chain_a_height_start)
+                a_lock_tx_addr = ci_from.getSCLockScriptAddress(xmr_swap.a_lock_tx_script)
+                lock_tx_chain_info = ci_from.getLockTxHeight(bid.xmr_a_lock_tx.txid, a_lock_tx_addr, bid.amount, bid.chain_a_height_start)
 
                 if lock_tx_chain_info is None:
                     return rv
@@ -3669,11 +3675,8 @@ class BasicSwap(BaseApp):
                 if TxTypes.XMR_SWAP_A_LOCK_REFUND in bid.txns:
                     refund_tx = bid.txns[TxTypes.XMR_SWAP_A_LOCK_REFUND]
                     if refund_tx.block_time is None:
-                        if offer.coin_from == Coins.FIRO:
-                            lock_refund_tx_chain_info = ci_from.getLockTxHeightFiro(refund_tx.txid, xmr_swap.a_lock_refund_tx_script, 0, bid.chain_a_height_start)
-                        else:
-                            refund_tx_addr = ci_from.getSCLockScriptAddress(xmr_swap.a_lock_refund_tx_script)
-                            lock_refund_tx_chain_info = ci_from.getLockTxHeight(refund_tx.txid, refund_tx_addr, 0, bid.chain_a_height_start)
+                        refund_tx_addr = ci_from.getSCLockScriptAddress(xmr_swap.a_lock_refund_tx_script)
+                        lock_refund_tx_chain_info = ci_from.getLockTxHeight(refund_tx.txid, refund_tx_addr, 0, bid.chain_a_height_start)
 
                         if lock_refund_tx_chain_info is not None and lock_refund_tx_chain_info.get('height', 0) > 0:
                             self.setTxBlockInfoFromHeight(ci_from, refund_tx, lock_refund_tx_chain_info['height'])
@@ -4637,7 +4640,8 @@ class BasicSwap(BaseApp):
         if swap_type == SwapTypes.SELLER_FIRST:
             ensure(len(bid_data.pkhash_buyer) == 20, 'Bad pkhash_buyer length')
 
-            sum_unspent = ci_to.verifyProofOfFunds(bid_data.proof_address, bid_data.proof_signature, offer_id)
+            proof_utxos = ci_to.decodeProofUtxos(bid_data.proof_utxos)
+            sum_unspent = ci_to.verifyProofOfFunds(bid_data.proof_address, bid_data.proof_signature, proof_utxos, offer_id)
             self.log.debug('Proof of funds %s %s', bid_data.proof_address, self.ci(coin_to).format_amount(sum_unspent))
             ensure(sum_unspent >= amount_to, 'Proof of funds failed')
 
@@ -4658,6 +4662,8 @@ class BasicSwap(BaseApp):
                 amount=bid_data.amount,
                 rate=bid_data.rate,
                 pkhash_buyer=bid_data.pkhash_buyer,
+                proof_address=bid_data.proof_address,
+                proof_utxos=bid_data.proof_utxos,
 
                 created_at=msg['sent'],
                 amount_to=amount_to,

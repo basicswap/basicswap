@@ -1379,9 +1379,20 @@ class BTCInterface(CoinInterface):
 
         signature = self.rpc_callback('signmessage', [sign_for_addr, sign_for_addr + '_swap_proof_' + extra_commit_bytes.hex()])
 
-        return (sign_for_addr, signature)
+        prove_utxos = []  # TODO: Send specific utxos
+        return (sign_for_addr, signature, prove_utxos)
 
-    def verifyProofOfFunds(self, address, signature, extra_commit_bytes):
+    def decodeProofUtxos(self, msg_utxos):
+        proof_utxos = []
+        if len(msg_utxos) > 0:
+            num_utxos = len(msg_utxos) // 34
+            p: int = 0
+            for i in range(num_utxos):
+                proof_utxos.append((msg_utxos[p: p + 32], int.from_bytes(msg_utxos[p + 32: p + 34])))
+                p += 34
+        return proof_utxos
+
+    def verifyProofOfFunds(self, address, signature, utxos, extra_commit_bytes):
         passed = self.verifyMessage(address, address + '_swap_proof_' + extra_commit_bytes.hex(), signature)
         ensure(passed is True, 'Proof of funds signature invalid')
 

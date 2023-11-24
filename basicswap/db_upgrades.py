@@ -293,6 +293,9 @@ def upgradeDatabase(self, db_version):
                     msg_id BLOB,
                     PRIMARY KEY (record_id))''')
             session.execute('ALTER TABLE offers ADD COLUMN bid_reversed INTEGER')
+        elif current_version == 21:
+            session.execute('ALTER TABLE offers ADD COLUMN proof_utxos BLOB')
+            session.execute('ALTER TABLE bids ADD COLUMN proof_utxos BLOB')
 
         if current_version != db_version:
             self.db_version = db_version
