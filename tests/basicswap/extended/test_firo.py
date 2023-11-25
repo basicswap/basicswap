@@ -97,11 +97,13 @@ def prepareDataDir(datadir, node_id, conf_file, dir_prefix, base_p2p_port, base_
         fp.write('fallbackfee=0.01\n')
         fp.write('acceptnonstdtxn=0\n')
 
+        '''
         # qa/rpc-tests/segwit.py
         fp.write('prematurewitness=1\n')
         fp.write('walletprematurewitness=1\n')
         fp.write('blockversion=4\n')
         fp.write('promiscuousmempoolflags=517\n')
+        '''
 
         for i in range(0, num_nodes):
             if node_id == i:

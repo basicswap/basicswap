@@ -1,4 +1,14 @@
-0.0.68
+0.12.1
+==============
+
+- Firo and Navcoin send utxo outpoints with proof of funds address+sig.
+  - Avoids missing scantxoutset command
+  - Firo Bids will be incompatible with older versions.
+  - Bids for other coins should still work between versions.
+- Firo uses workarounds for missing getblock verbosity and rescanblockchain
+
+
+0.11.68
 ==============
 
 - Temporarily disabled Navcoin.
@@ -6,7 +16,7 @@
 - Fixed bug where requesting a new XMR subaddress would return an old one.
 
 
-0.0.67
+0.11.67
 ==============
 
 - Added support for p2sh-p2wsh coins
@@ -16,13 +26,13 @@
   - Not backwards compatible with previous versions.
 
 
-0.0.66
+0.11.66
 ==============
 
 - Fixed bugs in getLinkedMessageId and validateSwapType.
 
 
-0.0.65
+0.11.65
 ==============
 
 - smsg: Outbox messages are removed when expired.
@@ -33,7 +43,7 @@
 - ui: Show ITX and PTX status for adaptor sig type swaps.
 
 
-0.0.64
+0.11.64
 ==============
 
 - protocol: Added reversed Adaptor sig protocol.
@@ -44,7 +54,7 @@
   - Not backwards compatible with previous versions.
 
 
-0.0.63
+0.11.63
 ==============
 
 - cores: Raised Particl and Monero daemon version.
@@ -53,7 +63,7 @@
   - Abandoning a bid stops all processing.
 
 
-0.0.62
+0.11.62
 ==============
 
 - ui: Persistent filters
@@ -62,13 +72,13 @@
   - Adaptor signature swaps are not backwards compatible with previous versions.
 
 
-0.0.61
+0.11.61
 ==============
 
 - GUI 2.0
 
 
-0.0.60
+0.11.60
 ==============
 
 - Accepted bids will timeout if the peer does not respond within an hour after the bid expires.
@@ -80,7 +90,7 @@
     BITCOIN_FASTSYNC_FILE env var in the datadir without checking it's size or signature.
 
 
-0.0.59
+0.11.59
 ==============
 
 - Added total_bids_value_multiplier option to automation strategies.
@@ -104,7 +114,7 @@
 - ui: Can edit offer automation strategy.
 
 
-0.0.54
+0.11.54
 ==============
 
 - If the XMR daemon is busy the wallet can fail a transfer, later sending the tx unknown to bsx.
