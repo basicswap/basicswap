@@ -58,16 +58,19 @@ PIVX_VERSION_TAG = os.getenv('PIVX_VERSION_TAG', '')
 DASH_VERSION = os.getenv('DASH_VERSION', '19.3.0')
 DASH_VERSION_TAG = os.getenv('DASH_VERSION_TAG', '')
 
-FIRO_VERSION = os.getenv('FIRO_VERSION', '0.14.12.1')
-FIRO_VERSION_TAG = os.getenv('FIRO_VERSION_TAG', '')
+FIRO_VERSION = os.getenv('FIRO_VERSION', '0.14.13.0')
+FIRO_VERSION_TAG = os.getenv('FIRO_VERSION_TAG', '-firod-only')
 
 NAV_VERSION = os.getenv('NAV_VERSION', '7.0.3')
-NAV_VERSION_TAG = os.getenv('NAV_VERSION', '')
+NAV_VERSION_TAG = os.getenv('NAV_VERSION_TAG', '')
 
 GUIX_SSL_CERT_DIR = None
 
 ADD_PUBKEY_URL = os.getenv('ADD_PUBKEY_URL', '')
 OVERRIDE_DISABLED_COINS = toBool(os.getenv('OVERRIDE_DISABLED_COINS', 'false'))
+
+# If SKIP_GPG_VALIDATION is set to true the script will check hashes but not signatures
+SKIP_GPG_VALIDATION = toBool(os.getenv('SKIP_GPG_VALIDATION', 'false'))
 
 
 known_coins = {
@@ -109,6 +112,10 @@ elif USE_PLATFORM == 'Windows':
 else:
     BIN_ARCH = 'x86_64-linux-gnu'
     FILE_EXT = 'tar.gz'
+
+# Allow manually overriding the arch tag
+BIN_ARCH = os.getenv('BIN_ARCH', BIN_ARCH)
+FILE_EXT = os.getenv('FILE_EXT', FILE_EXT)
 
 logger = logging.getLogger()
 logger.level = logging.INFO
@@ -613,16 +620,15 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
             assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, major_version)
             assert_url = 'https://raw.githubusercontent.com/dashpay/gitian.sigs/master/%s-%s/%s/%s' % (version + version_tag, os_dir_name, signing_key_name, assert_filename)
         elif coin == 'firo':
-
+            arch_name = BIN_ARCH
+            '''
+            # Usual release naming
             if BIN_ARCH == 'x86_64-linux-gnu':
                 arch_name = 'linux64'
-                file_ext = 'tar.gz'
-            elif BIN_ARCH == 'win64':
-                arch_name = 'win64'
-                file_ext = 'zip'
-            else:
-                raise ValueError('Firo: Unknown architecture')
-            release_filename = '{}-{}-{}{}.{}'.format('firo', version + version_tag, arch_name, filename_extra, file_ext)
+            release_filename = '{}-{}-{}{}.{}'.format('firo', version + version_tag, arch_name, filename_extra, FILE_EXT)
+            release_url = 'https://github.com/firoorg/firo/releases/download/v{}/{}'.format(version + version_tag, release_filename)
+            '''
+            release_filename = '{}-{}-{}{}.{}'.format('firo', '39c41e5e7ec6', arch_name, filename_extra, FILE_EXT)
             release_url = 'https://github.com/firoorg/firo/releases/download/v{}/{}'.format(version + version_tag, release_filename)
             assert_url = 'https://github.com/firoorg/firo/releases/download/v%s/SHA256SUMS' % (version + version_tag)
         elif coin == 'navcoin':
@@ -664,6 +670,11 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
         else:
             logger.info('Found release hash in assert file.')
 
+    if SKIP_GPG_VALIDATION:
+        logger.warning('Skipping binary signature check as SKIP_GPG_VALIDATION env var is set.')
+        extractCore(coin, version_data, settings, bin_dir, release_path, extra_opts)
+        return
+
     """
     gnupghome = os.path.join(data_dir, 'gpg')
     if not os.path.exists(gnupghome):
@@ -681,9 +692,7 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
                     for key in rv.fingerprints:
                         gpg.trust_keys(rv.fingerprints[0], 'TRUST_FULLY')
 
-    if coin in ('firo', ):
-        pubkey_filename = '{}_{}.pgp'.format('particl', signing_key_name)
-    elif coin in ('navcoin', ):
+    if coin in ('navcoin', ):
         pubkey_filename = '{}_builder.pgp'.format(coin)
     else:
         pubkey_filename = '{}_{}.pgp'.format(coin, signing_key_name)
