@@ -111,9 +111,7 @@ Test:
 
 ## Run One Test
 
-```
-pytest -v -s tests/basicswap/test_xmr.py::Test::test_02_leader_recover_a_lock_tx
-```
+    pytest -v -s tests/basicswap/test_xmr.py::Test::test_02_leader_recover_a_lock_tx
 
 
 ## Private Offers
@@ -125,6 +123,17 @@ To send a private offer:
  4. Offerer sends a new offer to the recipients key instead of the public network.
 
 Nodes will ignore offers sent on keys other than the network key or keys created for offer-receiving.
+
+
+## Coin reindexing
+
+    export COINDATA_PATH=/var/data/coinswaps
+    cd $COINDATA_PATH/bin/firo
+    ./firod -reindex -datadir=$COINDATA_PATH/firo -nodebuglogfile -printtoconsole > /tmp/firo.log
+
+Observe progress with
+
+    tail -f /tmp/firo.log
 
 
 
