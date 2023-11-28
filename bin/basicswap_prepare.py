@@ -1589,7 +1589,7 @@ def main():
             'use_csv': False,
             'blocks_confirmed': 1,
             'conf_target': 2,
-            'core_version_group': 18,
+            'core_version_group': 14,
             'chain_lookups': 'local',
         },
         'navcoin': {
