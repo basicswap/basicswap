@@ -258,7 +258,7 @@ class BasicSwap(BaseApp):
         # TODO: Set dynamically
         self.scriptless_coins = (Coins.XMR, Coins.PART_ANON)
         self.adaptor_swap_only_coins = self.scriptless_coins + (Coins.PART_BLIND, )
-        self.secret_hash_swap_only_coins = (Coins.PIVX, Coins.DASH, Coins.FIRO, Coins.NMC)  # Coins without segwit
+        self.coins_without_segwit = (Coins.PIVX, Coins.DASH, Coins.FIRO, Coins.NMC)
 
         # TODO: Adjust ranges
         self.min_delay_event = self.settings.get('min_delay_event', 10)
@@ -1095,7 +1095,7 @@ class BasicSwap(BaseApp):
             else:
                 use_session.execute('DELETE FROM actions WHERE linked_id = x\'{}\' '.format(bid.bid_id.hex()))
 
-            reverse_bid: bool = offer.coin_from in self.scriptless_coins
+            reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from)
             # Unlock locked inputs (TODO)
             if offer.swap_type == SwapTypes.XMR_SWAP:
                 ci_from = self.ci(offer.coin_to if reverse_bid else offer.coin_from)
@@ -1161,11 +1161,14 @@ class BasicSwap(BaseApp):
         ro = self.callrpc('smsgsend', [addr_from, addr_to, payload_hex, False, msg_valid, False, options])
         return bytes.fromhex(ro['msgid'])
 
+    def is_reverse_ads_bid(self, coin_from) -> bool:
+        return coin_from in self.scriptless_coins + self.coins_without_segwit
+
     def validateSwapType(self, coin_from, coin_to, swap_type):
         if swap_type == SwapTypes.XMR_SWAP:
-            reverse_bid: bool = coin_from in self.scriptless_coins
+            reverse_bid: bool = self.is_reverse_ads_bid(coin_from)
             itx_coin = coin_to if reverse_bid else coin_from
-            if (itx_coin in self.secret_hash_swap_only_coins):
+            if (itx_coin in self.coins_without_segwit):
                 raise ValueError('Invalid swap type for: {} -> {}'.format(coin_from.name, coin_to.name))
             if (coin_from in self.scriptless_coins and coin_to in self.scriptless_coins):
                 raise ValueError('Invalid swap type for: {} -> {}'.format(coin_from.name, coin_to.name))
@@ -1361,13 +1364,17 @@ class BasicSwap(BaseApp):
         if lock_type == OfferMessage.SEQUENCE_LOCK_TIME:
             ensure(lock_value >= self.min_sequence_lock_seconds and lock_value <= self.max_sequence_lock_seconds, 'Invalid lock_value time')
             if swap_type == SwapTypes.XMR_SWAP:
-                ensure(coin_from_has_csv, 'Coin from needs CSV activated.')
+                reverse_bid: bool = self.is_reverse_ads_bid(coin_from)
+                itx_coin_has_csv = coin_to_has_csv if reverse_bid else coin_from_has_csv
+                ensure(itx_coin_has_csv, 'ITX coin needs CSV activated.')
             else:
                 ensure(coin_from_has_csv and coin_to_has_csv, 'Both coins need CSV activated.')
         elif lock_type == OfferMessage.SEQUENCE_LOCK_BLOCKS:
             ensure(lock_value >= 5 and lock_value <= 1000, 'Invalid lock_value blocks')
             if swap_type == SwapTypes.XMR_SWAP:
-                ensure(coin_from_has_csv, 'Coin from needs CSV activated.')
+                reverse_bid: bool = self.is_reverse_ads_bid(coin_from)
+                itx_coin_has_csv = coin_to_has_csv if reverse_bid else coin_from_has_csv
+                ensure(itx_coin_has_csv, 'ITX coin needs CSV activated.')
             else:
                 ensure(coin_from_has_csv and coin_to_has_csv, 'Both coins need CSV activated.')
         elif lock_type == TxLockTypes.ABS_LOCK_TIME:
@@ -1433,7 +1440,7 @@ class BasicSwap(BaseApp):
 
         offer_addr_to = self.getOfferAddressTo(extra_options)
 
-        reverse_bid: bool = coin_from in self.scriptless_coins
+        reverse_bid: bool = self.is_reverse_ads_bid(coin_from)
 
         self.mxDB.acquire()
         session = None
@@ -1541,7 +1548,7 @@ class BasicSwap(BaseApp):
                 created_at=offer_created_at,
                 expire_at=offer_created_at + msg_buf.time_valid,
                 was_sent=True,
-                bid_reversed=msg_buf.coin_from in self.scriptless_coins,
+                bid_reversed=self.is_reverse_ads_bid(msg_buf.coin_from),
                 security_token=security_token)
             offer.setState(OfferStates.OFFER_SENT)
 
@@ -2354,7 +2361,7 @@ class BasicSwap(BaseApp):
         ensure(bid.state in (BidStates.BID_RECEIVED, ), 'Wrong bid state: {}'.format(BidStates(bid.state).name))
 
         if offer.swap_type == SwapTypes.XMR_SWAP:
-            reverse_bid: bool = Coins(offer.coin_from) in self.scriptless_coins
+            reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from)
             if reverse_bid:
                 return self.acceptADSReverseBid(bid_id)
 
@@ -2496,7 +2503,7 @@ class BasicSwap(BaseApp):
             balance_to = ci_to.getSpendableBalance()
             ensure(balance_to > amount_to, '{} spendable balance is too low: {}'.format(ci_to.coin_name(), ci_to.format_amount(balance_to)))
 
-            reverse_bid: bool = coin_from in self.scriptless_coins
+            reverse_bid: bool = self.is_reverse_ads_bid(coin_from)
             if reverse_bid:
                 reversed_rate: int = ci_to.make_int(amount / amount_to, r=1)
                 amount_from: int = int((int(amount_to) * reversed_rate) // ci_to.COIN())
@@ -2671,7 +2678,7 @@ class BasicSwap(BaseApp):
             ensure(xmr_offer, 'Adaptor-sig offer not found: {}.'.format(bid.offer_id.hex()))
             ensure(offer.expire_at > now, 'Offer has expired')
 
-            reverse_bid: bool = offer.coin_from in self.scriptless_coins
+            reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from)
             coin_from = Coins(offer.coin_to if reverse_bid else offer.coin_from)
             coin_to = Coins(offer.coin_from if reverse_bid else offer.coin_to)
             ci_from = self.ci(coin_from)
@@ -3463,7 +3470,7 @@ class BasicSwap(BaseApp):
     def checkXmrBidState(self, bid_id: bytes, bid, offer):
         rv = False
 
-        reverse_bid: bool = offer.coin_from in self.scriptless_coins
+        reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from)
         ci_from = self.ci(offer.coin_to if reverse_bid else offer.coin_from)
         ci_to = self.ci(offer.coin_from if reverse_bid else offer.coin_to)
 
@@ -3982,7 +3989,7 @@ class BasicSwap(BaseApp):
             ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
             ensure(xmr_offer, 'Adaptor-sig offer not found: {}.'.format(bid.offer_id.hex()))
 
-            reverse_bid: bool = offer.coin_from in self.scriptless_coins
+            reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from)
             was_received: bool = bid.was_sent if reverse_bid else bid.was_received
             coin_from = Coins(offer.coin_to if reverse_bid else offer.coin_from)
             coin_to = Coins(offer.coin_from if reverse_bid else offer.coin_to)
@@ -4033,7 +4040,7 @@ class BasicSwap(BaseApp):
             ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
             ensure(xmr_offer, 'Adaptor-sig offer not found: {}.'.format(bid.offer_id.hex()))
 
-            reverse_bid: bool = offer.coin_from in self.scriptless_coins
+            reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from)
             coin_from = Coins(offer.coin_to if reverse_bid else offer.coin_from)
             coin_to = Coins(offer.coin_from if reverse_bid else offer.coin_to)
             was_sent: bool = bid.was_received if reverse_bid else bid.was_sent
@@ -4364,7 +4371,7 @@ class BasicSwap(BaseApp):
 
         ensure(msg['sent'] + offer_data.time_valid >= now, 'Offer expired')
 
-        reverse_bid: bool = coin_from in self.scriptless_coins
+        reverse_bid: bool = self.is_reverse_ads_bid(coin_from)
 
         if offer_data.swap_type == SwapTypes.SELLER_FIRST:
             ensure(offer_data.protocol_version >= MINPROTO_VERSION_SECRET_HASH, 'Invalid protocol version')
@@ -4427,7 +4434,7 @@ class BasicSwap(BaseApp):
                     created_at=msg['sent'],
                     expire_at=msg['sent'] + offer_data.time_valid,
                     was_sent=False,
-                    bid_reversed=offer_data.coin_from in self.scriptless_coins)
+                    bid_reversed=self.is_reverse_ads_bid(offer_data.coin_from))
                 offer.setState(OfferStates.OFFER_RECEIVED)
                 session.add(offer)
 
@@ -4786,7 +4793,7 @@ class BasicSwap(BaseApp):
         xmr_swap = session.query(XmrSwap).filter_by(bid_id=bid.bid_id).first()
         ensure(xmr_swap, 'Adaptor-sig swap not found: {}.'.format(bid.bid_id.hex()))
 
-        reverse_bid: bool = offer.coin_from in self.scriptless_coins
+        reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from)
         addr_expect_from: str = ''
         if reverse_bid:
             ci_from = self.ci(Coins(offer.coin_to))
@@ -4853,7 +4860,7 @@ class BasicSwap(BaseApp):
         xmr_swap = session.query(XmrSwap).filter_by(bid_id=bid.bid_id).first()
         ensure(xmr_swap, 'Adaptor-sig swap not found: {}.'.format(bid.bid_id.hex()))
 
-        reverse_bid: bool = offer.coin_from in self.scriptless_coins
+        reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from)
         ci_from = self.ci(offer.coin_to if reverse_bid else offer.coin_from)
         ci_to = self.ci(offer.coin_from if reverse_bid else offer.coin_to)
         addr_from: str = bid.bid_addr if reverse_bid else offer.addr_from
@@ -5014,7 +5021,7 @@ class BasicSwap(BaseApp):
         ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
         ensure(xmr_offer, 'Adaptor-sig offer not found: {}.'.format(bid.offer_id.hex()))
 
-        reverse_bid: bool = offer.coin_from in self.scriptless_coins
+        reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from)
         ci_from = self.ci(offer.coin_to if reverse_bid else offer.coin_from)
         ci_to = self.ci(offer.coin_from if reverse_bid else offer.coin_to)
         addr_from: str = bid.bid_addr if reverse_bid else offer.addr_from
@@ -5093,7 +5100,7 @@ class BasicSwap(BaseApp):
         self.log.debug('Adaptor-sig swap in progress, bid %s', bid.bid_id.hex())
         self.swaps_in_progress[bid.bid_id] = (bid, offer)
 
-        reverse_bid: bool = offer.coin_from in self.scriptless_coins
+        reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from)
         coin_from = Coins(offer.coin_to if reverse_bid else offer.coin_from)
         self.setLastHeightChecked(coin_from, bid.chain_a_height_start)
         self.addWatchedOutput(coin_from, bid.bid_id, bid.xmr_a_lock_tx.txid.hex(), bid.xmr_a_lock_tx.vout, TxTypes.XMR_SWAP_A_LOCK, SwapTypes.XMR_SWAP)
@@ -5114,7 +5121,7 @@ class BasicSwap(BaseApp):
         ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
         ensure(xmr_offer, 'Adaptor-sig offer not found: {}.'.format(bid.offer_id.hex()))
 
-        reverse_bid: bool = offer.coin_from in self.scriptless_coins
+        reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from)
         coin_from = Coins(offer.coin_to if reverse_bid else offer.coin_from)
         coin_to = Coins(offer.coin_from if reverse_bid else offer.coin_to)
         ci_from = self.ci(coin_from)
@@ -5178,7 +5185,7 @@ class BasicSwap(BaseApp):
         ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
         ensure(xmr_offer, 'Adaptor-sig offer not found: {}.'.format(bid.offer_id.hex()))
 
-        reverse_bid: bool = offer.coin_from in self.scriptless_coins
+        reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from)
         coin_from = Coins(offer.coin_to if reverse_bid else offer.coin_from)
         coin_to = Coins(offer.coin_from if reverse_bid else offer.coin_to)
         ci_from = self.ci(coin_from)
@@ -5249,7 +5256,7 @@ class BasicSwap(BaseApp):
         ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
         ensure(xmr_offer, 'Adaptor-sig offer not found: {}.'.format(bid.offer_id.hex()))
 
-        reverse_bid: bool = offer.coin_from in self.scriptless_coins
+        reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from)
         ci_from = self.ci(offer.coin_to if reverse_bid else offer.coin_from)
         ci_to = self.ci(offer.coin_from if reverse_bid else offer.coin_to)
         b_fee_rate: int = xmr_offer.a_fee_rate if reverse_bid else xmr_offer.b_fee_rate
@@ -5330,7 +5337,7 @@ class BasicSwap(BaseApp):
         ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
         ensure(xmr_offer, 'Adaptor-sig offer not found: {}.'.format(bid.offer_id.hex()))
 
-        reverse_bid: bool = offer.coin_from in self.scriptless_coins
+        reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from)
         coin_from = Coins(offer.coin_to if reverse_bid else offer.coin_from)
         coin_to = Coins(offer.coin_from if reverse_bid else offer.coin_to)
 
@@ -5362,7 +5369,7 @@ class BasicSwap(BaseApp):
         ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
         ensure(xmr_offer, 'Adaptor-sig offer not found: {}.'.format(bid.offer_id.hex()))
 
-        reverse_bid: bool = offer.coin_from in self.scriptless_coins
+        reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from)
         coin_from = Coins(offer.coin_to if reverse_bid else offer.coin_from)
         coin_to = Coins(offer.coin_from if reverse_bid else offer.coin_to)
         ci_from = self.ci(coin_from)
@@ -5414,7 +5421,7 @@ class BasicSwap(BaseApp):
         ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
         ensure(xmr_offer, 'Adaptor-sig offer not found: {}.'.format(bid.offer_id.hex()))
 
-        reverse_bid: bool = offer.coin_from in self.scriptless_coins
+        reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from)
         coin_from = Coins(offer.coin_to if reverse_bid else offer.coin_from)
         coin_to = Coins(offer.coin_from if reverse_bid else offer.coin_to)
         ci_from = self.ci(coin_from)
@@ -5485,7 +5492,7 @@ class BasicSwap(BaseApp):
         ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
         ensure(xmr_offer, 'Adaptor-sig offer not found: {}.'.format(bid.offer_id.hex()))
 
-        reverse_bid: bool = offer.coin_from in self.scriptless_coins
+        reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from)
         coin_from = Coins(offer.coin_to if reverse_bid else offer.coin_from)
         coin_to = Coins(offer.coin_from if reverse_bid else offer.coin_to)
         ci_from = self.ci(coin_from)
@@ -5551,7 +5558,7 @@ class BasicSwap(BaseApp):
         ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
         ensure(xmr_offer, 'Adaptor-sig offer not found: {}.'.format(bid.offer_id.hex()))
 
-        reverse_bid: bool = offer.coin_from in self.scriptless_coins
+        reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from)
         ci_from = self.ci(offer.coin_to if reverse_bid else offer.coin_from)
         addr_send_from: str = bid.bid_addr if reverse_bid else offer.addr_from
         addr_send_to: str = offer.addr_from if reverse_bid else bid.bid_addr
@@ -5589,7 +5596,7 @@ class BasicSwap(BaseApp):
         ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
         ensure(xmr_offer, 'Adaptor-sig offer not found: {}.'.format(bid.offer_id.hex()))
 
-        reverse_bid: bool = offer.coin_from in self.scriptless_coins
+        reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from)
         coin_from = Coins(offer.coin_to if reverse_bid else offer.coin_from)
         coin_to = Coins(offer.coin_from if reverse_bid else offer.coin_to)
         addr_sent_from: str = offer.addr_from if reverse_bid else bid.bid_addr
@@ -5662,7 +5669,7 @@ class BasicSwap(BaseApp):
         ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
         ensure(xmr_offer, 'Adaptor-sig offer not found: {}.'.format(bid.offer_id.hex()))
 
-        reverse_bid: bool = offer.coin_from in self.scriptless_coins
+        reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from)
         ci_from = self.ci(offer.coin_to if reverse_bid else offer.coin_from)
         ci_to = self.ci(offer.coin_from if reverse_bid else offer.coin_to)
         addr_sent_from: str = bid.bid_addr if reverse_bid else offer.addr_from
@@ -5751,7 +5758,7 @@ class BasicSwap(BaseApp):
         ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
         ensure(xmr_offer, 'Adaptor-sig offer not found: {}.'.format(bid.offer_id.hex()))
 
-        reverse_bid: bool = offer.coin_from in self.scriptless_coins
+        reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from)
         ci_from = self.ci(offer.coin_to if reverse_bid else offer.coin_from)
         addr_sent_from: str = bid.bid_addr if reverse_bid else offer.addr_from
         addr_sent_to: str = offer.addr_from if reverse_bid else bid.bid_addr
@@ -6914,7 +6921,7 @@ class BasicSwap(BaseApp):
     def createCoinALockRefundSwipeTx(self, ci, bid, offer, xmr_swap, xmr_offer):
         self.log.debug('Creating %s lock refund swipe tx', ci.coin_name())
 
-        reverse_bid: bool = offer.coin_from in self.scriptless_coins
+        reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from)
         a_fee_rate: int = xmr_offer.b_fee_rate if reverse_bid else xmr_offer.a_fee_rate
         coin_from = Coins(offer.coin_to if reverse_bid else offer.coin_from)
         coin_to = Coins(offer.coin_from if reverse_bid else offer.coin_to)

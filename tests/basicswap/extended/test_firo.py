@@ -620,6 +620,30 @@ class Test(BaseTest):
         wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.XMR_SWAP_FAILED_REFUNDED, wait_for=180)
         wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.XMR_SWAP_FAILED_REFUNDED, sent=True)
 
+    def test_13_adsswap_reverse(self):
+        logging.info('---------- Test ads swap protocol reverse')
+
+        swap_clients = self.swap_clients
+        coin_from = Coins.FIRO
+        coin_to = Coins.BTC
+        swap_type = SwapTypes.XMR_SWAP
+        ci_from = swap_clients[0].ci(coin_from)
+        ci_to = swap_clients[1].ci(coin_to)
+
+        swap_value = ci_from.make_int(random.uniform(0.2, 20.0), r=1)
+        rate_swap = ci_to.make_int(random.uniform(0.2, 20.0), r=1)
+        offer_id = swap_clients[0].postOffer(coin_from, coin_to, swap_value, rate_swap, swap_value, swap_type)
+
+        wait_for_offer(test_delay_event, swap_clients[1], offer_id)
+        offer = swap_clients[1].getOffer(offer_id)
+        bid_id = swap_clients[1].postBid(offer_id, offer.amount_from)
+
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.BID_RECEIVED)
+        swap_clients[0].acceptBid(bid_id)
+
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=120)
+        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=120)
+
     def test_101_full_swap(self):
         logging.info('---------- Test {} to XMR'.format(self.test_coin_from.name))
         if not self.test_xmr:

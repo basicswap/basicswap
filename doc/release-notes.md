@@ -6,6 +6,7 @@
   - Firo Bids will be incompatible with older versions.
   - Bids for other coins should still work between versions.
 - Firo uses workarounds for missing getblock verbosity and rescanblockchain
+- Coins without segwit can be used in reverse adaptor sig swaps.
 
 
 0.11.68

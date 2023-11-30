@@ -149,7 +149,7 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
     ci_from = swap_client.ci(Coins(offer.coin_from))
     ci_to = swap_client.ci(Coins(offer.coin_to))
 
-    reverse_bid: bool = Coins(offer.coin_from) in swap_client.scriptless_coins
+    reverse_bid: bool = swap_client.is_reverse_ads_bid(offer.coin_from)
     ci_leader = ci_to if reverse_bid else ci_from
     ci_follower = ci_from if reverse_bid else ci_to
 

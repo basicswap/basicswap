@@ -584,7 +584,7 @@ function set_swap_type_enabled(coin_from, coin_to, swap_type) {
         make_hidden = true;
         swap_type.classList.add('select-disabled'); // Add the class to the disabled select
     } else
-    if (secret_hash_only_coins.includes(coin_from)) {
+    if (secret_hash_only_coins.includes(coin_from) && secret_hash_only_coins.includes(coin_to)) {
         swap_type.disabled = true;
         swap_type.value = 'seller_first';
         make_hidden = true;
