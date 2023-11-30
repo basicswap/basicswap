@@ -1388,7 +1388,7 @@ class BTCInterface(CoinInterface):
             num_utxos = len(msg_utxos) // 34
             p: int = 0
             for i in range(num_utxos):
-                proof_utxos.append((msg_utxos[p: p + 32], int.from_bytes(msg_utxos[p + 32: p + 34])))
+                proof_utxos.append((msg_utxos[p: p + 32], int.from_bytes(msg_utxos[p + 32: p + 34], 'big')))
                 p += 34
         return proof_utxos
 

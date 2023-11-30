@@ -4706,7 +4706,7 @@ class BasicSwap(BaseApp):
 
         bid_id = bid_accept_data.bid_msg_id
         bid, offer = self.getBidAndOffer(bid_id)
-        ensure(bid is not None and bid.was_sent is True, 'Unknown bidid')
+        ensure(bid is not None and bid.was_sent is True, 'Unknown bid_id')
         ensure(offer, 'Offer not found ' + bid.offer_id.hex())
 
         ensure(bid.expire_at > now + self._bid_expired_leeway, 'Bid expired')

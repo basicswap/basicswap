@@ -261,10 +261,14 @@ def postNewOfferFromParsed(swap_client, parsed_data):
     elif parsed_data['coin_to'] in (Coins.XMR, Coins.PART_ANON):
         swap_type = SwapTypes.XMR_SWAP
 
-    if swap_client.coin_clients[parsed_data['coin_from']]['use_csv'] and swap_client.coin_clients[parsed_data['coin_to']]['use_csv']:
+    if swap_type == SwapTypes.XMR_SWAP:
+        # All coins capable of segwit should be capable of csv
         lock_type = TxLockTypes.SEQUENCE_LOCK_TIME
     else:
-        lock_type = TxLockTypes.ABS_LOCK_TIME
+        if swap_client.coin_clients[parsed_data['coin_from']]['use_csv'] and swap_client.coin_clients[parsed_data['coin_to']]['use_csv']:
+            lock_type = TxLockTypes.SEQUENCE_LOCK_TIME
+        else:
+            lock_type = TxLockTypes.ABS_LOCK_TIME
 
     extra_options = {}
 
