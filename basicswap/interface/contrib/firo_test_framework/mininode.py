@@ -67,6 +67,18 @@ mininode_socket_map = dict()
 # access to any data shared with the NodeConnCB or NodeConn.
 mininode_lock = RLock()
 
+
+ZC_GENESIS_BLOCK_TIME = 1414776286
+MTP_SWITCH_TIME = 1544443200
+PP_SWITCH_TIME = 1635228000
+
+
+def set_regtest() -> None:
+    global MTP_SWITCH_TIME, PP_SWITCH_TIME
+    MTP_SWITCH_TIME = 4294967295
+    PP_SWITCH_TIME = 4294967295
+
+
 # Serialization/deserialization tools
 def sha256(s):
     return hashlib.new('sha256', s).digest()
@@ -516,10 +528,12 @@ class CTransaction(object):
         ver32bit = struct.unpack("<i", f.read(4))[0]
         self.nVersion = ver32bit & 0xffff
         self.nType = (ver32bit >> 16) & 0xffff
+
         self.vin = deser_vector(f, CTxIn)
         self.vout = deser_vector(f, CTxOut)
         self.nLockTime = struct.unpack("<I", f.read(4))[0]
-        if self.nType != 0:
+
+        if self.nVersion == 3 and self.nType != 0:
             self.vExtraPayload = deser_string(f)
         self.sha256 = None
         self.hash = None
@@ -531,7 +545,7 @@ class CTransaction(object):
         r += ser_vector(self.vin)
         r += ser_vector(self.vout)
         r += struct.pack("<I", self.nLockTime)
-        if self.nType != 0:
+        if self.nVersion == 3 and self.nType != 0:
             r += ser_string(self.vExtraPayload)
         return r
 
@@ -607,6 +621,38 @@ class msg_dandeliontx():
         return "msg_dandeliontx(tx=%s)" % (repr(self.tx))
 
 
+class CMTPHashData(object):
+    def __init__(self):
+        '''
+        uint8_t hashRootMTP[16]; // 16 is 128 bit of blake2b
+        uint64_t nBlockMTP[mtp::MTP_L*2][128]; // 128 is ARGON2_QWORDS_IN_BLOCK
+        std::deque<std::vector<uint8_t>> nProofMTP[mtp::MTP_L*3];
+        '''
+        self.hashRootMTP = [0] * 16  # uint8_t 16 is 128 bit of blake2b
+        self.nBlockMTP = None
+        self.nProofMTP = None
+
+    def IsMTPDataStripped(self):
+        for i in range(16):
+            if self.hashRootMTP[i] != 0:
+                return False
+        return True
+
+    def deserialize(self, f):
+        for i in range(16):
+            self.hashRootMTP[i] = struct.unpack("<B", f.read(1))[0]
+
+        if self.IsMTPDataStripped():
+            return
+
+        raise ValueError('TODO')
+
+
+    def serialize(self):
+        r = b""
+        return r
+
+
 class CBlockHeader(object):
     def __init__(self, header=None):
         if header is None:
@@ -620,6 +666,22 @@ class CBlockHeader(object):
             self.nNonce = header.nNonce
             self.sha256 = header.sha256
             self.hash = header.hash
+
+            # Firo - ProgPow
+            self.nHeight = header.nHeight
+            self.nNonce64 = header.nNonce64
+            self.mix_hash = header.mix_hash
+
+            # Firo - MTP
+            self.nVersionMTP = header.nVersionMTP
+            self.mtpHashValue = header.mtpHashValue
+
+            # Reserved fields
+            self.reserved = header.reserved
+
+            # Store this only when absolutely needed for verification
+            self.mtpHashData = header.mtpHashData
+
             self.calc_sha256()
 
     def set_null(self):
@@ -632,13 +694,43 @@ class CBlockHeader(object):
         self.sha256 = None
         self.hash = None
 
+        # Firo - ProgPow
+        self.nHeight = 0  # uint32_t
+        self.nNonce64 = 0  # uint64_t
+        self.mix_hash = None # uint256
+
+        # Firo - MTP
+        self.nVersionMTP = 0x1000  # int32_t
+        self.mtpHashValue = None # uint256
+
+        # Reserved fields
+        self.reserved = [None, None]  # uint256
+
+        # Store this only when absolutely needed for verification
+        self.mtpHashData = None
+
     def deserialize(self, f):
         self.nVersion = struct.unpack("<i", f.read(4))[0]
         self.hashPrevBlock = deser_uint256(f)
         self.hashMerkleRoot = deser_uint256(f)
         self.nTime = struct.unpack("<I", f.read(4))[0]
         self.nBits = struct.unpack("<I", f.read(4))[0]
-        self.nNonce = struct.unpack("<I", f.read(4))[0]
+
+        if self.IsProgPow():
+            self.nHeight = struct.unpack("<I", f.read(4))[0]
+            self.nNonce64 = struct.unpack("<Q", f.read(8))[0]
+            self.mix_hash = deser_uint256(f)
+        else:
+            self.nNonce = struct.unpack("<I", f.read(4))[0]
+
+            if self.IsMTP():
+                self.nVersionMTP = struct.unpack("<i", f.read(4))[0]
+                self.mtpHashValue = deser_uint256(f)
+                self.reserved[0] = deser_uint256(f)
+                self.reserved[1] = deser_uint256(f)
+                self.mtpHashData = CMTPHashData()
+                self.mtpHashData.deserialize(f)
+
         self.sha256 = None
         self.hash = None
 
@@ -649,18 +741,23 @@ class CBlockHeader(object):
         r += ser_uint256(self.hashMerkleRoot)
         r += struct.pack("<I", self.nTime)
         r += struct.pack("<I", self.nBits)
-        r += struct.pack("<I", self.nNonce)
+
+        if self.IsProgPow():
+            r += struct.pack("<I", self.nHeight)
+            r += struct.pack("<Q", self.nNonce64)
+            r += ser_uint256(mix_hash)
+        else:
+            r += struct.pack("<I", self.nNonce)
+            if self.IsMTP():
+                raise ValueError('TODO')
+
+
         return r
 
     def calc_sha256(self):
         if self.sha256 is None:
-            r = b""
-            r += struct.pack("<i", self.nVersion)
-            r += ser_uint256(self.hashPrevBlock)
-            r += ser_uint256(self.hashMerkleRoot)
-            r += struct.pack("<I", self.nTime)
-            r += struct.pack("<I", self.nBits)
-            r += struct.pack("<I", self.nNonce)
+            r = self.serialize()
+
             self.sha256 = uint256_from_str(hash256(r))
             self.hash = encode(hash256(r)[::-1], 'hex_codec').decode('ascii')
 
@@ -673,6 +770,12 @@ class CBlockHeader(object):
         return "CBlockHeader(nVersion=%i hashPrevBlock=%064x hashMerkleRoot=%064x nTime=%s nBits=%08x nNonce=%08x)" \
             % (self.nVersion, self.hashPrevBlock, self.hashMerkleRoot,
                time.ctime(self.nTime), self.nBits, self.nNonce)
+
+    def IsMTP(self) -> bool:
+        return self.nTime >= MTP_SWITCH_TIME
+
+    def IsProgPow(self) -> bool:
+        return self.nTime >= PP_SWITCH_TIME
 
 
 class CBlock(CBlockHeader):
@@ -1168,6 +1271,8 @@ class CFinalCommitment:
         r += self.quorumSig
         r += self.membersSig
         return r
+
+
 # Objects that correspond to messages on the wire
 class msg_version(object):
     command = b"version"

@@ -47,6 +47,7 @@ from tests.basicswap.common import (
 from basicswap.interface.contrib.firo_test_framework.mininode import (
     FromHex,
     CTransaction,
+    set_regtest,
 )
 from bin.basicswap_run import startDaemon
 from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
@@ -152,6 +153,10 @@ class Test(BaseTest):
 
     @classmethod
     def prepareExtraCoins(cls):
+
+        # Raise MTP_SWITCH_TIME and PP_SWITCH_TIME in mininode.py
+        set_regtest()
+
         if cls.restore_instance:
             void_block_rewards_pubkey = cls.getRandomPubkey()
             cls.firo_addr = cls.swap_clients[0].ci(Coins.FIRO).pubkey_to_address(void_block_rewards_pubkey)
