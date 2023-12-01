@@ -1168,9 +1168,7 @@ class BasicSwap(BaseApp):
         if swap_type == SwapTypes.XMR_SWAP:
             reverse_bid: bool = self.is_reverse_ads_bid(coin_from)
             itx_coin = coin_to if reverse_bid else coin_from
-            if (itx_coin in self.coins_without_segwit):
-                raise ValueError('Invalid swap type for: {} -> {}'.format(coin_from.name, coin_to.name))
-            if (coin_from in self.scriptless_coins and coin_to in self.scriptless_coins):
+            if (itx_coin in self.coins_without_segwit + self.scriptless_coins):
                 raise ValueError('Invalid swap type for: {} -> {}'.format(coin_from.name, coin_to.name))
         else:
             if coin_from in self.adaptor_swap_only_coins or coin_to in self.adaptor_swap_only_coins:

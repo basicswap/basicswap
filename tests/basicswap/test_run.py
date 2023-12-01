@@ -193,10 +193,10 @@ class Test(BaseTest):
             (Coins.BTC, Coins.FIRO, SwapTypes.XMR_SWAP),
             (Coins.FIRO, Coins.BTC, SwapTypes.SELLER_FIRST),
             (Coins.BTC, Coins.FIRO, SwapTypes.SELLER_FIRST),
+            (Coins.FIRO, Coins.BTC, SwapTypes.XMR_SWAP),
         ]
         should_fail = [
             (Coins.BTC, Coins.XMR, SwapTypes.SELLER_FIRST),
-            (Coins.FIRO, Coins.BTC, SwapTypes.XMR_SWAP),
             (Coins.XMR, Coins.PART_ANON, SwapTypes.XMR_SWAP),
             (Coins.FIRO, Coins.PART_ANON, SwapTypes.XMR_SWAP),
             (Coins.PART_ANON, Coins.FIRO, SwapTypes.XMR_SWAP),
