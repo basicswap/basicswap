@@ -1523,6 +1523,7 @@ class BasicSwap(BaseApp):
             if security_token is not None and len(security_token) != 20:
                 raise ValueError('Security token must be 20 bytes long.')
 
+            bid_reversed: bool = msg_buf.swap_type == SwapTypes.XMR_SWAP and self.is_reverse_ads_bid(msg_buf.coin_from)
             session = scoped_session(self.session_factory)
             offer = Offer(
                 offer_id=offer_id,
@@ -1546,7 +1547,7 @@ class BasicSwap(BaseApp):
                 created_at=offer_created_at,
                 expire_at=offer_created_at + msg_buf.time_valid,
                 was_sent=True,
-                bid_reversed=self.is_reverse_ads_bid(msg_buf.coin_from),
+                bid_reversed=bid_reversed,
                 security_token=security_token)
             offer.setState(OfferStates.OFFER_SENT)
 
@@ -4410,6 +4411,7 @@ class BasicSwap(BaseApp):
             # Check for sent
             existing_offer = self.getOffer(offer_id)
             if existing_offer is None:
+                bid_reversed: bool = offer_data.swap_type == SwapTypes.XMR_SWAP and self.is_reverse_ads_bid(offer_data.coin_from)
                 offer = Offer(
                     offer_id=offer_id,
                     active_ind=1,
@@ -4432,7 +4434,7 @@ class BasicSwap(BaseApp):
                     created_at=msg['sent'],
                     expire_at=msg['sent'] + offer_data.time_valid,
                     was_sent=False,
-                    bid_reversed=self.is_reverse_ads_bid(offer_data.coin_from))
+                    bid_reversed=bid_reversed)
                 offer.setState(OfferStates.OFFER_RECEIVED)
                 session.add(offer)
 

@@ -488,7 +488,7 @@ def page_offer(self, url_split, post_string):
     ci_from = swap_client.ci(Coins(offer.coin_from))
     ci_to = swap_client.ci(Coins(offer.coin_to))
 
-    reverse_bid: bool = swap_client.is_reverse_ads_bid(offer.coin_from)
+    reverse_bid: bool = True if offer.bid_reversed else False
 
     # Set defaults
     debugind = -1
@@ -590,7 +590,7 @@ def page_offer(self, url_split, post_string):
         'is_expired': offer.expire_at <= now,
         'active_ind': offer.active_ind,
         'swap_type': strSwapDesc(offer.swap_type),
-        'reverse': offer.bid_reversed
+        'reverse': reverse_bid,
     }
     data.update(extend_data)
 
