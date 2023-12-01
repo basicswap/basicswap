@@ -727,17 +727,3 @@ class NAVInterface(BTCInterface):
                        i2h(tx.sha256), tx_fee_rate, vsize, pay_fee)
 
         return tx.serialize()
-
-    def get_fee_rate(self, conf_target: int = 2):
-
-        try:
-            fee_rate = self.rpc_callback('estimatesmartfee', [conf_target])['feerate']
-            assert (fee_rate > 0.0), 'Non positive feerate'
-            return fee_rate, 'estimatesmartfee'
-        except Exception:
-            try:
-                fee_rate = self.rpc_callback('getwalletinfo')['paytxfee']
-                assert (fee_rate > 0.0), 'Non positive feerate'
-                return fee_rate, 'paytxfee'
-            except Exception:
-                return self.rpc_callback('getnetworkinfo')['relayfee'], 'relayfee'

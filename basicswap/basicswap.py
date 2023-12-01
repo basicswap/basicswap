@@ -472,6 +472,8 @@ class BasicSwap(BaseApp):
 
         if coin == Coins.FIRO:
             self.coin_clients[coin]['use_csv'] = False
+            if 'min_relay_fee' not in self.coin_clients[coin]:
+                self.coin_clients[coin]['min_relay_fee'] = 0.00001
 
         if coin == Coins.PART:
             self.coin_clients[coin]['anon_tx_ring_size'] = chain_client_settings.get('anon_tx_ring_size', 12)
@@ -1792,12 +1794,6 @@ class BasicSwap(BaseApp):
         return self.callcoinrpc(coin_type, 'getnetworkinfo')['relayfee']
 
     def getFeeRateForCoin(self, coin_type, conf_target: int = 2):
-        chain_client_settings = self.getChainClientSettings(coin_type)
-        override_feerate = chain_client_settings.get('override_feerate', None)
-        if override_feerate:
-            self.log.debug('Fee rate override used for %s: %f', Coins(coin_type).name, override_feerate)
-            return override_feerate, 'override_feerate'
-
         return self.ci(coin_type).get_fee_rate(conf_target)
 
     def estimateWithdrawFee(self, coin_type, fee_rate):

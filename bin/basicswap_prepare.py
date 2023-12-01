@@ -1590,6 +1590,7 @@ def main():
             'blocks_confirmed': 1,
             'conf_target': 2,
             'core_version_group': 14,
+            'min_relay_fee': 0.00001,
             'chain_lookups': 'local',
         },
         'navcoin': {

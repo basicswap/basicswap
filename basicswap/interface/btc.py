@@ -358,18 +358,31 @@ class BTCInterface(CoinInterface):
         if self.sc._restrict_unknown_seed_wallets:
             ensure(addr_info['hdseedid'] == self._expect_seedid_hex, 'unexpected seedid')
 
-    def get_fee_rate(self, conf_target: int = 2):
-        try:
-            fee_rate = self.rpc_callback('estimatesmartfee', [conf_target])['feerate']
-            assert (fee_rate > 0.0), 'Non positive feerate'
-            return fee_rate, 'estimatesmartfee'
-        except Exception:
+    def get_fee_rate(self, conf_target: int = 2) -> (float, str):
+        chain_client_settings = self._sc.getChainClientSettings(self.coin_type())
+        override_feerate = chain_client_settings.get('override_feerate', None)
+        if override_feerate:
+            self._log.debug('Fee rate override used for %s: %f', self.coin_name(), override_feerate)
+            return override_feerate, 'override_feerate'
+
+        min_relay_fee = chain_client_settings.get('min_relay_fee', None)
+        def try_get_fee_rate(self, conf_target):
             try:
-                fee_rate = self.rpc_callback('getwalletinfo')['paytxfee']
+                fee_rate = self.rpc_callback('estimatesmartfee', [conf_target])['feerate']
                 assert (fee_rate > 0.0), 'Non positive feerate'
-                return fee_rate, 'paytxfee'
+                return fee_rate, 'estimatesmartfee'
             except Exception:
-                return self.rpc_callback('getnetworkinfo')['relayfee'], 'relayfee'
+                try:
+                    fee_rate = self.rpc_callback('getwalletinfo')['paytxfee']
+                    assert (fee_rate > 0.0), 'Non positive feerate'
+                    return fee_rate, 'paytxfee'
+                except Exception:
+                    return self.rpc_callback('getnetworkinfo')['relayfee'], 'relayfee'
+
+        fee_rate, rate_src = try_get_fee_rate(self, conf_target)
+        if min_relay_fee and min_relay_fee > fee_rate:
+            return min_relay_fee, 'min_relay_fee'
+        return fee_rate, rate_src
 
     def isSegwitAddress(self, address: str) -> bool:
         return address.startswith(self.chainparams_network()['hrp'] + '1')
