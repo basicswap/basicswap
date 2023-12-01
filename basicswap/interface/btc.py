@@ -366,6 +366,7 @@ class BTCInterface(CoinInterface):
             return override_feerate, 'override_feerate'
 
         min_relay_fee = chain_client_settings.get('min_relay_fee', None)
+
         def try_get_fee_rate(self, conf_target):
             try:
                 fee_rate = self.rpc_callback('estimatesmartfee', [conf_target])['feerate']

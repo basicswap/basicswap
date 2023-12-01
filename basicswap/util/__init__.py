@@ -181,7 +181,7 @@ def format_timestamp(value: int, with_seconds: bool = False) -> str:
     str_format = '%Y-%m-%d %H:%M'
     if with_seconds:
         str_format += ':%S'
-    str_format += ' %Z'
+    str_format += ' %z'
     return time.strftime(str_format, time.localtime(value))
 
 

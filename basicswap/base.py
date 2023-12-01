@@ -76,10 +76,10 @@ class BaseApp:
         # Remove any existing handlers
         self.log.handlers = []
 
-        formatter = logging.Formatter('%(asctime)s %(levelname)s : %(message)s')
+        formatter = logging.Formatter('%(asctime)s %(levelname)s : %(message)s', '%Y-%m-%d %H:%M:%S')
         stream_stdout = logging.StreamHandler()
         if self.log_name != 'BasicSwap':
-            stream_stdout.setFormatter(logging.Formatter('%(asctime)s %(name)s %(levelname)s : %(message)s'))
+            stream_stdout.setFormatter(logging.Formatter('%(asctime)s %(name)s %(levelname)s : %(message)s', '%Y-%m-%d %H:%M:%S'))
         else:
             stream_stdout.setFormatter(formatter)
         stream_fp = logging.StreamHandler(self.fp)
