@@ -285,34 +285,25 @@ class Test(BaseTest):
 
         swap_client = self.swap_clients[0]
 
+        # First address sometimes has a balance already
         addr_plain = self.callnoderpc('getnewaddress', ['gettxout test',])
 
         addr_plain1 = self.callnoderpc('getnewaddress', ['gettxout test 1',])
-        addr_witness = self.callnoderpc('addwitnessaddress', [addr_plain1,])
 
-        txid = self.callnoderpc('sendtoaddress', [addr_witness, 1.0])
+        txid = self.callnoderpc('sendtoaddress', [addr_plain1, 1.0])
         assert len(txid) == 64
 
-        self.callnoderpc('generatetoaddress', [1, self.firo_addr])
+        self.mineBlock()
 
-        unspents = self.callnoderpc('listunspent')
-
-        for u in unspents:
-            if u['spendable'] is not True:
-                continue
-            if u['address'] == addr_witness:
-                print(u)
-
-        unspents = self.callnoderpc('listunspent', [0, 999999999, [addr_witness,]])
+        unspents = self.callnoderpc('listunspent', [0, 999999999, [addr_plain1,]])
         assert (len(unspents) == 1)
 
         utxo = unspents[0]
         txout = self.callnoderpc('gettxout', [utxo['txid'], utxo['vout']])
-        assert (addr_witness in txout['scriptPubKey']['addresses'])
+        assert (addr_plain1 in txout['scriptPubKey']['addresses'])
         # Spend
         addr_plain2 = self.callnoderpc('getnewaddress', ['gettxout test 2',])
-        addr_witness2 = self.callnoderpc('addwitnessaddress', [addr_plain2,])
-        tx_funded = self.callnoderpc('createrawtransaction', [[{'txid': utxo['txid'], 'vout': utxo['vout']}], {addr_witness2: 0.99}])
+        tx_funded = self.callnoderpc('createrawtransaction', [[{'txid': utxo['txid'], 'vout': utxo['vout']}], {addr_plain2: 0.99}])
         tx_signed = self.callnoderpc('signrawtransaction', [tx_funded,])['hex']
         self.callnoderpc('sendrawtransaction', [tx_signed,])
 
@@ -320,7 +311,7 @@ class Test(BaseTest):
         txout = self.callnoderpc('gettxout', [utxo['txid'], utxo['vout']])
         assert (txout is None)
 
-        self.callnoderpc('generatetoaddress', [1, self.firo_addr])
+        self.mineBlock()
 
         ci = swap_client.ci(Coins.FIRO)
         require_amount: int = ci.make_int(1)

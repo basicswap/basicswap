@@ -663,6 +663,45 @@ class BasicSwapTest(TestFunctions):
         rv = read_json_api(1800, 'getcoinseed', {'coin': 'XMR'})
         assert (rv['address'] == '47H7UDLzYEsR28BWttxp59SP1UVSxs4VKDJYSfmz7Wd4Fue5VWuoV9x9eejunwzVSmHWN37gBkaAPNf9VD4bTvwQKsBVWyK')
 
+    def test_008_gettxout(self):
+        logging.info('---------- Test {} gettxout'.format(self.test_coin_from.name))
+
+        swap_client = self.swap_clients[0]
+
+        addr_1 = self.callnoderpc('getnewaddress', ['gettxout test 1',])
+        txid = self.callnoderpc('sendtoaddress', [addr_1, 1.0])
+        assert len(txid) == 64
+
+        self.mineBlock()
+
+        unspents = self.callnoderpc('listunspent', [0, 999999999, [addr_1,]])
+        assert (len(unspents) == 1)
+
+        utxo = unspents[0]
+        txout = self.callnoderpc('gettxout', [utxo['txid'], utxo['vout']])
+        assert (addr_1 == txout['scriptPubKey']['address'])
+        # Spend
+        addr_2 = self.callnoderpc('getnewaddress', ['gettxout test 2',])
+        tx_funded = self.callnoderpc('createrawtransaction', [[{'txid': utxo['txid'], 'vout': utxo['vout']}], {addr_2: 0.99}])
+        tx_signed = self.callnoderpc('signrawtransactionwithwallet', [tx_funded,])['hex']
+        self.callnoderpc('sendrawtransaction', [tx_signed,])
+
+        # utxo should be unavailable when spent in the mempool
+        txout = self.callnoderpc('gettxout', [utxo['txid'], utxo['vout']])
+        assert (txout is None)
+
+    def test_009_scantxoutset(self):
+        logging.info('---------- Test {} scantxoutset'.format(self.test_coin_from.name))
+        addr_1 = self.callnoderpc('getnewaddress', ['scantxoutset test', ])
+        txid = self.callnoderpc('sendtoaddress', [addr_1, 1.0])
+        assert len(txid) == 64
+
+        self.mineBlock()
+
+        ro = self.callnoderpc('scantxoutset', ['start', ['addr({})'.format(addr_1)]])
+        assert (len(ro['unspents']) == 1)
+        assert (ro['unspents'][0]['txid'] == txid)
+
     def test_010_txn_size(self):
         logging.info('---------- Test {} txn_size'.format(self.test_coin_from.name))
 
