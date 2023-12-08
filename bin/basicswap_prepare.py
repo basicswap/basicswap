@@ -628,6 +628,8 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
             release_filename = '{}-{}-{}{}.{}'.format('firo', version + version_tag, arch_name, filename_extra, FILE_EXT)
             release_url = 'https://github.com/firoorg/firo/releases/download/v{}/{}'.format(version + version_tag, release_filename)
             '''
+            if BIN_ARCH == 'osx64':
+                arch_name = 'x86_64-apple-darwin'
             release_filename = '{}-{}-{}{}.{}'.format('firo', '39c41e5e7ec6', arch_name, filename_extra, FILE_EXT)
             release_url = 'https://github.com/firoorg/firo/releases/download/v{}/{}'.format(version + version_tag, release_filename)
             assert_url = 'https://github.com/firoorg/firo/releases/download/v%s/SHA256SUMS' % (version + version_tag)
