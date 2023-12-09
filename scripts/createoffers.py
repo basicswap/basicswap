@@ -326,6 +326,8 @@ def main():
                 if args.debug:
                     print('offer data {}'.format(offer_data))
                 new_offer = read_json_api('offers/new', offer_data)
+                if 'error' in new_offer:
+                    raise ValueError('Server failed to create offer: {}'.format(new_offer['error']))
                 print('New offer: {}'.format(new_offer['offer_id']))
                 if 'offers' not in script_state:
                     script_state['offers'] = {}
@@ -516,6 +518,8 @@ def main():
                         if args.debug:
                             print('Creating bid: {}'.format(bid_data))
                         new_bid = read_json_api('bids/new', bid_data)
+                        if 'error' in new_bid:
+                            raise ValueError('Server failed to create bid: {}'.format(new_bid['error']))
                         print('New bid: {} on offer {}'.format(new_bid['bid_id'], offer['offer_id']))
                         bid_id = new_bid['bid_id']
 

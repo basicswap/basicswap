@@ -553,6 +553,40 @@ class Test(unittest.TestCase):
         rv_stdout = result.stdout.decode().split('\n')
         '''
 
+    def test_error_messages(self):
+        waitForServer(self.delay_event, UI_PORT + 0)
+        waitForServer(self.delay_event, UI_PORT + 1)
+
+        # Reset test
+        clear_offers(self.delay_event, 0)
+        delete_file(self.node0_statefile)
+        delete_file(self.node1_statefile)
+        wait_for_offers(self.delay_event, 1, 0)
+
+        node0_test1_config = {
+            'offers': [
+                {
+                    'name': 'offer should fail',
+                    'coin_from': 'Particl',
+                    'coin_to': 'XMR',
+                    'amount': 20,
+                    'minrate': 0.05,
+                    'ratetweakpercent': 50000000,
+                    'amount_variable': True,
+                    'address': -1,
+                    'min_coin_from_amt': 20,
+                    'max_coin_to_amt': -1
+                }
+            ],
+        }
+        with open(self.node0_configfile, 'w') as fp:
+            json.dump(node0_test1_config, fp, indent=4)
+
+        logging.info('Test that an offer is created')
+        result = subprocess.run(self.node0_args, stdout=subprocess.PIPE)
+        rv_stdout = result.stdout.decode().split('\n')
+        assert (count_lines_with(rv_stdout, 'Error: Server failed to create offer: To amount above max') == 1)
+
     def test_bid_tracking(self):
 
         waitForServer(self.delay_event, UI_PORT + 0)
