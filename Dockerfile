@@ -15,7 +15,7 @@ RUN wget -O protobuf_src.tar.gz https://github.com/protocolbuffers/protobuf/rele
     make -j$(nproc) install && \
     ldconfig
 
-ARG COINCURVE_VERSION=v0.1
+ARG COINCURVE_VERSION=v0.2
 RUN wget -O coincurve-anonswap.zip https://github.com/tecnovert/coincurve/archive/refs/tags/anonswap_$COINCURVE_VERSION.zip && \
     unzip coincurve-anonswap.zip && \
     mv ./coincurve-anonswap_$COINCURVE_VERSION ./coincurve-anonswap && \

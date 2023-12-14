@@ -26,7 +26,7 @@
 (define libsecp256k1-anonswap
   (package
     (name "libsecp256k1-anonswap")
-    (version "anonswap_v0.1")
+    (version "anonswap_v0.2")
     (source (origin
       (method git-fetch)
       (uri (git-reference
@@ -34,15 +34,17 @@
         (commit version)))
       (sha256
        (base32
-        "1lrcc5gjywlzvrgwzifva4baa2nsvwr3h0wmkc71q0zhag9pjbah"))
+        "1r07rkrw5qsnc5v1q7cb0zfs1cr62fqwq7kd2v8650g6ha4k5r8i"))
       (file-name (git-file-name name version))))
     (build-system gnu-build-system)
     (arguments
      '(#:configure-flags '("--enable-shared"
                            "--disable-dependency-tracking"
-                           "--with-valgrind=no"
-                           "--enable-experimental"
+                           "--with-pic"
+                           "--enable-module-extrakeys"
                            "--enable-module-recovery"
+                           "--enable-module-schnorrsig"
+                           "--enable-experimental"
                            "--enable-module-ecdh"
                            "--enable-benchmark=no"
                            "--enable-tests=no"
@@ -50,6 +52,7 @@
                            "--enable-module-generator"
                            "--enable-module-dleag"
                            "--enable-module-ecdsaotves"
+                           "--with-valgrind=no"
                            )))
     (native-inputs
      (list autoconf automake libtool))
@@ -63,7 +66,7 @@
 (define python-coincurve-anonswap
   (package
     (name "python-coincurve-anonswap")
-    (version "anonswap_v0.1")
+    (version "anonswap_v0.2")
     (source
      (origin
        (method git-fetch)
@@ -74,7 +77,7 @@
        (file-name
         (git-file-name name version))
        (sha256
-        (base32 "0vyzvpp2s21js01185qbm1lgs4ps4hki2d6yzprfsjqap1i5qhmp"))))
+        (base32 "08fz02afh88m83axfm8jsgq1c65mw1f3g07x9hz361vblvqjwzqh"))))
     (build-system python-build-system)
     (arguments
      '(#:tests? #f ;XXX fails to load "libsecp256k1.dll"

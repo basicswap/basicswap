@@ -22,7 +22,7 @@ before_install:
 install:
   - travis_retry pip install tox pytest
 before_script:
-  - wget -O coincurve-anonswap.zip https://github.com/tecnovert/coincurve/archive/refs/tags/anonswap_v0.1.zip
+  - wget -O coincurve-anonswap.zip https://github.com/tecnovert/coincurve/archive/refs/tags/anonswap_v0.2.zip
   - unzip -d coincurve-anonswap coincurve-anonswap.zip
   - mv ./coincurve-anonswap/*/{.,}* ./coincurve-anonswap || true
   - cd coincurve-anonswap
