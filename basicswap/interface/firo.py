@@ -13,6 +13,7 @@ from basicswap.util import (
     i2b,
     ensure,
 )
+from basicswap.util.crypto import hash160
 from basicswap.util.address import decodeAddress
 from basicswap.chainparams import Coins
 from basicswap.interface.contrib.firo_test_framework.script import (
@@ -22,7 +23,6 @@ from basicswap.interface.contrib.firo_test_framework.script import (
     OP_HASH160,
     OP_CHECKSIG,
     OP_EQUALVERIFY,
-    hash160,
 )
 from basicswap.interface.contrib.firo_test_framework.mininode import (
     CBlock,

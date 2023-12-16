@@ -51,9 +51,6 @@ MSG_TYPE_MASK = 0xffffffff >> 2
 def sha256(s):
     return hashlib.new('sha256', s).digest()
 
-def ripemd160(s):
-    return hashlib.new('ripemd160', s).digest()
-
 def hash256(s):
     return sha256(sha256(s))
 

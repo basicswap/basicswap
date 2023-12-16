@@ -37,10 +37,6 @@ MAX_SCRIPT_OPCODES = 201
 
 OPCODE_NAMES = {}
 
-def hash160(s):
-    return hashlib.new('ripemd160', sha256(s)).digest()
-
-
 _opcode_instances = []
 class CScriptOp(int):
     """A single script opcode"""

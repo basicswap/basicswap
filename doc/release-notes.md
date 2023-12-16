@@ -1,3 +1,11 @@
+0.12.2
+==============
+
+- Updated coincurve and libsecp256k1 versions.
+  - Avoids needing secp256k1_generator_const_g as it's not accessible from a dll.
+- Fix missing ripemd160 on some systems.
+
+
 0.12.1
 ==============
 

@@ -22,7 +22,7 @@ from coincurve.keys import (
     PrivateKey)
 
 from basicswap.util import i2b, h2b
-from basicswap.util.crypto import ripemd160
+from basicswap.util.crypto import ripemd160, hash160
 from basicswap.util.rfc2440 import rfc2440_hash_password
 from basicswap.interface.btc import BTCInterface
 from basicswap.interface.xmr import XMRInterface
@@ -40,6 +40,7 @@ from basicswap.messages_pb2 import (
     BidMessage,
     BidMessage_v1Deprecated,
 )
+from basicswap.contrib.test_framework.script import hash160 as hash160_btc
 
 
 class Test(unittest.TestCase):
@@ -316,6 +317,12 @@ class Test(unittest.TestCase):
     def test_ripemd160(self):
         input_data = b'hash this'
         assert (ripemd160(input_data).hex() == 'd5443a154f167e2c1332f6de72cfb4c6ab9c8c17')
+
+    def test_hash160(self):
+        # hash160 is RIPEMD(SHA256(data))
+        input_data = b'hash this'
+        assert (hash160(input_data).hex() == '072985b3583a4a71f548494a5e1d5f6b00d0fe13')
+        assert (hash160_btc(input_data).hex() == '072985b3583a4a71f548494a5e1d5f6b00d0fe13')
 
     def test_protobuf(self):
         # Ensure old protobuf templates can be read

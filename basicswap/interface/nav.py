@@ -25,6 +25,7 @@ from basicswap.interface.contrib.nav_test_framework.mininode import (
     FromHex,
     uint256_from_str,
 )
+from basicswap.util.crypto import hash160
 from basicswap.util.address import (
     decodeWif,
     pubkeyToAddress,
@@ -39,7 +40,6 @@ from basicswap.basicswap_util import (
 )
 
 from basicswap.interface.contrib.nav_test_framework.script import (
-    hash160,
     CScript,
     OP_0,
     OP_EQUAL,
