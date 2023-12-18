@@ -219,6 +219,7 @@ chainparams = {
         'message_magic': 'DarkNet Signed Message:\n',
         'blocks_target': 60 * 1,
         'decimal_places': 8,
+        'has_cltv': True,
         'has_csv': False,
         'has_segwit': False,
         'use_ticker_as_name': True,
@@ -296,7 +297,8 @@ chainparams = {
         'message_magic': 'Zcoin Signed Message:\n',
         'blocks_target': 60 * 10,
         'decimal_places': 8,
-        'has_csv': True,
+        'has_cltv': False,
+        'has_csv': False,
         'has_segwit': False,
         'mainnet': {
             'rpcport': 8888,

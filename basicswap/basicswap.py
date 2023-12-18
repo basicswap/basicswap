@@ -256,9 +256,9 @@ class BasicSwap(BaseApp):
         self._is_locked = None
 
         # TODO: Set dynamically
-        self.scriptless_coins = (Coins.XMR, Coins.PART_ANON)
+        self.scriptless_coins = (Coins.XMR, Coins.PART_ANON, Coins.FIRO)
         self.adaptor_swap_only_coins = self.scriptless_coins + (Coins.PART_BLIND, )
-        self.coins_without_segwit = (Coins.PIVX, Coins.DASH, Coins.FIRO, Coins.NMC)
+        self.coins_without_segwit = (Coins.PIVX, Coins.DASH, Coins.NMC)
 
         # TODO: Adjust ranges
         self.min_delay_event = self.settings.get('min_delay_event', 10)
