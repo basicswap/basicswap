@@ -1,3 +1,10 @@
+0.12.3
+==============
+
+- New basicswap-run parameter startonlycoin.
+  - If set basicswap-run will only start the specified coin daemon/s.
+
+
 0.12.2
 ==============
 

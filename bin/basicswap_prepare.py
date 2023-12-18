@@ -55,7 +55,7 @@ XMR_SITE_COMMIT = 'a3b195eb90c7d5564cc9d9ec09c873783d21901b'  # Lock hashes.txt 
 PIVX_VERSION = os.getenv('PIVX_VERSION', '5.5.0')
 PIVX_VERSION_TAG = os.getenv('PIVX_VERSION_TAG', '')
 
-DASH_VERSION = os.getenv('DASH_VERSION', '19.3.0')
+DASH_VERSION = os.getenv('DASH_VERSION', '20.0.2')
 DASH_VERSION_TAG = os.getenv('DASH_VERSION_TAG', '')
 
 FIRO_VERSION = os.getenv('FIRO_VERSION', '0.14.13.0')
@@ -201,6 +201,11 @@ use_tor_proxy = False
 default_socket = socket.socket
 default_socket_timeout = socket.getdefaulttimeout()
 default_socket_getaddrinfo = socket.getaddrinfo
+
+
+def exitWithError(error_msg):
+    sys.stderr.write('Error: {}, exiting.\n'.format(error_msg))
+    sys.exit(1)
 
 
 def make_reporthook(read_start=0):
@@ -618,7 +623,7 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
             release_filename = '{}-{}-{}.{}'.format('dashcore', version + version_tag, BIN_ARCH, FILE_EXT)
             release_url = 'https://github.com/dashpay/dash/releases/download/v{}/{}'.format(version + version_tag, release_filename)
             assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, major_version)
-            assert_url = 'https://raw.githubusercontent.com/dashpay/gitian.sigs/master/%s-%s/%s/%s' % (version + version_tag, os_dir_name, signing_key_name, assert_filename)
+            assert_url = f'https://raw.githubusercontent.com/dashpay/guix.sigs/master/{version}/{signing_key_name}/codesigned.SHA256SUMS'
         elif coin == 'firo':
             arch_name = BIN_ARCH
             '''
@@ -653,7 +658,8 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
             downloadFile(assert_url, assert_path)
 
         if coin not in ('firo', ):
-            assert_sig_url = assert_url + ('.asc' if major_version >= 22 else '.sig')
+            use_guix: bool = coin in ('dash', ) or major_version >= 22
+            assert_sig_url = assert_url + ('.asc' if use_guix else '.sig')
             if coin not in ('nav', ):
                 assert_sig_filename = '{}-{}-{}-build-{}.assert.sig'.format(coin, os_name, version, signing_key_name)
             assert_sig_path = os.path.join(bin_dir, assert_sig_filename)
@@ -1045,11 +1051,6 @@ def modify_tor_config(settings, coin, tor_control_password=None, enable=False):
             writeTorSettings(fp, coin, coin_settings, tor_control_password)
 
 
-def exitWithError(error_msg):
-    sys.stderr.write('Error: {}, exiting.\n'.format(error_msg))
-    sys.exit(1)
-
-
 def printVersion():
     logger.info(f'Basicswap version: {__version__}')
 
@@ -1329,13 +1330,9 @@ def main():
         if name == 'h' or name == 'help':
             printHelp()
             return 0
-        if name == 'mainnet':
-            continue
-        if name == 'testnet':
-            chain = 'testnet'
-            continue
-        if name == 'regtest':
-            chain = 'regtest'
+
+        if name in ('mainnet', 'testnet', 'regtest'):
+            chain = name
             continue
         if name == 'preparebinonly':
             prepare_bin_only = True
@@ -1380,13 +1377,13 @@ def main():
             if name == 'particl_mnemonic':
                 particl_wallet_mnemonic = s[1].strip('"')
                 continue
-            if name == 'withcoin' or name == 'withcoins':
+            if name in ('withcoin', 'withcoins'):
                 for coin in [s.lower() for s in s[1].split(',')]:
                     ensure_coin_valid(coin)
                     with_coins.add(coin)
                 coins_changed = True
                 continue
-            if name == 'withoutcoin' or name == 'withoutcoins':
+            if name in ('withoutcoin', 'withoutcoins'):
                 for coin in [s.lower() for s in s[1].split(',')]:
                     ensure_coin_valid(coin, test_disabled=False)
                     with_coins.discard(coin)

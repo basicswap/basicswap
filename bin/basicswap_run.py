@@ -21,12 +21,25 @@ from basicswap.basicswap import BasicSwap
 from basicswap.http_server import HttpThread
 from basicswap.contrib.websocket_server import WebsocketServer
 
+
 logger = logging.getLogger()
 logger.level = logging.DEBUG
 if not len(logger.handlers):
     logger.addHandler(logging.StreamHandler(sys.stdout))
 
 swap_client = None
+# TODO: deduplicate
+known_coins = [
+    'particl',
+    'litecoin',
+    'bitcoin',
+    'namecoin',
+    'monero',
+    'pivx',
+    'dash',
+    'firo',
+    'navcoin',
+]
 
 
 def signal_handler(sig, frame):
@@ -112,7 +125,7 @@ def ws_message_received(client, server, message):
         swap_client.log.debug(f'ws_message_received {client["id"]} {message}')
 
 
-def runClient(fp, data_dir, chain):
+def runClient(fp, data_dir, chain, start_only_coins):
     global swap_client
     daemons = []
     pids = []
@@ -143,6 +156,9 @@ def runClient(fp, data_dir, chain):
     try:
         # Try start daemons
         for c, v in settings['chainclients'].items():
+
+            if len(start_only_coins) > 0 and c not in start_only_coins:
+                continue
             try:
                 coin_id = swap_client.getCoinIdFromName(c)
                 display_name = getCoinName(coin_id)
@@ -189,28 +205,33 @@ def runClient(fp, data_dir, chain):
 
         signal.signal(signal.SIGINT, signal_handler)
         signal.signal(signal.SIGTERM, signal_handler)
-        swap_client.start()
 
-        if 'htmlhost' in settings:
-            swap_client.log.info('Starting http server at http://%s:%d.' % (settings['htmlhost'], settings['htmlport']))
-            allow_cors = settings['allowcors'] if 'allowcors' in settings else cfg.DEFAULT_ALLOW_CORS
-            thread_http = HttpThread(fp, settings['htmlhost'], settings['htmlport'], allow_cors, swap_client)
-            threads.append(thread_http)
-            thread_http.start()
+        if len(start_only_coins) > 0:
+            logger.info(f'Only running {start_only_coins}. Manually exit with Ctrl + c when ready.')
+            while not swap_client.delay_event.wait(0.5):
+                pass
+        else:
+            swap_client.start()
+            if 'htmlhost' in settings:
+                swap_client.log.info('Starting http server at http://%s:%d.' % (settings['htmlhost'], settings['htmlport']))
+                allow_cors = settings['allowcors'] if 'allowcors' in settings else cfg.DEFAULT_ALLOW_CORS
+                thread_http = HttpThread(fp, settings['htmlhost'], settings['htmlport'], allow_cors, swap_client)
+                threads.append(thread_http)
+                thread_http.start()
 
-        if 'wshost' in settings:
-            ws_url = 'ws://{}:{}'.format(settings['wshost'], settings['wsport'])
-            swap_client.log.info(f'Starting ws server at {ws_url}.')
+            if 'wshost' in settings:
+                ws_url = 'ws://{}:{}'.format(settings['wshost'], settings['wsport'])
+                swap_client.log.info(f'Starting ws server at {ws_url}.')
 
-            swap_client.ws_server = WebsocketServer(host=settings['wshost'], port=settings['wsport'])
-            swap_client.ws_server.set_fn_new_client(ws_new_client)
-            swap_client.ws_server.set_fn_client_left(ws_client_left)
-            swap_client.ws_server.set_fn_message_received(ws_message_received)
-            swap_client.ws_server.run_forever(threaded=True)
+                swap_client.ws_server = WebsocketServer(host=settings['wshost'], port=settings['wsport'])
+                swap_client.ws_server.set_fn_new_client(ws_new_client)
+                swap_client.ws_server.set_fn_client_left(ws_client_left)
+                swap_client.ws_server.set_fn_message_received(ws_message_received)
+                swap_client.ws_server.run_forever(threaded=True)
 
-        logger.info('Exit with Ctrl + c.')
-        while not swap_client.delay_event.wait(0.5):
-            swap_client.update()
+            logger.info('Exit with Ctrl + c.')
+            while not swap_client.delay_event.wait(0.5):
+                swap_client.update()
 
     except Exception as ex:
         traceback.print_exc()
@@ -267,18 +288,20 @@ def printVersion():
 
 
 def printHelp():
-    logger.info('Usage: basicswap-run ')
-    logger.info('\n--help, -h               Print help.')
-    logger.info('--version, -v            Print version.')
-    logger.info('--datadir=PATH           Path to basicswap data directory, default:{}.'.format(cfg.BASICSWAP_DATADIR))
-    logger.info('--mainnet                Run in mainnet mode.')
-    logger.info('--testnet                Run in testnet mode.')
-    logger.info('--regtest                Run in regtest mode.')
+    print('Usage: basicswap-run ')
+    print('\n--help, -h               Print help.')
+    print('--version, -v            Print version.')
+    print('--datadir=PATH           Path to basicswap data directory, default:{}.'.format(cfg.BASICSWAP_DATADIR))
+    print('--mainnet                Run in mainnet mode.')
+    print('--testnet                Run in testnet mode.')
+    print('--regtest                Run in regtest mode.')
+    print('--startonlycoin          Only start the provides coin daemon/s, use this if a chain requires extra processing.')
 
 
 def main():
     data_dir = None
     chain = 'mainnet'
+    start_only_coins = set()
 
     for v in sys.argv[1:]:
         if len(v) < 2 or v[0] != '-':
@@ -299,17 +322,20 @@ def main():
             printHelp()
             return 0
 
-        if name == 'testnet':
-            chain = 'testnet'
-            continue
-        if name == 'regtest':
-            chain = 'regtest'
+        if name in ('mainnet', 'testnet', 'regtest'):
+            chain = name
             continue
 
         if len(s) == 2:
             if name == 'datadir':
                 data_dir = os.path.expanduser(s[1])
                 continue
+        if name == 'startonlycoin':
+            for coin in [s.lower() for s in s[1].split(',')]:
+                if coin not in known_coins:
+                    raise ValueError(f'Unknown coin: {coin}')
+                start_only_coins.add(coin)
+            continue
 
         logger.warning('Unknown argument %s', v)
 
@@ -323,7 +349,7 @@ def main():
 
     with open(os.path.join(data_dir, 'basicswap.log'), 'a') as fp:
         logger.info(os.path.basename(sys.argv[0]) + ', version: ' + __version__ + '\n\n')
-        runClient(fp, data_dir, chain)
+        runClient(fp, data_dir, chain, start_only_coins)
 
     logger.info('Done.')
     return swap_client.fail_code if swap_client is not None else 0
