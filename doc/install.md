@@ -173,6 +173,7 @@ Close the terminal and open a new one to update the python symlinks.
     git clone https://github.com/tecnovert/basicswap.git
     cd $SWAP_DATADIR/basicswap
 
+
 If installed on OSX, you may need to install additional root ssl certificates for the ssl module.
 From https://pypi.org/project/certifi/
 
@@ -189,16 +190,18 @@ Prepare the datadir:
 
     CURRENT_XMR_HEIGHT=$(curl https://localmonero.co/blocks/api/get_stats | jq .height)
 
+    basicswap-prepare --datadir=$SWAP_DATADIR --withcoins=monero --xmrrestoreheight=$CURRENT_XMR_HEIGHT
+
+    OR using a remote/public XMR daemon (not recommended):
     XMR_RPC_HOST="node.xmr.to" BASE_XMR_RPC_PORT=18081 basicswap-prepare --datadir=$SWAP_DATADIR --withcoins=monero --xmrrestoreheight=$CURRENT_XMR_HEIGHT
 
-    OR using a local XMR daemon:
-    basicswap-prepare --datadir=$SWAP_DATADIR --withcoins=monero --xmrrestoreheight=$CURRENT_XMR_HEIGHT
 
 Record the mnemonic from the output of the above command.
 
 Start Basicswap:
 
     basicswap-run --datadir=$SWAP_DATADIR
+
 
 Open in browser: `http://localhost:12700`
 It may take a few minutes to start as the coin daemons are started before the http interface.
