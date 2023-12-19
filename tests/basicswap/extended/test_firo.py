@@ -13,7 +13,6 @@ import unittest
 import basicswap.config as cfg
 from basicswap.basicswap import (
     Coins,
-    TxStates,
     SwapTypes,
     BidStates,
     DebugTypes,
@@ -22,7 +21,6 @@ from basicswap.basicswap_util import (
     TxLockTypes,
 )
 from basicswap.util import (
-    COIN,
     make_int,
     format_amount,
 )
@@ -39,10 +37,6 @@ from tests.basicswap.common import (
     make_rpc_func,
     TEST_HTTP_PORT,
     wait_for_offer,
-    wait_for_balance,
-    wait_for_unspent,
-    wait_for_in_progress,
-    wait_for_bid_tx_state,
 )
 from basicswap.interface.contrib.firo_test_framework.mininode import (
     FromHex,

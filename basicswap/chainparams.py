@@ -465,5 +465,5 @@ class CoinInterface:
         if 'daemon is busy' in str_error:
             return True
         if 'timed out' in str_error:
-+           return True
+            return True
         return False
