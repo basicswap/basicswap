@@ -14,6 +14,7 @@ from selenium.webdriver.support.select import Select
 from selenium.webdriver.support import expected_conditions as EC
 
 from util import get_driver
+from basicswap.ui.page_offers import default_chart_api_key
 
 
 def test_settings(driver):
@@ -77,7 +78,7 @@ def test_settings(driver):
     chart_api_key = bytes.fromhex(settings.get('chart_api_key_enc', '')).decode('utf-8')
     assert (chart_api_key == difficult_text)
 
-    hex_text = '95dd900af910656e0e17c41f2ddc5dba77d01bf8b0e7d2787634a16bd976c553'
+    hex_text = default_chart_api_key
     el = driver.find_element(By.NAME, 'chartapikey')
     el.clear()
     el.send_keys(hex_text)

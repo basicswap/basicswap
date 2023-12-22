@@ -41,6 +41,9 @@ from basicswap.chainparams import (
 )
 
 
+default_chart_api_key = '95dd900af910656e0e17c41f2ddc5dba77d01bf8b0e7d2787634a16bd976c553'
+
+
 def value_or_none(v):
     if v == -1 or v == '-1':
         return None
@@ -445,7 +448,7 @@ def page_newoffer(self, url_split, post_string):
     chart_api_key = swap_client.settings.get('chart_api_key', '')
     if chart_api_key == '':
         chart_api_key_enc = swap_client.settings.get('chart_api_key_enc', '')
-        chart_api_key = '95dd900af910656e0e17c41f2ddc5dba77d01bf8b0e7d2787634a16bd976c553' if chart_api_key_enc == '' else bytes.fromhex(chart_api_key_enc).decode('utf-8')
+        chart_api_key = default_chart_api_key if chart_api_key_enc == '' else bytes.fromhex(chart_api_key_enc).decode('utf-8')
 
     return self.render_template(template, {
         'messages': messages,
@@ -746,7 +749,7 @@ def page_offers(self, url_split, post_string, sent=False):
     chart_api_key = swap_client.settings.get('chart_api_key', '')
     if chart_api_key == '':
         chart_api_key_enc = swap_client.settings.get('chart_api_key_enc', '')
-        chart_api_key = 'cd7600e7b5fdd99c6f900673ff0ee8f64d6d4219a4bb87191ad4a2e3fc65d7f4' if chart_api_key_enc == '' else bytes.fromhex(chart_api_key_enc).decode('utf-8')
+        chart_api_key = default_chart_api_key if chart_api_key_enc == '' else bytes.fromhex(chart_api_key_enc).decode('utf-8')
 
     template = server.env.get_template('offers.html')
     return self.render_template(template, {

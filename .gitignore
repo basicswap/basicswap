@@ -9,3 +9,6 @@ __pycache__
 .tox
 .eggs
 *~
+
+# geckodriver.log
+*.log
