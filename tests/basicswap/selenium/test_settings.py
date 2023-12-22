@@ -77,7 +77,7 @@ def test_settings(driver):
     chart_api_key = bytes.fromhex(settings.get('chart_api_key_enc', '')).decode('utf-8')
     assert (chart_api_key == difficult_text)
 
-    hex_text = 'cd7600e7b5fdd99c6f900673ff0ee8f64d6d4219a4bb87191ad4a2e3fc65d7f4'
+    hex_text = '95dd900af910656e0e17c41f2ddc5dba77d01bf8b0e7d2787634a16bd976c553'
     el = driver.find_element(By.NAME, 'chartapikey')
     el.clear()
     el.send_keys(hex_text)

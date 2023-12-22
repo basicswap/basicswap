@@ -96,6 +96,17 @@
   display: block;
 }
 
+.blurred {
+    filter: blur(4px);
+    pointer-events: none;
+    user-select: none; 
+}
+
+.error-overlay.non-blurred {
+    filter: none;
+    pointer-events: auto;
+    user-select: auto;
+}
 
 /* Disable opacity on disabled form elements in Chrome */
 @media screen and (-webkit-min-device-pixel-ratio:0) {
