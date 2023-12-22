@@ -577,16 +577,17 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
             downloadFile(assert_url, assert_path)
     else:
         major_version = int(version.split('.')[0])
+
+        use_guix: bool = coin in ('dash', ) or major_version >= 22
         arch_name = BIN_ARCH
-        if major_version >= 23:
-            if os_name == 'osx':
-                arch_name = 'x86_64-apple-darwin'
-                if coin == 'particl':
-                    arch_name += '18'
+        if os_name == 'osx' and use_guix:
+            arch_name = 'x86_64-apple-darwin'
+            if coin == 'particl':
+                arch_name += '18'
 
         release_filename = '{}-{}-{}.{}'.format(coin, version + version_tag, arch_name, FILE_EXT)
         if filename_extra != '':
-            if major_version >= 23:
+            if use_guix:
                 release_filename = '{}-{}_{}-{}.{}'.format(coin, version + version_tag, filename_extra, arch_name, FILE_EXT)
             else:
                 release_filename = '{}-{}-{}_{}.{}'.format(coin, version + version_tag, arch_name, filename_extra, FILE_EXT)
@@ -595,7 +596,7 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
         if coin == 'particl':
             release_url = 'https://github.com/particl/particl-core/releases/download/v{}/{}'.format(version + version_tag, release_filename)
             assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, version)
-            if major_version >= 22:
+            if use_guix:
                 assert_url = f'https://raw.githubusercontent.com/particl/guix.sigs/master/{version}/{signing_key_name}/all.SHA256SUMS'
             else:
                 assert_url = 'https://raw.githubusercontent.com/particl/gitian.sigs/master/%s-%s/%s/%s' % (version + version_tag, os_dir_name, signing_key_name, assert_filename)
@@ -606,7 +607,7 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
         elif coin == 'bitcoin':
             release_url = 'https://bitcoincore.org/bin/bitcoin-core-{}/{}'.format(version, release_filename)
             assert_filename = '{}-core-{}-{}-build.assert'.format(coin, os_name, '.'.join(version.split('.')[:2]))
-            if major_version >= 22:
+            if use_guix:
                 assert_url = f'https://raw.githubusercontent.com/bitcoin-core/guix.sigs/main/{version}/{signing_key_name}/all.SHA256SUMS'
             else:
                 assert_url = 'https://raw.githubusercontent.com/bitcoin-core/gitian.sigs/master/%s-%s/%s/%s' % (version, os_dir_name, signing_key_name, assert_filename)
@@ -620,9 +621,9 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
             assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, version.rsplit('.', 1)[0])
             assert_url = 'https://raw.githubusercontent.com/PIVX-Project/gitian.sigs/master/%s-%s/%s/%s' % (version + version_tag, os_dir_name, signing_key_name.capitalize(), assert_filename)
         elif coin == 'dash':
-            release_filename = '{}-{}-{}.{}'.format('dashcore', version + version_tag, BIN_ARCH, FILE_EXT)
+            release_filename = '{}-{}-{}.{}'.format('dashcore', version + version_tag, arch_name, FILE_EXT)
             release_url = 'https://github.com/dashpay/dash/releases/download/v{}/{}'.format(version + version_tag, release_filename)
-            assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, major_version)
+            assert_filename = '{}-{}-{}-build.assert'.format(coin, arch_name, major_version)
             assert_url = f'https://raw.githubusercontent.com/dashpay/guix.sigs/master/{version}/{signing_key_name}/codesigned.SHA256SUMS'
         elif coin == 'firo':
             arch_name = BIN_ARCH
@@ -658,7 +659,6 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
             downloadFile(assert_url, assert_path)
 
         if coin not in ('firo', ):
-            use_guix: bool = coin in ('dash', ) or major_version >= 22
             assert_sig_url = assert_url + ('.asc' if use_guix else '.sig')
             if coin not in ('nav', ):
                 assert_sig_filename = '{}-{}-{}-build-{}.assert.sig'.format(coin, os_name, version, signing_key_name)
