@@ -58,8 +58,8 @@ PIVX_VERSION_TAG = os.getenv('PIVX_VERSION_TAG', '')
 DASH_VERSION = os.getenv('DASH_VERSION', '20.0.2')
 DASH_VERSION_TAG = os.getenv('DASH_VERSION_TAG', '')
 
-FIRO_VERSION = os.getenv('FIRO_VERSION', '0.14.13.0')
-FIRO_VERSION_TAG = os.getenv('FIRO_VERSION_TAG', '-firod-only')
+FIRO_VERSION = os.getenv('FIRO_VERSION', '0.14.13.1')
+FIRO_VERSION_TAG = os.getenv('FIRO_VERSION_TAG', '')
 
 NAV_VERSION = os.getenv('NAV_VERSION', '7.0.3')
 NAV_VERSION_TAG = os.getenv('NAV_VERSION_TAG', '')
@@ -627,16 +627,11 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
             assert_url = f'https://raw.githubusercontent.com/dashpay/guix.sigs/master/{version}/{signing_key_name}/codesigned.SHA256SUMS'
         elif coin == 'firo':
             arch_name = BIN_ARCH
-            '''
-            # Usual release naming
             if BIN_ARCH == 'x86_64-linux-gnu':
                 arch_name = 'linux64'
+            elif BIN_ARCH == 'osx64':
+                arch_name = 'macos'
             release_filename = '{}-{}-{}{}.{}'.format('firo', version + version_tag, arch_name, filename_extra, FILE_EXT)
-            release_url = 'https://github.com/firoorg/firo/releases/download/v{}/{}'.format(version + version_tag, release_filename)
-            '''
-            if BIN_ARCH == 'osx64':
-                arch_name = 'x86_64-apple-darwin'
-            release_filename = '{}-{}-{}{}.{}'.format('firo', '39c41e5e7ec6', arch_name, filename_extra, FILE_EXT)
             release_url = 'https://github.com/firoorg/firo/releases/download/v{}/{}'.format(version + version_tag, release_filename)
             assert_url = 'https://github.com/firoorg/firo/releases/download/v%s/SHA256SUMS' % (version + version_tag)
         elif coin == 'navcoin':
