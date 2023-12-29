@@ -83,14 +83,14 @@ class PARTInterface(BTCInterface):
         return True
 
     def getNewAddress(self, use_segwit, label='swap_receive') -> str:
-        return self.rpc_callback('getnewaddress', [label])
+        return self.rpc_wallet('getnewaddress', [label])
 
     def getNewStealthAddress(self, label='swap_stealth') -> str:
-        return self.rpc_callback('getnewstealthaddress', [label])
+        return self.rpc_wallet('getnewstealthaddress', [label])
 
     def haveSpentIndex(self):
         version = self.getDaemonVersion()
-        index_info = self.rpc_callback('getinsightinfo' if int(str(version)[:2]) > 19 else 'getindexinfo')
+        index_info = self.rpc('getinsightinfo' if int(str(version)[:2]) > 19 else 'getindexinfo')
         return index_info['spentindex']
 
     def initialiseWallet(self, key):
@@ -98,14 +98,14 @@ class PARTInterface(BTCInterface):
 
     def withdrawCoin(self, value, addr_to, subfee):
         params = [addr_to, value, '', '', subfee, '', True, self._conf_target]
-        return self.rpc_callback('sendtoaddress', params)
+        return self.rpc_wallet('sendtoaddress', params)
 
     def sendTypeTo(self, type_from, type_to, value, addr_to, subfee):
         params = [type_from, type_to,
                   [{'address': addr_to, 'amount': value, 'subfee': subfee}, ],
                   '', '', self._anon_tx_ring_size, 1, False,
                   {'conf_target': self._conf_target}]
-        return self.rpc_callback('sendtypeto', params)
+        return self.rpc_wallet('sendtypeto', params)
 
     def getScriptForPubkeyHash(self, pkh: bytes) -> CScript:
         return CScript([OP_DUP, OP_HASH160, pkh, OP_EQUALVERIFY, OP_CHECKSIG])
@@ -122,7 +122,7 @@ class PARTInterface(BTCInterface):
         return length
 
     def getWalletRestoreHeight(self) -> int:
-        start_time = self.rpc_callback('getwalletinfo')['keypoololdest']
+        start_time = self.rpc_wallet('getwalletinfo')['keypoololdest']
 
         blockchaininfo = self.getBlockchainInfo()
         best_block = blockchaininfo['bestblockhash']
@@ -132,8 +132,8 @@ class PARTInterface(BTCInterface):
             raise ValueError('{} chain isn\'t synced.'.format(self.coin_name()))
 
         self._log.debug('Finding block at time: {}'.format(start_time))
-        block_hash = self.rpc_callback('getblockhashafter', [start_time])
-        block_header = self.rpc_callback('getblockheader', [block_hash])
+        block_hash = self.rpc('getblockhashafter', [start_time])
+        block_header = self.rpc('getblockheader', [block_hash])
         return block_header['height']
 
     def getHTLCSpendTxVSize(self, redeem: bool = True) -> int:
@@ -171,16 +171,16 @@ class PARTInterfaceBlind(PARTInterface):
             if txo['type'] != 'blind':
                 continue
             try:
-                blinded_info = self.rpc_callback('rewindrangeproof', [txo['rangeproof'], txo['valueCommitment'], nonce.hex()])
+                blinded_info = self.rpc('rewindrangeproof', [txo['rangeproof'], txo['valueCommitment'], nonce.hex()])
                 output_n = txo['n']
 
-                self.rpc_callback('rewindrangeproof', [txo['rangeproof'], txo['valueCommitment'], nonce.hex()])
+                self.rpc('rewindrangeproof', [txo['rangeproof'], txo['valueCommitment'], nonce.hex()])
                 break
             except Exception as e:
                 self._log.debug('Searching for locked output: {}'.format(str(e)))
                 continue
             # Should not be possible for commitment not to match
-            v = self.rpc_callback('verifycommitment', [txo['valueCommitment'], blinded_info['blind'], blinded_info['amount']])
+            v = self.rpc('verifycommitment', [txo['valueCommitment'], blinded_info['blind'], blinded_info['amount']])
             ensure(v['result'] is True, 'verifycommitment failed')
         return output_n, blinded_info
 
@@ -195,7 +195,7 @@ class PARTInterfaceBlind(PARTInterface):
         inputs = []
         outputs = [{'type': 'blind', 'amount': self.format_amount(value), 'address': p2wsh_addr, 'nonce': nonce.hex(), 'data': ephemeral_pubkey.hex()}]
         params = [inputs, outputs]
-        rv = self.rpc_callback('createrawparttransaction', params)
+        rv = self.rpc_wallet('createrawparttransaction', params)
 
         tx_bytes = bytes.fromhex(rv['hex'])
         return tx_bytes
@@ -207,11 +207,11 @@ class PARTInterfaceBlind(PARTInterface):
         tx_hex = tx_bytes.hex()
         nonce = self.getScriptLockTxNonce(vkbv)
 
-        tx_obj = self.rpc_callback('decoderawtransaction', [tx_hex])
+        tx_obj = self.rpc('decoderawtransaction', [tx_hex])
 
         assert (len(tx_obj['vout']) == 1)
         txo = tx_obj['vout'][0]
-        blinded_info = self.rpc_callback('rewindrangeproof', [txo['rangeproof'], txo['valueCommitment'], nonce.hex()])
+        blinded_info = self.rpc('rewindrangeproof', [txo['rangeproof'], txo['valueCommitment'], nonce.hex()])
 
         outputs_info = {0: {'value': blinded_info['amount'], 'blind': blinded_info['blind'], 'nonce': nonce.hex()}}
 
@@ -219,11 +219,11 @@ class PARTInterfaceBlind(PARTInterface):
             'lockUnspents': True,
             'feeRate': feerate_str,
         }
-        rv = self.rpc_callback('fundrawtransactionfrom', ['blind', tx_hex, {}, outputs_info, options])
+        rv = self.rpc('fundrawtransactionfrom', ['blind', tx_hex, {}, outputs_info, options])
         return bytes.fromhex(rv['hex'])
 
     def createSCLockRefundTx(self, tx_lock_bytes, script_lock, Kal, Kaf, lock1_value, csv_val, tx_fee_rate, vkbv):
-        lock_tx_obj = self.rpc_callback('decoderawtransaction', [tx_lock_bytes.hex()])
+        lock_tx_obj = self.rpc('decoderawtransaction', [tx_lock_bytes.hex()])
         assert (self.getTxid(tx_lock_bytes).hex() == lock_tx_obj['txid'])
         # Nonce is derived from vkbv, ephemeral_key isn't used
         ephemeral_key = self.getNewSecretKey()
@@ -244,7 +244,7 @@ class PARTInterfaceBlind(PARTInterface):
         inputs = [{'txid': tx_lock_id, 'vout': spend_n, 'sequence': lock1_value, 'blindingfactor': input_blinded_info['blind']}]
         outputs = [{'type': 'blind', 'amount': locked_coin, 'address': p2wsh_addr, 'nonce': output_nonce.hex(), 'data': ephemeral_pubkey.hex()}]
         params = [inputs, outputs]
-        rv = self.rpc_callback('createrawparttransaction', params)
+        rv = self.rpc_wallet('createrawparttransaction', params)
         lock_refund_tx_hex = rv['hex']
 
         # Set dummy witness data for fee estimation
@@ -261,7 +261,7 @@ class PARTInterfaceBlind(PARTInterface):
             'feeRate': self.format_amount(tx_fee_rate),
             'subtractFeeFromOutputs': [0, ]
         }
-        rv = self.rpc_callback('fundrawtransactionfrom', ['blind', lock_refund_tx_hex, inputs_info, outputs_info, options])
+        rv = self.rpc_wallet('fundrawtransactionfrom', ['blind', lock_refund_tx_hex, inputs_info, outputs_info, options])
         lock_refund_tx_hex = rv['hex']
 
         for vout, txo in rv['output_amounts'].items():
@@ -275,7 +275,7 @@ class PARTInterfaceBlind(PARTInterface):
         # The follower will sign the multisig path with a signature encumbered by the leader's coinB spend pubkey
         # If the leader publishes the decrypted signature the leader's coinB spend privatekey will be revealed to the follower
 
-        lock_refund_tx_obj = self.rpc_callback('decoderawtransaction', [tx_lock_refund_bytes.hex()])
+        lock_refund_tx_obj = self.rpc('decoderawtransaction', [tx_lock_refund_bytes.hex()])
         # Nonce is derived from vkbv
         nonce = self.getScriptLockRefundTxNonce(vkbv)
 
@@ -285,7 +285,7 @@ class PARTInterfaceBlind(PARTInterface):
 
         tx_lock_refund_id = lock_refund_tx_obj['txid']
         addr_out = self.pkh_to_address(pkh_refund_to)
-        addr_info = self.rpc_callback('getaddressinfo', [addr_out])
+        addr_info = self.rpc_wallet('getaddressinfo', [addr_out])
         output_pubkey_hex = addr_info['pubkey']
 
         # Follower won't be able to decode output to check amount, shouldn't matter as fee is public and output is to leader, sum has to balance
@@ -293,7 +293,7 @@ class PARTInterfaceBlind(PARTInterface):
         inputs = [{'txid': tx_lock_refund_id, 'vout': spend_n, 'sequence': 0, 'blindingfactor': input_blinded_info['blind']}]
         outputs = [{'type': 'blind', 'amount': input_blinded_info['amount'], 'address': addr_out, 'pubkey': output_pubkey_hex}]
         params = [inputs, outputs]
-        rv = self.rpc_callback('createrawparttransaction', params)
+        rv = self.rpc_wallet('createrawparttransaction', params)
         lock_refund_spend_tx_hex = rv['hex']
 
         # Set dummy witness data for fee estimation
@@ -311,7 +311,7 @@ class PARTInterfaceBlind(PARTInterface):
             'subtractFeeFromOutputs': [0, ]
         }
 
-        rv = self.rpc_callback('fundrawtransactionfrom', ['blind', lock_refund_spend_tx_hex, inputs_info, outputs_info, options])
+        rv = self.rpc_wallet('fundrawtransactionfrom', ['blind', lock_refund_spend_tx_hex, inputs_info, outputs_info, options])
         lock_refund_spend_tx_hex = rv['hex']
 
         return bytes.fromhex(lock_refund_spend_tx_hex)
@@ -321,7 +321,7 @@ class PARTInterfaceBlind(PARTInterface):
                        Kal, Kaf,
                        feerate,
                        check_lock_tx_inputs, vkbv):
-        lock_tx_obj = self.rpc_callback('decoderawtransaction', [tx_bytes.hex()])
+        lock_tx_obj = self.rpc('decoderawtransaction', [tx_bytes.hex()])
         lock_txid_hex = lock_tx_obj['txid']
         self._log.info('Verifying lock tx: {}.'.format(lock_txid_hex))
 
@@ -363,7 +363,7 @@ class PARTInterfaceBlind(PARTInterface):
     def verifySCLockRefundTx(self, tx_bytes, lock_tx_bytes, script_out,
                              prevout_id, prevout_n, prevout_seq, prevout_script,
                              Kal, Kaf, csv_val_expect, swap_value, feerate, vkbv):
-        lock_refund_tx_obj = self.rpc_callback('decoderawtransaction', [tx_bytes.hex()])
+        lock_refund_tx_obj = self.rpc('decoderawtransaction', [tx_bytes.hex()])
         lock_refund_txid_hex = lock_refund_tx_obj['txid']
         self._log.info('Verifying lock refund tx: {}.'.format(lock_refund_txid_hex))
 
@@ -396,10 +396,10 @@ class PARTInterfaceBlind(PARTInterface):
         ensure(C == Kaf, 'Bad script pubkey')
 
         # Check rangeproofs and commitments sum
-        lock_tx_obj = self.rpc_callback('decoderawtransaction', [lock_tx_bytes.hex()])
+        lock_tx_obj = self.rpc('decoderawtransaction', [lock_tx_bytes.hex()])
         prevout = lock_tx_obj['vout'][prevout_n]
         prevtxns = [{'txid': prevout_id.hex(), 'vout': prevout_n, 'scriptPubKey': prevout['scriptPubKey']['hex'], 'amount_commitment': prevout['valueCommitment']}]
-        rv = self.rpc_callback('verifyrawtransaction', [tx_bytes.hex(), prevtxns])
+        rv = self.rpc('verifyrawtransaction', [tx_bytes.hex(), prevtxns])
         ensure(rv['outputs_valid'] is True, 'Invalid outputs')
         ensure(rv['inputs_valid'] is True, 'Invalid inputs')
 
@@ -422,7 +422,7 @@ class PARTInterfaceBlind(PARTInterface):
                                   lock_refund_tx_id, prevout_script,
                                   Kal,
                                   prevout_n, prevout_value, feerate, vkbv):
-        lock_refund_spend_tx_obj = self.rpc_callback('decoderawtransaction', [tx_bytes.hex()])
+        lock_refund_spend_tx_obj = self.rpc('decoderawtransaction', [tx_bytes.hex()])
         lock_refund_spend_txid_hex = lock_refund_spend_tx_obj['txid']
         self._log.info('Verifying lock refund spend tx: {}.'.format(lock_refund_spend_txid_hex))
 
@@ -441,10 +441,10 @@ class PARTInterfaceBlind(PARTInterface):
         # Follower is not concerned with them as they pay to leader
 
         # Check rangeproofs and commitments sum
-        lock_refund_tx_obj = self.rpc_callback('decoderawtransaction', [lock_refund_tx_bytes.hex()])
+        lock_refund_tx_obj = self.rpc('decoderawtransaction', [lock_refund_tx_bytes.hex()])
         prevout = lock_refund_tx_obj['vout'][prevout_n]
         prevtxns = [{'txid': lock_refund_tx_id.hex(), 'vout': prevout_n, 'scriptPubKey': prevout['scriptPubKey']['hex'], 'amount_commitment': prevout['valueCommitment']}]
-        rv = self.rpc_callback('verifyrawtransaction', [tx_bytes.hex(), prevtxns])
+        rv = self.rpc('verifyrawtransaction', [tx_bytes.hex(), prevtxns])
         ensure(rv['outputs_valid'] is True, 'Invalid outputs')
         ensure(rv['inputs_valid'] is True, 'Invalid inputs')
 
@@ -459,28 +459,28 @@ class PARTInterfaceBlind(PARTInterface):
         return True
 
     def getLockTxSwapOutputValue(self, bid, xmr_swap):
-        lock_tx_obj = self.rpc_callback('decoderawtransaction', [xmr_swap.a_lock_tx.hex()])
+        lock_tx_obj = self.rpc('decoderawtransaction', [xmr_swap.a_lock_tx.hex()])
         nonce = self.getScriptLockTxNonce(xmr_swap.vkbv)
         output_n, _ = self.findOutputByNonce(lock_tx_obj, nonce)
         ensure(output_n is not None, 'Output not found in tx')
         return bytes.fromhex(lock_tx_obj['vout'][output_n]['valueCommitment'])
 
     def getLockRefundTxSwapOutputValue(self, bid, xmr_swap):
-        lock_refund_tx_obj = self.rpc_callback('decoderawtransaction', [xmr_swap.a_lock_refund_tx.hex()])
+        lock_refund_tx_obj = self.rpc('decoderawtransaction', [xmr_swap.a_lock_refund_tx.hex()])
         nonce = self.getScriptLockRefundTxNonce(xmr_swap.vkbv)
         output_n, _ = self.findOutputByNonce(lock_refund_tx_obj, nonce)
         ensure(output_n is not None, 'Output not found in tx')
         return bytes.fromhex(lock_refund_tx_obj['vout'][output_n]['valueCommitment'])
 
     def getLockRefundTxSwapOutput(self, xmr_swap):
-        lock_refund_tx_obj = self.rpc_callback('decoderawtransaction', [xmr_swap.a_lock_refund_tx.hex()])
+        lock_refund_tx_obj = self.rpc('decoderawtransaction', [xmr_swap.a_lock_refund_tx.hex()])
         nonce = self.getScriptLockRefundTxNonce(xmr_swap.vkbv)
         output_n, _ = self.findOutputByNonce(lock_refund_tx_obj, nonce)
         ensure(output_n is not None, 'Output not found in tx')
         return output_n
 
     def createSCLockSpendTx(self, tx_lock_bytes: bytes, script_lock: bytes, pk_dest: bytes, tx_fee_rate: int, vkbv: bytes, fee_info={}) -> bytes:
-        lock_tx_obj = self.rpc_callback('decoderawtransaction', [tx_lock_bytes.hex()])
+        lock_tx_obj = self.rpc('decoderawtransaction', [tx_lock_bytes.hex()])
         lock_txid_hex = lock_tx_obj['txid']
 
         ensure(lock_tx_obj['version'] == self.txVersion(), 'Bad version')
@@ -496,7 +496,7 @@ class PARTInterfaceBlind(PARTInterface):
         inputs = [{'txid': lock_txid_hex, 'vout': spend_n, 'sequence': 0, 'blindingfactor': blinded_info['blind']}]
         outputs = [{'type': 'blind', 'amount': blinded_info['amount'], 'address': addr_out, 'pubkey': pk_dest.hex()}]
         params = [inputs, outputs]
-        rv = self.rpc_callback('createrawparttransaction', params)
+        rv = self.rpc_wallet('createrawparttransaction', params)
         lock_spend_tx_hex = rv['hex']
 
         # Set dummy witness data for fee estimation
@@ -513,9 +513,9 @@ class PARTInterfaceBlind(PARTInterface):
             'subtractFeeFromOutputs': [0, ]
         }
 
-        rv = self.rpc_callback('fundrawtransactionfrom', ['blind', lock_spend_tx_hex, inputs_info, outputs_info, options])
+        rv = self.rpc_wallet('fundrawtransactionfrom', ['blind', lock_spend_tx_hex, inputs_info, outputs_info, options])
         lock_spend_tx_hex = rv['hex']
-        lock_spend_tx_obj = self.rpc_callback('decoderawtransaction', [lock_spend_tx_hex])
+        lock_spend_tx_obj = self.rpc('decoderawtransaction', [lock_spend_tx_hex])
         pay_fee = make_int(lock_spend_tx_obj['vout'][0]['ct_fee'])
 
         # lock_spend_tx_hex does not include the dummy witness stack
@@ -535,7 +535,7 @@ class PARTInterfaceBlind(PARTInterface):
     def verifySCLockSpendTx(self, tx_bytes,
                             lock_tx_bytes, lock_tx_script,
                             a_pk_f, feerate, vkbv):
-        lock_spend_tx_obj = self.rpc_callback('decoderawtransaction', [tx_bytes.hex()])
+        lock_spend_tx_obj = self.rpc('decoderawtransaction', [tx_bytes.hex()])
         lock_spend_txid_hex = lock_spend_tx_obj['txid']
         self._log.info('Verifying lock spend tx: {}.'.format(lock_spend_txid_hex))
 
@@ -543,7 +543,7 @@ class PARTInterfaceBlind(PARTInterface):
         ensure(lock_spend_tx_obj['locktime'] == 0, 'Bad nLockTime')
         ensure(len(lock_spend_tx_obj['vin']) == 1, 'tx doesn\'t have one input')
 
-        lock_tx_obj = self.rpc_callback('decoderawtransaction', [lock_tx_bytes.hex()])
+        lock_tx_obj = self.rpc('decoderawtransaction', [lock_tx_bytes.hex()])
         lock_txid_hex = lock_tx_obj['txid']
 
         # Find the output of the lock tx to verify
@@ -559,7 +559,7 @@ class PARTInterfaceBlind(PARTInterface):
         ensure(len(lock_spend_tx_obj['vout']) == 3, 'tx doesn\'t have three outputs')
 
         addr_out = self.pubkey_to_address(a_pk_f)
-        privkey = self.rpc_callback('dumpprivkey', [addr_out])
+        privkey = self.rpc_wallet('dumpprivkey', [addr_out])
 
         # Find output:
         output_blinded_info = None
@@ -568,7 +568,7 @@ class PARTInterfaceBlind(PARTInterface):
             if txo['type'] != 'blind':
                 continue
             try:
-                output_blinded_info = self.rpc_callback('rewindrangeproof', [txo['rangeproof'], txo['valueCommitment'], privkey, txo['data_hex']])
+                output_blinded_info = self.rpc('rewindrangeproof', [txo['rangeproof'], txo['valueCommitment'], privkey, txo['data_hex']])
                 output_n = txo['n']
                 break
             except Exception as e:
@@ -577,13 +577,13 @@ class PARTInterfaceBlind(PARTInterface):
         ensure(output_n is not None, 'Output not found in tx')
 
         # Commitment
-        v = self.rpc_callback('verifycommitment', [lock_spend_tx_obj['vout'][output_n]['valueCommitment'], output_blinded_info['blind'], output_blinded_info['amount']])
+        v = self.rpc('verifycommitment', [lock_spend_tx_obj['vout'][output_n]['valueCommitment'], output_blinded_info['blind'], output_blinded_info['amount']])
         ensure(v['result'] is True, 'verifycommitment failed')
 
         # Check rangeproofs and commitments sum
         prevout = lock_tx_obj['vout'][spend_n]
         prevtxns = [{'txid': lock_txid_hex, 'vout': spend_n, 'scriptPubKey': prevout['scriptPubKey']['hex'], 'amount_commitment': prevout['valueCommitment']}]
-        rv = self.rpc_callback('verifyrawtransaction', [tx_bytes.hex(), prevtxns])
+        rv = self.rpc('verifyrawtransaction', [tx_bytes.hex(), prevtxns])
         ensure(rv['outputs_valid'] is True, 'Invalid outputs')
         ensure(rv['inputs_valid'] is True, 'Invalid inputs')
 
@@ -607,7 +607,7 @@ class PARTInterfaceBlind(PARTInterface):
     def createSCLockRefundSpendToFTx(self, tx_lock_refund_bytes, script_lock_refund, pkh_dest, tx_fee_rate, vkbv):
         # lock refund swipe tx
         # Sends the coinA locked coin to the follower
-        lock_refund_tx_obj = self.rpc_callback('decoderawtransaction', [tx_lock_refund_bytes.hex()])
+        lock_refund_tx_obj = self.rpc('decoderawtransaction', [tx_lock_refund_bytes.hex()])
         nonce = self.getScriptLockRefundTxNonce(vkbv)
 
         # Find the output of the lock refund tx to spend
@@ -616,7 +616,7 @@ class PARTInterfaceBlind(PARTInterface):
 
         tx_lock_refund_id = lock_refund_tx_obj['txid']
         addr_out = self.pkh_to_address(pkh_dest)
-        addr_info = self.rpc_callback('getaddressinfo', [addr_out])
+        addr_info = self.rpc_wallet('getaddressinfo', [addr_out])
         output_pubkey_hex = addr_info['pubkey']
 
         A, B, lock2_value, C = self.extractScriptLockRefundScriptValues(script_lock_refund)
@@ -626,7 +626,7 @@ class PARTInterfaceBlind(PARTInterface):
         inputs = [{'txid': tx_lock_refund_id, 'vout': spend_n, 'sequence': lock2_value, 'blindingfactor': input_blinded_info['blind']}]
         outputs = [{'type': 'blind', 'amount': input_blinded_info['amount'], 'address': addr_out, 'pubkey': output_pubkey_hex}]
         params = [inputs, outputs]
-        rv = self.rpc_callback('createrawparttransaction', params)
+        rv = self.rpc_wallet('createrawparttransaction', params)
 
         lock_refund_swipe_tx_hex = rv['hex']
 
@@ -645,13 +645,13 @@ class PARTInterfaceBlind(PARTInterface):
             'subtractFeeFromOutputs': [0, ]
         }
 
-        rv = self.rpc_callback('fundrawtransactionfrom', ['blind', lock_refund_swipe_tx_hex, inputs_info, outputs_info, options])
+        rv = self.rpc_wallet('fundrawtransactionfrom', ['blind', lock_refund_swipe_tx_hex, inputs_info, outputs_info, options])
         lock_refund_swipe_tx_hex = rv['hex']
 
         return bytes.fromhex(lock_refund_swipe_tx_hex)
 
     def getSpendableBalance(self) -> int:
-        return self.make_int(self.rpc_callback('getbalances')['mine']['blind_trusted'])
+        return self.make_int(self.rpc_wallet('getbalances')['mine']['blind_trusted'])
 
     def publishBLockTx(self, vkbv: bytes, Kbs: bytes, output_amount: int, feerate: int, delay_for: int = 10, unlock_time: int = 0) -> bytes:
         Kbv = self.getPubkey(vkbv)
@@ -664,7 +664,7 @@ class PARTInterfaceBlind(PARTInterface):
                   '', '', self._anon_tx_ring_size, 1, False,
                   {'conf_target': self._conf_target, 'blind_watchonly_visible': True}]
 
-        txid = self.rpc_callback('sendtypeto', params)
+        txid = self.rpc_wallet('sendtypeto', params)
         return bytes.fromhex(txid)
 
     def findTxB(self, kbv, Kbs, cb_swap_value, cb_block_confirmed, restore_height: int, bid_sender: bool):
@@ -675,17 +675,17 @@ class PARTInterfaceBlind(PARTInterface):
         if bid_sender:
             cb_swap_value *= -1
         else:
-            addr_info = self.rpc_callback('getaddressinfo', [sx_addr])
+            addr_info = self.rpc_wallet('getaddressinfo', [sx_addr])
             if not addr_info['iswatchonly']:
                 wif_prefix = self.chainparams_network()['key_prefix']
                 wif_scan_key = toWIF(wif_prefix, kbv)
-                self.rpc_callback('importstealthaddress', [wif_scan_key, Kbs.hex()])
+                self.rpc_wallet('importstealthaddress', [wif_scan_key, Kbs.hex()])
                 self._log.info('Imported watch-only sx_addr: {}'.format(sx_addr))
                 self._log.info('Rescanning {} chain from height: {}'.format(self.coin_name(), restore_height))
-                self.rpc_callback('rescanblockchain', [restore_height])
+                self.rpc_wallet('rescanblockchain', [restore_height])
 
         params = [{'include_watchonly': True, 'search': sx_addr}]
-        txns = self.rpc_callback('filtertransactions', params)
+        txns = self.rpc_wallet('filtertransactions', params)
 
         if len(txns) == 1:
             tx = txns[0]
@@ -695,7 +695,7 @@ class PARTInterfaceBlind(PARTInterface):
             if make_int(tx['outputs'][0]['amount']) == cb_swap_value:
                 height = 0
                 if tx['confirmations'] > 0:
-                    chain_height = self.rpc_callback('getblockcount')
+                    chain_height = self.rpc('getblockcount')
                     height = chain_height - (tx['confirmations'] - 1)
                 return {'txid': tx['txid'], 'amount': cb_swap_value, 'height': height}
             else:
@@ -707,20 +707,20 @@ class PARTInterfaceBlind(PARTInterface):
         Kbv = self.getPubkey(kbv)
         Kbs = self.getPubkey(kbs)
         sx_addr = self.formatStealthAddress(Kbv, Kbs)
-        addr_info = self.rpc_callback('getaddressinfo', [sx_addr])
+        addr_info = self.rpc_wallet('getaddressinfo', [sx_addr])
         if not addr_info['ismine']:
             wif_prefix = self.chainparams_network()['key_prefix']
             wif_scan_key = toWIF(wif_prefix, kbv)
             wif_spend_key = toWIF(wif_prefix, kbs)
-            self.rpc_callback('importstealthaddress', [wif_scan_key, wif_spend_key])
+            self.rpc_wallet('importstealthaddress', [wif_scan_key, wif_spend_key])
             self._log.info('Imported spend key for sx_addr: {}'.format(sx_addr))
             self._log.info('Rescanning {} chain from height: {}'.format(self.coin_name(), restore_height))
-            self.rpc_callback('rescanblockchain', [restore_height])
+            self.rpc_wallet('rescanblockchain', [restore_height])
 
         # TODO: Remove workaround
-        # utxos = self.rpc_callback('listunspentblind', [1, 9999999, [sx_addr]])
+        # utxos = self.rpc_wallet('listunspentblind', [1, 9999999, [sx_addr]])
         utxos = []
-        all_utxos = self.rpc_callback('listunspentblind', [1, 9999999])
+        all_utxos = self.rpc_wallet('listunspentblind', [1, 9999999])
         for utxo in all_utxos:
             if utxo.get('stealth_address', '_') == sx_addr:
                 utxos.append(utxo)
@@ -741,14 +741,14 @@ class PARTInterfaceBlind(PARTInterface):
                   [{'address': address_to, 'amount': self.format_amount(cb_swap_value), 'subfee': True}, ],
                   '', '', self._anon_tx_ring_size, 1, False,
                   {'conf_target': self._conf_target, 'inputs': inputs, 'show_fee': True}]
-        rv = self.rpc_callback('sendtypeto', params)
+        rv = self.rpc_wallet('sendtypeto', params)
         return bytes.fromhex(rv['txid'])
 
     def findTxnByHash(self, txid_hex):
         # txindex is enabled for Particl
 
         try:
-            rv = self.rpc_callback('getrawtransaction', [txid_hex, True])
+            rv = self.rpc('getrawtransaction', [txid_hex, True])
         except Exception as ex:
             self._log.debug('findTxnByHash getrawtransaction failed: {}'.format(txid_hex))
             return None
@@ -759,7 +759,7 @@ class PARTInterfaceBlind(PARTInterface):
         return None
 
     def createRawFundedTransaction(self, addr_to: str, amount: int, sub_fee: bool = False, lock_unspents: bool = True) -> str:
-        txn = self.rpc_callback('createrawtransaction', [[], {addr_to: self.format_amount(amount)}])
+        txn = self.rpc_wallet('createrawtransaction', [[], {addr_to: self.format_amount(amount)}])
 
         options = {
             'lockUnspents': lock_unspents,
@@ -767,7 +767,7 @@ class PARTInterfaceBlind(PARTInterface):
         }
         if sub_fee:
             options['subtractFeeFromOutputs'] = [0,]
-        return self.rpc_callback('fundrawtransactionfrom', ['blind', txn, options])['hex']
+        return self.rpc_wallet('fundrawtransactionfrom', ['blind', txn, options])['hex']
 
 
 class PARTInterfaceAnon(PARTInterface):
@@ -801,7 +801,7 @@ class PARTInterfaceAnon(PARTInterface):
                   '', '', self._anon_tx_ring_size, 1, False,
                   {'conf_target': self._conf_target, 'blind_watchonly_visible': True}]
 
-        txid = self.rpc_callback('sendtypeto', params)
+        txid = self.rpc_wallet('sendtypeto', params)
         return bytes.fromhex(txid)
 
     def findTxB(self, kbv, Kbs, cb_swap_value, cb_block_confirmed, restore_height, bid_sender):
@@ -813,17 +813,17 @@ class PARTInterfaceAnon(PARTInterface):
         if bid_sender:
             cb_swap_value *= -1
         else:
-            addr_info = self.rpc_callback('getaddressinfo', [sx_addr])
+            addr_info = self.rpc_wallet('getaddressinfo', [sx_addr])
             if not addr_info['iswatchonly']:
                 wif_prefix = self.chainparams_network()['key_prefix']
                 wif_scan_key = toWIF(wif_prefix, kbv)
-                self.rpc_callback('importstealthaddress', [wif_scan_key, Kbs.hex()])
+                self.rpc_wallet('importstealthaddress', [wif_scan_key, Kbs.hex()])
                 self._log.info('Imported watch-only sx_addr: {}'.format(sx_addr))
                 self._log.info('Rescanning {} chain from height: {}'.format(self.coin_name(), restore_height))
-                self.rpc_callback('rescanblockchain', [restore_height])
+                self.rpc_wallet('rescanblockchain', [restore_height])
 
         params = [{'include_watchonly': True, 'search': sx_addr}]
-        txns = self.rpc_callback('filtertransactions', params)
+        txns = self.rpc_wallet('filtertransactions', params)
 
         if len(txns) == 1:
             tx = txns[0]
@@ -833,7 +833,7 @@ class PARTInterfaceAnon(PARTInterface):
             if make_int(tx['outputs'][0]['amount']) == cb_swap_value:
                 height = 0
                 if tx['confirmations'] > 0:
-                    chain_height = self.rpc_callback('getblockcount')
+                    chain_height = self.rpc('getblockcount')
                     height = chain_height - (tx['confirmations'] - 1)
                 return {'txid': tx['txid'], 'amount': cb_swap_value, 'height': height}
             else:
@@ -845,17 +845,17 @@ class PARTInterfaceAnon(PARTInterface):
         Kbv = self.getPubkey(kbv)
         Kbs = self.getPubkey(kbs)
         sx_addr = self.formatStealthAddress(Kbv, Kbs)
-        addr_info = self.rpc_callback('getaddressinfo', [sx_addr])
+        addr_info = self.rpc_wallet('getaddressinfo', [sx_addr])
         if not addr_info['ismine']:
             wif_prefix = self.chainparams_network()['key_prefix']
             wif_scan_key = toWIF(wif_prefix, kbv)
             wif_spend_key = toWIF(wif_prefix, kbs)
-            self.rpc_callback('importstealthaddress', [wif_scan_key, wif_spend_key])
+            self.rpc_wallet('importstealthaddress', [wif_scan_key, wif_spend_key])
             self._log.info('Imported spend key for sx_addr: {}'.format(sx_addr))
             self._log.info('Rescanning {} chain from height: {}'.format(self.coin_name(), restore_height))
-            self.rpc_callback('rescanblockchain', [restore_height])
+            self.rpc_wallet('rescanblockchain', [restore_height])
 
-        autxos = self.rpc_callback('listunspentanon', [1, 9999999, [sx_addr]])
+        autxos = self.rpc_wallet('listunspentanon', [1, 9999999, [sx_addr]])
 
         if len(autxos) < 1:
             raise TemporaryError('No spendable outputs')
@@ -874,14 +874,14 @@ class PARTInterfaceAnon(PARTInterface):
                   [{'address': address_to, 'amount': self.format_amount(cb_swap_value), 'subfee': True}, ],
                   '', '', self._anon_tx_ring_size, 1, False,
                   {'conf_target': self._conf_target, 'inputs': inputs, 'show_fee': True}]
-        rv = self.rpc_callback('sendtypeto', params)
+        rv = self.rpc_wallet('sendtypeto', params)
         return bytes.fromhex(rv['txid'])
 
     def findTxnByHash(self, txid_hex: str):
         # txindex is enabled for Particl
 
         try:
-            rv = self.rpc_callback('getrawtransaction', [txid_hex, True])
+            rv = self.rpc('getrawtransaction', [txid_hex, True])
         except Exception as ex:
             self._log.debug('findTxnByHash getrawtransaction failed: {}'.format(txid_hex))
             return None
@@ -892,4 +892,4 @@ class PARTInterfaceAnon(PARTInterface):
         return None
 
     def getSpendableBalance(self) -> int:
-        return self.make_int(self.rpc_callback('getbalances')['mine']['anon_trusted'])
+        return self.make_int(self.rpc_wallet('getbalances')['mine']['anon_trusted'])

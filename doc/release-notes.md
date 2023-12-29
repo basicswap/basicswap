@@ -1,3 +1,11 @@
+
+0.12.4
+==============
+
+- LTC creates a new wallet to hold MWEB balance.
+  - MWEB wallet should be be automatically created at startup or when unlocked if system is encrypted.
+
+
 0.12.3
 ==============
 

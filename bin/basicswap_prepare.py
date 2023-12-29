@@ -42,7 +42,7 @@ PARTICL_VERSION = os.getenv('PARTICL_VERSION', '23.2.7.0')
 PARTICL_VERSION_TAG = os.getenv('PARTICL_VERSION_TAG', '')
 PARTICL_LINUX_EXTRA = os.getenv('PARTICL_LINUX_EXTRA', 'nousb')
 
-LITECOIN_VERSION = os.getenv('LITECOIN_VERSION', '0.21.2')
+LITECOIN_VERSION = os.getenv('LITECOIN_VERSION', '0.21.2.2')
 LITECOIN_VERSION_TAG = os.getenv('LITECOIN_VERSION_TAG', '')
 
 BITCOIN_VERSION = os.getenv('BITCOIN_VERSION', '23.0')
@@ -602,7 +602,7 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
                 assert_url = 'https://raw.githubusercontent.com/particl/gitian.sigs/master/%s-%s/%s/%s' % (version + version_tag, os_dir_name, signing_key_name, assert_filename)
         elif coin == 'litecoin':
             release_url = 'https://download.litecoin.org/litecoin-{}/{}/{}'.format(version, os_name, release_filename)
-            assert_filename = '{}-core-{}-{}-build.assert'.format(coin, os_name, version.rsplit('.', 1)[0])
+            assert_filename = '{}-core-{}-{}-build.assert'.format(coin, os_name, '.'.join(version.split('.')[:2]))
             assert_url = 'https://raw.githubusercontent.com/litecoin-project/gitian.sigs.ltc/master/%s-%s/%s/%s' % (version, os_dir_name, signing_key_name, assert_filename)
         elif coin == 'bitcoin':
             release_url = 'https://bitcoincore.org/bin/bitcoin-core-{}/{}'.format(version, release_filename)
@@ -1141,6 +1141,12 @@ def test_particl_encryption(data_dir, settings, chain, use_tor_proxy):
                 finalise_daemon(d)
 
 
+def encrypt_wallet(swap_client, coin_type) -> None:
+    ci = swap_client.ci(coin_type)
+    ci.changeWalletPassword('', WALLET_ENCRYPTION_PWD)
+    ci.unlockWallet(WALLET_ENCRYPTION_PWD)
+
+
 def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, chain, use_tor_proxy):
     swap_client = None
     daemons = []
@@ -1185,16 +1191,18 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
                     if len(wallets) < 1:
                         logger.info('Creating wallet.dat for {}.'.format(getCoinName(c)))
 
-                        if c == Coins.BTC:
+                        if c in (Coins.BTC, Coins.LTC):
                             # wallet_name, disable_private_keys, blank, passphrase, avoid_reuse, descriptors
-                            swap_client.callcoinrpc(c, 'createwallet', ['wallet.dat', False, True, '', False, False])
+                            swap_client.callcoinrpc(c, 'createwallet', ['wallet.dat', False, True, WALLET_ENCRYPTION_PWD, False, False])
+                            swap_client.ci(c).unlockWallet(WALLET_ENCRYPTION_PWD)
                         else:
                             swap_client.callcoinrpc(c, 'createwallet', ['wallet.dat'])
+                            if WALLET_ENCRYPTION_PWD != '':
+                                encrypt_wallet(swap_client, c)
 
-                        if WALLET_ENCRYPTION_PWD != '':
-                            ci = swap_client.ci(c)
-                            ci.changeWalletPassword('', WALLET_ENCRYPTION_PWD)
-                            ci.unlockWallet(WALLET_ENCRYPTION_PWD)
+                        if c == Coins.LTC:
+                            password = WALLET_ENCRYPTION_PWD if WALLET_ENCRYPTION_PWD != '' else None
+                            swap_client.ci(Coins.LTC_MWEB).init_wallet(password)
 
                 if c == Coins.PART:
                     if 'particl' in with_coins:

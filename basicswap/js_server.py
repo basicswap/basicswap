@@ -63,6 +63,9 @@ def withdraw_coin(swap_client, coin_type, post_string, is_json):
         type_from = get_data_entry_or(post_data, 'type_from', 'plain')
         type_to = get_data_entry_or(post_data, 'type_to', 'plain')
         txid_hex = swap_client.withdrawParticl(type_from, type_to, value, address, subfee)
+    elif coin_type == Coins.LTC:
+        type_from = get_data_entry_or(post_data, 'type_from', 'plain')
+        txid_hex = swap_client.withdrawLTC(type_from, value, address, subfee)
     else:
         txid_hex = swap_client.withdrawCoin(coin_type, value, address, subfee)
 
@@ -92,6 +95,8 @@ def js_coins(self, url_split, post_string, is_json) -> bytes:
             entry['variant'] = 'Anon'
         elif coin == Coins.PART_BLIND:
             entry['variant'] = 'Blind'
+        elif coin == Coins.LTC_MWEB:
+            entry['variant'] = 'MWEB'
         coins.append(entry)
 
     return bytes(json.dumps(coins), 'UTF-8')
@@ -108,19 +113,30 @@ def js_wallets(self, url_split, post_string, is_json):
             cmd = url_split[4]
             if cmd == 'withdraw':
                 return bytes(json.dumps(withdraw_coin(swap_client, coin_type, post_string, is_json)), 'UTF-8')
-            if cmd == 'nextdepositaddr':
+            elif cmd == 'nextdepositaddr':
                 return bytes(json.dumps(swap_client.cacheNewAddressForCoin(coin_type)), 'UTF-8')
-            if cmd == 'createutxo':
+            elif cmd == 'createutxo':
                 post_data = getFormData(post_string, is_json)
                 ci = swap_client.ci(coin_type)
                 value = ci.make_int(get_data_entry(post_data, 'value'))
                 txid_hex, new_addr = ci.createUTXO(value)
                 return bytes(json.dumps({'txid': txid_hex, 'address': new_addr}), 'UTF-8')
-            if cmd == 'reseed':
+            elif cmd == 'reseed':
                 swap_client.reseedWallet(coin_type)
                 return bytes(json.dumps({'reseeded': True}), 'UTF-8')
+            elif cmd == 'newstealthaddress':
+                if coin_type != Coins.PART:
+                    raise ValueError('Invalid coin for command')
+                return bytes(json.dumps(swap_client.ci(coin_type).getNewStealthAddress()), 'UTF-8')
+            elif cmd == 'newmwebaddress':
+                if coin_type not in (Coins.LTC, Coins.LTC_MWEB):
+                    raise ValueError('Invalid coin for command')
+                return bytes(json.dumps(swap_client.ci(coin_type).getNewMwebAddress()), 'UTF-8')
+
             raise ValueError('Unknown command')
 
+        if coin_type == Coins.LTC_MWEB:
+            coin_type = Coins.LTC
         rv = swap_client.getWalletInfo(coin_type)
         rv.update(swap_client.getBlockchainInfo(coin_type))
         ci = swap_client.ci(coin_type)
@@ -647,7 +663,7 @@ def js_setpassword(self, url_split, post_string, is_json) -> bytes:
     if have_data_entry(post_data, 'coin'):
         # Set password for one coin
         coin = getCoinType(get_data_entry(post_data, 'coin'))
-        if coin in (Coins.PART_ANON, Coins.PART_BLIND):
+        if coin in (Coins.PART_ANON, Coins.PART_BLIND, Coins.LTC_MWEB):
             raise ValueError('Invalid coin.')
         swap_client.changeWalletPasswords(old_password, new_password, coin)
         return bytes(json.dumps({'success': True}), 'UTF-8')

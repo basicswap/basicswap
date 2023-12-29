@@ -1,4 +1,6 @@
 {% include 'header.html' %}
+{% from 'style.html' import select_box_arrow_svg, select_box_class, circular_arrows_svg %}
+
 <div class="container mx-auto">
  <section class="p-5 mt-5">
   <div class="flex flex-wrap items-center -m-2">
@@ -47,12 +49,7 @@
      <div class="w-full md:w-1/2 p-3 p-6 container flex flex-wrap items-center justify-end items-center mx-auto">
       <a class="w-full md:w-1/2 p-3 p-6 container flex flex-wrap items-center justify-end items-center mx-auto">
        <a class="mr-5 flex flex-wrap justify-center px-5 py-3 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border dark:bg-gray-500 dark:hover:bg-gray-700 border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" id="refresh" href="/wallet/{{ w.ticker }}">
-        <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
-         <g fill="#ffffff" class="nc-icon-wrapper">
-          <path fill="#ffffff" d="M12,3c1.989,0,3.873,0.65,5.43,1.833l-3.604,3.393l9.167,0.983L22.562,0l-3.655,3.442 C16.957,1.862,14.545,1,12,1C5.935,1,1,5.935,1,12h2C3,7.037,7.037,3,12,3z"></path>
-          <path data-color="color-2" d="M12,21c-1.989,0-3.873-0.65-5.43-1.833l3.604-3.393l-9.167-0.983L1.438,24l3.655-3.442 C7.043,22.138,9.455,23,12,23c6.065,0,11-4.935,11-11h-2C21,16.963,16.963,21,12,21z"></path>
-         </g>
-        </svg>
+        {{ circular_arrows_svg }}
         <span>Refresh</span>
        </a>
      </div>
@@ -165,7 +162,7 @@
              </td>
              <td class="py-3 px-6 bold coinname-value" data-coinname="{{ w.name }}">{{ w.balance }} {{ w.ticker }} (<span class="usd-value"></span>){% if w.unconfirmed %} <span class="inline-block py-1 px-2 rounded-full bg-green-100 text-green-500 dark:bg-gray-500 dark:text-green-500">Unconfirmed: +{{ w.unconfirmed }} {{ w.ticker }}</span>{% endif %}</td>
             </tr>
-            {% if w.cid == '1' %}
+            {% if w.cid == '1' %} {# PART #}
             <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
              <td class="py-3 px-6 bold">
               <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded">
@@ -180,9 +177,21 @@
                <img class="h-7" src="/static/images/coins/{{ w.name }}.png" alt="{{ w.name }} Anon">
               </span>Anon Balance:
              </td>
-             <td class="py-3 px-6 bold coinname-value" data-coinname="{{ w.name }}">{{ w.anon_balance }} {{ w.ticker }} (<span class="usd-value"></span>) {% if w.anon_pending %} <span class="inline-block py-1 px-2 rounded-full bg-green-100 text-green-500 dark:bg-gray-500 dark:text-green-500">Pending: +{{ w.anon_pending }} {{ w.ticker }}</span>{% endif %}</td>             
+             <td class="py-3 px-6 bold coinname-value" data-coinname="{{ w.name }}">{{ w.anon_balance }} {{ w.ticker }} (<span class="usd-value"></span>) {% if w.anon_pending %} <span class="inline-block py-1 px-2 rounded-full bg-green-100 text-green-500 dark:bg-gray-500 dark:text-green-500">Pending: +{{ w.anon_pending }} {{ w.ticker }}</span>{% endif %}</td>
              <td class="usd-value"></td>
-            </tr> {% endif %} <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
+            </tr>
+            {% endif %} {# / PART #}
+            {% if w.cid == '3' %} {# LTC #}
+            <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
+             <td class="py-3 px-6 bold">
+              <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded">
+               <img class="h-7" src="/static/images/coins/{{ w.name }}.png" alt="{{ w.name }} MWEB">
+              </span>MWEB Balance:
+             </td>
+             <td class="py-3 px-6 bold coinname-value" data-coinname="{{ w.name }}">{{ w.mweb_balance }} {{ w.ticker }} (<span class="usd-value"></span>) {% if w.mweb_pending %} <span class="inline-block py-1 px-2 rounded-full bg-green-100 text-green-500 dark:bg-gray-500 dark:text-green-500">Pending: +{{ w.mweb_pending }} {{ w.ticker }}</span>{% endif %}</td>
+            </tr>
+            {% endif %} {# / LTC #}
+            <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
              <td class="py-3 px-6 bold">Blocks:</td>
              <td class="py-3 px-6">{{ w.blocks }} {% if w.known_block_count %} / {{ w.known_block_count }} {% endif %}</td>
             </tr>
@@ -192,13 +201,13 @@
             </tr> {% if w.bootstrapping %} <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
              <td class="py-3 px-6 bold">Bootstrapping:</td>
              <td class="py-3 px-6">{{ w.bootstrapping }}</td>
-            </tr> {% endif %}
+            </tr> {% endif %} {# / bootstrapping #}
             {% if w.encrypted %}
             <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
              <td class="py-3 px-6 bold">Locked:</td>
              <td class="py-3 px-6">{{ w.locked }}</td>
             </tr>
-            {% endif %}
+            {% endif %} {# / encrypted #}
             <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
              <td class="py-3 px-6 bold">Expected Seed:</td>
              <td class="py-3 px-6">{{ w.expected_seed }}</td> {% if block_unknown_seeds and w.expected_seed != true %} {# Only show addresses if wallet seed is correct #}
@@ -235,13 +244,22 @@
 
      {% else %}
        </tr>
-     {% if w.cid == '1' %}
+         {% if w.cid == '1' %} {# PART #}
          <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
           <td class="py-3 px-6 bold">Stealth Address</td>
           <td colspan=2 class="py-3 px-6 monospace bold select-all">{{ w.stealth_address }}</td>
          </tr>
-         {% endif %}
-         {% if w.cid == '6' %}
+         {% endif %} {# / PART #}
+         {% if w.cid == '3' %} {# LTC #}
+         <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
+          <td class="py-3 px-6 bold">
+           <button type="submit" class="flex flex-wrap justify-center py-2 px-4 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" name="newmwebaddr_{{ w.cid }}" value="New MWEB Address">
+            {{ circular_arrows_svg }} New MWEB Address</button>
+          </td>
+          <td colspan=2 class="py-3 px-6 monospace bold select-all">{{ w.mweb_address }}</td>
+         </tr>
+         {% endif %} {# / LTC #}
+         {% if w.cid == '6' %} {# XMR #}
          <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
           <td class="py-3 px-6 bold">Main Address</td>
           <td colspan=2 class="py-3 px-6 monospace bold select-all">{{ w.main_address }}</td>
@@ -249,12 +267,7 @@
          <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
           <td class="py-3 px-6 bold">
            <button type="submit" class="flex flex-wrap justify-center py-2 px-4 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" name="newaddr_{{ w.cid }}" value="New Subaddress">
-            <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
-             <g fill="#ffffff" class="nc-icon-wrapper">
-              <path fill="#ffffff" d="M12,3c1.989,0,3.873,0.65,5.43,1.833l-3.604,3.393l9.167,0.983L22.562,0l-3.655,3.442 C16.957,1.862,14.545,1,12,1C5.935,1,1,5.935,1,12h2C3,7.037,7.037,3,12,3z"></path>
-              <path data-color="color-2" d="M12,21c-1.989,0-3.873-0.65-5.43-1.833l3.604-3.393l-9.167-0.983L1.438,24l3.655-3.442 C7.043,22.138,9.455,23,12,23c6.065,0,11-4.935,11-11h-2C21,16.963,16.963,21,12,21z"></path>
-             </g>
-            </svg> New {{ w.ticker }} Sub Address </button>
+            {{ circular_arrows_svg }} New {{ w.ticker }} Sub Address </button>
           </td>
           <td colspan=2 class="py-3 px-6 monospace select-all">{{ w.deposit_address }}</td>
          </tr>
@@ -262,12 +275,7 @@
          <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
           <td class="py-3 px-6 bold">
            <button type="submit" class="flex flex-wrap justify-center py-2 px-4 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" name="newaddr_{{ w.cid }}" value="New Deposit Address">
-            <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
-             <g fill="#ffffff" class="nc-icon-wrapper">
-              <path fill="#ffffff" d="M12,3c1.989,0,3.873,0.65,5.43,1.833l-3.604,3.393l9.167,0.983L22.562,0l-3.655,3.442 C16.957,1.862,14.545,1,12,1C5.935,1,1,5.935,1,12h2C3,7.037,7.037,3,12,3z"></path>
-              <path data-color="color-2" d="M12,21c-1.989,0-3.873-0.65-5.43-1.833l3.604-3.393l-9.167-0.983L1.438,24l3.655-3.442 C7.043,22.138,9.455,23,12,23c6.065,0,11-4.935,11-11h-2C21,16.963,16.963,21,12,21z"></path>
-             </g>
-            </svg>New {{ w.ticker }} Deposit Address</button>
+            {{ circular_arrows_svg }} New {{ w.ticker }} Deposit Address</button>
           </td>
           <td colspan=2 class="py-3 px-6 monospace bold select-all" id="deposit_address">{{ w.deposit_address }}</td>
          </tr>
@@ -342,16 +350,14 @@
            </td>
            <td></td>
           </tr>
-          {% if w.cid == '1' %} 
+          {% if w.cid == '1' %} {# PART #}
           <tr class="opacity-100 text-gray-500 dark:text-gray-100">
            <td class="py-3 px-6 bold">Type From -> To:</td>
            <td class="py-3 px-6">
             <div class="w-full md:flex-1">
              <div class="relative">
-              <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-               <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"></path>
-              </svg>
-              <select class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="withdraw_type_from_{{ w.cid }}">
+              {{ select_box_arrow_svg }}
+              <select class="{{ select_box_class }}" name="withdraw_type_from_{{ w.cid }}">
                <option value="plain" {% if w.wd_type_from=='plain' %} selected{% endif %}>Plain</option>
                <option value="blind" {% if w.wd_type_from=='blind' %} selected{% endif %}>Blind</option>
                <option value="anon" {% if w.wd_type_from=='anon' %} selected{% endif %}>Anon</option>
@@ -362,10 +368,8 @@
            <td class="py-3 px-6">
             <div class="w-full md:flex-1">
              <div class="relative">
-              <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-               <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"></path>
-              </svg>
-              <select class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="withdraw_type_to_{{ w.cid }}">
+              {{ select_box_arrow_svg }}
+              <select class="{{ select_box_class }}" name="withdraw_type_to_{{ w.cid }}">
                <option value="plain" {% if w.wd_type_to=='plain' %} selected{% endif %}>Plain</option>
                <option value="blind" {% if w.wd_type_to=='blind' %} selected{% endif %}>Blind</option>
                <option value="anon" {% if w.wd_type_to=='anon' %} selected{% endif %}>Anon</option>
@@ -374,7 +378,23 @@
             </div>
            </td>
           </tr>
-          {% endif %}
+          {% endif %} {# / PART #}
+          {% if w.cid == '3' %} {# LTC #}
+          <tr class="opacity-100 text-gray-500 dark:text-gray-100">
+           <td class="py-3 px-6 bold">Type From:</td>
+           <td class="py-3 px-6">
+            <div class="w-full md:flex-1">
+             <div class="relative">
+              {{ select_box_arrow_svg }}
+              <select class="{{ select_box_class }}" name="withdraw_type_from_{{ w.cid }}">
+               <option value="plain" {% if w.wd_type_from=='plain' %} selected{% endif %}>Plain</option>
+               <option value="mweb" {% if w.wd_type_from=='mweb' %} selected{% endif %}>MWEB</option>
+              </select>
+             </div>
+            </div>
+           </td>
+          </tr>
+          {% endif %} {# / LTC #}
           <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
            <td class="py-3 px-6 bold">Fee Rate:</td>
            <td class="py-3 px-6 bold">{{ w.fee_rate }}</td>
@@ -392,7 +412,7 @@
   </div>
  </div>
 </section>
-{% if w.cid != '6' %}
+{% if w.cid != '6' %} {# !XMR #}
 {% if w.show_utxo_groups %}
 <section class="p-6">
  <div class="flex flex-wrap items-center">

@@ -419,6 +419,8 @@ def getCoinName(c):
         return chainparams[Coins.PART]['name'].capitalize() + ' Anon'
     if c == Coins.PART_BLIND:
         return chainparams[Coins.PART]['name'].capitalize() + ' Blind'
+    if c == Coins.LTC_MWEB:
+        return chainparams[Coins.LTC]['name'].capitalize() + ' MWEB'
 
     coin_chainparams = chainparams[c]
     if coin_chainparams.get('use_ticker_as_name', False):
@@ -438,6 +440,11 @@ def listAvailableCoins(swap_client, with_variants=True, split_from=False):
                 coins_from.append(coins[-1])
             if with_variants and k == Coins.PART:
                 for v in (Coins.PART_ANON, Coins.PART_BLIND):
+                    coins.append((int(v), getCoinName(v)))
+                    if split_from and v not in invalid_coins_from:
+                        coins_from.append(coins[-1])
+            if with_variants and k == Coins.LTC:
+                for v in (Coins.LTC_MWEB, ):
                     coins.append((int(v), getCoinName(v)))
                     if split_from and v not in invalid_coins_from:
                         coins_from.append(coins[-1])

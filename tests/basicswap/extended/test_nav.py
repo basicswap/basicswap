@@ -902,7 +902,7 @@ class Test(TestFunctions):
         # Verify expected inputs were used
         bid, offer = swap_clients[2].getBidAndOffer(bid_id)
         assert (bid.initiate_tx)
-        wtx = ci_from.rpc_callback('gettransaction', [bid.initiate_tx.txid.hex(),])
+        wtx = ci_from.rpc('gettransaction', [bid.initiate_tx.txid.hex(),])
         itx_after = ci_from.describeTx(wtx['hex'])
         assert (len(itx_after['vin']) == len(itx_decoded['vin']))
         for i, txin in enumerate(itx_decoded['vin']):

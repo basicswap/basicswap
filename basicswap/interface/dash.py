@@ -32,7 +32,7 @@ class DASHInterface(BTCInterface):
         words = self.seedToMnemonic(key)
 
         mnemonic_passphrase = ''
-        self.rpc_callback('upgradetohd', [words, mnemonic_passphrase, self._wallet_passphrase])
+        self.rpc_wallet('upgradetohd', [words, mnemonic_passphrase, self._wallet_passphrase])
         self._have_checked_seed = False
         if self._wallet_passphrase != '':
             self.unlockWallet(self._wallet_passphrase)
@@ -42,7 +42,7 @@ class DASHInterface(BTCInterface):
 
     def checkExpectedSeed(self, key_hash: str):
         try:
-            rv = self.rpc_callback('dumphdinfo')
+            rv = self.rpc_wallet('dumphdinfo')
             entropy = Mnemonic('english').to_entropy(rv['mnemonic'].split(' '))
             entropy_hash = self.getAddressHashFromKey(entropy)[::-1].hex()
             self._have_checked_seed = True
@@ -53,10 +53,10 @@ class DASHInterface(BTCInterface):
 
     def withdrawCoin(self, value, addr_to, subfee):
         params = [addr_to, value, '', '', subfee, False, False, self._conf_target]
-        return self.rpc_callback('sendtoaddress', params)
+        return self.rpc_wallet('sendtoaddress', params)
 
     def getSpendableBalance(self) -> int:
-        return self.make_int(self.rpc_callback('getwalletinfo')['balance'])
+        return self.make_int(self.rpc_wallet('getwalletinfo')['balance'])
 
     def getScriptForPubkeyHash(self, pkh: bytes) -> bytearray:
         # Return P2PKH
@@ -72,7 +72,7 @@ class DASHInterface(BTCInterface):
     def findTxnByHash(self, txid_hex: str):
         # Only works for wallet txns
         try:
-            rv = self.rpc_callback('gettransaction', [txid_hex])
+            rv = self.rpc_wallet('gettransaction', [txid_hex])
         except Exception as ex:
             self._log.debug('findTxnByHash getrawtransaction failed: {}'.format(txid_hex))
             return None

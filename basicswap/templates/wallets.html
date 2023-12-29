@@ -113,7 +113,7 @@
           <div class="bold inline-block py-1 px-2 rounded-full bg-green-100 text-xs text-green-500 dark:bg-gray-500 dark:text-green-500 usd-value"></div>
          </div>
        {% endif %}
-       {% if w.cid == '1' %}
+       {% if w.cid == '1' %} {# PART #}
        <div class="flex mb-2 justify-between items-center">
         <h4 class="text-xs font-medium dark:text-white">Blind Balance:</h4>
         <span class="bold inline-block py-1 px-2 rounded-full bg-blue-100 text-xs text-black-500 dark:bg-gray-500 dark:text-gray-200 coinname-value" data-coinname="{{ w.name }}">{{ w.blind_balance }} {{ w.ticker }}</span>
@@ -130,7 +130,7 @@
       <div class="flex mb-2 justify-between items-center">
           <h4 class="text-xs font-bold text-green-500 dark:text-green-500">Blind Unconfirmed USD value:</h4>
           <div class="bold inline-block py-1 px-2 rounded-full bg-green-100 text-xs text-green-500 dark:bg-gray-500 dark:text-green-500 usd-value"></div>
-        </div> 
+        </div>
        {% endif %}
        <div class="flex mb-2 justify-between items-center">
         <h4 class="text-xs font-medium dark:text-white">Anon Balance:</h4>
@@ -149,9 +149,30 @@
         <div class="flex mb-2 justify-between items-center">
           <h4 class="text-xs font-bold text-green-500 dark:text-green-500">Anon Pending USD value:</h4>
           <div class="bold inline-block py-1 px-2 rounded-full bg-green-100 text-xs text-green-500 dark:bg-gray-500 dark:text-green-500 usd-value"></div>
-        </div>       
+        </div>
        {% endif %}
+       {% endif %} {# / PART #}
+       {% if w.cid == '3' %} {# LTC #}
+       <div class="flex mb-2 justify-between items-center">
+        <h4 class="text-xs font-medium dark:text-white">MWEB Balance:</h4>
+        <span class="bold inline-block py-1 px-2 rounded-full bg-blue-100 text-xs text-black-500 dark:bg-gray-500 dark:text-gray-200 coinname-value" data-coinname="{{ w.name }}">{{ w.mweb_balance }} {{ w.ticker }}</span>
+       </div>
+        <div class="flex mb-2 justify-between items-center">
+          <h4 class="text-xs font-medium dark:text-white">MWEB USD value:</h4>
+          <div class="bold inline-block py-1 px-2 rounded-full bg-blue-100 text-xs text-black-500 dark:bg-gray-500 dark:text-gray-200 usd-value"></div>
+        </div>
+        {% if w.mweb_pending %}
+       <div class="flex mb-2 justify-between items-center">
+        <h4 class="text-xs font-bold text-green-500 dark:text-green-500">MWEB Pending:</h4>
+        <span class="bold inline-block py-1 px-2 rounded-full bg-green-100 text-xs text-green-500 dark:bg-gray-500 dark:text-green-500 coinname-value"  data-coinname="{{ w.name }}">
+        +{{ w.mweb_pending }} {{ w.ticker }}</span>
+       </div>
+        <div class="flex mb-2 justify-between items-center">
+          <h4 class="text-xs font-bold text-green-500 dark:text-green-500">MWEB Pending USD value:</h4>
+          <div class="bold inline-block py-1 px-2 rounded-full bg-green-100 text-xs text-green-500 dark:bg-gray-500 dark:text-green-500 usd-value"></div>
+        </div>
        {% endif %}
+       {% endif %} {# / LTC #}
        <div class="flex mb-2 justify-between items-center">
         <h4 class="text-xs font-medium dark:text-white">Blocks:</h4>
         <span class="inline-block py-1 px-2 rounded-full bg-blue-100 text-xs text-black-500 dark:bg-gray-500 dark:text-gray-200">{{ w.blocks }}{% if w.known_block_count %} / {{ w.known_block_count }}{% endif %}</span>

@@ -32,6 +32,7 @@ class Coins(IntEnum):
     DASH = 12
     FIRO = 13
     NAV = 14
+    LTC_MWEB = 15
 
 
 chainparams = {

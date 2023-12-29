@@ -280,6 +280,8 @@ class HttpHandler(BaseHTTPRequestHandler):
                     coin_id = int(get_data_entry(form_data, 'coin_type'))
                     if coin_id in (-2, -3, -4):
                         coin_type = Coins(Coins.XMR)
+                    elif coin_id in (-5,):
+                        coin_type = Coins(Coins.LTC)
                     else:
                         coin_type = Coins(coin_id)
                 except Exception:
@@ -295,20 +297,23 @@ class HttpHandler(BaseHTTPRequestHandler):
                     method = arr[0]
                     params = json.loads(arr[1]) if len(arr) > 1 else []
                     if coin_id == -4:
-                        rv = ci.rpc_wallet_cb(method, params)
+                        rv = ci.rpc_wallet(method, params)
                     elif coin_id == -3:
-                        rv = ci.rpc_cb(method, params)
+                        rv = ci.rpc(method, params)
                     elif coin_id == -2:
                         if params == []:
                             params = None
-                        rv = ci.rpc_cb2(method, params)
+                        rv = ci.rpc2(method, params)
                     else:
                         raise ValueError('Unknown XMR RPC variant')
                     result = json.dumps(rv, indent=4)
                 else:
                     if call_type == 'http':
                         method, params = parse_cmd(cmd, type_map)
-                        rv = swap_client.ci(coin_type).rpc_callback(method, params)
+                        if coin_id == -5:
+                            rv = swap_client.ci(coin_type).rpc_wallet_mweb(method, params)
+                        else:
+                            rv = swap_client.ci(coin_type).rpc_wallet(method, params)
                         if not isinstance(rv, str):
                             rv = json.dumps(rv, indent=4)
                         result = cmd + '\n' + rv
@@ -323,6 +328,7 @@ class HttpHandler(BaseHTTPRequestHandler):
 
         coins = listAvailableCoins(swap_client, with_variants=False)
         coins = [c for c in coins if c[0] != Coins.XMR]
+        coins.append((-5, 'Litecoin MWEB Wallet'))
         coins.append((-2, 'Monero'))
         coins.append((-3, 'Monero JSON'))
         coins.append((-4, 'Monero Wallet'))

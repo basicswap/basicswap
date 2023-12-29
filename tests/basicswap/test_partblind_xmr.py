@@ -101,7 +101,7 @@ class Test(BaseTest):
             nonlocal ci
             i = 0
             while not delay_event.is_set():
-                unspents = ci.rpc_callback('listunspentblind')
+                unspents = ci.rpc_wallet('listunspentblind')
                 if len(unspents) >= 1:
                     return
                 delay_event.wait(delay_time)
@@ -113,8 +113,8 @@ class Test(BaseTest):
         amount: int = ci.make_int(random.uniform(0.1, 2.0), r=1)
 
         # Record unspents before createSCLockTx as the used ones will be locked
-        unspents = ci.rpc_callback('listunspentblind')
-        locked_utxos_before = ci.rpc_callback('listlockunspent')
+        unspents = ci.rpc_wallet('listunspentblind')
+        locked_utxos_before = ci.rpc_wallet('listlockunspent')
 
         # fee_rate is in sats/kvB
         fee_rate: int = 1000
@@ -131,33 +131,33 @@ class Test(BaseTest):
         lock_tx = ci.fundSCLockTx(lock_tx, fee_rate, vkbv)
         lock_tx = ci.signTxWithWallet(lock_tx)
 
-        unspents_after = ci.rpc_callback('listunspentblind')
-        locked_utxos_after = ci.rpc_callback('listlockunspent')
+        unspents_after = ci.rpc_wallet('listunspentblind')
+        locked_utxos_after = ci.rpc_wallet('listlockunspent')
 
         assert (len(unspents) > len(unspents_after))
         assert (len(locked_utxos_after) > len(locked_utxos_before))
-        lock_tx_decoded = ci.rpc_callback('decoderawtransaction', [lock_tx.hex()])
+        lock_tx_decoded = ci.rpc_wallet('decoderawtransaction', [lock_tx.hex()])
         txid = lock_tx_decoded['txid']
 
         vsize = lock_tx_decoded['vsize']
         expect_fee_int = round(fee_rate * vsize / 1000)
         expect_fee = ci.format_amount(expect_fee_int)
 
-        ci.rpc_callback('sendrawtransaction', [lock_tx.hex()])
-        rv = ci.rpc_callback('gettransaction', [txid])
+        ci.rpc_wallet('sendrawtransaction', [lock_tx.hex()])
+        rv = ci.rpc_wallet('gettransaction', [txid])
         wallet_tx_fee = -ci.make_int(rv['details'][0]['fee'])
 
         assert (wallet_tx_fee >= expect_fee_int)
         assert (wallet_tx_fee - expect_fee_int < 20)
 
         addr_out = ci.getNewAddress(True)
-        addrinfo = ci.rpc_callback('getaddressinfo', [addr_out,])
+        addrinfo = ci.rpc_wallet('getaddressinfo', [addr_out,])
         pk_out = bytes.fromhex(addrinfo['pubkey'])
         fee_info = {}
         lock_spend_tx = ci.createSCLockSpendTx(lock_tx, lock_tx_script, pk_out, fee_rate, vkbv, fee_info=fee_info)
         vsize_estimated: int = fee_info['vsize']
 
-        spend_tx_decoded = ci.rpc_callback('decoderawtransaction', [lock_spend_tx.hex()])
+        spend_tx_decoded = ci.rpc('decoderawtransaction', [lock_spend_tx.hex()])
         txid = spend_tx_decoded['txid']
 
         nonce = ci.getScriptLockTxNonce(vkbv)
@@ -172,12 +172,12 @@ class Test(BaseTest):
             lock_tx_script,
         ]
         lock_spend_tx = ci.setTxSignature(lock_spend_tx, witness_stack)
-        tx_decoded = ci.rpc_callback('decoderawtransaction', [lock_spend_tx.hex()])
+        tx_decoded = ci.rpc('decoderawtransaction', [lock_spend_tx.hex()])
         vsize_actual: int = tx_decoded['vsize']
 
         # Note: The fee is set allowing 9 bytes for the encoded fee amount, causing a small overestimate
         assert (vsize_actual <= vsize_estimated and vsize_estimated - vsize_actual < 10)
-        assert (ci.rpc_callback('sendrawtransaction', [lock_spend_tx.hex()]) == txid)
+        assert (ci.rpc('sendrawtransaction', [lock_spend_tx.hex()]) == txid)
 
         # Test chain b (no-script) lock tx size
         v = ci.getNewSecretKey()
@@ -198,7 +198,7 @@ class Test(BaseTest):
         lock_tx_b_spend = ci.getTransaction(lock_tx_b_spend_txid)
         if lock_tx_b_spend is None:
             lock_tx_b_spend = ci.getWalletTransaction(lock_tx_b_spend_txid)
-        lock_tx_b_spend_decoded = ci.rpc_callback('decoderawtransaction', [lock_tx_b_spend.hex()])
+        lock_tx_b_spend_decoded = ci.rpc('decoderawtransaction', [lock_tx_b_spend.hex()])
 
         expect_vsize: int = ci.xmr_swap_b_lock_spend_tx_vsize()
         assert (expect_vsize >= lock_tx_b_spend_decoded['vsize'])
@@ -472,7 +472,7 @@ class Test(BaseTest):
         # Verify expected inputs were used
         bid, _, _, _, _ = swap_clients[2].getXmrBidAndOffer(bid_id)
         assert (bid.xmr_a_lock_tx)
-        wtx = ci.rpc_callback('gettransaction', [bid.xmr_a_lock_tx.txid.hex(),])
+        wtx = ci.rpc_wallet('gettransaction', [bid.xmr_a_lock_tx.txid.hex(),])
         itx_after = ci.describeTx(wtx['hex'])
         assert (len(itx_after['vin']) == len(itx_decoded['vin']))
         for i, txin in enumerate(itx_decoded['vin']):

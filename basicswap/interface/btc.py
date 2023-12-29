@@ -195,7 +195,9 @@ class BTCInterface(CoinInterface):
         self._rpc_host = coin_settings.get('rpchost', '127.0.0.1')
         self._rpcport = coin_settings['rpcport']
         self._rpcauth = coin_settings['rpcauth']
-        self.rpc_callback = make_rpc_func(self._rpcport, self._rpcauth, host=self._rpc_host)
+        self.rpc = make_rpc_func(self._rpcport, self._rpcauth, host=self._rpc_host)
+        self._rpc_wallet = 'wallet.dat'
+        self.rpc_wallet = make_rpc_func(self._rpcport, self._rpcauth, host=self._rpc_host, wallet=self._rpc_wallet)
         self.blocks_confirmed = coin_settings['blocks_confirmed']
         self.setConfTarget(coin_settings['conf_target'])
         self._use_segwit = coin_settings['use_segwit']
@@ -203,6 +205,23 @@ class BTCInterface(CoinInterface):
         self._sc = swap_client
         self._log = self._sc.log if self._sc and self._sc.log else logging
         self._expect_seedid_hex = None
+
+    def checkWallets(self) -> int:
+        wallets = self.rpc('listwallets')
+
+        # Wallet name is "" for some LTC and PART installs on older cores
+        if self._rpc_wallet not in wallets and len(wallets) > 0:
+            self._log.debug('Changing {} wallet name.'.format(self.ticker()))
+            for wallet_name in wallets:
+                # Skip over other expected wallets
+                if wallet_name in ('mweb', ):
+                    continue
+                self._rpc_wallet = wallet_name
+                self._log.info('Switched {} wallet name to {}.'.format(self.ticker(), self._rpc_wallet))
+                self.rpc_wallet = make_rpc_func(self._rpcport, self._rpcauth, host=self._rpc_host, wallet=self._rpc_wallet)
+                break
+
+        return len(wallets)
 
     def using_segwit(self) -> bool:
         # Using btc native segwit
@@ -239,34 +258,34 @@ class BTCInterface(CoinInterface):
         self._conf_target = new_conf_target
 
     def testDaemonRPC(self, with_wallet=True) -> None:
-        self.rpc_callback('getwalletinfo' if with_wallet else 'getblockchaininfo')
+        self.rpc_wallet('getwalletinfo' if with_wallet else 'getblockchaininfo')
 
     def getDaemonVersion(self):
-        return self.rpc_callback('getnetworkinfo')['version']
+        return self.rpc('getnetworkinfo')['version']
 
     def getBlockchainInfo(self):
-        return self.rpc_callback('getblockchaininfo')
+        return self.rpc('getblockchaininfo')
 
     def getChainHeight(self) -> int:
-        return self.rpc_callback('getblockcount')
+        return self.rpc('getblockcount')
 
     def getMempoolTx(self, txid):
-        return self.rpc_callback('getrawtransaction', [txid.hex()])
+        return self.rpc('getrawtransaction', [txid.hex()])
 
     def getBlockHeaderFromHeight(self, height):
-        block_hash = self.rpc_callback('getblockhash', [height])
-        return self.rpc_callback('getblockheader', [block_hash])
+        block_hash = self.rpc('getblockhash', [height])
+        return self.rpc('getblockheader', [block_hash])
 
     def getBlockHeader(self, block_hash):
-        return self.rpc_callback('getblockheader', [block_hash])
+        return self.rpc('getblockheader', [block_hash])
 
     def getBlockHeaderAt(self, time: int, block_after=False):
-        blockchaininfo = self.rpc_callback('getblockchaininfo')
-        last_block_header = self.rpc_callback('getblockheader', [blockchaininfo['bestblockhash']])
+        blockchaininfo = self.rpc('getblockchaininfo')
+        last_block_header = self.rpc('getblockheader', [blockchaininfo['bestblockhash']])
 
         max_tries = 5000
         for i in range(max_tries):
-            prev_block_header = self.rpc_callback('getblock', [last_block_header['previousblockhash']])
+            prev_block_header = self.rpc('getblock', [last_block_header['previousblockhash']])
             if prev_block_header['time'] <= time:
                 return last_block_header if block_after else prev_block_header
 
@@ -275,11 +294,10 @@ class BTCInterface(CoinInterface):
 
     def initialiseWallet(self, key_bytes: bytes) -> None:
         key_wif = self.encodeKey(key_bytes)
-
-        self.rpc_callback('sethdseed', [True, key_wif])
+        self.rpc_wallet('sethdseed', [True, key_wif])
 
     def getWalletInfo(self):
-        rv = self.rpc_callback('getwalletinfo')
+        rv = self.rpc_wallet('getwalletinfo')
         rv['encrypted'] = 'unlocked_until' in rv
         rv['locked'] = rv.get('unlocked_until', 1) <= 0
         return rv
@@ -288,7 +306,7 @@ class BTCInterface(CoinInterface):
         return self._restore_height
 
     def getWalletRestoreHeight(self) -> int:
-        start_time = self.rpc_callback('getwalletinfo')['keypoololdest']
+        start_time = self.rpc_wallet('getwalletinfo')['keypoololdest']
 
         blockchaininfo = self.getBlockchainInfo()
         best_block = blockchaininfo['bestblockhash']
@@ -312,7 +330,7 @@ class BTCInterface(CoinInterface):
         raise ValueError('{} wallet restore height not found.'.format(self.coin_name()))
 
     def getWalletSeedID(self) -> str:
-        wi = self.rpc_callback('getwalletinfo')
+        wi = self.rpc_wallet('getwalletinfo')
         return 'Not found' if 'hdseedid' not in wi else wi['hdseedid']
 
     def checkExpectedSeed(self, expect_seedid) -> bool:
@@ -323,11 +341,11 @@ class BTCInterface(CoinInterface):
         args = [label]
         if use_segwit:
             args.append('bech32')
-        return self.rpc_callback('getnewaddress', args)
+        return self.rpc_wallet('getnewaddress', args)
 
     def isValidAddress(self, address: str) -> bool:
         try:
-            rv = self.rpc_callback('validateaddress', [address])
+            rv = self.rpc_wallet('validateaddress', [address])
             if rv['isvalid'] is True:
                 return True
         except Exception as ex:
@@ -347,13 +365,13 @@ class BTCInterface(CoinInterface):
             return False
 
     def isAddressMine(self, address: str, or_watch_only: bool = False) -> bool:
-        addr_info = self.rpc_callback('getaddressinfo', [address])
+        addr_info = self.rpc_wallet('getaddressinfo', [address])
         if not or_watch_only:
             return addr_info['ismine']
         return addr_info['ismine'] or addr_info['iswatchonly']
 
     def checkAddressMine(self, address: str) -> None:
-        addr_info = self.rpc_callback('getaddressinfo', [address])
+        addr_info = self.rpc_wallet('getaddressinfo', [address])
         ensure(addr_info['ismine'], 'ismine is false')
         if self.sc._restrict_unknown_seed_wallets:
             ensure(addr_info['hdseedid'] == self._expect_seedid_hex, 'unexpected seedid')
@@ -369,16 +387,16 @@ class BTCInterface(CoinInterface):
 
         def try_get_fee_rate(self, conf_target):
             try:
-                fee_rate = self.rpc_callback('estimatesmartfee', [conf_target])['feerate']
+                fee_rate = self.rpc_wallet('estimatesmartfee', [conf_target])['feerate']
                 assert (fee_rate > 0.0), 'Non positive feerate'
                 return fee_rate, 'estimatesmartfee'
             except Exception:
                 try:
-                    fee_rate = self.rpc_callback('getwalletinfo')['paytxfee']
+                    fee_rate = self.rpc_wallet('getwalletinfo')['paytxfee']
                     assert (fee_rate > 0.0), 'Non positive feerate'
                     return fee_rate, 'paytxfee'
                 except Exception:
-                    return self.rpc_callback('getnetworkinfo')['relayfee'], 'relayfee'
+                    return self.rpc('getnetworkinfo')['relayfee'], 'relayfee'
 
         fee_rate, rate_src = try_get_fee_rate(self, conf_target)
         if min_relay_fee and min_relay_fee > fee_rate:
@@ -734,7 +752,7 @@ class BTCInterface(CoinInterface):
             add_bytes = 0
             add_witness_bytes = getCompactSizeLen(len(tx.vin))
             for pi in tx.vin:
-                ptx = self.rpc_callback('getrawtransaction', [i2h(pi.prevout.hash), True])
+                ptx = self.rpc('getrawtransaction', [i2h(pi.prevout.hash), True])
                 prevout = ptx['vout'][pi.prevout.n]
                 inputs_value += make_int(prevout['value'])
 
@@ -942,13 +960,13 @@ class BTCInterface(CoinInterface):
             'lockUnspents': True,
             'feeRate': feerate_str,
         }
-        rv = self.rpc_callback('fundrawtransaction', [tx.hex(), options])
+        rv = self.rpc_wallet('fundrawtransaction', [tx.hex(), options])
         return bytes.fromhex(rv['hex'])
 
     def listInputs(self, tx_bytes):
         tx = self.loadTx(tx_bytes)
 
-        all_locked = self.rpc_callback('listlockunspent')
+        all_locked = self.rpc_wallet('listlockunspent')
         inputs = []
         for pi in tx.vin:
             txid_hex = i2h(pi.prevout.hash)
@@ -962,19 +980,19 @@ class BTCInterface(CoinInterface):
         inputs = []
         for pi in tx.vin:
             inputs.append({'txid': i2h(pi.prevout.hash), 'vout': pi.prevout.n})
-        self.rpc_callback('lockunspent', [True, inputs])
+        self.rpc('lockunspent', [True, inputs])
 
     def signTxWithWallet(self, tx: bytes) -> bytes:
-        rv = self.rpc_callback('signrawtransactionwithwallet', [tx.hex()])
+        rv = self.rpc_wallet('signrawtransactionwithwallet', [tx.hex()])
         return bytes.fromhex(rv['hex'])
 
     def signTxWithKey(self, tx: bytes, key: bytes) -> bytes:
         key_wif = self.encodeKey(key)
-        rv = self.rpc_callback('signrawtransactionwithkey', [tx.hex(), [key_wif, ]])
+        rv = self.rpc('signrawtransactionwithkey', [tx.hex(), [key_wif, ]])
         return bytes.fromhex(rv['hex'])
 
     def publishTx(self, tx: bytes):
-        return self.rpc_callback('sendrawtransaction', [tx.hex()])
+        return self.rpc('sendrawtransaction', [tx.hex()])
 
     def encodeTx(self, tx) -> bytes:
         return tx.serialize()
@@ -1018,18 +1036,18 @@ class BTCInterface(CoinInterface):
         return self.getScriptForPubkeyHash(self.getPubkeyHash(K))
 
     def scanTxOutset(self, dest):
-        return self.rpc_callback('scantxoutset', ['start', ['raw({})'.format(dest.hex())]])
+        return self.rpc('scantxoutset', ['start', ['raw({})'.format(dest.hex())]])
 
     def getTransaction(self, txid: bytes):
         try:
-            return bytes.fromhex(self.rpc_callback('getrawtransaction', [txid.hex()]))
+            return bytes.fromhex(self.rpc('getrawtransaction', [txid.hex()]))
         except Exception as ex:
             # TODO: filter errors
             return None
 
     def getWalletTransaction(self, txid: bytes):
         try:
-            return bytes.fromhex(self.rpc_callback('gettransaction', [txid.hex()]))
+            return bytes.fromhex(self.rpc('gettransaction', [txid.hex()]))
         except Exception as ex:
             # TODO: filter errors
             return None
@@ -1115,7 +1133,7 @@ class BTCInterface(CoinInterface):
 
     def spendBLockTx(self, chain_b_lock_txid: bytes, address_to: str, kbv: bytes, kbs: bytes, cb_swap_value: int, b_fee: int, restore_height: int) -> bytes:
         self._log.info('spendBLockTx %s:\n', chain_b_lock_txid.hex())
-        wtx = self.rpc_callback('gettransaction', [chain_b_lock_txid.hex(), ])
+        wtx = self.rpc_wallet('gettransaction', [chain_b_lock_txid.hex(), ])
         lock_tx = self.loadTx(bytes.fromhex(wtx['hex']))
 
         Kbs = self.getPubkey(kbs)
@@ -1144,10 +1162,10 @@ class BTCInterface(CoinInterface):
         return bytes.fromhex(self.publishTx(b_lock_spend_tx))
 
     def importWatchOnlyAddress(self, address: str, label: str):
-        self.rpc_callback('importaddress', [address, label, False])
+        self.rpc_wallet('importaddress', [address, label, False])
 
     def isWatchOnlyAddress(self, address: str):
-        addr_info = self.rpc_callback('getaddressinfo', [address])
+        addr_info = self.rpc_wallet('getaddressinfo', [address])
         return addr_info['iswatchonly']
 
     def getSCLockScriptAddress(self, lock_script):
@@ -1161,11 +1179,11 @@ class BTCInterface(CoinInterface):
             self.importWatchOnlyAddress(dest_address, 'bid')
             self._log.info('Imported watch-only addr: {}'.format(dest_address))
             self._log.info('Rescanning {} chain from height: {}'.format(self.coin_name(), rescan_from))
-            self.rpc_callback('rescanblockchain', [rescan_from])
+            self.rpc_wallet('rescanblockchain', [rescan_from])
 
         return_txid = True if txid is None else False
         if txid is None:
-            txns = self.rpc_callback('listunspent', [0, 9999999, [dest_address, ]])
+            txns = self.rpc_wallet('listunspent', [0, 9999999, [dest_address, ]])
 
             for tx in txns:
                 if self.make_int(tx['amount']) == bid_amount:
@@ -1176,11 +1194,11 @@ class BTCInterface(CoinInterface):
             return None
 
         try:
-            tx = self.rpc_callback('gettransaction', [txid.hex()])
+            tx = self.rpc_wallet('gettransaction', [txid.hex()])
 
             block_height = 0
             if 'blockhash' in tx:
-                block_header = self.rpc_callback('getblockheader', [tx['blockhash']])
+                block_header = self.rpc('getblockheader', [tx['blockhash']])
                 block_height = block_header['height']
 
             rv = {
@@ -1192,7 +1210,7 @@ class BTCInterface(CoinInterface):
             return None
 
         if find_index:
-            tx_obj = self.rpc_callback('decoderawtransaction', [tx['hex']])
+            tx_obj = self.rpc('decoderawtransaction', [tx['hex']])
             rv['index'] = find_vout_for_address_from_txobj(tx_obj, dest_address)
 
         if return_txid:
@@ -1202,7 +1220,7 @@ class BTCInterface(CoinInterface):
 
     def getOutput(self, txid, dest_script, expect_value, xmr_swap=None):
         # TODO: Use getrawtransaction if txindex is active
-        utxos = self.rpc_callback('scantxoutset', ['start', ['raw({})'.format(dest_script.hex())]])
+        utxos = self.rpc('scantxoutset', ['start', ['raw({})'.format(dest_script.hex())]])
         if 'height' in utxos:  # chain_height not returned by v18 codebase
             chain_height = utxos['height']
         else:
@@ -1225,7 +1243,7 @@ class BTCInterface(CoinInterface):
 
     def withdrawCoin(self, value, addr_to, subfee):
         params = [addr_to, value, '', '', subfee, True, self._conf_target]
-        return self.rpc_callback('sendtoaddress', params)
+        return self.rpc_wallet('sendtoaddress', params)
 
     def signCompact(self, k, message):
         message_hash = hashlib.sha256(bytes(message, 'utf-8')).digest()
@@ -1318,10 +1336,10 @@ class BTCInterface(CoinInterface):
         return length
 
     def describeTx(self, tx_hex: str):
-        return self.rpc_callback('decoderawtransaction', [tx_hex])
+        return self.rpc('decoderawtransaction', [tx_hex])
 
     def getSpendableBalance(self) -> int:
-        return self.make_int(self.rpc_callback('getbalances')['mine']['trusted'])
+        return self.make_int(self.rpc_wallet('getbalances')['mine']['trusted'])
 
     def createUTXO(self, value_sats: int):
         # Create a new address and send value_sats to it
@@ -1334,7 +1352,7 @@ class BTCInterface(CoinInterface):
         return self.withdrawCoin(self.format_amount(value_sats), address, False), address
 
     def createRawFundedTransaction(self, addr_to: str, amount: int, sub_fee: bool = False, lock_unspents: bool = True) -> str:
-        txn = self.rpc_callback('createrawtransaction', [[], {addr_to: self.format_amount(amount)}])
+        txn = self.rpc('createrawtransaction', [[], {addr_to: self.format_amount(amount)}])
 
         options = {
             'lockUnspents': lock_unspents,
@@ -1342,18 +1360,18 @@ class BTCInterface(CoinInterface):
         }
         if sub_fee:
             options['subtractFeeFromOutputs'] = [0,]
-        return self.rpc_callback('fundrawtransaction', [txn, options])['hex']
+        return self.rpc_wallet('fundrawtransaction', [txn, options])['hex']
 
     def createRawSignedTransaction(self, addr_to, amount) -> str:
         txn_funded = self.createRawFundedTransaction(addr_to, amount)
-        return self.rpc_callback('signrawtransactionwithwallet', [txn_funded])['hex']
+        return self.rpc_wallet('signrawtransactionwithwallet', [txn_funded])['hex']
 
     def getBlockWithTxns(self, block_hash: str):
-        return self.rpc_callback('getblock', [block_hash, 2])
+        return self.rpc('getblock', [block_hash, 2])
 
     def getUnspentsByAddr(self):
         unspent_addr = dict()
-        unspent = self.rpc_callback('listunspent')
+        unspent = self.rpc_wallet('listunspent')
         for u in unspent:
             if u['spendable'] is not True:
                 continue
@@ -1361,11 +1379,11 @@ class BTCInterface(CoinInterface):
         return unspent_addr
 
     def getUTXOBalance(self, address: str):
-        num_blocks = self.rpc_callback('getblockcount')
+        num_blocks = self.rpc('getblockcount')
 
         sum_unspent = 0
         self._log.debug('[rm] scantxoutset start')  # scantxoutset is slow
-        ro = self.rpc_callback('scantxoutset', ['start', ['addr({})'.format(address)]])  # TODO: Use combo(address) where possible
+        ro = self.rpc('scantxoutset', ['start', ['addr({})'.format(address)]])  # TODO: Use combo(address) where possible
         self._log.debug('[rm] scantxoutset end')
         for o in ro['unspents']:
             sum_unspent += self.make_int(o['amount'])
@@ -1391,7 +1409,7 @@ class BTCInterface(CoinInterface):
             sign_for_addr = self.pkh_to_address(pkh)
             self._log.debug('sign_for_addr converted %s', sign_for_addr)
 
-        signature = self.rpc_callback('signmessage', [sign_for_addr, sign_for_addr + '_swap_proof_' + extra_commit_bytes.hex()])
+        signature = self.rpc_wallet('signmessage', [sign_for_addr, sign_for_addr + '_swap_proof_' + extra_commit_bytes.hex()])
 
         prove_utxos = []  # TODO: Send specific utxos
         return (sign_for_addr, signature, prove_utxos)
@@ -1416,17 +1434,17 @@ class BTCInterface(CoinInterface):
         return self.getUTXOBalance(address)
 
     def isWalletEncrypted(self) -> bool:
-        wallet_info = self.rpc_callback('getwalletinfo')
+        wallet_info = self.rpc_wallet('getwalletinfo')
         return 'unlocked_until' in wallet_info
 
     def isWalletLocked(self) -> bool:
-        wallet_info = self.rpc_callback('getwalletinfo')
+        wallet_info = self.rpc_wallet('getwalletinfo')
         if 'unlocked_until' in wallet_info and wallet_info['unlocked_until'] <= 0:
             return True
         return False
 
     def isWalletEncryptedLocked(self):
-        wallet_info = self.rpc_callback('getwalletinfo')
+        wallet_info = self.rpc_wallet('getwalletinfo')
         encrypted = 'unlocked_until' in wallet_info
         locked = encrypted and wallet_info['unlocked_until'] <= 0
         return encrypted, locked
@@ -1436,8 +1454,8 @@ class BTCInterface(CoinInterface):
         if old_password == '':
             if self.isWalletEncrypted():
                 raise ValueError('Old password must be set')
-            return self.rpc_callback('encryptwallet', [new_password])
-        self.rpc_callback('walletpassphrasechange', [old_password, new_password])
+            return self.rpc_wallet('encryptwallet', [new_password])
+        self.rpc_wallet('walletpassphrasechange', [old_password, new_password])
 
     def unlockWallet(self, password: str):
         if password == '':
@@ -1447,21 +1465,20 @@ class BTCInterface(CoinInterface):
         if self.coin_type() == Coins.BTC:
             # Recreate wallet if none found
             # Required when encrypting an existing btc wallet, workaround is to delete the btc wallet and recreate
-            wallets = self.rpc_callback('listwallets')
+            wallets = self.rpc('listwallets')
             if len(wallets) < 1:
                 self._log.info('Creating wallet.dat for {}.'.format(self.coin_name()))
                 # wallet_name, disable_private_keys, blank, passphrase, avoid_reuse, descriptors
-                self.rpc_callback('createwallet', ['wallet.dat', False, True, '', False, False])
-                self.rpc_callback('encryptwallet', [password])
+                self.rpc('createwallet', ['wallet.dat', False, True, '', False, False])
+                self.rpc_wallet('encryptwallet', [password])
 
         # Max timeout value, ~3 years
-        self.rpc_callback('walletpassphrase', [password, 100000000])
-
+        self.rpc_wallet('walletpassphrase', [password, 100000000])
         self._sc.checkWalletSeed(self.coin_type())
 
     def lockWallet(self):
         self._log.info('lockWallet - {}'.format(self.ticker()))
-        self.rpc_callback('walletlock')
+        self.rpc_wallet('walletlock')
 
     def get_p2sh_script_pubkey(self, script: bytearray) -> bytearray:
         script_hash = hash160(script)
@@ -1474,7 +1491,7 @@ class BTCInterface(CoinInterface):
     def findTxnByHash(self, txid_hex: str):
         # Only works for wallet txns
         try:
-            rv = self.rpc_callback('gettransaction', [txid_hex])
+            rv = self.rpc_wallet('gettransaction', [txid_hex])
         except Exception as ex:
             self._log.debug('findTxnByHash getrawtransaction failed: {}'.format(txid_hex))
             return None

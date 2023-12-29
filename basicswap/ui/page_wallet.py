@@ -51,12 +51,16 @@ def format_wallet_data(swap_client, ci, w):
 
     if ci.coin_type() == Coins.PART:
         wf['stealth_address'] = w.get('stealth_address', '?')
-        wf['blind_balance'] = "{:.8f}".format(float(w['blind_balance']))
+        wf['blind_balance'] = w.get('blind_balance', '?')
         if 'blind_unconfirmed' in w and float(w['blind_unconfirmed']) > 0.0:
             wf['blind_unconfirmed'] = w['blind_unconfirmed']
         wf['anon_balance'] = w.get('anon_balance', '?')
         if 'anon_pending' in w and float(w['anon_pending']) > 0.0:
             wf['anon_pending'] = w['anon_pending']
+    elif ci.coin_type() == Coins.LTC:
+        wf['mweb_address'] = w.get('mweb_address', '?')
+        wf['mweb_balance'] = w.get('mweb_balance', '?')
+        wf['mweb_pending'] = w.get('mweb_pending', '?')
 
     checkAddressesOwned(swap_client, ci, wf)
     return wf
@@ -128,6 +132,8 @@ def page_wallet(self, url_split, post_string):
 
         if bytes('newaddr_' + cid, 'utf-8') in form_data:
             swap_client.cacheNewAddressForCoin(coin_id)
+        elif bytes('newmwebaddr_' + cid, 'utf-8') in form_data:
+            swap_client.cacheNewStealthAddressForCoin(coin_id)
         elif bytes('reseed_' + cid, 'utf-8') in form_data:
             try:
                 swap_client.reseedWallet(coin_id)
@@ -158,22 +164,28 @@ def page_wallet(self, url_split, post_string):
                     page_data['wd_type_to_' + cid] = type_to
                 except Exception as e:
                     err_messages.append('Missing type')
+            elif coin_id == Coins.LTC:
+                try:
+                    type_from = form_data[bytes('withdraw_type_from_' + cid, 'utf-8')][0].decode('utf-8')
+                    page_data['wd_type_from_' + cid] = type_from
+                except Exception as e:
+                    err_messages.append('Missing type')
 
             if len(messages) == 0:
                 ci = swap_client.ci(coin_id)
                 ticker = ci.ticker()
-                if coin_id == Coins.PART:
-                    try:
+                try:
+                    if coin_id == Coins.PART:
                         txid = swap_client.withdrawParticl(type_from, type_to, value, address, subfee)
                         messages.append('Withdrew {} {} ({} to {}) to address {}<br/>In txid: {}'.format(value, ticker, type_from, type_to, address, txid))
-                    except Exception as e:
-                        err_messages.append(str(e))
-                else:
-                    try:
+                    elif coin_id == Coins.LTC:
+                        txid = swap_client.withdrawLTC(type_from, value, address, subfee)
+                        messages.append('Withdrew {} {} (from {}) to address {}<br/>In txid: {}'.format(value, ticker, type_from, address, txid))
+                    else:
                         txid = swap_client.withdrawCoin(coin_id, value, address, subfee)
                         messages.append('Withdrew {} {} to address {}<br/>In txid: {}'.format(value, ticker, address, txid))
-                    except Exception as e:
-                        err_messages.append(str(e))
+                except Exception as e:
+                    err_messages.append(str(e))
                 swap_client.updateWalletsInfo(True, coin_id)
         elif have_data_entry(form_data, 'showutxogroups'):
             show_utxo_groups = True
@@ -227,6 +239,8 @@ def page_wallet(self, url_split, post_string):
 
         if k == Coins.XMR:
             wallet_data['main_address'] = w.get('main_address', 'Refresh necessary')
+        elif k == Coins.LTC:
+            wallet_data['mweb_address'] = w.get('mweb_address', 'Refresh necessary')
 
         if 'wd_type_from_' + cid in page_data:
             wallet_data['wd_type_from'] = page_data['wd_type_from_' + cid]

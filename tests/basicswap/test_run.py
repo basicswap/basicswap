@@ -80,10 +80,10 @@ class Test(BaseTest):
         super(Test, cls).setUpClass()
 
         btc_addr1 = callnoderpc(1, 'getnewaddress', ['initial funds', 'bech32'], base_rpc_port=BTC_BASE_RPC_PORT)
-        ltc_addr1 = callnoderpc(1, 'getnewaddress', ['initial funds', 'bech32'], base_rpc_port=LTC_BASE_RPC_PORT)
+        ltc_addr1 = callnoderpc(1, 'getnewaddress', ['initial funds', 'bech32'], base_rpc_port=LTC_BASE_RPC_PORT, wallet='wallet.dat')
 
         callnoderpc(0, 'sendtoaddress', [btc_addr1, 1000], base_rpc_port=BTC_BASE_RPC_PORT)
-        callnoderpc(0, 'sendtoaddress', [ltc_addr1, 1000], base_rpc_port=LTC_BASE_RPC_PORT)
+        callnoderpc(0, 'sendtoaddress', [ltc_addr1, 1000], base_rpc_port=LTC_BASE_RPC_PORT, wallet='wallet.dat')
 
         wait_for_balance(test_delay_event, 'http://127.0.0.1:1801/json/wallets/btc', 'balance', 1000.0)
         wait_for_balance(test_delay_event, 'http://127.0.0.1:1801/json/wallets/ltc', 'balance', 1000.0)
@@ -181,6 +181,9 @@ class Test(BaseTest):
 
         rv = read_json_api(1800, 'automationstrategies/1')
         assert (rv['label'] == 'Accept All')
+
+        sx_addr = read_json_api(1800, 'wallets/part/newstealthaddress')
+        assert (callnoderpc(0, 'getaddressinfo', [sx_addr, ])['isstealthaddress'] is True)
 
     def test_004_validateSwapType(self):
         logging.info('---------- Test validateSwapType')
@@ -570,7 +573,7 @@ class Test(BaseTest):
     def test_12_withdrawal(self):
         logging.info('---------- Test LTC withdrawals')
 
-        ltc_addr = callnoderpc(0, 'getnewaddress', ['Withdrawal test', 'legacy'], base_rpc_port=LTC_BASE_RPC_PORT)
+        ltc_addr = callnoderpc(0, 'getnewaddress', ['Withdrawal test', 'legacy'], base_rpc_port=LTC_BASE_RPC_PORT, wallet='wallet.dat')
         wallets0 = read_json_api(TEST_HTTP_PORT + 0, 'wallets')
         assert (float(wallets0['LTC']['balance']) > 100)
 
@@ -712,7 +715,7 @@ class Test(BaseTest):
         # Verify expected inputs were used
         bid, offer = swap_clients[2].getBidAndOffer(bid_id)
         assert (bid.initiate_tx)
-        wtx = ci.rpc_callback('gettransaction', [bid.initiate_tx.txid.hex(),])
+        wtx = ci.rpc('gettransaction', [bid.initiate_tx.txid.hex(),])
         itx_after = ci.describeTx(wtx['hex'])
         assert (len(itx_after['vin']) == len(itx_decoded['vin']))
         for i, txin in enumerate(itx_decoded['vin']):

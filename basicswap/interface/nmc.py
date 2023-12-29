@@ -19,7 +19,7 @@ class NMCInterface(BTCInterface):
 
     def getLockTxHeight(self, txid, dest_address, bid_amount, rescan_from, find_index=False):
         self._log.debug('[rm] scantxoutset start')  # scantxoutset is slow
-        ro = self.rpc_callback('scantxoutset', ['start', ['addr({})'.format(dest_address)]])  # TODO: Use combo(address) where possible
+        ro = self.rpc('scantxoutset', ['start', ['addr({})'.format(dest_address)]])  # TODO: Use combo(address) where possible
         self._log.debug('[rm] scantxoutset end')
         return_txid = True if txid is None else False
         for o in ro['unspents']:

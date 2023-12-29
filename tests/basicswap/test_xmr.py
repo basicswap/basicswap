@@ -530,29 +530,29 @@ class BaseTest(unittest.TestCase):
 
                 if cls.start_ltc_nodes:
                     num_blocks = 400
-                    cls.ltc_addr = callnoderpc(0, 'getnewaddress', ['mining_addr', 'bech32'], base_rpc_port=LTC_BASE_RPC_PORT)
+                    cls.ltc_addr = callnoderpc(0, 'getnewaddress', ['mining_addr', 'bech32'], base_rpc_port=LTC_BASE_RPC_PORT, wallet='wallet.dat')
                     logging.info('Mining %d Litecoin blocks to %s', num_blocks, cls.ltc_addr)
-                    callnoderpc(0, 'generatetoaddress', [num_blocks, cls.ltc_addr], base_rpc_port=LTC_BASE_RPC_PORT)
+                    callnoderpc(0, 'generatetoaddress', [num_blocks, cls.ltc_addr], base_rpc_port=LTC_BASE_RPC_PORT, wallet='wallet.dat')
 
                     num_blocks = 31
                     cls.ltc_addr = cls.swap_clients[0].ci(Coins.LTC).pubkey_to_address(void_block_rewards_pubkey)
                     logging.info('Mining %d Litecoin blocks to %s', num_blocks, cls.ltc_addr)
-                    callnoderpc(0, 'generatetoaddress', [num_blocks, cls.ltc_addr], base_rpc_port=LTC_BASE_RPC_PORT)
+                    callnoderpc(0, 'generatetoaddress', [num_blocks, cls.ltc_addr], base_rpc_port=LTC_BASE_RPC_PORT, wallet='wallet.dat')
 
                     # https://github.com/litecoin-project/litecoin/issues/807
                     # Block 432 is when MWEB activates. It requires a peg-in. You'll need to generate an mweb address and send some coins to it. Then it will allow you to mine the next block.
-                    mweb_addr = callnoderpc(2, 'getnewaddress', ['mweb_addr', 'mweb'], base_rpc_port=LTC_BASE_RPC_PORT)
-                    callnoderpc(0, 'sendtoaddress', [mweb_addr, 1], base_rpc_port=LTC_BASE_RPC_PORT)
+                    mweb_addr = callnoderpc(2, 'getnewaddress', ['mweb_addr', 'mweb'], base_rpc_port=LTC_BASE_RPC_PORT, wallet='wallet.dat')
+                    callnoderpc(0, 'sendtoaddress', [mweb_addr, 1], base_rpc_port=LTC_BASE_RPC_PORT, wallet='wallet.dat')
 
-                    ltc_addr1 = callnoderpc(1, 'getnewaddress', ['initial addr'], base_rpc_port=LTC_BASE_RPC_PORT)
+                    ltc_addr1 = callnoderpc(1, 'getnewaddress', ['initial addr'], base_rpc_port=LTC_BASE_RPC_PORT, wallet='wallet.dat')
                     for i in range(5):
-                        callnoderpc(0, 'sendtoaddress', [ltc_addr1, 100], base_rpc_port=LTC_BASE_RPC_PORT)
+                        callnoderpc(0, 'sendtoaddress', [ltc_addr1, 100], base_rpc_port=LTC_BASE_RPC_PORT, wallet='wallet.dat')
 
                     num_blocks = 69
                     cls.ltc_addr = cls.swap_clients[0].ci(Coins.LTC).pubkey_to_address(void_block_rewards_pubkey)
-                    callnoderpc(0, 'generatetoaddress', [num_blocks, cls.ltc_addr], base_rpc_port=LTC_BASE_RPC_PORT)
+                    callnoderpc(0, 'generatetoaddress', [num_blocks, cls.ltc_addr], base_rpc_port=LTC_BASE_RPC_PORT, wallet='wallet.dat')
 
-                    checkForks(callnoderpc(0, 'getblockchaininfo', base_rpc_port=LTC_BASE_RPC_PORT))
+                    checkForks(callnoderpc(0, 'getblockchaininfo', base_rpc_port=LTC_BASE_RPC_PORT, wallet='wallet.dat'))
 
                 num_blocks = 100
                 if cls.start_xmr_nodes:
@@ -682,7 +682,7 @@ class Test(BaseTest):
         amount: int = ci.make_int(random.uniform(0.1, 2.0), r=1)
 
         # Record unspents before createSCLockTx as the used ones will be locked
-        unspents = ci.rpc_callback('listunspent')
+        unspents = ci.rpc('listunspent')
 
         # fee_rate is in sats/kvB
         fee_rate: int = 1000
@@ -698,10 +698,10 @@ class Test(BaseTest):
         lock_tx = ci.fundSCLockTx(lock_tx, fee_rate)
         lock_tx = ci.signTxWithWallet(lock_tx)
 
-        unspents_after = ci.rpc_callback('listunspent')
+        unspents_after = ci.rpc('listunspent')
         assert (len(unspents) > len(unspents_after))
 
-        tx_decoded = ci.rpc_callback('decoderawtransaction', [lock_tx.hex()])
+        tx_decoded = ci.rpc('decoderawtransaction', [lock_tx.hex()])
         txid = tx_decoded['txid']
 
         vsize = tx_decoded['vsize']
@@ -722,8 +722,8 @@ class Test(BaseTest):
                     break
         fee_value = in_value - out_value
 
-        ci.rpc_callback('sendrawtransaction', [lock_tx.hex()])
-        rv = ci.rpc_callback('gettransaction', [txid])
+        ci.rpc('sendrawtransaction', [lock_tx.hex()])
+        rv = ci.rpc('gettransaction', [txid])
         wallet_tx_fee = -ci.make_int(rv['fee'])
 
         assert (wallet_tx_fee == fee_value)
@@ -735,7 +735,7 @@ class Test(BaseTest):
         lock_spend_tx = ci.createSCLockSpendTx(lock_tx, lock_tx_script, pkh_out, fee_rate, fee_info=fee_info)
         vsize_estimated: int = fee_info['vsize']
 
-        tx_decoded = ci.rpc_callback('decoderawtransaction', [lock_spend_tx.hex()])
+        tx_decoded = ci.rpc('decoderawtransaction', [lock_spend_tx.hex()])
         txid = tx_decoded['txid']
 
         witness_stack = [
@@ -745,11 +745,11 @@ class Test(BaseTest):
             lock_tx_script,
         ]
         lock_spend_tx = ci.setTxSignature(lock_spend_tx, witness_stack)
-        tx_decoded = ci.rpc_callback('decoderawtransaction', [lock_spend_tx.hex()])
+        tx_decoded = ci.rpc('decoderawtransaction', [lock_spend_tx.hex()])
         vsize_actual: int = tx_decoded['vsize']
 
         assert (vsize_actual <= vsize_estimated and vsize_estimated - vsize_actual < 4)
-        assert (ci.rpc_callback('sendrawtransaction', [lock_spend_tx.hex()]) == txid)
+        assert (ci.rpc('sendrawtransaction', [lock_spend_tx.hex()]) == txid)
 
         expect_vsize: int = ci.xmr_swap_a_lock_spend_tx_vsize()
         assert (expect_vsize >= vsize_actual)
@@ -766,7 +766,7 @@ class Test(BaseTest):
         lock_tx_b_spend = ci.getTransaction(lock_tx_b_spend_txid)
         if lock_tx_b_spend is None:
             lock_tx_b_spend = ci.getWalletTransaction(lock_tx_b_spend_txid)
-        lock_tx_b_spend_decoded = ci.rpc_callback('decoderawtransaction', [lock_tx_b_spend.hex()])
+        lock_tx_b_spend_decoded = ci.rpc('decoderawtransaction', [lock_tx_b_spend.hex()])
 
         expect_vsize: int = ci.xmr_swap_b_lock_spend_tx_vsize()
         assert (expect_vsize >= lock_tx_b_spend_decoded['vsize'])
@@ -1354,7 +1354,7 @@ class Test(BaseTest):
         lock_tx_b_spend = ci.getTransaction(lock_tx_b_spend_txid)
         if lock_tx_b_spend is None:
             lock_tx_b_spend = ci.getWalletTransaction(lock_tx_b_spend_txid)
-        lock_tx_b_spend_decoded = ci.rpc_callback('decoderawtransaction', [lock_tx_b_spend.hex()])
+        lock_tx_b_spend_decoded = ci.rpc('decoderawtransaction', [lock_tx_b_spend.hex()])
 
         expect_vsize: int = ci.xmr_swap_b_lock_spend_tx_vsize()
         assert (expect_vsize >= lock_tx_b_spend_decoded['vsize'])
@@ -1501,7 +1501,7 @@ class Test(BaseTest):
         # Verify expected inputs were used
         bid, _, _, _, _ = swap_clients[2].getXmrBidAndOffer(bid_id)
         assert (bid.xmr_a_lock_tx)
-        wtx = ci.rpc_callback('gettransaction', [bid.xmr_a_lock_tx.txid.hex(),])
+        wtx = ci.rpc('gettransaction', [bid.xmr_a_lock_tx.txid.hex(),])
         itx_after = ci.describeTx(wtx['hex'])
         assert (len(itx_after['vin']) == len(itx_decoded['vin']))
         for i, txin in enumerate(itx_decoded['vin']):

@@ -256,6 +256,7 @@ class BasicSwap(BaseApp):
         self._is_locked = None
 
         # TODO: Set dynamically
+        self.balance_only_coins = (Coins.LTC_MWEB, )
         self.scriptless_coins = (Coins.XMR, Coins.PART_ANON, Coins.FIRO)
         self.adaptor_swap_only_coins = self.scriptless_coins + (Coins.PART_BLIND, )
         self.coins_without_segwit = (Coins.PIVX, Coins.DASH, Coins.NMC)
@@ -480,6 +481,9 @@ class BasicSwap(BaseApp):
             self.coin_clients[Coins.PART_ANON] = self.coin_clients[coin]
             self.coin_clients[Coins.PART_BLIND] = self.coin_clients[coin]
 
+        if coin == Coins.LTC:
+            self.coin_clients[Coins.LTC_MWEB] = self.coin_clients[coin]
+
         if self.coin_clients[coin]['connection_type'] == 'rpc':
             if coin == Coins.XMR:
                 if chain_client_settings.get('automatically_select_daemon', False):
@@ -510,8 +514,8 @@ class BasicSwap(BaseApp):
         if current_daemon_url in remote_daemon_urls:
             self.log.info(f'Trying last used url {rpchost}:{rpcport}.')
             try:
-                rpc_cb2 = make_xmr_rpc2_func(rpcport, daemon_login, rpchost)
-                test = rpc_cb2('get_height', timeout=20)['height']
+                rpc2 = make_xmr_rpc2_func(rpcport, daemon_login, rpchost)
+                test = rpc2('get_height', timeout=20)['height']
                 return True
             except Exception as e:
                 self.log.warning(f'Failed to set XMR remote daemon to {rpchost}:{rpcport}, {e}')
@@ -520,8 +524,8 @@ class BasicSwap(BaseApp):
             self.log.info(f'Trying url {url}.')
             try:
                 rpchost, rpcport = url.rsplit(':', 1)
-                rpc_cb2 = make_xmr_rpc2_func(rpcport, daemon_login, rpchost)
-                test = rpc_cb2('get_height', timeout=20)['height']
+                rpc2 = make_xmr_rpc2_func(rpcport, daemon_login, rpchost)
+                test = rpc2('get_height', timeout=20)['height']
                 coin_settings['rpchost'] = rpchost
                 coin_settings['rpcport'] = rpcport
                 data = {
@@ -544,6 +548,9 @@ class BasicSwap(BaseApp):
         if coin == Coins.PART_BLIND:
             use_coinid = Coins.PART
             interface_ind = 'interface_blind'
+        if coin == Coins.LTC_MWEB:
+            use_coinid = Coins.LTC
+            interface_ind = 'interface_mweb'
 
         if use_coinid not in self.coin_clients:
             raise ValueError('Unknown coinid {}'.format(int(coin)))
@@ -558,6 +565,9 @@ class BasicSwap(BaseApp):
         if coin == Coins.PART_BLIND:
             use_coinid = Coins.PART
             interface_ind = 'interface_blind'
+        if coin == Coins.LTC_MWEB:
+            use_coinid = Coins.LTC
+            interface_ind = 'interface_mweb'
 
         if use_coinid not in self.coin_clients:
             raise ValueError('Unknown coinid {}'.format(int(coin)))
@@ -573,13 +583,18 @@ class BasicSwap(BaseApp):
 
     def createInterface(self, coin):
         if coin == Coins.PART:
-            return PARTInterface(self.coin_clients[coin], self.chain, self)
+            interface = PARTInterface(self.coin_clients[coin], self.chain, self)
+            self.coin_clients[coin]['interface_anon'] = PARTInterfaceAnon(self.coin_clients[coin], self.chain, self)
+            self.coin_clients[coin]['interface_blind'] = PARTInterfaceBlind(self.coin_clients[coin], self.chain, self)
+            return interface
         elif coin == Coins.BTC:
             from .interface.btc import BTCInterface
             return BTCInterface(self.coin_clients[coin], self.chain, self)
         elif coin == Coins.LTC:
-            from .interface.ltc import LTCInterface
-            return LTCInterface(self.coin_clients[coin], self.chain, self)
+            from .interface.ltc import LTCInterface, LTCInterfaceMWEB
+            interface = LTCInterface(self.coin_clients[coin], self.chain, self)
+            self.coin_clients[coin]['interface_mweb'] = LTCInterfaceMWEB(self.coin_clients[coin], self.chain, self)
+            return interface
         elif coin == Coins.NMC:
             from .interface.nmc import NMCInterface
             return NMCInterface(self.coin_clients[coin], self.chain, self)
@@ -662,9 +677,6 @@ class BasicSwap(BaseApp):
     def createCoinInterface(self, coin):
         if self.coin_clients[coin]['connection_type'] == 'rpc':
             self.coin_clients[coin]['interface'] = self.createInterface(coin)
-            if coin == Coins.PART:
-                self.coin_clients[coin]['interface_anon'] = PARTInterfaceAnon(self.coin_clients[coin], self.chain, self)
-                self.coin_clients[coin]['interface_blind'] = PARTInterfaceBlind(self.coin_clients[coin], self.chain, self)
         elif self.coin_clients[coin]['connection_type'] == 'passthrough':
             self.coin_clients[coin]['interface'] = self.createPassthroughInterface(coin)
 
@@ -685,13 +697,11 @@ class BasicSwap(BaseApp):
             self.createCoinInterface(c)
 
             if self.coin_clients[c]['connection_type'] == 'rpc':
-                if c in (Coins.BTC, ):
-                    self.waitForDaemonRPC(c, with_wallet=False)
-                    if len(self.callcoinrpc(c, 'listwallets')) >= 1:
-                        self.waitForDaemonRPC(c)
-                else:
-                    self.waitForDaemonRPC(c)
                 ci = self.ci(c)
+                self.waitForDaemonRPC(c, with_wallet=False)
+                if c not in (Coins.XMR,) and ci.checkWallets() >= 1:
+                    self.waitForDaemonRPC(c)
+
                 core_version = ci.getDaemonVersion()
                 self.log.info('%s Core version %d', ci.coin_name(), core_version)
                 self.coin_clients[c]['core_version'] = core_version
@@ -721,6 +731,11 @@ class BasicSwap(BaseApp):
                     except Exception as e:
                         self.log.warning('Can\'t open XMR wallet, could be locked.')
                         continue
+                elif c == Coins.LTC:
+                    ci_mweb = self.ci(Coins.LTC_MWEB)
+                    is_encrypted, _ = self.getLockedState()
+                    if not is_encrypted and not ci_mweb.has_mweb_wallet():
+                        ci_mweb.init_wallet()
 
                 self.checkWalletSeed(c)
 
@@ -850,6 +865,16 @@ class BasicSwap(BaseApp):
             if self.coin_clients[c]['connection_type'] == 'rpc':
                 yield c
 
+    def getListOfWalletCoins(self):
+        coins_list = copy.deepcopy(self.activeCoins())
+        # Always unlock Particl first
+        if Coins.PART in coins_list:
+            coins_list.pop(Coins.PART)
+            coins_list = [Coins.PART,] + coins_list
+        if Coins.LTC in coins_list:
+            coins_list.append(Coins.LTC_MWEB)
+        return coins_list
+
     def changeWalletPasswords(self, old_password: str, new_password: str, coin=None) -> None:
         # Only the main wallet password is changed for monero, avoid issues by preventing until active swaps are complete
         if len(self.swaps_in_progress) > 0:
@@ -861,8 +886,10 @@ class BasicSwap(BaseApp):
         if len(new_password) < 4:
             raise ValueError('New password is too short')
 
+        coins_list = self.getListOfWalletCoins()
+
         # Unlock wallets to ensure they all have the same password.
-        for c in self.activeCoins():
+        for c in coins_list:
             if coin and c != coin:
                 continue
             ci = self.ci(c)
@@ -871,7 +898,7 @@ class BasicSwap(BaseApp):
             except Exception as e:
                 raise ValueError('Failed to unlock {}'.format(ci.coin_name()))
 
-        for c in self.activeCoins():
+        for c in coins_list:
             if coin and c != coin:
                 continue
             self.ci(c).changeWalletPassword(old_password, new_password)
@@ -882,7 +909,7 @@ class BasicSwap(BaseApp):
 
     def unlockWallets(self, password: str, coin=None) -> None:
         self._read_zmq_queue = False
-        for c in self.activeCoins():
+        for c in self.getListOfWalletCoins():
             if coin and c != coin:
                 continue
             self.ci(c).unlockWallet(password)
@@ -896,7 +923,7 @@ class BasicSwap(BaseApp):
         self._read_zmq_queue = False
         self.swaps_in_progress.clear()
 
-        for c in self.activeCoins():
+        for c in self.getListOfWalletCoins():
             if coin and c != coin:
                 continue
             self.ci(c).lockWallet()
@@ -923,7 +950,6 @@ class BasicSwap(BaseApp):
 
         root_key = self.getWalletKey(coin_type, 1)
         root_hash = ci.getSeedHash(root_key)
-
         try:
             ci.initialiseWallet(root_key)
         except Exception as e:
@@ -931,6 +957,8 @@ class BasicSwap(BaseApp):
             self.log.error('initialiseWallet failed: {}'.format(str(e)))
             if raise_errors:
                 raise e
+            if self.debug:
+                self.log.error(traceback.format_exc())
             return
 
         try:
@@ -1167,6 +1195,11 @@ class BasicSwap(BaseApp):
         return coin_from in self.scriptless_coins + self.coins_without_segwit
 
     def validateSwapType(self, coin_from, coin_to, swap_type):
+
+        for coin in (coin_from, coin_to):
+            if coin in self.balance_only_coins:
+                raise ValueError('Invalid coin: {}'.format(coin.name))
+
         if swap_type == SwapTypes.XMR_SWAP:
             reverse_bid: bool = self.is_reverse_ads_bid(coin_from)
             itx_coin = coin_to if reverse_bid else coin_from
@@ -1812,6 +1845,14 @@ class BasicSwap(BaseApp):
         self.log.debug('In txn: {}'.format(txid))
         return txid
 
+    def withdrawLTC(self, type_from, value, addr_to, subfee):
+        ci = self.ci(Coins.LTC)
+        self.log.info('withdrawLTC %s %s to %s %s', value, ci.ticker(), addr_to, ' subfee' if subfee else '')
+
+        txid = ci.withdrawCoin(value, type_from, addr_to, subfee)
+        self.log.debug('In txn: {}'.format(txid))
+        return txid
+
     def withdrawParticl(self, type_from, type_to, value, addr_to, subfee):
         self.log.info('withdrawParticl %s %s to %s %s %s', value, type_from, type_to, addr_to, ' subfee' if subfee else '')
 
@@ -1827,7 +1868,7 @@ class BasicSwap(BaseApp):
 
     def cacheNewAddressForCoin(self, coin_type):
         self.log.debug('cacheNewAddressForCoin %s', coin_type)
-        key_str = 'receive_addr_' + chainparams[coin_type]['name']
+        key_str = 'receive_addr_' + self.ci(coin_type).coin_name().lower()
         addr = self.getReceiveAddressForCoin(coin_type)
         self.setStringKV(key_str, addr)
         return addr
@@ -1864,7 +1905,7 @@ class BasicSwap(BaseApp):
         if expect_seedid is None:
             self.log.warning('Can\'t find expected wallet seed id for coin {}'.format(ci.coin_name()))
             return False
-        if c == Coins.BTC and len(ci.rpc_callback('listwallets')) < 1:
+        if c == Coins.BTC and len(ci.rpc('listwallets')) < 1:
             self.log.warning('Missing wallet for coin {}'.format(ci.coin_name()))
             return False
         if ci.checkExpectedSeed(expect_seedid):
@@ -1893,7 +1934,8 @@ class BasicSwap(BaseApp):
         self.log.debug('getCachedAddressForCoin %s', coin_type)
         # TODO: auto refresh after used
 
-        key_str = 'receive_addr_' + chainparams[coin_type]['name']
+        ci = self.ci(coin_type)
+        key_str = 'receive_addr_' + ci.coin_name().lower()
         session = self.openSession()
         try:
             try:
@@ -1908,9 +1950,22 @@ class BasicSwap(BaseApp):
             self.closeSession(session)
         return addr
 
+    def cacheNewStealthAddressForCoin(self, coin_type):
+        self.log.debug('cacheNewStealthAddressForCoin %s', coin_type)
+
+        if coin_type == Coins.LTC_MWEB:
+            coin_type = Coins.LTC
+        ci = self.ci(coin_type)
+        key_str = 'stealth_addr_' + ci.coin_name().lower()
+        addr = ci.getNewStealthAddress()
+        self.setStringKV(key_str, addr)
+        return addr
+
     def getCachedStealthAddressForCoin(self, coin_type):
         self.log.debug('getCachedStealthAddressForCoin %s', coin_type)
 
+        if coin_type == Coins.LTC_MWEB:
+            coin_type = Coins.LTC
         ci = self.ci(coin_type)
         key_str = 'stealth_addr_' + ci.coin_name().lower()
         session = self.openSession()
@@ -2559,7 +2614,7 @@ class BasicSwap(BaseApp):
 
             address_out = self.getReceiveAddressFromPool(coin_from, offer_id, TxTypes.XMR_SWAP_A_LOCK)
             if coin_from == Coins.PART_BLIND:
-                addrinfo = ci_from.rpc_callback('getaddressinfo', [address_out])
+                addrinfo = ci_from.rpc('getaddressinfo', [address_out])
                 msg_buf.dest_af = bytes.fromhex(addrinfo['pubkey'])
             else:
                 msg_buf.dest_af = ci_from.decodeAddress(address_out)
@@ -2870,7 +2925,7 @@ class BasicSwap(BaseApp):
 
             address_out = self.getReceiveAddressFromPool(coin_from, bid.offer_id, TxTypes.XMR_SWAP_A_LOCK)
             if coin_from == Coins.PART_BLIND:
-                addrinfo = ci_from.rpc_callback('getaddressinfo', [address_out])
+                addrinfo = ci_from.rpc('getaddressinfo', [address_out])
                 xmr_swap.dest_af = bytes.fromhex(addrinfo['pubkey'])
             else:
                 xmr_swap.dest_af = ci_from.decodeAddress(address_out)
@@ -3339,7 +3394,8 @@ class BasicSwap(BaseApp):
         bid.participate_tx.chain_height = participate_txn_height
 
         # Start checking for spends of participate_txn before fully confirmed
-        self.log.debug('Watching %s chain for spend of output %s %d', chainparams[coin_type]['name'], txid_hex, vout)
+        ci = self.ci(coin_type)
+        self.log.debug('Watching %s chain for spend of output %s %d', ci.coin_name().lower(), txid_hex, vout)
         self.addWatchedOutput(coin_type, bid_id, txid_hex, vout, BidStates.SWAP_PARTICIPATING)
 
     def participateTxnConfirmed(self, bid_id: bytes, bid, offer) -> None:
@@ -4151,7 +4207,7 @@ class BasicSwap(BaseApp):
                 last_height_checked += 1
             if c['last_height_checked'] != last_height_checked:
                 c['last_height_checked'] = last_height_checked
-                self.setIntKV('last_height_checked_' + chainparams[coin_type]['name'], last_height_checked)
+                self.setIntKV('last_height_checked_' + ci.coin_name().lower(), last_height_checked)
 
     def expireMessages(self) -> None:
         if self._is_locked is True:
@@ -6413,6 +6469,11 @@ class BasicSwap(BaseApp):
                 rv['main_address'] = self.getCachedMainWalletAddress(ci)
             elif coin == Coins.NAV:
                 rv['immature'] = walletinfo['immature_balance']
+            elif coin == Coins.LTC:
+                rv['mweb_address'] = self.getCachedStealthAddressForCoin(Coins.LTC_MWEB)
+                rv['mweb_balance'] = walletinfo['mweb_balance']
+                rv['mweb_pending'] = walletinfo['mweb_unconfirmed'] + walletinfo['mweb_immature']
+                rv['mweb_pending'] = walletinfo['mweb_unconfirmed'] + walletinfo['mweb_immature']
 
             return rv
         except Exception as e:
@@ -6505,10 +6566,17 @@ class BasicSwap(BaseApp):
                     wallet_data['lastupdated'] = row[3]
                     wallet_data['updating'] = self._updating_wallets_info.get(coin_id, False)
 
-                    # Ensure the latest deposit address is displayed
-                    q = session.execute('SELECT value FROM kv_string WHERE key = "receive_addr_{}"'.format(chainparams[coin_id]['name']))
+                    # Ensure the latest addresses are displayed
+                    q = session.execute('SELECT key, value FROM kv_string WHERE key = "receive_addr_{0}" OR key = "stealth_addr_{0}"'.format(chainparams[coin_id]['name']))
                     for row in q:
-                        wallet_data['deposit_address'] = row[0]
+
+                        if row[0].startswith('stealth'):
+                            if coin_id == Coins.LTC:
+                                wallet_data['mweb_address'] = row[1]
+                            else:
+                                wallet_data['stealth_address'] = row[1]
+                        else:
+                            wallet_data['deposit_address'] = row[1]
 
                 if coin_id in rv:
                     rv[coin_id].update(wallet_data)
