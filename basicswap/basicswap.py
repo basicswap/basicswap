@@ -8,7 +8,6 @@ import os
 import re
 import sys
 import zmq
-import copy
 import json
 import time
 import base64
@@ -866,11 +865,8 @@ class BasicSwap(BaseApp):
                 yield c
 
     def getListOfWalletCoins(self):
-        coins_list = copy.deepcopy(self.activeCoins())
         # Always unlock Particl first
-        if Coins.PART in coins_list:
-            coins_list.pop(Coins.PART)
-            coins_list = [Coins.PART,] + coins_list
+        coins_list = [Coins.PART, ] + [c for c in self.activeCoins() if c != Coins.PART]
         if Coins.LTC in coins_list:
             coins_list.append(Coins.LTC_MWEB)
         return coins_list
