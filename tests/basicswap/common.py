@@ -73,7 +73,9 @@ def prepareDataDir(datadir, node_id, conf_file, dir_prefix, base_p2p_port=BASE_P
         fp.write('wallet=wallet.dat\n')
         fp.write('findpeers=0\n')
 
-        if base_p2p_port == BASE_PORT:  # Particl
+        if base_p2p_port == BTC_BASE_PORT:
+            fp.write('deprecatedrpc=create_bdb\n')
+        elif base_p2p_port == BASE_PORT:  # Particl
             fp.write('zmqpubsmsg=tcp://127.0.0.1:{}\n'.format(BASE_ZMQ_PORT + node_id))
             # minstakeinterval=5  # Using walletsettings stakelimit instead
             fp.write('stakethreadconddelayms=1000\n')

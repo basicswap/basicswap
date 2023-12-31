@@ -820,6 +820,9 @@ class BasicSwap(BaseApp):
         chain_client_settings = self.getChainClientSettings(coin_type)
         if 'startup_tries' in chain_client_settings:
             startup_tries = chain_client_settings['startup_tries']
+        if startup_tries < 1:
+            self.log.warning('startup_tries can\'t be less than 1.')
+            startup_tries = 1
         for i in range(startup_tries):
             if self.delay_event.is_set():
                 return

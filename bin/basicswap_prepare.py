@@ -45,7 +45,7 @@ PARTICL_LINUX_EXTRA = os.getenv('PARTICL_LINUX_EXTRA', 'nousb')
 LITECOIN_VERSION = os.getenv('LITECOIN_VERSION', '0.21.2.2')
 LITECOIN_VERSION_TAG = os.getenv('LITECOIN_VERSION_TAG', '')
 
-BITCOIN_VERSION = os.getenv('BITCOIN_VERSION', '23.0')
+BITCOIN_VERSION = os.getenv('BITCOIN_VERSION', '26.0')
 BITCOIN_VERSION_TAG = os.getenv('BITCOIN_VERSION_TAG', '')
 
 MONERO_VERSION = os.getenv('MONERO_VERSION', '0.18.2.2')
@@ -884,6 +884,7 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
             if LTC_RPC_USER != '':
                 fp.write('rpcauth={}:{}${}\n'.format(LTC_RPC_USER, salt, password_to_hmac(salt, LTC_RPC_PWD)))
         elif coin == 'bitcoin':
+            fp.write('deprecatedrpc=create_bdb\n')
             fp.write('prune=2000\n')
             fp.write('fallbackfee=0.0002\n')
             if BTC_RPC_USER != '':
