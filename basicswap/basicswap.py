@@ -8,6 +8,7 @@ import os
 import re
 import sys
 import zmq
+import copy
 import json
 import time
 import base64
