@@ -1,3 +1,9 @@
+0.12.5
+==============
+
+- Unlock wallets logs an error when failing to unlock a wallet.
+- Fixed bug where failed unlock prevents processing incoming smsg messages.
+
 
 0.12.4
 ==============
