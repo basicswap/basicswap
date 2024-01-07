@@ -6505,7 +6505,7 @@ class BasicSwap(BaseApp):
 
             return rv
         except Exception as e:
-            self.log.warning('getWalletInfo failed with: %s', str(e))
+            self.log.warning('getWalletInfo for %s failed with: %s', ci.coin_name(), str(e))
 
     def addWalletInfoRecord(self, coin, info_type, wi) -> None:
         coin_id = int(coin)
