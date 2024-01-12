@@ -603,7 +603,8 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
         elif coin == 'litecoin':
             release_url = 'https://download.litecoin.org/litecoin-{}/{}/{}'.format(version, os_name, release_filename)
             assert_filename = '{}-core-{}-{}-build.assert'.format(coin, os_name, '.'.join(version.split('.')[:2]))
-            assert_url = 'https://raw.githubusercontent.com/litecoin-project/gitian.sigs.ltc/master/%s-%s/%s/%s' % (version, os_dir_name, signing_key_name, assert_filename)
+            use_signing_key_name = (signing_key_name + '/' + signing_key_name) if os_name == 'win' else signing_key_name
+            assert_url = 'https://raw.githubusercontent.com/litecoin-project/gitian.sigs.ltc/master/%s-%s/%s/%s' % (version, os_dir_name, use_signing_key_name, assert_filename)
         elif coin == 'bitcoin':
             release_url = 'https://bitcoincore.org/bin/bitcoin-core-{}/{}'.format(version, release_filename)
             assert_filename = '{}-core-{}-{}-build.assert'.format(coin, os_name, '.'.join(version.split('.')[:2]))
