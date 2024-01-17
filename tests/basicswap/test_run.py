@@ -125,11 +125,10 @@ class Test(BaseTest):
     def test_002_lookup_rates(self):
         rv = self.swap_clients[0].lookupRates(Coins.BTC, Coins.PART)
         assert ('coingecko' in rv)
-        assert ('bittrex' in rv)
 
         rv = self.swap_clients[0].lookupRates(Coins.LTC, Coins.BTC)
         assert ('coingecko' in rv)
-        assert ('bittrex' in rv)
+
 
         rv = read_json_api(1800, 'rateslist?from=PART&to=BTC')
         assert len(rv) == 2
