@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019-2023 tecnovert
+# Copyright (c) 2019-2024 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -128,7 +128,6 @@ class Test(BaseTest):
 
         rv = self.swap_clients[0].lookupRates(Coins.LTC, Coins.BTC)
         assert ('coingecko' in rv)
-
 
         rv = read_json_api(1800, 'rateslist?from=PART&to=BTC')
         assert len(rv) == 2
