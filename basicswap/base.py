@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019-2023 tecnovert
+# Copyright (c) 2019-2024 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -8,6 +8,7 @@ import os
 import time
 import shlex
 import socks
+import random
 import socket
 import urllib
 import logging
@@ -198,3 +199,28 @@ class BaseApp:
     def setMockTimeOffset(self, new_offset: int) -> None:
         self.log.warning(f'Setting mocktime to {new_offset}')
         self.mock_time_offset = new_offset
+
+    def get_int_setting(self, name: str, default_v: int, min_v: int, max_v) -> int:
+        value: int = self.settings.get(name, default_v)
+        if value < min_v:
+            self.log.warning(f'Setting {name} to {min_v}')
+            value = min_v
+        if value > max_v:
+            self.log.warning(f'Setting {name} to {max_v}')
+            value = max_v
+        return value
+
+    def get_delay_event_seconds(self):
+        if self.min_delay_event == self.max_delay_event:
+            return self.min_delay_event
+        return random.randrange(self.min_delay_event, self.max_delay_event)
+
+    def get_short_delay_event_seconds(self):
+        if self.min_delay_event_short == self.max_delay_event_short:
+            return self.min_delay_event_short
+        return random.randrange(self.min_delay_event_short, self.max_delay_event_short)
+
+    def get_delay_retry_seconds(self):
+        if self.min_delay_retry == self.max_delay_retry:
+            return self.min_delay_retry
+        return random.randrange(self.min_delay_retry, self.max_delay_retry)

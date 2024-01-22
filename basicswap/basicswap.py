@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019-2023 tecnovert
+# Copyright (c) 2019-2024 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -173,7 +173,7 @@ def threadPollXMRChainState(swap_client, coin_type):
                     cc['chain_height'] = new_height
         except Exception as e:
             swap_client.log.warning('threadPollXMRChainState {}, error: {}'.format(ci.ticker(), str(e)))
-        swap_client.chainstate_delay_event.wait(random.randrange(20, 30))  # random to stagger updates
+        swap_client.chainstate_delay_event.wait(random.randrange(20, 30))  # Random to stagger updates
 
 
 def threadPollChainState(swap_client, coin_type):
@@ -191,7 +191,7 @@ def threadPollChainState(swap_client, coin_type):
                         cc['chain_median_time'] = chain_state['mediantime']
         except Exception as e:
             swap_client.log.warning('threadPollChainState {}, error: {}'.format(ci.ticker(), str(e)))
-        swap_client.chainstate_delay_event.wait(random.randrange(20, 30))  # random to stagger updates
+        swap_client.chainstate_delay_event.wait(random.randrange(20, 30))  # Random to stagger updates
 
 
 class WatchedOutput():  # Watch for spends
@@ -229,12 +229,12 @@ class BasicSwap(BaseApp):
         v = __version__.split('.')
         self._version = struct.pack('>HHH', int(v[0]), int(v[1]), int(v[2]))
 
-        self.check_progress_seconds = self.settings.get('check_progress_seconds', 60)
-        self.check_watched_seconds = self.settings.get('check_watched_seconds', 60)
-        self.check_expired_seconds = self.settings.get('check_expired_seconds', 60 * 5)
-        self.check_actions_seconds = self.settings.get('check_actions_seconds', 10)
-        self.check_xmr_swaps_seconds = self.settings.get('check_xmr_swaps_seconds', 20)
-        self.startup_tries = self.settings.get('startup_tries', 21)  # Seconds waited for will be (x(1 + x+1) / 2
+        self.check_progress_seconds = self.get_int_setting('check_progress_seconds', 60, 1, 10 * 60)
+        self.check_watched_seconds = self.get_int_setting('check_watched_seconds', 60, 1, 10 * 60)
+        self.check_expired_seconds = self.get_int_setting('check_expired_seconds', 5 * 60, 1, 10 * 60)
+        self.check_actions_seconds = self.get_int_setting('check_actions_seconds', 10, 1, 10 * 60)
+        self.check_xmr_swaps_seconds = self.get_int_setting('check_xmr_swaps_seconds', 20, 1, 10 * 60)
+        self.startup_tries = self.get_int_setting('startup_tries', 21, 1, 100)  # Seconds waited for will be (x(1 + x+1) / 2
         self.debug_ui = self.settings.get('debug_ui', False)
         self._last_checked_progress = 0
         self._last_checked_watched = 0
@@ -246,7 +246,7 @@ class BasicSwap(BaseApp):
         self._last_updated_wallets_info = 0
         self._zmq_queue_enabled = self.settings.get('zmq_queue_enabled', True)
         self._poll_smsg = self.settings.get('poll_smsg', False)
-        self.check_smsg_seconds = self.settings.get('check_smsg_seconds', 10)
+        self.check_smsg_seconds = self.get_int_setting('check_smsg_seconds', 10, 1, 10 * 60)
         self._last_checked_smsg = 0
 
         self._notifications_enabled = self.settings.get('notifications_enabled', True)
@@ -254,7 +254,7 @@ class BasicSwap(BaseApp):
         self._keep_notifications = self.settings.get('keep_notifications', 50)
         self._show_notifications = self.settings.get('show_notifications', 10)
         self._expire_db_records = self.settings.get('expire_db_records', False)
-        self._expire_db_records_after = self.settings.get('expire_db_records_after', 86400 * 7)  # Seconds
+        self._expire_db_records_after = self.get_int_setting('expire_db_records_after', 7 * 86400, 0, 31 * 86400)  # Seconds
         self._notifications_cache = {}
         self._is_encrypted = None
         self._is_locked = None
@@ -266,13 +266,13 @@ class BasicSwap(BaseApp):
         self.coins_without_segwit = (Coins.PIVX, Coins.DASH, Coins.NMC)
 
         # TODO: Adjust ranges
-        self.min_delay_event = self.settings.get('min_delay_event', 10)
-        self.max_delay_event = self.settings.get('max_delay_event', 60)
-        self.min_delay_event_short = self.settings.get('min_delay_event_short', 2)
-        self.max_delay_event_short = self.settings.get('max_delay_event_short', 30)
+        self.min_delay_event = self.get_int_setting('min_delay_event', 10, 0, 20 * 60)
+        self.max_delay_event = self.get_int_setting('max_delay_event', 60, self.min_delay_event, 20 * 60)
+        self.min_delay_event_short = self.get_int_setting('min_delay_event_short', 2, 0, 10 * 60)
+        self.max_delay_event_short = self.get_int_setting('max_delay_event_short', 30, self.min_delay_event_short, 10 * 60)
 
-        self.min_delay_retry = self.settings.get('min_delay_retry', 60)
-        self.max_delay_retry = self.settings.get('max_delay_retry', 5 * 60)
+        self.min_delay_retry = self.get_int_setting('min_delay_retry', 60, 0, 20 * 60)
+        self.max_delay_retry = self.get_int_setting('max_delay_retry', 5 * 60, self.min_delay_retry, 20 * 60)
 
         self.min_sequence_lock_seconds = self.settings.get('min_sequence_lock_seconds', 60 if self.debug else (1 * 60 * 60))
         self.max_sequence_lock_seconds = self.settings.get('max_sequence_lock_seconds', 96 * 60 * 60)
@@ -3654,7 +3654,7 @@ class BasicSwap(BaseApp):
             elif state == BidStates.XMR_SWAP_FAILED:
                 if was_sent and bid.xmr_b_lock_tx:
                     if self.countQueuedActions(session, bid_id, ActionTypes.RECOVER_XMR_SWAP_LOCK_TX_B) < 1:
-                        delay = random.randrange(self.min_delay_event, self.max_delay_event)
+                        delay = self.get_delay_event_seconds()
                         self.log.info('Recovering adaptor-sig swap chain B lock tx for bid %s in %d seconds', bid_id.hex(), delay)
                         self.createActionInSession(delay, ActionTypes.RECOVER_XMR_SWAP_LOCK_TX_B, bid_id, session)
                         session.commit()
@@ -3690,7 +3690,7 @@ class BasicSwap(BaseApp):
                     bid_changed = True
 
                     if was_sent:
-                        delay = random.randrange(self.min_delay_event, self.max_delay_event)
+                        delay = self.get_delay_event_seconds()
                         self.log.info('Sending adaptor-sig swap chain B lock tx for bid %s in %d seconds', bid_id.hex(), delay)
                         self.createActionInSession(delay, ActionTypes.SEND_XMR_SWAP_LOCK_TX_B, bid_id, session)
                         # bid.setState(BidStates.SWAP_DELAYING)
@@ -3711,7 +3711,7 @@ class BasicSwap(BaseApp):
                         bid.setState(BidStates.XMR_SWAP_NOSCRIPT_COIN_LOCKED)
 
                         if was_received:
-                            delay = random.randrange(self.min_delay_event, self.max_delay_event)
+                            delay = self.get_delay_event_seconds()
                             self.log.info('Releasing ads script coin lock tx for bid %s in %d seconds', bid_id.hex(), delay)
                             self.createActionInSession(delay, ActionTypes.SEND_XMR_LOCK_RELEASE, bid_id, session)
 
@@ -3732,7 +3732,7 @@ class BasicSwap(BaseApp):
             elif state == BidStates.XMR_SWAP_SCRIPT_TX_REDEEMED:
                 if was_received and self.countQueuedActions(session, bid_id, ActionTypes.REDEEM_XMR_SWAP_LOCK_TX_B) < 1:
                     bid.setState(BidStates.SWAP_DELAYING)
-                    delay = random.randrange(self.min_delay_event, self.max_delay_event)
+                    delay = self.get_delay_event_seconds()
                     self.log.info('Redeeming coin b lock tx for bid %s in %d seconds', bid_id.hex(), delay)
                     self.createActionInSession(delay, ActionTypes.REDEEM_XMR_SWAP_LOCK_TX_B, bid_id, session)
                     self.saveBidInSession(bid_id, bid, session, xmr_swap)
@@ -4033,7 +4033,7 @@ class BasicSwap(BaseApp):
                         bid.setState(BidStates.BID_ABANDONED)
                         self.logBidEvent(bid.bid_id, EventLogTypes.DEBUG_TWEAK_APPLIED, 'ind {}'.format(bid.debug_ind), None)
                     else:
-                        delay = random.randrange(self.min_delay_event_short, self.max_delay_event_short)
+                        delay = self.get_short_delay_event_seconds()
                         self.log.info('Redeeming ITX for bid %s in %d seconds', bid_id.hex(), delay)
                         self.createAction(delay, ActionTypes.REDEEM_ITX, bid_id)
                 # TODO: Wait for depth? new state SWAP_TXI_REDEEM_SENT?
@@ -4133,7 +4133,7 @@ class BasicSwap(BaseApp):
                             txid=xmr_swap.a_lock_refund_spend_tx_id,
                         )
                     if bid.xmr_b_lock_tx is not None:
-                        delay = random.randrange(self.min_delay_event, self.max_delay_event)
+                        delay = self.get_delay_event_seconds()
                         self.log.info('Recovering adaptor-sig swap chain B lock tx for bid %s in %d seconds', bid_id.hex(), delay)
                         self.createActionInSession(delay, ActionTypes.RECOVER_XMR_SWAP_LOCK_TX_B, bid_id, session)
                     else:
@@ -4764,7 +4764,7 @@ class BasicSwap(BaseApp):
         self.notify(NT.BID_RECEIVED, {'type': 'secrethash', 'bid_id': bid_id.hex(), 'offer_id': bid_data.offer_msg_id.hex()})
 
         if self.shouldAutoAcceptBid(offer, bid):
-            delay = random.randrange(self.min_delay_event, self.max_delay_event)
+            delay = self.get_delay_event_seconds()
             self.log.info('Auto accepting bid %s in %d seconds', bid_id.hex(), delay)
             self.createAction(delay, ActionTypes.ACCEPT_BID, bid_id)
 
@@ -4912,7 +4912,7 @@ class BasicSwap(BaseApp):
         bid.setState(BidStates.BID_RECEIVED)
 
         if reverse_bid or self.shouldAutoAcceptBid(offer, bid, session):
-            delay = random.randrange(self.min_delay_event, self.max_delay_event)
+            delay = self.get_delay_event_seconds()
             self.log.info('Auto accepting %sadaptor-sig bid %s in %d seconds', 'reverse ' if reverse_bid else '', bid.bid_id.hex(), delay)
             self.createActionInSession(delay, ActionTypes.ACCEPT_XMR_BID, bid.bid_id, session)
             bid.setState(BidStates.SWAP_DELAYING)
@@ -4981,7 +4981,7 @@ class BasicSwap(BaseApp):
         if reverse_bid is False:
             self.notify(NT.BID_ACCEPTED, {'bid_id': bid.bid_id.hex()}, session)
 
-        delay = random.randrange(self.min_delay_event, self.max_delay_event)
+        delay = self.get_delay_event_seconds()
         self.log.info('Responding to adaptor-sig bid accept %s in %d seconds', bid.bid_id.hex(), delay)
         self.createActionInSession(delay, ActionTypes.SIGN_XMR_SWAP_LOCK_TX_A, bid.bid_id, session)
 
@@ -5284,7 +5284,7 @@ class BasicSwap(BaseApp):
             xmr_swap.a_lock_tx, xmr_swap.a_lock_tx_script,
             xmr_swap.dest_af, a_fee_rate, xmr_swap.vkbv)
         '''
-        delay = random.randrange(self.min_delay_event_short, self.max_delay_event_short)
+        delay = self.get_short_delay_event_seconds()
         self.log.info('Sending lock spend tx message for bid %s in %d seconds', bid_id.hex(), delay)
         self.createActionInSession(delay, ActionTypes.SEND_XMR_SWAP_LOCK_SPEND_MSG, bid_id, session)
 
@@ -5373,7 +5373,7 @@ class BasicSwap(BaseApp):
             self.log.error(error_msg)
 
             if num_retries < 5 and (ci_to.is_transient_error(ex) or self.is_transient_error(ex)):
-                delay = random.randrange(self.min_delay_retry, self.max_delay_retry)
+                delay = self.get_delay_retry_seconds()
                 self.log.info('Retrying sending adaptor-sig swap chain B lock tx for bid %s in %d seconds', bid_id.hex(), delay)
                 self.createActionInSession(delay, ActionTypes.SEND_XMR_SWAP_LOCK_TX_B, bid_id, session)
             else:
@@ -5532,7 +5532,7 @@ class BasicSwap(BaseApp):
             self.log.error(error_msg)
 
             if num_retries < 100 and (ci_to.is_transient_error(ex) or self.is_transient_error(ex)):
-                delay = random.randrange(self.min_delay_retry, self.max_delay_retry)
+                delay = self.get_delay_retry_seconds()
                 self.log.info('Retrying sending adaptor-sig swap chain B spend tx for bid %s in %d seconds', bid_id.hex(), delay)
                 self.createActionInSession(delay, ActionTypes.REDEEM_XMR_SWAP_LOCK_TX_B, bid_id, session)
             else:
@@ -5599,7 +5599,7 @@ class BasicSwap(BaseApp):
 
             str_error = str(ex)
             if num_retries < 100 and (ci_to.is_transient_error(ex) or self.is_transient_error(ex)):
-                delay = random.randrange(self.min_delay_retry, self.max_delay_retry)
+                delay = self.get_delay_retry_seconds()
                 self.log.info('Retrying sending adaptor-sig swap chain B refund tx for bid %s in %d seconds', bid_id.hex(), delay)
                 self.createActionInSession(delay, ActionTypes.RECOVER_XMR_SWAP_LOCK_TX_B, bid_id, session)
             else:
@@ -5709,7 +5709,7 @@ class BasicSwap(BaseApp):
             ensure(v, 'Invalid signature for lock refund spend txn')
             xmr_swap_1.addLockRefundSigs(self, xmr_swap, ci_from)
 
-            delay = random.randrange(self.min_delay_event, self.max_delay_event)
+            delay = self.get_delay_event_seconds()
             self.log.info('Sending coin A lock tx for adaptor-sig bid %s in %d seconds', bid_id.hex(), delay)
             self.createAction(delay, ActionTypes.SEND_XMR_SWAP_LOCK_TX_A, bid_id)
 
@@ -5850,7 +5850,7 @@ class BasicSwap(BaseApp):
             self.swaps_in_progress[bid_id] = (bid, offer)
             return
 
-        delay = random.randrange(self.min_delay_event, self.max_delay_event)
+        delay = self.get_delay_event_seconds()
         self.log.info('Redeeming coin A lock tx for adaptor-sig bid %s in %d seconds', bid_id.hex(), delay)
         self.createAction(delay, ActionTypes.REDEEM_XMR_SWAP_LOCK_TX_A, bid_id)
 
@@ -5940,7 +5940,7 @@ class BasicSwap(BaseApp):
 
             options = {'reverse_bid': True, 'bid_rate': bid_data.rate}
             if self.shouldAutoAcceptBid(offer, bid, session, options=options):
-                delay = random.randrange(self.min_delay_event, self.max_delay_event)
+                delay = self.get_delay_event_seconds()
                 self.log.info('Auto accepting reverse adaptor-sig bid %s in %d seconds', bid.bid_id.hex(), delay)
                 self.createActionInSession(delay, ActionTypes.ACCEPT_AS_REV_BID, bid.bid_id, session)
                 bid.setState(BidStates.SWAP_DELAYING)
