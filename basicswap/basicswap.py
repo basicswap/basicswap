@@ -2432,7 +2432,6 @@ class BasicSwap(BaseApp):
             reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from)
             if reverse_bid:
                 return self.acceptADSReverseBid(bid_id)
-
             return self.acceptXmrBid(bid_id)
 
         if bid.contract_count is None:
@@ -4301,23 +4300,28 @@ class BasicSwap(BaseApp):
             self.closeSession(session)
 
     def countQueuedActions(self, session, bid_id: bytes, action_type) -> int:
-        q = session.query(Action).filter(sa.and_(Action.active_ind == 1, Action.linked_id == bid_id, Action.action_type == int(action_type)))
+        q = session.query(Action).filter(sa.and_(Action.active_ind == 1, Action.linked_id == bid_id))
+        if action_type is not None:
+            q.filter(Action.action_type == int(action_type))
         return q.count()
 
     def checkQueuedActions(self) -> None:
         self.mxDB.acquire()
         now: int = self.getTime()
         session = None
-        reload_in_progress = False
+        reload_in_progress: bool = False
         try:
             session = scoped_session(self.session_factory)
 
             q = session.query(Action).filter(sa.and_(Action.active_ind == 1, Action.trigger_at <= now))
             for row in q:
+                accepting_bid: bool = False
                 try:
                     if row.action_type == ActionTypes.ACCEPT_BID:
+                        accepting_bid = True
                         self.acceptBid(row.linked_id)
                     elif row.action_type == ActionTypes.ACCEPT_XMR_BID:
+                        accepting_bid = True
                         self.acceptXmrBid(row.linked_id)
                     elif row.action_type == ActionTypes.SIGN_XMR_SWAP_LOCK_TX_A:
                         self.sendXmrBidTxnSigsFtoL(row.linked_id, session)
@@ -4338,11 +4342,34 @@ class BasicSwap(BaseApp):
                     elif row.action_type == ActionTypes.REDEEM_ITX:
                         atomic_swap_1.redeemITx(self, row.linked_id, session)
                     elif row.action_type == ActionTypes.ACCEPT_AS_REV_BID:
+                        accepting_bid = True
                         self.acceptADSReverseBid(row.linked_id)
                     else:
                         self.log.warning('Unknown event type: %d', row.event_type)
                 except Exception as ex:
-                    self.logException(f'checkQueuedActions failed: {ex}')
+                    err_msg = f'checkQueuedActions failed: {ex}'
+                    self.logException(err_msg)
+
+                    bid_id = row.linked_id
+                    # Failing to accept a bid should not set an error state as the bid has not begun yet
+                    if accepting_bid:
+                        self.logEvent(Concepts.BID,
+                                      bid_id,
+                                      EventLogTypes.ERROR,
+                                      err_msg,
+                                      session)
+
+                        # If delaying with no (further) queued actions reset state
+                        if self.countQueuedActions(session, bid_id, None) < 2:
+                            bid = self.getBid(bid_id, session)
+                            if bid and bid.state == BidStates.SWAP_DELAYING:
+                                bid.setState(BidStates.BID_RECEIVED)
+                                self.saveBidInSession(bid_id, bid, session)
+                    else:
+                        bid = self.getBid(bid_id, session)
+                        if bid:
+                            bid.setState(BidStates.BID_ERROR, err_msg)
+                            self.saveBidInSession(bid_id, bid, session)
 
             if self.debug:
                 session.execute('UPDATE actions SET active_ind = 2 WHERE trigger_at <= :now', {'now': now})

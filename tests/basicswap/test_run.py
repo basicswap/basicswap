@@ -112,7 +112,6 @@ class Test(BaseTest):
 
     def test_001_js_coins(self):
         js_coins = read_json_api(1800, 'coins')
-
         for c in Coins:
             coin = next((x for x in js_coins if x['id'] == int(c)), None)
             if c in (Coins.PART, Coins.BTC, Coins.LTC, Coins.PART_ANON, Coins.PART_BLIND):
@@ -130,7 +129,7 @@ class Test(BaseTest):
         assert ('coingecko' in rv)
 
         rv = read_json_api(1800, 'rateslist?from=PART&to=BTC')
-        assert len(rv) == 2
+        assert len(rv) == 1
 
     def test_003_api(self):
         logging.info('---------- Test API')

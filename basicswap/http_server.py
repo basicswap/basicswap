@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019-2023 tecnovert
+# Copyright (c) 2019-2024 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -327,11 +327,15 @@ class HttpHandler(BaseHTTPRequestHandler):
         template = env.get_template('rpc.html')
 
         coins = listAvailableCoins(swap_client, with_variants=False)
+        with_xmr: bool = any(c[0] == Coins.XMR for c in coins)
         coins = [c for c in coins if c[0] != Coins.XMR]
-        coins.append((-5, 'Litecoin MWEB Wallet'))
-        coins.append((-2, 'Monero'))
-        coins.append((-3, 'Monero JSON'))
-        coins.append((-4, 'Monero Wallet'))
+
+        if any(c[0] == Coins.LTC for c in coins):
+            coins.append((-5, 'Litecoin MWEB Wallet'))
+        if with_xmr:
+            coins.append((-2, 'Monero'))
+            coins.append((-3, 'Monero JSON'))
+            coins.append((-4, 'Monero Wallet'))
 
         return self.render_template(template, {
             'messages': messages,
