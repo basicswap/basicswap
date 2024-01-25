@@ -31,7 +31,7 @@ xu {
             C note C2
                 [label="The XmrBidLockSpendTxMessage contains the script-coin-lock-tx and proof the bidder can sign it.",
                  textbgcolor="#FFFFCC"];
-    B =>> N [label="Sends script-coin-lock-tx"],
+    B =>> N [label="Sends script-coin-lock-tx"];
     O abox O [label="Bid Script coin spend tx valid"];
     O abox O [label="Exchanged script lock spend tx msg"];
     O => O [label="Wait for script-coin-lock-tx to confirm"];

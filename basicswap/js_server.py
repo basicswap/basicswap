@@ -84,11 +84,14 @@ def js_coins(self, url_split, post_string, is_json) -> bytes:
     for coin in Coins:
         cc = swap_client.coin_clients[coin]
         coin_chainparams = chainparams[cc['coin']]
+        coin_active: bool = False if cc['connection_type'] == 'none' else True
+        if coin == Coins.LTC_MWEB:
+            coin_active = False
         entry = {
             'id': int(coin),
             'ticker': coin_chainparams['ticker'],
             'name': getCoinName(coin),
-            'active': False if cc['connection_type'] == 'none' else True,
+            'active': coin_active,
             'decimal_places': coin_chainparams['decimal_places'],
         }
         if coin == Coins.PART_ANON:

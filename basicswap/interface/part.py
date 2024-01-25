@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2020-2023 tecnovert
+# Copyright (c) 2020-2024 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -140,6 +140,17 @@ class PARTInterface(BTCInterface):
         tx_vsize = 5  # Add a few bytes, sequence in script takes variable amount of bytes
         tx_vsize += 204 if redeem else 187
         return tx_vsize
+
+    def getUnspentsByAddr(self):
+        unspent_addr = dict()
+        unspent = self.rpc_wallet('listunspent')
+        for u in unspent:
+            if u['spendable'] is not True:
+                continue
+            if 'address' not in u:
+                continue
+            unspent_addr[u['address']] = unspent_addr.get(u['address'], 0) + self.make_int(u['amount'], r=1)
+        return unspent_addr
 
 
 class PARTInterfaceBlind(PARTInterface):

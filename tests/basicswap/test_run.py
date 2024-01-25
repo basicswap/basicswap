@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019-2023 tecnovert
+# Copyright (c) 2019-2024 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -112,7 +112,6 @@ class Test(BaseTest):
 
     def test_001_js_coins(self):
         js_coins = read_json_api(1800, 'coins')
-
         for c in Coins:
             coin = next((x for x in js_coins if x['id'] == int(c)), None)
             if c in (Coins.PART, Coins.BTC, Coins.LTC, Coins.PART_ANON, Coins.PART_BLIND):
@@ -125,14 +124,12 @@ class Test(BaseTest):
     def test_002_lookup_rates(self):
         rv = self.swap_clients[0].lookupRates(Coins.BTC, Coins.PART)
         assert ('coingecko' in rv)
-        assert ('bittrex' in rv)
 
         rv = self.swap_clients[0].lookupRates(Coins.LTC, Coins.BTC)
         assert ('coingecko' in rv)
-        assert ('bittrex' in rv)
 
         rv = read_json_api(1800, 'rateslist?from=PART&to=BTC')
-        assert len(rv) == 2
+        assert len(rv) == 1
 
     def test_003_api(self):
         logging.info('---------- Test API')

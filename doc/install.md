@@ -140,7 +140,7 @@ Continue from the [Run Using Docker](#run-using-docker) section.
 
 ### Ubuntu Setup:
 
-    apt-get install -y wget python3-pip gnupg unzip protobuf-compiler automake libtool pkg-config curl jq
+    apt-get install -y wget git python3-venv python3-pip gnupg unzip protobuf-compiler automake libtool pkg-config curl jq
 
 ### OSX Setup:
 

@@ -320,7 +320,7 @@
             <div class="text-xs" id="eth-price-btc"></div>
           </p>
         </div>
-      </div>     
+      </div>
 
   </section>
   <script>
@@ -382,7 +382,7 @@ function displayErrorMessage(message) {
     if (errorOverlay && errorContent) {
         errorOverlay.classList.remove('hidden');
         errorContent.querySelector('p').textContent = `Error: ${message}`;
-        
+
         containersToBlur.forEach(container => {
             container.classList.add('blurred');
         });
@@ -781,7 +781,7 @@ const chart = new Chart(ctx, {
                             <!--<td class="py-4 px-6 text-xs"><a class="monospace text-xs" href=/offer/{{ o[1] }}>{{ o[1]|truncate(6, True) }}</a></td>-->
                             <!--<td class="py-4 px-6 text-xs monospace">{{ o[8] }}{% if o[9]==true %} <b>Sent</b>{% endif %}</td>-->
 
-                            <!-- DETAIS -->
+                            <!-- DETAILS -->
                             <td class="py-3 px-6 text-xs">
                               <div class="network"><span class="bold">Network:</span> {{ o[7] }}</div>
                               <div class="partial pt-1"><span class="bold">Amount Variable:</span>{{ o[14] }}</div>
@@ -874,8 +874,8 @@ const chart = new Chart(ctx, {
 
                             <!-- SWAP OR EDIT -->
                             <td class="py-3 px-6">
-                              <a class="inline-block w-20 py-1 px-2 font-medium text-center text-sm rounded-md 
-                              {% if o[9]==true %}  bg-blue-500 text-white border hover:bg-blue-600 dark:border-gray-700 bg-gray-700 transition duration-200  
+                              <a class="inline-block w-20 py-1 px-2 font-medium text-center text-sm rounded-md
+                              {% if o[9]==true %}  bg-blue-500 text-white border hover:bg-blue-600 dark:border-gray-700 bg-gray-700 transition duration-200
                                {% else %} bg-blue-500 text-white hover:bg-blue-600 transition duration-200 {% endif %}" href="/offer/{{ o[1] }}">{% if o[9]==true %} Edit {% else %} Swap {% endif %}</a>
                             </td>
                             <!-- SWAP OR EDIT -->
@@ -959,7 +959,7 @@ const chart = new Chart(ctx, {
         const exchangeRate = exchangeRateCache[coinSymbol].rate;
         const usdValue = cryptoValue * exchangeRate;
         usdCell.textContent = `${usdValue.toFixed(2)} USD`;
-        
+
         updateProfitLoss(cryptoCell.closest('tr'));
         updateProfitValue(cryptoCell.closest('tr'));
       } else {

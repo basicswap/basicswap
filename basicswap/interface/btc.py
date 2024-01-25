@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2020-2023 tecnovert
+# Copyright (c) 2020-2024 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -1375,6 +1375,20 @@ class BTCInterface(CoinInterface):
         for u in unspent:
             if u['spendable'] is not True:
                 continue
+            if 'address' not in u:
+                continue
+            if 'desc' in u:
+                desc = u['desc']
+                if self.using_segwit:
+                    if self.use_p2shp2wsh():
+                        if not desc.startswith('sh(wpkh'):
+                            continue
+                    else:
+                        if not desc.startswith('wpkh'):
+                            continue
+                else:
+                    if not desc.startswith('pkh'):
+                        continue
             unspent_addr[u['address']] = unspent_addr.get(u['address'], 0) + self.make_int(u['amount'], r=1)
         return unspent_addr
 
