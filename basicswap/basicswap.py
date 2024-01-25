@@ -2179,7 +2179,7 @@ class BasicSwap(BaseApp):
 
     def postBid(self, offer_id: bytes, amount: int, addr_send_from: str = None, extra_options={}) -> bytes:
         # Bid to send bid.amount * bid.rate of coin_to in exchange for bid.amount of coin_from
-        self.log.debug('postBid %s', offer_id.hex())
+        self.log.debug('postBid for offer: %s', offer_id.hex())
 
         offer = self.getOffer(offer_id)
         ensure(offer, 'Offer not found: {}.'.format(offer_id.hex()))
@@ -2557,7 +2557,7 @@ class BasicSwap(BaseApp):
             bid_rate: int = extra_options.get('bid_rate', offer.rate)
             amount_to: int = int((int(amount) * bid_rate) // ci_from.COIN())
 
-            bid_created_at = self.getTime()
+            bid_created_at: int = self.getTime()
             if offer.swap_type != SwapTypes.XMR_SWAP:
                 raise ValueError('TODO: Unknown swap type ' + offer.swap_type.name)
 
@@ -2567,8 +2567,8 @@ class BasicSwap(BaseApp):
 
             self.checkCoinsReady(coin_from, coin_to)
 
-            balance_to = ci_to.getSpendableBalance()
-            ensure(balance_to > amount_to, '{} spendable balance is too low: {}'.format(ci_to.coin_name(), ci_to.format_amount(balance_to)))
+            balance_to: int = ci_to.getSpendableBalance()
+            ensure(balance_to > amount_to, '{} spendable balance is too low: {} < {}'.format(ci_to.coin_name(), ci_to.format_amount(balance_to), ci_to.format_amount(amount_to)))
 
             reverse_bid: bool = self.is_reverse_ads_bid(coin_from)
             if reverse_bid:
@@ -4361,9 +4361,11 @@ class BasicSwap(BaseApp):
 
                         # If delaying with no (further) queued actions reset state
                         if self.countQueuedActions(session, bid_id, None) < 2:
-                            bid = self.getBid(bid_id, session)
-                            if bid and bid.state == BidStates.SWAP_DELAYING:
-                                bid.setState(BidStates.BID_RECEIVED)
+                            bid, offer = self.getBidAndOffer(bid_id)
+                            last_state = getLastBidState(bid.states)
+                            if bid and bid.state == BidStates.SWAP_DELAYING and last_state == BidStates.BID_RECEIVED:
+                                new_state = BidStates.BID_ERROR if offer.bid_reversed else BidStates.BID_RECEIVED
+                                bid.setState(new_state)
                                 self.saveBidInSession(bid_id, bid, session)
                     else:
                         bid = self.getBid(bid_id, session)
@@ -6063,7 +6065,7 @@ class BasicSwap(BaseApp):
                 self.processADSBidReversedAccept(msg)
 
         except InactiveCoin as ex:
-            self.log.info('Ignoring message involving inactive coin {}, type {}'.format(Coins(ex.coinid).name, MessageTypes(msg_type).name))
+            self.log.debug('Ignoring message involving inactive coin {}, type {}'.format(Coins(ex.coinid).name, MessageTypes(msg_type).name))
         except Exception as ex:
             self.log.error('processMsg %s', str(ex))
             if self.debug:
