@@ -1,313 +1,332 @@
 {% include 'header.html' %}
+{% from 'style.html' import breadcrumb_line_svg, place_new_offer_svg, page_back_svg, page_forwards_svg, filter_clear_svg, filter_apply_svg, input_arrow_down_svg, arrow_right_svg %}
+
 <div class="container mx-auto">
- <section class="p-5 mt-5">
-  <div class="flex flex-wrap items-center -m-2">
-   <div class="w-full md:w-1/2 p-2">
-    <ul class="flex flex-wrap items-center gap-x-3 mb-2">
-     <li>
-      <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/">
-       <p>Home</p>
-      </a>
-     </li>
-     <li>
-      <svg width="6" height="15" viewBox="0 0 6 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-       <path d="M5.34 0.671999L2.076 14.1H0.732L3.984 0.671999H5.34Z" fill="#BBC3CF"></path>
-      </svg>
-     </li>
-     <li>
-      <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="#">{{ page_type }}</a>
-     </li>
-     <li>
-      <svg width="6" height="15" viewBox="0 0 6 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-       <path d="M5.34 0.671999L2.076 14.1H0.732L3.984 0.671999H5.34Z" fill="#BBC3CF"></path>
-      </svg>
-     </li>
-    </ul>
-   </div>
-  </div>
- </section>
+  <section class="p-5 mt-5">
+    <div class="flex flex-wrap items-center -m-2">
+      <div class="w-full md:w-1/2 p-2">
+        <ul class="flex flex-wrap items-center gap-x-3 mb-2">
+          <li><a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/">Home</a></li>
+          <li>{{ breadcrumb_line_svg | safe }}</li>
+          <li><a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/wallets">{{ page_type }}</a></li>
+          <li>{{ breadcrumb_line_svg | safe }}</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
   <section class="py-4">
     <div class="container px-4 mx-auto">
-   <div class="relative py-11 px-16 bg-coolGray-900 dark:bg-blue-500 rounded-md overflow-hidden">
-        <img class="absolute z-10 left-4 top-4" src="/static/images/elements/dots-red.svg" alt="">
-        <img class="absolute z-10 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt="">
-        <img class="absolute h-64 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" src="/static/images/elements/wave.svg" alt="">
+      <div class="relative py-11 px-16 bg-coolGray-900 dark:bg-blue-500 rounded-md overflow-hidden">
+        <img class="absolute z-10 left-4 top-4 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt="dots-red">
+        <img class="absolute h-64 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" src="/static/images/elements/wave.svg" alt="wave">
         <div class="relative z-20 flex flex-wrap items-center -m-3">
           <div class="w-full md:w-1/2 p-3">
-      <h2 class="mb-6 text-4xl font-bold text-white tracking-tighter">{{ page_type }}</h2>
-      <p class="font-normal text-coolGray-200 dark:text-white">{{ page_type_description }}</p>
-     </div>
-     <div class="{{ page_button }} w-full md:w-1/2 p-3 p-6 container flex flex-wrap items-center justify-end items-center mx-auto">
-      <a id="refresh" href="/newoffer" class="flex flex-wrap justify-center px-5 py-4 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border dark:bg-gray-500 dark:hover:bg-gray-700 border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
-       <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="18" width="18" viewBox="0 0 24 24">
-        <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round">
-         <circle cx="5" cy="5" r="4"></circle>
-         <circle cx="19" cy="19" r="4"></circle>
-         <polyline data-cap="butt" points="13,5 21,5 21,11 " stroke="#ffffff"></polyline>
-         <polyline data-cap="butt" points="11,19 3,19 3,13 " stroke="#ffffff"></polyline>
-         <polyline points=" 16,2 13,5 16,8 " stroke="#ffffff"></polyline>
-         <polyline points=" 8,16 11,19 8,22 " stroke="#ffffff"></polyline>
-        </g>
-       </svg>
-       <span>Place new Offer</span>
-      </a>
-     </div>
-    </div>
-   </div>
-  </div>
- </section>
-{% include 'inc_messages.html' %}
-
-{% if show_chart %}
-<section class="relative">
-  <div class="pl-6 pr-6 pt-0 pb-0 mt-5 h-full overflow-hidden">
-      <div class="pb-6 border-coolGray-100">
-          <div class="flex flex-wrap items-center justify-between -m-2">
-              <div class="w-full pt-2">
-                  <div class="container mt-5 mx-auto relative">
-                      <div class="pt-6 pb-8 bg-coolGray-100 dark:bg-gray-500 rounded-xl container-to-blur">
-                          <div class="px-6">
-                              <div class="w-full mt-6 pb-6 overflow-x-auto">
-                                  <div class="chart-container" style="max-width: 100%;">
-                                      <canvas id="coin-chart" style="height: 280px;"></canvas>
-                                  </div>
-                              </div>
-                          </div>
-                      </div>
-                      <div id="error-overlay" class="error-overlay hidden absolute inset-0 flex items-center justify-center">
-                          <div id="error-content" class="error-content bg-coolGray-100 dark:bg-gray-500 rounded-md p-4 non-blurred">
-                              <p class="text-red-600 font-semibold text-center">Error:</p>
-                              <p class="text-sm text-gray-700 dark:text-gray-300 mt-5 text-center">To review or update your Chart API Key, navigate to <a href="/settings">Settings & Tools > Settings > General (TAB).</a></p>
-                          </div>
-                      </div>
-                  </div>
-              </div>
+            <h2 class="mb-6 text-4xl font-bold text-white tracking-tighter">{{ page_type }}</h2>
+            <p class="font-normal text-coolGray-200 dark:text-white">{{ page_type_description }}</p>
           </div>
+          <div class="rounded-full{{ page_button }} w-full md:w-1/2 p-3 p-6 container flex flex-wrap items-center justify-end items-center mx-auto">
+            <a id="refresh" href="/newoffer" class="rounded-full flex flex-wrap justify-center px-5 py-4 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border dark:bg-gray-500 dark:hover:bg-gray-700 border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+              {{ place_new_offer_svg | safe }} <span>Place new Offer</span>
+            </a>
+          </div>
+        </div>
       </div>
-  </div>
-</section>
+    </div>
+  </section>
+  {% include 'inc_messages.html' %}
+
+  {% if show_chart %}
+  <section class="relative">
+    <div class="pl-6 pr-6 pt-0 pb-0 mt-5 h-full overflow-hidden">
+      <div class="pb-6 border-coolGray-100">
+        <div class="flex flex-wrap items-center justify-between -m-2">
+          <div class="w-full pt-2">
+            <div class="container mt-5 mx-auto relative">
+              <div class="pt-6 pb-8 bg-coolGray-100 dark:bg-gray-500 rounded-xl container-to-blur">
+                <div class="px-6">
+                  <div class="w-full mt-6 pb-6 overflow-x-auto">
+                    <div class="chart-container" style="max-width: 100%;">
+                      <canvas id="coin-chart" style="height: 280px;"></canvas>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div id="error-overlay" class="error-overlay hidden absolute inset-0 flex items-center justify-center">
+                <div id="error-content" class="error-content bg-coolGray-100 dark:bg-gray-500 rounded-md p-4 non-blurred">
+                  <p class="text-red-600 font-semibold text-center">Error:</p>
+                  <p class="text-sm text-gray-700 dark:text-gray-300 mt-5 text-center">To review or update your Chart API Key, navigate to <a href="/settings">Settings & Tools > Settings > General (TAB).</a></p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
 
 <section class="py-4 overflow-hidden container-to-blur">
   <div class="container px-4 mx-auto">
     <div class="flex flex-wrap -m-3">
-<div class="w-full sm:w-1/2 lg:w-1/5 p-3" id="btc-container">
-        <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-lg dark:text-white" id="btc-active">
-            <div class="flex items-center mb-2.5">
-                <img src="/static/images/coins/Bitcoin-20.png" height="20" width="20" class="mr-2">
-                <p class="text-sm text-neutral-500 font-medium">Bitcoin (BTC)</p>
+
+      <div class="w-full sm:w-1/2 lg:w-1/5 p-3" id="btc-container">
+        <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-lg dark:text-white active-container" id="btc-active">
+          <div class="flex items-center mb-2.5">
+            <img src="/static/images/coins/Bitcoin-20.png" height="20" width="20" class="mr-2">
+            <p class="text-sm text-neutral-500 font-medium">Bitcoin (BTC)</p>
+          </div>
+          <div class="flex flex-wrap items-center mb-2 -m-1">
+            <div class="w-auto p-1">
+              <h3 class="font-heading text-1xl font-semibold">
+                <div id="btc-price-usd"></div>
+              </h3>
             </div>
-            <div class="flex flex-wrap items-center mb-2 -m-1">
-                <div class="w-auto p-1">
-                    <h3 class="font-heading text-1xl font-semibold">
-                        <div id="btc-price-usd"></div>
-                    </h3>
-                </div>
-                <div class="w-auto p-1">
-                    <div id="btc-price-change-container" class="w-auto p-1"></div>
-                </div>
-                <div class="w-auto p-1">
-                    <h3 class="font-heading text-1xl font-semibold">
-                        <div id="btc-price-btc"></div>
-                    </h3>
-                </div>
+            <div class="w-auto p-1">
+              <div id="btc-price-change-container" class="w-auto p-1"></div>
             </div>
-            <p class="text-xs text-neutral-400 font-medium">
-                Volume 24H:<div class="text-xs" id="btc-volume-24h"></div>
-            </p>
+            <div class="w-auto p-1">
+              <h3 class="font-heading text-1xl font-semibold">
+                <div id="btc-price-btc"></div>
+              </h3>
+            </div>
+          </div>
+          <p class="text-2xs text-neutral-400 font-medium">
+            Volume 24H:
+            <div class="text-xs" id="btc-volume-24h"></div>
+          </p>
+          <p class="text-2xs text-neutral-400 font-medium hidden">
+            Price in BTC:
+            <div class="text-xs" id="usd-price-btc"></div>
+          </p>
         </div>
-    </div>
-<div class="w-full sm:w-1/2 lg:w-1/5 p-3" id="xmr-container">
-  <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-lg dark:text-white">
-        <div class="flex items-center mb-2.5">
-      <img src="/static/images/coins/Monero-20.png" height="20" width="20" class="mr-2">
-      <p class="text-sm text-neutral-500 font-medium">Monero (XMR)</p>
-    </div>
-    <div class="flex flex-wrap items-center mb-2 -m-1">
-      <div class="w-auto p-1">
-        <h3 class="font-heading text-1xl font-semibold">
-          <div id="xmr-price-usd"></div>
-        </h3>
-      </div>
-          <div class="w-auto p-1">
-        <div id="xmr-price-change-container" class="w-auto p-1"></div>
-      </div>
-      <div class="w-auto p-1">
-        <h3 class="font-heading text-1xl font-semibold">
-          <div class="text-xs" id="xmr-price-btc"></div>
-        </h3>
       </div>
 
-    </div>
-    <p class="text-xs text-neutral-400 font-medium">
-      Volume 24H:<div class="text-xs" id="xmr-volume-24h"></div>
-    </p>
-  </div>
-</div>
-
-<div class="w-full sm:w-1/2 lg:w-1/5 p-3" id="part-container">
-  <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-lg dark:text-white">
-        <div class="flex items-center mb-2.5">
-      <img src="/static/images/coins/Particl-20.png" height="20" width="20" class="mr-2">
-      <p class="text-sm text-neutral-500 font-medium">Particl (PART)</p>
-    </div>
-    <div class="flex flex-wrap items-center mb-2 -m-1">
-      <div class="w-auto p-1">
-        <h3 class="font-heading text-1xl font-semibold">
-          <div id="part-price-usd"></div>
-        </h3>
-      </div>
-          <div class="w-auto p-1">
-        <div id="part-price-change-container" class="w-auto p-1"></div>
-      </div>
-      <div class="w-auto p-1">
-        <h3 class="font-heading text-1xl font-semibold">
-          <div class="text-xs" id="part-price-btc"></div>
-        </h3>
-      </div>
-
-    </div>
-    <p class="text-xs text-neutral-400 font-medium">
-      Volume 24H:<div class="text-xs"id="part-volume-24h"></div>
-    </p>
-  </div>
-</div>
-<div class="w-full sm:w-1/2 lg:w-1/5 p-3" id="pivx-container">
-  <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-lg dark:text-white">
-        <div class="flex items-center mb-2.5">
-      <img src="/static/images/coins/PIVX-20.png" height="20" width="20" class="mr-2">
-      <p class="text-sm text-neutral-500 font-medium">PIVX (PIVX)</p>
-    </div>
-    <div class="flex flex-wrap items-center mb-2 -m-1">
-      <div class="w-auto p-1">
-        <h3 class="font-heading text-1xl font-semibold">
-          <div id="pivx-price-usd"></div>
-        </h3>
-      </div>
-          <div class="w-auto p-1">
-        <div id="pivx-price-change-container" class="w-auto p-1"></div>
-      </div>
-      <div class="w-auto p-1">
-        <h3 class="text-xs font-semibold">
-          <div id="pivx-price-btc"></div>
-        </h3>
+      <div class="w-full sm:w-1/2 lg:w-1/5 p-3" id="xmr-container">
+        <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-lg dark:text-white">
+          <div class="flex items-center mb-2.5">
+            <img src="/static/images/coins/Monero-20.png" height="20" width="20" class="mr-2">
+            <p class="text-sm text-neutral-500 font-medium">Monero (BTC)</p>
+          </div>
+          <div class="flex flex-wrap items-center mb-2 -m-1">
+            <div class="w-auto p-1">
+              <h3 class="font-heading text-1xl font-semibold">
+                <div id="xmr-price-usd"></div>
+              </h3>
+            </div>
+            <div class="w-auto p-1">
+              <div id="xmr-price-change-container" class="w-auto p-1"></div>
+            </div>
+            <div class="w-auto p-1">
+              <h3 class="font-heading text-1xl font-semibold">
+                <div id="xmr-price-usd"></div>
+              </h3>
+            </div>
+          </div>
+          <p class="text-2xs text-neutral-400 font-medium">
+            Volume 24H:
+            <div class="text-xs" id="xmr-volume-24h"></div>
+          </p>
+          <p class="text-2xs text-neutral-400 font-medium">
+            Price in BTC:
+            <div class="text-xs" id="xmr-price-btc"></div>
+          </p>
+        </div>
       </div>
 
-    </div>
-    <p class="text-xs text-neutral-400 font-medium">
-      Volume 24H:<div class="text-xs" id="pivx-volume-24h"></div>
-    </p>
-  </div>
-</div>
-<div class="w-full sm:w-1/2 lg:w-1/5 p-3" id="firo-container">
-  <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-lg dark:text-white">
-       <div class="flex items-center mb-2.5">
-      <img src="/static/images/coins/Firo-20.png" height="20" width="20" class="mr-2">
-      <p class="text-sm text-neutral-500 font-medium">Firo (FIRO)</p>
-    </div>
-    <div class="flex flex-wrap items-center mb-2 -m-1">
-      <div class="w-auto p-1">
-        <h3 class="font-heading text-1xl font-semibold">
-          <div id="firo-price-usd"></div>
-        </h3>
-      </div>
-          <div class="w-auto p-1">
-        <div id="firo-price-change-container" class="w-auto p-1"></div>
-      </div>
-      <div class="w-auto p-1">
-        <h3 class="text-xs font-semibold">
-          <div id="firo-price-btc"></div>
-        </h3>
+      <div class="w-full sm:w-1/2 lg:w-1/5 p-3" id="part-container">
+        <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-lg dark:text-white">
+          <div class="flex items-center mb-2.5">
+            <img src="/static/images/coins/Particl-20.png" height="20" width="20" class="mr-2">
+            <p class="text-sm text-neutral-500 font-medium">Particl (PART)</p>
+          </div>
+          <div class="flex flex-wrap items-center mb-2 -m-1">
+            <div class="w-auto p-1">
+              <h3 class="font-heading text-1xl font-semibold">
+                <div id="part-price-usd"></div>
+              </h3>
+            </div>
+            <div class="w-auto p-1">
+              <div id="part-price-change-container" class="w-auto p-1"></div>
+            </div>
+          </div>
+          <p class="text-2xs text-neutral-400 font-medium">
+            Volume 24H:
+            <div class="text-xs" id="part-volume-24h"></div>
+          </p>
+          <p class="text-2xs text-neutral-400 font-medium">
+            Price in BTC:
+            <div class="text-xs" id="part-price-btc"></div>
+          </p>
+        </div>
       </div>
 
-    </div>
-    <p class="text-xs text-neutral-400 font-medium">
-      Volume 24H:<div class="text-xs" id="firo-volume-24h"></div>
-    </p>
-  </div>
-</div>
-<div class="w-full sm:w-1/2 lg:w-1/5 p-3" id="ltc-container">
-  <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-lg dark:text-white">
-        <div class="flex items-center mb-2.5">
-      <img src="/static/images/coins/Litecoin-20.png" height="20" width="20" class="mr-2">
-      <p class="text-sm text-neutral-500 font-medium">Litecoin (LTC)</p>
-    </div>
-    <div class="flex flex-wrap items-center mb-2 -m-1">
-      <div class="w-auto p-1">
-        <h3 class="font-heading text-1xl font-semibold">
-          <div id="ltc-price-usd"></div>
-        </h3>
+      <div class="w-full sm:w-1/2 lg:w-1/5 p-3" id="pivx-container">
+        <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-lg dark:text-white">
+          <div class="flex items-center mb-2.5">
+            <img src="/static/images/coins/PIVX-20.png" height="20" width="20" class="mr-2">
+            <p class="text-sm text-neutral-500 font-medium">PIVX (PIVX)</p>
+          </div>
+          <div class="flex flex-wrap items-center mb-2 -m-1">
+            <div class="w-auto p-1">
+              <h3 class="font-heading text-1xl font-semibold">
+                <div id="pivx-price-usd"></div>
+              </h3>
+            </div>
+            <div class="w-auto p-1">
+              <div id="pivx-price-change-container" class="w-auto p-1"></div>
+            </div>
+          </div>
+          <p class="text-2xs text-neutral-400 font-medium">
+            Volume 24H:
+            <div class="text-xs" id="pivx-volume-24h"></div>
+          </p>
+          <p class="text-2xs text-neutral-400 font-medium">
+            Price in BTC:
+            <div class="text-xs" id="pivx-price-btc"></div>
+          </p>
+        </div>
       </div>
-          <div class="w-auto p-1">
-        <div id="ltc-price-change-container" class="w-auto p-1"></div>
+
+      <div class="w-full sm:w-1/2 lg:w-1/5 p-3" id="firo-container">
+        <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-lg dark:text-white">
+          <div class="flex items-center mb-2.5">
+            <img src="/static/images/coins/Firo-20.png" height="20" width="20" class="mr-2">
+            <p class="text-sm text-neutral-500 font-medium">Firo (FIRO)</p>
+          </div>
+          <div class="flex flex-wrap items-center mb-2 -m-1">
+            <div class="w-auto p-1">
+              <h3 class="font-heading text-1xl font-semibold">
+                <div id="firo-price-usd"></div>
+              </h3>
+            </div>
+            <div class="w-auto p-1">
+              <div id="firo-price-change-container" class="w-auto p-1"></div>
+            </div>
+          </div>
+          <p class="text-2xs text-neutral-400 font-medium">
+            Volume 24H:
+            <div class="text-xs" id="firo-volume-24h"></div>
+          </p>
+          <p class="text-2xs text-neutral-400 font-medium">
+            Price in BTC:
+            <div class="text-xs" id="firo-price-btc"></div>
+          </p>
+        </div>
       </div>
-      <div class="w-auto p-1">
-        <h3 class="text-xs font-semibold">
-          <div id="ltc-price-btc"></div>
-        </h3>
+
+      <div class="w-full sm:w-1/2 lg:w-1/5 p-3" id="ltc-container">
+        <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-lg dark:text-white">
+          <div class="flex items-center mb-2.5">
+            <img src="/static/images/coins/Litecoin-20.png" height="20" width="20" class="mr-2">
+            <p class="text-sm text-neutral-500 font-medium">Litecoin (LTC)</p>
+          </div>
+          <div class="flex flex-wrap items-center mb-2 -m-1">
+            <div class="w-auto p-1">
+              <h3 class="font-heading text-1xl font-semibold">
+                <div id="ltc-price-usd"></div>
+              </h3>
+            </div>
+            <div class="w-auto p-1">
+              <div id="ltc-price-change-container" class="w-auto p-1"></div>
+            </div>
+          </div>
+          <p class="text-2xs text-neutral-400 font-medium">
+            Volume 24H:
+            <div class="text-xs" id="ltc-volume-24h"></div>
+          </p>
+          <p class="text-2xs text-neutral-400 font-medium">
+            Price in BTC:
+            <div class="text-xs" id="ltc-price-btc"></div>
+          </p>
+        </div>
       </div>
-    </div>
-    <p class="text-xs text-neutral-400 font-medium">
-      Volume 24H:<div class="text-xs" id="ltc-volume-24h"></div>
-    </p>
-  </div>
-</div>
-<div class="w-full sm:w-1/2 lg:w-1/5 p-3" id="dash-container">
-  <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-lg dark:text-white">
-        <div class="flex items-center mb-2.5">
-      <img src="/static/images/coins/Dash-20.png" height="20" width="20" class="mr-2">
-      <p class="text-sm text-neutral-500 font-medium">Dash (DASH)</p>
-    </div>
-    <div class="flex flex-wrap items-center mb-2 -m-1">
-      <div class="w-auto p-1">
-        <h3 class="font-heading text-1xl font-semibold">
-          <div id="dash-price-usd"></div>
-        </h3>
+
+       <div class="w-full sm:w-1/2 lg:w-1/5 p-3" id="dash-container">
+        <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-lg dark:text-white">
+          <div class="flex items-center mb-2.5">
+            <img src="/static/images/coins/Dash-20.png" height="20" width="20" class="mr-2">
+            <p class="text-sm text-neutral-500 font-medium">Dash (DASH)</p>
+          </div>
+          <div class="flex flex-wrap items-center mb-2 -m-1">
+            <div class="w-auto p-1">
+              <h3 class="font-heading text-1xl font-semibold">
+                <div id="dash-price-usd"></div>
+              </h3>
+            </div>
+            <div class="w-auto p-1">
+              <div id="dash-price-change-container" class="w-auto p-1"></div>
+            </div>
+          </div>
+          <p class="text-2xs text-neutral-400 font-medium">
+            Volume 24H:
+            <div class="text-xs" id="dash-volume-24h"></div>
+          </p>
+          <p class="text-2xs text-neutral-400 font-medium">
+            Price in BTC:
+            <div class="text-xs" id="dash-price-btc"></div>
+          </p>
+        </div>
       </div>
-          <div class="w-auto p-1">
-        <div id="dash-price-change-container" class="w-auto p-1"></div>
+
+      <div class="w-full sm:w-1/2 lg:w-1/5 p-3" id="doge-container">
+        <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-lg dark:text-white">
+          <div class="flex items-center mb-2.5">
+            <img src="/static/images/coins/Doge-20.png" height="20" width="20" class="mr-2">
+            <p class="text-sm text-neutral-500 font-medium">Dogecoin (DOGE)</p>
+          </div>
+          <div class="flex flex-wrap items-center mb-2 -m-1">
+            <div class="w-auto p-1">
+              <h3 class="font-heading text-1xl font-semibold">
+                <div id="doge-price-usd"></div>
+              </h3>
+            </div>
+            <div class="w-auto p-1">
+              <div id="doge-price-change-container" class="w-auto p-1"></div>
+            </div>
+          </div>
+          <p class="text-2xs text-neutral-400 font-medium">
+            Volume 24H:
+            <div class="text-xs" id="doge-volume-24h"></div>
+          </p>
+          <p class="text-2xs text-neutral-400 font-medium">
+            Price in BTC:
+            <div class="text-xs" id="doge-price-btc"></div>
+          </p>
+        </div>
       </div>
-      <div class="w-auto p-1">
-        <h3 class="text-xs font-semibold">
-          <div id="dash-price-btc"></div>
-        </h3>
+
+       <div class="w-full sm:w-1/2 lg:w-1/5 p-3" id="eth-container">
+        <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-lg dark:text-white">
+          <div class="flex items-center mb-2.5">
+            <img src="/static/images/coins/Ethereum-20.png" height="20" width="20" class="mr-2">
+            <p class="text-sm text-neutral-500 font-medium">Ethereum (ETH)</p>
+          </div>
+          <div class="flex flex-wrap items-center mb-2 -m-1">
+            <div class="w-auto p-1">
+              <h3 class="font-heading text-1xl font-semibold">
+                <div id="eth-price-usd"></div>
+              </h3>
+            </div>
+            <div class="w-auto p-1">
+              <div id="eth-price-change-container" class="w-auto p-1"></div>
+            </div>
+          </div>
+          <p class="text-2xs text-neutral-400 font-medium">
+            Volume 24H:
+            <div class="text-xs" id="eth-volume-24h"></div>
+          </p>
+          <p class="text-2xs text-neutral-400 font-medium">
+            Price in BTC:
+            <div class="text-xs" id="eth-price-btc"></div>
+          </p>
+        </div>
       </div>
-    </div>
-    <p class="text-xs text-neutral-400 font-medium">
-      Volume 24H:<div class="text-xs" id="dash-volume-24h"></div>
-    </p>
-  </div>
-</div>
-<div class="w-full sm:w-1/2 lg:w-1/5 p-3" id="doge-container">
-  <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-lg dark:text-white">
-        <div class="flex items-center mb-2.5">
-      <img src="/static/images/coins/Doge-20.png" height="20" width="20" class="mr-2">
-      <p class="text-sm text-neutral-500 font-medium">Dogecoin (DOGE)</p>
-    </div>
-    <div class="flex flex-wrap items-center mb-2 -m-1">
-      <div class="w-auto p-1">
-        <h3 class="font-heading text-1xl font-semibold">
-          <div id="doge-price-usd"></div>
-        </h3>
-      </div>
-          <div class="w-auto p-1">
-        <div id="doge-price-change-container" class="w-auto p-1"></div>
-      </div>
-      <div class="w-auto p-1">
-        <h3 class="text-xs font-semibold">
-          <div id="doge-price-btc"></div>
-        </h3>
-      </div>
-    </div>
-    <p class="text-xs text-neutral-400 font-medium">
-      Volume 24H:<div class="text-xs" id="doge-volume-24h"></div>
-    </p>
-  </div>
-</div>
-</section>
-<script>
-window.addEventListener('load', function() {
+
+  </section>
+  <script>
+    window.addEventListener('load', function() {
     const api_key = '{{chart_api_key}}';
-    const coins = ['BTC', 'PART', 'XMR', 'LTC', 'FIRO', 'DASH', 'PIVX', 'DOGE'];
+    const coins = ['BTC', 'PART', 'XMR', 'LTC', 'FIRO', 'DASH', 'PIVX', 'DOGE', 'ETH'];
     coins.forEach(coin => {
         fetch(`https://min-api.cryptocompare.com/data/pricemultifull?fsyms=${coin}&tsyms=USD,BTC&api_key=${api_key}`)
             .then(response => {
@@ -363,7 +382,7 @@ function displayErrorMessage(message) {
     if (errorOverlay && errorContent) {
         errorOverlay.classList.remove('hidden');
         errorContent.querySelector('p').textContent = `Error: ${message}`;
-        
+
         containersToBlur.forEach(container => {
             container.classList.add('blurred');
         });
@@ -392,7 +411,7 @@ function negativePriceChangeHTML(value) {
 }
 
 function setActiveContainer(containerId) {
-  const containerIds = ['btc-container', 'xmr-container', 'part-container', 'pivx-container', 'firo-container', 'dash-container', 'ltc-container', 'doge-container'];
+  const containerIds = ['btc-container', 'xmr-container', 'part-container', 'pivx-container', 'firo-container', 'dash-container', 'ltc-container', 'doge-container', 'eth-container'];
   const activeClass = 'active-container';
   containerIds.forEach(id => {
     const container = document.getElementById(id);
@@ -436,6 +455,10 @@ document.getElementById('ltc-container').addEventListener('click', () => {
 document.getElementById('doge-container').addEventListener('click', () => {
   setActiveContainer('doge-container');
   updateChart('DOGE');
+});
+document.getElementById('eth-container').addEventListener('click', () => {
+  setActiveContainer('eth-container');
+  updateChart('ETH');
 });
 
 let coin;
@@ -580,358 +603,340 @@ const chart = new Chart(ctx, {
   }
 });
 </script>
-{% endif %}
- <section>
-  <div class="pl-6 pr-6 pt-0 pb-0 mt-5 h-full overflow-hidden">
-   <div class="pb-6 border-coolGray-100">
-    <div class="flex flex-wrap items-center justify-between -m-2">
-     <div class="w-full pt-2">
-      <form method="post">
-       <div class="flex justify-between items-center pb-4 dark:text-white">
-        <div class="rounded-b-md">
-         <div class="w-full md:w-0/12">
-          <div class="flex flex-wrap justify-end -m-1.5">
-           <div class="w-full md:w-auto p-1.5">
-            <div class="relative">
-             <svg class="absolute right-4 top-1/2 transform -translate-y-1/2 " width="16 " height="16 " viewBox="0 0 16 16 " fill="none " xmlns="http://www.w3.org/2000/svg ">
-              <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z " fill="#8896AB"></path>
-             </svg>
-             <select name="coin_from" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
-              <option value="any" {% if filters.coin_from==-1 %} selected{% endif %}>Any</option>
-              {% for c in coins_from %}
-              <option class="text-sm" value="{{ c[0] }}" {% if filters.coin_from==c[0] %} selected{% endif %} data-image="/static/images/coins/{{ c[1]|replace(" ", "-") }}-20.png">{{ c[1] }}</option>
-              {% endfor %}
-             </select>
-            </div>
-           </div>
-           <div class="flex items-center">
-            <div class="w-full md:w-auto p-1.5">
-             <p class="text-sm font-heading">
-              <svg aria-hidden="true" class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg ">
-               <path fill-rule="evenodd " d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z " clip-rule="evenodd"></path>
-              </svg>
-             </p>
-            </div>
-           </div>
-           <div class="w-full md:w-auto p-1.5">
-            <div class="relative">
-             <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"></path>
-             </svg>
-             <!-- is="ms-dropdown" todo -->
-             <select name="coin_to" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
-              <option value="any" {% if filters.coin_to==-1 %} selected{% endif %}>Any</option>
-              {% for c in coins %}
-              <option class="text-sm" value="{{ c[0] }}" {% if filters.coin_to==c[0] %} selected{% endif %} data-image="/static/images/coins/{{ c[1]|replace(" ", "-") }}-20.png">{{ c[1] }}</option>
-              {% endfor %}
-             </select>
-            </div>
-           </div>
-           <div class="flex items-center">
-            <div class="w-full md:w-auto p-1.5">
-             <p class="text-sm font-heading bold">Sort By:</p>
-            </div>
-           </div>
-           <div class="w-full md:w-auto p-1.5">
-            <div class="relative">
-             <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"></path>
-             </svg>
-             <select name="sort_by" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
-              <option value="created_at" {% if filters.sort_by=='created_at' %} selected{% endif %}>Time Created</option>
-              <option value="rate" {% if filters.sort_by=='rate' %} selected{% endif %}>Rate</option>
-             </select>
-            </div>
-           </div>
-           <div class="w-full md:w-auto p-1.5">
-            <div class="relative">
-             <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"></path>
-             </svg>
-             <select name="sort_dir" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
-              <option value="asc" {% if filters.sort_dir=='asc' %} selected{% endif %}>Ascending</option>
-              <option value="desc" {% if filters.sort_dir=='desc' %} selected{% endif %}>Descending</option>
-             </select>
-            </div>
-           </div>
-           <div class="flex items-center">
-            <div class="w-full md:w-auto p-1.5">
-             <p class="text-sm font-heading bold">Sent From Node:</p>
-            </div>
-           </div>
-           <div class="w-full md:w-auto p-1.5">
-            <div class="relative">
-             <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"></path>
-             </svg>
-             <select name="sent_from" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
-              <option value="any" {% if filters.sent_from=='any' %} selected{% endif %}>Any</option>
-              <option value="only" {% if filters.sent_from=='only' %} selected{% endif %}>Only</option>
-             </select>
-            </div>
-           </div>
-            {% if sent_offers %}
-            <div class="flex items-center">
-            <div class="w-full md:w-auto p-1.5">
-             <p class="text-sm font-heading bold">State:</p>
-            </div>
-           </div>
-           <div class="w-full md:w-auto p-1.5">
-            <div class="relative">
-             <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"></path>
-             </svg>
-             <select name="active" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
-              <option value="any" {% if filters.active=='any' %} selected{% endif %}>Any</option>
-              <option value="active" {% if filters.active=='active' %} selected{% endif %}>Active</option>
-              <option value="expired" {% if filters.active=='expired' %} selected{% endif %}>Expired</option>
-              <option value="revoked" {% if filters.active=='revoked' %} selected{% endif %}>Revoked</option>
-             </select>
-            </div>
-           </div>
-            {% endif %}
-          <div class="w-full md:w-auto p-1.5">
-            <div class="relative">
-             <button type="submit" name='clearfilters' value="Clear Filters" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-white bg-blue-500 hover:bg-blue-600 rounded-lg transition duration-200 border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
-              <svg class="mr-2 w-5 h-5" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
-               <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round">
-                <line x1="20" y1="2" x2="12.329" y2="11.506"></line>
-                <path d="M11,11a2,2,0,0,1,2,2,3.659,3.659,0,0,1-.2.891A9.958,9.958,0,0,0,13.258,23H1C1,16.373,4.373,11,11,11Z"></path>
-                <line x1="18" y1="15" x2="23" y2="15" stroke="#ffffff"></line>
-                <line x1="17" y1="19" x2="23" y2="19" stroke="#ffffff"></line>
-                <line x1="19" y1="23" x2="23" y2="23" stroke="#ffffff"></line>
-                <path d="M8.059,11.415A3.9,3.9,0,0,0,12,16c.041,0,.079-.011.12-.012" data-cap="butt"></path>
-                <path d="M5,23a13.279,13.279,0,0,1,.208-3.4" data-cap="butt"></path>
-                <path d="M9.042,23c-.688-1.083-.313-3.4-.313-3.4" data-cap="butt"></path>
-               </g>
-              </svg>
-              <span>Clear</span>
-             </button>
-            </div>
-           </div>
-           <div class="w-full md:w-auto p-1.5">
-            <div class="relative">
-             <button type="submit" name='applyfilters' value="Apply Filters" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-white bg-blue-500 hover:bg-blue-600 rounded-lg transition duration-200 border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
-              <svg class="mr-2 w-5 h-5" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
-               <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round">
-                <rect x="2" y="2" width="7" height="7"></rect>
-                <rect x="15" y="15" width="7" height="7"></rect>
-                <rect x="2" y="15" width="7" height="7"></rect>
-                <polyline points="15 6 17 8 22 3" stroke="#ffffff"></polyline>
-               </g>
-              </svg>
-              <span>Apply Filters</span>
-             </button>
-            </div>
-           </div>
+  {% endif %}
+
+  <section>
+    <div class="pl-6 pr-6 pt-0 pb-0 mt-5 h-full overflow-hidden">
+      <div class="pb-6 border-coolGray-100">
+        <div class="flex flex-wrap items-center justify-between -m-2">
+          <div class="w-full pt-2">
+            <form method="post">
+              <div class="flex justify-between items-center pb-4 dark:text-white">
+                <div class="rounded-b-md">
+                  <div class="w-full md:w-0/12">
+                    <div class="flex flex-wrap justify-end -m-1.5">
+                      <div class="w-full md:w-auto p-1.5">
+                        <div class="relative">{{ input_arrow_down_svg | safe }}
+                          <select name="coin_from" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
+                            <option value="any" {% if filters.coin_from==-1 %} selected{% endif %}>Any</option>
+                            {% for c in coins_from %}
+                            <option class="text-sm" value="{{ c[0] }}" {% if filters.coin_from==c[0] %} selected{% endif %} data-image="/static/images/coins/{{ c[1]|replace(" ", "-") }}-20.png">{{ c[1] }}</option>
+                            {% endfor %}
+                          </select>
+                        </div>
+                      </div>
+                      <div class="flex items-center">
+                        <div class="w-full md:w-auto p-1.5">
+                          <p class="text-sm font-heading">{{ arrow_right_svg | safe }}
+                          </p>
+                        </div>
+                      </div>
+                      <div class="w-full md:w-auto p-1.5">
+                        <div class="relative">{{ input_arrow_down_svg | safe }}
+
+                          <!-- is="ms-dropdown" todo -->
+                          <select name="coin_to" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
+                            <option value="any" {% if filters.coin_to==-1 %} selected{% endif %}>Any</option>
+                            {% for c in coins %}
+                            <option class="text-sm" value="{{ c[0] }}" {% if filters.coin_to==c[0] %} selected{% endif %} data-image="/static/images/coins/{{ c[1]|replace(" ", "-") }}-20.png">{{ c[1] }}</option>
+                            {% endfor %}
+                          </select>
+                        </div>
+                      </div>
+                      <div class="flex items-center">
+                        <div class="w-full md:w-auto p-1.5">
+                          <p class="text-sm font-heading bold">Sort By:</p>
+                        </div>
+                      </div>
+                      <div class="w-full md:w-auto p-1.5">
+                        <div class="relative">{{ input_arrow_down_svg | safe }}
+                          <select name="sort_by" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
+                            <option value="created_at" {% if filters.sort_by=='created_at' %} selected{% endif %}>Time Created</option>
+                            <option value="rate" {% if filters.sort_by=='rate' %} selected{% endif %}>Rate</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div class="w-full md:w-auto p-1.5">
+                        <div class="relative">{{ input_arrow_down_svg | safe }}
+                          <select name="sort_dir" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
+                            <option value="asc" {% if filters.sort_dir=='asc' %} selected{% endif %}>Ascending</option>
+                            <option value="desc" {% if filters.sort_dir=='desc' %} selected{% endif %}>Descending</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div class="flex items-center">
+                        <div class="w-full md:w-auto p-1.5">
+                          <p class="text-sm font-heading bold">Sent From Node:</p>
+                        </div>
+                      </div>
+                      <div class="w-full md:w-auto p-1.5">
+                        <div class="relative">{{ input_arrow_down_svg | safe }}
+                          <select name="sent_from" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
+                            <option value="any" {% if filters.sent_from=='any' %} selected{% endif %}>Any</option>
+                            <option value="only" {% if filters.sent_from=='only' %} selected{% endif %}>Only</option>
+                          </select>
+                        </div>
+                      </div>
+                      {% if sent_offers %}
+                      <div class="flex items-center">
+                        <div class="w-full md:w-auto p-1.5">
+                          <p class="text-sm font-heading bold">State:</p>
+                        </div>
+                      </div>
+                      <div class="w-full md:w-auto p-1.5">
+                        <div class="relative">{{ input_arrow_down_svg | safe }}
+                          <select name="active" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
+                            <option value="any" {% if filters.active=='any' %} selected{% endif %}>Any</option>
+                            <option value="active" {% if filters.active=='active' %} selected{% endif %}>Active</option>
+                            <option value="expired" {% if filters.active=='expired' %} selected{% endif %}>Expired</option>
+                            <option value="revoked" {% if filters.active=='revoked' %} selected{% endif %}>Revoked</option>
+                          </select>
+                        </div>
+                      </div>
+                      {% endif %}
+                      <div class="w-full md:w-auto p-1.5">
+                        <div class="relative">
+                          <button type="submit" name='clearfilters' value="Clear Filters" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-white bg-blue-500 hover:bg-blue-600 rounded-lg transition duration-200 border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">{{ filter_clear_svg | safe }}
+                            <span>Clear</span>
+                          </button>
+                        </div>
+                      </div>
+                      <div class="w-full md:w-auto p-1.5">
+                        <div class="relative">
+                          <button type="submit" name='applyfilters' value="Apply Filters" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-white bg-blue-500 hover:bg-blue-600 rounded-lg transition duration-200 border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">{{ filter_apply_svg | safe }}
+                            <span>Apply Filters</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="container mt-5 mx-auto">
+                <div class="pt-6 pb-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
+                  <div class="px-6">
+                    <div class="w-full mt-6 pb-6 overflow-x-auto">
+                      <table class="w-full min-w-max">
+
+                        <thead class="uppercase">
+                          <tr class="text-left">
+                            <th class="p-0">
+                              <div class="py-3 px-6 rounded-tl-xl bg-coolGray-200 dark:bg-gray-600">
+                                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Date/Time at</span>
+                              </div>
+                            </th>
+                            <th class="p-0">
+                              <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
+                                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Details</span>
+                              </div>
+                            </th>
+                            <th class="p-0">
+                              <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
+                                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Recipient</span>
+                              </div>
+                            </th>
+                            <!--<th>ID</th>-->
+                            <th class="p-0">
+                              <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
+                                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">You get</span>
+                              </div>
+                            </th>
+                            <th class="p-0">
+                              <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
+                                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">You Send</span>
+                              </div>
+                            </th>
+                            <th class="p-0">
+                              <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
+                                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Rate</span>
+                              </div>
+                            </th>
+                            <!--<th>Amount From Swapped</th>-->
+                            <th class="p-0">
+                              <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600 rounded-tr-xl">
+                                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Trade</span>
+                              </div>
+                            </th>
+                          </tr>
+                        </thead>
+
+                        <tbody>
+                          {% for o in offers %}
+                          <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
+
+                            <!-- TIME + ACTIVE -->
+                            <td class="flex items-center py-7 px-46 dark:text-white text-gray-900 whitespace-nowrap" title="{% if o[12]==2 %}Revoked{% elif o[11]==true %}Expired{% else %}Active{% endif %}">
+                              <svg alt="" class="w-5 h-5 rounded-full ml-5" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
+                                <g stroke-linecap="round" stroke-width="2" fill="none" stroke="{% if o[12]==2 %}#AC0000{% elif o[11]==true %}#6b7280{% else %}#3B82F6{% endif %}" stroke-linejoin="round">
+                                  <circle cx="12" cy="12" r="11"></circle>
+                                  <polyline points=" 12,6 12,12 18,12 " stroke="{% if o[12]==2 %} #AC0000 {% elif o[11]==true %} #6b7280 {% else %} #3B82F6 {% endif %}"></polyline>
+                                </g>
+                              </svg>
+                              <div class="pl-3">
+                                <div class="{% if o[11]==true or o[12]==2 %} dark:text-white {% else %} font-semibold {% endif %} text-xs">{{ o[0] }}</div>
+                              </div>
+                            </td>
+                            <!-- TIME + ACTIVE -->
+
+                            <!--<td class="py-4 px-6 text-xs"><a class="monospace text-xs" href=/offer/{{ o[1] }}>{{ o[1]|truncate(6, True) }}</a></td>-->
+                            <!--<td class="py-4 px-6 text-xs monospace">{{ o[8] }}{% if o[9]==true %} <b>Sent</b>{% endif %}</td>-->
+
+                            <!-- DETAILS -->
+                            <td class="py-3 px-6 text-xs">
+                              <div class="network"><span class="bold">Network:</span> {{ o[7] }}</div>
+                              <div class="partial pt-1"><span class="bold">Amount Variable:</span>{{ o[14] }}</div>
+                              <div class="swaptype pt-1"><span class="bold">Swap Type:</span> {{ o[13] }}</div>
+                            <!-- {% if o[12]==2 %}(Revoked){% elif o[11]==true %}(Not Active){% else %}(Active){% endif %} -->
+                            </td>
+                            <!-- DETAILS -->
+
+                            <!-- RECIPIENT -->
+                            <td class="py-3 px-6 text-xs monospace">
+                              <a href="/identity/{{ o[8] }}{% if o[9]==true %}{% endif %}">{{ o[8] }}</a>
+                            </td>
+                            <!-- RECIPIENT -->
+
+                            <!-- YOU GET ICON -->
+                            {% if o[9] == true %}
+                            <td class="py-3 px-6 text-xs">
+                              <div class="flex items-center">
+                                <span class="inline-flex align-middle items-center justify-center w-9 h-10 rounded"><img class="h-7" src="/static/images/coins/{{ o[3]|replace(" ", "-") }}.png" alt=""></span>
+                                <div class="flex flex-col ml-2">
+                                  <div class="coinname-value bold" data-coinname="{{ o[3] }}">
+                                    {{ o[5]|truncate(8, true, '', 0) }} {{ o[3] }}
+                                  </div>
+                                  <div class="usd-value"></div>
+                                </div>
+                              </div>
+                            </td>
+                            <!-- YOU GET ICON -->
+
+                            <!-- YOU GET ICON OFFERS -->
+                            {% else %}
+                            <td class="py-3 px-6 text-xs">
+                              <div class="flex items-center">
+                                <span class="inline-flex align-middle items-center justify-center w-9 h-10 rounded"><img class="h-7" src="/static/images/coins/{{ o[2]|replace(" ", "-") }}.png" alt=""></span>
+                                <div class="flex flex-col ml-2">
+                                  <div class="coinname-value bold" data-coinname="{{ o[2] }}">
+                                    {{ o[4]|truncate(8, true, '', 0) }} {{ o[2] }}
+                                  </div>
+                                  <div class="usd-value"></div>
+                                </div>
+                              </div>
+                            </td>
+                            {% endif %}
+
+                            <!-- YOU GET ICON OFFERS -->
+
+                            <!-- YOU SEND ICON -->
+                            {% if o[9] == true %}
+                            <td class="py-3 px-6 text-xs">
+                              <div class="flex items-center">
+                                <span class="inline-flex align-middle items-center justify-center w-9 h-10 rounded"><img class="h-7" src="/static/images/coins/{{ o[2]|replace(" ", "-") }}.png" alt=""></span>
+                                <div class="flex flex-col ml-2">
+                                  <div class="coinname-value bold" data-coinname="{{ o[2] }}">
+                                    {{ o[4]|truncate(8,true,'',0) }} {{ o[2] }}
+                                  </div>
+                                  <div class="usd-value"></div>
+                                </div>
+                              </div>
+                            </td>
+                            <!-- YOU SEND ICON -->
+
+                            <!-- YOU SEND ICON OFFERS -->
+                            {% else %}
+                            <td class="py-3 px-6 text-xs">
+                              <div class="flex items-center">
+                                <span class="inline-flex align-middle items-center justify-center w-9 h-10 rounded"><img class="h-7" src="/static/images/coins/{{ o[3]|replace(" ", "-") }}.png" alt=""></span>
+                                <div class="flex flex-col ml-2">
+
+                                  <!-- Added ml-2 for left margin -->
+                                  <div class="coinname-value bold" data-coinname="{{ o[3] }}">
+                                    {{ o[5]|truncate(8, true, '', 0) }} {{ o[3] }}
+                                  </div>
+                                  <div class="usd-value"></div>
+                                </div>
+                              </div>
+                            </td>
+                            {% endif %}
+                            <!-- YOU SEND ICON OFFERS -->
+
+                            <!-- RATE -->
+                            <td class="py-3 px-6 text-xs">
+                              <div class="coinname-value" data-coinname="{{ o[3] }}">{{ o[6]|truncate(8,true,'',0) }}</div>
+                              <div class="usd-value"></div>
+                              <div class="profit-value hidden"></div>
+                              <div class="profit-loss"></div>
+                            </td>
+                            <!-- RATE -->
+
+                            <!--  <td class="py-4 px-6">{{ o[10] }}</td>-->
+
+                            <!-- SWAP OR EDIT -->
+                            <td class="py-3 px-6">
+                              <a class="inline-block w-20 py-1 px-2 font-medium text-center text-sm rounded-md
+                              {% if o[9]==true %}  bg-blue-500 text-white border hover:bg-blue-600 dark:border-gray-700 bg-gray-700 transition duration-200
+                               {% else %} bg-blue-500 text-white hover:bg-blue-600 transition duration-200 {% endif %}" href="/offer/{{ o[1] }}">{% if o[9]==true %} Edit {% else %} Swap {% endif %}</a>
+                            </td>
+                            <!-- SWAP OR EDIT -->
+
+                          </tr>
+                        </tbody>
+                        {% endfor %}
+                      </table>
+                      <input type="hidden" name="formid" value="{{ form_id }}">
+                      <input type="hidden" name="pageno" value="{{ filters.page_no }}">
+                    </div>
+                  </div>
+
+                  <div class="rounded-b-md">
+                    <div class="w-full md:w-0/12">
+                      <div class="flex flex-wrap justify-end pt-6 pr-6 border-t border-gray-100 dark:border-gray-400">
+                        <div class="w-full md:w-auto p-1.5">
+                          <button type="submit" name='pageback' value="Page Back" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-blue-600 rounded-lg transition duration-200 focus:ring-0 focus:outline-none">
+                            {{ page_back_svg | safe }}
+                            <span>Page Back</span>
+                          </button>
+                        </div>
+                        <div class="flex items-center">
+                          <div class="w-full md:w-auto p-1.5">
+                            <p class="text-sm font-heading dark:text-white">Page: {{ filters.page_no }}</p>
+                          </div>
+                        </div>
+                        <div class="w-full md:w-auto p-1.5">
+                          <button type="submit" name='pageforwards' value="Page Forwards" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-blue-600 rounded-lg transition duration-200 focus:ring-0 focus:outline-none">
+                            <span>Page Forwards</span>
+                            {{ page_forwards_svg | safe }}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+            </form>
           </div>
-         </div>
         </div>
-       </div>
-       <div class="container mt-5 mx-auto">
-        <div class="pt-6 pb-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
-         <div class="px-6">
-          <div class="w-full mt-6 pb-6 overflow-x-auto">
-           <table class="w-full min-w-max">
-            <thead class="uppercase">
-             <tr class="text-left">
-              <th class="p-0">
-               <div class="py-3 px-6 rounded-tl-xl bg-coolGray-200 dark:bg-gray-600">
-                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Date/Time at</span>
-               </div>
-              </th>
-              <th class="p-0">
-               <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
-                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Details</span>
-               </div>
-              </th>
-              <th class="p-0">
-               <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
-                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Recipient</span>
-               </div>
-              </th>
-              <!--<th>ID</th>-->
-              <th class="p-0">
-               <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
-                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">You get</span>
-               </div>
-              </th>
-              <th class="p-0">
-               <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
-                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Amount</span>
-               </div>
-              </th>
-              <th class="p-0">
-               <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
-                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">You Send</span>
-               </div>
-              </th>
-              <th class="p-0">
-               <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
-                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Amount</span>
-               </div>
-              </th>
-              <th class="p-0">
-               <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
-                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Rate</span>
-               </div>
-              </th>
-              <!--<th>Amount From Swapped</th>-->
-              <th class="p-0">
-               <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600 rounded-tr-xl">
-                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Trade</span>
-               </div>
-              </th>
-             </tr>
-            </thead>
-            <tbody>
-            {% for o in offers %}
-              <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
-              <td class="flex items-center py-7 px-46 dark:text-white text-gray-900 whitespace-nowrap" title="{% if o[12]==2 %}Revoked{% elif o[11]==true %}Expired{% else %}Active{% endif %}">
-               <svg alt="" class="w-5 h-5 rounded-full ml-5" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-                <g stroke-linecap="round" stroke-width="2" fill="none" stroke="{% if o[12]==2 %}#AC0000{% elif o[11]==true %}#6b7280{% else %}#3B82F6{% endif %}" stroke-linejoin="round">
-                 <circle cx="12" cy="12" r="11"></circle>
-                 <polyline points=" 12,6 12,12 18,12 " stroke="{% if o[12]==2 %} #AC0000 {% elif o[11]==true %} #6b7280 {% else %} #3B82F6 {% endif %}"></polyline>
-                </g>
-               </svg>
-               <div class="pl-3">
-                <div class="{% if o[11]==true or o[12]==2 %} dark:text-white {% else %} font-semibold {% endif %} text-xs">{{ o[0] }}</div>
-               </div>
-              </td>
-              <!--<td class="py-4 px-6 text-xs"><a class="monospace text-xs" href=/offer/{{ o[1] }}>{{ o[1]|truncate(6, True) }}</a></td>-->
-              <!--<td class="py-4 px-6 text-xs monospace">{{ o[8] }}{% if o[9]==true %} <b>Sent</b>{% endif %}</td>-->
-              <td class="py-3 px-6 text-xs">
-                <div class="network"><span class="bold">Network:</span> {{ o[7] }}</div>
-                <div class="partial pt-1"><span class="bold">Amount Variable:</span> {{ o[14] }}<div>
-                <div class="swaptype pt-1"><span class="bold">Swap Type:</span> {{ o[13] }}</div>
-               <!-- {% if o[12]==2 %}(Revoked){% elif o[11]==true %}(Not Active){% else %}(Active){% endif %} -->
-              </td>
-              <td class="py-3 px-6 text-xs monospace">
-               <a href="/identity/{{ o[8] }}{% if o[9]==true %}{% endif %}">{{ o[8] }}</a>
-              </td>
-              <td class="py-3 px-6 text-xs">
-               <span class="inline-flex align-middle items-center justify-center w-9 h-10 rounded">
-                {% if o[9]==true %} <img class="h-7" src="/static/images/coins/{{ o[3]|replace(" ", "-") }}.png" alt="">
-               </span>{{ o[3] }}
-              </td>
-              <td class="py-3 px-6 text-xs">
-                <div class="coinname-value" data-coinname="{{ o[3] }}">{{ o[5]|truncate(8,true,'',0) }}</div>
-                <div class="usd-value"></div>
-              </td>
-             {% else %}
-              <img class="h-7" src="/static/images/coins/{{ o[2]|replace(" ", "-") }}.png" alt="">
-              </span>{{ o[2] }}
-              </td>
-              <td class="py-3 px-6 text-xs">
-                <div class="coinname-value" data-coinname="{{ o[2] }}">{{ o[4]|truncate(8,true,'',0) }}</div>
-                <div class="usd-value"></div>
-              </td>
-              {% endif %}
-              <td class="py-4 px-6 text-xs">
-               <span class="inline-flex align-middle items-center justify-center w-9 h-10 rounded"> {% if o[9]==true %} <img class="h-7" src="/static/images/coins/{{ o[2]|replace(" ", "-") }}.png" alt="">
-               </span>{{ o[2] }}
-              </td>
-              <td class="py-3 px-6 text-xs">
-                 <div class="coinname-value" data-coinname="{{ o[2] }}">{{ o[4]|truncate(8,true,'',0) }}</div>
-                 <div class="usd-value"></div>
-              </td>
-              {% else %}
-              <img class="h-7" src="/static/images/coins/{{ o[3]|replace(" ", "-") }}.png" alt="">
-              </span>{{ o[3] }}
-              </td>
-              <td class="py-3 px-6 text-xs">
-                 <div class="coinname-value" data-coinname="{{ o[3] }}">{{ o[5]|truncate(8,true,'',0) }}</div>
-                 <div class="usd-value"></div>
-              </td>
-              {% endif %}
-              <td class="py-3 px-6 text-xs">
-                <div class="coinname-value" data-coinname="{{ o[3] }}">{{ o[6]|truncate(8,true,'',0) }}</div>
-                <div class="usd-value"></div>
-              </td>
-              <!--  <td class="py-4 px-6">{{ o[10] }}</td>-->
-              <td class="py-3 px-6">
-               <a class="inline-block w-20 py-1 px-2 font-medium text-center text-sm rounded-md {% if o[9]==true %} bg-blue-500 text-white border border-blue-500 hover:bg-blue-600 transition duration-200  {% else %} bg-blue-500 text-white hover:bg-blue-600 transition duration-200 {% endif %}" href="/offer/{{ o[1] }}">{% if o[9]==true %}Edit{% else %}Swap{% endif %}</a>
-              </td>
-             </tr>
-            </tbody>
-            {% endfor %}
-           </table>
-           <input type="hidden" name="formid" value="{{ form_id }}">
-           <input type="hidden" name="pageno" value="{{ filters.page_no }}">
-          </div>
-         </div>
-        <div class="rounded-b-md">
-          <div class="w-full md:w-0/12">
-           <div class="flex flex-wrap justify-end pt-6 pr-6 border-t border-gray-100 dark:border-gray-400">
-            <div class="w-full md:w-auto p-1.5">
-             <button type="submit" name='pageback' value="Page Back" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-blue-600 rounded-lg transition duration-200 focus:ring-0 focus:outline-none">
-              <svg aria-hidden="true" class="mr-2 w-5 h-5" fill="#fff" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-               <path fill-rule="evenodd" d="M7.707 14.707a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l2.293 2.293a1 1 0 010 1.414z" clip-rule="evenodd"></path>
-              </svg>
-              <span>Page Back</span>
-             </button>
-            </div>
-            <div class="flex items-center">
-             <div class="w-full md:w-auto p-1.5">
-              <p class="text-sm font-heading dark:text-white">Page: {{ filters.page_no }}</p>
-             </div>
-            </div>
-            <div class="w-full md:w-auto p-1.5">
-             <button type="submit" name='pageforwards' value="Page Forwards" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-blue-600 rounded-lg transition duration-200 focus:ring-0 focus:outline-none">
-              <span>Page Forwards</span>
-              <svg aria-hidden="true" class="ml-2 w-5 h-5" fill="#fff" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-               <path fill-rule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd"></path>
-              </svg>
-             </button>
-            </div>
-           </div>
-          </div>
-         </div>
-      </form>
-     </div>
+      </div>
     </div>
-   </div>
-  </div>
- </section>
+  </section>
 </div>
 {% include 'footer.html' %}
 <script>
-    document.getElementById('btc-container').addEventListener('click', () => {
-      updateChart('BTC');
-    });
-    document.getElementById('xmr-container').addEventListener('click', () => {
-      updateChart('XMR');
-    });
-    document.getElementById('part-container').addEventListener('click', () => {
-      updateChart('PART');
-    });
-    document.getElementById('pivx-container').addEventListener('click', () => {
-      updateChart('PIVX');
-    });
-    document.getElementById('firo-container').addEventListener('click', () => {
-      updateChart('FIRO');
-    });
-    document.getElementById('dash-container').addEventListener('click', () => {
-      updateChart('DASH');
-    });
-    document.getElementById('ltc-container').addEventListener('click', () => {
-      updateChart('LTC');
-    });
-</script>
-<script>
-const coinNameToSymbol = {
-  'Bitcoin': 'BTC',
-  'Particl': 'PART',
-  'Particl Blind': 'PART',
-  'Particl Anon': 'PART',
-  'Monero': 'XMR',
-  'Litecoin': 'LTC',
-  'Firo': 'FIRO',
-  'Dash': 'DASH',
-  'PIVX': 'PIVX'
-};
+    const coinNameToSymbol = {
+    'Bitcoin': 'BTC',
+    'Particl': 'PART',
+    'Particl Blind': 'PART',
+    'Particl Anon': 'PART',
+    'Monero': 'XMR',
+    'Litecoin': 'LTC',
+    'Firo': 'FIRO',
+    'Dash': 'DASH',
+    'PIVX': 'PIVX'
+  };
 
-  function updateUsdValue(cryptoCell, coinFullName) {
+  const exchangeRateCache = {};
+
+  function updateUsdValue(cryptoCell, coinFullName, isRate = false) {
     const coinSymbol = coinNameToSymbol[coinFullName];
     if (!coinSymbol) {
       console.error(`Coin symbol not found for full name: ${coinFullName}`);
@@ -940,30 +945,112 @@ const coinNameToSymbol = {
 
     const cryptoValue = parseFloat(cryptoCell.textContent);
     const usdCell = cryptoCell.nextElementSibling;
-    const apiUrl = `https://min-api.cryptocompare.com/data/price?fsym=${coinSymbol}&tsyms=USD`;
 
-    fetch(apiUrl)
-      .then(response => response.json())
-      .then(data => {
-        const exchangeRate = data.USD;
-        if (!isNaN(exchangeRate)) {
-          const usdValue = cryptoValue * exchangeRate;
-          usdCell.textContent = `${usdValue.toFixed(2)} USD`;
-        } else {
-          usdCell.textContent = 'Invalid exchange rate';
-        }
-      })
-      .catch(error => {
-        usdCell.textContent = 'Error retrieving exchange rate';
-      });
+    if (isRate) {
+      const rateCell = usdCell.nextElementSibling;
+      const usdValue = rateCell.previousElementSibling.textContent * cryptoValue;
+      usdCell.textContent = `${usdValue.toFixed(2)} USD`;
+    } else {
+      const apiUrl = `https://min-api.cryptocompare.com/data/price?fsym=${coinSymbol}&tsyms=USD`;
+
+      // Check if the exchange rate is in the cache and is not expired
+      if (exchangeRateCache[coinSymbol] && !isCacheExpired(coinSymbol)) {
+        console.log(`Using cached exchange rate for ${coinSymbol}`);
+        const exchangeRate = exchangeRateCache[coinSymbol].rate;
+        const usdValue = cryptoValue * exchangeRate;
+        usdCell.textContent = `${usdValue.toFixed(2)} USD`;
+
+        updateProfitLoss(cryptoCell.closest('tr'));
+        updateProfitValue(cryptoCell.closest('tr'));
+      } else {
+        console.log(`Fetching exchange rate from API for ${coinSymbol}`);
+        fetch(apiUrl)
+          .then(response => response.json())
+          .then(data => {
+            const exchangeRate = data.USD;
+            if (!isNaN(exchangeRate)) {
+              console.log(`Received exchange rate from API for ${coinSymbol}`);
+              const usdValue = cryptoValue * exchangeRate;
+              usdCell.textContent = `${usdValue.toFixed(2)} USD`;
+
+              exchangeRateCache[coinSymbol] = {
+                rate: exchangeRate,
+                timestamp: Date.now(),
+                ttl: 300000 // 5 minutes
+              };
+
+              updateProfitLoss(cryptoCell.closest('tr'));
+              updateProfitValue(cryptoCell.closest('tr'));
+            } else {
+              console.error('Invalid exchange rate. Response:', data);
+              usdCell.textContent = 'Invalid exchange rate';
+            }
+          })
+          .catch(error => {
+            console.error('Error retrieving exchange rate:', error);
+            usdCell.textContent = 'Error retrieving exchange rate';
+          });
+      }
+    }
+  }
+
+  function isCacheExpired(coinSymbol) {
+    const cacheEntry = exchangeRateCache[coinSymbol];
+    return cacheEntry && (Date.now() - cacheEntry.timestamp > cacheEntry.ttl);
+  }
+
+function updateProfitLoss(row) {
+  const sellingUSD = parseFloat(row.querySelector('.usd-value').textContent);
+  const buyingUSD = parseFloat(row.querySelectorAll('.usd-value')[1].textContent);
+  const profitLossCell = row.querySelector('.profit-loss');
+
+  if (!isNaN(sellingUSD) && !isNaN(buyingUSD)) {
+    const profitLossPercentage = ((sellingUSD - buyingUSD) / buyingUSD) * 100;
+    profitLossCell.textContent = `${profitLossPercentage.toFixed(2)}%`;
+
+    if (profitLossPercentage > 0) {
+      profitLossCell.classList.add('text-green-500'); // Profit (positive)
+      profitLossCell.classList.remove('text-red-500');
+    } else if (profitLossPercentage < 0) {
+      profitLossCell.classList.add('text-red-500'); // Loss (negative)
+      profitLossCell.classList.remove('text-green-500');
+    } else {
+      profitLossCell.classList.add('text-yellow-500'); // No profit or loss (zero)
+      profitLossCell.classList.remove('text-green-500', 'text-red-500');
+    }
+  } else {
+    profitLossCell.textContent = 'Invalid USD values';
+    profitLossCell.classList.remove('text-green-500', 'text-red-500');
+  }
+}
+
+
+  function updateProfitValue(row) {
+    const sellingUSD = parseFloat(row.querySelector('.usd-value').textContent);
+    const profitValueCell = row.querySelector('.profit-value');
+
+    if (!isNaN(sellingUSD)) {
+      profitValueCell.textContent = `${sellingUSD.toFixed(2)} USD`;
+    } else {
+      profitValueCell.textContent = 'Invalid USD value';
+    }
   }
 
   document.addEventListener('DOMContentLoaded', () => {
     const coinNameValues = document.querySelectorAll('.coinname-value');
     for (let i = 0; i < coinNameValues.length; i++) {
       const coinFullName = coinNameValues[i].getAttribute('data-coinname');
-      updateUsdValue(coinNameValues[i], coinFullName);
-      coinNameValues[i].addEventListener('input', () => updateUsdValue(coinNameValues[i], coinFullName));
+      const isRate = coinNameValues[i].textContent.includes('rate');
+      updateUsdValue(coinNameValues[i], coinFullName, isRate);
+
+      if (!isRate) {
+        coinNameValues[i].addEventListener('input', () => {
+          // Clear the cache when the user inputs a new value
+          console.log(`Clearing cache for ${coinNameToSymbol[coinFullName]}`);
+          exchangeRateCache[coinNameToSymbol[coinFullName]] = undefined;
+          updateUsdValue(coinNameValues[i], coinFullName);
+        });
+      }
     }
   });
 </script>
