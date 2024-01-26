@@ -48,9 +48,9 @@ LITECOIN_VERSION_TAG = os.getenv('LITECOIN_VERSION_TAG', '')
 BITCOIN_VERSION = os.getenv('BITCOIN_VERSION', '26.0')
 BITCOIN_VERSION_TAG = os.getenv('BITCOIN_VERSION_TAG', '')
 
-MONERO_VERSION = os.getenv('MONERO_VERSION', '0.18.2.2')
+MONERO_VERSION = os.getenv('MONERO_VERSION', '0.18.3.1')
 MONERO_VERSION_TAG = os.getenv('MONERO_VERSION_TAG', '')
-XMR_SITE_COMMIT = 'a3b195eb90c7d5564cc9d9ec09c873783d21901b'  # Lock hashes.txt to monero version
+XMR_SITE_COMMIT = '1bdb0d456943a224a4d6241b1bb713172e5fa29f'  # Lock hashes.txt to monero version
 
 PIVX_VERSION = os.getenv('PIVX_VERSION', '5.5.0')
 PIVX_VERSION_TAG = os.getenv('PIVX_VERSION_TAG', '')
