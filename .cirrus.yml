@@ -47,3 +47,4 @@ test_task:
     - pytest tests/basicswap/test_other.py
     - pytest tests/basicswap/test_run.py
     - pytest tests/basicswap/test_reload.py
+    - pytest tests/basicswap/test_btc_xmr.py -k 'test_01_a or test_01_b or test_02_a or test_02_b'

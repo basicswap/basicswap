@@ -1207,8 +1207,13 @@ class BasicSwap(BaseApp):
 
     def sendSmsg(self, addr_from: str, addr_to: str, payload_hex: bytes, msg_valid: int) -> bytes:
         options = {'decodehex': True, 'ttl_is_seconds': True}
-        ro = self.callrpc('smsgsend', [addr_from, addr_to, payload_hex, False, msg_valid, False, options])
-        return bytes.fromhex(ro['msgid'])
+        try:
+            ro = self.callrpc('smsgsend', [addr_from, addr_to, payload_hex, False, msg_valid, False, options])
+            return bytes.fromhex(ro['msgid'])
+        except Exception as e:
+            if self.debug:
+                self.log.error('smsgsend failed {}'.format(json.dumps(ro, indent=4)))
+            raise e
 
     def is_reverse_ads_bid(self, coin_from) -> bool:
         return coin_from in self.scriptless_coins + self.coins_without_segwit
@@ -1856,24 +1861,24 @@ class BasicSwap(BaseApp):
         est_fee = (fee_rate * tx_vsize) / 1000
         return est_fee
 
-    def withdrawCoin(self, coin_type, value, addr_to, subfee):
+    def withdrawCoin(self, coin_type, value, addr_to, subfee: bool) -> str:
         ci = self.ci(coin_type)
-        self.log.info('withdrawCoin %s %s to %s %s', value, ci.ticker(), addr_to, ' subfee' if subfee else '')
+        self.log.info('withdrawCoin {} {} to {} {}'.format(value, ci.ticker(), addr_to, ' subfee' if subfee else ''))
 
         txid = ci.withdrawCoin(value, addr_to, subfee)
         self.log.debug('In txn: {}'.format(txid))
         return txid
 
-    def withdrawLTC(self, type_from, value, addr_to, subfee):
+    def withdrawLTC(self, type_from, value, addr_to, subfee: bool) -> str:
         ci = self.ci(Coins.LTC)
-        self.log.info('withdrawLTC %s %s to %s %s', value, ci.ticker(), addr_to, ' subfee' if subfee else '')
+        self.log.info('withdrawLTC {} {} to {} {}'.format(value, type_from, addr_to, ' subfee' if subfee else ''))
 
         txid = ci.withdrawCoin(value, type_from, addr_to, subfee)
         self.log.debug('In txn: {}'.format(txid))
         return txid
 
-    def withdrawParticl(self, type_from, type_to, value, addr_to, subfee):
-        self.log.info('withdrawParticl %s %s to %s %s %s', value, type_from, type_to, addr_to, ' subfee' if subfee else '')
+    def withdrawParticl(self, type_from: str, type_to: str, value, addr_to: str, subfee: bool) -> str:
+        self.log.info('withdrawParticl {} {} to {} {} {}'.format(value, type_from, type_to, addr_to, ' subfee' if subfee else ''))
 
         if type_from == 'plain':
             type_from = 'part'

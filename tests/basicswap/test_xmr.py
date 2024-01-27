@@ -336,6 +336,7 @@ class BaseTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        test_delay_event.clear()
         random.seed(time.time())
 
         logger.propagate = False
@@ -617,6 +618,13 @@ class BaseTest(unittest.TestCase):
         stopDaemons(cls.part_daemons)
         stopDaemons(cls.btc_daemons)
         stopDaemons(cls.ltc_daemons)
+
+        cls.http_threads.clear()
+        cls.swap_clients.clear()
+        cls.part_daemons.clear()
+        cls.btc_daemons.clear()
+        cls.ltc_daemons.clear()
+        cls.xmr_daemons.clear()
 
         super(BaseTest, cls).tearDownClass()
 

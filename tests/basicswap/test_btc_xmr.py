@@ -31,6 +31,7 @@ from tests.basicswap.util import (
     read_json_api,
 )
 from tests.basicswap.common import (
+    abandon_all_swaps,
     wait_for_bid,
     wait_for_event,
     wait_for_offer,
@@ -1198,6 +1199,8 @@ class TestBTC(BasicSwapTest):
             assert (jsw['locked'] is False)
 
     def test_01_full_swap(self):
+        abandon_all_swaps(test_delay_event, self.swap_clients[0])
+        wait_for_none_active(test_delay_event, 1800)
         js_0 = read_json_api(1800, 'wallets')
         if not js_0['PART']['encrypted']:
             read_json_api(1800, 'setpassword', {'oldpassword': '', 'newpassword': 'notapassword123'})
