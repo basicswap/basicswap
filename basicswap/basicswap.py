@@ -6522,6 +6522,9 @@ class BasicSwap(BaseApp):
                 'locked': walletinfo['locked'],
             }
 
+            if 'locked_utxos' in walletinfo:
+                rv['locked_utxos'] = walletinfo['locked_utxos']
+
             if coin == Coins.PART:
                 rv['stealth_address'] = self.getCachedStealthAddressForCoin(Coins.PART)
                 rv['anon_balance'] = walletinfo['anon_balance']

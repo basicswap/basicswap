@@ -182,6 +182,9 @@ class Test(BaseTest):
         sx_addr = read_json_api(1800, 'wallets/part/newstealthaddress')
         assert (callnoderpc(0, 'getaddressinfo', [sx_addr, ])['isstealthaddress'] is True)
 
+        rv = read_json_api(1800, 'wallets/part')
+        assert ('locked_utxos' in rv)
+
     def test_004_validateSwapType(self):
         logging.info('---------- Test validateSwapType')
 

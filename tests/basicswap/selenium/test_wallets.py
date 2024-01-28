@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2022-2023 tecnovert
+# Copyright (c) 2022-2024 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -10,7 +10,9 @@ import time
 
 from urllib.request import urlopen
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support.select import Select
 from util import get_driver
+from basicswap.util import dumpje
 
 
 def test_wallets(driver):
@@ -71,6 +73,50 @@ def test_wallets(driver):
     assert (len(elements) == 1)
     e = elements[0]
     assert ('Withdrew 10 rtPART (plain to plain) to address' in e.text)
+
+    print('Locking UTXO')
+    driver.get(base_url + '/rpc')
+    el = driver.find_element(By.NAME, 'coin_type')
+    for option in el.find_elements(By.TAG_NAME, 'option'):
+        if option.text == 'Particl':
+            option.click()
+            break
+    driver.find_element(By.NAME, 'cmd').send_keys('listunspent')
+    driver.find_element(By.NAME, 'apply').click()
+    time.sleep(1)
+
+    text_value = driver.find_element(By.NAME, 'result').text
+    utxos = json.loads(text_value.split('\n', 1)[1])
+
+    lock_utxos = [{'txid': utxos[0]['txid'], 'vout': utxos[0]['vout']}]
+    driver.find_element(By.NAME, 'cmd').send_keys('lockunspent false "{}"'.format(dumpje(lock_utxos)))
+    driver.find_element(By.NAME, 'apply').click()
+
+    print('Check for locked UTXO count')
+    driver.get(base_url + '/wallet/PART')
+    found = False
+    for i in range(5):
+        try:
+            el = driver.find_element(By.ID, 'locked_utxos')
+            found = True
+            break
+        except Exception:
+            continue
+        driver.find_element(By.ID, 'refresh').click()
+        time.sleep(2)
+        found = True
+    assert (found)
+    driver.refresh()
+
+    print('Unlocking UTXO')
+    driver.get(base_url + '/rpc')
+    el = driver.find_element(By.NAME, 'coin_type')
+    for option in el.find_elements(By.TAG_NAME, 'option'):
+        if option.text == 'Particl':
+            option.click()
+            break
+    driver.find_element(By.NAME, 'cmd').send_keys('lockunspent true "{}"'.format(dumpje(lock_utxos)))
+    driver.find_element(By.NAME, 'apply').click()
 
     print('Test Passed!')
 

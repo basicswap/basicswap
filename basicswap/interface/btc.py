@@ -300,6 +300,7 @@ class BTCInterface(CoinInterface):
         rv = self.rpc_wallet('getwalletinfo')
         rv['encrypted'] = 'unlocked_until' in rv
         rv['locked'] = rv.get('unlocked_until', 1) <= 0
+        rv['locked_utxos'] = len(self.rpc_wallet('listlockunspent'))
         return rv
 
     def walletRestoreHeight(self) -> int:

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2020-2023 tecnovert
+# Copyright (c) 2020-2024 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -107,6 +107,7 @@ XMR_BASE_RPC_PORT = 21792
 XMR_BASE_ZMQ_PORT = 22792
 XMR_BASE_WALLET_RPC_PORT = 23792
 
+signal_event = threading.Event()  # Set if test was cancelled
 test_delay_event = threading.Event()
 RESET_TEST = make_boolean(os.getenv('RESET_TEST', 'true'))
 
@@ -255,6 +256,7 @@ def ltcCli(cmd, node_id=0):
 
 def signal_handler(sig, frame):
     logging.info('signal {} detected.'.format(sig))
+    signal_event.set()
     test_delay_event.set()
 
 
@@ -336,6 +338,8 @@ class BaseTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        if signal_event.is_set():
+            raise ValueError('Test has been cancelled.')
         test_delay_event.clear()
         random.seed(time.time())
 
