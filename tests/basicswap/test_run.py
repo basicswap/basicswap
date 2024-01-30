@@ -182,6 +182,9 @@ class Test(BaseTest):
         sx_addr = read_json_api(1800, 'wallets/part/newstealthaddress')
         assert (callnoderpc(0, 'getaddressinfo', [sx_addr, ])['isstealthaddress'] is True)
 
+        rv = read_json_api(1800, 'wallets/part')
+        assert ('locked_utxos' in rv)
+
     def test_004_validateSwapType(self):
         logging.info('---------- Test validateSwapType')
 
@@ -660,7 +663,7 @@ class Test(BaseTest):
         js_w2 = read_json_api(1802, 'wallets')
         if float(js_w2['PART']['balance']) < 100.0:
             post_json = {
-                'value': 100,
+                'value': 100.0,
                 'address': js_w2['PART']['deposit_address'],
                 'subfee': False,
             }
@@ -678,8 +681,8 @@ class Test(BaseTest):
             'subfee': True,
         }
         json_rv = read_json_api(TEST_HTTP_PORT + 2, 'wallets/part/withdraw', post_json)
-        wait_for_balance(test_delay_event, 'http://127.0.0.1:1802/json/wallets/part', 'balance', 10.0)
         assert (len(json_rv['txid']) == 64)
+        wait_for_balance(test_delay_event, 'http://127.0.0.1:1802/json/wallets/part', 'balance', 10.0)
 
         # Create prefunded ITX
         ci = swap_clients[2].ci(Coins.PART)

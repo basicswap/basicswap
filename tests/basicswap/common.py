@@ -230,6 +230,14 @@ def wait_for_none_active(delay_event, port, wait_for=30):
     raise ValueError('wait_for_none_active timed out.')
 
 
+def abandon_all_swaps(delay_event, swap_client) -> None:
+    logging.info('abandon_all_swaps')
+    for bid in swap_client.listBids(sent=True):
+        swap_client.abandonBid(bid[2])
+    for bid in swap_client.listBids(sent=False):
+        swap_client.abandonBid(bid[2])
+
+
 def waitForNumOffers(delay_event, port, offers, wait_for=20):
     for i in range(wait_for):
         if delay_event.is_set():

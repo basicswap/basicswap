@@ -41,6 +41,8 @@ def format_wallet_data(swap_client, ci, w):
         wf['bootstrapping'] = True
     if 'known_block_count' in w:
         wf['known_block_count'] = w['known_block_count']
+    if 'locked_utxos' in w:
+        wf['locked_utxos'] = w['locked_utxos']
 
     if 'balance' in w and 'unconfirmed' in w:
         wf['balance_all'] = float(w['balance']) + float(w['unconfirmed'])

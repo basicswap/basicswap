@@ -33,9 +33,7 @@ class LTCInterface(BTCInterface):
         return self.rpc_wallet('sendtoaddress', params)
 
     def getWalletInfo(self):
-        rv = self.rpc_wallet('getwalletinfo')
-        rv['encrypted'] = 'unlocked_until' in rv
-        rv['locked'] = rv.get('unlocked_until', 1) <= 0
+        rv = super(LTCInterface, self).getWalletInfo()
 
         mweb_info = self.rpc_wallet_mweb('getwalletinfo')
         rv['mweb_balance'] = mweb_info['balance']
