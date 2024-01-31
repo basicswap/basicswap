@@ -3534,7 +3534,7 @@ class BasicSwap(BaseApp):
                 self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_B_INVALID, 'Detected invalid lock tx B', session)
                 bid_changed = True
         elif found_tx is not None:
-            if bid.xmr_b_lock_tx is None or not bid.xmr_b_lock_tx.chain_height:
+            if found_tx['height'] != 0 and (bid.xmr_b_lock_tx is None or not bid.xmr_b_lock_tx.chain_height):
                 self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_B_SEEN, '', session)
             if bid.xmr_b_lock_tx is None:
                 self.log.debug('Found {} lock tx in chain'.format(ci_to.coin_name()))

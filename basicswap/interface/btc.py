@@ -981,7 +981,7 @@ class BTCInterface(CoinInterface):
         inputs = []
         for pi in tx.vin:
             inputs.append({'txid': i2h(pi.prevout.hash), 'vout': pi.prevout.n})
-        self.rpc('lockunspent', [True, inputs])
+        self.rpc_wallet('lockunspent', [True, inputs])
 
     def signTxWithWallet(self, tx: bytes) -> bytes:
         rv = self.rpc_wallet('signrawtransactionwithwallet', [tx.hex()])

@@ -180,6 +180,7 @@ class EventLogTypes(IntEnum):
     PTX_PUBLISHED = auto()
     PTX_REDEEM_PUBLISHED = auto()
     PTX_REFUND_PUBLISHED = auto()
+    LOCK_TX_B_IN_MEMPOOL = auto()
 
 
 class XmrSplitMsgTypes(IntEnum):
@@ -391,6 +392,8 @@ def describeEventEntry(event_type, event_msg):
         return 'Lock tx B seen in chain'
     if event_type == EventLogTypes.LOCK_TX_B_CONFIRMED:
         return 'Lock tx B confirmed in chain'
+    if event_type == EventLogTypes.LOCK_TX_B_IN_MEMPOOL:
+        return 'Lock tx B seen in mempool'
     if event_type == EventLogTypes.DEBUG_TWEAK_APPLIED:
         return 'Debug tweak applied ' + event_msg
     if event_type == EventLogTypes.FAILED_TX_B_REFUND:
