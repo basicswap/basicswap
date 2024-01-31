@@ -1504,6 +1504,7 @@ def main():
             'blocks_confirmed': 2,
             'conf_target': 2,
             'core_version_group': 21,
+            'min_relay_fee': 0.00001,
             'chain_lookups': 'local',
         },
         'bitcoin': {
