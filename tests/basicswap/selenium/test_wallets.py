@@ -8,11 +8,11 @@
 import json
 import time
 
-from urllib.request import urlopen
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support.select import Select
-from util import get_driver
+from urllib.request import urlopen
+
 from basicswap.util import dumpje
+from util import get_driver
 
 
 def test_wallets(driver):

@@ -16,16 +16,17 @@ from basicswap.chainparams import (
     chainparams,
 )
 from basicswap.basicswap_util import (
-    TxTypes,
-    TxStates,
+    ActionTypes,
     BidStates,
-    SwapTypes,
-    strTxType,
     DebugTypes,
-    strTxState,
-    strBidState,
-    TxLockTypes,
     getLastBidState,
+    strBidState,
+    strTxState,
+    strTxType,
+    SwapTypes,
+    TxLockTypes,
+    TxStates,
+    TxTypes,
 )
 
 from basicswap.protocols.xmr_swap_1 import getChainBSplitKey, getChainBRemoteSplitKey
@@ -142,6 +143,13 @@ def listBidStates():
     rv = []
     for s in BidStates:
         rv.append((int(s), strBidState(s)))
+    return rv
+
+
+def listBidActions():
+    rv = []
+    for a in ActionTypes:
+        rv.append((int(a), a.name))
     return rv
 
 

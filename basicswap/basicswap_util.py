@@ -198,6 +198,7 @@ class DebugTypes(IntEnum):
     SKIP_LOCK_TX_REFUND = auto()
     SEND_LOCKED_XMR = auto()
     B_LOCK_TX_MISSED_SEND = auto()
+    DUPLICATE_ACTIONS = auto()
 
 
 class NotificationTypes(IntEnum):
