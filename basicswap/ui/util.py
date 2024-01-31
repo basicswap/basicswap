@@ -453,9 +453,7 @@ def listAvailableCoins(swap_client, with_variants=True, split_from=False):
                         coins_from.append(coins[-1])
             if with_variants and k == Coins.LTC:
                 for v in (Coins.LTC_MWEB, ):
-                    coins.append((int(v), getCoinName(v)))
-                    if split_from and v not in invalid_coins_from:
-                        coins_from.append(coins[-1])
+                    pass  # Add when swappable
     if split_from:
         return coins_from, coins
     return coins
