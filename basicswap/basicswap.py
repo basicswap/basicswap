@@ -479,10 +479,8 @@ class BasicSwap(BaseApp):
         }
 
         if coin in (Coins.FIRO, Coins.LTC):
-            self.coin_clients[coin]['min_relay_fee'] = 0.00001
-
-        if chain_client_settings.get('min_relay_fee', None):
-            self.coin_clients[coin]['min_relay_fee'] = chain_client_settings['min_relay_fee']
+            if not chain_client_settings.get('min_relay_fee'):
+                chain_client_settings['min_relay_fee'] = 0.00001
 
         if coin == Coins.PART:
             self.coin_clients[coin]['anon_tx_ring_size'] = chain_client_settings.get('anon_tx_ring_size', 12)

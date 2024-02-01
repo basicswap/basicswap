@@ -378,7 +378,7 @@ class BTCInterface(CoinInterface):
             ensure(addr_info['hdseedid'] == self._expect_seedid_hex, 'unexpected seedid')
 
     def get_fee_rate(self, conf_target: int = 2) -> (float, str):
-        chain_client_settings = self._sc.getChainClientSettings(self.coin_type())
+        chain_client_settings = self._sc.getChainClientSettings(self.coin_type())  # basicswap.json
         override_feerate = chain_client_settings.get('override_feerate', None)
         if override_feerate:
             self._log.debug('Fee rate override used for %s: %f', self.coin_name(), override_feerate)
@@ -388,19 +388,21 @@ class BTCInterface(CoinInterface):
 
         def try_get_fee_rate(self, conf_target):
             try:
-                fee_rate = self.rpc_wallet('estimatesmartfee', [conf_target])['feerate']
-                assert (fee_rate > 0.0), 'Non positive feerate'
+                fee_rate: float = self.rpc_wallet('estimatesmartfee', [conf_target])['feerate']
+                assert (fee_rate > 0.0), 'Negative feerate'
                 return fee_rate, 'estimatesmartfee'
             except Exception:
                 try:
-                    fee_rate = self.rpc_wallet('getwalletinfo')['paytxfee']
+                    fee_rate: float = self.rpc_wallet('getwalletinfo')['paytxfee']
                     assert (fee_rate > 0.0), 'Non positive feerate'
                     return fee_rate, 'paytxfee'
                 except Exception:
-                    return self.rpc('getnetworkinfo')['relayfee'], 'relayfee'
+                    fee_rate: float = self.rpc('getnetworkinfo')['relayfee']
+                    return fee_rate, 'relayfee'
 
         fee_rate, rate_src = try_get_fee_rate(self, conf_target)
         if min_relay_fee and min_relay_fee > fee_rate:
+            self._log.warning('Feerate {} ({}) is below min relay fee {} for {}'.format(self.format_amount(fee_rate, True, 1), rate_src, self.format_amount(min_relay_fee, True, 1), self.coin_name()))
             return min_relay_fee, 'min_relay_fee'
         return fee_rate, rate_src
 
