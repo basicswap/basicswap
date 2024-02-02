@@ -996,7 +996,7 @@ def modify_tor_config(settings, coin, tor_control_password=None, enable=False):
                 fp.write('proxy-allow-dns-leaks=0\n')
                 fp.write('no-igd=1\n')
 
-        wallet_tor_settings = ('proxy=',)
+        wallet_tor_settings = ('proxy=', 'daemon-ssl-allow-any-cert=',)
         with open(wallet_conf_path, 'w') as fp:
             with open(wallet_conf_path + '.last') as fp_in:
                 # Disable tor first
@@ -1011,6 +1011,7 @@ def modify_tor_config(settings, coin, tor_control_password=None, enable=False):
             if enable:
                 if not coin_settings['manage_daemon']:
                     fp.write(f'proxy={TOR_PROXY_HOST}:{TOR_PROXY_PORT}\n')
+                    fp.write(f'daemon-ssl-allow-any-cert=1\n')
         return
 
     config_path = os.path.join(data_dir, coin + '.conf')
