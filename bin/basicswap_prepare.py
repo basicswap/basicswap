@@ -1550,7 +1550,7 @@ def main():
             'datadir': os.getenv('XMR_DATA_DIR', os.path.join(data_dir, 'monero')),
             'bindir': os.path.join(bin_dir, 'monero'),
             'restore_height': xmr_restore_height,
-            'blocks_confirmed': 7,  # TODO: 10?
+            'blocks_confirmed': 3,
         },
         'pivx': {
             'connection_type': 'rpc' if 'pivx' in with_coins else 'none',
