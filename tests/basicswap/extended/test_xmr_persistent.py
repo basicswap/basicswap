@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2021-2022 tecnovert
+# Copyright (c) 2021-2024 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -60,7 +60,7 @@ UI_PORT = 12700 + PORT_OFS
 PARTICL_RPC_PORT_BASE = int(os.getenv('PARTICL_RPC_PORT_BASE', BASE_RPC_PORT))
 BITCOIN_RPC_PORT_BASE = int(os.getenv('BITCOIN_RPC_PORT_BASE', BTC_BASE_RPC_PORT))
 XMR_BASE_RPC_PORT = int(os.getenv('XMR_BASE_RPC_PORT', XMR_BASE_RPC_PORT))
-
+TEST_COINS_LIST = os.getenv('TEST_COINS_LIST', 'bitcoin,monero')
 
 NUM_NODES = int(os.getenv('NUM_NODES', 3))
 EXTRA_CONFIG_JSON = json.loads(os.getenv('EXTRA_CONFIG_JSON', '{}'))
@@ -129,7 +129,7 @@ class Test(unittest.TestCase):
             logging.info(f'Continuing with existing directory: {test_path}')
         else:
             logging.info('Preparing %d nodes.', NUM_NODES)
-            prepare_nodes(NUM_NODES, 'bitcoin,monero', True, {'min_sequence_lock_seconds': 60}, PORT_OFS)
+            prepare_nodes(NUM_NODES, TEST_COINS_LIST, True, {'min_sequence_lock_seconds': 60}, PORT_OFS)
 
         signal.signal(signal.SIGINT, lambda signal, frame: cls.signal_handler(cls, signal, frame))
 

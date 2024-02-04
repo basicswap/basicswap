@@ -236,6 +236,7 @@ class BasicSwap(BaseApp):
         self.check_xmr_swaps_seconds = self.get_int_setting('check_xmr_swaps_seconds', 20, 1, 10 * 60)
         self.startup_tries = self.get_int_setting('startup_tries', 21, 1, 100)  # Seconds waited for will be (x(1 + x+1) / 2
         self.debug_ui = self.settings.get('debug_ui', False)
+        self._debug_cases = []
         self._last_checked_progress = 0
         self._last_checked_watched = 0
         self._last_checked_expired = 0
@@ -478,10 +479,8 @@ class BasicSwap(BaseApp):
         }
 
         if coin in (Coins.FIRO, Coins.LTC):
-            self.coin_clients[coin]['min_relay_fee'] = 0.00001
-
-        if chain_client_settings.get('min_relay_fee', None):
-            self.coin_clients[coin]['min_relay_fee'] = chain_client_settings['min_relay_fee']
+            if not chain_client_settings.get('min_relay_fee'):
+                chain_client_settings['min_relay_fee'] = 0.00001
 
         if coin == Coins.PART:
             self.coin_clients[coin]['anon_tx_ring_size'] = chain_client_settings.get('anon_tx_ring_size', 12)
@@ -2098,6 +2097,16 @@ class BasicSwap(BaseApp):
             action_type=action_type,
             linked_id=linked_id)
         session.add(action)
+        for debug_case in self._debug_cases:
+            bid_id, debug_ind = debug_case
+            if bid_id == linked_id and debug_ind == DebugTypes.DUPLICATE_ACTIONS:
+                action = Action(
+                    active_ind=1,
+                    created_at=now,
+                    trigger_at=now + delay + 3,
+                    action_type=action_type,
+                    linked_id=linked_id)
+                session.add(action)
 
     def createAction(self, delay: int, action_type: int, linked_id: bytes) -> None:
         # self.log.debug('createAction %d %s', action_type, linked_id.hex())
@@ -3523,7 +3532,7 @@ class BasicSwap(BaseApp):
                 self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_B_INVALID, 'Detected invalid lock tx B', session)
                 bid_changed = True
         elif found_tx is not None:
-            if bid.xmr_b_lock_tx is None or not bid.xmr_b_lock_tx.chain_height:
+            if found_tx['height'] != 0 and (bid.xmr_b_lock_tx is None or not bid.xmr_b_lock_tx.chain_height):
                 self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_B_SEEN, '', session)
             if bid.xmr_b_lock_tx is None:
                 self.log.debug('Found {} lock tx in chain'.format(ci_to.coin_name()))
@@ -5505,12 +5514,15 @@ class BasicSwap(BaseApp):
         txid = bytes.fromhex(ci_from.publishTx(xmr_swap.a_lock_spend_tx))
         self.log.debug('Submitted lock spend txn %s to %s chain for bid %s', txid.hex(), ci_from.coin_name(), bid_id.hex())
         self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_A_SPEND_TX_PUBLISHED, '', session)
-        bid.xmr_a_lock_spend_tx = SwapTx(
-            bid_id=bid_id,
-            tx_type=TxTypes.XMR_SWAP_A_LOCK_SPEND,
-            txid=txid,
-        )
-        bid.xmr_a_lock_spend_tx.setState(TxStates.TX_NONE)
+        if bid.xmr_a_lock_spend_tx is None:
+            bid.xmr_a_lock_spend_tx = SwapTx(
+                bid_id=bid_id,
+                tx_type=TxTypes.XMR_SWAP_A_LOCK_SPEND,
+                txid=txid,
+            )
+            bid.xmr_a_lock_spend_tx.setState(TxStates.TX_NONE)
+        else:
+            self.log.warning('Chain A lock TX %s already exists for bid %s', bid.xmr_a_lock_spend_tx.txid.hex(), bid_id.hex())
 
         self.saveBidInSession(bid_id, bid, session, xmr_swap, save_in_progress=offer)
 
@@ -6182,6 +6194,8 @@ class BasicSwap(BaseApp):
     def manualBidUpdate(self, bid_id: bytes, data):
         self.log.info('Manually updating bid %s', bid_id.hex())
         self.mxDB.acquire()
+
+        add_bid_action = -1
         try:
             bid, offer = self.getBidAndOffer(bid_id)
             ensure(bid, 'Bid not found {}'.format(bid_id.hex()))
@@ -6190,7 +6204,12 @@ class BasicSwap(BaseApp):
             has_changed = False
             if bid.state != data['bid_state']:
                 bid.setState(data['bid_state'])
-                self.log.debug('Set state to %s', strBidState(bid.state))
+                self.log.warning('Set state to %s', strBidState(bid.state))
+                has_changed = True
+
+            if data['bid_action'] != -1:
+                self.log.warning('Adding action', ActionTypes(data['bid_action']).name)
+                add_bid_action = ActionTypes(data['bid_action'])
                 has_changed = True
 
             if bid.debug_ind != data['debug_ind']:
@@ -6210,6 +6229,10 @@ class BasicSwap(BaseApp):
                     activate_bid = False
                     if bid.state and isActiveBidState(bid.state):
                         activate_bid = True
+
+                    if add_bid_action > -1:
+                        delay = self.get_delay_event_seconds()
+                        self.createActionInSession(delay, add_bid_action, bid_id, session)
 
                     if activate_bid:
                         self.activateBid(session, bid)
@@ -7074,8 +7097,13 @@ class BasicSwap(BaseApp):
 
         xmr_swap.a_lock_refund_swipe_tx = ci.setTxSignature(spend_tx, witness_stack)
 
-    def setBidDebugInd(self, bid_id: bytes, debug_ind) -> None:
+    def setBidDebugInd(self, bid_id: bytes, debug_ind, add_to_bid: bool = True) -> None:
         self.log.debug('Bid %s Setting debug flag: %s', bid_id.hex(), debug_ind)
+
+        self._debug_cases.append((bid_id, debug_ind))
+        if add_to_bid is False:
+            return
+
         bid = self.getBid(bid_id)
         bid.debug_ind = debug_ind
 

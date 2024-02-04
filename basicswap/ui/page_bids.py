@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2022-2023 tecnovert
+# Copyright (c) 2022-2024 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -10,6 +10,7 @@ from .util import (
     get_data_entry,
     have_data_entry,
     get_data_entry_or,
+    listBidActions,
     listBidStates,
     listOldBidStates,
     set_pagination_filters,
@@ -73,6 +74,7 @@ def page_bid(self, url_split, post_string):
         elif b'edit_bid_submit' in form_data:
             data = {
                 'bid_state': int(form_data[b'new_state'][0]),
+                'bid_action': int(get_data_entry_or(form_data, 'new_action', -1)),
                 'debug_ind': int(get_data_entry_or(form_data, 'debugind', -1)),
                 'kbs_other': get_data_entry_or(form_data, 'kbs_other', None),
             }
@@ -106,6 +108,14 @@ def page_bid(self, url_split, post_string):
 
     if len(data['addr_from_label']) > 0:
         data['addr_from_label'] = '(' + data['addr_from_label'] + ')'
+
+    page_data = {
+        'bid_states': listBidStates(),
+        'bid_actions': []
+    }
+
+    if swap_client.debug_ui:
+        data['bid_actions'] = [(-1, 'None'), ] + listBidActions()
 
     template = server.env.get_template('bid_xmr.html' if offer.swap_type == SwapTypes.XMR_SWAP else 'bid.html')
     return self.render_template(template, {
@@ -175,9 +185,8 @@ def page_bids(self, url_split, post_string, sent=False, available=False, receive
     bids = swap_client.listBids(sent=sent, filters=filters)
 
     page_data = {
-        'bid_states': listBidStates()
+        'bid_states': listBidStates(),
     }
-
     template = server.env.get_template('bids.html')
     return self.render_template(template, {
         'page_type_sent': 'Bids Sent' if sent else '',

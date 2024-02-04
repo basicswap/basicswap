@@ -222,7 +222,7 @@ class XMRInterface(CoinInterface):
             return new_address
 
     def get_fee_rate(self, conf_target: int = 2):
-        self._log.warning('TODO - estimate fee rate?')
+        self._log.warning('TODO - estimate XMR fee rate?')
         return 0.0, 'unused'
 
     def getNewSecretKey(self) -> bytes:
