@@ -16,40 +16,49 @@ basicswap-prepare can be configured to download all binaries through tor and to 
 Docker will create directories instead of files if these don't exist.
 
     mkdir -p $COINDATA_PATH/tor
-    touch $COINDATA_PATH/tor/torrc
+    echo 'SocksPort 0.0.0.0:9050' > $COINDATA_PATH/tor/torrc
 
 
 #### For a new install
 
+Use the `--usetorproxy` argument to download the coin binaries over tor, then enable tor with `--enabletor`.
 Note that some download links, notably for Litecoin, are unreachable when using tor.
 
-If running through docker start the tor container with the following command as the torrc configuration file won't exist yet.
+    docker compose -f docker-compose_with_tor.yml run --rm swapclient \
+        basicswap-prepare --usetorproxy --datadir=/coindata --withcoins=monero,particl
 
-    docker compose -f docker-compose_with_tor.yml run --name tor --rm tor \
-            tor --allow-missing-torrc --SocksPort 0.0.0.0:9050
+    docker compose -f docker-compose_with_tor.yml run --rm swapclient \
+        basicswap-prepare --enabletor --datadir=/coindata
 
-    docker compose -f docker-compose_with_tor.yml run -e TOR_PROXY_HOST=172.16.238.200 --rm swapclient \
-            basicswap-prepare --usetorproxy --datadir=/coindata --withcoins=monero,particl
+
+The `--enabletor` option will add config to the torrc file, the tor container must afterwards be stopped to load the new config:
+
+    docker compose -f docker-compose_with_tor.yml stop
 
 
 Start Basicswap with:
 
     docker compose -f docker-compose_with_tor.yml up
 
+
 #### Enable tor on an existing datadir
 
-    docker compose -f docker-compose_with_tor.yml run -e TOR_PROXY_HOST=172.16.238.200 --rm swapclient \
-            basicswap-prepare --datadir=/coindata --enabletor
+    docker compose -f docker-compose_with_tor.yml run --rm swapclient \
+        basicswap-prepare --datadir=/coindata --enabletor
+
+    docker compose -f docker-compose_with_tor.yml stop
 
 #### Disable tor on an existing datadir
 
     docker compose -f docker-compose_with_tor.yml run --rm swapclient \
-            basicswap-prepare --datadir=/coindata --disabletor
+        basicswap-prepare --datadir=/coindata --disabletor
+
+    docker compose -f docker-compose_with_tor.yml stop
 
 
 #### Update coin release
 
     docker compose -f docker-compose_with_tor.yml up -d tor
-    docker compose -f docker-compose_with_tor.yml run -e TOR_PROXY_HOST=172.16.238.200 --rm swapclient \
-            basicswap-prepare --usetorproxy --datadir=/coindata --preparebinonly --withcoins=bitcoin
+    docker compose -f docker-compose_with_tor.yml run --rm swapclient \
+        basicswap-prepare --usetorproxy --datadir=/coindata --preparebinonly --withcoins=bitcoin
     docker compose -f docker-compose_with_tor.yml stop

@@ -5,6 +5,8 @@ services:
         image: i_swapclient
         container_name: swapclient
         stop_grace_period: 5m
+        depends_on:
+            - tor
         build:
             context: ../
         volumes:

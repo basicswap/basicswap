@@ -1011,7 +1011,7 @@ def modify_tor_config(settings, coin, tor_control_password=None, enable=False):
             if enable:
                 if not coin_settings['manage_daemon']:
                     fp.write(f'proxy={TOR_PROXY_HOST}:{TOR_PROXY_PORT}\n')
-                    fp.write(f'daemon-ssl-allow-any-cert=1\n')
+                    fp.write('daemon-ssl-allow-any-cert=1\n')
         return
 
     config_path = os.path.join(data_dir, coin + '.conf')
