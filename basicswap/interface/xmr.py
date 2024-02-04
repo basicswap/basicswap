@@ -80,12 +80,6 @@ class XMRInterface(CoinInterface):
 
     def __init__(self, coin_settings, network, swap_client=None):
         super().__init__(network)
-        daemon_login = None
-        if coin_settings.get('rpcuser', '') != '':
-            daemon_login = (coin_settings.get('rpcuser', ''), coin_settings.get('rpcpassword', ''))
-        self.rpc = make_xmr_rpc_func(coin_settings['rpcport'], daemon_login, host=coin_settings.get('rpchost', '127.0.0.1'))
-        self.rpc2 = make_xmr_rpc2_func(coin_settings['rpcport'], daemon_login, host=coin_settings.get('rpchost', '127.0.0.1'))  # non-json endpoint
-        self.rpc_wallet = make_xmr_rpc_func(coin_settings['walletrpcport'], coin_settings['walletrpcauth'], host=coin_settings.get('walletrpchost', '127.0.0.1'))
 
         self.blocks_confirmed = coin_settings['blocks_confirmed']
         self._restore_height = coin_settings.get('restore_height', 0)
@@ -94,6 +88,30 @@ class XMRInterface(CoinInterface):
         self._log = self._sc.log if self._sc and self._sc.log else logging
         self._wallet_password = None
         self._have_checked_seed = False
+
+        daemon_login = None
+        if coin_settings.get('rpcuser', '') != '':
+            daemon_login = (coin_settings.get('rpcuser', ''), coin_settings.get('rpcpassword', ''))
+
+        rpchost = coin_settings.get('rpchost', '127.0.0.1')
+        proxy_host = None
+        proxy_port = None
+        # Connect to the daemon over a proxy if not running locally
+        if swap_client:
+            if swap_client.use_tor_proxy:
+                chain_client_settings = swap_client.getChainClientSettings(self.coin_type())
+                if chain_client_settings['manage_daemon'] is False:
+                    proxy_host = swap_client.tor_proxy_host
+                    proxy_port = swap_client.tor_proxy_port
+                    self._log.info(f'Connecting to remote {self.coin_name()} daemon at {rpchost} through proxy at {proxy_host}.')
+                else:
+                    self._log.info(f'Not connecting to local {self.coin_name()} daemon through proxy.')
+            elif chain_client_settings['manage_daemon'] is False:
+                self._log.info(f'Connecting to remote {self.coin_name()} daemon at {proxy_host}.')
+
+        self.rpc = make_xmr_rpc_func(coin_settings['rpcport'], daemon_login, host=rpchost, proxy_host=proxy_host, proxy_port=proxy_port)
+        self.rpc2 = make_xmr_rpc2_func(coin_settings['rpcport'], daemon_login, host=rpchost, proxy_host=proxy_host, proxy_port=proxy_port)  # non-json endpoint
+        self.rpc_wallet = make_xmr_rpc_func(coin_settings['walletrpcport'], coin_settings['walletrpcauth'], host=coin_settings.get('walletrpchost', '127.0.0.1'))
 
     def checkWallets(self) -> int:
         return 1

@@ -511,8 +511,14 @@ class BasicSwap(BaseApp):
         remote_daemon_urls = chain_client_settings.get('remote_daemon_urls', [])
 
         coin_settings = self.coin_clients[coin]
-        rpchost = coin_settings['rpchost']
-        rpcport = coin_settings['rpcport']
+        rpchost: str = coin_settings['rpchost']
+        rpcport: int = coin_settings['rpcport']
+
+        proxy_host: str = self.tor_proxy_host if self.use_tor_proxy else None
+        proxy_port: int = self.tor_proxy_port if self.use_tor_proxy else None
+        if proxy_host:
+            self.log.info(f'Connecting through proxy at {proxy_host}.')
+
         daemon_login = None
         if coin_settings.get('rpcuser', '') != '':
             daemon_login = (coin_settings.get('rpcuser', ''), coin_settings.get('rpcpassword', ''))
@@ -520,7 +526,7 @@ class BasicSwap(BaseApp):
         if current_daemon_url in remote_daemon_urls:
             self.log.info(f'Trying last used url {rpchost}:{rpcport}.')
             try:
-                rpc2 = make_xmr_rpc2_func(rpcport, daemon_login, rpchost)
+                rpc2 = make_xmr_rpc2_func(rpcport, daemon_login, rpchost, proxy_host=proxy_host, proxy_port=proxy_port)
                 test = rpc2('get_height', timeout=20)['height']
                 return True
             except Exception as e:
@@ -530,7 +536,7 @@ class BasicSwap(BaseApp):
             self.log.info(f'Trying url {url}.')
             try:
                 rpchost, rpcport = url.rsplit(':', 1)
-                rpc2 = make_xmr_rpc2_func(rpcport, daemon_login, rpchost)
+                rpc2 = make_xmr_rpc2_func(rpcport, daemon_login, rpchost, proxy_host=proxy_host, proxy_port=proxy_port)
                 test = rpc2('get_height', timeout=20)['height']
                 coin_settings['rpchost'] = rpchost
                 coin_settings['rpcport'] = rpcport
