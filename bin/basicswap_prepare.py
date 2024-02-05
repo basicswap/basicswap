@@ -1456,7 +1456,7 @@ def main():
                 logger.warning('Not automatically setting --usetorproxy as --notorproxy is set')
             else:
                 use_tor_proxy = True
-                logger.info(f'Automatically setting --usetorproxy')
+                logger.info('Automatically setting --usetorproxy')
 
     setConnectionParameters(allow_set_tor=False)
 
@@ -1572,6 +1572,9 @@ def main():
             'bindir': os.path.join(bin_dir, 'monero'),
             'restore_height': xmr_restore_height,
             'blocks_confirmed': 3,
+            'rpctimeout': 60,
+            'walletrpctimeout': 120,
+            'walletrpctimeoutlong': 600,
         },
         'pivx': {
             'connection_type': 'rpc' if 'pivx' in with_coins else 'none',
@@ -1800,7 +1803,8 @@ def main():
             'max_delay_event': 50,  # Max delay in seconds before reacting to an event
             'check_progress_seconds': 60,
             'check_watched_seconds': 60,
-            'check_expired_seconds': 60
+            'check_expired_seconds': 60,
+            'wallet_update_timeout': 10,  # Seconds to wait for wallet page update
         }
 
         if wshost != 'none':

@@ -110,9 +110,13 @@ class XMRInterface(CoinInterface):
             elif manage_daemon is False:
                 self._log.info(f'Connecting to remote {self.coin_name()} daemon at {rpchost}.')
 
-        self.rpc = make_xmr_rpc_func(coin_settings['rpcport'], daemon_login, host=rpchost, proxy_host=proxy_host, proxy_port=proxy_port)
-        self.rpc2 = make_xmr_rpc2_func(coin_settings['rpcport'], daemon_login, host=rpchost, proxy_host=proxy_host, proxy_port=proxy_port)  # non-json endpoint
-        self.rpc_wallet = make_xmr_rpc_func(coin_settings['walletrpcport'], coin_settings['walletrpcauth'], host=coin_settings.get('walletrpchost', '127.0.0.1'))
+        self._rpctimeout = coin_settings.get('rpctimeout', 60)
+        self._walletrpctimeout = coin_settings.get('walletrpctimeout', 120)
+        self._walletrpctimeoutlong = coin_settings.get('walletrpctimeoutlong', 600)
+
+        self.rpc = make_xmr_rpc_func(coin_settings['rpcport'], daemon_login, host=rpchost, proxy_host=proxy_host, proxy_port=proxy_port, default_timeout=self._rpctimeout)
+        self.rpc2 = make_xmr_rpc2_func(coin_settings['rpcport'], daemon_login, host=rpchost, proxy_host=proxy_host, proxy_port=proxy_port, default_timeout=self._rpctimeout)  # non-json endpoint
+        self.rpc_wallet = make_xmr_rpc_func(coin_settings['walletrpcport'], coin_settings['walletrpcauth'], host=coin_settings.get('walletrpchost', '127.0.0.1'), default_timeout=self._walletrpctimeout)
 
     def checkWallets(self) -> int:
         return 1
@@ -176,7 +180,7 @@ class XMRInterface(CoinInterface):
         return self.rpc_wallet('get_version')['version']
 
     def getBlockchainInfo(self):
-        get_height = self.rpc2('get_height', timeout=30)
+        get_height = self.rpc2('get_height', timeout=self._rpctimeout)
         rv = {
             'blocks': get_height['height'],
             'verificationprogress': 0.0,
@@ -187,7 +191,7 @@ class XMRInterface(CoinInterface):
             # get_block_count returns "Internal error" if bootstrap-daemon is active
             if get_height['untrusted'] is True:
                 rv['bootstrapping'] = True
-                get_info = self.rpc2('get_info', timeout=30)
+                get_info = self.rpc2('get_info', timeout=self._rpctimeout)
                 if 'height_without_bootstrap' in get_info:
                     rv['blocks'] = get_info['height_without_bootstrap']
 
@@ -195,7 +199,7 @@ class XMRInterface(CoinInterface):
                 if rv['known_block_count'] > rv['blocks']:
                     rv['verificationprogress'] = rv['blocks'] / rv['known_block_count']
             else:
-                rv['known_block_count'] = self.rpc('get_block_count', timeout=30)['count']
+                rv['known_block_count'] = self.rpc('get_block_count', timeout=self._rpctimeout)['count']
                 rv['verificationprogress'] = rv['blocks'] / rv['known_block_count']
         except Exception as e:
             self._log.warning('XMR get_block_count failed with: %s', str(e))
@@ -204,7 +208,7 @@ class XMRInterface(CoinInterface):
         return rv
 
     def getChainHeight(self):
-        return self.rpc2('get_height', timeout=30)['height']
+        return self.rpc2('get_height', timeout=self._rpctimeout)['height']
 
     def getWalletInfo(self):
         with self._mx_wallet:
@@ -347,7 +351,7 @@ class XMRInterface(CoinInterface):
                 self.createWallet(params)
                 self.openWallet(address_b58)
 
-            self.rpc_wallet('refresh', timeout=600)
+            self.rpc_wallet('refresh', timeout=self._walletrpctimeoutlong)
 
             '''
             # Debug
@@ -382,10 +386,10 @@ class XMRInterface(CoinInterface):
     def findTxnByHash(self, txid):
         with self._mx_wallet:
             self.openWallet(self._wallet_filename)
-            self.rpc_wallet('refresh', timeout=600)
+            self.rpc_wallet('refresh', timeout=self._walletrpctimeoutlong)
 
             try:
-                current_height = self.rpc2('get_height', timeout=30)['height']
+                current_height = self.rpc2('get_height', timeout=self._rpctimeout)['height']
                 self._log.info('findTxnByHash XMR current_height %d\nhash: %s', current_height, txid)
             except Exception as e:
                 self._log.info('rpc failed %s', str(e))

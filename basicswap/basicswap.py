@@ -278,6 +278,8 @@ class BasicSwap(BaseApp):
         self.min_sequence_lock_seconds = self.settings.get('min_sequence_lock_seconds', 60 if self.debug else (1 * 60 * 60))
         self.max_sequence_lock_seconds = self.settings.get('max_sequence_lock_seconds', 96 * 60 * 60)
 
+        self._wallet_update_timeout = self.settings.get('wallet_update_timeout', 10)
+
         self._restrict_unknown_seed_wallets = self.settings.get('restrict_unknown_seed_wallets', True)
 
         self._bid_expired_leeway = 5
@@ -492,6 +494,10 @@ class BasicSwap(BaseApp):
 
         if self.coin_clients[coin]['connection_type'] == 'rpc':
             if coin == Coins.XMR:
+                self.coin_clients[coin]['rpctimeout'] = chain_client_settings.get('rpctimeout', 60)
+                self.coin_clients[coin]['walletrpctimeout'] = chain_client_settings.get('walletrpctimeout', 120)
+                self.coin_clients[coin]['walletrpctimeoutlong'] = chain_client_settings.get('walletrpctimeoutlong', 600)
+
                 if chain_client_settings.get('automatically_select_daemon', False):
                     self.selectXMRRemoteDaemon(coin)
 
@@ -513,6 +519,7 @@ class BasicSwap(BaseApp):
         coin_settings = self.coin_clients[coin]
         rpchost: str = coin_settings['rpchost']
         rpcport: int = coin_settings['rpcport']
+        timeout: int = coin_settings['rpctimeout']
 
         proxy_host: str = self.tor_proxy_host if self.use_tor_proxy else None
         proxy_port: int = self.tor_proxy_port if self.use_tor_proxy else None
@@ -527,7 +534,7 @@ class BasicSwap(BaseApp):
             self.log.info(f'Trying last used url {rpchost}:{rpcport}.')
             try:
                 rpc2 = make_xmr_rpc2_func(rpcport, daemon_login, rpchost, proxy_host=proxy_host, proxy_port=proxy_port)
-                test = rpc2('get_height', timeout=20)['height']
+                test = rpc2('get_height', timeout=timeout)['height']
                 return True
             except Exception as e:
                 self.log.warning(f'Failed to set XMR remote daemon to {rpchost}:{rpcport}, {e}')
@@ -537,7 +544,7 @@ class BasicSwap(BaseApp):
             try:
                 rpchost, rpcport = url.rsplit(':', 1)
                 rpc2 = make_xmr_rpc2_func(rpcport, daemon_login, rpchost, proxy_host=proxy_host, proxy_port=proxy_port)
-                test = rpc2('get_height', timeout=20)['height']
+                test = rpc2('get_height', timeout=timeout)['height']
                 coin_settings['rpchost'] = rpchost
                 coin_settings['rpcport'] = rpcport
                 data = {
@@ -6622,7 +6629,7 @@ class BasicSwap(BaseApp):
                 handle = self.thread_pool.submit(self.updateWalletInfo, c)
                 if wait_for_complete:
                     try:
-                        handle.result(timeout=10)
+                        handle.result(timeout=self._wallet_update_timeout)
                     except Exception as e:
                         self.log.error(f'updateWalletInfo {e}')
 

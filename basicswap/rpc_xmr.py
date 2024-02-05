@@ -222,33 +222,35 @@ def callrpc_xmr2(rpc_port: int, method: str, params=None, auth=None, rpc_host='1
     return r
 
 
-def make_xmr_rpc2_func(port, auth, host='127.0.0.1', proxy_host=None, proxy_port=None):
+def make_xmr_rpc2_func(port, auth, host='127.0.0.1', proxy_host=None, proxy_port=None, default_timeout=120):
     port = port
     auth = auth
     host = host
     transport = None
+    default_timeout = default_timeout
 
     if proxy_host:
         transport = SocksTransport()
         transport.set_proxy(proxy_host, proxy_port)
 
-    def rpc_func(method, params=None, wallet=None, timeout=120):
+    def rpc_func(method, params=None, wallet=None, timeout=default_timeout):
         nonlocal port, auth, host, transport
         return callrpc_xmr2(port, method, params, auth=auth, rpc_host=host, timeout=timeout, transport=transport)
     return rpc_func
 
 
-def make_xmr_rpc_func(port, auth, host='127.0.0.1', proxy_host=None, proxy_port=None):
+def make_xmr_rpc_func(port, auth, host='127.0.0.1', proxy_host=None, proxy_port=None, default_timeout=120):
     port = port
     auth = auth
     host = host
     transport = None
+    default_timeout = default_timeout
 
     if proxy_host:
         transport = SocksTransport()
         transport.set_proxy(proxy_host, proxy_port)
 
-    def rpc_func(method, params=None, wallet=None, timeout=120):
+    def rpc_func(method, params=None, wallet=None, timeout=default_timeout):
         nonlocal port, auth, host, transport
         return callrpc_xmr(port, method, params, rpc_host=host, auth=auth, timeout=timeout, transport=transport)
     return rpc_func
