@@ -1115,12 +1115,12 @@ def test_particl_encryption(data_dir, settings, chain, use_tor_proxy):
     swap_client = None
     daemons = []
     daemon_args = ['-noconnect', '-nodnsseed', '-nofindpeers', '-nostaking']
-    if not use_tor_proxy:
-        # Cannot set -bind or -whitebind together with -listen=0
-        daemon_args.append('-nolisten')
     with open(os.path.join(data_dir, 'basicswap.log'), 'a') as fp:
         try:
             swap_client = BasicSwap(fp, data_dir, settings, chain)
+            if not swap_client.use_tor_proxy:
+                # Cannot set -bind or -whitebind together with -listen=0
+                daemon_args.append('-nolisten')
             c = Coins.PART
             coin_name = 'particl'
             coin_settings = settings['chainclients'][coin_name]
@@ -1155,14 +1155,13 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
     swap_client = None
     daemons = []
     daemon_args = ['-noconnect', '-nodnsseed']
-    if not use_tor_proxy:
-        # Cannot set -bind or -whitebind together with -listen=0
-        daemon_args.append('-nolisten')
 
     with open(os.path.join(data_dir, 'basicswap.log'), 'a') as fp:
         try:
             swap_client = BasicSwap(fp, data_dir, settings, chain)
-
+            if not swap_client.use_tor_proxy:
+                # Cannot set -bind or -whitebind together with -listen=0
+                daemon_args.append('-nolisten')
             coins_to_create_wallets_for = (Coins.PART, Coins.BTC, Coins.LTC, Coins.DASH)
             # Always start Particl, it must be running to initialise a wallet in addcoin mode
             # Particl must be loaded first as subsequent coins are initialised from the Particl mnemonic
