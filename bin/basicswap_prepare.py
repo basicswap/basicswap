@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019-2023 tecnovert
+# Copyright (c) 2019-2024 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -196,7 +196,7 @@ BITCOIN_FASTSYNC_FILE = os.getenv('BITCOIN_FASTSYNC_FILE', 'utxo-snapshot-bitcoi
 # Encrypt new wallets with this password, must match the Particl wallet password when adding coins
 WALLET_ENCRYPTION_PWD = os.getenv('WALLET_ENCRYPTION_PWD', '')
 
-use_tor_proxy = False
+use_tor_proxy: bool = False
 
 default_socket = socket.socket
 default_socket_timeout = socket.getdefaulttimeout()
@@ -323,7 +323,7 @@ def urlretrieve(url, filename, reporthook=None, data=None, resume_from=0):
     return result
 
 
-def setConnectionParameters(timeout=5):
+def setConnectionParameters(timeout: int = 5, allow_set_tor: bool = True):
     opener = urllib.request.build_opener()
     opener.addheaders = [('User-agent', 'Mozilla/5.0')]
     urllib.request.install_opener(opener)
@@ -1083,6 +1083,7 @@ def printHelp():
     print('--xmrrestoreheight=n     Block height to restore Monero wallet from, default:{}.'.format(DEFAULT_XMR_RESTORE_HEIGHT))
     print('--noextractover          Prevent extracting cores if files exist.  Speeds up tests')
     print('--usetorproxy            Use TOR proxy during setup.  Note that some download links may be inaccessible over TOR.')
+    print('--notorproxy             Force usetorproxy off, usetorproxy is automatically set when tor is enabled')
     print('--enabletor              Setup Basicswap instance to use TOR.')
     print('--disabletor             Setup Basicswap instance to not use TOR.')
     print('--usebtcfastsync         Initialise the BTC chain with a snapshot from btcpayserver FastSync.\n'
@@ -1355,6 +1356,9 @@ def main():
         if name == 'usetorproxy':
             use_tor_proxy = True
             continue
+        if name == 'notorproxy':
+            extra_opts['no_tor_proxy'] = True
+            continue
         if name == 'enabletor':
             enable_tor = True
             continue
@@ -1419,14 +1423,6 @@ def main():
 
         exitWithError('Unknown argument {}'.format(v))
 
-    setConnectionParameters()
-
-    if use_tor_proxy and TEST_TOR_PROXY:
-        testTorConnection()
-
-    if use_tor_proxy and TEST_ONION_LINK:
-        testOnionLink()
-
     if data_dir is None:
         data_dir = os.path.join(os.path.expanduser(cfg.BASICSWAP_DATADIR))
     if bin_dir is None:
@@ -1445,6 +1441,30 @@ def main():
     if not os.path.exists(data_dir):
         os.makedirs(data_dir)
     config_path = os.path.join(data_dir, cfg.CONFIG_FILENAME)
+
+    if use_tor_proxy and extra_opts.get('no_tor_proxy', False):
+        exitWithError('Can\'t use --usetorproxy and --notorproxy together')
+
+    # Check config to see if tor is enabled
+    if not use_tor_proxy and os.path.exists(config_path):
+        settings = load_config(config_path)
+        settings_use_tor = settings.get('use_tor', False)
+        if settings_use_tor:
+            logger.info('use_tor is set in the config')
+            if extra_opts.get('no_tor_proxy', False):
+                use_tor_proxy = False
+                logger.warning('Not automatically setting --usetorproxy as --notorproxy is set')
+            else:
+                use_tor_proxy = True
+                logger.info(f'Automatically setting --usetorproxy')
+
+    setConnectionParameters(allow_set_tor=False)
+
+    if use_tor_proxy and TEST_TOR_PROXY:
+        testTorConnection()
+
+    if use_tor_proxy and TEST_ONION_LINK:
+        testOnionLink()
 
     should_download_btc_fastsync = False
     if extra_opts.get('use_btc_fastsync', False) is True:

@@ -98,16 +98,17 @@ class XMRInterface(CoinInterface):
         proxy_port = None
         # Connect to the daemon over a proxy if not running locally
         if swap_client:
+            chain_client_settings = swap_client.getChainClientSettings(self.coin_type())
+            manage_daemon: bool = chain_client_settings['manage_daemon']
             if swap_client.use_tor_proxy:
-                chain_client_settings = swap_client.getChainClientSettings(self.coin_type())
-                if chain_client_settings['manage_daemon'] is False:
+                if manage_daemon is False:
                     proxy_host = swap_client.tor_proxy_host
                     proxy_port = swap_client.tor_proxy_port
                     self._log.info(f'Connecting to remote {self.coin_name()} daemon at {rpchost} through proxy at {proxy_host}.')
                 else:
                     self._log.info(f'Not connecting to local {self.coin_name()} daemon through proxy.')
-            elif chain_client_settings['manage_daemon'] is False:
-                self._log.info(f'Connecting to remote {self.coin_name()} daemon at {proxy_host}.')
+            elif manage_daemon is False:
+                self._log.info(f'Connecting to remote {self.coin_name()} daemon at {rpchost}.')
 
         self.rpc = make_xmr_rpc_func(coin_settings['rpcport'], daemon_login, host=rpchost, proxy_host=proxy_host, proxy_port=proxy_port)
         self.rpc2 = make_xmr_rpc2_func(coin_settings['rpcport'], daemon_login, host=rpchost, proxy_host=proxy_host, proxy_port=proxy_port)  # non-json endpoint
