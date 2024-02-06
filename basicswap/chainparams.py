@@ -467,4 +467,6 @@ class CoinInterface:
             return True
         if 'timed out' in str_error:
             return True
+        if 'request-sent' in str_error:
+            return True
         return False
