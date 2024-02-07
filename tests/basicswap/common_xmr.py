@@ -47,6 +47,11 @@ BITCOIN_TOR_PORT_BASE = int(os.getenv('BITCOIN_TOR_PORT_BASE', BTC_BASE_TOR_PORT
 
 LITECOIN_RPC_PORT_BASE = int(os.getenv('LITECOIN_RPC_PORT_BASE', LTC_BASE_RPC_PORT))
 
+FIRO_BASE_PORT = 34832
+FIRO_BASE_RPC_PORT = 35832
+FIRO_RPC_PORT_BASE = int(os.getenv('FIRO_RPC_PORT_BASE', FIRO_BASE_RPC_PORT))
+
+
 XMR_BASE_P2P_PORT = 17792
 XMR_BASE_RPC_PORT = 29798
 XMR_BASE_WALLET_RPC_PORT = 29998
@@ -88,6 +93,7 @@ def run_prepare(node_id, datadir_path, bins_path, with_coins, mnemonic_in=None, 
     os.environ['PART_RPC_PORT'] = str(PARTICL_RPC_PORT_BASE)
     os.environ['BTC_RPC_PORT'] = str(BITCOIN_RPC_PORT_BASE)
     os.environ['LTC_RPC_PORT'] = str(LITECOIN_RPC_PORT_BASE)
+    os.environ['FIRO_RPC_PORT'] = str(FIRO_RPC_PORT_BASE)
 
     os.environ['XMR_RPC_USER'] = 'xmr_user'
     os.environ['XMR_RPC_PWD'] = 'xmr_pwd'
@@ -232,6 +238,33 @@ def run_prepare(node_id, datadir_path, bins_path, with_coins, mnemonic_in=None, 
                 if ip != node_id:
                     fp.write('connect=127.0.0.1:{}\n'.format(PIVX_BASE_PORT + ip + port_ofs))
             for opt in EXTRA_CONFIG_JSON.get('pivx{}'.format(node_id), []):
+                fp.write(opt + '\n')
+
+    if 'firo' in coins_array:
+        # Pruned nodes don't provide blocks
+        with open(os.path.join(datadir_path, 'firo', 'firo.conf'), 'r') as fp:
+            lines = fp.readlines()
+        with open(os.path.join(datadir_path, 'firo', 'firo.conf'), 'w') as fp:
+            for line in lines:
+                if not line.startswith('prune'):
+                    fp.write(line)
+            fp.write('port={}\n'.format(FIRO_BASE_PORT + node_id + port_ofs))
+            fp.write('bind=127.0.0.1\n')
+            fp.write('dnsseed=0\n')
+            fp.write('discover=0\n')
+            fp.write('listenonion=0\n')
+            fp.write('upnp=0\n')
+            if use_rpcauth:
+                salt = generate_salt(16)
+                rpc_user = 'test_firo_' + str(node_id)
+                rpc_pass = 'test_firo_pwd_' + str(node_id)
+                fp.write('rpcauth={}:{}${}\n'.format(rpc_user, salt, password_to_hmac(salt, rpc_pass)))
+                settings['chainclients']['firo']['rpcuser'] = rpc_user
+                settings['chainclients']['firo']['rpcpassword'] = rpc_pass
+            for ip in range(num_nodes):
+                if ip != node_id:
+                    fp.write('connect=127.0.0.1:{}\n'.format(FIRO_BASE_PORT + ip + port_ofs))
+            for opt in EXTRA_CONFIG_JSON.get('firo{}'.format(node_id), []):
                 fp.write(opt + '\n')
 
     if 'monero' in coins_array:

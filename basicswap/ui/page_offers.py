@@ -173,7 +173,7 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
         try:
             swap_client.validateSwapType(coin_from, coin_to, swap_type)
         except Exception as e:
-            errors.append(f'Invalid Swap type {e}')
+            errors.append(f'{e}')
 
     if have_data_entry(form_data, 'step1'):
         if len(errors) == 0 and have_data_entry(form_data, 'continue'):
