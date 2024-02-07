@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2020-2023 tecnovert
+# Copyright (c) 2020-2024 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -27,16 +27,16 @@ from coincurve.dleag import (
 from basicswap.interface import (
     Curves)
 from basicswap.util import (
-    i2b,
+    i2b, b2i, b2h,
     dumpj,
     ensure,
     make_int,
     TemporaryError)
+from basicswap.util.network import (
+    is_private_ip_address)
 from basicswap.rpc_xmr import (
     make_xmr_rpc_func,
     make_xmr_rpc2_func)
-from basicswap.util import (
-    b2i, b2h)
 from basicswap.chainparams import XMR_COIN, CoinInterface, Coins
 
 
@@ -102,9 +102,17 @@ class XMRInterface(CoinInterface):
             manage_daemon: bool = chain_client_settings['manage_daemon']
             if swap_client.use_tor_proxy:
                 if manage_daemon is False:
-                    proxy_host = swap_client.tor_proxy_host
-                    proxy_port = swap_client.tor_proxy_port
-                    self._log.info(f'Connecting to remote {self.coin_name()} daemon at {rpchost} through proxy at {proxy_host}.')
+                    log_str: str = ''
+                    have_cc_tor_opt = 'use_tor' in chain_client_settings
+                    if have_cc_tor_opt and chain_client_settings['use_tor'] is False:
+                        log_str = ' bypassing proxy (use_tor false for XMR)'
+                    elif have_cc_tor_opt is False and is_private_ip_address(rpchost):
+                        log_str = ' bypassing proxy (private ip address)'
+                    else:
+                        proxy_host = swap_client.tor_proxy_host
+                        proxy_port = swap_client.tor_proxy_port
+                        log_str = f' through proxy at {proxy_host}'
+                    self._log.info(f'Connecting to remote {self.coin_name()} daemon at {rpchost}{log_str}.')
                 else:
                     self._log.info(f'Not connecting to local {self.coin_name()} daemon through proxy.')
             elif manage_daemon is False:

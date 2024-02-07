@@ -59,6 +59,7 @@ from .util.address import (
     decodeAddress,
     pubkeyToAddress,
 )
+from basicswap.util.network import is_private_ip_address
 from .chainparams import (
     Coins,
     chainparams,
@@ -521,10 +522,23 @@ class BasicSwap(BaseApp):
         rpcport: int = coin_settings['rpcport']
         timeout: int = coin_settings['rpctimeout']
 
-        proxy_host: str = self.tor_proxy_host if self.use_tor_proxy else None
-        proxy_port: int = self.tor_proxy_port if self.use_tor_proxy else None
-        if proxy_host:
-            self.log.info(f'Connecting through proxy at {proxy_host}.')
+        def get_rpc_func(rpcport, daemon_login, rpchost):
+
+            proxy_host = None
+            proxy_port = None
+            if self.use_tor_proxy:
+                have_cc_tor_opt = 'use_tor' in chain_client_settings
+                if have_cc_tor_opt and chain_client_settings['use_tor'] is False:
+                    self.log.warning('use_tor is true for system but false for XMR.')
+                elif have_cc_tor_opt is False and is_private_ip_address(rpchost):
+                    self.log.warning(f'Not using proxy for XMR node at private ip address {rpchost}.')
+                else:
+                    proxy_host = self.tor_proxy_host
+                    proxy_port = self.tor_proxy_port
+                if proxy_host:
+                    self.log.info(f'Connecting through proxy at {proxy_host}.')
+
+            return make_xmr_rpc2_func(rpcport, daemon_login, rpchost, proxy_host=proxy_host, proxy_port=proxy_port)
 
         daemon_login = None
         if coin_settings.get('rpcuser', '') != '':
@@ -533,7 +547,7 @@ class BasicSwap(BaseApp):
         if current_daemon_url in remote_daemon_urls:
             self.log.info(f'Trying last used url {rpchost}:{rpcport}.')
             try:
-                rpc2 = make_xmr_rpc2_func(rpcport, daemon_login, rpchost, proxy_host=proxy_host, proxy_port=proxy_port)
+                rpc2 = get_rpc_func(rpcport, daemon_login, rpchost)
                 test = rpc2('get_height', timeout=timeout)['height']
                 return True
             except Exception as e:
@@ -543,7 +557,7 @@ class BasicSwap(BaseApp):
             self.log.info(f'Trying url {url}.')
             try:
                 rpchost, rpcport = url.rsplit(':', 1)
-                rpc2 = make_xmr_rpc2_func(rpcport, daemon_login, rpchost, proxy_host=proxy_host, proxy_port=proxy_port)
+                rpc2 = get_rpc_func(rpcport, daemon_login, rpchost)
                 test = rpc2('get_height', timeout=timeout)['height']
                 coin_settings['rpchost'] = rpchost
                 coin_settings['rpcport'] = rpcport
