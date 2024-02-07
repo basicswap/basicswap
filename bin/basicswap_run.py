@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019-2023 tecnovert
+# Copyright (c) 2019-2024 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -176,13 +176,17 @@ def runClient(fp, data_dir, chain, start_only_coins):
                 if v['manage_wallet_daemon'] is True:
                     swap_client.log.info(f'Starting {display_name} wallet daemon')
                     daemon_addr = '{}:{}'.format(v['rpchost'], v['rpcport'])
-                    swap_client.log.info('daemon-address: {}'.format(daemon_addr))
+
+                    trusted_daemon: bool = v.get('trusted_daemon', False)
+                    swap_client.log.info('daemon-address: {} ({})'.format(daemon_addr, 'trusted' if trusted_daemon else 'untrusted'))
                     opts = ['--daemon-address', daemon_addr, ]
                     daemon_rpcuser = v.get('rpcuser', '')
                     daemon_rpcpass = v.get('rpcpassword', '')
                     if daemon_rpcuser != '':
                         opts.append('--daemon-login')
                         opts.append(daemon_rpcuser + ':' + daemon_rpcpass)
+
+                    opts.append('--trusted-daemon' if trusted_daemon else '--untrusted-daemon')
                     filename = 'monero-wallet-rpc' + ('.exe' if os.name == 'nt' else '')
                     daemons.append(startXmrWalletDaemon(v['datadir'], v['bindir'], filename, opts))
                     pid = daemons[-1].pid

@@ -34,6 +34,7 @@ from basicswap.basicswap import BasicSwap
 from basicswap.chainparams import Coins
 from basicswap.ui.util import getCoinName
 from basicswap.util import toBool
+from basicswap.util.network import is_private_ip_address
 from basicswap.util.rfc2440 import rfc2440_hash_password
 from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
 from bin.basicswap_run import startDaemon, startXmrWalletDaemon
@@ -822,7 +823,7 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
             if extra_opts.get('use_containers', False) is True:
                 fp.write('daemon-address={}:{}\n'.format(core_settings['rpchost'], core_settings['rpcport']))
                 config_datadir = '/data'
-            fp.write('untrusted-daemon=1\n')
+
             fp.write('no-dns=1\n')
             fp.write('rpc-bind-port={}\n'.format(core_settings['walletrpcport']))
             fp.write('rpc-bind-ip={}\n'.format(COINS_RPCBIND_IP))
@@ -962,7 +963,7 @@ def addTorSettings(settings, tor_control_password):
     settings['tor_control_port'] = TOR_CONTROL_PORT
 
 
-def modify_tor_config(settings, coin, tor_control_password=None, enable=False):
+def modify_tor_config(settings, coin, tor_control_password=None, enable=False, extra_opts={}):
     coin_settings = settings['chainclients'][coin]
     data_dir = coin_settings['datadir']
 
@@ -1012,6 +1013,8 @@ def modify_tor_config(settings, coin, tor_control_password=None, enable=False):
                 if not coin_settings['manage_daemon']:
                     fp.write(f'proxy={TOR_PROXY_HOST}:{TOR_PROXY_PORT}\n')
                     fp.write('daemon-ssl-allow-any-cert=1\n')
+
+            coin_settings['trusted_daemon'] = extra_opts.get('trust_remote_node', is_private_ip_address(coin_settings['rpchost']))
         return
 
     config_path = os.path.join(data_dir, coin + '.conf')
@@ -1081,6 +1084,7 @@ def printHelp():
     print('--htmlhost=              Interface to host html server on, default:127.0.0.1.')
     print('--wshost=                Interface to host websocket server on, disable by setting to "none", default:127.0.0.1.')
     print('--xmrrestoreheight=n     Block height to restore Monero wallet from, default:{}.'.format(DEFAULT_XMR_RESTORE_HEIGHT))
+    print('--trustremotenode        Set trusted-daemon for XMR, default is true for private ip addresses else false')
     print('--noextractover          Prevent extracting cores if files exist.  Speeds up tests')
     print('--usetorproxy            Use TOR proxy during setup.  Note that some download links may be inaccessible over TOR.')
     print('--notorproxy             Force usetorproxy off, usetorproxy is automatically set when tor is enabled')
@@ -1370,6 +1374,9 @@ def main():
         if name == 'skipbtcfastsyncchecks':
             extra_opts['check_btc_fastsync'] = False
             continue
+        if name == 'trustremotenode':
+            extra_opts['trust_remote_node'] = True
+            continue
         if name == 'initwalletsonly':
             initwalletsonly = True
             continue
@@ -1418,6 +1425,9 @@ def main():
                 continue
             if name == 'keysdirpath':
                 extra_opts['keysdirpath'] = os.path.expanduser(s[1].strip('"'))
+                continue
+            if name == 'trustremotenode':
+                extra_opts['trust_remote_node'] = toBool(s[1])
                 continue
 
         exitWithError('Unknown argument {}'.format(v))
@@ -1563,6 +1573,7 @@ def main():
             'zmqport': BASE_XMR_ZMQ_PORT + port_offset,
             'walletrpcport': BASE_XMR_WALLET_PORT + port_offset,
             'rpchost': XMR_RPC_HOST,
+            'trusted_daemon': extra_opts.get('trust_remote_node', is_private_ip_address(XMR_RPC_HOST)),
             'walletrpchost': XMR_WALLET_RPC_HOST,
             'walletrpcuser': XMR_WALLET_RPC_USER,
             'walletrpcpassword': XMR_WALLET_RPC_PWD,
@@ -1692,7 +1703,7 @@ def main():
 
         addTorSettings(settings, tor_control_password)
         for coin in settings['chainclients']:
-            modify_tor_config(settings, coin, tor_control_password, enable=True)
+            modify_tor_config(settings, coin, tor_control_password, enable=True, extra_opts=extra_opts)
 
         with open(config_path, 'w') as fp:
             json.dump(settings, fp, indent=4)
@@ -1705,7 +1716,7 @@ def main():
         settings = load_config(config_path)
         settings['use_tor'] = False
         for coin in settings['chainclients']:
-            modify_tor_config(settings, coin, tor_control_password=None, enable=False)
+            modify_tor_config(settings, coin, tor_control_password=None, enable=False, extra_opts=extra_opts)
 
         with open(config_path, 'w') as fp:
             json.dump(settings, fp, indent=4)

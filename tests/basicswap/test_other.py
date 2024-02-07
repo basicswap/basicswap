@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019-2023 tecnovert
+# Copyright (c) 2019-2024 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -23,6 +23,7 @@ from coincurve.keys import (
 
 from basicswap.util import i2b, h2b
 from basicswap.util.crypto import ripemd160, hash160
+from basicswap.util.network import is_private_ip_address
 from basicswap.util.rfc2440 import rfc2440_hash_password
 from basicswap.interface.btc import BTCInterface
 from basicswap.interface.xmr import XMRInterface
@@ -335,6 +336,16 @@ class Test(unittest.TestCase):
         msg_buf_v2.ParseFromString(serialised_msg)
 
         assert (msg_buf_v2.protocol_version == 2)
+
+    def test_is_private_ip_address(self):
+        assert (is_private_ip_address('localhost'))
+        assert (is_private_ip_address('127.0.0.1'))
+        assert (is_private_ip_address('10.0.0.0'))
+        assert (is_private_ip_address('172.16.0.0'))
+        assert (is_private_ip_address('192.168.0.0'))
+
+        assert (is_private_ip_address('20.87.245.0') is False)
+        assert (is_private_ip_address('particl.io') is False)
 
 
 if __name__ == '__main__':
