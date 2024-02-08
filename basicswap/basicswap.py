@@ -513,17 +513,19 @@ class BasicSwap(BaseApp):
                 self.coin_clients[coin]['rpcpassword'] = chain_client_settings.get('rpcpassword', '')
 
     def getXMRTrustedDaemon(self, coin, node_host: str) -> bool:
+        coin = Coins(coin)  # Errors for invalid coin value
         chain_client_settings = self.getChainClientSettings(coin)
         trusted_daemon_setting = chain_client_settings.get('trusted_daemon', 'auto')
+        self.log.debug(f'\'trusted_daemon\' setting for {getCoinName(coin)}: {trusted_daemon_setting}.')
         if isinstance(trusted_daemon_setting, bool):
             return trusted_daemon_setting
         if trusted_daemon_setting == 'auto':
             return is_private_ip_address(node_host)
-        ci = self.ci(coin)
-        self.log.warning(f'Unknown \'trusted_daemon\' setting for {ci.coin_name()}: {trusted_daemon_setting}.')
+        self.log.warning(f'Unknown \'trusted_daemon\' setting for {getCoinName(coin)}: {trusted_daemon_setting}.')
         return False
 
     def getXMRWalletProxy(self, coin, node_host: str) -> (Optional[str], Optional[int]):
+        coin = Coins(coin)  # Errors for invalid coin value
         chain_client_settings = self.getChainClientSettings(coin)
         proxy_host = None
         proxy_port = None
@@ -550,7 +552,7 @@ class BasicSwap(BaseApp):
 
         def get_rpc_func(rpcport, daemon_login, rpchost):
 
-            proxy_host, proxy_port = self.getXMRWalletProxy(chain_client_settings, rpchost)
+            proxy_host, proxy_port = self.getXMRWalletProxy(coin, rpchost)
             if proxy_host:
                 self.log.info(f'Connecting through proxy at {proxy_host}.')
 
