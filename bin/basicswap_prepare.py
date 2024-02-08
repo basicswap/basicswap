@@ -1080,7 +1080,7 @@ def printHelp():
     print('--usecontainers          Expect each core to run in a unique container.')
     print('--portoffset=n           Raise all ports by n.')
     print('--htmlhost=              Interface to host html server on, default:127.0.0.1.')
-    print('--wshost=                Interface to host websocket server on, disable by setting to "none", default:127.0.0.1.')
+    print('--wshost=                Interface to host websocket server on, disable by setting to "none", default\'s to --htmlhost.')
     print('--xmrrestoreheight=n     Block height to restore Monero wallet from, default:{}.'.format(DEFAULT_XMR_RESTORE_HEIGHT))
     print('--trustremotenode        Set trusted-daemon for XMR, defaults to auto: true when daemon rpchost value is a private ip address else false')
     print('--noextractover          Prevent extracting cores if files exist.  Speeds up tests')
@@ -1304,7 +1304,6 @@ def main():
     disable_coin = ''
     coins_changed = False
     htmlhost = '127.0.0.1'
-    wshost = '127.0.0.1'
     xmr_restore_height = DEFAULT_XMR_RESTORE_HEIGHT
     prepare_bin_only = False
     no_cores = False
@@ -1416,7 +1415,7 @@ def main():
                 htmlhost = s[1].strip('"')
                 continue
             if name == 'wshost':
-                wshost = s[1].strip('"')
+                extra_opts['wshost'] = s[1].strip('"')
                 continue
             if name == 'xmrrestoreheight':
                 xmr_restore_height = int(s[1])
@@ -1815,6 +1814,7 @@ def main():
             'wallet_update_timeout': 10,  # Seconds to wait for wallet page update
         }
 
+        wshost: str = extra_opts.get('wshost', htmlhost)
         if wshost != 'none':
             settings['wshost'] = wshost
             settings['wsport'] = UI_WS_PORT + port_offset
