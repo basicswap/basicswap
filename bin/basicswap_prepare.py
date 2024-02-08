@@ -34,7 +34,6 @@ from basicswap.basicswap import BasicSwap
 from basicswap.chainparams import Coins
 from basicswap.ui.util import getCoinName
 from basicswap.util import toBool
-from basicswap.util.network import is_private_ip_address
 from basicswap.util.rfc2440 import rfc2440_hash_password
 from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
 from bin.basicswap_run import startDaemon, startXmrWalletDaemon
@@ -804,7 +803,6 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
             fp.write('prune-blockchain=1\n')
 
             if tor_control_password is not None:
-                fp.write(f'proxy={TOR_PROXY_HOST}:{TOR_PROXY_PORT}\n')
                 fp.write('proxy-allow-dns-leaks=0\n')
                 fp.write('no-igd=1\n')
 
@@ -1014,7 +1012,7 @@ def modify_tor_config(settings, coin, tor_control_password=None, enable=False, e
                     fp.write(f'proxy={TOR_PROXY_HOST}:{TOR_PROXY_PORT}\n')
                     fp.write('daemon-ssl-allow-any-cert=1\n')
 
-            coin_settings['trusted_daemon'] = extra_opts.get('trust_remote_node', is_private_ip_address(coin_settings['rpchost']))
+            coin_settings['trusted_daemon'] = extra_opts.get('trust_remote_node', 'auto')
         return
 
     config_path = os.path.join(data_dir, coin + '.conf')
@@ -1084,7 +1082,7 @@ def printHelp():
     print('--htmlhost=              Interface to host html server on, default:127.0.0.1.')
     print('--wshost=                Interface to host websocket server on, disable by setting to "none", default:127.0.0.1.')
     print('--xmrrestoreheight=n     Block height to restore Monero wallet from, default:{}.'.format(DEFAULT_XMR_RESTORE_HEIGHT))
-    print('--trustremotenode        Set trusted-daemon for XMR, default is true for private ip addresses else false')
+    print('--trustremotenode        Set trusted-daemon for XMR, defaults to auto: true when daemon rpchost value is a private ip address else false')
     print('--noextractover          Prevent extracting cores if files exist.  Speeds up tests')
     print('--usetorproxy            Use TOR proxy during setup.  Note that some download links may be inaccessible over TOR.')
     print('--notorproxy             Force usetorproxy off, usetorproxy is automatically set when tor is enabled')
@@ -1573,7 +1571,7 @@ def main():
             'zmqport': BASE_XMR_ZMQ_PORT + port_offset,
             'walletrpcport': BASE_XMR_WALLET_PORT + port_offset,
             'rpchost': XMR_RPC_HOST,
-            'trusted_daemon': extra_opts.get('trust_remote_node', is_private_ip_address(XMR_RPC_HOST)),
+            'trusted_daemon': extra_opts.get('trust_remote_node', 'auto'),
             'walletrpchost': XMR_WALLET_RPC_HOST,
             'walletrpcuser': XMR_WALLET_RPC_USER,
             'walletrpcpassword': XMR_WALLET_RPC_PWD,

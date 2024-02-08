@@ -512,6 +512,32 @@ class BasicSwap(BaseApp):
                 self.coin_clients[coin]['rpcuser'] = chain_client_settings.get('rpcuser', '')
                 self.coin_clients[coin]['rpcpassword'] = chain_client_settings.get('rpcpassword', '')
 
+    def getXMRTrustedDaemon(self, coin, node_host: str) -> bool:
+        chain_client_settings = self.getChainClientSettings(coin)
+        trusted_daemon_setting = chain_client_settings.get('trusted_daemon', 'auto')
+        if isinstance(trusted_daemon_setting, bool):
+            return trusted_daemon_setting
+        if trusted_daemon_setting == 'auto':
+            return is_private_ip_address(node_host)
+        ci = self.ci(coin)
+        self.log.warning(f'Unknown \'trusted_daemon\' setting for {ci.coin_name()}: {trusted_daemon_setting}.')
+        return False
+
+    def getXMRWalletProxy(self, coin, node_host: str) -> (Optional[str], Optional[int]):
+        chain_client_settings = self.getChainClientSettings(coin)
+        proxy_host = None
+        proxy_port = None
+        if self.use_tor_proxy:
+            have_cc_tor_opt = 'use_tor' in chain_client_settings
+            if have_cc_tor_opt and chain_client_settings['use_tor'] is False:
+                self.log.warning('use_tor is true for system but false for XMR.')
+            elif have_cc_tor_opt is False and is_private_ip_address(node_host):
+                self.log.warning(f'Not using proxy for XMR node at private ip address {node_host}.')
+            else:
+                proxy_host = self.tor_proxy_host
+                proxy_port = self.tor_proxy_port
+        return proxy_host, proxy_port
+
     def selectXMRRemoteDaemon(self, coin):
         self.log.info('Selecting remote XMR daemon.')
         chain_client_settings = self.getChainClientSettings(coin)
@@ -524,19 +550,9 @@ class BasicSwap(BaseApp):
 
         def get_rpc_func(rpcport, daemon_login, rpchost):
 
-            proxy_host = None
-            proxy_port = None
-            if self.use_tor_proxy:
-                have_cc_tor_opt = 'use_tor' in chain_client_settings
-                if have_cc_tor_opt and chain_client_settings['use_tor'] is False:
-                    self.log.warning('use_tor is true for system but false for XMR.')
-                elif have_cc_tor_opt is False and is_private_ip_address(rpchost):
-                    self.log.warning(f'Not using proxy for XMR node at private ip address {rpchost}.')
-                else:
-                    proxy_host = self.tor_proxy_host
-                    proxy_port = self.tor_proxy_port
-                if proxy_host:
-                    self.log.info(f'Connecting through proxy at {proxy_host}.')
+            proxy_host, proxy_port = self.getXMRWalletProxy(chain_client_settings, rpchost)
+            if proxy_host:
+                self.log.info(f'Connecting through proxy at {proxy_host}.')
 
             return make_xmr_rpc2_func(rpcport, daemon_login, rpchost, proxy_host=proxy_host, proxy_port=proxy_port)
 

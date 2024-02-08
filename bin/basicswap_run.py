@@ -176,10 +176,17 @@ def runClient(fp, data_dir, chain, start_only_coins):
                 if v['manage_wallet_daemon'] is True:
                     swap_client.log.info(f'Starting {display_name} wallet daemon')
                     daemon_addr = '{}:{}'.format(v['rpchost'], v['rpcport'])
-
-                    trusted_daemon: bool = v.get('trusted_daemon', False)
-                    swap_client.log.info('daemon-address: {} ({})'.format(daemon_addr, 'trusted' if trusted_daemon else 'untrusted'))
+                    trusted_daemon: bool = swap_client.getXMRTrustedDaemon(c, v['rpchost'])
                     opts = ['--daemon-address', daemon_addr, ]
+
+                    proxy_log_str = ''
+                    proxy_host, proxy_port = swap_client.getXMRWalletProxy(c, v['rpchost'])
+                    if proxy_host:
+                        proxy_log_str = ' through proxy'
+                        opts += ['--proxy', f'{proxy_host}:{proxy_port}', ]
+
+                    swap_client.log.info('daemon-address: {} ({}){}'.format(daemon_addr, 'trusted' if trusted_daemon else 'untrusted', proxy_log_str))
+
                     daemon_rpcuser = v.get('rpcuser', '')
                     daemon_rpcpass = v.get('rpcpassword', '')
                     if daemon_rpcuser != '':
