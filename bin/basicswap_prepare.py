@@ -1144,7 +1144,7 @@ def test_particl_encryption(data_dir, settings, chain, use_tor_proxy):
     daemon_args = ['-noconnect', '-nodnsseed', '-nofindpeers', '-nostaking']
     with open(os.path.join(data_dir, 'basicswap.log'), 'a') as fp:
         try:
-            swap_client = BasicSwap(fp, data_dir, settings, chain)
+            swap_client = BasicSwap(fp, data_dir, settings, chain, transient_instance=True)
             if not swap_client.use_tor_proxy:
                 # Cannot set -bind or -whitebind together with -listen=0
                 daemon_args.append('-nolisten')
@@ -1185,7 +1185,7 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
 
     with open(os.path.join(data_dir, 'basicswap.log'), 'a') as fp:
         try:
-            swap_client = BasicSwap(fp, data_dir, settings, chain)
+            swap_client = BasicSwap(fp, data_dir, settings, chain, transient_instance=True)
             if not swap_client.use_tor_proxy:
                 # Cannot set -bind or -whitebind together with -listen=0
                 daemon_args.append('-nolisten')
@@ -1476,8 +1476,9 @@ def main():
     if use_tor_proxy and extra_opts.get('no_tor_proxy', False):
         exitWithError('Can\'t use --usetorproxy and --notorproxy together')
 
-    # Check config to see if tor is enabled
-    if not use_tor_proxy and os.path.exists(config_path):
+    # Automatically enable tor for certain commands if it's set in basicswap config
+    if not (initwalletsonly or enable_tor or disable_tor or disable_coin) and \
+       not use_tor_proxy and os.path.exists(config_path):
         settings = load_config(config_path)
         settings_use_tor = settings.get('use_tor', False)
         if settings_use_tor:

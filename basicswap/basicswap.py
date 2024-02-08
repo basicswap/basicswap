@@ -224,12 +224,13 @@ class BasicSwap(BaseApp):
         SwapTypes.XMR_SWAP: xmr_swap_1.XmrSwapInterface(),
     }
 
-    def __init__(self, fp, data_dir, settings, chain, log_name='BasicSwap'):
+    def __init__(self, fp, data_dir, settings, chain, log_name='BasicSwap', transient_instance=False):
         super().__init__(fp, data_dir, settings, chain, log_name)
 
         v = __version__.split('.')
         self._version = struct.pack('>HHH', int(v[0]), int(v[1]), int(v[2]))
 
+        self._transient_instance = transient_instance
         self.check_progress_seconds = self.get_int_setting('check_progress_seconds', 60, 1, 10 * 60)
         self.check_watched_seconds = self.get_int_setting('check_watched_seconds', 60, 1, 10 * 60)
         self.check_expired_seconds = self.get_int_setting('check_expired_seconds', 5 * 60, 1, 10 * 60)
@@ -499,7 +500,7 @@ class BasicSwap(BaseApp):
                 self.coin_clients[coin]['walletrpctimeout'] = chain_client_settings.get('walletrpctimeout', 120)
                 self.coin_clients[coin]['walletrpctimeoutlong'] = chain_client_settings.get('walletrpctimeoutlong', 600)
 
-                if chain_client_settings.get('automatically_select_daemon', False):
+                if not self._transient_instance and chain_client_settings.get('automatically_select_daemon', False):
                     self.selectXMRRemoteDaemon(coin)
 
                 self.coin_clients[coin]['walletrpchost'] = chain_client_settings.get('walletrpchost', '127.0.0.1')
