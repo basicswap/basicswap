@@ -110,7 +110,11 @@ elif USE_PLATFORM == 'Windows':
     BIN_ARCH = 'win64'
     FILE_EXT = 'zip'
 else:
-    BIN_ARCH = 'x86_64-linux-gnu'
+    machine: str = platform.machine()
+    if 'arm' in machine:
+        BIN_ARCH = 'arm-linux-gnueabihf'
+    else:
+        BIN_ARCH = machine + '-linux-gnu'
     FILE_EXT = 'tar.gz'
 
 # Allow manually overriding the arch tag
@@ -526,6 +530,8 @@ def extractCore(coin, version_data, settings, bin_dir, release_path, extra_opts=
 
                     if coin == 'pivx':
                         filename = '{}-{}/bin/{}'.format(dir_name, version, b)
+                    elif coin == 'particl' and '_nousb-' in release_path:
+                        filename = '{}-{}_nousb/bin/{}'.format(dir_name, version + version_tag, b)
                     else:
                         filename = '{}-{}/bin/{}'.format(dir_name, version + version_tag, b)
 
@@ -564,7 +570,14 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
         release_filename = '{}-{}-{}.{}'.format(coin, version, BIN_ARCH, use_file_ext)
         if os_name == 'osx':
             os_name = 'mac'
-        release_url = 'https://downloads.getmonero.org/cli/monero-{}-x64-v{}.{}'.format(os_name, version, use_file_ext)
+
+        architecture = 'x64'
+        if 'aarch64' in BIN_ARCH:
+            architecture = 'armv8'
+        elif 'arm' in BIN_ARCH:
+            architecture = 'armv7'
+
+        release_url = 'https://downloads.getmonero.org/cli/monero-{}-{}-v{}.{}'.format(os_name, architecture, version, use_file_ext)
         release_path = os.path.join(bin_dir, release_filename)
         if not os.path.exists(release_path):
             downloadFile(release_url, release_path)
@@ -591,8 +604,6 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
                 release_filename = '{}-{}_{}-{}.{}'.format(coin, version + version_tag, filename_extra, arch_name, FILE_EXT)
             else:
                 release_filename = '{}-{}-{}_{}.{}'.format(coin, version + version_tag, arch_name, filename_extra, FILE_EXT)
-
-        release_filename = '{}-{}-{}.{}'.format(coin, version + version_tag, arch_name, FILE_EXT)
         if coin == 'particl':
             release_url = 'https://github.com/particl/particl-core/releases/download/v{}/{}'.format(version + version_tag, release_filename)
             assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, version)
