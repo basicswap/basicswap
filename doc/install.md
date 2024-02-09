@@ -32,10 +32,13 @@ Without this step you will need to preface each `docker-compose` command with `s
 
 #### Create the images:
 
-COINDATA_PATH can be set to your preference but must be exported each time you launch Basicswap.<br>
-Consider adding COINDATA_PATH to the `.env` file in the docker directory file so it's always set.
+Coin-related files, such as blockchain and wallet files, are stored in `/var/data/coinswaps` by default. To use a different location, simply modify the target path in your `.env` file found within the `/docker` sub-folder.
 
-    export COINDATA_PATH=/var/data/coinswaps
+    cd basicswap/docker
+    nano .env
+
+#### Create the images:
+
     cd basicswap/docker
     docker-compose build
 
@@ -57,7 +60,6 @@ Append `--usebtcfastsync` to the below command to optionally initialise the Bitc
 
 Setup with a local Monero daemon (recommended):
 
-    export COINDATA_PATH=/var/data/coinswaps
     docker run --rm -t --name swap_prepare -v $COINDATA_PATH:/coindata i_swapclient basicswap-prepare --datadir=/coindata --withcoins=monero --htmlhost="0.0.0.0" --wshost="0.0.0.0" --xmrrestoreheight=$CURRENT_XMR_HEIGHT
 
 
@@ -72,10 +74,6 @@ To instead use Monero public nodes and not run a local Monero daemon<br>(it can 
 **Mnemonics should be stored encrypted and/or air-gapped.**
 And the output of `echo $CURRENT_XMR_HEIGHT` for use if you need to later restore your wallet.
 
-#### Make COINDATA_PATH permanent (optional):
-
-Edit the `.env` file in the docker directory and uncomment COINDATA_PATH line by deleting the hashtag.
-
 #### Set the timezone (optional):
 
 Edit the `.env` file in the docker directory, set TZ to your local timezone.
@@ -84,7 +82,6 @@ Valid options can be listed with: `timedatectl list-timezones`
 
 #### Start the container:
 
-    export COINDATA_PATH=/var/data/coinswaps
     docker-compose up
 
 Open in browser: `http://localhost:12700`
@@ -94,7 +91,6 @@ Open in browser: `http://localhost:12700`
 ### Add a coin
 
     docker-compose stop
-    export COINDATA_PATH=/var/data/coinswaps
     docker run --rm -t --name swap_prepare -v $COINDATA_PATH:/coindata i_swapclient basicswap-prepare --datadir=/coindata --addcoin=bitcoin --usebtcfastsync
 
 You can copy an existing pruned datadir (excluding bitcoin.conf and any wallets) over to `$COINDATA_PATH/bitcoin`
@@ -103,7 +99,6 @@ Remove any existing wallets after copying over a pruned chain or the Bitcoin dae
 
 With Encryption
 
-    export COINDATA_PATH=/var/data/coinswaps
     docker run -e WALLET_ENCRYPTION_PWD=passwordhere --rm -t --name swap_prepare -v $COINDATA_PATH:/coindata i_swapclient basicswap-prepare --datadir=/coindata --addcoin=bitcoin --usebtcfastsync
 
 
