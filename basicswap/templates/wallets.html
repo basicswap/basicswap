@@ -48,9 +48,9 @@
  <section class="py-4">
   <div class="container px-4 mx-auto">
    <div class="flex flex-wrap -m-4">
-    {% for w in wallets %} 
-    {% if w.havedata %} 
-    {% if w.error %}<p>Error: {{ w.error }}</p> 
+    {% for w in wallets %}
+    {% if w.havedata %}
+    {% if w.error %}<p>Error: {{ w.error }}</p>
     {% else %}
     <div class="w-full lg:w-1/3 p-4">
      <div class="bg-gray-50 shadow rounded overflow-hidden dark:bg-gray-500">
@@ -76,13 +76,13 @@
            <h4 class="text-xs font-medium dark:text-white">{{ w.ticker }} USD value:</h4>
            <div class="bold inline-block py-1 px-2 rounded-full bg-blue-100 text-xs text-black-500 dark:bg-gray-500 dark:text-gray-200 usd-value"></div>
         </div>
-        {% if w.unconfirmed %}
+        {% if w.pending %}
          <div class="flex mb-2 justify-between items-center">
-           <h4 class="text-xs font-bold text-green-500 dark:text-green-500">Unconfirmed:</h4>
-           <span class="bold inline-block py-1 px-2 rounded-full bg-green-100 text-xs text-green-500 dark:bg-gray-500 dark:text-green-500 coinname-value" data-coinname="{{ w.name }}">+{{ w.unconfirmed }} {{ w.ticker }}</span>
+           <h4 class="text-xs font-bold text-green-500 dark:text-green-500">Pending:</h4>
+           <span class="bold inline-block py-1 px-2 rounded-full bg-green-100 text-xs text-green-500 dark:bg-gray-500 dark:text-green-500 coinname-value" data-coinname="{{ w.name }}">+{{ w.pending }} {{ w.ticker }}</span>
           </div>
          <div class="flex mb-2 justify-between items-center">
-           <h4 class="text-xs font-bold text-green-500 dark:text-green-500">Unconfirmed USD value:</h4>
+           <h4 class="text-xs font-bold text-green-500 dark:text-green-500">Pending USD value:</h4>
           <div class="bold inline-block py-1 px-2 rounded-full bg-green-100 text-xs text-green-500 dark:bg-gray-500 dark:text-green-500 usd-value"></div>
          </div>
        {% endif %}

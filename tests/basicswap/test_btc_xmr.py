@@ -575,7 +575,7 @@ class BasicSwapTest(TestFunctions):
         swap_clients = self.swap_clients
         ci = self.swap_clients[0].ci(self.test_coin_from)
 
-        self.check_softfork_active('bip66')
+        self.check_softfork_active('csv')
 
         script = CScript([3, OP_CHECKSEQUENCEVERIFY, ])
 

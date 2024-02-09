@@ -141,7 +141,7 @@
                           <img class="h-7" src="/static/images/coins/{{ w.name }}.png" alt="{{ w.name }}">
                         </span>Balance:
                       </td>
-                      <td class="py-3 px-6 bold coinname-value" data-coinname="{{ w.name }}">{{ w.balance }} {{ w.ticker }} (<span class="usd-value"></span>){% if w.unconfirmed %} <span class="inline-block py-1 px-2 rounded-full bg-green-100 text-green-500 dark:bg-gray-500 dark:text-green-500">Unconfirmed: +{{ w.unconfirmed }} {{ w.ticker }}</span>{% endif %}</td>
+                      <td class="py-3 px-6 bold coinname-value" data-coinname="{{ w.name }}">{{ w.balance }} {{ w.ticker }} (<span class="usd-value"></span>){% if w.pending %} <span class="inline-block py-1 px-2 rounded-full bg-green-100 text-green-500 dark:bg-gray-500 dark:text-green-500">Pending: +{{ w.pending }} {{ w.ticker }}</span>{% endif %}</td>
                     </tr>
                     {% if w.cid == '1' %} {# PART #}
                       <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">

@@ -48,8 +48,14 @@ def format_wallet_data(swap_client, ci, w):
         wf['balance_all'] = float(w['balance']) + float(w['unconfirmed'])
     if 'lastupdated' in w:
         wf['lastupdated'] = format_timestamp(w['lastupdated'])
+
+    pending: int = 0
     if 'unconfirmed' in w and float(w['unconfirmed']) > 0.0:
-        wf['unconfirmed'] = w['unconfirmed']
+        pending += ci.make_int(w['unconfirmed'])
+    if 'immature' in w and float(w['immature']) > 0.0:
+        pending += ci.make_int(w['immature'])
+    if pending > 0.0:
+        wf['pending'] = ci.format_amount(pending)
 
     if ci.coin_type() == Coins.PART:
         wf['stealth_address'] = w.get('stealth_address', '?')

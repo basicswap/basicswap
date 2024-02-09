@@ -42,7 +42,6 @@ from .util import (
     LockedCoinError,
     TemporaryError,
     InactiveCoin,
-    format_amount,
     format_timestamp,
     DeserialiseNum,
     zeroIfNone,
@@ -6584,15 +6583,17 @@ class BasicSwap(BaseApp):
 
         try:
             walletinfo = ci.getWalletInfo()
-            scale = chainparams[coin]['decimal_places']
             rv = {
                 'deposit_address': self.getCachedAddressForCoin(coin),
-                'balance': format_amount(make_int(walletinfo['balance'], scale), scale),
-                'unconfirmed': format_amount(make_int(walletinfo.get('unconfirmed_balance'), scale), scale),
+                'balance': ci.format_amount(walletinfo['balance'], conv_int=True),
+                'unconfirmed': ci.format_amount(walletinfo['unconfirmed_balance'], conv_int=True),
                 'expected_seed': ci.knownWalletSeed(),
                 'encrypted': walletinfo['encrypted'],
                 'locked': walletinfo['locked'],
             }
+
+            if 'immature_balance' in walletinfo:
+                rv['immature'] = ci.format_amount(walletinfo['immature_balance'], conv_int=True)
 
             if 'locked_utxos' in walletinfo:
                 rv['locked_utxos'] = walletinfo['locked_utxos']
@@ -6610,7 +6611,6 @@ class BasicSwap(BaseApp):
             elif coin == Coins.LTC:
                 rv['mweb_address'] = self.getCachedStealthAddressForCoin(Coins.LTC_MWEB)
                 rv['mweb_balance'] = walletinfo['mweb_balance']
-                rv['mweb_pending'] = walletinfo['mweb_unconfirmed'] + walletinfo['mweb_immature']
                 rv['mweb_pending'] = walletinfo['mweb_unconfirmed'] + walletinfo['mweb_immature']
 
             return rv
