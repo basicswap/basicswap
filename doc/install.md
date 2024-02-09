@@ -30,7 +30,7 @@ Without this step you will need to preface each `docker-compose` command with `s
     https://docs.docker.com/engine/install/linux-postinstall/
 
 
-#### Create the images:
+#### (Optional) Set custom coin data path:
 
 Coin-related files, such as blockchain and wallet files, are stored in `/var/data/coinswaps` by default. To use a different location, simply modify the target path in your `.env` file found within the `/docker` sub-folder.
 
