@@ -18,6 +18,7 @@
   - `rpctimeout`, `walletrpctimeout` and `walletrpctimeoutlong` in the Monero section of basicswap.json.
   - `wallet_update_timeout` in basicswap.json to set how long the wallet ui page waits for an rpc response.
 - ui: Renamed unconfirmed balance to pending and include immature balance in pending.
+- Fixed LTC create utxo
 
 
 0.12.6
