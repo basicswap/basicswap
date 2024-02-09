@@ -12,8 +12,6 @@ Update only the code (prepend sudo to each docker command if necessary):
 
     basicswap]$ git pull
     cd docker
-    export COINDATA_PATH=[PATH_TO]
-    (Probably export COINDATA_PATH=/var/data/coinswaps)
     docker-compose build
     docker-compose up
 
@@ -21,7 +19,6 @@ If the dependencies have changed the container must be built with `--no-cache`:
 
     basicswap]$ git pull
     cd docker
-    export COINDATA_PATH=[PATH_TO]
     docker-compose build --no-cache
     docker-compose up
 
