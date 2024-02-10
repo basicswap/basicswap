@@ -78,25 +78,21 @@ def startXmrWalletDaemon(node_dir, bin_dir, wallet_bin, opts=[]):
     config_path = os.path.join(data_dir, 'monero_wallet.conf')
     args = [daemon_bin, '--non-interactive', '--config-file=' + config_path] + opts
 
-    # TODO: Remove
-    # Remove daemon-address
-    has_daemon_address = False
-    has_untrusted = False
+    # Remove old config
+    needs_rewrite: bool = False
+    config_to_remove = ['daemon-address=', 'untrusted-daemon=', 'trusted-daemon=', 'proxy=']
     with open(config_path) as fp:
         for line in fp:
-            if line.startswith('daemon-address'):
-                has_daemon_address = True
-            if line.startswith('untrusted-daemon'):
-                has_untrusted = True
-    if has_daemon_address:
+            if any(line.startswith(config_line) for config_line in config_to_remove):
+                logging.warning('Found old config in monero_wallet.conf: {}'.format(line.strip()))
+                needs_rewrite = True
+    if needs_rewrite:
         logging.info('Rewriting monero_wallet.conf')
         shutil.copyfile(config_path, config_path + '.last')
         with open(config_path + '.last') as fp_from, open(config_path, 'w') as fp_to:
             for line in fp_from:
-                if not line.startswith('daemon-address'):
+                if not any(line.startswith(config_line) for config_line in config_to_remove):
                     fp_to.write(line)
-            if not has_untrusted:
-                fp_to.write('untrusted-daemon=1\n')
 
     logging.info('Starting wallet daemon {} --wallet-dir={}'.format(daemon_bin, node_dir))
 
