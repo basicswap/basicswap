@@ -326,14 +326,21 @@
                         <input placeholder="{{ w.ticker }} Address" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" name="to_{{ w.cid }}" value="{{ w.wd_address }}">
                       </td>
                       <td class="py-3 px-6">
-                        <input placeholder="{{ w.ticker }} Amount" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" name="amt_{{ w.cid }}" value="{{ w.wd_value }}">
+                        <input placeholder="{{ w.ticker }} Amount" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" id="amount" name="amt_{{ w.cid }}" value="{{ w.wd_value }}">
                       </td>
                     </tr>
                     <tr class="opacity-100 text-gray-500 dark:text-gray-100">
+                      {% if w.cid == '6' %} {# XMR #}
+                      <td class="py-3 px-6 bold">Sweep All:</td>
+                      <td class="py-3 px-6">
+                        <input class="hover:border-blue-500 w-5 h-5 form-check-input text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-1 dark:bg-gray-500 dark:border-gray-400" type="checkbox" id="sweepall" name="sweepall_{{ w.cid }}" {% if w.wd_sweepall==true %} checked=checked{% endif %}>
+                      </td>
+                      {% else %}
                       <td class="py-3 px-6 bold">Subtract Fee:</td>
                       <td class="py-3 px-6">
                         <input class="hover:border-blue-500 w-5 h-5 form-check-input text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-1 dark:bg-gray-500 dark:border-gray-400" type="checkbox" name="subfee_{{ w.cid }}" {% if w.wd_subfee==true %} checked=checked{% endif %}>
                       </td>
+                      {% endif %}
                       <td></td>
                     </tr>
                     {% if w.cid == '1' %} {# PART #}
@@ -623,6 +630,24 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   calculateTotalUsdValue();
+
+  function set_sweep_all(element) {
+    let input = document.getElementById('amount');
+    if (element.checked) {
+      input.disabled = true;
+      input.style.display = 'none';
+    } else {
+      input.disabled = false;
+      input.style.display = 'block';
+    }
+  }
+  let cb_sweepall = document.getElementById('sweepall');
+  if (cb_sweepall) {
+    set_sweep_all(cb_sweepall);
+    cb_sweepall.addEventListener('change', (event) => {
+      set_sweep_all(event.currentTarget);
+    })
+  }
 });
 </script>
 

@@ -150,19 +150,23 @@ def page_wallet(self, url_split, post_string):
                 err_messages.append('Reseed failed ' + str(ex))
             swap_client.updateWalletsInfo(True, coin_id)
         elif bytes('withdraw_' + cid, 'utf-8') in form_data:
-            try:
-                value = form_data[bytes('amt_' + cid, 'utf-8')][0].decode('utf-8')
-                page_data['wd_value_' + cid] = value
-            except Exception as e:
-                err_messages.append('Missing value')
+            subfee = True if bytes('subfee_' + cid, 'utf-8') in form_data else False
+            page_data['wd_subfee_' + cid] = subfee
+
+            sweepall = True if bytes('sweepall_' + cid, 'utf-8') in form_data else False
+            page_data['wd_sweepall_' + cid] = sweepall
+            value = None
+            if not sweepall:
+                try:
+                    value = form_data[bytes('amt_' + cid, 'utf-8')][0].decode('utf-8')
+                    page_data['wd_value_' + cid] = value
+                except Exception as e:
+                    err_messages.append('Missing value')
             try:
                 address = form_data[bytes('to_' + cid, 'utf-8')][0].decode('utf-8')
                 page_data['wd_address_' + cid] = address
             except Exception as e:
                 err_messages.append('Missing address')
-
-            subfee = True if bytes('subfee_' + cid, 'utf-8') in form_data else False
-            page_data['wd_subfee_' + cid] = subfee
 
             if coin_id == Coins.PART:
                 try:
@@ -179,7 +183,7 @@ def page_wallet(self, url_split, post_string):
                 except Exception as e:
                     err_messages.append('Missing type')
 
-            if len(messages) == 0:
+            if len(err_messages) == 0:
                 ci = swap_client.ci(coin_id)
                 ticker = ci.ticker()
                 try:
@@ -189,6 +193,12 @@ def page_wallet(self, url_split, post_string):
                     elif coin_id == Coins.LTC:
                         txid = swap_client.withdrawLTC(type_from, value, address, subfee)
                         messages.append('Withdrew {} {} (from {}) to address {}<br/>In txid: {}'.format(value, ticker, type_from, address, txid))
+                    elif coin_id == Coins.XMR:
+                        txid = swap_client.withdrawCoin(coin_id, value, address, sweepall)
+                        if sweepall:
+                            messages.append('Swept all {} to address {}<br/>In txid: {}'.format(ticker, address, txid))
+                        else:
+                            messages.append('Withdrew {} {} to address {}<br/>In txid: {}'.format(value, ticker, address, txid))
                     else:
                         txid = swap_client.withdrawCoin(coin_id, value, address, subfee)
                         messages.append('Withdrew {} {} to address {}<br/>In txid: {}'.format(value, ticker, address, txid))
@@ -261,6 +271,8 @@ def page_wallet(self, url_split, post_string):
             wallet_data['wd_address'] = page_data['wd_address_' + cid]
         if 'wd_subfee_' + cid in page_data:
             wallet_data['wd_subfee'] = page_data['wd_subfee_' + cid]
+        if 'wd_sweepall_' + cid in page_data:
+            wallet_data['wd_sweepall'] = page_data['wd_sweepall_' + cid]
         if 'utxo_value' in page_data:
             wallet_data['utxo_value'] = page_data['utxo_value']
 

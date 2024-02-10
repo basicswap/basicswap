@@ -52,12 +52,20 @@ def getFormData(post_string: str, is_json: bool):
 
 def withdraw_coin(swap_client, coin_type, post_string, is_json):
     post_data = getFormData(post_string, is_json)
-
-    value = get_data_entry(post_data, 'value')
     address = get_data_entry(post_data, 'address')
-    subfee = get_data_entry(post_data, 'subfee')
-    if not isinstance(subfee, bool):
-        subfee = toBool(subfee)
+
+    if coin_type == Coins.XMR:
+        value = None
+        sweepall = get_data_entry(post_data, 'sweepall')
+        if not isinstance(sweepall, bool):
+            sweepall = toBool(sweepall)
+        if not sweepall:
+            value = get_data_entry(post_data, 'value')
+    else:
+        value = get_data_entry(post_data, 'value')
+        subfee = get_data_entry(post_data, 'subfee')
+        if not isinstance(subfee, bool):
+            subfee = toBool(subfee)
 
     if coin_type == Coins.PART:
         type_from = get_data_entry_or(post_data, 'type_from', 'plain')
@@ -66,6 +74,8 @@ def withdraw_coin(swap_client, coin_type, post_string, is_json):
     elif coin_type == Coins.LTC:
         type_from = get_data_entry_or(post_data, 'type_from', 'plain')
         txid_hex = swap_client.withdrawLTC(type_from, value, address, subfee)
+    elif coin_type == Coins.XMR:
+        txid_hex = swap_client.withdrawCoin(coin_type, value, address, sweepall)
     else:
         txid_hex = swap_client.withdrawCoin(coin_type, value, address, subfee)
 

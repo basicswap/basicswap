@@ -1910,7 +1910,10 @@ class BasicSwap(BaseApp):
 
     def withdrawCoin(self, coin_type, value, addr_to, subfee: bool) -> str:
         ci = self.ci(coin_type)
-        self.log.info('withdrawCoin {} {} to {} {}'.format(value, ci.ticker(), addr_to, ' subfee' if subfee else ''))
+        if subfee and coin_type == Coins.XMR:
+            self.log.info('withdrawCoin sweep all {} to {}'.format(ci.ticker(), addr_to))
+        else:
+            self.log.info('withdrawCoin {} {} to {} {}'.format(value, ci.ticker(), addr_to, ' subfee' if subfee else ''))
 
         txid = ci.withdrawCoin(value, addr_to, subfee)
         self.log.debug('In txn: {}'.format(txid))
