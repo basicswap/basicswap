@@ -133,27 +133,33 @@ def page_wallet(self, url_split, post_string):
     page_data = {}
     messages = []
     err_messages = []
-    show_utxo_groups = False
+    show_utxo_groups: bool = False
+    withdrawal_successful: bool = False
+    force_refresh: bool = False
     form_data = self.checkForm(post_string, 'wallet', err_messages)
     if form_data:
         cid = str(int(coin_id))
 
-        if bytes('newaddr_' + cid, 'utf-8') in form_data:
+        estimate_fee: bool = have_data_entry(form_data, 'estfee_' + cid)
+        withdraw: bool = have_data_entry(form_data, 'withdraw_' + cid)
+        if have_data_entry(form_data, 'newaddr_' + cid):
             swap_client.cacheNewAddressForCoin(coin_id)
-        elif bytes('newmwebaddr_' + cid, 'utf-8') in form_data:
+        elif have_data_entry(form_data, 'forcerefresh'):
+            force_refresh = True
+        elif have_data_entry(form_data, 'newmwebaddr_' + cid):
             swap_client.cacheNewStealthAddressForCoin(coin_id)
-        elif bytes('reseed_' + cid, 'utf-8') in form_data:
+        elif have_data_entry(form_data, 'reseed_' + cid):
             try:
                 swap_client.reseedWallet(coin_id)
                 messages.append('Reseed complete ' + str(coin_id))
             except Exception as ex:
                 err_messages.append('Reseed failed ' + str(ex))
             swap_client.updateWalletsInfo(True, coin_id)
-        elif bytes('withdraw_' + cid, 'utf-8') in form_data:
-            subfee = True if bytes('subfee_' + cid, 'utf-8') in form_data else False
+        elif withdraw or estimate_fee:
+            subfee = True if have_data_entry(form_data, 'subfee_' + cid) else False
             page_data['wd_subfee_' + cid] = subfee
 
-            sweepall = True if bytes('sweepall_' + cid, 'utf-8') in form_data else False
+            sweepall = True if have_data_entry(form_data, 'sweepall_' + cid) else False
             page_data['wd_sweepall_' + cid] = sweepall
             value = None
             if not sweepall:
@@ -167,6 +173,13 @@ def page_wallet(self, url_split, post_string):
                 page_data['wd_address_' + cid] = address
             except Exception as e:
                 err_messages.append('Missing address')
+
+            if estimate_fee and withdraw:
+                err_messages.append('Estimate fee and withdraw can\'t be used together.')
+            if estimate_fee and coin_id not in (Coins.XMR, ):
+                ci = swap_client.ci(coin_id)
+                ticker: str = ci.ticker()
+                err_messages.append(f'Estimate fee unavailable for {ticker}.')
 
             if coin_id == Coins.PART:
                 try:
@@ -185,7 +198,7 @@ def page_wallet(self, url_split, post_string):
 
             if len(err_messages) == 0:
                 ci = swap_client.ci(coin_id)
-                ticker = ci.ticker()
+                ticker: str = ci.ticker()
                 try:
                     if coin_id == Coins.PART:
                         txid = swap_client.withdrawParticl(type_from, type_to, value, address, subfee)
@@ -194,17 +207,31 @@ def page_wallet(self, url_split, post_string):
                         txid = swap_client.withdrawLTC(type_from, value, address, subfee)
                         messages.append('Withdrew {} {} (from {}) to address {}<br/>In txid: {}'.format(value, ticker, type_from, address, txid))
                     elif coin_id == Coins.XMR:
-                        txid = swap_client.withdrawCoin(coin_id, value, address, sweepall)
-                        if sweepall:
-                            messages.append('Swept all {} to address {}<br/>In txid: {}'.format(ticker, address, txid))
+                        if estimate_fee:
+                            fee_estimate = ci.estimateFee(value, address, sweepall)
+                            suffix = 's' if fee_estimate['num_txns'] > 1 else ''
+                            sum_fees = ci.format_amount(fee_estimate['sum_fee'])
+                            value_str = ci.format_amount(fee_estimate['sum_amount'])
+                            messages.append(f'Estimated fee for {value_str} {ticker} to address {address}: {sum_fees} in {fee_estimate["num_txns"]} transaction{suffix}.')
+                            page_data['fee_estimate'] = fee_estimate
                         else:
-                            messages.append('Withdrew {} {} to address {}<br/>In txid: {}'.format(value, ticker, address, txid))
+                            txid = swap_client.withdrawCoin(coin_id, value, address, sweepall)
+                            if sweepall:
+                                messages.append('Swept all {} to address {}<br/>In txid: {}'.format(ticker, address, txid))
+                            else:
+                                messages.append('Withdrew {} {} to address {}<br/>In txid: {}'.format(value, ticker, address, txid))
+                            messages.append('Note: The wallet balance can take a while to update.')
                     else:
                         txid = swap_client.withdrawCoin(coin_id, value, address, subfee)
                         messages.append('Withdrew {} {} to address {}<br/>In txid: {}'.format(value, ticker, address, txid))
+                    if not estimate_fee:
+                        withdrawal_successful = True
                 except Exception as e:
+                    if swap_client.debug is True:
+                        swap_client.log.error(traceback.format_exc())
                     err_messages.append(str(e))
-                swap_client.updateWalletsInfo(True, coin_id)
+            if not estimate_fee:
+                swap_client.updateWalletsInfo(True, only_coin=coin_id)
         elif have_data_entry(form_data, 'showutxogroups'):
             show_utxo_groups = True
         elif have_data_entry(form_data, 'create_utxo'):
@@ -214,7 +241,6 @@ def page_wallet(self, url_split, post_string):
                 page_data['utxo_value'] = value
 
                 ci = swap_client.ci(coin_id)
-
                 value_sats = ci.make_int(value)
 
                 txid, address = ci.createUTXO(value_sats)
@@ -224,7 +250,7 @@ def page_wallet(self, url_split, post_string):
                 if swap_client.debug is True:
                     swap_client.log.error(traceback.format_exc())
 
-    swap_client.updateWalletsInfo(only_coin=coin_id, wait_for_complete=True)
+    swap_client.updateWalletsInfo(force_refresh, only_coin=coin_id, wait_for_complete=True)
     wallets = swap_client.getCachedWalletsInfo({'coin_id': coin_id})
     for k in wallets.keys():
         w = wallets[k]
@@ -265,16 +291,21 @@ def page_wallet(self, url_split, post_string):
         if 'wd_type_to_' + cid in page_data:
             wallet_data['wd_type_to'] = page_data['wd_type_to_' + cid]
 
-        if 'wd_value_' + cid in page_data:
-            wallet_data['wd_value'] = page_data['wd_value_' + cid]
-        if 'wd_address_' + cid in page_data:
-            wallet_data['wd_address'] = page_data['wd_address_' + cid]
-        if 'wd_subfee_' + cid in page_data:
-            wallet_data['wd_subfee'] = page_data['wd_subfee_' + cid]
-        if 'wd_sweepall_' + cid in page_data:
-            wallet_data['wd_sweepall'] = page_data['wd_sweepall_' + cid]
         if 'utxo_value' in page_data:
             wallet_data['utxo_value'] = page_data['utxo_value']
+
+        if not withdrawal_successful:
+            if 'wd_value_' + cid in page_data:
+                wallet_data['wd_value'] = page_data['wd_value_' + cid]
+            if 'wd_address_' + cid in page_data:
+                wallet_data['wd_address'] = page_data['wd_address_' + cid]
+            if 'wd_subfee_' + cid in page_data:
+                wallet_data['wd_subfee'] = page_data['wd_subfee_' + cid]
+            if 'wd_sweepall_' + cid in page_data:
+                wallet_data['wd_sweepall'] = page_data['wd_sweepall_' + cid]
+            if 'fee_estimate' in page_data:
+                wallet_data['est_fee'] = ci.format_amount(page_data['fee_estimate']['sum_fee'])
+                wallet_data['fee_rate'] = ci.format_amount(page_data['fee_estimate']['sum_fee'] * 1000 // page_data['fee_estimate']['sum_weight'])
 
         if show_utxo_groups:
             utxo_groups = ''

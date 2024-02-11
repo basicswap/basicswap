@@ -231,6 +231,7 @@ class XMRInterface(CoinInterface):
             rv = {}
             self.rpc_wallet('refresh')
             balance_info = self.rpc_wallet('get_balance')
+
             rv['balance'] = self.format_amount(balance_info['unlocked_balance'])
             rv['unconfirmed_balance'] = self.format_amount(balance_info['balance'] - balance_info['unlocked_balance'])
             rv['encrypted'] = False if self._wallet_password is None else True
@@ -473,7 +474,7 @@ class XMRInterface(CoinInterface):
 
             return bytes.fromhex(rv['tx_hash_list'][0])
 
-    def withdrawCoin(self, value: int, addr_to: str, sweepall: bool) -> str:
+    def withdrawCoin(self, value, addr_to: str, sweepall: bool, estimate_fee: bool = False) -> str:
         with self._mx_wallet:
             self.openWallet(self._wallet_filename)
             self.rpc_wallet('refresh')
@@ -482,20 +483,27 @@ class XMRInterface(CoinInterface):
                 balance = self.rpc_wallet('get_balance')
                 if balance['balance'] != balance['unlocked_balance']:
                     raise ValueError('Balance must be fully confirmed to use sweep all.')
-                self._log.info('XMR withdraw sweep_all.')
+                self._log.info('XMR {} sweep_all.'.format('estimate fee' if estimate_fee else 'withdraw'))
                 self._log.debug('XMR balance: {}'.format(balance['balance']))
-                params = {'address': addr_to}
+                params = {'address': addr_to, 'do_not_relay': estimate_fee}
                 if self._fee_priority > 0:
                     params['priority'] = self._fee_priority
                 rv = self.rpc_wallet('sweep_all', params)
+                if estimate_fee:
+                    return {'num_txns': len(rv['fee_list']), 'sum_amount': sum(rv['amount_list']), 'sum_fee': sum(rv['fee_list']), 'sum_weight': sum(rv['weight_list'])}
                 return rv['tx_hash_list'][0]
 
             value_sats: int = make_int(value, self.exp())
-            params = {'destinations': [{'amount': value_sats, 'address': addr_to}]}
+            params = {'destinations': [{'amount': value_sats, 'address': addr_to}], 'do_not_relay': estimate_fee}
             if self._fee_priority > 0:
                 params['priority'] = self._fee_priority
             rv = self.rpc_wallet('transfer', params)
+            if estimate_fee:
+                return {'num_txns': 1, 'sum_amount': rv['amount'], 'sum_fee': rv['fee'], 'sum_weight': rv['weight']}
             return rv['tx_hash']
+
+    def estimateFee(self, value: int, addr_to: str, sweepall: bool) -> str:
+        return self.withdrawCoin(value, addr_to, sweepall, estimate_fee=True)
 
     def showLockTransfers(self, kbv, Kbs, restore_height):
         with self._mx_wallet:

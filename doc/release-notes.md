@@ -18,7 +18,11 @@
   - `rpctimeout`, `walletrpctimeout` and `walletrpctimeoutlong` in the Monero section of basicswap.json.
   - `wallet_update_timeout` in basicswap.json to set how long the wallet ui page waits for an rpc response.
 - ui: Renamed unconfirmed balance to pending and include immature balance in pending.
-- Fixed LTC create utxo
+- Fixed LTC create utxo.
+- ui: Changed 'Subtract Fee' option to 'Sweep All' on XMR wallet page.
+- ui: Added An Estimate Fee button on XMR wallet page.
+- ui: Added a Force Refresh button on XMR wallet page.
+  - get_balance (if called) at the end of withdrawCoin is correct, subsequent get_balance calls return old balance for a while.
 
 
 0.12.6
