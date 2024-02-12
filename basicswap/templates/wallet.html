@@ -31,14 +31,13 @@
         </div>
         <div class="w-full md:w-1/2 p-3 p-6 container flex flex-wrap items-center justify-end items-center mx-auto">
           {% if w.cid == '6' %} {# XMR #}
-          <button type="submit" form="main_form" class="flex flex-wrap justify-center px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" id="forcerefresh" name="forcerefresh" value="Force Refresh">
-                      {{ circular_arrows_svg | safe }} Force Refresh</button>
+          <button type="submit" form="main_form" class="rounded-full mr-5 flex flex-wrap justify-center px-5 py-3 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border dark:bg-gray-500 dark:hover:bg-gray-700 border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" id="forcerefresh" name="forcerefresh" value="Force Refresh">
+          {{ circular_arrows_svg | safe }} Force Refresh</button>
           {% endif %} {# / XMR #}
           <a class="rounded-full mr-5 flex flex-wrap justify-center px-5 py-3 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border dark:bg-gray-500 dark:hover:bg-gray-700 border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" id="refresh" href="/wallet/{{ w.ticker }}">
-            {{ circular_arrows_svg | safe }}<span>Refresh</span>
+          {{ circular_arrows_svg | safe }}<span>Refresh</span>
           </a>
         </div>
-
       </div>
     </div>
   </div>
