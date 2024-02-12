@@ -27,8 +27,7 @@ If the dependencies have changed the container must be built with `--no-cache`:
 
 After updating the code and rebuilding the container run:
 
-    basicswap/docker]$ export COINDATA_PATH=[PATH_TO]
-    $ docker-compose run --rm swapclient \
+    basicswap/docker]$ docker-compose run --rm swapclient \
         basicswap-prepare --datadir=/coindata --preparebinonly --withcoins=monero,bitcoin
 
 
