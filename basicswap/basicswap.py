@@ -4317,6 +4317,7 @@ class BasicSwap(BaseApp):
                 except Exception as e:
                     if self.debug:
                         self.log.error(traceback.format_exc())
+                        self.log.error(f'Failed to process message {msg}')
 
             now: int = self.getTime()
             options = {'encoding': 'none', 'setread': False}
