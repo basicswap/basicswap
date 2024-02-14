@@ -1182,6 +1182,8 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
     daemons = []
     daemon_args = ['-noconnect', '-nodnsseed']
 
+    coins_failed_to_initialise = []
+
     with open(os.path.join(data_dir, 'basicswap.log'), 'a') as fp:
         try:
             swap_client = BasicSwap(fp, data_dir, settings, chain, transient_instance=True)
@@ -1248,7 +1250,10 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
                 if c in (Coins.PART, ):
                     continue
                 swap_client.waitForDaemonRPC(c)
-                swap_client.initialiseWallet(c)
+                try:
+                    swap_client.initialiseWallet(c, raise_errors=True)
+                except Exception as e:
+                    coins_failed_to_initialise.append((c, e))
                 if WALLET_ENCRYPTION_PWD != '' and c not in coins_to_create_wallets_for:
                     try:
                         swap_client.ci(c).changeWalletPassword('', WALLET_ENCRYPTION_PWD)
@@ -1261,6 +1266,14 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
                 del swap_client
             for d in daemons:
                 finalise_daemon(d)
+
+    print('')
+    for pair in coins_failed_to_initialise:
+        c, _ = pair
+        if c in (Coins.PIVX, ):
+            print(f'NOTE - Unable to initialise wallet for {getCoinName(c)}.  To complete setup click \'Reseed Wallet\' from the ui page once chain is synced.')
+        else:
+            print(f'WARNING - Failed to initialise wallet for {getCoinName(c)}')
 
     if particl_wallet_mnemonic is not None:
         if particl_wallet_mnemonic:
