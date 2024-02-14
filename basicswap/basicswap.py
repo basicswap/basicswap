@@ -1622,7 +1622,7 @@ class BasicSwap(BaseApp):
 
             offer_bytes = msg_buf.SerializeToString()
             payload_hex = str.format('{:02x}', MessageTypes.OFFER) + offer_bytes.hex()
-            msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR * 1, valid_for_seconds)
+            msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR, valid_for_seconds)
             offer_id = self.sendSmsg(offer_addr, offer_addr_to, payload_hex, msg_valid)
 
             security_token = extra_options.get('security_token', None)
@@ -1717,7 +1717,9 @@ class BasicSwap(BaseApp):
 
             msg_bytes = msg_buf.SerializeToString()
             payload_hex = str.format('{:02x}', MessageTypes.OFFER_REVOKE) + msg_bytes.hex()
-            msg_id = self.sendSmsg(offer.addr_from, self.network_addr, payload_hex, offer.time_valid)
+
+            msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR, offer.time_valid)
+            msg_id = self.sendSmsg(offer.addr_from, self.network_addr, payload_hex, msg_valid)
             self.log.debug('Revoked offer %s in msg %s', offer_id.hex(), msg_id.hex())
         finally:
             self.closeSession(session, commit=False)
@@ -1902,7 +1904,7 @@ class BasicSwap(BaseApp):
 
     def estimateWithdrawFee(self, coin_type, fee_rate):
         if coin_type == Coins.XMR:
-            self.log.error('TODO: estimateWithdrawFee XMR')
+            # Fee estimate must be manually initiated
             return None
         tx_vsize = self.ci(coin_type).getHTLCSpendTxVSize()
         est_fee = (fee_rate * tx_vsize) / 1000
@@ -2298,7 +2300,7 @@ class BasicSwap(BaseApp):
             payload_hex = str.format('{:02x}', MessageTypes.BID) + bid_bytes.hex()
 
             bid_addr = self.newSMSGAddress(use_type=AddressTypes.BID)[0] if addr_send_from is None else addr_send_from
-            msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR * 1, valid_for_seconds)
+            msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR, valid_for_seconds)
             bid_id = self.sendSmsg(bid_addr, offer.addr_from, payload_hex, msg_valid)
 
             bid = Bid(
@@ -2657,7 +2659,7 @@ class BasicSwap(BaseApp):
                 xmr_swap.contract_count = self.getNewContractId()
 
                 bid_addr = self.newSMSGAddress(use_type=AddressTypes.BID)[0] if addr_send_from is None else addr_send_from
-                msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR * 1, valid_for_seconds)
+                msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR, valid_for_seconds)
                 xmr_swap.bid_id = self.sendSmsg(bid_addr, offer.addr_from, payload_hex, msg_valid)
 
                 bid = Bid(
@@ -2743,7 +2745,7 @@ class BasicSwap(BaseApp):
             payload_hex = str.format('{:02x}', MessageTypes.XMR_BID_FL) + bid_bytes.hex()
 
             bid_addr = self.newSMSGAddress(use_type=AddressTypes.BID)[0] if addr_send_from is None else addr_send_from
-            msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR * 1, valid_for_seconds)
+            msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR, valid_for_seconds)
             xmr_swap.bid_id = self.sendSmsg(bid_addr, offer.addr_from, payload_hex, msg_valid)
 
             bid_msg_ids = {}

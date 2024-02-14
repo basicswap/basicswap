@@ -76,7 +76,7 @@ class XMRInterface(CoinInterface):
     @staticmethod
     def xmr_swap_b_lock_spend_tx_vsize() -> int:
         # TODO: Estimate with ringsize
-        return 1507
+        return 1604
 
     def __init__(self, coin_settings, network, swap_client=None):
         super().__init__(network)
@@ -254,8 +254,15 @@ class XMRInterface(CoinInterface):
             return new_address
 
     def get_fee_rate(self, conf_target: int = 2):
-        self._log.warning('TODO - estimate XMR fee rate?')
-        return 0.0, 'unused'
+        # fees - array of unsigned int; Represents the base fees at different priorities [slow, normal, fast, fastest].
+        fee_est = self.rpc('get_fee_estimate')
+        if conf_target <= 1:
+            conf_target = 1  # normal
+        else:
+            conf_target = 0  # slow
+        fee_per_k_bytes = fee_est['fees'][conf_target] * 1000
+
+        return float(self.format_amount(fee_per_k_bytes)), 'get_fee_estimate'
 
     def getNewSecretKey(self) -> bytes:
         # Note: Returned bytes are in big endian order
