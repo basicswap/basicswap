@@ -122,6 +122,8 @@ class TestFunctions(BaseTest):
             'address': js_w[coin_ticker][address_type],
             'subfee': False,
         }
+        if coin in (Coins.XMR, ):
+            post_json['sweepall'] = False
         if coin in (Coins.PART_BLIND, Coins.PART_ANON):
             post_json['type_to'] = type_to
         json_rv = read_json_api(port_take_from_node, 'wallets/{}/withdraw'.format(coin_ticker.lower()), post_json)
