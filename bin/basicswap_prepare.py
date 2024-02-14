@@ -920,7 +920,6 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
         elif coin == 'pivx':
             params_dir = os.path.join(data_dir, 'pivx-params')
             downloadPIVXParams(params_dir)
-            fp.write('prune=4000\n')
             PIVX_PARAMSDIR = os.getenv('PIVX_PARAMSDIR', '/data/pivx-params' if extra_opts.get('use_containers', False) else params_dir)
             fp.write(f'paramsdir={PIVX_PARAMSDIR}\n')
             if PIVX_RPC_USER != '':
