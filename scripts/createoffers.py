@@ -463,6 +463,7 @@ def main():
                                     print(f'Not bidding on offer {offer_id}, too many failed bids ({failed_sent_bids}).')
                                 continue
 
+                    validateamount: bool = False
                     max_coin_from_balance = bid_template.get('max_coin_from_balance', -1)
                     if max_coin_from_balance > 0:
                         wallet_from = read_json_api_wallet('wallets/{}'.format(coin_from_data['ticker']))
@@ -472,6 +473,7 @@ def main():
                         if total_balance_from + bid_amount > max_coin_from_balance:
                             if can_adjust_amount and max_coin_from_balance - total_balance_from > min_swap_amount:
                                 bid_amount = max_coin_from_balance - total_balance_from
+                                validateamount = True
                                 print(f'Reduced bid amount to {bid_amount}')
                             else:
                                 if args.debug:
@@ -493,8 +495,9 @@ def main():
                                 adjusted_bid_amount = adjusted_swap_amount_to / offer_rate
 
                                 if adjusted_bid_amount > min_swap_amount:
-                                    print(f'Reduced bid amount to {bid_amount}')
                                     bid_amount = adjusted_bid_amount
+                                    validateamount = True
+                                    print(f'Reduced bid amount to {bid_amount}')
                                     swap_amount_to = adjusted_bid_amount * offer_rate
 
                         if total_balance_to - swap_amount_to < min_coin_to_balance:
@@ -502,6 +505,8 @@ def main():
                                 print(f'Bid amount would exceed minimum coin to wallet total for offer {offer_id}')
                             continue
 
+                    if validateamount:
+                        bid_amount = read_json_api('validateamount', {'coin': coin_from_data['ticker'], 'amount': bid_amount, 'method': 'rounddown'})
                     bid_data = {
                         'offer_id': offer['offer_id'],
                         'amount_from': bid_amount}

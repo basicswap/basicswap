@@ -507,7 +507,7 @@ class Test(unittest.TestCase):
         possible_bids = get_possible_bids(rv_stdout)
         possible_bids = get_possible_bids(rv_stdout)
         assert (len(possible_bids) == 1)
-        assert (float(possible_bids[0]['amount_from'] < 20.0))
+        assert (float(possible_bids[0]['amount_from']) < 20.0)
 
         logging.info('Adding mock data to node1 db for tests')
         rows = []

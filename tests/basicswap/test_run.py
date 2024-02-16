@@ -185,6 +185,15 @@ class Test(BaseTest):
         rv = read_json_api(1800, 'wallets/part')
         assert ('locked_utxos' in rv)
 
+        rv = read_json_api(1800, 'validateamount', {'coin': 'part', 'amount': 0.000000015})
+        assert ('Mantissa too long' in rv['error'])
+
+        rv = read_json_api(1800, 'validateamount', {'coin': 'part', 'amount': 0.000000015, 'method': 'roundoff'})
+        assert (rv == '0.00000002')
+
+        rv = read_json_api(1800, 'validateamount', {'coin': 'part', 'amount': 0.000000015, 'method': 'rounddown'})
+        assert (rv == '0.00000001')
+
     def test_004_validateSwapType(self):
         logging.info('---------- Test validateSwapType')
 

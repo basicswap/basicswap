@@ -632,6 +632,33 @@ def js_automationstrategies(self, url_split, post_string: str, is_json: bool) ->
     return bytes(json.dumps(rv), 'UTF-8')
 
 
+def js_validateamount(self, url_split, post_string: str, is_json: bool) -> bytes:
+    swap_client = self.server.swap_client
+    swap_client.checkSystemStatus()
+
+    post_data = getFormData(post_string, is_json)
+
+    ticker_str = post_data['coin']
+    amount = post_data['amount']
+    round_method = post_data.get('method', 'none')
+
+    valid_round_methods = ('roundoff', 'rounddown', 'none')
+    if round_method not in valid_round_methods:
+        raise ValueError(f'Unknown rounding method, must be one of {valid_round_methods}')
+
+    coin_type = tickerToCoinId(ticker_str)
+    ci = swap_client.ci(coin_type)
+
+    r = 0
+    if round_method == 'roundoff':
+        r = 1
+    elif round_method == 'rounddown':
+        r = -1
+
+    output_amount = ci.format_amount(amount, conv_int=True, r=r)
+    return bytes(json.dumps(output_amount), 'UTF-8')
+
+
 def js_vacuumdb(self, url_split, post_string, is_json) -> bytes:
     swap_client = self.server.swap_client
     swap_client.checkSystemStatus()
@@ -747,6 +774,7 @@ pages = {
     'notifications': js_notifications,
     'identities': js_identities,
     'automationstrategies': js_automationstrategies,
+    'validateamount': js_validateamount,
     'vacuumdb': js_vacuumdb,
     'getcoinseed': js_getcoinseed,
     'setpassword': js_setpassword,

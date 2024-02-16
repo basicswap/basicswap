@@ -106,7 +106,7 @@ def float_to_str(f: float) -> str:
     return format(d1, 'f')
 
 
-def make_int(v, scale: int = 8, r: int = 0) -> int:  # r = 0, no rounding, fail, r > 0 round up, r < 0 floor
+def make_int(v, scale: int = 8, r: int = 0) -> int:  # r = 0, no rounding (fail), r > 0 round off, r < 0 floor
     if isinstance(v, float):
         v = float_to_str(v)
     elif isinstance(v, int):
@@ -132,7 +132,7 @@ def make_int(v, scale: int = 8, r: int = 0) -> int:  # r = 0, no rounding, fail,
                 if r == 0:
                     raise ValueError('Mantissa too long')
                 if r > 0:
-                    # Round up
+                    # Round off
                     if int(c) > 4:
                         rv += 1
                 break
