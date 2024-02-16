@@ -319,7 +319,7 @@ class XMRInterface(CoinInterface):
     def encodeSharedAddress(self, Kbv: bytes, Kbs: bytes) -> str:
         return xmr_util.encode_address(Kbv, Kbs)
 
-    def publishBLockTx(self, kbv: bytes, Kbs: bytes, output_amount: int, feerate: int, delay_for: int = 10, unlock_time: int = 0) -> bytes:
+    def publishBLockTx(self, kbv: bytes, Kbs: bytes, output_amount: int, feerate: int, unlock_time: int = 0) -> bytes:
         with self._mx_wallet:
             self.openWallet(self._wallet_filename)
             self.rpc_wallet('refresh')
@@ -333,18 +333,6 @@ class XMRInterface(CoinInterface):
             rv = self.rpc_wallet('transfer', params)
             self._log.info('publishBLockTx %s to address_b58 %s', rv['tx_hash'], shared_addr)
             tx_hash = bytes.fromhex(rv['tx_hash'])
-
-            if self._sc.debug:
-                i = 0
-                while not self._sc.delay_event.is_set():
-                    gt_params = {'out': True, 'pending': True, 'failed': True, 'pool': True, }
-                    rv = self.rpc_wallet('get_transfers', gt_params)
-                    self._log.debug('get_transfers {}'.format(dumpj(rv)))
-                    if 'pending' not in rv:
-                        break
-                    if i >= delay_for:
-                        break
-                    self._sc.delay_event.wait(1.0)
 
             return tx_hash
 
