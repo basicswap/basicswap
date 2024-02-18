@@ -1,3 +1,37 @@
+0.12.7
+==============
+
+- basicswap-prepare
+  - Sets --usetorproxy automatically when tor is enabled on existing installs for commands that access the network.
+    - Disable with --notorproxy
+  - Switch the LTC download URL to github (works over Tor)
+  - Sets `wshost` to match `htmlhost` by default
+- doc: Simplify docker tor install notes.
+- Basicswap will set monero-wallet-rpc proxy when Tor is enabled if the host ip setting (`rpchost`) for the monerod instance is not a private ip.
+  - Works for automatically selected daemons too.
+  - Override with a `use_tor` parameter in the Monero section of basicswap.json.
+- Basicswap sets monero-wallet-rpc `--trusted-daemon` if the host ip setting for the monerod instance is a private ip.
+  - Override with the `trusted_daemon` parameter in the Monero section of basicswap.json.
+    - Defaults to auto.
+      - Override in basicswap-prepare with `--trustremotenode`
+- Add settings in basicswap.json to set Monero rpc timeouts
+  - `rpctimeout`, `walletrpctimeout` and `walletrpctimeoutlong` in the Monero section of basicswap.json.
+  - `wallet_update_timeout` in basicswap.json to set how long the wallet ui page waits for an rpc response.
+- ui: Renamed unconfirmed balance to pending and include immature balance in pending.
+- Fixed LTC create utxo.
+- ui: Changed 'Subtract Fee' option to 'Sweep All' on XMR wallet page.
+- ui: Added An Estimate Fee button on XMR wallet page.
+- ui: Added a Force Refresh button on XMR wallet page.
+  - get_balance (if called) at the end of withdrawCoin is correct, subsequent get_balance calls return old balance for a while.
+
+
+0.12.6
+==============
+
+- ui: Display count of locked UTXOs on wallet page.
+  - Only shows if locked UTXOs is > 0
+
+
 0.12.5
 ==============
 

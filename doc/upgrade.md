@@ -12,8 +12,6 @@ Update only the code (prepend sudo to each docker command if necessary):
 
     basicswap]$ git pull
     cd docker
-    export COINDATA_PATH=[PATH_TO]
-    (Probably export COINDATA_PATH=/var/data/coinswaps)
     docker-compose build
     docker-compose up
 
@@ -21,7 +19,6 @@ If the dependencies have changed the container must be built with `--no-cache`:
 
     basicswap]$ git pull
     cd docker
-    export COINDATA_PATH=[PATH_TO]
     docker-compose build --no-cache
     docker-compose up
 
@@ -30,8 +27,7 @@ If the dependencies have changed the container must be built with `--no-cache`:
 
 After updating the code and rebuilding the container run:
 
-    basicswap/docker]$ export COINDATA_PATH=[PATH_TO]
-    $ docker-compose run --rm swapclient \
+    basicswap/docker]$ docker-compose run --rm swapclient \
         basicswap-prepare --datadir=/coindata --preparebinonly --withcoins=monero,bitcoin
 
 

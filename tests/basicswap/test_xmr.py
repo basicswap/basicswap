@@ -1152,20 +1152,9 @@ class Test(BaseTest):
         assert (float(js_1[Coins.XMR.name]['balance']) > 0.0)
 
         post_json = {
-            'value': 0.001,
-            'address': address_to,
-            'subfee': True,
-        }
-        rv = read_json_api(1801, 'wallets/xmr/withdraw', post_json)
-        assert ('Withdraw value must be close to total to use subfee' in rv['error'])
-        post_json['value'] = 1000000000.0
-        rv = read_json_api(1801, 'wallets/xmr/withdraw', post_json)
-        assert ('Withdraw value must be close to total to use subfee' in rv['error'])
-
-        post_json = {
             'value': 1.1,
             'address': address_to,
-            'subfee': False,
+            'sweepall': False,
         }
         rv = read_json_api(1801, 'wallets/xmr/withdraw', post_json)
         assert (len(rv['txid']) == 64)
@@ -1552,28 +1541,44 @@ class Test(BaseTest):
 
     def test_97_withdraw_all(self):
         logging.info('---------- Test XMR withdrawal all')
+
+        wait_for_balance(test_delay_event, 'http://127.0.0.1:1800/json/wallets/xmr', 'unconfirmed', 0.0)
+        wallets0 = read_json_api(TEST_HTTP_PORT + 0, 'wallets')
+        xmr_total = float(wallets0[Coins.XMR.name]['balance'])
+
+        if xmr_total < 10.0:
+            address_to = read_json_api(1800, 'wallets')[Coins.XMR.name]['deposit_address']
+            post_json = {
+                'value': 10.0,
+                'address': address_to,
+                'sweepall': False,
+            }
+            json_rv = read_json_api(TEST_HTTP_PORT + 1, 'wallets/xmr/withdraw', post_json)
+            wait_for_balance(test_delay_event, 'http://127.0.0.1:1800/json/wallets/xmr', 'balance', 10.0)
+
+        post_json = {
+            'address': read_json_api(1801, 'wallets')[Coins.XMR.name]['deposit_address'],
+            'sweepall': True,
+        }
+        json_rv = json.loads(post_json_req('http://127.0.0.1:{}/json/wallets/xmr/withdraw'.format(TEST_HTTP_PORT + 0), post_json))
+        assert (len(json_rv['txid']) == 64)
+
         try:
             logging.info('Disabling XMR mining')
             pause_event.clear()
 
-            js_0 = read_json_api(1800, 'wallets')
-            address_to = js_0[Coins.XMR.name]['deposit_address']
+            address_to = read_json_api(1800, 'wallets')[Coins.XMR.name]['deposit_address']
 
             wallets1 = read_json_api(TEST_HTTP_PORT + 1, 'wallets')
             xmr_total = float(wallets1[Coins.XMR.name]['balance'])
             assert (xmr_total > 10)
 
             post_json = {
-                'value': 10,
                 'address': address_to,
-                'subfee': True,
+                'sweepall': True,
             }
             json_rv = json.loads(post_json_req('http://127.0.0.1:{}/json/wallets/xmr/withdraw'.format(TEST_HTTP_PORT + 1), post_json))
-            assert (json_rv['error'] == 'Withdraw value must be close to total to use subfee/sweep_all.')
-
-            post_json['value'] = xmr_total
-            json_rv = json.loads(post_json_req('http://127.0.0.1:{}/json/wallets/xmr/withdraw'.format(TEST_HTTP_PORT + 1), post_json))
-            assert (len(json_rv['txid']) == 64)
+            assert ('Balance must be fully confirmed to use sweep all' in json_rv['error'])
         finally:
             logging.info('Restoring XMR mining')
             pause_event.set()

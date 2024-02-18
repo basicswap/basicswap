@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019-2022 tecnovert
+# Copyright (c) 2019-2024 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -91,7 +91,6 @@ class Test(unittest.TestCase):
                         prepareSystem.main()
 
             self.assertEqual(cm.exception.code, 1)
-            logger.info('fake_stderr.getvalue() %s', fake_stderr.getvalue())
             self.assertTrue('exists, exiting' in fake_stderr.getvalue())
 
             logger.info('Test addcoin new')
@@ -117,6 +116,17 @@ class Test(unittest.TestCase):
             with open(config_path) as fs:
                 settings = json.load(fs)
                 self.assertTrue(settings['chainclients']['namecoin']['connection_type'] == 'rpc')
+
+            logging.info('notorproxy')
+            testargs = ['basicswap-prepare', '-datadir=' + test_path_plain, '-addcoin=firo', '--usetorproxy', '--notorproxy']
+            with patch('sys.stderr', new=StringIO()) as fake_stderr:
+                with patch.object(sys, 'argv', testargs):
+                    with self.assertRaises(SystemExit) as cm:
+                        prepareSystem.main()
+
+            self.assertEqual(cm.exception.code, 1)
+            self.assertTrue('--usetorproxy and --notorproxy together' in fake_stderr.getvalue())
+
         finally:
             del prepareSystem
 

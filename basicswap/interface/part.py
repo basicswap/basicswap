@@ -664,7 +664,7 @@ class PARTInterfaceBlind(PARTInterface):
     def getSpendableBalance(self) -> int:
         return self.make_int(self.rpc_wallet('getbalances')['mine']['blind_trusted'])
 
-    def publishBLockTx(self, vkbv: bytes, Kbs: bytes, output_amount: int, feerate: int, delay_for: int = 10, unlock_time: int = 0) -> bytes:
+    def publishBLockTx(self, vkbv: bytes, Kbs: bytes, output_amount: int, feerate: int, unlock_time: int = 0) -> bytes:
         Kbv = self.getPubkey(vkbv)
         sx_addr = self.formatStealthAddress(Kbv, Kbs)
         self._log.debug('sx_addr: {}'.format(sx_addr))
@@ -802,7 +802,7 @@ class PARTInterfaceAnon(PARTInterface):
     def coin_name(self) -> str:
         return super().coin_name() + ' Anon'
 
-    def publishBLockTx(self, kbv: bytes, Kbs: bytes, output_amount: int, feerate: int, delay_for: int = 10, unlock_time: int = 0) -> bytes:
+    def publishBLockTx(self, kbv: bytes, Kbs: bytes, output_amount: int, feerate: int, unlock_time: int = 0) -> bytes:
         Kbv = self.getPubkey(kbv)
         sx_addr = self.formatStealthAddress(Kbv, Kbs)
 

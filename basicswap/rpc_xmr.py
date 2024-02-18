@@ -2,6 +2,7 @@
 
 import os
 import json
+import socks
 import time
 import urllib
 import hashlib
@@ -10,7 +11,30 @@ from xmlrpc.client import (
     Transport,
     SafeTransport,
 )
+from sockshandler import SocksiPyConnection
 from .util import jsonDecimal
+
+
+class SocksTransport(Transport):
+
+    def set_proxy(self, proxy_host, proxy_port):
+        self.proxy_host = proxy_host
+        self.proxy_port = proxy_port
+
+        self.proxy_type = socks.PROXY_TYPE_SOCKS5
+        self.proxy_rdns = True
+        self.proxy_username = None
+        self.proxy_password = None
+
+    def make_connection(self, host):
+        # return an existing connection if possible.  This allows
+        # HTTP/1.1 keep-alive.
+        if self._connection and host == self._connection[0]:
+            return self._connection[1]
+        # create a HTTP connection object from a host descriptor
+        chost, self._extra_headers, x509 = self.get_host_info(host)
+        self._connection = host, SocksiPyConnection(self.proxy_type, self.proxy_host, self.proxy_port, self.proxy_rdns, self.proxy_username, self.proxy_password, chost)
+        return self._connection[1]
 
 
 class JsonrpcDigest():
@@ -148,7 +172,7 @@ class JsonrpcDigest():
             raise
 
 
-def callrpc_xmr(rpc_port, method, params=[], rpc_host='127.0.0.1', path='json_rpc', auth=None, timeout=120):
+def callrpc_xmr(rpc_port, method, params=[], rpc_host='127.0.0.1', path='json_rpc', auth=None, timeout=120, transport=None, tag=''):
     # auth is a tuple: (username, password)
     try:
         if rpc_host.count('://') > 0:
@@ -156,7 +180,7 @@ def callrpc_xmr(rpc_port, method, params=[], rpc_host='127.0.0.1', path='json_rp
         else:
             url = 'http://{}:{}/{}'.format(rpc_host, rpc_port, path)
 
-        x = JsonrpcDigest(url)
+        x = JsonrpcDigest(url, transport=transport)
         request_body = {
             'method': method,
             'params': params,
@@ -170,22 +194,22 @@ def callrpc_xmr(rpc_port, method, params=[], rpc_host='127.0.0.1', path='json_rp
         x.close()
         r = json.loads(v.decode('utf-8'))
     except Exception as ex:
-        raise ValueError('RPC Server Error: {}'.format(str(ex)))
+        raise ValueError('{}RPC Server Error: {}'.format(tag, str(ex)))
 
     if 'error' in r and r['error'] is not None:
-        raise ValueError('RPC error ' + str(r['error']))
+        raise ValueError(tag + 'RPC error ' + str(r['error']))
 
     return r['result']
 
 
-def callrpc_xmr2(rpc_port: int, method: str, params=None, auth=None, rpc_host='127.0.0.1', timeout=120):
+def callrpc_xmr2(rpc_port: int, method: str, params=None, auth=None, rpc_host='127.0.0.1', timeout=120, transport=None, tag=''):
     try:
         if rpc_host.count('://') > 0:
             url = '{}:{}/{}'.format(rpc_host, rpc_port, method)
         else:
             url = 'http://{}:{}/{}'.format(rpc_host, rpc_port, method)
 
-        x = JsonrpcDigest(url)
+        x = JsonrpcDigest(url, transport=transport)
         if auth:
             v = x.json_request(params, username=auth[0], password=auth[1], timeout=timeout)
         else:
@@ -193,28 +217,42 @@ def callrpc_xmr2(rpc_port: int, method: str, params=None, auth=None, rpc_host='1
         x.close()
         r = json.loads(v.decode('utf-8'))
     except Exception as ex:
-        raise ValueError('RPC Server Error: {}'.format(str(ex)))
+        raise ValueError('{}RPC Server Error: {}'.format(tag, str(ex)))
 
     return r
 
 
-def make_xmr_rpc2_func(port, auth, host='127.0.0.1'):
+def make_xmr_rpc2_func(port, auth, host='127.0.0.1', proxy_host=None, proxy_port=None, default_timeout=120, tag=''):
     port = port
     auth = auth
     host = host
+    transport = None
+    default_timeout = default_timeout
+    tag = tag
 
-    def rpc_func(method, params=None, wallet=None, timeout=120):
-        nonlocal port, auth, host
-        return callrpc_xmr2(port, method, params, auth=auth, rpc_host=host, timeout=timeout)
+    if proxy_host:
+        transport = SocksTransport()
+        transport.set_proxy(proxy_host, proxy_port)
+
+    def rpc_func(method, params=None, wallet=None, timeout=default_timeout):
+        nonlocal port, auth, host, transport, tag
+        return callrpc_xmr2(port, method, params, auth=auth, rpc_host=host, timeout=timeout, transport=transport, tag=tag)
     return rpc_func
 
 
-def make_xmr_rpc_func(port, auth, host='127.0.0.1'):
+def make_xmr_rpc_func(port, auth, host='127.0.0.1', proxy_host=None, proxy_port=None, default_timeout=120, tag=''):
     port = port
     auth = auth
     host = host
+    transport = None
+    default_timeout = default_timeout
+    tag = tag
 
-    def rpc_func(method, params=None, wallet=None, timeout=120):
-        nonlocal port, auth, host
-        return callrpc_xmr(port, method, params, rpc_host=host, auth=auth, timeout=timeout)
+    if proxy_host:
+        transport = SocksTransport()
+        transport.set_proxy(proxy_host, proxy_port)
+
+    def rpc_func(method, params=None, wallet=None, timeout=default_timeout):
+        nonlocal port, auth, host, transport, tag
+        return callrpc_xmr(port, method, params, rpc_host=host, auth=auth, timeout=timeout, transport=transport, tag=tag)
     return rpc_func

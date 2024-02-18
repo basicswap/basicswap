@@ -173,7 +173,7 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
         try:
             swap_client.validateSwapType(coin_from, coin_to, swap_type)
         except Exception as e:
-            errors.append(f'Invalid Swap type {e}')
+            errors.append(f'{e}')
 
     if have_data_entry(form_data, 'step1'):
         if len(errors) == 0 and have_data_entry(form_data, 'continue'):
@@ -250,7 +250,9 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
                     page_data['to_fee_override'] = ci_to.format_amount(ci_to.make_int(to_fee_override, r=1))
                     parsed_data['to_fee_override'] = page_data['to_fee_override']
     except Exception as e:
-        print('Error setting fee', str(e))  # Expected if missing fields
+        # Error is expected if missing fields
+        if swap_client.debug is True:
+            swap_client.log.warning(f'parseOfferFormData failed to set fee: Error {e}')
 
     return parsed_data, errors
 

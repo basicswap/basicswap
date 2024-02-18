@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019-2023 tecnovert
+# Copyright (c) 2019-2024 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -110,7 +110,11 @@ elif USE_PLATFORM == 'Windows':
     BIN_ARCH = 'win64'
     FILE_EXT = 'zip'
 else:
-    BIN_ARCH = 'x86_64-linux-gnu'
+    machine: str = platform.machine()
+    if 'arm' in machine:
+        BIN_ARCH = 'arm-linux-gnueabihf'
+    else:
+        BIN_ARCH = machine + '-linux-gnu'
     FILE_EXT = 'tar.gz'
 
 # Allow manually overriding the arch tag
@@ -196,7 +200,21 @@ BITCOIN_FASTSYNC_FILE = os.getenv('BITCOIN_FASTSYNC_FILE', 'utxo-snapshot-bitcoi
 # Encrypt new wallets with this password, must match the Particl wallet password when adding coins
 WALLET_ENCRYPTION_PWD = os.getenv('WALLET_ENCRYPTION_PWD', '')
 
-use_tor_proxy = False
+use_tor_proxy: bool = False
+
+monerod_proxy_config = [
+    f'proxy={TOR_PROXY_HOST}:{TOR_PROXY_PORT}',
+    'proxy-allow-dns-leaks=0',
+    'no-igd=1',                 # Disable UPnP port mapping
+    'hide-my-port=1',           # Don't share the p2p port
+    'p2p-bind-ip=127.0.0.1',    # Don't broadcast ip
+    'in-peers=0',               # Changes "error" in log to "incoming connections disabled"
+]
+
+monero_wallet_rpc_proxy_config = [
+    'daemon-ssl-allow-any-cert=1',
+]
+
 
 default_socket = socket.socket
 default_socket_timeout = socket.getdefaulttimeout()
@@ -323,7 +341,7 @@ def urlretrieve(url, filename, reporthook=None, data=None, resume_from=0):
     return result
 
 
-def setConnectionParameters(timeout=5):
+def setConnectionParameters(timeout: int = 5, allow_set_tor: bool = True):
     opener = urllib.request.build_opener()
     opener.addheaders = [('User-agent', 'Mozilla/5.0')]
     urllib.request.install_opener(opener)
@@ -526,6 +544,8 @@ def extractCore(coin, version_data, settings, bin_dir, release_path, extra_opts=
 
                     if coin == 'pivx':
                         filename = '{}-{}/bin/{}'.format(dir_name, version, b)
+                    elif coin == 'particl' and '_nousb-' in release_path:
+                        filename = '{}-{}_nousb/bin/{}'.format(dir_name, version + version_tag, b)
                     else:
                         filename = '{}-{}/bin/{}'.format(dir_name, version + version_tag, b)
 
@@ -564,7 +584,14 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
         release_filename = '{}-{}-{}.{}'.format(coin, version, BIN_ARCH, use_file_ext)
         if os_name == 'osx':
             os_name = 'mac'
-        release_url = 'https://downloads.getmonero.org/cli/monero-{}-x64-v{}.{}'.format(os_name, version, use_file_ext)
+
+        architecture = 'x64'
+        if 'aarch64' in BIN_ARCH:
+            architecture = 'armv8'
+        elif 'arm' in BIN_ARCH:
+            architecture = 'armv7'
+
+        release_url = 'https://downloads.getmonero.org/cli/monero-{}-{}-v{}.{}'.format(os_name, architecture, version, use_file_ext)
         release_path = os.path.join(bin_dir, release_filename)
         if not os.path.exists(release_path):
             downloadFile(release_url, release_path)
@@ -591,8 +618,6 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
                 release_filename = '{}-{}_{}-{}.{}'.format(coin, version + version_tag, filename_extra, arch_name, FILE_EXT)
             else:
                 release_filename = '{}-{}-{}_{}.{}'.format(coin, version + version_tag, arch_name, filename_extra, FILE_EXT)
-
-        release_filename = '{}-{}-{}.{}'.format(coin, version + version_tag, arch_name, FILE_EXT)
         if coin == 'particl':
             release_url = 'https://github.com/particl/particl-core/releases/download/v{}/{}'.format(version + version_tag, release_filename)
             assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, version)
@@ -601,7 +626,7 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
             else:
                 assert_url = 'https://raw.githubusercontent.com/particl/gitian.sigs/master/%s-%s/%s/%s' % (version + version_tag, os_dir_name, signing_key_name, assert_filename)
         elif coin == 'litecoin':
-            release_url = 'https://download.litecoin.org/litecoin-{}/{}/{}'.format(version, os_name, release_filename)
+            release_url = 'https://github.com/litecoin-project/litecoin/releases/download/v{}/{}'.format(version + version_tag, release_filename)
             assert_filename = '{}-core-{}-{}-build.assert'.format(coin, os_name, '.'.join(version.split('.')[:2]))
             use_signing_key_name = (signing_key_name + '/' + signing_key_name) if os_name == 'win' else signing_key_name
             assert_url = 'https://raw.githubusercontent.com/litecoin-project/gitian.sigs.ltc/master/%s-%s/%s/%s' % (version, os_dir_name, use_signing_key_name, assert_filename)
@@ -803,9 +828,8 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
             fp.write('prune-blockchain=1\n')
 
             if tor_control_password is not None:
-                fp.write(f'proxy={TOR_PROXY_HOST}:{TOR_PROXY_PORT}\n')
-                fp.write('proxy-allow-dns-leaks=0\n')
-                fp.write('no-igd=1\n')
+                for opt_line in monerod_proxy_config:
+                    fp.write(opt_line + '\n')
 
             if XMR_RPC_USER != '':
                 fp.write(f'rpc-login={XMR_RPC_USER}:{XMR_RPC_PWD}\n')
@@ -822,7 +846,7 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
             if extra_opts.get('use_containers', False) is True:
                 fp.write('daemon-address={}:{}\n'.format(core_settings['rpchost'], core_settings['rpcport']))
                 config_datadir = '/data'
-            fp.write('untrusted-daemon=1\n')
+
             fp.write('no-dns=1\n')
             fp.write('rpc-bind-port={}\n'.format(core_settings['walletrpcport']))
             fp.write('rpc-bind-ip={}\n'.format(COINS_RPCBIND_IP))
@@ -836,7 +860,8 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
 
             if tor_control_password is not None:
                 if not core_settings['manage_daemon']:
-                    fp.write(f'proxy={TOR_PROXY_HOST}:{TOR_PROXY_PORT}\n')
+                    for opt_line in monero_wallet_rpc_proxy_config:
+                        fp.write(opt_line + '\n')
         return
 
     core_conf_path = os.path.join(data_dir, coin + '.conf')
@@ -895,7 +920,6 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
         elif coin == 'pivx':
             params_dir = os.path.join(data_dir, 'pivx-params')
             downloadPIVXParams(params_dir)
-            fp.write('prune=4000\n')
             PIVX_PARAMSDIR = os.getenv('PIVX_PARAMSDIR', '/data/pivx-params' if extra_opts.get('use_containers', False) else params_dir)
             fp.write(f'paramsdir={PIVX_PARAMSDIR}\n')
             if PIVX_RPC_USER != '':
@@ -962,7 +986,7 @@ def addTorSettings(settings, tor_control_password):
     settings['tor_control_port'] = TOR_CONTROL_PORT
 
 
-def modify_tor_config(settings, coin, tor_control_password=None, enable=False):
+def modify_tor_config(settings, coin, tor_control_password=None, enable=False, extra_opts={}):
     coin_settings = settings['chainclients'][coin]
     data_dir = coin_settings['datadir']
 
@@ -979,30 +1003,29 @@ def modify_tor_config(settings, coin, tor_control_password=None, enable=False):
         shutil.copyfile(core_conf_path, core_conf_path + '.last')
         shutil.copyfile(wallet_conf_path, wallet_conf_path + '.last')
 
-        daemon_tor_settings = ('proxy=', 'proxy-allow-dns-leaks=', 'no-igd=')
         with open(core_conf_path, 'w') as fp:
             with open(core_conf_path + '.last') as fp_in:
                 # Disable tor first
                 for line in fp_in:
-                    skip_line = False
-                    for setting in daemon_tor_settings:
+                    skip_line: bool = False
+                    for opt_line in monerod_proxy_config:
+                        setting: str = opt_line[0: opt_line.find('=') + 1]
                         if line.startswith(setting):
                             skip_line = True
                             break
                     if not skip_line:
                         fp.write(line)
             if enable:
-                fp.write(f'proxy={TOR_PROXY_HOST}:{TOR_PROXY_PORT}\n')
-                fp.write('proxy-allow-dns-leaks=0\n')
-                fp.write('no-igd=1\n')
+                for opt_line in monerod_proxy_config:
+                    fp.write(opt_line + '\n')
 
-        wallet_tor_settings = ('proxy=',)
         with open(wallet_conf_path, 'w') as fp:
             with open(wallet_conf_path + '.last') as fp_in:
                 # Disable tor first
                 for line in fp_in:
                     skip_line = False
-                    for setting in wallet_tor_settings:
+                    for opt_line in monero_wallet_rpc_proxy_config + ['proxy=',]:
+                        setting: str = opt_line[0: opt_line.find('=') + 1]
                         if line.startswith(setting):
                             skip_line = True
                             break
@@ -1010,7 +1033,10 @@ def modify_tor_config(settings, coin, tor_control_password=None, enable=False):
                         fp.write(line)
             if enable:
                 if not coin_settings['manage_daemon']:
-                    fp.write(f'proxy={TOR_PROXY_HOST}:{TOR_PROXY_PORT}\n')
+                    for opt_line in monero_wallet_rpc_proxy_config:
+                        fp.write(opt_line + '\n')
+
+            coin_settings['trusted_daemon'] = extra_opts.get('trust_remote_node', 'auto')
         return
 
     config_path = os.path.join(data_dir, coin + '.conf')
@@ -1078,10 +1104,12 @@ def printHelp():
     print('--usecontainers          Expect each core to run in a unique container.')
     print('--portoffset=n           Raise all ports by n.')
     print('--htmlhost=              Interface to host html server on, default:127.0.0.1.')
-    print('--wshost=                Interface to host websocket server on, disable by setting to "none", default:127.0.0.1.')
+    print('--wshost=                Interface to host websocket server on, disable by setting to "none", default\'s to --htmlhost.')
     print('--xmrrestoreheight=n     Block height to restore Monero wallet from, default:{}.'.format(DEFAULT_XMR_RESTORE_HEIGHT))
+    print('--trustremotenode        Set trusted-daemon for XMR, defaults to auto: true when daemon rpchost value is a private ip address else false')
     print('--noextractover          Prevent extracting cores if files exist.  Speeds up tests')
     print('--usetorproxy            Use TOR proxy during setup.  Note that some download links may be inaccessible over TOR.')
+    print('--notorproxy             Force usetorproxy off, usetorproxy is automatically set when tor is enabled')
     print('--enabletor              Setup Basicswap instance to use TOR.')
     print('--disabletor             Setup Basicswap instance to not use TOR.')
     print('--usebtcfastsync         Initialise the BTC chain with a snapshot from btcpayserver FastSync.\n'
@@ -1113,12 +1141,12 @@ def test_particl_encryption(data_dir, settings, chain, use_tor_proxy):
     swap_client = None
     daemons = []
     daemon_args = ['-noconnect', '-nodnsseed', '-nofindpeers', '-nostaking']
-    if not use_tor_proxy:
-        # Cannot set -bind or -whitebind together with -listen=0
-        daemon_args.append('-nolisten')
     with open(os.path.join(data_dir, 'basicswap.log'), 'a') as fp:
         try:
-            swap_client = BasicSwap(fp, data_dir, settings, chain)
+            swap_client = BasicSwap(fp, data_dir, settings, chain, transient_instance=True)
+            if not swap_client.use_tor_proxy:
+                # Cannot set -bind or -whitebind together with -listen=0
+                daemon_args.append('-nolisten')
             c = Coins.PART
             coin_name = 'particl'
             coin_settings = settings['chainclients'][coin_name]
@@ -1153,14 +1181,15 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
     swap_client = None
     daemons = []
     daemon_args = ['-noconnect', '-nodnsseed']
-    if not use_tor_proxy:
-        # Cannot set -bind or -whitebind together with -listen=0
-        daemon_args.append('-nolisten')
+
+    coins_failed_to_initialise = []
 
     with open(os.path.join(data_dir, 'basicswap.log'), 'a') as fp:
         try:
-            swap_client = BasicSwap(fp, data_dir, settings, chain)
-
+            swap_client = BasicSwap(fp, data_dir, settings, chain, transient_instance=True)
+            if not swap_client.use_tor_proxy:
+                # Cannot set -bind or -whitebind together with -listen=0
+                daemon_args.append('-nolisten')
             coins_to_create_wallets_for = (Coins.PART, Coins.BTC, Coins.LTC, Coins.DASH)
             # Always start Particl, it must be running to initialise a wallet in addcoin mode
             # Particl must be loaded first as subsequent coins are initialised from the Particl mnemonic
@@ -1221,7 +1250,10 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
                 if c in (Coins.PART, ):
                     continue
                 swap_client.waitForDaemonRPC(c)
-                swap_client.initialiseWallet(c)
+                try:
+                    swap_client.initialiseWallet(c, raise_errors=True)
+                except Exception as e:
+                    coins_failed_to_initialise.append((c, e))
                 if WALLET_ENCRYPTION_PWD != '' and c not in coins_to_create_wallets_for:
                     try:
                         swap_client.ci(c).changeWalletPassword('', WALLET_ENCRYPTION_PWD)
@@ -1234,6 +1266,14 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
                 del swap_client
             for d in daemons:
                 finalise_daemon(d)
+
+    print('')
+    for pair in coins_failed_to_initialise:
+        c, _ = pair
+        if c in (Coins.PIVX, ):
+            print(f'NOTE - Unable to initialise wallet for {getCoinName(c)}.  To complete setup click \'Reseed Wallet\' from the ui page once chain is synced.')
+        else:
+            print(f'WARNING - Failed to initialise wallet for {getCoinName(c)}')
 
     if particl_wallet_mnemonic is not None:
         if particl_wallet_mnemonic:
@@ -1301,7 +1341,6 @@ def main():
     disable_coin = ''
     coins_changed = False
     htmlhost = '127.0.0.1'
-    wshost = '127.0.0.1'
     xmr_restore_height = DEFAULT_XMR_RESTORE_HEIGHT
     prepare_bin_only = False
     no_cores = False
@@ -1354,6 +1393,9 @@ def main():
         if name == 'usetorproxy':
             use_tor_proxy = True
             continue
+        if name == 'notorproxy':
+            extra_opts['no_tor_proxy'] = True
+            continue
         if name == 'enabletor':
             enable_tor = True
             continue
@@ -1365,6 +1407,9 @@ def main():
             continue
         if name == 'skipbtcfastsyncchecks':
             extra_opts['check_btc_fastsync'] = False
+            continue
+        if name == 'trustremotenode':
+            extra_opts['trust_remote_node'] = True
             continue
         if name == 'initwalletsonly':
             initwalletsonly = True
@@ -1407,7 +1452,7 @@ def main():
                 htmlhost = s[1].strip('"')
                 continue
             if name == 'wshost':
-                wshost = s[1].strip('"')
+                extra_opts['wshost'] = s[1].strip('"')
                 continue
             if name == 'xmrrestoreheight':
                 xmr_restore_height = int(s[1])
@@ -1415,16 +1460,11 @@ def main():
             if name == 'keysdirpath':
                 extra_opts['keysdirpath'] = os.path.expanduser(s[1].strip('"'))
                 continue
+            if name == 'trustremotenode':
+                extra_opts['trust_remote_node'] = toBool(s[1])
+                continue
 
         exitWithError('Unknown argument {}'.format(v))
-
-    setConnectionParameters()
-
-    if use_tor_proxy and TEST_TOR_PROXY:
-        testTorConnection()
-
-    if use_tor_proxy and TEST_ONION_LINK:
-        testOnionLink()
 
     if data_dir is None:
         data_dir = os.path.join(os.path.expanduser(cfg.BASICSWAP_DATADIR))
@@ -1444,6 +1484,31 @@ def main():
     if not os.path.exists(data_dir):
         os.makedirs(data_dir)
     config_path = os.path.join(data_dir, cfg.CONFIG_FILENAME)
+
+    if use_tor_proxy and extra_opts.get('no_tor_proxy', False):
+        exitWithError('Can\'t use --usetorproxy and --notorproxy together')
+
+    # Automatically enable tor for certain commands if it's set in basicswap config
+    if not (initwalletsonly or enable_tor or disable_tor or disable_coin) and \
+       not use_tor_proxy and os.path.exists(config_path):
+        settings = load_config(config_path)
+        settings_use_tor = settings.get('use_tor', False)
+        if settings_use_tor:
+            logger.info('use_tor is set in the config')
+            if extra_opts.get('no_tor_proxy', False):
+                use_tor_proxy = False
+                logger.warning('Not automatically setting --usetorproxy as --notorproxy is set')
+            else:
+                use_tor_proxy = True
+                logger.info('Automatically setting --usetorproxy')
+
+    setConnectionParameters(allow_set_tor=False)
+
+    if use_tor_proxy and TEST_TOR_PROXY:
+        testTorConnection()
+
+    if use_tor_proxy and TEST_ONION_LINK:
+        testOnionLink()
 
     should_download_btc_fastsync = False
     if extra_opts.get('use_btc_fastsync', False) is True:
@@ -1543,6 +1608,7 @@ def main():
             'zmqport': BASE_XMR_ZMQ_PORT + port_offset,
             'walletrpcport': BASE_XMR_WALLET_PORT + port_offset,
             'rpchost': XMR_RPC_HOST,
+            'trusted_daemon': extra_opts.get('trust_remote_node', 'auto'),
             'walletrpchost': XMR_WALLET_RPC_HOST,
             'walletrpcuser': XMR_WALLET_RPC_USER,
             'walletrpcpassword': XMR_WALLET_RPC_PWD,
@@ -1551,6 +1617,9 @@ def main():
             'bindir': os.path.join(bin_dir, 'monero'),
             'restore_height': xmr_restore_height,
             'blocks_confirmed': 3,
+            'rpctimeout': 60,
+            'walletrpctimeout': 120,
+            'walletrpctimeoutlong': 600,
         },
         'pivx': {
             'connection_type': 'rpc' if 'pivx' in with_coins else 'none',
@@ -1669,7 +1738,7 @@ def main():
 
         addTorSettings(settings, tor_control_password)
         for coin in settings['chainclients']:
-            modify_tor_config(settings, coin, tor_control_password, enable=True)
+            modify_tor_config(settings, coin, tor_control_password, enable=True, extra_opts=extra_opts)
 
         with open(config_path, 'w') as fp:
             json.dump(settings, fp, indent=4)
@@ -1682,7 +1751,7 @@ def main():
         settings = load_config(config_path)
         settings['use_tor'] = False
         for coin in settings['chainclients']:
-            modify_tor_config(settings, coin, tor_control_password=None, enable=False)
+            modify_tor_config(settings, coin, tor_control_password=None, enable=False, extra_opts=extra_opts)
 
         with open(config_path, 'w') as fp:
             json.dump(settings, fp, indent=4)
@@ -1779,9 +1848,11 @@ def main():
             'max_delay_event': 50,  # Max delay in seconds before reacting to an event
             'check_progress_seconds': 60,
             'check_watched_seconds': 60,
-            'check_expired_seconds': 60
+            'check_expired_seconds': 60,
+            'wallet_update_timeout': 10,  # Seconds to wait for wallet page update
         }
 
+        wshost: str = extra_opts.get('wshost', htmlhost)
         if wshost != 'none':
             settings['wshost'] = wshost
             settings['wsport'] = UI_WS_PORT + port_offset

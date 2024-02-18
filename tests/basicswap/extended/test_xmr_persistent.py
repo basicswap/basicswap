@@ -38,6 +38,7 @@ from basicswap.rpc import (
 from tests.basicswap.common import (
     BASE_RPC_PORT,
     BTC_BASE_RPC_PORT,
+    LTC_BASE_RPC_PORT,
 )
 from tests.basicswap.util import (
     make_boolean,
@@ -59,6 +60,7 @@ UI_PORT = 12700 + PORT_OFS
 
 PARTICL_RPC_PORT_BASE = int(os.getenv('PARTICL_RPC_PORT_BASE', BASE_RPC_PORT))
 BITCOIN_RPC_PORT_BASE = int(os.getenv('BITCOIN_RPC_PORT_BASE', BTC_BASE_RPC_PORT))
+LITECOIN_RPC_PORT_BASE = int(os.getenv('LITECOIN_RPC_PORT_BASE', LTC_BASE_RPC_PORT))
 XMR_BASE_RPC_PORT = int(os.getenv('XMR_BASE_RPC_PORT', XMR_BASE_RPC_PORT))
 TEST_COINS_LIST = os.getenv('TEST_COINS_LIST', 'bitcoin,monero')
 
@@ -78,6 +80,11 @@ def callpartrpc(node_id, method, params=[], wallet=None, base_rpc_port=PARTICL_R
 
 def callbtcrpc(node_id, method, params=[], wallet=None, base_rpc_port=BITCOIN_RPC_PORT_BASE + PORT_OFS):
     auth = 'test_btc_{0}:test_btc_pwd_{0}'.format(node_id)
+    return callrpc(base_rpc_port + node_id, auth, method, params, wallet)
+
+
+def callltcrpc(node_id, method, params=[], wallet=None, base_rpc_port=LITECOIN_RPC_PORT_BASE + PORT_OFS):
+    auth = 'test_ltc_{0}:test_ltc_pwd_{0}'.format(node_id)
     return callrpc(base_rpc_port + node_id, auth, method, params, wallet)
 
 
@@ -167,11 +174,28 @@ class Test(unittest.TestCase):
         logging.info('XMR blocks: %d', callrpc_xmr(XMR_BASE_RPC_PORT + 1, 'get_block_count', auth=xmr_auth)['count'])
 
         self.btc_addr = callbtcrpc(0, 'getnewaddress', ['mining_addr', 'bech32'])
-        num_blocks = 500  # Mine enough to activate segwit
-        if callbtcrpc(0, 'getblockchaininfo')['blocks'] < num_blocks:
+        num_blocks: int = 500  # Mine enough to activate segwit
+        if callbtcrpc(0, 'getblockcount') < num_blocks:
             logging.info('Mining %d Bitcoin blocks to %s', num_blocks, self.btc_addr)
             callbtcrpc(0, 'generatetoaddress', [num_blocks, self.btc_addr])
-        logging.info('BTC blocks: %d', callbtcrpc(0, 'getblockchaininfo')['blocks'])
+        logging.info('BTC blocks: %d', callbtcrpc(0, 'getblockcount'))
+
+        if 'litecoin' in TEST_COINS_LIST:
+            self.ltc_addr = callltcrpc(0, 'getnewaddress', ['mining_addr'], wallet='wallet.dat')
+            num_blocks: int = 431
+            have_blocks: int = callltcrpc(0, 'getblockcount')
+            if have_blocks < 500:
+                logging.info('Mining %d Litecoin blocks to %s', num_blocks, self.ltc_addr)
+                callltcrpc(0, 'generatetoaddress', [num_blocks - have_blocks, self.ltc_addr], wallet='wallet.dat')
+
+                # https://github.com/litecoin-project/litecoin/issues/807
+                # Block 432 is when MWEB activates. It requires a peg-in. You'll need to generate an mweb address and send some coins to it. Then it will allow you to mine the next block.
+                mweb_addr = callltcrpc(0, 'getnewaddress', ['mweb_addr', 'mweb'], wallet='mweb')
+                callltcrpc(0, 'sendtoaddress', [mweb_addr, 1.0], wallet='wallet.dat')
+                num_blocks = 69
+
+                have_blocks: int = callltcrpc(0, 'getblockcount')
+                callltcrpc(0, 'generatetoaddress', [500 - have_blocks, self.ltc_addr], wallet='wallet.dat')
 
         # Lower output split threshold for more stakeable outputs
         for i in range(NUM_NODES):

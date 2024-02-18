@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2021-2023 tecnovert
+# Copyright (c) 2021-2024 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -27,7 +27,8 @@ from tests.basicswap.common import (
     TEST_HTTP_PORT,
     LTC_BASE_RPC_PORT,
 )
-from .test_btc_xmr import BasicSwapTest, test_delay_event, callnoderpc
+from .test_btc_xmr import BasicSwapTest, test_delay_event
+from .test_xmr import pause_event
 
 logger = logging.getLogger()
 
@@ -37,13 +38,6 @@ class TestLTC(BasicSwapTest):
     test_coin_from = Coins.LTC
     start_ltc_nodes = True
     base_rpc_port = LTC_BASE_RPC_PORT
-
-    @classmethod
-    def prepareExtraCoins(cls):
-        logging.info('Mining {} chain to height 1352 to activate CVS (BIP66)'.format(cls.test_coin_from.name))
-        chain_height = callnoderpc(0, 'getblockcount', base_rpc_port=LTC_BASE_RPC_PORT)
-        num_blocks: int = 1352 - chain_height
-        callnoderpc(0, 'generatetoaddress', [num_blocks, cls.ltc_addr], base_rpc_port=LTC_BASE_RPC_PORT)
 
     def mineBlock(self, num_blocks=1):
         self.callnoderpc('generatetoaddress', [num_blocks, self.ltc_addr])
@@ -137,7 +131,24 @@ class TestLTC(BasicSwapTest):
         addr_info1 = ci1.rpc_wallet('getaddressinfo', [mweb_addr_1,])
         assert (addr_info1['ismweb'] is True)
 
-        txid = ci0.rpc_wallet('sendtoaddress', [mweb_addr_0, 10.0])
+        trusted_before = ci0.rpc_wallet('getbalances')['mine']['trusted']
+        ci0.rpc_wallet('sendtoaddress', [mweb_addr_0, 10.0])
+        assert (trusted_before - float(ci0.rpc_wallet('getbalances')['mine']['trusted']) < 0.1)
+
+        try:
+            pause_event.clear()  # Stop mining
+            ci0.rpc_wallet('sendtoaddress', [mweb_addr_1, 10.0])
+
+            found_unconfirmed: bool = False
+            for i in range(20):
+                test_delay_event.wait(1)
+                ltc_wallet = read_json_api(TEST_HTTP_PORT + 1, 'wallets/ltc')
+                if float(ltc_wallet['unconfirmed']) == 10.0:
+                    found_unconfirmed = True
+                    break
+        finally:
+            pause_event.set()
+        assert (found_unconfirmed)
 
         self.mineBlock()
 

@@ -12,3 +12,4 @@ __pycache__
 
 # geckodriver.log
 *.log
+docker/.env

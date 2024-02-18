@@ -52,12 +52,20 @@ def getFormData(post_string: str, is_json: bool):
 
 def withdraw_coin(swap_client, coin_type, post_string, is_json):
     post_data = getFormData(post_string, is_json)
-
-    value = get_data_entry(post_data, 'value')
     address = get_data_entry(post_data, 'address')
-    subfee = get_data_entry(post_data, 'subfee')
-    if not isinstance(subfee, bool):
-        subfee = toBool(subfee)
+
+    if coin_type == Coins.XMR:
+        value = None
+        sweepall = get_data_entry(post_data, 'sweepall')
+        if not isinstance(sweepall, bool):
+            sweepall = toBool(sweepall)
+        if not sweepall:
+            value = get_data_entry(post_data, 'value')
+    else:
+        value = get_data_entry(post_data, 'value')
+        subfee = get_data_entry(post_data, 'subfee')
+        if not isinstance(subfee, bool):
+            subfee = toBool(subfee)
 
     if coin_type == Coins.PART:
         type_from = get_data_entry_or(post_data, 'type_from', 'plain')
@@ -66,6 +74,8 @@ def withdraw_coin(swap_client, coin_type, post_string, is_json):
     elif coin_type == Coins.LTC:
         type_from = get_data_entry_or(post_data, 'type_from', 'plain')
         txid_hex = swap_client.withdrawLTC(type_from, value, address, subfee)
+    elif coin_type == Coins.XMR:
+        txid_hex = swap_client.withdrawCoin(coin_type, value, address, sweepall)
     else:
         txid_hex = swap_client.withdrawCoin(coin_type, value, address, subfee)
 
@@ -622,6 +632,33 @@ def js_automationstrategies(self, url_split, post_string: str, is_json: bool) ->
     return bytes(json.dumps(rv), 'UTF-8')
 
 
+def js_validateamount(self, url_split, post_string: str, is_json: bool) -> bytes:
+    swap_client = self.server.swap_client
+    swap_client.checkSystemStatus()
+
+    post_data = getFormData(post_string, is_json)
+
+    ticker_str = post_data['coin']
+    amount = post_data['amount']
+    round_method = post_data.get('method', 'none')
+
+    valid_round_methods = ('roundoff', 'rounddown', 'none')
+    if round_method not in valid_round_methods:
+        raise ValueError(f'Unknown rounding method, must be one of {valid_round_methods}')
+
+    coin_type = tickerToCoinId(ticker_str)
+    ci = swap_client.ci(coin_type)
+
+    r = 0
+    if round_method == 'roundoff':
+        r = 1
+    elif round_method == 'rounddown':
+        r = -1
+
+    output_amount = ci.format_amount(amount, conv_int=True, r=r)
+    return bytes(json.dumps(output_amount), 'UTF-8')
+
+
 def js_vacuumdb(self, url_split, post_string, is_json) -> bytes:
     swap_client = self.server.swap_client
     swap_client.checkSystemStatus()
@@ -737,6 +774,7 @@ pages = {
     'notifications': js_notifications,
     'identities': js_identities,
     'automationstrategies': js_automationstrategies,
+    'validateamount': js_validateamount,
     'vacuumdb': js_vacuumdb,
     'getcoinseed': js_getcoinseed,
     'setpassword': js_setpassword,

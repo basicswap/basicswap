@@ -42,7 +42,6 @@ from .util import (
     LockedCoinError,
     TemporaryError,
     InactiveCoin,
-    format_amount,
     format_timestamp,
     DeserialiseNum,
     zeroIfNone,
@@ -59,6 +58,7 @@ from .util.address import (
     decodeAddress,
     pubkeyToAddress,
 )
+from basicswap.util.network import is_private_ip_address
 from .chainparams import (
     Coins,
     chainparams,
@@ -223,12 +223,13 @@ class BasicSwap(BaseApp):
         SwapTypes.XMR_SWAP: xmr_swap_1.XmrSwapInterface(),
     }
 
-    def __init__(self, fp, data_dir, settings, chain, log_name='BasicSwap'):
+    def __init__(self, fp, data_dir, settings, chain, log_name='BasicSwap', transient_instance=False):
         super().__init__(fp, data_dir, settings, chain, log_name)
 
         v = __version__.split('.')
         self._version = struct.pack('>HHH', int(v[0]), int(v[1]), int(v[2]))
 
+        self._transient_instance = transient_instance
         self.check_progress_seconds = self.get_int_setting('check_progress_seconds', 60, 1, 10 * 60)
         self.check_watched_seconds = self.get_int_setting('check_watched_seconds', 60, 1, 10 * 60)
         self.check_expired_seconds = self.get_int_setting('check_expired_seconds', 5 * 60, 1, 10 * 60)
@@ -277,6 +278,8 @@ class BasicSwap(BaseApp):
 
         self.min_sequence_lock_seconds = self.settings.get('min_sequence_lock_seconds', 60 if self.debug else (1 * 60 * 60))
         self.max_sequence_lock_seconds = self.settings.get('max_sequence_lock_seconds', 96 * 60 * 60)
+
+        self._wallet_update_timeout = self.settings.get('wallet_update_timeout', 10)
 
         self._restrict_unknown_seed_wallets = self.settings.get('restrict_unknown_seed_wallets', True)
 
@@ -492,7 +495,11 @@ class BasicSwap(BaseApp):
 
         if self.coin_clients[coin]['connection_type'] == 'rpc':
             if coin == Coins.XMR:
-                if chain_client_settings.get('automatically_select_daemon', False):
+                self.coin_clients[coin]['rpctimeout'] = chain_client_settings.get('rpctimeout', 60)
+                self.coin_clients[coin]['walletrpctimeout'] = chain_client_settings.get('walletrpctimeout', 120)
+                self.coin_clients[coin]['walletrpctimeoutlong'] = chain_client_settings.get('walletrpctimeoutlong', 600)
+
+                if not self._transient_instance and chain_client_settings.get('automatically_select_daemon', False):
                     self.selectXMRRemoteDaemon(coin)
 
                 self.coin_clients[coin]['walletrpchost'] = chain_client_settings.get('walletrpchost', '127.0.0.1')
@@ -505,14 +512,52 @@ class BasicSwap(BaseApp):
                 self.coin_clients[coin]['rpcuser'] = chain_client_settings.get('rpcuser', '')
                 self.coin_clients[coin]['rpcpassword'] = chain_client_settings.get('rpcpassword', '')
 
+    def getXMRTrustedDaemon(self, coin, node_host: str) -> bool:
+        coin = Coins(coin)  # Errors for invalid coin value
+        chain_client_settings = self.getChainClientSettings(coin)
+        trusted_daemon_setting = chain_client_settings.get('trusted_daemon', 'auto')
+        self.log.debug(f'\'trusted_daemon\' setting for {getCoinName(coin)}: {trusted_daemon_setting}.')
+        if isinstance(trusted_daemon_setting, bool):
+            return trusted_daemon_setting
+        if trusted_daemon_setting == 'auto':
+            return is_private_ip_address(node_host)
+        self.log.warning(f'Unknown \'trusted_daemon\' setting for {getCoinName(coin)}: {trusted_daemon_setting}.')
+        return False
+
+    def getXMRWalletProxy(self, coin, node_host: str) -> (Optional[str], Optional[int]):
+        coin = Coins(coin)  # Errors for invalid coin value
+        chain_client_settings = self.getChainClientSettings(coin)
+        proxy_host = None
+        proxy_port = None
+        if self.use_tor_proxy:
+            have_cc_tor_opt = 'use_tor' in chain_client_settings
+            if have_cc_tor_opt and chain_client_settings['use_tor'] is False:
+                self.log.warning('use_tor is true for system but false for XMR.')
+            elif have_cc_tor_opt is False and is_private_ip_address(node_host):
+                self.log.warning(f'Not using proxy for XMR node at private ip address {node_host}.')
+            else:
+                proxy_host = self.tor_proxy_host
+                proxy_port = self.tor_proxy_port
+        return proxy_host, proxy_port
+
     def selectXMRRemoteDaemon(self, coin):
         self.log.info('Selecting remote XMR daemon.')
         chain_client_settings = self.getChainClientSettings(coin)
         remote_daemon_urls = chain_client_settings.get('remote_daemon_urls', [])
 
         coin_settings = self.coin_clients[coin]
-        rpchost = coin_settings['rpchost']
-        rpcport = coin_settings['rpcport']
+        rpchost: str = coin_settings['rpchost']
+        rpcport: int = coin_settings['rpcport']
+        timeout: int = coin_settings['rpctimeout']
+
+        def get_rpc_func(rpcport, daemon_login, rpchost):
+
+            proxy_host, proxy_port = self.getXMRWalletProxy(coin, rpchost)
+            if proxy_host:
+                self.log.info(f'Connecting through proxy at {proxy_host}.')
+
+            return make_xmr_rpc2_func(rpcport, daemon_login, rpchost, proxy_host=proxy_host, proxy_port=proxy_port)
+
         daemon_login = None
         if coin_settings.get('rpcuser', '') != '':
             daemon_login = (coin_settings.get('rpcuser', ''), coin_settings.get('rpcpassword', ''))
@@ -520,8 +565,8 @@ class BasicSwap(BaseApp):
         if current_daemon_url in remote_daemon_urls:
             self.log.info(f'Trying last used url {rpchost}:{rpcport}.')
             try:
-                rpc2 = make_xmr_rpc2_func(rpcport, daemon_login, rpchost)
-                test = rpc2('get_height', timeout=20)['height']
+                rpc2 = get_rpc_func(rpcport, daemon_login, rpchost)
+                test = rpc2('get_height', timeout=timeout)['height']
                 return True
             except Exception as e:
                 self.log.warning(f'Failed to set XMR remote daemon to {rpchost}:{rpcport}, {e}')
@@ -530,8 +575,8 @@ class BasicSwap(BaseApp):
             self.log.info(f'Trying url {url}.')
             try:
                 rpchost, rpcport = url.rsplit(':', 1)
-                rpc2 = make_xmr_rpc2_func(rpcport, daemon_login, rpchost)
-                test = rpc2('get_height', timeout=20)['height']
+                rpc2 = get_rpc_func(rpcport, daemon_login, rpchost)
+                test = rpc2('get_height', timeout=timeout)['height']
                 coin_settings['rpchost'] = rpchost
                 coin_settings['rpcport'] = rpcport
                 data = {
@@ -1226,7 +1271,10 @@ class BasicSwap(BaseApp):
         if swap_type == SwapTypes.XMR_SWAP:
             reverse_bid: bool = self.is_reverse_ads_bid(coin_from)
             itx_coin = coin_to if reverse_bid else coin_from
-            if (itx_coin in self.coins_without_segwit + self.scriptless_coins):
+            ptx_coin = coin_from if reverse_bid else coin_to
+            if itx_coin in self.coins_without_segwit + self.scriptless_coins:
+                if ptx_coin in self.coins_without_segwit + self.scriptless_coins:
+                    raise ValueError('{} -> {} is not currently supported'.format(coin_from.name, coin_to.name))
                 raise ValueError('Invalid swap type for: {} -> {}'.format(coin_from.name, coin_to.name))
         else:
             if coin_from in self.adaptor_swap_only_coins or coin_to in self.adaptor_swap_only_coins:
@@ -1574,7 +1622,7 @@ class BasicSwap(BaseApp):
 
             offer_bytes = msg_buf.SerializeToString()
             payload_hex = str.format('{:02x}', MessageTypes.OFFER) + offer_bytes.hex()
-            msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR * 1, valid_for_seconds)
+            msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR, valid_for_seconds)
             offer_id = self.sendSmsg(offer_addr, offer_addr_to, payload_hex, msg_valid)
 
             security_token = extra_options.get('security_token', None)
@@ -1669,7 +1717,9 @@ class BasicSwap(BaseApp):
 
             msg_bytes = msg_buf.SerializeToString()
             payload_hex = str.format('{:02x}', MessageTypes.OFFER_REVOKE) + msg_bytes.hex()
-            msg_id = self.sendSmsg(offer.addr_from, self.network_addr, payload_hex, offer.time_valid)
+
+            msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR, offer.time_valid)
+            msg_id = self.sendSmsg(offer.addr_from, self.network_addr, payload_hex, msg_valid)
             self.log.debug('Revoked offer %s in msg %s', offer_id.hex(), msg_id.hex())
         finally:
             self.closeSession(session, commit=False)
@@ -1854,7 +1904,7 @@ class BasicSwap(BaseApp):
 
     def estimateWithdrawFee(self, coin_type, fee_rate):
         if coin_type == Coins.XMR:
-            self.log.error('TODO: estimateWithdrawFee XMR')
+            # Fee estimate must be manually initiated
             return None
         tx_vsize = self.ci(coin_type).getHTLCSpendTxVSize()
         est_fee = (fee_rate * tx_vsize) / 1000
@@ -1862,7 +1912,10 @@ class BasicSwap(BaseApp):
 
     def withdrawCoin(self, coin_type, value, addr_to, subfee: bool) -> str:
         ci = self.ci(coin_type)
-        self.log.info('withdrawCoin {} {} to {} {}'.format(value, ci.ticker(), addr_to, ' subfee' if subfee else ''))
+        if subfee and coin_type == Coins.XMR:
+            self.log.info('withdrawCoin sweep all {} to {}'.format(ci.ticker(), addr_to))
+        else:
+            self.log.info('withdrawCoin {} {} to {} {}'.format(value, ci.ticker(), addr_to, ' subfee' if subfee else ''))
 
         txid = ci.withdrawCoin(value, addr_to, subfee)
         self.log.debug('In txn: {}'.format(txid))
@@ -2247,7 +2300,7 @@ class BasicSwap(BaseApp):
             payload_hex = str.format('{:02x}', MessageTypes.BID) + bid_bytes.hex()
 
             bid_addr = self.newSMSGAddress(use_type=AddressTypes.BID)[0] if addr_send_from is None else addr_send_from
-            msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR * 1, valid_for_seconds)
+            msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR, valid_for_seconds)
             bid_id = self.sendSmsg(bid_addr, offer.addr_from, payload_hex, msg_valid)
 
             bid = Bid(
@@ -2606,7 +2659,7 @@ class BasicSwap(BaseApp):
                 xmr_swap.contract_count = self.getNewContractId()
 
                 bid_addr = self.newSMSGAddress(use_type=AddressTypes.BID)[0] if addr_send_from is None else addr_send_from
-                msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR * 1, valid_for_seconds)
+                msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR, valid_for_seconds)
                 xmr_swap.bid_id = self.sendSmsg(bid_addr, offer.addr_from, payload_hex, msg_valid)
 
                 bid = Bid(
@@ -2692,7 +2745,7 @@ class BasicSwap(BaseApp):
             payload_hex = str.format('{:02x}', MessageTypes.XMR_BID_FL) + bid_bytes.hex()
 
             bid_addr = self.newSMSGAddress(use_type=AddressTypes.BID)[0] if addr_send_from is None else addr_send_from
-            msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR * 1, valid_for_seconds)
+            msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR, valid_for_seconds)
             xmr_swap.bid_id = self.sendSmsg(bid_addr, offer.addr_from, payload_hex, msg_valid)
 
             bid_msg_ids = {}
@@ -4266,6 +4319,7 @@ class BasicSwap(BaseApp):
                 except Exception as e:
                     if self.debug:
                         self.log.error(traceback.format_exc())
+                        self.log.error(f'Failed to process message {msg}')
 
             now: int = self.getTime()
             options = {'encoding': 'none', 'setread': False}
@@ -6535,15 +6589,17 @@ class BasicSwap(BaseApp):
 
         try:
             walletinfo = ci.getWalletInfo()
-            scale = chainparams[coin]['decimal_places']
             rv = {
                 'deposit_address': self.getCachedAddressForCoin(coin),
-                'balance': format_amount(make_int(walletinfo['balance'], scale), scale),
-                'unconfirmed': format_amount(make_int(walletinfo.get('unconfirmed_balance'), scale), scale),
+                'balance': ci.format_amount(walletinfo['balance'], conv_int=True),
+                'unconfirmed': ci.format_amount(walletinfo['unconfirmed_balance'], conv_int=True),
                 'expected_seed': ci.knownWalletSeed(),
                 'encrypted': walletinfo['encrypted'],
                 'locked': walletinfo['locked'],
             }
+
+            if 'immature_balance' in walletinfo:
+                rv['immature'] = ci.format_amount(walletinfo['immature_balance'], conv_int=True)
 
             if 'locked_utxos' in walletinfo:
                 rv['locked_utxos'] = walletinfo['locked_utxos']
@@ -6561,7 +6617,6 @@ class BasicSwap(BaseApp):
             elif coin == Coins.LTC:
                 rv['mweb_address'] = self.getCachedStealthAddressForCoin(Coins.LTC_MWEB)
                 rv['mweb_balance'] = walletinfo['mweb_balance']
-                rv['mweb_pending'] = walletinfo['mweb_unconfirmed'] + walletinfo['mweb_immature']
                 rv['mweb_pending'] = walletinfo['mweb_unconfirmed'] + walletinfo['mweb_immature']
 
             return rv
@@ -6616,7 +6671,7 @@ class BasicSwap(BaseApp):
                 handle = self.thread_pool.submit(self.updateWalletInfo, c)
                 if wait_for_complete:
                     try:
-                        handle.result(timeout=10)
+                        handle.result(timeout=self._wallet_update_timeout)
                     except Exception as e:
                         self.log.error(f'updateWalletInfo {e}')
 

@@ -32,6 +32,16 @@ class LTCInterface(BTCInterface):
             return self.rpc_wallet_mweb('sendtoaddress', params)
         return self.rpc_wallet('sendtoaddress', params)
 
+    def createUTXO(self, value_sats: int):
+        # Create a new address and send value_sats to it
+
+        spendable_balance = self.getSpendableBalance()
+        if spendable_balance < value_sats:
+            raise ValueError('Balance too low')
+
+        address = self.getNewAddress(self._use_segwit, 'create_utxo')
+        return self.withdrawCoin(self.format_amount(value_sats), 'plain', address, False), address
+
     def getWalletInfo(self):
         rv = super(LTCInterface, self).getWalletInfo()
 
