@@ -149,6 +149,8 @@ def runClient(fp, data_dir, chain, start_only_coins):
     # Ensure daemons are stopped
     swap_client.stopDaemons()
 
+    # Settings may have been modified
+    settings = swap_client.settings
     try:
         # Try start daemons
         for c, v in settings['chainclients'].items():

@@ -6401,12 +6401,14 @@ class BasicSwap(BaseApp):
                         remotedaemonurls.add(url.strip())
 
                 if set(settings_cc.get('remote_daemon_urls', [])) != remotedaemonurls:
-                    if len(remotedaemonurls) == 0 and 'remote_daemon_urls' in settings_cc:
-                        del settings_cc['remote_daemon_urls']
-                    else:
-                        settings_cc['remote_daemon_urls'] = list(remotedaemonurls)
+                    settings_cc['remote_daemon_urls'] = list(remotedaemonurls)
                     settings_changed = True
                     suggest_reboot = True
+
+            # Ensure remote_daemon_urls appears in settings if automatically_select_daemon is present
+            if 'automatically_select_daemon' in settings_cc and 'remote_daemon_urls' not in settings_cc:
+                settings_cc['remote_daemon_urls'] = []
+                settings_changed = True
 
             if 'fee_priority' in data:
                 new_fee_priority = data['fee_priority']
