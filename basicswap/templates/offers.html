@@ -8,7 +8,7 @@
         <ul class="flex flex-wrap items-center gap-x-3 mb-2">
           <li><a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/">Home</a></li>
           <li>{{ breadcrumb_line_svg | safe }}</li>
-          <li><a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/wallets">{{ page_type }}</a></li>
+          <li><a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="{% if page_type == 'offers' %} offers {% elif page_type == 'sentoffers' %} sentoffers {% endif %}">{{ page_type }}</a></li>
           <li>{{ breadcrumb_line_svg | safe }}</li>
         </ul>
       </div>
@@ -45,9 +45,9 @@
             <div class="container mt-5 mx-auto relative">
               <div class="pt-6 pb-8 bg-coolGray-100 dark:bg-gray-500 rounded-xl container-to-blur">
                 <div class="px-6">
-                  <div class="w-full mt-6 pb-6 overflow-x-auto">
+                  <div class="w-full mt-6 overflow-x-auto">
                     <div class="chart-container" style="max-width: 100%;">
-                      <canvas id="coin-chart" style="height: 280px;"></canvas>
+                      <canvas id="coin-chart" style="height: 275px;"></canvas>
                     </div>
                   </div>
                 </div>
@@ -65,264 +65,304 @@
     </div>
   </section>
 
-<section class="py-4 overflow-hidden container-to-blur">
-  <div class="container px-4 mx-auto">
-    <div class="flex flex-wrap -m-3">
+  <section class="py-4 overflow-hidden container-to-blur">
+    <div class="container px-4 mx-auto">
+      <div class="flex flex-wrap -m-3">
 
-      <div class="w-full sm:w-1/2 lg:w-1/5 p-3" id="btc-container">
-        <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-lg dark:text-white active-container" id="btc-active">
-          <div class="flex items-center mb-2.5">
-            <img src="/static/images/coins/Bitcoin-20.png" height="20" width="20" class="mr-2">
-            <p class="text-sm text-neutral-500 font-medium">Bitcoin (BTC)</p>
+        <div class="w-full sm:w-1/2 lg:w-1/6 p-3" id="btc-container">
+            <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-2xl dark:text-white active-container" id="btc-active">
+              <div class="flex items-center">
+                  <img src="/static/images/coins/Bitcoin.png" class="rounded-xl" style="width: 35px; height: 35px; object-fit: contain;" alt="Bitcoin">
+                  <p class="ml-2 text-black text-sm dark:text-white">
+                      Bitcoin (BTC)
+                  </p>
+              </div>
+              <div class="flex flex-col justify-start">
+                  <p class="my-2 text-xl font-bold text-left text-gray-700 dark:text-gray-100" id="btc-price-usd">
+                      <span class="text-sm">
+                          <span id="btc-price-usd-value"></span>
+                  </p>
+                  <div class="flex items-center text-sm">
+                      <div class="w-auto">
+                        <div id="btc-price-change-container" class="w-auto p-1"></div>
+                      </div>
+                  </div>
+                  <div class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2">
+                    <span class="bold mr-2">VOL:</span>
+                      <div id="btc-volume-24h">
+                      </div>
+                  </div>
+              </div>
           </div>
-          <div class="flex flex-wrap items-center mb-2 -m-1">
-            <div class="w-auto p-1">
-              <h3 class="font-heading text-1xl font-semibold">
-                <div id="btc-price-usd"></div>
-              </h3>
-            </div>
-            <div class="w-auto p-1">
-              <div id="btc-price-change-container" class="w-auto p-1"></div>
-            </div>
-            <div class="w-auto p-1">
-              <h3 class="font-heading text-1xl font-semibold">
-                <div id="btc-price-btc"></div>
-              </h3>
-            </div>
           </div>
-          <p class="text-2xs text-neutral-400 font-medium">
-            Volume 24H:
-            <div class="text-xs" id="btc-volume-24h"></div>
+
+      <div class="w-full sm:w-1/2 lg:w-1/6 p-3" id="xmr-container">
+        <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-2xl dark:text-white price-container">
+      <div class="flex items-center">
+          <img src="/static/images/coins/Monero.png" class="rounded-xl" style="width: 35px; height: 35px; object-fit: contain;" alt="Monero">
+          <p class="ml-2 text-black text-sm dark:text-white">
+              Monero (XMR)
           </p>
-          <p class="text-2xs text-neutral-400 font-medium hidden">
-            Price in BTC:
-            <div class="text-xs" id="usd-price-btc"></div>
-          </p>
-        </div>
       </div>
-
-      <div class="w-full sm:w-1/2 lg:w-1/5 p-3" id="xmr-container">
-        <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-lg dark:text-white">
-          <div class="flex items-center mb-2.5">
-            <img src="/static/images/coins/Monero-20.png" height="20" width="20" class="mr-2">
-            <p class="text-sm text-neutral-500 font-medium">Monero (BTC)</p>
-          </div>
-          <div class="flex flex-wrap items-center mb-2 -m-1">
-            <div class="w-auto p-1">
-              <h3 class="font-heading text-1xl font-semibold">
-                <div id="xmr-price-usd"></div>
-              </h3>
-            </div>
-            <div class="w-auto p-1">
-              <div id="xmr-price-change-container" class="w-auto p-1"></div>
-            </div>
-            <div class="w-auto p-1">
-              <h3 class="font-heading text-1xl font-semibold">
-                <div id="xmr-price-usd"></div>
-              </h3>
-            </div>
-          </div>
-          <p class="text-2xs text-neutral-400 font-medium">
-            Volume 24H:
-            <div class="text-xs" id="xmr-volume-24h"></div>
+      <div class="flex flex-col justify-start">
+          <p class="my-2 text-xl font-bold text-left text-gray-700 dark:text-gray-100" id="xmr-price-usd">
+              <span class="text-sm">
+                  <span id="xmr-price-usd-value"></span>
           </p>
-          <p class="text-2xs text-neutral-400 font-medium">
-            Price in BTC:
-            <div class="text-xs" id="xmr-price-btc"></div>
-          </p>
-        </div>
+          <div class="flex items-center text-sm">
+              <div class="w-auto">
+                <div id="xmr-price-change-container" class="w-auto p-1"></div>
+              </div>
+          </div>
+          <div class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2">
+            <span class="bold mr-2">VOL:</span>
+              <div id="xmr-volume-24h">
+              </div>
+          </div>
+          <div class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2">
+              <span class="bold mr-2">BTC:</span>
+              <span id="xmr-price-btc">
+              </span>
+          </div>
       </div>
+  </div>
+  </div>
 
-      <div class="w-full sm:w-1/2 lg:w-1/5 p-3" id="part-container">
-        <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-lg dark:text-white">
-          <div class="flex items-center mb-2.5">
-            <img src="/static/images/coins/Particl-20.png" height="20" width="20" class="mr-2">
-            <p class="text-sm text-neutral-500 font-medium">Particl (PART)</p>
-          </div>
-          <div class="flex flex-wrap items-center mb-2 -m-1">
-            <div class="w-auto p-1">
-              <h3 class="font-heading text-1xl font-semibold">
-                <div id="part-price-usd"></div>
-              </h3>
-            </div>
-            <div class="w-auto p-1">
-              <div id="part-price-change-container" class="w-auto p-1"></div>
-            </div>
-          </div>
-          <p class="text-2xs text-neutral-400 font-medium">
-            Volume 24H:
-            <div class="text-xs" id="part-volume-24h"></div>
-          </p>
-          <p class="text-2xs text-neutral-400 font-medium">
-            Price in BTC:
-            <div class="text-xs" id="part-price-btc"></div>
-          </p>
+  <div class="w-full sm:w-1/2 lg:w-1/6 p-3" id="part-container">
+    <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-2xl dark:text-white">
+        <div class="flex items-center">
+            <img src="/static/images/coins/Particl.png" class="rounded-xl" style="width: 35px; height: 35px; object-fit: contain;" alt="Particl">
+            <p class="ml-2 text-black text-md dark:text-white">
+                Particl (PART)
+            </p>
         </div>
-      </div>
-
-      <div class="w-full sm:w-1/2 lg:w-1/5 p-3" id="pivx-container">
-        <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-lg dark:text-white">
-          <div class="flex items-center mb-2.5">
-            <img src="/static/images/coins/PIVX-20.png" height="20" width="20" class="mr-2">
-            <p class="text-sm text-neutral-500 font-medium">PIVX (PIVX)</p>
-          </div>
-          <div class="flex flex-wrap items-center mb-2 -m-1">
-            <div class="w-auto p-1">
-              <h3 class="font-heading text-1xl font-semibold">
-                <div id="pivx-price-usd"></div>
-              </h3>
+        <div class="flex flex-col justify-start">
+            <p class="my-2 text-xl font-bold text-left text-gray-700 dark:text-gray-100" id="part-price-usd">
+                <span class="text-sm">
+                    $ <span id="part-price-usd-value"></span>
+                </span>
+            </p>
+            <div class="flex items-center text-sm">
+                <div class="w-auto">
+                  <div id="part-price-change-container" class="w-auto p-1"></div>
+                </div>
             </div>
-            <div class="w-auto p-1">
-              <div id="pivx-price-change-container" class="w-auto p-1"></div>
+            <div class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2">
+              <span class="bold mr-2">VOL:</span>
+                <div id="part-volume-24h">
+                </div>
             </div>
-          </div>
-          <p class="text-2xs text-neutral-400 font-medium">
-            Volume 24H:
-            <div class="text-xs" id="pivx-volume-24h"></div>
-          </p>
-          <p class="text-2xs text-neutral-400 font-medium">
-            Price in BTC:
-            <div class="text-xs" id="pivx-price-btc"></div>
-          </p>
+            <div class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2">
+                <span class="bold mr-2">BTC:</span>
+                <span id="part-price-btc">
+                </span>
+            </div>
         </div>
-      </div>
+    </div>
+</div>
 
-      <div class="w-full sm:w-1/2 lg:w-1/5 p-3" id="firo-container">
-        <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-lg dark:text-white">
-          <div class="flex items-center mb-2.5">
-            <img src="/static/images/coins/Firo-20.png" height="20" width="20" class="mr-2">
-            <p class="text-sm text-neutral-500 font-medium">Firo (FIRO)</p>
+<div class="w-full sm:w-1/2 lg:w-1/6 p-3" id="ltc-container">
+  <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-2xl dark:text-white">
+      <div class="flex items-center">
+          <img src="/static/images/coins/Litecoin.png" class="rounded-xl" style="width: 35px; height: 35px; object-fit: contain;" alt="Litecoin">
+          <p class="ml-2 text-black text-md dark:text-white">
+              Litecoin (LTC)
+          </p>
+      </div>
+      <div class="flex flex-col justify-start">
+          <p class="my-2 text-xl font-bold text-left text-gray-700 dark:text-gray-100" id="ltc-price-usd">
+              <span class="text-sm">
+                  <span id="ltc-price-usd-value"></span>
+              </span>
+          </p>
+          <div class="flex items-center text-sm">
+              <div class="w-auto">
+                <div id="ltc-price-change-container" class="w-auto p-1"></div>
+              </div>
           </div>
-          <div class="flex flex-wrap items-center mb-2 -m-1">
-            <div class="w-auto p-1">
-              <h3 class="font-heading text-1xl font-semibold">
-                <div id="firo-price-usd"></div>
-              </h3>
-            </div>
-            <div class="w-auto p-1">
+          <div class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2">
+            <span class="bold mr-2">VOL:</span>
+              <div id="ltc-volume-24h">
+              </div>
+          </div>
+          <div class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2">
+              <span class="bold mr-2">BTC:</span>
+              <span id="ltc-price-btc">
+              </span>
+          </div>
+      </div>
+  </div>
+  </div>
+
+  <div class="w-full sm:w-1/2 lg:w-1/6 p-3" id="firo-container">
+    <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-2xl dark:text-white">
+            <div class="flex items-center">
+        <img src="/static/images/coins/Firo.png" class="rounded-xl" style="width: 35px; height: 35px; object-fit: contain;" alt="Firo">
+        <p class="ml-2 text-black text-md dark:text-white">
+            Firo (FIRO)
+        </p>
+    </div>
+    <div class="flex flex-col justify-start">
+        <p class="my-2 text-xl font-bold text-left text-gray-700 dark:text-gray-100" id="firo-price-usd">
+            <span class="text-sm">
+                <span id="firo-price-usd-value"></span>
+            </span>
+        </p>
+        <div class="flex items-center text-sm">
+            <div class="w-auto">
               <div id="firo-price-change-container" class="w-auto p-1"></div>
             </div>
-          </div>
-          <p class="text-2xs text-neutral-400 font-medium">
-            Volume 24H:
-            <div class="text-xs" id="firo-volume-24h"></div>
-          </p>
-          <p class="text-2xs text-neutral-400 font-medium">
-            Price in BTC:
-            <div class="text-xs" id="firo-price-btc"></div>
-          </p>
         </div>
-      </div>
-
-      <div class="w-full sm:w-1/2 lg:w-1/5 p-3" id="ltc-container">
-        <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-lg dark:text-white">
-          <div class="flex items-center mb-2.5">
-            <img src="/static/images/coins/Litecoin-20.png" height="20" width="20" class="mr-2">
-            <p class="text-sm text-neutral-500 font-medium">Litecoin (LTC)</p>
-          </div>
-          <div class="flex flex-wrap items-center mb-2 -m-1">
-            <div class="w-auto p-1">
-              <h3 class="font-heading text-1xl font-semibold">
-                <div id="ltc-price-usd"></div>
-              </h3>
+        <div class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2">
+          <span class="bold mr-2">VOL:</span>
+            <div id="firo-volume-24h">
             </div>
-            <div class="w-auto p-1">
-              <div id="ltc-price-change-container" class="w-auto p-1"></div>
-            </div>
-          </div>
-          <p class="text-2xs text-neutral-400 font-medium">
-            Volume 24H:
-            <div class="text-xs" id="ltc-volume-24h"></div>
-          </p>
-          <p class="text-2xs text-neutral-400 font-medium">
-            Price in BTC:
-            <div class="text-xs" id="ltc-price-btc"></div>
-          </p>
         </div>
-      </div>
-
-       <div class="w-full sm:w-1/2 lg:w-1/5 p-3" id="dash-container">
-        <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-lg dark:text-white">
-          <div class="flex items-center mb-2.5">
-            <img src="/static/images/coins/Dash-20.png" height="20" width="20" class="mr-2">
-            <p class="text-sm text-neutral-500 font-medium">Dash (DASH)</p>
-          </div>
-          <div class="flex flex-wrap items-center mb-2 -m-1">
-            <div class="w-auto p-1">
-              <h3 class="font-heading text-1xl font-semibold">
-                <div id="dash-price-usd"></div>
-              </h3>
-            </div>
-            <div class="w-auto p-1">
-              <div id="dash-price-change-container" class="w-auto p-1"></div>
-            </div>
-          </div>
-          <p class="text-2xs text-neutral-400 font-medium">
-            Volume 24H:
-            <div class="text-xs" id="dash-volume-24h"></div>
-          </p>
-          <p class="text-2xs text-neutral-400 font-medium">
-            Price in BTC:
-            <div class="text-xs" id="dash-price-btc"></div>
-          </p>
+        <div class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2">
+            <span class="bold mr-2">BTC:</span>
+            <span id="firo-price-btc">
+            </span>
         </div>
-      </div>
+    </div>
+</div>
+</div>
 
-      <div class="w-full sm:w-1/2 lg:w-1/5 p-3" id="doge-container">
-        <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-lg dark:text-white">
-          <div class="flex items-center mb-2.5">
-            <img src="/static/images/coins/Doge-20.png" height="20" width="20" class="mr-2">
-            <p class="text-sm text-neutral-500 font-medium">Dogecoin (DOGE)</p>
+<div class="w-full sm:w-1/2 lg:w-1/6 p-3" id="pivx-container">
+  <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-2xl dark:text-white">
+  <div class="flex items-center">
+      <img src="/static/images/coins/Pivx.png" class="rounded-xl" style="width: 35px; height: 35px; object-fit: contain;" alt="Pivx">
+      <p class="ml-2 text-black text-md dark:text-white">
+          PIVX (PIVX)
+      </p>
+  </div>
+  <div class="flex flex-col justify-start">
+      <p class="my-2 text-xl font-bold text-left text-gray-700 dark:text-gray-100" id="pivx-price-usd">
+          <span class="text-sm">
+              <span id="pivx-price-usd-value"></span>
+          </span>
+      </p>
+      <div class="flex items-center text-sm">
+          <div class="w-auto">
+            <div id="pivx-price-change-container" class="w-auto p-1"></div>
           </div>
-          <div class="flex flex-wrap items-center mb-2 -m-1">
-            <div class="w-auto p-1">
-              <h3 class="font-heading text-1xl font-semibold">
-                <div id="doge-price-usd"></div>
-              </h3>
-            </div>
-            <div class="w-auto p-1">
-              <div id="doge-price-change-container" class="w-auto p-1"></div>
-            </div>
-          </div>
-          <p class="text-2xs text-neutral-400 font-medium">
-            Volume 24H:
-            <div class="text-xs" id="doge-volume-24h"></div>
-          </p>
-          <p class="text-2xs text-neutral-400 font-medium">
-            Price in BTC:
-            <div class="text-xs" id="doge-price-btc"></div>
-          </p>
-        </div>
       </div>
-
-       <div class="w-full sm:w-1/2 lg:w-1/5 p-3" id="eth-container">
-        <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-lg dark:text-white">
-          <div class="flex items-center mb-2.5">
-            <img src="/static/images/coins/Ethereum-20.png" height="20" width="20" class="mr-2">
-            <p class="text-sm text-neutral-500 font-medium">Ethereum (ETH)</p>
+      <div class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2">
+        <span class="bold mr-2">VOL:</span>
+          <div id="pivx-volume-24h">
           </div>
-          <div class="flex flex-wrap items-center mb-2 -m-1">
-            <div class="w-auto p-1">
-              <h3 class="font-heading text-1xl font-semibold">
-                <div id="eth-price-usd"></div>
-              </h3>
-            </div>
-            <div class="w-auto p-1">
-              <div id="eth-price-change-container" class="w-auto p-1"></div>
-            </div>
-          </div>
-          <p class="text-2xs text-neutral-400 font-medium">
-            Volume 24H:
-            <div class="text-xs" id="eth-volume-24h"></div>
-          </p>
-          <p class="text-2xs text-neutral-400 font-medium">
-            Price in BTC:
-            <div class="text-xs" id="eth-price-btc"></div>
-          </p>
-        </div>
       </div>
+      <div class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2">
+          <span class="bold mr-2">BTC:</span>
+          <span id="pivx-price-btc">
+          </span>
+      </div>
+  </div>
+</div>
+</div>
 
-  </section>
+<div class="w-full sm:w-1/2 lg:w-1/6 p-3" id="dash-container">
+  <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-2xl dark:text-white">
+  <div class="flex items-center">
+      <img src="/static/images/coins/Dash.png" class="rounded-xl" style="width: 35px; height: 35px; object-fit: contain;" alt="Dash">
+      <p class="ml-2 text-black text-md dark:text-white">
+          Dash (DASH)
+      </p>
+  </div>
+  <div class="flex flex-col justify-start">
+      <p class="my-2 text-xl font-bold text-left text-gray-700 dark:text-gray-100" id="dash-price-usd">
+          <span class="text-sm">
+              <span id="dash-price-usd-value"></span>
+          </span>
+      </p>
+      <div class="flex items-center text-sm">
+          <div class="w-auto">
+            <div id="dash-price-change-container" class="w-auto p-1"></div>
+          </div>
+      </div>
+      <div class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2">
+        <span class="bold mr-2">VOL:</span>
+          <div id="dash-volume-24h">
+          </div>
+      </div>
+      <div class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2">
+          <span class="bold mr-2">BTC:</span>
+          <span id="dash-price-btc">
+          </span>
+      </div>
+  </div>
+</div>
+</div>
+
+<div class="w-full sm:w-1/2 lg:w-1/6 p-3" id="eth-container">
+  <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-2xl dark:text-white">
+  <div class="flex items-center">
+      <img src="/static/images/coins/Ethereum.png" class="rounded-xl" style="width: 35px; height: 35px; object-fit: contain;" alt="Ethereum">
+      <p class="ml-2 text-black text-md dark:text-white">
+          Ethereum (ETH)
+      </p>
+  </div>
+  <div class="flex flex-col justify-start">
+      <p class="my-2 text-xl font-bold text-left text-gray-700 dark:text-gray-100" id="eth-price-usd">
+          <span class="text-sm">
+              <span id="eth-price-usd-value"></span>
+          </span>
+      </p>
+      <div class="flex items-center text-sm">
+          <div class="w-auto">
+            <div id="eth-price-change-container" class="w-auto p-1"></div>
+          </div>
+      </div>
+      <div class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2">
+        <span class="bold mr-2">VOL:</span>
+          <div id="eth-volume-24h">
+          </div>
+      </div>
+      <div class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2">
+          <span class="bold mr-2">BTC:</span>
+          <span id="eth-price-btc">
+          </span>
+      </div>
+  </div>
+</div>
+</div>
+
+<div class="w-full sm:w-1/2 lg:w-1/6 p-3" id="doge-container">
+  <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-2xl dark:text-white">
+  <div class="flex items-center">
+      <img src="/static/images/coins/Doge.png" class="rounded-xl" style="width: 35px; height: 35px; object-fit: contain;" alt="Dogecoin">
+      <p class="ml-2 text-black text-md dark:text-white">
+          Dogecoin (DOGE)
+      </p>
+  </div>
+  <div class="flex flex-col justify-start">
+      <p class="my-2 text-xl font-bold text-left text-gray-700 dark:text-gray-100" id="doge-price-usd">
+          <span class="text-sm">
+              <span id="doge-price-usd-value"></span>
+          </span>
+      </p>
+      <div class="flex items-center text-sm">
+          <div class="w-auto">
+            <div id="doge-price-change-container" class="w-auto p-1"></div>
+          </div>
+      </div>
+      <div class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2">
+        <span class="bold mr-2">VOL:</span>
+          <div id="doge-volume-24h">
+          </div>
+      </div>
+      <div class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2">
+          <span class="bold mr-2">BTC:</span>
+          <span id="doge-price-btc">
+          </span>
+      </div>
+  </div>
+</div>
+</div>
+
+</div>
+</div>
+
+</section>
   <script>
     window.addEventListener('load', function() {
     const api_key = '{{chart_api_key}}';
@@ -351,7 +391,7 @@ function displayCoinData(coin, data) {
     const priceBTC = data.RAW[coin].BTC.PRICE;
     const priceChange1h = data.RAW[coin].USD.CHANGEPCTHOUR;
     const volume24h = data.RAW[coin].USD.TOTALVOLUME24HTO;
-    document.querySelector(`#${coin.toLowerCase()}-price-usd`).textContent = priceUSD.toFixed(2) + ' USD';
+    document.querySelector(`#${coin.toLowerCase()}-price-usd`).textContent = priceUSD.toFixed(2) + ' $';
     if (coin !== 'BTC') {
         document.querySelector(`#${coin.toLowerCase()}-price-btc`).textContent = priceBTC.toFixed(8) + ' BTC';
     }
@@ -712,22 +752,18 @@ const chart = new Chart(ctx, {
                   </div>
                 </div>
               </div>
+
               <div class="container mt-5 mx-auto">
                 <div class="pt-6 pb-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
                   <div class="px-6">
                     <div class="w-full mt-6 pb-6 overflow-x-auto">
-                      <table class="w-full min-w-max">
+                      <table id="myTable" class="w-full min-w-max">
 
                         <thead class="uppercase">
-                          <tr class="text-left">
+                          <tr class="text-center">
                             <th class="p-0">
                               <div class="py-3 px-6 rounded-tl-xl bg-coolGray-200 dark:bg-gray-600">
                                 <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Date/Time at</span>
-                              </div>
-                            </th>
-                            <th class="p-0">
-                              <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
-                                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Details</span>
                               </div>
                             </th>
                             <th class="p-0">
@@ -762,36 +798,34 @@ const chart = new Chart(ctx, {
 
                         <tbody>
                           {% for o in offers %}
-                          <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
+                          <tr class="text-center opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600 main-row"">
 
                             <!-- TIME + ACTIVE -->
-                            <td class="flex items-center py-7 px-46 dark:text-white text-gray-900 whitespace-nowrap" title="{% if o[12]==2 %}Revoked{% elif o[11]==true %}Expired{% else %}Active{% endif %}">
-                              <svg alt="" class="w-5 h-5 rounded-full ml-5" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
+                            <td class="flex py-3 px-6 dark:text-white text-gray-900" title="Time">
+                            <svg alt="" class="w-5 h-5 rounded-full mt-5 ml-5 mr-5" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
                                 <g stroke-linecap="round" stroke-width="2" fill="none" stroke="{% if o[12]==2 %}#AC0000{% elif o[11]==true %}#6b7280{% else %}#3B82F6{% endif %}" stroke-linejoin="round">
                                   <circle cx="12" cy="12" r="11"></circle>
                                   <polyline points=" 12,6 12,12 18,12 " stroke="{% if o[12]==2 %} #AC0000 {% elif o[11]==true %} #6b7280 {% else %} #3B82F6 {% endif %}"></polyline>
                                 </g>
                               </svg>
-                              <div class="pl-3">
-                                <div class="{% if o[11]==true or o[12]==2 %} dark:text-white {% else %} font-semibold {% endif %} text-xs">{{ o[0] }}</div>
+                              <div class="py-3 px-6 text-xs text-left" data-tooltip-target="tooltip-active" >
+                                  <div class="{% if o[11]==true or o[12]==2 %} dark:text-white {% else %} {% endif %} text-xs"><span class="bold">Posted:</span> {{ o[0] }} ago</div>
+                                  <div class="{% if o[11]==true or o[12]==2 %} dark:text-white {% else %} {% endif %} text-xs"><span class="bold">Expires in:</span> {{ o[13] }}</div>
                               </div>
                             </td>
+
+                            <div id="tooltip-active" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+                              <div class="active-revoked-expired"><span class="bold">{% if o[12]==2 %}Revoked{% elif o[11]==true %}Expired{% else %}Active{% endif %}</div>
+                            <div class="tooltip-arrow" data-popper-arrow></div>
+                            </div>
+
                             <!-- TIME + ACTIVE -->
 
                             <!--<td class="py-4 px-6 text-xs"><a class="monospace text-xs" href=/offer/{{ o[1] }}>{{ o[1]|truncate(6, True) }}</a></td>-->
                             <!--<td class="py-4 px-6 text-xs monospace">{{ o[8] }}{% if o[9]==true %} <b>Sent</b>{% endif %}</td>-->
 
-                            <!-- DETAILS -->
-                            <td class="py-3 px-6 text-xs">
-                              <div class="network"><span class="bold">Network:</span> {{ o[7] }}</div>
-                              <div class="partial pt-1"><span class="bold">Amount Variable:</span>{{ o[14] }}</div>
-                              <div class="swaptype pt-1"><span class="bold">Swap Type:</span> {{ o[13] }}</div>
-                            <!-- {% if o[12]==2 %}(Revoked){% elif o[11]==true %}(Not Active){% else %}(Active){% endif %} -->
-                            </td>
-                            <!-- DETAILS -->
-
                             <!-- RECIPIENT -->
-                            <td class="py-3 px-6 text-xs monospace">
+                            <td class="py-3 text-xs monospace">
                               <a href="/identity/{{ o[8] }}{% if o[9]==true %}{% endif %}">{{ o[8] }}</a>
                             </td>
                             <!-- RECIPIENT -->
@@ -800,12 +834,13 @@ const chart = new Chart(ctx, {
                             {% if o[9] == true %}
                             <td class="py-3 px-6 text-xs">
                               <div class="flex items-center">
-                                <span class="inline-flex align-middle items-center justify-center w-9 h-10 rounded"><img class="h-7" src="/static/images/coins/{{ o[3]|replace(" ", "-") }}.png" alt=""></span>
+                                <span class="inline-flex align-middle items-center justify-center w-9 h-10 rounded"><img class="h-7" src="/static/images/coins/{{ o[3]|replace(" ", "-") }}.png" alt="{{ o[3] }}"></span>
                                 <div class="flex flex-col ml-2">
                                   <div class="coinname-value bold" data-coinname="{{ o[3] }}">
                                     {{ o[5]|truncate(8, true, '', 0) }} {{ o[3] }}
                                   </div>
                                   <div class="usd-value"></div>
+                                  <div class="coin-coin">{{ o[3] }}/{{ o[2] }}</div>
                                 </div>
                               </div>
                             </td>
@@ -815,12 +850,14 @@ const chart = new Chart(ctx, {
                             {% else %}
                             <td class="py-3 px-6 text-xs">
                               <div class="flex items-center">
-                                <span class="inline-flex align-middle items-center justify-center w-9 h-10 rounded"><img class="h-7" src="/static/images/coins/{{ o[2]|replace(" ", "-") }}.png" alt=""></span>
+                                <span class="inline-flex align-middle items-center justify-center w-9 h-10 rounded"><img class="h-7" src="/static/images/coins/{{ o[2]|replace(" ", "-") }}.png" alt="{{ o[2] }}"></span>
                                 <div class="flex flex-col ml-2">
                                   <div class="coinname-value bold" data-coinname="{{ o[2] }}">
                                     {{ o[4]|truncate(8, true, '', 0) }} {{ o[2] }}
                                   </div>
+
                                   <div class="usd-value"></div>
+                                  <div class="coin-coin">{{ o[2] }}/{{ o[3] }}</div>
                                 </div>
                               </div>
                             </td>
@@ -832,12 +869,13 @@ const chart = new Chart(ctx, {
                             {% if o[9] == true %}
                             <td class="py-3 px-6 text-xs">
                               <div class="flex items-center">
-                                <span class="inline-flex align-middle items-center justify-center w-9 h-10 rounded"><img class="h-7" src="/static/images/coins/{{ o[2]|replace(" ", "-") }}.png" alt=""></span>
+                                <span class="inline-flex align-middle items-center justify-center w-9 h-10 rounded"><img class="h-7" src="/static/images/coins/{{ o[2]|replace(" ", "-") }}.png" alt="{{ o[2] }}"></span>
                                 <div class="flex flex-col ml-2">
                                   <div class="coinname-value bold" data-coinname="{{ o[2] }}">
                                     {{ o[4]|truncate(8,true,'',0) }} {{ o[2] }}
                                   </div>
                                   <div class="usd-value"></div>
+                                    <div class="coin-coin">{{ o[2] }}/{{ o[3] }}</div>
                                 </div>
                               </div>
                             </td>
@@ -847,14 +885,13 @@ const chart = new Chart(ctx, {
                             {% else %}
                             <td class="py-3 px-6 text-xs">
                               <div class="flex items-center">
-                                <span class="inline-flex align-middle items-center justify-center w-9 h-10 rounded"><img class="h-7" src="/static/images/coins/{{ o[3]|replace(" ", "-") }}.png" alt=""></span>
+                                <span class="inline-flex align-middle items-center justify-center w-9 h-10 rounded"><img class="h-7" src="/static/images/coins/{{ o[3]|replace(" ", "-") }}.png" alt="{{ o[3] }}"></span>
                                 <div class="flex flex-col ml-2">
-
-                                  <!-- Added ml-2 for left margin -->
                                   <div class="coinname-value bold" data-coinname="{{ o[3] }}">
                                     {{ o[5]|truncate(8, true, '', 0) }} {{ o[3] }}
                                   </div>
                                   <div class="usd-value"></div>
+                                    <div class="coin-coin">{{ o[3] }}/{{ o[2] }}</div>
                                 </div>
                               </div>
                             </td>
@@ -863,9 +900,9 @@ const chart = new Chart(ctx, {
 
                             <!-- RATE -->
                             <td class="py-3 px-6 text-xs">
-                              <div class="coinname-value" data-coinname="{{ o[3] }}">{{ o[6]|truncate(8,true,'',0) }}</div>
-                              <div class="usd-value"></div>
-                              <div class="profit-value hidden"></div>
+                              <div class="coinname-value hidden" data-coinname="{{ o[3] }}">{{ o[6]|truncate(8,true,'',0) }}</div>
+                              <div class="usd-value hidden"></div>
+                              <div class="profit-value hidden "></div>
                               <div class="profit-loss"></div>
                             </td>
                             <!-- RATE -->
@@ -874,45 +911,57 @@ const chart = new Chart(ctx, {
 
                             <!-- SWAP OR EDIT -->
                             <td class="py-3 px-6">
-                              <a class="inline-block w-20 py-1 px-2 font-medium text-center text-sm rounded-md
+                              <a data-tooltip-target="tooltip-swaps" class="inline-block w-20 py-1 px-2 font-medium text-center text-sm rounded-md
                               {% if o[9]==true %}  bg-blue-500 text-white border hover:bg-blue-600 dark:border-gray-700 bg-gray-700 transition duration-200
                                {% else %} bg-blue-500 text-white hover:bg-blue-600 transition duration-200 {% endif %}" href="/offer/{{ o[1] }}">{% if o[9]==true %} Edit {% else %} Swap {% endif %}</a>
                             </td>
-                            <!-- SWAP OR EDIT -->
 
+                            <div id="tooltip-swaps hidden" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+                              <div class="network"><span class="bold">Network:</span> {{ o[7] }}</div>
+                              <div class="swaptype pt-1"><span class="bold">Swap Type:</span> {{ o[14] }}</div><!-- fix - not showing the correct swap type -->
+                              <div class="partial pt-1"><span class="bold">Amount Variable:</span> {{ o[15] }}</div>
+                            <!-- todo <div class="partial pt-1"><span class="bold">Auto Accept/;</span> Yes</div> -->
+                            <div class="tooltip-arrow" data-popper-arrow></div>
+                            </div>
+                            <!-- SWAP OR EDIT -->
                           </tr>
+
                         </tbody>
                         {% endfor %}
                       </table>
+
                       <input type="hidden" name="formid" value="{{ form_id }}">
                       <input type="hidden" name="pageno" value="{{ filters.page_no }}">
                     </div>
                   </div>
-
                   <div class="rounded-b-md">
-                    <div class="w-full md:w-0/12">
-                      <div class="flex flex-wrap justify-end pt-6 pr-6 border-t border-gray-100 dark:border-gray-400">
-                        <div class="w-full md:w-auto p-1.5">
-                          <button type="submit" name='pageback' value="Page Back" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-blue-600 rounded-lg transition duration-200 focus:ring-0 focus:outline-none">
-                            {{ page_back_svg | safe }}
-                            <span>Page Back</span>
-                          </button>
-                        </div>
-                        <div class="flex items-center">
-                          <div class="w-full md:w-auto p-1.5">
-                            <p class="text-sm font-heading dark:text-white">Page: {{ filters.page_no }}</p>
+                      <div class="w-full md:w-0/12">
+                          <div class="flex flex-wrap justify-end pt-6 pr-6 border-t border-gray-100 dark:border-gray-400">
+                              {% if filters.page_no > 1 %}
+                              <div class="w-full md:w-auto p-1.5">
+                                  <button type="submit" name='pageback' value="Previous" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-blue-600 rounded-lg transition duration-200 focus:ring-0 focus:outline-none">
+                                      {{ page_back_svg | safe }}
+                                      <span>Previous</span>
+                                  </button>
+                              </div>
+                              {% endif %}
+                              <div class="flex items-center">
+                                  <div class="w-full md:w-auto p-1.5">
+                                      <p class="text-sm font-heading dark:text-white">Page: {{ filters.page_no }}</p>
+                                  </div>
+                              </div>
+                              {% if offers_count > 10 %}
+                              <div class="w-full md:w-auto p-1.5">
+                                      <button type="submit" name='pageforwards' value="Next" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-blue-600 rounded-lg transition duration-200 focus:ring-0 focus:outline-none">
+                                          <span>Next</span>
+                                          {{ page_forwards_svg | safe }}
+                                      </button>
+                              </div>
+                              {% endif %}
                           </div>
-                        </div>
-                        <div class="w-full md:w-auto p-1.5">
-                          <button type="submit" name='pageforwards' value="Page Forwards" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-blue-600 rounded-lg transition duration-200 focus:ring-0 focus:outline-none">
-                            <span>Page Forwards</span>
-                            {{ page_forwards_svg | safe }}
-                          </button>
-                        </div>
                       </div>
-                    </div>
                   </div>
-
+                  </div>
             </form>
           </div>
         </div>
@@ -1024,7 +1073,6 @@ function updateProfitLoss(row) {
   }
 }
 
-
   function updateProfitValue(row) {
     const sellingUSD = parseFloat(row.querySelector('.usd-value').textContent);
     const profitValueCell = row.querySelector('.profit-value');
@@ -1045,7 +1093,6 @@ function updateProfitLoss(row) {
 
       if (!isRate) {
         coinNameValues[i].addEventListener('input', () => {
-          // Clear the cache when the user inputs a new value
           console.log(`Clearing cache for ${coinNameToSymbol[coinFullName]}`);
           exchangeRateCache[coinNameToSymbol[coinFullName]] = undefined;
           updateUsdValue(coinNameValues[i], coinFullName);

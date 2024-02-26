@@ -201,7 +201,7 @@
               <div class="py-3 px-6 rounded-tr-xl bg-coolGray-200 dark:bg-gray-600">
                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Details</span>
               </div>
-             </th>           
+             </th>
             </tr>
            </thead>
            <tbody>
@@ -238,7 +238,7 @@
               <td class="py-3 px-6 text-xs">
                <a class="inline-block w-20 py-1 px-2 font-medium text-center text-sm rounded-md bg-blue-500 text-white border border-blue-500 hover:bg-blue-600 transition duration-200 bg-blue-500 text-white hover:bg-blue-600 transition duration-200" href="/bid/{{ b[1] }}">Accept</a>
               </td>
-             {% endif %} 
+             {% endif %}
             </tr>
            </tbody>
            {% endfor %}
@@ -247,33 +247,35 @@
           <input type="hidden" name="pageno" value="{{ filters.page_no }}">
          </div>
         </div>
+
         <div class="rounded-b-md">
-         <div class="w-full md:w-0/12">
-          <div class="flex flex-wrap justify-end pt-6 pr-6 border-t border-gray-100 dark:border-gray-400">
-           <div class="w-full md:w-auto p-1.5">
-            <button type="submit" name='pageback' value="Page Back" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-blue-600 rounded-lg transition duration-200 focus:ring-0 focus:outline-none">
-             <svg aria-hidden="true" class="mr-2 w-5 h-5" fill="#fff" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-              <path fill-rule="evenodd" d="M7.707 14.707a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l2.293 2.293a1 1 0 010 1.414z" clip-rule="evenodd"></path>
-             </svg>
-             <span>Page Back</span>
-            </button>
-           </div>
-           <div class="flex items-center">
-            <div class="w-full md:w-auto p-1.5">
-             <p class="text-sm font-heading dark:text-white">Page: {{ filters.page_no }}</p>
+            <div class="w-full md:w-0/12">
+                <div class="flex flex-wrap justify-end pt-6 pr-6 border-t border-gray-100 dark:border-gray-400">
+                    {% if filters.page_no > 1 %}
+                    <div class="w-full md:w-auto p-1.5">
+                        <button type="submit" name='pageback' value="Previous" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-blue-600 rounded-lg transition duration-200 focus:ring-0 focus:outline-none">
+                            {{ page_back_svg | safe }}
+                            <span>Previous</span>
+                        </button>
+                    </div>
+                    {% endif %}
+                    <div class="flex items-center">
+                        <div class="w-full md:w-auto p-1.5">
+                            <p class="text-sm font-heading dark:text-white">Page: {{ filters.page_no }}</p>
+                        </div>
+                    </div>
+                    {% if bids_count > 10 %}
+                    <div class="w-full md:w-auto p-1.5">
+                            <button type="submit" name='pageforwards' value="Next" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-blue-600 rounded-lg transition duration-200 focus:ring-0 focus:outline-none">
+                                <span>Next</span>
+                                {{ page_forwards_svg | safe }}
+                            </button>
+                    </div>
+                    {% endif %}
+                </div>
             </div>
-           </div>
-           <div class="w-full md:w-auto p-1.5">
-            <button type="submit" name='pageforwards' value="Page Forwards" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-blue-600 rounded-lg transition duration-200 focus:ring-0 focus:outline-none">
-             <span>Page Forwards</span>
-             <svg aria-hidden="true" class="ml-2 w-5 h-5" fill="#fff" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-              <path fill-rule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd"></path>
-             </svg>
-            </button>
-           </div>
-          </div>
-         </div>
         </div>
+
      </form>
     </div>
    </div>

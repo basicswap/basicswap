@@ -5,6 +5,7 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import traceback
+import time
 
 from urllib import parse
 from .util import (
@@ -40,9 +41,7 @@ from basicswap.chainparams import (
     Coins,
 )
 
-
 default_chart_api_key = '95dd900af910656e0e17c41f2ddc5dba77d01bf8b0e7d2787634a16bd976c553'
-
 
 def value_or_none(v):
     if v == -1 or v == '-1':
@@ -662,6 +661,32 @@ def page_offer(self, url_split, post_string):
         'summary': summary,
     })
 
+def format_timestamp(timestamp):
+    current_time = int(time.time())
+    time_diff = current_time - timestamp
+
+    if time_diff <= 172800:  # Within the last 48 hours
+        hours_ago = time_diff // 3600
+        minutes_ago = (time_diff % 3600) // 60
+
+        if hours_ago == 0:  # Less than an hour ago
+            if minutes_ago == 1:
+                return "1 min"
+            else:
+                return f"{minutes_ago} mins"
+        elif hours_ago == 1:  # Within the last hour
+            if minutes_ago == 0:
+                return "1h ago"
+            else:
+                return f"1h {minutes_ago}min"
+        else:  # More than 1 hour ago
+            if minutes_ago == 0:
+                return f"{int(hours_ago)}h"
+            else:
+                return f"{int(hours_ago)}h {minutes_ago}min"
+    else:
+        return time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(timestamp))
+
 
 def page_offers(self, url_split, post_string, sent=False):
     server = self.server
@@ -729,8 +754,10 @@ def page_offers(self, url_split, post_string, sent=False):
         ci_to = swap_client.ci(Coins(o.coin_to))
         is_expired = o.expire_at <= now
         amount_negotiable = "Yes" if o.amount_negotiable else "No"
+        formatted_created_at = format_timestamp(o.created_at)
+        formatted_expired_at = format_timestamp(o.expire_at)
         formatted_offers.append((
-            format_timestamp(o.created_at),
+            formatted_created_at,
             o.offer_id.hex(),
             ci_from.coin_name(),
             ci_to.coin_name(),
@@ -743,6 +770,7 @@ def page_offers(self, url_split, post_string, sent=False):
             ci_from.format_amount(completed_amount),
             is_expired,
             o.active_ind,
+            formatted_expired_at,
             strSwapDesc(o.swap_type),
             amount_negotiable))
 
@@ -753,10 +781,12 @@ def page_offers(self, url_split, post_string, sent=False):
         chart_api_key_enc = swap_client.settings.get('chart_api_key_enc', '')
         chart_api_key = default_chart_api_key if chart_api_key_enc == '' else bytes.fromhex(chart_api_key_enc).decode('utf-8')
 
+    offers_count = len(formatted_offers)
+
     template = server.env.get_template('offers.html')
     return self.render_template(template, {
         'page_type': 'Your Offers' if sent else 'Network Order Book',
-        'page_button': 'hidden' if sent else '',
+        'page_button': 'hidden' if sent or offers_count <= 30 else '',  # Conditionally hide the button
         'page_type_description': 'Your entire offer history.' if sent else 'Consult available offers in the order book and initiate a coin swap.',
         'messages': messages,
         'show_chart': False if sent else swap_client.settings.get('show_chart', True),
@@ -768,4 +798,5 @@ def page_offers(self, url_split, post_string, sent=False):
         'offers': formatted_offers,
         'summary': summary,
         'sent_offers': sent,
+        'offers_count': offers_count,
     })
