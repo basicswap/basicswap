@@ -757,34 +757,34 @@ const chart = new Chart(ctx, {
                 <div class="pt-6 pb-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
                   <div class="px-6">
                     <div class="w-full mt-6 pb-6 overflow-x-auto">
-                      <table id="myTable" class="w-full min-w-max">
+                      <table class="w-full min-w-max">
 
                         <thead class="uppercase">
-                          <tr class="text-center">
+                          <tr>
                             <th class="p-0">
-                              <div class="py-3 px-6 rounded-tl-xl bg-coolGray-200 dark:bg-gray-600">
+                              <div class="py-3 px-6 rounded-tl-xl bg-coolGray-200 dark:bg-gray-600 ">
                                 <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Date/Time at</span>
                               </div>
                             </th>
                             <th class="p-0">
-                              <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
+                              <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600 text-left">
                                 <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Recipient</span>
                               </div>
                             </th>
                             <!--<th>ID</th>-->
                             <th class="p-0">
-                              <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
+                              <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600 text-left">
                                 <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">You get</span>
                               </div>
                             </th>
                             <th class="p-0">
-                              <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
+                              <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600 text-left">
                                 <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">You Send</span>
                               </div>
                             </th>
                             <th class="p-0">
-                              <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
-                                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Rate</span>
+                              <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600 text-left">
+                                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Details</span>
                               </div>
                             </th>
                             <!--<th>Amount From Swapped</th>-->
@@ -798,74 +798,85 @@ const chart = new Chart(ctx, {
 
                         <tbody>
                           {% for o in offers %}
-                          <tr class="text-center opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600 main-row"">
+                          <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
 
                             <!-- TIME + ACTIVE -->
-                            <td class="flex py-3 px-6 dark:text-white text-gray-900" title="Time">
-                            <svg alt="" class="w-5 h-5 rounded-full mt-5 ml-5 mr-5" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-                                <g stroke-linecap="round" stroke-width="2" fill="none" stroke="{% if o[12]==2 %}#AC0000{% elif o[11]==true %}#6b7280{% else %}#3B82F6{% endif %}" stroke-linejoin="round">
-                                  <circle cx="12" cy="12" r="11"></circle>
-                                  <polyline points=" 12,6 12,12 18,12 " stroke="{% if o[12]==2 %} #AC0000 {% elif o[11]==true %} #6b7280 {% else %} #3B82F6 {% endif %}"></polyline>
-                                </g>
-                              </svg>
-                              <div class="py-3 px-6 text-xs text-left" data-tooltip-target="tooltip-active" >
-                                  <div class="{% if o[11]==true or o[12]==2 %} dark:text-white {% else %} {% endif %} text-xs"><span class="bold">Posted:</span> {{ o[0] }} ago</div>
-                                  <div class="{% if o[11]==true or o[12]==2 %} dark:text-white {% else %} {% endif %} text-xs"><span class="bold">Expires in:</span> {{ o[13] }}</div>
-                              </div>
+                            <td class="py-3 px-6 text-xs">
+                                <div class="flex items-center justify-center">
+                                    <svg alt="" class="w-5 h-5 rounded-full mr-5" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
+                                        <g stroke-linecap="round" stroke-width="2" fill="none" stroke="{% if o[12]==2 %}#AC0000{% elif o[11]==true %}#6b7280{% else %}#3B82F6{% endif %}" stroke-linejoin="round">
+                                            <circle cx="12" cy="12" r="11"></circle>
+                                            <polyline points=" 12,6 12,12 18,12 " stroke="{% if o[12]==2 %} #AC0000 {% elif o[11]==true %} #6b7280 {% else %} #3B82F6 {% endif %}"></polyline>
+                                        </g>
+                                    </svg>
+                                    <div class="flex flex-col" data-tooltip-target="tooltip-active{{loop.index}}">
+                                        <div class="{% if o[11]==true or o[12]==2 %} dark:text-white {% else %} {% endif %} text-xs"><span class="bold">Posted:</span> {{ o[0] }} ago</div>
+                                        <div class="{% if o[11]==true or o[12]==2 %} dark:text-white {% else %} {% endif %} text-xs"><span class="bold">Expires in:</span> {{ o[13] }}</div>
+                                    </div>
+                                </div>
                             </td>
 
-                            <div id="tooltip-active" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+                            <div id="tooltip-active{{loop.index}}" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
                               <div class="active-revoked-expired"><span class="bold">{% if o[12]==2 %}Revoked{% elif o[11]==true %}Expired{% else %}Active{% endif %}</div>
                             <div class="tooltip-arrow" data-popper-arrow></div>
                             </div>
-
                             <!-- TIME + ACTIVE -->
 
                             <!--<td class="py-4 px-6 text-xs"><a class="monospace text-xs" href=/offer/{{ o[1] }}>{{ o[1]|truncate(6, True) }}</a></td>-->
                             <!--<td class="py-4 px-6 text-xs monospace">{{ o[8] }}{% if o[9]==true %} <b>Sent</b>{% endif %}</td>-->
 
                             <!-- RECIPIENT -->
-                            <td class="py-3 text-xs monospace">
-                              <a href="/identity/{{ o[8] }}{% if o[9]==true %}{% endif %}">{{ o[8] }}</a>
+                            <td class="py-3 text-xs monospace text-center">
+                              <a data-tooltip-target="tooltip-recipient{{loop.index}}" href="/identity/{{ o[8] }}{% if o[9]==true %}{% endif %}">{{ o[8]|truncate(20, true, '...', 0) }} </a>
                             </td>
+
+                            <div id="tooltip-recipient{{loop.index}}" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+                              <div class="active-revoked-expired"><span class="bold">{{ o[8] }}</div>
+                            <div class="tooltip-arrow" data-popper-arrow></div>
+                            </div>
                             <!-- RECIPIENT -->
 
-                            <!-- YOU GET ICON -->
+                            <!-- YOU GET YOUR OFFERR -->
                             {% if o[9] == true %}
                             <td class="py-3 px-6 text-xs">
-                              <div class="flex items-center">
-                                <span class="inline-flex align-middle items-center justify-center w-9 h-10 rounded"><img class="h-7" src="/static/images/coins/{{ o[3]|replace(" ", "-") }}.png" alt="{{ o[3] }}"></span>
+                              <div class="flex items-left">
+                                <span class="inline-flex align-middle items-center justify-center w-9 h-10 rounded mr-3"><img class="h-7" src="/static/images/coins/{{ o[3]|replace(" ", "-") }}.png" alt="{{ o[3] }}"></span>
                                 <div class="flex flex-col ml-2">
                                   <div class="coinname-value bold" data-coinname="{{ o[3] }}">
                                     {{ o[5]|truncate(8, true, '', 0) }} {{ o[3] }}
                                   </div>
                                   <div class="usd-value"></div>
-                                  <div class="coin-coin">{{ o[3] }}/{{ o[2] }}</div>
+                                  <div class="usd-value-converted-in-the-cryptocurrency"></div>
+                                  <div class="coin-coin hidden">{{ o[3] }}/{{ o[2] }}</div>
+                                  <div class="coin-coin">{{ o[17] }}/{{ o[16] }}</div>
                                 </div>
                               </div>
                             </td>
-                            <!-- YOU GET ICON -->
+                            <!-- YOU GET YOUR OFFERS -->
 
-                            <!-- YOU GET ICON OFFERS -->
+                            <!-- YOU GET NETWORK OFFERS -->
                             {% else %}
                             <td class="py-3 px-6 text-xs">
-                              <div class="flex items-center">
-                                <span class="inline-flex align-middle items-center justify-center w-9 h-10 rounded"><img class="h-7" src="/static/images/coins/{{ o[2]|replace(" ", "-") }}.png" alt="{{ o[2] }}"></span>
-                                <div class="flex flex-col ml-2">
-                                  <div class="coinname-value bold" data-coinname="{{ o[2] }}">
-                                    {{ o[4]|truncate(8, true, '', 0) }} {{ o[2] }}
-                                  </div>
-
-                                  <div class="usd-value"></div>
-                                  <div class="coin-coin">{{ o[2] }}/{{ o[3] }}</div>
+                                <div class="flex items-center">
+                                    <span class="inline-flex align-middle items-center justify-center w-9 h-10 rounded">
+                                        <img class="h-7" src="/static/images/coins/{{ o[2]|replace(" ", "-") }}.png" alt="{{ o[2] }}">
+                                    </span>
+                                    <div class="flex flex-col ml-5">
+                                      <div class="coinname bold" data-coinname="{{ o[2] }}">
+                                          {{ o[2] }}
+                                      </div>
+                                        <div class="coinname-value" data-coinname="{{ o[2] }}">
+                                            {{ o[4]|truncate(8, true, '', 0) }}  {{ o[16] }}/{{ o[17] }}
+                                        </div>
+                                        <div class="usd-value"></div>
+                                        <div class="usd-value-in-coin-value"></div>
+                                    </div>
                                 </div>
-                              </div>
                             </td>
                             {% endif %}
+                            <!-- YOU GET NETWORK OFFERS -->
 
-                            <!-- YOU GET ICON OFFERS -->
-
-                            <!-- YOU SEND ICON -->
+                            <!-- YOU SEND ICON  YOUR OFFERS -->
                             {% if o[9] == true %}
                             <td class="py-3 px-6 text-xs">
                               <div class="flex items-center">
@@ -875,58 +886,60 @@ const chart = new Chart(ctx, {
                                     {{ o[4]|truncate(8,true,'',0) }} {{ o[2] }}
                                   </div>
                                   <div class="usd-value"></div>
+                                  <div class="coin-value"></div>
                                     <div class="coin-coin">{{ o[2] }}/{{ o[3] }}</div>
                                 </div>
                               </div>
                             </td>
-                            <!-- YOU SEND ICON -->
+                            <!-- YOU SEND YOUR OFFERS ICON -->
 
-                            <!-- YOU SEND ICON OFFERS -->
+                            <!-- YOU SEND NETWORK OFFERS -->
                             {% else %}
                             <td class="py-3 px-6 text-xs">
-                              <div class="flex items-center">
-                                <span class="inline-flex align-middle items-center justify-center w-9 h-10 rounded"><img class="h-7" src="/static/images/coins/{{ o[3]|replace(" ", "-") }}.png" alt="{{ o[3] }}"></span>
-                                <div class="flex flex-col ml-2">
-                                  <div class="coinname-value bold" data-coinname="{{ o[3] }}">
-                                    {{ o[5]|truncate(8, true, '', 0) }} {{ o[3] }}
-                                  </div>
-                                  <div class="usd-value"></div>
-                                    <div class="coin-coin">{{ o[3] }}/{{ o[2] }}</div>
+                                <div class="flex items-center">
+                                    <span class=" inline-flex align-middle items-center justify-center w-9 h-10 rounded">
+                                        <img class="h-7" src="/static/images/coins/{{ o[3]|replace(" ", "-") }}.png" alt="{{ o[3] }}">
+                                    </span>
+                                    <div class="flex flex-col ml-5">
+                                      <div class="coinname bold" data-coinname="{{ o[3] }}">
+                                          {{ o[3] }}
+                                      </div>
+                                        <div class="coinname-value" data-coinname="{{ o[3] }}">
+                                            {{ o[5]|truncate(8, true, '', 0) }}  {{ o[17] }}/{{ o[16] }}
+                                        </div>
+                                        <div class="usd-value"></div>
+                                        <div class="usd-value-in-coin-value"></div>
+                                    </div>
                                 </div>
-                              </div>
                             </td>
                             {% endif %}
-                            <!-- YOU SEND ICON OFFERS -->
+                            <!-- YOU SEND NETWORK OFFERS -->
 
                             <!-- RATE -->
-                            <td class="py-3 px-6 text-xs">
-                              <div class="coinname-value hidden" data-coinname="{{ o[3] }}">{{ o[6]|truncate(8,true,'',0) }}</div>
-                              <div class="usd-value hidden"></div>
-                              <div class="profit-value hidden "></div>
-                              <div class="profit-loss"></div>
+                            <td class="py-3 px-6 text-xs rate-table-info">
+
+                                <div class="ratetype pt-1"><span class="bold">Rate:</span><span class="echange-rates" data-coinname="{{ o[3] }}"> {{ o[6]|truncate(8,true,'',0) }}</span>
+                                <div class="profit-name hidden">Profit Value:</div>
+                                <span class="profit-value hidden"></span>
+                                <div class="profittype pt-1"><span class="bold">Profit/Loss:</span><span class="pl-1 profit-loss"></span>
+                                <div class="swaptype pt-1"><span class="bold">Swap Type:</span> {{ o[14] }}</div>
+                                <div class="partial pt-1"><span class="bold">Amount Variable:</span> {{ o[15] }}</div>
+                                <div class="network pt-1"><span class="bold">Network:</span> {{ o[7] }}</div>
                             </td>
                             <!-- RATE -->
-
-                            <!--  <td class="py-4 px-6">{{ o[10] }}</td>-->
 
                             <!-- SWAP OR EDIT -->
-                            <td class="py-3 px-6">
-                              <a data-tooltip-target="tooltip-swaps" class="inline-block w-20 py-1 px-2 font-medium text-center text-sm rounded-md
-                              {% if o[9]==true %}  bg-blue-500 text-white border hover:bg-blue-600 dark:border-gray-700 bg-gray-700 transition duration-200
-                               {% else %} bg-blue-500 text-white hover:bg-blue-600 transition duration-200 {% endif %}" href="/offer/{{ o[1] }}">{% if o[9]==true %} Edit {% else %} Swap {% endif %}</a>
+                            <td class="py-3 px-6 text-center">
+                                <div class="flex justify-center items-center h-full">
+                                    <a class="inline-block w-20 py-1 px-2 font-medium text-center text-sm rounded-md {% if o[9]==true %} bg-blue-500 text-white border hover:bg-blue-600 dark:border-gray-700 bg-gray-700 transition duration-200 {% else %} bg-blue-500 text-white hover:bg-blue-600 transition duration-200 {% endif %}" href="/offer/{{ o[1] }}">
+                                        {% if o[9]==true %} Edit {% else %} Swap {% endif %}
+                                    </a>
+                                </div>
                             </td>
-
-                            <div id="tooltip-swaps hidden" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
-                              <div class="network"><span class="bold">Network:</span> {{ o[7] }}</div>
-                              <div class="swaptype pt-1"><span class="bold">Swap Type:</span> {{ o[14] }}</div><!-- fix - not showing the correct swap type -->
-                              <div class="partial pt-1"><span class="bold">Amount Variable:</span> {{ o[15] }}</div>
-                            <!-- todo <div class="partial pt-1"><span class="bold">Auto Accept/;</span> Yes</div> -->
-                            <div class="tooltip-arrow" data-popper-arrow></div>
-                            </div>
                             <!-- SWAP OR EDIT -->
                           </tr>
 
-                        </tbody>
+                      </tbody>
                         {% endfor %}
                       </table>
 
@@ -969,9 +982,9 @@ const chart = new Chart(ctx, {
     </div>
   </section>
 </div>
-{% include 'footer.html' %}
+
 <script>
-    const coinNameToSymbol = {
+  const coinNameToSymbol = {
     'Bitcoin': 'BTC',
     'Particl': 'PART',
     'Particl Blind': 'PART',
@@ -1101,5 +1114,6 @@ function updateProfitLoss(row) {
     }
   });
 </script>
+{% include 'footer.html' %}
 </body>
 </html>
