@@ -661,7 +661,9 @@ def page_offer(self, url_split, post_string):
         'summary': summary,
     })
 
-def format_timestamp(timestamp, is_expired=False):
+import time
+
+def format_timestamp(timestamp, with_ago=True, is_expired=False):
     current_time = int(time.time())
 
     if is_expired:
@@ -677,21 +679,21 @@ def format_timestamp(timestamp, is_expired=False):
 
         if hours_ago == 0:
             if minutes_ago == 1:
-                return "1 min"
+                return "1 min ago" if with_ago else "1 min"
             else:
-                return f"{minutes_ago} mins"
+                return f"{minutes_ago} mins ago" if with_ago else f"{minutes_ago} mins"
         elif hours_ago == 1:
             if minutes_ago == 0:
-                return "1h ago"
+                return "1h ago" if with_ago else "1h"
             else:
-                return f"1h {minutes_ago}min"
+                return f"1h {minutes_ago}min ago" if with_ago else f"1h {minutes_ago}min"
         else:
             if minutes_ago == 0:
-                return f"{int(hours_ago)}h"
+                return f"{int(hours_ago)}h ago" if with_ago else f"{int(hours_ago)}h"
             else:
-                return f"{int(hours_ago)}h {minutes_ago}min"
+                return f"{int(hours_ago)}h {minutes_ago}min ago" if with_ago else f"{int(hours_ago)}h {minutes_ago}min"
     else:
-        return time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(timestamp))
+        return time.strftime('%Y-%m-%d', time.localtime(timestamp))
 
 def page_offers(self, url_split, post_string, sent=False):
     server = self.server
@@ -753,14 +755,17 @@ def page_offers(self, url_split, post_string, sent=False):
 
     now: int = swap_client.getTime()
     formatted_offers = []
+    tla_from = ""
+    tla_to = ""
+
     for row in offers:
         o, completed_amount = row
         ci_from = swap_client.ci(Coins(o.coin_from))
         ci_to = swap_client.ci(Coins(o.coin_to))
         is_expired = o.expire_at <= now
         amount_negotiable = "Yes" if o.amount_negotiable else "No"
-        formatted_created_at = format_timestamp(o.created_at)
-        formatted_expired_at = format_timestamp(o.expire_at, is_expired=True)
+        formatted_created_at = format_timestamp(o.created_at, with_ago=True)
+        formatted_expired_at = format_timestamp(o.expire_at, with_ago=False, is_expired=True)
         tla_from = ci_from.ticker()
         tla_to = ci_to.ticker()
         formatted_offers.append((
@@ -781,7 +786,8 @@ def page_offers(self, url_split, post_string, sent=False):
             strSwapDesc(o.swap_type),
             amount_negotiable,
             tla_from,
-            tla_to))
+            tla_to
+        ))
 
     coins_from, coins_to = listAvailableCoins(swap_client, split_from=True)
 

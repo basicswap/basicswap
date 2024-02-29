@@ -810,7 +810,7 @@ const chart = new Chart(ctx, {
                                         </g>
                                     </svg>
                                     <div class="flex flex-col" data-tooltip-target="tooltip-active{{loop.index}}">
-                                        <div class="{% if o[11]==true or o[12]==2 %} dark:text-white {% else %} {% endif %} text-xs"><span class="bold">Posted:</span> {{ o[0] }} ago</div>
+                                        <div class="{% if o[11]==true or o[12]==2 %} dark:text-white {% else %} {% endif %} text-xs"><span class="bold">Posted:</span> {{ o[0] }}</div>
                                         <div class="{% if o[11]==true or o[12]==2 %} dark:text-white {% else %} {% endif %} text-xs"><span class="bold">Expires in:</span> {{ o[13] }}</div>
                                     </div>
                                 </div>
@@ -839,18 +839,21 @@ const chart = new Chart(ctx, {
                             <!-- YOU GET YOUR OFFERR -->
                             {% if o[9] == true %}
                             <td class="py-3 px-6 text-xs">
-                              <div class="flex items-left">
-                                <span class="inline-flex align-middle items-center justify-center w-9 h-10 rounded mr-3"><img class="h-7" src="/static/images/coins/{{ o[3]|replace(" ", "-") }}.png" alt="{{ o[3] }}"></span>
-                                <div class="flex flex-col ml-2">
-                                  <div class="coinname-value bold" data-coinname="{{ o[3] }}">
-                                    {{ o[5]|truncate(8, true, '', 0) }} {{ o[3] }}
-                                  </div>
-                                  <div class="usd-value"></div>
-                                  <div class="usd-value-converted-in-the-cryptocurrency"></div>
-                                  <div class="coin-coin hidden">{{ o[3] }}/{{ o[2] }}</div>
-                                  <div class="coin-coin">{{ o[17] }}/{{ o[16] }}</div>
+                                <div class="flex items-center">
+                                    <span class="inline-flex align-middle items-center justify-center w-9 h-10 rounded">
+                                        <img class="h-7" src="/static/images/coins/{{ o[3]|replace(" ", "-") }}.png" alt="{{ o[3] }}">
+                                    </span>
+                                    <div class="flex flex-col ml-5">
+                                      <div class="coinname bold" data-coinname="{{ o[3] }}">
+                                          {{ o[3] }}
+                                      </div>
+                                        <div class="coinname-value" data-coinname="{{ o[2] }}">
+                                            {{ o[5]|truncate(8, true, '', 0) }}  {{ o[17] }}/{{ o[16] }}
+                                        </div>
+                                        <div class="usd-value"></div>
+                                        <div class="usd-value-in-coin-value"></div>
+                                    </div>
                                 </div>
-                              </div>
                             </td>
                             <!-- YOU GET YOUR OFFERS -->
 
@@ -879,17 +882,21 @@ const chart = new Chart(ctx, {
                             <!-- YOU SEND ICON  YOUR OFFERS -->
                             {% if o[9] == true %}
                             <td class="py-3 px-6 text-xs">
-                              <div class="flex items-center">
-                                <span class="inline-flex align-middle items-center justify-center w-9 h-10 rounded"><img class="h-7" src="/static/images/coins/{{ o[2]|replace(" ", "-") }}.png" alt="{{ o[2] }}"></span>
-                                <div class="flex flex-col ml-2">
-                                  <div class="coinname-value bold" data-coinname="{{ o[2] }}">
-                                    {{ o[4]|truncate(8,true,'',0) }} {{ o[2] }}
-                                  </div>
-                                  <div class="usd-value"></div>
-                                  <div class="coin-value"></div>
-                                    <div class="coin-coin">{{ o[2] }}/{{ o[3] }}</div>
+                                <div class="flex items-center">
+                                    <span class=" inline-flex align-middle items-center justify-center w-9 h-10 rounded">
+                                        <img class="h-7" src="/static/images/coins/{{ o[2]|replace(" ", "-") }}.png" alt="{{ o[2] }}">
+                                    </span>
+                                    <div class="flex flex-col ml-5">
+                                      <div class="coinname bold" data-coinname="{{ o[2] }}">
+                                          {{ o[2] }}
+                                      </div>
+                                        <div class="coinname-value" data-coinname="{{ o[3] }}">
+                                            {{ o[4]|truncate(8, true, '', 0) }}  {{ o[16] }}/{{ o[17] }}
+                                        </div>
+                                        <div class="usd-value"></div>
+                                        <div class="usd-value-in-coin-value"></div>
+                                    </div>
                                 </div>
-                              </div>
                             </td>
                             <!-- YOU SEND YOUR OFFERS ICON -->
 
@@ -917,7 +924,6 @@ const chart = new Chart(ctx, {
 
                             <!-- RATE -->
                             <td class="py-3 px-6 text-xs rate-table-info">
-
                                 <div class="ratetype pt-1"><span class="bold">Rate:</span><span class="echange-rates" data-coinname="{{ o[3] }}"> {{ o[6]|truncate(8,true,'',0) }}</span>
                                 <div class="profit-name hidden">Profit Value:</div>
                                 <span class="profit-value hidden"></span>
@@ -963,7 +969,7 @@ const chart = new Chart(ctx, {
                                       <p class="text-sm font-heading dark:text-white">Page: {{ filters.page_no }}</p>
                                   </div>
                               </div>
-                              {% if offers_count > 10 %}
+                              {% if offers_count > 15 %}
                               <div class="w-full md:w-auto p-1.5">
                                       <button type="submit" name='pageforwards' value="Next" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-blue-600 rounded-lg transition duration-200 focus:ring-0 focus:outline-none">
                                           <span>Next</span>
