@@ -184,8 +184,6 @@ def page_bids(self, url_split, post_string, sent=False, available=False, receive
 
     bids = swap_client.listBids(sent=sent, filters=filters)
 
-    bids_count = len(bids)
-
     page_data = {
         'bid_states': listBidStates(),
     }
@@ -203,5 +201,5 @@ def page_bids(self, url_split, post_string, sent=False, available=False, receive
         'summary': summary,
         'bids': [(format_timestamp(b[0]),
                  b[2].hex(), b[3].hex(), strBidState(b[5]), strTxState(b[7]), strTxState(b[8]), b[11]) for b in bids],
-        'bids_count': bids_count,  # Pass the count of offers to the template
+        'bids_count': len(bids),
     })

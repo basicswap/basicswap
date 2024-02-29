@@ -25,7 +25,6 @@ from basicswap.db import (
 from basicswap.util import (
     ensure,
     format_amount,
-    format_timestamp,
 )
 from basicswap.basicswap_util import (
     SwapTypes,
@@ -42,6 +41,7 @@ from basicswap.chainparams import (
 )
 
 default_chart_api_key = '95dd900af910656e0e17c41f2ddc5dba77d01bf8b0e7d2787634a16bd976c553'
+
 
 def value_or_none(v):
     if v == -1 or v == '-1':
@@ -660,8 +660,6 @@ def page_offer(self, url_split, post_string):
         'addrs': None if show_bid_form is None else swap_client.listSmsgAddresses('bid'),
         'summary': summary,
     })
-
-import time
 
 def format_timestamp(timestamp, with_ago=True, is_expired=False):
     current_time = int(time.time())

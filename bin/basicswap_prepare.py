@@ -52,7 +52,7 @@ MONERO_VERSION = os.getenv('MONERO_VERSION', '0.18.3.1')
 MONERO_VERSION_TAG = os.getenv('MONERO_VERSION_TAG', '')
 XMR_SITE_COMMIT = '1bdb0d456943a224a4d6241b1bb713172e5fa29f'  # Lock hashes.txt to monero version
 
-PIVX_VERSION = os.getenv('PIVX_VERSION', '5.5.0')
+PIVX_VERSION = os.getenv('PIVX_VERSION', '5.6.1')
 PIVX_VERSION_TAG = os.getenv('PIVX_VERSION_TAG', '')
 
 DASH_VERSION = os.getenv('DASH_VERSION', '20.0.2')
@@ -96,7 +96,7 @@ expected_key_ids = {
     'JeremyRand': ('2DBE339E29F6294C',),
     'binaryfate': ('F0AF4D462A0BDF92',),
     'davidburkett38': ('3620E9D387E55666',),
-    'fuzzbawls': ('3BDCDA2D87A881D9',),
+    'fuzzbawls': ('C1ABA64407731FD9',),
     'pasta': ('52527BEDABE87984',),
     'reuben': ('1290A1D0FA7EE109',),
     'nav_builder': ('2782262BF6E7FADB',),
