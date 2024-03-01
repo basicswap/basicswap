@@ -662,31 +662,37 @@ def page_offer(self, url_split, post_string):
     })
 
 
-def format_timestamp(timestamp):
+def format_timestamp(timestamp, with_ago=True, is_expired=False):
     current_time = int(time.time())
-    time_diff = current_time - timestamp
 
-    if time_diff <= 172800:  # Within the last 48 hours
+    if is_expired:
+        time_diff = timestamp - current_time
+        if time_diff <= 0:
+            return "Expired"
+    else:
+        time_diff = current_time - timestamp
+
+    if time_diff <= 172800:
         hours_ago = time_diff // 3600
         minutes_ago = (time_diff % 3600) // 60
 
-        if hours_ago == 0:  # Less than an hour ago
+        if hours_ago == 0:
             if minutes_ago == 1:
-                return "1 min"
+                return "1 min ago" if with_ago else "1 min"
             else:
-                return f"{minutes_ago} mins"
-        elif hours_ago == 1:  # Within the last hour
+                return f"{minutes_ago} mins ago" if with_ago else f"{minutes_ago} mins"
+        elif hours_ago == 1:
             if minutes_ago == 0:
-                return "1h ago"
+                return "1h ago" if with_ago else "1h"
             else:
-                return f"1h {minutes_ago}min"
-        else:  # More than 1 hour ago
+                return f"1h {minutes_ago}min ago" if with_ago else f"1h {minutes_ago}min"
+        else:
             if minutes_ago == 0:
-                return f"{int(hours_ago)}h"
+                return f"{int(hours_ago)}h ago" if with_ago else f"{int(hours_ago)}h"
             else:
-                return f"{int(hours_ago)}h {minutes_ago}min"
+                return f"{int(hours_ago)}h {minutes_ago}min ago" if with_ago else f"{int(hours_ago)}h {minutes_ago}min"
     else:
-        return time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(timestamp))
+        return time.strftime('%Y-%m-%d', time.localtime(timestamp))
 
 
 def page_offers(self, url_split, post_string, sent=False):
@@ -749,14 +755,19 @@ def page_offers(self, url_split, post_string, sent=False):
 
     now: int = swap_client.getTime()
     formatted_offers = []
+    tla_from = ""
+    tla_to = ""
+
     for row in offers:
         o, completed_amount = row
         ci_from = swap_client.ci(Coins(o.coin_from))
         ci_to = swap_client.ci(Coins(o.coin_to))
         is_expired = o.expire_at <= now
         amount_negotiable = "Yes" if o.amount_negotiable else "No"
-        formatted_created_at = format_timestamp(o.created_at)
-        formatted_expired_at = format_timestamp(o.expire_at)
+        formatted_created_at = format_timestamp(o.created_at, with_ago=True)
+        formatted_expired_at = format_timestamp(o.expire_at, with_ago=False, is_expired=True)
+        tla_from = ci_from.ticker()
+        tla_to = ci_to.ticker()
         formatted_offers.append((
             formatted_created_at,
             o.offer_id.hex(),
@@ -773,7 +784,10 @@ def page_offers(self, url_split, post_string, sent=False):
             o.active_ind,
             formatted_expired_at,
             strSwapDesc(o.swap_type),
-            amount_negotiable))
+            amount_negotiable,
+            tla_from,
+            tla_to
+        ))
 
     coins_from, coins_to = listAvailableCoins(swap_client, split_from=True)
 
@@ -787,7 +801,7 @@ def page_offers(self, url_split, post_string, sent=False):
     template = server.env.get_template('offers.html')
     return self.render_template(template, {
         'page_type': 'Your Offers' if sent else 'Network Order Book',
-        'page_button': 'hidden' if sent or offers_count <= 30 else '',  # Conditionally hide the button
+        'page_button': 'hidden' if sent or offers_count <= 30 else '',
         'page_type_description': 'Your entire offer history.' if sent else 'Consult available offers in the order book and initiate a coin swap.',
         'messages': messages,
         'show_chart': False if sent else swap_client.settings.get('show_chart', True),
@@ -800,4 +814,6 @@ def page_offers(self, url_split, post_string, sent=False):
         'summary': summary,
         'sent_offers': sent,
         'offers_count': offers_count,
+        'tla_from': tla_from,
+        'tla_to': tla_to,
     })
