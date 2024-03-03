@@ -737,14 +737,14 @@ const chart = new Chart(ctx, {
                       {% endif %}
                       <div class="w-full md:w-auto p-1.5">
                         <div class="relative">
-                          <button type="submit" name='clearfilters' value="Clear Filters" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-white bg-blue-500 hover:bg-green-600 hover:border-green-600 rounded-lg transition duration-200 border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">{{ filter_clear_svg | safe }}
+                          <button type="submit" name='clearfilters' value="Clear Filters" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-white bg-gray-400 hover:bg-green-600 hover:border-green-600 rounded-lg transition duration-200 border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">{{ filter_clear_svg | safe }}
                             <span>Clear</span>
                           </button>
                         </div>  <!-- todo -->
                       </div>
                       <div class="w-full md:w-auto p-1.5">
                         <div class="relative">
-                          <button type="submit" name='applyfilters' value="Apply Filters" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-white bg-blue-500 hover:bg-green-600 hover:border-green-600 rounded-lg transition duration-200 border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">{{ filter_apply_svg | safe }}
+                          <button type="submit" name='applyfilters' value="Apply Filters" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-white bg-blue-600 hover:bg-green-600 hover:border-green-600 rounded-lg transition duration-200 border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">{{ filter_apply_svg | safe }}
                             <span>Apply Filters</span>
                           </button>
                         </div>
@@ -764,38 +764,38 @@ const chart = new Chart(ctx, {
                           <tr>
                             <th class="p-0">
                               <div class="py-3 px-4 justify-center rounded-tl-xl bg-coolGray-200 dark:bg-gray-600 ">
-                                <span class="text-xs mr-3 text-gray-600 dark:text-gray-300 font-semibold">Time</span>
+                                <span class="text-sm mr-3 text-gray-600 dark:text-gray-300 font-semibold">Time</span>
                               </div>
                             </th>
                             <!--<th>ID</th>-->
                             <th class="p-0 hidden xl:block">
                               <div class="py-3 px-0 bg-coolGray-200 dark:bg-gray-600 text-left">
-                                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Recipient</span>
+                                <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Recipient</span>
                               </div>
                             </th>
                             <th class="p-0 hidden">
                               <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-left">
-                                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">You Send</span>
+                                <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">You Send</span>
                               </div>
                             </th>
                             <th class="p-0">
                               <div class="py-3 px-0 bg-coolGray-200 dark:bg-gray-600 text-center">
-                                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Amount</span>
+                                <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Swap</span>
                               </div>
                             </th>
                             <th class="p-0">
                               <div class="py-3 px-3 bg-coolGray-200 dark:bg-gray-600 text-left">
-                                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Rate</span>
+                                <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Rate</span>
                               </div>
                             </th>
                             <th class="p-0">
                               <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-center">
-                                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Slippage</span>
+                                <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Market +/-</span>
                               </div>
                             </th>
                             <th class="p-0">
                               <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 rounded-tr-xl">
-                                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Trade</span>
+                                <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Trade</span>
                               </div>
                             </th>
                           </tr>
@@ -856,8 +856,8 @@ const chart = new Chart(ctx, {
                                           {{ o[3] }}
                                       </div>
                                       <div class="ratetype hidden"><span class="echange-rates" data-coinname="{{ o[3] }}"> {{ o[6]|truncate(6,true,'',0) }} {{ o[16] }}/{{ o[17] }}</span>
-                                      <div class="coinname-value hidden" data-coinname="{{ o[3] }}">
-                                          {{ o[5]|truncate(6, true, '', 0) }}
+                                      <div class="coinname-value hidden" data-coinname="{{ o[2] }}">
+                                          {{ o[4]|truncate(6, true, '', 0) }}
                                       </div>
                                       <div class="usd-value hidden"></div>
                                       <div class="usd-value-in-coin-value"></div>
@@ -921,8 +921,8 @@ const chart = new Chart(ctx, {
                                             <span class="echange-rates" data-coinname="{{ o[2] }}">
                                                 {{ o[6]|truncate(6,true,'',0) }} {{ o[17] }}/{{ o[16] }}
                                             </span>
-                                            <div class="coinname-value hidden" data-coinname="{{ o[2] }}">
-                                                {{ o[4]|truncate(7, true, '', 0) }}
+                                            <div class="coinname-value hidden" data-coinname="{{ o[3] }}">
+                                                {{ o[5]|truncate(7, true, '', 0) }}
                                             </div>
                                             <div class="usd-value hidden"></div>
                                             <div class="usd-value-in-coin-value"></div>
@@ -1016,7 +1016,7 @@ const chart = new Chart(ctx, {
                             <!-- SWAP OR EDIT -->
                             <td class="py-6 px-4 text-center">
                                 <div class="flex justify-center items-center h-full">
-                                    <a class="inline-block w-20 py-1 px-2 font-medium text-center text-sm rounded-md {% if o[9]==true %} bg-green-600 border-green:600 text-white hover:bg-green-600 dark:border-green-600 transition duration-200 {% else %} bg-blue-500 text-white hover:bg-green-600 transition duration-200 {% endif %}" href="/offer/{{ o[1] }}">
+                                    <a class="inline-block w-20 py-1 px-2 font-medium text-center text-sm rounded-md {% if o[9]==true %} bg-gray-600 border-green:600 text-white hover:bg-green-600 dark:border-green-600 transition duration-200 {% else %} bg-blue-500 text-white hover:bg-green-600 transition duration-200 {% endif %}" href="/offer/{{ o[1] }}">
                                         {% if o[9]==true %} Edit {% else %} Swap {% endif %}
                                     </a>
                                 </div>
