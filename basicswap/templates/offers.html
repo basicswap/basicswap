@@ -737,8 +737,8 @@ const chart = new Chart(ctx, {
                       {% endif %}
                       <div class="w-full md:w-auto p-1.5">
                         <div class="relative">
-                          <button type="submit" name='clearfilters' value="Clear Filters" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-white bg-gray-400 hover:bg-green-600 hover:border-green-600 rounded-lg transition duration-200 border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">{{ filter_clear_svg | safe }}
-                            <span>Clear</span>
+                          <button type="submit" name='clearfilters' value="Clear Filters" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm dark:text-white dark:bg-gray-500 bg-coolGray-200 hover:bg-green-600 hover:border-green-600 rounded-lg transition duration-200 border border-coolGray-200 dark:border-gray-400 rounded-md shadow-button focus:ring-0 focus:outline-none">
+                            <span>Clear Filters</span>
                           </button>
                         </div>  <!-- todo -->
                       </div>
@@ -1016,7 +1016,7 @@ const chart = new Chart(ctx, {
                             <!-- SWAP OR EDIT -->
                             <td class="py-6 px-4 text-center">
                                 <div class="flex justify-center items-center h-full">
-                                    <a class="inline-block w-20 py-1 px-2 font-medium text-center text-sm rounded-md {% if o[9]==true %} bg-gray-600 border-green:600 text-white hover:bg-green-600 dark:border-green-600 transition duration-200 {% else %} bg-blue-500 text-white hover:bg-green-600 transition duration-200 {% endif %}" href="/offer/{{ o[1] }}">
+                                    <a class="inline-block w-20 py-1 px-2 font-medium text-center text-sm rounded-md {% if o[9]==true %} bg-gray-600 dark:border-gray-300 text-white hover:bg-green-600 transition duration-200 {% else %} bg-blue-500 text-white hover:bg-green-600 transition duration-200 {% endif %}" href="/offer/{{ o[1] }}">
                                         {% if o[9]==true %} Edit {% else %} Swap {% endif %}
                                     </a>
                                 </div>
