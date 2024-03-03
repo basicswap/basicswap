@@ -661,6 +661,7 @@ def page_offer(self, url_split, post_string):
         'summary': summary,
     })
 
+
 def format_timestamp(timestamp, with_ago=True, is_expired=False):
     current_time = int(time.time())
 
@@ -692,6 +693,7 @@ def format_timestamp(timestamp, with_ago=True, is_expired=False):
                 return f"{int(hours_ago)}h {minutes_ago}min ago" if with_ago else f"{int(hours_ago)}h {minutes_ago}min"
     else:
         return time.strftime('%Y-%m-%d', time.localtime(timestamp))
+
 
 def page_offers(self, url_split, post_string, sent=False):
     server = self.server
