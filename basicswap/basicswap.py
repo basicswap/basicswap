@@ -104,6 +104,7 @@ from .db import (
     AutomationLink,
     AutomationStrategy,
     MessageLink,
+    pack_state,
 )
 from .db_upgrades import upgradeDatabase, upgradeDatabaseData
 from .base import BaseApp
@@ -230,26 +231,30 @@ class BasicSwap(BaseApp):
         self._version = struct.pack('>HHH', int(v[0]), int(v[1]), int(v[2]))
 
         self._transient_instance = transient_instance
-        self.check_progress_seconds = self.get_int_setting('check_progress_seconds', 60, 1, 10 * 60)
-        self.check_watched_seconds = self.get_int_setting('check_watched_seconds', 60, 1, 10 * 60)
-        self.check_expired_seconds = self.get_int_setting('check_expired_seconds', 5 * 60, 1, 10 * 60)
         self.check_actions_seconds = self.get_int_setting('check_actions_seconds', 10, 1, 10 * 60)
+        self.check_expired_seconds = self.get_int_setting('check_expired_seconds', 5 * 60, 1, 10 * 60)  # Expire DB records and smsg messages
+        self.check_expiring_bids_offers_seconds = self.get_int_setting('check_expiring_bids_offers_seconds', 60, 1, 10 * 60)  # Set offer and bid states to expired
+        self.check_progress_seconds = self.get_int_setting('check_progress_seconds', 60, 1, 10 * 60)
+        self.check_smsg_seconds = self.get_int_setting('check_smsg_seconds', 10, 1, 10 * 60)
+        self.check_watched_seconds = self.get_int_setting('check_watched_seconds', 60, 1, 10 * 60)
         self.check_xmr_swaps_seconds = self.get_int_setting('check_xmr_swaps_seconds', 20, 1, 10 * 60)
         self.startup_tries = self.get_int_setting('startup_tries', 21, 1, 100)  # Seconds waited for will be (x(1 + x+1) / 2
         self.debug_ui = self.settings.get('debug_ui', False)
         self._debug_cases = []
-        self._last_checked_progress = 0
-        self._last_checked_watched = 0
-        self._last_checked_expired = 0
         self._last_checked_actions = 0
+        self._last_checked_expired = 0
+        self._last_checked_expiring_bids_offers = 0
+        self._last_checked_progress = 0
+        self._last_checked_smsg = 0
+        self._last_checked_watched = 0
         self._last_checked_xmr_swaps = 0
         self._possibly_revoked_offers = collections.deque([], maxlen=48)  # TODO: improve
+        self._expiring_bids = []  # List of bids expiring soon
+        self._expiring_offers = []  # List of offers expiring soon
         self._updating_wallets_info = {}
         self._last_updated_wallets_info = 0
         self._zmq_queue_enabled = self.settings.get('zmq_queue_enabled', True)
         self._poll_smsg = self.settings.get('poll_smsg', False)
-        self.check_smsg_seconds = self.get_int_setting('check_smsg_seconds', 10, 1, 10 * 60)
-        self._last_checked_smsg = 0
 
         self._notifications_enabled = self.settings.get('notifications_enabled', True)
         self._disabled_notification_types = self.settings.get('disabled_notification_types', [])
@@ -6173,7 +6178,88 @@ class BasicSwap(BaseApp):
 
         self.processMsg(msg)
 
+    def expireBidsAndOffers(self, now) -> None:
+        bids_to_expire = set()
+        offers_to_expire = set()
+        check_records: bool = False
+
+        for i, (bid_id, expired_at) in enumerate(self._expiring_bids):
+            if expired_at <= now:
+                bids_to_expire.add(bid_id)
+                self._expiring_bids.pop(i)
+        for i, (offer_id, expired_at) in enumerate(self._expiring_offers):
+            if expired_at <= now:
+                offers_to_expire.add(offer_id)
+                self._expiring_offers.pop(i)
+
+        if now - self._last_checked_expiring_bids_offers >= self.check_expiring_bids_offers_seconds:
+            check_records = True
+            self._last_checked_expiring_bids = now
+
+        if len(bids_to_expire) == 0 and len(offers_to_expire) == 0 and check_records is False:
+            return
+
+        bids_expired: int = 0
+        offers_expired: int = 0
+        try:
+            session = self.openSession()
+
+            if check_records:
+                query = '''SELECT 1, bid_id, expire_at FROM bids WHERE active_ind = 1 AND state IN (:bid_received, :bid_sent) AND expire_at <= :check_time
+                           UNION ALL
+                           SELECT 2, offer_id, expire_at FROM offers WHERE active_ind = 1 AND state IN (:offer_received, :offer_sent) AND expire_at <= :check_time
+                '''
+                q = session.execute(query, {'bid_received': int(BidStates.BID_RECEIVED),
+                                            'offer_received': int(OfferStates.OFFER_RECEIVED),
+                                            'bid_sent': int(BidStates.BID_SENT),
+                                            'offer_sent': int(OfferStates.OFFER_SENT),
+                                            'check_time': now + self.check_expiring_bids_offers_seconds})
+                for entry in q:
+                    record_id = entry[1]
+                    expire_at = entry[2]
+                    if entry[0] == 1:
+                        if expire_at > now:
+                            self._expiring_bids.append((record_id, expire_at))
+                        else:
+                            bids_to_expire.add(record_id)
+                    elif entry[0] == 2:
+                        if expire_at > now:
+                            self._expiring_offers.append((record_id, expire_at))
+                        else:
+                            offers_to_expire.add(record_id)
+
+            for bid_id in bids_to_expire:
+                query = 'SELECT expire_at, states FROM bids WHERE bid_id = :bid_id AND active_ind = 1 AND state IN (:bid_received, :bid_sent)'
+                rows = session.execute(query, {'bid_id': bid_id,
+                                               'bid_received': int(BidStates.BID_RECEIVED),
+                                               'bid_sent': int(BidStates.BID_SENT)}).fetchall()
+                if len(rows) > 0:
+                    new_state: int = int(BidStates.BID_EXPIRED)
+                    states = (bytes() if rows[0][1] is None else rows[0][1]) + pack_state(new_state, now)
+                    query = 'UPDATE bids SET state = :new_state, states = :states WHERE bid_id = :bid_id'
+                    session.execute(query, {'bid_id': bid_id, 'new_state': new_state, 'states': states})
+                    bids_expired += 1
+            for offer_id in offers_to_expire:
+                query = 'SELECT expire_at, states FROM offers WHERE offer_id = :offer_id AND active_ind = 1 AND state IN (:offer_received, :offer_sent)'
+                rows = session.execute(query, {'offer_id': offer_id,
+                                               'offer_received': int(OfferStates.OFFER_RECEIVED),
+                                               'offer_sent': int(OfferStates.OFFER_SENT)}).fetchall()
+                if len(rows) > 0:
+                    new_state: int = int(OfferStates.OFFER_EXPIRED)
+                    states = (bytes() if rows[0][1] is None else rows[0][1]) + pack_state(new_state, now)
+                    query = 'UPDATE offers SET state = :new_state, states = :states WHERE offer_id = :offer_id'
+                    session.execute(query, {'offer_id': offer_id, 'new_state': new_state, 'states': states})
+                    offers_expired += 1
+        finally:
+            self.closeSession(session)
+
+        if bids_expired + offers_expired > 0:
+            mb = '' if bids_expired == 1 else 's'
+            mo = '' if offers_expired == 1 else 's'
+            self.log.debug(f'Expired {bids_expired} bid{mb} and {offers_expired} offer{mo}')
+
     def update(self) -> None:
+        # Run every half second from basicswap-run
         if self._zmq_queue_enabled:
             try:
                 if self._read_zmq_queue:
@@ -6198,6 +6284,8 @@ class BasicSwap(BaseApp):
         try:
             # TODO: Wait for blocks / txns, would need to check multiple coins
             now: int = self.getTime()
+            self.expireBidsAndOffers(now)
+
             if now - self._last_checked_progress >= self.check_progress_seconds:
                 to_remove = []
                 for bid_id, v in self.swaps_in_progress.items():

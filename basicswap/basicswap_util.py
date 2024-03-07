@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2021-2023 tecnovert
+# Copyright (c) 2021-2024 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -70,6 +70,7 @@ class OfferStates(IntEnum):
     OFFER_SENT = 1
     OFFER_RECEIVED = 2
     OFFER_ABANDONED = 3
+    OFFER_EXPIRED = 4
 
 
 class BidStates(IntEnum):
@@ -103,6 +104,7 @@ class BidStates(IntEnum):
     XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX = 28     # XmrBidLockSpendTxMessage
     BID_REQUEST_SENT = 29
     BID_REQUEST_ACCEPTED = 30
+    BID_EXPIRED = 31
 
 
 class TxStates(IntEnum):
@@ -248,6 +250,8 @@ def strOfferState(state):
         return 'Received'
     if state == OfferStates.OFFER_ABANDONED:
         return 'Abandoned'
+    if state == OfferStates.OFFER_EXPIRED:
+        return 'Expired'
     return 'Unknown'
 
 
@@ -312,7 +316,8 @@ def strBidState(state):
         return 'Request accepted'
     if state == BidStates.BID_STATE_UNKNOWN:
         return 'Unknown bid state'
-
+    if state == BidStates.BID_EXPIRED:
+        return 'Expired'
     return 'Unknown' + ' ' + str(state)
 
 
@@ -503,7 +508,7 @@ def strSwapDesc(swap_type):
     return None
 
 
-inactive_states = [BidStates.SWAP_COMPLETED, BidStates.BID_ERROR, BidStates.BID_REJECTED, BidStates.SWAP_TIMEDOUT, BidStates.BID_ABANDONED]
+inactive_states = [BidStates.SWAP_COMPLETED, BidStates.BID_ERROR, BidStates.BID_REJECTED, BidStates.SWAP_TIMEDOUT, BidStates.BID_ABANDONED, BidStates.BID_EXPIRED]
 
 
 def isActiveBidState(state):
