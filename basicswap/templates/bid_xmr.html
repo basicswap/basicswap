@@ -833,7 +833,7 @@
                      <button name="abandon_bid" type="submit" value="Abandon Bid" onclick="return confirmPopup();" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-white hover:text-red border border-red-500 hover:border-red-500 hover:bg-red-600 bg-red-500 rounded-md focus:ring-0 focus:outline-none">Abandon Bid</button>
                     </div>
                      {% endif %}
-                      {% if data.was_received == 'True' and not edit_bid %}
+                      {% if data.was_received == 'True' and not edit_bid and data.can_accept_bid %}
                       <div class="w-full md:w-auto p-1.5">
                      <button name="accept_bid" value="Accept Bid" type="submit" onclick='return confirmPopup("Accept");' class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md focus:ring-0 focus:outline-none">Accept Bid</button>
                     </div>
