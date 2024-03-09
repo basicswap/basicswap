@@ -768,9 +768,9 @@ const chart = new Chart(ctx, {
                               </div>
                             </th>
                             <!--<th>ID</th>-->
-                            <th class="p-0 hidden xl:block">
-                              <div class="py-3 px-0 bg-coolGray-200 dark:bg-gray-600 text-left">
-                                <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Recipient</span>
+                            <th class="p-0">
+                              <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
+                                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Details</span>
                               </div>
                             </th>
                             <th class="p-0 hidden">
@@ -833,15 +833,22 @@ const chart = new Chart(ctx, {
                             <!--<td class="py-4 px-4 text-xs"><a class="monospace text-xs" href=/offer/{{ o[1] }}>{{ o[1]|truncate(6, True) }}</a></td>-->
                             <!--<td class="py-4 px-4 text-xs monospace">{{ o[8] }}{% if o[9]==true %} <b>Sent</b>{% endif %}</td>-->
 
-                            <!-- RECIPIENT -->
-                            <td class="py-8 text-xs monospace text-left hidden xl:block">
-                              <a data-tooltip-target="tooltip-recipient{{loop.index}}" href="/identity/{{ o[8] }}{% if o[9]==true %}{% endif %}">{{ o[8]|truncate(17, true, '...', 0) }} </a>
-                            </td>
+                            <!-- DETAILS -->
+                            <td class="py-3 px-0 text-xs">
+                              <div class="network"><span class="bold">Network:</span> {{ o[7] }}</div>
+                              <!-- div class="partial pt-1"><span class="bold">Amount Variable:</span> {{ o[14] }}</div> -->
+                              <div class="swaptype"><span class="bold">Swap Type:</span> {{ o[14] }}</div>
+                              <a data-tooltip-target="tooltip-recipient{{loop.index}}" href="/identity/{{ o[8] }}{% if o[9]==true %}{% endif %}"><span class="bold">Recipient:</span> {{ o[8]|truncate(10, true, '...', 0) }}</a>
 
                             <div id="tooltip-recipient{{loop.index}}" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
                               <div class="active-revoked-expired"><span class="bold">{{ o[8] }}</div>
                             <div class="tooltip-arrow" data-popper-arrow></div>
                             </div>
+                            <!-- {% if o[12]==2 %}(Revoked){% elif o[11]==true %}(Not Active){% else %}(Active){% endif %} -->
+                            </td>
+                            <!-- DETAILS -->
+
+                            <!-- RECIPIENT -->
                             <!-- RECIPIENT -->
 
                             <!-- YOU REQUESTING FROM TAKER / NOBOOK -->
@@ -891,10 +898,23 @@ const chart = new Chart(ctx, {
 
                             <!-- YOUR OFFERS / MAKER / BOOK -->
                             {% if o[9] == true %}
-                            <td class="py-0 px-6 text-right text-sm">
+                            <td class="py-0 px-6 text-right text-sm mx-20">
                                 <div class="flex items-center justify-evenly monospace">
+                                    <div class="flex flex-col text-left mr-5 ml-5">
+                                      <div class="coinname bold" data-coinname="{{ o[3] }}">
+                                          {{ o[5]|truncate(9, true, '', 0) }}
+                                      </div>
+                                          {{ o[3] }}
+                                        <div class="ratetype hidden"><span class="echange-rates" data-coinname="{{ o[3] }}"> {{ o[6]|truncate(6,true,'',0) }} {{ o[16] }}/{{ o[17] }}</span>
+                                        <div class="coinname-value hidden" data-coinname="{{ o[3] }}">
+                                          {{ o[5]|truncate(7, true, '', 0) }}
+                                        </div>
+                                      <div class="usd-value hidden"></div>
+                                      <div class="usd-value-in-coin-value"></div>
+                                    </div>
+                                </div>
                                         <a data-tooltip-target="tooltip-wallet{{loop.index}}" href="/wallet/{{ o[17] }}">
-                                    <span class="mr-3 inline-flex align-middle items-center justify-center w-18 h-20 rounded">
+                                    <span class="mr-3 ml-3 inline-flex align-middle items-center justify-center w-18 h-20 rounded">
                                         <img class="h-12" src="/static/images/coins/{{ o[3]|replace(" ", "-") }}.png" alt="{{ o[3] }}">
                                     </span></a>
                                      {{ arrow_right_svg | safe }}
@@ -903,7 +923,7 @@ const chart = new Chart(ctx, {
                                            <div class="tooltip-arrow pr-6" data-popper-arrow></div>
                                         </div>
                                         <a data-tooltip-target="tooltip-maker-wallet{{loop.index}}" href="/wallet/{{ o[16] }}">
-                                    <span class=" inline-flex ml-3 align-middle items-center justify-center w-18 h-20 rounded">
+                                    <span class=" inline-flex ml-3 mr-3 align-middle items-center justify-center w-18 h-20 rounded">
                                         <img class="h-12" src="/static/images/coins/{{ o[2]|replace(" ", "-") }}.png" alt="{{ o[2] }}">
                                     </span></a>
                                         <div id="tooltip-maker-wallet{{loop.index}}" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
@@ -912,9 +932,9 @@ const chart = new Chart(ctx, {
                                         </div>
                                         <a data-tooltip-target="tooltip-maker{{loop.index}}" href="/offer/{{ o[1] }}">
 
-                                    <div class="flex flex-col ml-5">
+                                    <div class="flex flex-col ml-5 mr-5">
                                         <div class="coinname bold w-24" data-coinname="{{ o[2] }}">
-                                            {{ o[4]|truncate(7, true, '', 0) }}
+                                            {{ o[4]|truncate(9, true, '', 0) }}
                                         </div>
                                         {{ o[2] }}
                                         <div class="ratetype italic hidden">
@@ -938,10 +958,23 @@ const chart = new Chart(ctx, {
 
                             <!-- NETWORK OFFERS / MAKER / BOOK -->
                             {% else %}
-                            <td class="py-0 px-6 text-right text-sm">
+                            <td class="py-0 px-6 text-right text-sm mx-20">
                                 <div class="flex items-center justify-evenly monospace">
+                                    <div class="flex flex-col text-left mr-5 ml-5">
+                                      <div class="coinname bold" data-coinname="{{ o[3] }}">
+                                          {{ o[4]|truncate(9, true, '', 0) }}
+                                      </div>
+                                          {{ o[3] }}
+                                      <div class="ratetype hidden"><span class="echange-rates" data-coinname="{{ o[3] }}"> {{ o[6]|truncate(6,true,'',0) }} {{ o[16] }}/{{ o[17] }}</span>
+                                      <div class="coinname-value hidden" data-coinname="{{ o[2] }}">
+                                          {{ o[4]|truncate(6, true, '', 0) }}
+                                      </div>
+                                      <div class="usd-value hidden"></div>
+                                      <div class="usd-value-in-coin-value"></div>
+                                    </div>
+                                </div>
                                         <a data-tooltip-target="tooltip-wallet{{loop.index}}" href="/wallet/{{ o[17] }}">
-                                    <span class="inline-flex mr-3 align-middle items-center justify-center w-18 h-20 rounded">
+                                    <span class="inline-flex mr-3 ml-3 align-middle items-center justify-center w-18 h-20 rounded">
                                         <img class="h-12" src="/static/images/coins/{{ o[3]|replace(" ", "-") }}.png" alt="{{ o[3] }}">
                                     </span></a>
                                      {{ arrow_right_svg | safe }}
@@ -952,7 +985,7 @@ const chart = new Chart(ctx, {
                                         </div>
 
                                         <a data-tooltip-target="tooltip-maker-wallet{{loop.index}}" href="/wallet/{{ o[16] }}">
-                                    <span class="inline-flex ml-3 align-middle items-center justify-center w-18 h-20 rounded">
+                                    <span class="inline-flex ml-3 mr-3 align-middle items-center justify-center w-18 h-20 rounded">
                                         <img class="h-12" src="/static/images/coins/{{ o[2]|replace(" ", "-") }}.png" alt="{{ o[2] }}">
                                     </span></a>
 
@@ -962,9 +995,9 @@ const chart = new Chart(ctx, {
                                         </div>
                                         <a data-tooltip-target="tooltip-offer{{loop.index}}" href="/offer/{{ o[1] }}">
 
-                                          <div class="flex flex-col ml-5">
+                                          <div class="flex flex-col ml-5 mr-5">
                                               <div class="coinname bold w-24" data-coinname="{{ o[2] }}">
-                                                  {{ o[4]|truncate(7, true, '', 0) }}
+                                                  {{ o[4]|truncate(9, true, '', 0) }}
                                               </div>
                                               {{ o[2] }}
                                               <div class="ratetype italic hidden">
