@@ -891,7 +891,7 @@ const chart = new Chart(ctx, {
 
                             <!-- YOUR OFFERS / MAKER / BOOK -->
                             {% if o[9] == true %}
-                            <td class="py-0 px-6 text-xs">
+                            <td class="py-0 px-6 text-right text-sm">
                                 <div class="flex items-center justify-evenly monospace">
                                         <a data-tooltip-target="tooltip-wallet{{loop.index}}" href="/wallet/{{ o[17] }}">
                                     <span class="mr-3 inline-flex align-middle items-center justify-center w-18 h-20 rounded">
@@ -912,12 +912,12 @@ const chart = new Chart(ctx, {
                                         </div>
                                         <a data-tooltip-target="tooltip-maker{{loop.index}}" href="/offer/{{ o[1] }}">
 
-                                    <div class="flex flex-col text-sm ml-5">
-                                        <div class="coinname bold text-right w-24" data-coinname="{{ o[2] }}">
+                                    <div class="flex flex-col ml-5">
+                                        <div class="coinname bold w-24" data-coinname="{{ o[2] }}">
                                             {{ o[4]|truncate(7, true, '', 0) }}
                                         </div>
                                         {{ o[2] }}
-                                        <div class="ratetype text-xs italic hidden">
+                                        <div class="ratetype italic hidden">
                                             <span class="echange-rates" data-coinname="{{ o[2] }}">
                                                 {{ o[6]|truncate(6,true,'',0) }} {{ o[17] }}/{{ o[16] }}
                                             </span>
@@ -938,7 +938,7 @@ const chart = new Chart(ctx, {
 
                             <!-- NETWORK OFFERS / MAKER / BOOK -->
                             {% else %}
-                            <td class="py-0 px-6 text-xs">
+                            <td class="py-0 px-6 text-right text-sm">
                                 <div class="flex items-center justify-evenly monospace">
                                         <a data-tooltip-target="tooltip-wallet{{loop.index}}" href="/wallet/{{ o[17] }}">
                                     <span class="inline-flex mr-3 align-middle items-center justify-center w-18 h-20 rounded">
@@ -962,12 +962,12 @@ const chart = new Chart(ctx, {
                                         </div>
                                         <a data-tooltip-target="tooltip-offer{{loop.index}}" href="/offer/{{ o[1] }}">
 
-                                          <div class="flex flex-col text-sm ml-5">
-                                              <div class="coinname bold text-right w-24" data-coinname="{{ o[2] }}">
+                                          <div class="flex flex-col ml-5">
+                                              <div class="coinname bold w-24" data-coinname="{{ o[2] }}">
                                                   {{ o[4]|truncate(7, true, '', 0) }}
                                               </div>
                                               {{ o[2] }}
-                                              <div class="ratetype text-xs italic hidden">
+                                              <div class="ratetype italic hidden">
                                                   <span class="echange-rates" data-coinname="{{ o[2] }}">
                                                       {{ o[6]|truncate(6,true,'',0) }} {{ o[17] }}/{{ o[16] }}
                                                   </span>
