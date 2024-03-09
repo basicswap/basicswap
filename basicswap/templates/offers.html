@@ -1069,7 +1069,7 @@ const chart = new Chart(ctx, {
 </div>
 
 <script>
-  const coinNameToSymbol = {
+const coinNameToSymbol = {
     'Bitcoin': 'BTC',
     'Particl': 'PART',
     'Particl Blind': 'PART',
@@ -1079,125 +1079,134 @@ const chart = new Chart(ctx, {
     'Firo': 'FIRO',
     'Dash': 'DASH',
     'PIVX': 'PIVX'
-  };
+};
 
-  const exchangeRateCache = {};
+const exchangeRateCache = {};
 
-  function updateUsdValue(cryptoCell, coinFullName, isRate = false) {
+function updateUsdValue(cryptoCell, coinFullName, isRate = false) {
     const coinSymbol = coinNameToSymbol[coinFullName];
     if (!coinSymbol) {
-      console.error(`Coin symbol not found for full name: ${coinFullName}`);
-      return;
+        console.error(`Coin symbol not found for full name: ${coinFullName}`);
+        return;
     }
 
     const cryptoValue = parseFloat(cryptoCell.textContent);
     const usdCell = cryptoCell.nextElementSibling;
+    if (usdCell) {
+        // Check if the exchange rate is in the cache and is not expired
+        if (exchangeRateCache[coinSymbol] && !isCacheExpired(coinSymbol)) {
+            console.log(`Using cached exchange rate for ${coinSymbol}`);
+            const exchangeRate = exchangeRateCache[coinSymbol].rate;
+            const cryptoValue = parseFloat(cryptoCell.textContent);
+            const usdValue = cryptoValue * exchangeRate;
+            usdCell.textContent = `${usdValue.toFixed(2)} USD`;
+
+            updateProfitLoss(cryptoCell.closest('tr'));
+            updateProfitValue(cryptoCell.closest('tr'));
+        }
+    } else {
+    }
 
     if (isRate) {
-      const rateCell = usdCell.nextElementSibling;
-      const usdValue = rateCell.previousElementSibling.textContent * cryptoValue;
-      usdCell.textContent = `${usdValue.toFixed(2)} USD`;
+        const rateCell = usdCell.nextElementSibling;
+        if (rateCell) {
+            const usdValue = rateCell.previousElementSibling.textContent * cryptoValue;
+            usdCell.textContent = `${usdValue.toFixed(2)} USD`;
+        } else {
+            console.error("Rate cell does not exist.");
+        }
     } else {
-      const apiUrl = `https://min-api.cryptocompare.com/data/price?fsym=${coinSymbol}&tsyms=USD`;
+        const apiUrl = `https://min-api.cryptocompare.com/data/price?fsym=${coinSymbol}&tsyms=USD`;
 
-      // Check if the exchange rate is in the cache and is not expired
-      if (exchangeRateCache[coinSymbol] && !isCacheExpired(coinSymbol)) {
-        console.log(`Using cached exchange rate for ${coinSymbol}`);
-        const exchangeRate = exchangeRateCache[coinSymbol].rate;
-        const usdValue = cryptoValue * exchangeRate;
-        usdCell.textContent = `${usdValue.toFixed(2)} USD`;
+        // Check if the exchange rate is in the cache and is not expired
+        if (exchangeRateCache[coinSymbol] && !isCacheExpired(coinSymbol)) {
+            console.log(`Using cached exchange rate for ${coinSymbol}`);
+            const exchangeRate = exchangeRateCache[coinSymbol].rate;
+            const usdValue = cryptoValue * exchangeRate;
+            usdCell.textContent = `${usdValue.toFixed(2)} USD`;
 
-        updateProfitLoss(cryptoCell.closest('tr'));
-        updateProfitValue(cryptoCell.closest('tr'));
-      } else {
-        console.log(`Fetching exchange rate from API for ${coinSymbol}`);
-        fetch(apiUrl)
-          .then(response => response.json())
-          .then(data => {
-            const exchangeRate = data.USD;
-            if (!isNaN(exchangeRate)) {
-              console.log(`Received exchange rate from API for ${coinSymbol}`);
-              const usdValue = cryptoValue * exchangeRate;
-              usdCell.textContent = `${usdValue.toFixed(2)} USD`;
+            updateProfitLoss(cryptoCell.closest('tr'));
+            updateProfitValue(cryptoCell.closest('tr'));
+        } else {
+            console.log(`Fetching exchange rate from API for ${coinSymbol}`);
+            fetch(apiUrl)
+                .then(response => response.json())
+                .then(data => {
+                    const exchangeRate = data.USD;
+                    if (!isNaN(exchangeRate)) {
+                        console.log(`Received exchange rate from API for ${coinSymbol}`);
+                        const usdValue = cryptoValue * exchangeRate;
+                        usdCell.textContent = `${usdValue.toFixed(2)} USD`;
 
-              exchangeRateCache[coinSymbol] = {
-                rate: exchangeRate,
-                timestamp: Date.now(),
-                ttl: 300000 // 5 minutes
-              };
+                        exchangeRateCache[coinSymbol] = {
+                            rate: exchangeRate,
+                            timestamp: Date.now(),
+                            ttl: 300000 // 5 minutes
+                        };
 
-              updateProfitLoss(cryptoCell.closest('tr'));
-              updateProfitValue(cryptoCell.closest('tr'));
-            } else {
-              console.error('Invalid exchange rate. Response:', data);
-              usdCell.textContent = 'Invalid exchange rate';
-            }
-          })
-          .catch(error => {
-            console.error('Error retrieving exchange rate:', error);
-            usdCell.textContent = 'Error retrieving exchange rate';
-          });
-      }
+                        updateProfitLoss(cryptoCell.closest('tr'));
+                        updateProfitValue(cryptoCell.closest('tr'));
+                    } else {
+                        console.error('Invalid exchange rate. Response:', data);
+                        usdCell.textContent = 'Invalid exchange rate';
+                    }
+                })
+                .catch(error => {
+                });
+        }
     }
-  }
-
-  function isCacheExpired(coinSymbol) {
-    const cacheEntry = exchangeRateCache[coinSymbol];
-    return cacheEntry && (Date.now() - cacheEntry.timestamp > cacheEntry.ttl);
-  }
-
-function updateProfitLoss(row) {
-  const buyingUSD = parseFloat(row.querySelector('.usd-value').textContent);
-  const sellingUSD = parseFloat(row.querySelectorAll('.usd-value')[1].textContent);
-  const profitLossCell = row.querySelector('.profit-loss');
-
-  if (!isNaN(sellingUSD) && !isNaN(buyingUSD)) {
-    const profitLossPercentage = ((sellingUSD - buyingUSD) / buyingUSD) * 100;
-    profitLossCell.textContent = `${profitLossPercentage.toFixed(2)}%`;
-
-    if (profitLossPercentage > 0) {
-      profitLossCell.classList.add('text-green-500'); // Profit (positive)
-      profitLossCell.classList.remove('text-red-500');
-    } else if (profitLossPercentage < 0) {
-      profitLossCell.classList.add('text-red-500'); // Loss (negative)
-      profitLossCell.classList.remove('text-green-500');
-    } else {
-      profitLossCell.classList.add('text-yellow-500'); // No profit or loss (zero)
-      profitLossCell.classList.remove('text-green-500', 'text-red-500');
-    }
-  } else {
-    profitLossCell.textContent = 'Invalid USD values';
-    profitLossCell.classList.remove('text-green-500', 'text-red-500');
-  }
 }
 
-  function updateProfitValue(row) {
+function isCacheExpired(coinSymbol) {
+    const cacheEntry = exchangeRateCache[coinSymbol];
+    return cacheEntry && (Date.now() - cacheEntry.timestamp > cacheEntry.ttl);
+}
+
+function updateProfitLoss(row) {
+    const buyingUSD = parseFloat(row.querySelector('.usd-value').textContent);
+    const sellingUSD = parseFloat(row.querySelectorAll('.usd-value')[1].textContent);
+    const profitLossCell = row.querySelector('.profit-loss');
+
+    if (!isNaN(sellingUSD) && !isNaN(buyingUSD)) {
+        const profitLossPercentage = ((sellingUSD - buyingUSD) / buyingUSD) * 100;
+        profitLossCell.textContent = `${profitLossPercentage.toFixed(2)}%`;
+
+        if (profitLossPercentage > 0) {
+            profitLossCell.classList.add('text-green-500'); // Profit (positive)
+            profitLossCell.classList.remove('text-red-500');
+        } else if (profitLossPercentage < 0) {
+            profitLossCell.classList.add('text-red-500'); // Loss (negative)
+            profitLossCell.classList.remove('text-green-500');
+        } else {
+            profitLossCell.classList.add('text-yellow-500'); // No profit or loss (zero)
+            profitLossCell.classList.remove('text-green-500', 'text-red-500');
+        }
+    } else {
+        profitLossCell.textContent = 'Invalid USD values';
+        profitLossCell.classList.remove('text-green-500', 'text-red-500');
+    }
+}
+
+function updateProfitValue(row) {
     const sellingUSD = parseFloat(row.querySelector('.usd-value').textContent);
     const profitValueCell = row.querySelector('.profit-value');
 
     if (!isNaN(sellingUSD)) {
-      profitValueCell.textContent = `${sellingUSD.toFixed(2)} USD`;
+        profitValueCell.textContent = `${sellingUSD.toFixed(2)} USD`;
     } else {
-      profitValueCell.textContent = 'Invalid USD value';
+        profitValueCell.textContent = 'Invalid USD value';
     }
-  }
+}
 
-  document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', () => {
     const coinNameValues = document.querySelectorAll('.coinname-value');
-    for (let i = 0; i < coinNameValues.length; i++) {
-      const coinFullName = coinNameValues[i].getAttribute('data-coinname');
-      const isRate = coinNameValues[i].textContent.includes('rate');
-      updateUsdValue(coinNameValues[i], coinFullName, isRate);
-
-      if (!isRate) {
-        coinNameValues[i].addEventListener('input', () => {
-          console.log(`Clearing cache for ${coinNameToSymbol[coinFullName]}`);
-          exchangeRateCache[coinNameToSymbol[coinFullName]] = undefined;
-          updateUsdValue(coinNameValues[i], coinFullName);
-        });
-      }
-    }
-  });
+    coinNameValues.forEach(coinNameValue => {
+        const coinFullName = coinNameValue.getAttribute('data-coinname');
+        const isRateElement = coinNameValue.parentElement.querySelector('.ratetype');
+        const isRate = isRateElement ? isRateElement.textContent.includes('rate') : false;
+        updateUsdValue(coinNameValue, coinFullName, isRate);
+    });
+});
 </script>
 {% include 'footer.html' %}
 </body>
