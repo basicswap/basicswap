@@ -83,7 +83,7 @@ class XMRInterface(CoinInterface):
 
         self.blocks_confirmed = coin_settings['blocks_confirmed']
         self._restore_height = coin_settings.get('restore_height', 0)
-        self.setFeePriority(coin_settings.get('fee_priority', 0))
+        self.setFeePriority(coin_settings.get('fee_priority', 2))
         self._sc = swap_client
         self._log = self._sc.log if self._sc and self._sc.log else logging
         self._wallet_password = None

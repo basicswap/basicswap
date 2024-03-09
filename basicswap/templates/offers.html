@@ -844,7 +844,7 @@ const chart = new Chart(ctx, {
                             </div>
                             <!-- RECIPIENT -->
 
-                            <!-- YOUR REQUESTING / TAKER / NOBOOK -->
+                            <!-- YOU REQUESTING FROM TAKER / NOBOOK -->
                             {% if o[9] == true %}
                             <td class="py-3 px-2 text-xs hidden">
                                 <div class="flex items-center">
@@ -864,7 +864,7 @@ const chart = new Chart(ctx, {
                                     </div>
                                 </div>
                             </td>
-                            <!-- YOU REQUESTING / TAKER / NOBOOK -->
+                            <!-- YOU REQUESTING FROM TAKER / NOBOOK -->
 
                             <!-- OFFERS WHERE YOU WILL BE TAKER -->
                             {% else %}
@@ -913,7 +913,7 @@ const chart = new Chart(ctx, {
                                         <a data-tooltip-target="tooltip-maker{{loop.index}}" href="/offer/{{ o[1] }}">
 
                                     <div class="flex flex-col text-sm ml-5">
-                                        <div class="coinname bold text-left w-24" data-coinname="{{ o[2] }}">
+                                        <div class="coinname bold text-right w-24" data-coinname="{{ o[2] }}">
                                             {{ o[4]|truncate(7, true, '', 0) }}
                                         </div>
                                         {{ o[2] }}
@@ -963,7 +963,7 @@ const chart = new Chart(ctx, {
                                         <a data-tooltip-target="tooltip-offer{{loop.index}}" href="/offer/{{ o[1] }}">
 
                                           <div class="flex flex-col text-sm ml-5">
-                                              <div class="coinname bold text-left w-24" data-coinname="{{ o[2] }}">
+                                              <div class="coinname bold text-right w-24" data-coinname="{{ o[2] }}">
                                                   {{ o[4]|truncate(7, true, '', 0) }}
                                               </div>
                                               {{ o[2] }}
@@ -988,21 +988,21 @@ const chart = new Chart(ctx, {
                             <!-- NETWORK OFFERS / MAKER / BOOK -->
 
                             <!-- RATE -->
-                            <td class="py-3 px-2 text-xs text-left items-center rate-table-info">
+                            <td class="py-3 px-2 bold monospace italic text-sm text-left items-center rate-table-info">
                                 <span class="profit-value hidden"></span>
                                 <div class="coinname-value hidden" data-coinname="{{ o[3] }}">
                                      {{ o[6]|truncate(6, true, '', 0) }}
                                 </div>
-                                <span class="usd-value text-sm italic"></span><span class="text-sm italic">/{{ o[16] }}</span>
-                                    <div class="ratetype text-sm italic"><span class="echange-rates" data-coinname="{{ o[2] }}"> {{ o[6]|truncate(6,true,'',0) }} {{ o[17] }}/{{ o[16] }}</span>
+                                <span class="usd-value"></span><span class="text-sm italic">/{{ o[16] }}</span>
+                                    <div class="ratetype"><span class="echange-rates" data-coinname="{{ o[2] }}"> {{ o[6]|truncate(6,true,'',0) }} {{ o[17] }}/{{ o[16] }}</span>
                                 </div>
                             </td>
                             <!-- RATE -->
 
                             <!-- PERCENTAGE -->
-                            <td class="py-3 px-2 text-xs text-center items-center rate-table-info">
+                            <td class="py-3 px-2 bold text-sm text-center items-center rate-table-info">
                                 <span class="profit-value hidden"></span>
-                                <div class="profittype pt-1"><span class="profit-loss bold text-sm"</span>
+                                <div class="profittype pt-1"><span class="profit-loss"</span>
                                    <div class="coinname-value hidden" data-coinname="{{ o[3] }}">
                                      {{ o[6]|truncate(6, true, '', 0) }}
                                    </div>
