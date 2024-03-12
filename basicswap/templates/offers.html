@@ -652,7 +652,6 @@ const chart = new Chart(ctx, {
           <div class="w-full mx-auto pt-2">
             <form method="post">
               <div class="flex items-center justify-center pb-4 dark:text-white">
-
                 <div class="rounded-b-md">
                   <div class="w-full md:w-0/12">
                     <div class="flex flex-wrap justify-center -m-1.5">
@@ -674,8 +673,6 @@ const chart = new Chart(ctx, {
                       </div>
                       <div class="w-full md:w-auto p-1.5">
                         <div class="relative">{{ input_arrow_down_svg | safe }}
-
-                          <!-- is="ms-dropdown" todo -->
                           <select name="coin_from" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
                             <option value="any" {% if filters.coin_from==-1 %} selected{% endif %}>Filter Offers</option>
                             {% for c in coins %}
@@ -740,7 +737,7 @@ const chart = new Chart(ctx, {
                           <button type="submit" name='clearfilters' value="Clear Filters" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm dark:text-white dark:bg-gray-500 bg-coolGray-200 hover:bg-green-600 hover:border-green-600 rounded-lg transition duration-200 border border-coolGray-200 dark:border-gray-400 rounded-md shadow-button focus:ring-0 focus:outline-none">
                             <span>Clear Filters</span>
                           </button>
-                        </div>  <!-- todo -->
+                        </div>
                       </div>
                       <div class="w-full md:w-auto p-1.5">
                         <div class="relative">
@@ -753,61 +750,63 @@ const chart = new Chart(ctx, {
                   </div>
                 </div>
               </div>
-
               <div class="container mt-5 mx-auto">
                 <div class="pt-0 pb-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
                   <div class="px-0">
                     <div class="w-auto mt-6 pb-6 overflow-x-auto">
                       <table class="w-full min-w-max">
-
                         <thead class="uppercase">
-                          <tr>
-                            <th class="p-0">
-                              <div class="py-3 px-4 justify-center rounded-tl-xl bg-coolGray-200 dark:bg-gray-600 ">
-                                <span class="text-sm mr-3 text-gray-600 dark:text-gray-300 font-semibold">Time</span>
-                              </div>
-                            </th>
-                            <!--<th>ID</th>-->
-                            <th class="p-0 hidden xl:block">
-                              <div class="py-3 px-0 bg-coolGray-200 dark:bg-gray-600 text-left">
-                                <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Recipient</span>
-                              </div>
-                            </th>
-                            <th class="p-0 hidden">
-                              <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-left">
-                                <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">You Send</span>
-                              </div>
-                            </th>
-                            <th class="p-0">
-                              <div class="py-3 px-0 bg-coolGray-200 dark:bg-gray-600 text-center">
-                                <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Swap</span>
-                              </div>
-                            </th>
-                            <th class="p-0">
-                              <div class="py-3 px-3 bg-coolGray-200 dark:bg-gray-600 text-left">
-                                <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Rate</span>
-                              </div>
-                            </th>
-                            <th class="p-0">
-                              <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-center">
-                                <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Market +/-</span>
-                              </div>
-                            </th>
-                            <th class="p-0">
-                              <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 rounded-tr-xl">
-                                <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Trade</span>
-                              </div>
-                            </th>
-                          </tr>
+                            <tr>
+                                <th class="p-0" onclick="sortTable(0)">
+                                    <div class="py-3 px-4 justify-center rounded-tl-xl bg-coolGray-200 dark:bg-gray-600 ">
+                                        <span class="text-sm mr-1 text-gray-600 dark:text-gray-300 font-semibold">Time</span>
+                                        <span class="sort-icon text-gray-600 dark:text-gray-400" id="sort-icon-0">&darr;</span>
+                                    </div>
+                                </th>
+                                <th class="p-0" onclick="sortTable(1)" disabled>
+                                    <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
+                                        <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Details</span>
+                                        <span class="sort-icon hidden" id="sort-icon-1">&darr;</span>
+                                    </div>
+                                </th>
+                                <th class="p-0 hidden" onclick="sortTable(2)" disabled>
+                                    <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-left">
+                                        <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">You Send</span>
+                                        <span class="sort-icon hidden" id="sort-icon-2">&darr;</span>
+                                    </div>
+                                </th>
+                                <th class="p-0" onclick="sortTable(3)" disabled>
+                                    <div class="py-3 px-0 bg-coolGray-200 dark:bg-gray-600 text-center">
+                                        <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Swap</span>
+                                        <span class="sort-icon hidden" id="sort-icon-3">&darr;</span>
+                                    </div>
+                                </th>
+                                <th class="p-0" onclick="sortTable(4)">
+                                    <div class="py-3 px-3 bg-coolGray-200 dark:bg-gray-600 text-left">
+                                        <span class="text-sm mr-1 text-gray-600 dark:text-gray-300 font-semibold">Rate</span>
+                                        <span class="sort-icon text-gray-600 dark:text-gray-400" id="sort-icon-4">&darr;</span>
+                                    </div>
+                                </th>
+                                <th class="p-0" onclick="sortTable(5)">
+                                    <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-center">
+                                        <span class="text-sm mr-1 text-gray-600 dark:text-gray-300 font-semibold">Market +/-</span>
+                                        <span class="sort-icon text-gray-600 dark:text-gray-400" id="sort-icon-5">&darr;</span>
+                                    </div>
+                                </th>
+                                <th class="p-0" onclick="sortTable(6)" disabled>
+                                    <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 rounded-tr-xl">
+                                        <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Trade</span>
+                                        <span class="sort-icon hidden" id="sort-icon-6">&darr;</span>
+                                    </div>
+                                </th>
+                            </tr>
                         </thead>
-
                         <tbody>
                           {% for o in offers %}
                           <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
-
                             <!-- TIME + ACTIVE -->
-                            <td class="py-3 px-4 text-xs">
-                                <div class="flex items-center justify-center">
+                            <td class="py-3 px-6 text-xs">
+                                <div class="flex items-center">
                                     <svg alt="" class="w-5 h-5 rounded-full mr-3" data-tooltip-target="tooltip-active{{loop.index}}" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
                                         <g stroke-linecap="round" stroke-width="2" fill="none" stroke="{% if o[12]==2 %}#AC0000{% elif o[11]==true %}#6b7280{% else %}#3B82F6{% endif %}" stroke-linejoin="round">
                                             <circle cx="12" cy="12" r="11"></circle>
@@ -820,7 +819,6 @@ const chart = new Chart(ctx, {
                                     </div>
                                 </div>
                             </td>
-
                             <div id="tooltip-active{{loop.index}}" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-green-600  {% if o[11]==true or o[12]==2 %} bg-gray-400 {% else %} {% endif %} rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
                               <div class="active-revoked-expired"><span class="bold">
                                         <div class="{% if o[11]==true or o[12]==2 %} dark:text-white {% else %} {% endif %} text-xs"><span class="bold">Posted:</span> {{ o[0] }}</div>
@@ -829,21 +827,23 @@ const chart = new Chart(ctx, {
                             <div class="tooltip-arrow" data-popper-arrow></div>
                             </div>
                             <!-- TIME + ACTIVE -->
-
-                            <!--<td class="py-4 px-4 text-xs"><a class="monospace text-xs" href=/offer/{{ o[1] }}>{{ o[1]|truncate(6, True) }}</a></td>-->
-                            <!--<td class="py-4 px-4 text-xs monospace">{{ o[8] }}{% if o[9]==true %} <b>Sent</b>{% endif %}</td>-->
-
-                            <!-- RECIPIENT -->
-                            <td class="py-8 text-xs monospace text-left hidden xl:block">
-                              <a data-tooltip-target="tooltip-recipient{{loop.index}}" href="/identity/{{ o[8] }}{% if o[9]==true %}{% endif %}">{{ o[8]|truncate(17, true, '...', 0) }} </a>
+                            <!-- DETAILS -->
+                            <td class="py-8 text-xs text-left hidden xl:block">
+                            <a data-tooltip-target="tooltip-recipient{{loop.index}}" href="/identity/{{ o[8] }}{% if o[9]==true %}{% endif %}"><span class="bold">Recipient:</span> {{ o[8]|truncate(10, true, '...', 0) }}</a>
+                              {% if sent_offers %}
+                              <!-- SENTOFFERS-->
+                                  <div class="network"><span class="bold">Network:</span> <span class="monospace">{{ o[7] }}</span></div>
+                                  <!--<div class="partial"><span class="bold">Amount Variable:</span> {{ o[15] }}</div>-->
+                                  <div class="swaptype"><span class="bold">Swap Type:</span> {{ o[14] }}</div>
+                              {% else %}
+                              <!-- NETWORK OFFERS -->
+                              {% endif %}
                             </td>
-
                             <div id="tooltip-recipient{{loop.index}}" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
-                              <div class="active-revoked-expired"><span class="bold">{{ o[8] }}</div>
+                              <div class="active-revoked-expired"><span class="bold monospace">{{ o[8] }}</div>
                             <div class="tooltip-arrow" data-popper-arrow></div>
                             </div>
-                            <!-- RECIPIENT -->
-
+                            <!-- DETAILS -->
                             <!-- YOU REQUESTING FROM TAKER / NOBOOK -->
                             {% if o[9] == true %}
                             <td class="py-3 px-2 text-xs hidden">
@@ -853,7 +853,7 @@ const chart = new Chart(ctx, {
                                     </span>
                                     <div class="flex flex-col ml-5">
                                       <div class="coinname bold" data-coinname="{{ o[3] }}">
-                                          {{ o[3] }}
+                                          <div class="text-gray-600 dark:text-gray-300">{{ o[3] }}</div>
                                       </div>
                                       <div class="ratetype hidden"><span class="echange-rates" data-coinname="{{ o[3] }}"> {{ o[6]|truncate(6,true,'',0) }} {{ o[16] }}/{{ o[17] }}</span>
                                       <div class="coinname-value hidden" data-coinname="{{ o[2] }}">
@@ -865,7 +865,6 @@ const chart = new Chart(ctx, {
                                 </div>
                             </td>
                             <!-- YOU REQUESTING FROM TAKER / NOBOOK -->
-
                             <!-- OFFERS WHERE YOU WILL BE TAKER -->
                             {% else %}
                             <td class="py-3 px-2 text-xs hidden">
@@ -875,7 +874,7 @@ const chart = new Chart(ctx, {
                                     </span>
                                     <div class="flex flex-col ml-5">
                                       <div class="coinname bold" data-coinname="{{ o[3] }}">
-                                          {{ o[3] }}
+                                          <div class="text-gray-600 dark:text-gray-300">{{ o[3] }}</div>
                                       </div>
                                       <div class="ratetype hidden"><span class="echange-rates" data-coinname="{{ o[3] }}"> {{ o[6]|truncate(6,true,'',0) }} {{ o[16] }}/{{ o[17] }}</span>
                                       <div class="coinname-value hidden" data-coinname="{{ o[3] }}">
@@ -888,14 +887,26 @@ const chart = new Chart(ctx, {
                             </td>
                             {% endif %}
                             <!-- OFFERS WHERE YOU WILL BE TAKER -->
-
                             <!-- YOUR OFFERS / MAKER / BOOK -->
                             {% if o[9] == true %}
-                            <td class="py-0 px-6 text-right text-sm">
+                            <td class="py-0 px-6 text-right text-sm mx-20">
                                 <div class="flex items-center justify-evenly monospace">
-                                        <a data-tooltip-target="tooltip-wallet{{loop.index}}" href="/wallet/{{ o[17] }}">
-                                    <span class="mr-3 inline-flex align-middle items-center justify-center w-18 h-20 rounded">
-                                        <img class="h-12" src="/static/images/coins/{{ o[3]|replace(" ", "-") }}.png" alt="{{ o[3] }}">
+                                    <div class="flex flex-col text-left mr-5 ml-5">
+                                      <div class="coinname bold w-32" data-coinname="{{ o[3] }}">
+                                          {{ o[5]|truncate(9, true, '', 0) }}
+                                      </div>
+                                          <div class="text-gray-600 dark:text-gray-300">{{ o[3] }}</div>
+                                        <div class="ratetype hidden"><span class="echange-rates" data-coinname="{{ o[3] }}"> {{ o[6]|truncate(6,true,'',0) }} {{ o[16] }}/{{ o[17] }}</span>
+                                        <div class="coinname-value hidden" data-coinname="{{ o[3] }}">
+                                          {{ o[5]|truncate(7, true, '', 0) }}
+                                        </div>
+                                      <div class="usd-value hidden"></div>
+                                      <div class="usd-value-in-coin-value"></div>
+                                    </div>
+                                </div>
+                                    <a data-tooltip-target="tooltip-wallet{{loop.index}}" href="/wallet/{{ o[17] }}">
+                                    <span class="mr-3 ml-3 inline-flex align-middle items-center justify-center w-18 h-20 rounded">
+                                    <img class="h-12" src="/static/images/coins/{{ o[3]|replace(" ", "-") }}.png" alt="{{ o[3] }}">
                                     </span></a>
                                      {{ arrow_right_svg | safe }}
                                         <div id="tooltip-wallet{{loop.index}}" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
@@ -903,7 +914,7 @@ const chart = new Chart(ctx, {
                                            <div class="tooltip-arrow pr-6" data-popper-arrow></div>
                                         </div>
                                         <a data-tooltip-target="tooltip-maker-wallet{{loop.index}}" href="/wallet/{{ o[16] }}">
-                                    <span class=" inline-flex ml-3 align-middle items-center justify-center w-18 h-20 rounded">
+                                    <span class=" inline-flex ml-3 mr-3 align-middle items-center justify-center w-18 h-20 rounded">
                                         <img class="h-12" src="/static/images/coins/{{ o[2]|replace(" ", "-") }}.png" alt="{{ o[2] }}">
                                     </span></a>
                                         <div id="tooltip-maker-wallet{{loop.index}}" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
@@ -911,12 +922,11 @@ const chart = new Chart(ctx, {
                                            <div class="tooltip-arrow pl-1" data-popper-arrow></div>
                                         </div>
                                         <a data-tooltip-target="tooltip-maker{{loop.index}}" href="/offer/{{ o[1] }}">
-
-                                    <div class="flex flex-col ml-5">
+                                    <div class="flex flex-col ml-5 mr-5">
                                         <div class="coinname bold w-24" data-coinname="{{ o[2] }}">
-                                            {{ o[4]|truncate(7, true, '', 0) }}
+                                            {{ o[4]|truncate(9, true, '', 0) }}
                                         </div>
-                                        {{ o[2] }}
+                                        <div class="text-gray-600 dark:text-gray-300">{{ o[2] }}</div>
                                         <div class="ratetype italic hidden">
                                             <span class="echange-rates" data-coinname="{{ o[2] }}">
                                                 {{ o[6]|truncate(6,true,'',0) }} {{ o[17] }}/{{ o[16] }}
@@ -928,45 +938,52 @@ const chart = new Chart(ctx, {
                                             <div class="usd-value-in-coin-value"></div>
                                         </div>
                                     </div>
-
                             <div id="tooltip-maker{{loop.index}}" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
                               <div class="active-revoked-expired"><span class="bold">Edit</div>
                             <div class="tooltip-arrow" data-popper-arrow></div>
                                 </div>
                             </td>
                             <!-- YOUR OFFERS / MAKER / BOOK -->
-
                             <!-- NETWORK OFFERS / MAKER / BOOK -->
                             {% else %}
-                            <td class="py-0 px-6 text-right text-sm">
+                            <td class="py-0 px-6 text-right text-sm mx-20">
                                 <div class="flex items-center justify-evenly monospace">
+                                    <div class="flex flex-col text-left mr-5 ml-5">
+                                      <div class="coinname bold w-32" data-coinname="{{ o[3] }}">
+                                          {{ o[4]|truncate(9, true, '', 0) }}
+                                      </div>
+                                          <div class="text-gray-600 dark:text-gray-300">{{ o[3] }}</div>
+                                      <div class="ratetype hidden"><span class="echange-rates" data-coinname="{{ o[3] }}"> {{ o[6]|truncate(6,true,'',0) }} {{ o[16] }}/{{ o[17] }}</span>
+                                      <div class="coinname-value hidden" data-coinname="{{ o[2] }}">
+                                          {{ o[4]|truncate(6, true, '', 0) }} test
+                                      </div>
+                                      <div class="usd-value hidden"></div>
+                                      <div class="usd-value-in-coin-value"></div>
+                                    </div>
+                                </div>
                                         <a data-tooltip-target="tooltip-wallet{{loop.index}}" href="/wallet/{{ o[17] }}">
-                                    <span class="inline-flex mr-3 align-middle items-center justify-center w-18 h-20 rounded">
+                                    <span class="inline-flex mr-3 ml-3 align-middle items-center justify-center w-18 h-20 rounded">
                                         <img class="h-12" src="/static/images/coins/{{ o[3]|replace(" ", "-") }}.png" alt="{{ o[3] }}">
                                     </span></a>
                                      {{ arrow_right_svg | safe }}
-
                                         <div id="tooltip-wallet{{loop.index}}" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
                                            <div class="active-revoked-expired"><span class="bold">My {{ o[17] }} Wallet</div>
                                            <div class="tooltip-arrow pr-6" data-popper-arrow></div>
                                         </div>
-
                                         <a data-tooltip-target="tooltip-maker-wallet{{loop.index}}" href="/wallet/{{ o[16] }}">
-                                    <span class="inline-flex ml-3 align-middle items-center justify-center w-18 h-20 rounded">
+                                    <span class="inline-flex ml-3 mr-3 align-middle items-center justify-center w-18 h-20 rounded">
                                         <img class="h-12" src="/static/images/coins/{{ o[2]|replace(" ", "-") }}.png" alt="{{ o[2] }}">
                                     </span></a>
-
                                         <div id="tooltip-maker-wallet{{loop.index}}" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
                                            <div class="active-revoked-expired"><span class="bold">My {{ o[16] }} Wallet</div>
                                            <div class="tooltip-arrow pl-1" data-popper-arrow></div>
                                         </div>
                                         <a data-tooltip-target="tooltip-offer{{loop.index}}" href="/offer/{{ o[1] }}">
-
-                                          <div class="flex flex-col ml-5">
+                                          <div class="flex flex-col ml-5 mr-5">
                                               <div class="coinname bold w-24" data-coinname="{{ o[2] }}">
-                                                  {{ o[4]|truncate(7, true, '', 0) }}
+                                                  {{ o[4]|truncate(9, true, '', 0) }}
                                               </div>
-                                              {{ o[2] }}
+                                              <div class="text-gray-600 dark:text-gray-300">{{ o[2] }}</div>
                                               <div class="ratetype italic hidden">
                                                   <span class="echange-rates" data-coinname="{{ o[2] }}">
                                                       {{ o[6]|truncate(6,true,'',0) }} {{ o[17] }}/{{ o[16] }}
@@ -978,7 +995,6 @@ const chart = new Chart(ctx, {
                                                   <div class="usd-value-in-coin-value"></div>
                                               </div>
                                           </div>
-
                             <div id="tooltip-offer{{loop.index}}" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-green-600 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
                               <div class="active-revoked-expired"><span class="bold">Buy {{ o[2] }}</div>
                             <div class="tooltip-arrow" data-popper-arrow></div>
@@ -986,7 +1002,6 @@ const chart = new Chart(ctx, {
                             </td>
                             {% endif %}
                             <!-- NETWORK OFFERS / MAKER / BOOK -->
-
                             <!-- RATE -->
                             <td class="py-3 px-2 bold monospace italic text-sm text-left items-center rate-table-info">
                                 <span class="profit-value hidden"></span>
@@ -998,7 +1013,6 @@ const chart = new Chart(ctx, {
                                 </div>
                             </td>
                             <!-- RATE -->
-
                             <!-- PERCENTAGE -->
                             <td class="py-3 px-2 bold text-sm text-center items-center rate-table-info">
                                 <span class="profit-value hidden"></span>
@@ -1012,22 +1026,29 @@ const chart = new Chart(ctx, {
                                 </div>
                             </td>
                             <!-- PERCENTAGE -->
-
                             <!-- SWAP OR EDIT -->
+                            {% if sent_offers %}
                             <td class="py-6 px-4 text-center">
                                 <div class="flex justify-center items-center h-full">
-                                    <a class="inline-block w-20 py-1 px-2 font-medium text-center text-sm rounded-md {% if o[9]==true %} bg-gray-600 dark:border-gray-300 text-white hover:bg-green-600 transition duration-200 {% else %} bg-blue-500 text-white hover:bg-green-600 transition duration-200 {% endif %}" href="/offer/{{ o[1] }}">
+                                    <a class="inline-block w-20 py-1 px-2 font-medium text-center text-sm rounded-md {% if o[11]==true %} bg-gray-400 dark:border-gray-300 text-white hover:bg-green-600 transition duration-200 {% else %} bg-green-500 text-white hover:bg-green-600 transition duration-200 {% endif %}" href="/offer/{{ o[1] }}">
+                                        {% if o[11]==true %} Expired {% else %} Edit {% endif %}
+                                    </a>
+                                </div>
+                            </td>
+                            {% else %}
+                            <td class="py-6 px-4 text-center">
+                                <div class="flex justify-center items-center h-full">
+                                    <a class="inline-block w-20 py-1 px-2 font-medium text-center text-sm rounded-md {% if o[9]==true %} bg-green-500 dark:border-gray-300 text-white hover:bg-green-600 transition duration-200 {% else %} bg-blue-500 text-white hover:bg-green-600 transition duration-200 {% endif %}" href="/offer/{{ o[1] }}">
                                         {% if o[9]==true %} Edit {% else %} Swap {% endif %}
                                     </a>
                                 </div>
                             </td>
+                            {% endif %}
                             <!-- SWAP OR EDIT -->
                           </tr>
-
-                      </tbody>
+                        </tbody>
                         {% endfor %}
                       </table>
-
                       <input type="hidden" name="formid" value="{{ form_id }}">
                       <input type="hidden" name="pageno" value="{{ filters.page_no }}">
                     </div>
@@ -1048,7 +1069,7 @@ const chart = new Chart(ctx, {
                                       <p class="text-sm font-heading dark:text-white">Page: {{ filters.page_no }}</p>
                                   </div>
                               </div>
-                              {% if offers_count > 15 %}
+                              {% if offers_count > 10 %}
                               <div class="w-full md:w-auto p-1.5">
                                       <button type="submit" name='pageforwards' value="Next" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-green-600 rounded-lg transition duration-200 focus:ring-0 focus:outline-none">
                                           <span>Next</span>
@@ -1067,7 +1088,6 @@ const chart = new Chart(ctx, {
     </div>
   </section>
 </div>
-
 <script>
 const coinNameToSymbol = {
     'Bitcoin': 'BTC',
@@ -1207,6 +1227,37 @@ document.addEventListener('DOMContentLoaded', () => {
         updateUsdValue(coinNameValue, coinFullName, isRate);
     });
 });
+
+function sortTable(columnIndex) {
+    const sortableColumns = [0, 4, 5];
+
+    if (!sortableColumns.includes(columnIndex)) {
+        return;
+    }
+
+    const table = document.querySelector('table');
+    const rows = Array.from(table.querySelectorAll('tbody tr'));
+
+    const sortIcon = document.getElementById(`sort-icon-${columnIndex}`);
+    let sortOrder = sortIcon.textContent === '↓' ? 1 : -1;
+
+    if (sortOrder === 1) {
+        sortIcon.textContent = '↑';
+    } else {
+        sortIcon.textContent = '↓';
+    }
+
+    rows.sort((a, b) => {
+        const aValue = a.cells[columnIndex].textContent.trim();
+        const bValue = b.cells[columnIndex].textContent.trim();
+
+        if (aValue < bValue) return -1 * sortOrder;
+        if (aValue > bValue) return 1 * sortOrder;
+        return 0;
+    });
+
+    rows.forEach(row => table.querySelector('tbody').appendChild(row));
+}
 </script>
 {% include 'footer.html' %}
 </body>
