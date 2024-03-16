@@ -108,11 +108,7 @@ def page_bid(self, url_split, post_string):
 
     if len(data['addr_from_label']) > 0:
         data['addr_from_label'] = '(' + data['addr_from_label'] + ')'
-
-    page_data = {
-        'bid_states': listBidStates(),
-        'bid_actions': []
-    }
+    data['can_accept_bid'] = True if bid.state == BidStates.BID_RECEIVED else False
 
     if swap_client.debug_ui:
         data['bid_actions'] = [(-1, 'None'), ] + listBidActions()
@@ -201,4 +197,5 @@ def page_bids(self, url_split, post_string, sent=False, available=False, receive
         'summary': summary,
         'bids': [(format_timestamp(b[0]),
                  b[2].hex(), b[3].hex(), strBidState(b[5]), strTxState(b[7]), strTxState(b[8]), b[11]) for b in bids],
+        'bids_count': len(bids),
     })

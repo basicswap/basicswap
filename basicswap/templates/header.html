@@ -1,3 +1,4 @@
+{% from 'style.html' import notifications_network_offer_svg, notifications_bid_accepted_svg, notifications_unknow_event_svg, notifications_new_bid_on_offer_svg, notifications_close_svg, swap_in_progress_mobile_svg, wallet_svg, page_back_svg, order_book_svg, new_offer_svg, settings_svg, asettings_svg, cog_svg, rpc_svg, debug_svg, explorer_svg, tor_svg, smsg_svg, outputs_svg, automation_svg, shutdown_svg, notifications_svg, debug_nerd_svg, wallet_locked_svg, mobile_menu_svg, wallet_unlocked_svg, tor_purple_svg, sun_svg, moon_svg, swap_in_progress_svg, available_bids_svg, your_offers_svg, bids_received_svg, bids_sent_svg, header_arrow_down_svg %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -91,57 +92,34 @@
 <body class="dark:bg-gray-700">
   <section>
     <nav class="relative bg-gray-700">
+
       <div class="p-6 container flex flex-wrap items-center justify-between items-center mx-auto">
         <a class="flex-shrink-0 mr-12 text-2xl text-white font-semibold" href="/"> <img class="h-10" src="/static/images/logos/basicswap-logo.svg" alt="" width="auto"></a>
         <ul class="hidden xl:flex">
           <li>
             <a class="flex mr-10 items-center py-3 text-gray-50 hover:text-gray-100 text-sm" href="/wallets">
-              <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="18" width="18" viewBox="0 0 24 24">
-                <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
-                  <path d="M6,3H3C1.895,3,1,3.895,1,5 v0c0,1.105,0.895,2,2,2"></path>
-                  <polyline points=" 6,7 6,1 20,1 20,7 " stroke="#6b7280"></polyline>
-                  <path d="M23,7H3 C1.895,7,1,6.105,1,5v15c0,1.657,1.343,3,3,3h19V7z"></path>
-                  <circle cx="17" cy="15" r="2"></circle>
-                </g>
-              </svg> <span>Wallets</span></a>
+              {{ wallet_svg | safe }}
+               <span>Wallets</span>
+             </a>
           </li>
+
           <li>
             <a class="flex mr-10 items-center py-2.5 text-gray-50 hover:text-gray-100 text-sm" href="/offers">
-              <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="18" width="18" viewBox="0 0 24 24">
-                <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
-                  <rect x="3" y="1" width="18" height="22"></rect>
-                  <line x1="12" y1="8" x2="12" y2="16" stroke="#6b7280"></line>
-                  <line x1="8" y1="14" x2="8" y2="16" stroke="#6b7280"></line>
-                  <line x1="16" y1="11" x2="16" y2="16" stroke="#6b7280"> </line>
-                </g>
-              </svg> <span>Show Order Book</span> <span class="inline-flex justify-center items-center text-xs font-semibold ml-3 mr-2 px-2.5 py-1 font-small text-white bg-blue-500 rounded-full">{{ summary.num_network_offers }}</span></a>
+              {{ order_book_svg | safe }}<span>Show Order Book</span>
+              <span class="inline-flex justify-center items-center text-xs font-semibold ml-3 mr-2 px-2.5 py-1 font-small text-white bg-blue-500 rounded-full">{{ summary.num_network_offers }}</span>
+            </a>
           </li>
           <li>
-            <a class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" href="/newoffer">
-              <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="18" width="18" viewBox="0 0 24 24">
-                <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round">
-                  <circle cx="5" cy="5" r="4"></circle>
-                  <circle cx="19" cy="19" r="4"></circle>
-                  <polyline data-cap="butt" points="13,5 21,5 21,11 " stroke="#ffffff"></polyline>
-                  <polyline data-cap="butt" points="11,19 3,19 3,13 " stroke="#ffffff"></polyline>
-                  <polyline points=" 16,2 13,5 16,8 " stroke="#ffffff"></polyline>
-                  <polyline points=" 8,16 11,19 8,22 " stroke="#ffffff"></polyline>
-                </g>
-              </svg> <span>Place new Offer</span></a>
+            <a class="flex rounded-full flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" href="/newoffer">
+              {{ new_offer_svg | safe }}
+              <span>Place new Offer</span>
+            </a>
           </li>
         </ul>
         <ul class="mr-10 hidden xl:flex lg:justify-end lg:items-center lg:space-x-6 ml-auto">
           <div id="dropdownNavbarLink" data-dropdown-toggle="dropdownNavbar" class="flex justify-between items-center py-2 pr-4 pl-3 w-full text-gray-50 text-sm  md:border-0 md:p-0 md:w-auto text-gray-50 hover:text-gray-100">
-            <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
-              <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
-                <path d="M14,19l2.95,2.95A3.5,3.5,0,0,0,21.9,22l.051-.051h0A3.5,3.5,0,0,0,22,17l-.051-.051L20,15" stroke="#6b7280"></path>
-                <polyline data-cap="butt" points="11.491 8.866 4.203 1.578 1.661 4.12 8.779 11.238" stroke="#6b7280"></polyline>
-                <path d="M22.678,4.922,19.6,7.987l-3.6-3.576,3.08-3.066a4.214,4.214,0,0,0-2.259-.307,5.615,5.615,0,0,0-5.133,5.723A4.223,4.223,0,0,0,12,8.4L2.145,17.083a3.419,3.419,0,0,0-.276,4.827c.023.027.047.052.071.078h0a3.286,3.286,0,0,0,4.647.1,3.232,3.232,0,0,0,.281-.3l8.726-9.81a6.717,6.717,0,0,0,2.875.2A5.687,5.687,0,0,0,22.78,8.192,5.088,5.088,0,0,0,22.678,4.922Z"></path>
-              </g>
-            </svg> Settings & Tools
-            <svg class="text-gray-400 ml-4" width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M9.08335 0.666657C8.75002 0.333323 8.25002 0.333323 7.91669 0.666657L5.00002 3.58332L2.08335 0.666657C1.75002 0.333323 1.25002 0.333323 0.916687 0.666657C0.583354 0.99999 0.583354 1.49999 0.916687 1.83332L4.41669 5.33332C4.58335 5.49999 4.75002 5.58332 5.00002 5.58332C5.25002 5.58332 5.41669 5.49999 5.58335 5.33332L9.08335 1.83332C9.41669 1.49999 9.41669 0.99999 9.08335 0.666657Z" fill="#6b7280"></path>
-            </svg>
+            {{ settings_svg | safe }} Settings & Tools
+            {{ header_arrow_down_svg| safe }}
           </div>
         </ul>
         <!-- dropdown settings & tools -->
@@ -149,138 +127,77 @@
           <ul class="py-0 text-sm text-gray-700" aria-labelledby="dropdownLargeButton">
             <li>
               <a href="/settings" class="flex items-center block py-4 px-4 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-white"> <span class="sr-only">Settings</span>
-                <svg class="text-gray-500 w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" height="18" width="18" viewBox="0 0 24 24">
-                  <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
-                    <circle cx="12" cy="12" r="3" stroke="#6b7280"></circle>
-                    <path d="M20,12a8.049,8.049,0,0,0-.188-1.713l2.714-2.055-2-3.464L17.383,6.094a7.987,7.987,0,0,0-2.961-1.719L14,1H10L9.578,4.375A7.987,7.987,0,0,0,6.617,6.094L3.474,4.768l-2,3.464,2.714,2.055a7.9,7.9,0,0,0,0,3.426L1.474,15.768l2,3.464,3.143-1.326a7.987,7.987,0,0,0,2.961,1.719L10,23h4l.422-3.375a7.987,7.987,0,0,0,2.961-1.719l3.143,1.326,2-3.464-2.714-2.055A8.049,8.049,0,0,0,20,12Z"></path>
-                  </g>
-                </svg> Settings</a>
+            {{ cog_svg | safe }} Settings</a>
             </li>
             {% if debug_mode == true %}
             <li>
               <a href="/rpc" class="flex items-center block py-4 px-4 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-white"> <span class="sr-only">RPC</span>
-                <svg class="text-gray-500 w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-                  <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
-                    <rect x="1" y="2" width="22" height="20"></rect>
-                    <line x1="1" y1="6" x2="23" y2="6"></line>
-                    <polyline points=" 5,11 7,13 5,15 " stroke="#6b7280"></polyline>
-                    <line x1="10" y1="15" x2="14" y2="15" stroke="#6b7280"></line>
-                    <line x1="6" y1="2" x2="6" y2="6"></line>
-                  </g>
-                </svg> RPC Console </a>
+                {{ rpc_svg | safe }} RPC Console </a>
             </li>
             {% endif %}
             {% if debug_mode == true %}
             <li>
-              <a href="/debug" class="flex items-center block py-4 px-4 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-white"> <span class="sr-only">Debug</span>
-                <svg class="text-gray-500 w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
-                  <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
-                    <path data-cap="butt" d="M5.29,10H4A3,3,0,0,1,1,7V6" stroke="#6b7280"></path>
-                    <path data-cap="butt" d="M5.29,18H4a3,3,0,0,0-3,3v1" stroke="#6b7280"></path>
-                    <path data-cap="butt" d="M8,6.255V5a4,4,0,0,1,4-4h0a4,4,0,0,1,4,4V6.255" stroke="#6b7280"></path>
-                    <line x1="5" y1="14" x2="1" y2="14" stroke="#6b7280"></line>
-                    <path data-cap="butt" d="M18.71,10H20a3,3,0,0,0,3-3V6" stroke="#6b7280"></path>
-                    <path data-cap="butt" d="M18.71,18H20a3,3,0,0,1,3,3v1" stroke="#6b7280"></path>
-                    <line x1="19" y1="14" x2="23" y2="14" stroke="#6b7280"></line>
-                    <path d="M19,16A7,7,0,0,1,5,16V12a7,7,0,0,1,14,0Z"></path>
-                  </g>
-                </svg> Debug</a>
+            <a href="/debug" class="flex items-center block py-4 px-4 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-white"> <span class="sr-only">Debug</span>
+            {{ debug_svg | safe }}  Debug</a>
             </li>
             {% endif %}
             {% if debug_mode == true %}
             <li>
               <a href="/explorers" class="flex items-center block py-4 px-4 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-white"> <span class="sr-only">Explorers</span>
-                <svg class="text-gray-500 w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-                  <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
-                    <line x1="22" y1="22" x2="15.656" y2="15.656" stroke="#6b7280"></line>
-                    <circle cx="10" cy="10" r="8"></circle>
-                  </g>
-                </svg> Explorers </a>
+            {{ explorer_svg | safe }}  Explorers </a>
             </li>
             {% endif %}
             {% if use_tor_proxy == true %}
             <li>
-              <a href="/tor" class="flex items-center block py-4 px-4 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-white"> <span class="sr-only">Debug</span>
-                <svg class="text-gray-500 w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
-                          <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
-                            <path d="M9,18.8A6.455,6.455,0,0,1,7,14,6.455,6.455,0,0,1,9,9.2" stroke="#6b7280"></path>
-                            <path d="M15,18.8A6.455,6.455,0,0,0,17,14a6.455,6.455,0,0,0-2-4.8" stroke="#6b7280"></path>
-                            <path d="M14,2.256V1H10V2.256A3.949,3.949,0,0,1,7.658,5.891,8.979,8.979,0,0,0,2,14c0,4.971,4.477,9,10,9s10-4.029,10-9a8.978,8.978,0,0,0-5.658-8.109A3.95,3.95,0,0,1,14,2.256Z"></path>
-                          </g>
-                        </svg>
-                </svg> Tor </a>
+              <a href="/tor" class="flex items-center block py-4 px-4 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-white"> <span class="sr-only">Tor</span>
+            {{ tor_svg | safe }} Tor </a>
             </li>
             {% endif %}
             <li>
               <a href="/smsgaddresses" class="flex items-center block py-4 px-4 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-white"> <span class="sr-only">Settings</span>
-                <svg class="text-gray-500 w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-                  <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
-                    <path data-cap="butt" d="M11.992,11.737,14.2,13.4A2,2,0,0,1,15,15v1H7V15a2,2,0,0,1,.8-1.6l2.208-1.663" stroke="#6b7280"></path>
-                    <rect x="9" y="7" width="4" height="5" rx="2" ry="2" stroke="#6b7280"></rect>
-                    <path d="M2,1H18a2,2,0,0,1,2,2V21a2,2,0,0,1-2,2H2Z"></path>
-                    <line x1="23" y1="5" x2="23" y2="9" stroke="#6b7280"></line>
-                  </g>
-                </svg> SMSG Addresses</a>
+            {{ smsg_svg | safe }}  SMSG Addresses</a>
             </li>
             <li>
-              <a href="/watched" class="flex items-center block py-4 px-4 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-white"> <span class="sr-only">Automation Strategies</span>
-                <svg class="text-gray-500 w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-                  <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
-                    <path d="M1.373,13.183a2.064,2.064,0,0,1,0-2.366C2.946,8.59,6.819,4,12,4s9.054,4.59,10.627,6.817a2.064,2.064,0,0,1,0,2.366C21.054,15.41,17.181,20,12,20S2.946,15.41,1.373,13.183Z"></path>
-                    <circle cx="12" cy="12" r="4" stroke="#6b7280"></circle>
-                  </g>
-                </svg> Watch Outputs <span class="inline-flex justify-center items-center text-xs font-semibold ml-3 mr-2 px-2.5 py-1 font-small text-white bg-blue-500 rounded-full">{{ summary.num_watched_outputs }}</span> </a>
+            <a href="/watched" class="flex items-center block py-4 px-4 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-white"> <span class="sr-only">Automation Strategies</span>
+            {{ outputs_svg | safe }}  Watch Outputs
+            <span class="inline-flex justify-center items-center text-xs font-semibold ml-3 mr-2 px-2.5 py-1 font-small text-white bg-blue-500 rounded-full">{{ summary.num_watched_outputs }}</span>
+            </a>
             </li>
             {% if debug_mode == true %}
             <li>
               <a href="/automation" class="flex items-center block py-4 px-4 hover:bg-gray-10 dark:hover:bg-gray-700 dark:text-white"> <span class="sr-only">Automation Strategies</span>
-                <svg class="text-gray-500 w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-                  <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
-                    <line data-cap="butt" x1="5" y1="1" x2="5" y2="6" stroke="#6b7280"></line>
-                    <line x1="3" y1="1" x2="7" y2="1" stroke="#6b7280"> </line>
-                    <line data-cap="butt" x1="19" y1="1" x2="19" y2="6" stroke="#6b7280"></line>
-                    <line x1="17" y1="1" x2="21" y2="1" stroke="#6b7280"></line>
-                    <rect x="6" y="15" width="12" height="4" stroke="#6b7280"></rect>
-                    <line data-cap="butt" x1="10" y1="19" x2="10" y2="15" stroke="#6b7280"></line>
-                    <line data-cap="butt" x1="14" y1="19" x2="14" y2="15" stroke="#6b7280"></line>
-                    <line x1="6" y1="11" x2="8" y2="11" stroke="#6b7280"></line>
-                    <line x1="16" y1="11" x2="18" y2="11" stroke="#6b7280"> </line>
-                    <polygon points="23 6 5 6 1 6 1 23 23 23 23 6"></polygon>
-                  </g>
-                </svg> Automation Strategies</a>
+            {{ automation_svg | safe }} Automation Strategies</a>
             </li>
           {% endif %}
         </ul>
           <div class="text-sm text-gray-700">
             <a href="/shutdown/{{ shutdown_token }}" class="flex items-center block py-4 px-4 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-white"> <span class="sr-only">Shutdown</span>
-              <svg class="text-gray-500 w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-                <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
-                  <line data-cap="butt" x1="11" y1="10" x2="22" y2="10" stroke="#6b7280"></line>
-                  <polyline points="18 6 22 10 18 14" stroke="#6b7280"></polyline>
-                  <polyline data-cap="butt" points="13 13 13 17 8 17"></polyline>
-                  <polyline data-cap="butt" points="1 2 8 7.016 8 22 1 17 1 2 13 2 13 7"></polyline>
-                </g>
-              </svg> Shutdown </a>
+            {{ shutdown_svg | safe }}  Shutdown </a>
           </div>
         </div>
+
         <!-- dropdown settings & tools -->
+
         <!-- notifications -->
         <button id="dropdownNotificationButton" data-dropdown-toggle="dropdownNotification" class="inline-flex items-center text-sm font-medium text-center text-gray-500 focus:outline-none " type="button">
-          <svg class="h-5 w-5" viewBox="0 0 16 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M14 11.18V8C13.9986 6.58312 13.4958 5.21247 12.5806 4.13077C11.6655 3.04908 10.3971 2.32615 9 2.09V1C9 0.734784 8.89464 0.48043 8.70711 0.292893C8.51957 0.105357 8.26522 0 8 0C7.73478 0 7.48043 0.105357 7.29289 0.292893C7.10536 0.48043 7 0.734784 7 1V2.09C5.60294 2.32615 4.33452 3.04908 3.41939 4.13077C2.50425 5.21247 2.00144 6.58312 2 8V11.18C1.41645 11.3863 0.910998 11.7681 0.552938 12.2729C0.194879 12.7778 0.00173951 13.3811 0 14V16C0 16.2652 0.105357 16.5196 0.292893 16.7071C0.48043 16.8946 0.734784 17 1 17H4.14C4.37028 17.8474 4.873 18.5954 5.5706 19.1287C6.26819 19.6621 7.1219 19.951 8 19.951C8.8781 19.951 9.73181 19.6621 10.4294 19.1287C11.127 18.5954 11.6297 17.8474 11.86 17H15C15.2652 17 15.5196 16.8946 15.7071 16.7071C15.8946 16.5196 16 16.2652 16 16V14C15.9983 13.3811 15.8051 12.7778 15.4471 12.2729C15.089 11.7681 14.5835 11.3863 14 11.18ZM4 8C4 6.93913 4.42143 5.92172 5.17157 5.17157C5.92172 4.42143 6.93913 4 8 4C9.06087 4 10.0783 4.42143 10.8284 5.17157C11.5786 5.92172 12 6.93913 12 8V11H4V8ZM8 18C7.65097 17.9979 7.30857 17.9045 7.00683 17.7291C6.70509 17.5536 6.45451 17.3023 6.28 17H9.72C9.54549 17.3023 9.29491 17.5536 8.99317 17.7291C8.69143 17.9045 8.34903 17.9979 8 18ZM14 15H2V14C2 13.7348 2.10536 13.4804 2.29289 13.2929C2.48043 13.1054 2.73478 13 3 13H13C13.2652 13 13.5196 13.1054 13.7071 13.2929C13.8946 13.4804 14 13.7348 14 14V15Z" fill="#6b7280"></path>
-          </svg>
+          {{ notifications_svg | safe }}
           <div class="flex relative">
             <!-- Todo -->
             <!-- <div class="inline-flex relative -top-2 right-2 w-3 h-3 bg-green-500 rounded-full border-2 border-gray-800"></div> -->
-            <!-- Red <div class="inline-flex relative -top-2 right-3 w-3 h-3 bg-red-500 rounded-full border-2 border-white"></div>  --></div>
+            <!-- Red <div class="inline-flex relative -top-2 right-3 w-3 h-3 bg-red-500 rounded-full border-2 border-white"></div>  -->
+            <!-- Todo -->
+          </div>
         </button>
+
         <!-- Dropdown menu -->
         <div id="dropdownNotification" class="hidden z-50 w-full max-w-sm bg-white shadow rounded divide-y divide-gray-100 drop-shadow dark:bg-gray-500 dark:divide-gray-400 dark:text-white" aria-labelledby="dropdownNotificationButton">
           <div class="block py-2 px-4 font-semibold text-center text-gray-700 bg-gray-50 drop-shadow dark:text-white dark:bg-gray-500">Notifications History</div>
           <div class="divide-y divide-gray-100 dark:divide-gray-400">
             {% for entry in notifications %} {% if entry[1] == 1 %}
             <div class="flex py-3 px-4 hover:bg-gray-100 dark:hover:bg-gray-700">
-              <div class="inline-flex flex-shrink-0 justify-center items-center w-8 h-8 bg-blue-500 rounded-lg"><svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" height="18" width="18" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round"><circle cx="5" cy="5" r="4"></circle> <circle cx="19" cy="19" r="4"></circle> <polyline data-cap="butt" points="13,5 21,5 21,11 " stroke="#ffffff"></polyline> <polyline data-cap="butt" points="11,19 3,19 3,13 " stroke="#ffffff"></polyline> <polyline points=" 16,2 13,5 16,8 " stroke="#ffffff"></polyline> <polyline points=" 8,16 11,19 8,22 " stroke="#ffffff"></polyline></g></svg></div>
+              <div class="inline-flex flex-shrink-0 justify-center items-center w-8 h-8 bg-blue-500 rounded-lg">
+                {{ notifications_network_offer_svg | safe }}
+              </div>
               <div class="pl-3 w-full">
                 <div class="text-gray-500 text-sm mb-1.5"> <span class="font-semibold text-gray-900 dark:text-white">
                     NEW NETWORK <a class="underline text-blue-500" href="/offer/{{ entry[2].offer_id }}">OFFER</a></span>
@@ -292,7 +209,9 @@
             </div>
             {% elif entry[1] == 2 %}
             <div class="flex py-3 px-4 hover:bg-gray-100 dark:hover:bg-gray-700">
-              <div class="inline-flex flex-shrink-0 justify-center items-center w-8 h-8 bg-blue-500 rounded-lg"><svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" height="18" width="18" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round"><rect x="9.843" y="5.379" transform="matrix(0.7071 -0.7071 0.7071 0.7071 -0.7635 13.1569)" width="11.314" height="4.243"></rect> <polyline points="3,23 3,19 15,19 15,23 "></polyline> <line x1="4" y1="15" x2="1" y2="15" stroke="#ffffff"></line> <line x1="5.757" y1="10.757" x2="3.636" y2="8.636" stroke="#ffffff"></line> <line x1="1" y1="23" x2="17" y2="23"></line> <line x1="17" y1="9" x2="23" y2="15"></line></g></svg></div>
+              <div class="inline-flex flex-shrink-0 justify-center items-center w-8 h-8 bg-blue-500 rounded-lg">
+                {{ notifications_new_bid_on_offer_svg | safe }}
+              </div>
               <div class="pl-3 w-full">
                 <div class="text-gray-500 dark:text-white text-sm mb-1.5"> <span class="font-semibold text-gray-900 dark:text-white">
                     <a class="underline text-blue-500" href="/bid/{{ entry[2].bid_id }}">NEW BID</a> ON <a class="underline text-blue-500" href="/offer/{{ entry[2].offer_id }}">OFFER</a></span>
@@ -304,7 +223,9 @@
             </div>
             {% elif entry[1] == 3 %}
             <div class="flex py-3 px-4 hover:bg-gray-100 dark:hover:bg-gray-700">
-              <div class="inline-flex flex-shrink-0 justify-center items-center w-8 h-8 bg-violet-500 rounded-lg"><svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" height="18" width="18" viewBox="0 0 24 24"><g fill="#ffffff"><path d="M8.5,20a1.5,1.5,0,0,1-1.061-.439L.379,12.5,2.5,10.379l6,6,13-13L23.621,5.5,9.561,19.561A1.5,1.5,0,0,1,8.5,20Z" fill="#ffffff"></path></g></svg></div>
+              <div class="inline-flex flex-shrink-0 justify-center items-center w-8 h-8 bg-violet-500 rounded-lg">
+                {{ notifications_bid_accepted_svg | safe }}
+              </div>
               <div class="pl-3 w-full">
                 <div class="text-gray-500 text-sm mb-1.5 dark:text-white"> <span class="font-semibold text-gray-900 dark:text-white">
                     <a class="underline text-blue-500" href="/bid/{{ entry[2].bid_id }}">BID</a> ACCEPTED</span>
@@ -316,7 +237,9 @@
             </div>
             {% else %}
             <div class="flex py-3 px-4 hover:bg-gray-100 dark:hover:bg-gray-700">
-              <div class="inline-flex flex-shrink-0 justify-center items-center w-8 h-8 bg-blue-500 rounded-lg"><svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" height="18" width="18" viewBox="0 0 24 24"><g fill="#ffffff"><path d="M8.5,20a1.5,1.5,0,0,1-1.061-.439L.379,12.5,2.5,10.379l6,6,13-13L23.621,5.5,9.561,19.561A1.5,1.5,0,0,1,8.5,20Z" fill="#ffffff"></path></g></svg></div>
+              <div class="inline-flex flex-shrink-0 justify-center items-center w-8 h-8 bg-blue-500 rounded-lg">
+                {{ notifications_unknow_event_svg | safe }}
+              </div>
               <div class="pl-3 w-full">
                 <div class="text-gray-500 text-sm mb-1.5 dark:text-white"> <span class="font-semibold text-gray-900 dark:text-white">
                     UNKNOWN EVENT</span>
@@ -328,36 +251,19 @@
                {% endif %}
                {% endfor %}
             </div>
-           <!-- todo <a href="#" class="block py-2 text-sm font-medium text-center text-gray-900 bg-gray-50 hover:bg-gray-100">
-             <div class="inline-flex items-center ">
-                <svg class="mr-2 w-4 h-4 text-gray-500" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-                  <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
-                    <path d="M1.373,13.183a2.064,2.064,0,0,1,0-2.366C2.946,8.59,6.819,4,12,4s9.054,4.59,10.627,6.817a2.064,2.064,0,0,1,0,2.366C21.054,15.41,17.181,20,12,20S2.946,15.41,1.373,13.183Z"></path>
-                    <circle cx="12" cy="12" r="4" stroke="#6b7280"></circle>
-                  </g>
-                </svg> View all
-              </div>
-            </a>-->
           </div>
 <!-- notifications -->
-<!-- todo - fix line -->
+
 <div class="flex mr-2 items-center text-gray-50 hover:text-gray-100 text-sm ml-5">
   <div class="flex-shrink-0 w-px h-10 bg-gray-400 dark:bg-gray-400 ml-4 mr-5"></div>
               {% if debug_mode == true %}
               <!-- dev mode icons on/off -->
               <ul class="xl:flex">
               <li>
-                <div data-tooltip-target="tooltip-DEV" class="ml-5 flex items-center text-gray-50 hover:text-gray-100 text-sm">
-                    <svg class="text-gray-500 w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" height="18" width="18" viewBox="0 0 24 24">
-                    <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#2ad167" stroke-linejoin="round">
-                      <circle cx="12" cy="12" r="11"></circle>
-                      <path data-cap="butt" d="M9,16a3,3,0,0,0,6,0" stroke="#2ad167"></path>
-                      <circle cx="17" cy="10" r="3" stroke="#2ad167"></circle>
-                      <circle cx="7" cy="10" r="3" stroke="#2ad167"></circle>
-                      <path data-cap="butt" d="M10,10a2,2,0,0,1,4,0" stroke="#2ad167"></path></g>
-                  </svg>
+                <div data-tooltip-target="tooltip-debug" class="ml-5 flex items-center text-gray-50 hover:text-gray-100 text-sm">
+                  {{ debug_nerd_svg | safe }}
                   <span data-tooltip-target="tooltip-DEV" ></span> </div>
-                <div id="tooltip-DEV" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+                <div id="tooltip-debug" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
                   <p><b>Debug mode:</b> Active</p>
                   {% if debug_ui_mode == true %}
                   <p><b>Debug UI mode:</b> Active</p>
@@ -372,7 +278,7 @@
                 <ul class="xl:flex"><li>
                 {% if locked == true %}
                 <div data-tooltip-target="tooltip-locked-wallets" class="ml-5 flex items-center text-gray-50 hover:text-gray-100 text-sm">
-                   <svg class="text-gray-500 w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#2ad167" stroke-linejoin="round"><rect x="3" y="11" width="18" height="12" rx="2"></rect><circle cx="12" cy="17" r="2" stroke="#2ad167"></circle><path d="M17,7V6a4.951,4.951,0,0,0-4.9-5H12A4.951,4.951,0,0,0,7,5.9V7" stroke="#2ad167"></path></g></svg>
+                  {{ wallet_locked_svg | safe }}
                   <span data-tooltip-target="tooltip-locked-wallets" ></span> </div>
                 <div id="tooltip-locked-wallets" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
                   <p><b>Wallets:</b> Locked </p>
@@ -380,7 +286,7 @@
                 {% else %}
                 <a href='/lock'>
                 <div data-tooltip-target="tooltip-unlocked-wallets" class="ml-5 flex items-center text-gray-50 hover:text-gray-100 text-sm">
-                   <svg class="text-gray-500 w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#f80b0b" stroke-linejoin="round"><rect x="3" y="11" width="18" height="12"></rect><circle cx="12" cy="17" r="2" stroke="#f80b0b"></circle><path data-cap="butt" d="M17,6a4.951,4.951,0,0,0-4.9-5H12A4.951,4.951,0,0,0,7,5.9V11"></path></g></svg>
+                {{ wallet_unlocked_svg | safe }}
                   <span data-tooltip-target="tooltip-unlocked-wallets" ></span> </div>
                 <div class="tooltip-arrow" data-popper-arrow></div>
                 <div id="tooltip-unlocked-wallets" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
@@ -395,68 +301,67 @@
                 <ul class="xl:flex ml-5">
                   <li>
                     <a href="/tor">
-                      <div data-tooltip-target="tooltip-TOR" class="flex items-center text-gray-50 hover:text-gray-100 text-sm">
-                        <svg class="text-gray-500 w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-                          <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#AA70E4" stroke-linejoin="round">
-                            <path d="M9,18.8A6.455,6.455,0,0,1,7,14,6.455,6.455,0,0,1,9,9.2" stroke="#AA70E4"></path>
-                            <path d="M15,18.8A6.455,6.455,0,0,0,17,14a6.455,6.455,0,0,0-2-4.8" stroke="#AA70E4"></path>
-                            <path d="M14,2.256V1H10V2.256A3.949,3.949,0,0,1,7.658,5.891,8.979,8.979,0,0,0,2,14c0,4.971,4.477,9,10,9s10-4.029,10-9a8.978,8.978,0,0,0-5.658-8.109A3.95,3.95,0,0,1,14,2.256Z"></path>
-                          </g>
-                        </svg>
-                    </a> <span data-tooltip-target="tooltip-TOR"></span></div>
-                    <div id="tooltip-TOR" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip"><b>Tor mode:</b> Active {% if tor_established == true %}
-                      <br><b>Tor:</b> Connected{% endif %}</div>
+                      <div data-tooltip-target="tooltip-tor" class="flex items-center text-gray-50 hover:text-gray-100 text-sm">
+                        {{ tor_purple_svg | safe }}
+                    </a> <span data-tooltip-target="tooltip-tor"></span></div>
+                    <div id="tooltip-tor" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip"><b>Tor mode:</b> Active
+                      {% if tor_established == true %}
+                      <br><b>Tor:</b> Connected
+                      {% endif %}
+                    </div>
                   </li>
                 </ul>
                 <!-- tor -->
               {% endif %}
               <button data-tooltip-target="tooltip-darkmode" id="theme-toggle" type="button" class="text-gray-500 dark:text-gray-400 focus:outline-none rounded-lg text-sm ml-5">
-               <svg id="theme-toggle-dark-icon" class="hidden w-5 h-5" fill="#F59E0B" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"></path></svg>
-               <svg id="theme-toggle-light-icon" class="hidden w-5 h-5" fill="#F59E0B" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" fill-rule="evenodd" clip-rule="evenodd"></path></svg>
+                {{ sun_svg | safe }}
+                {{ moon_svg | safe }}
                <span data-tooltip-target="tooltip-darkmode"></span>
                   <div id="tooltip-darkmode" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">Dark mode</div>
               </button>
             </div>
+
               <div class="hidden xl:block"></div>
+
               <!-- mobile menu -->
               <div class="ml-auto flex xl:hidden">
                 <button class="navbar-burger flex items-center rounded focus:outline-none">
-                  <svg class="text-white bg-blue-500 hover:bg-blue-600 block h-8 w-8 p-2 rounded" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" fill="currentColor">
-                    <title>Mobile Menu</title>
-                    <path d="M0 3h20v2H0V3zm0 6h20v2H0V9zm0 6h20v2H0v-2z"></path>
-                  </svg>
+                  {{ mobile_menu_svg | safe }}
                 </button>
               </div>
-              <!-- mobile menu -->
+
             </div>
             <div class="hidden xl:block py-5 px-6 bg-coolGray-100 border-gray-100 dark:border-gray-500 dark:bg-body border-b dark:border-b-2">
               <div class="flex items-center container flex flex-wrap items-center justify-between items-center mx-auto">
                 <ul class="flex items-center">
+
                   <li>
                     <a class="flex mr-5 items-center text-sm text-gray-400 hover:text-gray-600 dark:text-gray-100 dark:hover:text-gray-100" href="/active">
-                      <svg class="text-gray-100 w-5 h-5 ml-7 mr-2" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-                        <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
-                          <circle data-cap="butt" cx="12" cy="12" r="3" stroke="#6b7280"></circle>
-                          <polyline points="16.071 5.341 21.763 6.927 21.034 1.13"></polyline>
-                          <path data-cap="butt" d="M1,12A11,11,0,0,1,21.763,6.927"></path>
-                          <polyline points="7.929 18.659 2.237 17.073 2.966 22.87"></polyline>
-                          <path data-cap="butt" d="M23,12A11,11,0,0,1,2.237,17.073"></path>
-                        </g>
-                      </svg><span>Swaps in Progress </span> <span class="inline-flex justify-center items-center text-xs font-semibold ml-3 mr-2 px-2.5 py-1 font-small text-white bg-blue-500 rounded-full">{{ summary.num_swapping }}</span></a>
+                      <div id="swapContainer" class="inline-flex center-spin ml-7 mr-2" {% if summary.num_swapping != 0 %}style="animation: spin 2s linear infinite;"{% endif %}>
+                        {{ swap_in_progress_svg | safe }}
+                      </div>
+                      <span>Swaps in Progress</span>
+                      <span class="inline-flex justify-center items-center text-xs font-semibold ml-3 mr-2 px-2.5 py-1 font-small text-white bg-blue-500 rounded-full num-swap">{{ summary.num_swapping }}</span>
+                    </a>
                   </li>
+<style>
+.center-spin {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+</style>
                   <div class="flex-shrink-0 w-px h-10 bg-gray-200 dark:bg-gray-400 mr-10"></div>
+
                   <li>
                     <a data-tooltip-target="tooltip-your-offers" class="flex mr-5 items-center text-sm text-gray-400 hover:text-gray-600 dark:text-gray-100 dark:hover:text-gray-100" href="/sentoffers">
-                      <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="18" width="18" viewBox="0 0 24 24">
-                        <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
-                          <circle cx="5" cy="5" r="4"></circle>
-                          <circle cx="19" cy="19" r="4"></circle>
-                          <polyline data-cap="butt" points="13,5 21,5 21,11 " stroke="#6b7280"></polyline>
-                          <polyline data-cap="butt" points="11,19 3,19 3,13 " stroke="#6b7280"></polyline>
-                          <polyline points=" 16,2 13,5 16,8 " stroke="#6b7280"></polyline>
-                          <polyline points=" 8,16 11,19 8,22 " stroke="#6b7280"></polyline>
-                        </g>
-                      </svg><span>Your Offers</span> <span class="inline-flex justify-center items-center text-xs font-semibold ml-3 mr-2 px-2.5 py-1 font-small text-white bg-blue-500 rounded-full">{{ summary.num_sent_active_offers }}</span></a>
+                      {{ your_offers_svg | safe }}
+                      <span>Your Offers</span> <span class="inline-flex justify-center items-center text-xs font-semibold ml-3 mr-2 px-2.5 py-1 font-small text-white bg-blue-500 rounded-full">{{ summary.num_sent_active_offers }}</span></a>
 
                 <div id="tooltip-your-offers" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
                   <p><b>Total:</b> {{ summary.num_sent_offers }}</p>
@@ -466,23 +371,13 @@
                   </li>
                   <div class="flex-shrink-0 w-px h-10 bg-gray-200 dark:bg-gray-400 mr-10"></div>
                   <li>
-                    <a class="flex mr-10 items-center text-sm text-gray-400 hover:text-gray-600 dark:text-gray-100 dark:hover:text-gray-100" href="/availablebids">
-                      <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-                        <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
-                          <circle cx="12" cy="12" r="11"></circle>
-                          <polyline points=" 12,6 12,12 18,12 " stroke="#6b7280"></polyline>
-                        </g>
-                      </svg><span>Available Bids</span> <span class="inline-flex justify-center items-center text-xs font-semibold ml-3 mr-2 px-2.5 py-1 font-small text-white bg-blue-500 rounded-full">{{ summary.num_available_bids }}</span></a>
+                    <a class="flex mr-10 items-center text-sm text-gray-400 hover:text-gray-600 dark:text-gray-100 dark:hover:text-gray-100" href="/availablebids">{{ available_bids_svg | safe }}
+                      <span>Available Bids</span> <span class="inline-flex justify-center items-center text-xs font-semibold ml-3 mr-2 px-2.5 py-1 font-small text-white bg-blue-500 rounded-full">{{ summary.num_available_bids }}</span></a>
                   </li>
                   <li>
                     <a data-tooltip-target="tooltip-bids-received" class="flex mr-10 items-center text-sm text-gray-400 hover:text-gray-600 dark:text-gray-100 dark:hover:text-gray-100" href="/receivedbids">
-                      <svg class="text-gray-100 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-                        <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
-                          <path d="M2,16v4a2,2,0,0,0,2,2H20a2,2,0,0,0,2-2V16"> </path>
-                          <line data-cap="butt" x1="12" y1="1" x2="12" y2="16" stroke="#6b7280"></line>
-                          <polyline points="7 11 12 16 17 11" stroke="#6b7280"></polyline>
-                        </g>
-                      </svg><span>Bids Received</span> <span class="inline-flex justify-center items-center text-xs font-semibold ml-3 mr-2 px-2.5 py-1 font-small text-white bg-blue-500 rounded-full">{{ summary.num_recv_active_bids }}</span></a>
+                      {{ bids_received_svg | safe }}
+                      <span>Bids Received</span> <span class="inline-flex justify-center items-center text-xs font-semibold ml-3 mr-2 px-2.5 py-1 font-small text-white bg-blue-500 rounded-full">{{ summary.num_recv_active_bids }}</span></a>
                   </li>
 
                 <div id="tooltip-bids-received" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
@@ -491,13 +386,8 @@
                 </div>
                   <li>
                     <a data-tooltip-target="tooltip-bids-sent" class="flex mr-10 items-center text-sm text-gray-400 hover:text-gray-600 dark:text-gray-100 dark:hover:text-gray-100" href="/sentbids">
-                      <svg class="text-gray-100 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-                        <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
-                          <path d="M2,16v4a2,2,0,0,0,2,2H20a2,2,0,0,0,2-2V16"></path>
-                          <line data-cap="butt" x1="12" y1="17" x2="12" y2="2" stroke="#6b7280"></line>
-                          <polyline points="17 7 12 2 7 7" stroke="#6b7280"></polyline>
-                        </g>
-                      </svg><span>Bids Sent</span><span class="inline-flex justify-center items-center text-xs font-semibold ml-3 mr-2 px-2.5 py-1 font-small text-white bg-blue-500 rounded-full">{{ summary.num_sent_active_bids }}</span></a>
+                      {{ bids_sent_svg| safe }}
+                      <span>Bids Sent</span><span class="inline-flex justify-center items-center text-xs font-semibold ml-3 mr-2 px-2.5 py-1 font-small text-white bg-blue-500 rounded-full">{{ summary.num_sent_active_bids }}</span></a>
                 <div id="tooltip-bids-sent" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
                   <p><b>Total:</b>  {{ summary.num_sent_bids }}</p>
                 <div class="tooltip-arrow" data-popper-arrow></div>
@@ -520,103 +410,46 @@
           <ul class="mb-8 text-sm font-medium">
             <li>
               <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded" href="/wallets"> <span class="inline-block mr-3">
-                <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="18" width="18" viewBox="0 0 24 24">
-                  <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
-                    <path d="M6,3H3C1.895,3,1,3.895,1,5 v0c0,1.105,0.895,2,2,2"></path>
-                    <polyline points=" 6,7 6,1 20,1 20,7 " stroke="#6b7280"></polyline>
-                    <path d="M23,7H3 C1.895,7,1,6.105,1,5v15c0,1.657,1.343,3,3,3h19V7z"></path>
-                    <circle cx="17" cy="15" r="2"></circle>
-                  </g>
-                </svg>
-                </span><span>Wallets</span> <span class="inline-block ml-auto">
-                </span></a>
+                {{ wallet_svg | safe }}
+                </span><span>Wallets</span>
+                <span class="inline-block ml-auto"></span></a>
             </li>
           </ul>
           <h3 class="mb-2 text-xs uppercase text-gray-300 font-medium dark:text-gray-300">Exchange</h3>
           <ul class="text-sm font-medium">
             <li>
               <a class="flex items-center pl-3 py-3 pr-2 text-gray-50 hover:bg-gray-900 rounded" href="/newoffer"> <span class="inline-block mr-3">
-                <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="18" width="18" viewBox="0 0 24 24">
-                  <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
-                    <circle cx="5" cy="5" r="4"></circle>
-                    <circle cx="19" cy="19" r="4"></circle>
-                    <polyline data-cap="butt" points="13,5 21,5 21,11 " stroke="#6b7280"></polyline>
-                    <polyline data-cap="butt" points="11,19 3,19 3,13 " stroke="#6b7280"></polyline>
-                    <polyline points=" 16,2 13,5 16,8 " stroke="#6b7280"></polyline>
-                    <polyline points=" 8,16 11,19 8,22 " stroke="#6b7280"></polyline>
-                  </g>
-                </svg>
+                {{ new_offer_svg | safe }}
                 </span><span>Place new Offer</span></a>
             </li>
             <li>
               <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded" href="/active"> <span class="inline-block mr-3">
-                <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
-                  <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
-                    <circle data-cap="butt" cx="12" cy="12" r="3" stroke="#6b7280"></circle>
-                    <polyline points="16.071 5.341 21.763 6.927 21.034 1.13"></polyline>
-                    <path data-cap="butt" d="M1,12A11,11,0,0,1,21.763,6.927"></path>
-                    <polyline points="7.929 18.659 2.237 17.073 2.966 22.87"></polyline>
-                    <path data-cap="butt" d="M23,12A11,11,0,0,1,2.237,17.073"></path>
-                  </g>
-                </svg>
-                </span><span>Swaps in Progress</span> <span class="inline-flex justify-center items-center text-xs font-semibold ml-3 mr-2 px-2.5 py-1 font-small text-white bg-blue-500 rounded-full">{{ summary.num_swapping }}</span></a>
+                {{ swap_in_progress_mobile_svg | safe }}
+              </span><span>Swaps in Progress</span> <span class="inline-flex justify-center items-center text-xs font-semibold ml-3 mr-2 px-2.5 py-1 font-small text-white bg-blue-500 rounded-full">{{ summary.num_swapping }}</span></a>
             </li>
             <li>
               <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded" href="/offers"> <span class="inline-block mr-3">
-                <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
-                  <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
-                    <rect x="3" y="1" width="18" height="22"></rect>
-                    <line x1="12" y1="8" x2="12" y2="16" stroke="#6b7280"></line>
-                    <line x1="8" y1="14" x2="8" y2="16" stroke="#6b7280"></line>
-                    <line x1="16" y1="11" x2="16" y2="16" stroke="#6b7280"> </line>
-                  </g>
-                </svg>
+                {{ order_book_svg | safe }}
                 </span><span>Show Order Book</span> <span class="inline-flex justify-center items-center text-xs font-semibold ml-3 mr-2 px-2.5 py-1 font-small text-white bg-blue-500 rounded-full">{{ summary.num_network_offers }}</span></a>
             </li>
             <li>
               <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded" href="sentoffers"> <span class="inline-block mr-3">
-                <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="18" width="18" viewBox="0 0 24 24">
-                  <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
-                    <circle cx="5" cy="5" r="4"></circle>
-                    <circle cx="19" cy="19" r="4"></circle>
-                    <polyline data-cap="butt" points="13,5 21,5 21,11 " stroke="#6b7280"></polyline>
-                    <polyline data-cap="butt" points="11,19 3,19 3,13 " stroke="#6b7280"></polyline>
-                    <polyline points=" 16,2 13,5 16,8 " stroke="#6b7280"></polyline>
-                    <polyline points=" 8,16 11,19 8,22 " stroke="#6b7280"></polyline>
-                  </g>
-                </svg>
+                {{ your_offers_svg | safe }}
               </span><span>Your Offers</span> <span class="inline-flex justify-center items-center text-xs font-semibold ml-3 mr-2 px-2.5 py-1 font-small text-white bg-blue-500 rounded-full">{{ summary.num_sent_offers }}</span></a>
             </li>
             <li>
               <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded" href="/availablebids"> <span class="inline-block mr-3">
-                <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-                  <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
-                    <circle cx="12" cy="12" r="11"></circle>
-                    <polyline points=" 12,6 12,12 18,12 " stroke="#6b7280"></polyline>
-                  </g>
-                </svg>
+                {{ available_bids_svg | safe }}
                 </span><span>Available Bids</span> <span class="inline-flex justify-center items-center text-xs font-semibold ml-3 mr-2 px-2.5 py-1 font-small text-white bg-blue-500 rounded-full">{{ summary.num_available_bids }}</span></a>
             </li>
             <li>
               <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded" href="/receivedbids"> <span class="inline-block mr-3">
-                <svg class="text-gray-100 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-                  <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
-                    <path d="M2,16v4a2,2,0,0,0,2,2H20a2,2,0,0,0,2-2V16"> </path>
-                    <line data-cap="butt" x1="12" y1="1" x2="12" y2="16" stroke="#6b7280"></line>
-                    <polyline points="7 11 12 16 17 11" stroke="#6b7280"></polyline>
-                  </g>
-                </svg>
+                {{ bids_received_svg | safe }}
                 </span><span>Bids Received</span> <span class="inline-flex justify-center items-center text-xs font-semibold ml-3 mr-2 px-2.5 py-1 font-small text-white bg-blue-500 rounded-full">{{ summary.num_recv_bids }}</span></a>
             </li>
             <li>
               <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded" href="/sentbids"> <span class="inline-block mr-3">
-                <svg class="text-gray-100 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-                  <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
-                    <path d="M2,16v4a2,2,0,0,0,2,2H20a2,2,0,0,0,2-2V16"></path>
-                    <line data-cap="butt" x1="12" y1="17" x2="12" y2="2" stroke="#6b7280"></line>
-                    <polyline points="17 7 12 2 7 7" stroke="#6b7280"></polyline>
-                  </g>
-                </svg>
+                {{ bids_sent_svg | safe }}
                 </span><span>Bids Sent</span> <span class="inline-flex justify-center items-center text-xs font-semibold ml-3 mr-2 px-2.5 py-1 font-small text-white bg-blue-500 rounded-full">{{ summary.num_sent_bids }}</span></a>
             </li>
           </ul>
@@ -624,127 +457,65 @@
           <ul class="text-sm font-medium">
             <li>
               <a class="flex items-center pl-3 py-3 pr-2 text-gray-50 hover:bg-gray-900 rounded" href="/settings"> <span class="inline-block mr-3">
-                  <svg class="text-gray-500 w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" height="18" width="18" viewBox="0 0 24 24">
-                    <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
-                      <circle cx="12" cy="12" r="3" stroke="#6b7280"></circle>
-                      <path d="M20,12a8.049,8.049,0,0,0-.188-1.713l2.714-2.055-2-3.464L17.383,6.094a7.987,7.987,0,0,0-2.961-1.719L14,1H10L9.578,4.375A7.987,7.987,0,0,0,6.617,6.094L3.474,4.768l-2,3.464,2.714,2.055a7.9,7.9,0,0,0,0,3.426L1.474,15.768l2,3.464,3.143-1.326a7.987,7.987,0,0,0,2.961,1.719L10,23h4l.422-3.375a7.987,7.987,0,0,0,2.961-1.719l3.143,1.326,2-3.464-2.714-2.055A8.049,8.049,0,0,0,20,12Z"></path>
-                    </g>
-                  </svg>
+                  {{ settings_svg | safe }}
                   </span><span>Settings</span></a>
             </li>
             {% if debug_mode == true %}
             <li>
               <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded" href="/rpc"> <span class="inline-block mr-3">
-                <svg class="text-gray-500 w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-                  <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
-                    <rect x="1" y="2" width="22" height="20"></rect>
-                    <line x1="1" y1="6" x2="23" y2="6"></line>
-                    <polyline points=" 5,11 7,13 5,15 " stroke="#6b7280"></polyline>
-                    <line x1="10" y1="15" x2="14" y2="15" stroke="#6b7280"></line>
-                    <line x1="6" y1="2" x2="6" y2="6"></line>
-                  </g>
-                </svg>
+                {{ rpc_svg | safe }}
                 </span><span>RPC Console</span></a>
             </li>
             {% endif %}
             {% if debug_mode == true %}
             <li>
               <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded" href="/debug"> <span class="inline-block mr-3">
-              <svg class="text-gray-500 w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
-              <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
-              <path data-cap="butt" d="M5.29,10H4A3,3,0,0,1,1,7V6" stroke="#6b7280"></path>
-              <path data-cap="butt" d="M5.29,18H4a3,3,0,0,0-3,3v1" stroke="#6b7280"></path>
-              <path data-cap="butt" d="M8,6.255V5a4,4,0,0,1,4-4h0a4,4,0,0,1,4,4V6.255" stroke="#6b7280"></path>
-              <line x1="5" y1="14" x2="1" y2="14" stroke="#6b7280"></line> <path data-cap="butt" d="M18.71,10H20a3,3,0,0,0,3-3V6" stroke="#6b7280"></path>
-              <path data-cap="butt" d="M18.71,18H20a3,3,0,0,1,3,3v1" stroke="#6b7280"></path> <line x1="19" y1="14" x2="23" y2="14" stroke="#6b7280"></line>
-              <path d="M19,16A7,7,0,0,1,5,16V12a7,7,0,0,1,14,0Z"></path></g></svg>
+              {{ debug_svg | safe }}
             </span> <span>Debug</span> </a>
             </li>
             {% endif %}
             {% if debug_mode == true %}
             <li>
               <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded" href="/explorers"> <span class="inline-block mr-3">
-                <svg class="text-gray-500 w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-                  <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
-                    <line x1="22" y1="22" x2="15.656" y2="15.656" stroke="#6b7280"></line>
-                    <circle cx="10" cy="10" r="8"></circle>
-                  </g>
-                </svg>
+            {{ explorer_svg | safe }}
                 </span><span>Explorers</span></a>
             </li>
             {% endif %}
             <li>
               <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded" href="/smsgaddresses"> <span class="inline-block mr-3">
-                <svg class="text-gray-500 w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-                  <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
-                    <path data-cap="butt" d="M11.992,11.737,14.2,13.4A2,2,0,0,1,15,15v1H7V15a2,2,0,0,1,.8-1.6l2.208-1.663" stroke="#6b7280"></path>
-                    <rect x="9" y="7" width="4" height="5" rx="2" ry="2" stroke="#6b7280"></rect>
-                    <path d="M2,1H18a2,2,0,0,1,2,2V21a2,2,0,0,1-2,2H2Z"></path>
-                    <line x1="23" y1="5" x2="23" y2="9" stroke="#6b7280"></line>
-                  </g>
-                </svg>
+              {{ smsg_svg | safe }}
                 </span><span>SMSG Addresses</span></a>
             </li>
             <li>
               <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded" href="/watched"> <span class="inline-block mr-3">
-                <svg class="text-gray-500 w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-                  <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
-                    <path d="M1.373,13.183a2.064,2.064,0,0,1,0-2.366C2.946,8.59,6.819,4,12,4s9.054,4.59,10.627,6.817a2.064,2.064,0,0,1,0,2.366C21.054,15.41,17.181,20,12,20S2.946,15.41,1.373,13.183Z"></path>
-                    <circle cx="12" cy="12" r="4" stroke="#6b7280"></circle>
-                  </g>
-                </svg>
+                {{ outputs_svg| safe }}
                 </span><span>Watched Outputs</span> <span class="inline-flex justify-center items-center text-xs font-semibold ml-3 mr-2 px-2.5 py-1 font-small text-white bg-blue-500 rounded-full">{{ summary.num_watched_outputs }}</span></a>
             </li>
             {% if debug_mode == true %}
             <li>
               <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded" href="/automation"> <span class="inline-block mr-3">
-                <svg class="text-gray-500 w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-                  <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
-                    <line data-cap="butt" x1="5" y1="1" x2="5" y2="6" stroke="#6b7280"></line>
-                    <line x1="3" y1="1" x2="7" y2="1" stroke="#6b7280"> </line>
-                    <line data-cap="butt" x1="19" y1="1" x2="19" y2="6" stroke="#6b7280"></line>
-                    <line x1="17" y1="1" x2="21" y2="1" stroke="#6b7280"></line>
-                    <rect x="6" y="15" width="12" height="4" stroke="#6b7280"></rect>
-                    <line data-cap="butt" x1="10" y1="19" x2="10" y2="15" stroke="#6b7280"></line>
-                    <line data-cap="butt" x1="14" y1="19" x2="14" y2="15" stroke="#6b7280"></line>
-                    <line x1="6" y1="11" x2="8" y2="11" stroke="#6b7280"></line>
-                    <line x1="16" y1="11" x2="18" y2="11" stroke="#6b7280"> </line>
-                    <polygon points="23 6 5 6 1 6 1 23 23 23 23 6"></polygon>
-                  </g>
-                </svg>
+              {{ automation_svg | safe }}
                 </span><span>Automation Strategies</span></a>
             </li>
             {% endif %}
             {% if use_tor_proxy == true %}
             <li>
               <a class="flex items-center pl-3 py-3 pr-2 text-gray-50 hover:bg-gray-900 rounded" href="/tor"> <span class="inline-block mr-3">
-                <svg class="text-gray-500 w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-                  <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#AA70E4" stroke-linejoin="round">
-                    <path d="M9,18.8A6.455,6.455,0,0,1,7,14,6.455,6.455,0,0,1,9,9.2" stroke="#AA70E4"></path>
-                    <path d="M15,18.8A6.455,6.455,0,0,0,17,14a6.455,6.455,0,0,0-2-4.8" stroke="#AA70E4"></path>
-                     <path d="M14,2.256V1H10V2.256A3.949,3.949,0,0,1,7.658,5.891,8.979,8.979,0,0,0,2,14c0,4.971,4.477,9,10,9s10-4.029,10-9a8.978,8.978,0,0,0-5.658-8.109A3.95,3.95,0,0,1,14,2.256Z"></path>
-                   </g>
-                 </svg>
+              {{ tor_svg | safe }} <!-- change color -->
               </span><span>Tor</span></a>
             </li>
           {% endif %}
         </ul>
           <div class="pt-8 text-sm font-medium">
             <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded" href="/shutdown/{{ shutdown_token }}"> <span class="inline-block mr-3">
-              <svg class="text-gray-500 w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-                <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
-                  <line data-cap="butt" x1="11" y1="10" x2="22" y2="10" stroke="#6b7280"></line>
-                  <polyline points="18 6 22 10 18 14" stroke="#6b7280"></polyline>
-                  <polyline data-cap="butt" points="13 13 13 17 8 17"></polyline>
-                  <polyline data-cap="butt" points="1 2 8 7.016 8 22 1 17 1 2 13 2 13 7"></polyline>
-                </g>
-              </svg>
+              {{ shutdown_svg | safe }}
               </span><span>Shutdown</span></a>
           </div>
         </div>
       </nav>
     </div>
-    <!-- mobile sidebar -->
+  <!-- mobile sidebar -->
+
   </section>
   {% if ws_url %}
   <script>

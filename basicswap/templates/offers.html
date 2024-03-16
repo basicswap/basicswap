@@ -8,7 +8,7 @@
         <ul class="flex flex-wrap items-center gap-x-3 mb-2">
           <li><a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/">Home</a></li>
           <li>{{ breadcrumb_line_svg | safe }}</li>
-          <li><a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/wallets">{{ page_type }}</a></li>
+          <li><a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="{% if page_type == 'offers' %} offers {% elif page_type == 'sentoffers' %} sentoffers {% endif %}">{{ page_type }}</a></li>
           <li>{{ breadcrumb_line_svg | safe }}</li>
         </ul>
       </div>
@@ -17,7 +17,7 @@
 
   <section class="py-4">
     <div class="container px-4 mx-auto">
-      <div class="relative py-11 px-16 bg-coolGray-900 dark:bg-blue-500 rounded-md overflow-hidden">
+      <div class="relative py-11 px-16 bg-coolGray-900 dark:bg-gray-500 rounded-md overflow-hidden">
         <img class="absolute z-10 left-4 top-4 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt="dots-red">
         <img class="absolute h-64 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" src="/static/images/elements/wave.svg" alt="wave">
         <div class="relative z-20 flex flex-wrap items-center -m-3">
@@ -26,7 +26,7 @@
             <p class="font-normal text-coolGray-200 dark:text-white">{{ page_type_description }}</p>
           </div>
           <div class="rounded-full{{ page_button }} w-full md:w-1/2 p-3 p-6 container flex flex-wrap items-center justify-end items-center mx-auto">
-            <a id="refresh" href="/newoffer" class="rounded-full flex flex-wrap justify-center px-5 py-4 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border dark:bg-gray-500 dark:hover:bg-gray-700 border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+            <a id="refresh" href="/newoffer" class="rounded-full flex flex-wrap justify-center px-5 py-4 bg-blue-500 hover:bg-green-600 hover:border-green-600 font-medium text-sm text-white border  border-blue-500 rounded-md focus:ring-0 focus:outline-none">
               {{ place_new_offer_svg | safe }} <span>Place new Offer</span>
             </a>
           </div>
@@ -37,17 +37,17 @@
   {% include 'inc_messages.html' %}
 
   {% if show_chart %}
-  <section class="relative">
+  <section class="relative hidden xl:block">
     <div class="pl-6 pr-6 pt-0 pb-0 mt-5 h-full overflow-hidden">
       <div class="pb-6 border-coolGray-100">
         <div class="flex flex-wrap items-center justify-between -m-2">
           <div class="w-full pt-2">
             <div class="container mt-5 mx-auto relative">
               <div class="pt-6 pb-8 bg-coolGray-100 dark:bg-gray-500 rounded-xl container-to-blur">
-                <div class="px-6">
-                  <div class="w-full mt-6 pb-6 overflow-x-auto">
+                <div class="px-4">
+                  <div class="w-full mt-6 overflow-x-auto">
                     <div class="chart-container" style="max-width: 100%;">
-                      <canvas id="coin-chart" style="height: 280px;"></canvas>
+                      <canvas id="coin-chart" style="height: 275px;"></canvas>
                     </div>
                   </div>
                 </div>
@@ -65,264 +65,304 @@
     </div>
   </section>
 
-<section class="py-4 overflow-hidden container-to-blur">
-  <div class="container px-4 mx-auto">
-    <div class="flex flex-wrap -m-3">
+  <section class="py-4 overflow-hidden container-to-blur">
+    <div class="container px-4 mx-auto">
+      <div class="flex flex-wrap -m-3">
 
-      <div class="w-full sm:w-1/2 lg:w-1/5 p-3" id="btc-container">
-        <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-lg dark:text-white active-container" id="btc-active">
-          <div class="flex items-center mb-2.5">
-            <img src="/static/images/coins/Bitcoin-20.png" height="20" width="20" class="mr-2">
-            <p class="text-sm text-neutral-500 font-medium">Bitcoin (BTC)</p>
+        <div class="w-full sm:w-1/2 lg:w-1/6 p-3" id="btc-container">
+            <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-2xl dark:text-white active-container" id="btc-active">
+              <div class="flex items-center">
+                  <img src="/static/images/coins/Bitcoin.png" class="rounded-xl" style="width: 35px; height: 35px; object-fit: contain;" alt="Bitcoin">
+                  <p class="ml-2 text-black text-sm dark:text-white">
+                      Bitcoin (BTC)
+                  </p>
+              </div>
+              <div class="flex flex-col justify-start">
+                  <p class="my-2 text-xl font-bold text-left text-gray-700 dark:text-gray-100" id="btc-price-usd">
+                      <span class="text-sm">
+                          <span id="btc-price-usd-value"></span>
+                  </p>
+                  <div class="flex items-center text-sm">
+                      <div class="w-auto">
+                        <div id="btc-price-change-container" class="w-auto p-1"></div>
+                      </div>
+                  </div>
+                  <div class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2">
+                    <span class="bold mr-2">VOL:</span>
+                      <div id="btc-volume-24h">
+                      </div>
+                  </div>
+              </div>
           </div>
-          <div class="flex flex-wrap items-center mb-2 -m-1">
-            <div class="w-auto p-1">
-              <h3 class="font-heading text-1xl font-semibold">
-                <div id="btc-price-usd"></div>
-              </h3>
-            </div>
-            <div class="w-auto p-1">
-              <div id="btc-price-change-container" class="w-auto p-1"></div>
-            </div>
-            <div class="w-auto p-1">
-              <h3 class="font-heading text-1xl font-semibold">
-                <div id="btc-price-btc"></div>
-              </h3>
-            </div>
           </div>
-          <p class="text-2xs text-neutral-400 font-medium">
-            Volume 24H:
-            <div class="text-xs" id="btc-volume-24h"></div>
+
+      <div class="w-full sm:w-1/2 lg:w-1/6 p-3" id="xmr-container">
+        <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-2xl dark:text-white price-container">
+      <div class="flex items-center">
+          <img src="/static/images/coins/Monero.png" class="rounded-xl" style="width: 35px; height: 35px; object-fit: contain;" alt="Monero">
+          <p class="ml-2 text-black text-sm dark:text-white">
+              Monero (XMR)
           </p>
-          <p class="text-2xs text-neutral-400 font-medium hidden">
-            Price in BTC:
-            <div class="text-xs" id="usd-price-btc"></div>
-          </p>
-        </div>
       </div>
-
-      <div class="w-full sm:w-1/2 lg:w-1/5 p-3" id="xmr-container">
-        <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-lg dark:text-white">
-          <div class="flex items-center mb-2.5">
-            <img src="/static/images/coins/Monero-20.png" height="20" width="20" class="mr-2">
-            <p class="text-sm text-neutral-500 font-medium">Monero (BTC)</p>
-          </div>
-          <div class="flex flex-wrap items-center mb-2 -m-1">
-            <div class="w-auto p-1">
-              <h3 class="font-heading text-1xl font-semibold">
-                <div id="xmr-price-usd"></div>
-              </h3>
-            </div>
-            <div class="w-auto p-1">
-              <div id="xmr-price-change-container" class="w-auto p-1"></div>
-            </div>
-            <div class="w-auto p-1">
-              <h3 class="font-heading text-1xl font-semibold">
-                <div id="xmr-price-usd"></div>
-              </h3>
-            </div>
-          </div>
-          <p class="text-2xs text-neutral-400 font-medium">
-            Volume 24H:
-            <div class="text-xs" id="xmr-volume-24h"></div>
+      <div class="flex flex-col justify-start">
+          <p class="my-2 text-xl font-bold text-left text-gray-700 dark:text-gray-100" id="xmr-price-usd">
+              <span class="text-sm">
+                  <span id="xmr-price-usd-value"></span>
           </p>
-          <p class="text-2xs text-neutral-400 font-medium">
-            Price in BTC:
-            <div class="text-xs" id="xmr-price-btc"></div>
-          </p>
-        </div>
+          <div class="flex items-center text-sm">
+              <div class="w-auto">
+                <div id="xmr-price-change-container" class="w-auto p-1"></div>
+              </div>
+          </div>
+          <div class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2">
+            <span class="bold mr-2">VOL:</span>
+              <div id="xmr-volume-24h">
+              </div>
+          </div>
+          <div class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2">
+              <span class="bold mr-2">BTC:</span>
+              <span id="xmr-price-btc">
+              </span>
+          </div>
       </div>
+  </div>
+  </div>
 
-      <div class="w-full sm:w-1/2 lg:w-1/5 p-3" id="part-container">
-        <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-lg dark:text-white">
-          <div class="flex items-center mb-2.5">
-            <img src="/static/images/coins/Particl-20.png" height="20" width="20" class="mr-2">
-            <p class="text-sm text-neutral-500 font-medium">Particl (PART)</p>
-          </div>
-          <div class="flex flex-wrap items-center mb-2 -m-1">
-            <div class="w-auto p-1">
-              <h3 class="font-heading text-1xl font-semibold">
-                <div id="part-price-usd"></div>
-              </h3>
-            </div>
-            <div class="w-auto p-1">
-              <div id="part-price-change-container" class="w-auto p-1"></div>
-            </div>
-          </div>
-          <p class="text-2xs text-neutral-400 font-medium">
-            Volume 24H:
-            <div class="text-xs" id="part-volume-24h"></div>
-          </p>
-          <p class="text-2xs text-neutral-400 font-medium">
-            Price in BTC:
-            <div class="text-xs" id="part-price-btc"></div>
-          </p>
+  <div class="w-full sm:w-1/2 lg:w-1/6 p-3" id="part-container">
+    <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-2xl dark:text-white">
+        <div class="flex items-center">
+            <img src="/static/images/coins/Particl.png" class="rounded-xl" style="width: 35px; height: 35px; object-fit: contain;" alt="Particl">
+            <p class="ml-2 text-black text-md dark:text-white">
+                Particl (PART)
+            </p>
         </div>
-      </div>
-
-      <div class="w-full sm:w-1/2 lg:w-1/5 p-3" id="pivx-container">
-        <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-lg dark:text-white">
-          <div class="flex items-center mb-2.5">
-            <img src="/static/images/coins/PIVX-20.png" height="20" width="20" class="mr-2">
-            <p class="text-sm text-neutral-500 font-medium">PIVX (PIVX)</p>
-          </div>
-          <div class="flex flex-wrap items-center mb-2 -m-1">
-            <div class="w-auto p-1">
-              <h3 class="font-heading text-1xl font-semibold">
-                <div id="pivx-price-usd"></div>
-              </h3>
+        <div class="flex flex-col justify-start">
+            <p class="my-2 text-xl font-bold text-left text-gray-700 dark:text-gray-100" id="part-price-usd">
+                <span class="text-sm">
+                    $ <span id="part-price-usd-value"></span>
+                </span>
+            </p>
+            <div class="flex items-center text-sm">
+                <div class="w-auto">
+                  <div id="part-price-change-container" class="w-auto p-1"></div>
+                </div>
             </div>
-            <div class="w-auto p-1">
-              <div id="pivx-price-change-container" class="w-auto p-1"></div>
+            <div class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2">
+              <span class="bold mr-2">VOL:</span>
+                <div id="part-volume-24h">
+                </div>
             </div>
-          </div>
-          <p class="text-2xs text-neutral-400 font-medium">
-            Volume 24H:
-            <div class="text-xs" id="pivx-volume-24h"></div>
-          </p>
-          <p class="text-2xs text-neutral-400 font-medium">
-            Price in BTC:
-            <div class="text-xs" id="pivx-price-btc"></div>
-          </p>
+            <div class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2">
+                <span class="bold mr-2">BTC:</span>
+                <span id="part-price-btc">
+                </span>
+            </div>
         </div>
-      </div>
+    </div>
+</div>
 
-      <div class="w-full sm:w-1/2 lg:w-1/5 p-3" id="firo-container">
-        <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-lg dark:text-white">
-          <div class="flex items-center mb-2.5">
-            <img src="/static/images/coins/Firo-20.png" height="20" width="20" class="mr-2">
-            <p class="text-sm text-neutral-500 font-medium">Firo (FIRO)</p>
+<div class="w-full sm:w-1/2 lg:w-1/6 p-3" id="ltc-container">
+  <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-2xl dark:text-white">
+      <div class="flex items-center">
+          <img src="/static/images/coins/Litecoin.png" class="rounded-xl" style="width: 35px; height: 35px; object-fit: contain;" alt="Litecoin">
+          <p class="ml-2 text-black text-md dark:text-white">
+              Litecoin (LTC)
+          </p>
+      </div>
+      <div class="flex flex-col justify-start">
+          <p class="my-2 text-xl font-bold text-left text-gray-700 dark:text-gray-100" id="ltc-price-usd">
+              <span class="text-sm">
+                  <span id="ltc-price-usd-value"></span>
+              </span>
+          </p>
+          <div class="flex items-center text-sm">
+              <div class="w-auto">
+                <div id="ltc-price-change-container" class="w-auto p-1"></div>
+              </div>
           </div>
-          <div class="flex flex-wrap items-center mb-2 -m-1">
-            <div class="w-auto p-1">
-              <h3 class="font-heading text-1xl font-semibold">
-                <div id="firo-price-usd"></div>
-              </h3>
-            </div>
-            <div class="w-auto p-1">
+          <div class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2">
+            <span class="bold mr-2">VOL:</span>
+              <div id="ltc-volume-24h">
+              </div>
+          </div>
+          <div class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2">
+              <span class="bold mr-2">BTC:</span>
+              <span id="ltc-price-btc">
+              </span>
+          </div>
+      </div>
+  </div>
+  </div>
+
+  <div class="w-full sm:w-1/2 lg:w-1/6 p-3" id="firo-container">
+    <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-2xl dark:text-white">
+            <div class="flex items-center">
+        <img src="/static/images/coins/Firo.png" class="rounded-xl" style="width: 35px; height: 35px; object-fit: contain;" alt="Firo">
+        <p class="ml-2 text-black text-md dark:text-white">
+            Firo (FIRO)
+        </p>
+    </div>
+    <div class="flex flex-col justify-start">
+        <p class="my-2 text-xl font-bold text-left text-gray-700 dark:text-gray-100" id="firo-price-usd">
+            <span class="text-sm">
+                <span id="firo-price-usd-value"></span>
+            </span>
+        </p>
+        <div class="flex items-center text-sm">
+            <div class="w-auto">
               <div id="firo-price-change-container" class="w-auto p-1"></div>
             </div>
-          </div>
-          <p class="text-2xs text-neutral-400 font-medium">
-            Volume 24H:
-            <div class="text-xs" id="firo-volume-24h"></div>
-          </p>
-          <p class="text-2xs text-neutral-400 font-medium">
-            Price in BTC:
-            <div class="text-xs" id="firo-price-btc"></div>
-          </p>
         </div>
-      </div>
-
-      <div class="w-full sm:w-1/2 lg:w-1/5 p-3" id="ltc-container">
-        <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-lg dark:text-white">
-          <div class="flex items-center mb-2.5">
-            <img src="/static/images/coins/Litecoin-20.png" height="20" width="20" class="mr-2">
-            <p class="text-sm text-neutral-500 font-medium">Litecoin (LTC)</p>
-          </div>
-          <div class="flex flex-wrap items-center mb-2 -m-1">
-            <div class="w-auto p-1">
-              <h3 class="font-heading text-1xl font-semibold">
-                <div id="ltc-price-usd"></div>
-              </h3>
+        <div class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2">
+          <span class="bold mr-2">VOL:</span>
+            <div id="firo-volume-24h">
             </div>
-            <div class="w-auto p-1">
-              <div id="ltc-price-change-container" class="w-auto p-1"></div>
-            </div>
-          </div>
-          <p class="text-2xs text-neutral-400 font-medium">
-            Volume 24H:
-            <div class="text-xs" id="ltc-volume-24h"></div>
-          </p>
-          <p class="text-2xs text-neutral-400 font-medium">
-            Price in BTC:
-            <div class="text-xs" id="ltc-price-btc"></div>
-          </p>
         </div>
-      </div>
-
-       <div class="w-full sm:w-1/2 lg:w-1/5 p-3" id="dash-container">
-        <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-lg dark:text-white">
-          <div class="flex items-center mb-2.5">
-            <img src="/static/images/coins/Dash-20.png" height="20" width="20" class="mr-2">
-            <p class="text-sm text-neutral-500 font-medium">Dash (DASH)</p>
-          </div>
-          <div class="flex flex-wrap items-center mb-2 -m-1">
-            <div class="w-auto p-1">
-              <h3 class="font-heading text-1xl font-semibold">
-                <div id="dash-price-usd"></div>
-              </h3>
-            </div>
-            <div class="w-auto p-1">
-              <div id="dash-price-change-container" class="w-auto p-1"></div>
-            </div>
-          </div>
-          <p class="text-2xs text-neutral-400 font-medium">
-            Volume 24H:
-            <div class="text-xs" id="dash-volume-24h"></div>
-          </p>
-          <p class="text-2xs text-neutral-400 font-medium">
-            Price in BTC:
-            <div class="text-xs" id="dash-price-btc"></div>
-          </p>
+        <div class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2">
+            <span class="bold mr-2">BTC:</span>
+            <span id="firo-price-btc">
+            </span>
         </div>
-      </div>
+    </div>
+</div>
+</div>
 
-      <div class="w-full sm:w-1/2 lg:w-1/5 p-3" id="doge-container">
-        <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-lg dark:text-white">
-          <div class="flex items-center mb-2.5">
-            <img src="/static/images/coins/Doge-20.png" height="20" width="20" class="mr-2">
-            <p class="text-sm text-neutral-500 font-medium">Dogecoin (DOGE)</p>
+<div class="w-full sm:w-1/2 lg:w-1/6 p-3" id="pivx-container">
+  <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-2xl dark:text-white">
+  <div class="flex items-center">
+      <img src="/static/images/coins/Pivx.png" class="rounded-xl" style="width: 35px; height: 35px; object-fit: contain;" alt="Pivx">
+      <p class="ml-2 text-black text-md dark:text-white">
+          PIVX (PIVX)
+      </p>
+  </div>
+  <div class="flex flex-col justify-start">
+      <p class="my-2 text-xl font-bold text-left text-gray-700 dark:text-gray-100" id="pivx-price-usd">
+          <span class="text-sm">
+              <span id="pivx-price-usd-value"></span>
+          </span>
+      </p>
+      <div class="flex items-center text-sm">
+          <div class="w-auto">
+            <div id="pivx-price-change-container" class="w-auto p-1"></div>
           </div>
-          <div class="flex flex-wrap items-center mb-2 -m-1">
-            <div class="w-auto p-1">
-              <h3 class="font-heading text-1xl font-semibold">
-                <div id="doge-price-usd"></div>
-              </h3>
-            </div>
-            <div class="w-auto p-1">
-              <div id="doge-price-change-container" class="w-auto p-1"></div>
-            </div>
-          </div>
-          <p class="text-2xs text-neutral-400 font-medium">
-            Volume 24H:
-            <div class="text-xs" id="doge-volume-24h"></div>
-          </p>
-          <p class="text-2xs text-neutral-400 font-medium">
-            Price in BTC:
-            <div class="text-xs" id="doge-price-btc"></div>
-          </p>
-        </div>
       </div>
-
-       <div class="w-full sm:w-1/2 lg:w-1/5 p-3" id="eth-container">
-        <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-lg dark:text-white">
-          <div class="flex items-center mb-2.5">
-            <img src="/static/images/coins/Ethereum-20.png" height="20" width="20" class="mr-2">
-            <p class="text-sm text-neutral-500 font-medium">Ethereum (ETH)</p>
+      <div class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2">
+        <span class="bold mr-2">VOL:</span>
+          <div id="pivx-volume-24h">
           </div>
-          <div class="flex flex-wrap items-center mb-2 -m-1">
-            <div class="w-auto p-1">
-              <h3 class="font-heading text-1xl font-semibold">
-                <div id="eth-price-usd"></div>
-              </h3>
-            </div>
-            <div class="w-auto p-1">
-              <div id="eth-price-change-container" class="w-auto p-1"></div>
-            </div>
-          </div>
-          <p class="text-2xs text-neutral-400 font-medium">
-            Volume 24H:
-            <div class="text-xs" id="eth-volume-24h"></div>
-          </p>
-          <p class="text-2xs text-neutral-400 font-medium">
-            Price in BTC:
-            <div class="text-xs" id="eth-price-btc"></div>
-          </p>
-        </div>
       </div>
+      <div class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2">
+          <span class="bold mr-2">BTC:</span>
+          <span id="pivx-price-btc">
+          </span>
+      </div>
+  </div>
+</div>
+</div>
 
-  </section>
+<div class="w-full sm:w-1/2 lg:w-1/6 p-3" id="dash-container">
+  <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-2xl dark:text-white">
+  <div class="flex items-center">
+      <img src="/static/images/coins/Dash.png" class="rounded-xl" style="width: 35px; height: 35px; object-fit: contain;" alt="Dash">
+      <p class="ml-2 text-black text-md dark:text-white">
+          Dash (DASH)
+      </p>
+  </div>
+  <div class="flex flex-col justify-start">
+      <p class="my-2 text-xl font-bold text-left text-gray-700 dark:text-gray-100" id="dash-price-usd">
+          <span class="text-sm">
+              <span id="dash-price-usd-value"></span>
+          </span>
+      </p>
+      <div class="flex items-center text-sm">
+          <div class="w-auto">
+            <div id="dash-price-change-container" class="w-auto p-1"></div>
+          </div>
+      </div>
+      <div class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2">
+        <span class="bold mr-2">VOL:</span>
+          <div id="dash-volume-24h">
+          </div>
+      </div>
+      <div class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2">
+          <span class="bold mr-2">BTC:</span>
+          <span id="dash-price-btc">
+          </span>
+      </div>
+  </div>
+</div>
+</div>
+
+<div class="w-full sm:w-1/2 lg:w-1/6 p-3" id="eth-container">
+  <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-2xl dark:text-white">
+  <div class="flex items-center">
+      <img src="/static/images/coins/Ethereum.png" class="rounded-xl" style="width: 35px; height: 35px; object-fit: contain;" alt="Ethereum">
+      <p class="ml-2 text-black text-md dark:text-white">
+          Ethereum (ETH)
+      </p>
+  </div>
+  <div class="flex flex-col justify-start">
+      <p class="my-2 text-xl font-bold text-left text-gray-700 dark:text-gray-100" id="eth-price-usd">
+          <span class="text-sm">
+              <span id="eth-price-usd-value"></span>
+          </span>
+      </p>
+      <div class="flex items-center text-sm">
+          <div class="w-auto">
+            <div id="eth-price-change-container" class="w-auto p-1"></div>
+          </div>
+      </div>
+      <div class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2">
+        <span class="bold mr-2">VOL:</span>
+          <div id="eth-volume-24h">
+          </div>
+      </div>
+      <div class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2">
+          <span class="bold mr-2">BTC:</span>
+          <span id="eth-price-btc">
+          </span>
+      </div>
+  </div>
+</div>
+</div>
+
+<div class="w-full sm:w-1/2 lg:w-1/6 p-3" id="doge-container">
+  <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-2xl dark:text-white">
+  <div class="flex items-center">
+      <img src="/static/images/coins/Doge.png" class="rounded-xl" style="width: 35px; height: 35px; object-fit: contain;" alt="Dogecoin">
+      <p class="ml-2 text-black text-md dark:text-white">
+          Dogecoin (DOGE)
+      </p>
+  </div>
+  <div class="flex flex-col justify-start">
+      <p class="my-2 text-xl font-bold text-left text-gray-700 dark:text-gray-100" id="doge-price-usd">
+          <span class="text-sm">
+              <span id="doge-price-usd-value"></span>
+          </span>
+      </p>
+      <div class="flex items-center text-sm">
+          <div class="w-auto">
+            <div id="doge-price-change-container" class="w-auto p-1"></div>
+          </div>
+      </div>
+      <div class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2">
+        <span class="bold mr-2">VOL:</span>
+          <div id="doge-volume-24h">
+          </div>
+      </div>
+      <div class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2">
+          <span class="bold mr-2">BTC:</span>
+          <span id="doge-price-btc">
+          </span>
+      </div>
+  </div>
+</div>
+</div>
+
+</div>
+</div>
+
+</section>
   <script>
     window.addEventListener('load', function() {
     const api_key = '{{chart_api_key}}';
@@ -351,7 +391,7 @@ function displayCoinData(coin, data) {
     const priceBTC = data.RAW[coin].BTC.PRICE;
     const priceChange1h = data.RAW[coin].USD.CHANGEPCTHOUR;
     const volume24h = data.RAW[coin].USD.TOTALVOLUME24HTO;
-    document.querySelector(`#${coin.toLowerCase()}-price-usd`).textContent = priceUSD.toFixed(2) + ' USD';
+    document.querySelector(`#${coin.toLowerCase()}-price-usd`).textContent = priceUSD.toFixed(2) + ' $';
     if (coin !== 'BTC') {
         document.querySelector(`#${coin.toLowerCase()}-price-btc`).textContent = priceBTC.toFixed(8) + ' BTC';
     }
@@ -609,18 +649,19 @@ const chart = new Chart(ctx, {
     <div class="pl-6 pr-6 pt-0 pb-0 mt-5 h-full overflow-hidden">
       <div class="pb-6 border-coolGray-100">
         <div class="flex flex-wrap items-center justify-between -m-2">
-          <div class="w-full pt-2">
+          <div class="w-full mx-auto pt-2">
             <form method="post">
-              <div class="flex justify-between items-center pb-4 dark:text-white">
+              <div class="flex items-center justify-center pb-4 dark:text-white">
+
                 <div class="rounded-b-md">
                   <div class="w-full md:w-0/12">
-                    <div class="flex flex-wrap justify-end -m-1.5">
+                    <div class="flex flex-wrap justify-center -m-1.5">
                       <div class="w-full md:w-auto p-1.5">
                         <div class="relative">{{ input_arrow_down_svg | safe }}
-                          <select name="coin_from" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
-                            <option value="any" {% if filters.coin_from==-1 %} selected{% endif %}>Any</option>
+                          <select name="coin_to" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
+                            <option value="any" {% if filters.coin_to==-1 %} selected{% endif %}>Filter Bids</option>
                             {% for c in coins_from %}
-                            <option class="text-sm" value="{{ c[0] }}" {% if filters.coin_from==c[0] %} selected{% endif %} data-image="/static/images/coins/{{ c[1]|replace(" ", "-") }}-20.png">{{ c[1] }}</option>
+                            <option class="text-sm" value="{{ c[0] }}" {% if filters.coin_to==c[0] %} selected{% endif %} data-image="/static/images/coins/{{ c[1]|replace(" ", "-") }}-20.png">{{ c[1] }}</option>
                             {% endfor %}
                           </select>
                         </div>
@@ -635,10 +676,10 @@ const chart = new Chart(ctx, {
                         <div class="relative">{{ input_arrow_down_svg | safe }}
 
                           <!-- is="ms-dropdown" todo -->
-                          <select name="coin_to" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
-                            <option value="any" {% if filters.coin_to==-1 %} selected{% endif %}>Any</option>
+                          <select name="coin_from" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
+                            <option value="any" {% if filters.coin_from==-1 %} selected{% endif %}>Filter Offers</option>
                             {% for c in coins %}
-                            <option class="text-sm" value="{{ c[0] }}" {% if filters.coin_to==c[0] %} selected{% endif %} data-image="/static/images/coins/{{ c[1]|replace(" ", "-") }}-20.png">{{ c[1] }}</option>
+                            <option class="text-sm" value="{{ c[0] }}" {% if filters.coin_from==c[0] %} selected{% endif %} data-image="/static/images/coins/{{ c[1]|replace(" ", "-") }}-20.png">{{ c[1] }}</option>
                             {% endfor %}
                           </select>
                         </div>
@@ -664,12 +705,12 @@ const chart = new Chart(ctx, {
                           </select>
                         </div>
                       </div>
-                      <div class="flex items-center">
+                      <div class="flex items-center hidden">
                         <div class="w-full md:w-auto p-1.5">
                           <p class="text-sm font-heading bold">Sent From Node:</p>
                         </div>
                       </div>
-                      <div class="w-full md:w-auto p-1.5">
+                      <div class="w-full md:w-auto p-1.5 hidden">
                         <div class="relative">{{ input_arrow_down_svg | safe }}
                           <select name="sent_from" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
                             <option value="any" {% if filters.sent_from=='any' %} selected{% endif %}>Any</option>
@@ -685,7 +726,7 @@ const chart = new Chart(ctx, {
                       </div>
                       <div class="w-full md:w-auto p-1.5">
                         <div class="relative">{{ input_arrow_down_svg | safe }}
-                          <select name="active" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
+                          <select name="active" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 border border-gray-200 dark:border-gray-400 dark:text-gray-50 dark:bg-gray-500 dark:text-white dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
                             <option value="any" {% if filters.active=='any' %} selected{% endif %}>Any</option>
                             <option value="active" {% if filters.active=='active' %} selected{% endif %}>Active</option>
                             <option value="expired" {% if filters.active=='expired' %} selected{% endif %}>Expired</option>
@@ -696,14 +737,14 @@ const chart = new Chart(ctx, {
                       {% endif %}
                       <div class="w-full md:w-auto p-1.5">
                         <div class="relative">
-                          <button type="submit" name='clearfilters' value="Clear Filters" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-white bg-blue-500 hover:bg-blue-600 rounded-lg transition duration-200 border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">{{ filter_clear_svg | safe }}
-                            <span>Clear</span>
+                          <button type="submit" name='clearfilters' value="Clear Filters" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm dark:text-white dark:bg-gray-500 bg-coolGray-200 hover:bg-green-600 hover:border-green-600 rounded-lg transition duration-200 border border-coolGray-200 dark:border-gray-400 rounded-md shadow-button focus:ring-0 focus:outline-none">
+                            <span>Clear Filters</span>
                           </button>
-                        </div>
+                        </div>  <!-- todo -->
                       </div>
                       <div class="w-full md:w-auto p-1.5">
                         <div class="relative">
-                          <button type="submit" name='applyfilters' value="Apply Filters" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-white bg-blue-500 hover:bg-blue-600 rounded-lg transition duration-200 border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">{{ filter_apply_svg | safe }}
+                          <button type="submit" name='applyfilters' value="Apply Filters" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-white bg-blue-600 hover:bg-green-600 hover:border-green-600 rounded-lg transition duration-200 border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">{{ filter_apply_svg | safe }}
                             <span>Apply Filters</span>
                           </button>
                         </div>
@@ -712,49 +753,49 @@ const chart = new Chart(ctx, {
                   </div>
                 </div>
               </div>
+
               <div class="container mt-5 mx-auto">
-                <div class="pt-6 pb-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
-                  <div class="px-6">
-                    <div class="w-full mt-6 pb-6 overflow-x-auto">
+                <div class="pt-0 pb-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
+                  <div class="px-0">
+                    <div class="w-auto mt-6 pb-6 overflow-x-auto">
                       <table class="w-full min-w-max">
 
                         <thead class="uppercase">
-                          <tr class="text-left">
+                          <tr>
                             <th class="p-0">
-                              <div class="py-3 px-6 rounded-tl-xl bg-coolGray-200 dark:bg-gray-600">
-                                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Date/Time at</span>
-                              </div>
-                            </th>
-                            <th class="p-0">
-                              <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
-                                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Details</span>
-                              </div>
-                            </th>
-                            <th class="p-0">
-                              <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
-                                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Recipient</span>
+                              <div class="py-3 px-4 justify-center rounded-tl-xl bg-coolGray-200 dark:bg-gray-600 ">
+                                <span class="text-sm mr-3 text-gray-600 dark:text-gray-300 font-semibold">Time</span>
                               </div>
                             </th>
                             <!--<th>ID</th>-->
-                            <th class="p-0">
-                              <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
-                                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">You get</span>
+                            <th class="p-0 hidden xl:block">
+                              <div class="py-3 px-0 bg-coolGray-200 dark:bg-gray-600 text-left">
+                                <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Recipient</span>
+                              </div>
+                            </th>
+                            <th class="p-0 hidden">
+                              <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-left">
+                                <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">You Send</span>
                               </div>
                             </th>
                             <th class="p-0">
-                              <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
-                                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">You Send</span>
+                              <div class="py-3 px-0 bg-coolGray-200 dark:bg-gray-600 text-center">
+                                <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Swap</span>
                               </div>
                             </th>
                             <th class="p-0">
-                              <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
-                                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Rate</span>
+                              <div class="py-3 px-3 bg-coolGray-200 dark:bg-gray-600 text-left">
+                                <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Rate</span>
                               </div>
                             </th>
-                            <!--<th>Amount From Swapped</th>-->
                             <th class="p-0">
-                              <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600 rounded-tr-xl">
-                                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Trade</span>
+                              <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-center">
+                                <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Market +/-</span>
+                              </div>
+                            </th>
+                            <th class="p-0">
+                              <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 rounded-tr-xl">
+                                <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Trade</span>
                               </div>
                             </th>
                           </tr>
@@ -765,154 +806,260 @@ const chart = new Chart(ctx, {
                           <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
 
                             <!-- TIME + ACTIVE -->
-                            <td class="flex items-center py-7 px-46 dark:text-white text-gray-900 whitespace-nowrap" title="{% if o[12]==2 %}Revoked{% elif o[11]==true %}Expired{% else %}Active{% endif %}">
-                              <svg alt="" class="w-5 h-5 rounded-full ml-5" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-                                <g stroke-linecap="round" stroke-width="2" fill="none" stroke="{% if o[12]==2 %}#AC0000{% elif o[11]==true %}#6b7280{% else %}#3B82F6{% endif %}" stroke-linejoin="round">
-                                  <circle cx="12" cy="12" r="11"></circle>
-                                  <polyline points=" 12,6 12,12 18,12 " stroke="{% if o[12]==2 %} #AC0000 {% elif o[11]==true %} #6b7280 {% else %} #3B82F6 {% endif %}"></polyline>
-                                </g>
-                              </svg>
-                              <div class="pl-3">
-                                <div class="{% if o[11]==true or o[12]==2 %} dark:text-white {% else %} font-semibold {% endif %} text-xs">{{ o[0] }}</div>
-                              </div>
+                            <td class="py-3 px-4 text-xs">
+                                <div class="flex items-center justify-center">
+                                    <svg alt="" class="w-5 h-5 rounded-full mr-3" data-tooltip-target="tooltip-active{{loop.index}}" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
+                                        <g stroke-linecap="round" stroke-width="2" fill="none" stroke="{% if o[12]==2 %}#AC0000{% elif o[11]==true %}#6b7280{% else %}#3B82F6{% endif %}" stroke-linejoin="round">
+                                            <circle cx="12" cy="12" r="11"></circle>
+                                            <polyline points=" 12,6 12,12 18,12 " stroke="{% if o[12]==2 %} #AC0000 {% elif o[11]==true %} #6b7280 {% else %} #3B82F6 {% endif %}"></polyline>
+                                        </g>
+                                    </svg>
+                                    <div class="flex flex-col hidden xl:block">
+                                        <div class="{% if o[11]==true or o[12]==2 %} dark:text-white {% else %} {% endif %} text-xs"><span class="bold">Posted:</span> {{ o[0] }}</div>
+                                        <div class="{% if o[11]==true or o[12]==2 %} dark:text-white {% else %} {% endif %} text-xs"><span class="bold">Expires in:</span> {{ o[13] }}</div>
+                                    </div>
+                                </div>
                             </td>
+
+                            <div id="tooltip-active{{loop.index}}" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-green-600  {% if o[11]==true or o[12]==2 %} bg-gray-400 {% else %} {% endif %} rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+                              <div class="active-revoked-expired"><span class="bold">
+                                        <div class="{% if o[11]==true or o[12]==2 %} dark:text-white {% else %} {% endif %} text-xs"><span class="bold">Posted:</span> {{ o[0] }}</div>
+                                        <div class="{% if o[11]==true or o[12]==2 %} dark:text-white {% else %} {% endif %} text-xs"><span class="bold">Expires in:</span> {{ o[13] }}</div>
+                              </div>
+                            <div class="tooltip-arrow" data-popper-arrow></div>
+                            </div>
                             <!-- TIME + ACTIVE -->
 
-                            <!--<td class="py-4 px-6 text-xs"><a class="monospace text-xs" href=/offer/{{ o[1] }}>{{ o[1]|truncate(6, True) }}</a></td>-->
-                            <!--<td class="py-4 px-6 text-xs monospace">{{ o[8] }}{% if o[9]==true %} <b>Sent</b>{% endif %}</td>-->
-
-                            <!-- DETAILS -->
-                            <td class="py-3 px-6 text-xs">
-                              <div class="network"><span class="bold">Network:</span> {{ o[7] }}</div>
-                              <div class="partial pt-1"><span class="bold">Amount Variable:</span>{{ o[14] }}</div>
-                              <div class="swaptype pt-1"><span class="bold">Swap Type:</span> {{ o[13] }}</div>
-                            <!-- {% if o[12]==2 %}(Revoked){% elif o[11]==true %}(Not Active){% else %}(Active){% endif %} -->
-                            </td>
-                            <!-- DETAILS -->
+                            <!--<td class="py-4 px-4 text-xs"><a class="monospace text-xs" href=/offer/{{ o[1] }}>{{ o[1]|truncate(6, True) }}</a></td>-->
+                            <!--<td class="py-4 px-4 text-xs monospace">{{ o[8] }}{% if o[9]==true %} <b>Sent</b>{% endif %}</td>-->
 
                             <!-- RECIPIENT -->
-                            <td class="py-3 px-6 text-xs monospace">
-                              <a href="/identity/{{ o[8] }}{% if o[9]==true %}{% endif %}">{{ o[8] }}</a>
+                            <td class="py-8 text-xs monospace text-left hidden xl:block">
+                              <a data-tooltip-target="tooltip-recipient{{loop.index}}" href="/identity/{{ o[8] }}{% if o[9]==true %}{% endif %}">{{ o[8]|truncate(17, true, '...', 0) }} </a>
                             </td>
+
+                            <div id="tooltip-recipient{{loop.index}}" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+                              <div class="active-revoked-expired"><span class="bold">{{ o[8] }}</div>
+                            <div class="tooltip-arrow" data-popper-arrow></div>
+                            </div>
                             <!-- RECIPIENT -->
 
-                            <!-- YOU GET ICON -->
+                            <!-- YOU REQUESTING FROM TAKER / NOBOOK -->
                             {% if o[9] == true %}
-                            <td class="py-3 px-6 text-xs">
-                              <div class="flex items-center">
-                                <span class="inline-flex align-middle items-center justify-center w-9 h-10 rounded"><img class="h-7" src="/static/images/coins/{{ o[3]|replace(" ", "-") }}.png" alt=""></span>
-                                <div class="flex flex-col ml-2">
-                                  <div class="coinname-value bold" data-coinname="{{ o[3] }}">
-                                    {{ o[5]|truncate(8, true, '', 0) }} {{ o[3] }}
-                                  </div>
-                                  <div class="usd-value"></div>
+                            <td class="py-3 px-2 text-xs hidden">
+                                <div class="flex items-center">
+                                    <span class="inline-flex align-middle items-center justify-center w-9 h-10 rounded">
+                                        <img class="h-7" src="/static/images/coins/{{ o[3]|replace(" ", "-") }}.png" alt="{{ o[3] }}">
+                                    </span>
+                                    <div class="flex flex-col ml-5">
+                                      <div class="coinname bold" data-coinname="{{ o[3] }}">
+                                          {{ o[3] }}
+                                      </div>
+                                      <div class="ratetype hidden"><span class="echange-rates" data-coinname="{{ o[3] }}"> {{ o[6]|truncate(6,true,'',0) }} {{ o[16] }}/{{ o[17] }}</span>
+                                      <div class="coinname-value hidden" data-coinname="{{ o[2] }}">
+                                          {{ o[4]|truncate(6, true, '', 0) }}
+                                      </div>
+                                      <div class="usd-value hidden"></div>
+                                      <div class="usd-value-in-coin-value"></div>
+                                    </div>
                                 </div>
-                              </div>
                             </td>
-                            <!-- YOU GET ICON -->
+                            <!-- YOU REQUESTING FROM TAKER / NOBOOK -->
 
-                            <!-- YOU GET ICON OFFERS -->
+                            <!-- OFFERS WHERE YOU WILL BE TAKER -->
                             {% else %}
-                            <td class="py-3 px-6 text-xs">
-                              <div class="flex items-center">
-                                <span class="inline-flex align-middle items-center justify-center w-9 h-10 rounded"><img class="h-7" src="/static/images/coins/{{ o[2]|replace(" ", "-") }}.png" alt=""></span>
-                                <div class="flex flex-col ml-2">
-                                  <div class="coinname-value bold" data-coinname="{{ o[2] }}">
-                                    {{ o[4]|truncate(8, true, '', 0) }} {{ o[2] }}
-                                  </div>
-                                  <div class="usd-value"></div>
+                            <td class="py-3 px-2 text-xs hidden">
+                                <div class="flex items-center">
+                                    <span class=" inline-flex align-middle items-center justify-center w-9 h-10 rounded">
+                                        <img class="h-7" src="/static/images/coins/{{ o[3]|replace(" ", "-") }}.png" alt="{{ o[3] }}">
+                                    </span>
+                                    <div class="flex flex-col ml-5">
+                                      <div class="coinname bold" data-coinname="{{ o[3] }}">
+                                          {{ o[3] }}
+                                      </div>
+                                      <div class="ratetype hidden"><span class="echange-rates" data-coinname="{{ o[3] }}"> {{ o[6]|truncate(6,true,'',0) }} {{ o[16] }}/{{ o[17] }}</span>
+                                      <div class="coinname-value hidden" data-coinname="{{ o[3] }}">
+                                          {{ o[5]|truncate(6, true, '', 0) }}
+                                      </div>
+                                      <div class="usd-value hidden"></div>
+                                      <div class="usd-value-in-coin-value"></div>
+                                    </div>
                                 </div>
-                              </div>
                             </td>
                             {% endif %}
+                            <!-- OFFERS WHERE YOU WILL BE TAKER -->
 
-                            <!-- YOU GET ICON OFFERS -->
-
-                            <!-- YOU SEND ICON -->
+                            <!-- YOUR OFFERS / MAKER / BOOK -->
                             {% if o[9] == true %}
-                            <td class="py-3 px-6 text-xs">
-                              <div class="flex items-center">
-                                <span class="inline-flex align-middle items-center justify-center w-9 h-10 rounded"><img class="h-7" src="/static/images/coins/{{ o[2]|replace(" ", "-") }}.png" alt=""></span>
-                                <div class="flex flex-col ml-2">
-                                  <div class="coinname-value bold" data-coinname="{{ o[2] }}">
-                                    {{ o[4]|truncate(8,true,'',0) }} {{ o[2] }}
-                                  </div>
-                                  <div class="usd-value"></div>
+                            <td class="py-0 px-6 text-right text-sm">
+                                <div class="flex items-center justify-evenly monospace">
+                                        <a data-tooltip-target="tooltip-wallet{{loop.index}}" href="/wallet/{{ o[17] }}">
+                                    <span class="mr-3 inline-flex align-middle items-center justify-center w-18 h-20 rounded">
+                                        <img class="h-12" src="/static/images/coins/{{ o[3]|replace(" ", "-") }}.png" alt="{{ o[3] }}">
+                                    </span></a>
+                                     {{ arrow_right_svg | safe }}
+                                        <div id="tooltip-wallet{{loop.index}}" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+                                           <div class="active-revoked-expired"><span class="bold">My {{ o[17] }} Wallet</div>
+                                           <div class="tooltip-arrow pr-6" data-popper-arrow></div>
+                                        </div>
+                                        <a data-tooltip-target="tooltip-maker-wallet{{loop.index}}" href="/wallet/{{ o[16] }}">
+                                    <span class=" inline-flex ml-3 align-middle items-center justify-center w-18 h-20 rounded">
+                                        <img class="h-12" src="/static/images/coins/{{ o[2]|replace(" ", "-") }}.png" alt="{{ o[2] }}">
+                                    </span></a>
+                                        <div id="tooltip-maker-wallet{{loop.index}}" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+                                           <div class="active-revoked-expired"><span class="bold">My {{ o[16] }} Wallet</div>
+                                           <div class="tooltip-arrow pl-1" data-popper-arrow></div>
+                                        </div>
+                                        <a data-tooltip-target="tooltip-maker{{loop.index}}" href="/offer/{{ o[1] }}">
+
+                                    <div class="flex flex-col ml-5">
+                                        <div class="coinname bold w-24" data-coinname="{{ o[2] }}">
+                                            {{ o[4]|truncate(7, true, '', 0) }}
+                                        </div>
+                                        {{ o[2] }}
+                                        <div class="ratetype italic hidden">
+                                            <span class="echange-rates" data-coinname="{{ o[2] }}">
+                                                {{ o[6]|truncate(6,true,'',0) }} {{ o[17] }}/{{ o[16] }}
+                                            </span>
+                                            <div class="coinname-value hidden" data-coinname="{{ o[3] }}">
+                                                {{ o[5]|truncate(7, true, '', 0) }}
+                                            </div>
+                                            <div class="usd-value hidden"></div>
+                                            <div class="usd-value-in-coin-value"></div>
+                                        </div>
+                                    </div>
+
+                            <div id="tooltip-maker{{loop.index}}" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+                              <div class="active-revoked-expired"><span class="bold">Edit</div>
+                            <div class="tooltip-arrow" data-popper-arrow></div>
                                 </div>
-                              </div>
                             </td>
-                            <!-- YOU SEND ICON -->
+                            <!-- YOUR OFFERS / MAKER / BOOK -->
 
-                            <!-- YOU SEND ICON OFFERS -->
+                            <!-- NETWORK OFFERS / MAKER / BOOK -->
                             {% else %}
-                            <td class="py-3 px-6 text-xs">
-                              <div class="flex items-center">
-                                <span class="inline-flex align-middle items-center justify-center w-9 h-10 rounded"><img class="h-7" src="/static/images/coins/{{ o[3]|replace(" ", "-") }}.png" alt=""></span>
-                                <div class="flex flex-col ml-2">
+                            <td class="py-0 px-6 text-right text-sm">
+                                <div class="flex items-center justify-evenly monospace">
+                                        <a data-tooltip-target="tooltip-wallet{{loop.index}}" href="/wallet/{{ o[17] }}">
+                                    <span class="inline-flex mr-3 align-middle items-center justify-center w-18 h-20 rounded">
+                                        <img class="h-12" src="/static/images/coins/{{ o[3]|replace(" ", "-") }}.png" alt="{{ o[3] }}">
+                                    </span></a>
+                                     {{ arrow_right_svg | safe }}
 
-                                  <!-- Added ml-2 for left margin -->
-                                  <div class="coinname-value bold" data-coinname="{{ o[3] }}">
-                                    {{ o[5]|truncate(8, true, '', 0) }} {{ o[3] }}
-                                  </div>
-                                  <div class="usd-value"></div>
+                                        <div id="tooltip-wallet{{loop.index}}" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+                                           <div class="active-revoked-expired"><span class="bold">My {{ o[17] }} Wallet</div>
+                                           <div class="tooltip-arrow pr-6" data-popper-arrow></div>
+                                        </div>
+
+                                        <a data-tooltip-target="tooltip-maker-wallet{{loop.index}}" href="/wallet/{{ o[16] }}">
+                                    <span class="inline-flex ml-3 align-middle items-center justify-center w-18 h-20 rounded">
+                                        <img class="h-12" src="/static/images/coins/{{ o[2]|replace(" ", "-") }}.png" alt="{{ o[2] }}">
+                                    </span></a>
+
+                                        <div id="tooltip-maker-wallet{{loop.index}}" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+                                           <div class="active-revoked-expired"><span class="bold">My {{ o[16] }} Wallet</div>
+                                           <div class="tooltip-arrow pl-1" data-popper-arrow></div>
+                                        </div>
+                                        <a data-tooltip-target="tooltip-offer{{loop.index}}" href="/offer/{{ o[1] }}">
+
+                                          <div class="flex flex-col ml-5">
+                                              <div class="coinname bold w-24" data-coinname="{{ o[2] }}">
+                                                  {{ o[4]|truncate(7, true, '', 0) }}
+                                              </div>
+                                              {{ o[2] }}
+                                              <div class="ratetype italic hidden">
+                                                  <span class="echange-rates" data-coinname="{{ o[2] }}">
+                                                      {{ o[6]|truncate(6,true,'',0) }} {{ o[17] }}/{{ o[16] }}
+                                                  </span>
+                                                  <div class="coinname-value hidden" data-coinname="{{ o[2] }}">
+                                                      {{ o[4]|truncate(7, true, '', 0) }}
+                                                  </div>
+                                                  <div class="usd-value hidden"></div>
+                                                  <div class="usd-value-in-coin-value"></div>
+                                              </div>
+                                          </div>
+
+                            <div id="tooltip-offer{{loop.index}}" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-green-600 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+                              <div class="active-revoked-expired"><span class="bold">Buy {{ o[2] }}</div>
+                            <div class="tooltip-arrow" data-popper-arrow></div>
                                 </div>
-                              </div>
                             </td>
                             {% endif %}
-                            <!-- YOU SEND ICON OFFERS -->
+                            <!-- NETWORK OFFERS / MAKER / BOOK -->
 
                             <!-- RATE -->
-                            <td class="py-3 px-6 text-xs">
-                              <div class="coinname-value" data-coinname="{{ o[3] }}">{{ o[6]|truncate(8,true,'',0) }}</div>
-                              <div class="usd-value"></div>
-                              <div class="profit-value hidden"></div>
-                              <div class="profit-loss"></div>
+                            <td class="py-3 px-2 bold monospace italic text-sm text-left items-center rate-table-info">
+                                <span class="profit-value hidden"></span>
+                                <div class="coinname-value hidden" data-coinname="{{ o[3] }}">
+                                     {{ o[6]|truncate(6, true, '', 0) }}
+                                </div>
+                                <span class="usd-value"></span><span class="text-sm italic">/{{ o[16] }}</span>
+                                    <div class="ratetype"><span class="echange-rates" data-coinname="{{ o[2] }}"> {{ o[6]|truncate(6,true,'',0) }} {{ o[17] }}/{{ o[16] }}</span>
+                                </div>
                             </td>
                             <!-- RATE -->
 
-                            <!--  <td class="py-4 px-6">{{ o[10] }}</td>-->
+                            <!-- PERCENTAGE -->
+                            <td class="py-3 px-2 bold text-sm text-center items-center rate-table-info">
+                                <span class="profit-value hidden"></span>
+                                <div class="profittype pt-1"><span class="profit-loss"</span>
+                                   <div class="coinname-value hidden" data-coinname="{{ o[3] }}">
+                                     {{ o[6]|truncate(6, true, '', 0) }}
+                                   </div>
+                                </div>
+                                <div class="coinname-value hidden" data-coinname="{{ o[3] }}">
+                                     {{ o[6]|truncate(6, true, '', 0) }}
+                                </div>
+                            </td>
+                            <!-- PERCENTAGE -->
 
                             <!-- SWAP OR EDIT -->
-                            <td class="py-3 px-6">
-                              <a class="inline-block w-20 py-1 px-2 font-medium text-center text-sm rounded-md
-                              {% if o[9]==true %}  bg-blue-500 text-white border hover:bg-blue-600 dark:border-gray-700 bg-gray-700 transition duration-200
-                               {% else %} bg-blue-500 text-white hover:bg-blue-600 transition duration-200 {% endif %}" href="/offer/{{ o[1] }}">{% if o[9]==true %} Edit {% else %} Swap {% endif %}</a>
+                            <td class="py-6 px-4 text-center">
+                                <div class="flex justify-center items-center h-full">
+                                    <a class="inline-block w-20 py-1 px-2 font-medium text-center text-sm rounded-md {% if o[9]==true %} bg-gray-600 dark:border-gray-300 text-white hover:bg-green-600 transition duration-200 {% else %} bg-blue-500 text-white hover:bg-green-600 transition duration-200 {% endif %}" href="/offer/{{ o[1] }}">
+                                        {% if o[9]==true %} Edit {% else %} Swap {% endif %}
+                                    </a>
+                                </div>
                             </td>
                             <!-- SWAP OR EDIT -->
-
                           </tr>
-                        </tbody>
+
+                      </tbody>
                         {% endfor %}
                       </table>
+
                       <input type="hidden" name="formid" value="{{ form_id }}">
                       <input type="hidden" name="pageno" value="{{ filters.page_no }}">
                     </div>
                   </div>
-
                   <div class="rounded-b-md">
-                    <div class="w-full md:w-0/12">
-                      <div class="flex flex-wrap justify-end pt-6 pr-6 border-t border-gray-100 dark:border-gray-400">
-                        <div class="w-full md:w-auto p-1.5">
-                          <button type="submit" name='pageback' value="Page Back" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-blue-600 rounded-lg transition duration-200 focus:ring-0 focus:outline-none">
-                            {{ page_back_svg | safe }}
-                            <span>Page Back</span>
-                          </button>
-                        </div>
-                        <div class="flex items-center">
-                          <div class="w-full md:w-auto p-1.5">
-                            <p class="text-sm font-heading dark:text-white">Page: {{ filters.page_no }}</p>
+                      <div class="w-full md:w-0/12">
+                          <div class="flex flex-wrap justify-end pt-6 pr-6 border-t border-gray-100 dark:border-gray-400">
+                              {% if filters.page_no > 1 %}
+                              <div class="w-full md:w-auto p-1.5">
+                                  <button type="submit" name='pageback' value="Previous" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-green-600 rounded-lg transition duration-200 focus:ring-0 focus:outline-none">
+                                      {{ page_back_svg | safe }}
+                                      <span>Previous</span>
+                                  </button>
+                              </div>
+                              {% endif %}
+                              <div class="flex items-center">
+                                  <div class="w-full md:w-auto p-1.5">
+                                      <p class="text-sm font-heading dark:text-white">Page: {{ filters.page_no }}</p>
+                                  </div>
+                              </div>
+                              {% if offers_count > 15 %}
+                              <div class="w-full md:w-auto p-1.5">
+                                      <button type="submit" name='pageforwards' value="Next" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-green-600 rounded-lg transition duration-200 focus:ring-0 focus:outline-none">
+                                          <span>Next</span>
+                                          {{ page_forwards_svg | safe }}
+                                      </button>
+                              </div>
+                              {% endif %}
                           </div>
-                        </div>
-                        <div class="w-full md:w-auto p-1.5">
-                          <button type="submit" name='pageforwards' value="Page Forwards" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-blue-600 rounded-lg transition duration-200 focus:ring-0 focus:outline-none">
-                            <span>Page Forwards</span>
-                            {{ page_forwards_svg | safe }}
-                          </button>
-                        </div>
                       </div>
-                    </div>
                   </div>
-
+                  </div>
             </form>
           </div>
         </div>
@@ -920,9 +1067,9 @@ const chart = new Chart(ctx, {
     </div>
   </section>
 </div>
-{% include 'footer.html' %}
+
 <script>
-    const coinNameToSymbol = {
+const coinNameToSymbol = {
     'Bitcoin': 'BTC',
     'Particl': 'PART',
     'Particl Blind': 'PART',
@@ -932,127 +1079,135 @@ const chart = new Chart(ctx, {
     'Firo': 'FIRO',
     'Dash': 'DASH',
     'PIVX': 'PIVX'
-  };
+};
 
-  const exchangeRateCache = {};
+const exchangeRateCache = {};
 
-  function updateUsdValue(cryptoCell, coinFullName, isRate = false) {
+function updateUsdValue(cryptoCell, coinFullName, isRate = false) {
     const coinSymbol = coinNameToSymbol[coinFullName];
     if (!coinSymbol) {
-      console.error(`Coin symbol not found for full name: ${coinFullName}`);
-      return;
+        console.error(`Coin symbol not found for full name: ${coinFullName}`);
+        return;
     }
 
     const cryptoValue = parseFloat(cryptoCell.textContent);
     const usdCell = cryptoCell.nextElementSibling;
+    if (usdCell) {
+        // Check if the exchange rate is in the cache and is not expired
+        if (exchangeRateCache[coinSymbol] && !isCacheExpired(coinSymbol)) {
+            console.log(`Using cached exchange rate for ${coinSymbol}`);
+            const exchangeRate = exchangeRateCache[coinSymbol].rate;
+            const cryptoValue = parseFloat(cryptoCell.textContent);
+            const usdValue = cryptoValue * exchangeRate;
+            usdCell.textContent = `${usdValue.toFixed(2)} USD`;
+
+            updateProfitLoss(cryptoCell.closest('tr'));
+            updateProfitValue(cryptoCell.closest('tr'));
+        }
+    } else {
+    }
 
     if (isRate) {
-      const rateCell = usdCell.nextElementSibling;
-      const usdValue = rateCell.previousElementSibling.textContent * cryptoValue;
-      usdCell.textContent = `${usdValue.toFixed(2)} USD`;
+        const rateCell = usdCell.nextElementSibling;
+        if (rateCell) {
+            const usdValue = rateCell.previousElementSibling.textContent * cryptoValue;
+            usdCell.textContent = `${usdValue.toFixed(2)} USD`;
+        } else {
+            console.error("Rate cell does not exist.");
+        }
     } else {
-      const apiUrl = `https://min-api.cryptocompare.com/data/price?fsym=${coinSymbol}&tsyms=USD`;
+        const apiUrl = `https://min-api.cryptocompare.com/data/price?fsym=${coinSymbol}&tsyms=USD`;
 
-      // Check if the exchange rate is in the cache and is not expired
-      if (exchangeRateCache[coinSymbol] && !isCacheExpired(coinSymbol)) {
-        console.log(`Using cached exchange rate for ${coinSymbol}`);
-        const exchangeRate = exchangeRateCache[coinSymbol].rate;
-        const usdValue = cryptoValue * exchangeRate;
-        usdCell.textContent = `${usdValue.toFixed(2)} USD`;
+        // Check if the exchange rate is in the cache and is not expired
+        if (exchangeRateCache[coinSymbol] && !isCacheExpired(coinSymbol)) {
+            console.log(`Using cached exchange rate for ${coinSymbol}`);
+            const exchangeRate = exchangeRateCache[coinSymbol].rate;
+            const usdValue = cryptoValue * exchangeRate;
+            usdCell.textContent = `${usdValue.toFixed(2)} USD`;
 
-        updateProfitLoss(cryptoCell.closest('tr'));
-        updateProfitValue(cryptoCell.closest('tr'));
-      } else {
-        console.log(`Fetching exchange rate from API for ${coinSymbol}`);
-        fetch(apiUrl)
-          .then(response => response.json())
-          .then(data => {
-            const exchangeRate = data.USD;
-            if (!isNaN(exchangeRate)) {
-              console.log(`Received exchange rate from API for ${coinSymbol}`);
-              const usdValue = cryptoValue * exchangeRate;
-              usdCell.textContent = `${usdValue.toFixed(2)} USD`;
+            updateProfitLoss(cryptoCell.closest('tr'));
+            updateProfitValue(cryptoCell.closest('tr'));
+        } else {
+            console.log(`Fetching exchange rate from API for ${coinSymbol}`);
+            fetch(apiUrl)
+                .then(response => response.json())
+                .then(data => {
+                    const exchangeRate = data.USD;
+                    if (!isNaN(exchangeRate)) {
+                        console.log(`Received exchange rate from API for ${coinSymbol}`);
+                        const usdValue = cryptoValue * exchangeRate;
+                        usdCell.textContent = `${usdValue.toFixed(2)} USD`;
 
-              exchangeRateCache[coinSymbol] = {
-                rate: exchangeRate,
-                timestamp: Date.now(),
-                ttl: 300000 // 5 minutes
-              };
+                        exchangeRateCache[coinSymbol] = {
+                            rate: exchangeRate,
+                            timestamp: Date.now(),
+                            ttl: 300000 // 5 minutes
+                        };
 
-              updateProfitLoss(cryptoCell.closest('tr'));
-              updateProfitValue(cryptoCell.closest('tr'));
-            } else {
-              console.error('Invalid exchange rate. Response:', data);
-              usdCell.textContent = 'Invalid exchange rate';
-            }
-          })
-          .catch(error => {
-            console.error('Error retrieving exchange rate:', error);
-            usdCell.textContent = 'Error retrieving exchange rate';
-          });
-      }
+                        updateProfitLoss(cryptoCell.closest('tr'));
+                        updateProfitValue(cryptoCell.closest('tr'));
+                    } else {
+                        console.error('Invalid exchange rate. Response:', data);
+                        usdCell.textContent = 'Invalid exchange rate';
+                    }
+                })
+                .catch(error => {
+                });
+        }
     }
-  }
-
-  function isCacheExpired(coinSymbol) {
-    const cacheEntry = exchangeRateCache[coinSymbol];
-    return cacheEntry && (Date.now() - cacheEntry.timestamp > cacheEntry.ttl);
-  }
-
-function updateProfitLoss(row) {
-  const sellingUSD = parseFloat(row.querySelector('.usd-value').textContent);
-  const buyingUSD = parseFloat(row.querySelectorAll('.usd-value')[1].textContent);
-  const profitLossCell = row.querySelector('.profit-loss');
-
-  if (!isNaN(sellingUSD) && !isNaN(buyingUSD)) {
-    const profitLossPercentage = ((sellingUSD - buyingUSD) / buyingUSD) * 100;
-    profitLossCell.textContent = `${profitLossPercentage.toFixed(2)}%`;
-
-    if (profitLossPercentage > 0) {
-      profitLossCell.classList.add('text-green-500'); // Profit (positive)
-      profitLossCell.classList.remove('text-red-500');
-    } else if (profitLossPercentage < 0) {
-      profitLossCell.classList.add('text-red-500'); // Loss (negative)
-      profitLossCell.classList.remove('text-green-500');
-    } else {
-      profitLossCell.classList.add('text-yellow-500'); // No profit or loss (zero)
-      profitLossCell.classList.remove('text-green-500', 'text-red-500');
-    }
-  } else {
-    profitLossCell.textContent = 'Invalid USD values';
-    profitLossCell.classList.remove('text-green-500', 'text-red-500');
-  }
 }
 
+function isCacheExpired(coinSymbol) {
+    const cacheEntry = exchangeRateCache[coinSymbol];
+    return cacheEntry && (Date.now() - cacheEntry.timestamp > cacheEntry.ttl);
+}
 
-  function updateProfitValue(row) {
+function updateProfitLoss(row) {
+    const buyingUSD = parseFloat(row.querySelector('.usd-value').textContent);
+    const sellingUSD = parseFloat(row.querySelectorAll('.usd-value')[1].textContent);
+    const profitLossCell = row.querySelector('.profit-loss');
+
+    if (!isNaN(sellingUSD) && !isNaN(buyingUSD)) {
+        const profitLossPercentage = ((sellingUSD - buyingUSD) / buyingUSD) * 100;
+        profitLossCell.textContent = `${profitLossPercentage.toFixed(2)}%`;
+
+        if (profitLossPercentage > 0) {
+            profitLossCell.classList.add('text-green-500'); // Profit (positive)
+            profitLossCell.classList.remove('text-red-500');
+        } else if (profitLossPercentage < 0) {
+            profitLossCell.classList.add('text-red-500'); // Loss (negative)
+            profitLossCell.classList.remove('text-green-500');
+        } else {
+            profitLossCell.classList.add('text-yellow-500'); // No profit or loss (zero)
+            profitLossCell.classList.remove('text-green-500', 'text-red-500');
+        }
+    } else {
+        profitLossCell.textContent = 'Invalid USD values';
+        profitLossCell.classList.remove('text-green-500', 'text-red-500');
+    }
+}
+
+function updateProfitValue(row) {
     const sellingUSD = parseFloat(row.querySelector('.usd-value').textContent);
     const profitValueCell = row.querySelector('.profit-value');
 
     if (!isNaN(sellingUSD)) {
-      profitValueCell.textContent = `${sellingUSD.toFixed(2)} USD`;
+        profitValueCell.textContent = `${sellingUSD.toFixed(2)} USD`;
     } else {
-      profitValueCell.textContent = 'Invalid USD value';
+        profitValueCell.textContent = 'Invalid USD value';
     }
-  }
+}
 
-  document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', () => {
     const coinNameValues = document.querySelectorAll('.coinname-value');
-    for (let i = 0; i < coinNameValues.length; i++) {
-      const coinFullName = coinNameValues[i].getAttribute('data-coinname');
-      const isRate = coinNameValues[i].textContent.includes('rate');
-      updateUsdValue(coinNameValues[i], coinFullName, isRate);
-
-      if (!isRate) {
-        coinNameValues[i].addEventListener('input', () => {
-          // Clear the cache when the user inputs a new value
-          console.log(`Clearing cache for ${coinNameToSymbol[coinFullName]}`);
-          exchangeRateCache[coinNameToSymbol[coinFullName]] = undefined;
-          updateUsdValue(coinNameValues[i], coinFullName);
-        });
-      }
-    }
-  });
+    coinNameValues.forEach(coinNameValue => {
+        const coinFullName = coinNameValue.getAttribute('data-coinname');
+        const isRateElement = coinNameValue.parentElement.querySelector('.ratetype');
+        const isRate = isRateElement ? isRateElement.textContent.includes('rate') : false;
+        updateUsdValue(coinNameValue, coinFullName, isRate);
+    });
+});
 </script>
+{% include 'footer.html' %}
 </body>
 </html>

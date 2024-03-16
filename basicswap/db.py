@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019-2023 tecnovert
+# Copyright (c) 2019-2024 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import time
-import struct
 import sqlalchemy as sa
 
 from enum import IntEnum, auto
@@ -32,6 +31,10 @@ def strConcepts(state):
     if state == Concepts.NETWORK_MESSAGE:
         return 'Network Message'
     return 'Unknown'
+
+
+def pack_state(new_state: int, now: int) -> bytes:
+    return int(new_state).to_bytes(4, 'little') + now.to_bytes(8, 'little')
 
 
 class DBKVInt(Base):
@@ -96,9 +99,9 @@ class Offer(Base):
         now = int(time.time())
         self.state = new_state
         if self.states is None:
-            self.states = struct.pack('<iq', new_state, now)
+            self.states = pack_state(new_state, now)
         else:
-            self.states += struct.pack('<iq', new_state, now)
+            self.states += pack_state(new_state, now)
 
 
 class Bid(Base):
@@ -183,9 +186,9 @@ class Bid(Base):
         if state_note is not None:
             self.state_note = state_note
         if self.states is None:
-            self.states = struct.pack('<iq', new_state, now)
+            self.states = pack_state(new_state, now)
         else:
-            self.states += struct.pack('<iq', new_state, now)
+            self.states += pack_state(new_state, now)
 
 
 class SwapTx(Base):
@@ -222,7 +225,11 @@ class SwapTx(Base):
         if self.state == new_state:
             return
         self.state = new_state
-        self.states = (self.states if self.states is not None else bytes()) + struct.pack('<iq', new_state, int(time.time()))
+        now: int = int(time.time())
+        if self.states is None:
+            self.states = pack_state(new_state, now)
+        else:
+            self.states += pack_state(new_state, now)
 
 
 class PrefundedTx(Base):
