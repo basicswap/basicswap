@@ -45,6 +45,7 @@ def page_settings(self, url_split, post_string):
                 data = {
                     'show_chart': toBool(get_data_entry(form_data, 'showchart')),
                     'chart_api_key': html.unescape(get_data_entry_or(form_data, 'chartapikey', '')),
+                    'coingecko_api_key': html.unescape(get_data_entry_or(form_data, 'coingeckoapikey', '')),
                 }
                 swap_client.editGeneralSettings(data)
             elif have_data_entry(form_data, 'apply_tor'):
@@ -130,9 +131,16 @@ def page_settings(self, url_split, post_string):
         chart_api_key = html.escape(bytes.fromhex(swap_client.settings.get('chart_api_key_enc', '')).decode('utf-8'))
     else:
         chart_api_key = swap_client.settings.get('chart_api_key', '')
+
+    if 'coingecko_api_key_enc' in swap_client.settings:
+        coingecko_api_key = html.escape(bytes.fromhex(swap_client.settings.get('coingecko_api_key_enc', '')).decode('utf-8'))
+    else:
+        coingecko_api_key = swap_client.settings.get('coingecko_api_key', '')
+        
     chart_settings = {
         'show_chart': swap_client.settings.get('show_chart', True),
         'chart_api_key': chart_api_key,
+        'coingecko_api_key': coingecko_api_key,
     }
 
     tor_control_password = '' if swap_client.tor_control_password is None else swap_client.tor_control_password

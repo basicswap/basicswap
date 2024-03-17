@@ -6447,6 +6447,25 @@ class BasicSwap(BaseApp):
                             settings_copy.pop('chart_api_key')
                         settings_changed = True
 
+            if 'coingecko_api_key' in data:
+                new_value = data['coingecko_api_key']
+                ensure(isinstance(new_value, str), 'New coingecko_api_key value not a string')
+                ensure(len(new_value) <= 128, 'New coingecko_api_keyvalue too long')
+                if all(c in string.hexdigits for c in new_value):
+                    if settings_copy.get('coingecko_api_key', '') != new_value:
+                        settings_copy['coingecko_api_key'] = new_value
+                        if 'coingecko_api_key_enc' in settings_copy:
+                            settings_copy.pop('coingecko_api_key_enc')
+                        settings_changed = True
+                else:
+                    # Encode value as hex to avoid escaping
+                    new_value = new_value.encode('utf-8').hex()
+                    if settings_copy.get('coingecko_api_key_enc', '') != new_value:
+                        settings_copy['coingecko_api_key_enc'] = new_value
+                        if 'coingecko_api_key' in settings_copy:
+                            settings_copy.pop('coingecko_api_key')
+                        settings_changed = True
+                        
             if settings_changed:
                 settings_path = os.path.join(self.data_dir, cfg.CONFIG_FILENAME)
                 settings_path_new = settings_path + '.new'

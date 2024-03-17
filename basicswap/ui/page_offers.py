@@ -41,6 +41,7 @@ from basicswap.chainparams import (
 )
 
 default_chart_api_key = '95dd900af910656e0e17c41f2ddc5dba77d01bf8b0e7d2787634a16bd976c553'
+default_coingecko_api_key = 'CG-8hm3r9iLfpEXv4ied8oLbeUj'
 
 
 def value_or_none(v):
@@ -451,6 +452,11 @@ def page_newoffer(self, url_split, post_string):
         chart_api_key_enc = swap_client.settings.get('chart_api_key_enc', '')
         chart_api_key = default_chart_api_key if chart_api_key_enc == '' else bytes.fromhex(chart_api_key_enc).decode('utf-8')
 
+    coingecko_api_key = swap_client.settings.get('coingecko_api_key', '')
+    if coingecko_api_key == '':
+        coingecko_api_key_enc = swap_client.settings.get('coingecko_api_key_enc', '')
+        coingecko_api_key = default_coingecko_api_key if coingecko_api_key_enc == '' else bytes.fromhex(coingecko_api_key_enc).decode('utf-8')
+
     return self.render_template(template, {
         'messages': messages,
         'err_messages': err_messages,
@@ -464,6 +470,7 @@ def page_newoffer(self, url_split, post_string):
         'swap_types': [(strSwapType(x), strSwapDesc(x)) for x in SwapTypes if strSwapType(x)],
         'show_chart': swap_client.settings.get('show_chart', True),
         'chart_api_key': chart_api_key,
+        'coingecko_api_key': coingecko_api_key,
     })
 
 
@@ -694,7 +701,6 @@ def format_timestamp(timestamp, with_ago=True, is_expired=False):
     else:
         return time.strftime('%Y-%m-%d', time.localtime(timestamp))
 
-
 def page_offers(self, url_split, post_string, sent=False):
     server = self.server
     swap_client = server.swap_client
@@ -796,6 +802,11 @@ def page_offers(self, url_split, post_string, sent=False):
         chart_api_key_enc = swap_client.settings.get('chart_api_key_enc', '')
         chart_api_key = default_chart_api_key if chart_api_key_enc == '' else bytes.fromhex(chart_api_key_enc).decode('utf-8')
 
+    coingecko_api_key = swap_client.settings.get('coingecko_api_key', '')
+    if coingecko_api_key == '':
+        coingecko_api_key_enc = swap_client.settings.get('coingecko_api_key_enc', '')
+        coingecko_api_key = default_coingecko_api_key if coingecko_api_key_enc == '' else bytes.fromhex(coingecko_api_key_enc).decode('utf-8')
+
     offers_count = len(formatted_offers)
 
     template = server.env.get_template('offers.html')
@@ -806,6 +817,7 @@ def page_offers(self, url_split, post_string, sent=False):
         'messages': messages,
         'show_chart': False if sent else swap_client.settings.get('show_chart', True),
         'chart_api_key': chart_api_key,
+        'coingecko_api_key': coingecko_api_key,
         'coins_from': coins_from,
         'coins': coins_to,
         'messages': messages,

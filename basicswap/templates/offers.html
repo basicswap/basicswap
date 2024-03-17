@@ -55,7 +55,7 @@
               <div id="error-overlay" class="error-overlay hidden absolute inset-0 flex items-center justify-center">
                 <div id="error-content" class="error-content bg-coolGray-100 dark:bg-gray-500 rounded-md p-4 non-blurred">
                   <p class="text-red-600 font-semibold text-center">Error:</p>
-                  <p class="text-sm text-gray-700 dark:text-gray-300 mt-5 text-center">To review or update your Chart API Key, navigate to <a href="/settings">Settings & Tools > Settings > General (TAB).</a></p>
+                  <p class="text-sm text-gray-700 dark:text-gray-300 mt-5 text-center">To review or update your Chart API Key(s), navigate to <a href="/settings">Settings & Tools > Settings > General (TAB).</a></p>
                 </div>
               </div>
             </div>
@@ -359,16 +359,77 @@
 </div>
 </div>
 
+<div class="w-full sm:w-1/2 lg:w-1/6 p-3" id="wow-container">
+  <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-2xl dark:text-white">
+    <div class="flex items-center">
+        <img src="/static/images/coins/Wownero.png" class="rounded-xl" style="width: 35px; height: 35px; object-fit: contain;" alt="WOWNERO">
+        <p class="ml-2 text-black text-md dark:text-white">
+            Wownero (WOW)
+        </p>
+    </div>
+    <div class="flex flex-col justify-start">
+        <p class="my-2 text-xl font-bold text-left text-gray-700 dark:text-gray-100" id="wow-price-usd-value">
+            <span class="text-sm">
+                <span id="wow-price-usd-value" style="min-width: 80px;"></span>
+            </span>
+        </p>
+        <div class="flex items-center text-sm">
+            <div class="w-auto">
+              <div id="wow-price-change-container" class="w-auto p-1"></div>
+            </div>
+        </div>
+        <div class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2">
+          <span class="bold mr-2">VOL:</span>
+            <div id="wow-volume-24h">
+            </div>
+        </div>
+        <div class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2 hidden">
+            <span class="bold mr-2">BTC:</span>
+            <span id="wow-price-btc">
+            </span>
+        </div>
+    </div>
+  </div>
+</div>
+
 </div>
 </div>
 
 </section>
-  <script>
+<script>
     window.addEventListener('load', function() {
-    const api_key = '{{chart_api_key}}';
-    const coins = ['BTC', 'PART', 'XMR', 'LTC', 'FIRO', 'DASH', 'PIVX', 'DOGE', 'ETH'];
-    coins.forEach(coin => {
-        fetch(`https://min-api.cryptocompare.com/data/pricemultifull?fsyms=${coin}&tsyms=USD,BTC&api_key=${api_key}`)
+      const coins = ['BTC', 'PART', 'XMR', 'LTC', 'FIRO', 'DASH', 'PIVX', 'DOGE', 'ETH', 'WOW'];
+      const api_key = '{{chart_api_key}}';
+      const coinGeckoApiKey = '{{coingecko_api_key}}';
+      coins.forEach(coin => {
+        if (coin === 'WOW') {
+          fetchWowneroData();
+        } else {
+          fetchCryptoCompareData(coin, api_key);
+        }
+      });
+      updateChart('BTC');
+    });
+
+    function fetchCryptoCompareData(coin, api_key) {
+      fetch(`https://min-api.cryptocompare.com/data/pricemultifull?fsyms=${coin}&tsyms=USD,BTC&api_key=${api_key}`)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`Error fetching data. Status: ${response.status}`);
+          }
+          return response.json();
+        })
+        .then(data => {
+          displayCoinData(coin, data);
+        })
+        .catch(error => {
+          console.error(`Fetching ${coin} data:`, error);
+          displayErrorMessage(`Unable to fetch data. Please verify your API key or try again later.`);
+        });
+    }
+
+    function fetchWowneroData(coinGeckoApiKey) {
+        fetch(`https://api.coingecko.com/api/v3/coins/wownero/market_chart?vs_currency=usd&days=1&api_key=${coinGeckoApiKey}`)
             .then(response => {
                 if (!response.ok) {
                     throw new Error(`Error fetching data. Status: ${response.status}`);
@@ -376,15 +437,38 @@
                 return response.json();
             })
             .then(data => {
-                displayCoinData(coin, data);
+                displayWowneroData(data);
             })
             .catch(error => {
-                console.error(`Fetching ${coin} data:`, error);
-                displayErrorMessage(`Unable to fetch data. Please verify your API key or try again later.`);
+                console.error('Fetching Wownero data:', error);
+                displayErrorMessage('Unable to fetch data for Wownero. Please try again later.');
             });
-    });
-    updateChart('BTC');
-});
+    }
+
+    function displayWowneroData(data) {
+      const prices = data.prices;
+
+      const latestPriceUSD = prices[prices.length - 1][1];
+      const priceChange24h = data.market_caps[data.market_caps.length - 1][1] / data.market_caps[data.market_caps.length - 2][1] - 1;
+      const volume24h = data.total_volumes[data.total_volumes.length - 1][1];
+
+      document.getElementById('wow-price-usd-value').textContent = latestPriceUSD.toFixed(2) + ' $';
+      document.getElementById('wow-price-change-container').textContent = (priceChange24h * 100).toFixed(2) + '%';
+      document.getElementById('wow-volume-24h').textContent = volume24h.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',') + ' USD';
+
+      const priceChangeContainer = document.getElementById('wow-price-change-container');
+      if (priceChange24h >= 0) {
+        priceChangeContainer.innerHTML = positivePriceChangeHTML(priceChange24h * 100);
+      } else {
+        priceChangeContainer.innerHTML = negativePriceChangeHTML(priceChange24h * 100);
+      }
+
+      const latestPriceBTC = parseFloat(data.prices[data.prices.length - 1][1]);
+      // Todo fix value USD -> BTC
+      const priceBTC = latestPriceUSD / latestPriceBTC;
+
+      document.getElementById('wow-price-btc').textContent = priceBTC.toFixed(8) + ' BTC';
+    }
 
 function displayCoinData(coin, data) {
     const priceUSD = data.RAW[coin].USD.PRICE;
@@ -451,7 +535,7 @@ function negativePriceChangeHTML(value) {
 }
 
 function setActiveContainer(containerId) {
-  const containerIds = ['btc-container', 'xmr-container', 'part-container', 'pivx-container', 'firo-container', 'dash-container', 'ltc-container', 'doge-container', 'eth-container'];
+  const containerIds = ['btc-container', 'xmr-container', 'part-container', 'pivx-container', 'firo-container', 'dash-container', 'ltc-container', 'doge-container', 'eth-container', 'wow-container'];
   const activeClass = 'active-container';
   containerIds.forEach(id => {
     const container = document.getElementById(id);
@@ -500,6 +584,11 @@ document.getElementById('eth-container').addEventListener('click', () => {
   setActiveContainer('eth-container');
   updateChart('ETH');
 });
+document.getElementById('wow-container').addEventListener('click', () => {
+  setActiveContainer('wow-container');
+  updateChart('WOW');
+});
+
 
 let coin;
 const coinOptions = {
@@ -508,38 +597,64 @@ const coinOptions = {
     backgroundColor: 'rgba(77, 132, 240, 0.1)'
   }
 };
+
 function updateChart(coinSymbol) {
   coin = coinSymbol;
   const api_key = '{{chart_api_key}}';
-  fetch(`https://min-api.cryptocompare.com/data/v2/histoday?fsym=${coin}&tsym=USD&limit=30&api_key=${api_key}`)
-    .then((response) => response.json())
-    .then((data) => {
-      const coinSettings = coinOptions[coinSymbol] || {};
-      const chartData = {
-        labels: data.Data.Data.map(d => formatDate(new Date(d.time * 1000))),
-        datasets: [{
-          data: data.Data.Data.map(d => d.close),
-          borderColor: coinSettings.lineColor || 'rgba(77, 132, 240, 1)',
-          tension: 0.1,
-          fill: true,
-          backgroundColor: coinSettings.backgroundColor || 'rgba(77, 132, 240, 0.1)',
-          pointStyle: 'circle',
-          pointRadius: 5,
-          pointHoverRadius: 10
-        }]
-      };
+  const coinGeckoApiKey = '{{coingecko_api_key}}';
 
-      chart.data.labels = chartData.labels;
-      chart.data.datasets = chartData.datasets;
-      chart.options.scales.y.title.text = `Price (USD) - ${coin} 30 DAYS`;
-      chart.update();
-    })
-    .catch(error => console.error(`Error updating chart for ${coin}:`, error));
+  if (coinSymbol === 'WOW') {
+    fetch(`https://api.coingecko.com/api/v3/coins/wownero/market_chart?vs_currency=usd&days=30&interval=daily&d&api_key=${coinGeckoApiKey}`)
+      .then(response => response.json())
+      .then(data => {
+        const chartData = {
+          labels: data.prices.map(entry => formatDate(new Date(entry[0]))),
+          datasets: [{
+            label: 'Wownero Price (USD)',
+            data: data.prices.map(entry => entry[1]),
+            borderColor: 'rgba(77, 132, 240, 1)',
+            backgroundColor: 'rgba(77, 132, 240, 0.1)',
+            fill: true
+          }]
+        };
+
+        chart.data = chartData;
+        chart.options.scales.y.title.text = 'Price (USD) - Wownero 30 DAYS';
+        chart.update();
+      })
+      .catch(error => console.error('Error updating chart for Wownero:', error));
+  } else {
+    fetch(`https://min-api.cryptocompare.com/data/v2/histoday?fsym=${coin}&tsym=USD&limit=30&api_key=${api_key}`)
+      .then(response => response.json())
+      .then(data => {
+        const coinSettings = coinOptions[coinSymbol] || {};
+        const chartData = {
+          labels: data.Data.Data.map(d => formatDate(new Date(d.time * 1000))),
+          datasets: [{
+            data: data.Data.Data.map(d => d.close),
+            borderColor: coinSettings.lineColor || 'rgba(77, 132, 240, 1)',
+            tension: 0.1,
+            fill: true,
+            backgroundColor: coinSettings.backgroundColor || 'rgba(77, 132, 240, 0.1)',
+            pointStyle: 'circle',
+            pointRadius: 5,
+            pointHoverRadius: 10
+          }]
+        };
+
+        chart.data = chartData;
+        chart.options.scales.y.title.text = `Price (USD) - ${coin} 30 DAYS`;
+        chart.update();
+      })
+      .catch(error => console.error(`Error updating chart for ${coin}:`, error));
+  }
 }
+
 function formatDate(date) {
   const options = { day: '2-digit', month: '2-digit', year: '2-digit' };
   return new Intl.DateTimeFormat('en-US', options).format(date);
 }
+
 const verticalLinePlugin = {
   id: 'verticalLine',
   beforeTooltipDraw: (chart, args) => {
@@ -563,6 +678,7 @@ const verticalLinePlugin = {
     }
   }
 };
+
 Chart.register(verticalLinePlugin);
 const ctx = document.getElementById('coin-chart').getContext('2d');
 const chart = new Chart(ctx, {
@@ -643,6 +759,7 @@ const chart = new Chart(ctx, {
   }
 });
 </script>
+
 {% endif %}
   <section>
     <div class="pl-6 pr-6 pt-0 pb-0 mt-5 h-full overflow-hidden">
