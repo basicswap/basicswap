@@ -723,7 +723,8 @@ const chart = new Chart(ctx, {
         display: true,
         title: {
           display: true,
-          text: 'Price (USD)'
+          text: 'Price (USD)',
+          color: 'rgba(77, 132, 240, 1)'
         }
       }
     },
@@ -1017,7 +1018,7 @@ const chart = new Chart(ctx, {
                             </td>
                             {% endif %}
                             <!-- OFFERS WHERE YOU WILL BE TAKER -->
-                            <!-- YOUR OFFERS / MAKER / BOOK -->
+                            <!-- YOUR OFFERS / MAKER / BOOK-->
                             {% if o[9] == true %}
                             <td class="py-0 px-6 text-right text-sm mx-20">
                                 <div class="flex items-center justify-evenly monospace">
@@ -1079,8 +1080,8 @@ const chart = new Chart(ctx, {
                             <td class="py-0 px-6 text-right text-sm mx-20">
                                 <div class="flex items-center justify-evenly monospace">
                                     <div class="flex flex-col text-left mr-5 ml-5">
-                                      <div class="coinname bold w-32" data-coinname="{{ o[3] }}">
-                                          {{ o[4]|truncate(9, true, '', 0) }}
+                                      <div class="coinname bold w-32" data-coinname="{{ o[3] }}"><!-- todo id:4-->
+                                          {{ o[5]|truncate(9, true, '', 0) }}
                                       </div>
                                           <div class="text-gray-600 dark:text-gray-300">{{ o[3] }}</div>
                                       <div class="ratetype hidden"><span class="echange-rates" data-coinname="{{ o[3] }}"> {{ o[6]|truncate(6,true,'',0) }} {{ o[16] }}/{{ o[17] }}</span>
