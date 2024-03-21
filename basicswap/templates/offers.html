@@ -68,6 +68,7 @@
   <section class="py-4 overflow-hidden container-to-blur">
     <div class="container px-4 mx-auto">
       <div class="flex flex-wrap -m-3">
+      
         <div class="w-full sm:w-1/2 lg:w-1/6 p-3" id="btc-container">
         <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-2xl dark:text-white active-container" id="btc-active">
       <div class="flex items-center">
@@ -722,8 +723,7 @@ const chart = new Chart(ctx, {
         display: true,
         title: {
           display: true,
-          text: 'Price (USD)',
-          color: 'rgba(77, 132, 240, 1)'
+          text: 'Price (USD)'
         }
       }
     },
@@ -1056,39 +1056,8 @@ const chart = new Chart(ctx, {
                                       </div>
                                       <div class="usd-value hidden"></div>
                                       <div class="usd-value-in-coin-value"></div>
-<<<<<<< HEAD
-                                    </div>
-                                </div>
-                            </td>
-                            {% endif %}
-                            <!-- OFFERS WHERE YOU WILL BE TAKER -->
-                            <!-- YOUR OFFERS / MAKER / BOOK-->
-                            {% if o[9] == true %}
-                            <td class="py-0 px-6 text-right text-sm mx-20">
-                                <div class="flex items-center justify-evenly monospace">
-                                    <div class="flex flex-col text-left mr-5 ml-5">
-                                      <div class="coinname bold w-32" data-coinname="{{ o[3] }}">
-                                          {{ o[5]|truncate(9, true, '', 0) }}
-                                      </div>
-                                          <div class="text-gray-600 dark:text-gray-300">{{ o[3] }}</div>
-                                        <div class="ratetype hidden"><span class="echange-rates" data-coinname="{{ o[3] }}"> {{ o[6]|truncate(6,true,'',0) }} {{ o[16] }}/{{ o[17] }}</span>
-                                        <div class="coinname-value hidden" data-coinname="{{ o[3] }}">
-                                          {{ o[5]|truncate(7, true, '', 0) }}
-                                        </div>
-                                      <div class="usd-value hidden"></div>
-                                      <div class="usd-value-in-coin-value"></div>
-                                    </div>
-                                </div>
-                                    <a data-tooltip-target="tooltip-wallet{{loop.index}}" href="/wallet/{{ o[17] }}">
-                                    <span class="mr-3 ml-3 inline-flex align-middle items-center justify-center w-18 h-20 rounded">
-                                    <img class="h-12" src="/static/images/coins/{{ o[3]|replace(" ", "-") }}.png" alt="{{ o[3] }}">
-                                    </span></a>
-                                     {{ arrow_right_svg | safe }}
-                                        <div id="tooltip-wallet{{loop.index}}" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
-=======
                                     </div></a>
                                        <div id="tooltip-wallet{{loop.index}}" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
->>>>>>> 3b2532e (ui: orderbook update & fixes)
                                            <div class="active-revoked-expired"><span class="bold">My {{ o[17] }} Wallet</div>
                                            <div class="tooltip-arrow pl-1" data-popper-arrow></div>
                                         </div>
@@ -1098,23 +1067,6 @@ const chart = new Chart(ctx, {
                             <td class="py-0 px-0 text-right text-sm">
                                 <a data-tooltip-target="tooltip-offer{{loop.index}}" href="/offer/{{ o[1] }}">
                                 <div class="flex items-center justify-evenly monospace">
-<<<<<<< HEAD
-                                    <div class="flex flex-col text-left mr-5 ml-5">
-                                      <div class="coinname bold w-32" data-coinname="{{ o[3] }}"><!-- todo id:4-->
-                                          {{ o[5]|truncate(9, true, '', 0) }}
-                                      </div>
-                                          <div class="text-gray-600 dark:text-gray-300">{{ o[3] }}</div>
-                                      <div class="ratetype hidden"><span class="echange-rates" data-coinname="{{ o[3] }}"> {{ o[6]|truncate(6,true,'',0) }} {{ o[16] }}/{{ o[17] }}</span>
-                                      <div class="coinname-value hidden" data-coinname="{{ o[2] }}">
-                                          {{ o[4]|truncate(6, true, '', 0) }} test
-                                      </div>
-                                      <div class="usd-value hidden"></div>
-                                      <div class="usd-value-in-coin-value"></div>
-                                    </div>
-                                </div>
-                                        <a data-tooltip-target="tooltip-wallet{{loop.index}}" href="/wallet/{{ o[17] }}">
-=======
->>>>>>> 3b2532e (ui: orderbook update & fixes)
                                     <span class="inline-flex mr-3 ml-3 align-middle items-center justify-center w-18 h-20 rounded">
                                         <img class="h-12" src="/static/images/coins/{{ o[3]|replace(" ", "-") }}.png" alt="{{ o[3] }}">
                                     </span>
