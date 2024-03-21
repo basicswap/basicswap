@@ -148,3 +148,16 @@
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
+
+.hover-container:hover #coin_to_button, .hover-container:hover #coin_to {
+  border-color: #3b82f6;
+}
+.hover-container:hover #coin_from_button, .hover-container:hover #coin_from {
+  border-color: #3b82f6;
+}
+
+#coin_to_button, #coin_from_button {
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 20px 20px;
+}

@@ -136,7 +136,7 @@ def page_settings(self, url_split, post_string):
         coingecko_api_key = html.escape(bytes.fromhex(swap_client.settings.get('coingecko_api_key_enc', '')).decode('utf-8'))
     else:
         coingecko_api_key = swap_client.settings.get('coingecko_api_key', '')
- 
+
     chart_settings = {
         'show_chart': swap_client.settings.get('show_chart', True),
         'chart_api_key': chart_api_key,
