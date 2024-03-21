@@ -229,7 +229,6 @@ class XMRInterface(CoinInterface):
                 raise e
 
             rv = {}
-            self.rpc_wallet('refresh')
             balance_info = self.rpc_wallet('get_balance')
 
             rv['balance'] = self.format_amount(balance_info['unlocked_balance'])
@@ -322,7 +321,6 @@ class XMRInterface(CoinInterface):
     def publishBLockTx(self, kbv: bytes, Kbs: bytes, output_amount: int, feerate: int, unlock_time: int = 0) -> bytes:
         with self._mx_wallet:
             self.openWallet(self._wallet_filename)
-            self.rpc_wallet('refresh')
 
             Kbv = self.getPubkey(kbv)
             shared_addr = xmr_util.encode_address(Kbv, Kbs)
@@ -471,8 +469,8 @@ class XMRInterface(CoinInterface):
 
     def withdrawCoin(self, value, addr_to: str, sweepall: bool, estimate_fee: bool = False) -> str:
         with self._mx_wallet:
-            self.openWallet(self._wallet_filename)
-            self.rpc_wallet('refresh')
+           # self.openWallet(self._wallet_filename)
+           # self.rpc_wallet('refresh')
 
             if sweepall:
                 balance = self.rpc_wallet('get_balance')
@@ -536,7 +534,6 @@ class XMRInterface(CoinInterface):
         with self._mx_wallet:
             self.openWallet(self._wallet_filename)
 
-            self.rpc_wallet('refresh')
             balance_info = self.rpc_wallet('get_balance')
             return balance_info['unlocked_balance']
 
