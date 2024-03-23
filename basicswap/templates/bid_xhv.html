@@ -1,0 +1,864 @@
+{% include 'header.html' %}
+{% from 'style.html' import input_arrow_down_svg %}
+
+<div class="container mx-auto">
+ <section class="p-5 mt-5">
+  <div class="flex flex-wrap items-center -m-2">
+   <div class="w-full md:w-1/2 p-2">
+    <ul class="flex flex-wrap items-center gap-x-3 mb-2">
+     <li>
+      <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/">
+       <p>Home</p>
+      </a>
+     </li>
+     <li>
+      <svg width="6" height="15" viewBox="0 0 6 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+       <path d="M5.34 0.671999L2.076 14.1H0.732L3.984 0.671999H5.34Z" fill="#BBC3CF"></path>
+      </svg>
+     </li>
+     <li>
+      <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="#">Bids</a>
+     </li>
+     <li>
+      <svg width="6" height="15" viewBox="0 0 6 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+       <path d="M5.34 0.671999L2.076 14.1H0.732L3.984 0.671999H5.34Z" fill="#BBC3CF"></path>
+      </svg>
+     </li>
+     <li>
+      <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="{{ bid_id }}">BID ID: {{ bid_id }}</a>
+     </li>
+    </ul>
+   </div>
+  </div>
+ </section>
+ <section class="py-3">
+  <div class="container px-4 mx-auto">
+   <div class="relative py-11 px-16 bg-coolGray-900 dark:bg-blue-500 rounded-md overflow-hidden">
+    <img class="absolute z-10 left-4 top-4" src="/static/images/elements/dots-red.svg" alt="">
+    <img class="absolute z-10 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt="">
+    <img class="absolute h-64 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" src="/static/images/elements/wave.svg" alt="">
+    <div class="relative z-20 flex flex-wrap items-center -m-3">
+     <div class="w-full md:w-1/2 p-3">
+      <h2 class="mb-6 text-4xl font-bold text-white tracking-tighter">Bid {% if debug_mode == true %} (Debug: bid_xhv template) {% endif %}</h2>
+      <p class="font-normal text-coolGray-200 dark:text-white">Bid ID: {{ bid_id }}</p>
+     </div>
+     <div class="w-full md:w-1/2 p-3 p-6 container flex flex-wrap items-center justify-end items-center mx-auto"> {% if refresh %} <a id="refresh" href="/bid/{{ bid_id }}" class="flex flex-wrap justify-center px-5 py-3 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border dark:bg-gray-500 dark:hover:bg-gray-700 border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+       <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
+        <g fill="#ffffff">
+         <path fill="#ffffff" d="M12,3c1.989,0,3.873,0.65,5.43,1.833l-3.604,3.393l9.167,0.983L22.562,0l-3.655,3.442 C16.957,1.862,14.545,1,12,1C5.935,1,1,5.935,1,12h2C3,7.037,7.037,3,12,3z"></path>
+         <path data-color="color-2" d="M12,21c-1.989,0-3.873-0.65-5.43-1.833l3.604-3.393l-9.167-0.983L1.438,24l3.655-3.442 C7.043,22.138,9.455,23,12,23c6.065,0,11-4.935,11-11h-2C21,16.963,16.963,21,12,21z"></path>
+        </g>
+       </svg>
+       <span>Refresh {{ refresh }} seconds</span>
+      </a>
+      {% else %}
+      <a id="refresh" href="/bid/{{ bid_id }}" class="flex flex-wrap justify-center px-5 py-3 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border dark:bg-gray-500 dark:hover:bg-gray-700 border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+       <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
+        <g fill="#ffffff">
+         <path fill="#ffffff" d="M12,3c1.989,0,3.873,0.65,5.43,1.833l-3.604,3.393l9.167,0.983L22.562,0l-3.655,3.442 C16.957,1.862,14.545,1,12,1C5.935,1,1,5.935,1,12h2C3,7.037,7.037,3,12,3z"></path>
+         <path data-color="color-2" d="M12,21c-1.989,0-3.873-0.65-5.43-1.833l3.604-3.393l-9.167-0.983L1.438,24l3.655-3.442 C7.043,22.138,9.455,23,12,23c6.065,0,11-4.935,11-11h-2C21,16.963,16.963,21,12,21z"></path>
+        </g>
+       </svg>
+       <span>Refresh</span>
+      </a>
+    {% endif %}
+  </div>
+    </div>
+   </div>
+  </div>
+ </section>
+ {% include 'inc_messages.html' %}
+ <section>
+  <div class="pl-6 pr-6 pt-0 pb-0 mt-5 h-full overflow-hidden">
+   <div class="pb-6 border-coolGray-100">
+    <div class="flex flex-wrap items-center justify-between -m-2">
+     <div class="w-full pt-2">
+      <div class="container mt-5 mx-auto">
+       <div class="pt-6 pb-8 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
+        <div class="px-6">
+         <div class="w-full mt-6 pb-6 overflow-x-auto">
+          <table class="w-full min-w-max text-sm">
+           <thead class="uppercase">
+            <tr class="text-left">
+             <th class="p-0">
+              <div class="py-3 px-6 rounded-tl-xl bg-coolGray-200 dark:bg-gray-600">
+               <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Options</span>
+              </div>
+             </th>
+             <th class="p-0">
+              <div class="py-3 px-6 rounded-tr-xl bg-coolGray-200 dark:bg-gray-600">
+               <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Details</span>
+              </div>
+             </th>
+            </tr>
+           </thead>
+           {% if data.was_sent == 'True' %}
+           <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
+            <td class="py-3 px-6 bold">Swap</td>
+            <td class="py-3 px-6">
+             <div class="content flex py-2">
+              <span class="bold">{{ data.amt_to }} {{ data.ticker_to }}</span>
+              <svg aria-hidden="true " class="w-5 h-5 ml-3 mr-3" fill="currentColor " viewBox="0 0 20 20 " xmlns="http://www.w3.org/2000/svg ">
+               <path fill-rule="evenodd " d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z " clip-rule="evenodd "></path>
+              </svg>
+              <span class="text-xs bold">{{ data.amt_from }} {{ data.ticker_from }}</span>
+             </div>
+            </td>
+           </tr>
+           {% else %}
+           <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
+            <td class="py-3 px-6 bold">Swap</td>
+            <td class="py-3 px-6">
+             <div class="content flex py-2">
+              <span class="bold">{{ data.amt_from }} {{ data.ticker_from }}</span>
+              <svg aria-hidden="true " class="w-5 h-5 ml-3 mr-3" fill="currentColor " viewBox="0 0 20 20 " xmlns="http://www.w3.org/2000/svg ">
+               <path fill-rule="evenodd " d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z " clip-rule="evenodd "></path>
+              </svg>
+              <span class="bold">{{ data.amt_to }} {{ data.ticker_to }}</span>
+             </div>
+            </td>
+           </tr>
+           {% endif %}
+           <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
+            <td class="py-3 px-6 bold">Bid Rate</td>
+            <td class="py-3 px-6">{{ data.bid_rate }}</td>
+           </tr>
+           {% if data.was_sent == 'True' %}
+           <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
+            <td class="py-3 px-6 bold">You Send</td>
+            <td class="py-3 px-6">
+             <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded">
+              <img class="h-7" src="/static/images/coins/{{ data.coin_to }}.png" alt="{{ data.coin_to }}">
+             </span>{{ data.coin_to }}
+            </td>
+           </tr>
+           <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
+            <td class="py-3 px-6 bold">You Get</td>
+            <td class="py-3 px-6">
+             <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded">
+              <img class="h-7" src="/static/images/coins/{{ data.coin_from }}.png" alt="{{ data.coin_from }}">
+             </span>{{ data.coin_from }}
+            </td>
+           </tr>{% else %}
+           <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
+            <td class="py-3 px-6 bold">You Send</td>
+            <td class="py-3 px-6">
+             <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded">
+              <img class="h-7" src="/static/images/coins/{{ data.coin_from }}.png" alt="{{ data.coin_from }}">
+             </span>
+             {{ data.coin_from }}
+            </td>
+           </tr>
+           <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
+            <td class="py-3 px-6 bold">You Get</td>
+            <td class="py-3 px-6">
+             <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded">
+              <img class="h-7" src="/static/images/coins/{{ data.coin_to }}.png" alt="{{ data.coin_to }}">
+             </span>
+             {{ data.coin_to }}
+            </td>
+           </tr>
+           {% endif %}
+           <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
+            <td class="py-3 px-6 bold">Bid State</td>
+            <td class="py-3 px-6">{{ data.bid_state }}</td>
+           </tr>
+           <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
+            <td class="py-3 px-6 bold">State Description </td>
+            <td class="py-3 px-6">{{ data.state_description }}</td>
+           </tr>
+           <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
+            <td class="py-3 px-6 bold">Offer</td>
+            <td class="py-3 px-6">
+             <a class="monospace bold select-all" href="/offer/{{ data.offer_id }}">{{ data.offer_id }}</a>
+            </td>
+           </tr>
+           <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
+            <td class="py-3 px-6 bold">Address From</td>
+            <td class="py-3 px-6">
+             <a class="monospace bold select-all" href="/identity/{{ data.addr_from }}">{{ data.addr_from }}</a> {{ data.addr_from_label }}
+            </td>
+           </tr>
+           <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
+            <td class="flex items-center px-46 whitespace-nowrap">
+             <svg alt="" class="w-5 h-5 rounded-full ml-5" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
+              <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3B82F6" stroke-linejoin="round">
+               <circle cx="12" cy="12" r="11"></circle>
+               <polyline points=" 12,6 12,12 18,12 " stroke="#3B82F6"></polyline>
+              </g>
+             </svg>
+             <div class="py-3 pl-2 bold">
+              <div>Created At</div>
+             </div>
+            </td>
+            <td class="py-3 px-6">{{ data.created_at }}</td>
+           </tr>
+           <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
+            <td class="flex items-center px-46 whitespace-nowrap">
+             <svg alt="" class="w-5 h-5 rounded-full  ml-5" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
+              <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
+               <circle cx="12" cy="12" r="11"></circle>
+               <polyline points=" 12,6 12,12 18,12 " stroke="#6b7280"></polyline>
+              </g>
+             </svg>
+             <div class="py-3 pl-2 bold">
+              <div>Expired At</div>
+             </div>
+            </td>
+            <td class="py-3 px-6">{{ data.expired_at }}</td>
+           </tr>
+           <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
+            <td class="py-3 px-6 bold">Sent</td>
+            <td class="py-3 px-6">{{ data.was_sent }}</td>
+           </tr>
+           <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
+            <td class="py-3 px-6 bold">Received</td>
+            <td class="py-3 px-6">{{ data.was_received }}</td>
+           </tr>
+           {% if data.coin_a_lock_refund_tx_est_final != 'None' %}
+           <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
+            <td class="py-3 px-6 bold">{{ data.ticker_from }} lock refund tx valid at</td>
+            <td class="py-3 px-6">{{ data.coin_a_lock_refund_tx_est_final | formatts }}</td>
+           </tr>
+           {% if data.coin_a_lock_refund_swipe_tx_est_final != 'None' %}
+           <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
+            <td class="py-3 px-6 bold">{{ data.ticker_from }} lock refund tx swipeable at</td>
+            <td class="py-3 px-6">{{ data.coin_a_lock_refund_swipe_tx_est_final | formatts }}</td>
+           </tr>
+           {% endif %}
+           <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
+            <td class="py-3 px-6 bold">{{ data.ticker_from }} chain median time</td>
+            <td class="py-3 px-6">{{ data.coin_a_last_median_time | formatts }}</td>
+           </tr>
+           {% endif %}
+          </table>
+         </div>
+        </div>
+       </div>
+ </section>
+ <section class="p-6">
+  <div class="flex flex-wrap items-center">
+   <div class="w-full">
+    <h4 class="font-semibold text-black dark:text-white text-2xl">Old states</h4>
+   </div>
+  </div>
+ </section>
+ <section>
+  <div class="pl-6 pr-6 pt-0 pb-0 h-full overflow-hidden">
+   <div class="pb-6 border-coolGray-100">
+    <div class="flex flex-wrap items-center justify-between -m-2">
+     <div class="w-full pt-2">
+      <div class="container mt-5 mx-auto">
+       <div class="pt-6 pb-8 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
+        <div class="px-6">
+         <div class="w-full mt-6 pb-6 overflow-x-auto">
+          <table class="w-full min-w-max text-sm">
+           <thead class="uppercase">
+            <tr class="text-left">
+             <th class="p-0">
+              <div class="py-3 px-6 rounded-tl-xl bg-coolGray-200 dark:bg-gray-600">
+               <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Set at time</span>
+              </div>
+             </th>
+             <th class="p-0">
+              <div class="py-3 px-6 rounded-tr-xl bg-coolGray-200 dark:bg-gray-600">
+               <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Old states</span>
+              </div>
+             </th>
+            </tr>
+           </thead>
+           {% for s in old_states %}
+           <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
+            <td class="flex items-center whitespace-nowrap">
+             <svg alt="" class="w-5 h-5 rounded-full  ml-5" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
+              <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
+               <circle cx="12" cy="12" r="11"></circle>
+               <polyline points=" 12,6 12,12 18,12 " stroke="#6b7280"></polyline>
+              </g>
+             </svg>
+             <div class="py-3 pl-2 bold">
+              <div>{{ s[0] | formatts }}</div>
+             </div>
+            </td>
+            <td class="py-3 px-6">{{ s[1] }}</td>
+           </tr>
+           {% endfor %}
+          </table>
+         </div>
+        </div>
+       </div>
+      </div>
+     </div>
+    </div>
+   </div>
+  </div>
+ </section> {% if data.events %} <section class="p-6">
+  <div class="flex flex-wrap items-center">
+   <div class="w-full">
+    <h4 class="font-semibold text-black dark:text-white text-2xl">Events</h4>
+   </div>
+  </div>
+ </section>
+ <section>
+  <div class="pl-6 pr-6 pt-0 pb-0 h-full overflow-hidden">
+   <div class="pb-6 border-coolGray-100">
+    <div class="flex flex-wrap items-center justify-between -m-2">
+     <div class="w-full pt-2">
+      <div class="container mt-5 mx-auto">
+       <div class="pt-6 pb-8 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
+        <div class="px-6">
+         <div class="w-full mt-6 pb-6 overflow-x-auto">
+          <table class="w-full min-w-max text-sm">
+           <thead class="uppercase">
+            <tr class="text-left">
+             <th class="p-0">
+              <div class="py-3 px-6 rounded-tl-xl bg-coolGray-200 dark:bg-gray-600">
+               <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Time</span>
+              </div>
+             </th>
+             <th class="p-0">
+              <div class="py-3 px-6 rounded-tr-xl bg-coolGray-200 dark:bg-gray-600">
+               <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Events</span>
+              </div>
+             </th>
+            </tr>
+           </thead> {% for e in data.events %} <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
+            <td class="flex items-center px-46 whitespace-nowrap">
+             <svg alt="" class="w-5 h-5 rounded-full  ml-5" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
+              <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
+               <circle cx="12" cy="12" r="11"></circle>
+               <polyline points=" 12,6 12,12 18,12 " stroke="#6b7280"></polyline>
+              </g>
+             </svg>
+             <div class="py-3 pl-2 bold">
+              <div>{{ e.at | formatts }}</div>
+             </div>
+            </td>
+            <td class="py-3 px-6">{{ e.desc }}</td>
+           </tr>
+           {% endfor %}
+          </table>
+         </div>
+        </div>
+       </div>
+      </div>
+     </div>
+    </div>
+   </div>
+  </div>
+ </section>
+ {% else %}
+ {% endif %}
+ <form method="post">
+  {% if data.show_txns %}
+  {% if data.xhv_b_shared_address or data.xhv_b_shared_viewkey or data.xhv_b_half_privatekey %}
+  <section class="p-6">
+   <div class="flex flex-wrap items-center">
+    <div class="w-full">
+     <h4 class="font-semibold text-black dark:text-white text-2xl">View keys/Shared Address</h4>
+    </div>
+   </div>
+  </section>
+  <section>
+   <div class="pl-6 pr-6 pt-0 pb-0 h-full overflow-hidden">
+    <div class="pb-6 border-coolGray-100">
+     <div class="flex flex-wrap items-center justify-between -m-2">
+      <div class="w-full pt-2">
+       <div class="container mt-5 mx-auto">
+        <div class="pt-6 pb-8 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
+         <div class="px-6">
+          <div class="w-full mt-6 pb-6 overflow-x-auto">
+           <table class="table w-full min-w-max text-sm">
+            <thead class="uppercase">
+             <tr class="text-left">
+              <th class="p-0">
+               <div class="py-3 px-6 rounded-tl-xl bg-coolGray-200 dark:bg-gray-600">
+                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Type</span>
+               </div>
+              </th>
+              <th class="p-0">
+               <div class="py-3 px-6 rounded-tr-xl bg-coolGray-200 dark:bg-gray-600">
+                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Output</span>
+               </div>
+              </th>
+             </tr>
+            </thead>
+            {% if data.xhv_b_shared_address %}
+            <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
+             <td class="py-3 px-6 bold">Shared Address:</td>
+             <td class="py-3 px-6 monospace">{{ data.xhv_b_shared_address }}</td>
+            </tr>
+            {% endif %}
+            {% if data.xhv_b_shared_viewkey %}
+            <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
+             <td class="py-3 px-6 bold">Shared View Key:</td>
+             <td class="py-3 px-6 monospace">{{ data.xhv_b_shared_viewkey }}</td>
+            </tr>
+            {% endif %}
+            {% if data.xhv_b_half_privatekey %}
+            <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
+             <td class="py-3 px-6 bold">Key Half (WARNING key data!):</td>
+             <td class="py-3 px-6 monospace">{{ data.xhv_b_half_privatekey }}</td>
+            </tr>
+            {% endif %}
+            {% if data.xhv_b_half_privatekey_remote %}
+            <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
+             <td class="py-3 px-6 bold">Remote Key Half:</td>
+             <td class="py-3 px-6 monospace">{{ data.xhv_b_half_privatekey_remote }}</td>
+            </tr>
+            {% endif %}
+           </table>
+          </div>
+         </div>
+        </div>
+       </div>
+      </div>
+     </div>
+    </div>
+   </div>
+  </section>
+  {% endif %}
+  <section class="p-6">
+   <div class="flex flex-wrap items-center">
+    <div class="w-full">
+     <h4 class="font-semibold text-black dark:text-white text-2xl">Transactions</h4>
+    </div>
+   </div>
+  </section>
+  <section>
+   <div class="pl-6 pr-6 pt-0 pb-0 h-full overflow-hidden">
+    <div class="pb-6 border-coolGray-100">
+     <div class="flex flex-wrap items-center justify-between -m-2">
+      <div class="w-full pt-2">
+       <div class="container mt-5 mx-auto">
+        <div class="pt-6 pb-8 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
+         <div class="px-6">
+          <div class="w-full mt-6 pb-6 overflow-x-auto">
+           <table class="w-full min-w-max text-sm">
+            <thead class="uppercase">
+             <tr class="text-left">
+              <th class="p-0">
+               <div class="py-3 px-6 rounded-tl-xl bg-coolGray-200 dark:bg-gray-600">
+                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Tx Type</span>
+               </div>
+              </th>
+              <th class="p-0">
+               <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
+                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Tx ID</span>
+               </div>
+              </th>
+              <th class="p-0">
+               <div class="py-3 px-6 rounded-tr-xl bg-coolGray-200 dark:bg-gray-600">
+                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Blocks Deep</span>
+               </div>
+              </th>
+             </tr>
+            </thead>
+            {% for tx in data.txns %}
+            <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
+             <td class="py-3 px-6 bold">{{ tx.type }}</td>
+             <td class="py-3 px-6 monospace">{{ tx.txid }}</td>
+             <td class="py-3 px-6">{{ tx.confirms }}</td>
+            </tr>
+            {% endfor %}
+           </table>
+          </div>
+         </div>
+        </div>
+       </div>
+      </div>
+     </div>
+    </div>
+   </div>
+  </section>
+  <section class="p-6">
+   <div class="flex flex-wrap items-center">
+    <div class="w-full">
+     <h4 class="font-semibold text-black dark:text-white text-2xl">More Information</h4>
+    </div>
+   </div>
+  </section>
+  <section>
+   <div class="pl-6 pr-6 pt-0 pb-0 h-full overflow-hidden">
+    <div class="pb-6 border-coolGray-100">
+     <div class="flex flex-wrap items-center justify-between -m-2">
+      <div class="w-full pt-2">
+       <div class="container mt-5 mx-auto">
+        <div class="pt-6 pb-8 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
+         <div class="px-6">
+          <div class="w-full mt-6 pb-6 overflow-x-auto">
+           <table class="w-full min-w-max text-sm">
+            <thead class="uppercase">
+             <tr class="text-left">
+              <th class="p-0">
+               <div class="py-3 px-6 rounded-tl-xl bg-coolGray-200 dark:bg-gray-600">
+                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Setting</span>
+               </div>
+              </th>
+              <th class="p-0">
+               <div class="py-3 px-6 rounded-tr-xl bg-coolGray-200 dark:bg-gray-600">
+                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Options</span>
+               </div>
+              </th>
+             </tr>
+            </thead>
+            <tr class="opacity-100 text-gray-500 dark:text-gray-100">
+             <td class="py-3 px-6 bold">View Transaction:</td>
+             <td class="py-3 px-6 bold">
+              <div class="relative">{{ input_arrow_down_svg | safe }}
+               <select class="bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="view_tx">
+                {% if data.txns|length %} {% for tx in data.txns %}
+                <option value="{{ tx.txid }}" {% if data.view_tx_ind==tx.txid %} selected{% endif %}>{{ tx.type }} {{ tx.txid }}</option>
+                {% endfor %}
+                {% else %}
+                <option value="0">None exist yet</option>
+                {% endif %}
+              </select>
+              </div>
+             </td>
+            </tr>
+           </table>
+           <div class="w-full md:w-0/12 mt-5">
+            <div class="flex flex-wrap justify-end">
+             <div class="w-full md:w-auto p-1.5 ml-2">
+              <button name="view_tx_submit" value="View Tx" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+               <span>View Tx</span>
+              </button>
+             </div>
+            <!-- Info: Unimplemented
+            <div class="w-full md:w-auto p-1.5 ml-2"><button name="view_lock_transfers" value="View Lock Wallet Transfers" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" ><span>View Lock Wallet Transfers</span></button></div>
+            -->
+            </div>
+           </div>
+           {% if data.view_tx_hex %}
+           <table class="w-full min-w-max text-sm  mt-10">
+            <thead class="uppercase">
+             <tr class="text-left">
+              <th class="p-0">
+               <div class="py-3 px-6 rounded-tl-xl rounded-tr-xl bg-coolGray-200 dark:bg-gray-600">
+                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">TX Hex:</span>
+               </div>
+              </th>
+             </tr>
+            </thead>
+            <tr class="opacity-100 text-gray-500 dark:text-gray-100">
+             <td class="py-3 px-6">
+              <textarea rows="5" class="bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0 monospace" readonly>{{ data.view_tx_hex }}</textarea>
+              <textarea rows="20" class="mt-5 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0 monospace" id="tx_view" readonly>{{ data.view_tx_desc }}</textarea>
+             </td>
+            </tr>
+            {% endif %}
+            {% if data.lock_transfers %}
+            <!--<label for="transfers_view" class="bold block mb-2 text-sm font-medium text-gray-900">Lock wallet transfers:</label>-->
+            <textarea rows="20" class="mt-5 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0 monospace" id="transfers_view" readonly>{{ data.lock_transfers }}</textarea>
+            {% endif %}
+           </table>
+          </div>
+         </div>
+        </div>
+       </div>
+      </div>
+     </div>
+    </div>
+   </div>
+  </section>
+  {% endif %}
+  {% if data.chain_a_lock_tx_inputs %}
+  <section class="p-6">
+   <div class="flex flex-wrap items-center">
+    <div class="w-full">
+     <h4 class="font-semibold text-black dark:text-white text-2xl">Chain A Lock TX Inputs</h4>
+    </div>
+   </div>
+  </section>
+  <div class="pl-6 pr-6 pt-0 pb-0 h-full overflow-hidden">
+   <div class="pb-6 border-coolGray-100">
+    <div class="flex flex-wrap items-center justify-between -m-2">
+     <div class="w-full pt-2">
+      <div class="container mt-5 mx-auto">
+       <div class="pt-6 pb-8 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
+        <div class="px-6">
+         <div class="w-full mt-6 pb-6 overflow-x-auto">
+          <table class="w-full min-w-max text-sm">
+           <thead class="uppercase">
+            <thead class="uppercase">
+             <tr class="text-left">
+              <th class="p-0">
+               <div class="py-3 px-6 rounded-tl-xl bg-coolGray-200 dark:bg-gray-600">
+                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">TXID</span>
+               </div>
+              </th>
+              <th class="p-0">
+               <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
+                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Out</span>
+               </div>
+              </th>
+              <th class="p-0">
+               <div class="py-3 px-6 rounded-tr-xl bg-coolGray-200 dark:bg-gray-600">
+                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Locked</span>
+               </div>
+              </th>
+             </tr>
+            </thead>
+            {% for txi in data.chain_a_lock_tx_inputs %}
+            <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
+             <td class="py-3 px-6 monospace">{{ txi.txid }}</td>
+             <td class="py-3 px-6 monospace">{{ txi.vout }}</td>
+             <td class="py-3 px-6 bold">{% if txi.islocked %} true {% else %} false {% endif %}</td>
+            </tr>
+            {% endfor %}
+          </table>
+         </div>
+        </div>
+       </div>
+      </div>
+     </div>
+    </div>
+   </div>
+  </div>
+  </section>
+  {% endif %}
+  {% if data.show_bidder_seq_diagram %}
+  <section class="p-6">
+   <div class="flex flex-wrap items-center">
+    <div class="w-full">
+     <h4 class="font-semibold text-black dark:text-white text-2xl">Bidder Sequence Diagram</h4>
+    </div>
+   </div>
+  </section>
+  <section>
+   <div class="pl-6 pr-6 pt-0 pb-0 h-full overflow-hidden">
+    <div class="pb-6 border-coolGray-100">
+     <div class="flex flex-wrap items-center justify-between -m-2">
+      <div class="w-full pt-2">
+       <div class="container mt-5 mx-auto">
+        <div class="pt-6 pb-8 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
+         <div class="px-6">
+          <div class="w-full mt-6 pb-6 overflow-x-auto">
+           <div class="overflow-x-auto items-center justify-center relative">
+            <div class="flex items-center justify-center min-h-screen">
+             <div class="flex items-center justify-between text-white">
+              {% if data.reverse_bid %}
+              <img class="h-full py-2 pr-4 ml-8" src="/static/sequence_diagrams/ads.rev.bidder.xu.min.svg">
+              {% else %}
+              <img class="h-full py-2 pr-4 ml-8" src="/static/sequence_diagrams/ads.bidder.alt.xu.min.svg">
+              {% endif %}
+             </div>
+            </div>
+           </div>
+          </div>
+         </div>
+        </div>
+       </div>
+      </div>
+     </div>
+    </div>
+   </div>
+  </section>
+  {% endif %}
+  {% if data.show_offerer_seq_diagram %}
+  <section class="p-6">
+   <div class="flex flex-wrap items-center">
+    <div class="w-full">
+     <h4 class="font-semibold text-black dark:text-white text-2xl">Offerer Sequence Diagram</h4>
+    </div>
+   </div>
+  </section>
+  <section>
+   <div class="pl-6 pr-6 pt-0 pb-0 h-full overflow-hidden">
+    <div class="pb-6 border-coolGray-100">
+     <div class="flex flex-wrap items-center justify-between -m-2">
+      <div class="w-full pt-2">
+       <div class="container mt-5 mx-auto">
+        <div class="pt-6 pb-8 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
+         <div class="px-6">
+          <div class="w-full mt-6 pb-6 overflow-x-auto">
+           <div class="overflow-x-auto items-center justify-center relative">
+            <div class="flex items-center justify-center min-h-screen">
+             <div class="flex items-center justify-between text-white">
+              {% if data.reverse_bid %}
+              <img class="h-full py-2 pr-4 ml-8" src="/static/sequence_diagrams/ads.rev.offerer.xu.min.svg">
+              {% else %}
+              <img class="h-full py-2 pr-4 ml-8" src="/static/sequence_diagrams/ads.offerer.alt.xu.min.svg">
+              {% endif %}
+             </div>
+            </div>
+           </div>
+          </div>
+         </div>
+        </div>
+       </div>
+      </div>
+     </div>
+    </div>
+   </div>
+  </section>
+  {% endif %}
+  {% if edit_bid %}
+  <section>
+   <div class="pl-6 pr-6 pt-0 pb-0 h-full overflow-hidden">
+    <div class="pb-6 border-coolGray-100">
+     <div class="flex flex-wrap items-center justify-between -m-2">
+      <div class="w-full pt-2">
+       <div class="container mt-5 mx-auto">
+        <div class="pt-6 pb-8 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
+         <div class="px-6">
+          <div class="w-full mt-6 pb-6 overflow-x-auto">
+           <table class="w-full min-w-max text-sm">
+            <thead class="uppercase">
+             <tr class="text-left">
+              <th class="p-0">
+               <div class="py-3 px-6 rounded-tl-xl bg-coolGray-200 dark:bg-gray-600">
+                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Option</span>
+               </div>
+              </th>
+              <th class="p-0">
+               <div class="py-3 px-6 rounded-tr-xl bg-coolGray-200 dark:bg-gray-600">
+                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Settings</span>
+               </div>
+              </th>
+             </tr>
+            </thead>
+            <tr class="opacity-100 text-gray-500 dark:text-gray-100">
+             <td class="py-3 px-6 bold">Change Bid State:</td>
+             <td class="py-3 px-6">
+              <div class="relative">{{ input_arrow_down_svg | safe }}
+               <select class="bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="new_state">
+                {% for s in data.bid_states %}
+                <option value="{{ s[0] }}" {% if data.bid_state_ind==s[0] %} selected{% endif %}>{{ s[1] }}</option>
+                {% endfor %}
+                </select>
+              </div>
+             </td>
+            </tr>
+            {% if data.debug_ui == true %}
+            <tr class="opacity-100 text-gray-500 dark:text-gray-100">
+             <td class="py-3 px-6 bold">Add Bid Action:</td>
+             <td class="py-3 px-6">
+              <div class="relative">{{ input_arrow_down_svg | safe }}
+               <select class="bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="new_action">
+                {% for a in data.bid_actions %}
+                <option value="{{ a[0] }}">{{ a[1] }}</option>
+                {% endfor %}
+                </select>
+              </div>
+             </td>
+            </tr>
+            <tr class="opacity-100 text-gray-500 dark:text-gray-100">
+             <td class="py-3 px-6 bold">Debug Option</td>
+             <td class="py-3 px-6">
+              <div class="relative">{{ input_arrow_down_svg | safe }}
+               <select class="bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="debugind">
+                <option{% if data.debug_ind=="-1" %} selected{% endif %} value="-1">None</option>
+                  {% for a in data.debug_options %}
+                  <option{% if data.debug_ind==a[0] %} selected{% endif %} value="{{ a[0] }}">{{ a[1] }}</option>
+                  {% endfor %}
+               </select>
+              </div>
+             </td>
+            </tr>
+            <tr class="opacity-100 text-gray-500 dark:text-gray-100">
+             <td class="py-3 px-6 bold">Sweep No-Script TX</td>
+             <td class="py-3 px-6">
+              <input class="bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" id="kbs_other" name="kbs_other">
+             </td>
+            </tr>
+              {% endif %}
+           </table>
+          </div>
+         </div>
+        </div>
+       </div>
+      </div>
+     </div>
+    </div>
+   </div>
+  </section>
+  <section>
+   <div class="pl-6 pr-6 pt-0 pb-0 h-full overflow-hidden">
+    <div class="pb-6 border-coolGray-100">
+     <div class="flex flex-wrap items-center justify-between -m-2">
+      <div class="w-full pt-2">
+       <div class="container mt-5 mx-auto">
+        <div class="pt-6 pb-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
+         <div class="px-6">
+          <div class="flex flex-wrap justify-end">
+           <div class="w-full md:w-auto p-1.5">
+            <button name="edit_bid_cancel" value="Cancel" type="submit" class="lex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none dark:text-white dark:hover:text-white dark:bg-gray-600 dark:hover:bg-gray-700 dark:border-gray-600 dark:hover:border-gray-600">Cancel</button>
+           </div>
+           <div class="w-full md:w-auto p-1.5">
+            <button name="edit_bid_submit" value="Submit" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">Submit Edit</button>
+           </div>
+           {% else %}
+           <section>
+            <div class="pl-6 pr-6 pt-0 pb-0 h-full overflow-hidden">
+             <div class="pb-6 border-coolGray-100">
+              <div class="flex flex-wrap items-center justify-between -m-2">
+               <div class="w-full pt-2">
+                <div class="container mt-5 mx-auto">
+                 <div class="pt-6 pb-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
+                  <div class="px-6">
+                   <div class="flex flex-wrap justify-end">
+                    {% if data.show_bidder_seq_diagram %}
+                    <div class="w-full md:w-auto p-1.5">
+                     <button name="hide_bidder_seq_diagram" type="submit" value="Hide Bidder Sequence Diagram" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md focus:ring-0 focus:outline-none dark:text-white dark:hover:text-white dark:bg-gray-600 dark:hover:bg-gray-700 dark:border-gray-600 dark:hover:border-gray-600">Hide Bidder Sequence Diagram</button>
+                    </div> {% else %} <div class="w-full md:w-auto p-1.5">
+                     <button name="show_bidder_seq_diagram" type="submit" value="Show Bidder Sequence Diagram" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md focus:ring-0 focus:outline-none dark:text-white dark:hover:text-white dark:bg-gray-600 dark:hover:bg-gray-700 dark:border-gray-600 dark:hover:border-gray-600">Show Bidder Sequence Diagram</button>
+                    </div>
+                    {% endif %}
+                    {% if data.show_offerer_seq_diagram %}
+                    <div class="w-full md:w-auto p-1.5">
+                     <button name="hide_offerer_seq_diagram" type="submit" value="Hide Offerer Sequence Diagram" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md focus:ring-0 focus:outline-none dark:text-white dark:hover:text-white dark:bg-gray-600 dark:hover:bg-gray-700 dark:border-gray-600 dark:hover:border-gray-600">Hide Offerer Sequence Diagram</button>
+                    </div>
+                    {% else %}
+                    <div class="w-full md:w-auto p-1.5">
+                     <button name="show_offerer_seq_diagram" type="submit" value="Show Offerer Sequence Diagram" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md focus:ring-0 focus:outline-none dark:text-white dark:hover:text-white dark:bg-gray-600 dark:hover:bg-gray-700 dark:border-gray-600 dark:hover:border-gray-600">Show Offerer Sequence Diagram</button>
+                    </div>
+                    {% endif %}
+                    {% if data.show_txns %}
+                    <div class="w-full md:w-auto p-1.5">
+                     <button name="hide_txns" type="submit" value="Hide Info" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md focus:ring-0 focus:outline-none dark:text-white dark:hover:text-white dark:bg-gray-600 dark:hover:bg-gray-700 dark:border-gray-600 dark:hover:border-gray-600">Hide More info</button>
+                    </div>
+                    {% else %}
+                    <div class="w-full md:w-auto p-1.5">
+                     <button name="show_txns" type="submit" value="Show More Info" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md focus:ring-0 focus:outline-none dark:text-white dark:hover:text-white dark:bg-gray-600 dark:hover:bg-gray-700 dark:border-gray-600 dark:hover:border-gray-600">Show More Info </button>
+                    </div>
+                    {% endif %}
+                    <div class="w-full md:w-auto p-1.5">
+                     <button name="edit_bid" type="submit" value="Edit Bid" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md focus:ring-0 focus:outline-none dark:text-white dark:hover:text-white dark:bg-gray-600 dark:hover:bg-gray-700 dark:border-gray-600 dark:hover:border-gray-600">Edit Bid</button>
+                    </div>
+                    {% endif %}
+                    {% if data.can_abandon == true %}
+                     <div class="w-full md:w-auto p-1.5">
+                     <button name="abandon_bid" type="submit" value="Abandon Bid" onclick="return confirmPopup();" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-white hover:text-red border border-red-500 hover:border-red-500 hover:bg-red-600 bg-red-500 rounded-md focus:ring-0 focus:outline-none">Abandon Bid</button>
+                    </div>
+                     {% endif %}
+                      {% if data.was_received == 'True' and not edit_bid and data.can_accept_bid %}
+                      <div class="w-full md:w-auto p-1.5">
+                     <button name="accept_bid" value="Accept Bid" type="submit" onclick='return confirmPopup("Accept");' class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md focus:ring-0 focus:outline-none">Accept Bid</button>
+                    </div>
+                     {% endif %}
+                    </div>
+                  </div>
+                 </div>
+                </div>
+               </div>
+              </div>
+             </div>
+            </div>
+           </section>
+           <input type="hidden" name="formid" value="{{ form_id }}">
+          </div>
+         </div>
+        </div>
+       </div>
+ </form>
+ <script>
+  function confirmPopup(name) {
+   return confirm(name + " Bid - Are you sure?");
+  }
+ </script>
+</div>
+{% include 'footer.html' %}
+</body>
+</html>

@@ -136,6 +136,40 @@ def test_settings(driver):
         settings = json.load(fs)
     assert (len(settings['chainclients']['monero']['remote_daemon_urls']) == 0)
 
+    # Apply XHV settings with blank nodes list
+    driver.find_element(By.ID, 'coins-tab').click()
+    btn_apply_haven = wait.until(EC.element_to_be_clickable((By.NAME, 'apply_haven')))
+    el = driver.find_element(By.NAME, 'remotedaemonurls_haven')
+    el.clear()
+    btn_apply_haven.click()
+    time.sleep(1)
+
+    with open(settings_path_0) as fs:
+        settings = json.load(fs)
+    assert (len(settings['chainclients']['haven']['remote_daemon_urls']) == 0)
+
+    btn_apply_haven = wait.until(EC.element_to_be_clickable((By.NAME, 'apply_haven')))
+    el = driver.find_element(By.NAME, 'remotedaemonurls_haven')
+    el.clear()
+    el.send_keys('remote.haven.miner.rocks:17750\nsg.haven.miner.rocks:30031')
+    btn_apply_haven.click()
+    time.sleep(1)
+
+    with open(settings_path_0) as fs:
+        settings = json.load(fs)
+    remotedaemonurls = settings['chainclients']['haven']['remote_daemon_urls']
+    assert (len(remotedaemonurls) == 2)
+
+    btn_apply_haven = wait.until(EC.element_to_be_clickable((By.NAME, 'apply_haven')))
+    el = driver.find_element(By.NAME, 'remotedaemonurls_haven')
+    el.clear()
+    btn_apply_haven.click()
+    time.sleep(1)
+
+    with open(settings_path_0) as fs:
+        settings = json.load(fs)
+    assert (len(settings['chainclients']['haven']['remote_daemon_urls']) == 0)
+
     print('Test Passed!')
 
 

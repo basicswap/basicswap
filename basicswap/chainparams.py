@@ -14,6 +14,7 @@ from .util import (
     TemporaryError,
 )
 
+XHV_COIN = 10 ** 12
 XMR_COIN = 10 ** 12
 
 
@@ -33,6 +34,7 @@ class Coins(IntEnum):
     FIRO = 13
     NAV = 14
     LTC_MWEB = 15
+    XHV = 16
 
 
 chainparams = {
@@ -369,6 +371,30 @@ chainparams = {
             'bip44': 1,
             'min_amount': 1000,
             'max_amount': 100000 * COIN,
+        }
+    },
+    Coins.XHV: {
+        'name': 'haven',
+        'ticker': 'XHV',
+        'client': 'xhv',
+        'decimal_places': 12,
+        'mainnet': {
+            'rpcport': 17750,
+            'walletrpcport': 17751,
+            'min_amount': 100000,
+            'max_amount': 10000 * XHV_COIN,
+        },
+        'testnet': {
+            'rpcport': 27750,
+            'walletrpcport': 27751,
+            'min_amount': 100000,
+            'max_amount': 10000 * XHV_COIN,
+        },
+        'regtest': {
+            'rpcport': 17750,
+            'walletrpcport': 17751,
+            'min_amount': 100000,
+            'max_amount': 10000 * XHV_COIN,
         }
     }
 }

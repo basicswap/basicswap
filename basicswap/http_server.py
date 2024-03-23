@@ -329,6 +329,8 @@ class HttpHandler(BaseHTTPRequestHandler):
         coins = listAvailableCoins(swap_client, with_variants=False)
         with_xmr: bool = any(c[0] == Coins.XMR for c in coins)
         coins = [c for c in coins if c[0] != Coins.XMR]
+        with_xhv: bool = any(c[0] == Coins.XHV for c in coins)
+        coins = [c for c in coins if c[0] != Coins.XHV]
 
         if any(c[0] == Coins.LTC for c in coins):
             coins.append((-5, 'Litecoin MWEB Wallet'))
@@ -336,6 +338,10 @@ class HttpHandler(BaseHTTPRequestHandler):
             coins.append((-2, 'Monero'))
             coins.append((-3, 'Monero JSON'))
             coins.append((-4, 'Monero Wallet'))
+        if with_xhv:
+            coins.append((-2, 'Haven'))
+            coins.append((-3, 'Haven JSON'))
+            coins.append((-4, 'Haven Wallet'))
 
         return self.render_template(template, {
             'messages': messages,

@@ -8,6 +8,8 @@
             - ${DATA_PATH}/swapclient:/data/swapclient
             - ${DATA_PATH}/monero_daemon:/data/monero_daemon
             - ${DATA_PATH}/monero_wallet:/data/monero_wallet
+            - ${DATA_PATH}/haven_daemon:/data/haven_daemon
+            - ${DATA_PATH}/haven_wallet:/data/haven_wallet
             - ${DATA_PATH}/particl:/data/particl
             - ${DATA_PATH}/bitcoin:/data/bitcoin
             - ${DATA_PATH}/litecoin:/data/litecoin
@@ -45,6 +47,16 @@
             - XMR_WALLET_RPC_USER
             - XMR_WALLET_RPC_PWD
             - DEFAULT_XMR_RESTORE_HEIGHT
+            - XHV_DATA_DIR
+            - XHV_RPC_HOST
+            - BASE_XHV_RPC_PORT
+            - BASE_XHV_ZMQ_PORT
+            - XHV_WALLETS_DIR
+            - XHV_WALLET_RPC_HOST
+            - BASE_XHV_WALLET_PORT
+            - XHV_WALLET_RPC_USER
+            - XHV_WALLET_RPC_PWD
+            - DEFAULT_XHV_RESTORE_HEIGHT
             - PIVX_DATA_DIR
             - PIVX_RPC_HOST
             - PIVX_RPC_PORT
