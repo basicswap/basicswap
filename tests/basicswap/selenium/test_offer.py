@@ -88,6 +88,7 @@ def test_offer(driver):
 
     print('Test Passed!')
 
+# didn't do test_offer_for_xhv
 
 def run_tests():
     driver = get_driver()

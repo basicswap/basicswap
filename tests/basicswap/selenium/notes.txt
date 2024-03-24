@@ -1,2 +1,3 @@
 python tests/basicswap/extended/test_xmr_persistent.py
+python tests/basicswap/extended/test_xhv_persistent.py
 python tests/basicswap/selenium/test_wallets.py

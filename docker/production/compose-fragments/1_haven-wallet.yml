@@ -1,0 +1,16 @@
+    haven_wallet:
+        image: i_haven_wallet
+        build:
+            context: haven_wallet
+            dockerfile: Dockerfile
+        container_name: haven_wallet
+        volumes:
+            - ${DATA_PATH}/haven_wallet:/data
+        expose:
+            - ${BASE_XHV_WALLET_PORT}
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "3"
+        restart: unless-stopped

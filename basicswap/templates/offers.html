@@ -128,6 +128,40 @@
   </div>
   </div>
 
+
+      <div class="w-full sm:w-1/2 lg:w-1/6 p-3" id="xhv-container">
+        <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-2xl dark:text-white price-container">
+      <div class="flex items-center">
+          <img src="/static/images/coins/Haven.png" class="rounded-xl" style="width: 35px; height: 35px; object-fit: contain;" alt="Haven">
+          <p class="ml-2 text-black text-sm dark:text-white">
+              Haven (XHV)
+          </p>
+      </div>
+      <div class="flex flex-col justify-start">
+          <p class="my-2 text-xl font-bold text-left text-gray-700 dark:text-gray-100" id="xhv-price-usd">
+              <span class="text-sm">
+                  <span id="xhv-price-usd-value"></span>
+          </p>
+          <div class="flex items-center text-sm">
+              <div class="w-auto">
+                <div id="xhv-price-change-container" class="w-auto p-1"></div>
+              </div>
+          </div>
+          <div class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2">
+            <span class="bold mr-2">VOL:</span>
+              <div id="xhv-volume-24h">
+              </div>
+          </div>
+          <div class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2">
+              <span class="bold mr-2">BTC:</span>
+              <span id="xhv-price-btc">
+              </span>
+          </div>
+      </div>
+  </div>
+  </div>
+
+
   <div class="w-full sm:w-1/2 lg:w-1/6 p-3" id="part-container">
     <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-2xl dark:text-white">
         <div class="flex items-center">
@@ -366,7 +400,7 @@
   <script>
     window.addEventListener('load', function() {
     const api_key = '{{chart_api_key}}';
-    const coins = ['BTC', 'PART', 'XMR', 'LTC', 'FIRO', 'DASH', 'PIVX', 'DOGE', 'ETH'];
+    const coins = ['BTC', 'PART', 'XMR', 'XHV', 'LTC', 'FIRO', 'DASH', 'PIVX', 'DOGE', 'ETH'];
     coins.forEach(coin => {
         fetch(`https://min-api.cryptocompare.com/data/pricemultifull?fsyms=${coin}&tsyms=USD,BTC&api_key=${api_key}`)
             .then(response => {
@@ -451,7 +485,7 @@ function negativePriceChangeHTML(value) {
 }
 
 function setActiveContainer(containerId) {
-  const containerIds = ['btc-container', 'xmr-container', 'part-container', 'pivx-container', 'firo-container', 'dash-container', 'ltc-container', 'doge-container', 'eth-container'];
+  const containerIds = ['btc-container', 'xmr-container', 'xhv-container', 'part-container', 'pivx-container', 'firo-container', 'dash-container', 'ltc-container', 'doge-container', 'eth-container'];
   const activeClass = 'active-container';
   containerIds.forEach(id => {
     const container = document.getElementById(id);
@@ -471,6 +505,10 @@ document.getElementById('btc-container').addEventListener('click', () => {
 document.getElementById('xmr-container').addEventListener('click', () => {
   setActiveContainer('xmr-container');
   updateChart('XMR');
+});
+document.getElementById('xhv-container').addEventListener('click', () => {
+  setActiveContainer('xhv-container');
+  updateChart('XHV');
 });
 document.getElementById('part-container').addEventListener('click', () => {
   setActiveContainer('part-container');
@@ -1075,6 +1113,7 @@ const coinNameToSymbol = {
     'Particl Blind': 'PART',
     'Particl Anon': 'PART',
     'Monero': 'XMR',
+    'Haven': 'XHV',
     'Litecoin': 'LTC',
     'Firo': 'FIRO',
     'Dash': 'DASH',
