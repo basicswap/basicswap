@@ -67,6 +67,7 @@ def dumpje(jin):
 
 
 def SerialiseNum(n: int) -> bytes:
+    # For script
     if n == 0:
         return bytes((0x00,))
     if n > 0 and n <= 16:
@@ -85,6 +86,7 @@ def SerialiseNum(n: int) -> bytes:
 
 
 def DeserialiseNum(b: bytes, o: int = 0) -> int:
+    # For script
     if b[o] == 0:
         return 0
     if b[o] > 0x50 and b[o] <= 0x50 + 16:

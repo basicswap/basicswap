@@ -22,9 +22,11 @@ from coincurve.keys import (
     PrivateKey)
 
 from basicswap.util import i2b, h2b
+from basicswap.util.integer import encode_varint, decode_varint
 from basicswap.util.crypto import ripemd160, hash160
 from basicswap.util.network import is_private_ip_address
 from basicswap.util.rfc2440 import rfc2440_hash_password
+from basicswap.util_xmr import encode_address as xmr_encode_address
 from basicswap.interface.btc import BTCInterface
 from basicswap.interface.xmr import XMRInterface
 
@@ -346,6 +348,35 @@ class Test(unittest.TestCase):
 
         assert (is_private_ip_address('20.87.245.0') is False)
         assert (is_private_ip_address('particl.io') is False)
+
+    def test_varint(self):
+        def test_case(i, expect_length):
+            b = encode_varint(i)
+            assert (len(b) == expect_length)
+            assert (decode_varint(b) == i)
+
+        test_case(0, 1)
+        test_case(1, 1)
+        test_case(127, 1)
+        test_case(128, 2)
+        test_case(253, 2)
+        test_case(8321, 2)
+        test_case(16383, 2)
+        test_case(16384, 3)
+        test_case(2097151, 3)
+        test_case(2097152, 4)
+
+    def test_base58(self):
+        kv = edu.get_secret()
+        Kv = edu.encodepoint(edf.scalarmult_B(kv))
+        ks = edu.get_secret()
+        Ks = edu.encodepoint(edf.scalarmult_B(ks))
+
+        addr = xmr_encode_address(Kv, Ks)
+        assert (addr.startswith('4'))
+
+        addr = xmr_encode_address(Kv, Ks, 4146)
+        assert (addr.startswith('Wo'))
 
 
 if __name__ == '__main__':

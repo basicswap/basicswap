@@ -81,6 +81,8 @@ class XMRInterface(CoinInterface):
     def __init__(self, coin_settings, network, swap_client=None):
         super().__init__(network)
 
+        self._addr_prefix = self.chainparams_network()['address_prefix']
+
         self.blocks_confirmed = coin_settings['blocks_confirmed']
         self._restore_height = coin_settings.get('restore_height', 0)
         self.setFeePriority(coin_settings.get('fee_priority', 2))
@@ -165,7 +167,7 @@ class XMRInterface(CoinInterface):
 
             Kbv = self.getPubkey(key_view)
             Kbs = self.getPubkey(key_spend)
-            address_b58 = xmr_util.encode_address(Kbv, Kbs)
+            address_b58 = xmr_util.encode_address(Kbv, Kbs, self._addr_prefix)
 
             params = {
                 'filename': self._wallet_filename,
@@ -289,7 +291,7 @@ class XMRInterface(CoinInterface):
     def getAddressFromKeys(self, key_view: bytes, key_spend: bytes) -> str:
         pk_view = self.getPubkey(key_view)
         pk_spend = self.getPubkey(key_spend)
-        return xmr_util.encode_address(pk_view, pk_spend)
+        return xmr_util.encode_address(pk_view, pk_spend, self._addr_prefix)
 
     def verifyKey(self, k: int) -> bool:
         i = b2i(k)
@@ -317,7 +319,7 @@ class XMRInterface(CoinInterface):
         return ed25519_add(Ka, Kb)
 
     def encodeSharedAddress(self, Kbv: bytes, Kbs: bytes) -> str:
-        return xmr_util.encode_address(Kbv, Kbs)
+        return xmr_util.encode_address(Kbv, Kbs, self._addr_prefix)
 
     def publishBLockTx(self, kbv: bytes, Kbs: bytes, output_amount: int, feerate: int, unlock_time: int = 0) -> bytes:
         with self._mx_wallet:
@@ -325,7 +327,7 @@ class XMRInterface(CoinInterface):
             self.rpc_wallet('refresh')
 
             Kbv = self.getPubkey(kbv)
-            shared_addr = xmr_util.encode_address(Kbv, Kbs)
+            shared_addr = xmr_util.encode_address(Kbv, Kbs, self._addr_prefix)
 
             params = {'destinations': [{'amount': output_amount, 'address': shared_addr}], 'unlock_time': unlock_time}
             if self._fee_priority > 0:
@@ -339,7 +341,7 @@ class XMRInterface(CoinInterface):
     def findTxB(self, kbv, Kbs, cb_swap_value, cb_block_confirmed, restore_height, bid_sender):
         with self._mx_wallet:
             Kbv = self.getPubkey(kbv)
-            address_b58 = xmr_util.encode_address(Kbv, Kbs)
+            address_b58 = xmr_util.encode_address(Kbv, Kbs, self._addr_prefix)
 
             kbv_le = kbv[::-1]
             params = {
@@ -417,7 +419,7 @@ class XMRInterface(CoinInterface):
         with self._mx_wallet:
             Kbv = self.getPubkey(kbv)
             Kbs = self.getPubkey(kbs)
-            address_b58 = xmr_util.encode_address(Kbv, Kbs)
+            address_b58 = xmr_util.encode_address(Kbv, Kbs, self._addr_prefix)
 
             wallet_filename = address_b58 + '_spend'
 
@@ -504,7 +506,7 @@ class XMRInterface(CoinInterface):
         with self._mx_wallet:
             try:
                 Kbv = self.getPubkey(kbv)
-                address_b58 = xmr_util.encode_address(Kbv, Kbs)
+                address_b58 = xmr_util.encode_address(Kbv, Kbs, self._addr_prefix)
                 wallet_file = address_b58 + '_spend'
                 try:
                     self.openWallet(wallet_file)

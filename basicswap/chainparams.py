@@ -200,18 +200,21 @@ chainparams = {
             'walletrpcport': 18082,
             'min_amount': 100000,
             'max_amount': 10000 * XMR_COIN,
+            'address_prefix': 18,
         },
         'testnet': {
             'rpcport': 28081,
             'walletrpcport': 28082,
             'min_amount': 100000,
             'max_amount': 10000 * XMR_COIN,
+            'address_prefix': 18,
         },
         'regtest': {
             'rpcport': 18081,
             'walletrpcport': 18082,
             'min_amount': 100000,
             'max_amount': 10000 * XMR_COIN,
+            'address_prefix': 18,
         }
     },
     Coins.PIVX: {
