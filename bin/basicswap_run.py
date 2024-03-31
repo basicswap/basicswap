@@ -118,13 +118,16 @@ def startXmrWalletDaemon(node_dir, bin_dir, wallet_bin, opts=[]):
     config_to_remove = ['daemon-address=', 'untrusted-daemon=', 'trusted-daemon=', 'proxy=']
 
     data_dir = os.path.expanduser(node_dir)
-    config_path = os.path.join(data_dir, 'monero_wallet.conf')
+
+    config_path = os.path.join(data_dir, wallet_bin + '.conf')
+    if wallet_bin == 'monero-wallet-rpc':  # backward compatible filename.
+        config_path = os.path.join(data_dir, 'monero_wallet.conf')
     if os.path.exists(config_path):
         args += ['--config-file=' + config_path]
         with open(config_path) as fp:
             for line in fp:
                 if any(line.startswith(config_line) for config_line in config_to_remove):
-                    logging.warning('Found old config in monero_wallet.conf: {}'.format(line.strip()))
+                    logging.warning('Found old wallet config: {}'.format(line.strip()))
                     needs_rewrite = True
     args += opts
 

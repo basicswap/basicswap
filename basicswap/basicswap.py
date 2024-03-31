@@ -803,6 +803,8 @@ class BasicSwap(BaseApp):
             if self.coin_clients[c]['connection_type'] == 'rpc':
                 ci = self.ci(c)
                 self.waitForDaemonRPC(c)
+                if c not in (Coins.XMR, Coins.WOW,) and ci.checkWallets() >= 1:
+                    self.waitForDaemonRPC(c)
 
                 core_version = ci.getDaemonVersion()
                 self.log.info('%s Core version %d', ci.coin_name(), core_version)
@@ -895,7 +897,7 @@ class BasicSwap(BaseApp):
         self.log.info('Scanned %d unread messages.', nm)
 
     def stopDaemon(self, coin) -> None:
-        if coin in (Coins.XMR, Coins.DCR, Coins.WOW):
+        if coin in (Coins.XMR, Coins.WOW, Coins.DCR):
             return
         num_tries = 10
         authcookiepath = os.path.join(self.getChainDatadirPath(coin), '.cookie')

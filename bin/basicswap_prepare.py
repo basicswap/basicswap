@@ -682,6 +682,31 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
         if not os.path.exists(assert_path):
             downloadFile(assert_url, assert_path)
 
+    elif coin == 'wownero':
+        use_file_ext = 'tar.bz2' if FILE_EXT == 'tar.gz' else FILE_EXT
+        release_filename = '{}-{}-{}.{}'.format(coin, version, BIN_ARCH, use_file_ext)
+        if os_name == 'osx':
+            os_name = 'mac'
+
+        architecture = 'x64'
+        release_url = 'https://git.wownero.com/attachments/280753b0-3af0-4a78-a248-8b925e8f4593'
+        if 'aarch64' in BIN_ARCH:
+            architecture = 'armv8'
+            release_url = 'https://git.wownero.com/attachments/0869ffe3-eeff-4240-a185-168ca80fa1e3'
+        elif 'arm' in BIN_ARCH:
+            architecture = 'armv7'  # 32bit doesn't work
+            release_url = 'https://git.wownero.com/attachments/ff0c4886-3865-4670-9bc6-63dd60ded0e3'
+
+        release_path = os.path.join(bin_dir, release_filename)
+        if not os.path.exists(release_path):
+            downloadFile(release_url, release_path)
+
+        assert_filename = 'wownero-{}-hashes.txt'.format(version)
+        assert_url = 'https://git.wownero.com/wownero/wownero.org-website/raw/commit/{}/hashes.txt'.format(WOW_SITE_COMMIT)
+        assert_path = os.path.join(bin_dir, assert_filename)
+        if not os.path.exists(assert_path):
+            downloadFile(assert_url, assert_path)
+
     elif coin == 'decred':
         arch_name = BIN_ARCH
         if USE_PLATFORM == 'Darwin':
@@ -1862,6 +1887,28 @@ def main():
             'walletrpctimeoutlong': 600,
             'core_type_group': 'xmr',
         },
+        'wownero': {
+            'connection_type': 'rpc' if 'wownero' in with_coins else 'none',
+            'manage_daemon': True if ('wownero' in with_coins and WOW_RPC_HOST == '127.0.0.1') else False,
+            'manage_wallet_daemon': True if ('wownero' in with_coins and WOW_WALLET_RPC_HOST == '127.0.0.1') else False,
+            'rpcport': BASE_WOW_RPC_PORT + port_offset,
+            'zmqport': BASE_WOW_ZMQ_PORT + port_offset,
+            'walletrpcport': BASE_WOW_WALLET_PORT + port_offset,
+            'rpchost': WOW_RPC_HOST,
+            'trusted_daemon': extra_opts.get('trust_remote_node', 'auto'),
+            'walletrpchost': WOW_WALLET_RPC_HOST,
+            'walletrpcuser': WOW_WALLET_RPC_USER,
+            'walletrpcpassword': WOW_WALLET_RPC_PWD,
+            'walletfile': 'swap_wallet',
+            'datadir': os.getenv('WOW_DATA_DIR', os.path.join(data_dir, 'wownero')),
+            'bindir': os.path.join(bin_dir, 'wownero'),
+            'restore_height': wow_restore_height,
+            'blocks_confirmed': 2,
+            'rpctimeout': 60,
+            'walletrpctimeout': 120,
+            'walletrpctimeoutlong': 600,
+            'core_type_group': 'xmr',
+        },
         'pivx': {
             'connection_type': 'rpc' if 'pivx' in with_coins else 'none',
             'manage_daemon': True if ('pivx' in with_coins and PIVX_RPC_HOST == '127.0.0.1') else False,
@@ -1920,28 +1967,6 @@ def main():
             'core_version_group': 18,
             'chain_lookups': 'local',
             'startup_tries': 40,
-        },
-        'wownero': {
-            'connection_type': 'rpc' if 'wownero' in with_coins else 'none',
-            'manage_daemon': True if ('wownero' in with_coins and WOW_RPC_HOST == '127.0.0.1') else False,
-            'manage_wallet_daemon': True if ('wownero' in with_coins and WOW_WALLET_RPC_HOST == '127.0.0.1') else False,
-            'rpcport': BASE_WOW_RPC_PORT + port_offset,
-            'zmqport': BASE_WOW_ZMQ_PORT + port_offset,
-            'walletrpcport': BASE_WOW_WALLET_PORT + port_offset,
-            'rpchost': WOW_RPC_HOST,
-            'trusted_daemon': extra_opts.get('trust_remote_node', 'auto'),
-            'walletrpchost': WOW_WALLET_RPC_HOST,
-            'walletrpcuser': WOW_WALLET_RPC_USER,
-            'walletrpcpassword': WOW_WALLET_RPC_PWD,
-            'walletfile': 'swap_wallet',
-            'datadir': os.getenv('WOW_DATA_DIR', os.path.join(data_dir, 'wownero')),
-            'bindir': os.path.join(bin_dir, 'wownero'),
-            'restore_height': wow_restore_height,
-            'blocks_confirmed': 2,
-            'rpctimeout': 60,
-            'walletrpctimeout': 120,
-            'walletrpctimeoutlong': 300,
-            'core_type_group': 'xmr',
         }
     }
 
