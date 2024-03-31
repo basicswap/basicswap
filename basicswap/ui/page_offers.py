@@ -89,7 +89,7 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
         page_data['coin_from'] = getCoinType(get_data_entry(form_data, 'coin_from'))
         coin_from = Coins(page_data['coin_from'])
         ci_from = swap_client.ci(coin_from)
-        if coin_from != Coins.XMR:
+        if coin_from not in (Coins.XMR, Coins.WOW):
             page_data['fee_from_conf'] = ci_from._conf_target  # Set default value
         parsed_data['coin_from'] = coin_from
     except Exception:
@@ -99,7 +99,7 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
         page_data['coin_to'] = getCoinType(get_data_entry(form_data, 'coin_to'))
         coin_to = Coins(page_data['coin_to'])
         ci_to = swap_client.ci(coin_to)
-        if coin_to != Coins.XMR:
+        if coin_to not in (Coins.XMR, Coins.WOW):
             page_data['fee_to_conf'] = ci_to._conf_target  # Set default value
         parsed_data['coin_to'] = coin_to
     except Exception:
@@ -161,7 +161,7 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
         page_data['swap_type'] = get_data_entry(form_data, 'swap_type')
         parsed_data['swap_type'] = page_data['swap_type']
         swap_type = swap_type_from_string(parsed_data['swap_type'])
-    elif parsed_data['coin_to'] in (Coins.XMR, Coins.PART_ANON):
+    elif parsed_data['coin_to'] in (Coins.XMR, Coins.WOW, Coins.PART_ANON):
         parsed_data['swap_type'] = strSwapType(SwapTypes.XMR_SWAP)
         swap_type = SwapTypes.XMR_SWAP
     else:
@@ -243,7 +243,7 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
                 page_data['amt_from_lock_spend_tx_fee'] = ci_from.format_amount(lock_spend_tx_fee // ci_from.COIN())
                 page_data['tla_from'] = ci_from.ticker()
 
-            if ci_to == Coins.XMR:
+            if ci_to in (Coins.XMR, Coins.WOW):
                 if have_data_entry(form_data, 'fee_rate_to'):
                     page_data['to_fee_override'] = get_data_entry(form_data, 'fee_rate_to')
                     parsed_data['to_fee_override'] = page_data['to_fee_override']
@@ -267,7 +267,7 @@ def postNewOfferFromParsed(swap_client, parsed_data):
     if 'swap_type' in parsed_data:
         str_swap_type = parsed_data['swap_type'].lower()
         swap_type = swap_type_from_string(str_swap_type)
-    elif parsed_data['coin_to'] in (Coins.XMR, Coins.PART_ANON):
+    elif parsed_data['coin_to'] in (Coins.XMR, Coins.WOW, Coins.PART_ANON):
         swap_type = SwapTypes.XMR_SWAP
 
     if swap_type == SwapTypes.XMR_SWAP:

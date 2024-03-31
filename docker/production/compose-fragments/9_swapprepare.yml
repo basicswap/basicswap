@@ -8,6 +8,8 @@
             - ${DATA_PATH}/swapclient:/data/swapclient
             - ${DATA_PATH}/monero_daemon:/data/monero_daemon
             - ${DATA_PATH}/monero_wallet:/data/monero_wallet
+            - ${DATA_PATH}/wownero_daemon:/data/wownero_daemon
+            - ${DATA_PATH}/wownero_wallet:/data/wownero_wallet
             - ${DATA_PATH}/particl:/data/particl
             - ${DATA_PATH}/bitcoin:/data/bitcoin
             - ${DATA_PATH}/litecoin:/data/litecoin
@@ -45,6 +47,16 @@
             - XMR_WALLET_RPC_USER
             - XMR_WALLET_RPC_PWD
             - DEFAULT_XMR_RESTORE_HEIGHT
+            - WOW_DATA_DIR
+            - WOW_RPC_HOST
+            - BASE_WOW_RPC_PORT
+            - BASE_WOW_ZMQ_PORT
+            - WOW_WALLETS_DIR
+            - WOW_WALLET_RPC_HOST
+            - BASE_WOW_WALLET_PORT
+            - WOW_WALLET_RPC_USER
+            - WOW_WALLET_RPC_PWD
+            - DEFAULT_WOW_RESTORE_HEIGHT
             - PIVX_DATA_DIR
             - PIVX_RPC_HOST
             - PIVX_RPC_PORT

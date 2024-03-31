@@ -10,6 +10,7 @@ from .util import (
 )
 
 XMR_COIN = 10 ** 12
+WOW_COIN = 10 ** 11
 
 
 class Coins(IntEnum):
@@ -21,13 +22,14 @@ class Coins(IntEnum):
     XMR = 6
     PART_BLIND = 7
     PART_ANON = 8
-    # ZANO = 9
+    WOW = 9
     # NDAU = 10
     PIVX = 11
     DASH = 12
     FIRO = 13
     NAV = 14
     LTC_MWEB = 15
+    # ZANO = 16 was 9
 
 
 chainparams = {
@@ -245,6 +247,33 @@ chainparams = {
             'min_amount': 100000,
             'max_amount': 10000 * XMR_COIN,
             'address_prefix': 18,
+        }
+    },
+    Coins.WOW: {
+        'name': 'wownero',
+        'ticker': 'WOW',
+        'client': 'wow',
+        'decimal_places': 11,
+        'mainnet': {
+            'rpcport': 34568,
+            'walletrpcport': 34572,  # todo
+            'min_amount': 100000,
+            'max_amount': 10000 * WOW_COIN,
+            'address_prefix': 4146,
+        },
+        'testnet': {
+            'rpcport': 44568,
+            'walletrpcport': 44572,
+            'min_amount': 100000,
+            'max_amount': 10000 * WOW_COIN,
+            'address_prefix': 4146,
+        },
+        'regtest': {
+            'rpcport': 54568,
+            'walletrpcport': 54572,
+            'min_amount': 100000,
+            'max_amount': 10000 * WOW_COIN,
+            'address_prefix': 4146,
         }
     },
     Coins.PIVX: {

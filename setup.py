@@ -29,6 +29,7 @@ setuptools.setup(
         "particl",
         "bitcoin",
         "monero",
+        "wownero",
     ],
     install_requires=[
         "wheel",

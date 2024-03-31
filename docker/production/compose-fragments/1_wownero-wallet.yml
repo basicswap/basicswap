@@ -1,0 +1,16 @@
+    wownero_wallet:
+        image: i_wownero_wallet
+        build:
+            context: wownero_wallet
+            dockerfile: Dockerfile
+        container_name: wownero_wallet
+        volumes:
+            - ${DATA_PATH}/wownero_wallet:/data
+        expose:
+            - ${BASE_WOW_WALLET_PORT}
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "3"
+        restart: unless-stopped

@@ -57,12 +57,12 @@ def main():
             if coin_name == 'particl':
                 # Nothing to do
                 continue
-            if coin_name == 'monero':
-                with open(os.path.join(fragments_dir, '1_monero-wallet.yml'), 'rb') as fp_in:
+            if coin_name in ('monero', 'wownero'):
+                with open(os.path.join(fragments_dir, '1_{coin_name}-wallet.yml'), 'rb') as fp_in:
                     for line in fp_in:
                         fp.write(line)
                         fpp.write(line)
-                with open(os.path.join(fragments_dir, '8_monero-daemon.yml'), 'rb') as fp_in:
+                with open(os.path.join(fragments_dir, '8_{coin_name}-daemon.yml'), 'rb') as fp_in:
                     for line in fp_in:
                         fp.write(line)
                 continue
