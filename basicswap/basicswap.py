@@ -34,6 +34,7 @@ from .interface.part import PARTInterface, PARTInterfaceAnon, PARTInterfaceBlind
 from . import __version__
 from .rpc import escape_rpcauth
 from .rpc_xmr import make_xmr_rpc2_func
+from .rpc_wow import make_wow_rpc2_func
 from .ui.util import getCoinName, known_chart_coins
 from .util import (
     AutomationConstraint,
@@ -180,6 +181,21 @@ def threadPollXMRChainState(swap_client, coin_type):
         swap_client.chainstate_delay_event.wait(random.randrange(20, 30))  # Random to stagger updates
 
 
+def threadPollWOWChainState(swap_client, coin_type):
+    ci = swap_client.ci(coin_type)
+    cc = swap_client.coin_clients[coin_type]
+    while not swap_client.chainstate_delay_event.is_set():
+        try:
+            new_height = ci.getChainHeight()
+            if new_height != cc['chain_height']:
+                swap_client.log.debug('New {} block at height: {}'.format(ci.ticker(), new_height))
+                with swap_client.mxDB:
+                    cc['chain_height'] = new_height
+        except Exception as e:
+            swap_client.log.warning('threadPollWOWChainState {}, error: {}'.format(ci.ticker(), str(e)))
+        swap_client.chainstate_delay_event.wait(random.randrange(20, 30))  # Random to stagger updates
+
+
 def threadPollChainState(swap_client, coin_type):
     ci = swap_client.ci(coin_type)
     cc = swap_client.coin_clients[coin_type]
@@ -281,7 +297,7 @@ class BasicSwap(BaseApp):
 
         # TODO: Set dynamically
         self.balance_only_coins = (Coins.LTC_MWEB, )
-        self.scriptless_coins = (Coins.XMR, Coins.PART_ANON, Coins.FIRO)
+        self.scriptless_coins = (Coins.XMR, Coins.WOW, Coins.PART_ANON, Coins.FIRO)
         self.adaptor_swap_only_coins = self.scriptless_coins + (Coins.PART_BLIND, )
         self.coins_without_segwit = (Coins.PIVX, Coins.DASH, Coins.NMC)
 
@@ -523,7 +539,7 @@ class BasicSwap(BaseApp):
         if self.coin_clients[coin]['connection_type'] == 'rpc':
             if coin == Coins.DCR:
                 self.coin_clients[coin]['walletrpcport'] = chain_client_settings['walletrpcport']
-            elif coin == Coins.XMR:
+            elif coin in (Coins.XMR, Coins.WOW):
                 self.coin_clients[coin]['rpctimeout'] = chain_client_settings.get('rpctimeout', 60)
                 self.coin_clients[coin]['walletrpctimeout'] = chain_client_settings.get('walletrpctimeout', 120)
                 self.coin_clients[coin]['walletrpctimeoutlong'] = chain_client_settings.get('walletrpctimeoutlong', 600)
@@ -561,9 +577,9 @@ class BasicSwap(BaseApp):
         if self.use_tor_proxy:
             have_cc_tor_opt = 'use_tor' in chain_client_settings
             if have_cc_tor_opt and chain_client_settings['use_tor'] is False:
-                self.log.warning('use_tor is true for system but false for XMR.')
+                self.log.warning('use_tor is true for system but false for ' + coin + '.')
             elif have_cc_tor_opt is False and is_private_ip_address(node_host):
-                self.log.warning(f'Not using proxy for XMR node at private ip address {node_host}.')
+                self.log.warning(f'Not using proxy for {coin} node at private ip address {node_host}.')
             else:
                 proxy_host = self.tor_proxy_host
                 proxy_port = self.tor_proxy_port
@@ -585,7 +601,10 @@ class BasicSwap(BaseApp):
             if proxy_host:
                 self.log.info(f'Connecting through proxy at {proxy_host}.')
 
-            return make_xmr_rpc2_func(rpcport, daemon_login, rpchost, proxy_host=proxy_host, proxy_port=proxy_port)
+            if coin == Coins.XMR:
+                return make_xmr_rpc2_func(rpcport, daemon_login, rpchost, proxy_host=proxy_host, proxy_port=proxy_port)
+            if coin == Coins.WOW:
+                return make_wow_rpc2_func(rpcport, daemon_login, rpchost, proxy_host=proxy_host, proxy_port=proxy_port)
 
         daemon_login = None
         if coin_settings.get('rpcuser', '') != '':
@@ -687,6 +706,12 @@ class BasicSwap(BaseApp):
             chain_client_settings = self.getChainClientSettings(coin)
             xmr_i.setWalletFilename(chain_client_settings['walletfile'])
             return xmr_i
+        elif coin == Coins.WOW:
+            from .interface.wow import WOWInterface
+            wow_i = WOWInterface(self.coin_clients[coin], self.chain, self)
+            chain_client_settings = self.getChainClientSettings(coin)
+            wow_i.setWalletFilename(chain_client_settings['walletfile'])
+            return wow_i
         elif coin == Coins.PIVX:
             from .interface.pivx import PIVXInterface
             return PIVXInterface(self.coin_clients[coin], self.chain, self)
@@ -711,7 +736,7 @@ class BasicSwap(BaseApp):
 
     def setCoinRunParams(self, coin):
         cc = self.coin_clients[coin]
-        if coin == Coins.XMR:
+        if coin in (Coins.XMR, Coins.WOW):
             return
         if cc['connection_type'] == 'rpc' and cc['rpcauth'] is None:
             chain_client_settings = self.getChainClientSettings(coin)
@@ -782,8 +807,14 @@ class BasicSwap(BaseApp):
                 core_version = ci.getDaemonVersion()
                 self.log.info('%s Core version %d', ci.coin_name(), core_version)
                 self.coin_clients[c]['core_version'] = core_version
+                # thread_func = threadPollXMRChainState if c in (Coins.XMR, Coins.WOW) else threadPollChainState
+                if c == Coins.XMR:
+                    thread_func = threadPollXMRChainState
+                elif c == Coins.WOW:
+                    thread_func = threadPollWOWChainState
+                else:
+                    thread_func = threadPollChainState
 
-                thread_func = threadPollXMRChainState if c == Coins.XMR else threadPollChainState
                 t = threading.Thread(target=thread_func, args=(self, c))
                 self.threads.append(t)
                 t.start()
@@ -807,6 +838,12 @@ class BasicSwap(BaseApp):
                         ci.ensureWalletExists()
                     except Exception as e:
                         self.log.warning('Can\'t open XMR wallet, could be locked.')
+                        continue
+                elif c == Coins.WOW:
+                    try:
+                        ci.ensureWalletExists()
+                    except Exception as e:
+                        self.log.warning('Can\'t open WOW wallet, could be locked.')
                         continue
                 elif c == Coins.LTC:
                     ci_mweb = self.ci(Coins.LTC_MWEB)
@@ -858,7 +895,7 @@ class BasicSwap(BaseApp):
         self.log.info('Scanned %d unread messages.', nm)
 
     def stopDaemon(self, coin) -> None:
-        if coin in (Coins.XMR, Coins.DCR):
+        if coin in (Coins.XMR, Coins.DCR, Coins.WOW):
             return
         num_tries = 10
         authcookiepath = os.path.join(self.getChainDatadirPath(coin), '.cookie')
@@ -897,7 +934,7 @@ class BasicSwap(BaseApp):
 
         if with_wallet:
             self.waitForDaemonRPC(coin_type, with_wallet=False)
-            if coin_type in (Coins.XMR,):
+            if coin_type in (Coins.XMR, Coins.WOW):
                 return
             ci = self.ci(coin_type)
             # checkWallets can adjust the wallet name.
@@ -932,7 +969,7 @@ class BasicSwap(BaseApp):
                 raise ValueError('{} has an unexpected wallet seed and "restrict_unknown_seed_wallets" is enabled.'.format(ci.coin_name()))
             if self.coin_clients[c]['connection_type'] != 'rpc':
                 continue
-            if c == Coins.XMR:
+            if c in (Coins.XMR, Coins.WOW):
                 continue  # TODO
             synced = round(ci.getBlockchainInfo()['verificationprogress'], 3)
             if synced < 1.0:
@@ -1035,7 +1072,7 @@ class BasicSwap(BaseApp):
         db_key_coin_name = ci.coin_name().lower()
         self.log.info('Initialising {} wallet.'.format(ci.coin_name()))
 
-        if coin_type == Coins.XMR:
+        if coin_type in (Coins.XMR, Coins.WOW):
             key_view = self.getWalletKey(coin_type, 1, for_ed25519=True)
             key_spend = self.getWalletKey(coin_type, 2, for_ed25519=True)
             ci.initialiseWallet(key_view, key_spend)
@@ -1950,7 +1987,7 @@ class BasicSwap(BaseApp):
         return self.ci(coin_type).get_fee_rate(conf_target)
 
     def estimateWithdrawFee(self, coin_type, fee_rate):
-        if coin_type == Coins.XMR:
+        if coin_type in (Coins.XMR, Coins.WOW):
             # Fee estimate must be manually initiated
             return None
         tx_vsize = self.ci(coin_type).getHTLCSpendTxVSize()
@@ -1959,7 +1996,7 @@ class BasicSwap(BaseApp):
 
     def withdrawCoin(self, coin_type, value, addr_to, subfee: bool) -> str:
         ci = self.ci(coin_type)
-        if subfee and coin_type == Coins.XMR:
+        if subfee and coin_type in (Coins.XMR, Coins.WOW):
             self.log.info('withdrawCoin sweep all {} to {}'.format(ci.ticker(), addr_to))
         else:
             self.log.info('withdrawCoin {} {} to {} {}'.format(value, ci.ticker(), addr_to, ' subfee' if subfee else ''))
@@ -2011,7 +2048,7 @@ class BasicSwap(BaseApp):
         if c == Coins.PART:
             ci.setWalletSeedWarning(False)  # All keys should be be derived from the Particl mnemonic
             return True  # TODO
-        if c == Coins.XMR:
+        if c in (Coins.XMR, Coins.WOW):
             expect_address = self.getCachedMainWalletAddress(ci)
             if expect_address is None:
                 self.log.warning('Can\'t find expected main wallet address for coin {}'.format(ci.coin_name()))
@@ -2055,7 +2092,7 @@ class BasicSwap(BaseApp):
         # TODO: How to scan pruned blocks?
 
         if not self.checkWalletSeed(coin_type):
-            if coin_type == Coins.XMR:
+            if coin_type in (Coins.XMR, Coins.WOW):
                 raise ValueError('TODO: How to reseed XMR wallet?')
             else:
                 raise ValueError('Wallet seed doesn\'t match expected.')
@@ -5862,7 +5899,7 @@ class BasicSwap(BaseApp):
             kbsl = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, KeyTypes.KBSL, for_ed25519)
             vkbs = ci_to.sumKeys(kbsl, kbsf)
 
-            if coin_to == Coins.XMR:
+            if coin_to in (Coins.XMR, Coins.WOW):
                 address_to = self.getCachedMainWalletAddress(ci_to, session)
             elif coin_to in (Coins.PART_BLIND, Coins.PART_ANON):
                 address_to = self.getCachedStealthAddressForCoin(coin_to, session)
@@ -5929,7 +5966,7 @@ class BasicSwap(BaseApp):
         vkbs = ci_to.sumKeys(kbsl, kbsf)
 
         try:
-            if offer.coin_to == Coins.XMR:
+            if offer.coin_to in (Coins.XMR, Coins.WOW):
                 address_to = self.getCachedMainWalletAddress(ci_to, session)
             elif coin_to in (Coins.PART_BLIND, Coins.PART_ANON):
                 address_to = self.getCachedStealthAddressForCoin(coin_to, session)
@@ -6981,7 +7018,7 @@ class BasicSwap(BaseApp):
                 rv['anon_pending'] = walletinfo['unconfirmed_anon'] + walletinfo['immature_anon_balance']
                 rv['blind_balance'] = walletinfo['blind_balance']
                 rv['blind_unconfirmed'] = walletinfo['unconfirmed_blind']
-            elif coin == Coins.XMR:
+            elif coin in (Coins.XMR, Coins.WOW):
                 rv['main_address'] = self.getCachedMainWalletAddress(ci)
             elif coin == Coins.NAV:
                 rv['immature'] = walletinfo['immature_balance']

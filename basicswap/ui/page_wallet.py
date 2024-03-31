@@ -176,7 +176,7 @@ def page_wallet(self, url_split, post_string):
 
             if estimate_fee and withdraw:
                 err_messages.append('Estimate fee and withdraw can\'t be used together.')
-            if estimate_fee and coin_id not in (Coins.XMR, ):
+            if estimate_fee and coin_id not in (Coins.XMR, Coins.WOW):
                 ci = swap_client.ci(coin_id)
                 ticker: str = ci.ticker()
                 err_messages.append(f'Estimate fee unavailable for {ticker}.')
@@ -206,7 +206,7 @@ def page_wallet(self, url_split, post_string):
                     elif coin_id == Coins.LTC:
                         txid = swap_client.withdrawLTC(type_from, value, address, subfee)
                         messages.append('Withdrew {} {} (from {}) to address {}<br/>In txid: {}'.format(value, ticker, type_from, address, txid))
-                    elif coin_id == Coins.XMR:
+                    elif coin_id in (Coins.XMR, Coins.WOW):
                         if estimate_fee:
                             fee_estimate = ci.estimateFee(value, address, sweepall)
                             suffix = 's' if fee_estimate['num_txns'] > 1 else ''
@@ -281,7 +281,7 @@ def page_wallet(self, url_split, post_string):
         wallet_data['est_fee'] = 'Unknown' if est_fee is None else ci.format_amount(int(est_fee * ci.COIN()))
         wallet_data['deposit_address'] = w.get('deposit_address', 'Refresh necessary')
 
-        if k == Coins.XMR:
+        if k in (Coins.XMR, Coins.WOW):
             wallet_data['main_address'] = w.get('main_address', 'Refresh necessary')
         elif k == Coins.LTC:
             wallet_data['mweb_address'] = w.get('mweb_address', 'Refresh necessary')

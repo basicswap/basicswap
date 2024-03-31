@@ -55,6 +55,10 @@ MONERO_VERSION = os.getenv('MONERO_VERSION', '0.18.3.3')
 MONERO_VERSION_TAG = os.getenv('MONERO_VERSION_TAG', '')
 XMR_SITE_COMMIT = 'd00169a6decd9470ebdf6a75e3351df4ebcd260a'  # Lock hashes.txt to monero version
 
+WOWNERO_VERSION = os.getenv('WOWNERO_VERSION', '0.11.1.0')
+WOWNERO_VERSION_TAG = os.getenv('WOWNERO_VERSION_TAG', '')
+WOW_SITE_COMMIT = '97e100e1605e9f59bc8ca82a5b237d5562c8a21c'  # todo
+
 PIVX_VERSION = os.getenv('PIVX_VERSION', '5.6.1')
 PIVX_VERSION_TAG = os.getenv('PIVX_VERSION_TAG', '')
 
@@ -85,6 +89,7 @@ known_coins = {
     'bitcoin': (BITCOIN_VERSION, BITCOIN_VERSION_TAG, ('laanwj',)),
     'namecoin': ('0.18.0', '', ('JeremyRand',)),
     'monero': (MONERO_VERSION, MONERO_VERSION_TAG, ('binaryfate',)),
+    'wownero': (WOWNERO_VERSION, WOWNERO_VERSION_TAG, ('wowario',)),
     'pivx': (PIVX_VERSION, PIVX_VERSION_TAG, ('fuzzbawls',)),
     'dash': (DASH_VERSION, DASH_VERSION_TAG, ('pasta',)),
     'firo': (FIRO_VERSION, FIRO_VERSION_TAG, ('reuben',)),
@@ -103,6 +108,7 @@ expected_key_ids = {
     'laanwj': ('1E4AED62986CD25D',),
     'JeremyRand': ('2DBE339E29F6294C',),
     'binaryfate': ('F0AF4D462A0BDF92',),
+    'wowario': ('793504B449C69220',),
     'davidburkett38': ('3620E9D387E55666',),
     'fuzzbawls': ('C1ABA64407731FD9',),
     'pasta': ('52527BEDABE87984',),
@@ -156,6 +162,17 @@ XMR_WALLET_RPC_PWD = os.getenv('XMR_WALLET_RPC_PWD', 'xmr_wallet_pwd')
 XMR_RPC_USER = os.getenv('XMR_RPC_USER', '')
 XMR_RPC_PWD = os.getenv('XMR_RPC_PWD', '')
 DEFAULT_XMR_RESTORE_HEIGHT = int(os.getenv('DEFAULT_XMR_RESTORE_HEIGHT', 2245107))
+
+WOW_RPC_HOST = os.getenv('WOW_RPC_HOST', '127.0.0.1')
+BASE_WOW_RPC_PORT = int(os.getenv('BASE_WOW_RPC_PORT', 34598))
+BASE_WOW_ZMQ_PORT = int(os.getenv('BASE_WOW_ZMQ_PORT', 34698))
+BASE_WOW_WALLET_PORT = int(os.getenv('BASE_WOW_WALLET_PORT', 34798))
+WOW_WALLET_RPC_HOST = os.getenv('WOW_WALLET_RPC_HOST', '127.0.0.1')
+WOW_WALLET_RPC_USER = os.getenv('WOW_WALLET_RPC_USER', 'wow_wallet_user')
+WOW_WALLET_RPC_PWD = os.getenv('WOW_WALLET_RPC_PWD', 'wow_wallet_pwd')
+WOW_RPC_USER = os.getenv('WOW_RPC_USER', '')
+WOW_RPC_PWD = os.getenv('WOW_RPC_PWD', '')
+DEFAULT_WOW_RESTORE_HEIGHT = int(os.getenv('DEFAULT_WOW_RESTORE_HEIGHT', 450000))
 
 LTC_RPC_HOST = os.getenv('LTC_RPC_HOST', '127.0.0.1')
 LTC_RPC_PORT = int(os.getenv('LTC_RPC_PORT', 19895))
@@ -226,12 +243,28 @@ monerod_proxy_config = [
     'hide-my-port=1',           # Don't share the p2p port
     'p2p-bind-ip=127.0.0.1',    # Don't broadcast ip
     'in-peers=0',               # Changes "error" in log to "incoming connections disabled"
+    'out-peers=24',
+    f'tx-proxy=tor,{TOR_PROXY_HOST}:{TOR_PROXY_PORT},disable_noise,16'  # Outgoing tx relay to onion
 ]
 
 monero_wallet_rpc_proxy_config = [
-    'daemon-ssl-allow-any-cert=1',
+    #    'daemon-ssl-allow-any-cert=1', moved to startup flag
 ]
 
+wownerod_proxy_config = [
+    f'proxy={TOR_PROXY_HOST}:{TOR_PROXY_PORT}',
+    'proxy-allow-dns-leaks=0',
+    'no-igd=1',                 # Disable UPnP port mapping
+    'hide-my-port=1',           # Don't share the p2p port
+    'p2p-bind-ip=127.0.0.1',    # Don't broadcast ip
+    'in-peers=0',               # Changes "error" in log to "incoming connections disabled"
+    'out-peers=24',
+    f'tx-proxy=tor,{TOR_PROXY_HOST}:{TOR_PROXY_PORT},disable_noise,16'  # Outgoing tx relay to onion
+]
+
+wownero_wallet_rpc_proxy_config = [
+    #    'daemon-ssl-allow-any-cert=1', moved to startup flag
+]
 
 default_socket = socket.socket
 default_socket_timeout = socket.getdefaulttimeout()
@@ -483,9 +516,9 @@ def extractCore(coin, version_data, settings, bin_dir, release_path, extra_opts=
     logger.info('extractCore %s v%s%s', coin, version, version_tag)
     extract_core_overwrite = extra_opts.get('extract_core_overwrite', True)
 
-    if coin in ('monero', 'firo'):
-        if coin == 'monero':
-            bins = ['monerod', 'monero-wallet-rpc']
+    if coin in ('monero', 'firo', 'wownero'):
+        if coin in ('monero', 'wownero'):
+            bins = [coin + 'd', coin + '-wallet-rpc']
         elif coin == 'firo':
             bins = [coin + 'd', coin + '-cli', coin + '-tx']
         else:
@@ -624,6 +657,30 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
         assert_path = os.path.join(bin_dir, assert_filename)
         if not os.path.exists(assert_path):
             downloadFile(assert_url, assert_path)
+    elif coin == 'wownero':
+        use_file_ext = 'tar.bz2' if FILE_EXT == 'tar.gz' else FILE_EXT
+        release_filename = '{}-{}-{}.{}'.format(coin, version, BIN_ARCH, use_file_ext)
+        if os_name == 'osx':
+            os_name = 'mac'
+
+        architecture = 'x64'
+        release_url = 'https://git.wownero.com/attachments/280753b0-3af0-4a78-a248-8b925e8f4593'
+        if 'aarch64' in BIN_ARCH:
+            architecture = 'armv8'
+            release_url = 'https://git.wownero.com/attachments/0869ffe3-eeff-4240-a185-168ca80fa1e3'
+        elif 'arm' in BIN_ARCH:
+            architecture = 'armv7'  # 32bit doesn't work
+            release_url = 'https://git.wownero.com/attachments/ff0c4886-3865-4670-9bc6-63dd60ded0e3'
+
+        release_path = os.path.join(bin_dir, release_filename)
+        if not os.path.exists(release_path):
+            downloadFile(release_url, release_path)
+
+        assert_filename = 'wownero-{}-hashes.txt'.format(version)
+        assert_url = 'https://git.wownero.com/wownero/wownero.org-website/raw/commit/{}/hashes.txt'.format(WOW_SITE_COMMIT)
+        assert_path = os.path.join(bin_dir, assert_filename)
+        if not os.path.exists(assert_path):
+            downloadFile(assert_url, assert_path)
 
     elif coin == 'decred':
         arch_name = BIN_ARCH
@@ -642,6 +699,7 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
         release_filename = '{}-{}-{}.{}'.format(coin, version, arch_name, FILE_EXT)
         release_page_url = 'https://github.com/decred/decred-binaries/releases/download/v{}'.format(version)
         release_url = release_page_url + '/' + 'decred-{}-v{}.{}'.format(arch_name, version, FILE_EXT)
+
         release_path = os.path.join(bin_dir, release_filename)
         if not os.path.exists(release_path):
             downloadFile(release_url, release_path)
@@ -789,13 +847,15 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
         pubkeyurls.append('https://raw.githubusercontent.com/dashpay/dash/master/contrib/gitian-keys/pasta.pgp')
     if coin == 'monero':
         pubkeyurls.append('https://raw.githubusercontent.com/monero-project/monero/master/utils/gpg_keys/binaryfate.asc')
+    if coin == 'wownero':
+        pubkeyurls.append('https://git.wownero.com/wownero/wownero/raw/branch/master/utils/gpg_keys/wowario.asc')
     if coin == 'firo':
         pubkeyurls.append('https://firo.org/reuben.asc')
 
     if ADD_PUBKEY_URL != '':
         pubkeyurls.append(ADD_PUBKEY_URL + '/' + pubkey_filename)
 
-    if coin in ('monero', 'firo'):
+    if coin in ('monero', 'wownero', 'firo'):
         with open(assert_path, 'rb') as fp:
             verified = gpg.verify_file(fp)
 
@@ -862,7 +922,7 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
     if not os.path.exists(data_dir):
         os.makedirs(data_dir)
 
-    if coin == 'monero':
+    if coin in ('wownero', 'monero'):
         core_conf_path = os.path.join(data_dir, coin + 'd.conf')
         if os.path.exists(core_conf_path):
             exitWithError('{} exists'.format(core_conf_path))
@@ -886,18 +946,28 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
             fp.write('zmq-rpc-bind-ip={}\n'.format(COINS_RPCBIND_IP))
             fp.write('prune-blockchain=1\n')
 
-            if tor_control_password is not None:
-                for opt_line in monerod_proxy_config:
-                    fp.write(opt_line + '\n')
+            if coin == 'monero':
+                if XMR_RPC_USER != '':
+                    fp.write(f'rpc-login={XMR_RPC_USER}:{XMR_RPC_PWD}\n')
+                if tor_control_password is not None:
+                    for opt_line in monerod_proxy_config:
+                        fp.write(opt_line + '\n')
 
-            if XMR_RPC_USER != '':
-                fp.write(f'rpc-login={XMR_RPC_USER}:{XMR_RPC_PWD}\n')
+            if coin == 'wownero':
+                if WOW_RPC_USER != '':
+                    fp.write(f'rpc-login={WOW_RPC_USER}:{WOW_RPC_PWD}\n')
+                if tor_control_password is not None:
+                    for opt_line in wownerod_proxy_config:
+                        fp.write(opt_line + '\n')
 
+    if coin in ('wownero', 'monero'):
         wallets_dir = core_settings.get('walletsdir', data_dir)
         if not os.path.exists(wallets_dir):
             os.makedirs(wallets_dir)
 
-        wallet_conf_path = os.path.join(wallets_dir, coin + '_wallet.conf')
+        wallet_conf_path = os.path.join(wallets_dir, coin + '-wallet-rpc.conf')
+        if coin == 'monero':
+            wallet_conf_path = os.path.join(wallets_dir, 'monero_wallet.conf')
         if os.path.exists(wallet_conf_path):
             exitWithError('{} exists'.format(wallet_conf_path))
         with open(wallet_conf_path, 'w') as fp:
@@ -911,9 +981,11 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
             fp.write('rpc-bind-ip={}\n'.format(COINS_RPCBIND_IP))
             fp.write(f'wallet-dir={config_datadir}\n')
             fp.write('log-file={}\n'.format(os.path.join(config_datadir, 'wallet.log')))
-            fp.write('shared-ringdb-dir={}\n'.format(os.path.join(config_datadir, 'shared-ringdb')))
             fp.write('rpc-login={}:{}\n'.format(core_settings['walletrpcuser'], core_settings['walletrpcpassword']))
-
+            if coin == 'monero':
+                fp.write('shared-ringdb-dir={}\n'.format(os.path.join(config_datadir, 'shared-ringdb')))
+            elif coin == 'wownero':
+                fp.write('wow-shared-ringdb-dir={}\n'.format(os.path.join(config_datadir, 'shared-ringdb')))
             if chain == 'regtest':
                 fp.write('allow-mismatched-daemon-version=1\n')
 
@@ -1087,12 +1159,15 @@ def modify_tor_config(settings, coin, tor_control_password=None, enable=False, e
     coin_settings = settings['chainclients'][coin]
     data_dir = coin_settings['datadir']
 
-    if coin == 'monero':
+    if coin in ('monero', 'wownero'):
         core_conf_path = os.path.join(data_dir, coin + 'd.conf')
         if not os.path.exists(core_conf_path):
             exitWithError('{} does not exist'.format(core_conf_path))
+
         wallets_dir = coin_settings.get('walletsdir', data_dir)
-        wallet_conf_path = os.path.join(wallets_dir, coin + '_wallet.conf')
+        wallet_conf_path = os.path.join(wallets_dir, coin + '-wallet-rpc.conf')
+        if coin == 'monero':
+            wallet_conf_path = os.path.join(wallets_dir, 'monero_wallet.conf')
         if not os.path.exists(wallet_conf_path):
             exitWithError('{} does not exist'.format(wallet_conf_path))
 
@@ -1105,16 +1180,27 @@ def modify_tor_config(settings, coin, tor_control_password=None, enable=False, e
                 # Disable tor first
                 for line in fp_in:
                     skip_line: bool = False
-                    for opt_line in monerod_proxy_config:
-                        setting: str = opt_line[0: opt_line.find('=') + 1]
-                        if line.startswith(setting):
-                            skip_line = True
-                            break
+                    if coin == 'monero':
+                        for opt_line in monerod_proxy_config:
+                            setting: str = opt_line[0: opt_line.find('=') + 1]
+                            if line.startswith(setting):
+                                skip_line = True
+                                break
+                    if coin == 'wownero':
+                        for opt_line in wownerod_proxy_config:
+                            setting: str = opt_line[0: opt_line.find('=') + 1]
+                            if line.startswith(setting):
+                                skip_line = True
+                                break
                     if not skip_line:
                         fp.write(line)
             if enable:
-                for opt_line in monerod_proxy_config:
-                    fp.write(opt_line + '\n')
+                if coin == 'monero':
+                    for opt_line in monerod_proxy_config:
+                        fp.write(opt_line + '\n')
+                if coin == 'wownero':
+                    for opt_line in wownerod_proxy_config:
+                        fp.write(opt_line + '\n')
 
         with open(wallet_conf_path, 'w') as fp:
             with open(wallet_conf_path + '.last') as fp_in:
@@ -1210,6 +1296,7 @@ def printHelp():
     print('--htmlhost=              Interface to host html server on, default:127.0.0.1.')
     print('--wshost=                Interface to host websocket server on, disable by setting to "none", default\'s to --htmlhost.')
     print('--xmrrestoreheight=n     Block height to restore Monero wallet from, default:{}.'.format(DEFAULT_XMR_RESTORE_HEIGHT))
+    print('--wowrestoreheight=n     Block height to restore Wownero wallet from, default:{}.'.format(DEFAULT_WOW_RESTORE_HEIGHT))
     print('--trustremotenode        Set trusted-daemon for XMR, defaults to auto: true when daemon rpchost value is a private ip address else false')
     print('--noextractover          Prevent extracting cores if files exist.  Speeds up tests')
     print('--usetorproxy            Use TOR proxy during setup.  Note that some download links may be inaccessible over TOR.')
@@ -1305,7 +1392,11 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
 
                 if c == Coins.XMR:
                     if coin_settings['manage_wallet_daemon']:
-                        filename = 'monero-wallet-rpc' + ('.exe' if os.name == 'nt' else '')
+                        filename = coin_name + '-wallet-rpc' + ('.exe' if os.name == 'nt' else '')
+                        daemons.append(startXmrWalletDaemon(coin_settings['datadir'], coin_settings['bindir'], filename))
+                elif c == Coins.WOW:
+                    if coin_settings['manage_wallet_daemon']:
+                        filename = coin_name + '-wallet-rpc' + ('.exe' if os.name == 'nt' else '')
                         daemons.append(startXmrWalletDaemon(coin_settings['datadir'], coin_settings['bindir'], filename))
                 elif c == Coins.DCR:
                     pass
@@ -1470,6 +1561,7 @@ def main():
     coins_changed = False
     htmlhost = '127.0.0.1'
     xmr_restore_height = DEFAULT_XMR_RESTORE_HEIGHT
+    wow_restore_height = DEFAULT_WOW_RESTORE_HEIGHT
     prepare_bin_only = False
     no_cores = False
     enable_tor = False
@@ -1584,6 +1676,9 @@ def main():
                 continue
             if name == 'xmrrestoreheight':
                 xmr_restore_height = int(s[1])
+                continue
+            if name == 'wowrestoreheight':
+                wow_restore_height = int(s[1])
                 continue
             if name == 'keysdirpath':
                 extra_opts['keysdirpath'] = os.path.expanduser(s[1].strip('"'))
@@ -1825,6 +1920,28 @@ def main():
             'core_version_group': 18,
             'chain_lookups': 'local',
             'startup_tries': 40,
+        },
+        'wownero': {
+            'connection_type': 'rpc' if 'wownero' in with_coins else 'none',
+            'manage_daemon': True if ('wownero' in with_coins and WOW_RPC_HOST == '127.0.0.1') else False,
+            'manage_wallet_daemon': True if ('wownero' in with_coins and WOW_WALLET_RPC_HOST == '127.0.0.1') else False,
+            'rpcport': BASE_WOW_RPC_PORT + port_offset,
+            'zmqport': BASE_WOW_ZMQ_PORT + port_offset,
+            'walletrpcport': BASE_WOW_WALLET_PORT + port_offset,
+            'rpchost': WOW_RPC_HOST,
+            'trusted_daemon': extra_opts.get('trust_remote_node', 'auto'),
+            'walletrpchost': WOW_WALLET_RPC_HOST,
+            'walletrpcuser': WOW_WALLET_RPC_USER,
+            'walletrpcpassword': WOW_WALLET_RPC_PWD,
+            'walletfile': 'swap_wallet',
+            'datadir': os.getenv('WOW_DATA_DIR', os.path.join(data_dir, 'wownero')),
+            'bindir': os.path.join(bin_dir, 'wownero'),
+            'restore_height': wow_restore_height,
+            'blocks_confirmed': 2,
+            'rpctimeout': 60,
+            'walletrpctimeout': 120,
+            'walletrpctimeoutlong': 300,
+            'core_type_group': 'xmr',
         }
     }
 
@@ -1840,6 +1957,9 @@ def main():
     if XMR_RPC_USER != '':
         chainclients['monero']['rpcuser'] = XMR_RPC_USER
         chainclients['monero']['rpcpassword'] = XMR_RPC_PWD
+    if WOW_RPC_USER != '':
+        chainclients['wownero']['rpcuser'] = WOW_RPC_USER
+        chainclients['wownero']['rpcpassword'] = WOW_RPC_PWD
     if PIVX_RPC_USER != '':
         chainclients['pivx']['rpcuser'] = PIVX_RPC_USER
         chainclients['pivx']['rpcpassword'] = PIVX_RPC_PWD
@@ -1854,6 +1974,7 @@ def main():
         chainclients['nav']['rpcpassword'] = NAV_RPC_PWD
 
     chainclients['monero']['walletsdir'] = os.getenv('XMR_WALLETS_DIR', chainclients['monero']['datadir'])
+    chainclients['wownero']['walletsdir'] = os.getenv('WOW_WALLETS_DIR', chainclients['wownero']['datadir'])
 
     if initwalletsonly:
         logger.info('Initialising wallets')

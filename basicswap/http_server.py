@@ -311,6 +311,22 @@ class HttpHandler(BaseHTTPRequestHandler):
                     else:
                         raise ValueError('Unknown RPC variant')
                     result = json.dumps(rv, indent=4)
+                elif coin_type == Coins.WOW:
+                    ci = swap_client.ci(coin_type)
+                    arr = cmd.split(None, 1)
+                    method = arr[0]
+                    params = json.loads(arr[1]) if len(arr) > 1 else []
+                    if coin_id == -8:
+                        rv = ci.rpc_wallet(method, params)
+                    elif coin_id == -7:
+                        rv = ci.rpc(method, params)
+                    elif coin_id == -6:
+                        if params == []:
+                            params = None
+                        rv = ci.rpc2(method, params)
+                    else:
+                        raise ValueError('Unknown WOW RPC variant')
+                    result = json.dumps(rv, indent=4)
                 else:
                     if call_type == 'http':
                         ci = swap_client.ci(coin_type)
@@ -338,6 +354,7 @@ class HttpHandler(BaseHTTPRequestHandler):
 
         coin_available = listAvailableCoins(swap_client, with_variants=False)
         with_xmr: bool = any(c[0] == Coins.XMR for c in coin_available)
+        with_wow: bool = any(c[0] == Coins.WOW for c in coin_available)
         coins = [(str(c[0]) + ',0', c[1]) for c in coin_available if c[0] not in (Coins.XMR, )]
 
         if any(c[0] == Coins.DCR for c in coin_available):
@@ -348,6 +365,10 @@ class HttpHandler(BaseHTTPRequestHandler):
             coins.append((str(int(Coins.XMR)) + ',0', 'Monero'))
             coins.append((str(int(Coins.XMR)) + ',1', 'Monero JSON'))
             coins.append((str(int(Coins.XMR)) + ',2', 'Monero Wallet'))
+        if with_wow:
+            coins.append((str(int(Coins.WOW)) + ',0', 'Wownero'))
+            coins.append((str(int(Coins.WOW)) + ',1', 'Wownero JSON'))
+            coins.append((str(int(Coins.WOW)) + ',2', 'Wownero Wallet'))
 
         return self.render_template(template, {
             'messages': messages,
