@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019-2023 tecnovert
+# Copyright (c) 2019-2024 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -21,7 +21,7 @@ class Coins(IntEnum):
     PART = 1
     BTC = 2
     LTC = 3
-    # DCR = 4
+    DCR = 4
     NMC = 5
     XMR = 6
     PART_BLIND = 7
@@ -150,6 +150,41 @@ chainparams = {
             'script_address2': 58,
             'key_prefix': 239,
             'hrp': 'rltc',
+            'bip44': 1,
+            'min_amount': 1000,
+            'max_amount': 100000 * COIN,
+        }
+    },
+    Coins.DCR: {
+        'name': 'decred',
+        'ticker': 'DCR',
+        'message_magic': 'Decred Signed Message:\n',
+        'blocks_target': 60 * 5,
+        'decimal_places': 8,
+        'mainnet': {
+            'rpcport': 9109,
+            'pubkey_address': 0x073f,
+            'script_address': 0x071a,
+            'key_prefix': 0x22de,
+            'bip44': 42,
+            'min_amount': 1000,
+            'max_amount': 100000 * COIN,
+        },
+        'testnet': {
+            'rpcport': 19109,
+            'pubkey_address': 0x0f21,
+            'script_address': 0x0efc,
+            'key_prefix': 0x230e,
+            'bip44': 1,
+            'min_amount': 1000,
+            'max_amount': 100000 * COIN,
+            'name': 'testnet3',
+        },
+        'regtest': {
+            'rpcport': 18656,
+            'pubkey_address': 0x0e00,
+            'script_address': 0x0ddb,
+            'key_prefix': 0x22fe,
             'bip44': 1,
             'min_amount': 1000,
             'max_amount': 100000 * COIN,
