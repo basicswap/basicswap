@@ -37,6 +37,9 @@ from basicswap.util.address import (
     decodeAddress,
     pubkeyToAddress,
 )
+from basicswap.util.crypto import (
+    sha256,
+)
 from coincurve.keys import (
     PrivateKey,
     PublicKey)
@@ -109,10 +112,26 @@ def find_vout_for_address_from_txobj(tx_obj, addr: str) -> int:
     raise RuntimeError("Vout not found for address: txid={}, addr={}".format(tx_obj['txid'], addr))
 
 
-class BTCInterface(CoinInterface):
+class Secp256k1Interface(CoinInterface):
     @staticmethod
     def curve_type():
         return Curves.secp256k1
+
+    def getNewSecretKey(self) -> bytes:
+        return i2b(getSecretInt())
+
+    def getPubkey(self, privkey):
+        return PublicKey.from_secret(privkey).format()
+
+    def verifyKey(self, k: bytes) -> bool:
+        i = b2i(k)
+        return (i < ep.o and i > 0)
+
+    def verifyPubkey(self, pubkey_bytes: bytes) -> bool:
+        return verify_secp256k1_point(pubkey_bytes)
+
+
+class BTCInterface(Secp256k1Interface):
 
     @staticmethod
     def coin_type():
@@ -422,11 +441,11 @@ class BTCInterface(CoinInterface):
         return segwit_addr.encode(bech32_prefix, version, pkh)
 
     def pkh_to_address(self, pkh: bytes) -> str:
-        # pkh is hash160(pk)
+        # pkh is ripemd160(sha256(pk))
         assert (len(pkh) == 20)
         prefix = self.chainparams_network()['pubkey_address']
         data = bytes((prefix,)) + pkh
-        checksum = hashlib.sha256(hashlib.sha256(data).digest()).digest()
+        checksum = sha256(sha256(data))
         return b58encode(data + checksum[0:4])
 
     def sh_to_address(self, sh: bytes) -> str:
@@ -452,25 +471,12 @@ class BTCInterface(CoinInterface):
         assert (len(pk) == 33)
         return self.pkh_to_address(hash160(pk))
 
-    def getNewSecretKey(self) -> bytes:
-        return i2b(getSecretInt())
-
-    def getPubkey(self, privkey):
-        return PublicKey.from_secret(privkey).format()
-
     def getAddressHashFromKey(self, key: bytes) -> bytes:
         pk = self.getPubkey(key)
         return hash160(pk)
 
     def getSeedHash(self, seed) -> bytes:
         return self.getAddressHashFromKey(seed)[::-1]
-
-    def verifyKey(self, k: bytes) -> bool:
-        i = b2i(k)
-        return (i < ep.o and i > 0)
-
-    def verifyPubkey(self, pubkey_bytes: bytes) -> bool:
-        return verify_secp256k1_point(pubkey_bytes)
 
     def encodeKey(self, key_bytes: bytes) -> str:
         wif_prefix = self.chainparams_network()['key_prefix']
@@ -1018,20 +1024,20 @@ class BTCInterface(CoinInterface):
         return hash160(K)
 
     def getScriptDest(self, script):
-        return CScript([OP_0, hashlib.sha256(script).digest()])
+        return CScript([OP_0, sha256(script)])
 
     def getScriptScriptSig(self, script: bytes) -> bytes:
         return bytes()
 
     def getP2SHP2WSHDest(self, script):
-        script_hash = hashlib.sha256(script).digest()
+        script_hash = sha256(script)
         assert len(script_hash) == 32
         p2wsh_hash = hash160(CScript([OP_0, script_hash]))
         assert len(p2wsh_hash) == 20
         return CScript([OP_HASH160, p2wsh_hash, OP_EQUAL])
 
     def getP2SHP2WSHScriptSig(self, script):
-        script_hash = hashlib.sha256(script).digest()
+        script_hash = sha256(script)
         assert len(script_hash) == 32
         return CScript([CScript([OP_0, script_hash, ]), ])
 
@@ -1249,25 +1255,25 @@ class BTCInterface(CoinInterface):
         return self.rpc_wallet('sendtoaddress', params)
 
     def signCompact(self, k, message):
-        message_hash = hashlib.sha256(bytes(message, 'utf-8')).digest()
+        message_hash = sha256(bytes(message, 'utf-8'))
 
         privkey = PrivateKey(k)
         return privkey.sign_recoverable(message_hash, hasher=None)[:64]
 
     def signRecoverable(self, k, message):
-        message_hash = hashlib.sha256(bytes(message, 'utf-8')).digest()
+        message_hash = sha256(bytes(message, 'utf-8'))
 
         privkey = PrivateKey(k)
         return privkey.sign_recoverable(message_hash, hasher=None)
 
     def verifyCompactSig(self, K, message, sig):
-        message_hash = hashlib.sha256(bytes(message, 'utf-8')).digest()
+        message_hash = sha256(bytes(message, 'utf-8'))
         pubkey = PublicKey(K)
         rv = pubkey.verify_compact(sig, message_hash, hasher=None)
         assert (rv is True)
 
     def verifySigAndRecover(self, sig, message):
-        message_hash = hashlib.sha256(bytes(message, 'utf-8')).digest()
+        message_hash = sha256(bytes(message, 'utf-8'))
         pubkey = PublicKey.from_signature_and_message(sig, message_hash, hasher=None)
         return pubkey.format()
 
@@ -1276,7 +1282,7 @@ class BTCInterface(CoinInterface):
             message_magic = self.chainparams()['message_magic']
 
         message_bytes = SerialiseNumCompact(len(message_magic)) + bytes(message_magic, 'utf-8') + SerialiseNumCompact(len(message)) + bytes(message, 'utf-8')
-        message_hash = hashlib.sha256(hashlib.sha256(message_bytes).digest()).digest()
+        message_hash = sha256(sha256(message_bytes))
         signature_bytes = base64.b64decode(signature)
         rec_id = (signature_bytes[0] - 27) & 3
         signature_bytes = signature_bytes[1:] + bytes((rec_id,))
@@ -1502,7 +1508,7 @@ class BTCInterface(CoinInterface):
         return CScript([OP_HASH160, script_hash, OP_EQUAL])
 
     def get_p2wsh_script_pubkey(self, script: bytearray) -> bytearray:
-        return CScript([OP_0, hashlib.sha256(script).digest()])
+        return CScript([OP_0, sha256(script)])
 
     def findTxnByHash(self, txid_hex: str):
         # Only works for wallet txns

@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2022-2023 tecnovert
+# Copyright (c) 2022-2024 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-import hashlib
 from basicswap.contrib.segwit_addr import bech32_decode, convertbits, bech32_encode
-from basicswap.util.crypto import ripemd160
+from basicswap.util.crypto import ripemd160, sha256
 
 __b58chars = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
 
@@ -68,7 +67,7 @@ def encodeStealthAddress(prefix_byte: int, scan_pubkey: bytes, spend_pubkey: byt
     data += bytes((0x00,))  # num prefix bits
 
     b = bytes((prefix_byte,)) + data
-    b += hashlib.sha256(hashlib.sha256(b).digest()).digest()[:4]
+    b += sha256(sha256(b))[:4]
     return b58encode(b)
 
 
@@ -83,13 +82,12 @@ def toWIF(prefix_byte: int, b: bytes, compressed: bool = True) -> str:
     b = bytes((prefix_byte,)) + b
     if compressed:
         b += bytes((0x01,))
-    b += hashlib.sha256(hashlib.sha256(b).digest()).digest()[:4]
+    b += sha256(sha256(b))[:4]
     return b58encode(b)
 
 
 def getKeyID(key_data: bytes) -> bytes:
-    sha256_hash = hashlib.sha256(key_data).digest()
-    return ripemd160(sha256_hash)
+    return ripemd160(sha256(key_data))
 
 
 def bech32Decode(hrp, addr):
@@ -109,18 +107,19 @@ def bech32Encode(hrp, data):
     return ret
 
 
-def decodeAddress(address_str: str):
-    b58_addr = b58decode(address_str)
-    if b58_addr is not None:
-        address = b58_addr[:-4]
-        checksum = b58_addr[-4:]
-        assert (hashlib.sha256(hashlib.sha256(address).digest()).digest()[:4] == checksum), 'Checksum mismatch'
-        return b58_addr[:-4]
-    return None
+def decodeAddress(address: str):
+    addr_data = b58decode(address)
+    if addr_data is None:
+        return None
+    prefixed_data = addr_data[:-4]
+    checksum = addr_data[-4:]
+    if sha256(sha256(prefixed_data))[:4] != checksum:
+        raise ValueError('Checksum mismatch')
+    return prefixed_data
 
 
 def encodeAddress(address: bytes) -> str:
-    checksum = hashlib.sha256(hashlib.sha256(address).digest()).digest()
+    checksum = sha256(sha256(address))
     return b58encode(address + checksum[0:4])
 
 

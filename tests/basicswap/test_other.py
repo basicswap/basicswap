@@ -24,12 +24,13 @@ from coincurve.keys import (
 
 from basicswap.util import i2b, h2b
 from basicswap.util.integer import encode_varint, decode_varint
-from basicswap.util.crypto import ripemd160, hash160
+from basicswap.util.crypto import ripemd160, hash160, blake256
 from basicswap.util.network import is_private_ip_address
 from basicswap.util.rfc2440 import rfc2440_hash_password
 from basicswap.util_xmr import encode_address as xmr_encode_address
 from basicswap.interface.btc import BTCInterface
 from basicswap.interface.xmr import XMRInterface
+from tests.basicswap.util import REQUIRED_SETTINGS
 
 from basicswap.basicswap_util import (
     TxLockTypes)
@@ -48,7 +49,6 @@ from basicswap.contrib.test_framework.script import hash160 as hash160_btc
 
 
 class Test(unittest.TestCase):
-    REQUIRED_SETTINGS = {'blocks_confirmed': 1, 'conf_target': 1, 'use_segwit': True, 'connection_type': 'rpc'}
 
     def test_serialise_num(self):
         def test_case(v, nb=None):
@@ -69,7 +69,7 @@ class Test(unittest.TestCase):
 
     def test_sequence(self):
         coin_settings = {'rpcport': 0, 'rpcauth': 'none'}
-        coin_settings.update(self.REQUIRED_SETTINGS)
+        coin_settings.update(REQUIRED_SETTINGS)
 
         ci = BTCInterface(coin_settings, 'regtest')
 
@@ -177,7 +177,7 @@ class Test(unittest.TestCase):
 
     def test_ecdsa_otves(self):
         coin_settings = {'rpcport': 0, 'rpcauth': 'none'}
-        coin_settings.update(self.REQUIRED_SETTINGS)
+        coin_settings.update(REQUIRED_SETTINGS)
         ci = BTCInterface(coin_settings, 'regtest')
         vk_sign = ci.getNewSecretKey()
         vk_encrypt = ci.getNewSecretKey()
@@ -200,7 +200,7 @@ class Test(unittest.TestCase):
 
     def test_sign(self):
         coin_settings = {'rpcport': 0, 'rpcauth': 'none'}
-        coin_settings.update(self.REQUIRED_SETTINGS)
+        coin_settings.update(REQUIRED_SETTINGS)
         ci = BTCInterface(coin_settings, 'regtest')
 
         vk = ci.getNewSecretKey()
@@ -215,7 +215,7 @@ class Test(unittest.TestCase):
 
     def test_sign_compact(self):
         coin_settings = {'rpcport': 0, 'rpcauth': 'none'}
-        coin_settings.update(self.REQUIRED_SETTINGS)
+        coin_settings.update(REQUIRED_SETTINGS)
         ci = BTCInterface(coin_settings, 'regtest')
 
         vk = ci.getNewSecretKey()
@@ -230,7 +230,7 @@ class Test(unittest.TestCase):
 
     def test_sign_recoverable(self):
         coin_settings = {'rpcport': 0, 'rpcauth': 'none'}
-        coin_settings.update(self.REQUIRED_SETTINGS)
+        coin_settings.update(REQUIRED_SETTINGS)
         ci = BTCInterface(coin_settings, 'regtest')
 
         vk = ci.getNewSecretKey()
@@ -246,7 +246,7 @@ class Test(unittest.TestCase):
 
     def test_pubkey_to_address(self):
         coin_settings = {'rpcport': 0, 'rpcauth': 'none'}
-        coin_settings.update(self.REQUIRED_SETTINGS)
+        coin_settings.update(REQUIRED_SETTINGS)
         ci = BTCInterface(coin_settings, 'regtest')
         pk = h2b('02c26a344e7d21bcc6f291532679559f2fd234c881271ff98714855edc753763a6')
         addr = ci.pubkey_to_address(pk)
@@ -254,7 +254,7 @@ class Test(unittest.TestCase):
 
     def test_dleag(self):
         coin_settings = {'rpcport': 0, 'walletrpcport': 0, 'walletrpcauth': 'none'}
-        coin_settings.update(self.REQUIRED_SETTINGS)
+        coin_settings.update(REQUIRED_SETTINGS)
 
         ci = XMRInterface(coin_settings, 'regtest')
 
@@ -430,31 +430,35 @@ class Test(unittest.TestCase):
         assert (msg_buf_v2.time_valid == 0)
 
     def test_is_private_ip_address(self):
-        assert (is_private_ip_address('localhost'))
-        assert (is_private_ip_address('127.0.0.1'))
-        assert (is_private_ip_address('10.0.0.0'))
-        assert (is_private_ip_address('172.16.0.0'))
-        assert (is_private_ip_address('192.168.0.0'))
-
-        assert (is_private_ip_address('20.87.245.0') is False)
-        assert (is_private_ip_address('particl.io') is False)
+        test_addresses = [
+            ('localhost', True),
+            ('127.0.0.1', True),
+            ('10.0.0.0', True),
+            ('172.16.0.0', True),
+            ('192.168.0.0', True),
+            ('20.87.245.0', False),
+            ('particl.io', False),
+        ]
+        for addr, is_private in test_addresses:
+            assert (is_private_ip_address(addr) is is_private)
 
     def test_varint(self):
-        def test_case(i, expect_length):
+        test_vectors = [
+            (0, 1),
+            (1, 1),
+            (127, 1),
+            (128, 2),
+            (253, 2),
+            (8321, 2),
+            (16383, 2),
+            (16384, 3),
+            (2097151, 3),
+            (2097152, 4),
+        ]
+        for i, expect_length in test_vectors:
             b = encode_varint(i)
             assert (len(b) == expect_length)
             assert (decode_varint(b) == i)
-
-        test_case(0, 1)
-        test_case(1, 1)
-        test_case(127, 1)
-        test_case(128, 2)
-        test_case(253, 2)
-        test_case(8321, 2)
-        test_case(16383, 2)
-        test_case(16384, 3)
-        test_case(2097151, 3)
-        test_case(2097152, 4)
 
     def test_base58(self):
         kv = edu.get_secret()
@@ -467,6 +471,14 @@ class Test(unittest.TestCase):
 
         addr = xmr_encode_address(Kv, Ks, 4146)
         assert (addr.startswith('Wo'))
+
+    def test_blake256(self):
+        test_vectors = [
+            ('716f6e863f744b9ac22c97ec7b76ea5f5908bc5b2f67c61510bfc4751384ea7a', b''),
+            ('7576698ee9cad30173080678e5965916adbb11cb5245d386bf1ffda1cb26c9d7', b'The quick brown fox jumps over the lazy dog'),
+        ]
+        for expect_hash, data in test_vectors:
+            assert (blake256(data).hex() == expect_hash)
 
 
 if __name__ == '__main__':
