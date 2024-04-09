@@ -64,6 +64,9 @@ FIRO_VERSION_TAG = os.getenv('FIRO_VERSION_TAG', '')
 NAV_VERSION = os.getenv('NAV_VERSION', '7.0.3')
 NAV_VERSION_TAG = os.getenv('NAV_VERSION_TAG', '')
 
+DCR_VERSION = os.getenv('DCR_VERSION', '1.8.1')
+DCR_VERSION_TAG = os.getenv('DCR_VERSION_TAG', '')
+
 GUIX_SSL_CERT_DIR = None
 
 ADD_PUBKEY_URL = os.getenv('ADD_PUBKEY_URL', '')
@@ -83,6 +86,7 @@ known_coins = {
     'dash': (DASH_VERSION, DASH_VERSION_TAG, ('pasta',)),
     'firo': (FIRO_VERSION, FIRO_VERSION_TAG, ('reuben',)),
     'navcoin': (NAV_VERSION, NAV_VERSION_TAG, ('nav_builder',)),
+    'decred': (DCR_VERSION, DCR_VERSION_TAG, ('decred_release',)),
 }
 
 disabled_coins = [
@@ -100,6 +104,7 @@ expected_key_ids = {
     'pasta': ('52527BEDABE87984',),
     'reuben': ('1290A1D0FA7EE109',),
     'nav_builder': ('2782262BF6E7FADB',),
+    'decred_release': ('6D897EDF518A031D',),
 }
 
 USE_PLATFORM = os.getenv('USE_PLATFORM', platform.system())
@@ -159,6 +164,11 @@ BTC_RPC_PORT = int(os.getenv('BTC_RPC_PORT', 19996))
 BTC_ONION_PORT = int(os.getenv('BTC_ONION_PORT', 8334))
 BTC_RPC_USER = os.getenv('BTC_RPC_USER', '')
 BTC_RPC_PWD = os.getenv('BTC_RPC_PWD', '')
+
+DCR_RPC_HOST = os.getenv('DCR_RPC_HOST', '127.0.0.1')
+DCR_RPC_PORT = int(os.getenv('DCR_RPC_PORT', 9109))
+DCR_RPC_USER = os.getenv('DCR_RPC_USER', '')
+DCR_RPC_PWD = os.getenv('DCR_RPC_PWD', '')
 
 NMC_RPC_HOST = os.getenv('NMC_RPC_HOST', '127.0.0.1')
 NMC_RPC_PORT = int(os.getenv('NMC_RPC_PORT', 19698))
@@ -519,11 +529,25 @@ def extractCore(coin, version_data, settings, bin_dir, release_path, extra_opts=
                         logging.warning('Unable to set file permissions: %s, for %s', str(e), out_path)
         return
 
-    bins = [coin + 'd', coin + '-cli', coin + '-tx']
-    versions = version.split('.')
     dir_name = 'dashcore' if coin == 'dash' else coin
-    if int(versions[0]) >= 22 or int(versions[1]) >= 19:
-        bins.append(coin + '-wallet')
+    if coin == 'decred':
+        bins = ['dcrd', 'dcrwallet']
+    else:
+        bins = [coin + 'd', coin + '-cli', coin + '-tx']
+        versions = version.split('.')
+        if int(versions[0]) >= 22 or int(versions[1]) >= 19:
+            bins.append(coin + '-wallet')
+
+    def get_archive_path(b):
+        if coin == 'pivx':
+            return '{}-{}/bin/{}'.format(dir_name, version, b)
+        elif coin == 'particl' and '_nousb-' in release_path:
+            return '{}-{}_nousb/bin/{}'.format(dir_name, version + version_tag, b)
+        elif coin == 'decred':
+            return '{}-{}-v{}/{}'.format(dir_name, extra_opts['arch_name'], version, b)
+        else:
+            return '{}-{}/bin/{}'.format(dir_name, version + version_tag, b)
+
     if 'win32' in BIN_ARCH or 'win64' in BIN_ARCH:
         with zipfile.ZipFile(release_path) as fz:
             for b in bins:
@@ -531,7 +555,7 @@ def extractCore(coin, version_data, settings, bin_dir, release_path, extra_opts=
                 out_path = os.path.join(bin_dir, b)
                 if (not os.path.exists(out_path)) or extract_core_overwrite:
                     with open(out_path, 'wb') as fout:
-                        fout.write(fz.read('{}-{}/bin/{}'.format(dir_name, version, b)))
+                        fout.write(fz.read(get_archive_path(b)))
                     try:
                         os.chmod(out_path, stat.S_IRWXU | stat.S_IXGRP | stat.S_IXOTH)
                     except Exception as e:
@@ -541,15 +565,7 @@ def extractCore(coin, version_data, settings, bin_dir, release_path, extra_opts=
             for b in bins:
                 out_path = os.path.join(bin_dir, b)
                 if not os.path.exists(out_path) or extract_core_overwrite:
-
-                    if coin == 'pivx':
-                        filename = '{}-{}/bin/{}'.format(dir_name, version, b)
-                    elif coin == 'particl' and '_nousb-' in release_path:
-                        filename = '{}-{}_nousb/bin/{}'.format(dir_name, version + version_tag, b)
-                    else:
-                        filename = '{}-{}/bin/{}'.format(dir_name, version + version_tag, b)
-
-                    with open(out_path, 'wb') as fout, ft.extractfile(filename) as fi:
+                    with open(out_path, 'wb') as fout, ft.extractfile(get_archive_path(b)) as fi:
                         fout.write(fi.read())
                     try:
                         os.chmod(out_path, stat.S_IRWXU | stat.S_IXGRP | stat.S_IXOTH)
@@ -602,6 +618,39 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
         assert_path = os.path.join(bin_dir, assert_filename)
         if not os.path.exists(assert_path):
             downloadFile(assert_url, assert_path)
+
+    elif coin == 'decred':
+        arch_name = BIN_ARCH
+        if USE_PLATFORM == 'Darwin':
+            arch_name = 'darwin-amd64'
+        elif USE_PLATFORM == 'Windows':
+            arch_name = 'windows-amd64'
+        else:
+            machine: str = platform.machine()
+            if 'arm' in machine:
+                arch_name = 'linux-arm'
+            else:
+                arch_name = 'linux-amd64'
+
+        extra_opts['arch_name'] = arch_name
+        release_filename = '{}-{}-{}.{}'.format(coin, version, arch_name, FILE_EXT)
+        release_page_url = 'https://github.com/decred/decred-binaries/releases/download/v{}'.format(version)
+        release_url = release_page_url + '/' + 'decred-{}-v{}.{}'.format(arch_name, version, FILE_EXT)
+        release_path = os.path.join(bin_dir, release_filename)
+        if not os.path.exists(release_path):
+            downloadFile(release_url, release_path)
+
+        assert_filename = 'decred-v{}-manifest.txt'.format(version)
+        assert_url = release_page_url + '/' + assert_filename
+        assert_path = os.path.join(bin_dir, assert_filename)
+        if not os.path.exists(assert_path):
+            downloadFile(assert_url, assert_path)
+
+        assert_sig_filename = assert_filename + '.asc'
+        assert_sig_url = assert_url + '.asc'
+        assert_sig_path = os.path.join(bin_dir, assert_sig_filename)
+        if not os.path.exists(assert_sig_path):
+            downloadFile(assert_sig_url, assert_sig_path)
     else:
         major_version = int(version.split('.')[0])
 
@@ -1555,7 +1604,19 @@ def main():
             'override_feerate': 0.002,
             'conf_target': 2,
             'core_version_group': 21,
-            'chain_lookups': 'local',
+        },
+        'bitcoin': {
+            'connection_type': 'rpc' if 'bitcoin' in with_coins else 'none',
+            'manage_daemon': True if ('bitcoin' in with_coins and BTC_RPC_HOST == '127.0.0.1') else False,
+            'rpchost': BTC_RPC_HOST,
+            'rpcport': BTC_RPC_PORT + port_offset,
+            'onionport': BTC_ONION_PORT + port_offset,
+            'datadir': os.getenv('BTC_DATA_DIR', os.path.join(data_dir, 'bitcoin')),
+            'bindir': os.path.join(bin_dir, 'bitcoin'),
+            'use_segwit': True,
+            'blocks_confirmed': 1,
+            'conf_target': 2,
+            'core_version_group': 22,
         },
         'litecoin': {
             'connection_type': 'rpc' if 'litecoin' in with_coins else 'none',
@@ -1570,21 +1631,19 @@ def main():
             'conf_target': 2,
             'core_version_group': 21,
             'min_relay_fee': 0.00001,
-            'chain_lookups': 'local',
         },
-        'bitcoin': {
-            'connection_type': 'rpc' if 'bitcoin' in with_coins else 'none',
-            'manage_daemon': True if ('bitcoin' in with_coins and BTC_RPC_HOST == '127.0.0.1') else False,
-            'rpchost': BTC_RPC_HOST,
-            'rpcport': BTC_RPC_PORT + port_offset,
-            'onionport': BTC_ONION_PORT + port_offset,
-            'datadir': os.getenv('BTC_DATA_DIR', os.path.join(data_dir, 'bitcoin')),
-            'bindir': os.path.join(bin_dir, 'bitcoin'),
+        'decred': {
+            'connection_type': 'rpc' if 'decred' in with_coins else 'none',
+            'manage_daemon': True if ('decred' in with_coins and DCR_RPC_HOST == '127.0.0.1') else False,
+            'rpchost': DCR_RPC_HOST,
+            'rpcport': DCR_RPC_PORT + port_offset,
+            'datadir': os.getenv('DCR_DATA_DIR', os.path.join(data_dir, 'decred')),
+            'bindir': os.path.join(bin_dir, 'decred'),
             'use_segwit': True,
-            'blocks_confirmed': 1,
+            'blocks_confirmed': 2,
             'conf_target': 2,
-            'core_version_group': 22,
-            'chain_lookups': 'local',
+            'core_type_group': 'dcr',
+            'min_relay_fee': 0.00001,
         },
         'namecoin': {
             'connection_type': 'rpc' if 'namecoin' in with_coins else 'none',
@@ -1620,6 +1679,7 @@ def main():
             'rpctimeout': 60,
             'walletrpctimeout': 120,
             'walletrpctimeoutlong': 600,
+            'core_type_group': 'xmr',
         },
         'pivx': {
             'connection_type': 'rpc' if 'pivx' in with_coins else 'none',
@@ -1634,7 +1694,6 @@ def main():
             'blocks_confirmed': 1,
             'conf_target': 2,
             'core_version_group': 17,
-            'chain_lookups': 'local',
         },
         'dash': {
             'connection_type': 'rpc' if 'dash' in with_coins else 'none',
@@ -1649,7 +1708,6 @@ def main():
             'blocks_confirmed': 1,
             'conf_target': 2,
             'core_version_group': 18,
-            'chain_lookups': 'local',
         },
         'firo': {
             'connection_type': 'rpc' if 'firo' in with_coins else 'none',
@@ -1665,7 +1723,6 @@ def main():
             'conf_target': 2,
             'core_version_group': 14,
             'min_relay_fee': 0.00001,
-            'chain_lookups': 'local',
         },
         'navcoin': {
             'connection_type': 'rpc' if 'navcoin' in with_coins else 'none',
