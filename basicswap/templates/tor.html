@@ -1,4 +1,5 @@
 {% include 'header.html' %}
+{% from 'style.html' import breadcrumb_line_svg, circular_arrows_svg %} 
 <div class="container mx-auto">
  <section class="p-5 mt-5">
   <div class="flex flex-wrap items-center -m-2">
@@ -9,19 +10,11 @@
        <p>Home</p>
       </a>
      </li>
-     <li>
-      <svg width="6" height="15" viewBox="0 0 6 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-       <path d="M5.34 0.671999L2.076 14.1H0.732L3.984 0.671999H5.34Z" fill="#BBC3CF"></path>
-      </svg>
-     </li>
+    <li>{{ breadcrumb_line_svg | safe }}</li>
      <li>
       <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/tor">Tor</a>
      </li>
-     <li>
-      <svg width="6" height="15" viewBox="0 0 6 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-       <path d="M5.34 0.671999L2.076 14.1H0.732L3.984 0.671999H5.34Z" fill="#BBC3CF"></path>
-      </svg>
-     </li>
+    <li>{{ breadcrumb_line_svg | safe }}</li>
     </ul>
    </div>
   </div>
@@ -39,23 +32,13 @@
      </div>
      <div class="w-full md:w-1/2 p-3 p-6 container flex flex-wrap items-center justify-end items-center mx-auto">
       {% if refresh %}
-      <a id="refresh" href="/tor" class="flex flex-wrap justify-center px-5 py-4 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border dark:text-white dark:hover:text-white dark:bg-gray-600 dark:hover:bg-gray-700 dark:border-gray-600 dark:hover:border-gray-600 rounded-md shadow-button focus:ring-0 focus:outline-none">
-       <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
-        <g fill="#ffffff">
-         <path fill="#ffffff" d="M12,3c1.989,0,3.873,0.65,5.43,1.833l-3.604,3.393l9.167,0.983L22.562,0l-3.655,3.442 C16.957,1.862,14.545,1,12,1C5.935,1,1,5.935,1,12h2C3,7.037,7.037,3,12,3z"></path>
-         <path data-color="color-2" d="M12,21c-1.989,0-3.873-0.65-5.43-1.833l3.604-3.393l-9.167-0.983L1.438,24l3.655-3.442 C7.043,22.138,9.455,23,12,23c6.065,0,11-4.935,11-11h-2C21,16.963,16.963,21,12,21z"></path>
-        </g>
-       </svg>
+      <a id="refresh" href="/tor" class="rounded-full flex flex-wrap justify-center px-5 py-3 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border dark:bg-gray-500 dark:hover:bg-gray-700 border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+        {{ circular_arrows_svg | safe }}
        <span>Refresh {{ refresh }} seconds</span>
       </a>
       {% else %}
-      <a id="refresh" href="/tor" class="flex flex-wrap justify-center px-5 py-4 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white borderdark:text-white dark:hover:text-white dark:bg-gray-600 dark:hover:bg-gray-700 dark:border-gray-600 dark:hover:border-gray-600 border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
-       <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
-        <g fill="#ffffff">
-         <path fill="#ffffff" d="M12,3c1.989,0,3.873,0.65,5.43,1.833l-3.604,3.393l9.167,0.983L22.562,0l-3.655,3.442 C16.957,1.862,14.545,1,12,1C5.935,1,1,5.935,1,12h2C3,7.037,7.037,3,12,3z"></path>
-         <path data-color="color-2" d="M12,21c-1.989,0-3.873-0.65-5.43-1.833l3.604-3.393l-9.167-0.983L1.438,24l3.655-3.442 C7.043,22.138,9.455,23,12,23c6.065,0,11-4.935,11-11h-2C21,16.963,16.963,21,12,21z"></path>
-        </g>
-       </svg>
+      <a id="refresh" href="/tor" class="rounded-full flex flex-wrap justify-center px-5 py-3 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border dark:bg-gray-500 dark:hover:bg-gray-700 border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+        {{ circular_arrows_svg | safe }}
        <span>Refresh</span>
       </a>
     {% endif %}

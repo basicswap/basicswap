@@ -1,4 +1,5 @@
-{% from 'style.html' import notifications_network_offer_svg, notifications_bid_accepted_svg, notifications_unknow_event_svg, notifications_new_bid_on_offer_svg, notifications_close_svg, swap_in_progress_mobile_svg, wallet_svg, page_back_svg, order_book_svg, new_offer_svg, settings_svg, asettings_svg, cog_svg, rpc_svg, debug_svg, explorer_svg, tor_svg, smsg_svg, outputs_svg, automation_svg, shutdown_svg, notifications_svg, debug_nerd_svg, wallet_locked_svg, mobile_menu_svg, wallet_unlocked_svg, tor_purple_svg, sun_svg, moon_svg, swap_in_progress_svg, available_bids_svg, your_offers_svg, bids_received_svg, bids_sent_svg, header_arrow_down_svg %}
+{% from 'style.html' import notifications_network_offer_svg, notifications_bid_accepted_svg, notifications_unknow_event_svg, notifications_new_bid_on_offer_svg, notifications_close_svg, swap_in_progress_mobile_svg, wallet_svg, page_back_svg, order_book_svg, new_offer_svg, settings_svg, asettings_svg, cog_svg, rpc_svg, debug_svg, explorer_svg, tor_svg, smsg_svg, outputs_svg, automation_svg, shutdown_svg, notifications_svg, debug_nerd_svg, wallet_locked_svg, mobile_menu_svg, wallet_unlocked_svg, tor_purple_svg, sun_svg, moon_svg, swap_in_progress_svg, swap_in_progress_green_svg, available_bids_svg, your_offers_svg, bids_received_svg, bids_sent_svg, header_arrow_down_svg, love_svg %}
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -338,7 +339,11 @@
                   <li>
                     <a class="flex mr-5 items-center text-sm text-gray-400 hover:text-gray-600 dark:text-gray-100 dark:hover:text-gray-100" href="/active">
                       <div id="swapContainer" class="inline-flex center-spin ml-7 mr-2" {% if summary.num_swapping != 0 %}style="animation: spin 2s linear infinite;"{% endif %}>
+                        {% if summary.num_swapping != 0 %}
+                        {{ swap_in_progress_green_svg | safe }} 
+                        {% else %} 
                         {{ swap_in_progress_svg | safe }}
+                        {% endif %}  
                       </div>
                       <span>Swaps in Progress</span>
                       <span class="inline-flex justify-center items-center text-xs font-semibold ml-3 mr-2 px-2.5 py-1 font-small text-white bg-blue-500 rounded-full num-swap">{{ summary.num_swapping }}</span>

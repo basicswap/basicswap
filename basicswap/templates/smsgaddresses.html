@@ -1,4 +1,5 @@
 {% include 'header.html' %}
+{% from 'style.html' import breadcrumb_line_svg, input_arrow_down_svg, filter_apply_svg, circle_plus_svg, page_forwards_svg, page_back_svg %} 
 <div class="container mx-auto">
  <section class="p-5 mt-5">
   <div class="flex flex-wrap items-center -m-2">
@@ -9,19 +10,11 @@
        <p>Home</p>
       </a>
      </li>
-     <li>
-      <svg width="6" height="15" viewBox="0 0 6 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-       <path d="M5.34 0.671999L2.076 14.1H0.732L3.984 0.671999H5.34Z" fill="#BBC3CF"></path>
-      </svg>
-     </li>
+    <li>{{ breadcrumb_line_svg | safe }}</li>
      <li>
       <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/smsgaddresses">SMSG Addresses</a>
      </li>
-     <li>
-      <svg width="6" height="15" viewBox="0 0 6 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-       <path d="M5.34 0.671999L2.076 14.1H0.732L3.984 0.671999H5.34Z" fill="#BBC3CF"></path>
-      </svg>
-     </li>
+    <li>{{ breadcrumb_line_svg | safe }}</li>
     </ul>
    </div>
   </div>
@@ -43,7 +36,7 @@
  </section>
  {% include 'inc_messages.html' %}
  <form method="post">
-  {% if data.edit_address %}
+{% if data.edit_address %}
   <input type="hidden" name="edit_address_id" value="{{ data.addr_data.id }}">
   <input type="hidden" name="edit_address" value="{{ data.addr_data.addr }}">
   <section class="p-6 bg-body dark:bg-gray-700">
@@ -85,9 +78,7 @@
              <td class="py-3 px-6">Active</td>
              <td class="py-3 px-6">
               <div class="relative">
-               <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"></path>
-               </svg>
+                {{ input_arrow_down_svg| safe }} 
                <select class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="active_ind">
                 <option value="1" {% if data.addr_data.active_ind==1 %} selected{% endif %}>True</option>
                 <option value="0" {% if data.addr_data.active_ind==0 %} selected{% endif %}>False</option>
@@ -121,24 +112,10 @@
          <div class="px-6">
           <div class="flex flex-wrap justify-end">
            <div class="w-full md:w-auto p-1.5 ml-2">
-            <button name="saveaddr" value="Save Address" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
-             <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
-              <g stroke-linecap="square" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="miter" class="nc-icon-wrapper" stroke-miterlimit="10">
-               <line x1="12" y1="7" x2="12" y2="17" stroke="#ffffff"></line>
-               <line x1="17" y1="12" x2="7" y2="12" stroke="#ffffff"></line>
-               <circle cx="12" cy="12" r="11"></circle>
-              </g>
-             </svg>Save Address </button>
+            <button name="saveaddr" value="Save Address" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">Save Address</button>
            </div>
            <div class="w-full md:w-auto p-1.5 ml-2">
-            <button name="cancel" value="Cancel" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
-             <svg class="text-gray-500 w-5 h-5 mr-2" height="24" width="24" viewBox="0 0 24 24">
-              <g stroke-linecap="square" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="miter" class="nc-icon-wrapper" stroke-miterlimit="10">
-               <line data-cap="butt" x1="18" y1="12" x2="7" y2="12" stroke-linecap="butt" stroke="#ffffff"></line>
-               <polyline points=" 11,16 7,12 11,8 " stroke="#ffffff"></polyline>
-               <circle cx="12" cy="12" r="11"></circle>
-              </g>
-             </svg>Go Back </button>
+            <button name="cancel" value="Cancel" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">Back</button>
            </div>
           </div>
          </div>
@@ -207,24 +184,10 @@
          <div class="px-6">
           <div class="flex flex-wrap justify-end">
            <div class="w-full md:w-auto p-1.5 ml-2">
-            <button name="createnewaddr" value="Create Address" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
-             <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
-              <g stroke-linecap="square" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="miter" class="nc-icon-wrapper" stroke-miterlimit="10">
-               <line x1="12" y1="7" x2="12" y2="17" stroke="#ffffff"></line>
-               <line x1="17" y1="12" x2="7" y2="12" stroke="#ffffff"></line>
-               <circle cx="12" cy="12" r="11"></circle>
-              </g>
-             </svg>Create Address</button>
+            <button name="createnewaddr" value="Create Address" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">Create Address</button>
            </div>
            <div class="w-full md:w-auto p-1.5 ml-2">
-            <button name="cancel" value="Cancel" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
-             <svg class="text-gray-500 w-5 h-5 mr-2" height="24" width="24" viewBox="0 0 24 24">
-              <g stroke-linecap="square" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="miter" class="nc-icon-wrapper" stroke-miterlimit="10">
-               <line data-cap="butt" x1="18" y1="12" x2="7" y2="12" stroke-linecap="butt" stroke="#ffffff"></line>
-               <polyline points=" 11,16 7,12 11,8 " stroke="#ffffff"></polyline>
-               <circle cx="12" cy="12" r="11"></circle>
-              </g>
-             </svg>Go Back</button>
+            <button name="cancel" value="Cancel" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">Back</button>
            </div>
           </div>
          </div>
@@ -299,24 +262,10 @@
          <div class="px-6">
           <div class="flex flex-wrap justify-end">
            <div class="w-full md:w-auto p-1.5 ml-2">
-            <button name="createnewsendaddr" value="Add Address" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
-             <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
-              <g stroke-linecap="square" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="miter" class="nc-icon-wrapper" stroke-miterlimit="10">
-               <line x1="12" y1="7" x2="12" y2="17" stroke="#ffffff"></line>
-               <line x1="17" y1="12" x2="7" y2="12" stroke="#ffffff"></line>
-               <circle cx="12" cy="12" r="11"></circle>
-              </g>
-             </svg>Create Address</button>
+            <button name="createnewsendaddr" value="Add Address" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">Create Address</button>
            </div>
            <div class="w-full md:w-auto p-1.5 ml-2">
-            <button name="cancel" value="Cancel" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
-             <svg class="text-gray-500 w-5 h-5 mr-2" height="24" width="24" viewBox="0 0 24 24">
-              <g stroke-linecap="square" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="miter" class="nc-icon-wrapper" stroke-miterlimit="10">
-               <line data-cap="butt" x1="18" y1="12" x2="7" y2="12" stroke-linecap="butt" stroke="#ffffff"></line>
-               <polyline points=" 11,16 7,12 11,8 " stroke="#ffffff"></polyline>
-               <circle cx="12" cy="12" r="11"></circle>
-              </g>
-             </svg>Go Back</button>
+            <button name="cancel" value="Cancel" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">Back</button>
            </div>
           </div>
          </div>
@@ -360,15 +309,21 @@
             <tr class="opacity-100 text-gray-500 dark:text-gray-100">
              <td class="py-3 px-6 bold"> Sort by: </td>
              <td class="py-3 px-6">
+              <div class="relative">
+                {{ input_arrow_down_svg| safe }} 
               <select class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="sort_by">
                <option value="created_at" {% if filters.sort_by=='created_at' %} selected{% endif %}>Created At</option>
               </select>
+            </div>
              </td>
              <td class="py-3 px-6">
+             <div class="relative">
+                {{ input_arrow_down_svg| safe }} 
               <select class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="sort_dir">
                <option value="asc" {% if filters.sort_dir=='asc' %} selected{% endif %}>Ascending</option>
                <option value="desc" {% if filters.sort_dir=='desc' %} selected{% endif %}>Descending</option>
               </select>
+                </div>
              </td>
             </tr>
             <tr class="opacity-100 text-gray-500 dark:text-gray-100">
@@ -381,12 +336,15 @@
             <tr class="opacity-100 text-gray-500 dark:text-gray-100">
              <td class="py-3 px-6">Type</td>
              <td class="py-3 px-6">
+             <div class="relative">
+                {{ input_arrow_down_svg| safe }}                 
               <select class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="filter_addr_type">
                <option{% if filters.addr_type=="-1" %} selected{% endif %} value="-1">Any</option>
                 {% for a in page_data.addr_types %}
                 <option{% if filters.addr_type==a[0] %} selected{% endif %} value="{{ a[0] }}">{{ a[1] }}</option>
                 {% endfor %}
               </select>
+            </div>
              </td>
              <td class="py-4 pr-5"></td>
             </tr>
@@ -407,50 +365,22 @@
          <div class="px-6">
           <div class="flex flex-wrap justify-end">
            <div class="w-full md:w-auto p-1.5 ml-2">
-            <button name="clearfilters" value="Clear Filters" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
-             <svg class="mr-2 w-5 h-5" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
-              <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round">
-               <line x1="20" y1="2" x2="12.329" y2="11.506"></line>
-               <path d="M11,11a2,2,0,0,1,2,2,3.659,3.659,0,0,1-.2.891A9.958,9.958,0,0,0,13.258,23H1C1,16.373,4.373,11,11,11Z"></path>
-               <line x1="18" y1="15" x2="23" y2="15" stroke="#ffffff"></line>
-               <line x1="17" y1="19" x2="23" y2="19" stroke="#ffffff"></line>
-               <line x1="19" y1="23" x2="23" y2="23" stroke="#ffffff"></line>
-               <path d="M8.059,11.415A3.9,3.9,0,0,0,12,16c.041,0,.079-.011.12-.012" data-cap="butt"></path>
-               <path d="M5,23a13.279,13.279,0,0,1,.208-3.4" data-cap="butt"></path>
-               <path d="M9.042,23c-.688-1.083-.313-3.4-.313-3.4" data-cap="butt"></path>
-              </g>
-             </svg>Clear</button>
+            <button name="clearfilters" value="Clear Filters" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm hover:text-white dark:text-white dark:bg-gray-500 bg-coolGray-200 hover:bg-green-600 hover:border-green-600 rounded-lg transition duration-200 border border-coolGray-200 dark:border-gray-400 rounded-md shadow-button focus:ring-0 focus:outline-none">Clear</button>
            </div>
            <div class="w-full md:w-auto p-1.5 ml-2">
             <button name="applyfilters" value="Submit" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
-             <svg class="mr-2 w-5 h-5" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
-              <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round">
-               <rect x="2" y="2" width="7" height="7"></rect>
-               <rect x="15" y="15" width="7" height="7"></rect>
-               <rect x="2" y="15" width="7" height="7"></rect>
-               <polyline points="15 6 17 8 22 3" stroke="#ffffff"></polyline>
-              </g>
-             </svg>Apply Filters</button>
+            {{ filter_apply_svg | safe }}
+            Apply Filters</button>
            </div>
            <div class="w-full md:w-auto p-1.5 ml-2">
             <button name="shownewaddr" value="New Address" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
-             <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
-              <g stroke-linecap="square" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="miter" class="nc-icon-wrapper" stroke-miterlimit="10">
-               <line x1="12" y1="7" x2="12" y2="17" stroke="#ffffff"></line>
-               <line x1="17" y1="12" x2="7" y2="12" stroke="#ffffff"></line>
-               <circle cx="12" cy="12" r="11"></circle>
-              </g>
-             </svg>New Address</button>
+            {{ circle_plus_svg | safe }}
+            New Address</button>
            </div>
            <div class="w-full md:w-auto p-1.5 ml-2">
             <button name="showaddaddr" value="Add Sending Address" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
-             <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
-              <g stroke-linecap="square" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="miter" class="nc-icon-wrapper" stroke-miterlimit="10">
-               <line x1="12" y1="7" x2="12" y2="17" stroke="#ffffff"></line>
-               <line x1="17" y1="12" x2="7" y2="12" stroke="#ffffff"></line>
-               <circle cx="12" cy="12" r="11"></circle>
-              </g>
-             </svg>Add Sending Address</button>
+            {{ circle_plus_svg | safe }}
+            Add Sending Address</button>
            </div>
           </div>
          </div>
@@ -550,10 +480,8 @@
           <div class="flex flex-wrap justify-end">
            <div class="w-full md:w-auto p-1.5">
             <button type="submit" name='pageback' value="Page Back" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-blue-600 rounded-lg transition duration-200 focus:ring-0 focus:outline-none">
-             <svg aria-hidden="true" class="mr-2 w-5 h-5" fill="#ffffff" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-              <path fill-rule="evenodd" d="M7.707 14.707a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l2.293 2.293a1 1 0 010 1.414z" clip-rule="evenodd"></path>
-             </svg>
-             <span>Page Back</span>
+             {{ page_back_svg| safe }}
+             <span>Previous</span>
             </button>
            </div>
            <div class="flex items-center">
@@ -563,10 +491,8 @@
            </div>
            <div class="w-full md:w-auto p-1.5">
             <button type="submit" name='pageforwards' value="Page Forwards" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-blue-600 rounded-lg transition duration-200 focus:ring-0 focus:outline-none">
-             <span>Page Forwards</span>
-             <svg aria-hidden="true" class="ml-2 w-5 h-5" fill="#ffffff" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-              <path fill-rule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd"></path>
-             </svg>
+             <span>Next</span>
+            {{ page_forwards_svg| safe }}
             </button>
            </div>
           </div>

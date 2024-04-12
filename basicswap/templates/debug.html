@@ -1,4 +1,5 @@
 {% include 'header.html' %}
+{% from 'style.html' import breadcrumb_line_svg, start_process_svg %} 
 <div class="container mx-auto">
  <section class="p-5 mt-5">
   <div class="flex flex-wrap items-center -m-2">
@@ -9,19 +10,11 @@
        <p>Home</p>
       </a>
      </li>
-     <li>
-      <svg width="6" height="15" viewBox="0 0 6 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-       <path d="M5.34 0.671999L2.076 14.1H0.732L3.984 0.671999H5.34Z" fill="#BBC3CF"></path>
-      </svg>
-     </li>
+      <li> {{ breadcrumb_line_svg | safe }} </li>
      <li>
       <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/debug">Debug</a>
      </li>
-     <li>
-      <svg width="6" height="15" viewBox="0 0 6 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-       <path d="M5.34 0.671999L2.076 14.1H0.732L3.984 0.671999H5.34Z" fill="#BBC3CF"></path>
-      </svg>
-     </li>
+      <li> {{ breadcrumb_line_svg | safe }} </li>
     </ul>
    </div>
   </div>
@@ -35,7 +28,7 @@
     <div class="relative z-20 flex flex-wrap items-center -m-3">
      <div class="w-full md:w-1/2 p-3">
       <h2 class="mb-6 text-4xl font-bold text-white tracking-tighter">Debug</h2>
-      <p class="font-normal text-coolGray-200 dark:text-white">Debug options & Easter eggs.</p>
+      <p class="font-normal text-coolGray-200 dark:text-white">Expert debug options</p>
      </div>
     </div>
    </div>
@@ -70,24 +63,15 @@
             <tr class="opacity-100 text-gray-500 dark:text-gray-100">
              <td class="py-3 px-6 bold">Remove expired offers and bids</td>
              <td td class="py-3 px-6 ">
-              <button name="remove_expired" type="submit" value="Yes" class="flex flex-wrap justify-center py-2 px-4 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" onclick="return confirmRemoveExpired();">
-              Yes - Remove Data</button>
+              <button name="remove_expired" type="submit" value="Yes" class="w-60 flex flex-wrap justify-center py-2 px-4 bg-red-500 hover:bg-red-600 font-medium text-sm text-white border border-red-500 rounded-md shadow-button focus:ring-0 focus:outline-none" onclick="return confirmRemoveExpired();">
+              Remove Data</button>
              </td>
             </tr>
             <tr class="opacity-100 text-gray-500 dark:text-gray-100">
              <td class="py-3 px-6 bold">Reinitialise XMR wallet</td>
              <td td class="py-3 px-6 ">
-              <button name="reinit_xmr" type="submit" value="Yes" class="flex flex-wrap justify-center py-2 px-4 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
-               <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
-                <g stroke-linecap="square" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="miter" class="nc-icon-wrapper" stroke-miterlimit="10">
-                 <polyline points="2.966 1.13 2.237 6.927 7.929 5.341"></polyline>
-                 <path d="M2.921,18.2a11.006,11.006,0,0,1-1.041-1.9" stroke="#ffffff"></path>
-                 <path d="M8.461,22.412a11.07,11.07,0,0,1-1.529-.654q-.2-.1-.392-.214" stroke="#ffffff"></path>
-                 <path d="M15.539,22.41a11.062,11.062,0,0,1-2.06.486" stroke="#ffffff"></path>
-                 <path d="M21.08,18.206a10.984,10.984,0,0,1-1.438,1.705" stroke="#ffffff"></path>
-                 <path d="M2.759,6.027A11,11,0,0,1,22.9,13.464"></path>
-                </g>
-               </svg>Yes - Start Process</button>
+              <button name="reinit_xmr" type="submit" value="Yes" class="w-60 flex flex-wrap justify-center py-2 px-4 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+              {{ start_process_svg| safe }} Start Process</button>
              </td>
             </tr>
             <input type="hidden" name="formid" value="{{ form_id }}">

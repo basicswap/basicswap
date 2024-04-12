@@ -338,6 +338,17 @@
    </g>
 </svg>
 ' %}
+{% set swap_in_progress_green_svg = '
+<svg class="text-gray-100 w-5 h-5 " xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+   <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#66CD73" stroke-linejoin="round">
+      <circle data-cap="butt" cx="12" cy="12" r="3" stroke="#66CD73"></circle>
+      <polyline points="16.071 5.341 21.763 6.927 21.034 1.13"></polyline>
+      <path data-cap="butt" d="M1,12A11,11,0,0,1,21.763,6.927"></path>
+      <polyline points="7.929 18.659 2.237 17.073 2.966 22.87"></polyline>
+      <path data-cap="butt" d="M23,12A11,11,0,0,1,2.237,17.073"></path>
+   </g>
+</svg>
+' %}
 {% set swap_in_progress_mobile_svg = '
 <svg class="text-gray-100 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
    <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
@@ -441,4 +452,100 @@
    <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
 </svg>
 ' %}
+{% set confirm_green_svg = '
+<svg class="relative top-0.5" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+   <path d="M12.4732 4.80667C12.4112 4.74418 12.3375 4.69458 12.2563 4.66074C12.175 4.62689 12.0879 4.60947 11.9999 4.60947C11.9119 4.60947 11.8247 4.62689 11.7435 4.66074C11.6623 4.69458 11.5885 4.74418 11.5266 4.80667L6.55989 9.78L4.47322 7.68667C4.40887 7.62451 4.33291 7.57563 4.24967 7.54283C4.16644 7.51003 4.07755 7.49394 3.9881 7.49549C3.89865 7.49703 3.81037 7.51619 3.72832 7.55185C3.64627 7.58751 3.57204 7.63898 3.50989 7.70333C3.44773 7.76768 3.39885 7.84364 3.36605 7.92688C3.33324 8.01011 3.31716 8.099 3.31871 8.18845C3.32025 8.2779 3.3394 8.36618 3.37507 8.44823C3.41073 8.53028 3.4622 8.60451 3.52655 8.66667L6.08655 11.2267C6.14853 11.2892 6.22226 11.3387 6.3035 11.3726C6.38474 11.4064 6.47188 11.4239 6.55989 11.4239C6.64789 11.4239 6.73503 11.4064 6.81627 11.3726C6.89751 11.3387 6.97124 11.2892 7.03322 11.2267L12.4732 5.78667C12.5409 5.72424 12.5949 5.64847 12.6318 5.56414C12.6688 5.4798 12.6878 5.38873 12.6878 5.29667C12.6878 5.2046 12.6688 5.11353 12.6318 5.02919C12.5949 4.94486 12.5409 4.86909 12.4732 4.80667Z" fill="#2AD168"></path>
+</svg>
+' %}
+{% set green_cross_close_svg = '
+<svg aria-hidden="true" class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+   <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+</svg>
+' %}
+{% set red_cross_close_svg = '
+<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+   <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+</svg>
+' %}
+{% set white_automation_svg = '
+<svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
+   <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round">
+   <line data-cap="butt" x1="5" y1="1" x2="5" y2="6" stroke="#ffffff"></line>
+   <line x1="3" y1="1" x2="7" y2="1" stroke="#fffffwww"></line>
+   <line data-cap="butt" x1="19" y1="1" x2="19" y2="6" stroke="#ffffff"></line>
+   <line x1="17" y1="1" x2="21" y2="1" stroke="#ffffff"></line>
+   <rect x="6" y="15" width="12" height="4" stroke="#ffffff"></rect>
+   <line data-cap="butt" x1="10" y1="19" x2="10" y2="15" stroke="#ffffff"></line>
+   <line data-cap="butt" x1="14" y1="19" x2="14" y2="15" stroke="#ffffff"></line>
+   <line x1="6" y1="11" x2="8" y2="11" stroke="#ffffff"></line>
+   <line x1="16" y1="11" x2="18" y2="11" stroke="#fff"></line>
+   <polygon points="23 6 5 6 1 6 1 23 23 23 23 6"></polygon>
+   </g>
+</svg>
+' %}
+{% set start_process_svg = '
+<svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
+   <g stroke-linecap="square" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="miter" class="nc-icon-wrapper" stroke-miterlimit="10">
+   <polyline points="2.966 1.13 2.237 6.927 7.929 5.341"></polyline>
+   <path d="M2.921,18.2a11.006,11.006,0,0,1-1.041-1.9" stroke="#ffffff"></path>
+   <path d="M8.461,22.412a11.07,11.07,0,0,1-1.529-.654q-.2-.1-.392-.214" stroke="#ffffff"></path>
+   <path d="M15.539,22.41a11.062,11.062,0,0,1-2.06.486" stroke="#ffffff"></path>
+   <path d="M21.08,18.206a10.984,10.984,0,0,1-1.438,1.705" stroke="#ffffff"></path>
+   <path d="M2.759,6.027A11,11,0,0,1,22.9,13.464"></path>
+   </g>
+</svg>
+' %}
+{% set love_svg = '
+<svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
+   <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#f80b0b" stroke-linejoin="round">
+   <path d="M21.243,3.757 c-2.343-2.343-6.142-2.343-8.485,0c-0.289,0.289-0.54,0.6-0.757,0.927c-0.217-0.327-0.469-0.639-0.757-0.927 c-2.343-2.343-6.142-2.343-8.485,0c-2.343,2.343-2.343,6.142,0,8.485L12,21.485l9.243-9.243C23.586,9.899,23.586,6.1,21.243,3.757z"></path>
+   </g>
+</svg>
+' %}
+{% set github_svg = '
+<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+   <path d="M9 0C4.0275 0 0 4.13211 0 9.22838C0 13.3065 2.5785 16.7648 6.15375 17.9841C6.60375 18.0709 6.76875 17.7853 6.76875 17.5403C6.76875 17.3212 6.76125 16.7405 6.7575 15.9712C4.254 16.5277 3.726 14.7332 3.726 14.7332C3.3165 13.6681 2.72475 13.3832 2.72475 13.3832C1.9095 12.8111 2.78775 12.8229 2.78775 12.8229C3.6915 12.887 4.16625 13.7737 4.16625 13.7737C4.96875 15.1847 6.273 14.777 6.7875 14.5414C6.8685 13.9443 7.10025 13.5381 7.3575 13.3073C5.35875 13.0764 3.258 12.2829 3.258 8.74709C3.258 7.73988 3.60675 6.91659 4.18425 6.27095C4.083 6.03774 3.77925 5.0994 4.263 3.82846C4.263 3.82846 5.01675 3.58116 6.738 4.77462C7.458 4.56958 8.223 4.46785 8.988 4.46315C9.753 4.46785 10.518 4.56958 11.238 4.77462C12.948 3.58116 13.7017 3.82846 13.7017 3.82846C14.1855 5.0994 13.8818 6.03774 13.7917 6.27095C14.3655 6.91659 14.7142 7.73988 14.7142 8.74709C14.7142 12.2923 12.6105 13.0725 10.608 13.2995C10.923 13.5765 11.2155 14.1423 11.2155 15.0071C11.2155 16.242 11.2043 17.2344 11.2043 17.5341C11.2043 17.7759 11.3617 18.0647 11.823 17.9723C15.4237 16.7609 18 13.3002 18 9.22838C18 4.13211 13.9703 0 9 0Z" fill="currentColor"></path>
+</svg>
+' %}
+{% set index_wallet_svg = '
+<svg width="21" height="21" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+   <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round">
+   <path d="M6,3H3C1.895,3,1,3.895,1,5 v0c0,1.105,0.895,2,2,2"></path>
+   <polyline points=" 6,7 6,1 20,1 20,7 " stroke="#ffffff"></polyline>
+   <path d="M23,7H3 C1.895,7,1,6.105,1,5v15c0,1.657,1.343,3,3,3h19V7z"></path>
+   <circle cx="17" cy="15" r="2"></circle>
+   </g>
+</svg>
+' %}
+{% set index_trading_svg = '
+<svg width="21" height="21" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+   <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round">
+   <circle cx="5" cy="5" r="4"></circle>
+   <circle cx="19" cy="19" r="4"></circle>
+   <polyline data-cap="butt" points="13,5 21,5 21,11 " stroke="#ffffff"></polyline>
+   <polyline data-cap="butt" points="11,19 3,19 3,13 " stroke="#ffffff"></polyline>
+   <polyline points=" 16,2 13,5 16,8 " stroke="#ffffff"></polyline>
+   <polyline points=" 8,16 11,19 8,22 " stroke="#ffffff"></polyline>
+   </g>
+</svg>
+' %}
+{% set index_support_svg = '
+<svg width="22" height="22" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+   <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round">
+   <line x1="23" y1="11" x2="23" y2="16" stroke="#ffffff"></line>
+   <polygon points="12,13 2,8 12,3 22,8 "></polygon>
+   <path data-cap="butt" d="M5,9.5V18c0,1.657,3.134,3,7,3 s7-1.343,7-3V9.5"></path>
+   </g>
+</svg>
+' %}
+{% set circle_plus_svg = '
+<svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
+   <g stroke-linecap="square" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="miter" class="nc-icon-wrapper" stroke-miterlimit="10">
+   <line x1="12" y1="7" x2="12" y2="17" stroke="#ffffff"></line>
+   <line x1="17" y1="12" x2="7" y2="12" stroke="#ffffff"></line>
+   <circle cx="12" cy="12" r="11"></circle>
+   </g>
+</svg>
+' %}
+
 {% set select_box_class = 'hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0' %}

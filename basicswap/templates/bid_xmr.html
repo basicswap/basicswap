@@ -40,25 +40,17 @@
     <div class="relative z-20 flex flex-wrap items-center -m-3">
      <div class="w-full md:w-1/2 p-3">
       <h2 class="mb-6 text-4xl font-bold text-white tracking-tighter">Bid {% if debug_mode == true %} (Debug: bid_xmr template) {% endif %}</h2>
-      <p class="font-normal text-coolGray-200 dark:text-white">Bid ID: {{ bid_id }}</p>
+      <p class="font-normal text-coolGray-200 dark:text-white"><span class="bold">Bid ID:</span> {{ bid_id }}</p>
      </div>
-     <div class="w-full md:w-1/2 p-3 p-6 container flex flex-wrap items-center justify-end items-center mx-auto"> {% if refresh %} <a id="refresh" href="/bid/{{ bid_id }}" class="flex flex-wrap justify-center px-5 py-3 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border dark:bg-gray-500 dark:hover:bg-gray-700 border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
-       <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
-        <g fill="#ffffff">
-         <path fill="#ffffff" d="M12,3c1.989,0,3.873,0.65,5.43,1.833l-3.604,3.393l9.167,0.983L22.562,0l-3.655,3.442 C16.957,1.862,14.545,1,12,1C5.935,1,1,5.935,1,12h2C3,7.037,7.037,3,12,3z"></path>
-         <path data-color="color-2" d="M12,21c-1.989,0-3.873-0.65-5.43-1.833l3.604-3.393l-9.167-0.983L1.438,24l3.655-3.442 C7.043,22.138,9.455,23,12,23c6.065,0,11-4.935,11-11h-2C21,16.963,16.963,21,12,21z"></path>
-        </g>
-       </svg>
+     <div class="w-full md:w-1/2 p-3 p-6 container flex flex-wrap items-center justify-end items-center mx-auto">
+      {% if refresh %} 
+      <a id="refresh" href="/bid/{{ bid_id }}"  class="rounded-full flex flex-wrap justify-center px-5 py-3 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border dark:bg-gray-500 dark:hover:bg-gray-700 border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+        {{ circular_arrows_svg | safe }}
        <span>Refresh {{ refresh }} seconds</span>
       </a>
       {% else %}
-      <a id="refresh" href="/bid/{{ bid_id }}" class="flex flex-wrap justify-center px-5 py-3 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border dark:bg-gray-500 dark:hover:bg-gray-700 border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
-       <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
-        <g fill="#ffffff">
-         <path fill="#ffffff" d="M12,3c1.989,0,3.873,0.65,5.43,1.833l-3.604,3.393l9.167,0.983L22.562,0l-3.655,3.442 C16.957,1.862,14.545,1,12,1C5.935,1,1,5.935,1,12h2C3,7.037,7.037,3,12,3z"></path>
-         <path data-color="color-2" d="M12,21c-1.989,0-3.873-0.65-5.43-1.833l3.604-3.393l-9.167-0.983L1.438,24l3.655-3.442 C7.043,22.138,9.455,23,12,23c6.065,0,11-4.935,11-11h-2C21,16.963,16.963,21,12,21z"></path>
-        </g>
-       </svg>
+      <a id="refresh" href="/bid/{{ bid_id }}"  class="rounded-full flex flex-wrap justify-center px-5 py-3 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border dark:bg-gray-500 dark:hover:bg-gray-700 border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+        {{ circular_arrows_svg | safe }}
        <span>Refresh</span>
       </a>
     {% endif %}
@@ -101,7 +93,7 @@
               <svg aria-hidden="true " class="w-5 h-5 ml-3 mr-3" fill="currentColor " viewBox="0 0 20 20 " xmlns="http://www.w3.org/2000/svg ">
                <path fill-rule="evenodd " d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z " clip-rule="evenodd "></path>
               </svg>
-              <span class="text-xs bold">{{ data.amt_from }} {{ data.ticker_from }}</span>
+              <span class="bold">{{ data.amt_from }} {{ data.ticker_from }}</span>
              </div>
             </td>
            </tr>

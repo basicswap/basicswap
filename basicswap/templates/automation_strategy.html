@@ -1,4 +1,5 @@
 {% include 'header.html' %}
+{% from 'style.html' import breadcrumb_line_svg %}
 <div class="container mx-auto">
  <section class="p-5 mt-5">
   <div class="flex flex-wrap items-center -m-2">
@@ -8,21 +9,13 @@
       <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/">
        <p>Home</p>
       </a>
-     <li>
-      <svg width="6" height="15" viewBox="0 0 6 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-       <path d="M5.34 0.671999L2.076 14.1H0.732L3.984 0.671999H5.34Z" fill="#BBC3CF"></path>
-      </svg>
-     </li>
+        <li>{{ breadcrumb_line_svg | safe }}</li>
      <li>
       <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/automation">Automation Strategies</a>
      </li>
+        <li>{{ breadcrumb_line_svg | safe }}</li>
      <li>
-      <svg width="6" height="15" viewBox="0 0 6 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-       <path d="M5.34 0.671999L2.076 14.1H0.732L3.984 0.671999H5.34Z" fill="#BBC3CF"></path>
-      </svg>
-     </li>
-     <li>
-      <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/automation">ID: <!-- todo ID here {{ strategy_id }} --></a>
+      <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/automation">ID:<!-- todo ID here {{ strategy_id }} --></a>
      </li>
     </ul>
     </ul>
@@ -38,7 +31,7 @@
     <div class="relative z-20 flex flex-wrap items-center -m-3">
      <div class="w-full md:w-1/2 p-3">
       <h2 class="mb-6 text-4xl font-bold text-white tracking-tighter">Automation Strategy {{ strategy_id }}</h2>
-      <p class="font-normal text-coolGray-200 dark:text-white">ID: <!-- todo ID here  {{ strategy_id }} -->
+      <p class="font-normal text-coolGray-200 dark:text-white"><span class="bold">ID:</span><!-- todo ID here  {{ strategy_id }} -->
       </p>
      </div>
     </div>
@@ -66,7 +59,7 @@
               </th>
               <th class="p-0">
                <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
-                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Type</span>
+                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Input</span>
                </div>
               </th>
              </tr>
@@ -114,42 +107,17 @@
          <div class="flex flex-wrap justify-end">
           {% if show_edit_form %}
           <div class="w-full md:w-auto p-1.5 ml-2">
-           <button name="apply" value="Apply" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
-            <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
-             <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round">
-              <polyline points=" 6,12 10,16 18,8 " stroke="#ffffff"></polyline>
-              <circle cx="12" cy="12" r="11"></circle>
-             </g>
-            </svg>Apply</button>
+           <button name="apply" value="Apply" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">Apply</button>
           </div>
           <div class="w-full md:w-auto p-1.5 ml-2">
-           <button name="cancel" value="Cancel" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-red-500 hover:bg-red-600 font-medium text-sm text-white border border-red-500 rounded-md shadow-button focus:ring-0 focus:outline-none" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
-            <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ef5844" stroke-linejoin="round">
-             <line x1="16" y1="8" x2="8" y2="16" stroke="#ef5844"></line>
-             <line x1="16" y1="16" x2="8" y2="8" stroke="#ef5844"></line>
-             <circle cx="12" cy="12" r="11"></circle>
-            </g>
-            </svg>Cancel</button>
-          </div> {% else %} <div class="w-full md:w-auto p-1.5">
-           <button name="edit" value="edit" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
-            <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
-             <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round">
-              <line x1="2" y1="23" x2="22" y2="23" stroke="#ffffff"></line>
-              <line data-cap="butt" x1="13" y1="5" x2="17" y2="9"></line>
-              <polygon points="8 18 3 19 4 14 16 2 20 6 8 18"></polygon>
-             </g>
-            </svg>Edit</button>
+           <button name="cancel" value="Cancel" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-red-500 hover:bg-red-600 font-medium text-sm text-white border border-red-500 rounded-md shadow-button focus:ring-0 focus:outline-none">Cancel</button>
+          </div>
+          {% else %}
+          <div class="w-full md:w-auto p-1.5">
+           <button name="edit" value="edit" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">Edit</button>
           </div>
           <div class="w-full md:w-auto p-1.5 ml-2">
-           <a href="/automation" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
-            <svg class="text-gray-500 w-5 h-5 mr-2" height="24" width="24" viewBox="0 0 24 24">
-             <g stroke-linecap="square" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="miter" class="nc-icon-wrapper" stroke-miterlimit="10">
-              <line data-cap="butt" x1="18" y1="12" x2="7" y2="12" stroke-linecap="butt" stroke="#ffffff"></line>
-              <polyline points=" 11,16 7,12 11,8 " stroke="#ffffff"></polyline>
-              <circle cx="12" cy="12" r="11"></circle>
-             </g>
-            </svg>
-            <span>Back</span>
+           <a href="/automation" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none"><span>Back</span>
            </a>
           </div>
           {% endif %}

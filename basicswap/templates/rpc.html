@@ -1,4 +1,5 @@
 {% include 'header.html' %}
+{% from 'style.html' import breadcrumb_line_svg, input_arrow_down_svg %} 
 <div class="container mx-auto">
  <section class="p-5 mt-5">
   <div class="flex flex-wrap items-center -m-2">
@@ -9,19 +10,11 @@
        <p>Home</p>
       </a>
      </li>
-     <li>
-      <svg width="6" height="15" viewBox="0 0 6 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-       <path d="M5.34 0.671999L2.076 14.1H0.732L3.984 0.671999H5.34Z" fill="#BBC3CF"></path>
-      </svg>
-     </li>
+    <li> {{ breadcrumb_line_svg | safe }} </li>
      <li>
       <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/rpc">RPC Console</a>
      </li>
-     <li>
-      <svg width="6" height="15" viewBox="0 0 6 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-       <path d="M5.34 0.671999L2.076 14.1H0.732L3.984 0.671999H5.34Z" fill="#BBC3CF"></path>
-      </svg>
-     </li>
+    <li> {{ breadcrumb_line_svg | safe }} </li>
     </ul>
    </div>
   </div>
@@ -35,7 +28,6 @@
     <div class="relative z-20 flex flex-wrap items-center -m-3">
      <div class="w-full md:w-1/2 p-3">
       <h2 class="mb-6 text-4xl font-bold text-white tracking-tighter">RPC Console</h2>
-      <p class="font-normal text-coolGray-200 dark:text-white">Manage your BasicSwap client and coins settings.</p>
      </div>
     </div>
    </div>
@@ -70,9 +62,7 @@
             <tr class="opacity-100 text-gray-500 dark:text-gray-100">
              <td class="py-3 px-6">
               <div class="relative">
-               <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"></path>
-               </svg>
+                {{ input_arrow_down_svg| safe }} 
                <select class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="coin_type">
                 <option value="-1" {% if coin_type==-1 %} selected{% endif %}>Select Coin</option>
                 {% for c in coins %}
@@ -88,9 +78,7 @@
             <tr class="opacity-100 text-gray-500 dark:text-gray-100">
              <td class="py-3 px-6">
               <div class="relative">
-               <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"></path>
-               </svg>
+                {{ input_arrow_down_svg| safe }} 
                <select class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="call_type">
                 <option value="cli" {% if call_type=="cli" %} selected{% endif %}>CLI</option>
                 <option value="http" {% if call_type=="http" %} selected{% endif %}>HTTP</option>
@@ -121,13 +109,7 @@
         <div class="px-6">
          <div class="flex flex-wrap justify-end">
           <div class="w-full md:w-auto p-1.5 ml-2">
-           <button name="apply" value="Apply" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
-            <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
-             <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round">
-              <polyline points=" 6,12 10,16 18,8 " stroke="#ffffff"></polyline>
-              <circle cx="12" cy="12" r="11"></circle>
-             </g>
-            </svg>Apply </button>
+           <button name="apply" value="Apply" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">Apply</button>
           </div>
          </div>
         </div>
@@ -138,14 +120,15 @@
    </div>
   </div>
  </section>
+
  {% if result %}
- <section>
+<section class="rounded-xl">
   <div class="pl-6 pr-6 pt-0 pb-0 h-full overflow-hidden">
    <div class="border-coolGray-100">
     <div class="flex flex-wrap items-center justify-between -m-2">
      <div class="w-full pt-2">
       <div class="container mt-5 mx-auto">
-       <div class="pt-6 pb-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
+       <div class="pt-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl rounded-bl-none rounded-br-none">
         <div class="px-6">
          <div class="w-full mt-6 pb-6 overflow-x-auto">
           <table class="w-full min-w-max text-sm">
@@ -153,7 +136,7 @@
             <tr class="text-left">
              <th class="p-0">
               <div class="py-3 px-6 rounded-tl-xl bg-coolGray-200 dark:bg-gray-600">
-               <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">RPC Console Output</span>
+               <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">RPC Console Output:</span>
               </div>
              </th>
             </tr>
@@ -165,14 +148,31 @@
            </tr>
           </table>
          </div>
-        </div>
-        {% endif %}
+        </div>  
         </form>
        </div>
       </div>
      </div>
     </div>
  </section>
+  <section>
+  <div class="pl-6 pr-6 pt-0 pb-0 h-full overflow-hidden ">
+   <div class="pb-6 ">
+    <div class="flex flex-wrap items-center justify-between -m-2">
+     <div class="w-full pt-2">
+      <div class="container mx-auto">
+       <div class="pt-6 pb-6 bg-coolGray-100 dark:border-gray-400 dark:bg-gray-500 rounded-bl-xl rounded-br-xl">
+        <div class="px-6">
+         <div class="flex flex-wrap justify-end">
+         </div>
+        </div>
+       </div>
+      </div>
+     </div>
+    </div>
+   </div>
+ </section>
+{% endif %}
 </div>
 {% include 'footer.html' %}
 </body>

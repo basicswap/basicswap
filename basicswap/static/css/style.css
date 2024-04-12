@@ -161,3 +161,59 @@
   background-position: center;
   background-size: 20px 20px;
 }
+
+.input-like-container {
+  max-width: 100%;
+  background-color: #ffffff;
+  width: 360px;
+  padding: 1rem;
+  color: #374151;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  outline: none;
+  word-wrap: break-word;
+  height: 90px;
+  color: #374151;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  outline: none;
+  word-break: break-all;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.input-like-container.copying {
+  width: inherit;
+}
+
+.qrcode {
+  position: relative;
+  display: inline-block;
+  padding: 10px;
+  overflow: hidden;
+  position: relative;
+}
+
+.qrcode-border {
+  border: 2px solid;
+  border-color: rgba(59, 130, 246, var(--tw-border-opacity));
+  border-radius: 20px;
+}
+
+.qrcode img {
+  width: 100%;
+  height: auto;
+  border-radius: 15px;
+}
+
+#showQR {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  height:25px;
+}

@@ -1,287 +1,219 @@
 {% include 'header.html' %}
+{% from 'style.html' import breadcrumb_line_svg, page_back_svg, page_forwards_svg, filter_clear_svg, filter_apply_svg, circular_arrows_svg, input_arrow_down_svg %}
 <div class="container mx-auto">
- <section class="p-5 mt-5">
-  <div class="flex flex-wrap items-center -m-2">
-   <div class="w-full md:w-1/2 p-2">
-    <ul class="flex flex-wrap items-center gap-x-3 mb-2">
-     <li>
-      <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/">
-       <p>Home</p>
-      </a>
-     </li>
-     <li>
-      <svg width="6" height="15" viewBox="0 0 6 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-       <path d="M5.34 0.671999L2.076 14.1H0.732L3.984 0.671999H5.34Z" fill="#BBC3CF"></path>
-      </svg>
-     </li>
-     <li>
-      <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="#">{{ page_type_available }} {{ page_type_received }} {{ page_type_sent }}</a>
-     </li>
-     <li>
-      <svg width="6" height="15" viewBox="0 0 6 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-       <path d="M5.34 0.671999L2.076 14.1H0.732L3.984 0.671999H5.34Z" fill="#BBC3CF"></path>
-      </svg>
-     </li>
-    </ul>
-   </div>
-  </div>
- </section>
- <section class="py-4">
-  <div class="container px-4 mx-auto">
-   <div class="relative py-11 px-16 bg-coolGray-900 dark:bg-blue-500 rounded-md overflow-hidden">
-    <img class="absolute z-10 left-4 top-4" src="/static/images/elements/dots-red.svg" alt="">
-    <img class="absolute z-10 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt="">
-    <img class="absolute h-64 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" src="/static/images/elements/wave.svg" alt="">
-    <div class="relative z-20 flex flex-wrap items-center -m-3">
-     <div class="w-full md:w-1/2 p-3">
-      <h2 class="mb-6 text-4xl font-bold text-white tracking-tighter">{{ page_type_available }} {{ page_type_received }} {{ page_type_sent }}</h2>
-      <p class="font-normal text-coolGray-200 dark:text-white">{{ page_type_available_description }} {{ page_type_received_description }} {{ page_type_sent_description }}</p>
-     </div>
-     <div class="w-full md:w-1/2 p-3 p-6 container flex flex-wrap items-center justify-end items-center mx-auto"> {% if refresh %} <a id="refresh" href="/bid/{{ bid_id }}" class="flex flex-wrap justify-center px-5 py-4 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
-       <svg class="text-gray-500 w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
-        <g fill="#ffffff">
-         <path fill="#ffffff" d="M12,3c1.989,0,3.873,0.65,5.43,1.833l-3.604,3.393l9.167,0.983L22.562,0l-3.655,3.442 C16.957,1.862,14.545,1,12,1C5.935,1,1,5.935,1,12h2C3,7.037,7.037,3,12,3z"></path>
-         <path data-color="color-2" d="M12,21c-1.989,0-3.873-0.65-5.43-1.833l3.604-3.393l-9.167-0.983L1.438,24l3.655-3.442 C7.043,22.138,9.455,23,12,23c6.065,0,11-4.935,11-11h-2C21,16.963,16.963,21,12,21z"></path>
-        </g>
-       </svg>
-       <span>Refresh {{ refresh }} seconds</span>
-      </a>
-    {% endif %}
+  <section class="p-5 mt-5">
+    <div class="flex flex-wrap items-center -m-2">
+      <div class="w-full md:w-1/2 p-2">
+        <ul class="flex flex-wrap items-center gap-x-3 mb-2">
+          <li>
+            <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/"><p>Home</p></a>
+          </li>
+          <li> {{ breadcrumb_line_svg | safe }} </li>
+          <li> <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="#">{{ page_type_available }} {{ page_type_received }} {{ page_type_sent }}</a> </li>
+          <li> {{ breadcrumb_line_svg | safe }} </li>
+        </ul>
       </div>
     </div>
-   </div>
-  </div>
- </section>
- {% include 'inc_messages.html' %}
- <div class="pl-6 pr-6 pt-0 pb-0 mt-5 h-full overflow-hidden">
-  <div class="pb-6 border-coolGray-100">
-   <div class="flex flex-wrap items-center justify-between -m-2">
-    <div class="w-full pt-2">
-     <form method="post">
-      <div class="flex justify-between items-center pb-4 dark:text-white">
-       <div class="rounded-b-md">
-        <div class="w-full md:w-0/12">
-         <div class="flex flex-wrap justify-end -m-1.5">
-          <div class="w-full md:w-auto p-1.5">
-           <div class="relative">
-            <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-             <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"></path>
-            </svg>
-            <select name="sort_by" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
-             <option value="created_at" {% if filters.sort_by=='created_at' %} selected{% endif %}>Time At</option>
-            </select>
-           </div>
+  </section>
+  <section class="py-4">
+    <div class="container px-4 mx-auto">
+      <div class="relative py-11 px-16 bg-coolGray-900 dark:bg-blue-500 rounded-md overflow-hidden">
+        <img class="absolute z-10 left-4 top-4" src="/static/images/elements/dots-red.svg" alt=""> <img class="absolute z-10 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt="">
+        <img class="absolute h-64 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" src="/static/images/elements/wave.svg" alt="">
+        <div class="relative z-20 flex flex-wrap items-center -m-3">
+          <div class="w-full md:w-1/2 p-3">
+            <h2 class="mb-6 text-4xl font-bold text-white tracking-tighter">{{ page_type_available }} {{ page_type_received }} {{ page_type_sent }}</h2>
+            <p class="font-normal text-coolGray-200 dark:text-white">{{ page_type_available_description }} {{ page_type_received_description }} {{ page_type_sent_description }}</p>
           </div>
-          <div class="w-full md:w-auto p-1.5">
-           <div class="relative">
-            <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-             <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"></path>
-            </svg>
-            <select name="sort_dir" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
-             <option value="asc" {% if filters.sort_dir=='asc' %} selected{% endif %}>Ascending</option>
-             <option value="desc" {% if filters.sort_dir=='desc' %} selected{% endif %}>Descending</option>
-            </select>
-           </div>
-          </div>
-          <div class="flex items-center">
-           <div class="w-full md:w-auto p-1.5">
-            <p class="text-sm font-heading bold">State:</p>
-           </div>
-          </div>
-          <div class="w-full md:w-auto p-1.5">
-           <div class="relative">
-            <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-             <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"></path>
-            </svg>
-            <select name="state" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
-             <option value="-1" {% if filters.bid_state_ind==-1 %} selected{% endif %}>Any</option>
-             {% for s in data.bid_states %}
-             <option value="{{ s[0] }}" {% if filters.bid_state_ind==s[0] %} selected{% endif %}>{{ s[1] }}</option>
-             {% endfor %}
-            </select>
-           </div>
-          </div>
-          <div class="flex items-center">
-           <div class="w-full md:w-auto p-1.5">
-            <p class="text-sm font-heading bold">Include Expired:</p>
-           </div>
-          </div>
-          <div class="w-full md:w-auto p-1.5">
-           <div class="relative">
-            <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-             <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"></path>
-            </svg>
-            <select name="with_expired" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
-             <option value="true" {% if filters.with_expired==true %} selected{% endif %}>Include</option>
-             <option value="false" {% if filters.with_expired==false %} selected{% endif %}>Exclude</option>
-            </select>
-           </div>
-          </div>
-          <div class="w-full md:w-auto p-1.5">
-           <div class="relative">
-            <button type="submit" name='clearfilters' value="Clear Filters" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-white bg-blue-500 hover:bg-blue-600 rounded-lg transition duration-200 border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
-             <svg class="mr-2 w-5 h-5" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
-              <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#fff" stroke-linejoin="round">
-               <line x1="20" y1="2" x2="12.329" y2="11.506"></line>
-               <path d="M11,11a2,2,0,0,1,2,2,3.659,3.659,0,0,1-.2.891A9.958,9.958,0,0,0,13.258,23H1C1,16.373,4.373,11,11,11Z"></path>
-               <line x1="18" y1="15" x2="23" y2="15" stroke="#fff"></line>
-               <line x1="17" y1="19" x2="23" y2="19" stroke="#fff"></line>
-               <line x1="19" y1="23" x2="23" y2="23" stroke="#fff"></line>
-               <path d="M8.059,11.415A3.9,3.9,0,0,0,12,16c.041,0,.079-.011.12-.012" data-cap="butt"></path>
-               <path d="M5,23a13.279,13.279,0,0,1,.208-3.4" data-cap="butt"></path>
-               <path d="M9.042,23c-.688-1.083-.313-3.4-.313-3.4" data-cap="butt"></path>
-              </g>
-             </svg>
-             <span>Clear</span>
-            </button>
-           </div>
-          </div>
-          <div class="w-full md:w-auto p-1.5">
-           <div class="relative">
-            <button type="submit" name='applyfilters' value="Apply Filters" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-white bg-blue-500 hover:bg-blue-600 rounded-lg transition duration-200 border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
-             <svg class="mr-2 w-5 h-5" xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24">
-              <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#fff" stroke-linejoin="round">
-               <rect x="2" y="2" width="7" height="7"></rect>
-               <rect x="15" y="15" width="7" height="7"></rect>
-               <rect x="2" y="15" width="7" height="7"></rect>
-               <polyline points="15 6 17 8 22 3" stroke="#fff"></polyline>
-              </g>
-             </svg>
-             <span>Apply Filters</span>
-            </button>
-           </div>
-          </div>
-         </div>
+          <div class="w-full md:w-1/2 p-3 p-6 container flex flex-wrap items-center justify-end items-center mx-auto">
+            {% if refresh %}
+            <a id="refresh" href="/bid/{{ bid_id }}" class="rounded-full mr-5 flex flex-wrap justify-center px-5 py-3 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border dark:bg-gray-500 dark:hover:bg-gray-700 border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+              {{ circular_arrows_svg | safe }}
+              <span>Refresh {{ refresh }} seconds</span>
+            </a>
+          {% endif %}
         </div>
-       </div>
+        </div>
       </div>
-      <div class="container mt-5 mx-auto">
-       <div class="pt-6 pb-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
-        <div class="px-6">
-         <div class="w-full mt-6 pb-6 overflow-x-auto">
-          <table class="w-full min-w-max">
-           <thead class="uppercase">
-            <tr class="text-left">
-             <th class="p-0">
-              <div class="py-3 px-6 rounded-tl-xl bg-coolGray-200 dark:bg-gray-600">
-               <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Date/Time at</span>
-              </div>
-             </th>
-             <th class="p-0">
-              <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
-               <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Bid ID</span>
-              </div>
-             </th>
-             <th class="p-0">
-              <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
-               <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Offer ID</span>
-              </div>
-             </th>
-             <th class="p-0">
-              <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
-               <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Bid From</span>
-              </div>
-             </th>
-             <th class="p-0">
-              <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
-               <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Bid Status</span>
-              </div>
-             </th>
-             <th class="p-0">
-              <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
-               <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">ITX Status</span>
-              </div>
-             </th>
-             <th class="p-0">
-              <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
-               <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">PTX Status</span>
-              </div>
-             </th>
-            <th class="p-0">
-              <div class="py-3 px-6 rounded-tr-xl bg-coolGray-200 dark:bg-gray-600">
-               <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Details</span>
-              </div>
-             </th>
-            </tr>
-           </thead>
-           <tbody>
-            {% for b in bids %}
-            <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
-             <th scope="row" class="flex items-center py-7 px-46 text-gray-900 whitespace-nowrap">
-              <svg class="w-5 h-5 rounded-full ml-5" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-               <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="11"></circle>
-                <polyline points=" 12,6 12,12 18,12 " stroke="#6b7280"></polyline>
-               </g>
-              </svg>
-              <div class="pl-3">
-               <div class="font-semibold text-xs dark:text-white">{{ b[0] }}</div>
-              </div>
-             </th>
-             <td class="py-3 px-6 text-xs monospace">
-              <a href=/bid/{{ b[1] }}>{{ b[1]|truncate(20, True) }}</a>
-             </td>
-             <td class="py-3 px-6 text-xs monospace">
-              <a href=/offer/{{ b[2] }}>{{ b[2]|truncate(20, True) }}</a>
-             </td>
-             <td class="py-3 px-6 text-xs monospace">
-              <a href=/identity/{{ b[6] }}>{{ b[6] }}</a>
-             </td>
-             <td class="py-3 px-6 text-xs">{{ b[3] }}</td>
-             <td class="py-3 px-6 text-xs">{{ b[4] }}</td>
-             <td class="py-3 px-6 text-xs">{{ b[5] }}</td>
-             {% if page_type_received or page_type_sent %}
-              <td class="py-3 px-6 text-xs">
-               <a class="inline-block w-20 py-1 px-2 font-medium text-center text-sm rounded-md bg-blue-500 text-white border border-blue-500 hover:bg-blue-600 transition duration-200 bg-blue-500 text-white hover:bg-blue-600 transition duration-200" href="/bid/{{ b[1] }}">Details</a>
-              </td>
-             {% elif page_type_available %}
-              <td class="py-3 px-6 text-xs">
-               <a class="inline-block w-20 py-1 px-2 font-medium text-center text-sm rounded-md bg-blue-500 text-white border border-blue-500 hover:bg-blue-600 transition duration-200 bg-blue-500 text-white hover:bg-blue-600 transition duration-200" href="/bid/{{ b[1] }}">Accept</a>
-              </td>
-             {% endif %}
-            </tr>
-           </tbody>
-           {% endfor %}
-          </table>
-          <input type="hidden" name="formid" value="{{ form_id }}">
-          <input type="hidden" name="pageno" value="{{ filters.page_no }}">
-         </div>
-        </div>
-
-        <div class="rounded-b-md">
-            <div class="w-full md:w-0/12">
-                <div class="flex flex-wrap justify-end pt-6 pr-6 border-t border-gray-100 dark:border-gray-400">
-                    {% if filters.page_no > 1 %}
+    </div>
+  </section>
+  {% include 'inc_messages.html' %}
+  <div class="pl-6 pr-6 pt-0 pb-0 mt-5 h-full overflow-hidden">
+    <div class="pb-6 border-coolGray-100">
+      <div class="flex flex-wrap items-center justify-between -m-2">
+        <div class="w-full mx-auto pt-2">
+          <form method="post">
+            <div class="flex items-center justify-center pb-4 dark:text-white">
+              <div class="rounded-b-md">
+                <div class="w-full md:w-0/12">
+                  <div class="flex flex-wrap justify-center -m-1.5">
                     <div class="w-full md:w-auto p-1.5">
-                        <button type="submit" name='pageback' value="Previous" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-blue-600 rounded-lg transition duration-200 focus:ring-0 focus:outline-none">
-                            {{ page_back_svg | safe }}
-                            <span>Previous</span>
-                        </button>
+                      <div class="relative">
+                        {{ input_arrow_down_svg | safe }}
+                        <select name="sort_by" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
+                          <option value="created_at" {% if filters.sort_by=='created_at' %} selected{% endif %}>Time At</option>
+                        </select>
+                      </div>
                     </div>
-                    {% endif %}
+                    <div class="w-full md:w-auto p-1.5">
+                      <div class="relative">
+                        {{ input_arrow_down_svg | safe }}
+                        <select name="sort_dir" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
+                          <option value="asc" {% if filters.sort_dir=='asc' %} selected{% endif %}>Ascending</option>
+                          <option value="desc" {% if filters.sort_dir=='desc' %} selected{% endif %}>Descending</option>
+                        </select>
+                      </div>
+                    </div>
                     <div class="flex items-center">
-                        <div class="w-full md:w-auto p-1.5">
-                            <p class="text-sm font-heading dark:text-white">Page: {{ filters.page_no }}</p>
-                        </div>
+                      <div class="w-full md:w-auto p-1.5">
+                        <p class="text-sm font-heading bold">State:</p>
+                      </div>
                     </div>
-                    {% if bids_count > 10 %}
                     <div class="w-full md:w-auto p-1.5">
-                            <button type="submit" name='pageforwards' value="Next" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-blue-600 rounded-lg transition duration-200 focus:ring-0 focus:outline-none">
-                                <span>Next</span>
-                                {{ page_forwards_svg | safe }}
-                            </button>
+                      <div class="relative">
+                        {{ input_arrow_down_svg | safe }}
+                        <select name="state" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
+                          <option value="-1" {% if filters.bid_state_ind==-1 %} selected{% endif %}>Any</option>
+                          {% for s in data.bid_states %}
+                          <option value="{{ s[0] }}" {% if filters.bid_state_ind==s[0] %} selected{% endif %}>{{ s[1] }}</option>
+                          {% endfor %}
+                        </select>
+                      </div>
                     </div>
-                    {% endif %}
+                    <div class="flex items-center">
+                      <div class="w-full md:w-auto p-1.5">
+                        <p class="text-sm font-heading bold">Include Expired:</p>
+                      </div>
+                    </div>
+                    <div class="w-full md:w-auto p-1.5">
+                      <div class="relative">
+                        {{ input_arrow_down_svg | safe }}
+                        <select name="with_expired" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
+                          <option value="true" {% if filters.with_expired==true %} selected{% endif %}>Include</option>
+                          <option value="false" {% if filters.with_expired==false %} selected{% endif %}>Exclude</option>
+                        </select> </div>
+                    </div>
+                    <div class="w-full md:w-auto p-1.5">
+                      <div class="relative">
+                        <button type="submit" name='clearfilters' value="Clear Filters" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm hover:text-white dark:text-white dark:bg-gray-500 bg-coolGray-200 hover:bg-green-600 hover:border-green-600 rounded-lg transition duration-200 border border-coolGray-200 dark:border-gray-400 rounded-md shadow-button focus:ring-0 focus:outline-none">
+                          <span>Clear Filters</span>
+                        </button>
+                      </div>
+                    </div>
+                    <div class="w-full md:w-auto p-1.5">
+                      <div class="relative"> <button type="submit" name='applyfilters' value="Apply Filters" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-white bg-blue-600 hover:bg-green-600 hover:border-green-600 rounded-lg transition duration-200 border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+                        {{ filter_apply_svg | safe }}
+                        <span>Apply Filters</span>
+                      </button>
+                    </div>
+                    </div>
+                  </div>
                 </div>
+              </div>
             </div>
+            <div class="container mt-5 mx-auto">
+              <div class="pt-6 pb-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
+                <div class="px-6">
+                  <div class="w-full mt-6 pb-6 overflow-x-auto">
+                    <table class="w-full min-w-max">
+                      <thead class="uppercase">
+                        <tr class="text-left">
+                          <th class="p-0">
+                            <div class="py-3 px-6 rounded-tl-xl bg-coolGray-200 dark:bg-gray-600"> <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Date/Time at</span>
+                            </div>
+                          </th>
+                          <th class="p-0">
+                            <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600"> <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Bid ID</span>
+                            </div>
+                          </th>
+                          <th class="p-0">
+                            <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600"> <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Offer ID</span>
+                            </div>
+                          </th>
+                          <th class="p-0">
+                            <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600"> <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Bid From</span>
+                            </div>
+                          </th>
+                          <th class="p-0">
+                            <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600"> <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Bid Status</span>
+                            </div>
+                          </th>
+                          <th class="p-0">
+                            <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600"> <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">ITX Status</span>
+                            </div>
+                          </th>
+                          <th class="p-0">
+                            <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600"> <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">PTX Status</span>
+                            </div>
+                          </th>
+                          <th class="p-0">
+                            <div class="py-3 px-6 rounded-tr-xl bg-coolGray-200 dark:bg-gray-600"> <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Details</span>
+                            </div>
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for b in bids %}
+                        <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
+                          <th scope="row" class="flex items-center py-7 px-46 text-gray-900 whitespace-nowrap"> <svg class="w-5 h-5 rounded-full ml-5" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
+                              <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="11"></circle>
+                                <polyline points=" 12,6 12,12 18,12 " stroke="#6b7280"></polyline>
+                              </g>
+                            </svg>
+                            <div class="pl-3">
+                              <div class="font-semibold text-xs dark:text-white">{{ b[0] }}</div>
+                            </div>
+                          </th>
+                          <td class="py-3 px-6 text-xs monospace"> <a href=/bid/{{ b[1] }}>{{ b[1]|truncate(20, True) }}</a> </td>
+                          <td class="py-3 px-6 text-xs monospace"> <a href=/offer/{{ b[2] }}>{{ b[2]|truncate(20, True) }}</a> </td>
+                          <td class="py-3 px-6 text-xs monospace"> <a href=/identity/{{ b[6] }}>{{ b[6] }}</a> </td>
+                          <td class="py-3 px-6 text-xs">{{ b[3] }}</td>
+                          <td class="py-3 px-6 text-xs">{{ b[4] }}</td>
+                          <td class="py-3 px-6 text-xs">{{ b[5] }}</td>
+                          {% if page_type_received or page_type_sent %}
+                          <td class="py-3 px-6 text-xs"> <a class="inline-block w-20 py-1 px-2 font-medium text-center text-sm rounded-md bg-blue-500 text-white border border-blue-500 hover:bg-blue-600 transition duration-200 bg-blue-500 text-white hover:bg-blue-600 transition duration-200" href="/bid/{{ b[1] }}">Details</a>
+                          </td> {% elif page_type_available %}
+                          <td class="py-3 px-6 text-xs"> <a class="inline-block w-20 py-1 px-2 font-medium text-center text-sm rounded-md bg-blue-500 text-white border border-blue-500 hover:bg-blue-600 transition duration-200 bg-blue-500 text-white hover:bg-blue-600 transition duration-200" href="/bid/{{ b[1] }}">Accept</a>
+                          </td>
+                          {% endif %}
+                        </tr>
+                      </tbody>
+                      {% endfor %}
+                    </table> <input type="hidden" name="formid" value="{{ form_id }}"> <input type="hidden" name="pageno" value="{{ filters.page_no }}">
+                  </div>
+                </div>
+                <div class="rounded-b-md">
+                  <div class="w-full md:w-0/12">
+                    <div class="flex flex-wrap justify-end pt-6 pr-6 border-t border-gray-100 dark:border-gray-400">
+                      {% if filters.page_no > 1 %} <div class="w-full md:w-auto p-1.5">
+                        <button type="submit" name='pageback' value="Previous" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-blue-600 rounded-lg transition duration-200 focus:ring-0 focus:outline-none">
+                          {{ page_back_svg | safe }}
+                          <span>Previous</span>
+                        </button>
+                      </div>
+                      {% endif %}
+                      <div class="flex items-center">
+                        <div class="w-full md:w-auto p-1.5">
+                          <p class="text-sm font-heading dark:text-white">Page: {{ filters.page_no }}</p>
+                        </div>
+                      </div>
+                      {% if bids_count > 20 %}
+                      <div class="w-full md:w-auto p-1.5"> <button type="submit" name='pageforwards' value="Next" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-blue-600 rounded-lg transition duration-200 focus:ring-0 focus:outline-none">
+                        <span>Next</span>
+                      {{ page_forwards_svg | safe }}
+                    </button>
+                  </div>
+                {% endif %}
+              </div>
+                  </div>
+                </div>
+          </form>
         </div>
-
-     </form>
+      </div>
     </div>
-   </div>
   </div>
- </div>
- </section>
+  </section>
 </div>
 {% include 'footer.html' %}
 </body>

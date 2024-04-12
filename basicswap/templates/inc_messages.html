@@ -1,24 +1,22 @@
 {% for m in messages %}
+{% from 'style.html' import confirm_green_svg, green_cross_close_svg, red_cross_close_svg %}
+<!-- todo -->
 <section class="py-4" id="messages_{{ m[0] }}" role="alert">
   <div class="container px-4 mx-auto">
-    <div class="p-6 bg-green-100 border border-green-200 rounded-md">
+    <div class="p-6 text-green-800 rounded-lg bg-green-50 dark:border-green-500 dark:bg-gray-500 dark:text-green-400 rounded-md">
       <div class="flex flex-wrap justify-between items-center -m-2">
         <div class="flex-1 p-2">
           <div class="flex flex-wrap -m-1">
             <div class="w-auto p-1">
-              <svg class="relative top-0.5" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12.4732 4.80667C12.4112 4.74418 12.3375 4.69458 12.2563 4.66074C12.175 4.62689 12.0879 4.60947 11.9999 4.60947C11.9119 4.60947 11.8247 4.62689 11.7435 4.66074C11.6623 4.69458 11.5885 4.74418 11.5266 4.80667L6.55989 9.78L4.47322 7.68667C4.40887 7.62451 4.33291 7.57563 4.24967 7.54283C4.16644 7.51003 4.07755 7.49394 3.9881 7.49549C3.89865 7.49703 3.81037 7.51619 3.72832 7.55185C3.64627 7.58751 3.57204 7.63898 3.50989 7.70333C3.44773 7.76768 3.39885 7.84364 3.36605 7.92688C3.33324 8.01011 3.31716 8.099 3.31871 8.18845C3.32025 8.2779 3.3394 8.36618 3.37507 8.44823C3.41073 8.53028 3.4622 8.60451 3.52655 8.66667L6.08655 11.2267C6.14853 11.2892 6.22226 11.3387 6.3035 11.3726C6.38474 11.4064 6.47188 11.4239 6.55989 11.4239C6.64789 11.4239 6.73503 11.4064 6.81627 11.3726C6.89751 11.3387 6.97124 11.2892 7.03322 11.2267L12.4732 5.78667C12.5409 5.72424 12.5949 5.64847 12.6318 5.56414C12.6688 5.4798 12.6878 5.38873 12.6878 5.29667C12.6878 5.2046 12.6688 5.11353 12.6318 5.02919C12.5949 4.94486 12.5409 4.86909 12.4732 4.80667Z" fill="#2AD168"></path>
-              </svg>
+            {{ confirm_green_svg | safe }}
             </div>
             <div class="flex-1 p-1">
-              <h3 class="infomsg font-medium text-sm text-green-900">{{ m[1] }}</h3></div>
+              <h3 class="infomsg font-medium text-sm">{{ m[1] }}</h3></div>
           </div>
         </div>
         <div class="w-auto p-2">
-          <button type="button" class="ml-auto bg-green-100 text-green-500 rounded-lg focus:ring-0 focus:ring-green-400 p-1.5 hover:bg-green-200 inline-flex h-8 w-8 focus:outline-none" data-dismiss-target="#messages_{{ m[0] }}" aria-label="Close"><span class="sr-only">Close</span>
-            <svg aria-hidden="true" class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-              <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
-            </svg>
+          <button type="button" class="ms-auto bg-green-50 text-green-500 rounded-lg focus:ring-2 focus:ring-green-400 p-1.5 hover:bg-green-200 inline-flex items-center justify-center h-8 w-8 dark:bg-gray-800 dark:text-green-400 dark:hover:bg-gray-700" data-dismiss-target="#messages_{{ m[0] }}" aria-label="Close"><span class="sr-only">Close</span>
+            {{ green_cross_close_svg | safe }}
           </button>
         </div>
       </div>
@@ -47,9 +45,7 @@
         <div class="w-auto p-2">
           <button type="button" class="ml-auto bg-red-100 text-red-500 rounded-lg focus:ring-0 focus:ring-red-400 p-1.5 hover:bg-red-200 inline-flex h-8 w-8 focus:outline-none" data-dismiss-target="#err_messages_{{ err_messages[0][0] }}" aria-label="Close">
             <span class="sr-only">Close</span>
-            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-              <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
-            </svg>
+            {{ red_cross_close_svg | safe }}
           </button>
         </div>
       </div>
@@ -57,4 +53,3 @@
   </div>
 </section>
 {% endif %}
-<!-- todo messages colors better for darkmode -->
