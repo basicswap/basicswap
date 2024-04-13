@@ -100,7 +100,7 @@ If you’d like to add a cryptocurrency to BasicSwap, either [apply for a listin
 
 ### Chats
 
-* **For developers** The chat [#particl-dev:matrix.org](https://app.element.io/#/room/#particl-dev:matrix.org) using [Element](https://element.io) (formerly Riot).
+* **For developers** The chat [#particl-dev:matrix.org](https://matrix.to/#/#particl-dev:matrix.org) using a Matrix client.
 * **For community** The community chat [https://discord.me/particl](https://discord.me/particl) [![Discord](https://img.shields.io/discord/391967609660112925)](https://discord.me/particl).
 
 [![Twitter Follow](https://img.shields.io/twitter/follow/BasicSwapDEX?label=follow%20us&style=social)](http://twitter.com/BasicSwapDEX)
@@ -118,7 +118,7 @@ For non-developers curious to explore a new world of commerce, binaries can be d
 
 * [Telegram](https://t.me/particlhelp)
 
-* [Element](https://app.element.io/#/room/#particlhelp:matrix.org)
+* [Matrix](https://matrix.to/#/#particlhelp:matrix.org)
 
 # Tutorials
 
