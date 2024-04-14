@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2022-2023 tecnovert
+# Copyright (c) 2022-2024 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -46,6 +46,7 @@ def page_settings(self, url_split, post_string):
                     'show_chart': toBool(get_data_entry(form_data, 'showchart')),
                     'chart_api_key': html.unescape(get_data_entry_or(form_data, 'chartapikey', '')),
                     'coingecko_api_key': html.unescape(get_data_entry_or(form_data, 'coingeckoapikey', '')),
+                    'enabled_chart_coins': get_data_entry_or(form_data, 'enabledchartcoins', ''),
                 }
                 swap_client.editGeneralSettings(data)
             elif have_data_entry(form_data, 'apply_tor'):
@@ -141,6 +142,7 @@ def page_settings(self, url_split, post_string):
         'show_chart': swap_client.settings.get('show_chart', True),
         'chart_api_key': chart_api_key,
         'coingecko_api_key': coingecko_api_key,
+        'enabled_chart_coins': swap_client.settings.get('enabled_chart_coins', ''),
     }
 
     tor_control_password = '' if swap_client.tor_control_password is None else swap_client.tor_control_password

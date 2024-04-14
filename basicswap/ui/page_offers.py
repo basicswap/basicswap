@@ -9,14 +9,15 @@ import time
 
 from urllib import parse
 from .util import (
-    PAGE_LIMIT,
     getCoinType,
-    inputAmount,
-    setCoinFilter,
     get_data_entry,
-    have_data_entry,
     get_data_entry_or,
+    have_data_entry,
+    inputAmount,
+    known_chart_coins,
     listAvailableCoins,
+    PAGE_LIMIT,
+    setCoinFilter,
     set_pagination_filters,
 )
 from basicswap.db import (
@@ -815,6 +816,24 @@ def page_offers(self, url_split, post_string, sent=False):
 
     offers_count = len(formatted_offers)
 
+    enabled_chart_coins = []
+    enabled_chart_coins_setting = swap_client.settings.get('enabled_chart_coins', '')
+    if enabled_chart_coins_setting.lower() == 'all':
+        enabled_chart_coins = known_chart_coins
+    elif enabled_chart_coins_setting.strip() == '':
+        for coin_id in swap_client.coin_clients:
+            if not swap_client.isCoinActive(coin_id):
+                continue
+            enabled_ticker = swap_client.ci(coin_id).ticker_mainnet()
+            if enabled_ticker not in enabled_chart_coins and enabled_ticker in known_chart_coins:
+                enabled_chart_coins.append(enabled_ticker)
+    else:
+        for ticker in enabled_chart_coins_setting.split(','):
+            upcased_ticker = ticker.strip().upper()
+
+            if upcased_ticker not in enabled_chart_coins and upcased_ticker in known_chart_coins:
+                enabled_chart_coins.append(upcased_ticker)
+
     template = server.env.get_template('offers.html')
     return self.render_template(template, {
         'page_type': 'Your Offers' if sent else 'Network Order Book',
@@ -834,4 +853,5 @@ def page_offers(self, url_split, post_string, sent=False):
         'offers_count': offers_count,
         'tla_from': tla_from,
         'tla_to': tla_to,
+        'enabled_chart_coins': enabled_chart_coins,
     })

@@ -66,69 +66,73 @@
   </section>
 
   <section class="py-4 overflow-hidden container-to-blur">
-    <div class="container px-4 mx-auto">
-      <div class="flex flex-wrap -m-3">
 
-        <div class="w-full sm:w-1/2 lg:w-1/6 p-3" id="btc-container">
-        <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-2xl dark:text-white active-container" id="btc-active">
+{% if 'BTC' in enabled_chart_coins %}
+<div class="container px-4 mx-auto">
+  <div class="flex flex-wrap -m-3">
+
+    <div class="w-full sm:w-1/2 lg:w-1/6 p-3" id="btc-container">
+    <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-2xl dark:text-white active-container" id="btc-active">
+  <div class="flex items-center">
+      <img src="/static/images/coins/Bitcoin.png" class="rounded-xl" style="width: 35px; height: 35px; object-fit: contain;" alt="Bitcoin">
+      <p class="ml-2 text-black text-sm dark:text-white">
+          Bitcoin (BTC)
+      </p>
+  </div>
+  <div class="flex flex-col justify-start">
+      <p class="my-2 text-xl font-bold text-left text-gray-700 dark:text-gray-100" id="btc-price-usd">
+          <span class="text-sm">
+              <span id="btc-price-usd-value"></span>
+      </p>
+      <div class="flex items-center text-sm">
+          <div class="w-auto">
+            <div id="btc-price-change-container" class="w-auto p-1"></div>
+          </div>
+      </div>
+      <div class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2">
+        <span class="bold mr-2">VOL:</span>
+          <div id="btc-volume-24h">
+          </div>
+      </div>
+  </div>
+  </div>
+</div>
+{% endif %}
+{% if 'XMR' in enabled_chart_coins %}
+<div class="w-full sm:w-1/2 lg:w-1/6 p-3" id="xmr-container">
+    <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-2xl dark:text-white price-container">
       <div class="flex items-center">
-          <img src="/static/images/coins/Bitcoin.png" class="rounded-xl" style="width: 35px; height: 35px; object-fit: contain;" alt="Bitcoin">
+          <img src="/static/images/coins/Monero.png" class="rounded-xl" style="width: 35px; height: 35px; object-fit: contain;" alt="Monero">
           <p class="ml-2 text-black text-sm dark:text-white">
-              Bitcoin (BTC)
+              Monero (XMR)
           </p>
       </div>
       <div class="flex flex-col justify-start">
-          <p class="my-2 text-xl font-bold text-left text-gray-700 dark:text-gray-100" id="btc-price-usd">
+          <p class="my-2 text-xl font-bold text-left text-gray-700 dark:text-gray-100" id="xmr-price-usd">
               <span class="text-sm">
-                  <span id="btc-price-usd-value"></span>
+                  <span id="xmr-price-usd-value"></span>
           </p>
           <div class="flex items-center text-sm">
               <div class="w-auto">
-                <div id="btc-price-change-container" class="w-auto p-1"></div>
+                <div id="xmr-price-change-container" class="w-auto p-1"></div>
               </div>
           </div>
           <div class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2">
             <span class="bold mr-2">VOL:</span>
-              <div id="btc-volume-24h">
+              <div id="xmr-volume-24h">
               </div>
           </div>
-      </div>
+        <div class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2">
+      <span class="bold mr-2">BTC:</span>
+      <span id="xmr-price-btc">
+      </span>
+  </div>
       </div>
   </div>
-
-        <div class="w-full sm:w-1/2 lg:w-1/6 p-3" id="xmr-container">
-            <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-2xl dark:text-white price-container">
-              <div class="flex items-center">
-                  <img src="/static/images/coins/Monero.png" class="rounded-xl" style="width: 35px; height: 35px; object-fit: contain;" alt="Monero">
-                  <p class="ml-2 text-black text-sm dark:text-white">
-                      Monero (XMR)
-                  </p>
-              </div>
-              <div class="flex flex-col justify-start">
-                  <p class="my-2 text-xl font-bold text-left text-gray-700 dark:text-gray-100" id="xmr-price-usd">
-                      <span class="text-sm">
-                          <span id="xmr-price-usd-value"></span>
-                  </p>
-                  <div class="flex items-center text-sm">
-                      <div class="w-auto">
-                        <div id="xmr-price-change-container" class="w-auto p-1"></div>
-                      </div>
-                  </div>
-                  <div class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2">
-                    <span class="bold mr-2">VOL:</span>
-                      <div id="xmr-volume-24h">
-                      </div>
-                  </div>
-                <div class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2">
-              <span class="bold mr-2">BTC:</span>
-              <span id="xmr-price-btc">
-              </span>
-          </div>
-              </div>
-          </div>
-      </div>
-
-  <div class="w-full sm:w-1/2 lg:w-1/6 p-3" id="part-container">
+</div>
+{% endif %}
+{% if 'PART' in enabled_chart_coins %}
+<div class="w-full sm:w-1/2 lg:w-1/6 p-3" id="part-container">
     <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-2xl dark:text-white">
         <div class="flex items-center">
             <img src="/static/images/coins/Particl.png" class="rounded-xl" style="width: 35px; height: 35px; object-fit: contain;" alt="Particl">
@@ -160,7 +164,8 @@
         </div>
     </div>
 </div>
-
+{% endif %}
+{% if 'LTC' in enabled_chart_coins %}
 <div class="w-full sm:w-1/2 lg:w-1/6 p-3" id="ltc-container">
   <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-2xl dark:text-white">
       <div class="flex items-center">
@@ -192,9 +197,10 @@
           </div>
       </div>
   </div>
-  </div>
-
-  <div class="w-full sm:w-1/2 lg:w-1/6 p-3" id="firo-container">
+</div>
+{% endif %}
+{% if 'FIRO' in enabled_chart_coins %}
+<div class="w-full sm:w-1/2 lg:w-1/6 p-3" id="firo-container">
     <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-2xl dark:text-white">
             <div class="flex items-center">
         <img src="/static/images/coins/Firo.png" class="rounded-xl" style="width: 35px; height: 35px; object-fit: contain;" alt="Firo">
@@ -226,11 +232,12 @@
     </div>
 </div>
 </div>
-
+{% endif %}
+{% if 'PIVX' in enabled_chart_coins %}
 <div class="w-full sm:w-1/2 lg:w-1/6 p-3" id="pivx-container">
   <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-2xl dark:text-white">
   <div class="flex items-center">
-      <img src="/static/images/coins/Pivx.png" class="rounded-xl" style="width: 35px; height: 35px; object-fit: contain;" alt="Pivx">
+      <img src="/static/images/coins/PIVX.png" class="rounded-xl" style="width: 35px; height: 35px; object-fit: contain;" alt="PIVX">
       <p class="ml-2 text-black text-md dark:text-white">
           PIVX (PIVX)
       </p>
@@ -259,7 +266,8 @@
   </div>
 </div>
 </div>
-
+{% endif %}
+{% if 'DASH' in enabled_chart_coins %}
 <div class="w-full sm:w-1/2 lg:w-1/6 p-3" id="dash-container">
   <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-2xl dark:text-white">
   <div class="flex items-center">
@@ -292,7 +300,8 @@
   </div>
 </div>
 </div>
-
+{% endif %}
+{% if 'ETH' in enabled_chart_coins %}
 <div class="w-full sm:w-1/2 lg:w-1/6 p-3" id="eth-container">
   <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-2xl dark:text-white">
   <div class="flex items-center">
@@ -325,7 +334,8 @@
   </div>
 </div>
 </div>
-
+{% endif %}
+{% if 'DOGE' in enabled_chart_coins %}
 <div class="w-full sm:w-1/2 lg:w-1/6 p-3" id="doge-container">
   <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-2xl dark:text-white">
   <div class="flex items-center">
@@ -358,7 +368,8 @@
   </div>
 </div>
 </div>
-
+{% endif %}
+{% if 'DCR' in enabled_chart_coins %}
 <div class="w-full sm:w-1/2 lg:w-1/6 p-3" id="dcr-container">
   <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-2xl dark:text-white">
     <div class="flex items-center">
@@ -391,7 +402,8 @@
     </div>
   </div>
 </div>
-
+{% endif %}
+{% if 'ZANO' in enabled_chart_coins %}
 <div class="w-full sm:w-1/2 lg:w-1/6 p-3" id="zano-container">
   <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-2xl dark:text-white">
     <div class="flex items-center">
@@ -424,7 +436,8 @@
     </div>
   </div>
 </div>
-
+{% endif %}
+{% if 'WOW' in enabled_chart_coins %}
 <div class="w-full sm:w-1/2 lg:w-1/6 p-3" id="wow-container">
   <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-2xl dark:text-white">
     <div class="flex items-center">
@@ -457,17 +470,25 @@
     </div>
   </div>
 </div>
-
+{% endif %}
 </div>
 </div>
 
 </section>
 <script>
 window.addEventListener('load', function() {
-  const coins = ['BTC', 'PART', 'XMR', 'LTC', 'FIRO', 'DASH', 'PIVX', 'DOGE', 'ETH', 'DCR', 'ZANO', 'WOW'];
+  const coins = ['{{ enabled_chart_coins|join("','") }}'];
   const api_key = '{{chart_api_key}}';
   const coinGeckoApiKey = '{{coingecko_api_key}}';
   coins.forEach(coin => {
+    let container_id = coin.toLowerCase() + '-container';
+    let container = document.getElementById(container_id)
+    if (container != null) {
+      container.addEventListener('click', () => {
+        setActiveContainer(container_id);
+        updateChart(coin);
+      });
+    }
     if (coin === 'WOW') {
       fetchWowneroData();
     } else if (coin === 'ZANO') {
@@ -650,6 +671,9 @@ function setActiveContainer(containerId) {
   const activeClass = 'active-container';
   containerIds.forEach(id => {
     const container = document.getElementById(id);
+    if (container == null) {
+      return;
+    }
     const innerDiv = container.querySelector('div');
     if (id === containerId) {
       innerDiv.classList.add(activeClass);
@@ -658,55 +682,6 @@ function setActiveContainer(containerId) {
     }
   });
 }
-
-document.getElementById('btc-container').addEventListener('click', () => {
-  setActiveContainer('btc-container');
-  updateChart('BTC');
-});
-document.getElementById('xmr-container').addEventListener('click', () => {
-  setActiveContainer('xmr-container');
-  updateChart('XMR');
-});
-document.getElementById('part-container').addEventListener('click', () => {
-  setActiveContainer('part-container');
-  updateChart('PART');
-});
-document.getElementById('pivx-container').addEventListener('click', () => {
-  setActiveContainer('pivx-container');
-  updateChart('PIVX');
-});
-document.getElementById('firo-container').addEventListener('click', () => {
-  setActiveContainer('firo-container');
-  updateChart('FIRO');
-});
-document.getElementById('dash-container').addEventListener('click', () => {
-  setActiveContainer('dash-container');
-  updateChart('DASH');
-});
-document.getElementById('ltc-container').addEventListener('click', () => {
-  setActiveContainer('ltc-container');
-  updateChart('LTC');
-});
-document.getElementById('doge-container').addEventListener('click', () => {
-  setActiveContainer('doge-container');
-  updateChart('DOGE');
-});
-document.getElementById('eth-container').addEventListener('click', () => {
-  setActiveContainer('eth-container');
-  updateChart('ETH');
-});
-document.getElementById('dcr-container').addEventListener('click', () => {
-  setActiveContainer('dcr-container');
-  updateChart('DCR');
-});
-document.getElementById('wow-container').addEventListener('click', () => {
-  setActiveContainer('wow-container');
-  updateChart('WOW');
-});
-document.getElementById('zano-container').addEventListener('click', () => {
-  setActiveContainer('zano-container');
-  updateChart('ZANO');
-});
 
 let coin;
 const coinOptions = {

@@ -36,7 +36,7 @@ from .interface.part import PARTInterface, PARTInterfaceAnon, PARTInterfaceBlind
 from . import __version__
 from .rpc import escape_rpcauth
 from .rpc_xmr import make_xmr_rpc2_func
-from .ui.util import getCoinName
+from .ui.util import getCoinName, known_chart_coins
 from .util import (
     AutomationConstraint,
     LockedCoinError,
@@ -6483,6 +6483,25 @@ class BasicSwap(BaseApp):
                         if 'coingecko_api_key' in settings_copy:
                             settings_copy.pop('coingecko_api_key')
                         settings_changed = True
+
+            if 'enabled_chart_coins' in data:
+                new_value = data['enabled_chart_coins'].strip()
+                ensure(isinstance(new_value, str), 'New enabled_chart_coins value not a string')
+                if new_value.lower() == 'all' or new_value == '':
+                    pass
+                else:
+                    tickers = new_value.split(',')
+                    seen_tickers = []
+                    for ticker in tickers:
+                        upcased_ticker = ticker.strip().upper()
+                        if upcased_ticker not in known_chart_coins:
+                            raise ValueError(f'Unknown coin: {ticker}')
+                        if upcased_ticker in seen_tickers:
+                            raise ValueError(f'Duplicate coin: {ticker}')
+                        seen_tickers.append(upcased_ticker)
+                if settings_copy.get('enabled_chart_coins', '') != new_value:
+                    settings_copy['enabled_chart_coins'] = new_value
+                    settings_changed = True
 
             if settings_changed:
                 settings_path = os.path.join(self.data_dir, cfg.CONFIG_FILENAME)
