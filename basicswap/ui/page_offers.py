@@ -352,6 +352,10 @@ def offer_to_post_string(self, swap_client, offer_id):
 
     ci_from = swap_client.ci(offer.coin_from)
     ci_to = swap_client.ci(offer.coin_to)
+
+    amount_to: int = offer.amount_to
+    if amount_to is None:
+        amount_to = (offer.amount_from * offer.rate) // ci_from.COIN()
     offer_data = {
         'formid': self.generate_form_id(),
         'addr_to': offer.addr_to,
@@ -364,7 +368,7 @@ def offer_to_post_string(self, swap_client, offer_id):
         'amt_from': ci_from.format_amount(offer.amount_from),
         'amt_bid_min': ci_from.format_amount(offer.min_bid_amount),
         'rate': ci_to.format_amount(offer.rate),
-        'amt_to': ci_to.format_amount(offer.amount_to),
+        'amt_to': ci_to.format_amount(amount_to),
         'validhrs': offer.time_valid // (60 * 60),
         'swap_type': strSwapType(offer.swap_type),
     }
@@ -575,6 +579,9 @@ def page_offer(self, url_split, post_string):
                 err_messages.append('Send bid failed: ' + str(ex))
                 show_bid_form = True
 
+    amount_to: int = offer.amount_to
+    if amount_to is None:
+        amount_to = (offer.amount_from * offer.rate) // ci_from.COIN()
     now: int = swap_client.getTime()
     data = {
         'tla_from': ci_from.ticker(),
@@ -585,7 +592,7 @@ def page_offer(self, url_split, post_string):
         'coin_from_ind': int(ci_from.coin_type()),
         'coin_to_ind': int(ci_to.coin_type()),
         'amt_from': ci_from.format_amount(offer.amount_from),
-        'amt_to': ci_to.format_amount(offer.amount_to),
+        'amt_to': ci_to.format_amount(amount_to),
         'amt_bid_min': ci_from.format_amount(offer.min_bid_amount),
         'rate': ci_to.format_amount(offer.rate),
         'lock_type': getLockName(offer.lock_type),
@@ -781,13 +788,16 @@ def page_offers(self, url_split, post_string, sent=False):
         formatted_expired_at = format_timestamp(o.expire_at, with_ago=False, is_expired=True)
         tla_from = ci_from.ticker()
         tla_to = ci_to.ticker()
+        amount_to: int = o.amount_to
+        if amount_to is None:
+            amount_to = (o.amount_from * o.rate) // ci_from.COIN()
         formatted_offers.append((
             formatted_created_at,
             o.offer_id.hex(),
             ci_from.coin_name(),
             ci_to.coin_name(),
             ci_from.format_amount(o.amount_from),
-            ci_to.format_amount(o.amount_to),
+            ci_to.format_amount(amount_to),
             ci_to.format_amount(o.rate),
             'Public' if o.addr_to == swap_client.network_addr else o.addr_to,
             o.addr_from,
@@ -824,7 +834,10 @@ def page_offers(self, url_split, post_string, sent=False):
         for coin_id in swap_client.coin_clients:
             if not swap_client.isCoinActive(coin_id):
                 continue
-            enabled_ticker = swap_client.ci(coin_id).ticker_mainnet()
+            try:
+                enabled_ticker = swap_client.ci(coin_id).ticker_mainnet()
+            except Exception:
+                continue
             if enabled_ticker not in enabled_chart_coins and enabled_ticker in known_chart_coins:
                 enabled_chart_coins.append(enabled_ticker)
     else:

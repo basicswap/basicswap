@@ -6,6 +6,10 @@
 - Bid and offer states change when expired.
 - bid amounts are specified directly and not constructed from rate.
 - Breaks compatibility with prior versions.
+- Added enabled_chart_coins setting for which coins to show on the offers page.
+  - Blank/unset for active coins.
+  - All for all known coins.
+  - Comma separated list of coin tickers to show.
 
 
 0.12.7

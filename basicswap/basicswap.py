@@ -153,6 +153,8 @@ MINPROTO_VERSION_SECRET_HASH = 4
 PROTOCOL_VERSION_ADAPTOR_SIG = 4
 MINPROTO_VERSION_ADAPTOR_SIG = 4
 
+MINPROTO_VERSION = min(MINPROTO_VERSION_SECRET_HASH, MINPROTO_VERSION_ADAPTOR_SIG)
+MAXPROTO_VERSION = 10
 
 def validOfferStateToReceiveBid(offer_state):
     if offer_state == OfferStates.OFFER_RECEIVED:
@@ -2265,6 +2267,7 @@ class BasicSwap(BaseApp):
         if offer.swap_type == SwapTypes.XMR_SWAP:
             return self.postXmrBid(offer_id, amount, addr_send_from, extra_options)
 
+        ensure(offer.protocol_version >= MINPROTO_VERSION_SECRET_HASH, 'Incompatible offer protocol version')
         valid_for_seconds = extra_options.get('valid_for_seconds', 60 * 10)
         self.validateBidValidTime(offer.swap_type, offer.coin_from, offer.coin_to, valid_for_seconds)
 
@@ -2516,11 +2519,13 @@ class BasicSwap(BaseApp):
         ensure(bid.state in (BidStates.BID_RECEIVED, ), 'Wrong bid state: {}'.format(BidStates(bid.state).name))
 
         if offer.swap_type == SwapTypes.XMR_SWAP:
+            ensure(bid.protocol_version >= MINPROTO_VERSION_ADAPTOR_SIG, 'Incompatible bid protocol version')
             reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from)
             if reverse_bid:
                 return self.acceptADSReverseBid(bid_id)
             return self.acceptXmrBid(bid_id)
 
+        ensure(bid.protocol_version >= MINPROTO_VERSION_SECRET_HASH, 'Incompatible bid protocol version')
         if bid.contract_count is None:
             bid.contract_count = self.getNewContractId()
 
@@ -2633,6 +2638,7 @@ class BasicSwap(BaseApp):
 
             ensure(offer, 'Offer not found: {}.'.format(offer_id.hex()))
             ensure(xmr_offer, 'Adaptor-sig offer not found: {}.'.format(offer_id.hex()))
+            ensure(offer.protocol_version >= MINPROTO_VERSION_ADAPTOR_SIG, 'Incompatible offer protocol version')
             ensure(offer.expire_at > self.getTime(), 'Offer has expired')
 
             coin_from = Coins(offer.coin_from)
@@ -4544,7 +4550,12 @@ class BasicSwap(BaseApp):
 
     def processOffer(self, msg) -> None:
         offer_bytes = bytes.fromhex(msg['hex'][2:-2])
+
         offer_data = OfferMessage()
+        offer_data.ParseFromString(offer_bytes[:2])
+        if offer_data.protocol_version < MINPROTO_VERSION or offer_data.protocol_version > MAXPROTO_VERSION:
+            self.log.warning(f'Incoming offer invalid protocol version: {offer_data.protocol_version} ')
+            return
         offer_data.ParseFromString(offer_bytes)
 
         # Validate data
