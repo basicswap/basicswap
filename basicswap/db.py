@@ -11,7 +11,7 @@ from enum import IntEnum, auto
 from sqlalchemy.ext.declarative import declarative_base
 
 
-CURRENT_DB_VERSION = 22
+CURRENT_DB_VERSION = 23
 CURRENT_DB_DATA_VERSION = 4
 Base = declarative_base()
 
@@ -61,6 +61,7 @@ class Offer(Base):
     coin_from = sa.Column(sa.Integer)
     coin_to = sa.Column(sa.Integer)
     amount_from = sa.Column(sa.BigInteger)
+    amount_to = sa.Column(sa.BigInteger)
     rate = sa.Column(sa.BigInteger)
     min_bid_amount = sa.Column(sa.BigInteger)
     time_valid = sa.Column(sa.BigInteger)

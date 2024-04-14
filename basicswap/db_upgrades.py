@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2022-2023 tecnovert
+# Copyright (c) 2022-2024 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -297,7 +297,9 @@ def upgradeDatabase(self, db_version):
             db_version += 1
             session.execute('ALTER TABLE offers ADD COLUMN proof_utxos BLOB')
             session.execute('ALTER TABLE bids ADD COLUMN proof_utxos BLOB')
-
+        elif current_version == 22:
+            db_version += 1
+            session.execute('ALTER TABLE offers ADD COLUMN amount_to INTEGER')
         if current_version != db_version:
             self.db_version = db_version
             self.setIntKVInSession('db_version', db_version, session)

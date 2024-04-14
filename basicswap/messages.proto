@@ -4,12 +4,13 @@ package basicswap;
 
 /* Step 1, seller -> network */
 message OfferMessage {
-    uint32 coin_from = 1;
-    uint32 coin_to = 2;
-    uint64 amount_from = 3;
-    uint64 rate = 4;
-    uint64 min_bid_amount = 5;
-    uint64 time_valid = 6;
+    uint32 protocol_version = 1;
+    uint32 coin_from = 2;
+    uint32 coin_to = 3;
+    uint64 amount_from = 4;
+    uint64 amount_to = 5;
+    uint64 min_bid_amount = 6;
+    uint64 time_valid = 7;
     enum LockType {
         NOT_SET = 0;
         SEQUENCE_LOCK_BLOCKS = 1;
@@ -17,20 +18,19 @@ message OfferMessage {
         ABS_LOCK_BLOCKS = 3;
         ABS_LOCK_TIME = 4;
     }
-    LockType lock_type = 7;
-    uint32 lock_value = 8;
-    uint32 swap_type = 9;
+    LockType lock_type = 8;
+    uint32 lock_value = 9;
+    uint32 swap_type = 10;
 
     /* optional */
-    string proof_address = 10;
-    string proof_signature = 11;
-    bytes pkhash_seller = 12;
-    bytes secret_hash = 13;
+    string proof_address = 11;
+    string proof_signature = 12;
+    bytes pkhash_seller = 13;
+    bytes secret_hash = 14;
 
-    uint64 fee_rate_from = 14;
-    uint64 fee_rate_to = 15;
+    uint64 fee_rate_from = 15;
+    uint64 fee_rate_to = 16;
 
-    uint32 protocol_version = 16;
     bool amount_negotiable = 17;
     bool rate_negotiable = 18;
 
@@ -39,33 +39,26 @@ message OfferMessage {
 
 /* Step 2, buyer -> seller */
 message BidMessage {
-    bytes offer_msg_id = 1;
-    uint64 time_valid = 2;          /* seconds bid is valid for */
-    uint64 amount = 3;              /* amount of amount_from bid is for */
-    uint64 rate = 4;
-    bytes pkhash_buyer = 5;         /* buyer's address to receive amount_from */
-    string proof_address = 6;
-    string proof_signature = 7;
-
-    uint32 protocol_version = 8;
+    uint32 protocol_version = 1;
+    bytes offer_msg_id = 2;
+    uint64 time_valid = 3;          /* seconds bid is valid for */
+    uint64 amount = 4;              /* amount of amount_from bid is for */
+    uint64 amount_to = 5;
+    bytes pkhash_buyer = 6;         /* buyer's address to receive amount_from */
+    string proof_address = 7;
+    string proof_signature = 8;
 
     bytes proof_utxos = 9;          /* 32 byte txid 2 byte vout, repeated */
 }
 
 /* For tests */
-message BidMessage_v1Deprecated {
-    bytes offer_msg_id = 1;
-    uint64 time_valid = 2;          /* seconds bid is valid for */
-    uint64 amount = 3;              /* amount of amount_from bid is for */
-    uint64 rate = 4;
-    bytes pkhash_buyer = 5;         /* buyer's address to receive amount_from */
-    string proof_address = 6;
-    string proof_signature = 7;
-
-    uint32 protocol_version = 8;
+message BidMessage_test {
+    uint32 protocol_version = 1;
+    bytes offer_msg_id = 2;
+    uint64 time_valid = 3;
+    uint64 amount = 4;
+    uint64 rate = 5;
 }
-
-
 
 /* Step 3, seller -> buyer */
 message BidAcceptMessage {
@@ -81,25 +74,23 @@ message OfferRevokeMessage {
 
 message BidRejectMessage {
     bytes bid_msg_id = 1;
-
     uint32 reject_code = 2;
 }
 
 message XmrBidMessage {
     /* MSG1L, F -> L */
-    bytes offer_msg_id = 1;
-    uint64 time_valid = 2;          /* seconds bid is valid for */
-    uint64 amount = 3;              /* amount of amount_from bid is for */
-    uint64 rate = 4;
+    uint32 protocol_version = 1;
+    bytes offer_msg_id = 2;
+    uint64 time_valid = 3;          /* seconds bid is valid for */
+    uint64 amount = 4;              /* amount of amount_from bid is for */
+    uint64 amount_to = 5;
 
-    bytes pkaf = 5;
+    bytes pkaf = 6;
 
-    bytes kbvf = 6;
-    bytes kbsf_dleag = 7;
+    bytes kbvf = 7;
+    bytes kbsf_dleag = 8;
 
-    bytes dest_af = 8;
-
-    uint32 protocol_version = 9;
+    bytes dest_af = 9;
 }
 
 message XmrSplitMessage {
@@ -112,24 +103,22 @@ message XmrSplitMessage {
 message XmrBidAcceptMessage {
     bytes bid_msg_id = 1;
 
-    bytes pkal = 3;
-
-    bytes kbvl = 4;
-    bytes kbsl_dleag = 5;
+    bytes pkal = 2;
+    bytes kbvl = 3;
+    bytes kbsl_dleag = 4;
 
     /* MSG2F */
-    bytes a_lock_tx = 6;
-    bytes a_lock_tx_script = 7;
-    bytes a_lock_refund_tx = 8;
-    bytes a_lock_refund_tx_script = 9;
-    bytes a_lock_refund_spend_tx = 10;
-    bytes al_lock_refund_tx_sig = 11;
+    bytes a_lock_tx = 5;
+    bytes a_lock_tx_script = 6;
+    bytes a_lock_refund_tx = 7;
+    bytes a_lock_refund_tx_script = 8;
+    bytes a_lock_refund_spend_tx = 9;
+    bytes al_lock_refund_tx_sig = 10;
 }
 
 message XmrBidLockTxSigsMessage {
     /* MSG3L */
     bytes bid_msg_id = 1;
-
     bytes af_lock_refund_spend_tx_esig = 2;
     bytes af_lock_refund_tx_sig = 3;
 }
@@ -137,7 +126,6 @@ message XmrBidLockTxSigsMessage {
 message XmrBidLockSpendTxMessage {
     /* MSG4F */
     bytes bid_msg_id = 1;
-
     bytes a_lock_spend_tx = 2;
     bytes kal_sig = 3;
 }
@@ -145,19 +133,16 @@ message XmrBidLockSpendTxMessage {
 message XmrBidLockReleaseMessage {
     /* MSG5F */
     bytes bid_msg_id = 1;
-
     bytes al_lock_spend_tx_esig = 2;
 }
 
 message ADSBidIntentMessage {
     /* L -> F Sent from bidder, construct a reverse bid */
-    bytes offer_msg_id = 1;
-    uint64 time_valid = 2;          /* seconds bid is valid for */
-    uint64 amount_from = 3;         /* amount of offer.coin_from bid is for */
-    uint64 amount_to = 4;           /* amount of offer.coin_to bid is for, equivalent to bid.amount */
-    uint64 rate = 5;                /* amount of offer.coin_from bid is for */
-
-    uint32 protocol_version = 6;
+    uint32 protocol_version = 1;
+    bytes offer_msg_id = 2;
+    uint64 time_valid = 3;          /* seconds bid is valid for */
+    uint64 amount_from = 4;         /* amount of offer.coin_from bid is for */
+    uint64 amount_to = 5;           /* amount of offer.coin_to bid is for, equivalent to bid.amount */
 }
 
 message ADSBidIntentAcceptMessage {

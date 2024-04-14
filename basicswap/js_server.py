@@ -339,7 +339,10 @@ def js_bids(self, url_split, post_string: str, is_json: bool) -> bytes:
             extra_options = {
                 'valid_for_seconds': valid_for_seconds,
             }
-            if have_data_entry(post_data, 'bid_rate'):
+
+            if have_data_entry(post_data, 'amount_to'):
+                extra_options['amount_to'] = inputAmount(get_data_entry(post_data, 'amount_to'), ci_to)
+            elif have_data_entry(post_data, 'bid_rate'):
                 extra_options['bid_rate'] = ci_to.make_int(get_data_entry(post_data, 'bid_rate'), r=1)
             if have_data_entry(post_data, 'bid_amount'):
                 amount_from = inputAmount(get_data_entry(post_data, 'bid_amount'), ci_from)
@@ -493,10 +496,10 @@ def js_rate(self, url_split, post_string, is_json) -> bytes:
             amount_from = ci_from.format_amount(int((amt_to * rate) // ci_to.COIN()), r=1)
             return bytes(json.dumps({'amount_from': amount_from}), 'UTF-8')
 
-    amt_from = inputAmount(get_data_entry(post_data, 'amt_from'), ci_from)
-    amt_to = inputAmount(get_data_entry(post_data, 'amt_to'), ci_to)
+    amt_from: int = inputAmount(get_data_entry(post_data, 'amt_from'), ci_from)
+    amt_to: int = inputAmount(get_data_entry(post_data, 'amt_to'), ci_to)
 
-    rate = ci_to.format_amount(ci_from.make_int(amt_to / amt_from, r=1))
+    rate: int = ci_to.format_amount(ci_from.make_int(amt_to / amt_from, r=1))
     return bytes(json.dumps({'rate': rate}), 'UTF-8')
 
 

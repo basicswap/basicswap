@@ -142,6 +142,9 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
         parsed_data['rate'] = ci_from.make_int(parsed_data['amt_to'] / parsed_data['amt_from'], r=1)
         page_data['rate'] = ci_to.format_amount(parsed_data['rate'])
 
+    if 'amt_to' not in parsed_data and 'rate' in parsed_data and 'amt_from' in parsed_data:
+        parsed_data['amt_to'] = int((parsed_data['amt_from'] * parsed_data['rate']) // ci_from.COIN())
+
     page_data['amt_var'] = True if have_data_entry(form_data, 'amt_var') else False
     parsed_data['amt_var'] = page_data['amt_var']
     page_data['rate_var'] = True if have_data_entry(form_data, 'rate_var') else False
@@ -308,6 +311,8 @@ def postNewOfferFromParsed(swap_client, parsed_data):
         extra_options['automation_id'] = parsed_data['automation_strat_id']
 
     swap_value = parsed_data['amt_from']
+    if parsed_data.get('amt_to', None) is not None:
+        extra_options['amount_to'] = parsed_data['amt_to']
     if parsed_data.get('subfee', False):
         ci_from = swap_client.ci(parsed_data['coin_from'])
         pi = swap_client.pi(swap_type)
@@ -358,7 +363,7 @@ def offer_to_post_string(self, swap_client, offer_id):
         'amt_from': ci_from.format_amount(offer.amount_from),
         'amt_bid_min': ci_from.format_amount(offer.min_bid_amount),
         'rate': ci_to.format_amount(offer.rate),
-        'amt_to': ci_to.format_amount((offer.amount_from * offer.rate) // ci_from.COIN()),
+        'amt_to': ci_to.format_amount(offer.amount_to),
         'validhrs': offer.time_valid // (60 * 60),
         'swap_type': strSwapType(offer.swap_type),
     }
@@ -579,7 +584,7 @@ def page_offer(self, url_split, post_string):
         'coin_from_ind': int(ci_from.coin_type()),
         'coin_to_ind': int(ci_to.coin_type()),
         'amt_from': ci_from.format_amount(offer.amount_from),
-        'amt_to': ci_to.format_amount((offer.amount_from * offer.rate) // ci_from.COIN()),
+        'amt_to': ci_to.format_amount(offer.amount_to),
         'amt_bid_min': ci_from.format_amount(offer.min_bid_amount),
         'rate': ci_to.format_amount(offer.rate),
         'lock_type': getLockName(offer.lock_type),
@@ -781,7 +786,7 @@ def page_offers(self, url_split, post_string, sent=False):
             ci_from.coin_name(),
             ci_to.coin_name(),
             ci_from.format_amount(o.amount_from),
-            ci_to.format_amount((o.amount_from * o.rate) // ci_from.COIN()),
+            ci_to.format_amount(o.amount_to),
             ci_to.format_amount(o.rate),
             'Public' if o.addr_to == swap_client.network_addr else o.addr_to,
             o.addr_from,

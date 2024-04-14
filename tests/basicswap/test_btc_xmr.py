@@ -185,7 +185,7 @@ class TestFunctions(BaseTest):
         bid0 = read_json_api(1800 + id_offerer, f'bids/{bid_id.hex()}')
         bid1 = read_json_api(1800 + id_bidder, f'bids/{bid_id.hex()}')
 
-        tolerance = 20 if reverse_bid else 0
+        tolerance = 1
         assert (bid0['ticker_from'] == ci_from.ticker())
         assert (bid1['ticker_from'] == ci_from.ticker())
         assert (bid0['ticker_to'] == ci_to.ticker())

@@ -147,11 +147,11 @@ from basicswap.db_util import (
     remove_expired_data,
 )
 
-PROTOCOL_VERSION_SECRET_HASH = 3
-MINPROTO_VERSION_SECRET_HASH = 2
+PROTOCOL_VERSION_SECRET_HASH = 4
+MINPROTO_VERSION_SECRET_HASH = 4
 
-PROTOCOL_VERSION_ADAPTOR_SIG = 3
-MINPROTO_VERSION_ADAPTOR_SIG = 3
+PROTOCOL_VERSION_ADAPTOR_SIG = 4
+MINPROTO_VERSION_ADAPTOR_SIG = 4
 
 
 def validOfferStateToReceiveBid(offer_state):
@@ -1455,14 +1455,13 @@ class BasicSwap(BaseApp):
         finally:
             self.closeSession(session)
 
-    def validateOfferAmounts(self, coin_from, coin_to, amount: int, rate: int, min_bid_amount: int) -> None:
+    def validateOfferAmounts(self, coin_from, coin_to, amount: int, amount_to: int, min_bid_amount: int) -> None:
         ci_from = self.ci(coin_from)
         ci_to = self.ci(coin_to)
         ensure(amount >= min_bid_amount, 'amount < min_bid_amount')
         ensure(amount > ci_from.min_amount(), 'From amount below min value for chain')
         ensure(amount < ci_from.max_amount(), 'From amount above max value for chain')
 
-        amount_to = int((amount * rate) // ci_from.COIN())
         ensure(amount_to > ci_to.min_amount(), 'To amount below min value for chain')
         ensure(amount_to < ci_to.max_amount(), 'To amount above max value for chain')
 
@@ -1524,7 +1523,7 @@ class BasicSwap(BaseApp):
             return extra_options['addr_send_to']
         return self.network_addr
 
-    def postOffer(self, coin_from, coin_to, amount: int, rate, min_bid_amount: int, swap_type,
+    def postOffer(self, coin_from, coin_to, amount: int, rate: int, min_bid_amount: int, swap_type,
                   lock_type=TxLockTypes.SEQUENCE_LOCK_TIME, lock_value: int = 48 * 60 * 60, auto_accept_bids: bool = False, addr_send_from: str = None, extra_options={}) -> bytes:
         # Offer to send offer.amount_from of coin_from in exchange for offer.amount_from * offer.rate of coin_to
 
@@ -1540,10 +1539,14 @@ class BasicSwap(BaseApp):
         except Exception:
             raise ValueError('Unknown coin to type')
 
-        valid_for_seconds = extra_options.get('valid_for_seconds', 60 * 60)
+        valid_for_seconds: int = extra_options.get('valid_for_seconds', 60 * 60)
+        amount_to: int = extra_options.get('amount_to', int((amount * rate) // ci_from.COIN()))
+
+        # Recalculate the rate so it will match the bid rate
+        rate = ci_from.make_int(amount_to / amount, r=1)
 
         self.validateSwapType(coin_from_t, coin_to_t, swap_type)
-        self.validateOfferAmounts(coin_from_t, coin_to_t, amount, rate, min_bid_amount)
+        self.validateOfferAmounts(coin_from_t, coin_to_t, amount, amount_to, min_bid_amount)
         self.validateOfferLockValue(swap_type, coin_from_t, coin_to_t, lock_type, lock_value)
         self.validateOfferValidTime(swap_type, coin_from_t, coin_to_t, valid_for_seconds)
 
@@ -1564,7 +1567,7 @@ class BasicSwap(BaseApp):
             msg_buf.coin_from = int(coin_from)
             msg_buf.coin_to = int(coin_to)
             msg_buf.amount_from = int(amount)
-            msg_buf.rate = int(rate)
+            msg_buf.amount_to = int(amount_to)
             msg_buf.min_bid_amount = int(min_bid_amount)
 
             msg_buf.time_valid = valid_for_seconds
@@ -1644,7 +1647,8 @@ class BasicSwap(BaseApp):
                 coin_from=msg_buf.coin_from,
                 coin_to=msg_buf.coin_to,
                 amount_from=msg_buf.amount_from,
-                rate=msg_buf.rate,
+                amount_to=msg_buf.amount_to,
+                rate=rate,
                 min_bid_amount=msg_buf.min_bid_amount,
                 time_valid=msg_buf.time_valid,
                 lock_type=int(msg_buf.lock_type),
@@ -2264,24 +2268,34 @@ class BasicSwap(BaseApp):
         valid_for_seconds = extra_options.get('valid_for_seconds', 60 * 10)
         self.validateBidValidTime(offer.swap_type, offer.coin_from, offer.coin_to, valid_for_seconds)
 
-        bid_rate = extra_options.get('bid_rate', offer.rate)
+        if not isinstance(amount, int):
+            amount = int(amount)
+            self.log.warning('postBid amount should be an integer type.')
+
+        coin_from = Coins(offer.coin_from)
+        coin_to = Coins(offer.coin_to)
+        ci_from = self.ci(coin_from)
+        ci_to = self.ci(coin_to)
+
+        if 'amount_to' in extra_options:
+            amount_to: int = extra_options['amount_to']
+            bid_rate: int = ci_from.make_int(amount_to / amount, r=1)
+        else:
+            bid_rate = extra_options.get('bid_rate', offer.rate)
+            amount_to: int = int((amount * bid_rate) // ci_from.COIN())
+
         self.validateBidAmount(offer, amount, bid_rate)
 
         self.mxDB.acquire()
         try:
+            self.checkCoinsReady(coin_from, coin_to)
+
             msg_buf = BidMessage()
             msg_buf.protocol_version = PROTOCOL_VERSION_SECRET_HASH
             msg_buf.offer_msg_id = offer_id
             msg_buf.time_valid = valid_for_seconds
-            msg_buf.amount = int(amount)  # amount of coin_from
-            msg_buf.rate = bid_rate
-
-            coin_from = Coins(offer.coin_from)
-            coin_to = Coins(offer.coin_to)
-            ci_from = self.ci(coin_from)
-            ci_to = self.ci(coin_to)
-
-            self.checkCoinsReady(coin_from, coin_to)
+            msg_buf.amount = amount  # amount of coin_from
+            msg_buf.amount_to = amount_to
 
             amount_to = int((msg_buf.amount * bid_rate) // ci_from.COIN())
 
@@ -2314,14 +2328,14 @@ class BasicSwap(BaseApp):
                 bid_id=bid_id,
                 offer_id=offer_id,
                 amount=msg_buf.amount,
-                rate=msg_buf.rate,
+                amount_to=msg_buf.amount_to,
+                rate=bid_rate,
                 pkhash_buyer=msg_buf.pkhash_buyer,
                 proof_address=msg_buf.proof_address,
                 proof_utxos=msg_buf.proof_utxos,
 
                 created_at=now,
                 contract_count=contract_count,
-                amount_to=amount_to,
                 expire_at=now + msg_buf.time_valid,
                 bid_addr=bid_addr,
                 was_sent=True,
@@ -2627,8 +2641,16 @@ class BasicSwap(BaseApp):
             ci_to = self.ci(coin_to)
 
             valid_for_seconds: int = extra_options.get('valid_for_seconds', 60 * 10)
-            bid_rate: int = extra_options.get('bid_rate', offer.rate)
-            amount_to: int = int((int(amount) * bid_rate) // ci_from.COIN())
+
+            if 'amount_to' in extra_options:
+                amount_to: int = extra_options['amount_to']
+                bid_rate: int = ci_from.make_int(amount_to / amount, r=1)
+            elif 'bid_rate' in extra_options:
+                bid_rate: int = extra_options.get('bid_rate', offer.rate)
+                amount_to: int = int((int(amount) * bid_rate) // ci_from.COIN())
+            else:
+                amount_to: int = offer.amount_to
+                bid_rate: int = ci_from.make_int(amount_to / amount, r=1)
 
             bid_created_at: int = self.getTime()
             if offer.swap_type != SwapTypes.XMR_SWAP:
@@ -2646,8 +2668,6 @@ class BasicSwap(BaseApp):
             reverse_bid: bool = self.is_reverse_ads_bid(coin_from)
             if reverse_bid:
                 reversed_rate: int = ci_to.make_int(amount / amount_to, r=1)
-                amount_from: int = int((int(amount_to) * reversed_rate) // ci_to.COIN())
-                ensure(abs(amount_from - amount) < 20, 'invalid bid amount')  # TODO: Tolerance?
 
                 msg_buf = ADSBidIntentMessage()
                 msg_buf.protocol_version = PROTOCOL_VERSION_ADAPTOR_SIG
@@ -2655,7 +2675,6 @@ class BasicSwap(BaseApp):
                 msg_buf.time_valid = valid_for_seconds
                 msg_buf.amount_from = amount
                 msg_buf.amount_to = amount_to
-                msg_buf.rate = bid_rate
 
                 bid_bytes = msg_buf.SerializeToString()
                 payload_hex = str.format('{:02x}', MessageTypes.ADS_BID_LF) + bid_bytes.hex()
@@ -2673,10 +2692,10 @@ class BasicSwap(BaseApp):
                     bid_id=xmr_swap.bid_id,
                     offer_id=offer_id,
                     amount=msg_buf.amount_to,
+                    amount_to=msg_buf.amount_from,
                     rate=reversed_rate,
                     created_at=bid_created_at,
                     contract_count=xmr_swap.contract_count,
-                    amount_to=msg_buf.amount_from,
                     expire_at=bid_created_at + msg_buf.time_valid,
                     bid_addr=bid_addr,
                     was_sent=True,
@@ -2700,7 +2719,7 @@ class BasicSwap(BaseApp):
             msg_buf.offer_msg_id = offer_id
             msg_buf.time_valid = valid_for_seconds
             msg_buf.amount = int(amount)  # Amount of coin_from
-            msg_buf.rate = bid_rate
+            msg_buf.amount_to = amount_to
 
             address_out = self.getReceiveAddressFromPool(coin_from, offer_id, TxTypes.XMR_SWAP_A_LOCK)
             if coin_from == Coins.PART_BLIND:
@@ -2763,10 +2782,10 @@ class BasicSwap(BaseApp):
                 bid_id=xmr_swap.bid_id,
                 offer_id=offer_id,
                 amount=msg_buf.amount,
-                rate=msg_buf.rate,
+                amount_to=msg_buf.amount_to,
+                rate=bid_rate,
                 created_at=bid_created_at,
                 contract_count=xmr_swap.contract_count,
-                amount_to=(msg_buf.amount * msg_buf.rate) // ci_from.COIN(),
                 expire_at=bid_created_at + msg_buf.time_valid,
                 bid_addr=bid_addr,
                 was_sent=True,
@@ -4537,12 +4556,13 @@ class BasicSwap(BaseApp):
         ensure(offer_data.coin_from != offer_data.coin_to, 'coin_from == coin_to')
 
         self.validateSwapType(coin_from, coin_to, offer_data.swap_type)
-        self.validateOfferAmounts(coin_from, coin_to, offer_data.amount_from, offer_data.rate, offer_data.min_bid_amount)
+        self.validateOfferAmounts(coin_from, coin_to, offer_data.amount_from, offer_data.amount_to, offer_data.min_bid_amount)
         self.validateOfferLockValue(offer_data.swap_type, coin_from, coin_to, offer_data.lock_type, offer_data.lock_value)
         self.validateOfferValidTime(offer_data.swap_type, coin_from, coin_to, offer_data.time_valid)
 
         ensure(msg['sent'] + offer_data.time_valid >= now, 'Offer expired')
 
+        offer_rate: int = ci_from.make_int(offer_data.amount_to / offer_data.amount_from, r=1)
         reverse_bid: bool = self.is_reverse_ads_bid(coin_from)
 
         if offer_data.swap_type == SwapTypes.SELLER_FIRST:
@@ -4593,7 +4613,8 @@ class BasicSwap(BaseApp):
                     coin_from=offer_data.coin_from,
                     coin_to=offer_data.coin_to,
                     amount_from=offer_data.amount_from,
-                    rate=offer_data.rate,
+                    amount_to=offer_data.amount_to,
+                    rate=offer_rate,
                     min_bid_amount=offer_data.min_bid_amount,
                     time_valid=offer_data.time_valid,
                     lock_type=int(offer_data.lock_type),
@@ -4806,16 +4827,16 @@ class BasicSwap(BaseApp):
         ensure(now <= offer.expire_at, 'Offer expired')
         self.validateBidValidTime(offer.swap_type, offer.coin_from, offer.coin_to, bid_data.time_valid)
         ensure(now <= msg['sent'] + bid_data.time_valid, 'Bid expired')
-        self.validateBidAmount(offer, bid_data.amount, bid_data.rate)
-
-        # TODO: Allow higher bids
-        # assert (bid_data.rate != offer['data'].rate), 'Bid rate mismatch'
 
         coin_to = Coins(offer.coin_to)
         ci_from = self.ci(offer.coin_from)
         ci_to = self.ci(coin_to)
+        bid_rate: int = ci_from.make_int(bid_data.amount_to / bid_data.amount, r=1)
+        self.validateBidAmount(offer, bid_data.amount, bid_rate)
 
-        amount_to = int((bid_data.amount * bid_data.rate) // ci_from.COIN())
+        # TODO: Allow higher bids
+        # assert (bid_data.rate != offer['data'].rate), 'Bid rate mismatch'
+
         swap_type = offer.swap_type
         if swap_type == SwapTypes.SELLER_FIRST:
             ensure(len(bid_data.pkhash_buyer) == 20, 'Bad pkhash_buyer length')
@@ -4823,7 +4844,7 @@ class BasicSwap(BaseApp):
             proof_utxos = ci_to.decodeProofUtxos(bid_data.proof_utxos)
             sum_unspent = ci_to.verifyProofOfFunds(bid_data.proof_address, bid_data.proof_signature, proof_utxos, offer_id)
             self.log.debug('Proof of funds %s %s', bid_data.proof_address, self.ci(coin_to).format_amount(sum_unspent))
-            ensure(sum_unspent >= amount_to, 'Proof of funds failed')
+            ensure(sum_unspent >= bid_data.amount_to, 'Proof of funds failed')
 
         elif swap_type == SwapTypes.BUYER_FIRST:
             raise ValueError('TODO')
@@ -4840,13 +4861,13 @@ class BasicSwap(BaseApp):
                 offer_id=offer_id,
                 protocol_version=bid_data.protocol_version,
                 amount=bid_data.amount,
-                rate=bid_data.rate,
+                amount_to=bid_data.amount_to,
+                rate=bid_rate,
                 pkhash_buyer=bid_data.pkhash_buyer,
                 proof_address=bid_data.proof_address,
                 proof_utxos=bid_data.proof_utxos,
 
                 created_at=msg['sent'],
-                amount_to=amount_to,
                 expire_at=msg['sent'] + bid_data.time_valid,
                 bid_addr=msg['from'],
                 was_received=True,
@@ -5116,7 +5137,8 @@ class BasicSwap(BaseApp):
         self.validateBidValidTime(offer.swap_type, offer.coin_from, offer.coin_to, bid_data.time_valid)
         ensure(now <= msg['sent'] + bid_data.time_valid, 'Bid expired')
 
-        self.validateBidAmount(offer, bid_data.amount, bid_data.rate)
+        bid_rate: int = ci_from.make_int(bid_data.amount_to / bid_data.amount, r=1)
+        self.validateBidAmount(offer, bid_data.amount, bid_rate)
 
         ensure(ci_to.verifyKey(bid_data.kbvf), 'Invalid chain B follower view key')
         ensure(ci_from.verifyPubkey(bid_data.pkaf), 'Invalid chain A follower public key')
@@ -5135,9 +5157,9 @@ class BasicSwap(BaseApp):
                 offer_id=offer_id,
                 protocol_version=bid_data.protocol_version,
                 amount=bid_data.amount,
-                rate=bid_data.rate,
+                amount_to=bid_data.amount_to,
+                rate=bid_rate,
                 created_at=msg['sent'],
-                amount_to=(bid_data.amount * bid_data.rate) // ci_from.COIN(),
                 expire_at=msg['sent'] + bid_data.time_valid,
                 bid_addr=msg['from'],
                 was_received=True,
@@ -5992,14 +6014,10 @@ class BasicSwap(BaseApp):
         self.validateBidValidTime(offer.swap_type, offer.coin_from, offer.coin_to, bid_data.time_valid)
         ensure(now <= msg['sent'] + bid_data.time_valid, 'Bid expired')
 
-        amount_from: int = bid_data.amount_from
-        amount_to: int = (bid_data.amount_from * bid_data.rate) // ci_to.COIN()
-        ensure(abs(amount_to - bid_data.amount_to) < 20, 'invalid bid amount_to')  # TODO: Tolerance?
-        reversed_rate: int = ci_from.make_int(amount_from / bid_data.amount_to, r=1)
-        amount_from_recovered: int = int((amount_to * reversed_rate) // ci_from.COIN())
-        ensure(abs(amount_from - amount_from_recovered) < 20, 'invalid bid amount_from')  # TODO: Tolerance?
-
-        self.validateBidAmount(offer, amount_from, bid_data.rate)
+        # ci_from/to are reversed
+        bid_rate: int = ci_to.make_int(bid_data.amount_to / bid_data.amount_from, r=1)
+        reversed_rate: int = ci_from.make_int(bid_data.amount_from / bid_data.amount_to, r=1)
+        self.validateBidAmount(offer, bid_data.amount_from, bid_rate)
 
         bid_id = bytes.fromhex(msg['msgid'])
 
@@ -6010,10 +6028,10 @@ class BasicSwap(BaseApp):
                 bid_id=bid_id,
                 offer_id=offer_id,
                 protocol_version=bid_data.protocol_version,
-                amount=amount_to,
+                amount=bid_data.amount_to,
+                amount_to=bid_data.amount_from,
                 rate=reversed_rate,
                 created_at=msg['sent'],
-                amount_to=amount_from,
                 expire_at=msg['sent'] + bid_data.time_valid,
                 bid_addr=msg['from'],
                 was_sent=False,
@@ -6044,7 +6062,7 @@ class BasicSwap(BaseApp):
             session = self.openSession()
             self.notify(NT.BID_RECEIVED, {'type': 'ads_reversed', 'bid_id': bid.bid_id.hex(), 'offer_id': bid.offer_id.hex()}, session)
 
-            options = {'reverse_bid': True, 'bid_rate': bid_data.rate}
+            options = {'reverse_bid': True, 'bid_rate': bid_rate}
             if self.shouldAutoAcceptBid(offer, bid, session, options=options):
                 delay = self.get_delay_event_seconds()
                 self.log.info('Auto accepting reverse adaptor-sig bid %s in %d seconds', bid.bid_id.hex(), delay)
@@ -6998,6 +7016,7 @@ class BasicSwap(BaseApp):
                     result[13] = amount_to
                     ci_from = self.ci(coin_from)
                     result[10] = ci_from.make_int(amount_to / amount_from, r=1)
+
                 rv.append(result)
             return rv
         finally:

@@ -1,3 +1,13 @@
+
+0.13.0
+==============
+
+- GUI v3.0
+- Bid and offer states change when expired.
+- bid amounts are specified directly and not constructed from rate.
+- Breaks compatibility with prior versions.
+
+
 0.12.7
 ==============
 

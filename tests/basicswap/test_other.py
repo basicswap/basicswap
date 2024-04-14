@@ -6,6 +6,7 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import hashlib
+import random
 import secrets
 import unittest
 
@@ -41,7 +42,7 @@ from basicswap.util import (
 
 from basicswap.messages_pb2 import (
     BidMessage,
-    BidMessage_v1Deprecated,
+    BidMessage_test,
 )
 from basicswap.contrib.test_framework.script import hash160 as hash160_btc
 
@@ -310,6 +311,89 @@ class Test(unittest.TestCase):
         amount_to_recreate = int((amount_from * rate) // (10 ** scale_from))
         assert ('10.00000000' == format_amount(amount_to_recreate, scale_to))
 
+        coin_settings = {'rpcport': 0, 'rpcauth': 'none', 'walletrpcport': 0, 'walletrpcauth': 'none'}
+        coin_settings.update(self.REQUIRED_SETTINGS)
+        ci_xmr = XMRInterface(coin_settings, 'regtest')
+        ci_btc = BTCInterface(coin_settings, 'regtest')
+
+        for i in range(10000):
+
+            test_pairs = random.randint(0, 3)
+            if test_pairs == 0:
+                ci_from = ci_btc
+                ci_to = ci_xmr
+            elif test_pairs == 1:
+                ci_from = ci_xmr
+                ci_to = ci_btc
+            elif test_pairs == 2:
+                ci_from = ci_xmr
+                ci_to = ci_xmr
+            else:
+                ci_from = ci_btc
+                ci_to = ci_btc
+
+            test_range = random.randint(0, 5)
+            if test_range == 0:
+                amount_from = random.randint(10000, 1 * ci_from.COIN())
+            elif test_range == 1:
+                amount_from = random.randint(10000, 1000 * ci_from.COIN())
+            elif test_range == 2:
+                amount_from = random.randint(10000, 2100 * ci_from.COIN())
+            elif test_range == 3:
+                amount_from = random.randint(10000, 210000 * ci_from.COIN())
+            elif test_range == 4:
+                amount_from = random.randint(10000, 21000000 * ci_from.COIN())
+            else:
+                amount_from = random.randint(10000, 2100000000 * ci_from.COIN())
+
+            test_range = random.randint(0, 5)
+            if test_range == 0:
+                amount_to = random.randint(10000, 1 * ci_to.COIN())
+            elif test_range == 1:
+                amount_to = random.randint(10000, 1000 * ci_to.COIN())
+            elif test_range == 2:
+                amount_to = random.randint(10000, 2100 * ci_to.COIN())
+            elif test_range == 3:
+                amount_to = random.randint(10000, 210000 * ci_to.COIN())
+            elif test_range == 4:
+                amount_to = random.randint(10000, 21000000 * ci_to.COIN())
+            else:
+                amount_to = random.randint(10000, 2100000000 * ci_to.COIN())
+
+            offer_rate = ci_from.make_int(amount_to / amount_from, r=1)
+            amount_to_from_rate: int = int((int(amount_from) * offer_rate) // (10 ** scale_from))
+
+            scale_from = 24
+            offer_rate = make_int(amount_to, scale_from) // amount_from
+            amount_to_from_rate: int = int((int(amount_from) * offer_rate) // (10 ** scale_from))
+
+            if abs(amount_to - amount_to_from_rate) == 1:
+                offer_rate += 1
+
+            offer_rate_human_read: int = int(offer_rate // (10 ** (scale_from - ci_from.exp())))
+            amount_to_from_rate: int = int((int(amount_from) * offer_rate) // (10 ** scale_from))
+
+            if amount_to != amount_to_from_rate:
+                print('from exp, amount', ci_from.exp(), amount_from)
+                print('to exp, amount', ci_to.exp(), amount_to)
+                print('amount_to_from_rate', amount_to_from_rate)
+                raise ValueError('Bad amount_to')
+
+            scale_to = 24
+            reversed_rate = make_int(amount_from, scale_to) // amount_to
+
+            amount_from_from_rate: int = int((int(amount_to) * reversed_rate) // (10 ** scale_to))
+            if abs(amount_from - amount_from_from_rate) == 1:
+                reversed_rate += 1
+
+            amount_from_from_rate: int = int((int(amount_to) * reversed_rate) // (10 ** scale_to))
+
+            if amount_from != amount_from_from_rate:
+                print('from exp, amount', ci_from.exp(), amount_from)
+                print('to exp, amount', ci_to.exp(), amount_to)
+                print('amount_from_from_rate', amount_from_from_rate)
+                raise ValueError('Bad amount_from')
+
     def test_rfc2440(self):
         password = 'test'
         salt = bytes.fromhex('B7A94A7E4988630E')
@@ -330,14 +414,20 @@ class Test(unittest.TestCase):
     def test_protobuf(self):
         # Ensure old protobuf templates can be read
 
-        msg_buf = BidMessage_v1Deprecated()
+        msg_buf = BidMessage_test()
         msg_buf.protocol_version = 2
+        msg_buf.time_valid = 1024
         serialised_msg = msg_buf.SerializeToString()
 
         msg_buf_v2 = BidMessage()
         msg_buf_v2.ParseFromString(serialised_msg)
-
         assert (msg_buf_v2.protocol_version == 2)
+        assert (msg_buf_v2.time_valid == 1024)
+
+        # Decode only the first field
+        msg_buf_v2.ParseFromString(serialised_msg[:2])
+        assert (msg_buf_v2.protocol_version == 2)
+        assert (msg_buf_v2.time_valid == 0)
 
     def test_is_private_ip_address(self):
         assert (is_private_ip_address('localhost'))

@@ -162,12 +162,14 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
     ci_follower = ci_from if reverse_bid else ci_to
 
     bid_amount: int = bid.amount
+    bid_amount_to: int = bid.amount_to
     bid_rate: int = offer.rate if bid.rate is None else bid.rate
 
     initiator_role: str = 'offerer'  # Leader
     participant_role: str = 'bidder'  # Follower
     if reverse_bid:
         bid_amount = bid.amount_to
+        bid_amount_to = bid.amount
         bid_rate = ci_from.make_int(bid.amount / bid.amount_to, r=1)
         initiator_role = 'bidder'
         participant_role = 'offerer'
@@ -259,7 +261,7 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
         'coin_from': ci_from.coin_name(),
         'coin_to': ci_to.coin_name(),
         'amt_from': ci_from.format_amount(bid_amount),
-        'amt_to': ci_to.format_amount((bid_amount * bid_rate) // ci_from.COIN()),
+        'amt_to': ci_to.format_amount(bid_amount_to),
         'bid_rate': ci_to.format_amount(bid_rate),
         'ticker_from': ci_from.ticker(),
         'ticker_to': ci_to.ticker(),
