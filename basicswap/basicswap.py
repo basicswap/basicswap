@@ -7038,13 +7038,19 @@ class BasicSwap(BaseApp):
             q = session.execute(query_str, {'ads_swap': SwapTypes.XMR_SWAP, 'itx_type': TxTypes.ITX, 'ptx_type': TxTypes.PTX, 'al_type': TxTypes.XMR_SWAP_A_LOCK, 'bl_type': TxTypes.XMR_SWAP_B_LOCK})
             for row in q:
                 result = [x for x in row]
+                coin_from = result[9]
+                coin_to = result[14]
+                # Show bids for enabled coins only
+                try:
+                    ci_from = self.ci(coin_from)
+                    ci_to = self.ci(coin_to)
+                except Exception as e:
+                    continue
                 if result[12]:  # Reversed
-                    coin_from = result[9]
                     amount_from = result[13]
                     amount_to = result[4]
                     result[4] = amount_from
                     result[13] = amount_to
-                    ci_from = self.ci(coin_from)
                     result[10] = ci_from.make_int(amount_to / amount_from, r=1)
 
                 rv.append(result)
