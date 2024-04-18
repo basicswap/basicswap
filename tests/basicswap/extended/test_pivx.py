@@ -41,7 +41,6 @@ from basicswap.util.address import (
 )
 from basicswap.rpc import (
     callrpc_cli,
-    waitForRPC,
 )
 from basicswap.contrib.key import (
     ECKey,
@@ -67,6 +66,7 @@ from tests.basicswap.common import (
     BASE_RPC_PORT,
     BASE_ZMQ_PORT,
     PREFIX_SECRET_KEY_REGTEST,
+    waitForRPC,
 )
 from bin.basicswap_run import startDaemon
 from bin.basicswap_prepare import downloadPIVXParams
@@ -326,7 +326,7 @@ class Test(unittest.TestCase):
 
         for i in range(NUM_NODES):
             rpc = make_part_cli_rpc_func(i)
-            waitForRPC(rpc)
+            waitForRPC(rpc, delay_event)
             if i == 0:
                 rpc('extkeyimportmaster', ['abandon baby cabbage dad eager fabric gadget habit ice kangaroo lab absorb'])
             elif i == 1:
@@ -343,17 +343,18 @@ class Test(unittest.TestCase):
             with open(settings_path) as fs:
                 settings = json.load(fs)
             fp = open(os.path.join(basicswap_dir, 'basicswap.log'), 'w')
-            cls.swap_clients.append(BasicSwap(fp, basicswap_dir, settings, 'regtest', log_name='BasicSwap{}'.format(i)))
-            cls.swap_clients[-1].setDaemonPID(Coins.BTC, cls.daemons[0].handle.pid)
-            cls.swap_clients[-1].setDaemonPID(Coins.PIVX, cls.daemons[1].handle.pid)
-            cls.swap_clients[-1].setDaemonPID(Coins.PART, cls.daemons[2 + i].handle.pid)
-            cls.swap_clients[-1].start()
+            sc = BasicSwap(fp, basicswap_dir, settings, 'regtest', log_name='BasicSwap{}'.format(i))
+            cls.swap_clients.append(sc)
+            sc.setDaemonPID(Coins.BTC, cls.daemons[0].handle.pid)
+            sc.setDaemonPID(Coins.PIVX, cls.daemons[1].handle.pid)
+            sc.setDaemonPID(Coins.PART, cls.daemons[2 + i].handle.pid)
+            sc.start()
 
-            t = HttpThread(cls.swap_clients[i].fp, TEST_HTTP_HOST, TEST_HTTP_PORT + i, False, cls.swap_clients[i])
+            t = HttpThread(sc.fp, TEST_HTTP_HOST, TEST_HTTP_PORT + i, False, sc)
             cls.http_threads.append(t)
             t.start()
 
-        waitForRPC(pivxRpc)
+        waitForRPC(pivxRpc, delay_event)
         num_blocks = 1352  # CHECKLOCKTIMEVERIFY soft-fork activates at (regtest) block height 1351.
         logging.info('Mining %d pivx blocks', num_blocks)
         cls.pivx_addr = pivxRpc('getnewaddress mining_addr')
@@ -369,7 +370,7 @@ class Test(unittest.TestCase):
         except Exception:
             logging.info('pivx: segwit is not active')
 
-        waitForRPC(btcRpc)
+        waitForRPC(btcRpc, delay_event)
         cls.btc_addr = btcRpc('getnewaddress mining_addr bech32')
         logging.info('Mining %d Bitcoin blocks to %s', num_blocks, cls.btc_addr)
         btcRpc('generatetoaddress {} {}'.format(num_blocks, cls.btc_addr))

@@ -31,7 +31,6 @@ from basicswap.util.address import (
 from basicswap.rpc import (
     callrpc,
     callrpc_cli,
-    waitForRPC,
 )
 from basicswap.contrib.key import (
     ECKey,
@@ -56,6 +55,7 @@ from tests.basicswap.common import (
     BTC_BASE_PORT,
     BTC_BASE_RPC_PORT,
     PREFIX_SECRET_KEY_REGTEST,
+    waitForRPC,
 )
 
 from bin.basicswap_run import startDaemon
@@ -211,7 +211,7 @@ class Test(unittest.TestCase):
             for i in range(NUM_NODES):
                 # Load mnemonics after all nodes have started to avoid staking getting stuck in TryToSync
                 rpc = make_rpc_func(i)
-                waitForRPC(rpc)
+                waitForRPC(rpc, delay_event)
                 if i == 0:
                     rpc('extkeyimportmaster', ['abandon baby cabbage dad eager fabric gadget habit ice kangaroo lab absorb'])
                 elif i == 1:
@@ -232,7 +232,7 @@ class Test(unittest.TestCase):
                 cls.btc_daemons.append(startDaemon(os.path.join(TEST_DIR, 'btc_' + str(i)), cfg.BITCOIN_BINDIR, cfg.BITCOIND))
                 logging.info('Started %s %d', cfg.BITCOIND, cls.handle.part_daemons[-1].handle.pid)
 
-                waitForRPC(make_rpc_func(i, base_rpc_port=BTC_BASE_RPC_PORT))
+                waitForRPC(make_rpc_func(i, base_rpc_port=BTC_BASE_RPC_PORT), delay_event)
 
             logging.info('Preparing swap clients.')
             eckey = ECKey()
@@ -248,12 +248,12 @@ class Test(unittest.TestCase):
                     settings = json.load(fs)
                 fp = open(os.path.join(basicswap_dir, 'basicswap.log'), 'w')
                 sc = BasicSwap(fp, basicswap_dir, settings, 'regtest', log_name='BasicSwap{}'.format(i))
+                cls.swap_clients.append(sc)
                 sc.setDaemonPID(Coins.BTC, cls.btc_daemons[i].handle.pid)
                 sc.setDaemonPID(Coins.PART, cls.part_daemons[i].handle.pid)
                 sc.start()
-                cls.swap_clients.append(sc)
 
-                t = HttpThread(cls.swap_clients[i].fp, TEST_HTTP_HOST, TEST_HTTP_PORT + i, False, cls.swap_clients[i])
+                t = HttpThread(sc.fp, TEST_HTTP_HOST, TEST_HTTP_PORT + i, False, sc)
                 cls.http_threads.append(t)
                 t.start()
 

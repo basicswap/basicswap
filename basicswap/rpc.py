@@ -1,15 +1,13 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2020-2023 tecnovert
+# Copyright (c) 2020-2024 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import os
-import time
 import json
 import shlex
 import urllib
-import logging
 import traceback
 import subprocess
 from xmlrpc.client import (
@@ -18,18 +16,6 @@ from xmlrpc.client import (
     SafeTransport,
 )
 from .util import jsonDecimal
-
-
-def waitForRPC(rpc_func, expect_wallet=True, max_tries=7):
-    for i in range(max_tries + 1):
-        try:
-            rpc_func('getwalletinfo' if expect_wallet else 'getblockchaininfo')
-            return
-        except Exception as ex:
-            if i < max_tries:
-                logging.warning('Can\'t connect to RPC: %s. Retrying in %d second/s.', str(ex), (i + 1))
-                time.sleep(i + 1)
-    raise ValueError('waitForRPC failed')
 
 
 class Jsonrpc():

@@ -14,18 +14,18 @@ import basicswap.config as cfg
 from basicswap.basicswap import (
     Coins,
 )
-from basicswap.rpc import (
-    waitForRPC,
+from basicswap.interface.dcr.rpc import (
+    callrpc,
 )
 from tests.basicswap.common import (
     stopDaemons,
-    make_rpc_func,
+    waitForRPC,
 )
 from tests.basicswap.util import (
     REQUIRED_SETTINGS,
 )
 
-from tests.basicswap.test_xmr import BaseTest
+from tests.basicswap.test_xmr import BaseTest, test_delay_event
 from basicswap.interface.dcr import DCRInterface
 from bin.basicswap_run import startDaemon
 
@@ -40,6 +40,16 @@ DCR_BASE_PORT = 44932
 DCR_BASE_RPC_PORT = 45932
 
 
+def make_rpc_func(node_id, base_rpc_port):
+    node_id = node_id
+    auth = 'test{0}:test_pass{0}'.format(node_id)
+
+    def rpc_func(method, params=None):
+        nonlocal node_id, auth
+        return callrpc(base_rpc_port + node_id, auth, method, params)
+    return rpc_func
+
+
 def prepareDCDDataDir(datadir, node_id, conf_file, dir_prefix, base_p2p_port, base_rpc_port, num_nodes=3):
     node_dir = os.path.join(datadir, dir_prefix + str(node_id))
     if not os.path.exists(node_dir):
@@ -51,10 +61,11 @@ def prepareDCDDataDir(datadir, node_id, conf_file, dir_prefix, base_p2p_port, ba
         config = [
             'regnet=1\n',  # or simnet?
             'debuglevel=debug\n',
-            f'listen=127.0.0.1:{base_p2p_port}\n',
-            f'rpclisten=127.0.0.1:{base_rpc_port}\n',
+            f'listen=127.0.0.1:{base_p2p_port + node_id}\n',
+            f'rpclisten=127.0.0.1:{base_rpc_port + node_id}\n',
             f'rpcuser=test{node_id}\n',
-            f'rpcpass=test_pass{node_id}\n',]
+            f'rpcpass=test_pass{node_id}\n',
+            'notls=1\n',]
 
         for i in range(0, num_nodes):
             if node_id == i:
@@ -100,7 +111,7 @@ class Test(BaseTest):
         cls.dcr_daemons.append(startDaemon(appdata, DCR_BINDIR, DCRD, opts=extra_opts, extra_config={'add_datadir': False, 'stdout_to_file': True, 'stdout_filename': 'dcrd_stdout.log'}))
         logging.info('Started %s %d', DCRD, cls.dcr_daemons[-1].handle.pid)
 
-        waitForRPC(make_rpc_func(i, base_rpc_port=DCR_BASE_RPC_PORT), max_tries=12)
+        waitForRPC(make_rpc_func(i, base_rpc_port=DCR_BASE_RPC_PORT), test_delay_event, rpc_command='getnetworkinfo', max_tries=12)
 
     @classmethod
     def addCoinSettings(cls, settings, datadir, node_id):
