@@ -312,6 +312,20 @@ def make_rpc_func(node_id, base_rpc_port=BASE_RPC_PORT):
     return rpc_func
 
 
+def waitForRPC(rpc_func, delay_event, rpc_command='getwalletinfo', max_tries=7):
+    for i in range(max_tries + 1):
+        if delay_event.is_set():
+            raise ValueError('Test stopped.')
+        try:
+            rpc_func(rpc_command)
+            return
+        except Exception as ex:
+            if i < max_tries:
+                logging.warning('Can\'t connect to RPC: %s. Retrying in %d second/s.', str(ex), (i + 1))
+                delay_event.wait(i + 1)
+    raise ValueError('waitForRPC failed')
+
+
 def extract_states_from_xu_file(file_path, prefix):
     states = {}
 

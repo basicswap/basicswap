@@ -29,9 +29,6 @@ from basicswap.util import (
 from basicswap.util.address import (
     decodeWif,
 )
-from basicswap.rpc import (
-    waitForRPC,
-)
 from tests.basicswap.util import (
     read_json_api,
 )
@@ -45,6 +42,7 @@ from tests.basicswap.common import (
     wait_for_unspent,
     wait_for_in_progress,
     wait_for_bid_tx_state,
+    waitForRPC,
 )
 from basicswap.interface.contrib.nav_test_framework.mininode import (
     ToHex,
@@ -161,7 +159,7 @@ class Test(TestFunctions):
         cls.nav_daemons.append(startDaemon(os.path.join(cfg.TEST_DATADIRS, 'nav_' + str(i)), NAV_BINDIR, NAVD, opts=extra_opts))
         logging.info('Started %s %d', NAVD, cls.nav_daemons[-1].handle.pid)
 
-        waitForRPC(make_rpc_func(i, base_rpc_port=NAV_BASE_RPC_PORT), max_tries=12)
+        waitForRPC(make_rpc_func(i, base_rpc_port=NAV_BASE_RPC_PORT), test_delay_event, max_tries=12)
 
     @classmethod
     def addPIDInfo(cls, sc, i):

@@ -43,7 +43,6 @@ from basicswap.util.address import (
 from basicswap.rpc import (
     callrpc,
     callrpc_cli,
-    waitForRPC,
 )
 from basicswap.rpc_xmr import (
     callrpc_xmr,
@@ -76,6 +75,7 @@ from tests.basicswap.common import (
     wait_for_none_active,
     wait_for_balance,
     wait_for_unspent,
+    waitForRPC,
     compare_bid_states,
     extract_states_from_xu_file,
     TEST_HTTP_HOST,
@@ -374,7 +374,7 @@ class BaseTest(unittest.TestCase):
                 for i in range(NUM_NODES):
                     # Load mnemonics after all nodes have started to avoid staking getting stuck in TryToSync
                     rpc = make_rpc_func(i)
-                    waitForRPC(rpc)
+                    waitForRPC(rpc, test_delay_event)
                     if i == 0:
                         rpc('extkeyimportmaster', ['abandon baby cabbage dad eager fabric gadget habit ice kangaroo lab absorb'])
                     elif i == 1:
@@ -400,7 +400,7 @@ class BaseTest(unittest.TestCase):
                 cls.btc_daemons.append(startDaemon(os.path.join(TEST_DIR, 'btc_' + str(i)), cfg.BITCOIN_BINDIR, cfg.BITCOIND))
                 logging.info('Started %s %d', cfg.BITCOIND, cls.part_daemons[-1].handle.pid)
 
-                waitForRPC(make_rpc_func(i, base_rpc_port=BTC_BASE_RPC_PORT))
+                waitForRPC(make_rpc_func(i, base_rpc_port=BTC_BASE_RPC_PORT), test_delay_event)
 
             if cls.start_ltc_nodes:
                 for i in range(NUM_LTC_NODES):
@@ -412,7 +412,7 @@ class BaseTest(unittest.TestCase):
                     cls.ltc_daemons.append(startDaemon(os.path.join(TEST_DIR, 'ltc_' + str(i)), cfg.LITECOIN_BINDIR, cfg.LITECOIND))
                     logging.info('Started %s %d', cfg.LITECOIND, cls.part_daemons[-1].handle.pid)
 
-                    waitForRPC(make_rpc_func(i, base_rpc_port=LTC_BASE_RPC_PORT))
+                    waitForRPC(make_rpc_func(i, base_rpc_port=LTC_BASE_RPC_PORT), test_delay_event)
 
             if cls.start_xmr_nodes:
                 for i in range(NUM_XMR_NODES):
@@ -474,6 +474,7 @@ class BaseTest(unittest.TestCase):
                         cls.network_pubkey = settings['network_pubkey']
                 fp = open(os.path.join(basicswap_dir, 'basicswap.log'), 'w')
                 sc = BasicSwap(fp, basicswap_dir, settings, 'regtest', log_name='BasicSwap{}'.format(i))
+                cls.swap_clients.append(sc)
                 sc.setDaemonPID(Coins.BTC, cls.btc_daemons[i].handle.pid)
                 sc.setDaemonPID(Coins.PART, cls.part_daemons[i].handle.pid)
 
@@ -486,9 +487,8 @@ class BaseTest(unittest.TestCase):
                     # Set XMR main wallet address
                     xmr_ci = sc.ci(Coins.XMR)
                     sc.setStringKV('main_wallet_addr_' + xmr_ci.coin_name().lower(), xmr_ci.getMainWalletAddress())
-                cls.swap_clients.append(sc)
 
-                t = HttpThread(cls.swap_clients[i].fp, TEST_HTTP_HOST, TEST_HTTP_PORT + i, False, cls.swap_clients[i])
+                t = HttpThread(sc.fp, TEST_HTTP_HOST, TEST_HTTP_PORT + i, False, sc)
                 cls.http_threads.append(t)
                 t.start()
             # Set future block rewards to nowhere (a random address), so wallet amounts stay constant

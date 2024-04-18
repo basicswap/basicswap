@@ -39,7 +39,6 @@ from basicswap.util.address import (
 )
 from basicswap.rpc import (
     callrpc_cli,
-    waitForRPC,
 )
 from basicswap.contrib.key import (
     ECKey,
@@ -63,6 +62,7 @@ from tests.basicswap.common import (
     BASE_RPC_PORT,
     BASE_ZMQ_PORT,
     PREFIX_SECRET_KEY_REGTEST,
+    waitForRPC,
 )
 from bin.basicswap_run import startDaemon
 
@@ -289,7 +289,7 @@ class Test(unittest.TestCase):
 
         for i in range(NUM_NODES):
             rpc = make_part_cli_rpc_func(i)
-            waitForRPC(rpc)
+            waitForRPC(rpc, delay_event)
             if i == 0:
                 rpc('extkeyimportmaster', ['abandon baby cabbage dad eager fabric gadget habit ice kangaroo lab absorb'])
             elif i == 1:
@@ -306,17 +306,19 @@ class Test(unittest.TestCase):
             with open(settings_path) as fs:
                 settings = json.load(fs)
             fp = open(os.path.join(basicswap_dir, 'basicswap.log'), 'w')
-            cls.swap_clients.append(BasicSwap(fp, basicswap_dir, settings, 'regtest', log_name='BasicSwap{}'.format(i)))
-            cls.swap_clients[-1].setDaemonPID(Coins.BTC, cls.daemons[0].handle.pid)
-            cls.swap_clients[-1].setDaemonPID(Coins.NMC, cls.daemons[1].handle.pid)
-            cls.swap_clients[-1].setDaemonPID(Coins.PART, cls.daemons[2 + i].handle.pid)
-            cls.swap_clients[-1].start()
+            sc = BasicSwap(fp, basicswap_dir, settings, 'regtest', log_name='BasicSwap{}'.format(i))
+            cls.swap_clients.append(sc)
 
-            t = HttpThread(cls.swap_clients[i].fp, TEST_HTTP_HOST, TEST_HTTP_PORT + i, False, cls.swap_clients[i])
+            sc.setDaemonPID(Coins.BTC, cls.daemons[0].handle.pid)
+            sc.setDaemonPID(Coins.NMC, cls.daemons[1].handle.pid)
+            sc.setDaemonPID(Coins.PART, cls.daemons[2 + i].handle.pid)
+            sc.start()
+
+            t = HttpThread(sc.fp, TEST_HTTP_HOST, TEST_HTTP_PORT + i, False, sc)
             cls.http_threads.append(t)
             t.start()
 
-        waitForRPC(nmcRpc)
+        waitForRPC(nmcRpc, delay_event)
         num_blocks = 500
         logging.info('Mining %d namecoin blocks', num_blocks)
         cls.nmc_addr = nmcRpc('getnewaddress mining_addr legacy')
@@ -332,7 +334,7 @@ class Test(unittest.TestCase):
         except Exception:
             logging.info('nmc: segwit is not active')
 
-        waitForRPC(btcRpc)
+        waitForRPC(btcRpc, delay_event)
         cls.btc_addr = btcRpc('getnewaddress mining_addr bech32')
         logging.info('Mining %d Bitcoin blocks to %s', num_blocks, cls.btc_addr)
         btcRpc('generatetoaddress {} {}'.format(num_blocks, cls.btc_addr))

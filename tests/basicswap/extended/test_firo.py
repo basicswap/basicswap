@@ -26,7 +26,6 @@ from basicswap.util import (
 )
 from basicswap.rpc import (
     callrpc_cli,
-    waitForRPC,
 )
 from tests.basicswap.util import (
     read_json_api,
@@ -37,6 +36,7 @@ from tests.basicswap.common import (
     make_rpc_func,
     TEST_HTTP_PORT,
     wait_for_offer,
+    waitForRPC,
 )
 from basicswap.interface.contrib.firo_test_framework.mininode import (
     FromHex,
@@ -139,7 +139,7 @@ class Test(BaseTest):
         cls.firo_daemons.append(startDaemon(os.path.join(cfg.TEST_DATADIRS, 'firo_' + str(i)), FIRO_BINDIR, FIROD, opts=extra_opts))
         logging.info('Started %s %d', FIROD, cls.firo_daemons[-1].handle.pid)
 
-        waitForRPC(make_rpc_func(i, base_rpc_port=FIRO_BASE_RPC_PORT))
+        waitForRPC(make_rpc_func(i, base_rpc_port=FIRO_BASE_RPC_PORT), test_delay_event)
 
     @classmethod
     def addPIDInfo(cls, sc, i):

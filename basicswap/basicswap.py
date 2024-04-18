@@ -654,6 +654,9 @@ class BasicSwap(BaseApp):
             interface = LTCInterface(self.coin_clients[coin], self.chain, self)
             self.coin_clients[coin]['interface_mweb'] = LTCInterfaceMWEB(self.coin_clients[coin], self.chain, self)
             return interface
+        elif coin == Coins.DCR:
+            from .interface.dcr import DCRInterface
+            return DCRInterface(self.coin_clients[coin], self.chain, self)
         elif coin == Coins.NMC:
             from .interface.nmc import NMCInterface
             return NMCInterface(self.coin_clients[coin], self.chain, self)

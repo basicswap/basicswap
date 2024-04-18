@@ -15,6 +15,7 @@ from basicswap.util.crypto import (
     blake256,
     ripemd160,
 )
+from basicswap.interface.dcr.rpc import make_rpc_func
 
 
 class DCRInterface(Secp256k1Interface):
@@ -41,6 +42,10 @@ class DCRInterface(Secp256k1Interface):
 
     def __init__(self, coin_settings, network, swap_client=None):
         super().__init__(network)
+        self._rpc_host = coin_settings.get('rpchost', '127.0.0.1')
+        self._rpcport = coin_settings['rpcport']
+        self._rpcauth = coin_settings['rpcauth']
+        self.rpc = make_rpc_func(self._rpcport, self._rpcauth, host=self._rpc_host)
 
     def pkh(self, pubkey: bytes) -> bytes:
         return ripemd160(blake256(pubkey))
@@ -61,3 +66,9 @@ class DCRInterface(Secp256k1Interface):
         if blake256(blake256(prefixed_data))[:4] != checksum:
             raise ValueError('Checksum mismatch')
         return prefixed_data
+
+    def testDaemonRPC(self, with_wallet=True) -> None:
+        if with_wallet:
+            self.rpc_wallet('getwalletinfo')
+        else:
+            self.rpc('getblockchaininfo')
