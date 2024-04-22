@@ -23,8 +23,10 @@ from coincurve.keys import (
     PrivateKey)
 
 from basicswap.util import i2b, h2b
-from basicswap.util.integer import encode_varint, decode_varint
+from basicswap.util.address import decodeAddress
 from basicswap.util.crypto import ripemd160, hash160, blake256
+from basicswap.util.extkey import ExtKeyPair
+from basicswap.util.integer import encode_varint, decode_varint
 from basicswap.util.network import is_private_ip_address
 from basicswap.util.rfc2440 import rfc2440_hash_password
 from basicswap.util_xmr import encode_address as xmr_encode_address
@@ -312,7 +314,7 @@ class Test(unittest.TestCase):
         assert ('10.00000000' == format_amount(amount_to_recreate, scale_to))
 
         coin_settings = {'rpcport': 0, 'rpcauth': 'none', 'walletrpcport': 0, 'walletrpcauth': 'none'}
-        coin_settings.update(self.REQUIRED_SETTINGS)
+        coin_settings.update(REQUIRED_SETTINGS)
         ci_xmr = XMRInterface(coin_settings, 'regtest')
         ci_btc = BTCInterface(coin_settings, 'regtest')
 
@@ -479,6 +481,37 @@ class Test(unittest.TestCase):
         ]
         for expect_hash, data in test_vectors:
             assert (blake256(data).hex() == expect_hash)
+
+    def test_extkey(self):
+
+        test_key = 'XPARHAr37YxmFP8wyjkaHAQWmp84GiyLikL7EL8j9BCx4LkB8Q1Bw5Kr8sA1GA3Ym53zNLcaxxFHr6u81JVTeCaD61c6fKS1YRAuti8Zu5SzJCjh'
+        test_key_c0 = 'XPARHAt1XMcNYAwP5wEnQXknBAkGSzaetdZt2eoJZehdB4WXfV1xbSjpgHe44AivmumcSejW5KaYx6L5M6MyR1WyXrsWTwaiUEfHq2RrqCfXj3ZW'
+        test_key_c0_p = 'PPARTKPL4rp5WLnrYP6jZfuRjx6jrmvbsz5QdHofPfFqJdm918mQwdPLq6Dd9TkdbQeKUqjbHWkyzWe7Pftd7itzm7ETEoUMq4cbG4fY9FKH1YSU'
+        test_key_c0h = 'XPARHAt1XMcNgWbv48LwoQbjs1bC8kCXKomzvJLRT5xmbQ2GKf9e8Vfr1MMcfiWJC34RyDp5HvAfjeiNyLDfkFm1UrRCrPkVC9GGaAWa3nXMWew8'
+
+        ek_data = decodeAddress(test_key)[4:]
+
+        ek = ExtKeyPair()
+        ek.decode(ek_data)
+        assert (ek.encode_v() == ek_data)
+
+        m_0 = ek.derive(0)
+
+        ek_c0_data = decodeAddress(test_key_c0)[4:]
+        assert (m_0.encode_v() == ek_c0_data)
+
+        child_no: int = 0 | (1 << 31)
+        m_0h = ek.derive(child_no)
+
+        ek_c0h_data = decodeAddress(test_key_c0h)[4:]
+        assert (m_0h.encode_v() == ek_c0h_data)
+
+        ek.neuter()
+        assert (ek.has_key() is False)
+        m_0 = ek.derive(0)
+
+        ek_c0_p_data = decodeAddress(test_key_c0_p)[4:]
+        assert (m_0.encode_p() == ek_c0_p_data)
 
 
 if __name__ == '__main__':

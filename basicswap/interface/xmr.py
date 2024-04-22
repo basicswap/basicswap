@@ -156,7 +156,7 @@ class XMRInterface(CoinInterface):
             pass
         self.rpc_wallet('open_wallet', params)
 
-    def initialiseWallet(self, key_view, key_spend, restore_height=None):
+    def initialiseWallet(self, key_view: bytes, key_spend: bytes, restore_height=None) -> None:
         with self._mx_wallet:
             try:
                 self.openWallet(self._wallet_filename)

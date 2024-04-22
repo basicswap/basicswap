@@ -38,6 +38,7 @@ from basicswap.util.address import (
     pubkeyToAddress,
 )
 from basicswap.util.crypto import (
+    hash160,
     sha256,
 )
 from coincurve.keys import (
@@ -70,8 +71,7 @@ from basicswap.contrib.test_framework.script import (
     OP_DROP,
     OP_HASH160, OP_EQUAL,
     SIGHASH_ALL,
-    SegwitV0SignatureHash,
-    hash160)
+    SegwitV0SignatureHash)
 
 from basicswap.basicswap_util import (
     TxLockTypes)

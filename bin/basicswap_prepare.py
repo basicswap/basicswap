@@ -91,6 +91,8 @@ known_coins = {
 
 disabled_coins = [
     'navcoin',
+    'namecoin',  # Needs update
+    'decred',  # In-progress
 ]
 
 expected_key_ids = {

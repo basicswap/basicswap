@@ -93,7 +93,7 @@ class PARTInterface(BTCInterface):
         index_info = self.rpc('getinsightinfo' if int(str(version)[:2]) > 19 else 'getindexinfo')
         return index_info['spentindex']
 
-    def initialiseWallet(self, key):
+    def initialiseWallet(self, key: bytes) -> None:
         raise ValueError('TODO')
 
     def withdrawCoin(self, value, addr_to, subfee):
