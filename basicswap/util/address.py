@@ -90,7 +90,7 @@ def getKeyID(key_data: bytes) -> bytes:
     return ripemd160(sha256(key_data))
 
 
-def bech32Decode(hrp, addr):
+def bech32Decode(hrp: str, addr: str) -> bytes:
     hrpgot, data = bech32_decode(addr)
     if hrpgot != hrp:
         return None
@@ -100,14 +100,14 @@ def bech32Decode(hrp, addr):
     return bytes(decoded)
 
 
-def bech32Encode(hrp, data):
+def bech32Encode(hrp: str, data: bytes) -> str:
     ret = bech32_encode(hrp, convertbits(data, 8, 5))
     if bech32Decode(hrp, ret) is None:
         return None
     return ret
 
 
-def decodeAddress(address: str):
+def decodeAddress(address: str) -> bytes:
     addr_data = b58decode(address)
     if addr_data is None:
         return None

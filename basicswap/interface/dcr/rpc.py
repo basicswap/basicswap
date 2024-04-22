@@ -16,7 +16,6 @@ def callrpc(rpc_port, auth, method, params=[], host='127.0.0.1'):
         x.__handler = None
         v = x.json_request(method, params)
         x.close()
-        print('[rm] v', v)
         r = json.loads(v.decode('utf-8'))
     except Exception as ex:
         traceback.print_exc()

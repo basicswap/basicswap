@@ -502,7 +502,9 @@ class BasicSwap(BaseApp):
             self.coin_clients[Coins.LTC_MWEB] = self.coin_clients[coin]
 
         if self.coin_clients[coin]['connection_type'] == 'rpc':
-            if coin == Coins.XMR:
+            if coin == Coins.DCR:
+                self.coin_clients[coin]['walletrpcport'] = chain_client_settings['walletrpcport']
+            elif coin == Coins.XMR:
                 self.coin_clients[coin]['rpctimeout'] = chain_client_settings.get('rpctimeout', 60)
                 self.coin_clients[coin]['walletrpctimeout'] = chain_client_settings.get('walletrpctimeout', 120)
                 self.coin_clients[coin]['walletrpctimeoutlong'] = chain_client_settings.get('walletrpctimeoutlong', 600)

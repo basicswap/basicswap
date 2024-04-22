@@ -81,6 +81,7 @@ def startDaemon(node_dir, bin_dir, daemon_bin, opts=[], extra_config={}):
         args.append('-datadir=' + datadir_path)
     args += opts
     logging.info('Starting node ' + daemon_bin + ' ' + (('-datadir=' + node_dir) if add_datadir else ''))
+    logging.info('[rm] {}'.format(' '.join(args)))
 
     opened_files = []
     if extra_config.get('stdout_to_file', False):

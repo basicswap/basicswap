@@ -76,11 +76,11 @@ class NAVInterface(BTCInterface):
         # p2sh-p2wsh
         return True
 
-    def seedToMnemonic(self, key):
+    def seedToMnemonic(self, key: bytes) -> None:
         return Mnemonic('english').to_mnemonic(key)
 
     def initialiseWallet(self, key):
-        # load with -importmnemonic= parameter
+        # Load with -importmnemonic= parameter
         pass
 
     def getWalletSeedID(self):
