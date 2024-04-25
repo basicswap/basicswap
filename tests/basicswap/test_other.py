@@ -460,7 +460,7 @@ class Test(unittest.TestCase):
         for i, expect_length in test_vectors:
             b = encode_varint(i)
             assert (len(b) == expect_length)
-            assert (decode_varint(b) == i)
+            assert (decode_varint(b) == (i, expect_length))
 
     def test_base58(self):
         kv = edu.get_secret()

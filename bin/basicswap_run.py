@@ -81,17 +81,17 @@ def startDaemon(node_dir, bin_dir, daemon_bin, opts=[], extra_config={}):
         args.append('-datadir=' + datadir_path)
     args += opts
     logging.info('Starting node ' + daemon_bin + ' ' + (('-datadir=' + node_dir) if add_datadir else ''))
-    logging.info('[rm] {}'.format(' '.join(args)))
 
     opened_files = []
     if extra_config.get('stdout_to_file', False):
         stdout_dest = open(os.path.join(datadir_path, extra_config.get('stdout_filename', 'core_stdout.log')), 'w')
         opened_files.append(stdout_dest)
+        stderr_dest = stdout_dest
     else:
         stdout_dest = subprocess.PIPE
+        stderr_dest = subprocess.PIPE
 
-    return Daemon(subprocess.Popen(args, stdin=subprocess.PIPE, stdout=stdout_dest, stderr=subprocess.PIPE, cwd=datadir_path), opened_files)
->>>>>>> 676701b (tests: Start dcrd)
+    return Daemon(subprocess.Popen(args, stdin=subprocess.PIPE, stdout=stdout_dest, stderr=stderr_dest, cwd=datadir_path), opened_files)
 
 
 def startXmrDaemon(node_dir, bin_dir, daemon_bin, opts=[]):

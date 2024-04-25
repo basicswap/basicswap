@@ -68,7 +68,8 @@ def prepareDCDDataDir(datadir, node_id, conf_file, dir_prefix, num_nodes=3):
         f'rpclisten=127.0.0.1:{DCR_BASE_RPC_PORT + node_id}\n',
         f'rpcuser=test{node_id}\n',
         f'rpcpass=test_pass{node_id}\n',
-        'notls=1\n',]
+        'notls=1\n',
+        'miningaddr=SsYbXyjkKAEXXcGdFgr4u4bo4L8RkCxwQpH\n',]
 
     for i in range(0, num_nodes):
         if node_id == i:
@@ -87,7 +88,8 @@ def prepareDCDDataDir(datadir, node_id, conf_file, dir_prefix, num_nodes=3):
         f'username=test{node_id}\n',
         f'password=test_pass{node_id}\n',
         'noservertls=1\n',
-        'noclienttls=1\n',]
+        'noclienttls=1\n',
+        'enablevoting=1\n',]
 
     wallet_cfg_file_path = os.path.join(node_dir, 'dcrwallet.conf')
     with open(wallet_cfg_file_path, 'w+') as fp:
@@ -101,6 +103,7 @@ class Test(BaseTest):
     dcr_daemons = []
     start_ltc_nodes = False
     start_xmr_nodes = False
+    dcr_mining_addr = 'SsYbXyjkKAEXXcGdFgr4u4bo4L8RkCxwQpH'
 
     hex_seeds = [
         'e8574b2a94404ee62d8acc0258cab4c0defcfab8a5dfc2f4954c1f9d7e09d72a',
@@ -110,7 +113,13 @@ class Test(BaseTest):
 
     @classmethod
     def prepareExtraCoins(cls):
-        pass
+        if not cls.restore_instance:
+            ci0 = cls.swap_clients[0].ci(cls.test_coin_from)
+            assert (ci0.rpc_wallet('getnewaddress') == cls.dcr_mining_addr)
+            cls.dcr_ticket_account = ci0.rpc_wallet('getaccount', [cls.dcr_mining_addr, ])
+            ci0.rpc('generate', [110,])
+        else:
+            cls.dcr_ticket_account = ci0.rpc_wallet('getaccount', [cls.dcr_mining_addr, ])
 
     @classmethod
     def tearDownClass(cls):
@@ -123,6 +132,21 @@ class Test(BaseTest):
     @classmethod
     def coins_loop(cls):
         super(Test, cls).coins_loop()
+        ci0 = cls.swap_clients[0].ci(cls.test_coin_from)
+
+        num_passed: int = 0
+        for i in range(5):
+            try:
+                ci0.rpc_wallet('purchaseticket', [cls.dcr_ticket_account, 0.1, 0])
+                num_passed += 1
+            except Exception as e:
+                logging.warning('coins_loop purchaseticket {}'.format(e))
+
+        try:
+            if num_passed >= 5:
+                ci0.rpc('generate', [1,])
+        except Exception as e:
+                logging.warning('coins_loop generate {}'.format(e))
 
     @classmethod
     def prepareExtraDataDir(cls, i):
@@ -148,6 +172,7 @@ class Test(BaseTest):
             while p.poll() is None:
                 while len(select.select([pipe_r], [], [], 0)[0]) == 1:
                     buf = os.read(pipe_r, 1024).decode('utf-8')
+                    logging.debug(f'dcrwallet {buf}')
                     response = None
                     if 'Use the existing configured private passphrase' in buf:
                         response = b'y\n'
@@ -157,6 +182,8 @@ class Test(BaseTest):
                         response = b'y\n'
                     elif 'Enter existing wallet seed' in buf:
                         response = (cls.hex_seeds[i] + '\n').encode('utf-8')
+                    elif 'Seed input successful' in buf:
+                        pass
                     else:
                         raise ValueError(f'Unexpected output: {buf}')
                     if response is not None:
@@ -171,6 +198,8 @@ class Test(BaseTest):
             os.close(pipe_r)
             os.close(pipe_w)
             p.stdin.close()
+
+        test_delay_event.wait(1.0)
 
         cls.dcr_daemons.append(startDaemon(appdata, DCR_BINDIR, DCR_WALLET, opts=extra_opts, extra_config={'add_datadir': False, 'stdout_to_file': True, 'stdout_filename': 'dcrwallet_stdout.log'}))
         logging.info('Started %s %d', DCR_WALLET, cls.dcr_daemons[-1].handle.pid)
@@ -211,15 +240,7 @@ class Test(BaseTest):
         data = ci.decode_address(address)
         assert (data[2:] == pkh)
 
-    def test_001_segwit(self):
-        logging.info('---------- Test {} segwit'.format(self.test_coin_from.name))
-
-        swap_clients = self.swap_clients
-
-        ci = swap_clients[0].ci(self.test_coin_from)
-        assert (ci.using_segwit() is True)
-
-        for i, sc in enumerate(swap_clients):
+        for i, sc in enumerate(self.swap_clients):
             loop_ci = sc.ci(self.test_coin_from)
             root_key = sc.getWalletKey(Coins.DCR, 1)
             masterpubkey = loop_ci.rpc_wallet('getmasterpubkey')
@@ -230,6 +251,39 @@ class Test(BaseTest):
                 assert (masterpubkey == 'spubVV1z2AFYjVZvzM45FSaWMPRqyUoUwyW78wfANdjdNG6JGCXrr8AbRvUgYb3Lm1iun9CgHew1KswdePryNLKEnBSQ82AjNpYdQgzXPUme9c6')
             if i < 2:
                 assert (seed_hash == hash160(masterpubkey_data))
+
+    def test_001_segwit(self):
+        logging.info('---------- Test {} segwit'.format(self.test_coin_from.name))
+
+        swap_clients = self.swap_clients
+
+        ci0 = swap_clients[0].ci(self.test_coin_from)
+        assert (ci0.using_segwit() is True)
+
+        addr_out = ci0.rpc_wallet('getnewaddress')
+        addr_info = ci0.rpc_wallet('validateaddress', [addr_out,])
+        assert (addr_info['isvalid'] is True)
+        assert (addr_info['ismine'] is True)
+
+        rtx = ci0.rpc_wallet('createrawtransaction', [[], {addr_out: 2.0}])
+
+        account_from = ci0.rpc_wallet('getaccount', [self.dcr_mining_addr, ])
+        frtx = ci0.rpc_wallet('fundrawtransaction', [rtx, account_from])
+
+        f_decoded = ci0.rpc_wallet('decoderawtransaction', [frtx['hex'], ])
+
+        sfrtx = ci0.rpc_wallet('signrawtransaction', [frtx['hex']])
+        s_decoded = ci0.rpc_wallet('decoderawtransaction', [sfrtx['hex'], ])
+        sent_txid = ci0.rpc_wallet('sendrawtransaction', [sfrtx['hex'], ])
+
+        assert (f_decoded['txid'] == sent_txid)
+        assert (f_decoded['txid'] == s_decoded['txid'])
+        assert (f_decoded['txid'] == s_decoded['txid'])
+
+        ctx = ci0.loadTx(bytes.fromhex(sfrtx['hex']))
+        ser_out = ctx.serialize()
+        assert (ser_out.hex() == sfrtx['hex'])
+        assert (f_decoded['txid'] == ctx.TxHash().hex())
 
 
 if __name__ == '__main__':
