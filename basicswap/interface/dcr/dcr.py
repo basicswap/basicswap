@@ -20,6 +20,7 @@ from basicswap.util.crypto import (
 )
 from basicswap.util.extkey import ExtKeyPair
 from basicswap.interface.dcr.rpc import make_rpc_func
+from .messages import CTransaction
 
 
 class DCRInterface(Secp256k1Interface):
@@ -119,3 +120,8 @@ class DCRInterface(Secp256k1Interface):
         ek_account = ek_coin.derive(0 | (1 << 31))
 
         return hash160(ek_account.encode_p())
+
+    def loadTx(self, tx_bytes: bytes) -> CTransaction:
+        tx = CTransaction()
+        tx.deserialize(tx_bytes)
+        return tx
