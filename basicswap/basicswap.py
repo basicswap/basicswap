@@ -156,6 +156,7 @@ MINPROTO_VERSION_ADAPTOR_SIG = 4
 MINPROTO_VERSION = min(MINPROTO_VERSION_SECRET_HASH, MINPROTO_VERSION_ADAPTOR_SIG)
 MAXPROTO_VERSION = 10
 
+
 def validOfferStateToReceiveBid(offer_state):
     if offer_state == OfferStates.OFFER_RECEIVED:
         return True
