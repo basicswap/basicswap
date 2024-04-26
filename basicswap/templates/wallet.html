@@ -1,5 +1,5 @@
 {% include 'header.html' %}
-{% from 'style.html' import select_box_arrow_svg, select_box_class, circular_arrows_svg, circular_error_svg, circular_info_svg, cross_close_svg, breadcrumb_line_svg, withdraw_svg, utxo_groups_svg, create_utxo_svg, red_cross_close_svg %} 
+{% from 'style.html' import select_box_arrow_svg, select_box_class, circular_arrows_svg, circular_error_svg, circular_info_svg, cross_close_svg, breadcrumb_line_svg, withdraw_svg, utxo_groups_svg, create_utxo_svg, red_cross_close_svg, blue_cross_close_svg, circular_update_messages_svg, circular_error_messages_svg %} 
 <script src="/static/js/libs//qrcode.js"></script>
 <div class="container mx-auto">
   <section class="p-5 mt-5">
@@ -28,49 +28,59 @@
     </div>
   </section>
   {% include 'inc_messages.html' %} 
-
   {% if w.updating %}
-  <section class="py-4" id="updating" role="alert">
-    <div class="container px-4 mx-auto">
-      <div class="p-6 bg-blue-100 border border-blue-200 rounded-md">
-        <div class="flex flex-wrap justify-between items-center -m-2">
-          <div class="flex-1 p-2">
-            <div class="flex flex-wrap -m-1">
-              <div class="w-auto p-1">
-                <div class="w-auto p-1"> {{ circular_info_svg | safe }} </div>
-              </div>
-              <div class="flex-1 p-1">
-                <h3 class="font-medium text-sm text-blue-900">Updating, please wait...</h3>
-              </div>
+<section class="py-4" id="messages_updating" role="alert">
+  <div class="container px-4 mx-auto">
+    <div class="p-6 text-green-800 rounded-lg bg-blue-50 border border-blue-500 dark:bg-gray-500 dark:text-blue-400 rounded-md">
+      <div class="flex flex-wrap justify-between items-center -m-2">
+        <div class="flex-1 p-2">
+          <div class="flex flex-wrap -m-1">
+            <div class="w-auto p-1">
+            {{ circular_update_messages_svg | safe }}
             </div>
-          </div>
-          <div class="w-auto p-2"> <button type="button" class="ml-auto bg-blue-100 text-blue-500 rounded-lg focus:ring-0 focus:ring-blue-400 p-1.5 hover:bg-blue-200 inline-flex h-8 w-8 focus:outline-none" data-dismiss-target="#updating" aria-label="Close"> <span class="sr-only">Close</span> {{ cross_close_svg | safe }} </button> </div>
+            <ul class="ml-4 mt-1">
+                <li class="font-semibold text-sm text-blue-500 error_msg"><span class="bold">UPDATING:</span></li>
+                <li class="font-medium text-sm text-blue-500">Please wait...</li>
+            </ul>
+           </div>             
+        </div>
+        <div class="w-auto p-2">
+          <button type="button" class="ms-auto bg-blue-50 text-blue-500 rounded-lg focus:ring-0 focus:ring-blue-400 p-1.5 hover:bg-blue-200 inline-flex items-center justify-center h-8 w-8 focus:outline-none dark:bg-gray-800 dark:text-blue-400 dark:hover:bg-gray-700" data-dismiss-target="#messages_updating" aria-label="Close"><span class="sr-only">Close</span>
+            {{ blue_cross_close_svg | safe }}
+          </button>
         </div>
       </div>
     </div>
-  </section>
+  </div>
+</section>
   {% endif %}
   {% if w.havedata %}
   {% if w.error %} 
-  <section class="py-4" id="error" role="alert">
-    <div class="container px-4 mx-auto">
-      <div class="p-6 bg-red-100 border border-red-200 rounded-md">
-        <div class="flex flex-wrap justify-between items-center -m-2">
-          <div class="flex-1 p-2">
-            <div class="flex flex-wrap -m-1">
-              <div class="w-auto p-1"> {{ circular_error_svg | safe }} </div>
-              <div class="flex-1 p-1">
-                <h3 class="font-medium text-sm text-red-900 error_msg">
-                  <p class="error_msg">Error: {{ w.error }}</p>
-                </h3>
-              </div>
+<section class="py-4" id="messages_error" role="alert">
+  <div class="container px-4 mx-auto">
+    <div class="p-6 text-green-800 rounded-lg bg-red-50 border border-red-400 dark:bg-gray-500 dark:text-red-400 rounded-md">
+      <div class="flex flex-wrap justify-between items-center -m-2">
+        <div class="flex-1 p-2">
+          <div class="flex flex-wrap -m-1">
+            <div class="w-auto p-1">
+              {{ circular_error_messages_svg | safe }}
             </div>
-          </div>
-          <div class="w-auto p-2"> <button type="button" class="ml-auto bg-red-100 text-red-500 rounded-lg focus:ring-0 focus:ring-red-400 p-1.5 hover:bg-red-200 inline-flex h-8 w-8 focus:outline-none" data-dismiss-target="#error" aria-label="Close"> <span class="sr-only">Close</span> {{ red_cross_close_svg | safe }} </button> </div>
+            <ul class="ml-4 mt-1">
+                <li class="font-semibold text-sm text-red-500 error_msg"><span class="bold">ERROR:</span></li>
+                <li class="font-medium text-sm text-red-500 error_msg">{{ w.error }}</li>
+            </ul>
+      </div>
+        </div>
+        <div class="w-auto p-2">
+          <button type="button" class="ml-auto bg-red-100 text-red-500 rounded-lg focus:ring-0 focus:ring-red-400 p-1.5 hover:bg-red-200 inline-flex h-8 w-8 focus:outline-none inline-flex items-center justify-center h-8 w-8 dark:bg-gray-800 dark:text-red-400 dark:hover:bg-gray-700" data-dismiss-target="#messages_error" aria-label="Close">
+            <span class="sr-only">Close</span>
+            {{ red_cross_close_svg | safe }}
+          </button>
         </div>
       </div>
     </div>
-  </section>
+  </div>
+</section>
   {% else %}
   <form method="post" autocomplete="off">
     <section>
