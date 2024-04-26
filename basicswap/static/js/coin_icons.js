@@ -1,70 +1,68 @@
-// Define a cache object to store selected option data
-const selectCache = {};
+document.addEventListener('DOMContentLoaded', () => {
 
-// Function to update the cache with the selected option data for a given select element
-function updateSelectCache(select) {
-  const selectedOption = select.options[select.selectedIndex];
-  const image = selectedOption.getAttribute('data-image');
-  const name = selectedOption.textContent.trim();
-  selectCache[select.id] = { image, name };
-}
+    const selectCache = {};
 
-// Function to set the selected option and associated image and name for a given select element
+    function updateSelectCache(select) {
+        const selectedOption = select.options[select.selectedIndex];
+        const image = selectedOption.getAttribute('data-image');
+        const name = selectedOption.textContent.trim();
+        selectCache[select.id] = { image, name };
+    }
 
+    function setSelectData(select) {
+        const selectedOption = select.options[select.selectedIndex];
+        const image = selectedOption.getAttribute('data-image') || '';
+        const name = selectedOption.textContent.trim();
+        select.style.backgroundImage = image ? `url(${image}?${new Date().getTime()})` : '';
+        
+        const selectImage = select.nextElementSibling.querySelector('.select-image');
+        if (selectImage) {
+            selectImage.src = image;
+        }
 
-function setSelectData(select) {
-  const selectedOption = select.options[select.selectedIndex];
-  const image = selectedOption.getAttribute('data-image') || '/static/images/other/coin.png'; // set a default image URL
-  const name = selectedOption.textContent.trim();
-  if (image) {
-    select.style.backgroundImage = `url(${image})`;
-    select.nextElementSibling.querySelector('.select-image').src = image;
-  } else {
-    select.style.backgroundImage = '';
-    select.nextElementSibling.querySelector('.select-image').src = '';
-  }
-  select.nextElementSibling.querySelector('.select-name').textContent = name;
-  updateSelectCache(select);
-}
+        const selectNameElement = select.nextElementSibling.querySelector('.select-name');
+        if (selectNameElement) {
+            selectNameElement.textContent = name;
+        }
 
+        updateSelectCache(select);
+    }
 
-// Function to get the selected option data from cache for a given select element
-function getSelectData(select) {
-  return selectCache[select.id] || {};
-}
+    const selectIcons = document.querySelectorAll('.custom-select .select-icon');
+    const selectImages = document.querySelectorAll('.custom-select .select-image');
+    const selectNames = document.querySelectorAll('.custom-select .select-name');
 
-// Update all custom select elements on the page
-const selects = document.querySelectorAll('.custom-select .select');
-selects.forEach((select) => {
-  // Set the initial select data based on the cached data (if available) or the selected option (if any)
-  const cachedData = getSelectData(select);
-  if (cachedData.image) {
-    select.style.backgroundImage = `url(${cachedData.image})`;
-    select.nextElementSibling.querySelector('.select-image').src = cachedData.image;
-  }
-  if (cachedData.name) {
-    select.nextElementSibling.querySelector('.select-name').textContent = cachedData.name;
-  }
-  if (select.selectedIndex >= 0) {
-    setSelectData(select);
-  }
+    selectIcons.forEach(icon => icon.style.display = 'none');
+    selectImages.forEach(image => image.style.display = 'none');
+    selectNames.forEach(name => name.style.display = 'none');
 
-  // Add event listener to update select data when an option is selected
-  select.addEventListener('change', () => {
-    setSelectData(select);
-  });
-});
+    function setupCustomSelect(select) {
+        const options = select.querySelectorAll('option');
+        const selectIcon = select.parentElement.querySelector('.select-icon');
+        const selectImage = select.parentElement.querySelector('.select-image');
 
-// Hide the select image and name on page load
-const selectIcons = document.querySelectorAll('.custom-select .select-icon');
-const selectImages = document.querySelectorAll('.custom-select .select-image');
-const selectNames = document.querySelectorAll('.custom-select .select-name');
-selectIcons.forEach((icon) => {
-  icon.style.display = 'none';
-});
-selectImages.forEach((image) => {
-  image.style.display = 'none';
-});
-selectNames.forEach((name) => {
-  name.style.display = 'none';
+        options.forEach(option => {
+            const image = option.getAttribute('data-image');
+            if (image) {
+                option.style.backgroundImage = `url(${image})`;
+            }
+        });
+
+        const storedValue = localStorage.getItem(select.name);
+        if (storedValue && select.value == '-1') {
+            select.value = storedValue;
+        }
+
+        select.addEventListener('change', () => {
+            setSelectData(select);
+            localStorage.setItem(select.name, select.value);
+        });
+
+        setSelectData(select);
+        selectIcon.style.display = 'none';
+        selectImage.style.display = 'none';
+    }
+
+    const customSelects = document.querySelectorAll('.custom-select select');
+    customSelects.forEach(setupCustomSelect);
 });

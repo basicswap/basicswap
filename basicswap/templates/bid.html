@@ -1,4 +1,6 @@
 {% include 'header.html' %}
+{% from 'style.html' import breadcrumb_line_svg, circular_arrows_svg, input_arrow_down_svg, small_arrow_white_right_svg %}
+
 <div class="container mx-auto">
  <section class="p-5 mt-5">
   <div class="flex flex-wrap items-center -m-2">
@@ -9,19 +11,11 @@
        <p>Home</p>
       </a>
      </li>
-     <li>
-      <svg width="6" height="15" viewBox="0 0 6 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-       <path d="M5.34 0.671999L2.076 14.1H0.732L3.984 0.671999H5.34Z" fill="#BBC3CF"></path>
-      </svg>
-     </li>
+      <li> {{ breadcrumb_line_svg | safe }} </li>
      <li>
       <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="#">Bids</a>
      </li>
-     <li>
-      <svg width="6" height="15" viewBox="0 0 6 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-       <path d="M5.34 0.671999L2.076 14.1H0.732L3.984 0.671999H5.34Z" fill="#BBC3CF"></path>
-      </svg>
-     </li>
+      <li> {{ breadcrumb_line_svg | safe }} </li>
      <li>
       <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="{{ bid_id }}">BID ID: {{ bid_id }}</a>
      </li>
@@ -38,7 +32,7 @@
     <div class="relative z-20 flex flex-wrap items-center -m-3">
      <div class="w-full md:w-1/2 p-3">
       <h2 class="mb-6 text-4xl font-bold text-white tracking-tighter">Bid {% if debug_mode == true %} (Debug: bid template) {% endif %}</h2>
-      <p class="font-normal text-coolGray-200 dark:text-white"><span class="bold">Bid ID:</span> {{ bid_id }}</p>
+      <p class="font-normal text-coolGray-200 dark:text-white"><span class="bold">BID ID:</span> {{ bid_id }}</p>
      </div>
      <div class="w-full md:w-1/2 p-3 p-6 container flex flex-wrap items-center justify-end items-center mx-auto">
       {% if refresh %} 
@@ -88,9 +82,7 @@
             <td class="py-3 px-6">
              <div class="content flex py-2">
               <span class="bold">{{ data.amt_to }} {{ data.ticker_to }}</span>
-              <svg aria-hidden="true " class="w-5 h-5 ml-3 mr-3" fill="currentColor " viewBox="0 0 20 20 " xmlns="http://www.w3.org/2000/svg ">
-               <path fill-rule="evenodd " d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z " clip-rule="evenodd "></path>
-              </svg>
+                {{ small_arrow_white_right_svg | safe }}
               <span class="text-xs bold">{{ data.amt_from }} {{ data.ticker_from }}</span>
              </div>
             </td>
@@ -101,9 +93,7 @@
             <td class="py-3 px-6">
              <div class="content flex py-2">
               <span class="bold">{{ data.amt_from }} {{ data.ticker_from }}</span>
-              <svg aria-hidden="true " class="w-5 h-5 ml-3 mr-3" fill="currentColor " viewBox="0 0 20 20 " xmlns="http://www.w3.org/2000/svg ">
-               <path fill-rule="evenodd " d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z " clip-rule="evenodd "></path>
-              </svg>
+                {{ small_arrow_white_right_svg | safe }}
               <span class="bold">{{ data.amt_to }} {{ data.ticker_to }}</span>
              </div>
             </td>
@@ -455,9 +445,7 @@
              <td class="py-3 px-6 bold">Change Bid State:</td>
              <td class="py-3 px-6">
               <div class="relative">
-               <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"></path>
-               </svg>
+                {{ input_arrow_down_svg| safe }}
                <select class="bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-" name="new_state">
                 {% for s in data.bid_states %}
                 <option value="{{ s[0] }}" {% if data.bid_state_ind==s[0] %} selected{% endif %}>{{ s[1] }}</option>
@@ -471,9 +459,7 @@
              <td class="py-3 px-6 bold">Debug Option</td>
              <td class="py-3 px-6">
               <div class="relative">
-               <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"></path>
-               </svg>
+                {{ input_arrow_down_svg| safe }}
                <select class="bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-" name="debugind">
                 <option{% if data.debug_ind=="-1" %} selected{% endif %} value="-1">None</option>
                 {% for a in data.debug_options %}

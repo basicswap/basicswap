@@ -1,727 +1,494 @@
-{% include 'header.html' %}
-<div class="container mx-auto">
- <section class="p-5 mt-5">
-  <div class="flex flex-wrap items-center -m-2">
-   <div class="w-full md:w-1/2 p-2">
-    <ul class="flex flex-wrap items-center gap-x-3 mb-2">
-     <li>
-      <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/">
-       <p>Home</p>
-      </a>
-     </li>
-     <li>
-      <svg width="6" height="15" viewBox="0 0 6 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-       <path d="M5.34 0.671999L2.076 14.1H0.732L3.984 0.671999H5.34Z" fill="#BBC3CF"></path>
-      </svg>
-     </li>
-     <li>
-      <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/newoffer">Place an new offer</a>
-     </li>
-     <li>
-      <svg width="6" height="15" viewBox="0 0 6 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-       <path d="M5.34 0.671999L2.076 14.1H0.732L3.984 0.671999H5.34Z" fill="#BBC3CF"></path>
-      </svg>
-     </li>
-    </ul>
-   </div>
-  </div>
- </section>
- <section class="py-4">
-  <div class="container px-4 mx-auto">
-   <div class="relative py-11 px-16 bg-coolGray-900 dark:bg-blue-500 rounded-md overflow-hidden">
-    <img class="absolute z-10 left-4 top-4" src="/static/images/elements/dots-red.svg" alt="">
-    <img class="absolute z-10 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt="">
-    <img class="absolute h-64 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" src="/static/images/elements/wave.svg" alt="">
-    <div class="relative z-20 flex flex-wrap items-center -m-3">
-     <div class="w-full md:w-1/2 p-3">
-      <h2 class="mb-6 text-4xl font-bold text-white tracking-tighter">Place an new offer</h2>
-      <p class="font-normal text-coolGray-200 dark:text-white">Place an order on the order book.</p>
-     </div>
-    </div>
-   </div>
-  </div>
- </section>
- {% include 'inc_messages.html' %}
- <section>
-  <div class="p-5 mb-10">
-   <div class="mx-4 p-4">
-    <div class="flex items-center">
-     <div class="flex items-center text-teal-600 relative">
-      <div class="rounded-full h-12 w-12 py-3 border-2 border-blue-500">
-       <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 24 24">
-        <g fill="#3b82f6">
-         <polygon points="14.5 23.5 11.5 23.5 11.5 4.321 6.766 8.108 4.892 5.766 11.474 0.5 14.5 0.5 14.5 23.5" fill="#3b82f6"></polygon>
-        </g>
-       </svg>
-      </div>
-      <div class="absolute top-0 -ml-10 text-center mt-16 w-32 text-xs font-medium uppercase dark:text-white text-gray-600">Step 1</div>
-     </div>
-     <div class="flex-auto border-t-2 border-teal-600 dark:border-gray-400"></div>
-     <div class="flex items-center text-teal-600 relative">
-      <div class="rounded-full transition duration-500 ease-in-out h-12 w-12 py-3 border-2 border-teal-600 dark:border-gray-400">
-       <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 24 24">
-        <g fill="#3b82f6">
-         <path d="M19.5,23.5H4.5V20.2l.667-.445C9.549,16.828,16.5,10.78,16.5,7c0-2.654-1.682-4-5-4A9.108,9.108,0,0,0,7.333,4.248L6.084,5.08,4.42,2.584l1.247-.832A11.963,11.963,0,0,1,11.5,0c4.935,0,8,2.683,8,7,0,5-6.5,10.662-10.232,13.5H19.5ZM6,21H6Z" fill="#d1d5db"></path>
-        </g>
-       </svg>
-      </div>
-      <div class="absolute top-0 -ml-10 text-center mt-16 w-32 text-xs font-medium uppercase dark:text-white text-gray-600">Step 2</div>
-     </div>
-     <div class="flex-auto border-t-2 border-teal-600 dark:border-gray-400"></div>
-     <div class="flex items-center text-gray-500 relative">
-      <div class="rounded-full transition duration-500 ease-in-out h-12 w-12 py-3 border-2 border-teal-600 dark:border-gray-400">
-       <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 24 24">
-        <g fill="#3b82f6">
-         <polygon points="9 21 1 13 4 10 9 15 21 3 24 6 9 21" fill="#d1d5db"></polygon>
-        </g>
-       </svg>
-      </div>
-      <div class="absolute top-0 -ml-10 text-center mt-16 w-32 text-xs font-medium uppercase dark:text-white text-gray-600">Confirm</div>
-     </div>
-    </div>
-   </div>
-  </div>
- </section>
- <section class="py-3">
-  <div class="container px-4 mx-auto">
-   <div class="p-8 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
-    <div class="flex flex-wrap items-center justify-between -mx-4 mb-8 pb-6 border-b border-gray-400 border-opacity-20">
-     <div class="w-full sm:w-auto px-4 mb-6 sm:mb-0">
-      <h4 class="text-2xl font-bold tracking-wide dark:text-white mb-1">STEP 1</h4>
-      <!-- todo add subtitle <p class="text-sm text-coolGray-500">Lorem ipsum dolor sit amet</p> -->
-     </div>
-    </div>
-    <form method="post" autocomplete="off" id='form'>
-     <div class="py-3 border-b items-center justify-between -mx-4 mb-6 pb-6 border-gray-400 border-opacity-20">
-      <div class="w-full md:w-10/12">
-       <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
-        <div class="w-full md:w-1/3 p-3">
-         <p class="text-sm text-coolGray-800 dark:text-white font-semibold">Select Network</p>
-        </div>
-        <div class="w-full md:flex-1 p-3">
-         <div class="relative">
-          <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-           <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"></path>
-          </svg>
-          <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-           <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-            <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3b82f6" stroke-linejoin="round">
-             <line data-cap="butt" x1="7.6" y1="10.5" x2="16.4" y2="5.5" stroke="#3b82f6"></line>
-             <line data-cap="butt" x1="7.6" y1="13.5" x2="16.4" y2="18.5" stroke="#3b82f6"></line>
-             <circle cx="5" cy="12" r="3"></circle>
-             <circle cx="19" cy="4" r="3"></circle>
-             <circle cx="19" cy="20" r="3"></circle>
-            </g>
-           </svg>
-          </div>
-          <select class="pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="addr_to">
-           <option{% if data.addr_to=="-1" %} selected{% endif %} value="-1">Public Network</option>
-            {% for a in addrs_to %}
-            <option{% if data.addr_to==a[0] %} selected{% endif %} value="{{ a[0] }}">{{ a[0] }} {{ a[1] }}</option>
-            {% endfor %}
-          </select>
-         </div>
-        </div>
-       </div>
-      </div>
-     </div>
-     <div class="py-3 border-b items-center justify-between -mx-4 mb-6 pb-6 border-gray-400 border-opacity-20">
-      <div class="w-full md:w-10/12">
-       <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
-        <div class="w-full md:w-1/3 p-3">
-         <p class="text-sm text-coolGray-800 dark:text-white font-semibold">Select Address</p>
-        </div>
-        <div class="w-full md:flex-1 p-3">
-         <div class="relative">
-          <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-           <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"></path>
-          </svg>
-          <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-           <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-            <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3b82f6" stroke-linejoin="round">
-             <path data-cap="butt" d="M11.992,11.737,14.2,13.4A2,2,0,0,1,15,15v1H7V15a2,2,0,0,1,.8-1.6l2.208-1.663" stroke="#3b82f6"></path>
-             <rect x="9" y="7" width="4" height="5" rx="2" ry="2" stroke="#3b82f6"></rect>
-             <path d="M2,1H18a2,2,0,0,1,2,2V21a2,2,0,0,1-2,2H2Z"></path>
-             <line x1="23" y1="5" x2="23" y2="9" stroke="#3b82f6"></line>
-            </g>
-           </svg>
-          </div>
-          <select class="pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="addr_from">
-            {% for a in addrs %}
-            <option{% if data.addr_from==a[0] %} selected{% endif %} value="{{ a[0] }}">{{ a[0] }} {{ a[1] }}</option>
-            {% endfor %}
-            <option{% if data.addr_from=="-1" %} selected{% endif %} value="-1">New Address</option>
-          </select>
-         </div>
-        </div>
-       </div>
-      </div>
-     </div>
-     <div class="py-3 border-b items-center justify-between -mx-4 mb-6 pb-6 border-gray-400 border-opacity-20">
-      <div class="w-full md:w-10/12">
-       <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
-        <div class="w-full md:w-1/3 p-3">
-         <p class="text-sm text-coolGray-800 dark:text-white font-semibold">Swap Type</p>
-        </div>
-        <div class="w-full md:flex-1 p-3">
-         <div class="relative">
-          <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-           <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"></path>
-          </svg>
-          <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-           <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-            <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3b82f6" stroke-linejoin="round">
-             <path data-cap="butt" d="M11.992,11.737,14.2,13.4A2,2,0,0,1,15,15v1H7V15a2,2,0,0,1,.8-1.6l2.208-1.663" stroke="#3b82f6"></path>
-             <rect x="9" y="7" width="4" height="5" rx="2" ry="2" stroke="#3b82f6"></rect>
-             <path d="M2,1H18a2,2,0,0,1,2,2V21a2,2,0,0,1-2,2H2Z"></path>
-             <line x1="23" y1="5" x2="23" y2="9" stroke="#3b82f6"></line>
-            </g>
-           </svg>
-          </div>
-          <select class="pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="swap_type" id="swap_type">
-            {% for a in swap_types %}
-            <option{% if data.swap_type==a[0] %} selected{% endif %} value="{{ a[0] }}">{{ a[1] }}</option>
-            {% endfor %}
-          </select>
-         </div>
-        </div>
-       </div>
-      </div>
-     </div>
-
-<div class="py-3 border-b items-center justify-between -mx-4 mb-6 pb-6 border-gray-400 border-opacity-20">
- <div class="w-full md:w-10/12">
-  <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
-   <div class="w-full md:w-1/3 p-3">
-    <p class="text-sm text-coolGray-800 dark:text-white font-semibold">You Send</p>
-   </div>
-   <div class="w-full md:flex-1 p-3">
-    <div class="flex flex-wrap -m-3">
-     <div class="w-full md:w-1/2 p-3">
-      <div class="custom-select">
-       <div class="relative">
-        <svg class="absolute right-4 top-1/2 transform -translate-y-1/2 z-50" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-         <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"></path>
-        </svg>
-        <select class="select hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" id="coin_from" name="coin_from" onchange="set_rate('coin_from');">
-         <option value="-1">Select coin you send</option>
-         {% for c in coins_from %}
-         <option{% if data.coin_from==c[0] %} selected{% endif %} value="{{ c[0] }}" data-image="/static/images/coins/{{ c[1]|replace(" ", "-") }}-20.png">{{ c[1] }}</option>
-          {% endfor %}
-        </select>
-        <div class="select-dropdown">
-         <img class="select-icon" src="" alt="">
-         <img class="select-image" src="" alt="">
-        </div>
-       </div>
-      </div>
-     </div>
-     <div class="w-full md:w-1/2 p-3">
-      <div class="relative">
-       <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-        <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-         <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3b82f6" stroke-linejoin="round">
-          <path d="M15.6,13.873a2.273,2.273,0,0,1-.825,1.833,4.1,4.1,0,0,1-2.31.829v1.47h-.982V16.563a7.95,7.95,0,0,1-3.07-.617V14.053a8.328,8.328,0,0,0,1.5.545,8.019,8.019,0,0,0,1.568.28V12.654L11,12.468a5.357,5.357,0,0,1-2.012-1.216A2.332,2.332,0,0,1,8.4,9.627a2.123,2.123,0,0,1,.814-1.71,4.143,4.143,0,0,1,2.27-.812v-1.1h.982V7.074a8.126,8.126,0,0,1,2.97.66l-.674,1.678a7.768,7.768,0,0,0-2.3-.559v2.116a11.073,11.073,0,0,1,1.991.932,2.733,2.733,0,0,1,.867.868A2.146,2.146,0,0,1,15.6,13.873ZM10.558,9.627a.678.678,0,0,0,.219.52,2.569,2.569,0,0,0,.707.42V8.881Q10.559,9.017,10.558,9.627Zm2.884,4.354a.646.646,0,0,0-.244-.509,3.173,3.173,0,0,0-.732-.431v1.786Q13.441,14.662,13.442,13.981Z" stroke="none" fill="#3b82f6"></path>
-          <polyline points="5.346 7.929 6.932 2.237 1.135 2.966"></polyline>
-          <path data-cap="butt" d="M11.789,23A11,11,0,0,1,6.932,2.237"></path>
-          <polyline points="18.654 16.071 17.068 21.763 22.865 21.034"></polyline>
-          <path data-cap="butt" d="M12.211,1a11,11,0,0,1,4.857,20.763"></path>
-         </g>
-        </svg>
-       </div>
-       <input class="pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" placeholder="Amount you send" type="text" id="amt_from" name="amt_from" value="{{ data.amt_from }}" onchange="set_rate('amt_from');">
-      </div>
-     </div>
-    </div>
-   </div>
-  </div>
- </div>
-</div>
-<div class="py-3 border-b items-center justify-between -mx-4 mb-6 pb-6 border-gray-400 border-opacity-20">
- <div class="w-full md:w-10/12">
-  <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
-   <div class="w-full md:w-1/3 p-3">
-    <p class="text-sm text-coolGray-800 dark:text-white font-semibold">You Get</p>
-   </div>
-   <div class="w-full md:flex-1 p-3">
-    <div class="flex flex-wrap -m-3">
-     <div class="w-full md:w-1/2 p-3">
-      <div class="custom-select">
-       <div class="relative">
-        <svg class="absolute right-4 top-1/2 transform -translate-y-1/2 z-50" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-         <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"></path>
-        </svg>
-        <select class="select hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0"" id="coin_to" name="coin_to" onchange="set_rate('coin_to');">
-         <option value="-1">Select coin you get</option>
-         {% for c in coins %}
-         <option{% if data.coin_to==c[0] %} selected{% endif %} value="{{ c[0] }}" data-image="/static/images/coins/{{ c[1]|replace(" ", "-") }}-20.png">{{ c[1] }}</option>
-          {% endfor %}
-        </select>
-        <div class="select-dropdown">
-         <img class="select-icon" src="" alt="">
-         <img class="select-image" src="" alt="">
-        </div>
-       </div>
-      </div>
-     </div>
-     <div class="w-full md:w-1/2 p-3">
-      <div class="relative">
-       <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-        <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-         <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3b82f6" stroke-linejoin="round">
-          <path d="M15.6,13.873a2.273,2.273,0,0,1-.825,1.833,4.1,4.1,0,0,1-2.31.829v1.47h-.982V16.563a7.95,7.95,0,0,1-3.07-.617V14.053a8.328,8.328,0,0,0,1.5.545,8.019,8.019,0,0,0,1.568.28V12.654L11,12.468a5.357,5.357,0,0,1-2.012-1.216A2.332,2.332,0,0,1,8.4,9.627a2.123,2.123,0,0,1,.814-1.71,4.143,4.143,0,0,1,2.27-.812v-1.1h.982V7.074a8.126,8.126,0,0,1,2.97.66l-.674,1.678a7.768,7.768,0,0,0-2.3-.559v2.116a11.073,11.073,0,0,1,1.991.932,2.733,2.733,0,0,1,.867.868A2.146,2.146,0,0,1,15.6,13.873ZM10.558,9.627a.678.678,0,0,0,.219.52,2.569,2.569,0,0,0,.707.42V8.881Q10.559,9.017,10.558,9.627Zm2.884,4.354a.646.646,0,0,0-.244-.509,3.173,3.173,0,0,0-.732-.431v1.786Q13.441,14.662,13.442,13.981Z" stroke="none" fill="#3b82f6"></path>
-          <polyline points="5.346 7.929 6.932 2.237 1.135 2.966"></polyline>
-          <path data-cap="butt" d="M11.789,23A11,11,0,0,1,6.932,2.237"></path>
-          <polyline points="18.654 16.071 17.068 21.763 22.865 21.034"></polyline>
-          <path data-cap="butt" d="M12.211,1a11,11,0,0,1,4.857,20.763"></path>
-         </g>
-        </svg>
-       </div>
-       <input class="pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" placeholder="Amount you get" type="text" id="amt_to" name="amt_to" value="{{ data.amt_to }}" onchange="set_rate('amt_to');">
-      </div>
-     </div>
-    </div>
-   </div>
-  </div>
- </div>
-</div>
-<div class="py-3 border-b items-center justify-between -mx-4 mb-6 pb-6 border-gray-400 border-opacity-20">
- <div class="w-full md:w-10/12">
-  <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
-   <div class="w-full md:w-1/3 p-3">
-    <p class="text-sm text-coolGray-800 dark:text-white font-semibold">Bid Amount</p>
-   </div>
-   <div class="w-full md:flex-1 p-3">
-    <div class="flex flex-wrap -m-3">
-     <div class="w-full md:w-1/2 p-3">
-      <p class="mb-1.5 font-medium text-base dark:text-white text-coolGray-800">Minimum Bid Amount</p>
-      <div class="relative">
-       <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-        <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-         <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3b82f6" stroke-linejoin="round">
-          <rect x="9.843" y="5.379" transform="matrix(0.7071 -0.7071 0.7071 0.7071 -0.7635 13.1569)" width="11.314" height="4.243"></rect>
-          <polyline points="3,23 3,19 15,19 15,23 "></polyline>
-          <line x1="4" y1="15" x2="1" y2="15" stroke="#3b82f6"></line>
-          <line x1="5.757" y1="10.757" x2="3.636" y2="8.636" stroke="#3b82f6"></line>
-          <line x1="1" y1="23" x2="17" y2="23"></line>
-          <line x1="17" y1="9" x2="23" y2="15"></line>
-         </g>
-        </svg>
-       </div>
-       <input class="pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" id="amt_bid_min" name="amt_bid_min" value="{{ data.amt_bid_min }}" title="Bids with an amount below the minimum bid value will be discarded">
-      </div>
-     </div>
-     <div class="w-full md:w-1/2 p-3">
-      <p class="mb-1.5 font-medium text-base dark:text-white text-coolGray-800">Rate</p>
-      <div class="relative">
-       <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-        <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-         <g fill="#3b82f6">
-          <path d="M9,9h5L7,0,0,9H5V23a1,1,0,0,0,1,1H8a1,1,0,0,0,1-1Z" fill="#3b82f6"></path>
-          <path d="M14,17a3,3,0,1,1,3-3A3,3,0,0,1,14,17Zm0-4a1,1,0,1,0,1,1A1,1,0,0,0,14,13Z" data-color="color-2"></path>
-          <path d="M21,24a3,3,0,1,1,3-3A3,3,0,0,1,21,24Zm0-4a1,1,0,1,0,1,1A1,1,0,0,0,21,20Z" data-color="color-2"></path>
-          <path d="M13,23a1,1,0,0,1-.707-1.707l9-9a1,1,0,0,1,1.414,1.414l-9,9A1,1,0,0,1,13,23Z" data-color="color-2"></path>
-         </g>
-        </svg>
-       </div>
-       <input class="pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" id="rate" name="rate" value="{{ data.rate }}" onchange="set_rate('rate');">
-      </div>
-
-    <div class="flex form-check form-check-inline mt-5">
-    <div class="flex items-center h-5">
-        <input class="form-check-input hover:border-blue-500 w-5 h-5 form-check-input text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-1 dark:bg-gray-500 dark:border-gray-400" type="checkbox" id="rate_lock" name="rate_lock" value="rl" checked=checked>
-    </div>
-    <div class="ml-2 text-sm">
-        <label class="form-check-label text-sm font-medium text-gray-800 dark:text-white" for="inlineCheckbox1">Lock Rate</label>
-        <p id="helper-checkbox-text" class="text-xs font-normal text-gray-500 dark:text-gray-300">Automatically adjusts the <b>You Get</b> value based on the rate you’ve entered. Without it, the rate value is automatically adjusted based on the number of coins you put in <b>You Get.</b></p>
-    </div>
-    </div>
-
-     </div>
-    </div>
-   </div>
-  </div>
- </div>
-</div>
-<div class="py-3 border-b items-center justify-between -mx-4 mb-6 pb-6 border-gray-400 border-opacity-20">
- <div class="w-full md:w-10/12">
-  <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
-   <div class="w-full md:w-1/3 p-3">
-    <p class="text-sm text-coolGray-800 dark:text-white font-semibold">Options</p>
-   </div>
-   <div class="w-full md:flex-1 p-3">
-
-<div class="flex form-check form-check-inline">
-    <div class="flex items-center h-5">
-        <input class="hover:border-blue-500 w-5 h-5 form-check-input text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-1 dark:bg-gray-500 dark:border-gray-400" type="checkbox" id="amt_var" name="amt_var" value="av" {% if data.amt_var==true %} checked="checked" {% endif %}>
-    </div>
-    <div class="ml-2 text-sm">
-        <label class="form-check-label text-sm font-medium text-gray-800 dark:text-white" for="inlineCheckbox2">Amount Variable</label>
-        <p id="helper-checkbox-text" class="text-xs font-normal text-gray-500 dark:text-gray-300">Allow bids with a different amount to the offer.</p>
-    </div>
-</div>
-
-<div class="flex mt-2 form-check form-check-inline">
-    <div class="flex items-center h-5">
-        <input class="hover:border-blue-500 w-5 h-5 form-check-input text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-1 dark:bg-gray-500 dark:border-gray-400" type="checkbox" id="rate_var" name="rate_var" value="rv" {% if data.rate_var==true %} checked="checked" {% endif %}>
-    </div>
-    <div class="ml-2 text-sm">
-        <label class="form-check-label text-sm font-medium text-gray-800 dark:text-white" for="inlineCheckbox3">Rate Variable</label>
-        <p id="helper-checkbox-text" class="text-xs font-normal text-gray-500 dark:text-gray-300">Allow bids with a different rate to the offer.</p>
-    </div>
-</div>
-
-   </div>
-  </div>
- </div>
-</div>
-<div class="pricejsonhidden hidden py-3 border-b items-center justify-between -mx-4 mb-6 pb-6 border-gray-400 border-opacity-20">
- <div class="w-full md:w-10/12">
-  <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
-   <div class="w-full md:w-1/3 p-3">
-    <p class="text-sm text-coolGray-800 dark:text-white font-semibold">Coin Prices/Rates (JSON)</p>
-   </div>
-   <div class="w-full md:flex-1 p-3 dark:text-white text-sm monospace">
-    <p id="rates_display"></p>
-   </div>
-  </div>
- </div>
-</div>
-<div class="pricetablehidden hidden py-3 border-b items-center justify-between -mx-4 mb-6 pb-6 border-gray-400 border-opacity-20">
- <div class="w-full md:w-10/12">
-  <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
-   <div class="w-full md:w-1/3 p-3">
-    <p class="text-sm text-coolGray-800 dark:text-white font-semibold">Coin Prices/Rates (Table)</p>
-   </div>
-   <div class="w-full md:flex-1 p-3 dark:text-white text-sm">
-           <table id="priceTable" class="hidden w-full min-w-max text-sm">
-            <thead class="uppercase">
-             <tr class="text-left">
-              <th class="p-0">
-               <div class="py-3 px-6 rounded-tl-xl bg-coolGray-200 dark:bg-gray-600">
-                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Coin</span>
-               </div>
-              </th>
-              <th class="p-0">
-               <div class="py-3 bg-coolGray-200 dark:bg-gray-600">
-                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Price in USD</span>
-               </div>
-              </th>
-               <th class="p-0">
-               <div class="py-3 rounded-tr-xl bg-coolGray-200 dark:bg-gray-600">
-                <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Price in BTC (Rate)</span>
-               </div>
-              </th>
-             </tr>
-            </thead>
-       <tbody id="priceTableBody" class="text-gray-700">
-      </tbody>
-    </table>
-   </div>
-  </div>
- </div>
-</div>
-</div>
-</div>
-</section>
-<section>
- <div class="pl-6 pr-6 pt-0 pb-0 h-full overflow-hidden">
-  <div class="pb-6 border-coolGray-100">
-   <div class="flex flex-wrap items-center justify-between -m-2">
-    <div class="w-full pt-2">
-     <div class="container mt-5 mx-auto">
-      <div class="pt-6 pb-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
-       <div class="px-6">
-        <div class="flex flex-wrap justify-end">
-         <!--<div class="w-full md:w-auto p-1.5"><button name="show_rates_table" type="button" value="Show Rates Table" onclick='lookup_rates_table();' class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none"><svg class="mr-2"
-          xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24"><g fill="#556987"><path fill="#556987" d="M12,3c1.989,0,3.873,0.65,5.43,1.833l-3.604,3.393l9.167,0.983L22.562,0l-3.655,3.442 C16.957,1.862,14.545,1,12,1C5.935,1,1,5.935,1,12h2C3,7.037,7.037,3,12,3z"></path><path data-color="#556987" d="M12,21c-1.989,0-3.873-0.65-5.43-1.833l3.604-3.393l-9.167-0.983L1.438,24l3.655-3.442 C7.043,22.138,9.455,23,12,23c6.065,0,11-4.935,11-11h-2C21,16.963,16.963,21,12,21z"></path></g></svg><span>Show Rates Table</span></button></div>-->
-          {% if show_chart %}
-          <div class="w-full md:w-auto p-1.5">
-              <button name="loadPrices" id="loadPricesButton" type="button" value="Check Current Prices/Rates (TABLE)" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md focus:ring-0 focus:outline-none dark:text-white dark:hover:text-white dark:bg-gray-600 dark:hover:bg-gray-700 dark:border-gray-600 dark:hover:border-gray-600"><span>Check Current Prices/Rates (TABLE)</span>
-            </button>
-          </div>
-          {% endif %}
-         <div class="w-full md:w-auto p-1.5">
-          <button name="check_rates" type="button" value="Check Current Prices/Rates (JSON)" onclick='lookup_rates();' class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md focus:ring-0 focus:outline-none dark:text-white dark:hover:text-white dark:bg-gray-600 dark:hover:bg-gray-700 dark:border-gray-600 dark:hover:border-gray-600"><span>Check Current Prices/Rates (JSON)</span>
-          </button>
-         </div>
-         <div class="w-full md:w-auto p-1.5">
-          <button name="continue" value="Continue" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
-           <svg class="mr-2" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-            <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round">
-             <circle cx="12" cy="12" r="11"></circle>
-             <polyline points="11 8 15 12 11 16" stroke="#ffffff"></polyline>
-            </g>
-           </svg>
-           <span>Continue</span>
-          </button>
-         </div>
-         <input type="hidden" name="formid" value="{{ form_id }}">
-         <input type="hidden" name="step1" value="a">
-         </form>
-        </div>
-       </div>
-      </div>
-     </div>
-    </div>
-   </div>
-  </div>
- </div>
-</section>
-
-<style>
-select.select-disabled {
-opacity: 0.50 !important;
-}
-</style>
-
-<script>
-const xhr_rates = new XMLHttpRequest();
-xhr_rates.onload = () => {
-    if (xhr_rates.status == 200) {
-        const obj = JSON.parse(xhr_rates.response);
-        inner_html = '<pre><code>' + JSON.stringify(obj, null, '  ') + '</code></pre>';
-        document.getElementById('rates_display').innerHTML = inner_html;
-    }
-}
-const xhr_rate = new XMLHttpRequest();
-xhr_rate.onload = () => {
-    if (xhr_rate.status == 200) {
-        const obj = JSON.parse(xhr_rate.response);
-        if (obj.hasOwnProperty('rate')) {
-            document.getElementById('rate').value = obj['rate'];
-        } else
-        if (obj.hasOwnProperty('amount_to')) {
-            document.getElementById('amt_to').value = obj['amount_to'];
-        } else
-        if (obj.hasOwnProperty('amount_from')) {
-            document.getElementById('amt_from').value = obj['amount_from'];
-        }
-    }
-}
-const xhr_rates_table = new XMLHttpRequest();
-xhr_rates_table.onload = () => {
-    if (xhr_rates_table.status == 200) {
-        const list = JSON.parse(xhr_rates_table.response);
-        headings = ['Source', 'Coin From', 'Coin To', 'Coin From USD Rate', 'Coin To USD Rate', 'Coin From BTC Rate', 'Coin To BTC Rate', 'Relative Rate'];
-        table = document.createElement('table');
-        table.setAttribute("class", "");
-        heading_head = document.createElement('thead');
-        headings_row = document.createElement('tr');
-        data_row.setAttribute("class", "");
-        for (let i = 0; i < headings.length; i++) {
-            column = document.createElement('th');
-            column.textContent = headings[i];
-            headings_row.appendChild(column);
-        }
-        table.appendChild(headings_row);
-        for (let i = 0; i < list.length; i++) {
-            data_row = document.createElement('tr');
-            for (let j = 0; j < list[i].length; j++) {
-                column = document.createElement('td');
-                column.textContent = list[i][j];
-                data_row.appendChild(column);
-            }
-            table.appendChild(data_row);
-        }
-        // Clear existing
-        const display_node = document.getElementById("rates_display");
-        while (display_node.lastElementChild) {
-            display_node.removeChild(display_node.lastElementChild);
-        }
-        heading = document.createElement('h4');
-        heading.textContent = ''
-        display_node.appendChild(heading);
-        display_node.appendChild(table);
-    }
-}
-
-function lookup_rates() {
-    const coin_from = document.getElementById('coin_from').value;
-    const coin_to = document.getElementById('coin_to').value;
-    
-    if (coin_from === '-1' || coin_to === '-1') {
-        alert('Coins from and to must be set first.');
-        return;
-    }
-    
-    const selectedCoin = (coin_from === '15') ? '3' : coin_from;
-    
-    inner_html = '<p>Updating...</p>';
-    document.getElementById('rates_display').innerHTML = inner_html;
-    document.querySelector(".pricejsonhidden").classList.remove("hidden");
-
-    const xhr_rates = new XMLHttpRequest();
-    xhr_rates.onreadystatechange = function() {
-        if (xhr_rates.readyState === XMLHttpRequest.DONE) {
-            if (xhr_rates.status === 200) {
-                document.getElementById('rates_display').innerHTML = xhr_rates.responseText;
-            } else {
-                console.error('Error fetching data:', xhr_rates.statusText);
-            }
-        }
-    };
-
-    xhr_rates.open('POST', '/json/rates');
-    xhr_rates.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
-    xhr_rates.send('coin_from=' + selectedCoin + '&coin_to=' + coin_to);
-}
-
-function lookup_rates_table() {
-    const coin_from = document.getElementById('coin_from').value;
-    const coin_to = document.getElementById('coin_to').value;
-    if (coin_from == '-1' || coin_to == '-1') {
-        alert('Coins from and to must be set first.');
-        return;
-    }
-    inner_html = 'Updating...</p>';
-    document.getElementById('rates_display').innerHTML = inner_html;
-
-    // Remove the 'hidden' class
-    document.querySelector(".hidden.py-3.border-b").classList.remove("hidden");
-
-    xhr_rates_table.open('GET', '/json/rateslist?from=' + coin_from + '&to=' + coin_to);
-    xhr_rates_table.send();
-}
-
-
-function set_swap_type_enabled(coin_from, coin_to, swap_type) {
-    const adaptor_sig_only_coins = ['6' /* XMR */, '8' /* PART_ANON */, '7' /* PART_BLIND */, '13' /* FIRO */];
-    const secret_hash_only_coins = ['11' /* PIVX */, '12' /* DASH */];
-    let make_hidden = false;
-    if (adaptor_sig_only_coins.includes(coin_from) || adaptor_sig_only_coins.includes(coin_to)) {
-        swap_type.disabled = true;
-        swap_type.value = 'xmr_swap';
-        make_hidden = true;
-        swap_type.classList.add('select-disabled'); // Add the class to the disabled select
-    } else
-    if (secret_hash_only_coins.includes(coin_from) && secret_hash_only_coins.includes(coin_to)) {
-        swap_type.disabled = true;
-        swap_type.value = 'seller_first';
-        make_hidden = true;
-        swap_type.classList.add('select-disabled'); // Add the class to the disabled select
-    } else {
-        swap_type.disabled = false;
-        swap_type.classList.remove('select-disabled'); // Remove the class from the enabled select
-    }
-    let swap_type_hidden = document.getElementById('swap_type_hidden');
-    if (make_hidden) {
-        if (!swap_type_hidden) {
-            swap_type_hidden = document.createElement('input');
-            swap_type_hidden.setAttribute('id', 'swap_type_hidden');
-            swap_type_hidden.setAttribute('type', 'hidden');
-            swap_type_hidden.setAttribute('name', 'swap_type');
-            document.getElementById('form').appendChild(swap_type_hidden)
-        }
-        swap_type_hidden.setAttribute('value', swap_type.value);
-    } else
-    if (swap_type_hidden) {
-        swap_type_hidden.parentNode.removeChild(swap_type_hidden);
-    }
-}
-
-function set_rate(value_changed) {
-    const coin_from = document.getElementById('coin_from').value;
-    const coin_to = document.getElementById('coin_to').value;
-    const amt_from = document.getElementById('amt_from').value;
-    const amt_to = document.getElementById('amt_to').value;
-    const rate = document.getElementById('rate').value;
-    const lock_rate = rate == '' ? false : document.getElementById('rate_lock').checked;
-
-    const swap_type = document.getElementById('swap_type');
-    set_swap_type_enabled(coin_from, coin_to, swap_type);
-
-    if (coin_from == '-1' || coin_to == '-1') {
-        return;
-    }
-    params = 'coin_from=' + coin_from + '&coin_to=' + coin_to;
-    if (value_changed == 'rate' || (lock_rate && value_changed == 'amt_from') || (amt_to == '' && value_changed == 'amt_from')) {
-        if (amt_from == '' || rate == '') {
-            return;
-        }
-        params += '&rate=' + rate + '&amt_from=' + amt_from;
-    } else
-    if (lock_rate && value_changed == 'amt_to') {
-        if (amt_to == '' || rate == '') {
-            return;
-        }
-        params += '&amt_to=' + amt_to + '&rate=' + rate;
-    } else {
-        if (amt_from == '' || amt_to == '') {
-            return;
-        }
-        params += '&amt_from=' + amt_from + '&amt_to=' + amt_to;
-    }
-    xhr_rate.open('POST', '/json/rate');
-    xhr_rate.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
-    xhr_rate.send(params);
-}
-
-document.addEventListener("DOMContentLoaded", function() {
-    const coin_from = document.getElementById('coin_from').value;
-    const coin_to = document.getElementById('coin_to').value;
-    const swap_type = document.getElementById('swap_type');
-    set_swap_type_enabled(coin_from, coin_to, swap_type);
-});
-
-{% if show_chart %}
-document.addEventListener('DOMContentLoaded', function() {
-    const loadPricesButton = document.getElementById("loadPricesButton");
-
-    function loadPrices() {
-        const api_key = '{{chart_api_key}}';
-        const coins = ['BTC', 'PART', 'XMR', 'LTC', 'FIRO', 'DASH', 'PIVX', 'DOGE', 'DCR', 'ZANO', 'WOW'];
-
-        document.getElementById("priceTable").classList.remove("hidden");
-
-        coins.forEach(coin => {
-            fetch(`https://min-api.cryptocompare.com/data/pricemultifull?fsyms=${coin}&tsyms=USD,BTC&api_key=${api_key}`)
-                .then(response => response.json())
-                .then(data => {
-                    const priceUSD = data.RAW[coin].USD.PRICE;
-                    const priceBTC = data.RAW[coin].BTC.PRICE;
-
-                    const tableRow = document.createElement("tr");
-                    tableRow.classList.add("opacity-100", "text-gray-500", "dark:text-gray-100",
-                                            "dark:text-gray-100", "hover:bg-coolGray-200",
-                                            "dark:hover:bg-gray-600");
-
-                    const coinCell = document.createElement("td");
-                    coinCell.textContent = coin;
-                    coinCell.classList.add("py-3", "px-6", "bold");
-                    tableRow.appendChild(coinCell);
-
-                    const usdPriceCell = document.createElement("td");
-                    usdPriceCell.textContent = priceUSD.toFixed(2) + ' USD';
-                    usdPriceCell.classList.add("py-3");
-                    tableRow.appendChild(usdPriceCell);
-
-                    const btcPriceCell = document.createElement("td");
-                    btcPriceCell.classList.add("py-3");
-                    if (coin !== 'BTC') {
-                        btcPriceCell.textContent = priceBTC.toFixed(8) + ' BTC';
-                    } else {
-                        btcPriceCell.textContent = '-';
-                    }
-                    tableRow.appendChild(btcPriceCell);
-
-                    document.getElementById("priceTableBody").appendChild(tableRow);
-                })
-                .catch(error => console.error(`Error fetching ${coin} data:`, error));
-        });
-
-        document.querySelector(".pricetablehidden").classList.remove("hidden");
-        loadPricesButton.disabled = true;
-    }
-
-    loadPricesButton.addEventListener("click", loadPrices);
-});
-{% endif %}
-</script>
-<script src="static/js/new_offer.js"></script>
+{% include 'header.html' %} {% from 'style.html' import breadcrumb_line_svg, input_down_arrow_offer_svg, select_network_svg, select_address_svg, select_swap_type_svg, select_bid_amount_svg, select_rate_svg, step_one_svg, step_two_svg, step_three_svg %}
 <script src="static/js/coin_icons.js"></script>
-<script src="static/js/coin_icons_2.js"></script>
+<div class="container mx-auto">
+  <section class="p-5 mt-5">
+    <div class="flex flex-wrap items-center -m-2">
+      <div class="w-full md:w-1/2 p-2">
+        <ul class="flex flex-wrap items-center gap-x-3 mb-2">
+          <li><a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/">
+              <p>Home</p>
+            </a>
+          </li>
+          <li>{{ breadcrumb_line_svg | safe }}</li>
+          <li><a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/newoffer">Place</a></li>
+          <li>{{ breadcrumb_line_svg | safe }}</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+  <section class="py-4">
+    <div class="container px-4 mx-auto">
+      <div class="relative py-11 px-16 bg-coolGray-900 dark:bg-blue-500 rounded-md overflow-hidden">
+        <img class="absolute z-10 left-4 top-4" src="/static/images/elements/dots-red.svg" alt="">
+        <img class="absolute z-10 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt="">
+        <img class="absolute h-64 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" src="/static/images/elements/wave.svg" alt="">
+        <div class="relative z-20 flex flex-wrap items-center -m-3">
+          <div class="w-full md:w-1/2 p-3">
+            <h2 class="mb-6 text-4xl font-bold text-white tracking-tighter">Place an New Offer</h2>
+            <p class="font-normal text-coolGray-200 dark:text-white">Place an order on the network order book.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  {% include 'inc_messages.html' %}
+  <section>
+    <div class="p-5 mb-5">
+      <div class="mx-4 p-4">
+        <div class="flex items-center">
+
+          <div class="flex items-center text-teal-600 relative">
+            <div class="rounded-full h-12 w-12 py-3 border-2 border-blue-500">
+            {{ step_one_svg | safe }}
+          </div>
+            <div class="absolute top-0 -ml-10 text-center mt-16 w-32 text-xs font-medium uppercase dark:text-white text-gray-700">Step 1 - Place</div>
+          </div>
+
+          <div class="flex-auto border-t-2 border-gray-300 dark:border-gray-400"></div>
+
+          <div class="flex items-center text-teal-600 relative">
+            <div class="rounded-full transition duration-500 ease-in-out h-12 w-12 py-3 border-2 border-gray-300 dark:border-gray-400">
+            {{ step_two_svg | safe }}
+          </div>
+            <div class="absolute top-0 -ml-10 text-center mt-16 w-32 text-xs font-medium uppercase dark:text-white text-gray-700">Step 2 - Setup</div>
+          </div>
+
+          <div class="flex-auto border-t-2 border-gray-300 dark:border-gray-400"></div>
+
+          <div class="flex items-center text-gray-500 relative">
+            <div class="rounded-full transition duration-500 ease-in-out h-12 w-12 py-3 border-2 border-gray-300 dark:border-gray-400">
+            {{ step_three_svg | safe }}
+          </div>
+            <div class="absolute top-0 -ml-10 text-center mt-16 w-32 text-xs font-medium uppercase dark:text-white text-gray-700">Confirm</div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </section>
+  <section class="py-3">
+    <div class="container px-4 mx-auto">
+      <div class="p-8 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
+        <div class="flex flex-wrap items-center justify-between -mx-4 pb-6 border-gray-400 border-opacity-20"> </div>
+        <form method="post" autocomplete="off" id='form'>
+          <div class="py-3 border-b items-center justify-between -mx-4 mb-6 pb-3 border-gray-400 border-opacity-20">
+            <div class="w-full md:w-10/12">
+              <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
+                <div class="w-full md:w-1/3 p-6">
+                  <p class="text-sm text-coolGray-800 dark:text-white font-semibold">Select Network</p>
+                </div>
+                <div class="w-full md:flex-1 p-3">
+                  <div class="relative">
+                    {{ input_down_arrow_offer_svg | safe }}
+                    <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
+                    {{ select_network_svg | safe }}
+                  </div>
+                    <select class="pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="addr_to">
+                      <option{% if data.addr_to=="-1" %} selected{% endif %} value="-1">Public Network</option>
+                        {% for a in addrs_to %}
+                        <option{% if data.addr_to==a[0] %} selected{% endif %} value="{{ a[0] }}">{{ a[0] }} {{ a[1] }}</option>
+                        {% endfor %}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="py-0 border-b items-center justify-between -mx-4 mb-6 pb-3 border-gray-400 border-opacity-20">
+            <div class="w-full md:w-10/12">
+              <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
+                <div class="w-full md:w-1/3 p-6">
+                  <p class="text-sm text-coolGray-800 dark:text-white font-semibold">Select Address</p>
+                </div>
+                <div class="w-full md:flex-1 p-3">
+                  <div class="relative">
+                    {{ input_down_arrow_offer_svg | safe }}
+                    <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
+                    {{ select_address_svg | safe }}
+                  </div>
+                  <select class="hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="addr_from">
+                    {% for a in addrs %}
+                    <option{% if data.addr_from==a[0] %} selected{% endif %} value="{{ a[0] }}">{{ a[0] }} {{ a[1] }}</option>
+                    {% endfor %}
+                    <option{% if data.addr_from=="-1" %} selected{% endif %} value="-1">New Address</option>
+                  </select>               
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="py-0 border-b items-center justify-between -mx-4 mb-6 pb-3 border-gray-400 border-opacity-20">
+            <div class="w-full md:w-10/12">
+              <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
+                <div class="w-full md:w-1/3 p-6">
+                  <p class="text-sm text-coolGray-800 dark:text-white font-semibold">Swap Type</p>
+                </div>
+                <div class="w-full md:flex-1 p-3">
+                  <div class="relative">
+                    {{ input_down_arrow_offer_svg | safe }}
+                    <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
+                    {{ select_swap_type_svg | safe }}
+                  </div>
+                  <select class="hover:border-blue-500 bg-gray-50 pl-10 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="swap_type" id="swap_type">
+                    {% for a in swap_types %}
+                    <option{% if data.swap_type==a[0] %} selected{% endif %} value="{{ a[0] }}">{{ a[1] }}</option>
+                    {% endfor %}
+                  </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="py-0 border-b items-center justify-between -mx-4 mb-6 pb-3 border-gray-400 border-opacity-20">
+            <div class="w-full md:w-10/12">
+              <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
+                <div class="w-full md:w-1/3 p-6">
+                  <p class="text-sm text-coolGray-800 dark:text-white font-semibold">You Send</p>
+                </div>
+                <div class="w-full md:flex-1 p-3">
+                  <div class="flex flex-wrap -m-3">
+                    <div class="w-full md:w-1/2 p-3">
+                       <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Select Coin You Send</p>
+                      <div class="custom-select">                      
+                        <div class="relative">
+                          {{ input_down_arrow_offer_svg | safe }}
+                          <select class="select hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-5 bold focus:ring-0" id="coin_from" name="coin_from" onchange="set_rate('coin_from');">
+                            <option value="-1">Select coin you send</option>
+                            {% for c in coins_from %}
+                            <option{% if data.coin_from==c[0] %} selected{% endif %} value="{{ c[0] }}" data-image="/static/images/coins/{{ c[1]|replace(" ", "-") }}-20.png">{{ c[1] }}</option>
+                            {% endfor %}
+                          </select>
+                          <div class="select-dropdown"> <img class="select-icon" src="" alt=""> <img class="select-image" src="" alt=""> </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="w-full md:w-1/2 p-3">
+                      <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Amount You Send</p>
+                      <div class="relative">
+                        <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none"> </div> <input class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-5 focus:ring-0 bold" placeholder="0" type="text" id="amt_from" name="amt_from" value="{{ data.amt_from }}" onchange="set_rate('amt_from');">
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="py-0 border-b items-center justify-between -mx-4 mb-6 pb-3 border-gray-400 border-opacity-20">
+            <div class="w-full md:w-10/12">
+              <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
+                <div class="w-full md:w-1/3 p-6">
+                  <p class="text-sm text-coolGray-800 dark:text-white font-semibold">You Get</p>
+                </div>
+                <div class="w-full md:flex-1 p-3">
+                  <div class="flex flex-wrap -m-3">
+                    <div class="w-full md:w-1/2 p-3">
+                      <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Select Coin You Get</p>                     
+                      <div class="custom-select">
+                        <div class="relative">
+                          {{ input_down_arrow_offer_svg | safe }}
+                          <select class="select hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-5 bold focus:ring-0" id="coin_to" name="coin_to" onchange="set_rate('coin_to');">
+                            <option value="-1">Select coin you get</option>
+                            {% for c in coins %}
+                            <option{% if data.coin_to==c[0] %} selected{% endif %} value="{{ c[0] }}" data-image="/static/images/coins/{{ c[1]|replace(" ", "-") }}-20.png">{{ c[1] }}</option>
+                            {% endfor %}
+                          </select>
+                          <div class="select-dropdown"> <img class="select-icon" src="" alt=""> <img class="select-image" src="" alt=""> </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="w-full md:w-1/2 p-3">
+                      <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Amount You Get</p>
+                      <div class="relative">
+                        <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none"> </div> <input class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-5 focus:ring-0 bold" placeholder="0" type="text" id="amt_to" name="amt_to" value="{{ data.amt_to }}" onchange="set_rate('amt_to');">
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="py-0 border-b items-center justify-between -mx-4 mb-6 pb-3 border-gray-400 border-opacity-20">
+            <div class="w-full md:w-10/12">
+              <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
+                <div class="w-full md:w-1/3 p-6">
+                  <p class="text-sm text-coolGray-800 dark:text-white font-semibold">Bid Amount</p>
+                </div>
+                <div class="w-full md:flex-1 p-3">
+                  <div class="flex flex-wrap -m-3">
+                    <div class="w-full md:w-1/2 p-3">
+                      <p class="mb-1.5 font-medium text-base dark:text-white text-coolGray-800">Minimum Bid Amount</p>
+                      <div class="relative">
+                        <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
+                        {{ select_bid_amount_svg | safe }}
+                      </div>
+                      <input class="pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" id="amt_bid_min" name="amt_bid_min" value="{{ data.amt_bid_min }}" title="Bids with an amount below the minimum bid value will be discarded">
+                      </div>
+                    </div>
+                    <div class="w-full md:w-1/2 p-3">
+                      <p class="mb-1.5 font-medium text-base dark:text-white text-coolGray-800">Rate</p>
+                      <div class="relative">
+                        <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
+                        {{ select_rate_svg | safe }}
+                      </div>
+                      <input class="pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" id="rate" name="rate" value="{{ data.rate }}" onchange="set_rate('rate');">
+                      </div>
+                      <div class="text-sm mt-2">
+                        <a href="" id="get_rate_inferred_button" class="mt-2 dark:text-white bold text-coolGray-800">Get Rate Inferred:<span id="rate_inferred_display"></span></a>
+                      </div>
+                      <div class="flex form-check form-check-inline mt-5">
+                        <div class="flex items-center h-5"> <input class="form-check-input hover:border-blue-500 w-5 h-5 form-check-input text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-1 dark:bg-gray-500 dark:border-gray-400" type="checkbox" id="rate_lock" name="rate_lock" value="rl" checked=checked> </div>
+                        <div class="ml-2 text-sm">
+                          <label class="form-check-label text-sm font-medium text-gray-800 dark:text-white" for="inlineCheckbox1">Lock Rate</label>
+                          <p id="helper-checkbox-text" class="text-xs font-normal text-gray-500 dark:text-gray-300">Automatically adjusts the <b>You Get</b> value based on the rate you’ve entered. Without it, the rate value is automatically adjusted based on the number of coins you put in <b>You Get.</b></p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="py-0 border-b items-center justify-between -mx-4 mb-6 pb-3 border-gray-400 border-opacity-20">
+            <div class="w-full md:w-10/12">
+              <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
+                <div class="w-full md:w-1/3 p-6">
+                  <p class="text-sm text-coolGray-800 dark:text-white font-semibold">Options</p>
+                </div>
+                <div class="w-full md:flex-1 p-3">
+                  <div class="flex form-check form-check-inline">
+                    <div class="flex items-center h-5"> <input class="hover:border-blue-500 w-5 h-5 form-check-input text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-1 dark:bg-gray-500 dark:border-gray-400" type="checkbox" id="amt_var" name="amt_var" value="av" {% if data.amt_var==true %} checked="checked" {% endif %}> </div>
+                    <div class="ml-2 text-sm">
+                      <label class="form-check-label text-sm font-medium text-gray-800 dark:text-white" for="inlineCheckbox2">Amount Variable</label>
+                      <p id="helper-checkbox-text" class="text-xs font-normal text-gray-500 dark:text-gray-300">Allow bids with a different amount to the offer.</p>
+                    </div>
+                  </div>
+                  <div class="flex mt-2 form-check form-check-inline">
+                    <div class="flex items-center h-5"> <input class="hover:border-blue-500 w-5 h-5 form-check-input text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-1 dark:bg-gray-500 dark:border-gray-400" type="checkbox" id="rate_var" name="rate_var" value="rv" {% if data.rate_var==true %} checked="checked" {% endif %}> </div>
+                    <div class="ml-2 text-sm">
+                      <label class="form-check-label text-sm font-medium text-gray-800 dark:text-white" for="inlineCheckbox3">Rate Variable</label>
+                      <p id="helper-checkbox-text" class="text-xs font-normal text-gray-500 dark:text-gray-300">Allow bids with a different rate to the offer.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="pricejsonhidden hidden py-3 border-b items-center justify-between -mx-4 mb-6 pb-3 border-gray-400 border-opacity-20">
+            <div class="w-full md:w-10/12">
+              <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
+                <div class="w-full md:w-1/3 p-6">
+                  <p class="text-sm text-coolGray-800 dark:text-white font-semibold">Coin Prices/Rates (JSON)</p>
+                </div>
+                <div class="w-full md:flex-1 p-3 dark:text-white text-sm monospace">
+                  <p id="rates_display"></p>
+                </div>
+              </div>
+            </div>
+          </div>
+      </div>
+    </div>
+  </section>
+  <section>
+    <div class="pl-6 pr-6 pt-0 pb-0 h-full overflow-hidden">
+      <div class="pb-6 border-coolGray-100">
+        <div class="flex flex-wrap items-center justify-between -m-2">
+          <div class="w-full pt-2">
+            <div class="container mt-5 mx-auto">
+              <div class="pt-6 pb-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
+                <div class="px-6">
+                  <div class="flex flex-wrap justify-end">
+                    <div class="w-full md:w-auto p-1.5">
+                      <button name="check_rates" type="button" value="Check Current Prices/Rates (JSON)" onclick='lookup_rates();' class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md focus:ring-0 focus:outline-none dark:text-white dark:hover:text-white dark:bg-gray-600 dark:hover:bg-gray-700 dark:border-gray-600 dark:hover:border-gray-600">
+                        <span>Check Current Prices/Rates (JSON)</span>
+                    </button>
+                  </div>
+                    <div class="w-full md:w-auto p-1.5">
+                      <button name="continue" value="Continue" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+                        <span>Continue</span>
+                      </button>
+                    </div>
+                    <input type="hidden" name="formid" value="{{ form_id }}">
+                    <input type="hidden" name="step1" value="a">
+                  </form>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <script>
+    const xhr_rates = new XMLHttpRequest();
+    xhr_rates.onload = () => {
+        if (xhr_rates.status == 200) {
+            const obj = JSON.parse(xhr_rates.response);
+            inner_html = '<pre><code>' + JSON.stringify(obj, null, '  ') + '</code></pre>';
+            document.getElementById('rates_display').innerHTML = inner_html;
+        }
+    }
+    const xhr_rate = new XMLHttpRequest();
+    xhr_rate.onload = () => {
+        if (xhr_rate.status == 200) {
+            const obj = JSON.parse(xhr_rate.response);
+            if (obj.hasOwnProperty('rate')) {
+                document.getElementById('rate').value = obj['rate'];
+            } else
+            if (obj.hasOwnProperty('amount_to')) {
+                document.getElementById('amt_to').value = obj['amount_to'];
+            } else
+            if (obj.hasOwnProperty('amount_from')) {
+                document.getElementById('amt_from').value = obj['amount_from'];
+            }
+        }
+    }
+    
+    function lookup_rates() {
+        const coin_from = document.getElementById('coin_from').value;
+        const coin_to = document.getElementById('coin_to').value;
+        
+        if (coin_from === '-1' || coin_to === '-1') {
+            alert('Coins from and to must be set first.');
+            return;
+        }
+        
+        const selectedCoin = (coin_from === '15') ? '3' : coin_from;
+        
+        inner_html = '<p>Updating...</p>';
+        document.getElementById('rates_display').innerHTML = inner_html;
+        document.querySelector(".pricejsonhidden").classList.remove("hidden");
+    
+        const xhr_rates = new XMLHttpRequest();
+        xhr_rates.onreadystatechange = function() {
+            if (xhr_rates.readyState === XMLHttpRequest.DONE) {
+                if (xhr_rates.status === 200) {
+                    document.getElementById('rates_display').innerHTML = xhr_rates.responseText;
+                } else {
+                    console.error('Error fetching data:', xhr_rates.statusText);
+                }
+            }
+        };
+    
+        xhr_rates.open('POST', '/json/rates');
+        xhr_rates.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+        xhr_rates.send('coin_from=' + selectedCoin + '&coin_to=' + coin_to);
+    }
+    
+    function getRateInferred(event) {
+        event.preventDefault(); // Prevent default form submission behavior
+        
+        const coin_from = document.getElementById('coin_from').value;
+        const coin_to = document.getElementById('coin_to').value;
+        const params = 'coin_from=' + encodeURIComponent(coin_from) + '&coin_to=' + encodeURIComponent(coin_to);
+    
+        const xhr_rates = new XMLHttpRequest();
+        xhr_rates.onreadystatechange = function() {
+            if (xhr_rates.readyState === XMLHttpRequest.DONE) {
+                //console.log(xhr_rates.responseText);
+                if (xhr_rates.status === 200) {
+                    try {
+                        const responseData = JSON.parse(xhr_rates.responseText);
+                        const rateInferred = responseData.coingecko.rate_inferred;
+                        //document.getElementById('rate_inferred_display').innerText = " (" + coin_from + " to " + coin_to + "): " + rateInferred;
+                        document.getElementById('rate_inferred_display').innerText = " " + rateInferred;
+                    } catch (error) {
+                        console.error('Error parsing response:', error);
+                    }
+                } else {
+                    console.error('Error fetching data:', xhr_rates.statusText);
+                }
+            }
+        };
+    
+        xhr_rates.open('POST', '/json/rates');
+        xhr_rates.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+        xhr_rates.send(params);
+    }
+    
+    document.getElementById('get_rate_inferred_button').addEventListener('click', getRateInferred);
+    
+    function set_swap_type_enabled(coin_from, coin_to, swap_type) {
+        const adaptor_sig_only_coins = ['6' /* XMR */, '8' /* PART_ANON */, '7' /* PART_BLIND */, '13' /* FIRO */];
+        const secret_hash_only_coins = ['11' /* PIVX */, '12' /* DASH */];
+        let make_hidden = false;
+        if (adaptor_sig_only_coins.includes(coin_from) || adaptor_sig_only_coins.includes(coin_to)) {
+            swap_type.disabled = true;
+            swap_type.value = 'xmr_swap';
+            make_hidden = true;
+            swap_type.classList.add('select-disabled');
+        } else
+        if (secret_hash_only_coins.includes(coin_from) && secret_hash_only_coins.includes(coin_to)) {
+            swap_type.disabled = true;
+            swap_type.value = 'seller_first';
+            make_hidden = true;
+            swap_type.classList.add('select-disabled');
+        } else {
+            swap_type.disabled = false;
+            swap_type.classList.remove('select-disabled');
+        }
+        let swap_type_hidden = document.getElementById('swap_type_hidden');
+        if (make_hidden) {
+            if (!swap_type_hidden) {
+                swap_type_hidden = document.createElement('input');
+                swap_type_hidden.setAttribute('id', 'swap_type_hidden');
+                swap_type_hidden.setAttribute('type', 'hidden');
+                swap_type_hidden.setAttribute('name', 'swap_type');
+                document.getElementById('form').appendChild(swap_type_hidden)
+            }
+            swap_type_hidden.setAttribute('value', swap_type.value);
+        } else
+        if (swap_type_hidden) {
+            swap_type_hidden.parentNode.removeChild(swap_type_hidden);
+        }
+    }
+    
+    function set_rate(value_changed) {
+        const coin_from = document.getElementById('coin_from').value;
+        const coin_to = document.getElementById('coin_to').value;
+        const amt_from = document.getElementById('amt_from').value;
+        const amt_to = document.getElementById('amt_to').value;
+        const rate = document.getElementById('rate').value;
+        const lock_rate = rate == '' ? false : document.getElementById('rate_lock').checked;
+    
+        const swap_type = document.getElementById('swap_type');
+        set_swap_type_enabled(coin_from, coin_to, swap_type);
+    
+        if (coin_from == '-1' || coin_to == '-1') {
+            return;
+        }
+        params = 'coin_from=' + coin_from + '&coin_to=' + coin_to;
+        if (value_changed == 'rate' || (lock_rate && value_changed == 'amt_from') || (amt_to == '' && value_changed == 'amt_from')) {
+            if (amt_from == '' || rate == '') {
+                return;
+            }
+            params += '&rate=' + rate + '&amt_from=' + amt_from;
+        } else
+        if (lock_rate && value_changed == 'amt_to') {
+            if (amt_to == '' || rate == '') {
+                return;
+            }
+            params += '&amt_to=' + amt_to + '&rate=' + rate;
+        } else {
+            if (amt_from == '' || amt_to == '') {
+                return;
+            }
+            params += '&amt_from=' + amt_from + '&amt_to=' + amt_to;
+        }
+        xhr_rate.open('POST', '/json/rate');
+        xhr_rate.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+        xhr_rate.send(params);
+    }
+    
+    document.addEventListener("DOMContentLoaded", function() {
+        const coin_from = document.getElementById('coin_from').value;
+        const coin_to = document.getElementById('coin_to').value;
+        const swap_type = document.getElementById('swap_type');
+        set_swap_type_enabled(coin_from, coin_to, swap_type);
+    });
+  </script>
 </div>
+<script src="static/js/new_offer.js"></script>
 {% include 'footer.html' %}
 </div>
 </body>

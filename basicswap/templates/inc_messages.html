@@ -1,21 +1,26 @@
+{% from 'style.html' import circular_info_messages_svg, green_cross_close_svg, red_cross_close_svg, circular_error_messages_svg %}
+
 {% for m in messages %}
-{% from 'style.html' import confirm_green_svg, green_cross_close_svg, red_cross_close_svg %}
-<!-- todo -->
 <section class="py-4" id="messages_{{ m[0] }}" role="alert">
   <div class="container px-4 mx-auto">
-    <div class="p-6 text-green-800 rounded-lg bg-green-50 dark:border-green-500 dark:bg-gray-500 dark:text-green-400 rounded-md">
+    <div class="p-6 text-green-800 rounded-lg bg-green-50 border border-green-500 dark:bg-gray-500 dark:text-green-400 rounded-md">
       <div class="flex flex-wrap justify-between items-center -m-2">
         <div class="flex-1 p-2">
           <div class="flex flex-wrap -m-1">
             <div class="w-auto p-1">
-            {{ confirm_green_svg | safe }}
+            {{ circular_info_messages_svg | safe }}
             </div>
-            <div class="flex-1 p-1">
-              <h3 class="infomsg font-medium text-sm">{{ m[1] }}</h3></div>
-          </div>
+
+
+        <ul class="ml-4 mt-1">
+            <li class="font-semibold text-sm text-green-500 error_msg"><span class="bold">INFO:</span></li>
+                <li class="font-medium text-sm text-green-500 infomsg">{{ m[1] }}</li>
+        </ul>
+           </div>             
+
         </div>
         <div class="w-auto p-2">
-          <button type="button" class="ms-auto bg-green-50 text-green-500 rounded-lg focus:ring-2 focus:ring-green-400 p-1.5 hover:bg-green-200 inline-flex items-center justify-center h-8 w-8 dark:bg-gray-800 dark:text-green-400 dark:hover:bg-gray-700" data-dismiss-target="#messages_{{ m[0] }}" aria-label="Close"><span class="sr-only">Close</span>
+          <button type="button" class="ms-auto bg-green-50 text-green-500 rounded-lg focus:ring-0 focus:ring-green-400 p-1.5 hover:bg-green-200 inline-flex items-center justify-center h-8 w-8 focus:outline-none dark:bg-gray-800 dark:text-green-400 dark:hover:bg-gray-700" data-dismiss-target="#messages_{{ m[0] }}" aria-label="Close"><span class="sr-only">Close</span>
             {{ green_cross_close_svg | safe }}
           </button>
         </div>
@@ -27,23 +32,25 @@
 {% if err_messages %}
 <section class="py-4" id="err_messages_{{ err_messages[0][0] }}" role="alert">
   <div class="container px-4 mx-auto">
-    <div class="p-6 bg-red-100 border border-red-200 rounded-md">
+    <div class="p-6 text-green-800 rounded-lg bg-red-50 border border-red-400 dark:bg-gray-500 dark:text-red-400 rounded-md">
       <div class="flex flex-wrap justify-between items-center -m-2">
         <div class="flex-1 p-2">
           <div class="flex flex-wrap -m-1">
             <div class="w-auto p-1">
-              {% for m in err_messages %}
-              <div class="flex-1 p-1">
-                <h3 class="font-medium text-sm text-red-900 error_msg">
-                  <p class="error_msg">Error: {{ m[1] }}</p>
-                </h3>
-              </div>
-              {% endfor %}
+              {{ circular_error_messages_svg | safe }}
             </div>
-          </div>
+    {% if err_messages %}
+        <ul class="ml-4 mt-1">
+            <li class="font-semibold text-sm text-red-500 error_msg"><span class="bold">ERROR:</span></li>
+            {% for m in err_messages %}
+                <li class="font-medium text-sm text-red-500 error_msg">{{ m[1] }}</li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+      </div>
         </div>
         <div class="w-auto p-2">
-          <button type="button" class="ml-auto bg-red-100 text-red-500 rounded-lg focus:ring-0 focus:ring-red-400 p-1.5 hover:bg-red-200 inline-flex h-8 w-8 focus:outline-none" data-dismiss-target="#err_messages_{{ err_messages[0][0] }}" aria-label="Close">
+          <button type="button" class="ml-auto bg-red-100 text-red-500 rounded-lg focus:ring-0 focus:ring-red-400 p-1.5 hover:bg-red-200 inline-flex h-8 w-8 focus:outline-none inline-flex items-center justify-center h-8 w-8 dark:bg-gray-800 dark:text-red-400 dark:hover:bg-gray-700" data-dismiss-target="#err_messages_{{ err_messages[0][0] }}" aria-label="Close">
             <span class="sr-only">Close</span>
             {{ red_cross_close_svg | safe }}
           </button>

@@ -1,692 +1,452 @@
-{% include 'header.html' %}
+{% include 'header.html' %} {% from 'style.html' import breadcrumb_line_svg, input_down_arrow_offer_svg, select_network_svg, select_address_svg, select_swap_type_svg, select_bid_amount_svg, select_rate_svg, step_one_svg, step_two_svg, step_three_svg, select_setup_svg, input_time_svg, select_target_svg , select_auto_strategy_svg %}
+<script src="static/js/coin_icons.js"></script>
 <div class="container mx-auto">
- <section class="p-5 mt-5">
-  <div class="flex flex-wrap items-center -m-2">
-   <div class="w-full md:w-1/2 p-2">
-    <ul class="flex flex-wrap items-center gap-x-3 mb-2">
-     <li>
-      <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/">
-       <p>Home</p>
-      </a>
-     </li>
-     <li>
-      <svg width="6" height="15" viewBox="0 0 6 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-       <path d="M5.34 0.671999L2.076 14.1H0.732L3.984 0.671999H5.34Z" fill="#BBC3CF"></path>
-      </svg>
-     </li>
-     <li>
-      <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/newoffer">Place an new offer</a>
-     </li>
-     <li>
-      <svg width="6" height="15" viewBox="0 0 6 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-       <path d="M5.34 0.671999L2.076 14.1H0.732L3.984 0.671999H5.34Z" fill="#BBC3CF"></path>
-      </svg>
-     </li>
-     <li>
-      <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="#">Setup offers parameters</a>
-     </li>
-     <li>
-      <svg width="6" height="15" viewBox="0 0 6 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-       <path d="M5.34 0.671999L2.076 14.1H0.732L3.984 0.671999H5.34Z" fill="#BBC3CF"></path>
-      </svg>
-     </li>
-    </ul>
-   </div>
-  </div>
- </section>
- <section class="py-4">
-  <div class="container px-4 mx-auto">
-   <div class="relative py-11 px-16 bg-coolGray-900 dark:bg-blue-500 rounded-md overflow-hidden">
-    <img class="absolute z-10 left-4 top-4" src="/static/images/elements/dots-red.svg" alt="">
-    <img class="absolute z-10 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt="">
-    <img class="absolute h-64 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" src="/static/images/elements/wave.svg" alt="">
-    <div class="relative z-20 flex flex-wrap items-center -m-3">
-     <div class="w-full md:w-1/2 p-3">
-      <h2 class="mb-6 text-4xl font-bold text-white tracking-tighter">Setup offers parameters</h2>
-      <p class="font-normal text-coolGray-200 dark:text-white">Place an order on the order book.</p>
-     </div>
+  <section class="p-5 mt-5">
+    <div class="flex flex-wrap items-center -m-2">
+      <div class="w-full md:w-1/2 p-2">
+        <ul class="flex flex-wrap items-center gap-x-3 mb-2">
+          <li> <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/">
+              <p>Home</p>
+            </a>
+          </li>
+          {{ breadcrumb_line_svg | safe }}
+          <li>
+            <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/newoffer">Placer</a>
+          </li>
+          {{ breadcrumb_line_svg | safe }}
+          <li>
+            <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="#">Setup</a>
+          </li>
+          {{ breadcrumb_line_svg | safe }}
+        </ul>
+      </div>
     </div>
-   </div>
-  </div>
- </section>
- {% include 'inc_messages.html' %}
- <section>
-  <div class="p-5 mb-10">
-   <div class="mx-4 p-4">
-    <div class="flex items-center">
-     <div class="flex items-center text-teal-600 relative">
-      <div class="rounded-full h-12 w-12 py-3 border-2 border-blue-500">
-       <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 24 24">
-        <g fill="#3b82f6">
-         <polygon points="14.5 23.5 11.5 23.5 11.5 4.321 6.766 8.108 4.892 5.766 11.474 0.5 14.5 0.5 14.5 23.5" fill="#3b82f6"></polygon>
-        </g>
-       </svg>
+  </section>
+  <section class="py-4">
+    <div class="container px-4 mx-auto">
+      <div class="relative py-11 px-16 bg-coolGray-900 dark:bg-blue-500 rounded-md overflow-hidden">
+        <img class="absolute z-10 left-4 top-4" src="/static/images/elements/dots-red.svg" alt="">
+        <img class="absolute z-10 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt="">
+        <img class="absolute h-64 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" src="/static/images/elements/wave.svg" alt="">
+        <div class="relative z-20 flex flex-wrap items-center -m-3">
+          <div class="w-full md:w-1/2 p-3">
+            <h2 class="mb-6 text-4xl font-bold text-white tracking-tighter">Setup Offers Parameters</h2>
+            <p class="font-normal text-coolGray-200 dark:text-white">Place an order on the network order book.</p>
+          </div>
+        </div>
       </div>
-      <div class="absolute top-0 -ml-10 text-center mt-16 w-32 text-xs font-medium uppercase dark:text-white text-gray-600">Step 1</div>
-     </div>
-     <div class="flex-auto border-t-2 border-blue-500 dark:border-blue-500"></div>
-     <div class="flex items-center text-teal-600 relative ">
-      <div class="rounded-full transition duration-500 ease-in-out h-12 w-12 py-3 border-2 border-blue-500 dark:border-blue-500">
-       <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 24 24">
-        <g fill="#3b82f6">
-         <path d="M19.5,23.5H4.5V20.2l.667-.445C9.549,16.828,16.5,10.78,16.5,7c0-2.654-1.682-4-5-4A9.108,9.108,0,0,0,7.333,4.248L6.084,5.08,4.42,2.584l1.247-.832A11.963,11.963,0,0,1,11.5,0c4.935,0,8,2.683,8,7,0,5-6.5,10.662-10.232,13.5H19.5ZM6,21H6Z" fill="#3b82f6"></path>
-        </g>
-       </svg>
-      </div>
-      <div class="absolute top-0 -ml-10 text-center mt-16 w-32 text-xs font-medium uppercase dark:text-white text-gray-600">Step 2</div>
-     </div>
-     <div class="flex-auto border-t-2 border-teal-600 dark:border-gray-400"></div>
-     <div class="flex items-center text-gray-500 relative">
-      <div class="rounded-full transition duration-500 ease-in-out h-12 w-12 py-3 border-2 border-teal-600 dark:border-gray-400">
-       <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 24 24">
-        <g fill="#3b82f6">
-         <polygon points="9 21 1 13 4 10 9 15 21 3 24 6 9 21" fill="#d1d5db"></polygon>
-        </g>
-       </svg>
-      </div>
-      <div class="absolute top-0 -ml-10 text-center mt-16 w-32 text-xs font-medium uppercase dark:text-white text-gray-600">Confirm</div>
-     </div>
     </div>
-   </div>
-  </div>
- </section>
- <section class="py-3">
-  <div class="container px-4 mx-auto">
-   <div class="p-8 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
-    <div class="flex flex-wrap items-center justify-between -mx-4 mb-8 pb-6 border-b border-gray-400 border-opacity-20">
-     <div class="w-full sm:w-auto px-4 mb-6 sm:mb-0">
-      <h4 class="text-2xl font-bold tracking-wide dark:text-white mb-1">STEP 2</h4>
-      <!-- todo add subtitle <p class="text-sm text-coolGray-500">Lorem ipsum dolor sit amet</p> -->
-     </div>
+  </section>
+  {% include 'inc_messages.html' %}
+  <section>
+    <div class="p-5 mb-5">
+      <div class="mx-4 p-4">
+        <div class="flex items-center">
+
+          <div class="flex items-center text-teal-600 relative">
+            <div class="rounded-full h-12 w-12 py-3 border-2 border-blue-500">
+            {{ step_one_svg | safe }}
+          </div>
+            <div class="absolute top-0 -ml-10 text-center mt-16 w-32 text-xs font-medium uppercase dark:text-white text-gray-600">Step 1</div>
+          </div>
+
+          <div class="flex-auto border-t-2 border-blue-500 dark:border-blue-500"></div>
+
+          <div class="flex items-center text-teal-600 relative ">
+            <div class="rounded-full transition duration-500 ease-in-out h-12 w-12 py-3 border-2 border-blue-500 dark:border-blue-500">
+            {{ step_two_svg | safe }}
+          </div>
+            <div class="absolute top-0 -ml-10 text-center mt-16 w-32 text-xs font-medium uppercase dark:text-white text-gray-600">Step 2</div>
+          </div>
+
+          <div class="flex-auto border-t-2 border-gray-300 dark:border-gray-400"></div>
+
+          <div class="flex items-center text-gray-500 relative">
+            <div class="rounded-full transition duration-500 ease-in-out h-12 w-12 py-3 border-2 border-gray-300  dark:border-gray-400">
+            {{ step_three_svg | safe }}
+          </div>
+            <div class="absolute top-0 -ml-10 text-center mt-16 w-32 text-xs font-medium uppercase dark:text-white text-gray-600">Confirm</div>
+          </div>
+        </div>
+      </div>
     </div>
-    <form method="post" autocomplete="off" id='form'>
-     <div class="py-3 border-b items-center justify-between -mx-4 mb-6 pb-6 border-gray-400 border-opacity-20">
-      <div class="w-full md:w-10/12">
-       <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
-        <div class="w-full md:w-1/3 p-3">
-         <p class="text-sm text-coolGray-800 dark:text-white font-semibold">Select Network</p>
-        </div>
-        <div class="w-full md:flex-1 p-3">
-         <div class="relative">
-          <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-           <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"></path>
-          </svg>
-          <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-           <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-            <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3b82f6" stroke-linejoin="round">
-             <line data-cap="butt" x1="7.6" y1="10.5" x2="16.4" y2="5.5" stroke="#3b82f6"></line>
-             <line data-cap="butt" x1="7.6" y1="13.5" x2="16.4" y2="18.5" stroke="#3b82f6"></line>
-             <circle cx="5" cy="12" r="3"></circle>
-             <circle cx="19" cy="4" r="3"></circle>
-             <circle cx="19" cy="20" r="3"></circle>
-            </g>
-           </svg>
+  </section>
+  <section class="py-3">
+    <div class="container px-4 mx-auto">
+      <div class="p-8 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
+        <div class="flex flex-wrap items-center justify-between -mx-4 pb-6 border-gray-400 border-opacity-20"> </div>
+        <form method="post" autocomplete="off" id='form'>
+          <div class="py-3 border-b items-center justify-between -mx-4 mb-6 pb-3 border-gray-400 border-opacity-20">
+            <div class="w-full md:w-10/12">
+              <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
+                <div class="w-full md:w-1/3 p-6">
+                  <p class="text-sm text-coolGray-800 dark:text-white font-semibold">Select Network</p>
+                </div>
+                <div class="w-full md:flex-1 p-3">
+                  <div class="relative">
+                    {{ input_down_arrow_offer_svg | safe }}
+                    <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
+                      {{ select_network_svg | safe }}
+                    </div>
+                    <select class="cursor-not-allowed disabled-select hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="addr_to" disabled>
+                      <option{% if data.addr_to=="-1" %} selected{% endif %} value="-1">Public Network</option>
+                        {% for a in addrs_to %}
+                        <option{% if data.addr_to==a[0] %} selected{% endif %} value="{{ a[0] }}">{{ a[0] }} {{ a[1] }}</option>
+                        {% endfor %}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-          <select class="cursor-not-allowed disabled-select pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0 disabled:opacity-20" name="addr_to" disabled>
-           <option{% if data.addr_to=="-1" %} selected{% endif %} value="-1">Public Network</option>
-            {% for a in addrs_to %}
-            <option{% if data.addr_to==a[0] %} selected{% endif %} value="{{ a[0] }}">{{ a[0] }} {{ a[1] }}</option>
-            {% endfor %}
-          </select>
-         </div>
-        </div>
-       </div>
+          <div class="py-0 border-b items-center justify-between -mx-4 mb-6 pb-3 border-gray-400 border-opacity-20">
+            <div class="w-full md:w-10/12">
+              <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
+                <div class="w-full md:w-1/3 p-6">
+                  <p class="text-sm text-coolGray-800 dark:text-white font-semibold">Select Address</p>
+                </div>
+                <div class="w-full md:flex-1 p-3">
+                  <div class="relative">
+                    {{ input_down_arrow_offer_svg | safe }}
+                    <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
+                    {{ select_address_svg | safe }}
+                  </div>
+                  <select class="cursor-not-allowed disabled-select hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="addr_from" disabled>
+                    {% for a in addrs %}
+                    <option{% if data.addr_from==a[0] %} selected{% endif %} value="{{ a[0] }}">{{ a[0] }} {{ a[1] }}</option>
+                    {% endfor %}
+                    <option{% if data.addr_from=="-1" %} selected{% endif %} value="-1">New Address</option>
+                  </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="py-0 border-b items-center justify-between -mx-4 mb-6 pb-3 border-gray-400 border-opacity-20">
+            <div class="w-full md:w-10/12">
+              <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
+                <div class="w-full md:w-1/3 p-6">
+                  <p class="text-sm text-coolGray-800 dark:text-white font-semibold">Swap Type</p>
+                </div>
+                <div class="w-full md:flex-1 p-3">
+                  <div class="relative">
+                    {{ input_down_arrow_offer_svg | safe }}
+                    <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
+                    {{ select_swap_type_svg | safe }}
+                  </div>
+                  <select class="cursor-not-allowed disabled-select pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="swap_type" id="swap_type" disabled>
+                    {% for a in swap_types %}
+                    <option{% if data.swap_type==a[0] %} selected{% endif %} value="{{ a[0] }}">{{ a[1] }}</option>
+                    {% endfor %}
+                  </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="py-0 border-b items-center justify-between -mx-4 mb-6 pb-3 border-gray-400 border-opacity-20">
+            <div class="w-full md:w-10/12">
+              <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
+                <div class="w-full md:w-1/3 p-6">
+                  <p class="text-sm text-coolGray-800 dark:text-white font-semibold">You Send</p>
+                </div>
+                <div class="w-full md:flex-1 p-3">
+                  <div class="flex flex-wrap -m-3">
+                    <div class="w-full md:w-1/2 p-3">
+                      <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Coin You Send</p>                      
+                      <div class="custom-select">
+                        <div class="relative">
+                          {{ input_down_arrow_offer_svg | safe }}
+                          <select class="select cursor-not-allowed disabled-select hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-5 focus:ring-0" id="coin_from" name="coin_from" onchange="set_rate('coin_from');" disabled>
+                            <option value="-1">Select coin you send</option>
+                            {% for c in coins_from %}
+                            <option{% if data.coin_from==c[0] %} selected{% endif %} value="{{ c[0] }}" data-image="/static/images/coins/{{ c[1]|replace(" ", "-") }}-20.png">{{ c[1] }}</option>
+                            {% endfor %}
+                          </select>
+                          <div class="select-dropdown">
+                            <img class="select-icon" src="" alt=""> <img class="select-image" src="" alt=""></div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="w-full md:w-1/2 p-3">
+                      <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Amount You Send</p>                     
+                      <div class="relative">
+                        <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none"> </div> <input class="cursor-not-allowed disabled-input appearance-none pr-10 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-5 focus:ring-0" type="text" id="amt_from" name="amt_from" value="{{ data.amt_from }}" onchange="set_rate('amt_from');" readonly>
+                      </div>
+                    </div>
+                    {% if data.swap_style == 'xmr' %}
+                    <div class="w-full md:w-1/2 p-3">
+                      <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Fee From Confirm Target</p>
+                      <div class="relative">
+                        <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
+                        {{ select_target_svg | safe }}
+                      </div>
+                      <input class="pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="number" name="fee_from_conf" min="1" max="32" value="{{ data.fee_from_conf }}">
+                      </div>
+                    </div>
+                    <div class="w-full md:w-1/2 p-3">
+                      <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Fee From Increase By</p>
+                      <div class="relative">
+                        {{ input_down_arrow_offer_svg | safe }}
+                        <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
+                        {{ select_rate_svg | safe }}
+                      </div> <select class="pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="fee_from_extra">
+                          <option value="0">None</option>
+                          <option value="10" {% if data.fee_from_extra==10 %} selected{% endif %}>10%</option>
+                          <option value="50" {% if data.fee_from_extra==50 %} selected{% endif %}>50%</option>
+                          <option value="100" {% if data.fee_from_extra==100 %} selected{% endif %}>100%</option>
+                        </select>
+                      </div>
+                    </div>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="py-0 border-b items-center justify-between -mx-4 mb-6 pb-3 border-gray-400 border-opacity-20">
+            <div class="w-full md:w-10/12">
+              <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
+                <div class="w-full md:w-1/3 p-6">
+                  <p class="text-sm text-coolGray-800 dark:text-white font-semibold">You Get</p>
+                </div>
+                <div class="w-full md:flex-1 p-3">
+                  <div class="flex flex-wrap -m-3">
+                    <div class="w-full md:w-1/2 p-3">
+                      <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Coin You Get</p>                           
+                      <div class="custom-select">
+                        <div class="relative">
+                          {{ input_down_arrow_offer_svg | safe }}
+                          <select class="select cursor-not-allowed disabled-select hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-5 focus:ring-0" id="coin_to" name="coin_to" onchange="set_rate('coin_to');" disabled>
+                            <option value="-1"></option>
+                            {% for c in coins %}
+                            <option{% if data.coin_to==c[0] %} selected{% endif %} value="{{ c[0] }}" data-image="/static/images/coins/{{ c[1]|replace(" ", "-") }}-20.png">{{ c[1] }}</option>
+                            {% endfor %}
+                          </select>
+                          <div class="select-dropdown"> <img class="select-icon" src="" alt=""> <img class="select-image" src="" alt=""> </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="w-full md:w-1/2 p-3">
+                      <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Amount You Get</p>                      
+                      <div class="relative">
+                        <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none"> </div> <input class="cursor-not-allowed disabled-input hover:border-blue-500 pr-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-5 focus:ring-0" type="text" id="amt_to" name="amt_to" value="{{ data.amt_to }}" onchange="set_rate('amt_to');" readonly>
+                      </div>
+                    </div>
+                    {% if data.swap_style == 'xmr' and coin_to != '6' %}
+                    <div class="w-full md:w-1/2 p-3">
+                      <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Fee To Confirm Target</p>
+                      <div class="relative">
+                        <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
+                        {{ select_target_svg | safe }}
+                      </div>
+                      <input class="disabled-input pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="number" name="fee_to_conf" min="1" max="32" value="{{ data.fee_to_conf }}">
+                      </div>
+                    </div>
+                    <div class="w-full md:w-1/2 p-3">
+                      <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Fee To Increase By</p>
+                      <div class="relative">
+                        {{ input_down_arrow_offer_svg | safe }}
+                        <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
+                        {{ select_rate_svg | safe }}
+                      </div>
+                      <select class="pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="fee_to_extra">
+                          <option value="0">None</option>
+                          <option value="10" {% if data.fee_to_extra==10 %} selected{% endif %}>10%</option>
+                          <option value="50" {% if data.fee_to_extra==50 %} selected{% endif %}>50%</option>
+                          <option value="100" {% if data.fee_to_extra==100 %} selected{% endif %}>100%</option>
+                        </select>
+                      </div>
+                    </div>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="py-0 border-b items-center justify-between -mx-4 mb-6 pb-3 border-gray-400 border-opacity-20">
+            <div class="w-full md:w-10/12">
+              <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
+                <div class="w-full md:w-1/3 p-6">
+                  <p class="text-sm text-coolGray-800 dark:text-white font-semibold">Bid Amount</p>
+                </div>
+                <div class="w-full md:flex-1 p-3">
+                  <div class="flex flex-wrap -m-3">
+                    <div class="w-full md:w-1/2 p-3">
+                      <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Minimum Bid Amount</p>
+                      <div class="relative">
+                        <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
+                        {{ select_bid_amount_svg | safe }}
+                      </div> <input class="cursor-not-allowed disabled-input pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" id="amt_bid_min" name="amt_bid_min" value="{{ data.amt_bid_min }}" title="Bids with an amount below the minimum bid value will be discarded" readonly>
+                      </div>
+                    </div>
+                    <div class="w-full md:w-1/2 p-3">
+                      <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Rate</p>
+                      <div class="relative">
+                        <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
+                        {{ select_rate_svg | safe }}
+                      </div>
+                      <input class="cursor-not-allowed disabled-input pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" id="rate" name="rate" value="{{ data.rate }}" onchange="set_rate('rate');" readonly>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="py-0 border-b items-center justify-between -mx-4 mb-6 pb-3 border-gray-400 border-opacity-20">
+            <div class="w-full md:w-10/12">
+              <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
+                <div class="w-full md:w-1/3 p-6">
+                  <p class="text-sm text-coolGray-800 dark:text-white font-semibold">Time</p>
+                </div>
+                <div class="w-full md:flex-1 p-3">
+                  <div class="flex flex-wrap -m-3">
+                    <div class="w-full md:w-1/2 p-3">
+                      <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Offer valid (hrs)</p>
+                      <div class="relative">
+                        <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
+                        {{ input_time_svg | safe }}
+                      </div>
+                      <input class="pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="number" name="validhrs" min="1" max="48" value="{{ data.validhrs }}">
+                      </div>
+                    </div>
+                    {% if data.debug_ui == true %}
+                    <div class="w-full md:w-1/2 p-3">
+                      <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Contract Locked (Mins)</p>
+                      <div class="relative">
+                        <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
+                        {{ input_time_svg | safe }}
+                      </div>
+                      <input class="pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="number" name="lockmins" min="10" max="5000" value="{{ data.lockmins }}">
+                      </div>
+                      {% if data.swap_style != 'xmr' %}
+                      <div class="text-sm text-gray-500 mt-1.5">(Participate txn will be locked for half the time.)</div> 
+                      {% endif %}
+                    </div>
+                    {% else %}
+                    <div class="w-full md:w-1/2 p-3">
+                      <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Contract locked (Hours)</p>
+                      <div class="relative">
+                        <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
+                        {{ input_time_svg | safe }}
+                      </div>
+                      <input class="pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="number" name="lockhrs" min="1" max="96" value="{{ data.lockhrs }}">
+                      </div>
+                      {% if data.swap_style != 'xmr' %}
+                      <div class="text-sm text-gray-500 mt-1.5 dark:text-white">(Participate txn will be locked for half the time.)</div>
+                      {% endif %}
+                    </div>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="py-0 border-b items-center justify-between -mx-4 mb-6 pb-3 border-gray-400 border-opacity-20">
+            <div class="w-full md:w-10/12">
+              <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
+                <div class="w-full md:w-1/3 p-6">
+                  <p class="text-sm text-coolGray-800 dark:text-white font-semibold">Strategy</p>
+                </div>
+                <div class="w-full md:flex-1 p-3">
+                  <div class="flex flex-wrap -m-3">
+                    <div class="w-full md:w-1/2 p-3">
+                      <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Auto Accept Strategy</p>
+                      <div class="relative">
+                        {{ input_down_arrow_offer_svg | safe }}
+                        <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
+                        {{ select_auto_strategy_svg | safe }}
+                      </div>
+                      <select class="pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="automation_strat_id">
+                          <option value="-1" {% if data.automation_strat_id==-1 %} selected{% endif %}>None</option>
+                          {% for a in automation_strategies %}
+                          <option value="{{ a[0] }}" {% if data.automation_strat_id==a[0] %} selected{% endif %}>{{ a[1] }}</option>
+                          {% endfor %}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="py-0 border-b items-center justify-between -mx-4 mb-6 pb-3 border-gray-400 border-opacity-20">
+            <div class="w-full md:w-10/12">
+              <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
+                <div class="w-full md:w-1/3 p-6">
+                  <p class="text-sm text-coolGray-800 dark:text-white font-semibold">Options</p>
+                </div>
+                <div class="w-full md:flex-1 p-3">
+                  <div class="flex form-check form-check-inline">
+                    <div class="flex items-center h-5">
+                      <input class="cursor-not-allowed hover:border-blue-500 w-5 h-5 form-check-input text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-1 dark:bg-gray-500 dark:border-gray-400" type="checkbox" id="amt_var" name="amt_var" value="av" {% if data.amt_var==true %} checked="checked" {% endif %} disabled>
+                    </div>
+                    <div class="ml-2 text-sm">
+                      <label class="form-check-label text-sm font-medium text-gray-800 dark:text-white" for="inlineCheckbox2" style="opacity: 0.40;">Amount Variable</label>
+                      <p id="helper-checkbox-text" class="text-xs font-normal text-gray-500 dark:text-gray-300" style="opacity: 0.40;">Allow bids with a different amount to the offer.</p>
+                    </div>
+                  </div>
+                  <div class="flex mt-2 form-check form-check-inline">
+                    <div class="flex items-center h-5">
+                      <input class="cursor-not-allowed hover:border-blue-500 w-5 h-5 form-check-input text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-1 dark:bg-gray-500 dark:border-gray-400" type="checkbox" id="rate_var" name="rate_var" value="rv" {% if data.rate_var==true %} checked="checked" {% endif %} disabled> </div>
+                    <div class="ml-2 text-sm">
+                      <label class="form-check-label text-sm font-medium text-gray-800 dark:text-white" for="inlineCheckbox3" style="opacity: 0.40;">Rate Variable</label>
+                      <p id="helper-checkbox-text" class="text-xs font-normal text-gray-500 dark:text-gray-300" style="opacity: 0.40;">Allow bids with a different rate to the offer.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
       </div>
-     </div>
-     <div class="py-3 border-b items-center justify-between -mx-4 mb-6 pb-6 border-gray-400 border-opacity-20">
-      <div class="w-full md:w-10/12">
-       <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
-        <div class="w-full md:w-1/3 p-3">
-         <p class="text-sm text-coolGray-800 dark:text-white font-semibold">Select Address</p>
-        </div>
-        <div class="w-full md:flex-1 p-3">
-         <div class="relative">
-          <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-           <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"></path>
-          </svg>
-          <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-           <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-            <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3b82f6" stroke-linejoin="round">
-             <path data-cap="butt" d="M11.992,11.737,14.2,13.4A2,2,0,0,1,15,15v1H7V15a2,2,0,0,1,.8-1.6l2.208-1.663" stroke="#3b82f6"></path>
-             <rect x="9" y="7" width="4" height="5" rx="2" ry="2" stroke="#3b82f6"></rect>
-             <path d="M2,1H18a2,2,0,0,1,2,2V21a2,2,0,0,1-2,2H2Z"></path>
-             <line x1="23" y1="5" x2="23" y2="9" stroke="#3b82f6"></line>
-            </g>
-           </svg>
-          </div>
-          <select class="cursor-not-allowed disabled-select pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="addr_from" disabled>
-            {% for a in addrs %}
-            <option{% if data.addr_from==a[0] %} selected{% endif %} value="{{ a[0] }}">{{ a[0] }} {{ a[1] }}</option>
-            {% endfor %}
-            <option{% if data.addr_from=="-1" %} selected{% endif %} value="-1">New Address</option>
-          </select>
-         </div>
-        </div>
-       </div>
-      </div>
-     </div>
-     <div class="py-3 border-b items-center justify-between -mx-4 mb-6 pb-6 border-gray-400 border-opacity-20">
-      <div class="w-full md:w-10/12">
-       <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
-        <div class="w-full md:w-1/3 p-3">
-         <p class="text-sm text-coolGray-800 dark:text-white font-semibold">Swap Type</p>
-        </div>
-        <div class="w-full md:flex-1 p-3">
-         <div class="relative">
-          <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-           <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"></path>
-          </svg>
-          <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-           <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-            <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3b82f6" stroke-linejoin="round">
-             <path data-cap="butt" d="M11.992,11.737,14.2,13.4A2,2,0,0,1,15,15v1H7V15a2,2,0,0,1,.8-1.6l2.208-1.663" stroke="#3b82f6"></path>
-             <rect x="9" y="7" width="4" height="5" rx="2" ry="2" stroke="#3b82f6"></rect>
-             <path d="M2,1H18a2,2,0,0,1,2,2V21a2,2,0,0,1-2,2H2Z"></path>
-             <line x1="23" y1="5" x2="23" y2="9" stroke="#3b82f6"></line>
-            </g>
-           </svg>
-          </div>
-          <select class="cursor-not-allowed disabled-select pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="swap_type" id="swap_type" disabled>
-            {% for a in swap_types %}
-            <option{% if data.swap_type==a[0] %} selected{% endif %} value="{{ a[0] }}">{{ a[1] }}</option>
-            {% endfor %}
-          </select>
-         </div>
-        </div>
-       </div>
-      </div>
-     </div>
-     <div class="py-3 border-b items-center justify-between -mx-4 mb-6 pb-6 border-gray-400 border-opacity-20">
-      <div class="w-full md:w-10/12">
-       <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
-        <div class="w-full md:w-1/3 p-3">
-         <p class="text-sm text-coolGray-800 dark:text-white font-semibold">You Send</p>
-        </div>
-        <div class="w-full md:flex-1 p-3">
-         <div class="flex flex-wrap -m-3">
-          <div class="w-full md:w-1/2 p-3">
-           <div class="custom-select">
-            <div class="relative">
-             <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"></path>
-             </svg>
-             <select class="select cursor-not-allowed disabled-select hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" id="coin_from" name="coin_from" onchange="set_rate('coin_from');" disabled>
-              <option value="-1">Select coin you send</option>
-              {% for c in coins_from %}
-              <option{% if data.coin_from==c[0] %} selected{% endif %} value="{{ c[0] }}" data-image="/static/images/coins/{{ c[1]|replace(" ", "-") }}-20.png">{{ c[1] }}</option>
-              {% endfor %}
-             </select>
-             <div class="select-dropdown">
-              <img class="select-icon" src="" alt="">
-              <img class="select-image" src="" alt="">
-             </div>
-            </div>
-           </div>
-          </div>
-          <div class="w-full md:w-1/2 p-3">
-           <div class="relative">
-            <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-             <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-              <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3b82f6" stroke-linejoin="round">
-               <path d="M15.6,13.873a2.273,2.273,0,0,1-.825,1.833,4.1,4.1,0,0,1-2.31.829v1.47h-.982V16.563a7.95,7.95,0,0,1-3.07-.617V14.053a8.328,8.328,0,0,0,1.5.545,8.019,8.019,0,0,0,1.568.28V12.654L11,12.468a5.357,5.357,0,0,1-2.012-1.216A2.332,2.332,0,0,1,8.4,9.627a2.123,2.123,0,0,1,.814-1.71,4.143,4.143,0,0,1,2.27-.812v-1.1h.982V7.074a8.126,8.126,0,0,1,2.97.66l-.674,1.678a7.768,7.768,0,0,0-2.3-.559v2.116a11.073,11.073,0,0,1,1.991.932,2.733,2.733,0,0,1,.867.868A2.146,2.146,0,0,1,15.6,13.873ZM10.558,9.627a.678.678,0,0,0,.219.52,2.569,2.569,0,0,0,.707.42V8.881Q10.559,9.017,10.558,9.627Zm2.884,4.354a.646.646,0,0,0-.244-.509,3.173,3.173,0,0,0-.732-.431v1.786Q13.441,14.662,13.442,13.981Z" stroke="none" fill="#3b82f6"></path>
-               <polyline points="5.346 7.929 6.932 2.237 1.135 2.966"></polyline>
-               <path data-cap="butt" d="M11.789,23A11,11,0,0,1,6.932,2.237"></path>
-               <polyline points="18.654 16.071 17.068 21.763 22.865 21.034"></polyline>
-               <path data-cap="butt" d="M12.211,1a11,11,0,0,1,4.857,20.763"></path>
-              </g>
-             </svg>
-            </div>
-            <input class="cursor-not-allowed disabled-input appearance-none pl-10 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" id="amt_from" name="amt_from" value="{{ data.amt_from }}" onchange="set_rate('amt_from');" readonly>
-           </div>
-          </div>
-          {% if data.swap_style == 'xmr' %}
-          <div class="w-full md:w-1/2 p-3">
-           <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Fee From Confirm Target</p>
-           <div class="relative">
-            <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-             <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-              <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3b82f6" stroke-linejoin="round">
-               <path d="M15.6,13.873a2.273,2.273,0,0,1-.825,1.833,4.1,4.1,0,0,1-2.31.829v1.47h-.982V16.563a7.95,7.95,0,0,1-3.07-.617V14.053a8.328,8.328,0,0,0,1.5.545,8.019,8.019,0,0,0,1.568.28V12.654L11,12.468a5.357,5.357,0,0,1-2.012-1.216A2.332,2.332,0,0,1,8.4,9.627a2.123,2.123,0,0,1,.814-1.71,4.143,4.143,0,0,1,2.27-.812v-1.1h.982V7.074a8.126,8.126,0,0,1,2.97.66l-.674,1.678a7.768,7.768,0,0,0-2.3-.559v2.116a11.073,11.073,0,0,1,1.991.932,2.733,2.733,0,0,1,.867.868A2.146,2.146,0,0,1,15.6,13.873ZM10.558,9.627a.678.678,0,0,0,.219.52,2.569,2.569,0,0,0,.707.42V8.881Q10.559,9.017,10.558,9.627Zm2.884,4.354a.646.646,0,0,0-.244-.509,3.173,3.173,0,0,0-.732-.431v1.786Q13.441,14.662,13.442,13.981Z" stroke="none" fill="#3b82f6"></path>
-               <polyline points="5.346 7.929 6.932 2.237 1.135 2.966"></polyline>
-               <path data-cap="butt" d="M11.789,23A11,11,0,0,1,6.932,2.237"></path>
-               <polyline points="18.654 16.071 17.068 21.763 22.865 21.034"></polyline>
-               <path data-cap="butt" d="M12.211,1a11,11,0,0,1,4.857,20.763"></path>
-              </g>
-             </svg>
-            </div>
-            <input class="pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="number" name="fee_from_conf" min="1" max="32" value="{{ data.fee_from_conf }}">
-           </div>
-          </div>
-          <div class="w-full md:w-1/2 p-3">
-           <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Fee From Increase By</p>
-           <div class="relative">
-            <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-             <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"></path>
-            </svg>
-            <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-             <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-              <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3b82f6" stroke-linejoin="round">
-               <path d="M15.6,13.873a2.273,2.273,0,0,1-.825,1.833,4.1,4.1,0,0,1-2.31.829v1.47h-.982V16.563a7.95,7.95,0,0,1-3.07-.617V14.053a8.328,8.328,0,0,0,1.5.545,8.019,8.019,0,0,0,1.568.28V12.654L11,12.468a5.357,5.357,0,0,1-2.012-1.216A2.332,2.332,0,0,1,8.4,9.627a2.123,2.123,0,0,1,.814-1.71,4.143,4.143,0,0,1,2.27-.812v-1.1h.982V7.074a8.126,8.126,0,0,1,2.97.66l-.674,1.678a7.768,7.768,0,0,0-2.3-.559v2.116a11.073,11.073,0,0,1,1.991.932,2.733,2.733,0,0,1,.867.868A2.146,2.146,0,0,1,15.6,13.873ZM10.558,9.627a.678.678,0,0,0,.219.52,2.569,2.569,0,0,0,.707.42V8.881Q10.559,9.017,10.558,9.627Zm2.884,4.354a.646.646,0,0,0-.244-.509,3.173,3.173,0,0,0-.732-.431v1.786Q13.441,14.662,13.442,13.981Z" stroke="none" fill="#3b82f6"></path>
-               <polyline points="5.346 7.929 6.932 2.237 1.135 2.966"></polyline>
-               <path data-cap="butt" d="M11.789,23A11,11,0,0,1,6.932,2.237"></path>
-               <polyline points="18.654 16.071 17.068 21.763 22.865 21.034"></polyline>
-               <path data-cap="butt" d="M12.211,1a11,11,0,0,1,4.857,20.763"></path>
-              </g>
-             </svg>
-            </div>
-            <select class="pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="fee_from_extra">
-             <option value="0">None</option>
-             <option value="10" {% if data.fee_from_extra==10 %} selected{% endif %}>10%</option>
-             <option value="50" {% if data.fee_from_extra==50 %} selected{% endif %}>50%</option>
-             <option value="100" {% if data.fee_from_extra==100 %} selected{% endif %}>100%</option>
-            </select>
-           </div>
-          </div>
-          {% endif %}
-         </div>
-        </div>
-       </div>
-      </div>
-     </div>
-     <div class="py-3 border-b items-center justify-between -mx-4 mb-6 pb-6 border-gray-400 border-opacity-20">
-      <div class="w-full md:w-10/12">
-       <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
-        <div class="w-full md:w-1/3 p-3">
-         <p class="text-sm text-coolGray-800 dark:text-white font-semibold">You Get</p>
-        </div>
-        <div class="w-full md:flex-1 p-3">
-         <div class="flex flex-wrap -m-3">
-          <div class="w-full md:w-1/2 p-3">
-           <div class="custom-select">
-            <div class="relative">
-             <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"></path>
-             </svg>
-             <select class="select cursor-not-allowed disabled-select hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" id="coin_to" name="coin_to" onchange="set_rate('coin_to');" disabled>
-              <option value="-1"></option>
-              {% for c in coins %}
-              <option{% if data.coin_to==c[0] %} selected{% endif %} value="{{ c[0] }}" data-image="/static/images/coins/{{ c[1]|replace(" ", "-") }}-20.png">{{ c[1] }}</option>
-              {% endfor %}
-             </select>
-             <div class="select-dropdown">
-              <img class="select-icon" src="" alt="">
-              <img class="select-image" src="" alt="">
-             </div>
-            </div>
-           </div>
-          </div>
-          <div class="w-full md:w-1/2 p-3">
-           <div class="relative">
-            <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-             <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-              <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3b82f6" stroke-linejoin="round">
-               <path d="M15.6,13.873a2.273,2.273,0,0,1-.825,1.833,4.1,4.1,0,0,1-2.31.829v1.47h-.982V16.563a7.95,7.95,0,0,1-3.07-.617V14.053a8.328,8.328,0,0,0,1.5.545,8.019,8.019,0,0,0,1.568.28V12.654L11,12.468a5.357,5.357,0,0,1-2.012-1.216A2.332,2.332,0,0,1,8.4,9.627a2.123,2.123,0,0,1,.814-1.71,4.143,4.143,0,0,1,2.27-.812v-1.1h.982V7.074a8.126,8.126,0,0,1,2.97.66l-.674,1.678a7.768,7.768,0,0,0-2.3-.559v2.116a11.073,11.073,0,0,1,1.991.932,2.733,2.733,0,0,1,.867.868A2.146,2.146,0,0,1,15.6,13.873ZM10.558,9.627a.678.678,0,0,0,.219.52,2.569,2.569,0,0,0,.707.42V8.881Q10.559,9.017,10.558,9.627Zm2.884,4.354a.646.646,0,0,0-.244-.509,3.173,3.173,0,0,0-.732-.431v1.786Q13.441,14.662,13.442,13.981Z" stroke="none" fill="#3b82f6"></path>
-               <polyline points="5.346 7.929 6.932 2.237 1.135 2.966"></polyline>
-               <path data-cap="butt" d="M11.789,23A11,11,0,0,1,6.932,2.237"></path>
-               <polyline points="18.654 16.071 17.068 21.763 22.865 21.034"></polyline>
-               <path data-cap="butt" d="M12.211,1a11,11,0,0,1,4.857,20.763"></path>
-              </g>
-             </svg>
-            </div>
-            <input class="cursor-not-allowed disabled-input pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" id="amt_to" name="amt_to" value="{{ data.amt_to }}" onchange="set_rate('amt_to');" readonly>
-           </div>
-          </div>
-          {% if data.swap_style == 'xmr' and coin_to != '6' %}
-          <div class="w-full md:w-1/2 p-3">
-           <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Fee From Confirm Target</p>
-           <div class="relative">
-            <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-             <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-              <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3b82f6" stroke-linejoin="round">
-               <path d="M15.6,13.873a2.273,2.273,0,0,1-.825,1.833,4.1,4.1,0,0,1-2.31.829v1.47h-.982V16.563a7.95,7.95,0,0,1-3.07-.617V14.053a8.328,8.328,0,0,0,1.5.545,8.019,8.019,0,0,0,1.568.28V12.654L11,12.468a5.357,5.357,0,0,1-2.012-1.216A2.332,2.332,0,0,1,8.4,9.627a2.123,2.123,0,0,1,.814-1.71,4.143,4.143,0,0,1,2.27-.812v-1.1h.982V7.074a8.126,8.126,0,0,1,2.97.66l-.674,1.678a7.768,7.768,0,0,0-2.3-.559v2.116a11.073,11.073,0,0,1,1.991.932,2.733,2.733,0,0,1,.867.868A2.146,2.146,0,0,1,15.6,13.873ZM10.558,9.627a.678.678,0,0,0,.219.52,2.569,2.569,0,0,0,.707.42V8.881Q10.559,9.017,10.558,9.627Zm2.884,4.354a.646.646,0,0,0-.244-.509,3.173,3.173,0,0,0-.732-.431v1.786Q13.441,14.662,13.442,13.981Z" stroke="none" fill="#3b82f6"></path>
-               <polyline points="5.346 7.929 6.932 2.237 1.135 2.966"></polyline>
-               <path data-cap="butt" d="M11.789,23A11,11,0,0,1,6.932,2.237"></path>
-               <polyline points="18.654 16.071 17.068 21.763 22.865 21.034"></polyline>
-               <path data-cap="butt" d="M12.211,1a11,11,0,0,1,4.857,20.763"></path>
-              </g>
-             </svg>
-            </div>
-            <input class="disabled-input pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="number" name="fee_to_conf" min="1" max="32" value="{{ data.fee_from_conf }}">
-           </div>
-          </div>
-          <div class="w-full md:w-1/2 p-3">
-           <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Fee From Increase By</p>
-           <div class="relative">
-            <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-             <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"></path>
-            </svg>
-            <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-             <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-              <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3b82f6" stroke-linejoin="round">
-               <path d="M15.6,13.873a2.273,2.273,0,0,1-.825,1.833,4.1,4.1,0,0,1-2.31.829v1.47h-.982V16.563a7.95,7.95,0,0,1-3.07-.617V14.053a8.328,8.328,0,0,0,1.5.545,8.019,8.019,0,0,0,1.568.28V12.654L11,12.468a5.357,5.357,0,0,1-2.012-1.216A2.332,2.332,0,0,1,8.4,9.627a2.123,2.123,0,0,1,.814-1.71,4.143,4.143,0,0,1,2.27-.812v-1.1h.982V7.074a8.126,8.126,0,0,1,2.97.66l-.674,1.678a7.768,7.768,0,0,0-2.3-.559v2.116a11.073,11.073,0,0,1,1.991.932,2.733,2.733,0,0,1,.867.868A2.146,2.146,0,0,1,15.6,13.873ZM10.558,9.627a.678.678,0,0,0,.219.52,2.569,2.569,0,0,0,.707.42V8.881Q10.559,9.017,10.558,9.627Zm2.884,4.354a.646.646,0,0,0-.244-.509,3.173,3.173,0,0,0-.732-.431v1.786Q13.441,14.662,13.442,13.981Z" stroke="none" fill="#3b82f6"></path>
-               <polyline points="5.346 7.929 6.932 2.237 1.135 2.966"></polyline>
-               <path data-cap="butt" d="M11.789,23A11,11,0,0,1,6.932,2.237"></path>
-               <polyline points="18.654 16.071 17.068 21.763 22.865 21.034"></polyline>
-               <path data-cap="butt" d="M12.211,1a11,11,0,0,1,4.857,20.763"></path>
-              </g>
-             </svg>
-            </div>
-            <select class="pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="fee_to_extra">
-             <option value="0">None</option>
-             <option value="10" {% if data.fee_from_extra==10 %} selected{% endif %}>10%</option>
-             <option value="50" {% if data.fee_from_extra==50 %} selected{% endif %}>50%</option>
-             <option value="100" {% if data.fee_from_extra==100 %} selected{% endif %}>100%</option>
-            </select>
-           </div>
-          </div>
-          {% endif %}
-         </div>
-        </div>
-       </div>
-      </div>
-     </div>
-     <div class="py-3 border-b items-center justify-between -mx-4 mb-6 pb-6 border-gray-400 border-opacity-20">
-      <div class="w-full md:w-10/12">
-       <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
-        <div class="w-full md:w-1/3 p-3">
-         <p class="text-sm text-coolGray-800 dark:text-white font-semibold">Bid Amount</p>
-        </div>
-        <div class="w-full md:flex-1 p-3">
-         <div class="flex flex-wrap -m-3">
-          <div class="w-full md:w-1/2 p-3">
-           <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Minimum Bid Amount</p>
-           <div class="relative">
-            <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-             <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-              <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3b82f6" stroke-linejoin="round">
-               <rect x="9.843" y="5.379" transform="matrix(0.7071 -0.7071 0.7071 0.7071 -0.7635 13.1569)" width="11.314" height="4.243"></rect>
-               <polyline points="3,23 3,19 15,19 15,23 "></polyline>
-               <line x1="4" y1="15" x2="1" y2="15" stroke="#3b82f6"></line>
-               <line x1="5.757" y1="10.757" x2="3.636" y2="8.636" stroke="#3b82f6"></line>
-               <line x1="1" y1="23" x2="17" y2="23"></line>
-               <line x1="17" y1="9" x2="23" y2="15"></line>
-              </g>
-             </svg>
-            </div>
-            <input class="cursor-not-allowed disabled-input pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" id="amt_bid_min" name="amt_bid_min" value="{{ data.amt_bid_min }}" title="Bids with an amount below the minimum bid value will be discarded" readonly>
-           </div>
-          </div>
-          <div class="w-full md:w-1/2 p-3">
-           <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Rate</p>
-           <div class="relative">
-            <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-             <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-              <g fill="#3b82f6">
-               <path d="M9,9h5L7,0,0,9H5V23a1,1,0,0,0,1,1H8a1,1,0,0,0,1-1Z" fill="#3b82f6"></path>
-               <path d="M14,17a3,3,0,1,1,3-3A3,3,0,0,1,14,17Zm0-4a1,1,0,1,0,1,1A1,1,0,0,0,14,13Z" data-color="color-2"></path>
-               <path d="M21,24a3,3,0,1,1,3-3A3,3,0,0,1,21,24Zm0-4a1,1,0,1,0,1,1A1,1,0,0,0,21,20Z" data-color="color-2"></path>
-               <path d="M13,23a1,1,0,0,1-.707-1.707l9-9a1,1,0,0,1,1.414,1.414l-9,9A1,1,0,0,1,13,23Z" data-color="color-2"></path>
-              </g>
-             </svg>
-            </div>
-            <input class="cursor-not-allowed disabled-input pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" id="rate" name="rate" value="{{ data.rate }}" onchange="set_rate('rate');" readonly>
-           </div>
-          </div>
-         </div>
-        </div>
-       </div>
-      </div>
-     </div>
-     <div class="py-3 border-b items-center justify-between -mx-4 mb-6 pb-6 border-gray-400 border-opacity-20">
-      <div class="w-full md:w-10/12">
-       <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
-        <div class="w-full md:w-1/3 p-3">
-         <p class="text-sm text-coolGray-800 dark:text-white font-semibold">Time</p>
-        </div>
-        <div class="w-full md:flex-1 p-3">
-         <div class="flex flex-wrap -m-3">
-          <div class="w-full md:w-1/2 p-3">
-           <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Offer valid (hrs)</p>
-           <div class="relative">
-            <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-             <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-              <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3b82f6" stroke-linejoin="round">
-               <path d="M15.6,13.873a2.273,2.273,0,0,1-.825,1.833,4.1,4.1,0,0,1-2.31.829v1.47h-.982V16.563a7.95,7.95,0,0,1-3.07-.617V14.053a8.328,8.328,0,0,0,1.5.545,8.019,8.019,0,0,0,1.568.28V12.654L11,12.468a5.357,5.357,0,0,1-2.012-1.216A2.332,2.332,0,0,1,8.4,9.627a2.123,2.123,0,0,1,.814-1.71,4.143,4.143,0,0,1,2.27-.812v-1.1h.982V7.074a8.126,8.126,0,0,1,2.97.66l-.674,1.678a7.768,7.768,0,0,0-2.3-.559v2.116a11.073,11.073,0,0,1,1.991.932,2.733,2.733,0,0,1,.867.868A2.146,2.146,0,0,1,15.6,13.873ZM10.558,9.627a.678.678,0,0,0,.219.52,2.569,2.569,0,0,0,.707.42V8.881Q10.559,9.017,10.558,9.627Zm2.884,4.354a.646.646,0,0,0-.244-.509,3.173,3.173,0,0,0-.732-.431v1.786Q13.441,14.662,13.442,13.981Z" stroke="none" fill="#3b82f6"></path>
-               <polyline points="5.346 7.929 6.932 2.237 1.135 2.966"></polyline>
-               <path data-cap="butt" d="M11.789,23A11,11,0,0,1,6.932,2.237"></path>
-               <polyline points="18.654 16.071 17.068 21.763 22.865 21.034"></polyline>
-               <path data-cap="butt" d="M12.211,1a11,11,0,0,1,4.857,20.763"></path>
-              </g>
-             </svg>
-            </div>
-            <input class="pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="number" name="validhrs" min="1" max="48" value="{{ data.validhrs }}">
-           </div>
-          </div>
-          {% if data.debug_ui == true %}
-          <div class="w-full md:w-1/2 p-3">
-           <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Contract Locked (Mins)</p>
-           <div class="relative">
-            <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-             <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-              <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3b82f6" stroke-linejoin="round">
-               <path d="M15.6,13.873a2.273,2.273,0,0,1-.825,1.833,4.1,4.1,0,0,1-2.31.829v1.47h-.982V16.563a7.95,7.95,0,0,1-3.07-.617V14.053a8.328,8.328,0,0,0,1.5.545,8.019,8.019,0,0,0,1.568.28V12.654L11,12.468a5.357,5.357,0,0,1-2.012-1.216A2.332,2.332,0,0,1,8.4,9.627a2.123,2.123,0,0,1,.814-1.71,4.143,4.143,0,0,1,2.27-.812v-1.1h.982V7.074a8.126,8.126,0,0,1,2.97.66l-.674,1.678a7.768,7.768,0,0,0-2.3-.559v2.116a11.073,11.073,0,0,1,1.991.932,2.733,2.733,0,0,1,.867.868A2.146,2.146,0,0,1,15.6,13.873ZM10.558,9.627a.678.678,0,0,0,.219.52,2.569,2.569,0,0,0,.707.42V8.881Q10.559,9.017,10.558,9.627Zm2.884,4.354a.646.646,0,0,0-.244-.509,3.173,3.173,0,0,0-.732-.431v1.786Q13.441,14.662,13.442,13.981Z" stroke="none" fill="#3b82f6"></path>
-               <polyline points="5.346 7.929 6.932 2.237 1.135 2.966"></polyline>
-               <path data-cap="butt" d="M11.789,23A11,11,0,0,1,6.932,2.237"></path>
-               <polyline points="18.654 16.071 17.068 21.763 22.865 21.034"></polyline>
-               <path data-cap="butt" d="M12.211,1a11,11,0,0,1,4.857,20.763"></path>
-              </g>
-             </svg>
-            </div>
-            <input class="pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="number" name="lockmins" min="10" max="5000" value="{{ data.lockmins }}">
-           </div>
-           {% if data.swap_style != 'xmr' %}
-           <div class="text-sm text-gray-500 mt-1.5">(Participate txn will be locked for half the time.)</div>
-           {% endif %}
-          </div> {% else %} <div class="w-full md:w-1/2 p-3">
-           <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Contract locked (Hours)</p>
-           <div class="relative">
-            <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-             <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-              <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3b82f6" stroke-linejoin="round">
-               <path d="M15.6,13.873a2.273,2.273,0,0,1-.825,1.833,4.1,4.1,0,0,1-2.31.829v1.47h-.982V16.563a7.95,7.95,0,0,1-3.07-.617V14.053a8.328,8.328,0,0,0,1.5.545,8.019,8.019,0,0,0,1.568.28V12.654L11,12.468a5.357,5.357,0,0,1-2.012-1.216A2.332,2.332,0,0,1,8.4,9.627a2.123,2.123,0,0,1,.814-1.71,4.143,4.143,0,0,1,2.27-.812v-1.1h.982V7.074a8.126,8.126,0,0,1,2.97.66l-.674,1.678a7.768,7.768,0,0,0-2.3-.559v2.116a11.073,11.073,0,0,1,1.991.932,2.733,2.733,0,0,1,.867.868A2.146,2.146,0,0,1,15.6,13.873ZM10.558,9.627a.678.678,0,0,0,.219.52,2.569,2.569,0,0,0,.707.42V8.881Q10.559,9.017,10.558,9.627Zm2.884,4.354a.646.646,0,0,0-.244-.509,3.173,3.173,0,0,0-.732-.431v1.786Q13.441,14.662,13.442,13.981Z" stroke="none" fill="#3b82f6"></path>
-               <polyline points="5.346 7.929 6.932 2.237 1.135 2.966"></polyline>
-               <path data-cap="butt" d="M11.789,23A11,11,0,0,1,6.932,2.237"></path>
-               <polyline points="18.654 16.071 17.068 21.763 22.865 21.034"></polyline>
-               <path data-cap="butt" d="M12.211,1a11,11,0,0,1,4.857,20.763"></path>
-              </g>
-             </svg>
-            </div>
-            <input class="pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="number" name="lockhrs" min="1" max="96" value="{{ data.lockhrs }}">
-           </div>
-           {% if data.swap_style != 'xmr' %}
-           <div class="text-sm text-gray-500 mt-1.5 dark:text-white">(Participate txn will be locked for half the time.)</div>
-           {% endif %}
-          </div>
-          {% endif %}
-         </div>
-        </div>
-       </div>
-      </div>
-     </div>
-     <div class="py-3 border-b items-center justify-between -mx-4 mb-6 pb-6 border-gray-400 border-opacity-20">
-      <div class="w-full md:w-10/12">
-       <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
-        <div class="w-full md:w-1/3 p-3">
-         <p class="text-sm text-coolGray-800 dark:text-white font-semibold">Strategy</p>
-        </div>
-        <div class="w-full md:flex-1 p-3">
-         <div class="flex flex-wrap -m-3">
-          <div class="w-full md:w-1/2 p-3">
-           <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Auto Accept Strategy</p>
-           <div class="relative">
-            <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-             <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"></path>
-            </svg>
-            <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-             <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-              <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3b82f6" stroke-linejoin="round">
-               <circle cx="12" cy="12" r="5" stroke="#3b82f6" data-cap="butt"></circle>
-               <polygon points="5 6 2 4 5 2 5 6" fill="#3b82f6" stroke="none"></polygon>
-               <polygon points="19 18 22 20 19 22 19 18" fill="#3b82f6" stroke="none"></polygon>
-               <polygon points="5 6 2 4 5 2 5 6"></polygon>
-               <line x1="5" y1="4" x2="9" y2="4"></line>
-               <polygon points="19 18 22 20 19 22 19 18"></polygon>
-               <line x1="19" y1="20" x2="15" y2="20"></line>
-              </g>
-             </svg>
-            </div>
-            <select class="pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="automation_strat_id">
-             <option value="-1" {% if data.automation_strat_id==-1 %} selected{% endif %}>None</option>
-             {% for a in automation_strategies %}
-             <option value="{{ a[0] }}" {% if data.automation_strat_id==a[0] %} selected{% endif %}>{{ a[1] }}</option>
-             {% endfor %}
-            </select>
-           </div>
-          </div>
-         </div>
-        </div>
-       </div>
-      </div>
-     </div>
-     <div class="py-3 border-b items-center justify-between -mx-4 mb-6 pb-6 border-gray-400 border-opacity-20">
-      <div class="w-full md:w-10/12">
-       <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
-        <div class="w-full md:w-1/3 p-3">
-         <p class="text-sm text-coolGray-800 dark:text-white font-semibold">Options</p>
-        </div>
-        <div class="w-full md:flex-1 p-3">
-         <div class="form-check form-check-inline">
-          <input class="cursor-not-allowed disabled-input hover:border-blue-500 w-5 h-5 form-check-input text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-1 dark:bg-gray-500 dark:border-gray-400" type="checkbox" id="amt_var" name="amt_var" value="av" {% if data.amt_var==true %} checked="checked" {% endif %} disabled>
-          <label class="form-check-label ml-2 text-sm font-medium text-gray-800 dark:text-white" for="inlineCheckbox2">Amount Variable</label>
-         </div>
-         <div class="form-check form-check-inline mt-2">
-          <input class="cursor-not-allowed disabled-input hover:border-blue-500 w-5 h-5 form-check-input text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-1 dark:bg-gray-500 dark:border-gray-400" type="checkbox" id="rate_var" name="rate_var" value="rv" {% if data.rate_var==true %} checked="checked" {% endif %} disabled>
-          <label class="form-check-label ml-2 text-sm font-medium text-gray-800 dark:text-white" for="inlineCheckbox3">Rate Variable</label>
-         </div>
-        </div>
-       </div>
-      </div>
-     </div>
-   </div>
-  </div>
- </section>
- <section>
-  <div class="pl-6 pr-6 pt-0 pb-0 h-full overflow-hidden">
-   <div class="pb-6 border-coolGray-100">
-    <div class="flex flex-wrap items-center justify-between -m-2">
-     <div class="w-full pt-2">
-      <div class="container mt-5 mx-auto">
-       <div class="pt-6 pb-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
-        <div class="px-6">
-         <div class="flex flex-wrap justify-end">
-          <div class="w-full md:w-auto p-1.5">
-           <button name="step1" type="submit" value="Back" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md focus:ring-0 focus:outline-none dark:text-white dark:hover:text-white dark:bg-gray-600 dark:hover:bg-gray-700 dark:border-gray-600 dark:hover:border-gray-600">
-            <span>Back</span>
-           </button>
-          </div>
-          <div class="w-full md:w-auto p-1.5">
-           <button name="check_offer" value="Continue" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
-            <svg class="mr-2" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-             <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="11"></circle>
-              <polyline points="11 8 15 12 11 16" stroke="#ffffff"></polyline>
-             </g>
-            </svg>
-            <span>Continue</span>
-           </button>
-          </div>
-         </div>
-        </div>
-       </div>
-      </div>
-     </div>
     </div>
-   </div>
-  </div>
- </section>
- <input type="hidden" name="formid" value="{{ form_id }}">
- <input type="hidden" name="addr_to" value="{{ data.addr_to }}">
- <input type="hidden" name="addr_from" value="{{ data.addr_from }}">
- <input type="hidden" name="swap_type" value="{{ data.swap_type }}">
- <input type="hidden" name="coin_from" value="{{ data.coin_from }}">
- <input type="hidden" name="coin_to" value="{{ data.coin_to }}">
- {% if data.amt_var==true %}
- <input type="hidden" name="amt_var" value="true">
- {% endif %}
- {% if data.rate_var==true %}
- <input type="hidden" name="rate_var" value="true">
+  </section>
+  <section>
+    <div class="pl-6 pr-6 pt-0 pb-0 h-full overflow-hidden">
+      <div class="pb-6 border-coolGray-100">
+        <div class="flex flex-wrap items-center justify-between -m-2">
+          <div class="w-full pt-2">
+            <div class="container mt-5 mx-auto">
+              <div class="pt-6 pb-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
+                <div class="px-6">
+                  <div class="flex flex-wrap justify-end">
+                    <div class="w-full md:w-auto p-1.5">
+                      <button name="step1" type="submit" value="Back" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md focus:ring-0 focus:outline-none dark:text-white dark:hover:text-white dark:bg-gray-600 dark:hover:bg-gray-700 dark:border-gray-600 dark:hover:border-gray-600">
+                        <span>Back</span>
+                      </button>
+                    </div>
+                    <div class="w-full md:w-auto p-1.5">
+                      <button name="check_offer" value="Continue" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+                        <span>Continue</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <input type="hidden" name="formid" value="{{ form_id }}">
+  <input type="hidden" name="addr_to" value="{{ data.addr_to }}">
+  <input type="hidden" name="addr_from" value="{{ data.addr_from }}">
+  <input type="hidden" name="swap_type" value="{{ data.swap_type }}">
+  <input type="hidden" name="coin_from" value="{{ data.coin_from }}">
+  <input type="hidden" name="coin_to" value="{{ data.coin_to }}">
+  {% if data.amt_var==true %}
+  <input type="hidden" name="amt_var" value="true">
+  {% endif %} {% if data.rate_var==true %}
+  <input type="hidden" name="rate_var" value="true">
 {% endif %}
 </form>
-<script>
-const selects = document.querySelectorAll('select.disabled-select');
-for (const select of selects) {
-    if (select.disabled) {
-        select.classList.add('disabled-select-enabled');
-    } else {
-        select.classList.remove('disabled-select-enabled');
-    }
-}
-</script>
-
-<script>
-const inputs = document.querySelectorAll('input.disabled-input, input[type="checkbox"].disabled-input');
-for (const input of inputs) {
-    if (input.readOnly) {
-        input.classList.add('disabled-input-enabled');
-    } else {
-        input.classList.remove('disabled-input-enabled');
-    }
-}
-</script>
-
-<style>
-.disabled-input-enabled {
-    opacity: 0.50 !important;
-}
-select.disabled-select-enabled {
-    opacity: 0.50 !important;
-}
- </style>  
-
-<script src="static/js/new_offer.js"></script>
-<style>
-  .custom-select .select {
-   appearance: none;
-   background-position: 10px center;
-   background-repeat: no-repeat;
-   position: relative;
-  }
-
-  .custom-select select::-webkit-scrollbar {
-   width: 0;
-  }
-
-  .custom-select .select option {
-   padding-left: 0;
-   text-indent: 0;
-   background-repeat: no-repeat;
-   background-position: 0 50%;
-  }
-
-  .custom-select .select option.no-space {
-   padding-left: 0;
-  }
-
-  .custom-select .select option[data-image] {
-   background-image: url('');
-  }
-
-  .custom-select .select-icon {
-   position: absolute;
-   top: 50%;
-   left: 10px;
-   transform: translateY(-50%);
-  }
-
-  .custom-select .select-image {
-   display: none;
-   margin-top: 10px;
-  }
-
-  .custom-select .select:focus+.select-dropdown .select-image {
-   display: block;
-  }
- </style>
-<script src="static/js/coin_icons.js"></script>
-<script src="static/js/coin_icons_2.js"></script>
+  <script src="static/js/new_offer.js"></script>  
 </div>
 </div>
 </div>
-</div>{% include 'footer.html' %}
+</div>
+{% include 'footer.html' %}
 </body>
 </html>

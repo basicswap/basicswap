@@ -24,7 +24,6 @@
 
 .error_msg
 {
-  color:red;
 }
 
 #hide {
@@ -217,3 +216,60 @@
   transform: translate(-50%, -50%);
   height:25px;
 }
+
+
+select.select-disabled {
+opacity: 0.40 !important;
+}
+
+
+.disabled-input-enabled {
+    opacity: 0.40 !important;
+}
+select.disabled-select-enabled {
+    opacity: 0.40 !important;
+}
+
+
+  .custom-select .select {
+   appearance: none;
+   background-position: 10px center;
+   background-repeat: no-repeat;
+   position: relative;
+  }
+
+  .custom-select select::-webkit-scrollbar {
+   width: 0;
+  }
+
+  .custom-select .select option {
+   padding-left: 0;
+   text-indent: 0;
+   background-repeat: no-repeat;
+   background-position: 0 50%;
+  }
+
+  .custom-select .select option.no-space {
+   padding-left: 0;
+  }
+
+  .custom-select .select option[data-image] {
+   background-image: url('');
+  }
+
+  .custom-select .select-icon {
+   position: absolute;
+   top: 50%;
+   left: 10px;
+   transform: translateY(-50%);
+  }
+
+  .custom-select .select-image {
+   display: none;
+   margin-top: 10px;
+  }
+
+  .custom-select .select:focus+.select-dropdown .select-image {
+   display: block;
+  }
+

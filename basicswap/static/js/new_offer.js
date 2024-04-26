@@ -38,3 +38,22 @@ window.addEventListener('DOMContentLoaded', (event) => {
     });
   });
 });
+
+const selects = document.querySelectorAll('select.disabled-select');
+for (const select of selects) {
+    if (select.disabled) {
+        select.classList.add('disabled-select-enabled');
+    } else {
+        select.classList.remove('disabled-select-enabled');
+    }
+}
+
+
+const inputs = document.querySelectorAll('input.disabled-input, input[type="checkbox"].disabled-input');
+for (const input of inputs) {
+    if (input.readOnly) {
+        input.classList.add('disabled-input-enabled');
+    } else {
+        input.classList.remove('disabled-input-enabled');
+    }
+}

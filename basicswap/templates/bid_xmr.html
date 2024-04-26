@@ -1,5 +1,5 @@
 {% include 'header.html' %}
-{% from 'style.html' import input_arrow_down_svg %}
+{% from 'style.html' import breadcrumb_line_svg, circular_arrows_svg, input_arrow_down_svg, small_arrow_white_right_svg %}
 
 <div class="container mx-auto">
  <section class="p-5 mt-5">
@@ -11,19 +11,11 @@
        <p>Home</p>
       </a>
      </li>
-     <li>
-      <svg width="6" height="15" viewBox="0 0 6 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-       <path d="M5.34 0.671999L2.076 14.1H0.732L3.984 0.671999H5.34Z" fill="#BBC3CF"></path>
-      </svg>
-     </li>
+      <li> {{ breadcrumb_line_svg | safe }} </li>
      <li>
       <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="#">Bids</a>
      </li>
-     <li>
-      <svg width="6" height="15" viewBox="0 0 6 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-       <path d="M5.34 0.671999L2.076 14.1H0.732L3.984 0.671999H5.34Z" fill="#BBC3CF"></path>
-      </svg>
-     </li>
+      <li> {{ breadcrumb_line_svg | safe }} </li>
      <li>
       <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="{{ bid_id }}">BID ID: {{ bid_id }}</a>
      </li>
@@ -40,7 +32,7 @@
     <div class="relative z-20 flex flex-wrap items-center -m-3">
      <div class="w-full md:w-1/2 p-3">
       <h2 class="mb-6 text-4xl font-bold text-white tracking-tighter">Bid {% if debug_mode == true %} (Debug: bid_xmr template) {% endif %}</h2>
-      <p class="font-normal text-coolGray-200 dark:text-white"><span class="bold">Bid ID:</span> {{ bid_id }}</p>
+      <p class="font-normal text-coolGray-200 dark:text-white"><span class="bold">BID ID:</span> {{ bid_id }}</p>
      </div>
      <div class="w-full md:w-1/2 p-3 p-6 container flex flex-wrap items-center justify-end items-center mx-auto">
       {% if refresh %} 
@@ -90,9 +82,7 @@
             <td class="py-3 px-6">
              <div class="content flex py-2">
               <span class="bold">{{ data.amt_to }} {{ data.ticker_to }}</span>
-              <svg aria-hidden="true " class="w-5 h-5 ml-3 mr-3" fill="currentColor " viewBox="0 0 20 20 " xmlns="http://www.w3.org/2000/svg ">
-               <path fill-rule="evenodd " d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z " clip-rule="evenodd "></path>
-              </svg>
+                {{ small_arrow_white_right_svg | safe }}
               <span class="bold">{{ data.amt_from }} {{ data.ticker_from }}</span>
              </div>
             </td>
@@ -103,9 +93,7 @@
             <td class="py-3 px-6">
              <div class="content flex py-2">
               <span class="bold">{{ data.amt_from }} {{ data.ticker_from }}</span>
-              <svg aria-hidden="true " class="w-5 h-5 ml-3 mr-3" fill="currentColor " viewBox="0 0 20 20 " xmlns="http://www.w3.org/2000/svg ">
-               <path fill-rule="evenodd " d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z " clip-rule="evenodd "></path>
-              </svg>
+                {{ small_arrow_white_right_svg | safe }}
               <span class="bold">{{ data.amt_to }} {{ data.ticker_to }}</span>
              </div>
             </td>
@@ -497,7 +485,8 @@
             <tr class="opacity-100 text-gray-500 dark:text-gray-100">
              <td class="py-3 px-6 bold">View Transaction:</td>
              <td class="py-3 px-6 bold">
-              <div class="relative">{{ input_arrow_down_svg | safe }}
+              <div class="relative">
+                {{ input_arrow_down_svg | safe }}
                <select class="bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="view_tx">
                 {% if data.txns|length %} {% for tx in data.txns %}
                 <option value="{{ tx.txid }}" {% if data.view_tx_ind==tx.txid %} selected{% endif %}>{{ tx.type }} {{ tx.txid }}</option>
@@ -714,7 +703,8 @@
             <tr class="opacity-100 text-gray-500 dark:text-gray-100">
              <td class="py-3 px-6 bold">Change Bid State:</td>
              <td class="py-3 px-6">
-              <div class="relative">{{ input_arrow_down_svg | safe }}
+              <div class="relative">
+                {{ input_arrow_down_svg | safe }}
                <select class="bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="new_state">
                 {% for s in data.bid_states %}
                 <option value="{{ s[0] }}" {% if data.bid_state_ind==s[0] %} selected{% endif %}>{{ s[1] }}</option>
@@ -727,7 +717,8 @@
             <tr class="opacity-100 text-gray-500 dark:text-gray-100">
              <td class="py-3 px-6 bold">Add Bid Action:</td>
              <td class="py-3 px-6">
-              <div class="relative">{{ input_arrow_down_svg | safe }}
+              <div class="relative">
+                {{ input_arrow_down_svg | safe }}
                <select class="bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="new_action">
                 {% for a in data.bid_actions %}
                 <option value="{{ a[0] }}">{{ a[1] }}</option>
@@ -739,7 +730,8 @@
             <tr class="opacity-100 text-gray-500 dark:text-gray-100">
              <td class="py-3 px-6 bold">Debug Option</td>
              <td class="py-3 px-6">
-              <div class="relative">{{ input_arrow_down_svg | safe }}
+              <div class="relative">
+                {{ input_arrow_down_svg | safe }}
                <select class="bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="debugind">
                 <option{% if data.debug_ind=="-1" %} selected{% endif %} value="-1">None</option>
                   {% for a in data.debug_options %}
