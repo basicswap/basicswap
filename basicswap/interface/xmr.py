@@ -30,7 +30,6 @@ from basicswap.util import (
     i2b, b2i, b2h,
     dumpj,
     ensure,
-    make_int,
     TemporaryError)
 from basicswap.util.network import (
     is_private_ip_address)
@@ -490,7 +489,7 @@ class XMRInterface(CoinInterface):
                     return {'num_txns': len(rv['fee_list']), 'sum_amount': sum(rv['amount_list']), 'sum_fee': sum(rv['fee_list']), 'sum_weight': sum(rv['weight_list'])}
                 return rv['tx_hash_list'][0]
 
-            value_sats: int = make_int(value, self.exp())
+            value_sats: int = self.make_int(value)
             params = {'destinations': [{'amount': value_sats, 'address': addr_to}], 'do_not_relay': estimate_fee}
             if self._fee_priority > 0:
                 params['priority'] = self._fee_priority

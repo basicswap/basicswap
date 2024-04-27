@@ -18,7 +18,6 @@ from basicswap.interface import (
     Curves)
 from basicswap.util import (
     ensure,
-    make_int,
     b2h, i2b, b2i, i2h)
 from basicswap.util.ecc import (
     ep,
@@ -763,7 +762,7 @@ class BTCInterface(Secp256k1Interface):
             for pi in tx.vin:
                 ptx = self.rpc('getrawtransaction', [i2h(pi.prevout.hash), True])
                 prevout = ptx['vout'][pi.prevout.n]
-                inputs_value += make_int(prevout['value'])
+                inputs_value += self.make_int(prevout['value'])
 
                 prevout_type = prevout['scriptPubKey']['type']
                 if prevout_type == 'witness_v0_keyhash':
@@ -930,25 +929,25 @@ class BTCInterface(Secp256k1Interface):
 
         return True
 
-    def signTx(self, key_bytes, tx_bytes, input_n, prevout_script, prevout_value):
+    def signTx(self, key_bytes: bytes, tx_bytes: bytes, input_n: int, prevout_script: bytes, prevout_value: int) -> bytes:
         tx = self.loadTx(tx_bytes)
         sig_hash = SegwitV0SignatureHash(prevout_script, tx, input_n, SIGHASH_ALL, prevout_value)
 
         eck = PrivateKey(key_bytes)
         return eck.sign(sig_hash, hasher=None) + bytes((SIGHASH_ALL,))
 
-    def signTxOtVES(self, key_sign, pubkey_encrypt, tx_bytes, input_n, prevout_script, prevout_value):
+    def signTxOtVES(self, key_sign: bytes, pubkey_encrypt: bytes, tx_bytes: bytes, input_n: int, prevout_script: bytes, prevout_value: int) -> bytes:
         tx = self.loadTx(tx_bytes)
         sig_hash = SegwitV0SignatureHash(prevout_script, tx, input_n, SIGHASH_ALL, prevout_value)
 
         return ecdsaotves_enc_sign(key_sign, pubkey_encrypt, sig_hash)
 
-    def verifyTxOtVES(self, tx_bytes, ct, Ks, Ke, input_n, prevout_script, prevout_value):
+    def verifyTxOtVES(self, tx_bytes: bytes, ct: bytes, Ks: bytes, Ke: bytes, input_n: int, prevout_script: bytes, prevout_value):
         tx = self.loadTx(tx_bytes)
         sig_hash = SegwitV0SignatureHash(prevout_script, tx, input_n, SIGHASH_ALL, prevout_value)
         return ecdsaotves_enc_verify(Ks, Ke, sig_hash, ct)
 
-    def decryptOtVES(self, k, esig):
+    def decryptOtVES(self, k: bytes, esig: bytes) -> bytes:
         return ecdsaotves_dec_sig(k, esig) + bytes((SIGHASH_ALL,))
 
     def verifyTxSig(self, tx_bytes: bytes, sig: bytes, K: bytes, input_n: int, prevout_script: bytes, prevout_value: int) -> bool:
