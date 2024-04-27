@@ -19,8 +19,91 @@ from basicswap.util.crypto import (
     ripemd160,
 )
 from basicswap.util.extkey import ExtKeyPair
+from basicswap.util.integer import encode_varint
 from basicswap.interface.dcr.rpc import make_rpc_func
-from .messages import CTransaction
+from .messages import CTransaction, SigHashType, TxSerializeType
+from .script import push_script_data
+
+from coincurve.keys import (
+    PrivateKey
+)
+
+
+SigHashSerializePrefix: int = 1
+SigHashSerializeWitness: int = 3
+
+
+def DCRSignatureHash(sign_script: bytes, hash_type: SigHashType, tx: CTransaction, idx: int) -> bytes:
+    masked_hash_type = hash_type & SigHashType.SigHashMask
+    if masked_hash_type != SigHashType.SigHashAll:
+        raise ValueError('todo')
+
+    # Prefix hash
+    sign_tx_in_idx: int = idx
+    sign_vins = tx.vin
+    if hash_type & SigHashType.SigHashAnyOneCanPay != 0:
+        sign_vins = [tx.vin[idx],]
+        sign_tx_in_idx = 0
+
+    hash_buffer = bytearray()
+    version: int = tx.version | (SigHashSerializePrefix << 16)
+    hash_buffer += version.to_bytes(4, 'little')
+    hash_buffer += encode_varint(len(sign_vins))
+
+    for txi_n, txi in enumerate(sign_vins):
+        hash_buffer += txi.prevout.hash.to_bytes(32, 'little')
+        hash_buffer += txi.prevout.n.to_bytes(4, 'little')
+        hash_buffer += txi.prevout.tree.to_bytes(1)
+
+        # In the case of SigHashNone and SigHashSingle, commit to 0 for everything that is not the input being signed instead.
+        if (masked_hash_type == SigHashType.SigHashNone
+            or masked_hash_type == SigHashType.SigHashSingle) and \
+           sign_tx_in_idx != txi_n:
+            hash_buffer += (0).to_bytes(4, 'little')
+        else:
+            hash_buffer += txi.sequence.to_bytes(4, 'little')
+
+    hash_buffer += encode_varint(len(tx.vout))
+
+    for txo_n, txo in enumerate(tx.vout):
+        if masked_hash_type == SigHashType.SigHashSingle and \
+           idx != txo_n:
+            hash_buffer += (-1).to_bytes(8, 'little')
+            hash_buffer += txo.version.to_bytes(2, 'little')
+            hash_buffer += encode_varint(0)
+            continue
+        hash_buffer += txo.value.to_bytes(8, 'little')
+        hash_buffer += txo.version.to_bytes(2, 'little')
+        hash_buffer += encode_varint(len(txo.script_pubkey))
+        hash_buffer += txo.script_pubkey
+
+    hash_buffer += tx.locktime.to_bytes(4, 'little')
+    hash_buffer += tx.expiry.to_bytes(4, 'little')
+
+    prefix_hash = blake256(hash_buffer)
+
+    # Witness hash
+    hash_buffer.clear()
+
+    version: int = tx.version | (SigHashSerializeWitness << 16)
+    hash_buffer += version.to_bytes(4, 'little')
+
+    hash_buffer += encode_varint(len(sign_vins))
+    for txi_n, txi in enumerate(sign_vins):
+        if sign_tx_in_idx != txi_n:
+            hash_buffer += encode_varint(0)
+            continue
+        hash_buffer += encode_varint(len(sign_script))
+        hash_buffer += sign_script
+
+    witness_hash = blake256(hash_buffer)
+
+    hash_buffer.clear()
+    hash_buffer += hash_type.to_bytes(4, 'little')
+    hash_buffer += prefix_hash
+    hash_buffer += witness_hash
+
+    return blake256(hash_buffer)
 
 
 class DCRInterface(Secp256k1Interface):
@@ -121,7 +204,38 @@ class DCRInterface(Secp256k1Interface):
 
         return hash160(ek_account.encode_p())
 
+    def decodeKey(self, encoded_key: str) -> (int, bytes):
+        key = b58decode(encoded_key)
+        checksum = key[-4:]
+        key = key[:-4]
+
+        if blake256(key)[:4] != checksum:
+            raise ValueError('Checksum mismatch')
+        return key[2], key[3:]
+
     def loadTx(self, tx_bytes: bytes) -> CTransaction:
         tx = CTransaction()
         tx.deserialize(tx_bytes)
         return tx
+
+    def signTx(self, key_bytes: bytes, tx_bytes: bytes, input_n: int, prevout_script: bytes, prevout_value: int) -> bytes:
+        tx = self.loadTx(tx_bytes)
+        sig_hash = DCRSignatureHash(prevout_script, SigHashType.SigHashAll, tx, input_n)
+
+        eck = PrivateKey(key_bytes)
+        return eck.sign(sig_hash, hasher=None) + bytes((SigHashType.SigHashAll,))
+
+    def setTxSignature(self, tx_bytes: bytes, stack, txi: int = 0) -> bytes:
+        tx = self.loadTx(tx_bytes)
+
+        script_data = bytearray()
+        for data in stack:
+            push_script_data(script_data, data)
+
+        tx.vin[txi].signature_script = script_data
+
+        return tx.serialize()
+
+    def stripTxSignature(self, tx_bytes) -> bytes:
+        tx = self.loadTx(tx_bytes)
+        return tx.serialize(TxSerializeType.NoWitness)

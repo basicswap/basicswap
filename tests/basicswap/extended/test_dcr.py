@@ -16,9 +16,15 @@ import basicswap.config as cfg
 from basicswap.basicswap import (
     Coins,
 )
-from basicswap.util.crypto import hash160
+from basicswap.util.crypto import (
+    hash160
+)
 from basicswap.interface.dcr.rpc import (
     callrpc,
+)
+from basicswap.interface.dcr.messages import (
+    SigHashType,
+    TxSerializeType,
 )
 from tests.basicswap.common import (
     stopDaemons,
@@ -146,7 +152,7 @@ class Test(BaseTest):
             if num_passed >= 5:
                 ci0.rpc('generate', [1,])
         except Exception as e:
-                logging.warning('coins_loop generate {}'.format(e))
+            logging.warning('coins_loop generate {}'.format(e))
 
     @classmethod
     def prepareExtraDataDir(cls, i):
@@ -256,7 +262,6 @@ class Test(BaseTest):
         logging.info('---------- Test {} segwit'.format(self.test_coin_from.name))
 
         swap_clients = self.swap_clients
-
         ci0 = swap_clients[0].ci(self.test_coin_from)
         assert (ci0.using_segwit() is True)
 
@@ -284,6 +289,53 @@ class Test(BaseTest):
         ser_out = ctx.serialize()
         assert (ser_out.hex() == sfrtx['hex'])
         assert (f_decoded['txid'] == ctx.TxHash().hex())
+
+    def test_003_signature_hash(self):
+        logging.info('---------- Test {} signature_hash'.format(self.test_coin_from.name))
+        # Test that signing a transaction manually produces the same result when signed with the wallet
+
+        swap_clients = self.swap_clients
+        ci0 = swap_clients[0].ci(self.test_coin_from)
+
+        utxos = ci0.rpc_wallet('listunspent')
+        addr_out = ci0.rpc_wallet('getnewaddress')
+        rtx = ci0.rpc_wallet('createrawtransaction', [[], {addr_out: 2.0}])
+
+        account_from = ci0.rpc_wallet('getaccount', [self.dcr_mining_addr, ])
+        frtx = ci0.rpc_wallet('fundrawtransaction', [rtx, account_from])
+        sfrtx = ci0.rpc_wallet('signrawtransaction', [frtx['hex']])
+
+        ctx = ci0.loadTx(bytes.fromhex(frtx['hex']))
+
+        prevout = None
+        prevout_txid = ctx.vin[0].prevout.get_hash().hex()
+        prevout_n = ctx.vin[0].prevout.n
+        for utxo in utxos:
+            if prevout_txid == utxo['txid'] and prevout_n == utxo['vout']:
+                prevout = utxo
+                break
+        assert (prevout is not None)
+
+        tx_bytes_no_witness: bytes = ctx.serialize(TxSerializeType.NoWitness)
+        sig0 = ci0.rpc_wallet('createsignature', [prevout['address'], 0, SigHashType.SigHashAll, prevout['scriptPubKey'], tx_bytes_no_witness.hex()])
+
+        priv_key_wif = ci0.rpc_wallet('dumpprivkey', [prevout['address'], ])
+        sig_type, key_bytes = ci0.decodeKey(priv_key_wif)
+
+        addr_info = ci0.rpc_wallet('validateaddress', [prevout['address'],])
+        pk_hex: str = addr_info['pubkey']
+
+        sig0_py = ci0.signTx(key_bytes, tx_bytes_no_witness, 0, bytes.fromhex(prevout['scriptPubKey']), ci0.make_int(prevout['amount']))
+        tx_bytes_signed = ci0.setTxSignature(tx_bytes_no_witness, [sig0_py, bytes.fromhex(pk_hex)])
+
+        # Set prevout value
+        ctx = ci0.loadTx(tx_bytes_signed)
+        ctx.vin[0].value_in = ci0.make_int(prevout['amount'])
+        tx_bytes_signed = ctx.serialize()
+        assert (tx_bytes_signed.hex() == sfrtx['hex'])
+
+        sent_txid = ci0.rpc_wallet('sendrawtransaction', [tx_bytes_signed.hex(), ])
+        assert (len(sent_txid) == 64)
 
 
 if __name__ == '__main__':

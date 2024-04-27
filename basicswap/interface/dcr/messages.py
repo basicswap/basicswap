@@ -17,13 +17,36 @@ class TxSerializeType(IntEnum):
     OnlyWitness = 2
 
 
+class SigHashType(IntEnum):
+    SigHashAll = 0x1
+    SigHashNone = 0x2
+    SigHashSingle = 0x3
+    SigHashAnyOneCanPay = 0x80
+
+    SigHashMask = 0x1f
+
+
+class SignatureType(IntEnum):
+    STEcdsaSecp256k1 = 0
+    STEd25519 = 1
+    STSchnorrSecp256k1 = 2
+
+
 class COutpoint:
     __slots__ = ('hash', 'n', 'tree')
+
+    def get_hash(self) -> bytes:
+        return self.hash.to_bytes(32, 'big')
 
 
 class CTxIn:
     __slots__ = ('prevout', 'sequence',
                  'value_in', 'block_height', 'block_index', 'signature_script')  # Witness
+
+    def __init__(self, tx=None):
+        self.value_in = -1
+        self.block_height = 0
+        self.block_index = 0xffffffff
 
 
 class CTxOut:
@@ -46,7 +69,6 @@ class CTransaction:
             self.vout = copy.deepcopy(tx.vout)
             self.locktime = tx.locktime
             self.expiry = tx.expiry
-
 
     def deserialize(self, data: bytes) -> None:
 
@@ -91,6 +113,9 @@ class CTransaction:
             o += 4
             self.expiry = int.from_bytes(data[o:o + 4], 'little')
             o += 4
+
+        if ser_type == TxSerializeType.NoWitness:
+            return
 
         num_wit_scripts, nb = decode_varint(data, o)
         o += nb
@@ -140,7 +165,8 @@ class CTransaction:
         if ser_type == TxSerializeType.Full or ser_type == TxSerializeType.OnlyWitness:
             data += encode_varint(len(self.vin))
             for txi in self.vin:
-                data += txi.value_in.to_bytes(8, 'little')
+                tc_value_in = txi.value_in & 0xffffffffffffffff  # Convert negative values
+                data += tc_value_in.to_bytes(8, 'little')
                 data += txi.block_height.to_bytes(4, 'little')
                 data += txi.block_index.to_bytes(4, 'little')
                 data += encode_varint(len(txi.signature_script))

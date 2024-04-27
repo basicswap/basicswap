@@ -18,7 +18,6 @@ from basicswap.contrib.test_framework.script import (
 )
 from basicswap.util import (
     ensure,
-    make_int,
     TemporaryError,
 )
 from basicswap.util.script import (
@@ -345,7 +344,7 @@ class PARTInterfaceBlind(PARTInterface):
         ensure(lock_output_n is not None, 'Output not found in tx')
 
         # Check value
-        locked_txo_value = make_int(blinded_info['amount'])
+        locked_txo_value = self.make_int(blinded_info['amount'])
         ensure(locked_txo_value == swap_value, 'Bad locked value')
 
         # Check script
@@ -359,7 +358,7 @@ class PARTInterfaceBlind(PARTInterface):
         # TODO: Check that inputs are unspent, rangeproofs and commitments sum
         # Verify fee rate
         vsize = lock_tx_obj['vsize']
-        fee_paid = make_int(lock_tx_obj['vout'][0]['ct_fee'])
+        fee_paid = self.make_int(lock_tx_obj['vout'][0]['ct_fee'])
 
         fee_rate_paid = fee_paid * 1000 // vsize
 
@@ -394,7 +393,7 @@ class PARTInterfaceBlind(PARTInterface):
         lock_refund_output_n, blinded_info = self.findOutputByNonce(lock_refund_tx_obj, nonce)
         ensure(lock_refund_output_n is not None, 'Output not found in tx')
 
-        lock_refund_txo_value = make_int(blinded_info['amount'])
+        lock_refund_txo_value = self.make_int(blinded_info['amount'])
 
         # Check script
         lock_refund_txo_scriptpk = bytes.fromhex(lock_refund_tx_obj['vout'][lock_refund_output_n]['scriptPubKey']['hex'])
@@ -415,7 +414,7 @@ class PARTInterfaceBlind(PARTInterface):
         ensure(rv['inputs_valid'] is True, 'Invalid inputs')
 
         # Check value
-        fee_paid = make_int(lock_refund_tx_obj['vout'][0]['ct_fee'])
+        fee_paid = self.make_int(lock_refund_tx_obj['vout'][0]['ct_fee'])
         ensure(swap_value - lock_refund_txo_value == fee_paid, 'Bad output value')
 
         # Check fee rate
@@ -463,7 +462,7 @@ class PARTInterfaceBlind(PARTInterface):
         dummy_witness_stack = self.getScriptLockRefundSpendTxDummyWitness(prevout_script)
         witness_bytes = self.getWitnessStackSerialisedLength(dummy_witness_stack)
         vsize = self.getTxVSize(self.loadTx(tx_bytes), add_witness_bytes=witness_bytes)
-        fee_paid = make_int(lock_refund_spend_tx_obj['vout'][0]['ct_fee'])
+        fee_paid = self.make_int(lock_refund_spend_tx_obj['vout'][0]['ct_fee'])
         fee_rate_paid = fee_paid * 1000 // vsize
         ensure(self.compareFeeRates(fee_rate_paid, feerate), 'Bad fee rate, expected: {}'.format(feerate))
 
@@ -527,7 +526,7 @@ class PARTInterfaceBlind(PARTInterface):
         rv = self.rpc_wallet('fundrawtransactionfrom', ['blind', lock_spend_tx_hex, inputs_info, outputs_info, options])
         lock_spend_tx_hex = rv['hex']
         lock_spend_tx_obj = self.rpc('decoderawtransaction', [lock_spend_tx_hex])
-        pay_fee = make_int(lock_spend_tx_obj['vout'][0]['ct_fee'])
+        pay_fee = self.make_int(lock_spend_tx_obj['vout'][0]['ct_fee'])
 
         # lock_spend_tx_hex does not include the dummy witness stack
         witness_bytes = self.getWitnessStackSerialisedLength(dummy_witness_stack)
@@ -599,8 +598,8 @@ class PARTInterfaceBlind(PARTInterface):
         ensure(rv['inputs_valid'] is True, 'Invalid inputs')
 
         # Check amount
-        fee_paid = make_int(lock_spend_tx_obj['vout'][0]['ct_fee'])
-        amount_difference = make_int(input_blinded_info['amount']) - make_int(output_blinded_info['amount'])
+        fee_paid = self.make_int(lock_spend_tx_obj['vout'][0]['ct_fee'])
+        amount_difference = self.make_int(input_blinded_info['amount']) - self.make_int(output_blinded_info['amount'])
         ensure(fee_paid == amount_difference, 'Invalid output amount')
 
         # Check fee
@@ -703,7 +702,7 @@ class PARTInterfaceBlind(PARTInterface):
             assert (tx['outputs'][0]['stealth_address'] == sx_addr)  # Should not be possible
             ensure(tx['outputs'][0]['type'] == 'blind', 'Output is not anon')
 
-            if make_int(tx['outputs'][0]['amount']) == cb_swap_value:
+            if self.make_int(tx['outputs'][0]['amount']) == cb_swap_value:
                 height = 0
                 if tx['confirmations'] > 0:
                     chain_height = self.rpc('getblockcount')
@@ -741,7 +740,7 @@ class PARTInterfaceBlind(PARTInterface):
             raise ValueError('Too many spendable outputs')
 
         utxo = utxos[0]
-        utxo_sats = make_int(utxo['amount'])
+        utxo_sats = self.make_int(utxo['amount'])
 
         if spend_actual_balance and utxo_sats != cb_swap_value:
             self._log.warning('Spending actual balance {}, not swap value {}.'.format(utxo_sats, cb_swap_value))
@@ -841,7 +840,7 @@ class PARTInterfaceAnon(PARTInterface):
             assert (tx['outputs'][0]['stealth_address'] == sx_addr)  # Should not be possible
             ensure(tx['outputs'][0]['type'] == 'anon', 'Output is not anon')
 
-            if make_int(tx['outputs'][0]['amount']) == cb_swap_value:
+            if self.make_int(tx['outputs'][0]['amount']) == cb_swap_value:
                 height = 0
                 if tx['confirmations'] > 0:
                     chain_height = self.rpc('getblockcount')
@@ -874,7 +873,7 @@ class PARTInterfaceAnon(PARTInterface):
             raise ValueError('Too many spendable outputs')
 
         utxo = autxos[0]
-        utxo_sats = make_int(utxo['amount'])
+        utxo_sats = self.make_int(utxo['amount'])
 
         if spend_actual_balance and utxo_sats != cb_swap_value:
             self._log.warning('Spending actual balance {}, not swap value {}.'.format(utxo_sats, cb_swap_value))

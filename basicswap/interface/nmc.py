@@ -7,9 +7,6 @@
 
 from .btc import BTCInterface
 from basicswap.chainparams import Coins
-from basicswap.util import (
-    make_int,
-)
 
 
 class NMCInterface(BTCInterface):
@@ -26,7 +23,7 @@ class NMCInterface(BTCInterface):
             if txid and o['txid'] != txid.hex():
                 continue
             # Verify amount
-            if make_int(o['amount']) != int(bid_amount):
+            if self.make_int(o['amount']) != int(bid_amount):
                 self._log.warning('Found output to lock tx address of incorrect value: %s, %s', str(o['amount']), o['txid'])
                 continue
 
