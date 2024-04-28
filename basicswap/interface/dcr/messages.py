@@ -32,8 +32,13 @@ class SignatureType(IntEnum):
     STSchnorrSecp256k1 = 2
 
 
-class COutpoint:
+class COutPoint:
     __slots__ = ('hash', 'n', 'tree')
+
+    def __init__(self, hash=0, n=0, tree=0):
+        self.hash = hash
+        self.n = n
+        self.tree = tree
 
     def get_hash(self) -> bytes:
         return self.hash.to_bytes(32, 'big')
@@ -43,14 +48,22 @@ class CTxIn:
     __slots__ = ('prevout', 'sequence',
                  'value_in', 'block_height', 'block_index', 'signature_script')  # Witness
 
-    def __init__(self, tx=None):
+    def __init__(self, prevout=COutPoint(), sequence=0):
+        self.prevout = prevout
+        self.sequence = sequence
         self.value_in = -1
         self.block_height = 0
         self.block_index = 0xffffffff
+        self.signature_script = bytes()
 
 
 class CTxOut:
     __slots__ = ('value', 'version', 'script_pubkey')
+
+    def __init__(self, value=0, script_pubkey=bytes()):
+        self.value = value
+        self.version = 0
+        self.script_pubkey = script_pubkey
 
 
 class CTransaction:
@@ -83,7 +96,7 @@ class CTransaction:
 
             for i in range(num_txin):
                 txi = CTxIn()
-                txi.prevout = COutpoint()
+                txi.prevout = COutPoint()
                 txi.prevout.hash = int.from_bytes(data[o:o + 32], 'little')
                 o += 32
                 txi.prevout.n = int.from_bytes(data[o:o + 4], 'little')

@@ -425,7 +425,7 @@ class Test(TestFunctions):
         tx.vout.append(ci.txoType()(ci.make_int(1.1), script_dest))
         tx_hex = ToHex(tx)
         tx_funded = self.callnoderpc('fundrawtransaction', [tx_hex])
-        utxo_pos = 0 if tx_funded['changepos'] == 1 else 1
+        utxo_pos: int = 0 if tx_funded['changepos'] == 1 else 1
         tx_signed = self.callnoderpc('signrawtransaction', [tx_funded['hex'], ])['hex']
         self.sync_blocks()
         txid = self.callnoderpc('sendrawtransaction', [tx_signed, ])

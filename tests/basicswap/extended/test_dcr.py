@@ -36,6 +36,8 @@ from tests.basicswap.util import (
 
 from tests.basicswap.test_xmr import BaseTest, test_delay_event
 from basicswap.interface.dcr import DCRInterface
+from basicswap.interface.dcr.messages import CTransaction, CTxIn, COutPoint
+from basicswap.interface.dcr.script import OP_CHECKSEQUENCEVERIFY, push_script_data
 from bin.basicswap_run import startDaemon
 
 logger = logging.getLogger()
@@ -276,6 +278,7 @@ class Test(BaseTest):
         frtx = ci0.rpc_wallet('fundrawtransaction', [rtx, account_from])
 
         f_decoded = ci0.rpc_wallet('decoderawtransaction', [frtx['hex'], ])
+        assert (f_decoded['version'] == 1)
 
         sfrtx = ci0.rpc_wallet('signrawtransaction', [frtx['hex']])
         s_decoded = ci0.rpc_wallet('decoderawtransaction', [sfrtx['hex'], ])
@@ -330,12 +333,87 @@ class Test(BaseTest):
 
         # Set prevout value
         ctx = ci0.loadTx(tx_bytes_signed)
+        assert (ctx.vout[0].version == 0)
         ctx.vin[0].value_in = ci0.make_int(prevout['amount'])
         tx_bytes_signed = ctx.serialize()
         assert (tx_bytes_signed.hex() == sfrtx['hex'])
 
         sent_txid = ci0.rpc_wallet('sendrawtransaction', [tx_bytes_signed.hex(), ])
         assert (len(sent_txid) == 64)
+
+    def test_004_csv(self):
+        logging.info('---------- Test {} csv'.format(self.test_coin_from.name))
+        swap_clients = self.swap_clients
+        ci0 = swap_clients[0].ci(self.test_coin_from)
+
+        script = bytearray()
+        push_script_data(script, bytes((3,)))
+        script += OP_CHECKSEQUENCEVERIFY.to_bytes(1)
+
+        script_dest = ci0.getScriptDest(script)
+
+        prevout_amount: int = ci0.make_int(1.1)
+        tx = CTransaction()
+        tx.version = ci0.txVersion()
+        tx.vout.append(ci0.txoType()(prevout_amount, script_dest))
+        tx_hex = tx.serialize().hex()
+        tx_decoded = ci0.rpc_wallet('decoderawtransaction', [tx_hex, ])
+
+        utxo_pos = None
+        script_address = None
+        for i, txo in enumerate(tx_decoded['vout']):
+            script_address = tx_decoded['vout'][0]['scriptPubKey']['addresses'][0]
+            addr_info = ci0.rpc_wallet('validateaddress', [script_address,])
+            if addr_info['isscript'] is True:
+                utxo_pos = i
+                break
+        assert (utxo_pos is not None)
+
+        accounts = ci0.rpc_wallet('listaccounts')
+        for account_from in accounts:
+            try:
+                frtx = ci0.rpc_wallet('fundrawtransaction', [tx_hex, account_from])
+                break
+            except Exception as e:
+                logging.warning('fundrawtransaction failed {}'.format(e))
+        sfrtx = ci0.rpc_wallet('signrawtransaction', [frtx['hex']])
+        sent_txid = ci0.rpc_wallet('sendrawtransaction', [sfrtx['hex'], ])
+
+        tx_spend = CTransaction()
+        tx_spend.version = ci0.txVersion()
+
+        tx_spend.vin.append(CTxIn(COutPoint(int(sent_txid, 16), utxo_pos), sequence=3))
+        tx_spend.vin[0].value_in = prevout_amount
+        signature_script = bytearray()
+        push_script_data(signature_script, script)
+        tx_spend.vin[0].signature_script = signature_script
+
+        addr_out = ci0.rpc_wallet('getnewaddress')
+        pkh = ci0.decode_address(addr_out)[2:]
+
+        tx_spend.vout.append(ci0.txoType()())
+        tx_spend.vout[0].value = ci0.make_int(1.09)
+        tx_spend.vout[0].script_pubkey = ci0.getPubkeyHashDest(pkh)
+
+        tx_spend_hex = tx_spend.serialize().hex()
+
+        try:
+            sent_spend_txid = ci0.rpc_wallet('sendrawtransaction', [tx_spend_hex, ])
+        except Exception as e:
+            assert ('transaction sequence locks on inputs not met' in str(e))
+        else:
+            assert False, 'Should fail'
+
+        sent_spend_txid = None
+        for i in range(20):
+            try:
+                sent_spend_txid = ci0.rpc_wallet('sendrawtransaction', [tx_spend_hex, ])
+                break
+            except Exception as e:
+                logging.info('sendrawtransaction failed {}, height {}'.format(e, ci0.getChainHeight()))
+            test_delay_event.wait(1)
+
+        assert (sent_spend_txid is not None)
 
 
 if __name__ == '__main__':
