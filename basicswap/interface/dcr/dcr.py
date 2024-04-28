@@ -21,8 +21,8 @@ from basicswap.util.crypto import (
 from basicswap.util.extkey import ExtKeyPair
 from basicswap.util.integer import encode_varint
 from basicswap.interface.dcr.rpc import make_rpc_func
-from .messages import CTransaction, SigHashType, TxSerializeType
-from .script import push_script_data
+from .messages import CTransaction, CTxOut, SigHashType, TxSerializeType
+from .script import push_script_data, OP_HASH160, OP_EQUAL, OP_DUP, OP_EQUALVERIFY, OP_CHECKSIG
 
 from coincurve.keys import (
     PrivateKey
@@ -128,6 +128,14 @@ class DCRInterface(Secp256k1Interface):
     def nbK() -> int:  # No. of bytes requires to encode a public key
         return 33
 
+    @staticmethod
+    def txVersion() -> int:
+        return 2
+
+    @staticmethod
+    def txoType():
+        return CTxOut
+
     def __init__(self, coin_settings, network, swap_client=None):
         super().__init__(network)
         self._rpc_host = coin_settings.get('rpchost', '127.0.0.1')
@@ -168,6 +176,9 @@ class DCRInterface(Secp256k1Interface):
             self.rpc_wallet('getinfo')
         else:
             self.rpc('getblockchaininfo')
+
+    def getChainHeight(self) -> int:
+        return self.rpc('getblockcount')
 
     def checkWallets(self) -> int:
         # Only one wallet possible?
@@ -239,3 +250,16 @@ class DCRInterface(Secp256k1Interface):
     def stripTxSignature(self, tx_bytes) -> bytes:
         tx = self.loadTx(tx_bytes)
         return tx.serialize(TxSerializeType.NoWitness)
+
+    def getScriptDest(self, script: bytes) -> bytes:
+        # P2SH
+        script_hash = self.pkh(script)
+        assert len(script_hash) == 20
+
+        return OP_HASH160.to_bytes(1) + len(script_hash).to_bytes(1) + script_hash + OP_EQUAL.to_bytes(1)
+
+    def getPubkeyHashDest(self, pkh: bytes) -> bytes:
+        # P2PKH
+
+        assert len(pkh) == 20
+        return OP_DUP.to_bytes(1) + OP_HASH160.to_bytes(1) + len(pkh).to_bytes(1) + pkh + OP_EQUALVERIFY.to_bytes(1) + OP_CHECKSIG.to_bytes(1)

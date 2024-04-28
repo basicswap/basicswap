@@ -488,7 +488,7 @@ class NAVInterface(BTCInterface):
 
         return block_rv
 
-    def getScriptScriptSig(self, script: bytes) -> bytearray:
+    def getScriptScriptSig(self, script: bytes) -> bytes:
         return self.getP2SHP2WSHScriptSig(script)
 
     def getScriptDest(self, script):
