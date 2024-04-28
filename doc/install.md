@@ -66,13 +66,13 @@ Append `--usebtcfastsync` to the below command to optionally initialise the Bitc
 
 Setup with a local Monero daemon (recommended):
 
-    docker run --rm -t --name swap_prepare -v $COINDATA_PATH:/coindata i_swapclient basicswap-prepare --datadir=/coindata --withcoins=monero --htmlhost="0.0.0.0" --wshost="0.0.0.0" --xmrrestoreheight=$CURRENT_XMR_HEIGHT
+    docker-compose run --rm swapclient basicswap-prepare --datadir=/coindata --withcoins=monero --htmlhost="0.0.0.0" --wshost="0.0.0.0" --xmrrestoreheight=$CURRENT_XMR_HEIGHT
 
 
 To instead use Monero public nodes and not run a local Monero daemon<br>(it can be difficult to find reliable public nodes):
 
     Set XMR_RPC_HOST and BASE_XMR_RPC_PORT to a public XMR node.
-    docker run --rm -e XMR_RPC_HOST="node.xmr.to" -e BASE_XMR_RPC_PORT=18081 -t --name swap_prepare -v $COINDATA_PATH:/coindata i_swapclient basicswap-prepare --datadir=/coindata --withcoins=monero --htmlhost="0.0.0.0" --wshost="0.0.0.0" --xmrrestoreheight=$CURRENT_XMR_HEIGHT
+    docker-compose run --rm -e XMR_RPC_HOST="node.xmr.to" -e BASE_XMR_RPC_PORT=18081 swapclient basicswap-prepare --datadir=/coindata --withcoins=monero --htmlhost="0.0.0.0" --wshost="0.0.0.0" --xmrrestoreheight=$CURRENT_XMR_HEIGHT
 
 
 **Record the mnemonic from the output of the above command.**
@@ -96,7 +96,7 @@ Open in browser: `http://localhost:12700`
 ### Add a coin
 
     docker-compose stop
-    docker run --rm -t --name swap_prepare -v $COINDATA_PATH:/coindata i_swapclient basicswap-prepare --datadir=/coindata --addcoin=bitcoin --usebtcfastsync
+    docker-compose run --rm swapclient basicswap-prepare --datadir=/coindata --addcoin=bitcoin --usebtcfastsync
 
 You can copy an existing pruned datadir (excluding bitcoin.conf and any wallets) over to `$COINDATA_PATH/bitcoin`
 Remove any existing wallets after copying over a pruned chain or the Bitcoin daemon won't start.
@@ -104,7 +104,7 @@ Remove any existing wallets after copying over a pruned chain or the Bitcoin dae
 
 With Encryption
 
-    docker run -e WALLET_ENCRYPTION_PWD=passwordhere --rm -t --name swap_prepare -v $COINDATA_PATH:/coindata i_swapclient basicswap-prepare --datadir=/coindata --addcoin=bitcoin --usebtcfastsync
+    docker-compose run --rm -e WALLET_ENCRYPTION_PWD=passwordhere swapclient basicswap-prepare --datadir=/coindata --addcoin=bitcoin --usebtcfastsync
 
 
 ## Windows
