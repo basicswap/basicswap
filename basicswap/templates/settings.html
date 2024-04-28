@@ -182,7 +182,7 @@
                 <div class="relative">
                 {{ input_arrow_down_svg| safe }}
                  <select class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="fee_priority_{{ c.name }}">
-                  <option value="0" {% if c.fee_priority==0 %} selected{% endif %}>[Auto] Slow</option>
+                  <option value="0" {% if c.fee_priority==0 %} selected{% endif %}>Auto</option>
                   <option value="1" {% if c.fee_priority==1 %} selected{% endif %}>Slow</option>
                   <option value="2" {% if c.fee_priority==2 %} selected{% endif %}>Normal</option>
                   <option value="3" {% if c.fee_priority==3 %} selected{% endif %}>Fast</option>
