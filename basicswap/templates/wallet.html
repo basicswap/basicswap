@@ -251,7 +251,8 @@
                               </div>
                               <div class="font-normal bold text-gray-500 text-center dark:text-white mb-5">{{ w.name }} Stealth Address: </div>
                               <div class="relative flex justify-center items-center">
-                                <div data-tooltip-target="tooltip-copy-particl-stealth" class="input-like-container hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-10 focus:ring-0" id="stealth_address"> {{ w.stealth_address }} </div>
+                                <div data-tooltip-target="tooltip-copy-particl-stealth" class="input-like-container hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-10 focus:ring-0" id="stealth_address"> {{ w.stealth_address }}
+                                </div>
                               </div>
                               <div id="tooltip-copy-particl-stealth" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
                                 <p>Copy to clipboard</p>
@@ -300,7 +301,9 @@
                                 <div data-tooltip-target="tooltip-copy-monero-sub" class="input-like-container hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full focus:ring-0" id="monero_sub_address">{{ w.deposit_address }}</div>
                               </div>
                               <div class="opacity-100 text-gray-500 dark:text-gray-100 flex justify-center items-center">
-                                <div class="py-3 px-6 bold mt-5"> <button type="submit" class="flex justify-center py-2 px-4 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" name="newaddr_{{ w.cid }}" value="New Subaddress"> {{ circular_arrows_svg }} New {{ w.name }} Deposit Address </button> </div>
+                                <div class="py-3 px-6 bold mt-5">
+                                  <button type="submit" class="flex justify-center py-2 px-4 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" name="newaddr_{{ w.cid }}" value="New Subaddress"> {{ circular_arrows_svg }} New {{ w.name }} Deposit Address</button>
+                                </div>
                               </div>
                               <div id="tooltip-copy-monero-sub" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
                                 <p>Copy to clipboard</p>
@@ -325,7 +328,9 @@
                                 <div data-tooltip-target="tooltip-copy-default" class="input-like-container hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full focus:ring-0" id="main_deposit_address">{{ w.deposit_address }}</div>
                               </div>
                               <div class="opacity-100 text-gray-500 dark:text-gray-100 flex justify-center items-center">
-                                <div class="py-3 px-6 bold mt-5"> <button type="submit" class="flex justify-center py-2 px-4 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" name="newaddr_{{ w.cid }}" value="New Deposit Address"> {{ circular_arrows_svg }} New {{ w.name }} Deposit Address </button> </div>
+                                <div class="py-3 px-6 bold mt-5">
+                                  <button type="submit" class="flex justify-center py-2 px-4 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" name="newaddr_{{ w.cid }}" value="New Deposit Address"> {{ circular_arrows_svg }} New {{ w.name }} Deposit Address </button>
+                                </div>
                               </div>
                               <div id="tooltip-copy-default" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
                                 <p>Copy to clipboard</p>
@@ -349,8 +354,13 @@
                               </div>
                               <div class="font-normal bold text-gray-500 text-center dark:text-white mb-5">{{ w.name }} MWEB Address: </div>
                               <div class="text-center relative">
-                                <div data-tooltip-target="tooltip-copy-litecoin-mweb" class="input-like-container hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" id="stealth_address">{{ w.mweb_address }}</div> <span class="absolute inset-y-0 right-0 flex items-center pr-3 cursor-pointer" id="copyIcon"></span>
+                                <div data-tooltip-target="tooltip-copy-litecoin-mweb" class="input-like-container hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" id="stealth_address">{{ w.mweb_address }}</div>
+                                <span class="absolute inset-y-0 right-0 flex items-center pr-3 cursor-pointer" id="copyIcon"></span>
                               </div>
+                              <div class="opacity-100 text-gray-500 dark:text-gray-100 flex justify-center items-center">
+                                <div class="py-3 px-6 bold mt-5">
+                                  <button type="submit" class="flex justify-center py-2 px-4 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" name="newmwebaddr_{{ w.cid }}" value="New MWEB Address"> {{ circular_arrows_svg }} New MWEB Address </button>
+                                </div>
                               <div id="tooltip-copy-litecoin-mweb" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
                                 <p>Copy to clipboard</p>
                                 <div class="tooltip-arrow" data-popper-arrow></div>
@@ -371,10 +381,10 @@
   {% if w.cid == '1' %}
   {# PART #}
   <script>
-    // Particl Stealh
+    // Particl Stealth
     var stealthAddress = "{{ w.stealth_address }}";
     
-    var qrCodeStealh = new QRCode(document.getElementById("qrcode-stealth"), {
+    var qrCodeStealth = new QRCode(document.getElementById("qrcode-stealth"), {
       text: stealthAddress,
       width: 170,
       height: 170,
