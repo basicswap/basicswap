@@ -1376,7 +1376,9 @@ class BTCInterface(CoinInterface):
         unspent_addr = dict()
         unspent = self.rpc_wallet('listunspent')
         for u in unspent:
-            if u['spendable'] is not True:
+            if u.get('spendable', False) is False:
+                continue
+            if u.get('solveable', False) is False:
                 continue
             if 'address' not in u:
                 continue

@@ -216,8 +216,6 @@ class NAVInterface(BTCInterface):
                 break
         utxos_hash = hasher.digest()
 
-        self._log.debug('sign_for_addr %s', sign_for_addr)
-
         if self.using_segwit():  # TODO: Use isSegwitAddress when scantxoutset can use combo
             # 'Address does not refer to key' for non p2pkh
             addr_info = self.rpc('validateaddress', [addr, ])

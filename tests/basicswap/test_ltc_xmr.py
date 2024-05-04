@@ -177,8 +177,14 @@ class TestLTC(BasicSwapTest):
         tx = ci1.rpc_wallet('gettransaction', [mweb_tx['txid'],])
 
         blockhash = tx['blockhash']
-        block = ci1.rpc('getblock', [blockhash, 3])
-        block = ci1.rpc('getblock', [blockhash, 0])
+        block3 = ci1.rpc('getblock', [blockhash, 3])
+        block0 = ci1.rpc('getblock', [blockhash, 0])
+
+        require_amount: int = ci1.make_int(1)
+        unspent_addr = ci1.getUnspentsByAddr()
+        for addr, _ in unspent_addr.items():
+            if 'mweb1' in addr:
+                raise ValueError('getUnspentsByAddr should exclude mweb UTXOs.')
 
         # TODO
 
