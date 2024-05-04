@@ -42,7 +42,7 @@ PARTICL_VERSION = os.getenv('PARTICL_VERSION', '23.2.7.0')
 PARTICL_VERSION_TAG = os.getenv('PARTICL_VERSION_TAG', '')
 PARTICL_LINUX_EXTRA = os.getenv('PARTICL_LINUX_EXTRA', 'nousb')
 
-LITECOIN_VERSION = os.getenv('LITECOIN_VERSION', '0.21.2.2')
+LITECOIN_VERSION = os.getenv('LITECOIN_VERSION', '0.21.3')
 LITECOIN_VERSION_TAG = os.getenv('LITECOIN_VERSION_TAG', '')
 
 BITCOIN_VERSION = os.getenv('BITCOIN_VERSION', '26.0')
@@ -628,8 +628,7 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
         elif coin == 'litecoin':
             release_url = 'https://github.com/litecoin-project/litecoin/releases/download/v{}/{}'.format(version + version_tag, release_filename)
             assert_filename = '{}-core-{}-{}-build.assert'.format(coin, os_name, '.'.join(version.split('.')[:2]))
-            use_signing_key_name = (signing_key_name + '/' + signing_key_name) if os_name == 'win' else signing_key_name
-            assert_url = 'https://raw.githubusercontent.com/litecoin-project/gitian.sigs.ltc/master/%s-%s/%s/%s' % (version, os_dir_name, use_signing_key_name, assert_filename)
+            assert_url = 'https://raw.githubusercontent.com/litecoin-project/gitian.sigs.ltc/master/%s-%s/%s/%s' % (version, os_dir_name, signing_key_name, assert_filename)
         elif coin == 'bitcoin':
             release_url = 'https://bitcoincore.org/bin/bitcoin-core-{}/{}'.format(version, release_filename)
             assert_filename = '{}-core-{}-{}-build.assert'.format(coin, os_name, '.'.join(version.split('.')[:2]))
@@ -906,7 +905,8 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
                 fp.write('rpcauth={}:{}${}\n'.format(PART_RPC_USER, salt, password_to_hmac(salt, PART_RPC_PWD)))
         elif coin == 'litecoin':
             fp.write('prune=4000\n')
-            fp.write('pid=litecoind.pid\n')
+            fp.write('blockfilterindex=0\n')
+            fp.write('peerblockfilters=0\n')
             if LTC_RPC_USER != '':
                 fp.write('rpcauth={}:{}${}\n'.format(LTC_RPC_USER, salt, password_to_hmac(salt, LTC_RPC_PWD)))
         elif coin == 'bitcoin':
