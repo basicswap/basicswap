@@ -53,6 +53,24 @@ def startDaemon(node_dir, bin_dir, daemon_bin, opts=[]):
     daemon_bin = os.path.expanduser(os.path.join(bin_dir, daemon_bin))
 
     datadir_path = os.path.expanduser(node_dir)
+
+    # Rewrite litecoin.conf for 0.21.3
+    ltc_conf_path = os.path.join(datadir_path, 'litecoin.conf')
+    if os.path.exists(ltc_conf_path):
+        config_to_add = ['blockfilterindex=0', 'peerblockfilters=0']
+        with open(ltc_conf_path) as fp:
+            for line in fp:
+                line = line.strip()
+                if line in config_to_add:
+                    config_to_add.remove(line)
+
+        if len(config_to_add) > 0:
+            logging.info('Rewriting litecoin.conf')
+            shutil.copyfile(ltc_conf_path, ltc_conf_path + '.last')
+            with open(ltc_conf_path, 'a') as fp:
+                for line in config_to_add:
+                    fp.write(line + '\n')
+
     args = [daemon_bin, '-datadir=' + datadir_path] + opts
     logging.info('Starting node ' + daemon_bin + ' ' + '-datadir=' + node_dir)
     return subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=datadir_path)
