@@ -15,7 +15,6 @@ import logging
 import unittest
 import traceback
 import threading
-import subprocess
 
 import basicswap.config as cfg
 from basicswap.db import (
@@ -92,7 +91,7 @@ from tests.basicswap.common import (
 from basicswap.db_util import (
     remove_expired_data,
 )
-from bin.basicswap_run import startDaemon, startXmrDaemon
+from bin.basicswap_run import startDaemon, startXmrDaemon, startXmrWalletDaemon
 
 
 logger = logging.getLogger()
@@ -138,29 +137,6 @@ def prepareXmrDataDir(datadir, node_id, conf_file):
             if node_id == i:
                 continue
             fp.write('add-exclusive-node=127.0.0.1:{}\n'.format(XMR_BASE_P2P_PORT + i))
-
-
-def startXmrWalletRPC(node_dir, bin_dir, wallet_bin, node_id, opts=[]):
-    daemon_bin = os.path.expanduser(os.path.join(bin_dir, wallet_bin))
-
-    data_dir = os.path.expanduser(node_dir)
-    args = [daemon_bin]
-    args += ['--non-interactive']
-    args += ['--daemon-address=127.0.0.1:{}'.format(XMR_BASE_RPC_PORT + node_id)]
-    args += ['--no-dns']
-    args += ['--rpc-bind-port={}'.format(XMR_BASE_WALLET_RPC_PORT + node_id)]
-    args += ['--wallet-dir={}'.format(os.path.join(data_dir, 'wallets'))]
-    args += ['--log-file={}'.format(os.path.join(data_dir, 'wallet.log'))]
-    args += ['--rpc-login=test{0}:test_pass{0}'.format(node_id)]
-    args += ['--shared-ringdb-dir={}'.format(os.path.join(data_dir, 'shared-ringdb'))]
-    args += ['--allow-mismatched-daemon-version']
-
-    args += opts
-    logging.info('Starting daemon {} --wallet-dir={}'.format(daemon_bin, node_dir))
-
-    wallet_stdout = open(os.path.join(data_dir, 'wallet_stdout.log'), 'w')
-    wallet_stderr = open(os.path.join(data_dir, 'wallet_stderr.log'), 'w')
-    return subprocess.Popen(args, stdin=subprocess.PIPE, stdout=wallet_stdout, stderr=wallet_stderr, cwd=data_dir)
 
 
 def prepare_swapclient_dir(datadir, node_id, network_key, network_pubkey, with_coins=set(), cls=None):
@@ -392,7 +368,7 @@ class BaseTest(unittest.TestCase):
                             callrpc_cli(cfg.PARTICL_BINDIR, data_dir, 'regtest', '-wallet=wallet.dat create', 'particl-wallet')
 
                 cls.part_daemons.append(startDaemon(os.path.join(TEST_DIR, 'part_' + str(i)), cfg.PARTICL_BINDIR, cfg.PARTICLD))
-                logging.info('Started %s %d', cfg.PARTICLD, cls.part_daemons[-1].pid)
+                logging.info('Started %s %d', cfg.PARTICLD, cls.part_daemons[-1].handle.pid)
 
             if not cls.restore_instance:
                 for i in range(NUM_NODES):
@@ -422,7 +398,7 @@ class BaseTest(unittest.TestCase):
                             callrpc_cli(cfg.BITCOIN_BINDIR, data_dir, 'regtest', '-wallet=wallet.dat create', 'bitcoin-wallet')
 
                 cls.btc_daemons.append(startDaemon(os.path.join(TEST_DIR, 'btc_' + str(i)), cfg.BITCOIN_BINDIR, cfg.BITCOIND))
-                logging.info('Started %s %d', cfg.BITCOIND, cls.part_daemons[-1].pid)
+                logging.info('Started %s %d', cfg.BITCOIND, cls.part_daemons[-1].handle.pid)
 
                 waitForRPC(make_rpc_func(i, base_rpc_port=BTC_BASE_RPC_PORT))
 
@@ -434,7 +410,7 @@ class BaseTest(unittest.TestCase):
                             callrpc_cli(cfg.LITECOIN_BINDIR, data_dir, 'regtest', '-wallet=wallet.dat create', 'litecoin-wallet')
 
                     cls.ltc_daemons.append(startDaemon(os.path.join(TEST_DIR, 'ltc_' + str(i)), cfg.LITECOIN_BINDIR, cfg.LITECOIND))
-                    logging.info('Started %s %d', cfg.LITECOIND, cls.part_daemons[-1].pid)
+                    logging.info('Started %s %d', cfg.LITECOIND, cls.part_daemons[-1].handle.pid)
 
                     waitForRPC(make_rpc_func(i, base_rpc_port=LTC_BASE_RPC_PORT))
 
@@ -443,11 +419,22 @@ class BaseTest(unittest.TestCase):
                     if not cls.restore_instance:
                         prepareXmrDataDir(TEST_DIR, i, 'monerod.conf')
 
-                    cls.xmr_daemons.append(startXmrDaemon(os.path.join(TEST_DIR, 'xmr_' + str(i)), cfg.XMR_BINDIR, cfg.XMRD))
-                    logging.info('Started %s %d', cfg.XMRD, cls.xmr_daemons[-1].pid)
+                    node_dir = os.path.join(TEST_DIR, 'xmr_' + str(i))
+                    cls.xmr_daemons.append(startXmrDaemon(node_dir, cfg.XMR_BINDIR, cfg.XMRD))
+                    logging.info('Started %s %d', cfg.XMRD, cls.xmr_daemons[-1].handle.pid)
                     waitForXMRNode(i)
 
-                    cls.xmr_daemons.append(startXmrWalletRPC(os.path.join(TEST_DIR, 'xmr_' + str(i)), cfg.XMR_BINDIR, cfg.XMR_WALLET_RPC, i))
+                    opts = [
+                        '--daemon-address=127.0.0.1:{}'.format(XMR_BASE_RPC_PORT + i),
+                        '--no-dns',
+                        '--rpc-bind-port={}'.format(XMR_BASE_WALLET_RPC_PORT + i),
+                        '--wallet-dir={}'.format(os.path.join(node_dir, 'wallets')),
+                        '--log-file={}'.format(os.path.join(node_dir, 'wallet.log')),
+                        '--rpc-login=test{0}:test_pass{0}'.format(i),
+                        '--shared-ringdb-dir={}'.format(os.path.join(node_dir, 'shared-ringdb')),
+                        '--allow-mismatched-daemon-version',
+                    ]
+                    cls.xmr_daemons.append(startXmrWalletDaemon(node_dir, cfg.XMR_BINDIR, cfg.XMR_WALLET_RPC, opts=opts))
 
                 for i in range(NUM_XMR_NODES):
                     cls.xmr_wallet_auth.append(('test{0}'.format(i), 'test_pass{0}'.format(i)))
@@ -487,11 +474,11 @@ class BaseTest(unittest.TestCase):
                         cls.network_pubkey = settings['network_pubkey']
                 fp = open(os.path.join(basicswap_dir, 'basicswap.log'), 'w')
                 sc = BasicSwap(fp, basicswap_dir, settings, 'regtest', log_name='BasicSwap{}'.format(i))
-                sc.setDaemonPID(Coins.BTC, cls.btc_daemons[i].pid)
-                sc.setDaemonPID(Coins.PART, cls.part_daemons[i].pid)
+                sc.setDaemonPID(Coins.BTC, cls.btc_daemons[i].handle.pid)
+                sc.setDaemonPID(Coins.PART, cls.part_daemons[i].handle.pid)
 
                 if cls.start_ltc_nodes:
-                    sc.setDaemonPID(Coins.LTC, cls.ltc_daemons[i].pid)
+                    sc.setDaemonPID(Coins.LTC, cls.ltc_daemons[i].handle.pid)
                 cls.addPIDInfo(sc, i)
 
                 sc.start()
@@ -593,7 +580,7 @@ class BaseTest(unittest.TestCase):
 
         except Exception:
             traceback.print_exc()
-            Test.tearDownClass()
+            cls.tearDownClass()
             raise ValueError('setUpClass() failed.')
 
     @classmethod

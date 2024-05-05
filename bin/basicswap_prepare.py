@@ -1175,13 +1175,13 @@ def printHelp():
 
 
 def finalise_daemon(d):
-    logging.info('Interrupting {}'.format(d.pid))
+    logging.info('Interrupting {}'.format(d.handle.pid))
     try:
-        d.send_signal(signal.CTRL_C_EVENT if os.name == 'nt' else signal.SIGINT)
-        d.wait(timeout=120)
+        d.handle.send_signal(signal.CTRL_C_EVENT if os.name == 'nt' else signal.SIGINT)
+        d.handle.wait(timeout=120)
     except Exception as e:
         logging.info(f'Error {e} for process {d.pid}')
-    for fp in (d.stdout, d.stderr, d.stdin):
+    for fp in [d.handle.stdout, d.handle.stderr, d.handle.stdin] + d.files:
         if fp:
             fp.close()
 
@@ -1202,7 +1202,7 @@ def test_particl_encryption(data_dir, settings, chain, use_tor_proxy):
             if coin_settings['manage_daemon']:
                 filename = coin_name + 'd' + ('.exe' if os.name == 'nt' else '')
                 daemons.append(startDaemon(coin_settings['datadir'], coin_settings['bindir'], filename, daemon_args))
-                swap_client.setDaemonPID(c, daemons[-1].pid)
+                swap_client.setDaemonPID(c, daemons[-1].handle.pid)
             swap_client.setCoinRunParams(c)
             swap_client.createCoinInterface(c)
             swap_client.waitForDaemonRPC(c, with_wallet=True)

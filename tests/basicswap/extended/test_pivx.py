@@ -310,9 +310,9 @@ class Test(unittest.TestCase):
             except Exception:
                 callrpc_cli(cfg.BITCOIN_BINDIR, btc_data_dir, 'regtest', '-wallet=wallet.dat create', 'bitcoin-wallet')
         cls.daemons.append(startDaemon(btc_data_dir, cfg.BITCOIN_BINDIR, cfg.BITCOIND))
-        logging.info('Started %s %d', cfg.BITCOIND, cls.daemons[-1].pid)
+        logging.info('Started %s %d', cfg.BITCOIND, cls.daemons[-1].handle.pid)
         cls.daemons.append(startDaemon(os.path.join(cfg.TEST_DATADIRS, str(PIVX_NODE)), PIVX_BINDIR, PIVXD))
-        logging.info('Started %s %d', PIVXD, cls.daemons[-1].pid)
+        logging.info('Started %s %d', PIVXD, cls.daemons[-1].handle.pid)
 
         for i in range(NUM_NODES):
             data_dir = os.path.join(cfg.TEST_DATADIRS, str(i))
@@ -322,7 +322,7 @@ class Test(unittest.TestCase):
                 except Exception:
                     callrpc_cli(cfg.PARTICL_BINDIR, data_dir, 'regtest', '-wallet=wallet.dat create', 'particl-wallet')
             cls.daemons.append(startDaemon(data_dir, cfg.PARTICL_BINDIR, cfg.PARTICLD))
-            logging.info('Started %s %d', cfg.PARTICLD, cls.daemons[-1].pid)
+            logging.info('Started %s %d', cfg.PARTICLD, cls.daemons[-1].handle.pid)
 
         for i in range(NUM_NODES):
             rpc = make_part_cli_rpc_func(i)
@@ -344,9 +344,9 @@ class Test(unittest.TestCase):
                 settings = json.load(fs)
             fp = open(os.path.join(basicswap_dir, 'basicswap.log'), 'w')
             cls.swap_clients.append(BasicSwap(fp, basicswap_dir, settings, 'regtest', log_name='BasicSwap{}'.format(i)))
-            cls.swap_clients[-1].setDaemonPID(Coins.BTC, cls.daemons[0].pid)
-            cls.swap_clients[-1].setDaemonPID(Coins.PIVX, cls.daemons[1].pid)
-            cls.swap_clients[-1].setDaemonPID(Coins.PART, cls.daemons[2 + i].pid)
+            cls.swap_clients[-1].setDaemonPID(Coins.BTC, cls.daemons[0].handle.pid)
+            cls.swap_clients[-1].setDaemonPID(Coins.PIVX, cls.daemons[1].handle.pid)
+            cls.swap_clients[-1].setDaemonPID(Coins.PART, cls.daemons[2 + i].handle.pid)
             cls.swap_clients[-1].start()
 
             t = HttpThread(cls.swap_clients[i].fp, TEST_HTTP_HOST, TEST_HTTP_PORT + i, False, cls.swap_clients[i])
@@ -410,6 +410,9 @@ class Test(unittest.TestCase):
             c.fp.close()
 
         stopDaemons(cls.daemons)
+        cls.http_threads.clear()
+        cls.swap_clients.clear()
+        cls.daemons.clear()
 
         super(Test, cls).tearDownClass()
 
