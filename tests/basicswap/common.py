@@ -108,19 +108,19 @@ def checkForks(ro):
 
 def stopDaemons(daemons):
     for d in daemons:
-        logging.info('Interrupting %d', d.pid)
+        logging.info('Interrupting %d', d.handle.pid)
         try:
-            d.send_signal(signal.SIGINT)
+            d.handle.send_signal(signal.SIGINT)
         except Exception as e:
-            logging.info('Interrupting %d, error %s', d.pid, str(e))
+            logging.info('Interrupting %d, error %s', d.handle.pid, str(e))
     for d in daemons:
         try:
-            d.wait(timeout=20)
-            for fp in (d.stdout, d.stderr, d.stdin):
+            d.handle.wait(timeout=20)
+            for fp in [d.handle.stdout, d.handle.stderr, d.handle.stdin] + d.files:
                 if fp:
                     fp.close()
         except Exception as e:
-            logging.info('Closing %d, error %s', d.pid, str(e))
+            logging.info('Closing %d, error %s', d.handle.pid, str(e))
 
 
 def wait_for_bid(delay_event, swap_client, bid_id, state=None, sent: bool = False, wait_for: int = 20) -> None:

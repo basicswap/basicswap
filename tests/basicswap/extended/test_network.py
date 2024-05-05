@@ -206,7 +206,7 @@ class Test(unittest.TestCase):
                     callrpc_cli(cfg.PARTICL_BINDIR, data_dir, 'regtest', '-wallet=wallet.dat -legacy create', 'particl-wallet')
 
                 cls.part_daemons.append(startDaemon(os.path.join(TEST_DIR, 'part_' + str(i)), cfg.PARTICL_BINDIR, cfg.PARTICLD))
-                logging.info('Started %s %d', cfg.PARTICLD, cls.part_daemons[-1].pid)
+                logging.info('Started %s %d', cfg.PARTICLD, cls.handle.part_daemons[-1].handle.pid)
 
             for i in range(NUM_NODES):
                 # Load mnemonics after all nodes have started to avoid staking getting stuck in TryToSync
@@ -230,7 +230,7 @@ class Test(unittest.TestCase):
                     callrpc_cli(cfg.BITCOIN_BINDIR, data_dir, 'regtest', '-wallet=wallet.dat -legacy create', 'bitcoin-wallet')
 
                 cls.btc_daemons.append(startDaemon(os.path.join(TEST_DIR, 'btc_' + str(i)), cfg.BITCOIN_BINDIR, cfg.BITCOIND))
-                logging.info('Started %s %d', cfg.BITCOIND, cls.part_daemons[-1].pid)
+                logging.info('Started %s %d', cfg.BITCOIND, cls.handle.part_daemons[-1].handle.pid)
 
                 waitForRPC(make_rpc_func(i, base_rpc_port=BTC_BASE_RPC_PORT))
 
@@ -248,8 +248,8 @@ class Test(unittest.TestCase):
                     settings = json.load(fs)
                 fp = open(os.path.join(basicswap_dir, 'basicswap.log'), 'w')
                 sc = BasicSwap(fp, basicswap_dir, settings, 'regtest', log_name='BasicSwap{}'.format(i))
-                sc.setDaemonPID(Coins.BTC, cls.btc_daemons[i].pid)
-                sc.setDaemonPID(Coins.PART, cls.part_daemons[i].pid)
+                sc.setDaemonPID(Coins.BTC, cls.btc_daemons[i].handle.pid)
+                sc.setDaemonPID(Coins.PART, cls.part_daemons[i].handle.pid)
                 sc.start()
                 cls.swap_clients.append(sc)
 
@@ -274,7 +274,7 @@ class Test(unittest.TestCase):
             cls.coins_update_thread.start()
         except Exception:
             traceback.print_exc()
-            Test.tearDownClass()
+            cls.tearDownClass()
             raise ValueError('setUpClass() failed.')
 
     @classmethod
@@ -302,6 +302,11 @@ class Test(unittest.TestCase):
 
         stopDaemons(cls.part_daemons)
         stopDaemons(cls.btc_daemons)
+
+        cls.part_daemons.clear()
+        cls.btc_daemons.clear()
+        cls.http_threads.clear()
+        cls.swap_clients.clear()
 
         super(Test, cls).tearDownClass()
 

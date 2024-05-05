@@ -159,13 +159,13 @@ class Test(TestFunctions):
             data_dir = prepareDataDir(cfg.TEST_DATADIRS, i, 'navcoin.conf', 'nav_', base_p2p_port=NAV_BASE_PORT, base_rpc_port=NAV_BASE_RPC_PORT)
 
         cls.nav_daemons.append(startDaemon(os.path.join(cfg.TEST_DATADIRS, 'nav_' + str(i)), NAV_BINDIR, NAVD, opts=extra_opts))
-        logging.info('Started %s %d', NAVD, cls.nav_daemons[-1].pid)
+        logging.info('Started %s %d', NAVD, cls.nav_daemons[-1].handle.pid)
 
         waitForRPC(make_rpc_func(i, base_rpc_port=NAV_BASE_RPC_PORT), max_tries=12)
 
     @classmethod
     def addPIDInfo(cls, sc, i):
-        sc.setDaemonPID(Coins.NAV, cls.nav_daemons[i].pid)
+        sc.setDaemonPID(Coins.NAV, cls.nav_daemons[i].handle.pid)
 
     @classmethod
     def sync_blocks(cls, wait_for: int = 20, num_nodes: int = 3) -> None:
@@ -217,6 +217,7 @@ class Test(TestFunctions):
         super(Test, cls).tearDownClass()
 
         stopDaemons(cls.nav_daemons)
+        cls.nav_daemons.clear()
 
     @classmethod
     def addCoinSettings(cls, settings, datadir, node_id):

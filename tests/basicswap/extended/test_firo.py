@@ -137,13 +137,13 @@ class Test(BaseTest):
                 callrpc_cli(FIRO_BINDIR, data_dir, 'regtest', '-wallet=wallet.dat create', 'firo-wallet')
 
         cls.firo_daemons.append(startDaemon(os.path.join(cfg.TEST_DATADIRS, 'firo_' + str(i)), FIRO_BINDIR, FIROD, opts=extra_opts))
-        logging.info('Started %s %d', FIROD, cls.firo_daemons[-1].pid)
+        logging.info('Started %s %d', FIROD, cls.firo_daemons[-1].handle.pid)
 
         waitForRPC(make_rpc_func(i, base_rpc_port=FIRO_BASE_RPC_PORT))
 
     @classmethod
     def addPIDInfo(cls, sc, i):
-        sc.setDaemonPID(Coins.FIRO, cls.firo_daemons[i].pid)
+        sc.setDaemonPID(Coins.FIRO, cls.firo_daemons[i].handle.pid)
 
     @classmethod
     def prepareExtraCoins(cls):
@@ -180,6 +180,7 @@ class Test(BaseTest):
         super(Test, cls).tearDownClass()
 
         stopDaemons(cls.firo_daemons)
+        cls.firo_daemons.clear()
 
     @classmethod
     def addCoinSettings(cls, settings, datadir, node_id):

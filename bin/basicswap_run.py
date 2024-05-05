@@ -18,6 +18,7 @@ import basicswap.config as cfg
 from basicswap import __version__
 from basicswap.ui.util import getCoinName
 from basicswap.basicswap import BasicSwap
+from basicswap.chainparams import chainparams
 from basicswap.http_server import HttpThread
 from basicswap.contrib.websocket_server import WebsocketServer
 
@@ -28,18 +29,21 @@ if not len(logger.handlers):
     logger.addHandler(logging.StreamHandler(sys.stdout))
 
 swap_client = None
-# TODO: deduplicate
-known_coins = [
-    'particl',
-    'litecoin',
-    'bitcoin',
-    'namecoin',
-    'monero',
-    'pivx',
-    'dash',
-    'firo',
-    'navcoin',
-]
+
+
+class Daemon:
+    __slots__ = ('handle', 'files')
+
+    def __init__(self, handle, files):
+        self.handle = handle
+        self.files = files
+
+
+def is_known_coin(coin_name: str) -> bool:
+    for k, v in chainparams:
+        if coin_name == v['name']:
+            return True
+    return False
 
 
 def signal_handler(sig, frame):
@@ -49,7 +53,7 @@ def signal_handler(sig, frame):
         swap_client.stopRunning()
 
 
-def startDaemon(node_dir, bin_dir, daemon_bin, opts=[]):
+def startDaemon(node_dir, bin_dir, daemon_bin, opts=[], extra_config={}):
     daemon_bin = os.path.expanduser(os.path.join(bin_dir, daemon_bin))
 
     datadir_path = os.path.expanduser(node_dir)
@@ -71,9 +75,22 @@ def startDaemon(node_dir, bin_dir, daemon_bin, opts=[]):
                 for line in config_to_add:
                     fp.write(line + '\n')
 
-    args = [daemon_bin, '-datadir=' + datadir_path] + opts
-    logging.info('Starting node ' + daemon_bin + ' ' + '-datadir=' + node_dir)
-    return subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=datadir_path)
+    args = [daemon_bin, ]
+    add_datadir: bool = extra_config.get('add_datadir', True)
+    if add_datadir:
+        args.append('-datadir=' + datadir_path)
+    args += opts
+    logging.info('Starting node ' + daemon_bin + ' ' + (('-datadir=' + node_dir) if add_datadir else ''))
+
+    opened_files = []
+    if extra_config.get('stdout_to_file', False):
+        stdout_dest = open(os.path.join(datadir_path, extra_config.get('stdout_filename', 'core_stdout.log')), 'w')
+        opened_files.append(stdout_dest)
+    else:
+        stdout_dest = subprocess.PIPE
+
+    return Daemon(subprocess.Popen(args, stdin=subprocess.PIPE, stdout=stdout_dest, stderr=subprocess.PIPE, cwd=datadir_path), opened_files)
+>>>>>>> 676701b (tests: Start dcrd)
 
 
 def startXmrDaemon(node_dir, bin_dir, daemon_bin, opts=[]):
@@ -86,24 +103,27 @@ def startXmrDaemon(node_dir, bin_dir, daemon_bin, opts=[]):
     # return subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     file_stdout = open(os.path.join(datadir_path, 'core_stdout.log'), 'w')
     file_stderr = open(os.path.join(datadir_path, 'core_stderr.log'), 'w')
-    return subprocess.Popen(args, stdin=subprocess.PIPE, stdout=file_stdout, stderr=file_stderr, cwd=datadir_path)
+    return Daemon(subprocess.Popen(args, stdin=subprocess.PIPE, stdout=file_stdout, stderr=file_stderr, cwd=datadir_path), [file_stdout, file_stderr])
 
 
 def startXmrWalletDaemon(node_dir, bin_dir, wallet_bin, opts=[]):
     daemon_bin = os.path.expanduser(os.path.join(bin_dir, wallet_bin))
+    args = [daemon_bin, '--non-interactive']
+
+    needs_rewrite: bool = False
+    config_to_remove = ['daemon-address=', 'untrusted-daemon=', 'trusted-daemon=', 'proxy=']
 
     data_dir = os.path.expanduser(node_dir)
     config_path = os.path.join(data_dir, 'monero_wallet.conf')
-    args = [daemon_bin, '--non-interactive', '--config-file=' + config_path] + opts
+    if os.path.exists(config_path):
+        args += ['--config-file=' + config_path]
+        with open(config_path) as fp:
+            for line in fp:
+                if any(line.startswith(config_line) for config_line in config_to_remove):
+                    logging.warning('Found old config in monero_wallet.conf: {}'.format(line.strip()))
+                    needs_rewrite = True
+    args += opts
 
-    # Remove old config
-    needs_rewrite: bool = False
-    config_to_remove = ['daemon-address=', 'untrusted-daemon=', 'trusted-daemon=', 'proxy=']
-    with open(config_path) as fp:
-        for line in fp:
-            if any(line.startswith(config_line) for config_line in config_to_remove):
-                logging.warning('Found old config in monero_wallet.conf: {}'.format(line.strip()))
-                needs_rewrite = True
     if needs_rewrite:
         logging.info('Rewriting monero_wallet.conf')
         shutil.copyfile(config_path, config_path + '.last')
@@ -117,7 +137,7 @@ def startXmrWalletDaemon(node_dir, bin_dir, wallet_bin, opts=[]):
     # TODO: return subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=data_dir)
     wallet_stdout = open(os.path.join(data_dir, 'wallet_stdout.log'), 'w')
     wallet_stderr = open(os.path.join(data_dir, 'wallet_stderr.log'), 'w')
-    return subprocess.Popen(args, stdin=subprocess.PIPE, stdout=wallet_stdout, stderr=wallet_stderr, cwd=data_dir)
+    return Daemon(subprocess.Popen(args, stdin=subprocess.PIPE, stdout=wallet_stdout, stderr=wallet_stderr, cwd=data_dir), [wallet_stdout, wallet_stderr])
 
 
 def ws_new_client(client, server):
@@ -186,7 +206,7 @@ def runClient(fp, data_dir, chain, start_only_coins):
                     swap_client.log.info(f'Starting {display_name} daemon')
                     filename = 'monerod' + ('.exe' if os.name == 'nt' else '')
                     daemons.append(startXmrDaemon(v['datadir'], v['bindir'], filename))
-                    pid = daemons[-1].pid
+                    pid = daemons[-1].handle.pid
                     swap_client.log.info('Started {} {}'.format(filename, pid))
 
                 if v['manage_wallet_daemon'] is True:
@@ -212,7 +232,7 @@ def runClient(fp, data_dir, chain, start_only_coins):
                     opts.append('--trusted-daemon' if trusted_daemon else '--untrusted-daemon')
                     filename = 'monero-wallet-rpc' + ('.exe' if os.name == 'nt' else '')
                     daemons.append(startXmrWalletDaemon(v['datadir'], v['bindir'], filename, opts))
-                    pid = daemons[-1].pid
+                    pid = daemons[-1].handle.pid
                     swap_client.log.info('Started {} {}'.format(filename, pid))
 
                 continue
@@ -221,7 +241,7 @@ def runClient(fp, data_dir, chain, start_only_coins):
 
                 filename = c + 'd' + ('.exe' if os.name == 'nt' else '')
                 daemons.append(startDaemon(v['datadir'], v['bindir'], filename))
-                pid = daemons[-1].pid
+                pid = daemons[-1].handle.pid
                 pids.append((c, pid))
                 swap_client.setDaemonPID(c, pid)
                 swap_client.log.info('Started {} {}'.format(filename, pid))
@@ -281,18 +301,18 @@ def runClient(fp, data_dir, chain, start_only_coins):
 
     closed_pids = []
     for d in daemons:
-        swap_client.log.info('Interrupting {}'.format(d.pid))
+        swap_client.log.info('Interrupting {}'.format(d.handle.pid))
         try:
-            d.send_signal(signal.CTRL_C_EVENT if os.name == 'nt' else signal.SIGINT)
+            d.handle.send_signal(signal.CTRL_C_EVENT if os.name == 'nt' else signal.SIGINT)
         except Exception as e:
-            swap_client.log.info('Interrupting %d, error %s', d.pid, str(e))
+            swap_client.log.info('Interrupting %d, error %s', d.handle.pid, str(e))
     for d in daemons:
         try:
-            d.wait(timeout=120)
-            for fp in (d.stdout, d.stderr, d.stdin):
+            d.handle.wait(timeout=120)
+            for fp in [d.handle.stdout, d.handle.stderr, d.handle.stdin] + d.files:
                 if fp:
                     fp.close()
-            closed_pids.append(d.pid)
+            closed_pids.append(d.handle.pid)
         except Exception as ex:
             swap_client.log.error('Error: {}'.format(ex))
 
@@ -359,7 +379,7 @@ def main():
                 continue
         if name == 'startonlycoin':
             for coin in [s.lower() for s in s[1].split(',')]:
-                if coin not in known_coins:
+                if is_known_coin(coin) is False:
                     raise ValueError(f'Unknown coin: {coin}')
                 start_only_coins.add(coin)
             continue
