@@ -11,6 +11,7 @@
   - All for all known coins.
   - Comma separated list of coin tickers to show.
 - basicswap-run will rewrite litecoin.conf file to add config required to run Litecoin 0.21.3 in pruned mode.
+- On new offers page a blank amount-from is auto-filled from amount-to and rate.
 
 
 0.12.7

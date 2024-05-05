@@ -51,6 +51,31 @@ class LTCInterface(BTCInterface):
         rv['mweb_immature'] = mweb_info['immature_balance']
         return rv
 
+    def getUnspentsByAddr(self):
+        unspent_addr = dict()
+        unspent = self.rpc_wallet('listunspent')
+        for u in unspent:
+            if u.get('spendable', False) is False:
+                continue
+            if u.get('solvable', False) is False:  # Filter out mweb outputs
+                continue
+            if 'address' not in u:
+                continue
+            if 'desc' in u:
+                desc = u['desc']
+                if self.using_segwit:
+                    if self.use_p2shp2wsh():
+                        if not desc.startswith('sh(wpkh'):
+                            continue
+                    else:
+                        if not desc.startswith('wpkh'):
+                            continue
+                else:
+                    if not desc.startswith('pkh'):
+                        continue
+            unspent_addr[u['address']] = unspent_addr.get(u['address'], 0) + self.make_int(u['amount'], r=1)
+        return unspent_addr
+
 
 class LTCInterfaceMWEB(LTCInterface):
     @staticmethod

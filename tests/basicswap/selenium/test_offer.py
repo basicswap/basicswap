@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2023 tecnovert
+# Copyright (c) 2023-2024 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -29,8 +29,39 @@ def test_offer(driver):
     select = Select(driver.find_element(By.ID, 'coin_to'))
     select.select_by_visible_text('Monero')
 
-    driver.find_element(By.NAME, 'amt_from').send_keys('1')
-    driver.find_element(By.NAME, 'amt_to').send_keys('2')
+    amt_from = driver.find_element(By.NAME, 'amt_from')
+    amt_to = driver.find_element(By.NAME, 'amt_to')
+    rate = driver.find_element(By.ID, 'rate')
+    amt_from.send_keys('1')
+    amt_to.send_keys('2')
+    amt_from.click()
+    time.sleep(0.5)
+    rate_value = rate.get_attribute('value')
+    assert (float(rate_value) == 2.0)
+
+    rate.clear()
+    rate.send_keys('3')
+    amt_from.click()
+    time.sleep(0.5)
+    amt_to_value = amt_to.get_attribute('value')
+    assert (float(amt_to_value) == 3.0)
+
+    amt_from.clear()
+    amt_from.send_keys('2')
+    amt_to.click()
+    time.sleep(0.5)
+    amt_to_value = amt_to.get_attribute('value')
+    assert (float(amt_to_value) == 6.0)
+
+    amt_from.clear()
+    amt_to.clear()
+    rate.clear()
+    amt_to.send_keys('2')
+    rate.send_keys('2')
+    amt_to.click()
+    time.sleep(0.2)
+    amt_from_value = amt_from.get_attribute('value')
+    assert (float(amt_from_value) == 1.0)
 
     driver.find_element(By.NAME, 'continue').click()
     WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.NAME, 'check_offer'))).click()

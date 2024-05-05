@@ -182,6 +182,7 @@ class TestLTC(BasicSwapTest):
 
         require_amount: int = ci1.make_int(1)
         unspent_addr = ci1.getUnspentsByAddr()
+        assert (len(unspent_addr) > 0)
         for addr, _ in unspent_addr.items():
             if 'mweb1' in addr:
                 raise ValueError('getUnspentsByAddr should exclude mweb UTXOs.')

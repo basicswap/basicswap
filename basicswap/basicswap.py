@@ -444,10 +444,10 @@ class BasicSwap(BaseApp):
         if connection_type == 'rpc':
             if 'rpcauth' in chain_client_settings:
                 rpcauth = chain_client_settings['rpcauth']
-                self.log.debug('Read %s rpc credentials from json settings', coin)
+                self.log.debug(f'Read {Coins(coin).name} rpc credentials from json settings')
             elif 'rpcpassword' in chain_client_settings:
                 rpcauth = chain_client_settings['rpcuser'] + ':' + chain_client_settings['rpcpassword']
-                self.log.debug('Read %s rpc credentials from json settings', coin)
+                self.log.debug(f'Read {Coins(coin).name} rpc credentials from json settings')
 
         session = scoped_session(self.session_factory)
         try:
@@ -698,7 +698,7 @@ class BasicSwap(BaseApp):
                 pidfilename += 'd'
 
             pidfilepath = os.path.join(self.getChainDatadirPath(coin), pidfilename + '.pid')
-            self.log.debug('Reading %s rpc credentials from auth cookie %s', coin, authcookiepath)
+            self.log.debug('Reading %s rpc credentials from auth cookie %s', Coins(coin).name, authcookiepath)
             # Wait for daemon to start
             # Test pids to ensure authcookie is read for the correct process
             datadir_pid = -1
@@ -1948,7 +1948,7 @@ class BasicSwap(BaseApp):
         return txid
 
     def cacheNewAddressForCoin(self, coin_type):
-        self.log.debug('cacheNewAddressForCoin %s', coin_type)
+        self.log.debug('cacheNewAddressForCoin %s', Coins(coin_type).name)
         key_str = 'receive_addr_' + self.ci(coin_type).coin_name().lower()
         addr = self.getReceiveAddressForCoin(coin_type)
         self.setStringKV(key_str, addr)
@@ -2012,7 +2012,7 @@ class BasicSwap(BaseApp):
                 raise ValueError('Wallet seed doesn\'t match expected.')
 
     def getCachedAddressForCoin(self, coin_type):
-        self.log.debug('getCachedAddressForCoin %s', coin_type)
+        self.log.debug('getCachedAddressForCoin %s', Coins(coin_type).name)
         # TODO: auto refresh after used
 
         ci = self.ci(coin_type)
@@ -2032,7 +2032,7 @@ class BasicSwap(BaseApp):
         return addr
 
     def cacheNewStealthAddressForCoin(self, coin_type):
-        self.log.debug('cacheNewStealthAddressForCoin %s', coin_type)
+        self.log.debug('cacheNewStealthAddressForCoin %s', Coins(coin_type).name)
 
         if coin_type == Coins.LTC_MWEB:
             coin_type = Coins.LTC
@@ -2043,7 +2043,7 @@ class BasicSwap(BaseApp):
         return addr
 
     def getCachedStealthAddressForCoin(self, coin_type):
-        self.log.debug('getCachedStealthAddressForCoin %s', coin_type)
+        self.log.debug('getCachedStealthAddressForCoin %s', Coins(coin_type).name)
 
         if coin_type == Coins.LTC_MWEB:
             coin_type = Coins.LTC
@@ -2546,7 +2546,7 @@ class BasicSwap(BaseApp):
                     lock_value = self.callcoinrpc(coin_from, 'getblockcount') + offer.lock_value
                 else:
                     lock_value = self.getTime() + offer.lock_value
-                self.log.debug('Initiate %s lock_value %d %d', coin_from, offer.lock_value, lock_value)
+                self.log.debug('Initiate %s lock_value %d %d', ci_from.coin_name(), offer.lock_value, lock_value)
                 script = atomic_swap_1.buildContractScript(lock_value, secret_hash, bid.pkhash_buyer, pkhash_refund, OpCodes.OP_CHECKLOCKTIMEVERIFY)
 
             p2sh = self.callcoinrpc(Coins.PART, 'decodescript', [script.hex()])['p2sh']
@@ -3161,12 +3161,12 @@ class BasicSwap(BaseApp):
                 cblock_hash = block_header_at['hash']
                 cblock_height = block_header_at['height']
 
-                self.log.debug('Setting lock value from height of block %s %s', coin_to, cblock_hash)
+                self.log.debug('Setting lock value from height of block %s %s', Coins(coin_to).name, cblock_hash)
                 contract_lock_value = cblock_height + lock_value
             else:
-                self.log.debug('Setting lock value from time of block %s %s', coin_from, initiate_tx_block_hash)
+                self.log.debug('Setting lock value from time of block %s %s', Coins(coin_from).name, initiate_tx_block_hash)
                 contract_lock_value = initiate_tx_block_time + lock_value
-            self.log.debug('participate %s lock_value %d %d', coin_to, lock_value, contract_lock_value)
+            self.log.debug('participate %s lock_value %d %d', Coins(coin_to).name, lock_value, contract_lock_value)
             participate_script = atomic_swap_1.buildContractScript(contract_lock_value, secret_hash, pkhash_seller, pkhash_buyer_refund, OpCodes.OP_CHECKLOCKTIMEVERIFY)
         return participate_script
 
@@ -3965,7 +3965,7 @@ class BasicSwap(BaseApp):
                 bid.participate_tx.conf = found['depth']
                 index = found['index']
                 if bid.participate_tx is None or bid.participate_tx.txid is None:
-                    self.log.debug('Found bid %s participate txn %s in chain %s', bid_id.hex(), found['txid'], coin_to)
+                    self.log.debug('Found bid %s participate txn %s in chain %s', bid_id.hex(), found['txid'], Coins(coin_to).name)
                     self.addParticipateTxn(bid_id, bid, coin_to, found['txid'], found['index'], found['height'])
                     bid.setPTxState(TxStates.TX_SENT)
                     save_bid = True
@@ -4265,7 +4265,7 @@ class BasicSwap(BaseApp):
 
     def checkForSpends(self, coin_type, c):
         # assert (self.mxDB.locked())
-        self.log.debug('checkForSpends %s', coin_type)
+        self.log.debug('checkForSpends %s', Coins(coin_type).name)
 
         # TODO: Check for spends on watchonly txns where possible
 
@@ -7375,7 +7375,7 @@ class BasicSwap(BaseApp):
         return self._is_encrypted, self._is_locked
 
     def lookupRates(self, coin_from, coin_to, output_array=False):
-        self.log.debug('lookupRates {}, {}'.format(coin_from, coin_to))
+        self.log.debug('lookupRates {}, {}'.format(coin_from, Coins(coin_to).name))
 
         rate_sources = self.settings.get('rate_sources', {})
         ci_from = self.ci(int(coin_from))

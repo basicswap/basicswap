@@ -1378,8 +1378,6 @@ class BTCInterface(CoinInterface):
         for u in unspent:
             if u.get('spendable', False) is False:
                 continue
-            if u.get('solveable', False) is False:
-                continue
             if 'address' not in u:
                 continue
             if 'desc' in u:
@@ -1411,7 +1409,6 @@ class BTCInterface(CoinInterface):
     def getProofOfFunds(self, amount_for, extra_commit_bytes):
         # TODO: Lock unspent and use same output/s to fund bid
         unspent_addr = self.getUnspentsByAddr()
-
         sign_for_addr = None
         for addr, value in unspent_addr.items():
             if value >= amount_for:
