@@ -30,7 +30,7 @@ from typing import Optional
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.orm.session import close_all_sessions
 
-from .interface import Curves
+from .interface.base import Curves
 from .interface.part import PARTInterface, PARTInterfaceAnon, PARTInterfaceBlind
 
 from . import __version__
@@ -2334,9 +2334,7 @@ class BasicSwap(BaseApp):
                 msg_buf.proof_signature = proof_sig
 
                 if len(proof_utxos) > 0:
-                    msg_buf.proof_utxos = bytes()
-                    for utxo in proof_utxos:
-                        msg_buf.proof_utxos += utxo[0] + utxo[1].to_bytes(2, 'big')
+                    msg_buf.proof_utxos = ci_to.encodeProofUtxos(proof_utxos)
 
                 contract_count = self.getNewContractId()
                 msg_buf.pkhash_buyer = getKeyID(self.getContractPubkey(dt.datetime.fromtimestamp(now).date(), contract_count))
@@ -3356,10 +3354,11 @@ class BasicSwap(BaseApp):
             return None
 
         ci = self.ci(coin_type)
-        if coin_type in (Coins.NAV, ):
+        if coin_type in (Coins.NAV, Coins.DCR):
             wif_prefix = chainparams[coin_type][self.chain]['key_prefix']
             prevout = ci.find_prevout_info(txn, txn_script)
         else:
+            # TODO: Sign in bsx for all coins
             wif_prefix = chainparams[Coins.PART][self.chain]['key_prefix']
             txjs = self.callcoinrpc(Coins.PART, 'decoderawtransaction', [txn])
             if ci.using_segwit():
@@ -3414,7 +3413,7 @@ class BasicSwap(BaseApp):
         options = {}
         if self.coin_clients[coin_type]['use_segwit']:
             options['force_segwit'] = True
-        if coin_type in (Coins.NAV, ):
+        if coin_type in (Coins.NAV, Coins.DCR):
             refund_sig = ci.getTxSignature(refund_txn, prevout, privkey)
         else:
             refund_sig = self.callcoinrpc(Coins.PART, 'createsignaturewithkey', [refund_txn, prevout, privkey, 'ALL', options])
@@ -3432,7 +3431,7 @@ class BasicSwap(BaseApp):
             script += format(OpCodes.OP_PUSHDATA1, '02x') + format(len(txn_script), '02x') + txn_script.hex()
             refund_txn = ci.setTxScriptSig(bytes.fromhex(refund_txn), 0, bytes.fromhex(script)).hex()
 
-        if coin_type in (Coins.NAV, ):
+        if coin_type in (Coins.NAV, Coins.DCR):
             # Only checks signature
             ro = ci.verifyRawTransaction(refund_txn, [prevout])
         else:

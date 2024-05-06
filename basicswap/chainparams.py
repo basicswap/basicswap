@@ -4,14 +4,9 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-import threading
-
 from enum import IntEnum
 from .util import (
     COIN,
-    make_int,
-    format_amount,
-    TemporaryError,
 )
 
 XMR_COIN = 10 ** 12
@@ -180,11 +175,11 @@ chainparams = {
             'max_amount': 100000 * COIN,
             'name': 'testnet3',
         },
-        'regtest': {
+        'regtest': {  # simnet
             'rpcport': 18656,
-            'pubkey_address': 0x0e00,
-            'script_address': 0x0ddb,
-            'key_prefix': 0x22fe,
+            'pubkey_address': 0x0e91,
+            'script_address': 0x0e6c,
+            'key_prefix': 0x2307,
             'bip44': 1,
             'min_amount': 1000,
             'max_amount': 100000 * COIN,
@@ -422,89 +417,3 @@ def getCoinIdFromTicker(ticker):
         return ticker_map[ticker.lower()]
     except Exception:
         raise ValueError('Unknown coin')
-
-
-class CoinInterface:
-    def __init__(self, network):
-        self.setDefaults()
-        self._network = network
-        self._mx_wallet = threading.Lock()
-
-    def setDefaults(self):
-        self._unknown_wallet_seed = True
-        self._restore_height = None
-
-    def make_int(self, amount_in: int, r: int = 0) -> int:
-        return make_int(amount_in, self.exp(), r=r)
-
-    def format_amount(self, amount_in, conv_int=False, r=0):
-        amount_int = make_int(amount_in, self.exp(), r=r) if conv_int else amount_in
-        return format_amount(amount_int, self.exp())
-
-    def coin_name(self) -> str:
-        coin_chainparams = chainparams[self.coin_type()]
-        if coin_chainparams.get('use_ticker_as_name', False):
-            return coin_chainparams['ticker']
-        return coin_chainparams['name'].capitalize()
-
-    def ticker(self) -> str:
-        ticker = chainparams[self.coin_type()]['ticker']
-        if self._network == 'testnet':
-            ticker = 't' + ticker
-        elif self._network == 'regtest':
-            ticker = 'rt' + ticker
-        return ticker
-
-    def getExchangeTicker(self, exchange_name: str) -> str:
-        return chainparams[self.coin_type()]['ticker']
-
-    def getExchangeName(self, exchange_name: str) -> str:
-        return chainparams[self.coin_type()]['name']
-
-    def ticker_mainnet(self) -> str:
-        ticker = chainparams[self.coin_type()]['ticker']
-        return ticker
-
-    def min_amount(self) -> int:
-        return chainparams[self.coin_type()][self._network]['min_amount']
-
-    def max_amount(self) -> int:
-        return chainparams[self.coin_type()][self._network]['max_amount']
-
-    def setWalletSeedWarning(self, value: bool) -> None:
-        self._unknown_wallet_seed = value
-
-    def setWalletRestoreHeight(self, value: int) -> None:
-        self._restore_height = value
-
-    def knownWalletSeed(self) -> bool:
-        return not self._unknown_wallet_seed
-
-    def chainparams(self):
-        return chainparams[self.coin_type()]
-
-    def chainparams_network(self):
-        return chainparams[self.coin_type()][self._network]
-
-    def has_segwit(self) -> bool:
-        return chainparams[self.coin_type()].get('has_segwit', True)
-
-    def is_transient_error(self, ex) -> bool:
-        if isinstance(ex, TemporaryError):
-            return True
-        str_error: str = str(ex).lower()
-        if 'not enough unlocked money' in str_error:
-            return True
-        if 'no unlocked balance' in str_error:
-            return True
-        if 'transaction was rejected by daemon' in str_error:
-            return True
-        if 'invalid unlocked_balance' in str_error:
-            return True
-        if 'daemon is busy' in str_error:
-            return True
-        if 'timed out' in str_error:
-            return True
-        if 'request-sent' in str_error:
-            return True
-        return False

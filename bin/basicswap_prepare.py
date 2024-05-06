@@ -1182,7 +1182,7 @@ def finalise_daemon(d):
         d.handle.send_signal(signal.CTRL_C_EVENT if os.name == 'nt' else signal.SIGINT)
         d.handle.wait(timeout=120)
     except Exception as e:
-        logging.info(f'Error {e} for process {d.pid}')
+        logging.info(f'Error {e} for process {d.handle.pid}')
     for fp in [d.handle.stdout, d.handle.stderr, d.handle.stdin] + d.files:
         if fp:
             fp.close()
@@ -1262,7 +1262,7 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
                             coin_args += ['-hdseed={}'.format(swap_client.getWalletKey(Coins.FIRO, 1).hex())]
 
                         daemons.append(startDaemon(coin_settings['datadir'], coin_settings['bindir'], filename, daemon_args + coin_args))
-                        swap_client.setDaemonPID(c, daemons[-1].pid)
+                        swap_client.setDaemonPID(c, daemons[-1].handle.pid)
                 swap_client.setCoinRunParams(c)
                 swap_client.createCoinInterface(c)
 

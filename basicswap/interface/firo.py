@@ -5,8 +5,8 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-import random
 import hashlib
+import random
 
 from .btc import BTCInterface, find_vout_for_address_from_txobj
 from basicswap.util import (

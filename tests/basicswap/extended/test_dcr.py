@@ -7,8 +7,8 @@
 
 import logging
 import os
-import subprocess
 import select
+import subprocess
 import unittest
 
 import basicswap.config as cfg
@@ -29,11 +29,12 @@ from basicswap.interface.dcr.messages import (
 from tests.basicswap.common import (
     stopDaemons,
     waitForRPC,
+    wait_for_balance,
 )
 from tests.basicswap.util import (
+    read_json_api,
     REQUIRED_SETTINGS,
 )
-
 from tests.basicswap.test_xmr import BaseTest, test_delay_event
 from basicswap.interface.dcr import DCRInterface
 from basicswap.interface.dcr.messages import CTransaction, CTxIn, COutPoint
@@ -107,7 +108,7 @@ def prepareDCDDataDir(datadir, node_id, conf_file, dir_prefix, num_nodes=3):
 
 class Test(BaseTest):
     __test__ = True
-    test_coin_from = Coins.DCR
+    test_coin = Coins.DCR
     dcr_daemons = []
     start_ltc_nodes = False
     start_xmr_nodes = False
@@ -122,7 +123,7 @@ class Test(BaseTest):
     @classmethod
     def prepareExtraCoins(cls):
         if not cls.restore_instance:
-            ci0 = cls.swap_clients[0].ci(cls.test_coin_from)
+            ci0 = cls.swap_clients[0].ci(cls.test_coin)
             assert (ci0.rpc_wallet('getnewaddress') == cls.dcr_mining_addr)
             cls.dcr_ticket_account = ci0.rpc_wallet('getaccount', [cls.dcr_mining_addr, ])
             ci0.rpc('generate', [110,])
@@ -140,7 +141,7 @@ class Test(BaseTest):
     @classmethod
     def coins_loop(cls):
         super(Test, cls).coins_loop()
-        ci0 = cls.swap_clients[0].ci(cls.test_coin_from)
+        ci0 = cls.swap_clients[0].ci(cls.test_coin)
 
         num_passed: int = 0
         for i in range(5):
@@ -148,7 +149,10 @@ class Test(BaseTest):
                 ci0.rpc_wallet('purchaseticket', [cls.dcr_ticket_account, 0.1, 0])
                 num_passed += 1
             except Exception as e:
-                logging.warning('coins_loop purchaseticket {}'.format(e))
+                if 'double spend' in str(e):
+                    pass
+                else:
+                    logging.warning('coins_loop purchaseticket {}'.format(e))
 
         try:
             if num_passed >= 5:
@@ -230,8 +234,30 @@ class Test(BaseTest):
             'blocks_confirmed': 1,
         }
 
+    def prepare_balance(self, coin, amount: float, port_target_node: int, port_take_from_node: int, test_balance: bool = True) -> None:
+        delay_iterations = 20
+        delay_time = 3
+        coin_ticker: str = coin.name
+        balance_type: str = 'balance'
+        address_type: str = 'deposit_address'
+        js_w = read_json_api(port_target_node, 'wallets')
+        current_balance: float = float(js_w[coin_ticker][balance_type])
+        if test_balance and current_balance >= amount:
+            return
+        post_json = {
+            'value': amount,
+            'address': js_w[coin_ticker][address_type],
+            'subfee': False,
+        }
+        json_rv = read_json_api(port_take_from_node, 'wallets/{}/withdraw'.format(coin_ticker.lower()), post_json)
+        assert (len(json_rv['txid']) == 64)
+        wait_for_amount: float = amount
+        if not test_balance:
+            wait_for_amount += current_balance
+        wait_for_balance(test_delay_event, 'http://127.0.0.1:{}/json/wallets/{}'.format(port_target_node, coin_ticker.lower()), balance_type, wait_for_amount, iterations=delay_iterations, delay_time=delay_time)
+
     def test_0001_decred_address(self):
-        logging.info('---------- Test {}'.format(self.test_coin_from.name))
+        logging.info('---------- Test {}'.format(self.test_coin.name))
 
         coin_settings = {'rpcport': 0, 'rpcauth': 'none'}
         coin_settings.update(REQUIRED_SETTINGS)
@@ -249,7 +275,7 @@ class Test(BaseTest):
         assert (data[2:] == pkh)
 
         for i, sc in enumerate(self.swap_clients):
-            loop_ci = sc.ci(self.test_coin_from)
+            loop_ci = sc.ci(self.test_coin)
             root_key = sc.getWalletKey(Coins.DCR, 1)
             masterpubkey = loop_ci.rpc_wallet('getmasterpubkey')
             masterpubkey_data = loop_ci.decode_address(masterpubkey)[4:]
@@ -261,13 +287,13 @@ class Test(BaseTest):
                 assert (seed_hash == hash160(masterpubkey_data))
 
     def test_001_segwit(self):
-        logging.info('---------- Test {} segwit'.format(self.test_coin_from.name))
+        logging.info('---------- Test {} segwit'.format(self.test_coin.name))
 
         swap_clients = self.swap_clients
-        ci0 = swap_clients[0].ci(self.test_coin_from)
+        ci0 = swap_clients[0].ci(self.test_coin)
         assert (ci0.using_segwit() is True)
 
-        addr_out = ci0.rpc_wallet('getnewaddress')
+        addr_out = ci0.getNewAddress()
         addr_info = ci0.rpc_wallet('validateaddress', [addr_out,])
         assert (addr_info['isvalid'] is True)
         assert (addr_info['ismine'] is True)
@@ -294,13 +320,13 @@ class Test(BaseTest):
         assert (f_decoded['txid'] == ctx.TxHash().hex())
 
     def test_003_signature_hash(self):
-        logging.info('---------- Test {} signature_hash'.format(self.test_coin_from.name))
+        logging.info('---------- Test {} signature_hash'.format(self.test_coin.name))
         # Test that signing a transaction manually produces the same result when signed with the wallet
 
         swap_clients = self.swap_clients
-        ci0 = swap_clients[0].ci(self.test_coin_from)
+        ci0 = swap_clients[0].ci(self.test_coin)
 
-        utxos = ci0.rpc_wallet('listunspent')
+        utxos = ci0.getNewAddress()
         addr_out = ci0.rpc_wallet('getnewaddress')
         rtx = ci0.rpc_wallet('createrawtransaction', [[], {addr_out: 2.0}])
 
@@ -342,15 +368,18 @@ class Test(BaseTest):
         assert (len(sent_txid) == 64)
 
     def test_004_csv(self):
-        logging.info('---------- Test {} csv'.format(self.test_coin_from.name))
+        logging.info('---------- Test {} csv'.format(self.test_coin.name))
         swap_clients = self.swap_clients
-        ci0 = swap_clients[0].ci(self.test_coin_from)
+        ci0 = swap_clients[0].ci(self.test_coin)
 
         script = bytearray()
         push_script_data(script, bytes((3,)))
         script += OP_CHECKSEQUENCEVERIFY.to_bytes(1)
 
         script_dest = ci0.getScriptDest(script)
+        script_info = ci0.rpc_wallet('decodescript', [script_dest.hex(),])
+        script_addr = ci0.encodeScriptDest(script_dest)
+        assert (script_info['addresses'][0] == script_addr)
 
         prevout_amount: int = ci0.make_int(1.1)
         tx = CTransaction()
@@ -388,7 +417,7 @@ class Test(BaseTest):
         push_script_data(signature_script, script)
         tx_spend.vin[0].signature_script = signature_script
 
-        addr_out = ci0.rpc_wallet('getnewaddress')
+        addr_out = ci0.getNewAddress()
         pkh = ci0.decode_address(addr_out)[2:]
 
         tx_spend.vout.append(ci0.txoType()())
@@ -399,6 +428,7 @@ class Test(BaseTest):
 
         try:
             sent_spend_txid = ci0.rpc_wallet('sendrawtransaction', [tx_spend_hex, ])
+            logging.info('Sent tx spending csv output, txid: {}'.format(sent_spend_txid))
         except Exception as e:
             assert ('transaction sequence locks on inputs not met' in str(e))
         else:
@@ -414,6 +444,135 @@ class Test(BaseTest):
             test_delay_event.wait(1)
 
         assert (sent_spend_txid is not None)
+
+    def test_005_watchonly(self):
+        logging.info('---------- Test {} watchonly'.format(self.test_coin.name))
+
+        swap_clients = self.swap_clients
+        ci0 = swap_clients[0].ci(self.test_coin)
+        ci1 = swap_clients[1].ci(self.test_coin)
+
+        addr = ci0.getNewAddress()
+        pkh = ci0.decode_address(addr)[2:]
+        addr_info = ci0.rpc_wallet('validateaddress', [addr,])
+
+        addr_script = ci0.getPubkeyHashDest(pkh).hex()
+        script_info = ci0.rpc_wallet('decodescript', [addr_script,])
+        assert (addr in script_info['addresses'])
+
+        # Importscript doesn't import an address
+        ci1.rpc_wallet('importscript', [addr_script,])
+        addr_info1 = ci1.rpc_wallet('validateaddress', [addr,])
+        assert (addr_info1.get('ismine', False) is False)
+
+        # Would need to run a second wallet daemon?
+        try:
+            ro = ci1.rpc_wallet('importpubkey', [addr_info['pubkey'],])
+        except Exception as e:
+            assert ('public keys may only be imported by watching-only wallets' in str(e))
+        else:
+            logging.info('Expected importpubkey to fail on non watching-only wallet')
+
+        chain_height_last = ci1.getChainHeight()
+        txid = ci0.rpc_wallet('sendtoaddress', [addr, 1])
+
+        found_txid = None
+        for i in range(20):
+            if found_txid is not None:
+                break
+
+            chain_height_now = ci1.getChainHeight()
+            while chain_height_last <= chain_height_now:
+                if found_txid is not None:
+                    break
+                try:
+                    check_hash = ci1.rpc('getblockhash', [chain_height_last + 1, ])
+                except Exception as e:
+                    logging.warning('getblockhash {} failed {}'.format(chain_height_last + 1, e))
+                    test_delay_event.wait(1)
+                    break
+
+                chain_height_last += 1
+                check_hash = ci1.rpc('getblockhash', [chain_height_last, ])
+                block_tx = ci1.rpc('getblock', [check_hash, True, True])
+                for tx in block_tx['rawtx']:
+                    if found_txid is not None:
+                        break
+                    for txo in tx['vout']:
+                        if addr_script == txo['scriptPubKey']['hex']:
+                            found_txid = tx['txid']
+                            logging.info('found_txid {}'.format(found_txid))
+                            break
+
+            test_delay_event.wait(1)
+
+        assert (found_txid is not None)
+
+    def test_008_gettxout(self):
+        logging.info('---------- Test {} gettxout'.format(self.test_coin.name))
+
+        ci0 = self.swap_clients[0].ci(self.test_coin)
+
+        addr = ci0.getNewAddress()
+
+        test_amount: float = 1.0
+        txid = ci0.withdrawCoin(test_amount, addr)
+        assert len(txid) == 64
+
+        unspents = None
+        for i in range(30):
+            unspents = ci0.rpc_wallet('listunspent', [0, 999999999, [addr,]])
+            if unspents is None:
+                unspents = []
+            if len(unspents) > 0:
+                break
+            test_delay_event.wait(1)
+        assert (len(unspents) == 1)
+        utxo = unspents[0]
+
+        txout = ci0.rpc('gettxout', [utxo['txid'], utxo['vout'], utxo['tree']])
+
+        # Lock utxo so it's not spent for tickets, while waiting for depth
+        rv = ci0.rpc_wallet('lockunspent', [False, [utxo, ]])
+
+        def wait_for_depth():
+            for i in range(20):
+                logging.info('Waiting for txout depth, iter {}'.format(i))
+                txout = ci0.rpc('gettxout', [utxo['txid'], utxo['vout'], utxo['tree']])
+                if txout['confirmations'] > 0:
+                    return txout
+                test_delay_event.wait(1)
+            raise ValueError('prevout not confirmed')
+        txout = wait_for_depth()
+        assert (txout['confirmations'] > 0)
+        assert (addr in txout['scriptPubKey']['addresses'])
+
+        addr_out = ci0.getNewAddress()
+        rtx = ci0.rpc_wallet('createrawtransaction', [[utxo, ], {addr_out: test_amount - 0.0001}])
+        stx = ci0.rpc_wallet('signrawtransaction', [rtx])
+
+        chain_height_before_send = ci0.getChainHeight()
+        sent_txid = ci0.rpc_wallet('sendrawtransaction', [stx['hex'], ])
+
+        # NOTE: UTXO is still found when spent in the mempool (tested in loop, not delay from wallet to core)
+        txout = ci0.rpc('gettxout', [utxo['txid'], utxo['vout'], utxo['tree']])
+        assert (addr in txout['scriptPubKey']['addresses'])
+
+        for i in range(20):
+            txout = ci0.rpc('gettxout', [utxo['txid'], utxo['vout'], utxo['tree']])
+            if txout is None:
+                logging.info('txout spent, height before spent {}, height spent {}'.format(chain_height_before_send, ci0.getChainHeight()))
+                break
+            test_delay_event.wait(1)
+        assert (txout is None)
+
+        logging.info('Testing getProofOfFunds')
+        require_amount: int = ci0.make_int(1)
+        funds_proof = ci0.getProofOfFunds(require_amount, 'test'.encode('utf-8'))
+
+        logging.info('Testing verifyProofOfFunds')
+        amount_proved = ci0.verifyProofOfFunds(funds_proof[0], funds_proof[1], funds_proof[2], 'test'.encode('utf-8'))
+        assert (amount_proved >= require_amount)
 
 
 if __name__ == '__main__':

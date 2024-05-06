@@ -5,24 +5,32 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-import json
 import base64
 import hashlib
+import json
 import logging
 import traceback
+
 from io import BytesIO
 
-from basicswap.contrib.test_framework import segwit_addr
-
-from basicswap.interface import (
-    Curves)
+from basicswap.basicswap_util import (
+    getVoutByAddress,
+    getVoutByScriptPubKey,
+)
+from basicswap.contrib.test_framework import (
+    segwit_addr,
+)
+from basicswap.interface.base import (
+    Secp256k1Interface,
+)
 from basicswap.util import (
     ensure,
-    b2h, i2b, b2i, i2h)
+    b2h, i2b, b2i, i2h,
+)
 from basicswap.util.ecc import (
     ep,
     pointToCPK, CPKToPoint,
-    getSecretInt)
+)
 from basicswap.util.script import (
     decodeScriptNum,
     getCompactSizeLen,
@@ -42,14 +50,14 @@ from basicswap.util.crypto import (
 )
 from coincurve.keys import (
     PrivateKey,
-    PublicKey)
-from coincurve.dleag import (
-    verify_secp256k1_point)
+    PublicKey,
+)
 from coincurve.ecdsaotves import (
     ecdsaotves_enc_sign,
     ecdsaotves_enc_verify,
     ecdsaotves_dec_sig,
-    ecdsaotves_rec_enc_key)
+    ecdsaotves_rec_enc_key
+)
 
 from basicswap.contrib.test_framework.messages import (
     COIN,
@@ -70,12 +78,13 @@ from basicswap.contrib.test_framework.script import (
     OP_DROP,
     OP_HASH160, OP_EQUAL,
     SIGHASH_ALL,
-    SegwitV0SignatureHash)
-
+    SegwitV0SignatureHash,
+)
 from basicswap.basicswap_util import (
-    TxLockTypes)
+    TxLockTypes
+)
 
-from basicswap.chainparams import CoinInterface, Coins
+from basicswap.chainparams import Coins
 from basicswap.rpc import make_rpc_func, openrpc
 
 
@@ -109,25 +118,6 @@ def find_vout_for_address_from_txobj(tx_obj, addr: str) -> int:
             if addr == scriptPubKey["address"]:
                 return i
     raise RuntimeError("Vout not found for address: txid={}, addr={}".format(tx_obj['txid'], addr))
-
-
-class Secp256k1Interface(CoinInterface):
-    @staticmethod
-    def curve_type():
-        return Curves.secp256k1
-
-    def getNewSecretKey(self) -> bytes:
-        return i2b(getSecretInt())
-
-    def getPubkey(self, privkey):
-        return PublicKey.from_secret(privkey).format()
-
-    def verifyKey(self, k: bytes) -> bool:
-        i = b2i(k)
-        return (i < ep.o and i > 0)
-
-    def verifyPubkey(self, pubkey_bytes: bytes) -> bool:
-        return verify_secp256k1_point(pubkey_bytes)
 
 
 class BTCInterface(Secp256k1Interface):
@@ -185,7 +175,7 @@ class BTCInterface(Secp256k1Interface):
 
     @staticmethod
     def getExpectedSequence(lockType: int, lockVal: int) -> int:
-        assert (lockVal >= 1), 'Bad lockVal'
+        ensure(lockVal >= 1, 'Bad lockVal')
         if lockType == TxLockTypes.SEQUENCE_LOCK_BLOCKS:
             return lockVal
         if lockType == TxLockTypes.SEQUENCE_LOCK_TIME:
@@ -271,10 +261,6 @@ class BTCInterface(Secp256k1Interface):
     def close_rpc(self, rpc_conn):
         rpc_conn.close()
 
-    def setConfTarget(self, new_conf_target: int) -> None:
-        ensure(new_conf_target >= 1 and new_conf_target < 33, 'Invalid conf_target value')
-        self._conf_target = new_conf_target
-
     def testDaemonRPC(self, with_wallet=True) -> None:
         self.rpc_wallet('getwalletinfo' if with_wallet else 'getblockchaininfo')
 
@@ -320,9 +306,6 @@ class BTCInterface(Secp256k1Interface):
         rv['locked'] = rv.get('unlocked_until', 1) <= 0
         rv['locked_utxos'] = len(self.rpc_wallet('listlockunspent'))
         return rv
-
-    def walletRestoreHeight(self) -> int:
-        return self._restore_height
 
     def getWalletRestoreHeight(self) -> int:
         start_time = self.rpc_wallet('getwalletinfo')['keypoololdest']
@@ -1249,7 +1232,7 @@ class BTCInterface(Secp256k1Interface):
                 'vout': utxo['vout']})
         return rv, chain_height
 
-    def withdrawCoin(self, value, addr_to, subfee):
+    def withdrawCoin(self, value: float, addr_to: str, subfee: bool):
         params = [addr_to, value, '', '', subfee, True, self._conf_target]
         return self.rpc_wallet('sendtoaddress', params)
 
@@ -1435,6 +1418,12 @@ class BTCInterface(Secp256k1Interface):
         prove_utxos = []  # TODO: Send specific utxos
         return (sign_for_addr, signature, prove_utxos)
 
+    def encodeProofUtxos(self, proof_utxos):
+        packed_utxos = bytes()
+        for utxo in proof_utxos:
+            packed_utxos += utxo[0] + utxo[1].to_bytes(2, 'big')
+        return packed_utxos
+
     def decodeProofUtxos(self, msg_utxos):
         proof_utxos = []
         if len(msg_utxos) > 0:
@@ -1554,6 +1543,24 @@ class BTCInterface(Secp256k1Interface):
         else:
             tx_vsize += 323 if redeem else 287
         return tx_vsize
+
+    def find_prevout_info(self, txn_hex: str, txn_script: bytes):
+        txjs = self.rpc('decoderawtransaction', [txn_hex])
+
+        if self.using_segwit():
+            p2wsh = self.getScriptDest(txn_script)
+            n = getVoutByScriptPubKey(txjs, p2wsh.hex())
+        else:
+            addr_to = self.encode_p2sh(txn_script)
+            n = getVoutByAddress(txjs, addr_to)
+
+        return {
+            'txid': txjs['txid'],
+            'vout': n,
+            'scriptPubKey': txjs['vout'][n]['scriptPubKey']['hex'],
+            'redeemScript': txn_script.hex(),
+            'amount': txjs['vout'][n]['value']
+        }
 
 
 def testBTCInterface():

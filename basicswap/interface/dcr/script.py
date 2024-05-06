@@ -42,5 +42,4 @@ def push_script_data(data_array: bytearray, data: bytes) -> None:
     else:
         data_array += bytes((OP_PUSHDATA4,)) + len_data.to_bytes(4, 'little')
 
-    print('[rm] data_array', (data_array + data).hex())
     data_array += data
