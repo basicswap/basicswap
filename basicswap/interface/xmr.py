@@ -24,8 +24,9 @@ from coincurve.dleag import (
     verify_ed25519_point,
 )
 
-from basicswap.interface import (
-    Curves)
+from basicswap.interface.base import (
+    Curves,
+)
 from basicswap.util import (
     i2b, b2i, b2h,
     dumpj,
@@ -36,7 +37,8 @@ from basicswap.util.network import (
 from basicswap.rpc_xmr import (
     make_xmr_rpc_func,
     make_xmr_rpc2_func)
-from basicswap.chainparams import XMR_COIN, CoinInterface, Coins
+from basicswap.chainparams import XMR_COIN, Coins
+from basicswap.interface.base import CoinInterface
 
 
 class XMRInterface(CoinInterface):
@@ -238,9 +240,6 @@ class XMRInterface(CoinInterface):
             rv['encrypted'] = False if self._wallet_password is None else True
             rv['locked'] = False
             return rv
-
-    def walletRestoreHeight(self):
-        return self._restore_height
 
     def getMainWalletAddress(self) -> str:
         with self._mx_wallet:

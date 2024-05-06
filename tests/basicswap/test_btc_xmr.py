@@ -13,10 +13,10 @@ from basicswap.db import (
     Concepts,
 )
 from basicswap.basicswap import (
-    Coins,
-    SwapTypes,
     BidStates,
+    Coins,
     DebugTypes,
+    SwapTypes,
 )
 from basicswap.basicswap_util import (
     TxLockTypes,

@@ -9,7 +9,7 @@ from sqlalchemy.orm import scoped_session
 from basicswap.util import (
     ensure,
 )
-from basicswap.interface import Curves
+from basicswap.interface.base import Curves
 from basicswap.chainparams import (
     Coins,
 )
