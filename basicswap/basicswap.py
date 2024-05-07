@@ -7375,7 +7375,7 @@ class BasicSwap(BaseApp):
         return self._is_encrypted, self._is_locked
 
     def lookupRates(self, coin_from, coin_to, output_array=False):
-        self.log.debug('lookupRates {}, {}'.format(coin_from, Coins(coin_to).name))
+        self.log.debug('lookupRates {}, {}'.format(Coins(int(coin_from)).name, Coins(int(coin_to)).name))
 
         rate_sources = self.settings.get('rate_sources', {})
         ci_from = self.ci(int(coin_from))
