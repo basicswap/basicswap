@@ -731,6 +731,31 @@ class Test(BaseTest):
             assert (txin['txid'] == itx_after['vin'][i]['txid'])
             assert (txin['vout'] == itx_after['vin'][i]['vout'])
 
+    def test_15_variable_amount(self):
+        logging.info('---------- Test fixed rate variable amount offer')
+        swap_clients = self.swap_clients
+
+        swap_value = 86474957
+        offer_rate = 996774992
+        extra_options = {'amount_negotiable': True, 'rate_negotiable': False}
+        offer_id = swap_clients[1].postOffer(Coins.PART, Coins.BTC, swap_value, offer_rate, swap_value // 2, SwapTypes.SELLER_FIRST, extra_options=extra_options)
+
+        wait_for_offer(test_delay_event, swap_clients[0], offer_id)
+        offer = swap_clients[0].getOffer(offer_id)
+
+        bid_amount = 86474842
+        bid_id = swap_clients[0].postBid(offer_id, bid_amount, extra_options={'bid_rate': offer_rate})
+        wait_for_bid(test_delay_event, swap_clients[1], bid_id)
+        bid = swap_clients[1].getBid(bid_id)
+        assert (bid.amount == 86474828)
+
+        swap_clients[1].acceptBid(bid_id)
+
+        wait_for_in_progress(test_delay_event, swap_clients[0], bid_id, sent=True)
+
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=60)
+        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, wait_for=60)
+
     def pass_99_delay(self):
         logging.info('Delay')
         for i in range(60 * 10):

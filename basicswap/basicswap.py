@@ -2250,6 +2250,40 @@ class BasicSwap(BaseApp):
             if session is None:
                 self.closeSession(use_session, commit=False)
 
+    def setBidAmounts(self, amount: int, offer, extra_options, ci_from) -> (int, int, int):
+        if 'amount_to' in extra_options:
+            amount_to: int = extra_options['amount_to']
+        elif 'bid_rate' in extra_options:
+            bid_rate = extra_options['bid_rate']
+            amount_to: int = int((amount * bid_rate) // ci_from.COIN())
+            if not offer.rate_negotiable:
+                self.log.warning('Fixed-rate offer bids should set amount to instead of bid rate.')
+        else:
+            amount_to: int = offer.amount_to
+        bid_rate: int = ci_from.make_int(amount_to / amount, r=1)
+
+        if offer.amount_negotiable and not offer.rate_negotiable:
+            if bid_rate != offer.rate and extra_options.get('adjust_amount_for_rate', True):
+                self.log.debug('Attempting to reduce amount to match offer rate.')
+                for i in range(100):
+                    test_amount = amount - i
+                    test_amount_to: int = int((test_amount * offer.rate) // ci_from.COIN())
+                    test_bid_rate: int = ci_from.make_int(test_amount_to / test_amount, r=1)
+                    if test_bid_rate != offer.rate:
+                        test_amount_to -= 1
+                        test_bid_rate: int = ci_from.make_int(test_amount_to / test_amount, r=1)
+                    if test_bid_rate == offer.rate:
+                        if amount != test_amount:
+                            self.log.info('Reducing bid amount-from from {} to {} to match offer rate.'.format(amount, test_amount))
+                        elif amount_to != test_amount_to:
+                            # Only show on first loop iteration (amount from unchanged)
+                            self.log.info('Reducing bid amount-to from {} to {} to match offer rate.'.format(amount_to, test_amount_to))
+                        amount = test_amount
+                        amount_to = test_amount_to
+                        bid_rate = test_bid_rate
+                        break
+        return amount, amount_to, bid_rate
+
     def postBid(self, offer_id: bytes, amount: int, addr_send_from: str = None, extra_options={}) -> bytes:
         # Bid to send bid.amount * bid.rate of coin_to in exchange for bid.amount of coin_from
         self.log.debug('postBid for offer: %s', offer_id.hex())
@@ -2274,13 +2308,7 @@ class BasicSwap(BaseApp):
         ci_from = self.ci(coin_from)
         ci_to = self.ci(coin_to)
 
-        if 'amount_to' in extra_options:
-            amount_to: int = extra_options['amount_to']
-            bid_rate: int = ci_from.make_int(amount_to / amount, r=1)
-        else:
-            bid_rate = extra_options.get('bid_rate', offer.rate)
-            amount_to: int = int((amount * bid_rate) // ci_from.COIN())
-
+        amount, amount_to, bid_rate = self.setBidAmounts(amount, offer, extra_options, ci_from)
         self.validateBidAmount(offer, amount, bid_rate)
 
         self.mxDB.acquire()
@@ -2293,8 +2321,6 @@ class BasicSwap(BaseApp):
             msg_buf.time_valid = valid_for_seconds
             msg_buf.amount = amount  # amount of coin_from
             msg_buf.amount_to = amount_to
-
-            amount_to = int((msg_buf.amount * bid_rate) // ci_from.COIN())
 
             now: int = self.getTime()
             if offer.swap_type == SwapTypes.SELLER_FIRST:
@@ -2642,15 +2668,7 @@ class BasicSwap(BaseApp):
 
             valid_for_seconds: int = extra_options.get('valid_for_seconds', 60 * 10)
 
-            if 'amount_to' in extra_options:
-                amount_to: int = extra_options['amount_to']
-                bid_rate: int = ci_from.make_int(amount_to / amount, r=1)
-            elif 'bid_rate' in extra_options:
-                bid_rate: int = extra_options.get('bid_rate', offer.rate)
-                amount_to: int = int((int(amount) * bid_rate) // ci_from.COIN())
-            else:
-                amount_to: int = offer.amount_to
-                bid_rate: int = ci_from.make_int(amount_to / amount, r=1)
+            amount, amount_to, bid_rate = self.setBidAmounts(amount, offer, extra_options, ci_from)
 
             bid_created_at: int = self.getTime()
             if offer.swap_type != SwapTypes.XMR_SWAP:
@@ -3180,9 +3198,7 @@ class BasicSwap(BaseApp):
             return None
         ci = self.ci(coin_to)
 
-        amount_to = bid.amount_to
-        # Check required?
-        assert (amount_to == (bid.amount * bid.rate) // self.ci(offer.coin_from).COIN())
+        amount_to: int = bid.amount_to
 
         if bid.debug_ind == DebugTypes.MAKE_INVALID_PTX:
             amount_to -= 1
@@ -3680,7 +3696,7 @@ class BasicSwap(BaseApp):
                         self.saveBidInSession(bid_id, bid, session, xmr_swap)
                         session.commit()
 
-                    if TxTypes.XMR_SWAP_A_LOCK_REFUND_SWIPE not in bid.txns:
+                    if TxTypes.XMR_SWAP_A_LOCK_REFUND_SWIPE not in bid.txns and BidStates(bid.state) != BidStates.BID_STALLED_FOR_TEST:
                         try:
                             txid = ci_from.publishTx(xmr_swap.a_lock_refund_swipe_tx)
                             self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_A_REFUND_SWIPE_TX_PUBLISHED, '', session)
