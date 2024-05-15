@@ -87,7 +87,7 @@ class FIROInterface(BTCInterface):
 
         return address
 
-    def getLockTxHeight(self, txid, dest_address, bid_amount, rescan_from, find_index: bool = False):
+    def getLockTxHeight(self, txid, dest_address, bid_amount, rescan_from, find_index: bool = False, vout: int = -1):
         # Add watchonly address and rescan if required
 
         if not self.isAddressMine(dest_address, or_watch_only=True):
@@ -337,7 +337,7 @@ class FIROInterface(BTCInterface):
                         return
             current_height -= 1
 
-    def getBlockWithTxns(self, block_hash):
+    def getBlockWithTxns(self, block_hash: str):
         # TODO: Bypass decoderawtransaction and getblockheader
         block = self.rpc('getblock', [block_hash, False])
         block_header = self.rpc('getblockheader', [block_hash])
@@ -355,9 +355,11 @@ class FIROInterface(BTCInterface):
 
         block_rv = {
             'hash': block_hash,
+            'previousblockhash': block_header['previousblockhash'],
             'tx': tx_rv,
             'confirmations': block_header['confirmations'],
             'height': block_header['height'],
+            'time': block_header['time'],
             'version': block_header['version'],
             'merkleroot': block_header['merkleroot'],
         }

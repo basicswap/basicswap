@@ -52,5 +52,7 @@ def remove_expired_data(self, time_offset: int = 0):
         if num_offers > 0 or num_bids > 0:
             self.log.info('Removed data for {} expired offer{} and {} bid{}.'.format(num_offers, 's' if num_offers != 1 else '', num_bids, 's' if num_bids != 1 else ''))
 
+        session.execute('DELETE FROM checkedblocks WHERE created_at <= :expired_at', {'expired_at': now - time_offset})
+
     finally:
         self.closeSession(session)

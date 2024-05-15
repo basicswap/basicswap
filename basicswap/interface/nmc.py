@@ -14,7 +14,7 @@ class NMCInterface(BTCInterface):
     def coin_type():
         return Coins.NMC
 
-    def getLockTxHeight(self, txid, dest_address, bid_amount, rescan_from, find_index=False):
+    def getLockTxHeight(self, txid, dest_address, bid_amount, rescan_from, find_index: bool = False, vout: int = -1):
         self._log.debug('[rm] scantxoutset start')  # scantxoutset is slow
         ro = self.rpc('scantxoutset', ['start', ['addr({})'.format(dest_address)]])  # TODO: Use combo(address) where possible
         self._log.debug('[rm] scantxoutset end')

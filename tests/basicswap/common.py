@@ -389,7 +389,7 @@ def extract_states_from_xu_file(file_path, prefix):
     return states
 
 
-def compare_bid_states(states, expect_states, exact_match=True):
+def compare_bid_states(states, expect_states, exact_match: bool = True) -> bool:
 
     for i in range(len(states) - 1, -1, -1):
         if states[i][1] == 'Bid Delaying':
@@ -412,6 +412,22 @@ def compare_bid_states(states, expect_states, exact_match=True):
                     continue
                 raise ValueError(f'Expected state {expect_states[i]}, found {s[1]}')
             assert (s[1] == expect_states[i])
+    except Exception as e:
+        logging.info('Expecting states: {}'.format(json.dumps(expect_states, indent=4)))
+        logging.info('Have states: {}'.format(json.dumps(states, indent=4)))
+        raise e
+    return True
+
+
+def compare_bid_states_unordered(states, expect_states) -> bool:
+    for i in range(len(states) - 1, -1, -1):
+        if states[i][1] == 'Bid Delaying':
+            del states[i]
+
+    try:
+        assert len(states) == len(expect_states)
+        for state in expect_states:
+            assert (any(state in s[1] for s in states))
     except Exception as e:
         logging.info('Expecting states: {}'.format(json.dumps(expect_states, indent=4)))
         logging.info('Have states: {}'.format(json.dumps(states, indent=4)))

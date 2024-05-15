@@ -66,8 +66,8 @@ from basicswap.contrib.test_framework.messages import (
     CTxIn,
     CTxInWitness,
     CTxOut,
-    uint256_from_str)
-
+    uint256_from_str,
+)
 from basicswap.contrib.test_framework.script import (
     CScript, CScriptOp,
     OP_IF, OP_ELSE, OP_ENDIF,
@@ -230,17 +230,6 @@ class BTCInterface(Secp256k1Interface):
                 break
 
         return len(wallets)
-
-    def using_segwit(self) -> bool:
-        # Using btc native segwit
-        return self._use_segwit
-
-    def use_p2shp2wsh(self) -> bool:
-        # p2sh-p2wsh
-        return False
-
-    def get_connection_type(self):
-        return self._connection_type
 
     def open_rpc(self, wallet=None):
         return openrpc(self._rpcport, self._rpcauth, wallet=wallet, host=self._rpc_host)
@@ -1163,7 +1152,7 @@ class BTCInterface(Secp256k1Interface):
         lock_tx_dest = self.getScriptDest(lock_script)
         return self.encodeScriptDest(lock_tx_dest)
 
-    def getLockTxHeight(self, txid, dest_address, bid_amount, rescan_from, find_index: bool = False):
+    def getLockTxHeight(self, txid, dest_address, bid_amount, rescan_from, find_index: bool = False, vout: int = -1):
         # Add watchonly address and rescan if required
 
         if not self.isAddressMine(dest_address, or_watch_only=True):
@@ -1509,7 +1498,7 @@ class BTCInterface(Secp256k1Interface):
             return {'txid': txid_hex, 'amount': 0, 'height': rv['blockheight']}
         return None
 
-    def createRedeemTxn(self, prevout, output_addr: str, output_value: int) -> str:
+    def createRedeemTxn(self, prevout, output_addr: str, output_value: int, txn_script: bytes = None) -> str:
         tx = CTransaction()
         tx.nVersion = self.txVersion()
         prev_txid = uint256_from_str(bytes.fromhex(prevout['txid'])[::-1])
@@ -1520,7 +1509,7 @@ class BTCInterface(Secp256k1Interface):
         tx.rehash()
         return tx.serialize().hex()
 
-    def createRefundTxn(self, prevout, output_addr: str, output_value: int, locktime: int, sequence: int) -> str:
+    def createRefundTxn(self, prevout, output_addr: str, output_value: int, locktime: int, sequence: int, txn_script: bytes = None) -> str:
         tx = CTransaction()
         tx.nVersion = self.txVersion()
         tx.nLockTime = locktime

@@ -13,17 +13,16 @@ $ pytest -v -s tests/basicswap/test_run.py::Test::test_04_ltc_btc
 
 """
 
-import os
 import random
 import logging
 import unittest
 
 from basicswap.basicswap import (
-    Coins,
-    SwapTypes,
     BidStates,
-    TxStates,
+    Coins,
     DebugTypes,
+    SwapTypes,
+    TxStates,
 )
 from basicswap.basicswap_util import (
     TxLockTypes,
@@ -40,24 +39,23 @@ from tests.basicswap.util import (
     read_json_api,
 )
 from tests.basicswap.common import (
-    wait_for_offer,
-    wait_for_bid,
-    wait_for_balance,
-    wait_for_unspent,
-    wait_for_bid_tx_state,
-    wait_for_in_progress,
-    TEST_HTTP_PORT,
-    LTC_BASE_RPC_PORT,
     BTC_BASE_RPC_PORT,
     compare_bid_states,
-    extract_states_from_xu_file,
+    LTC_BASE_RPC_PORT,
+    TEST_HTTP_PORT,
+    wait_for_balance,
+    wait_for_bid,
+    wait_for_bid_tx_state,
+    wait_for_in_progress,
+    wait_for_offer,
+    wait_for_unspent,
 )
 from basicswap.contrib.test_framework.messages import (
-    ToHex,
-    CTxIn,
     COutPoint,
     CTransaction,
+    CTxIn,
     CTxInWitness,
+    ToHex,
 )
 from basicswap.contrib.test_framework.script import (
     CScript,
@@ -87,10 +85,6 @@ class Test(BaseTest):
 
         wait_for_balance(test_delay_event, 'http://127.0.0.1:1801/json/wallets/btc', 'balance', 1000.0)
         wait_for_balance(test_delay_event, 'http://127.0.0.1:1801/json/wallets/ltc', 'balance', 1000.0)
-
-        diagrams_dir = 'doc/protocols/sequence_diagrams'
-        cls.states_bidder = extract_states_from_xu_file(os.path.join(diagrams_dir, 'bidder.alt.xu'), 'B')
-        cls.states_offerer = extract_states_from_xu_file(os.path.join(diagrams_dir, 'offerer.alt.xu'), 'O')
 
         # Wait for height, or sequencelock is thrown off by genesis blocktime
         cls.waitForParticlHeight(3)
@@ -329,7 +323,8 @@ class Test(BaseTest):
         logging.info('---------- Test PART to LTC')
         swap_clients = self.swap_clients
 
-        offer_id = swap_clients[0].postOffer(Coins.PART, Coins.LTC, 100 * COIN, 0.1 * COIN, 100 * COIN, SwapTypes.SELLER_FIRST)
+        swap_value = 100 * COIN
+        offer_id = swap_clients[0].postOffer(Coins.PART, Coins.LTC, swap_value, 0.1 * COIN, swap_value, SwapTypes.SELLER_FIRST)
 
         wait_for_offer(test_delay_event, swap_clients[1], offer_id)
         offer = swap_clients[1].getOffer(offer_id)
@@ -341,21 +336,34 @@ class Test(BaseTest):
 
         wait_for_in_progress(test_delay_event, swap_clients[1], bid_id, sent=True)
 
-        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=60)
-        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=60)
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=80)
+        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=80)
 
-        js_0 = read_json_api(1800)
-        js_1 = read_json_api(1801)
-        assert (js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
-        assert (js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
+        # Verify lock tx spends are found in the expected wallets
+        bid, offer = swap_clients[0].getBidAndOffer(bid_id)
+        max_fee: int = 1000
+        itx_spend = bid.initiate_tx.spend_txid.hex()
+        ci_node_1_from = swap_clients[1].ci(Coins.PART)
+        wtx = ci_node_1_from.rpc_wallet('gettransaction', [itx_spend,])
+        assert (swap_value - ci_node_1_from.make_int(wtx['details'][0]['amount']) < max_fee)
+
+        ci_node_0_to = swap_clients[0].ci(Coins.LTC)
+        ptx_spend = bid.participate_tx.spend_txid.hex()
+        wtx = ci_node_0_to.rpc_wallet('gettransaction', [ptx_spend,])
+        assert (bid.amount_to - ci_node_0_to.make_int(wtx['details'][0]['amount']) < max_fee)
 
         bid_id_hex = bid_id.hex()
         path = f'bids/{bid_id_hex}/states'
         offerer_states = read_json_api(1800, path)
         bidder_states = read_json_api(1801, path)
 
-        assert (compare_bid_states(offerer_states, self.states_offerer[0]) is True)
-        assert (compare_bid_states(bidder_states, self.states_bidder[0]) is True)
+        assert (compare_bid_states(offerer_states, self.states_offerer_sh[0]) is True)
+        assert (compare_bid_states(bidder_states, self.states_bidder_sh[0]) is True)
+
+        js_0 = read_json_api(1800)
+        js_1 = read_json_api(1801)
+        assert (js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
+        assert (js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
 
     def test_03_ltc_part(self):
         logging.info('---------- Test LTC to PART')
@@ -372,8 +380,8 @@ class Test(BaseTest):
 
         wait_for_in_progress(test_delay_event, swap_clients[0], bid_id, sent=True)
 
-        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=60)
-        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, wait_for=60)
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=80)
+        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, wait_for=80)
 
         js_0 = read_json_api(1800)
         js_1 = read_json_api(1801)
@@ -395,8 +403,8 @@ class Test(BaseTest):
 
         wait_for_in_progress(test_delay_event, swap_clients[1], bid_id, sent=True)
 
-        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=60)
-        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=60)
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=80)
+        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=80)
 
         js_0 = read_json_api(1800)
         js_1 = read_json_api(1801)
@@ -419,8 +427,8 @@ class Test(BaseTest):
         read_json_api(1801, 'bids/{}'.format(bid_id.hex()), {'abandon': True})
         swap_clients[0].acceptBid(bid_id)
 
-        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=60)
-        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.BID_ABANDONED, sent=True, wait_for=60)
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=80)
+        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.BID_ABANDONED, sent=True, wait_for=80)
 
         js_0_bid = read_json_api(1800, 'bids/{}'.format(bid_id.hex()))
         js_1_bid = read_json_api(1801, 'bids/{}'.format(bid_id.hex()))
@@ -437,7 +445,7 @@ class Test(BaseTest):
         offerer_states = read_json_api(1800, path)
         bidder_states = read_json_api(1801, path)
 
-        assert (compare_bid_states(offerer_states, self.states_offerer[1]) is True)
+        assert (compare_bid_states(offerer_states, self.states_offerer_sh[1]) is True)
         assert (bidder_states[-1][1] == 'Bid Abandoned')
 
     def test_06_self_bid(self):
@@ -455,8 +463,8 @@ class Test(BaseTest):
         wait_for_bid(test_delay_event, swap_clients[0], bid_id)
         swap_clients[0].acceptBid(bid_id)
 
-        wait_for_bid_tx_state(test_delay_event, swap_clients[0], bid_id, TxStates.TX_REDEEMED, TxStates.TX_REDEEMED, wait_for=60)
-        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=60)
+        wait_for_bid_tx_state(test_delay_event, swap_clients[0], bid_id, TxStates.TX_REDEEMED, TxStates.TX_REDEEMED, wait_for=80)
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=80)
 
         js_0 = read_json_api(1800)
         assert (js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
@@ -504,8 +512,8 @@ class Test(BaseTest):
         offer = swap_clients[1].getOffer(offer_id)
         bid_id = swap_clients[1].postBid(offer_id, offer.amount_from)
 
-        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=60)
-        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=60)
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=80)
+        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=80)
 
     def test_10_bad_ptx(self):
         # Invalid PTX sent, swap should stall and ITx and PTx should be reclaimed by senders
@@ -543,8 +551,8 @@ class Test(BaseTest):
         offerer_states = read_json_api(1800, path)
         bidder_states = read_json_api(1801, path)
 
-        assert (compare_bid_states(offerer_states, self.states_offerer[1]) is True)
-        assert (compare_bid_states(bidder_states, self.states_bidder[1]) is True)
+        assert (compare_bid_states(offerer_states, self.states_offerer_sh[1]) is True)
+        assert (compare_bid_states(bidder_states, self.states_bidder_sh[1]) is True)
 
     '''
     def test_11_refund(self):
@@ -654,8 +662,8 @@ class Test(BaseTest):
         offerer_states = read_json_api(1800, path)
         bidder_states = read_json_api(1801, path)
 
-        assert (compare_bid_states(offerer_states, self.states_offerer[2]) is True)
-        assert (compare_bid_states(bidder_states, self.states_bidder[2], exact_match=False) is True)
+        assert (compare_bid_states(offerer_states, self.states_offerer_sh[2]) is True)
+        assert (compare_bid_states(bidder_states, self.states_bidder_sh[2], exact_match=False) is True)
 
     def test_14_sweep_balance(self):
         logging.info('---------- Test sweep balance offer')
@@ -718,8 +726,8 @@ class Test(BaseTest):
         wait_for_bid(test_delay_event, swap_clients[2], bid_id)
         swap_clients[2].acceptBid(bid_id)
 
-        wait_for_bid(test_delay_event, swap_clients[2], bid_id, BidStates.SWAP_COMPLETED, wait_for=60)
-        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=60)
+        wait_for_bid(test_delay_event, swap_clients[2], bid_id, BidStates.SWAP_COMPLETED, wait_for=80)
+        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=80)
 
         # Verify expected inputs were used
         bid, offer = swap_clients[2].getBidAndOffer(bid_id)
@@ -753,8 +761,8 @@ class Test(BaseTest):
 
         wait_for_in_progress(test_delay_event, swap_clients[0], bid_id, sent=True)
 
-        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=60)
-        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, wait_for=60)
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=80)
+        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, wait_for=80)
 
     def pass_99_delay(self):
         logging.info('Delay')

@@ -75,9 +75,11 @@ class PIVXInterface(BTCInterface):
 
         block_rv = {
             'hash': block_hash,
+            'previousblockhash': block_header['previousblockhash'],
             'tx': tx_rv,
             'confirmations': block_header['confirmations'],
             'height': block_header['height'],
+            'time': block_header['time'],
             'version': block_header['version'],
             'merkleroot': block_header['merkleroot'],
         }

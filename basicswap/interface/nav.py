@@ -415,7 +415,7 @@ class NAVInterface(BTCInterface):
                         return
             current_height -= 1
 
-    def getLockTxHeight(self, txid, dest_address, bid_amount, rescan_from, find_index: bool = False):
+    def getLockTxHeight(self, txid, dest_address, bid_amount, rescan_from, find_index: bool = False, vout: int = -1):
         # Add watchonly address and rescan if required
 
         if not self.isAddressMine(dest_address, or_watch_only=True):
@@ -479,9 +479,11 @@ class NAVInterface(BTCInterface):
 
         block_rv = {
             'hash': block_hash,
+            'previousblockhash': block_header['previousblockhash'],
             'tx': tx_rv,
             'confirmations': block_header['confirmations'],
             'height': block_header['height'],
+            'time': block_header['time'],
             'version': block_header['version'],
             'merkleroot': block_header['merkleroot'],
         }

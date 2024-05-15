@@ -202,6 +202,7 @@ class DebugTypes(IntEnum):
     SEND_LOCKED_XMR = auto()
     B_LOCK_TX_MISSED_SEND = auto()
     DUPLICATE_ACTIONS = auto()
+    DONT_CONFIRM_PTX = auto()
 
 
 class NotificationTypes(IntEnum):

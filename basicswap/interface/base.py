@@ -19,6 +19,9 @@ from basicswap.util import (
     format_amount,
     TemporaryError,
 )
+from basicswap.util.crypto import (
+    hash160,
+)
 from basicswap.util.ecc import (
     ep,
     getSecretInt,
@@ -37,6 +40,10 @@ class Curves(IntEnum):
 
 
 class CoinInterface:
+    @staticmethod
+    def watch_blocks_for_scripts() -> bool:
+        return False
+
     def __init__(self, network):
         self.setDefaults()
         self._network = network
@@ -101,6 +108,10 @@ class CoinInterface:
     def has_segwit(self) -> bool:
         return chainparams[self.coin_type()].get('has_segwit', True)
 
+    def use_p2shp2wsh(self) -> bool:
+        # p2sh-p2wsh
+        return False
+
     def is_transient_error(self, ex) -> bool:
         if isinstance(ex, TemporaryError):
             return True
@@ -128,6 +139,16 @@ class CoinInterface:
     def walletRestoreHeight(self) -> int:
         return self._restore_height
 
+    def get_connection_type(self):
+        return self._connection_type
+
+    def using_segwit(self) -> bool:
+        # Using btc native segwit
+        return self._use_segwit
+
+    def use_tx_vsize(self) -> bool:
+        return self._use_segwit
+
 
 class Secp256k1Interface(CoinInterface):
     @staticmethod
@@ -137,8 +158,11 @@ class Secp256k1Interface(CoinInterface):
     def getNewSecretKey(self) -> bytes:
         return i2b(getSecretInt())
 
-    def getPubkey(self, privkey):
+    def getPubkey(self, privkey: bytes) -> bytes:
         return PublicKey.from_secret(privkey).format()
+
+    def pkh(self, pubkey: bytes) -> bytes:
+        return hash160(pubkey)
 
     def verifyKey(self, k: bytes) -> bool:
         i = b2i(k)

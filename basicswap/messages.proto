@@ -49,6 +49,9 @@ message BidMessage {
     string proof_signature = 8;
 
     bytes proof_utxos = 9;          /* 32 byte txid 2 byte vout, repeated */
+
+    /* optional */
+    bytes pkhash_buyer_to = 13;     /* When pubkey hash is different on the to-chain */
 }
 
 /* For tests */
@@ -65,6 +68,7 @@ message BidAcceptMessage {
     bytes bid_msg_id = 1;
     bytes initiate_txid = 2;
     bytes contract_script = 3;
+    bytes pkhash_seller = 4;
 }
 
 message OfferRevokeMessage {

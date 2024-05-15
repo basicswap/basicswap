@@ -319,7 +319,6 @@ class Test(unittest.TestCase):
         ci_btc = BTCInterface(coin_settings, 'regtest')
 
         for i in range(10000):
-
             test_pairs = random.randint(0, 3)
             if test_pairs == 0:
                 ci_from = ci_btc
@@ -425,6 +424,9 @@ class Test(unittest.TestCase):
         msg_buf_v2.ParseFromString(serialised_msg)
         assert (msg_buf_v2.protocol_version == 2)
         assert (msg_buf_v2.time_valid == 1024)
+        assert (msg_buf_v2.amount == 0)
+        assert (msg_buf_v2.pkhash_buyer is not None)
+        assert (len(msg_buf_v2.pkhash_buyer) == 0)
 
         # Decode only the first field
         msg_buf_v2.ParseFromString(serialised_msg[:2])

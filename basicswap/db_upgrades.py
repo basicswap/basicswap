@@ -300,6 +300,18 @@ def upgradeDatabase(self, db_version):
         elif current_version == 22:
             db_version += 1
             session.execute('ALTER TABLE offers ADD COLUMN amount_to INTEGER')
+        elif current_version == 23:
+            db_version += 1
+            session.execute('''
+                CREATE TABLE checkedblocks (
+                    record_id INTEGER NOT NULL,
+                    created_at BIGINT,
+                    coin_type INTEGER,
+                    block_height INTEGER,
+                    block_hash BLOB,
+                    block_time INTEGER,
+                    PRIMARY KEY (record_id))''')
+            session.execute('ALTER TABLE bids ADD COLUMN pkhash_buyer_to BLOB')
         if current_version != db_version:
             self.db_version = db_version
             self.setIntKVInSession('db_version', db_version, session)
