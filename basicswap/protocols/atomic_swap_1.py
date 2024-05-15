@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2020-2023 tecnovert
+# Copyright (c) 2020-2024 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -10,12 +10,15 @@ from basicswap.db import (
 from basicswap.util import (
     SerialiseNum,
 )
+from basicswap.util.script import (
+    decodeScriptNum,
+)
 from basicswap.script import (
     OpCodes,
 )
 from basicswap.basicswap_util import (
-    SwapTypes,
     EventLogTypes,
+    SwapTypes,
 )
 from . import ProtocolInterface
 
@@ -23,13 +26,13 @@ INITIATE_TX_TIMEOUT = 40 * 60  # TODO: make variable per coin
 ABS_LOCK_TIME_LEEWAY = 10 * 60
 
 
-def buildContractScript(lock_val: int, secret_hash: bytes, pkh_redeem: bytes, pkh_refund: bytes, op_lock=OpCodes.OP_CHECKSEQUENCEVERIFY) -> bytearray:
+def buildContractScript(lock_val: int, secret_hash: bytes, pkh_redeem: bytes, pkh_refund: bytes, op_lock=OpCodes.OP_CHECKSEQUENCEVERIFY, op_hash=OpCodes.OP_SHA256) -> bytearray:
     script = bytearray([
         OpCodes.OP_IF,
         OpCodes.OP_SIZE,
         0x01, 0x20,  # 32
         OpCodes.OP_EQUALVERIFY,
-        OpCodes.OP_SHA256,
+        op_hash,
         0x20]) \
         + secret_hash \
         + bytearray([
@@ -52,6 +55,46 @@ def buildContractScript(lock_val: int, secret_hash: bytes, pkh_redeem: bytes, pk
             OpCodes.OP_EQUALVERIFY,
             OpCodes.OP_CHECKSIG])
     return script
+
+
+def verifyContractScript(script, op_lock=OpCodes.OP_CHECKSEQUENCEVERIFY, op_hash=OpCodes.OP_SHA256):
+    if script[0] != OpCodes.OP_IF or \
+       script[1] != OpCodes.OP_SIZE or \
+       script[2] != 0x01 or script[3] != 0x20 or \
+       script[4] != OpCodes.OP_EQUALVERIFY or \
+       script[5] != op_hash or \
+       script[6] != 0x20:
+        return False, None, None, None, None
+    o = 7
+    script_hash = script[o: o + 32]
+    o += 32
+    if script[o] != OpCodes.OP_EQUALVERIFY or \
+       script[o + 1] != OpCodes.OP_DUP or \
+       script[o + 2] != OpCodes.OP_HASH160 or \
+       script[o + 3] != 0x14:
+        return False, script_hash, None, None, None
+    o += 4
+    pkh_redeem = script[o: o + 20]
+    o += 20
+    if script[o] != OpCodes.OP_ELSE:
+        return False, script_hash, pkh_redeem, None, None
+    o += 1
+    lock_val, nb = decodeScriptNum(script, o)
+    o += nb
+    if script[o] != op_lock or \
+       script[o + 1] != OpCodes.OP_DROP or \
+       script[o + 2] != OpCodes.OP_DUP or \
+       script[o + 3] != OpCodes.OP_HASH160 or \
+       script[o + 4] != 0x14:
+        return False, script_hash, pkh_redeem, lock_val, None
+    o += 5
+    pkh_refund = script[o: o + 20]
+    o += 20
+    if script[o] != OpCodes.OP_ENDIF or \
+       script[o + 1] != OpCodes.OP_EQUALVERIFY or \
+       script[o + 2] != OpCodes.OP_CHECKSIG:
+        return False, script_hash, pkh_redeem, lock_val, pkh_refund
+    return True, script_hash, pkh_redeem, lock_val, pkh_refund
 
 
 def extractScriptSecretHash(script):

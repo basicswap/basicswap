@@ -14,7 +14,7 @@ from basicswap.contrib.test_framework.messages import (
 from basicswap.contrib.test_framework.script import (
     CScript,
     OP_0,
-    OP_DUP, OP_HASH160, OP_EQUALVERIFY, OP_CHECKSIG
+    OP_DUP, OP_HASH160, OP_EQUALVERIFY, OP_CHECKSIG,
 )
 from basicswap.util import (
     ensure,
@@ -26,8 +26,8 @@ from basicswap.util.script import (
     getWitnessElementLen,
 )
 from basicswap.util.address import (
-    toWIF,
-    encodeStealthAddress)
+    encodeStealthAddress,
+)
 from basicswap.chainparams import Coins, chainparams
 from .btc import BTCInterface
 
@@ -72,6 +72,9 @@ class PARTInterface(BTCInterface):
     def __init__(self, coin_settings, network, swap_client=None):
         super().__init__(coin_settings, network, swap_client)
         self.setAnonTxRingSize(int(coin_settings.get('anon_tx_ring_size', 12)))
+
+    def use_tx_vsize(self) -> bool:
+        return True
 
     def setAnonTxRingSize(self, value):
         ensure(value >= 3 and value < 33, 'Invalid anon_tx_ring_size value')
@@ -687,8 +690,7 @@ class PARTInterfaceBlind(PARTInterface):
         else:
             addr_info = self.rpc_wallet('getaddressinfo', [sx_addr])
             if not addr_info['iswatchonly']:
-                wif_prefix = self.chainparams_network()['key_prefix']
-                wif_scan_key = toWIF(wif_prefix, kbv)
+                wif_scan_key = self.encodeKey(kbv)
                 self.rpc_wallet('importstealthaddress', [wif_scan_key, Kbs.hex()])
                 self._log.info('Imported watch-only sx_addr: {}'.format(sx_addr))
                 self._log.info('Rescanning {} chain from height: {}'.format(self.coin_name(), restore_height))
@@ -719,9 +721,8 @@ class PARTInterfaceBlind(PARTInterface):
         sx_addr = self.formatStealthAddress(Kbv, Kbs)
         addr_info = self.rpc_wallet('getaddressinfo', [sx_addr])
         if not addr_info['ismine']:
-            wif_prefix = self.chainparams_network()['key_prefix']
-            wif_scan_key = toWIF(wif_prefix, kbv)
-            wif_spend_key = toWIF(wif_prefix, kbs)
+            wif_scan_key = self.encodeKey(kbv)
+            wif_spend_key = self.encodeKey(kbs)
             self.rpc_wallet('importstealthaddress', [wif_scan_key, wif_spend_key])
             self._log.info('Imported spend key for sx_addr: {}'.format(sx_addr))
             self._log.info('Rescanning {} chain from height: {}'.format(self.coin_name(), restore_height))
@@ -825,8 +826,7 @@ class PARTInterfaceAnon(PARTInterface):
         else:
             addr_info = self.rpc_wallet('getaddressinfo', [sx_addr])
             if not addr_info['iswatchonly']:
-                wif_prefix = self.chainparams_network()['key_prefix']
-                wif_scan_key = toWIF(wif_prefix, kbv)
+                wif_scan_key = self.encodeKey(kbv)
                 self.rpc_wallet('importstealthaddress', [wif_scan_key, Kbs.hex()])
                 self._log.info('Imported watch-only sx_addr: {}'.format(sx_addr))
                 self._log.info('Rescanning {} chain from height: {}'.format(self.coin_name(), restore_height))
@@ -857,9 +857,8 @@ class PARTInterfaceAnon(PARTInterface):
         sx_addr = self.formatStealthAddress(Kbv, Kbs)
         addr_info = self.rpc_wallet('getaddressinfo', [sx_addr])
         if not addr_info['ismine']:
-            wif_prefix = self.chainparams_network()['key_prefix']
-            wif_scan_key = toWIF(wif_prefix, kbv)
-            wif_spend_key = toWIF(wif_prefix, kbs)
+            wif_scan_key = self.encodeKey(kbv)
+            wif_spend_key = self.encodeKey(kbs)
             self.rpc_wallet('importstealthaddress', [wif_scan_key, wif_spend_key])
             self._log.info('Imported spend key for sx_addr: {}'.format(sx_addr))
             self._log.info('Rescanning {} chain from height: {}'.format(self.coin_name(), restore_height))

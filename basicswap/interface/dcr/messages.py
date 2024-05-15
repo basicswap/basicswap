@@ -8,7 +8,7 @@
 import copy
 from enum import IntEnum
 from basicswap.util.crypto import blake256
-from basicswap.util.integer import decode_varint, encode_varint
+from basicswap.util.integer import decode_compactsize, encode_compactsize
 
 
 class TxSerializeType(IntEnum):
@@ -86,12 +86,12 @@ class CTransaction:
     def deserialize(self, data: bytes) -> None:
 
         version = int.from_bytes(data[:4], 'little')
-        self.version = self.version & 0xffff
+        self.version = version & 0xffff
         ser_type: int = version >> 16
         o = 4
 
         if ser_type == TxSerializeType.Full or ser_type == TxSerializeType.NoWitness:
-            num_txin, nb = decode_varint(data, o)
+            num_txin, nb = decode_compactsize(data, o)
             o += nb
 
             for i in range(num_txin):
@@ -107,7 +107,7 @@ class CTransaction:
                 o += 4
                 self.vin.append(txi)
 
-            num_txout, nb = decode_varint(data, o)
+            num_txout, nb = decode_compactsize(data, o)
             o += nb
 
             for i in range(num_txout):
@@ -116,7 +116,7 @@ class CTransaction:
                 o += 8
                 txo.version = int.from_bytes(data[o:o + 2], 'little')
                 o += 2
-                script_bytes, nb = decode_varint(data, o)
+                script_bytes, nb = decode_compactsize(data, o)
                 o += nb
                 txo.script_pubkey = data[o:o + script_bytes]
                 o += script_bytes
@@ -130,7 +130,7 @@ class CTransaction:
         if ser_type == TxSerializeType.NoWitness:
             return
 
-        num_wit_scripts, nb = decode_varint(data, o)
+        num_wit_scripts, nb = decode_compactsize(data, o)
         o += nb
 
         if ser_type == TxSerializeType.OnlyWitness:
@@ -147,7 +147,7 @@ class CTransaction:
             o += 4
             txi.block_index = int.from_bytes(data[o:o + 4], 'little')
             o += 4
-            script_bytes, nb = decode_varint(data, o)
+            script_bytes, nb = decode_compactsize(data, o)
             o += nb
             txi.signature_script = data[o:o + script_bytes]
             o += script_bytes
@@ -158,31 +158,31 @@ class CTransaction:
         data += version.to_bytes(4, 'little')
 
         if ser_type == TxSerializeType.Full or ser_type == TxSerializeType.NoWitness:
-            data += encode_varint(len(self.vin))
+            data += encode_compactsize(len(self.vin))
             for txi in self.vin:
                 data += txi.prevout.hash.to_bytes(32, 'little')
                 data += txi.prevout.n.to_bytes(4, 'little')
                 data += txi.prevout.tree.to_bytes(1)
                 data += txi.sequence.to_bytes(4, 'little')
 
-            data += encode_varint(len(self.vout))
+            data += encode_compactsize(len(self.vout))
             for txo in self.vout:
                 data += txo.value.to_bytes(8, 'little')
                 data += txo.version.to_bytes(2, 'little')
-                data += encode_varint(len(txo.script_pubkey))
+                data += encode_compactsize(len(txo.script_pubkey))
                 data += txo.script_pubkey
 
             data += self.locktime.to_bytes(4, 'little')
             data += self.expiry.to_bytes(4, 'little')
 
         if ser_type == TxSerializeType.Full or ser_type == TxSerializeType.OnlyWitness:
-            data += encode_varint(len(self.vin))
+            data += encode_compactsize(len(self.vin))
             for txi in self.vin:
                 tc_value_in = txi.value_in & 0xffffffffffffffff  # Convert negative values
                 data += tc_value_in.to_bytes(8, 'little')
                 data += txi.block_height.to_bytes(4, 'little')
                 data += txi.block_index.to_bytes(4, 'little')
-                data += encode_varint(len(txi.signature_script))
+                data += encode_compactsize(len(txi.signature_script))
                 data += txi.signature_script
 
         return data

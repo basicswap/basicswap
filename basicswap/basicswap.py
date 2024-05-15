@@ -5,7 +5,6 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import os
-import re
 import sys
 import zmq
 import copy
@@ -16,7 +15,6 @@ import random
 import shutil
 import string
 import struct
-import hashlib
 import secrets
 import datetime as dt
 import threading
@@ -53,10 +51,12 @@ from .util.script import (
 )
 from .util.address import (
     toWIF,
-    getKeyID,
     decodeWif,
     decodeAddress,
     pubkeyToAddress,
+)
+from .util.crypto import (
+    sha256,
 )
 from basicswap.util.network import is_private_ip_address
 from .chainparams import (
@@ -147,7 +147,7 @@ from basicswap.db_util import (
     remove_expired_data,
 )
 
-PROTOCOL_VERSION_SECRET_HASH = 4
+PROTOCOL_VERSION_SECRET_HASH = 5
 MINPROTO_VERSION_SECRET_HASH = 4
 
 PROTOCOL_VERSION_ADAPTOR_SIG = 4
@@ -205,6 +205,16 @@ class WatchedOutput():  # Watch for spends
         self.bid_id = bid_id
         self.txid_hex = txid_hex
         self.vout = vout
+        self.tx_type = tx_type
+        self.swap_type = swap_type
+
+
+class WatchedScript():  # Watch for txns containing outputs
+    __slots__ = ('bid_id', 'script', 'tx_type', 'swap_type')
+
+    def __init__(self, bid_id: bytes, script: bytes, tx_type, swap_type):
+        self.bid_id = bid_id
+        self.script = script
         self.tx_type = tx_type
         self.swap_type = swap_type
 
@@ -454,6 +464,10 @@ class BasicSwap(BaseApp):
             last_height_checked = session.query(DBKVInt).filter_by(key='last_height_checked_' + chainparams[coin]['name']).first().value
         except Exception:
             last_height_checked = 0
+        try:
+            block_check_min_time = session.query(DBKVInt).filter_by(key='block_check_min_time_' + chainparams[coin]['name']).first().value
+        except Exception:
+            block_check_min_time = 0xffffffffffffffff
         session.close()
         session.remove()
 
@@ -472,7 +486,9 @@ class BasicSwap(BaseApp):
             'blocks_confirmed': chain_client_settings.get('blocks_confirmed', 6),
             'conf_target': chain_client_settings.get('conf_target', 2),
             'watched_outputs': [],
+            'watched_scripts': [],
             'last_height_checked': last_height_checked,
+            'block_check_min_time': block_check_min_time,
             'use_segwit': chain_client_settings.get('use_segwit', default_segwit),
             'use_csv': chain_client_settings.get('use_csv', default_csv),
             'core_version_group': chain_client_settings.get('core_version_group', 0),
@@ -1150,12 +1166,17 @@ class BasicSwap(BaseApp):
             if bid.participate_tx and bid.participate_tx.txid:
                 self.addWatchedOutput(coin_to, bid.bid_id, bid.participate_tx.txid.hex(), bid.participate_tx.vout, BidStates.SWAP_PARTICIPATING)
 
+            if bid.participate_tx and bid.participate_tx.txid is None:
+                self.addWatchedScript(coin_to, bid.bid_id, self.ci(coin_to).getScriptDest(bid.participate_tx.script), TxTypes.PTX)
+                if bid.initiate_tx and bid.initiate_tx.chain_height:
+                    self.setLastHeightCheckedStart(coin_to, bid.initiate_tx.chain_height)
+
             if self.coin_clients[coin_from]['last_height_checked'] < 1:
                 if bid.initiate_tx and bid.initiate_tx.chain_height:
-                    self.coin_clients[coin_from]['last_height_checked'] = bid.initiate_tx.chain_height
+                    self.setLastHeightCheckedStart(coin_from, bid.initiate_tx.chain_height)
             if self.coin_clients[coin_to]['last_height_checked'] < 1:
                 if bid.participate_tx and bid.participate_tx.chain_height:
-                    self.coin_clients[coin_to]['last_height_checked'] = bid.participate_tx.chain_height
+                    self.setLastHeightCheckedStart(coin_to, bid.participate_tx.chain_height)
 
         # TODO process addresspool if bid has previously been abandoned
 
@@ -1171,6 +1192,9 @@ class BasicSwap(BaseApp):
         # Remove any watched outputs
         self.removeWatchedOutput(Coins(offer.coin_from), bid.bid_id, None)
         self.removeWatchedOutput(Coins(offer.coin_to), bid.bid_id, None)
+
+        self.removeWatchedScript(Coins(offer.coin_from), bid.bid_id, None)
+        self.removeWatchedScript(Coins(offer.coin_to), bid.bid_id, None)
 
         if bid.state in (BidStates.BID_ABANDONED, BidStates.SWAP_COMPLETED):
             # Return unused addrs to pool
@@ -1859,7 +1883,7 @@ class BasicSwap(BaseApp):
         path += '/' + str(date.year) + '/' + str(date.month) + '/' + str(date.day)
         path += '/' + str(contract_count)
 
-        return hashlib.sha256(bytes(self.callcoinrpc(Coins.PART, 'extkey', ['info', evkey, path])['key_info']['result'], 'utf-8')).digest()
+        return sha256(bytes(self.callcoinrpc(Coins.PART, 'extkey', ['info', evkey, path])['key_info']['result'], 'utf-8'))
 
     def getReceiveAddressFromPool(self, coin_type, bid_id: bytes, tx_type):
         self.log.debug('Get address from pool bid_id {}, type {}, coin {}'.format(bid_id.hex(), tx_type, coin_type))
@@ -2337,7 +2361,12 @@ class BasicSwap(BaseApp):
                     msg_buf.proof_utxos = ci_to.encodeProofUtxos(proof_utxos)
 
                 contract_count = self.getNewContractId()
-                msg_buf.pkhash_buyer = getKeyID(self.getContractPubkey(dt.datetime.fromtimestamp(now).date(), contract_count))
+                contract_pubkey = self.getContractPubkey(dt.datetime.fromtimestamp(now).date(), contract_count)
+                msg_buf.pkhash_buyer = ci_from.pkh(contract_pubkey)
+                pkhash_buyer_to = ci_to.pkh(contract_pubkey)
+                if pkhash_buyer_to != msg_buf.pkhash_buyer:
+                    # Different pubkey hash
+                    msg_buf.pkhash_buyer_to = pkhash_buyer_to
             else:
                 raise ValueError('TODO')
 
@@ -2369,6 +2398,9 @@ class BasicSwap(BaseApp):
                 chain_b_height_start=ci_to.getChainHeight(),
             )
             bid.setState(BidStates.BID_SENT)
+
+            if len(msg_buf.pkhash_buyer_to) > 0:
+                bid.pkhash_buyer_to = msg_buf.pkhash_buyer_to
 
             try:
                 session = scoped_session(self.session_factory)
@@ -2554,13 +2586,19 @@ class BasicSwap(BaseApp):
 
         coin_from = Coins(offer.coin_from)
         ci_from = self.ci(coin_from)
+        ci_to = self.ci(offer.coin_to)
         bid_date = dt.datetime.fromtimestamp(bid.created_at).date()
 
         secret = self.getContractSecret(bid_date, bid.contract_count)
-        secret_hash = hashlib.sha256(secret).digest()
+        secret_hash = sha256(secret)
 
         pubkey_refund = self.getContractPubkey(bid_date, bid.contract_count)
-        pkhash_refund = getKeyID(pubkey_refund)
+        pkhash_refund = ci_from.pkh(pubkey_refund)
+
+        if coin_from in (Coins.DCR, ):
+            op_hash = OpCodes.OP_SHA256_DECRED
+        else:
+            op_hash = OpCodes.OP_SHA256
 
         if bid.initiate_tx is not None:
             self.log.warning('Initiate txn %s already exists for bid %s', bid.initiate_tx.txid, bid_id.hex())
@@ -2569,21 +2607,19 @@ class BasicSwap(BaseApp):
         else:
             if offer.lock_type < TxLockTypes.ABS_LOCK_BLOCKS:
                 sequence = ci_from.getExpectedSequence(offer.lock_type, offer.lock_value)
-                script = atomic_swap_1.buildContractScript(sequence, secret_hash, bid.pkhash_buyer, pkhash_refund)
+                script = atomic_swap_1.buildContractScript(sequence, secret_hash, bid.pkhash_buyer, pkhash_refund, op_hash=op_hash)
             else:
                 if offer.lock_type == TxLockTypes.ABS_LOCK_BLOCKS:
-                    lock_value = self.callcoinrpc(coin_from, 'getblockcount') + offer.lock_value
+                    lock_value = ci_from.getChainHeight() + offer.lock_value
                 else:
                     lock_value = self.getTime() + offer.lock_value
                 self.log.debug('Initiate %s lock_value %d %d', ci_from.coin_name(), offer.lock_value, lock_value)
-                script = atomic_swap_1.buildContractScript(lock_value, secret_hash, bid.pkhash_buyer, pkhash_refund, OpCodes.OP_CHECKLOCKTIMEVERIFY)
+                script = atomic_swap_1.buildContractScript(lock_value, secret_hash, bid.pkhash_buyer, pkhash_refund, OpCodes.OP_CHECKLOCKTIMEVERIFY, op_hash=op_hash)
 
-            p2sh = self.callcoinrpc(Coins.PART, 'decodescript', [script.hex()])['p2sh']
-
-            bid.pkhash_seller = pkhash_refund
+            bid.pkhash_seller = ci_to.pkh(pubkey_refund)
 
             prefunded_tx = self.getPreFundedTx(Concepts.OFFER, offer.offer_id, TxTypes.ITX_PRE_FUNDED)
-            txn = self.createInitiateTxn(coin_from, bid_id, bid, script, prefunded_tx)
+            txn, lock_tx_vout = self.createInitiateTxn(coin_from, bid_id, bid, script, prefunded_tx)
 
             # Store the signed refund txn in case wallet is locked when refund is possible
             refund_txn = self.createRefundTxn(coin_from, txn, offer, bid, script)
@@ -2595,6 +2631,7 @@ class BasicSwap(BaseApp):
                 bid_id=bid_id,
                 tx_type=TxTypes.ITX,
                 txid=bytes.fromhex(txid),
+                vout=lock_tx_vout,
                 tx_data=bytes.fromhex(txn),
                 script=script,
             )
@@ -2614,6 +2651,11 @@ class BasicSwap(BaseApp):
             msg_buf.bid_msg_id = bid_id
             msg_buf.initiate_txid = bytes.fromhex(txid)
             msg_buf.contract_script = bytes(script)
+
+            # pkh sent in script is hashed with sha256, Decred expects blake256
+            if bid.pkhash_seller != pkhash_refund:
+                assert (ci_to.coin_type() == Coins.DCR or ci_from.coin_type() == Coins.DCR)  # [rm]
+                msg_buf.pkhash_seller = bid.pkhash_seller
 
             bid_bytes = msg_buf.SerializeToString()
             payload_hex = str.format('{:02x}', MessageTypes.BID_ACCEPT) + bid_bytes.hex()
@@ -3137,9 +3179,9 @@ class BasicSwap(BaseApp):
         if save_bid:
             self.saveBid(bid_id, bid, xmr_swap=xmr_swap)
 
-    def createInitiateTxn(self, coin_type, bid_id: bytes, bid, initiate_script, prefunded_tx=None) -> Optional[str]:
+    def createInitiateTxn(self, coin_type, bid_id: bytes, bid, initiate_script, prefunded_tx=None) -> (Optional[str], Optional[int]):
         if self.coin_clients[coin_type]['connection_type'] != 'rpc':
-            return None
+            return None, None
         ci = self.ci(coin_type)
 
         if ci.using_segwit():
@@ -3154,7 +3196,12 @@ class BasicSwap(BaseApp):
             txn_signed = pi.promoteMockTx(ci, prefunded_tx, initiate_script).hex()
         else:
             txn_signed = ci.createRawSignedTransaction(addr_to, bid.amount)
-        return txn_signed
+
+        txjs = ci.describeTx(txn_signed)
+        vout = getVoutByAddress(txjs, addr_to)
+        assert (vout is not None)
+
+        return txn_signed, vout
 
     def deriveParticipateScript(self, bid_id: bytes, bid, offer) -> bytearray:
         self.log.debug('deriveParticipateScript for bid %s', bid_id.hex())
@@ -3164,18 +3211,28 @@ class BasicSwap(BaseApp):
 
         secret_hash = atomic_swap_1.extractScriptSecretHash(bid.initiate_tx.script)
         pkhash_seller = bid.pkhash_seller
-        pkhash_buyer_refund = bid.pkhash_buyer
+
+        if bid.pkhash_buyer_to and len(bid.pkhash_buyer_to) > 0:
+            pkhash_buyer_refund = bid.pkhash_buyer_to
+        else:
+            pkhash_buyer_refund = bid.pkhash_buyer
+
+        if coin_to in (Coins.DCR, ):
+            op_hash = OpCodes.OP_SHA256_DECRED
+        else:
+            op_hash = OpCodes.OP_SHA256
 
         # Participate txn is locked for half the time of the initiate txn
         lock_value = offer.lock_value // 2
         if offer.lock_type < TxLockTypes.ABS_LOCK_BLOCKS:
             sequence = ci_to.getExpectedSequence(offer.lock_type, lock_value)
-            participate_script = atomic_swap_1.buildContractScript(sequence, secret_hash, pkhash_seller, pkhash_buyer_refund)
+            participate_script = atomic_swap_1.buildContractScript(sequence, secret_hash, pkhash_seller, pkhash_buyer_refund, op_hash=op_hash)
         else:
             # Lock from the height or time of the block containing the initiate txn
             coin_from = Coins(offer.coin_from)
-            initiate_tx_block_hash = self.callcoinrpc(coin_from, 'getblockhash', [bid.initiate_tx.chain_height, ])
-            initiate_tx_block_time = int(self.callcoinrpc(coin_from, 'getblock', [initiate_tx_block_hash, ])['time'])
+            block_header = self.ci(coin_from).getBlockHeaderFromHeight(bid.initiate_tx.chain_height)
+            initiate_tx_block_hash = block_header['hash']
+            initiate_tx_block_time = block_header['time']
             if offer.lock_type == TxLockTypes.ABS_LOCK_BLOCKS:
                 # Walk the coin_to chain back until block time matches
                 block_header_at = ci_to.getBlockHeaderAt(initiate_tx_block_time, block_after=True)
@@ -3188,7 +3245,7 @@ class BasicSwap(BaseApp):
                 self.log.debug('Setting lock value from time of block %s %s', Coins(coin_from).name, initiate_tx_block_hash)
                 contract_lock_value = initiate_tx_block_time + lock_value
             self.log.debug('participate %s lock_value %d %d', Coins(coin_to).name, lock_value, contract_lock_value)
-            participate_script = atomic_swap_1.buildContractScript(contract_lock_value, secret_hash, pkhash_seller, pkhash_buyer_refund, OpCodes.OP_CHECKLOCKTIMEVERIFY)
+            participate_script = atomic_swap_1.buildContractScript(contract_lock_value, secret_hash, pkhash_seller, pkhash_buyer_refund, OpCodes.OP_CHECKLOCKTIMEVERIFY, op_hash=op_hash)
         return participate_script
 
     def createParticipateTxn(self, bid_id: bytes, bid, offer, participate_script: bytearray):
@@ -3219,7 +3276,7 @@ class BasicSwap(BaseApp):
         refund_txn = self.createRefundTxn(coin_to, txn_signed, offer, bid, participate_script, tx_type=TxTypes.PTX_REFUND)
         bid.participate_txn_refund = bytes.fromhex(refund_txn)
 
-        chain_height = self.callcoinrpc(coin_to, 'getblockcount')
+        chain_height = ci.getChainHeight()
         txjs = self.callcoinrpc(coin_to, 'decoderawtransaction', [txn_signed])
         txid = txjs['txid']
 
@@ -3252,7 +3309,7 @@ class BasicSwap(BaseApp):
             prev_p2wsh = ci.getScriptDest(txn_script)
             script_pub_key = prev_p2wsh.hex()
         else:
-            script_pub_key = getP2SHScriptForHash(getKeyID(txn_script)).hex()
+            script_pub_key = getP2SHScriptForHash(ci.pkh(txn_script)).hex()
 
         prevout = {
             'txid': prev_txnid,
@@ -3262,17 +3319,16 @@ class BasicSwap(BaseApp):
             'amount': ci.format_amount(prev_amount)}
 
         bid_date = dt.datetime.fromtimestamp(bid.created_at).date()
-        if coin_type in (Coins.NAV, ):
-            wif_prefix = chainparams[coin_type][self.chain]['key_prefix']
-        else:
-            wif_prefix = chainparams[Coins.PART][self.chain]['key_prefix']
-        pubkey = self.getContractPubkey(bid_date, bid.contract_count)
-        privkey = toWIF(wif_prefix, self.getContractPrivkey(bid_date, bid.contract_count))
+        privkey = self.getContractPrivkey(bid_date, bid.contract_count)
+        pubkey = ci.getPubkey(privkey)
 
         secret = bid.recovered_secret
         if secret is None:
             secret = self.getContractSecret(bid_date, bid.contract_count)
         ensure(len(secret) == 32, 'Bad secret length')
+
+        self.log.debug('secret {}'.format(secret.hex()))
+        self.log.debug('sha256(secret) {}'.format(sha256(secret).hex()))
 
         if self.coin_clients[coin_type]['connection_type'] != 'rpc':
             return None
@@ -3294,40 +3350,40 @@ class BasicSwap(BaseApp):
 
         self.log.debug('addr_redeem_out %s', addr_redeem_out)
 
-        if ci.use_p2shp2wsh():
-            redeem_txn = ci.createRedeemTxn(prevout, addr_redeem_out, amount_out, txn_script)
-        else:
-            redeem_txn = ci.createRedeemTxn(prevout, addr_redeem_out, amount_out)
+        redeem_txn = ci.createRedeemTxn(prevout, addr_redeem_out, amount_out, txn_script)
         options = {}
         if ci.using_segwit():
             options['force_segwit'] = True
 
-        if coin_type in (Coins.NAV, ):
-            redeem_sig = ci.getTxSignature(redeem_txn, prevout, privkey)
+        if coin_type in (Coins.NAV, Coins.DCR):
+            privkey_wif = self.ci(coin_type).encodeKey(privkey)
+            redeem_sig = ci.getTxSignature(redeem_txn, prevout, privkey_wif)
         else:
-            redeem_sig = self.callcoinrpc(Coins.PART, 'createsignaturewithkey', [redeem_txn, prevout, privkey, 'ALL', options])
+            privkey_wif = self.ci(Coins.PART).encodeKey(privkey)
+            redeem_sig = self.callcoinrpc(Coins.PART, 'createsignaturewithkey', [redeem_txn, prevout, privkey_wif, 'ALL', options])
 
         if coin_type == Coins.PART or ci.using_segwit():
             witness_stack = [
                 bytes.fromhex(redeem_sig),
                 pubkey,
                 secret,
-                bytes((1,)),
+                bytes((1,)),  # Converted to OP_1 in Decred push_script_data
                 txn_script]
             redeem_txn = ci.setTxSignature(bytes.fromhex(redeem_txn), witness_stack).hex()
         else:
-            script = format(len(redeem_sig) // 2, '02x') + redeem_sig
-            script += format(33, '02x') + pubkey.hex()
-            script += format(32, '02x') + secret.hex()
-            script += format(OpCodes.OP_1, '02x')
-            script += format(OpCodes.OP_PUSHDATA1, '02x') + format(len(txn_script), '02x') + txn_script.hex()
-            redeem_txn = ci.setTxScriptSig(bytes.fromhex(redeem_txn), 0, bytes.fromhex(script)).hex()
+            script = (len(redeem_sig) // 2).to_bytes(1) + bytes.fromhex(redeem_sig)
+            script += (33).to_bytes(1) + pubkey
+            script += (32).to_bytes(1) + secret
+            script += (OpCodes.OP_1).to_bytes(1)
+            script += (OpCodes.OP_PUSHDATA1).to_bytes(1) + (len(txn_script)).to_bytes(1) + txn_script
+            redeem_txn = ci.setTxScriptSig(bytes.fromhex(redeem_txn), 0, script).hex()
 
-        if coin_type in (Coins.NAV, ):
+        if coin_type in (Coins.NAV, Coins.DCR):
             # Only checks signature
             ro = ci.verifyRawTransaction(redeem_txn, [prevout])
         else:
             ro = self.callcoinrpc(Coins.PART, 'verifyrawtransaction', [redeem_txn, [prevout]])
+
         ensure(ro['inputs_valid'] is True, 'inputs_valid is false')
         # outputs_valid will be false if not a Particl txn
         # ensure(ro['complete'] is True, 'complete is false')
@@ -3337,7 +3393,11 @@ class BasicSwap(BaseApp):
             # Check fee
             if ci.get_connection_type() == 'rpc':
                 redeem_txjs = self.callcoinrpc(coin_type, 'decoderawtransaction', [redeem_txn])
-                if ci.using_segwit() or coin_type in (Coins.PART, ):
+                if coin_type in (Coins.DCR, ):
+                    txsize = len(redeem_txn) // 2
+                    self.log.debug('size paid, actual size %d %d', tx_vsize, txsize)
+                    ensure(tx_vsize >= txsize, 'underpaid fee')
+                elif ci.use_tx_vsize():
                     self.log.debug('vsize paid, actual vsize %d %d', tx_vsize, redeem_txjs['vsize'])
                     ensure(tx_vsize >= redeem_txjs['vsize'], 'underpaid fee')
                 else:
@@ -3355,11 +3415,9 @@ class BasicSwap(BaseApp):
 
         ci = self.ci(coin_type)
         if coin_type in (Coins.NAV, Coins.DCR):
-            wif_prefix = chainparams[coin_type][self.chain]['key_prefix']
             prevout = ci.find_prevout_info(txn, txn_script)
         else:
             # TODO: Sign in bsx for all coins
-            wif_prefix = chainparams[Coins.PART][self.chain]['key_prefix']
             txjs = self.callcoinrpc(Coins.PART, 'decoderawtransaction', [txn])
             if ci.using_segwit():
                 p2wsh = ci.getScriptDest(txn_script)
@@ -3377,8 +3435,9 @@ class BasicSwap(BaseApp):
             }
 
         bid_date = dt.datetime.fromtimestamp(bid.created_at).date()
-        pubkey = self.getContractPubkey(bid_date, bid.contract_count)
-        privkey = toWIF(wif_prefix, self.getContractPrivkey(bid_date, bid.contract_count))
+
+        privkey = self.getContractPrivkey(bid_date, bid.contract_count)
+        pubkey = ci.getPubkey(privkey)
 
         lock_value = DeserialiseNum(txn_script, 64)
         sequence: int = 1
@@ -3405,19 +3464,25 @@ class BasicSwap(BaseApp):
         if offer.lock_type == TxLockTypes.ABS_LOCK_BLOCKS or offer.lock_type == TxLockTypes.ABS_LOCK_TIME:
             locktime = lock_value
 
-        if ci.use_p2shp2wsh():
-            refund_txn = ci.createRefundTxn(prevout, addr_refund_out, amount_out, locktime, sequence, txn_script)
-        else:
-            refund_txn = ci.createRefundTxn(prevout, addr_refund_out, amount_out, locktime, sequence)
+        refund_txn = ci.createRefundTxn(prevout, addr_refund_out, amount_out, locktime, sequence, txn_script)
 
         options = {}
         if self.coin_clients[coin_type]['use_segwit']:
             options['force_segwit'] = True
         if coin_type in (Coins.NAV, Coins.DCR):
-            refund_sig = ci.getTxSignature(refund_txn, prevout, privkey)
+            privkey_wif = ci.encodeKey(privkey)
+            refund_sig = ci.getTxSignature(refund_txn, prevout, privkey_wif)
         else:
-            refund_sig = self.callcoinrpc(Coins.PART, 'createsignaturewithkey', [refund_txn, prevout, privkey, 'ALL', options])
-        if coin_type == Coins.PART or self.coin_clients[coin_type]['use_segwit']:
+            privkey_wif = self.ci(Coins.PART).encodeKey(privkey)
+            refund_sig = self.callcoinrpc(Coins.PART, 'createsignaturewithkey', [refund_txn, prevout, privkey_wif, 'ALL', options])
+        if coin_type in (Coins.DCR, ):
+            witness_stack = [
+                bytes.fromhex(refund_sig),
+                pubkey,
+                (OpCodes.OP_0).to_bytes(1),
+                txn_script]
+            refund_txn = ci.setTxSignature(bytes.fromhex(refund_txn), witness_stack).hex()
+        elif coin_type in (Coins.PART, ) or self.coin_clients[coin_type]['use_segwit']:
             witness_stack = [
                 bytes.fromhex(refund_sig),
                 pubkey,
@@ -3425,11 +3490,11 @@ class BasicSwap(BaseApp):
                 txn_script]
             refund_txn = ci.setTxSignature(bytes.fromhex(refund_txn), witness_stack).hex()
         else:
-            script = format(len(refund_sig) // 2, '02x') + refund_sig
-            script += format(33, '02x') + pubkey.hex()
-            script += format(OpCodes.OP_0, '02x')
-            script += format(OpCodes.OP_PUSHDATA1, '02x') + format(len(txn_script), '02x') + txn_script.hex()
-            refund_txn = ci.setTxScriptSig(bytes.fromhex(refund_txn), 0, bytes.fromhex(script)).hex()
+            script = (len(refund_sig) // 2).to_bytes(1) + bytes.fromhex(refund_sig)
+            script += (33).to_bytes(1) + pubkey
+            script += (OpCodes.OP_0).to_bytes(1)
+            script += (OpCodes.OP_PUSHDATA1).to_bytes(1) + (len(txn_script)).to_bytes(1) + txn_script
+            refund_txn = ci.setTxScriptSig(bytes.fromhex(refund_txn), 0, script)
 
         if coin_type in (Coins.NAV, Coins.DCR):
             # Only checks signature
@@ -3445,8 +3510,12 @@ class BasicSwap(BaseApp):
         if self.debug:
             # Check fee
             if ci.get_connection_type() == 'rpc':
-                refund_txjs = self.callcoinrpc(coin_type, 'decoderawtransaction', [refund_txn])
-                if ci.using_segwit() or coin_type in (Coins.PART, ):
+                refund_txjs = self.callcoinrpc(coin_type, 'decoderawtransaction', [refund_txn,])
+                if coin_type in (Coins.DCR, ):
+                    txsize = len(refund_txn) // 2
+                    self.log.debug('size paid, actual size %d %d', tx_vsize, txsize)
+                    ensure(tx_vsize >= txsize, 'underpaid fee')
+                elif ci.use_tx_vsize():
                     self.log.debug('vsize paid, actual vsize %d %d', tx_vsize, refund_txjs['vsize'])
                     ensure(tx_vsize >= refund_txjs['vsize'], 'underpaid fee')
                 else:
@@ -3490,20 +3559,31 @@ class BasicSwap(BaseApp):
                 tx_type=TxTypes.PTX,
                 script=participate_script,
             )
+            ci = self.ci(offer.coin_to)
+            if ci.watch_blocks_for_scripts() is True:
+                self.addWatchedScript(offer.coin_to, bid_id, ci.getScriptDest(participate_script), TxTypes.PTX)
+                self.setLastHeightCheckedStart(offer.coin_to, bid.initiate_tx.chain_height)
 
         # Bid saved in checkBidState
 
-    def setLastHeightChecked(self, coin_type, tx_height: int) -> int:
-        coin_name = self.ci(coin_type).coin_name()
+    def setLastHeightCheckedStart(self, coin_type, tx_height: int) -> int:
+        ci = self.ci(coin_type)
+        coin_name = ci.coin_name()
         if tx_height < 1:
             tx_height = self.lookupChainHeight(coin_type)
 
-        if len(self.coin_clients[coin_type]['watched_outputs']) == 0:
-            self.coin_clients[coin_type]['last_height_checked'] = tx_height
+        block_header = ci.getBlockHeaderFromHeight(tx_height)
+        block_time = block_header['time']
+        cc = self.coin_clients[coin_type]
+        if len(cc['watched_outputs']) == 0 and len(cc['watched_scripts']) == 0:
+            cc['last_height_checked'] = tx_height
+            cc['block_check_min_time'] = block_time
+            self.setIntKV('block_check_min_time_' + coin_name, block_time)
             self.log.debug('Start checking %s chain at height %d', coin_name, tx_height)
-
-        if self.coin_clients[coin_type]['last_height_checked'] > tx_height:
-            self.coin_clients[coin_type]['last_height_checked'] = tx_height
+        elif cc['last_height_checked'] > tx_height:
+            cc['last_height_checked'] = tx_height
+            cc['block_check_min_time'] = block_time
+            self.setIntKV('block_check_min_time_' + coin_name, block_time)
             self.log.debug('Rewind checking of %s chain to height %d', coin_name, tx_height)
 
         return tx_height
@@ -3511,7 +3591,7 @@ class BasicSwap(BaseApp):
     def addParticipateTxn(self, bid_id: bytes, bid, coin_type, txid_hex: str, vout, tx_height) -> None:
 
         # TODO: Check connection type
-        participate_txn_height = self.setLastHeightChecked(coin_type, tx_height)
+        participate_txn_height = self.setLastHeightCheckedStart(coin_type, tx_height)
 
         if bid.participate_tx is None:
             bid.participate_tx = SwapTx(
@@ -3529,6 +3609,11 @@ class BasicSwap(BaseApp):
 
     def participateTxnConfirmed(self, bid_id: bytes, bid, offer) -> None:
         self.log.debug('participateTxnConfirmed for bid %s', bid_id.hex())
+
+        if bid.debug_ind == DebugTypes.DONT_CONFIRM_PTX:
+            self.log.debug('Not confirming PTX for debugging', bid_id.hex())
+            return
+
         bid.setState(BidStates.SWAP_PARTICIPATING)
         bid.setPTxState(TxStates.TX_CONFIRMED)
 
@@ -3774,9 +3859,9 @@ class BasicSwap(BaseApp):
                     return rv
 
                 # TODO: Timeout waiting for transactions
-                bid_changed = False
+                bid_changed: bool = False
                 a_lock_tx_addr = ci_from.getSCLockScriptAddress(xmr_swap.a_lock_tx_script)
-                lock_tx_chain_info = ci_from.getLockTxHeight(bid.xmr_a_lock_tx.txid, a_lock_tx_addr, bid.amount, bid.chain_a_height_start)
+                lock_tx_chain_info = ci_from.getLockTxHeight(bid.xmr_a_lock_tx.txid, a_lock_tx_addr, bid.amount, bid.chain_a_height_start, vout=bid.xmr_a_lock_tx.vout)
 
                 if lock_tx_chain_info is None:
                     return rv
@@ -3863,7 +3948,7 @@ class BasicSwap(BaseApp):
                     refund_tx = bid.txns[TxTypes.XMR_SWAP_A_LOCK_REFUND]
                     if refund_tx.block_time is None:
                         refund_tx_addr = ci_from.getSCLockScriptAddress(xmr_swap.a_lock_refund_tx_script)
-                        lock_refund_tx_chain_info = ci_from.getLockTxHeight(refund_tx.txid, refund_tx_addr, 0, bid.chain_a_height_start)
+                        lock_refund_tx_chain_info = ci_from.getLockTxHeight(refund_tx.txid, refund_tx_addr, 0, bid.chain_a_height_start, vout=refund_tx.vout)
 
                         if lock_refund_tx_chain_info is not None and lock_refund_tx_chain_info.get('height', 0) > 0:
                             self.setTxBlockInfoFromHeight(ci_from, refund_tx, lock_refund_tx_chain_info['height'])
@@ -3904,14 +3989,14 @@ class BasicSwap(BaseApp):
             return True  # Mark bid for archiving
         if state == BidStates.BID_ACCEPTED:
             # Waiting for initiate txn to be confirmed in 'from' chain
-            initiate_txnid_hex = bid.initiate_tx.txid.hex()
-            p2sh = ci_from.encode_p2sh(bid.initiate_tx.script)
             index = None
             tx_height = None
+            initiate_txnid_hex = bid.initiate_tx.txid.hex()
             last_initiate_txn_conf = bid.initiate_tx.conf
             ci_from = self.ci(coin_from)
             if coin_from == Coins.PART:  # Has txindex
                 try:
+                    p2sh = ci_from.encode_p2sh(bid.initiate_tx.script)
                     initiate_txn = self.callcoinrpc(coin_from, 'getrawtransaction', [initiate_txnid_hex, True])
                     # Verify amount
                     vout = getVoutByAddress(initiate_txn, p2sh)
@@ -3932,24 +4017,29 @@ class BasicSwap(BaseApp):
                     dest_script = ci_from.getScriptDest(bid.initiate_tx.script)
                     addr = ci_from.encodeScriptDest(dest_script)
                 else:
-                    addr = p2sh
+                    addr = ci_from.encode_p2sh(bid.initiate_tx.script)
 
-                found = ci_from.getLockTxHeight(bytes.fromhex(initiate_txnid_hex), addr, bid.amount, bid.chain_a_height_start, find_index=True)
+                found = ci_from.getLockTxHeight(bid.initiate_tx.txid, addr, bid.amount, bid.chain_a_height_start, find_index=True, vout=bid.initiate_tx.vout)
+                index = None
                 if found:
                     bid.initiate_tx.conf = found['depth']
-                    index = found['index']
+                    if 'index' in found:
+                        index = found['index']
                     tx_height = found['height']
 
             if bid.initiate_tx.conf != last_initiate_txn_conf:
                 save_bid = True
 
+            if bid.initiate_tx.vout is None and index is not None:
+                bid.initiate_tx.vout = index
+                save_bid = True
+
             if bid.initiate_tx.conf is not None:
                 self.log.debug('initiate_txnid %s confirms %d', initiate_txnid_hex, bid.initiate_tx.conf)
 
-                if bid.initiate_tx.vout is None and tx_height > 0:
-                    bid.initiate_tx.vout = index
+                if (last_initiate_txn_conf is None or last_initiate_txn_conf < 1) and tx_height > 0:
                     # Start checking for spends of initiate_txn before fully confirmed
-                    bid.initiate_tx.chain_height = self.setLastHeightChecked(coin_from, tx_height)
+                    bid.initiate_tx.chain_height = self.setLastHeightCheckedStart(coin_from, tx_height)
                     self.setTxBlockInfoFromHeight(ci_from, bid.initiate_tx, tx_height)
 
                     self.addWatchedOutput(coin_from, bid_id, initiate_txnid_hex, bid.initiate_tx.vout, BidStates.SWAP_INITIATED)
@@ -3978,17 +4068,22 @@ class BasicSwap(BaseApp):
 
             ci_to = self.ci(coin_to)
             participate_txid = None if bid.participate_tx is None or bid.participate_tx.txid is None else bid.participate_tx.txid
-            found = ci_to.getLockTxHeight(participate_txid, addr, bid.amount_to, bid.chain_b_height_start, find_index=True)
+            participate_txvout = None if bid.participate_tx is None or bid.participate_tx.vout is None else bid.participate_tx.vout
+            found = ci_to.getLockTxHeight(participate_txid, addr, bid.amount_to, bid.chain_b_height_start, find_index=True, vout=participate_txvout)
             if found:
+                index = found.get('index', participate_txvout)
                 if bid.participate_tx.conf != found['depth']:
                     save_bid = True
+                if bid.participate_tx.conf is None and bid.participate_tx.state != TxStates.TX_SENT:
+                    txid = found.get('txid', None if participate_txid is None else participate_txid.hex())
+                    self.log.debug('Found bid %s participate txn %s in chain %s', bid_id.hex(), txid, Coins(coin_to).name)
+                    self.addParticipateTxn(bid_id, bid, coin_to, txid, index, found['height'])
+
+                    # Only update tx state if tx hasn't already been seen
+                    if bid.participate_tx.state is None or bid.participate_tx.state < TxStates.TX_SENT:
+                        bid.setPTxState(TxStates.TX_SENT)
+
                 bid.participate_tx.conf = found['depth']
-                index = found['index']
-                if bid.participate_tx is None or bid.participate_tx.txid is None:
-                    self.log.debug('Found bid %s participate txn %s in chain %s', bid_id.hex(), found['txid'], Coins(coin_to).name)
-                    self.addParticipateTxn(bid_id, bid, coin_to, found['txid'], found['index'], found['height'])
-                    bid.setPTxState(TxStates.TX_SENT)
-                    save_bid = True
                 if found['height'] > 0 and bid.participate_tx.block_height is None:
                     self.setTxBlockInfoFromHeight(ci_to, bid.participate_tx, found['height'])
 
@@ -4047,13 +4142,17 @@ class BasicSwap(BaseApp):
                 self.logEvent(Concepts.BID, bid.bid_id, EventLogTypes.PTX_REFUND_PUBLISHED, '', None)
                 # State will update when spend is detected
             except Exception as ex:
-                if 'non-BIP68-final' not in str(ex) and 'non-final' not in str(ex):
+                if 'non-BIP68-final' not in str(ex) and 'non-final' not in str(ex) and 'locks on inputs not met' not in str(ex):
                     self.log.warning('Error trying to submit participate refund txn: %s', str(ex))
         return False  # Bid is still active
 
     def extractSecret(self, coin_type, bid, spend_in):
         try:
-            if coin_type == Coins.PART or self.coin_clients[coin_type]['use_segwit']:
+            if coin_type in (Coins.DCR, ):
+                script_sig = spend_in['scriptSig']['asm'].split(' ')
+                ensure(len(script_sig) == 5, 'Bad witness size')
+                return bytes.fromhex(script_sig[2])
+            elif coin_type in (Coins.PART, ) or self.coin_clients[coin_type]['use_segwit']:
                 ensure(len(spend_in['txinwitness']) == 5, 'Bad witness size')
                 return bytes.fromhex(spend_in['txinwitness'][2])
             else:
@@ -4064,7 +4163,7 @@ class BasicSwap(BaseApp):
             return None
 
     def addWatchedOutput(self, coin_type, bid_id, txid_hex, vout, tx_type, swap_type=None):
-        self.log.debug('Adding watched output %s bid %s tx %s type %s', coin_type, bid_id.hex(), txid_hex, tx_type)
+        self.log.debug('Adding watched output %s bid %s tx %s type %s', Coins(coin_type).name, bid_id.hex(), txid_hex, tx_type)
 
         watched = self.coin_clients[coin_type]['watched_outputs']
 
@@ -4085,7 +4184,29 @@ class BasicSwap(BaseApp):
                 del self.coin_clients[coin_type]['watched_outputs'][i]
                 self.log.debug('Removed watched output %s %s %s', Coins(coin_type).name, bid_id.hex(), wo.txid_hex)
 
-    def initiateTxnSpent(self, bid_id: bytes, spend_txid: str, spend_n: int, spend_txn):
+    def addWatchedScript(self, coin_type, bid_id, script, tx_type, swap_type=None):
+        self.log.debug('Adding watched script %s bid %s type %s', Coins(coin_type).name, bid_id.hex(), tx_type)
+
+        watched = self.coin_clients[coin_type]['watched_scripts']
+
+        for ws in watched:
+            if ws.bid_id == bid_id and ws.tx_type == tx_type and ws.script == script:
+                self.log.debug('Script already being watched.')
+                return
+
+        watched.append(WatchedScript(bid_id, script, tx_type, swap_type))
+
+    def removeWatchedScript(self, coin_type, bid_id: bytes, script: bytes) -> None:
+        # Remove all for bid if txid is None
+        self.log.debug('removeWatchedScript %s %s', Coins(coin_type).name, bid_id.hex())
+        old_len = len(self.coin_clients[coin_type]['watched_scripts'])
+        for i in range(old_len - 1, -1, -1):
+            ws = self.coin_clients[coin_type]['watched_scripts'][i]
+            if ws.bid_id == bid_id and (script is None or ws.script == script):
+                del self.coin_clients[coin_type]['watched_scripts'][i]
+                self.log.debug('Removed watched script %s %s', Coins(coin_type).name, bid_id.hex())
+
+    def initiateTxnSpent(self, bid_id: bytes, spend_txid: str, spend_n: int, spend_txn) -> None:
         self.log.debug('Bid %s initiate txn spent by %s %d', bid_id.hex(), spend_txid, spend_n)
 
         if bid_id in self.swaps_in_progress:
@@ -4112,7 +4233,7 @@ class BasicSwap(BaseApp):
             self.removeWatchedOutput(coin_from, bid_id, bid.initiate_tx.txid.hex())
             self.saveBid(bid_id, bid)
 
-    def participateTxnSpent(self, bid_id: bytes, spend_txid: str, spend_n: int, spend_txn):
+    def participateTxnSpent(self, bid_id: bytes, spend_txid: str, spend_n: int, spend_txn) -> None:
         self.log.debug('Bid %s participate txn spent by %s %d', bid_id.hex(), spend_txid, spend_n)
 
         # TODO: More SwapTypes
@@ -4268,7 +4389,7 @@ class BasicSwap(BaseApp):
             session.remove()
             self.mxDB.release()
 
-    def processSpentOutput(self, coin_type, watched_output, spend_txid_hex, spend_n, spend_txn):
+    def processSpentOutput(self, coin_type, watched_output, spend_txid_hex, spend_n, spend_txn) -> None:
         if watched_output.swap_type == SwapTypes.XMR_SWAP:
             if watched_output.tx_type == TxTypes.XMR_SWAP_A_LOCK:
                 self.process_XMR_SWAP_A_LOCK_tx_spend(watched_output.bid_id, spend_txid_hex, spend_txn['hex'])
@@ -4283,13 +4404,65 @@ class BasicSwap(BaseApp):
         else:
             self.initiateTxnSpent(watched_output.bid_id, spend_txid_hex, spend_n, spend_txn)
 
+    def processFoundScript(self, coin_type, watched_script, txid: bytes, vout: int) -> None:
+        if watched_script.tx_type == TxTypes.PTX:
+            if watched_script.bid_id in self.swaps_in_progress:
+                bid = self.swaps_in_progress[watched_script.bid_id][0]
+
+                bid.participate_tx.txid = txid
+                bid.participate_tx.vout = vout
+                bid.setPTxState(TxStates.TX_IN_CHAIN)
+
+                self.saveBid(watched_script.bid_id, bid)
+            else:
+                self.log.warning('Could not find active bid for found watched script: {}'.format(watched_script.bid_id.hex()))
+        else:
+            self.log.warning('Unknown found watched script tx type for bid {}'.format(watched_script.bid_id.hex()))
+
+        self.removeWatchedScript(coin_type, watched_script.bid_id, watched_script.script)
+
+    def checkNewBlock(self, coin_type, c):
+        pass
+
+    def haveCheckedPrevBlock(self, ci, c, block, session=None) -> bool:
+        previousblockhash = bytes.fromhex(block['previousblockhash'])
+        try:
+            use_session = self.openSession(session)
+
+            q = use_session.execute('SELECT COUNT(*) FROM checkedblocks WHERE block_hash = :block_hash', {'block_hash': previousblockhash}).first()
+            if q[0] > 0:
+                return True
+
+        finally:
+            if session is None:
+                self.closeSession(use_session, commit=False)
+
+        return False
+
+    def updateCheckedBlock(self, ci, cc, block, session=None) -> None:
+        now: int = self.getTime()
+        try:
+            use_session = self.openSession(session)
+
+            block_height = int(block['height'])
+            if cc['last_height_checked'] != block_height:
+                cc['last_height_checked'] = block_height
+                self.setIntKVInSession('last_height_checked_' + ci.coin_name().lower(), block_height, use_session)
+
+            query = '''INSERT INTO checkedblocks (created_at, coin_type, block_height, block_hash, block_time)
+                       VALUES (:now, :coin_type, :block_height, :block_hash, :block_time)'''
+            use_session.execute(query, {'now': now, 'coin_type': int(ci.coin_type()), 'block_height': block_height, 'block_hash': bytes.fromhex(block['hash']), 'block_time': int(block['time'])})
+
+        finally:
+            if session is None:
+                self.closeSession(use_session)
+
     def checkForSpends(self, coin_type, c):
         # assert (self.mxDB.locked())
         self.log.debug('checkForSpends %s', Coins(coin_type).name)
 
         # TODO: Check for spends on watchonly txns where possible
-
-        if 'have_spent_index' in self.coin_clients[coin_type] and self.coin_clients[coin_type]['have_spent_index']:
+        if self.coin_clients[coin_type].get('have_spent_index', False):
             # TODO: batch getspentinfo
             for o in c['watched_outputs']:
                 found_spend = None
@@ -4304,39 +4477,56 @@ class BasicSwap(BaseApp):
                     spend_n = found_spend['index']
                     spend_txn = self.callcoinrpc(Coins.PART, 'getrawtransaction', [spend_txid, True])
                     self.processSpentOutput(coin_type, o, spend_txid, spend_n, spend_txn)
-        else:
-            ci = self.ci(coin_type)
-            chain_blocks = ci.getChainHeight()
-            last_height_checked = c['last_height_checked']
-            self.log.debug('chain_blocks, last_height_checked %s %s', chain_blocks, last_height_checked)
-            while last_height_checked < chain_blocks:
-                block_hash = self.callcoinrpc(coin_type, 'getblockhash', [last_height_checked + 1])
-                try:
-                    block = ci.getBlockWithTxns(block_hash)
-                except Exception as e:
-                    if 'Block not available (pruned data)' in str(e):
-                        # TODO: Better solution?
-                        bci = self.callcoinrpc(coin_type, 'getblockchaininfo')
-                        self.log.error('Coin %s last_height_checked %d set to pruneheight %d', self.ci(coin_type).coin_name(), last_height_checked, bci['pruneheight'])
-                        last_height_checked = bci['pruneheight']
-                        continue
-                    else:
-                        self.logException(f'getblock error {e}')
-                        break
+            return
 
-                for tx in block['tx']:
+        ci = self.ci(coin_type)
+        chain_blocks = ci.getChainHeight()
+        last_height_checked: int = c['last_height_checked']
+        block_check_min_time: int = c['block_check_min_time']
+        self.log.debug('chain_blocks, last_height_checked %d %d', chain_blocks, last_height_checked)
+
+        while last_height_checked < chain_blocks:
+            block_hash = ci.rpc('getblockhash', [last_height_checked + 1])
+            try:
+                block = ci.getBlockWithTxns(block_hash)
+            except Exception as e:
+                if 'Block not available (pruned data)' in str(e):
+                    # TODO: Better solution?
+                    bci = self.callcoinrpc(coin_type, 'getblockchaininfo')
+                    self.log.error('Coin %s last_height_checked %d set to pruneheight %d', self.ci(coin_type).coin_name(), last_height_checked, bci['pruneheight'])
+                    last_height_checked = bci['pruneheight']
+                    continue
+                else:
+                    self.logException(f'getblock error {e}')
+                    break
+
+            if block_check_min_time > block['time'] or last_height_checked < 1:
+                pass
+            elif not self.haveCheckedPrevBlock(ci, c, block):
+                last_height_checked -= 1
+                self.log.debug('Have not seen previousblockhash {} for block {}'.format(block['previousblockhash'], block['hash']))
+                continue
+
+            for tx in block['tx']:
+                for s in c['watched_scripts']:
+                    for i, txo in enumerate(tx['vout']):
+                        if 'scriptPubKey' in txo and 'hex' in txo['scriptPubKey']:
+                            # TODO: Optimise by loading rawtx in CTransaction
+                            if bytes.fromhex(txo['scriptPubKey']['hex']) == s.script:
+                                self.log.debug('Found script from search for bid %s: %s %d', s.bid_id.hex(), tx['txid'], i)
+                                self.processFoundScript(coin_type, s, bytes.fromhex(tx['txid']), i)
+
+                for o in c['watched_outputs']:
                     for i, inp in enumerate(tx['vin']):
-                        for o in c['watched_outputs']:
-                            inp_txid = inp.get('txid', None)
-                            if inp_txid is None:  # Coinbase
-                                continue
-                            if inp_txid == o.txid_hex and inp['vout'] == o.vout:
-                                self.log.debug('Found spend from search %s %d in %s %d', o.txid_hex, o.vout, tx['txid'], i)
-                                self.processSpentOutput(coin_type, o, tx['txid'], i, tx)
-                last_height_checked += 1
-            if c['last_height_checked'] != last_height_checked:
-                c['last_height_checked'] = last_height_checked
-                self.setIntKV('last_height_checked_' + ci.coin_name().lower(), last_height_checked)
+                        inp_txid = inp.get('txid', None)
+                        if inp_txid is None:  # Coinbase
+                            continue
+                        if inp_txid == o.txid_hex and inp['vout'] == o.vout:
+                            self.log.debug('Found spend from search %s %d in %s %d', o.txid_hex, o.vout, tx['txid'], i)
+                            self.processSpentOutput(coin_type, o, tx['txid'], i, tx)
+
+            last_height_checked += 1
+            self.updateCheckedBlock(ci, c, block)
 
     def expireMessages(self) -> None:
         if self._is_locked is True:
@@ -4572,7 +4762,7 @@ class BasicSwap(BaseApp):
             return
         offer_data.ParseFromString(offer_bytes)
 
-        # Validate data
+        # Validate offer data
         now: int = self.getTime()
         coin_from = Coins(offer_data.coin_from)
         ci_from = self.ci(coin_from)
@@ -4839,7 +5029,7 @@ class BasicSwap(BaseApp):
         bid_data = BidMessage()
         bid_data.ParseFromString(bid_bytes)
 
-        # Validate data
+        # Validate bid data
         ensure(bid_data.protocol_version >= MINPROTO_VERSION_SECRET_HASH, 'Invalid protocol version')
         ensure(len(bid_data.offer_msg_id) == 28, 'Bad offer_id length')
 
@@ -4899,6 +5089,9 @@ class BasicSwap(BaseApp):
                 chain_a_height_start=ci_from.getChainHeight(),
                 chain_b_height_start=ci_to.getChainHeight(),
             )
+
+            if len(bid_data.pkhash_buyer_to) > 0:
+                bid.pkhash_buyer_to = bid_data.pkhash_buyer_to
         else:
             ensure(bid.state == BidStates.BID_SENT, 'Wrong bid state: {}'.format(BidStates(bid.state).name))
             bid.created_at = msg['sent']
@@ -4952,33 +5145,29 @@ class BasicSwap(BaseApp):
 
         use_csv = True if offer.lock_type < TxLockTypes.ABS_LOCK_BLOCKS else False
 
-        # TODO: Verify script without decoding?
-        decoded_script = self.callcoinrpc(Coins.PART, 'decodescript', [bid_accept_data.contract_script.hex()])
-        lock_check_op = 'OP_CHECKSEQUENCEVERIFY' if use_csv else 'OP_CHECKLOCKTIMEVERIFY'
-        prog = re.compile(r'OP_IF OP_SIZE 32 OP_EQUALVERIFY OP_SHA256 (\w+) OP_EQUALVERIFY OP_DUP OP_HASH160 (\w+) OP_ELSE (\d+) {} OP_DROP OP_DUP OP_HASH160 (\w+) OP_ENDIF OP_EQUALVERIFY OP_CHECKSIG'.format(lock_check_op))
-        rr = prog.match(decoded_script['asm'])
-        if not rr:
+        if coin_from in (Coins.DCR, ):
+            op_hash = OpCodes.OP_SHA256_DECRED
+        else:
+            op_hash = OpCodes.OP_SHA256
+        op_lock = OpCodes.OP_CHECKSEQUENCEVERIFY if use_csv else OpCodes.OP_CHECKLOCKTIMEVERIFY
+        script_valid, script_hash, script_pkhash1, script_lock_val, script_pkhash2 = atomic_swap_1.verifyContractScript(bid_accept_data.contract_script, op_lock=op_lock, op_hash=op_hash)
+        if not script_valid:
             raise ValueError('Bad script')
-        scriptvalues = rr.groups()
 
-        ensure(len(scriptvalues[0]) == 64, 'Bad secret_hash length')
-        ensure(bytes.fromhex(scriptvalues[1]) == bid.pkhash_buyer, 'pkhash_buyer mismatch')
+        ensure(script_pkhash1 == bid.pkhash_buyer, 'pkhash_buyer mismatch')
 
-        script_lock_value = int(scriptvalues[2])
         if use_csv:
             expect_sequence = ci_from.getExpectedSequence(offer.lock_type, offer.lock_value)
-            ensure(script_lock_value == expect_sequence, 'sequence mismatch')
+            ensure(script_lock_val == expect_sequence, 'sequence mismatch')
         else:
             if offer.lock_type == TxLockTypes.ABS_LOCK_BLOCKS:
                 block_header_from = ci_from.getBlockHeaderAt(now)
                 chain_height_at_bid_creation = block_header_from['height']
-                ensure(script_lock_value <= chain_height_at_bid_creation + offer.lock_value + atomic_swap_1.ABS_LOCK_BLOCKS_LEEWAY, 'script lock height too high')
-                ensure(script_lock_value >= chain_height_at_bid_creation + offer.lock_value - atomic_swap_1.ABS_LOCK_BLOCKS_LEEWAY, 'script lock height too low')
+                ensure(script_lock_val <= chain_height_at_bid_creation + offer.lock_value + atomic_swap_1.ABS_LOCK_BLOCKS_LEEWAY, 'script lock height too high')
+                ensure(script_lock_val >= chain_height_at_bid_creation + offer.lock_value - atomic_swap_1.ABS_LOCK_BLOCKS_LEEWAY, 'script lock height too low')
             else:
-                ensure(script_lock_value <= now + offer.lock_value + atomic_swap_1.INITIATE_TX_TIMEOUT, 'script lock time too high')
-                ensure(script_lock_value >= now + offer.lock_value - atomic_swap_1.ABS_LOCK_TIME_LEEWAY, 'script lock time too low')
-
-        ensure(len(scriptvalues[3]) == 40, 'pkhash_refund bad length')
+                ensure(script_lock_val <= now + offer.lock_value + atomic_swap_1.INITIATE_TX_TIMEOUT, 'script lock time too high')
+                ensure(script_lock_val >= now + offer.lock_value - atomic_swap_1.ABS_LOCK_TIME_LEEWAY, 'script lock time too low')
 
         ensure(self.countMessageLinks(Concepts.BID, bid_id, MessageTypes.BID_ACCEPT) == 0, 'Bid already accepted')
 
@@ -4991,7 +5180,12 @@ class BasicSwap(BaseApp):
             txid=bid_accept_data.initiate_txid,
             script=bid_accept_data.contract_script,
         )
-        bid.pkhash_seller = bytes.fromhex(scriptvalues[3])
+
+        if len(bid_accept_data.pkhash_seller) == 20:
+            bid.pkhash_seller = bid_accept_data.pkhash_seller
+        else:
+            bid.pkhash_seller = script_pkhash2
+
         bid.setState(BidStates.BID_ACCEPTED)
         bid.setITxState(TxStates.TX_NONE)
 
@@ -5322,7 +5516,7 @@ class BasicSwap(BaseApp):
 
         reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from)
         coin_from = Coins(offer.coin_to if reverse_bid else offer.coin_from)
-        self.setLastHeightChecked(coin_from, bid.chain_a_height_start)
+        self.setLastHeightCheckedStart(coin_from, bid.chain_a_height_start)
         self.addWatchedOutput(coin_from, bid.bid_id, bid.xmr_a_lock_tx.txid.hex(), bid.xmr_a_lock_tx.vout, TxTypes.XMR_SWAP_A_LOCK, SwapTypes.XMR_SWAP)
 
         lock_refund_vout = self.ci(coin_from).getLockRefundTxSwapOutput(xmr_swap)
@@ -6351,9 +6545,9 @@ class BasicSwap(BaseApp):
 
             if now - self._last_checked_watched >= self.check_watched_seconds:
                 for k, c in self.coin_clients.items():
-                    if k == Coins.PART_ANON or k == Coins.PART_BLIND:
+                    if k == Coins.PART_ANON or k == Coins.PART_BLIND or k == Coins.LTC_MWEB:
                         continue
-                    if len(c['watched_outputs']) > 0:
+                    if len(c['watched_outputs']) > 0 or len(c['watched_scripts']):
                         self.checkForSpends(k, c)
                 self._last_checked_watched = now
 

@@ -15,6 +15,9 @@ from basicswap.basicswap_util import (
     TxLockTypes
 )
 from basicswap.chainparams import Coins
+from basicswap.contrib.test_framework.messages import (
+    uint256_from_str,
+)
 from basicswap.interface.btc import Secp256k1Interface
 from basicswap.util import (
     ensure,
@@ -34,8 +37,22 @@ from basicswap.util.script import (
 from basicswap.util.extkey import ExtKeyPair
 from basicswap.util.integer import encode_varint
 from basicswap.interface.dcr.rpc import make_rpc_func
-from .messages import CTransaction, CTxOut, SigHashType, TxSerializeType
-from .script import push_script_data, OP_HASH160, OP_EQUAL, OP_DUP, OP_EQUALVERIFY, OP_CHECKSIG
+from .messages import (
+    CTransaction,
+    CTxIn,
+    CTxOut,
+    COutPoint,
+    SigHashType,
+    TxSerializeType,
+)
+from .script import (
+    push_script_data,
+    OP_HASH160,
+    OP_EQUAL,
+    OP_DUP,
+    OP_EQUALVERIFY,
+    OP_CHECKSIG,
+)
 
 from coincurve.keys import (
     PrivateKey,
@@ -124,6 +141,20 @@ def DCRSignatureHash(sign_script: bytes, hash_type: SigHashType, tx: CTransactio
     return blake256(hash_buffer)
 
 
+def extract_sig_and_pk(sig_script: bytes) -> (bytes, bytes):
+    sig = None
+    pk = None
+    o: int = 0
+    num_bytes = sig_script[o]
+    o += 1
+    sig = sig_script[o: o + num_bytes]
+    o += num_bytes
+    num_bytes = sig_script[o]
+    o += 1
+    pk = sig_script[o: o + num_bytes]
+    return sig, pk
+
+
 class DCRInterface(Secp256k1Interface):
 
     @staticmethod
@@ -168,6 +199,10 @@ class DCRInterface(Secp256k1Interface):
             return secondsLocked | SEQUENCE_LOCKTIME_TYPE_FLAG
         raise ValueError('Unknown lock type')
 
+    @staticmethod
+    def watch_blocks_for_scripts() -> bool:
+        return True
+
     def __init__(self, coin_settings, network, swap_client=None):
         super().__init__(network)
         self._rpc_host = coin_settings.get('rpchost', '127.0.0.1')
@@ -183,7 +218,11 @@ class DCRInterface(Secp256k1Interface):
         self.blocks_confirmed = coin_settings['blocks_confirmed']
         self.setConfTarget(coin_settings['conf_target'])
 
-        self._use_segwit = coin_settings['use_segwit']
+        self._use_segwit = True  # Decred is natively segwit
+        self._connection_type = coin_settings['connection_type']
+
+    def use_tx_vsize(self) -> bool:
+        return False
 
     def pkh(self, pubkey: bytes) -> bytes:
         return ripemd160(blake256(pubkey))
@@ -235,9 +274,6 @@ class DCRInterface(Secp256k1Interface):
     def getBlockchainInfo(self):
         return self.rpc('getblockchaininfo')
 
-    def using_segwit(self) -> bool:
-        return self._use_segwit
-
     def getWalletInfo(self):
         rv = {}
         rv = self.rpc_wallet('getinfo')
@@ -276,6 +312,13 @@ class DCRInterface(Secp256k1Interface):
             raise ValueError('Checksum mismatch')
         return key[2], key[3:]
 
+    def encodeKey(self, key_bytes: bytes) -> str:
+        wif_prefix = self.chainparams_network()['key_prefix']
+        key_type = 0  # STEcdsaSecp256k1
+        b = wif_prefix.to_bytes(2, 'big') + key_type.to_bytes(1) + key_bytes
+        b += blake256(b)[:4]
+        return b58encode(b)
+
     def loadTx(self, tx_bytes: bytes) -> CTransaction:
         tx = CTransaction()
         tx.deserialize(tx_bytes)
@@ -288,14 +331,21 @@ class DCRInterface(Secp256k1Interface):
         eck = PrivateKey(key_bytes)
         return eck.sign(sig_hash, hasher=None) + bytes((SigHashType.SigHashAll,))
 
-    def setTxSignature(self, tx_bytes: bytes, stack, txi: int = 0) -> bytes:
+    def setTxSignatureScript(self, tx_bytes: bytes, script: bytes, txi: int = 0) -> bytes:
         tx = self.loadTx(tx_bytes)
 
+        tx.vin[txi].signature_script = script
+        return tx.serialize()
+
+    def setTxSignature(self, tx_bytes: bytes, stack, txi: int = 0) -> bytes:
+        tx = self.loadTx(tx_bytes)
         script_data = bytearray()
         for data in stack:
             push_script_data(script_data, data)
 
         tx.vin[txi].signature_script = script_data
+        test_ser = tx.serialize()
+        test_tx = self.loadTx(test_ser)
 
         return tx.serialize()
 
@@ -310,6 +360,20 @@ class DCRInterface(Secp256k1Interface):
 
         return sig.hex()
 
+    def verifyTxSig(self, tx_bytes: bytes, sig: bytes, K: bytes, input_n: int, prevout_script: bytes, prevout_value: int) -> bool:
+        tx = self.loadTx(tx_bytes)
+
+        sig_hash = DCRSignatureHash(prevout_script, SigHashType.SigHashAll, tx, input_n)
+        pubkey = PublicKey(K)
+        return pubkey.verify(sig[: -1], sig_hash, hasher=None)  # Pop the hashtype byte
+
+    def getTxid(self, tx) -> bytes:
+        if isinstance(tx, str):
+            tx = bytes.fromhex(tx)
+        if isinstance(tx, bytes):
+            tx = self.loadTx(tx)
+        return tx.TxHash()
+
     def getScriptDest(self, script: bytes) -> bytes:
         # P2SH
         script_hash = self.pkh(script)
@@ -323,7 +387,6 @@ class DCRInterface(Secp256k1Interface):
 
     def getPubkeyHashDest(self, pkh: bytes) -> bytes:
         # P2PKH
-
         assert len(pkh) == 20
         return OP_DUP.to_bytes(1) + OP_HASH160.to_bytes(1) + len(pkh).to_bytes(1) + pkh + OP_EQUALVERIFY.to_bytes(1) + OP_CHECKSIG.to_bytes(1)
 
@@ -424,7 +487,7 @@ class DCRInterface(Secp256k1Interface):
         return self.rpc_wallet('sendtoaddress', params)
 
     def isAddressMine(self, address: str, or_watch_only: bool = False) -> bool:
-        addr_info = self.rpc('validateaddress', [address])
+        addr_info = self.rpc_wallet('validateaddress', [address])
         return addr_info.get('ismine', False)
 
     def encodeProofUtxos(self, proof_utxos):
@@ -504,18 +567,133 @@ class DCRInterface(Secp256k1Interface):
         txn_funded = self.createRawFundedTransaction(addr_to, amount)
         return self.rpc_wallet('signrawtransaction', [txn_funded])['hex']
 
-    def getLockTxHeight(self, txid, dest_address, bid_amount, rescan_from, find_index: bool = False):
-        self._log.debug('TODO: getLockTxHeight')
-        return None
+    def getLockTxHeight(self, txid, dest_address, bid_amount, rescan_from, find_index: bool = False, vout: int = -1):
+        if txid is None:
+            self._log.debug('TODO: getLockTxHeight')
+            return None
+
+        found_vout = None
+        # Search for txo at vout 0 and 1 if vout is not known
+        if vout is None:
+            test_range = range(2)
+        else:
+            test_range = (vout, )
+        for try_vout in test_range:
+            try:
+                txout = self.rpc('gettxout', [txid.hex(), try_vout, 0, True])
+                addresses = txout['scriptPubKey']['addresses']
+                if len(addresses) != 1 or addresses[0] != dest_address:
+                    continue
+                if self.make_int(txout['value']) != bid_amount:
+                    self._log.warning('getLockTxHeight found txout {} with incorrect amount {}'.format(txid.hex(), txout['value']))
+                    continue
+                found_vout = try_vout
+                break
+            except Exception as e:
+                # self._log.warning('gettxout {}'.format(e))
+                return None
+
+        block_height: int = 0
+        confirmations: int = 0 if 'confirmations' not in txout else txout['confirmations']
+
+        # TODO: Better way?
+        if confirmations > 0:
+            block_height = self.getChainHeight() - confirmations
+
+        rv = {
+            'depth': confirmations,
+            'index': found_vout,
+            'height': block_height}
+
+        return rv
 
     def find_prevout_info(self, txn_hex: str, txn_script: bytes):
         txjs = self.rpc('decoderawtransaction', [txn_hex])
         n = getVoutByScriptPubKey(txjs, self.getScriptDest(txn_script).hex())
 
+        txo = txjs['vout'][n]
         return {
             'txid': txjs['txid'],
             'vout': n,
-            'scriptPubKey': txjs['vout'][n]['scriptPubKey']['hex'],
+            'scriptPubKey': txo['scriptPubKey']['hex'],
             'redeemScript': txn_script.hex(),
-            'amount': txjs['vout'][n]['value']
+            'amount': txo['value'],
         }
+
+    def getHTLCSpendTxVSize(self, redeem: bool = True) -> int:
+        tx_vsize = 5  # Add a few bytes, sequence in script takes variable amount of bytes
+        tx_vsize += 348 if redeem else 316
+        return tx_vsize
+
+    def createRedeemTxn(self, prevout, output_addr: str, output_value: int, txn_script: bytes = None) -> str:
+        tx = CTransaction()
+        tx.version = self.txVersion()
+        prev_txid = uint256_from_str(bytes.fromhex(prevout['txid'])[::-1])
+        tx.vin.append(CTxIn(COutPoint(prev_txid, prevout['vout'], 0)))
+        pkh = self.decode_address(output_addr)[2:]
+        script = self.getPubkeyHashDest(pkh)
+        tx.vout.append(self.txoType()(output_value, script))
+        return tx.serialize().hex()
+
+    def createRefundTxn(self, prevout, output_addr: str, output_value: int, locktime: int, sequence: int, txn_script: bytes = None) -> str:
+        tx = CTransaction()
+        tx.version = self.txVersion()
+        tx.locktime = locktime
+        prev_txid = uint256_from_str(bytes.fromhex(prevout['txid'])[::-1])
+        tx.vin.append(CTxIn(COutPoint(prev_txid, prevout['vout'], 0), sequence=sequence,))
+        pkh = self.decode_address(output_addr)[2:]
+        script = self.getPubkeyHashDest(pkh)
+        tx.vout.append(self.txoType()(output_value, script))
+        return tx.serialize().hex()
+
+    def verifyRawTransaction(self, tx_hex: str, prevouts):
+        inputs_valid: bool = True
+        validscripts: int = 0
+
+        tx_bytes = bytes.fromhex(tx_hex)
+        tx = self.loadTx(bytes.fromhex(tx_hex))
+
+        for i, txi in enumerate(tx.vin):
+            prevout_data = prevouts[i]
+            redeem_script = bytes.fromhex(prevout_data['redeemScript'])
+            prevout_value = self.make_int(prevout_data['amount'])
+            sig, pk = extract_sig_and_pk(txi.signature_script)
+
+            if not sig or not pk:
+                self._log.warning(f'verifyRawTransaction failed to extract signature for input {i}')
+                continue
+
+            if self.verifyTxSig(tx_bytes, sig, pk, i, redeem_script, prevout_value):
+                validscripts += 1
+
+        # TODO: validate inputs
+        inputs_valid = True
+
+        return {
+            'inputs_valid': inputs_valid,
+            'validscripts': validscripts,
+        }
+
+    def getBlockHeaderFromHeight(self, height):
+        block_hash = self.rpc('getblockhash', [height])
+        return self.rpc('getblockheader', [block_hash])
+
+    def getBlockWithTxns(self, block_hash: str):
+        block = self.rpc('getblock', [block_hash, True, True])
+
+        return {
+            'hash': block['hash'],
+            'previousblockhash': block['previousblockhash'],
+            'tx': block['rawtx'],
+            'confirmations': block['confirmations'],
+            'height': block['height'],
+            'time': block['time'],
+            'version': block['version'],
+            'merkleroot': block['merkleroot'],
+        }
+
+    def publishTx(self, tx: bytes):
+        return self.rpc('sendrawtransaction', [tx.hex()])
+
+    def describeTx(self, tx_hex: str):
+        return self.rpc('decoderawtransaction', [tx_hex])

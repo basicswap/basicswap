@@ -11,7 +11,7 @@ from enum import IntEnum, auto
 from sqlalchemy.ext.declarative import declarative_base
 
 
-CURRENT_DB_VERSION = 23
+CURRENT_DB_VERSION = 24
 CURRENT_DB_DATA_VERSION = 4
 Base = declarative_base()
 
@@ -127,6 +127,7 @@ class Bid(Base):
     amount_to = sa.Column(sa.BigInteger)  # amount * offer.rate
 
     pkhash_buyer = sa.Column(sa.LargeBinary)
+    pkhash_buyer_to = sa.Column(sa.LargeBinary)  # Used for the ptx if coin pubkey hashes differ
     amount = sa.Column(sa.BigInteger)
     rate = sa.Column(sa.BigInteger)
 
@@ -522,3 +523,14 @@ class MessageLink(Base):
     msg_type = sa.Column(sa.Integer)
     msg_sequence = sa.Column(sa.Integer)
     msg_id = sa.Column(sa.LargeBinary)
+
+
+class CheckedBlock(Base):
+    __tablename__ = 'checkedblocks'
+
+    record_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
+    created_at = sa.Column(sa.BigInteger)
+    coin_type = sa.Column(sa.Integer)
+    block_height = sa.Column(sa.Integer)
+    block_hash = sa.Column(sa.LargeBinary)
+    block_time = sa.Column(sa.BigInteger)

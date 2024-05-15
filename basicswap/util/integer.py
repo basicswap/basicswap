@@ -5,6 +5,29 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 
+def decode_compactsize(b: bytes, offset: int = 0) -> (int, int):
+    i = b[offset]
+    if i < 0xfd:
+        return i, 1
+    offset += 1
+    if i == 0xfd:
+        return int.from_bytes(b[offset: offset + 2]), 3
+    if i == 0xfe:
+        return int.from_bytes(b[offset: offset + 4]), 5
+    # 0xff
+    return int.from_bytes(b[offset: offset + 8]), 9
+
+
+def encode_compactsize(i: int) -> bytes:
+    if i < 0xfd:
+        return bytes((i,))
+    if i <= 0xffff:
+        return bytes((0xfd,)) + i.to_bytes(2, 'little')
+    if i <= 0xffffffff:
+        return bytes((0xfe,)) + i.to_bytes(4, 'little')
+    return bytes((0xff,)) + i.to_bytes(8, 'little')
+
+
 def decode_varint(b: bytes, offset: int = 0) -> (int, int):
     i: int = 0
     num_bytes: int = 0

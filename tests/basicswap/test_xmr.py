@@ -334,6 +334,9 @@ class BaseTest(unittest.TestCase):
         cls.states_bidder = extract_states_from_xu_file(os.path.join(diagrams_dir, 'ads.bidder.alt.xu'), 'B')
         cls.states_offerer = extract_states_from_xu_file(os.path.join(diagrams_dir, 'ads.offerer.alt.xu'), 'O')
 
+        cls.states_bidder_sh = extract_states_from_xu_file(os.path.join(diagrams_dir, 'bidder.alt.xu'), 'B')
+        cls.states_offerer_sh = extract_states_from_xu_file(os.path.join(diagrams_dir, 'offerer.alt.xu'), 'O')
+
         if os.path.isdir(TEST_DIR):
             if RESET_TEST:
                 logging.info('Removing ' + TEST_DIR)
