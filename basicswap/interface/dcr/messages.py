@@ -153,7 +153,7 @@ class CTransaction:
             o += script_bytes
 
     def serialize(self, ser_type=TxSerializeType.Full) -> bytes:
-        data = bytearray()
+        data = bytes()
         version = (self.version & 0xffff) | (ser_type << 16)
         data += version.to_bytes(4, 'little')
 
@@ -195,3 +195,10 @@ class CTransaction:
 
     def TxHashFull(self) -> bytes:
         raise ValueError('todo')
+
+
+def findOutput(tx, script_pk: bytes):
+    for i in range(len(tx.vout)):
+        if tx.vout[i].script_pubkey == script_pk:
+            return i
+    return None

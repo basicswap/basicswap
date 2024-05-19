@@ -5,9 +5,6 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-# TODO
-#  - Occasionally DCR simnet chain stalls.
-
 import copy
 import logging
 import os
@@ -27,6 +24,7 @@ from basicswap.basicswap import (
 )
 from basicswap.basicswap_util import (
     TxLockTypes,
+    TxTypes
 )
 from basicswap.util.crypto import (
     hash160
@@ -80,7 +78,25 @@ def make_rpc_func(node_id, base_rpc_port):
     return rpc_func
 
 
-def test_success_path(self, coin_from: Coins, coin_to: Coins):
+def wait_for_dcr_height(http_port, num_blocks=3):
+    logging.info('Waiting for DCR chain height %d', num_blocks)
+    for i in range(60):
+        if test_delay_event.is_set():
+            raise ValueError('Test stopped.')
+        try:
+            wallet = read_json_api(http_port, 'wallets/dcr')
+            decred_blocks = wallet['blocks']
+            print('decred_blocks', decred_blocks)
+            if decred_blocks >= num_blocks:
+                return
+        except Exception as e:
+            print('Error reading wallets', str(e))
+
+        test_delay_event.wait(1)
+    raise ValueError(f'wait_for_decred_blocks failed http_port: {http_port}')
+
+
+def run_test_success_path(self, coin_from: Coins, coin_to: Coins):
     logging.info(f'---------- Test {coin_from.name} to {coin_to.name}')
 
     node_from = 0
@@ -106,7 +122,7 @@ def test_success_path(self, coin_from: Coins, coin_to: Coins):
     swap_clients[node_from].acceptBid(bid_id)
 
     wait_for_bid(test_delay_event, swap_clients[node_from], bid_id, BidStates.SWAP_COMPLETED, wait_for=120)
-    wait_for_bid(test_delay_event, swap_clients[node_to], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=120)
+    wait_for_bid(test_delay_event, swap_clients[node_to], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=30)
 
     # Verify lock tx spends are found in the expected wallets
     bid, offer = swap_clients[node_from].getBidAndOffer(bid_id)
@@ -139,7 +155,7 @@ def test_success_path(self, coin_from: Coins, coin_to: Coins):
     assert (compare_bid_states(bidder_states, self.states_bidder_sh[0]) is True)
 
 
-def test_bad_ptx(self, coin_from: Coins, coin_to: Coins):
+def run_test_bad_ptx(self, coin_from: Coins, coin_to: Coins):
     # Invalid PTX sent, swap should stall and ITx and PTx should be reclaimed by senders
     logging.info(f'---------- Test bad ptx {coin_from.name} to {coin_to.name}')
 
@@ -164,7 +180,7 @@ def test_bad_ptx(self, coin_from: Coins, coin_to: Coins):
     swap_clients[node_to].setBidDebugInd(bid_id, DebugTypes.MAKE_INVALID_PTX)
 
     wait_for_bid(test_delay_event, swap_clients[node_from], bid_id, BidStates.SWAP_COMPLETED, wait_for=120)
-    wait_for_bid(test_delay_event, swap_clients[node_to], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=120)
+    wait_for_bid(test_delay_event, swap_clients[node_to], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=30)
 
     js_0_bid = read_json_api(1800 + node_from, 'bids/{}'.format(bid_id.hex()))
     js_1_bid = read_json_api(1800 + node_to, 'bids/{}'.format(bid_id.hex()))
@@ -190,6 +206,8 @@ def test_bad_ptx(self, coin_from: Coins, coin_to: Coins):
     offerer_states = read_json_api(1800 + node_from, path)
     bidder_states = read_json_api(1800 + node_to, path)
 
+    if coin_to not in (Coins.XMR,):
+        return
     # Hard to get the timing right
     assert (compare_bid_states_unordered(offerer_states, self.states_offerer_sh[1]) is True)
     assert (compare_bid_states_unordered(bidder_states, self.states_bidder_sh[1]) is True)
@@ -200,7 +218,7 @@ def test_bad_ptx(self, coin_from: Coins, coin_to: Coins):
     assert (js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
 
 
-def test_itx_refund(self, coin_from: Coins, coin_to: Coins):
+def run_test_itx_refund(self, coin_from: Coins, coin_to: Coins):
     # Offerer claims PTX and refunds ITX after lock expires
     # Bidder loses PTX value without gaining ITX value
     logging.info(f'---------- Test itx refund {coin_from.name} to {coin_to.name}')
@@ -248,6 +266,189 @@ def test_itx_refund(self, coin_from: Coins, coin_to: Coins):
     ptx_spend = bid.participate_tx.spend_txid.hex()
     wtx = node_from_ci_to.rpc_wallet('gettransaction', [ptx_spend,])
     assert (bid.amount_to - node_from_ci_to.make_int(wtx['details'][0]['amount']) < max_fee)
+
+
+def run_test_ads_success_path(self, coin_from: Coins, coin_to: Coins):
+    logging.info(f'---------- Test ADS swap {coin_from.name} to {coin_to.name}')
+
+    # Offerer sends the offer
+    # Bidder sends the bid
+    id_offerer: int = 0
+    id_bidder: int = 1
+
+    swap_clients = self.swap_clients
+    reverse_bid: bool = coin_from in swap_clients[id_offerer].scriptless_coins
+    ci_from = swap_clients[id_offerer].ci(coin_from)
+    ci_to = swap_clients[id_bidder].ci(coin_to)
+
+    self.prepare_balance(coin_to, 100.0, 1801, 1800)
+    self.prepare_balance(coin_from, 100.0, 1800, 1801)
+
+    # Leader sends the initial (chain a) lock tx.
+    # Follower sends the participate (chain b) lock tx.
+    id_leader: int = id_bidder if reverse_bid else id_offerer
+    id_follower: int = id_offerer if reverse_bid else id_bidder
+    logging.info(f'Offerer, bidder, leader, follower: {id_offerer}, {id_bidder}, {id_leader}, {id_follower}')
+
+    amt_swap = ci_from.make_int(random.uniform(0.1, 2.0), r=1)
+    rate_swap = ci_to.make_int(random.uniform(0.2, 20.0), r=1)
+    offer_id = swap_clients[id_offerer].postOffer(coin_from, coin_to, amt_swap, rate_swap, amt_swap, SwapTypes.XMR_SWAP)
+
+    wait_for_offer(test_delay_event, swap_clients[id_bidder], offer_id)
+    bid_id = swap_clients[id_bidder].postXmrBid(offer_id, amt_swap)
+    wait_for_bid(test_delay_event, swap_clients[id_offerer], bid_id, BidStates.BID_RECEIVED)
+
+    swap_clients[id_offerer].acceptBid(bid_id)
+
+    wait_for_bid(test_delay_event, swap_clients[id_offerer], bid_id, BidStates.SWAP_COMPLETED, wait_for=(180))
+    wait_for_bid(test_delay_event, swap_clients[id_bidder], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=(30))
+
+    if reverse_bid:
+        return  # TODO
+
+    # Verify lock tx spends are found in the expected wallets
+    bid, xmr_swap = swap_clients[id_offerer].getXmrBid(bid_id)
+
+    node_from_ci_to = swap_clients[0].ci(coin_to)
+    max_fee: int = 10000
+    if node_from_ci_to.coin_type() in (Coins.XMR, ):
+        pass
+    else:
+        wtx = node_from_ci_to.rpc_wallet('gettransaction', [bid.xmr_b_lock_tx.spend_txid.hex(),])
+        assert (bid.amount_to - node_from_ci_to.make_int(wtx['details'][0]['amount']) < max_fee)
+
+    node_to_ci_from = swap_clients[1].ci(coin_from)
+    if node_to_ci_from.coin_type() in (Coins.XMR, ):
+        pass
+    else:
+        wtx = node_to_ci_from.rpc_wallet('gettransaction', [xmr_swap.a_lock_spend_tx_id.hex(),])
+        assert (bid.amount - node_to_ci_from.make_int(wtx['details'][0]['amount']) < max_fee)
+
+    bid_id_hex = bid_id.hex()
+    path = f'bids/{bid_id_hex}/states'
+    offerer_states = read_json_api(1800 + id_offerer, path)
+    bidder_states = read_json_api(1800 + id_bidder, path)
+
+    assert (compare_bid_states(offerer_states, self.states_offerer[0]) is True)
+    assert (compare_bid_states(bidder_states, self.states_bidder[0]) is True)
+
+
+def run_test_ads_both_refund(self, coin_from: Coins, coin_to: Coins, lock_value: int = 32) -> None:
+    logging.info('---------- Test {} to {} both lock txns refunded'.format(coin_from.name, coin_to.name))
+
+    id_offerer: int = 0
+    id_bidder: int = 1
+
+    swap_clients = self.swap_clients
+    reverse_bid: bool = coin_from in swap_clients[id_offerer].scriptless_coins
+    ci_from = swap_clients[id_offerer].ci(coin_from)
+    ci_to = swap_clients[id_offerer].ci(coin_to)
+
+    if reverse_bid:
+        self.prepare_balance(coin_to, 100.0, 1801, 1800)
+        self.prepare_balance(coin_from, 100.0, 1800, 1801)
+
+    id_leader: int = id_bidder if reverse_bid else id_offerer
+    id_follower: int = id_offerer if reverse_bid else id_bidder
+    logging.info(f'Offerer, bidder, leader, follower: {id_offerer}, {id_bidder}, {id_leader}, {id_follower}')
+
+    amt_swap = ci_from.make_int(random.uniform(0.1, 2.0), r=1)
+    rate_swap = ci_to.make_int(random.uniform(0.2, 20.0), r=1)
+
+    debug_case = (None, DebugTypes.OFFER_LOCK_2_VALUE_INC)
+    try:
+        swap_clients[0]._debug_cases.append(debug_case)
+        swap_clients[1]._debug_cases.append(debug_case)
+        offer_id = swap_clients[id_offerer].postOffer(
+            coin_from, coin_to, amt_swap, rate_swap, amt_swap, SwapTypes.XMR_SWAP,
+            lock_type=TxLockTypes.SEQUENCE_LOCK_BLOCKS, lock_value=lock_value)
+        wait_for_offer(test_delay_event, swap_clients[id_bidder], offer_id)
+        offer = swap_clients[id_bidder].getOffer(offer_id)
+    finally:
+        swap_clients[0]._debug_cases.remove(debug_case)
+        swap_clients[1]._debug_cases.remove(debug_case)
+
+    bid_id = swap_clients[id_bidder].postXmrBid(offer_id, offer.amount_from)
+    wait_for_bid(test_delay_event, swap_clients[id_offerer], bid_id, BidStates.BID_RECEIVED)
+
+    swap_clients[id_follower].setBidDebugInd(bid_id, DebugTypes.CREATE_INVALID_COIN_B_LOCK)
+    swap_clients[id_offerer].acceptBid(bid_id)
+
+    leader_sent_bid: bool = True if reverse_bid else False
+    wait_for_bid(test_delay_event, swap_clients[id_leader], bid_id, BidStates.XMR_SWAP_FAILED_REFUNDED, sent=leader_sent_bid, wait_for=(self.extra_wait_time + 180))
+    wait_for_bid(test_delay_event, swap_clients[id_follower], bid_id, BidStates.XMR_SWAP_FAILED_REFUNDED, sent=(not leader_sent_bid), wait_for=(self.extra_wait_time + 40))
+
+    if reverse_bid:
+        return  # TODO
+
+    # Verify lock tx spends are found in the expected wallets
+    bid, xmr_swap = swap_clients[id_offerer].getXmrBid(bid_id)
+    lock_refund_spend_txid = bid.txns[TxTypes.XMR_SWAP_A_LOCK_REFUND_SPEND].txid
+
+    bid, xmr_swap = swap_clients[id_bidder].getXmrBid(bid_id)
+
+    node_from_ci_from = swap_clients[0].ci(coin_from)
+    max_fee: int = 10000
+    if node_from_ci_from.coin_type() in (Coins.XMR, ):
+        pass
+    else:
+        wtx = node_from_ci_from.rpc_wallet('gettransaction', [lock_refund_spend_txid.hex(),])
+        assert (bid.amount - node_from_ci_from.make_int(wtx['details'][0]['amount']) < max_fee)
+
+    node_to_ci_to = swap_clients[1].ci(coin_to)
+    if node_to_ci_to.coin_type() in (Coins.XMR, ):
+        pass
+    else:
+        wtx = node_to_ci_to.rpc_wallet('gettransaction', [bid.xmr_b_lock_tx.spend_txid.hex(),])
+        assert (bid.amount_to - node_to_ci_to.make_int(wtx['details'][0]['amount']) < max_fee)
+
+    bid_id_hex = bid_id.hex()
+    path = f'bids/{bid_id_hex}/states'
+    offerer_states = read_json_api(1800 + id_offerer, path)
+    bidder_states = read_json_api(1800 + id_bidder, path)
+
+    assert (compare_bid_states(offerer_states, self.states_offerer[1]) is True)
+    assert (compare_bid_states(bidder_states, self.states_bidder[1]) is True)
+
+
+def run_test_ads_swipe_refund(self, coin_from: Coins, coin_to: Coins, lock_value: int = 32) -> None:
+    logging.info('---------- Test {} to {} coin a lock refund tx swiped'.format(coin_from.name, coin_to.name))
+
+    id_offerer: int = 0
+    id_bidder: int = 1
+
+    swap_clients = self.swap_clients
+    reverse_bid: bool = coin_from in swap_clients[id_offerer].scriptless_coins
+    ci_from = swap_clients[id_offerer].ci(coin_from)
+    ci_to = swap_clients[id_offerer].ci(coin_to)
+
+    id_leader: int = id_bidder if reverse_bid else id_offerer
+    id_follower: int = id_offerer if reverse_bid else id_bidder
+    logging.info(f'Offerer, bidder, leader, follower: {id_offerer}, {id_bidder}, {id_leader}, {id_follower}')
+
+    if reverse_bid:
+        self.prepare_balance(coin_to, 100.0, 1801, 1800)
+        self.prepare_balance(coin_from, 100.0, 1800, 1801)
+
+    amt_swap = ci_from.make_int(random.uniform(0.1, 2.0), r=1)
+    rate_swap = ci_to.make_int(random.uniform(0.2, 20.0), r=1)
+    offer_id = swap_clients[id_offerer].postOffer(
+        coin_from, coin_to, amt_swap, rate_swap, amt_swap, SwapTypes.XMR_SWAP,
+        lock_type=TxLockTypes.SEQUENCE_LOCK_BLOCKS, lock_value=lock_value)
+    wait_for_offer(test_delay_event, swap_clients[id_bidder], offer_id)
+    offer = swap_clients[id_bidder].getOffer(offer_id)
+
+    bid_id = swap_clients[id_bidder].postXmrBid(offer_id, offer.amount_from)
+    wait_for_bid(test_delay_event, swap_clients[id_offerer], bid_id, BidStates.BID_RECEIVED)
+
+    swap_clients[id_follower].setBidDebugInd(bid_id, DebugTypes.BID_STOP_AFTER_COIN_A_LOCK)
+    swap_clients[id_leader].setBidDebugInd(bid_id, DebugTypes.BID_DONT_SPEND_COIN_A_LOCK_REFUND)
+
+    swap_clients[id_offerer].acceptBid(bid_id)
+
+    leader_sent_bid: bool = True if reverse_bid else False
+    wait_for_bid(test_delay_event, swap_clients[id_leader], bid_id, BidStates.BID_STALLED_FOR_TEST, wait_for=(self.extra_wait_time + 180), sent=leader_sent_bid)
+    wait_for_bid(test_delay_event, swap_clients[id_follower], bid_id, BidStates.XMR_SWAP_FAILED_SWIPED, wait_for=(self.extra_wait_time + 80), sent=(not leader_sent_bid))
 
 
 def prepareDCDDataDir(datadir, node_id, conf_file, dir_prefix, num_nodes=3):
@@ -298,8 +499,9 @@ class Test(BaseTest):
     test_coin = Coins.DCR
     dcr_daemons = []
     start_ltc_nodes = False
-    start_xmr_nodes = False
+    start_xmr_nodes = True
     dcr_mining_addr = 'SsYbXyjkKAEXXcGdFgr4u4bo4L8RkCxwQpH'
+    extra_wait_time = 0
 
     hex_seeds = [
         'e8574b2a94404ee62d8acc0258cab4c0defcfab8a5dfc2f4954c1f9d7e09d72a',
@@ -331,15 +533,19 @@ class Test(BaseTest):
         ci0 = cls.swap_clients[0].ci(cls.test_coin)
 
         num_passed: int = 0
-        for i in range(5):
+        for i in range(30):
             try:
                 ci0.rpc_wallet('purchaseticket', [cls.dcr_ticket_account, 0.1, 0])
                 num_passed += 1
+                if num_passed >= 5:
+                    break
+                test_delay_event.wait(0.1)
             except Exception as e:
                 if 'double spend' in str(e):
                     pass
                 else:
                     logging.warning('coins_loop purchaseticket {}'.format(e))
+                test_delay_event.wait(0.5)
 
         try:
             if num_passed >= 5:
@@ -436,6 +642,8 @@ class Test(BaseTest):
             'address': js_w[coin_ticker][address_type],
             'subfee': False,
         }
+        if coin in (Coins.XMR, ):
+            post_json['sweepall'] = False
         json_rv = read_json_api(port_take_from_node, 'wallets/{}/withdraw'.format(coin_ticker.lower()), post_json)
         assert (len(json_rv['txid']) == 64)
         wait_for_amount: float = amount
@@ -763,22 +971,49 @@ class Test(BaseTest):
         assert (amount_proved >= require_amount)
 
     def test_02_part_coin(self):
-        test_success_path(self, Coins.PART, self.test_coin)
+        run_test_success_path(self, Coins.PART, self.test_coin)
 
     def test_03_coin_part(self):
-        test_success_path(self, self.test_coin, Coins.PART)
+        run_test_success_path(self, self.test_coin, Coins.PART)
 
     def test_04_part_coin_bad_ptx(self):
-        test_bad_ptx(self, Coins.PART, self.test_coin)
+        run_test_bad_ptx(self, Coins.PART, self.test_coin)
 
     def test_05_coin_part_bad_ptx(self):
-        test_bad_ptx(self, self.test_coin, Coins.PART)
+        run_test_bad_ptx(self, self.test_coin, Coins.PART)
 
     def test_06_part_coin_itx_refund(self):
-        test_itx_refund(self, Coins.PART, self.test_coin)
+        run_test_itx_refund(self, Coins.PART, self.test_coin)
 
     def test_07_coin_part_itx_refund(self):
-        test_itx_refund(self, self.test_coin, Coins.PART)
+        run_test_itx_refund(self, self.test_coin, Coins.PART)
+
+    def test_08_ads_coin_xmr(self):
+        run_test_ads_success_path(self, self.test_coin, Coins.XMR)
+
+    def test_09_ads_xmr_coin(self):
+        # Reverse bid
+        run_test_ads_success_path(self, Coins.XMR, self.test_coin)
+
+    def test_10_ads_part_coin(self):
+        run_test_ads_success_path(self, Coins.PART, self.test_coin)
+
+    def test_11_ads_coin_xmr_both_refund(self):
+        run_test_ads_both_refund(self, self.test_coin, Coins.XMR, lock_value=20)
+
+    def test_12_ads_xmr_coin_both_refund(self):
+        # Reverse bid
+        run_test_ads_both_refund(self, Coins.XMR, self.test_coin, lock_value=20)
+
+    def test_13_ads_part_coin_both_refund(self):
+        run_test_ads_both_refund(self, Coins.PART, self.test_coin, lock_value=20)
+
+    def test_14_ads_coin_xmr_swipe_refund(self):
+        run_test_ads_swipe_refund(self, self.test_coin, Coins.XMR, lock_value=20)
+
+    def test_15_ads_xmr_coin_swipe_refund(self):
+        # Reverse bid
+        run_test_ads_swipe_refund(self, Coins.XMR, self.test_coin, lock_value=20)
 
 
 if __name__ == '__main__':

@@ -26,7 +26,7 @@ from basicswap.util import (
     make_int,
     format_amount,
 )
-from basicswap.interface import Curves
+from basicswap.interface.base import Curves
 from tests.basicswap.util import (
     read_json_api,
 )

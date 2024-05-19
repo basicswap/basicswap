@@ -76,7 +76,7 @@ class FIROInterface(BTCInterface):
             return addr_info['ismine']
         return addr_info['ismine'] or addr_info['iswatchonly']
 
-    def getSCLockScriptAddress(self, lock_script):
+    def getSCLockScriptAddress(self, lock_script: bytes) -> str:
         lock_tx_dest = self.getScriptDest(lock_script)
         address = self.encodeScriptDest(lock_tx_dest)
 
@@ -201,7 +201,7 @@ class FIROInterface(BTCInterface):
         add_bytes = 107
         size = len(tx.serialize_with_witness()) + add_bytes
         pay_fee = round(fee_rate * size / 1000)
-        self._log.info(f'BLockSpendTx  fee_rate, size, fee: {fee_rate}, {size}, {pay_fee}.')
+        self._log.info(f'BLockSpendTx fee_rate, size, fee: {fee_rate}, {size}, {pay_fee}.')
         return pay_fee
 
     def signTxWithKey(self, tx: bytes, key: bytes) -> bytes:

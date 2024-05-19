@@ -409,7 +409,7 @@ class XMRInterface(CoinInterface):
 
             return None
 
-    def spendBLockTx(self, chain_b_lock_txid: bytes, address_to: str, kbv: bytes, kbs: bytes, cb_swap_value: int, b_fee_rate: int, restore_height: int, spend_actual_balance: bool = False) -> bytes:
+    def spendBLockTx(self, chain_b_lock_txid: bytes, address_to: str, kbv: bytes, kbs: bytes, cb_swap_value: int, b_fee_rate: int, restore_height: int, spend_actual_balance: bool = False, lock_tx_vout=None) -> bytes:
         '''
         Notes:
         "Error: No unlocked balance in the specified subaddress(es)" can mean not enough funds after tx fee.

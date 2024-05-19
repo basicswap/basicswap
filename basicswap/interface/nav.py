@@ -13,7 +13,12 @@ from coincurve.keys import (
     PublicKey,
     PrivateKey,
 )
-from .btc import BTCInterface, find_vout_for_address_from_txobj, findOutput
+from basicswap.interface.btc import (
+    BTCInterface,
+    extractScriptLockRefundScriptValues,
+    findOutput,
+    find_vout_for_address_from_txobj,
+)
 from basicswap.rpc import make_rpc_func
 from basicswap.chainparams import Coins
 from basicswap.interface.contrib.nav_test_framework.mininode import (
@@ -24,7 +29,6 @@ from basicswap.interface.contrib.nav_test_framework.mininode import (
     CTransaction,
     CTxInWitness,
     FromHex,
-    uint256_from_str,
 )
 from basicswap.util.crypto import hash160
 from basicswap.util.address import (
@@ -33,7 +37,7 @@ from basicswap.util.address import (
     encodeAddress,
 )
 from basicswap.util import (
-    i2b, i2h,
+    b2i, i2b, i2h,
     ensure,
 )
 from basicswap.basicswap_util import (
@@ -305,7 +309,7 @@ class NAVInterface(BTCInterface):
     def createRedeemTxn(self, prevout, output_addr: str, output_value: int, txn_script: bytes) -> str:
         tx = CTransaction()
         tx.nVersion = self.txVersion()
-        prev_txid = uint256_from_str(bytes.fromhex(prevout['txid'])[::-1])
+        prev_txid = b2i(bytes.fromhex(prevout['txid']))
 
         tx.vin.append(CTxIn(COutPoint(prev_txid, prevout['vout']),
                             scriptSig=self.getScriptScriptSig(txn_script)))
@@ -319,7 +323,7 @@ class NAVInterface(BTCInterface):
         tx = CTransaction()
         tx.nVersion = self.txVersion()
         tx.nLockTime = locktime
-        prev_txid = uint256_from_str(bytes.fromhex(prevout['txid'])[::-1])
+        prev_txid = b2i(bytes.fromhex(prevout['txid']))
         tx.vin.append(CTxIn(COutPoint(prev_txid, prevout['vout']),
                             nSequence=sequence,
                             scriptSig=self.getScriptScriptSig(txn_script)))
@@ -512,7 +516,7 @@ class NAVInterface(BTCInterface):
         tx.vout.append(self.txoType()(output_amount, script_pk))
         return tx.serialize()
 
-    def spendBLockTx(self, chain_b_lock_txid: bytes, address_to: str, kbv: bytes, kbs: bytes, cb_swap_value: int, b_fee: int, restore_height: int) -> bytes:
+    def spendBLockTx(self, chain_b_lock_txid: bytes, address_to: str, kbv: bytes, kbs: bytes, cb_swap_value: int, b_fee: int, restore_height: int, lock_tx_vout=None) -> bytes:
         self._log.info('spendBLockTx %s:\n', chain_b_lock_txid.hex())
         wtx = self.rpc('gettransaction', [chain_b_lock_txid.hex(), ])
         lock_tx = self.loadTx(bytes.fromhex(wtx['hex']))
@@ -526,7 +530,7 @@ class NAVInterface(BTCInterface):
         tx = CTransaction()
         tx.nVersion = self.txVersion()
 
-        chain_b_lock_txid_int = uint256_from_str(chain_b_lock_txid[::-1])
+        chain_b_lock_txid_int = b2i(chain_b_lock_txid)
 
         script_sig = self.getInputScriptForPubkeyHash(self.getPubkeyHash(Kbs))
 
@@ -678,7 +682,7 @@ class NAVInterface(BTCInterface):
         ensure(locked_n is not None, 'Output not found in tx')
         locked_coin = tx_lock_refund.vout[locked_n].nValue
 
-        A, B, lock2_value, C = self.extractScriptLockRefundScriptValues(script_lock_refund)
+        A, B, lock2_value, C = extractScriptLockRefundScriptValues(script_lock_refund)
 
         tx_lock_refund.rehash()
         tx_lock_refund_hash_int = tx_lock_refund.sha256

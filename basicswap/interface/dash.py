@@ -66,7 +66,7 @@ class DASHInterface(BTCInterface):
         add_bytes = 107
         size = len(tx.serialize_with_witness()) + add_bytes
         pay_fee = round(fee_rate * size / 1000)
-        self._log.info(f'BLockSpendTx  fee_rate, size, fee: {fee_rate}, {size}, {pay_fee}.')
+        self._log.info(f'BLockSpendTx fee_rate, size, fee: {fee_rate}, {size}, {pay_fee}.')
         return pay_fee
 
     def findTxnByHash(self, txid_hex: str):
