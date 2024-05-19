@@ -337,7 +337,7 @@ class Test(BaseTest):
         wait_for_in_progress(test_delay_event, swap_clients[1], bid_id, sent=True)
 
         wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=80)
-        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=80)
+        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=30)
 
         # Verify lock tx spends are found in the expected wallets
         bid, offer = swap_clients[0].getBidAndOffer(bid_id)
@@ -381,7 +381,7 @@ class Test(BaseTest):
         wait_for_in_progress(test_delay_event, swap_clients[0], bid_id, sent=True)
 
         wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=80)
-        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, wait_for=80)
+        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, wait_for=30)
 
         js_0 = read_json_api(1800)
         js_1 = read_json_api(1801)
@@ -404,7 +404,7 @@ class Test(BaseTest):
         wait_for_in_progress(test_delay_event, swap_clients[1], bid_id, sent=True)
 
         wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=80)
-        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=80)
+        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=30)
 
         js_0 = read_json_api(1800)
         js_1 = read_json_api(1801)
@@ -428,7 +428,7 @@ class Test(BaseTest):
         swap_clients[0].acceptBid(bid_id)
 
         wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=80)
-        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.BID_ABANDONED, sent=True, wait_for=80)
+        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.BID_ABANDONED, sent=True, wait_for=30)
 
         js_0_bid = read_json_api(1800, 'bids/{}'.format(bid_id.hex()))
         js_1_bid = read_json_api(1801, 'bids/{}'.format(bid_id.hex()))
@@ -464,7 +464,7 @@ class Test(BaseTest):
         swap_clients[0].acceptBid(bid_id)
 
         wait_for_bid_tx_state(test_delay_event, swap_clients[0], bid_id, TxStates.TX_REDEEMED, TxStates.TX_REDEEMED, wait_for=80)
-        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=80)
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=30)
 
         js_0 = read_json_api(1800)
         assert (js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
@@ -513,7 +513,7 @@ class Test(BaseTest):
         bid_id = swap_clients[1].postBid(offer_id, offer.amount_from)
 
         wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=80)
-        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=80)
+        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=30)
 
     def test_10_bad_ptx(self):
         # Invalid PTX sent, swap should stall and ITx and PTx should be reclaimed by senders
@@ -534,7 +534,7 @@ class Test(BaseTest):
         swap_clients[0].acceptBid(bid_id)
 
         wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=120)
-        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=120)
+        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=30)
 
         js_0_bid = read_json_api(1800, 'bids/{}'.format(bid_id.hex()))
         js_1_bid = read_json_api(1801, 'bids/{}'.format(bid_id.hex()))
@@ -574,7 +574,7 @@ class Test(BaseTest):
         swap_clients[0].acceptBid(bid_id)
 
         wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=120)
-        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.BID_ABANDONED, sent=True, wait_for=120)
+        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.BID_ABANDONED, sent=True, wait_for=30)
 
         js_0_bid = read_json_api(1800, 'bids/{}'.format(bid_id.hex()))
         js_1_bid = read_json_api(1801, 'bids/{}'.format(bid_id.hex()))
@@ -727,7 +727,7 @@ class Test(BaseTest):
         swap_clients[2].acceptBid(bid_id)
 
         wait_for_bid(test_delay_event, swap_clients[2], bid_id, BidStates.SWAP_COMPLETED, wait_for=80)
-        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=80)
+        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=30)
 
         # Verify expected inputs were used
         bid, offer = swap_clients[2].getBidAndOffer(bid_id)
@@ -762,7 +762,7 @@ class Test(BaseTest):
         wait_for_in_progress(test_delay_event, swap_clients[0], bid_id, sent=True)
 
         wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, sent=True, wait_for=80)
-        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, wait_for=80)
+        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, wait_for=30)
 
     def pass_99_delay(self):
         logging.info('Delay')

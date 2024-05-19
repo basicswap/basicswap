@@ -28,8 +28,13 @@ from basicswap.util.script import (
 from basicswap.util.address import (
     encodeStealthAddress,
 )
+from basicswap.interface.btc import (
+    BTCInterface,
+    extractScriptLockScriptValues,
+    extractScriptLockRefundScriptValues,
+)
+
 from basicswap.chainparams import Coins, chainparams
-from .btc import BTCInterface
 
 
 class BalanceTypes(IntEnum):
@@ -354,7 +359,7 @@ class PARTInterfaceBlind(PARTInterface):
         lock_txo_scriptpk = bytes.fromhex(lock_tx_obj['vout'][lock_output_n]['scriptPubKey']['hex'])
         script_pk = CScript([OP_0, hashlib.sha256(script_out).digest()])
         ensure(lock_txo_scriptpk == script_pk, 'Bad output script')
-        A, B = self.extractScriptLockScriptValues(script_out)
+        A, B = extractScriptLockScriptValues(script_out)
         ensure(A == Kal, 'Bad script leader pubkey')
         ensure(B == Kaf, 'Bad script follower pubkey')
 
@@ -402,7 +407,7 @@ class PARTInterfaceBlind(PARTInterface):
         lock_refund_txo_scriptpk = bytes.fromhex(lock_refund_tx_obj['vout'][lock_refund_output_n]['scriptPubKey']['hex'])
         script_pk = CScript([OP_0, hashlib.sha256(script_out).digest()])
         ensure(lock_refund_txo_scriptpk == script_pk, 'Bad output script')
-        A, B, csv_val, C = self.extractScriptLockRefundScriptValues(script_out)
+        A, B, csv_val, C = extractScriptLockRefundScriptValues(script_out)
         ensure(A == Kal, 'Bad script pubkey')
         ensure(B == Kaf, 'Bad script pubkey')
         ensure(csv_val == csv_val_expect, 'Bad script csv value')
@@ -632,7 +637,7 @@ class PARTInterfaceBlind(PARTInterface):
         addr_info = self.rpc_wallet('getaddressinfo', [addr_out])
         output_pubkey_hex = addr_info['pubkey']
 
-        A, B, lock2_value, C = self.extractScriptLockRefundScriptValues(script_lock_refund)
+        A, B, lock2_value, C = extractScriptLockRefundScriptValues(script_lock_refund)
 
         # Follower won't be able to decode output to check amount, shouldn't matter as fee is public and output is to leader, sum has to balance
 
@@ -715,7 +720,7 @@ class PARTInterfaceBlind(PARTInterface):
                 return -1
         return None
 
-    def spendBLockTx(self, chain_b_lock_txid: bytes, address_to: str, kbv: bytes, kbs: bytes, cb_swap_value: int, b_fee: int, restore_height: int, spend_actual_balance: bool = False) -> bytes:
+    def spendBLockTx(self, chain_b_lock_txid: bytes, address_to: str, kbv: bytes, kbs: bytes, cb_swap_value: int, b_fee: int, restore_height: int, spend_actual_balance: bool = False, lock_tx_vout=None) -> bytes:
         Kbv = self.getPubkey(kbv)
         Kbs = self.getPubkey(kbs)
         sx_addr = self.formatStealthAddress(Kbv, Kbs)
@@ -851,7 +856,7 @@ class PARTInterfaceAnon(PARTInterface):
                 return -1
         return None
 
-    def spendBLockTx(self, chain_b_lock_txid: bytes, address_to: str, kbv: bytes, kbs: bytes, cb_swap_value: int, b_fee: int, restore_height: int, spend_actual_balance: bool = False) -> bytes:
+    def spendBLockTx(self, chain_b_lock_txid: bytes, address_to: str, kbv: bytes, kbs: bytes, cb_swap_value: int, b_fee: int, restore_height: int, spend_actual_balance: bool = False, lock_tx_vout=None) -> bytes:
         Kbv = self.getPubkey(kbv)
         Kbs = self.getPubkey(kbs)
         sx_addr = self.formatStealthAddress(Kbv, Kbs)

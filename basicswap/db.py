@@ -192,6 +192,11 @@ class Bid(Base):
         else:
             self.states += pack_state(new_state, now)
 
+    def getLockTXBVout(self):
+        if self.xmr_b_lock_tx:
+            return self.xmr_b_lock_tx.vout
+        return None
+
 
 class SwapTx(Base):
     __tablename__ = 'transactions'

@@ -1528,7 +1528,7 @@ class Test(BaseTest):
         swap_clients[0].acceptXmrBid(bid_id)
 
         wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.XMR_SWAP_FAILED_REFUNDED, wait_for=1800)
-        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.XMR_SWAP_FAILED_REFUNDED, wait_for=1800, sent=True)
+        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.XMR_SWAP_FAILED_REFUNDED, wait_for=30, sent=True)
 
     def test_16_new_subaddress(self):
         logging.info('---------- Test that new subaddresses are created')

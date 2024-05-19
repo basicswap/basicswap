@@ -21,13 +21,17 @@ from basicswap.basicswap_util import (
 from . import ProtocolInterface
 from basicswap.contrib.test_framework.script import (
     CScript, CScriptOp,
-    OP_CHECKMULTISIG)
+    OP_CHECKMULTISIG
+)
 
 
 def addLockRefundSigs(self, xmr_swap, ci):
     self.log.debug('Setting lock refund tx sigs')
-    witness_stack = [
-        b'',
+
+    witness_stack = []
+    if ci.coin_type() not in (Coins.DCR, ):
+        witness_stack += [b'', ]
+    witness_stack += [
         xmr_swap.al_lock_refund_tx_sig,
         xmr_swap.af_lock_refund_tx_sig,
         xmr_swap.a_lock_tx_script,
@@ -74,7 +78,8 @@ def recoverNoScriptTxnWithKey(self, bid_id: bytes, encoded_key):
             address_to = self.getCachedStealthAddressForCoin(offer.coin_to)
 
         amount = bid.amount_to
-        txid = ci_to.spendBLockTx(xmr_swap.b_lock_tx_id, address_to, xmr_swap.vkbv, vkbs, bid.amount_to, xmr_offer.b_fee_rate, bid.chain_b_height_start, spend_actual_balance=True)
+        lock_tx_vout = bid.getLockTXBVout()
+        txid = ci_to.spendBLockTx(xmr_swap.b_lock_tx_id, address_to, xmr_swap.vkbv, vkbs, amount, xmr_offer.b_fee_rate, bid.chain_b_height_start, spend_actual_balance=True, lock_tx_vout=lock_tx_vout)
         self.log.debug('Submitted lock B spend txn %s to %s chain for bid %s', txid.hex(), ci_to.coin_name(), bid_id.hex())
         self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_B_SPEND_TX_PUBLISHED, txid.hex(), session)
         session.commit()

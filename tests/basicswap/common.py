@@ -419,9 +419,10 @@ def compare_bid_states(states, expect_states, exact_match: bool = True) -> bool:
     return True
 
 
-def compare_bid_states_unordered(states, expect_states) -> bool:
+def compare_bid_states_unordered(states, expect_states, ignore_states=[]) -> bool:
+    ignore_states.append('Bid Delaying')
     for i in range(len(states) - 1, -1, -1):
-        if states[i][1] == 'Bid Delaying':
+        if states[i][1] in ignore_states:
             del states[i]
 
     try:

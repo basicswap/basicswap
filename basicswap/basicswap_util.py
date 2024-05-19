@@ -203,6 +203,7 @@ class DebugTypes(IntEnum):
     B_LOCK_TX_MISSED_SEND = auto()
     DUPLICATE_ACTIONS = auto()
     DONT_CONFIRM_PTX = auto()
+    OFFER_LOCK_2_VALUE_INC = auto()
 
 
 class NotificationTypes(IntEnum):

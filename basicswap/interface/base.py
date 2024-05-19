@@ -44,6 +44,10 @@ class CoinInterface:
     def watch_blocks_for_scripts() -> bool:
         return False
 
+    @staticmethod
+    def compareFeeRates(a, b) -> bool:
+        return abs(a - b) < 20
+
     def __init__(self, network):
         self.setDefaults()
         self._network = network
@@ -149,8 +153,44 @@ class CoinInterface:
     def use_tx_vsize(self) -> bool:
         return self._use_segwit
 
+    def getLockTxSwapOutputValue(self, bid, xmr_swap):
+        return bid.amount
 
-class Secp256k1Interface(CoinInterface):
+    def getLockRefundTxSwapOutputValue(self, bid, xmr_swap):
+        return xmr_swap.a_swap_refund_value
+
+    def getLockRefundTxSwapOutput(self, xmr_swap):
+        # Only one prevout exists
+        return 0
+
+
+class AdaptorSigInterface():
+    def getScriptLockTxDummyWitness(self, script: bytes):
+        return [
+            b'',
+            bytes(72),
+            bytes(72),
+            bytes(len(script))
+        ]
+
+    def getScriptLockRefundSpendTxDummyWitness(self, script: bytes):
+        return [
+            b'',
+            bytes(72),
+            bytes(72),
+            bytes((1,)),
+            bytes(len(script))
+        ]
+
+    def getScriptLockRefundSwipeTxDummyWitness(self, script: bytes):
+        return [
+            bytes(72),
+            b'',
+            bytes(len(script))
+        ]
+
+
+class Secp256k1Interface(CoinInterface, AdaptorSigInterface):
     @staticmethod
     def curve_type():
         return Curves.secp256k1
@@ -170,3 +210,26 @@ class Secp256k1Interface(CoinInterface):
 
     def verifyPubkey(self, pubkey_bytes: bytes) -> bool:
         return verify_secp256k1_point(pubkey_bytes)
+
+    def isValidAddressHash(self, address_hash: bytes) -> bool:
+        hash_len = len(address_hash)
+        if hash_len == 20:
+            return True
+
+    def isValidPubkey(self, pubkey: bytes) -> bool:
+        try:
+            self.verifyPubkey(pubkey)
+            return True
+        except Exception:
+            return False
+
+    def verifySig(self, pubkey: bytes, signed_hash: bytes, sig: bytes) -> bool:
+        pubkey = PublicKey(pubkey)
+        return pubkey.verify(sig, signed_hash, hasher=None)
+
+    def sumKeys(self, ka: bytes, kb: bytes) -> bytes:
+        # TODO: Add to coincurve
+        return i2b((b2i(ka) + b2i(kb)) % ep.o)
+
+    def sumPubkeys(self, Ka: bytes, Kb: bytes) -> bytes:
+        return PublicKey.combine_keys([PublicKey(Ka), PublicKey(Kb)]).format()

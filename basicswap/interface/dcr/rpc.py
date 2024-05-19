@@ -27,6 +27,15 @@ def callrpc(rpc_port, auth, method, params=[], host='127.0.0.1'):
     return r['result']
 
 
+def openrpc(rpc_port, auth, host='127.0.0.1'):
+    try:
+        url = 'http://{}@{}:{}/'.format(auth, host, rpc_port)
+        return Jsonrpc(url)
+    except Exception as ex:
+        traceback.print_exc()
+        raise ValueError('RPC error ' + str(ex))
+
+
 def make_rpc_func(port, auth, host='127.0.0.1'):
     port = port
     auth = auth
