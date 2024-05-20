@@ -207,6 +207,14 @@ class DCRInterface(Secp256k1Interface):
         return CTxOut
 
     @staticmethod
+    def xmr_swap_a_lock_spend_tx_vsize() -> int:
+        return 327
+
+    @staticmethod
+    def xmr_swap_b_lock_spend_tx_vsize() -> int:
+        return 224
+
+    @staticmethod
     def getExpectedSequence(lockType: int, lockVal: int) -> int:
         ensure(lockVal >= 1, 'Bad lockVal')
         if lockType == TxLockTypes.SEQUENCE_LOCK_BLOCKS:
@@ -483,6 +491,13 @@ class DCRInterface(Secp256k1Interface):
 
     def getNewAddress(self, use_segwit: bool = True, label: str = 'swap_receive') -> str:
         return self.rpc_wallet('getnewaddress')
+
+    def getWalletTransaction(self, txid: bytes):
+        try:
+            return bytes.fromhex(self.rpc_wallet('gettransaction', [txid.hex()])['hex'])
+        except Exception as ex:
+            # TODO: filter errors
+            return None
 
     def getProofOfFunds(self, amount_for, extra_commit_bytes):
         # TODO: Lock unspent and use same output/s to fund bid
@@ -1299,7 +1314,7 @@ class DCRInterface(Secp256k1Interface):
         return bytes.fromhex(self.publishTx(b_lock_tx))
 
     def getBLockSpendTxFee(self, tx, fee_rate: int) -> int:
-        witness_bytes = 120  # TODO
+        witness_bytes = 115
         size = len(tx.serialize()) + witness_bytes
         pay_fee = round(fee_rate * size / 1000)
         self._log.info(f'BLockSpendTx fee_rate, vsize, fee: {fee_rate}, {size}, {pay_fee}.')
