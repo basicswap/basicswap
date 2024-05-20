@@ -1001,7 +1001,7 @@ class BTCInterface(Secp256k1Interface):
 
     def getWalletTransaction(self, txid: bytes):
         try:
-            return bytes.fromhex(self.rpc('gettransaction', [txid.hex()]))
+            return bytes.fromhex(self.rpc_wallet('gettransaction', [txid.hex()]))
         except Exception as ex:
             # TODO: filter errors
             return None

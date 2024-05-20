@@ -942,6 +942,108 @@ class Test(BaseTest):
         amount_proved = ci0.verifyProofOfFunds(funds_proof[0], funds_proof[1], funds_proof[2], 'test'.encode('utf-8'))
         assert (amount_proved >= require_amount)
 
+    def test_010_txn_size(self):
+        logging.info('---------- Test {} txn_size'.format(self.test_coin.name))
+
+        swap_clients = self.swap_clients
+        ci = swap_clients[0].ci(self.test_coin)
+        pi = swap_clients[0].pi(SwapTypes.XMR_SWAP)
+
+        amount: int = ci.make_int(random.uniform(0.1, 2.0), r=1)
+
+        # Record unspents before createSCLockTx as the used ones will be locked
+        unspents = ci.rpc_wallet('listunspent')
+
+        # fee_rate is in sats/kvB
+        fee_rate: int = 10000
+
+        a = ci.getNewSecretKey()
+        b = ci.getNewSecretKey()
+
+        A = ci.getPubkey(a)
+        B = ci.getPubkey(b)
+        lock_tx_script = pi.genScriptLockTxScript(ci, A, B)
+
+        lock_tx = ci.createSCLockTx(amount, lock_tx_script)
+        lock_tx = ci.fundSCLockTx(lock_tx, fee_rate)
+        lock_tx = ci.signTxWithWallet(lock_tx)
+
+        unspents_after = ci.rpc_wallet('listunspent')
+        assert (len(unspents) > len(unspents_after))
+
+        tx_decoded = ci.rpc('decoderawtransaction', [lock_tx.hex()])
+        txid = tx_decoded['txid']
+
+        size = len(lock_tx)
+        expect_fee_int = round(fee_rate * size / 1000)
+        expect_fee = ci.format_amount(expect_fee_int)
+
+        out_value: int = 0
+        for txo in tx_decoded['vout']:
+            if 'value' in txo:
+                out_value += ci.make_int(txo['value'])
+        in_value: int = 0
+        for txi in tx_decoded['vin']:
+            for utxo in unspents:
+                if 'vout' not in utxo:
+                    continue
+                if utxo['txid'] == txi['txid'] and utxo['vout'] == txi['vout']:
+                    in_value += ci.make_int(utxo['amount'])
+                    break
+        fee_value = in_value - out_value
+
+        ci.rpc('sendrawtransaction', [lock_tx.hex()])
+
+        addr_out = ci.getNewAddress(True)
+        pkh_out = ci.decodeAddress(addr_out)
+        fee_info = {}
+        lock_spend_tx = ci.createSCLockSpendTx(lock_tx, lock_tx_script, pkh_out, fee_rate, fee_info=fee_info)
+        size_estimated: int = fee_info['size']
+
+        tx_decoded = ci.rpc('decoderawtransaction', [lock_spend_tx.hex()])
+        txid = tx_decoded['txid']
+
+        witness_stack = [
+            ci.signTx(a, lock_spend_tx, 0, lock_tx_script, amount),
+            ci.signTx(b, lock_spend_tx, 0, lock_tx_script, amount),
+            lock_tx_script,
+        ]
+        lock_spend_tx = ci.setTxSignature(lock_spend_tx, witness_stack)
+
+        size_actual: int = len(lock_spend_tx)
+
+        assert (size_actual <= size_estimated and size_estimated - size_actual < 4)
+        assert (ci.rpc('sendrawtransaction', [lock_spend_tx.hex()]) == txid)
+
+        expect_size: int = ci.xmr_swap_a_lock_spend_tx_vsize()
+        assert (expect_size >= size_actual)
+        assert (expect_size - size_actual < 10)
+
+        # Test chain b (no-script) lock tx size
+        v = ci.getNewSecretKey()
+        s = ci.getNewSecretKey()
+        S = ci.getPubkey(s)
+        lock_tx_b_txid = ci.publishBLockTx(v, S, amount, fee_rate)
+        test_delay_event.wait(1)
+
+        addr_out = ci.getNewAddress(True)
+        lock_tx_b_spend_txid = ci.spendBLockTx(lock_tx_b_txid, addr_out, v, s, amount, fee_rate, 0)
+        test_delay_event.wait(1)
+        lock_tx_b_spend = ci.getWalletTransaction(lock_tx_b_spend_txid)
+        if lock_tx_b_spend is None:
+            lock_tx_b_spend = ci.getWalletTransaction(lock_tx_b_spend_txid)
+
+        tx_obj = ci.loadTx(lock_tx_b_spend)
+        tx_out_value: int = tx_obj.vout[0].value
+        fee_paid = amount - tx_out_value
+
+        actual_size = len(lock_tx_b_spend)
+        expect_size: int = ci.xmr_swap_b_lock_spend_tx_vsize()
+        fee_expect = round(fee_rate * expect_size / 1000)
+        assert (fee_expect == fee_paid)
+        assert (expect_size >= actual_size)
+        assert (expect_size - actual_size < 10)
+
     def test_02_part_coin(self):
         run_test_success_path(self, Coins.PART, self.test_coin)
 
