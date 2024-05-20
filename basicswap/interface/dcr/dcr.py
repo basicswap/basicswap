@@ -109,7 +109,7 @@ def DCRSignatureHash(sign_script: bytes, hash_type: SigHashType, tx: CTransactio
     for txi_n, txi in enumerate(sign_vins):
         hash_buffer += txi.prevout.hash.to_bytes(32, 'little')
         hash_buffer += txi.prevout.n.to_bytes(4, 'little')
-        hash_buffer += txi.prevout.tree.to_bytes(1)
+        hash_buffer += txi.prevout.tree.to_bytes(1, 'little')
 
         # In the case of SigHashNone and SigHashSingle, commit to 0 for everything that is not the input being signed instead.
         if (masked_hash_type == SigHashType.SigHashNone
@@ -308,13 +308,18 @@ class DCRInterface(Secp256k1Interface):
     def getChainHeight(self) -> int:
         return self.rpc('getblockcount')
 
-    def checkWallets(self) -> int:
-        # Only one wallet possible?
-        return 1
-
     def initialiseWallet(self, key: bytes) -> None:
         # Load with --create
         pass
+
+    def getWalletSeedID(self):
+        masterpubkey = self.rpc_wallet('getmasterpubkey')
+        masterpubkey_data = self.decode_address(masterpubkey)[4:]
+        return hash160(masterpubkey_data).hex()
+
+    def checkExpectedSeed(self, expect_seedid) -> bool:
+        self._expect_seedid_hex = expect_seedid
+        return expect_seedid == self.getWalletSeedID()
 
     def getDaemonVersion(self):
         return self.rpc('getnetworkinfo')['version']
@@ -368,7 +373,7 @@ class DCRInterface(Secp256k1Interface):
     def encodeKey(self, key_bytes: bytes) -> str:
         wif_prefix = self.chainparams_network()['key_prefix']
         key_type = 0  # STEcdsaSecp256k1
-        b = wif_prefix.to_bytes(2, 'big') + key_type.to_bytes(1) + key_bytes
+        b = wif_prefix.to_bytes(2, 'big') + key_type.to_bytes(1, 'big') + key_bytes
         b += blake256(b)[:4]
         return b58encode(b)
 
@@ -433,7 +438,7 @@ class DCRInterface(Secp256k1Interface):
         script_hash = self.pkh(script)
         assert len(script_hash) == 20
 
-        return OP_HASH160.to_bytes(1) + len(script_hash).to_bytes(1) + script_hash + OP_EQUAL.to_bytes(1)
+        return bytes((OP_HASH160,)) + bytes((len(script_hash),)) + script_hash + bytes((OP_EQUAL,))
 
     def encodeScriptDest(self, script_dest: bytes) -> str:
         script_hash = script_dest[2:-1]  # Extract hash from script
@@ -442,7 +447,7 @@ class DCRInterface(Secp256k1Interface):
     def getPubkeyHashDest(self, pkh: bytes) -> bytes:
         # P2PKH
         assert len(pkh) == 20
-        return OP_DUP.to_bytes(1) + OP_HASH160.to_bytes(1) + len(pkh).to_bytes(1) + pkh + OP_EQUALVERIFY.to_bytes(1) + OP_CHECKSIG.to_bytes(1)
+        return bytes((OP_DUP,)) + bytes((OP_HASH160,)) + bytes((len(pkh),)) + pkh + bytes((OP_EQUALVERIFY,)) + bytes((OP_CHECKSIG,))
 
     def getPkDest(self, K: bytes) -> bytearray:
         return self.getPubkeyHashDest(self.pkh(K))
@@ -532,7 +537,7 @@ class DCRInterface(Secp256k1Interface):
             prove_utxos.append(outpoint)
             hasher.update(outpoint[0])
             hasher.update(outpoint[1].to_bytes(2, 'big'))
-            hasher.update(outpoint[2].to_bytes(1))
+            hasher.update(outpoint[2].to_bytes(1, 'big'))
             if sum_value >= amount_for:
                 break
         utxos_hash = hasher.digest()
@@ -554,7 +559,7 @@ class DCRInterface(Secp256k1Interface):
     def encodeProofUtxos(self, proof_utxos):
         packed_utxos = bytes()
         for utxo in proof_utxos:
-            packed_utxos += utxo[0] + utxo[1].to_bytes(2, 'big') + utxo[2].to_bytes(1)
+            packed_utxos += utxo[0] + utxo[1].to_bytes(2, 'big') + utxo[2].to_bytes(1, 'big')
         return packed_utxos
 
     def decodeProofUtxos(self, msg_utxos):
@@ -573,7 +578,7 @@ class DCRInterface(Secp256k1Interface):
         for outpoint in utxos:
             hasher.update(outpoint[0])
             hasher.update(outpoint[1].to_bytes(2, 'big'))
-            hasher.update(outpoint[2].to_bytes(1))
+            hasher.update(outpoint[2].to_bytes(1, 'big'))
         utxos_hash = hasher.digest()
 
         passed = self.verifyMessage(address, address + '_swap_proof_' + utxos_hash.hex() + extra_commit_bytes.hex(), signature)
@@ -841,19 +846,19 @@ class DCRInterface(Secp256k1Interface):
         Kaf_enc = Kaf if len(Kaf) == 33 else self.encodePubkey(Kaf)
 
         script = bytearray()
-        script += OP_IF.to_bytes(1)
+        script += bytes((OP_IF,))
         push_script_data(script, bytes((2,)))
         push_script_data(script, Kal_enc)
         push_script_data(script, Kaf_enc)
         push_script_data(script, bytes((2,)))
-        script += OP_CHECKMULTISIG.to_bytes(1)
-        script += OP_ELSE.to_bytes(1)
+        script += bytes((OP_CHECKMULTISIG,))
+        script += bytes((OP_ELSE,))
         script += CScriptNum.encode(CScriptNum(csv_val))
-        script += OP_CHECKSEQUENCEVERIFY.to_bytes(1)
-        script += OP_DROP.to_bytes(1)
+        script += bytes((OP_CHECKSEQUENCEVERIFY,))
+        script += bytes((OP_DROP,))
         push_script_data(script, Kaf_enc)
-        script += OP_CHECKSIG.to_bytes(1)
-        script += OP_ENDIF.to_bytes(1)
+        script += bytes((OP_CHECKSIG,))
+        script += bytes((OP_ENDIF,))
 
         return script
 

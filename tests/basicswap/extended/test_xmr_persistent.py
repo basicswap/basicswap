@@ -49,6 +49,7 @@ from tests.basicswap.common_xmr import (
     prepare_nodes,
     XMR_BASE_RPC_PORT,
 )
+from basicswap.interface.dcr.rpc import callrpc as callrpc_dcr
 import bin.basicswap_run as runSystem
 
 
@@ -61,6 +62,7 @@ UI_PORT = 12700 + PORT_OFS
 PARTICL_RPC_PORT_BASE = int(os.getenv('PARTICL_RPC_PORT_BASE', BASE_RPC_PORT))
 BITCOIN_RPC_PORT_BASE = int(os.getenv('BITCOIN_RPC_PORT_BASE', BTC_BASE_RPC_PORT))
 LITECOIN_RPC_PORT_BASE = int(os.getenv('LITECOIN_RPC_PORT_BASE', LTC_BASE_RPC_PORT))
+DECRED_WALLET_RPC_PORT_BASE = int(os.getenv('DECRED_WALLET_RPC_PORT_BASE', 9210))
 XMR_BASE_RPC_PORT = int(os.getenv('XMR_BASE_RPC_PORT', XMR_BASE_RPC_PORT))
 TEST_COINS_LIST = os.getenv('TEST_COINS_LIST', 'bitcoin,monero')
 
@@ -88,6 +90,11 @@ def callltcrpc(node_id, method, params=[], wallet=None, base_rpc_port=LITECOIN_R
     return callrpc(base_rpc_port + node_id, auth, method, params, wallet)
 
 
+def calldcrrpc(node_id, method, params=[], wallet=None, base_rpc_port=DECRED_WALLET_RPC_PORT_BASE):
+    auth = 'user:dcr_pwd'
+    return callrpc_dcr(base_rpc_port + node_id, auth, method, params)
+
+
 def updateThread(cls):
     while not cls.delay_event.is_set():
         try:
@@ -98,7 +105,7 @@ def updateThread(cls):
         cls.delay_event.wait(random.randrange(cls.update_min, cls.update_max))
 
 
-def updateThreadXmr(cls):
+def updateThreadXMR(cls):
     xmr_auth = None
     if os.getenv('XMR_RPC_USER', '') != '':
         xmr_auth = (os.getenv('XMR_RPC_USER', ''), os.getenv('XMR_RPC_PWD', ''))
@@ -108,8 +115,36 @@ def updateThreadXmr(cls):
             if cls.xmr_addr is not None:
                 callrpc_xmr(XMR_BASE_RPC_PORT + 1, 'generateblocks', {'wallet_address': cls.xmr_addr, 'amount_of_blocks': 1}, auth=xmr_auth)
         except Exception as e:
-            print('updateThreadXmr error', str(e))
+            print('updateThreadXMR error', str(e))
         cls.delay_event.wait(random.randrange(cls.xmr_update_min, cls.xmr_update_max))
+
+
+def updateThreadDCR(cls):
+    while not cls.delay_event.is_set():
+        try:
+            pass
+            num_passed: int = 0
+            for i in range(30):
+                try:
+                    calldcrrpc(0, 'purchaseticket', [cls.dcr_acc, 0.1, 0])
+                    num_passed += 1
+                    if num_passed >= 5:
+                        break
+                    cls.delay_event.wait(0.1)
+                except Exception as e:
+                    if 'double spend' in str(e):
+                        pass
+                    else:
+                        logging.warning('updateThreadDCR purchaseticket {}'.format(e))
+                    cls.delay_event.wait(0.5)
+            try:
+                if num_passed >= 5:
+                    calldcrrpc(0, 'generate', [1,])
+            except Exception as e:
+                logging.warning('updateThreadDCR generate {}'.format(e))
+        except Exception as e:
+            print('updateThreadDCR error', str(e))
+        cls.delay_event.wait(random.randrange(cls.dcr_update_min, cls.dcr_update_max))
 
 
 class Test(unittest.TestCase):
@@ -123,12 +158,18 @@ class Test(unittest.TestCase):
         cls.xmr_update_min = int(os.getenv('XMR_UPDATE_THREAD_MIN_WAIT', '1'))
         cls.xmr_update_max = cls.xmr_update_min * 4
 
+        cls.dcr_update_min = int(os.getenv('DCR_UPDATE_THREAD_MIN_WAIT', '1'))
+        cls.dcr_update_max = cls.dcr_update_min * 4
+
         cls.delay_event = threading.Event()
         cls.update_thread = None
         cls.update_thread_xmr = None
+        cls.update_thread_dcr = None
         cls.processes = []
         cls.btc_addr = None
         cls.xmr_addr = None
+        cls.dcr_addr = 'SsYbXyjkKAEXXcGdFgr4u4bo4L8RkCxwQpH'
+        cls.dcr_acc = None
 
         random.seed(time.time())
 
@@ -197,13 +238,25 @@ class Test(unittest.TestCase):
                 have_blocks: int = callltcrpc(0, 'getblockcount')
                 callltcrpc(0, 'generatetoaddress', [500 - have_blocks, self.ltc_addr], wallet='wallet.dat')
 
+        if 'decred' in TEST_COINS_LIST:
+            if RESET_TEST:
+                addr = calldcrrpc(0, 'getnewaddress')
+                # assert (addr == self.dcr_addr)
+                self.dcr_acc = calldcrrpc(0, 'getaccount', [self.dcr_addr, ])
+                addr = calldcrrpc(0, 'generate', [110,])
+            else:
+                self.dcr_acc = calldcrrpc(0, 'getaccount', [self.dcr_addr, ])
+
+            self.update_thread_dcr = threading.Thread(target=updateThreadDCR, args=(self,))
+            self.update_thread_dcr.start()
+
         # Lower output split threshold for more stakeable outputs
         for i in range(NUM_NODES):
             callpartrpc(i, 'walletsettings', ['stakingoptions', {'stakecombinethreshold': 100, 'stakesplitthreshold': 200}])
         self.update_thread = threading.Thread(target=updateThread, args=(self,))
         self.update_thread.start()
 
-        self.update_thread_xmr = threading.Thread(target=updateThreadXmr, args=(self,))
+        self.update_thread_xmr = threading.Thread(target=updateThreadXMR, args=(self,))
         self.update_thread_xmr.start()
 
         # Wait for height, or sequencelock is thrown off by genesis blocktime
@@ -228,12 +281,15 @@ class Test(unittest.TestCase):
             cls.update_thread.join()
         if cls.update_thread_xmr:
             cls.update_thread_xmr.join()
+        if cls.update_thread_dcr:
+            cls.update_thread_dcr.join()
         for p in cls.processes:
             p.terminate()
         for p in cls.processes:
             p.join()
         cls.update_thread = None
         cls.update_thread_xmr = None
+        cls.update_thread_dcr = None
         cls.processes = []
 
     def test_persistent(self):

@@ -153,15 +153,18 @@ class CoinInterface:
     def use_tx_vsize(self) -> bool:
         return self._use_segwit
 
-    def getLockTxSwapOutputValue(self, bid, xmr_swap):
+    def getLockTxSwapOutputValue(self, bid, xmr_swap) -> int:
         return bid.amount
 
-    def getLockRefundTxSwapOutputValue(self, bid, xmr_swap):
+    def getLockRefundTxSwapOutputValue(self, bid, xmr_swap) -> int:
         return xmr_swap.a_swap_refund_value
 
-    def getLockRefundTxSwapOutput(self, xmr_swap):
+    def getLockRefundTxSwapOutput(self, xmr_swap) -> int:
         # Only one prevout exists
         return 0
+
+    def checkWallets(self) -> int:
+        return 1
 
 
 class AdaptorSigInterface():
