@@ -129,9 +129,6 @@ class XMRInterface(CoinInterface):
         self.rpc2 = make_xmr_rpc2_func(coin_settings['rpcport'], daemon_login, host=rpchost, proxy_host=proxy_host, proxy_port=proxy_port, default_timeout=self._rpctimeout, tag='Node ')  # non-json endpoint
         self.rpc_wallet = make_xmr_rpc_func(coin_settings['walletrpcport'], coin_settings['walletrpcauth'], host=coin_settings.get('walletrpchost', '127.0.0.1'), default_timeout=self._walletrpctimeout, tag='Wallet ')
 
-    def checkWallets(self) -> int:
-        return 1
-
     def setFeePriority(self, new_priority):
         ensure(new_priority >= 0 and new_priority < 4, 'Invalid fee_priority value')
         self._fee_priority = new_priority

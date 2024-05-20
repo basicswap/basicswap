@@ -774,9 +774,7 @@ class BasicSwap(BaseApp):
 
             if self.coin_clients[c]['connection_type'] == 'rpc':
                 ci = self.ci(c)
-                self.waitForDaemonRPC(c, with_wallet=False)
-                if c not in (Coins.XMR,) and ci.checkWallets() >= 1:
-                    self.waitForDaemonRPC(c)
+                self.waitForDaemonRPC(c)
 
                 core_version = ci.getDaemonVersion()
                 self.log.info('%s Core version %d', ci.coin_name(), core_version)
@@ -857,7 +855,7 @@ class BasicSwap(BaseApp):
         self.log.info('Scanned %d unread messages.', nm)
 
     def stopDaemon(self, coin) -> None:
-        if coin == Coins.XMR:
+        if coin in (Coins.XMR, Coins.DCR):
             return
         num_tries = 10
         authcookiepath = os.path.join(self.getChainDatadirPath(coin), '.cookie')
@@ -893,6 +891,17 @@ class BasicSwap(BaseApp):
                 self.stopDaemon(c)
 
     def waitForDaemonRPC(self, coin_type, with_wallet: bool = True) -> None:
+
+        if with_wallet:
+            self.waitForDaemonRPC(coin_type, with_wallet=False)
+            if coin_type in (Coins.XMR,):
+                return
+            ci = self.ci(coin_type)
+            # checkWallets can adjust the wallet name.
+            if ci.checkWallets() < 1:
+                self.log.error('No wallets found for coin {}.'.format(ci.coin_name()))
+                self.stopRunning(1)  # systemd will try to restart the process if fail_code != 0
+
         startup_tries = self.startup_tries
         chain_client_settings = self.getChainClientSettings(coin_type)
         if 'startup_tries' in chain_client_settings:
@@ -1937,9 +1946,6 @@ class BasicSwap(BaseApp):
         new_addr = self.ci(coin_type).getNewAddress(self.coin_clients[coin_type]['use_segwit'])
         self.log.debug('Generated new receive address %s for %s', new_addr, Coins(coin_type).name)
         return new_addr
-
-    def getRelayFeeRateForCoin(self, coin_type):
-        return self.callcoinrpc(coin_type, 'getnetworkinfo')['relayfee']
 
     def getFeeRateForCoin(self, coin_type, conf_target: int = 2):
         return self.ci(coin_type).get_fee_rate(conf_target)
@@ -3376,11 +3382,11 @@ class BasicSwap(BaseApp):
                 txn_script]
             redeem_txn = ci.setTxSignature(bytes.fromhex(redeem_txn), witness_stack).hex()
         else:
-            script = (len(redeem_sig) // 2).to_bytes(1) + bytes.fromhex(redeem_sig)
-            script += (33).to_bytes(1) + pubkey
-            script += (32).to_bytes(1) + secret
-            script += (OpCodes.OP_1).to_bytes(1)
-            script += (OpCodes.OP_PUSHDATA1).to_bytes(1) + (len(txn_script)).to_bytes(1) + txn_script
+            script = (len(redeem_sig) // 2).to_bytes(1, 'big') + bytes.fromhex(redeem_sig)
+            script += (33).to_bytes(1, 'big') + pubkey
+            script += (32).to_bytes(1, 'big') + secret
+            script += (OpCodes.OP_1).to_bytes(1, 'big')
+            script += (OpCodes.OP_PUSHDATA1).to_bytes(1, 'big') + (len(txn_script)).to_bytes(1, 'big') + txn_script
             redeem_txn = ci.setTxScriptSig(bytes.fromhex(redeem_txn), 0, script).hex()
 
         if coin_type in (Coins.NAV, Coins.DCR):
@@ -3488,10 +3494,10 @@ class BasicSwap(BaseApp):
                 txn_script]
             refund_txn = ci.setTxSignature(bytes.fromhex(refund_txn), witness_stack).hex()
         else:
-            script = (len(refund_sig) // 2).to_bytes(1) + bytes.fromhex(refund_sig)
-            script += (33).to_bytes(1) + pubkey
-            script += (OpCodes.OP_0).to_bytes(1)
-            script += (OpCodes.OP_PUSHDATA1).to_bytes(1) + (len(txn_script)).to_bytes(1) + txn_script
+            script = (len(refund_sig) // 2).to_bytes(1, 'big') + bytes.fromhex(refund_sig)
+            script += (33).to_bytes(1, 'big') + pubkey
+            script += (OpCodes.OP_0).to_bytes(1, 'big')
+            script += (OpCodes.OP_PUSHDATA1).to_bytes(1, 'big') + (len(txn_script)).to_bytes(1, 'big') + txn_script
             refund_txn = ci.setTxScriptSig(bytes.fromhex(refund_txn), 0, script)
 
         if coin_type in (Coins.NAV, Coins.DCR):
@@ -4517,8 +4523,8 @@ class BasicSwap(BaseApp):
             except Exception as e:
                 if 'Block not available (pruned data)' in str(e):
                     # TODO: Better solution?
-                    bci = self.callcoinrpc(coin_type, 'getblockchaininfo')
-                    self.log.error('Coin %s last_height_checked %d set to pruneheight %d', self.ci(coin_type).coin_name(), last_height_checked, bci['pruneheight'])
+                    bci = ci.getBlockchainInfo()
+                    self.log.error('Coin %s last_height_checked %d set to pruneheight %d', ci.coin_name(), last_height_checked, bci['pruneheight'])
                     last_height_checked = bci['pruneheight']
                     continue
                 else:

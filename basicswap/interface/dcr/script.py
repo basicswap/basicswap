@@ -39,7 +39,7 @@ def push_script_data(data_array: bytearray, data: bytes) -> None:
         return
 
     if len_data < OP_PUSHDATA1:
-        data_array += len_data.to_bytes(1)
+        data_array += len_data.to_bytes(1, 'little')
     elif len_data <= 0xff:
         data_array += bytes((OP_PUSHDATA1, len_data))
     elif len_data <= 0xffff:

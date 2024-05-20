@@ -236,7 +236,33 @@ def runClient(fp, data_dir, chain, start_only_coins):
                     pid = daemons[-1].handle.pid
                     swap_client.log.info('Started {} {}'.format(filename, pid))
 
-                continue
+                continue  # /monero
+
+            if c == 'decred':
+                appdata = v['datadir']
+                extra_opts = [f'--appdata="{appdata}"', ]
+                if v['manage_daemon'] is True:
+                    swap_client.log.info(f'Starting {display_name} daemon')
+                    filename = 'dcrd' + ('.exe' if os.name == 'nt' else '')
+
+                    extra_config = {'add_datadir': False, 'stdout_to_file': True, 'stdout_filename': 'dcrd_stdout.log'}
+                    daemons.append(startDaemon(appdata, v['bindir'], filename, opts=extra_opts, extra_config=extra_config))
+                    pid = daemons[-1].handle.pid
+                    swap_client.log.info('Started {} {}'.format(filename, pid))
+
+                if v['manage_wallet_daemon'] is True:
+                    swap_client.log.info(f'Starting {display_name} wallet daemon')
+                    filename = 'dcrwallet' + ('.exe' if os.name == 'nt' else '')
+
+                    wallet_pwd = v['wallet_pwd']
+                    extra_opts.append(f'--pass="{wallet_pwd}"')
+                    extra_config = {'add_datadir': False, 'stdout_to_file': True, 'stdout_filename': 'dcrwallet_stdout.log'}
+                    daemons.append(startDaemon(appdata, v['bindir'], filename, opts=extra_opts, extra_config=extra_config))
+                    pid = daemons[-1].handle.pid
+                    swap_client.log.info('Started {} {}'.format(filename, pid))
+
+                continue  # /decred
+
             if v['manage_daemon'] is True:
                 swap_client.log.info(f'Starting {display_name} daemon')
 

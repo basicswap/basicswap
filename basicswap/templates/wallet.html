@@ -1,5 +1,5 @@
 {% include 'header.html' %}
-{% from 'style.html' import select_box_arrow_svg, select_box_class, circular_arrows_svg, circular_error_svg, circular_info_svg, cross_close_svg, breadcrumb_line_svg, withdraw_svg, utxo_groups_svg, create_utxo_svg, red_cross_close_svg, blue_cross_close_svg, circular_update_messages_svg, circular_error_messages_svg %} 
+{% from 'style.html' import select_box_arrow_svg, select_box_class, circular_arrows_svg, circular_error_svg, circular_info_svg, cross_close_svg, breadcrumb_line_svg, withdraw_svg, utxo_groups_svg, create_utxo_svg, red_cross_close_svg, blue_cross_close_svg, circular_update_messages_svg, circular_error_messages_svg %}
 <script src="/static/js/libs//qrcode.js"></script>
 <div class="container mx-auto">
   <section class="p-5 mt-5">
@@ -27,7 +27,7 @@
       </div>
     </div>
   </section>
-  {% include 'inc_messages.html' %} 
+  {% include 'inc_messages.html' %}
   {% if w.updating %}
 <section class="py-4" id="messages_updating" role="alert">
   <div class="container px-4 mx-auto">
@@ -42,7 +42,7 @@
                 <li class="font-semibold text-sm text-blue-500 error_msg"><span class="bold">UPDATING:</span></li>
                 <li class="font-medium text-sm text-blue-500">Please wait...</li>
             </ul>
-           </div>             
+           </div>
         </div>
         <div class="w-auto p-2">
           <button type="button" class="ms-auto bg-blue-50 text-blue-500 rounded-lg focus:ring-0 focus:ring-blue-400 p-1.5 hover:bg-blue-200 inline-flex items-center justify-center h-8 w-8 focus:outline-none dark:bg-gray-800 dark:text-blue-400 dark:hover:bg-gray-700" data-dismiss-target="#messages_updating" aria-label="Close"><span class="sr-only">Close</span>
@@ -55,7 +55,7 @@
 </section>
   {% endif %}
   {% if w.havedata %}
-  {% if w.error %} 
+  {% if w.error %}
 <section class="py-4" id="messages_error" role="alert">
   <div class="container px-4 mx-auto">
     <div class="p-6 text-green-800 rounded-lg bg-red-50 border border-red-400 dark:bg-gray-500 dark:text-red-400 rounded-md">
@@ -113,7 +113,7 @@
                         </tr> {% if w.cid == '1' %} {# PART #}
                         <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
                           <td class="py-3 px-6 bold"> <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"> <img class="h-7" src="/static/images/coins/{{ w.name }}.png" alt="{{ w.name }} Blind"> </span>Blind Balance: </td>
-                          <td class="py-3 px-6 bold coinname-value" data-coinname="{{ w.name }}">{{ w.blind_balance }} {{ w.ticker }} (<span class="usd-value"></span>) 
+                          <td class="py-3 px-6 bold coinname-value" data-coinname="{{ w.name }}">{{ w.blind_balance }} {{ w.ticker }} (<span class="usd-value"></span>)
                           {% if w.blind_unconfirmed %}
                           <span class="inline-block py-1 px-2 rounded-full bg-green-100 text-green-500 dark:bg-gray-500 dark:text-green-500">Unconfirmed: +{{ w.blind_unconfirmed }} {{ w.ticker }}</span>
                           {% endif %}
@@ -136,11 +136,11 @@
                           <td class="py-3 px-6 bold coinname-value" data-coinname="{{ w.name }}">{{ w.mweb_balance }} {{ w.ticker }} (<span class="usd-value"></span>)
                         {% if w.mweb_pending %}
                             <span class="inline-block py-1 px-2 rounded-full bg-green-100 text-green-500 dark:bg-gray-500 dark:text-green-500">Pending: +{{ w.mweb_pending }} {{ w.ticker }} </span>
-                        {% endif %} 
+                        {% endif %}
                         </td>
                         </tr>
                         {% endif %}
-                        {# / LTC #} 
+                        {# / LTC #}
                         {% if w.locked_utxos %}
                         <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
                           <td class="py-3 px-6 bold">Locked Outputs:</td>
@@ -202,9 +202,11 @@
             <div class="container mt-5 mx-auto">
               <div class="pt-6 pb-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
                 <div class="px-6">
+                  {% if w.cid != '4' %} {# DCR #}
                   <div class="flex flex-wrap justify-end">
                     <div class="w-full md:w-auto p-1.5"> <input class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-white hover:text-red border border-red-500 hover:border-red-500 hover:bg-red-600 bg-red-500 rounded-md shadow-button focus:ring-0 focus:outline-none cursor-pointer" type="submit" name="reseed_{{ w.cid }}" value="Reseed wallet" onclick="return confirmReseed();"> </div>
                   </div>
+                  {% endif %}
                 </div>
               </div>
             </div>
@@ -369,7 +371,7 @@
                           </div>
                         </div>
                       </div>
-                      {% endif %} 
+                      {% endif %}
                       {# / LTC #}
                     </div>
                   </div>
@@ -383,7 +385,7 @@
   <script>
     // Particl Stealth
     var stealthAddress = "{{ w.stealth_address }}";
-    
+
     var qrCodeStealth = new QRCode(document.getElementById("qrcode-stealth"), {
       text: stealthAddress,
       width: 170,
@@ -399,7 +401,7 @@
   <script>
     // Litecoin MWEB
     var mwebAddress = "{{ w.mweb_address }}";
-    
+
     var qrCodeMWEB = new QRCode(document.getElementById("qrcode-mweb"), {
       text: mwebAddress,
       width: 170,
@@ -408,14 +410,14 @@
       colorLight: "#ffffff",
       correctLevel: QRCode.CorrectLevel.L
     });
-  </script> 
+  </script>
   {% endif %}
   {% if w.cid == '6' %}
   {# XMR #}
   <script>
     // Monero Sub
     var moneroSubAddress = "{{ w.deposit_address }}";
-    
+
     var qrCodeMoneroSub = new QRCode(document.getElementById("qrcode-monero-sub"), {
       text: moneroSubAddress,
       width: 170,
@@ -428,7 +430,7 @@
   <script>
     // Monero Main
     var moneroMainAddress = "{{ w.main_address }}";
-    
+
     var qrCodeMoneroMain = new QRCode(document.getElementById("qrcode-monero-main"), {
       text: moneroMainAddress,
       width: 170,
@@ -442,7 +444,7 @@
   <script>
     // Default
     var defaultAddress = "{{ w.deposit_address }}";
-    
+
     var qrCodeDepost = new QRCode(document.getElementById("qrcode-deposit"), {
       text: defaultAddress,
        width: 170,
@@ -462,48 +464,48 @@
         document.execCommand('copy');
         document.body.removeChild(el);
     }
-    
+
     function copyAndShowMessage(elementId) {
         const addressElement = document.getElementById(elementId);
         if (!addressElement) return;
         const addressText = addressElement.innerText.trim();
         copyToClipboard(addressText);
         addressElement.innerText = 'Copied to clipboard';
-    
+
         const originalWidth = addressElement.offsetWidth;
-    
+
         addressElement.classList.add('copying');
-    
+
         addressElement.parentElement.style.width = `${originalWidth}px`;
-    
+
         setTimeout(function () {
             addressElement.innerText = addressText;
             addressElement.classList.remove('copying');
             addressElement.parentElement.style.width = '';
         }, 2000);
     }
-    
+
     const stealthAddressElement = document.getElementById('stealth_address');
     if (stealthAddressElement) {
         stealthAddressElement.addEventListener('click', function () {
             copyAndShowMessage('stealth_address');
         });
     }
-    
+
     const mainDepositAddressElement = document.getElementById('main_deposit_address');
     if (mainDepositAddressElement) {
         mainDepositAddressElement.addEventListener('click', function () {
             copyAndShowMessage('main_deposit_address');
         });
     }
-    
+
     const moneroMainAddressElement = document.getElementById('monero_main_address');
     if (moneroMainAddressElement) {
         moneroMainAddressElement.addEventListener('click', function () {
             copyAndShowMessage('monero_main_address');
         });
     }
-    
+
     const moneroSubAddressElement = document.getElementById('monero_sub_address');
     if (moneroSubAddressElement) {
         moneroSubAddressElement.addEventListener('click', function () {
@@ -572,7 +574,7 @@
                                     var selectedType = typeSelect.value;
                                     var floatBalance;
                                     var calculatedAmount;
-                                
+
                                     switch(selectedType) {
                                         case 'plain':
                                             floatBalance = parseFloat(balance);
@@ -591,7 +593,7 @@
                                             calculatedAmount = floatBalance * percent;
                                             break;
                                     }
-                                
+
                                     amountInput.value = calculatedAmount.toFixed(8);
                                 }
                               </script>
@@ -606,7 +608,7 @@
                                   var selectedType = typeSelect.value;
                                   var floatBalance;
                                   var calculatedAmount;
-                                
+
                                   switch(selectedType) {
                                     case 'plain':
                                       floatBalance = parseFloat(balance);
@@ -621,7 +623,7 @@
                                       calculatedAmount = floatBalance * percent;
                                       break;
                                   }
-                                
+
                                   amountInput.value = calculatedAmount.toFixed(8);
                                 }
                               </script>
@@ -633,10 +635,10 @@
                                     var amountInput = document.getElementById('amount');
                                     var floatBalance;
                                     var calculatedAmount;
-                                
+
                                     floatBalance = parseFloat(balance);
                                     calculatedAmount = floatBalance * percent;
-                                
+
                                     if (cid === '6' && percent === 1) {
                                         amountInput.setAttribute('data-hidden', 'true');
                                         amountInput.placeholder = 'Sweep All';
@@ -652,7 +654,7 @@
                                         amountInput.placeholder = '';
                                         amountInput.disabled = false;
                                     }
-                                
+
                                     if (cid === '6' && percent === 1) {
                                         var sweepAllCheckbox = document.getElementById('sweepall');
                                         if (sweepAllCheckbox) {
@@ -665,7 +667,7 @@
                                         }
                                     }
                                 }
-                                
+
                               </script>
                               {% endif %}
                             </div>
@@ -677,7 +679,7 @@
                         <td class="py-3 px-6"> <input class="hover:border-blue-500 w-5 h-5 form-check-input text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-1 dark:bg-gray-500 dark:border-gray-400" type="checkbox" id="sweepall" name="sweepall_{{ w.cid }}" {% if w.wd_sweepall==true %} checked=checked{% endif %}> </td> {% else %} <td class="py-3 px-6 bold">Subtract Fee:</td>
                         <td class="py-3 px-6"> <input class="hover:border-blue-500 w-5 h-5 form-check-input text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-1 dark:bg-gray-500 dark:border-gray-400" type="checkbox" name="subfee_{{ w.cid }}" {% if w.wd_subfee==true %} checked=checked{% endif %}> </td>
                         {% endif %}
-                        <td>                         
+                        <td>
                         </td>
                       </tr>
                       {% if w.cid == '1' %}
@@ -855,7 +857,7 @@
     'DECRED': 'DCR',
     'WOWNERO': 'WOW'
   };
-  
+
   const getUsdValue = (cryptoValue, coinSymbol) => fetch(`https://min-api.cryptocompare.com/data/price?fsym=${coinSymbol}&tsyms=USD`)
     .then(response => response.json())
     .then(data => {
@@ -866,16 +868,16 @@
         throw new Error(`Invalid exchange rate for ${coinSymbol}`);
       }
     });
-  
+
   const updateUsdValue = async (cryptoCell, coinFullName, usdValueSpan) => {
     const coinSymbol = coinNameToSymbol[coinFullName] || '';
     if (!coinSymbol) {
       console.error(`Coin symbol not found for full name: ${coinFullName}`);
       return;
     }
-  
+
     const cryptoValue = parseFloat(cryptoCell.textContent);
-  
+
     if (!isNaN(cryptoValue) && cryptoValue !== 0) {
       try {
         const usdValue = await getUsdValue(cryptoValue, coinSymbol);
@@ -894,19 +896,19 @@
       }
     }
   };
-  
+
   const calculateTotalUsdValue = async () => {
     const coinNameValues = document.querySelectorAll('.coinname-value');
     let totalUsdValue = 0;
-  
+
     for (const coinNameValue of coinNameValues) {
       const coinFullName = coinNameValue.getAttribute('data-coinname');
       const cryptoValue = parseFloat(coinNameValue.textContent);
       const coinSymbol = coinNameToSymbol[coinFullName];
-  
+
       if (coinSymbol) {
         const usdValueSpan = coinNameValue.querySelector('.usd-value');
-  
+
         if (!isNaN(cryptoValue) && cryptoValue !== 0) {
           try {
             const usdValue = await getUsdValue(cryptoValue, coinSymbol);
@@ -926,24 +928,24 @@
         console.error(`Coin symbol not found for full name: ${coinFullName}`);
       }
     }
-  
+
     const totalUsdValueElement = document.getElementById('total-usd-value');
     if (totalUsdValueElement) {
       totalUsdValueElement.textContent = `$${totalUsdValue.toFixed(2)}`;
     }
   };
-  
+
   document.addEventListener('DOMContentLoaded', () => {
     const coinNameValues = document.querySelectorAll('.coinname-value');
-  
+
     for (const coinNameValue of coinNameValues) {
       const coinFullName = coinNameValue.getAttribute('data-coinname');
       const usdValueSpan = coinNameValue.querySelector('.usd-value');
       updateUsdValue(coinNameValue, coinFullName, usdValueSpan);
     }
-  
+
     calculateTotalUsdValue();
-  
+
   function set_sweep_all(element) {
   let input = document.getElementById('amount');
   if (element.checked) {
@@ -952,7 +954,7 @@
     input.disabled = false;
   }
   }
-  
+
   let cb_sweepall = document.getElementById('sweepall');
   if (cb_sweepall) {
   set_sweep_all(cb_sweepall);
@@ -960,7 +962,7 @@
     set_sweep_all(event.currentTarget);
   });
   }
-  
+
   });
 </script>
 {% include 'footer.html' %}
@@ -968,11 +970,11 @@
   function confirmReseed() {
    return confirm("Are you sure?\nBackup your wallet before and after.\nWon't detect used keys.\nShould only be used for new wallets.");
   }
-  
+
   function confirmWithdrawal() {
    return confirm("Are you sure?");
   }
-  
+
   function confirmUTXOResize() {
    return confirm("Are you sure?");
   }

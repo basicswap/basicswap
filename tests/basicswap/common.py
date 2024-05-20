@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2020-2023 tecnovert
+# Copyright (c) 2020-2024 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE.txt or http://www.opensource.org/licenses/mit-license.php.
 
@@ -34,6 +34,10 @@ BTC_BASE_TOR_PORT = 33732
 LTC_BASE_PORT = 34792
 LTC_BASE_RPC_PORT = 35792
 LTC_BASE_ZMQ_PORT = 36792
+
+DCR_BASE_PORT = 18555
+DCR_BASE_RPC_PORT = 9110
+
 
 PIVX_BASE_PORT = 34892
 PIVX_BASE_RPC_PORT = 35892

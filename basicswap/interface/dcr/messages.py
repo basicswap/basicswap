@@ -162,7 +162,7 @@ class CTransaction:
             for txi in self.vin:
                 data += txi.prevout.hash.to_bytes(32, 'little')
                 data += txi.prevout.n.to_bytes(4, 'little')
-                data += txi.prevout.tree.to_bytes(1)
+                data += txi.prevout.tree.to_bytes(1, 'little')
                 data += txi.sequence.to_bytes(4, 'little')
 
             data += encode_compactsize(len(self.vout))

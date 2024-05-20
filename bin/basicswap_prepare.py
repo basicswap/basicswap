@@ -5,37 +5,40 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-import os
-import sys
-import json
-import time
-import mmap
-import stat
+import contextlib
 import gnupg
-import socks
+import hashlib
+import json
+import logging
+import mmap
+import os
+import platform
+import random
 import shutil
 import signal
 import socket
-import hashlib
+import socks
+import stat
+import sys
 import tarfile
-import zipfile
-import logging
-import platform
-import contextlib
+import threading
+import time
 import urllib.parse
+import zipfile
+
 from urllib.error import ContentTooShortError
-from urllib.request import Request, urlopen
 from urllib.parse import _splittype
+from urllib.request import Request, urlopen
 
 import basicswap.config as cfg
-from basicswap import __version__
 from basicswap.base import getaddrinfo_tor
 from basicswap.basicswap import BasicSwap
 from basicswap.chainparams import Coins
+from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
+from basicswap import __version__
 from basicswap.ui.util import getCoinName
 from basicswap.util import toBool
 from basicswap.util.rfc2440 import rfc2440_hash_password
-from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
 from bin.basicswap_run import startDaemon, startXmrWalletDaemon
 
 PARTICL_VERSION = os.getenv('PARTICL_VERSION', '23.2.7.0')
@@ -92,7 +95,6 @@ known_coins = {
 disabled_coins = [
     'navcoin',
     'namecoin',  # Needs update
-    'decred',  # In-progress
 ]
 
 expected_key_ids = {
@@ -169,8 +171,11 @@ BTC_RPC_PWD = os.getenv('BTC_RPC_PWD', '')
 
 DCR_RPC_HOST = os.getenv('DCR_RPC_HOST', '127.0.0.1')
 DCR_RPC_PORT = int(os.getenv('DCR_RPC_PORT', 9109))
-DCR_RPC_USER = os.getenv('DCR_RPC_USER', '')
-DCR_RPC_PWD = os.getenv('DCR_RPC_PWD', '')
+DCR_WALLET_RPC_HOST = os.getenv('DCR_WALLET_RPC_HOST', '127.0.0.1')
+DCR_WALLET_RPC_PORT = int(os.getenv('DCR_WALLET_RPC_PORT', 9209))
+DCR_WALLET_PWD = os.getenv('DCR_WALLET_PWD', random.randbytes(random.randint(14, 18)).hex())
+DCR_RPC_USER = os.getenv('DCR_RPC_USER', 'user')
+DCR_RPC_PWD = os.getenv('DCR_RPC_PWD', random.randbytes(random.randint(14, 18)).hex())
 
 NMC_RPC_HOST = os.getenv('NMC_RPC_HOST', '127.0.0.1')
 NMC_RPC_PORT = int(os.getenv('NMC_RPC_PORT', 19698))
@@ -367,16 +372,16 @@ def setConnectionParameters(timeout: int = 5, allow_set_tor: bool = True):
     socket.setdefaulttimeout(timeout)
 
 
-def popConnectionParameters():
+def popConnectionParameters() -> None:
     if use_tor_proxy:
         socket.socket = default_socket
         socket.getaddrinfo = default_socket_getaddrinfo
     socket.setdefaulttimeout(default_socket_timeout)
 
 
-def downloadFile(url, path, timeout=5, resume_from=0):
-    logger.info('Downloading file %s', url)
-    logger.info('To %s', path)
+def downloadFile(url: str, path: str, timeout=5, resume_from=0) -> None:
+    logger.info(f'Downloading file {url}')
+    logger.info(f'To {path}')
     try:
         setConnectionParameters(timeout=timeout)
         urlretrieve(url, path, make_reporthook(resume_from), resume_from=resume_from)
@@ -397,12 +402,11 @@ def importPubkeyFromUrls(gpg, pubkeyurls):
         try:
             logger.info('Importing public key from url: ' + url)
             rv = gpg.import_keys(downloadBytes(url))
+            for key in rv.fingerprints:
+                gpg.trust_keys(key, 'TRUST_FULLY')
             break
         except Exception as e:
             logging.warning('Import from url failed: %s', str(e))
-
-    for key in rv.fingerprints:
-        gpg.trust_keys(key, 'TRUST_FULLY')
 
 
 def testTorConnection():
@@ -773,6 +777,8 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
 
     if coin in ('navcoin', ):
         pubkey_filename = '{}_builder.pgp'.format(coin)
+    elif coin in ('decred', ):
+        pubkey_filename = '{}_release.pgp'.format(coin)
     else:
         pubkey_filename = '{}_{}.pgp'.format(coin, signing_key_name)
     pubkeyurls = [
@@ -912,6 +918,40 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
                 if not core_settings['manage_daemon']:
                     for opt_line in monero_wallet_rpc_proxy_config:
                         fp.write(opt_line + '\n')
+        return
+
+    if coin == 'decred':
+        chainname = 'simnet' if chain == 'regtest' else chain
+        core_conf_path = os.path.join(data_dir, 'dcrd.conf')
+        if os.path.exists(core_conf_path):
+            exitWithError('{} exists'.format(core_conf_path))
+        with open(core_conf_path, 'w') as fp:
+            if chain != 'mainnet':
+                fp.write(chainname + '=1\n')
+            fp.write('debuglevel=debug\n')
+            fp.write('notls=1\n')
+
+            fp.write('rpclisten={}:{}\n'.format(core_settings['rpchost'], core_settings['rpcport']))
+
+            fp.write('rpcuser={}\n'.format(core_settings['rpcuser']))
+            fp.write('rpcpass={}\n'.format(core_settings['rpcpassword']))
+
+        wallet_conf_path = os.path.join(data_dir, 'dcrwallet.conf')
+        if os.path.exists(wallet_conf_path):
+            exitWithError('{} exists'.format(wallet_conf_path))
+        with open(wallet_conf_path, 'w') as fp:
+            if chain != 'mainnet':
+                fp.write(chainname + '=1\n')
+            fp.write('debuglevel=debug\n')
+            fp.write('noservertls=1\n')
+            fp.write('noclienttls=1\n')
+
+            fp.write('rpcconnect={}:{}\n'.format(core_settings['rpchost'], core_settings['rpcport']))
+            fp.write('rpclisten={}:{}\n'.format(core_settings['walletrpchost'], core_settings['walletrpcport']))
+
+            fp.write('username={}\n'.format(core_settings['rpcuser']))
+            fp.write('password={}\n'.format(core_settings['rpcpassword']))
+
         return
 
     core_conf_path = os.path.join(data_dir, coin + '.conf')
@@ -1253,6 +1293,8 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
                     if coin_settings['manage_wallet_daemon']:
                         filename = 'monero-wallet-rpc' + ('.exe' if os.name == 'nt' else '')
                         daemons.append(startXmrWalletDaemon(coin_settings['datadir'], coin_settings['bindir'], filename))
+                elif c == Coins.DCR:
+                    pass
                 else:
                     if coin_settings['manage_daemon']:
                         filename = coin_name + 'd' + ('.exe' if os.name == 'nt' else '')
@@ -1266,6 +1308,17 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
                 swap_client.setCoinRunParams(c)
                 swap_client.createCoinInterface(c)
 
+                if c == Coins.DCR:
+                    if coin_settings['manage_wallet_daemon']:
+                        from basicswap.interface.dcr.util import createDCRWallet
+                        extra_opts = ['--appdata="{}"'.format(coin_settings['datadir']),
+                                      '--pass={}'.format(coin_settings['wallet_pwd']),
+                                      ]
+
+                        filename = 'dcrwallet' + ('.exe' if os.name == 'nt' else '')
+                        args = [os.path.join(coin_settings['bindir'], filename), '--create'] + extra_opts
+                        hex_seed = swap_client.getWalletKey(Coins.DCR, 1).hex()
+                        createDCRWallet(args, hex_seed, logger, threading.Event())
                 if c in coins_to_create_wallets_for:
                     swap_client.waitForDaemonRPC(c, with_wallet=False)
                     # Create wallet if it doesn't exist yet
@@ -1300,7 +1353,9 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
                 c = swap_client.getCoinIdFromName(coin_name)
                 if c in (Coins.PART, ):
                     continue
-                swap_client.waitForDaemonRPC(c)
+                if c not in (Coins.DCR, ):
+                    # initialiseWallet only sets main_wallet_seedid_
+                    swap_client.waitForDaemonRPC(c)
                 try:
                     swap_client.initialiseWallet(c, raise_errors=True)
                 except Exception as e:
@@ -1320,11 +1375,11 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
 
     print('')
     for pair in coins_failed_to_initialise:
-        c, _ = pair
+        c, e = pair
         if c in (Coins.PIVX, ):
             print(f'NOTE - Unable to initialise wallet for {getCoinName(c)}.  To complete setup click \'Reseed Wallet\' from the ui page once chain is synced.')
         else:
-            print(f'WARNING - Failed to initialise wallet for {getCoinName(c)}')
+            print(f'WARNING - Failed to initialise wallet for {getCoinName(c)}: {e}')
 
     if particl_wallet_mnemonic is not None:
         if particl_wallet_mnemonic:
@@ -1637,10 +1692,17 @@ def main():
         'decred': {
             'connection_type': 'rpc' if 'decred' in with_coins else 'none',
             'manage_daemon': True if ('decred' in with_coins and DCR_RPC_HOST == '127.0.0.1') else False,
+            'manage_wallet_daemon': True if ('decred' in with_coins and DCR_WALLET_RPC_HOST == '127.0.0.1') else False,
+            'wallet_pwd': DCR_WALLET_PWD,
             'rpchost': DCR_RPC_HOST,
             'rpcport': DCR_RPC_PORT + port_offset,
+            'walletrpchost': DCR_WALLET_RPC_HOST,
+            'walletrpcport': DCR_WALLET_RPC_PORT + port_offset,
+            'rpcuser': DCR_RPC_USER,
+            'rpcpassword': DCR_RPC_PWD,
             'datadir': os.getenv('DCR_DATA_DIR', os.path.join(data_dir, 'decred')),
             'bindir': os.path.join(bin_dir, 'decred'),
+            'use_csv': True,
             'use_segwit': True,
             'blocks_confirmed': 2,
             'conf_target': 2,

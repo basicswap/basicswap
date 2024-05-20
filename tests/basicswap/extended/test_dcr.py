@@ -9,8 +9,7 @@ import copy
 import logging
 import os
 import random
-import select
-import subprocess
+
 import unittest
 
 import basicswap.config as cfg
@@ -35,6 +34,9 @@ from basicswap.interface.dcr.rpc import (
 from basicswap.interface.dcr.messages import (
     SigHashType,
     TxSerializeType,
+)
+from basicswap.interface.dcr.util import (
+    createDCRWallet,
 )
 from tests.basicswap.common import (
     compare_bid_states,
@@ -466,6 +468,9 @@ def prepareDCDDataDir(datadir, node_id, conf_file, dir_prefix, num_nodes=3):
         f'rpcuser=test{node_id}\n',
         f'rpcpass=test_pass{node_id}\n',
         'notls=1\n',
+        'noseeders=1\n',
+        'nodnsseed=1\n',
+        'nodiscoverip=1\n',
         'miningaddr=SsYbXyjkKAEXXcGdFgr4u4bo4L8RkCxwQpH\n',]
 
     for i in range(0, num_nodes):
@@ -511,8 +516,8 @@ class Test(BaseTest):
 
     @classmethod
     def prepareExtraCoins(cls):
+        ci0 = cls.swap_clients[0].ci(cls.test_coin)
         if not cls.restore_instance:
-            ci0 = cls.swap_clients[0].ci(cls.test_coin)
             assert (ci0.rpc_wallet('getnewaddress') == cls.dcr_mining_addr)
             cls.dcr_ticket_account = ci0.rpc_wallet('getaccount', [cls.dcr_mining_addr, ])
             ci0.rpc('generate', [110,])
@@ -567,42 +572,9 @@ class Test(BaseTest):
 
         waitForRPC(make_rpc_func(i, base_rpc_port=DCR_BASE_RPC_PORT), test_delay_event, rpc_command='getnetworkinfo', max_tries=12)
 
-        logging.info('Creating wallet')
         extra_opts.append('--pass=test_pass')
         args = [os.path.join(DCR_BINDIR, DCR_WALLET), '--create'] + extra_opts
-        (pipe_r, pipe_w) = os.pipe()  # subprocess.PIPE is buffered, blocks when read
-        p = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=pipe_w, stderr=pipe_w)
-
-        try:
-            while p.poll() is None:
-                while len(select.select([pipe_r], [], [], 0)[0]) == 1:
-                    buf = os.read(pipe_r, 1024).decode('utf-8')
-                    logging.debug(f'dcrwallet {buf}')
-                    response = None
-                    if 'Use the existing configured private passphrase' in buf:
-                        response = b'y\n'
-                    elif 'Do you want to add an additional layer of encryption' in buf:
-                        response = b'n\n'
-                    elif 'Do you have an existing wallet seed' in buf:
-                        response = b'y\n'
-                    elif 'Enter existing wallet seed' in buf:
-                        response = (cls.hex_seeds[i] + '\n').encode('utf-8')
-                    elif 'Seed input successful' in buf:
-                        pass
-                    else:
-                        raise ValueError(f'Unexpected output: {buf}')
-                    if response is not None:
-                        p.stdin.write(response)
-                        p.stdin.flush()
-                test_delay_event.wait(0.1)
-        except Exception as e:
-            logging.error(f'{DCR_WALLET} --create failed: {e}')
-        finally:
-            if p.poll() is None:
-                p.terminate()
-            os.close(pipe_r)
-            os.close(pipe_w)
-            p.stdin.close()
+        createDCRWallet(args, cls.hex_seeds[i], logging, test_delay_event)
 
         test_delay_event.wait(1.0)
 
@@ -769,7 +741,7 @@ class Test(BaseTest):
 
         script = bytearray()
         push_script_data(script, bytes((3,)))
-        script += OP_CHECKSEQUENCEVERIFY.to_bytes(1)
+        script += bytes((OP_CHECKSEQUENCEVERIFY,))
 
         script_dest = ci0.getScriptDest(script)
         script_info = ci0.rpc_wallet('decodescript', [script_dest.hex(),])

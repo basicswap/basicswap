@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2020-2022 tecnovert
+# Copyright (c) 2020-2024 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -29,6 +29,7 @@ from tests.basicswap.common import (
     BASE_PORT, BASE_RPC_PORT,
     BTC_BASE_PORT, BTC_BASE_RPC_PORT, BTC_BASE_TOR_PORT,
     LTC_BASE_PORT, LTC_BASE_RPC_PORT,
+    DCR_BASE_PORT, DCR_BASE_RPC_PORT,
     PIVX_BASE_PORT,
 )
 from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
@@ -46,6 +47,7 @@ BITCOIN_RPC_PORT_BASE = int(os.getenv('BITCOIN_RPC_PORT_BASE', BTC_BASE_RPC_PORT
 BITCOIN_TOR_PORT_BASE = int(os.getenv('BITCOIN_TOR_PORT_BASE', BTC_BASE_TOR_PORT))
 
 LITECOIN_RPC_PORT_BASE = int(os.getenv('LITECOIN_RPC_PORT_BASE', LTC_BASE_RPC_PORT))
+DECRED_RPC_PORT_BASE = int(os.getenv('DECRED_RPC_PORT_BASE', DCR_BASE_RPC_PORT))
 
 FIRO_BASE_PORT = 34832
 FIRO_BASE_RPC_PORT = 35832
@@ -93,10 +95,13 @@ def run_prepare(node_id, datadir_path, bins_path, with_coins, mnemonic_in=None, 
     os.environ['PART_RPC_PORT'] = str(PARTICL_RPC_PORT_BASE)
     os.environ['BTC_RPC_PORT'] = str(BITCOIN_RPC_PORT_BASE)
     os.environ['LTC_RPC_PORT'] = str(LITECOIN_RPC_PORT_BASE)
+    os.environ['DCR_RPC_PORT'] = str(DECRED_RPC_PORT_BASE)
     os.environ['FIRO_RPC_PORT'] = str(FIRO_RPC_PORT_BASE)
 
     os.environ['XMR_RPC_USER'] = 'xmr_user'
     os.environ['XMR_RPC_PWD'] = 'xmr_pwd'
+
+    os.environ['DCR_RPC_PWD'] = 'dcr_pwd'
 
     import bin.basicswap_prepare as prepareSystem
     # Hack: Reload module to set env vars as the basicswap_prepare module is initialised if imported from elsewhere earlier
@@ -126,9 +131,10 @@ def run_prepare(node_id, datadir_path, bins_path, with_coins, mnemonic_in=None, 
     with open(config_path) as fs:
         settings = json.load(fs)
 
-    with open(os.path.join(datadir_path, 'particl', 'particl.conf'), 'r') as fp:
+    config_filename = os.path.join(datadir_path, 'particl', 'particl.conf')
+    with open(config_filename, 'r') as fp:
         lines = fp.readlines()
-    with open(os.path.join(datadir_path, 'particl', 'particl.conf'), 'w') as fp:
+    with open(config_filename, 'w') as fp:
         for line in lines:
             if not line.startswith('staking'):
                 fp.write(line)
@@ -158,9 +164,10 @@ def run_prepare(node_id, datadir_path, bins_path, with_coins, mnemonic_in=None, 
 
     if 'bitcoin' in coins_array:
         # Pruned nodes don't provide blocks
-        with open(os.path.join(datadir_path, 'bitcoin', 'bitcoin.conf'), 'r') as fp:
+        config_filename = os.path.join(datadir_path, 'bitcoin', 'bitcoin.conf')
+        with open(config_filename, 'r') as fp:
             lines = fp.readlines()
-        with open(os.path.join(datadir_path, 'bitcoin', 'bitcoin.conf'), 'w') as fp:
+        with open(config_filename, 'w') as fp:
             for line in lines:
                 if not line.startswith('prune'):
                     fp.write(line)
@@ -188,9 +195,10 @@ def run_prepare(node_id, datadir_path, bins_path, with_coins, mnemonic_in=None, 
 
     if 'litecoin' in coins_array:
         # Pruned nodes don't provide blocks
-        with open(os.path.join(datadir_path, 'litecoin', 'litecoin.conf'), 'r') as fp:
+        config_filename = os.path.join(datadir_path, 'litecoin', 'litecoin.conf')
+        with open(config_filename, 'r') as fp:
             lines = fp.readlines()
-        with open(os.path.join(datadir_path, 'litecoin', 'litecoin.conf'), 'w') as fp:
+        with open(config_filename, 'w') as fp:
             for line in lines:
                 if not line.startswith('prune'):
                     fp.write(line)
@@ -213,11 +221,34 @@ def run_prepare(node_id, datadir_path, bins_path, with_coins, mnemonic_in=None, 
             for opt in EXTRA_CONFIG_JSON.get('ltc{}'.format(node_id), []):
                 fp.write(opt + '\n')
 
+    if 'decred' in coins_array:
+        # Pruned nodes don't provide blocks
+        config_filename = os.path.join(datadir_path, 'decred', 'dcrd.conf')
+        with open(config_filename, 'r') as fp:
+            lines = fp.readlines()
+        with open(config_filename, 'w') as fp:
+            for line in lines:
+                if not line.startswith('prune'):
+                    fp.write(line)
+            fp.write('listen=127.0.0.1:{}\n'.format(DCR_BASE_PORT + node_id + port_ofs))
+            fp.write('noseeders=1\n')
+            fp.write('nodnsseed=1\n')
+            fp.write('nodiscoverip=1\n')
+            if node_id == 0:
+                fp.write('miningaddr=SsYbXyjkKAEXXcGdFgr4u4bo4L8RkCxwQpH\n')
+                for ip in range(num_nodes):
+                    if ip != node_id:
+                        fp.write('addpeer=127.0.0.1:{}\n'.format(DCR_BASE_PORT + ip + port_ofs))
+        config_filename = os.path.join(datadir_path, 'decred', 'dcrwallet.conf')
+        with open(config_filename, 'a') as fp:
+            fp.write('enablevoting=1\n')
+
     if 'pivx' in coins_array:
         # Pruned nodes don't provide blocks
-        with open(os.path.join(datadir_path, 'pivx', 'pivx.conf'), 'r') as fp:
+        config_filename = os.path.join(datadir_path, 'pivx', 'pivx.conf')
+        with open(config_filename, 'r') as fp:
             lines = fp.readlines()
-        with open(os.path.join(datadir_path, 'pivx', 'pivx.conf'), 'w') as fp:
+        with open(config_filename, 'w') as fp:
             for line in lines:
                 if not line.startswith('prune'):
                     fp.write(line)
@@ -242,9 +273,10 @@ def run_prepare(node_id, datadir_path, bins_path, with_coins, mnemonic_in=None, 
 
     if 'firo' in coins_array:
         # Pruned nodes don't provide blocks
-        with open(os.path.join(datadir_path, 'firo', 'firo.conf'), 'r') as fp:
+        config_filename = os.path.join(datadir_path, 'firo', 'firo.conf')
+        with open(config_filename, 'r') as fp:
             lines = fp.readlines()
-        with open(os.path.join(datadir_path, 'firo', 'firo.conf'), 'w') as fp:
+        with open(config_filename, 'w') as fp:
             for line in lines:
                 if not line.startswith('prune'):
                     fp.write(line)

@@ -13,7 +13,7 @@ from coincurve.keys import (
 
 
 def BIP32Hash(chaincode: bytes, child_no: int, key_data_type: int, keydata: bytes):
-    return hmac_sha512(chaincode, key_data_type.to_bytes(1) + keydata + child_no.to_bytes(4, 'big'))
+    return hmac_sha512(chaincode, key_data_type.to_bytes(1, 'big') + keydata + child_no.to_bytes(4, 'big'))
 
 
 def hash160_dcr(data: bytes) -> bytes:
@@ -85,7 +85,7 @@ class ExtKeyPair():
         return out
 
     def encode_v(self) -> bytes:
-        return self._depth.to_bytes(1) + \
+        return self._depth.to_bytes(1, 'big') + \
             self._fingerprint + \
             self._child_no.to_bytes(4, 'big') + \
             self._chaincode + \
@@ -94,7 +94,7 @@ class ExtKeyPair():
 
     def encode_p(self) -> bytes:
         pubkey = PublicKey.from_secret(self._key).format() if self._pubkey is None else self._pubkey
-        return self._depth.to_bytes(1) + \
+        return self._depth.to_bytes(1, 'big') + \
             self._fingerprint + \
             self._child_no.to_bytes(4, 'big') + \
             self._chaincode + \
