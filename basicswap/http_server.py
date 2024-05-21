@@ -98,6 +98,8 @@ def parse_cmd(cmd: str, type_map: str):
             type_ind = type_map[i]
         if type_ind == 'i':
             typed_params.append(int(param))
+        elif type_ind == 'f':
+            typed_params.append(float(param))
         elif type_ind == 'b':
             typed_params.append(toBool(param))
         elif type_ind == 'j':
@@ -265,6 +267,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         summary = swap_client.getSummary()
 
         result = None
+        cmd = ''
         coin_type = -1
         coin_id = -1
         call_type = 'cli'
@@ -282,10 +285,15 @@ class HttpHandler(BaseHTTPRequestHandler):
                         coin_type = Coins(Coins.XMR)
                     elif coin_id in (-5,):
                         coin_type = Coins(Coins.LTC)
+                    elif coin_id in (-6,):
+                        coin_type = Coins(Coins.DCR)
                     else:
                         coin_type = Coins(coin_id)
                 except Exception:
                     raise ValueError('Unknown Coin Type')
+
+                if coin_type in (Coins.DCR,):
+                    call_type = 'http'
 
                 try:
                     cmd = get_data_entry(form_data, 'cmd')
@@ -309,18 +317,24 @@ class HttpHandler(BaseHTTPRequestHandler):
                     result = json.dumps(rv, indent=4)
                 else:
                     if call_type == 'http':
+                        ci = swap_client.ci(coin_type)
                         method, params = parse_cmd(cmd, type_map)
-                        if coin_id == -5:
-                            rv = swap_client.ci(coin_type).rpc_wallet_mweb(method, params)
+                        if coin_id == -6:
+                            rv = ci.rpc_wallet(method, params)
+                        elif coin_id == -5:
+                            rv = ci.rpc_wallet_mweb(method, params)
                         else:
-                            rv = swap_client.ci(coin_type).rpc_wallet(method, params)
+                            if coin_type in (Coins.DCR, ):
+                                rv = ci.rpc(method, params)
+                            else:
+                                rv = ci.rpc_wallet(method, params)
                         if not isinstance(rv, str):
                             rv = json.dumps(rv, indent=4)
                         result = cmd + '\n' + rv
                     else:
                         result = cmd + '\n' + swap_client.callcoincli(coin_type, cmd)
             except Exception as ex:
-                result = str(ex)
+                result = cmd + '\n' + str(ex)
                 if self.server.swap_client.debug is True:
                     self.server.swap_client.log.error(traceback.format_exc())
 
@@ -330,6 +344,8 @@ class HttpHandler(BaseHTTPRequestHandler):
         with_xmr: bool = any(c[0] == Coins.XMR for c in coins)
         coins = [c for c in coins if c[0] != Coins.XMR]
 
+        if any(c[0] == Coins.DCR for c in coins):
+            coins.append((-6, 'Decred Wallet'))
         if any(c[0] == Coins.LTC for c in coins):
             coins.append((-5, 'Litecoin MWEB Wallet'))
         if with_xmr:

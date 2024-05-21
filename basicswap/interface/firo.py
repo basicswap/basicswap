@@ -49,6 +49,9 @@ class FIROInterface(BTCInterface):
         # load with -hdseed= parameter
         pass
 
+    def checkWallets(self) -> int:
+        return 1
+
     def getNewAddress(self, use_segwit, label='swap_receive'):
         return self.rpc('getnewaddress', [label])
         # addr_plain = self.rpc('getnewaddress', [label])

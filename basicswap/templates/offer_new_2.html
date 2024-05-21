@@ -153,11 +153,11 @@
                 <div class="w-full md:flex-1 p-3">
                   <div class="flex flex-wrap -m-3">
                     <div class="w-full md:w-1/2 p-3">
-                      <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Coin You Send</p>                      
+                      <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Coin You Send</p>
                       <div class="custom-select">
                         <div class="relative">
                           {{ input_down_arrow_offer_svg | safe }}
-                          <select class="select cursor-not-allowed disabled-select hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-5 focus:ring-0" id="coin_from" name="coin_from" onchange="set_rate('coin_from');" disabled>
+                          <select class="select cursor-not-allowed disabled-select hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-5 focus:ring-0" id="coin_from" name="coin_from" disabled>
                             <option value="-1">Select coin you send</option>
                             {% for c in coins_from %}
                             <option{% if data.coin_from==c[0] %} selected{% endif %} value="{{ c[0] }}" data-image="/static/images/coins/{{ c[1]|replace(" ", "-") }}-20.png">{{ c[1] }}</option>
@@ -169,9 +169,9 @@
                       </div>
                     </div>
                     <div class="w-full md:w-1/2 p-3">
-                      <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Amount You Send</p>                     
+                      <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Amount You Send</p>
                       <div class="relative">
-                        <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none"> </div> <input class="cursor-not-allowed disabled-input appearance-none pr-10 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-5 focus:ring-0" type="text" id="amt_from" name="amt_from" value="{{ data.amt_from }}" onchange="set_rate('amt_from');" readonly>
+                        <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none"> </div> <input class="cursor-not-allowed disabled-input appearance-none pr-10 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-5 focus:ring-0" type="text" id="amt_from" name="amt_from" value="{{ data.amt_from }}" readonly>
                       </div>
                     </div>
                     {% if data.swap_style == 'xmr' %}
@@ -213,11 +213,11 @@
                 <div class="w-full md:flex-1 p-3">
                   <div class="flex flex-wrap -m-3">
                     <div class="w-full md:w-1/2 p-3">
-                      <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Coin You Get</p>                           
+                      <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Coin You Get</p>
                       <div class="custom-select">
                         <div class="relative">
                           {{ input_down_arrow_offer_svg | safe }}
-                          <select class="select cursor-not-allowed disabled-select hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-5 focus:ring-0" id="coin_to" name="coin_to" onchange="set_rate('coin_to');" disabled>
+                          <select class="select cursor-not-allowed disabled-select hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-5 focus:ring-0" id="coin_to" name="coin_to" disabled>
                             <option value="-1"></option>
                             {% for c in coins %}
                             <option{% if data.coin_to==c[0] %} selected{% endif %} value="{{ c[0] }}" data-image="/static/images/coins/{{ c[1]|replace(" ", "-") }}-20.png">{{ c[1] }}</option>
@@ -228,9 +228,9 @@
                       </div>
                     </div>
                     <div class="w-full md:w-1/2 p-3">
-                      <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Amount You Get</p>                      
+                      <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Amount You Get</p>
                       <div class="relative">
-                        <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none"> </div> <input class="cursor-not-allowed disabled-input hover:border-blue-500 pr-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-5 focus:ring-0" type="text" id="amt_to" name="amt_to" value="{{ data.amt_to }}" onchange="set_rate('amt_to');" readonly>
+                        <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none"> </div> <input class="cursor-not-allowed disabled-input hover:border-blue-500 pr-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-5 focus:ring-0" type="text" id="amt_to" name="amt_to" value="{{ data.amt_to }}" readonly>
                       </div>
                     </div>
                     {% if data.swap_style == 'xmr' and coin_to != '6' %}
@@ -286,7 +286,7 @@
                         <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
                         {{ select_rate_svg | safe }}
                       </div>
-                      <input class="cursor-not-allowed disabled-input pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" id="rate" name="rate" value="{{ data.rate }}" onchange="set_rate('rate');" readonly>
+                      <input class="cursor-not-allowed disabled-input pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" id="rate" name="rate" value="{{ data.rate }}" readonly>
                       </div>
                     </div>
                   </div>
@@ -321,7 +321,7 @@
                       <input class="pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="number" name="lockmins" min="10" max="5000" value="{{ data.lockmins }}">
                       </div>
                       {% if data.swap_style != 'xmr' %}
-                      <div class="text-sm text-gray-500 mt-1.5">(Participate txn will be locked for half the time.)</div> 
+                      <div class="text-sm text-gray-500 mt-1.5">(Participate txn will be locked for half the time.)</div>
                       {% endif %}
                     </div>
                     {% else %}
@@ -442,7 +442,7 @@
   <input type="hidden" name="rate_var" value="true">
 {% endif %}
 </form>
-  <script src="static/js/new_offer.js"></script>  
+  <script src="static/js/new_offer.js"></script>
 </div>
 </div>
 </div>
