@@ -564,7 +564,7 @@ class DCRInterface(Secp256k1Interface):
     def withdrawCoin(self, value: float, addr_to: str, subfee: bool = False) -> str:
         if subfee:
             raise ValueError('TODO')
-        params = [addr_to, value]
+        params = [addr_to, float(value)]
         return self.rpc_wallet('sendtoaddress', params)
 
     def isAddressMine(self, address: str, or_watch_only: bool = False) -> bool:

@@ -1,5 +1,5 @@
 {% include 'header.html' %}
-{% from 'style.html' import breadcrumb_line_svg, input_arrow_down_svg %} 
+{% from 'style.html' import breadcrumb_line_svg, input_arrow_down_svg %}
 <div class="container mx-auto">
  <section class="p-5 mt-5">
   <div class="flex flex-wrap items-center -m-2">
@@ -62,8 +62,8 @@
             <tr class="opacity-100 text-gray-500 dark:text-gray-100">
              <td class="py-3 px-6">
               <div class="relative">
-                {{ input_arrow_down_svg| safe }} 
-               <select class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="coin_type">
+                {{ input_arrow_down_svg| safe }}
+               <select class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="coin_type" id="coin_type" onchange="set_coin();">
                 <option value="-1" {% if coin_type==-1 %} selected{% endif %}>Select Coin</option>
                 {% for c in coins %}
                 <option value="{{ c[0] }}" {% if coin_type==c[0] %} selected{% endif %}>{{ c[1] }}</option>
@@ -72,21 +72,21 @@
               </div>
              </td>
              <td class="py-3 px-6">
-              <input class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" name="cmd">
+              <input class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" name="cmd" id="cmd" oninput="set_method();">
              </td>
             </tr>
             <tr class="opacity-100 text-gray-500 dark:text-gray-100">
              <td class="py-3 px-6">
               <div class="relative">
-                {{ input_arrow_down_svg| safe }} 
-               <select class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="call_type">
+                {{ input_arrow_down_svg| safe }}
+               <select class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="call_type" id="call_type" >
                 <option value="cli" {% if call_type=="cli" %} selected{% endif %}>CLI</option>
                 <option value="http" {% if call_type=="http" %} selected{% endif %}>HTTP</option>
                </select>
               </div>
              </td>
              <td class="py-3 px-6">
-              <input class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" name="type_map" title="Convert inputs when using http.  Example: 'sibj' 1st parameter is a string, 2nd is converted to an int then boolean and json object or array">
+              <input class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" name="type_map" id="type_map" title="Convert inputs when using http.  Example: 'sifbj' 1st parameter is a string, 2nd is converted to an int, 3rd to float then boolean and json object or array">
              </td>
            </table>
           </div>
@@ -148,7 +148,7 @@
            </tr>
           </table>
          </div>
-        </div>  
+        </div>
         </form>
        </div>
       </div>
@@ -176,4 +176,28 @@
 </div>
 {% include 'footer.html' %}
 </body>
+<script>
+    function set_method() {
+        const coin_type = document.getElementById('coin_type').value;
+        if (coin_type == 4 || coin_type == -6) {
+            const cmd = document.getElementById('cmd');
+            const type_map = document.getElementById('type_map');
+            let method = cmd.value.split(' ')[0];
+            if (method == 'sendtoaddress') {
+                type_map.value = 'sf';
+            }
+        }
+    }
+    function set_coin() {
+        const coin_type = document.getElementById('coin_type').value;
+        let call_type = document.getElementById('call_type');
+        if (coin_type == 4 || coin_type == -6) {
+            call_type.disabled = true;
+            call_type.value = 'http';
+        } else {
+            call_type.disabled = false;
+        }
+        set_method();
+    }
+  </script>
 </html>

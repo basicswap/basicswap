@@ -84,6 +84,9 @@ class NAVInterface(BTCInterface):
         # Load with -importmnemonic= parameter
         pass
 
+    def checkWallets(self) -> int:
+        return 1
+
     def getWalletSeedID(self):
         return self.rpc('getwalletinfo')['hdmasterkeyid']
 
