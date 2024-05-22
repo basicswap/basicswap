@@ -6861,6 +6861,12 @@ class BasicSwap(BaseApp):
                                 self.ci(coin).setAnonTxRingSize(new_anon_tx_ring_size)
                             break
 
+            if 'wallet_pwd' in data:
+                new_wallet_pwd = data['wallet_pwd']
+                if settings_cc.get('wallet_pwd', '') != new_wallet_pwd:
+                    settings_changed = True
+                    settings_cc['wallet_pwd'] = new_wallet_pwd
+
             if settings_changed:
                 settings_path = os.path.join(self.data_dir, cfg.CONFIG_FILENAME)
                 settings_path_new = settings_path + '.new'

@@ -40,7 +40,7 @@ class Daemon:
 
 
 def is_known_coin(coin_name: str) -> bool:
-    for k, v in chainparams:
+    for k, v in chainparams.items():
         if coin_name == v['name']:
             return True
     return False
@@ -169,7 +169,11 @@ def runClient(fp, data_dir, chain, start_only_coins):
     pids_path = os.path.join(data_dir, '.pids')
 
     if os.getenv('WALLET_ENCRYPTION_PWD', '') != '':
-        raise ValueError('Please unset the WALLET_ENCRYPTION_PWD environment variable.')
+        if 'decred' in start_only_coins:
+            # Workaround for dcrwallet requiring password for initial startup
+            logger.warning('Allowing set WALLET_ENCRYPTION_PWD var with --startonlycoin=decred.')
+        else:
+            raise ValueError('Please unset the WALLET_ENCRYPTION_PWD environment variable.')
 
     if not os.path.exists(settings_path):
         raise ValueError('Settings file not found: ' + str(settings_path))
@@ -255,7 +259,11 @@ def runClient(fp, data_dir, chain, start_only_coins):
                     filename = 'dcrwallet' + ('.exe' if os.name == 'nt' else '')
 
                     wallet_pwd = v['wallet_pwd']
-                    extra_opts.append(f'--pass="{wallet_pwd}"')
+                    if wallet_pwd == '':
+                        # Only set when in startonlycoin mode
+                        wallet_pwd = os.getenv('WALLET_ENCRYPTION_PWD', '')
+                    if wallet_pwd != '':
+                        extra_opts.append(f'--pass="{wallet_pwd}"')
                     extra_config = {'add_datadir': False, 'stdout_to_file': True, 'stdout_filename': 'dcrwallet_stdout.log'}
                     daemons.append(startDaemon(appdata, v['bindir'], filename, opts=extra_opts, extra_config=extra_config))
                     pid = daemons[-1].handle.pid

@@ -1311,8 +1311,10 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
                 if c == Coins.DCR:
                     if coin_settings['manage_wallet_daemon']:
                         from basicswap.interface.dcr.util import createDCRWallet
+
+                        dcr_password = coin_settings['wallet_pwd'] if WALLET_ENCRYPTION_PWD == '' else WALLET_ENCRYPTION_PWD
                         extra_opts = ['--appdata="{}"'.format(coin_settings['datadir']),
-                                      '--pass={}'.format(coin_settings['wallet_pwd']),
+                                      '--pass={}'.format(dcr_password),
                                       ]
 
                         filename = 'dcrwallet' + ('.exe' if os.name == 'nt' else '')
@@ -1380,6 +1382,9 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
             print(f'NOTE - Unable to initialise wallet for {getCoinName(c)}.  To complete setup click \'Reseed Wallet\' from the ui page once chain is synced.')
         else:
             print(f'WARNING - Failed to initialise wallet for {getCoinName(c)}: {e}')
+
+    if 'decred' in with_coins and WALLET_ENCRYPTION_PWD != '':
+        print('WARNING - dcrwallet requires the password to be entered at the first startup when encrypted.\nPlease use basicswap-run with --startonlycoin=decred and the WALLET_ENCRYPTION_PWD environment var set for the initial sync.')
 
     if particl_wallet_mnemonic is not None:
         if particl_wallet_mnemonic:
@@ -1693,7 +1698,7 @@ def main():
             'connection_type': 'rpc' if 'decred' in with_coins else 'none',
             'manage_daemon': True if ('decred' in with_coins and DCR_RPC_HOST == '127.0.0.1') else False,
             'manage_wallet_daemon': True if ('decred' in with_coins and DCR_WALLET_RPC_HOST == '127.0.0.1') else False,
-            'wallet_pwd': DCR_WALLET_PWD,
+            'wallet_pwd': DCR_WALLET_PWD if WALLET_ENCRYPTION_PWD == '' else '',
             'rpchost': DCR_RPC_HOST,
             'rpcport': DCR_RPC_PORT + port_offset,
             'walletrpchost': DCR_WALLET_RPC_HOST,
