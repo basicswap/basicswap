@@ -250,9 +250,10 @@ class Test(unittest.TestCase):
             self.update_thread_dcr = threading.Thread(target=updateThreadDCR, args=(self,))
             self.update_thread_dcr.start()
 
-        # Lower output split threshold for more stakeable outputs
-        for i in range(NUM_NODES):
-            callpartrpc(i, 'walletsettings', ['stakingoptions', {'stakecombinethreshold': 100, 'stakesplitthreshold': 200}])
+        if RESET_TEST:
+            # Lower output split threshold for more stakeable outputs
+            for i in range(NUM_NODES):
+                callpartrpc(i, 'walletsettings', ['stakingoptions', {'stakecombinethreshold': 100, 'stakesplitthreshold': 200}])
         self.update_thread = threading.Thread(target=updateThread, args=(self,))
         self.update_thread.start()
 

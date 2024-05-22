@@ -320,6 +320,44 @@ class DCRInterface(Secp256k1Interface):
         # Load with --create
         pass
 
+    def isWalletEncrypted(self) -> bool:
+        return True
+
+    def isWalletLocked(self) -> bool:
+        walletislocked = self.rpc_wallet('walletislocked')
+        return walletislocked
+
+    def isWalletEncryptedLocked(self) -> (bool, bool):
+        walletislocked = self.rpc_wallet('walletislocked')
+        return True, walletislocked
+
+    def changeWalletPassword(self, old_password: str, new_password: str):
+        self._log.info('changeWalletPassword - {}'.format(self.ticker()))
+        if old_password == '':
+            # Read initial pwd from settings
+            settings = self._sc.getChainClientSettings(self.coin_type())
+            old_password = settings['wallet_pwd']
+        self.rpc_wallet('walletpassphrasechange', [old_password, new_password])
+
+        # Lock wallet to match other coins
+        self.rpc_wallet('walletlock')
+
+        # Clear initial password
+        self._sc.editSettings(self.coin_name().lower(), {'wallet_pwd': ''})
+
+    def unlockWallet(self, password: str):
+        if password == '':
+            return
+        self._log.info('unlockWallet - {}'.format(self.ticker()))
+
+        # Max timeout value, ~3 years
+        self.rpc_wallet('walletpassphrase', [password, 100000000])
+        self._sc.checkWalletSeed(self.coin_type())
+
+    def lockWallet(self):
+        self._log.info('lockWallet - {}'.format(self.ticker()))
+        self.rpc_wallet('walletlock')
+
     def getWalletSeedID(self):
         masterpubkey = self.rpc_wallet('getmasterpubkey')
         masterpubkey_data = self.decode_address(masterpubkey)[4:]

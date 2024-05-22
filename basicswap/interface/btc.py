@@ -1379,7 +1379,7 @@ class BTCInterface(Secp256k1Interface):
             return True
         return False
 
-    def isWalletEncryptedLocked(self):
+    def isWalletEncryptedLocked(self) -> (bool, bool):
         wallet_info = self.rpc_wallet('getwalletinfo')
         encrypted = 'unlocked_until' in wallet_info
         locked = encrypted and wallet_info['unlocked_until'] <= 0

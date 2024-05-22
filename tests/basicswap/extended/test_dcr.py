@@ -594,6 +594,7 @@ class Test(BaseTest):
             'rpcpassword': 'test_pass' + str(node_id),
             'datadir': os.path.join(datadir, 'dcr_' + str(node_id)),
             'bindir': DCR_BINDIR,
+            'wallet_pwd': 'test_pass',
             'use_csv': True,
             'use_segwit': True,
             'blocks_confirmed': 1,
@@ -942,8 +943,41 @@ class Test(BaseTest):
         amount_proved = ci0.verifyProofOfFunds(funds_proof[0], funds_proof[1], funds_proof[2], 'test'.encode('utf-8'))
         assert (amount_proved >= require_amount)
 
+    def test_009_wallet_encryption(self):
+        logging.info('---------- Test {} wallet encryption'.format(self.test_coin.name))
+
+        for coin in ('part', 'dcr', 'xmr'):
+            jsw = read_json_api(1800, f'wallets/{coin}')
+            assert (jsw['encrypted'] is (True if coin == 'dcr' else False))
+            assert (jsw['locked'] is False)
+
+        read_json_api(1800, 'setpassword', {'oldpassword': '', 'newpassword': 'notapassword123'})
+
+        # Entire system is locked with Particl wallet
+        jsw = read_json_api(1800, 'wallets/dcr')
+        assert ('Coin must be unlocked' in jsw['error'])
+
+        read_json_api(1800, 'unlock', {'coin': 'part', 'password': 'notapassword123'})
+
+        for coin in ('dcr', 'xmr'):
+            jsw = read_json_api(1800, f'wallets/{coin}')
+            assert (jsw['encrypted'] is True)
+            assert (jsw['locked'] is True)
+
+        read_json_api(1800, 'lock', {'coin': 'part'})
+        jsw = read_json_api(1800, 'wallets/part')
+        assert ('Coin must be unlocked' in jsw['error'])
+
+        read_json_api(1800, 'setpassword', {'oldpassword': 'notapassword123', 'newpassword': 'notapassword456'})
+        read_json_api(1800, 'unlock', {'password': 'notapassword456'})
+
+        for coin in ('part', 'dcr', 'xmr'):
+            jsw = read_json_api(1800, f'wallets/{coin}')
+            assert (jsw['encrypted'] is True)
+            assert (jsw['locked'] is False)
+
     def test_010_txn_size(self):
-        logging.info('---------- Test {} txn_size'.format(self.test_coin.name))
+        logging.info('---------- Test {} txn size'.format(self.test_coin.name))
 
         swap_clients = self.swap_clients
         ci = swap_clients[0].ci(self.test_coin)
