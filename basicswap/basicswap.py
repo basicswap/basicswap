@@ -1169,7 +1169,7 @@ class BasicSwap(BaseApp):
         if offer.swap_type == SwapTypes.XMR_SWAP:
             xmr_swap = session.query(XmrSwap).filter_by(bid_id=bid.bid_id).first()
             self.watchXmrSwap(bid, offer, xmr_swap)
-            if coin_to.watch_blocks_for_scripts() and bid.xmr_a_lock_tx and bid.xmr_a_lock_tx.chain_height:
+            if self.ci(coin_to).watch_blocks_for_scripts() and bid.xmr_a_lock_tx and bid.xmr_a_lock_tx.chain_height:
                 if not bid.xmr_b_lock_tx or not bid.xmr_b_lock_tx.txid:
                     ci_from = self.ci(coin_from)
                     ci_to = self.ci(coin_to)
@@ -2308,13 +2308,17 @@ class BasicSwap(BaseApp):
         if offer.amount_negotiable and not offer.rate_negotiable:
             if bid_rate != offer.rate and extra_options.get('adjust_amount_for_rate', True):
                 self.log.debug('Attempting to reduce amount to match offer rate.')
-                for i in range(100):
+
+                adjust_tries: int = 10000 if ci_from.exp() > 8 else 1000
+                for i in range(adjust_tries):
                     test_amount = amount - i
                     test_amount_to: int = int((test_amount * offer.rate) // ci_from.COIN())
                     test_bid_rate: int = ci_from.make_int(test_amount_to / test_amount, r=1)
+
                     if test_bid_rate != offer.rate:
                         test_amount_to -= 1
                         test_bid_rate: int = ci_from.make_int(test_amount_to / test_amount, r=1)
+
                     if test_bid_rate == offer.rate:
                         if amount != test_amount:
                             self.log.info('Reducing bid amount-from from {} to {} to match offer rate.'.format(amount, test_amount))
