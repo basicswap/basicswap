@@ -22,7 +22,7 @@ Docker will create directories instead of files if these don't exist.
 #### For a new install
 
 Use the `--usetorproxy` argument to download the coin binaries over tor, then enable tor with `--enabletor`.
-Note that some download links, notably for Litecoin, are unreachable when using tor.
+Note that some download links may be unreachable when using tor.
 
     docker compose -f docker-compose_with_tor.yml run --rm swapclient \
         basicswap-prepare --usetorproxy --datadir=/coindata --withcoins=monero,particl

@@ -835,12 +835,15 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
 
 
 def writeTorSettings(fp, coin, coin_settings, tor_control_password):
-    onionport = coin_settings['onionport']
     '''
     TOR_PROXY_HOST must be an ip address.
     BTC versions >21 and Particl with lookuptorcontrolhost=any can accept hostnames, XMR and LTC cannot
     '''
     fp.write(f'proxy={TOR_PROXY_HOST}:{TOR_PROXY_PORT}\n')
+    if coin in ('decred',):
+        return
+
+    onionport = coin_settings['onionport']
     fp.write(f'torpassword={tor_control_password}\n')
     fp.write(f'torcontrol={TOR_PROXY_HOST}:{TOR_CONTROL_PORT}\n')
 
@@ -935,6 +938,9 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
 
             fp.write('rpcuser={}\n'.format(core_settings['rpcuser']))
             fp.write('rpcpass={}\n'.format(core_settings['rpcpassword']))
+
+            if tor_control_password is not None:
+                writeTorSettings(fp, coin, core_settings, tor_control_password)
 
         wallet_conf_path = os.path.join(data_dir, 'dcrwallet.conf')
         if os.path.exists(wallet_conf_path):
@@ -1130,7 +1136,11 @@ def modify_tor_config(settings, coin, tor_control_password=None, enable=False, e
             coin_settings['trusted_daemon'] = extra_opts.get('trust_remote_node', 'auto')
         return
 
-    config_path = os.path.join(data_dir, coin + '.conf')
+    if coin == 'decred':
+        config_path = os.path.join(data_dir, 'dcrd.conf')
+    else:
+        config_path = os.path.join(data_dir, coin + '.conf')
+
     if not os.path.exists(config_path):
         exitWithError('{} does not exist'.format(config_path))
 
@@ -1142,9 +1152,12 @@ def modify_tor_config(settings, coin, tor_control_password=None, enable=False, e
             default_onionport = PART_ONION_PORT
         elif coin == 'litecoin':
             default_onionport = LTC_ONION_PORT
+        elif coin in ('decred',):
+            pass
         else:
             exitWithError('Unknown default onion listening port for {}'.format(coin))
-        coin_settings['onionport'] = default_onionport
+        if default_onionport > 0:
+            coin_settings['onionport'] = default_onionport
 
     # Backup
     shutil.copyfile(config_path, config_path + '.last')
@@ -1599,7 +1612,7 @@ def main():
     if use_tor_proxy and extra_opts.get('no_tor_proxy', False):
         exitWithError('Can\'t use --usetorproxy and --notorproxy together')
 
-    # Automatically enable tor for certain commands if it's set in basicswap config
+    # Automatically enable usetorproxy for certain commands if it's set in basicswap config
     if not (initwalletsonly or enable_tor or disable_tor or disable_coin) and \
        not use_tor_proxy and os.path.exists(config_path):
         settings = load_config(config_path)
@@ -1910,6 +1923,8 @@ def main():
     if add_coin != '':
         logger.info('Adding coin: %s', add_coin)
         settings = load_config(config_path)
+        if tor_control_password is None and settings.get('use_tor', False):
+            extra_opts['tor_control_password'] = settings.get('tor_control_password', None)
 
         if particl_wallet_mnemonic != 'none':
             # Ensure Particl wallet is unencrypted or correct password is supplied
