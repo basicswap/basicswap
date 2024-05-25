@@ -295,7 +295,7 @@ class HttpHandler(BaseHTTPRequestHandler):
                     cmd = get_data_entry(form_data, 'cmd')
                 except Exception:
                     raise ValueError('Invalid command')
-                if coin_type in (Coins.XMR, ):
+                if coin_type in (Coins.XMR, Coins.WOW):
                     ci = swap_client.ci(coin_type)
                     arr = cmd.split(None, 1)
                     method = arr[0]
@@ -310,22 +310,6 @@ class HttpHandler(BaseHTTPRequestHandler):
                         rv = ci.rpc2(method, params)
                     else:
                         raise ValueError('Unknown RPC variant')
-                    result = json.dumps(rv, indent=4)
-                elif coin_type == Coins.WOW:
-                    ci = swap_client.ci(coin_type)
-                    arr = cmd.split(None, 1)
-                    method = arr[0]
-                    params = json.loads(arr[1]) if len(arr) > 1 else []
-                    if coin_id == -8:
-                        rv = ci.rpc_wallet(method, params)
-                    elif coin_id == -7:
-                        rv = ci.rpc(method, params)
-                    elif coin_id == -6:
-                        if params == []:
-                            params = None
-                        rv = ci.rpc2(method, params)
-                    else:
-                        raise ValueError('Unknown WOW RPC variant')
                     result = json.dumps(rv, indent=4)
                 else:
                     if call_type == 'http':

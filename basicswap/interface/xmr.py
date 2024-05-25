@@ -51,6 +51,10 @@ class XMRInterface(CoinInterface):
         return Coins.XMR
 
     @staticmethod
+    def ticker_str() -> int:
+        return Coins.XMR.name
+
+    @staticmethod
     def COIN():
         return XMR_COIN
 
@@ -210,7 +214,7 @@ class XMRInterface(CoinInterface):
                 rv['known_block_count'] = self.rpc('get_block_count', timeout=self._rpctimeout)['count']
                 rv['verificationprogress'] = rv['blocks'] / rv['known_block_count']
         except Exception as e:
-            self._log.warning('XMR get_block_count failed with: %s', str(e))
+            self._log.warning(f'{self.ticker_str()} get_block_count failed with: {e}')
             rv['verificationprogress'] = 0.0
 
         return rv
@@ -391,7 +395,7 @@ class XMRInterface(CoinInterface):
 
             try:
                 current_height = self.rpc2('get_height', timeout=self._rpctimeout)['height']
-                self._log.info('findTxnByHash XMR current_height %d\nhash: %s', current_height, txid)
+                self._log.info(f'findTxnByHash {self.ticker_str()} current_height {current_height}\nhash: {txid}')
             except Exception as e:
                 self._log.info('rpc failed %s', str(e))
                 current_height = None  # If the transfer is available it will be deep enough
@@ -475,8 +479,8 @@ class XMRInterface(CoinInterface):
                 balance = self.rpc_wallet('get_balance')
                 if balance['balance'] != balance['unlocked_balance']:
                     raise ValueError('Balance must be fully confirmed to use sweep all.')
-                self._log.info('XMR {} sweep_all.'.format('estimate fee' if estimate_fee else 'withdraw'))
-                self._log.debug('XMR balance: {}'.format(balance['balance']))
+                self._log.info('{} {} sweep_all.'.format(self.ticker_str(), 'estimate fee' if estimate_fee else 'withdraw'))
+                self._log.debug('{} balance: {}'.format(self.ticker_str(), balance['balance']))
                 params = {'address': addr_to, 'do_not_relay': estimate_fee}
                 if self._fee_priority > 0:
                     params['priority'] = self._fee_priority

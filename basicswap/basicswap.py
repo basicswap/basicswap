@@ -34,7 +34,6 @@ from .interface.part import PARTInterface, PARTInterfaceAnon, PARTInterfaceBlind
 from . import __version__
 from .rpc import escape_rpcauth
 from .rpc_xmr import make_xmr_rpc2_func
-from .rpc_wow import make_wow_rpc2_func
 from .ui.util import getCoinName, known_chart_coins
 from .util import (
     AutomationConstraint,
@@ -601,10 +600,8 @@ class BasicSwap(BaseApp):
             if proxy_host:
                 self.log.info(f'Connecting through proxy at {proxy_host}.')
 
-            if coin == Coins.XMR:
+            if coin in (Coins.XMR, Coins.WOW):
                 return make_xmr_rpc2_func(rpcport, daemon_login, rpchost, proxy_host=proxy_host, proxy_port=proxy_port)
-            if coin == Coins.WOW:
-                return make_wow_rpc2_func(rpcport, daemon_login, rpchost, proxy_host=proxy_host, proxy_port=proxy_port)
 
         daemon_login = None
         if coin_settings.get('rpcuser', '') != '':

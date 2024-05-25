@@ -118,7 +118,9 @@ def startXmrWalletDaemon(node_dir, bin_dir, wallet_bin, opts=[]):
     config_to_remove = ['daemon-address=', 'untrusted-daemon=', 'trusted-daemon=', 'proxy=']
 
     data_dir = os.path.expanduser(node_dir)
-    config_path = os.path.join(data_dir, 'monero_wallet.conf')
+
+    wallet_config_filename = 'wownero-wallet-rpc.conf' if wallet_bin.startswith('wow') else 'monero_wallet.conf'
+    config_path = os.path.join(data_dir, wallet_config_filename)
     if os.path.exists(config_path):
         args += ['--config-file=' + config_path]
         with open(config_path) as fp:

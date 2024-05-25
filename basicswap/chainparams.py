@@ -29,7 +29,7 @@ class Coins(IntEnum):
     FIRO = 13
     NAV = 14
     LTC_MWEB = 15
-    # ZANO = 16 was 9
+    # ZANO = 16
 
 
 chainparams = {

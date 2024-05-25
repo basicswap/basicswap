@@ -85,8 +85,9 @@ SKIP_GPG_VALIDATION = toBool(os.getenv('SKIP_GPG_VALIDATION', 'false'))
 
 known_coins = {
     'particl': (PARTICL_VERSION, PARTICL_VERSION_TAG, ('tecnovert',)),
-    'litecoin': (LITECOIN_VERSION, LITECOIN_VERSION_TAG, ('davidburkett38',)),
     'bitcoin': (BITCOIN_VERSION, BITCOIN_VERSION_TAG, ('laanwj',)),
+    'litecoin': (LITECOIN_VERSION, LITECOIN_VERSION_TAG, ('davidburkett38',)),
+    'decred': (DCR_VERSION, DCR_VERSION_TAG, ('decred_release',)),
     'namecoin': ('0.18.0', '', ('JeremyRand',)),
     'monero': (MONERO_VERSION, MONERO_VERSION_TAG, ('binaryfate',)),
     'wownero': (WOWNERO_VERSION, WOWNERO_VERSION_TAG, ('wowario',)),
@@ -94,7 +95,6 @@ known_coins = {
     'dash': (DASH_VERSION, DASH_VERSION_TAG, ('pasta',)),
     'firo': (FIRO_VERSION, FIRO_VERSION_TAG, ('reuben',)),
     'navcoin': (NAV_VERSION, NAV_VERSION_TAG, ('nav_builder',)),
-    'decred': (DCR_VERSION, DCR_VERSION_TAG, ('decred_release',)),
 }
 
 disabled_coins = [
