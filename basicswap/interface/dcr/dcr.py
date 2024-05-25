@@ -229,6 +229,13 @@ class DCRInterface(Secp256k1Interface):
         raise ValueError('Unknown lock type')
 
     @staticmethod
+    def decodeSequence(lock_value: int) -> int:
+        # Return the raw value
+        if lock_value & SEQUENCE_LOCKTIME_TYPE_FLAG:
+            return (lock_value & SEQUENCE_LOCKTIME_MASK) << SEQUENCE_LOCKTIME_GRANULARITY
+        return lock_value & SEQUENCE_LOCKTIME_MASK
+
+    @staticmethod
     def watch_blocks_for_scripts() -> bool:
         return True
 

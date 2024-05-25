@@ -11,11 +11,11 @@ def decode_compactsize(b: bytes, offset: int = 0) -> (int, int):
         return i, 1
     offset += 1
     if i == 0xfd:
-        return int.from_bytes(b[offset: offset + 2]), 3
+        return int.from_bytes(b[offset: offset + 2], 'little'), 3
     if i == 0xfe:
-        return int.from_bytes(b[offset: offset + 4]), 5
+        return int.from_bytes(b[offset: offset + 4], 'little'), 5
     # 0xff
-    return int.from_bytes(b[offset: offset + 8]), 9
+    return int.from_bytes(b[offset: offset + 8], 'little'), 9
 
 
 def encode_compactsize(i: int) -> bytes:
