@@ -63,7 +63,6 @@ logger = logging.getLogger()
 DCR_BINDIR = os.path.expanduser(os.getenv('DCR_BINDIR', os.path.join(cfg.DEFAULT_TEST_BINDIR, 'decred')))
 DCRD = os.getenv('DCRD', 'dcrd' + cfg.bin_suffix)
 DCR_WALLET = os.getenv('DCR_WALLET', 'dcrwallet' + cfg.bin_suffix)
-DCR_CLI = os.getenv('DCR_CLI', 'dcrctl' + cfg.bin_suffix)
 
 DCR_BASE_PORT = 44932
 DCR_BASE_RPC_PORT = 45932
@@ -582,6 +581,10 @@ class Test(BaseTest):
         logging.info('Started %s %d', DCR_WALLET, cls.dcr_daemons[-1].handle.pid)
 
         waitForRPC(make_rpc_func(i, base_rpc_port=DCR_BASE_WALLET_RPC_PORT), test_delay_event, rpc_command='getinfo', max_tries=12)
+
+    @classmethod
+    def addPIDInfo(cls, sc, i):
+        sc.setDaemonPID(Coins.DCR, cls.dcr_daemons[i].handle.pid)
 
     @classmethod
     def addCoinSettings(cls, settings, datadir, node_id):
