@@ -178,7 +178,7 @@
 </body>
 <script>
     function set_method() {
-        const coin_type = document.getElementById('coin_type').value;
+        const coin_type = document.getElementById('coin_type').value.split(',')[0];
         if (coin_type == 4 || coin_type == -6) {
             const cmd = document.getElementById('cmd');
             const type_map = document.getElementById('type_map');
@@ -189,9 +189,9 @@
         }
     }
     function set_coin() {
-        const coin_type = document.getElementById('coin_type').value;
+        const coin_type = document.getElementById('coin_type').value.split(',')[0];
         let call_type = document.getElementById('call_type');
-        if (coin_type == 4 || coin_type == -6) {
+        if (coin_type == '4' || coin_type == '6') {
             call_type.disabled = true;
             call_type.value = 'http';
         } else {
@@ -199,5 +199,8 @@
         }
         set_method();
     }
+    document.addEventListener('DOMContentLoaded', () => {
+        set_coin();
+    });
   </script>
 </html>

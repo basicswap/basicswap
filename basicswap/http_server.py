@@ -268,6 +268,7 @@ class HttpHandler(BaseHTTPRequestHandler):
 
         result = None
         cmd = ''
+        coin_type_selected = -1
         coin_type = -1
         coin_id = -1
         call_type = 'cli'
@@ -280,15 +281,10 @@ class HttpHandler(BaseHTTPRequestHandler):
                 call_type = get_data_entry_or(form_data, 'call_type', 'cli')
                 type_map = get_data_entry_or(form_data, 'type_map', '')
                 try:
-                    coin_id = int(get_data_entry(form_data, 'coin_type'))
-                    if coin_id in (-2, -3, -4):
-                        coin_type = Coins(Coins.XMR)
-                    elif coin_id in (-5,):
-                        coin_type = Coins(Coins.LTC)
-                    elif coin_id in (-6,):
-                        coin_type = Coins(Coins.DCR)
-                    else:
-                        coin_type = Coins(coin_id)
+                    coin_type_selected = get_data_entry(form_data, 'coin_type')
+                    coin_type_split = coin_type_selected.split(',')
+                    coin_type = Coins(int(coin_type_split[0]))
+                    coin_variant = int(coin_type_split[1])
                 except Exception:
                     raise ValueError('Unknown Coin Type')
 
@@ -299,29 +295,29 @@ class HttpHandler(BaseHTTPRequestHandler):
                     cmd = get_data_entry(form_data, 'cmd')
                 except Exception:
                     raise ValueError('Invalid command')
-                if coin_type == Coins.XMR:
+                if coin_type in (Coins.XMR, ):
                     ci = swap_client.ci(coin_type)
                     arr = cmd.split(None, 1)
                     method = arr[0]
                     params = json.loads(arr[1]) if len(arr) > 1 else []
-                    if coin_id == -4:
+                    if coin_variant == 2:
                         rv = ci.rpc_wallet(method, params)
-                    elif coin_id == -3:
+                    elif coin_variant == 0:
                         rv = ci.rpc(method, params)
-                    elif coin_id == -2:
+                    elif coin_variant == 1:
                         if params == []:
                             params = None
                         rv = ci.rpc2(method, params)
                     else:
-                        raise ValueError('Unknown XMR RPC variant')
+                        raise ValueError('Unknown RPC variant')
                     result = json.dumps(rv, indent=4)
                 else:
                     if call_type == 'http':
                         ci = swap_client.ci(coin_type)
                         method, params = parse_cmd(cmd, type_map)
-                        if coin_id == -6:
+                        if coin_variant == 1:
                             rv = ci.rpc_wallet(method, params)
-                        elif coin_id == -5:
+                        elif coin_variant == 2:
                             rv = ci.rpc_wallet_mweb(method, params)
                         else:
                             if coin_type in (Coins.DCR, ):
@@ -340,24 +336,24 @@ class HttpHandler(BaseHTTPRequestHandler):
 
         template = env.get_template('rpc.html')
 
-        coins = listAvailableCoins(swap_client, with_variants=False)
-        with_xmr: bool = any(c[0] == Coins.XMR for c in coins)
-        coins = [c for c in coins if c[0] != Coins.XMR]
+        coin_available = listAvailableCoins(swap_client, with_variants=False)
+        with_xmr: bool = any(c[0] == Coins.XMR for c in coin_available)
+        coins = [(str(c[0]) + ',0', c[1]) for c in coin_available if c[0] not in (Coins.XMR, )]
 
-        if any(c[0] == Coins.DCR for c in coins):
-            coins.append((-6, 'Decred Wallet'))
-        if any(c[0] == Coins.LTC for c in coins):
-            coins.append((-5, 'Litecoin MWEB Wallet'))
+        if any(c[0] == Coins.DCR for c in coin_available):
+            coins.append((str(int(Coins.DCR)) + ',1', 'Decred Wallet'))
+        if any(c[0] == Coins.LTC for c in coin_available):
+            coins.append((str(int(Coins.LTC)) + ',2', 'Litecoin MWEB Wallet'))
         if with_xmr:
-            coins.append((-2, 'Monero'))
-            coins.append((-3, 'Monero JSON'))
-            coins.append((-4, 'Monero Wallet'))
+            coins.append((str(int(Coins.XMR)) + ',0', 'Monero'))
+            coins.append((str(int(Coins.XMR)) + ',1', 'Monero JSON'))
+            coins.append((str(int(Coins.XMR)) + ',2', 'Monero Wallet'))
 
         return self.render_template(template, {
             'messages': messages,
             'err_messages': err_messages,
             'coins': coins,
-            'coin_type': coin_id,
+            'coin_type': coin_type_selected,
             'call_type': call_type,
             'result': result,
             'messages': messages,
