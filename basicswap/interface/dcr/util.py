@@ -18,7 +18,6 @@ def createDCRWallet(args, hex_seed, logging, delay_event):
         while p.poll() is None:
             while len(select.select([pipe_r], [], [], 0)[0]) == 1:
                 buf = os.read(pipe_r, 1024).decode('utf-8')
-                logging.debug(f'dcrwallet {buf}')
                 response = None
                 if 'Use the existing configured private passphrase' in buf:
                     response = b'y\n'

@@ -400,14 +400,14 @@ class DCRInterface(Secp256k1Interface):
         default_account_bal = balances['balances'][0]  # 0 always default?
         return self.make_int(default_account_bal['spendable'])
 
-    def getSeedHash(self, seed: bytes) -> bytes:
+    def getSeedHash(self, seed: bytes, coin_type_id=None) -> bytes:
         # m / purpose' / coin_type' / account' / change / address_index
         # m/44'/coin_type'/0'/0/0
 
         ek = ExtKeyPair(self.coin_type())
         ek.set_seed(seed)
 
-        coin_type = self.chainparams_network()['bip44']
+        coin_type = self.chainparams_network()['bip44'] if coin_type_id is None else coin_type_id
         ek_purpose = ek.derive(44 | (1 << 31))
         ek_coin = ek_purpose.derive(coin_type | (1 << 31))
         ek_account = ek_coin.derive(0 | (1 << 31))
