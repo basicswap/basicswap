@@ -91,6 +91,9 @@ def startDaemon(node_dir, bin_dir, daemon_bin, opts=[], extra_config={}):
         stdout_dest = subprocess.PIPE
         stderr_dest = subprocess.PIPE
 
+    if extra_config.get('use_shell', False):
+        str_args = ' '.join(args)
+        return Daemon(subprocess.Popen(str_args, shell=True, stdin=subprocess.PIPE, stdout=stdout_dest, stderr=stderr_dest, cwd=datadir_path), opened_files)
     return Daemon(subprocess.Popen(args, stdin=subprocess.PIPE, stdout=stdout_dest, stderr=stderr_dest, cwd=datadir_path), opened_files)
 
 
@@ -245,11 +248,12 @@ def runClient(fp, data_dir, chain, start_only_coins):
             if c == 'decred':
                 appdata = v['datadir']
                 extra_opts = [f'--appdata="{appdata}"', ]
+                use_shell: bool = True if os.name == 'nt' else False
                 if v['manage_daemon'] is True:
                     swap_client.log.info(f'Starting {display_name} daemon')
                     filename = 'dcrd' + ('.exe' if os.name == 'nt' else '')
 
-                    extra_config = {'add_datadir': False, 'stdout_to_file': True, 'stdout_filename': 'dcrd_stdout.log'}
+                    extra_config = {'add_datadir': False, 'stdout_to_file': True, 'stdout_filename': 'dcrd_stdout.log', 'use_shell': use_shell}
                     daemons.append(startDaemon(appdata, v['bindir'], filename, opts=extra_opts, extra_config=extra_config))
                     pid = daemons[-1].handle.pid
                     swap_client.log.info('Started {} {}'.format(filename, pid))
@@ -264,7 +268,7 @@ def runClient(fp, data_dir, chain, start_only_coins):
                         wallet_pwd = os.getenv('WALLET_ENCRYPTION_PWD', '')
                     if wallet_pwd != '':
                         extra_opts.append(f'--pass="{wallet_pwd}"')
-                    extra_config = {'add_datadir': False, 'stdout_to_file': True, 'stdout_filename': 'dcrwallet_stdout.log'}
+                    extra_config = {'add_datadir': False, 'stdout_to_file': True, 'stdout_filename': 'dcrwallet_stdout.log', 'use_shell': use_shell}
                     daemons.append(startDaemon(appdata, v['bindir'], filename, opts=extra_opts, extra_config=extra_config))
                     pid = daemons[-1].handle.pid
                     swap_client.log.info('Started {} {}'.format(filename, pid))
