@@ -1055,10 +1055,20 @@ class BasicSwap(BaseApp):
                 self.log.error(traceback.format_exc())
             return
 
+        legacy_root_hash = None
+        if coin_type == Coins.DCR:
+            legacy_root_hash = ci.getSeedHash(root_key, 20)
         try:
             session = self.openSession()
             key_str = 'main_wallet_seedid_' + db_key_coin_name
             self.setStringKV(key_str, root_hash.hex(), session)
+
+            if coin_type == Coins.DCR:
+                # TODO: How to force getmasterpubkey to always return the new slip44 (42) key
+                key_str = 'main_wallet_seedid_alt_' + db_key_coin_name
+                self.setStringKV(key_str, legacy_root_hash.hex(), session)
+
+            session.commit()  # else get error database is locked!?
 
             # Clear any saved addresses
             self.clearStringKV('receive_addr_' + db_key_coin_name, session)
@@ -2035,6 +2045,13 @@ class BasicSwap(BaseApp):
         if ci.checkExpectedSeed(expect_seedid):
             ci.setWalletSeedWarning(False)
             return True
+        if c == Coins.DCR:
+            # Try the legacy extkey
+            expect_seedid = self.getStringKV('main_wallet_seedid_alt_' + ci.coin_name().lower())
+            if ci.checkExpectedSeed(expect_seedid):
+                ci.setWalletSeedWarning(False)
+                self.log.warning('{} is using the legacy extkey.'.format(ci.coin_name()))
+                return True
         self.log.warning('Wallet for coin {} not derived from swap seed.'.format(ci.coin_name()))
         return False
 

@@ -1285,6 +1285,7 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
     swap_client = None
     daemons = []
     daemon_args = ['-noconnect', '-nodnsseed']
+    generated_mnemonic: bool = False
 
     coins_failed_to_initialise = []
 
@@ -1359,6 +1360,7 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
                         logger.info('Loading Particl mnemonic')
                         if particl_wallet_mnemonic is None:
                             particl_wallet_mnemonic = swap_client.callcoinrpc(Coins.PART, 'mnemonic', ['new'])['mnemonic']
+                            generated_mnemonic = True
                         swap_client.callcoinrpc(Coins.PART, 'extkeyimportmaster', [particl_wallet_mnemonic])
                     # Particl wallet must be unlocked to call getWalletKey
                     if WALLET_ENCRYPTION_PWD != '':
@@ -1400,7 +1402,7 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
         print('WARNING - dcrwallet requires the password to be entered at the first startup when encrypted.\nPlease use basicswap-run with --startonlycoin=decred and the WALLET_ENCRYPTION_PWD environment var set for the initial sync.')
 
     if particl_wallet_mnemonic is not None:
-        if particl_wallet_mnemonic:
+        if generated_mnemonic:
             # Print directly to stdout for tests
             print('IMPORTANT - Save your particl wallet recovery phrase:\n{}\n'.format(particl_wallet_mnemonic))
 
