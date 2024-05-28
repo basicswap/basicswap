@@ -51,7 +51,7 @@ message BidMessage {
     bytes proof_utxos = 9;          /* 32 byte txid 2 byte vout, repeated */
 
     /* optional */
-    bytes pkhash_buyer_to = 13;     /* When pubkey hash is different on the to-chain */
+    bytes pkhash_buyer_to = 10;     /* When pubkey hash is different on the to-chain */
 }
 
 /* For tests */

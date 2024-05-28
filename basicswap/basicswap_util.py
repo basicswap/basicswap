@@ -475,7 +475,7 @@ def getOfferProofOfFundsHash(offer_msg, offer_addr):
     # TODO: Hash must not include proof_of_funds sig if it exists in offer_msg
     h = hashlib.sha256()
     h.update(offer_addr.encode('utf-8'))
-    offer_bytes = offer_msg.SerializeToString()
+    offer_bytes = offer_msg.to_bytes()
     h.update(offer_bytes)
     return h.digest()
 

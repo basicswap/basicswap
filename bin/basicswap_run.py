@@ -425,6 +425,9 @@ def main():
 
         logger.warning('Unknown argument %s', v)
 
+    if os.name == 'nt':
+        logger.warning('Running on windows is discouraged and windows support may be discontinued in the future.  Please consider using the WSL docker setup instead.')
+
     if data_dir is None:
         data_dir = os.path.join(os.path.expanduser(cfg.BASICSWAP_DATADIR))
     logger.info('Using datadir: %s', data_dir)
