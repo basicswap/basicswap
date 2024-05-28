@@ -67,7 +67,6 @@ from .script import (
     OpCodes,
 )
 from .messages_pb2 import (
-    OfferMessage,
     BidMessage,
     BidAcceptMessage,
     XmrBidMessage,
@@ -79,6 +78,9 @@ from .messages_pb2 import (
     OfferRevokeMessage,
     ADSBidIntentMessage,
     ADSBidIntentAcceptMessage,
+)
+from .messages_npb import (
+    OfferMessage,
 )
 from .db import (
     CURRENT_DB_VERSION,
@@ -1525,7 +1527,7 @@ class BasicSwap(BaseApp):
         coin_from_has_csv = self.coin_clients[coin_from]['use_csv']
         coin_to_has_csv = self.coin_clients[coin_to]['use_csv']
 
-        if lock_type == OfferMessage.SEQUENCE_LOCK_TIME:
+        if lock_type == TxLockTypes.SEQUENCE_LOCK_TIME:
             ensure(lock_value >= self.min_sequence_lock_seconds and lock_value <= self.max_sequence_lock_seconds, 'Invalid lock_value time')
             if swap_type == SwapTypes.XMR_SWAP:
                 reverse_bid: bool = self.is_reverse_ads_bid(coin_from)
@@ -1533,7 +1535,7 @@ class BasicSwap(BaseApp):
                 ensure(itx_coin_has_csv, 'ITX coin needs CSV activated.')
             else:
                 ensure(coin_from_has_csv and coin_to_has_csv, 'Both coins need CSV activated.')
-        elif lock_type == OfferMessage.SEQUENCE_LOCK_BLOCKS:
+        elif lock_type == TxLockTypes.SEQUENCE_LOCK_BLOCKS:
             ensure(lock_value >= 5 and lock_value <= 1000, 'Invalid lock_value blocks')
             if swap_type == SwapTypes.XMR_SWAP:
                 reverse_bid: bool = self.is_reverse_ads_bid(coin_from)
@@ -1680,7 +1682,7 @@ class BasicSwap(BaseApp):
                 proof_addr, proof_sig, proof_utxos = self.getProofOfFunds(coin_from_t, int(amount), proof_of_funds_hash)
                 # TODO: For now proof_of_funds is just a client side check, may need to be sent with offers in future however.
 
-            offer_bytes = msg_buf.SerializeToString()
+            offer_bytes = msg_buf.to_bytes()
             payload_hex = str.format('{:02x}', MessageTypes.OFFER) + offer_bytes.hex()
             msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR, valid_for_seconds)
             offer_id = self.sendSmsg(offer_addr, offer_addr_to, payload_hex, msg_valid)
@@ -4808,11 +4810,17 @@ class BasicSwap(BaseApp):
         offer_bytes = bytes.fromhex(msg['hex'][2:-2])
 
         offer_data = OfferMessage()
-        offer_data.ParseFromString(offer_bytes[:2])
-        if offer_data.protocol_version < MINPROTO_VERSION or offer_data.protocol_version > MAXPROTO_VERSION:
-            self.log.warning(f'Incoming offer invalid protocol version: {offer_data.protocol_version} ')
+        try:
+            offer_data.from_bytes(offer_bytes[:2], init_all=False)
+            ensure(offer_data.protocol_version >= MINPROTO_VERSION and offer_data.protocol_version <= MAXPROTO_VERSION, 'protocol_version out of range')
+        except Exception as e:
+            self.log.warning('Incoming offer invalid protocol version: {}.'.format(getattr(offer_data, 'protocol_version', -1)))
             return
-        offer_data.ParseFromString(offer_bytes)
+        try:
+            offer_data.from_bytes(offer_bytes)
+        except Exception as e:
+            self.log.warning('Failed to decode offer, protocol version: {}, {}.'.format(getattr(offer_data, 'protocol_version', -1), str(e)))
+            return
 
         # Validate offer data
         now: int = self.getTime()

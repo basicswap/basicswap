@@ -46,6 +46,10 @@ from basicswap.util import (
 from basicswap.messages_pb2 import (
     BidMessage,
     BidMessage_test,
+    OfferMessage,
+)
+from basicswap.messages_npb import (
+    OfferMessage as OfferMessage_npb,
 )
 from basicswap.contrib.test_framework.script import hash160 as hash160_btc
 
@@ -432,6 +436,30 @@ class Test(unittest.TestCase):
         msg_buf_v2.ParseFromString(serialised_msg[:2])
         assert (msg_buf_v2.protocol_version == 2)
         assert (msg_buf_v2.time_valid == 0)
+
+        msg_buf = OfferMessage()
+        msg_buf.protocol_version = 2
+        msg_buf.amount_from = 1024
+        msg_buf.amount_to = 0  # test if it gets encoded
+        msg_buf.pkhash_seller = bytes((1,)) * 32
+        msg_buf.proof_address = 'a string'
+        msg_buf.amount_negotiable = True
+        msg_buf.rate_negotiable = False
+        msg_buf.fee_rate_to = 2485
+        pb_serialised_msg = msg_buf.SerializeToString()
+
+        npb = OfferMessage_npb()
+        npb.from_bytes(pb_serialised_msg)
+        assert (npb.protocol_version == msg_buf.protocol_version)
+        assert (npb.amount_from == msg_buf.amount_from)
+        assert (npb.amount_to == msg_buf.amount_to)
+        assert (npb.pkhash_seller == msg_buf.pkhash_seller)
+        assert (npb.proof_address == msg_buf.proof_address)
+        assert (npb.amount_negotiable == msg_buf.amount_negotiable)
+        assert (npb.fee_rate_to == msg_buf.fee_rate_to)
+
+        npb_serialised_msg = npb.to_bytes()
+        assert (npb_serialised_msg == pb_serialised_msg)
 
     def test_is_private_ip_address(self):
         test_addresses = [
