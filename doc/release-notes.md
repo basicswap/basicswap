@@ -2,6 +2,7 @@
 ==============
 
 - Remove protobuf and protoc dependencies.
+- Include mnemonic dependency directly.
 
 
 0.13.1

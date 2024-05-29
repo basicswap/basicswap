@@ -154,7 +154,6 @@
     python-gnupg
     python-jinja2
     python-pysocks
-    python-mnemonic
     ))
   (native-inputs
    (list

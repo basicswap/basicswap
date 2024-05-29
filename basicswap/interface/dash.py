@@ -8,7 +8,7 @@
 from .btc import BTCInterface
 from basicswap.chainparams import Coins
 from basicswap.util.address import decodeAddress
-from mnemonic import Mnemonic
+from basicswap.contrib.mnemonic import Mnemonic
 from basicswap.contrib.test_framework.script import (
     CScript,
     OP_DUP, OP_HASH160, OP_EQUALVERIFY, OP_CHECKSIG
@@ -25,11 +25,11 @@ class DASHInterface(BTCInterface):
         self._wallet_passphrase = ''
         self._have_checked_seed = False
 
-    def seedToMnemonic(self, key: bytes) -> str:
+    def entropyToMnemonic(self, key: bytes) -> str:
         return Mnemonic('english').to_mnemonic(key)
 
     def initialiseWallet(self, key: bytes):
-        words = self.seedToMnemonic(key)
+        words = self.entropyToMnemonic(key)
 
         mnemonic_passphrase = ''
         self.rpc_wallet('upgradetohd', [words, mnemonic_passphrase, self._wallet_passphrase])

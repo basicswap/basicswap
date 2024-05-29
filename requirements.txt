@@ -5,4 +5,3 @@ python-gnupg
 Jinja2
 pycryptodome
 PySocks
-mnemonic

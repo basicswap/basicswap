@@ -38,7 +38,6 @@ setuptools.setup(
         "Jinja2",
         "pycryptodome",
         "PySocks",
-        "mnemonic",
     ],
     entry_points={
         "console_scripts": [

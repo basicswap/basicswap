@@ -61,7 +61,7 @@ from basicswap.interface.contrib.nav_test_framework.script import (
 from bin.basicswap_run import startDaemon
 from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
 from tests.basicswap.test_xmr import test_delay_event, callnoderpc
-from mnemonic import Mnemonic
+from basicswap.contrib.mnemonic import Mnemonic
 
 from tests.basicswap.test_btc_xmr import TestFunctions
 
@@ -152,7 +152,6 @@ class Test(TestFunctions):
         if not cls.restore_instance:
             seed_hex = cls.nav_seeds[i]
             mnemonic = Mnemonic('english').to_mnemonic(bytes.fromhex(seed_hex))
-            print('mnemonic', mnemonic)
             extra_opts.append(f'-importmnemonic={mnemonic}')
             data_dir = prepareDataDir(cfg.TEST_DATADIRS, i, 'navcoin.conf', 'nav_', base_p2p_port=NAV_BASE_PORT, base_rpc_port=NAV_BASE_RPC_PORT)
 
