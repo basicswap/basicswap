@@ -21,6 +21,7 @@ from basicswap.interface.btc import (
 )
 from basicswap.rpc import make_rpc_func
 from basicswap.chainparams import Coins
+from basicswap.contrib.mnemonic import Mnemonic
 from basicswap.interface.contrib.nav_test_framework.mininode import (
     CTxIn,
     CTxOut,
@@ -52,7 +53,6 @@ from basicswap.interface.contrib.nav_test_framework.script import (
     SIGHASH_ALL,
     SegwitVersion1SignatureHash,
 )
-from mnemonic import Mnemonic
 
 
 class NAVInterface(BTCInterface):
@@ -77,7 +77,7 @@ class NAVInterface(BTCInterface):
         # p2sh-p2wsh
         return True
 
-    def seedToMnemonic(self, key: bytes) -> None:
+    def entropyToMnemonic(self, key: bytes) -> None:
         return Mnemonic('english').to_mnemonic(key)
 
     def initialiseWallet(self, key):

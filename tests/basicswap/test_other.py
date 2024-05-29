@@ -22,6 +22,7 @@ from coincurve.ecdsaotves import (
 from coincurve.keys import (
     PrivateKey)
 
+from basicswap.contrib.mnemonic import Mnemonic
 from basicswap.util import i2b, h2b
 from basicswap.util.address import decodeAddress
 from basicswap.util.crypto import ripemd160, hash160, blake256
@@ -32,6 +33,7 @@ from basicswap.util.rfc2440 import rfc2440_hash_password
 from basicswap.util_xmr import encode_address as xmr_encode_address
 from basicswap.interface.btc import BTCInterface
 from basicswap.interface.xmr import XMRInterface
+from tests.basicswap.mnemonics import mnemonics
 from tests.basicswap.util import REQUIRED_SETTINGS
 
 from basicswap.basicswap_util import (
@@ -489,7 +491,6 @@ class Test(unittest.TestCase):
             assert (blake256(data).hex() == expect_hash)
 
     def test_extkey(self):
-
         test_key = 'XPARHAr37YxmFP8wyjkaHAQWmp84GiyLikL7EL8j9BCx4LkB8Q1Bw5Kr8sA1GA3Ym53zNLcaxxFHr6u81JVTeCaD61c6fKS1YRAuti8Zu5SzJCjh'
         test_key_c0 = 'XPARHAt1XMcNYAwP5wEnQXknBAkGSzaetdZt2eoJZehdB4WXfV1xbSjpgHe44AivmumcSejW5KaYx6L5M6MyR1WyXrsWTwaiUEfHq2RrqCfXj3ZW'
         test_key_c0_p = 'PPARTKPL4rp5WLnrYP6jZfuRjx6jrmvbsz5QdHofPfFqJdm918mQwdPLq6Dd9TkdbQeKUqjbHWkyzWe7Pftd7itzm7ETEoUMq4cbG4fY9FKH1YSU'
@@ -518,6 +519,12 @@ class Test(unittest.TestCase):
 
         ek_c0_p_data = decodeAddress(test_key_c0_p)[4:]
         assert (m_0.encode_p() == ek_c0_p_data)
+
+    def test_mnemonic(self):
+        entropy0: bytes = Mnemonic('english').to_entropy(mnemonics[0])
+        assert (entropy0.hex() == '0002207e9b744ea2d7ab41702f31f000')
+        mnemonic_recovered: str = Mnemonic('english').to_mnemonic(entropy0)
+        assert (mnemonic_recovered == mnemonics[0])
 
 
 if __name__ == '__main__':
