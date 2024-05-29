@@ -46,7 +46,7 @@ class BaseApp:
         self.settings = settings
         self.coin_clients = {}
         self.coin_interfaces = {}
-        self.mxDB = threading.RLock()
+        self.mxDB = threading.Lock()
         self.debug = self.settings.get('debug', False)
         self.delay_event = threading.Event()
         self.chainstate_delay_event = threading.Event()

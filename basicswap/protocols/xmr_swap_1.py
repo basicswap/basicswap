@@ -1,10 +1,8 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2020-2023 tecnovert
+# Copyright (c) 2020-2024 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
-
-from sqlalchemy.orm import scoped_session
 
 from basicswap.util import (
     ensure,
@@ -45,7 +43,7 @@ def addLockRefundSigs(self, xmr_swap, ci):
 def recoverNoScriptTxnWithKey(self, bid_id: bytes, encoded_key):
     self.log.info('Manually recovering %s', bid_id.hex())
     # Manually recover txn if other key is known
-    session = scoped_session(self.session_factory)
+    session = self.openSession()
     try:
         bid, xmr_swap = self.getXmrBidFromSession(session, bid_id)
         ensure(bid, 'Bid not found: {}.'.format(bid_id.hex()))
@@ -86,8 +84,7 @@ def recoverNoScriptTxnWithKey(self, bid_id: bytes, encoded_key):
 
         return txid
     finally:
-        session.close()
-        session.remove()
+        self.closeSession(session, commit=False)
 
 
 def getChainBSplitKey(swap_client, bid, xmr_swap, offer):

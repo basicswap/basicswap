@@ -93,7 +93,7 @@ def upgradeDatabaseData(self, data_version):
                         created_at=now))
 
             self.db_data_version = CURRENT_DB_DATA_VERSION
-            self.setIntKVInSession('db_data_version', self.db_data_version, session)
+            self.setIntKV('db_data_version', self.db_data_version, session)
             session.commit()
             self.log.info('Upgraded database records to version {}'.format(self.db_data_version))
         finally:
@@ -314,7 +314,7 @@ def upgradeDatabase(self, db_version):
             session.execute('ALTER TABLE bids ADD COLUMN pkhash_buyer_to BLOB')
         if current_version != db_version:
             self.db_version = db_version
-            self.setIntKVInSession('db_version', db_version, session)
+            self.setIntKV('db_version', db_version, session)
             session.commit()
             session.close()
             session.remove()

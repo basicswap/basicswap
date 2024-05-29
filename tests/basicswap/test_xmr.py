@@ -1388,9 +1388,13 @@ class Test(BaseTest):
         js_0 = read_json_api(1800, 'wallets/part')
         node0_blind_before = js_0['blind_balance'] + js_0['blind_unconfirmed']
 
-        amt_swap = make_int(random.uniform(0.1, 2.0), scale=8, r=1)
-        rate_swap = make_int(random.uniform(2.0, 20.0), scale=8, r=1)
-        offer_id = swap_clients[0].postOffer(Coins.PART_BLIND, Coins.XMR, amt_swap, rate_swap, amt_swap, SwapTypes.XMR_SWAP)
+        coin_from = Coins.PART_BLIND
+        coin_to = Coins.XMR
+        ci_from = swap_clients[0].ci(coin_from)
+        ci_to = swap_clients[0].ci(coin_to)
+        amt_swap = ci_from.make_int(random.uniform(0.1, 2.0), r=1)
+        rate_swap = ci_to.make_int(random.uniform(0.2, 20.0), r=1)
+        offer_id = swap_clients[0].postOffer(coin_from, coin_to, amt_swap, rate_swap, amt_swap, SwapTypes.XMR_SWAP)
         wait_for_offer(test_delay_event, swap_clients[1], offer_id)
         offers = swap_clients[0].listOffers(filters={'offer_id': offer_id})
         offer = offers[0]

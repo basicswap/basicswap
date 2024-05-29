@@ -345,9 +345,8 @@ def run_test_ads_both_refund(self, coin_from: Coins, coin_to: Coins, lock_value:
     ci_from = swap_clients[id_offerer].ci(coin_from)
     ci_to = swap_clients[id_offerer].ci(coin_to)
 
-    if reverse_bid:
-        self.prepare_balance(coin_to, 100.0, 1801, 1800)
-        self.prepare_balance(coin_from, 100.0, 1800, 1801)
+    self.prepare_balance(coin_to, 100.0, 1801, 1800)
+    self.prepare_balance(coin_from, 100.0, 1800, 1801)
 
     id_leader: int = id_bidder if reverse_bid else id_offerer
     id_follower: int = id_offerer if reverse_bid else id_bidder
