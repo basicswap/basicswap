@@ -18,7 +18,7 @@ cache:
   directories:
     - "$BIN_DIR"
 before_install:
-  - sudo apt-get install -y wget python3-pip gnupg unzip protobuf-compiler automake libtool pkg-config
+  - sudo apt-get install -y wget python3-pip gnupg unzip automake libtool pkg-config
 install:
   - travis_retry pip install tox pytest
 before_script:

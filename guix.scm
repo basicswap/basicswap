@@ -14,7 +14,6 @@
 #:use-module (gnu packages databases)
 #:use-module (gnu packages finance)
 #:use-module (gnu packages gnupg)
-#:use-module (gnu packages protobuf)
 #:use-module (gnu packages python)
 #:use-module (gnu packages python-build)
 #:use-module (gnu packages python-crypto)
@@ -150,7 +149,6 @@
     python-coincurve-anonswap
     python-pycryptodome
     python-pytest
-    python-protobuf
     python-sqlalchemy-1.4.39
     python-pyzmq
     python-gnupg

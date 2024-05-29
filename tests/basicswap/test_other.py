@@ -42,14 +42,8 @@ from basicswap.util import (
     format_amount,
     DeserialiseNum,
     validate_amount)
-
-from basicswap.messages_pb2 import (
-    BidMessage,
-    BidMessage_test,
-    OfferMessage,
-)
 from basicswap.messages_npb import (
-    OfferMessage as OfferMessage_npb,
+    BidMessage,
 )
 from basicswap.contrib.test_framework.script import hash160 as hash160_btc
 
@@ -417,49 +411,31 @@ class Test(unittest.TestCase):
         assert (hash160_btc(input_data).hex() == '072985b3583a4a71f548494a5e1d5f6b00d0fe13')
 
     def test_protobuf(self):
-        # Ensure old protobuf templates can be read
-
-        msg_buf = BidMessage_test()
+        msg_buf = BidMessage()
         msg_buf.protocol_version = 2
         msg_buf.time_valid = 1024
-        serialised_msg = msg_buf.SerializeToString()
+        serialised_msg = msg_buf.to_bytes()
 
-        msg_buf_v2 = BidMessage()
-        msg_buf_v2.ParseFromString(serialised_msg)
-        assert (msg_buf_v2.protocol_version == 2)
-        assert (msg_buf_v2.time_valid == 1024)
-        assert (msg_buf_v2.amount == 0)
-        assert (msg_buf_v2.pkhash_buyer is not None)
-        assert (len(msg_buf_v2.pkhash_buyer) == 0)
+        msg_buf_2 = BidMessage()
+        msg_buf_2.from_bytes(serialised_msg)
+        assert (msg_buf_2.protocol_version == 2)
+        assert (msg_buf_2.time_valid == 1024)
+        assert (msg_buf_2.amount == 0)
+        assert (msg_buf_2.pkhash_buyer is not None)
+        assert (len(msg_buf_2.pkhash_buyer) == 0)
 
         # Decode only the first field
-        msg_buf_v2.ParseFromString(serialised_msg[:2])
-        assert (msg_buf_v2.protocol_version == 2)
-        assert (msg_buf_v2.time_valid == 0)
+        msg_buf_3 = BidMessage()
+        msg_buf_3.from_bytes(serialised_msg[:2])
+        assert (msg_buf_3.protocol_version == 2)
+        assert (msg_buf_3.time_valid == 0)
 
-        msg_buf = OfferMessage()
-        msg_buf.protocol_version = 2
-        msg_buf.amount_from = 1024
-        msg_buf.amount_to = 0  # test if it gets encoded
-        msg_buf.pkhash_seller = bytes((1,)) * 32
-        msg_buf.proof_address = 'a string'
-        msg_buf.amount_negotiable = True
-        msg_buf.rate_negotiable = False
-        msg_buf.fee_rate_to = 2485
-        pb_serialised_msg = msg_buf.SerializeToString()
-
-        npb = OfferMessage_npb()
-        npb.from_bytes(pb_serialised_msg)
-        assert (npb.protocol_version == msg_buf.protocol_version)
-        assert (npb.amount_from == msg_buf.amount_from)
-        assert (npb.amount_to == msg_buf.amount_to)
-        assert (npb.pkhash_seller == msg_buf.pkhash_seller)
-        assert (npb.proof_address == msg_buf.proof_address)
-        assert (npb.amount_negotiable == msg_buf.amount_negotiable)
-        assert (npb.fee_rate_to == msg_buf.fee_rate_to)
-
-        npb_serialised_msg = npb.to_bytes()
-        assert (npb_serialised_msg == pb_serialised_msg)
+        try:
+            msg_buf_4 = BidMessage(doesnotexist=1)
+        except Exception as e:
+            assert ('unexpected keyword argument' in str(e))
+        else:
+            raise ValueError('Should have errored.')
 
     def test_is_private_ip_address(self):
         test_addresses = [

@@ -1,3 +1,14 @@
+0.13.2
+==============
+
+- Remove protobuf and protoc dependencies.
+
+
+0.13.1
+==============
+
+- coins: Add Decred.
+
 
 0.13.0
 ==============
