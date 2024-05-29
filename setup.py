@@ -33,7 +33,6 @@ setuptools.setup(
     install_requires=[
         "wheel",
         "pyzmq",
-        "protobuf",
         "sqlalchemy==1.4.39",
         "python-gnupg",
         "Jinja2",

@@ -21,7 +21,7 @@ test_task:
     - XMR_BINDIR: ${BIN_DIR}/monero
   setup_script:
     - apt-get update
-    - apt-get install -y wget python3-pip gnupg unzip protobuf-compiler automake libtool pkg-config
+    - apt-get install -y wget python3-pip gnupg unzip automake libtool pkg-config
     - pip install tox pytest
     - python3 setup.py install
     - wget -O coincurve-anonswap.zip https://github.com/tecnovert/coincurve/archive/refs/tags/anonswap_v0.2.zip

@@ -66,21 +66,19 @@ from .chainparams import (
 from .script import (
     OpCodes,
 )
-from .messages_pb2 import (
-    BidMessage,
-    BidAcceptMessage,
-    XmrBidMessage,
-    XmrBidAcceptMessage,
-    XmrSplitMessage,
-    XmrBidLockTxSigsMessage,
-    XmrBidLockSpendTxMessage,
-    XmrBidLockReleaseMessage,
-    OfferRevokeMessage,
-    ADSBidIntentMessage,
-    ADSBidIntentAcceptMessage,
-)
 from .messages_npb import (
+    ADSBidIntentAcceptMessage,
+    ADSBidIntentMessage,
+    BidAcceptMessage,
+    BidMessage,
     OfferMessage,
+    OfferRevokeMessage,
+    XmrBidAcceptMessage,
+    XmrBidLockReleaseMessage,
+    XmrBidLockSpendTxMessage,
+    XmrBidLockTxSigsMessage,
+    XmrBidMessage,
+    XmrSplitMessage,
 )
 from .db import (
     CURRENT_DB_VERSION,
@@ -1778,7 +1776,7 @@ class BasicSwap(BaseApp):
 
             msg_buf.signature = base64.b64decode(signature_enc)
 
-            msg_bytes = msg_buf.SerializeToString()
+            msg_bytes = msg_buf.to_bytes()
             payload_hex = str.format('{:02x}', MessageTypes.OFFER_REVOKE) + msg_bytes.hex()
 
             msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR, offer.time_valid)
@@ -2407,7 +2405,7 @@ class BasicSwap(BaseApp):
             else:
                 raise ValueError('TODO')
 
-            bid_bytes = msg_buf.SerializeToString()
+            bid_bytes = msg_buf.to_bytes()
             payload_hex = str.format('{:02x}', MessageTypes.BID) + bid_bytes.hex()
 
             bid_addr = self.newSMSGAddress(use_type=AddressTypes.BID)[0] if addr_send_from is None else addr_send_from
@@ -2694,7 +2692,7 @@ class BasicSwap(BaseApp):
             if bid.pkhash_seller != pkhash_refund:
                 msg_buf.pkhash_seller = bid.pkhash_seller
 
-            bid_bytes = msg_buf.SerializeToString()
+            bid_bytes = msg_buf.to_bytes()
             payload_hex = str.format('{:02x}', MessageTypes.BID_ACCEPT) + bid_bytes.hex()
 
             msg_valid: int = self.getAcceptBidMsgValidTime(bid)
@@ -2715,7 +2713,7 @@ class BasicSwap(BaseApp):
             sequence=1,
             dleag=dleag[16000:32000]
         )
-        msg_bytes = msg_buf2.SerializeToString()
+        msg_bytes = msg_buf2.to_bytes()
         payload_hex = str.format('{:02x}', MessageTypes.XMR_BID_SPLIT) + msg_bytes.hex()
         bid_msg_ids[1] = self.sendSmsg(addr_from, addr_to, payload_hex, msg_valid)
 
@@ -2725,7 +2723,7 @@ class BasicSwap(BaseApp):
             sequence=2,
             dleag=dleag[32000:]
         )
-        msg_bytes = msg_buf3.SerializeToString()
+        msg_bytes = msg_buf3.to_bytes()
         payload_hex = str.format('{:02x}', MessageTypes.XMR_BID_SPLIT) + msg_bytes.hex()
         bid_msg_ids[2] = self.sendSmsg(addr_from, addr_to, payload_hex, msg_valid)
 
@@ -2776,7 +2774,7 @@ class BasicSwap(BaseApp):
                 msg_buf.amount_from = amount
                 msg_buf.amount_to = amount_to
 
-                bid_bytes = msg_buf.SerializeToString()
+                bid_bytes = msg_buf.to_bytes()
                 payload_hex = str.format('{:02x}', MessageTypes.ADS_BID_LF) + bid_bytes.hex()
 
                 xmr_swap = XmrSwap()
@@ -2865,7 +2863,7 @@ class BasicSwap(BaseApp):
             msg_buf.pkaf = xmr_swap.pkaf
             msg_buf.kbvf = kbvf
 
-            bid_bytes = msg_buf.SerializeToString()
+            bid_bytes = msg_buf.to_bytes()
             payload_hex = str.format('{:02x}', MessageTypes.XMR_BID_FL) + bid_bytes.hex()
 
             bid_addr = self.newSMSGAddress(use_type=AddressTypes.BID)[0] if addr_send_from is None else addr_send_from
@@ -3066,7 +3064,7 @@ class BasicSwap(BaseApp):
             msg_buf.a_lock_refund_spend_tx = xmr_swap.a_lock_refund_spend_tx
             msg_buf.al_lock_refund_tx_sig = xmr_swap.al_lock_refund_tx_sig
 
-            msg_bytes = msg_buf.SerializeToString()
+            msg_bytes = msg_buf.to_bytes()
             payload_hex = str.format('{:02x}', MessageTypes.XMR_BID_ACCEPT_LF) + msg_bytes.hex()
 
             addr_from: str = bid.bid_addr if reverse_bid else offer.addr_from
@@ -3155,7 +3153,7 @@ class BasicSwap(BaseApp):
             msg_buf.kbvf = kbvf
             msg_buf.kbsf_dleag = xmr_swap.kbsf_dleag if len(xmr_swap.kbsf_dleag) < 16000 else xmr_swap.kbsf_dleag[:16000]
 
-            bid_bytes = msg_buf.SerializeToString()
+            bid_bytes = msg_buf.to_bytes()
             payload_hex = str.format('{:02x}', MessageTypes.ADS_BID_ACCEPT_FL) + bid_bytes.hex()
 
             addr_from: str = offer.addr_from
@@ -4809,7 +4807,7 @@ class BasicSwap(BaseApp):
     def processOffer(self, msg) -> None:
         offer_bytes = bytes.fromhex(msg['hex'][2:-2])
 
-        offer_data = OfferMessage()
+        offer_data = OfferMessage(init_all=False)
         try:
             offer_data.from_bytes(offer_bytes[:2], init_all=False)
             ensure(offer_data.protocol_version >= MINPROTO_VERSION and offer_data.protocol_version <= MAXPROTO_VERSION, 'protocol_version out of range')
@@ -4937,8 +4935,8 @@ class BasicSwap(BaseApp):
         ensure(msg['to'] == self.network_addr, 'Message received on wrong address')
 
         msg_bytes = bytes.fromhex(msg['hex'][2:-2])
-        msg_data = OfferRevokeMessage()
-        msg_data.ParseFromString(msg_bytes)
+        msg_data = OfferRevokeMessage(init_all=False)
+        msg_data.from_bytes(msg_bytes)
 
         now: int = self.getTime()
         try:
@@ -5086,8 +5084,8 @@ class BasicSwap(BaseApp):
         self.log.debug('Processing bid msg %s', msg['msgid'])
         now: int = self.getTime()
         bid_bytes = bytes.fromhex(msg['hex'][2:-2])
-        bid_data = BidMessage()
-        bid_data.ParseFromString(bid_bytes)
+        bid_data = BidMessage(init_all=False)
+        bid_data.from_bytes(bid_bytes)
 
         # Validate bid data
         ensure(bid_data.protocol_version >= MINPROTO_VERSION_SECRET_HASH, 'Invalid protocol version')
@@ -5174,8 +5172,8 @@ class BasicSwap(BaseApp):
         self.log.debug('Processing bid accepted msg %s', msg['msgid'])
         now: int = self.getTime()
         bid_accept_bytes = bytes.fromhex(msg['hex'][2:-2])
-        bid_accept_data = BidAcceptMessage()
-        bid_accept_data.ParseFromString(bid_accept_bytes)
+        bid_accept_data = BidAcceptMessage(init_all=False)
+        bid_accept_data.from_bytes(bid_accept_bytes)
 
         ensure(len(bid_accept_data.bid_msg_id) == 28, 'Bad bid_msg_id length')
         ensure(len(bid_accept_data.initiate_txid) == 32, 'Bad initiate_txid length')
@@ -5393,8 +5391,8 @@ class BasicSwap(BaseApp):
         self.log.debug('Processing adaptor-sig bid msg %s', msg['msgid'])
         now: int = self.getTime()
         bid_bytes = bytes.fromhex(msg['hex'][2:-2])
-        bid_data = XmrBidMessage()
-        bid_data.ParseFromString(bid_bytes)
+        bid_data = XmrBidMessage(init_all=False)
+        bid_data.from_bytes(bid_bytes)
 
         # Validate data
         ensure(bid_data.protocol_version >= MINPROTO_VERSION_ADAPTOR_SIG, 'Invalid protocol version')
@@ -5481,8 +5479,8 @@ class BasicSwap(BaseApp):
         self.log.debug('Processing adaptor-sig bid accept msg %s', msg['msgid'])
         now: int = self.getTime()
         msg_bytes = bytes.fromhex(msg['hex'][2:-2])
-        msg_data = XmrBidAcceptMessage()
-        msg_data.ParseFromString(msg_bytes)
+        msg_data = XmrBidAcceptMessage(init_all=False)
+        msg_data.from_bytes(msg_bytes)
 
         ensure(len(msg_data.bid_msg_id) == 28, 'Bad bid_msg_id length')
 
@@ -5618,7 +5616,7 @@ class BasicSwap(BaseApp):
                 af_lock_refund_tx_sig=xmr_swap.af_lock_refund_tx_sig
             )
 
-            msg_bytes = msg_buf.SerializeToString()
+            msg_bytes = msg_buf.to_bytes()
             payload_hex = str.format('{:02x}', MessageTypes.XMR_BID_TXN_SIGS_FL) + msg_bytes.hex()
 
             msg_valid: int = self.getActiveBidMsgValidTime()
@@ -5825,7 +5823,7 @@ class BasicSwap(BaseApp):
             bid_msg_id=bid_id,
             al_lock_spend_tx_esig=xmr_swap.al_lock_spend_tx_esig)
 
-        msg_bytes = msg_buf.SerializeToString()
+        msg_bytes = msg_buf.to_bytes()
         payload_hex = str.format('{:02x}', MessageTypes.XMR_BID_LOCK_RELEASE_LF) + msg_bytes.hex()
 
         addr_send_from: str = bid.bid_addr if reverse_bid else offer.addr_from
@@ -6056,7 +6054,7 @@ class BasicSwap(BaseApp):
             a_lock_spend_tx=xmr_swap.a_lock_spend_tx,
             kal_sig=xmr_swap.kal_sig)
 
-        msg_bytes = msg_buf.SerializeToString()
+        msg_bytes = msg_buf.to_bytes()
         payload_hex = str.format('{:02x}', MessageTypes.XMR_BID_LOCK_SPEND_TX_LF) + msg_bytes.hex()
 
         msg_valid: int = self.getActiveBidMsgValidTime()
@@ -6070,8 +6068,8 @@ class BasicSwap(BaseApp):
         self.log.debug('Processing xmr coin a follower lock sigs msg %s', msg['msgid'])
         now: int = self.getTime()
         msg_bytes = bytes.fromhex(msg['hex'][2:-2])
-        msg_data = XmrBidLockTxSigsMessage()
-        msg_data.ParseFromString(msg_bytes)
+        msg_data = XmrBidLockTxSigsMessage(init_all=False)
+        msg_data.from_bytes(msg_bytes)
 
         ensure(len(msg_data.bid_msg_id) == 28, 'Bad bid_msg_id length')
         bid_id = msg_data.bid_msg_id
@@ -6145,8 +6143,8 @@ class BasicSwap(BaseApp):
         self.log.debug('Processing adaptor-sig bid lock spend tx msg %s', msg['msgid'])
         now: int = self.getTime()
         msg_bytes = bytes.fromhex(msg['hex'][2:-2])
-        msg_data = XmrBidLockSpendTxMessage()
-        msg_data.ParseFromString(msg_bytes)
+        msg_data = XmrBidLockSpendTxMessage(init_all=False)
+        msg_data.from_bytes(msg_bytes)
 
         ensure(len(msg_data.bid_msg_id) == 28, 'Bad bid_msg_id length')
         bid_id = msg_data.bid_msg_id
@@ -6201,8 +6199,8 @@ class BasicSwap(BaseApp):
         self.log.debug('Processing xmr split msg %s', msg['msgid'])
         now: int = self.getTime()
         msg_bytes = bytes.fromhex(msg['hex'][2:-2])
-        msg_data = XmrSplitMessage()
-        msg_data.ParseFromString(msg_bytes)
+        msg_data = XmrSplitMessage(init_all=False)
+        msg_data.from_bytes(msg_bytes)
 
         # Validate data
         ensure(len(msg_data.msg_id) == 28, 'Bad msg_id length')
@@ -6235,8 +6233,8 @@ class BasicSwap(BaseApp):
         self.log.debug('Processing adaptor-sig swap lock release msg %s', msg['msgid'])
         now: int = self.getTime()
         msg_bytes = bytes.fromhex(msg['hex'][2:-2])
-        msg_data = XmrBidLockReleaseMessage()
-        msg_data.ParseFromString(msg_bytes)
+        msg_data = XmrBidLockReleaseMessage(init_all=False)
+        msg_data.from_bytes(msg_bytes)
 
         # Validate data
         ensure(len(msg_data.bid_msg_id) == 28, 'Bad msg_id length')
@@ -6285,8 +6283,8 @@ class BasicSwap(BaseApp):
 
         now: int = self.getTime()
         bid_bytes = bytes.fromhex(msg['hex'][2:-2])
-        bid_data = ADSBidIntentMessage()
-        bid_data.ParseFromString(bid_bytes)
+        bid_data = ADSBidIntentMessage(init_all=False)
+        bid_data.from_bytes(bid_bytes)
 
         # Validate data
         ensure(bid_data.protocol_version >= MINPROTO_VERSION_ADAPTOR_SIG, 'Invalid protocol version')
@@ -6370,8 +6368,8 @@ class BasicSwap(BaseApp):
 
         now: int = self.getTime()
         msg_bytes = bytes.fromhex(msg['hex'][2:-2])
-        msg_data = ADSBidIntentAcceptMessage()
-        msg_data.ParseFromString(msg_bytes)
+        msg_data = ADSBidIntentAcceptMessage(init_all=False)
+        msg_data.from_bytes(msg_bytes)
 
         bid_id = msg_data.bid_msg_id
         bid, xmr_swap = self.getXmrBid(bid_id)

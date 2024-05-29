@@ -7,6 +7,8 @@
 
 
 '''
+syntax = "proto3";
+
 0 VARINT int32, int64, uint32, uint64, sint32, sint64, bool, enum
 1 I64 fixed64, sfixed64, double
 2 LEN string, bytes, embedded messages, packed repeated fields
@@ -14,12 +16,45 @@
 
 Don't encode fields of default values.
 When decoding initialise all fields not set from data.
+
+protobuf ParseFromString would reset the whole object, from_bytes won't.
 '''
 
 from basicswap.util.integer import encode_varint, decode_varint
 
 
 class NonProtobufClass():
+    def __init__(self, init_all: bool = True, **kwargs):
+        for key, value in kwargs.items():
+            found_field: bool = False
+            for field_num, v in self._map.items():
+                field_name, wire_type, field_type = v
+                if field_name == key:
+                    setattr(self, field_name, value)
+                    found_field = True
+                    break
+            if found_field is False:
+                raise ValueError(f'got an unexpected keyword argument \'{key}\'')
+
+        if init_all:
+            self.init_fields()
+
+    def init_fields(self) -> None:
+        # Set default values for missing fields
+        for field_num, v in self._map.items():
+            field_name, wire_type, field_type = v
+            if hasattr(self, field_name):
+                continue
+            if wire_type == 0:
+                setattr(self, field_name, 0)
+            elif wire_type == 2:
+                if field_type == 1:
+                    setattr(self, field_name, str())
+                else:
+                    setattr(self, field_name, bytes())
+            else:
+                raise ValueError(f'Unknown wire_type {wire_type}')
+
     def to_bytes(self) -> bytes:
         rv = bytes()
 
@@ -74,22 +109,8 @@ class NonProtobufClass():
 
             setattr(self, field_name, field_value)
 
-        if not init_all:
-            return
-        # Set default values for missing fields
-        for field_num, v in self._map.items():
-            field_name, wire_type, field_type = v
-            if hasattr(self, field_name):
-                continue
-            if wire_type == 0:
-                setattr(self, field_name, 0)
-            elif wire_type == 2:
-                if field_type == 1:
-                    setattr(self, field_name, str())
-                else:
-                    setattr(self, field_name, bytes())
-            else:
-                raise ValueError(f'Unknown wire_type {wire_type}')
+        if init_all:
+            self.init_fields()
 
 
 class OfferMessage(NonProtobufClass):

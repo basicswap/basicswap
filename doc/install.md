@@ -140,7 +140,7 @@ Continue from the [Run Using Docker](#run-using-docker) section.
 
 ### Ubuntu Setup:
 
-    apt-get install -y wget git python3-venv python3-pip gnupg unzip protobuf-compiler automake libtool pkg-config curl jq
+    apt-get install -y wget git python3-venv python3-pip gnupg unzip automake libtool pkg-config curl jq
 
 ### OSX Setup:
 
@@ -182,7 +182,6 @@ From https://pypi.org/project/certifi/
 
 Continue installing Basicswap
 
-    protoc -I=basicswap --python_out=basicswap basicswap/messages.proto
     pip3 install .
 
 
