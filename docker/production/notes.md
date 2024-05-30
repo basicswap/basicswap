@@ -3,6 +3,13 @@
 This will setup Basicswap so that each coin runs in it's own container.
 
 
+### Coin notes
+
+    - Decred is only partially supported, the wallet will need to be initialised manually.
+
+
+## Setup
+
 Install dependencies:
 
     sudo apt install basez docker-compose
@@ -33,13 +40,14 @@ Create docker-compose config:
     # Using the helper script:
     ./scripts/build_yml_files.py -c bitcoin monero
 
-    # Or
+    # Or manually:
 
     cat compose-fragments/0_start.yml > docker-compose.yml
 
     # Add the relevant coin fragments
     cat compose-fragments/1_bitcoin.yml >> docker-compose.yml
     cat compose-fragments/1_litecoin.yml >> docker-compose.yml
+    cat compose-fragments/1_decred-wallet.yml >> docker-compose.yml
     cat compose-fragments/1_monero-wallet.yml >> docker-compose.yml
     cat compose-fragments/1_pivx.yml >> docker-compose.yml
     cat compose-fragments/1_dash.yml >> docker-compose.yml
@@ -121,6 +129,7 @@ Start BasicSwap:
     popd
 
     docker-compose build monero_daemon
+    docker-compose build decred_daemon
     docker-compose build
 
     docker-compose build --no-cache swapclient

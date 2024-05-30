@@ -1,0 +1,16 @@
+    monero_wallet:
+        image: i_decred_wallet
+        build:
+            context: decred_wallet
+            dockerfile: Dockerfile
+        container_name: decred_wallet
+        volumes:
+            - ${DATA_PATH}/decred_wallet:/data
+        expose:
+            - ${DCR_WALLET_RPC_PORT}
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "3"
+        restart: unless-stopped

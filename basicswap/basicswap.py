@@ -1071,8 +1071,6 @@ class BasicSwap(BaseApp):
                 key_str = 'main_wallet_seedid_alt_' + db_key_coin_name
                 self.setStringKV(key_str, legacy_root_hash.hex(), session)
 
-            session.commit()  # else get error database is locked!?
-
             # Clear any saved addresses
             self.clearStringKV('receive_addr_' + db_key_coin_name, session)
             self.clearStringKV('stealth_addr_' + db_key_coin_name, session)
@@ -1140,12 +1138,13 @@ class BasicSwap(BaseApp):
             if session is None:
                 self.closeSession(use_session, commit=False)
 
-    def clearStringKV(self, str_key: str, str_val: str) -> None:
+    def clearStringKV(self, str_key: str, session=None) -> None:
         try:
-            session = self.openSession()
-            session.execute('DELETE FROM kv_string WHERE key = :key', {'key': str_key})
+            use_session = self.openSession(session)
+            use_session.execute('DELETE FROM kv_string WHERE key = :key', {'key': str_key})
         finally:
-            self.closeSession(session)
+            if session is None:
+                self.closeSession(use_session)
 
     def getPreFundedTx(self, linked_type: int, linked_id: bytes, tx_type: int, session=None) -> Optional[bytes]:
         try:

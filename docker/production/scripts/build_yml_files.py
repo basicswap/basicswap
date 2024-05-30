@@ -66,6 +66,15 @@ def main():
                     for line in fp_in:
                         fp.write(line)
                 continue
+            if coin_name == 'decred':
+                with open(os.path.join(fragments_dir, '1_decred-wallet.yml'), 'rb') as fp_in:
+                    for line in fp_in:
+                        fp.write(line)
+                        fpp.write(line)
+                with open(os.path.join(fragments_dir, '8_decred-daemon.yml'), 'rb') as fp_in:
+                    for line in fp_in:
+                        fp.write(line)
+                continue
             with open(os.path.join(fragments_dir, f'1_{coin_name}.yml'), 'rb') as fp_in:
                 for line in fp_in:
                     fp.write(line)

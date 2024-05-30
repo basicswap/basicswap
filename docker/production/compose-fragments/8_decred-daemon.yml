@@ -1,0 +1,16 @@
+    monero_daemon:
+        image: i_decred_daemon
+        build:
+            context: decred_daemon
+            dockerfile: Dockerfile
+        container_name: decred_daemon
+        volumes:
+            - ${DATA_PATH}/decred_daemon:/data
+        expose:
+            - ${DCR_RPC_PORT}
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "3"
+        restart: unless-stopped
