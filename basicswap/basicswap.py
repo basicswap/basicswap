@@ -1174,16 +1174,17 @@ class BasicSwap(BaseApp):
         coin_from = Coins(offer.coin_from)
         coin_to = Coins(offer.coin_to)
 
+        reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from)
+        ci_from = self.ci(offer.coin_to if reverse_bid else offer.coin_from)
+        ci_to = self.ci(offer.coin_from if reverse_bid else offer.coin_to)
+
         if offer.swap_type == SwapTypes.XMR_SWAP:
             xmr_swap = session.query(XmrSwap).filter_by(bid_id=bid.bid_id).first()
             self.watchXmrSwap(bid, offer, xmr_swap, session)
-            if self.ci(coin_to).watch_blocks_for_scripts() and bid.xmr_a_lock_tx and bid.xmr_a_lock_tx.chain_height:
+            if ci_to.watch_blocks_for_scripts() and bid.xmr_a_lock_tx and bid.xmr_a_lock_tx.chain_height:
                 if not bid.xmr_b_lock_tx or not bid.xmr_b_lock_tx.txid:
-                    ci_from = self.ci(coin_from)
-                    ci_to = self.ci(coin_to)
                     chain_a_block_header = ci_from.getBlockHeaderFromHeight(bid.xmr_a_lock_tx.chain_height)
-                    block_time = chain_a_block_header['time']
-                    chain_b_block_header = ci_to.getBlockHeaderAt(block_time)
+                    chain_b_block_header = ci_to.getBlockHeaderAt(chain_a_block_header['time'])
                     dest_script = ci_to.getPkDest(xmr_swap.pkbs)
                     self.addWatchedScript(ci_to.coin_type(), bid.bid_id, dest_script, TxTypes.XMR_SWAP_B_LOCK)
                     self.setLastHeightCheckedStart(ci_to.coin_type(), chain_b_block_header['height'], session)
@@ -1195,10 +1196,12 @@ class BasicSwap(BaseApp):
             if bid.participate_tx and bid.participate_tx.txid:
                 self.addWatchedOutput(coin_to, bid.bid_id, bid.participate_tx.txid.hex(), bid.participate_tx.vout, BidStates.SWAP_PARTICIPATING)
 
-            if bid.participate_tx and bid.participate_tx.txid is None:
-                self.addWatchedScript(coin_to, bid.bid_id, self.ci(coin_to).getScriptDest(bid.participate_tx.script), TxTypes.PTX)
+            if ci_to.watch_blocks_for_scripts() and bid.participate_tx and bid.participate_tx.txid is None:
+                self.addWatchedScript(coin_to, bid.bid_id, ci_to.getScriptDest(bid.participate_tx.script), TxTypes.PTX)
                 if bid.initiate_tx and bid.initiate_tx.chain_height:
-                    self.setLastHeightCheckedStart(coin_to, bid.initiate_tx.chain_height, session)
+                    chain_a_block_header = ci_from.getBlockHeaderFromHeight(bid.initiate_tx.chain_height)
+                    chain_b_block_header = ci_to.getBlockHeaderAt(chain_a_block_header['time'])
+                    self.setLastHeightCheckedStart(coin_to, chain_b_block_header['height'], session)
 
             if self.coin_clients[coin_from]['last_height_checked'] < 1:
                 if bid.initiate_tx and bid.initiate_tx.chain_height:
