@@ -931,7 +931,7 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
         with open(core_conf_path, 'w') as fp:
             if chain != 'mainnet':
                 fp.write(chainname + '=1\n')
-            fp.write('debuglevel=debug\n')
+            fp.write('debuglevel=info\n')
             fp.write('notls=1\n')
 
             fp.write('rpclisten={}:{}\n'.format(core_settings['rpchost'], core_settings['rpcport']))
@@ -948,7 +948,7 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
         with open(wallet_conf_path, 'w') as fp:
             if chain != 'mainnet':
                 fp.write(chainname + '=1\n')
-            fp.write('debuglevel=debug\n')
+            fp.write('debuglevel=info\n')
             fp.write('noservertls=1\n')
             fp.write('noclienttls=1\n')
 

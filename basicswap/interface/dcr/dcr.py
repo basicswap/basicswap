@@ -378,7 +378,16 @@ class DCRInterface(Secp256k1Interface):
         return self.rpc('getnetworkinfo')['version']
 
     def getBlockchainInfo(self):
-        return self.rpc('getblockchaininfo')
+        bci = self.rpc('getblockchaininfo')
+
+        # Adjust verificationprogress to consider blocks wallet has synced
+        wallet_blocks = self.rpc_wallet('getinfo')['blocks']
+        synced_ind = bci['verificationprogress']
+        wallet_synced_ind = wallet_blocks / bci['headers']
+        if wallet_synced_ind < synced_ind:
+            bci['verificationprogress'] = wallet_synced_ind
+
+        return bci
 
     def getWalletInfo(self):
         rv = {}
