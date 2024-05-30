@@ -1295,7 +1295,7 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
             if not swap_client.use_tor_proxy:
                 # Cannot set -bind or -whitebind together with -listen=0
                 daemon_args.append('-nolisten')
-            coins_to_create_wallets_for = (Coins.PART, Coins.BTC, Coins.LTC, Coins.DASH)
+            coins_to_create_wallets_for = (Coins.PART, Coins.BTC, Coins.LTC, Coins.DCR, Coins.DASH)
             # Always start Particl, it must be running to initialise a wallet in addcoin mode
             # Particl must be loaded first as subsequent coins are initialised from the Particl mnemonic
             start_daemons = ['particl', ] + [c for c in with_coins if c != 'particl']
@@ -1322,8 +1322,10 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
                 swap_client.setCoinRunParams(c)
                 swap_client.createCoinInterface(c)
 
-                if c == Coins.DCR:
-                    if coin_settings['manage_wallet_daemon']:
+                if c in coins_to_create_wallets_for:
+                    if c == Coins.DCR:
+                        if coin_settings['manage_wallet_daemon'] is False:
+                            continue
                         from basicswap.interface.dcr.util import createDCRWallet
 
                         dcr_password = coin_settings['wallet_pwd'] if WALLET_ENCRYPTION_PWD == '' else WALLET_ENCRYPTION_PWD
@@ -1335,7 +1337,7 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
                         args = [os.path.join(coin_settings['bindir'], filename), '--create'] + extra_opts
                         hex_seed = swap_client.getWalletKey(Coins.DCR, 1).hex()
                         createDCRWallet(args, hex_seed, logger, threading.Event())
-                if c in coins_to_create_wallets_for:
+                        continue
                     swap_client.waitForDaemonRPC(c, with_wallet=False)
                     # Create wallet if it doesn't exist yet
                     wallets = swap_client.callcoinrpc(c, 'listwallets')
