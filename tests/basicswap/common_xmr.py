@@ -126,7 +126,10 @@ def run_prepare(node_id, datadir_path, bins_path, with_coins, mnemonic_in=None, 
     with patch.object(sys, 'argv', testargs), patch('sys.stdout', new=StringIO()) as mocked_stdout:
         prepareSystem.main()
         lines = mocked_stdout.getvalue().split('\n')
-        mnemonic_out = lines[-4]
+        if mnemonic_in is None:
+            mnemonic_out = lines[-4]
+        else:
+            mnemonic_out = mnemonic_in
 
     with open(config_path) as fs:
         settings = json.load(fs)

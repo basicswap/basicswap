@@ -1432,6 +1432,9 @@ class DCRInterface(Secp256k1Interface):
             return {'txid': txid_hex, 'amount': 0, 'height': block_height}
         return None
 
+    def encodeSharedAddress(self, Kbv, Kbs):
+        return self.pkh_to_address(self.pkh(Kbs))
+
     def isTxExistsError(self, err_str: str) -> bool:
         return 'transaction already exists' in err_str or 'already have transaction' in err_str
 
