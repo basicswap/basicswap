@@ -200,15 +200,14 @@ def runClient(fp, data_dir, chain, start_only_coins):
     try:
         # Try start daemons
         for c, v in settings['chainclients'].items():
-
             if len(start_only_coins) > 0 and c not in start_only_coins:
                 continue
             try:
                 coin_id = swap_client.getCoinIdFromName(c)
                 display_name = getCoinName(coin_id)
             except Exception as e:
-                logger.warning('Error getting coin display name for {}: {}'.format(c, str(e)))
-                display_name = 'Unknown'
+                logger.warning('Not starting unknown coin: {}'.format(c))
+                continue
             if c == 'monero':
                 if v['manage_daemon'] is True:
                     swap_client.log.info(f'Starting {display_name} daemon')

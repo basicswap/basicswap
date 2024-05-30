@@ -1556,24 +1556,24 @@ def main():
                 particl_wallet_mnemonic = s[1].strip('"')
                 continue
             if name in ('withcoin', 'withcoins'):
-                for coin in [s.lower() for s in s[1].split(',')]:
+                for coin in [s.strip().lower() for s in s[1].split(',')]:
                     ensure_coin_valid(coin)
                     with_coins.add(coin)
                 coins_changed = True
                 continue
             if name in ('withoutcoin', 'withoutcoins'):
-                for coin in [s.lower() for s in s[1].split(',')]:
+                for coin in [s.strip().lower() for s in s[1].split(',')]:
                     ensure_coin_valid(coin, test_disabled=False)
                     with_coins.discard(coin)
                 coins_changed = True
                 continue
             if name == 'addcoin':
-                add_coin = s[1].lower()
+                add_coin = s[1].strip().lower()
                 ensure_coin_valid(add_coin)
                 with_coins = {add_coin, }
                 continue
             if name == 'disablecoin':
-                disable_coin = s[1].lower()
+                disable_coin = s[1].strip().lower()
                 ensure_coin_valid(disable_coin, test_disabled=False)
                 continue
             if name == 'htmlhost':
