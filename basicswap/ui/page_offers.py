@@ -602,7 +602,7 @@ def page_offer(self, url_split, post_string):
         'created_at': offer.created_at,
         'expired_at': offer.expire_at,
         'sent': offer.was_sent,
-        'was_revoked': 'True' if offer.active_ind == 2 else 'False',
+        'was_revoked': True if offer.active_ind == 2 else False,
         'show_bid_form': show_bid_form,
         'show_edit_form': show_edit_form,
         'amount_negotiable': offer.amount_negotiable,
