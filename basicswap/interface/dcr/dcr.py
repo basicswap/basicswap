@@ -1315,6 +1315,17 @@ class DCRInterface(Secp256k1Interface):
         ofs += 1
         return tx.vin[0].signature_script[ofs: ofs + sig_len]
 
+    def listInputs(self, tx_bytes: bytes):
+        tx = self.loadTx(tx_bytes)
+
+        all_locked = self.rpc_wallet('listlockunspent')
+        inputs = []
+        for txi in tx.vin:
+            txid_hex = i2h(txi.prevout.hash)
+            islocked = any([txid_hex == a['txid'] and txi.prevout.n == a['vout'] for a in all_locked])
+            inputs.append({'txid': txid_hex, 'vout': txi.prevout.n, 'islocked': islocked})
+        return inputs
+
     def unlockInputs(self, tx_bytes):
         tx = self.loadTx(tx_bytes)
 
