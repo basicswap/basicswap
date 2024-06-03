@@ -42,7 +42,6 @@ from tests.basicswap.common import (
     compare_bid_states,
     compare_bid_states_unordered,
     stopDaemons,
-    wait_for_balance,
     wait_for_bid,
     wait_for_bid_tx_state,
     wait_for_offer,
@@ -207,7 +206,7 @@ def run_test_bad_ptx(self, coin_from: Coins, coin_to: Coins):
     offerer_states = read_json_api(1800 + node_from, path)
     bidder_states = read_json_api(1800 + node_to, path)
 
-    if coin_to not in (Coins.XMR,):
+    if coin_to not in (Coins.XMR, Coins.WOW):
         return
     # Hard to get the timing right
     assert (compare_bid_states_unordered(offerer_states, self.states_offerer_sh[1]) is True)
@@ -312,14 +311,14 @@ def run_test_ads_success_path(self, coin_from: Coins, coin_to: Coins):
 
     node_from_ci_to = swap_clients[0].ci(coin_to)
     max_fee: int = 10000
-    if node_from_ci_to.coin_type() in (Coins.XMR, ):
+    if node_from_ci_to.coin_type() in (Coins.XMR, Coins.WOW):
         pass
     else:
         wtx = node_from_ci_to.rpc_wallet('gettransaction', [bid.xmr_b_lock_tx.spend_txid.hex(),])
         assert (bid.amount_to - node_from_ci_to.make_int(wtx['details'][0]['amount']) < max_fee)
 
     node_to_ci_from = swap_clients[1].ci(coin_from)
-    if node_to_ci_from.coin_type() in (Coins.XMR, ):
+    if node_to_ci_from.coin_type() in (Coins.XMR, Coins.WOW):
         pass
     else:
         wtx = node_to_ci_from.rpc_wallet('gettransaction', [xmr_swap.a_lock_spend_tx_id.hex(),])
@@ -389,14 +388,14 @@ def run_test_ads_both_refund(self, coin_from: Coins, coin_to: Coins, lock_value:
 
     node_from_ci_from = swap_clients[0].ci(coin_from)
     max_fee: int = 10000
-    if node_from_ci_from.coin_type() in (Coins.XMR, ):
+    if node_from_ci_from.coin_type() in (Coins.XMR, Coins.WOW):
         pass
     else:
         wtx = node_from_ci_from.rpc_wallet('gettransaction', [lock_refund_spend_txid.hex(),])
         assert (bid.amount - node_from_ci_from.make_int(wtx['details'][0]['amount']) < max_fee)
 
     node_to_ci_to = swap_clients[1].ci(coin_to)
-    if node_to_ci_to.coin_type() in (Coins.XMR, ):
+    if node_to_ci_to.coin_type() in (Coins.XMR, Coins.WOW):
         pass
     else:
         wtx = node_to_ci_to.rpc_wallet('gettransaction', [bid.xmr_b_lock_tx.spend_txid.hex(),])
@@ -601,30 +600,6 @@ class Test(BaseTest):
             'use_segwit': True,
             'blocks_confirmed': 1,
         }
-
-    def prepare_balance(self, coin, amount: float, port_target_node: int, port_take_from_node: int, test_balance: bool = True) -> None:
-        delay_iterations = 20
-        delay_time = 3
-        coin_ticker: str = coin.name
-        balance_type: str = 'balance'
-        address_type: str = 'deposit_address'
-        js_w = read_json_api(port_target_node, 'wallets')
-        current_balance: float = float(js_w[coin_ticker][balance_type])
-        if test_balance and current_balance >= amount:
-            return
-        post_json = {
-            'value': amount,
-            'address': js_w[coin_ticker][address_type],
-            'subfee': False,
-        }
-        if coin in (Coins.XMR, ):
-            post_json['sweepall'] = False
-        json_rv = read_json_api(port_take_from_node, 'wallets/{}/withdraw'.format(coin_ticker.lower()), post_json)
-        assert (len(json_rv['txid']) == 64)
-        wait_for_amount: float = amount
-        if not test_balance:
-            wait_for_amount += current_balance
-        wait_for_balance(test_delay_event, 'http://127.0.0.1:{}/json/wallets/{}'.format(port_target_node, coin_ticker.lower()), balance_type, wait_for_amount, iterations=delay_iterations, delay_time=delay_time)
 
     def test_0001_decred_address(self):
         logging.info('---------- Test {}'.format(self.test_coin.name))

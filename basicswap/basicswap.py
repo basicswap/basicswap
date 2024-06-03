@@ -576,9 +576,9 @@ class BasicSwap(BaseApp):
         if self.use_tor_proxy:
             have_cc_tor_opt = 'use_tor' in chain_client_settings
             if have_cc_tor_opt and chain_client_settings['use_tor'] is False:
-                self.log.warning('use_tor is true for system but false for ' + coin + '.')
+                self.log.warning(f'use_tor is true for system but false for {coin.name}.')
             elif have_cc_tor_opt is False and is_private_ip_address(node_host):
-                self.log.warning(f'Not using proxy for {coin} node at private ip address {node_host}.')
+                self.log.warning(f'Not using proxy for {coin.name} node at private ip address {node_host}.')
             else:
                 proxy_host = self.tor_proxy_host
                 proxy_port = self.tor_proxy_port

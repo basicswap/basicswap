@@ -339,7 +339,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         coin_available = listAvailableCoins(swap_client, with_variants=False)
         with_xmr: bool = any(c[0] == Coins.XMR for c in coin_available)
         with_wow: bool = any(c[0] == Coins.WOW for c in coin_available)
-        coins = [(str(c[0]) + ',0', c[1]) for c in coin_available if c[0] not in (Coins.XMR, )]
+        coins = [(str(c[0]) + ',0', c[1]) for c in coin_available if c[0] not in (Coins.XMR, Coins.WOW)]
 
         if any(c[0] == Coins.DCR for c in coin_available):
             coins.append((str(int(Coins.DCR)) + ',1', 'Decred Wallet'))
