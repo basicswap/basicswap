@@ -3165,7 +3165,7 @@ class BasicSwap(BaseApp):
 
     def timeoutBid(self, bid_id: bytes, session_in=None) -> None:
         self.log.info('Bid %s timed-out', bid_id.hex())
-        self.deactivateBidForReason(bid_id, BidStates.SWAP_TIMEDOUT)
+        self.deactivateBidForReason(bid_id, BidStates.SWAP_TIMEDOUT, session_in=session_in)
 
     def setBidError(self, bid_id: bytes, bid, error_str: str, save_bid: bool = True, xmr_swap=None) -> None:
         self.log.error('Bid %s - Error: %s', bid_id.hex(), error_str)
