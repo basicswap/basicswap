@@ -861,7 +861,7 @@ class Test(BaseTest):
         post_json = {
             'addressnote': 'testing',
         }
-        json_rv = json.loads(post_json_req('http://127.0.0.1:1801/json/smsgaddresses/new', post_json))
+        json_rv = read_json_api(1801, 'smsgaddresses/new', post_json)
         new_address = json_rv['new_address']
         new_address_pk = json_rv['pubkey']
 
@@ -888,7 +888,7 @@ class Test(BaseTest):
             'addressnote': 'testing2',
             'active_ind': '0',
         }
-        json_rv = json.loads(post_json_req('http://127.0.0.1:1801/json/smsgaddresses/edit', post_json))
+        json_rv = read_json_api(1801, 'smsgaddresses/edit', post_json)
         assert (json_rv['edited_address'] == new_address)
 
         js_3 = read_json_api(1801, 'smsgaddresses')
@@ -897,7 +897,7 @@ class Test(BaseTest):
         post_json = {
             'exclude_inactive': False,
         }
-        js_3 = json.loads(post_json_req('http://127.0.0.1:1801/json/smsgaddresses', post_json))
+        js_3 = read_json_api(1801, 'smsgaddresses', post_json)
         found = False
         for addr in js_3:
             if addr['addr'] == new_address:
@@ -918,7 +918,7 @@ class Test(BaseTest):
             'address': new_address,
             'active_ind': '1',
         }
-        json_rv = json.loads(post_json_req('http://127.0.0.1:1801/json/smsgaddresses/edit', post_json))
+        json_rv = read_json_api(1801, 'smsgaddresses/edit', post_json)
         assert (json_rv['edited_address'] == new_address)
 
         found = False
@@ -933,7 +933,7 @@ class Test(BaseTest):
             'addresspubkey': new_address_pk,
             'addressnote': 'testing_add_addr',
         }
-        json_rv = json.loads(post_json_req('http://127.0.0.1:1800/json/smsgaddresses/add', post_json))
+        json_rv = read_json_api(1800, 'smsgaddresses/add', post_json)
         assert (json_rv['added_address'] == new_address)
 
         post_json = {
@@ -944,7 +944,7 @@ class Test(BaseTest):
             'amt_from': 1,
             'amt_to': 1,
             'lockhrs': 24}
-        rv = json.loads(post_json_req('http://127.0.0.1:1800/json/offers/new', post_json))
+        rv = read_json_api(1800, 'offers/new', post_json)
         offer_id_hex = rv['offer_id']
 
         wait_for_offer(test_delay_event, swap_clients[1], bytes.fromhex(offer_id_hex))
@@ -954,6 +954,10 @@ class Test(BaseTest):
 
         rv = read_json_api(1800, f'offers/{offer_id_hex}')
         assert (rv[0]['addr_to'] == new_address)
+
+        # Disable all
+        json_rv = read_json_api(1800, 'smsgaddresses/disableall')
+        assert (json_rv['num_disabled'] >= 1)
 
     def test_02_leader_recover_a_lock_tx(self):
         logging.info('---------- Test PART to XMR leader recovers coin a lock tx')

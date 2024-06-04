@@ -1614,7 +1614,8 @@ class BasicSwap(BaseApp):
         try:
             session = self.openSession()
             self.checkCoinsReady(coin_from_t, coin_to_t)
-            offer_addr = self.newSMSGAddress(use_type=AddressTypes.OFFER, session=session)[0] if addr_send_from is None else addr_send_from
+            offer_addr = self.prepareSMSGAddress(addr_send_from, AddressTypes.OFFER, session)
+
             offer_created_at = self.getTime()
 
             msg_buf = OfferMessage()
@@ -2395,7 +2396,7 @@ class BasicSwap(BaseApp):
             bid_bytes = msg_buf.to_bytes()
             payload_hex = str.format('{:02x}', MessageTypes.BID) + bid_bytes.hex()
 
-            bid_addr = self.newSMSGAddress(use_type=AddressTypes.BID, session=session)[0] if addr_send_from is None else addr_send_from
+            bid_addr = self.prepareSMSGAddress(addr_send_from, AddressTypes.BID, session)
             msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR, valid_for_seconds)
             bid_id = self.sendSmsg(bid_addr, offer.addr_from, payload_hex, msg_valid)
 
@@ -2755,7 +2756,8 @@ class BasicSwap(BaseApp):
                 xmr_swap = XmrSwap()
                 xmr_swap.contract_count = self.getNewContractId(session)
 
-                bid_addr = self.newSMSGAddress(use_type=AddressTypes.BID, session=session)[0] if addr_send_from is None else addr_send_from
+                bid_addr = self.prepareSMSGAddress(addr_send_from, AddressTypes.BID, session)
+
                 msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR, valid_for_seconds)
                 xmr_swap.bid_id = self.sendSmsg(bid_addr, offer.addr_from, payload_hex, msg_valid)
 
@@ -2837,7 +2839,8 @@ class BasicSwap(BaseApp):
             bid_bytes = msg_buf.to_bytes()
             payload_hex = str.format('{:02x}', MessageTypes.XMR_BID_FL) + bid_bytes.hex()
 
-            bid_addr = self.newSMSGAddress(use_type=AddressTypes.BID, session=session)[0] if addr_send_from is None else addr_send_from
+            bid_addr = self.prepareSMSGAddress(addr_send_from, AddressTypes.BID, session)
+
             msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR, valid_for_seconds)
             xmr_swap.bid_id = self.sendSmsg(bid_addr, offer.addr_from, payload_hex, msg_valid)
 
@@ -7307,7 +7310,7 @@ class BasicSwap(BaseApp):
         finally:
             self.mxDB.release()
 
-    def listAllSMSGAddresses(self, filters={}):
+    def listAllSMSGAddresses(self, filters={}, session=None):
         query_str = 'SELECT addr_id, addr, use_type, active_ind, created_at, note, pubkey FROM smsgaddresses'
         query_str += ' WHERE 1 = 1 '
         query_data = {}
@@ -7336,9 +7339,9 @@ class BasicSwap(BaseApp):
             query_str += f' OFFSET {offset}'
 
         try:
-            session = self.openSession()
+            use_session = self.openSession(session)
             rv = []
-            q = session.execute(query_str, query_data)
+            q = use_session.execute(query_str, query_data)
             for row in q:
                 rv.append({
                     'id': row[0],
@@ -7351,9 +7354,10 @@ class BasicSwap(BaseApp):
                 })
             return rv
         finally:
-            self.closeSession(session, commit=False)
+            if session is None:
+                self.closeSession(use_session, commit=False)
 
-    def listSmsgAddresses(self, use_type_str):
+    def listSMSGAddresses(self, use_type_str: str):
         if use_type_str == 'offer_send_from':
             use_type = AddressTypes.OFFER
         elif use_type_str == 'offer_send_to':
@@ -7471,7 +7475,11 @@ class BasicSwap(BaseApp):
             self.callrpc('smsgaddlocaladdress', [new_addr])  # Enable receiving smsgs
             self.callrpc('smsglocalkeys', ['anon', '-', new_addr])
 
-            use_session.add(SmsgAddress(addr=new_addr, use_type=use_type, active_ind=1, created_at=now, note=addressnote, pubkey=addr_info['pubkey']))
+            addr_obj = SmsgAddress(addr=new_addr, use_type=use_type, active_ind=1, created_at=now, pubkey=addr_info['pubkey'])
+            if addressnote is not None:
+                addr_obj.note = addressnote
+
+            use_session.add(addr_obj)
             return new_addr, addr_info['pubkey']
         finally:
             if session is None:
@@ -7491,16 +7499,68 @@ class BasicSwap(BaseApp):
         finally:
             self.closeSession(session)
 
-    def editSMSGAddress(self, address: str, active_ind: int, addressnote: str) -> None:
-        session = self.openSession()
+    def editSMSGAddress(self, address: str, active_ind: int, addressnote: str = None, use_type=None, session=None) -> None:
+        use_session = self.openSession(session)
         try:
             mode = '-' if active_ind == 0 else '+'
             self.callrpc('smsglocalkeys', ['recv', mode, address])
+            values = {'active_ind': active_ind, 'addr': address, 'use_type': use_type}
 
-            session.execute('UPDATE smsgaddresses SET active_ind = :active_ind, note = :note WHERE addr = :addr', {'active_ind': active_ind, 'note': addressnote, 'addr': address})
-            session.commit()
+            query_str: str = 'UPDATE smsgaddresses SET active_ind = :active_ind'
+            if addressnote is not None:
+                values['note'] = addressnote
+                query_str += ', note = :note'
+            query_str += ' WHERE addr = :addr'
+
+            rv = use_session.execute(query_str, values)
+            if rv.rowcount < 1:
+                query_str: str = 'INSERT INTO smsgaddresses (addr, active_ind, use_type) VALUES (:addr, :active_ind, :use_type)'
+                use_session.execute(query_str, values)
+        finally:
+            if session is None:
+                self.closeSession(use_session)
+
+    def disableAllSMSGAddresses(self):
+        filters = {
+            'exclude_inactive': True,
+        }
+        session = self.openSession()
+        rv = {}
+        num_disabled = 0
+        try:
+            active_addresses = self.listAllSMSGAddresses(filters, session=session)
+            for active_address in active_addresses:
+                if active_address['addr'] == self.network_addr:
+                    continue
+                self.editSMSGAddress(active_address['addr'], active_ind=0, session=session)
+            num_disabled += 1
         finally:
             self.closeSession(session)
+
+        rv['num_disabled'] = num_disabled
+
+        num_core_disabled = 0
+        # Check localkeys
+        smsg_localkeys = self.callrpc('smsglocalkeys')
+        all_keys = smsg_localkeys['wallet_keys'] + smsg_localkeys['smsg_keys']
+        for smsg_addr in all_keys:
+            if smsg_addr['address'] == self.network_addr:
+                continue
+            if smsg_addr['receive'] != 0:
+                self.log.warning('Disabling smsg key found in core and not bsx: {}'.format(smsg_addr['address']))
+                self.callrpc('smsglocalkeys', ['recv', '-', smsg_addr['address']])
+                num_core_disabled += 1
+
+        if num_core_disabled > 0:
+            rv['num_core_disabled'] = num_core_disabled
+        return rv
+
+    def prepareSMSGAddress(self, addr_send_from, use_type, session):
+        if addr_send_from is None:
+            return self.newSMSGAddress(use_type=use_type, session=session)[0]
+        use_addr = addr_send_from
+        self.editSMSGAddress(use_addr, 1, use_type=use_type, session=session)  # Ensure receive is active
+        return use_addr
 
     def createCoinALockRefundSwipeTx(self, ci, bid, offer, xmr_swap, xmr_offer):
         self.log.debug('Creating %s lock refund swipe tx', ci.coin_name())
