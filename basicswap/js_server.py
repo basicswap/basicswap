@@ -429,27 +429,31 @@ def js_smsgaddresses(self, url_split, post_string, is_json) -> bytes:
     swap_client = self.server.swap_client
     swap_client.checkSystemStatus()
     post_data = {} if post_string == '' else getFormData(post_string, is_json)
+
     if len(url_split) > 3:
-        if url_split[3] == 'new':
+        mode: str = url_split[3]
+        if mode == 'new':
             addressnote = get_data_entry_or(post_data, 'addressnote', '')
             new_addr, pubkey = swap_client.newSMSGAddress(addressnote=addressnote)
             return bytes(json.dumps({'new_address': new_addr, 'pubkey': pubkey}), 'UTF-8')
-        if url_split[3] == 'add':
+        if mode == 'add':
             addressnote = get_data_entry_or(post_data, 'addressnote', '')
             pubkey_hex = get_data_entry(post_data, 'addresspubkey')
             added_address = swap_client.addSMSGAddress(pubkey_hex, addressnote)
             return bytes(json.dumps({'added_address': added_address, 'pubkey': pubkey_hex}), 'UTF-8')
-        elif url_split[3] == 'edit':
+        elif mode == 'edit':
             address = get_data_entry(post_data, 'address')
             activeind = int(get_data_entry(post_data, 'active_ind'))
             addressnote = get_data_entry_or(post_data, 'addressnote', '')
             new_addr = swap_client.editSMSGAddress(address, activeind, addressnote)
             return bytes(json.dumps({'edited_address': address}), 'UTF-8')
+        elif mode == 'disableall':
+            rv = swap_client.disableAllSMSGAddresses()
+            return bytes(json.dumps(rv), 'UTF-8')
 
     filters = {
         'exclude_inactive': post_data.get('exclude_inactive', True),
     }
-
     return bytes(json.dumps(swap_client.listAllSMSGAddresses(filters)), 'UTF-8')
 
 

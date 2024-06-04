@@ -472,8 +472,8 @@ def page_newoffer(self, url_split, post_string):
         'err_messages': err_messages,
         'coins_from': coins_from,
         'coins': coins_to,
-        'addrs': swap_client.listSmsgAddresses('offer_send_from'),
-        'addrs_to': swap_client.listSmsgAddresses('offer_send_to'),
+        'addrs': swap_client.listSMSGAddresses('offer_send_from'),
+        'addrs_to': swap_client.listSMSGAddresses('offer_send_to'),
         'data': page_data,
         'automation_strategies': automation_strategies,
         'summary': summary,
@@ -677,7 +677,7 @@ def page_offer(self, url_split, post_string):
         'err_messages': err_messages,
         'data': data,
         'bids': formatted_bids,
-        'addrs': None if show_bid_form is None else swap_client.listSmsgAddresses('bid'),
+        'addrs': None if show_bid_form is None else swap_client.listSMSGAddresses('bid'),
         'summary': summary,
     })
 
