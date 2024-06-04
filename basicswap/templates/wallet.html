@@ -266,8 +266,8 @@
                       </div>
                       {% endif %}
                       {# / PART #}
-                      {% if w.cid == '6' %}
-                      {# XMR #}
+                      {% if w.cid in '6, 9' %}
+                      {# XMR | WOW #}
                       <div class="w-full md:w-1/2 p-3 flex justify-center items-center">
                         <div class="h-full">
                           <div class="flex flex-wrap -m-3">
@@ -412,8 +412,8 @@
     });
   </script>
   {% endif %}
-  {% if w.cid == '6' %}
-  {# XMR #}
+  {% if w.cid in '6, 9' %}
+  {# XMR | WOW #}
   <script>
     // Monero Sub
     var moneroSubAddress = "{{ w.deposit_address }}";
@@ -638,8 +638,7 @@
 
                                     floatBalance = parseFloat(balance);
                                     calculatedAmount = floatBalance * percent;
-
-                                    if (cid === '6' && percent === 1) {
+                                    if (cid in '6, 9' && percent === 1) {
                                         amountInput.setAttribute('data-hidden', 'true');
                                         amountInput.placeholder = 'Sweep All';
                                         amountInput.value = '';
@@ -654,8 +653,7 @@
                                         amountInput.placeholder = '';
                                         amountInput.disabled = false;
                                     }
-
-                                    if (cid === '6' && percent === 1) {
+                                    if (cid in '6, 9' && percent === 1) {
                                         var sweepAllCheckbox = document.getElementById('sweepall');
                                         if (sweepAllCheckbox) {
                                             sweepAllCheckbox.checked = true;
@@ -674,7 +672,7 @@
                         </td>
                       </tr>
                       <tr class="opacity-100 text-gray-500 dark:text-gray-100">
-                        {% if w.cid == '6' %} {# XMR #}
+                        {% if w.cid in '6, 9' %} {# XMR | WOW #}
                         <td class="py-3 px-6 bold">Sweep All:</td>
                         <td class="py-3 px-6"> <input class="hover:border-blue-500 w-5 h-5 form-check-input text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-1 dark:bg-gray-500 dark:border-gray-400" type="checkbox" id="sweepall" name="sweepall_{{ w.cid }}" {% if w.wd_sweepall==true %} checked=checked{% endif %}> </td> {% else %} <td class="py-3 px-6 bold">Subtract Fee:</td>
                         <td class="py-3 px-6"> <input class="hover:border-blue-500 w-5 h-5 form-check-input text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-1 dark:bg-gray-500 dark:border-gray-400" type="checkbox" name="subfee_{{ w.cid }}" {% if w.wd_subfee==true %} checked=checked{% endif %}> </td>
@@ -753,17 +751,17 @@
               <div class="pt-6 pb-6 bg-coolGray-100 border-t border-gray-100 dark:border-gray-400 dark:bg-gray-500 rounded-bl-xl rounded-br-xl">
                 <div class="px-6">
                   <div class="flex flex-wrap justify-end">
-                    {% if w.cid != '6' %}
-                    {# !XMR #}
+                    {% if w.cid not in '6, 9' %}
+                    {# !XMR | WOW #}
                     {% if w.show_utxo_groups %}
                     {% else %}
                     <div class="w-full md:w-auto p-1.5"> <button type="submit" class="flex flex-wrap justify-center px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" id="showutxogroups" name="showutxogroups" value="Show UTXO Groups"> {{ utxo_groups_svg | safe }} Show UTXO Groups </button> </div>
                     {% endif %} {% endif %}
-                    {% if w.cid == '6' %}
-                    {# XMR #}
+                    {% if w.cid in '6, 9' %}
+                    {# XMR | WOW #}
                     <div class="w-full md:w-auto p-1.5 ml-2"> <button type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" name="estfee_{{ w.cid }}" value="Estimate Fee">Estimate {{ w.ticker }} Fee </button> </div>
                     {% endif %}
-                    {# / XMR #} <div class="w-full md:w-auto p-1.5 ml-2"> <button type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" name="withdraw_{{ w.cid }}" value="Withdraw" onclick="return confirmWithdrawal();">{{ withdraw_svg | safe }} Withdraw {{ w.ticker }} </div>
+                    {# / XMR | WOW #} <div class="w-full md:w-auto p-1.5 ml-2"> <button type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" name="withdraw_{{ w.cid }}" value="Withdraw" onclick="return confirmWithdrawal();">{{ withdraw_svg | safe }} Withdraw {{ w.ticker }} </div>
                   </div>
                 </div>
               </div>
@@ -772,8 +770,8 @@
         </div>
       </div>
   </section>
-  {% if w.cid != '6' %}
-  {# !XMR #}
+  {% if w.cid not in '6, 9' %}
+  {# !XMR | WOW #}
   {% if w.show_utxo_groups %}
   <section class="p-6">
     <div class="flex items-center">

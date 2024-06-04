@@ -57,7 +57,7 @@ def page_settings(self, url_split, post_string):
             for name, c in swap_client.settings['chainclients'].items():
                 if have_data_entry(form_data, 'apply_' + name):
                     data = {'lookups': get_data_entry(form_data, 'lookups_' + name)}
-                    if name == 'monero':
+                    if name in ('monero', 'wownero'):
                         data['fee_priority'] = int(get_data_entry(form_data, 'fee_priority_' + name))
                         data['manage_daemon'] = True if get_data_entry(form_data, 'managedaemon_' + name) == 'true' else False
                         data['rpchost'] = get_data_entry(form_data, 'rpchost_' + name)
@@ -104,7 +104,7 @@ def page_settings(self, url_split, post_string):
             'manage_daemon': c.get('manage_daemon', 'Unknown'),
             'connection_type': c.get('connection_type', 'Unknown'),
         })
-        if name == 'monero':
+        if name in ('monero', 'wownero'):
             chains_formatted[-1]['fee_priority'] = c.get('fee_priority', 0)
             chains_formatted[-1]['manage_wallet_daemon'] = c.get('manage_wallet_daemon', 'Unknown')
             chains_formatted[-1]['rpchost'] = c.get('rpchost', 'localhost')

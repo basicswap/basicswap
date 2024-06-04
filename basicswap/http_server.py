@@ -295,7 +295,7 @@ class HttpHandler(BaseHTTPRequestHandler):
                     cmd = get_data_entry(form_data, 'cmd')
                 except Exception:
                     raise ValueError('Invalid command')
-                if coin_type in (Coins.XMR, ):
+                if coin_type in (Coins.XMR, Coins.WOW):
                     ci = swap_client.ci(coin_type)
                     arr = cmd.split(None, 1)
                     method = arr[0]
@@ -338,7 +338,8 @@ class HttpHandler(BaseHTTPRequestHandler):
 
         coin_available = listAvailableCoins(swap_client, with_variants=False)
         with_xmr: bool = any(c[0] == Coins.XMR for c in coin_available)
-        coins = [(str(c[0]) + ',0', c[1]) for c in coin_available if c[0] not in (Coins.XMR, )]
+        with_wow: bool = any(c[0] == Coins.WOW for c in coin_available)
+        coins = [(str(c[0]) + ',0', c[1]) for c in coin_available if c[0] not in (Coins.XMR, Coins.WOW)]
 
         if any(c[0] == Coins.DCR for c in coin_available):
             coins.append((str(int(Coins.DCR)) + ',1', 'Decred Wallet'))
@@ -348,6 +349,10 @@ class HttpHandler(BaseHTTPRequestHandler):
             coins.append((str(int(Coins.XMR)) + ',0', 'Monero'))
             coins.append((str(int(Coins.XMR)) + ',1', 'Monero JSON'))
             coins.append((str(int(Coins.XMR)) + ',2', 'Monero Wallet'))
+        if with_wow:
+            coins.append((str(int(Coins.WOW)) + ',0', 'Wownero'))
+            coins.append((str(int(Coins.WOW)) + ',1', 'Wownero JSON'))
+            coins.append((str(int(Coins.WOW)) + ',2', 'Wownero Wallet'))
 
         return self.render_template(template, {
             'messages': messages,

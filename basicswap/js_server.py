@@ -54,7 +54,7 @@ def withdraw_coin(swap_client, coin_type, post_string, is_json):
     post_data = getFormData(post_string, is_json)
     address = get_data_entry(post_data, 'address')
 
-    if coin_type == Coins.XMR:
+    if coin_type in (Coins.XMR, Coins.WOW):
         value = None
         sweepall = get_data_entry(post_data, 'sweepall')
         if not isinstance(sweepall, bool):
@@ -74,7 +74,7 @@ def withdraw_coin(swap_client, coin_type, post_string, is_json):
     elif coin_type == Coins.LTC:
         type_from = get_data_entry_or(post_data, 'type_from', 'plain')
         txid_hex = swap_client.withdrawLTC(type_from, value, address, subfee)
-    elif coin_type == Coins.XMR:
+    elif coin_type in (Coins.XMR, Coins.WOW):
         txid_hex = swap_client.withdrawCoin(coin_type, value, address, sweepall)
     else:
         txid_hex = swap_client.withdrawCoin(coin_type, value, address, subfee)
@@ -685,7 +685,7 @@ def js_getcoinseed(self, url_split, post_string, is_json) -> bytes:
         raise ValueError('Particl wallet seed is set from the Basicswap mnemonic.')
 
     ci = swap_client.ci(coin)
-    if coin == Coins.XMR:
+    if coin in (Coins.XMR, Coins.WOW):
         key_view = swap_client.getWalletKey(coin, 1, for_ed25519=True)
         key_spend = swap_client.getWalletKey(coin, 2, for_ed25519=True)
         address = ci.getAddressFromKeys(key_view, key_spend)

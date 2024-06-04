@@ -409,7 +409,7 @@
     document.getElementById('get_rate_inferred_button').addEventListener('click', getRateInferred);
 
     function set_swap_type_enabled(coin_from, coin_to, swap_type) {
-        const adaptor_sig_only_coins = ['6' /* XMR */, '8' /* PART_ANON */, '7' /* PART_BLIND */, '13' /* FIRO */];
+        const adaptor_sig_only_coins = ['6' /* XMR */,'9' /* WOW */, '8' /* PART_ANON */, '7' /* PART_BLIND */, '13' /* FIRO */];
         const secret_hash_only_coins = ['11' /* PIVX */, '12' /* DASH */];
         let make_hidden = false;
         if (adaptor_sig_only_coins.includes(coin_from) || adaptor_sig_only_coins.includes(coin_to)) {

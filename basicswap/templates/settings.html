@@ -105,7 +105,7 @@
               </tr>
               {% endif %}
               {% if c.manage_daemon is defined %}
-              {% if c.name == 'monero' %}
+              {% if c.name in ('wownero', 'monero') %}
               <tr class="opacity-100 text-gray-500 dark:text-gray-100">
                <td class="py-3 px-6 bold">Manage Daemon</td>
                <td class="py-3 px-6">
@@ -175,7 +175,7 @@
                 </div>
                </td>
               </tr>
-              {% if c.name == 'monero' %}
+              {% if c.name in ('wownero', 'monero') %}
               <tr class="opacity-100 text-gray-500 dark:text-gray-100">
                <td class="py-3 px-6 bold">Transaction Fee Priority</td>
                <td class="py-3 px-6">
