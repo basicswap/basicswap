@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2023 tecnovert
+# Copyright (c) 2023-2024 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -323,6 +323,8 @@ def main():
                     'swap_type': offer_template.get('swap_type', 'adaptor_sig'),
                     'lockhrs': '24',
                     'automation_strat_id': 1}
+                if 'min_swap_amount' in offer_template:
+                    offer_data['amt_bid_min'] = offer_template['min_swap_amount']
                 if args.debug:
                     print('offer data {}'.format(offer_data))
                 new_offer = read_json_api('offers/new', offer_data)

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2023 tecnovert
+# Copyright (c) 2023-2024 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -304,7 +304,8 @@ class Test(unittest.TestCase):
                     'amount_variable': True,
                     'address': -1,
                     'min_coin_from_amt': 20,
-                    'max_coin_to_amt': -1
+                    'max_coin_to_amt': -1,
+                    'min_swap_amount': 0.11,
                 },
                 {
                     'name': 'offer example 1_2',
@@ -316,7 +317,8 @@ class Test(unittest.TestCase):
                     'amount_variable': True,
                     'address': -1,
                     'min_coin_from_amt': 21,
-                    'max_coin_to_amt': -1
+                    'max_coin_to_amt': -1,
+                    'min_swap_amount': 0.12,
                 }
             ],
         }
@@ -330,6 +332,8 @@ class Test(unittest.TestCase):
 
         offers = read_json_api(UI_PORT, 'offers')
         assert (len(offers) == 1)
+        offer_min_bid_amount = float(offers[0]['min_bid_amount'])
+        assert (offer_min_bid_amount == 0.11 or offer_min_bid_amount == 0.12)
 
         logging.info('Test that an offer is not created while delaying')
         result = subprocess.run(self.node0_args, stdout=subprocess.PIPE)
