@@ -115,7 +115,7 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
         errors.append('Amount From')
 
     try:
-        if 'amt_bid_min' not in page_data:
+        if have_data_entry(form_data, 'amt_bid_min') is False:
             if options.get('add_min_bid_amt', False) is True:
                 parsed_data['amt_bid_min'] = ci_from.chainparams_network()['min_amount']
             else:

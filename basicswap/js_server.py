@@ -228,6 +228,7 @@ def js_offers(self, url_split, post_string, is_json, sent=False) -> bytes:
             'amount_from': ci_from.format_amount(o.amount_from),
             'amount_to': ci_to.format_amount((o.amount_from * o.rate) // ci_from.COIN()),
             'rate': ci_to.format_amount(o.rate),
+            'min_bid_amount': ci_from.format_amount(o.min_bid_amount),
         }
         if with_extra_info:
             offer_data['amount_negotiable'] = o.amount_negotiable
