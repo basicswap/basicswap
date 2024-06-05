@@ -101,7 +101,8 @@ def startXmrDaemon(node_dir, bin_dir, daemon_bin, opts=[]):
     daemon_path = os.path.expanduser(os.path.join(bin_dir, daemon_bin))
 
     datadir_path = os.path.expanduser(node_dir)
-    args = [daemon_path, '--non-interactive', '--config-file=' + os.path.join(datadir_path, daemon_bin + '.conf')] + opts
+    config_filename = 'wownerod.conf' if daemon_bin.startswith('wow') else 'monerod.conf'
+    args = [daemon_path, '--non-interactive', '--config-file=' + os.path.join(datadir_path, config_filename)] + opts
     logging.info('Starting node {} --data-dir={}'.format(daemon_path, node_dir))
 
     # return subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
