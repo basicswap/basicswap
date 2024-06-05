@@ -671,6 +671,12 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
         elif 'arm' in BIN_ARCH:
             architecture = 'armv7'  # 32bit doesn't work
             release_url = 'https://git.wownero.com/attachments/ff0c4886-3865-4670-9bc6-63dd60ded0e3'
+        elif 'osx64' in BIN_ARCH:
+            release_url = 'https://git.wownero.com/attachments/7e3fd17c-1bcd-442c-b82d-92a00cccffb8'
+        elif 'win64' in BIN_ARCH:
+            release_url = 'https://git.wownero.com/attachments/a1cf8611-1727-4b49-a8e5-1c66fe4f72a3'
+        elif 'win32' in BIN_ARCH:
+            release_url = 'https://git.wownero.com/attachments/007d606d-56e0-4c8a-92c1-d0974a781e80'
 
         release_path = os.path.join(bin_dir, release_filename)
         if not os.path.exists(release_path):
