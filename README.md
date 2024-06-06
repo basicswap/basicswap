@@ -15,27 +15,31 @@ Table of Contents
 
 ## About
 
-The BasicSwap DEX is a privacy-first and decentralized exchange which features cross-chain atomic swaps and a distributed order book.
+**BasicSwap** is the world’s most secure and decentralized DEX. It facilitates cross-chain atomic swaps by enabling peers to interact directly with each other within a free and open environment without central points of failure.
 
-[BasicSwap](https://academy.particl.io/en/latest/glossary.html#term-BasicSwap) is a cross-chain and privacy-centric DEX (decentralized exchange) that lets you trade cryptocurrencies with no third party involvement. Its distributed order book lets you make or take orders at no cost and trade within a free and open environment without central points of failure.
+This DEX is fully non-custodial and features a decentralized order book, letting you create or accept swap offers without any fees, counterparties, or the need for accounts.
 
-This DEX protocol was built in direct response to the increasingly invasive demands and data mining practices of today’s cryptocurrency exchanges. It strives to bring more decentralized and more private cryptocurrency trading conditions for all.
+Built as a low-friction, highly secure solution to the frequent losses of funds on centralized exchanges (e.g., FTX, BitFinex, MtGox), **BasicSwap** aims to provide more reliable and secure cryptocurrency trading conditions for everyone.
 
-BasicSwap is still in beta. This means that, while it already offers most of the vital trading features you’d expect to see on centralized exchanges, it is still in heavy development, and many more features will come about in the near future.
-
-Check out our [roadmap](https://basicswapdex.com/roadmap) to get a better idea of what we've got planned for it!
+**BasicSwap** is currently in active development by the community. While it already offers some of the essential trading features you'd expect from an exchange, more features and quality-of-life improvements are being worked on with the goal to provide you with a smoother user experience.
 
 ## Features
 
 * **True cross-chain support** — Swap cryptocurrencies that live on entirely different blockchain environments, like Bitcoin and Monero.
-* **Distributed order book** — Make or take limit orders on a completely distributed order book system.
-* **No third-party or middleman** — Trade crypto with no intermediaries whatsoever.
+* **Decentralized order book** — Make or take swap offers on a completely decentralized order book system.
+* **No third-party or middleman** — Trade crypto with no intermediaries, completely eliminating central points of failure.
 * **No trading fees** — Only pay the typical cryptocurrency network fee.
-* **Privacy from the ground up** — Every component of BasicSwap is built with a privacy-first commitment.
-* **Full Monero support** — Swap Monero with a variety of other cryptocurrencies like Bitcoin or Particl. No wrapped assets or trickery involved.
+* **Superior financial privacy** — Protect your financial information from unauthorized access with BasicSwap’s privacy-conscious technology.
+* **Full Monero support** — Swap Monero with a variety of other cryptocurrencies like Bitcoin or Particl. No wrapped assets or layer-2 involved.
 * **User-friendly interface** — Enjoy all these features within a user-friendly and intuitive interface that handles all the complicated parts for you.
 
-BasicSwap is still in beta. This means that, while it already offers most of the vital trading features you’d expect to see on centralized exchanges, it is still in heavy development, and many more features will come about in the near future.
+## Under the Hood
+
+**BasicSwap** can be best understood as the decentralized version of the SWIFT messaging network; providing a decentralized messaging protocol that allows for peers to connect directly with each other with the purpose of executing atomic swaps without central points of failure and using official core wallets (Bitcoin Core, Litecoin Core). 
+
+BasicSwap does not process, initiate, or execute swaps; it merely enables peers to communicate with each other and exchange the required information to simplify the process of using atomic swaps on the respective blockchains of the coins being swapped. 
+
+In essence, BasicSwap operates merely as a decentralized messaging protocol supplemented by a user-friendly interface.
 
 ## Available Assets
 
@@ -85,6 +89,18 @@ BasicSwap is compatible with the following digital assets.
    </td>
   </tr>
   <tr>
+   <td>Decred
+   </td>
+   <td>DCR
+   </td>
+  </tr>
+  <tr>
+   <td>Wownero
+   </td>
+   <td>WOW
+   </td>
+  </tr>
+  <tr>
    <td>Particl
    </td>
    <td>PART
@@ -92,9 +108,7 @@ BasicSwap is compatible with the following digital assets.
   </tr>
 </table>
 
-We plan on adding many other cryptocurrencies moving forward, including ETH and its ERC-20 tokens. However, due to the true cross-chain nature of the BasicSwap DEX protocol, each integration has to be done on a case-by-case basis.
-
-If you’d like to add a cryptocurrency to BasicSwap, either [apply for a listing using our listing application form](https://forms.gle/9DsHoHTJVqSiMNHW9), or try coding the integration yourself by referencing how other cryptocurrencies have been added. Follow [this link](https://academy.particl.io/en/latest/basicswap-guides/basicswapguides_apply.html) for more information on how to integrate a coin yourself.
+If you’d like to add a cryptocurrency to BasicSwap, refer to how other cryptocurrencies have been integrated to the DEX by following [this link](https://academy.particl.io/en/latest/basicswap-guides/basicswapguides_apply.html).
 
 # Participate
 
@@ -108,23 +122,19 @@ If you’d like to add a cryptocurrency to BasicSwap, either [apply for a listin
 
 ### Documentation, installation
 
-For non-developers curious to explore a new world of commerce, binaries can be downloaded and installed. It is the easiest way to get started. Following the guides on [Particl Academy](https://academy.particl.io), a reference book in straightforward language, is recommended.
+Follow the guides on [Particl Academy](https://academy.particl.io) for tutorials and guides on how BasicSwap works.
 
 * [Download BasicSwapDEX](https://github.com/tecnovert/basicswap/tree/master/doc)
 
 #### Community chat support
 
-* [Discord](https://discord.me/particl) navigate to the #support channel
-
-* [Telegram](https://t.me/particlhelp)
-
-* [Matrix](https://matrix.to/#/#particlhelp:matrix.org)
+* [Matrix](https://matrix.to/#/#basicswap:matrix.org)
 
 # Tutorials
 
 You can find a wide variety of tutorials and step-by-step guides about BasicSwap on the [Particl Academy](https://academy.particl.io) or on Particl’s Youtube channel.
 
-If you encounter an issue or try to accomplish something not mentioned in any of the tutorials included in the links above, please join the community chat support channels; you’ll be sure to find help and support from our awesome community and open-source team there!
+If you encounter an issue or try to accomplish something not mentioned in any of the tutorials included in the links above, please join the community chat support channel; you’ll be sure to find help and support from current contributors there!
 
 # License
 
