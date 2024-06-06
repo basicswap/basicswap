@@ -37,9 +37,9 @@ Built as a low-friction, highly secure solution to the frequent losses of funds 
 
 **BasicSwap** can be best understood as the decentralized version of the SWIFT messaging network; providing a decentralized messaging protocol that allows for peers to connect directly with each other with the purpose of executing atomic swaps without central points of failure and using official core wallets (Bitcoin Core, Litecoin Core). 
 
-BasicSwap does not process, initiate, or execute swaps; it merely enables peers to communicate with each other and exchange the required information to simplify the process of using atomic swaps on the respective blockchains of the coins being swapped. 
+**BasicSwap** does not process, initiate, or execute swaps; it merely enables peers to communicate with each other and exchange the required information to simplify the process of using atomic swaps on the respective blockchains of the coins being swapped. 
 
-In essence, BasicSwap operates merely as a decentralized messaging protocol supplemented by a user-friendly interface.
+In essence, **BasicSwap** operates merely as a decentralized messaging protocol supplemented by a user-friendly interface.
 
 ## Available Assets
 
@@ -114,11 +114,9 @@ If you’d like to add a cryptocurrency to BasicSwap, refer to how other cryptoc
 
 ### Chats
 
-* **For developers** The chat [#particl-dev:matrix.org](https://matrix.to/#/#particl-dev:matrix.org) using a Matrix client.
-* **For community** The community chat [https://discord.me/particl](https://discord.me/particl) [![Discord](https://img.shields.io/discord/391967609660112925)](https://discord.me/particl).
+* **For support** Join the community on [#basicswap:matrix.org](https://matrix.to/#/#basicswap:matrix.org) using a Matrix client.
 
 [![Twitter Follow](https://img.shields.io/twitter/follow/BasicSwapDEX?label=follow%20us&style=social)](http://twitter.com/BasicSwapDEX)
-[![Subreddit subscribers](https://img.shields.io/reddit/subreddit-subscribers/particl?style=social)](http://reddit.com/r/particl)
 
 ### Documentation, installation
 
