@@ -21,7 +21,7 @@ This DEX is fully non-custodial and features a decentralized order book, letting
 
 Built as a low-friction, highly secure solution to the frequent losses of funds on centralized exchanges (e.g., FTX, BitFinex, MtGox), **BasicSwap** aims to provide more reliable and secure cryptocurrency trading conditions for everyone.
 
-**BasicSwap** is currently in active development by the community. While it already offers some of the essential trading features you'd expect from an exchange, more features and quality-of-life improvements are being worked on with the goal to provide you with a smoother user experience.
+**BasicSwap** is currently in active development by the community. While it already offers some of the essential trading features you'd expect from an exchange, more features and quality-of-life improvements are being worked on with the goal to provide a smoother user experience.
 
 ## Features
 
@@ -35,7 +35,7 @@ Built as a low-friction, highly secure solution to the frequent losses of funds 
 
 ## Under the Hood
 
-**BasicSwap** can be best understood as the decentralized version of the SWIFT messaging network; providing a decentralized messaging protocol that allows for peers to connect directly with each other with the purpose of executing atomic swaps without central points of failure and using official core wallets (Bitcoin Core, Litecoin Core). 
+**BasicSwap** can be best understood as the decentralized version of the SWIFT messaging network; providing a decentralized messaging protocol that allows for peers to connect directly with each other with the purpose of executing atomic swaps without central points of failure and using official core wallets (Bitcoin Core, Litecoin Core, etc). 
 
 **BasicSwap** does not process, initiate, or execute swaps; it merely enables peers to communicate with each other and exchange the required information to simplify the process of using atomic swaps on the respective blockchains of the coins being swapped. 
 
