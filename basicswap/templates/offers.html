@@ -486,22 +486,40 @@ window.addEventListener('load', function() {
     if (container != null) {
       container.addEventListener('click', () => {
         setActiveContainer(container_id);
-        updateChart(coin);
+        updateChart(coin, coinGeckoApiKey);
       });
     }
     if (coin === 'WOW') {
-      fetchWowneroData();
+      fetchWowneroData(coinGeckoApiKey);
     } else if (coin === 'ZANO') {
       fetchZanoData(coinGeckoApiKey);
     } else {
       fetchCryptoCompareData(coin, api_key);
     }
   });
-  updateChart('BTC');
+  updateChart('BTC', coinGeckoApiKey);
 });
 
+function fetchWowneroData(coinGeckoApiKey) {
+    fetch(`https://api.coingecko.com/api/v3/coins/wownero/market_chart?vs_currency=usd&days=1&api_key={{coingecko_api_key}}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Error fetching data. Status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            displayWowneroData(data);
+        })
+        .catch(error => {
+            console.error('Fetching Wownero data:', error);
+            displayErrorMessage('Unable to fetch data for Wownero. Please try again later.');
+        });
+}
+
+
 function fetchZanoData(coinGeckoApiKey) {
-    fetch(`https://api.coingecko.com/api/v3/coins/zano/market_chart?vs_currency=usd&days=30&interval=daily&api_key=${coinGeckoApiKey}`)
+    fetch(`https://api.coingecko.com/api/v3/coins/zano/market_chart?vs_currency=usd&days=30&interval=daily&api_key={{coingecko_api_key}}`)
         .then(response => {
             if (!response.ok) {
                 throw new Error(`Error fetching data. Status: ${response.status}`);
@@ -517,40 +535,22 @@ function fetchZanoData(coinGeckoApiKey) {
         });
 }
 
-    function fetchCryptoCompareData(coin, api_key) {
-      fetch(`https://min-api.cryptocompare.com/data/pricemultifull?fsyms=${coin}&tsyms=USD,BTC&api_key=${api_key}`)
+function fetchCryptoCompareData(coin, api_key) {
+    fetch(`https://min-api.cryptocompare.com/data/pricemultifull?fsyms=${coin}&tsyms=USD,BTC&api_key={{chart_api_key}}`)
         .then(response => {
-          if (!response.ok) {
-            throw new Error(`Error fetching data. Status: ${response.status}`);
-          }
-          return response.json();
+            if (!response.ok) {
+                throw new Error(`Error fetching data. Status: ${response.status}`);
+            }
+            return response.json();
         })
         .then(data => {
-          displayCoinData(coin, data);
+            displayCoinData(coin, data);
         })
         .catch(error => {
-          console.error(`Fetching ${coin} data:`, error);
-          displayErrorMessage(`Unable to fetch data. Please verify your API key or try again later.`);
+            console.error(`Fetching ${coin} data:`, error);
+            displayErrorMessage(`Unable to fetch data. Please verify your API key or try again later.`);
         });
-    }
-
-    function fetchWowneroData(coinGeckoApiKey) {
-        fetch(`https://api.coingecko.com/api/v3/coins/wownero/market_chart?vs_currency=usd&days=1&api_key=${coinGeckoApiKey}`)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`Error fetching data. Status: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                displayWowneroData(data);
-            })
-            .catch(error => {
-                console.error('Fetching Wownero data:', error);
-                displayErrorMessage('Unable to fetch data for Wownero. Please try again later.');
-            });
-    }
-
+}
 
     function displayWowneroData(data) {
       const prices = data.prices;
@@ -667,6 +667,8 @@ function negativePriceChangeHTML(value) {
 }
 
 function setActiveContainer(containerId) {
+  const api_key = '{{chart_api_key}}';
+  const coinGeckoApiKey = '{{coingecko_api_key}}';
   const containerIds = ['btc-container', 'xmr-container', 'part-container', 'pivx-container', 'firo-container', 'dash-container', 'ltc-container', 'doge-container', 'eth-container', 'dcr-container', 'zano-container', 'wow-container'];
   const activeClass = 'active-container';
   containerIds.forEach(id => {
@@ -691,13 +693,10 @@ const coinOptions = {
   }
 };
 
-function updateChart(coinSymbol) {
+function updateChart(coinSymbol, coinGeckoApiKey) {
   coin = coinSymbol;
-  const api_key = '{{chart_api_key}}';
-  const coinGeckoApiKey = '{{coingecko_api_key}}';
-
   if (coinSymbol === 'WOW') {
-    fetch(`https://api.coingecko.com/api/v3/coins/wownero/market_chart?vs_currency=usd&days=30&interval=daily&api_key=${coinGeckoApiKey}`)
+    fetch(`https://api.coingecko.com/api/v3/coins/wownero/market_chart?vs_currency=usd&days=30&interval=daily&api_key={{coingecko_api_key}}`)
       .then(response => response.json())
       .then(data => {
         const chartData = {
@@ -717,7 +716,7 @@ function updateChart(coinSymbol) {
       })
       .catch(error => console.error('Error updating chart for Wownero:', error));
   } else if (coinSymbol === 'ZANO') {
-    fetch(`https://api.coingecko.com/api/v3/coins/zano/market_chart?vs_currency=usd&days=30&interval=daily&api_key=${coinGeckoApiKey}`)
+    fetch(`https://api.coingecko.com/api/v3/coins/zano/market_chart?vs_currency=usd&days=30&interval=daily&api_key={{coingecko_api_key}}`)
       .then(response => response.json())
       .then(data => {
         const chartData = {
@@ -737,7 +736,7 @@ function updateChart(coinSymbol) {
       })
       .catch(error => console.error('Error updating chart for Zano:', error));
   } else {
-    fetch(`https://min-api.cryptocompare.com/data/v2/histoday?fsym=${coinSymbol}&tsym=USD&limit=30&api_key=${api_key}`)
+    fetch(`https://min-api.cryptocompare.com/data/v2/histoday?fsym=${coinSymbol}&tsym=USD&limit=30&api_key={{chart_api_key}}`)
       .then(response => response.json())
       .then(data => {
         // Check if data is undefined
@@ -1322,6 +1321,7 @@ const coinNameToSymbol = {
 };
 
 const exchangeRateCache = {};
+const coinGeckoApiKey = '{{coingecko_api_key}}';
 
 function updateUsdValue(cryptoCell, coinFullName, isRate = false) {
     const coinSymbol = coinNameToSymbol[coinFullName];
@@ -1332,68 +1332,52 @@ function updateUsdValue(cryptoCell, coinFullName, isRate = false) {
 
     const cryptoValue = parseFloat(cryptoCell.textContent);
     const usdCell = cryptoCell.nextElementSibling;
-    if (usdCell) {
-        // Check if the exchange rate is in the cache and is not expired
-        if (exchangeRateCache[coinSymbol] && !isCacheExpired(coinSymbol)) {
-            console.log(`Using cached exchange rate for ${coinSymbol}`);
-            const exchangeRate = exchangeRateCache[coinSymbol].rate;
-            const cryptoValue = parseFloat(cryptoCell.textContent);
-            const usdValue = cryptoValue * exchangeRate;
-            usdCell.textContent = `${usdValue.toFixed(2)} USD`;
-
-            updateProfitLoss(cryptoCell.closest('tr'));
-            updateProfitValue(cryptoCell.closest('tr'));
-        }
-    } else {
+    if (!usdCell) {
+        console.error("USD cell does not exist.");
+        return;
     }
 
-    if (isRate) {
-        const rateCell = usdCell.nextElementSibling;
-        if (rateCell) {
-            const usdValue = rateCell.previousElementSibling.textContent * cryptoValue;
-            usdCell.textContent = `${usdValue.toFixed(2)} USD`;
-        } else {
-            console.error("Rate cell does not exist.");
-        }
-    } else {
-        const apiUrl = `https://min-api.cryptocompare.com/data/price?fsym=${coinSymbol}&tsyms=USD`;
+    if (exchangeRateCache[coinSymbol] && !isCacheExpired(coinSymbol)) {
+        console.log(`Using cached exchange rate for ${coinSymbol}`);
+        const exchangeRate = exchangeRateCache[coinSymbol].rate;
+        const usdValue = cryptoValue * exchangeRate;
+        usdCell.textContent = `${usdValue.toFixed(2)} USD`;
 
-        if (exchangeRateCache[coinSymbol] && !isCacheExpired(coinSymbol)) {
-            // console.log(`Using cached exchange rate for ${coinSymbol}`);
-            const exchangeRate = exchangeRateCache[coinSymbol].rate;
-            const usdValue = cryptoValue * exchangeRate;
-            usdCell.textContent = `${usdValue.toFixed(2)} USD`;
-
-            updateProfitLoss(cryptoCell.closest('tr'));
-            updateProfitValue(cryptoCell.closest('tr'));
-        } else {
-            // console.log(`Fetching exchange rate from API for ${coinSymbol}`);
-            fetch(apiUrl)
-                .then(response => response.json())
-                .then(data => {
-                    const exchangeRate = data.USD;
-                    if (!isNaN(exchangeRate)) {
-                        // console.log(`Received exchange rate from API for ${coinSymbol}`);
-                        const usdValue = cryptoValue * exchangeRate;
-                        usdCell.textContent = `${usdValue.toFixed(2)} USD`;
-
-                        exchangeRateCache[coinSymbol] = {
-                            rate: exchangeRate,
-                            timestamp: Date.now(),
-                            ttl: 300000 // 5 minutes
-                        };
-
-                        updateProfitLoss(cryptoCell.closest('tr'));
-                        updateProfitValue(cryptoCell.closest('tr'));
-                    } else {
-                        console.error('Invalid exchange rate. Response:', data);
-                        usdCell.textContent = 'Invalid exchange rate';
-                    }
-                })
-                .catch(error => {
-                });
-        }
+        updateProfitLoss(cryptoCell.closest('tr'));
+        updateProfitValue(cryptoCell.closest('tr'));
+        return;
     }
+
+    const apiUrl = coinSymbol === 'WOW'
+        ? `https://api.coingecko.com/api/v3/simple/price?ids=wownero&vs_currencies=usd&api_key=${{coingecko_api_key}}`
+        : `https://min-api.cryptocompare.com/data/price?fsym=${coinSymbol}&tsyms=USD`;
+
+    fetch(apiUrl)
+        .then(response => response.json())
+        .then(data => {
+            const exchangeRate = coinSymbol === 'WOW' ? data.wownero.usd : data.USD;
+            if (!isNaN(exchangeRate)) {
+                console.log(`Received exchange rate from API for ${coinSymbol}`);
+                const usdValue = cryptoValue * exchangeRate;
+                usdCell.textContent = `${usdValue.toFixed(2)} USD`;
+
+                exchangeRateCache[coinSymbol] = {
+                    rate: exchangeRate,
+                    timestamp: Date.now(),
+                    ttl: 300000 // 5 minutes
+                };
+
+                updateProfitLoss(cryptoCell.closest('tr'));
+                updateProfitValue(cryptoCell.closest('tr'));
+            } else {
+                console.error('Invalid exchange rate. Response:', data);
+                usdCell.textContent = 'Invalid exchange rate';
+            }
+        })
+        .catch(error => {
+            console.error(`Fetching ${coinSymbol} data:`, error);
+            usdCell.textContent = 'Error fetching data';
+        });
 }
 
 function isCacheExpired(coinSymbol) {
@@ -1408,15 +1392,17 @@ function updateProfitLoss(row) {
 
     if (!isNaN(sellingUSD) && !isNaN(buyingUSD)) {
         const profitLossPercentage = ((sellingUSD - buyingUSD) / buyingUSD) * 100;
-        profitLossCell.textContent = `${profitLossPercentage.toFixed(2)}%`;
 
         if (profitLossPercentage > 0) {
-            profitLossCell.classList.add('text-green-500'); // Profit (positive)
+            profitLossCell.textContent = `-${profitLossPercentage.toFixed(2)}%`; // Change from "+" to "-"
+            profitLossCell.classList.add('text-green-500'); // Profit (negative)
             profitLossCell.classList.remove('text-red-500');
         } else if (profitLossPercentage < 0) {
-            profitLossCell.classList.add('text-red-500'); // Loss (negative)
+            profitLossCell.textContent = `+${Math.abs(profitLossPercentage).toFixed(2)}%`; // Change from "-" to "+"
+            profitLossCell.classList.add('text-red-500'); // Loss (positive)
             profitLossCell.classList.remove('text-green-500');
         } else {
+            profitLossCell.textContent = `${profitLossPercentage.toFixed(2)}%`;
             profitLossCell.classList.add('text-yellow-500'); // No profit or loss (zero)
             profitLossCell.classList.remove('text-green-500', 'text-red-500');
         }
@@ -1425,6 +1411,7 @@ function updateProfitLoss(row) {
         profitLossCell.classList.remove('text-green-500', 'text-red-500');
     }
 }
+
 
 function updateProfitValue(row) {
     const sellingUSD = parseFloat(row.querySelector('.usd-value').textContent);
@@ -1460,51 +1447,43 @@ function sortTable(columnIndex) {
     const sortIcon = document.getElementById(`sort-icon-${columnIndex}`);
     let sortOrder = sortIcon.textContent === '↓' ? 1 : -1;
 
-    if (sortOrder === 1) {
-        sortIcon.textContent = '↑';
-    } else {
-        sortIcon.textContent = '↓';
-    }
+    sortIcon.textContent = sortOrder === 1 ? '↑' : '↓';
 
     rows.sort((a, b) => {
         const aValue = a.cells[columnIndex].textContent.trim();
         const bValue = b.cells[columnIndex].textContent.trim();
 
-        if (aValue < bValue) return -1 * sortOrder;
-        if (aValue > bValue) return 1 * sortOrder;
-        return 0;
+        return aValue < bValue ? -1 * sortOrder : aValue > bValue ? 1 * sortOrder : 0;
     });
 
     rows.forEach(row => table.querySelector('tbody').appendChild(row));
 }
+
 document.addEventListener('DOMContentLoaded', function() {
-  const coinToSelect = document.getElementById('coin_to');
-  const coinFromSelect = document.getElementById('coin_from');
-  const coinToButton = document.getElementById('coin_to_button');
-  const coinFromButton = document.getElementById('coin_from_button');
+    const coinToSelect = document.getElementById('coin_to');
+    const coinFromSelect = document.getElementById('coin_from');
+    const coinToButton = document.getElementById('coin_to_button');
+    const coinFromButton = document.getElementById('coin_from_button');
 
-  function updateSelectedImage(selectElement, buttonElement) {
-    const selectedOption = selectElement.options[selectElement.selectedIndex];
-    const imageURL = selectedOption.getAttribute('data-image');
-    if (imageURL) {
-      buttonElement.style.backgroundImage = `url('${imageURL}')`;
-    } else {
-      buttonElement.style.backgroundImage = 'none';
+    function updateSelectedImage(selectElement, buttonElement) {
+        const selectedOption = selectElement.options[selectElement.selectedIndex];
+        const imageURL = selectedOption.getAttribute('data-image');
+        buttonElement.style.backgroundImage = imageURL ? `url('${imageURL}')` : 'none';
     }
-  }
 
-  coinToSelect.addEventListener('change', function() {
+    coinToSelect.addEventListener('change', function() {
+        updateSelectedImage(coinToSelect, coinToButton);
+    });
+
+    coinFromSelect.addEventListener('change', function() {
+        updateSelectedImage(coinFromSelect, coinFromButton);
+    });
+
+    // Initialize selected images on page load
     updateSelectedImage(coinToSelect, coinToButton);
-  });
-
-  coinFromSelect.addEventListener('change', function() {
     updateSelectedImage(coinFromSelect, coinFromButton);
-  });
-
-  // Initialize selected images on page load
-  updateSelectedImage(coinToSelect, coinToButton);
-  updateSelectedImage(coinFromSelect, coinFromButton);
 });
+
 </script>
 {% include 'footer.html' %}
 </body>
