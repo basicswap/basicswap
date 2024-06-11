@@ -35,9 +35,9 @@ Built as a low-friction, highly secure solution to the frequent losses of funds 
 
 ## Under the Hood
 
-**BasicSwap** can be best understood as the decentralized version of the SWIFT messaging network; providing a decentralized messaging protocol that allows for peers to connect directly with each other with the purpose of executing atomic swaps without central points of failure and using official core wallets (Bitcoin Core, Litecoin Core, etc). 
+**BasicSwap** can be best understood as the decentralized version of the SWIFT messaging network; providing a decentralized messaging protocol that allows for peers to connect directly with each other with the purpose of executing atomic swaps without central points of failure and using official core wallets (Bitcoin Core, Litecoin Core, etc).
 
-**BasicSwap** does not process, initiate, or execute swaps; it merely enables peers to communicate with each other and exchange the required information to simplify the process of using atomic swaps on the respective blockchains of the coins being swapped. 
+**BasicSwap** does not process, initiate, or execute swaps; it merely enables peers to communicate with each other and exchange the required information to simplify the process of using atomic swaps on the respective blockchains of the coins being swapped.
 
 In essence, **BasicSwap** operates merely as a decentralized messaging protocol supplemented by a user-friendly interface.
 
@@ -122,7 +122,7 @@ If you’d like to add a cryptocurrency to BasicSwap, refer to how other cryptoc
 
 Follow the guides on [Particl Academy](https://academy.particl.io) for tutorials and guides on how BasicSwap works.
 
-* [Download BasicSwapDEX](https://github.com/tecnovert/basicswap/tree/master/doc)
+* [Download BasicSwapDEX](https://github.com/basicswap/basicswap/tree/master/doc)
 
 #### Community chat support
 

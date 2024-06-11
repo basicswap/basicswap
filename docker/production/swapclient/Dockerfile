@@ -14,7 +14,7 @@ RUN wget -O coincurve-anonswap.zip https://github.com/tecnovert/coincurve/archiv
     cd coincurve-anonswap && \
     python3 setup.py install --force
 
-ARG BASICSWAP_URL=https://github.com/tecnovert/basicswap/archive/master.zip
+ARG BASICSWAP_URL=https://github.com/basicswap/basicswap/archive/master.zip
 ARG BASICSWAP_DIR=basicswap-master
 RUN wget -O basicswap-repo.zip $BASICSWAP_URL; \
     unzip basicswap-repo.zip; \

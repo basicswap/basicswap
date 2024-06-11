@@ -187,4 +187,4 @@ Prepare wallet:
 # Notes
 
 Switch Basicswap repo:
-    docker-compose build swapclient --build-arg BASICSWAP_URL=https://github.com/tecnovert/basicswap/archive/refs/heads/dev.zip --build-arg BASICSWAP_DIR=basicswap-dev
+    docker-compose build swapclient --build-arg BASICSWAP_URL=https://github.com/basicswap/basicswap/archive/refs/heads/dev.zip --build-arg BASICSWAP_DIR=basicswap-dev

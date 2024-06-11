@@ -1,7 +1,7 @@
 
 ## Source code
 
-    git clone https://github.com/tecnovert/basicswap.git
+    git clone https://github.com/basicswap/basicswap.git
 
 
 ## Run Using Docker
@@ -125,7 +125,7 @@ Install Git:
 
 Download the BasicSwap code:
 
-    git clone https://github.com/tecnovert/basicswap.git
+    git clone https://github.com/basicswap/basicswap.git
     cd basicswap/docker/
 
 
@@ -170,7 +170,7 @@ Close the terminal and open a new one to update the python symlinks.
 
 
     cd $SWAP_DATADIR
-    git clone https://github.com/tecnovert/basicswap.git
+    git clone https://github.com/basicswap/basicswap.git
     cd $SWAP_DATADIR/basicswap
 
 

@@ -123,7 +123,7 @@
   (source (origin
     (method git-fetch)
     (uri (git-reference
-      (url "https://github.com/tecnovert/basicswap")
+      (url "https://github.com/basicswap/basicswap")
       (commit "15bf9b2187d3b8a03939e61b4c3ebf4d90fcc919")))
     (sha256
       (base32
@@ -164,5 +164,5 @@
     ))
   (synopsis "Simple Atomic Swap Network - Proof of Concept")
   (description #f)
-  (home-page "https://github.com/tecnovert/basicswap")
+  (home-page "https://github.com/basicswap/basicswap")
   (license license:bsd-3)))

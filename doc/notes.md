@@ -99,7 +99,7 @@ Install coincurve
 
 Install basicswap
 
-    git clone https://github.com/tecnovert/basicswap.git
+    git clone https://github.com/basicswap/basicswap.git
     cd basicswap
     pip3 install .
 

@@ -15,7 +15,7 @@ setuptools.setup(
     description="Simple atomic swap system",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
-    url="https://github.com/tecnovert/basicswap",
+    url="https://github.com/basicswap/basicswap",
     packages=setuptools.find_packages(),
     include_package_data=True,
     classifiers=[

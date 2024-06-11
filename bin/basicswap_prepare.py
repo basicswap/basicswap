@@ -846,7 +846,7 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
     else:
         pubkey_filename = '{}_{}.pgp'.format(coin, signing_key_name)
     pubkeyurls = [
-        'https://raw.githubusercontent.com/tecnovert/basicswap/master/pgp/keys/' + pubkey_filename,
+        'https://raw.githubusercontent.com/basicswap/basicswap/master/pgp/keys/' + pubkey_filename,
         'https://gitlab.com/particl/basicswap/-/raw/master/pgp/keys/' + pubkey_filename,
     ]
     if coin == 'dash':
@@ -1518,7 +1518,7 @@ def signal_handler(sig, frame):
 
 
 def check_btc_fastsync_data(base_dir, sync_file_path):
-    github_pgp_url = 'https://raw.githubusercontent.com/tecnovert/basicswap/master/pgp'
+    github_pgp_url = 'https://raw.githubusercontent.com/basicswap/basicswap/master/pgp'
     gitlab_pgp_url = 'https://gitlab.com/particl/basicswap/-/raw/master/pgp'
     asc_filename = BITCOIN_FASTSYNC_FILE + '.asc'
     asc_file_path = os.path.join(base_dir, asc_filename)
