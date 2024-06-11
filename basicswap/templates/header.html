@@ -12,6 +12,7 @@
   <link type="text/css" media="all" href="/static/css/style.css" rel="stylesheet">
   <script src="/static/js/main.js"></script>
   <script src="/static/js/libs/flowbite.js"></script>
+
 <script>
   const isDarkMode =
     localStorage.getItem('color-theme') === 'dark' ||
@@ -19,7 +20,7 @@
       window.matchMedia('(prefers-color-scheme: dark)').matches);
 
   if (!localStorage.getItem('color-theme')) {
-    localStorage.setItem('color-theme', isDarkMode ? 'dark' : 'light');
+    localStorage.setItem('color-theme', 'dark');
   }
 
   document.documentElement.classList.toggle('dark', isDarkMode);
@@ -260,26 +261,25 @@
               <!-- dev mode icons on/off -->
               <ul class="xl:flex">
               <li>
-                <div data-tooltip-target="tooltip-debug" class="ml-5 flex items-center text-gray-50 hover:text-gray-100 text-sm">
+                <div data-tooltip-target="tooltip-DEV" class="ml-5 flex items-center text-gray-50 hover:text-gray-100 text-sm">
                   {{ debug_nerd_svg | safe }}
-                  <span data-tooltip-target="tooltip-DEV" ></span> </div>
-                <div id="tooltip-debug" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+                 </div>
+                <div id="tooltip-DEV" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
                   <p><b>Debug mode:</b> Active</p>
                   {% if debug_ui_mode == true %}
                   <p><b>Debug UI mode:</b> Active</p>
-                  {% endif %}
+                  {% endif %}              
                 </div>
                 </li>
                 </ul>
                 <!-- dev mode icons on/off -->
                 {% endif %}
-
+                         
                 {% if encrypted == true %}
                 <ul class="xl:flex"><li>
                 {% if locked == true %}
                 <div data-tooltip-target="tooltip-locked-wallets" class="ml-5 flex items-center text-gray-50 hover:text-gray-100 text-sm">
-                  {{ wallet_locked_svg | safe }}
-                  <span data-tooltip-target="tooltip-locked-wallets" ></span> </div>
+                  {{ wallet_locked_svg | safe }}</div>
                 <div id="tooltip-locked-wallets" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
                   <p><b>Wallets:</b> Locked </p>
                 </div>
@@ -287,8 +287,7 @@
                 <a href='/lock'>
                 <div data-tooltip-target="tooltip-unlocked-wallets" class="ml-5 flex items-center text-gray-50 hover:text-gray-100 text-sm">
                 {{ wallet_unlocked_svg | safe }}
-                  <span data-tooltip-target="tooltip-unlocked-wallets" ></span> </div>
-                <div class="tooltip-arrow" data-popper-arrow></div>
+                 </div>
                 <div id="tooltip-unlocked-wallets" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
                   <p><b>Wallets:</b> Unlocked </p>
                 </div>
@@ -303,7 +302,7 @@
                     <a href="/tor">
                       <div data-tooltip-target="tooltip-tor" class="flex items-center text-gray-50 hover:text-gray-100 text-sm">
                         {{ tor_purple_svg | safe }}
-                    </a> <span data-tooltip-target="tooltip-tor"></span></div>
+                    </a></div>
                     <div id="tooltip-tor" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip"><b>Tor mode:</b> Active
                       {% if tor_established == true %}
                       <br><b>Tor:</b> Connected
@@ -316,7 +315,6 @@
               <button data-tooltip-target="tooltip-darkmode" id="theme-toggle" type="button" class="text-gray-500 dark:text-gray-400 focus:outline-none rounded-lg text-sm ml-5">
                 {{ sun_svg | safe }}
                 {{ moon_svg | safe }}
-               <span data-tooltip-target="tooltip-darkmode"></span>
                   <div id="tooltip-darkmode" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">Dark mode</div>
               </button>
             </div>

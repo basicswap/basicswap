@@ -842,30 +842,46 @@
   <input type="hidden" name="formid" value="{{ form_id }}">
 </form>
 <script>
-  const coinNameToSymbol = {
-    'Bitcoin': 'BTC',
-    'Particl': 'PART',
-    'Particl Blind': 'PART',
-    'Particl Anon': 'PART',
-    'Monero': 'XMR',
-    'Litecoin': 'LTC',
-    'Firo': 'FIRO',
-    'Dash': 'DASH',
-    'PIVX': 'PIVX',
-    'DECRED': 'DCR',
-    'WOWNERO': 'WOW'
-  };
+const coinNameToSymbol = {
+  'Bitcoin': 'BTC',
+  'Particl': 'PART',
+  'Particl Blind': 'PART',
+  'Particl Anon': 'PART',
+  'Monero': 'XMR',
+  'Wownero': 'WOW',
+  'Litecoin': 'LTC',
+  'Firo': 'FIRO',
+  'Dash': 'DASH',
+  'PIVX': 'PIVX',
+  'Decred': 'DCR',
+  'Zano': 'ZANO',
+};
 
-  const getUsdValue = (cryptoValue, coinSymbol) => fetch(`https://min-api.cryptocompare.com/data/price?fsym=${coinSymbol}&tsyms=USD`)
-    .then(response => response.json())
-    .then(data => {
-      const exchangeRate = data.USD;
-      if (!isNaN(exchangeRate)) {
-        return cryptoValue * exchangeRate;
-      } else {
-        throw new Error(`Invalid exchange rate for ${coinSymbol}`);
-      }
-    });
+const getUsdValue = (cryptoValue, coinSymbol) => {
+  if (coinSymbol === 'WOW') {
+    return fetch(`https://api.coingecko.com/api/v3/simple/price?ids=wownero&vs_currencies=usd`)
+      .then(response => response.json())
+      .then(data => {
+        const exchangeRate = data.wownero.usd;
+        if (!isNaN(exchangeRate)) {
+          return cryptoValue * exchangeRate;
+        } else {
+          throw new Error(`Invalid exchange rate for ${coinSymbol}`);
+        }
+      });
+  } else {
+    return fetch(`https://min-api.cryptocompare.com/data/price?fsym=${coinSymbol}&tsyms=USD`)
+      .then(response => response.json())
+      .then(data => {
+        const exchangeRate = data.USD;
+        if (!isNaN(exchangeRate)) {
+          return cryptoValue * exchangeRate;
+        } else {
+          throw new Error(`Invalid exchange rate for ${coinSymbol}`);
+        }
+      });
+  }
+};
 
   const updateUsdValue = async (cryptoCell, coinFullName, usdValueSpan) => {
     const coinSymbol = coinNameToSymbol[coinFullName] || '';

@@ -223,17 +223,37 @@ const coinNameToSymbol = {
 };
 
 const getUsdValue = (cryptoValue, coinSymbol) => {
-  return fetch(`https://min-api.cryptocompare.com/data/price?fsym=${coinSymbol}&tsyms=USD`)
+  let apiUrl;
+
+  if (coinSymbol === 'WOW') {
+    apiUrl = `https://api.coingecko.com/api/v3/simple/price?ids=wownero&vs_currencies=usd`;
+  } else {
+    apiUrl = `https://min-api.cryptocompare.com/data/price?fsym=${coinSymbol}&tsyms=USD`;
+  }
+
+  return fetch(apiUrl)
     .then(response => response.json())
     .then(data => {
-      const exchangeRate = data.USD;
-      if (!isNaN(exchangeRate)) {
-        return {
-          usdValue: cryptoValue * exchangeRate,
-          btcValue: cryptoValue / exchangeRate
-        };
+      if (coinSymbol === 'WOW') {
+        const exchangeRate = data.wownero.usd;
+        if (!isNaN(exchangeRate)) {
+          return {
+            usdValue: cryptoValue * exchangeRate,
+            btcValue: cryptoValue / exchangeRate
+          };
+        } else {
+          throw new Error(`Invalid exchange rate for ${coinSymbol}`);
+        }
       } else {
-        throw new Error(`Invalid exchange rate for ${coinSymbol}`);
+        const exchangeRate = data.USD;
+        if (!isNaN(exchangeRate)) {
+          return {
+            usdValue: cryptoValue * exchangeRate,
+            btcValue: cryptoValue / exchangeRate
+          };
+        } else {
+          throw new Error(`Invalid exchange rate for ${coinSymbol}`);
+        }
       }
     });
 };
