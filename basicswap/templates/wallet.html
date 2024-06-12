@@ -629,44 +629,44 @@
                               </script>
                               {# / LTC #}
                               {% else %}
-                              <button type="button" class="py-1 px-2 bg-blue-500 text-white text-sm rounded-md focus:outline-none" onclick="setAmount(0.25, '{{ w.balance }}', {{ w.cid }})">25%</button> <button type="button" class="ml-2 py-1 px-2 bg-blue-500 text-white text-sm rounded-md focus:outline-none" onclick="setAmount(0.5, '{{ w.balance }}')">50%</button> <button type="button" class="ml-2 py-1 px-2 bg-blue-500 text-white text-sm rounded-md focus:outline-none" onclick="setAmount(1, '{{ w.balance }}', '{{ w.cid }}')">100%</button>
-                              <script>
-                                function setAmount(percent, balance, cid) {
-                                    var amountInput = document.getElementById('amount');
-                                    var floatBalance;
-                                    var calculatedAmount;
+                              <button type="button" class="py-1 px-2 bg-blue-500 text-white text-sm rounded-md focus:outline-none" onclick="setAmount(0.25, '{{ w.balance }}')">25%</button> <button type="button" class="ml-2 py-1 px-2 bg-blue-500 text-white text-sm rounded-md focus:outline-none" onclick="setAmount(0.5, '{{ w.balance }}')">50%</button> <button type="button" class="ml-2 py-1 px-2 bg-blue-500 text-white text-sm rounded-md focus:outline-none" onclick="setAmount(1, '{{ w.balance }}', '{{ w.cid }}')">100%</button>
+<script>
+  function setAmount(percent, balance, cid) {
+    var amountInput = document.getElementById('amount');
+    var floatBalance;
+    var calculatedAmount;
 
-                                    floatBalance = parseFloat(balance);
-                                    calculatedAmount = floatBalance * percent;
-                                    if ((cid == 6 || cid ==  9) && percent === 1) {
-                                        amountInput.setAttribute('data-hidden', 'true');
-                                        amountInput.placeholder = 'Sweep All';
-                                        amountInput.value = '';
-                                        amountInput.disabled = true;
-                                    } else if (amountInput.getAttribute('data-hidden') === 'true' && percent !== 1) {
-                                        amountInput.value = calculatedAmount.toFixed(8);
-                                        amountInput.setAttribute('data-hidden', 'false');
-                                        amountInput.placeholder = '';
-                                        amountInput.disabled = false;
-                                    } else {
-                                        amountInput.value = calculatedAmount.toFixed(8);
-                                        amountInput.placeholder = '';
-                                        amountInput.disabled = false;
-                                    }
-                                    if ((cid == 6 || cid ==  9) && percent === 1) {
-                                        var sweepAllCheckbox = document.getElementById('sweepall');
-                                        if (sweepAllCheckbox) {
-                                            sweepAllCheckbox.checked = true;
-                                        }
-                                    } else {
-                                        var sweepAllCheckbox = document.getElementById('sweepall');
-                                        if (sweepAllCheckbox) {
-                                            sweepAllCheckbox.checked = false;
-                                        }
-                                    }
-                                }
+    floatBalance = parseFloat(balance);
+    calculatedAmount = floatBalance * percent;
 
-                              </script>
+    var specialCids = [6, 9];
+
+    if (specialCids.includes(cid) && percent === 1) {
+        amountInput.setAttribute('data-hidden', 'true');
+        amountInput.placeholder = 'Sweep All';
+        amountInput.value = '';
+        amountInput.disabled = true;
+    } else if (amountInput.getAttribute('data-hidden') === 'true' && percent !== 1) {
+        amountInput.value = calculatedAmount.toFixed(8);
+        amountInput.setAttribute('data-hidden', 'false');
+        amountInput.placeholder = '';
+        amountInput.disabled = false;
+    } else {
+        amountInput.value = calculatedAmount.toFixed(8);
+        amountInput.placeholder = '';
+        amountInput.disabled = false;
+    }
+
+    var sweepAllCheckbox = document.getElementById('sweepall');
+    if (sweepAllCheckbox) {
+        if (specialCids.includes(cid) && percent === 1) {
+            sweepAllCheckbox.checked = true;
+        } else {
+            sweepAllCheckbox.checked = false;
+        }
+    }
+  }
+</script>
                               {% endif %}
                             </div>
                         </td>
