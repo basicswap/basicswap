@@ -1344,8 +1344,13 @@ class DCRInterface(Secp256k1Interface):
         if chain_synced < 1.0:
             raise ValueError('{} chain isn\'t synced.'.format(self.coin_name()))
 
-        self._log.debug('Finding block at time: {}'.format(start_time))
+        if start_time == 0:
+            self._log.debug('Using genesis block for restore height as keypoololdest is 0.')
+            return 0
 
+        self._log.info('Finding block at time: {} for restore height.'.format(start_time))
+
+        blocks_searched: int = 0
         rpc_conn = self.open_rpc()
         try:
             block_hash = best_block
@@ -1358,6 +1363,9 @@ class DCRInterface(Secp256k1Interface):
                     return block_header['height']
 
                 block_hash = block_header['previousblockhash']
+                blocks_searched += 1
+                if blocks_searched % 10000 == 0:
+                    self._log.debug('Still finding restore height, block at height {} has time {}.'.format(block_header['height'], block_header['time']))
         finally:
             self.close_rpc(rpc_conn)
         raise ValueError('{} wallet restore height not found.'.format(self.coin_name()))
