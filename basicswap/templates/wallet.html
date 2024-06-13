@@ -629,7 +629,7 @@
                               </script>
                               {# / LTC #}
                               {% else %}
-                              <button type="button" class="py-1 px-2 bg-blue-500 text-white text-sm rounded-md focus:outline-none" onclick="setAmount(0.25, '{{ w.balance }}')">25%</button> <button type="button" class="ml-2 py-1 px-2 bg-blue-500 text-white text-sm rounded-md focus:outline-none" onclick="setAmount(0.5, '{{ w.balance }}')">50%</button> <button type="button" class="ml-2 py-1 px-2 bg-blue-500 text-white text-sm rounded-md focus:outline-none" onclick="setAmount(1, '{{ w.balance }}', '{{ w.cid }}')">100%</button>
+                              <button type="button" class="py-1 px-2 bg-blue-500 text-white text-sm rounded-md focus:outline-none" onclick="setAmount(0.25, '{{ w.balance }}', {{ w.cid }})">25%</button> <button type="button" class="ml-2 py-1 px-2 bg-blue-500 text-white text-sm rounded-md focus:outline-none" onclick="setAmount(0.5, '{{ w.balance }}')">50%</button> <button type="button" class="ml-2 py-1 px-2 bg-blue-500 text-white text-sm rounded-md focus:outline-none" onclick="setAmount(1, '{{ w.balance }}', '{{ w.cid }}')">100%</button>
                               <script>
                                 function setAmount(percent, balance, cid) {
                                     var amountInput = document.getElementById('amount');
@@ -638,7 +638,7 @@
 
                                     floatBalance = parseFloat(balance);
                                     calculatedAmount = floatBalance * percent;
-                                    if (cid in '6, 9' && percent === 1) {
+                                    if ((cid == 6 || cid ==  9) && percent === 1) {
                                         amountInput.setAttribute('data-hidden', 'true');
                                         amountInput.placeholder = 'Sweep All';
                                         amountInput.value = '';
@@ -653,7 +653,7 @@
                                         amountInput.placeholder = '';
                                         amountInput.disabled = false;
                                     }
-                                    if (cid in '6, 9' && percent === 1) {
+                                    if ((cid == 6 || cid ==  9) && percent === 1) {
                                         var sweepAllCheckbox = document.getElementById('sweepall');
                                         if (sweepAllCheckbox) {
                                             sweepAllCheckbox.checked = true;
