@@ -849,7 +849,7 @@ class DCRInterface(Secp256k1Interface):
         blockchaininfo = self.rpc('getblockchaininfo')
         last_block_header = self.rpc('getblockheader', [blockchaininfo['bestblockhash']])
 
-        max_tries = 5000
+        max_tries = 15000
         for i in range(max_tries):
             prev_block_header = self.rpc('getblockheader', [last_block_header['previousblockhash']])
             if prev_block_header['time'] <= time:

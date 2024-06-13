@@ -3589,6 +3589,7 @@ class BasicSwap(BaseApp):
         # Bid saved in checkBidState
 
     def setLastHeightCheckedStart(self, coin_type, tx_height: int, session=None) -> int:
+        self.log.debug('setLastHeightCheckedStart {} {}'.format(Coins(coin_type).name, tx_height))
         ci = self.ci(coin_type)
         coin_name = ci.coin_name()
         if tx_height < 1:
@@ -3924,6 +3925,7 @@ class BasicSwap(BaseApp):
                         chain_a_block_header = ci_from.getBlockHeaderFromHeight(bid.xmr_a_lock_tx.chain_height)
                         block_time = chain_a_block_header['time']
                         chain_b_block_header = ci_to.getBlockHeaderAt(block_time)
+                        self.log.debug('chain a block_time {}, chain b block height {}'.format(block_time, chain_b_block_header['height']))
                         dest_script = ci_to.getPkDest(xmr_swap.pkbs)
                         self.addWatchedScript(ci_to.coin_type(), bid.bid_id, dest_script, TxTypes.XMR_SWAP_B_LOCK)
                         self.setLastHeightCheckedStart(ci_to.coin_type(), chain_b_block_header['height'], session)
@@ -4521,9 +4523,16 @@ class BasicSwap(BaseApp):
         chain_blocks = ci.getChainHeight()
         last_height_checked: int = c['last_height_checked']
         block_check_min_time: int = c['block_check_min_time']
-        self.log.debug('chain_blocks, last_height_checked %d %d', chain_blocks, last_height_checked)
+        self.log.debug('{} chain_blocks, last_height_checked {} {}'.format(ci.ticker(), chain_blocks, last_height_checked))
 
+        blocks_checked: int = 0
         while last_height_checked < chain_blocks:
+            if self.delay_event.is_set():
+                break
+            blocks_checked += 1
+            if blocks_checked % 10000 == 0:
+                self.log.debug('{} chain_blocks, last_height_checked, blocks_checked {} {} {}'.format(ci.ticker(), chain_blocks, last_height_checked, blocks_checked))
+
             block_hash = ci.rpc('getblockhash', [last_height_checked + 1])
             try:
                 block = ci.getBlockWithTxns(block_hash)
