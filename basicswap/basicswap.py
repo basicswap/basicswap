@@ -315,6 +315,7 @@ class BasicSwap(BaseApp):
         self._wallet_update_timeout = self.settings.get('wallet_update_timeout', 10)
 
         self._restrict_unknown_seed_wallets = self.settings.get('restrict_unknown_seed_wallets', True)
+        self._max_check_loop_blocks = self.settings.get('max_check_loop_blocks', 100000)
 
         self._bid_expired_leeway = 5
 
@@ -1220,8 +1221,8 @@ class BasicSwap(BaseApp):
                     chain_a_block_header = ci_from.getBlockHeaderFromHeight(bid.xmr_a_lock_tx.chain_height)
                     chain_b_block_header = ci_to.getBlockHeaderAt(chain_a_block_header['time'])
                     dest_script = ci_to.getPkDest(xmr_swap.pkbs)
-                    self.addWatchedScript(ci_to.coin_type(), bid.bid_id, dest_script, TxTypes.XMR_SWAP_B_LOCK)
                     self.setLastHeightCheckedStart(ci_to.coin_type(), chain_b_block_header['height'], session)
+                    self.addWatchedScript(ci_to.coin_type(), bid.bid_id, dest_script, TxTypes.XMR_SWAP_B_LOCK)
         else:
             self.swaps_in_progress[bid.bid_id] = (bid, offer)
 
@@ -1231,11 +1232,11 @@ class BasicSwap(BaseApp):
                 self.addWatchedOutput(coin_to, bid.bid_id, bid.participate_tx.txid.hex(), bid.participate_tx.vout, BidStates.SWAP_PARTICIPATING)
 
             if ci_to.watch_blocks_for_scripts() and bid.participate_tx and bid.participate_tx.txid is None:
-                self.addWatchedScript(coin_to, bid.bid_id, ci_to.getScriptDest(bid.participate_tx.script), TxTypes.PTX)
                 if bid.initiate_tx and bid.initiate_tx.chain_height:
                     chain_a_block_header = ci_from.getBlockHeaderFromHeight(bid.initiate_tx.chain_height)
                     chain_b_block_header = ci_to.getBlockHeaderAt(chain_a_block_header['time'])
                     self.setLastHeightCheckedStart(coin_to, chain_b_block_header['height'], session)
+                self.addWatchedScript(coin_to, bid.bid_id, ci_to.getScriptDest(bid.participate_tx.script), TxTypes.PTX)
 
             if self.coin_clients[coin_from]['last_height_checked'] < 1:
                 if bid.initiate_tx and bid.initiate_tx.chain_height:
@@ -3583,13 +3584,14 @@ class BasicSwap(BaseApp):
             )
             ci = self.ci(offer.coin_to)
             if ci.watch_blocks_for_scripts() is True:
+                chain_a_block_header = self.ci(offer.coin_from).getBlockHeaderFromHeight(bid.initiate_tx.chain_height)
+                chain_b_block_header = self.ci(offer.coin_to).getBlockHeaderAt(chain_a_block_header['time'])
+                self.setLastHeightCheckedStart(offer.coin_to, chain_b_block_header['height'])
                 self.addWatchedScript(offer.coin_to, bid_id, ci.getScriptDest(participate_script), TxTypes.PTX)
-                self.setLastHeightCheckedStart(offer.coin_to, bid.initiate_tx.chain_height)
 
         # Bid saved in checkBidState
 
     def setLastHeightCheckedStart(self, coin_type, tx_height: int, session=None) -> int:
-        self.log.debug('setLastHeightCheckedStart {} {}'.format(Coins(coin_type).name, tx_height))
         ci = self.ci(coin_type)
         coin_name = ci.coin_name()
         if tx_height < 1:
@@ -3607,7 +3609,9 @@ class BasicSwap(BaseApp):
             cc['last_height_checked'] = tx_height
             cc['block_check_min_time'] = block_time
             self.setIntKV('block_check_min_time_' + coin_name, block_time, session)
-            self.log.debug('Rewind checking of %s chain to height %d', coin_name, tx_height)
+            self.log.debug('Rewind %s chain last height checked to %d', coin_name, tx_height)
+        else:
+            self.log.debug('Not setting %s chain last height checked to %d, leaving on %d', coin_name, tx_height, cc['last_height_checked'])
 
         return tx_height
 
@@ -3927,8 +3931,8 @@ class BasicSwap(BaseApp):
                         chain_b_block_header = ci_to.getBlockHeaderAt(block_time)
                         self.log.debug('chain a block_time {}, chain b block height {}'.format(block_time, chain_b_block_header['height']))
                         dest_script = ci_to.getPkDest(xmr_swap.pkbs)
-                        self.addWatchedScript(ci_to.coin_type(), bid.bid_id, dest_script, TxTypes.XMR_SWAP_B_LOCK)
                         self.setLastHeightCheckedStart(ci_to.coin_type(), chain_b_block_header['height'], session)
+                        self.addWatchedScript(ci_to.coin_type(), bid.bid_id, dest_script, TxTypes.XMR_SWAP_B_LOCK)
 
                 if bid_changed:
                     self.saveBidInSession(bid_id, bid, session, xmr_swap)
@@ -4532,6 +4536,9 @@ class BasicSwap(BaseApp):
             blocks_checked += 1
             if blocks_checked % 10000 == 0:
                 self.log.debug('{} chain_blocks, last_height_checked, blocks_checked {} {} {}'.format(ci.ticker(), chain_blocks, last_height_checked, blocks_checked))
+            if blocks_checked > self._max_check_loop_blocks:
+                self.log.debug('Hit max_check_loop_blocks for {} chain_blocks, last_height_checked {} {}'.format(ci.ticker(), chain_blocks, last_height_checked))
+                break
 
             block_hash = ci.rpc('getblockhash', [last_height_checked + 1])
             try:

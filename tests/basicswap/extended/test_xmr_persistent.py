@@ -100,6 +100,8 @@ def updateThread(cls):
         try:
             if cls.btc_addr is not None:
                 callbtcrpc(0, 'generatetoaddress', [1, cls.btc_addr])
+            if cls.ltc_addr is not None:
+                callltcrpc(0, 'generatetoaddress', [1, cls.ltc_addr])
         except Exception as e:
             print('updateThread error', str(e))
         cls.delay_event.wait(random.randrange(cls.update_min, cls.update_max))
