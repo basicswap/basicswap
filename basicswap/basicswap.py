@@ -7553,9 +7553,11 @@ class BasicSwap(BaseApp):
         use_session = self.openSession(session)
         try:
             mode = '-' if active_ind == 0 else '+'
-            self.callrpc('smsglocalkeys', ['recv', mode, address])
+            rv = self.callrpc('smsglocalkeys', ['recv', mode, address])
+            if 'not found' in rv['result']:
+                self.callrpc('smsgaddlocaladdress', [address,])
+                self.callrpc('smsglocalkeys', ['anon', '-', address])
             values = {'active_ind': active_ind, 'addr': address, 'use_type': use_type}
-
             query_str: str = 'UPDATE smsgaddresses SET active_ind = :active_ind'
             if addressnote is not None:
                 values['note'] = addressnote
