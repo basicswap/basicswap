@@ -501,7 +501,7 @@ window.addEventListener('load', function() {
 });
 
 function fetchWowneroData(coinGeckoApiKey) {
-    fetch(`https://api.coingecko.com/api/v3/coins/wownero/market_chart?vs_currency=usd&days=1&api_key={{coingecko_api_key}}`)
+    fetch(`https://api.coingecko.com/api/v3/coins/wownero/market_chart?vs_currency=usd&days=30&api_key={{coingecko_api_key}}`)
         .then(response => {
             if (!response.ok) {
                 throw new Error(`Error fetching data. Status: ${response.status}`);
@@ -605,19 +605,19 @@ function displayZanoData(data) {
 function displayCoinData(coin, data) {
     const priceUSD = data.RAW[coin].USD.PRICE;
     const priceBTC = data.RAW[coin].BTC.PRICE;
-    const priceChange1h = data.RAW[coin].USD.CHANGEPCTHOUR;
+    const priceChange1d = data.RAW[coin].USD.CHANGEPCT24HOUR;
     const volume24h = data.RAW[coin].USD.TOTALVOLUME24HTO;
     document.querySelector(`#${coin.toLowerCase()}-price-usd`).textContent = priceUSD.toFixed(2) + ' $';
     if (coin !== 'BTC') {
         document.querySelector(`#${coin.toLowerCase()}-price-btc`).textContent = priceBTC.toFixed(8) + ' BTC';
     }
-    document.querySelector(`#${coin.toLowerCase()}-price-change-container`).textContent = priceChange1h.toFixed(2) + '%';
+    document.querySelector(`#${coin.toLowerCase()}-price-change-container`).textContent = priceChange1d.toFixed(2) + '%';
     document.querySelector(`#${coin.toLowerCase()}-volume-24h`).textContent = volume24h.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',') + ' USD';
     const priceChangeContainer = document.querySelector(`#${coin.toLowerCase()}-price-change-container`);
-    if (priceChange1h >= 0) {
-        priceChangeContainer.innerHTML = positivePriceChangeHTML(priceChange1h);
+    if (priceChange1d >= 0) {
+        priceChangeContainer.innerHTML = positivePriceChangeHTML(priceChange1d);
     } else {
-        priceChangeContainer.innerHTML = negativePriceChangeHTML(priceChange1h);
+        priceChangeContainer.innerHTML = negativePriceChangeHTML(priceChange1d);
     }
 }
 
