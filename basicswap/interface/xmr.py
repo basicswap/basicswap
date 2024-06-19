@@ -481,7 +481,7 @@ class XMRInterface(CoinInterface):
                     raise ValueError('Balance must be fully confirmed to use sweep all.')
                 self._log.info('{} {} sweep_all.'.format(self.ticker_str(), 'estimate fee' if estimate_fee else 'withdraw'))
                 self._log.debug('{} balance: {}'.format(self.ticker_str(), balance['balance']))
-                params = {'address': addr_to, 'do_not_relay': estimate_fee}
+                params = {'address': addr_to, 'do_not_relay': estimate_fee, 'subaddr_indices_all': True}
                 if self._fee_priority > 0:
                     params['priority'] = self._fee_priority
                 rv = self.rpc_wallet('sweep_all', params)

@@ -169,6 +169,7 @@ class Test(unittest.TestCase):
         cls.update_thread_dcr = None
         cls.processes = []
         cls.btc_addr = None
+        cls.ltc_addr = None
         cls.xmr_addr = None
         cls.dcr_addr = 'SsYbXyjkKAEXXcGdFgr4u4bo4L8RkCxwQpH'
         cls.dcr_acc = None
