@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-{% from 'style.html' import notifications_network_offer_svg, notifications_bid_accepted_svg, notifications_unknow_event_svg, notifications_new_bid_on_offer_svg, notifications_close_svg, swap_in_progress_mobile_svg, wallet_svg, page_back_svg, order_book_svg, new_offer_svg, settings_svg, asettings_svg, cog_svg, rpc_svg, debug_svg, explorer_svg, tor_svg, smsg_svg, outputs_svg, automation_svg, shutdown_svg, notifications_svg, debug_nerd_svg, wallet_locked_svg, mobile_menu_svg, wallet_unlocked_svg, tor_purple_svg, sun_svg, moon_svg, swap_in_progress_svg, swap_in_progress_green_svg, available_bids_svg, your_offers_svg, bids_received_svg, bids_sent_svg, header_arrow_down_svg, love_svg %}
+{% from 'style.html' import change_password_svg, notifications_network_offer_svg, notifications_bid_accepted_svg, notifications_unknow_event_svg, notifications_new_bid_on_offer_svg, notifications_close_svg, swap_in_progress_mobile_svg, wallet_svg, page_back_svg, order_book_svg, new_offer_svg, settings_svg, asettings_svg, cog_svg, rpc_svg, debug_svg, explorer_svg, tor_svg, smsg_svg, outputs_svg, automation_svg, shutdown_svg, notifications_svg, debug_nerd_svg, wallet_locked_svg, mobile_menu_svg, wallet_unlocked_svg, tor_purple_svg, sun_svg, moon_svg, swap_in_progress_svg, swap_in_progress_green_svg, available_bids_svg, your_offers_svg, bids_received_svg, bids_sent_svg, header_arrow_down_svg, love_svg %}
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -130,6 +130,10 @@
               <a href="/settings" class="flex items-center block py-4 px-4 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-white"> <span class="sr-only">Settings</span>
             {{ cog_svg | safe }} Settings</a>
             </li>
+              <li>
+              <a href="/changepassword" class="flex items-center block py-4 px-4 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-white"> <span class="sr-only">Change/Set Password</span>
+            {{ change_password_svg | safe }} Change/Set Password</a>
+            </li>         
             {% if debug_mode == true %}
             <li>
               <a href="/rpc" class="flex items-center block py-4 px-4 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-white"> <span class="sr-only">RPC</span>
@@ -450,6 +454,11 @@
               <a class="flex items-center pl-3 py-3 pr-2 text-gray-50 hover:bg-gray-900 rounded" href="/settings"> <span class="inline-block mr-3">
                   {{ settings_svg | safe }}
                   </span><span>Settings</span></a>
+            </li>
+           <li>
+              <a class="flex items-center pl-3 py-3 pr-2 text-gray-50 hover:bg-gray-900 rounded" href="/changepassword"> <span class="inline-block mr-3">
+                  {{ change_password_svg | safe }}
+                  </span><span>Change/Set Password</span></a>
             </li>
             {% if debug_mode == true %}
             <li>
