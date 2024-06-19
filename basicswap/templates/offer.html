@@ -1,5 +1,5 @@
 {% include 'header.html' %}
-{% from 'style.html' import breadcrumb_line_svg, input_arrow_down_svg, circular_arrows_svg, confirm_green_svg, green_cross_close_svg %}
+{% from 'style.html' import breadcrumb_line_svg, input_arrow_down_svg, circular_arrows_svg, confirm_green_svg, green_cross_close_svg, circular_info_messages_svg %}
 
 <div class="container mx-auto">
  <section class="p-5 mt-5">
@@ -57,19 +57,21 @@
  {% if sent_bid_id %}
 <section class="py-4" id="messages_send_bid_id" role="alert">
   <div class="container px-4 mx-auto">
-    <div class="p-6 bg-green-100 border border-green-200 rounded-md">
+    <div class="p-6 text-green-800 rounded-lg bg-green-50 border border-green-500 dark:bg-gray-500 dark:text-green-400 rounded-md">
       <div class="flex flex-wrap justify-between items-center -m-2">
         <div class="flex-1 p-2">
           <div class="flex flex-wrap -m-1">
             <div class="w-auto p-1">
-            {{ confirm_green_svg | safe }}
+            {{ circular_info_messages_svg | safe }}
             </div>
-            <div class="flex-1 p-1">
-              <h3 class="infomsg font-medium text-sm text-green-900">Sent Bid {{ sent_bid_id }}</h3></div>
-          </div>
+        <ul class="ml-4 mt-1">
+            <li class="font-semibold text-sm text-green-500 error_msg"><span class="bold">INFO:</span></li>
+                <li class="font-medium text-sm text-green-500 infomsg">Sent Bid {{ sent_bid_id }}</li>
+        </ul>
+           </div>             
         </div>
         <div class="w-auto p-2">
-          <button type="button" class="ml-auto bg-green-100 text-green-500 rounded-lg focus:ring-0 focus:ring-green-400 p-1.5 hover:bg-green-200 inline-flex h-8 w-8 focus:outline-none" data-dismiss-target="#messages_send_bid_id" aria-label="Close"><span class="sr-only">Close</span>
+          <button type="button" class="ms-auto bg-green-50 text-green-500 rounded-lg focus:ring-0 focus:ring-green-400 p-1.5 hover:bg-green-200 inline-flex items-center justify-center h-8 w-8 focus:outline-none dark:bg-gray-800 dark:text-green-400 dark:hover:bg-gray-700" data-dismiss-target="#messages_send_bid_id" aria-label="Close"><span class="sr-only">Close</span>
             {{ green_cross_close_svg | safe }}
           </button>
         </div>
