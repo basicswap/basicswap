@@ -648,18 +648,13 @@
     const specialCids = [6, 9];
 
     if (specialCids.includes(parseInt(cid)) && percent === 1) {
-        amountInput.setAttribute('data-hidden', 'true');
-        amountInput.placeholder = 'Sweep All';
-        amountInput.value = '';
+        amountInput.value = floatBalance.toFixed(8);
         amountInput.disabled = true;
-    } else if (amountInput.getAttribute('data-hidden') === 'true' && percent !== 1) {
+    } else if (amountInput.disabled === true && percent !== 1) {
         amountInput.value = calculatedAmount.toFixed(8);
-        amountInput.setAttribute('data-hidden', 'false');
-        amountInput.placeholder = '';
         amountInput.disabled = false;
     } else {
         amountInput.value = calculatedAmount.toFixed(8);
-        amountInput.placeholder = '';
         amountInput.disabled = false;
     }
 
@@ -683,7 +678,7 @@
  </td>
 </tr>
 <tr class="opacity-100 text-gray-500 dark:text-gray-100">
-  {% if w.cid in [6, 9] %} {# XMR | WOW #}
+  {% if w.cid in '6, 9' %} {# XMR | WOW #}
   <td class="py-3 px-6 bold">Sweep All:</td>
   <td class="py-3 px-6">
     <input class="hover:border-blue-500 w-5 h-5 form-check-input text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-1 dark:bg-gray-500 dark:border-gray-400" type="checkbox" id="sweepall" name="sweepall_{{ w.cid }}" {% if w.wd_sweepall==true %} checked=checked{% endif %}>
