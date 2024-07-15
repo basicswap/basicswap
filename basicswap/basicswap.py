@@ -722,6 +722,12 @@ class BasicSwap(BaseApp):
         elif coin == Coins.NAV:
             from .interface.nav import NAVInterface
             return NAVInterface(self.coin_clients[coin], self.chain, self)
+        elif coin == Coins.XNO:
+            from .interface.xno import XNOInterface
+            xno_i = XNOInterface(self.coin_clients[coin], self.chain, self)
+            #chain_client_settings = self.getChainClientSettings(coin)
+            #xno_i.setWalletFilename(chain_client_settings['walletfile'])
+            return xno_i
         else:
             raise ValueError('Unknown coin type')
 
@@ -734,6 +740,12 @@ class BasicSwap(BaseApp):
 
     def setCoinRunParams(self, coin):
         cc = self.coin_clients[coin]
+
+        # FIXME
+        if cc['name'] == 'nano':
+            self.log.warning('ignoring setCoinRunParams for nano')
+            return
+
         if coin in (Coins.XMR, Coins.WOW):
             return
         if cc['connection_type'] == 'rpc' and cc['rpcauth'] is None:
@@ -743,8 +755,13 @@ class BasicSwap(BaseApp):
             pidfilename = cc['name']
             if cc['name'] in ('bitcoin', 'litecoin', 'namecoin', 'dash', 'firo'):
                 pidfilename += 'd'
+            elif cc['name'] == 'nano':
+                pidfilename = 'nano_node'
+                # https://github.com/nanocurrency/nano-node/issues/4682
+                # nano_node should allow to write the process id to a pid file
 
             pidfilepath = os.path.join(self.getChainDatadirPath(coin), pidfilename + '.pid')
+            print("basicswap/basicswap.py 750 pidfilepath", pidfilepath)
             self.log.debug('Reading %s rpc credentials from auth cookie %s', Coins(coin).name, authcookiepath)
             # Wait for daemon to start
             # Test pids to ensure authcookie is read for the correct process
@@ -757,7 +774,7 @@ class BasicSwap(BaseApp):
                     else:
                         with open(pidfilepath, 'rb') as fp:
                             datadir_pid = int(fp.read().decode('utf-8'))
-                        assert (datadir_pid == cc['pid']), 'Mismatched pid'
+                        assert (datadir_pid == cc['pid']), f'Mismatched pid in {pidfilepath}: {datadir_pid} != {cc["pid"]}'
                     assert (os.path.exists(authcookiepath))
                     break
                 except Exception as e:
@@ -766,12 +783,15 @@ class BasicSwap(BaseApp):
                     self.delay_event.wait(0.5)
             try:
                 if os.name != 'nt' or cc['core_version_group'] > 17:  # Litecoin on windows doesn't write a pid file
-                    assert (datadir_pid == cc['pid']), 'Mismatched pid'
+                    # FIXME cc['pid'] == None
+                    assert (datadir_pid == cc['pid']), f'Mismatched pid in {pidfilepath}: {datadir_pid} != {cc["pid"]}'
                 with open(authcookiepath, 'rb') as fp:
                     cc['rpcauth'] = escape_rpcauth(fp.read().decode('utf-8'))
             except Exception as e:
                 self.log.error('Unable to read authcookie for %s, %s, datadir pid %d, daemon pid %s. Error: %s', Coins(coin).name, authcookiepath, datadir_pid, cc['pid'], str(e))
-                raise ValueError('Error, terminating')
+                # no. avoid "During handling of the above exception, another exception occurred"
+                #raise ValueError('Error, terminating')
+                raise
 
     def createCoinInterface(self, coin):
         if self.coin_clients[coin]['connection_type'] == 'rpc':

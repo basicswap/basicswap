@@ -39,6 +39,7 @@ setuptools.setup(
         "Jinja2",
         "pycryptodome",
         "PySocks",
+        "coincurve",
     ],
     entry_points={
         "console_scripts": [

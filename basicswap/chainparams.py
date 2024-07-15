@@ -11,6 +11,7 @@ from .util import (
 
 XMR_COIN = 10 ** 12
 WOW_COIN = 10 ** 11
+XNO_COIN = 10 ** 10 # FIXME
 
 
 class Coins(IntEnum):
@@ -30,6 +31,7 @@ class Coins(IntEnum):
     NAV = 14
     LTC_MWEB = 15
     # ZANO = 16
+    XNO = 17
 
 
 chainparams = {
@@ -246,6 +248,34 @@ chainparams = {
             'walletrpcport': 18082,
             'min_amount': 100000,
             'max_amount': 10000 * XMR_COIN,
+            'address_prefix': 18,
+        }
+    },
+    Coins.XNO: {
+        'name': 'nano',
+        'ticker': 'XNO',
+        'client': 'xno',
+        # FIXME ...
+        'decimal_places': 12,
+        'mainnet': {
+            'rpcport': 18081,
+            #'walletrpcport': 18082,
+            'min_amount': 100000,
+            'max_amount': 10000 * XNO_COIN,
+            'address_prefix': 18,
+        },
+        'testnet': {
+            'rpcport': 28081,
+            #'walletrpcport': 28082,
+            'min_amount': 100000,
+            'max_amount': 10000 * XNO_COIN,
+            'address_prefix': 18,
+        },
+        'regtest': {
+            'rpcport': 18081,
+            #'walletrpcport': 18082,
+            'min_amount': 100000,
+            'max_amount': 10000 * XNO_COIN,
             'address_prefix': 18,
         }
     },

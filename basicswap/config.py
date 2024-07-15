@@ -36,3 +36,8 @@ NAMECOIN_TX = os.getenv('NAMECOIN_TX', 'namecoin-tx' + bin_suffix)
 XMR_BINDIR = os.path.expanduser(os.getenv('XMR_BINDIR', os.path.join(DEFAULT_TEST_BINDIR, 'monero')))
 XMRD = os.getenv('XMRD', 'monerod' + bin_suffix)
 XMR_WALLET_RPC = os.getenv('XMR_WALLET_RPC', 'monero-wallet-rpc' + bin_suffix)
+
+XNO_BINDIR = os.path.expanduser(os.getenv('XNO_BINDIR', os.path.join(DEFAULT_TEST_BINDIR, 'nano')))
+XNO_NODE = os.getenv('XNO_NODE', 'nano_node' + bin_suffix)
+XNO_RPC = os.getenv('XNO_RPC', 'nano_rpc' + bin_suffix)
+XNO_WALLET = os.getenv('XNO_WALLET', 'nano_wallet' + bin_suffix)

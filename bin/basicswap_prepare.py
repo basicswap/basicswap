@@ -5,6 +5,8 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
+debug = True
+
 import contextlib
 import gnupg
 import hashlib
@@ -25,6 +27,7 @@ import threading
 import time
 import urllib.parse
 import zipfile
+import traceback
 
 from urllib.error import ContentTooShortError
 from urllib.parse import _splittype
@@ -54,6 +57,9 @@ BITCOIN_VERSION_TAG = os.getenv('BITCOIN_VERSION_TAG', '')
 MONERO_VERSION = os.getenv('MONERO_VERSION', '0.18.3.3')
 MONERO_VERSION_TAG = os.getenv('MONERO_VERSION_TAG', '')
 XMR_SITE_COMMIT = 'd00169a6decd9470ebdf6a75e3351df4ebcd260a'  # Lock hashes.txt to monero version
+
+NANO_VERSION = os.getenv('NANO_VERSION', '26.1')
+NANO_VERSION_TAG = os.getenv('NANO_VERSION_TAG', '')
 
 WOWNERO_VERSION = os.getenv('WOWNERO_VERSION', '0.11.1.0')
 WOWNERO_VERSION_TAG = os.getenv('WOWNERO_VERSION_TAG', '')
@@ -90,6 +96,7 @@ known_coins = {
     'decred': (DCR_VERSION, DCR_VERSION_TAG, ('decred_release',)),
     'namecoin': ('0.18.0', '', ('JeremyRand',)),
     'monero': (MONERO_VERSION, MONERO_VERSION_TAG, ('binaryfate',)),
+    'nano': (NANO_VERSION, NANO_VERSION_TAG, ('whatisthis-maybe-username',)),
     'wownero': (WOWNERO_VERSION, WOWNERO_VERSION_TAG, ('wowario',)),
     'pivx': (PIVX_VERSION, PIVX_VERSION_TAG, ('fuzzbawls',)),
     'dash': (DASH_VERSION, DASH_VERSION_TAG, ('pasta',)),
@@ -162,6 +169,17 @@ XMR_WALLET_RPC_PWD = os.getenv('XMR_WALLET_RPC_PWD', 'xmr_wallet_pwd')
 XMR_RPC_USER = os.getenv('XMR_RPC_USER', '')
 XMR_RPC_PWD = os.getenv('XMR_RPC_PWD', '')
 DEFAULT_XMR_RESTORE_HEIGHT = int(os.getenv('DEFAULT_XMR_RESTORE_HEIGHT', 2245107))
+
+XNO_RPC_HOST = os.getenv('XNO_RPC_HOST', '127.0.0.1')
+BASE_XNO_RPC_PORT = int(os.getenv('BASE_XNO_RPC_PORT', 7076))
+#BASE_XNO_ZMQ_PORT = int(os.getenv('BASE_XNO_ZMQ_PORT', 30898))
+#BASE_XNO_WALLET_PORT = int(os.getenv('BASE_XNO_WALLET_PORT', 29998))
+#XNO_WALLET_RPC_HOST = os.getenv('XNO_WALLET_RPC_HOST', '127.0.0.1')
+#XNO_WALLET_RPC_USER = os.getenv('XNO_WALLET_RPC_USER', 'XNO_wallet_user')
+#XNO_WALLET_RPC_PWD = os.getenv('XNO_WALLET_RPC_PWD', 'XNO_wallet_pwd')
+XNO_RPC_USER = os.getenv('XNO_RPC_USER', '')
+XNO_RPC_PWD = os.getenv('XNO_RPC_PWD', '')
+#DEFAULT_XNO_RESTORE_HEIGHT = int(os.getenv('DEFAULT_XNO_RESTORE_HEIGHT', 2245107))
 
 WOW_RPC_HOST = os.getenv('WOW_RPC_HOST', '127.0.0.1')
 BASE_WOW_RPC_PORT = int(os.getenv('BASE_WOW_RPC_PORT', 34598))
@@ -413,6 +431,8 @@ def popConnectionParameters() -> None:
 
 
 def downloadFile(url: str, path: str, timeout=5, resume_from=0) -> None:
+    # this is avoided by replacing "bin_dir = None"
+    #raise 123
     logger.info(f'Downloading file {url}')
     logger.info(f'To {path}')
     try:
@@ -522,6 +542,7 @@ def extractCore(coin, version_data, settings, bin_dir, release_path, extra_opts=
         elif coin == 'firo':
             bins = [coin + 'd', coin + '-cli', coin + '-tx']
         else:
+            print("bin/basicswap_prepare.py 540 Unknown coin")
             raise ValueError('Unknown coin')
 
         if 'win32' in BIN_ARCH or 'win64' in BIN_ARCH:
@@ -632,6 +653,8 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
         os_name = 'linux'
         if coin == 'particl':
             filename_extra = PARTICL_LINUX_EXTRA
+
+    print("bin/basicswap_prepare.py 650 coin", repr(coin))
 
     signing_key_name = signers[0]
     if coin == 'monero':
@@ -784,7 +807,10 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
             assert_filename = 'SHA256SUM_7.0.3.asc'
             assert_sig_filename = 'SHA256SUM_7.0.3.asc.sig'
             assert_url = 'https://github.com/navcoin/navcoin-core/releases/download/{}/{}'.format(version + version_tag, assert_filename)
+        elif coin == 'nano':
+            raise NotImplementedError
         else:
+            print("bin/basicswap_prepare.py 800 Unknown coin")
             raise ValueError('Unknown coin')
 
         release_path = os.path.join(bin_dir, release_filename)
@@ -1116,7 +1142,11 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
             fp.write('fallbackfee=0.0002\n')
             if NAV_RPC_USER != '':
                 fp.write('rpcauth={}:{}${}\n'.format(NAV_RPC_USER, salt, password_to_hmac(salt, NAV_RPC_PWD)))
+        elif coin == 'nano':
+            # TODO?
+            pass
         else:
+            print("bin/basicswap_prepare.py 1140 Unknown coin")
             logger.warning('Unknown coin %s', coin)
 
     if coin == 'bitcoin' and extra_opts.get('use_btc_fastsync', False) is True:
@@ -1329,6 +1359,8 @@ def finalise_daemon(d):
         d.handle.wait(timeout=120)
     except Exception as e:
         logging.info(f'Error {e} for process {d.handle.pid}')
+        if debug:
+            traceback.print_exc()
     for fp in [d.handle.stdout, d.handle.stderr, d.handle.stdin] + d.files:
         if fp:
             fp.close()
@@ -1349,8 +1381,10 @@ def test_particl_encryption(data_dir, settings, chain, use_tor_proxy):
             coin_settings = settings['chainclients'][coin_name]
             if coin_settings['manage_daemon']:
                 filename = coin_name + 'd' + ('.exe' if os.name == 'nt' else '')
-                daemons.append(startDaemon(coin_settings['datadir'], coin_settings['bindir'], filename, daemon_args))
-                swap_client.setDaemonPID(c, daemons[-1].handle.pid)
+                print("bin/basicswap_prepare.py 1380 startDaemon")
+                daemon = startDaemon(coin_settings['datadir'], coin_settings['bindir'], filename, daemon_args)
+                daemons.append(daemon)
+                swap_client.setDaemonPID(c, daemon.handle.pid)
             swap_client.setCoinRunParams(c)
             swap_client.createCoinInterface(c)
             swap_client.waitForDaemonRPC(c, with_wallet=True)
@@ -1393,30 +1427,90 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
             # Particl must be loaded first as subsequent coins are initialised from the Particl mnemonic
             start_daemons = ['particl', ] + [c for c in with_coins if c != 'particl']
             for coin_name in start_daemons:
+                # bin/basicswap_prepare.py 1430 starting daemon particl
+                # basicswap/basicswap.py 750 pidfilepath /home/user/.basicswap/particl/particl.pid
+                print(f"bin/basicswap_prepare.py 1430 starting daemon {coin_name}")
                 coin_settings = settings['chainclients'][coin_name]
                 c = swap_client.getCoinIdFromName(coin_name)
 
                 if c == Coins.XMR:
                     if coin_settings['manage_wallet_daemon']:
                         filename = coin_name + '-wallet-rpc' + ('.exe' if os.name == 'nt' else '')
-                        daemons.append(startXmrWalletDaemon(coin_settings['datadir'], coin_settings['bindir'], filename))
+                        print("bin/basicswap_prepare.py 1435 startDaemon")
+                        daemon = startXmrWalletDaemon(coin_settings['datadir'], coin_settings['bindir'], filename)
+                        daemons.append(daemon)
                 elif c == Coins.WOW:
                     if coin_settings['manage_wallet_daemon']:
                         filename = coin_name + '-wallet-rpc' + ('.exe' if os.name == 'nt' else '')
-                        daemons.append(startXmrWalletDaemon(coin_settings['datadir'], coin_settings['bindir'], filename))
+                        print("bin/basicswap_prepare.py 1440 startDaemon")
+                        daemon = startXmrWalletDaemon(coin_settings['datadir'], coin_settings['bindir'], filename)
+                        daemons.append(daemon)
+                elif c == Coins.XNO:
+                    if coin_settings['manage_wallet_daemon']:
+                        filename = coin_name + '_node' + ('.exe' if os.name == 'nt' else '')
+                        print("bin/basicswap_prepare.py 1450 startDaemon")
+                        daemon = startXmrWalletDaemon(coin_settings['datadir'], coin_settings['bindir'], filename)
+                        daemons.append(daemon)
                 elif c == Coins.DCR:
+                    print("bin/basicswap_prepare.py 1455 pass")
                     pass
                 else:
+                    print(f"bin/basicswap_prepare.py 1460 else: coin {coin_name}")
                     if coin_settings['manage_daemon']:
+                        print(f"bin/basicswap_prepare.py 1460 else: coin {coin_name}: manage_daemon=True")
+                        print(f"bin/basicswap_prepare.py 1460 else: coin {coin_name}: manage_daemon=False")
                         filename = coin_name + 'd' + ('.exe' if os.name == 'nt' else '')
                         coin_args = ['-nofindpeers', '-nostaking'] if c == Coins.PART else []
 
                         if c == Coins.FIRO:
                             coin_args += ['-hdseed={}'.format(swap_client.getWalletKey(Coins.FIRO, 1).hex())]
 
-                        daemons.append(startDaemon(coin_settings['datadir'], coin_settings['bindir'], filename, daemon_args + coin_args))
-                        swap_client.setDaemonPID(c, daemons[-1].handle.pid)
+                        print("bin/basicswap_prepare.py 1460 startDaemon")
+                        daemon = startDaemon(coin_settings['datadir'], coin_settings['bindir'], filename, daemon_args + coin_args)
+                        daemons.append(daemon)
+                        swap_client.setDaemonPID(c, daemon.handle.pid)
+                    else:
+                        print(f"bin/basicswap_prepare.py 1460 else: coin {coin_name}: manage_daemon=False")
+                        # get pid of running daemon
+                        #pidfilepath = ... # -> basicswap/basicswap.py
+
+                        # FIXME KeyError: 'particl'
+                        # set cc['pid']
+                        # FIXME refactor with basicswap/basicswap.py: pidfilepath = os.path.join(...
+                        cc = swap_client.coin_clients[c]
+                        pidfilename = cc['name']
+                        if cc['name'] in ('bitcoin', 'litecoin', 'namecoin', 'dash', 'firo'):
+                            pidfilename += 'd'
+                        elif cc['name'] == 'nano':
+                            pidfilename = 'nano_node'
+                            # https://github.com/nanocurrency/nano-node/issues/4682
+                            # nano_node should allow to write the process id to a pid file
+
+                        #pidfilepath = os.path.join(self.getChainDatadirPath(coin), pidfilename + '.pid')
+                        pidfilepath = os.path.join(swap_client.getChainDatadirPath(c), pidfilename + '.pid')
+
+                        if not os.path.exists(pidfilepath):
+                            raise Exception(f'missing pid file: {pidfilepath}')
+
+                        with open(pidfilepath) as f:
+                            pidtext = f.read()
+
+                        try:
+                            pid = int(pidtext)
+                        except Exception:
+                            print(f'failed to parse pid from pid file: {pidfilepath}')
+                            raise
+
+                        # TODO check if process with pid is running
+                        # and if the process name is cc['name']
+
+                        cc['pid'] = pid
+
+                # FIXME cc['pid'] == None
+                # FIXME self.coin_clients['particl]['pid'] == None
+                # FIXME swap_client.coin_clients['particl]['pid'] == None
                 swap_client.setCoinRunParams(c)
+
                 swap_client.createCoinInterface(c)
 
                 if c in coins_to_create_wallets_for:
@@ -1460,7 +1554,13 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
                         if particl_wallet_mnemonic is None:
                             particl_wallet_mnemonic = swap_client.callcoinrpc(Coins.PART, 'mnemonic', ['new'])['mnemonic']
                             generated_mnemonic = True
-                        swap_client.callcoinrpc(Coins.PART, 'extkeyimportmaster', [particl_wallet_mnemonic])
+                        #swap_client.callcoinrpc(Coins.PART, 'extkeyimportmaster', [particl_wallet_mnemonic])
+                        try:
+                            swap_client.callcoinrpc(Coins.PART, 'extkeyimportmaster', [particl_wallet_mnemonic])
+                        except ValueError as exc:
+                            # TODO check ValueError: RPC error {'code': -4, 'message': 'This wallet already has an active account, pass replace_account option to ignore.'}
+                            traceback.print_exc()
+                            logger.warning(f'Ignoring error: {exc}')
                     # Particl wallet must be unlocked to call getWalletKey
                     if WALLET_ENCRYPTION_PWD != '':
                         swap_client.ci(c).unlockWallet(WALLET_ENCRYPTION_PWD)
@@ -1476,6 +1576,8 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
                     swap_client.initialiseWallet(c, raise_errors=True)
                 except Exception as e:
                     coins_failed_to_initialise.append((c, e))
+                    if debug:
+                        traceback.print_exc()
                 if WALLET_ENCRYPTION_PWD != '' and c not in coins_to_create_wallets_for:
                     try:
                         swap_client.ci(c).changeWalletPassword('', WALLET_ENCRYPTION_PWD)
@@ -1549,6 +1651,7 @@ def check_btc_fastsync_data(base_dir, sync_file_path):
 
 def ensure_coin_valid(coin: str, test_disabled: bool = True) -> None:
     if coin not in known_coins:
+        print("bin/basicswap_prepare.py 1580 Unknown coin")
         exitWithError(f'Unknown coin {coin.capitalize()}')
     if test_disabled and not OVERRIDE_DISABLED_COINS and coin in disabled_coins:
         exitWithError(f'{coin.capitalize()} is disabled')
@@ -1557,11 +1660,17 @@ def ensure_coin_valid(coin: str, test_disabled: bool = True) -> None:
 def main():
     global use_tor_proxy
     data_dir = None
-    bin_dir = None
+
+    # basicswap.nix patch
+    # avoid calling "def downloadFile"
+    #bin_dir = None
+    bin_dir = os.environ.get("DEFAULT_TEST_BINDIR", None)
+
     port_offset = None
     chain = 'mainnet'
     particl_wallet_mnemonic = None
     with_coins = {'particl', }
+    dont_manage_daemons = set()
     add_coin = ''
     disable_coin = ''
     coins_changed = False
@@ -1569,7 +1678,12 @@ def main():
     xmr_restore_height = DEFAULT_XMR_RESTORE_HEIGHT
     wow_restore_height = DEFAULT_WOW_RESTORE_HEIGHT
     prepare_bin_only = False
-    no_cores = False
+
+    # TODO what?
+    # basicswap.nix patches this to True
+    #no_cores = False
+    no_cores = True
+
     enable_tor = False
     disable_tor = False
     initwalletsonly = False
@@ -1661,9 +1775,18 @@ def main():
                 continue
             if name in ('withoutcoin', 'withoutcoins'):
                 for coin in [s.strip().lower() for s in s[1].split(',')]:
+                    if coin == '': continue
+                    if coin == 'particl':
+                        raise ValueError('particl coin is required. please remove --withoutcoin=particl')
                     ensure_coin_valid(coin, test_disabled=False)
                     with_coins.discard(coin)
                 coins_changed = True
+                continue
+            if name in ('dont_manage_daemon', 'dont_manage_daemons'):
+                for coin in [s.strip().lower() for s in s[1].split(',')]:
+                    if coin == '': continue
+                    ensure_coin_valid(coin, test_disabled=False)
+                    dont_manage_daemons.add(coin)
                 continue
             if name == 'addcoin':
                 add_coin = s[1].strip().lower()
@@ -1698,6 +1821,8 @@ def main():
     if data_dir is None:
         data_dir = os.path.join(os.path.expanduser(cfg.BASICSWAP_DATADIR))
     if bin_dir is None:
+        # no. here we create a new bindir
+        #bin_dir = os.path.join(os.path.expanduser(cfg.DEFAULT_TEST_BINDIR))
         bin_dir = os.path.join(data_dir, 'bin')
 
     logger.info(f'BasicSwap prepare script {__version__}\n')
@@ -1771,6 +1896,8 @@ def main():
             return 1
 
     withchainclients = {}
+
+    # TODO refactor this to "class Particl", "class "Bitcoin", ...
     chainclients = {
         'particl': {
             'connection_type': 'rpc',
@@ -1868,6 +1995,29 @@ def main():
             'walletrpctimeoutlong': 600,
             'core_type_group': 'xmr',
         },
+        'nano': {
+            'connection_type': 'rpc' if 'nano' in with_coins else 'none',
+            'manage_daemon': True if ('nano' in with_coins and XNO_RPC_HOST == '127.0.0.1') else False,
+            #'manage_wallet_daemon': True if ('nano' in with_coins and XNO_WALLET_RPC_HOST == '127.0.0.1') else False,
+            'manage_wallet_daemon': False,
+            'rpcport': BASE_XNO_RPC_PORT + port_offset,
+            #'zmqport': BASE_XNO_ZMQ_PORT + port_offset,
+            #'walletrpcport': BASE_XNO_WALLET_PORT + port_offset,
+            'rpchost': XNO_RPC_HOST,
+            #'trusted_daemon': extra_opts.get('trust_remote_node', 'auto'),
+            #'walletrpchost': XNO_WALLET_RPC_HOST,
+            #'walletrpcuser': XNO_WALLET_RPC_USER,
+            #'walletrpcpassword': XNO_WALLET_RPC_PWD,
+            #'walletfile': 'swap_wallet',
+            'datadir': os.getenv('XNO_DATA_DIR', os.path.join(data_dir, 'nano')),
+            'bindir': os.path.join(bin_dir, 'nano'),
+            #'restore_height': xno_restore_height,
+            #'blocks_confirmed': 3,
+            'rpctimeout': 60,
+            #'walletrpctimeout': 120,
+            #'walletrpctimeoutlong': 600,
+            'core_type_group': 'xno',
+        },
         'pivx': {
             'connection_type': 'rpc' if 'pivx' in with_coins else 'none',
             'manage_daemon': True if ('pivx' in with_coins and PIVX_RPC_HOST == '127.0.0.1') else False,
@@ -1951,6 +2101,9 @@ def main():
         }
     }
 
+    for coin in dont_manage_daemons:
+        chainclients[coin]['manage_daemon'] = False
+
     if PART_RPC_USER != '':
         chainclients['particl']['rpcuser'] = PART_RPC_USER
         chainclients['particl']['rpcpassword'] = PART_RPC_PWD
@@ -1963,6 +2116,9 @@ def main():
     if XMR_RPC_USER != '':
         chainclients['monero']['rpcuser'] = XMR_RPC_USER
         chainclients['monero']['rpcpassword'] = XMR_RPC_PWD
+    if XNO_RPC_USER != '':
+        chainclients['nano']['rpcuser'] = XNO_RPC_USER
+        chainclients['nano']['rpcpassword'] = XNO_RPC_PWD
     if WOW_RPC_USER != '':
         chainclients['wownero']['rpcuser'] = WOW_RPC_USER
         chainclients['wownero']['rpcpassword'] = WOW_RPC_PWD
@@ -1981,6 +2137,7 @@ def main():
 
     chainclients['monero']['walletsdir'] = os.getenv('XMR_WALLETS_DIR', chainclients['monero']['datadir'])
     chainclients['wownero']['walletsdir'] = os.getenv('WOW_WALLETS_DIR', chainclients['wownero']['datadir'])
+    #chainclients['nano']['walletsdir'] = os.getenv('XNO_WALLETS_DIR', chainclients['nano']['datadir'])
 
     if initwalletsonly:
         logger.info('Initialising wallets')
@@ -2092,6 +2249,10 @@ def main():
         return 0
 
     logger.info('With coins: %s', ', '.join(with_coins))
+
+    if dont_manage_daemons:
+        logger.info('Dont manage daemons: %s', ', '.join(dont_manage_daemons))
+
     if os.path.exists(config_path):
         if not prepare_bin_only:
             exitWithError('{} exists'.format(config_path))
@@ -2150,6 +2311,8 @@ def main():
     if particl_wallet_mnemonic == 'none':
         logger.info('Done.')
         return 0
+
+    #print("with_coins", with_coins); raise 123
 
     initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, chain, use_tor_proxy)
     print('Done.')

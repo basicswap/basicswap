@@ -1,0 +1,8 @@
+dont start/stop the node daemons
+let an external tool (systemd) manage the node daemons
+and only connect to running node daemons
+based on daemon config: host, ports
+
+done by setting
+"manage_daemon": false
+in basicswap.json

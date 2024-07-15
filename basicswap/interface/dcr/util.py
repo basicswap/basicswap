@@ -5,6 +5,7 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import os
+import shlex
 import select
 import subprocess
 
@@ -15,7 +16,8 @@ def createDCRWallet(args, hex_seed, logging, delay_event):
     (pipe_r, pipe_w) = os.pipe()  # subprocess.PIPE is buffered, blocks when read
 
     if os.name == 'nt':
-        str_args = ' '.join(args)
+        #str_args = ' '.join(args)
+        str_args = shlex.join(args)
         p = subprocess.Popen(str_args, shell=True, stdin=subprocess.PIPE, stdout=pipe_w, stderr=pipe_w)
     else:
         p = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=pipe_w, stderr=pipe_w)
