@@ -13,6 +13,7 @@ import time
 import base64
 import random
 import shutil
+import signal
 import string
 import struct
 import secrets
@@ -918,6 +919,15 @@ class BasicSwap(BaseApp):
     def stopDaemon(self, coin) -> None:
         if coin in (Coins.XMR, Coins.DCR, Coins.WOW):
             return
+        if coin == Coins.XNO:
+            raise NotImplementedError("stop nano_node daemon")
+            # there is no nano-cli. simply kill the process
+            # TODO get pid of daemon
+            pid = -1
+            # TODO verify that the process actually is nano_node
+            # or if nano_node is no longer running
+            # and the pid is now used by a different process
+            os.kill(pid, signal.SIGKILL)
         num_tries = 10
         authcookiepath = os.path.join(self.getChainDatadirPath(coin), '.cookie')
         stopping = False
