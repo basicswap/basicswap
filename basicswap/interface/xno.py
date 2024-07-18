@@ -61,6 +61,20 @@ from basicswap.chainparams import XNO_COIN, Coins
 from basicswap.interface.base import CoinInterface
 
 
+# https://github.com/ipazc/nanoblocks/blob/main/nanoblocks/utils/crypto.py
+"""
+xno_crypto.account_privkey(seed, account_index)
+xno_crypto.account_pubkey(priv_key)
+xno_crypto.account_address(pub_key)
+xno_crypto.address_pubkey(nano_address)
+xno_crypto.hash_block(block_hex)
+xno_crypto.sign_block(block_hash, private_key, public_key)
+xno_crypto.make_seed(entropy_size=64)
+xno_crypto.derive_seed(bip39list)
+xno_crypto.derive_bip39(seed)
+"""
+from basicswap import xno_crypto
+
 class XNOInterface(CoinInterface):
     @staticmethod
     def curve_type():
@@ -234,18 +248,18 @@ class XNOInterface(CoinInterface):
             pass
         self.rpc_wallet('open_wallet', params)
 
-    def initialiseWallet(self, key_view: bytes, key_spend: bytes, restore_height=None) -> None:
-        raise 123
-        # FIXME wallet != account
-        """
-        {
-          "action": "wallet_create"
-        }
+    #def initialiseWallet(self, key_view: bytes, key_spend: bytes, restore_height=None) -> None:
+    def initialiseWallet(self, root_key: bytes, restore_height=None) -> None:
 
-        {
-          "wallet": "000D1BAEC8EC208142C99059B393051BAC8380F9B5A2E6B2489A277D81789F3F"
-        }
-        """
+        # hex string
+        wallet = self.rpc('wallet_create')
+        print("basicswap/interface/xno.py initialiseWallet wallet", wallet)
+        self._wallet_id = wallet['wallet']
+
+        return
+
+        #account = self.rpc('wallet_add', {'wallet': self._wallet_id, 'key': root_key.hex()})['account']
+
         with self._mx_wallet:
             #self.openWallet(self._wallet_id)
             #new_address = self.rpc_wallet('wallet_create')['wallet'] # no!
@@ -461,11 +475,26 @@ class XNOInterface(CoinInterface):
     def getPubkey(self, privkey):
         return ed25519_get_pubkey(privkey)
 
-    def getAddressFromKeys(self, key_view: bytes, key_spend: bytes) -> str:
+    def __getAddressFromKeys(self, key_view: bytes, key_spend: bytes) -> str:
         pk_view = self.getPubkey(key_view)
         pk_spend = self.getPubkey(key_spend)
         #return xno_util.encode_address(pk_view, pk_spend, self._addr_prefix)
         return "FIXME"
+
+    def getSeedHash(self, seed: bytes, account_index: int = 0) -> bytes:
+        #print("basicswap/interface/xno.py getSeedHash seed", repr(seed))
+        priv_key = xno_crypto.account_privkey(seed, account_index)
+        hash = self.getAddressHashFromKey(priv_key)
+        #print("basicswap/interface/xno.py getSeedHash hash", repr(hash))
+        return hash
+        #return self.getAddressHashFromKey(priv_key)[::-1] # TODO reverse bytes?
+
+    def getAddressHashFromKey(self, priv_key: bytes) -> bytes:
+        #print("basicswap/interface/xno.py getAddressHashFromKey priv_key", repr(priv_key))
+        pub_key = xno_crypto.account_pubkey(priv_key)
+        #print("basicswap/interface/xno.py getAddressHashFromKey pub_key", repr(pub_key))
+        return pub_key
+        return xno_crypto.account_address(pub_key) # string: "nano_xxxxxx"
 
     def verifyKey(self, k: int) -> bool:
         i = b2i(k)

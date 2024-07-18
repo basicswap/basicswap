@@ -209,14 +209,10 @@ def callrpc_xno(rpc_port, method, params=[], rpc_host='127.0.0.1', path='json_rp
     except Exception as ex:
         raise ValueError('{}RPC Server Error: {}'.format(tag, str(ex)))
 
-    return r
-
-    """
     if 'error' in r and r['error'] is not None:
         raise ValueError(tag + 'RPC error ' + str(r['error']))
 
-    return r['result']
-    """
+    return r
 
 
 def callrpc_xno2(rpc_port: int, method: str, params=None, auth=None, rpc_host='127.0.0.1', timeout=120, transport=None, tag=''):

@@ -1542,7 +1542,8 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
                             #'--config', 'node.websocket.enable=true',
                             # enable dangerous RPC calls: send, work_generatelogging]
                             # TODO call work_generate ahead of send to make the tx faster
-                            '--config', 'rpc.enable_control=true',
+                            #'--config', 'rpc.enable_control=true',
+                            '--rpcconfig', 'enable_control=true',
                             # dont log RPC calls
                             '--config', 'logging.log_rpc=false',
                             # use IPC integration?

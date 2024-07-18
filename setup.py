@@ -40,6 +40,8 @@ setuptools.setup(
         "pycryptodome",
         "PySocks",
         "coincurve",
+        "numpy",
+        "pandas",
     ],
     entry_points={
         "console_scripts": [
