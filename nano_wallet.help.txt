@@ -1,0 +1,151 @@
+Command line options:
+  --help                                Print out options
+  --config arg                          Pass configuration values. This takes 
+                                        precedence over any values in the node 
+                                        configuration file. This option can be 
+                                        repeated multiple times.
+  --rpcconfig arg                       Pass RPC configuration values. This 
+                                        takes precedence over any values in the
+                                        RPC configuration file. This option can
+                                        be repeated multiple times.
+  --disable_add_initial_peers           Disable contacting the peer in the 
+                                        peers table at startup
+  --disable_max_peers_per_ip            Disables the limit on the number of 
+                                        peer connections allowed per IP address
+  --disable_max_peers_per_subnetwork    Disables the limit on the number of 
+                                        peer connections allowed per subnetwork
+  --disable_activate_successors         Disables activate_successors in 
+                                        active_elections
+  --disable_backup                      Disable wallet automatic backups
+  --disable_lazy_bootstrap              Disables lazy bootstrap
+  --disable_legacy_bootstrap            Disables legacy bootstrap
+  --disable_wallet_bootstrap            Disables wallet lazy bootstrap
+  --disable_ongoing_bootstrap           Disable ongoing bootstrap
+  --disable_ascending_bootstrap         Disable ascending bootstrap
+  --disable_rep_crawler                 Disable rep crawler
+  --disable_request_loop                Disable request loop
+  --disable_bootstrap_listener          Disables bootstrap processing for TCP 
+                                        listener (not including realtime 
+                                        network TCP connections)
+  --disable_unchecked_cleanup           Disables periodic cleanup of old 
+                                        records from unchecked table
+  --disable_unchecked_drop              Disables drop of unchecked table at 
+                                        startup
+  --disable_providing_telemetry_metrics 
+                                        Disable using any node information in 
+                                        the telemetry_ack messages.
+  --disable_block_processor_unchecked_deletion 
+                                        Disable deletion of unchecked blocks 
+                                        after processing
+  --disable_bootstrap_bulk_pull_server  Disables the legacy bulk pull server 
+                                        for bootstrap operations
+  --disable_bootstrap_bulk_push_client  Disables the legacy bulk push client 
+                                        for bootstrap operations
+  --disable_tcp_realtime                Disables TCP realtime connections
+  --disable_ongoing_telemetry_requests  Disables ongoing telemetry requests to 
+                                        peers
+  --disable_block_processor_republishing 
+                                        Disables block republishing by 
+                                        disabling the local_block_broadcaster 
+                                        component
+  --disable_search_pending              Disables the periodic search for 
+                                        pending transactions
+  --enable_pruning                      Enable experimental ledger pruning
+  --allow_bootstrap_peers_duplicates    Allow multiple connections to same peer
+                                        in bootstrap attempts
+  --fast_bootstrap                      Increase bootstrap speed for high end 
+                                        nodes with higher limits
+  --block_processor_batch_size arg      Increase block processor transaction 
+                                        batch write size, default 0 (limited by
+                                        config block_processor_batch_max_time),
+                                        256k for fast_bootstrap
+  --block_processor_full_size arg       Increase block processor allowed blocks
+                                        queue size before dropping live network
+                                        packets and holding bootstrap download,
+                                        default 65536, 1 million for 
+                                        fast_bootstrap
+  --block_processor_verification_size arg
+                                        Increase batch signature verification 
+                                        size in block processor, default 0 
+                                        (limited by config signature_checker_th
+                                        reads), unlimited for fast_bootstrap
+  --inactive_votes_cache_size arg       Increase cached votes without active 
+                                        elections size, default 16384
+  --vote_processor_capacity arg         Vote processor queue size before 
+                                        dropping votes, default 144k
+  --initialize                          Initialize the data folder, if it is 
+                                        not already initialised. This command 
+                                        is meant to be run when the data folder
+                                        is empty, to populate it with the 
+                                        genesis block.
+  --account_create                      Insert next deterministic key in to 
+                                        <wallet>
+  --account_get                         Get account number for the <key>
+  --account_key                         Get the public key for <account>
+  --vacuum                              Compact database. If data_path is 
+                                        missing, the database in data directory
+                                        is compacted.
+  --snapshot                            Compact database and create snapshot, 
+                                        functions similar to vacuum but does 
+                                        not replace the existing database
+  --data_path arg                       Use the supplied path as the data 
+                                        directory
+  --network arg                         Use the supplied network (live, test, 
+                                        beta or dev)
+  --clear_send_ids                      Remove all send IDs from the database 
+                                        (dangerous: not intended for production
+                                        use)
+  --online_weight_clear                 Clear online weight history records
+  --peer_clear                          Clear online peers database dump
+  --unchecked_clear                     Clear unchecked blocks
+  --confirmation_height_clear           Clear confirmation height. Requires an 
+                                        <account> option that can be 'all' to 
+                                        clear all accounts
+  --final_vote_clear                    Clear final votes
+  --rebuild_database                    Rebuild LMDB database with vacuum for 
+                                        best compaction
+  --migrate_database_lmdb_to_rocksdb    Migrates LMDB database to RocksDB
+  --diagnostics                         Run internal diagnostics
+  --generate_config arg                 Write configuration to stdout, 
+                                        populated with defaults suitable for 
+                                        this system. Pass the configuration 
+                                        type node, rpc or log. See also 
+                                        use_defaults.
+  --update_config                       Reads the current node configuration 
+                                        and updates it with missing keys and 
+                                        values and delete keys that are no 
+                                        longer used. Updated configuration is 
+                                        written to stdout.
+  --key_create                          Generates a adhoc random keypair and 
+                                        prints it to stdout
+  --key_expand                          Derive public key and account number 
+                                        from <key>
+  --wallet_add_adhoc                    Insert <key> in to <wallet>
+  --wallet_create                       Creates a new wallet and prints the ID
+  --wallet_change_seed                  Changes seed for <wallet> to <key>
+  --wallet_decrypt_unsafe               Decrypts <wallet> using <password>, 
+                                        !!THIS WILL PRINT YOUR PRIVATE KEY TO 
+                                        STDOUT!!
+  --wallet_destroy                      Destroys <wallet> and all keys it 
+                                        contains
+  --wallet_import                       Imports keys in <file> using <password>
+                                        in to <wallet>
+  --wallet_list                         Dumps wallet IDs and public keys
+  --wallet_remove                       Remove <account> from <wallet>
+  --wallet_representative_get           Prints default representative for 
+                                        <wallet>
+  --wallet_representative_set           Set <account> as default representative
+                                        for <wallet>
+  --all                                 Only valid with --final_vote_clear
+  --account arg                         Defines <account> for other commands
+  --root arg                            Defines <root> for other commands
+  --file arg                            Defines <file> for other commands
+  --key arg                             Defines the <key> for other commands, 
+                                        hex
+  --seed arg                            Defines the <seed> for other commands, 
+                                        hex
+  --password arg                        Defines <password> for other commands
+  --wallet arg                          Defines <wallet> for other commands
+  --force arg                           Bool to force command if allowed
+  --use_defaults                        If present, the generate_config command
+                                        will generate uncommented entries

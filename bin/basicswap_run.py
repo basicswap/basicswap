@@ -5,9 +5,13 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
+debug = True
+
 import os
 import sys
+import time
 import json
+import shlex
 import shutil
 import signal
 import logging
@@ -22,6 +26,10 @@ from basicswap.chainparams import chainparams
 from basicswap.http_server import HttpThread
 from basicswap.contrib.websocket_server import WebsocketServer
 
+logging.basicConfig(
+    format='%(asctime)s %(name)s %(filename)s %(lineno)d %(levelname)s %(message)s',
+    level=logging.DEBUG,
+)
 
 logger = logging.getLogger()
 logger.level = logging.DEBUG
@@ -35,6 +43,7 @@ class Daemon:
     __slots__ = ('handle', 'files')
 
     def __init__(self, handle, files):
+        # FIXME rename handle to proc
         self.handle = handle
         self.files = files
 
@@ -79,8 +88,10 @@ def startDaemon(node_dir, bin_dir, daemon_bin, opts=[], extra_config={}):
     add_datadir: bool = extra_config.get('add_datadir', True)
     if add_datadir:
         args.append('-datadir=' + datadir_path)
+
     args += opts
-    logging.info('Starting node ' + daemon_bin + ' ' + (('-datadir=' + node_dir) if add_datadir else ''))
+    #logging.info('Starting node ' + daemon_bin + ' ' + (('-datadir=' + node_dir) if add_datadir else ''))
+    logging.info('Starting node ' + shlex.join(args))
 
     opened_files = []
     if extra_config.get('stdout_to_file', False):
@@ -91,10 +102,31 @@ def startDaemon(node_dir, bin_dir, daemon_bin, opts=[], extra_config={}):
         stdout_dest = subprocess.PIPE
         stderr_dest = subprocess.PIPE
 
+    print("bin/basicswap_run.py 100 stdout_dest", stdout_dest)
+    print("bin/basicswap_run.py 100 stderr_dest", stderr_dest)
+
+    kwargs = dict(
+        stdin=subprocess.PIPE,
+        # FIXME write stderr to subprocess.STDOUT to correctly interleave stdout and stderr
+        stdout=stdout_dest,
+        stderr=stderr_dest,
+        cwd=datadir_path,
+    )
+
     if extra_config.get('use_shell', False):
-        str_args = ' '.join(args)
-        return Daemon(subprocess.Popen(str_args, shell=True, stdin=subprocess.PIPE, stdout=stdout_dest, stderr=stderr_dest, cwd=datadir_path), opened_files)
-    return Daemon(subprocess.Popen(args, stdin=subprocess.PIPE, stdout=stdout_dest, stderr=stderr_dest, cwd=datadir_path), opened_files)
+        args = shlex.join(args)
+        kwargs['shell'] = True
+
+    proc = subprocess.Popen(args, **kwargs)
+
+    # give the daemon some time to fail early
+    # for example on invalid CLI args
+    time.sleep(2)
+
+    if proc.returncode != None:
+        raise Exception(f'daemon did not start: {args}')
+
+    return Daemon(proc, opened_files)
 
 
 def startXmrDaemon(node_dir, bin_dir, daemon_bin, opts=[]):
@@ -213,6 +245,7 @@ def runClient(fp, data_dir, chain, start_only_coins):
                 continue
             if c in ('monero', 'wownero'):
                 if v['manage_daemon'] is True:
+                    print("bin/basicswap_run.py 220")
                     swap_client.log.info(f'Starting {display_name} daemon')
                     filename = c + 'd' + ('.exe' if os.name == 'nt' else '')
                     daemons.append(startXmrDaemon(v['datadir'], v['bindir'], filename))
@@ -252,6 +285,7 @@ def runClient(fp, data_dir, chain, start_only_coins):
                 extra_opts = [f'--appdata="{appdata}"', ]
                 use_shell: bool = True if os.name == 'nt' else False
                 if v['manage_daemon'] is True:
+                    print("bin/basicswap_run.py 260")
                     swap_client.log.info(f'Starting {display_name} daemon')
                     filename = 'dcrd' + ('.exe' if os.name == 'nt' else '')
 
@@ -278,14 +312,43 @@ def runClient(fp, data_dir, chain, start_only_coins):
                 continue  # /decred
 
             if v['manage_daemon'] is True:
+
+                # FIXME move this code to basicswap/base.py
+                # so we have a single source of truth
+                # for stuff like pidfilepath
+
+                print("bin/basicswap_run.py 290")
                 swap_client.log.info(f'Starting {display_name} daemon')
 
+                # based on basicswap/base.py
+                pidfilename = c
+                # TODO refactor: this logic belongs to "class Bitcoin", "class Litecoin", ...
+                if c in ('bitcoin', 'litecoin', 'namecoin', 'dash', 'firo'):
+                    pidfilename += 'd'
+                # FIXME use the same path as basicswap/base.py: def getChainDatadirPath
+                #pidfilepath = os.path.join(self.getChainDatadirPath(coin), pidfilename + '.pid')
+                pidfilepath = os.path.join(os.environ['HOME'], '.basicswap', c, pidfilename + '.pid')
+
                 filename = c + 'd' + ('.exe' if os.name == 'nt' else '')
-                daemons.append(startDaemon(v['datadir'], v['bindir'], filename))
+                #daemons.append(startDaemon(v['datadir'], v['bindir'], filename))
+                opts = [
+                    #f'-pid={pidfilepath}',
+                ]
+                daemons.append(startDaemon(v['datadir'], v['bindir'], filename, opts))
                 pid = daemons[-1].handle.pid
                 pids.append((c, pid))
                 swap_client.setDaemonPID(c, pid)
                 swap_client.log.info('Started {} {}'.format(filename, pid))
+
+                # wait for pid file
+                # fix: WARNING : Error, iteration 0: [Errno 2] No such file or directory: '/home/user/.basicswap/particl/particl.pid'
+                # this fails if pidfilepath is wrong
+                # so wait only 1 second here
+                for _ in range(10):
+                    if os.path.exists(pidfilepath):
+                        break
+                    time.sleep(0.1)
+
         if len(pids) > 0:
             with open(pids_path, 'w') as fd:
                 for p in pids:
@@ -347,6 +410,8 @@ def runClient(fp, data_dir, chain, start_only_coins):
             d.handle.send_signal(signal.CTRL_C_EVENT if os.name == 'nt' else signal.SIGINT)
         except Exception as e:
             swap_client.log.info('Interrupting %d, error %s', d.handle.pid, str(e))
+            if debug:
+                traceback.print_exc()
     for d in daemons:
         try:
             d.handle.wait(timeout=120)
@@ -356,6 +421,8 @@ def runClient(fp, data_dir, chain, start_only_coins):
             closed_pids.append(d.handle.pid)
         except Exception as ex:
             swap_client.log.error('Error: {}'.format(ex))
+            if debug:
+                traceback.print_exc()
 
     if os.path.exists(pids_path):
         with open(pids_path) as fd:

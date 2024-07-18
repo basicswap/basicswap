@@ -5,3 +5,6 @@ python-gnupg
 Jinja2
 pycryptodome
 PySocks
+coincurve
+numpy
+pandas
