@@ -16,15 +16,15 @@ def decodeScriptNum(script_bytes, o):
         return ((num_len - OpCodes.OP_1) + 1, 1)
 
     if num_len > 4:
-        raise ValueError('Bad scriptnum length')  # Max 4 bytes
+        raise ValueError("Bad scriptnum length")  # Max 4 bytes
     if num_len + o >= len(script_bytes):
-        raise ValueError('Bad script length')
+        raise ValueError("Bad script length")
     o += 1
     for i in range(num_len):
         b = script_bytes[o + i]
         # Negative flag set in last byte, if num is positive and > 0x80 an extra 0x00 byte will be appended
         if i == num_len - 1 and b & 0x80:
-            b &= (~(0x80) & 0xFF)
+            b &= ~(0x80) & 0xFF
             v += int(b) << 8 * i
             v *= -1
         else:
@@ -33,9 +33,7 @@ def decodeScriptNum(script_bytes, o):
 
 
 def getP2SHScriptForHash(p2sh):
-    return bytes((OpCodes.OP_HASH160, 0x14)) \
-        + p2sh \
-        + bytes((OpCodes.OP_EQUAL,))
+    return bytes((OpCodes.OP_HASH160, 0x14)) + p2sh + bytes((OpCodes.OP_EQUAL,))
 
 
 def getP2WSH(script):
@@ -45,26 +43,26 @@ def getP2WSH(script):
 def SerialiseNumCompact(v):
     if v < 253:
         return bytes((v,))
-    if v <= 0xffff:  # USHRT_MAX
+    if v <= 0xFFFF:  # USHRT_MAX
         return struct.pack("<BH", 253, v)
-    if v <= 0xffffffff:  # UINT_MAX
+    if v <= 0xFFFFFFFF:  # UINT_MAX
         return struct.pack("<BI", 254, v)
-    if v <= 0xffffffffffffffff:  # UINT_MAX
+    if v <= 0xFFFFFFFFFFFFFFFF:  # UINT_MAX
         return struct.pack("<BQ", 255, v)
-    raise ValueError('Value too large')
+    raise ValueError("Value too large")
 
 
 def getCompactSizeLen(v):
     # Compact Size
     if v < 253:
         return 1
-    if v <= 0xffff:  # USHRT_MAX
+    if v <= 0xFFFF:  # USHRT_MAX
         return 3
-    if v <= 0xffffffff:  # UINT_MAX
+    if v <= 0xFFFFFFFF:  # UINT_MAX
         return 5
-    if v <= 0xffffffffffffffff:  # UINT_MAX
+    if v <= 0xFFFFFFFFFFFFFFFF:  # UINT_MAX
         return 9
-    raise ValueError('Value too large')
+    raise ValueError("Value too large")
 
 
 def getWitnessElementLen(v):

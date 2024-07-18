@@ -10,32 +10,37 @@ import urllib
 from urllib.request import urlopen
 
 
-REQUIRED_SETTINGS = {'blocks_confirmed': 1, 'conf_target': 1, 'use_segwit': True, 'connection_type': 'rpc'}
+REQUIRED_SETTINGS = {
+    "blocks_confirmed": 1,
+    "conf_target": 1,
+    "use_segwit": True,
+    "connection_type": "rpc",
+}
 
 
 def make_boolean(s):
-    return s.lower() in ['1', 'true']
+    return s.lower() in ["1", "true"]
 
 
 def post_json_req(url, json_data):
     req = urllib.request.Request(url)
-    req.add_header('Content-Type', 'application/json; charset=utf-8')
-    post_bytes = json.dumps(json_data).encode('utf-8')
-    req.add_header('Content-Length', len(post_bytes))
+    req.add_header("Content-Type", "application/json; charset=utf-8")
+    post_bytes = json.dumps(json_data).encode("utf-8")
+    req.add_header("Content-Length", len(post_bytes))
     return urlopen(req, post_bytes, timeout=300).read()
 
 
 def read_text_api(port, path=None):
-    url = f'http://127.0.0.1:{port}/json'
+    url = f"http://127.0.0.1:{port}/json"
     if path is not None:
-        url += '/' + path
-    return urlopen(url, timeout=300).read().decode('utf-8')
+        url += "/" + path
+    return urlopen(url, timeout=300).read().decode("utf-8")
 
 
 def read_json_api(port, path=None, json_data=None):
-    url = f'http://127.0.0.1:{port}/json'
+    url = f"http://127.0.0.1:{port}/json"
     if path is not None:
-        url += '/' + path
+        url += "/" + path
 
     if json_data is not None:
         return json.loads(post_json_req(url, json_data))
@@ -43,20 +48,20 @@ def read_json_api(port, path=None, json_data=None):
 
 
 def post_json_api(port, path, json_data):
-    url = f'http://127.0.0.1:{port}/json'
+    url = f"http://127.0.0.1:{port}/json"
     if path is not None:
-        url += '/' + path
+        url += "/" + path
     return json.loads(post_json_req(url, json_data))
 
 
 def waitForServer(delay_event, port, wait_for=20):
     for i in range(wait_for):
         if delay_event.is_set():
-            raise ValueError('Test stopped.')
+            raise ValueError("Test stopped.")
         try:
             delay_event.wait(1)
             summary = read_json_api(port)
             return
         except Exception as e:
-            print('waitForServer, error:', str(e))
-    raise ValueError('waitForServer failed')
+            print("waitForServer, error:", str(e))
+    raise ValueError("waitForServer failed")

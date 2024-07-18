@@ -9,7 +9,7 @@ from basicswap.contrib.ellipticcurve import CurveFp, Point, INFINITY, jacobi_sym
 from . import i2b
 
 
-class ECCParameters():
+class ECCParameters:
     def __init__(self, p, a, b, Gx, Gy, o):
         self.p = p
         self.a = a
@@ -20,12 +20,13 @@ class ECCParameters():
 
 
 ep = ECCParameters(
-    p=0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f,
+    p=0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F,
     a=0x0,
     b=0x7,
-    Gx=0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798,
-    Gy=0x483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8,
-    o=0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141)
+    Gx=0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798,
+    Gy=0x483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8,
+    o=0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141,
+)
 
 
 curve_secp256k1 = CurveFp(ep.p, ep.a, ep.b)
@@ -34,7 +35,11 @@ SECP256K1_ORDER_HALF = ep.o // 2
 
 
 def ToDER(P) -> bytes:
-    return bytes((4, )) + int(P.x()).to_bytes(32, byteorder='big') + int(P.y()).to_bytes(32, byteorder='big')
+    return (
+        bytes((4,))
+        + int(P.x()).to_bytes(32, byteorder="big")
+        + int(P.y()).to_bytes(32, byteorder="big")
+    )
 
 
 def getSecretBytes() -> bytes:
@@ -50,7 +55,7 @@ def getInsecureBytes() -> bytes:
     while True:
         s = os.urandom(32)
 
-        s_test = int.from_bytes(s, byteorder='big')
+        s_test = int.from_bytes(s, byteorder="big")
         if s_test > 1 and s_test < ep.o:
             return s
 
@@ -59,7 +64,7 @@ def getInsecureInt() -> int:
     while True:
         s = os.urandom(32)
 
-        s_test = int.from_bytes(s, byteorder='big')
+        s_test = int.from_bytes(s, byteorder="big")
         if s_test > 1 and s_test < ep.o:
             return s_test
 
@@ -77,7 +82,7 @@ def powMod(x, y, z) -> int:
 
 
 def ExpandPoint(xb, sign):
-    x = int.from_bytes(xb, byteorder='big')
+    x = int.from_bytes(xb, byteorder="big")
     a = (powMod(x, 3, ep.p) + 7) % ep.p
     y = powMod(a, (ep.p + 1) // 4, ep.p)
 
@@ -89,7 +94,7 @@ def ExpandPoint(xb, sign):
 def CPKToPoint(cpk):
     y_parity = cpk[0] - 2
 
-    x = int.from_bytes(cpk[1:], byteorder='big')
+    x = int.from_bytes(cpk[1:], byteorder="big")
     a = (powMod(x, 3, ep.p) + 7) % ep.p
     y = powMod(a, (ep.p + 1) // 4, ep.p)
 
@@ -102,28 +107,29 @@ def CPKToPoint(cpk):
 def pointToCPK2(point, ind=0x09):
     # The function is_square(x), where x is an integer, returns whether or not x is a quadratic residue modulo p. Since p is prime, it is equivalent to the Legendre symbol (x / p) = x(p-1)/2 mod p being equal to 1[8].
     ind = bytes((ind ^ (1 if jacobi_symbol(point.y(), ep.p) == 1 else 0),))
-    return ind + point.x().to_bytes(32, byteorder='big')
+    return ind + point.x().to_bytes(32, byteorder="big")
 
 
 def pointToCPK(point):
 
-    y = point.y().to_bytes(32, byteorder='big')
+    y = point.y().to_bytes(32, byteorder="big")
     ind = bytes((0x03,)) if y[31] % 2 else bytes((0x02,))
 
-    cpk = ind + point.x().to_bytes(32, byteorder='big')
+    cpk = ind + point.x().to_bytes(32, byteorder="big")
     return cpk
 
 
 def secretToCPK(secret):
-    secretInt = secret if isinstance(secret, int) \
-        else int.from_bytes(secret, byteorder='big')
+    secretInt = (
+        secret if isinstance(secret, int) else int.from_bytes(secret, byteorder="big")
+    )
 
     R = G * secretInt
 
-    Y = R.y().to_bytes(32, byteorder='big')
+    Y = R.y().to_bytes(32, byteorder="big")
     ind = bytes((0x03,)) if Y[31] % 2 else bytes((0x02,))
 
-    pubkey = ind + R.x().to_bytes(32, byteorder='big')
+    pubkey = ind + R.x().to_bytes(32, byteorder="big")
 
     return pubkey
 
@@ -136,7 +142,7 @@ def getKeypair():
 def hashToCurve(pubkey):
 
     xBytes = hashlib.sha256(pubkey).digest()
-    x = int.from_bytes(xBytes, byteorder='big')
+    x = int.from_bytes(xBytes, byteorder="big")
 
     for k in range(0, 100):
         # get matching y element for point
@@ -155,12 +161,14 @@ def hashToCurve(pubkey):
             x = (x + 1) % ep.p  # % P?
             continue
 
-        if R == INFINITY or R * ep.o != INFINITY:  # is R * O != INFINITY check necessary?  Validation of Elliptic Curve Public Keys says no if cofactor = 1
+        if (
+            R == INFINITY or R * ep.o != INFINITY
+        ):  # is R * O != INFINITY check necessary?  Validation of Elliptic Curve Public Keys says no if cofactor = 1
             x = (x + 1) % ep.p  # % P?
             continue
         return R
 
-    raise ValueError('hashToCurve failed for 100 tries')
+    raise ValueError("hashToCurve failed for 100 tries")
 
 
 def hash256(inb):
@@ -168,23 +176,35 @@ def hash256(inb):
 
 
 def testEccUtils():
-    print('testEccUtils()')
+    print("testEccUtils()")
 
     G_enc = ToDER(G)
-    assert (G_enc.hex() == '0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8')
+    assert (
+        G_enc.hex()
+        == "0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8"
+    )
 
     G_enc = pointToCPK(G)
-    assert (G_enc.hex() == '0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798')
+    assert (
+        G_enc.hex()
+        == "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+    )
     G_dec = CPKToPoint(G_enc)
-    assert (G_dec == G)
+    assert G_dec == G
 
     G_enc = pointToCPK2(G)
-    assert (G_enc.hex() == '0879be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798')
+    assert (
+        G_enc.hex()
+        == "0879be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+    )
 
     H = hashToCurve(ToDER(G))
-    assert (pointToCPK(H).hex() == '0250929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0')
+    assert (
+        pointToCPK(H).hex()
+        == "0250929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0"
+    )
 
-    print('Passed.')
+    print("Passed.")
 
 
 if __name__ == "__main__":

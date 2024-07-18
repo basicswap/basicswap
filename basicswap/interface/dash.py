@@ -11,7 +11,10 @@ from basicswap.util.address import decodeAddress
 from basicswap.contrib.mnemonic import Mnemonic
 from basicswap.contrib.test_framework.script import (
     CScript,
-    OP_DUP, OP_HASH160, OP_EQUALVERIFY, OP_CHECKSIG
+    OP_DUP,
+    OP_HASH160,
+    OP_EQUALVERIFY,
+    OP_CHECKSIG,
 )
 
 
@@ -22,19 +25,21 @@ class DASHInterface(BTCInterface):
 
     def __init__(self, coin_settings, network, swap_client=None):
         super().__init__(coin_settings, network, swap_client)
-        self._wallet_passphrase = ''
+        self._wallet_passphrase = ""
         self._have_checked_seed = False
 
     def entropyToMnemonic(self, key: bytes) -> str:
-        return Mnemonic('english').to_mnemonic(key)
+        return Mnemonic("english").to_mnemonic(key)
 
     def initialiseWallet(self, key: bytes):
         words = self.entropyToMnemonic(key)
 
-        mnemonic_passphrase = ''
-        self.rpc_wallet('upgradetohd', [words, mnemonic_passphrase, self._wallet_passphrase])
+        mnemonic_passphrase = ""
+        self.rpc_wallet(
+            "upgradetohd", [words, mnemonic_passphrase, self._wallet_passphrase]
+        )
         self._have_checked_seed = False
-        if self._wallet_passphrase != '':
+        if self._wallet_passphrase != "":
             self.unlockWallet(self._wallet_passphrase)
 
     def decodeAddress(self, address: str) -> bytes:
@@ -42,21 +47,21 @@ class DASHInterface(BTCInterface):
 
     def checkExpectedSeed(self, key_hash: str):
         try:
-            rv = self.rpc_wallet('dumphdinfo')
-            entropy = Mnemonic('english').to_entropy(rv['mnemonic'].split(' '))
+            rv = self.rpc_wallet("dumphdinfo")
+            entropy = Mnemonic("english").to_entropy(rv["mnemonic"].split(" "))
             entropy_hash = self.getAddressHashFromKey(entropy)[::-1].hex()
             self._have_checked_seed = True
             return entropy_hash == key_hash
         except Exception as e:
-            self._log.warning('checkExpectedSeed failed: {}'.format(str(e)))
+            self._log.warning("checkExpectedSeed failed: {}".format(str(e)))
         return False
 
     def withdrawCoin(self, value, addr_to, subfee):
-        params = [addr_to, value, '', '', subfee, False, False, self._conf_target]
-        return self.rpc_wallet('sendtoaddress', params)
+        params = [addr_to, value, "", "", subfee, False, False, self._conf_target]
+        return self.rpc_wallet("sendtoaddress", params)
 
     def getSpendableBalance(self) -> int:
-        return self.make_int(self.rpc_wallet('getwalletinfo')['balance'])
+        return self.make_int(self.rpc_wallet("getwalletinfo")["balance"])
 
     def getScriptForPubkeyHash(self, pkh: bytes) -> bytearray:
         # Return P2PKH
@@ -66,19 +71,23 @@ class DASHInterface(BTCInterface):
         add_bytes = 107
         size = len(tx.serialize_with_witness()) + add_bytes
         pay_fee = round(fee_rate * size / 1000)
-        self._log.info(f'BLockSpendTx fee_rate, size, fee: {fee_rate}, {size}, {pay_fee}.')
+        self._log.info(
+            f"BLockSpendTx fee_rate, size, fee: {fee_rate}, {size}, {pay_fee}."
+        )
         return pay_fee
 
     def findTxnByHash(self, txid_hex: str):
         # Only works for wallet txns
         try:
-            rv = self.rpc_wallet('gettransaction', [txid_hex])
+            rv = self.rpc_wallet("gettransaction", [txid_hex])
         except Exception as ex:
-            self._log.debug('findTxnByHash getrawtransaction failed: {}'.format(txid_hex))
+            self._log.debug(
+                "findTxnByHash getrawtransaction failed: {}".format(txid_hex)
+            )
             return None
-        if 'confirmations' in rv and rv['confirmations'] >= self.blocks_confirmed:
-            block_height = self.getBlockHeader(rv['blockhash'])['height']
-            return {'txid': txid_hex, 'amount': 0, 'height': block_height}
+        if "confirmations" in rv and rv["confirmations"] >= self.blocks_confirmed:
+            block_height = self.getBlockHeader(rv["blockhash"])["height"]
+            return {"txid": txid_hex, "amount": 0, "height": block_height}
 
         return None
 
@@ -91,4 +100,4 @@ class DASHInterface(BTCInterface):
 
     def lockWallet(self):
         super().lockWallet()
-        self._wallet_passphrase = ''
+        self._wallet_passphrase = ""

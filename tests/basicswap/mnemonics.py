@@ -6,7 +6,7 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 mnemonics = [
-    'abandon baby cabbage dad eager fabric gadget habit ice kangaroo lab absorb',
-    'actuel comédie poésie noble facile éprouver brave cellule rotule académie hilarant chambre',
-    'ちしき　いてざ　きおち　あしあと　ぽちぶくろ　こえる　さつえい　むえき　あける　ほんき　むさぼる　ねいろ',
+    "abandon baby cabbage dad eager fabric gadget habit ice kangaroo lab absorb",
+    "actuel comédie poésie noble facile éprouver brave cellule rotule académie hilarant chambre",
+    "ちしき　いてざ　きおち　あしあと　ぽちぶくろ　こえる　さつえい　むえき　あける　ほんき　むさぼる　ねいろ",
 ]

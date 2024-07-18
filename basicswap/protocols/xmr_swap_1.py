@@ -17,18 +17,17 @@ from basicswap.basicswap_util import (
     EventLogTypes,
 )
 from . import ProtocolInterface
-from basicswap.contrib.test_framework.script import (
-    CScript, CScriptOp,
-    OP_CHECKMULTISIG
-)
+from basicswap.contrib.test_framework.script import CScript, CScriptOp, OP_CHECKMULTISIG
 
 
 def addLockRefundSigs(self, xmr_swap, ci):
-    self.log.debug('Setting lock refund tx sigs')
+    self.log.debug("Setting lock refund tx sigs")
 
     witness_stack = []
-    if ci.coin_type() not in (Coins.DCR, ):
-        witness_stack += [b'', ]
+    if ci.coin_type() not in (Coins.DCR,):
+        witness_stack += [
+            b"",
+        ]
     witness_stack += [
         xmr_swap.al_lock_refund_tx_sig,
         xmr_swap.af_lock_refund_tx_sig,
@@ -36,21 +35,23 @@ def addLockRefundSigs(self, xmr_swap, ci):
     ]
 
     signed_tx = ci.setTxSignature(xmr_swap.a_lock_refund_tx, witness_stack)
-    ensure(signed_tx, 'setTxSignature failed')
+    ensure(signed_tx, "setTxSignature failed")
     xmr_swap.a_lock_refund_tx = signed_tx
 
 
 def recoverNoScriptTxnWithKey(self, bid_id: bytes, encoded_key):
-    self.log.info('Manually recovering %s', bid_id.hex())
+    self.log.info("Manually recovering %s", bid_id.hex())
     # Manually recover txn if other key is known
     session = self.openSession()
     try:
         bid, xmr_swap = self.getXmrBidFromSession(session, bid_id)
-        ensure(bid, 'Bid not found: {}.'.format(bid_id.hex()))
-        ensure(xmr_swap, 'Adaptor-sig swap not found: {}.'.format(bid_id.hex()))
-        offer, xmr_offer = self.getXmrOfferFromSession(session, bid.offer_id, sent=False)
-        ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
-        ensure(xmr_offer, 'Adaptor-sig offer not found: {}.'.format(bid.offer_id.hex()))
+        ensure(bid, "Bid not found: {}.".format(bid_id.hex()))
+        ensure(xmr_swap, "Adaptor-sig swap not found: {}.".format(bid_id.hex()))
+        offer, xmr_offer = self.getXmrOfferFromSession(
+            session, bid.offer_id, sent=False
+        )
+        ensure(offer, "Offer not found: {}.".format(bid.offer_id.hex()))
+        ensure(xmr_offer, "Adaptor-sig offer not found: {}.".format(bid.offer_id.hex()))
         ci_to = self.ci(offer.coin_to)
 
         for_ed25519 = True if Coins(offer.coin_to) == Coins.XMR else False
@@ -58,16 +59,30 @@ def recoverNoScriptTxnWithKey(self, bid_id: bytes, encoded_key):
         try:
             decoded_key_half = ci_to.decodeKey(encoded_key)
         except Exception as e:
-            raise ValueError('Failed to decode provided key-half: ', str(e))
+            raise ValueError("Failed to decode provided key-half: ", str(e))
 
         if bid.was_sent:
             kbsl = decoded_key_half
-            kbsf = self.getPathKey(offer.coin_from, offer.coin_to, bid.created_at, xmr_swap.contract_count, KeyTypes.KBSF, for_ed25519)
+            kbsf = self.getPathKey(
+                offer.coin_from,
+                offer.coin_to,
+                bid.created_at,
+                xmr_swap.contract_count,
+                KeyTypes.KBSF,
+                for_ed25519,
+            )
         else:
-            kbsl = self.getPathKey(offer.coin_from, offer.coin_to, bid.created_at, xmr_swap.contract_count, KeyTypes.KBSL, for_ed25519)
+            kbsl = self.getPathKey(
+                offer.coin_from,
+                offer.coin_to,
+                bid.created_at,
+                xmr_swap.contract_count,
+                KeyTypes.KBSL,
+                for_ed25519,
+            )
             kbsf = decoded_key_half
-        ensure(ci_to.verifyKey(kbsl), 'Invalid kbsl')
-        ensure(ci_to.verifyKey(kbsf), 'Invalid kbsf')
+        ensure(ci_to.verifyKey(kbsl), "Invalid kbsl")
+        ensure(ci_to.verifyKey(kbsf), "Invalid kbsf")
         vkbs = ci_to.sumKeys(kbsl, kbsf)
 
         if offer.coin_to == Coins.XMR:
@@ -77,9 +92,26 @@ def recoverNoScriptTxnWithKey(self, bid_id: bytes, encoded_key):
 
         amount = bid.amount_to
         lock_tx_vout = bid.getLockTXBVout()
-        txid = ci_to.spendBLockTx(xmr_swap.b_lock_tx_id, address_to, xmr_swap.vkbv, vkbs, amount, xmr_offer.b_fee_rate, bid.chain_b_height_start, spend_actual_balance=True, lock_tx_vout=lock_tx_vout)
-        self.log.debug('Submitted lock B spend txn %s to %s chain for bid %s', txid.hex(), ci_to.coin_name(), bid_id.hex())
-        self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_B_SPEND_TX_PUBLISHED, txid.hex(), session)
+        txid = ci_to.spendBLockTx(
+            xmr_swap.b_lock_tx_id,
+            address_to,
+            xmr_swap.vkbv,
+            vkbs,
+            amount,
+            xmr_offer.b_fee_rate,
+            bid.chain_b_height_start,
+            spend_actual_balance=True,
+            lock_tx_vout=lock_tx_vout,
+        )
+        self.log.debug(
+            "Submitted lock B spend txn %s to %s chain for bid %s",
+            txid.hex(),
+            ci_to.coin_name(),
+            bid_id.hex(),
+        )
+        self.logBidEvent(
+            bid.bid_id, EventLogTypes.LOCK_TX_B_SPEND_TX_PUBLISHED, txid.hex(), session
+        )
         session.commit()
 
         return txid
@@ -92,7 +124,16 @@ def getChainBSplitKey(swap_client, bid, xmr_swap, offer):
     ci_follower = swap_client.ci(offer.coin_from if reverse_bid else offer.coin_to)
 
     key_type = KeyTypes.KBSF if bid.was_sent else KeyTypes.KBSL
-    return ci_follower.encodeKey(swap_client.getPathKey(offer.coin_from, offer.coin_to, bid.created_at, xmr_swap.contract_count, key_type, True if ci_follower.coin_type() == Coins.XMR else False))
+    return ci_follower.encodeKey(
+        swap_client.getPathKey(
+            offer.coin_from,
+            offer.coin_to,
+            bid.created_at,
+            xmr_swap.contract_count,
+            key_type,
+            True if ci_follower.coin_type() == Coins.XMR else False,
+        )
+    )
 
 
 def getChainBRemoteSplitKey(swap_client, bid, xmr_swap, offer):
@@ -102,13 +143,21 @@ def getChainBRemoteSplitKey(swap_client, bid, xmr_swap, offer):
 
     if bid.was_sent:
         if xmr_swap.a_lock_refund_spend_tx:
-            af_lock_refund_spend_tx_sig = ci_leader.extractFollowerSig(xmr_swap.a_lock_refund_spend_tx)
-            kbsl = ci_leader.recoverEncKey(xmr_swap.af_lock_refund_spend_tx_esig, af_lock_refund_spend_tx_sig, xmr_swap.pkasl)
+            af_lock_refund_spend_tx_sig = ci_leader.extractFollowerSig(
+                xmr_swap.a_lock_refund_spend_tx
+            )
+            kbsl = ci_leader.recoverEncKey(
+                xmr_swap.af_lock_refund_spend_tx_esig,
+                af_lock_refund_spend_tx_sig,
+                xmr_swap.pkasl,
+            )
             return ci_follower.encodeKey(kbsl)
     else:
         if xmr_swap.a_lock_spend_tx:
             al_lock_spend_tx_sig = ci_leader.extractLeaderSig(xmr_swap.a_lock_spend_tx)
-            kbsf = ci_leader.recoverEncKey(xmr_swap.al_lock_spend_tx_esig, al_lock_spend_tx_sig, xmr_swap.pkasf)
+            kbsf = ci_leader.recoverEncKey(
+                xmr_swap.al_lock_spend_tx_esig, al_lock_spend_tx_sig, xmr_swap.pkasf
+            )
             return ci_follower.encodeKey(kbsf)
     return None
 
@@ -116,18 +165,22 @@ def getChainBRemoteSplitKey(swap_client, bid, xmr_swap, offer):
 def setDLEAG(xmr_swap, ci_to, kbsf: bytes) -> None:
     if ci_to.curve_type() == Curves.ed25519:
         xmr_swap.kbsf_dleag = ci_to.proveDLEAG(kbsf)
-        xmr_swap.pkasf = xmr_swap.kbsf_dleag[0: 33]
+        xmr_swap.pkasf = xmr_swap.kbsf_dleag[0:33]
     elif ci_to.curve_type() == Curves.secp256k1:
         for i in range(10):
-            xmr_swap.kbsf_dleag = ci_to.signRecoverable(kbsf, 'proof kbsf owned for swap')
-            pk_recovered: bytes = ci_to.verifySigAndRecover(xmr_swap.kbsf_dleag, 'proof kbsf owned for swap')
+            xmr_swap.kbsf_dleag = ci_to.signRecoverable(
+                kbsf, "proof kbsf owned for swap"
+            )
+            pk_recovered: bytes = ci_to.verifySigAndRecover(
+                xmr_swap.kbsf_dleag, "proof kbsf owned for swap"
+            )
             if pk_recovered == xmr_swap.pkbsf:
                 break
             # self.log.debug('kbsl recovered pubkey mismatch, retrying.')
-        assert (pk_recovered == xmr_swap.pkbsf)
+        assert pk_recovered == xmr_swap.pkbsf
         xmr_swap.pkasf = xmr_swap.pkbsf
     else:
-        raise ValueError('Unknown curve')
+        raise ValueError("Unknown curve")
 
 
 class XmrSwapInterface(ProtocolInterface):
@@ -141,7 +194,9 @@ class XmrSwapInterface(ProtocolInterface):
 
     def getFundedInitiateTxTemplate(self, ci, amount: int, sub_fee: bool) -> bytes:
         addr_to = self.getMockAddrTo(ci)
-        funded_tx = ci.createRawFundedTransaction(addr_to, amount, sub_fee, lock_unspents=False)
+        funded_tx = ci.createRawFundedTransaction(
+            addr_to, amount, sub_fee, lock_unspents=False
+        )
 
         return bytes.fromhex(funded_tx)
 
@@ -157,9 +212,9 @@ class XmrSwapInterface(ProtocolInterface):
                 found += 1
 
         if found < 1:
-            raise ValueError('Mocked output not found')
+            raise ValueError("Mocked output not found")
         if found > 1:
-            raise ValueError('Too many mocked outputs found')
+            raise ValueError("Too many mocked outputs found")
         ctx.nLockTime = 0
 
         return ctx.serialize()

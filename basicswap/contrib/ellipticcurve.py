@@ -34,6 +34,7 @@
 #
 # Written in 2005 by Peter Pearson and placed in the public domain.
 
+
 def inverse_mod(a, m):
     """Inverse of a mod m."""
 
@@ -60,7 +61,7 @@ def inverse_mod(a, m):
 
 def modular_sqrt(a, p):
     # from http://eli.thegreenplace.net/2009/03/07/computing-modular-square-roots-in-python/
-    """ Find a quadratic residue (mod p) of 'a'. p
+    """Find a quadratic residue (mod p) of 'a'. p
     must be an odd prime.
 
     Solve the congruence of the form:
@@ -142,7 +143,7 @@ def modular_sqrt(a, p):
 
 
 def legendre_symbol(a, p):
-    """ Compute the Legendre symbol a|p using
+    """Compute the Legendre symbol a|p using
     Euler's criterion. p is a prime, a is
     relatively prime to p (if p divides
     a, then a|p = 0)
@@ -159,7 +160,8 @@ def jacobi_symbol(n, k):
 
     See http://en.wikipedia.org/wiki/Jacobi_symbol
 
-    For our application k is always prime, so this is the same as the Legendre symbol."""
+    For our application k is always prime, so this is the same as the Legendre symbol.
+    """
     assert k > 0 and k & 1, "jacobi symbol is only defined for positive odd k"
     n %= k
     t = 0
@@ -167,9 +169,9 @@ def jacobi_symbol(n, k):
         while n & 1 == 0:
             n >>= 1
             r = k & 7
-            t ^= (r == 3 or r == 5)
+            t ^= r == 3 or r == 5
         n, k = k, n
-        t ^= (n & k & 3 == 3)
+        t ^= n & k & 3 == 3
         n = n % k
     if k == 1:
         return -1 if t else 1
@@ -178,6 +180,7 @@ def jacobi_symbol(n, k):
 
 class CurveFp(object):
     """Elliptic Curve over the field of integers modulo a prime."""
+
     def __init__(self, p, a, b):
         """The curve of points satisfying y^2 = x^3 + a*x + b (mod p)."""
         self.__p = p
@@ -199,8 +202,9 @@ class CurveFp(object):
 
 
 class Point(object):
-    """ A point on an elliptic curve. Altering x and y is forbidding,
-        but they can be read by the x() and y() methods."""
+    """A point on an elliptic curve. Altering x and y is forbidding,
+    but they can be read by the x() and y() methods."""
+
     def __init__(self, curve, x, y, order=None):
         """curve, x, y, order; order (optional) is the order of this point."""
         self.__curve = curve
@@ -215,9 +219,11 @@ class Point(object):
 
     def __eq__(self, other):
         """Return 1 if the points are identical, 0 otherwise."""
-        if self.__curve == other.__curve \
-           and self.__x == other.__x \
-           and self.__y == other.__y:
+        if (
+            self.__curve == other.__curve
+            and self.__x == other.__x
+            and self.__y == other.__y
+        ):
             return 1
         else:
             return 0
@@ -247,8 +253,8 @@ class Point(object):
         return Point(self.__curve, x3, y3)
 
     def __sub__(self, other):
-        #The inverse of a point P=(xP,yP) is its reflexion across the x-axis : P′=(xP,−yP).
-        #If you want to compute Q−P, just replace yP by −yP in the usual formula for point addition.
+        # The inverse of a point P=(xP,yP) is its reflexion across the x-axis : P′=(xP,−yP).
+        # If you want to compute Q−P, just replace yP by −yP in the usual formula for point addition.
 
         # X9.62 B.3:
         if other == INFINITY:
@@ -258,10 +264,10 @@ class Point(object):
         assert self.__curve == other.__curve
 
         p = self.__curve.p()
-        #opi = inverse_mod(other.__y, p)
+        # opi = inverse_mod(other.__y, p)
         opi = -other.__y % p
-        #print(opi)
-        #print(-other.__y % p)
+        # print(opi)
+        # print(-other.__y % p)
 
         if self.__x == other.__x:
             if (self.__y + opi) % self.__curve.p() == 0:
@@ -404,7 +410,9 @@ def __main__():
         p3 = p1.double()
         print("%s doubled = %s" % (p1, p3))
         if p3.x() != INFINITY.x() or p3.y() != INFINITY.y():
-            raise FailedTest("Failure: should give (%d,%d)." % (INFINITY.x(), INFINITY.y()))
+            raise FailedTest(
+                "Failure: should give (%d,%d)." % (INFINITY.x(), INFINITY.y())
+            )
         else:
             print(" Good.")
 
@@ -423,7 +431,7 @@ def __main__():
     c = CurveFp(23, 1, 1)
     test_add(c, 3, 10, 9, 7, 17, 20)
     test_double(c, 3, 10, 7, 12)
-    test_add(c, 3, 10, 3, 10, 7, 12)    # (Should just invoke double.)
+    test_add(c, 3, 10, 3, 10, 7, 12)  # (Should just invoke double.)
     test_multiply(c, 3, 10, 2, 7, 12)
 
     test_double_infinity(c)
@@ -445,11 +453,11 @@ def __main__():
     # NIST Curve P-192:
     p = 6277101735386680763835789423207666416083908700390324961279
     r = 6277101735386680763835789423176059013767194773182842284081
-    #s = 0x3045ae6fc8422f64ed579528d38120eae12196d5L
-    c = 0x3099d2bbbfcb2538542dcd5fb078b6ef5f3d6fe2c745de65
-    b = 0x64210519e59c80e70fa7e9ab72243049feb8deecc146b9b1
-    Gx = 0x188da80eb03090f67cbf20eb43a18800f4ff0afd82ff1012
-    Gy = 0x07192b95ffc8da78631011ed6b24cdd573f977a11e794811
+    # s = 0x3045ae6fc8422f64ed579528d38120eae12196d5L
+    c = 0x3099D2BBBFCB2538542DCD5FB078B6EF5F3D6FE2C745DE65
+    b = 0x64210519E59C80E70FA7E9AB72243049FEB8DEECC146B9B1
+    Gx = 0x188DA80EB03090F67CBF20EB43A18800F4FF0AFD82FF1012
+    Gy = 0x07192B95FFC8DA78631011ED6B24CDD573F977A11E794811
 
     c192 = CurveFp(p, -3, b)
     p192 = Point(c192, Gx, Gy, r)
@@ -466,8 +474,10 @@ def __main__():
 
     k = 6140507067065001063065065565667405560006161556565665656654
     R = k * p192
-    if R.x() != 0x885052380FF147B734C330C43D39B2C4A89F29B0F749FEAD \
-       or R.y() != 0x9CF9FA1CBEFEFB917747A3BB29C072B9289C2547884FD835:
+    if (
+        R.x() != 0x885052380FF147B734C330C43D39B2C4A89F29B0F749FEAD
+        or R.y() != 0x9CF9FA1CBEFEFB917747A3BB29C072B9289C2547884FD835
+    ):
         raise FailedTest("k * p192 came out wrong.")
     else:
         print("k * p192 came out right.")
@@ -475,8 +485,10 @@ def __main__():
     u1 = 2563697409189434185194736134579731015366492496392189760599
     u2 = 6266643813348617967186477710235785849136406323338782220568
     temp = u1 * p192 + u2 * Q
-    if temp.x() != 0x885052380FF147B734C330C43D39B2C4A89F29B0F749FEAD \
-       or temp.y() != 0x9CF9FA1CBEFEFB917747A3BB29C072B9289C2547884FD835:
+    if (
+        temp.x() != 0x885052380FF147B734C330C43D39B2C4A89F29B0F749FEAD
+        or temp.y() != 0x9CF9FA1CBEFEFB917747A3BB29C072B9289C2547884FD835
+    ):
         raise FailedTest("u1 * p192 + u2 * Q came out wrong.")
     else:
         print("u1 * p192 + u2 * Q came out right.")

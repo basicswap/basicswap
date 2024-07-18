@@ -7,12 +7,12 @@
 from basicswap.contrib.segwit_addr import bech32_decode, convertbits, bech32_encode
 from basicswap.util.crypto import ripemd160, sha256
 
-__b58chars = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
+__b58chars = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 
 
 def b58decode(v, length=None):
     long_value = 0
-    for (i, c) in enumerate(v[::-1]):
+    for i, c in enumerate(v[::-1]):
         ofs = __b58chars.find(c)
         if ofs < 0:
             return None
@@ -38,10 +38,10 @@ def b58decode(v, length=None):
 
 def b58encode(v):
     long_value = 0
-    for (i, c) in enumerate(v[::-1]):
+    for i, c in enumerate(v[::-1]):
         long_value += (256**i) * c
 
-    result = ''
+    result = ""
     while long_value >= 58:
         div, mod = divmod(long_value, 58)
         result = __b58chars[mod] + result
@@ -58,7 +58,9 @@ def b58encode(v):
     return (__b58chars[0] * nPad) + result
 
 
-def encodeStealthAddress(prefix_byte: int, scan_pubkey: bytes, spend_pubkey: bytes) -> str:
+def encodeStealthAddress(
+    prefix_byte: int, scan_pubkey: bytes, spend_pubkey: bytes
+) -> str:
     data = bytes((0x00,))
     data += scan_pubkey
     data += bytes((0x01,))
@@ -114,7 +116,7 @@ def decodeAddress(address: str) -> bytes:
     prefixed_data = addr_data[:-4]
     checksum = addr_data[-4:]
     if sha256(sha256(prefixed_data))[:4] != checksum:
-        raise ValueError('Checksum mismatch')
+        raise ValueError("Checksum mismatch")
     return prefixed_data
 
 
