@@ -49,6 +49,13 @@ class LTCInterface(BTCInterface):
         rv['mweb_balance'] = mweb_info['balance']
         rv['mweb_unconfirmed'] = mweb_info['unconfirmed_balance']
         rv['mweb_immature'] = mweb_info['immature_balance']
+
+        # Add unconfirmed mweb -> plain txns to the unconfirmed_balance
+        txns = self.rpc_wallet('listtransactions')
+        for tx in reversed(txns):
+            amount: float = tx.get('amount', 0.0)
+            if tx['confirmations'] == 0 and tx.get('mweb_out', None) and amount > 0.0:
+                rv['unconfirmed_balance'] += amount
         return rv
 
     def getUnspentsByAddr(self):
