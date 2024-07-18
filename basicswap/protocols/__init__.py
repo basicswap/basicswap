@@ -16,19 +16,26 @@ class ProtocolInterface:
     swap_type = None
 
     def getFundedInitiateTxTemplate(self, ci, amount: int, sub_fee: bool) -> bytes:
-        raise ValueError('base class')
+        raise ValueError("base class")
 
     def getMockScript(self) -> bytearray:
-        return bytearray([
-            OpCodes.OP_RETURN, OpCodes.OP_1])
+        return bytearray([OpCodes.OP_RETURN, OpCodes.OP_1])
 
     def getMockScriptScriptPubkey(self, ci) -> bytearray:
         script = self.getMockScript()
-        return ci.getScriptDest(script) if ci._use_segwit else ci.get_p2sh_script_pubkey(script)
+        return (
+            ci.getScriptDest(script)
+            if ci._use_segwit
+            else ci.get_p2sh_script_pubkey(script)
+        )
 
     def getMockAddrTo(self, ci):
         script = self.getMockScript()
-        return ci.encodeScriptDest(ci.getScriptDest(script)) if ci._use_segwit else ci.encode_p2sh(script)
+        return (
+            ci.encodeScriptDest(ci.getScriptDest(script))
+            if ci._use_segwit
+            else ci.encode_p2sh(script)
+        )
 
     def findMockVout(self, ci, itx_decoded):
         mock_addr = self.getMockAddrTo(ci)

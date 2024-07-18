@@ -10,8 +10,8 @@ one = bytes((1,))
 
 
 def rfc6979_hmac_sha256_initialize(key):
-    rng_v = one * 32    # RFC6979 3.2.b.
-    rng_k = zero * 32   # RFC6979 3.2.c.
+    rng_v = one * 32  # RFC6979 3.2.b.
+    rng_k = zero * 32  # RFC6979 3.2.c.
 
     # RFC6979 3.2.d.
     h = hmac.new(rng_k, digestmod=hashlib.sha256)

@@ -4,7 +4,7 @@ import io
 
 __version__ = re.search(
     r'__version__\s*=\s*[\'"]([^\'"]*)[\'"]',
-    io.open('basicswap/__init__.py', encoding='utf_8_sig').read()
+    io.open("basicswap/__init__.py", encoding="utf_8_sig").read(),
 ).group(1)
 
 setuptools.setup(
@@ -45,5 +45,5 @@ setuptools.setup(
             "basicswap-run=bin.basicswap_run:main",
             "basicswap-prepare=bin.basicswap_prepare:main",
         ]
-    }
+    },
 )

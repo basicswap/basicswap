@@ -17,47 +17,49 @@ from util import get_driver
 def test_swap_dir(driver):
     node_1_port = 12701
     node_2_port = 12702
-    node1_url = f'http://localhost:{node_1_port}'
-    node2_url = f'http://localhost:{node_2_port}'
+    node1_url = f"http://localhost:{node_1_port}"
+    node2_url = f"http://localhost:{node_2_port}"
 
     offer_data = {
-        'addr_from': -1,
-        'coin_from': 'PART',
-        'coin_to': 'XMR',
-        'amt_from': 1,
-        'amt_to': 2,
-        'lockhrs': 24}
-    rv = read_json_api(node_1_port, 'offers/new', offer_data)
-    offer0_id = rv['offer_id']
+        "addr_from": -1,
+        "coin_from": "PART",
+        "coin_to": "XMR",
+        "amt_from": 1,
+        "amt_to": 2,
+        "lockhrs": 24,
+    }
+    rv = read_json_api(node_1_port, "offers/new", offer_data)
+    offer0_id = rv["offer_id"]
 
     offer_data = {
-        'addr_from': -1,
-        'coin_from': 'PART',
-        'coin_to': 'BTC',
-        'amt_from': 3,
-        'amt_to': 4,
-        'lockhrs': 24}
-    rv = read_json_api(node_1_port, 'offers/new', offer_data)
-    offer0_id = rv['offer_id']
+        "addr_from": -1,
+        "coin_from": "PART",
+        "coin_to": "BTC",
+        "amt_from": 3,
+        "amt_to": 4,
+        "lockhrs": 24,
+    }
+    rv = read_json_api(node_1_port, "offers/new", offer_data)
+    offer0_id = rv["offer_id"]
 
     # Wait for offer to propagate
-    offers_api_1 = read_json_api(node_1_port, 'offers')
-    print('offers_api_1', offers_api_1)
+    offers_api_1 = read_json_api(node_1_port, "offers")
+    print("offers_api_1", offers_api_1)
 
-    offers_api_2 = read_json_api(node_2_port, 'offers')
+    offers_api_2 = read_json_api(node_2_port, "offers")
     while len(offers_api_2) < 1:
-        rv = read_json_api(node_2_port, 'offers')
-    print('offers_api_2', offers_api_2)
+        rv = read_json_api(node_2_port, "offers")
+    print("offers_api_2", offers_api_2)
 
-    driver.get(f'{node1_url}/offers')
+    driver.get(f"{node1_url}/offers")
     time.sleep(1)
 
-    driver.get(f'{node2_url}/offers')
+    driver.get(f"{node2_url}/offers")
     time.sleep(300)
 
-    raise ValueError('TODO')
+    raise ValueError("TODO")
 
-    print('Test Passed!')
+    print("Test Passed!")
 
 
 def run_tests():
@@ -68,5 +70,5 @@ def run_tests():
         driver.close()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     run_tests()

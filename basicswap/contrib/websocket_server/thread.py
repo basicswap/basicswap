@@ -11,7 +11,7 @@ class ThreadWithLoggedException(threading.Thread):
     Exception is also reachable via <thread>.exception from the main thread.
     """
 
-    DIVIDER = "*"*80
+    DIVIDER = "*" * 80
 
     def __init__(self, *args, **kwargs):
         try:
@@ -28,11 +28,14 @@ class ThreadWithLoggedException(threading.Thread):
         except Exception as exception:
             thread = threading.current_thread()
             self.exception = exception
-            self.logger.exception(f"{self.DIVIDER}\nException in child thread {thread}: {exception}\n{self.DIVIDER}")
+            self.logger.exception(
+                f"{self.DIVIDER}\nException in child thread {thread}: {exception}\n{self.DIVIDER}"
+            )
         finally:
             del self._target, self._args, self._kwargs
 
 
 class WebsocketServerThread(ThreadWithLoggedException):
     """Dummy wrapper to make debug messages a bit more readable"""
+
     pass

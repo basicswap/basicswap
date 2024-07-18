@@ -16,7 +16,7 @@ def rfc2440_hash_password(password, salt=None):
         salt = secrets.token_bytes(8)
     assert len(salt) == 8
 
-    hashbytes = salt + password.encode('utf-8')
+    hashbytes = salt + password.encode("utf-8")
     len_hashbytes = len(hashbytes)
     h = hashlib.sha1()
 
@@ -27,5 +27,5 @@ def rfc2440_hash_password(password, salt=None):
             continue
         h.update(hashbytes[:count])
         break
-    rv = '16:' + salt.hex() + '60' + h.hexdigest()
+    rv = "16:" + salt.hex() + "60" + h.hexdigest()
     return rv.upper()

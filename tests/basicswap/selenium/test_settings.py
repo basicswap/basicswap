@@ -18,125 +18,129 @@ from basicswap.ui.page_offers import default_chart_api_key
 
 
 def click_option(el, option_text):
-    for option in el.find_elements(By.TAG_NAME, 'option'):
+    for option in el.find_elements(By.TAG_NAME, "option"):
         if option.text == option_text:
             option.click()
             break
 
 
 def test_settings(driver):
-    base_url = 'http://localhost:12701'
-    node2_url = 'http://localhost:12702'
+    base_url = "http://localhost:12701"
+    node2_url = "http://localhost:12702"
 
-    url = base_url + '/settings'
+    url = base_url + "/settings"
     driver.get(url)
-    driver.find_element(By.ID, 'general-tab').click()
+    driver.find_element(By.ID, "general-tab").click()
 
     wait = WebDriverWait(driver, 10)
-    btn_apply_general = wait.until(EC.element_to_be_clickable((By.NAME, 'apply_general')))
+    btn_apply_general = wait.until(
+        EC.element_to_be_clickable((By.NAME, "apply_general"))
+    )
 
-    el = driver.find_element(By.NAME, 'debugmode')
+    el = driver.find_element(By.NAME, "debugmode")
     selected_option = Select(el).first_selected_option
-    assert (selected_option.text == 'True')
-    click_option(el, 'False')
+    assert selected_option.text == "True"
+    click_option(el, "False")
 
-    el = driver.find_element(By.NAME, 'debugui')
+    el = driver.find_element(By.NAME, "debugui")
     selected_option = Select(el).first_selected_option
-    assert (selected_option.text == 'False')
-    click_option(el, 'True')
+    assert selected_option.text == "False"
+    click_option(el, "True")
 
     btn_apply_general.click()
     time.sleep(1)
 
-    settings_path_0 = '/tmp/test_persistent/client0/basicswap.json'
+    settings_path_0 = "/tmp/test_persistent/client0/basicswap.json"
     with open(settings_path_0) as fs:
         settings = json.load(fs)
 
-    assert (settings['debug'] is False)
-    assert (settings['debug_ui'] is True)
+    assert settings["debug"] is False
+    assert settings["debug_ui"] is True
 
-    el = driver.find_element(By.NAME, 'showchart')
+    el = driver.find_element(By.NAME, "showchart")
     selected_option = Select(el).first_selected_option
-    assert (selected_option.text == 'True')
-    click_option(el, 'False')
+    assert selected_option.text == "True"
+    click_option(el, "False")
 
-    difficult_text = '`~!@#$%^&*()-_=+[{}]\\|;:\'",<>./? '
-    el = driver.find_element(By.NAME, 'chartapikey')
+    difficult_text = "`~!@#$%^&*()-_=+[{}]\\|;:'\",<>./? "
+    el = driver.find_element(By.NAME, "chartapikey")
     el.clear()
     el.send_keys(difficult_text)
 
-    btn_apply_chart = wait.until(EC.element_to_be_clickable((By.NAME, 'apply_chart')))
+    btn_apply_chart = wait.until(EC.element_to_be_clickable((By.NAME, "apply_chart")))
     btn_apply_chart.click()
     time.sleep(1)
 
     with open(settings_path_0) as fs:
         settings = json.load(fs)
 
-    assert (settings['show_chart'] is False)
-    chart_api_key = bytes.fromhex(settings.get('chart_api_key_enc', '')).decode('utf-8')
-    assert (chart_api_key == difficult_text)
+    assert settings["show_chart"] is False
+    chart_api_key = bytes.fromhex(settings.get("chart_api_key_enc", "")).decode("utf-8")
+    assert chart_api_key == difficult_text
 
     hex_text = default_chart_api_key
-    el = driver.find_element(By.NAME, 'chartapikey')
+    el = driver.find_element(By.NAME, "chartapikey")
     el.clear()
     el.send_keys(hex_text)
-    btn_apply_chart = wait.until(EC.element_to_be_clickable((By.NAME, 'apply_chart')))
+    btn_apply_chart = wait.until(EC.element_to_be_clickable((By.NAME, "apply_chart")))
     btn_apply_chart.click()
     time.sleep(1)
 
-    el = driver.find_element(By.NAME, 'chartapikey')
-    assert el.get_property('value') == hex_text
+    el = driver.find_element(By.NAME, "chartapikey")
+    assert el.get_property("value") == hex_text
 
     with open(settings_path_0) as fs:
         settings = json.load(fs)
 
-    assert (settings.get('chart_api_key') == hex_text)
+    assert settings.get("chart_api_key") == hex_text
 
     # Reset
-    btn_apply_general = wait.until(EC.element_to_be_clickable((By.NAME, 'apply_general')))
-    click_option(driver.find_element(By.NAME, 'debugmode'), 'True')
-    click_option(driver.find_element(By.NAME, 'debugui'), 'False')
+    btn_apply_general = wait.until(
+        EC.element_to_be_clickable((By.NAME, "apply_general"))
+    )
+    click_option(driver.find_element(By.NAME, "debugmode"), "True")
+    click_option(driver.find_element(By.NAME, "debugui"), "False")
     btn_apply_general.click()
-    btn_apply_chart = wait.until(EC.element_to_be_clickable((By.NAME, 'apply_chart')))
-    click_option(driver.find_element(By.NAME, 'showchart'), 'True')
+    btn_apply_chart = wait.until(EC.element_to_be_clickable((By.NAME, "apply_chart")))
+    click_option(driver.find_element(By.NAME, "showchart"), "True")
     btn_apply_chart.click()
     time.sleep(1)
 
     # Apply XMR settings with blank nodes list
-    driver.find_element(By.ID, 'coins-tab').click()
-    btn_apply_monero = wait.until(EC.element_to_be_clickable((By.NAME, 'apply_monero')))
-    el = driver.find_element(By.NAME, 'remotedaemonurls_monero')
+    driver.find_element(By.ID, "coins-tab").click()
+    btn_apply_monero = wait.until(EC.element_to_be_clickable((By.NAME, "apply_monero")))
+    el = driver.find_element(By.NAME, "remotedaemonurls_monero")
     el.clear()
     btn_apply_monero.click()
     time.sleep(1)
 
     with open(settings_path_0) as fs:
         settings = json.load(fs)
-    assert (len(settings['chainclients']['monero']['remote_daemon_urls']) == 0)
+    assert len(settings["chainclients"]["monero"]["remote_daemon_urls"]) == 0
 
-    btn_apply_monero = wait.until(EC.element_to_be_clickable((By.NAME, 'apply_monero')))
-    el = driver.find_element(By.NAME, 'remotedaemonurls_monero')
+    btn_apply_monero = wait.until(EC.element_to_be_clickable((By.NAME, "apply_monero")))
+    el = driver.find_element(By.NAME, "remotedaemonurls_monero")
     el.clear()
-    el.send_keys('node.xmr.to:18081\nnode1.xmr.to:18082')
+    el.send_keys("node.xmr.to:18081\nnode1.xmr.to:18082")
     btn_apply_monero.click()
     time.sleep(1)
 
     with open(settings_path_0) as fs:
         settings = json.load(fs)
-    remotedaemonurls = settings['chainclients']['monero']['remote_daemon_urls']
-    assert (len(remotedaemonurls) == 2)
+    remotedaemonurls = settings["chainclients"]["monero"]["remote_daemon_urls"]
+    assert len(remotedaemonurls) == 2
 
-    btn_apply_monero = wait.until(EC.element_to_be_clickable((By.NAME, 'apply_monero')))
-    el = driver.find_element(By.NAME, 'remotedaemonurls_monero')
+    btn_apply_monero = wait.until(EC.element_to_be_clickable((By.NAME, "apply_monero")))
+    el = driver.find_element(By.NAME, "remotedaemonurls_monero")
     el.clear()
     btn_apply_monero.click()
     time.sleep(1)
 
     with open(settings_path_0) as fs:
         settings = json.load(fs)
-    assert (len(settings['chainclients']['monero']['remote_daemon_urls']) == 0)
+    assert len(settings["chainclients"]["monero"]["remote_daemon_urls"]) == 0
 
-    print('Test Passed!')
+    print("Test Passed!")
 
 
 def run_tests():
@@ -147,5 +151,5 @@ def run_tests():
         driver.close()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     run_tests()
