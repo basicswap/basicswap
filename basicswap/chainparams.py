@@ -262,7 +262,7 @@ chainparams = {
         'decimal_places': 12,
         'mainnet': {
             # https://docs.nano.org/running-a-node/configuration/#network-details
-            'rpchost': '::1', # ipv6 only
+            'rpchost': '[::1]', # ipv6 only
             'rpcport': 7076,
             'wsport': 7078, # websockets
             #'walletrpcport': 18082,

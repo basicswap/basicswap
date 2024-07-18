@@ -28,6 +28,9 @@ import time
 import urllib.parse
 import zipfile
 import traceback
+import shlex
+import subprocess
+import datetime
 
 from urllib.error import ContentTooShortError
 from urllib.parse import _splittype
@@ -1515,6 +1518,32 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
                             #'-nodnsseed',
                         ]
 
+                        # TODO use config files
+                        # https://docs.nano.org/running-a-node/configuration/#configuration-file-locations
+                        # nano_node --generate_config node # config-node.toml
+                        # nano_node --generate_config rpc # config-rpc.toml
+
+                        # https://stackoverflow.com/questions/2150739/iso-time-iso-8601-in-python#28147286
+                        datetime_str = datetime.datetime.utcnow().strftime("%Y%m%dT%H%M%S.%fZ")
+
+                        # write default configs
+                        for config_name in ['node', 'rpc']:
+                            args = [
+                                os.path.join(coin_settings['bindir'], filename),
+                                '--data_path', coin_settings['datadir'],
+                                '--generate_config', config_name,
+                            ]
+                            print(">", shlex.join(args))
+                            config_bytes = subprocess.check_output(args)
+                            config_path = os.path.join(coin_settings['datadir'], f"config-{config_name}.toml")
+                            if os.path.exists(config_path):
+                                config_path_bak = f"{config_path}.bak.{datetime_str}"
+                                print("moving old config to", config_path_bak)
+                                os.rename(config_path, config_path_bak)
+                            with open(config_path, "wb") as f:
+                                f.write(config_bytes)
+                            print("done", config_path)
+
                         if not swap_client.use_tor_proxy:
                             # Cannot set -bind or -whitebind together with -listen=0
                             #coin_args.append('-nolisten')
@@ -1522,14 +1551,29 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
                             # listener (not including realtime
                             # network TCP connections)
                             coin_args.append('--disable_bootstrap_listener')
+
                         # pidfilepath = '.../nano/nano_node.pid'
+
                         coin_args += [
+
                             '--daemon',
+
                             '--data_path', coin_settings['datadir'],
+
                             # https://docs.nano.org/running-a-node/configuration/
+
                             # Binds to localhost by default for security reasons
                             '--config', 'rpc.enable=true',
-                            '--config', 'rpc.address=127.0.0.1', # ipv6 by default
+
+                            # ipv6 by default: rpchost = "[::1]"
+                            # TODO use rpchost from settings, like in basicswap/interface/xno.py
+                            #   rpchost = coin_settings.get('rpchost', '127.0.0.1')
+                            #   coin_settings = swap_client.coin_clients[coin]
+                            # Error deserializing RPC config: address is not an unknown type
+                            #'--rpcconfig', 'address=127.0.0.1',
+                            # no effect
+                            #'--rpcconfig', 'rpc.address=127.0.0.1',
+
                             # TODO use websockets instead of node.httpcallback
                             # JSON POST requests with every confirmed block are sent to the callback server
                             # When possible, using a WebSocket is recommended
@@ -1540,21 +1584,27 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
                             # producer-subscriber broadcast
                             # https://docs.nano.org/integration-guides/websockets
                             #'--config', 'node.websocket.enable=true',
+
                             # enable dangerous RPC calls: send, work_generatelogging]
                             # TODO call work_generate ahead of send to make the tx faster
                             #'--config', 'rpc.enable_control=true',
                             '--rpcconfig', 'enable_control=true',
+
                             # dont log RPC calls
                             '--config', 'logging.log_rpc=false',
+
                             # use IPC integration?
                             # https://docs.nano.org/integration-guides/ipc-integration/#configuration
+
                             # TODO nano_node should allow to write the process id to a pid file
                             # https://github.com/nanocurrency/nano-node/issues/4682
                             #'--pid_file', pidfilepath,
                         ]
+
                         extra_config = dict(
                             add_datadir=False,
                         )
+
                         daemon = startDaemon(coin_settings['datadir'], coin_settings['bindir'], filename, coin_args, extra_config)
                         daemons.append(daemon)
 

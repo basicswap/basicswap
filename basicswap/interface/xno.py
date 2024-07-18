@@ -139,12 +139,15 @@ class XNOInterface(CoinInterface):
         self._have_checked_seed = False
 
         daemon_login = None
+
         if coin_settings.get('rpcuser', '') != '':
             daemon_login = (coin_settings.get('rpcuser', ''), coin_settings.get('rpcpassword', ''))
 
         rpchost = coin_settings.get('rpchost', '127.0.0.1')
+
         proxy_host = None
         proxy_port = None
+
         # Connect to the daemon over a proxy if not running locally
         if swap_client:
             chain_client_settings = swap_client.getChainClientSettings(self.coin_type())
@@ -171,13 +174,9 @@ class XNOInterface(CoinInterface):
         self._walletrpctimeout = coin_settings.get('walletrpctimeout', 120)
         self._walletrpctimeoutlong = coin_settings.get('walletrpctimeoutlong', 600)
 
-        # FIXME
-        #raise 123
-
         # FIXME basicswap/interface/xno.py 160 rpchost 127.0.0.1
-        # should be ::1
-        # curl: http://::1:7076/ URL rejected: Port number was not a decimal number between 0 and 65535
-        # -> curl needs host = [::1]
+        # should be [::1] per basicswap/chainparams.py
+        #assert rpchost == '[::1]', f"bad rpchost {rpchost!r}"
         rpchost = '[::1]' # ipv6
         #rpchost = 'localhost' # ipv4 or ipv6
         print("basicswap/interface/xno.py 160 rpchost", rpchost)
