@@ -741,6 +741,9 @@ class BasicSwap(BaseApp):
     def setCoinRunParams(self, coin):
         cc = self.coin_clients[coin]
 
+        # FIXME cc['pid'] == None
+        # FIXME self.coin_clients['particl]['pid'] == None
+
         # FIXME
         if cc['name'] == 'nano':
             self.log.warning('ignoring setCoinRunParams for nano')
@@ -1101,7 +1104,10 @@ class BasicSwap(BaseApp):
             return
 
         root_key = self.getWalletKey(coin_type, 1)
+
+        # FIXME AttributeError: 'XNOInterface' object has no attribute 'getSeedHash'
         root_hash = ci.getSeedHash(root_key)
+
         try:
             ci.initialiseWallet(root_key)
         except Exception as e:

@@ -1422,16 +1422,32 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
             if not swap_client.use_tor_proxy:
                 # Cannot set -bind or -whitebind together with -listen=0
                 daemon_args.append('-nolisten')
+
             coins_to_create_wallets_for = (Coins.PART, Coins.BTC, Coins.LTC, Coins.DCR, Coins.DASH)
+
             # Always start Particl, it must be running to initialise a wallet in addcoin mode
             # Particl must be loaded first as subsequent coins are initialised from the Particl mnemonic
             start_daemons = ['particl', ] + [c for c in with_coins if c != 'particl']
+
             for coin_name in start_daemons:
-                # bin/basicswap_prepare.py 1430 starting daemon particl
+
                 # basicswap/basicswap.py 750 pidfilepath /home/user/.basicswap/particl/particl.pid
                 print(f"bin/basicswap_prepare.py 1430 starting daemon {coin_name}")
+                # bin/basicswap_prepare.py 1430 starting daemon particl
+                # bin/basicswap_prepare.py 1430 starting daemon nano
+
+                print(f"bin/basicswap_prepare.py 1430 starting daemon {coin_name}: getting coin_settings")
                 coin_settings = settings['chainclients'][coin_name]
+
+                print(f"bin/basicswap_prepare.py 1430 starting daemon {coin_name}: calling swap_client.getCoinIdFromName")
+                # bin/basicswap_prepare.py 1430 starting daemon nano: calling swap_client.getCoinIdFromName
                 c = swap_client.getCoinIdFromName(coin_name)
+
+                print(f"bin/basicswap_prepare.py 1430 starting daemon {coin_name}: c {c}")
+                # bin/basicswap_prepare.py 1430 starting daemon nano: c 17
+
+                # KeyError: 'manage_wallet_daemon'
+                #print(f"bin/basicswap_prepare.py 1430 starting daemon {coin_name}: coin_settings.manage_wallet_daemon=" + repr(coin_settings['manage_wallet_daemon']))
 
                 if c == Coins.XMR:
                     if coin_settings['manage_wallet_daemon']:
@@ -1446,11 +1462,141 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
                         daemon = startXmrWalletDaemon(coin_settings['datadir'], coin_settings['bindir'], filename)
                         daemons.append(daemon)
                 elif c == Coins.XNO:
+                    print(f"bin/basicswap_prepare.py 1430 starting daemon {coin_name}: coin is nano")
+                    # no. nano has no wallet daemon
+                    """
                     if coin_settings['manage_wallet_daemon']:
                         filename = coin_name + '_node' + ('.exe' if os.name == 'nt' else '')
                         print("bin/basicswap_prepare.py 1450 startDaemon")
                         daemon = startXmrWalletDaemon(coin_settings['datadir'], coin_settings['bindir'], filename)
                         daemons.append(daemon)
+                    """
+                    if coin_settings['manage_daemon']:
+                        filename = coin_name + '_node' + ('.exe' if os.name == 'nt' else '')
+                        print("bin/basicswap_prepare.py 1450 startDaemon")
+                        #daemon = startXmrWalletDaemon(coin_settings['datadir'], coin_settings['bindir'], filename)
+
+                        """
+                        $ nano_node --help
+                          --daemon                              Start node daemon
+                          --data_path arg                       Use the supplied path as the data 
+                                                                directory
+
+                          --disable_bootstrap_listener          Disables bootstrap processing for TCP 
+                                                                listener (not including realtime 
+                                                                network TCP connections)
+                          --disable_lazy_bootstrap              Disables lazy bootstrap
+                          --disable_legacy_bootstrap            Disables legacy bootstrap
+                          --disable_max_peers_per_ip            Disables the limit on the number of 
+                                                                peer connections allowed per IP address
+                          --disable_max_peers_per_subnetwork    Disables the limit on the number of 
+                                                                peer connections allowed per subnetwork
+                          --disable_ongoing_bootstrap           Disable ongoing bootstrap
+
+                          --disable_tcp_realtime                Disables TCP realtime connections
+
+                        """
+
+                        coin_args = [
+                            # not in nano?
+                            # $ particld --help
+                            #  -connect=<ip>
+                            #       Connect only to the specified node; -noconnect disables automatic
+                            #       connections (the rules for this peer are the same as for
+                            #       -addnode). This option can be specified multiple times to connect
+                            #       to multiple nodes.
+                            #'-noconnect',
+
+                            # not in nano?
+                            # $ particld --help
+                            #  -dnsseed
+                            #       Query for peer addresses via DNS lookup, if low on addresses (default: 1
+                            #       unless -connect used)
+                            #'-nodnsseed',
+                        ]
+
+                        if not swap_client.use_tor_proxy:
+                            # Cannot set -bind or -whitebind together with -listen=0
+                            #coin_args.append('-nolisten')
+                            # Disables bootstrap processing for TCP
+                            # listener (not including realtime
+                            # network TCP connections)
+                            coin_args.append('--disable_bootstrap_listener')
+                        # pidfilepath = '.../nano/nano_node.pid'
+                        coin_args += [
+                            '--daemon',
+                            '--data_path', coin_settings['datadir'],
+                            # https://docs.nano.org/running-a-node/configuration/
+                            # Binds to localhost by default for security reasons
+                            '--config', 'rpc.enable=true',
+                            '--config', 'rpc.address=127.0.0.1', # ipv6 by default
+                            # TODO use websockets instead of node.httpcallback
+                            # JSON POST requests with every confirmed block are sent to the callback server
+                            # When possible, using a WebSocket is recommended
+                            # as it provides more efficiency,
+                            # more options for types of information to receive
+                            # and better control over the volume of notifications with filtering.
+                            # Binds to localhost by default due to data throughput potentially being very high;
+                            # producer-subscriber broadcast
+                            # https://docs.nano.org/integration-guides/websockets
+                            #'--config', 'node.websocket.enable=true',
+                            # enable dangerous RPC calls: send, work_generatelogging]
+                            # TODO call work_generate ahead of send to make the tx faster
+                            '--config', 'rpc.enable_control=true',
+                            # dont log RPC calls
+                            '--config', 'logging.log_rpc=false',
+                            # use IPC integration?
+                            # https://docs.nano.org/integration-guides/ipc-integration/#configuration
+                            # TODO nano_node should allow to write the process id to a pid file
+                            # https://github.com/nanocurrency/nano-node/issues/4682
+                            #'--pid_file', pidfilepath,
+                        ]
+                        extra_config = dict(
+                            add_datadir=False,
+                        )
+                        daemon = startDaemon(coin_settings['datadir'], coin_settings['bindir'], filename, coin_args, extra_config)
+                        daemons.append(daemon)
+
+                        # not needed?
+                        """
+                        # set cc['pid'] for setCoinRunParams
+                        cc = swap_client.coin_clients[c]
+                        cc['pid'] = daemon.handle.pid
+                        """
+
+                        # not needed?
+                        """
+                        # write pid file
+                        pid = daemon.handle.pid
+
+                        # set cc['pid'] for setCoinRunParams
+                        # FIXME refactor with basicswap/basicswap.py: pidfilepath = os.path.join(...
+                        cc = swap_client.coin_clients[c]
+                        pidfilename = cc['name']
+                        if cc['name'] in ('bitcoin', 'litecoin', 'namecoin', 'dash', 'firo'):
+                            pidfilename += 'd'
+                        elif cc['name'] == 'nano':
+                            pidfilename = 'nano_node'
+                            # https://github.com/nanocurrency/nano-node/issues/4682
+                            # nano_node should allow to write the process id to a pid file
+                        #pidfilepath = os.path.join(self.getChainDatadirPath(coin), pidfilename + '.pid')
+                        pidfilepath = os.path.join(swap_client.getChainDatadirPath(c), pidfilename + '.pid')
+                        if not os.path.exists(pidfilepath):
+                            raise Exception(f'missing pid file: {pidfilepath}')
+                        with open(pidfilepath) as f:
+                            pidtext = f.read()
+                        try:
+                            pid = int(pidtext)
+                        except Exception:
+                            print(f'failed to parse pid from pid file: {pidfilepath}')
+                            raise
+
+                        # TODO check if process with pid is running
+                        # and if the process name is cc['name']
+
+                        cc['pid'] = pid
+                        """
+
                 elif c == Coins.DCR:
                     print("bin/basicswap_prepare.py 1455 pass")
                     pass
@@ -1474,8 +1620,7 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
                         # get pid of running daemon
                         #pidfilepath = ... # -> basicswap/basicswap.py
 
-                        # FIXME KeyError: 'particl'
-                        # set cc['pid']
+                        # set cc['pid'] for setCoinRunParams
                         # FIXME refactor with basicswap/basicswap.py: pidfilepath = os.path.join(...
                         cc = swap_client.coin_clients[c]
                         pidfilename = cc['name']
@@ -1485,16 +1630,12 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
                             pidfilename = 'nano_node'
                             # https://github.com/nanocurrency/nano-node/issues/4682
                             # nano_node should allow to write the process id to a pid file
-
                         #pidfilepath = os.path.join(self.getChainDatadirPath(coin), pidfilename + '.pid')
                         pidfilepath = os.path.join(swap_client.getChainDatadirPath(c), pidfilename + '.pid')
-
                         if not os.path.exists(pidfilepath):
                             raise Exception(f'missing pid file: {pidfilepath}')
-
                         with open(pidfilepath) as f:
                             pidtext = f.read()
-
                         try:
                             pid = int(pidtext)
                         except Exception:

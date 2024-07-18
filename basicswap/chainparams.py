@@ -11,7 +11,10 @@ from .util import (
 
 XMR_COIN = 10 ** 12
 WOW_COIN = 10 ** 11
-XNO_COIN = 10 ** 10 # FIXME
+
+# https://docs.nano.org/integration-guides/#units
+# 1 nano = 10^30 raw
+XNO_COIN = 10 ** 30
 
 
 class Coins(IntEnum):
@@ -258,26 +261,29 @@ chainparams = {
         # FIXME ...
         'decimal_places': 12,
         'mainnet': {
-            'rpcport': 18081,
+            # https://docs.nano.org/running-a-node/configuration/#network-details
+            'rpchost': '::1', # ipv6 only
+            'rpcport': 7076,
+            'wsport': 7078, # websockets
             #'walletrpcport': 18082,
             'min_amount': 100000,
             'max_amount': 10000 * XNO_COIN,
             'address_prefix': 18,
         },
-        'testnet': {
-            'rpcport': 28081,
-            #'walletrpcport': 28082,
-            'min_amount': 100000,
-            'max_amount': 10000 * XNO_COIN,
-            'address_prefix': 18,
-        },
-        'regtest': {
-            'rpcport': 18081,
-            #'walletrpcport': 18082,
-            'min_amount': 100000,
-            'max_amount': 10000 * XNO_COIN,
-            'address_prefix': 18,
-        }
+#         'testnet': {
+#             'rpcport': 28081,
+#             #'walletrpcport': 28082,
+#             'min_amount': 100000,
+#             'max_amount': 10000 * XNO_COIN,
+#             'address_prefix': 18,
+#         },
+#         'regtest': {
+#             'rpcport': 18081,
+#             #'walletrpcport': 18082,
+#             'min_amount': 100000,
+#             'max_amount': 10000 * XNO_COIN,
+#             'address_prefix': 18,
+#         }
     },
     Coins.WOW: {
         'name': 'wownero',

@@ -174,32 +174,49 @@ class JsonrpcDigest():
 
 def callrpc_xno(rpc_port, method, params=[], rpc_host='127.0.0.1', path='json_rpc', auth=None, timeout=120, transport=None, tag=''):
     # auth is a tuple: (username, password)
+    path = ''
     try:
         if rpc_host.count('://') > 0:
             url = '{}:{}/{}'.format(rpc_host, rpc_port, path)
         else:
             url = 'http://{}:{}/{}'.format(rpc_host, rpc_port, path)
 
+        print("basicswap/rpc_xno.py 180 url", url)
+
         x = JsonrpcDigest(url, transport=transport)
         request_body = {
-            'method': method,
-            'params': params,
-            'jsonrpc': '2.0',
-            'id': x.request_id()
+            #'method': method,
+            'action': method,
+            #'params': params,
+            #'jsonrpc': '2.0',
+            #'id': x.request_id()
+            #**params,
         }
+        if params:
+            request_body.update(params)
+        print("basicswap/rpc_xno.py 190 request_body", request_body)
+
+        # FIXME 2024-07-18 09:01:12 WARNING : Can't connect to XNO RPC: 'result'.  Trying again in 4 second/s, 4/21.
         if auth:
             v = x.json_request(request_body, username=auth[0], password=auth[1], timeout=timeout)
         else:
             v = x.json_request(request_body, timeout=timeout)
         x.close()
+
+        print("basicswap/rpc_xno.py 200 v", v)
         r = json.loads(v.decode('utf-8'))
+        print("basicswap/rpc_xno.py 200 r", r)
     except Exception as ex:
         raise ValueError('{}RPC Server Error: {}'.format(tag, str(ex)))
 
+    return r
+
+    """
     if 'error' in r and r['error'] is not None:
         raise ValueError(tag + 'RPC error ' + str(r['error']))
 
     return r['result']
+    """
 
 
 def callrpc_xno2(rpc_port: int, method: str, params=None, auth=None, rpc_host='127.0.0.1', timeout=120, transport=None, tag=''):

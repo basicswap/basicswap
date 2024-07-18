@@ -160,9 +160,21 @@ class XNOInterface(CoinInterface):
         # FIXME
         #raise 123
 
+        # FIXME basicswap/interface/xno.py 160 rpchost 127.0.0.1
+        # should be ::1
+        # curl: http://::1:7076/ URL rejected: Port number was not a decimal number between 0 and 65535
+        # -> curl needs host = [::1]
+        rpchost = '[::1]' # ipv6
+        #rpchost = 'localhost' # ipv4 or ipv6
+        print("basicswap/interface/xno.py 160 rpchost", rpchost)
+        print("basicswap/interface/xno.py 160 rpcport", coin_settings['rpcport'])
+
         self.rpc = make_xno_rpc_func(coin_settings['rpcport'], daemon_login, host=rpchost, proxy_host=proxy_host, proxy_port=proxy_port, default_timeout=self._rpctimeout, tag='Node(j) ')
-        self.rpc2 = make_xno_rpc2_func(coin_settings['rpcport'], daemon_login, host=rpchost, proxy_host=proxy_host, proxy_port=proxy_port, default_timeout=self._rpctimeout, tag='Node ')  # non-json endpoint
-        self.rpc_wallet = make_xno_rpc_func(coin_settings['walletrpcport'], coin_settings['walletrpcauth'], host=coin_settings.get('walletrpchost', '127.0.0.1'), default_timeout=self._walletrpctimeout, tag='Wallet ')
+        #self.rpc2 = make_xno_rpc2_func(coin_settings['rpcport'], daemon_login, host=rpchost, proxy_host=proxy_host, proxy_port=proxy_port, default_timeout=self._rpctimeout, tag='Node ')  # non-json endpoint
+        #self.rpc_wallet = make_xno_rpc_func(coin_settings['walletrpcport'], coin_settings['walletrpcauth'], host=coin_settings.get('walletrpchost', '127.0.0.1'), default_timeout=self._walletrpctimeout, tag='Wallet ')
+        # i guess there is no separate rpc for nano wallet
+        self.rpc_wallet = self.rpc
+        self.rpc2 = self.rpc
 
     #def setFeePriority(self, new_priority):
     #    ensure(new_priority >= 0 and new_priority < 4, 'Invalid fee_priority value')

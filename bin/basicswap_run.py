@@ -43,6 +43,7 @@ class Daemon:
     __slots__ = ('handle', 'files')
 
     def __init__(self, handle, files):
+        # FIXME rename handle to proc
         self.handle = handle
         self.files = files
 
@@ -87,6 +88,7 @@ def startDaemon(node_dir, bin_dir, daemon_bin, opts=[], extra_config={}):
     add_datadir: bool = extra_config.get('add_datadir', True)
     if add_datadir:
         args.append('-datadir=' + datadir_path)
+
     args += opts
     #logging.info('Starting node ' + daemon_bin + ' ' + (('-datadir=' + node_dir) if add_datadir else ''))
     logging.info('Starting node ' + shlex.join(args))
@@ -100,11 +102,31 @@ def startDaemon(node_dir, bin_dir, daemon_bin, opts=[], extra_config={}):
         stdout_dest = subprocess.PIPE
         stderr_dest = subprocess.PIPE
 
+    print("bin/basicswap_run.py 100 stdout_dest", stdout_dest)
+    print("bin/basicswap_run.py 100 stderr_dest", stderr_dest)
+
+    kwargs = dict(
+        stdin=subprocess.PIPE,
+        # FIXME write stderr to subprocess.STDOUT to correctly interleave stdout and stderr
+        stdout=stdout_dest,
+        stderr=stderr_dest,
+        cwd=datadir_path,
+    )
+
     if extra_config.get('use_shell', False):
-        #str_args = ' '.join(args)
-        str_args = shlex.join(args)
-        return Daemon(subprocess.Popen(str_args, shell=True, stdin=subprocess.PIPE, stdout=stdout_dest, stderr=stderr_dest, cwd=datadir_path), opened_files)
-    return Daemon(subprocess.Popen(args, stdin=subprocess.PIPE, stdout=stdout_dest, stderr=stderr_dest, cwd=datadir_path), opened_files)
+        args = shlex.join(args)
+        kwargs['shell'] = True
+
+    proc = subprocess.Popen(args, **kwargs)
+
+    # give the daemon some time to fail early
+    # for example on invalid CLI args
+    time.sleep(2)
+
+    if proc.returncode != None:
+        raise Exception(f'daemon did not start: {args}')
+
+    return Daemon(proc, opened_files)
 
 
 def startXmrDaemon(node_dir, bin_dir, daemon_bin, opts=[]):
