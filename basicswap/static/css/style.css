@@ -199,14 +199,14 @@
 
 .qrcode-border {
   border: 2px solid;
-  border-color: rgba(59, 130, 246, var(--tw-border-opacity));
-  border-radius: 20px;
+  background-color: #ffffff;
+  border-radius: 0px;
 }
 
 .qrcode img {
   width: 100%;
   height: auto;
-  border-radius: 15px;
+  border-radius: 0px;
 }
 
 #showQR {
@@ -216,6 +216,10 @@
   transform: translate(-50%, -50%);
   height:25px;
 }
+
+.qrcode-container {
+ margin-top: 25px;
+ }
 
 
 select.select-disabled {
