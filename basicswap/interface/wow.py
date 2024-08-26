@@ -25,3 +25,7 @@ class WOWInterface(XMRInterface):
     @staticmethod
     def exp() -> int:
         return 11
+
+    @staticmethod
+    def depth_spendable() -> int:
+        return 3
