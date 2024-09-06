@@ -229,7 +229,7 @@ TEST_TOR_PROXY = toBool(os.getenv('TEST_TOR_PROXY', 'true'))  # Expects a known 
 TEST_ONION_LINK = toBool(os.getenv('TEST_ONION_LINK', 'false'))
 
 BITCOIN_FASTSYNC_URL = os.getenv('BITCOIN_FASTSYNC_URL', 'https://eu2.contabostorage.com/1f50a74c9dc14888a8664415dad3d020:utxosets/')
-BITCOIN_FASTSYNC_FILE = os.getenv('BITCOIN_FASTSYNC_FILE', 'utxo-snapshot-bitcoin-mainnet-769818.tar')
+BITCOIN_FASTSYNC_FILE = os.getenv('BITCOIN_FASTSYNC_FILE', 'utxo-snapshot-bitcoin-mainnet-820852.tar')
 
 # Encrypt new wallets with this password, must match the Particl wallet password when adding coins
 WALLET_ENCRYPTION_PWD = os.getenv('WALLET_ENCRYPTION_PWD', '')
