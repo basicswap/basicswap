@@ -54,7 +54,7 @@ Depending on your environment, the `docker-compose` command may not work. If tha
 
 Set xmrrestoreheight to the current xmr chain height.
 
-    CURRENT_XMR_HEIGHT=$(curl https://localmonero.co/blocks/api/get_stats | jq .height)
+    CURRENT_XMR_HEIGHT=$(curl https://xmrchain.net/api/networkinfo | jq .data.height)
 
 Adjust `--withcoins` and `--withoutcoins` as desired, eg: `--withcoins=monero,bitcoin`.  By default only Particl is loaded.
 
@@ -187,7 +187,7 @@ Continue installing Basicswap
 
 Prepare the datadir:
 
-    CURRENT_XMR_HEIGHT=$(curl https://localmonero.co/blocks/api/get_stats | jq .height)
+    CURRENT_XMR_HEIGHT=$(curl https://xmrchain.net/api/networkinfo | jq .data.height)
 
     basicswap-prepare --datadir=$SWAP_DATADIR --withcoins=monero --xmrrestoreheight=$CURRENT_XMR_HEIGHT
 
