@@ -6,25 +6,25 @@
     {% if refresh %}
     <meta http-equiv="refresh" content="{{ refresh }}">
     {% endif %}
-  <link type="text/css" media="all" href="/static/css/libs/flowbite.min.css" rel="stylesheet" />
-  <link type="text/css" media="all" href="/static/css/libs/tailwind.min.css" rel="stylesheet">
-  <link type="text/css" media="all" href="/static/css/style.css" rel="stylesheet">
-  <script src="/static/js/main.js"></script>
-  <script src="/static/js/libs/flowbite.js"></script>
-<script>
-  const isDarkMode =
-    localStorage.getItem('color-theme') === 'dark' ||
-    (!localStorage.getItem('color-theme') &&
-      window.matchMedia('(prefers-color-scheme: dark)').matches);
+    <link type="text/css" media="all" href="/static/css/libs/flowbite.min.css" rel="stylesheet" />
+    <link type="text/css" media="all" href="/static/css/libs/tailwind.min.css" rel="stylesheet">
+    <link type="text/css" media="all" href="/static/css/style.css" rel="stylesheet">
+    <script src="/static/js/main.js"></script>
+    <script src="/static/js/libs/flowbite.js"></script>
+    <script>
+      const isDarkMode =
+        localStorage.getItem('color-theme') === 'dark' ||
+        (!localStorage.getItem('color-theme') &&
+          window.matchMedia('(prefers-color-scheme: dark)').matches);
 
-  if (!localStorage.getItem('color-theme')) {
-    localStorage.setItem('color-theme', isDarkMode ? 'dark' : 'light');
-  }
+      if (!localStorage.getItem('color-theme')) {
+        localStorage.setItem('color-theme', isDarkMode ? 'dark' : 'light');
+      }
 
-  document.documentElement.classList.toggle('dark', isDarkMode);
-</script>
+      document.documentElement.classList.toggle('dark', isDarkMode);
+    </script>
     <link rel=icon sizes="32x32" type="image/png" href="/static/images/favicon/favicon-32.png">
-  <title>(BSX) BasicSwap - v{{ version }}</title>
+    <title>(BSX) BasicSwap - v{{ version }}</title>
   </head>
   <body class="dark:bg-gray-700">
     <section class="py-24 md:py-32">
@@ -32,10 +32,10 @@
         <div class="max-w-sm mx-auto">
           <div class="mb-3 text-center">
             <a class="inline-block mb-6" href="#">
-          <img src="/static/images/logos/basicswap-logo.svg" class="h-20 imageshow dark-image">
-          <img src="/static/images/logos/basicswap-logo-dark.svg" class="h-20 imageshow light-image">
+              <img src="/static/images/logos/basicswap-logo.svg" class="h-20 imageshow dark-image">
+              <img src="/static/images/logos/basicswap-logo-dark.svg" class="h-20 imageshow light-image">
             </a>
-            <p class="text-lg text-coolGray-500 font-medium mb-6 dark:text-white" contenteditable="false">Unlock your wallets</p>
+            <p class="text-lg text-coolGray-500 font-medium mb-6 dark:text-white">Unlock your wallets</p>
             {% for m in messages %}
             <section class="py-4" id="messages_{{ m[0] }}" role="alert">
               <div class="container px-4 mx-auto">
@@ -77,7 +77,7 @@
           </div>
           <form method="post" autocomplete="off">
             <div class="mb-4">
-              <label class="block mb-2 text-coolGray-800 font-medium dark:text-white" for="" contenteditable="false">Your Password</label>
+              <label class="block mb-2 text-coolGray-800 font-medium dark:text-white" for="">Your Password</label>
               <div class="relative w-full">
                 <div class="absolute inset-y-0 right-0 flex items-center px-2">
                   <input class="hidden js-password-toggle" id="toggle" type="checkbox" />
@@ -94,41 +94,40 @@
             </div>
             <button type="submit" name="unlock" value="Unlock" class="appearance-none focus:outline-none inline-block py-3 px-7 mb-6 w-full text-base text-blue-50 font-medium text-center leading-6 bg-blue-500 hover:bg-blue-600 focus:ring-0 rounded-md shadow-sm">Unlock</button>
             <p class="text-center">
-              <span class="text-xs font-medium dark:text-white" contenteditable="false">Need help?</span>
-              <a class="inline-block text-xs font-medium text-blue-500 hover:text-blue-600 hover:underline" href="https://academy.particl.io/en/latest/faq/get_support.html" target="_blank" contenteditable="false">Help / Tutorials</a>
+              <span class="text-xs font-medium dark:text-white">Need help?</span>
+              <a class="inline-block text-xs font-medium text-blue-500 hover:text-blue-600 hover:underline" href="https://academy.particl.io/en/latest/faq/get_support.html" target="_blank">Help / Tutorials</a>
             </p>
             <p class="text-center">
-              <span class="text-xs font-medium text-coolGray-500 dark:text-gray-500" contenteditable="false">{{ title }}</span>
+              <span class="text-xs font-medium text-coolGray-500 dark:text-gray-500">{{ title }}</span>
             </p>
             <input type="hidden" name="formid" value="{{ form_id }}">
           </form>
         </div>
       </div>
     </section>
-<script>
-const passwordToggle = document.querySelector('.js-password-toggle')
-passwordToggle.addEventListener('change', function() {
-  const password = document.querySelector('.js-password'),
-    passwordLabel = document.querySelector('.js-password-label')
-  if (password.type === 'password') {
-    password.type = 'text'
-    passwordLabel.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24"><g fill="#8896ab"><path d="M23.444,10.239a22.936,22.936,0,0,0-2.492-2.948l-4.021,4.021A5.026,5.026,0,0,1,17,12a5,5,0,0,1-5,5,5.026,5.026,0,0,1-.688-.069L8.055,20.188A10.286,10.286,0,0,0,12,21c5.708,0,9.905-5.062,11.445-7.24A3.058,3.058,0,0,0,23.444,10.239Z" fill="#8896ab"></path><path d="M12,3C6.292,3,2.1,8.062.555,10.24a3.058,3.058,0,0,0,0,3.52h0a21.272,21.272,0,0,0,4.784,4.9l3.124-3.124a5,5,0,0,1,7.071-7.072L8.464,15.536l10.2-10.2A11.484,11.484,0,0,0,12,3Z" fill="#8896ab"></path><path data-color="color-2" d="M1,24a1,1,0,0,1-.707-1.707l22-22a1,1,0,0,1,1.414,1.414l-22,22A1,1,0,0,1,1,24Z"></path></g></svg>'
-  } else {
-    password.type = 'password'
-    passwordLabel.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24"><g fill="#8896ab" ><path d="M23.444,10.239C21.905,8.062,17.708,3,12,3S2.1,8.062.555,10.24a3.058,3.058,0,0,0,0,3.52h0C2.1,15.938,6.292,21,12,21s9.905-5.062,11.445-7.24A3.058,3.058,0,0,0,23.444,10.239ZM12,17a5,5,0,1,1,5-5A5,5,0,0,1,12,17Z" fill="#8896ab"></path></g></svg>'
-  }
-  password.focus()
-})
-</script>
+    
     <script>
-      window.onload = () => {
-        toggleImages();
-      };
+    document.addEventListener('DOMContentLoaded', () => {
+      // Password toggle functionality
+      const passwordToggle = document.querySelector('.js-password-toggle');
+      if (passwordToggle) {
+        passwordToggle.addEventListener('change', function() {
+          const password = document.querySelector('.js-password');
+          const passwordLabel = document.querySelector('.js-password-label');
+          if (password && passwordLabel) {
+            if (password.type === 'password') {
+              password.type = 'text';
+              passwordLabel.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24"><g fill="#8896ab"><path d="M23.444,10.239a22.936,22.936,0,0,0-2.492-2.948l-4.021,4.021A5.026,5.026,0,0,1,17,12a5,5,0,0,1-5,5,5.026,5.026,0,0,1-.688-.069L8.055,20.188A10.286,10.286,0,0,0,12,21c5.708,0,9.905-5.062,11.445-7.24A3.058,3.058,0,0,0,23.444,10.239Z" fill="#8896ab"></path><path d="M12,3C6.292,3,2.1,8.062.555,10.24a3.058,3.058,0,0,0,0,3.52h0a21.272,21.272,0,0,0,4.784,4.9l3.124-3.124a5,5,0,0,1,7.071-7.072L8.464,15.536l10.2-10.2A11.484,11.484,0,0,0,12,3Z" fill="#8896ab"></path><path data-color="color-2" d="M1,24a1,1,0,0,1-.707-1.707l22-22a1,1,0,0,1,1.414,1.414l-22,22A1,1,0,0,1,1,24Z"></path></g></svg>';
+            } else {
+              password.type = 'password';
+              passwordLabel.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24"><g fill="#8896ab" ><path d="M23.444,10.239C21.905,8.062,17.708,3,12,3S2.1,8.062.555,10.24a3.058,3.058,0,0,0,0,3.52h0C2.1,15.938,6.292,21,12,21s9.905-5.062,11.445-7.24A3.058,3.058,0,0,0,23.444,10.239ZM12,17a5,5,0,1,1,5-5A5,5,0,0,1,12,17Z" fill="#8896ab"></path></g></svg>';
+            }
+            password.focus();
+          }
+        });
+      }
 
-      document.getElementById('theme-toggle').addEventListener('click', () => {
-        toggleImages();
-      });
-
+      // Image toggling function
       function toggleImages() {
         const html = document.querySelector('html');
         const darkImages = document.querySelectorAll('.dark-image');
@@ -148,17 +147,8 @@ passwordToggle.addEventListener('change', function() {
           img.style.display = display;
         });
       }
-    </script>
-<script>
-      var themeToggleDarkIcon = document.getElementById('theme-toggle-dark-icon');
-      var themeToggleLightIcon = document.getElementById('theme-toggle-light-icon');
 
-      if (localStorage.getItem('color-theme') === 'dark' || (!('color-theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-          themeToggleLightIcon.classList.remove('hidden');
-      } else {
-          themeToggleDarkIcon.classList.remove('hidden');
-      }
-
+      // Theme toggle functionality
       function setTheme(theme) {
         if (theme === 'light') {
           document.documentElement.classList.remove('dark');
@@ -169,17 +159,33 @@ passwordToggle.addEventListener('change', function() {
         }
       }
 
-      document.getElementById('theme-toggle').addEventListener('click', () => {
-        if (localStorage.getItem('color-theme') === 'dark') {
-          setTheme('light');
-        } else {
-          setTheme('dark');
-        }
-        themeToggleDarkIcon.classList.toggle('hidden');
-        themeToggleLightIcon.classList.toggle('hidden');
-        toggleImages();
-      });
+      // Initialize theme
+      const themeToggle = document.getElementById('theme-toggle');
+      const themeToggleDarkIcon = document.getElementById('theme-toggle-dark-icon');
+      const themeToggleLightIcon = document.getElementById('theme-toggle-light-icon');
 
-</script>
-</body>
+      if (themeToggle && themeToggleDarkIcon && themeToggleLightIcon) {
+        if (localStorage.getItem('color-theme') === 'dark' || (!('color-theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+          themeToggleLightIcon.classList.remove('hidden');
+        } else {
+          themeToggleDarkIcon.classList.remove('hidden');
+        }
+
+        themeToggle.addEventListener('click', () => {
+          if (localStorage.getItem('color-theme') === 'dark') {
+            setTheme('light');
+          } else {
+            setTheme('dark');
+          }
+          themeToggleDarkIcon.classList.toggle('hidden');
+          themeToggleLightIcon.classList.toggle('hidden');
+          toggleImages();
+        });
+      }
+
+      // Call toggleImages on load
+      toggleImages();
+    });
+    </script>
+  </body>
 </html>

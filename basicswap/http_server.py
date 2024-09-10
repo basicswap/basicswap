@@ -111,7 +111,6 @@ def parse_cmd(cmd: str, type_map: str):
 
 
 class HttpHandler(BaseHTTPRequestHandler):
-
     def log_error(self, format, *args):
         super().log_message(format, *args)
 
@@ -145,9 +144,12 @@ class HttpHandler(BaseHTTPRequestHandler):
             args_dict['use_tor_proxy'] = True
             # TODO: Cache value?
             try:
-                args_dict['tor_established'] = True if get_tor_established_state(swap_client) == '1' else False
-            except Exception:
+                tor_state = get_tor_established_state(swap_client)
+                args_dict['tor_established'] = True if tor_state == '1' else False
+            except Exception as e:
+                args_dict['tor_established'] = False
                 if swap_client.debug:
+                    swap_client.log.error(f"Error getting Tor state: {str(e)}")
                     swap_client.log.error(traceback.format_exc())
 
         if swap_client._show_notifications:
@@ -409,12 +411,10 @@ class HttpHandler(BaseHTTPRequestHandler):
         swap_client = self.server.swap_client
         swap_client.checkSystemStatus()
         summary = swap_client.getSummary()
-        template = env.get_template('index.html')
-        return self.render_template(template, {
-            'refresh': 30,
-            'summary': summary,
-            'use_tor_proxy': swap_client.use_tor_proxy
-        })
+        self.send_response(302)
+        self.send_header('Location', '/offers')
+        self.end_headers()
+        return b''
 
     def page_404(self, url_split):
         swap_client = self.server.swap_client

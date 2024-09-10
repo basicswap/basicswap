@@ -15,6 +15,9 @@ import logging
 import threading
 import traceback
 import subprocess
+import urllib.request
+import urllib.error
+import json
 
 from sockshandler import SocksiPyHandler
 
@@ -162,20 +165,42 @@ class BaseApp:
             socket.getaddrinfo = self.default_socket_getaddrinfo
         socket.setdefaulttimeout(self.default_socket_timeout)
 
-    def readURL(self, url: str, timeout: int = 120, headers=None) -> bytes:
-        open_handler = None
-        if self.use_tor_proxy:
-            open_handler = SocksiPyHandler(socks.PROXY_TYPE_SOCKS5, self.tor_proxy_host, self.tor_proxy_port)
-        opener = urllib.request.build_opener(open_handler) if self.use_tor_proxy else urllib.request.build_opener()
-        opener.addheaders = [('User-agent', 'Mozilla/5.0')]
-        request = urllib.request.Request(url, headers=headers)
-        return opener.open(request, timeout=timeout).read()
+    def is_tor_available(self):
+        if not hasattr(self, 'use_tor_proxy'):
+            return False
+        if not self.use_tor_proxy:
+            return False
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            result = sock.connect_ex((self.tor_proxy_host, self.tor_proxy_port))
+            sock.close()
+            return result == 0
+        except:
+            return False
 
-    def logException(self, message) -> None:
-        self.log.error(message)
-        if self.debug:
-            self.log.error(traceback.format_exc())
-
+    def readURL(self, url: str, timeout: int = 120, headers={}) -> bytes:
+        use_tor = self.is_tor_available()
+        try:
+            if use_tor:
+                proxy_handler = SocksiPyHandler(socks.PROXY_TYPE_SOCKS5, self.tor_proxy_host, self.tor_proxy_port)
+                opener = urllib.request.build_opener(proxy_handler)
+            else:
+                opener = urllib.request.build_opener()
+                
+            opener.addheaders = [(key, value) for key, value in headers.items()]
+            request = urllib.request.Request(url)
+            
+            with opener.open(request, timeout=timeout) as response:
+                return response.read()
+        except urllib.error.URLError as e:
+            if isinstance(e.reason, ConnectionRefusedError) and use_tor:
+                error_msg = f"Connection refused. Tor proxy might not be running. Error: {str(e)}"
+            else:
+                error_msg = f"URLError: {str(e)}"
+        except Exception as e:
+            error_msg = f"Unexpected error: {str(e)}"
+        return json.dumps({"Error": error_msg}).encode()
+        
     def torControl(self, query):
         try:
             command = 'AUTHENTICATE "{}"\r\n{}\r\nQUIT\r\n'.format(self.tor_control_password, query).encode('utf-8')
