@@ -519,38 +519,55 @@
   </section>
   {% if ws_url %}
   <script>
-    var ws = new WebSocket("{{ ws_url }}"),
+// Configuration object
+const notificationConfig = {
+    showNewOffers: false,
+    showNewBids: true,
+    showBidAccepted: true
+};
+
+var ws = new WebSocket("{{ ws_url }}"),
     floating_div = document.createElement('div');
-    floating_div.classList.add('floatright');
-    messages = document.createElement('ul');
-    messages.setAttribute('id', 'ul_updates');
-    ws.onmessage = function(event) {
-      let json = JSON.parse(event.data);
-      let event_message = 'Unknown event';
-      if (json['event'] == 'new_offer') {
+floating_div.classList.add('floatright');
+messages = document.createElement('ul');
+messages.setAttribute('id', 'ul_updates');
+
+floating_div.appendChild(messages);
+
+ws.onmessage = function(event) {
+    let json = JSON.parse(event.data);
+    let event_message = 'Unknown event';
+    let should_display = false;
+
+    if (json['event'] == 'new_offer' && notificationConfig.showNewOffers) {
         event_message = '<div id="hide"><div id="toast-success" class="flex items-center p-4 mb-4 w-full max-w-xs text-gray-500 bg-white rounded-lg shadow" role="alert"><div class="inline-flex flex-shrink-0 justify-center items-center w-10 h-10 bg-blue-500 rounded-lg"><svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" height="18" width="18" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round"><circle cx="5" cy="5" r="4"></circle> <circle cx="19" cy="19" r="4"></circle> <polyline data-cap="butt" points="13,5 21,5 21,11 " stroke="#ffffff"></polyline> <polyline data-cap="butt" points="11,19 3,19 3,13 " stroke="#ffffff"></polyline> <polyline points=" 16,2 13,5 16,8 " stroke="#ffffff"></polyline> <polyline points=" 8,16 11,19 8,22 " stroke="#ffffff"></polyline></g></svg></div><div class="uppercase w-40 ml-3 text-sm font-semibold text-gray-900">New network <a class="underline" href=/offer/' + json['offer_id'] + '>offer</a></div><button type="button" onclick="closeAlert(event)" class="ml-auto -mx-1.5 -my-1.5 bg-white text-gray-400 hover:text-gray-900 rounded-lg focus:ring-0 focus:outline-none focus:ring-gray-300 p-1.5 hover:bg-gray-100 inline-flex h-8 w-8" data-dismiss="#toast-success" aria-label="Close"><span class="sr-only">Close</span><svg aria-hidden="true" class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg></button></div></div>';
-      }
-      else
-      if (json['event'] == 'new_bid') {
+        should_display = true;
+    }
+    else if (json['event'] == 'new_bid' && notificationConfig.showNewBids) {
         event_message = '<div id="hide"><div id="toast-success" class="flex items-center p-4 mb-4 w-full max-w-xs text-gray-500 bg-white rounded-lg shadow" role="alert"><div class="inline-flex flex-shrink-0 justify-center items-center w-10 h-10 bg-violet-500 rounded-lg"><svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" height="18" width="18" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ffffff" stroke-linejoin="round"><rect x="9.843" y="5.379" transform="matrix(0.7071 -0.7071 0.7071 0.7071 -0.7635 13.1569)" width="11.314" height="4.243"></rect> <polyline points="3,23 3,19 15,19 15,23 "></polyline> <line x1="4" y1="15" x2="1" y2="15" stroke="#ffffff"></line> <line x1="5.757" y1="10.757" x2="3.636" y2="8.636" stroke="#ffffff"></line> <line x1="1" y1="23" x2="17" y2="23"></line> <line x1="17" y1="9" x2="23" y2="15"></line></g></svg></div><div class="uppercase w-40 ml-3 text-sm font-normal"><span class="mb-1 text-sm font-semibold text-gray-900"><a class="underline" href=/bid/' + json['bid_id'] + '>New bid</a> on <a class="underline" href=/offer/' + json['offer_id'] + '>offer</a></span></div><button type="button" onclick="closeAlert(event)" class="ml-auto -mx-1.5 -my-1.5 bg-white text-gray-400 hover:text-gray-900 rounded-lg focus:ring-0 focus:outline-nonefocus:ring-gray-300 p-1.5 hover:bg-gray-100 inline-flex h-8 w-8" data-dismiss="#toast-success" aria-label="Close"><svg aria-hidden="true" class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg></button></div></div>';
-      }
-      else
-      if (json['event'] == 'bid_accepted') {
+        should_display = true;
+    }
+    else if (json['event'] == 'bid_accepted' && notificationConfig.showBidAccepted) {
         event_message = '<div id="hide"><div id="toast-success" class="flex items-center p-4 mb-4 w-full max-w-xs text-gray-500 bg-white rounded-lg shadow" role="alert"><div class="inline-flex flex-shrink-0 justify-center items-center w-10 h-10 bg-violet-500 rounded-lg"><svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" height="18" width="18" viewBox="0 0 24 24"><g fill="#ffffff"><path d="M8.5,20a1.5,1.5,0,0,1-1.061-.439L.379,12.5,2.5,10.379l6,6,13-13L23.621,5.5,9.561,19.561A1.5,1.5,0,0,1,8.5,20Z" fill="#ffffff"></path></g></svg></div><div class="uppercase w-40 ml-3 text-sm font-semibold text-gray-900"><a class="underline" href=/bid/' + json['bid_id'] + '>Bid</a> accepted</div><button type="button" onclick="closeAlert(event)" class="ml-auto -mx-1.5 -my-1.5 bg-white text-gray-400 hover:text-gray-900 rounded-lg focus:ring-0 focus:outline-none focus:ring-gray-300 p-1.5 hover:bg-gray-100 inline-flex h-8 w-8" data-dismiss="#toast-success" aria-label="Close"><span class="sr-only">Close</span><svg aria-hidden="true" class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg></button></div></div>';
-      }
-      let messages = document.getElementById('ul_updates'),
-        message = document.createElement('li');
-      message.innerHTML = event_message;
-      messages.appendChild(message);
-    };
-    floating_div.appendChild(messages);
-    document.body.appendChild(floating_div);
-      function closeAlert(event){
+        should_display = true;
+    }
+
+    if (should_display) {
+        let messages = document.getElementById('ul_updates'),
+            message = document.createElement('li');
+        message.innerHTML = event_message;
+        messages.appendChild(message);
+    }
+};
+
+document.body.appendChild(floating_div);
+
+function closeAlert(event){
     let element = event.target;
     while(element.nodeName !== "BUTTON"){
-      element = element.parentNode;
+        element = element.parentNode;
     }
     element.parentNode.parentNode.removeChild(element.parentNode);
-  }
+}
   </script>
   {% endif %}

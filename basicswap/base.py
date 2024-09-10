@@ -1,9 +1,3 @@
-# -*- coding: utf-8 -*-
-
-# Copyright (c) 2019-2024 tecnovert
-# Distributed under the MIT software license, see the accompanying
-# file LICENSE or http://www.opensource.org/licenses/mit-license.php.
-
 import os
 import time
 import shlex
@@ -15,6 +9,9 @@ import logging
 import threading
 import traceback
 import subprocess
+import urllib.request
+import urllib.error
+import json
 
 from sockshandler import SocksiPyHandler
 
@@ -162,19 +159,60 @@ class BaseApp:
             socket.getaddrinfo = self.default_socket_getaddrinfo
         socket.setdefaulttimeout(self.default_socket_timeout)
 
-    def readURL(self, url: str, timeout: int = 120, headers=None) -> bytes:
-        open_handler = None
-        if self.use_tor_proxy:
-            open_handler = SocksiPyHandler(socks.PROXY_TYPE_SOCKS5, self.tor_proxy_host, self.tor_proxy_port)
-        opener = urllib.request.build_opener(open_handler) if self.use_tor_proxy else urllib.request.build_opener()
-        opener.addheaders = [('User-agent', 'Mozilla/5.0')]
-        request = urllib.request.Request(url, headers=headers)
-        return opener.open(request, timeout=timeout).read()
+    def is_tor_available(self):
+        if not hasattr(self, 'use_tor_proxy'):
+            return False
+        if not self.use_tor_proxy:
+            return False
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            result = sock.connect_ex((self.tor_proxy_host, self.tor_proxy_port))
+            sock.close()
+            return result == 0
+        except:
+            return False
 
-    def logException(self, message) -> None:
-        self.log.error(message)
-        if self.debug:
-            self.log.error(traceback.format_exc())
+    def readURL(self, url: str, timeout: int = 120, headers={}, debug: bool = False) -> bytes:
+        default_headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+        }
+        default_headers.update(headers)
+
+        use_tor = self.is_tor_available()
+        if debug:
+            print(f"Debug: Tor is {'available and will be used' if use_tor else 'not available or not configured. Using clearnet'}.")
+            print(f"Debug: Attempting to connect to {url}")
+
+        try:
+            if use_tor:
+                if debug:
+                    print(f"Debug: Using Tor proxy at {self.tor_proxy_host}:{self.tor_proxy_port}")
+                proxy_handler = SocksiPyHandler(socks.PROXY_TYPE_SOCKS5, self.tor_proxy_host, self.tor_proxy_port)
+                opener = urllib.request.build_opener(proxy_handler)
+            else:
+                if debug:
+                    print("Debug: Using clearnet connection")
+                opener = urllib.request.build_opener()
+
+            opener.addheaders = [(key, value) for key, value in default_headers.items()]
+            request = urllib.request.Request(url)
+            
+            with opener.open(request, timeout=timeout) as response:
+                return response.read()
+
+        except urllib.error.URLError as e:
+            if isinstance(e.reason, ConnectionRefusedError) and use_tor:
+                error_msg = f"Connection refused. Tor proxy might not be running. Error: {str(e)}"
+            else:
+                error_msg = f"URLError: {str(e)}"
+        except Exception as e:
+            error_msg = f"Unexpected error: {str(e)}"
+
+        if debug:
+            print(f"Debug: Error occurred - {error_msg}")
+        return json.dumps({"Error": error_msg}).encode()
 
     def torControl(self, query):
         try:
