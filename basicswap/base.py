@@ -1,3 +1,9 @@
+# -*- coding: utf-8 -*-
+
+# Copyright (c) 2019-2024 tecnovert
+# Distributed under the MIT software license, see the accompanying
+# file LICENSE or http://www.opensource.org/licenses/mit-license.php.
+
 import os
 import time
 import shlex
@@ -179,29 +185,25 @@ class BaseApp:
             'Accept-Language': 'en-US,en;q=0.5',
         }
         default_headers.update(headers)
-
         use_tor = self.is_tor_available()
         if debug:
-            print(f"Debug: Tor is {'available and will be used' if use_tor else 'not available or not configured. Using clearnet'}.")
-            print(f"Debug: Attempting to connect to {url}")
-
+            self.log.debug(f"Tor is {'available and will be used' if use_tor else 'not available or not configured. Using clearnet'}.")
+            self.log.debug(f"Attempting to connect to {url}")
         try:
             if use_tor:
                 if debug:
-                    print(f"Debug: Using Tor proxy at {self.tor_proxy_host}:{self.tor_proxy_port}")
+                    self.log.debug(f"Using Tor proxy at {self.tor_proxy_host}:{self.tor_proxy_port}")
                 proxy_handler = SocksiPyHandler(socks.PROXY_TYPE_SOCKS5, self.tor_proxy_host, self.tor_proxy_port)
                 opener = urllib.request.build_opener(proxy_handler)
             else:
                 if debug:
-                    print("Debug: Using clearnet connection")
+                    self.log.debug("Using clearnet connection")
                 opener = urllib.request.build_opener()
-
             opener.addheaders = [(key, value) for key, value in default_headers.items()]
             request = urllib.request.Request(url)
             
             with opener.open(request, timeout=timeout) as response:
                 return response.read()
-
         except urllib.error.URLError as e:
             if isinstance(e.reason, ConnectionRefusedError) and use_tor:
                 error_msg = f"Connection refused. Tor proxy might not be running. Error: {str(e)}"
@@ -209,9 +211,8 @@ class BaseApp:
                 error_msg = f"URLError: {str(e)}"
         except Exception as e:
             error_msg = f"Unexpected error: {str(e)}"
-
         if debug:
-            print(f"Debug: Error occurred - {error_msg}")
+            self.log.debug(f"Error occurred - {error_msg}")
         return json.dumps({"Error": error_msg}).encode()
 
     def torControl(self, query):
