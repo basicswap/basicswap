@@ -7,7 +7,6 @@
 import json
 import random
 import urllib.parse
-import logging
 
 from .util import (
     ensure,
@@ -773,7 +772,7 @@ def js_readurl(self, url_split, post_string, is_json) -> bytes:
         try:
             error = json.loads(response.decode())
             if "Error" in error:
-                print(f"Error reading URL: {error['Error']}")
+                self.log.error(f"Error reading URL: {error['Error']}")
                 return json.dumps({"Error": error['Error']}).encode()
         except json.JSONDecodeError:
             pass
