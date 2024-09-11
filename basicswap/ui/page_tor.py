@@ -3,6 +3,7 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
+
 def extract_data(bytes_in):
     if bytes_in is None:
         return None
@@ -16,9 +17,11 @@ def extract_data(bytes_in):
         return None
     return str_in[start: end]
 
+
 def get_tor_established_state(swap_client):
     rv = swap_client.torControl('GETINFO status/circuit-established')
     return extract_data(rv)
+
 
 def page_tor(self, url_split, post_string):
     swap_client = self.server.swap_client
