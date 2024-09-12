@@ -15,9 +15,6 @@ import logging
 import threading
 import traceback
 import subprocess
-import urllib.request
-import urllib.error
-import json
 
 from sockshandler import SocksiPyHandler
 
@@ -165,19 +162,6 @@ class BaseApp:
             socket.getaddrinfo = self.default_socket_getaddrinfo
         socket.setdefaulttimeout(self.default_socket_timeout)
 
-    def is_tor_available(self):
-        if not hasattr(self, 'use_tor_proxy'):
-            return False
-        if not self.use_tor_proxy:
-            return False
-        try:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            result = sock.connect_ex((self.tor_proxy_host, self.tor_proxy_port))
-            sock.close()
-            return result == 0
-        except:
-            return False
-
     def readURL(self, url: str, timeout: int = 120, headers={}) -> bytes:
         open_handler = None
         if self.use_tor_proxy:
@@ -193,7 +177,6 @@ class BaseApp:
         if self.debug:
             self.log.error(traceback.format_exc())
 
-        
     def torControl(self, query):
         try:
             command = 'AUTHENTICATE "{}"\r\n{}\r\nQUIT\r\n'.format(self.tor_control_password, query).encode('utf-8')
