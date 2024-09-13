@@ -1,64 +1,63 @@
-
-.padded_row td
-{
-  padding-top:1.5em;
+/* General Styles */
+.bold {
+  font-weight: bold;
 }
 
-.bold
-{
-  font-weight:bold;
+.monospace {
+  font-family: monospace;
 }
 
-.monospace
-{
-  font-family:monospace;
-}
-
-.floatright
-{
+.floatright {
   position: fixed;
-  top:1.25rem;
-  right:1.25rem;
+  top: 1.25rem;
+  right: 1.25rem;
   z-index: 9999;
 }
 
-.error_msg
-{
+/* Table Styles */
+.padded_row td {
+  padding-top: 1.5em;
 }
 
+/* Modal Styles */
+.modal-highest {
+  z-index: 9999;
+}
+
+/* Animation */
 #hide {
-    -moz-animation: cssAnimation 0s ease-in 15s forwards;
-    /* Firefox */
-    -webkit-animation: cssAnimation 0s ease-in 15s forwards;
-    /* Safari and Chrome */
-    -o-animation: cssAnimation 0s ease-in 15s forwards;
-    /* Opera */
-    animation: cssAnimation 0s ease-in 15s forwards;
-    -webkit-animation-fill-mode: forwards;
-    animation-fill-mode: forwards;
-}
-@keyframes cssAnimation {
-    to {
-        width:0;
-        height:0;
-        overflow:hidden;
-    }
-}
-@-webkit-keyframes cssAnimation {
-    to {
-        width:0;
-        height:0;
-        visibility:hidden;
-    }
+  -moz-animation: cssAnimation 0s ease-in 15s forwards;
+  -webkit-animation: cssAnimation 0s ease-in 15s forwards;
+  -o-animation: cssAnimation 0s ease-in 15s forwards;
+  animation: cssAnimation 0s ease-in 15s forwards;
+  -webkit-animation-fill-mode: forwards;
+  animation-fill-mode: forwards;
 }
 
-.custom-select .select {
-    appearance: none;
-    background-image: url('/static/images/other/coin.png');
-    background-position: 10px center;
-    background-repeat: no-repeat;
-    position: relative;
+@keyframes cssAnimation {
+  to {
+    width: 0;
+    height: 0;
+    overflow: hidden;
   }
+}
+
+@-webkit-keyframes cssAnimation {
+  to {
+    width: 0;
+    height: 0;
+    visibility: hidden;
+  }
+}
+
+/* Custom Select Styles */
+.custom-select .select {
+  appearance: none;
+  background-image: url('/static/images/other/coin.png');
+  background-position: 10px center;
+  background-repeat: no-repeat;
+  position: relative;
+}
 
 .custom-select select::-webkit-scrollbar {
   width: 0;
@@ -95,19 +94,20 @@
   display: block;
 }
 
+/* Blur and Overlay Styles */
 .blurred {
-    filter: blur(4px);
-    pointer-events: none;
-    user-select: none;
+  filter: blur(3px);
+  pointer-events: none;
+  user-select: none;
 }
 
 .error-overlay.non-blurred {
-    filter: none;
-    pointer-events: auto;
-    user-select: auto;
+  filter: none;
+  pointer-events: auto;
+  user-select: auto;
 }
 
-/* Disable opacity on disabled form elements in Chrome */
+/* Form Element Styles */
 @media screen and (-webkit-min-device-pixel-ratio:0) {
   select:disabled,
   input:disabled,
@@ -120,6 +120,7 @@
   border: 1px solid red !important;
 }
 
+/* Active Container Styles */
 .active-container {
   position: relative;
   border-radius: 10px;
@@ -137,6 +138,7 @@
   pointer-events: none;
 }
 
+/* Center Spin Animation */
 .center-spin {
   display: flex;
   justify-content: center;
@@ -148,10 +150,11 @@
   100% { transform: rotate(360deg); }
 }
 
-.hover-container:hover #coin_to_button, .hover-container:hover #coin_to {
-  border-color: #3b82f6;
-}
-.hover-container:hover #coin_from_button, .hover-container:hover #coin_from {
+/* Hover Container Styles */
+.hover-container:hover #coin_to_button,
+.hover-container:hover #coin_to,
+.hover-container:hover #coin_from_button,
+.hover-container:hover #coin_from {
   border-color: #3b82f6;
 }
 
@@ -161,6 +164,7 @@
   background-size: 20px 20px;
 }
 
+/* Input-like Container Styles */
 .input-like-container {
   max-width: 100%;
   background-color: #ffffff;
@@ -172,29 +176,33 @@
   line-height: 1.25rem;
   outline: none;
   word-wrap: break-word;
-  height: 90px;
-  color: #374151;
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
-  line-height: 1.25rem;
-  outline: none;
+  overflow-wrap: break-word;
   word-break: break-all;
+  height: auto;
+  min-height: 90px;
+  max-height: 150px;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
+  overflow-y: auto;
+}
+
+.input-like-container.dark {
+  background-color: #374151;
+  color: #ffffff;
 }
 
 .input-like-container.copying {
   width: inherit;
 }
 
+/* QR Code Styles */
 .qrcode {
   position: relative;
   display: inline-block;
   padding: 10px;
   overflow: hidden;
-  position: relative;
 }
 
 .qrcode-border {
@@ -214,66 +222,59 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  height:25px;
+  height: 25px;
 }
 
 .qrcode-container {
- margin-top: 25px;
- }
-
-
-select.select-disabled {
-opacity: 0.40 !important;
+  margin-top: 25px;
 }
 
-
-.disabled-input-enabled {
-    opacity: 0.40 !important;
-}
+/* Disabled Element Styles */
+select.select-disabled,
+.disabled-input-enabled,
 select.disabled-select-enabled {
-    opacity: 0.40 !important;
+  opacity: 0.40 !important;
 }
 
+/* Shutdown Modal Styles */
+#shutdownModal {
+  z-index: 50;
+}
 
-  .custom-select .select {
-   appearance: none;
-   background-position: 10px center;
-   background-repeat: no-repeat;
-   position: relative;
-  }
+#shutdownModal > div:first-child {
+  z-index: 40;
+}
 
-  .custom-select select::-webkit-scrollbar {
-   width: 0;
-  }
+#shutdownModal > div:last-child {
+  z-index: 50;
+}
 
-  .custom-select .select option {
-   padding-left: 0;
-   text-indent: 0;
-   background-repeat: no-repeat;
-   background-position: 0 50%;
-  }
+#shutdownModal > div {
+  transition: opacity 0.3s ease-out;
+}
 
-  .custom-select .select option.no-space {
-   padding-left: 0;
-  }
+#shutdownModal.hidden > div {
+  opacity: 0;
+}
 
-  .custom-select .select option[data-image] {
-   background-image: url('');
-  }
+#shutdownModal:not(.hidden) > div {
+  opacity: 1;
+}
 
-  .custom-select .select-icon {
-   position: absolute;
-   top: 50%;
-   left: 10px;
-   transform: translateY(-50%);
-  }
+.shutdown-button {
+  transition: all 0.3s ease;
+}
 
-  .custom-select .select-image {
-   display: none;
-   margin-top: 10px;
-  }
+.shutdown-button.shutdown-disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  color: #a0aec0;
+}
 
-  .custom-select .select:focus+.select-dropdown .select-image {
-   display: block;
-  }
+.shutdown-button.shutdown-disabled:hover {
+  background-color: #4a5568;
+}
 
+.shutdown-button.shutdown-disabled svg {
+  opacity: 0.5;
+}
