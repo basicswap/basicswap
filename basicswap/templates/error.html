@@ -1,13 +1,123 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <link rel=icon sizes="32x32" type="image/png" href="/static/images/favicon-32.png">
-  <title>(BSX) BasicSwap - v{{ version }}</title>
-</head>
-<body>
-  <h2>{{ title_str }}</h2>
-  <p>Info: {{ message_str }}</p>
-  <p><a href="/">home</a></p>
-</body>
+  <head>
+    <meta charset="UTF-8">
+    <link type="text/css" media="all" href="/static/css/libs/flowbite.min.css" rel="stylesheet" />
+    <link type="text/css" media="all" href="/static/css/libs/tailwind.min.css" rel="stylesheet">
+    <link type="text/css" media="all" href="/static/css/style.css" rel="stylesheet">
+    <script src="/static/js/main.js"></script>
+    <script src="/static/js/libs/flowbite.js"></script>
+    <script>
+      const isDarkMode =
+        localStorage.getItem('color-theme') === 'dark' ||
+        (!localStorage.getItem('color-theme') &&
+          window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+      if (!localStorage.getItem('color-theme')) {
+        localStorage.setItem('color-theme', isDarkMode ? 'dark' : 'light');
+      }
+
+      document.documentElement.classList.toggle('dark', isDarkMode);
+    </script>
+    <link rel=icon sizes="32x32" type="image/png" href="/static/images/favicon/favicon-32.png">
+    <title>(BSX) BasicSwap - Info</title>
+    <style>
+      body {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        margin: 0;
+      }
+      .container {
+        width: 100%;
+        max-width: 600px;
+      }
+    </style>
+  </head>
+  <body class="dark:bg-gray-700">
+    <div class="container px-4 mx-auto">
+      <div class="text-center">
+        <a class="inline-block mb-6" href="#">
+          <img src="/static/images/logos/basicswap-logo.svg" class="h-20 imageshow dark-image">
+          <img src="/static/images/logos/basicswap-logo-dark.svg" class="h-20 imageshow light-image">
+        </a>
+        
+        <div class="p-6 bg-coolGray-100 dark:bg-gray-800 rounded-lg shadow-md">
+          <h2 class="text-xl font-bold mb-4 text-coolGray-900 dark:text-white">ERROR:</h2>
+          <p class="text-lg text-coolGray-500 dark:text-white mb-6">{{ message_str }}</p>
+          <a href="/" class="inline-block py-2 px-4 bg-blue-500 hover:bg-blue-600 text-white rounded-md transition duration-300">Home</a>
+        </div>
+        <p class="mt-10">
+          <span class="text-xs font-medium dark:text-white">Need help?</span>
+          <a class="inline-block text-xs font-medium text-blue-500 hover:text-blue-600 hover:underline" href="https://academy.particl.io/en/latest/faq/get_support.html" target="_blank">Help / Tutorials</a>
+        </p>
+        <p>
+          <span class="text-xs font-medium text-coolGray-500 dark:text-gray-500">{{ title }}</span>
+        </p>
+      </div>
+    </div>
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // Image toggling function
+      function toggleImages() {
+        const html = document.querySelector('html');
+        const darkImages = document.querySelectorAll('.dark-image');
+        const lightImages = document.querySelectorAll('.light-image');
+
+        if (html && html.classList.contains('dark')) {
+          toggleImageDisplay(darkImages, 'block');
+          toggleImageDisplay(lightImages, 'none');
+        } else {
+          toggleImageDisplay(darkImages, 'none');
+          toggleImageDisplay(lightImages, 'block');
+        }
+      }
+
+      function toggleImageDisplay(images, display) {
+        images.forEach(img => {
+          img.style.display = display;
+        });
+      }
+
+      // Theme toggle functionality
+      function setTheme(theme) {
+        if (theme === 'light') {
+          document.documentElement.classList.remove('dark');
+          localStorage.setItem('color-theme', 'light');
+        } else {
+          document.documentElement.classList.add('dark');
+          localStorage.setItem('color-theme', 'dark');
+        }
+      }
+
+      // Initialize theme
+      const themeToggle = document.getElementById('theme-toggle');
+      const themeToggleDarkIcon = document.getElementById('theme-toggle-dark-icon');
+      const themeToggleLightIcon = document.getElementById('theme-toggle-light-icon');
+
+      if (themeToggle && themeToggleDarkIcon && themeToggleLightIcon) {
+        if (localStorage.getItem('color-theme') === 'dark' || (!('color-theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+          themeToggleLightIcon.classList.remove('hidden');
+        } else {
+          themeToggleDarkIcon.classList.remove('hidden');
+        }
+
+        themeToggle.addEventListener('click', () => {
+          if (localStorage.getItem('color-theme') === 'dark') {
+            setTheme('light');
+          } else {
+            setTheme('dark');
+          }
+          themeToggleDarkIcon.classList.toggle('hidden');
+          themeToggleLightIcon.classList.toggle('hidden');
+          toggleImages();
+        });
+      }
+
+      // Call toggleImages on load
+      toggleImages();
+    });
+    </script>
+  </body>
 </html>
