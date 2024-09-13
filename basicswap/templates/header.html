@@ -91,6 +91,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const shutdownButtons = document.querySelectorAll('.shutdown-button');
     const shutdownModal = document.getElementById('shutdownModal');
     const closeModalButton = document.getElementById('closeShutdownModal');
+    const confirmShutdownButton = document.getElementById('confirmShutdown');
+    const shutdownWarning = document.getElementById('shutdownWarning');
 
     function updateShutdownButtons() {
         const activeSwaps = parseInt(shutdownButtons[0].getAttribute('data-active-swaps') || '0');
@@ -99,7 +101,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (activeSwaps > 0) {
                 button.classList.add('shutdown-disabled');
                 button.setAttribute('data-disabled', 'true');
-                button.setAttribute('title', 'Cannot shutdown while swaps are in progress');
+                button.setAttribute('title', 'Caution: Swaps in progress');
             } else {
                 button.classList.remove('shutdown-disabled');
                 button.removeAttribute('data-disabled');
@@ -109,6 +111,14 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function showShutdownModal() {
+        const activeSwaps = parseInt(shutdownButtons[0].getAttribute('data-active-swaps') || '0');
+        if (activeSwaps > 0) {
+            shutdownWarning.classList.remove('hidden');
+            confirmShutdownButton.textContent = 'Yes, Shut Down Anyway';
+        } else {
+            shutdownWarning.classList.add('hidden');
+            confirmShutdownButton.textContent = 'Yes, Shut Down';
+        }
         shutdownModal.classList.remove('hidden');
         document.body.style.overflow = 'hidden';
     }
@@ -120,14 +130,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
     shutdownButtons.forEach(button => {
         button.addEventListener('click', function(e) {
-            if (this.hasAttribute('data-disabled')) {
-                e.preventDefault();
-                showShutdownModal();
-            }
+            e.preventDefault();
+            showShutdownModal();
         });
     });
 
     closeModalButton.addEventListener('click', hideShutdownModal);
+
+    confirmShutdownButton.addEventListener('click', function() {
+        const shutdownToken = document.querySelector('.shutdown-button').getAttribute('href').split('/').pop();
+        window.location.href = '/shutdown/' + shutdownToken;
+    });
 
     shutdownModal.addEventListener('click', function(e) {
         if (e.target === this) {
@@ -236,7 +249,7 @@ document.addEventListener('DOMContentLoaded', function() {
 </a>
 </div>
 </div> 
- <div id="shutdownModal" tabindex="-1" class="hidden fixed inset-0 z-50 overflow-y-auto overflow-x-hidden">
+<div id="shutdownModal" tabindex="-1" class="hidden fixed inset-0 z-50 overflow-y-auto overflow-x-hidden">
     <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity"></div>
     <div class="flex items-center justify-center min-h-screen p-4 relative z-10">
         <div class="bg-white dark:bg-gray-500 rounded-lg shadow-xl max-w-md w-full">
@@ -244,10 +257,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 <svg class="mx-auto mb-4 text-gray-400 w-12 h-12 dark:text-gray-200" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 20">
                     <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 11V6m0 8h.01M19 10a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
                 </svg>
-                <h3 class="mb-5 text-lg font-normal text-gray-300 dark:text-gray-400">Cannot Shutdown</h3>
-                <p class="mb-5 text-sm text-gray-500 dark:text-gray-300">Shutdown is not possible while swaps are in progress. Please wait for all swaps to complete before shutting down.</p>
-                <button id="closeShutdownModal" type="button" class="text-white bg-red-600 hover:bg-red-800 focus:ring-0 focus:outline-none focus:ring-red-300 dark:focus:ring-red-800 font-medium rounded-lg text-sm inline-flex items-center px-5 py-2.5 text-center">
-                    Close
+                <h3 class="mb-5 text-lg font-normal text-gray-700 dark:text-gray-300">Are you sure you want to shut down?</h3>
+                <p id="shutdownWarning" class="mb-5 text-sm text-red-500 font-bold hidden">Warning: Swaps are in progress. Shutting down now may result in incomplete transactions.</p>
+                <p class="mb-5 text-sm text-gray-500 dark:text-gray-300">This action will shut down the application. Are you sure you want to proceed?</p>
+                <button id="confirmShutdown" type="button" class="text-white bg-red-600 hover:bg-red-800 focus:ring-0 focus:outline-none focus:ring-red-300 dark:focus:ring-red-800 font-medium rounded-lg text-sm inline-flex items-center px-5 py-2.5 text-center mr-2">
+                    Yes, Shut Down
+                </button>
+                <button id="closeShutdownModal" type="button" class="text-gray-500 bg-white hover:bg-gray-100 focus:ring-0 focus:outline-none focus:ring-gray-200 rounded-lg border border-gray-200 text-sm font-medium px-5 py-2.5 hover:text-gray-900 focus:z-10 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-500 dark:hover:text-white dark:hover:bg-gray-600 dark:focus:ring-gray-600">
+                    Cancel
                 </button>
             </div>
         </div>
