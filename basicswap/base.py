@@ -162,12 +162,13 @@ class BaseApp:
             socket.getaddrinfo = self.default_socket_getaddrinfo
         socket.setdefaulttimeout(self.default_socket_timeout)
 
-    def readURL(self, url: str, timeout: int = 120, headers=None) -> bytes:
+    def readURL(self, url: str, timeout: int = 120, headers={}) -> bytes:
         open_handler = None
         if self.use_tor_proxy:
             open_handler = SocksiPyHandler(socks.PROXY_TYPE_SOCKS5, self.tor_proxy_host, self.tor_proxy_port)
         opener = urllib.request.build_opener(open_handler) if self.use_tor_proxy else urllib.request.build_opener()
-        opener.addheaders = [('User-agent', 'Mozilla/5.0')]
+        if headers is None:
+            opener.addheaders = [('User-agent', 'Mozilla/5.0')]
         request = urllib.request.Request(url, headers=headers)
         return opener.open(request, timeout=timeout).read()
 

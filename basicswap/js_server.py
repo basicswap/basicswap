@@ -38,7 +38,6 @@ from .ui.util import (
 from .ui.page_offers import postNewOffer
 from .protocols.xmr_swap_1 import recoverNoScriptTxnWithKey, getChainBSplitKey
 
-
 def getFormData(post_string: str, is_json: bool):
     if post_string == '':
         raise ValueError('No post data')
@@ -763,7 +762,26 @@ def js_help(self, url_split, post_string, is_json) -> bytes:
     for k in pages:
         commands.append(k)
     return bytes(json.dumps({'commands': commands}), 'UTF-8')
-
+    
+def js_readurl(self, url_split, post_string, is_json) -> bytes:
+    swap_client = self.server.swap_client
+    post_data = {} if post_string == '' else getFormData(post_string, is_json)
+    if have_data_entry(post_data, 'url'):
+        url = get_data_entry(post_data, 'url')
+        default_headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+        }
+        response = swap_client.readURL(url, headers=default_headers)
+        try:
+            error = json.loads(response.decode())
+            if "Error" in error:
+                return json.dumps({"Error": error['Error']}).encode()
+        except json.JSONDecodeError:
+            pass
+        return response
+    raise ValueError('Requires URL.')
 
 pages = {
     'coins': js_coins,
@@ -789,8 +807,8 @@ pages = {
     'unlock': js_unlock,
     'lock': js_lock,
     'help': js_help,
+    'readurl': js_readurl,
 }
-
 
 def js_url_to_function(url_split):
     if len(url_split) > 2:

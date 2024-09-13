@@ -7716,7 +7716,7 @@ class BasicSwap(BaseApp):
         exchange_name_to = ci_to.getExchangeName('coingecko.com')
         ticker_from = ci_from.chainparams()['ticker']
         ticker_to = ci_to.chainparams()['ticker']
-        headers = {'Connection': 'close'}
+        headers = {'User-Agent': 'Mozilla/5.0', 'Connection': 'close'}
         rv = {}
 
         if rate_sources.get('coingecko.com', True):
