@@ -92,7 +92,7 @@ Create and activate a venv
 
 Install coincurve
 
-    git clone https://github.com/tecnovert/coincurve.git -b bsx_windows
+    git clone https://github.com/basicswap/coincurve.git -b basicswap
     cd coincurve/
     pip3 install .
 

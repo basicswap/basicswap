@@ -24,11 +24,11 @@ test_task:
     - apt-get install -y wget python3-pip gnupg unzip automake libtool pkg-config
     - pip install tox pytest
     - python3 setup.py install
-    - wget -O coincurve-anonswap.zip https://github.com/tecnovert/coincurve/archive/refs/tags/anonswap_v0.2.zip
-    - unzip -d coincurve-anonswap coincurve-anonswap.zip
-    - mv ./coincurve-anonswap/*/{.,}* ./coincurve-anonswap || true
-    - cd coincurve-anonswap
-    - python3 setup.py install --force
+    - wget -O coincurve-basicswap.zip https://github.com/basicswap/coincurve/archive/refs/tags/basicswap_v0.2.zip
+    - unzip -d coincurve-basicswap coincurve-basicswap.zip
+    - mv ./coincurve-basicswap/*/{.,}* ./coincurve-basicswap || true
+    - cd coincurve-basicswap
+    - pip install .
   bins_cache:
     folder: /tmp/cached_bin
     reupload_on_changes: false
