@@ -54,7 +54,7 @@ Depending on your environment, the `docker-compose` command may not work. If tha
 
 Set xmrrestoreheight to the current xmr chain height.
 
-    CURRENT_XMR_HEIGHT=$(curl https://localmonero.co/blocks/api/get_stats | jq .height)
+    CURRENT_XMR_HEIGHT=$(curl -s http://node2.monerodevs.org:18089/get_info | jq .height)
 
 Adjust `--withcoins` and `--withoutcoins` as desired, eg: `--withcoins=monero,bitcoin`.  By default only Particl is loaded.
 
@@ -140,7 +140,7 @@ Continue from the [Run Using Docker](#run-using-docker) section.
 
 ### Ubuntu Setup:
 
-    apt-get install -y wget git python3-venv python3-pip gnupg unzip automake libtool pkg-config curl jq
+    apt-get install -y git python3-venv python3-pip gnupg automake libtool pkg-config curl jq
 
 ### OSX Setup:
 
@@ -150,21 +150,18 @@ Install Homebrew (See https://brew.sh/):
 
 Dependencies:
 
-    brew install wget unzip python git protobuf gnupg automake libtool pkg-config curl jq
+    brew install python git protobuf gnupg automake libtool pkg-config curl jq
 
 Close the terminal and open a new one to update the python symlinks.
 
 
 ### Basicswap:
 
-    export SWAP_DATADIR=/Users/$USER/coinswaps
-    mkdir -p "$SWAP_DATADIR/venv"
+    export SWAP_DATADIR=$HOME/coinswaps
     python3 -m venv "$SWAP_DATADIR/venv"
     . $SWAP_DATADIR/venv/bin/activate && python -V
     cd $SWAP_DATADIR
-    wget -O coincurve-basicswap.zip https://github.com/tecnovert/coincurve/archive/refs/tags/basicswap_v0.2.zip
-    unzip -d coincurve-basicswap coincurve-basicswap.zip
-    mv ./coincurve-basicswap/*/{.,}* ./coincurve-basicswap || true
+    git clone https://github.com/basicswap/coincurve.git -b basicswap_v0.2 coincurve-basicswap
     cd $SWAP_DATADIR/coincurve-basicswap
     pip3 install .
 
@@ -182,12 +179,13 @@ From https://pypi.org/project/certifi/
 
 Continue installing Basicswap
 
+    pip3 install wheel
     pip3 install .
 
 
 Prepare the datadir:
 
-    CURRENT_XMR_HEIGHT=$(curl https://localmonero.co/blocks/api/get_stats | jq .height)
+    CURRENT_XMR_HEIGHT=$(curl -s http://node2.monerodevs.org:18089/get_info | jq .height)
 
     basicswap-prepare --datadir=$SWAP_DATADIR --withcoins=monero --xmrrestoreheight=$CURRENT_XMR_HEIGHT
 

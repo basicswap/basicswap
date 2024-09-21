@@ -21,12 +21,10 @@ test_task:
     - XMR_BINDIR: ${BIN_DIR}/monero
   setup_script:
     - apt-get update
-    - apt-get install -y wget python3-pip gnupg unzip automake libtool pkg-config
-    - pip install tox pytest
+    - apt-get install -y git python3-pip gnupg automake libtool pkg-config
+    - pip install tox pytest wheel
     - python3 setup.py install
-    - wget -O coincurve-basicswap.zip https://github.com/basicswap/coincurve/archive/refs/tags/basicswap_v0.2.zip
-    - unzip -d coincurve-basicswap coincurve-basicswap.zip
-    - mv ./coincurve-basicswap/*/{.,}* ./coincurve-basicswap || true
+    - git clone https://github.com/basicswap/coincurve.git -b basicswap_v0.2 coincurve-basicswap
     - cd coincurve-basicswap
     - pip install .
   bins_cache:
