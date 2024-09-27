@@ -5,13 +5,10 @@ ENV LANG=C.UTF-8 \
     DATADIRS="/coindata"
 
 RUN apt-get update; \
-    apt-get install -y wget python3-pip gnupg unzip make g++ autoconf automake libtool pkg-config gosu tzdata;
+    apt-get install -y git python3-pip gnupg make g++ autoconf automake libtool pkg-config gosu tzdata;
 
 ARG COINCURVE_VERSION=v0.2
-RUN wget -O coincurve-basicswap.zip https://github.com/basicswap/coincurve/archive/refs/tags/basicswap_$COINCURVE_VERSION.zip && \
-    echo "c309deef22c929c9ab5b3adf7adbda940bffcea6c6ec7c66202d6c3d4e3ceb79 coincurve-basicswap.zip" | sha256sum -c && \
-    unzip coincurve-basicswap.zip && \
-    mv ./coincurve-basicswap_$COINCURVE_VERSION ./coincurve-basicswap && \
+RUN git clone https://github.com/basicswap/coincurve.git -b basicswap_$COINCURVE_VERSION coincurve-basicswap && \
     cd coincurve-basicswap && \
     pip install .
 

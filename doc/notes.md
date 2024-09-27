@@ -11,33 +11,28 @@ In chainclients.monero:
 - connection_type - rpc
 - manage_daemon - false
 - manage_wallet_daemon - true
-- rpchost - ip of remote monero node (192.168.1.9)
-- rpcport - rpcport that monero is listening on remote node (18081)
+- rpchost - ip of remote monero node (example: 192.168.1.9)
+- rpcport - rpcport that monero is listening on remote node (18089)
 - rpcuser - test_user
 - rpcpassword - test_pwd
 
 
 Edit monerod.conf on the remote node:
 
-    data-dir=PATH_TO_MONERO_DATADIR
-    restricted-rpc=1
     rpc-login=test_user:test_pwd
-    rpc-bind-port=18081
-    rpc-bind-ip=192.168.1.9
-    prune-blockchain=1
+    rpc-restricted-bind-port=18089
+    rpc-restricted-bind-ip=0.0.0.0
 
-Start the remote monerod binary with `--confirm-external-bind`
-
-Remember to open port 18081 in the remote machine's firewall if necessary.
+Remember to open port 18089 in the remote machine's firewall if necessary.
 
 You can debug the connection using curl (from the local node)
 
-    curl http://192.168.1.9:18081/json_rpc -u test_user:test_pwd --digest -d '{"jsonrpc":"2.0","id":"0","method":"get_info"}' -H 'Content-Type: application/json'
+    curl http://node.ip.addr.here:18089/json_rpc -u test_user:test_pwd --digest -d '{"jsonrpc":"2.0","id":"0","method":"get_info"}' -H 'Content-Type: application/json'
 
 
 ## Monero remote private node with ssh tunneling
 
-Example connecting to a private remote monero node running at 192.168.1.9
+Example connecting to a private remote monero node over ssh:
 
 Set the following in basicswap.json:
 
@@ -46,13 +41,20 @@ In chainclients.monero:
 - manage_daemon - false
 - manage_wallet_daemon - true
 - rpchost - localhost
-- rpcport - rpcport that monero is listening on remote node (18081)
+- rpcport - rpcport that monero is listening on remote node (18089)
 
-On the remote machine open an ssh tunnel to port 18081:
+Edit monerod.conf on the remote node:
 
-    ssh -N -R 18081:localhost:18081 user@LOCAL_NODE_IP
+    rpc-restricted-bind-port=18089
 
-And start monerod
+On the remote machine open an ssh tunnel to BSX:
+
+    ssh -N -R 18089:localhost:18089 user@LOCAL_BSX_IP
+
+Or, on the BSX host machine create a tunnel to the node:
+
+    ssh -N -L 18089:localhost:18089 user@REMOTE_NODE_IP
+
 
 
 ## SSH Tunnel to Remote BasicSwap Node
@@ -92,8 +94,8 @@ Create and activate a venv
 
 Install coincurve
 
-    git clone https://github.com/basicswap/coincurve.git -b basicswap
-    cd coincurve/
+    git clone https://github.com/basicswap/coincurve.git -b basicswap_v0.2 coincurve-basicswap
+    cd coincurve-basicswap
     pip3 install .
 
 
@@ -101,6 +103,7 @@ Install basicswap
 
     git clone https://github.com/basicswap/basicswap.git
     cd basicswap
+    pip3 install wheel
     pip3 install .
 
 
