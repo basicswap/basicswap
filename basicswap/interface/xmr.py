@@ -233,7 +233,6 @@ class XMRInterface(CoinInterface):
                 raise e
 
             rv = {}
-            self.rpc_wallet('refresh')
             balance_info = self.rpc_wallet('get_balance')
 
             rv['balance'] = self.format_amount(balance_info['unlocked_balance'])
