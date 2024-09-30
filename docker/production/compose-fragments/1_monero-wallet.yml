@@ -7,7 +7,7 @@
         volumes:
             - ${DATA_PATH}/monero_wallet:/data
         expose:
-            - ${BASE_XMR_WALLET_PORT}
+            - ${XMR_WALLET_PORT}
         logging:
             driver: "json-file"
             options:

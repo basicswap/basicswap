@@ -153,9 +153,9 @@ PART_RPC_USER = os.getenv('PART_RPC_USER', '')
 PART_RPC_PWD = os.getenv('PART_RPC_PWD', '')
 
 XMR_RPC_HOST = os.getenv('XMR_RPC_HOST', '127.0.0.1')
-BASE_XMR_RPC_PORT = int(os.getenv('BASE_XMR_RPC_PORT', 29798))
-BASE_XMR_ZMQ_PORT = int(os.getenv('BASE_XMR_ZMQ_PORT', 30898))
-BASE_XMR_WALLET_PORT = int(os.getenv('BASE_XMR_WALLET_PORT', 29998))
+XMR_RPC_PORT = int(os.getenv('XMR_RPC_PORT', 29798))
+XMR_ZMQ_PORT = int(os.getenv('XMR_ZMQ_PORT', 30898))
+XMR_WALLET_PORT = int(os.getenv('XMR_WALLET_PORT', 29998))
 XMR_WALLET_RPC_HOST = os.getenv('XMR_WALLET_RPC_HOST', '127.0.0.1')
 XMR_WALLET_RPC_USER = os.getenv('XMR_WALLET_RPC_USER', 'xmr_wallet_user')
 XMR_WALLET_RPC_PWD = os.getenv('XMR_WALLET_RPC_PWD', 'xmr_wallet_pwd')
@@ -164,9 +164,9 @@ XMR_RPC_PWD = os.getenv('XMR_RPC_PWD', '')
 DEFAULT_XMR_RESTORE_HEIGHT = int(os.getenv('DEFAULT_XMR_RESTORE_HEIGHT', 2245107))
 
 WOW_RPC_HOST = os.getenv('WOW_RPC_HOST', '127.0.0.1')
-BASE_WOW_RPC_PORT = int(os.getenv('BASE_WOW_RPC_PORT', 34598))
-BASE_WOW_ZMQ_PORT = int(os.getenv('BASE_WOW_ZMQ_PORT', 34698))
-BASE_WOW_WALLET_PORT = int(os.getenv('BASE_WOW_WALLET_PORT', 34798))
+WOW_RPC_PORT = int(os.getenv('WOW_RPC_PORT', 34598))
+WOW_ZMQ_PORT = int(os.getenv('WOW_ZMQ_PORT', 34698))
+WOW_WALLET_PORT = int(os.getenv('WOW_WALLET_PORT', 34798))
 WOW_WALLET_RPC_HOST = os.getenv('WOW_WALLET_RPC_HOST', '127.0.0.1')
 WOW_WALLET_RPC_USER = os.getenv('WOW_WALLET_RPC_USER', 'wow_wallet_user')
 WOW_WALLET_RPC_PWD = os.getenv('WOW_WALLET_RPC_PWD', 'wow_wallet_pwd')
@@ -1897,9 +1897,9 @@ def main():
             'connection_type': 'rpc' if 'monero' in with_coins else 'none',
             'manage_daemon': True if ('monero' in with_coins and XMR_RPC_HOST == '127.0.0.1') else False,
             'manage_wallet_daemon': True if ('monero' in with_coins and XMR_WALLET_RPC_HOST == '127.0.0.1') else False,
-            'rpcport': BASE_XMR_RPC_PORT + port_offset,
-            'zmqport': BASE_XMR_ZMQ_PORT + port_offset,
-            'walletrpcport': BASE_XMR_WALLET_PORT + port_offset,
+            'rpcport': XMR_RPC_PORT + port_offset,
+            'zmqport': XMR_ZMQ_PORT + port_offset,
+            'walletrpcport': XMR_WALLET_PORT + port_offset,
             'rpchost': XMR_RPC_HOST,
             'trusted_daemon': extra_opts.get('trust_remote_node', 'auto'),
             'walletrpchost': XMR_WALLET_RPC_HOST,
@@ -1978,9 +1978,9 @@ def main():
             'connection_type': 'rpc' if 'wownero' in with_coins else 'none',
             'manage_daemon': True if ('wownero' in with_coins and WOW_RPC_HOST == '127.0.0.1') else False,
             'manage_wallet_daemon': True if ('wownero' in with_coins and WOW_WALLET_RPC_HOST == '127.0.0.1') else False,
-            'rpcport': BASE_WOW_RPC_PORT + port_offset,
-            'zmqport': BASE_WOW_ZMQ_PORT + port_offset,
-            'walletrpcport': BASE_WOW_WALLET_PORT + port_offset,
+            'rpcport': WOW_RPC_PORT + port_offset,
+            'zmqport': WOW_ZMQ_PORT + port_offset,
+            'walletrpcport': WOW_WALLET_PORT + port_offset,
             'rpchost': WOW_RPC_HOST,
             'trusted_daemon': extra_opts.get('trust_remote_node', 'auto'),
             'walletrpchost': WOW_WALLET_RPC_HOST,

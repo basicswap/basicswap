@@ -71,8 +71,8 @@ Setup with a local Monero daemon (recommended):
 
 To instead use Monero public nodes and not run a local Monero daemon<br>(it can be difficult to find reliable public nodes):
 
-    Set XMR_RPC_HOST and BASE_XMR_RPC_PORT to a public XMR node.
-    docker-compose run --rm -e XMR_RPC_HOST="node.xmr.to" -e BASE_XMR_RPC_PORT=18081 swapclient basicswap-prepare --datadir=/coindata --withcoins=monero --htmlhost="0.0.0.0" --wshost="0.0.0.0" --xmrrestoreheight=$CURRENT_XMR_HEIGHT
+    Set XMR_RPC_HOST and XMR_RPC_PORT to a public XMR node.
+    docker-compose run --rm -e XMR_RPC_HOST="node.xmr.to" -e XMR_RPC_PORT=18081 swapclient basicswap-prepare --datadir=/coindata --withcoins=monero --htmlhost="0.0.0.0" --wshost="0.0.0.0" --xmrrestoreheight=$CURRENT_XMR_HEIGHT
 
 
 **Record the mnemonic from the output of the above command.**
@@ -190,7 +190,7 @@ Prepare the datadir:
     basicswap-prepare --datadir=$SWAP_DATADIR --withcoins=monero --xmrrestoreheight=$CURRENT_XMR_HEIGHT
 
     OR using a remote/public XMR daemon (not recommended):
-    XMR_RPC_HOST="node.xmr.to" BASE_XMR_RPC_PORT=18081 basicswap-prepare --datadir=$SWAP_DATADIR --withcoins=monero --xmrrestoreheight=$CURRENT_XMR_HEIGHT
+    XMR_RPC_HOST="node.xmr.to" XMR_RPC_PORT=18081 basicswap-prepare --datadir=$SWAP_DATADIR --withcoins=monero --xmrrestoreheight=$CURRENT_XMR_HEIGHT
 
 
 Record the mnemonic from the output of the above command.

@@ -39,11 +39,11 @@
             - LTC_RPC_PWD
             - XMR_DATA_DIR
             - XMR_RPC_HOST
-            - BASE_XMR_RPC_PORT
-            - BASE_XMR_ZMQ_PORT
+            - XMR_RPC_PORT
+            - XMR_ZMQ_PORT
             - XMR_WALLETS_DIR
             - XMR_WALLET_RPC_HOST
-            - BASE_XMR_WALLET_PORT
+            - XMR_WALLET_PORT
             - XMR_WALLET_RPC_USER
             - XMR_WALLET_RPC_PWD
             - DEFAULT_XMR_RESTORE_HEIGHT

@@ -7,7 +7,7 @@
         volumes:
             - ${DATA_PATH}/monero_daemon:/data
         expose:
-            - ${BASE_XMR_RPC_PORT}
+            - ${XMR_RPC_PORT}
         logging:
             driver: "json-file"
             options:
