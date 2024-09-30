@@ -38,6 +38,7 @@ from .ui.util import (
 from .ui.page_offers import postNewOffer
 from .protocols.xmr_swap_1 import recoverNoScriptTxnWithKey, getChainBSplitKey
 
+
 def getFormData(post_string: str, is_json: bool):
     if post_string == '':
         raise ValueError('No post data')
@@ -762,7 +763,8 @@ def js_help(self, url_split, post_string, is_json) -> bytes:
     for k in pages:
         commands.append(k)
     return bytes(json.dumps({'commands': commands}), 'UTF-8')
-    
+
+
 def js_readurl(self, url_split, post_string, is_json) -> bytes:
     swap_client = self.server.swap_client
     post_data = {} if post_string == '' else getFormData(post_string, is_json)
@@ -782,6 +784,7 @@ def js_readurl(self, url_split, post_string, is_json) -> bytes:
             pass
         return response
     raise ValueError('Requires URL.')
+
 
 pages = {
     'coins': js_coins,
@@ -809,6 +812,7 @@ pages = {
     'help': js_help,
     'readurl': js_readurl,
 }
+
 
 def js_url_to_function(url_split):
     if len(url_split) > 2:
