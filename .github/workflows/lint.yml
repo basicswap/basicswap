@@ -1,0 +1,26 @@
+name: lint
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.12"]
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v3
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 codespell
+    - name: Running flake8
+      run: |
+        PYTHONWARNINGS="ignore" flake8 --ignore=E501,F841,W503 --exclude=basicswap/contrib,basicswap/interface/contrib,messages_pb2.py,.eggs,.tox,bin/install_certifi.py
+    - name: Running codespell
+      run: |
+        codespell --check-filenames --disable-colors --quiet-level=7 --ignore-words=tests/lint/spelling.ignore-words.txt -S .git,.eggs,.tox,pgp,*.pyc,*basicswap/contrib,*basicswap/interface/contrib,*mnemonics.py,bin/install_certifi.py,*basicswap/static
