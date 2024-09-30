@@ -339,7 +339,8 @@ def make_reporthook(read_start=0):
 
 
 def urlretrieve(url, filename, reporthook=None, data=None, resume_from=0):
-    # urlretrieve with resume
+    '''urlretrieve with resume
+    '''
     url_type, path = _splittype(url)
 
     req = Request(url)
@@ -412,7 +413,45 @@ def popConnectionParameters() -> None:
     socket.setdefaulttimeout(default_socket_timeout)
 
 
-def downloadFile(url: str, path: str, timeout=5, resume_from=0) -> None:
+def getRemoteFileLength(url: str) -> (int, bool):
+    try:
+        setConnectionParameters()
+        with contextlib.closing(urlopen(url)) as fp:
+            # NOTE: The test here is case insensitive, 'Accept-Ranges' will match
+            can_resume = 'accept-ranges' in fp.headers
+            return fp.length, can_resume
+    finally:
+        popConnectionParameters()
+
+
+def downloadRelease(url: str, path: str, extra_opts, timeout: int = 10) -> None:
+    """If file exists at path compare it's size to the content length at the url
+       and attempt to resume download if file size is below expected.
+    """
+    resume_from: int = 0
+
+    if os.path.exists(path):
+        if extra_opts.get('redownload_releases', False):
+            logging.warning(f'Overwriting: {path}')
+        elif extra_opts.get('verify_release_file_size', True):
+            file_size = os.stat(path).st_size
+            remote_file_length, can_resume = getRemoteFileLength(url)
+            if file_size < remote_file_length:
+                logger.warning(f'{path} is an unexpected size, {file_size} < {remote_file_length}.  Attempting to resume download.')
+                if can_resume:
+                    resume_from = file_size
+                else:
+                    logger.warning('Download can not be resumed, restarting.')
+            else:
+                return
+        else:
+            # File exists and size check is disabled
+            return
+
+    return downloadFile(url, path, timeout, resume_from)
+
+
+def downloadFile(url: str, path: str, timeout: int = 5, resume_from: int = 0) -> None:
     logger.info(f'Downloading file {url}')
     logger.info(f'To {path}')
     try:
@@ -422,10 +461,11 @@ def downloadFile(url: str, path: str, timeout=5, resume_from=0) -> None:
         popConnectionParameters()
 
 
-def downloadBytes(url):
+def downloadBytes(url) -> None:
     try:
         setConnectionParameters()
-        return urllib.request.urlopen(url).read()
+        with contextlib.closing(urlopen(url)) as fp:
+            return fp.read()
     finally:
         popConnectionParameters()
 
@@ -648,8 +688,7 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
 
         release_url = 'https://downloads.getmonero.org/cli/monero-{}-{}-v{}.{}'.format(os_name, architecture, version, use_file_ext)
         release_path = os.path.join(bin_dir, release_filename)
-        if not os.path.exists(release_path):
-            downloadFile(release_url, release_path)
+        downloadRelease(release_url, release_path, extra_opts)
 
         assert_filename = 'monero-{}-hashes.txt'.format(version)
         # assert_url = 'https://www.getmonero.org/downloads/hashes.txt'
@@ -679,8 +718,7 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
             release_url = 'https://git.wownero.com/attachments/007d606d-56e0-4c8a-92c1-d0974a781e80'
 
         release_path = os.path.join(bin_dir, release_filename)
-        if not os.path.exists(release_path):
-            downloadFile(release_url, release_path)
+        downloadRelease(release_url, release_path, extra_opts)
 
         assert_filename = 'wownero-{}-hashes.txt'.format(version)
         assert_url = 'https://git.wownero.com/wownero/wownero.org-website/raw/commit/{}/hashes.txt'.format(WOW_SITE_COMMIT)
@@ -707,8 +745,7 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
         release_url = release_page_url + '/' + 'decred-{}-v{}.{}'.format(arch_name, version, FILE_EXT)
 
         release_path = os.path.join(bin_dir, release_filename)
-        if not os.path.exists(release_path):
-            downloadFile(release_url, release_path)
+        downloadRelease(release_url, release_path, extra_opts)
 
         assert_filename = 'decred-v{}-manifest.txt'.format(version)
         assert_url = release_page_url + '/' + assert_filename
@@ -788,8 +825,7 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
             raise ValueError('Unknown coin')
 
         release_path = os.path.join(bin_dir, release_filename)
-        if not os.path.exists(release_path):
-            downloadFile(release_url, release_path)
+        downloadRelease(release_url, release_path, extra_opts)
 
         # Rename assert files with full version
         assert_filename = '{}-{}-{}-build-{}.assert'.format(coin, os_name, version, signing_key_name)
@@ -1314,6 +1350,8 @@ def printHelp():
     print('--skipbtcfastsyncchecks  Use the provided btcfastsync file without checking it\'s size or signature.')
     print('--initwalletsonly        Setup coin wallets only.')
     print('--keysdirpath            Speed up tests by preloading all PGP keys in directory.')
+    print('--noreleasesizecheck     If unset the size of existing core release files will be compared to their size at their download url.')
+    print('--redownloadreleases     If set core release files will be redownloaded.')
 
     active_coins = []
     for coin_name in known_coins.keys():
@@ -1637,6 +1675,12 @@ def main():
         if name == 'trustremotenode':
             extra_opts['trust_remote_node'] = True
             continue
+        if name == 'noreleasesizecheck':
+            extra_opts['verify_release_file_size'] = False
+            continue
+        if name == 'redownloadreleases':
+            extra_opts['redownload_releases'] = True
+            continue
         if name == 'initwalletsonly':
             initwalletsonly = True
             continue
@@ -1758,9 +1802,12 @@ def main():
                 check_sig = check_btc_fastsync
             elif check_btc_fastsync:
                 file_size = os.stat(sync_file_path).st_size
-                remote_file = urlopen(sync_file_url)
-                if file_size < remote_file.length:
-                    logger.warning(f'{BITCOIN_FASTSYNC_FILE} is an unexpected size, {file_size} < {remote_file.length}')
+                remote_file_length, can_resume = getRemoteFileLength(sync_file_url)
+                if file_size < remote_file_length:
+                    logger.warning(f'{BITCOIN_FASTSYNC_FILE} is an unexpected size, {file_size} < {remote_file_length}')
+                    if not can_resume:
+                        logger.warning(f'{BITCOIN_FASTSYNC_URL} can not be resumed, restarting download.')
+                        file_size = 0
                     downloadFile(sync_file_url, sync_file_path, timeout=50, resume_from=file_size)
                     check_sig = True
 
