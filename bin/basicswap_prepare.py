@@ -22,22 +22,20 @@ import stat
 import sys
 import tarfile
 import threading
-import time
 import urllib.parse
 import zipfile
 
-from urllib.error import ContentTooShortError
-from urllib.parse import _splittype
-from urllib.request import Request, urlopen
+from urllib.request import urlopen
 
 import basicswap.config as cfg
+from basicswap import __version__
 from basicswap.base import getaddrinfo_tor
 from basicswap.basicswap import BasicSwap
 from basicswap.chainparams import Coins
 from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
-from basicswap import __version__
 from basicswap.ui.util import getCoinName
 from basicswap.util import toBool
+from basicswap.util.network import urlretrieve, make_reporthook
 from basicswap.util.rfc2440 import rfc2440_hash_password
 from bin.basicswap_run import startDaemon, startXmrWalletDaemon
 
@@ -141,6 +139,7 @@ logger.level = logging.INFO
 if not len(logger.handlers):
     logger.addHandler(logging.StreamHandler(sys.stdout))
 
+BSX_DOCKER_MODE = toBool(os.getenv('BSX_DOCKER_MODE', 'false'))
 UI_HTML_PORT = int(os.getenv('UI_HTML_PORT', 12700))
 UI_WS_PORT = int(os.getenv('UI_WS_PORT', 11700))
 COINS_RPCBIND_IP = os.getenv('COINS_RPCBIND_IP', '127.0.0.1')
@@ -155,7 +154,7 @@ PART_RPC_PWD = os.getenv('PART_RPC_PWD', '')
 XMR_RPC_HOST = os.getenv('XMR_RPC_HOST', '127.0.0.1')
 XMR_RPC_PORT = int(os.getenv('XMR_RPC_PORT', 29798))
 XMR_ZMQ_PORT = int(os.getenv('XMR_ZMQ_PORT', 30898))
-XMR_WALLET_PORT = int(os.getenv('XMR_WALLET_PORT', 29998))
+XMR_WALLET_RPC_PORT = int(os.getenv('XMR_WALLET_RPC_PORT', 29998))
 XMR_WALLET_RPC_HOST = os.getenv('XMR_WALLET_RPC_HOST', '127.0.0.1')
 XMR_WALLET_RPC_USER = os.getenv('XMR_WALLET_RPC_USER', 'xmr_wallet_user')
 XMR_WALLET_RPC_PWD = os.getenv('XMR_WALLET_RPC_PWD', 'xmr_wallet_pwd')
@@ -166,7 +165,7 @@ DEFAULT_XMR_RESTORE_HEIGHT = int(os.getenv('DEFAULT_XMR_RESTORE_HEIGHT', 2245107
 WOW_RPC_HOST = os.getenv('WOW_RPC_HOST', '127.0.0.1')
 WOW_RPC_PORT = int(os.getenv('WOW_RPC_PORT', 34598))
 WOW_ZMQ_PORT = int(os.getenv('WOW_ZMQ_PORT', 34698))
-WOW_WALLET_PORT = int(os.getenv('WOW_WALLET_PORT', 34798))
+WOW_WALLET_RPC_PORT = int(os.getenv('WOW_WALLET_RPC_PORT', 34798))
 WOW_WALLET_RPC_HOST = os.getenv('WOW_WALLET_RPC_HOST', '127.0.0.1')
 WOW_WALLET_RPC_USER = os.getenv('WOW_WALLET_RPC_USER', 'wow_wallet_user')
 WOW_WALLET_RPC_PWD = os.getenv('WOW_WALLET_RPC_PWD', 'wow_wallet_pwd')
@@ -248,7 +247,7 @@ monerod_proxy_config = [
 ]
 
 monero_wallet_rpc_proxy_config = [
-    #    'daemon-ssl-allow-any-cert=1', moved to startup flag
+    #   'daemon-ssl-allow-any-cert=1', moved to startup flag
 ]
 
 wownerod_proxy_config = [
@@ -263,7 +262,7 @@ wownerod_proxy_config = [
 ]
 
 wownero_wallet_rpc_proxy_config = [
-    #    'daemon-ssl-allow-any-cert=1', moved to startup flag
+    #   'daemon-ssl-allow-any-cert=1', moved to startup flag
 ]
 
 default_socket = socket.socket
@@ -271,125 +270,28 @@ default_socket_timeout = socket.getdefaulttimeout()
 default_socket_getaddrinfo = socket.getaddrinfo
 
 
-def exitWithError(error_msg):
+def shouldManageDaemon(prefix: str) -> bool:
+    '''
+    If the user sets the XMR_RPC_HOST or PORT variables, set manage_daemon to false.
+    The XMR_MANAGE_DAEMON variable can override this and set manage_daemon directly.
+    if BSX_DOCKER_MODE is active -COIN-_MANAGE_DAEMON will default to false
+    '''
+    manage_daemon: str = os.getenv(prefix + '_MANAGE_DAEMON', 'false' if BSX_DOCKER_MODE else 'auto')
+
+    if manage_daemon == 'auto':
+        host_was_set: bool = prefix + '_RPC_HOST' in os.environ
+        port_was_set: bool = prefix + '_RPC_PORT' in os.environ
+
+        if host_was_set or port_was_set:
+            return False
+        return True
+
+    return toBool(manage_daemon)
+
+
+def exitWithError(error_msg: str):
     sys.stderr.write('Error: {}, exiting.\n'.format(error_msg))
     sys.exit(1)
-
-
-def make_reporthook(read_start=0):
-    read = read_start  # Number of bytes read so far
-    last_percent_str = ''
-    time_last = time.time()
-    read_last = read_start
-    display_last = time_last
-    abo = 7
-    average_buffer = [-1] * 8
-
-    def reporthook(blocknum, blocksize, totalsize):
-        nonlocal read, last_percent_str, time_last, read_last, display_last, read_start
-        nonlocal average_buffer, abo
-        read += blocksize
-
-        # totalsize excludes read_start
-        use_size = totalsize + read_start
-        dl_complete: bool = totalsize > 0 and read >= use_size
-        time_now = time.time()
-        time_delta = time_now - time_last
-        if time_delta < 4.0 and not dl_complete:
-            return
-
-        # Avoid division by zero by picking a value
-        if time_delta <= 0.0:
-            time_delta = 0.01
-
-        bytes_delta = read - read_last
-        time_last = time_now
-        read_last = read
-        bits_per_second = (bytes_delta * 8) / time_delta
-
-        abo = 0 if abo >= 7 else abo + 1
-        average_buffer[abo] = bits_per_second
-
-        samples = 0
-        average_bits_per_second = 0
-        for sample in average_buffer:
-            if sample < 0:
-                continue
-            average_bits_per_second += sample
-            samples += 1
-        average_bits_per_second /= samples
-
-        speed_str: str
-        if average_bits_per_second > 1000 ** 3:
-            speed_str = '{:.2f} Gbps'.format(average_bits_per_second / (1000 ** 3))
-        elif average_bits_per_second > 1000 ** 2:
-            speed_str = '{:.2f} Mbps'.format(average_bits_per_second / (1000 ** 2))
-        else:
-            speed_str = '{:.2f} kbps'.format(average_bits_per_second / 1000)
-
-        if totalsize > 0:
-            percent_str = '%5.0f%%' % (read * 1e2 / use_size)
-            if percent_str != last_percent_str or time_now - display_last > 10:
-                logger.info(percent_str + '  ' + speed_str)
-                last_percent_str = percent_str
-                display_last = time_now
-        else:
-            logger.info(f'Read {read}, {speed_str}')
-    return reporthook
-
-
-def urlretrieve(url, filename, reporthook=None, data=None, resume_from=0):
-    '''urlretrieve with resume
-    '''
-    url_type, path = _splittype(url)
-
-    req = Request(url)
-    if resume_from > 0:
-        logger.info(f'Attempting to resume from byte {resume_from}')
-        req.add_header('Range', f'bytes={resume_from}-')
-    with contextlib.closing(urlopen(req)) as fp:
-        headers = fp.info()
-
-        # Just return the local path and the "headers" for file://
-        # URLs. No sense in performing a copy unless requested.
-        if url_type == "file" and not filename:
-            return os.path.normpath(path), headers
-
-        with open(filename, 'ab' if resume_from > 0 else 'wb') as tfp:
-            result = filename, headers
-            bs = 1024 * 8
-            size = -1
-            read = resume_from
-            blocknum = 0
-            range_from = 0
-            if "content-length" in headers:
-                size = int(headers["Content-Length"])
-            if "Content-Range" in headers:
-                range_str = headers["Content-Range"]
-                offset = range_str.find('-')
-                range_from = int(range_str[6:offset])
-            if resume_from != range_from:
-                raise ValueError('Download is not resuming from the expected byte')
-
-            if reporthook:
-                reporthook(blocknum, bs, size)
-
-            while True:
-                block = fp.read(bs)
-                if not block:
-                    break
-                read += len(block)
-                tfp.write(block)
-                blocknum += 1
-                if reporthook:
-                    reporthook(blocknum, bs, size)
-
-    if size >= 0 and read < size:
-        raise ContentTooShortError(
-            "retrieval incomplete: got only %i out of %i bytes"
-            % (read, size), result)
-
-    return result
 
 
 def setConnectionParameters(timeout: int = 5, allow_set_tor: bool = True):
@@ -456,7 +358,7 @@ def downloadFile(url: str, path: str, timeout: int = 5, resume_from: int = 0) ->
     logger.info(f'To {path}')
     try:
         setConnectionParameters(timeout=timeout)
-        urlretrieve(url, path, make_reporthook(resume_from), resume_from=resume_from)
+        urlretrieve(url, path, make_reporthook(resume_from, logger), resume_from=resume_from)
     finally:
         popConnectionParameters()
 
@@ -1094,7 +996,8 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
 
         if COINS_RPCBIND_IP != '127.0.0.1':
             fp.write('rpcallowip=127.0.0.1\n')
-            fp.write('rpcallowip=172.0.0.0/8\n')  # Allow 172.x.x.x, range used by docker
+            if BSX_DOCKER_MODE:
+                fp.write('rpcallowip=172.0.0.0/8\n')  # Allow 172.x.x.x, range used by docker
             fp.write('rpcbind={}\n'.format(COINS_RPCBIND_IP))
 
         fp.write('rpcport={}\n'.format(core_settings['rpcport']))
@@ -1821,7 +1724,7 @@ def main():
     chainclients = {
         'particl': {
             'connection_type': 'rpc',
-            'manage_daemon': True if ('particl' in with_coins and PART_RPC_HOST == '127.0.0.1') else False,
+            'manage_daemon': shouldManageDaemon('PART'),
             'rpchost': PART_RPC_HOST,
             'rpcport': PART_RPC_PORT + port_offset,
             'onionport': PART_ONION_PORT + port_offset,
@@ -1833,8 +1736,8 @@ def main():
             'core_version_group': 21,
         },
         'bitcoin': {
-            'connection_type': 'rpc' if 'bitcoin' in with_coins else 'none',
-            'manage_daemon': True if ('bitcoin' in with_coins and BTC_RPC_HOST == '127.0.0.1') else False,
+            'connection_type': 'rpc',
+            'manage_daemon': shouldManageDaemon('BTC'),
             'rpchost': BTC_RPC_HOST,
             'rpcport': BTC_RPC_PORT + port_offset,
             'onionport': BTC_ONION_PORT + port_offset,
@@ -1846,8 +1749,8 @@ def main():
             'core_version_group': 22,
         },
         'litecoin': {
-            'connection_type': 'rpc' if 'litecoin' in with_coins else 'none',
-            'manage_daemon': True if ('litecoin' in with_coins and LTC_RPC_HOST == '127.0.0.1') else False,
+            'connection_type': 'rpc',
+            'manage_daemon': shouldManageDaemon('LTC'),
             'rpchost': LTC_RPC_HOST,
             'rpcport': LTC_RPC_PORT + port_offset,
             'onionport': LTC_ONION_PORT + port_offset,
@@ -1860,9 +1763,9 @@ def main():
             'min_relay_fee': 0.00001,
         },
         'decred': {
-            'connection_type': 'rpc' if 'decred' in with_coins else 'none',
-            'manage_daemon': True if ('decred' in with_coins and DCR_RPC_HOST == '127.0.0.1') else False,
-            'manage_wallet_daemon': True if ('decred' in with_coins and DCR_WALLET_RPC_HOST == '127.0.0.1') else False,
+            'connection_type': 'rpc',
+            'manage_daemon': shouldManageDaemon('DCR'),
+            'manage_wallet_daemon': shouldManageDaemon('DCR_WALLET'),
             'wallet_pwd': DCR_WALLET_PWD if WALLET_ENCRYPTION_PWD == '' else '',
             'rpchost': DCR_RPC_HOST,
             'rpcport': DCR_RPC_PORT + port_offset,
@@ -1880,8 +1783,8 @@ def main():
             'min_relay_fee': 0.00001,
         },
         'namecoin': {
-            'connection_type': 'rpc' if 'namecoin' in with_coins else 'none',
-            'manage_daemon': True if ('namecoin' in with_coins and NMC_RPC_HOST == '127.0.0.1') else False,
+            'connection_type': 'rpc',
+            'manage_daemon': shouldManageDaemon('NMC'),
             'rpchost': NMC_RPC_HOST,
             'rpcport': NMC_RPC_PORT + port_offset,
             'datadir': os.getenv('NMC_DATA_DIR', os.path.join(data_dir, 'namecoin')),
@@ -1894,12 +1797,12 @@ def main():
             'chain_lookups': 'local',
         },
         'monero': {
-            'connection_type': 'rpc' if 'monero' in with_coins else 'none',
-            'manage_daemon': True if ('monero' in with_coins and XMR_RPC_HOST == '127.0.0.1') else False,
-            'manage_wallet_daemon': True if ('monero' in with_coins and XMR_WALLET_RPC_HOST == '127.0.0.1') else False,
+            'connection_type': 'rpc',
+            'manage_daemon': shouldManageDaemon('XMR'),
+            'manage_wallet_daemon': shouldManageDaemon('XMR_WALLET'),
             'rpcport': XMR_RPC_PORT + port_offset,
             'zmqport': XMR_ZMQ_PORT + port_offset,
-            'walletrpcport': XMR_WALLET_PORT + port_offset,
+            'walletrpcport': XMR_WALLET_RPC_PORT + port_offset,
             'rpchost': XMR_RPC_HOST,
             'trusted_daemon': extra_opts.get('trust_remote_node', 'auto'),
             'walletrpchost': XMR_WALLET_RPC_HOST,
@@ -1916,8 +1819,8 @@ def main():
             'core_type_group': 'xmr',
         },
         'pivx': {
-            'connection_type': 'rpc' if 'pivx' in with_coins else 'none',
-            'manage_daemon': True if ('pivx' in with_coins and PIVX_RPC_HOST == '127.0.0.1') else False,
+            'connection_type': 'rpc',
+            'manage_daemon': shouldManageDaemon('PIVX'),
             'rpchost': PIVX_RPC_HOST,
             'rpcport': PIVX_RPC_PORT + port_offset,
             'onionport': PIVX_ONION_PORT + port_offset,
@@ -1930,8 +1833,8 @@ def main():
             'core_version_group': 17,
         },
         'dash': {
-            'connection_type': 'rpc' if 'dash' in with_coins else 'none',
-            'manage_daemon': True if ('dash' in with_coins and DASH_RPC_HOST == '127.0.0.1') else False,
+            'connection_type': 'rpc',
+            'manage_daemon': shouldManageDaemon('DASH'),
             'rpchost': DASH_RPC_HOST,
             'rpcport': DASH_RPC_PORT + port_offset,
             'onionport': DASH_ONION_PORT + port_offset,
@@ -1944,8 +1847,8 @@ def main():
             'core_version_group': 18,
         },
         'firo': {
-            'connection_type': 'rpc' if 'firo' in with_coins else 'none',
-            'manage_daemon': True if ('firo' in with_coins and FIRO_RPC_HOST == '127.0.0.1') else False,
+            'connection_type': 'rpc',
+            'manage_daemon': shouldManageDaemon('FIRO'),
             'rpchost': FIRO_RPC_HOST,
             'rpcport': FIRO_RPC_PORT + port_offset,
             'onionport': FIRO_ONION_PORT + port_offset,
@@ -1959,8 +1862,8 @@ def main():
             'min_relay_fee': 0.00001,
         },
         'navcoin': {
-            'connection_type': 'rpc' if 'navcoin' in with_coins else 'none',
-            'manage_daemon': True if ('navcoin' in with_coins and NAV_RPC_HOST == '127.0.0.1') else False,
+            'connection_type': 'rpc',
+            'manage_daemon': shouldManageDaemon('NAV'),
             'rpchost': NAV_RPC_HOST,
             'rpcport': NAV_RPC_PORT + port_offset,
             'onionport': NAV_ONION_PORT + port_offset,
@@ -1975,12 +1878,12 @@ def main():
             'startup_tries': 40,
         },
         'wownero': {
-            'connection_type': 'rpc' if 'wownero' in with_coins else 'none',
-            'manage_daemon': True if ('wownero' in with_coins and WOW_RPC_HOST == '127.0.0.1') else False,
-            'manage_wallet_daemon': True if ('wownero' in with_coins and WOW_WALLET_RPC_HOST == '127.0.0.1') else False,
+            'connection_type': 'rpc',
+            'manage_daemon': shouldManageDaemon('WOW'),
+            'manage_wallet_daemon': shouldManageDaemon('WOW_WALLET'),
             'rpcport': WOW_RPC_PORT + port_offset,
             'zmqport': WOW_ZMQ_PORT + port_offset,
-            'walletrpcport': WOW_WALLET_PORT + port_offset,
+            'walletrpcport': WOW_WALLET_RPC_PORT + port_offset,
             'rpchost': WOW_RPC_HOST,
             'trusted_daemon': extra_opts.get('trust_remote_node', 'auto'),
             'walletrpchost': WOW_WALLET_RPC_HOST,

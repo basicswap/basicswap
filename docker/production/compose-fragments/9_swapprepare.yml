@@ -18,6 +18,7 @@
             - ${DATA_PATH}/firo:/data/firo
         environment:
             - TZ
+            - BSX_DOCKER_MODE
             - UI_HTML_PORT
             - COINS_RPCBIND_IP
             - BASICSWAP_DATADIR
@@ -43,7 +44,7 @@
             - XMR_ZMQ_PORT
             - XMR_WALLETS_DIR
             - XMR_WALLET_RPC_HOST
-            - XMR_WALLET_PORT
+            - XMR_WALLET_RPC_PORT
             - XMR_WALLET_RPC_USER
             - XMR_WALLET_RPC_PWD
             - DEFAULT_XMR_RESTORE_HEIGHT
@@ -53,7 +54,7 @@
             - BASE_WOW_ZMQ_PORT
             - WOW_WALLETS_DIR
             - WOW_WALLET_RPC_HOST
-            - BASE_WOW_WALLET_PORT
+            - WOW_WALLET_RPC_PORT
             - WOW_WALLET_RPC_USER
             - WOW_WALLET_RPC_PWD
             - DEFAULT_WOW_RESTORE_HEIGHT

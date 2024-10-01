@@ -7,7 +7,7 @@
         volumes:
             - ${DATA_PATH}/wownero_wallet:/data
         expose:
-            - ${BASE_WOW_WALLET_PORT}
+            - ${WOW_WALLET_RPC_PORT}
         logging:
             driver: "json-file"
             options:

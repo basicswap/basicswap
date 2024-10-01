@@ -441,7 +441,7 @@ for c, params in chainparams.items():
     ticker_map[params['ticker'].lower()] = c
 
 
-def getCoinIdFromTicker(ticker):
+def getCoinIdFromTicker(ticker: str) -> str:
     try:
         return ticker_map[ticker.lower()]
     except Exception:
