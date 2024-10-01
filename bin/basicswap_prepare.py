@@ -1821,7 +1821,7 @@ def main():
     chainclients = {
         'particl': {
             'connection_type': 'rpc',
-            'manage_daemon': True if ('particl' in with_coins and PART_RPC_HOST == '127.0.0.1') else False,
+            'manage_daemon': True if ('particl' in with_coins and PART_RPC_HOST == '127.0.0.1' and PART_RPC_PORT == '19792') else False,
             'rpchost': PART_RPC_HOST,
             'rpcport': PART_RPC_PORT + port_offset,
             'onionport': PART_ONION_PORT + port_offset,
@@ -1834,7 +1834,7 @@ def main():
         },
         'bitcoin': {
             'connection_type': 'rpc' if 'bitcoin' in with_coins else 'none',
-            'manage_daemon': True if ('bitcoin' in with_coins and BTC_RPC_HOST == '127.0.0.1') else False,
+            'manage_daemon': True if ('bitcoin' in with_coins and BTC_RPC_HOST == '127.0.0.1' and BTC_RPC_PORT == '19996') else False,
             'rpchost': BTC_RPC_HOST,
             'rpcport': BTC_RPC_PORT + port_offset,
             'onionport': BTC_ONION_PORT + port_offset,
@@ -1847,7 +1847,7 @@ def main():
         },
         'litecoin': {
             'connection_type': 'rpc' if 'litecoin' in with_coins else 'none',
-            'manage_daemon': True if ('litecoin' in with_coins and LTC_RPC_HOST == '127.0.0.1') else False,
+            'manage_daemon': True if ('litecoin' in with_coins and LTC_RPC_HOST == '127.0.0.1' and LTC_RPC_PORT == '19895') else False,
             'rpchost': LTC_RPC_HOST,
             'rpcport': LTC_RPC_PORT + port_offset,
             'onionport': LTC_ONION_PORT + port_offset,
@@ -1861,8 +1861,8 @@ def main():
         },
         'decred': {
             'connection_type': 'rpc' if 'decred' in with_coins else 'none',
-            'manage_daemon': True if ('decred' in with_coins and DCR_RPC_HOST == '127.0.0.1') else False,
-            'manage_wallet_daemon': True if ('decred' in with_coins and DCR_WALLET_RPC_HOST == '127.0.0.1') else False,
+            'manage_daemon': True if ('decred' in with_coins and DCR_RPC_HOST == '127.0.0.1' and DCR_RPC_PORT == '9109') else False,
+            'manage_wallet_daemon': True if ('decred' in with_coins and DCR_WALLET_RPC_HOST == '127.0.0.1' and DCR_WALLET_RPC_PORT == '9209') else False,
             'wallet_pwd': DCR_WALLET_PWD if WALLET_ENCRYPTION_PWD == '' else '',
             'rpchost': DCR_RPC_HOST,
             'rpcport': DCR_RPC_PORT + port_offset,
@@ -1881,7 +1881,7 @@ def main():
         },
         'namecoin': {
             'connection_type': 'rpc' if 'namecoin' in with_coins else 'none',
-            'manage_daemon': True if ('namecoin' in with_coins and NMC_RPC_HOST == '127.0.0.1') else False,
+            'manage_daemon': True if ('namecoin' in with_coins and NMC_RPC_HOST == '127.0.0.1' and NMC_RPC_PORT == '19698') else False,
             'rpchost': NMC_RPC_HOST,
             'rpcport': NMC_RPC_PORT + port_offset,
             'datadir': os.getenv('NMC_DATA_DIR', os.path.join(data_dir, 'namecoin')),
@@ -1895,8 +1895,8 @@ def main():
         },
         'monero': {
             'connection_type': 'rpc' if 'monero' in with_coins else 'none',
-            'manage_daemon': True if ('monero' in with_coins and XMR_RPC_HOST == '127.0.0.1') else False,
-            'manage_wallet_daemon': True if ('monero' in with_coins and XMR_WALLET_RPC_HOST == '127.0.0.1') else False,
+            'manage_daemon': True if ('monero' in with_coins and XMR_RPC_HOST == '127.0.0.1' and XMR_RPC_PORT == '29798') else False,
+            'manage_wallet_daemon': True if ('monero' in with_coins and XMR_WALLET_RPC_HOST == '127.0.0.1' and XMR_WALLET_PORT == '29998') else False,
             'rpcport': XMR_RPC_PORT + port_offset,
             'zmqport': XMR_ZMQ_PORT + port_offset,
             'walletrpcport': XMR_WALLET_PORT + port_offset,
@@ -1917,7 +1917,7 @@ def main():
         },
         'pivx': {
             'connection_type': 'rpc' if 'pivx' in with_coins else 'none',
-            'manage_daemon': True if ('pivx' in with_coins and PIVX_RPC_HOST == '127.0.0.1') else False,
+            'manage_daemon': True if ('pivx' in with_coins and PIVX_RPC_HOST == '127.0.0.1' and PIVX_RPC_PORT == '51473') else False,
             'rpchost': PIVX_RPC_HOST,
             'rpcport': PIVX_RPC_PORT + port_offset,
             'onionport': PIVX_ONION_PORT + port_offset,
@@ -1931,7 +1931,7 @@ def main():
         },
         'dash': {
             'connection_type': 'rpc' if 'dash' in with_coins else 'none',
-            'manage_daemon': True if ('dash' in with_coins and DASH_RPC_HOST == '127.0.0.1') else False,
+            'manage_daemon': True if ('dash' in with_coins and DASH_RPC_HOST == '127.0.0.1' and DASH_RPC_PORT == '9998') else False,
             'rpchost': DASH_RPC_HOST,
             'rpcport': DASH_RPC_PORT + port_offset,
             'onionport': DASH_ONION_PORT + port_offset,
@@ -1945,7 +1945,7 @@ def main():
         },
         'firo': {
             'connection_type': 'rpc' if 'firo' in with_coins else 'none',
-            'manage_daemon': True if ('firo' in with_coins and FIRO_RPC_HOST == '127.0.0.1') else False,
+            'manage_daemon': True if ('firo' in with_coins and FIRO_RPC_HOST == '127.0.0.1' and FIRO_RPC_PORT == '8888') else False,
             'rpchost': FIRO_RPC_HOST,
             'rpcport': FIRO_RPC_PORT + port_offset,
             'onionport': FIRO_ONION_PORT + port_offset,
@@ -1960,7 +1960,7 @@ def main():
         },
         'navcoin': {
             'connection_type': 'rpc' if 'navcoin' in with_coins else 'none',
-            'manage_daemon': True if ('navcoin' in with_coins and NAV_RPC_HOST == '127.0.0.1') else False,
+            'manage_daemon': True if ('navcoin' in with_coins and NAV_RPC_HOST == '127.0.0.1' and NAV_RPC_PORT == '44444') else False,
             'rpchost': NAV_RPC_HOST,
             'rpcport': NAV_RPC_PORT + port_offset,
             'onionport': NAV_ONION_PORT + port_offset,
@@ -1976,8 +1976,8 @@ def main():
         },
         'wownero': {
             'connection_type': 'rpc' if 'wownero' in with_coins else 'none',
-            'manage_daemon': True if ('wownero' in with_coins and WOW_RPC_HOST == '127.0.0.1') else False,
-            'manage_wallet_daemon': True if ('wownero' in with_coins and WOW_WALLET_RPC_HOST == '127.0.0.1') else False,
+            'manage_daemon': True if ('wownero' in with_coins and WOW_RPC_HOST == '127.0.0.1' and WOW_RPC_PORT == '34598') else False,
+            'manage_wallet_daemon': True if ('wownero' in with_coins and WOW_WALLET_RPC_HOST == '127.0.0.1' and WOW_WALLET_PORT == '34798') else False,
             'rpcport': WOW_RPC_PORT + port_offset,
             'zmqport': WOW_ZMQ_PORT + port_offset,
             'walletrpcport': WOW_WALLET_PORT + port_offset,
