@@ -1880,12 +1880,12 @@ class BasicSwap(BaseApp):
 
         return self.grindForEd25519Key(coin_type, evkey, key_path_base)
 
-    def getPathKey(self, coin_from, coin_to, offer_created_at: int, contract_count: int, key_no: int, for_ed25519: bool = False) -> bytes:
+    def getPathKey(self, coin_from, coin_to, bid_created_at: int, contract_count: int, key_no: int, for_ed25519: bool = False) -> bytes:
         evkey = self.callcoinrpc(Coins.PART, 'extkey', ['account', 'default', 'true'])['evkey']
         ci = self.ci(coin_to)
 
-        days = offer_created_at // 86400
-        secs = offer_created_at - days * 86400
+        days = bid_created_at // 86400
+        secs = bid_created_at - days * 86400
         key_path_base = '44445555h/999999/{}/{}/{}/{}/{}/{}'.format(int(coin_from), int(coin_to), days, secs, contract_count, key_no)
 
         if not for_ed25519:
@@ -1917,7 +1917,7 @@ class BasicSwap(BaseApp):
         pubkey = self.callcoinrpc(Coins.PART, 'extkey', ['info', extkey])['key_info']['pubkey']
         return bytes.fromhex(pubkey)
 
-    def getContractPrivkey(self, date, contract_count):
+    def getContractPrivkey(self, date: dt.datetime, contract_count: int) -> bytes:
         # Derive an address to use for a contract
         evkey = self.callcoinrpc(Coins.PART, 'extkey', ['account', 'default', 'true'])['evkey']
 
@@ -1932,7 +1932,7 @@ class BasicSwap(BaseApp):
             raw = raw[:32]
         return raw
 
-    def getContractSecret(self, date, contract_count):
+    def getContractSecret(self, date: dt.datetime, contract_count: int) -> bytes:
         # Derive a key to use for a contract secret
         evkey = self.callcoinrpc(Coins.PART, 'extkey', ['account', 'default', 'true'])['evkey']
 

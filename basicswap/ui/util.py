@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2020-2023 tecnovert
+# Copyright (c) 2020-2024 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import json
 import struct
-import traceback
 from basicswap.util import (
     make_int,
     format_timestamp,
@@ -330,12 +329,14 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
             if swap_client.debug_ui:
                 try:
                     data['xmr_b_half_privatekey'] = getChainBSplitKey(swap_client, bid, xmr_swap, offer)
-
+                except Exception as e:
+                    swap_client.log.debug('Unable to get xmr_b_half_privatekey for bid: {}'.format(bid.bid_id.hex()))
+                try:
                     remote_split_key = getChainBRemoteSplitKey(swap_client, bid, xmr_swap, offer)
                     if remote_split_key:
                         data['xmr_b_half_privatekey_remote'] = remote_split_key
                 except Exception as e:
-                    swap_client.log.error(traceback.format_exc())
+                    swap_client.log.debug('Unable to get xmr_b_half_privatekey_remote for bid: {}'.format(bid.bid_id.hex()))
 
             if show_lock_transfers:
                 if xmr_swap.pkbs:
