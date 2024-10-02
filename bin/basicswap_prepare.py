@@ -272,9 +272,9 @@ default_socket_getaddrinfo = socket.getaddrinfo
 
 def shouldManageDaemon(prefix: str) -> bool:
     '''
-    If the user sets the XMR_RPC_HOST or PORT variables, set manage_daemon to false.
-    The XMR_MANAGE_DAEMON variable can override this and set manage_daemon directly.
-    if BSX_DOCKER_MODE is active -COIN-_MANAGE_DAEMON will default to false
+    If the user sets a COIN _RPC_HOST or PORT variable, set manage_daemon for COIN to false.
+    The COIN _MANAGE_DAEMON variables can override this and set manage_daemon directly.
+    If BSX_DOCKER_MODE is active COIN _MANAGE_DAEMON will default to false.
     '''
     manage_daemon: str = os.getenv(prefix + '_MANAGE_DAEMON', 'false' if BSX_DOCKER_MODE else 'auto')
 
