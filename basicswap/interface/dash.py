@@ -25,12 +25,41 @@ class DASHInterface(BTCInterface):
         self._wallet_passphrase = ''
         self._have_checked_seed = False
 
+        self._wallet_v20_compatible = False if not swap_client else swap_client.getChainClientSettings(self.coin_type()).get('wallet_v20_compatible', False)
+
     def decodeAddress(self, address: str) -> bytes:
         return decodeAddress(address)[1:]
 
     def getWalletSeedID(self) -> str:
         hdseed: str = self.rpc_wallet('dumphdinfo')['hdseed']
         return self.getSeedHash(bytes.fromhex(hdseed)).hex()
+
+    def entropyToMnemonic(self, key: bytes) -> None:
+        return Mnemonic('english').to_mnemonic(key)
+
+    def initialiseWallet(self, key_bytes: bytes) -> None:
+        if self._wallet_v20_compatible:
+            self._log.warning('Generating wallet compatible with v20 seed.')
+            words = self.entropyToMnemonic(key_bytes)
+            mnemonic_passphrase = ''
+            self.rpc_wallet('upgradetohd', [words, mnemonic_passphrase, self._wallet_passphrase])
+            self._have_checked_seed = False
+            if self._wallet_passphrase != '':
+                self.unlockWallet(self._wallet_passphrase)
+            return
+
+        key_wif = self.encodeKey(key_bytes)
+        self.rpc_wallet('sethdseed', [True, key_wif])
+
+    def checkExpectedSeed(self, expect_seedid: str) -> bool:
+        self._expect_seedid_hex = expect_seedid
+        rv = self.rpc_wallet('dumphdinfo')
+        if rv['mnemonic'] != '':
+            entropy = Mnemonic('english').to_entropy(rv['mnemonic'].split(' '))
+            entropy_hash = self.getAddressHashFromKey(entropy)[::-1].hex()
+            return expect_seedid == entropy_hash
+        else:
+            return expect_seedid == self.getWalletSeedID()
 
     def withdrawCoin(self, value, addr_to, subfee):
         params = [addr_to, value, '', '', subfee, False, False, self._conf_target]

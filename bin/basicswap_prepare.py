@@ -1256,6 +1256,7 @@ def printHelp():
     print('--keysdirpath            Speed up tests by preloading all PGP keys in directory.')
     print('--noreleasesizecheck     If unset the size of existing core release files will be compared to their size at their download url.')
     print('--redownloadreleases     If set core release files will be redownloaded.')
+    print('--dashv20compatible      Generate the same DASH wallet seed as for DASH v20 - Use only when importing an existing seed.')
 
     active_coins = []
     for coin_name in known_coins.keys():
@@ -1587,6 +1588,9 @@ def main():
             continue
         if name == 'initwalletsonly':
             initwalletsonly = True
+            continue
+        if name == 'dashv20compatible':
+            extra_opts['dash_v20_compatible'] = True
             continue
         if len(s) == 2:
             if name == 'datadir':
@@ -1932,6 +1936,9 @@ def main():
 
     chainclients['monero']['walletsdir'] = os.getenv('XMR_WALLETS_DIR', chainclients['monero']['datadir'])
     chainclients['wownero']['walletsdir'] = os.getenv('WOW_WALLETS_DIR', chainclients['wownero']['datadir'])
+
+    if extra_opts.get('dash_v20_compatible', False):
+        chainclients['dash']['wallet_v20_compatible'] = True
 
     if initwalletsonly:
         logger.info('Initialising wallets')
