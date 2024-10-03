@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2022 tecnovert
+# Copyright (c) 2022-2024 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -25,31 +25,12 @@ class DASHInterface(BTCInterface):
         self._wallet_passphrase = ''
         self._have_checked_seed = False
 
-    def entropyToMnemonic(self, key: bytes) -> str:
-        return Mnemonic('english').to_mnemonic(key)
-
-    def initialiseWallet(self, key: bytes):
-        words = self.entropyToMnemonic(key)
-
-        mnemonic_passphrase = ''
-        self.rpc_wallet('upgradetohd', [words, mnemonic_passphrase, self._wallet_passphrase])
-        self._have_checked_seed = False
-        if self._wallet_passphrase != '':
-            self.unlockWallet(self._wallet_passphrase)
-
     def decodeAddress(self, address: str) -> bytes:
         return decodeAddress(address)[1:]
 
-    def checkExpectedSeed(self, key_hash: str):
-        try:
-            rv = self.rpc_wallet('dumphdinfo')
-            entropy = Mnemonic('english').to_entropy(rv['mnemonic'].split(' '))
-            entropy_hash = self.getAddressHashFromKey(entropy)[::-1].hex()
-            self._have_checked_seed = True
-            return entropy_hash == key_hash
-        except Exception as e:
-            self._log.warning('checkExpectedSeed failed: {}'.format(str(e)))
-        return False
+    def getWalletSeedID(self) -> str:
+        hdseed: str = self.rpc_wallet('dumphdinfo')['hdseed']
+        return self.getSeedHash(bytes.fromhex(hdseed)).hex()
 
     def withdrawCoin(self, value, addr_to, subfee):
         params = [addr_to, value, '', '', subfee, False, False, self._conf_target]

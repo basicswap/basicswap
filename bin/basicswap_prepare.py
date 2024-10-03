@@ -60,7 +60,7 @@ WOW_SITE_COMMIT = '97e100e1605e9f59bc8ca82a5b237d5562c8a21c'  # Lock hashes.txt 
 PIVX_VERSION = os.getenv('PIVX_VERSION', '5.6.1')
 PIVX_VERSION_TAG = os.getenv('PIVX_VERSION_TAG', '')
 
-DASH_VERSION = os.getenv('DASH_VERSION', '20.0.2')
+DASH_VERSION = os.getenv('DASH_VERSION', '21.1.0')
 DASH_VERSION_TAG = os.getenv('DASH_VERSION_TAG', '')
 
 FIRO_VERSION = os.getenv('FIRO_VERSION', '0.14.14.0')
@@ -707,7 +707,8 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
             release_filename = '{}-{}-{}.{}'.format('dashcore', version + version_tag, arch_name, FILE_EXT)
             release_url = 'https://github.com/dashpay/dash/releases/download/v{}/{}'.format(version + version_tag, release_filename)
             assert_filename = '{}-{}-{}-build.assert'.format(coin, arch_name, major_version)
-            assert_url = f'https://raw.githubusercontent.com/dashpay/guix.sigs/master/{version}/{signing_key_name}/codesigned.SHA256SUMS'
+            sums_name = 'all' if major_version >= 21 else 'codesigned'
+            assert_url = f'https://raw.githubusercontent.com/dashpay/guix.sigs/master/{version}/{signing_key_name}/{sums_name}.SHA256SUMS'
         elif coin == 'firo':
             arch_name = BIN_ARCH
             if BIN_ARCH == 'x86_64-linux-gnu':
@@ -1382,7 +1383,7 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
                     if len(wallets) < 1:
                         logger.info('Creating wallet.dat for {}.'.format(getCoinName(c)))
 
-                        if c in (Coins.BTC, Coins.LTC):
+                        if c in (Coins.BTC, Coins.LTC, Coins.DASH):
                             # wallet_name, disable_private_keys, blank, passphrase, avoid_reuse, descriptors
                             swap_client.callcoinrpc(c, 'createwallet', ['wallet.dat', False, True, WALLET_ENCRYPTION_PWD, False, False])
                             swap_client.ci(c).unlockWallet(WALLET_ENCRYPTION_PWD)

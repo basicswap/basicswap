@@ -692,8 +692,6 @@ def js_getcoinseed(self, url_split, post_string, is_json) -> bytes:
         return bytes(json.dumps({'coin': ci.ticker(), 'key_view': ci.encodeKey(key_view), 'key_spend': ci.encodeKey(key_spend), 'address': address}), 'UTF-8')
 
     seed_key = swap_client.getWalletKey(coin, 1)
-    if coin == Coins.DASH:
-        return bytes(json.dumps({'coin': ci.ticker(), 'seed': seed_key.hex(), 'mnemonic': ci.entropyToMnemonic(seed_key)}), 'UTF-8')
     seed_id = ci.getSeedHash(seed_key)
     return bytes(json.dumps({'coin': ci.ticker(), 'seed': seed_key.hex(), 'seed_id': seed_id.hex()}), 'UTF-8')
 

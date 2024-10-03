@@ -77,9 +77,6 @@ class NAVInterface(BTCInterface):
         # p2sh-p2wsh
         return True
 
-    def entropyToMnemonic(self, key: bytes) -> None:
-        return Mnemonic('english').to_mnemonic(key)
-
     def initialiseWallet(self, key):
         # Load with -importmnemonic= parameter
         pass

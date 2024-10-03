@@ -367,7 +367,7 @@ class BTCInterface(Secp256k1Interface):
         wi = self.rpc_wallet('getwalletinfo')
         return 'Not found' if 'hdseedid' not in wi else wi['hdseedid']
 
-    def checkExpectedSeed(self, expect_seedid) -> bool:
+    def checkExpectedSeed(self, expect_seedid: str) -> bool:
         self._expect_seedid_hex = expect_seedid
         return expect_seedid == self.getWalletSeedID()
 
