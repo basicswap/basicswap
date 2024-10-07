@@ -250,6 +250,7 @@ class BasicSwap(BaseApp):
     protocolInterfaces = {
         SwapTypes.SELLER_FIRST: atomic_swap_1.AtomicSwapInterface(),
         SwapTypes.XMR_SWAP: xmr_swap_1.XmrSwapInterface(),
+        SwapTypes.XMR_BCH_SWAP: xmr_swap_1.XmrBchSwapInterface(),
     }
 
     def __init__(self, fp, data_dir, settings, chain, log_name='BasicSwap', transient_instance=False):
@@ -687,6 +688,9 @@ class BasicSwap(BaseApp):
         elif coin == Coins.BTC:
             from .interface.btc import BTCInterface
             return BTCInterface(self.coin_clients[coin], self.chain, self)
+        elif coin == Coins.BCH:
+            from .interface.bch import BCHInterface
+            return BCHInterface(self.coin_clients[coin], self.chain, self)
         elif coin == Coins.LTC:
             from .interface.ltc import LTCInterface, LTCInterfaceMWEB
             interface = LTCInterface(self.coin_clients[coin], self.chain, self)

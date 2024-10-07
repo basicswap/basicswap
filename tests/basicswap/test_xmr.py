@@ -84,6 +84,8 @@ from tests.basicswap.common import (
     BASE_ZMQ_PORT,
     BTC_BASE_PORT,
     BTC_BASE_RPC_PORT,
+    BCH_BASE_PORT,
+    BCH_BASE_RPC_PORT,
     LTC_BASE_PORT,
     LTC_BASE_RPC_PORT,
     PREFIX_SECRET_KEY_REGTEST,
@@ -99,6 +101,7 @@ logger = logging.getLogger()
 NUM_NODES = 3
 NUM_XMR_NODES = 3
 NUM_BTC_NODES = 3
+NUM_BCH_NODES = 3
 NUM_LTC_NODES = 3
 TEST_DIR = cfg.TEST_DATADIRS
 
@@ -216,6 +219,18 @@ def prepare_swapclient_dir(datadir, node_id, network_key, network_pubkey, with_c
             'use_segwit': True,
         }
 
+    if Coins.BCH in with_coins:
+        settings['chainclients']['bitcoincash'] = {
+            'connection_type': 'rpc',
+            'manage_daemon': False,
+            'rpcport': BCH_BASE_RPC_PORT + node_id,
+            'rpcuser': 'test' + str(node_id),
+            'rpcpassword': 'test_pass' + str(node_id),
+            'datadir': os.path.join(datadir, 'bch_' + str(node_id)),
+            'bindir': cfg.BITCOINCASH_BINDIR,
+            'use_segwit': False,
+        }
+
     if cls:
         cls.addCoinSettings(settings, datadir, node_id)
 
@@ -226,6 +241,8 @@ def prepare_swapclient_dir(datadir, node_id, network_key, network_pubkey, with_c
 def btcCli(cmd, node_id=0):
     return callrpc_cli(cfg.BITCOIN_BINDIR, os.path.join(TEST_DIR, 'btc_' + str(node_id)), 'regtest', cmd, cfg.BITCOIN_CLI)
 
+def bchCli(cmd, node_id=0):
+    return callrpc_cli(cfg.BITCOINCASH_BINDIR, os.path.join(TEST_DIR, 'bch_' + str(node_id)), 'regtest', cmd, cfg.BITCOINCASH_CLI)
 
 def ltcCli(cmd, node_id=0):
     return callrpc_cli(cfg.LITECOIN_BINDIR, os.path.join(TEST_DIR, 'ltc_' + str(node_id)), 'regtest', cmd, cfg.LITECOIN_CLI)
@@ -294,17 +311,20 @@ class BaseTest(unittest.TestCase):
     swap_clients = []
     part_daemons = []
     btc_daemons = []
+    bch_daemons = []
     ltc_daemons = []
     xmr_daemons = []
     xmr_wallet_auth = []
     restore_instance = False
 
+    start_bch_nodes = False
     start_ltc_nodes = False
     start_xmr_nodes = True
     has_segwit = True
 
     xmr_addr = None
     btc_addr = None
+    bch_addr = None
     ltc_addr = None
 
     @classmethod
@@ -405,6 +425,20 @@ class BaseTest(unittest.TestCase):
 
                 waitForRPC(make_rpc_func(i, base_rpc_port=BTC_BASE_RPC_PORT), test_delay_event)
 
+            for i in range(NUM_BCH_NODES):
+                if not cls.restore_instance:
+                    data_dir = prepareDataDir(TEST_DIR, i, 'bitcoin.conf', 'bch_', base_p2p_port=BCH_BASE_PORT, base_rpc_port=BCH_BASE_RPC_PORT)
+                    if os.path.exists(os.path.join(cfg.BITCOINCASH_BINDIR, 'bitcoin-wallet')):
+                        try:
+                            callrpc_cli(cfg.BITCOINCASH_BINDIR, data_dir, 'regtest', '-wallet=wallet.dat create', 'bitcoin-wallet')
+                        except Exception as e:
+                            logging.warning('bch: bitcoin-wallet create failed')
+                            raise e
+
+                cls.bch_daemons.append(startDaemon(os.path.join(TEST_DIR, 'bch_' + str(i)), cfg.BITCOINCASH_BINDIR, cfg.BITCOINCASHD))
+                logging.info('Bch: Started %s %d', cfg.BITCOINCASHD, cls.part_daemons[-1].handle.pid)
+                waitForRPC(make_rpc_func(i, base_rpc_port=BCH_BASE_RPC_PORT), test_delay_event)
+
             if cls.start_ltc_nodes:
                 for i in range(NUM_LTC_NODES):
                     if not cls.restore_instance:
@@ -466,6 +500,8 @@ class BaseTest(unittest.TestCase):
                     start_nodes.add(Coins.LTC)
                 if cls.start_xmr_nodes:
                     start_nodes.add(Coins.XMR)
+                if cls.start_bch_nodes:
+                    start_nodes.add(Coins.BCH)
                 if not cls.restore_instance:
                     prepare_swapclient_dir(TEST_DIR, i, cls.network_key, cls.network_pubkey, start_nodes, cls)
                 basicswap_dir = os.path.join(os.path.join(TEST_DIR, 'basicswap_' + str(i)))
@@ -483,6 +519,8 @@ class BaseTest(unittest.TestCase):
 
                 if cls.start_ltc_nodes:
                     sc.setDaemonPID(Coins.LTC, cls.ltc_daemons[i].handle.pid)
+                if cls.start_bch_nodes:
+                    sc.setDaemonPID(Coins.BCH, cls.bch_daemons[i].handle.pid)
                 cls.addPIDInfo(sc, i)
 
                 sc.start()
@@ -502,6 +540,8 @@ class BaseTest(unittest.TestCase):
                     cls.ltc_addr = cls.swap_clients[0].ci(Coins.LTC).pubkey_to_address(void_block_rewards_pubkey)
                 if cls.start_xmr_nodes:
                     cls.xmr_addr = cls.callxmrnodewallet(cls, 1, 'get_address')['address']
+                if cls.start_bch_nodes:
+                    cls.bch_addr = cls.swap_clients[0].ci(Coins.BCH).pubkey_to_address(void_block_rewards_pubkey)
             else:
                 cls.btc_addr = callnoderpc(0, 'getnewaddress', ['mining_addr', 'bech32'], base_rpc_port=BTC_BASE_RPC_PORT)
                 num_blocks = 400  # Mine enough to activate segwit
@@ -549,6 +589,12 @@ class BaseTest(unittest.TestCase):
                     callnoderpc(0, 'generatetoaddress', [num_blocks, cls.ltc_addr], base_rpc_port=LTC_BASE_RPC_PORT, wallet='wallet.dat')
 
                     checkForks(callnoderpc(0, 'getblockchaininfo', base_rpc_port=LTC_BASE_RPC_PORT, wallet='wallet.dat'))
+
+                if cls.start_bch_nodes:
+                    num_blocks = 200
+                    cls.bch_addr = callnoderpc(0, 'getnewaddress', ['mining_addr'], base_rpc_port=BCH_BASE_RPC_PORT, wallet='wallet.dat')
+                    logging.info('Mining %d BitcoinCash blocks to %s', num_blocks, cls.bch_addr)
+                    callnoderpc(0, 'generatetoaddress', [num_blocks, cls.bch_addr], base_rpc_port=BCH_BASE_RPC_PORT, wallet='wallet.dat')
 
                 num_blocks = 100
                 if cls.start_xmr_nodes:
@@ -612,12 +658,14 @@ class BaseTest(unittest.TestCase):
         stopDaemons(cls.xmr_daemons)
         stopDaemons(cls.part_daemons)
         stopDaemons(cls.btc_daemons)
+        stopDaemons(cls.bch_daemons)
         stopDaemons(cls.ltc_daemons)
 
         cls.http_threads.clear()
         cls.swap_clients.clear()
         cls.part_daemons.clear()
         cls.btc_daemons.clear()
+        cls.bch_daemons.clear()
         cls.ltc_daemons.clear()
         cls.xmr_daemons.clear()
 
@@ -643,6 +691,8 @@ class BaseTest(unittest.TestCase):
     def coins_loop(cls):
         if cls.btc_addr is not None:
             btcCli('generatetoaddress 1 {}'.format(cls.btc_addr))
+        if cls.bch_addr is not None:
+            ltcCli('generatetoaddress 1 {}'.format(cls.bch_addr))
         if cls.ltc_addr is not None:
             ltcCli('generatetoaddress 1 {}'.format(cls.ltc_addr))
         if cls.xmr_addr is not None:

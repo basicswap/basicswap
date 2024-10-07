@@ -30,6 +30,7 @@ class Coins(IntEnum):
     NAV = 14
     LTC_MWEB = 15
     # ZANO = 16
+    BCH = 17
 
 
 chainparams = {
@@ -432,7 +433,45 @@ chainparams = {
             'min_amount': 1000,
             'max_amount': 100000 * COIN,
         }
-    }
+    },
+    Coins.BCH: {
+        'name': 'bitcoincash',
+        'ticker': 'BCH',
+        'message_magic': 'Bitcoin Signed Message:\n',
+        'blocks_target': 60 * 2,
+        'decimal_places': 8,
+        'mainnet': {
+            'rpcport': 8332,
+            'pubkey_address': 0,
+            'script_address': 5,
+            'key_prefix': 128,
+            'hrp': 'bitcoincash',
+            'bip44': 0,
+            'min_amount': 1000,
+            'max_amount': 100000 * COIN,
+        },
+        'testnet': {
+            'rpcport': 18332,
+            'pubkey_address': 111,
+            'script_address': 196,
+            'key_prefix': 239,
+            'hrp': 'bchtest',
+            'bip44': 1,
+            'min_amount': 1000,
+            'max_amount': 100000 * COIN,
+            'name': 'testnet3',
+        },
+        'regtest': {
+            'rpcport': 18443,
+            'pubkey_address': 111,
+            'script_address': 196,
+            'key_prefix': 239,
+            'hrp': 'bchreg',
+            'bip44': 1,
+            'min_amount': 1000,
+            'max_amount': 100000 * COIN,
+        }
+    },
 }
 ticker_map = {}
 
