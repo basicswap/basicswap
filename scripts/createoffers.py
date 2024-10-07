@@ -7,6 +7,54 @@
 
 """
 Create offers
+
+{
+    "min_seconds_between_offers": Add a random delay between creating offers between min and max, default 60.
+    "max_seconds_between_offers": ^, default "min_seconds_between_offers" * 4
+    "min_seconds_between_bids": Add a random delay between creating bids between min and max, default 60.
+    "max_seconds_between_bids": ^, default "min_seconds_between_bids" * 4
+    "wallet_port_override": Used for testing.
+    "offers": [
+        {
+            "name": Offer tenplate name, eg "Offer 0", will be automatically renamed if not unique.
+            "coin_from": Coin you send.
+            "coin_to": Coin you receive.
+            "amount": Amount to create the offer for.
+            "minrate": Rate below which the offer won't drop.
+            "ratetweakpercent": modify the offer rate from the fetched value, can be negative.
+            "amount_variable": bool, bidder can set a different amount
+            "address": Address offer is sent from, default will generate a new address per offer.
+            "min_coin_from_amt": Won't generate offers if the wallet would drop below min_coin_from_amt.
+            "offer_valid_seconds": Seconds that the generated offers will be valid for.
+
+            # Optional
+            "enabled": Set to false to ignore offer template.
+            "swap_type": Type of swap, defaults to "adaptor_sig"
+            "min_swap_amount": Sets "amt_bid_min" on the offer, minimum valid bid when offer amount is variable.
+            "min_amount": If set offers will be created for amounts between "min_coin_from_amt" and "amount" in increments of "min_amount".
+        },
+        ...
+    ],
+    "bids": [
+        {
+            "name": Bid template name, must be unique, eg "Bid 0", will be automatically renamed if not unique.
+            "coin_from": Coin you receive.
+            "coin_to": Coin you send.
+            "amount": amount to bid.
+            "max_rate": Maximum rate for bids.
+            "min_coin_to_balance": Won't send bids if wallet amount of "coin_to" would drop below.
+
+            # Optional
+            "enabled": Set to false to ignore bid template.
+            "max_concurrent": Maximum number of bids to have active at once, default 1.
+            "amount_variable": Can send bids below the set "amount" where possible if true.
+            "max_coin_from_balance": Won't send bids if wallet amount of "coin_from" would be above.
+            "address": Address offer is sent from, default will generate a new address per bid.
+        },
+        ...
+    ]
+}
+
 """
 
 __version__ = '0.2'
@@ -120,9 +168,10 @@ def readConfig(args, known_coins):
             num_changes += 1
         offer_templates_map[offer_template['name']] = offer_template
 
-        if offer_template.get('min_coin_from_amt', 0) < offer_template['amount']:
+        min_offer_amount: float = float(offer_template.get('min_amount', offer_template['amount']))
+        if float(offer_template.get('min_coin_from_amt', 0)) < min_offer_amount:
             print('Setting min_coin_from_amt for', offer_template['name'])
-            offer_template['min_coin_from_amt'] = offer_template['amount']
+            offer_template['min_coin_from_amt'] = min_offer_amount
             num_changes += 1
 
         if 'address' not in offer_template:
@@ -280,9 +329,20 @@ def main():
                 if offers_found > 0:
                     continue
 
-                if float(wallet_from['balance']) <= float(offer_template['min_coin_from_amt']):
+                max_offer_amount: float = offer_template['amount']
+                min_offer_amount: float = offer_template.get('min_amount', max_offer_amount)
+                wallet_balance: float = float(wallet_from['balance'])
+                min_wallet_from_amount: float = float(offer_template['min_coin_from_amt'])
+                if wallet_balance - min_offer_amount <= min_wallet_from_amount:
                     print('Skipping template {}, wallet from balance below minimum'.format(offer_template['name']))
                     continue
+
+                offer_amount: float = max_offer_amount
+                if wallet_balance - max_offer_amount <= min_wallet_from_amount:
+                    available_balance: float = wallet_balance - min_wallet_from_amount
+                    min_steps: int = available_balance // min_offer_amount
+                    assert (min_steps > 0)  # Should not be possible, checked above
+                    offer_amount = min_offer_amount * min_steps
 
                 delay_next_offer_before = script_state.get('delay_next_offer_before', 0)
                 if delay_next_offer_before > int(time.time()):
@@ -316,7 +376,7 @@ def main():
                     'addr_from': -1 if template_from_addr == 'auto' else template_from_addr,
                     'coin_from': coin_from_data['ticker'],
                     'coin_to': coin_to_data['ticker'],
-                    'amt_from': offer_template['amount'],
+                    'amt_from': offer_amount,
                     'amt_var': offer_template['amount_variable'],
                     'valid_for_seconds': offer_template.get('offer_valid_seconds', config.get('offer_valid_seconds', 3600)),
                     'rate': use_rate,
@@ -339,10 +399,10 @@ def main():
                 script_state['offers'][template_name].append({'offer_id': new_offer['offer_id'], 'time': int(time.time())})
                 max_seconds_between_offers = config['max_seconds_between_offers']
                 min_seconds_between_offers = config['min_seconds_between_offers']
+                time_between_offers = min_seconds_between_offers
                 if max_seconds_between_offers > min_seconds_between_offers:
                     time_between_offers = random.randint(min_seconds_between_offers, max_seconds_between_offers)
-                else:
-                    time_between_offers = min_seconds_between_offers
+
                 script_state['delay_next_offer_before'] = int(time.time()) + time_between_offers
                 write_state(args.statefile, script_state)
 

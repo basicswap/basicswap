@@ -28,6 +28,9 @@ import http.client
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib import parse
 
+from tests.basicswap.common import (
+    wait_for_balance,
+)
 from tests.basicswap.util import (
     read_json_api,
     waitForServer,
@@ -557,6 +560,63 @@ class Test(unittest.TestCase):
         rv_stdout = result.stdout.decode().split('\n')
         '''
 
+    def test_offer_min_amount(self):
+        waitForServer(self.delay_event, UI_PORT + 0)
+        waitForServer(self.delay_event, UI_PORT + 1)
+
+        # Reset test
+        clear_offers(self.delay_event, 0)
+        delete_file(self.node0_statefile)
+        delete_file(self.node1_statefile)
+        wait_for_offers(self.delay_event, 1, 0)
+
+        offer_amount = 200000000
+        offer_min_amount = 20
+        min_coin_from_amt = 10
+
+        xmr_wallet = read_json_api(UI_PORT + 0, 'wallets/xmr')
+        xmr_wallet_balance = float(xmr_wallet['balance'])
+
+        expect_balance = offer_min_amount * 2 + min_coin_from_amt + 1
+        if xmr_wallet_balance < expect_balance:
+
+            post_json = {
+                'value': expect_balance,
+                'address': xmr_wallet['deposit_address'],
+                'sweepall': False,
+            }
+            json_rv = read_json_api(UI_PORT + 1, 'wallets/xmr/withdraw', post_json)
+            assert (len(json_rv['txid']) == 64)
+            wait_for_balance(self.delay_event, f'http://127.0.0.1:{UI_PORT + 1}/json/wallets/xmr', 'balance', expect_balance)
+
+            xmr_wallet_balance = read_json_api(UI_PORT + 0, 'wallets/xmr')['balance']
+
+        assert (xmr_wallet_balance > offer_min_amount)
+        assert (xmr_wallet_balance < offer_amount)
+
+        node0_test_config = {
+            'offers': [
+                {
+                    'name': 'test min amount',
+                    'coin_from': 'XMR',
+                    'coin_to': 'Particl',
+                    'amount': offer_amount,
+                    'min_amount': offer_min_amount,
+                    'minrate': 0.05,
+                    'amount_variable': True,
+                    'address': -1,
+                    'min_coin_from_amt': min_coin_from_amt,
+                    'max_coin_to_amt': -1
+                }
+            ],
+        }
+        with open(self.node0_configfile, 'w') as fp:
+            json.dump(node0_test_config, fp, indent=4)
+
+        result = subprocess.run(self.node0_args, stdout=subprocess.PIPE)
+        rv_stdout = result.stdout.decode().split('\n')
+        assert (len(get_created_offers(rv_stdout)) == 1)
+
     def test_error_messages(self):
         waitForServer(self.delay_event, UI_PORT + 0)
         waitForServer(self.delay_event, UI_PORT + 1)
@@ -586,7 +646,7 @@ class Test(unittest.TestCase):
         with open(self.node0_configfile, 'w') as fp:
             json.dump(node0_test1_config, fp, indent=4)
 
-        logging.info('Test that an offer is created')
+        logging.info('Test that an offer is not created')
         result = subprocess.run(self.node0_args, stdout=subprocess.PIPE)
         rv_stdout = result.stdout.decode().split('\n')
         assert (count_lines_with(rv_stdout, 'Error: Server failed to create offer: To amount above max') == 1)
