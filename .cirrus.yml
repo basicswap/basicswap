@@ -16,6 +16,7 @@ test_task:
     - BIN_DIR: /tmp/cached_bin
     - PARTICL_BINDIR: ${BIN_DIR}/particl
     - BITCOIN_BINDIR: ${BIN_DIR}/bitcoin
+    - BITCOINCASH_BINDIR: ${BIN_DIR}/bitcoincash
     - LITECOIN_BINDIR: ${BIN_DIR}/litecoin
     - XMR_BINDIR: ${BIN_DIR}/monero
   setup_script:
@@ -29,7 +30,7 @@ test_task:
     fingerprint_script:
       - basicswap-prepare -v
     populate_script:
-      - basicswap-prepare --bindir=/tmp/cached_bin --preparebinonly --withcoins=particl,bitcoin,litecoin,monero
+      - basicswap-prepare --bindir=/tmp/cached_bin --preparebinonly --withcoins=particl,bitcoin,bitcoincash,litecoin,monero
   script:
     - cd "${CIRRUS_WORKING_DIR}"
     - export DATADIRS="${TEST_DIR}"

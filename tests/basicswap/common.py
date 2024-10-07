@@ -31,6 +31,11 @@ BTC_BASE_RPC_PORT = 32792
 BTC_BASE_ZMQ_PORT = 33792
 BTC_BASE_TOR_PORT = 33732
 
+BCH_BASE_PORT = 41792
+BCH_BASE_RPC_PORT = 42792
+BCH_BASE_ZMQ_PORT = 43792
+BCH_BASE_TOR_PORT = 43732
+
 LTC_BASE_PORT = 34792
 LTC_BASE_RPC_PORT = 35792
 LTC_BASE_ZMQ_PORT = 36792
@@ -75,7 +80,8 @@ def prepareDataDir(datadir, node_id, conf_file, dir_prefix, base_p2p_port=BASE_P
         fp.write('acceptnonstdtxn=0\n')
         fp.write('txindex=1\n')
         fp.write('wallet=wallet.dat\n')
-        fp.write('findpeers=0\n')
+        if not base_p2p_port == BCH_BASE_PORT:
+            fp.write('findpeers=0\n')
 
         if base_p2p_port == BTC_BASE_PORT:
             fp.write('deprecatedrpc=create_bdb\n')
