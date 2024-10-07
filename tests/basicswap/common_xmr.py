@@ -92,6 +92,7 @@ def recursive_update_dict(base, new_vals):
 def run_prepare(node_id, datadir_path, bins_path, with_coins, mnemonic_in=None, num_nodes=3, use_rpcauth=False, extra_settings={}, port_ofs=0):
     config_path = os.path.join(datadir_path, cfg.CONFIG_FILENAME)
 
+    os.environ['BSX_TEST_MODE'] = 'true'
     os.environ['PART_RPC_PORT'] = str(PARTICL_RPC_PORT_BASE)
     os.environ['BTC_RPC_PORT'] = str(BITCOIN_RPC_PORT_BASE)
     os.environ['LTC_RPC_PORT'] = str(LITECOIN_RPC_PORT_BASE)

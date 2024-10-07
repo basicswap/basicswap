@@ -140,6 +140,7 @@ if not len(logger.handlers):
     logger.addHandler(logging.StreamHandler(sys.stdout))
 
 BSX_DOCKER_MODE = toBool(os.getenv('BSX_DOCKER_MODE', 'false'))
+BSX_TEST_MODE = toBool(os.getenv('BSX_TEST_MODE', 'false'))
 UI_HTML_PORT = int(os.getenv('UI_HTML_PORT', 12700))
 UI_WS_PORT = int(os.getenv('UI_WS_PORT', 11700))
 COINS_RPCBIND_IP = os.getenv('COINS_RPCBIND_IP', '127.0.0.1')
@@ -276,7 +277,8 @@ def shouldManageDaemon(prefix: str) -> bool:
     The COIN _MANAGE_DAEMON variables can override this and set manage_daemon directly.
     If BSX_DOCKER_MODE is active COIN _MANAGE_DAEMON will default to false.
     '''
-    manage_daemon: str = os.getenv(prefix + '_MANAGE_DAEMON', 'false' if BSX_DOCKER_MODE else 'auto')
+    default_mode: str = 'false' if BSX_DOCKER_MODE else 'true' if BSX_TEST_MODE else 'auto'
+    manage_daemon: str = os.getenv(prefix + '_MANAGE_DAEMON', default_mode)
 
     if manage_daemon == 'auto':
         host_was_set: bool = prefix + '_RPC_HOST' in os.environ
