@@ -214,7 +214,7 @@ def runClient(fp, data_dir, chain, start_only_coins):
             if c in ('monero', 'wownero'):
                 if v['manage_daemon'] is True:
                     swap_client.log.info(f'Starting {display_name} daemon')
-                    filename = c + 'd' + ('.exe' if os.name == 'nt' else '')
+                    filename = (c if not c == "bitcoincash" else "bitcoin") + 'd' + ('.exe' if os.name == 'nt' else '')
                     daemons.append(startXmrDaemon(v['datadir'], v['bindir'], filename))
                     pid = daemons[-1].handle.pid
                     swap_client.log.info('Started {} {}'.format(filename, pid))
@@ -280,7 +280,7 @@ def runClient(fp, data_dir, chain, start_only_coins):
             if v['manage_daemon'] is True:
                 swap_client.log.info(f'Starting {display_name} daemon')
 
-                filename = c + 'd' + ('.exe' if os.name == 'nt' else '')
+                filename = (c if not c == "bitcoincash" else "bitcoin") + 'd' + ('.exe' if os.name == 'nt' else '')
                 daemons.append(startDaemon(v['datadir'], v['bindir'], filename))
                 pid = daemons[-1].handle.pid
                 pids.append((c, pid))

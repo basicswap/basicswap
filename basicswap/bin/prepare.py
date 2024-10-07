@@ -49,6 +49,9 @@ LITECOIN_VERSION_TAG = os.getenv('LITECOIN_VERSION_TAG', '')
 BITCOIN_VERSION = os.getenv('BITCOIN_VERSION', '26.0')
 BITCOIN_VERSION_TAG = os.getenv('BITCOIN_VERSION_TAG', '')
 
+BITCOINCASH_VERSION = os.getenv('BITCOIN_VERSION', '27.1.0')
+BITCOINCASH_VERSION_TAG = os.getenv('BITCOIN_VERSION_TAG', '')
+
 MONERO_VERSION = os.getenv('MONERO_VERSION', '0.18.3.4')
 MONERO_VERSION_TAG = os.getenv('MONERO_VERSION_TAG', '')
 XMR_SITE_COMMIT = '3751c0d7987a9e78324a718c32c008e2ec91b339'  # Lock hashes.txt to monero version
@@ -84,6 +87,7 @@ SKIP_GPG_VALIDATION = toBool(os.getenv('SKIP_GPG_VALIDATION', 'false'))
 known_coins = {
     'particl': (PARTICL_VERSION, PARTICL_VERSION_TAG, ('tecnovert',)),
     'bitcoin': (BITCOIN_VERSION, BITCOIN_VERSION_TAG, ('laanwj',)),
+    'bitcoincash': (BITCOINCASH_VERSION, BITCOINCASH_VERSION_TAG, ('Calin_Culianu',)),
     'litecoin': (LITECOIN_VERSION, LITECOIN_VERSION_TAG, ('davidburkett38',)),
     'decred': (DCR_VERSION, DCR_VERSION_TAG, ('decred_release',)),
     'namecoin': ('0.18.0', '', ('JeremyRand',)),
@@ -113,6 +117,7 @@ expected_key_ids = {
     'reuben': ('1290A1D0FA7EE109',),
     'nav_builder': ('2782262BF6E7FADB',),
     'decred_release': ('6D897EDF518A031D',),
+    'Calin_Culianu': ('21810A542031C02C',),
 }
 
 USE_PLATFORM = os.getenv('USE_PLATFORM', platform.system())
@@ -185,6 +190,12 @@ BTC_RPC_PORT = int(os.getenv('BTC_RPC_PORT', 19996))
 BTC_ONION_PORT = int(os.getenv('BTC_ONION_PORT', 8334))
 BTC_RPC_USER = os.getenv('BTC_RPC_USER', '')
 BTC_RPC_PWD = os.getenv('BTC_RPC_PWD', '')
+
+BCH_RPC_HOST = os.getenv('BCH_RPC_HOST', '127.0.0.1')
+BCH_RPC_PORT = int(os.getenv('BCH_RPC_PORT', 19997))
+BCH_ONION_PORT = int(os.getenv('BCH_ONION_PORT', 8334))
+BCH_RPC_USER = os.getenv('BCH_RPC_USER', '')
+BCH_RPC_PWD = os.getenv('BCH_RPC_PWD', '')
 
 DCR_RPC_HOST = os.getenv('DCR_RPC_HOST', '127.0.0.1')
 DCR_RPC_PORT = int(os.getenv('DCR_RPC_PORT', 9109))
@@ -513,8 +524,14 @@ def extractCore(coin, version_data, settings, bin_dir, release_path, extra_opts=
         return
 
     dir_name = 'dashcore' if coin == 'dash' else coin
+    dir_name = 'bitcoin-cash-node' if coin == 'bitcoincash' else coin
     if coin == 'decred':
         bins = ['dcrd', 'dcrwallet']
+    elif coin == 'bitcoincash':
+        bins = ['bitcoind', 'bitcoin-cli', 'bitcoin-tx']
+        versions = version.split('.')
+        if int(versions[0]) >= 22 or int(versions[1]) >= 19:
+            bins.append('bitcoin-wallet')
     else:
         bins = [coin + 'd', coin + '-cli', coin + '-tx']
         versions = version.split('.')
@@ -696,6 +713,11 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
                 assert_url = f'https://raw.githubusercontent.com/bitcoin-core/guix.sigs/main/{version}/{signing_key_name}/all.SHA256SUMS'
             else:
                 assert_url = 'https://raw.githubusercontent.com/bitcoin-core/gitian.sigs/master/%s-%s/%s/%s' % (version, os_dir_name, signing_key_name, assert_filename)
+        elif coin == 'bitcoincash':
+            release_filename = 'bitcoin-cash-node-{}-{}.{}'.format(version, BIN_ARCH, FILE_EXT)
+            release_url = 'https://github.com/bitcoin-cash-node/bitcoin-cash-node/releases/download/v{}/{}'.format(version, release_filename)
+            assert_filename = 'SHA256SUMS.{}.asc.Calin_Culianu'.format(version)
+            assert_url = 'https://gitlab.com/bitcoin-cash-node/announcements/-/raw/master/release-sigs/%s/%s' % (version, assert_filename)
         elif coin == 'namecoin':
             release_url = 'https://beta.namecoin.org/files/namecoin-core/namecoin-core-{}/{}'.format(version, release_filename)
             assert_filename = '{}-{}-{}-build.assert'.format(coin, os_name, version.rsplit('.', 1)[0])
@@ -738,7 +760,7 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
         if not os.path.exists(assert_path):
             downloadFile(assert_url, assert_path)
 
-        if coin not in ('firo', ):
+        if coin not in ('firo', 'bitcoincash',):
             assert_sig_url = assert_url + ('.asc' if use_guix else '.sig')
             if coin not in ('nav', ):
                 assert_sig_filename = '{}-{}-{}-build-{}.assert.sig'.format(coin, os_name, version, signing_key_name)
@@ -798,11 +820,13 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
         pubkeyurls.append('https://git.wownero.com/wownero/wownero/raw/branch/master/utils/gpg_keys/wowario.asc')
     if coin == 'firo':
         pubkeyurls.append('https://firo.org/reuben.asc')
+    if coin == 'bitcoincash':
+        pubkeyurls.append('https://gitlab.com/bitcoin-cash-node/bitcoin-cash-node/-/raw/master/contrib/gitian-signing/pubkeys.txt')
 
     if ADD_PUBKEY_URL != '':
         pubkeyurls.append(ADD_PUBKEY_URL + '/' + pubkey_filename)
 
-    if coin in ('monero', 'wownero', 'firo'):
+    if coin in ('monero', 'wownero', 'firo', 'bitcoincash',):
         with open(assert_path, 'rb') as fp:
             verified = gpg.verify_file(fp)
 
@@ -837,7 +861,6 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
                 verified = gpg.verify_file(fp, assert_path)
 
     ensureValidSignatureBy(verified, signing_key_name)
-
     extractCore(coin, version_data, settings, bin_dir, release_path, extra_opts)
 
 
@@ -1032,6 +1055,10 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
             fp.write('fallbackfee=0.0002\n')
             if BTC_RPC_USER != '':
                 fp.write('rpcauth={}:{}${}\n'.format(BTC_RPC_USER, salt, password_to_hmac(salt, BTC_RPC_PWD)))
+        elif coin == 'bitcoincash':
+            fp.write('prune=2000\n')
+            if BCH_RPC_USER != '':
+                fp.write('rpcauth={}:{}${}\n'.format(BCH_RPC_USER, salt, password_to_hmac(salt, BCH_RPC_PWD)))
         elif coin == 'namecoin':
             fp.write('prune=2000\n')
         elif coin == 'pivx':
@@ -1182,6 +1209,8 @@ def modify_tor_config(settings, coin, tor_control_password=None, enable=False, e
         default_onionport = 0
         if coin == 'bitcoin':
             default_onionport = BTC_ONION_PORT
+        if coin == 'bitcoincash':
+            default_onionport = BCH_ONION_PORT
         elif coin == 'particl':
             default_onionport = PART_ONION_PORT
         elif coin == 'litecoin':
@@ -1353,7 +1382,7 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
                     pass
                 else:
                     if coin_settings['manage_daemon']:
-                        filename = coin_name + 'd' + ('.exe' if os.name == 'nt' else '')
+                        filename = (coin_name if not coin_name == "bitcoincash" else "bitcoin") + 'd' + ('.exe' if os.name == 'nt' else '')
                         coin_args = ['-nofindpeers', '-nostaking'] if c == Coins.PART else []
 
                         if c == Coins.FIRO:
@@ -1755,6 +1784,19 @@ def main():
             'conf_target': 2,
             'core_version_group': 22,
         },
+        'bitcoincash': {
+            'connection_type': 'rpc' if 'bitcoincash' in with_coins else 'none',
+            'manage_daemon': True if ('bitcoincash' in with_coins and BCH_RPC_HOST == '127.0.0.1') else False,
+            'rpchost': BCH_RPC_HOST,
+            'rpcport': BCH_RPC_PORT + port_offset,
+            'onionport': BCH_ONION_PORT + port_offset,
+            'datadir': os.getenv('BCH_DATA_DIR', os.path.join(data_dir, 'bitcoincash')),
+            'bindir': os.path.join(bin_dir, 'bitcoincash'),
+            'use_segwit': False,
+            'blocks_confirmed': 1,
+            'conf_target': 2,
+            'core_version_group': 22,
+        },
         'litecoin': {
             'connection_type': 'rpc',
             'manage_daemon': shouldManageDaemon('LTC'),
@@ -1917,6 +1959,9 @@ def main():
     if BTC_RPC_USER != '':
         chainclients['bitcoin']['rpcuser'] = BTC_RPC_USER
         chainclients['bitcoin']['rpcpassword'] = BTC_RPC_PWD
+    if BCH_RPC_USER != '':
+        chainclients['bitcoin']['rpcuser'] = BCH_RPC_USER
+        chainclients['bitcoin']['rpcpassword'] = BCH_RPC_PWD
     if XMR_RPC_USER != '':
         chainclients['monero']['rpcuser'] = XMR_RPC_USER
         chainclients['monero']['rpcpassword'] = XMR_RPC_PWD

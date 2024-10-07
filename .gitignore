@@ -13,3 +13,6 @@ __pycache__
 # geckodriver.log
 *.log
 docker/.env
+
+# vscode dev container settings
+compose-dev.yaml

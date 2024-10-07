@@ -64,6 +64,7 @@ class SwapTypes(IntEnum):
     SELLER_FIRST_2MSG = auto()
     BUYER_FIRST_2MSG = auto()
     XMR_SWAP = auto()
+    XMR_BCH_SWAP = auto()
 
 
 class OfferStates(IntEnum):
