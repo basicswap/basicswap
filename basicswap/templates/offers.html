@@ -1,5 +1,22 @@
 {% include 'header.html' %}
 {% from 'style.html' import breadcrumb_line_svg, place_new_offer_svg, page_back_svg, page_forwards_svg, filter_clear_svg, filter_apply_svg, input_arrow_down_svg, arrow_right_svg %}
+
+<script>
+  window.offersTableConfig = {
+    jsonData: {{ offers|tojson|safe }},
+    isSentOffers: {{ sent_offers|tojson }}
+  };
+</script>
+
+<script>
+function getAPIKeys() {
+  return {
+    cryptoCompare: '{{chart_api_key}}',
+    coinGecko: '{{coingecko_api_key}}'
+  };
+}
+</script>
+
 <div class="container mx-auto">
   <section class="p-5 mt-5">
     <div class="flex flex-wrap items-center -m-2">
@@ -12,8 +29,9 @@
         </ul>
       </div>
     </div>
- </section>
- <section class="py-4">
+  </section>
+ 
+  <section class="py-4">
     <div class="container px-4 mx-auto">
       <div class="relative py-11 px-16 bg-coolGray-900 dark:bg-gray-500 rounded-md overflow-hidden">
         <img class="absolute z-10 left-4 top-4 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt="dots-red">
@@ -24,16 +42,16 @@
             <p class="font-normal text-coolGray-200 dark:text-white">{{ page_type_description }}</p>
           </div>
           <div class="rounded-full{{ page_button }} w-full md:w-1/2 p-3 p-6 container flex flex-wrap items-center justify-end items-center mx-auto">
-            <a id="refresh" href="/newoffer" class="rounded-full flex flex-wrap justify-center px-5 py-3 bg-blue-500 hover:bg-green-600 hover:border-green-600 font-medium text-sm text-white border border-blue-500 rounded-md focus:ring-0 focus:outline-none">
-              {{ place_new_offer_svg | safe }} <span>Place new Offer</span>
-            </a>
+            <a id="refresh" href="/newoffer" class="rounded-full flex flex-wrap justify-center px-5 py-3 bg-blue-500 hover:bg-green-600 hover:border-green-600 font-medium text-sm text-white border border-blue-500 rounded-md focus:ring-0 focus:outline-none">{{ place_new_offer_svg | safe }}<span>Place new Offer</span></a>
           </div>
         </div>
       </div>
     </div>
   </section>
-</div>
+</div> 
+
 {% include 'inc_messages.html' %}
+
 {% if show_chart %}
 <section class="relative hidden xl:block">
   <div class="pl-6 pr-6 pt-0 pb-0 mt-5 h-full overflow-hidden">
@@ -43,19 +61,30 @@
           <div class="container px-4 mx-auto">
             <div class="pt-6 pb-8 bg-coolGray-100 dark:bg-gray-500 rounded-xl container-to-blur">
               <div class="flex justify-between items-center mb-4 mr-10 ml-10">
-                <h2 class="text-xl font-bold dark:text-white" id="chart-title">Price Chart</h2>
+                <div class="flex items-center justify-between">
+                  <h2 class="text-xl font-bold dark:text-white" id="chart-title">Price Chart</h2>
+                  <div class="flex items-center space-x-4">
+                    <button id="resolution-month" class="ml-5 resolution-button">1M</button>
+                    <button id="resolution-week" class="resolution-button">1W</button>
+                    <button id="resolution-day" class="resolution-button">24H</button>
+                  </div>
+                </div>
                 <div class="flex items-center">
                   <span id="load-time" class="mr-2 text-sm text-gray-600 dark:text-gray-300"></span>
+                  <span id="last-refreshed-time" class="mr-2 text-sm text-gray-600 dark:text-gray-300"></span>
                   <span id="cache-status" class="mr-4 text-sm text-gray-600 dark:text-gray-300"></span>
-                  <span id="tor-status" class="mr-4 text-sm {% if tor_established %}text-green-500{% else %}text-red-500{% endif %}">
-                    Tor <> API: {% if tor_established %}Connected{% else %}Not Connected{% endif %}
+                  <span id="tor-status" class="mr-4 text-sm {% if tor_established %}text-green-500{% else %}text-red-500{% endif %}"> Tor <> API: {% if tor_established %}Connected{% else %}Not Connected{% endif %}
                     <a href="https://academy.particl.io/en/latest/basicswap-guides/basicswapguides_tor.html" target="_blank" rel="noopener noreferrer" class="underline">(?)</a>
+                  </span>       
+                  <span id="next-refresh-time" class="mr-4 text-sm text-gray-600 dark:text-gray-300">
+                    <span id="next-refresh-label"></span>
+                    <span id="next-refresh-value"></span>
                   </span>
                   <div id="tooltip-volume" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
                     Toggle Coin Volume
                     <div class="tooltip-arrow" data-popper-arrow></div>
-                  </div>
-                  <button id="toggle-volume" data-tooltip-target="tooltip-volume" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded mr-2 rounded-md focus:ring-0 focus:outline-none" title="Toggle Volume">
+                  </div> 
+                  <button id="toggle-volume" data-tooltip-target="tooltip-volume" class="text-white font-bold py-2 px-4 rounded mr-2 focus:outline-none focus:ring-0 transition-colors duration-200" title="Toggle Volume">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                       <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
                     </svg>
@@ -63,8 +92,18 @@
                   <div id="tooltip-refresh" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
                     Refresh Charts/Prices & Clear Cache
                     <div class="tooltip-arrow" data-popper-arrow></div>
+                  </div> 
+                  <button id="refresh-all" data-tooltip-target="tooltip-refresh" class="text-gray-600 dark:text-gray-400 font-bold py-2 px-4 rounded mr-2 focus:outline-none focus:ring-0 transition-colors duration-200" title="Refresh Data & Clear Cache">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  </button>
+                  <div id="tooltip-auto" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+                    Auto Refresh Enable/Disable
+                    <div class="tooltip-arrow" data-popper-arrow></div>
                   </div>
-                  <button id="refresh-all" data-tooltip-target="tooltip-refresh" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded rounded-md focus:ring-0 focus:outline-none" title="Refresh All Data">
+                  <button id="toggle-auto-refresh" data-enabled="false" data-tooltip-target="tooltip-auto" class="text-white font-bold py-2 px-4 rounded mr-2 focus:outline-none focus:ring-0 transition-colors duration-200" title="Enable Auto-Refresh">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                       <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd" />
                     </svg>
@@ -72,7 +111,7 @@
                 </div>
               </div>
               <div class="w-full mt-6 ml-6 mr-10 overflow-x-auto">
-                <div class="chart-container relative" style="max-width: 98%; height: 250px;">
+                <div class="chart-container relative" style="max-width: 96%; height: 250px;">
                   <div id="chart-loader" class="absolute inset-0 flex items-center justify-center z-10 bg-coolGray-100 dark:bg-gray-500">
                     <div style="width: 300px; height: 4px; background-color: #3B82F6;" class="rounded-full animate-pulse"></div>
                   </div>
@@ -81,6 +120,7 @@
               </div>
             </div>
           </div>
+          
           <div id="error-overlay" class="error-overlay hidden absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
             <div id="error-content" class="error-content bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-2xl mx-4 relative">
               <button id="close-error" class="absolute top-3 right-3 bg-red-500 text-white rounded-full p-2 hover:bg-red-600 focus:outline-none">
@@ -90,9 +130,7 @@
               </button>
               <p class="text-red-600 font-semibold text-xl mb-4">Error</p>
               <p id="error-message" class="text-gray-700 dark:text-gray-300 text-lg mb-6"></p>
-              <p class="text-sm text-gray-600 dark:text-gray-400">
-                To review or update your Chart API Key(s), navigate to 
-                <a href="/settings" class="text-blue-500 hover:underline">Settings & Tools > Settings > General (TAB)</a>.
+              <p class="text-sm text-gray-600 dark:text-gray-400">To review or update your Chart API Key(s), navigate to<a href="/settings" class="text-blue-500 hover:underline">Settings & Tools > Settings > General (TAB)</a>.
               </p>
             </div>
           </div>
@@ -101,1186 +139,77 @@
     </div>
   </div>
 </section>
+
 <section class="py-4 flex flex-wrap justify-center overflow-hidden container-to-blur">
-  <div class="container px-4 mx-auto">
-    <div class="flex flex-wrap -m-3">
-      {% set coin_data = {
-        'BTC': {'name': 'Bitcoin', 'symbol': 'BTC', 'image': 'Bitcoin.png'},
-        'XMR': {'name': 'Monero', 'symbol': 'XMR', 'image': 'Monero.png'},
-        'PART': {'name': 'Particl', 'symbol': 'PART', 'image': 'Particl.png'},
-        'LTC': {'name': 'Litecoin', 'symbol': 'LTC', 'image': 'Litecoin.png'},
-        'FIRO': {'name': 'Firo', 'symbol': 'FIRO', 'image': 'Firo.png'},
-        'PIVX': {'name': 'PIVX', 'symbol': 'PIVX', 'image': 'PIVX.png'},
-        'DASH': {'name': 'Dash', 'symbol': 'DASH', 'image': 'Dash.png'},
-        'ETH': {'name': 'Ethereum', 'symbol': 'ETH', 'image': 'Ethereum.png'},
-        'DOGE': {'name': 'Dogecoin', 'symbol': 'DOGE', 'image': 'Doge.png'},
-        'DCR': {'name': 'Decred', 'symbol': 'DCR', 'image': 'Decred.png'},
-        'ZANO': {'name': 'Zano', 'symbol': 'ZANO', 'image': 'Zano.png'},
-        'WOW': {'name': 'Wownero', 'symbol': 'WOW', 'image': 'Wownero.png'}
-      } %}
-      {% for coin_symbol, coin in coin_data.items() if coin_symbol in enabled_chart_coins %}
-        <div class="w-full sm:w-1/2 lg:w-1/6 p-3" id="{{ coin_symbol.lower() }}-container">
-          <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-2xl dark:text-white {% if coin_symbol == 'BTC' %}active-container{% endif %}" style="min-height: 180px;">
-            <div class="flex items-center">
-              <img src="/static/images/coins/{{ coin.image }}" class="rounded-xl" style="width: 28px; height: 28px; object-fit: contain;" alt="{{ coin.name }}">
-              <p class="ml-1 text-black text-sm dark:text-white">
-                {{ coin.name }} {% if coin.symbol != coin.name %}({{ coin.symbol }}){% endif %}
-              </p>
-            </div>
-            
-            <div class="flex flex-col justify-start relative">
-              <div id="{{ coin_symbol.lower() }}-loader" class="absolute inset-0 flex items-center justify-center bg-coolGray-100 dark:bg-gray-500 z-10 hidden">
-                <div class="w-16 h-1 bg-blue-500 rounded-full animate-pulse"></div>
-              </div>
-              
-              <p class="my-2 text-xl font-bold text-left monospace text-gray-700 dark:text-gray-100" id="{{ coin_symbol.lower() }}-price-usd">
-                <span id="{{ coin_symbol.lower() }}-price-usd-value" {% if coin_symbol in ['DCR', 'ZANO', 'WOW'] %}style="min-width: 80px;"{% endif %}></span>
-              </p>
-              <div class="flex items-center text-sm">
-                <div class="w-auto">
-                  <div id="{{ coin_symbol.lower() }}-price-change-container" class="w-auto p-1"></div>
-                </div>
-              </div>
-              {% if coin_symbol != 'BTC' %}
-                <div id="{{ coin_symbol.lower() }}-btc-price-div" class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2 {% if coin_symbol == 'WOW' %}hidden{% endif %}">
-                  <span class="bold mr-2">BTC:</span>
-                  <span id="{{ coin_symbol.lower() }}-price-btc"></span>
-                </div>
-              {% endif %}
-              <div id="{{ coin_symbol.lower() }}-volume-div" class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2">
-                <span class="bold mr-2">VOL:</span>
-                <div id="{{ coin_symbol.lower() }}-volume-24h"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-      {% endfor %}
+ <div class="container px-4 mx-auto">
+  <div class="flex flex-wrap -m-3">
+		{% set coin_data = {
+  'BTC': {'name': 'Bitcoin', 'symbol': 'BTC', 'image': 'Bitcoin.png', 'show': true},
+  'XMR': {'name': 'Monero', 'symbol': 'XMR', 'image': 'Monero.png', 'show': true},
+  'PART': {'name': 'Particl', 'symbol': 'PART', 'image': 'Particl.png', 'show': true},
+  'LTC': {'name': 'Litecoin', 'symbol': 'LTC', 'image': 'Litecoin.png', 'show': true},
+  'FIRO': {'name': 'Firo', 'symbol': 'FIRO', 'image': 'Firo.png', 'show': true},
+  'PIVX': {'name': 'PIVX', 'symbol': 'PIVX', 'image': 'PIVX.png', 'show': true},
+  'DASH': {'name': 'Dash', 'symbol': 'DASH', 'image': 'Dash.png', 'show': true},
+  'ETH': {'name': 'Ethereum', 'symbol': 'ETH', 'image': 'Ethereum.png', 'show': false},
+  'DOGE': {'name': 'Dogecoin', 'symbol': 'DOGE', 'image': 'Doge.png', 'show': false},
+  'DCR': {'name': 'Decred', 'symbol': 'DCR', 'image': 'Decred.png', 'show': true},
+  'ZANO': {'name': 'Zano', 'symbol': 'ZANO', 'image': 'Zano.png', 'show': false},
+  'BCH': {'name': 'BCH', 'symbol': 'BCH', 'image': 'Bitcoin-cash.png', 'show': true},
+  'WOW': {'name': 'Wownero', 'symbol': 'WOW', 'image': 'Wownero.png', 'show': true}
+} %}
+{% for coin_symbol, coin in coin_data.items() if coin_symbol in enabled_chart_coins and coin.show %}
+<div class="w-full sm:w-1/2 lg:w-1/6 p-3" id="{{ coin_symbol.lower() }}-container">
+    <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-2xl dark:text-white {% if coin_symbol == 'BTC' %}active-container{% endif %}" style="min-height: 180px;">
+     <div class="flex items-center">
+      <img src="/static/images/coins/{{ coin.image }}" class="rounded-xl" style="width: 28px; height: 28px; object-fit: contain;" alt="{{ coin.name }}">
+      <p class="ml-1 text-black text-sm dark:text-white">
+     {{ coin.name }} {% if coin.symbol != coin.name %}({{ coin.symbol }})
+      {% endif %}
+      </p>
+     </div>
+     <div class="flex flex-col justify-start relative">
+      <div id="{{ coin_symbol.lower() }}-loader" class="absolute inset-0 flex items-center justify-center bg-coolGray-100 dark:bg-gray-500 z-10 hidden">
+       <div class="w-16 h-1 bg-blue-500 rounded-full animate-pulse"></div>
+      </div>
+      <p class="my-2 text-xl font-bold text-left monospace text-gray-700 dark:text-gray-100" id="{{ coin_symbol.lower() }}-price-usd"> <span id="{{ coin_symbol.lower() }}-price-usd-value" {% if coin_symbol in ['DCR', 'ZANO', 'WOW'] %}style="min-width: 80px;" {% endif %}></span>
+      </p>
+      <div class="flex items-center text-sm">
+       <div class="w-auto">
+        <div id="{{ coin_symbol.lower() }}-price-change-container" class="w-auto p-1"></div>
+       </div>
+      </div>
+      {% if coin_symbol != 'BTC' %}
+      <div id="{{ coin_symbol.lower() }}-btc-price-div" class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2 {% if coin_symbol == 'WOW' %}hidden{% endif %}">
+       <span class="bold mr-2">BTC:</span> <span id="{{ coin_symbol.lower() }}-price-btc"></span> </div> {% endif %} <div id="{{ coin_symbol.lower() }}-volume-div" class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2">
+       <span class="bold mr-2">VOL:</span>
+       <div id="{{ coin_symbol.lower() }}-volume-24h"></div>
+      </div>
+     </div>
     </div>
-  </div>
+   </div>
+   {% endfor %}
+   </div>
+ </div>
 </section>
 {% endif %}
-<script>
-const config = {
-  apiKeys: {
-    cryptoCompare: '{{chart_api_key}}',
-    coinGecko: '{{coingecko_api_key}}'
-  },
-  coins: [{
-      symbol: 'BTC',
-      usesCryptoCompare: true,
-      usesCoinGecko: false,
-      historicalDays: 30
-    },
-    {
-      symbol: 'XMR',
-      usesCryptoCompare: true,
-      usesCoinGecko: false,
-      historicalDays: 30
-    },
-    {
-      symbol: 'PART',
-      usesCryptoCompare: true,
-      usesCoinGecko: false,
-      historicalDays: 30
-    },
-    {
-      symbol: 'PIVX',
-      usesCryptoCompare: true,
-      usesCoinGecko: false,
-      historicalDays: 30
-    },
-    {
-      symbol: 'FIRO',
-      usesCryptoCompare: true,
-      usesCoinGecko: false,
-      historicalDays: 30
-    },
-    {
-      symbol: 'DASH',
-      usesCryptoCompare: true,
-      usesCoinGecko: false,
-      historicalDays: 30
-    },
-    {
-      symbol: 'LTC',
-      usesCryptoCompare: true,
-      usesCoinGecko: false,
-      historicalDays: 30
-    },
-    {
-      symbol: 'DOGE',
-      usesCryptoCompare: true,
-      usesCoinGecko: false,
-      historicalDays: 30
-    },
-    {
-      symbol: 'ETH',
-      usesCryptoCompare: true,
-      usesCoinGecko: false,
-      historicalDays: 30
-    },
-    {
-      symbol: 'DCR',
-      usesCryptoCompare: true,
-      usesCoinGecko: false,
-      historicalDays: 30
-    },
-    {
-      symbol: 'ZANO',
-      usesCryptoCompare: false,
-      usesCoinGecko: true,
-      historicalDays: 30
-    },
-    {
-      symbol: 'WOW',
-      usesCryptoCompare: false,
-      usesCoinGecko: true,
-      historicalDays: 30
-    }
-  ],
-  apiEndpoints: {
-    cryptoCompare: 'https://min-api.cryptocompare.com/data/pricemultifull',
-    coinGecko: 'https://api.coingecko.com/api/v3/coins',
-    cryptoCompareHistorical: 'https://min-api.cryptocompare.com/data/v2/histoday'
-  },
-  chartColors: {
-    default: {
-      lineColor: 'rgba(77, 132, 240, 1)',
-      backgroundColor: 'rgba(77, 132, 240, 0.1)'
-    }
-  },
-  showVolume: false
-};
-const utils = {
-  formatNumber: (number, decimals = 2) => number.toFixed(decimals).replace(/\B(?=(\d{3})+(?!\d))/g, ','),
-  formatDate: (date) => {
-    const options = {
-      day: '2-digit',
-      month: '2-digit',
-      year: '2-digit'
-    };
-    return new Intl.DateTimeFormat('en-US', options).format(date);
-  }
-};
 
-function updateVolumeDisplay() {
-  const volumeDivs = document.querySelectorAll('[id$="-volume-div"]');
-  volumeDivs.forEach(div => {
-    div.style.display = config.showVolume ? 'flex' : 'none';
-  });
-}
-updateVolumeDisplay();
-const api = {
-  makePostRequest: (url, headers = {}) => {
-    return new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open('POST', '/json/readurl');
-      xhr.setRequestHeader('Content-Type', 'application/json');
-      xhr.timeout = 30000;
-      xhr.ontimeout = () => reject(new Error('Request timed out'));
-      xhr.onload = () => {
-        console.log(`Response for ${url}:`, xhr.responseText);
-        if (xhr.status === 200) {
-          try {
-            const response = JSON.parse(xhr.responseText);
-            if (response.Error) {
-              console.error(`API Error for ${url}:`, response.Error);
-              reject(new Error(response.Error));
-            } else {
-              resolve(response);
-            }
-          } catch (error) {
-            console.error(`Invalid JSON response for ${url}:`, xhr.responseText);
-            reject(new Error(`Invalid JSON response: ${error.message}`));
-          }
-        } else {
-          console.error(`HTTP Error for ${url}: ${xhr.status} ${xhr.statusText}`);
-          reject(new Error(`HTTP Error: ${xhr.status} ${xhr.statusText}`));
-        }
-      };
-      xhr.onerror = () => reject(new Error('Network error occurred'));
-      xhr.send(JSON.stringify({
-        url: url,
-        headers: headers
-      }));
-    });
-  },
-  fetchCryptoCompareDataXHR: (coin) => {
-    const url = `${config.apiEndpoints.cryptoCompare}?fsyms=${coin}&tsyms=USD,BTC&api_key=${config.apiKeys.cryptoCompare}`;
-    const headers = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-      'Accept-Language': 'en-US,en;q=0.5',
-    };
-    return api.makePostRequest(url, headers).catch(error => ({
-      error: error.message
-    }));
-  },
-  fetchCoinGeckoDataXHR: (coin) => {
-    const coinConfig = config.coins.find(c => c.symbol === coin);
-    if (!coinConfig) {
-      console.error(`No configuration found for coin: ${coin}`);
-      return Promise.reject(new Error(`No configuration found for coin: ${coin}`));
-    }
-    let coinId;
-    switch (coin) {
-      case 'ZANO':
-        coinId = 'zano';
-        break;
-      case 'WOW':
-        coinId = 'wownero';
-        break;
-      default:
-        coinId = coin.toLowerCase();
-    }
-    const url = `${config.apiEndpoints.coinGecko}/${coinId}?localization=false&tickers=false&market_data=true&community_data=false&developer_data=false&sparkline=false`;
-    console.log(`Fetching data for ${coin} from CoinGecko: ${url}`);
-    return api.makePostRequest(url)
-      .then(data => {
-        console.log(`Raw CoinGecko data for ${coin}:`, data);
-        if (!data.market_data || !data.market_data.current_price) {
-          throw new Error(`Invalid data structure received for ${coin}`);
-        }
-        return data;
-      })
-      .catch(error => {
-        console.error(`Error fetching CoinGecko data for ${coin}:`, error);
-        return {
-          error: error.message
-        };
-      });
-  },
-  fetchHistoricalDataXHR: (coinSymbol) => {
-    const coin = config.coins.find(c => c.symbol === coinSymbol);
-    let url;
-    if (coin.usesCoinGecko) {
-      let coinId;
-      switch (coinSymbol) {
-        case 'ZANO':
-          coinId = 'zano';
-          break;
-        case 'WOW':
-          coinId = 'wownero';
-          break;
-        default:
-          coinId = coinSymbol.toLowerCase();
-      }
-      url = `${config.apiEndpoints.coinGecko}/${coinId}/market_chart?vs_currency=usd&days=${coin.historicalDays}&interval=daily`;
-    } else {
-      url = `${config.apiEndpoints.cryptoCompareHistorical}?fsym=${coinSymbol}&tsym=USD&limit=${coin.historicalDays}&api_key=${config.apiKeys.cryptoCompare}`;
-    }
-    return api.makePostRequest(url).catch(error => {
-      if (error.message.includes('429')) {
-        throw new Error('Too many requests. Please try again later.');
-      } else if (error.message.includes('500')) {
-        throw new Error('Server error. Please try again later.');
-      } else {
-        throw error;
-      }
-    });
-  }
-};
-const ui = {
-  displayCoinData: (coin, data) => {
-    const coinConfig = config.coins.find(c => c.symbol === coin);
-    let priceUSD, priceBTC, priceChange1d, volume24h;
-    const updateUI = (isError = false) => {
-      const priceUsdElement = document.querySelector(`#${coin.toLowerCase()}-price-usd`);
-      const volumeDiv = document.querySelector(`#${coin.toLowerCase()}-volume-div`);
-      const volumeElement = document.querySelector(`#${coin.toLowerCase()}-volume-24h`);
-      const btcPriceDiv = document.querySelector(`#${coin.toLowerCase()}-btc-price-div`);
-      const priceBtcElement = document.querySelector(`#${coin.toLowerCase()}-price-btc`);
-      if (priceUsdElement) {
-        priceUsdElement.textContent = isError ? 'N/A' : `$ ${ui.formatPrice(coin, priceUSD)}`;
-      }
-      if (volumeDiv && volumeElement) {
-        volumeElement.textContent = isError ? 'N/A' : `${utils.formatNumber(volume24h, 0)} USD`;
-        volumeDiv.style.display = volumeToggle.isVisible ? 'flex' : 'none';
-      }
-      if (btcPriceDiv && priceBtcElement && coin !== 'BTC') {
-        priceBtcElement.textContent = isError ? 'N/A' : `${priceBTC.toFixed(8)} BTC`;
-        btcPriceDiv.style.display = 'flex';
-      }
-      ui.updatePriceChangeContainer(coin, isError ? null : priceChange1d);
-    };
-    try {
-      if (data.error) {
-        throw new Error(data.error);
-      }
-      if (coinConfig.usesCoinGecko) {
-        if (!data.market_data) {
-          throw new Error(`Invalid CoinGecko data structure for ${coin}`);
-        }
-        priceUSD = data.market_data.current_price.usd;
-        priceBTC = data.market_data.current_price.btc;
-        priceChange1d = data.market_data.price_change_percentage_24h;
-        volume24h = data.market_data.total_volume.usd;
-      } else if (coinConfig.usesCryptoCompare) {
-        if (!data.RAW || !data.RAW[coin] || !data.RAW[coin].USD) {
-          throw new Error(`Invalid CryptoCompare data structure for ${coin}`);
-        }
-        priceUSD = data.RAW[coin].USD.PRICE;
-        priceBTC = data.RAW[coin].BTC.PRICE;
-        priceChange1d = data.RAW[coin].USD.CHANGEPCT24HOUR;
-        volume24h = data.RAW[coin].USD.TOTALVOLUME24HTO;
-      }
-      if (isNaN(priceUSD) || isNaN(priceBTC) || isNaN(volume24h)) {
-        throw new Error(`Invalid numeric values in data for ${coin}`);
-      }
-      updateUI(false);
-    } catch (error) {
-      console.error(`Error displaying data for ${coin}:`, error.message);
-      updateUI(true);
-    }
-  },
-  showLoader: () => {
-    const loader = document.getElementById('loader');
-    if (loader) {
-      loader.classList.remove('hidden');
-    }
-  },
-  hideLoader: () => {
-    const loader = document.getElementById('loader');
-    if (loader) {
-      loader.classList.add('hidden');
-    }
-  },
-  showCoinLoader: (coinSymbol) => {
-    const loader = document.getElementById(`${coinSymbol.toLowerCase()}-loader`);
-    if (loader) {
-      loader.classList.remove('hidden');
-    }
-  },
-  hideCoinLoader: (coinSymbol) => {
-    const loader = document.getElementById(`${coinSymbol.toLowerCase()}-loader`);
-    if (loader) {
-      loader.classList.add('hidden');
-    }
-  },
-  updateCacheStatus: (isCached) => {
-    const cacheStatusElement = document.getElementById('cache-status');
-    if (cacheStatusElement) {
-      cacheStatusElement.textContent = isCached ? 'Cached' : 'Live';
-      cacheStatusElement.classList.toggle('text-green-500', isCached);
-      cacheStatusElement.classList.toggle('text-blue-500', !isCached);
-    }
-  },
-  updateLoadTimeAndCache: (loadTime, cachedData) => {
-    const loadTimeElement = document.getElementById('load-time');
-    const cacheStatusElement = document.getElementById('cache-status');
-    if (loadTimeElement) {
-      loadTimeElement.textContent = `Load time: ${loadTime}ms`;
-    }
-    if (cacheStatusElement) {
-      if (cachedData && cachedData.remainingTime) {
-        const remainingMinutes = Math.ceil(cachedData.remainingTime / 60000);
-        cacheStatusElement.textContent = `Cached (${remainingMinutes} min left)`;
-        cacheStatusElement.classList.add('text-green-500');
-        cacheStatusElement.classList.remove('text-blue-500');
-      } else {
-        cacheStatusElement.textContent = 'Live';
-        cacheStatusElement.classList.add('text-blue-500');
-        cacheStatusElement.classList.remove('text-green-500');
-      }
-    }
-  },
-  updatePriceChangeContainer: (coin, priceChange) => {
-    const container = document.querySelector(`#${coin.toLowerCase()}-price-change-container`);
-    if (container) {
-      container.innerHTML = priceChange !== null ?
-        (priceChange >= 0 ? ui.positivePriceChangeHTML(priceChange) : ui.negativePriceChangeHTML(priceChange)) :
-        'N/A';
-    }
-  },
-  positivePriceChangeHTML: (value) => `
-    <div class="flex flex-wrap items-center py-px px-1 border border-green-500 rounded-full">
-      <svg class="mr-0.5" width="15" height="10" viewBox="0 0 15 10" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M8.16667 0.916748C7.75245 0.916748 7.41667 1.25253 7.41667 1.66675C7.41667 2.08096 7.75245 2.41675 8.16667 2.41675V0.916748ZM13.5 1.66675H14.25C14.25 1.25253 13.9142 0.916748 13.5 0.916748V1.66675ZM12.75 7.00008C12.75 7.41429 13.0858 7.75008 13.5 7.75008C13.9142 7.75008 14.25 7.41429 14.25 7.00008H12.75ZM0.96967 7.80308C0.676777 8.09598 0.676777 8.57085 0.96967 8.86374C1.26256 9.15664 1.73744 9.15664 2.03033 8.86374L0.96967 7.80308ZM5.5 4.33341L6.03033 3.80308C5.73744 3.51019 5.26256 3.51019 4.96967 3.80308L5.5 4.33341ZM8.16667 7.00008L7.63634 7.53041C7.92923 7.8233 8.4041 7.8233 8.697 7.53041L8.16667 7.00008ZM8.16667 2.41675H13.5V0.916748H8.16667V2.41675ZM12.75 1.66675V7.00008H14.25V1.66675H12.75ZM2.03033 8.86374L6.03033 4.86374L4.96967 3.80308L0.96967 7.80308L2.03033 8.86374ZM4.96967 4.86374L7.63634 7.53041L8.697 6.46975L6.03033 3.80308L4.96967 4.86374ZM8.697 7.53041L14.0303 2.19708L12.9697 1.13642L7.63634 6.46975L8.697 7.53041Z" fill="#20C43A"></path>
-      </svg>
-      <span class="text-xs text-green-500 font-medium">${value.toFixed(2)}%</span>
-    </div>
-  `,
-  negativePriceChangeHTML: (value) => `
-    <div class="flex flex-wrap items-center py-px px-1 border border-red-500 rounded-full">
-      <svg class="mr-0.5" width="14" height="10" viewBox="0 0 14 10" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M7.66667 7.58341C7.25245 7.58341 6.91667 7.9192 6.91667 8.33341C6.91667 8.74763 7.25245 9.08341 7.66667 9.08341V7.58341ZM13 8.33341V9.08341C13.4142 9.08341 13.75 8.74763 13.75 8.33341H13ZM13.75 3.00008C13.75 2.58587 13.4142 2.25008 13 2.25008C12.5858 2.25008 12.25 2.58587 12.25 3.00008H13.75ZM1.53033 1.13642C1.23744 0.843525 0.762563 0.843525 0.46967 1.13642C0.176777 1.42931 0.176777 1.90418 0.46967 2.19708L1.53033 1.13642ZM5 5.66675L4.46967 6.19708C4.76256 6.48997 5.23744 6.48997 5.53033 6.19708L5 5.66675ZM7.66667 3.00008L8.197 2.46975C7.9041 2.17686 7.42923 2.17686 7.13634 2.46975L7.66667 3.00008ZM7.66667 9.08341H13V7.58341H7.66667V9.08341ZM13.75 8.33341V3.00008H12.25V8.33341H13.75ZM0.46967 2.19708L4.46967 6.19708L5.53033 5.13642L1.53033 1.13642L0.46967 2.19708ZM5.53033 6.19708L8.197 3.53041L7.13634 2.46975L4.46967 5.13642L5.53033 6.19708ZM7.13634 3.53041L12.4697 8.86374L13.5303 7.80308L8.197 2.46975L7.13634 3.53041Z" fill="#FF3131"></path>
-      </svg>
-      <span class="text-xs text-red-500 font-medium">${Math.abs(value).toFixed(2)}%</span>
-    </div>
-  `,
-  formatPrice: (coin, price) => {
-    if (typeof price !== 'number' || isNaN(price)) {
-      console.error(`Invalid price for ${coin}:`, price);
-      return 'N/A';
-    }
-    if (price < 0.000001) return price.toExponential(2);
-    if (price < 0.001) return price.toFixed(8);
-    if (price < 1) return price.toFixed(4);
-    if (price < 1000) return price.toFixed(2);
-    return price.toFixed(1);
-  },
-  setActiveContainer: (containerId) => {
-    const containerIds = ['btc', 'xmr', 'part', 'pivx', 'firo', 'dash', 'ltc', 'doge', 'eth', 'dcr', 'zano', 'wow'].map(id => `${id}-container`);
-    containerIds.forEach(id => {
-      const container = document.getElementById(id);
-      if (container) {
-        const innerDiv = container.querySelector('div');
-        innerDiv.classList.toggle('active-container', id === containerId);
-      }
-    });
-  },
-  displayErrorMessage: (message) => {
-    const errorOverlay = document.getElementById('error-overlay');
-    const errorMessage = document.getElementById('error-message');
-    const chartContainer = document.querySelector('.container-to-blur');
-    if (errorOverlay && errorMessage && chartContainer) {
-      errorOverlay.classList.remove('hidden');
-      errorMessage.textContent = message;
-      chartContainer.classList.add('blurred');
-    }
-  },
-  hideErrorMessage: () => {
-    const errorOverlay = document.getElementById('error-overlay');
-    const containersToBlur = document.querySelectorAll('.container-to-blur');
-    if (errorOverlay) {
-      errorOverlay.classList.add('hidden');
-      containersToBlur.forEach(container => container.classList.remove('blurred'));
-    }
-  }
-};
-const chartModule = {
-  chart: null,
-  currentCoin: 'BTC',
-  loadStartTime: 0,
-  verticalLinePlugin: {
-    id: 'verticalLine',
-    beforeDraw: (chart, args, options) => {
-      if (chart.tooltip._active && chart.tooltip._active.length) {
-        const activePoint = chart.tooltip._active[0];
-        const ctx = chart.ctx;
-        const x = activePoint.element.x;
-        const topY = chart.scales.y.top;
-        const bottomY = chart.scales.y.bottom;
-        ctx.save();
-        ctx.beginPath();
-        ctx.moveTo(x, topY);
-        ctx.lineTo(x, bottomY);
-        ctx.lineWidth = options.lineWidth || 1;
-        ctx.strokeStyle = options.lineColor || 'rgba(77, 132, 240, 0.5)';
-        ctx.stroke();
-        ctx.restore();
-      }
-    }
-  },
-  initChart: () => {
-    const ctx = document.getElementById('coin-chart').getContext('2d');
-    const gradient = ctx.createLinearGradient(0, 0, 0, 400);
-    gradient.addColorStop(0, 'rgba(77, 132, 240, 0.2)');
-    gradient.addColorStop(1, 'rgba(77, 132, 240, 0)');
-    chartModule.chart = new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels: [],
-        datasets: [{
-          data: [],
-          borderColor: 'rgba(77, 132, 240, 1)',
-          backgroundColor: gradient,
-          tension: 0.4,
-          fill: true,
-          borderWidth: 3,
-          cubicInterpolationMode: 'monotone',
-          pointStyle: 'circle',
-          pointRadius: 5,
-          pointHoverRadius: 10
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        interaction: {
-          intersect: false,
-          mode: 'index'
-        },
-        scales: {
-          x: {
-            grid: {
-              display: false
-            },
-            ticks: {
-              font: {
-                size: 12,
-                family: "'Inter', sans-serif"
-              },
-              color: 'rgba(156, 163, 175, 1)',
-              maxTicksLimit: 7,
-              maxRotation: 0,
-              minRotation: 0,
-              callback: function(value, index, values) {
-                return chartModule.chart.data.labels[index];
-              },
-            }
-          },
-          y: {
-            grid: {
-              display: false
-            },
-            ticks: {
-              font: {
-                size: 12,
-                family: "'Inter', sans-serif"
-              },
-              color: 'rgba(156, 163, 175, 1)',
-              callback: (value) => '$' + value.toLocaleString()
-            },
-            title: {
-              display: true,
-              text: 'Price (USD)',
-              color: 'rgba(77, 132, 240, 1)',
-              font: {
-                size: 10,
-                family: "'Inter', sans-serif",
-                weight: 'bold'
-              }
-            }
-          }
-        },
-        plugins: {
-          legend: {
-            display: false
-          },
-          tooltip: {
-            mode: 'index',
-            intersect: false,
-            backgroundColor: 'rgba(255, 255, 255, 0.9)',
-            titleColor: 'rgba(17, 24, 39, 1)',
-            bodyColor: 'rgba(55, 65, 81, 1)',
-            borderColor: 'rgba(226, 232, 240, 1)',
-            borderWidth: 1,
-            cornerRadius: 4,
-            padding: 8,
-            displayColors: false,
-            callbacks: {
-              title: (tooltipItems) => chartModule.chart.data.labels[tooltipItems[0].dataIndex],
-              label: (item) => {
-                const value = item.parsed.y;
-                return `${chartModule.currentCoin}: $${value.toLocaleString(undefined, { minimumFractionDigits: 8, maximumFractionDigits: 8 })}`;
-              }
-            }
-          },
-          verticalLine: {
-            lineWidth: 1,
-            lineColor: 'rgba(77, 132, 240, 0.5)'
-          }
-        },
-        elements: {
-          point: {
-            backgroundColor: 'transparent',
-            borderColor: 'rgba(77, 132, 240, 1)',
-            borderWidth: 2,
-            radius: 4,
-            hoverRadius: 4,
-            hitRadius: 6,
-            hoverBorderWidth: 2
-          },
-          line: {
-            backgroundColor: gradient,
-            borderColor: 'rgba(77, 132, 240, 1)',
-            fill: true
-          }
-        }
-      },
-      plugins: [chartModule.verticalLinePlugin]
-    });
-  },
-  showChartLoader: () => {
-    const chartLoader = document.getElementById('chart-loader');
-    const coinChart = document.getElementById('coin-chart');
-    if (chartLoader) {
-      chartLoader.classList.remove('hidden');
-    } else {
-      console.warn('Chart loader element not found');
-    }
-    if (coinChart) {
-      coinChart.classList.add('hidden');
-    } else {
-      console.warn('Coin chart element not found');
-    }
-  },
-  hideChartLoader: () => {
-    const chartLoader = document.getElementById('chart-loader');
-    const coinChart = document.getElementById('coin-chart');
-    if (chartLoader) {
-      chartLoader.classList.add('hidden');
-    } else {
-      console.warn('Chart loader element not found');
-    }
-    if (coinChart) {
-      coinChart.classList.remove('hidden');
-    } else {
-      console.warn('Coin chart element not found');
-    }
-  },
-  updateLoadTime: () => {
-    const loadTime = Date.now() - chartModule.loadStartTime;
-    document.getElementById('load-time').textContent = `Load time: ${loadTime}ms`;
-  },
-  updateChart: async (coinSymbol, forceRefresh = false) => {
-    try {
-      chartModule.showChartLoader();
-      chartModule.loadStartTime = Date.now();
-      const cacheKey = `chartData_${coinSymbol}`;
-      let cachedData = !forceRefresh ? cache.get(cacheKey) : null;
-      if (cachedData) {
-        data = cachedData.value;
-      } else {
-        data = await api.fetchHistoricalDataXHR(coinSymbol);
-        if (data.error) {
-          throw new Error(data.error);
-        }
-        cache.set(cacheKey, data);
-        cachedData = null;
-      }
-      const chartData = chartModule.prepareChartData(coinSymbol, data);
-      if (chartModule.chart) {
-        chartModule.chart.data = chartData;
-        const coin = config.coins.find(c => c.symbol === coinSymbol);
-        let apiSource = coin.usesCryptoCompare ? 'CryptoCompare' : 'CoinGecko';
-        let currency = 'USD';
-        // Update chart title
-        const chartTitle = document.getElementById('chart-title');
-        if (chartTitle) {
-          chartTitle.textContent = `${coinSymbol} Price Chart`;
-        }
-        // Update y-axis title and format
-        chartModule.chart.options.scales.y.title.text = `Price (${currency}) - ${coinSymbol} ${coin.historicalDays} DAYS - ${apiSource}`;
-        // Use appropriate formatting for different price ranges
-        chartModule.chart.options.scales.y.ticks.callback = (value) => {
-          return ui.formatPrice(coinSymbol, value);
-        };
-        chartModule.chart.options.plugins.tooltip.callbacks.label = (context) => {
-          let label = context.dataset.label || '';
-          if (label) {
-            label += ': ';
-          }
-          if (context.parsed.y !== null) {
-            label += '$' + ui.formatPrice(coinSymbol, context.parsed.y);
-          }
-          return label;
-        };
-        chartModule.chart.update('active');
-      } else {
-        console.warn('Chart object not initialized');
-      }
-      chartModule.currentCoin = coinSymbol;
-      const loadTime = Date.now() - chartModule.loadStartTime;
-      ui.updateLoadTimeAndCache(loadTime, cachedData);
-    } catch (error) {
-      console.error(`Error updating chart for ${coinSymbol}:`, error);
-      let errorMessage = `Failed to update chart for ${coinSymbol}`;
-      if (error.message) {
-        errorMessage += `: ${error.message}`;
-      }
-      ui.displayErrorMessage(errorMessage);
-    } finally {
-      chartModule.hideChartLoader();
-    }
-  },
-  showChartLoader: () => {
-    document.getElementById('chart-loader').classList.remove('hidden');
-    document.getElementById('coin-chart').classList.add('hidden');
-  },
-  hideChartLoader: () => {
-    document.getElementById('chart-loader').classList.add('hidden');
-    document.getElementById('coin-chart').classList.remove('hidden');
-  },
-  prepareChartData: (coinSymbol, data) => {
-    console.log(`Preparing chart data for ${coinSymbol}:`, data);
-    const coin = config.coins.find(c => c.symbol === coinSymbol);
-    if (!data || typeof data !== 'object' || data.error) {
-      console.error(`Invalid data received for ${coinSymbol}:`, data);
-      return {
-        labels: [],
-        datasets: [{
-          label: `${coinSymbol} Price`,
-          data: []
-        }]
-      };
-    }
-    try {
-      if (coin.usesCoinGecko) {
-        if (!data.prices || !Array.isArray(data.prices)) {
-          throw new Error(`Invalid CoinGecko data structure for ${coinSymbol}`);
-        }
-        return {
-          labels: data.prices.map(entry => utils.formatDate(new Date(entry[0]))),
-          datasets: [{
-            label: `${coinSymbol} Price (USD)`,
-            data: data.prices.map(entry => entry[1])
-          }]
-        };
-      } else {
-        // CryptoCompare
-        if (!data.Data || !data.Data.Data || !Array.isArray(data.Data.Data)) {
-          throw new Error(`Invalid CryptoCompare data structure for ${coinSymbol}`);
-        }
-        return {
-          labels: data.Data.Data.map(d => utils.formatDate(new Date(d.time * 1000))),
-          datasets: [{
-            label: `${coinSymbol} Price (USD)`,
-            data: data.Data.Data.map(d => d.close)
-          }]
-        };
-      }
-    } catch (error) {
-      console.error(`Error preparing chart data for ${coinSymbol}:`, error);
-      return {
-        labels: [],
-        datasets: [{
-          label: `${coinSymbol} Price`,
-          data: []
-        }]
-      };
-    }
-  }
-};
-Chart.register(chartModule.verticalLinePlugin);
-const volumeToggle = {
-  isVisible: localStorage.getItem('volumeToggleState') === 'true',
-  init: () => {
-    const toggleButton = document.getElementById('toggle-volume');
-    if (toggleButton) {
-      toggleButton.addEventListener('click', volumeToggle.toggle);
-    }
-    volumeToggle.updateVolumeDisplay();
-  },
-  toggle: () => {
-    volumeToggle.isVisible = !volumeToggle.isVisible;
-    localStorage.setItem('volumeToggleState', volumeToggle.isVisible.toString());
-    volumeToggle.updateVolumeDisplay();
-  },
-  updateVolumeDisplay: () => {
-    const volumeDivs = document.querySelectorAll('[id$="-volume-div"]');
-    volumeDivs.forEach(div => {
-      div.style.display = volumeToggle.isVisible ? 'flex' : 'none';
-    });
-    // Update button appearance
-    const toggleButton = document.getElementById('toggle-volume');
-    if (toggleButton) {
-      toggleButton.classList.toggle('bg-green-500', volumeToggle.isVisible);
-      toggleButton.classList.toggle('bg-blue-500', !volumeToggle.isVisible);
-    }
-  }
-};
-const cache = {
-  ttl: 10 * 60 * 1000, // 10 minutes in milliseconds
-  set: (key, value) => {
-    const item = {
-      value: value,
-      timestamp: Date.now(),
-      expiresAt: Date.now() + cache.ttl
-    };
-    localStorage.setItem(key, JSON.stringify(item));
-  },
-  get: (key) => {
-    const itemStr = localStorage.getItem(key);
-    if (!itemStr) {
-      return null;
-    }
-    try {
-      const item = JSON.parse(itemStr);
-      const now = Date.now();
-      if (now < item.expiresAt) {
-        return {
-          value: item.value,
-          remainingTime: item.expiresAt - now
-        };
-      } else {
-        localStorage.removeItem(key);
-      }
-    } catch (e) {
-      console.error('Error parsing cache item:', e);
-      localStorage.removeItem(key);
-    }
-    return null;
-  },
-  isValid: (key) => {
-    return cache.get(key) !== null;
-  },
-  clear: () => {
-    Object.keys(localStorage).forEach(key => {
-      if (key.startsWith('coinData_') || key.startsWith('chartData_')) {
-        localStorage.removeItem(key);
-      }
-    });
-  }
-};
-const app = {
-  btcPriceUSD: 0,
-  init: () => {
-    window.addEventListener('load', app.onLoad);
-  },
-  onLoad: async () => {
-    ui.showLoader();
-    try {
-      volumeToggle.init();
-      await app.updateBTCPrice();
-      const chartContainer = document.getElementById('coin-chart');
-      if (chartContainer) {
-        chartModule.initChart();
-        chartModule.showChartLoader();
-      } else {
-        console.warn('Chart container not found, skipping chart initialization');
-      }
-      for (const coin of config.coins) {
-        await app.loadCoinData(coin);
-      }
-      if (chartModule.chart) {
-        await chartModule.updateChart('BTC');
-      }
-      ui.setActiveContainer('btc-container');
-      config.coins.forEach(coin => {
-        const container = document.getElementById(`${coin.symbol.toLowerCase()}-container`);
-        if (container) {
-          container.addEventListener('click', () => {
-            ui.setActiveContainer(`${coin.symbol.toLowerCase()}-container`);
-            if (chartModule.chart) {
-              chartModule.updateChart(coin.symbol);
-            }
-          });
-        }
-      });
-      const refreshAllButton = document.getElementById('refresh-all');
-      if (refreshAllButton) {
-        refreshAllButton.addEventListener('click', app.refreshAllData);
-      }
-      tableRateModule.initializeTable();
-      app.initializeSelectImages();
-      const headers = document.querySelectorAll('th');
-      headers.forEach((header, index) => {
-        header.addEventListener('click', () => app.sortTable(index, header.classList.contains('disabled')));
-      });
-      const closeErrorButton = document.getElementById('close-error');
-      if (closeErrorButton) {
-        closeErrorButton.addEventListener('click', ui.hideErrorMessage);
-      }
-    } catch (error) {
-      console.error('Error during initialization:', error);
-      ui.displayErrorMessage('Failed to initialize the dashboard. Please try refreshing the page.');
-    } finally {
-      ui.hideLoader();
-      if (chartModule.chart) {
-        chartModule.hideChartLoader();
-      }
-    }
-  },
-  loadCoinData: async (coin) => {
-    const cacheKey = `coinData_${coin.symbol}`;
-    let cachedData = cache.get(cacheKey);
-    if (cachedData) {
-      data = cachedData.value;
-    } else {
-      try {
-        ui.showCoinLoader(coin.symbol);
-        if (coin.usesCoinGecko) {
-          data = await api.fetchCoinGeckoDataXHR(coin.symbol);
-        } else {
-          data = await api.fetchCryptoCompareDataXHR(coin.symbol);
-        }
-        if (data.error) {
-          throw new Error(data.error);
-        }
-        cache.set(cacheKey, data);
-        cachedData = null;
-      } catch (error) {
-        console.error(`Error fetching ${coin.symbol} data:`, error.message);
-        data = {
-          error: error.message
-        };
-      } finally {
-        ui.hideCoinLoader(coin.symbol);
-      }
-    }
-    ui.displayCoinData(coin.symbol, data);
-    ui.updateLoadTimeAndCache(0, cachedData);
-  },
-  refreshAllData: async () => {
-    ui.showLoader();
-    chartModule.showChartLoader();
-    try {
-      cache.clear();
-      await app.updateBTCPrice();
-      for (const coin of config.coins) {
-        await app.loadCoinData(coin);
-      }
-      if (chartModule.currentCoin) {
-        await chartModule.updateChart(chartModule.currentCoin, true);
-      }
-      tableRateModule.initializeTable();
-    } catch (error) {
-      console.error('Error refreshing all data:', error);
-      ui.displayErrorMessage('Failed to refresh all data. Please try again.');
-    } finally {
-      ui.hideLoader();
-      chartModule.hideChartLoader();
-    }
-  },
-  updateBTCPrice: async () => {
-    try {
-      const btcData = await api.fetchCryptoCompareDataXHR('BTC');
-      if (btcData.error) {
-        console.error('Error fetching BTC price:', btcData.error);
-        app.btcPriceUSD = 0;
-      } else if (btcData.RAW && btcData.RAW.BTC && btcData.RAW.BTC.USD) {
-        app.btcPriceUSD = btcData.RAW.BTC.USD.PRICE;
-      } else {
-        console.error('Unexpected BTC data structure:', btcData);
-        app.btcPriceUSD = 0;
-      }
-    } catch (error) {
-      console.error('Error fetching BTC price:', error);
-      app.btcPriceUSD = 0;
-    }
-    console.log('Current BTC price:', app.btcPriceUSD);
-  },
-  sortTable: (columnIndex) => {
-    const sortableColumns = [5, 6]; // Only Rate (5) and Market +/- (6) are sortable
-    if (!sortableColumns.includes(columnIndex)) return;
-    const table = document.querySelector('table');
-    if (!table) {
-      console.error("Table not found for sorting.");
-      return;
-    }
-    const rows = Array.from(table.querySelectorAll('tbody tr'));
-    const sortIcon = document.getElementById(`sort-icon-${columnIndex}`);
-    if (!sortIcon) {
-      console.error("Sort icon not found.");
-      return;
-    }
-    const sortOrder = sortIcon.textContent === '↓' ? 1 : -1;
-    sortIcon.textContent = sortOrder === 1 ? '↑' : '↓';
-    rows.sort((a, b) => {
-      const aValue = a.cells[columnIndex]?.textContent.trim() || '';
-      const bValue = b.cells[columnIndex]?.textContent.trim() || '';
-      return aValue.localeCompare(bValue, undefined, {
-        numeric: true,
-        sensitivity: 'base'
-      }) * sortOrder;
-    });
-    const tbody = table.querySelector('tbody');
-    if (tbody) {
-      rows.forEach(row => tbody.appendChild(row));
-    } else {
-      console.error("Table body not found.");
-    }
-  },
-  initializeTableSorting: () => {
-    const headers = document.querySelectorAll('th[data-sortable="true"]');
-    headers.forEach((header) => {
-      header.addEventListener('click', () => {
-        const columnIndex = parseInt(header.getAttribute('data-column-index'), 10);
-        app.sortTable(columnIndex);
-      });
-    });
-  },
-  initializeSelectImages: () => {
-    const updateSelectedImage = (selectId) => {
-      const select = document.getElementById(selectId);
-      const button = document.getElementById(`${selectId}_button`);
-      if (!select || !button) {
-        console.error(`Elements not found for ${selectId}`);
-        return;
-      }
-      const selectedOption = select.options[select.selectedIndex];
-      const imageURL = selectedOption?.getAttribute('data-image');
-      requestAnimationFrame(() => {
-        if (imageURL) {
-          button.style.backgroundImage = `url('${imageURL}')`;
-          button.style.backgroundSize = '25px 25px';
-          button.style.backgroundPosition = 'center';
-          button.style.backgroundRepeat = 'no-repeat';
-        } else {
-          button.style.backgroundImage = 'none';
-        }
-        // Ensure the button is large enough to display the image
-        button.style.minWidth = '30px';
-        button.style.minHeight = '30px';
-      });
-    };
-    const handleSelectChange = (event) => {
-      updateSelectedImage(event.target.id);
-    };
-    ['coin_to', 'coin_from'].forEach(selectId => {
-      const select = document.getElementById(selectId);
-      if (select) {
-        select.addEventListener('change', handleSelectChange);
-        updateSelectedImage(selectId); // Initial update
-      } else {
-        console.error(`Select element not found for ${selectId}`);
-      }
-    });
-  },
-};
-const tableRateModule = {
-  coinNameToSymbol: {
-    'Bitcoin': 'BTC',
-    'Particl': 'PART',
-    'Particl Blind': 'PART',
-    'Particl Anon': 'PART',
-    'Monero': 'XMR',
-    'Wownero': 'WOW',
-    'Litecoin': 'LTC',
-    'Firo': 'FIRO',
-    'Dash': 'DASH',
-    'PIVX': 'PIVX',
-    'Decred': 'DCR',
-    'Zano': 'ZANO'
-  },
-  formatUSD: (value) => `${value.toFixed(2)} USD`,
-  async updateUsdValue(cryptoCell, coinFullName, isRate = false) {
-    const coinSymbol = this.coinNameToSymbol[coinFullName];
-    if (!coinSymbol) {
-      console.error(`Coin symbol not found for full name: ${coinFullName}`);
-      return;
-    }
-    
-    const cryptoValue = parseFloat(cryptoCell.textContent);
-    const usdCell = cryptoCell.closest('td').querySelector('.usd-value');
-    if (!usdCell) {
-      console.error("USD cell not found.");
-      return;
-    }
-    
-    try {
-      const cacheKey = `coinData_${coinSymbol}`;
-      let cachedData = cache.get(cacheKey);
-      let data;
-      
-      if (cachedData) {
-        console.log(`Using cached data for ${coinSymbol}`);
-        data = cachedData.value;
-      } else {
-        console.log(`Fetching fresh data for ${coinSymbol}`);
-        if (config.coins.find(c => c.symbol === coinSymbol)?.usesCoinGecko) {
-          data = await api.fetchCoinGeckoDataXHR(coinSymbol);
-        } else {
-          data = await api.fetchCryptoCompareDataXHR(coinSymbol);
-        }
-        cache.set(cacheKey, data);
-      }
-      
-      const exchangeRate = this.extractExchangeRate(data, coinSymbol);
-      if (exchangeRate !== null) {
-        const usdValue = cryptoValue * exchangeRate;
-        usdCell.textContent = this.formatUSD(usdValue);
-        const row = cryptoCell.closest('tr');
-        if (row) {
-          this.updateProfitLoss(row);
-          this.updateProfitValue(row);
-        } else {
-          console.error("Row not found for updating profit/loss and value.");
-        }
-      } else {
-        throw new Error(`Failed to extract exchange rate for ${coinSymbol}`);
-      }
-    } catch (error) {
-      console.error(`Error updating USD value for ${coinSymbol}:`, error);
-      usdCell.textContent = 'Error fetching data';
-    }
-  },
-  extractExchangeRate(data, coinSymbol) {
-    const coin = config.coins.find(c => c.symbol === coinSymbol);
-    if (!coin) {
-      console.error(`Configuration not found for coin: ${coinSymbol}`);
-      return null;
-    }
-    
-    if (data.error) {
-      console.error(`Error in data for ${coinSymbol}:`, data.error);
-      return null;
-    }
-    
-    if (coin.usesCoinGecko) {
-      if (!data.market_data || !data.market_data.current_price || !data.market_data.current_price.usd) {
-        console.error(`Invalid CoinGecko data structure for ${coinSymbol}:`, data);
-        return null;
-      }
-      return data.market_data.current_price.usd;
-    } else {
-      if (!data.RAW || !data.RAW[coinSymbol] || !data.RAW[coinSymbol].USD || typeof data.RAW[coinSymbol].USD.PRICE !== 'number') {
-        console.error(`Invalid CryptoCompare data structure for ${coinSymbol}:`, data);
-        return null;
-      }
-      return data.RAW[coinSymbol].USD.PRICE;
-    }
-  },
-  updateProfitLoss(row) {
-    const usdCells = row.querySelectorAll('.usd-value');
-    if (usdCells.length < 2) {
-      console.error("Not enough USD value cells found.");
-      return;
-    }
-    const [buyingUSD, sellingUSD] = Array.from(usdCells).map(cell => parseFloat(cell.textContent));
-    const profitLossCell = row.querySelector('.profit-loss');
-    if (!profitLossCell) {
-      console.error("Profit/loss cell not found.");
-      return;
-    }
-    if (!isNaN(sellingUSD) && !isNaN(buyingUSD)) {
-      const profitLossPercentage = ((sellingUSD - buyingUSD) / buyingUSD) * 100;
-      profitLossCell.textContent = `${profitLossPercentage > 0 ? '+' : ''}${profitLossPercentage.toFixed(2)}%`;
-      profitLossCell.className = 'profit-loss ' + (profitLossPercentage > 0 ? 'text-green-500' :
-        profitLossPercentage < 0 ? 'text-red-500' : 'text-yellow-500');
-    } else {
-      profitLossCell.textContent = 'Invalid USD values';
-      profitLossCell.className = 'profit-loss';
-    }
-  },
-  updateProfitValue(row) {
-    const usdCells = row.querySelectorAll('.usd-value');
-    if (usdCells.length < 2) {
-      console.error("Not enough USD value cells found.");
-      return;
-    }
-    const [buyingUSD, sellingUSD] = Array.from(usdCells).map(cell => parseFloat(cell.textContent));
-    const profitValueCell = row.querySelector('.profit-value');
-    if (!profitValueCell) {
-      console.error("Profit value cell not found.");
-      return;
-    }
-    if (!isNaN(sellingUSD) && !isNaN(buyingUSD)) {
-      const profitValue = sellingUSD - buyingUSD;
-      profitValueCell.textContent = this.formatUSD(profitValue);
-      profitValueCell.classList.remove('hidden');
-    } else {
-      profitValueCell.textContent = 'Invalid USD values';
-      profitValueCell.classList.remove('hidden');
-    }
-  },
-  initializeTable() {
-    document.querySelectorAll('.coinname-value').forEach(coinNameValue => {
-      const coinFullName = coinNameValue.getAttribute('data-coinname');
-      const isRate = coinNameValue.closest('td').querySelector('.ratetype') !== null;
-      coinNameValue.classList.remove('hidden');
-      this.updateUsdValue(coinNameValue, coinFullName, isRate);
-    });
-  }
-};
-app.init();
-</script>
+<script src="/static/js/pricechart.js"></script>
+
 <section>
-    <div class="pl-6 pr-6 pt-0 pb-0 mt-5 h-full overflow-hidden">
-      <div class="border-coolGray-100">
-        <div class="flex flex-wrap items-center justify-between -m-2">
-          <div class="w-full mx-auto pt-2">
-            <form method="post">
-              <div class="flex items-center justify-center pb-4 dark:text-white">
-                <div class="rounded-b-md">
-                  <div class="w-full md:w-0/12">
-                    <div class="container flex flex-wrap justify-center">
-                    
-                    <!-- Coin Filter Section -->
+  <div class="pl-6 pr-6 pt-0 pb-0 mt-5 h-full overflow-hidden">
+    <div class="border-coolGray-100">
+      <div class="flex flex-wrap items-center justify-between -m-2">
+        <div class="w-full mx-auto pt-2">
+          <form method="post" id="filterForm">
+            <div class="flex items-center justify-center pb-4 dark:text-white">
+              <div class="rounded-b-md">
+                <div class="w-full md:w-0/12">
+                  <div class="container flex flex-wrap justify-center">
+
                     <div class="md:w-auto p-1.5 hover-container">
                       <div class="flex">
+
                         <!-- Coin To Filter -->
                         <button id="coin_to_button" class="bg-gray-50 text-gray-900 appearance-none w-10 dark:bg-gray-500 dark:text-white border-l border-t border-b border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-l-lg flex items-center" disabled></button>
                         <div class="relative">
@@ -1293,7 +222,6 @@ app.init();
                           </select>
                         </div>
 
-                        <!-- Arrow -->
                         <div class="flex items-center">
                           <div class="w-full md:w-auto p-1.5">
                             <p class="text-sm font-heading">{{ arrow_right_svg | safe }}</p>
@@ -1314,7 +242,6 @@ app.init();
                       </div>
                     </div>
 
-                    <!-- Sort Options -->
                     <div class="w-full md:w-auto mt-3">
                       <div class="w-full md:w-auto p-1.5">
                         <p class="text-sm font-heading bold">Sort By:</p>
@@ -1339,7 +266,6 @@ app.init();
                       </div>
                     </div>
 
-                    <!-- Hidden Sent From Node Filter -->
                     <div class="flex items-center hidden">
                       <div class="w-full md:w-auto p-1.5">
                         <p class="text-sm font-heading bold">Sent From Node:</p>
@@ -1355,7 +281,6 @@ app.init();
                       </div>
                     </div>
 
-                    <!-- Conditional State Filter -->
                     {% if sent_offers %}
                       <div class="flex items-center">
                         <div class="w-full md:w-auto p-1.5">
@@ -1374,304 +299,149 @@ app.init();
                         </div>
                       </div>
                     {% endif %}
-
-                    <!-- Action Buttons -->
+                    
                     <div class="w-full md:w-auto p-1.5">
                       <div class="relative">
-                        <button type="submit" name='clearfilters' value="Clear Filters" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm hover:text-white dark:text-white dark:bg-gray-500 bg-coolGray-200 hover:bg-green-600 hover:border-green-600 rounded-lg transition duration-200 border border-coolGray-200 dark:border-gray-400 rounded-md shadow-button focus:ring-0 focus:outline-none">
+                        <button type="button" id="clearFilters" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm hover:text-white dark:text-white dark:bg-gray-500 bg-coolGray-200 hover:bg-green-600 hover:border-green-600 rounded-lg transition duration-200 border border-coolGray-200 dark:border-gray-400 rounded-md shadow-button focus:ring-0 focus:outline-none">
                           <span>Clear Filters</span>
                         </button>
                       </div>
                     </div>
-                    <div class="w-full md:w-auto p-1.5">
+                    <div class="w-full md:w-auto hidden p-1.5">
                       <div class="relative">
-                        <button type="submit" name='applyfilters' value="Apply Filters" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-white bg-blue-600 hover:bg-green-600 hover:border-green-600 rounded-lg transition duration-200 border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+                        <button type="submit" id="applyFilters" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-white bg-blue-600 hover:bg-green-600 hover:border-green-600 rounded-lg transition duration-200 border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
                           {{ filter_apply_svg | safe }}
                           <span>Apply Filters</span>
                         </button>
                       </div>
                     </div>
-              </section>
-              <div class="container mt-5 mx-auto">
-                <div class="pt-0 pb-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
-                  <div class="px-0">
-                    <div class="w-auto mt-6 pb-6 overflow-x-auto">
-                      <table class="w-full min-w-max">
-<thead class="uppercase">
-    <tr>
-        <th class="p-0">
-            <div class="py-3 pl-4 justify-center rounded-tl-xl bg-coolGray-200 dark:bg-gray-600">
-                <span class="text-sm mr-1 text-gray-600 dark:text-gray-300 font-semibold">Time</span>
-            </div>
-        </th>
-        <th class="p-0 hidden xl:block">
-            <div class="py-3 px-4 text-left bg-coolGray-200 dark:bg-gray-600">
-                <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Details</span>
-            </div>
-        </th>
-        <th class="p-0">
-            <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-left">
-                <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Max send</span>
-            </div>
-        </th>
-        <th class="p-0">
-            <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-center">
-                <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Swap</span>
-            </div>
-        </th>
-        <th class="p-0">
-            <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-right">
-                <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Max Recv</span>
-            </div>
-        </th>
-        <th class="p-0" data-sortable="true" data-column-index="5">
-            <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-right flex items-center justify-end">
-                <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Rate</span>
-                <span class="sort-icon ml-1 text-gray-600 dark:text-gray-400" id="sort-icon-5">↓</span>
-            </div>
-        </th>
-        <th class="p-0" data-sortable="true" data-column-index="6">
-            <div class="py-3 bg-coolGray-200 dark:bg-gray-600 text-center flex items-center justify-center">
-                <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Market +/-</span>
-                <span class="sort-icon ml-1 text-gray-600 dark:text-gray-400" id="sort-icon-6">↓</span>
-            </div>
-        </th>
-        <th class="p-0">
-            <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 rounded-tr-xl">
-                <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Trade</span>
-            </div>
-        </th>
-    </tr>
-</thead>
-          <tbody>
- {% for o in offers %}
-  <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
-    <!-- TIME + ACTIVE -->
-    <td class="py-3 pl-6 text-xs">
-      <div class="flex items-center">
-        <svg alt="" class="w-5 h-5 rounded-full mr-3" data-tooltip-target="tooltip-active{{loop.index}}" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-          <g stroke-linecap="round" stroke-width="2" fill="none" stroke="{% if o[12]==2 %}#AC0000{% elif o[11]==true %}#6b7280{% else %}#3B82F6{% endif %}" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="11"></circle>
-            <polyline points="12,6 12,12 18,12" stroke="{% if o[12]==2 %}#AC0000{% elif o[11]==true %}#6b7280{% else %}#3B82F6{% endif %}"></polyline>
-          </g>
-        </svg>
-        <div class="flex flex-col hidden xl:block">
-          <div class="{% if o[11]==true or o[12]==2 %}dark:text-white{% endif %} text-xs"><span class="bold">Posted:</span> {{ o[0] }}</div>
-          <div class="{% if o[11]==true or o[12]==2 %}dark:text-white{% endif %} text-xs"><span class="bold">Expires in:</span> {{ o[13] }}</div>
-        </div>
-      </div>
-    </td>
-    <!-- DETAILS -->
-    <td class="py-8 px-4 text-xs text-left hidden xl:block">
-      <div class="network"><span class="bold">Network:</span> <span class="monospace">{{ o[7] }}</span></div>
-      {% if sent_offers %}
-        <div class="partial"><span class="bold">Amount Variable:</span> {{ o[15] }}</div>
-      {% endif %}
-      <a data-tooltip-target="tooltip-recipient{{loop.index}}" href="/identity/{{ o[8] }}{% if o[9]==true %}{% endif %}">
-        <span class="bold">Recipient:</span> {{ o[8]|truncate(10, true, '...', 0) }}
-      </a>
-    </td>
-    {% if o[9] == true %}
-      <!-- YOUR OFFERS - TAKER AMOUNT -->
-      <td class="py-0 px-4 text-left text-sm">
-        <a data-tooltip-target="tooltip-wallet{{loop.index}}" href="/wallet/{{ o[17] }}" class="items-center monospace">
-          <span class="coinname bold w-32" data-coinname="{{ o[3] }}">
-            {{ o[5]|truncate(7, true, '', 0) }}
-            <div class="text-gray-600 dark:text-gray-300 text-xs">{{ o[3] }}</div>
-          </span>
-        </a>
-        <div class="ratetype hidden">
-          <span class="echange-rates" data-coinname="{{ o[3] }}">{{ o[6]|truncate(6,true,'',0) }} {{ o[16] }}/{{ o[17] }}</span>
-          <div class="coinname-value hidden" data-coinname="{{ o[2] }}">{{ o[4]|truncate(6, true, '', 0) }}</div>
-          <div class="usd-value hidden"></div>
-          <div class="usd-value-in-coin-value"></div>
-        </div>
-      </td>
-      <!-- YOUR OFFERS - SWAP -->
-      <td class="py-0 px-0 text-right text-sm">
-        <a data-tooltip-target="tooltip-offer{{loop.index}}" href="/offer/{{ o[1] }}">
-          <div class="flex items-center justify-evenly monospace">
-            <span class="inline-flex mr-3 ml-3 align-middle items-center justify-center w-18 h-20 rounded">
-              <img class="h-12" src="/static/images/coins/{{ o[3]|replace(" ", "-") }}.png" alt="{{ o[3] }}">
-            </span>
-            {{ arrow_right_svg | safe }}
-            <span class="inline-flex ml-3 mr-3 align-middle items-center justify-center w-18 h-20 rounded">
-              <img class="h-12" src="/static/images/coins/{{ o[2]|replace(" ", "-") }}.png" alt="{{ o[2] }}">
-            </span>
-          </div>
-        </a>
-      </td>
-      <!-- YOUR OFFERS - ORDERBOOK -->
-      <td class="py-0 px-4 text-right text-sm">
-        <a data-tooltip-target="tooltip-wallet-maker{{loop.index}}" href="/wallet/{{ o[16] }}" class="items-center monospace">
-          <span class="coinname bold w-32" data-coinname="{{ o[2] }}">
-            {{ o[4]|truncate(7, true, '', 0) }}
-            <div class="text-gray-600 dark:text-gray-300 text-xs">{{ o[2] }}</div>
-          </span>
-        </a>
-        <div class="ratetype italic hidden">
-          <span class="echange-rates" data-coinname="{{ o[2] }}">{{ o[6]|truncate(6,true,'',0) }} {{ o[17] }}/{{ o[16] }}</span>
-          <div class="coinname-value hidden" data-coinname="{{ o[3] }}">{{ o[5]|truncate(7, true, '', 0) }}</div>
-          <div class="usd-value hidden"></div>
-          <div class="usd-value-in-coin-value"></div>
-        </div>
-      </td>
-    {% else %}
-      <!-- NETWORK OFFERS - TAKER AMOUNT -->
-      <td class="py-0 px-4 text-left text-sm">
-        <a data-tooltip-target="tooltip-wallet{{loop.index}}" href="/wallet/{{ o[17] }}" class="items-center monospace">
-          <span class="coinname bold w-32" data-coinname="{{ o[3] }}">
-            {{ o[5]|truncate(7, true, '', 0) }}
-            <div class="text-gray-600 dark:text-gray-300 text-xs">{{ o[3] }}</div>
-          </span>
-          <div class="ratetype hidden">
-            <span class="echange-rates" data-coinname="{{ o[3] }}">{{ o[6]|truncate(6,true,'',0) }} {{ o[16] }}/{{ o[17] }}</span>
-            <div class="coinname-value hidden" data-coinname="{{ o[3] }}">{{ o[5]|truncate(6, true, '', 0) }}</div>
-            <div class="usd-value hidden"></div>
-            <div class="usd-value-in-coin-value"></div>
-          </div>
-        </a>
-      </td>    
-      <!-- NETWORK OFFERS - SWAP -->
-      <td class="py-0 px-0 text-right text-sm">
-        <a data-tooltip-target="tooltip-offer{{loop.index}}" href="/offer/{{ o[1] }}">
-          <div class="flex items-center justify-evenly monospace">
-            <span class="inline-flex mr-3 ml-3 align-middle items-center justify-center w-18 h-20 rounded">
-              <img class="h-12" src="/static/images/coins/{{ o[3]|replace(" ", "-") }}.png" alt="{{ o[3] }}">
-            </span>
-            {{ arrow_right_svg | safe }}
-            <span class="inline-flex ml-3 mr-3 align-middle items-center justify-center w-18 h-20 rounded">
-              <img class="h-12" src="/static/images/coins/{{ o[2]|replace(" ", "-") }}.png" alt="{{ o[2] }}">
-            </span>
-          </div>
-        </a>
-      </td>
-      <!-- NETWORK OFFERS - ORDERBOOK -->
-      <td class="py-0 px-4 text-right text-sm">
-        <a data-tooltip-target="tooltip-wallet-maker{{loop.index}}" href="/wallet/{{ o[16] }}" class="items-center monospace">
-          <span class="coinname bold w-32" data-coinname="{{ o[2] }}">
-            {{ o[4]|truncate(7, true, '', 0) }}
-            <div class="text-gray-600 dark:text-gray-300 text-xs">{{ o[2] }}</div>
-          </span>
-        </a>
-        <div class="ratetype italic hidden">
-          <span class="echange-rates" data-coinname="{{ o[2] }}">{{ o[6]|truncate(6,true,'',0) }} {{ o[17] }}/{{ o[16] }}</span>
-          <div class="coinname-value hidden" data-coinname="{{ o[2] }}">{{ o[4]|truncate(7, true, '', 0) }}</div>
-          <div class="usd-value hidden"></div>
-          <div class="usd-value-in-coin-value"></div>
-        </div>
-      </td>
-    {% endif %}
-    <!-- RATE -->
-    <td class="py-3 pl-6 bold monospace text-sm text-right items-center rate-table-info">
-      <span class="profit-value hidden"></span>
-      <div class="coinname-value hidden" data-coinname="{{ o[3] }}">{{ o[6]|truncate(6, true, '', 0) }}</div>
-      <span class="usd-value"></span><span class="">/{{ o[16] }}</span>
-      <div class="ratetype"><span class="echange-rates" data-coinname="{{ o[2] }}">{{ o[6]|truncate(10,true,'',0) }} {{ o[17] }}/{{ o[16] }}</span></div>
-    </td>
-    <!-- PERCENTAGE -->
-    <td class="py-3 px-2 bold text-sm text-center items-center rate-table-info">
-      <div class="profittype"><span class="profit-loss"></span></div>
-    </td>   
-    <!-- SWAP OR EDIT -->
-    <td class="py-6 px-2 text-center">
-      <div class="flex justify-center items-center h-full">
-        <a class="inline-block w-20 py-1 px-2 font-medium text-center text-sm rounded-md 
-                  {% if sent_offers %}
-                    {% if o[11]==true %}
-                      bg-gray-400 text-white dark:border-gray-300 text-white hover:bg-red-700 transition duration-200
-                    {% else %}
-                      bg-gray-300 bold text-white bold hover:bg-green-600 transition duration-200
-                    {% endif %}
-                  {% else %}
-                    {% if o[9]==true %}
-                      bg-gray-300 text-white dark:border-gray-300 hover:bg-green-600 transition duration-200
-                    {% else %}
-                      bg-blue-500 text-white hover:bg-green-600 transition duration-200
-                    {% endif %}
-                  {% endif %}"
-           href="/offer/{{ o[1] }}">
-          {% if sent_offers %}
-            {% if o[11]==true %}Expired{% else %}Edit{% endif %}
-          {% else %}
-            {% if o[9]==true %}Edit{% else %}Swap{% endif %}
-          {% endif %}
-        </a>
-      </div>
-    </td>
-  </tr>
-  <!-- Tooltips -->
-  <div id="tooltip-active{{loop.index}}" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-green-600 {% if o[11]==true or o[12]==2 %}bg-gray-400{% endif %} rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
-    <div class="active-revoked-expired">
-      <span class="bold">
-        <div class="{% if o[11]==true or o[12]==2 %}dark:text-white{% endif %} text-xs"><span class="bold">Posted:</span> {{ o[0] }}</div>
-        <div class="{% if o[11]==true or o[12]==2 %}dark:text-white{% endif %} text-xs"><span class="bold">Expires in:</span> {{ o[13] }}</div>
-      </span>
-    </div>
-    <div class="tooltip-arrow" data-popper-arrow></div>
-  </div>
-  
-  <div id="tooltip-recipient{{loop.index}}" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
-    <div class="active-revoked-expired"><span class="bold monospace">{{ o[8] }}</span></div>
-    <div class="tooltip-arrow" data-popper-arrow></div>
-  </div>
-  
-  <div id="tooltip-wallet{{loop.index}}" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
-    <div class="active-revoked-expired"><span class="bold">My {{ o[17] }} Wallet</span></div>
-    <div class="tooltip-arrow pl-1" data-popper-arrow></div>
-  </div>
-  
-  <div id="tooltip-offer{{loop.index}}" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white {% if o[9] == true %}bg-gray-300{% else %}bg-green-700{% endif %} rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
-    <div class="active-revoked-expired"><span class="bold">{% if o[9] == true %}Edit Offer{% else %}Buy {{ o[2] }}{% endif %}</span></div>
-    <div class="tooltip-arrow pr-6" data-popper-arrow></div>
-  </div>
-  
-  <div id="tooltip-wallet-maker{{loop.index}}" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
-    <div class="active-revoked-expired"><span class="bold">My {{ o[16] }} Wallet</span></div>
-    <div class="tooltip-arrow pl-1" data-popper-arrow></div>
-  </div>
-{% endfor %}
-          </tbody>
-        </table>
-        <input type="hidden" name="formid" value="{{ form_id }}">
-                      <input type="hidden" name="pageno" value="{{ filters.page_no }}">
+                    <div class="w-full md:w-auto p-1.5">
+                      <div class="relative">
+                        <button type="button" id="refreshOffers" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-white bg-blue-600 hover:bg-green-600 hover:border-green-600 rounded-lg transition duration-200 border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+                          <svg id="refreshIcon" class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                          </svg>
+                          <span id="refreshText">Refresh</span>
+                        </button>
+                      </div>
+                    </div>
+                    <div class="w-full md:w-auto p-1.5">
+                      <div class="relative">
+                        <button id="toggleView" class="hidden flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-white bg-blue-600 hover:bg-green-600 hover:border-green-600 rounded-lg transition duration-200 border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+                          <span>Toggle JSON View</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
-                  <div class="rounded-b-md">
-                      <div class="w-full md:w-0/12">
-                        <div class="flex flex-wrap justify-end pt-6 pr-6 border-t border-gray-100 dark:border-gray-400">
-                          {% if filters.page_no > 1 %}
-                          <div class="w-full md:w-auto p-1.5">
-                              <button type="submit" name='pageback' value="Previous" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-green-600 rounded-lg transition duration-200 focus:ring-0 focus:outline-none">
-                                  {{ page_back_svg | safe }}
-                                  <span>Previous</span>
-                              </button>
-                          </div>
-                          {% endif %}
-                          <div class="flex items-center">
-                              <div class="w-full md:w-auto p-1.5">
-                                  <p class="text-sm font-heading dark:text-white">Page: {{ filters.page_no }}</p>
-                              </div>
-                          </div>
-                          {% if offers_count > 20 %}
-                          <div class="w-full md:w-auto p-1.5">
-                                  <button type="submit" name='pageforwards' value="Next" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-green-600 rounded-lg transition duration-200 focus:ring-0 focus:outline-none">
-                                      <span>Next</span>
-                                      {{ page_forwards_svg | safe }}
-                                  </button>
-                          </div>
-                          {% endif %}
-                        </div>
-                      </div>
-                  </div>
-                  </div>
-            </form>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div id="jsonView" class="hidden mb-4">
+    <pre id="jsonContent" class="bg-gray-100 p-4 rounded overflow-auto" style="max-height: 300px;"></pre>
+  </div>
+  <div class="container mt-5 px-4 mx-auto">
+    <div class="pt-0 py-4 pb-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
+      <div class="px-0">
+        <div class="w-auto mt-6 overflow-x-auto">
+          <div id="tableView">
+            <table id="offers-table" class="w-full min-w-ma">
+              <thead class="uppercase">
+                <tr>
+                  <th class="p-0">
+                    <div class="py-3 pl-4 justify-center rounded-tl-xl bg-coolGray-200 dark:bg-gray-600">
+                      <span class="text-sm mr-1 text-gray-600 dark:text-gray-300 font-semibold">Time</span>
+                    </div>
+                  </th>
+                  <th class="p-0 hidden xl:block">
+                    <div class="py-3 px-4 text-left bg-coolGray-200 dark:bg-gray-600">
+                      <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Details</span>
+                    </div>
+                  </th>
+                  <th class="p-0">
+                    <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-left">
+                      <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Max send</span>
+                    </div>
+                  </th>
+                  <th class="p-0">
+                    <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-center">
+                      <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Swap</span> 
+                    </div>
+                  </th>
+                  <th class="p-0">
+                    <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-right">
+                      <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Max Recv</span> 
+                    </div>
+                  </th>
+                  <th class="p-0" data-sortable="true" data-column-index="5">
+                    <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-right flex items-center justify-end">
+                      <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Rate</span>
+                      <span class="sort-icon ml-1 text-gray-600 dark:text-gray-400" id="sort-icon-5">↓</span> 
+                    </div>
+                  </th>
+                  <th class="p-0" data-sortable="true" data-column-index="6">
+                    <div class="py-3 bg-coolGray-200 dark:bg-gray-600 text-center flex items-center justify-center">
+                      <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Market +/-</span>
+                      <span class="sort-icon ml-1 text-gray-600 dark:text-gray-400" id="sort-icon-6">↓</span> 
+                    </div>
+                  </th>
+                  <th class="p-0">
+                    <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 rounded-tr-xl">
+                      <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Trade</span> 
+                    </div>
+                  </th>
+                </tr>
+              </thead>
+              <tbody id="offers-body">
+
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    
+      <div class="rounded-b-md">
+        <div class="w-full">
+          <div class="flex flex-wrap justify-between items-center pl-6 pt-6 pr-6 border-t border-gray-100 dark:border-gray-400">
+            <div class="flex items-center">
+              <p class="text-sm font-heading dark:text-gray-400 mr-4">Last refreshed:
+                <span id="lastRefreshTime">Never</span>
+              </p>
+              <p class="text-sm font-heading dark:text-gray-400 mr-4">Listings:
+                <span id="newEntriesCount"></span>
+              </p>
+              <p class="text-sm font-heading dark:text-gray-400 mr-4">Next refresh:
+                <span id="nextRefreshTime"></span>
+              </p>
+               <p class="text-sm font-heading dark:text-gray-400">Full refresh:
+                <span id="nextFullRefreshTime"></span>
+              </p>
+            </div>
+            <div class="flex items-center space-x-2">
+              <button type="button" id="prevPage" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-green-600 rounded-lg transition duration-200 focus:ring-0 focus:outline-none">
+                {{ page_back_svg | safe }}
+                <span class="ml-1">Previous</span>
+              </button>
+              <p class="text-sm font-heading dark:text-white">Page:<span class="ml-1" id="currentPage">1</span> of <span id="totalPages">1</span></p>
+              <button type="button" id="nextPage" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-green-600 rounded-lg transition duration-200 focus:ring-0 focus:outline-none">
+                <span class="mr-1">Next</span>{{ page_forwards_svg | safe }}
+              </button>
+            </div>
           </div>
         </div>
       </div>
     </div>
-  </section>
-</div>
-{% include 'footer.html' %}
-</body>
-</html>
+  </div>
+</section>
+
+<input type="hidden" name="formid" value="{{ form_id }}">
+
+<script src="/static/js/offerstable.js"></script>
+ {% include 'footer.html' %}
