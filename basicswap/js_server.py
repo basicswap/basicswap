@@ -230,9 +230,7 @@ def js_offers(self, url_split, post_string, is_json, sent=False) -> bytes:
             'rate': ci_to.format_amount(o.rate),
             'min_bid_amount': ci_from.format_amount(o.min_bid_amount),
             'is_expired': o.expire_at <= swap_client.getTime(),
-            'is_own_offer': o.was_sent,
-            'amount_variable': o.amount_negotiable,
-            'rate_variable': o.rate_negotiable
+            'is_own_offer': o.was_sent
         }
         if with_extra_info:
             offer_data['amount_negotiable'] = o.amount_negotiable

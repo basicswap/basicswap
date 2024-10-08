@@ -1220,7 +1220,6 @@ function createDetailsColumn(offer) {
       <a data-tooltip-target="tooltip-recipient${escapeHtml(offer.offer_id)}" href="/identity/${escapeHtml(addrFrom)}">
         <span class="bold">Recipient:</span> ${escapeHtml(addrFrom.substring(0, 10))}...
       </a>
-      <div class="partial hidden"><span class="bold">Amount Variable:</span> ${amountVariable ? 'Yes' : 'No'}</div>
     </td>
   `;
 }
