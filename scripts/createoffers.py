@@ -31,7 +31,7 @@ Create offers
             "enabled": Set to false to ignore offer template.
             "swap_type": Type of swap, defaults to "adaptor_sig"
             "min_swap_amount": Sets "amt_bid_min" on the offer, minimum valid bid when offer amount is variable.
-            "min_amount": If set offers will be created for amounts between "min_coin_from_amt" and "amount" in increments of "min_amount".
+            "amount_step": If set offers will be created for amount values between "amount" and "min_coin_from_amt" in decrements of "amount_step".
         },
         ...
     ],
@@ -168,7 +168,7 @@ def readConfig(args, known_coins):
             num_changes += 1
         offer_templates_map[offer_template['name']] = offer_template
 
-        min_offer_amount: float = float(offer_template.get('min_amount', offer_template['amount']))
+        min_offer_amount: float = float(offer_template.get('amount_step', offer_template['amount']))
         if float(offer_template.get('min_coin_from_amt', 0)) < min_offer_amount:
             print('Setting min_coin_from_amt for', offer_template['name'])
             offer_template['min_coin_from_amt'] = min_offer_amount
@@ -330,7 +330,7 @@ def main():
                     continue
 
                 max_offer_amount: float = offer_template['amount']
-                min_offer_amount: float = offer_template.get('min_amount', max_offer_amount)
+                min_offer_amount: float = offer_template.get('amount_step', max_offer_amount)
                 wallet_balance: float = float(wallet_from['balance'])
                 min_wallet_from_amount: float = float(offer_template['min_coin_from_amt'])
                 if wallet_balance - min_offer_amount <= min_wallet_from_amount:
