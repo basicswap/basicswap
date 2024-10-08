@@ -560,7 +560,7 @@ class Test(unittest.TestCase):
         rv_stdout = result.stdout.decode().split('\n')
         '''
 
-    def test_offer_min_amount(self):
+    def test_offer_amount_step(self):
         waitForServer(self.delay_event, UI_PORT + 0)
         waitForServer(self.delay_event, UI_PORT + 1)
 
@@ -587,9 +587,9 @@ class Test(unittest.TestCase):
             }
             json_rv = read_json_api(UI_PORT + 1, 'wallets/xmr/withdraw', post_json)
             assert (len(json_rv['txid']) == 64)
-            wait_for_balance(self.delay_event, f'http://127.0.0.1:{UI_PORT + 1}/json/wallets/xmr', 'balance', expect_balance)
+            wait_for_balance(self.delay_event, f'http://127.0.0.1:{UI_PORT + 0}/json/wallets/xmr', 'balance', expect_balance)
 
-            xmr_wallet_balance = read_json_api(UI_PORT + 0, 'wallets/xmr')['balance']
+            xmr_wallet_balance = float(read_json_api(UI_PORT + 0, 'wallets/xmr')['balance'])
 
         assert (xmr_wallet_balance > offer_min_amount)
         assert (xmr_wallet_balance < offer_amount)
@@ -601,7 +601,7 @@ class Test(unittest.TestCase):
                     'coin_from': 'XMR',
                     'coin_to': 'Particl',
                     'amount': offer_amount,
-                    'min_amount': offer_min_amount,
+                    'amount_step': offer_min_amount,
                     'minrate': 0.05,
                     'amount_variable': True,
                     'address': -1,
