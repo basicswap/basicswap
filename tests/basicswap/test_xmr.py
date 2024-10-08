@@ -847,50 +847,6 @@ class Test(BaseTest):
         assert (expect_size >= actual_size)
         assert (expect_size - actual_size < 100)  # TODO
 
-    def test_01_part_xmr(self):
-        logging.info('---------- Test PART to XMR')
-        swap_clients = self.swap_clients
-
-        start_xmr_amount = self.getXmrBalance(read_json_api(1800, 'wallets'))
-        js_1 = read_json_api(1801, 'wallets')
-        assert (self.getXmrBalance(js_1) > 0.0)
-
-        offer_id = swap_clients[0].postOffer(Coins.PART, Coins.XMR, 100 * COIN, 0.11 * XMR_COIN, 100 * COIN, SwapTypes.XMR_SWAP)
-        wait_for_offer(test_delay_event, swap_clients[1], offer_id)
-        offers = swap_clients[1].listOffers(filters={'offer_id': offer_id})
-        assert (len(offers) == 1)
-        offer = offers[0]
-
-        bid_id = swap_clients[1].postXmrBid(offer_id, offer.amount_from)
-
-        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.BID_RECEIVED)
-
-        bid, xmr_swap = swap_clients[0].getXmrBid(bid_id)
-        assert (xmr_swap)
-
-        swap_clients[0].acceptXmrBid(bid_id)
-
-        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=180)
-        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True)
-
-        js_0_end = read_json_api(1800, 'wallets')
-        end_xmr_amount = self.getXmrBalance(js_0_end)
-        xmr_amount_diff = end_xmr_amount - start_xmr_amount
-        assert (xmr_amount_diff > 10.9 and xmr_amount_diff < 11.0)
-
-        bid_id_hex = bid_id.hex()
-        path = f'bids/{bid_id_hex}/states'
-        offerer_states = read_json_api(1800, path)
-        bidder_states = read_json_api(1801, path)
-
-        assert (compare_bid_states(offerer_states, self.states_offerer[0]) is True)
-        assert (compare_bid_states(bidder_states, self.states_bidder[0]) is True)
-
-        # Test remove_expired_data
-        remove_expired_data(swap_clients[0], -swap_clients[0]._expire_db_records_after * 2)
-        offers = swap_clients[0].listOffers(filters={'offer_id': offer_id})
-        assert (len(offers) == 0)
-
     def test_011_smsgaddresses(self):
         logging.info('---------- Test address management and private offers')
         swap_clients = self.swap_clients
@@ -996,6 +952,50 @@ class Test(BaseTest):
         # Disable all
         json_rv = read_json_api(1800, 'smsgaddresses/disableall')
         assert (json_rv['num_disabled'] >= 1)
+
+    def test_01_part_xmr(self):
+        logging.info('---------- Test PART to XMR')
+        swap_clients = self.swap_clients
+
+        start_xmr_amount = self.getXmrBalance(read_json_api(1800, 'wallets'))
+        js_1 = read_json_api(1801, 'wallets')
+        assert (self.getXmrBalance(js_1) > 0.0)
+
+        offer_id = swap_clients[0].postOffer(Coins.PART, Coins.XMR, 100 * COIN, 0.11 * XMR_COIN, 100 * COIN, SwapTypes.XMR_SWAP)
+        wait_for_offer(test_delay_event, swap_clients[1], offer_id)
+        offers = swap_clients[1].listOffers(filters={'offer_id': offer_id})
+        assert (len(offers) == 1)
+        offer = offers[0]
+
+        bid_id = swap_clients[1].postXmrBid(offer_id, offer.amount_from)
+
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.BID_RECEIVED)
+
+        bid, xmr_swap = swap_clients[0].getXmrBid(bid_id)
+        assert (xmr_swap)
+
+        swap_clients[0].acceptXmrBid(bid_id)
+
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=180)
+        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True)
+
+        js_0_end = read_json_api(1800, 'wallets')
+        end_xmr_amount = self.getXmrBalance(js_0_end)
+        xmr_amount_diff = end_xmr_amount - start_xmr_amount
+        assert (xmr_amount_diff > 10.9 and xmr_amount_diff < 11.0)
+
+        bid_id_hex = bid_id.hex()
+        path = f'bids/{bid_id_hex}/states'
+        offerer_states = read_json_api(1800, path)
+        bidder_states = read_json_api(1801, path)
+
+        assert (compare_bid_states(offerer_states, self.states_offerer[0]) is True)
+        assert (compare_bid_states(bidder_states, self.states_bidder[0]) is True)
+
+        # Test remove_expired_data
+        remove_expired_data(swap_clients[0], -swap_clients[0]._expire_db_records_after * 2)
+        offers = swap_clients[0].listOffers(filters={'offer_id': offer_id})
+        assert (len(offers) == 0)
 
     def test_02_leader_recover_a_lock_tx(self):
         logging.info('---------- Test PART to XMR leader recovers coin a lock tx')
@@ -1585,6 +1585,32 @@ class Test(BaseTest):
         assert (first_subaddress != second_subaddress)
         assert (first_subaddress != current_subaddress)
         assert (second_subaddress != current_subaddress)
+
+    def test_17_edit_bid_state(self):
+        logging.info('---------- Test manually changing the state of a bid')
+        # Stall the bid by setting a debug token.  Once it's stalled, clear the debug token and fix the bid state.
+        swap_clients = self.swap_clients
+
+        amt_swap = make_int(random.uniform(0.1, 10.0), scale=8, r=1)
+        rate_swap = make_int(random.uniform(2.0, 20.0), scale=12, r=1)
+        offer_id = swap_clients[0].postOffer(Coins.PART, Coins.XMR, amt_swap, rate_swap, amt_swap, SwapTypes.XMR_SWAP)
+
+        wait_for_offer(test_delay_event, swap_clients[1], offer_id)
+        bid_id = swap_clients[1].postXmrBid(offer_id, amt_swap)
+        swap_clients[1].setBidDebugInd(bid_id, DebugTypes.BID_STOP_AFTER_COIN_A_LOCK)
+
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.BID_RECEIVED)
+        swap_clients[0].acceptXmrBid(bid_id)
+
+        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.BID_STALLED_FOR_TEST, sent=True, wait_for=90)
+        data = {
+            'debug_ind': int(DebugTypes.NONE),
+            'bid_state': int(BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX),
+        }
+        swap_clients[1].manualBidUpdate(bid_id, data)
+
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=180)
+        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True)
 
     def test_97_withdraw_all(self):
         logging.info('---------- Test XMR withdrawal all')

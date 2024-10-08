@@ -6623,13 +6623,13 @@ class BasicSwap(BaseApp):
         except Exception as ex:
             self.logException(f'update {ex}')
 
-    def manualBidUpdate(self, bid_id: bytes, data):
+    def manualBidUpdate(self, bid_id: bytes, data) -> None:
         self.log.info('Manually updating bid %s', bid_id.hex())
-        self.mxDB.acquire()
 
         add_bid_action = -1
         try:
-            bid, offer = self.getBidAndOffer(bid_id)
+            session = self.openSession()
+            bid, offer = self.getBidAndOffer(bid_id, session)
             ensure(bid, 'Bid not found {}'.format(bid_id.hex()))
             ensure(offer, 'Offer not found {}'.format(bid.offer_id.hex()))
 
@@ -6639,47 +6639,43 @@ class BasicSwap(BaseApp):
                 self.log.warning('Set state to %s', strBidState(bid.state))
                 has_changed = True
 
-            if data['bid_action'] != -1:
+            if data.get('bid_action', -1) != -1:
                 self.log.warning('Adding action', ActionTypes(data['bid_action']).name)
                 add_bid_action = ActionTypes(data['bid_action'])
                 has_changed = True
 
-            if bid.debug_ind != data['debug_ind']:
-                if bid.debug_ind is None and data['debug_ind'] == -1:
-                    pass  # Already unset
-                else:
-                    self.log.debug('Bid %s Setting debug flag: %s', bid_id.hex(), data['debug_ind'])
-                    bid.debug_ind = data['debug_ind']
-                    has_changed = True
+            if 'debug_ind' in data:
+                if bid.debug_ind != data['debug_ind']:
+                    if bid.debug_ind is None and data['debug_ind'] == -1:
+                        pass  # Already unset
+                    else:
+                        self.log.debug('Bid %s Setting debug flag: %s', bid_id.hex(), data['debug_ind'])
+                        bid.debug_ind = data['debug_ind']
+                        has_changed = True
 
-            if data['kbs_other'] is not None:
+            if data.get('kbs_other', None) is not None:
                 return xmr_swap_1.recoverNoScriptTxnWithKey(self, bid_id, data['kbs_other'])
 
             if has_changed:
-                session = scoped_session(self.session_factory)
-                try:
-                    activate_bid = False
-                    if bid.state and isActiveBidState(bid.state):
-                        activate_bid = True
+                activate_bid = False
+                if bid.state and isActiveBidState(bid.state):
+                    activate_bid = True
 
-                    if add_bid_action > -1:
-                        delay = self.get_delay_event_seconds()
-                        self.createActionInSession(delay, add_bid_action, bid_id, session)
+                if add_bid_action > -1:
+                    delay = self.get_delay_event_seconds()
+                    self.createActionInSession(delay, add_bid_action, bid_id, session)
 
-                    if activate_bid:
-                        self.activateBid(session, bid)
-                    else:
-                        self.deactivateBid(session, offer, bid)
+                if activate_bid:
+                    self.activateBid(session, bid)
+                else:
+                    self.deactivateBid(session, offer, bid)
 
-                    self.saveBidInSession(bid_id, bid, session)
-                    session.commit()
-                finally:
-                    session.close()
-                    session.remove()
+                self.saveBidInSession(bid_id, bid, session)
+                session.commit()
             else:
                 raise ValueError('No changes')
         finally:
-            self.mxDB.release()
+            self.closeSession(session, commit=False)
 
     def editGeneralSettings(self, data):
         self.log.info('Updating general settings')
