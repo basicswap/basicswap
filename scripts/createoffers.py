@@ -16,7 +16,7 @@ Create offers
     "wallet_port_override": Used for testing.
     "offers": [
         {
-            "name": Offer tenplate name, eg "Offer 0", will be automatically renamed if not unique.
+            "name": Offer template name, eg "Offer 0", will be automatically renamed if not unique.
             "coin_from": Coin you send.
             "coin_to": Coin you receive.
             "amount": Amount to create the offer for.
