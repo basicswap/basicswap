@@ -35,7 +35,7 @@ from tests.basicswap.common import (
 from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
 
 import basicswap.config as cfg
-import bin.basicswap_run as runSystem
+import basicswap.bin.run as runSystem
 
 TEST_PATH = os.path.expanduser(os.getenv('TEST_PATH', '~/test_basicswap1'))
 
@@ -104,7 +104,7 @@ def run_prepare(node_id, datadir_path, bins_path, with_coins, mnemonic_in=None, 
 
     os.environ['DCR_RPC_PWD'] = 'dcr_pwd'
 
-    import bin.basicswap_prepare as prepareSystem
+    import basicswap.bin.prepare as prepareSystem
     # Hack: Reload module to set env vars as the basicswap_prepare module is initialised if imported from elsewhere earlier
     from importlib import reload
     prepareSystem = reload(prepareSystem)

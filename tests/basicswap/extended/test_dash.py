@@ -68,7 +68,7 @@ from tests.basicswap.common import (
     PREFIX_SECRET_KEY_REGTEST,
     waitForRPC,
 )
-from bin.basicswap_run import startDaemon
+from basicswap.bin.run import startDaemon
 
 
 logger = logging.getLogger()

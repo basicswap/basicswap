@@ -34,7 +34,7 @@ from tests.basicswap.util import (
 from tests.basicswap.common_xmr import (
     run_prepare,
 )
-import bin.basicswap_run as runSystem
+import basicswap.bin.run as runSystem
 
 TEST_PATH = os.path.expanduser(os.getenv('TEST_PATH', '~/test_basicswap1'))
 

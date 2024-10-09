@@ -143,7 +143,7 @@
        #:phases (modify-phases %standard-phases
                   (add-after 'unpack 'patch-env
                     (lambda* (#:key inputs #:allow-other-keys)
-                      (substitute* "bin/basicswap_prepare.py"
+                      (substitute* "basicswap/bin/prepare.py"
                         (("GUIX_SSL_CERT_DIR = None")
                          (string-append "GUIX_SSL_CERT_DIR = \"" (search-input-directory inputs "etc/ssl/certs") "\""))))))))
   (propagated-inputs

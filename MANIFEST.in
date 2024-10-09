@@ -1,7 +1,0 @@
-include *.md LICENSE
-
-recursive-include doc *
-recursive-include pgp *
-recursive-include basicswap/templates *
-recursive-include basicswap/static *
-recursive-include basicswap/contrib/mnemonic/wordlist *

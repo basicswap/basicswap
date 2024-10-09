@@ -44,7 +44,7 @@ from basicswap.rpc import (
     callrpc,
 )
 from tests.basicswap.mnemonics import mnemonics
-import bin.basicswap_run as runSystem
+import basicswap.bin.run as runSystem
 from tests.basicswap.common import (
     BTC_BASE_RPC_PORT,
     LTC_BASE_RPC_PORT,

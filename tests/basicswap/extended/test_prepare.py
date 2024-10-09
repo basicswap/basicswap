@@ -39,7 +39,7 @@ def start_prepare(args, env_pairs=[]):
     for pair in env_pairs:
         os.environ[pair[0]] = pair[1]
         print(pair[0], os.environ[pair[0]])
-    import bin.basicswap_prepare as prepareSystemThread
+    import basicswap.bin.prepare as prepareSystemThread
     with patch.object(sys, 'argv', args):
         prepareSystemThread.main()
     del prepareSystemThread
@@ -49,7 +49,7 @@ def start_run(args, env_pairs=[]):
     for pair in env_pairs:
         os.environ[pair[0]] = pair[1]
         print(pair[0], os.environ[pair[0]])
-    import bin.basicswap_run as runSystemThread
+    import basicswap.bin.run as runSystemThread
     with patch.object(sys, 'argv', args):
         runSystemThread.main()
     del runSystemThread
@@ -81,7 +81,7 @@ class Test(unittest.TestCase):
         config_path = os.path.join(test_path_plain, cfg.CONFIG_FILENAME)
         self.assertTrue(os.path.exists(config_path))
 
-        import bin.basicswap_prepare as prepareSystem
+        import basicswap.bin.prepare as prepareSystem
         try:
             logging.info('Test no overwrite')
             testargs = ['basicswap-prepare', '-datadir=' + test_path_plain, '-withcoin=litecoin']

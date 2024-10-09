@@ -50,7 +50,7 @@ from tests.basicswap.common_xmr import (
     XMR_BASE_RPC_PORT,
 )
 from basicswap.interface.dcr.rpc import callrpc as callrpc_dcr
-import bin.basicswap_run as runSystem
+import basicswap.bin.run as runSystem
 
 
 test_path = os.path.expanduser(os.getenv('TEST_PATH', '/tmp/test_persistent'))
