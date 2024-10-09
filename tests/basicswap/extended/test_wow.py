@@ -20,7 +20,7 @@ from tests.basicswap.common import (
     stopDaemons,
 )
 from tests.basicswap.test_xmr import BaseTest
-from bin.basicswap_run import startXmrDaemon, startXmrWalletDaemon
+from basicswap.bin.run import startXmrDaemon, startXmrWalletDaemon
 
 from tests.basicswap.extended.test_dcr import (
     run_test_ads_success_path,

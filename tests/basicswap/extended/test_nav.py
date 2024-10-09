@@ -58,7 +58,7 @@ from basicswap.interface.contrib.nav_test_framework.script import (
     OP_CHECKSEQUENCEVERIFY
 )
 
-from bin.basicswap_run import startDaemon
+from basicswap.bin.run import startDaemon
 from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
 from tests.basicswap.test_xmr import test_delay_event, callnoderpc
 from basicswap.contrib.mnemonic import Mnemonic

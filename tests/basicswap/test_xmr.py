@@ -91,7 +91,7 @@ from tests.basicswap.common import (
 from basicswap.db_util import (
     remove_expired_data,
 )
-from bin.basicswap_run import startDaemon, startXmrDaemon, startXmrWalletDaemon
+from basicswap.bin.run import startDaemon, startXmrDaemon, startXmrWalletDaemon
 
 
 logger = logging.getLogger()

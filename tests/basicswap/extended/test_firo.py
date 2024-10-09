@@ -43,7 +43,7 @@ from basicswap.interface.contrib.firo_test_framework.mininode import (
     CTransaction,
     set_regtest,
 )
-from bin.basicswap_run import startDaemon
+from basicswap.bin.run import startDaemon
 from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
 from tests.basicswap.test_xmr import BaseTest, test_delay_event, callnoderpc
 

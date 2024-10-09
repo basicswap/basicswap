@@ -68,8 +68,8 @@ from tests.basicswap.common import (
     PREFIX_SECRET_KEY_REGTEST,
     waitForRPC,
 )
-from bin.basicswap_run import startDaemon
-from bin.basicswap_prepare import downloadPIVXParams
+from basicswap.bin.run import startDaemon
+from basicswap.bin.prepare import downloadPIVXParams
 
 
 logger = logging.getLogger()
