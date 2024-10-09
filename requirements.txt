@@ -5,3 +5,4 @@ python-gnupg
 Jinja2
 pycryptodome
 PySocks
+git+https://github.com/basicswap/coincurve@basicswap_v0.2

@@ -39,7 +39,7 @@ from tests.basicswap.common import (
 from tests.basicswap.common_xmr import (
     prepare_nodes,
 )
-import bin.basicswap_run as runSystem
+import basicswap.bin.run as runSystem
 
 TEST_PATH = os.path.expanduser(os.getenv('TEST_PATH', '~/test_basicswap1'))
 delay_event = threading.Event()

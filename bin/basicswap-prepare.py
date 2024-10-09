@@ -1,1 +1,1 @@
-basicswap_prepare.py
+../basicswap/bin/prepare.py

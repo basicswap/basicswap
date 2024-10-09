@@ -1,1 +1,1 @@
-basicswap_run.py
+../basicswap/bin/run.py
