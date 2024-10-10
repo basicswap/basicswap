@@ -95,7 +95,7 @@ Install basicswap
 
     git clone https://github.com/basicswap/basicswap.git
     cd basicswap
-    pip3 install .
+    pip3 install -r requirements.txt --require-hashes && pip3 install .
 
 
 Test:

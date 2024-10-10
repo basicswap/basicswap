@@ -172,9 +172,9 @@ From https://pypi.org/project/certifi/
     sudo python3 bin/install_certifi.py
 
 
-Continue installing Basicswap
+Continue installing dependencies and Basicswap.
 
-    pip3 install .
+    pip3 install -r requirements.txt --require-hashes && pip3 install .
 
 
 Prepare the datadir:
