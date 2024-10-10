@@ -103,11 +103,6 @@ Test:
     basicswap-prepare.exe --help
 
 
-## Run One Test
-
-    pytest -v -s tests/basicswap/test_xmr.py::Test::test_02_leader_recover_a_lock_tx
-
-
 ## Private Offers
 
 To send a private offer:
