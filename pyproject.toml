@@ -8,22 +8,21 @@ description = "Simple atomic swap system"
 keywords = ["crypto", "cryptocurrency", "particl", "bitcoin", "monero", "wownero"]
 readme = "README.md"
 license = {file = "LICENSE"}
-requires-python = ">=3.8"
-dependencies = [
-    "wheel",
-    "pyzmq",
-    "sqlalchemy==1.4.39",
-    "python-gnupg",
-    "Jinja2",
-    "pycryptodome",
-    "PySocks",
-    "coincurve@git+https://github.com/basicswap/coincurve@basicswap_v0.2"
-]
+requires-python = ">=3.9"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Topic :: Security :: Cryptography",
+]
+dependencies = [
+    "pyzmq==26.2.0",
+    "sqlalchemy==1.4.39",
+    "python-gnupg==0.5.3",
+    "Jinja2==3.1.4",
+    "pycryptodome==3.21.0",
+    "PySocks==1.7.1",
+    "coincurve@https://github.com/basicswap/coincurve/archive/refs/tags/basicswap_v0.2.zip#sha256=c309deef22c929c9ab5b3adf7adbda940bffcea6c6ec7c66202d6c3d4e3ceb79"
 ]
 dynamic = ["version"]
 
@@ -35,6 +34,13 @@ Source = "https://github.com/basicswap/basicswap"
 basicswap-prepare = "basicswap.bin.prepare:main"
 basicswap-run = "basicswap.bin.run:main"
 
+[project.optional-dependencies]
+dev = [
+    "codespell",
+    "flake8",
+    "hashin",
+    "pytest",
+]
 
 [tool.hatch.version]
 path = "basicswap/__init__.py"
