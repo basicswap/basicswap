@@ -1,3 +1,4 @@
 eventtypes
 wit
 ro
+hashin

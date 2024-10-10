@@ -5,11 +5,11 @@ ENV LANG=C.UTF-8 \
     DATADIRS="/coindata"
 
 RUN apt-get update; \
-    apt-get install -y git python3-pip gnupg make g++ autoconf automake libtool pkg-config gosu tzdata;
+    apt-get install -y python3-pip pkg-config gosu tzdata;
 
 # Install requirements first so as to skip in subsequent rebuilds
 COPY ./requirements.txt requirements.txt
-RUN pip3 install -r requirements.txt
+RUN pip3 install -r requirements.txt --require-hashes
 
 COPY . basicswap-master
 RUN cd basicswap-master; \
