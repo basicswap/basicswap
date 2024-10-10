@@ -37,7 +37,7 @@ from basicswap.ui.util import getCoinName
 from basicswap.util import toBool
 from basicswap.util.network import urlretrieve, make_reporthook
 from basicswap.util.rfc2440 import rfc2440_hash_password
-from bin.basicswap_run import startDaemon, startXmrWalletDaemon
+from basicswap.bin.run import startDaemon, startXmrWalletDaemon
 
 PARTICL_VERSION = os.getenv('PARTICL_VERSION', '23.2.7.0')
 PARTICL_VERSION_TAG = os.getenv('PARTICL_VERSION_TAG', '')

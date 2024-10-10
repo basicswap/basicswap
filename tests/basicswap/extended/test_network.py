@@ -58,7 +58,7 @@ from tests.basicswap.common import (
     waitForRPC,
 )
 
-from bin.basicswap_run import startDaemon
+from basicswap.bin.run import startDaemon
 
 
 logger = logging.getLogger()

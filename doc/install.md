@@ -160,11 +160,6 @@ Close the terminal and open a new one to update the python symlinks.
     export SWAP_DATADIR=$HOME/coinswaps
     python3 -m venv "$SWAP_DATADIR/venv"
     . $SWAP_DATADIR/venv/bin/activate && python -V
-    cd $SWAP_DATADIR
-    git clone https://github.com/basicswap/coincurve.git -b basicswap_v0.2 coincurve-basicswap
-    cd $SWAP_DATADIR/coincurve-basicswap
-    pip3 install .
-
 
     cd $SWAP_DATADIR
     git clone https://github.com/basicswap/basicswap.git
@@ -177,10 +172,9 @@ From https://pypi.org/project/certifi/
     sudo python3 bin/install_certifi.py
 
 
-Continue installing Basicswap
+Continue installing dependencies and Basicswap.
 
-    pip3 install wheel
-    pip3 install .
+    pip3 install -r requirements.txt --require-hashes && pip3 install .
 
 
 Prepare the datadir:

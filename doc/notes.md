@@ -91,30 +91,16 @@ Create and activate a venv
     python -m venv c:\bsx_venv
     c:/bsx_venv/scripts/activate
 
-
-Install coincurve
-
-    git clone https://github.com/basicswap/coincurve.git -b basicswap_v0.2 coincurve-basicswap
-    cd coincurve-basicswap
-    pip3 install .
-
-
 Install basicswap
 
     git clone https://github.com/basicswap/basicswap.git
     cd basicswap
-    pip3 install wheel
-    pip3 install .
+    pip3 install -r requirements.txt --require-hashes && pip3 install .
 
 
 Test:
 
     basicswap-prepare.exe --help
-
-
-## Run One Test
-
-    pytest -v -s tests/basicswap/test_xmr.py::Test::test_02_leader_recover_a_lock_tx
 
 
 ## Private Offers

@@ -3,8 +3,7 @@ container:
 
 lint_task:
   setup_script:
-    - pip install flake8
-    - pip install codespell
+    - pip install flake8 codespell
   script:
     - flake8 --version
     - PYTHONWARNINGS="ignore" flake8 --ignore=E501,F841,W503 --exclude=basicswap/contrib,basicswap/interface/contrib,messages_pb2.py,.eggs,.tox,bin/install_certifi.py
@@ -21,11 +20,8 @@ test_task:
     - XMR_BINDIR: ${BIN_DIR}/monero
   setup_script:
     - apt-get update
-    - apt-get install -y git python3-pip gnupg automake libtool pkg-config
-    - pip install tox pytest wheel
-    - python3 setup.py install
-    - git clone https://github.com/basicswap/coincurve.git -b basicswap_v0.2 coincurve-basicswap
-    - cd coincurve-basicswap
+    - apt-get install -y python3-pip pkg-config
+    - pip install tox pytest
     - pip install .
   bins_cache:
     folder: /tmp/cached_bin
