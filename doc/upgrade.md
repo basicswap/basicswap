@@ -41,7 +41,7 @@ If updating from versions below 0.21, you may need to add `wallet=wallet.dat` to
     $ . $SWAP_DATADIR/venv/bin/activate && python -V
     $ cd $SWAP_DATADIR/basicswap
     $ git pull
-    $ pip3 install .
+    $ pip3 install -r requirements.txt --require-hashes && pip3 install .
 
 
 #### Update core versions
