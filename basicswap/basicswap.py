@@ -25,6 +25,7 @@ import concurrent.futures
 
 from typing import Optional
 
+from sqlalchemy.sql import text
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.orm.session import close_all_sessions
 
@@ -1113,7 +1114,7 @@ class BasicSwap(BaseApp):
             coin_id = int(coin_type)
             info_type = 1  # wallet
             query_str = f'DELETE FROM wallets WHERE coin_id = {coin_id} AND balance_type = {info_type}'
-            session.execute(query_str)
+            session.execute(text(query_str))
         finally:
             self.closeSession(session)
 
@@ -1176,7 +1177,7 @@ class BasicSwap(BaseApp):
     def clearStringKV(self, str_key: str, session=None) -> None:
         try:
             use_session = self.openSession(session)
-            use_session.execute('DELETE FROM kv_string WHERE key = :key', {'key': str_key})
+            use_session.execute(text('DELETE FROM kv_string WHERE key = :key'), {'key': str_key})
         finally:
             if session is None:
                 self.closeSession(use_session)
@@ -1280,10 +1281,10 @@ class BasicSwap(BaseApp):
             use_session = self.openSession(session)
 
             # Remove any delayed events
+            query: str = 'DELETE FROM actions WHERE linked_id = x\'{}\' '.format(bid.bid_id.hex())
             if self.debug:
-                use_session.execute('UPDATE actions SET active_ind = 2 WHERE linked_id = x\'{}\' '.format(bid.bid_id.hex()))
-            else:
-                use_session.execute('DELETE FROM actions WHERE linked_id = x\'{}\' '.format(bid.bid_id.hex()))
+                query = 'UPDATE actions SET active_ind = 2 WHERE linked_id = x\'{}\' '.format(bid.bid_id.hex())
+            use_session.execute(text(query))
 
             reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from)
             # Unlock locked inputs (TODO)
@@ -1407,7 +1408,7 @@ class BasicSwap(BaseApp):
                 event_data=bytes(json.dumps(event_data), 'UTF-8'),
             ))
 
-            use_session.execute(f'DELETE FROM notifications WHERE record_id NOT IN (SELECT record_id FROM notifications WHERE active_ind=1 ORDER BY created_at ASC LIMIT {self._keep_notifications})')
+            use_session.execute(text(f'DELETE FROM notifications WHERE record_id NOT IN (SELECT record_id FROM notifications WHERE active_ind=1 ORDER BY created_at ASC LIMIT {self._keep_notifications})'))
 
             if show_event:
                 self._notifications_cache[now] = (event_type, event_data)
@@ -1421,7 +1422,7 @@ class BasicSwap(BaseApp):
 
     def buildNotificationsCache(self, session):
         self._notifications_cache.clear()
-        q = session.execute(f'SELECT created_at, event_type, event_data FROM notifications WHERE active_ind = 1 ORDER BY created_at ASC LIMIT {self._show_notifications}')
+        q = session.execute(text(f'SELECT created_at, event_type, event_data FROM notifications WHERE active_ind = 1 ORDER BY created_at ASC LIMIT {self._show_notifications}'))
         for entry in q:
             self._notifications_cache[entry[0]] = (entry[1], json.loads(entry[2].decode('UTF-8')))
 
@@ -1439,12 +1440,12 @@ class BasicSwap(BaseApp):
         try:
             now: int = self.getTime()
             session = self.openSession()
-            q = session.execute('SELECT COUNT(*) FROM knownidentities WHERE address = :address', {'address': address}).first()
+            q = session.execute(text('SELECT COUNT(*) FROM knownidentities WHERE address = :address'), {'address': address}).first()
             if q[0] < 1:
-                session.execute('INSERT INTO knownidentities (active_ind, address, created_at) VALUES (1, :address, :now)', {'address': address, 'now': now})
+                session.execute(text('INSERT INTO knownidentities (active_ind, address, created_at) VALUES (1, :address, :now)'), {'address': address, 'now': now})
 
             if 'label' in data:
-                session.execute('UPDATE knownidentities SET label = :label WHERE address = :address', {'address': address, 'label': data['label']})
+                session.execute(text('UPDATE knownidentities SET label = :label WHERE address = :address'), {'address': address, 'label': data['label']})
 
             if 'automation_override' in data:
                 new_value: int = 0
@@ -1465,7 +1466,7 @@ class BasicSwap(BaseApp):
                 else:
                     raise ValueError('Unknown automation_override type')
 
-                session.execute('UPDATE knownidentities SET automation_override = :new_value WHERE address = :address', {'address': address, 'new_value': new_value})
+                session.execute(text('UPDATE knownidentities SET automation_override = :new_value WHERE address = :address'), {'address': address, 'new_value': new_value})
 
             if 'visibility_override' in data:
                 new_value: int = 0
@@ -1486,10 +1487,10 @@ class BasicSwap(BaseApp):
                 else:
                     raise ValueError('Unknown visibility_override type')
 
-                session.execute('UPDATE knownidentities SET visibility_override = :new_value WHERE address = :address', {'address': address, 'new_value': new_value})
+                session.execute(text('UPDATE knownidentities SET visibility_override = :new_value WHERE address = :address'), {'address': address, 'new_value': new_value})
 
             if 'note' in data:
-                session.execute('UPDATE knownidentities SET note = :note WHERE address = :address', {'address': address, 'note': data['note']})
+                session.execute(text('UPDATE knownidentities SET note = :note WHERE address = :address'), {'address': address, 'note': data['note']})
 
         finally:
             self.closeSession(session)
@@ -1519,7 +1520,7 @@ class BasicSwap(BaseApp):
             if offset is not None:
                 query_str += f' OFFSET {offset}'
 
-            q = session.execute(query_str)
+            q = session.execute(text(query_str))
             rv = []
             for row in q:
                 identity = {
@@ -1543,7 +1544,7 @@ class BasicSwap(BaseApp):
     def vacuumDB(self):
         try:
             session = self.openSession()
-            return session.execute('VACUUM')
+            return session.execute(text('VACUUM'))
         finally:
             self.closeSession(session)
 
@@ -2180,7 +2181,7 @@ class BasicSwap(BaseApp):
 
     def getNewContractId(self, session):
         self._contract_count += 1
-        session.execute('UPDATE kv_int SET value = :value WHERE KEY="contract_count"', {'value': self._contract_count})
+        session.execute(text('UPDATE kv_int SET value = :value WHERE KEY="contract_count"'), {'value': self._contract_count})
         return self._contract_count
 
     def getProofOfFunds(self, coin_type, amount_for: int, extra_commit_bytes):
@@ -2281,7 +2282,7 @@ class BasicSwap(BaseApp):
         self.logEvent(Concepts.BID, bid_id, event_type, event_msg, session)
 
     def countBidEvents(self, bid, event_type, session):
-        q = session.execute('SELECT COUNT(*) FROM eventlog WHERE linked_type = {} AND linked_id = x\'{}\' AND event_type = {}'.format(int(Concepts.BID), bid.bid_id.hex(), int(event_type))).first()
+        q = session.execute(text('SELECT COUNT(*) FROM eventlog WHERE linked_type = {} AND linked_id = x\'{}\' AND event_type = {}'.format(int(Concepts.BID), bid.bid_id.hex(), int(event_type)))).first()
         return q[0]
 
     def getEvents(self, linked_type: int, linked_id: bytes):
@@ -2316,7 +2317,7 @@ class BasicSwap(BaseApp):
     def getLinkedMessageId(self, linked_type: int, linked_id: int, msg_type: int, msg_sequence: int = 0, session=None) -> bytes:
         try:
             use_session = self.openSession(session)
-            q = use_session.execute('SELECT msg_id FROM message_links WHERE linked_type = :linked_type AND linked_id = :linked_id AND msg_type = :msg_type AND msg_sequence = :msg_sequence',
+            q = use_session.execute(text('SELECT msg_id FROM message_links WHERE linked_type = :linked_type AND linked_id = :linked_id AND msg_type = :msg_type AND msg_sequence = :msg_sequence'),
                                     {'linked_type': linked_type, 'linked_id': linked_id, 'msg_type': msg_type, 'msg_sequence': msg_sequence}).first()
             return q[0]
         finally:
@@ -2326,7 +2327,7 @@ class BasicSwap(BaseApp):
     def countMessageLinks(self, linked_type: int, linked_id: int, msg_type: int, msg_sequence: int = 0, session=None) -> int:
         try:
             use_session = self.openSession(session)
-            q = use_session.execute('SELECT COUNT(*) FROM message_links WHERE linked_type = :linked_type AND linked_id = :linked_id AND msg_type = :msg_type AND msg_sequence = :msg_sequence',
+            q = use_session.execute(text('SELECT COUNT(*) FROM message_links WHERE linked_type = :linked_type AND linked_id = :linked_id AND msg_type = :msg_type AND msg_sequence = :msg_sequence'),
                                     {'linked_type': linked_type, 'linked_id': linked_id, 'msg_type': msg_type, 'msg_sequence': msg_sequence}).first()
             return q[0]
         finally:
@@ -2587,14 +2588,14 @@ class BasicSwap(BaseApp):
     def list_bid_events(self, bid_id: bytes, session):
         query_str = 'SELECT created_at, event_type, event_msg FROM eventlog ' + \
                     'WHERE active_ind = 1 AND linked_type = {} AND linked_id = x\'{}\' '.format(Concepts.BID, bid_id.hex())
-        q = session.execute(query_str)
+        q = session.execute(text(query_str))
         events = []
         for row in q:
             events.append({'at': row[0], 'desc': describeEventEntry(row[1], row[2])})
 
         query_str = 'SELECT created_at, trigger_at FROM actions ' + \
                     'WHERE active_ind = 1 AND linked_id = x\'{}\' '.format(bid_id.hex())
-        q = session.execute(query_str)
+        q = session.execute(text(query_str))
         for row in q:
             events.append({'at': row[0], 'desc': 'Delaying until: {}'.format(format_timestamp(row[1], with_seconds=True))})
 
@@ -4473,7 +4474,7 @@ class BasicSwap(BaseApp):
         try:
             use_session = self.openSession(session)
 
-            q = use_session.execute('SELECT COUNT(*) FROM checkedblocks WHERE block_hash = :block_hash', {'block_hash': previousblockhash}).first()
+            q = use_session.execute(text('SELECT COUNT(*) FROM checkedblocks WHERE block_hash = :block_hash'), {'block_hash': previousblockhash}).first()
             if q[0] > 0:
                 return True
 
@@ -4495,7 +4496,7 @@ class BasicSwap(BaseApp):
 
             query = '''INSERT INTO checkedblocks (created_at, coin_type, block_height, block_hash, block_time)
                        VALUES (:now, :coin_type, :block_height, :block_hash, :block_time)'''
-            use_session.execute(query, {'now': now, 'coin_type': int(ci.coin_type()), 'block_height': block_height, 'block_hash': bytes.fromhex(block['hash']), 'block_time': int(block['time'])})
+            use_session.execute(text(query), {'now': now, 'coin_type': int(ci.coin_type()), 'block_height': block_height, 'block_hash': bytes.fromhex(block['hash']), 'block_time': int(block['time'])})
 
         finally:
             if session is None:
@@ -4647,7 +4648,7 @@ class BasicSwap(BaseApp):
         try:
             query_str = 'SELECT bid_id FROM bids ' + \
                         'WHERE active_ind = 1 AND state = :accepted_state AND expire_at + :grace_period <= :now '
-            q = session.execute(query_str, {'accepted_state': int(BidStates.BID_ACCEPTED), 'now': now, 'grace_period': grace_period})
+            q = session.execute(text(query_str), {'accepted_state': int(BidStates.BID_ACCEPTED), 'now': now, 'grace_period': grace_period})
             for row in q:
                 bid_id = row[0]
                 self.log.info('Timing out bid {}.'.format(bid_id.hex()))
@@ -4728,10 +4729,10 @@ class BasicSwap(BaseApp):
                             bid.setState(BidStates.BID_ERROR, err_msg)
                             self.saveBidInSession(bid_id, bid, session)
 
+            query: str = 'DELETE FROM actions WHERE trigger_at <= :now'
             if self.debug:
-                session.execute('UPDATE actions SET active_ind = 2 WHERE trigger_at <= :now', {'now': now})
-            else:
-                session.execute('DELETE FROM actions WHERE trigger_at <= :now', {'now': now})
+                query = 'UPDATE actions SET active_ind = 2 WHERE trigger_at <= :now'
+            session.execute(text(query), {'now': now})
 
         except Exception as ex:
             self.handleSessionErrors(ex, session, 'checkQueuedActions')
@@ -4749,7 +4750,7 @@ class BasicSwap(BaseApp):
             session = self.openSession()
             q = session.query(Bid).filter(Bid.state == BidStates.BID_RECEIVING)
             for bid in q:
-                q = session.execute('SELECT COUNT(*) FROM xmr_split_data WHERE bid_id = x\'{}\' AND msg_type = {}'.format(bid.bid_id.hex(), XmrSplitMsgTypes.BID)).first()
+                q = session.execute(text('SELECT COUNT(*) FROM xmr_split_data WHERE bid_id = x\'{}\' AND msg_type = {}'.format(bid.bid_id.hex(), XmrSplitMsgTypes.BID))).first()
                 num_segments = q[0]
                 if num_segments > 1:
                     try:
@@ -4769,7 +4770,7 @@ class BasicSwap(BaseApp):
 
             q = session.query(Bid).filter(Bid.state == BidStates.BID_RECEIVING_ACC)
             for bid in q:
-                q = session.execute('SELECT COUNT(*) FROM xmr_split_data WHERE bid_id = x\'{}\' AND msg_type = {}'.format(bid.bid_id.hex(), XmrSplitMsgTypes.BID_ACCEPT)).first()
+                q = session.execute(text('SELECT COUNT(*) FROM xmr_split_data WHERE bid_id = x\'{}\' AND msg_type = {}'.format(bid.bid_id.hex(), XmrSplitMsgTypes.BID_ACCEPT))).first()
                 num_segments = q[0]
                 if num_segments > 1:
                     try:
@@ -4860,7 +4861,7 @@ class BasicSwap(BaseApp):
             if msg['to'] != self.network_addr:
                 # Double check active_ind, shouldn't be possible to receive message if not active
                 query_str = 'SELECT COUNT(addr_id) FROM smsgaddresses WHERE addr = "{}" AND use_type = {} AND active_ind = 1'.format(msg['to'], AddressTypes.RECV_OFFER)
-                rv = session.execute(query_str).first()
+                rv = session.execute(text(query_str)).first()
                 if rv[0] < 1:
                     raise ValueError('Offer received on incorrect address')
 
@@ -4962,7 +4963,7 @@ class BasicSwap(BaseApp):
     def getCompletedAndActiveBidsValue(self, offer, session):
         bids = []
         total_value = 0
-        q = session.execute(
+        q = session.execute(text(
             '''SELECT bid_id, amount, state FROM bids
                JOIN bidstates ON bidstates.state_id = bids.state AND (bidstates.state_id = {1} OR bidstates.in_progress > 0)
                WHERE bids.active_ind = 1 AND bids.offer_id = x\'{0}\'
@@ -4970,7 +4971,7 @@ class BasicSwap(BaseApp):
                SELECT bid_id, amount, state FROM bids
                JOIN actions ON actions.linked_id = bids.bid_id AND actions.active_ind = 1 AND (actions.action_type = {2} OR actions.action_type = {3})
                WHERE bids.active_ind = 1 AND bids.offer_id = x\'{0}\'
-            '''.format(offer.offer_id.hex(), BidStates.SWAP_COMPLETED, ActionTypes.ACCEPT_XMR_BID, ActionTypes.ACCEPT_BID))
+            '''.format(offer.offer_id.hex(), BidStates.SWAP_COMPLETED, ActionTypes.ACCEPT_XMR_BID, ActionTypes.ACCEPT_BID)))
         for row in q:
             bid_id, amount, state = row
             bids.append((bid_id, amount, state))
@@ -6199,7 +6200,7 @@ class BasicSwap(BaseApp):
         if msg_data.msg_type == XmrSplitMsgTypes.BID or msg_data.msg_type == XmrSplitMsgTypes.BID_ACCEPT:
             session = self.openSession()
             try:
-                q = session.execute('SELECT COUNT(*) FROM xmr_split_data WHERE bid_id = x\'{}\' AND msg_type = {} AND msg_sequence = {}'.format(msg_data.msg_id.hex(), msg_data.msg_type, msg_data.sequence)).first()
+                q = session.execute(text('SELECT COUNT(*) FROM xmr_split_data WHERE bid_id = x\'{}\' AND msg_type = {} AND msg_sequence = {}'.format(msg_data.msg_id.hex(), msg_data.msg_type, msg_data.sequence))).first()
                 num_exists = q[0]
                 if num_exists > 0:
                     self.log.warning('Ignoring duplicate xmr_split_data entry: ({}, {}, {})'.format(msg_data.msg_id.hex(), msg_data.msg_type, msg_data.sequence))
@@ -6503,11 +6504,11 @@ class BasicSwap(BaseApp):
                            UNION ALL
                            SELECT 2, offer_id, expire_at FROM offers WHERE active_ind = 1 AND state IN (:offer_received, :offer_sent) AND expire_at <= :check_time
                 '''
-                q = session.execute(query, {'bid_received': int(BidStates.BID_RECEIVED),
-                                            'offer_received': int(OfferStates.OFFER_RECEIVED),
-                                            'bid_sent': int(BidStates.BID_SENT),
-                                            'offer_sent': int(OfferStates.OFFER_SENT),
-                                            'check_time': now + self.check_expiring_bids_offers_seconds})
+                q = session.execute(text(query), {'bid_received': int(BidStates.BID_RECEIVED),
+                                                  'offer_received': int(OfferStates.OFFER_RECEIVED),
+                                                  'bid_sent': int(BidStates.BID_SENT),
+                                                  'offer_sent': int(OfferStates.OFFER_SENT),
+                                                  'check_time': now + self.check_expiring_bids_offers_seconds})
                 for entry in q:
                     record_id = entry[1]
                     expire_at = entry[2]
@@ -6523,7 +6524,7 @@ class BasicSwap(BaseApp):
                             offers_to_expire.add(record_id)
 
             for bid_id in bids_to_expire:
-                query = 'SELECT expire_at, states FROM bids WHERE bid_id = :bid_id AND active_ind = 1 AND state IN (:bid_received, :bid_sent)'
+                query = text('SELECT expire_at, states FROM bids WHERE bid_id = :bid_id AND active_ind = 1 AND state IN (:bid_received, :bid_sent)')
                 rows = session.execute(query, {'bid_id': bid_id,
                                                'bid_received': int(BidStates.BID_RECEIVED),
                                                'bid_sent': int(BidStates.BID_SENT)}).fetchall()
@@ -6531,18 +6532,18 @@ class BasicSwap(BaseApp):
                     new_state: int = int(BidStates.BID_EXPIRED)
                     states = (bytes() if rows[0][1] is None else rows[0][1]) + pack_state(new_state, now)
                     query = 'UPDATE bids SET state = :new_state, states = :states WHERE bid_id = :bid_id'
-                    session.execute(query, {'bid_id': bid_id, 'new_state': new_state, 'states': states})
+                    session.execute(text(query), {'bid_id': bid_id, 'new_state': new_state, 'states': states})
                     bids_expired += 1
             for offer_id in offers_to_expire:
                 query = 'SELECT expire_at, states FROM offers WHERE offer_id = :offer_id AND active_ind = 1 AND state IN (:offer_received, :offer_sent)'
-                rows = session.execute(query, {'offer_id': offer_id,
-                                               'offer_received': int(OfferStates.OFFER_RECEIVED),
-                                               'offer_sent': int(OfferStates.OFFER_SENT)}).fetchall()
+                rows = session.execute(text(query), {'offer_id': offer_id,
+                                                     'offer_received': int(OfferStates.OFFER_RECEIVED),
+                                                     'offer_sent': int(OfferStates.OFFER_SENT)}).fetchall()
                 if len(rows) > 0:
                     new_state: int = int(OfferStates.OFFER_EXPIRED)
                     states = (bytes() if rows[0][1] is None else rows[0][1]) + pack_state(new_state, now)
                     query = 'UPDATE offers SET state = :new_state, states = :states WHERE offer_id = :offer_id'
-                    session.execute(query, {'offer_id': offer_id, 'new_state': new_state, 'states': states})
+                    session.execute(text(query), {'offer_id': offer_id, 'new_state': new_state, 'states': states})
                     offers_expired += 1
         finally:
             self.closeSession(session)
@@ -6940,32 +6941,35 @@ class BasicSwap(BaseApp):
             num_watched_outputs += len(v['watched_outputs'])
 
         now: int = self.getTime()
-        q_str = '''SELECT
-                   COUNT(CASE WHEN b.was_sent THEN 1 ELSE NULL END) AS count_sent,
-                   COUNT(CASE WHEN b.was_sent AND (s.in_progress OR (s.swap_ended = 0 AND b.expire_at > {} AND o.expire_at > {})) THEN 1 ELSE NULL END) AS count_sent_active,
-                   COUNT(CASE WHEN b.was_received THEN 1 ELSE NULL END) AS count_received,
-                   COUNT(CASE WHEN b.was_received AND b.state = {} AND b.expire_at > {} AND o.expire_at > {} THEN 1 ELSE NULL END) AS count_available,
-                   COUNT(CASE WHEN b.was_received AND (s.in_progress OR (s.swap_ended = 0 AND b.expire_at > {} AND o.expire_at > {})) THEN 1 ELSE NULL END) AS count_recv_active
-                   FROM bids b
-                   JOIN offers o ON b.offer_id = o.offer_id
-                   JOIN bidstates s ON b.state = s.state_id
-                   WHERE b.active_ind = 1'''.format(now, now, BidStates.BID_RECEIVED, now, now, now, now)
-        q = self.engine.execute(q_str).first()
-        bids_sent = q[0]
-        bids_sent_active = q[1]
-        bids_received = q[2]
-        bids_available = q[3]
-        bids_recv_active = q[4]
+        q_bids_str = '''SELECT
+                        COUNT(CASE WHEN b.was_sent THEN 1 ELSE NULL END) AS count_sent,
+                        COUNT(CASE WHEN b.was_sent AND (s.in_progress OR (s.swap_ended = 0 AND b.expire_at > {} AND o.expire_at > {})) THEN 1 ELSE NULL END) AS count_sent_active,
+                        COUNT(CASE WHEN b.was_received THEN 1 ELSE NULL END) AS count_received,
+                        COUNT(CASE WHEN b.was_received AND b.state = {} AND b.expire_at > {} AND o.expire_at > {} THEN 1 ELSE NULL END) AS count_available,
+                        COUNT(CASE WHEN b.was_received AND (s.in_progress OR (s.swap_ended = 0 AND b.expire_at > {} AND o.expire_at > {})) THEN 1 ELSE NULL END) AS count_recv_active
+                        FROM bids b
+                        JOIN offers o ON b.offer_id = o.offer_id
+                        JOIN bidstates s ON b.state = s.state_id
+                        WHERE b.active_ind = 1'''.format(now, now, BidStates.BID_RECEIVED, now, now, now, now)
 
-        q_str = '''SELECT
-                   COUNT(CASE WHEN expire_at > {} THEN 1 ELSE NULL END) AS count_active,
-                   COUNT(CASE WHEN was_sent THEN 1 ELSE NULL END) AS count_sent,
-                   COUNT(CASE WHEN was_sent AND expire_at > {} THEN 1 ELSE NULL END) AS count_sent_active
-                   FROM offers WHERE active_ind = 1'''.format(now, now)
-        q = self.engine.execute(q_str).first()
-        num_offers = q[0]
-        num_sent_offers = q[1]
-        num_sent_active_offers = q[2]
+        q_offers_str = '''SELECT
+                          COUNT(CASE WHEN expire_at > {} THEN 1 ELSE NULL END) AS count_active,
+                          COUNT(CASE WHEN was_sent THEN 1 ELSE NULL END) AS count_sent,
+                          COUNT(CASE WHEN was_sent AND expire_at > {} THEN 1 ELSE NULL END) AS count_sent_active
+                          FROM offers WHERE active_ind = 1'''.format(now, now)
+
+        with self.engine.connect() as conn:
+            q = conn.execute(text(q_bids_str)).first()
+            bids_sent = q[0]
+            bids_sent_active = q[1]
+            bids_received = q[2]
+            bids_available = q[3]
+            bids_recv_active = q[4]
+
+            q = conn.execute(text(q_offers_str)).first()
+            num_offers = q[0]
+            num_sent_offers = q[1]
+            num_sent_active_offers = q[2]
 
         rv = {
             'network': self.chain,
@@ -7050,7 +7054,7 @@ class BasicSwap(BaseApp):
             now: int = self.getTime()
             session.add(Wallets(coin_id=coin, balance_type=info_type, wallet_data=json.dumps(wi), created_at=now))
             query_str = f'DELETE FROM wallets WHERE (coin_id = {coin_id} AND balance_type = {info_type}) AND record_id NOT IN (SELECT record_id FROM wallets WHERE coin_id = {coin_id} AND balance_type = {info_type} ORDER BY created_at DESC LIMIT 3 )'
-            session.execute(query_str)
+            session.execute(text(query_str))
             session.commit()
         except Exception as e:
             self.log.error(f'addWalletInfoRecord {e}')
@@ -7116,7 +7120,7 @@ class BasicSwap(BaseApp):
             inner_str = f'SELECT coin_id, balance_type, MAX(created_at) as max_created_at FROM wallets {where_str} GROUP BY coin_id, balance_type'
             query_str = 'SELECT a.coin_id, a.balance_type, wallet_data, created_at FROM wallets a, ({}) b WHERE a.coin_id = b.coin_id AND a.balance_type = b.balance_type AND a.created_at = b.max_created_at'.format(inner_str)
 
-            q = session.execute(query_str)
+            q = session.execute(text(query_str))
             for row in q:
                 coin_id = row[0]
 
@@ -7130,7 +7134,7 @@ class BasicSwap(BaseApp):
                     wallet_data['updating'] = self._updating_wallets_info.get(coin_id, False)
 
                     # Ensure the latest addresses are displayed
-                    q = session.execute('SELECT key, value FROM kv_string WHERE key = "receive_addr_{0}" OR key = "stealth_addr_{0}"'.format(chainparams[coin_id]['name']))
+                    q = session.execute(text('SELECT key, value FROM kv_string WHERE key = "receive_addr_{0}" OR key = "stealth_addr_{0}"'.format(chainparams[coin_id]['name'])))
                     for row in q:
 
                         if row[0].startswith('stealth'):
@@ -7166,9 +7170,9 @@ class BasicSwap(BaseApp):
         session = self.openSession()
         try:
             if offer_id:
-                q = session.execute('SELECT COUNT(*) FROM bids WHERE state >= {} AND offer_id = x\'{}\''.format(BidStates.BID_ACCEPTED, offer_id.hex())).first()
+                q = session.execute(text('SELECT COUNT(*) FROM bids WHERE state >= {} AND offer_id = x\'{}\''.format(BidStates.BID_ACCEPTED, offer_id.hex()))).first()
             else:
-                q = session.execute('SELECT COUNT(*) FROM bids WHERE state >= {}'.format(BidStates.BID_ACCEPTED)).first()
+                q = session.execute(text('SELECT COUNT(*) FROM bids WHERE state >= {}'.format(BidStates.BID_ACCEPTED))).first()
             return q[0]
         finally:
             self.closeSession(session, commit=False)
@@ -7296,7 +7300,7 @@ class BasicSwap(BaseApp):
             if offset is not None:
                 query_str += f' OFFSET {offset}'
 
-            q = session.execute(query_str, {'ads_swap': SwapTypes.XMR_SWAP, 'itx_type': TxTypes.ITX, 'ptx_type': TxTypes.PTX, 'al_type': TxTypes.XMR_SWAP_A_LOCK, 'bl_type': TxTypes.XMR_SWAP_B_LOCK})
+            q = session.execute(text(query_str), {'ads_swap': SwapTypes.XMR_SWAP, 'itx_type': TxTypes.ITX, 'ptx_type': TxTypes.PTX, 'al_type': TxTypes.XMR_SWAP_A_LOCK, 'bl_type': TxTypes.XMR_SWAP_B_LOCK})
             for row in q:
                 result = [x for x in row]
                 coin_from = result[9]
@@ -7387,7 +7391,7 @@ class BasicSwap(BaseApp):
         try:
             use_session = self.openSession(session)
             rv = []
-            q = use_session.execute(query_str, query_data)
+            q = use_session.execute(text(query_str), query_data)
             for row in q:
                 rv.append({
                     'id': row[0],
@@ -7416,7 +7420,7 @@ class BasicSwap(BaseApp):
         try:
             session = self.openSession()
             rv = []
-            q = session.execute('SELECT sa.addr, ki.label FROM smsgaddresses AS sa LEFT JOIN knownidentities AS ki ON sa.addr = ki.address WHERE sa.use_type = {} AND sa.active_ind = 1 ORDER BY sa.addr_id DESC'.format(use_type))
+            q = session.execute(text('SELECT sa.addr, ki.label FROM smsgaddresses AS sa LEFT JOIN knownidentities AS ki ON sa.addr = ki.address WHERE sa.use_type = {} AND sa.active_ind = 1 ORDER BY sa.addr_id DESC'.format(use_type)))
             for row in q:
                 rv.append((row[0], row[1]))
             return rv
@@ -7446,7 +7450,7 @@ class BasicSwap(BaseApp):
             if offset is not None:
                 query_str += f' OFFSET {offset}'
 
-            q = session.execute(query_str)
+            q = session.execute(text(query_str))
             for row in q:
                 rv.append(row)
             return rv
@@ -7476,7 +7480,7 @@ class BasicSwap(BaseApp):
             query_str = 'SELECT links.strategy_id, strats.label FROM automationlinks links' + \
                         ' LEFT JOIN automationstrategies strats ON strats.record_id = links.strategy_id' + \
                         ' WHERE links.linked_type = {} AND links.linked_id = x\'{}\' AND links.active_ind = 1'.format(int(linked_type), linked_id.hex())
-            q = session.execute(query_str).first()
+            q = session.execute(text(query_str)).first()
             return q
         finally:
             self.closeSession(session, commit=False)
@@ -7560,10 +7564,10 @@ class BasicSwap(BaseApp):
                 query_str += ', note = :note'
             query_str += ' WHERE addr = :addr'
 
-            rv = use_session.execute(query_str, values)
+            rv = use_session.execute(text(query_str), values)
             if rv.rowcount < 1:
                 query_str: str = 'INSERT INTO smsgaddresses (addr, active_ind, use_type) VALUES (:addr, :active_ind, :use_type)'
-                use_session.execute(query_str, values)
+                use_session.execute(text(query_str), values)
         finally:
             if session is None:
                 self.closeSession(use_session)
@@ -7784,6 +7788,6 @@ class BasicSwap(BaseApp):
             session = self.openSession()
             key_str = 'saved_filters_' + prefix
             query_str = 'DELETE FROM kv_string WHERE key = :key_str'
-            session.execute(query_str, {'key_str': key_str})
+            session.execute(text(query_str), {'key_str': key_str})
         finally:
             self.closeSession(session)
