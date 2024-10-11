@@ -866,69 +866,75 @@ const app = {
   },
   
   init: () => {
-    window.addEventListener('load', app.onLoad);
-    app.loadLastRefreshedTime();
-  },
-  
-  onLoad: async () => {
-    ui.showLoader();
-    try {
-      volumeToggle.init();
-      await app.updateBTCPrice();
-      const chartContainer = document.getElementById('coin-chart');
-      if (chartContainer) {
-        chartModule.initChart();
-        chartModule.showChartLoader();
-      } else {
-        console.warn('Chart container not found, skipping chart initialization');
-      }
-      for (const coin of config.coins) {
-        await app.loadCoinData(coin);
-      }
-      if (chartModule.chart) {
-        config.currentResolution = 'month';
-        await chartModule.updateChart('BTC');
-        app.updateResolutionButtons('BTC');
-      }
-      ui.setActiveContainer('btc-container');
-      config.coins.forEach(coin => {
-        const container = document.getElementById(`${coin.symbol.toLowerCase()}-container`);
-        if (container) {
-          container.addEventListener('click', () => {
-            ui.setActiveContainer(`${coin.symbol.toLowerCase()}-container`);
-            if (chartModule.chart) {
-              if (coin.symbol === 'WOW') {
-                config.currentResolution = 'day';
-              }
-              chartModule.updateChart(coin.symbol);
-              app.updateResolutionButtons(coin.symbol);
-            }
-          });
+    window.addEventListener('load', async () => {
+      ui.showLoader();
+      try {
+        volumeToggle.init();
+        await app.updateBTCPrice();
+
+          chartModule.initChart();
+          chartModule.showChartLoader();
+        } else {
+          console.warn('Chart container not found, skipping chart initialization');
         }
-      });     
-      const refreshAllButton = document.getElementById('refresh-all');
-      if (refreshAllButton) {
-        refreshAllButton.addEventListener('click', app.refreshAllData);
+
+        const coinDataPromises = config.coins.map(coin => app.loadCoinData(coin));
+        await Promise.all(coinDataPromises);
+
+        if (chartModule.chart) {
+          config.currentResolution = 'month';
+          await chartModule.updateChart('BTC');
+          app.updateResolutionButtons('BTC');
+        }
+
+        ui.setActiveContainer('btc-container');
+
+        // Set up event listeners for coin containers
+        config.coins.forEach(coin => {
+          const container = document.getElementById(`${coin.symbol.toLowerCase()}-container`);
+          if (container) {
+            container.addEventListener('click', () => {
+              ui.setActiveContainer(`${coin.symbol.toLowerCase()}-container`);
+              if (chartModule.chart) {
+                if (coin.symbol === 'WOW') {
+                  config.currentResolution = 'day';
+                }
+                chartModule.updateChart(coin.symbol);
+                app.updateResolutionButtons(coin.symbol);
+              }
+            });
+          }
+        });
+
+        app.initializeSelectImages();
+        app.initAutoRefresh();
+
+        const refreshAllButton = document.getElementById('refresh-all');
+        if (refreshAllButton) {
+          refreshAllButton.addEventListener('click', app.refreshAllData);
+        }
+
+        const headers = document.querySelectorAll('th');
+        headers.forEach((header, index) => {
+          header.addEventListener('click', () => app.sortTable(index, header.classList.contains('disabled')));
+        });
+
+        const closeErrorButton = document.getElementById('close-error');
+        if (closeErrorButton) {
+          closeErrorButton.addEventListener('click', ui.hideErrorMessage);
+        }
+
+      } catch (error) {
+        console.error('Error during initialization:', error);
+        ui.displayErrorMessage('Failed to initialize the dashboard. Please try refreshing the page.');
+      } finally {
+        ui.hideLoader();
+        if (chartModule.chart) {
+          chartModule.hideChartLoader();
+        }
       }
-      app.initializeSelectImages();
-      const headers = document.querySelectorAll('th');
-      headers.forEach((header, index) => {
-        header.addEventListener('click', () => app.sortTable(index, header.classList.contains('disabled')));
-      });
-      const closeErrorButton = document.getElementById('close-error');
-      if (closeErrorButton) {
-        closeErrorButton.addEventListener('click', ui.hideErrorMessage);
-      }
-      app.initAutoRefresh();
-    } catch (error) {
-      console.error('Error during initialization:', error);
-      ui.displayErrorMessage('Failed to initialize the dashboard. Please try refreshing the page.');
-    } finally {
-      ui.hideLoader();
-      if (chartModule.chart) {
-        chartModule.hideChartLoader();
-      }
-    }
+    });
+    app.loadLastRefreshedTime();
   },
 
   loadCoinData: async (coin) => {
