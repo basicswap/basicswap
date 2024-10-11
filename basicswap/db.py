@@ -8,7 +8,7 @@ import time
 import sqlalchemy as sa
 
 from enum import IntEnum, auto
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 
 
 CURRENT_DB_VERSION = 24
