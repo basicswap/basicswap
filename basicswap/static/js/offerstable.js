@@ -1,3 +1,126 @@
+const coinNameToSymbol = {
+  'Bitcoin': 'bitcoin',
+  'Particl': 'particl',
+  'Particl Blind': 'particl',
+  'Particl Anon': 'particl',
+  'Monero': 'monero',
+  'Wownero': 'wownero',
+  'Litecoin': 'litecoin',
+  'Firo': 'zcoin',
+  'Zcoin': 'zcoin',
+  'Dash': 'dash',
+  'PIVX': 'pivx',
+  'Decred': 'decred',
+  'Zano': 'zano',
+  'Dogecoin': 'dogecoin',
+};
+
+function makePostRequest(url, headers = {}) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/json/readurl');
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.timeout = 30000;
+    xhr.ontimeout = () => reject(new Error('Request timed out'));
+    xhr.onload = () => {
+      console.log(`Response for ${url}:`, xhr.responseText);
+      if (xhr.status === 200) {
+        try {
+          const response = JSON.parse(xhr.responseText);
+          if (response.Error) {
+            console.error(`API Error for ${url}:`, response.Error);
+            reject(new Error(response.Error));
+          } else {
+            resolve(response);
+          }
+        } catch (error) {
+          console.error(`Invalid JSON response for ${url}:`, xhr.responseText);
+          reject(new Error(`Invalid JSON response: ${error.message}`));
+        }
+      } else {
+        console.error(`HTTP Error for ${url}: ${xhr.status} ${xhr.statusText}`);
+        reject(new Error(`HTTP Error: ${xhr.status} ${xhr.statusText}`));
+      }
+    };
+    xhr.onerror = () => reject(new Error('Network error occurred'));
+    xhr.send(JSON.stringify({
+      url: url,
+      headers: headers
+    }));
+  });
+}
+
+const symbolToCoinName = {
+  ...Object.fromEntries(Object.entries(coinNameToSymbol).map(([key, value]) => [value, key])),
+  'zcoin': 'Firo'
+};
+
+let latestPrices = null;
+
+const CACHE_KEY = 'latestPricesCache';
+const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes in milliseconds
+
+async function fetchLatestPrices() {
+  console.log('Checking for cached prices...');
+  const cachedData = getCachedPrices();
+  
+  if (cachedData) {
+    console.log('Using cached price data');
+    latestPrices = cachedData;
+    return cachedData;
+  }
+
+  console.log('Fetching latest prices...');
+  const url = 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,dash,dogecoin,decred,litecoin,particl,pivx,monero,zano,wownero,zcoin&vs_currencies=USD,BTC';
+  
+  try {
+    const data = await makePostRequest(url);
+    console.log('Fetched price data:', data);
+    
+    latestPrices = data;
+    setCachedPrices(data);
+    return data;
+  } catch (error) {
+    console.error('Error fetching price data:', error.message);
+    return null;
+  }
+}
+
+function getCachedPrices() {
+  const cachedItem = localStorage.getItem(CACHE_KEY);
+  if (cachedItem) {
+    const { data, timestamp } = JSON.parse(cachedItem);
+    if (Date.now() - timestamp < CACHE_DURATION) {
+      return data;
+    }
+  }
+  return null;
+}
+
+function setCachedPrices(data) {
+  const cacheItem = {
+    data: data,
+    timestamp: Date.now()
+  };
+  localStorage.setItem(CACHE_KEY, JSON.stringify(cacheItem));
+}
+
+const getUsdValue = async (cryptoValue, coinSymbol) => {
+  try {
+    const prices = await fetchLatestPrices();
+    const apiSymbol = coinNameToSymbol[coinSymbol] || coinSymbol.toLowerCase();
+    const coinData = prices[apiSymbol];
+    if (coinData && coinData.usd) {
+      return cryptoValue * coinData.usd;
+    } else {
+      throw new Error(`Price data not available for ${coinSymbol}`);
+    }
+  } catch (error) {
+    console.error(`Error getting USD value for ${coinSymbol}:`, error);
+    throw error;
+  }
+};
+
 // Global
 let jsonData = [];
 let originalJsonData = [];
@@ -6,14 +129,14 @@ let tableRateModule;
 
 let lastRefreshTime = null;
 let newEntriesCount = 0;
-let nextRefreshCountdown = 600;
-let countdownToFullRefresh = 900;
+
+let nextRefreshCountdown = 60; // Default to 60 seconds
+const MIN_REFRESH_INTERVAL = 30; // Minimum refresh interval in seconds
 
 const isSentOffers = window.offersTableConfig.isSentOffers;
 
 let currentPage = 1;
-const itemsPerPage = 15;
-let offerCache = new Map();
+const itemsPerPage = 50;
 
 const coinIdToName = {
   1: 'particl', 2: 'bitcoin', 3: 'litecoin', 4: 'decred',
@@ -21,7 +144,7 @@ const coinIdToName = {
   9: 'wownero', 11: 'pivx', 13: 'firo'
 };
 
-// DOM elements
+// DOM
 const toggleButton = document.getElementById('toggleView');
 const tableView = document.getElementById('tableView');
 const jsonView = document.getElementById('jsonView');
@@ -37,13 +160,60 @@ const newEntriesCountSpan = document.getElementById('newEntriesCount');
 const nextRefreshTimeSpan = document.getElementById('nextRefreshTime');
 
 // Utility
+function getCoinSymbol(fullName) {
+  const symbolMap = {
+    'Bitcoin': 'BTC', 'Litecoin': 'LTC', 'Monero': 'XMR',
+    'Particl': 'PART', 'Particl Blind': 'PART', 'Particl Anon': 'PART',
+    'PIVX': 'PIVX', 'Firo': 'FIRO', 'Dash': 'DASH',
+    'Decred': 'DCR', 'Wownero': 'WOW', 'Bitcoin Cash': 'BCH'
+  };
+  return symbolMap[fullName] || fullName;
+}
+
+function getValidOffers() {
+    if (isSentOffers) {
+        return jsonData;
+    } else {
+        const currentTime = Math.floor(Date.now() / 1000);
+        return jsonData.filter(offer => offer.expire_at > currentTime);
+    }
+}
+
+function removeExpiredOffers() {
+    if (isSentOffers) {
+        return false;
+    }
+    const currentTime = Math.floor(Date.now() / 1000);
+    const initialLength = jsonData.length;
+    jsonData = jsonData.filter(offer => offer.expire_at > currentTime);
+    
+    if (jsonData.length < initialLength) {
+        console.log(`Removed ${initialLength - jsonData.length} expired offers`);
+        return true;
+    }
+    return false;
+}
+
+function handleNoOffersScenario() {
+    offersBody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-gray-500 dark:text-white">No active offers available. Refreshing data...</td></tr>';
+    fetchOffers(true);
+}
+
+function logOfferStatus() {
+    const validOffers = getValidOffers();
+    console.log(`Total offers: ${jsonData.length}, Valid offers: ${validOffers.length}, Current page: ${currentPage}, Total pages: ${Math.ceil(validOffers.length / itemsPerPage)}`);
+}
+
 function isOfferExpired(offer) {
-  const currentTime = Math.floor(Date.now() / 1000);
-  const isExpired = offer.expire_at <= currentTime;
-  if (isExpired) {
-    console.log(`Offer ${offer.offer_id} is expired. Expire time: ${offer.expire_at}, Current time: ${currentTime}`);
-  }
-  return isExpired;
+    if (isSentOffers) {
+        return false;
+    }
+    const currentTime = Math.floor(Date.now() / 1000);
+    const isExpired = offer.expire_at <= currentTime;
+    if (isExpired) {
+        console.log(`Offer ${offer.offer_id} is expired. Expire time: ${offer.expire_at}, Current time: ${currentTime}`);
+    }
+    return isExpired;
 }
 
 function setRefreshButtonLoading(isLoading) {
@@ -82,8 +252,7 @@ function formatTimeDifference(timestamp) {
 }
 
 function formatTimeAgo(timestamp) {
-  const timeDiff = formatTimeDifference(timestamp);
-  return `${timeDiff} ago`;
+  return `${formatTimeDifference(timestamp)} ago`;
 }
 
 function formatTimeLeft(timestamp) {
@@ -92,97 +261,40 @@ function formatTimeLeft(timestamp) {
   return formatTimeDifference(timestamp);
 }
 
-function formatTimestamp(timestamp, withAgo = true, isExpired = false) {
-  console.log("Incoming timestamp:", timestamp, typeof timestamp);
-  
-  if (typeof timestamp === 'string' && isNaN(Date.parse(timestamp))) {
-    return timestamp;
-  }
-
-  if (!timestamp || isNaN(timestamp)) {
-    console.log("Returning N/A due to invalid input");
-    return "N/A";
-  }
-  
-  try {
-    const date = new Date(typeof timestamp === 'number' ? timestamp * 1000 : timestamp);
-    console.log("Parsed date:", date);
+function getTimeUntilNextExpiration() {
+    const currentTime = Math.floor(Date.now() / 1000);
+    const nextExpiration = jsonData.reduce((earliest, offer) => {
+        const timeUntilExpiration = offer.expire_at - currentTime;
+        return timeUntilExpiration > 0 && timeUntilExpiration < earliest ? timeUntilExpiration : earliest;
+    }, Infinity);
     
-    if (isNaN(date.getTime())) {
-      console.log("Invalid date after parsing");
-      return "N/A";
+    return nextExpiration === Infinity ? 300 : Math.max(MIN_REFRESH_INTERVAL, Math.min(nextExpiration, 300));
+}
+
+function getNoOffersMessage() {
+    const formData = new FormData(filterForm);
+    const filters = Object.fromEntries(formData);
+    let message = 'No offers available';
+    if (filters.coin_to !== 'any') {
+        const coinToName = coinIdToName[filters.coin_to] || filters.coin_to;
+        message += ` for bids to ${coinToName}`;
     }
-
-    const now = new Date();
-    const diffTime = Math.abs(now - date);
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-    if (isExpired) {
-      if (date > now) {
-        const hours = Math.floor(diffTime / (1000 * 60 * 60));
-        const minutes = Math.floor((diffTime % (1000 * 60 * 60)) / (1000 * 60));
-        return `${hours}h ${minutes}min`;
-      } else {
-        return "Expired";
-      }
+    if (filters.coin_from !== 'any') {
+        const coinFromName = coinIdToName[filters.coin_from] || filters.coin_from;
+        message += ` for offers from ${coinFromName}`;
     }
-
-    if (diffDays <= 1) {
-      const hours = date.getHours().toString().padStart(2, '0');
-      const minutes = date.getMinutes().toString().padStart(2, '0');
-      return `${hours}:${minutes}${withAgo ? ' ago' : ''}`;
-    } else if (diffDays <= 7) {
-      const options = { weekday: 'short' };
-      return date.toLocaleDateString(undefined, options);
-    } else {
-      const options = { month: 'short', day: 'numeric' };
-      return date.toLocaleDateString(undefined, options);
+    if (isSentOffers && filters.active && filters.active !== 'any') {
+        message += ` with status: ${filters.active}`;
     }
-  } catch (error) {
-    console.error("Error formatting timestamp:", error);
-    return "N/A";
-  }
+    return message;
 }
 
-function normalizeCoinName(name) {
-  return name.toLowerCase().replace(/\s+/g, ' ').trim();
-}
-
-function getCoinSymbol(fullName) {
-  const symbolMap = {
-    'Bitcoin': 'BTC', 'Litecoin': 'LTC', 'Monero': 'XMR',
-    'Particl': 'PART', 'Particl Blind': 'PART', 'Particl Anon': 'PART',
-    'PIVX': 'PIVX', 'Firo': 'FIRO', 'Dash': 'DASH',
-    'Decred': 'DCR', 'Wownero': 'WOW', 'Bitcoin Cash': 'BCH'
-  };
-  return symbolMap[fullName] || fullName;
-}
-
-function formatSmallNumber(num) {
-  if (Math.abs(num) < 0.000001) {
-    return num.toExponential(8);
-  } else if (Math.abs(num) < 0.01) {
-    return num.toFixed(8);
-  } else {
-    return num.toFixed(4);
-  }
-}
-
-// Table Rate
 window.tableRateModule = {
   coinNameToSymbol: {
-    'Bitcoin': 'BTC',
-    'Particl': 'PART',
-    'Particl Blind': 'PART',
-    'Particl Anon': 'PART',
-    'Monero': 'XMR',
-    'Wownero': 'WOW',
-    'Litecoin': 'LTC',
-    'Firo': 'FIRO',
-    'Dash': 'DASH',
-    'PIVX': 'PIVX',
-    'Decred': 'DCR',
-    'Zano': 'ZANO',
+    'Bitcoin': 'BTC', 'Particl': 'PART', 'Particl Blind': 'PART',
+    'Particl Anon': 'PART', 'Monero': 'XMR', 'Wownero': 'WOW',
+    'Litecoin': 'LTC', 'Firo': 'FIRO', 'Dash': 'DASH',
+    'PIVX': 'PIVX', 'Decred': 'DCR', 'Zano': 'ZANO',
     'Bitcoin Cash': 'BCH'
   },
   
@@ -242,291 +354,9 @@ window.tableRateModule = {
     }
   },
 
-  async updateUsdValue(cryptoCell, coinFullNameOrSymbol, isRate = false) {
-    console.log('updateUsdValue called with:', { coinFullNameOrSymbol, isRate });
-    
-    if (!coinFullNameOrSymbol) {
-      console.error('No coin name or symbol provided');
-      return;
-    }
-    
-    let coinSymbol = this.coinNameToSymbol[coinFullNameOrSymbol] || coinFullNameOrSymbol;
-    console.log('Resolved coin symbol:', coinSymbol);
-    
-    const cryptoValue = parseFloat(cryptoCell.textContent);
-    console.log('Crypto value:', cryptoValue);
-    
-    if (isNaN(cryptoValue) || cryptoValue <= 0) {
-      console.error('Invalid or non-positive crypto value');
-      return;
-    }
-    
-    const usdCell = cryptoCell.closest('td').querySelector('.usd-value');
-    if (!usdCell) {
-      console.error("USD cell not found.");
-      return;
-    }
-    
-    const o16Value = usdCell.getAttribute('data-o16') || 'N/A';
-    console.log('o16 value:', o16Value);
-    
-    const isWownero = coinSymbol.toUpperCase() === 'WOW';
-    
-    try {
-      const [fromRate, toRate] = await Promise.all([
-        this.getExchangeRate(coinSymbol),
-        this.getExchangeRate(o16Value)
-      ]);
-      console.log(`Exchange rates - ${coinSymbol}: ${fromRate}, ${o16Value}: ${toRate}`);
-      
-      let usdValue = null;
-      let exchangeRate = null;
-
-      if (fromRate !== null && fromRate > 0) {
-        usdValue = cryptoValue * fromRate;
-        console.log(`Calculated USD value for ${coinSymbol}:`, usdValue);
-        
-        this.setFallbackValue(coinSymbol, fromRate);
-      }
-
-      if (usdValue === null) {
-        const fallbackValue = this.getFallbackValue(coinSymbol);
-        if (fallbackValue !== null) {
-          usdValue = cryptoValue * fallbackValue;
-          console.log(`Using fallback value for ${coinSymbol} USD:`, fallbackValue);
-        }
-      }
-
-      if (fromRate !== null && toRate !== null && fromRate > 0 && toRate > 0) {
-        exchangeRate = fromRate / toRate;
-        console.log(`Calculated exchange rate ${coinSymbol}/${o16Value}:`, exchangeRate);
-      }
-
-      if (usdValue !== null) {
-        usdCell.textContent = `${this.formatUSD(usdValue)}/${o16Value}`;
-        usdCell.removeAttribute('data-is-fallback');
-      } else {
-        usdCell.textContent = `N/A/${o16Value}`;
-        usdCell.setAttribute('data-is-fallback', 'true');
-        console.warn(`No valid price available for ${coinSymbol} USD`);
-      }
-
-      const rateKey = `rate_${coinSymbol}_${o16Value}`;
-      let cachedRate = this.getCachedValue(rateKey);
-      if (cachedRate === null && exchangeRate !== null) {
-        cachedRate = exchangeRate;
-        this.setCachedValue(rateKey, cachedRate);
-      } else if (cachedRate === null && usdValue !== null && toRate !== null && toRate > 0) {
-        cachedRate = usdValue / (cryptoValue * toRate);
-        this.setCachedValue(rateKey, cachedRate);
-      }
-
-      const marketPercentageKey = `market_percentage_${coinSymbol}_${o16Value}`;
-      let cachedMarketPercentage = this.getCachedValue(marketPercentageKey);
-      if (cachedMarketPercentage === null && exchangeRate !== null) {
-        const marketRate = await this.getExchangeRate(o16Value);
-        if (marketRate !== null && marketRate > 0) {
-          cachedMarketPercentage = ((exchangeRate - marketRate) / marketRate) * 100;
-          this.setCachedValue(marketPercentageKey, cachedMarketPercentage);
-        } else {
-          console.warn(`Invalid market rate for ${o16Value}, unable to calculate market percentage`);
-        }
-      }
-
-      const rateCell = cryptoCell.closest('tr').querySelector('.coinname-value[data-coinname]');
-      if (rateCell && cachedRate !== null) {
-        rateCell.textContent = this.formatNumber(cachedRate, 8);
-        const cachedRateElement = rateCell.closest('td').querySelector('.cached-rate');
-        if (cachedRateElement) {
-          cachedRateElement.textContent = cachedRate;
-        }
-      }
-
-      if (usdValue !== null || isWownero) {
-        const row = cryptoCell.closest('tr');
-        if (row) {
-          this.updateProfitLoss(row, cachedMarketPercentage);
-          this.updateProfitValue(row);
-        } else {
-          console.error("Row not found for updating profit/loss and value.");
-        }
-      }
-    } catch (error) {
-      console.error(`Error in updateUsdValue for ${coinSymbol}:`, error);
-
-      const fallbackValue = this.getFallbackValue(coinSymbol);
-      if (fallbackValue !== null) {
-        const usdValue = cryptoValue * fallbackValue;
-        usdCell.textContent = `${this.formatUSD(usdValue)}/${o16Value}`;
-        usdCell.setAttribute('data-is-fallback', 'true');
-        console.warn(`Using fallback value for ${coinSymbol} due to error:`, fallbackValue);
-        
-        const row = cryptoCell.closest('tr');
-        if (row) {
-          this.updateProfitLoss(row, null);
-          this.updateProfitValue(row);
-        }
-      } else {
-        usdCell.textContent = `N/A/${o16Value}`;
-        usdCell.setAttribute('data-is-fallback', 'true');
-        console.warn(`No valid fallback price for ${coinSymbol}. Using N/A.`);
-      }
-    }
-  },
-
-  setFallbackValue(coinSymbol, value) {
-    localStorage.setItem(`fallback_${coinSymbol}_usd`, value.toString());
-  },
-
   getFallbackValue(coinSymbol) {
     const value = localStorage.getItem(`fallback_${coinSymbol}_usd`);
     return value ? parseFloat(value) : null;
-  },
-
-  async getExchangeRate(coinSymbol) {
-    console.log(`Fetching exchange rate for ${coinSymbol}`);
-    const cacheKey = `coinData_${coinSymbol}`;
-    let cachedData = cache.get(cacheKey);
-    let data;
-
-    if (cachedData) {
-      console.log(`Using cached data for ${coinSymbol}`);
-      data = cachedData.value;
-    } else {
-      console.log(`Fetching fresh data for ${coinSymbol}`);
-      
-      const coin = config.coins.find(c => c.symbol.toLowerCase() === coinSymbol.toLowerCase());
-
-      if (!coin) {
-        return null;
-      }
-
-      if (coin.usesCoinGecko) {
-        data = await api.fetchCoinGeckoDataXHR(coinSymbol);
-      } else if (coin.usesCryptoCompare) {
-        data = await api.fetchCryptoCompareDataXHR(coinSymbol);
-      } else {
-        console.error(`No API source configured for ${coinSymbol}`);
-        return null;
-      }
-
-      cache.set(cacheKey, data);
-    }
-
-    console.log(`Data received for ${coinSymbol}:`, data);
-    return this.extractExchangeRate(data, coinSymbol);
-  },
-
-  extractExchangeRate(data, coinSymbol) {
-    console.log(`Extracting exchange rate for ${coinSymbol}`);
-    const coin = config.coins.find(c => c.symbol === coinSymbol);
-    if (!coin) {
-      console.error(`Configuration not found for coin: ${coinSymbol}`);
-      return null;
-    }
-    
-    if (data.error) {
-      console.error(`Error in data for ${coinSymbol}:`, data.error);
-      return null;
-    }
-    
-    let rate;
-    if (coin.usesCoinGecko) {
-      if (!data.market_data || !data.market_data.current_price || !data.market_data.current_price.usd) {
-        console.error(`Invalid CoinGecko data structure for ${coinSymbol}:`, data);
-        return null;
-      }
-      rate = data.market_data.current_price.usd;
-    } else {
-      if (!data.RAW || !data.RAW[coinSymbol] || !data.RAW[coinSymbol].USD || typeof data.RAW[coinSymbol].USD.PRICE !== 'number') {
-        console.error(`Invalid CryptoCompare data structure for ${coinSymbol}:`, data);
-        return null;
-      }
-      rate = data.RAW[coinSymbol].USD.PRICE;
-    }
-    
-    if (rate <= 0) {
-      console.error(`Invalid rate for ${coinSymbol}: ${rate}`);
-      return null;
-    }
-    
-    return rate;
-  },
-
-  updateProfitLoss(row, cachedMarketPercentage = null) {
-    const usdCells = row.querySelectorAll('.usd-value');
-    if (usdCells.length < 2) {
-      console.error("Not enough USD value cells found.");
-      return;
-    }
-    const [buyingUSDString, sellingUSDString] = Array.from(usdCells).map(cell => cell.textContent.split('/')[0].trim());
-    const buyingUSD = buyingUSDString === 'N/A' ? NaN : parseFloat(buyingUSDString);
-    const sellingUSD = sellingUSDString === 'N/A' ? NaN : parseFloat(sellingUSDString);
-    
-    console.log('ProfitLoss calculation inputs:', { buyingUSD, sellingUSD });
-    
-    const profitLossCell = row.querySelector('.profit-loss');
-    if (!profitLossCell) {
-      console.error("Profit/loss cell not found.");
-      return;
-    }
-    
-    if ((!isNaN(sellingUSD) && !isNaN(buyingUSD) && buyingUSD > 0) || cachedMarketPercentage !== null) {
-      let profitLossPercentage;
-      if (cachedMarketPercentage !== null) {
-        profitLossPercentage = cachedMarketPercentage;
-      } else {
-        profitLossPercentage = ((sellingUSD - buyingUSD) / buyingUSD) * 100;
-      }
-      console.log('Calculated profit/loss percentage:', profitLossPercentage);
-      
-      let formattedPercentage;
-      if (Math.abs(profitLossPercentage) < 0.000001) {
-        formattedPercentage = profitLossPercentage.toExponential(6);
-      } else if (Math.abs(profitLossPercentage) < 0.01) {
-        formattedPercentage = profitLossPercentage.toFixed(6);
-      } else {
-        formattedPercentage = profitLossPercentage.toFixed(2);
-      }
-
-      profitLossCell.textContent = `${profitLossPercentage >= 0 ? '+' : ''}${formattedPercentage}%`;
-      profitLossCell.className = 'profit-loss ' + (profitLossPercentage > 0 ? 'text-green-500' :
-        profitLossPercentage < 0 ? 'text-red-500' : 'text-yellow-500');
-      
-      const cachedMarketPercentageElement = profitLossCell.closest('td').querySelector('.cached-market-percentage');
-      if (cachedMarketPercentageElement) {
-        cachedMarketPercentageElement.textContent = profitLossPercentage;
-      }
-    } else {
-      profitLossCell.textContent = 'N/A';
-      profitLossCell.className = 'profit-loss text-yellow-500';
-    }
-  },
-
-  updateProfitValue(row) {
-    const usdCells = row.querySelectorAll('.usd-value');
-    if (usdCells.length < 2) {
-      console.error("Not enough USD value cells found.");
-      return;
-    }
-    const [buyingUSDString, sellingUSDString] = Array.from(usdCells).map(cell => cell.textContent.split('/')[0].trim());
-    const buyingUSD = parseFloat(buyingUSDString);
-    const sellingUSD = parseFloat(sellingUSDString);
-    
-    const profitValueCell = row.querySelector('.profit-value');
-    if (!profitValueCell) {
-      console.error("Profit value cell not found.");
-      return;
-    }
-    
-    if (!isNaN(sellingUSD) && !isNaN(buyingUSD)) {
-      const profitValue = sellingUSD - buyingUSD;
-      profitValueCell.textContent = this.formatUSD(profitValue);
-      profitValueCell.classList.remove('hidden');
-    } else {
-      profitValueCell.textContent = 'N/A';
-      profitValueCell.classList.remove('hidden');
-    }
   },
 
   initializeTable() {
@@ -538,9 +368,22 @@ window.tableRateModule = {
         console.warn('Missing or unknown coin name/symbol in data-coinname attribute');
         return;
       }
-      const isRate = coinNameValue.closest('td').querySelector('.ratetype') !== null;
       coinNameValue.classList.remove('hidden');
-      this.updateUsdValue(coinNameValue, coinFullNameOrSymbol, isRate);
+      if (!coinNameValue.textContent.trim()) {
+        coinNameValue.textContent = 'N/A';
+      }
+    });
+
+    document.querySelectorAll('.usd-value').forEach(usdValue => {
+      if (!usdValue.textContent.trim()) {
+        usdValue.textContent = 'N/A';
+      }
+    });
+
+    document.querySelectorAll('.profit-loss').forEach(profitLoss => {
+      if (!profitLoss.textContent.trim() || profitLoss.textContent === 'Calculating...') {
+        profitLoss.textContent = 'N/A';
+      }
     });
   },
 
@@ -550,13 +393,52 @@ window.tableRateModule = {
   }
 };
 
-// Main
+function updateProfitLoss(row, fromCoin, toCoin, fromAmount, toAmount) {
+  const profitLossElement = row.querySelector('.profit-loss');
+  if (!profitLossElement) {
+    console.warn('Profit loss element not found in row');
+    return;
+  }
+
+  calculateProfitLoss(fromCoin, toCoin, fromAmount, toAmount)
+    .then(profitLossPercentage => {
+      if (profitLossPercentage === null) {
+        profitLossElement.textContent = 'N/A';
+        profitLossElement.className = 'profit-loss text-lg font-bold text-gray-500';
+        console.log(`Unable to calculate profit/loss for ${fromCoin} to ${toCoin}`);
+        return;
+      }
+
+      const colorClass = getProfitColorClass(profitLossPercentage);
+      profitLossElement.textContent = `${profitLossPercentage > 0 ? '+' : ''}${profitLossPercentage}%`;
+      profitLossElement.className = `profit-loss text-lg font-bold ${colorClass}`;
+      
+      const tooltipId = `percentage-tooltip-${row.getAttribute('data-offer-id')}`;
+      const tooltipElement = document.getElementById(tooltipId);
+      if (tooltipElement) {
+        const tooltipContent = createTooltipContent(isSentOffers, fromCoin, toCoin, fromAmount, toAmount);
+        tooltipElement.innerHTML = `
+          <div class="tooltip-content">
+            ${tooltipContent}
+          </div>
+          <div class="tooltip-arrow" data-popper-arrow></div>
+        `;
+      }
+
+      console.log(`Updated profit/loss display: ${profitLossElement.textContent}, isSentOffers: ${isSentOffers}`);
+    })
+    .catch(error => {
+      console.error('Error in updateProfitLoss:', error);
+      profitLossElement.textContent = 'Error';
+      profitLossElement.className = 'profit-loss text-lg font-bold text-red-500';
+    });
+}
+
 function fetchOffers(manualRefresh = false) {
     return new Promise((resolve, reject) => {
         const endpoint = isSentOffers ? '/json/sentoffers' : '/json/offers';
         console.log(`Fetching offers from: ${endpoint}`);
         
-        const newEntriesCountSpan = document.getElementById('newEntriesCount');
         if (newEntriesCountSpan) {
             newEntriesCountSpan.textContent = 'Loading...';
         }
@@ -567,7 +449,17 @@ function fetchOffers(manualRefresh = false) {
         
         setRefreshButtonLoading(true);
         
-        fetch(endpoint)
+        const requestBody = {
+            with_extra_info: true
+        };
+        
+        fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestBody)
+        })
             .then(response => {
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
@@ -635,10 +527,12 @@ function fetchOffers(manualRefresh = false) {
                 
                 console.log('Final jsonData length:', jsonData.length);
                 
-                offerCache.clear();
-                jsonData.forEach(offer => offerCache.set(offer.offer_id, offer));
+                if (!isSentOffers) {
+                    removeExpiredOffers();
+                }
                 
-                const validItemCount = isSentOffers ? jsonData.length : jsonData.filter(offer => !isOfferExpired(offer)).length;
+                const validOffers = getValidOffers();
+                const validItemCount = validOffers.length;
                 if (newEntriesCountSpan) {
                     newEntriesCountSpan.textContent = validItemCount;
                 }
@@ -648,10 +542,14 @@ function fetchOffers(manualRefresh = false) {
                 nextRefreshCountdown = getTimeUntilNextExpiration();
                 updateLastRefreshTime();
                 updateNextRefreshTime();
-                applyFilters();
+                
                 updateOffersTable();
                 updateJsonView();
                 updatePaginationInfo();
+                
+                if (validItemCount === 0) {
+                    handleNoOffersScenario();
+                }
                 
                 if (manualRefresh) {
                     console.log('Offers refreshed successfully');
@@ -699,427 +597,173 @@ function fetchOffers(manualRefresh = false) {
 }
 
 function applyFilters() {
-  console.log('Applying filters');
-  console.log('Is Sent Offers:', isSentOffers);
-  
-  const formData = new FormData(filterForm);
-  const filters = Object.fromEntries(formData);
-  console.log('Raw filters:', filters);
-
-  if (filters.coin_to !== 'any') {
-    filters.coin_to = coinIdToName[filters.coin_to] || filters.coin_to;
-  }
-  if (filters.coin_from !== 'any') {
-    filters.coin_from = coinIdToName[filters.coin_from] || filters.coin_from;
-  }
-
-  console.log('Processed filters:', filters);
-
-  const currentTime = Math.floor(Date.now() / 1000);
-
-  jsonData = originalJsonData.filter(offer => {
-    const coinFrom = (offer.coin_from || '').toLowerCase();
-    const coinTo = (offer.coin_to || '').toLowerCase();
-    const isExpired = offer.expire_at <= currentTime;
-
-    console.log(`Offer - id: ${offer.offer_id}, coinFrom: ${coinFrom}, coinTo: ${coinTo}, isExpired: ${isExpired}`);
-
-    if (!isSentOffers && isExpired) {
-      console.log(`Filtered out: offer expired`);
-      return false;
-    }
-
-    if (isSentOffers) {
-      if (filters.coin_to !== 'any' && coinFrom.toLowerCase() !== filters.coin_to.toLowerCase()) {
-        console.log(`Filtered out sent offer: coin to send mismatch - ${coinFrom} !== ${filters.coin_to}`);
-        return false;
-      }
-      if (filters.coin_from !== 'any' && coinTo.toLowerCase() !== filters.coin_from.toLowerCase()) {
-        console.log(`Filtered out sent offer: coin to receive mismatch - ${coinTo} !== ${filters.coin_from}`);
-        return false;
-      }
-    } else {
-      if (filters.coin_to !== 'any' && coinTo.toLowerCase() !== filters.coin_to.toLowerCase()) {
-        console.log(`Filtered out offer: bid mismatch - ${coinTo} !== ${filters.coin_to}`);
-        return false;
-      }
-      if (filters.coin_from !== 'any' && coinFrom.toLowerCase() !== filters.coin_from.toLowerCase()) {
-        console.log(`Filtered out offer: offer mismatch - ${coinFrom} !== ${filters.coin_from}`);
-        return false;
-      }
-    }
-
-    if (isSentOffers && filters.active && filters.active !== 'any') {
-      const offerState = isExpired ? 'expired' : 'active';
-      if (filters.active !== offerState) {
-        console.log(`Filtered out: state mismatch - ${offerState} !== ${filters.active}`);
-        return false;
-      }
-    }
-
-    console.log('Offer passed all filters');
-    return true;
-  });
-
-  console.log('Filtered data length:', jsonData.length);
-
-  if (filters.sort_by) {
-    jsonData.sort((a, b) => {
-      const aValue = a[filters.sort_by];
-      const bValue = b[filters.sort_by];
-      
-      if (filters.sort_by === 'created_at') {
-        return (filters.sort_dir === 'asc' ? 1 : -1) * (Number(aValue) - Number(bValue));
-      } else {
-        return (filters.sort_dir === 'asc' ? 1 : -1) * String(aValue).localeCompare(String(bValue));
-      }
-    });
-  }
-
-  currentPage = 1;
-  updateOffersTable();
-  updateJsonView();
-  updatePaginationInfo();
+    console.log('Applying filters');
+    jsonData = filterAndSortData();
+    updateOffersTable();
+    updateJsonView();
+    updatePaginationInfo();
+    console.log('Filters applied, table updated');
 }
 
-function initializeFlowbiteTooltips() {
-  if (typeof Tooltip === 'undefined') {
-    console.warn('Tooltip is not defined. Make sure the required library is loaded.');
-    return;
-  }
-  
-  const tooltipElements = document.querySelectorAll('[data-tooltip-target]');
-  tooltipElements.forEach((el) => {
-    const tooltipId = el.getAttribute('data-tooltip-target');
-    const tooltipElement = document.getElementById(tooltipId);
-    if (tooltipElement) {
-      new Tooltip(tooltipElement, el);
-    }
-  });
-}
-
-function updateOffersTable() {
-  console.log('Updating offers table');
-  console.log('Current jsonData length:', jsonData.length);
-  console.log('Is Sent Offers:', isSentOffers);
-  console.log('Current Page:', currentPage);
-  
-  if (isInitialLoad) {
-    offersBody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-gray-500 dark:text-white">Loading offers...</td></tr>';
-    return;
-  }
-  
-  if (typeof initializeFlowbiteTooltips === 'function') {
-    initializeFlowbiteTooltips();
-  } else {
-    console.warn('initializeFlowbiteTooltips is not defined. Skipping tooltip initialization.');
-  }
-  
-  const currentTime = Math.floor(Date.now() / 1000);
-  const validOffers = jsonData.filter(offer => {
-    if (isSentOffers) {
-      offer.isExpired = offer.expire_at <= currentTime;
-      return true;
-    } else {
-      return offer.expire_at > currentTime;
-    }
-  });
-  console.log('Valid offers after filtering:', validOffers.length);
-
-  const totalPages = Math.max(1, Math.ceil(validOffers.length / itemsPerPage));
-  currentPage = Math.max(1, Math.min(currentPage, totalPages));
-
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const itemsToDisplay = validOffers.slice(startIndex, endIndex);
-  console.log('Items to display:', itemsToDisplay.length);
-  
-  offersBody.innerHTML = '';
-  
-  if (itemsToDisplay.length === 0) {
+function filterAndSortData() {
+    console.log('Filtering and sorting data');
+    
     const formData = new FormData(filterForm);
     const filters = Object.fromEntries(formData);
-    let message = 'No offers available';
+    console.log('Raw filters:', filters);
+
     if (filters.coin_to !== 'any') {
-      const coinToName = coinIdToName[filters.coin_to] || filters.coin_to;
-      message += ` for bids to ${coinToName}`;
+        filters.coin_to = coinIdToName[filters.coin_to] || filters.coin_to;
     }
     if (filters.coin_from !== 'any') {
-      const coinFromName = coinIdToName[filters.coin_from] || filters.coin_from;
-      message += ` for offers from ${coinFromName}`;
+        filters.coin_from = coinIdToName[filters.coin_from] || filters.coin_from;
     }
-    if (isSentOffers && filters.active && filters.active !== 'any') {
-      message += ` with status: ${filters.active}`;
-    }
-    offersBody.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-gray-500 dark:text-white">${message}</td></tr>`;
-    console.log(message);
-    return;
-  }
-  
-  itemsToDisplay.forEach(offer => {
-    const row = createTableRow(offer, isSentOffers);
-    if (row) {
-      offersBody.appendChild(row);
-    }
-  });
-  console.log('Rows added to table:', itemsToDisplay.length);
-  
-  updateRowTimes();
-  initializeFlowbiteTooltips();
-  updatePaginationInfo(validOffers.length);
-  
-  if (tableRateModule && typeof tableRateModule.initializeTable === 'function') {
-    setTimeout(() => {
-      tableRateModule.initializeTable();
-    }, 0);
-  } else {
-    console.warn('tableRateModule not found or initializeTable method not available');
-  }
-}
-function updateOffersTable() {
-  console.log('Updating offers table');
-  console.log('Current jsonData length:', jsonData.length);
-  console.log('Is Sent Offers:', isSentOffers);
-  console.log('Current Page:', currentPage);
-  
-  if (isInitialLoad) {
-    offersBody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-gray-500 dark:text-white">Loading offers...</td></tr>';
-    return;
-  }
-  
-  const currentTime = Math.floor(Date.now() / 1000);
-  const validOffers = isSentOffers ? jsonData : jsonData.filter(offer => offer.expire_at > currentTime);
-  console.log('Valid offers after filtering:', validOffers.length);
 
-  const totalPages = Math.max(1, Math.ceil(validOffers.length / itemsPerPage));
-  currentPage = Math.max(1, Math.min(currentPage, totalPages));
+    console.log('Processed filters:', filters);
 
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const itemsToDisplay = validOffers.slice(startIndex, endIndex);
-  console.log('Items to display:', itemsToDisplay.length);
-  
-  offersBody.innerHTML = '';
-  
-  if (itemsToDisplay.length === 0) {
-    const message = getNoOffersMessage();
-    offersBody.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-gray-500 dark:text-white">${message}</td></tr>`;
-    console.log(message);
-  } else {
-    itemsToDisplay.forEach(offer => {
-      const row = createTableRow(offer, isSentOffers);
-      if (row) {
-        offersBody.appendChild(row);
-      }
-    });
-    console.log('Rows added to table:', itemsToDisplay.length);
-  }
-  
-  updateRowTimes();
-  initializeFlowbiteTooltips();
-  updatePaginationInfo(validOffers.length);
-  
-  if (tableRateModule && typeof tableRateModule.initializeTable === 'function') {
-    setTimeout(() => {
-      tableRateModule.initializeTable();
-    }, 0);
-  } else {
-    console.warn('tableRateModule not found or initializeTable method not available');
-  }
-}
-
-function performFullRefresh() {
-    console.log('Performing full refresh');
     const currentTime = Math.floor(Date.now() / 1000);
-    
-    fetchOffers(true)
-        .then(() => {
-            jsonData = jsonData.filter(offer => {
-                if (isSentOffers) {
-                    offer.isExpired = offer.expire_at <= currentTime;
-                    return true;
-                } else {
-                    return offer.expire_at > currentTime;
-                }
-            });
-            
-            applyFilters();
-            updateOffersTable();
-            updateJsonView();
-            updatePaginationInfo();
-            
-            countdownToFullRefresh = 900;
-            updateNextFullRefreshTime();
-            
-            console.log('Full refresh completed');
-        })
-        .catch(error => {
-            console.error('Error during full refresh:', error);
-        });
-}
 
-function updateNextRefreshTime() {
-  if (!nextRefreshTimeSpan) {
-    console.warn('nextRefreshTime element not found');
-    return;
-  }
-  
-  const minutes = Math.floor(nextRefreshCountdown / 60);
-  const seconds = nextRefreshCountdown % 60;
-  
-  nextRefreshTimeSpan.textContent = `${minutes}m ${seconds}s`;
+    let filteredData = originalJsonData.filter(offer => {
+        const coinFrom = (offer.coin_from || '').toLowerCase();
+        const coinTo = (offer.coin_to || '').toLowerCase();
+        const isExpired = offer.expire_at <= currentTime;
 
-  updateNextFullRefreshTime();
-}
+        if (!isSentOffers && isExpired) {
+            return false;
+        }
 
-
-function refreshTableData() {
-  console.log('Refreshing table data');
-  setRefreshButtonLoading(true);
-
-  const offersBody = document.getElementById('offers-body');
-  if (offersBody) {
-    offersBody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-gray-500 dark:text-white">Refreshing offers...</td></tr>';
-  }
-  
-  const endpoint = isSentOffers ? '/json/sentoffers' : '/json/offers';
-  fetch(endpoint)
-    .then(response => response.json())
-    .then(newData => {
-      console.log('Received raw data:', newData);
-      console.log('Number of offers received:', Array.isArray(newData) ? newData.length : Object.keys(newData).length);
-      
-      let processedData = Array.isArray(newData) ? newData : Object.values(newData);
-      
-      if (!isSentOffers) {
-        const currentTime = Math.floor(Date.now() / 1000);
-        const beforeFilterCount = processedData.length;
-        processedData = processedData.filter(offer => !isOfferExpired(offer));
-        console.log(`Filtered out ${beforeFilterCount - processedData.length} expired offers`);
-      }
-      
-      const existingOfferIds = new Set(jsonData.map(offer => offer.offer_id));
-      const newOffers = processedData.filter(offer => !existingOfferIds.has(offer.offer_id));
-      console.log(`Found ${newOffers.length} new offers`);
-      
-      jsonData = processedData;
-      originalJsonData = [...processedData];
-      
-      console.log('Final number of offers in jsonData:', jsonData.length);
-      
-      lastRefreshTime = Date.now();
-      localStorage.setItem('lastRefreshedTime', lastRefreshTime.toString());
-      updateLastRefreshTime();
-      
-      newEntriesCount = newOffers.length;
-      
-      applyFilters();
-      updateOffersTable();
-      updateJsonView();
-      updatePaginationInfo();    
-      tableRateModule.initializeTable();
-      
-      console.log('Table data refreshed successfully');
-      setRefreshButtonLoading(false);
-    })
-    .catch(error => {
-      console.error('Error refreshing table data:', error);
-      setRefreshButtonLoading(false);
-      if (offersBody) {
-        offersBody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-red-500">Failed to refresh offers. Please try again.</td></tr>';
-      }
-    });
-}
-
-function updateRowTimes() {
-  const currentTime = Math.floor(Date.now() / 1000);
-  
-  document.querySelectorAll('[data-offer-id]').forEach(row => {
-    const offerId = row.getAttribute('data-offer-id');
-    let offer = offerCache.get(offerId);
-    
-    if (!offer) {
-      offer = jsonData.find(o => o.offer_id === offerId);
-      if (offer) {
-        offerCache.set(offerId, offer);
-      } else {
-        console.warn(`Offer not found for ID: ${offerId}`);
-        return;
-      }
-    }
-
-    const timeColumn = row.querySelector('td:first-child');
-    if (!timeColumn) return;
-
-    const timeDiv = timeColumn.querySelector('div.flex.flex-col');
-    if (!timeDiv) return;
-
-    const postedTime = formatTimeAgo(offer.created_at);
-    const expiresIn = formatTimeLeft(offer.expire_at);
-
-    timeDiv.innerHTML = `
-      <div class="text-xs"><span class="bold">Posted:</span> ${postedTime}</div>
-      <div class="text-xs"><span class="bold">Expires in:</span> ${expiresIn}</div>
-    `;
-    
-    const tooltipElement = document.getElementById(`tooltip-active${offerId}`);
-    if (tooltipElement) {
-      const tooltipContent = tooltipElement.querySelector('.active-revoked-expired');
-      if (tooltipContent) {
-        tooltipContent.innerHTML = `
-          <span class="bold">
-            <div class="text-xs"><span class="bold">Posted:</span> ${postedTime}</div>
-            <div class="text-xs"><span class="bold">Expires in:</span> ${expiresIn}</div>
-          </span>
-        `;
-      }
-    }
-  });
-}
-
-function checkExpiredAndFetchNew() {
-  const currentTime = Math.floor(Date.now() / 1000);
-  const expiredOffers = jsonData.filter(offer => offer.expire_at <= currentTime);
-  
-  if (expiredOffers.length > 0) {
-    console.log(`Found ${expiredOffers.length} expired offers. Removing and checking for new listings.`);
-    
-    jsonData = jsonData.filter(offer => offer.expire_at > currentTime);
-    
-    fetch('/json/offers')
-      .then(response => response.json())
-      .then(data => {
-        let newListings = Array.isArray(data) ? data : Object.values(data);
-        newListings = newListings.filter(offer => !isOfferExpired(offer));
-        
-        const brandNewListings = newListings.filter(newOffer => 
-          !jsonData.some(existingOffer => existingOffer.offer_id === newOffer.offer_id)
-        );
-        
-        if (brandNewListings.length > 0) {
-          console.log(`Found ${brandNewListings.length} new listings to add.`);
-          jsonData = [...jsonData, ...brandNewListings];
-          newEntriesCount += brandNewListings.length;
+        if (isSentOffers) {
+            if (filters.coin_to !== 'any' && coinFrom.toLowerCase() !== filters.coin_to.toLowerCase()) {
+                return false;
+            }
+            if (filters.coin_from !== 'any' && coinTo.toLowerCase() !== filters.coin_from.toLowerCase()) {
+                return false;
+            }
         } else {
-          console.log('No new listings found during expiry check.');
+            if (filters.coin_to !== 'any' && coinTo.toLowerCase() !== filters.coin_to.toLowerCase()) {
+                return false;
+            }
+            if (filters.coin_from !== 'any' && coinFrom.toLowerCase() !== filters.coin_from.toLowerCase()) {
+                return false;
+            }
+        }
+
+        if (isSentOffers && filters.active && filters.active !== 'any') {
+            const offerState = isExpired ? 'expired' : 'active';
+            if (filters.active !== offerState) {
+                return false;
+            }
+        }
+
+        return true;
+    });
+
+    console.log('Filtered data length:', filteredData.length);
+
+    const sortBy = filters.sort_by || 'created_at';
+    const sortDir = filters.sort_dir || 'desc';
+
+    filteredData.sort((a, b) => {
+        let aValue, bValue;
+
+        switch (sortBy) {
+            case 'created_at':
+                aValue = a.created_at;
+                bValue = b.created_at;
+                break;
+            case 'rate':
+                aValue = parseFloat(a.rate);
+                bValue = parseFloat(b.rate);
+                break;
+            default:
+                aValue = a.created_at;
+                bValue = b.created_at;
+        }
+
+        if (sortDir === 'asc') {
+            return aValue - bValue;
+        } else {
+            return bValue - aValue;
+        }
+    });
+
+    console.log(`Sorted offers by ${sortBy} in ${sortDir} order`);
+
+    return filteredData;
+}
+
+async function updateOffersTable() {
+    console.log('Starting updateOffersTable function');
+    console.log(`Is Sent Offers page: ${isSentOffers}`);
+    
+    try {
+        const priceData = await fetchLatestPrices();
+        if (!priceData) {
+            console.error('Failed to fetch latest prices. Using last known prices or proceeding without price data.');
+        } else {
+            console.log('Latest prices fetched successfully');
+            latestPrices = priceData;
+        }
+
+        let validOffers = getValidOffers();
+        console.log(`Valid offers: ${validOffers.length}`);
+
+        if (validOffers.length === 0) {
+            console.log('No valid offers found. Handling no offers scenario.');
+            handleNoOffersScenario();
+            return;
+        }
+
+        const totalPages = Math.max(1, Math.ceil(validOffers.length / itemsPerPage));
+        currentPage = Math.min(currentPage, totalPages);
+
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        const itemsToDisplay = validOffers.slice(startIndex, endIndex);
+        
+        console.log(`Displaying offers ${startIndex + 1} to ${endIndex} of ${validOffers.length}`);
+        
+        offersBody.innerHTML = '';
+        
+        for (const offer of itemsToDisplay) {
+            const row = createTableRow(offer, isSentOffers);
+            if (row) {
+                offersBody.appendChild(row);
+                try {
+                    const fromAmount = parseFloat(offer.amount_from);
+                    const toAmount = parseFloat(offer.amount_to);
+                    await updateProfitLoss(row, offer.coin_from, offer.coin_to, fromAmount, toAmount);
+                } catch (error) {
+                    console.error(`Error updating profit/loss for offer ${offer.offer_id}:`, error);
+                }
+            }
         }
         
-        updateOffersTable();
-        updateJsonView();
+        updateRowTimes();
+        initializeFlowbiteTooltips();
         updatePaginationInfo();
         
-        nextRefreshCountdown = getTimeUntilNextExpiration();
-        console.log(`Next expiration check in ${nextRefreshCountdown} seconds`);
-      })
-      .catch(error => {
-        console.error('Error fetching new listings during expiry check:', error);
-      });
-  } else {
-    console.log('No expired offers found during this check.');
+        if (tableRateModule && typeof tableRateModule.initializeTable === 'function') {
+            tableRateModule.initializeTable();
+        }
+        
+        logOfferStatus();
 
-    nextRefreshCountdown = getTimeUntilNextExpiration();
-    console.log(`Next expiration check in ${nextRefreshCountdown} seconds`);
-  }
+        lastRefreshTime = Date.now();
+        nextRefreshCountdown = getTimeUntilNextExpiration();
+        updateLastRefreshTime();
+        updateNextRefreshTime();
+
+        if (newEntriesCountSpan) {
+            newEntriesCountSpan.textContent = validOffers.length;
+        }
+
+    } catch (error) {
+        console.error('Error updating offers table:', error);
+        offersBody.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-red-500">An error occurred while updating the offers table. Please try again later.</td></tr>`;
+    } finally {
+        setRefreshButtonLoading(false);
+    }
 }
 
 function createTableRow(offer, isSentOffers) {
@@ -1127,23 +771,32 @@ function createTableRow(offer, isSentOffers) {
   row.className = `opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600`;
   row.setAttribute('data-offer-id', offer.offer_id);
 
-  const {
-    coinFrom, coinTo, coinFromSymbol, coinToSymbol,
-    postedTime, expiresIn, isActuallyExpired, isTreatedAsSentOffer,
-    formattedRate, buttonClass, buttonText, clockColor
-  } = prepareOfferData(offer, isSentOffers);
+  const coinFrom = symbolToCoinName[coinNameToSymbol[offer.coin_from]] || offer.coin_from;
+  const coinTo = symbolToCoinName[coinNameToSymbol[offer.coin_to]] || offer.coin_to;
+
+  const postedTime = formatTimeAgo(offer.created_at);
+  const expiresIn = formatTimeLeft(offer.expire_at);
+  
+  const currentTime = Math.floor(Date.now() / 1000);
+  const isActuallyExpired = currentTime > offer.expire_at;
+
+  const { buttonClass, buttonText } = getButtonProperties(isActuallyExpired, isSentOffers, offer.is_own_offer, offer.is_revoked);
 
   row.innerHTML = `
-    ${createTimeColumn(offer, postedTime, expiresIn, clockColor)}
+    ${createTimeColumn(offer, postedTime, expiresIn)}
     ${createDetailsColumn(offer)}
-    ${createTakerAmountColumn(offer, coinFrom, coinFromSymbol, coinTo)}
+    ${createTakerAmountColumn(offer, coinFrom, coinTo)}
     ${createSwapColumn(offer, coinFrom, coinTo)}
-    ${createOrderbookColumn(offer, coinTo, coinToSymbol, coinFrom)}
-    ${createRateColumn(offer, coinFrom, coinTo, formattedRate)}
+    ${createOrderbookColumn(offer, coinTo, coinFrom)}
+    ${createRateColumn(offer, coinFrom, coinTo)}
     ${createPercentageColumn(offer)}
     ${createActionColumn(offer, buttonClass, buttonText)}
     ${createTooltips(offer, isSentOffers, coinFrom, coinTo, postedTime, expiresIn, isActuallyExpired)}
   `;
+
+  const fromAmount = parseFloat(offer.amount_from);
+  const toAmount = parseFloat(offer.amount_to);
+  updateProfitLoss(row, coinFrom, coinTo, fromAmount, toAmount, isSentOffers);
 
   return row;
 }
@@ -1151,8 +804,6 @@ function createTableRow(offer, isSentOffers) {
 function prepareOfferData(offer, isSentOffers) {
   const coinFrom = offer.coin_from;
   const coinTo = offer.coin_to;
-  const coinFromSymbol = getCoinSymbol(coinFrom);
-  const coinToSymbol = getCoinSymbol(coinTo);
   
   const postedTime = formatTimeAgo(offer.created_at);
   const expiresIn = formatTimeLeft(offer.expire_at);
@@ -1160,22 +811,24 @@ function prepareOfferData(offer, isSentOffers) {
   const currentTime = Math.floor(Date.now() / 1000);
   const isActuallyExpired = currentTime > offer.expire_at;
 
-  const rateValue = parseFloat(offer.rate);
-  const formattedRate = formatSmallNumber(rateValue);
-
   const { buttonClass, buttonText } = getButtonProperties(isActuallyExpired, isSentOffers, offer.is_own_offer);
   
   const clockColor = isActuallyExpired ? "#9CA3AF" : "#3B82F6";
 
   return {
-    coinFrom, coinTo, coinFromSymbol, coinToSymbol,
+    coinFrom, coinTo,
     postedTime, expiresIn, isActuallyExpired,
-    formattedRate, buttonClass, buttonText, clockColor
+    buttonClass, buttonText, clockColor
   };
 }
 
-function getButtonProperties(isActuallyExpired, isSentOffers, isTreatedAsSentOffer) {
-  if (isActuallyExpired && isSentOffers) {
+function getButtonProperties(isActuallyExpired, isSentOffers, isTreatedAsSentOffer, isRevoked) {
+  if (isRevoked) {
+    return {
+      buttonClass: 'bg-red-500 text-white hover:bg-red-600 transition duration-200',
+      buttonText: 'Revoked'
+    };
+  } else if (isActuallyExpired && isSentOffers) {
     return {
       buttonClass: 'bg-gray-400 text-white dark:border-gray-300 text-white hover:bg-red-700 transition duration-200',
       buttonText: 'Expired'
@@ -1193,16 +846,154 @@ function getButtonProperties(isActuallyExpired, isSentOffers, isTreatedAsSentOff
   }
 }
 
-function createTimeColumn(offer, postedTime, expiresIn, clockColor) {
+function updateProfitLoss(row, fromCoin, toCoin, fromAmount, toAmount) {
+  const profitLossElement = row.querySelector('.profit-loss');
+  if (!profitLossElement) {
+    console.warn('Profit loss element not found in row');
+    return;
+  }
+
+  calculateProfitLoss(fromCoin, toCoin, fromAmount, toAmount)
+    .then(profitLossPercentage => {
+      if (profitLossPercentage === null) {
+        profitLossElement.textContent = 'N/A';
+        profitLossElement.className = 'profit-loss text-lg font-bold text-white';
+        console.log(`Unable to calculate profit/loss for ${fromCoin} to ${toCoin}`);
+        return;
+      }
+
+      const colorClass = getProfitColorClass(profitLossPercentage);
+      profitLossElement.textContent = `${profitLossPercentage > 0 ? '+' : ''}${profitLossPercentage}%`;
+      profitLossElement.className = `profit-loss text-lg font-bold ${colorClass}`;
+      
+      // Update the tooltip content
+      const tooltipId = `percentage-tooltip-${row.getAttribute('data-offer-id')}`;
+      const tooltipElement = document.getElementById(tooltipId);
+      if (tooltipElement) {
+        const tooltipContent = createTooltipContent(isSentOffers, fromCoin, toCoin, fromAmount, toAmount);
+        tooltipElement.innerHTML = `
+          <div class="tooltip-content">
+            ${tooltipContent}
+          </div>
+          <div class="tooltip-arrow" data-popper-arrow></div>
+        `;
+      }
+
+      console.log(`Updated profit/loss display: ${profitLossElement.textContent}, isSentOffers: ${isSentOffers}`);
+    })
+    .catch(error => {
+      console.error('Error in updateProfitLoss:', error);
+      profitLossElement.textContent = 'Error';
+      profitLossElement.className = 'profit-loss text-lg font-bold text-red-500';
+    });
+}
+
+async function calculateProfitLoss(fromCoin, toCoin, fromAmount, toAmount) {
+  console.log(`Calculating profit/loss for ${fromAmount} ${fromCoin} to ${toAmount} ${toCoin}, isSentOffers: ${isSentOffers}`);
+
+  if (!latestPrices) {
+    console.error('Latest prices not available. Unable to calculate profit/loss.');
+    return null;
+  }
+
+  const fromSymbol = coinNameToSymbol[fromCoin] || fromCoin.toLowerCase();
+  const toSymbol = coinNameToSymbol[toCoin] || toCoin.toLowerCase();
+
+  const fromPriceUSD = latestPrices[fromSymbol]?.usd;
+  const toPriceUSD = latestPrices[toSymbol]?.usd;
+
+  if (!fromPriceUSD || !toPriceUSD) {
+    console.error(`Price data missing for ${fromSymbol} or ${toSymbol}`);
+    return null;
+  }
+
+  const fromValueUSD = fromAmount * fromPriceUSD;
+  const toValueUSD = toAmount * toPriceUSD;
+
+  let profitPercentage;
+
+  if (isSentOffers) {
+    // Sent Offer
+    profitPercentage = ((toValueUSD / fromValueUSD) - 1) * 100;
+  } else {
+    // Offer Page
+    profitPercentage = ((fromValueUSD / toValueUSD) - 1) * 100;
+  }
+
+  console.log(`From value: $${fromValueUSD.toFixed(2)}, To value: $${toValueUSD.toFixed(2)}`);
+  console.log(`Profit percentage: ${profitPercentage.toFixed(2)}%, isSentOffers: ${isSentOffers}`);
+
+  return profitPercentage.toFixed(2);
+}
+
+function getProfitColorClass(percentage) {
+  const numericPercentage = parseFloat(percentage);
+  if (numericPercentage > 0) return 'text-green-500';
+  if (numericPercentage < 0) return 'text-red-500';
+  if (numericPercentage === 0) return 'text-yellowr-400';
+  return 'text-white';
+}
+
+function getMarketRate(fromCoin, toCoin) {
+    return new Promise((resolve) => {
+        console.log(`Attempting to get market rate for ${fromCoin} to ${toCoin}`);
+        if (!latestPrices) {
+            console.warn('Latest prices object is not available');
+            resolve(null);
+            return;
+        }
+        const fromPrice = latestPrices[fromCoin.toLowerCase()]?.usd;
+        const toPrice = latestPrices[toCoin.toLowerCase()]?.usd;
+        if (!fromPrice || !toPrice) {
+            console.warn(`Missing price data for ${!fromPrice ? fromCoin : toCoin}`);
+            resolve(null);
+            return;
+        }
+        const rate = toPrice / fromPrice;
+        console.log(`Market rate calculated: ${rate} ${toCoin}/${fromCoin}`);
+        resolve(rate);
+    });
+}
+
+function getTimerColor(offer) {
+  const now = Math.floor(Date.now() / 1000);
+  const offerAge = now - offer.created_at;
+  const offerLifespan = offer.expire_at - offer.created_at;
+  const timeLeft = offer.expire_at - now;
+
+  // New listing:
+  if (offerAge < offerLifespan * 0.1) {
+    return "#10B981"; // Green
+  }
+  
+  // Almost expired:
+  if (timeLeft < offerLifespan * 0.1) {
+    return "#9CA3AF"; // Gray
+  }
+  
+  // Fade from green to blue to gray
+  const bluePhase = (offerAge - offerLifespan * 0.1) / (offerLifespan * 0.8);
+  const r = Math.round(16 + (59 - 16) * bluePhase);
+  const g = Math.round(185 + (130 - 185) * bluePhase);
+  const b = Math.round(129 + (246 - 129) * bluePhase);
+  
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+function createTimeColumn(offer, postedTime, expiresIn) {
+  const timerColor = getTimerColor(offer);
+  
   return `
     <td class="py-3 pl-6 text-xs">
       <div class="flex items-center">
-        <svg alt="" class="w-5 h-5 rounded-full mr-3" data-tooltip-target="tooltip-active${escapeHtml(offer.offer_id)}" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-          <g stroke-linecap="round" stroke-width="2" fill="none" stroke="${escapeHtml(clockColor)}" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="11"></circle>
-            <polyline points="12,6 12,12 18,12" stroke="${escapeHtml(clockColor)}"></polyline>
-          </g>
-        </svg>
+        <div class="relative" data-tooltip-target="tooltip-active${escapeHtml(offer.offer_id)}">
+          <svg alt="" class="w-5 h-5 rounded-full mr-3 cursor-pointer" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
+            <g stroke-linecap="round" stroke-width="2" fill="none" stroke="${escapeHtml(timerColor)}" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="11"></circle>
+              <polyline points="12,6 12,12 18,12" stroke="${escapeHtml(timerColor)}"></polyline>
+            </g>
+          </svg>
+        </div>
         <div class="flex flex-col hidden xl:block">
           <div class="text-xs"><span class="bold">Posted:</span> ${escapeHtml(postedTime)}</div>
           <div class="text-xs"><span class="bold">Expires in:</span> ${escapeHtml(expiresIn)}</div>
@@ -1214,31 +1005,31 @@ function createTimeColumn(offer, postedTime, expiresIn, clockColor) {
 
 function createDetailsColumn(offer) {
   const addrFrom = offer.addr_from || '';
-  const amountVariable = offer.amount_variable !== undefined ? offer.amount_variable : false;
   return `
     <td class="py-8 px-4 text-xs text-left hidden xl:block">
       <a data-tooltip-target="tooltip-recipient${escapeHtml(offer.offer_id)}" href="/identity/${escapeHtml(addrFrom)}">
         <span class="bold">Recipient:</span> ${escapeHtml(addrFrom.substring(0, 10))}...
       </a>
+
     </td>
   `;
 }
 
-function createTakerAmountColumn(offer, coinFrom, coinFromSymbol, coinTo) {
+function createTakerAmountColumn(offer, coinFrom, coinTo) {
+  const fromAmount = parseFloat(offer.amount_from);
+  const fromSymbol = getCoinSymbol(coinFrom);
+  const fromPriceUSD = latestPrices[coinNameToSymbol[coinFrom]]?.usd || 0;
+  const fromValueUSD = fromAmount * fromPriceUSD;
+
   return `
-    <td class="py-0 px-4 text-left text-sm">
-      <a data-tooltip-target="tooltip-wallet${offer.offer_id}" href="/wallet/${coinFromSymbol}" class="items-center monospace">
-        <span class="coinname bold w-32" data-coinname="${coinFrom}">
-          ${offer.amount_from.substring(0, 7)}
+    <td class="py-0 px-0 text-left text-sm">
+      <a data-tooltip-target="tooltip-wallet${offer.offer_id}" href="/wallet/${fromSymbol}" class="items-center monospace">
+        <div class="coinname bold w-32" data-coinname="${coinFrom}">
+          ${fromAmount.toFixed(4)}
           <div class="text-gray-600 dark:text-gray-300 text-xs">${coinFrom}</div>
-        </span>
+          <div class="text-gray-600 dark:text-gray-300 text-xs">USD: (${fromValueUSD.toFixed(2)})</div>
+        </div>
       </a>
-      <div class="ratetype hidden">
-        <span class="exchange-rates" data-coinname="${coinFrom}">${offer.rate.substring(0, 6)} ${coinTo}/${coinFrom}</span>
-        <div class="coinname-value hidden" data-coinname="${coinTo}">${offer.amount_to.substring(0, 100)}</div>
-        <div class="usd-value hidden" data-o16="${coinTo}"></div>
-        <div class="usd-value-in-coin-value"></div>
-      </div>
     </td>
   `;
 }
@@ -1262,46 +1053,64 @@ function createSwapColumn(offer, coinFrom, coinTo) {
   `;
 }
 
-function createOrderbookColumn(offer, coinTo, coinToSymbol, coinFrom) {
+function createOrderbookColumn(offer, coinTo, coinFrom) {
+  const toAmount = parseFloat(offer.amount_to);
+  const toSymbol = getCoinSymbol(coinTo);
+  const toPriceUSD = latestPrices[coinNameToSymbol[coinTo]]?.usd || 0;
+  const toValueUSD = toAmount * toPriceUSD;
   return `
-    <td class="py-0 px-4 text-right text-sm">
-      <a data-tooltip-target="tooltip-wallet-maker${escapeHtml(offer.offer_id)}" href="/wallet/${escapeHtml(coinToSymbol)}" class="items-center monospace">
-        <span class="coinname bold w-32" data-coinname="${escapeHtml(coinTo)}">
-          ${escapeHtml(offer.amount_to.substring(0, 7))}
-          <div class="text-gray-600 dark:text-gray-300 text-xs">${escapeHtml(coinTo)}</div>
-        </span>
-      </a>
-      <div class="ratetype italic hidden">
-        <span class="exchange-rates" data-coinname="${escapeHtml(coinTo)}">${escapeHtml(offer.rate.substring(0, 6))} ${escapeHtml(coinFrom)}/${escapeHtml(coinTo)}</span>
-        <div class="coinname-value hidden" data-coinname="${escapeHtml(coinFrom)}">${escapeHtml(offer.amount_from.substring(0, 7))}</div>
-        <div class="usd-value hidden" data-o16="${escapeHtml(coinFrom)}"></div>
-        <div class="usd-value-in-coin-value"></div>
+    <td class="p-0">
+      <div class="py-3 px-4 text-right">
+        <a data-tooltip-target="tooltip-wallet-maker${escapeHtml(offer.offer_id)}" href="/wallet/${escapeHtml(toSymbol)}" class="block">
+          <div class="pr-2">
+            <div class="text-sm font-semibold">${toAmount.toFixed(4)}</div>
+            <div class="text-xs text-gray-500 dark:text-gray-400">${coinTo}</div>
+            <div class="text-xs text-gray-500 dark:text-gray-400">USD: (${toValueUSD.toFixed(2)})</div>
+          </div>
+        </a>
       </div>
     </td>
   `;
 }
 
-function createRateColumn(offer, coinFrom, coinTo, formattedRate) {
+function calculateInverseRate(rate) {
+    return (1 / parseFloat(rate)).toFixed(8);
+}
+
+function createRateColumn(offer, coinFrom, coinTo) {
+  const rate = parseFloat(offer.rate);
+  const inverseRate = 1 / rate;
+  const fromSymbol = getCoinSymbol(coinFrom);
+  const toSymbol = getCoinSymbol(coinTo);
+  
+  // Get USD prices
+  const fromPriceUSD = latestPrices[coinNameToSymbol[coinFrom]]?.usd || 0;
+  const toPriceUSD = latestPrices[coinNameToSymbol[coinTo]]?.usd || 0;
+
+  // Calculate USD equivalent of the rate
+  const rateInUSD = rate * toPriceUSD;
+
+  console.log(`Rate calculation for ${fromSymbol} to ${toSymbol}:`);
+  console.log(`Rate: ${rate} ${toSymbol}/${fromSymbol}`);
+  console.log(`Inverse Rate: ${inverseRate} ${fromSymbol}/${toSymbol}`);
+  console.log(`${fromSymbol} price: $${fromPriceUSD}`);
+  console.log(`${toSymbol} price: $${toPriceUSD}`);
+  console.log(`Rate in USD: $${rateInUSD.toFixed(2)}`);
+
   return `
-    <td class="py-3 pl-6 bold monospace text-sm text-right items-center rate-table-info">
-      <div class="relative" data-tooltip-target="tooltip-rate-${offer.offer_id}">
-        <div class="profit-value text-sm font-bold" style="display:none">
-          <span class="text-xs text-gray-500 dark:text-white" style="display:none">PROFIT:</span>
-        </div>
-        <div class="text-xs font-bold">
-          <span class="text-xs text-gray-500 dark:text-white">RATE:</span>
-          <span class="coinname-value" data-coinname="${coinFrom}">${formattedRate}</span>
-        </div>
-        <div class="text-xs">
-          <span class="text-gray-500 dark:text-white" style="display:none">USD:</span>
-          <span class="usd-value" style="display:none" data-o16="${coinTo}"></span>
-        </div>
-        <div class="ratetype text-xs text-gray-500 dark:text-white">
-          <span class="exchange-rates" style="display:none" data-coinname="${coinTo}">
-            ${formattedRate} ${coinFrom}/${coinTo}
+    <td class="py-3 pl-6 bold monospace text-xs text-right items-center rate-table-info">
+      <div class="relative">
+        <div class="flex flex-col items-end" data-tooltip-target="tooltip-rate-${offer.offer_id}">
+          <span class="font-bold text-gray-700 dark:text-white">
+            ${rate.toFixed(6)} ${toSymbol}/${fromSymbol}
+          </span>
+          <span class="text-gray-500 dark:text-white">
+            ${inverseRate.toFixed(6)} ${fromSymbol}/${toSymbol}
+          </span>
+          <span class="text-gray-400 dark:text-gray-400">
+            ($${rateInUSD.toFixed(2)})
           </span>
         </div>
-        <div class="cached-rate hidden"></div>
       </div>
     </td>
   `;
@@ -1312,9 +1121,10 @@ function createPercentageColumn(offer) {
     <td class="py-3 px-2 bold text-sm text-center monospace items-center rate-table-info">
       <div class="relative" data-tooltip-target="percentage-tooltip-${offer.offer_id}">
         <div class="profittype">
-          <span class="profit-loss text-lg font-bold"></span>
+          <span class="profit-loss text-lg font-bold" data-offer-id="${offer.offer_id}">
+            Calculating...
+          </span>
         </div>
-        <div class="cached-market-percentage hidden"></div>
       </div>
     </td>
   `;
@@ -1334,6 +1144,22 @@ function createActionColumn(offer, buttonClass, buttonText) {
 }
 
 function createTooltips(offer, isSentOffers, coinFrom, coinTo, postedTime, expiresIn, isActuallyExpired) {
+  const rate = parseFloat(offer.rate);
+  const fromSymbol = coinNameToSymbol[coinFrom] || coinFrom.toLowerCase();
+  const toSymbol = coinNameToSymbol[coinTo] || coinTo.toLowerCase();
+  
+  const fromPriceUSD = latestPrices[fromSymbol]?.usd || 0;
+  const toPriceUSD = latestPrices[toSymbol]?.usd || 0;
+  const rateInUSD = rate * toPriceUSD;
+
+
+  const combinedRateTooltip = createCombinedRateTooltip(offer, coinFrom, coinTo);
+
+
+  const fromAmount = parseFloat(offer.amount_from);
+  const toAmount = parseFloat(offer.amount_to);
+  const percentageTooltipContent = createTooltipContent(isSentOffers, coinFrom, coinTo, fromAmount, toAmount);
+
   return `
     <div id="tooltip-active${offer.offer_id}" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white ${isActuallyExpired ? 'bg-gray-400' : 'bg-green-600'} rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
       <div class="active-revoked-expired">
@@ -1349,13 +1175,13 @@ function createTooltips(offer, isSentOffers, coinFrom, coinTo, postedTime, expir
       <div class="active-revoked-expired"><span class="bold monospace">${offer.addr_from}</span></div>
       <div class="tooltip-arrow" data-popper-arrow></div>
     </div>
-    
+   
     <div id="tooltip-wallet${offer.offer_id}" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
       <div class="active-revoked-expired"><span class="bold">${isSentOffers ? 'My' : ''} ${coinFrom} Wallet</span></div>
       <div class="tooltip-arrow pl-1" data-popper-arrow></div>
     </div>
     
-    <div id="tooltip-offer${offer.offer_id}" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white ${offer.is_own_offer ? 'bg-gray-300' : 'bg-green-700'} rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+    <div id="tooltip-offer${offer.offer_id}" role="tooltip" class="inline-block absolute z-10 py-2 px-3 text-sm font-medium text-white ${offer.is_own_offer ? 'bg-gray-300' : 'bg-green-700'} rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
       <div class="active-revoked-expired"><span class="bold">${offer.is_own_offer ? 'Edit Offer' : `Buy ${coinTo}`}</span></div>
       <div class="tooltip-arrow pr-6" data-popper-arrow></div>
     </div>
@@ -1365,30 +1191,109 @@ function createTooltips(offer, isSentOffers, coinFrom, coinTo, postedTime, expir
       <div class="tooltip-arrow pl-1" data-popper-arrow></div>
     </div>
     
-    <div id="tooltip-rate-${offer.offer_id}" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+    <div id="tooltip-rate-${offer.offer_id}" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
       <div class="tooltip-content">
-        <p class="font-bold mb-1">Exchange Rate Explanation:</p>
-        <p>This rate shows how much ${coinTo} you'll receive for each ${coinFrom} you exchange.</p>
-        <p class="mt-1">Example: 1 ${coinFrom} = ${offer.rate.substring(0, 6)} ${coinTo}</p>
+        ${combinedRateTooltip}
       </div>
       <div class="tooltip-arrow" data-popper-arrow></div>
     </div>
 
-    <div id="percentage-tooltip-${offer.offer_id}" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+    <div id="percentage-tooltip-${offer.offer_id}" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
       <div class="tooltip-content">
-        <p class="font-bold mb-1">Market Comparison:</p>
-        <p>This percentage shows how this offer compares to the current market rate.</p>
-        <p class="mt-1">Positive: Better than market rate</p>
-        <p>Negative: Worse than market rate</p>
+        ${percentageTooltipContent}
       </div>
       <div class="tooltip-arrow" data-popper-arrow></div>
     </div>
   `;
 }
 
+function createTooltipContent(isSentOffers, coinFrom, coinTo, fromAmount, toAmount) {
+  const fromSymbol = coinNameToSymbol[coinFrom] || coinFrom.toLowerCase();
+  const toSymbol = coinNameToSymbol[coinTo] || coinTo.toLowerCase();
+  const fromPriceUSD = latestPrices[fromSymbol]?.usd;
+  const toPriceUSD = latestPrices[toSymbol]?.usd;
+
+  if (!fromPriceUSD || !toPriceUSD) {
+    return `<p class="font-bold mb-1">Unable to calculate profit/loss</p>
+            <p>Price data is missing for one or both coins.</p>`;
+  }
+
+  const fromValueUSD = fromAmount * fromPriceUSD;
+  const toValueUSD = toAmount * toPriceUSD;
+  const profitUSD = toValueUSD - fromValueUSD;
+  let profitPercentage;
+
+  if (isSentOffers) {
+    // Sent Offer Page
+    profitPercentage = ((toValueUSD / fromValueUSD) - 1) * 100;
+  } else {
+    // Offer Page
+    profitPercentage = ((fromValueUSD / toValueUSD) - 1) * 100;
+  }
+
+  const profitLabel = isSentOffers ? "Profit" : "Savings";
+  const actionLabel = isSentOffers ? "selling" : "buying";
+  const directionLabel = isSentOffers ? "receiving" : "paying";
+
+  return `
+    <p class="font-bold mb-1">Profit/Loss Calculation:</p>
+    <p>You are ${actionLabel} ${fromAmount} ${coinFrom} (${fromValueUSD.toFixed(2)} USD) <br/> and ${directionLabel} ${toAmount} ${coinTo} (${toValueUSD.toFixed(2)} USD).</p>
+    <p class="mt-1">Percentage: ${profitPercentage.toFixed(2)}%</p>
+    <p>USD ${profitLabel}: ${profitUSD > 0 ? '+' : ''}${profitUSD.toFixed(2)} USD</p>
+    <p class="font-bold mt-2">Calculation:</p>
+    <p>Percentage = ${isSentOffers ? 
+      "((To Amount in USD / From Amount in USD) - 1) * 100" : 
+      "((From Amount in USD / To Amount in USD) - 1) * 100"}</p>
+    <p>USD ${profitLabel} = ${isSentOffers ? 
+      "To Amount in USD - From Amount in USD" : 
+      "From Amount in USD - To Amount in USD"}</p>
+    <p class="font-bold mt-1">Interpretation:</p>
+    ${isSentOffers ? `
+    <p><span class="text-green-500">Positive percentage:</span> You're making a profit</p>
+    <p><span class="text-red-500">Negative percentage:</span> You're taking a loss</p>
+    ` : `
+    <p><span class="text-green-500">Positive percentage:</span> You're saving money compared to market rates</p>
+    <p><span class="text-red-500">Negative percentage:</span> You're paying more than current market rates</p>
+    `}
+    <p class="mt-1"><strong>Note:</strong> ${isSentOffers ? 
+      "As a seller, a positive percentage means you're selling<br/> for more than the current market value." : 
+      "As a buyer, a positive percentage indicates potential </br> savings compared to current market rates."}</p>
+  `;
+}
+function createCombinedRateTooltip(offer, coinFrom, coinTo) {
+  const rate = parseFloat(offer.rate);
+  const inverseRate = 1 / rate;
+  const fromSymbol = coinNameToSymbol[coinFrom] || coinFrom.toLowerCase();
+  const toSymbol = coinNameToSymbol[coinTo] || coinTo.toLowerCase();
+  
+  const fromPriceUSD = latestPrices[fromSymbol]?.usd || 0;
+  const toPriceUSD = latestPrices[toSymbol]?.usd || 0;
+  const rateInUSD = rate * toPriceUSD;
+
+  const marketRate = fromPriceUSD / toPriceUSD;
+  
+  const percentDiff = ((rate - marketRate) / marketRate) * 100;
+  const aboveOrBelow = percentDiff > 0 ? "above" : "below";
+
+  const action = isSentOffers ? "selling" : "buying";
+
+  return `
+    <p class="font-bold mb-1">Exchange Rate Explanation:</p>
+    <p>This offer is ${action} ${coinFrom} for ${coinTo} <br/>at a rate that is ${Math.abs(percentDiff).toFixed(2)}% ${aboveOrBelow} market price.</p>
+    <p class="font-bold mt-1">Exchange Rates:</p>
+    <p>1 ${coinFrom} = ${rate.toFixed(6)} ${toSymbol}</p>
+    <p>1 ${coinTo} = ${inverseRate.toFixed(6)} ${fromSymbol}</p>
+    <p class="font-bold mt-2">USD Equivalent:</p>
+    <p>1 ${coinFrom} = $${rateInUSD.toFixed(2)} USD</p>
+    <p class="font-bold mt-2">Current market prices:</p>
+    <p>${coinFrom}: $${fromPriceUSD.toFixed(2)} USD</p>
+    <p>${coinTo}: $${toPriceUSD.toFixed(2)} USD</p>
+    <p class="mt-1">Market rate: 1 ${coinFrom} = ${marketRate.toFixed(6)} ${toSymbol}</p>
+  `;
+}
+
 function updatePaginationInfo() {
-    const currentTime = Math.floor(Date.now() / 1000);
-    const validOffers = isSentOffers ? jsonData : jsonData.filter(offer => offer.expire_at > currentTime);
+    const validOffers = getValidOffers();
     const validItemCount = validOffers.length;
     const totalPages = Math.max(1, Math.ceil(validItemCount / itemsPerPage));
     
@@ -1398,10 +1303,10 @@ function updatePaginationInfo() {
     totalPagesSpan.textContent = totalPages;
     
     prevPageButton.classList.toggle('invisible', currentPage === 1 || validItemCount === 0);
-    nextPageButton.classList.toggle('invisible', currentPage === totalPages || validItemCount === 0 || validItemCount <= itemsPerPage);
+    nextPageButton.classList.toggle('invisible', currentPage === totalPages || validItemCount === 0);
 
     prevPageButton.style.display = currentPage === 1 ? 'none' : 'inline-flex';
-    nextPageButton.style.display = currentPage === totalPages ? 'none' : 'inline-flex';
+    nextPageButton.style.display = (currentPage === totalPages || validItemCount === 0) ? 'none' : 'inline-flex';
 
     if (lastRefreshTime) {
         lastRefreshTimeSpan.textContent = new Date(lastRefreshTime).toLocaleTimeString();
@@ -1412,171 +1317,278 @@ function updatePaginationInfo() {
         newEntriesCountSpan.textContent = validItemCount;
     }
 
-    console.log(`Pagination: Page ${currentPage} of ${totalPages}, Valid items: ${validItemCount}`);
+    logOfferStatus();
 }
 
 function updateJsonView() {
-  jsonContent.textContent = JSON.stringify(jsonData, null, 2);
+    jsonContent.textContent = JSON.stringify(jsonData, null, 2);
 }
 
 function updateLastRefreshTime() {
-  lastRefreshTimeSpan.textContent = new Date(lastRefreshTime).toLocaleTimeString();
+    lastRefreshTimeSpan.textContent = new Date(lastRefreshTime).toLocaleTimeString();
 }
 
-function updateNextFullRefreshTime() {
-    const nextFullRefreshTimeSpan = document.getElementById('nextFullRefreshTime');
-    if (nextFullRefreshTimeSpan) {
-        const minutes = Math.floor(Math.max(0, countdownToFullRefresh) / 60);
-        const seconds = Math.max(0, countdownToFullRefresh) % 60;
-        nextFullRefreshTimeSpan.textContent = `${minutes}m ${seconds}s`;
+function updateNextRefreshTime() {
+    if (isSentOffers) return;
+
+    const nextRefreshTimeSpan = document.getElementById('nextRefreshTime');
+    if (!nextRefreshTimeSpan) {
+        console.warn('nextRefreshTime element not found');
+        return;
     }
+    
+    const minutes = Math.floor(nextRefreshCountdown / 60);
+    const seconds = nextRefreshCountdown % 60;
+    
+    nextRefreshTimeSpan.textContent = `${minutes}m ${seconds}s`;
+    // console.log(`Next refresh in: ${minutes}m ${seconds}s`);
 }
 
-function getTimeUntilNextExpiration() {
+function updateRowTimes() {
   const currentTime = Math.floor(Date.now() / 1000);
-  const nextExpiration = jsonData.reduce((earliest, offer) => {
-    const timeUntilExpiration = offer.expire_at - currentTime;
-    return timeUntilExpiration > 0 && timeUntilExpiration < earliest ? timeUntilExpiration : earliest;
-  }, Infinity);
-  
-  return nextExpiration === Infinity ? 600 : Math.min(nextExpiration, 600);
+  jsonData.forEach(offer => {
+    const row = document.querySelector(`[data-offer-id="${offer.offer_id}"]`);
+    if (!row) return;
+
+    const timeColumn = row.querySelector('td:first-child');
+    if (!timeColumn) return;
+
+    const postedTime = formatTimeAgo(offer.created_at);
+    const expiresIn = formatTimeLeft(offer.expire_at);
+    const timerColor = getTimerColor(offer);
+
+    const svg = timeColumn.querySelector('svg');
+    if (svg) {
+      svg.querySelector('g').setAttribute('stroke', timerColor);
+      svg.querySelector('polyline').setAttribute('stroke', timerColor);
+    }
+
+    const textContainer = timeColumn.querySelector('.xl\\:block');
+    if (textContainer) {
+      textContainer.innerHTML = `
+        <div class="text-xs"><span class="bold">Posted:</span> ${escapeHtml(postedTime)}</div>
+        <div class="text-xs"><span class="bold">Expires in:</span> ${escapeHtml(expiresIn)}</div>
+      `;
+    }
+
+    const tooltipElement = document.getElementById(`tooltip-active${offer.offer_id}`);
+    if (tooltipElement) {
+      const tooltipContent = tooltipElement.querySelector('.active-revoked-expired');
+      if (tooltipContent) {
+        tooltipContent.innerHTML = `
+          <span class="bold">
+            <div class="text-xs"><span class="bold">Posted:</span> ${postedTime}</div>
+            <div class="text-xs"><span class="bold">Expires in:</span> ${expiresIn}</div>
+          </span>
+        `;
+      }
+    }
+  });
 }
 
-// Event listeners
+function updateCoinFilterImages() {
+    const coinToSelect = document.getElementById('coin_to');
+    const coinFromSelect = document.getElementById('coin_from');
+    const coinToButton = document.getElementById('coin_to_button');
+    const coinFromButton = document.getElementById('coin_from_button');
+
+    function updateButtonImage(select, button) {
+        const selectedOption = select.options[select.selectedIndex];
+        const imagePath = selectedOption.getAttribute('data-image');
+        if (imagePath && select.value !== 'any') {
+            button.style.backgroundImage = `url(${imagePath})`;
+            button.style.backgroundSize = 'contain';
+            button.style.backgroundRepeat = 'no-repeat';
+            button.style.backgroundPosition = 'center';
+        } else {
+            button.style.backgroundImage = 'none';
+        }
+    }
+
+    updateButtonImage(coinToSelect, coinToButton);
+    updateButtonImage(coinFromSelect, coinFromButton);
+}
+
+function updateCoinFilterOptions() {
+  const coinToSelect = document.getElementById('coin_to');
+  const coinFromSelect = document.getElementById('coin_from');
+  
+  const updateOptions = (select) => {
+    const options = select.options;
+    for (let i = 0; i < options.length; i++) {
+      const option = options[i];
+      if (option.value !== 'any') {
+        const displayName = symbolToCoinName[option.value] || option.value;
+        option.textContent = displayName;
+      }
+    }
+  };
+
+  updateOptions(coinToSelect);
+  updateOptions(coinFromSelect);
+}
+
+function initializeFlowbiteTooltips() {
+    if (typeof Tooltip === 'undefined') {
+        console.warn('Tooltip is not defined. Make sure the required library is loaded.');
+        return;
+    }
+    
+    const tooltipElements = document.querySelectorAll('[data-tooltip-target]');
+    tooltipElements.forEach((el) => {
+        const tooltipId = el.getAttribute('data-tooltip-target');
+        const tooltipElement = document.getElementById(tooltipId);
+        if (tooltipElement) {
+            new Tooltip(tooltipElement, el);
+        }
+    });
+}
+
+function startRefreshCountdown() {
+    if (isSentOffers) return;
+
+    console.log('Starting refresh countdown');
+
+    function refreshCycle() {
+        console.log(`Refresh cycle started. Current countdown: ${nextRefreshCountdown}`);
+        checkExpiredAndFetchNew().then(() => {
+            console.log(`Refresh cycle completed. Next refresh in ${nextRefreshCountdown} seconds`);
+            refreshInterval = setTimeout(refreshCycle, nextRefreshCountdown * 1000);
+        });
+    }
+
+    refreshCycle();
+
+    setInterval(() => {
+        if (nextRefreshCountdown > 0) {
+            nextRefreshCountdown--;
+            updateNextRefreshTime();
+        }
+    }, 1000);
+}
+
+function checkExpiredAndFetchNew() {
+    if (isSentOffers) return Promise.resolve();
+    console.log('Starting checkExpiredAndFetchNew');
+    const currentTime = Math.floor(Date.now() / 1000);
+    const expiredOffers = jsonData.filter(offer => offer.expire_at <= currentTime);
+    
+    console.log(`Checking for expired offers. Current time: ${currentTime}`);
+    console.log(`Found ${expiredOffers.length} expired offers.`);
+
+    jsonData = jsonData.filter(offer => offer.expire_at > currentTime);
+
+    console.log('Fetching new offers...');
+    
+    return fetch('/json/offers')
+        .then(response => response.json())
+        .then(data => {
+            let newListings = Array.isArray(data) ? data : Object.values(data);
+            newListings = newListings.filter(offer => !isOfferExpired(offer));
+            
+            const brandNewListings = newListings.filter(newOffer => 
+                !jsonData.some(existingOffer => existingOffer.offer_id === newOffer.offer_id)
+            );
+            
+            console.log(`Found ${brandNewListings.length} new listings to add.`);
+            jsonData = [...jsonData, ...brandNewListings];
+            newEntriesCount += brandNewListings.length;
+            
+            updateOffersTable();
+            updateJsonView();
+            updatePaginationInfo();
+            
+            if (jsonData.length === 0) {
+                console.log('No active offers. Displaying message to user.');
+                handleNoOffersScenario();
+            }
+
+            const timeUntilNextExpiration = getTimeUntilNextExpiration();
+            nextRefreshCountdown = Math.max(MIN_REFRESH_INTERVAL, Math.min(timeUntilNextExpiration, 300)); // Between 30 seconds and 5 minutes
+            console.log(`Next check scheduled in ${nextRefreshCountdown} seconds`);
+        })
+        .catch(error => {
+            console.error('Error fetching new listings:', error);
+            nextRefreshCountdown = 60;
+            console.log(`Error occurred. Next check scheduled in ${nextRefreshCountdown} seconds`);
+        });
+}
+
+// Event
 toggleButton.addEventListener('click', () => {
-  tableView.classList.toggle('hidden');
-  jsonView.classList.toggle('hidden');
-  toggleButton.textContent = tableView.classList.contains('hidden') ? 'Show Table View' : 'Show JSON View';
+    tableView.classList.toggle('hidden');
+    jsonView.classList.toggle('hidden');
+    toggleButton.textContent = tableView.classList.contains('hidden') ? 'Show Table View' : 'Show JSON View';
 });
 
 filterForm.addEventListener('submit', (e) => {
-  e.preventDefault();
-  applyFilters();
+    e.preventDefault();
+    applyFilters();
 });
 
 filterForm.addEventListener('change', applyFilters);
 
 document.getElementById('coin_to').addEventListener('change', (event) => {
-  console.log('Coin To filter changed:', event.target.value);
-  applyFilters();
+    console.log('Coin To filter changed:', event.target.value);
+    applyFilters();
 });
 
 document.getElementById('coin_from').addEventListener('change', (event) => {
-  console.log('Coin From filter changed:', event.target.value);
-  applyFilters();
+    console.log('Coin From filter changed:', event.target.value);
+    applyFilters();
 });
 
 prevPageButton.addEventListener('click', () => {
-  if (currentPage > 1) {
-    currentPage--;
-    updateOffersTable();
-    updatePaginationInfo();
-  }
+    if (currentPage > 1) {
+        currentPage--;
+        updateOffersTable();
+        updatePaginationInfo();
+    }
 });
 
 nextPageButton.addEventListener('click', () => {
-  const validOffers = isSentOffers ? jsonData : jsonData.filter(offer => !isOfferExpired(offer));
-  const totalPages = Math.ceil(validOffers.length / itemsPerPage);
-  if (currentPage < totalPages) {
-    currentPage++;
-    updateOffersTable();
-    updatePaginationInfo();
-  }
-  console.log(`Moved to page ${currentPage} of ${totalPages}`);
+    const validOffers = getValidOffers();
+    const totalPages = Math.ceil(validOffers.length / itemsPerPage);
+    if (currentPage < totalPages && validOffers.length > 0) {
+        currentPage++;
+        updateOffersTable();
+        updatePaginationInfo();
+        console.log(`Moved to page ${currentPage} of ${totalPages}`);
+    } else {
+        console.log('No more pages or all offers have expired');
+        nextPageButton.classList.add('invisible');
+        nextPageButton.style.display = 'none';
+        if (validOffers.length === 0) {
+            handleNoOffersScenario();
+        }
+    }
 });
 
 document.getElementById('clearFilters').addEventListener('click', () => {
-  filterForm.reset();
-  jsonData = [...originalJsonData];
-  currentPage = 1;
-  updateOffersTable();
-  updateJsonView();
-  updateCoinFilterImages();
+    filterForm.reset();
+    jsonData = [...originalJsonData];
+    currentPage = 1;
+    updateOffersTable();
+    updateJsonView();
+    updateCoinFilterImages();
 });
 
 document.getElementById('refreshOffers').addEventListener('click', () => {
-  console.log('Refresh button clicked');
-  fetchOffers(true);
+    console.log('Refresh button clicked');
+    fetchOffers(true);
 });
-
-function updateCoinFilterImages() {
-  const coinToSelect = document.getElementById('coin_to');
-  const coinFromSelect = document.getElementById('coin_from');
-  const coinToButton = document.getElementById('coin_to_button');
-  const coinFromButton = document.getElementById('coin_from_button');
-
-  function updateButtonImage(select, button) {
-    const selectedOption = select.options[select.selectedIndex];
-    const imagePath = selectedOption.getAttribute('data-image');
-    if (imagePath && select.value !== 'any') {
-      button.style.backgroundImage = `url(${imagePath})`;
-      button.style.backgroundSize = 'contain';
-      button.style.backgroundRepeat = 'no-repeat';
-      button.style.backgroundPosition = 'center';
-    } else {
-      button.style.backgroundImage = 'none';
-    }
-  }
-
-  updateButtonImage(coinToSelect, coinToButton);
-  updateButtonImage(coinFromSelect, coinFromButton);
-}
-
-function startRefreshCountdown() {
-    console.log('Starting refresh countdown');
-
-    setInterval(() => {
-        nextRefreshCountdown--;
-        countdownToFullRefresh--;
-
-        if (nextRefreshCountdown <= 0) {
-            checkExpiredAndFetchNew();
-            nextRefreshCountdown = getTimeUntilNextExpiration();
-        }
-
-        if (countdownToFullRefresh <= 0) {
-            performFullRefresh();
-            countdownToFullRefresh = 900;
-        }
-
-        updateNextRefreshTime();
-        updateNextFullRefreshTime();
-    }, 1000);
-}
-
-function initializeTableRateModule() {
-  if (typeof window.tableRateModule !== 'undefined') {
-    tableRateModule = window.tableRateModule;
-    console.log('tableRateModule loaded successfully');
-    return true;
-  } else {
-    console.warn('tableRateModule not found. Waiting for it to load...');
-    return false;
-  }
-}
 
 // Init
-document.addEventListener('DOMContentLoaded', () => {
-  console.log('DOM content loaded, initializing...');
-  
-  if (initializeTableRateModule()) {
-    continueInitialization();
-  } else {
-    let retryCount = 0;
-    const maxRetries = 5;
-    const retryInterval = setInterval(() => {
-      retryCount++;
-      if (initializeTableRateModule()) {
-        clearInterval(retryInterval);
-        continueInitialization();
-      } else if (retryCount >= maxRetries) {
-        console.error('Failed to load tableRateModule after multiple attempts. Some functionality may be limited.');
-        clearInterval(retryInterval);
-        continueInitialization();
-      }
-    }, 1000);
-  }
-});
+function initializeTableRateModule() {
+    if (typeof window.tableRateModule !== 'undefined') {
+        tableRateModule = window.tableRateModule;
+        console.log('tableRateModule loaded successfully');
+        return true;
+    } else {
+        console.warn('tableRateModule not found. Waiting for it to load...');
+        return false;
+    }
+}
 
 function continueInitialization() {
     if (typeof volumeToggle !== 'undefined' && volumeToggle.init) {
@@ -1584,15 +1596,12 @@ function continueInitialization() {
     } else {
         console.warn('volumeToggle is not defined or does not have an init method');
     }
-    updateOffersTable();
-    updateJsonView();
-    updateCoinFilterImages();
-    fetchOffers();
-    startRefreshCountdown();
-    initializeTableWithCache();
-    updateNextFullRefreshTime();
     
-    jsonData.forEach(offer => offerCache.set(offer.offer_id, offer));
+    updateCoinFilterImages();
+    fetchOffers().then(() => {
+        applyFilters();
+        startRefreshCountdown();
+    });
     
     function updateTimesLoop() {
         updateRowTimes();
@@ -1601,8 +1610,50 @@ function continueInitialization() {
     requestAnimationFrame(updateTimesLoop);
     
     setInterval(updateRowTimes, 900000);
-    
-    setInterval(performFullRefresh, 30 * 60 * 1000);
+
+    console.log('Initialization completed');
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOM content loaded, initializing...');
+    
+    if (initializeTableRateModule()) {
+        continueInitialization();
+    } else {
+        let retryCount = 0;
+        const maxRetries = 5;
+        const retryInterval = setInterval(() => {
+            retryCount++;
+            if (initializeTableRateModule()) {
+                clearInterval(retryInterval);
+                continueInitialization();
+            } else if (retryCount >= maxRetries) {
+                console.error('Failed to load tableRateModule after multiple attempts. Some functionality may be limited.');
+                clearInterval(retryInterval);
+                continueInitialization();
+            }
+        }, 1000);
+    }
+
+    filterForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        applyFilters();
+    });
+
+    filterForm.addEventListener('change', applyFilters);
+
+    document.getElementById('coin_to').addEventListener('change', applyFilters);
+    document.getElementById('coin_from').addEventListener('change', applyFilters);
+    document.getElementById('sort_by').addEventListener('change', applyFilters);
+    document.getElementById('sort_dir').addEventListener('change', applyFilters);
+
+    document.getElementById('clearFilters').addEventListener('click', () => {
+        filterForm.reset();
+        jsonData = [...originalJsonData];
+        currentPage = 1;
+        applyFilters();
+        updateCoinFilterImages();
+    });
+});
 
 console.log('Offers Table Module fully initialized');

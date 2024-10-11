@@ -206,42 +206,37 @@ function getAPIKeys() {
               <div class="rounded-b-md">
                 <div class="w-full md:w-0/12">
                   <div class="container flex flex-wrap justify-center">
-
                     <div class="md:w-auto p-1.5 hover-container">
                       <div class="flex">
-
-                        <!-- Coin To Filter -->
-                        <button id="coin_to_button" class="bg-gray-50 text-gray-900 appearance-none w-10 dark:bg-gray-500 dark:text-white border-l border-t border-b border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-l-lg flex items-center" disabled></button>
-                        <div class="relative">
-                          {{ input_arrow_down_svg | safe }}
-                          <select name="coin_to" id="coin_to" class="bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-none rounded-r-lg outline-none block w-full p-2.5 focus:ring-0">
-                            <option value="any" {% if filters.coin_to==-1 %} selected{% endif %}>Filter Bids</option>
-                            {% for c in coins_from %}
-                              <option class="text-sm" value="{{ c[0] }}" {% if filters.coin_to==c[0] %} selected{% endif %} data-image="/static/images/coins/{{ c[1]|replace(" ", "-") }}.png">{{ c[1] }}</option>
-                            {% endfor %}
-                          </select>
-                        </div>
-
-                        <div class="flex items-center">
-                          <div class="w-full md:w-auto p-1.5">
-                            <p class="text-sm font-heading">{{ arrow_right_svg | safe }}</p>
-                          </div>
-                        </div>
-
-                        <!-- Coin From Filter -->
+                        <!-- Coin From Filter (now for Bids) -->
                         <button id="coin_from_button" class="bg-gray-50 text-gray-900 appearance-none w-10 dark:bg-gray-500 dark:text-white border-l border-t border-b border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-l-lg flex items-center" disabled></button>
                         <div class="relative">
                           {{ input_arrow_down_svg | safe }}
                           <select name="coin_from" id="coin_from" class="bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-none rounded-r-lg outline-none block w-full p-2.5 focus:ring-0">
-                            <option value="any" {% if filters.coin_from==-1 %} selected{% endif %}>Filter Offers</option>
+                            <option value="any" {% if filters.coin_from==-1 %} selected{% endif %}>Filter {% if sent_offers %}Sending{% else %}Bids{% endif %}</option>
                             {% for c in coins %}
                               <option class="text-sm" value="{{ c[0] }}" {% if filters.coin_from==c[0] %} selected{% endif %} data-image="/static/images/coins/{{ c[1]|replace(" ", "-") }}.png">{{ c[1] }}</option>
                             {% endfor %}
                           </select>
                         </div>
+                        <div class="flex items-center">
+                          <div class="w-full md:w-auto p-1.5">
+                            <p class="text-sm font-heading">{{ arrow_right_svg | safe }}</p>
+                          </div>
+                        </div>
+                        <!-- Coin To Filter (now for Offers) -->
+                        <button id="coin_to_button" class="bg-gray-50 text-gray-900 appearance-none w-10 dark:bg-gray-500 dark:text-white border-l border-t border-b border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-l-lg flex items-center" disabled></button>
+                        <div class="relative">
+                          {{ input_arrow_down_svg | safe }}
+                          <select name="coin_to" id="coin_to" class="bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-none rounded-r-lg outline-none block w-full p-2.5 focus:ring-0">
+                            <option value="any" {% if filters.coin_to==-1 %} selected{% endif %}>Filter {% if sent_offers %}Receiving{% else %}Offers{% endif %}</option>
+                            {% for c in coins_from %}
+                              <option class="text-sm" value="{{ c[0] }}" {% if filters.coin_to==c[0] %} selected{% endif %} data-image="/static/images/coins/{{ c[1]|replace(" ", "-") }}.png">{{ c[1] }}</option>
+                            {% endfor %}
+                          </select>
+                        </div>
                       </div>
                     </div>
-
                     <div class="w-full md:w-auto mt-3">
                       <div class="w-full md:w-auto p-1.5">
                         <p class="text-sm font-heading bold">Sort By:</p>
@@ -250,7 +245,7 @@ function getAPIKeys() {
                     <div class="w-full md:w-auto p-1.5">
                       <div class="relative">
                         {{ input_arrow_down_svg | safe }}
-                        <select name="sort_by" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
+                        <select name="sort_by" id="sort_by" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
                           <option value="created_at" {% if filters.sort_by=='created_at' %} selected{% endif %}>Time Created</option>
                           <option value="rate" {% if filters.sort_by=='rate' %} selected{% endif %}>Rate</option>
                         </select>
@@ -259,13 +254,12 @@ function getAPIKeys() {
                     <div class="w-full md:w-auto p-1.5">
                       <div class="relative">
                         {{ input_arrow_down_svg | safe }}
-                        <select name="sort_dir" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
-                          <option value="asc" {% if filters.sort_dir=='asc' %} selected{% endif %}>Ascending</option>
+                        <select name="sort_dir" id="sort_dir" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
                           <option value="desc" {% if filters.sort_dir=='desc' %} selected{% endif %}>Descending</option>
+                          <option value="asc" {% if filters.sort_dir=='asc' %} selected{% endif %}>Ascending</option>
                         </select>
                       </div>
                     </div>
-
                     <div class="flex items-center hidden">
                       <div class="w-full md:w-auto p-1.5">
                         <p class="text-sm font-heading bold">Sent From Node:</p>
@@ -280,7 +274,6 @@ function getAPIKeys() {
                         </select>
                       </div>
                     </div>
-
                     {% if sent_offers %}
                       <div class="flex items-center">
                         <div class="w-full md:w-auto p-1.5">
@@ -299,7 +292,6 @@ function getAPIKeys() {
                         </div>
                       </div>
                     {% endif %}
-                    
                     <div class="w-full md:w-auto p-1.5">
                       <div class="relative">
                         <button type="button" id="clearFilters" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm hover:text-white dark:text-white dark:bg-gray-500 bg-coolGray-200 hover:bg-green-600 hover:border-green-600 rounded-lg transition duration-200 border border-coolGray-200 dark:border-gray-400 rounded-md shadow-button focus:ring-0 focus:outline-none">
@@ -347,66 +339,62 @@ function getAPIKeys() {
   <div id="jsonView" class="hidden mb-4">
     <pre id="jsonContent" class="bg-gray-100 p-4 rounded overflow-auto" style="max-height: 300px;"></pre>
   </div>
-  <div class="container mt-5 px-4 mx-auto">
-    <div class="pt-0 py-4 pb-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
+  <div class="container mt-5 mx-auto">
+    <div class="pt-0 pb-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
       <div class="px-0">
-        <div class="w-auto mt-6 overflow-x-auto">
-          <div id="tableView">
-            <table id="offers-table" class="w-full min-w-ma">
-              <thead class="uppercase">
-                <tr>
-                  <th class="p-0">
-                    <div class="py-3 pl-4 justify-center rounded-tl-xl bg-coolGray-200 dark:bg-gray-600">
-                      <span class="text-sm mr-1 text-gray-600 dark:text-gray-300 font-semibold">Time</span>
-                    </div>
-                  </th>
-                  <th class="p-0 hidden xl:block">
-                    <div class="py-3 px-4 text-left bg-coolGray-200 dark:bg-gray-600">
-                      <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Details</span>
-                    </div>
-                  </th>
-                  <th class="p-0">
-                    <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-left">
-                      <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Max send</span>
-                    </div>
-                  </th>
-                  <th class="p-0">
-                    <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-center">
-                      <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Swap</span> 
-                    </div>
-                  </th>
-                  <th class="p-0">
-                    <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-right">
-                      <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Max Recv</span> 
-                    </div>
-                  </th>
-                  <th class="p-0" data-sortable="true" data-column-index="5">
-                    <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-right flex items-center justify-end">
-                      <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Rate</span>
-                      <span class="sort-icon ml-1 text-gray-600 dark:text-gray-400" id="sort-icon-5">↓</span> 
-                    </div>
-                  </th>
-                  <th class="p-0" data-sortable="true" data-column-index="6">
-                    <div class="py-3 bg-coolGray-200 dark:bg-gray-600 text-center flex items-center justify-center">
-                      <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Market +/-</span>
-                      <span class="sort-icon ml-1 text-gray-600 dark:text-gray-400" id="sort-icon-6">↓</span> 
-                    </div>
-                  </th>
-                  <th class="p-0">
-                    <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 rounded-tr-xl">
-                      <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Trade</span> 
-                    </div>
-                  </th>
-                </tr>
-              </thead>
-              <tbody id="offers-body">
-
-              </tbody>
-            </table>
-          </div>
+        <div class="w-auto mt-6 pb-6 overflow-x-auto">
+          <table class="w-full min-w-max">
+            <thead class="uppercase">
+              <tr>
+                <th class="p-0">
+                  <div class="py-3 pl-4 justify-center rounded-tl-xl bg-coolGray-200 dark:bg-gray-600">
+                    <span class="text-sm mr-1 text-gray-600 dark:text-gray-300 font-semibold">Time</span>
+                  </div>
+                </th>
+                <th class="p-0 hidden xl:block">
+                  <div class="py-3 px-4 text-left bg-coolGray-200 dark:bg-gray-600">
+                    <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Details</span>
+                  </div>
+                </th>
+                <th class="p-0">
+                  <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-left">
+                    <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Max send</span>
+                  </div>
+                </th>
+                <th class="p-0">
+                  <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-center">
+                    <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Swap</span>
+                  </div>
+                </th>
+                <th class="p-0">
+                  <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-right">
+                    <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold pr-2">Max Recv</span>
+                  </div>
+                </th>
+                <th class="p-0" data-sortable="true" data-column-index="5">
+                  <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-right flex items-center justify-end">
+                    <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Rate</span>
+                    <span class="sort-icon ml-1 text-gray-600 dark:text-gray-400" id="sort-icon-5">↓</span>
+                  </div>
+                </th>
+                <th class="p-0" data-sortable="true" data-column-index="6">
+                  <div class="py-3 bg-coolGray-200 dark:bg-gray-600 text-center flex items-center justify-center">
+                    <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Market +/-</span>
+                    <span class="sort-icon ml-1 text-gray-600 dark:text-gray-400" id="sort-icon-6">↓</span>
+                  </div>
+                </th>
+                <th class="p-0">
+                  <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 rounded-tr-xl">
+                    <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Trade</span>
+                  </div>
+                </th>
+              </tr>
+            </thead>
+            <tbody id="offers-body">
+            </tbody>
+          </table>
         </div>
       </div>
-    
       <div class="rounded-b-md">
         <div class="w-full">
           <div class="flex flex-wrap justify-between items-center pl-6 pt-6 pr-6 border-t border-gray-100 dark:border-gray-400">
@@ -419,9 +407,6 @@ function getAPIKeys() {
               </p>
               <p class="text-sm font-heading dark:text-gray-400 mr-4">Next refresh:
                 <span id="nextRefreshTime"></span>
-              </p>
-               <p class="text-sm font-heading dark:text-gray-400">Full refresh:
-                <span id="nextFullRefreshTime"></span>
               </p>
             </div>
             <div class="flex items-center space-x-2">
