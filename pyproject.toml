@@ -16,13 +16,7 @@ classifiers = [
     "Topic :: Security :: Cryptography",
 ]
 dependencies = [
-    "pyzmq==26.2.0",
-    "sqlalchemy==1.4.39",
-    "python-gnupg==0.5.3",
-    "Jinja2==3.1.4",
-    "pycryptodome==3.21.0",
-    "PySocks==1.7.1",
-    "coincurve@https://github.com/basicswap/coincurve/archive/refs/tags/basicswap_v0.2.zip#sha256=c309deef22c929c9ab5b3adf7adbda940bffcea6c6ec7c66202d6c3d4e3ceb79"
+# See requirements.txt
 ]
 dynamic = ["version"]
 
