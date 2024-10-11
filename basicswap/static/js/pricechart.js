@@ -1061,27 +1061,37 @@ const app = {
   },
 
   updateAutoRefreshButton: () => {
-    const button = document.getElementById('toggle-auto-refresh');
-    if (button) {
-      if (app.isAutoRefreshEnabled) {
-        button.classList.remove('text-gray-600', 'dark:text-gray-400');
-        button.classList.add('text-green-500', 'dark:text-green-400');
-      } else {
-        button.classList.remove('text-green-500', 'dark:text-green-400');
-        button.classList.add('text-gray-600', 'dark:text-gray-400');
-      }
-      button.title = app.isAutoRefreshEnabled ? 'Disable Auto-Refresh' : 'Enable Auto-Refresh';
-      
-      const svg = button.querySelector('svg');
-      if (svg) {
-        if (app.isAutoRefreshEnabled) {
-          svg.classList.add('animate-spin');
-        } else {
-          svg.classList.remove('animate-spin');
-        }
-      }
+  const button = document.getElementById('toggle-auto-refresh');
+  if (button) {
+    if (app.isAutoRefreshEnabled) {
+      button.classList.remove('text-gray-600', 'dark:text-gray-400');
+      button.classList.add('text-green-500', 'dark:text-green-400');
+      app.startSpinAnimation();
+    } else {
+      button.classList.remove('text-green-500', 'dark:text-green-400');
+      button.classList.add('text-gray-600', 'dark:text-gray-400');
+      app.stopSpinAnimation();
     }
-  },
+    button.title = app.isAutoRefreshEnabled ? 'Disable Auto-Refresh' : 'Enable Auto-Refresh';
+  }
+},
+
+startSpinAnimation: () => {
+  const svg = document.querySelector('#toggle-auto-refresh svg');
+  if (svg) {
+    svg.classList.add('animate-spin');
+    setTimeout(() => {
+      svg.classList.remove('animate-spin');
+    }, 2000); // Remove the animation after 2 seconds
+  }
+},
+
+stopSpinAnimation: () => {
+  const svg = document.querySelector('#toggle-auto-refresh svg');
+  if (svg) {
+    svg.classList.remove('animate-spin');
+  }
+},
     
   refreshAllData: async () => {
     ui.showLoader();

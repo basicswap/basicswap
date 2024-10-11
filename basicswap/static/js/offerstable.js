@@ -485,7 +485,8 @@ function fetchOffers(manualRefresh = false) {
                     created_at: Number(offer.created_at || 0),
                     expire_at: Number(offer.expire_at || 0),
                     is_own_offer: Boolean(offer.is_own_offer),
-                    amount_negotiable: Boolean(offer.amount_negotiable)
+                    amount_negotiable: Boolean(offer.amount_negotiable),
+                    unique_id: `${offer.offer_id}_${offer.created_at}_${offer.coin_from}_${offer.coin_to}`
                 }));
                 
                 if (!isSentOffers) {
@@ -610,7 +611,7 @@ function filterAndSortData() {
     
     const formData = new FormData(filterForm);
     const filters = Object.fromEntries(formData);
-    console.log('Raw filters:', filters);
+    console.log('Processed filters:', filters);
 
     if (filters.coin_to !== 'any') {
         filters.coin_to = coinIdToName[filters.coin_to] || filters.coin_to;
@@ -623,40 +624,48 @@ function filterAndSortData() {
 
     const currentTime = Math.floor(Date.now() / 1000);
 
-    let filteredData = originalJsonData.filter(offer => {
+    const uniqueOffersMap = new Map();
+
+    originalJsonData.forEach(offer => {
         const coinFrom = (offer.coin_from || '').toLowerCase();
         const coinTo = (offer.coin_to || '').toLowerCase();
         const isExpired = offer.expire_at <= currentTime;
 
         if (!isSentOffers && isExpired) {
-            return false;
+            return;
         }
+
+        let passesFilter = true;
 
         if (isSentOffers) {
             if (filters.coin_to !== 'any' && coinFrom.toLowerCase() !== filters.coin_to.toLowerCase()) {
-                return false;
+                passesFilter = false;
             }
             if (filters.coin_from !== 'any' && coinTo.toLowerCase() !== filters.coin_from.toLowerCase()) {
-                return false;
+                passesFilter = false;
             }
         } else {
             if (filters.coin_to !== 'any' && coinTo.toLowerCase() !== filters.coin_to.toLowerCase()) {
-                return false;
+                passesFilter = false;
             }
             if (filters.coin_from !== 'any' && coinFrom.toLowerCase() !== filters.coin_from.toLowerCase()) {
-                return false;
+                passesFilter = false;
             }
         }
 
         if (isSentOffers && filters.active && filters.active !== 'any') {
             const offerState = isExpired ? 'expired' : 'active';
             if (filters.active !== offerState) {
-                return false;
+                passesFilter = false;
             }
         }
 
-        return true;
+        if (passesFilter) {
+            uniqueOffersMap.set(offer.unique_id, offer);
+        }
     });
+
+    let filteredData = Array.from(uniqueOffersMap.values());
 
     console.log('Filtered data length:', filteredData.length);
 
@@ -822,6 +831,7 @@ function prepareOfferData(offer, isSentOffers) {
   };
 }
 
+// to-do revoked
 function getButtonProperties(isActuallyExpired, isSentOffers, isTreatedAsSentOffer, isRevoked) {
   if (isRevoked) {
     return {
@@ -865,8 +875,7 @@ function updateProfitLoss(row, fromCoin, toCoin, fromAmount, toAmount) {
       const colorClass = getProfitColorClass(profitLossPercentage);
       profitLossElement.textContent = `${profitLossPercentage > 0 ? '+' : ''}${profitLossPercentage}%`;
       profitLossElement.className = `profit-loss text-lg font-bold ${colorClass}`;
-      
-      // Update the tooltip content
+
       const tooltipId = `percentage-tooltip-${row.getAttribute('data-offer-id')}`;
       const tooltipElement = document.getElementById(tooltipId);
       if (tooltipElement) {
@@ -955,6 +964,7 @@ function getMarketRate(fromCoin, toCoin) {
     });
 }
 
+// todo
 function getTimerColor(offer) {
   const now = Math.floor(Date.now() / 1000);
   const offerAge = now - offer.created_at;
@@ -1015,21 +1025,19 @@ function createDetailsColumn(offer) {
   `;
 }
 
-function createTakerAmountColumn(offer, coinFrom, coinTo) {
-  const fromAmount = parseFloat(offer.amount_from);
+function createOrderbookColumn(offer, coinFrom, coinTo) {
+  const toAmount = parseFloat(offer.amount_to);
   const fromSymbol = getCoinSymbol(coinFrom);
-  const fromPriceUSD = latestPrices[coinNameToSymbol[coinFrom]]?.usd || 0;
-  const fromValueUSD = fromAmount * fromPriceUSD;
-
   return `
-    <td class="py-0 px-0 text-left text-sm">
-      <a data-tooltip-target="tooltip-wallet${offer.offer_id}" href="/wallet/${fromSymbol}" class="items-center monospace">
-        <div class="coinname bold w-32" data-coinname="${coinFrom}">
-          ${fromAmount.toFixed(4)}
-          <div class="text-gray-600 dark:text-gray-300 text-xs">${coinFrom}</div>
-          <div class="text-gray-600 dark:text-gray-300 text-xs">USD: (${fromValueUSD.toFixed(2)})</div>
-        </div>
-      </a>
+    <td class="py-0">
+      <div class="py-3 px-4 text-right">
+        <a data-tooltip-target="tooltip-wallet${offer.offer_id}" href="/wallet/${fromSymbol}" class="items-center monospace">
+          <div class="pr-2">        
+            <div class="text-sm font-semibold">${toAmount.toFixed(4)}</div>          
+            <div class="text-xs text-gray-500 dark:text-gray-400">${coinFrom}</div>
+          </div>
+        </a>
+      </div>
     </td>
   `;
 }
@@ -1053,19 +1061,16 @@ function createSwapColumn(offer, coinFrom, coinTo) {
   `;
 }
 
-function createOrderbookColumn(offer, coinTo, coinFrom) {
-  const toAmount = parseFloat(offer.amount_to);
+function createTakerAmountColumn(offer, coinTo, coinFrom) {
+  const fromAmount = parseFloat(offer.amount_from);
   const toSymbol = getCoinSymbol(coinTo);
-  const toPriceUSD = latestPrices[coinNameToSymbol[coinTo]]?.usd || 0;
-  const toValueUSD = toAmount * toPriceUSD;
   return `
     <td class="p-0">
-      <div class="py-3 px-4 text-right">
-        <a data-tooltip-target="tooltip-wallet-maker${escapeHtml(offer.offer_id)}" href="/wallet/${escapeHtml(toSymbol)}" class="block">
-          <div class="pr-2">
-            <div class="text-sm font-semibold">${toAmount.toFixed(4)}</div>
+      <div class="py-3 px-4 text-left">
+        <a data-tooltip-target="tooltip-wallet-maker${escapeHtml(offer.offer_id)}" href="/wallet/${escapeHtml(toSymbol)}" class="items-center monospace">
+          <div class="pr-2">        
+            <div class="text-sm font-semibold">${fromAmount.toFixed(4)}</div>           
             <div class="text-xs text-gray-500 dark:text-gray-400">${coinTo}</div>
-            <div class="text-xs text-gray-500 dark:text-gray-400">USD: (${toValueUSD.toFixed(2)})</div>
           </div>
         </a>
       </div>
@@ -1083,11 +1088,9 @@ function createRateColumn(offer, coinFrom, coinTo) {
   const fromSymbol = getCoinSymbol(coinFrom);
   const toSymbol = getCoinSymbol(coinTo);
   
-  // Get USD prices
   const fromPriceUSD = latestPrices[coinNameToSymbol[coinFrom]]?.usd || 0;
   const toPriceUSD = latestPrices[coinNameToSymbol[coinTo]]?.usd || 0;
 
-  // Calculate USD equivalent of the rate
   const rateInUSD = rate * toPriceUSD;
 
   console.log(`Rate calculation for ${fromSymbol} to ${toSymbol}:`);
@@ -1101,14 +1104,14 @@ function createRateColumn(offer, coinFrom, coinTo) {
     <td class="py-3 pl-6 bold monospace text-xs text-right items-center rate-table-info">
       <div class="relative">
         <div class="flex flex-col items-end" data-tooltip-target="tooltip-rate-${offer.offer_id}">
-          <span class="font-bold text-gray-700 dark:text-white">
+          <span class="text-gray-700 dark:text-white">
+            $${rateInUSD.toFixed(2)}/${fromSymbol}
+          </span>
+          <span class="text-gray-700 dark:text-white">
             ${rate.toFixed(6)} ${toSymbol}/${fromSymbol}
           </span>
-          <span class="text-gray-500 dark:text-white">
+          <span class="text-gray-700 dark:text-white">
             ${inverseRate.toFixed(6)} ${fromSymbol}/${toSymbol}
-          </span>
-          <span class="text-gray-400 dark:text-gray-400">
-            ($${rateInUSD.toFixed(2)})
           </span>
         </div>
       </div>
@@ -1152,9 +1155,7 @@ function createTooltips(offer, isSentOffers, coinFrom, coinTo, postedTime, expir
   const toPriceUSD = latestPrices[toSymbol]?.usd || 0;
   const rateInUSD = rate * toPriceUSD;
 
-
   const combinedRateTooltip = createCombinedRateTooltip(offer, coinFrom, coinTo);
-
 
   const fromAmount = parseFloat(offer.amount_from);
   const toAmount = parseFloat(offer.amount_to);
@@ -1177,7 +1178,7 @@ function createTooltips(offer, isSentOffers, coinFrom, coinTo, postedTime, expir
     </div>
    
     <div id="tooltip-wallet${offer.offer_id}" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
-      <div class="active-revoked-expired"><span class="bold">${isSentOffers ? 'My' : ''} ${coinFrom} Wallet</span></div>
+      <div class="active-revoked-expired"><span class="bold">${isSentOffers ? 'My' : ''} ${coinTo} Wallet</span></div>
       <div class="tooltip-arrow pl-1" data-popper-arrow></div>
     </div>
     
@@ -1187,7 +1188,7 @@ function createTooltips(offer, isSentOffers, coinFrom, coinTo, postedTime, expir
     </div>
     
     <div id="tooltip-wallet-maker${offer.offer_id}" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
-      <div class="active-revoked-expired"><span class="bold">${isSentOffers ? 'My' : ''} ${coinTo} Wallet</span></div>
+      <div class="active-revoked-expired"><span class="bold">${isSentOffers ? 'My' : ''} ${coinFrom} Wallet</span></div>
       <div class="tooltip-arrow pl-1" data-popper-arrow></div>
     </div>
     
@@ -1260,6 +1261,7 @@ function createTooltipContent(isSentOffers, coinFrom, coinTo, fromAmount, toAmou
       "As a buyer, a positive percentage indicates potential </br> savings compared to current market rates."}</p>
   `;
 }
+
 function createCombinedRateTooltip(offer, coinFrom, coinTo) {
   const rate = parseFloat(offer.rate);
   const inverseRate = 1 / rate;
