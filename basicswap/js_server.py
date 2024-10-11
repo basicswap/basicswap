@@ -229,11 +229,12 @@ def js_offers(self, url_split, post_string, is_json, sent=False) -> bytes:
             'amount_to': ci_to.format_amount((o.amount_from * o.rate) // ci_from.COIN()),
             'rate': ci_to.format_amount(o.rate),
             'min_bid_amount': ci_from.format_amount(o.min_bid_amount),
+            'is_expired': o.expire_at <= swap_client.getTime(),
+            'is_own_offer': o.was_sent
         }
         if with_extra_info:
             offer_data['amount_negotiable'] = o.amount_negotiable
             offer_data['rate_negotiable'] = o.rate_negotiable
-
             if o.swap_type == SwapTypes.XMR_SWAP:
                 _, xmr_offer = swap_client.getXmrOffer(o.offer_id)
                 offer_data['lock_time_1'] = xmr_offer.lock_time_1
