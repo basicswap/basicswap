@@ -637,20 +637,11 @@ function filterAndSortData() {
 
         let passesFilter = true;
 
-        if (isSentOffers) {
-            if (filters.coin_to !== 'any' && coinFrom.toLowerCase() !== filters.coin_to.toLowerCase()) {
-                passesFilter = false;
-            }
-            if (filters.coin_from !== 'any' && coinTo.toLowerCase() !== filters.coin_from.toLowerCase()) {
-                passesFilter = false;
-            }
-        } else {
-            if (filters.coin_to !== 'any' && coinTo.toLowerCase() !== filters.coin_to.toLowerCase()) {
-                passesFilter = false;
-            }
-            if (filters.coin_from !== 'any' && coinFrom.toLowerCase() !== filters.coin_from.toLowerCase()) {
-                passesFilter = false;
-            }
+        if (filters.coin_to !== 'any' && coinTo.toLowerCase() !== filters.coin_to.toLowerCase()) {
+            passesFilter = false;
+        }
+        if (filters.coin_from !== 'any' && coinFrom.toLowerCase() !== filters.coin_from.toLowerCase()) {
+            passesFilter = false;
         }
 
         if (isSentOffers && filters.active && filters.active !== 'any') {
@@ -939,7 +930,7 @@ function getProfitColorClass(percentage) {
   const numericPercentage = parseFloat(percentage);
   if (numericPercentage > 0) return 'text-green-500';
   if (numericPercentage < 0) return 'text-red-500';
-  if (numericPercentage === 0) return 'text-yellowr-400';
+  if (numericPercentage === 0) return 'text-yellow-400';
   return 'text-white';
 }
 
@@ -1025,16 +1016,16 @@ function createDetailsColumn(offer) {
   `;
 }
 
-function createOrderbookColumn(offer, coinFrom, coinTo) {
+function createTakerAmountColumn(offer, coinTo, coinFrom) {
   const toAmount = parseFloat(offer.amount_to);
   const fromSymbol = getCoinSymbol(coinFrom);
   return `
     <td class="py-0">
-      <div class="py-3 px-4 text-right">
-        <a data-tooltip-target="tooltip-wallet${offer.offer_id}" href="/wallet/${fromSymbol}" class="items-center monospace">
+      <div class="py-3 px-4 text-left">
+        <a data-tooltip-target="tooltip-wallet${escapeHtml(offer.offer_id)}" href="/wallet/${escapeHtml(fromSymbol)}" class="items-center monospace">
           <div class="pr-2">        
             <div class="text-sm font-semibold">${toAmount.toFixed(4)}</div>          
-            <div class="text-xs text-gray-500 dark:text-gray-400">${coinFrom}</div>
+            <div class="text-sm text-gray-500 dark:text-gray-400">${coinFrom}</div>
           </div>
         </a>
       </div>
@@ -1042,7 +1033,7 @@ function createOrderbookColumn(offer, coinFrom, coinTo) {
   `;
 }
 
-function createSwapColumn(offer, coinFrom, coinTo) {
+function createSwapColumn(offer, coinTo, coinFrom) {
   return `
     <td class="py-0 px-0 text-right text-sm">
       <a data-tooltip-target="tooltip-offer${offer.offer_id}" href="/offer/${offer.offer_id}">
@@ -1061,16 +1052,16 @@ function createSwapColumn(offer, coinFrom, coinTo) {
   `;
 }
 
-function createTakerAmountColumn(offer, coinTo, coinFrom) {
+function createOrderbookColumn(offer, coinFrom, coinTo) {
   const fromAmount = parseFloat(offer.amount_from);
   const toSymbol = getCoinSymbol(coinTo);
   return `
     <td class="p-0">
-      <div class="py-3 px-4 text-left">
+      <div class="py-3 px-4 text-right">
         <a data-tooltip-target="tooltip-wallet-maker${escapeHtml(offer.offer_id)}" href="/wallet/${escapeHtml(toSymbol)}" class="items-center monospace">
           <div class="pr-2">        
             <div class="text-sm font-semibold">${fromAmount.toFixed(4)}</div>           
-            <div class="text-xs text-gray-500 dark:text-gray-400">${coinTo}</div>
+            <div class="text-sm text-gray-500 dark:text-gray-400">${coinTo}</div>
           </div>
         </a>
       </div>
@@ -1101,17 +1092,17 @@ function createRateColumn(offer, coinFrom, coinTo) {
   console.log(`Rate in USD: $${rateInUSD.toFixed(2)}`);
 
   return `
-    <td class="py-3 pl-6 bold monospace text-xs text-right items-center rate-table-info">
+    <td class="py-3 semibold monospace text-xs text-right items-center rate-table-info">
       <div class="relative">
-        <div class="flex flex-col items-end" data-tooltip-target="tooltip-rate-${offer.offer_id}">
-          <span class="text-gray-700 dark:text-white">
-            $${rateInUSD.toFixed(2)}/${fromSymbol}
+        <div class="flex flex-col items-end pr-3" data-tooltip-target="tooltip-rate-${offer.offer_id}">
+          <span class="text-sm bold text-gray-700 dark:text-white">
+            $${rateInUSD.toFixed(2)} USD
           </span>
-          <span class="text-gray-700 dark:text-white">
-            ${rate.toFixed(6)} ${toSymbol}/${fromSymbol}
+          <span class="bold text-gray-700 dark:text-white">
+            ${rate.toFixed(8)} ${toSymbol}/${fromSymbol}
           </span>
-          <span class="text-gray-700 dark:text-white">
-            ${inverseRate.toFixed(6)} ${fromSymbol}/${toSymbol}
+          <span class="semibold text-gray-400 dark:text-gray-300">
+            ${inverseRate.toFixed(8)} ${fromSymbol}/${toSymbol}
           </span>
         </div>
       </div>
@@ -1183,7 +1174,7 @@ function createTooltips(offer, isSentOffers, coinFrom, coinTo, postedTime, expir
     </div>
     
     <div id="tooltip-offer${offer.offer_id}" role="tooltip" class="inline-block absolute z-10 py-2 px-3 text-sm font-medium text-white ${offer.is_own_offer ? 'bg-gray-300' : 'bg-green-700'} rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
-      <div class="active-revoked-expired"><span class="bold">${offer.is_own_offer ? 'Edit Offer' : `Buy ${coinTo}`}</span></div>
+      <div class="active-revoked-expired"><span class="bold">${offer.is_own_offer ? 'Edit Offer' : `Buy ${coinFrom}`}</span></div>
       <div class="tooltip-arrow pr-6" data-popper-arrow></div>
     </div>
     
@@ -1283,14 +1274,14 @@ function createCombinedRateTooltip(offer, coinFrom, coinTo) {
     <p class="font-bold mb-1">Exchange Rate Explanation:</p>
     <p>This offer is ${action} ${coinFrom} for ${coinTo} <br/>at a rate that is ${Math.abs(percentDiff).toFixed(2)}% ${aboveOrBelow} market price.</p>
     <p class="font-bold mt-1">Exchange Rates:</p>
-    <p>1 ${coinFrom} = ${rate.toFixed(6)} ${toSymbol}</p>
-    <p>1 ${coinTo} = ${inverseRate.toFixed(6)} ${fromSymbol}</p>
+    <p>1 ${coinFrom} = ${rate.toFixed(8)} ${coinTo}</p>
+    <p>1 ${coinTo} = ${inverseRate.toFixed(8)} ${coinFrom}</p>
     <p class="font-bold mt-2">USD Equivalent:</p>
     <p>1 ${coinFrom} = $${rateInUSD.toFixed(2)} USD</p>
     <p class="font-bold mt-2">Current market prices:</p>
     <p>${coinFrom}: $${fromPriceUSD.toFixed(2)} USD</p>
     <p>${coinTo}: $${toPriceUSD.toFixed(2)} USD</p>
-    <p class="mt-1">Market rate: 1 ${coinFrom} = ${marketRate.toFixed(6)} ${toSymbol}</p>
+    <p class="mt-1">Market rate: 1 ${coinFrom} = ${marketRate.toFixed(8)} ${coinTo}</p>
   `;
 }
 
@@ -1646,8 +1637,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('coin_to').addEventListener('change', applyFilters);
     document.getElementById('coin_from').addEventListener('change', applyFilters);
-    document.getElementById('sort_by').addEventListener('change', applyFilters);
-    document.getElementById('sort_dir').addEventListener('change', applyFilters);
 
     document.getElementById('clearFilters').addEventListener('click', () => {
         filterForm.reset();

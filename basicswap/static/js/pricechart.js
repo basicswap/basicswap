@@ -209,7 +209,7 @@ fetchHistoricalDataXHR: (coinSymbol) => {
 
 // Cache
 const cache = {
-  ttl: 15 * 60 * 1000,
+  ttl: 15 * 60 * 1000, // 15 minutes in milliseconds
   set: (key, value, customTtl = null) => {
     const item = {
       value: value,
@@ -858,7 +858,7 @@ const app = {
   autoRefreshInterval: null,
   nextRefreshTime: null,
   lastRefreshedTime: null,
-  isAutoRefreshEnabled: localStorage.getItem('autoRefreshEnabled') === 'true',
+  isAutoRefreshEnabled: localStorage.getItem('autoRefreshEnabled') !== 'false',
   refreshTexts: {
     label: 'Auto-refresh in',
     disabled: 'Auto-refresh: disabled',
@@ -868,6 +868,7 @@ const app = {
   init: () => {
     window.addEventListener('load', app.onLoad);
     app.loadLastRefreshedTime();
+    app.updateAutoRefreshButton();
   },
   
   onLoad: async () => {
@@ -882,44 +883,22 @@ const app = {
       } else {
         console.warn('Chart container not found, skipping chart initialization');
       }
-      for (const coin of config.coins) {
-        await app.loadCoinData(coin);
-      }
+      
+      // Load all coin data immediately
+      await app.loadAllCoinData();
+      
       if (chartModule.chart) {
         config.currentResolution = 'month';
         await chartModule.updateChart('BTC');
         app.updateResolutionButtons('BTC');
       }
       ui.setActiveContainer('btc-container');
-      config.coins.forEach(coin => {
-        const container = document.getElementById(`${coin.symbol.toLowerCase()}-container`);
-        if (container) {
-          container.addEventListener('click', () => {
-            ui.setActiveContainer(`${coin.symbol.toLowerCase()}-container`);
-            if (chartModule.chart) {
-              if (coin.symbol === 'WOW') {
-                config.currentResolution = 'day';
-              }
-              chartModule.updateChart(coin.symbol);
-              app.updateResolutionButtons(coin.symbol);
-            }
-          });
-        }
-      });     
-      const refreshAllButton = document.getElementById('refresh-all');
-      if (refreshAllButton) {
-        refreshAllButton.addEventListener('click', app.refreshAllData);
-      }
+      
+      // Set up event listeners and other initializations
+      app.setupEventListeners();
       app.initializeSelectImages();
-      const headers = document.querySelectorAll('th');
-      headers.forEach((header, index) => {
-        header.addEventListener('click', () => app.sortTable(index, header.classList.contains('disabled')));
-      });
-      const closeErrorButton = document.getElementById('close-error');
-      if (closeErrorButton) {
-        closeErrorButton.addEventListener('click', ui.hideErrorMessage);
-      }
       app.initAutoRefresh();
+      
     } catch (error) {
       console.error('Error during initialization:', error);
       ui.displayErrorMessage('Failed to initialize the dashboard. Please try refreshing the page.');
@@ -930,7 +909,13 @@ const app = {
       }
     }
   },
-
+  
+  loadAllCoinData: async () => {
+    for (const coin of config.coins) {
+      await app.loadCoinData(coin);
+    }
+  },
+  
   loadCoinData: async (coin) => {
     const cacheKey = `coinData_${coin.symbol}`;
     let cachedData = cache.get(cacheKey);
@@ -962,6 +947,39 @@ const app = {
     ui.displayCoinData(coin.symbol, data);
     ui.updateLoadTimeAndCache(0, cachedData);
   },
+  
+  setupEventListeners: () => {
+    config.coins.forEach(coin => {
+      const container = document.getElementById(`${coin.symbol.toLowerCase()}-container`);
+      if (container) {
+        container.addEventListener('click', () => {
+          ui.setActiveContainer(`${coin.symbol.toLowerCase()}-container`);
+          if (chartModule.chart) {
+            if (coin.symbol === 'WOW') {
+              config.currentResolution = 'day';
+            }
+            chartModule.updateChart(coin.symbol);
+            app.updateResolutionButtons(coin.symbol);
+          }
+        });
+      }
+    });     
+    
+    const refreshAllButton = document.getElementById('refresh-all');
+    if (refreshAllButton) {
+      refreshAllButton.addEventListener('click', app.refreshAllData);
+    }
+    
+    const headers = document.querySelectorAll('th');
+    headers.forEach((header, index) => {
+      header.addEventListener('click', () => app.sortTable(index, header.classList.contains('disabled')));
+    });
+    
+    const closeErrorButton = document.getElementById('close-error');
+    if (closeErrorButton) {
+      closeErrorButton.addEventListener('click', ui.hideErrorMessage);
+    }
+  },
 
   initAutoRefresh: () => {
     const toggleAutoRefreshButton = document.getElementById('toggle-auto-refresh');
@@ -990,13 +1008,13 @@ const app = {
     app.stopAutoRefresh();
     
     if (resetTimer || !app.nextRefreshTime) {
-      app.nextRefreshTime = Date.now() + 15 * 60 * 1000;
+      app.nextRefreshTime = Date.now() + cache.ttl;
     }
     
     const timeUntilNextRefresh = Math.max(0, app.nextRefreshTime - Date.now());
     
     if (timeUntilNextRefresh === 0) {
-      app.nextRefreshTime = Date.now() + 15 * 60 * 1000;
+      app.nextRefreshTime = Date.now() + cache.ttl;
     }
     
     app.autoRefreshInterval = setTimeout(() => {
@@ -1061,37 +1079,37 @@ const app = {
   },
 
   updateAutoRefreshButton: () => {
-  const button = document.getElementById('toggle-auto-refresh');
-  if (button) {
-    if (app.isAutoRefreshEnabled) {
-      button.classList.remove('text-gray-600', 'dark:text-gray-400');
-      button.classList.add('text-green-500', 'dark:text-green-400');
-      app.startSpinAnimation();
-    } else {
-      button.classList.remove('text-green-500', 'dark:text-green-400');
-      button.classList.add('text-gray-600', 'dark:text-gray-400');
-      app.stopSpinAnimation();
+    const button = document.getElementById('toggle-auto-refresh');
+    if (button) {
+      if (app.isAutoRefreshEnabled) {
+        button.classList.remove('text-gray-600', 'dark:text-gray-400');
+        button.classList.add('text-green-500', 'dark:text-green-400');
+        app.startSpinAnimation();
+      } else {
+        button.classList.remove('text-green-500', 'dark:text-green-400');
+        button.classList.add('text-gray-600', 'dark:text-gray-400');
+        app.stopSpinAnimation();
+      }
+      button.title = app.isAutoRefreshEnabled ? 'Disable Auto-Refresh' : 'Enable Auto-Refresh';
     }
-    button.title = app.isAutoRefreshEnabled ? 'Disable Auto-Refresh' : 'Enable Auto-Refresh';
-  }
-},
+  },
 
-startSpinAnimation: () => {
-  const svg = document.querySelector('#toggle-auto-refresh svg');
-  if (svg) {
-    svg.classList.add('animate-spin');
-    setTimeout(() => {
+  startSpinAnimation: () => {
+    const svg = document.querySelector('#toggle-auto-refresh svg');
+    if (svg) {
+      svg.classList.add('animate-spin');
+      setTimeout(() => {
+        svg.classList.remove('animate-spin');
+      }, 2000);
+    }
+  },
+
+  stopSpinAnimation: () => {
+    const svg = document.querySelector('#toggle-auto-refresh svg');
+    if (svg) {
       svg.classList.remove('animate-spin');
-    }, 2000); // Remove the animation after 2 seconds
-  }
-},
-
-stopSpinAnimation: () => {
-  const svg = document.querySelector('#toggle-auto-refresh svg');
-  if (svg) {
-    svg.classList.remove('animate-spin');
-  }
-},
+    }
+  },
     
   refreshAllData: async () => {
     ui.showLoader();
@@ -1099,9 +1117,7 @@ stopSpinAnimation: () => {
     try {
       cache.clear();
       await app.updateBTCPrice();
-      for (const coin of config.coins) {
-        await app.loadCoinData(coin);
-      }
+      await app.loadAllCoinData();
       if (chartModule.currentCoin) {
         await chartModule.updateChart(chartModule.currentCoin, true);
       }
