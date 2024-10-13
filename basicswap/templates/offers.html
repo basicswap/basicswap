@@ -142,24 +142,25 @@ function getAPIKeys() {
 
 <section class="py-4 flex flex-wrap justify-center overflow-hidden container-to-blur">
  <div class="container px-4 mx-auto">
-  <div class="flex flex-wrap -m-3">
-		{% set coin_data = {
-  'BTC': {'name': 'Bitcoin', 'symbol': 'BTC', 'image': 'Bitcoin.png', 'show': true},
-  'XMR': {'name': 'Monero', 'symbol': 'XMR', 'image': 'Monero.png', 'show': true},
-  'PART': {'name': 'Particl', 'symbol': 'PART', 'image': 'Particl.png', 'show': true},
-  'LTC': {'name': 'Litecoin', 'symbol': 'LTC', 'image': 'Litecoin.png', 'show': true},
-  'FIRO': {'name': 'Firo', 'symbol': 'FIRO', 'image': 'Firo.png', 'show': true},
-  'PIVX': {'name': 'PIVX', 'symbol': 'PIVX', 'image': 'PIVX.png', 'show': true},
-  'DASH': {'name': 'Dash', 'symbol': 'DASH', 'image': 'Dash.png', 'show': true},
-  'ETH': {'name': 'Ethereum', 'symbol': 'ETH', 'image': 'Ethereum.png', 'show': false},
-  'DOGE': {'name': 'Dogecoin', 'symbol': 'DOGE', 'image': 'Doge.png', 'show': false},
-  'DCR': {'name': 'Decred', 'symbol': 'DCR', 'image': 'Decred.png', 'show': true},
-  'ZANO': {'name': 'Zano', 'symbol': 'ZANO', 'image': 'Zano.png', 'show': false},
-  'BCH': {'name': 'BCH', 'symbol': 'BCH', 'image': 'Bitcoin-cash.png', 'show': true},
-  'WOW': {'name': 'Wownero', 'symbol': 'WOW', 'image': 'Wownero.png', 'show': true}
-} %}
+  <div class="flex flex-wrap justify-center -m-3">
+  {% set coin_data = {
+    'BTC': {'name': 'Bitcoin', 'symbol': 'BTC', 'image': 'Bitcoin.png', 'show': true},
+    'XMR': {'name': 'Monero', 'symbol': 'XMR', 'image': 'Monero.png', 'show': true},
+    'PART': {'name': 'Particl', 'symbol': 'PART', 'image': 'Particl.png', 'show': true},
+    'LTC': {'name': 'Litecoin', 'symbol': 'LTC', 'image': 'Litecoin.png', 'show': true},
+    'FIRO': {'name': 'Firo', 'symbol': 'FIRO', 'image': 'Firo.png', 'show': true},
+    'PIVX': {'name': 'PIVX', 'symbol': 'PIVX', 'image': 'PIVX.png', 'show': true},
+    'DASH': {'name': 'Dash', 'symbol': 'DASH', 'image': 'Dash.png', 'show': true},
+    'ETH': {'name': 'Ethereum', 'symbol': 'ETH', 'image': 'Ethereum.png', 'show': false},
+    'DOGE': {'name': 'Dogecoin', 'symbol': 'DOGE', 'image': 'Doge.png', 'show': false},
+    'DCR': {'name': 'Decred', 'symbol': 'DCR', 'image': 'Decred.png', 'show': true},
+    'ZANO': {'name': 'Zano', 'symbol': 'ZANO', 'image': 'Zano.png', 'show': false},
+    'BCH': {'name': 'BCH', 'symbol': 'BCH', 'image': 'Bitcoin-cash.png', 'show': true},
+    'WOW': {'name': 'Wownero', 'symbol': 'WOW', 'image': 'Wownero.png', 'show': true}
+    }
+  %}
 {% for coin_symbol, coin in coin_data.items() if coin_symbol in enabled_chart_coins and coin.show %}
-<div class="w-full sm:w-1/2 lg:w-1/6 p-3" id="{{ coin_symbol.lower() }}-container">
+<div class="w-full sm:w-1/2 lg:w-1/5 p-3" id="{{ coin_symbol.lower() }}-container">
     <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-2xl dark:text-white {% if coin_symbol == 'BTC' %}active-container{% endif %}" style="min-height: 180px;">
      <div class="flex items-center">
       <img src="/static/images/coins/{{ coin.image }}" class="rounded-xl" style="width: 28px; height: 28px; object-fit: contain;" alt="{{ coin.name }}">
@@ -204,144 +205,48 @@ function getAPIKeys() {
             <div class="flex items-center justify-center pb-4 dark:text-white">
               <div class="rounded-b-md">
                 <div class="w-full md:w-0/12">
-                  <div class="container flex flex-wrap justify-center">
-                    <div class="md:w-auto p-1.5 hover-container">
-                      <div class="flex">
-                        {% if sent_offers %}
-
-                          <button id="coin_to_button" class="bg-gray-50 text-gray-900 appearance-none w-10 dark:bg-gray-500 dark:text-white border-l border-t border-b border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-l-lg flex items-center" disabled></button>
-                          <div class="relative">
-                            {{ input_arrow_down_svg | safe }}
-                            <select name="coin_to" id="coin_to" class="bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-none rounded-r-lg outline-none block w-full p-2.5 focus:ring-0">
-                              <option value="any" {% if filters.coin_to==-1 %} selected{% endif %}>Filter {% if sent_offers %}Sending{% else %}Bids{% endif %}</option>
-                              {% for c in coins_from %}
-                                <option class="text-sm" value="{{ c[0] }}" {% if filters.coin_to==c[0] %} selected{% endif %} data-image="/static/images/coins/{{ c[1]|replace(" ", "-") }}.png">{{ c[1] }}</option>
-                              {% endfor %}
-                            </select>
-                          </div>
-
-                          <div class="flex items-center">
-                            <div class="w-full md:w-auto p-1.5">
-                              <p class="text-sm font-heading">{{ arrow_right_svg | safe }}</p>
+                  <div class="container flex flex-wrap">
+                    <div class="md:w-auto hover-container">
+                      <div class="flex flex-wrap justify-center">
+                        <div class="md:w-auto hover-container">
+                          <div class="flex">
+                            <button id="coin_to_button" class="bg-gray-50 text-gray-900 appearance-none w-10 dark:bg-gray-500 dark:text-white border-l border-t border-b border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-l-lg flex items-center" disabled></button>
+                            <div class="relative">
+                              {{ input_arrow_down_svg | safe }}
+                              <select name="coin_to" id="coin_to" class="bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-none rounded-r-lg outline-none block w-full p-2.5 focus:ring-0">
+                                <option value="any" {% if filters.coin_to==-1 %} selected{% endif %}>Filter {% if sent_offers %}Receiving{% else %}Bids{% endif %}</option>
+                                {% for c in coins %}
+                                  <option class="text-sm" value="{{ c[0] }}" {% if filters.coin_to==c[0] %} selected{% endif %} data-image="/static/images/coins/{{ c[1]|replace(" ", "-") }}.png">{{ c[1] }}</option>
+                                {% endfor %}
+                              </select>
+                            </div>
+                            <div class="flex items-center">
+                              <div class="w-full md:w-auto p-1.5">
+                                <p class="text-sm font-heading">{{ arrow_right_svg | safe }}</p>
+                              </div>
+                            </div>
+                            <button id="coin_from_button" class="bg-gray-50 text-gray-900 appearance-none w-10 dark:bg-gray-500 dark:text-white border-l border-t border-b border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-l-lg flex items-center" disabled></button>
+                            <div class="relative">
+                              {{ input_arrow_down_svg | safe }}
+                              <select name="coin_from" id="coin_from" class="bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-none rounded-r-lg outline-none block w-full p-2.5 focus:ring-0">
+                                <option value="any" {% if filters.coin_from==-1 %} selected{% endif %}>Filter {% if sent_offers %}Sending{% else %}Offers{% endif %}</option>
+                                {% for c in coins_from %}
+                                  <option class="text-sm" value="{{ c[0] }}" {% if filters.coin_from==c[0] %} selected{% endif %} data-image="/static/images/coins/{{ c[1]|replace(" ", "-") }}.png">{{ c[1] }}</option>
+                                {% endfor %}
+                              </select>
                             </div>
                           </div>
-
-                          <button id="coin_from_button" class="bg-gray-50 text-gray-900 appearance-none w-10 dark:bg-gray-500 dark:text-white border-l border-t border-b border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-l-lg flex items-center" disabled></button>
-                          <div class="relative">
-                            {{ input_arrow_down_svg | safe }}
-                            <select name="coin_from" id="coin_from" class="bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-none rounded-r-lg outline-none block w-full p-2.5 focus:ring-0">
-                              <option value="any" {% if filters.coin_from==-1 %} selected{% endif %}>Filter {% if sent_offers %}Receiving{% else %}Offers{% endif %}</option>
-                              {% for c in coins %}
-                                <option class="text-sm" value="{{ c[0] }}" {% if filters.coin_from==c[0] %} selected{% endif %} data-image="/static/images/coins/{{ c[1]|replace(" ", "-") }}.png">{{ c[1] }}</option>
-                              {% endfor %}
-                            </select>
-                          </div>
-                        </div>   
-                        {% else %}                 
-                          <div class="md:w-auto p-1.5 hover-container">
-                            <div class="flex">
-
-                              <button id="coin_from_button" class="bg-gray-50 text-gray-900 appearance-none w-10 dark:bg-gray-500 dark:text-white border-l border-t border-b border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-l-lg flex items-center" disabled></button>
-                              <div class="relative">
-                                {{ input_arrow_down_svg | safe }}
-                                <select name="coin_from" id="coin_from" class="bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-none rounded-r-lg outline-none block w-full p-2.5 focus:ring-0">
-                                  <option value="any" {% if filters.coin_from==-1 %} selected{% endif %}>Filter {% if sent_offers %}Sending{% else %}Bids{% endif %}</option>
-                                  {% for c in coins %}
-                                    <option class="text-sm" value="{{ c[0] }}" {% if filters.coin_from==c[0] %} selected{% endif %} data-image="/static/images/coins/{{ c[1]|replace(" ", "-") }}.png">{{ c[1] }}</option>
-                                  {% endfor %}
-                                </select>
-                              </div>
-                              <div class="flex items-center">
-                                <div class="w-full md:w-auto p-1.5">
-                                  <p class="text-sm font-heading">{{ arrow_right_svg | safe }}</p>
-                                </div>
-                              </div>
-
-                              <button id="coin_to_button" class="bg-gray-50 text-gray-900 appearance-none w-10 dark:bg-gray-500 dark:text-white border-l border-t border-b border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-l-lg flex items-center" disabled></button>
-                              <div class="relative">
-                                {{ input_arrow_down_svg | safe }}
-                                <select name="coin_to" id="coin_to" class="bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-none rounded-r-lg outline-none block w-full p-2.5 focus:ring-0">
-                                  <option value="any" {% if filters.coin_to==-1 %} selected{% endif %}>Filter {% if sent_offers %}Receiving{% else %}Offers{% endif %}</option>
-                                  {% for c in coins_from %}
-                                    <option class="text-sm" value="{{ c[0] }}" {% if filters.coin_to==c[0] %} selected{% endif %} data-image="/static/images/coins/{{ c[1]|replace(" ", "-") }}.png">{{ c[1] }}</option>
-                                  {% endfor %}
-                                </select>
-                              </div>
-                            </div
-                          </div>                        
-                        {% endif %}                
-                    </div>
-                    <div class="w-full md:w-auto mt-3">
-                      <div class="w-full md:w-auto p-1.5">
-                        <p class="text-sm font-heading bold">Sort By:</p>
-                      </div>
-                    </div>
-                    <div class="w-full md:w-auto p-1.5">
-                      <div class="relative">
-                        {{ input_arrow_down_svg | safe }}
-                        <select name="sort_by" id="sort_by" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
-                          <option value="created_at" {% if filters.sort_by=='created_at' %} selected{% endif %}>Time Created</option>
-                          <option value="rate" {% if filters.sort_by=='rate' %} selected{% endif %}>Rate</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div class="w-full md:w-auto p-1.5">
-                      <div class="relative">
-                        {{ input_arrow_down_svg | safe }}
-                        <select name="sort_dir" id="sort_dir" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
-                          <option value="desc" {% if filters.sort_dir=='desc' %} selected{% endif %}>Descending</option>
-                          <option value="asc" {% if filters.sort_dir=='asc' %} selected{% endif %}>Ascending</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div class="flex items-center hidden">
-                      <div class="w-full md:w-auto p-1.5">
-                        <p class="text-sm font-heading bold">Sent From Node:</p>
-                      </div>
-                    </div>
-                    <div class="w-full md:w-auto p-1.5 hidden">
-                      <div class="relative">
-                        {{ input_arrow_down_svg | safe }}
-                        <select name="sent_from" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
-                          <option value="any" {% if filters.sent_from=='any' %} selected{% endif %}>Any</option>
-                          <option value="only" {% if filters.sent_from=='only' %} selected{% endif %}>Only</option>
-                        </select>
-                      </div>
-                    </div>
-                    {% if sent_offers %}
-                      <div class="flex items-center">
-                        <div class="w-full md:w-auto p-1.5">
-                          <p class="text-sm font-heading bold">State:</p>
                         </div>
                       </div>
-                      <div class="w-full md:w-auto p-1.5">
-                        <div class="relative">
-                          {{ input_arrow_down_svg | safe }}
-                          <select name="active" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 border border-gray-200 dark:border-gray-400 dark:text-gray-50 dark:bg-gray-500 dark:text-white dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
-                            <option value="any" {% if filters.active=='any' %} selected{% endif %}>Any</option>
-                            <option value="active" {% if filters.active=='active' %} selected{% endif %}>Active</option>
-                            <option value="expired" {% if filters.active=='expired' %} selected{% endif %}>Expired</option>
-                            <!-- todo <option value="revoked" {% if filters.active=='revoked' %} selected{% endif %}>Revoked</option>!-->
-                          </select>
-                        </div>
-                      </div>
-                    {% endif %}
-                    <div class="w-full md:w-auto p-1.5">
+                    </div>
+                    <div class="w-full md:w-auto ml-5">
                       <div class="relative">
                         <button type="button" id="clearFilters" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm hover:text-white dark:text-white dark:bg-gray-500 bg-coolGray-200 hover:bg-green-600 hover:border-green-600 rounded-lg transition duration-200 border border-coolGray-200 dark:border-gray-400 rounded-md shadow-button focus:ring-0 focus:outline-none">
                           <span>Clear Filters</span>
                         </button>
                       </div>
                     </div>
-                    <div class="w-full md:w-auto hidden p-1.5">
-                      <div class="relative">
-                        <button type="submit" id="applyFilters" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-white bg-blue-600 hover:bg-green-600 hover:border-green-600 rounded-lg transition duration-200 border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
-                          {{ filter_apply_svg | safe }}
-                          <span>Apply Filters</span>
-                        </button>
-                      </div>
-                    </div>
-                    <div class="w-full md:w-auto p-1.5">
+                    <div class="w-full md:w-auto ml-5">
                       <div class="relative">
                         <button type="button" id="refreshOffers" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-white bg-blue-600 hover:bg-green-600 hover:border-green-600 rounded-lg transition duration-200 border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
                           <svg id="refreshIcon" class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -351,7 +256,7 @@ function getAPIKeys() {
                         </button>
                       </div>
                     </div>
-                    <div class="w-full md:w-auto p-1.5">
+                    <div class="w-full md:w-auto ml-5">
                       <div class="relative">
                         <button id="toggleView" class="hidden flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-white bg-blue-600 hover:bg-green-600 hover:border-green-600 rounded-lg transition duration-200 border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
                           <span>Toggle JSON View</span>
@@ -368,9 +273,7 @@ function getAPIKeys() {
     </div>
   </div>
 </section>
-                            
-                            
-                            
+
 <section>
   <div id="jsonView" class="hidden mb-4">
     <pre id="jsonContent" class="bg-gray-100 p-4 rounded overflow-auto" style="max-height: 300px;"></pre>
@@ -392,21 +295,37 @@ function getAPIKeys() {
                     <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Details</span>
                   </div>
                 </th>
+                {% if sent_offers %}
                 <th class="p-0">
                   <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-left">
-                    <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Max send</span>
+                    <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Max Recv</span>
                   </div>
                 </th>
+                {% else %}
+                <th class="p-0">
+                  <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-left">
+                    <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Max Send</span>
+                  </div>
+                </th>
+                {% endif %}
                 <th class="p-0">
                   <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-center">
                     <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Swap</span>
                   </div>
                 </th>
+                {% if sent_offers %}
+                <th class="p-0">
+                  <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-right">
+                    <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold pr-2">Your Liq.</span>
+                  </div>
+                </th>
+                {% else %}
                 <th class="p-0">
                   <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-right">
                     <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold pr-2">Max Recv</span>
                   </div>
                 </th>
+                {% endif %}
                 <th class="p-0" data-sortable="true" data-column-index="5">
                   <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-right flex items-center justify-end">
                     <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Rate</span>
