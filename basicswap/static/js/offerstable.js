@@ -268,7 +268,7 @@ function getTimeUntilNextExpiration() {
         return timeUntilExpiration > 0 && timeUntilExpiration < earliest ? timeUntilExpiration : earliest;
     }, Infinity);
     
-    return nextExpiration === Infinity ? 300 : Math.max(MIN_REFRESH_INTERVAL, Math.min(nextExpiration, 300));
+    return Math.max(MIN_REFRESH_INTERVAL, Math.min(nextExpiration, 300));
 }
 
 function getNoOffersMessage() {
@@ -393,30 +393,34 @@ window.tableRateModule = {
   }
 };
 
-function updateProfitLoss(row, fromCoin, toCoin, fromAmount, toAmount) {
+function updateProfitLoss(row, fromCoin, toCoin, fromAmount, toAmount, isOwnOffer) {
   const profitLossElement = row.querySelector('.profit-loss');
   if (!profitLossElement) {
     console.warn('Profit loss element not found in row');
     return;
   }
 
-  calculateProfitLoss(fromCoin, toCoin, fromAmount, toAmount)
-    .then(profitLossPercentage => {
-      if (profitLossPercentage === null) {
+  calculateProfitLoss(fromCoin, toCoin, fromAmount, toAmount, isOwnOffer)
+    .then(percentDiff => {
+      if (percentDiff === null) {
         profitLossElement.textContent = 'N/A';
         profitLossElement.className = 'profit-loss text-lg font-bold text-gray-500';
         console.log(`Unable to calculate profit/loss for ${fromCoin} to ${toCoin}`);
         return;
       }
 
-      const colorClass = getProfitColorClass(profitLossPercentage);
-      profitLossElement.textContent = `${profitLossPercentage > 0 ? '+' : ''}${profitLossPercentage}%`;
+      const formattedPercentDiff = percentDiff.toFixed(2);
+      const percentDiffDisplay = formattedPercentDiff === "0.00" ? "0.00" : 
+                                 (percentDiff > 0 ? `+${formattedPercentDiff}` : formattedPercentDiff);
+
+      const colorClass = getProfitColorClass(percentDiff);
+      profitLossElement.textContent = `${percentDiffDisplay}%`;
       profitLossElement.className = `profit-loss text-lg font-bold ${colorClass}`;
       
       const tooltipId = `percentage-tooltip-${row.getAttribute('data-offer-id')}`;
       const tooltipElement = document.getElementById(tooltipId);
       if (tooltipElement) {
-        const tooltipContent = createTooltipContent(isSentOffers, fromCoin, toCoin, fromAmount, toAmount);
+        const tooltipContent = createTooltipContent(isOwnOffer, fromCoin, toCoin, fromAmount, toAmount);
         tooltipElement.innerHTML = `
           <div class="tooltip-content">
             ${tooltipContent}
@@ -425,7 +429,7 @@ function updateProfitLoss(row, fromCoin, toCoin, fromAmount, toAmount) {
         `;
       }
 
-      console.log(`Updated profit/loss display: ${profitLossElement.textContent}, isSentOffers: ${isSentOffers}`);
+      console.log(`Updated profit/loss display: ${profitLossElement.textContent}, isOwnOffer: ${isOwnOffer}`);
     })
     .catch(error => {
       console.error('Error in updateProfitLoss:', error);
@@ -692,78 +696,50 @@ function filterAndSortData() {
     return filteredData;
 }
 
-async function updateOffersTable() {
-    console.log('Starting updateOffersTable function');
-    console.log(`Is Sent Offers page: ${isSentOffers}`);
-    
-    try {
-        const priceData = await fetchLatestPrices();
-        if (!priceData) {
-            console.error('Failed to fetch latest prices. Using last known prices or proceeding without price data.');
-        } else {
-            console.log('Latest prices fetched successfully');
-            latestPrices = priceData;
-        }
+function updateProfitLoss(row, fromCoin, toCoin, fromAmount, toAmount, isOwnOffer) {
+  const profitLossElement = row.querySelector('.profit-loss');
+  if (!profitLossElement) {
+    console.warn('Profit loss element not found in row');
+    return;
+  }
 
-        let validOffers = getValidOffers();
-        console.log(`Valid offers: ${validOffers.length}`);
+  calculateProfitLoss(fromCoin, toCoin, fromAmount, toAmount, isOwnOffer)
+    .then(percentDiff => {
+      if (percentDiff === null) {
+        profitLossElement.textContent = 'N/A';
+        profitLossElement.className = 'profit-loss text-lg font-bold text-gray-500';
+        console.log(`Unable to calculate profit/loss for ${fromCoin} to ${toCoin}`);
+        return;
+      }
 
-        if (validOffers.length === 0) {
-            console.log('No valid offers found. Handling no offers scenario.');
-            handleNoOffersScenario();
-            return;
-        }
+      // Format the percentage to two decimal places
+      const formattedPercentDiff = percentDiff.toFixed(2);
+      const percentDiffDisplay = formattedPercentDiff === "0.00" ? "0.00" : 
+                                 (percentDiff > 0 ? `+${formattedPercentDiff}` : formattedPercentDiff);
 
-        const totalPages = Math.max(1, Math.ceil(validOffers.length / itemsPerPage));
-        currentPage = Math.min(currentPage, totalPages);
+      const colorClass = getProfitColorClass(percentDiff);
+      profitLossElement.textContent = `${percentDiffDisplay}%`;
+      profitLossElement.className = `profit-loss text-lg font-bold ${colorClass}`;
+      
+      const tooltipId = `percentage-tooltip-${row.getAttribute('data-offer-id')}`;
+      const tooltipElement = document.getElementById(tooltipId);
+      if (tooltipElement) {
+        const tooltipContent = createTooltipContent(isOwnOffer, fromCoin, toCoin, fromAmount, toAmount);
+        tooltipElement.innerHTML = `
+          <div class="tooltip-content">
+            ${tooltipContent}
+          </div>
+          <div class="tooltip-arrow" data-popper-arrow></div>
+        `;
+      }
 
-        const startIndex = (currentPage - 1) * itemsPerPage;
-        const endIndex = startIndex + itemsPerPage;
-        const itemsToDisplay = validOffers.slice(startIndex, endIndex);
-        
-        console.log(`Displaying offers ${startIndex + 1} to ${endIndex} of ${validOffers.length}`);
-        
-        offersBody.innerHTML = '';
-        
-        for (const offer of itemsToDisplay) {
-            const row = createTableRow(offer, isSentOffers);
-            if (row) {
-                offersBody.appendChild(row);
-                try {
-                    const fromAmount = parseFloat(offer.amount_from);
-                    const toAmount = parseFloat(offer.amount_to);
-                    await updateProfitLoss(row, offer.coin_from, offer.coin_to, fromAmount, toAmount);
-                } catch (error) {
-                    console.error(`Error updating profit/loss for offer ${offer.offer_id}:`, error);
-                }
-            }
-        }
-        
-        updateRowTimes();
-        initializeFlowbiteTooltips();
-        updatePaginationInfo();
-        
-        if (tableRateModule && typeof tableRateModule.initializeTable === 'function') {
-            tableRateModule.initializeTable();
-        }
-        
-        logOfferStatus();
-
-        lastRefreshTime = Date.now();
-        nextRefreshCountdown = getTimeUntilNextExpiration();
-        updateLastRefreshTime();
-        updateNextRefreshTime();
-
-        if (newEntriesCountSpan) {
-            newEntriesCountSpan.textContent = validOffers.length;
-        }
-
-    } catch (error) {
-        console.error('Error updating offers table:', error);
-        offersBody.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-red-500">An error occurred while updating the offers table. Please try again later.</td></tr>`;
-    } finally {
-        setRefreshButtonLoading(false);
-    }
+      console.log(`Updated profit/loss display: ${profitLossElement.textContent}, isOwnOffer: ${isOwnOffer}`);
+    })
+    .catch(error => {
+      console.error('Error in updateProfitLoss:', error);
+      profitLossElement.textContent = 'Error';
+      profitLossElement.className = 'profit-loss text-lg font-bold text-red-500';
+    });
 }
 
 function createTableRow(offer, isSentOffers) {
@@ -771,8 +747,12 @@ function createTableRow(offer, isSentOffers) {
   row.className = `opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600`;
   row.setAttribute('data-offer-id', offer.offer_id);
 
-  const coinFrom = symbolToCoinName[coinNameToSymbol[offer.coin_from]] || offer.coin_from;
-  const coinTo = symbolToCoinName[coinNameToSymbol[offer.coin_to]] || offer.coin_to;
+  const coinFrom = offer.coin_from ? (symbolToCoinName[coinNameToSymbol[offer.coin_from]] || offer.coin_from) : 'Unknown';
+  const coinTo = offer.coin_to ? (symbolToCoinName[coinNameToSymbol[offer.coin_to]] || offer.coin_to) : 'Unknown';
+
+  if (coinFrom === 'Unknown' || coinTo === 'Unknown') {
+    console.warn(`Invalid coin data for offer ${offer.offer_id}: coinFrom=${coinFrom}, coinTo=${coinTo}`);
+  }
 
   const postedTime = formatTimeAgo(offer.created_at);
   const expiresIn = formatTimeLeft(offer.expire_at);
@@ -780,7 +760,13 @@ function createTableRow(offer, isSentOffers) {
   const currentTime = Math.floor(Date.now() / 1000);
   const isActuallyExpired = currentTime > offer.expire_at;
 
-  const { buttonClass, buttonText } = getButtonProperties(isActuallyExpired, isSentOffers, offer.is_own_offer, offer.is_revoked);
+  // Determine if this offer should be treated as a sent offer
+  const isOwnOffer = offer.is_own_offer;
+
+  const { buttonClass, buttonText } = getButtonProperties(isActuallyExpired, isSentOffers, isOwnOffer);
+
+  const fromAmount = parseFloat(offer.amount_from) || 0;
+  const toAmount = parseFloat(offer.amount_to) || 0;
 
   row.innerHTML = `
     ${createTimeColumn(offer, postedTime, expiresIn)}
@@ -791,12 +777,10 @@ function createTableRow(offer, isSentOffers) {
     ${createRateColumn(offer, coinFrom, coinTo)}
     ${createPercentageColumn(offer)}
     ${createActionColumn(offer, buttonClass, buttonText)}
-    ${createTooltips(offer, isSentOffers, coinFrom, coinTo, postedTime, expiresIn, isActuallyExpired)}
+    ${createTooltips(offer, isOwnOffer, coinFrom, coinTo, fromAmount, toAmount, postedTime, expiresIn, isActuallyExpired)}
   `;
 
-  const fromAmount = parseFloat(offer.amount_from);
-  const toAmount = parseFloat(offer.amount_to);
-  updateProfitLoss(row, coinFrom, coinTo, fromAmount, toAmount, isSentOffers);
+  updateProfitLoss(row, coinFrom, coinTo, fromAmount, toAmount, isOwnOffer);
 
   return row;
 }
@@ -847,30 +831,116 @@ function getButtonProperties(isActuallyExpired, isSentOffers, isTreatedAsSentOff
   }
 }
 
-function updateProfitLoss(row, fromCoin, toCoin, fromAmount, toAmount) {
+async function updateOffersTable() {
+    console.log('Starting updateOffersTable function');
+    console.log(`Is Sent Offers page: ${isSentOffers}`);
+    
+    try {
+        const priceData = await fetchLatestPrices();
+        if (!priceData) {
+            console.error('Failed to fetch latest prices. Using last known prices or proceeding without price data.');
+        } else {
+            console.log('Latest prices fetched successfully');
+            latestPrices = priceData;
+        }
+
+        let validOffers = getValidOffers();
+        console.log(`Valid offers: ${validOffers.length}`);
+
+        if (validOffers.length === 0) {
+            console.log('No valid offers found. Handling no offers scenario.');
+            handleNoOffersScenario();
+            return;
+        }
+
+        const totalPages = Math.max(1, Math.ceil(validOffers.length / itemsPerPage));
+        currentPage = Math.min(currentPage, totalPages);
+
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        const itemsToDisplay = validOffers.slice(startIndex, endIndex);
+        
+        console.log(`Displaying offers ${startIndex + 1} to ${endIndex} of ${validOffers.length}`);
+        
+        offersBody.innerHTML = '';
+        
+        for (const offer of itemsToDisplay) {
+            const row = createTableRow(offer, isSentOffers);
+            if (row) {
+                offersBody.appendChild(row);
+                try {
+                    const fromAmount = parseFloat(offer.amount_from);
+                    const toAmount = parseFloat(offer.amount_to);
+                    await updateProfitLoss(row, offer.coin_from, offer.coin_to, fromAmount, toAmount, offer.is_own_offer);
+                } catch (error) {
+                    console.error(`Error updating profit/loss for offer ${offer.offer_id}:`, error);
+                }
+            }
+        }
+        
+        updateRowTimes();
+        initializeFlowbiteTooltips();
+        updatePaginationInfo();
+        
+        if (tableRateModule && typeof tableRateModule.initializeTable === 'function') {
+            tableRateModule.initializeTable();
+        }
+        
+        logOfferStatus();
+
+        lastRefreshTime = Date.now();
+        nextRefreshCountdown = getTimeUntilNextExpiration();
+        updateLastRefreshTime();
+        updateNextRefreshTime();
+
+        if (newEntriesCountSpan) {
+            newEntriesCountSpan.textContent = validOffers.length;
+        }
+
+    } catch (error) {
+        console.error('Error updating offers table:', error);
+        offersBody.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-red-500">An error occurred while updating the offers table. Please try again later.</td></tr>`;
+    } finally {
+        setRefreshButtonLoading(false);
+    }
+}
+
+function updateProfitLoss(row, fromCoin, toCoin, fromAmount, toAmount, isOwnOffer) {
   const profitLossElement = row.querySelector('.profit-loss');
   if (!profitLossElement) {
     console.warn('Profit loss element not found in row');
     return;
   }
 
-  calculateProfitLoss(fromCoin, toCoin, fromAmount, toAmount)
-    .then(profitLossPercentage => {
-      if (profitLossPercentage === null) {
+  if (!fromCoin || !toCoin) {
+    console.error(`Invalid coin names: fromCoin=${fromCoin}, toCoin=${toCoin}`);
+    profitLossElement.textContent = 'Error';
+    profitLossElement.className = 'profit-loss text-lg font-bold text-red-500';
+    return;
+  }
+
+  calculateProfitLoss(fromCoin, toCoin, fromAmount, toAmount, isOwnOffer)
+    .then(percentDiff => {
+      if (percentDiff === null) {
         profitLossElement.textContent = 'N/A';
-        profitLossElement.className = 'profit-loss text-lg font-bold text-white';
+        profitLossElement.className = 'profit-loss text-lg font-bold text-gray-500';
         console.log(`Unable to calculate profit/loss for ${fromCoin} to ${toCoin}`);
         return;
       }
 
-      const colorClass = getProfitColorClass(profitLossPercentage);
-      profitLossElement.textContent = `${profitLossPercentage > 0 ? '+' : ''}${profitLossPercentage}%`;
-      profitLossElement.className = `profit-loss text-lg font-bold ${colorClass}`;
+      // Format the percentage to two decimal places
+      const formattedPercentDiff = percentDiff.toFixed(2);
+      const percentDiffDisplay = formattedPercentDiff === "0.00" ? "0.00" : 
+                                 (percentDiff > 0 ? `+${formattedPercentDiff}` : formattedPercentDiff);
 
+      const colorClass = getProfitColorClass(percentDiff);
+      profitLossElement.textContent = `${percentDiffDisplay}%`;
+      profitLossElement.className = `profit-loss text-lg font-bold ${colorClass}`;
+      
       const tooltipId = `percentage-tooltip-${row.getAttribute('data-offer-id')}`;
       const tooltipElement = document.getElementById(tooltipId);
       if (tooltipElement) {
-        const tooltipContent = createTooltipContent(isSentOffers, fromCoin, toCoin, fromAmount, toAmount);
+        const tooltipContent = createTooltipContent(isSentOffers || isOwnOffer, fromCoin, toCoin, fromAmount, toAmount);
         tooltipElement.innerHTML = `
           <div class="tooltip-content">
             ${tooltipContent}
@@ -879,7 +949,7 @@ function updateProfitLoss(row, fromCoin, toCoin, fromAmount, toAmount) {
         `;
       }
 
-      console.log(`Updated profit/loss display: ${profitLossElement.textContent}, isSentOffers: ${isSentOffers}`);
+      console.log(`Updated profit/loss display: ${profitLossElement.textContent}, isSentOffers: ${isSentOffers}, isOwnOffer: ${isOwnOffer}`);
     })
     .catch(error => {
       console.error('Error in updateProfitLoss:', error);
@@ -888,8 +958,8 @@ function updateProfitLoss(row, fromCoin, toCoin, fromAmount, toAmount) {
     });
 }
 
-async function calculateProfitLoss(fromCoin, toCoin, fromAmount, toAmount) {
-  console.log(`Calculating profit/loss for ${fromAmount} ${fromCoin} to ${toAmount} ${toCoin}, isSentOffers: ${isSentOffers}`);
+async function calculateProfitLoss(fromCoin, toCoin, fromAmount, toAmount, isOwnOffer) {
+  console.log(`Calculating profit/loss for ${fromAmount} ${fromCoin} to ${toAmount} ${toCoin}, isOwnOffer: ${isOwnOffer}`);
 
   if (!latestPrices) {
     console.error('Latest prices not available. Unable to calculate profit/loss.');
@@ -910,20 +980,18 @@ async function calculateProfitLoss(fromCoin, toCoin, fromAmount, toAmount) {
   const fromValueUSD = fromAmount * fromPriceUSD;
   const toValueUSD = toAmount * toPriceUSD;
 
-  let profitPercentage;
-
-  if (isSentOffers) {
-    // Sent Offer
-    profitPercentage = ((toValueUSD / fromValueUSD) - 1) * 100;
+  let percentDiff;
+  if (isOwnOffer) {
+    // For sent offers or own offers, always calculate as if selling
+    percentDiff = ((toValueUSD / fromValueUSD) - 1) * 100;
   } else {
-    // Offer Page
-    profitPercentage = ((fromValueUSD / toValueUSD) - 1) * 100;
+    // For received offers, calculate savings percentage
+    percentDiff = ((fromValueUSD / toValueUSD) - 1) * 100;
   }
 
-  console.log(`From value: $${fromValueUSD.toFixed(2)}, To value: $${toValueUSD.toFixed(2)}`);
-  console.log(`Profit percentage: ${profitPercentage.toFixed(2)}%, isSentOffers: ${isSentOffers}`);
+  console.log(`Percent difference: ${percentDiff.toFixed(2)}%`);
 
-  return profitPercentage.toFixed(2);
+  return percentDiff;
 }
 
 function getProfitColorClass(percentage) {
@@ -955,30 +1023,17 @@ function getMarketRate(fromCoin, toCoin) {
     });
 }
 
-// todo
 function getTimerColor(offer) {
   const now = Math.floor(Date.now() / 1000);
-  const offerAge = now - offer.created_at;
-  const offerLifespan = offer.expire_at - offer.created_at;
   const timeLeft = offer.expire_at - now;
 
-  // New listing:
-  if (offerAge < offerLifespan * 0.1) {
-    return "#10B981"; // Green
+  if (timeLeft <= 300) { // 5 minutes or less
+    return "#9CA3AF"; // Grey
+  } else if (timeLeft <= 1800) { // 5-30 minutes
+    return "#3B82F6"; // Blue
+  } else { // More than 30 minutes
+    return "#10B981"; // Green/Turquoise
   }
-  
-  // Almost expired:
-  if (timeLeft < offerLifespan * 0.1) {
-    return "#9CA3AF"; // Gray
-  }
-  
-  // Fade from green to blue to gray
-  const bluePhase = (offerAge - offerLifespan * 0.1) / (offerLifespan * 0.8);
-  const r = Math.round(16 + (59 - 16) * bluePhase);
-  const g = Math.round(185 + (130 - 185) * bluePhase);
-  const b = Math.round(129 + (246 - 129) * bluePhase);
-  
-  return `rgb(${r}, ${g}, ${b})`;
 }
 
 function createTimeColumn(offer, postedTime, expiresIn) {
@@ -1137,60 +1192,88 @@ function createActionColumn(offer, buttonClass, buttonText) {
   `;
 }
 
-function createTooltips(offer, isSentOffers, coinFrom, coinTo, postedTime, expiresIn, isActuallyExpired) {
+function createTooltips(offer, treatAsSentOffer, coinFrom, coinTo, fromAmount, toAmount, postedTime, expiresIn, isActuallyExpired) {
   const rate = parseFloat(offer.rate);
-  const fromSymbol = coinNameToSymbol[coinFrom] || coinFrom.toLowerCase();
-  const toSymbol = coinNameToSymbol[coinTo] || coinTo.toLowerCase();
+  const fromSymbol = getCoinSymbolLowercase(coinFrom);
+  const toSymbol = getCoinSymbolLowercase(coinTo);
   
   const fromPriceUSD = latestPrices[fromSymbol]?.usd || 0;
   const toPriceUSD = latestPrices[toSymbol]?.usd || 0;
   const rateInUSD = rate * toPriceUSD;
 
-  const combinedRateTooltip = createCombinedRateTooltip(offer, coinFrom, coinTo);
+  const combinedRateTooltip = createCombinedRateTooltip(offer, coinFrom, coinTo, treatAsSentOffer);
 
-  const fromAmount = parseFloat(offer.amount_from);
-  const toAmount = parseFloat(offer.amount_to);
-  const percentageTooltipContent = createTooltipContent(isSentOffers, coinFrom, coinTo, fromAmount, toAmount);
+  const percentageTooltipContent = createTooltipContent(treatAsSentOffer, coinFrom, coinTo, fromAmount, toAmount);
 
   return `
-    <div id="tooltip-active${offer.offer_id}" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white ${isActuallyExpired ? 'bg-gray-400' : 'bg-green-600'} rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
-      <div class="active-revoked-expired">
-        <span class="bold">
-          <div class="${isActuallyExpired ? 'dark:text-white' : ''} text-xs"><span class="bold">Posted:</span> ${postedTime}</div>
-          <div class="${isActuallyExpired ? 'dark:text-white' : ''} text-xs"><span class="bold">Expires in:</span> ${expiresIn}</div>
-        </span>
-      </div>
-      <div class="tooltip-arrow" data-popper-arrow></div>
-    </div>
+<div id="tooltip-active${offer.offer_id}" role="tooltip" class="inline-block absolute invisible z-50 py-2 px-3 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+  <div class="active-revoked-expired">
+    <span class="bold">
+      <div class="text-xs"><span class="bold">Posted:</span> ${postedTime}</div>
+      <div class="text-xs"><span class="bold">Expires in:</span> ${expiresIn}</div>
+    </span>
+  </div>
+  <div class="mt-5 text-xs">
+    <p class="font-bold mb-3">Time Indicator Colors:</p>
+    <p class="flex items-center">
+      <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+        <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#10B981" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="11"></circle>
+          <polyline points="12,6 12,12 18,12" stroke="#10B981"></polyline>
+        </g>
+      </svg>
+      Green: More than 30 minutes left
+    </p>
+    <p class="flex items-center mt-3 ">
+      <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+        <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3B82F6" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="11"></circle>
+          <polyline points="12,6 12,12 18,12" stroke="#3B82F6"></polyline>
+        </g>
+      </svg>
+      Blue: Between 5 and 30 minutes left
+    </p>
+    <p class="flex items-center mt-3 mb-3">
+      <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+        <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#9CA3AF" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="11"></circle>
+          <polyline points="12,6 12,12 18,12" stroke="#9CA3AF"></polyline>
+        </g>
+      </svg>
+      Grey: Less than 5 minutes left or expired
+    </p>
+  </div>
+  <div class="tooltip-arrow" data-popper-arrow></div>
+</div>
     
-    <div id="tooltip-recipient${offer.offer_id}" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+    <div id="tooltip-recipient${offer.offer_id}" role="tooltip" class="inline-block absolute invisible z-50 py-2 px-3 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
       <div class="active-revoked-expired"><span class="bold monospace">${offer.addr_from}</span></div>
       <div class="tooltip-arrow" data-popper-arrow></div>
     </div>
    
-    <div id="tooltip-wallet${offer.offer_id}" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+    <div id="tooltip-wallet${offer.offer_id}" role="tooltip" class="inline-block absolute invisible z-50 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
       <div class="active-revoked-expired"><span class="bold">${isSentOffers ? 'My' : ''} ${coinTo} Wallet</span></div>
       <div class="tooltip-arrow pl-1" data-popper-arrow></div>
     </div>
     
-    <div id="tooltip-offer${offer.offer_id}" role="tooltip" class="inline-block absolute z-10 py-2 px-3 text-sm font-medium text-white ${offer.is_own_offer ? 'bg-gray-300' : 'bg-green-700'} rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+    <div id="tooltip-offer${offer.offer_id}" role="tooltip" class="inline-block absolute z-50 py-2 px-3 text-sm font-medium text-white ${offer.is_own_offer ? 'bg-gray-300' : 'bg-green-700'} rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
       <div class="active-revoked-expired"><span class="bold">${offer.is_own_offer ? 'Edit Offer' : `Buy ${coinFrom}`}</span></div>
       <div class="tooltip-arrow pr-6" data-popper-arrow></div>
     </div>
     
-    <div id="tooltip-wallet-maker${offer.offer_id}" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+    <div id="tooltip-wallet-maker${offer.offer_id}" role="tooltip" class="inline-block absolute invisible z-50 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
       <div class="active-revoked-expired"><span class="bold">${isSentOffers ? 'My' : ''} ${coinFrom} Wallet</span></div>
       <div class="tooltip-arrow pl-1" data-popper-arrow></div>
     </div>
     
-    <div id="tooltip-rate-${offer.offer_id}" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+    <div id="tooltip-rate-${offer.offer_id}" role="tooltip" class="inline-block absolute invisible z-50 py-2 px-3 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
       <div class="tooltip-content">
         ${combinedRateTooltip}
       </div>
       <div class="tooltip-arrow" data-popper-arrow></div>
     </div>
 
-    <div id="percentage-tooltip-${offer.offer_id}" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+    <div id="percentage-tooltip-${offer.offer_id}" role="tooltip" class="inline-block absolute invisible z-50 py-2 px-3 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
       <div class="tooltip-content">
         ${percentageTooltipContent}
       </div>
@@ -1199,7 +1282,28 @@ function createTooltips(offer, isSentOffers, coinFrom, coinTo, postedTime, expir
   `;
 }
 
-function createTooltipContent(isSentOffers, coinFrom, coinTo, fromAmount, toAmount) {
+function getCoinSymbolLowercase(coin) {
+  if (typeof coin === 'string') {
+    return (coinNameToSymbol[coin] || coin).toLowerCase();
+  } else if (coin && typeof coin === 'object' && coin.symbol) {
+    return coin.symbol.toLowerCase();
+  } else {
+    console.warn('Invalid coin input:', coin);
+    return 'unknown';
+  }
+}
+
+function createTooltipContent(isSentOffers, coinFrom, coinTo, fromAmount, toAmount, isOwnOffer) {
+  if (!coinFrom || !coinTo) {
+    console.error(`Invalid coin names: coinFrom=${coinFrom}, coinTo=${coinTo}`);
+    return `<p class="font-bold mb-1">Unable to calculate profit/loss</p>
+            <p>Invalid coin data.</p>`;
+  }
+
+  // Ensure fromAmount and toAmount are numbers
+  fromAmount = parseFloat(fromAmount) || 0;
+  toAmount = parseFloat(toAmount) || 0;
+
   const fromSymbol = coinNameToSymbol[coinFrom] || coinFrom.toLowerCase();
   const toSymbol = coinNameToSymbol[coinTo] || coinTo.toLowerCase();
   const fromPriceUSD = latestPrices[fromSymbol]?.usd;
@@ -1213,51 +1317,55 @@ function createTooltipContent(isSentOffers, coinFrom, coinTo, fromAmount, toAmou
   const fromValueUSD = fromAmount * fromPriceUSD;
   const toValueUSD = toAmount * toPriceUSD;
   const profitUSD = toValueUSD - fromValueUSD;
-  let profitPercentage;
 
-  if (isSentOffers) {
-    // Sent Offer Page
-    profitPercentage = ((toValueUSD / fromValueUSD) - 1) * 100;
+  const marketRate = fromPriceUSD / toPriceUSD;
+  const offerRate = toAmount / fromAmount;
+  let percentDiff;
+  
+  if (isSentOffers || isOwnOffer) {
+    percentDiff = ((toValueUSD / fromValueUSD) - 1) * 100;
   } else {
-    // Offer Page
-    profitPercentage = ((fromValueUSD / toValueUSD) - 1) * 100;
+    percentDiff = ((fromValueUSD / toValueUSD) - 1) * 100;
   }
 
-  const profitLabel = isSentOffers ? "Profit" : "Savings";
-  const actionLabel = isSentOffers ? "selling" : "buying";
-  const directionLabel = isSentOffers ? "receiving" : "paying";
+  const formattedPercentDiff = percentDiff.toFixed(2);
+  const percentDiffDisplay = formattedPercentDiff === "0.00" ? "0.00" : 
+                             (percentDiff > 0 ? `+${formattedPercentDiff}` : formattedPercentDiff);
+
+  const profitLabel = (isSentOffers || isOwnOffer) ? "Profit" : "Savings";
+  const actionLabel = (isSentOffers || isOwnOffer) ? "selling" : "buying";
+  const directionLabel = (isSentOffers || isOwnOffer) ? "receiving" : "paying";
 
   return `
     <p class="font-bold mb-1">Profit/Loss Calculation:</p>
-    <p>You are ${actionLabel} ${fromAmount} ${coinFrom} (${fromValueUSD.toFixed(2)} USD) <br/> and ${directionLabel} ${toAmount} ${coinTo} (${toValueUSD.toFixed(2)} USD).</p>
-    <p class="mt-1">Percentage: ${profitPercentage.toFixed(2)}%</p>
-    <p>USD ${profitLabel}: ${profitUSD > 0 ? '+' : ''}${profitUSD.toFixed(2)} USD</p>
+    <p>You are ${actionLabel} ${fromAmount.toFixed(8)} ${coinFrom} ($${fromValueUSD.toFixed(2)} USD) <br/> and ${directionLabel} ${toAmount.toFixed(8)} ${coinTo} ($${toValueUSD.toFixed(2)} USD).</p>
+    <p class="mt-1">Percentage difference: ${percentDiffDisplay}%</p>
+    <p>USD ${profitLabel}: ${profitUSD > 0 ? '+' : ''}$${profitUSD.toFixed(2)} USD</p>
     <p class="font-bold mt-2">Calculation:</p>
-    <p>Percentage = ${isSentOffers ? 
+    <p>Percentage = ${(isSentOffers || isOwnOffer) ? 
       "((To Amount in USD / From Amount in USD) - 1) * 100" : 
       "((From Amount in USD / To Amount in USD) - 1) * 100"}</p>
-    <p>USD ${profitLabel} = ${isSentOffers ? 
-      "To Amount in USD - From Amount in USD" : 
-      "From Amount in USD - To Amount in USD"}</p>
+    <p>USD ${profitLabel} = To Amount in USD - From Amount in USD</p>
     <p class="font-bold mt-1">Interpretation:</p>
-    ${isSentOffers ? `
-    <p><span class="text-green-500">Positive percentage:</span> You're making a profit</p>
-    <p><span class="text-red-500">Negative percentage:</span> You're taking a loss</p>
+    ${(isSentOffers || isOwnOffer) ? `
+    <p><span class="text-green-500">Positive percentage:</span> You're selling above market rate (profitable)</p>
+    <p><span class="text-red-500">Negative percentage:</span> You're selling below market rate (loss)</p>
     ` : `
-    <p><span class="text-green-500">Positive percentage:</span> You're saving money compared to market rates</p>
-    <p><span class="text-red-500">Negative percentage:</span> You're paying more than current market rates</p>
+    <p><span class="text-green-500">Positive percentage:</span> You're buying below market rate (savings)</p>
+    <p><span class="text-red-500">Negative percentage:</span> You're buying above market rate (premium)</p>
     `}
-    <p class="mt-1"><strong>Note:</strong> ${isSentOffers ? 
-      "As a seller, a positive percentage means you're selling<br/> for more than the current market value." : 
-      "As a buyer, a positive percentage indicates potential </br> savings compared to current market rates."}</p>
+    <p class="mt-1"><strong>Note:</strong> ${(isSentOffers || isOwnOffer) ? 
+      "As a seller, a positive percentage means <br/> you're selling for more than the current market value." : 
+      "As a buyer, a positive percentage indicates </br> potential savings compared to current market rates."}</p>
+    <p class="mt-1"><strong>Market Rate:</strong> 1 ${coinFrom} = ${marketRate.toFixed(8)} ${coinTo}</p>
+    <p><strong>Offer Rate:</strong> 1 ${coinFrom} = ${offerRate.toFixed(8)} ${coinTo}</p>
   `;
 }
-
-function createCombinedRateTooltip(offer, coinFrom, coinTo) {
+function createCombinedRateTooltip(offer, coinFrom, coinTo, isSentOffers, treatAsSentOffer) {
   const rate = parseFloat(offer.rate);
   const inverseRate = 1 / rate;
-  const fromSymbol = coinNameToSymbol[coinFrom] || coinFrom.toLowerCase();
-  const toSymbol = coinNameToSymbol[coinTo] || coinTo.toLowerCase();
+  const fromSymbol = getCoinSymbolLowercase(coinFrom);
+  const toSymbol = getCoinSymbolLowercase(coinTo);
   
   const fromPriceUSD = latestPrices[fromSymbol]?.usd || 0;
   const toPriceUSD = latestPrices[toSymbol]?.usd || 0;
@@ -1266,13 +1374,16 @@ function createCombinedRateTooltip(offer, coinFrom, coinTo) {
   const marketRate = fromPriceUSD / toPriceUSD;
   
   const percentDiff = ((rate - marketRate) / marketRate) * 100;
-  const aboveOrBelow = percentDiff > 0 ? "above" : "below";
+  const formattedPercentDiff = percentDiff.toFixed(2);
+  const percentDiffDisplay = formattedPercentDiff === "0.00" ? "0.00" : 
+                             (percentDiff > 0 ? `+${formattedPercentDiff}` : formattedPercentDiff);
+  const aboveOrBelow = percentDiff > 0 ? "above" : percentDiff < 0 ? "below" : "at";
 
-  const action = isSentOffers ? "selling" : "buying";
+  const action = isSentOffers || treatAsSentOffer ? "selling" : "buying";
 
   return `
     <p class="font-bold mb-1">Exchange Rate Explanation:</p>
-    <p>This offer is ${action} ${coinFrom} for ${coinTo} <br/>at a rate that is ${Math.abs(percentDiff).toFixed(2)}% ${aboveOrBelow} market price.</p>
+    <p>This offer is ${action} ${coinFrom} for ${coinTo} <br/>at a rate that is ${percentDiffDisplay}% ${aboveOrBelow} market price.</p>
     <p class="font-bold mt-1">Exchange Rates:</p>
     <p>1 ${coinFrom} = ${rate.toFixed(8)} ${coinTo}</p>
     <p>1 ${coinTo} = ${inverseRate.toFixed(8)} ${coinFrom}</p>
@@ -1333,15 +1444,18 @@ function updateNextRefreshTime() {
     const minutes = Math.floor(nextRefreshCountdown / 60);
     const seconds = nextRefreshCountdown % 60;
     
-    nextRefreshTimeSpan.textContent = `${minutes}m ${seconds}s`;
+    nextRefreshTimeSpan.textContent = `${minutes}m ${seconds.toString().padStart(2, '0')}s`;
     // console.log(`Next refresh in: ${minutes}m ${seconds}s`);
 }
 
 function updateRowTimes() {
   const currentTime = Math.floor(Date.now() / 1000);
-  jsonData.forEach(offer => {
-    const row = document.querySelector(`[data-offer-id="${offer.offer_id}"]`);
-    if (!row) return;
+  const rows = document.querySelectorAll('[data-offer-id]');
+  
+  rows.forEach(row => {
+    const offerId = row.getAttribute('data-offer-id');
+    const offer = jsonData.find(o => o.offer_id === offerId);
+    if (!offer) return;
 
     const timeColumn = row.querySelector('td:first-child');
     if (!timeColumn) return;
@@ -1358,22 +1472,22 @@ function updateRowTimes() {
 
     const textContainer = timeColumn.querySelector('.xl\\:block');
     if (textContainer) {
-      textContainer.innerHTML = `
-        <div class="text-xs"><span class="bold">Posted:</span> ${escapeHtml(postedTime)}</div>
-        <div class="text-xs"><span class="bold">Expires in:</span> ${escapeHtml(expiresIn)}</div>
-      `;
+      const postedElement = textContainer.querySelector('.text-xs:first-child');
+      const expiresElement = textContainer.querySelector('.text-xs:last-child');
+      
+      if (postedElement) postedElement.textContent = `Posted: ${postedTime}`;
+      if (expiresElement) expiresElement.textContent = `Expires in: ${expiresIn}`;
     }
 
-    const tooltipElement = document.getElementById(`tooltip-active${offer.offer_id}`);
+    const tooltipElement = document.getElementById(`tooltip-active${offerId}`);
     if (tooltipElement) {
       const tooltipContent = tooltipElement.querySelector('.active-revoked-expired');
       if (tooltipContent) {
-        tooltipContent.innerHTML = `
-          <span class="bold">
-            <div class="text-xs"><span class="bold">Posted:</span> ${postedTime}</div>
-            <div class="text-xs"><span class="bold">Expires in:</span> ${expiresIn}</div>
-          </span>
-        `;
+        const postedElement = tooltipContent.querySelector('.text-xs:first-child');
+        const expiresElement = tooltipContent.querySelector('.text-xs:last-child');
+        
+        if (postedElement) postedElement.textContent = `Posted: ${postedTime}`;
+        if (expiresElement) expiresElement.textContent = `Expires in: ${expiresIn}`;
       }
     }
   });
@@ -1442,22 +1556,48 @@ function startRefreshCountdown() {
 
     console.log('Starting refresh countdown');
 
+    let refreshTimeout;
+    let countdownInterval;
+
     function refreshCycle() {
         console.log(`Refresh cycle started. Current countdown: ${nextRefreshCountdown}`);
         checkExpiredAndFetchNew().then(() => {
             console.log(`Refresh cycle completed. Next refresh in ${nextRefreshCountdown} seconds`);
-            refreshInterval = setTimeout(refreshCycle, nextRefreshCountdown * 1000);
+            startCountdown();
         });
+    }
+
+    function startCountdown() {
+        // Clear any existing intervals
+        if (countdownInterval) {
+            clearInterval(countdownInterval);
+        }
+        if (refreshTimeout) {
+            clearTimeout(refreshTimeout);
+        }
+
+        nextRefreshCountdown = getTimeUntilNextExpiration();
+        updateNextRefreshTime();
+
+        countdownInterval = setInterval(() => {
+            if (nextRefreshCountdown > 0) {
+                nextRefreshCountdown--;
+                updateNextRefreshTime();
+            } else {
+                clearInterval(countdownInterval);
+                refreshCycle();
+            }
+        }, 1000);
+
+        refreshTimeout = setTimeout(refreshCycle, nextRefreshCountdown * 1000);
     }
 
     refreshCycle();
 
-    setInterval(() => {
-        if (nextRefreshCountdown > 0) {
-            nextRefreshCountdown--;
-            updateNextRefreshTime();
-        }
-    }, 1000);
+    window.addEventListener('beforeunload', () => {
+        if (countdownInterval) clearInterval(countdownInterval);
+        if (refreshTimeout) clearTimeout(refreshTimeout);
+    });
 }
 
 function checkExpiredAndFetchNew() {
