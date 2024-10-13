@@ -17,6 +17,7 @@ function getAPIKeys() {
 }
 </script>
 
+{% if sent_offers %}
 <div class="container mx-auto">
   <section class="p-5 mt-5">
     <div class="flex flex-wrap items-center -m-2">
@@ -24,14 +25,24 @@ function getAPIKeys() {
         <ul class="flex flex-wrap items-center gap-x-3 mb-2">
           <li><a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/">Home</a></li>
           <li>{{ breadcrumb_line_svg | safe }}</li>
-          <li><a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="{% if page_type == 'offers' %}offers{% elif page_type == 'sentoffers' %}sentoffers{% endif %}">{{ page_type }}</a></li>
+          <li>
+            <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="{% if page_type == 'offers' %}/offers{% elif page_type == 'sentoffers' %}/sentoffers{% endif %}">
+              {{ page_type }}
+            </a>
+          </li>
           <li>{{ breadcrumb_line_svg | safe }}</li>
         </ul>
       </div>
     </div>
   </section>
+{% else %}
+{% endif %}
  
-  <section class="py-4">
+{% if sent_offers %}
+  <section class="py-5">
+{% else %}
+  <section class="py-5 mt-5">
+{% endif %}
     <div class="container px-4 mx-auto">
       <div class="relative py-11 px-16 bg-coolGray-900 dark:bg-gray-500 rounded-md overflow-hidden">
         <img class="absolute z-10 left-4 top-4 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt="dots-red">
@@ -64,8 +75,8 @@ function getAPIKeys() {
                 <div class="flex items-center justify-between">
                   <h2 class="text-xl font-bold dark:text-white" id="chart-title">Price Chart</h2>
                   <div class="flex items-center space-x-4">
-                    <button id="resolution-month" class="ml-5 resolution-button">1M</button>
-                    <button id="resolution-week" class="resolution-button">1W</button>
+                    <button id="resolution-month" class="ml-5 resolution-button">1Y</button>
+                    <button id="resolution-week" class="resolution-button">1M</button>
                     <button id="resolution-day" class="resolution-button">24H</button>
                   </div>
                 </div>
