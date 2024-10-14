@@ -32,7 +32,7 @@ from basicswap.protocols.xmr_swap_1 import getChainBSplitKey, getChainBRemoteSpl
 
 PAGE_LIMIT = 25
 invalid_coins_from = []
-known_chart_coins = ['BTC', 'PART', 'XMR', 'LTC', 'FIRO', 'DASH', 'PIVX', 'DOGE', 'ETH', 'DCR', 'ZANO', 'WOW']
+known_chart_coins = ['BTC', 'PART', 'XMR', 'LTC', 'FIRO', 'DASH', 'PIVX', 'DOGE', 'ETH', 'DCR', 'ZANO', 'WOW', 'BCH']
 
 
 def tickerToCoinId(ticker):
