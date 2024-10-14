@@ -745,7 +745,7 @@ function updateProfitLoss(row, fromCoin, toCoin, fromAmount, toAmount, isOwnOffe
 function createTableRow(offer, isSentOffers) {
   const row = document.createElement('tr');
   row.className = `opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600`;
-  row.setAttribute('data-offer-id', offer.offer_id);
+    row.setAttribute('data-offer-id', `${offer.offer_id}_${offer.created_at}`);
 
   const coinFrom = offer.coin_from ? (symbolToCoinName[coinNameToSymbol[offer.coin_from]] || offer.coin_from) : 'Unknown';
   const coinTo = offer.coin_to ? (symbolToCoinName[coinNameToSymbol[offer.coin_to]] || offer.coin_to) : 'Unknown';

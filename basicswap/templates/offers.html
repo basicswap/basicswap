@@ -296,9 +296,10 @@ function getAPIKeys() {
           <table class="w-full min-w-max">
             <thead class="uppercase">
               <tr>
-                <th class="p-0">
+                <th class="p-0" data-sortable="true" data-column-index="0">
                   <div class="py-3 pl-4 justify-center rounded-tl-xl bg-coolGray-200 dark:bg-gray-600">
                     <span class="text-sm mr-1 text-gray-600 dark:text-gray-300 font-semibold">Time</span>
+                     <span class="sort-icon ml-1 text-gray-600 dark:text-gray-400" id="sort-icon-0">↓</span>
                   </div>
                 </th>
                 <th class="p-0 hidden xl:block">
@@ -349,11 +350,12 @@ function getAPIKeys() {
                     <span class="sort-icon ml-1 text-gray-600 dark:text-gray-400" id="sort-icon-6">↓</span>
                   </div>
                 </th>
-                <th class="p-0">
+                <th class="p-0" data-sortable="true" data-column-index="7">
                   <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 rounded-tr-xl">
-                    <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Trade</span>
-                  </div>
-                </th>
+                  <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Trade</span>
+                  <span class="sort-icon ml-1 text-gray-600 dark:text-gray-400" id="sort-icon-7">↓</span>
+                 </div>
+               </th>
               </tr>
             </thead>
             <tbody id="offers-body">
