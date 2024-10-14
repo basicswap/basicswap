@@ -1170,37 +1170,103 @@ const app = {
     console.log('Current BTC price:', app.btcPriceUSD);
   },
   
-  sortTable: (columnIndex) => {
-    const sortableColumns = [5, 6];
-    if (!sortableColumns.includes(columnIndex)) return;
-    const table = document.querySelector('table');
-    if (!table) {
-      console.error("Table not found for sorting.");
-      return;
+sortTable: (columnIndex) => {
+  console.log(`Sorting column: ${columnIndex}`);
+  const sortableColumns = [1, 5, 6, 7]; // 1: Time, 5: Rate, 6: Market +/-, 7: Trade
+  if (!sortableColumns.includes(columnIndex)) {
+    console.log(`Column ${columnIndex} is not sortable`);
+    return;
+  }
+  const table = document.querySelector('table');
+  if (!table) {
+    console.error("Table not found for sorting.");
+    return;
+  }
+  const rows = Array.from(table.querySelectorAll('tbody tr'));
+  console.log(`Found ${rows.length} rows to sort`);
+  const sortIcon = document.getElementById(`sort-icon-${columnIndex}`);
+  if (!sortIcon) {
+    console.error("Sort icon not found.");
+    return;
+  }
+  const sortOrder = sortIcon.textContent === '↓' ? 1 : -1;
+  sortIcon.textContent = sortOrder === 1 ? '↑' : '↓';
+
+  const getSafeTextContent = (element) => element ? element.textContent.trim() : '';
+
+  rows.sort((a, b) => {
+    let aValue, bValue;
+    switch (columnIndex) {
+      case 1: // Time column
+        aValue = getSafeTextContent(a.querySelector('td:first-child .text-xs:first-child'));
+        bValue = getSafeTextContent(b.querySelector('td:first-child .text-xs:first-child'));
+        // console.log(`Comparing times: "${aValue}" vs "${bValue}"`);
+
+        const parseTime = (timeStr) => {
+          const [value, unit] = timeStr.split(' ');
+          const numValue = parseFloat(value);
+          switch(unit) {
+            case 'seconds': return numValue;
+            case 'minutes': return numValue * 60;
+            case 'hours': return numValue * 3600;
+            case 'days': return numValue * 86400;
+            default: return 0;
+          }
+        };
+        return (parseTime(bValue) - parseTime(aValue)) * sortOrder;
+      
+      case 5: // Rate
+      case 6: // Market +/-
+        aValue = getSafeTextContent(a.cells[columnIndex]);
+        bValue = getSafeTextContent(b.cells[columnIndex]);
+        console.log(`Comparing values: "${aValue}" vs "${bValue}"`);
+
+        aValue = parseFloat(aValue.replace(/[^\d.-]/g, '') || '0');
+        bValue = parseFloat(bValue.replace(/[^\d.-]/g, '') || '0');
+        return (aValue - bValue) * sortOrder;
+      
+      case 7: // Trade
+        const aCell = a.cells[columnIndex];
+        const bCell = b.cells[columnIndex];
+        console.log('aCell:', aCell ? aCell.outerHTML : 'null');
+        console.log('bCell:', bCell ? bCell.outerHTML : 'null');
+        
+        aValue = getSafeTextContent(aCell.querySelector('a')) || 
+                 getSafeTextContent(aCell.querySelector('button')) || 
+                 getSafeTextContent(aCell);
+        bValue = getSafeTextContent(bCell.querySelector('a')) || 
+                 getSafeTextContent(bCell.querySelector('button')) || 
+                 getSafeTextContent(bCell);
+        
+        aValue = aValue.toLowerCase();
+        bValue = bValue.toLowerCase();
+        
+        console.log(`Comparing trade actions: "${aValue}" vs "${bValue}"`);
+        
+        if (aValue === bValue) return 0;
+        if (aValue === "swap") return -1 * sortOrder;
+        if (bValue === "swap") return 1 * sortOrder;
+        return aValue.localeCompare(bValue) * sortOrder;
+      
+      default:
+        aValue = getSafeTextContent(a.cells[columnIndex]);
+        bValue = getSafeTextContent(b.cells[columnIndex]);
+        console.log(`Comparing default values: "${aValue}" vs "${bValue}"`);
+        return aValue.localeCompare(bValue, undefined, {
+          numeric: true,
+          sensitivity: 'base'
+        }) * sortOrder;
     }
-    const rows = Array.from(table.querySelectorAll('tbody tr'));
-    const sortIcon = document.getElementById(`sort-icon-${columnIndex}`);
-    if (!sortIcon) {
-      console.error("Sort icon not found.");
-      return;
-    }
-    const sortOrder = sortIcon.textContent === '↓' ? 1 : -1;
-    sortIcon.textContent = sortOrder === 1 ? '↑' : '↓';
-    rows.sort((a, b) => {
-      const aValue = a.cells[columnIndex]?.textContent.trim() || '';
-      const bValue = b.cells[columnIndex]?.textContent.trim() || '';
-      return aValue.localeCompare(bValue, undefined, {
-        numeric: true,
-        sensitivity: 'base'
-      }) * sortOrder;
-    });
-    const tbody = table.querySelector('tbody');
-    if (tbody) {
-      rows.forEach(row => tbody.appendChild(row));
-    } else {
-      console.error("Table body not found.");
-    }
-  },
+  });
+
+  const tbody = table.querySelector('tbody');
+  if (tbody) {
+    rows.forEach(row => tbody.appendChild(row));
+  } else {
+    // console.error("Table body not found.");
+  }
+  // console.log('Sorting completed');
+},
   
   initializeSelectImages: () => {
     const updateSelectedImage = (selectId) => {
