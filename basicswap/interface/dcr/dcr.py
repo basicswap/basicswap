@@ -372,7 +372,9 @@ class DCRInterface(Secp256k1Interface):
 
     def checkExpectedSeed(self, expect_seedid) -> bool:
         self._expect_seedid_hex = expect_seedid
-        return expect_seedid == self.getWalletSeedID()
+        rv: bool = expect_seedid == self.getWalletSeedID()
+        self._have_checked_seed = True
+        return rv
 
     def getDaemonVersion(self):
         return self.rpc('getnetworkinfo')['version']

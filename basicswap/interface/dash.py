@@ -38,6 +38,7 @@ class DASHInterface(BTCInterface):
         return Mnemonic('english').to_mnemonic(key)
 
     def initialiseWallet(self, key_bytes: bytes) -> None:
+        self._have_checked_seed = False
         if self._wallet_v20_compatible:
             self._log.warning('Generating wallet compatible with v20 seed.')
             words = self.entropyToMnemonic(key_bytes)
@@ -57,9 +58,11 @@ class DASHInterface(BTCInterface):
         if rv['mnemonic'] != '':
             entropy = Mnemonic('english').to_entropy(rv['mnemonic'].split(' '))
             entropy_hash = self.getAddressHashFromKey(entropy)[::-1].hex()
-            return expect_seedid == entropy_hash
+            have_expected_seed: bool = expect_seedid == entropy_hash
         else:
-            return expect_seedid == self.getWalletSeedID()
+            have_expected_seed: bool = expect_seedid == self.getWalletSeedID()
+        self._have_checked_seed = True
+        return have_expected_seed
 
     def withdrawCoin(self, value, addr_to, subfee):
         params = [addr_to, value, '', '', subfee, False, False, self._conf_target]
@@ -94,10 +97,15 @@ class DASHInterface(BTCInterface):
 
     def unlockWallet(self, password: str):
         super().unlockWallet(password)
-        # Store password for initialiseWallet
-        self._wallet_passphrase = password
+        if self._wallet_v20_compatible:
+            # Store password for initialiseWallet
+            self._wallet_passphrase = password
         if not self._have_checked_seed:
-            self._sc.checkWalletSeed(self.coin_type())
+            try:
+                self._sc.checkWalletSeed(self.coin_type())
+            except Exception as ex:
+                # dumphdinfo can fail if the wallet is not initialised
+                self._log.debug(f'DASH checkWalletSeed failed: {ex}.')
 
     def lockWallet(self):
         super().lockWallet()

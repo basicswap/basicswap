@@ -2042,7 +2042,7 @@ class BasicSwap(BaseApp):
         self.setStringKV(db_key, main_address, session)
         return main_address
 
-    def checkWalletSeed(self, c):
+    def checkWalletSeed(self, c) -> bool:
         ci = self.ci(c)
         if c == Coins.PART:
             ci.setWalletSeedWarning(False)  # All keys should be be derived from the Particl mnemonic

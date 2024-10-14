@@ -331,6 +331,7 @@ class BTCInterface(Secp256k1Interface):
     def initialiseWallet(self, key_bytes: bytes) -> None:
         key_wif = self.encodeKey(key_bytes)
         self.rpc_wallet('sethdseed', [True, key_wif])
+        self._have_checked_seed = False
 
     def getWalletInfo(self):
         rv = self.rpc_wallet('getwalletinfo')
@@ -368,8 +369,10 @@ class BTCInterface(Secp256k1Interface):
         return 'Not found' if 'hdseedid' not in wi else wi['hdseedid']
 
     def checkExpectedSeed(self, expect_seedid: str) -> bool:
+        wallet_seed_id = self.getWalletSeedID()
         self._expect_seedid_hex = expect_seedid
-        return expect_seedid == self.getWalletSeedID()
+        self._have_checked_seed = True
+        return expect_seedid == wallet_seed_id
 
     def getNewAddress(self, use_segwit: bool, label: str = 'swap_receive') -> str:
         args = [label]
