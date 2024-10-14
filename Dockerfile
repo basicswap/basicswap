@@ -5,7 +5,8 @@ ENV LANG=C.UTF-8 \
     DATADIRS="/coindata"
 
 RUN apt-get update; \
-    apt-get install -y python3-pip pkg-config gosu tzdata;
+    apt-get install -y --no-install-recommends \
+        python3-pip libpython3-dev gnupg pkg-config gcc libc-dev gosu tzdata;
 
 # Install requirements first so as to skip in subsequent rebuilds
 COPY ./requirements.txt requirements.txt

@@ -1,16 +1,6 @@
 
-## Source code
 
-    git clone https://github.com/basicswap/basicswap.git
-
-
-## Run Using Docker
-
-
-Install dependencies:
-
-    apt-get install curl jq git
-
+## Run using Docker
 
 Docker must be installed and started:
 
@@ -30,27 +20,40 @@ Without this step you will need to preface each `docker-compose` command with `s
     https://docs.docker.com/engine/install/linux-postinstall/
 
 
-#### Copy the default environment file:
+#### Install dependencies
+
+    apt-get install --no-install-recommends git curl jq
+
+
+#### Get the source code
+
+    git clone https://github.com/basicswap/basicswap.git
+
+
+
+#### Copy the default environment file
 
     cd basicswap/docker
     cp example.env .env
 
 
-#### (Optional) Set custom coin data path:
+#### (Optional) Set custom coin data path
 
-Coin-related files, such as blockchain and wallet files, are stored in `/var/data/coinswaps` by default. To use a different location, simply modify the target path in your `.env` file found within the `/docker` sub-folder.
+Coin-related files, such as blockchain and wallet files, are stored in `/var/data/coinswaps` by default. To use a different location, simply modify `COINDATA_PATH` in your `.env` file found within the `/docker` sub-folder.
 
     cd basicswap/docker
     nano .env
 
-#### Create the images:
+
+#### Create the images
 
     cd basicswap/docker
     docker-compose build
 
 Depending on your environment, the `docker-compose` command may not work. If that's the case, type `docker compose` instead, without the dash.
 
-#### Prepare the datadir:
+
+#### Prepare the datadir
 
 Set xmrrestoreheight to the current xmr chain height.
 
@@ -79,13 +82,13 @@ To instead use Monero public nodes and not run a local Monero daemon<br>(it can 
 **Mnemonics should be stored encrypted and/or air-gapped.**
 And the output of `echo $CURRENT_XMR_HEIGHT` for use if you need to later restore your wallet.
 
-#### Set the timezone (optional):
+#### Set the timezone (optional)
 
 Edit the `.env` file in the docker directory, set TZ to your local timezone.
 Valid options can be listed with: `timedatectl list-timezones`
 
 
-#### Start the container:
+#### Start the container
 
     docker-compose up
 
@@ -120,7 +123,7 @@ Windows key + R -> "wsl" -> Enter
 Install Git:
 
     sudo apt update
-    sudo apt install git
+    sudo apt install --no-install-recommends git
 
 
 Download the BasicSwap code:
@@ -135,14 +138,15 @@ You can access it from the windows side at: `\\wsl$\Ubuntu`
 Continue from the [Run Using Docker](#run-using-docker) section.
 
 
-## Run Without Docker:
+## Run Without Docker
 
 
-### Ubuntu Setup:
+### Ubuntu Setup
 
-    apt-get install -y git python3-venv python3-pip pkg-config curl jq
+    apt-get install --no-install-recommends git python3-venv libpython3-dev gnupg pkg-config gcc libc-dev curl jq
 
-### OSX Setup:
+
+### OSX Setup
 
 Install Homebrew (See https://brew.sh/):
 
@@ -150,12 +154,12 @@ Install Homebrew (See https://brew.sh/):
 
 Dependencies:
 
-    brew install python git pkg-config curl jq
+    brew install python git gnupg pkg-config jq
 
 Close the terminal and open a new one to update the python symlinks.
 
 
-### Basicswap:
+### Basicswap
 
     export SWAP_DATADIR=$HOME/coinswaps
     python3 -m venv "$SWAP_DATADIR/venv"
