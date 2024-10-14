@@ -9,6 +9,7 @@ import random
 import logging
 import unittest
 
+from basicswap.chainparams import XMR_COIN
 from basicswap.db import (
     Concepts,
 )
@@ -23,6 +24,7 @@ from basicswap.basicswap_util import (
     EventLogTypes,
 )
 from basicswap.util import (
+    COIN,
     make_int,
     format_amount,
 )
@@ -107,9 +109,7 @@ class TestFunctions(BaseTest):
         mining_fee = 1000
         timelock = 2
         a_receive = ci.getNewAddress()
-        b_receive = ci.getNewAddress()
         b_refund = ci.getNewAddress()
-        print(pi)
         refund_lock_tx_script = pi.genScriptLockTxScript(mining_fee=mining_fee, out_1=ci.addressToLockingBytecode(b_refund), out_2=ci.addressToLockingBytecode(a_receive), public_key=A, timelock=timelock)
         addr_out = ci.getNewAddress()
 
@@ -124,11 +124,10 @@ class TestFunctions(BaseTest):
         assert (len(unspents) > len(unspents_after))
 
         tx_decoded = ci.rpc('decoderawtransaction', [lock_tx.hex()])
-        print(tx_decoded)
         txid = tx_decoded['txid']
 
-        size = tx_decoded['size']
-        expect_fee_int = round(fee_rate * size)
+        vsize = tx_decoded['size']
+        expect_fee_int = round(fee_rate * vsize)
         expect_fee = ci.format_amount(expect_fee_int)
 
         out_value: int = 0
@@ -147,7 +146,6 @@ class TestFunctions(BaseTest):
 
         ci.rpc('sendrawtransaction', [lock_tx.hex()])
         rv = ci.rpc('gettransaction', [txid])
-        print(rv)
         wallet_tx_fee = -ci.make_int(rv['fee'])
 
         assert (wallet_tx_fee == fee_value)
@@ -165,28 +163,24 @@ class TestFunctions(BaseTest):
 
         # alice decrypts the adaptor signature
         bAdaptorSig_dec = ecdsaotves_dec_sig(a, bAdaptorSig)
-        print("\nbAdaptorSig_dec", bAdaptorSig_dec.hex())
-
-        print(ci.addressToLockingBytecode(a_receive).hex(), msg.hex(), bAdaptorSig_dec.hex(), B.hex())
 
         fee_info = {}
         lock_spend_tx = ci.createSCLockSpendTx(lock_tx, lock_tx_script, pkh_out, mining_fee, ves=bAdaptorSig_dec, fee_info=fee_info)
-        print(lock_spend_tx.hex())
-        size_estimated: int = fee_info['size']
+        vsize_estimated: int = fee_info['vsize']
 
         tx_decoded = ci.rpc('decoderawtransaction', [lock_spend_tx.hex()])
         print(tx_decoded)
         txid = tx_decoded['txid']
 
         tx_decoded = ci.rpc('decoderawtransaction', [lock_spend_tx.hex()])
-        size_actual: int = tx_decoded['size']
+        vsize_actual: int = tx_decoded['size']
 
-        assert (size_actual <= size_estimated and size_estimated - size_actual < 4)
+        assert (vsize_actual <= vsize_estimated and vsize_estimated - vsize_actual < 4)
         assert (ci.rpc('sendrawtransaction', [lock_spend_tx.hex()]) == txid)
 
         expect_size: int = ci.xmr_swap_a_lock_spend_tx_vsize()
-        assert (expect_size >= size_actual)
-        assert (expect_size - size_actual < 10)
+        assert (expect_size >= vsize_actual)
+        assert (expect_size - vsize_actual < 10)
 
         # Test chain b (no-script) lock tx size
         v = ci.getNewSecretKey()
@@ -204,3 +198,27 @@ class TestFunctions(BaseTest):
         expect_size: int = ci.xmr_swap_b_lock_spend_tx_vsize()
         assert (expect_size >= lock_tx_b_spend_decoded['size'])
         assert (expect_size - lock_tx_b_spend_decoded['size'] < 10)
+
+    def test_05_bch_xmr(self):
+        logging.info('---------- Test BCH to XMR')
+        swap_clients = self.swap_clients
+        offer_id = swap_clients[0].postOffer(Coins.BCH, Coins.XMR, 10 * COIN, 100 * XMR_COIN, 10 * COIN, SwapTypes.XMR_SWAP)
+        wait_for_offer(test_delay_event, swap_clients[1], offer_id)
+        offers = swap_clients[1].listOffers(filters={'offer_id': offer_id})
+        offer = offers[0]
+
+        swap_clients[1].ci(Coins.XMR).setFeePriority(3)
+
+        bid_id = swap_clients[1].postXmrBid(offer_id, offer.amount_from)
+
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.BID_RECEIVED)
+
+        bid, xmr_swap = swap_clients[0].getXmrBid(bid_id)
+        assert (xmr_swap)
+
+        swap_clients[0].acceptXmrBid(bid_id)
+
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=180)
+        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True)
+
+        swap_clients[1].ci(Coins.XMR).setFeePriority(0)

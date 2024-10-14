@@ -440,6 +440,9 @@ chainparams = {
         'message_magic': 'Bitcoin Signed Message:\n',
         'blocks_target': 60 * 2,
         'decimal_places': 8,
+        'has_cltv': True,
+        'has_csv': True,
+        'has_segwit': False,
         'mainnet': {
             'rpcport': 8332,
             'pubkey_address': 0,

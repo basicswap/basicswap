@@ -189,7 +189,7 @@ class Address:
         :rtype: ``str``
         """
         version_bit = Address.VERSIONS[self.version]["version_bit"]
-        payload = [version_bit] + self.payload
+        payload = [version_bit] + list(self.payload)
         payload = convertbits(payload, 8, 5)
         checksum = calculate_checksum(self.prefix, payload)
         return self.prefix + ":" + b32encode(payload + checksum)
