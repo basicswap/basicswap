@@ -5,6 +5,7 @@ const config = {
     { symbol: 'BTC', usesCryptoCompare: true, usesCoinGecko: false, historicalDays: 30 },
     { symbol: 'XMR', usesCryptoCompare: true, usesCoinGecko: false, historicalDays: 30 },
     { symbol: 'PART', usesCryptoCompare: true, usesCoinGecko: false, historicalDays: 30 },
+    { symbol: 'BCH', usesCryptoCompare: true, usesCoinGecko: false, historicalDays: 30 },
     { symbol: 'PIVX', usesCryptoCompare: true, usesCoinGecko: false, historicalDays: 30 },
     { symbol: 'FIRO', usesCryptoCompare: true, usesCoinGecko: false, historicalDays: 30 },
     { symbol: 'DASH', usesCryptoCompare: true, usesCoinGecko: false, historicalDays: 30 },
@@ -13,8 +14,7 @@ const config = {
     { symbol: 'ETH', usesCryptoCompare: true, usesCoinGecko: false, historicalDays: 30 },
     { symbol: 'DCR', usesCryptoCompare: true, usesCoinGecko: false, historicalDays: 30 },
     { symbol: 'ZANO', usesCryptoCompare: true, usesCoinGecko: false, historicalDays: 30 },
-    { symbol: 'WOW', usesCryptoCompare: false, usesCoinGecko: true, historicalDays: 30 },
-    { symbol: 'BCH', usesCryptoCompare: true, usesCoinGecko: false, historicalDays: 30 }
+    { symbol: 'WOW', usesCryptoCompare: false, usesCoinGecko: true, historicalDays: 30 }
   ],
   apiEndpoints: {
     cryptoCompare: 'https://min-api.cryptocompare.com/data/pricemultifull',
@@ -1172,7 +1172,7 @@ const app = {
   
 sortTable: (columnIndex) => {
   console.log(`Sorting column: ${columnIndex}`);
-  const sortableColumns = [1, 5, 6, 7]; // 1: Time, 5: Rate, 6: Market +/-, 7: Trade
+  const sortableColumns = [0, 5, 6, 7]; // 0: Time, 5: Rate, 6: Market +/-, 7: Trade
   if (!sortableColumns.includes(columnIndex)) {
     console.log(`Column ${columnIndex} is not sortable`);
     return;
@@ -1200,7 +1200,7 @@ sortTable: (columnIndex) => {
       case 1: // Time column
         aValue = getSafeTextContent(a.querySelector('td:first-child .text-xs:first-child'));
         bValue = getSafeTextContent(b.querySelector('td:first-child .text-xs:first-child'));
-        // console.log(`Comparing times: "${aValue}" vs "${bValue}"`);
+        console.log(`Comparing times: "${aValue}" vs "${bValue}"`);
 
         const parseTime = (timeStr) => {
           const [value, unit] = timeStr.split(' ');
@@ -1263,9 +1263,9 @@ sortTable: (columnIndex) => {
   if (tbody) {
     rows.forEach(row => tbody.appendChild(row));
   } else {
-    // console.error("Table body not found.");
+    console.error("Table body not found.");
   }
-  // console.log('Sorting completed');
+  console.log('Sorting completed');
 },
   
   initializeSelectImages: () => {

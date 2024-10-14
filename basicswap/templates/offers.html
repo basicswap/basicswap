@@ -35,7 +35,7 @@ function getAPIKeys() {
       </div>
     </div>
   </section>
-{% else %}
+</div>
 {% endif %}
  
 {% if sent_offers %}
@@ -59,7 +59,6 @@ function getAPIKeys() {
       </div>
     </div>
   </section>
-</div> 
 
 {% include 'inc_messages.html' %}
 
@@ -153,12 +152,13 @@ function getAPIKeys() {
 
 <section class="py-4 flex flex-wrap justify-center overflow-hidden container-to-blur">
  <div class="container px-4 mx-auto">
-  <div class="flex flex-wrap justify-center -m-3">
-  {% set coin_data = {
+  <div class="flex flex-wrap justify-center -m-3" id="coin-container">
+{% set coin_data = {
     'BTC': {'name': 'Bitcoin', 'symbol': 'BTC', 'image': 'Bitcoin.png', 'show': true},
     'XMR': {'name': 'Monero', 'symbol': 'XMR', 'image': 'Monero.png', 'show': true},
     'PART': {'name': 'Particl', 'symbol': 'PART', 'image': 'Particl.png', 'show': true},
     'LTC': {'name': 'Litecoin', 'symbol': 'LTC', 'image': 'Litecoin.png', 'show': true},
+    'BCH': {'name': 'Bitcoin Cash', 'symbol': 'BCH', 'image': 'Bitcoin-Cash.png', 'show': true},
     'FIRO': {'name': 'Firo', 'symbol': 'FIRO', 'image': 'Firo.png', 'show': true},
     'PIVX': {'name': 'PIVX', 'symbol': 'PIVX', 'image': 'PIVX.png', 'show': true},
     'DASH': {'name': 'Dash', 'symbol': 'DASH', 'image': 'Dash.png', 'show': true},
@@ -166,47 +166,65 @@ function getAPIKeys() {
     'DOGE': {'name': 'Dogecoin', 'symbol': 'DOGE', 'image': 'Doge.png', 'show': false},
     'DCR': {'name': 'Decred', 'symbol': 'DCR', 'image': 'Decred.png', 'show': true},
     'ZANO': {'name': 'Zano', 'symbol': 'ZANO', 'image': 'Zano.png', 'show': false},
-    'BCH': {'name': 'BCH', 'symbol': 'BCH', 'image': 'Bitcoin-cash.png', 'show': true},
     'WOW': {'name': 'Wownero', 'symbol': 'WOW', 'image': 'Wownero.png', 'show': true}
     }
   %}
-{% for coin_symbol, coin in coin_data.items() if coin_symbol in enabled_chart_coins and coin.show %}
-<div class="w-full sm:w-1/2 lg:w-1/5 p-3" id="{{ coin_symbol.lower() }}-container">
-    <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-2xl dark:text-white {% if coin_symbol == 'BTC' %}active-container{% endif %}" style="min-height: 180px;">
-     <div class="flex items-center">
-      <img src="/static/images/coins/{{ coin.image }}" class="rounded-xl" style="width: 28px; height: 28px; object-fit: contain;" alt="{{ coin.name }}">
-      <p class="ml-1 text-black text-sm dark:text-white">
-     {{ coin.name }} {% if coin.symbol != coin.name %}({{ coin.symbol }})
-      {% endif %}
-      </p>
-     </div>
-     <div class="flex flex-col justify-start relative">
-      <div id="{{ coin_symbol.lower() }}-loader" class="absolute inset-0 flex items-center justify-center bg-coolGray-100 dark:bg-gray-500 z-10 hidden">
-       <div class="w-16 h-1 bg-blue-500 rounded-full animate-pulse"></div>
-      </div>
-      <p class="my-2 text-xl font-bold text-left monospace text-gray-700 dark:text-gray-100" id="{{ coin_symbol.lower() }}-price-usd"> <span id="{{ coin_symbol.lower() }}-price-usd-value" {% if coin_symbol in ['DCR', 'ZANO', 'WOW'] %}style="min-width: 80px;" {% endif %}></span>
-      </p>
-      <div class="flex items-center text-sm">
-       <div class="w-auto">
-        <div id="{{ coin_symbol.lower() }}-price-change-container" class="w-auto p-1"></div>
-       </div>
-      </div>
-      {% if coin_symbol != 'BTC' %}
-      <div id="{{ coin_symbol.lower() }}-btc-price-div" class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2 {% if coin_symbol == 'WOW' %}hidden{% endif %}">
-       <span class="bold mr-2">BTC:</span> <span id="{{ coin_symbol.lower() }}-price-btc"></span> </div> {% endif %} <div id="{{ coin_symbol.lower() }}-volume-div" class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2">
-       <span class="bold mr-2">VOL:</span>
-       <div id="{{ coin_symbol.lower() }}-volume-24h"></div>
-      </div>
-     </div>
+  {% set custom_order = ['BTC', 'ETH', 'XMR', 'PART', 'LTC', 'BCH', 'FIRO', 'PIVX', 'DASH', 'DOGE', 'DCR', 'ZANO', 'WOW'] %}
+  
+  {% if enabled_chart_coins is string %}
+    {% if enabled_chart_coins == "" %}
+      {% set display_coins = coin_data.keys()|list %}
+    {% elif enabled_chart_coins == "all" %}
+      {% set display_coins = custom_order %}
+    {% else %}
+      {% set display_coins = enabled_chart_coins.split(',') %}
+    {% endif %}
+  {% else %}
+    {% set display_coins = enabled_chart_coins %}
+  {% endif %}
+
+  {% for coin_symbol in custom_order %}
+    {% if coin_symbol in display_coins and coin_data[coin_symbol]['show'] %}
+    <div class="w-full sm:w-1/2 lg:w-1/5 p-3" id="{{ coin_symbol.lower() }}-container">
+        <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-2xl dark:text-white {% if coin_symbol == 'BTC' %}active-container{% endif %}" style="min-height: 180px;">
+         <div class="flex items-center">
+          <img src="/static/images/coins/{{ coin_data[coin_symbol]['image'] }}" class="rounded-xl" style="width: 28px; height: 28px; object-fit: contain;" alt="{{ coin_data[coin_symbol]['name'] }}">
+          <p class="ml-1 text-black text-sm dark:text-white">
+         {{ coin_data[coin_symbol]['name'] }} {% if coin_data[coin_symbol]['symbol'] != coin_data[coin_symbol]['name'] %}({{ coin_data[coin_symbol]['symbol'] }}){% endif %}
+          </p>
+         </div>
+         <div class="flex flex-col justify-start relative">
+          <div id="{{ coin_symbol.lower() }}-loader" class="absolute inset-0 flex items-center justify-center bg-coolGray-100 dark:bg-gray-500 z-10 hidden">
+           <div class="w-16 h-1 bg-blue-500 rounded-full animate-pulse"></div>
+          </div>
+          <p class="my-2 text-xl font-bold text-left monospace text-gray-700 dark:text-gray-100" id="{{ coin_symbol.lower() }}-price-usd"> <span id="{{ coin_symbol.lower() }}-price-usd-value" {% if coin_symbol in ['DCR', 'ZANO', 'WOW'] %}style="min-width: 80px;"{% endif %}></span>
+          </p>
+          <div class="flex items-center text-sm">
+           <div class="w-auto">
+            <div id="{{ coin_symbol.lower() }}-price-change-container" class="w-auto p-1"></div>
+           </div>
+          </div>
+          {% if coin_symbol != 'BTC' %}
+          <div id="{{ coin_symbol.lower() }}-btc-price-div" class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2 {% if coin_symbol == 'WOW' %}hidden{% endif %}">
+           <span class="bold mr-2">BTC:</span> <span id="{{ coin_symbol.lower() }}-price-btc"></span>
+          </div>
+          {% endif %}
+          <div id="{{ coin_symbol.lower() }}-volume-div" class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2">
+           <span class="bold mr-2">VOL:</span>
+           <div id="{{ coin_symbol.lower() }}-volume-24h"></div>
+          </div>
+         </div>
+        </div>
     </div>
-   </div>
-   {% endfor %}
-   </div>
+    {% endif %}
+  {% endfor %}
+  </div>
  </div>
 </section>
-{% endif %}
 
+{% endif %}
 <script src="/static/js/pricechart.js"></script>
+
 <section>
   <div class="pl-6 pr-6 pt-0 pb-0 mt-5 h-full overflow-hidden">
     <div class="border-coolGray-100">
