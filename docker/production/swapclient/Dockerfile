@@ -5,7 +5,8 @@ ENV LANG=C.UTF-8 \
     DATADIR=/data
 
 RUN apt-get update; \
-    apt-get install -y python3-pip unzip pkg-config gosu tzdata;
+    apt-get install -y --no-install-recommends \
+        python3-pip libpython3-dev gnupg pkg-config gcc libc-dev gosu tzdata;
 
 ARG BASICSWAP_URL=https://github.com/basicswap/basicswap/archive/master.zip
 ARG BASICSWAP_DIR=basicswap-master

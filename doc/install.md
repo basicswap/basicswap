@@ -120,7 +120,7 @@ Windows key + R -> "wsl" -> Enter
 Install Git:
 
     sudo apt update
-    sudo apt install git
+    sudo apt install --no-install-recommends git
 
 
 Download the BasicSwap code:
@@ -140,7 +140,7 @@ Continue from the [Run Using Docker](#run-using-docker) section.
 
 ### Ubuntu Setup:
 
-    apt-get install -y git python3-venv python3-pip pkg-config curl jq
+    apt-get install --no-install-recommends git python3-venv libpython3-dev gnupg pkg-config gcc libc-dev curl jq
 
 ### OSX Setup:
 
@@ -150,7 +150,7 @@ Install Homebrew (See https://brew.sh/):
 
 Dependencies:
 
-    brew install python git pkg-config curl jq
+    brew install python git gnupg pkg-config jq
 
 Close the terminal and open a new one to update the python symlinks.
 
