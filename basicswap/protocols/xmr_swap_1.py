@@ -4,6 +4,34 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
+import unittest
+from basicswap.interface.contrib.bch_test_framework.script import (
+    OP_TXINPUTCOUNT,
+    OP_1,
+    OP_NUMEQUALVERIFY,
+    OP_TXOUTPUTCOUNT,
+    OP_0,
+    OP_UTXOVALUE,
+    OP_OUTPUTVALUE,
+    OP_SUB,
+    OP_UTXOTOKENCATEGORY,
+    OP_OUTPUTTOKENCATEGORY,
+    OP_EQUALVERIFY,
+    OP_UTXOTOKENCOMMITMENT,
+    OP_OUTPUTTOKENCOMMITMENT,
+    OP_UTXOTOKENAMOUNT,
+    OP_OUTPUTTOKENAMOUNT,
+    OP_INPUTSEQUENCENUMBER,
+    OP_NOTIF,
+    OP_OUTPUTBYTECODE,
+    OP_OVER,
+    OP_CHECKDATASIG,
+    OP_ELSE,
+    OP_CHECKSEQUENCEVERIFY,
+    OP_DROP,
+    OP_EQUAL,
+    OP_ENDIF,
+)
 from basicswap.util import (
     ensure,
 )
@@ -133,7 +161,11 @@ def setDLEAG(xmr_swap, ci_to, kbsf: bytes) -> None:
 class XmrSwapInterface(ProtocolInterface):
     swap_type = SwapTypes.XMR_SWAP
 
-    def genScriptLockTxScript(self, ci, Kal: bytes, Kaf: bytes) -> CScript:
+    def genScriptLockTxScript(self, ci, Kal: bytes, Kaf: bytes, **kwargs) -> CScript:
+        # fallthrough to ci if genScriptLockTxScript is implemented there
+        if hasattr(ci, 'genScriptLockTxScript') and callable(ci.genScriptLockTxScript):
+            return ci.genScriptLockTxScript(ci, Kal, Kaf, **kwargs)
+
         Kal_enc = Kal if len(Kal) == 33 else ci.encodePubkey(Kal)
         Kaf_enc = Kaf if len(Kaf) == 33 else ci.encodePubkey(Kaf)
 

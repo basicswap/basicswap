@@ -1148,7 +1148,8 @@ class BTCInterface(Secp256k1Interface):
             return None
 
         try:
-            tx = self.rpc_wallet('gettransaction', [txid.hex()])
+            # set `include_watchonly` explicitly to `True` to get transactions for watchonly addresses also in BCH
+            tx = self.rpc_wallet('gettransaction', [txid.hex(), True])
 
             block_height = 0
             if 'blockhash' in tx:
