@@ -251,7 +251,6 @@ class BasicSwap(BaseApp):
     protocolInterfaces = {
         SwapTypes.SELLER_FIRST: atomic_swap_1.AtomicSwapInterface(),
         SwapTypes.XMR_SWAP: xmr_swap_1.XmrSwapInterface(),
-        SwapTypes.XMR_BCH_SWAP: xmr_swap_1.XmrBchSwapInterface(),
     }
 
     def __init__(self, fp, data_dir, settings, chain, log_name='BasicSwap', transient_instance=False):
@@ -674,6 +673,9 @@ class BasicSwap(BaseApp):
             raise InactiveCoin(int(coin))
 
         return self.coin_clients[use_coinid][interface_ind]
+
+    def isBchXmrSwap(self, offer: Offer):
+        return (offer['coin_from'] == Coins.BCH or offer['coin_to'] == Coins.BCH) and offer.swap_type == SwapTypes.XMR_SWAP
 
     def pi(self, protocol_ind):
         if protocol_ind not in self.protocolInterfaces:
@@ -2976,7 +2978,32 @@ class BasicSwap(BaseApp):
 
             # MSG2F
             pi = self.pi(SwapTypes.XMR_SWAP)
-            xmr_swap.a_lock_tx_script = pi.genScriptLockTxScript(ci_from, xmr_swap.pkal, xmr_swap.pkaf)
+
+            refundExtraArgs = dict()
+            lockExtraArgs = dict()
+            if self.isBchXmrSwap(offer):
+                pkh_refund_to = ci_from.decodeAddress(self.getCachedAddressForCoin(coin_from))
+                pkh_dest = xmr_swap.dest_af
+
+                # refund script
+                refundExtraArgs['mining_fee'] = 1000
+                refundExtraArgs['out_1'] = ci_from.getScriptForPubkeyHash(pkh_refund_to)
+                refundExtraArgs['out_2'] = ci_from.getScriptForPubkeyHash(pkh_dest)
+                refundExtraArgs['public_key'] = xmr_swap.pkaf
+                refundExtraArgs['timelock'] = xmr_offer.lock_time_2
+
+                refund_lock_tx_script = pi.genScriptLockTxScript(ci_from, xmr_swap.pkal, xmr_swap.pkaf, refundExtraArgs)
+                # will make use of this in `createSCLockRefundTx`
+                refundExtraArgs['refund_lock_tx_script'] = refund_lock_tx_script
+
+                # lock script
+                lockExtraArgs['mining_fee'] = 1000
+                lockExtraArgs['out_1'] = ci_from.getScriptForPubkeyHash(pkh_refund_to)
+                lockExtraArgs['out_2'] = ci_from.scriptToP2SH32LockingBytecode(refund_lock_tx_script)
+                lockExtraArgs['public_key'] = xmr_swap.pkal
+                lockExtraArgs['timelock'] = xmr_offer.lock_time_1
+
+            xmr_swap.a_lock_tx_script = pi.genScriptLockTxScript(ci_from, xmr_swap.pkal, xmr_swap.pkaf, lockExtraArgs)
             prefunded_tx = self.getPreFundedTx(Concepts.OFFER, bid.offer_id, TxTypes.ITX_PRE_FUNDED, session=use_session)
             if prefunded_tx:
                 xmr_swap.a_lock_tx = pi.promoteMockTx(ci_from, prefunded_tx, xmr_swap.a_lock_tx_script)
@@ -2994,7 +3021,7 @@ class BasicSwap(BaseApp):
                 xmr_swap.a_lock_tx, xmr_swap.a_lock_tx_script,
                 xmr_swap.pkal, xmr_swap.pkaf,
                 xmr_offer.lock_time_1, xmr_offer.lock_time_2,
-                a_fee_rate, xmr_swap.vkbv
+                a_fee_rate, xmr_swap.vkbv, refundExtraArgs
             )
             xmr_swap.a_lock_refund_tx_id = ci_from.getTxid(xmr_swap.a_lock_refund_tx)
 
@@ -3003,7 +3030,7 @@ class BasicSwap(BaseApp):
             v = ci_from.verifyTxSig(xmr_swap.a_lock_refund_tx, xmr_swap.al_lock_refund_tx_sig, xmr_swap.pkal, 0, xmr_swap.a_lock_tx_script, prevout_amount)
             ensure(v, 'Invalid coin A lock refund tx leader sig')
 
-            pkh_refund_to = ci_from.decodeAddress(self.getReceiveAddressForCoin(coin_from))
+            pkh_refund_to = ci_from.decodeAddress(self.getCachedAddressForCoin(coin_from))
             xmr_swap.a_lock_refund_spend_tx = ci_from.createSCLockRefundSpendTx(
                 xmr_swap.a_lock_refund_tx, xmr_swap.a_lock_refund_tx_script,
                 pkh_refund_to,
@@ -3894,6 +3921,7 @@ class BasicSwap(BaseApp):
                         self.createActionInSession(delay, ActionTypes.RECOVER_XMR_SWAP_LOCK_TX_B, bid_id, session)
                         session.commit()
             elif state == BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX:
+                print(3, bid.xmr_a_lock_tx)
                 if bid.xmr_a_lock_tx is None:
                     return rv
 
@@ -4847,10 +4875,11 @@ class BasicSwap(BaseApp):
             raise ValueError('TODO')
         elif offer_data.swap_type == SwapTypes.XMR_SWAP:
             ensure(offer_data.protocol_version >= MINPROTO_VERSION_ADAPTOR_SIG, 'Invalid protocol version')
-            if reverse_bid:
-                ensure(ci_to.has_segwit(), 'Coin-to must support segwit for reverse bid offers')
-            else:
-                ensure(ci_from.has_segwit(), 'Coin-from must support segwit')
+            if Coins.BCH not in (coin_from, coin_to):
+                if reverse_bid:
+                    ensure(ci_to.has_segwit(), 'Coin-to must support segwit for reverse bid offers')
+                else:
+                    ensure(ci_from.has_segwit(), 'Coin-from must support segwit')
             ensure(len(offer_data.proof_address) == 0, 'Unexpected data')
             ensure(len(offer_data.proof_signature) == 0, 'Unexpected data')
             ensure(len(offer_data.pkhash_seller) == 0, 'Unexpected data')
@@ -5695,6 +5724,7 @@ class BasicSwap(BaseApp):
 
         if lock_tx_sent is False:
             lock_tx_signed = ci_from.signTxWithWallet(xmr_swap.a_lock_tx)
+            print(1, lock_tx_signed)
             txid_hex = ci_from.publishTx(lock_tx_signed)
 
             vout_pos = ci_from.getTxOutputPos(xmr_swap.a_lock_tx, xmr_swap.a_lock_tx_script)
@@ -5764,6 +5794,7 @@ class BasicSwap(BaseApp):
 
         try:
             b_lock_tx_id = ci_to.publishBLockTx(xmr_swap.vkbv, xmr_swap.pkbs, bid.amount_to, b_fee_rate, unlock_time=unlock_time)
+            print(2, b_lock_tx_id)
             if bid.debug_ind == DebugTypes.B_LOCK_TX_MISSED_SEND:
                 self.log.debug('Adaptor-sig bid %s: Debug %d - Losing xmr lock tx %s.', bid_id.hex(), bid.debug_ind, b_lock_tx_id.hex())
                 self.logBidEvent(bid.bid_id, EventLogTypes.DEBUG_TWEAK_APPLIED, 'ind {}'.format(bid.debug_ind), session)

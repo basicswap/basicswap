@@ -98,11 +98,11 @@ from basicswap.bin.run import startDaemon, startXmrDaemon, startXmrWalletDaemon
 
 logger = logging.getLogger()
 
-NUM_NODES = 3
-NUM_XMR_NODES = 3
-NUM_BTC_NODES = 3
-NUM_BCH_NODES = 3
-NUM_LTC_NODES = 3
+NUM_NODES = 2
+NUM_XMR_NODES = 2
+NUM_BTC_NODES = 2
+NUM_BCH_NODES = 2
+NUM_LTC_NODES = 2
 TEST_DIR = cfg.TEST_DATADIRS
 
 XMR_BASE_P2P_PORT = 17792
