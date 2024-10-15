@@ -796,8 +796,9 @@ function updateProfitLoss(row, fromCoin, toCoin, fromAmount, toAmount, isOwnOffe
 
 function createTableRow(offer, isSentOffers) {
   const row = document.createElement('tr');
+  const uniqueId = `${offer.offer_id}_${offer.created_at}`;
   row.className = `opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600`;
-  row.setAttribute('data-offer-id', `${offer.offer_id}_${offer.created_at}`);
+  row.setAttribute('data-offer-id', uniqueId);
 
   const coinFromSymbol = coinNameToSymbol[offer.coin_from] || offer.coin_from.toLowerCase();
   const coinToSymbol = coinNameToSymbol[offer.coin_to] || offer.coin_to.toLowerCase();
@@ -828,6 +829,8 @@ function createTableRow(offer, isSentOffers) {
     ${createActionColumn(offer, buttonClass, buttonText)}
     ${createTooltips(offer, isOwnOffer, coinFromDisplay, coinToDisplay, fromAmount, toAmount, postedTime, expiresIn, isActuallyExpired)}
   `;
+
+  updateTooltipTargets(row, uniqueId);
 
   updateProfitLoss(row, coinFromDisplay, coinToDisplay, fromAmount, toAmount, isOwnOffer);
 
@@ -1286,8 +1289,10 @@ function createTooltips(offer, treatAsSentOffer, coinFrom, coinTo, fromAmount, t
 
   const percentageTooltipContent = createTooltipContent(treatAsSentOffer, coinFrom, coinTo, fromAmount, toAmount);
 
+  const uniqueId = `${offer.offer_id}_${offer.created_at}`;
+
   return `
-<div id="tooltip-active${offer.offer_id}" role="tooltip" class="inline-block absolute invisible z-50 py-2 px-3 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+<div id="tooltip-active-${uniqueId}" role="tooltip" class="inline-block absolute invisible z-50 py-2 px-3 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
   <div class="active-revoked-expired">
     <span class="bold">
       <div class="text-xs"><span class="bold">Posted:</span> ${postedTime}</div>
@@ -1327,40 +1332,50 @@ function createTooltips(offer, treatAsSentOffer, coinFrom, coinTo, fromAmount, t
   <div class="tooltip-arrow" data-popper-arrow></div>
 </div>
     
-    <div id="tooltip-recipient${offer.offer_id}" role="tooltip" class="inline-block absolute invisible z-50 py-2 px-3 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+    <div id="tooltip-recipient-${uniqueId}" role="tooltip" class="inline-block absolute invisible z-50 py-2 px-3 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
       <div class="active-revoked-expired"><span class="bold monospace">${offer.addr_from}</span></div>
       <div class="tooltip-arrow" data-popper-arrow></div>
     </div>
    
-    <div id="tooltip-wallet${offer.offer_id}" role="tooltip" class="inline-block absolute invisible z-50 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+    <div id="tooltip-wallet-${uniqueId}" role="tooltip" class="inline-block absolute invisible z-50 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
       <div class="active-revoked-expired"><span class="bold">${isSentOffers ? 'My' : ''} ${coinTo} Wallet</span></div>
       <div class="tooltip-arrow pl-1" data-popper-arrow></div>
     </div>
     
-    <div id="tooltip-offer${offer.offer_id}" role="tooltip" class="inline-block absolute z-50 py-2 px-3 text-sm font-medium text-white ${offer.is_own_offer ? 'bg-gray-300' : 'bg-green-700'} rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+    <div id="tooltip-offer-${uniqueId}" role="tooltip" class="inline-block absolute z-50 py-2 px-3 text-sm font-medium text-white ${offer.is_own_offer ? 'bg-gray-300' : 'bg-green-700'} rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
       <div class="active-revoked-expired"><span class="bold">${offer.is_own_offer ? 'Edit Offer' : `Buy ${coinFrom}`}</span></div>
       <div class="tooltip-arrow pr-6" data-popper-arrow></div>
     </div>
     
-    <div id="tooltip-wallet-maker${offer.offer_id}" role="tooltip" class="inline-block absolute invisible z-50 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+    <div id="tooltip-wallet-maker-${uniqueId}" role="tooltip" class="inline-block absolute invisible z-50 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
       <div class="active-revoked-expired"><span class="bold">${isSentOffers ? 'My' : ''} ${coinFrom} Wallet</span></div>
       <div class="tooltip-arrow pl-1" data-popper-arrow></div>
     </div>
     
-    <div id="tooltip-rate-${offer.offer_id}" role="tooltip" class="inline-block absolute invisible z-50 py-2 px-3 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+    <div id="tooltip-rate-${uniqueId}" role="tooltip" class="inline-block absolute invisible z-50 py-2 px-3 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
       <div class="tooltip-content">
         ${combinedRateTooltip}
       </div>
       <div class="tooltip-arrow" data-popper-arrow></div>
     </div>
 
-    <div id="percentage-tooltip-${offer.offer_id}" role="tooltip" class="inline-block absolute invisible z-50 py-2 px-3 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+    <div id="percentage-tooltip-${uniqueId}" role="tooltip" class="inline-block absolute invisible z-50 py-2 px-3 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
       <div class="tooltip-content">
         ${percentageTooltipContent}
       </div>
       <div class="tooltip-arrow" data-popper-arrow></div>
     </div>
   `;
+}
+
+function updateTooltipTargets(row, uniqueId) {
+  row.querySelector('[data-tooltip-target^="tooltip-active"]').setAttribute('data-tooltip-target', `tooltip-active-${uniqueId}`);
+  row.querySelector('[data-tooltip-target^="tooltip-recipient"]').setAttribute('data-tooltip-target', `tooltip-recipient-${uniqueId}`);
+  row.querySelector('[data-tooltip-target^="tooltip-wallet"]').setAttribute('data-tooltip-target', `tooltip-wallet-${uniqueId}`);
+  row.querySelector('[data-tooltip-target^="tooltip-offer"]').setAttribute('data-tooltip-target', `tooltip-offer-${uniqueId}`);
+  row.querySelector('[data-tooltip-target^="tooltip-wallet-maker"]').setAttribute('data-tooltip-target', `tooltip-wallet-maker-${uniqueId}`);
+  row.querySelector('[data-tooltip-target^="tooltip-rate"]').setAttribute('data-tooltip-target', `tooltip-rate-${uniqueId}`);
+  row.querySelector('[data-tooltip-target^="percentage-tooltip"]').setAttribute('data-tooltip-target', `percentage-tooltip-${uniqueId}`);
 }
 
 function getCoinSymbolLowercase(coin) {
