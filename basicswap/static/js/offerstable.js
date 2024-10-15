@@ -800,10 +800,12 @@ function createTableRow(offer, isSentOffers) {
   row.className = `opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600`;
   row.setAttribute('data-offer-id', uniqueId);
 
-  const coinFromSymbol = coinNameToSymbol[offer.coin_from] || offer.coin_from.toLowerCase();
-  const coinToSymbol = coinNameToSymbol[offer.coin_to] || offer.coin_to.toLowerCase();
-  const coinFromDisplay = getDisplayName(offer.coin_from);
-  const coinToDisplay = getDisplayName(offer.coin_to);
+  const coinFrom = offer.coin_from;
+  const coinTo = offer.coin_to;
+  const coinFromSymbol = coinNameToSymbol[coinFrom] || coinFrom.toLowerCase();
+  const coinToSymbol = coinNameToSymbol[coinTo] || coinTo.toLowerCase();
+  const coinFromDisplay = getDisplayName(coinFrom);
+  const coinToDisplay = getDisplayName(coinTo);
 
   const postedTime = formatTimeAgo(offer.created_at);
   const expiresIn = formatTimeLeft(offer.expire_at);
@@ -821,18 +823,18 @@ function createTableRow(offer, isSentOffers) {
   row.innerHTML = `
     ${createTimeColumn(offer, postedTime, expiresIn)}
     ${createDetailsColumn(offer)}
-    ${createTakerAmountColumn(offer, coinToDisplay, coinFromDisplay, coinFromSymbol)}
-    ${createSwapColumn(offer, coinToDisplay, coinFromDisplay, coinToSymbol, coinFromSymbol)}
-    ${createOrderbookColumn(offer, coinFromDisplay, coinToDisplay)}
-    ${createRateColumn(offer, coinFromDisplay, coinToDisplay)}
+    ${createTakerAmountColumn(offer, coinTo, coinFrom)}
+    ${createSwapColumn(offer, coinFromDisplay, coinToDisplay, coinFromSymbol, coinToSymbol)}
+    ${createOrderbookColumn(offer, coinFrom, coinTo)}
+    ${createRateColumn(offer, coinFrom, coinTo)}
     ${createPercentageColumn(offer)}
     ${createActionColumn(offer, buttonClass, buttonText)}
-    ${createTooltips(offer, isOwnOffer, coinFromDisplay, coinToDisplay, fromAmount, toAmount, postedTime, expiresIn, isActuallyExpired)}
+    ${createTooltips(offer, isOwnOffer, coinFrom, coinTo, fromAmount, toAmount, postedTime, expiresIn, isActuallyExpired)}
   `;
 
   updateTooltipTargets(row, uniqueId);
 
-  updateProfitLoss(row, coinFromDisplay, coinToDisplay, fromAmount, toAmount, isOwnOffer);
+  updateProfitLoss(row, coinFrom, coinTo, fromAmount, toAmount, isOwnOffer);
 
   return row;
 }
@@ -1142,15 +1144,42 @@ function createDetailsColumn(offer) {
   `;
 }
 
-function createTakerAmountColumn(offer, coinTo, coinFrom) {
-  const toAmount = parseFloat(offer.amount_to);
+function createSwapColumn(offer, coinFromDisplay, coinToDisplay, coinFromSymbol, coinToSymbol) {
+  const getImageFilename = (symbol, displayName) => {
+    if (displayName.toLowerCase() === 'zcoin' || displayName.toLowerCase() === 'firo') {
+      return 'Firo.png';
+    }
+    return `${displayName.replace(' ', '-')}.png`;
+  };
+
+  return `
+    <td class="py-0 px-0 text-right text-sm">
+      <a data-tooltip-target="tooltip-offer${offer.offer_id}" href="/offer/${offer.offer_id}">
+        <div class="flex items-center justify-evenly monospace">
+          <span class="inline-flex mr-3 ml-3 align-middle items-center justify-center w-18 h-20 rounded">
+            <img class="h-12" src="/static/images/coins/${getImageFilename(coinToSymbol, coinToDisplay)}" alt="${coinToDisplay}">
+          </span>
+          <svg aria-hidden="true" class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+            <path fill-rule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+          </svg>
+          <span class="inline-flex ml-3 mr-3 align-middle items-center justify-center w-18 h-20 rounded">
+            <img class="h-12" src="/static/images/coins/${getImageFilename(coinFromSymbol, coinFromDisplay)}" alt="${coinFromDisplay}">
+          </span>
+        </div>
+      </a>
+    </td>
+  `;
+}
+
+function createTakerAmountColumn(offer, coinFrom, coinTo) {
+  const fromAmount = parseFloat(offer.amount_to);
   const fromSymbol = getCoinSymbol(coinFrom);
   return `
     <td class="py-0">
       <div class="py-3 px-4 text-left">
         <a data-tooltip-target="tooltip-wallet${escapeHtml(offer.offer_id)}" href="/wallet/${escapeHtml(fromSymbol)}" class="items-center monospace">
           <div class="pr-2">        
-            <div class="text-sm font-semibold">${toAmount.toFixed(4)}</div>          
+            <div class="text-sm font-semibold">${fromAmount.toFixed(4)}</div>          
             <div class="text-sm text-gray-500 dark:text-gray-400">${coinFrom}</div>
           </div>
         </a>
@@ -1159,42 +1188,15 @@ function createTakerAmountColumn(offer, coinTo, coinFrom) {
   `;
 }
 
-function createSwapColumn(offer, coinToDisplay, coinFromDisplay, coinToSymbol, coinFromSymbol) {
-  const getImageFilename = (symbol, displayName) => {
-    if (displayName.toLowerCase() === 'zcoin' || displayName.toLowerCase() === 'firo') {
-      return 'firo.png';
-    }
-    return `${symbol.toLowerCase()}.png`;
-  };
-
-  return `
-    <td class="py-0 px-0 text-right text-sm">
-      <a data-tooltip-target="tooltip-offer${offer.offer_id}" href="/offer/${offer.offer_id}">
-        <div class="flex items-center justify-evenly monospace">
-          <span class="inline-flex mr-3 ml-3 align-middle items-center justify-center w-18 h-20 rounded">
-            <img class="h-12" src="/static/images/coins/${getImageFilename(coinFromSymbol, coinFromDisplay)}" alt="${coinFromDisplay}">
-          </span>
-          <svg aria-hidden="true" class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-            <path fill-rule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd"></path>
-          </svg>
-          <span class="inline-flex ml-3 mr-3 align-middle items-center justify-center w-18 h-20 rounded">
-            <img class="h-12" src="/static/images/coins/${getImageFilename(coinToSymbol, coinToDisplay)}" alt="${coinToDisplay}">
-          </span>
-        </div>
-      </a>
-    </td>
-  `;
-}
-
-function createOrderbookColumn(offer, coinFrom, coinTo) {
-  const fromAmount = parseFloat(offer.amount_from);
+function createOrderbookColumn(offer, coinTo, coinFrom) {
+  const toAmount = parseFloat(offer.amount_from);
   const toSymbol = getCoinSymbol(coinTo);
   return `
     <td class="p-0">
       <div class="py-3 px-4 text-right">
         <a data-tooltip-target="tooltip-wallet-maker${escapeHtml(offer.offer_id)}" href="/wallet/${escapeHtml(toSymbol)}" class="items-center monospace">
           <div class="pr-2">        
-            <div class="text-sm font-semibold">${fromAmount.toFixed(4)}</div>           
+            <div class="text-sm font-semibold">${toAmount.toFixed(4)}</div>           
             <div class="text-sm text-gray-500 dark:text-gray-400">${coinTo}</div>
           </div>
         </a>
