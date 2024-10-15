@@ -207,6 +207,43 @@
 {% include 'footer.html' %}
 
 <script>
+const api = {
+  makePostRequest: (url, headers = {}) => {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/json/readurl');
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.timeout = 30000;
+      xhr.ontimeout = () => reject(new Error('Request timed out'));
+      xhr.onload = () => {
+        console.log(`Response for ${url}:`, xhr.responseText);
+        if (xhr.status === 200) {
+          try {
+            const response = JSON.parse(xhr.responseText);
+            if (response.Error) {
+              console.error(`API Error for ${url}:`, response.Error);
+              reject(new Error(response.Error));
+            } else {
+              resolve(response);
+            }
+          } catch (error) {
+            console.error(`Invalid JSON response for ${url}:`, xhr.responseText);
+            reject(new Error(`Invalid JSON response: ${error.message}`));
+          }
+        } else {
+          console.error(`HTTP Error for ${url}: ${xhr.status} ${xhr.statusText}`);
+          reject(new Error(`HTTP Error: ${xhr.status} ${xhr.statusText}`));
+        }
+      };
+      xhr.onerror = () => reject(new Error('Network error occurred'));
+      xhr.send(JSON.stringify({
+        url: url,
+        headers: headers
+      }));
+    });
+  },
+};
+
 const coinNameToSymbol = {
   'Bitcoin': 'BTC',
   'Particl': 'PART',
@@ -222,73 +259,43 @@ const coinNameToSymbol = {
   'Zano': 'ZANO',
 };
 
-const getUsdValue = (cryptoValue, coinSymbol) => {
+const getUsdValue = async (cryptoValue, coinSymbol) => {
   let apiUrl;
 
   if (coinSymbol === 'WOW') {
-    apiUrl = `https://api.coingecko.com/api/v3/simple/price?ids=wownero&vs_currencies=usd`;
+    apiUrl = 'https://api.coingecko.com/api/v3/simple/price?ids=wownero&vs_currencies=usd';
   } else {
     apiUrl = `https://min-api.cryptocompare.com/data/price?fsym=${coinSymbol}&tsyms=USD`;
   }
 
-  return fetch(apiUrl)
-    .then(response => response.json())
-    .then(data => {
-      if (coinSymbol === 'WOW') {
-        const exchangeRate = data.wownero.usd;
-        if (!isNaN(exchangeRate)) {
-          return {
-            usdValue: cryptoValue * exchangeRate,
-            btcValue: cryptoValue / exchangeRate
-          };
-        } else {
-          throw new Error(`Invalid exchange rate for ${coinSymbol}`);
-        }
+  try {
+    const data = await api.makePostRequest(apiUrl);
+    
+    if (coinSymbol === 'WOW') {
+      const exchangeRate = data.wownero.usd;
+      if (!isNaN(exchangeRate)) {
+        return {
+          usdValue: cryptoValue * exchangeRate,
+          btcValue: cryptoValue / exchangeRate
+        };
       } else {
-        const exchangeRate = data.USD;
-        if (!isNaN(exchangeRate)) {
-          return {
-            usdValue: cryptoValue * exchangeRate,
-            btcValue: cryptoValue / exchangeRate
-          };
-        } else {
-          throw new Error(`Invalid exchange rate for ${coinSymbol}`);
-        }
-      }
-    });
-};
-
-const updateValues = async () => {
-  const coinNameValues = document.querySelectorAll('.coinname-value');
-
-  for (const coinNameValue of coinNameValues) {
-    const coinFullName = coinNameValue.getAttribute('data-coinname');
-    const cryptoValue = parseFloat(coinNameValue.textContent);
-    const coinSymbol = coinNameToSymbol[coinFullName];
-
-    if (coinSymbol) {
-      try {
-        const { usdValue, btcValue } = await getUsdValue(cryptoValue, coinSymbol);
-
-        const usdValueElement = coinNameValue.nextElementSibling.querySelector('.usd-value');
-        if (usdValueElement) {
-          usdValueElement.textContent = `$${usdValue.toFixed(2)}`;
-        }
-
-        const btcValueElement = coinNameValue.nextElementSibling.querySelector('.btc-value');
-        if (btcValueElement) {
-          btcValueElement.textContent = `${btcValue.toFixed(8)} BTC`;
-        }
-      } catch (error) {
-        console.error(`Error retrieving exchange rate for ${coinSymbol}`);
+        throw new Error(`Invalid exchange rate for ${coinSymbol}`);
       }
     } else {
-      console.error(`Coin symbol not found for full name: ${coinFullName}`);
+      const exchangeRate = data.USD;
+      if (!isNaN(exchangeRate)) {
+        return {
+          usdValue: cryptoValue * exchangeRate,
+          btcValue: cryptoValue / exchangeRate
+        };
+      } else {
+        throw new Error(`Invalid exchange rate for ${coinSymbol}`);
+      }
     }
+  } catch (error) {
+    console.error(`Error retrieving exchange rate for ${coinSymbol}:`, error);
+    throw error;
   }
-
-  calculateTotalUsdValue();
-  calculateTotalBtcValue();
 };
 
 const toggleUsdAmount = async (usdCell, isVisible) => {
@@ -388,9 +395,8 @@ const calculateTotalBtcValue = async () => {
   let totalBtcValue = 0;
 
   try {
-    const btcToUsdRate = await fetch('https://min-api.cryptocompare.com/data/price?fsym=BTC&tsyms=USD')
-      .then(response => response.json())
-      .then(data => data.USD);
+    const data = await api.makePostRequest('https://min-api.cryptocompare.com/data/price?fsym=BTC&tsyms=USD');
+    const btcToUsdRate = data.USD;
 
     for (const usdValueElement of usdValueElements) {
       const usdValue = parseFloat(usdValueElement.textContent.replace('$', ''));
@@ -412,7 +418,7 @@ const calculateTotalBtcValue = async () => {
       }
     }
   } catch (error) {
-    console.error(`Error retrieving BTC to USD exchange rate: ${error}`);
+    console.error(`Error retrieving BTC to USD exchange rate:`, error);
   }
 };
 

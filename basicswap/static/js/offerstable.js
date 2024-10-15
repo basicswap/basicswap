@@ -1,3 +1,5 @@
+// Config
+
 const coinNameToSymbol = {
   'Bitcoin': 'bitcoin',
   'Particl': 'particl',
@@ -6,8 +8,8 @@ const coinNameToSymbol = {
   'Monero': 'monero',
   'Wownero': 'wownero',
   'Litecoin': 'litecoin',
-  'Firo': 'zcoin',
-  'Zcoin': 'zcoin',
+  'Firo': 'firo',
+  'Zcoin': 'firo',
   'Dash': 'dash',
   'PIVX': 'pivx',
   'Decred': 'decred',
@@ -52,7 +54,30 @@ function makePostRequest(url, headers = {}) {
 
 const symbolToCoinName = {
   ...Object.fromEntries(Object.entries(coinNameToSymbol).map(([key, value]) => [value, key])),
-  'zcoin': 'Firo'
+  'zcoin': 'Firo',
+  'firo': 'Firo'
+};
+
+function getDisplayName(coinName) {
+  return coinNameToDisplayName[coinName] || coinName;
+}
+
+const coinNameToDisplayName = {
+  'Bitcoin': 'Bitcoin',
+  'Litecoin': 'Litecoin',
+  'Monero': 'Monero',
+  'Particl': 'Particl',
+  'Particl Blind': 'Particl Blind',
+  'Particl Anon': 'Particl Anon',
+  'PIVX': 'PIVX',
+  'Firo': 'Firo',
+  'Zcoin': 'Firo',
+  'Dash': 'Dash',
+  'Decred': 'Decred',
+  'Wownero': 'Wownero',
+  'Bitcoin Cash': 'Bitcoin Cash',
+  'Dogecoin': 'Dogecoin',
+  'Zano': 'Zano'
 };
 
 let latestPrices = null;
@@ -136,7 +161,7 @@ const MIN_REFRESH_INTERVAL = 30; // Minimum refresh interval in seconds
 const isSentOffers = window.offersTableConfig.isSentOffers;
 
 let currentPage = 1;
-const itemsPerPage = 50;
+const itemsPerPage = 20;
 
 const coinIdToName = {
   1: 'particl', 2: 'bitcoin', 3: 'litecoin', 4: 'decred',
@@ -164,10 +189,18 @@ function getCoinSymbol(fullName) {
   const symbolMap = {
     'Bitcoin': 'BTC', 'Litecoin': 'LTC', 'Monero': 'XMR',
     'Particl': 'PART', 'Particl Blind': 'PART', 'Particl Anon': 'PART',
-    'PIVX': 'PIVX', 'Firo': 'FIRO', 'Dash': 'DASH',
-    'Decred': 'DCR', 'Wownero': 'WOW', 'Bitcoin Cash': 'BCH'
+    'PIVX': 'PIVX', 'Firo': 'FIRO', 'Zcoin': 'FIRO',
+    'Dash': 'DASH', 'Decred': 'DCR', 'Wownero': 'WOW',
+    'Bitcoin Cash': 'BCH'
   };
   return symbolMap[fullName] || fullName;
+}
+
+function getDisplayName(coinName) {
+  if (coinName.toLowerCase() === 'zcoin') {
+    return 'Firo';
+  }
+  return coinNameToDisplayName[coinName] || coinName;
 }
 
 function getValidOffers() {
@@ -223,7 +256,7 @@ function setRefreshButtonLoading(isLoading) {
 
   refreshButton.disabled = isLoading;
   refreshIcon.classList.toggle('animate-spin', isLoading);
-  refreshText.textContent = isLoading ? 'Refreshing...' : 'Refresh';
+  refreshText.textContent = isLoading ? 'Refresh' : 'Refresh'; //to-do
 }
 
 function escapeHtml(unsafe) {
@@ -630,9 +663,28 @@ function filterAndSortData() {
 
     const uniqueOffersMap = new Map();
 
+    const isFiroOrZcoin = (coin) => ['firo', 'zcoin'].includes(coin.toLowerCase());
+    const isParticlVariant = (coin) => ['particl', 'particl anon', 'particl blind'].includes(coin.toLowerCase());
+
+    const coinMatches = (offerCoin, filterCoin) => {
+        offerCoin = offerCoin.toLowerCase();
+        filterCoin = filterCoin.toLowerCase();
+        
+        if (offerCoin === filterCoin) return true;
+        if (isFiroOrZcoin(offerCoin) && isFiroOrZcoin(filterCoin)) return true;
+        
+        if (isParticlVariant(filterCoin)) {
+            return offerCoin === filterCoin;
+        }
+        
+        if (filterCoin === 'particl' && isParticlVariant(offerCoin)) return true;
+        
+        return false;
+    };
+
     originalJsonData.forEach(offer => {
-        const coinFrom = (offer.coin_from || '').toLowerCase();
-        const coinTo = (offer.coin_to || '').toLowerCase();
+        const coinFrom = (offer.coin_from || '');
+        const coinTo = (offer.coin_to || '');
         const isExpired = offer.expire_at <= currentTime;
 
         if (!isSentOffers && isExpired) {
@@ -641,10 +693,10 @@ function filterAndSortData() {
 
         let passesFilter = true;
 
-        if (filters.coin_to !== 'any' && coinTo.toLowerCase() !== filters.coin_to.toLowerCase()) {
+        if (filters.coin_to !== 'any' && !coinMatches(coinTo, filters.coin_to)) {
             passesFilter = false;
         }
-        if (filters.coin_from !== 'any' && coinFrom.toLowerCase() !== filters.coin_from.toLowerCase()) {
+        if (filters.coin_from !== 'any' && !coinMatches(coinFrom, filters.coin_from)) {
             passesFilter = false;
         }
 
@@ -745,14 +797,12 @@ function updateProfitLoss(row, fromCoin, toCoin, fromAmount, toAmount, isOwnOffe
 function createTableRow(offer, isSentOffers) {
   const row = document.createElement('tr');
   row.className = `opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600`;
-    row.setAttribute('data-offer-id', `${offer.offer_id}_${offer.created_at}`);
+  row.setAttribute('data-offer-id', `${offer.offer_id}_${offer.created_at}`);
 
-  const coinFrom = offer.coin_from ? (symbolToCoinName[coinNameToSymbol[offer.coin_from]] || offer.coin_from) : 'Unknown';
-  const coinTo = offer.coin_to ? (symbolToCoinName[coinNameToSymbol[offer.coin_to]] || offer.coin_to) : 'Unknown';
-
-  if (coinFrom === 'Unknown' || coinTo === 'Unknown') {
-    console.warn(`Invalid coin data for offer ${offer.offer_id}: coinFrom=${coinFrom}, coinTo=${coinTo}`);
-  }
+  const coinFromSymbol = coinNameToSymbol[offer.coin_from] || offer.coin_from.toLowerCase();
+  const coinToSymbol = coinNameToSymbol[offer.coin_to] || offer.coin_to.toLowerCase();
+  const coinFromDisplay = getDisplayName(offer.coin_from);
+  const coinToDisplay = getDisplayName(offer.coin_to);
 
   const postedTime = formatTimeAgo(offer.created_at);
   const expiresIn = formatTimeLeft(offer.expire_at);
@@ -760,7 +810,6 @@ function createTableRow(offer, isSentOffers) {
   const currentTime = Math.floor(Date.now() / 1000);
   const isActuallyExpired = currentTime > offer.expire_at;
 
-  // Determine if this offer should be treated as a sent offer
   const isOwnOffer = offer.is_own_offer;
 
   const { buttonClass, buttonText } = getButtonProperties(isActuallyExpired, isSentOffers, isOwnOffer);
@@ -771,16 +820,16 @@ function createTableRow(offer, isSentOffers) {
   row.innerHTML = `
     ${createTimeColumn(offer, postedTime, expiresIn)}
     ${createDetailsColumn(offer)}
-    ${createTakerAmountColumn(offer, coinFrom, coinTo)}
-    ${createSwapColumn(offer, coinFrom, coinTo)}
-    ${createOrderbookColumn(offer, coinTo, coinFrom)}
-    ${createRateColumn(offer, coinFrom, coinTo)}
+    ${createTakerAmountColumn(offer, coinToDisplay, coinFromDisplay, coinFromSymbol)}
+    ${createSwapColumn(offer, coinToDisplay, coinFromDisplay, coinToSymbol, coinFromSymbol)}
+    ${createOrderbookColumn(offer, coinFromDisplay, coinToDisplay)}
+    ${createRateColumn(offer, coinFromDisplay, coinToDisplay)}
     ${createPercentageColumn(offer)}
     ${createActionColumn(offer, buttonClass, buttonText)}
-    ${createTooltips(offer, isOwnOffer, coinFrom, coinTo, fromAmount, toAmount, postedTime, expiresIn, isActuallyExpired)}
+    ${createTooltips(offer, isOwnOffer, coinFromDisplay, coinToDisplay, fromAmount, toAmount, postedTime, expiresIn, isActuallyExpired)}
   `;
 
-  updateProfitLoss(row, coinFrom, coinTo, fromAmount, toAmount, isOwnOffer);
+  updateProfitLoss(row, coinFromDisplay, coinToDisplay, fromAmount, toAmount, isOwnOffer);
 
   return row;
 }
@@ -966,8 +1015,16 @@ async function calculateProfitLoss(fromCoin, toCoin, fromAmount, toAmount, isOwn
     return null;
   }
 
-  const fromSymbol = coinNameToSymbol[fromCoin] || fromCoin.toLowerCase();
-  const toSymbol = coinNameToSymbol[toCoin] || toCoin.toLowerCase();
+  const getPriceKey = (coin) => {
+    const lowerCoin = coin.toLowerCase();
+    if (lowerCoin === 'firo' || lowerCoin === 'zcoin') {
+      return 'zcoin';
+    }
+    return coinNameToSymbol[coin] || lowerCoin;
+  };
+
+  const fromSymbol = getPriceKey(fromCoin);
+  const toSymbol = getPriceKey(toCoin);
 
   const fromPriceUSD = latestPrices[fromSymbol]?.usd;
   const toPriceUSD = latestPrices[toSymbol]?.usd;
@@ -993,7 +1050,6 @@ async function calculateProfitLoss(fromCoin, toCoin, fromAmount, toAmount, isOwn
 
   return percentDiff;
 }
-
 function getProfitColorClass(percentage) {
   const numericPercentage = parseFloat(percentage);
   if (numericPercentage > 0) return 'text-green-500';
@@ -1010,8 +1066,20 @@ function getMarketRate(fromCoin, toCoin) {
             resolve(null);
             return;
         }
-        const fromPrice = latestPrices[fromCoin.toLowerCase()]?.usd;
-        const toPrice = latestPrices[toCoin.toLowerCase()]?.usd;
+
+        const getPriceKey = (coin) => {
+            const lowerCoin = coin.toLowerCase();
+            if (lowerCoin === 'firo' || lowerCoin === 'zcoin') {
+                return 'zcoin';
+            }
+            return coinNameToSymbol[coin] || lowerCoin;
+        };
+
+        const fromSymbol = getPriceKey(fromCoin);
+        const toSymbol = getPriceKey(toCoin);
+
+        const fromPrice = latestPrices[fromSymbol]?.usd;
+        const toPrice = latestPrices[toSymbol]?.usd;
         if (!fromPrice || !toPrice) {
             console.warn(`Missing price data for ${!fromPrice ? fromCoin : toCoin}`);
             resolve(null);
@@ -1088,18 +1156,26 @@ function createTakerAmountColumn(offer, coinTo, coinFrom) {
   `;
 }
 
-function createSwapColumn(offer, coinTo, coinFrom) {
+function createSwapColumn(offer, coinToDisplay, coinFromDisplay, coinToSymbol, coinFromSymbol) {
+  const getImageFilename = (symbol, displayName) => {
+    if (displayName.toLowerCase() === 'zcoin' || displayName.toLowerCase() === 'firo') {
+      return 'firo.png';
+    }
+    return `${symbol.toLowerCase()}.png`;
+  };
+
   return `
     <td class="py-0 px-0 text-right text-sm">
       <a data-tooltip-target="tooltip-offer${offer.offer_id}" href="/offer/${offer.offer_id}">
         <div class="flex items-center justify-evenly monospace">
           <span class="inline-flex mr-3 ml-3 align-middle items-center justify-center w-18 h-20 rounded">
-            <img class="h-12" src="/static/images/coins/${coinFrom.replace(" ", "-")}.png" alt="${coinFrom}">
+            <img class="h-12" src="/static/images/coins/${getImageFilename(coinFromSymbol, coinFromDisplay)}" alt="${coinFromDisplay}">
           </span>
-             <svg aria-hidden="true" class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg ">
-             <path fill-rule="evenodd " d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z " clip-rule="evenodd"></path></svg>
+          <svg aria-hidden="true" class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+            <path fill-rule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+          </svg>
           <span class="inline-flex ml-3 mr-3 align-middle items-center justify-center w-18 h-20 rounded">
-            <img class="h-12" src="/static/images/coins/${coinTo.replace(" ", "-")}.png" alt="${coinTo}">
+            <img class="h-12" src="/static/images/coins/${getImageFilename(coinToSymbol, coinToDisplay)}" alt="${coinToDisplay}">
           </span>
         </div>
       </a>
@@ -1134,8 +1210,13 @@ function createRateColumn(offer, coinFrom, coinTo) {
   const fromSymbol = getCoinSymbol(coinFrom);
   const toSymbol = getCoinSymbol(coinTo);
   
-  const fromPriceUSD = latestPrices[coinNameToSymbol[coinFrom]]?.usd || 0;
-  const toPriceUSD = latestPrices[coinNameToSymbol[coinTo]]?.usd || 0;
+  const getPriceKey = (coin) => {
+    const lowerCoin = coin.toLowerCase();
+    return lowerCoin === 'firo' || lowerCoin === 'zcoin' ? 'zcoin' : coinNameToSymbol[coin] || lowerCoin;
+  };
+
+  const fromPriceUSD = latestPrices[getPriceKey(coinFrom)]?.usd || 0;
+  const toPriceUSD = latestPrices[getPriceKey(coinTo)]?.usd || 0;
 
   const rateInUSD = rate * toPriceUSD;
 
@@ -1300,12 +1381,16 @@ function createTooltipContent(isSentOffers, coinFrom, coinTo, fromAmount, toAmou
             <p>Invalid coin data.</p>`;
   }
 
-  // Ensure fromAmount and toAmount are numbers
   fromAmount = parseFloat(fromAmount) || 0;
   toAmount = parseFloat(toAmount) || 0;
 
-  const fromSymbol = coinNameToSymbol[coinFrom] || coinFrom.toLowerCase();
-  const toSymbol = coinNameToSymbol[coinTo] || coinTo.toLowerCase();
+  const getPriceKey = (coin) => {
+    const lowerCoin = coin.toLowerCase();
+    return lowerCoin === 'firo' || lowerCoin === 'zcoin' ? 'zcoin' : coinNameToSymbol[coin] || lowerCoin;
+  };
+
+  const fromSymbol = getPriceKey(coinFrom);
+  const toSymbol = getPriceKey(coinTo);
   const fromPriceUSD = latestPrices[fromSymbol]?.usd;
   const toPriceUSD = latestPrices[toSymbol]?.usd;
 
@@ -1361,11 +1446,18 @@ function createTooltipContent(isSentOffers, coinFrom, coinTo, fromAmount, toAmou
     <p><strong>Offer Rate:</strong> 1 ${coinFrom} = ${offerRate.toFixed(8)} ${coinTo}</p>
   `;
 }
+
 function createCombinedRateTooltip(offer, coinFrom, coinTo, isSentOffers, treatAsSentOffer) {
   const rate = parseFloat(offer.rate);
   const inverseRate = 1 / rate;
-  const fromSymbol = getCoinSymbolLowercase(coinFrom);
-  const toSymbol = getCoinSymbolLowercase(coinTo);
+  
+  const getPriceKey = (coin) => {
+    const lowerCoin = coin.toLowerCase();
+    return lowerCoin === 'firo' || lowerCoin === 'zcoin' ? 'zcoin' : getCoinSymbolLowercase(coin);
+  };
+
+  const fromSymbol = getPriceKey(coinFrom);
+  const toSymbol = getPriceKey(coinTo);
   
   const fromPriceUSD = latestPrices[fromSymbol]?.usd || 0;
   const toPriceUSD = latestPrices[toSymbol]?.usd || 0;
@@ -1568,7 +1660,6 @@ function startRefreshCountdown() {
     }
 
     function startCountdown() {
-        // Clear any existing intervals
         if (countdownInterval) {
             clearInterval(countdownInterval);
         }

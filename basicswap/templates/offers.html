@@ -74,15 +74,15 @@ function getAPIKeys() {
                 <div class="flex items-center justify-between">
                   <h2 class="text-xl font-bold dark:text-white" id="chart-title">Price Chart</h2>
                   <div class="flex items-center space-x-4">
-                    <button id="resolution-month" class="ml-5 resolution-button">1Y</button>
-                    <button id="resolution-week" class="resolution-button">1M</button>
-                    <button id="resolution-day" class="resolution-button">24H</button>
+                  <button id="resolution-year" class="ml-5 resolution-button">1Y</button>
+                  <button id="resolution-sixMonths" class="resolution-button">6M</button>
+                  <button id="resolution-day" class="resolution-button">24H</button>
                   </div>
                 </div>
                 <div class="flex items-center">
-                  <span id="load-time" class="mr-2 text-sm text-gray-600 dark:text-gray-300"></span>
-                  <span id="last-refreshed-time" class="mr-2 text-sm text-gray-600 dark:text-gray-300"></span>
-                  <span id="cache-status" class="mr-4 text-sm text-gray-600 dark:text-gray-300"></span>
+                  <span id="load-time hidden" class="mr-2 text-sm text-gray-600 dark:text-gray-300"></span>
+                  <span id="last-refreshed-time hidden" class="mr-2 text-sm text-gray-600 dark:text-gray-300"></span>
+                  <span id="cache-status hidden" class="mr-4 text-sm text-gray-600 dark:text-gray-300"></span>
                   <span id="tor-status" class="mr-4 text-sm {% if tor_established %}text-green-500{% else %}text-red-500{% endif %}"> Tor <> API: {% if tor_established %}Connected{% else %}Not Connected{% endif %}
                     <a href="https://academy.particl.io/en/latest/basicswap-guides/basicswapguides_tor.html" target="_blank" rel="noopener noreferrer" class="underline">(?)</a>
                   </span>       
@@ -388,7 +388,7 @@ function getAPIKeys() {
               <p class="text-sm font-heading dark:text-gray-400 mr-4">Last refreshed:
                 <span id="lastRefreshTime">Never</span>
               </p>
-              <p class="text-sm font-heading dark:text-gray-400 mr-4">Listings:
+              <p class="text-sm font-heading dark:text-gray-400 mr-4">Network Listings:
                 <span id="newEntriesCount"></span>
               </p>
               <p class="text-sm font-heading dark:text-gray-400 mr-4">Next refresh:
