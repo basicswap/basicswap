@@ -6,7 +6,7 @@
 
 ## Update requirements.txt
 
-    hashin --update-all -p3.9 -p3.10 -p3.11 -p3.12 -p3.13
+    pip-compile requirements.in --generate-hashes --output-file requirements.txt
 
 
 ## Run One Test

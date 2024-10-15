@@ -32,7 +32,7 @@ basicswap-run = "basicswap.bin.run:main"
 dev = [
     "codespell",
     "flake8",
-    "hashin",
+    "pip-tools",
     "pytest",
 ]
 

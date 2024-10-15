@@ -1,0 +1,7 @@
+pyzmq==26.2.0
+SQLAlchemy==2.0.35
+python-gnupg==0.5.3
+Jinja2==3.1.4
+pycryptodome==3.21.0
+PySocks==1.7.1
+coincurve@https://github.com/basicswap/coincurve/archive/refs/tags/basicswap_v0.2.zip
