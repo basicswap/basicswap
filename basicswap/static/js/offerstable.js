@@ -1157,13 +1157,13 @@ function createSwapColumn(offer, coinFromDisplay, coinToDisplay, coinFromSymbol,
       <a data-tooltip-target="tooltip-offer${offer.offer_id}" href="/offer/${offer.offer_id}">
         <div class="flex items-center justify-evenly monospace">
           <span class="inline-flex mr-3 ml-3 align-middle items-center justify-center w-18 h-20 rounded">
-            <img class="h-12" src="/static/images/coins/${getImageFilename(coinFromSymbol, coinFromDisplay)}" alt="${coinFromDisplay}">
+            <img class="h-12" src="/static/images/coins/${getImageFilename(coinToSymbol, coinToDisplay)}" alt="${coinToDisplay}">
           </span>
           <svg aria-hidden="true" class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
             <path fill-rule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd"></path>
           </svg>
           <span class="inline-flex ml-3 mr-3 align-middle items-center justify-center w-18 h-20 rounded">
-            <img class="h-12" src="/static/images/coins/${getImageFilename(coinToSymbol, coinToDisplay)}" alt="${coinToDisplay}">
+            <img class="h-12" src="/static/images/coins/${getImageFilename(coinFromSymbol, coinFromDisplay)}" alt="${coinFromDisplay}">
           </span>
         </div>
       </a>
@@ -1171,13 +1171,13 @@ function createSwapColumn(offer, coinFromDisplay, coinToDisplay, coinFromSymbol,
   `;
 }
 
-function createTakerAmountColumn(offer, coinTo, coinFrom) {
-  const fromAmount = parseFloat(offer.amount_from);
-  const toSymbol = getCoinSymbol(coinTo);
+function createTakerAmountColumn(offer, coinFrom, coinTo) {
+  const fromAmount = parseFloat(offer.amount_to);
+  const fromSymbol = getCoinSymbol(coinFrom);
   return `
     <td class="py-0">
       <div class="py-3 px-4 text-left">
-        <a data-tooltip-target="tooltip-wallet${escapeHtml(offer.offer_id)}" href="/wallet/${escapeHtml(toSymbol)}" class="items-center monospace">
+        <a data-tooltip-target="tooltip-wallet${escapeHtml(offer.offer_id)}" href="/wallet/${escapeHtml(fromSymbol)}" class="items-center monospace">
           <div class="pr-2">        
             <div class="text-sm font-semibold">${fromAmount.toFixed(4)}</div>          
             <div class="text-sm text-gray-500 dark:text-gray-400">${coinFrom}</div>
@@ -1188,13 +1188,13 @@ function createTakerAmountColumn(offer, coinTo, coinFrom) {
   `;
 }
 
-function createOrderbookColumn(offer, coinFrom, coinTo) {
-  const toAmount = parseFloat(offer.amount_to);
-  const fromSymbol = getCoinSymbol(coinFrom);
+function createOrderbookColumn(offer, coinTo, coinFrom) {
+  const toAmount = parseFloat(offer.amount_from);
+  const toSymbol = getCoinSymbol(coinTo);
   return `
     <td class="p-0">
       <div class="py-3 px-4 text-right">
-        <a data-tooltip-target="tooltip-wallet-maker${escapeHtml(offer.offer_id)}" href="/wallet/${escapeHtml(fromSymbol)}" class="items-center monospace">
+        <a data-tooltip-target="tooltip-wallet-maker${escapeHtml(offer.offer_id)}" href="/wallet/${escapeHtml(toSymbol)}" class="items-center monospace">
           <div class="pr-2">        
             <div class="text-sm font-semibold">${toAmount.toFixed(4)}</div>           
             <div class="text-sm text-gray-500 dark:text-gray-400">${coinTo}</div>
