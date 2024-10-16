@@ -125,17 +125,17 @@
 (define-public basicswap
 (package
   (name "basicswap")
-  (version "0.13.5")
+  (version "0.14.1")
   (source (origin
     (method git-fetch)
     (uri (git-reference
       (url "https://github.com/basicswap/basicswap")
-      (commit "25b479fdb683bfc0261e3378589c3282b51b122a")))
+      (commit "062cc6dbdc3c1f489d2bf78ce7cd99fbc885f14e")))
     (sha256
       (base32
-        "153awdqh7wpmc8xs6yvf3na63b84zpkfnhan3ni2bjb9y691yl24"))
+        "16m61d45rn4lzvximsnkvrdg4hfsdk4460lhyarixjcdzknh1z1z"))
     (file-name (git-file-name name version))))
-  (build-system python-build-system)
+  (build-system pyproject-build-system)
 
   (native-search-paths (list $SSL_CERT_DIR $SSL_CERT_FILE))
   (arguments
@@ -153,13 +153,14 @@
     python-coincurve-basicswap
     python-pycryptodome
     python-pytest
-    python-sqlalchemy-1.4.39
+    python-sqlalchemy
     python-pyzmq
     python-gnupg
     python-jinja2
     python-pysocks))
   (native-inputs
    (list
+    python-hatchling
     python-wheel
     python-pylint
     python-pyflakes))
