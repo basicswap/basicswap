@@ -161,7 +161,7 @@ const MIN_REFRESH_INTERVAL = 30; // Minimum refresh interval in seconds
 const isSentOffers = window.offersTableConfig.isSentOffers;
 
 let currentPage = 1;
-const itemsPerPage = 20;
+const itemsPerPage = 100;
 
 const coinIdToName = {
   1: 'particl', 2: 'bitcoin', 3: 'litecoin', 4: 'decred',
