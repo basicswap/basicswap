@@ -1442,7 +1442,7 @@ function createTooltipContent(isSentOffers, coinFrom, coinTo, fromAmount, toAmou
     <p class="font-bold mb-1">Profit/Loss Calculation:</p>
     <p>You are ${actionLabel} ${fromAmount.toFixed(8)} ${coinFrom} ($${fromValueUSD.toFixed(2)} USD) <br/> and ${directionLabel} ${toAmount.toFixed(8)} ${coinTo} ($${toValueUSD.toFixed(2)} USD).</p>
     <p class="mt-1">Percentage difference: ${percentDiffDisplay}%</p>
-    <p>USD ${profitLabel}: ${profitUSD > 0 ? '' : '-'}$${profitUSD.toFixed(2)} USD</p>
+    <p>${profitLabel}: ${profitUSD > 0 ? '' : '-'}$${profitUSD.toFixed(2)} USD</p>
     <p class="font-bold mt-2">Calculation:</p>
     <p>Percentage = ${(isSentOffers || isOwnOffer) ? 
       "((To Amount in USD / From Amount in USD) - 1) * 100" : 
