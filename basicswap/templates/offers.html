@@ -83,7 +83,7 @@ function getAPIKeys() {
                   <span id="load-time hidden" class="mr-2 text-sm text-gray-600 dark:text-gray-300"></span>
                   <span id="last-refreshed-time hidden" class="mr-2 text-sm text-gray-600 dark:text-gray-300"></span>
                   <span id="cache-status hidden" class="mr-4 text-sm text-gray-600 dark:text-gray-300"></span>
-                  <span id="tor-status" class="mr-4 text-sm {% if tor_established %}text-green-500{% else %}text-red-500{% endif %}"> Tor <> API: {% if tor_established %}Connected{% else %}Not Connected{% endif %}
+                  <span id="tor-status" class="mr-4 text-sm hidden {% if tor_established %}text-green-500{% else %}text-red-500{% endif %}"> Tor {% if tor_established %}ON{% else %}OFF{% endif %}
                     <a href="https://academy.particl.io/en/latest/basicswap-guides/basicswapguides_tor.html" target="_blank" rel="noopener noreferrer" class="underline">(?)</a>
                   </span>       
                   <span id="next-refresh-time" class="mr-4 text-sm text-gray-600 dark:text-gray-300">
