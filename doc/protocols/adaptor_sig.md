@@ -10,10 +10,10 @@ An OtVES:
  - The encrypting private key (b) can be recovered using both the encrypted and decrypted signatures.
 
 
-Offerer     - Sends the offer
-Bidder      - Sends the bid
-Leader      - Sends the first lock tx (ITX)
-Follower    - Sends the second lock tx (PTX)
+    Offerer     - Sends the offer
+    Bidder      - Sends the bid
+    Leader      - Sends the first lock tx (ITX)
+    Follower    - Sends the second lock tx (PTX)
 
 
 NOSCRIPT_COIN lock tx:
@@ -78,6 +78,6 @@ o8. Combines the keys to spend from the NOSCRIPT_COIN lock tx           |       
 ```
 
 Per swap (including the offer smsg):
-Offerer sent 6 smsgs (2 extra from split messages)
-Bidder sent 4 smsgs (2 extra from split messages)
+- Offerer sent 6 smsgs (2 extra from split messages)
+- Bidder sent 4 smsgs (2 extra from split messages)
 

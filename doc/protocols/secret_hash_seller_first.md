@@ -1,6 +1,6 @@
 # Seller first protocol
 
-Seller sends the first transaction.
+Seller sends the first transaction.\
 Both coin types must support scripts.
 
 

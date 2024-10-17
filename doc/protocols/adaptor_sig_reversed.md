@@ -4,10 +4,10 @@
 
 ## WIP
 
-Offerer     - Sends the offer
-Bidder      - Sends the bid
-Leader      - Sends the first lock tx (ITX)
-Follower    - Sends the second lock tx (PTX)
+    Offerer     - Sends the offer
+    Bidder      - Sends the bid
+    Leader      - Sends the first lock tx (ITX)
+    Follower    - Sends the second lock tx (PTX)
 
 
 The ITX must be sent from the script chain (coin A).
@@ -80,6 +80,6 @@ o7. Receives leader OtVES for SCRIPT_COIN lock spend tx.                |       
 ```
 
 Per swap (including the offer smsg):
-Offerer sent 5 smsgs (2 extra from split messages)
-Bidder sent 6 smsgs (2 extra from split messages)
+- Offerer sent 5 smsgs (2 extra from split messages)
+- Bidder sent 6 smsgs (2 extra from split messages)
 
