@@ -97,7 +97,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function updateShutdownButtons() {
         const activeSwaps = parseInt(shutdownButtons[0].getAttribute('data-active-swaps') || '0');
-        
+
         shutdownButtons.forEach(button => {
             if (activeSwaps > 0) {
                 button.classList.add('shutdown-disabled');
@@ -199,7 +199,7 @@ document.addEventListener('DOMContentLoaded', function() {
               <li>
               <a href="/changepassword" class="flex items-center block py-4 px-4 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-white"> <span class="sr-only">Change/Set Password</span>
             {{ change_password_svg | safe }} Change/Set Password</a>
-            </li>         
+            </li>
             {% if debug_mode == true %}
             <li>
               <a href="/rpc" class="flex items-center block py-4 px-4 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-white"> <span class="sr-only">RPC</span>
@@ -242,14 +242,14 @@ document.addEventListener('DOMContentLoaded', function() {
           {% endif %}
         </ul>
 <div class="text-sm text-gray-700">
-<a href="/shutdown/{{ shutdown_token }}" 
+<a href="/shutdown/{{ shutdown_token }}"
    class="shutdown-button flex items-center block py-4 px-4 text-sm text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-gray-200 dark:hover:text-white"
    data-active-swaps="{{ summary.num_swapping }}">
     {{ shutdown_svg | safe }}
     <span class="ml-2">Shutdown</span>
 </a>
 </div>
-</div> 
+</div>
 
 <div id="shutdownModal" tabindex="-1" class="hidden fixed inset-0 z-50 overflow-y-auto overflow-x-hidden">
     <div class="fixed inset-0 bg-black bg-opacity-60 transition-opacity"></div>
@@ -363,13 +363,13 @@ document.addEventListener('DOMContentLoaded', function() {
                   <p><b>Debug mode:</b> Active</p>
                   {% if debug_ui_mode == true %}
                   <p><b>Debug UI mode:</b> Active</p>
-                  {% endif %}              
+                  {% endif %}
                 </div>
                 </li>
                 </ul>
                 <!-- dev mode icons on/off -->
                 {% endif %}
-                         
+
                 {% if encrypted == true %}
                 <ul class="xl:flex"><li>
                 {% if locked == true %}
@@ -598,7 +598,7 @@ document.addEventListener('DOMContentLoaded', function() {
           {% endif %}
         </ul>
           <div class="pt-8 text-sm font-medium">
-<a href="/shutdown/{{ shutdown_token }}" 
+<a href="/shutdown/{{ shutdown_token }}"
    class="shutdown-button flex items-center block py-4 px-4 text-sm text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-gray-200 dark:hover:text-white"
    data-active-swaps="{{ summary.num_swapping }}">
     {{ shutdown_svg | safe }}
@@ -611,7 +611,7 @@ document.addEventListener('DOMContentLoaded', function() {
   <!-- mobile sidebar -->
 
   </section>
-  {% if ws_url %}
+  {% if ws_port %}
   <script>
 // Configuration object
 const notificationConfig = {
@@ -620,7 +620,7 @@ const notificationConfig = {
     showBidAccepted: true
 };
 
-var ws = new WebSocket("{{ ws_url }}"),
+var ws = new WebSocket("ws://" + window.location.hostname + ":{{ ws_port }}"),
     floating_div = document.createElement('div');
 floating_div.classList.add('floatright');
 messages = document.createElement('ul');

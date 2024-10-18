@@ -312,6 +312,7 @@ def runClient(fp, data_dir, chain, start_only_coins):
                 swap_client.log.info(f'Starting ws server at {ws_url}.')
 
                 swap_client.ws_server = WebsocketServer(host=settings['wshost'], port=settings['wsport'])
+                swap_client.ws_server.client_port = settings.get('wsclientport', settings['wsport'])
                 swap_client.ws_server.set_fn_new_client(ws_new_client)
                 swap_client.ws_server.set_fn_client_left(ws_client_left)
                 swap_client.ws_server.set_fn_message_received(ws_message_received)

@@ -135,7 +135,7 @@ class HttpHandler(BaseHTTPRequestHandler):
     def render_template(self, template, args_dict, status_code=200, version=__version__):
         swap_client = self.server.swap_client
         if swap_client.ws_server:
-            args_dict['ws_url'] = swap_client.ws_server.url
+            args_dict['ws_port'] = swap_client.ws_server.client_port
         if swap_client.debug:
             args_dict['debug_mode'] = True
         if swap_client.debug_ui:
