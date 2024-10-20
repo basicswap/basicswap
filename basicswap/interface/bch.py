@@ -6,14 +6,14 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 from typing import Union
-from basicswap.contrib.test_framework.messages import COutPoint, CTransaction, CTxIn, CTxOut
+from basicswap.contrib.test_framework.messages import COutPoint, CTransaction, CTxIn
 from basicswap.util import b2h, b2i, ensure, i2h
 from basicswap.util.script import decodePushData, decodeScriptNum
 from .btc import BTCInterface, ensure_op, find_vout_for_address_from_txobj, findOutput
 from basicswap.rpc import make_rpc_func
 from basicswap.chainparams import Coins
 from basicswap.interface.contrib.bch_test_framework.cashaddress import Address
-from basicswap.util.crypto import hash160, sha256
+from basicswap.util.crypto import sha256
 from basicswap.interface.contrib.bch_test_framework.script import (
     OP_TXINPUTCOUNT,
     OP_1,
@@ -45,9 +45,7 @@ from basicswap.interface.contrib.bch_test_framework.script import (
     OP_CHECKSIG,
     OP_HASH256,
 )
-from basicswap.contrib.test_framework.script import (
-    CScript, CScriptOp,
-)
+from basicswap.contrib.test_framework.script import CScript
 from coincurve.keys import (
     PrivateKey,
     PublicKey,
@@ -245,39 +243,39 @@ class BCHInterface(BTCInterface):
             # // Bob has BCH and/or CashTokens, wants XMR.
             # 
             # // Verify 1-in-1-out TX form
-            CScriptOp(OP_TXINPUTCOUNT),
-            CScriptOp(OP_1), CScriptOp(OP_NUMEQUALVERIFY),
-            CScriptOp(OP_TXOUTPUTCOUNT),
-            CScriptOp(OP_1), CScriptOp(OP_NUMEQUALVERIFY),
+            OP_TXINPUTCOUNT,
+            OP_1, OP_NUMEQUALVERIFY,
+            OP_TXOUTPUTCOUNT,
+            OP_1, OP_NUMEQUALVERIFY,
 
             # // int miningFee
             mining_fee,
             # // Verify pre-agreed mining fee and that the rest of BCH is forwarded
             # // to the output.
-            CScriptOp(OP_0), CScriptOp(OP_UTXOVALUE),
-            CScriptOp(OP_0), CScriptOp(OP_OUTPUTVALUE),
-            CScriptOp(OP_SUB), CScriptOp(OP_NUMEQUALVERIFY),
+            OP_0, OP_UTXOVALUE,
+            OP_0, OP_OUTPUTVALUE,
+            OP_SUB, OP_NUMEQUALVERIFY,
 
             # # // Verify that any CashTokens are forwarded to the output.
-            CScriptOp(OP_0), CScriptOp(OP_UTXOTOKENCATEGORY),
-            CScriptOp(OP_0), CScriptOp(OP_OUTPUTTOKENCATEGORY),
-            CScriptOp(OP_EQUALVERIFY),
-            CScriptOp(OP_0), CScriptOp(OP_UTXOTOKENCOMMITMENT),
-            CScriptOp(OP_0), CScriptOp(OP_OUTPUTTOKENCOMMITMENT),
-            CScriptOp(OP_EQUALVERIFY),
-            CScriptOp(OP_0), CScriptOp(OP_UTXOTOKENAMOUNT),
-            CScriptOp(OP_0), CScriptOp(OP_OUTPUTTOKENAMOUNT),
-            CScriptOp(OP_NUMEQUALVERIFY),
+            OP_0, OP_UTXOTOKENCATEGORY,
+            OP_0, OP_OUTPUTTOKENCATEGORY,
+            OP_EQUALVERIFY,
+            OP_0, OP_UTXOTOKENCOMMITMENT,
+            OP_0, OP_OUTPUTTOKENCOMMITMENT,
+            OP_EQUALVERIFY,
+            OP_0, OP_UTXOTOKENAMOUNT,
+            OP_0, OP_OUTPUTTOKENAMOUNT,
+            OP_NUMEQUALVERIFY,
 
             # // If sequence is not used then it is a regular swap TX.
-            CScriptOp(OP_0), CScriptOp(OP_INPUTSEQUENCENUMBER),
-            CScriptOp(OP_NOTIF),
+            OP_0, OP_INPUTSEQUENCENUMBER,
+            OP_NOTIF,
                 # // bytes aliceOutput
                 out_1,
                 # // Verify that the BCH and/or CashTokens are forwarded to Alice's
                 # // output.
-                CScriptOp(OP_0), CScriptOp(OP_OUTPUTBYTECODE),
-                CScriptOp(OP_OVER), CScriptOp(OP_EQUALVERIFY),
+                OP_0, OP_OUTPUTBYTECODE,
+                OP_OVER, OP_EQUALVERIFY,
 
                 # // pubkey bobPubkeyVES
                 public_key,
@@ -286,7 +284,7 @@ class BCHInterface(BTCInterface):
                 # // locking bytecode.
                 # // By decrypting Bob's VES and publishing it, Alice reveals her
                 # // XMR key share to Bob.
-                CScriptOp(OP_CHECKDATASIG),
+                OP_CHECKDATASIG,
 
                 # // If a TX using this path is mined then Alice gets her BCH.
                 # // Bob uses the revealed XMR key share to collect his XMR.
@@ -294,22 +292,22 @@ class BCHInterface(BTCInterface):
             # // Refund will become available when timelock expires, and it would
             # // expire because Alice didn't collect on time, either of her own accord
             # // or because Bob bailed out and witheld the encrypted signature.
-            CScriptOp(OP_ELSE),
+            OP_ELSE,
                 # // int timelock_0
                 timelock,
                 # // Verify refund timelock.
-                CScriptOp(OP_CHECKSEQUENCEVERIFY), CScriptOp(OP_DROP),
+                OP_CHECKSEQUENCEVERIFY, OP_DROP,
 
                 # // bytes refundLockingBytecode
                 out_2,
 
                 # // Verify that the BCH and/or CashTokens are forwarded to Refund
                 # // contract.
-                CScriptOp(OP_0), CScriptOp(OP_OUTPUTBYTECODE),
-                CScriptOp(OP_EQUAL),
+                OP_0, OP_OUTPUTBYTECODE,
+                OP_EQUAL,
 
                 # // BCH and/or CashTokens are simply forwarded to Refund contract.
-            CScriptOp(OP_ENDIF)
+            OP_ENDIF
         ])
 
     def pubkey_to_segwit_address(self, pk: bytes) -> str:
@@ -334,9 +332,9 @@ class BCHInterface(BTCInterface):
             script = bytes.fromhex(script)
 
         return CScript([
-            CScriptOp(OP_HASH256),
+            OP_HASH256,
             sha256(sha256(script)),
-            CScriptOp(OP_EQUAL),
+            OP_EQUAL,
         ])
     
     def createSCLockTx(self, value: int, script: bytearray, vkbv: bytes = None) -> bytes:
@@ -347,11 +345,11 @@ class BCHInterface(BTCInterface):
 
     def getScriptForPubkeyHash(self, pkh: bytes) -> CScript:
         return CScript([
-            CScriptOp(OP_DUP),
-            CScriptOp(OP_HASH160),
+            OP_DUP,
+            OP_HASH160,
             pkh,
-            CScriptOp(OP_EQUALVERIFY),
-            CScriptOp(OP_CHECKSIG),
+            OP_EQUALVERIFY,
+            OP_CHECKSIG,
         ])
 
     def getTxSize(self, tx: CTransaction) -> int:
