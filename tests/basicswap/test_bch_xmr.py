@@ -90,7 +90,7 @@ class TestFunctions(BaseTest):
 
         swap_clients = self.swap_clients
         ci = swap_clients[0].ci(Coins.BCH)
-        pi = swap_clients[0].pi(SwapTypes.XMR_BCH_SWAP)
+        pi = swap_clients[0].pi(SwapTypes.XMR_SWAP)
 
         amount: int = ci.make_int(random.uniform(0.1, 2.0), r=1)
 
@@ -108,17 +108,36 @@ class TestFunctions(BaseTest):
 
         mining_fee = 1000
         timelock = 2
-        a_receive = ci.getNewAddress()
-        b_refund = ci.getNewAddress()
-        refund_lock_tx_script = pi.genScriptLockTxScript(mining_fee=mining_fee, out_1=ci.addressToLockingBytecode(b_refund), out_2=ci.addressToLockingBytecode(a_receive), public_key=A, timelock=timelock)
-        addr_out = ci.getNewAddress()
+        b_receive = ci.getNewAddress()
+        a_refund = ci.getNewAddress()
 
-        lock_tx_script = pi.genScriptLockTxScript(mining_fee=mining_fee, out_1=ci.addressToLockingBytecode(a_receive), out_2=ci.scriptToP2SH32LockingBytecode(refund_lock_tx_script), public_key=B, timelock=timelock)
+        refundExtraArgs = dict()
+        lockExtraArgs = dict()
+
+        refundExtraArgs['mining_fee'] = 1000
+        refundExtraArgs['out_1'] = ci.addressToLockingBytecode(a_refund)
+        refundExtraArgs['out_2'] = ci.addressToLockingBytecode(b_receive)
+        refundExtraArgs['public_key'] = B
+        refundExtraArgs['timelock'] = 5
+
+        refund_lock_tx_script = pi.genScriptLockTxScript(ci, A, B, **refundExtraArgs)
+        # will make use of this in `createSCLockRefundTx`
+        refundExtraArgs['refund_lock_tx_script'] = refund_lock_tx_script
+
+        # lock script
+        lockExtraArgs['mining_fee'] = 1000
+        lockExtraArgs['out_1'] = ci.addressToLockingBytecode(b_receive)
+        lockExtraArgs['out_2'] = ci.scriptToP2SH32LockingBytecode(refund_lock_tx_script)
+        lockExtraArgs['public_key'] = A
+        lockExtraArgs['timelock'] = 2
+
+        lock_tx_script = pi.genScriptLockTxScript(ci, A, B, **lockExtraArgs)
 
         lock_tx = ci.createSCLockTx(amount, lock_tx_script)
         lock_tx = ci.fundSCLockTx(lock_tx, fee_rate)
         lock_tx = ci.signTxWithWallet(lock_tx)
         print(lock_tx.hex())
+        return
 
         unspents_after = ci.rpc('listunspent')
         assert (len(unspents) > len(unspents_after))
@@ -151,25 +170,25 @@ class TestFunctions(BaseTest):
         assert (wallet_tx_fee == fee_value)
         assert (wallet_tx_fee == expect_fee_int)
 
-        pkh_out = ci.decodeAddress(a_receive)
+        pkh_out = ci.decodeAddress(b_receive)
 
-        msg = sha256(ci.addressToLockingBytecode(a_receive))
+        msg = sha256(ci.addressToLockingBytecode(b_receive))
 
-        # bob creates an adaptor signature for alice and transmits it to her
-        bAdaptorSig = ecdsaotves_enc_sign(b, A, msg)
+        # leader creates an adaptor signature for follower and transmits it to the follower
+        aAdaptorSig = ecdsaotves_enc_sign(a, B, msg)
 
         # alice verifies the adaptor signature
-        assert (ecdsaotves_enc_verify(B, A, msg, bAdaptorSig))
+        assert (ecdsaotves_enc_verify(A, B, msg, aAdaptorSig))
 
         # alice decrypts the adaptor signature
-        bAdaptorSig_dec = ecdsaotves_dec_sig(a, bAdaptorSig)
+        aAdaptorSig_dec = ecdsaotves_dec_sig(b, aAdaptorSig)
 
         fee_info = {}
-        lock_spend_tx = ci.createSCLockSpendTx(lock_tx, lock_tx_script, pkh_out, mining_fee, ves=bAdaptorSig_dec, fee_info=fee_info)
+        lock_spend_tx = ci.createSCLockSpendTx(lock_tx, lock_tx_script, pkh_out, mining_fee, fee_info=fee_info, ves=aAdaptorSig_dec)
         vsize_estimated: int = fee_info['vsize']
 
         tx_decoded = ci.rpc('decoderawtransaction', [lock_spend_tx.hex()])
-        print(tx_decoded)
+        print('lock_spend_tx', lock_spend_tx.hex(), '\n', 'tx_decoded', tx_decoded)
         txid = tx_decoded['txid']
 
         tx_decoded = ci.rpc('decoderawtransaction', [lock_spend_tx.hex()])

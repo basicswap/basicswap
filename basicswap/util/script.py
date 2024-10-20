@@ -6,6 +6,7 @@
 
 import struct
 import hashlib
+from basicswap.contrib.test_framework.script import OP_PUSHDATA1, OP_PUSHDATA2, OP_PUSHDATA4, CScriptInvalidError, CScriptTruncatedPushDataError
 from basicswap.script import OpCodes
 
 
@@ -31,6 +32,49 @@ def decodeScriptNum(script_bytes, o):
             v += int(b) << 8 * i
     return (v, 1 + num_len)
 
+def decodePushData(script_bytes, o):
+    datasize = None
+    pushdata_type = None
+    i = o
+    opcode = script_bytes[i]
+    i += 1
+
+    if opcode < OP_PUSHDATA1:
+        pushdata_type = 'PUSHDATA(%d)' % opcode
+        datasize = opcode
+
+    elif opcode == OP_PUSHDATA1:
+        pushdata_type = 'PUSHDATA1'
+        if i >= len(script_bytes):
+            raise CScriptInvalidError('PUSHDATA1: missing data length')
+        datasize = script_bytes[i]
+        i += 1
+
+    elif opcode == OP_PUSHDATA2:
+        pushdata_type = 'PUSHDATA2'
+        if i + 1 >= len(script_bytes):
+            raise CScriptInvalidError('PUSHDATA2: missing data length')
+        datasize = script_bytes[i] + (script_bytes[i + 1] << 8)
+        i += 2
+
+    elif opcode == OP_PUSHDATA4:
+        pushdata_type = 'PUSHDATA4'
+        if i + 3 >= len(script_bytes):
+            raise CScriptInvalidError('PUSHDATA4: missing data length')
+        datasize = script_bytes[i] + (script_bytes[i + 1] << 8) + (script_bytes[i + 2] << 16) + (script_bytes[i + 3] << 24)
+        i += 4
+
+    else:
+        assert False  # shouldn't happen
+
+    data = bytes(script_bytes[i:i + datasize])
+
+    # Check for truncation
+    if len(data) < datasize:
+        raise CScriptTruncatedPushDataError('%s: truncated data' % pushdata_type, data)
+
+    # return data and the number of bytes to skip forward
+    return (data, i + datasize - o)
 
 def getP2SHScriptForHash(p2sh):
     return bytes((OpCodes.OP_HASH160, 0x14)) \
