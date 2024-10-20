@@ -6,34 +6,6 @@
 
 import traceback
 
-import unittest
-from basicswap.interface.contrib.bch_test_framework.script import (
-    OP_TXINPUTCOUNT,
-    OP_1,
-    OP_NUMEQUALVERIFY,
-    OP_TXOUTPUTCOUNT,
-    OP_0,
-    OP_UTXOVALUE,
-    OP_OUTPUTVALUE,
-    OP_SUB,
-    OP_UTXOTOKENCATEGORY,
-    OP_OUTPUTTOKENCATEGORY,
-    OP_EQUALVERIFY,
-    OP_UTXOTOKENCOMMITMENT,
-    OP_OUTPUTTOKENCOMMITMENT,
-    OP_UTXOTOKENAMOUNT,
-    OP_OUTPUTTOKENAMOUNT,
-    OP_INPUTSEQUENCENUMBER,
-    OP_NOTIF,
-    OP_OUTPUTBYTECODE,
-    OP_OVER,
-    OP_CHECKDATASIG,
-    OP_ELSE,
-    OP_CHECKSEQUENCEVERIFY,
-    OP_DROP,
-    OP_EQUAL,
-    OP_ENDIF,
-)
 from basicswap.util import (
     ensure,
 )
