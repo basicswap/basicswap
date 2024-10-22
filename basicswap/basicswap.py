@@ -2987,7 +2987,7 @@ class BasicSwap(BaseApp):
             refundExtraArgs = dict()
             lockExtraArgs = dict()
             if self.isBchXmrSwap(offer):
-                pkh_refund_to = ci_from.decodeAddress(self.getCachedAddressForCoin(offer.coin_from, use_session))
+                pkh_refund_to = ci_from.decodeAddress(self.getCachedAddressForCoin(coin_from, use_session))
                 pkh_dest = xmr_swap.dest_af
                 # refund script
                 refundExtraArgs['mining_fee'] = 1000
@@ -3957,7 +3957,8 @@ class BasicSwap(BaseApp):
                         bid.xmr_a_lock_tx.tx_data = xmr_swap.a_lock_tx
                         bid.xmr_a_lock_tx.spend_txid = xmr_swap.a_lock_spend_tx_id
 
-                    self.addWatchedOutput(offer.coin_from, bid.bid_id, bid.xmr_a_lock_tx.txid.hex(), bid.xmr_a_lock_tx.vout, TxTypes.XMR_SWAP_A_LOCK, SwapTypes.XMR_SWAP)
+                    coin_from = Coins(offer.coin_to if reverse_bid else offer.coin_from)
+                    self.addWatchedOutput(coin_from, bid.bid_id, bid.xmr_a_lock_tx.txid.hex(), bid.xmr_a_lock_tx.vout, TxTypes.XMR_SWAP_A_LOCK, SwapTypes.XMR_SWAP)
                     bid_changed = True
                     
                 if bid.xmr_a_lock_tx.state == TxStates.TX_NONE and lock_tx_chain_info['height'] == 0:
@@ -4922,11 +4923,10 @@ class BasicSwap(BaseApp):
             raise ValueError('TODO')
         elif offer_data.swap_type == SwapTypes.XMR_SWAP:
             ensure(offer_data.protocol_version >= MINPROTO_VERSION_ADAPTOR_SIG, 'Invalid protocol version')
-            if Coins.BCH not in (coin_from, coin_to):
-                if reverse_bid:
-                    ensure(ci_to.has_segwit(), 'Coin-to must support segwit for reverse bid offers')
-                else:
-                    ensure(ci_from.has_segwit(), 'Coin-from must support segwit')
+            if reverse_bid:
+                ensure(ci_to.has_segwit(), 'Coin-to must support segwit for reverse bid offers')
+            else:
+                ensure(ci_from.has_segwit(), 'Coin-from must support segwit')
             ensure(len(offer_data.proof_address) == 0, 'Unexpected data')
             ensure(len(offer_data.proof_signature) == 0, 'Unexpected data')
             ensure(len(offer_data.pkhash_seller) == 0, 'Unexpected data')

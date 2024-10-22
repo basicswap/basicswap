@@ -210,7 +210,7 @@ class Address:
 
         if address.upper() != address and address.lower() != address:
             raise ValueError(
-                "Cash address contains uppercase and lowercase characters"
+                "Cash address contains uppercase and lowercase characters: " + address
             )
 
         address = address.lower()
