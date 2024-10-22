@@ -13,7 +13,7 @@ from .btc import BTCInterface, ensure_op, find_vout_for_address_from_txobj, find
 from basicswap.rpc import make_rpc_func
 from basicswap.chainparams import Coins
 from basicswap.interface.contrib.bch_test_framework.cashaddress import Address
-from basicswap.util.crypto import sha256
+from basicswap.util.crypto import hash160, sha256
 from basicswap.interface.contrib.bch_test_framework.script import (
     OP_TXINPUTCOUNT,
     OP_1,
@@ -71,7 +71,12 @@ class BCHInterface(BTCInterface):
     def __init__(self, coin_settings, network, swap_client=None):
         super(BCHInterface, self).__init__(coin_settings, network, swap_client)
         # No multiwallet support
+        self.swap_client = swap_client
         self.rpc_wallet = make_rpc_func(self._rpcport, self._rpcauth, host=self._rpc_host)
+
+    def has_segwit(self) -> bool:
+        # bch does not have segwit, but we return true here to avoid extra checks in basicswap.py
+        return True
 
     def getExchangeName(self, exchange_name):
         return 'bch'
@@ -148,7 +153,7 @@ class BCHInterface(BTCInterface):
             return CScript([OP_HASH256, script_hash, OP_EQUAL])
 
     def withdrawCoin(self, value: float, addr_to: str, subfee: bool):
-        params = [addr_to, value, '', '', subfee, True, True]
+        params = [addr_to, value, '', '', subfee, 0, False]
         return self.rpc_wallet('sendtoaddress', params)
 
     def getSpendableBalance(self) -> int:
@@ -321,16 +326,19 @@ class BCHInterface(BTCInterface):
         address.prefix = prefix
         return address.cash_address()
 
+    def encodeSharedAddress(self, Kbv, Kbs):
+        return self.pkh_to_address(hash160(Kbs))
+
     def addressToLockingBytecode(self, address: str) -> bytes:
         return b'\x76\xa9\x14' + bytes(Address.from_string(address).payload) + b'\x88\xac'
     
+    def getSpendableBalance(self) -> int:
+        return self.make_int(self.rpc_wallet('getbalance', ["*", 1, False]))
+
     def getScriptDest(self, script):
         return self.scriptToP2SH32LockingBytecode(script)
 
     def scriptToP2SH32LockingBytecode(self, script: Union[bytes, str]) -> bytes:
-        if isinstance(script, str):
-            script = bytes.fromhex(script)
-
         return CScript([
             OP_HASH256,
             sha256(sha256(script)),
