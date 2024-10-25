@@ -83,6 +83,12 @@ class XMRInterface(CoinInterface):
         # TODO: Estimate with ringsize
         return 1604
 
+    def is_transient_error(self, ex) -> bool:
+        str_error: str = str(ex).lower()
+        if 'failed to get output distribution' in str_error:
+            return True
+        return super().is_transient_error(ex)
+
     def __init__(self, coin_settings, network, swap_client=None):
         super().__init__(network)
 
