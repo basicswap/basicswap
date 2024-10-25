@@ -367,7 +367,7 @@ class BCHInterface(BTCInterface):
         if ves is not None:
             return CScript([ves, script])
         else:
-            return CScript([0, script])
+            return CScript([script])
 
     def createSCLockSpendTx(self, tx_lock_bytes, script_lock, pkh_dest, tx_fee_rate, vkbv=None, fee_info={}, **kwargs):
         # tx_fee_rate in this context is equal to `mining_fee` contract param
@@ -443,6 +443,42 @@ class BCHInterface(BTCInterface):
         kwargs['ves'] = bytes(73)
         return self.createSCLockSpendTx(tx_lock_refund_bytes, script_lock_refund, pkh_refund_to, tx_fee_rate, vkbv, **kwargs)
 
+    def createSCLockRefundSpendToFTx(self, tx_lock_refund_bytes, script_lock_refund, pkh_dest, tx_fee_rate, vkbv=None):
+        # lock refund swipe tx
+        # Sends the coinA locked coin to the follower
+
+        tx_lock_refund = self.loadTx(tx_lock_refund_bytes)
+
+        output_script = self.getScriptDest(script_lock_refund)
+        locked_n = findOutput(tx_lock_refund, output_script)
+        ensure(locked_n is not None, 'Output not found in tx')
+        locked_coin = tx_lock_refund.vout[locked_n].nValue
+
+        mining_fee, out_1, out_2, public_key, timelock = self.extractScriptLockScriptValues(script_lock_refund)
+
+        tx_lock_refund.rehash()
+        tx_lock_refund_hash_int = tx_lock_refund.sha256
+
+        tx = CTransaction()
+        tx.nVersion = self.txVersion()
+        tx.vin.append(CTxIn(COutPoint(tx_lock_refund_hash_int, locked_n),
+                            nSequence=timelock,
+                            scriptSig=self.getScriptScriptSig(script_lock_refund, None)))
+
+        tx.vout.append(self.txoType()(locked_coin, CScript(out_2)))
+
+        size = self.getTxSize(tx)
+        vsize = size
+
+        pay_fee = mining_fee
+        tx.vout[0].nValue = locked_coin - pay_fee
+
+        tx.rehash()
+        self._log.info('createSCLockRefundSpendToFTx %s:\n    fee_rate, vsize, fee: %ld, %ld, %ld.',
+                       i2h(tx.sha256), tx_fee_rate, vsize, pay_fee)
+
+        return tx.serialize()
+
     def signTx(self, key_bytes: bytes, tx_bytes: bytes, input_n: int, prevout_script: bytes, prevout_value: int) -> bytes:
         # simply sign the entire tx data, as this is not a preimage signature
         eck = PrivateKey(key_bytes)
@@ -493,7 +529,11 @@ class BCHInterface(BTCInterface):
     
     def extractScriptLockScriptValuesFromScriptSig(self, script_bytes):
         signature, nb = decodePushData(script_bytes, 0)
-        unlock_script, _ = decodePushData(script_bytes, nb)
+        if nb == len(script_bytes):
+            unlock_script = signature[:]
+            signature = None
+        else:
+            unlock_script, _ = decodePushData(script_bytes, nb)
         mining_fee, out_1, out_2, public_key, timelock = self.extractScriptLockScriptValues(unlock_script)
 
         return signature, mining_fee, out_1, out_2, public_key, timelock
@@ -782,3 +822,19 @@ class BCHInterface(BTCInterface):
         tx = self.loadTx(tx_bytes)
         signature, _, _, _, _, _ = self.extractScriptLockScriptValuesFromScriptSig(tx.vin[0].scriptSig)
         return signature
+
+    def extractFollowerSig(self, tx_bytes: bytes) -> bytes:
+        tx = self.loadTx(tx_bytes)
+        signature, _, _, _, _, _ = self.extractScriptLockScriptValuesFromScriptSig(tx.vin[0].scriptSig)
+        return signature
+
+    def isSpendingLockTx(self, spend_tx: CTransaction) -> bool:
+        signature, _, _, _, _, _ = self.extractScriptLockScriptValuesFromScriptSig(spend_tx.vin[0].scriptSig)
+        return spend_tx.vin[0].nSequence == 0 and signature is not None
+
+    def isSpendingLockRefundTx(self, spend_tx: CTransaction) -> bool:
+        signature, _, _, _, _, _ = self.extractScriptLockScriptValuesFromScriptSig(spend_tx.vin[0].scriptSig)
+        return spend_tx.vin[0].nSequence == 0 and signature is not None
+
+    def isTxExistsError(self, err_str: str) -> bool:
+        return 'transaction already in block chain' in err_str
