@@ -204,6 +204,7 @@ class DebugTypes(IntEnum):
     DUPLICATE_ACTIONS = auto()
     DONT_CONFIRM_PTX = auto()
     OFFER_LOCK_2_VALUE_INC = auto()
+    BID_STOP_AFTER_COIN_B_LOCK = auto()
 
 
 class NotificationTypes(IntEnum):

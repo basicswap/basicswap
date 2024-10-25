@@ -40,15 +40,15 @@ def addLockRefundSigs(self, xmr_swap, ci):
     xmr_swap.a_lock_refund_tx = signed_tx
 
 
-def recoverNoScriptTxnWithKey(self, bid_id: bytes, encoded_key):
+def recoverNoScriptTxnWithKey(self, bid_id: bytes, encoded_key, session=None):
     self.log.info('Manually recovering %s', bid_id.hex())
     # Manually recover txn if other key is known
-    session = self.openSession()
     try:
-        bid, xmr_swap = self.getXmrBidFromSession(session, bid_id)
+        use_session = self.openSession(session)
+        bid, xmr_swap = self.getXmrBidFromSession(use_session, bid_id)
         ensure(bid, 'Bid not found: {}.'.format(bid_id.hex()))
         ensure(xmr_swap, 'Adaptor-sig swap not found: {}.'.format(bid_id.hex()))
-        offer, xmr_offer = self.getXmrOfferFromSession(session, bid.offer_id, sent=False)
+        offer, xmr_offer = self.getXmrOfferFromSession(use_session, bid.offer_id, sent=False)
         ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
         ensure(xmr_offer, 'Adaptor-sig offer not found: {}.'.format(bid.offer_id.hex()))
         ci_to = self.ci(offer.coin_to)
@@ -71,20 +71,20 @@ def recoverNoScriptTxnWithKey(self, bid_id: bytes, encoded_key):
         vkbs = ci_to.sumKeys(kbsl, kbsf)
 
         if offer.coin_to == Coins.XMR:
-            address_to = self.getCachedMainWalletAddress(ci_to)
+            address_to = self.getCachedMainWalletAddress(ci_to, use_session)
         else:
-            address_to = self.getCachedStealthAddressForCoin(offer.coin_to)
-
+            address_to = self.getCachedStealthAddressForCoin(offer.coin_to, use_session)
         amount = bid.amount_to
         lock_tx_vout = bid.getLockTXBVout()
         txid = ci_to.spendBLockTx(xmr_swap.b_lock_tx_id, address_to, xmr_swap.vkbv, vkbs, amount, xmr_offer.b_fee_rate, bid.chain_b_height_start, spend_actual_balance=True, lock_tx_vout=lock_tx_vout)
         self.log.debug('Submitted lock B spend txn %s to %s chain for bid %s', txid.hex(), ci_to.coin_name(), bid_id.hex())
-        self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_B_SPEND_TX_PUBLISHED, txid.hex(), session)
-        session.commit()
+        self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_B_SPEND_TX_PUBLISHED, txid.hex(), use_session)
+        use_session.commit()
 
         return txid
     finally:
-        self.closeSession(session, commit=False)
+        if session is None:
+            self.closeSession(use_session, commit=False)
 
 
 def getChainBSplitKey(swap_client, bid, xmr_swap, offer):

@@ -3945,7 +3945,11 @@ class BasicSwap(BaseApp):
                 if bid.xmr_b_lock_tx and bid.xmr_b_lock_tx.chain_height is not None and bid.xmr_b_lock_tx.chain_height > 0:
                     chain_height = ci_to.getChainHeight()
 
-                    if chain_height - bid.xmr_b_lock_tx.chain_height >= ci_to.blocks_confirmed:
+                    if bid.debug_ind == DebugTypes.BID_STOP_AFTER_COIN_B_LOCK:
+                        self.log.debug('Adaptor-sig bid %s: Stalling bid for testing: %d.', bid_id.hex(), bid.debug_ind)
+                        bid.setState(BidStates.BID_STALLED_FOR_TEST)
+                        self.logBidEvent(bid.bid_id, EventLogTypes.DEBUG_TWEAK_APPLIED, 'ind {}'.format(bid.debug_ind), session)
+                    elif chain_height - bid.xmr_b_lock_tx.chain_height >= ci_to.blocks_confirmed:
                         self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_B_CONFIRMED, '', session)
                         bid.xmr_b_lock_tx.setState(TxStates.TX_CONFIRMED)
                         bid.setState(BidStates.XMR_SWAP_NOSCRIPT_COIN_LOCKED)
@@ -5789,7 +5793,10 @@ class BasicSwap(BaseApp):
         xmr_swap.b_lock_tx_id = b_lock_tx_id
         bid.xmr_b_lock_tx.setState(TxStates.TX_SENT)
         self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_B_PUBLISHED, '', session)
-
+        if bid.debug_ind == DebugTypes.BID_STOP_AFTER_COIN_B_LOCK:
+            self.log.debug('Adaptor-sig bid %s: Stalling bid for testing: %d.', bid_id.hex(), bid.debug_ind)
+            bid.setState(BidStates.BID_STALLED_FOR_TEST)
+            self.logBidEvent(bid.bid_id, EventLogTypes.DEBUG_TWEAK_APPLIED, 'ind {}'.format(bid.debug_ind), session)
         self.saveBidInSession(bid_id, bid, session, xmr_swap, save_in_progress=offer)
 
     def sendXmrBidLockRelease(self, bid_id: bytes, session) -> None:
@@ -6233,6 +6240,10 @@ class BasicSwap(BaseApp):
         ensure(bid, 'Bid not found: {}.'.format(bid_id.hex()))
         ensure(xmr_swap, 'Adaptor-sig swap not found: {}.'.format(bid_id.hex()))
 
+        if BidStates(bid.state) == BidStates.BID_STALLED_FOR_TEST:
+            self.log.debug('Bid stalled %s', bid_id.hex())
+            return
+
         offer, xmr_offer = self.getXmrOffer(bid.offer_id, sent=False)
         ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
         ensure(xmr_offer, 'Adaptor-sig offer not found: {}.'.format(bid.offer_id.hex()))
@@ -6655,7 +6666,7 @@ class BasicSwap(BaseApp):
                         has_changed = True
 
             if data.get('kbs_other', None) is not None:
-                return xmr_swap_1.recoverNoScriptTxnWithKey(self, bid_id, data['kbs_other'])
+                return xmr_swap_1.recoverNoScriptTxnWithKey(self, bid_id, data['kbs_other'], session)
 
             if has_changed:
                 activate_bid = False
