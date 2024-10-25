@@ -520,3 +520,35 @@ class TestBCH(BasicSwapTest):
     def test_01_b_full_swap_reverse(self):
         self.prepare_balance(Coins.BCH, 100.0, 1801, 1800)
         super().test_01_b_full_swap_reverse()
+
+    def test_01_c_full_swap_to_part(self):
+        super().test_01_c_full_swap_to_part()
+
+    def test_01_d_full_swap_from_part(self):
+        self.prepare_balance(Coins.BCH, 100.0, 1801, 1800)
+        super().test_01_d_full_swap_from_part()
+
+    def test_02_a_leader_recover_a_lock_tx(self):
+        super().test_02_a_leader_recover_a_lock_tx()
+
+    def test_03_a_follower_recover_a_lock_tx(self):
+        super().test_03_a_follower_recover_a_lock_tx()
+
+    def test_03_b_follower_recover_a_lock_tx_reverse(self):
+        self.prepare_balance(Coins.BCH, 100.0, 1801, 1800)
+        super().test_03_b_follower_recover_a_lock_tx_reverse()
+
+    def test_03_c_follower_recover_a_lock_tx_to_part(self):
+        super().test_03_c_follower_recover_a_lock_tx_to_part()
+
+    def test_03_d_follower_recover_a_lock_tx_from_part(self):
+        self.prepare_balance(Coins.BCH, 100.0, 1801, 1800)
+        super().test_03_d_follower_recover_a_lock_tx_from_part()
+
+    def test_04_a_follower_recover_b_lock_tx(self):
+        super().test_04_a_follower_recover_b_lock_tx()
+
+    # does not work yet
+    # def test_04_b_follower_recover_b_lock_tx_reverse(self):
+    #     self.prepare_balance(Coins.BCH, 100.0, 1801, 1800)
+    #     super().test_04_b_follower_recover_b_lock_tx_reverse()

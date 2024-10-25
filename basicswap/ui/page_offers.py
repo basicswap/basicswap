@@ -224,7 +224,7 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
 
     try:
         if len(errors) == 0 and page_data['swap_style'] == 'xmr':
-            reverse_bid: bool = swap_client.is_reverse_ads_bid(coin_from)
+            reverse_bid: bool = swap_client.is_reverse_ads_bid(coin_from, coin_to)
             ci_leader = ci_to if reverse_bid else ci_from
             ci_follower = ci_from if reverse_bid else ci_to
 

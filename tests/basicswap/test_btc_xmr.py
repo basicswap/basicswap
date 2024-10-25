@@ -105,7 +105,7 @@ class TestFunctions(BaseTest):
         id_bidder: int = self.node_b_id
 
         swap_clients = self.swap_clients
-        reverse_bid: bool = coin_from in swap_clients[id_offerer].scriptless_coins
+        reverse_bid: bool = swap_clients[0].is_reverse_ads_bid(coin_from, coin_to)
         ci_from = swap_clients[id_offerer].ci(coin_from)
         ci_to = swap_clients[id_bidder].ci(coin_to)
         ci_part0 = swap_clients[id_offerer].ci(Coins.PART)
@@ -229,7 +229,7 @@ class TestFunctions(BaseTest):
         id_bidder: int = self.node_b_id
 
         swap_clients = self.swap_clients
-        reverse_bid: bool = coin_from in swap_clients[id_offerer].scriptless_coins
+        reverse_bid: bool = swap_clients[0].is_reverse_ads_bid(coin_from, coin_to)
         ci_from = swap_clients[id_offerer].ci(coin_from)
         ci_to = swap_clients[id_offerer].ci(coin_to)
 
@@ -274,7 +274,7 @@ class TestFunctions(BaseTest):
         id_bidder: int = self.node_b_id
 
         swap_clients = self.swap_clients
-        reverse_bid: bool = coin_from in swap_clients[id_offerer].scriptless_coins
+        reverse_bid: bool = swap_clients[0].is_reverse_ads_bid(coin_from, coin_to)
         ci_from = swap_clients[id_offerer].ci(coin_from)
         ci_to = swap_clients[id_offerer].ci(coin_to)
 
@@ -325,7 +325,7 @@ class TestFunctions(BaseTest):
         id_bidder: int = self.node_b_id
 
         swap_clients = self.swap_clients
-        reverse_bid: bool = coin_from in swap_clients[id_offerer].scriptless_coins
+        reverse_bid: bool = swap_clients[0].is_reverse_ads_bid(coin_from, coin_to)
         ci_from = swap_clients[id_offerer].ci(coin_from)
         ci_to = swap_clients[id_offerer].ci(coin_to)
 
