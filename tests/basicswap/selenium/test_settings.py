@@ -13,20 +13,17 @@ from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support.select import Select
 from selenium.webdriver.support import expected_conditions as EC
 
-from util import get_driver
+from util import (
+    BSX_0_PORT, BSX_1_PORT,
+    click_option,
+    get_driver,
+)
 from basicswap.ui.page_offers import default_chart_api_key
 
 
-def click_option(el, option_text):
-    for option in el.find_elements(By.TAG_NAME, 'option'):
-        if option.text == option_text:
-            option.click()
-            break
-
-
 def test_settings(driver):
-    base_url = 'http://localhost:12701'
-    node2_url = 'http://localhost:12702'
+    base_url = f'http://localhost:{BSX_0_PORT}'
+    node2_url = f'http://localhost:{BSX_1_PORT}'
 
     url = base_url + '/settings'
     driver.get(url)

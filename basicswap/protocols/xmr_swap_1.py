@@ -4,6 +4,8 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
+import traceback
+
 from basicswap.util import (
     ensure,
 )
@@ -41,7 +43,7 @@ def addLockRefundSigs(self, xmr_swap, ci):
 
 
 def recoverNoScriptTxnWithKey(self, bid_id: bytes, encoded_key, session=None):
-    self.log.info('Manually recovering %s', bid_id.hex())
+    self.log.info(f'Manually recovering {bid_id.hex()}')
     # Manually recover txn if other key is known
     try:
         use_session = self.openSession(session)
@@ -51,37 +53,57 @@ def recoverNoScriptTxnWithKey(self, bid_id: bytes, encoded_key, session=None):
         offer, xmr_offer = self.getXmrOfferFromSession(use_session, bid.offer_id, sent=False)
         ensure(offer, 'Offer not found: {}.'.format(bid.offer_id.hex()))
         ensure(xmr_offer, 'Adaptor-sig offer not found: {}.'.format(bid.offer_id.hex()))
-        ci_to = self.ci(offer.coin_to)
 
-        for_ed25519 = True if Coins(offer.coin_to) == Coins.XMR else False
+        # The no-script coin is always the follower
+        reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from)
+        ci_from = self.ci(Coins(offer.coin_from))
+        ci_to = self.ci(Coins(offer.coin_to))
+        ci_leader = ci_to if reverse_bid else ci_from
+        ci_follower = ci_from if reverse_bid else ci_to
 
         try:
-            decoded_key_half = ci_to.decodeKey(encoded_key)
+            decoded_key_half = ci_follower.decodeKey(encoded_key)
         except Exception as e:
             raise ValueError('Failed to decode provided key-half: ', str(e))
 
-        if bid.was_sent:
-            kbsl = decoded_key_half
-            kbsf = self.getPathKey(offer.coin_from, offer.coin_to, bid.created_at, xmr_swap.contract_count, KeyTypes.KBSF, for_ed25519)
-        else:
-            kbsl = self.getPathKey(offer.coin_from, offer.coin_to, bid.created_at, xmr_swap.contract_count, KeyTypes.KBSL, for_ed25519)
-            kbsf = decoded_key_half
-        ensure(ci_to.verifyKey(kbsl), 'Invalid kbsl')
-        ensure(ci_to.verifyKey(kbsf), 'Invalid kbsf')
-        vkbs = ci_to.sumKeys(kbsl, kbsf)
+        was_sent: bool = bid.was_received if reverse_bid else bid.was_sent
 
-        if offer.coin_to == Coins.XMR:
-            address_to = self.getCachedMainWalletAddress(ci_to, use_session)
+        localkeyhalf = ci_follower.decodeKey(getChainBSplitKey(self, bid, xmr_swap, offer))
+        if was_sent:
+            kbsl = decoded_key_half
+            kbsf = localkeyhalf
         else:
-            address_to = self.getCachedStealthAddressForCoin(offer.coin_to, use_session)
+            kbsl = localkeyhalf
+            kbsf = decoded_key_half
+
+        ensure(ci_follower.verifyKey(kbsl), 'Invalid kbsl')
+        ensure(ci_follower.verifyKey(kbsf), 'Invalid kbsf')
+        vkbs = ci_follower.sumKeys(kbsl, kbsf)
+
+        # Ensure summed key matches the expected pubkey
+        summed_pkbs = ci_follower.getPubkey(vkbs)
+        if (summed_pkbs != xmr_swap.pkbs):
+            err_msg: str = 'Summed key does not match expected wallet'
+            have_pk = summed_pkbs.hex()
+            expect_pk = xmr_swap.pkbs.hex()
+            self.log.error(f'{err_msg}. Got: {have_pk}, Expect: {expect_pk}')
+            raise ValueError(err_msg)
+
+        if ci_follower.coin_type() in (Coins.XMR, Coins.WOW):
+            address_to = self.getCachedMainWalletAddress(ci_follower, use_session)
+        else:
+            address_to = self.getCachedStealthAddressForCoin(ci_follower.coin_type(), use_session)
         amount = bid.amount_to
         lock_tx_vout = bid.getLockTXBVout()
-        txid = ci_to.spendBLockTx(xmr_swap.b_lock_tx_id, address_to, xmr_swap.vkbv, vkbs, amount, xmr_offer.b_fee_rate, bid.chain_b_height_start, spend_actual_balance=True, lock_tx_vout=lock_tx_vout)
-        self.log.debug('Submitted lock B spend txn %s to %s chain for bid %s', txid.hex(), ci_to.coin_name(), bid_id.hex())
+        txid = ci_follower.spendBLockTx(xmr_swap.b_lock_tx_id, address_to, xmr_swap.vkbv, vkbs, amount, xmr_offer.b_fee_rate, bid.chain_b_height_start, spend_actual_balance=True, lock_tx_vout=lock_tx_vout)
+        self.log.debug('Submitted lock B spend txn %s to %s chain for bid %s', txid.hex(), ci_follower.coin_name(), bid_id.hex())
         self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_B_SPEND_TX_PUBLISHED, txid.hex(), use_session)
         use_session.commit()
 
         return txid
+    except Exception as e:
+        self.log.error(traceback.format_exc())
+        raise (e)
     finally:
         if session is None:
             self.closeSession(use_session, commit=False)
@@ -89,10 +111,14 @@ def recoverNoScriptTxnWithKey(self, bid_id: bytes, encoded_key, session=None):
 
 def getChainBSplitKey(swap_client, bid, xmr_swap, offer):
     reverse_bid: bool = offer.bid_reversed
+    ci_leader = swap_client.ci(offer.coin_to if reverse_bid else offer.coin_from)
     ci_follower = swap_client.ci(offer.coin_from if reverse_bid else offer.coin_to)
 
-    key_type = KeyTypes.KBSF if bid.was_sent else KeyTypes.KBSL
-    return ci_follower.encodeKey(swap_client.getPathKey(offer.coin_from, offer.coin_to, bid.created_at, xmr_swap.contract_count, key_type, True if ci_follower.coin_type() == Coins.XMR else False))
+    for_ed25519: bool = True if ci_follower.curve_type() == Curves.ed25519 else False
+    was_sent: bool = bid.was_received if reverse_bid else bid.was_sent
+
+    key_type = KeyTypes.KBSF if was_sent else KeyTypes.KBSL
+    return ci_follower.encodeKey(swap_client.getPathKey(ci_leader.coin_type(), ci_follower.coin_type(), bid.created_at, xmr_swap.contract_count, key_type, for_ed25519))
 
 
 def getChainBRemoteSplitKey(swap_client, bid, xmr_swap, offer):

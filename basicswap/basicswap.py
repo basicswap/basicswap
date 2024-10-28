@@ -7659,6 +7659,9 @@ class BasicSwap(BaseApp):
             return
 
         bid = self.getBid(bid_id)
+        if bid is None:
+            raise ValueError('Bid not found.')
+
         bid.debug_ind = debug_ind
 
         # Update in memory copy.  TODO: Improve

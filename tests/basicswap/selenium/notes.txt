@@ -1,2 +1,13 @@
+
+cd basicswap
+. $SWAP_DATADIR/venv/bin/activate
+export PYTHONPATH=$(pwd)
 python tests/basicswap/extended/test_xmr_persistent.py
-python tests/basicswap/selenium/test_wallets.py
+
+In another terminal:
+cd basicswap
+. $SWAP_DATADIR/venv/bin/activate
+export PYTHONPATH=$(pwd)
+pip install -e .[dev]
+
+python tests/basicswap/selenium/test_settings.py

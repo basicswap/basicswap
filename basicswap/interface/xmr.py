@@ -5,7 +5,6 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-import json
 import logging
 
 import basicswap.contrib.ed25519_fast as edf
@@ -452,6 +451,8 @@ class XMRInterface(CoinInterface):
                     if len(txns) > 0:
                         txid = txns[0]['txid']
                         self._log.warning(f'spendBLockTx detected spending tx: {txid}.')
+
+                        # Should check for address_to, but only the from address is found in the output
                         if txns[0]['address'] == address_b58:
                             return bytes.fromhex(txid)
 
@@ -472,7 +473,6 @@ class XMRInterface(CoinInterface):
                 params['priority'] = self._fee_priority
 
             rv = self.rpc_wallet('sweep_all', params)
-            self._log.debug('sweep_all {}'.format(json.dumps(rv)))
 
             return bytes.fromhex(rv['tx_hash_list'][0])
 
