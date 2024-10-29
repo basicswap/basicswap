@@ -101,12 +101,31 @@ def recover_chain_b_lock_tx(driver, offer_data, offerer_port, bidder_port):
 
     url = f'{offerer_url}/bid/{bid0_id}'
     driver.get(url)
+    btn_more_info = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.NAME, 'show_txns')))
+    btn_more_info.click()
+    WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.NAME, 'hide_txns')))
+    offerer_localkeyhalf = driver.find_element(By.ID, 'localkeyhalf').text
+    print('Offerer keyhalf', offerer_localkeyhalf)
+
+    print('Trying with the local key in place of remote')
     btn_edit = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.NAME, 'edit_bid')))
     btn_edit.click()
     btn_submit = WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.NAME, 'edit_bid_submit')))
-
     kbs_other = driver.find_element(By.ID, 'kbs_other')
-    print('Trying to recover with incorrect key')
+    kbs_other.send_keys(offerer_localkeyhalf)
+    btn_submit.click()
+
+    btn_edit = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.NAME, 'edit_bid')))
+    elements = driver.find_elements(By.CLASS_NAME, 'error_msg')
+    expect_err_msg: str = 'Provided key matches local key'
+    assert (any(expect_err_msg in el.text for el in elements))
+    print('Found expected error: ' + expect_err_msg)
+
+    print('Trying with incorrect key')
+    btn_edit = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.NAME, 'edit_bid')))
+    btn_edit.click()
+    btn_submit = WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.NAME, 'edit_bid_submit')))
+    kbs_other = driver.find_element(By.ID, 'kbs_other')
     last_byte = bidder_localkeyhalf[-2:]
     invalid_byte = '01' if last_byte == '00' else '00'
     kbs_other.send_keys(bidder_localkeyhalf[:-2] + invalid_byte)
@@ -116,6 +135,9 @@ def recover_chain_b_lock_tx(driver, offer_data, offerer_port, bidder_port):
     elements = driver.find_elements(By.CLASS_NAME, 'error_msg')
     expect_err_msg: str = 'Summed key does not match expected wallet'
     assert (any(expect_err_msg in el.text for el in elements))
+    print('Found expected error: ' + expect_err_msg)
+
+    print('Trying with correct key')
     btn_edit.click()
     btn_submit = WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.NAME, 'edit_bid_submit')))
 
@@ -133,24 +155,21 @@ def recover_chain_b_lock_tx(driver, offer_data, offerer_port, bidder_port):
         time.sleep(2)
 
     kbs_other = driver.find_element(By.ID, 'kbs_other')
-    print('Trying to recover with correct key')
     kbs_other.send_keys(bidder_localkeyhalf)
     btn_submit.click()
     btn_edit = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.NAME, 'edit_bid')))
     elements = driver.find_elements(By.CLASS_NAME, 'infomsg')
     expect_msg: str = 'Bid edited'
     assert (any(expect_msg in el.text for el in elements))
+    print('Found expected message: ' + expect_msg)
 
-    print('Trying with nodes reversed (should fail as already spent)')
-    url = f'{offerer_url}/bid/{bid0_id}'
-    driver.get(url)
-    btn_more_info = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.NAME, 'show_txns')))
-    btn_more_info.click()
-    WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.NAME, 'hide_txns')))
-    offerer_localkeyhalf = driver.find_element(By.ID, 'localkeyhalf').text
-    print('Offerer keyhalf', offerer_localkeyhalf)
-
+    print('Trying with nodes reversed (should fail as already spent)')  # But should sum to the expected wallet key
     url = f'{bidder_url}/bid/{bid0_id}'
+    driver.get(url)
+    btn_edit = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.NAME, 'edit_bid')))
+    btn_edit.click()
+    btn_submit = WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.NAME, 'edit_bid_submit')))
+
     driver.get(url)
     btn_edit = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.NAME, 'edit_bid')))
     btn_edit.click()
@@ -160,7 +179,7 @@ def recover_chain_b_lock_tx(driver, offer_data, offerer_port, bidder_port):
     kbs_other.send_keys(offerer_localkeyhalf)
     btn_submit.click()
     btn_edit = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.NAME, 'edit_bid')))
-    # in log: "Balance is too low, checking for existing spend"
+    # In log: "Balance is too low, checking for existing spend"
     # Should error here, but the code can't tell where the tx was sent, and treats any existing send as correct.
     elements = driver.find_elements(By.CLASS_NAME, 'infomsg')
     expect_msg: str = 'Bid edited'

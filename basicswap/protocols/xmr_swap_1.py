@@ -78,12 +78,14 @@ def recoverNoScriptTxnWithKey(self, bid_id: bytes, encoded_key, session=None):
 
         ensure(ci_follower.verifyKey(kbsl), 'Invalid kbsl')
         ensure(ci_follower.verifyKey(kbsf), 'Invalid kbsf')
+        if kbsl == kbsf:
+            raise ValueError('Provided key matches local key')
         vkbs = ci_follower.sumKeys(kbsl, kbsf)
 
         # Ensure summed key matches the expected pubkey
         summed_pkbs = ci_follower.getPubkey(vkbs)
         if (summed_pkbs != xmr_swap.pkbs):
-            err_msg: str = 'Summed key does not match expected wallet'
+            err_msg: str = 'Summed key does not match expected wallet spend pubkey'
             have_pk = summed_pkbs.hex()
             expect_pk = xmr_swap.pkbs.hex()
             self.log.error(f'{err_msg}. Got: {have_pk}, Expect: {expect_pk}')
