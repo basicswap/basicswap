@@ -191,18 +191,18 @@ def js_offers(self, url_split, post_string, is_json, sent=False) -> bytes:
 
         if have_data_entry(post_data, 'sort_by'):
             sort_by = get_data_entry(post_data, 'sort_by')
-            assert (sort_by in ['created_at', 'rate']), 'Invalid sort by'
+            ensure(sort_by in ['created_at', 'rate'], 'Invalid sort by')
             filters['sort_by'] = sort_by
         if have_data_entry(post_data, 'sort_dir'):
             sort_dir = get_data_entry(post_data, 'sort_dir')
-            assert (sort_dir in ['asc', 'desc']), 'Invalid sort dir'
+            ensure(sort_dir in ['asc', 'desc'], 'Invalid sort dir')
             filters['sort_dir'] = sort_dir
 
         if have_data_entry(post_data, 'offset'):
             filters['offset'] = int(get_data_entry(post_data, 'offset'))
         if have_data_entry(post_data, 'limit'):
             filters['limit'] = int(get_data_entry(post_data, 'limit'))
-            assert (filters['limit'] > 0 and filters['limit'] <= PAGE_LIMIT), 'Invalid limit'
+            ensure(filters['limit'] > 0, 'Invalid limit')
         if have_data_entry(post_data, 'active'):
             filters['active'] = get_data_entry(post_data, 'active')
         if have_data_entry(post_data, 'include_sent'):
@@ -230,7 +230,8 @@ def js_offers(self, url_split, post_string, is_json, sent=False) -> bytes:
             'rate': ci_to.format_amount(o.rate),
             'min_bid_amount': ci_from.format_amount(o.min_bid_amount),
             'is_expired': o.expire_at <= swap_client.getTime(),
-            'is_own_offer': o.was_sent
+            'is_own_offer': o.was_sent,
+            'is_revoked': True if o.active_ind == 2 else False,
         }
         if with_extra_info:
             offer_data['amount_negotiable'] = o.amount_negotiable
