@@ -82,6 +82,8 @@ def recoverNoScriptTxnWithKey(self, bid_id: bytes, encoded_key, session=None):
             raise ValueError('Provided key matches local key')
         vkbs = ci_follower.sumKeys(kbsl, kbsf)
 
+        ensure(ci_follower.verifyPubkey(xmr_swap.pkbs), 'Invalid pkbs')  # Sanity check
+
         # Ensure summed key matches the expected pubkey
         summed_pkbs = ci_follower.getPubkey(vkbs)
         if (summed_pkbs != xmr_swap.pkbs):
