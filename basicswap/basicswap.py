@@ -47,7 +47,6 @@ from .util import (
     DeserialiseNum,
     h2b,
     i2b,
-    i2h,
     zeroIfNone,
     make_int,
     ensure,
@@ -3009,7 +3008,6 @@ class BasicSwap(BaseApp):
                 lockExtraArgs['public_key'] = xmr_swap.pkal
                 lockExtraArgs['timelock'] = xmr_offer.lock_time_1
 
-
             xmr_swap.a_lock_tx_script = pi.genScriptLockTxScript(ci_from, xmr_swap.pkal, xmr_swap.pkaf, **lockExtraArgs)
             prefunded_tx = self.getPreFundedTx(Concepts.OFFER, bid.offer_id, TxTypes.ITX_PRE_FUNDED, session=use_session)
             if prefunded_tx:
@@ -3950,7 +3948,7 @@ class BasicSwap(BaseApp):
                     return rv
 
                 if 'txid' in lock_tx_chain_info and lock_tx_chain_info['txid'] != b2h(xmr_swap.a_lock_tx_id):
-                    # if we find that txid was changed (by funding or otherwise), we need to update it to track correctly                    
+                    # if we find that txid was changed (by funding or otherwise), we need to update it to track correctly
                     xmr_swap.a_lock_tx_id = h2b(lock_tx_chain_info['txid'])
                     xmr_swap.a_lock_tx = h2b(lock_tx_chain_info['txhex'])
 
@@ -3972,7 +3970,7 @@ class BasicSwap(BaseApp):
                     # update watcher
                     self.watchXmrSwap(bid, offer, xmr_swap, session)
                     bid_changed = True
-                    
+
                 if bid.xmr_a_lock_tx.state == TxStates.TX_NONE and lock_tx_chain_info['height'] == 0:
                     bid.xmr_a_lock_tx.setState(TxStates.TX_IN_MEMPOOL)
 
@@ -4416,7 +4414,7 @@ class BasicSwap(BaseApp):
 
             ci_from = self.ci(coin_from)
             spend_tx = ci_from.loadTx(h2b(spend_txn_hex))
-            
+
             bid.xmr_a_lock_tx.spend_txid = spending_txid
 
             is_spending_lock_tx = False

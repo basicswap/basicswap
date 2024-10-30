@@ -57,6 +57,7 @@ from coincurve.ecdsaotves import (
     ecdsaotves_rec_enc_key,
 )
 
+
 class BCHInterface(BTCInterface):
     @staticmethod
     def coin_type():
@@ -130,27 +131,19 @@ class BCHInterface(BTCInterface):
         # Return P2PKH
         return CScript([OP_DUP, OP_HASH160, pkh, OP_EQUALVERIFY, OP_CHECKSIG])
 
-    # def getScriptDest(self, script: bytearray) -> bytearray:
-    #     # P2SH
-
-    #     script_hash = hash160(script)
-    #     assert len(script_hash) == 20
-
-    #     return CScript([OP_HASH160, script_hash, OP_EQUAL])
-
     def encodeScriptDest(self, script_dest: bytes) -> str:
         # Extract hash from script
         script_hash = script_dest[2:-1]
         return self.sh_to_address(script_hash)
-    
+
     def sh_to_address(self, sh: bytes) -> str:
         assert (len(sh) == 20 or len(sh) == 32)
         network = self._network.upper()
         address = None
         if len(sh) == 20:
-            address = Address("P2SH20" if network == "MAINNET" else "P2SH20-"+network, sh)
+            address = Address("P2SH20" if network == "MAINNET" else "P2SH20-" + network, sh)
         else:
-            address = Address("P2SH32" if network == "MAINNET" else "P2SH32-"+network, sh)
+            address = Address("P2SH32" if network == "MAINNET" else "P2SH32-" + network, sh)
 
         return address.cash_address()
 
@@ -164,9 +157,6 @@ class BCHInterface(BTCInterface):
     def withdrawCoin(self, value: float, addr_to: str, subfee: bool):
         params = [addr_to, value, '', '', subfee, 0, False]
         return self.rpc_wallet('sendtoaddress', params)
-
-    def getSpendableBalance(self) -> int:
-        return self.make_int(self.rpc('getwalletinfo')['unconfirmed_balance'])
 
     def getBLockSpendTxFee(self, tx, fee_rate: int) -> int:
         add_bytes = 107
@@ -188,7 +178,7 @@ class BCHInterface(BTCInterface):
         return None
 
     def getLockTxHeight(self, txid, dest_address, bid_amount, rescan_from, find_index: bool = False, vout: int = -1):
-        # Add watchonly address and rescan if required        
+        # Add watchonly address and rescan if required
         txid = None
 
         # first lookup by dest_address
@@ -252,10 +242,10 @@ class BCHInterface(BTCInterface):
         return CScript([
             # // v4.1.0-CashTokens-Optimized
             # // Based on swaplock.cash v4.1.0-CashTokens
-            # 
+            #
             # // Alice has XMR, wants BCH and/or CashTokens.
             # // Bob has BCH and/or CashTokens, wants XMR.
-            # 
+            #
             # // Verify 1-in-1-out TX form
             OP_TXINPUTCOUNT,
             OP_1, OP_NUMEQUALVERIFY,
@@ -305,7 +295,7 @@ class BCHInterface(BTCInterface):
 
             # // Refund will become available when timelock expires, and it would
             # // expire because Alice didn't collect on time, either of her own accord
-            # // or because Bob bailed out and witheld the encrypted signature.
+            # // or because Bob bailed out and withheld the encrypted signature.
             OP_ELSE,
                 # // int timelock_0
                 timelock,
@@ -340,7 +330,7 @@ class BCHInterface(BTCInterface):
 
     def addressToLockingBytecode(self, address: str) -> bytes:
         return b'\x76\xa9\x14' + bytes(Address.from_string(address).payload) + b'\x88\xac'
-    
+
     def getSpendableBalance(self) -> int:
         return self.make_int(self.rpc_wallet('getbalance', ["*", 1, False]))
 
@@ -353,21 +343,12 @@ class BCHInterface(BTCInterface):
             sha256(sha256(script)),
             OP_EQUAL,
         ])
-    
+
     def createSCLockTx(self, value: int, script: bytearray, vkbv: bytes = None) -> bytes:
         tx = CTransaction()
         tx.nVersion = self.txVersion()
         tx.vout.append(self.txoType()(value, self.getScriptDest(script)))
         return tx.serialize_without_witness()
-
-    def getScriptForPubkeyHash(self, pkh: bytes) -> CScript:
-        return CScript([
-            OP_DUP,
-            OP_HASH160,
-            pkh,
-            OP_EQUALVERIFY,
-            OP_CHECKSIG,
-        ])
 
     def getTxSize(self, tx: CTransaction) -> int:
         return len(tx.serialize_without_witness())
@@ -496,7 +477,7 @@ class BCHInterface(BTCInterface):
     def verifyTxSig(self, tx_bytes: bytes, sig: bytes, K: bytes, input_n: int, prevout_script: bytes, prevout_value: int) -> bool:
         # simple ecdsa signature verification
         return self.verifyDataSig(tx_bytes, sig, K)
-    
+
     def verifyDataSig(self, data: bytes, sig: bytes, K: bytes) -> bool:
         # simple ecdsa signature verification
         pubkey = PublicKey(K)
@@ -505,37 +486,6 @@ class BCHInterface(BTCInterface):
     def setTxSignature(self, tx_bytes: bytes, stack) -> bytes:
         return tx_bytes
 
-    def verifySCLockTx(self, tx_bytes, script_out,
-                       swap_value,
-                       Kal, Kaf,
-                       feerate,
-                       check_lock_tx_inputs, vkbv=None):
-        # Verify:
-        #
-
-        # Not necessary to check the lock txn is mineable, as protocol will wait for it to confirm
-        # However by checking early we can avoid wasting time processing unmineable txns
-        # Check fee is reasonable
-
-        tx = self.loadTx(tx_bytes)
-        txid = self.getTxid(tx)
-        self._log.info('Verifying lock tx: {}.'.format(b2h(txid)))
-
-        ensure(tx.nVersion == self.txVersion(), 'Bad version')
-        ensure(tx.nLockTime == 0, 'Bad nLockTime')  # TODO match txns created by cores
-
-        script_pk = self.getScriptDest(script_out)
-        locked_n = findOutput(tx, script_pk)
-        ensure(locked_n is not None, 'Output not found in tx')
-        locked_coin = tx.vout[locked_n].nValue
-
-        # Check value
-        ensure(locked_coin == swap_value, 'Bad locked value')
-
-        # TODO: better script matching, see interfaces/btc.py
-
-        return txid, locked_n
-    
     def extractScriptLockScriptValuesFromScriptSig(self, script_bytes):
         signature, nb = decodePushData(script_bytes, 0)
         if nb == len(script_bytes):
@@ -598,7 +548,7 @@ class BCHInterface(BTCInterface):
         ensure_op(script_bytes[o] == OP_EQUALVERIFY); o += 1
         public_key, nb = decodePushData(script_bytes, o); o += nb
         ensure_op(script_bytes[o] == OP_CHECKDATASIG); o += 1
-        
+
         ensure_op(script_bytes[o] == OP_ELSE); o += 1
         timelock, nb = decodeScriptNum(script_bytes, o); o += nb
         ensure_op(script_bytes[o] == OP_CHECKSEQUENCEVERIFY); o += 1
@@ -708,7 +658,6 @@ class BCHInterface(BTCInterface):
         ensure(public_key == _public_key, 'public_key mismatch')
         ensure(timelock == _timelock, 'timelock mismatch')
 
-
         fee_paid = locked_coin - mining_fee
         assert (fee_paid > 0)
 
@@ -814,7 +763,7 @@ class BCHInterface(BTCInterface):
         msg = sha256(out_1)
 
         return ecdsaotves_enc_sign(key_sign, pubkey_encrypt, msg)
-    
+
     def decryptOtVES(self, k: bytes, esig: bytes) -> bytes:
         return ecdsaotves_dec_sig(k, esig)
 

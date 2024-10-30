@@ -54,8 +54,6 @@ class TestFunctions(BaseTest):
     extra_wait_time = 0
     test_coin_from = Coins.BCH
 
-
-
     def callnoderpc(self, method, params=[], wallet=None, node_id=0):
         return callnoderpc(node_id, method, params, wallet, self.base_rpc_port)
 
@@ -85,6 +83,7 @@ class TestFunctions(BaseTest):
         wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True)
 
         swap_clients[1].ci(Coins.XMR).setFeePriority(0)
+
 
 class TestBCH(BasicSwapTest):
     __test__ = True

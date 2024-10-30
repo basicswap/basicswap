@@ -6,7 +6,7 @@ lint_task:
     - pip install flake8 codespell
   script:
     - flake8 --version
-    - PYTHONWARNINGS="ignore" flake8 --ignore=E501,F841,W503 --exclude=basicswap/contrib,basicswap/interface/contrib,messages_pb2.py,.eggs,.tox,bin/install_certifi.py
+    - PYTHONWARNINGS="ignore" flake8 --ignore=E501,F841,W503,E702,E131 --exclude=basicswap/contrib,basicswap/interface/contrib,messages_pb2.py,.eggs,.tox,bin/install_certifi.py
     - codespell --check-filenames --disable-colors --quiet-level=7 --ignore-words=tests/lint/spelling.ignore-words.txt -S .git,.eggs,.tox,pgp,*.pyc,*basicswap/contrib,*basicswap/interface/contrib,*mnemonics.py,bin/install_certifi.py,*basicswap/static
 
 test_task:

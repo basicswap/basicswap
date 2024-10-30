@@ -11,21 +11,14 @@ bch_lock_swipe_script = '4c8fc3519dc4519d02e80300c600cc949d00ce00d18800cf00d2880
 
 coin_settings = {'rpcport': 0, 'rpcauth': 'none', 'blocks_confirmed': 1, 'conf_target': 1, 'use_segwit': False, 'connection_type': 'rpc'}
 
+
 class TestXmrBchSwapInterface(unittest.TestCase):
-    # def test_generate_script(self):    
-    #     out_1 = bytes.fromhex('a9147171b53baf87efc9c78ffc0e37a78859cebaae4a87')
-    #     out_2 = bytes.fromhex('a9147171b53baf87efc9c78ffc0e37a78859cebaae4a87')
-    #     public_key = bytes.fromhex('03fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556')
-
-    #     ci = BCHInterface(coin_settings, "regtest")
-    #     print(ci.genScriptLockTxScript(None, 1000, out_1, out_2, public_key, 2).hex())
-
     def test_extractScriptLockScriptValues(self):
         ci = BCHInterface(coin_settings, "regtest")
 
         script_bytes = CScript(bytes.fromhex(bch_lock_script))
         ci.extractScriptLockScriptValues(script_bytes)
-        
+
         script_bytes = CScript(bytes.fromhex(bch_lock_spend_script))
         signature, mining_fee, out_1, out_2, public_key, timelock = ci.extractScriptLockScriptValuesFromScriptSig(script_bytes)
         ensure(signature is not None, 'signature not present')
