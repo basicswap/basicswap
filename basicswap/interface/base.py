@@ -68,6 +68,8 @@ class CoinInterface:
         coin_chainparams = chainparams[self.coin_type()]
         if coin_chainparams.get('use_ticker_as_name', False):
             return coin_chainparams['ticker']
+        if coin_chainparams['name'] == 'bitcoincash':
+            return 'Bitcoin Cash'
         return coin_chainparams['name'].capitalize()
 
     def ticker(self) -> str:
