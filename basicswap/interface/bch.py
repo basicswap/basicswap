@@ -57,16 +57,14 @@ from coincurve.ecdsaotves import (
     ecdsaotves_rec_enc_key,
 )
 
-def findOutput(tx, script_pk: bytes):
-    for i in range(len(tx.vout)):
-        if tx.vout[i].scriptPubKey == script_pk:
-            return i
-    return None
-
 class BCHInterface(BTCInterface):
     @staticmethod
     def coin_type():
         return Coins.BCH
+
+    @staticmethod
+    def xmr_swap_a_lock_spend_tx_vsize() -> int:
+        return 302
 
     def __init__(self, coin_settings, network, swap_client=None):
         super(BCHInterface, self).__init__(coin_settings, network, swap_client)
@@ -84,6 +82,17 @@ class BCHInterface(BTCInterface):
     def getNewAddress(self, use_segwit: bool = False, label: str = 'swap_receive') -> str:
         args = [label]
         return self.rpc_wallet('getnewaddress', args)
+
+    def getUnspentsByAddr(self):
+        unspent_addr = dict()
+        unspent = self.rpc_wallet('listunspent')
+        for u in unspent:
+            if u.get('spendable', False) is False:
+                continue
+            if 'address' not in u:
+                continue
+            unspent_addr[u['address']] = unspent_addr.get(u['address'], 0) + self.make_int(u['amount'], r=1)
+        return unspent_addr
 
     # returns pkh
     def decodeAddress(self, address: str) -> bytes:
