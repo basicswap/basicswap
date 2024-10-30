@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2022-2023 tecnovert
+# Copyright (c) 2024 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -320,12 +320,12 @@ class BCHInterface(BTCInterface):
     def pkh_to_address(self, pkh: bytes) -> str:
         # pkh is ripemd160(sha256(pk))
         assert (len(pkh) == 20)
-        prefix = self.chainparams_network()['hrp']
-        address = Address("P2PKH", b'\x76\xa9\x14' + pkh + b'\x88\xac')
-        address.prefix = prefix
+        network = self._network.upper()
+        address = Address("P2PKH" if network == "MAINNET" else "P2PKH-" + network, pkh)
+
         return address.cash_address()
 
-    def encodeSharedAddress(self, Kbv, Kbs):
+    def encodeSharedAddress(self, Kbv: bytes, Kbs: bytes) -> str:
         return self.pkh_to_address(hash160(Kbs))
 
     def addressToLockingBytecode(self, address: str) -> bytes:

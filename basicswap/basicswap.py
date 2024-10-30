@@ -678,8 +678,12 @@ class BasicSwap(BaseApp):
 
         return self.coin_clients[use_coinid][interface_ind]
 
-    def isBchXmrSwap(self, offer: Offer):
-        return (offer.coin_from == Coins.BCH or offer.coin_to == Coins.BCH) and offer.swap_type == SwapTypes.XMR_SWAP
+    def isBchXmrSwap(self, offer: Offer) -> bool:
+        if offer.swap_type != SwapTypes.XMR_SWAP:
+            return False
+        if self.is_reverse_ads_bid(offer.coin_from, offer.coin_to):
+            return offer.coin_to == Coins.BCH
+        return offer.coin_from == Coins.BCH
 
     def pi(self, protocol_ind):
         if protocol_ind not in self.protocolInterfaces:
@@ -1368,8 +1372,6 @@ class BasicSwap(BaseApp):
             raise e
 
     def is_reverse_ads_bid(self, coin_from, coin_to) -> bool:
-        if coin_to == Coins.BCH:
-            return True
         return coin_from in self.scriptless_coins + self.coins_without_segwit
 
     def validateSwapType(self, coin_from, coin_to, swap_type):
