@@ -3890,6 +3890,15 @@ class BasicSwap(BaseApp):
                     try:
                         txid = ci_from.publishTx(xmr_swap.a_lock_refund_tx)
 
+                        # bch txids change
+                        if self.isBchXmrSwap(offer):
+                            self.log.debug('Recomputing refund spend transaction and txid after submitting lock tx spend.')
+
+                            tx = ci_from.loadTx(xmr_swap.a_lock_refund_spend_tx)
+                            tx.vin[0].prevout.hash = b2i(xmr_swap.a_lock_refund_tx_id)
+                            xmr_swap.a_lock_refund_spend_tx = tx.serialize_without_witness()
+                            xmr_swap.a_lock_refund_spend_tx_id = ci_from.getTxid(xmr_swap.a_lock_refund_spend_tx)
+
                         self.log.info('Submitted coin a lock refund tx for bid {}'.format(bid_id.hex()))
                         self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_A_REFUND_TX_PUBLISHED, '', session)
                         bid.txns[TxTypes.XMR_SWAP_A_LOCK_REFUND] = SwapTx(
@@ -4437,7 +4446,7 @@ class BasicSwap(BaseApp):
                 self.log.debug('Coin a lock tx spent by lock refund tx.')
                 # bch txids change
                 if self.isBchXmrSwap(offer):
-                    self.log.debug('Recomputing refund spend transaction and txid after lock tx spend.')
+                    self.log.debug('Recomputing refund spend transaction and txid after lock tx spent.')
 
                     xmr_swap.a_lock_refund_tx_id = spending_txid
                     xmr_swap.a_lock_refund_tx = bytes.fromhex(spend_txn_hex)
@@ -5823,7 +5832,7 @@ class BasicSwap(BaseApp):
             lock_tx_signed = ci_from.signTxWithWallet(xmr_swap.a_lock_tx)
             txid_hex = ci_from.publishTx(lock_tx_signed)
             if txid_hex != b2h(xmr_swap.a_lock_tx_id):
-                self.log.info('Recomputing lock refund and lock spend transactions and txids after lock tx publish')
+                self.log.info('Recomputing refund transactions and txids after lock tx publish')
                 xmr_swap.a_lock_tx = lock_tx_signed
                 xmr_swap.a_lock_tx_id = bytes.fromhex(txid_hex)
 

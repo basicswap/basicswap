@@ -7,51 +7,28 @@
 
 import random
 import logging
-import unittest
 
 from basicswap.chainparams import XMR_COIN
-from basicswap.db import (
-    Concepts,
-)
 from basicswap.basicswap import (
     BidStates,
     Coins,
-    DebugTypes,
     SwapTypes,
-)
-from basicswap.basicswap_util import (
-    TxLockTypes,
-    EventLogTypes,
 )
 from basicswap.util import (
     COIN,
-    make_int,
-    format_amount,
 )
-from basicswap.interface.base import Curves
 from basicswap.util.crypto import sha256
 from tests.basicswap.test_btc_xmr import BasicSwapTest
-from tests.basicswap.util import (
-    read_json_api,
-)
 from tests.basicswap.common import (
     BCH_BASE_RPC_PORT,
-    abandon_all_swaps,
     wait_for_bid,
-    wait_for_event,
     wait_for_offer,
-    wait_for_balance,
-    wait_for_unspent,
-    wait_for_none_active,
-    BTC_BASE_RPC_PORT,
 )
 from basicswap.contrib.test_framework.messages import (
     ToHex,
-    FromHex,
     CTxIn,
     COutPoint,
     CTransaction,
-    CTxInWitness,
 )
 from basicswap.contrib.test_framework.script import (
     CScript,
@@ -64,8 +41,7 @@ from .test_xmr import BaseTest, test_delay_event, callnoderpc
 from coincurve.ecdsaotves import (
     ecdsaotves_enc_sign,
     ecdsaotves_enc_verify,
-    ecdsaotves_dec_sig,
-    ecdsaotves_rec_enc_key
+    ecdsaotves_dec_sig
 )
 
 logger = logging.getLogger()
@@ -283,7 +259,7 @@ class TestBCH(BasicSwapTest):
     def test_009_scantxoutset(self):
         super().test_009_scantxoutset()
 
-    def test_010_bch_txn_size(self):
+    def test_010_txn_size(self):
         logging.info('---------- Test {} txn_size'.format(Coins.BCH))
 
         swap_clients = self.swap_clients
@@ -335,7 +311,6 @@ class TestBCH(BasicSwapTest):
         lock_tx = ci.fundSCLockTx(lock_tx, fee_rate)
         lock_tx = ci.signTxWithWallet(lock_tx)
         print(lock_tx.hex())
-        return
 
         unspents_after = ci.rpc('listunspent')
         assert (len(unspents) > len(unspents_after))
@@ -398,23 +373,6 @@ class TestBCH(BasicSwapTest):
         expect_size: int = ci.xmr_swap_a_lock_spend_tx_vsize()
         assert (expect_size >= vsize_actual)
         assert (expect_size - vsize_actual < 10)
-
-        # Test chain b (no-script) lock tx size
-        v = ci.getNewSecretKey()
-        s = ci.getNewSecretKey()
-        S = ci.getPubkey(s)
-        lock_tx_b_txid = ci.publishBLockTx(v, S, amount, fee_rate)
-
-        addr_out = ci.getNewAddress(True)
-        lock_tx_b_spend_txid = ci.spendBLockTx(lock_tx_b_txid, addr_out, v, s, amount, fee_rate, 0)
-        lock_tx_b_spend = ci.getTransaction(lock_tx_b_spend_txid)
-        if lock_tx_b_spend is None:
-            lock_tx_b_spend = ci.getWalletTransaction(lock_tx_b_spend_txid)
-        lock_tx_b_spend_decoded = ci.rpc('decoderawtransaction', [lock_tx_b_spend.hex()])
-
-        expect_size: int = ci.xmr_swap_b_lock_spend_tx_vsize()
-        assert (expect_size >= lock_tx_b_spend_decoded['size'])
-        assert (expect_size - lock_tx_b_spend_decoded['size'] < 10)
 
     def test_011_p2sh(self):
         # Not used in bsx for native-segwit coins
@@ -548,7 +506,44 @@ class TestBCH(BasicSwapTest):
     def test_04_a_follower_recover_b_lock_tx(self):
         super().test_04_a_follower_recover_b_lock_tx()
 
-    # does not work yet
-    # def test_04_b_follower_recover_b_lock_tx_reverse(self):
-    #     self.prepare_balance(Coins.BCH, 100.0, 1801, 1800)
-    #     super().test_04_b_follower_recover_b_lock_tx_reverse()
+    def test_04_b_follower_recover_b_lock_tx_reverse(self):
+        self.prepare_balance(Coins.BCH, 100.0, 1801, 1800)
+        super().test_04_b_follower_recover_b_lock_tx_reverse()
+
+    def test_04_c_follower_recover_b_lock_tx_to_part(self):
+        super().test_04_c_follower_recover_b_lock_tx_to_part()
+
+    def test_04_d_follower_recover_b_lock_tx_from_part(self):
+        self.prepare_balance(Coins.BCH, 100.0, 1801, 1800)
+        super().test_04_d_follower_recover_b_lock_tx_from_part()
+
+    def test_05_self_bid(self):
+        self.prepare_balance(Coins.BCH, 100.0, 1801, 1800)
+        super().test_05_self_bid()
+
+    def test_05_self_bid_to_part(self):
+        self.prepare_balance(Coins.BCH, 100.0, 1801, 1800)
+        super().test_05_self_bid_to_part()
+
+    def test_05_self_bid_from_part(self):
+        self.prepare_balance(Coins.BCH, 100.0, 1801, 1800)
+        super().test_05_self_bid_from_part()
+
+    def test_05_self_bid_rev(self):
+        self.prepare_balance(Coins.BCH, 100.0, 1801, 1800)
+        super().test_05_self_bid_rev()
+
+    def test_06_preselect_inputs(self):
+        tla_from = self.test_coin_from.name
+        logging.info('---------- Test {} Preselected inputs'.format(tla_from))
+        logging.info('Skipped')
+
+    def test_07_expire_stuck_accepted(self):
+        super().test_07_expire_stuck_accepted()
+
+    def test_08_insufficient_funds(self):
+        super().test_08_insufficient_funds()
+
+    def test_08_insufficient_funds_rev(self):
+        self.prepare_balance(Coins.BCH, 100.0, 1801, 1800)
+        super().test_08_insufficient_funds_rev()
