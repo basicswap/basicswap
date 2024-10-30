@@ -633,7 +633,7 @@ class Test(unittest.TestCase):
                     'name': 'offer should fail',
                     'coin_from': 'Particl',
                     'coin_to': 'XMR',
-                    'amount': 20,
+                    'amount': 200,
                     'minrate': 0.05,
                     'ratetweakpercent': 50000000,
                     'amount_variable': True,

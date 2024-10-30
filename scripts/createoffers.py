@@ -452,6 +452,7 @@ def main():
                 coin_from_data = coins_map[bid_template['coin_from']]
                 coin_to_data = coins_map[bid_template['coin_to']]
 
+                page_limit: int = 25
                 offers_options = {
                     'active': 'active',
                     'include_sent': False,
@@ -460,9 +461,21 @@ def main():
                     'with_extra_info': True,
                     'sort_by': 'rate',
                     'sort_dir': 'asc',
+                    'offset': 0,
+                    'limit': page_limit,
                 }
 
-                received_offers = read_json_api('offers', offers_options)
+                received_offers = []
+                for i in range(1000000):  # for i in itertools.count()
+                    page_offers = read_json_api('offers', offers_options)
+                    if len(page_offers) < 1:
+                        break
+                    received_offers += page_offers
+                    offers_options['offset'] = offers_options['offset'] + page_limit
+                    if i > 100:
+                        print(f'Warning: Broke offers loop at: {i}')
+                        break
+
                 if args.debug:
                     print('Received Offers', received_offers)
 
