@@ -15,6 +15,7 @@ const coinNameToSymbol = {
   'Decred': 'decred',
   'Zano': 'zano',
   'Dogecoin': 'dogecoin',
+  'Bitcoin Cash': 'bitcoincash'
 };
 
 function makePostRequest(url, headers = {}) {
@@ -166,7 +167,7 @@ const itemsPerPage = 100;
 const coinIdToName = {
   1: 'particl', 2: 'bitcoin', 3: 'litecoin', 4: 'decred',
   6: 'monero', 7: 'particl blind', 8: 'particl anon',
-  9: 'wownero', 11: 'pivx', 13: 'firo'
+  9: 'wownero', 11: 'pivx', 13: 'firo', 17: 'bitcoincash'
 };
 
 // DOM
