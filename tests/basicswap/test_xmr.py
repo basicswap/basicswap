@@ -241,8 +241,10 @@ def prepare_swapclient_dir(datadir, node_id, network_key, network_pubkey, with_c
 def btcCli(cmd, node_id=0):
     return callrpc_cli(cfg.BITCOIN_BINDIR, os.path.join(TEST_DIR, 'btc_' + str(node_id)), 'regtest', cmd, cfg.BITCOIN_CLI)
 
+
 def bchCli(cmd, node_id=0):
     return callrpc_cli(cfg.BITCOINCASH_BINDIR, os.path.join(TEST_DIR, 'bch_' + str(node_id)), 'regtest', cmd, cfg.BITCOINCASH_CLI)
+
 
 def ltcCli(cmd, node_id=0):
     return callrpc_cli(cfg.LITECOIN_BINDIR, os.path.join(TEST_DIR, 'ltc_' + str(node_id)), 'regtest', cmd, cfg.LITECOIN_CLI)

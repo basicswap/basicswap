@@ -32,6 +32,7 @@ def decodeScriptNum(script_bytes, o):
             v += int(b) << 8 * i
     return (v, 1 + num_len)
 
+
 def decodePushData(script_bytes, o):
     datasize = None
     pushdata_type = None
@@ -75,6 +76,7 @@ def decodePushData(script_bytes, o):
 
     # return data and the number of bytes to skip forward
     return (data, i + datasize - o)
+
 
 def getP2SHScriptForHash(p2sh):
     return bytes((OpCodes.OP_HASH160, 0x14)) \
