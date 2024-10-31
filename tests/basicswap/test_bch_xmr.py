@@ -5,25 +5,25 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
+
 import logging
+import os
 import random
 import unittest
 
-from basicswap.chainparams import XMR_COIN
+import basicswap.config as cfg
 from basicswap.basicswap import (
-    BidStates,
     Coins,
     SwapTypes,
 )
-from basicswap.util import (
-    COIN,
-)
+from basicswap.bin.run import startDaemon
 from basicswap.util.crypto import sha256
 from tests.basicswap.test_btc_xmr import BasicSwapTest
 from tests.basicswap.common import (
-    BCH_BASE_RPC_PORT,
-    wait_for_bid,
-    wait_for_offer,
+    make_rpc_func,
+    prepareDataDir,
+    stopDaemons,
+    waitForRPC,
 )
 from basicswap.contrib.test_framework.messages import (
     ToHex,
@@ -38,14 +38,27 @@ from basicswap.contrib.test_framework.script import (
     OP_CHECKSEQUENCEVERIFY,
 )
 from basicswap.interface.bch import BCHInterface
+from basicswap.rpc import (
+    callrpc_cli,
+)
 from basicswap.util import ensure
-from .test_xmr import BaseTest, test_delay_event, callnoderpc
+from .test_xmr import test_delay_event, callnoderpc
 
 from coincurve.ecdsaotves import (
     ecdsaotves_enc_sign,
     ecdsaotves_enc_verify,
     ecdsaotves_dec_sig
 )
+
+BITCOINCASH_BINDIR = os.path.expanduser(os.getenv('BITCOINCASH_BINDIR', os.path.join(cfg.DEFAULT_TEST_BINDIR, 'bitcoincash')))
+BITCOINCASHD = os.getenv('BITCOINCASHD', 'bitcoind' + cfg.bin_suffix)
+BITCOINCASH_CLI = os.getenv('BITCOINCASH_CLI', 'bitcoin-cli' + cfg.bin_suffix)
+BITCOINCASH_TX = os.getenv('BITCOINCASH_TX', 'bitcoin-tx' + cfg.bin_suffix)
+
+BCH_BASE_PORT = 41792
+BCH_BASE_RPC_PORT = 42792
+BCH_BASE_ZMQ_PORT = 43792
+BCH_BASE_TOR_PORT = 43732
 
 logger = logging.getLogger()
 
@@ -74,49 +87,84 @@ class TestXmrBchSwapInterface(unittest.TestCase):
         ensure(signature is None, 'signature present')
 
 
-class TestFunctions(BaseTest):
-    __test__ = False
-    start_bch_nodes = True
-    base_rpc_port = BCH_BASE_RPC_PORT
-    extra_wait_time = 0
-    test_coin_from = Coins.BCH
-
-    def callnoderpc(self, method, params=[], wallet=None, node_id=0):
-        return callnoderpc(node_id, method, params, wallet, self.base_rpc_port)
-
-    def mineBlock(self, num_blocks=1):
-        self.callnoderpc('generatetoaddress', [num_blocks, self.bch_addr])
-
-    def test_05_bch_xmr(self):
-        logging.info('---------- Test BCH to XMR')
-        swap_clients = self.swap_clients
-        offer_id = swap_clients[0].postOffer(Coins.BCH, Coins.XMR, 10 * COIN, 100 * XMR_COIN, 10 * COIN, SwapTypes.XMR_SWAP)
-        wait_for_offer(test_delay_event, swap_clients[1], offer_id)
-        offers = swap_clients[1].listOffers(filters={'offer_id': offer_id})
-        offer = offers[0]
-
-        swap_clients[1].ci(Coins.XMR).setFeePriority(3)
-
-        bid_id = swap_clients[1].postXmrBid(offer_id, offer.amount_from)
-
-        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.BID_RECEIVED)
-
-        bid, xmr_swap = swap_clients[0].getXmrBid(bid_id)
-        assert (xmr_swap)
-
-        swap_clients[0].acceptXmrBid(bid_id)
-
-        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=180)
-        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, sent=True)
-
-        swap_clients[1].ci(Coins.XMR).setFeePriority(0)
-
-
 class TestBCH(BasicSwapTest):
     __test__ = True
+    test_coin = Coins.BCH
     test_coin_from = Coins.BCH
-    start_bch_nodes = True
     base_rpc_port = BCH_BASE_RPC_PORT
+
+    bch_daemons = []
+    start_ltc_nodes = False
+    bch_addr = None
+
+    @classmethod
+    def prepareExtraDataDir(cls, i):
+        if not cls.restore_instance:
+            data_dir = prepareDataDir(cfg.TEST_DATADIRS, i, 'bitcoin.conf', 'bch_', base_p2p_port=BCH_BASE_PORT, base_rpc_port=BCH_BASE_RPC_PORT)
+
+            # Rewrite conf file
+            config_filename: str = os.path.join(cfg.TEST_DATADIRS, 'bch_' + str(i), 'bitcoin.conf')
+            with open(config_filename, 'r') as fp:
+                lines = fp.readlines()
+            with open(config_filename, 'w') as fp:
+                for line in lines:
+                    if not line.startswith('findpeers'):
+                        fp.write(line)
+
+            if os.path.exists(os.path.join(BITCOINCASH_BINDIR, 'bitcoin-wallet')):
+                try:
+                    callrpc_cli(BITCOINCASH_BINDIR, data_dir, 'regtest', '-wallet=wallet.dat create', 'bitcoin-wallet')
+                except Exception as e:
+                    logging.warning('bch: bitcoin-wallet create failed')
+                    raise e
+
+        cls.bch_daemons.append(startDaemon(os.path.join(cfg.TEST_DATADIRS, 'bch_' + str(i)), BITCOINCASH_BINDIR, BITCOINCASHD))
+        logging.info('BCH: Started %s %d', BITCOINCASHD, cls.bch_daemons[-1].handle.pid)
+        waitForRPC(make_rpc_func(i, base_rpc_port=BCH_BASE_RPC_PORT), test_delay_event)
+
+    @classmethod
+    def addPIDInfo(cls, sc, i):
+        sc.setDaemonPID(Coins.BCH, cls.bch_daemons[i].handle.pid)
+
+    @classmethod
+    def prepareExtraCoins(cls):
+        cls.bch_addr = callnoderpc(0, 'getnewaddress', ['mining_addr'], base_rpc_port=BCH_BASE_RPC_PORT, wallet='wallet.dat')
+        if not cls.restore_instance:
+            num_blocks: int = 200
+            logging.info('Mining %d BitcoinCash blocks to %s', num_blocks, cls.bch_addr)
+            callnoderpc(0, 'generatetoaddress', [num_blocks, cls.bch_addr], base_rpc_port=BCH_BASE_RPC_PORT, wallet='wallet.dat')
+
+    @classmethod
+    def addCoinSettings(cls, settings, datadir, node_id):
+
+        settings['chainclients']['bitcoincash'] = {
+            'connection_type': 'rpc',
+            'manage_daemon': False,
+            'rpcport': BCH_BASE_RPC_PORT + node_id,
+            'rpcuser': 'test' + str(node_id),
+            'rpcpassword': 'test_pass' + str(node_id),
+            'datadir': os.path.join(datadir, 'bch_' + str(node_id)),
+            'bindir': BITCOINCASH_BINDIR,
+            'use_segwit': False,
+        }
+
+    @classmethod
+    def coins_loop(cls):
+        super(TestBCH, cls).coins_loop()
+        ci0 = cls.swap_clients[0].ci(cls.test_coin)
+        try:
+            if cls.bch_addr is not None:
+                ci0.rpc_wallet('generatetoaddress', [1, cls.bch_addr])
+        except Exception as e:
+            logging.warning('coins_loop generate {}'.format(e))
+
+    @classmethod
+    def tearDownClass(cls):
+        logging.info('Finalising Bitcoincash Test')
+        super(TestBCH, cls).tearDownClass()
+
+        stopDaemons(cls.bch_daemons)
+        cls.bch_daemons.clear()
 
     def mineBlock(self, num_blocks=1):
         self.callnoderpc('generatetoaddress', [num_blocks, self.bch_addr])
@@ -125,17 +173,17 @@ class TestBCH(BasicSwapTest):
         return True
 
     def test_001_nested_segwit(self):
-        logging.info('---------- Test {} p2sh nested segwit'.format(self.test_coin_from.name))
+        logging.info('---------- Test {} p2sh nested segwit'.format(self.test_coin.name))
         logging.info('Skipped')
 
     def test_002_native_segwit(self):
-        logging.info('---------- Test {} p2sh native segwit'.format(self.test_coin_from.name))
+        logging.info('---------- Test {} p2sh native segwit'.format(self.test_coin.name))
         logging.info('Skipped')
 
     def test_003_cltv(self):
-        logging.info('---------- Test {} cltv'.format(self.test_coin_from.name))
+        logging.info('---------- Test {} cltv'.format(self.test_coin.name))
 
-        ci = self.swap_clients[0].ci(self.test_coin_from)
+        ci = self.swap_clients[0].ci(self.test_coin)
 
         self.check_softfork_active('bip65')
 
@@ -196,10 +244,10 @@ class TestBCH(BasicSwapTest):
         assert (len(tx_wallet['blockhash']) == 64)
 
     def test_004_csv(self):
-        logging.info('---------- Test {} csv'.format(self.test_coin_from.name))
+        logging.info('---------- Test {} csv'.format(self.test_coin.name))
 
         swap_clients = self.swap_clients
-        ci = self.swap_clients[0].ci(self.test_coin_from)
+        ci = self.swap_clients[0].ci(self.test_coin)
 
         self.check_softfork_active('csv')
 
@@ -252,9 +300,9 @@ class TestBCH(BasicSwapTest):
         assert (len(tx_wallet['blockhash']) == 64)
 
     def test_005_watchonly(self):
-        logging.info('---------- Test {} watchonly'.format(self.test_coin_from.name))
-        ci = self.swap_clients[0].ci(self.test_coin_from)
-        ci1 = self.swap_clients[1].ci(self.test_coin_from)
+        logging.info('---------- Test {} watchonly'.format(self.test_coin.name))
+        ci = self.swap_clients[0].ci(self.test_coin)
+        ci1 = self.swap_clients[1].ci(self.test_coin)
 
         addr = ci.rpc_wallet('getnewaddress', ['watchonly test'])
         ro = ci1.rpc_wallet('importaddress', [addr, '', False])
@@ -268,10 +316,10 @@ class TestBCH(BasicSwapTest):
         super().test_006_getblock_verbosity()
 
     def test_007_hdwallet(self):
-        logging.info('---------- Test {} hdwallet'.format(self.test_coin_from.name))
+        logging.info('---------- Test {} hdwallet'.format(self.test_coin.name))
 
         test_seed = '8e54a313e6df8918df6d758fafdbf127a115175fdd2238d0e908dd8093c9ac3b'
-        test_wif = self.swap_clients[0].ci(self.test_coin_from).encodeKey(bytes.fromhex(test_seed))
+        test_wif = self.swap_clients[0].ci(self.test_coin).encodeKey(bytes.fromhex(test_seed))
         new_wallet_name = random.randbytes(10).hex()
         self.callnoderpc('createwallet', [new_wallet_name])
         self.callnoderpc('sethdseed', [True, test_wif], wallet=new_wallet_name)
@@ -402,10 +450,10 @@ class TestBCH(BasicSwapTest):
 
     def test_011_p2sh(self):
         # Not used in bsx for native-segwit coins
-        logging.info('---------- Test {} p2sh'.format(self.test_coin_from.name))
+        logging.info('---------- Test {} p2sh'.format(self.test_coin.name))
 
         swap_clients = self.swap_clients
-        ci = self.swap_clients[0].ci(self.test_coin_from)
+        ci = self.swap_clients[0].ci(self.test_coin)
 
         script = CScript([2, 2, OP_EQUAL, ])
 
@@ -449,10 +497,10 @@ class TestBCH(BasicSwapTest):
 
     def test_011_p2sh32(self):
         # Not used in bsx for native-segwit coins
-        logging.info('---------- Test {} p2sh32'.format(self.test_coin_from.name))
+        logging.info('---------- Test {} p2sh32'.format(self.test_coin.name))
 
         swap_clients = self.swap_clients
-        ci = self.swap_clients[0].ci(self.test_coin_from)
+        ci = self.swap_clients[0].ci(self.test_coin)
 
         script = CScript([2, 2, OP_EQUAL, ])
 
@@ -495,7 +543,7 @@ class TestBCH(BasicSwapTest):
         assert (len(tx_wallet['blockhash']) == 64)
 
     def test_012_p2sh_p2wsh(self):
-        logging.info('---------- Test {} p2sh-p2wsh'.format(self.test_coin_from.name))
+        logging.info('---------- Test {} p2sh-p2wsh'.format(self.test_coin.name))
         logging.info('Skipped')
 
     def test_01_a_full_swap(self):
@@ -560,7 +608,7 @@ class TestBCH(BasicSwapTest):
         super().test_05_self_bid_rev()
 
     def test_06_preselect_inputs(self):
-        tla_from = self.test_coin_from.name
+        tla_from = self.test_coin.name
         logging.info('---------- Test {} Preselected inputs'.format(tla_from))
         logging.info('Skipped')
 
