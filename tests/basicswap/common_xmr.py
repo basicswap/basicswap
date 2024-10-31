@@ -34,6 +34,9 @@ from tests.basicswap.common import (
 from tests.basicswap.extended.test_dcr import (
     DCR_BASE_PORT, DCR_BASE_RPC_PORT,
 )
+from tests.basicswap.test_bch_xmr import (
+    BCH_BASE_PORT, BCH_BASE_RPC_PORT,
+)
 
 from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
 
@@ -51,6 +54,8 @@ BITCOIN_TOR_PORT_BASE = int(os.getenv('BITCOIN_TOR_PORT_BASE', BTC_BASE_TOR_PORT
 
 LITECOIN_RPC_PORT_BASE = int(os.getenv('LITECOIN_RPC_PORT_BASE', LTC_BASE_RPC_PORT))
 DECRED_RPC_PORT_BASE = int(os.getenv('DECRED_RPC_PORT_BASE', DCR_BASE_RPC_PORT))
+BITCOINCASH_RPC_PORT_BASE = int(os.getenv('BITCOINCASH_RPC_PORT_BASE', BCH_BASE_RPC_PORT))
+
 
 FIRO_BASE_PORT = 34832
 FIRO_BASE_RPC_PORT = 35832
@@ -100,6 +105,7 @@ def run_prepare(node_id, datadir_path, bins_path, with_coins, mnemonic_in=None, 
     os.environ['BTC_RPC_PORT'] = str(BITCOIN_RPC_PORT_BASE)
     os.environ['LTC_RPC_PORT'] = str(LITECOIN_RPC_PORT_BASE)
     os.environ['DCR_RPC_PORT'] = str(DECRED_RPC_PORT_BASE)
+    os.environ['BCH_RPC_PORT'] = str(BITCOINCASH_RPC_PORT_BASE)
     os.environ['FIRO_RPC_PORT'] = str(FIRO_RPC_PORT_BASE)
 
     os.environ['XMR_RPC_USER'] = 'xmr_user'
@@ -120,6 +126,7 @@ def run_prepare(node_id, datadir_path, bins_path, with_coins, mnemonic_in=None, 
         '-regtest',
         f'-withcoins={with_coins}',
         '-noextractover',
+        '-noreleasesizecheck',
         '-xmrrestoreheight=0']
     if mnemonic_in:
         testargs.append(f'-particl_mnemonic="{mnemonic_in}"')
@@ -313,6 +320,33 @@ def run_prepare(node_id, datadir_path, bins_path, with_coins, mnemonic_in=None, 
             for ip in range(num_nodes):
                 if ip != node_id:
                     fp.write('add-exclusive-node=127.0.0.1:{}\n'.format(XMR_BASE_P2P_PORT + ip + port_ofs))
+
+    if 'bitcoincash' in coins_array:
+        config_filename = os.path.join(datadir_path, 'bitcoincash', 'bitcoin.conf')
+        with open(config_filename, 'r') as fp:
+            lines = fp.readlines()
+        with open(config_filename, 'w') as fp:
+            for line in lines:
+                if not line.startswith('prune'):
+                    fp.write(line)
+            fp.write('port={}\n'.format(BCH_BASE_PORT + node_id + port_ofs))
+            fp.write('bind=127.0.0.1\n')
+            fp.write('dnsseed=0\n')
+            fp.write('discover=0\n')
+            fp.write('listenonion=0\n')
+            fp.write('upnp=0\n')
+            if use_rpcauth:
+                salt = generate_salt(16)
+                rpc_user = 'test_bch_' + str(node_id)
+                rpc_pass = 'test_bch_pwd_' + str(node_id)
+                fp.write('rpcauth={}:{}${}\n'.format(rpc_user, salt, password_to_hmac(salt, rpc_pass)))
+                settings['chainclients']['bitcoincash']['rpcuser'] = rpc_user
+                settings['chainclients']['bitcoincash']['rpcpassword'] = rpc_pass
+            for ip in range(num_nodes):
+                if ip != node_id:
+                    fp.write('connect=127.0.0.1:{}\n'.format(BCH_BASE_PORT + ip + port_ofs))
+            for opt in EXTRA_CONFIG_JSON.get('bch{}'.format(node_id), []):
+                fp.write(opt + '\n')
 
     with open(config_path) as fs:
         settings = json.load(fs)
