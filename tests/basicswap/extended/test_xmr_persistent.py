@@ -44,6 +44,9 @@ from tests.basicswap.common import (
     BTC_BASE_RPC_PORT,
     LTC_BASE_RPC_PORT,
 )
+from tests.basicswap.test_bch_xmr import (
+    BCH_BASE_RPC_PORT,
+)
 from tests.basicswap.util import (
     make_boolean,
     read_json_api,
@@ -66,6 +69,7 @@ UI_PORT = 12700 + PORT_OFS
 PARTICL_RPC_PORT_BASE = int(os.getenv('PARTICL_RPC_PORT_BASE', BASE_RPC_PORT))
 BITCOIN_RPC_PORT_BASE = int(os.getenv('BITCOIN_RPC_PORT_BASE', BTC_BASE_RPC_PORT))
 LITECOIN_RPC_PORT_BASE = int(os.getenv('LITECOIN_RPC_PORT_BASE', LTC_BASE_RPC_PORT))
+BITCOINCASH_RPC_PORT_BASE = int(os.getenv('BITCOINCASH_RPC_PORT_BASE', BCH_BASE_RPC_PORT))
 DECRED_WALLET_RPC_PORT_BASE = int(os.getenv('DECRED_WALLET_RPC_PORT_BASE', 9210))
 XMR_BASE_RPC_PORT = int(os.getenv('XMR_BASE_RPC_PORT', XMR_BASE_RPC_PORT))
 TEST_COINS_LIST = os.getenv('TEST_COINS_LIST', 'bitcoin,monero')
@@ -99,6 +103,11 @@ def calldcrrpc(node_id, method, params=[], wallet=None, base_rpc_port=DECRED_WAL
     return callrpc_dcr(base_rpc_port + node_id, auth, method, params)
 
 
+def callbchrpc(node_id, method, params=[], wallet=None, base_rpc_port=BITCOINCASH_RPC_PORT_BASE + PORT_OFS):
+    auth = 'test_bch_{0}:test_bch_pwd_{0}'.format(node_id)
+    return callrpc(base_rpc_port + node_id, auth, method, params, wallet)
+
+
 def updateThread(cls):
     while not cls.delay_event.is_set():
         try:
@@ -106,6 +115,8 @@ def updateThread(cls):
                 callbtcrpc(0, 'generatetoaddress', [1, cls.btc_addr])
             if cls.ltc_addr is not None:
                 callltcrpc(0, 'generatetoaddress', [1, cls.ltc_addr])
+            if cls.bch_addr is not None:
+                callbchrpc(0, 'generatetoaddress', [1, cls.bch_addr])
         except Exception as e:
             print('updateThread error', str(e))
         cls.delay_event.wait(random.randrange(cls.update_min, cls.update_max))
@@ -174,6 +185,7 @@ class Test(unittest.TestCase):
         cls.processes = []
         cls.btc_addr = None
         cls.ltc_addr = None
+        cls.bch_addr = None
         cls.xmr_addr = None
         cls.dcr_addr = 'SsYbXyjkKAEXXcGdFgr4u4bo4L8RkCxwQpH'
         cls.dcr_acc = None
@@ -256,6 +268,14 @@ class Test(unittest.TestCase):
 
             self.update_thread_dcr = threading.Thread(target=updateThreadDCR, args=(self,))
             self.update_thread_dcr.start()
+
+        if 'bitcoincash' in TEST_COINS_LIST:
+            self.bch_addr = callbchrpc(0, 'getnewaddress', ['mining_addr'], wallet='wallet.dat')
+            num_blocks: int = 200
+            have_blocks: int = callbchrpc(0, 'getblockcount')
+            if have_blocks < num_blocks:
+                logging.info('Mining %d Bitcoincash blocks to %s', num_blocks - have_blocks, self.bch_addr)
+                callbchrpc(0, 'generatetoaddress', [num_blocks - have_blocks, self.bch_addr], wallet='wallet.dat')
 
         if RESET_TEST:
             # Lower output split threshold for more stakeable outputs
