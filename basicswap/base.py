@@ -126,7 +126,8 @@ class BaseApp:
     def callcoincli(self, coin_type, params, wallet=None, timeout=None):
         bindir = self.coin_clients[coin_type]['bindir']
         datadir = self.coin_clients[coin_type]['datadir']
-        command_cli = os.path.join(bindir, chainparams[coin_type]['name'] + '-cli' + ('.exe' if os.name == 'nt' else ''))
+        cli_bin: str = chainparams[coin_type].get('cli_binname', chainparams[coin_type]['name'] + '-cli')
+        command_cli = os.path.join(bindir, cli_bin + ('.exe' if os.name == 'nt' else ''))
         args = [command_cli, ]
         if self.chain != 'mainnet':
             args.append('-' + self.chain)

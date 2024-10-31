@@ -930,7 +930,6 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
                     for opt_line in wownerod_proxy_config:
                         fp.write(opt_line + '\n')
 
-    if coin in ('wownero', 'monero'):
         wallets_dir = core_settings.get('walletsdir', data_dir)
         if not os.path.exists(wallets_dir):
             os.makedirs(wallets_dir)
@@ -1002,7 +1001,8 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
 
         return
 
-    core_conf_path = os.path.join(data_dir, coin + '.conf')
+    core_conf_name: str = 'bitcoin.conf' if coin == 'bitcoincash' else coin + '.conf'
+    core_conf_path: str = os.path.join(data_dir, core_conf_name)
     if os.path.exists(core_conf_path):
         exitWithError('{} exists'.format(core_conf_path))
     with open(core_conf_path, 'w') as fp:
@@ -1056,7 +1056,8 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
             if BTC_RPC_USER != '':
                 fp.write('rpcauth={}:{}${}\n'.format(BTC_RPC_USER, salt, password_to_hmac(salt, BTC_RPC_PWD)))
         elif coin == 'bitcoincash':
-            fp.write('prune=2000\n')
+            fp.write('prune=4000\n')
+            fp.write('pid=bitcoincashd.pid\n')
             if BCH_RPC_USER != '':
                 fp.write('rpcauth={}:{}${}\n'.format(BCH_RPC_USER, salt, password_to_hmac(salt, BCH_RPC_PWD)))
         elif coin == 'namecoin':
