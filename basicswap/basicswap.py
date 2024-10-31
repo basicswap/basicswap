@@ -302,7 +302,7 @@ class BasicSwap(BaseApp):
         # TODO: Set dynamically
         self.balance_only_coins = (Coins.LTC_MWEB, )
         self.scriptless_coins = (Coins.XMR, Coins.WOW, Coins.PART_ANON, Coins.FIRO)
-        self.adaptor_swap_only_coins = self.scriptless_coins + (Coins.PART_BLIND, )
+        self.adaptor_swap_only_coins = self.scriptless_coins + (Coins.PART_BLIND, Coins.BCH)
         self.coins_without_segwit = (Coins.PIVX, Coins.DASH, Coins.NMC)
 
         # TODO: Adjust ranges
