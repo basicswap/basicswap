@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019-2023 tecnovert
+# Copyright (c) 2019-2024 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -37,7 +37,4 @@ XMR_BINDIR = os.path.expanduser(os.getenv('XMR_BINDIR', os.path.join(DEFAULT_TES
 XMRD = os.getenv('XMRD', 'monerod' + bin_suffix)
 XMR_WALLET_RPC = os.getenv('XMR_WALLET_RPC', 'monero-wallet-rpc' + bin_suffix)
 
-BITCOINCASH_BINDIR = os.path.expanduser(os.getenv('BITCOINCASH_BINDIR', os.path.join(DEFAULT_TEST_BINDIR, 'bitcoincash')))
-BITCOINCASHD = os.getenv('BITCOINCASHD', 'bitcoind' + bin_suffix)
-BITCOINCASH_CLI = os.getenv('BITCOINCASH_CLI', 'bitcoin-cli' + bin_suffix)
-BITCOINCASH_TX = os.getenv('BITCOINCASH_TX', 'bitcoin-tx' + bin_suffix)
+# NOTE: Adding coin definitions here is deprecated.  Please add in coin test file.

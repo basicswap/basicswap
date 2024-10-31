@@ -29,9 +29,12 @@ from tests.basicswap.common import (
     BASE_PORT, BASE_RPC_PORT,
     BTC_BASE_PORT, BTC_BASE_RPC_PORT, BTC_BASE_TOR_PORT,
     LTC_BASE_PORT, LTC_BASE_RPC_PORT,
-    DCR_BASE_PORT, DCR_BASE_RPC_PORT,
     PIVX_BASE_PORT,
 )
+from tests.basicswap.extended.test_dcr import (
+    DCR_BASE_PORT, DCR_BASE_RPC_PORT,
+)
+
 from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
 
 import basicswap.config as cfg

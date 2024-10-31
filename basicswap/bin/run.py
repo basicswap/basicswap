@@ -55,10 +55,10 @@ def signal_handler(sig, frame):
 
 def startDaemon(node_dir, bin_dir, daemon_bin, opts=[], extra_config={}):
     daemon_bin = os.path.expanduser(os.path.join(bin_dir, daemon_bin))
-
     datadir_path = os.path.expanduser(node_dir)
 
     # Rewrite litecoin.conf for 0.21.3
+    # TODO: Remove
     ltc_conf_path = os.path.join(datadir_path, 'litecoin.conf')
     if os.path.exists(ltc_conf_path):
         config_to_add = ['blockfilterindex=0', 'peerblockfilters=0']

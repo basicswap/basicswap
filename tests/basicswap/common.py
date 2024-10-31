@@ -31,18 +31,9 @@ BTC_BASE_RPC_PORT = 32792
 BTC_BASE_ZMQ_PORT = 33792
 BTC_BASE_TOR_PORT = 33732
 
-BCH_BASE_PORT = 41792
-BCH_BASE_RPC_PORT = 42792
-BCH_BASE_ZMQ_PORT = 43792
-BCH_BASE_TOR_PORT = 43732
-
 LTC_BASE_PORT = 34792
 LTC_BASE_RPC_PORT = 35792
 LTC_BASE_ZMQ_PORT = 36792
-
-DCR_BASE_PORT = 18555
-DCR_BASE_RPC_PORT = 9110
-
 
 PIVX_BASE_PORT = 34892
 PIVX_BASE_RPC_PORT = 35892
@@ -51,7 +42,7 @@ PIVX_BASE_ZMQ_PORT = 36892
 PREFIX_SECRET_KEY_REGTEST = 0x2e
 
 
-def prepareDataDir(datadir, node_id, conf_file, dir_prefix, base_p2p_port=BASE_PORT, base_rpc_port=BASE_RPC_PORT, num_nodes=3):
+def prepareDataDir(datadir, node_id, conf_file, dir_prefix, base_p2p_port=BASE_PORT, base_rpc_port=BASE_RPC_PORT, num_nodes=3, extra_opts=[]):
     node_dir = os.path.join(datadir, dir_prefix + str(node_id))
     if not os.path.exists(node_dir):
         os.makedirs(node_dir)
@@ -80,8 +71,11 @@ def prepareDataDir(datadir, node_id, conf_file, dir_prefix, base_p2p_port=BASE_P
         fp.write('acceptnonstdtxn=0\n')
         fp.write('txindex=1\n')
         fp.write('wallet=wallet.dat\n')
-        if not base_p2p_port == BCH_BASE_PORT:
-            fp.write('findpeers=0\n')
+
+        fp.write('findpeers=0\n')
+
+        for opt in extra_opts:
+            fp.write(opt + '\n')
 
         if base_p2p_port == BTC_BASE_PORT:
             fp.write('deprecatedrpc=create_bdb\n')
