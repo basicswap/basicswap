@@ -935,11 +935,16 @@ class BasicSwap(BaseApp):
             self.waitForDaemonRPC(coin_type, with_wallet=False)
             if coin_type in (Coins.XMR, Coins.WOW):
                 return
-            ci = self.ci(coin_type)
-            # checkWallets can adjust the wallet name.
-            if ci.checkWallets() < 1:
-                self.log.error('No wallets found for coin {}.'.format(ci.coin_name()))
-                self.stopRunning(1)  # systemd will try to restart the process if fail_code != 0
+
+            check_coin_types = [coin_type,]
+            if coin_type == Coins.PART:
+                check_coin_types += [Coins.PART_ANON, Coins.PART_BLIND]
+            for check_coin_type in check_coin_types:
+                ci = self.ci(check_coin_type)
+                # checkWallets can adjust the wallet name.
+                if ci.checkWallets() < 1:
+                    self.log.error('No wallets found for coin {}.'.format(ci.coin_name()))
+                    self.stopRunning(1)  # systemd will try to restart the process if fail_code != 0
 
         startup_tries = self.startup_tries
         chain_client_settings = self.getChainClientSettings(coin_type)
