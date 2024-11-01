@@ -252,6 +252,7 @@ def page_wallet(self, url_split, post_string):
 
     swap_client.updateWalletsInfo(force_refresh, only_coin=coin_id, wait_for_complete=True)
     wallets = swap_client.getCachedWalletsInfo({'coin_id': coin_id})
+    wallet_data = {}
     for k in wallets.keys():
         w = wallets[k]
         if 'error' in w:
