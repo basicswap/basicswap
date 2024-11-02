@@ -239,6 +239,7 @@ class BCHInterface(BTCInterface):
         public_key: bytes = kwargs['public_key'] if 'public_key' in kwargs else Kal
         timelock: int = kwargs['timelock']
 
+        # fmt: off
         return CScript([
             # // v4.1.0-CashTokens-Optimized
             # // Based on swaplock.cash v4.1.0-CashTokens
@@ -313,6 +314,7 @@ class BCHInterface(BTCInterface):
                 # // BCH and/or CashTokens are simply forwarded to Refund contract.
             OP_ENDIF
         ])
+        # fmt: on
 
     def pubkey_to_segwit_address(self, pk: bytes) -> str:
         raise NotImplementedError()

@@ -443,7 +443,8 @@ chainparams = {
         'has_cltv': True,
         'has_csv': True,
         'has_segwit': False,
-        'cli_binname' : 'bitcoin-cli',
+        'cli_binname': 'bitcoin-cli',
+        'core_binname': 'bitcoind',
         'mainnet': {
             'rpcport': 8332,
             'pubkey_address': 0,
