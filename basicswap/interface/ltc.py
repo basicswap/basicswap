@@ -95,8 +95,6 @@ class LTCInterfaceMWEB(LTCInterface):
 
     def coin_name(self) -> str:
         coin_chainparams = chainparams[Coins.LTC]
-        if coin_chainparams.get('use_ticker_as_name', False):
-            return coin_chainparams['ticker'] + ' MWEB'
         return coin_chainparams['name'].capitalize() + ' MWEB'
 
     def ticker(self) -> str:

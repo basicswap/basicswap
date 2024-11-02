@@ -435,8 +435,8 @@ def getCoinName(c):
         return chainparams[Coins.LTC]['name'].capitalize() + ' MWEB'
 
     coin_chainparams = chainparams[c]
-    if coin_chainparams.get('use_ticker_as_name', False):
-        return coin_chainparams['ticker']
+    if 'display_name' in coin_chainparams:
+        return coin_chainparams['display_name']
     return coin_chainparams['name'].capitalize()
 
 
