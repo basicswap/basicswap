@@ -69,7 +69,7 @@ def startDaemon(node_dir, bin_dir, daemon_bin, opts=[], extra_config={}):
                     config_to_add.remove(line)
 
         if len(config_to_add) > 0:
-            logging.info('Rewriting litecoin.conf')
+            logger.info('Rewriting litecoin.conf')
             shutil.copyfile(ltc_conf_path, ltc_conf_path + '.last')
             with open(ltc_conf_path, 'a') as fp:
                 for line in config_to_add:
@@ -80,7 +80,8 @@ def startDaemon(node_dir, bin_dir, daemon_bin, opts=[], extra_config={}):
     if add_datadir:
         args.append('-datadir=' + datadir_path)
     args += opts
-    logging.info('Starting node ' + daemon_bin + ' ' + (('-datadir=' + node_dir) if add_datadir else ''))
+    logger.info('Starting node {}'.format(daemon_bin))
+    logger.debug('Arguments {}'.format(' '.join(args)))
 
     opened_files = []
     if extra_config.get('stdout_to_file', False):
@@ -103,7 +104,8 @@ def startXmrDaemon(node_dir, bin_dir, daemon_bin, opts=[]):
     datadir_path = os.path.expanduser(node_dir)
     config_filename = 'wownerod.conf' if daemon_bin.startswith('wow') else 'monerod.conf'
     args = [daemon_path, '--non-interactive', '--config-file=' + os.path.join(datadir_path, config_filename)] + opts
-    logging.info('Starting node {} --data-dir={}'.format(daemon_path, node_dir))
+    logger.info('Starting node {}'.format(daemon_bin))
+    logger.debug('Arguments {}'.format(' '.join(args)))
 
     # return subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     file_stdout = open(os.path.join(datadir_path, 'core_stdout.log'), 'w')
@@ -112,8 +114,8 @@ def startXmrDaemon(node_dir, bin_dir, daemon_bin, opts=[]):
 
 
 def startXmrWalletDaemon(node_dir, bin_dir, wallet_bin, opts=[]):
-    daemon_bin = os.path.expanduser(os.path.join(bin_dir, wallet_bin))
-    args = [daemon_bin, '--non-interactive']
+    daemon_path = os.path.expanduser(os.path.join(bin_dir, wallet_bin))
+    args = [daemon_path, '--non-interactive']
 
     needs_rewrite: bool = False
     config_to_remove = ['daemon-address=', 'untrusted-daemon=', 'trusted-daemon=', 'proxy=']
@@ -127,19 +129,20 @@ def startXmrWalletDaemon(node_dir, bin_dir, wallet_bin, opts=[]):
         with open(config_path) as fp:
             for line in fp:
                 if any(line.startswith(config_line) for config_line in config_to_remove):
-                    logging.warning('Found old config in monero_wallet.conf: {}'.format(line.strip()))
+                    logger.warning('Found old config in monero_wallet.conf: {}'.format(line.strip()))
                     needs_rewrite = True
     args += opts
 
     if needs_rewrite:
-        logging.info('Rewriting wallet config')
+        logger.info('Rewriting wallet config')
         shutil.copyfile(config_path, config_path + '.last')
         with open(config_path + '.last') as fp_from, open(config_path, 'w') as fp_to:
             for line in fp_from:
                 if not any(line.startswith(config_line) for config_line in config_to_remove):
                     fp_to.write(line)
 
-    logging.info('Starting wallet daemon {} --wallet-dir={}'.format(daemon_bin, node_dir))
+    logger.info('Starting wallet daemon {}'.format(wallet_bin))
+    logger.debug('Arguments {}'.format(' '.join(args)))
 
     # TODO: return subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=data_dir)
     wallet_stdout = open(os.path.join(data_dir, 'wallet_stdout.log'), 'w')
@@ -166,8 +169,25 @@ def ws_message_received(client, server, message):
         swap_client.log.debug(f'ws_message_received {client["id"]} {message}')
 
 
+def getCoreBinName(coin_id: int, coin_settings, default_name: str) -> str:
+    return coin_settings.get('core_binname', chainparams[coin_id].get('core_binname', default_name)) + ('.exe' if os.name == 'nt' else '')
+
+
+def getWalletBinName(coin_id: int, coin_settings, default_name: str) -> str:
+    return coin_settings.get('wallet_binname', chainparams[coin_id].get('wallet_binname', default_name)) + ('.exe' if os.name == 'nt' else '')
+
+
+def getCoreBinArgs(coin_id: int, coin_settings):
+    extra_args = []
+    if 'config_filename' in coin_settings:
+        extra_args.append('--conf=' + coin_settings['config_filename'])
+    if 'port' in coin_settings:
+        extra_args.append('--port=' + str(int(coin_settings['port'])))
+    return extra_args
+
+
 def runClient(fp, data_dir, chain, start_only_coins):
-    global swap_client
+    global swap_client, logger
     daemons = []
     pids = []
     threads = []
@@ -188,6 +208,7 @@ def runClient(fp, data_dir, chain, start_only_coins):
         settings = json.load(fs)
 
     swap_client = BasicSwap(fp, data_dir, settings, chain)
+    logger = swap_client.log
 
     if os.path.exists(pids_path):
         with open(pids_path) as fd:
@@ -214,7 +235,8 @@ def runClient(fp, data_dir, chain, start_only_coins):
             if c in ('monero', 'wownero'):
                 if v['manage_daemon'] is True:
                     swap_client.log.info(f'Starting {display_name} daemon')
-                    filename = (c if not c == "bitcoincash" else "bitcoin") + 'd' + ('.exe' if os.name == 'nt' else '')
+                    filename: str = getCoreBinName(coin_id, v, c + 'd')
+
                     daemons.append(startXmrDaemon(v['datadir'], v['bindir'], filename))
                     pid = daemons[-1].handle.pid
                     swap_client.log.info('Started {} {}'.format(filename, pid))
@@ -240,7 +262,8 @@ def runClient(fp, data_dir, chain, start_only_coins):
                         opts.append(daemon_rpcuser + ':' + daemon_rpcpass)
 
                     opts.append('--trusted-daemon' if trusted_daemon else '--untrusted-daemon')
-                    filename = c + '-wallet-rpc' + ('.exe' if os.name == 'nt' else '')
+                    filename: str = getWalletBinName(coin_id, v, c + '-wallet-rpc')
+
                     daemons.append(startXmrWalletDaemon(v['datadir'], v['bindir'], filename, opts))
                     pid = daemons[-1].handle.pid
                     swap_client.log.info('Started {} {}'.format(filename, pid))
@@ -253,7 +276,7 @@ def runClient(fp, data_dir, chain, start_only_coins):
                 use_shell: bool = True if os.name == 'nt' else False
                 if v['manage_daemon'] is True:
                     swap_client.log.info(f'Starting {display_name} daemon')
-                    filename = 'dcrd' + ('.exe' if os.name == 'nt' else '')
+                    filename: str = getCoreBinName(coin_id, v, 'dcrd')
 
                     extra_config = {'add_datadir': False, 'stdout_to_file': True, 'stdout_filename': 'dcrd_stdout.log', 'use_shell': use_shell}
                     daemons.append(startDaemon(appdata, v['bindir'], filename, opts=extra_opts, extra_config=extra_config))
@@ -262,7 +285,7 @@ def runClient(fp, data_dir, chain, start_only_coins):
 
                 if v['manage_wallet_daemon'] is True:
                     swap_client.log.info(f'Starting {display_name} wallet daemon')
-                    filename = 'dcrwallet' + ('.exe' if os.name == 'nt' else '')
+                    filename: str = getWalletBinName(coin_id, v, 'dcrwallet')
 
                     wallet_pwd = v['wallet_pwd']
                     if wallet_pwd == '':
@@ -280,8 +303,9 @@ def runClient(fp, data_dir, chain, start_only_coins):
             if v['manage_daemon'] is True:
                 swap_client.log.info(f'Starting {display_name} daemon')
 
-                filename = (c if not c == "bitcoincash" else "bitcoin") + 'd' + ('.exe' if os.name == 'nt' else '')
-                daemons.append(startDaemon(v['datadir'], v['bindir'], filename))
+                filename: str = getCoreBinName(coin_id, v, c + 'd')
+                extra_opts = getCoreBinArgs(coin_id, v)
+                daemons.append(startDaemon(v['datadir'], v['bindir'], filename, opts=extra_opts))
                 pid = daemons[-1].handle.pid
                 pids.append((c, pid))
                 swap_client.setDaemonPID(c, pid)

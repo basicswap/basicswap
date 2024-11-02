@@ -37,7 +37,7 @@ from basicswap.ui.util import getCoinName
 from basicswap.util import toBool
 from basicswap.util.network import urlretrieve, make_reporthook
 from basicswap.util.rfc2440 import rfc2440_hash_password
-from basicswap.bin.run import startDaemon, startXmrWalletDaemon
+from basicswap.bin.run import startDaemon, startXmrWalletDaemon, getCoreBinName, getCoreBinArgs, getWalletBinName
 
 PARTICL_VERSION = os.getenv('PARTICL_VERSION', '23.2.7.0')
 PARTICL_VERSION_TAG = os.getenv('PARTICL_VERSION_TAG', '')
@@ -140,7 +140,8 @@ BIN_ARCH = os.getenv('BIN_ARCH', BIN_ARCH)
 FILE_EXT = os.getenv('FILE_EXT', FILE_EXT)
 
 logger = logging.getLogger()
-logger.level = logging.INFO
+LOG_LEVEL = logging.DEBUG
+logger.level = LOG_LEVEL
 if not len(logger.handlers):
     logger.addHandler(logging.StreamHandler(sys.stdout))
 
@@ -193,7 +194,8 @@ BTC_RPC_PWD = os.getenv('BTC_RPC_PWD', '')
 
 BCH_RPC_HOST = os.getenv('BCH_RPC_HOST', '127.0.0.1')
 BCH_RPC_PORT = int(os.getenv('BCH_RPC_PORT', 19997))
-BCH_ONION_PORT = int(os.getenv('BCH_ONION_PORT', 8334))
+BCH_ONION_PORT = int(os.getenv('BCH_ONION_PORT', 8335))
+BCH_PORT = int(os.getenv('BCH_PORT', 19798))
 BCH_RPC_USER = os.getenv('BCH_RPC_USER', '')
 BCH_RPC_PWD = os.getenv('BCH_RPC_PWD', '')
 
@@ -319,6 +321,7 @@ def setConnectionParameters(timeout: int = 5, allow_set_tor: bool = True):
 
     # Set low timeout for urlretrieve connections
     socket.setdefaulttimeout(timeout)
+    logger.level = logging.INFO
 
 
 def popConnectionParameters() -> None:
@@ -326,6 +329,7 @@ def popConnectionParameters() -> None:
         socket.socket = default_socket
         socket.getaddrinfo = default_socket_getaddrinfo
     socket.setdefaulttimeout(default_socket_timeout)
+    logger.level = LOG_LEVEL
 
 
 def getRemoteFileLength(url: str) -> (int, bool):
@@ -893,7 +897,8 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
         os.makedirs(data_dir)
 
     if coin in ('wownero', 'monero'):
-        core_conf_path = os.path.join(data_dir, coin + 'd.conf')
+        conf_filename: str = core_settings.get('config_filename', coin + 'd.conf')
+        core_conf_path = os.path.join(data_dir, conf_filename)
         if os.path.exists(core_conf_path):
             exitWithError('{} exists'.format(core_conf_path))
         with open(core_conf_path, 'w') as fp:
@@ -934,9 +939,8 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
         if not os.path.exists(wallets_dir):
             os.makedirs(wallets_dir)
 
-        wallet_conf_path = os.path.join(wallets_dir, coin + '-wallet-rpc.conf')
-        if coin == 'monero':
-            wallet_conf_path = os.path.join(wallets_dir, 'monero_wallet.conf')
+        wallet_conf_filename: str = core_settings.get('wallet_config_filename', 'monero_wallet.conf' if coin == 'monero' else (coin + '-wallet-rpc.conf'))
+        wallet_conf_path = os.path.join(wallets_dir, wallet_conf_filename)
         if os.path.exists(wallet_conf_path):
             exitWithError('{} exists'.format(wallet_conf_path))
         with open(wallet_conf_path, 'w') as fp:
@@ -966,7 +970,8 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
 
     if coin == 'decred':
         chainname = 'simnet' if chain == 'regtest' else chain
-        core_conf_path = os.path.join(data_dir, 'dcrd.conf')
+        conf_filename: str = core_settings.get('config_filename', 'dcrd.conf')
+        core_conf_path = os.path.join(data_dir, conf_filename)
         if os.path.exists(core_conf_path):
             exitWithError('{} exists'.format(core_conf_path))
         with open(core_conf_path, 'w') as fp:
@@ -983,7 +988,8 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
             if tor_control_password is not None:
                 writeTorSettings(fp, coin, core_settings, tor_control_password)
 
-        wallet_conf_path = os.path.join(data_dir, 'dcrwallet.conf')
+        wallet_conf_filename: str = core_settings.get('wallet_config_filename', 'dcrwallet.conf')
+        wallet_conf_path = os.path.join(data_dir, wallet_conf_filename)
         if os.path.exists(wallet_conf_path):
             exitWithError('{} exists'.format(wallet_conf_path))
         with open(wallet_conf_path, 'w') as fp:
@@ -1001,8 +1007,8 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
 
         return
 
-    core_conf_name: str = 'bitcoin.conf' if coin == 'bitcoincash' else coin + '.conf'
-    core_conf_path: str = os.path.join(data_dir, core_conf_name)
+    core_conf_name: str = core_settings.get('config_filename', coin + '.conf')
+    core_conf_path = os.path.join(data_dir, core_conf_name)
     if os.path.exists(core_conf_path):
         exitWithError('{} exists'.format(core_conf_path))
     with open(core_conf_path, 'w') as fp:
@@ -1136,14 +1142,14 @@ def modify_tor_config(settings, coin, tor_control_password=None, enable=False, e
     data_dir = coin_settings['datadir']
 
     if coin in ('monero', 'wownero'):
-        core_conf_path = os.path.join(data_dir, coin + 'd.conf')
+        core_conf_name: str = coin_settings.get('config_filename', coin + 'd.conf')
+        core_conf_path = os.path.join(data_dir, core_conf_name)
         if not os.path.exists(core_conf_path):
             exitWithError('{} does not exist'.format(core_conf_path))
 
         wallets_dir = coin_settings.get('walletsdir', data_dir)
-        wallet_conf_path = os.path.join(wallets_dir, coin + '-wallet-rpc.conf')
-        if coin == 'monero':
-            wallet_conf_path = os.path.join(wallets_dir, 'monero_wallet.conf')
+        wallet_conf_filename: str = coin_settings.get('wallet_config_filename', 'monero_wallet.conf' if coin == 'monero' else (coin + '-wallet-rpc.conf'))
+        wallet_conf_path = os.path.join(wallets_dir, wallet_conf_filename)
         if not os.path.exists(wallet_conf_path):
             exitWithError('{} does not exist'.format(wallet_conf_path))
 
@@ -1198,10 +1204,8 @@ def modify_tor_config(settings, coin, tor_control_password=None, enable=False, e
             coin_settings['trusted_daemon'] = extra_opts.get('trust_remote_node', 'auto')
         return
 
-    if coin == 'decred':
-        config_path = os.path.join(data_dir, 'dcrd.conf')
-    else:
-        config_path = os.path.join(data_dir, coin + '.conf')
+    core_conf_name: str = coin_settings.get('config_filename', 'dcrd.conf' if coin == 'decred' else (coin + '.conf'))
+    config_path = os.path.join(data_dir, core_conf_name)
 
     if not os.path.exists(config_path):
         exitWithError('{} does not exist'.format(config_path))
@@ -1322,8 +1326,9 @@ def test_particl_encryption(data_dir, settings, chain, use_tor_proxy):
             c = Coins.PART
             coin_name = 'particl'
             coin_settings = settings['chainclients'][coin_name]
+            daemon_args += getCoreBinArgs(c, coin_settings)
             if coin_settings['manage_daemon']:
-                filename = coin_name + 'd' + ('.exe' if os.name == 'nt' else '')
+                filename: str = getCoreBinName(c, coin_settings, coin_name + 'd')
                 daemons.append(startDaemon(coin_settings['datadir'], coin_settings['bindir'], filename, daemon_args))
                 swap_client.setDaemonPID(c, daemons[-1].handle.pid)
             swap_client.setCoinRunParams(c)
@@ -1374,17 +1379,19 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
                 if c == Coins.XMR:
                     if coin_settings['manage_wallet_daemon']:
                         filename = coin_name + '-wallet-rpc' + ('.exe' if os.name == 'nt' else '')
+                        filename: str = getWalletBinName(c, coin_settings, coin_name + '-wallet-rpc')
                         daemons.append(startXmrWalletDaemon(coin_settings['datadir'], coin_settings['bindir'], filename))
                 elif c == Coins.WOW:
                     if coin_settings['manage_wallet_daemon']:
-                        filename = coin_name + '-wallet-rpc' + ('.exe' if os.name == 'nt' else '')
+                        filename: str = getWalletBinName(c, coin_settings, coin_name + '-wallet-rpc')
                         daemons.append(startXmrWalletDaemon(coin_settings['datadir'], coin_settings['bindir'], filename))
                 elif c == Coins.DCR:
                     pass
                 else:
                     if coin_settings['manage_daemon']:
-                        filename = (coin_name if not coin_name == "bitcoincash" else "bitcoin") + 'd' + ('.exe' if os.name == 'nt' else '')
+                        filename: str = getCoreBinName(c, coin_settings, coin_name + 'd')
                         coin_args = ['-nofindpeers', '-nostaking'] if c == Coins.PART else []
+                        coin_args += getCoreBinArgs(c, coin_settings)
 
                         if c == Coins.FIRO:
                             coin_args += ['-hdseed={}'.format(swap_client.getWalletKey(Coins.FIRO, 1).hex())]
@@ -1405,7 +1412,7 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
                                       '--pass={}'.format(dcr_password),
                                       ]
 
-                        filename = 'dcrwallet' + ('.exe' if os.name == 'nt' else '')
+                        filename: str = getWalletBinName(c, coin_settings, 'dcrwallet')
                         args = [os.path.join(coin_settings['bindir'], filename), '--create'] + extra_opts
                         hex_seed = swap_client.getWalletKey(Coins.DCR, 1).hex()
                         createDCRWallet(args, hex_seed, logger, threading.Event())
@@ -1786,13 +1793,15 @@ def main():
             'core_version_group': 22,
         },
         'bitcoincash': {
-            'connection_type': 'rpc' if 'bitcoincash' in with_coins else 'none',
-            'manage_daemon': True if ('bitcoincash' in with_coins and BCH_RPC_HOST == '127.0.0.1') else False,
+            'connection_type': 'rpc',
+            'manage_daemon': shouldManageDaemon('BCH'),
             'rpchost': BCH_RPC_HOST,
             'rpcport': BCH_RPC_PORT + port_offset,
             'onionport': BCH_ONION_PORT + port_offset,
             'datadir': os.getenv('BCH_DATA_DIR', os.path.join(data_dir, 'bitcoincash')),
             'bindir': os.path.join(bin_dir, 'bitcoincash'),
+            'port': BCH_PORT + port_offset,
+            'config_filename': 'bitcoin.conf',
             'use_segwit': False,
             'blocks_confirmed': 1,
             'conf_target': 2,
@@ -1830,6 +1839,7 @@ def main():
             'blocks_confirmed': 2,
             'conf_target': 2,
             'core_type_group': 'dcr',
+            'config_filename': 'dcrd.conf',
             'min_relay_fee': 0.00001,
         },
         'namecoin': {
@@ -1866,6 +1876,7 @@ def main():
             'rpctimeout': 60,
             'walletrpctimeout': 120,
             'walletrpctimeoutlong': 600,
+            'wallet_config_filename': 'monero_wallet.conf',
             'core_type_group': 'xmr',
         },
         'pivx': {

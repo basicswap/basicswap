@@ -105,6 +105,7 @@ def run_prepare(node_id, datadir_path, bins_path, with_coins, mnemonic_in=None, 
     os.environ['BTC_RPC_PORT'] = str(BITCOIN_RPC_PORT_BASE)
     os.environ['LTC_RPC_PORT'] = str(LITECOIN_RPC_PORT_BASE)
     os.environ['DCR_RPC_PORT'] = str(DECRED_RPC_PORT_BASE)
+    os.environ['BCH_PORT'] = str(BCH_BASE_PORT)
     os.environ['BCH_RPC_PORT'] = str(BITCOINCASH_RPC_PORT_BASE)
     os.environ['FIRO_RPC_PORT'] = str(FIRO_RPC_PORT_BASE)
 
@@ -329,7 +330,7 @@ def run_prepare(node_id, datadir_path, bins_path, with_coins, mnemonic_in=None, 
             for line in lines:
                 if not line.startswith('prune'):
                     fp.write(line)
-            fp.write('port={}\n'.format(BCH_BASE_PORT + node_id + port_ofs))
+            # NOTE: port is set (when starting daemon) from basicswap.json
             fp.write('bind=127.0.0.1\n')
             fp.write('dnsseed=0\n')
             fp.write('discover=0\n')
