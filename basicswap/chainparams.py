@@ -280,13 +280,13 @@ chainparams = {
     Coins.PIVX: {
         'name': 'pivx',
         'ticker': 'PIVX',
+        'display_name': 'PIVX',
         'message_magic': 'DarkNet Signed Message:\n',
         'blocks_target': 60 * 1,
         'decimal_places': 8,
         'has_cltv': True,
         'has_csv': False,
         'has_segwit': False,
-        'use_ticker_as_name': True,
         'mainnet': {
             'rpcport': 51473,
             'pubkey_address': 30,
@@ -437,6 +437,7 @@ chainparams = {
     Coins.BCH: {
         'name': 'bitcoincash',
         'ticker': 'BCH',
+        'display_name': 'Bitcoin Cash',
         'message_magic': 'Bitcoin Signed Message:\n',
         'blocks_target': 60 * 2,
         'decimal_places': 8,
