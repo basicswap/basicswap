@@ -364,7 +364,8 @@ def js_bids(self, url_split, post_string: str, is_json: bool) -> bytes:
         bid_id = bytes.fromhex(url_split[3])
         assert (len(bid_id) == 28)
 
-        show_txns = False
+        show_txns: bool = False
+        with_events: bool = False
         if post_string != '':
             post_data = getFormData(post_string, is_json)
             if have_data_entry(post_data, 'accept'):
@@ -376,6 +377,8 @@ def js_bids(self, url_split, post_string: str, is_json: bool) -> bytes:
 
             if have_data_entry(post_data, 'show_extra'):
                 show_txns = True
+            if have_data_entry(post_data, 'with_events'):
+                with_events = True
 
         bid, xmr_swap, offer, xmr_offer, events = swap_client.getXmrBidAndOffer(bid_id)
         assert (bid), 'Unknown bid ID'
@@ -389,6 +392,17 @@ def js_bids(self, url_split, post_string: str, is_json: bool) -> bytes:
 
         if len(url_split) > 4 and url_split[4] == 'states':
             old_states = listOldBidStates(bid)
+
+            if with_events:
+                new_list = []
+                for entry in old_states:
+                    entry_list = list(entry)
+                    entry_list.insert(1, 'state')
+                    new_list.append(entry_list)
+                for event in events:
+                    new_list.append([event['at'], 'event', event['desc']])
+                old_states = sorted(new_list, key=lambda x: x[0])
+
             return bytes(json.dumps(old_states), 'UTF-8')
 
         edit_bid = False

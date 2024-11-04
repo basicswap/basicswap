@@ -4524,7 +4524,7 @@ class BasicSwap(BaseApp):
                         bid.setState(BidStates.XMR_SWAP_FAILED)
 
                 if was_received:
-                    if not was_sent:
+                    if not was_sent:  # Self bids
                         bid.setState(BidStates.XMR_SWAP_FAILED_REFUNDED)
 
             else:
