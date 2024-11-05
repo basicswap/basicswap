@@ -168,11 +168,16 @@ def readConfig(args, known_coins):
             num_changes += 1
         offer_templates_map[offer_template['name']] = offer_template
 
-        min_offer_amount: float = float(offer_template.get('amount_step', offer_template['amount']))
-        if float(offer_template.get('min_coin_from_amt', 0)) < min_offer_amount:
-            print('Setting min_coin_from_amt for', offer_template['name'])
-            offer_template['min_coin_from_amt'] = min_offer_amount
-            num_changes += 1
+        if 'amount_step' not in offer_template:
+            if offer_template.get('min_coin_from_amt', 0) < offer_template['amount']:
+                print('Setting min_coin_from_amt for', offer_template['name'])
+                offer_template['min_coin_from_amt'] = offer_template['amount']
+                num_changes += 1
+        else:
+            if 'min_coin_from_amt' not in offer_template:
+                print('Setting min_coin_from_amt for', offer_template['name'])
+                offer_template['min_coin_from_amt'] = 0
+                num_changes += 1
 
         if 'address' not in offer_template:
             print('Setting address to auto for offer', offer_template['name'])
