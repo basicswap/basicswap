@@ -45,7 +45,7 @@ from basicswap.interface.contrib.bch_test_framework.script import (
     OP_CHECKSIG,
     OP_HASH256,
 )
-from basicswap.contrib.test_framework.script import CScript
+from basicswap.contrib.test_framework.script import OP_RETURN, CScript
 from coincurve.keys import (
     PrivateKey,
     PublicKey,
@@ -469,7 +469,7 @@ class BCHInterface(BTCInterface):
         self._log.info('createSCLockRefundSpendToFTx %s:\n    fee_rate, vsize, fee: %ld, %ld, %ld.',
                        i2h(tx.sha256), tx_fee_rate, vsize, pay_fee)
 
-        return tx.serialize()
+        return tx.serialize_without_witness()
 
     def signTx(self, key_bytes: bytes, tx_bytes: bytes, input_n: int, prevout_script: bytes, prevout_value: int) -> bytes:
         # simply sign the entire tx data, as this is not a preimage signature
@@ -798,3 +798,39 @@ class BCHInterface(BTCInterface):
 
     def isTxExistsError(self, err_str: str) -> bool:
         return 'transaction already in block chain' in err_str
+
+    def createMercyTx(self, refund_swipe_tx_bytes: bytes, refund_swipe_tx_id: bytes, lock_refund_tx_script: bytes, keyshare: bytes) -> str:
+        refund_swipe_tx = self.loadTx(refund_swipe_tx_bytes)
+        refund_output_value = refund_swipe_tx.vout[0].nValue
+        refund_output_script = refund_swipe_tx.vout[0].scriptPubKey
+
+        # mercy transaction size consisting of one input of freshly received funds,
+        # one op_return with mercy information, a dust output to the leader and change back to the follower
+        tx_size = 275
+        dust_limit = 546
+
+        outValue = refund_output_value - tx_size - dust_limit
+
+        _, out_1, _, _, _ = self.extractScriptLockScriptValues(lock_refund_tx_script)
+
+        tx = CTransaction()
+        tx.nVersion = self.txVersion()
+        tx.vin.append(CTxIn(COutPoint(b2i(refund_swipe_tx_id), 0),
+                            nSequence=0,
+                            scriptSig=CScript(out_1)))
+
+        tx.vout.append(self.txoType()(0, CScript([OP_RETURN, b'XBSW', keyshare])))
+        tx.vout.append(self.txoType()(dust_limit, CScript(out_1)))
+        tx.vout.append(self.txoType()(outValue, refund_output_script))
+
+        size = tx_size
+        vsize = size
+
+        pay_fee = size
+
+        tx.rehash()
+        self._log.info('createMercyTx %s:\n    fee_rate, vsize, fee: %ld, %ld, %ld.',
+                       i2h(tx.sha256), 1, vsize, pay_fee)
+
+        txHex = tx.serialize_without_witness()
+        return self.signTxWithWallet(txHex)
