@@ -106,7 +106,6 @@ class BidStates(IntEnum):
     BID_REQUEST_SENT = 29
     BID_REQUEST_ACCEPTED = 30
     BID_EXPIRED = 31
-    BID_STALLED_FOR_TEST_TYPE2 = 32
 
 
 class TxStates(IntEnum):
@@ -212,6 +211,7 @@ class DebugTypes(IntEnum):
     OFFER_LOCK_2_VALUE_INC = auto()
     BID_STOP_AFTER_COIN_B_LOCK = auto()
     BID_DONT_SPEND_COIN_B_LOCK = auto()
+    WAIT_FOR_COIN_B_LOCK_BEFORE_REFUND = auto()
 
 
 class NotificationTypes(IntEnum):
@@ -363,7 +363,9 @@ def strTxType(tx_type):
     if tx_type == TxTypes.XMR_SWAP_B_LOCK:
         return 'Chain B Lock Tx'
     if tx_type == TxTypes.ITX_PRE_FUNDED:
-        return 'Funded mock initiate tx'
+        return 'Funded mock initiate Tx'
+    if tx_type == TxTypes.BCH_MERCY:
+        return 'BCH Mercy Tx'
     return 'Unknown'
 
 

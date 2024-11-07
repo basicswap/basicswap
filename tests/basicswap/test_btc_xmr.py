@@ -296,16 +296,19 @@ class TestFunctions(BaseTest):
         bid_id = swap_clients[id_bidder].postXmrBid(offer_id, offer.amount_from)
         wait_for_bid(test_delay_event, swap_clients[id_offerer], bid_id, BidStates.BID_RECEIVED)
 
-        debug_type = DebugTypes.BID_DONT_SPEND_COIN_B_LOCK if with_mercy else DebugTypes.BID_STOP_AFTER_COIN_A_LOCK
-        swap_clients[id_follower].setBidDebugInd(bid_id, debug_type)
         debug_type = DebugTypes.BID_DONT_SPEND_COIN_A_LOCK_REFUND2 if with_mercy else DebugTypes.BID_DONT_SPEND_COIN_A_LOCK_REFUND
         swap_clients[id_leader].setBidDebugInd(bid_id, debug_type)
+        debug_type = DebugTypes.BID_DONT_SPEND_COIN_B_LOCK if with_mercy else DebugTypes.BID_STOP_AFTER_COIN_A_LOCK
+        swap_clients[id_follower].setBidDebugInd(bid_id, debug_type)
+
+        swap_clients[id_leader].setBidDebugInd(bid_id, DebugTypes.WAIT_FOR_COIN_B_LOCK_BEFORE_REFUND, False)
+        swap_clients[id_follower].setBidDebugInd(bid_id, DebugTypes.WAIT_FOR_COIN_B_LOCK_BEFORE_REFUND, False)
 
         swap_clients[id_offerer].acceptBid(bid_id)
 
         leader_sent_bid: bool = True if reverse_bid else False
 
-        expect_state = BidStates.XMR_SWAP_NOSCRIPT_TX_REDEEMED if with_mercy else BidStates.BID_STALLED_FOR_TEST
+        expect_state = (BidStates.XMR_SWAP_NOSCRIPT_TX_REDEEMED, BidStates.SWAP_COMPLETED) if with_mercy else BidStates.BID_STALLED_FOR_TEST
         wait_for_bid(test_delay_event, swap_clients[id_leader], bid_id, expect_state, wait_for=(self.extra_wait_time + 180), sent=leader_sent_bid)
         wait_for_bid(test_delay_event, swap_clients[id_follower], bid_id, BidStates.XMR_SWAP_FAILED_SWIPED, wait_for=(self.extra_wait_time + 80), sent=(not leader_sent_bid))
 

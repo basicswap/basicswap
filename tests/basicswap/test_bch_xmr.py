@@ -568,7 +568,8 @@ class TestBCH(BasicSwapTest):
 
     def test_03_b_follower_recover_a_lock_tx_reverse(self):
         self.prepare_balance(Coins.BCH, 100.0, 1801, 1800)
-        super().test_03_b_follower_recover_a_lock_tx_reverse()
+        self.prepare_balance(Coins.XMR, 100.0, 1800, 1801)
+        self.do_test_03_follower_recover_a_lock_tx(Coins.XMR, self.test_coin_from, lock_value=12, with_mercy=True)
 
     def test_03_c_follower_recover_a_lock_tx_to_part(self):
         super().test_03_c_follower_recover_a_lock_tx_to_part()

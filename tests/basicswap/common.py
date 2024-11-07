@@ -141,7 +141,7 @@ def wait_for_bid(delay_event, swap_client, bid_id, state=None, sent: bool = Fals
         assert (len(bids) < 2)
         for bid in bids:
             if bid[2] == bid_id:
-                if isinstance(state, list):
+                if isinstance(state, (list, tuple)):
                     if bid[5] in state:
                         return
                     else:
