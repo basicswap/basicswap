@@ -799,6 +799,10 @@ class BCHInterface(BTCInterface):
     def isTxExistsError(self, err_str: str) -> bool:
         return 'transaction already in block chain' in err_str
 
+    def getRefundOutputScript(self, xmr_swap) -> bytes:
+        _, out_1, _, _, _ = self.extractScriptLockScriptValues(xmr_swap.a_lock_refund_tx_script)
+        return out_1
+
     def createMercyTx(self, refund_swipe_tx_bytes: bytes, refund_swipe_tx_id: bytes, lock_refund_tx_script: bytes, keyshare: bytes) -> str:
         refund_swipe_tx = self.loadTx(refund_swipe_tx_bytes)
         refund_output_value = refund_swipe_tx.vout[0].nValue
