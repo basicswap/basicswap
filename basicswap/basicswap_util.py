@@ -106,6 +106,7 @@ class BidStates(IntEnum):
     BID_REQUEST_SENT = 29
     BID_REQUEST_ACCEPTED = 30
     BID_EXPIRED = 31
+    BID_STALLED_FOR_TEST_TYPE2 = 32
 
 
 class TxStates(IntEnum):
@@ -136,6 +137,8 @@ class TxTypes(IntEnum):
     XMR_SWAP_B_LOCK_REFUND = auto()
 
     ITX_PRE_FUNDED = auto()
+
+    BCH_MERCY = auto()
 
 
 class ActionTypes(IntEnum):
@@ -184,6 +187,7 @@ class EventLogTypes(IntEnum):
     PTX_REDEEM_PUBLISHED = auto()
     PTX_REFUND_PUBLISHED = auto()
     LOCK_TX_B_IN_MEMPOOL = auto()
+    BCH_MERCY_TX_FOUND = auto()
 
 
 class XmrSplitMsgTypes(IntEnum):
@@ -195,6 +199,7 @@ class DebugTypes(IntEnum):
     NONE = 0
     BID_STOP_AFTER_COIN_A_LOCK = auto()
     BID_DONT_SPEND_COIN_A_LOCK_REFUND = auto()
+    BID_DONT_SPEND_COIN_A_LOCK_REFUND2 = auto()  # continues
     CREATE_INVALID_COIN_B_LOCK = auto()
     BUYER_STOP_AFTER_ITX = auto()
     MAKE_INVALID_PTX = auto()
@@ -206,6 +211,7 @@ class DebugTypes(IntEnum):
     DONT_CONFIRM_PTX = auto()
     OFFER_LOCK_2_VALUE_INC = auto()
     BID_STOP_AFTER_COIN_B_LOCK = auto()
+    BID_DONT_SPEND_COIN_B_LOCK = auto()
 
 
 class NotificationTypes(IntEnum):
@@ -445,6 +451,8 @@ def describeEventEntry(event_type, event_msg):
         return 'Participate tx redeem tx published'
     if event_type == EventLogTypes.PTX_REFUND_PUBLISHED:
         return 'Participate tx refund tx published'
+    if event_type == EventLogTypes.BCH_MERCY_TX_FOUND:
+        return 'BCH mercy tx found'
 
 
 def getVoutByAddress(txjs, p2sh):

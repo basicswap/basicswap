@@ -264,8 +264,8 @@ class TestFunctions(BaseTest):
         # TODO: Discard block rewards
         # assert (node0_from_before - node0_from_after < 0.02)
 
-    def do_test_03_follower_recover_a_lock_tx(self, coin_from, coin_to, lock_value: int = 32):
-        logging.info('---------- Test {} to {} follower recovers coin a lock tx'.format(coin_from.name, coin_to.name))
+    def do_test_03_follower_recover_a_lock_tx(self, coin_from, coin_to, lock_value: int = 32, with_mercy: bool = False):
+        logging.info('---------- Test {} to {} follower recovers coin a lock tx{}'.format(coin_from.name, coin_to.name, ' (with mercy tx)' if with_mercy else ''))
 
         # Leader is too slow to recover the coin a lock tx and follower swipes it
         # coin b lock tx remains unspent
@@ -296,13 +296,17 @@ class TestFunctions(BaseTest):
         bid_id = swap_clients[id_bidder].postXmrBid(offer_id, offer.amount_from)
         wait_for_bid(test_delay_event, swap_clients[id_offerer], bid_id, BidStates.BID_RECEIVED)
 
-        swap_clients[id_follower].setBidDebugInd(bid_id, DebugTypes.BID_STOP_AFTER_COIN_A_LOCK)
-        swap_clients[id_leader].setBidDebugInd(bid_id, DebugTypes.BID_DONT_SPEND_COIN_A_LOCK_REFUND)
+        debug_type = DebugTypes.BID_DONT_SPEND_COIN_B_LOCK if with_mercy else DebugTypes.BID_STOP_AFTER_COIN_A_LOCK
+        swap_clients[id_follower].setBidDebugInd(bid_id, debug_type)
+        debug_type = DebugTypes.BID_DONT_SPEND_COIN_A_LOCK_REFUND2 if with_mercy else DebugTypes.BID_DONT_SPEND_COIN_A_LOCK_REFUND
+        swap_clients[id_leader].setBidDebugInd(bid_id, debug_type)
 
         swap_clients[id_offerer].acceptBid(bid_id)
 
         leader_sent_bid: bool = True if reverse_bid else False
-        wait_for_bid(test_delay_event, swap_clients[id_leader], bid_id, BidStates.BID_STALLED_FOR_TEST, wait_for=(self.extra_wait_time + 180), sent=leader_sent_bid)
+
+        expect_state = BidStates.XMR_SWAP_NOSCRIPT_TX_REDEEMED if with_mercy else BidStates.BID_STALLED_FOR_TEST
+        wait_for_bid(test_delay_event, swap_clients[id_leader], bid_id, expect_state, wait_for=(self.extra_wait_time + 180), sent=leader_sent_bid)
         wait_for_bid(test_delay_event, swap_clients[id_follower], bid_id, BidStates.XMR_SWAP_FAILED_SWIPED, wait_for=(self.extra_wait_time + 80), sent=(not leader_sent_bid))
 
         js_w1_after = read_json_api(1800 + id_bidder, 'wallets')

@@ -201,7 +201,7 @@ class BCHInterface(BTCInterface):
         if not txid:
             txns = self.rpc_wallet('listtransactions', ["*", 100000, 0, True])
             for tx in txns:
-                if self.make_int(tx['amount']) == bid_amount and tx['category'] == 'send' and tx['address'] == dest_address:
+                if self.make_int(tx['amount']) == bid_amount and tx['category'] == 'send' and tx.get('address', '_NONE_') == dest_address:
                     txid = bytes.fromhex(tx['txid'])
                     break
 
