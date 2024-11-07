@@ -191,7 +191,6 @@ class BCHInterface(BTCInterface):
         return_txid = True
 
         txns = self.rpc_wallet('listunspent', [0, 9999999, [dest_address, ]])
-
         for tx in txns:
             if self.make_int(tx['amount']) == bid_amount:
                 txid = bytes.fromhex(tx['txid'])
@@ -435,7 +434,7 @@ class BCHInterface(BTCInterface):
         kwargs['ves'] = bytes(73)
         return self.createSCLockSpendTx(tx_lock_refund_bytes, script_lock_refund, pkh_refund_to, tx_fee_rate, vkbv, **kwargs)
 
-    def createSCLockRefundSpendToFTx(self, tx_lock_refund_bytes, script_lock_refund, pkh_dest, tx_fee_rate, vkbv=None):
+    def createSCLockRefundSpendToFTx(self, tx_lock_refund_bytes, script_lock_refund, pkh_dest, tx_fee_rate, vkbv=None, kbsf=None):
         # lock refund swipe tx
         # Sends the coinA locked coin to the follower
 
