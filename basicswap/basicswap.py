@@ -3828,10 +3828,13 @@ class BasicSwap(BaseApp):
             if TxTypes.XMR_SWAP_A_LOCK_REFUND in bid.txns:
                 refund_tx = bid.txns[TxTypes.XMR_SWAP_A_LOCK_REFUND]
                 if was_received:
-                    if bid.debug_ind == DebugTypes.BID_DONT_SPEND_COIN_A_LOCK_REFUND:
+                    if bid.debug_ind in (DebugTypes.BID_DONT_SPEND_COIN_A_LOCK_REFUND, DebugTypes.BID_DONT_SPEND_COIN_A_LOCK_REFUND2):
                         self.log.debug('Adaptor-sig bid %s: Stalling bid for testing: %d.', bid_id.hex(), bid.debug_ind)
-                        bid.setState(BidStates.BID_STALLED_FOR_TEST)
-                        rv = True
+                        if bid.debug_ind == DebugTypes.BID_DONT_SPEND_COIN_A_LOCK_REFUND:
+                            bid.setState(BidStates.BID_STALLED_FOR_TEST)
+                            rv = True
+                        else:
+                            bid.setState(BidStates.BID_STALLED_FOR_TEST_TYPE2)
                         self.saveBidInSession(bid_id, bid, session, xmr_swap)
                         self.logBidEvent(bid.bid_id, EventLogTypes.DEBUG_TWEAK_APPLIED, 'ind {}'.format(bid.debug_ind), session)
                         session.commit()
@@ -4055,10 +4058,16 @@ class BasicSwap(BaseApp):
                         self.log.debug('getrawtransaction lock spend tx failed: %s', str(e))
             elif state == BidStates.XMR_SWAP_SCRIPT_TX_REDEEMED:
                 if was_received and self.countQueuedActions(session, bid_id, ActionTypes.REDEEM_XMR_SWAP_LOCK_TX_B) < 1:
-                    bid.setState(BidStates.SWAP_DELAYING)
-                    delay = self.get_delay_event_seconds()
-                    self.log.info('Redeeming coin b lock tx for bid %s in %d seconds', bid_id.hex(), delay)
-                    self.createActionInSession(delay, ActionTypes.REDEEM_XMR_SWAP_LOCK_TX_B, bid_id, session)
+                    if bid.debug_ind == DebugTypes.BID_DONT_SPEND_COIN_B_LOCK:
+                        self.log.debug('Adaptor-sig bid %s: Stalling bid for testing: %d.', bid_id.hex(), bid.debug_ind)
+                        bid.setState(BidStates.BID_STALLED_FOR_TEST_TYPE2)  # If BID_STALLED_FOR_TEST is set process_XMR_SWAP_A_LOCK_tx_spend would fail
+
+                        self.logBidEvent(bid.bid_id, EventLogTypes.DEBUG_TWEAK_APPLIED, 'ind {}'.format(bid.debug_ind), session)
+                    else:
+                        bid.setState(BidStates.SWAP_DELAYING)
+                        delay = self.get_delay_event_seconds()
+                        self.log.info('Redeeming coin b lock tx for bid %s in %d seconds', bid_id.hex(), delay)
+                        self.createActionInSession(delay, ActionTypes.REDEEM_XMR_SWAP_LOCK_TX_B, bid_id, session)
                     self.saveBidInSession(bid_id, bid, session, xmr_swap)
                     session.commit()
             elif state == BidStates.XMR_SWAP_NOSCRIPT_TX_REDEEMED:
@@ -4464,6 +4473,10 @@ class BasicSwap(BaseApp):
                     xmr_swap.a_lock_refund_spend_tx = tx.serialize_without_witness()
                     xmr_swap.a_lock_refund_spend_tx_id = ci_from.getTxid(xmr_swap.a_lock_refund_spend_tx)
 
+                    if was_received:
+                        _, out_1, _, _, _ = ci_from.extractScriptLockScriptValues(xmr_swap.a_lock_refund_tx_script)
+                        self.addWatchedScript(ci_from.coin_type(), bid_id, out_1, TxTypes.BCH_MERCY)
+
                 bid.setState(BidStates.XMR_SWAP_SCRIPT_TX_PREREFUND)
                 self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_A_REFUND_TX_SEEN, '', use_session)
             else:
@@ -4587,6 +4600,34 @@ class BasicSwap(BaseApp):
 
         self.removeWatchedScript(coin_type, watched_script.bid_id, watched_script.script)
 
+    def processMercyTx(self, coin_type, watched_script, txid: bytes, vout: int, tx) -> None:
+        bid_id = watched_script.bid_id
+        self.log.warning('Found mercy tx for bid: {}'.format(bid_id.hex()))
+
+        self.logBidEvent(bid_id, EventLogTypes.BCH_MERCY_TX_FOUND, txid.hex(), session=None)
+
+        if bid_id not in self.swaps_in_progress:
+            self.log.warning('Could not find active bid for found mercy tx: {}'.format(bid_id.hex()))
+        else:
+            remote_keyshare = bytes.fromhex(tx['vout'][0]['scriptPubKey']['asm'].split(' ')[2])
+            ci = self.ci(coin_type)
+            ensure(ci.verifyKey(remote_keyshare), 'Invalid keyshare')
+
+            bid = self.swaps_in_progress[bid_id][0]
+            bid.txns[TxTypes.BCH_MERCY] = SwapTx(
+                bid_id=bid_id,
+                tx_type=TxTypes.BCH_MERCY,
+                txid=txid,
+                tx_data=remote_keyshare,
+            )
+            self.saveBid(bid_id, bid)
+
+            delay = self.get_delay_event_seconds()
+            self.log.info('Redeeming coin b lock tx for bid %s in %d seconds', bid_id.hex(), delay)
+            self.createAction(delay, ActionTypes.REDEEM_XMR_SWAP_LOCK_TX_B, bid_id)
+
+        self.removeWatchedScript(coin_type, bid_id, watched_script.script)
+
     def checkNewBlock(self, coin_type, c):
         pass
 
@@ -4690,7 +4731,10 @@ class BasicSwap(BaseApp):
                             # TODO: Optimise by loading rawtx in CTransaction
                             if bytes.fromhex(txo['scriptPubKey']['hex']) == s.script:
                                 self.log.debug('Found script from search for bid %s: %s %d', s.bid_id.hex(), tx['txid'], i)
-                                self.processFoundScript(coin_type, s, bytes.fromhex(tx['txid']), i)
+                                if s.tx_type == TxTypes.BCH_MERCY:
+                                    self.processMercyTx(coin_type, s, bytes.fromhex(tx['txid']), i, tx)
+                                else:
+                                    self.processFoundScript(coin_type, s, bytes.fromhex(tx['txid']), i, tx)
 
                 for o in c['watched_outputs']:
                     for i, inp in enumerate(tx['vin']):
@@ -6105,7 +6149,13 @@ class BasicSwap(BaseApp):
             # Extract the leader's decrypted signature and use it to recover the follower's privatekey
             xmr_swap.al_lock_spend_tx_sig = ci_from.extractLeaderSig(xmr_swap.a_lock_spend_tx)
 
-            kbsf = ci_from.recoverEncKey(xmr_swap.al_lock_spend_tx_esig, xmr_swap.al_lock_spend_tx_sig, xmr_swap.pkasf)
+            if TxTypes.BCH_MERCY in bid.txns:
+                self.log.info('Using keyshare from mercy tx.')
+                kbsf = bid.txns[TxTypes.BCH_MERCY].tx_data
+                pkbsf = ci_to.getPubkey(kbsf)
+                ensure(pkbsf == xmr_swap.pkbsf, 'Keyshare from mercy tx does not match expected pubkey')
+            else:
+                kbsf = ci_from.recoverEncKey(xmr_swap.al_lock_spend_tx_esig, xmr_swap.al_lock_spend_tx_sig, xmr_swap.pkasf)
             assert (kbsf is not None)
 
             for_ed25519: bool = True if ci_to.curve_type() == Curves.ed25519 else False
@@ -6170,7 +6220,6 @@ class BasicSwap(BaseApp):
 
         # Extract the follower's decrypted signature and use it to recover the leader's privatekey
         af_lock_refund_spend_tx_sig = ci_from.extractFollowerSig(xmr_swap.a_lock_refund_spend_tx)
-
         kbsl = ci_from.recoverEncKey(xmr_swap.af_lock_refund_spend_tx_esig, af_lock_refund_spend_tx_sig, xmr_swap.pkasl)
         assert (kbsl is not None)
 
@@ -6443,7 +6492,7 @@ class BasicSwap(BaseApp):
         ensure(bid, 'Bid not found: {}.'.format(bid_id.hex()))
         ensure(xmr_swap, 'Adaptor-sig swap not found: {}.'.format(bid_id.hex()))
 
-        if BidStates(bid.state) == BidStates.BID_STALLED_FOR_TEST:
+        if BidStates(bid.state) in (BidStates.BID_STALLED_FOR_TEST, BidStates.BID_STALLED_FOR_TEST_TYPE2):
             self.log.debug('Bid stalled %s', bid_id.hex())
             return
 
