@@ -4330,13 +4330,13 @@ class BasicSwap(BaseApp):
 
         watched.append(WatchedScript(bid_id, script, tx_type, swap_type))
 
-    def removeWatchedScript(self, coin_type, bid_id: bytes, script: bytes) -> None:
-        # Remove all for bid if txid is None
-        self.log.debug('removeWatchedScript %s %s', Coins(coin_type).name, bid_id.hex())
+    def removeWatchedScript(self, coin_type, bid_id: bytes, script: bytes, tx_type: TxTypes = None) -> None:
+        # Remove all for bid if script and type_ind is None
+        self.log.debug('removeWatchedScript {} {}{}'.format(Coins(coin_type).name, bid_id.hex(), (' type ' + str(tx_type)) if tx_type is not None else ''))
         old_len = len(self.coin_clients[coin_type]['watched_scripts'])
         for i in range(old_len - 1, -1, -1):
             ws = self.coin_clients[coin_type]['watched_scripts'][i]
-            if ws.bid_id == bid_id and (script is None or ws.script == script):
+            if ws.bid_id == bid_id and (script is None or ws.script == script) and (tx_type is None or ws.tx_type == tx_type):
                 del self.coin_clients[coin_type]['watched_scripts'][i]
                 self.log.debug('Removed watched script %s %s', Coins(coin_type).name, bid_id.hex())
 
@@ -4474,8 +4474,8 @@ class BasicSwap(BaseApp):
                     xmr_swap.a_lock_refund_spend_tx_id = ci_from.getTxid(xmr_swap.a_lock_refund_spend_tx)
 
                     if was_received:
-                        _, out_1, _, _, _ = ci_from.extractScriptLockScriptValues(xmr_swap.a_lock_refund_tx_script)
-                        self.addWatchedScript(ci_from.coin_type(), bid_id, out_1, TxTypes.BCH_MERCY)
+                        refund_to_script = ci_from.getRefundOutputScript(xmr_swap)
+                        self.addWatchedScript(ci_from.coin_type(), bid_id, refund_to_script, TxTypes.BCH_MERCY)
 
                 bid.setState(BidStates.XMR_SWAP_SCRIPT_TX_PREREFUND)
                 self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_A_REFUND_TX_SEEN, '', use_session)
@@ -4518,13 +4518,18 @@ class BasicSwap(BaseApp):
                 is_spending_lock_refund_tx = self.ci(coin_from).isSpendingLockRefundTx(spend_tx)
 
             if spending_txid == xmr_swap.a_lock_refund_spend_tx_id or (i2b(spend_tx.vin[0].prevout.hash) == xmr_swap.a_lock_refund_tx_id and is_spending_lock_refund_tx):
+                self.log.info('Found coin a lock refund spend tx, bid {}'.format(bid_id.hex()))
+
                 # bch txids change
                 if self.isBchXmrSwap(offer):
                     xmr_swap.a_lock_refund_spend_tx_id = spending_txid
                     xmr_swap.a_lock_refund_spend_tx = bytes.fromhex(spend_txn_hex)
 
-                self.log.info('Found coin a lock refund spend tx, bid {}'.format(bid_id.hex()))
+                    if was_received:
+                        self.removeWatchedScript(coin_from, bid_id, None, TxTypes.BCH_MERCY)
+
                 self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_A_REFUND_SPEND_TX_SEEN, '', session)
+
                 if bid.xmr_a_lock_tx:
                     bid.xmr_a_lock_tx.setState(TxStates.TX_REFUNDED)
 
@@ -4602,7 +4607,15 @@ class BasicSwap(BaseApp):
 
     def processMercyTx(self, coin_type, watched_script, txid: bytes, vout: int, tx) -> None:
         bid_id = watched_script.bid_id
-        self.log.warning('Found mercy tx for bid: {}'.format(bid_id.hex()))
+        ci = self.ci(coin_type)
+        if len(tx['vout']) < 2 or \
+           ci.make_int(tx['vout'][vout]['value']) != 546:  # Dust limit
+
+            self.log.info('Found tx is not a mercy tx for bid: {}'.format(bid_id.hex()))
+            self.removeWatchedScript(coin_type, bid_id, watched_script.script)
+            return
+
+        self.log.info('Found mercy tx for bid: {}'.format(bid_id.hex()))
 
         self.logBidEvent(bid_id, EventLogTypes.BCH_MERCY_TX_FOUND, txid.hex(), session=None)
 
@@ -4610,7 +4623,6 @@ class BasicSwap(BaseApp):
             self.log.warning('Could not find active bid for found mercy tx: {}'.format(bid_id.hex()))
         else:
             remote_keyshare = bytes.fromhex(tx['vout'][0]['scriptPubKey']['asm'].split(' ')[2])
-            ci = self.ci(coin_type)
             ensure(ci.verifyKey(remote_keyshare), 'Invalid keyshare')
 
             bid = self.swaps_in_progress[bid_id][0]
