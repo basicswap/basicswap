@@ -4492,7 +4492,7 @@ class BasicSwap(BaseApp):
             if session is None:
                 self.closeSession(use_session)
 
-    def process_XMR_SWAP_A_LOCK_REFUND_tx_spend(self, bid_id: bytes, spend_txid_hex, spend_txn) -> None:
+    def process_XMR_SWAP_A_LOCK_REFUND_tx_spend(self, bid_id: bytes, spend_txid_hex: str, spend_txn) -> None:
         self.log.debug('Detected spend of Adaptor-sig swap coin a lock refund tx for bid %s', bid_id.hex())
         try:
             session = self.openSession()
@@ -4510,15 +4510,17 @@ class BasicSwap(BaseApp):
             was_sent: bool = bid.was_received if reverse_bid else bid.was_sent
             was_received: bool = bid.was_sent if reverse_bid else bid.was_received
 
+            ci_from = self.ci(coin_from)
+
             state = BidStates(bid.state)
             spending_txid = bytes.fromhex(spend_txid_hex)
 
             spend_txn_hex = spend_txn['hex']
-            spend_tx = self.ci(coin_from).loadTx(h2b(spend_txn_hex))
+            spend_tx = ci_from.loadTx(h2b(spend_txn_hex))
 
             is_spending_lock_refund_tx = False
             if self.isBchXmrSwap(offer):
-                is_spending_lock_refund_tx = self.ci(coin_from).isSpendingLockRefundTx(spend_tx)
+                is_spending_lock_refund_tx = ci_from.isSpendingLockRefundTx(spend_tx)
 
             if spending_txid == xmr_swap.a_lock_refund_spend_tx_id or (i2b(spend_tx.vin[0].prevout.hash) == xmr_swap.a_lock_refund_tx_id and is_spending_lock_refund_tx):
                 self.log.info('Found coin a lock refund spend tx, bid {}'.format(bid_id.hex()))
@@ -4559,9 +4561,38 @@ class BasicSwap(BaseApp):
             else:
                 self.log.info('Coin a lock refund spent by unknown tx, bid {}'.format(bid_id.hex()))
 
-                if not was_received or bid.xmr_b_lock_tx is None:
-                    # Leave active if was received, to try and get lock tx b with mercy release
+                mercy_keyshare = None
+                if was_received:
+                    if self.isBchXmrSwap(offer):
+                        # Mercy tx is sent separately
+                        pass
+                    else:
+                        # Look for a mercy output
+                        try:
+                            mercy_keyshare = ci_from.inspectSwipeTx(spend_txn)
+                            if mercy_keyshare is None:
+                                raise ValueError('Not found')
+                            ensure(self.ci(coin_to).verifyKey(mercy_keyshare), 'Invalid keyshare')
+                        except Exception as e:
+                            self.log.warning('Could not extract mercy output from swipe tx: {}, {}'.format(spend_txid_hex, e))
+
+                        if mercy_keyshare is None:
+                            bid.setState(BidStates.XMR_SWAP_FAILED_SWIPED)
+                        else:
+                            delay = self.get_delay_event_seconds()
+                            self.log.info('Redeeming coin b lock tx for bid %s in %d seconds', bid_id.hex(), delay)
+                            self.createActionInSession(delay, ActionTypes.REDEEM_XMR_SWAP_LOCK_TX_B, bid_id, session)
+                else:
                     bid.setState(BidStates.XMR_SWAP_FAILED_SWIPED)
+
+                if TxTypes.XMR_SWAP_A_LOCK_REFUND_SWIPE not in bid.txns:
+                    bid.txns[TxTypes.XMR_SWAP_A_LOCK_REFUND_SWIPE] = SwapTx(
+                        bid_id=bid_id,
+                        tx_type=TxTypes.XMR_SWAP_A_LOCK_REFUND_SWIPE,
+                        txid=spending_txid,
+                    )
+                    if mercy_keyshare:
+                        bid.txns[TxTypes.XMR_SWAP_A_LOCK_REFUND_SWIPE].tx_data = mercy_keyshare
 
             self.saveBidInSession(bid_id, bid, session, xmr_swap, save_in_progress=offer)
         except Exception as ex:
@@ -4628,15 +4659,15 @@ class BasicSwap(BaseApp):
         if bid_id not in self.swaps_in_progress:
             self.log.warning('Could not find active bid for found mercy tx: {}'.format(bid_id.hex()))
         else:
-            remote_keyshare = bytes.fromhex(tx['vout'][0]['scriptPubKey']['asm'].split(' ')[2])
-            ensure(ci.verifyKey(remote_keyshare), 'Invalid keyshare')
+            mercy_keyshare = bytes.fromhex(tx['vout'][0]['scriptPubKey']['asm'].split(' ')[2])
+            ensure(ci.verifyKey(mercy_keyshare), 'Invalid keyshare')
 
             bid = self.swaps_in_progress[bid_id][0]
             bid.txns[TxTypes.BCH_MERCY] = SwapTx(
                 bid_id=bid_id,
                 tx_type=TxTypes.BCH_MERCY,
                 txid=txid,
-                tx_data=remote_keyshare,
+                tx_data=mercy_keyshare,
             )
             self.saveBid(bid_id, bid)
 
@@ -6168,15 +6199,19 @@ class BasicSwap(BaseApp):
             if lock_tx_depth < ci_to.depth_spendable():
                 raise TemporaryError(f'Chain B lock tx depth {lock_tx_depth} < required for spending.')
 
-            # Extract the leader's decrypted signature and use it to recover the follower's privatekey
-            xmr_swap.al_lock_spend_tx_sig = ci_from.extractLeaderSig(xmr_swap.a_lock_spend_tx)
-
             if TxTypes.BCH_MERCY in bid.txns:
                 self.log.info('Using keyshare from mercy tx.')
                 kbsf = bid.txns[TxTypes.BCH_MERCY].tx_data
                 pkbsf = ci_to.getPubkey(kbsf)
                 ensure(pkbsf == xmr_swap.pkbsf, 'Keyshare from mercy tx does not match expected pubkey')
+            elif TxTypes.XMR_SWAP_A_LOCK_REFUND_SWIPE in bid.txns:
+                self.log.info('Using keyshare from swipe tx.')
+                kbsf = bid.txns[TxTypes.XMR_SWAP_A_LOCK_REFUND_SWIPE].tx_data
+                pkbsf = ci_to.getPubkey(kbsf)
+                ensure(pkbsf == xmr_swap.pkbsf, 'Keyshare from swipe tx does not match expected pubkey')
             else:
+                # Extract the leader's decrypted signature and use it to recover the follower's privatekey
+                xmr_swap.al_lock_spend_tx_sig = ci_from.extractLeaderSig(xmr_swap.a_lock_spend_tx)
                 kbsf = ci_from.recoverEncKey(xmr_swap.al_lock_spend_tx_esig, xmr_swap.al_lock_spend_tx_sig, xmr_swap.pkasf)
             assert (kbsf is not None)
 
@@ -6201,7 +6236,6 @@ class BasicSwap(BaseApp):
             if num_retries > 0:
                 error_msg += ', retry no. {}'.format(num_retries)
             self.log.error(error_msg)
-            self.log.error(traceback.format_exc())  # [rm]
 
             if num_retries < 100 and (ci_to.is_transient_error(ex) or self.is_transient_error(ex)):
                 delay = self.get_delay_retry_seconds()
@@ -7912,7 +7946,7 @@ class BasicSwap(BaseApp):
             kbsf = None
             # BCH sends a separate mercy tx
         else:
-            for_ed25519: bool = True if ci.curve_type() == Curves.ed25519 else False
+            for_ed25519: bool = True if self.ci(coin_to).curve_type() == Curves.ed25519 else False
             kbsf = self.getPathKey(coin_from, coin_to, bid.created_at, xmr_swap.contract_count, KeyTypes.KBSF, for_ed25519)
 
         pkh_dest = ci.decodeAddress(self.getReceiveAddressForCoin(ci.coin_type()))

@@ -262,6 +262,7 @@ class DCRInterface(Secp256k1Interface):
 
         self._use_segwit = True  # Decred is natively segwit
         self._connection_type = coin_settings['connection_type']
+        self._altruistic = coin_settings.get('altruistic', True)
 
     def open_rpc(self):
         return openrpc(self._rpcport, self._rpcauth, host=self._rpc_host)
@@ -1232,7 +1233,7 @@ class DCRInterface(Secp256k1Interface):
 
         return True
 
-    def createSCLockRefundSpendToFTx(self, tx_lock_refund_bytes, script_lock_refund, pkh_dest, tx_fee_rate, vkbv=None):
+    def createSCLockRefundSpendToFTx(self, tx_lock_refund_bytes, script_lock_refund, pkh_dest, tx_fee_rate, vkbv=None, kbsf=None):
         # lock refund swipe tx
         # Sends the coinA locked coin to the follower
 

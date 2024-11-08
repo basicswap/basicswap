@@ -75,6 +75,7 @@ from basicswap.contrib.test_framework.script import (
     OP_CHECKSEQUENCEVERIFY,
     OP_DROP,
     OP_HASH160, OP_EQUAL,
+    OP_RETURN,
     SIGHASH_ALL,
     SegwitV0SignatureHash,
 )
@@ -258,6 +259,7 @@ class BTCInterface(Secp256k1Interface):
         self._sc = swap_client
         self._log = self._sc.log if self._sc and self._sc.log else logging
         self._expect_seedid_hex = None
+        self._altruistic = coin_settings.get('altruistic', True)
 
     def open_rpc(self, wallet=None):
         return openrpc(self._rpcport, self._rpcauth, wallet=wallet, host=self._rpc_host)
@@ -601,7 +603,7 @@ class BTCInterface(Secp256k1Interface):
 
         return tx.serialize()
 
-    def createSCLockRefundSpendToFTx(self, tx_lock_refund_bytes, script_lock_refund, pkh_dest, tx_fee_rate, vkbv=None):
+    def createSCLockRefundSpendToFTx(self, tx_lock_refund_bytes, script_lock_refund, pkh_dest, tx_fee_rate, vkbv=None, kbsf=None):
         # lock refund swipe tx
         # Sends the coinA locked coin to the follower
 
@@ -624,6 +626,10 @@ class BTCInterface(Secp256k1Interface):
                             scriptSig=self.getScriptScriptSig(script_lock_refund)))
 
         tx.vout.append(self.txoType()(locked_coin, self.getScriptForPubkeyHash(pkh_dest)))
+
+        if self._altruistic and kbsf:
+            # Add mercy_keyshare
+            tx.vout.append(self.txoType()(0, CScript([OP_RETURN, b'XBSW', kbsf])))
 
         dummy_witness_stack = self.getScriptLockRefundSwipeTxDummyWitness(script_lock_refund)
         witness_bytes = self.getWitnessStackSerialisedLength(dummy_witness_stack)
@@ -1491,6 +1497,18 @@ class BTCInterface(Secp256k1Interface):
             'redeemScript': txn_script.hex(),
             'amount': txjs['vout'][n]['value']
         }
+
+    def inspectSwipeTx(self, tx: dict) -> bytes | None:
+        mercy_keyshare = None
+        for vout in tx['vout']:
+            script_bytes = bytes.fromhex(vout['scriptPubKey']['hex'])
+            if len(script_bytes) < 39:
+                continue
+            if script_bytes[0] != OP_RETURN:
+                continue
+            script_bytes[0]
+            return script_bytes[7: 7 + 32]
+        return None
 
     def isTxExistsError(self, err_str: str) -> bool:
         return 'Transaction already in block chain' in err_str

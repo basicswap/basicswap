@@ -1031,6 +1031,8 @@ class Test(BaseTest):
         logging.info('---------- Test PART to XMR follower recovers coin a lock tx')
         swap_clients = self.swap_clients
 
+        swap_clients[1].ci(Coins.PART)._altruistic = False
+
         offer_id = swap_clients[0].postOffer(
             Coins.PART, Coins.XMR, 101 * COIN, 0.13 * XMR_COIN, 101 * COIN, SwapTypes.XMR_SWAP,
             lock_type=TxLockTypes.SEQUENCE_LOCK_BLOCKS, lock_value=16)
@@ -1061,6 +1063,39 @@ class Test(BaseTest):
 
         bidder_states = [s for s in bidder_states if s[1] != 'Bid Stalled (debug)']
         assert (compare_bid_states(bidder_states, self.states_bidder[2]) is True)
+
+    def test_03b_follower_recover_a_lock_tx_with_mercy(self):
+        logging.info('---------- Test PART to XMR follower recovers coin a lock tx with mercy output')
+        swap_clients = self.swap_clients
+
+        swap_clients[1].ci(Coins.PART)._altruistic = True
+
+        offer_id = swap_clients[0].postOffer(
+            Coins.PART, Coins.XMR, 101 * COIN, 0.13 * XMR_COIN, 101 * COIN, SwapTypes.XMR_SWAP,
+            lock_type=TxLockTypes.SEQUENCE_LOCK_BLOCKS, lock_value=16)
+        wait_for_offer(test_delay_event, swap_clients[1], offer_id)
+        offer = swap_clients[1].getOffer(offer_id)
+
+        bid_id = swap_clients[1].postXmrBid(offer_id, offer.amount_from)
+
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.BID_RECEIVED)
+
+        bid, xmr_swap = swap_clients[0].getXmrBid(bid_id)
+        assert (xmr_swap)
+
+        swap_clients[1].setBidDebugInd(bid_id, DebugTypes.BID_DONT_SPEND_COIN_B_LOCK)
+        swap_clients[0].setBidDebugInd(bid_id, DebugTypes.BID_DONT_SPEND_COIN_A_LOCK_REFUND2)
+
+        swap_clients[0].setBidDebugInd(bid_id, DebugTypes.WAIT_FOR_COIN_B_LOCK_BEFORE_REFUND, False)
+        swap_clients[1].setBidDebugInd(bid_id, DebugTypes.WAIT_FOR_COIN_B_LOCK_BEFORE_REFUND, False)
+
+        swap_clients[0].acceptXmrBid(bid_id)
+
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id, (BidStates.XMR_SWAP_NOSCRIPT_TX_REDEEMED, BidStates.SWAP_COMPLETED), wait_for=220)
+        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.XMR_SWAP_FAILED_SWIPED, wait_for=120, sent=True)
+
+        wait_for_none_active(test_delay_event, 1800)
+        wait_for_none_active(test_delay_event, 1801)
 
     def test_04_follower_recover_b_lock_tx(self):
         logging.info('---------- Test PART to XMR follower recovers coin b lock tx')

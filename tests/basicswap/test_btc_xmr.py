@@ -268,7 +268,7 @@ class TestFunctions(BaseTest):
         logging.info('---------- Test {} to {} follower recovers coin a lock tx{}'.format(coin_from.name, coin_to.name, ' (with mercy tx)' if with_mercy else ''))
 
         # Leader is too slow to recover the coin a lock tx and follower swipes it
-        # coin b lock tx remains unspent
+        # Coin B lock tx remains unspent unless a mercy output revealing the follower's keyshare is sent
 
         id_offerer: int = self.node_a_id
         id_bidder: int = self.node_b_id
@@ -281,6 +281,8 @@ class TestFunctions(BaseTest):
         id_leader: int = id_bidder if reverse_bid else id_offerer
         id_follower: int = id_offerer if reverse_bid else id_bidder
         logging.info(f'Offerer, bidder, leader, follower: {id_offerer}, {id_bidder}, {id_leader}, {id_follower}')
+
+        swap_clients[id_follower].ci(coin_from if reverse_bid else coin_to)._altruistic = with_mercy
 
         js_w0_before = read_json_api(1800 + id_offerer, 'wallets')
         js_w1_before = read_json_api(1800 + id_bidder, 'wallets')
@@ -940,6 +942,17 @@ class BasicSwapTest(TestFunctions):
 
     def test_03_d_follower_recover_a_lock_tx_from_part(self):
         self.do_test_03_follower_recover_a_lock_tx(Coins.PART, self.test_coin_from)
+
+    def test_03_e_follower_recover_a_lock_tx_mercy_release(self):
+        if not self.has_segwit:
+            return
+        self.do_test_03_follower_recover_a_lock_tx(self.test_coin_from, Coins.XMR, with_mercy=True)
+
+    def test_03_f_follower_recover_a_lock_tx_mercy_release_reverse(self):
+        if not self.has_segwit:
+            return
+        self.prepare_balance(Coins.XMR, 100.0, 1800, 1801)
+        self.do_test_03_follower_recover_a_lock_tx(Coins.XMR, self.test_coin_from, with_mercy=True)
 
     def test_04_a_follower_recover_b_lock_tx(self):
         if not self.has_segwit:

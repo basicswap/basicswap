@@ -622,7 +622,7 @@ class PARTInterfaceBlind(PARTInterface):
 
         return True
 
-    def createSCLockRefundSpendToFTx(self, tx_lock_refund_bytes, script_lock_refund, pkh_dest, tx_fee_rate, vkbv):
+    def createSCLockRefundSpendToFTx(self, tx_lock_refund_bytes, script_lock_refund, pkh_dest, tx_fee_rate, vkbv, kbsf=None):
         # lock refund swipe tx
         # Sends the coinA locked coin to the follower
         lock_refund_tx_obj = self.rpc('decoderawtransaction', [tx_lock_refund_bytes.hex()])
