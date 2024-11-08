@@ -668,7 +668,7 @@ class NAVInterface(BTCInterface):
 
         return tx.serialize()
 
-    def createSCLockRefundSpendToFTx(self, tx_lock_refund_bytes, script_lock_refund, pkh_dest, tx_fee_rate, vkbv=None):
+    def createSCLockRefundSpendToFTx(self, tx_lock_refund_bytes, script_lock_refund, pkh_dest, tx_fee_rate, vkbv=None, kbsf=None):
         # lock refund swipe tx
         # Sends the coinA locked coin to the follower
 
