@@ -349,6 +349,7 @@ class TestFunctions(BaseTest):
 
         amt_swap = ci_from.make_int(random.uniform(0.1, 2.0), r=1)
         rate_swap = ci_to.make_int(random.uniform(0.2, 20.0), r=1)
+        logging.info(f'amount from, rate, amount to: {amt_swap}, {rate_swap}, {amt_swap * rate_swap}')
         offer_id = swap_clients[id_offerer].postOffer(
             coin_from, coin_to, amt_swap, rate_swap, amt_swap, SwapTypes.XMR_SWAP,
             lock_type=TxLockTypes.SEQUENCE_LOCK_BLOCKS, lock_value=lock_value)

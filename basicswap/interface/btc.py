@@ -1092,14 +1092,18 @@ class BTCInterface(Secp256k1Interface):
         return pay_fee
 
     def spendBLockTx(self, chain_b_lock_txid: bytes, address_to: str, kbv: bytes, kbs: bytes, cb_swap_value: int, b_fee: int, restore_height: int, lock_tx_vout=None) -> bytes:
-        self._log.info('spendBLockTx %s:\n', chain_b_lock_txid.hex())
-        wtx = self.rpc_wallet('gettransaction', [chain_b_lock_txid.hex(), ])
-        lock_tx = self.loadTx(bytes.fromhex(wtx['hex']))
+        self._log.info('spendBLockTx: {} {}\n'.format(chain_b_lock_txid.hex(), lock_tx_vout))
+        locked_n = lock_tx_vout
 
         Kbs = self.getPubkey(kbs)
         script_pk = self.getPkDest(Kbs)
-        locked_n = findOutput(lock_tx, script_pk)
+
+        if locked_n is None:
+            wtx = self.rpc_wallet('gettransaction', [chain_b_lock_txid.hex(), ])
+            lock_tx = self.loadTx(bytes.fromhex(wtx['hex']))
+            locked_n = findOutput(lock_tx, script_pk)
         ensure(locked_n is not None, 'Output not found in tx')
+
         pkh_to = self.decodeAddress(address_to)
 
         tx = CTransaction()
