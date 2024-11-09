@@ -46,6 +46,7 @@ from .util import (
     format_timestamp,
     DeserialiseNum,
     h2b,
+    hex_or_none,
     i2b,
     zeroIfNone,
     make_int,
@@ -3775,7 +3776,7 @@ class BasicSwap(BaseApp):
         bid_changed = False
 
         found_tx = None
-        if ci_to.coin_type() in (Coins.DCR, ):
+        if ci_to.watch_blocks_for_scripts():
             if bid.xmr_b_lock_tx is None or bid.xmr_b_lock_tx.txid is None:
                 # Watching chain for dest_address with WatchedScript
                 pass
@@ -3794,15 +3795,20 @@ class BasicSwap(BaseApp):
             if found_tx['height'] != 0 and (bid.xmr_b_lock_tx is None or not bid.xmr_b_lock_tx.chain_height):
                 self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_B_SEEN, '', session)
 
-            if bid.xmr_b_lock_tx is None or bid.xmr_b_lock_tx.chain_height is None:
-                self.log.debug('Found {} lock tx in chain'.format(ci_to.coin_name()))
-                xmr_swap.b_lock_tx_id = bytes.fromhex(found_tx['txid'])
+            found_txid = bytes.fromhex(found_tx['txid'])
+            if bid.xmr_b_lock_tx is None or bid.xmr_b_lock_tx.chain_height is None or xmr_swap.b_lock_tx_id != found_txid:
+                self.log.debug('Found lock tx B in {} chain'.format(ci_to.coin_name()))
+                xmr_swap.b_lock_tx_id = found_txid
             if bid.xmr_b_lock_tx is None:
                 bid.xmr_b_lock_tx = SwapTx(
                     bid_id=bid.bid_id,
                     tx_type=TxTypes.XMR_SWAP_B_LOCK,
                     txid=xmr_swap.b_lock_tx_id,
                 )
+            if bid.xmr_b_lock_tx.txid != found_txid:
+                self.log.debug('Updating {} lock txid: {}'.format(ci_to.coin_name(), found_txid.hex()))
+                bid.xmr_b_lock_tx.txid = found_txid
+
             bid.xmr_b_lock_tx.chain_height = found_tx['height']
             bid_changed = True
         return bid_changed
@@ -3950,7 +3956,7 @@ class BasicSwap(BaseApp):
                         self.createActionInSession(delay, ActionTypes.RECOVER_XMR_SWAP_LOCK_TX_B, bid_id, session)
                         session.commit()
             elif state == BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX:
-                if bid.xmr_a_lock_tx is None:
+                if bid.xmr_a_lock_tx is None or bid.xmr_a_lock_tx.txid is None:
                     return rv
 
                 # TODO: Timeout waiting for transactions
@@ -3961,10 +3967,9 @@ class BasicSwap(BaseApp):
                 if lock_tx_chain_info is None:
                     return rv
 
-                if 'txid' in lock_tx_chain_info and lock_tx_chain_info['txid'] != b2h(xmr_swap.a_lock_tx_id):
-                    # if we find that txid was changed (by funding or otherwise), we need to update it to track correctly
+                if 'txid' in lock_tx_chain_info and (xmr_swap.a_lock_tx_id is None or lock_tx_chain_info['txid'] != b2h(xmr_swap.a_lock_tx_id)):
+                    # BCH: If we find that txid was changed (by funding or otherwise), we need to update it to track correctly
                     xmr_swap.a_lock_tx_id = h2b(lock_tx_chain_info['txid'])
-                    xmr_swap.a_lock_tx = h2b(lock_tx_chain_info['txhex'])
 
                     tx = ci_from.loadTx(xmr_swap.a_lock_refund_tx)
                     tx.vin[0].prevout.hash = b2i(xmr_swap.a_lock_tx_id)
@@ -3981,7 +3986,9 @@ class BasicSwap(BaseApp):
                         bid.xmr_a_lock_tx.tx_data = xmr_swap.a_lock_tx
                         bid.xmr_a_lock_tx.spend_txid = xmr_swap.a_lock_spend_tx_id
 
-                    # update watcher
+                    # Update watcher
+                    self.removeWatchedOutput(ci_from.coin_type(), bid.bid_id, None)
+                    self.removeWatchedOutput(ci_to.coin_type(), bid.bid_id, None)
                     self.watchXmrSwap(bid, offer, xmr_swap, session)
                     bid_changed = True
 
@@ -4321,7 +4328,7 @@ class BasicSwap(BaseApp):
                 del self.coin_clients[coin_type]['watched_outputs'][i]
                 self.log.debug('Removed watched output %s %s %s', Coins(coin_type).name, bid_id.hex(), wo.txid_hex)
 
-    def addWatchedScript(self, coin_type, bid_id, script, tx_type, swap_type=None):
+    def addWatchedScript(self, coin_type, bid_id, script: bytes, tx_type, swap_type=None):
         self.log.debug('Adding watched script %s bid %s type %s', Coins(coin_type).name, bid_id.hex(), tx_type)
 
         watched = self.coin_clients[coin_type]['watched_scripts']
@@ -4627,7 +4634,16 @@ class BasicSwap(BaseApp):
                 self.saveBid(watched_script.bid_id, bid)
             else:
                 self.log.warning('Could not find active bid for found watched script: {}'.format(watched_script.bid_id.hex()))
+        elif watched_script.tx_type == TxTypes.XMR_SWAP_A_LOCK:
+            self.log.info('Found chain A lock txid {} for bid: {}'.format(txid.hex(), watched_script.bid_id.hex()))
+            bid = self.swaps_in_progress[watched_script.bid_id][0]
+            if bid.xmr_a_lock_tx.txid != txid:
+                self.log.debug('Updating xmr_a_lock_tx from {} to {}'.format(hex_or_none(bid.xmr_a_lock_tx.txid), txid.hex()))
+                bid.xmr_a_lock_tx.txid = txid
+                bid.xmr_b_lock_tx.vout = vout
+            self.saveBid(watched_script.bid_id, bid)
         elif watched_script.tx_type == TxTypes.XMR_SWAP_B_LOCK:
+            self.log.info('Found chain B lock txid {} for bid: {}'.format(txid.hex(), watched_script.bid_id.hex()))
             bid = self.swaps_in_progress[watched_script.bid_id][0]
             bid.xmr_b_lock_tx = SwapTx(
                 bid_id=watched_script.bid_id,
@@ -4635,6 +4651,9 @@ class BasicSwap(BaseApp):
                 txid=txid,
                 vout=vout,
             )
+            if bid.xmr_b_lock_tx.txid != txid:
+                self.log.debug('Updating xmr_b_lock_tx from {} to {}'.format(hex_or_none(bid.xmr_b_lock_tx.txid), txid.hex()))
+                bid.xmr_b_lock_tx.txid = txid
             bid.xmr_b_lock_tx.setState(TxStates.TX_IN_CHAIN)
             self.saveBid(watched_script.bid_id, bid)
         else:
@@ -4783,7 +4802,7 @@ class BasicSwap(BaseApp):
                                 if s.tx_type == TxTypes.BCH_MERCY:
                                     self.processMercyTx(coin_type, s, bytes.fromhex(tx['txid']), i, tx)
                                 else:
-                                    self.processFoundScript(coin_type, s, bytes.fromhex(tx['txid']), i, tx)
+                                    self.processFoundScript(coin_type, s, bytes.fromhex(tx['txid']), i)
 
                 for o in c['watched_outputs']:
                     for i, inp in enumerate(tx['vin']):
@@ -5808,11 +5827,19 @@ class BasicSwap(BaseApp):
         reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
         coin_from = Coins(offer.coin_to if reverse_bid else offer.coin_from)
         self.setLastHeightCheckedStart(coin_from, bid.chain_a_height_start, session)
-        self.addWatchedOutput(coin_from, bid.bid_id, bid.xmr_a_lock_tx.txid.hex(), bid.xmr_a_lock_tx.vout, TxTypes.XMR_SWAP_A_LOCK, SwapTypes.XMR_SWAP)
 
-        lock_refund_vout = self.ci(coin_from).getLockRefundTxSwapOutput(xmr_swap)
-        self.addWatchedOutput(coin_from, bid.bid_id, xmr_swap.a_lock_refund_tx_id.hex(), lock_refund_vout, TxTypes.XMR_SWAP_A_LOCK_REFUND, SwapTypes.XMR_SWAP)
+        if bid.xmr_a_lock_tx.txid:
+            self.addWatchedOutput(coin_from, bid.bid_id, bid.xmr_a_lock_tx.txid.hex(), bid.xmr_a_lock_tx.vout, TxTypes.XMR_SWAP_A_LOCK, SwapTypes.XMR_SWAP)
+
+        if xmr_swap.a_lock_refund_tx_id:
+            lock_refund_vout = self.ci(coin_from).getLockRefundTxSwapOutput(xmr_swap)
+            self.addWatchedOutput(coin_from, bid.bid_id, xmr_swap.a_lock_refund_tx_id.hex(), lock_refund_vout, TxTypes.XMR_SWAP_A_LOCK_REFUND, SwapTypes.XMR_SWAP)
         bid.in_progress = 1
+
+        # Watch outputs for chain A lock tx if txid is unknown (BCH)
+        if bid.xmr_a_lock_tx and bid.xmr_a_lock_tx.txid is None:
+            find_script: bytes = self.ci(coin_from).getScriptDest(xmr_swap.a_lock_tx_script)
+            self.addWatchedScript(coin_from, bid.bid_id, find_script, TxTypes.XMR_SWAP_A_LOCK)
 
     def sendXmrBidTxnSigsFtoL(self, bid_id, session) -> None:
         # F -> L: Sending MSG3L
@@ -5859,9 +5886,21 @@ class BasicSwap(BaseApp):
             self.addMessageLink(Concepts.BID, bid_id, MessageTypes.XMR_BID_TXN_SIGS_FL, coin_a_lock_tx_sigs_l_msg_id, session=session)
             self.log.info('Sent XMR_BID_TXN_SIGS_FL %s for bid %s', coin_a_lock_tx_sigs_l_msg_id.hex(), bid_id.hex())
 
-            a_lock_tx_id = ci_from.getTxid(xmr_swap.a_lock_tx)
+            if ci_from.watch_blocks_for_scripts() and self.isBchXmrSwap(offer):
+                # BCH doesn't have segwit
+                # Lock txid will change when signed.
+                # TODO: BCH Watchonly: Remove when BCH watchonly works.
+                a_lock_tx_id = None
+            else:
+                a_lock_tx_id = ci_from.getTxid(xmr_swap.a_lock_tx)
             a_lock_tx_vout = ci_from.getTxOutputPos(xmr_swap.a_lock_tx, xmr_swap.a_lock_tx_script)
-            self.log.debug('Waiting for lock txn %s to %s chain for bid %s', a_lock_tx_id.hex(), ci_from.coin_name(), bid_id.hex())
+
+            if a_lock_tx_id:
+                self.log.debug('Waiting for lock tx A {} to {} chain for bid {}'.format(a_lock_tx_id.hex(), ci_from.coin_name(), bid_id.hex()))
+            else:
+                find_script: bytes = ci_from.getScriptDest(xmr_swap.a_lock_tx_script)
+                self.log.debug('Waiting for lock tx A with script {} to {} chain for bid {}'.format(find_script.hex(), ci_from.coin_name(), bid_id.hex()))
+
             if bid.xmr_a_lock_tx is None:
                 bid.xmr_a_lock_tx = SwapTx(
                     bid_id=bid_id,

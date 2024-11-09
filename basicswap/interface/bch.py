@@ -9,7 +9,7 @@ from typing import Union
 from basicswap.contrib.test_framework.messages import COutPoint, CTransaction, CTxIn
 from basicswap.util import b2h, b2i, ensure, i2h
 from basicswap.util.script import decodePushData, decodeScriptNum
-from .btc import BTCInterface, ensure_op, find_vout_for_address_from_txobj, findOutput
+from .btc import BTCInterface, ensure_op, findOutput
 from basicswap.rpc import make_rpc_func
 from basicswap.chainparams import Coins
 from basicswap.interface.contrib.bch_test_framework.cashaddress import Address
@@ -67,6 +67,11 @@ class BCHInterface(BTCInterface):
     def xmr_swap_a_lock_spend_tx_vsize() -> int:
         return 302
 
+    @staticmethod
+    def watch_blocks_for_scripts() -> bool:
+        # TODO: BCH Watchonly: Remove when BCH watchonly works.
+        return True
+
     def __init__(self, coin_settings, network, swap_client=None):
         super(BCHInterface, self).__init__(coin_settings, network, swap_client)
         # No multiwallet support
@@ -115,6 +120,9 @@ class BCHInterface(BTCInterface):
             addr_info = self.rpc('validateaddress', [address])
 
         return address
+
+    def importWatchOnlyAddress(self, address: str, label: str):
+        self.rpc_wallet('importaddress', [address, label, False, True])
 
     def createRawFundedTransaction(self, addr_to: str, amount: int, sub_fee: bool = False, lock_unspents: bool = True) -> str:
         txn = self.rpc('createrawtransaction', [[], {addr_to: self.format_amount(amount)}])
@@ -177,57 +185,53 @@ class BCHInterface(BTCInterface):
             return {'txid': txid_hex, 'amount': 0, 'height': block_height}
         return None
 
-    def getLockTxHeight(self, txid, dest_address, bid_amount, rescan_from, find_index: bool = False, vout: int = -1):
-        # Add watchonly address and rescan if required
-        txid = None
+    def getLockTxHeight(self, txid: bytes, dest_address: str, bid_amount: int, rescan_from: int, find_index: bool = False, vout: int = -1):
 
-        # first lookup by dest_address
-        if not self.isAddressMine(dest_address, or_watch_only=False):
-            self.importWatchOnlyAddress(dest_address, 'bid')
-            self._log.info('Imported watch-only addr: {}'.format(dest_address))
-            self._log.info('Rescanning {} chain from height: {}'.format(self.coin_name(), rescan_from))
-            self.rpc_wallet('rescanblockchain', [rescan_from])
-
-        return_txid = True
-
-        txns = self.rpc_wallet('listunspent', [0, 9999999, [dest_address, ]])
-        for tx in txns:
-            if self.make_int(tx['amount']) == bid_amount:
-                txid = bytes.fromhex(tx['txid'])
-                break
-
-        # try to look up in past transactions
-        if not txid:
-            txns = self.rpc_wallet('listtransactions', ["*", 100000, 0, True])
-            for tx in txns:
-                if self.make_int(tx['amount']) == bid_amount and tx['category'] == 'send' and tx.get('address', '_NONE_') == dest_address:
-                    txid = bytes.fromhex(tx['txid'])
-                    break
-
-        try:
-            # set `include_watchonly` explicitly to `True` to get transactions for watchonly addresses also in BCH
-            tx = self.rpc_wallet('gettransaction', [txid.hex(), True])
-
-            block_height = 0
-            if 'blockhash' in tx:
-                block_header = self.rpc('getblockheader', [tx['blockhash']])
-                block_height = block_header['height']
-
-            rv = {
-                'depth': 0 if 'confirmations' not in tx else tx['confirmations'],
-                'height': block_height}
-
-        except Exception as e:
-            # self._log.debug('getLockTxHeight gettransaction failed: %s, %s', txid.hex(), str(e))
+        '''
+            TODO: BCH Watchonly
+            Replace with importWatchOnlyAddress when it works again
+            Currently importing the watchonly address only works if rescanblockchain is run on every iteration
+        '''
+        if txid is None:
+            self._log.debug('TODO: getLockTxHeight')
             return None
 
-        if find_index:
-            tx_obj = self.rpc('decoderawtransaction', [tx['hex']])
-            rv['index'] = find_vout_for_address_from_txobj(tx_obj, dest_address)
+        found_vout = None
+        # Search for txo at vout 0 and 1 if vout is not known
+        if vout is None:
+            test_range = range(2)
+        else:
+            test_range = (vout, )
+        for try_vout in test_range:
+            try:
+                txout = self.rpc('gettxout', [txid.hex(), try_vout, True])
+                addresses = txout['scriptPubKey']['addresses']
+                if len(addresses) != 1 or addresses[0] != dest_address:
+                    continue
+                if self.make_int(txout['value']) != bid_amount:
+                    self._log.warning('getLockTxHeight found txout {} with incorrect amount {}'.format(txid.hex(), txout['value']))
+                    continue
+                found_vout = try_vout
+                break
+            except Exception as e:
+                # self._log.warning('gettxout {}'.format(e))
+                return None
 
-        if return_txid:
-            rv['txid'] = txid.hex()
-            rv['txhex'] = tx['hex']
+        if found_vout is None:
+            return None
+
+        block_height: int = 0
+        confirmations: int = 0 if 'confirmations' not in txout else txout['confirmations']
+
+        # TODO: Better way?
+        if confirmations > 0:
+            block_height = self.getChainHeight() - confirmations
+
+        rv = {
+            'txid': txid.hex(),
+            'depth': confirmations,
+            'index': found_vout,
+            'height': block_height}
 
         return rv
 

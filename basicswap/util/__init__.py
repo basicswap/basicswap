@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2018-2023 tecnovert
+# Copyright (c) 2024 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -215,3 +216,9 @@ def zeroIfNone(value) -> int:
     if value is None:
         return 0
     return value
+
+
+def hex_or_none(value: bytes) -> str:
+    if value is None:
+        return 'None'
+    return value.hex()
