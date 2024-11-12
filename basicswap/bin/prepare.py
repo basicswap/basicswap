@@ -1972,8 +1972,8 @@ def main():
         chainclients['bitcoin']['rpcuser'] = BTC_RPC_USER
         chainclients['bitcoin']['rpcpassword'] = BTC_RPC_PWD
     if BCH_RPC_USER != '':
-        chainclients['bitcoin']['rpcuser'] = BCH_RPC_USER
-        chainclients['bitcoin']['rpcpassword'] = BCH_RPC_PWD
+        chainclients['bitcoincash']['rpcuser'] = BCH_RPC_USER
+        chainclients['bitcoincash']['rpcpassword'] = BCH_RPC_PWD
     if XMR_RPC_USER != '':
         chainclients['monero']['rpcuser'] = XMR_RPC_USER
         chainclients['monero']['rpcpassword'] = XMR_RPC_PWD

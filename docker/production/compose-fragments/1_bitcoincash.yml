@@ -1,13 +1,13 @@
-    wownero_daemon:
-        image: i_wownero_daemon
+    bitcoincash_core:
+        image: i_bitcoincash
         build:
-            context: wownero_daemon
+            context: bitcoincash
             dockerfile: Dockerfile
-        container_name: wownero_daemon
+        container_name: bitcoincash_core
         volumes:
-            - ${DATA_PATH}/wownero_daemon:/data
+            - ${DATA_PATH}/bitcoincash:/data
         expose:
-            - ${WOW_RPC_PORT}
+            - ${BCH_RPC_PORT}
         logging:
             driver: "json-file"
             options:

@@ -1502,7 +1502,7 @@ class BTCInterface(Secp256k1Interface):
             'amount': txjs['vout'][n]['value']
         }
 
-    def inspectSwipeTx(self, tx: dict) -> bytes | None:
+    def inspectSwipeTx(self, tx: dict):
         mercy_keyshare = None
         for vout in tx['vout']:
             script_bytes = bytes.fromhex(vout['scriptPubKey']['hex'])

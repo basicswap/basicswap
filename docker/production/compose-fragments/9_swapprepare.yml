@@ -16,6 +16,7 @@
             - ${DATA_PATH}/pivx:/data/pivx
             - ${DATA_PATH}/dash:/data/dash
             - ${DATA_PATH}/firo:/data/firo
+            - ${DATA_PATH}/bitcoincash:/data/bitcoincash
         environment:
             - TZ
             - BSX_DOCKER_MODE
@@ -50,8 +51,8 @@
             - DEFAULT_XMR_RESTORE_HEIGHT
             - WOW_DATA_DIR
             - WOW_RPC_HOST
-            - BASE_WOW_RPC_PORT
-            - BASE_WOW_ZMQ_PORT
+            - WOW_RPC_PORT
+            - WOW_ZMQ_PORT
             - WOW_WALLETS_DIR
             - WOW_WALLET_RPC_HOST
             - WOW_WALLET_RPC_PORT
@@ -73,4 +74,9 @@
             - FIRO_RPC_PORT
             - FIRO_RPC_USER
             - FIRO_RPC_PWD
+            - BCH_DATA_DIR
+            - BCH_RPC_HOST
+            - BCH_RPC_PORT
+            - BCH_RPC_USER
+            - BCH_RPC_PWD
         restart: "no"
