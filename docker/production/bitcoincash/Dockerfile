@@ -8,20 +8,20 @@ RUN basicswap-prepare --preparebinonly --bindir=/coin_bin --withcoin=bitcoincash
 FROM debian:bullseye-slim
 COPY --from=install_stage /coin_bin .
 
-ENV BITCOIN_DATA /data
+ENV BITCOINCASH_DATA /data
 
-RUN groupadd -r bitcoin && useradd -r -m -g bitcoin bitcoin \
+RUN groupadd -r bitcoincash && useradd -r -m -g bitcoincash bitcoincash \
     && apt-get update \
     && apt-get install -qq --no-install-recommends gosu \
     && rm -rf /var/lib/apt/lists/* \
-    && mkdir "$BITCOIN_DATA" \
-    && chown -R bitcoin:bitcoin "$BITCOIN_DATA" \
-    && ln -sfn "$BITCOIN_DATA" /home/bitcoin/.bitcoin \
-    && chown -h bitcoin:bitcoin /home/bitcoin/.bitcoin
+    && mkdir "$BITCOINCASH_DATA" \
+    && chown -R bitcoincash:bitcoincash "$BITCOINCASH_DATA" \
+    && ln -sfn "$BITCOINCASH_DATA" /home/bitcoincash/.bitcoincash \
+    && chown -h bitcoincash:bitcoincash /home/bitcoincash/.bitcoincash
 VOLUME /data
 
 COPY entrypoint.sh /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
 
 EXPOSE 8332 8333 18332 18333 18443 18444
-CMD ["/bitcoin/bitcoind", "--datadir=/data"]
+CMD ["/bitcoincash/bitcoind", "--datadir=/data"]

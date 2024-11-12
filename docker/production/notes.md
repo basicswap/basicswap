@@ -165,7 +165,7 @@ Prepare config files:
 
     export ADD_COIN=monero
     docker-compose -f docker-compose-prepare.yml run --rm swapprepare \
-        basicswap-prepare --nocores --usecontainers --addcoin=${ADD_COIN} --htmlhost="0.0.0.0" --particl_mnemonic=none
+        basicswap-prepare --nocores --usecontainers --addcoin=${ADD_COIN} --particl_mnemonic=none
 
 
 Prepare wallet:
@@ -177,7 +177,7 @@ Prepare wallet:
 
     docker-compose -f docker-compose-prepare.yml run -e WALLET_ENCRYPTION_PWD=walletpass \
         --rm swapprepare \
-        basicswap-prepare --initwalletsonly --withoutcoin=particl --withcoin=monero
+        basicswap-prepare --initwalletsonly --withoutcoin=particl --withcoin=${ADD_COIN}
 
     docker-compose -f docker-compose-prepare.yml stop
 
