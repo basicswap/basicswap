@@ -7,6 +7,7 @@
 import json
 import struct
 from basicswap.util import (
+    hex_or_none,
     make_int,
     format_timestamp,
 )
@@ -303,7 +304,7 @@ def describeBid(swap_client, bid, xmr_swap, offer, xmr_offer, bid_events, edit_b
                 confirms = None
                 if swap_client.coin_clients[ci_leader.coin_type()]['chain_height'] and bid.xmr_a_lock_tx.chain_height:
                     confirms = (swap_client.coin_clients[ci_leader.coin_type()]['chain_height'] - bid.xmr_a_lock_tx.chain_height) + 1
-                txns.append({'type': 'Chain A Lock', 'txid': bid.xmr_a_lock_tx.txid.hex(), 'confirms': confirms})
+                txns.append({'type': 'Chain A Lock', 'txid': hex_or_none(bid.xmr_a_lock_tx.txid), 'confirms': confirms})
             if bid.xmr_a_lock_spend_tx:
                 txns.append({'type': 'Chain A Lock Spend', 'txid': bid.xmr_a_lock_spend_tx.txid.hex()})
             if bid.xmr_b_lock_tx:
