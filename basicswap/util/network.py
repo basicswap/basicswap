@@ -15,8 +15,9 @@ from urllib.request import Request, urlopen
 
 
 def is_private_ip_address(addr: str):
-    # Will return false for all URLs
     if addr == 'localhost':
+        return True
+    if addr.endswith('.local'):
         return True
     try:
         return ipaddress.ip_address(addr).is_private
