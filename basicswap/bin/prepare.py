@@ -1327,9 +1327,10 @@ def test_particl_encryption(data_dir, settings, chain, use_tor_proxy):
             coin_name = 'particl'
             coin_settings = settings['chainclients'][coin_name]
             daemon_args += getCoreBinArgs(c, coin_settings)
+            extra_config = {'stdout_to_file': True}
             if coin_settings['manage_daemon']:
                 filename: str = getCoreBinName(c, coin_settings, coin_name + 'd')
-                daemons.append(startDaemon(coin_settings['datadir'], coin_settings['bindir'], filename, daemon_args))
+                daemons.append(startDaemon(coin_settings['datadir'], coin_settings['bindir'], filename, daemon_args, extra_config=extra_config))
                 swap_client.setDaemonPID(c, daemons[-1].handle.pid)
             swap_client.setCoinRunParams(c)
             swap_client.createCoinInterface(c)
@@ -1396,7 +1397,8 @@ def initialise_wallets(particl_wallet_mnemonic, with_coins, data_dir, settings, 
                         if c == Coins.FIRO:
                             coin_args += ['-hdseed={}'.format(swap_client.getWalletKey(Coins.FIRO, 1).hex())]
 
-                        daemons.append(startDaemon(coin_settings['datadir'], coin_settings['bindir'], filename, daemon_args + coin_args))
+                        extra_config = {'stdout_to_file': True}
+                        daemons.append(startDaemon(coin_settings['datadir'], coin_settings['bindir'], filename, daemon_args + coin_args, extra_config=extra_config))
                         swap_client.setDaemonPID(c, daemons[-1].handle.pid)
                 swap_client.setCoinRunParams(c)
                 swap_client.createCoinInterface(c)

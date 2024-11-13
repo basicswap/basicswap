@@ -92,10 +92,11 @@ def startDaemon(node_dir, bin_dir, daemon_bin, opts=[], extra_config={}):
         stdout_dest = subprocess.PIPE
         stderr_dest = subprocess.PIPE
 
+    shell: bool = False
     if extra_config.get('use_shell', False):
-        str_args = ' '.join(args)
-        return Daemon(subprocess.Popen(str_args, shell=True, stdin=subprocess.PIPE, stdout=stdout_dest, stderr=stderr_dest, cwd=datadir_path), opened_files)
-    return Daemon(subprocess.Popen(args, stdin=subprocess.PIPE, stdout=stdout_dest, stderr=stderr_dest, cwd=datadir_path), opened_files)
+        args = ' '.join(args)
+        shell = True
+    return Daemon(subprocess.Popen(args, shell=shell, stdin=subprocess.PIPE, stdout=stdout_dest, stderr=stderr_dest, cwd=datadir_path), opened_files)
 
 
 def startXmrDaemon(node_dir, bin_dir, daemon_bin, opts=[]):
