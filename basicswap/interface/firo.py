@@ -42,7 +42,7 @@ class FIROInterface(BTCInterface):
         # No multiwallet support
         self.rpc_wallet = make_rpc_func(self._rpcport, self._rpcauth, host=self._rpc_host)
 
-    def getExchangeName(self, exchange_name):
+    def getExchangeName(self, exchange_name: str) -> str:
         return 'zcoin'
 
     def initialiseWallet(self, key):

@@ -82,8 +82,8 @@ class BCHInterface(BTCInterface):
         # bch does not have segwit, but we return true here to avoid extra checks in basicswap.py
         return True
 
-    def getExchangeName(self, exchange_name):
-        return 'bch'
+    def getExchangeName(self, exchange_name: str) -> str:
+        return 'bitcoin-cash'
 
     def getNewAddress(self, use_segwit: bool = False, label: str = 'swap_receive') -> str:
         args = [label]
