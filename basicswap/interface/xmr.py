@@ -182,11 +182,23 @@ class XMRInterface(CoinInterface):
             params["password"] = self._wallet_password
 
         try:
-            # Can't reopen the same wallet in windows, !is_keys_file_locked()
-            self.rpc_wallet("close_wallet")
+            self.rpc_wallet("open_wallet", params)
+            # TODO Remove `refresh` after upstream fix to refresh on open_wallet
+            self.rpc_wallet("refresh")
         except Exception:
-            pass
-        self.rpc_wallet("open_wallet", params)
+            self._log.debug(f"Failed to open {self.coin_name()} wallet")
+            try:
+                # TODO Remove `store` after upstream fix to autosave on close_wallet
+                self.rpc_wallet("store")
+                self.rpc_wallet("close_wallet")
+                self._log.debug(f"Attempt to save and close {self.coin_name()} wallet")
+            except Exception as e:
+                self._log.debug(f"{self.coin_name()}: {e}")
+                pass
+            self.rpc_wallet("open_wallet", params)
+            # TODO Remove `refresh` after upstream fix to refresh on open_wallet
+            self.rpc_wallet("refresh")
+            self._log.debug(f"Reattempt to open {self.coin_name()} wallet")
 
     def initialiseWallet(
         self, key_view: bytes, key_spend: bytes, restore_height=None
