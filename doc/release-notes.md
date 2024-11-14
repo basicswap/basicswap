@@ -1,3 +1,13 @@
+
+0.14.2
+==============
+
+- BCH support.
+- Mercy outputs on swipe txns of BTC descended coins.
+  - Disable by setting 'altruistic' to false in basicswap.json
+
+
+
 0.13.2
 ==============
 

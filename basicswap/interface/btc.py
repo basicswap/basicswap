@@ -627,9 +627,11 @@ class BTCInterface(Secp256k1Interface):
 
         tx.vout.append(self.txoType()(locked_coin, self.getScriptForPubkeyHash(pkh_dest)))
 
-        if self._altruistic and kbsf:
+        if self.altruistic() and kbsf:
             # Add mercy_keyshare
             tx.vout.append(self.txoType()(0, CScript([OP_RETURN, b'XBSW', kbsf])))
+        else:
+            self._log.debug('Not attaching mercy output, have kbsf {}.'.format('true' if kbsf else 'false'))
 
         dummy_witness_stack = self.getScriptLockRefundSwipeTxDummyWitness(script_lock_refund)
         witness_bytes = self.getWitnessStackSerialisedLength(dummy_witness_stack)
