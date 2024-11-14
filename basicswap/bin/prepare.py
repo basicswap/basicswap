@@ -2075,12 +2075,6 @@ def main():
     if add_coin != '':
         logger.info('Adding coin: %s', add_coin)
         settings = load_config(config_path)
-        if tor_control_password is None and settings.get('use_tor', False):
-            extra_opts['tor_control_password'] = settings.get('tor_control_password', None)
-
-        if particl_wallet_mnemonic != 'none':
-            # Ensure Particl wallet is unencrypted or correct password is supplied
-            test_particl_encryption(data_dir, settings, chain, use_tor_proxy)
 
         if add_coin in settings['chainclients']:
             coin_settings = settings['chainclients'][add_coin]
@@ -2095,6 +2089,13 @@ def main():
                 logger.info('Done.')
                 return 0
             exitWithError('{} is already in the settings file'.format(add_coin))
+
+        if tor_control_password is None and settings.get('use_tor', False):
+            extra_opts['tor_control_password'] = settings.get('tor_control_password', None)
+
+        if particl_wallet_mnemonic != 'none':
+            # Ensure Particl wallet is unencrypted or correct password is supplied
+            test_particl_encryption(data_dir, settings, chain, use_tor_proxy)
 
         settings['chainclients'][add_coin] = chainclients[add_coin]
         settings['use_tor_proxy'] = use_tor_proxy
