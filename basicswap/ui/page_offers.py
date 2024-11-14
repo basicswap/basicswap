@@ -161,7 +161,7 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
         page_data['swap_type'] = get_data_entry(form_data, 'swap_type')
         parsed_data['swap_type'] = page_data['swap_type']
         swap_type = swap_type_from_string(parsed_data['swap_type'])
-    elif parsed_data['coin_from'] in swap_client.scriptless_coins or parsed_data['coin_to'] in swap_client.scriptless_coins:
+    elif parsed_data['coin_from'] in swap_client.adaptor_swap_only_coins or parsed_data['coin_to'] in swap_client.adaptor_swap_only_coins:
         parsed_data['swap_type'] = strSwapType(SwapTypes.XMR_SWAP)
         swap_type = SwapTypes.XMR_SWAP
     else:
