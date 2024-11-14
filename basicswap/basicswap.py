@@ -3879,19 +3879,25 @@ class BasicSwap(BaseApp):
                                 tx_type=TxTypes.XMR_SWAP_A_LOCK_REFUND_SWIPE,
                                 txid=bytes.fromhex(txid),
                             )
-                            self.saveBidInSession(bid_id, bid, session, xmr_swap)
-                            session.commit()
-
                             if self.isBchXmrSwap(offer):
                                 if ci_from.altruistic():
                                     for_ed25519: bool = True if ci_to.curve_type() == Curves.ed25519 else False
                                     kbsf = self.getPathKey(ci_from.coin_type(), ci_to.coin_type(), bid.created_at, xmr_swap.contract_count, KeyTypes.KBSF, for_ed25519)
 
                                     mercy_tx = ci_from.createMercyTx(xmr_swap.a_lock_refund_swipe_tx, h2b(txid), xmr_swap.a_lock_refund_tx_script, kbsf)
-                                    txid = ci_from.publishTx(mercy_tx)
-                                    self.log.info('Submitted mercy tx for bid {}, txid {}'.format(bid_id.hex(), txid))
+                                    txid_hex: str = ci_from.publishTx(mercy_tx)
+                                    bid.txns[TxTypes.BCH_MERCY] = SwapTx(
+                                        bid_id=bid_id,
+                                        tx_type=TxTypes.BCH_MERCY,
+                                        txid=bytes.fromhex(txid_hex),
+                                    )
+                                    self.log.info('Submitted mercy tx for bid {}, txid {}'.format(bid_id.hex(), txid_hex))
+                                    self.logBidEvent(bid_id, EventLogTypes.BCH_MERCY_TX_PUBLISHED, '', session)
                                 else:
                                     self.log.info('Not sending mercy tx for bid {}'.format(bid_id.hex()))
+
+                            self.saveBidInSession(bid_id, bid, session, xmr_swap)
+                            session.commit()
                         except Exception as ex:
                             self.log.debug('Trying to publish coin a lock refund swipe tx: %s', str(ex))
 

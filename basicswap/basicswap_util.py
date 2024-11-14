@@ -186,6 +186,7 @@ class EventLogTypes(IntEnum):
     PTX_REDEEM_PUBLISHED = auto()
     PTX_REFUND_PUBLISHED = auto()
     LOCK_TX_B_IN_MEMPOOL = auto()
+    BCH_MERCY_TX_PUBLISHED = auto()
     BCH_MERCY_TX_FOUND = auto()
 
 
@@ -456,6 +457,8 @@ def describeEventEntry(event_type, event_msg):
         return 'Participate tx refund tx published'
     if event_type == EventLogTypes.BCH_MERCY_TX_FOUND:
         return 'BCH mercy tx found'
+    if event_type == EventLogTypes.BCH_MERCY_TX_PUBLISHED:
+        return 'Lock tx B mercy tx published'
 
 
 def getVoutByAddress(txjs, p2sh):
