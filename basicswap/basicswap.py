@@ -3845,7 +3845,7 @@ class BasicSwap(BaseApp):
 
                     if TxTypes.XMR_SWAP_A_LOCK_REFUND_SPEND not in bid.txns:
                         try:
-                            if bid.debug_ind == DebugTypes.BID_DONT_SPEND_COIN_A_LOCK_REFUND2:
+                            if self.haveDebugInd(bid.bid_id, DebugTypes.BID_DONT_SPEND_COIN_A_LOCK_REFUND2):
                                 raise TemporaryError('Debug: BID_DONT_SPEND_COIN_A_LOCK_REFUND2')
                             if bid.xmr_b_lock_tx is None and self.haveDebugInd(bid.bid_id, DebugTypes.WAIT_FOR_COIN_B_LOCK_BEFORE_REFUND):
                                 raise TemporaryError('Debug: Waiting for Coin B Lock Tx')
@@ -4069,7 +4069,7 @@ class BasicSwap(BaseApp):
                         self.log.debug('getrawtransaction lock spend tx failed: %s', str(e))
             elif state == BidStates.XMR_SWAP_SCRIPT_TX_REDEEMED:
                 if was_received and self.countQueuedActions(session, bid_id, ActionTypes.REDEEM_XMR_SWAP_LOCK_TX_B) < 1:
-                    if bid.debug_ind == DebugTypes.BID_DONT_SPEND_COIN_B_LOCK:
+                    if self.haveDebugInd(bid_id, DebugTypes.BID_DONT_SPEND_COIN_B_LOCK):
                         self.log.debug('Adaptor-sig bid %s: Stalling bid for testing: %d.', bid_id.hex(), bid.debug_ind)
                         # If BID_STALLED_FOR_TEST is set process_XMR_SWAP_A_LOCK_tx_spend would fail
                         self.logBidEvent(bid.bid_id, EventLogTypes.DEBUG_TWEAK_APPLIED, 'ind {}'.format(bid.debug_ind), session)
@@ -4640,7 +4640,7 @@ class BasicSwap(BaseApp):
             if bid.xmr_a_lock_tx.txid != txid:
                 self.log.debug('Updating xmr_a_lock_tx from {} to {}'.format(hex_or_none(bid.xmr_a_lock_tx.txid), txid.hex()))
                 bid.xmr_a_lock_tx.txid = txid
-                bid.xmr_b_lock_tx.vout = vout
+                bid.xmr_a_lock_tx.vout = vout
             self.saveBid(watched_script.bid_id, bid)
         elif watched_script.tx_type == TxTypes.XMR_SWAP_B_LOCK:
             self.log.info('Found chain B lock txid {} for bid: {}'.format(txid.hex(), watched_script.bid_id.hex()))
@@ -4654,6 +4654,7 @@ class BasicSwap(BaseApp):
             if bid.xmr_b_lock_tx.txid != txid:
                 self.log.debug('Updating xmr_b_lock_tx from {} to {}'.format(hex_or_none(bid.xmr_b_lock_tx.txid), txid.hex()))
                 bid.xmr_b_lock_tx.txid = txid
+                bid.xmr_b_lock_tx.vout = vout
             bid.xmr_b_lock_tx.setState(TxStates.TX_IN_CHAIN)
             self.saveBid(watched_script.bid_id, bid)
         else:
@@ -6618,9 +6619,12 @@ class BasicSwap(BaseApp):
             self.swaps_in_progress[bid_id] = (bid, offer)
             return
 
-        delay = self.get_delay_event_seconds()
-        self.log.info('Redeeming coin A lock tx for adaptor-sig bid %s in %d seconds', bid_id.hex(), delay)
-        self.createAction(delay, ActionTypes.REDEEM_XMR_SWAP_LOCK_TX_A, bid_id)
+        if self.haveDebugInd(bid_id, DebugTypes.BID_DONT_SPEND_COIN_A_LOCK):
+            self.logBidEvent(bid_id, EventLogTypes.DEBUG_TWEAK_APPLIED, 'ind {}'.format(DebugTypes.BID_DONT_SPEND_COIN_A_LOCK), None)
+        else:
+            delay = self.get_delay_event_seconds()
+            self.log.info('Redeeming coin A lock tx for adaptor-sig bid %s in %d seconds', bid_id.hex(), delay)
+            self.createAction(delay, ActionTypes.REDEEM_XMR_SWAP_LOCK_TX_A, bid_id)
 
         bid.setState(BidStates.XMR_SWAP_LOCK_RELEASED)
         self.saveBid(bid_id, bid, xmr_swap=xmr_swap)
@@ -7981,8 +7985,10 @@ class BasicSwap(BaseApp):
         coin_from = Coins(offer.coin_to if reverse_bid else offer.coin_from)
         coin_to = Coins(offer.coin_from if reverse_bid else offer.coin_to)
 
+        # TODO: Ensure a chain B lock tx to the expected/summed address exists before sending mercy output.
+        kbsf = None
         if self.isBchXmrSwap(offer):
-            kbsf = None
+            pass
             # BCH sends a separate mercy tx
         else:
             for_ed25519: bool = True if self.ci(coin_to).curve_type() == Curves.ed25519 else False

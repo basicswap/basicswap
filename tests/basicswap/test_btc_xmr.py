@@ -923,6 +923,7 @@ class BasicSwapTest(TestFunctions):
         self.do_test_02_leader_recover_a_lock_tx(self.test_coin_from, Coins.PART)
 
     def test_02_leader_recover_a_lock_tx_from_part(self):
+        self.prepare_balance(self.test_coin_from, 100.0, 1801, 1800)
         self.do_test_02_leader_recover_a_lock_tx(Coins.PART, self.test_coin_from)
 
     def test_03_a_follower_recover_a_lock_tx(self):
@@ -953,6 +954,7 @@ class BasicSwapTest(TestFunctions):
         if not self.has_segwit:
             return
         self.prepare_balance(Coins.XMR, 100.0, 1800, 1801)
+        self.prepare_balance(self.test_coin_from, 100.0, 1801, 1800)
         self.do_test_03_follower_recover_a_lock_tx(Coins.XMR, self.test_coin_from, with_mercy=True)
 
     def test_04_a_follower_recover_b_lock_tx(self):

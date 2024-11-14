@@ -212,6 +212,7 @@ class DebugTypes(IntEnum):
     BID_STOP_AFTER_COIN_B_LOCK = auto()
     BID_DONT_SPEND_COIN_B_LOCK = auto()
     WAIT_FOR_COIN_B_LOCK_BEFORE_REFUND = auto()
+    BID_DONT_SPEND_COIN_A_LOCK = auto()
 
 
 class NotificationTypes(IntEnum):
