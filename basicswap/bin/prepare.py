@@ -2060,6 +2060,8 @@ def main():
             exitWithError(f'{disable_coin} is already disabled')
         coin_settings['connection_type'] = 'none'
         coin_settings['manage_daemon'] = False
+        if 'manage_wallet_daemon' in coin_settings:
+            coin_settings['manage_wallet_daemon'] = False
 
         with open(config_path, 'w') as fp:
             json.dump(settings, fp, indent=4)
@@ -2086,6 +2088,8 @@ def main():
                 logger.info('Enabling coin: %s', add_coin)
                 coin_settings['connection_type'] = 'rpc'
                 coin_settings['manage_daemon'] = True
+                if 'manage_wallet_daemon' in coin_settings:
+                    coin_settings['manage_wallet_daemon'] = True
                 with open(config_path, 'w') as fp:
                     json.dump(settings, fp, indent=4)
                 logger.info('Done.')
