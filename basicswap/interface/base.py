@@ -52,6 +52,7 @@ class CoinInterface:
         self.setDefaults()
         self._network = network
         self._mx_wallet = threading.Lock()
+        self._altruistic = True
 
     def setDefaults(self):
         self._unknown_wallet_seed = True
@@ -165,6 +166,9 @@ class CoinInterface:
 
     def checkWallets(self) -> int:
         return 1
+
+    def altruistic(self) -> bool:
+        return self._altruistic
 
 
 class AdaptorSigInterface():
