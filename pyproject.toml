@@ -34,6 +34,8 @@ dev = [
     "flake8",
     "pip-tools",
     "pytest",
+    "ruff",
+    "black",
     "selenium",
 ]
 
@@ -42,3 +44,6 @@ path = "basicswap/__init__.py"
 
 [tool.hatch.metadata]
 allow-direct-references = true
+
+[tool.ruff]
+exclude = ["basicswap/contrib","basicswap/interface/contrib"]

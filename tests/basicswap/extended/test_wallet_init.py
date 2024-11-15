@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2020-2022 tecnovert
+# Copyright (c) 2024 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -36,7 +37,7 @@ from tests.basicswap.common_xmr import (
 )
 import basicswap.bin.run as runSystem
 
-TEST_PATH = os.path.expanduser(os.getenv('TEST_PATH', '~/test_basicswap1'))
+TEST_PATH = os.path.expanduser(os.getenv("TEST_PATH", "~/test_basicswap1"))
 
 logger = logging.getLogger()
 logger.level = logging.DEBUG
@@ -52,21 +53,21 @@ class Test(unittest.TestCase):
         cls.delay_event = threading.Event()
 
         # Load both wallets from the same mnemonic
-        bins_path = os.path.join(TEST_PATH, 'bin')
+        bins_path = os.path.join(TEST_PATH, "bin")
         for i in range(2):
-            logging.info('Preparing node: %d.', i)
-            client_path = os.path.join(TEST_PATH, 'client{}'.format(i))
+            logging.info("Preparing node: %d.", i)
+            client_path = os.path.join(TEST_PATH, "client{}".format(i))
             try:
                 shutil.rmtree(client_path)
             except Exception as ex:
-                logging.warning('setUpClass %s', str(ex))
+                logging.warning("setUpClass %s", str(ex))
 
-            run_prepare(i, client_path, bins_path, 'monero,bitcoin', mnemonics[0])
+            run_prepare(i, client_path, bins_path, "monero,bitcoin", mnemonics[0])
 
     def run_thread(self, client_id):
-        client_path = os.path.join(TEST_PATH, 'client{}'.format(client_id))
-        testargs = ['basicswap-run', '-datadir=' + client_path, '-regtest']
-        with patch.object(sys, 'argv', testargs):
+        client_path = os.path.join(TEST_PATH, "client{}".format(client_id))
+        testargs = ["basicswap-run", "-datadir=" + client_path, "-regtest"]
+        with patch.object(sys, "argv", testargs):
             runSystem.main()
 
     def test_wallet(self):
@@ -81,20 +82,25 @@ class Test(unittest.TestCase):
         try:
             waitForServer(self.delay_event, 12700)
 
-            wallets_0 = read_json_api(12700, 'wallets')
-            assert (wallets_0['PART']['expected_seed'] is True)
-            assert (wallets_0['XMR']['expected_seed'] is True)
+            wallets_0 = read_json_api(12700, "wallets")
+            assert wallets_0["PART"]["expected_seed"] is True
+            assert wallets_0["XMR"]["expected_seed"] is True
 
             waitForServer(self.delay_event, 12701)
-            wallets_1 = read_json_api(12701, 'wallets')
+            wallets_1 = read_json_api(12701, "wallets")
 
-            assert (wallets_0['PART']['expected_seed'] is True)
-            assert (wallets_1['XMR']['expected_seed'] is True)
+            assert wallets_0["PART"]["expected_seed"] is True
+            assert wallets_1["XMR"]["expected_seed"] is True
 
             # TODO: Check other coins
 
-            assert (wallets_0['PART']['deposit_address'] == wallets_1['1']['deposit_address'])
-            assert (wallets_0['XMR']['deposit_address'] == wallets_1['6']['deposit_address'])
+            assert (
+                wallets_0["PART"]["deposit_address"]
+                == wallets_1["1"]["deposit_address"]
+            )
+            assert (
+                wallets_0["XMR"]["deposit_address"] == wallets_1["6"]["deposit_address"]
+            )
         except Exception:
             traceback.print_exc()
 
@@ -106,5 +112,5 @@ class Test(unittest.TestCase):
             p.join()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
