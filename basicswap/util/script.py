@@ -6,7 +6,13 @@
 
 import struct
 import hashlib
-from basicswap.contrib.test_framework.script import OP_PUSHDATA1, OP_PUSHDATA2, OP_PUSHDATA4, CScriptInvalidError, CScriptTruncatedPushDataError
+from basicswap.contrib.test_framework.script import (
+    OP_PUSHDATA1,
+    OP_PUSHDATA2,
+    OP_PUSHDATA4,
+    CScriptInvalidError,
+    CScriptTruncatedPushDataError,
+)
 from basicswap.script import OpCodes
 
 
@@ -17,15 +23,15 @@ def decodeScriptNum(script_bytes, o):
         return ((num_len - OpCodes.OP_1) + 1, 1)
 
     if num_len > 4:
-        raise ValueError('Bad scriptnum length')  # Max 4 bytes
+        raise ValueError("Bad scriptnum length")  # Max 4 bytes
     if num_len + o >= len(script_bytes):
-        raise ValueError('Bad script length')
+        raise ValueError("Bad script length")
     o += 1
     for i in range(num_len):
         b = script_bytes[o + i]
         # Negative flag set in last byte, if num is positive and > 0x80 an extra 0x00 byte will be appended
         if i == num_len - 1 and b & 0x80:
-            b &= (~(0x80) & 0xFF)
+            b &= ~(0x80) & 0xFF
             v += int(b) << 8 * i
             v *= -1
         else:
@@ -41,47 +47,50 @@ def decodePushData(script_bytes, o):
     i += 1
 
     if opcode < OP_PUSHDATA1:
-        pushdata_type = 'PUSHDATA(%d)' % opcode
+        pushdata_type = "PUSHDATA(%d)" % opcode
         datasize = opcode
 
     elif opcode == OP_PUSHDATA1:
-        pushdata_type = 'PUSHDATA1'
+        pushdata_type = "PUSHDATA1"
         if i >= len(script_bytes):
-            raise CScriptInvalidError('PUSHDATA1: missing data length')
+            raise CScriptInvalidError("PUSHDATA1: missing data length")
         datasize = script_bytes[i]
         i += 1
 
     elif opcode == OP_PUSHDATA2:
-        pushdata_type = 'PUSHDATA2'
+        pushdata_type = "PUSHDATA2"
         if i + 1 >= len(script_bytes):
-            raise CScriptInvalidError('PUSHDATA2: missing data length')
+            raise CScriptInvalidError("PUSHDATA2: missing data length")
         datasize = script_bytes[i] + (script_bytes[i + 1] << 8)
         i += 2
 
     elif opcode == OP_PUSHDATA4:
-        pushdata_type = 'PUSHDATA4'
+        pushdata_type = "PUSHDATA4"
         if i + 3 >= len(script_bytes):
-            raise CScriptInvalidError('PUSHDATA4: missing data length')
-        datasize = script_bytes[i] + (script_bytes[i + 1] << 8) + (script_bytes[i + 2] << 16) + (script_bytes[i + 3] << 24)
+            raise CScriptInvalidError("PUSHDATA4: missing data length")
+        datasize = (
+            script_bytes[i]
+            + (script_bytes[i + 1] << 8)
+            + (script_bytes[i + 2] << 16)
+            + (script_bytes[i + 3] << 24)
+        )
         i += 4
 
     else:
         assert False  # shouldn't happen
 
-    data = bytes(script_bytes[i:i + datasize])
+    data = bytes(script_bytes[i : i + datasize])
 
     # Check for truncation
     if len(data) < datasize:
-        raise CScriptTruncatedPushDataError('%s: truncated data' % pushdata_type, data)
+        raise CScriptTruncatedPushDataError("%s: truncated data" % pushdata_type, data)
 
     # return data and the number of bytes to skip forward
     return (data, i + datasize - o)
 
 
 def getP2SHScriptForHash(p2sh):
-    return bytes((OpCodes.OP_HASH160, 0x14)) \
-        + p2sh \
-        + bytes((OpCodes.OP_EQUAL,))
+    return bytes((OpCodes.OP_HASH160, 0x14)) + p2sh + bytes((OpCodes.OP_EQUAL,))
 
 
 def getP2WSH(script):
@@ -91,26 +100,26 @@ def getP2WSH(script):
 def SerialiseNumCompact(v):
     if v < 253:
         return bytes((v,))
-    if v <= 0xffff:  # USHRT_MAX
+    if v <= 0xFFFF:  # USHRT_MAX
         return struct.pack("<BH", 253, v)
-    if v <= 0xffffffff:  # UINT_MAX
+    if v <= 0xFFFFFFFF:  # UINT_MAX
         return struct.pack("<BI", 254, v)
-    if v <= 0xffffffffffffffff:  # UINT_MAX
+    if v <= 0xFFFFFFFFFFFFFFFF:  # UINT_MAX
         return struct.pack("<BQ", 255, v)
-    raise ValueError('Value too large')
+    raise ValueError("Value too large")
 
 
 def getCompactSizeLen(v):
     # Compact Size
     if v < 253:
         return 1
-    if v <= 0xffff:  # USHRT_MAX
+    if v <= 0xFFFF:  # USHRT_MAX
         return 3
-    if v <= 0xffffffff:  # UINT_MAX
+    if v <= 0xFFFFFFFF:  # UINT_MAX
         return 5
-    if v <= 0xffffffffffffffff:  # UINT_MAX
+    if v <= 0xFFFFFFFFFFFFFFFF:  # UINT_MAX
         return 9
-    raise ValueError('Value too large')
+    raise ValueError("Value too large")
 
 
 def getWitnessElementLen(v):

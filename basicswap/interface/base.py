@@ -14,7 +14,8 @@ from basicswap.chainparams import (
 )
 from basicswap.util import (
     ensure,
-    i2b, b2i,
+    i2b,
+    b2i,
     make_int,
     format_amount,
     TemporaryError,
@@ -26,9 +27,7 @@ from basicswap.util.ecc import (
     ep,
     getSecretInt,
 )
-from coincurve.dleag import (
-    verify_secp256k1_point
-)
+from coincurve.dleag import verify_secp256k1_point
 from coincurve.keys import (
     PublicKey,
 )
@@ -67,33 +66,33 @@ class CoinInterface:
 
     def coin_name(self) -> str:
         coin_chainparams = chainparams[self.coin_type()]
-        if 'display_name' in coin_chainparams:
-            return coin_chainparams['display_name']
-        return coin_chainparams['name'].capitalize()
+        if "display_name" in coin_chainparams:
+            return coin_chainparams["display_name"]
+        return coin_chainparams["name"].capitalize()
 
     def ticker(self) -> str:
-        ticker = chainparams[self.coin_type()]['ticker']
-        if self._network == 'testnet':
-            ticker = 't' + ticker
-        elif self._network == 'regtest':
-            ticker = 'rt' + ticker
+        ticker = chainparams[self.coin_type()]["ticker"]
+        if self._network == "testnet":
+            ticker = "t" + ticker
+        elif self._network == "regtest":
+            ticker = "rt" + ticker
         return ticker
 
     def getExchangeTicker(self, exchange_name: str) -> str:
-        return chainparams[self.coin_type()]['ticker']
+        return chainparams[self.coin_type()]["ticker"]
 
     def getExchangeName(self, exchange_name: str) -> str:
-        return chainparams[self.coin_type()]['name']
+        return chainparams[self.coin_type()]["name"]
 
     def ticker_mainnet(self) -> str:
-        ticker = chainparams[self.coin_type()]['ticker']
+        ticker = chainparams[self.coin_type()]["ticker"]
         return ticker
 
     def min_amount(self) -> int:
-        return chainparams[self.coin_type()][self._network]['min_amount']
+        return chainparams[self.coin_type()][self._network]["min_amount"]
 
     def max_amount(self) -> int:
-        return chainparams[self.coin_type()][self._network]['max_amount']
+        return chainparams[self.coin_type()][self._network]["max_amount"]
 
     def setWalletSeedWarning(self, value: bool) -> None:
         self._unknown_wallet_seed = value
@@ -111,7 +110,7 @@ class CoinInterface:
         return chainparams[self.coin_type()][self._network]
 
     def has_segwit(self) -> bool:
-        return chainparams[self.coin_type()].get('has_segwit', True)
+        return chainparams[self.coin_type()].get("has_segwit", True)
 
     def use_p2shp2wsh(self) -> bool:
         # p2sh-p2wsh
@@ -121,24 +120,26 @@ class CoinInterface:
         if isinstance(ex, TemporaryError):
             return True
         str_error: str = str(ex).lower()
-        if 'not enough unlocked money' in str_error:
+        if "not enough unlocked money" in str_error:
             return True
-        if 'no unlocked balance' in str_error:
+        if "no unlocked balance" in str_error:
             return True
-        if 'transaction was rejected by daemon' in str_error:
+        if "transaction was rejected by daemon" in str_error:
             return True
-        if 'invalid unlocked_balance' in str_error:
+        if "invalid unlocked_balance" in str_error:
             return True
-        if 'daemon is busy' in str_error:
+        if "daemon is busy" in str_error:
             return True
-        if 'timed out' in str_error:
+        if "timed out" in str_error:
             return True
-        if 'request-sent' in str_error:
+        if "request-sent" in str_error:
             return True
         return False
 
     def setConfTarget(self, new_conf_target: int) -> None:
-        ensure(new_conf_target >= 1 and new_conf_target < 33, 'Invalid conf_target value')
+        ensure(
+            new_conf_target >= 1 and new_conf_target < 33, "Invalid conf_target value"
+        )
         self._conf_target = new_conf_target
 
     def walletRestoreHeight(self) -> int:
@@ -171,30 +172,15 @@ class CoinInterface:
         return self._altruistic
 
 
-class AdaptorSigInterface():
+class AdaptorSigInterface:
     def getScriptLockTxDummyWitness(self, script: bytes):
-        return [
-            b'',
-            bytes(72),
-            bytes(72),
-            bytes(len(script))
-        ]
+        return [b"", bytes(72), bytes(72), bytes(len(script))]
 
     def getScriptLockRefundSpendTxDummyWitness(self, script: bytes):
-        return [
-            b'',
-            bytes(72),
-            bytes(72),
-            bytes((1,)),
-            bytes(len(script))
-        ]
+        return [b"", bytes(72), bytes(72), bytes((1,)), bytes(len(script))]
 
     def getScriptLockRefundSwipeTxDummyWitness(self, script: bytes):
-        return [
-            bytes(72),
-            b'',
-            bytes(len(script))
-        ]
+        return [bytes(72), b"", bytes(len(script))]
 
 
 class Secp256k1Interface(CoinInterface, AdaptorSigInterface):
@@ -213,7 +199,7 @@ class Secp256k1Interface(CoinInterface, AdaptorSigInterface):
 
     def verifyKey(self, k: bytes) -> bool:
         i = b2i(k)
-        return (i < ep.o and i > 0)
+        return i < ep.o and i > 0
 
     def verifyPubkey(self, pubkey_bytes: bytes) -> bool:
         return verify_secp256k1_point(pubkey_bytes)

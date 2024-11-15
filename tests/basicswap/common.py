@@ -125,7 +125,7 @@ def checkForks(ro):
             assert ro["softforks"]["csv"]["active"]
             assert ro["softforks"]["segwit"]["active"]
     except Exception as e:
-        logging.warning("Could not parse deployment info")
+        logging.warning(f"Could not parse deployment info: {e}")
 
 
 def stopDaemons(daemons):

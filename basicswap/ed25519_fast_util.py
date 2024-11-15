@@ -13,8 +13,8 @@ def encodepoint(P):
     zi = edf.inv(P[2])
     x = (P[0] * zi) % edf.q
     y = (P[1] * zi) % edf.q
-    y += ((x & 1) << 255)
-    return y.to_bytes(32, byteorder='little')
+    y += (x & 1) << 255
+    return y.to_bytes(32, byteorder="little")
 
 
 def hashToEd25519(bytes_in):
@@ -22,8 +22,8 @@ def hashToEd25519(bytes_in):
     for i in range(1000):
         h255 = bytearray(hashed)
         x_sign = 0 if h255[31] & 0x80 == 0 else 1
-        h255[31] &= 0x7f  # Clear top bit
-        y = int.from_bytes(h255, byteorder='little')
+        h255[31] &= 0x7F  # Clear top bit
+        y = int.from_bytes(h255, byteorder="little")
         x = edf.xrecover(y, x_sign)
         if x == 0 and y == 1:  # Skip infinity point
             continue
@@ -33,4 +33,4 @@ def hashToEd25519(bytes_in):
         if edf.isoncurve(P) and edf.is_identity(edf.scalarmult(P, edf.l)):
             return P
         hashed = hashlib.sha256(hashed).digest()
-    raise ValueError('hashToEd25519 failed')
+    raise ValueError("hashToEd25519 failed")

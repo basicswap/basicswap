@@ -39,7 +39,7 @@ class LockedCoinError(Exception):
         self.coinid = coinid
 
     def __str__(self):
-        return 'Coin must be unlocked: ' + str(self.coinid)
+        return "Coin must be unlocked: " + str(self.coinid)
 
 
 def ensure(v, err_string):
@@ -50,7 +50,7 @@ def ensure(v, err_string):
 def toBool(s) -> bool:
     if isinstance(s, bool):
         return s
-    return s.lower() in ['1', 'true']
+    return s.lower() in ["1", "true"]
 
 
 def jsonDecimal(obj):
@@ -76,8 +76,8 @@ def SerialiseNum(n: int) -> bytes:
     rv = bytearray()
     neg = n < 0
     absvalue = -n if neg else n
-    while (absvalue):
-        rv.append(absvalue & 0xff)
+    while absvalue:
+        rv.append(absvalue & 0xFF)
         absvalue >>= 8
     if rv[-1] & 0x80:
         rv.append(0x80 if neg else 0)
@@ -106,34 +106,36 @@ def DeserialiseNum(b: bytes, o: int = 0) -> int:
 def float_to_str(f: float) -> str:
     # stackoverflow.com/questions/38847690
     d1 = decimal_ctx.create_decimal(repr(f))
-    return format(d1, 'f')
+    return format(d1, "f")
 
 
-def make_int(v, scale: int = 8, r: int = 0) -> int:  # r = 0, no rounding (fail), r > 0 round off, r < 0 floor
+def make_int(
+    v, scale: int = 8, r: int = 0
+) -> int:  # r = 0, no rounding (fail), r > 0 round off, r < 0 floor
     if isinstance(v, float):
         v = float_to_str(v)
     elif isinstance(v, int):
-        return v * 10 ** scale
+        return v * 10**scale
 
     sign = 1
-    if v[0] == '-':
+    if v[0] == "-":
         v = v[1:]
         sign = -1
-    ep = 10 ** scale
+    ep = 10**scale
     have_dp = False
     rv = 0
     for c in v:
-        if c == '.':
+        if c == ".":
             rv *= ep
             have_dp = True
             continue
         if not c.isdigit():
-            raise ValueError('Invalid char: ' + c)
+            raise ValueError("Invalid char: " + c)
         if have_dp:
             ep //= 10
             if ep <= 0:
                 if r == 0:
-                    raise ValueError('Mantissa too long')
+                    raise ValueError("Mantissa too long")
                 if r > 0:
                     # Round off
                     if int(c) > 4:
@@ -151,51 +153,53 @@ def validate_amount(amount, scale: int = 8) -> bool:
     str_amount = float_to_str(amount) if isinstance(amount, float) else str(amount)
     has_decimal = False
     for c in str_amount:
-        if c == '.' and not has_decimal:
+        if c == "." and not has_decimal:
             has_decimal = True
             continue
         if not c.isdigit():
-            raise ValueError('Invalid amount')
+            raise ValueError("Invalid amount")
 
-    ar = str_amount.split('.')
+    ar = str_amount.split(".")
     if len(ar) > 1 and len(ar[1]) > scale:
-        raise ValueError('Too many decimal places in amount {}'.format(str_amount))
+        raise ValueError("Too many decimal places in amount {}".format(str_amount))
     return True
 
 
 def format_amount(i: int, display_scale: int, scale: int = None) -> str:
     if not isinstance(i, int):
-        raise ValueError('Amount must be an integer.')  # Raise error instead of converting as amounts should always be integers
+        raise ValueError(
+            "Amount must be an integer."
+        )  # Raise error instead of converting as amounts should always be integers
     if scale is None:
         scale = display_scale
-    ep = 10 ** scale
+    ep = 10**scale
     n = abs(i)
     quotient = n // ep
     remainder = n % ep
     if display_scale != scale:
-        remainder %= (10 ** display_scale)
-    rv = '{}.{:0>{scale}}'.format(quotient, remainder, scale=display_scale)
+        remainder %= 10**display_scale
+    rv = "{}.{:0>{scale}}".format(quotient, remainder, scale=display_scale)
     if i < 0:
-        rv = '-' + rv
+        rv = "-" + rv
     return rv
 
 
 def format_timestamp(value: int, with_seconds: bool = False) -> str:
-    str_format = '%Y-%m-%d %H:%M'
+    str_format = "%Y-%m-%d %H:%M"
     if with_seconds:
-        str_format += ':%S'
-    str_format += ' %z'
+        str_format += ":%S"
+    str_format += " %z"
     return time.strftime(str_format, time.localtime(value))
 
 
 def b2i(b: bytes) -> int:
     # bytes32ToInt
-    return int.from_bytes(b, byteorder='big')
+    return int.from_bytes(b, byteorder="big")
 
 
 def i2b(i: int) -> bytes:
     # intToBytes32
-    return i.to_bytes(32, byteorder='big')
+    return i.to_bytes(32, byteorder="big")
 
 
 def b2h(b: bytes) -> str:
@@ -203,7 +207,7 @@ def b2h(b: bytes) -> str:
 
 
 def h2b(h: str) -> bytes:
-    if h.startswith('0x'):
+    if h.startswith("0x"):
         h = h[2:]
     return bytes.fromhex(h)
 
@@ -220,5 +224,5 @@ def zeroIfNone(value) -> int:
 
 def hex_or_none(value: bytes) -> str:
     if value is None:
-        return 'None'
+        return "None"
     return value.hex()

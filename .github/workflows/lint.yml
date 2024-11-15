@@ -20,7 +20,7 @@ jobs:
         pip install flake8 codespell
     - name: Running flake8
       run: |
-        flake8 --ignore=E203,E501,F841,W503 --per-file-ignores="basicswap/interface/bch.py:E131,E702" --exclude=basicswap/contrib,basicswap/interface/contrib,messages_pb2.py,.eggs,.tox,bin/install_certifi.py
+        flake8 --ignore=E203,E501,W503 --exclude=basicswap/contrib,basicswap/interface/contrib,.eggs,.tox,bin/install_certifi.py
     - name: Running codespell
       run: |
         codespell --check-filenames --disable-colors --quiet-level=7 --ignore-words=tests/lint/spelling.ignore-words.txt -S .git,.eggs,.tox,pgp,*.pyc,*basicswap/contrib,*basicswap/interface/contrib,*mnemonics.py,bin/install_certifi.py,*basicswap/static

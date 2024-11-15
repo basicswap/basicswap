@@ -76,13 +76,13 @@ class OfferStates(IntEnum):
 
 class BidStates(IntEnum):
     BID_SENT = 1
-    BID_RECEIVING = 2               # Partially received
+    BID_RECEIVING = 2  # Partially received
     BID_RECEIVED = 3
-    BID_RECEIVING_ACC = 4           # Partially received accept message
-    BID_ACCEPTED = 5                # BidAcceptMessage received/sent
-    SWAP_INITIATED = 6              # Initiate txn validated
-    SWAP_PARTICIPATING = 7          # Participate txn validated
-    SWAP_COMPLETED = 8              # All swap txns spent
+    BID_RECEIVING_ACC = 4  # Partially received accept message
+    BID_ACCEPTED = 5  # BidAcceptMessage received/sent
+    SWAP_INITIATED = 6  # Initiate txn validated
+    SWAP_PARTICIPATING = 7  # Participate txn validated
+    SWAP_COMPLETED = 8  # All swap txns spent
     XMR_SWAP_SCRIPT_COIN_LOCKED = 9
     XMR_SWAP_HAVE_SCRIPT_COIN_SPEND_TX = 10
     XMR_SWAP_NOSCRIPT_COIN_LOCKED = 11
@@ -96,13 +96,13 @@ class BidStates(IntEnum):
     XMR_SWAP_FAILED = 19
     SWAP_DELAYING = 20
     SWAP_TIMEDOUT = 21
-    BID_ABANDONED = 22          # Bid will no longer be processed
-    BID_ERROR = 23              # An error occurred
+    BID_ABANDONED = 22  # Bid will no longer be processed
+    BID_ERROR = 23  # An error occurred
     BID_STALLED_FOR_TEST = 24
     BID_REJECTED = 25
     BID_STATE_UNKNOWN = 26
-    XMR_SWAP_MSG_SCRIPT_LOCK_TX_SIGS = 27      # XmrBidLockTxSigsMessage
-    XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX = 28     # XmrBidLockSpendTxMessage
+    XMR_SWAP_MSG_SCRIPT_LOCK_TX_SIGS = 27  # XmrBidLockTxSigsMessage
+    XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX = 28  # XmrBidLockSpendTxMessage
     BID_REQUEST_SENT = 29
     BID_REQUEST_ACCEPTED = 30
     BID_EXPIRED = 31
@@ -231,12 +231,12 @@ class AutomationOverrideOptions(IntEnum):
 
 def strAutomationOverrideOption(option):
     if option == AutomationOverrideOptions.DEFAULT:
-        return 'Default'
+        return "Default"
     if option == AutomationOverrideOptions.ALWAYS_ACCEPT:
-        return 'Always Accept'
+        return "Always Accept"
     if option == AutomationOverrideOptions.NEVER_ACCEPT:
-        return 'Never Accept'
-    return 'Unknown'
+        return "Never Accept"
+    return "Unknown"
 
 
 class VisibilityOverrideOptions(IntEnum):
@@ -247,250 +247,253 @@ class VisibilityOverrideOptions(IntEnum):
 
 def strVisibilityOverrideOption(option):
     if option == VisibilityOverrideOptions.DEFAULT:
-        return 'Default'
+        return "Default"
     if option == VisibilityOverrideOptions.HIDE:
-        return 'Hide'
+        return "Hide"
     if option == VisibilityOverrideOptions.BLOCK:
-        return 'Block'
-    return 'Unknown'
+        return "Block"
+    return "Unknown"
 
 
 def strOfferState(state):
     if state == OfferStates.OFFER_SENT:
-        return 'Sent'
+        return "Sent"
     if state == OfferStates.OFFER_RECEIVED:
-        return 'Received'
+        return "Received"
     if state == OfferStates.OFFER_ABANDONED:
-        return 'Abandoned'
+        return "Abandoned"
     if state == OfferStates.OFFER_EXPIRED:
-        return 'Expired'
-    return 'Unknown'
+        return "Expired"
+    return "Unknown"
 
 
 def strBidState(state):
     if state == BidStates.BID_SENT:
-        return 'Sent'
+        return "Sent"
     if state == BidStates.BID_RECEIVING:
-        return 'Receiving'
+        return "Receiving"
     if state == BidStates.BID_RECEIVING_ACC:
-        return 'Receiving accept'
+        return "Receiving accept"
     if state == BidStates.BID_RECEIVED:
-        return 'Received'
+        return "Received"
     if state == BidStates.BID_ACCEPTED:
-        return 'Accepted'
+        return "Accepted"
     if state == BidStates.SWAP_INITIATED:
-        return 'Initiated'
+        return "Initiated"
     if state == BidStates.SWAP_PARTICIPATING:
-        return 'Participating'
+        return "Participating"
     if state == BidStates.SWAP_COMPLETED:
-        return 'Completed'
+        return "Completed"
     if state == BidStates.SWAP_TIMEDOUT:
-        return 'Timed-out'
+        return "Timed-out"
     if state == BidStates.BID_ABANDONED:
-        return 'Abandoned'
+        return "Abandoned"
     if state == BidStates.BID_STALLED_FOR_TEST:
-        return 'Stalled (debug)'
+        return "Stalled (debug)"
     if state == BidStates.BID_ERROR:
-        return 'Error'
+        return "Error"
     if state == BidStates.BID_REJECTED:
-        return 'Rejected'
+        return "Rejected"
     if state == BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED:
-        return 'Script coin locked'
+        return "Script coin locked"
     if state == BidStates.XMR_SWAP_HAVE_SCRIPT_COIN_SPEND_TX:
-        return 'Script coin spend tx valid'
+        return "Script coin spend tx valid"
     if state == BidStates.XMR_SWAP_NOSCRIPT_COIN_LOCKED:
-        return 'Scriptless coin locked'
+        return "Scriptless coin locked"
     if state == BidStates.XMR_SWAP_LOCK_RELEASED:
-        return 'Script coin lock released'
+        return "Script coin lock released"
     if state == BidStates.XMR_SWAP_SCRIPT_TX_REDEEMED:
-        return 'Script tx redeemed'
+        return "Script tx redeemed"
     if state == BidStates.XMR_SWAP_SCRIPT_TX_PREREFUND:
-        return 'Script pre-refund tx in chain'
+        return "Script pre-refund tx in chain"
     if state == BidStates.XMR_SWAP_NOSCRIPT_TX_REDEEMED:
-        return 'Scriptless tx redeemed'
+        return "Scriptless tx redeemed"
     if state == BidStates.XMR_SWAP_NOSCRIPT_TX_RECOVERED:
-        return 'Scriptless tx recovered'
+        return "Scriptless tx recovered"
     if state == BidStates.XMR_SWAP_FAILED_REFUNDED:
-        return 'Failed, refunded'
+        return "Failed, refunded"
     if state == BidStates.XMR_SWAP_FAILED_SWIPED:
-        return 'Failed, swiped'
+        return "Failed, swiped"
     if state == BidStates.XMR_SWAP_FAILED:
-        return 'Failed'
+        return "Failed"
     if state == BidStates.SWAP_DELAYING:
-        return 'Delaying'
+        return "Delaying"
     if state == BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_TX_SIGS:
-        return 'Exchanged script lock tx sigs msg'
+        return "Exchanged script lock tx sigs msg"
     if state == BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX:
-        return 'Exchanged script lock spend tx msg'
+        return "Exchanged script lock spend tx msg"
     if state == BidStates.BID_REQUEST_SENT:
-        return 'Request sent'
+        return "Request sent"
     if state == BidStates.BID_REQUEST_ACCEPTED:
-        return 'Request accepted'
+        return "Request accepted"
     if state == BidStates.BID_STATE_UNKNOWN:
-        return 'Unknown bid state'
+        return "Unknown bid state"
     if state == BidStates.BID_EXPIRED:
-        return 'Expired'
-    return 'Unknown' + ' ' + str(state)
+        return "Expired"
+    return "Unknown" + " " + str(state)
 
 
 def strTxState(state):
     if state == TxStates.TX_NONE:
-        return 'None'
+        return "None"
     if state == TxStates.TX_SENT:
-        return 'Sent'
+        return "Sent"
     if state == TxStates.TX_CONFIRMED:
-        return 'Confirmed'
+        return "Confirmed"
     if state == TxStates.TX_REDEEMED:
-        return 'Redeemed'
+        return "Redeemed"
     if state == TxStates.TX_REFUNDED:
-        return 'Refunded'
+        return "Refunded"
     if state == TxStates.TX_IN_MEMPOOL:
-        return 'In Mempool'
+        return "In Mempool"
     if state == TxStates.TX_IN_CHAIN:
-        return 'In Chain'
-    return 'Unknown'
+        return "In Chain"
+    return "Unknown"
 
 
 def strTxType(tx_type):
     if tx_type == TxTypes.XMR_SWAP_A_LOCK:
-        return 'Chain A Lock Tx'
+        return "Chain A Lock Tx"
     if tx_type == TxTypes.XMR_SWAP_A_LOCK_SPEND:
-        return 'Chain A Lock Spend Tx'
+        return "Chain A Lock Spend Tx"
     if tx_type == TxTypes.XMR_SWAP_A_LOCK_REFUND:
-        return 'Chain A Lock Refund Tx'
+        return "Chain A Lock Refund Tx"
     if tx_type == TxTypes.XMR_SWAP_A_LOCK_REFUND_SPEND:
-        return 'Chain A Lock Refund Spend Tx'
+        return "Chain A Lock Refund Spend Tx"
     if tx_type == TxTypes.XMR_SWAP_A_LOCK_REFUND_SWIPE:
-        return 'Chain A Lock Refund Swipe Tx'
+        return "Chain A Lock Refund Swipe Tx"
     if tx_type == TxTypes.XMR_SWAP_B_LOCK:
-        return 'Chain B Lock Tx'
+        return "Chain B Lock Tx"
     if tx_type == TxTypes.ITX_PRE_FUNDED:
-        return 'Funded mock initiate Tx'
+        return "Funded mock initiate Tx"
     if tx_type == TxTypes.BCH_MERCY:
-        return 'BCH Mercy Tx'
-    return 'Unknown'
+        return "BCH Mercy Tx"
+    return "Unknown"
 
 
 def strAddressType(addr_type):
     if addr_type == AddressTypes.OFFER:
-        return 'Offer'
+        return "Offer"
     if addr_type == AddressTypes.BID:
-        return 'Bid'
+        return "Bid"
     if addr_type == AddressTypes.RECV_OFFER:
-        return 'Offer recv'
+        return "Offer recv"
     if addr_type == AddressTypes.SEND_OFFER:
-        return 'Offer send'
-    return 'Unknown'
+        return "Offer send"
+    return "Unknown"
 
 
 def getLockName(lock_type):
     if lock_type == TxLockTypes.SEQUENCE_LOCK_BLOCKS:
-        return 'Sequence lock, blocks'
+        return "Sequence lock, blocks"
     if lock_type == TxLockTypes.SEQUENCE_LOCK_TIME:
-        return 'Sequence lock, time'
+        return "Sequence lock, time"
     if lock_type == TxLockTypes.ABS_LOCK_BLOCKS:
-        return 'blocks'
+        return "blocks"
     if lock_type == TxLockTypes.ABS_LOCK_TIME:
-        return 'time'
+        return "time"
 
 
 def describeEventEntry(event_type, event_msg):
     if event_type == EventLogTypes.FAILED_TX_B_LOCK_PUBLISH:
-        return 'Failed to publish lock tx B'
+        return "Failed to publish lock tx B"
     if event_type == EventLogTypes.LOCK_TX_A_PUBLISHED:
-        return 'Lock tx A published'
+        return "Lock tx A published"
     if event_type == EventLogTypes.LOCK_TX_B_PUBLISHED:
-        return 'Lock tx B published'
+        return "Lock tx B published"
     if event_type == EventLogTypes.FAILED_TX_B_SPEND:
-        return 'Failed to publish lock tx B spend: ' + event_msg
+        return "Failed to publish lock tx B spend: " + event_msg
     if event_type == EventLogTypes.LOCK_TX_A_SEEN:
-        return 'Lock tx A seen in chain'
+        return "Lock tx A seen in chain"
     if event_type == EventLogTypes.LOCK_TX_A_CONFIRMED:
-        return 'Lock tx A confirmed in chain'
+        return "Lock tx A confirmed in chain"
     if event_type == EventLogTypes.LOCK_TX_B_SEEN:
-        return 'Lock tx B seen in chain'
+        return "Lock tx B seen in chain"
     if event_type == EventLogTypes.LOCK_TX_B_CONFIRMED:
-        return 'Lock tx B confirmed in chain'
+        return "Lock tx B confirmed in chain"
     if event_type == EventLogTypes.LOCK_TX_B_IN_MEMPOOL:
-        return 'Lock tx B seen in mempool'
+        return "Lock tx B seen in mempool"
     if event_type == EventLogTypes.DEBUG_TWEAK_APPLIED:
-        return 'Debug tweak applied ' + event_msg
+        return "Debug tweak applied " + event_msg
     if event_type == EventLogTypes.FAILED_TX_B_REFUND:
-        return 'Failed to publish lock tx B refund'
+        return "Failed to publish lock tx B refund"
     if event_type == EventLogTypes.LOCK_TX_B_INVALID:
-        return 'Detected invalid lock Tx B'
+        return "Detected invalid lock Tx B"
     if event_type == EventLogTypes.LOCK_TX_A_REFUND_TX_PUBLISHED:
-        return 'Lock tx A refund tx published'
+        return "Lock tx A refund tx published"
     if event_type == EventLogTypes.LOCK_TX_A_REFUND_SPEND_TX_PUBLISHED:
-        return 'Lock tx A refund spend tx published'
+        return "Lock tx A refund spend tx published"
     if event_type == EventLogTypes.LOCK_TX_A_REFUND_SWIPE_TX_PUBLISHED:
-        return 'Lock tx A refund swipe tx published'
+        return "Lock tx A refund swipe tx published"
     if event_type == EventLogTypes.LOCK_TX_B_REFUND_TX_PUBLISHED:
-        return 'Lock tx B refund tx published'
+        return "Lock tx B refund tx published"
     if event_type == EventLogTypes.LOCK_TX_A_SPEND_TX_PUBLISHED:
-        return 'Lock tx A spend tx published'
+        return "Lock tx A spend tx published"
     if event_type == EventLogTypes.LOCK_TX_B_SPEND_TX_PUBLISHED:
-        return 'Lock tx B spend tx published'
+        return "Lock tx B spend tx published"
     if event_type == EventLogTypes.LOCK_TX_A_REFUND_TX_SEEN:
-        return 'Lock tx A refund tx seen in chain'
+        return "Lock tx A refund tx seen in chain"
     if event_type == EventLogTypes.LOCK_TX_A_REFUND_SPEND_TX_SEEN:
-        return 'Lock tx A refund spend tx seen in chain'
+        return "Lock tx A refund spend tx seen in chain"
     if event_type == EventLogTypes.SYSTEM_WARNING:
-        return 'Warning: ' + event_msg
+        return "Warning: " + event_msg
     if event_type == EventLogTypes.ERROR:
-        return 'Error: ' + event_msg
+        return "Error: " + event_msg
     if event_type == EventLogTypes.AUTOMATION_CONSTRAINT:
-        return 'Failed auto accepting'
+        return "Failed auto accepting"
     if event_type == EventLogTypes.AUTOMATION_ACCEPTING_BID:
-        return 'Auto accepting'
+        return "Auto accepting"
     if event_type == EventLogTypes.ITX_PUBLISHED:
-        return 'Initiate tx published'
+        return "Initiate tx published"
     if event_type == EventLogTypes.ITX_REDEEM_PUBLISHED:
-        return 'Initiate tx redeem tx published'
+        return "Initiate tx redeem tx published"
     if event_type == EventLogTypes.ITX_REFUND_PUBLISHED:
-        return 'Initiate tx refund tx published'
+        return "Initiate tx refund tx published"
     if event_type == EventLogTypes.PTX_PUBLISHED:
-        return 'Participate tx published'
+        return "Participate tx published"
     if event_type == EventLogTypes.PTX_REDEEM_PUBLISHED:
-        return 'Participate tx redeem tx published'
+        return "Participate tx redeem tx published"
     if event_type == EventLogTypes.PTX_REFUND_PUBLISHED:
-        return 'Participate tx refund tx published'
+        return "Participate tx refund tx published"
     if event_type == EventLogTypes.BCH_MERCY_TX_FOUND:
-        return 'BCH mercy tx found'
+        return "BCH mercy tx found"
     if event_type == EventLogTypes.BCH_MERCY_TX_PUBLISHED:
-        return 'Lock tx B mercy tx published'
+        return "Lock tx B mercy tx published"
 
 
 def getVoutByAddress(txjs, p2sh):
-    for o in txjs['vout']:
+    for o in txjs["vout"]:
         try:
-            if 'address' in o['scriptPubKey'] and o['scriptPubKey']['address'] == p2sh:
-                return o['n']
-            if p2sh in o['scriptPubKey']['addresses']:
-                return o['n']
+            if "address" in o["scriptPubKey"] and o["scriptPubKey"]["address"] == p2sh:
+                return o["n"]
+            if p2sh in o["scriptPubKey"]["addresses"]:
+                return o["n"]
         except Exception:
             pass
-    raise ValueError('Address output not found in txn')
+    raise ValueError("Address output not found in txn")
 
 
 def getVoutByScriptPubKey(txjs, scriptPubKey_hex: str) -> int:
-    for o in txjs['vout']:
+    for o in txjs["vout"]:
         try:
-            if scriptPubKey_hex == o['scriptPubKey']['hex']:
-                return o['n']
+            if scriptPubKey_hex == o["scriptPubKey"]["hex"]:
+                return o["n"]
         except Exception:
             pass
-    raise ValueError('scriptPubKey output not found in txn')
+    raise ValueError("scriptPubKey output not found in txn")
 
 
-def replaceAddrPrefix(addr, coin_type, chain_name, addr_type='pubkey_address'):
-    return encodeAddress(bytes((chainparams[coin_type][chain_name][addr_type],)) + decodeAddress(addr)[1:])
+def replaceAddrPrefix(addr, coin_type, chain_name, addr_type="pubkey_address"):
+    return encodeAddress(
+        bytes((chainparams[coin_type][chain_name][addr_type],))
+        + decodeAddress(addr)[1:]
+    )
 
 
 def getOfferProofOfFundsHash(offer_msg, offer_addr):
     # TODO: Hash must not include proof_of_funds sig if it exists in offer_msg
     h = hashlib.sha256()
-    h.update(offer_addr.encode('utf-8'))
+    h.update(offer_addr.encode("utf-8"))
     offer_bytes = offer_msg.to_bytes()
     h.update(offer_bytes)
     return h.digest()
@@ -500,33 +503,40 @@ def getLastBidState(packed_states):
     num_states = len(packed_states) // 12
     if num_states < 2:
         return BidStates.BID_STATE_UNKNOWN
-    return struct.unpack_from('<i', packed_states[(num_states - 2) * 12:])[0]
+    return struct.unpack_from("<i", packed_states[(num_states - 2) * 12 :])[0]
     try:
         num_states = len(packed_states) // 12
         if num_states < 2:
             return BidStates.BID_STATE_UNKNOWN
-        return struct.unpack_from('<i', packed_states[(num_states - 2) * 12:])[0]
+        return struct.unpack_from("<i", packed_states[(num_states - 2) * 12 :])[0]
     except Exception:
         return BidStates.BID_STATE_UNKNOWN
 
 
 def strSwapType(swap_type):
     if swap_type == SwapTypes.SELLER_FIRST:
-        return 'seller_first'
+        return "seller_first"
     if swap_type == SwapTypes.XMR_SWAP:
-        return 'xmr_swap'
+        return "xmr_swap"
     return None
 
 
 def strSwapDesc(swap_type):
     if swap_type == SwapTypes.SELLER_FIRST:
-        return 'Secret Hash'
+        return "Secret Hash"
     if swap_type == SwapTypes.XMR_SWAP:
-        return 'Adaptor Sig'
+        return "Adaptor Sig"
     return None
 
 
-inactive_states = [BidStates.SWAP_COMPLETED, BidStates.BID_ERROR, BidStates.BID_REJECTED, BidStates.SWAP_TIMEDOUT, BidStates.BID_ABANDONED, BidStates.BID_EXPIRED]
+inactive_states = [
+    BidStates.SWAP_COMPLETED,
+    BidStates.BID_ERROR,
+    BidStates.BID_REJECTED,
+    BidStates.SWAP_TIMEDOUT,
+    BidStates.BID_ABANDONED,
+    BidStates.BID_EXPIRED,
+]
 
 
 def isActiveBidState(state):

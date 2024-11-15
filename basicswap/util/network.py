@@ -15,9 +15,9 @@ from urllib.request import Request, urlopen
 
 
 def is_private_ip_address(addr: str):
-    if addr == 'localhost':
+    if addr == "localhost":
         return True
-    if addr.endswith('.local'):
+    if addr.endswith(".local"):
         return True
     try:
         return ipaddress.ip_address(addr).is_private
@@ -27,7 +27,7 @@ def is_private_ip_address(addr: str):
 
 def make_reporthook(read_start: int, logger):
     read = read_start  # Number of bytes read so far
-    last_percent_str = ''
+    last_percent_str = ""
     time_last = time.time()
     read_last = read_start
     display_last = time_last
@@ -35,7 +35,7 @@ def make_reporthook(read_start: int, logger):
     average_buffer = [-1] * 8
 
     if read_start > 0:
-        logger.info(f'Attempting to resume from byte {read_start}')
+        logger.info(f"Attempting to resume from byte {read_start}")
 
     def reporthook(blocknum, blocksize, totalsize):
         nonlocal read, last_percent_str, time_last, read_last, display_last, read_start
@@ -72,32 +72,32 @@ def make_reporthook(read_start: int, logger):
         average_bits_per_second /= samples
 
         speed_str: str
-        if average_bits_per_second > 1000 ** 3:
-            speed_str = '{:.2f} Gbps'.format(average_bits_per_second / (1000 ** 3))
-        elif average_bits_per_second > 1000 ** 2:
-            speed_str = '{:.2f} Mbps'.format(average_bits_per_second / (1000 ** 2))
+        if average_bits_per_second > 1000**3:
+            speed_str = "{:.2f} Gbps".format(average_bits_per_second / (1000**3))
+        elif average_bits_per_second > 1000**2:
+            speed_str = "{:.2f} Mbps".format(average_bits_per_second / (1000**2))
         else:
-            speed_str = '{:.2f} kbps'.format(average_bits_per_second / 1000)
+            speed_str = "{:.2f} kbps".format(average_bits_per_second / 1000)
 
         if totalsize > 0:
-            percent_str = '%5.0f%%' % (read * 1e2 / use_size)
+            percent_str = "%5.0f%%" % (read * 1e2 / use_size)
             if percent_str != last_percent_str or time_now - display_last > 10:
-                logger.info(percent_str + '  ' + speed_str)
+                logger.info(percent_str + "  " + speed_str)
                 last_percent_str = percent_str
                 display_last = time_now
         else:
-            logger.info(f'Read {read}, {speed_str}')
+            logger.info(f"Read {read}, {speed_str}")
+
     return reporthook
 
 
 def urlretrieve(url, filename, reporthook=None, data=None, resume_from=0):
-    '''urlretrieve with resume
-    '''
+    """urlretrieve with resume"""
     url_type, path = _splittype(url)
 
     req = Request(url)
     if resume_from > 0:
-        req.add_header('Range', f'bytes={resume_from}-')
+        req.add_header("Range", f"bytes={resume_from}-")
     with contextlib.closing(urlopen(req)) as fp:
         headers = fp.info()
 
@@ -106,7 +106,7 @@ def urlretrieve(url, filename, reporthook=None, data=None, resume_from=0):
         if url_type == "file" and not filename:
             return os.path.normpath(path), headers
 
-        with open(filename, 'ab' if resume_from > 0 else 'wb') as tfp:
+        with open(filename, "ab" if resume_from > 0 else "wb") as tfp:
             result = filename, headers
             bs = 1024 * 8
             size = -1
@@ -117,10 +117,10 @@ def urlretrieve(url, filename, reporthook=None, data=None, resume_from=0):
                 size = int(headers["Content-Length"])
             if "Content-Range" in headers:
                 range_str = headers["Content-Range"]
-                offset = range_str.find('-')
+                offset = range_str.find("-")
                 range_from = int(range_str[6:offset])
             if resume_from != range_from:
-                raise ValueError('Download is not resuming from the expected byte')
+                raise ValueError("Download is not resuming from the expected byte")
 
             if reporthook:
                 reporthook(blocknum, bs, size)
@@ -137,7 +137,7 @@ def urlretrieve(url, filename, reporthook=None, data=None, resume_from=0):
 
     if size >= 0 and read < size:
         raise ContentTooShortError(
-            "retrieval incomplete: got only %i out of %i bytes"
-            % (read, size), result)
+            "retrieval incomplete: got only %i out of %i bytes" % (read, size), result
+        )
 
     return result

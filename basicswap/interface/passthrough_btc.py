@@ -6,8 +6,7 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 from .btc import BTCInterface
-from basicswap.contrib.test_framework.messages import (
-    CTxOut)
+from basicswap.contrib.test_framework.messages import CTxOut
 
 
 class PassthroughBTCInterface(BTCInterface):
@@ -15,5 +14,5 @@ class PassthroughBTCInterface(BTCInterface):
         super().__init__(coin_settings, network)
         self.txoType = CTxOut
         self._network = network
-        self.blocks_confirmed = coin_settings['blocks_confirmed']
-        self.setConfTarget(coin_settings['conf_target'])
+        self.blocks_confirmed = coin_settings["blocks_confirmed"]
+        self.setConfTarget(coin_settings["conf_target"])
