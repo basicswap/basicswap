@@ -6,7 +6,7 @@ const coinNameToSymbol = {
   'Particl Blind': 'particl',
   'Particl Anon': 'particl',
   'Monero': 'monero',
-  'Wownero': 'wownero',
+  'Wownero': 'wownero', 
   'Litecoin': 'litecoin',
   'Firo': 'firo',
   'Zcoin': 'firo',
@@ -15,7 +15,7 @@ const coinNameToSymbol = {
   'Decred': 'decred',
   'Zano': 'zano',
   'Dogecoin': 'dogecoin',
-  'Bitcoin Cash': 'bitcoincash'
+  'Bitcoin Cash': 'bitcoin-cash'
 };
 
 function makePostRequest(url, headers = {}) {
@@ -97,7 +97,7 @@ async function fetchLatestPrices() {
   }
 
   console.log('Fetching latest prices...');
-  const url = 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,dash,dogecoin,decred,litecoin,particl,pivx,monero,zano,wownero,zcoin&vs_currencies=USD,BTC';
+  const url = 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,bitcoin-cash,dash,dogecoin,decred,litecoin,particl,pivx,monero,zano,wownero,zcoin&vs_currencies=USD,BTC';
   
   try {
     const data = await makePostRequest(url);
@@ -325,11 +325,20 @@ function getNoOffersMessage() {
 
 window.tableRateModule = {
   coinNameToSymbol: {
-    'Bitcoin': 'BTC', 'Particl': 'PART', 'Particl Blind': 'PART',
-    'Particl Anon': 'PART', 'Monero': 'XMR', 'Wownero': 'WOW',
-    'Litecoin': 'LTC', 'Firo': 'FIRO', 'Dash': 'DASH',
-    'PIVX': 'PIVX', 'Decred': 'DCR', 'Zano': 'ZANO',
-    'Bitcoin Cash': 'BCH'
+    'Bitcoin': 'BTC',
+    'Particl': 'PART',
+    'Particl Blind': 'PART',
+    'Particl Anon': 'PART',
+    'Monero': 'XMR',
+    'Wownero': 'WOW',
+    'Litecoin': 'LTC',
+    'Firo': 'FIRO',
+    'Dash': 'DASH',
+    'PIVX': 'PIVX',
+    'Decred': 'DCR',
+    'Zano': 'ZANO',
+    'Bitcoin Cash': 'BCH',
+    'Dogecoin': 'DOGE'
   },
   
   cache: {},
@@ -667,21 +676,23 @@ function filterAndSortData() {
     const isFiroOrZcoin = (coin) => ['firo', 'zcoin'].includes(coin.toLowerCase());
     const isParticlVariant = (coin) => ['particl', 'particl anon', 'particl blind'].includes(coin.toLowerCase());
 
-    const coinMatches = (offerCoin, filterCoin) => {
-        offerCoin = offerCoin.toLowerCase();
-        filterCoin = filterCoin.toLowerCase();
-        
-        if (offerCoin === filterCoin) return true;
-        if (isFiroOrZcoin(offerCoin) && isFiroOrZcoin(filterCoin)) return true;
-        
-        if (isParticlVariant(filterCoin)) {
-            return offerCoin === filterCoin;
-        }
-        
-        if (filterCoin === 'particl' && isParticlVariant(offerCoin)) return true;
-        
-        return false;
-    };
+   const coinMatches = (offerCoin, filterCoin) => {
+    offerCoin = offerCoin.toLowerCase();
+    filterCoin = filterCoin.toLowerCase();
+    
+    if (offerCoin === filterCoin) return true;
+    if (isFiroOrZcoin(offerCoin) && isFiroOrZcoin(filterCoin)) return true;
+    if (filterCoin === 'bitcoincash' && offerCoin === 'bitcoin cash') return true;
+    if (filterCoin === 'bitcoin cash' && offerCoin === 'bitcoincash') return true;
+    
+    if (isParticlVariant(filterCoin)) {
+        return offerCoin === filterCoin;
+    }
+    
+    if (filterCoin === 'particl' && isParticlVariant(offerCoin)) return true;
+    
+    return false;
+};
 
     originalJsonData.forEach(offer => {
         const coinFrom = (offer.coin_from || '');
@@ -1026,6 +1037,9 @@ async function calculateProfitLoss(fromCoin, toCoin, fromAmount, toAmount, isOwn
     if (lowerCoin === 'firo' || lowerCoin === 'zcoin') {
       return 'zcoin';
     }
+    if (lowerCoin === 'bitcoin cash') {
+      return 'bitcoin-cash';
+    }
     return coinNameToSymbol[coin] || lowerCoin;
   };
 
@@ -1045,17 +1059,15 @@ async function calculateProfitLoss(fromCoin, toCoin, fromAmount, toAmount, isOwn
 
   let percentDiff;
   if (isOwnOffer) {
-    // For sent offers or own offers, always calculate as if selling
     percentDiff = ((toValueUSD / fromValueUSD) - 1) * 100;
   } else {
-    // For received offers, calculate savings percentage
     percentDiff = ((fromValueUSD / toValueUSD) - 1) * 100;
   }
 
   console.log(`Percent difference: ${percentDiff.toFixed(2)}%`);
-
   return percentDiff;
 }
+
 function getProfitColorClass(percentage) {
   const numericPercentage = parseFloat(percentage);
   if (numericPercentage > 0) return 'text-green-500';
@@ -1065,36 +1077,39 @@ function getProfitColorClass(percentage) {
 }
 
 function getMarketRate(fromCoin, toCoin) {
-    return new Promise((resolve) => {
-        console.log(`Attempting to get market rate for ${fromCoin} to ${toCoin}`);
-        if (!latestPrices) {
-            console.warn('Latest prices object is not available');
-            resolve(null);
-            return;
-        }
+  return new Promise((resolve) => {
+    console.log(`Attempting to get market rate for ${fromCoin} to ${toCoin}`);
+    if (!latestPrices) {
+      console.warn('Latest prices object is not available');
+      resolve(null);
+      return;
+    }
 
-        const getPriceKey = (coin) => {
-            const lowerCoin = coin.toLowerCase();
-            if (lowerCoin === 'firo' || lowerCoin === 'zcoin') {
-                return 'zcoin';
-            }
-            return coinNameToSymbol[coin] || lowerCoin;
-        };
+    const getPriceKey = (coin) => {
+      const lowerCoin = coin.toLowerCase();
+      if (lowerCoin === 'firo' || lowerCoin === 'zcoin') {
+        return 'zcoin';
+      }
+      if (lowerCoin === 'bitcoin cash') {
+        return 'bitcoin-cash';
+      }
+      return coinNameToSymbol[coin] || lowerCoin;
+    };
 
-        const fromSymbol = getPriceKey(fromCoin);
-        const toSymbol = getPriceKey(toCoin);
+    const fromSymbol = getPriceKey(fromCoin);
+    const toSymbol = getPriceKey(toCoin);
 
-        const fromPrice = latestPrices[fromSymbol]?.usd;
-        const toPrice = latestPrices[toSymbol]?.usd;
-        if (!fromPrice || !toPrice) {
-            console.warn(`Missing price data for ${!fromPrice ? fromCoin : toCoin}`);
-            resolve(null);
-            return;
-        }
-        const rate = toPrice / fromPrice;
-        console.log(`Market rate calculated: ${rate} ${toCoin}/${fromCoin}`);
-        resolve(rate);
-    });
+    const fromPrice = latestPrices[fromSymbol]?.usd;
+    const toPrice = latestPrices[toSymbol]?.usd;
+    if (!fromPrice || !toPrice) {
+      console.warn(`Missing price data for ${!fromPrice ? fromCoin : toCoin}`);
+      resolve(null);
+      return;
+    }
+    const rate = toPrice / fromPrice;
+    console.log(`Market rate calculated: ${rate} ${toCoin}/${fromCoin}`);
+    resolve(rate);
+  });
 }
 
 function getTimerColor(offer) {
@@ -1218,7 +1233,13 @@ function createRateColumn(offer, coinFrom, coinTo) {
   
   const getPriceKey = (coin) => {
     const lowerCoin = coin.toLowerCase();
-    return lowerCoin === 'firo' || lowerCoin === 'zcoin' ? 'zcoin' : coinNameToSymbol[coin] || lowerCoin;
+    if (lowerCoin === 'firo' || lowerCoin === 'zcoin') {
+      return 'zcoin';
+    }
+    if (lowerCoin === 'bitcoin cash') {
+      return 'bitcoin-cash';
+    }
+    return coinNameToSymbol[coin] || lowerCoin;
   };
 
   const fromPriceUSD = latestPrices[getPriceKey(coinFrom)]?.usd || 0;
@@ -1226,11 +1247,11 @@ function createRateColumn(offer, coinFrom, coinTo) {
 
   const rateInUSD = rate * toPriceUSD;
 
+  // Add logging for debugging
   console.log(`Rate calculation for ${fromSymbol} to ${toSymbol}:`);
+  console.log(`Using price keys: ${getPriceKey(coinFrom)}, ${getPriceKey(coinTo)}`);
+  console.log(`Got prices: $${fromPriceUSD}, $${toPriceUSD}`);
   console.log(`Rate: ${rate} ${toSymbol}/${fromSymbol}`);
-  console.log(`Inverse Rate: ${inverseRate} ${fromSymbol}/${toSymbol}`);
-  console.log(`${fromSymbol} price: $${fromPriceUSD}`);
-  console.log(`${toSymbol} price: $${toPriceUSD}`);
   console.log(`Rate in USD: $${rateInUSD.toFixed(2)}`);
 
   return `
@@ -1383,6 +1404,9 @@ function updateTooltipTargets(row, uniqueId) {
 
 function getCoinSymbolLowercase(coin) {
   if (typeof coin === 'string') {
+    if (coin.toLowerCase() === 'bitcoin cash') {
+      return 'bitcoin-cash';
+    }
     return (coinNameToSymbol[coin] || coin).toLowerCase();
   } else if (coin && typeof coin === 'object' && coin.symbol) {
     return coin.symbol.toLowerCase();
@@ -1471,7 +1495,13 @@ function createCombinedRateTooltip(offer, coinFrom, coinTo, isSentOffers, treatA
   
   const getPriceKey = (coin) => {
     const lowerCoin = coin.toLowerCase();
-    return lowerCoin === 'firo' || lowerCoin === 'zcoin' ? 'zcoin' : getCoinSymbolLowercase(coin);
+    if (lowerCoin === 'firo' || lowerCoin === 'zcoin') {
+      return 'zcoin';
+    }
+    if (lowerCoin === 'bitcoin cash') {
+      return 'bitcoin-cash';
+    }
+    return coinNameToSymbol[coin] || lowerCoin;
   };
 
   const fromSymbol = getPriceKey(coinFrom);
@@ -1486,7 +1516,7 @@ function createCombinedRateTooltip(offer, coinFrom, coinTo, isSentOffers, treatA
   const percentDiff = ((rate - marketRate) / marketRate) * 100;
   const formattedPercentDiff = percentDiff.toFixed(2);
   const percentDiffDisplay = formattedPercentDiff === "0.00" ? "0.00" : 
-                             (percentDiff > 0 ? `+${formattedPercentDiff}` : formattedPercentDiff);
+                            (percentDiff > 0 ? `+${formattedPercentDiff}` : formattedPercentDiff);
   const aboveOrBelow = percentDiff > 0 ? "above" : percentDiff < 0 ? "below" : "at";
 
   const action = isSentOffers || treatAsSentOffer ? "selling" : "buying";
