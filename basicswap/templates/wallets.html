@@ -216,131 +216,86 @@ const api = {
       xhr.timeout = 30000;
       xhr.ontimeout = () => reject(new Error('Request timed out'));
       xhr.onload = () => {
-        console.log(`Response for ${url}:`, xhr.responseText);
         if (xhr.status === 200) {
           try {
             const response = JSON.parse(xhr.responseText);
             if (response.Error) {
-              console.error(`API Error for ${url}:`, response.Error);
               reject(new Error(response.Error));
             } else {
               resolve(response);
             }
           } catch (error) {
-            console.error(`Invalid JSON response for ${url}:`, xhr.responseText);
             reject(new Error(`Invalid JSON response: ${error.message}`));
           }
         } else {
-          console.error(`HTTP Error for ${url}: ${xhr.status} ${xhr.statusText}`);
           reject(new Error(`HTTP Error: ${xhr.status} ${xhr.statusText}`));
         }
       };
       xhr.onerror = () => reject(new Error('Network error occurred'));
-      xhr.send(JSON.stringify({
-        url: url,
-        headers: headers
-      }));
+      xhr.send(JSON.stringify({ url, headers }));
     });
   },
 };
 
 const coinNameToSymbol = {
-  'Bitcoin': 'BTC',
-  'Particl': 'PART',
-  'Particl Blind': 'PART',
-  'Particl Anon': 'PART',
-  'Monero': 'XMR',
-  'Wownero': 'WOW',
-  'Litecoin': 'LTC',
-  'Firo': 'FIRO',
-  'Dash': 'DASH',
-  'PIVX': 'PIVX',
-  'Decred': 'DCR',
-  'Zano': 'ZANO',
-  'Bitcoin Cash': 'BCH',
+  'Bitcoin': 'bitcoin',
+  'Particl': 'particl',
+  'Particl Blind': 'particl',
+  'Particl Anon': 'particl', 
+  'Monero': 'monero',
+  'Wownero': 'wownero',
+  'Litecoin': 'litecoin',
+  'Firo': 'zcoin',
+  'Dash': 'dash',
+  'PIVX': 'pivx',
+  'Decred': 'decred',
+  'Zano': 'zano',
+  'Bitcoin Cash': 'bitcoin-cash'
 };
 
-const getUsdValue = async (cryptoValue, coinSymbol) => {
-  let apiUrl;
-
-  if (coinSymbol === 'WOW') {
-    apiUrl = 'https://api.coingecko.com/api/v3/simple/price?ids=wownero&vs_currencies=usd';
-  } else {
-    apiUrl = `https://min-api.cryptocompare.com/data/price?fsym=${coinSymbol}&tsyms=USD`;
-  }
-
+async function updatePrices() {
   try {
-    const data = await api.makePostRequest(apiUrl);
-    
-    if (coinSymbol === 'WOW') {
-      const exchangeRate = data.wownero.usd;
-      if (!isNaN(exchangeRate)) {
-        return {
-          usdValue: cryptoValue * exchangeRate,
-          btcValue: cryptoValue / exchangeRate
-        };
-      } else {
-        throw new Error(`Invalid exchange rate for ${coinSymbol}`);
+    const response = await api.makePostRequest(
+      'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,bitcoin-cash,dash,dogecoin,decred,litecoin,particl,pivx,monero,zano,wownero,zcoin&vs_currencies=USD,BTC'
+    );
+
+    document.querySelectorAll('.coinname-value').forEach(el => {
+      const coinName = el.getAttribute('data-coinname');
+      const amount = parseFloat(el.textContent);
+      const coinId = coinNameToSymbol[coinName];
+      const price = response[coinId]?.usd;
+      
+      if (price && !isNaN(amount)) {
+        const usdValue = (amount * price).toFixed(2);
+        const usdEl = el.closest('.flex').nextElementSibling?.querySelector('.usd-value');
+        if (usdEl && localStorage.getItem('usdAmountVisible') === 'true') {
+          usdEl.textContent = `$${usdValue}`;
+        }
       }
-    } else {
-      const exchangeRate = data.USD;
-      if (!isNaN(exchangeRate)) {
-        return {
-          usdValue: cryptoValue * exchangeRate,
-          btcValue: cryptoValue / exchangeRate
-        };
-      } else {
-        throw new Error(`Invalid exchange rate for ${coinSymbol}`);
+    });
+
+    if (localStorage.getItem('usdAmountVisible') === 'true') {
+      const total = Array.from(document.querySelectorAll('.usd-value'))
+        .reduce((sum, el) => sum + (parseFloat(el.textContent?.replace('$', '')) || 0), 0);
+      
+      const totalUsdEl = document.getElementById('total-usd-value');
+      if (totalUsdEl) {
+        totalUsdEl.textContent = `$${total.toFixed(2)}`;
+      }
+
+      const btcPrice = response.bitcoin?.usd;
+      if (btcPrice) {
+        const btcTotal = total / btcPrice;
+        const totalBtcEl = document.getElementById('total-btc-value');
+        if (totalBtcEl) {
+          totalBtcEl.textContent = `~ ${btcTotal.toFixed(8)} BTC`;
+        }
       }
     }
   } catch (error) {
-    console.error(`Error retrieving exchange rate for ${coinSymbol}:`, error);
-    throw error;
+    console.error('Price update failed:', error);
   }
-};
-
-const toggleUsdAmount = async (usdCell, isVisible) => {
-
-    const usdText = document.getElementById('usd-text');
-
-
-    if (usdText) {
-        usdText.style.display = isVisible ? 'inline' : 'none';
-    }
-
-    if (isVisible) {
-        const coinNameValueElement = usdCell.parentElement.querySelector('.coinname-value');
-
-
-        if (coinNameValueElement) {
-            const coinFullName = coinNameValueElement.getAttribute('data-coinname');
-            console.log("coinFullName:", coinFullName);
-
-            if (coinFullName) {
-                const cryptoValue = parseFloat(coinNameValueElement.textContent);
-                console.log("cryptoValue:", cryptoValue);
-
-                const coinSymbol = coinNameToSymbol[coinFullName.trim()];
-                console.log("coinSymbol:", coinSymbol);
-
-                if (coinSymbol) {
-                    await updateValues();
-                } else {
-                    console.error(`Coin symbol not found for full name: ${coinFullName}`);
-                }
-            } else {
-                console.error(`Data attribute 'data-coinname' not found.`);
-            }
-        } else {
-        }
-    } else {
-        usdCell.textContent = "******";
-        const btcValueElement = usdCell.nextElementSibling;
-        if (btcValueElement) {
-            btcValueElement.textContent = "****";
-        }
-    }
-};
+}
 
 const toggleUsdIcon = (isVisible) => {
   const usdIcon = document.querySelector("#hide-usd-amount-toggle svg");
@@ -359,85 +314,28 @@ const toggleUsdIcon = (isVisible) => {
   }
 };
 
-const calculateTotalUsdValue = async () => {
-  const coinNameValues = document.querySelectorAll('.coinname-value');
-  let totalUsdValue = 0;
-
-  for (const coinNameValue of coinNameValues) {
-    const coinFullName = coinNameValue.getAttribute('data-coinname');
-    const cryptoValue = parseFloat(coinNameValue.textContent);
-    const coinSymbol = coinNameToSymbol[coinFullName];
-
-    if (coinSymbol) {
-      try {
-        const { usdValue } = await getUsdValue(cryptoValue, coinSymbol);
-        totalUsdValue += usdValue;
-
-        const usdValueElement = coinNameValue.parentElement.nextElementSibling.querySelector('.usd-value');
-        if (usdValueElement) {
-          usdValueElement.textContent = `$${usdValue.toFixed(2)}`;
-        }
-      } catch (error) {
-        console.error(`Error retrieving exchange rate for ${coinSymbol}`);
-      }
-    } else {
-      console.error(`Coin symbol not found for full name: ${coinFullName}`);
-    }
-  }
-
-  const totalUsdValueElement = document.getElementById('total-usd-value');
-  if (totalUsdValueElement) {
-    totalUsdValueElement.textContent = `$${totalUsdValue.toFixed(2)}`;
-  }
-};
-
-const calculateTotalBtcValue = async () => {
-  const usdValueElements = document.getElementsByClassName('usd-value');
-  let totalBtcValue = 0;
-
-  try {
-    const data = await api.makePostRequest('https://min-api.cryptocompare.com/data/price?fsym=BTC&tsyms=USD');
-    const btcToUsdRate = data.USD;
-
-    for (const usdValueElement of usdValueElements) {
-      const usdValue = parseFloat(usdValueElement.textContent.replace('$', ''));
-      const btcValue = usdValue / btcToUsdRate;
-
-      if (!isNaN(btcValue)) {
-        totalBtcValue += btcValue;
-      } else {
-        console.error(`Invalid USD value: ${usdValue}`);
-      }
-    }
-
-    const totalBtcValueElement = document.getElementById('total-btc-value');
-    if (totalBtcValueElement) {
-      if (localStorage.getItem('usdAmountVisible') === 'false') {
-        totalBtcValueElement.textContent = "****";
-      } else {
-        totalBtcValueElement.textContent = `~ ${totalBtcValue.toFixed(8)} BTC`;
-      }
-    }
-  } catch (error) {
-    console.error(`Error retrieving BTC to USD exchange rate:`, error);
+const toggleUsdAmount = (usdCell, isVisible) => {
+  const usdText = document.getElementById('usd-text');
+  if (usdText) {
+    usdText.style.display = isVisible ? 'inline' : 'none';
   }
 };
 
 const loadUsdAmountVisibility = async () => {
-  let usdAmountVisible = localStorage.getItem('usdAmountVisible') === 'true';
+  const usdAmountVisible = localStorage.getItem('usdAmountVisible') === 'true';
   toggleUsdIcon(usdAmountVisible);
 
   const usdValueElements = document.getElementsByClassName('usd-value');
   for (const usdValueElement of usdValueElements) {
-    toggleUsdAmount(usdValueElement, usdAmountVisible, !usdAmountVisible);
+    toggleUsdAmount(usdValueElement, usdAmountVisible);
   }
 
   const totalUsdValueElement = document.getElementById('total-usd-value');
   if (!usdAmountVisible && totalUsdValueElement) {
     totalUsdValueElement.textContent = "*****";
-  } else if (usdAmountVisible && totalUsdValueElement) {
-    await calculateTotalUsdValue();
-    calculateTotalBtcValue();
+    document.getElementById('total-btc-value').textContent = "****";
+  } else if (usdAmountVisible) {
+    updatePrices();
   }
 };
 
@@ -445,33 +343,27 @@ window.onload = async () => {
   const hideUsdAmountToggle = document.getElementById('hide-usd-amount-toggle');
   let usdAmountVisible = localStorage.getItem('usdAmountVisible') === 'true';
 
-  hideUsdAmountToggle.addEventListener('click', async () => {
+  hideUsdAmountToggle?.addEventListener('click', () => {
     usdAmountVisible = !usdAmountVisible;
     localStorage.setItem('usdAmountVisible', usdAmountVisible);
-
     toggleUsdIcon(usdAmountVisible);
-
+    
     const usdValueElements = document.getElementsByClassName('usd-value');
     for (const usdValueElement of usdValueElements) {
       toggleUsdAmount(usdValueElement, usdAmountVisible);
     }
 
-    const totalUsdValueElement = document.getElementById('total-usd-value');
-    if (!usdAmountVisible && totalUsdValueElement) {
-      totalUsdValueElement.textContent = "*****";
-    } else if (usdAmountVisible && totalUsdValueElement) {
-      await calculateTotalUsdValue();
-    }
-
-    const totalBtcValueElement = document.getElementById('total-btc-value');
-    if (!usdAmountVisible && totalBtcValueElement) {
-      totalBtcValueElement.textContent = "";
-    } else if (usdAmountVisible && totalBtcValueElement) {
-      await calculateTotalBtcValue();
+    if (usdAmountVisible) {
+      updatePrices();
+    } else {
+      document.querySelectorAll('.usd-value').forEach(el => el.textContent = '******');
+      document.getElementById('total-usd-value').textContent = '*****';
+      document.getElementById('total-btc-value').textContent = '****';
     }
   });
 
   await loadUsdAmountVisibility();
+  setInterval(updatePrices, 300000);
 };
 </script>
 </body>
