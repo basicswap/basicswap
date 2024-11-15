@@ -456,63 +456,63 @@
 </script>
 {% endif %}
 <script>
-    function copyToClipboard(text) {
-        const el = document.createElement('textarea');
-        el.value = text;
-        document.body.appendChild(el);
-        el.select();
-        document.execCommand('copy');
-        document.body.removeChild(el);
-    }
+let clickTimeout = null;
 
-    function copyAndShowMessage(elementId) {
-        const addressElement = document.getElementById(elementId);
-        if (!addressElement) return;
-        const addressText = addressElement.innerText.trim();
-        copyToClipboard(addressText);
-        addressElement.innerText = 'Copied to clipboard';
+function copyToClipboard(text) {
+   const el = document.createElement('textarea');
+   el.value = text;
+   document.body.appendChild(el);
+   el.select();
+   document.execCommand('copy');
+   document.body.removeChild(el);
+}
 
-        const originalWidth = addressElement.offsetWidth;
+function copyAndShowMessage(elementId) {
+   const addressElement = document.getElementById(elementId);
+   if (!addressElement) return;
+   const addressText = addressElement.innerText.trim();
+   
+   if (addressText === 'Copied to clipboard') return;
+   
+   copyToClipboard(addressText);
+   addressElement.innerText = 'Copied to clipboard';
+   const originalWidth = addressElement.offsetWidth;
+   addressElement.classList.add('copying');
+   addressElement.parentElement.style.width = `${originalWidth}px`;
+   setTimeout(function () {
+       addressElement.innerText = addressText;
+       addressElement.classList.remove('copying');
+       addressElement.parentElement.style.width = '';
+   }, 1000);
+}
 
-        addressElement.classList.add('copying');
-
-        addressElement.parentElement.style.width = `${originalWidth}px`;
-
-        setTimeout(function () {
-            addressElement.innerText = addressText;
-            addressElement.classList.remove('copying');
-            addressElement.parentElement.style.width = '';
-        }, 2000);
-    }
-
-    const stealthAddressElement = document.getElementById('stealth_address');
-    if (stealthAddressElement) {
-        stealthAddressElement.addEventListener('click', function () {
-            copyAndShowMessage('stealth_address');
-        });
-    }
-
-    const mainDepositAddressElement = document.getElementById('main_deposit_address');
-    if (mainDepositAddressElement) {
-        mainDepositAddressElement.addEventListener('click', function () {
-            copyAndShowMessage('main_deposit_address');
-        });
-    }
-
-    const moneroMainAddressElement = document.getElementById('monero_main_address');
-    if (moneroMainAddressElement) {
-        moneroMainAddressElement.addEventListener('click', function () {
-            copyAndShowMessage('monero_main_address');
-        });
-    }
-
-    const moneroSubAddressElement = document.getElementById('monero_sub_address');
-    if (moneroSubAddressElement) {
-        moneroSubAddressElement.addEventListener('click', function () {
-            copyAndShowMessage('monero_sub_address');
-        });
-    }
-  </script>
+document.addEventListener('DOMContentLoaded', function() {
+   const stealthAddressElement = document.getElementById('stealth_address');
+   if (stealthAddressElement) {
+       stealthAddressElement.addEventListener('click', function() {
+           copyAndShowMessage('stealth_address');
+       });
+   }
+   const mainDepositAddressElement = document.getElementById('main_deposit_address');
+   if (mainDepositAddressElement) {
+       mainDepositAddressElement.addEventListener('click', function() {
+           copyAndShowMessage('main_deposit_address');
+       });
+   }
+   const moneroMainAddressElement = document.getElementById('monero_main_address');
+   if (moneroMainAddressElement) {
+       moneroMainAddressElement.addEventListener('click', function() {
+           copyAndShowMessage('monero_main_address');
+       });
+   }
+   const moneroSubAddressElement = document.getElementById('monero_sub_address');
+   if (moneroSubAddressElement) {
+       moneroSubAddressElement.addEventListener('click', function() {
+           copyAndShowMessage('monero_sub_address');
+       });
+   }
+});
+</script>
   <section class="p-6">
     <div class="flex items-center">
       <h4 class="font-semibold text-2xl text-black dark:text-white">Withdraw</h4>
