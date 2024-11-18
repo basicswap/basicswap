@@ -617,7 +617,7 @@ def main():
         )
         runClient(fp, data_dir, chain, start_only_coins)
 
-    logger.info("Done.")
+    print("Done.")
     return swap_client.fail_code if swap_client is not None else 0
 
 
