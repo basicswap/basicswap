@@ -658,9 +658,17 @@ def page_offer(self, url_split, post_string):
                     addr_send_from=addr_from,
                     extra_options=extra_options,
                 ).hex()
+                    
+                sent_bid_id = swap_client.postBid(offer_id, amount_from, addr_send_from=addr_from, extra_options=extra_options).hex()
 
                 if debugind > -1:
                     swap_client.setBidDebugInd(bytes.fromhex(sent_bid_id), debugind)
+                
+                self.send_response(302)
+                self.send_header('Location', f'/bid/{sent_bid_id}')
+                self.end_headers()
+                return bytesß
+
             except Exception as ex:
                 if self.server.swap_client.debug is True:
                     self.server.swap_client.log.error(traceback.format_exc())
