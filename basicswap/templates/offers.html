@@ -266,11 +266,26 @@ function getAPIKeys() {
                             </div>
                           </div>
                         </div>
+                        {% if sent_offers %}
+                        <div class="pt-3 px-3 md:w-auto hover-container">
+                          <div class="flex">
+                            <div class="relative">
+                              {{ input_arrow_down_svg | safe }}
+                              <select name="status" id="status" class="bg-gray-50 text-gray-900 appearance-none pr-10 pl-5 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none block w-full p-2.5 focus:ring-0">
+                                <option value="any" {% if not filters.status %} selected{% endif %}>Filter Status</option>
+                                <option value="active" {% if filters.status == 'active' %} selected{% endif %}>Active</option>
+                                <option value="expired" {% if filters.status == 'expired' %} selected{% endif %}>Expired</option>
+                                <option value="revoked" {% if filters.status == 'revoked' %} selected{% endif %}>Revoked</option>
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+                        {% endif %}
                       </div>
                     </div>
                     <div class="w-full md:w-auto pt-3 px-3">
                       <div class="relative">
-                        <button type="button" id="clearFilters" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm hover:text-white dark:text-white dark:bg-gray-500 bg-coolGray-200 hover:bg-green-600 hover:border-green-600 rounded-lg transition duration-200 border border-coolGray-200 dark:border-gray-400 rounded-md shadow-button focus:ring-0 focus:outline-none">
+                        <button type="button" id="clearFilters" class="transition-opacity duration-200 flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm hover:text-white dark:text-white dark:bg-gray-500 bg-coolGray-200 hover:bg-green-600 hover:border-green-600 rounded-lg transition duration-200 border border-coolGray-200 dark:border-gray-400 rounded-md shadow-button focus:ring-0 focus:outline-none" disabled>
                           <span>Clear Filters</span>
                         </button>
                       </div>
@@ -384,17 +399,12 @@ function getAPIKeys() {
       <div class="rounded-b-md">
         <div class="w-full">
           <div class="flex flex-wrap justify-between items-center pl-6 pt-6 pr-6 border-t border-gray-100 dark:border-gray-400">
-            <div class="flex items-center">
-              <p class="text-sm font-heading dark:text-gray-400 mr-4">Last refreshed:
-                <span id="lastRefreshTime">Never</span>
-              </p>
-              <p class="text-sm font-heading dark:text-gray-400 mr-4">Network Listings:
-                <span id="newEntriesCount"></span>
-              </p>
-              <p class="text-sm font-heading dark:text-gray-400 mr-4">Next refresh:
-                <span id="nextRefreshTime"></span>
-              </p>
-            </div>
+          <div class="flex items-center">
+           <p class="text-sm font-heading dark:text-gray-400 mr-4">Last refreshed: <span id="lastRefreshTime">Never</span></p>
+           <p class="text-sm font-heading dark:text-gray-400 mr-4"><span class="ml-4" data-listing-label>Network Listings: </span><span id="newEntriesCount"></span></p>
+           <p class="text-sm font-heading dark:text-gray-400 mr-4"><span id="nextRefreshContainer" class="ml-4">Next refresh: <span id="nextRefreshTime"></span>
+         </span></p>
+        </div>
             <div class="flex items-center space-x-2">
               <button type="button" id="prevPage" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-green-600 rounded-lg transition duration-200 focus:ring-0 focus:outline-none">
                 {{ page_back_svg | safe }}
