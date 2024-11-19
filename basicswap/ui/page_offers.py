@@ -472,7 +472,7 @@ def page_newoffer(self, url_split, post_string):
         "lockmins": 30,  # used in debug mode
         "debug_ui": swap_client.debug_ui,
         "automation_strat_id": -1,
-        "amt_bid_min": format_amount(1000, 8),
+        "amt_bid_min": format_amount(1, 3),
         "swap_type": strSwapType(SwapTypes.SELLER_FIRST),
     }
 

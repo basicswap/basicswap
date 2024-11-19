@@ -222,9 +222,9 @@ def readConfig(args, known_coins):
             num_changes += 1
         bid_templates_map[bid_template["name"]] = bid_template
 
-        if bid_template.get("min_swap_amount", 0.0) < 0.00001:
+        if bid_template.get("min_swap_amount", 0.0) < 0.001:
             print("Setting min_swap_amount for bid template", bid_template["name"])
-            bid_template["min_swap_amount"] = 0.00001
+            bid_template["min_swap_amount"] = 0.001
 
         if "address" not in bid_template:
             print("Setting address to auto for bid", bid_template["name"])
