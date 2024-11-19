@@ -1414,6 +1414,16 @@ class BasicSwapTest(TestFunctions):
         )
         assert len(tx_wallet["blockhash"]) == 64
 
+    def test_01_0_lock_bad_prevouts(self):
+        logging.info(
+            "---------- Test {} lock_bad_prevouts".format(self.test_coin_from.name)
+        )
+        # Lock non segwit prevouts created in earlier tests
+        for i in range(2):
+            ci = self.swap_clients[i].ci(self.test_coin_from)
+            if hasattr(ci, "lockNonSegwitPrevouts"):
+                ci.lockNonSegwitPrevouts()
+
     def test_01_a_full_swap(self):
         if not self.has_segwit:
             return

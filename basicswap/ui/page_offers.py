@@ -898,7 +898,7 @@ def page_offers(self, url_split, post_string, sent=False):
         sent = True
     else:
         sent = False
-    offers = swap_client.listOffers(sent, filters, with_bid_info=True)
+    offers = swap_client.listOffers(sent, filters)
 
     now: int = swap_client.getTime()
     formatted_offers = []
@@ -906,7 +906,7 @@ def page_offers(self, url_split, post_string, sent=False):
     tla_to = ""
 
     for row in offers:
-        o, completed_amount = row
+        o = row
         ci_from = swap_client.ci(Coins(o.coin_from))
         ci_to = swap_client.ci(Coins(o.coin_to))
         is_expired = o.expire_at <= now
@@ -932,7 +932,7 @@ def page_offers(self, url_split, post_string, sent=False):
                 "Public" if o.addr_to == swap_client.network_addr else o.addr_to,
                 o.addr_from,
                 o.was_sent,
-                ci_from.format_amount(completed_amount),
+                None,  # placeholder, was completed_amount
                 is_expired,
                 o.active_ind,
                 formatted_expired_at,

@@ -42,17 +42,15 @@ def addLockRefundSigs(self, xmr_swap, ci):
     xmr_swap.a_lock_refund_tx = signed_tx
 
 
-def recoverNoScriptTxnWithKey(self, bid_id: bytes, encoded_key, session=None):
+def recoverNoScriptTxnWithKey(self, bid_id: bytes, encoded_key, cursor=None):
     self.log.info(f"Manually recovering {bid_id.hex()}")
     # Manually recover txn if other key is known
     try:
-        use_session = self.openSession(session)
-        bid, xmr_swap = self.getXmrBidFromSession(use_session, bid_id)
+        use_cursor = self.openDB(cursor)
+        bid, xmr_swap = self.getXmrBidFromSession(use_cursor, bid_id)
         ensure(bid, "Bid not found: {}.".format(bid_id.hex()))
         ensure(xmr_swap, "Adaptor-sig swap not found: {}.".format(bid_id.hex()))
-        offer, xmr_offer = self.getXmrOfferFromSession(
-            use_session, bid.offer_id, sent=False
-        )
+        offer, xmr_offer = self.getXmrOfferFromSession(use_cursor, bid.offer_id)
         ensure(offer, "Offer not found: {}.".format(bid.offer_id.hex()))
         ensure(xmr_offer, "Adaptor-sig offer not found: {}.".format(bid.offer_id.hex()))
 
@@ -97,10 +95,10 @@ def recoverNoScriptTxnWithKey(self, bid_id: bytes, encoded_key, session=None):
             raise ValueError(err_msg)
 
         if ci_follower.coin_type() in (Coins.XMR, Coins.WOW):
-            address_to = self.getCachedMainWalletAddress(ci_follower, use_session)
+            address_to = self.getCachedMainWalletAddress(ci_follower, use_cursor)
         else:
             address_to = self.getCachedStealthAddressForCoin(
-                ci_follower.coin_type(), use_session
+                ci_follower.coin_type(), use_cursor
             )
         amount = bid.amount_to
         lock_tx_vout = bid.getLockTXBVout()
@@ -125,17 +123,17 @@ def recoverNoScriptTxnWithKey(self, bid_id: bytes, encoded_key, session=None):
             bid.bid_id,
             EventLogTypes.LOCK_TX_B_SPEND_TX_PUBLISHED,
             txid.hex(),
-            use_session,
+            use_cursor,
         )
-        use_session.commit()
+        self.commitDB()
 
         return txid
     except Exception as e:
         self.log.error(traceback.format_exc())
         raise (e)
     finally:
-        if session is None:
-            self.closeSession(use_session, commit=False)
+        if cursor is None:
+            self.closeDB(use_cursor, commit=False)
 
 
 def getChainBSplitKey(swap_client, bid, xmr_swap, offer):

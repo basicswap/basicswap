@@ -1,5 +1,4 @@
 pyzmq==26.2.0
-SQLAlchemy==2.0.35
 python-gnupg==0.5.3
 Jinja2==3.1.4
 pycryptodome==3.21.0

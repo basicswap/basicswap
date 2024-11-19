@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2019-2024 tecnovert
+# Copyright (c) 2024 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -18,6 +19,9 @@ import subprocess
 
 from sockshandler import SocksiPyHandler
 
+from .db import (
+    DBMethods,
+)
 from .rpc import (
     callrpc,
 )
@@ -34,7 +38,7 @@ def getaddrinfo_tor(*args):
     return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (args[0], args[1]))]
 
 
-class BaseApp:
+class BaseApp(DBMethods):
     def __init__(self, fp, data_dir, settings, chain, log_name="BasicSwap"):
         self.log_name = log_name
         self.fp = fp

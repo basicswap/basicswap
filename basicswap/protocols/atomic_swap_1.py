@@ -119,12 +119,12 @@ def extractScriptSecretHash(script):
     return script[7:39]
 
 
-def redeemITx(self, bid_id: bytes, session):
-    bid, offer = self.getBidAndOffer(bid_id, session)
+def redeemITx(self, bid_id: bytes, cursor):
+    bid, offer = self.getBidAndOffer(bid_id, cursor)
     ci_from = self.ci(offer.coin_from)
 
     txn = self.createRedeemTxn(
-        ci_from.coin_type(), bid, for_txn_type="initiate", session=session
+        ci_from.coin_type(), bid, for_txn_type="initiate", cursor=cursor
     )
     txid = ci_from.publishTx(bytes.fromhex(txn))
 
@@ -135,7 +135,7 @@ def redeemITx(self, bid_id: bytes, session):
         ci_from.coin_name(),
         bid_id.hex(),
     )
-    self.logEvent(Concepts.BID, bid_id, EventLogTypes.ITX_REDEEM_PUBLISHED, "", session)
+    self.logEvent(Concepts.BID, bid_id, EventLogTypes.ITX_REDEEM_PUBLISHED, "", cursor)
 
 
 class AtomicSwapInterface(ProtocolInterface):

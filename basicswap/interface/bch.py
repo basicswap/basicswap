@@ -612,11 +612,11 @@ class BCHInterface(BTCInterface):
         prevout_script: bytes,
         prevout_value: int,
     ) -> bool:
-        # simple ecdsa signature verification
+        # Simple ecdsa signature verification
         return self.verifyDataSig(tx_bytes, sig, K)
 
     def verifyDataSig(self, data: bytes, sig: bytes, K: bytes) -> bool:
-        # simple ecdsa signature verification
+        # Simple ecdsa signature verification
         pubkey = PublicKey(K)
         return pubkey.verify(sig, sha256(data), hasher=None)
 
@@ -637,7 +637,7 @@ class BCHInterface(BTCInterface):
         return signature, mining_fee, out_1, out_2, public_key, timelock
 
     def extractScriptLockScriptValues(self, script_bytes):
-        # see BCHInterface.genScriptLockTxScript for reference
+        # See BCHInterface.genScriptLockTxScript for reference
 
         o = 0
 
@@ -1070,6 +1070,9 @@ class BCHInterface(BTCInterface):
             xmr_swap.a_lock_refund_tx_script
         )
         return out_1
+
+    def lockNonSegwitPrevouts(self) -> None:
+        pass
 
     def createMercyTx(
         self,

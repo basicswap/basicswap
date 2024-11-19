@@ -5,6 +5,7 @@
 - BCH support.
 - Mercy outputs on swipe txns of BTC descended coins.
   - Disable by setting 'altruistic' to false in basicswap.json
+- Removed sqlalchemy.
 
 
 

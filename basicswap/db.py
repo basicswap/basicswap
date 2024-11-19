@@ -1,19 +1,20 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2019-2024 tecnovert
+# Copyright (c) 2024 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
+import inspect
+import sqlite3
 import time
-import sqlalchemy as sa
 
 from enum import IntEnum, auto
-from sqlalchemy.orm import declarative_base
+from typing import Optional
 
 
 CURRENT_DB_VERSION = 24
 CURRENT_DB_DATA_VERSION = 4
-Base = declarative_base()
 
 
 class Concepts(IntEnum):
@@ -33,136 +34,196 @@ def strConcepts(state):
     return "Unknown"
 
 
+def firstOrNone(gen):
+    all_rows = list(gen)
+    return all_rows[0] if len(all_rows) > 0 else None
+
+
 def pack_state(new_state: int, now: int) -> bytes:
     return int(new_state).to_bytes(4, "little") + now.to_bytes(8, "little")
 
 
-class DBKVInt(Base):
+class Table:
+    __sqlite3_table__ = True
+
+    def __init__(self, **kwargs):
+        for name, value in kwargs.items():
+            if not hasattr(self, name):
+                raise ValueError(f"Unknown attribute {name}")
+            setattr(self, name, value)
+        # Init any unset columns to None
+        for mc in inspect.getmembers(self):
+            mc_name, mc_obj = mc
+            if hasattr(mc_obj, "__sqlite3_column__"):
+                setattr(self, mc_name, None)
+
+    def isSet(self, field: str):
+        io = getattr(self, field)
+
+        # Column is not set in instance
+        if hasattr(io, "__sqlite3_column__"):
+            return False
+        return True if io is not None else False
+
+
+class Column:
+    __sqlite3_column__ = True
+
+    def __init__(
+        self, column_type, primary_key=False, autoincrement=False, unique=False
+    ):
+        self.column_type = column_type
+        self.primary_key = primary_key
+        self.autoincrement = autoincrement
+        self.unique = unique
+
+
+class PrimaryKeyConstraint:
+    __sqlite3_primary_key__ = True
+
+    def __init__(self, column_1, column_2=None, column_3=None):
+        self.column_1 = column_1
+        self.column_2 = column_2
+        self.column_3 = column_3
+
+
+class UniqueConstraint:
+    __sqlite3_unique__ = True
+
+    def __init__(self, column_1, column_2=None, column_3=None):
+        self.column_1 = column_1
+        self.column_2 = column_2
+        self.column_3 = column_3
+
+
+class Index:
+    __sqlite3_index__ = True
+
+    def __init__(self, name, column_1, column_2=None, column_3=None):
+        self.name = name
+        self.column_1 = column_1
+        self.column_2 = column_2
+        self.column_3 = column_3
+
+
+class DBKVInt(Table):
     __tablename__ = "kv_int"
 
-    key = sa.Column(sa.String, primary_key=True)
-    value = sa.Column(sa.Integer)
+    key = Column("string", primary_key=True)
+    value = Column("integer")
 
 
-class DBKVString(Base):
+class DBKVString(Table):
     __tablename__ = "kv_string"
 
-    key = sa.Column(sa.String, primary_key=True)
-    value = sa.Column(sa.String)
+    key = Column("string", primary_key=True)
+    value = Column("string")
 
 
-class Offer(Base):
+class Offer(Table):
     __tablename__ = "offers"
 
-    offer_id = sa.Column(sa.LargeBinary, primary_key=True)
-    active_ind = sa.Column(sa.Integer)
+    offer_id = Column("blob", primary_key=True)
+    active_ind = Column("integer")
 
-    protocol_version = sa.Column(sa.Integer)
-    coin_from = sa.Column(sa.Integer)
-    coin_to = sa.Column(sa.Integer)
-    amount_from = sa.Column(sa.BigInteger)
-    amount_to = sa.Column(sa.BigInteger)
-    rate = sa.Column(sa.BigInteger)
-    min_bid_amount = sa.Column(sa.BigInteger)
-    time_valid = sa.Column(sa.BigInteger)
-    lock_type = sa.Column(sa.Integer)
-    lock_value = sa.Column(sa.Integer)
-    swap_type = sa.Column(sa.Integer)
+    protocol_version = Column("integer")
+    coin_from = Column("integer")
+    coin_to = Column("integer")
+    amount_from = Column("integer")
+    amount_to = Column("integer")
+    rate = Column("integer")
+    min_bid_amount = Column("integer")
+    time_valid = Column("integer")
+    lock_type = Column("integer")
+    lock_value = Column("integer")
+    swap_type = Column("integer")
 
-    proof_address = sa.Column(sa.String)
-    proof_signature = sa.Column(sa.LargeBinary)
-    proof_utxos = sa.Column(sa.LargeBinary)
-    pkhash_seller = sa.Column(sa.LargeBinary)
-    secret_hash = sa.Column(sa.LargeBinary)
+    proof_address = Column("string")
+    proof_signature = Column("blob")
+    proof_utxos = Column("blob")
+    pkhash_seller = Column("blob")
+    secret_hash = Column("blob")
 
-    addr_from = sa.Column(sa.String)
-    addr_to = sa.Column(sa.String)
-    created_at = sa.Column(sa.BigInteger)
-    expire_at = sa.Column(sa.BigInteger)
-    was_sent = sa.Column(sa.Boolean)  # Sent by node
+    addr_from = Column("string")
+    addr_to = Column("string")
+    created_at = Column("integer")
+    expire_at = Column("integer")
 
-    from_feerate = sa.Column(sa.BigInteger)
-    to_feerate = sa.Column(sa.BigInteger)
+    from_feerate = Column("integer")
+    to_feerate = Column("integer")
 
-    amount_negotiable = sa.Column(sa.Boolean)
-    rate_negotiable = sa.Column(sa.Boolean)
+    amount_negotiable = Column("bool")
+    rate_negotiable = Column("bool")
 
     # Local fields
-    auto_accept_bids = sa.Column(sa.Boolean)
-    withdraw_to_addr = sa.Column(
-        sa.String
+    auto_accept_bids = Column("bool")
+    was_sent = Column("bool")  # Sent by node
+    withdraw_to_addr = Column(
+        "string"
     )  # Address to spend lock tx to - address from wallet if empty TODO
-    security_token = sa.Column(sa.LargeBinary)
-    bid_reversed = sa.Column(sa.Boolean)
+    security_token = Column("blob")
+    bid_reversed = Column("bool")
 
-    state = sa.Column(sa.Integer)
-    states = sa.Column(sa.LargeBinary)  # Packed states and times
+    state = Column("integer")
+    states = Column("blob")  # Packed states and times
 
     def setState(self, new_state):
         now = int(time.time())
         self.state = new_state
-        if self.states is None:
+        if self.isSet("states") is False:
             self.states = pack_state(new_state, now)
         else:
             self.states += pack_state(new_state, now)
 
 
-class Bid(Base):
+class Bid(Table):
     __tablename__ = "bids"
 
-    bid_id = sa.Column(sa.LargeBinary, primary_key=True)
-    offer_id = sa.Column(sa.LargeBinary, sa.ForeignKey("offers.offer_id"))
-    active_ind = sa.Column(sa.Integer)
+    bid_id = Column("blob", primary_key=True)
+    offer_id = Column("blob")
+    active_ind = Column("integer")
+    protocol_version = Column("integer")
+    created_at = Column("integer")
+    expire_at = Column("integer")
+    bid_addr = Column("string")
+    proof_address = Column("string")
+    proof_utxos = Column("blob")
+    # Address to spend lock tx to - address from wallet if empty TODO
+    withdraw_to_addr = Column("string")
 
-    protocol_version = sa.Column(sa.Integer)
-    was_sent = sa.Column(sa.Boolean)  # Sent by node
-    was_received = sa.Column(sa.Boolean)
-    contract_count = sa.Column(sa.Integer)
-    created_at = sa.Column(sa.BigInteger)
-    expire_at = sa.Column(sa.BigInteger)
-    bid_addr = sa.Column(sa.String)
-    proof_address = sa.Column(sa.String)
-    proof_utxos = sa.Column(sa.LargeBinary)
-    withdraw_to_addr = sa.Column(
-        sa.String
-    )  # Address to spend lock tx to - address from wallet if empty TODO
+    recovered_secret = Column("blob")
+    amount_to = Column("integer")  # amount * offer.rate
 
-    recovered_secret = sa.Column(sa.LargeBinary)
-    amount_to = sa.Column(sa.BigInteger)  # amount * offer.rate
+    pkhash_buyer = Column("blob")
+    pkhash_buyer_to = Column("blob")  # Used for the ptx if coin pubkey hashes differ
+    amount = Column("integer")
+    rate = Column("integer")
 
-    pkhash_buyer = sa.Column(sa.LargeBinary)
-    pkhash_buyer_to = sa.Column(
-        sa.LargeBinary
-    )  # Used for the ptx if coin pubkey hashes differ
-    amount = sa.Column(sa.BigInteger)
-    rate = sa.Column(sa.BigInteger)
+    pkhash_seller = Column("blob")
 
-    pkhash_seller = sa.Column(sa.LargeBinary)
+    initiate_txn_redeem = Column("blob")
+    initiate_txn_refund = Column("blob")
 
-    initiate_txn_redeem = sa.Column(sa.LargeBinary)
-    initiate_txn_refund = sa.Column(sa.LargeBinary)
+    participate_txn_redeem = Column("blob")
+    participate_txn_refund = Column("blob")
 
-    participate_txn_redeem = sa.Column(sa.LargeBinary)
-    participate_txn_refund = sa.Column(sa.LargeBinary)
+    in_progress = Column("integer")
+    state = Column("integer")
+    state_time = Column("integer")  # Timestamp of last state change
+    states = Column("blob")  # Packed states and times
 
-    in_progress = sa.Column(sa.Integer)
-    state = sa.Column(sa.Integer)
-    state_time = sa.Column(sa.BigInteger)  # Timestamp of last state change
-    states = sa.Column(sa.LargeBinary)  # Packed states and times
+    state_note = Column("string")
+    was_sent = Column("bool")  # Sent by node
+    was_received = Column("bool")
+    contract_count = Column("integer")
+    debug_ind = Column("integer")
+    security_token = Column("blob")
 
-    state_note = sa.Column(sa.String)
+    chain_a_height_start = Column("integer")  # Height of script chain before the swap
+    # Height of scriptless chain before the swap
+    chain_b_height_start = Column("integer")
 
-    debug_ind = sa.Column(sa.Integer)
-    security_token = sa.Column(sa.LargeBinary)
-
-    chain_a_height_start = sa.Column(
-        sa.Integer
-    )  # Height of script chain before the swap
-    chain_b_height_start = sa.Column(
-        sa.Integer
-    )  # Height of scriptless chain before the swap
-
-    reject_code = sa.Column(sa.Integer)
+    reject_code = Column("integer")
 
     initiate_tx = None
     participate_tx = None
@@ -173,21 +234,21 @@ class Bid(Base):
     txns = {}
 
     def getITxState(self):
-        if self.initiate_tx is None:
+        if self.isSet("initiate_tx") is False:
             return None
         return self.initiate_tx.state
 
     def setITxState(self, new_state):
-        if self.initiate_tx is not None:
+        if self.isSet("initiate_tx"):
             self.initiate_tx.setState(new_state)
 
     def getPTxState(self):
-        if self.participate_tx is None:
+        if self.isSet("participate_tx") is False:
             return None
         return self.participate_tx.state
 
     def setPTxState(self, new_state):
-        if self.participate_tx is not None:
+        if self.isSet("participate_tx"):
             self.participate_tx.setState(new_state)
 
     def setState(self, new_state, state_note=None):
@@ -195,367 +256,687 @@ class Bid(Base):
         self.state = new_state
         self.state_time = now
 
-        if state_note is not None:
+        if self.isSet("state_note"):
             self.state_note = state_note
-        if self.states is None:
+        if self.isSet("states") is False:
             self.states = pack_state(new_state, now)
         else:
             self.states += pack_state(new_state, now)
 
     def getLockTXBVout(self):
-        if self.xmr_b_lock_tx:
+        if self.isSet("xmr_b_lock_tx"):
             return self.xmr_b_lock_tx.vout
         return None
 
 
-class SwapTx(Base):
+class SwapTx(Table):
     __tablename__ = "transactions"
 
-    bid_id = sa.Column(sa.LargeBinary, sa.ForeignKey("bids.bid_id"))
-    tx_type = sa.Column(sa.Integer)  # TxTypes
-    __table_args__ = (
-        sa.PrimaryKeyConstraint("bid_id", "tx_type"),
-        {},
-    )
+    bid_id = Column("blob")
+    tx_type = Column("integer")  # TxTypes
 
-    txid = sa.Column(sa.LargeBinary)
-    vout = sa.Column(sa.Integer)
-    tx_data = sa.Column(sa.LargeBinary)
+    txid = Column("blob")
+    vout = Column("integer")
+    tx_data = Column("blob")
 
-    script = sa.Column(sa.LargeBinary)
+    script = Column("blob")
 
-    tx_fee = sa.Column(sa.BigInteger)
-    chain_height = sa.Column(sa.Integer)
-    conf = sa.Column(sa.Integer)
+    tx_fee = Column("integer")
+    chain_height = Column("integer")
+    conf = Column("integer")
 
-    spend_txid = sa.Column(sa.LargeBinary)
-    spend_n = sa.Column(sa.Integer)
+    spend_txid = Column("blob")
+    spend_n = Column("integer")
 
-    block_hash = sa.Column(sa.LargeBinary)
-    block_height = sa.Column(sa.Integer)
-    block_time = sa.Column(sa.BigInteger)
+    block_hash = Column("blob")
+    block_height = Column("integer")
+    block_time = Column("integer")
 
-    state = sa.Column(sa.Integer)
-    states = sa.Column(sa.LargeBinary)  # Packed states and times
+    state = Column("integer")
+    states = Column("blob")  # Packed states and times
+
+    primary_key = PrimaryKeyConstraint("bid_id", "tx_type")
 
     def setState(self, new_state):
         if self.state == new_state:
             return
         self.state = new_state
         now: int = int(time.time())
-        if self.states is None:
+        if self.isSet("states") is False:
             self.states = pack_state(new_state, now)
         else:
             self.states += pack_state(new_state, now)
 
 
-class PrefundedTx(Base):
+class PrefundedTx(Table):
     __tablename__ = "prefunded_transactions"
 
-    record_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
-    active_ind = sa.Column(sa.Integer)
-    created_at = sa.Column(sa.BigInteger)
-    linked_type = sa.Column(sa.Integer)
-    linked_id = sa.Column(sa.LargeBinary)
-    tx_type = sa.Column(sa.Integer)  # TxTypes
-    tx_data = sa.Column(sa.LargeBinary)
-    used_by = sa.Column(sa.LargeBinary)
+    record_id = Column("integer", primary_key=True, autoincrement=True)
+    active_ind = Column("integer")
+    created_at = Column("integer")
+    linked_type = Column("integer")
+    linked_id = Column("blob")
+    tx_type = Column("integer")  # TxTypes
+    tx_data = Column("blob")
+    used_by = Column("blob")
 
 
-class PooledAddress(Base):
+class PooledAddress(Table):
     __tablename__ = "addresspool"
 
-    addr_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
-    coin_type = sa.Column(sa.Integer)
-    addr = sa.Column(sa.String)
-    bid_id = sa.Column(sa.LargeBinary)
-    tx_type = sa.Column(sa.Integer)
+    addr_id = Column("integer", primary_key=True, autoincrement=True)
+    coin_type = Column("integer")
+    addr = Column("string")
+    bid_id = Column("blob")
+    tx_type = Column("integer")
 
 
-class SentOffer(Base):
+class SentOffer(Table):
     __tablename__ = "sentoffers"
 
-    offer_id = sa.Column(sa.LargeBinary, primary_key=True)
+    offer_id = Column("blob", primary_key=True)
 
 
-class SmsgAddress(Base):
+class SmsgAddress(Table):
     __tablename__ = "smsgaddresses"
 
-    addr_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
-    active_ind = sa.Column(sa.Integer)
-    created_at = sa.Column(sa.BigInteger)
-    addr = sa.Column(sa.String, unique=True)
-    pubkey = sa.Column(sa.String)
-    use_type = sa.Column(sa.Integer)
-    note = sa.Column(sa.String)
+    addr_id = Column("integer", primary_key=True, autoincrement=True)
+    active_ind = Column("integer")
+    created_at = Column("integer")
+    addr = Column("string", unique=True)
+    pubkey = Column("string")
+    use_type = Column("integer")
+    note = Column("string")
 
 
-class Action(Base):
+class Action(Table):
     __tablename__ = "actions"
 
-    action_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
-    active_ind = sa.Column(sa.Integer)
-    created_at = sa.Column(sa.BigInteger)
-    trigger_at = sa.Column(sa.BigInteger)
-    linked_id = sa.Column(sa.LargeBinary)
-    action_type = sa.Column(sa.Integer)
-    action_data = sa.Column(sa.LargeBinary)
+    action_id = Column("integer", primary_key=True, autoincrement=True)
+    active_ind = Column("integer")
+    created_at = Column("integer")
+    trigger_at = Column("integer")
+    linked_id = Column("blob")
+    action_type = Column("integer")
+    action_data = Column("blob")
 
 
-class EventLog(Base):
+class EventLog(Table):
     __tablename__ = "eventlog"
 
-    event_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
-    active_ind = sa.Column(sa.Integer)
-    created_at = sa.Column(sa.BigInteger)
-    linked_type = sa.Column(sa.Integer)
-    linked_id = sa.Column(sa.LargeBinary)
-    event_type = sa.Column(sa.Integer)
-    event_msg = sa.Column(sa.String)
+    event_id = Column("integer", primary_key=True, autoincrement=True)
+    active_ind = Column("integer")
+    created_at = Column("integer")
+    linked_type = Column("integer")
+    linked_id = Column("blob")
+    event_type = Column("integer")
+    event_msg = Column("string")
 
-    __table_args__ = (sa.Index("main_index", "linked_type", "linked_id"),)
+    index = Index("main_index", "linked_type", "linked_id")
 
 
-class XmrOffer(Base):
+class XmrOffer(Table):
     __tablename__ = "xmr_offers"
     # TODO: Merge to Offer
 
-    swap_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
-    offer_id = sa.Column(sa.LargeBinary, sa.ForeignKey("offers.offer_id"))
+    swap_id = Column("integer", primary_key=True, autoincrement=True)
+    offer_id = Column("blob")
 
-    a_fee_rate = sa.Column(sa.BigInteger)  # Chain a fee rate
-    b_fee_rate = sa.Column(sa.BigInteger)  # Chain b fee rate
+    a_fee_rate = Column("integer")  # Chain a fee rate
+    b_fee_rate = Column("integer")  # Chain b fee rate
 
-    lock_time_1 = sa.Column(
-        sa.Integer
-    )  # Delay before the chain a lock refund tx can be mined
-    lock_time_2 = sa.Column(
-        sa.Integer
-    )  # Delay before the follower can spend from the chain a lock refund tx
+    # Delay before the chain a lock refund tx can be mined
+    lock_time_1 = Column("integer")
+    # Delay before the follower can spend from the chain a lock refund tx
+    lock_time_2 = Column("integer")
 
 
-class XmrSwap(Base):
+class XmrSwap(Table):
     __tablename__ = "xmr_swaps"
 
-    swap_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
-    bid_id = sa.Column(sa.LargeBinary, sa.ForeignKey("bids.bid_id"))
+    swap_id = Column("integer", primary_key=True, autoincrement=True)
+    bid_id = Column("blob")
 
-    contract_count = sa.Column(sa.Integer)
+    contract_count = Column("integer")
 
-    dest_af = sa.Column(
-        sa.LargeBinary
-    )  # Destination for coin A amount to follower when swap completes successfully
+    # Destination for coin A amount to follower when swap completes successfully
+    dest_af = Column("blob")
 
-    pkal = sa.Column(sa.LargeBinary)
-    pkasl = sa.Column(sa.LargeBinary)
+    pkal = Column("blob")
+    pkasl = Column("blob")
 
-    pkaf = sa.Column(sa.LargeBinary)
-    pkasf = sa.Column(sa.LargeBinary)
+    pkaf = Column("blob")
+    pkasf = Column("blob")
 
-    vkbvl = sa.Column(sa.LargeBinary)
-    vkbsl = sa.Column(sa.LargeBinary)
-    pkbvl = sa.Column(sa.LargeBinary)
-    pkbsl = sa.Column(sa.LargeBinary)
+    vkbvl = Column("blob")
+    vkbsl = Column("blob")
+    pkbvl = Column("blob")
+    pkbsl = Column("blob")
 
-    vkbvf = sa.Column(sa.LargeBinary)
-    vkbsf = sa.Column(sa.LargeBinary)
-    pkbvf = sa.Column(sa.LargeBinary)
-    pkbsf = sa.Column(sa.LargeBinary)
+    vkbvf = Column("blob")
+    vkbsf = Column("blob")
+    pkbvf = Column("blob")
+    pkbsf = Column("blob")
 
-    kbsl_dleag = sa.Column(sa.LargeBinary)
-    kbsf_dleag = sa.Column(sa.LargeBinary)
+    kbsl_dleag = Column("blob")
+    kbsf_dleag = Column("blob")
 
-    vkbv = sa.Column(sa.LargeBinary)  # chain b view private key
-    pkbv = sa.Column(sa.LargeBinary)  # chain b view public key
-    pkbs = sa.Column(sa.LargeBinary)  # chain b spend public key
+    vkbv = Column("blob")  # chain b view private key
+    pkbv = Column("blob")  # chain b view public key
+    pkbs = Column("blob")  # chain b spend public key
 
-    a_lock_tx = sa.Column(sa.LargeBinary)
-    a_lock_tx_script = sa.Column(sa.LargeBinary)
-    a_lock_tx_id = sa.Column(sa.LargeBinary)
-    a_lock_tx_vout = sa.Column(sa.Integer)
+    a_lock_tx = Column("blob")
+    a_lock_tx_script = Column("blob")
+    a_lock_tx_id = Column("blob")
+    a_lock_tx_vout = Column("integer")
 
-    a_lock_refund_tx = sa.Column(sa.LargeBinary)
-    a_lock_refund_tx_script = sa.Column(sa.LargeBinary)
-    a_lock_refund_tx_id = sa.Column(sa.LargeBinary)
-    a_swap_refund_value = sa.Column(sa.BigInteger)
-    al_lock_refund_tx_sig = sa.Column(sa.LargeBinary)
-    af_lock_refund_tx_sig = sa.Column(sa.LargeBinary)
+    a_lock_refund_tx = Column("blob")
+    a_lock_refund_tx_script = Column("blob")
+    a_lock_refund_tx_id = Column("blob")
+    a_swap_refund_value = Column("integer")
+    al_lock_refund_tx_sig = Column("blob")
+    af_lock_refund_tx_sig = Column("blob")
 
-    a_lock_refund_spend_tx = sa.Column(sa.LargeBinary)
-    a_lock_refund_spend_tx_id = sa.Column(sa.LargeBinary)
+    a_lock_refund_spend_tx = Column("blob")
+    a_lock_refund_spend_tx_id = Column("blob")
 
-    af_lock_refund_spend_tx_esig = sa.Column(sa.LargeBinary)
-    af_lock_refund_spend_tx_sig = sa.Column(sa.LargeBinary)
+    af_lock_refund_spend_tx_esig = Column("blob")
+    af_lock_refund_spend_tx_sig = Column("blob")
 
-    a_lock_spend_tx = sa.Column(sa.LargeBinary)
-    a_lock_spend_tx_id = sa.Column(sa.LargeBinary)
-    al_lock_spend_tx_esig = sa.Column(sa.LargeBinary)
-    kal_sig = sa.Column(sa.LargeBinary)
+    a_lock_spend_tx = Column("blob")
+    a_lock_spend_tx_id = Column("blob")
+    al_lock_spend_tx_esig = Column("blob")
+    kal_sig = Column("blob")
 
-    a_lock_refund_swipe_tx = sa.Column(
-        sa.LargeBinary
-    )  # Follower spends script coin lock refund tx
+    # Follower spends script coin lock refund tx
+    a_lock_refund_swipe_tx = Column("blob")
 
-    b_lock_tx_id = sa.Column(sa.LargeBinary)
+    b_lock_tx_id = Column("blob")
 
 
-class XmrSplitData(Base):
+class XmrSplitData(Table):
     __tablename__ = "xmr_split_data"
 
-    record_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
-    addr_from = sa.Column(sa.String)
-    addr_to = sa.Column(sa.String)
-    bid_id = sa.Column(sa.LargeBinary)
-    msg_type = sa.Column(sa.Integer)
-    msg_sequence = sa.Column(sa.Integer)
-    dleag = sa.Column(sa.LargeBinary)
-    created_at = sa.Column(sa.BigInteger)
+    record_id = Column("integer", primary_key=True, autoincrement=True)
+    addr_from = Column("string")
+    addr_to = Column("string")
+    bid_id = Column("blob")
+    msg_type = Column("integer")
+    msg_sequence = Column("integer")
+    dleag = Column("blob")
+    created_at = Column("integer")
 
-    __table_args__ = (
-        sa.UniqueConstraint("bid_id", "msg_type", "msg_sequence", name="uc_1"),
-    )
+    uc_1 = UniqueConstraint("bid_id", "msg_type", "msg_sequence")
 
 
-class RevokedMessage(Base):
+class RevokedMessage(Table):
     __tablename__ = "revoked_messages"
 
-    record_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
-    active_ind = sa.Column(sa.Integer)
-    msg_id = sa.Column(sa.LargeBinary)
-    created_at = sa.Column(sa.BigInteger)
-    expires_at = sa.Column(sa.BigInteger)
+    record_id = Column("integer", primary_key=True, autoincrement=True)
+    active_ind = Column("integer")
+    msg_id = Column("blob")
+    created_at = Column("integer")
+    expires_at = Column("integer")
 
 
-class Wallets(Base):
+class Wallets(Table):
     __tablename__ = "wallets"
 
-    record_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
-    active_ind = sa.Column(sa.Integer)
-    coin_id = sa.Column(sa.Integer)
-    wallet_name = sa.Column(sa.String)
-    wallet_data = sa.Column(sa.String)
-    balance_type = sa.Column(sa.Integer)
-    created_at = sa.Column(sa.BigInteger)
+    record_id = Column("integer", primary_key=True, autoincrement=True)
+    active_ind = Column("integer")
+    coin_id = Column("integer")
+    wallet_name = Column("string")
+    wallet_data = Column("string")
+    balance_type = Column("integer")
+    created_at = Column("integer")
 
 
-class KnownIdentity(Base):
+class KnownIdentity(Table):
     __tablename__ = "knownidentities"
 
-    record_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
-    active_ind = sa.Column(sa.Integer)
-    address = sa.Column(sa.String)
-    label = sa.Column(sa.String)
-    publickey = sa.Column(sa.LargeBinary)
-    num_sent_bids_successful = sa.Column(sa.Integer)
-    num_recv_bids_successful = sa.Column(sa.Integer)
-    num_sent_bids_rejected = sa.Column(sa.Integer)
-    num_recv_bids_rejected = sa.Column(sa.Integer)
-    num_sent_bids_failed = sa.Column(sa.Integer)
-    num_recv_bids_failed = sa.Column(sa.Integer)
-    automation_override = sa.Column(sa.Integer)  # AutomationOverrideOptions
-    visibility_override = sa.Column(sa.Integer)  # VisibilityOverrideOptions
-    data = sa.Column(sa.LargeBinary)
-    note = sa.Column(sa.String)
-    updated_at = sa.Column(sa.BigInteger)
-    created_at = sa.Column(sa.BigInteger)
+    record_id = Column("integer", primary_key=True, autoincrement=True)
+    active_ind = Column("integer")
+    address = Column("string")
+    label = Column("string")
+    publickey = Column("blob")
+    num_sent_bids_successful = Column("integer")
+    num_recv_bids_successful = Column("integer")
+    num_sent_bids_rejected = Column("integer")
+    num_recv_bids_rejected = Column("integer")
+    num_sent_bids_failed = Column("integer")
+    num_recv_bids_failed = Column("integer")
+    automation_override = Column("integer")  # AutomationOverrideOptions
+    visibility_override = Column("integer")  # VisibilityOverrideOptions
+    data = Column("blob")
+    note = Column("string")
+    updated_at = Column("integer")
+    created_at = Column("integer")
 
 
-class AutomationStrategy(Base):
+class AutomationStrategy(Table):
     __tablename__ = "automationstrategies"
 
-    record_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
-    active_ind = sa.Column(sa.Integer)
+    record_id = Column("integer", primary_key=True, autoincrement=True)
+    active_ind = Column("integer")
 
-    label = sa.Column(sa.String)
-    type_ind = sa.Column(sa.Integer)
-    only_known_identities = sa.Column(sa.Integer)
-    num_concurrent = sa.Column(sa.Integer)
-    data = sa.Column(sa.LargeBinary)
+    label = Column("string")
+    type_ind = Column("integer")
+    only_known_identities = Column("integer")
+    num_concurrent = Column("integer")
+    data = Column("blob")
 
-    note = sa.Column(sa.String)
-    created_at = sa.Column(sa.BigInteger)
+    note = Column("string")
+    created_at = Column("integer")
 
 
-class AutomationLink(Base):
+class AutomationLink(Table):
     __tablename__ = "automationlinks"
     # Contains per order/bid options
 
-    record_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
-    active_ind = sa.Column(sa.Integer)
+    record_id = Column("integer", primary_key=True, autoincrement=True)
+    active_ind = Column("integer")
 
-    linked_type = sa.Column(sa.Integer)
-    linked_id = sa.Column(sa.LargeBinary)
-    strategy_id = sa.Column(sa.Integer)
+    linked_type = Column("integer")
+    linked_id = Column("blob")
+    strategy_id = Column("integer")
 
-    data = sa.Column(sa.LargeBinary)
-    repeat_limit = sa.Column(sa.Integer)
-    repeat_count = sa.Column(sa.Integer)
+    data = Column("blob")
+    repeat_limit = Column("integer")
+    repeat_count = Column("integer")
 
-    note = sa.Column(sa.String)
-    created_at = sa.Column(sa.BigInteger)
+    note = Column("string")
+    created_at = Column("integer")
 
-    __table_args__ = (sa.Index("linked_index", "linked_type", "linked_id"),)
+    index = Index("linked_index", "linked_type", "linked_id")
 
 
-class History(Base):
+class History(Table):
     __tablename__ = "history"
 
-    record_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
-    concept_type = sa.Column(sa.Integer)
-    concept_id = sa.Column(sa.Integer)
+    record_id = Column("integer", primary_key=True, autoincrement=True)
+    concept_type = Column("integer")
+    concept_id = Column("integer")
 
-    changed_data = sa.Column(sa.LargeBinary)
-    created_at = sa.Column(sa.BigInteger)
+    changed_data = Column("blob")
+    created_at = Column("integer")
 
 
-class BidState(Base):
+class BidState(Table):
     __tablename__ = "bidstates"
 
-    record_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
-    active_ind = sa.Column(sa.Integer)
-    state_id = sa.Column(sa.Integer)
-    label = sa.Column(sa.String)
-    in_progress = sa.Column(sa.Integer)
-    in_error = sa.Column(sa.Integer)
-    swap_failed = sa.Column(sa.Integer)
-    swap_ended = sa.Column(sa.Integer)
+    record_id = Column("integer", primary_key=True, autoincrement=True)
+    active_ind = Column("integer")
+    state_id = Column("integer")
+    label = Column("string")
+    in_progress = Column("integer")
+    in_error = Column("integer")
+    swap_failed = Column("integer")
+    swap_ended = Column("integer")
 
-    note = sa.Column(sa.String)
-    created_at = sa.Column(sa.BigInteger)
+    note = Column("string")
+    created_at = Column("integer")
 
 
-class Notification(Base):
+class Notification(Table):
     __tablename__ = "notifications"
 
-    record_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
-    active_ind = sa.Column(sa.Integer)
-    created_at = sa.Column(sa.BigInteger)
-    event_type = sa.Column(sa.Integer)
-    event_data = sa.Column(sa.LargeBinary)
+    record_id = Column("integer", primary_key=True, autoincrement=True)
+    active_ind = Column("integer")
+    created_at = Column("integer")
+    event_type = Column("integer")
+    event_data = Column("blob")
 
 
-class MessageLink(Base):
+class MessageLink(Table):
     __tablename__ = "message_links"
 
-    record_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
-    active_ind = sa.Column(sa.Integer)
-    created_at = sa.Column(sa.BigInteger)
+    record_id = Column("integer", primary_key=True, autoincrement=True)
+    active_ind = Column("integer")
+    created_at = Column("integer")
 
-    linked_type = sa.Column(sa.Integer)
-    linked_id = sa.Column(sa.LargeBinary)
+    linked_type = Column("integer")
+    linked_id = Column("blob")
     # linked_row_id = sa.Column(sa.Integer)  # TODO: Find a way to use table rowids
 
-    msg_type = sa.Column(sa.Integer)
-    msg_sequence = sa.Column(sa.Integer)
-    msg_id = sa.Column(sa.LargeBinary)
+    msg_type = Column("integer")
+    msg_sequence = Column("integer")
+    msg_id = Column("blob")
 
 
-class CheckedBlock(Base):
+class CheckedBlock(Table):
     __tablename__ = "checkedblocks"
 
-    record_id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
-    created_at = sa.Column(sa.BigInteger)
-    coin_type = sa.Column(sa.Integer)
-    block_height = sa.Column(sa.Integer)
-    block_hash = sa.Column(sa.LargeBinary)
-    block_time = sa.Column(sa.BigInteger)
+    record_id = Column("integer", primary_key=True, autoincrement=True)
+    created_at = Column("integer")
+    coin_type = Column("integer")
+    block_height = Column("integer")
+    block_hash = Column("blob")
+    block_time = Column("integer")
+
+
+def create_db(db_path: str, log) -> None:
+    con = None
+    try:
+        con = sqlite3.connect(db_path)
+        c = con.cursor()
+
+        g = globals().copy()
+        for name, obj in g.items():
+            if not inspect.isclass(obj):
+                continue
+            if not hasattr(obj, "__sqlite3_table__"):
+                continue
+            if not hasattr(obj, "__tablename__"):
+                continue
+
+            table_name: str = obj.__tablename__
+            query: str = f"CREATE TABLE {table_name} ("
+
+            primary_key = None
+            constraints = []
+            indices = []
+            num_columns: int = 0
+            for m in inspect.getmembers(obj):
+                m_name, m_obj = m
+
+                if hasattr(m_obj, "__sqlite3_primary_key__"):
+                    primary_key = m_obj
+                    continue
+                if hasattr(m_obj, "__sqlite3_unique__"):
+                    constraints.append(m_obj)
+                    continue
+                if hasattr(m_obj, "__sqlite3_index__"):
+                    indices.append(m_obj)
+                    continue
+                if hasattr(m_obj, "__sqlite3_column__"):
+                    if num_columns > 0:
+                        query += ","
+
+                    col_type: str = m_obj.column_type.upper()
+                    if col_type == "BOOL":
+                        col_type = "INTEGER"
+                    query += f" {m_name} {col_type} "
+
+                    if m_obj.primary_key:
+                        query += "PRIMARY KEY ASC "
+                    if m_obj.unique:
+                        query += "UNIQUE "
+                    num_columns += 1
+
+            if primary_key is not None:
+                query += f", PRIMARY KEY ({primary_key.column_1}"
+                if primary_key.column_2:
+                    query += f", {primary_key.column_2}"
+                if primary_key.column_3:
+                    query += f", {primary_key.column_3}"
+                query += ") "
+
+            for constraint in constraints:
+                query += f", UNIQUE ({constraint.column_1}"
+                if constraint.column_2:
+                    query += f", {constraint.column_2}"
+                if constraint.column_3:
+                    query += f", {constraint.column_3}"
+                query += ") "
+
+            query += ")"
+            c.execute(query)
+            for i in indices:
+                query: str = f"CREATE INDEX {i.name} ON {table_name} ({i.column_1}"
+                if i.column_2 is not None:
+                    query += f", {i.column_2}"
+                if i.column_3 is not None:
+                    query += f", {i.column_3}"
+                query += ")"
+                c.execute(query)
+
+        con.commit()
+    finally:
+        if con:
+            con.close()
+
+
+class DBMethods:
+    def openDB(self, cursor=None):
+        if cursor:
+            # assert(self._thread_debug == threading.get_ident())
+            assert self.mxDB.locked()
+            return cursor
+
+        self.mxDB.acquire()
+        # self._thread_debug = threading.get_ident()
+        self._db_con = sqlite3.connect(self.sqlite_file)
+        return self._db_con.cursor()
+
+    def commitDB(self):
+        assert self.mxDB.locked()
+        self._db_con.commit()
+
+    def rollbackDB(self):
+        assert self.mxDB.locked()
+        self._db_con.rollback()
+
+    def closeDB(self, cursor, commit=True):
+        assert self.mxDB.locked()
+
+        if commit:
+            self._db_con.commit()
+
+        self._db_con.close()
+        self.mxDB.release()
+
+    def setIntKV(self, str_key: str, int_val: int, cursor=None) -> None:
+        try:
+            use_cursor = self.openDB(cursor)
+            use_cursor.execute(
+                """INSERT INTO kv_int (key, value)
+                   VALUES (:key, :value)
+                   ON CONFLICT(key)
+                   DO UPDATE SET value=:value
+                   WHERE key=:key;""",
+                {
+                    "key": str_key,
+                    "value": int(int_val),
+                },
+            )
+        finally:
+            if cursor is None:
+                self.closeDB(use_cursor)
+
+    def getIntKV(
+        self,
+        str_key: str,
+        cursor=None,
+        default_val: int = None,
+        update_if_default: bool = True,
+    ) -> Optional[int]:
+        try:
+            use_cursor = self.openDB(cursor)
+            rows = use_cursor.execute(
+                "SELECT value FROM kv_int WHERE key = :key", {"key": str_key}
+            ).fetchall()
+            return rows[0][0]
+        except Exception as e:
+            if default_val is not None:
+                if update_if_default:
+                    use_cursor.execute(
+                        """INSERT INTO kv_int (key, value)
+                           VALUES (:key, :value)""",
+                        {
+                            "key": str_key,
+                            "value": int(default_val),
+                        },
+                    )
+                return default_val
+            else:
+                raise e
+        finally:
+            if cursor is None:
+                self.closeDB(use_cursor)
+
+    def setStringKV(self, str_key: str, str_val: str, cursor=None) -> None:
+        try:
+            use_cursor = self.openDB(cursor)
+            use_cursor.execute(
+                """INSERT INTO kv_string (key, value)
+                   VALUES (:key, :value)
+                   ON CONFLICT(key)
+                   DO UPDATE SET value=:value""",
+                {
+                    "key": str_key,
+                    "value": str_val,
+                },
+            )
+        finally:
+            if cursor is None:
+                self.closeDB(use_cursor)
+
+    def getStringKV(self, str_key: str, cursor=None) -> Optional[str]:
+        try:
+            use_cursor = self.openDB(cursor)
+            rows = use_cursor.execute(
+                "SELECT value FROM kv_string WHERE key = :key", {"key": str_key}
+            ).fetchall()
+            if len(rows) < 1:
+                return None
+            return rows[0][0]
+        finally:
+            if cursor is None:
+                self.closeDB(use_cursor, commit=False)
+
+    def clearStringKV(self, str_key: str, cursor=None) -> None:
+        try:
+            use_cursor = self.openDB(cursor)
+            use_cursor.execute(
+                "DELETE FROM kv_string WHERE key = :key", {"key": str_key}
+            )
+        finally:
+            if cursor is None:
+                self.closeDB(use_cursor, commit=False)
+
+    def add(self, obj, cursor, upsert: bool = False):
+        if cursor is None:
+            raise ValueError("Cursor is null")
+        if not hasattr(obj, "__tablename__"):
+            raise ValueError("Adding invalid object")
+        table_name: str = obj.__tablename__
+
+        values = {}
+        query: str = f"INSERT INTO {table_name} ("
+
+        # See if the instance overwrote any class methods
+        for mc in inspect.getmembers(obj.__class__):
+            mc_name, mc_obj = mc
+
+            if not hasattr(mc_obj, "__sqlite3_column__"):
+                continue
+
+            m_obj = getattr(obj, mc_name)
+
+            # Column is not set in instance
+            if hasattr(m_obj, "__sqlite3_column__"):
+                continue
+
+            values[mc_name] = m_obj
+
+        query_values: str = " VALUES ("
+        for i, key in enumerate(values):
+            if i > 0:
+                query += ", "
+                query_values += ", "
+            query += key
+            query_values += ":" + key
+        query += ") " + query_values + ")"
+
+        if upsert:
+            query += " ON CONFLICT DO UPDATE SET "
+            for i, key in enumerate(values):
+                if i > 0:
+                    query += ", "
+                query += f"{key}=:{key}"
+
+        cursor.execute(query, values)
+
+    def query(
+        self, table_class, cursor, constraints={}, order_by={}, query_suffix=None
+    ):
+        if cursor is None:
+            raise ValueError("Cursor is null")
+        if not hasattr(table_class, "__tablename__"):
+            raise ValueError("Querying invalid class")
+        table_name: str = table_class.__tablename__
+
+        query: str = "SELECT "
+
+        columns = []
+
+        for mc in inspect.getmembers(table_class):
+            mc_name, mc_obj = mc
+
+            if not hasattr(mc_obj, "__sqlite3_column__"):
+                continue
+
+            if len(columns) > 0:
+                query += ", "
+            query += mc_name
+            columns.append((mc_name, mc_obj.column_type))
+
+        query += f" FROM {table_name} WHERE 1=1 "
+
+        for ck, cv in constraints.items():
+            query += f" AND {ck} = :{ck} "
+
+        for order_col, order_dir in order_by.items():
+            query += f" ORDER BY {order_col} {order_dir.upper()}"
+
+        if query_suffix:
+            query += query_suffix
+
+        rows = cursor.execute(query, constraints)
+        for row in rows:
+            obj = table_class()
+            for i, column_info in enumerate(columns):
+                colname, coltype = column_info
+                value = row[i]
+                if coltype == "bool":
+                    if row[i] is not None:
+                        value = False if row[i] == 0 else True
+                setattr(obj, colname, value)
+            yield obj
+
+    def updateDB(self, obj, cursor, constraints=[]):
+        if cursor is None:
+            raise ValueError("Cursor is null")
+        if not hasattr(obj, "__tablename__"):
+            raise ValueError("Updating invalid obj")
+        table_name: str = obj.__tablename__
+
+        query: str = f"UPDATE {table_name} SET "
+
+        values = {}
+        for mc in inspect.getmembers(obj.__class__):
+            mc_name, mc_obj = mc
+
+            if not hasattr(mc_obj, "__sqlite3_column__"):
+                continue
+
+            m_obj = getattr(obj, mc_name)
+            # Column is not set in instance
+            if hasattr(m_obj, "__sqlite3_column__"):
+                continue
+
+            if mc_name in constraints:
+                values[mc_name] = m_obj
+                continue
+
+            if len(values) > 0:
+                query += ", "
+            query += f"{mc_name} = :{mc_name}"
+            values[mc_name] = m_obj
+
+        query += " WHERE 1=1 "
+
+        for ck in constraints:
+            query += f" AND {ck} = :{ck} "
+
+        cursor.execute(query, values)

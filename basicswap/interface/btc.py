@@ -1158,13 +1158,35 @@ class BTCInterface(Secp256k1Interface):
 
     def fundTx(self, tx: bytes, feerate) -> bytes:
         feerate_str = self.format_amount(feerate)
-        # TODO: unlock unspents if bid cancelled
+        # TODO: Unlock unspents if bid cancelled
+        # TODO: Manually select only segwit prevouts
         options = {
             "lockUnspents": True,
             "feeRate": feerate_str,
         }
         rv = self.rpc_wallet("fundrawtransaction", [tx.hex(), options])
         return bytes.fromhex(rv["hex"])
+
+    def lockNonSegwitPrevouts(self) -> None:
+        # For tests
+        unspent = self.rpc_wallet("listunspent")
+
+        to_lock = []
+        for u in unspent:
+            if u.get("spendable", False) is False:
+                continue
+            if "desc" in u:
+                desc = u["desc"]
+                if self.use_p2shp2wsh():
+                    if not desc.startswith("sh(wpkh"):
+                        to_lock.append({"txid": u["txid"], "vout": u["vout"]})
+                else:
+                    if not desc.startswith("wpkh"):
+                        to_lock.append({"txid": u["txid"], "vout": u["vout"]})
+
+        if len(to_lock) > 0:
+            self._log.debug(f"Locking {len(to_lock)} non segwit prevouts")
+            self.rpc_wallet("lockunspent", [False, to_lock])
 
     def listInputs(self, tx_bytes: bytes):
         tx = self.loadTx(tx_bytes)

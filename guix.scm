@@ -111,17 +111,6 @@
     (home-page "https://github.com/basicswap/coincurve")
     (license license:bsd-3)))
 
-(define python-sqlalchemy-1.4.39
-  (package
-    (inherit python-sqlalchemy)
-    (version "1.4.39")
-    (source
-      (origin
-        (method url-fetch)
-        (uri (pypi-uri "SQLAlchemy" version))
-        (sha256
-          (base32 "09sx2lghywnm7qj1xm8xc3xrgj40bndfh2hbiaq4cfvm71h8k541"))))))
-
 (define-public basicswap
 (package
   (name "basicswap")
@@ -153,7 +142,6 @@
     python-coincurve-basicswap
     python-pycryptodome
     python-pytest
-    python-sqlalchemy
     python-pyzmq
     python-gnupg
     python-jinja2
