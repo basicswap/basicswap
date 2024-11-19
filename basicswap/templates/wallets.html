@@ -207,34 +207,86 @@
 {% include 'footer.html' %}
 
 <script>
+const MAX_RETRIES = 3;
+const BASE_DELAY = 1000;
+
 const api = {
+  cache: {
+    data: null,
+    timestamp: null,
+    expirationTime: 5 * 60 * 1000,
+    
+    isValid() {
+      console.log('Checking cache validity...');
+      const isValid = this.data && this.timestamp && 
+                     (Date.now() - this.timestamp < this.expirationTime);
+      console.log('Cache is valid:', isValid);
+      return isValid;
+    },
+    
+    set(data) {
+      console.log('Updating cache with new data...');
+      this.data = data;
+      this.timestamp = Date.now();
+    },
+    
+    get() {
+      console.log('Retrieving data from cache...');
+      return this.isValid() ? this.data : null;
+    },
+    
+    clear() {
+      console.log('Clearing cache...');
+      this.data = null;
+      this.timestamp = null;
+    }
+  },
+
   makePostRequest: (url, headers = {}) => {
     return new Promise((resolve, reject) => {
+      console.log('Making POST request to:', url);
+      const cachedData = api.cache.get();
+      if (cachedData) {
+        console.log('Using cached data');
+        return resolve(cachedData);
+      }
+
       const xhr = new XMLHttpRequest();
       xhr.open('POST', '/json/readurl');
       xhr.setRequestHeader('Content-Type', 'application/json');
       xhr.timeout = 30000;
-      xhr.ontimeout = () => reject(new Error('Request timed out'));
+      xhr.ontimeout = () => {
+        console.error('Request timed out');
+        reject(new Error('Request timed out'));
+      };
       xhr.onload = () => {
         if (xhr.status === 200) {
           try {
             const response = JSON.parse(xhr.responseText);
             if (response.Error) {
+              console.error('Error in API response:', response.Error);
               reject(new Error(response.Error));
             } else {
+              console.log('Caching API response data');
+              api.cache.set(response);
               resolve(response);
             }
           } catch (error) {
+            console.error('Error parsing JSON response:', error.message);
             reject(new Error(`Invalid JSON response: ${error.message}`));
           }
         } else {
+          console.error(`HTTP Error: ${xhr.status} ${xhr.statusText}`);
           reject(new Error(`HTTP Error: ${xhr.status} ${xhr.statusText}`));
         }
       };
-      xhr.onerror = () => reject(new Error('Network error occurred'));
+      xhr.onerror = () => {
+        console.error('Network error occurred');
+        reject(new Error('Network error occurred'));
+      };
       xhr.send(JSON.stringify({ url, headers }));
     });
-  },
+  }
 };
 
 const coinNameToSymbol = {
@@ -253,59 +305,221 @@ const coinNameToSymbol = {
   'Bitcoin Cash': 'bitcoin-cash'
 };
 
-async function updatePrices() {
-  try {
-    const response = await api.makePostRequest(
-      'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,bitcoin-cash,dash,dogecoin,decred,litecoin,particl,pivx,monero,zano,wownero,zcoin&vs_currencies=USD,BTC'
-    );
+function initializePercentageTooltip() {
+  if (typeof Tooltip === 'undefined') {
+    console.warn('Tooltip is not defined. Make sure the required library is loaded.');
+    return;
+  }
+  
+  console.log('Initializing percentage tooltip...');
+  const percentageEl = document.querySelector('[data-tooltip-target="tooltip-percentage"]');
+  const tooltipEl = document.getElementById('tooltip-percentage');
+  if (percentageEl && tooltipEl) {
+    console.log('Creating new tooltip instance');
+    new Tooltip(tooltipEl, percentageEl);
+  } else {
+    console.warn('Tooltip elements not found');
+  }
+}
 
+const PRICE_UPDATE_INTERVAL = 300000;
+let isUpdating = false;
+let previousTotalUsd = null;
+let currentPercentageChangeColor = 'white';
+let percentageChangeEl = null;
+let currentPercentageChange = null;
+
+async function fetchLatestPrices() {
+  let prices = null;
+  let retryAttempt = 0;
+
+  while (retryAttempt < MAX_RETRIES) {
+    try {
+      console.log(`Attempt ${retryAttempt + 1} of ${MAX_RETRIES} to fetch prices from API`);
+      prices = await api.makePostRequest(
+        'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,bitcoin-cash,dash,dogecoin,decred,litecoin,particl,pivx,monero,zano,wownero,zcoin&vs_currencies=USD,BTC'
+      );
+      
+      console.log('Caching fetched prices');
+      api.cache.set(prices);
+      return prices;
+    } catch (error) {
+      console.error('Error fetching prices:', error);
+      
+      const cachedPrices = api.cache.get();
+      if (cachedPrices) {
+        console.log('Using cached prices');
+        return cachedPrices;
+      }
+
+      retryAttempt++;
+      const delay = Math.min(BASE_DELAY * Math.pow(2, retryAttempt), 10000);
+      console.log(`Retrying in ${delay / 1000} seconds...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  
+  console.log('All retries failed, returning cached prices if available');
+  return api.cache.get() || null;
+}
+
+async function updatePrices(forceUpdate = false) {
+  if (isUpdating) {
+    console.log('Price update already in progress, skipping...');
+    return;
+  }
+  
+  try {
+    console.log('Starting price update...');
+    isUpdating = true;
+
+    if (forceUpdate) {
+      console.log('Clearing cache due to force update');
+      api.cache.clear();
+    }
+
+    const response = await fetchLatestPrices();
+
+    if (localStorage.getItem('balancesVisible') !== 'true') {
+      console.log('Balances not visible, skipping update');
+      const existingPercentageChangeEl = document.querySelector('.percentage-change');
+      if (existingPercentageChangeEl) {
+        console.log('Removing existing percentage change element');
+        existingPercentageChangeEl.remove();
+      }
+      return false;
+    }
+
+    let total = 0;
+    const updates = [];
+
+    console.log('Updating individual coin values...');
     document.querySelectorAll('.coinname-value').forEach(el => {
       const coinName = el.getAttribute('data-coinname');
-      const amount = parseFloat(el.textContent);
+      const amountStr = el.getAttribute('data-original-value');
+      if (!amountStr) return;
+
+      const amount = parseFloat(amountStr.replace(/[^0-9.-]+/g, ''));
       const coinId = coinNameToSymbol[coinName];
-      const price = response[coinId]?.usd;
+      const price = response?.[coinId]?.usd;
       
       if (price && !isNaN(amount)) {
         const usdValue = (amount * price).toFixed(2);
         const usdEl = el.closest('.flex').nextElementSibling?.querySelector('.usd-value');
-        if (usdEl && localStorage.getItem('usdAmountVisible') === 'true') {
-          usdEl.textContent = `$${usdValue}`;
+        if (usdEl) {
+          updates.push([usdEl, `$${usdValue}`]);
+          total += parseFloat(usdValue);
         }
+      } else {
+        console.log(`Could not find price for coin: ${coinName}`);
       }
     });
 
-    if (localStorage.getItem('usdAmountVisible') === 'true') {
-      const total = Array.from(document.querySelectorAll('.usd-value'))
-        .reduce((sum, el) => sum + (parseFloat(el.textContent?.replace('$', '')) || 0), 0);
-      
+    console.log('Updating total USD and BTC values...');
+    updates.forEach(([el, value]) => {
+      el.textContent = value;
+      el.setAttribute('data-original-value', value);
+    });
+
+    if (total > 0) {
       const totalUsdEl = document.getElementById('total-usd-value');
       if (totalUsdEl) {
-        totalUsdEl.textContent = `$${total.toFixed(2)}`;
+        const totalText = `$${total.toFixed(2)}`;
+        totalUsdEl.textContent = totalText;
+        totalUsdEl.setAttribute('data-original-value', totalText);
+
+        let percentageChangeEl = document.querySelector('.percentage-change');
+        if (!percentageChangeEl) {
+          console.log('Creating percentage change elements...');
+          const tooltipId = 'tooltip-percentage';
+          
+          const tooltip = document.createElement('div');
+          tooltip.id = tooltipId;
+          tooltip.role = 'tooltip';
+          tooltip.className = 'inline-block absolute invisible z-50 py-2 px-3 text-sm font-medium text-white bg-blue-500 dark:bg-gray-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip';
+          tooltip.innerHTML = `
+            Price change in the last 5 minutes<br>
+            <span style="color: rgb(34, 197, 94);">▲ Green:</span><span> Price increased</span><br>
+            <span style="color: rgb(239, 68, 68);">▼ Red:</span><span> Price decreased</span><br>
+            <span style="color: white;">→ White:</span><span> No change</span>
+            <div class="tooltip-arrow" data-popper-arrow></div>
+          `;
+          document.body.appendChild(tooltip);
+
+          percentageChangeEl = document.createElement('span');
+          percentageChangeEl.setAttribute('data-tooltip-target', tooltipId);
+          percentageChangeEl.className = 'ml-2 text-base dark:bg-gray-500 bg-blue-500 percentage-change px-2 py-1 rounded-full cursor-help';
+          totalUsdEl.parentNode.appendChild(percentageChangeEl);
+          
+          console.log('Initializing tooltip...');
+          initializePercentageTooltip();
+        }
+
+        let percentageChange = 0;
+        let percentageChangeIcon = '→';
+        let currentPercentageChangeColor = 'white';
+
+        percentageChangeEl.textContent = `${percentageChangeIcon} ${percentageChange.toFixed(2)}%`;
+        percentageChangeEl.style.color = currentPercentageChangeColor;
+        percentageChangeEl.style.display = localStorage.getItem('balancesVisible') === 'true' ? 'inline' : 'none';
+        console.log(`Displaying percentage change in total USD: ${percentageChangeEl.textContent}`);
+      } else {
+        console.log('Total USD element not found, skipping percentage change display');
       }
 
-      const btcPrice = response.bitcoin?.usd;
+      const btcPrice = response?.bitcoin?.usd;
       if (btcPrice) {
         const btcTotal = total / btcPrice;
         const totalBtcEl = document.getElementById('total-btc-value');
         if (totalBtcEl) {
-          totalBtcEl.textContent = `~ ${btcTotal.toFixed(8)} BTC`;
+          const btcText = `~ ${btcTotal.toFixed(8)} BTC`;
+          totalBtcEl.textContent = btcText;
+          totalBtcEl.setAttribute('data-original-value', btcText);
+        } else {
+          console.log('Total BTC element not found');
         }
+      } else {
+        console.log('Could not find BTC price');
+      }
+    } else {
+      console.log('Total value is 0, skipping update');
+      const existingPercentageChangeEl = document.querySelector('.percentage-change');
+      if (existingPercentageChangeEl) {
+        console.log('Removing existing percentage change element');
+        existingPercentageChangeEl.remove();
       }
     }
+
+    console.log('Price update completed successfully');
+    return true;
   } catch (error) {
     console.error('Price update failed:', error);
+    api.cache.clear();
+    return false;
+  } finally {
+    isUpdating = false;
   }
 }
 
-const toggleUsdIcon = (isVisible) => {
-  const usdIcon = document.querySelector("#hide-usd-amount-toggle svg");
-  if (usdIcon) {
+function storeOriginalValues() {
+  console.log('Storing original coin values...');
+  document.querySelectorAll('.coinname-value').forEach(el => {
+    if (!el.getAttribute('data-original-value')) {
+      el.setAttribute('data-original-value', el.textContent.trim());
+    }
+  });
+}
+
+const toggleIcon = (isVisible) => {
+  const eyeIcon = document.querySelector("#hide-usd-amount-toggle svg");
+  if (eyeIcon) {
+    console.log('Toggling eye icon visibility:', isVisible);
     if (isVisible) {
-      usdIcon.innerHTML = `
+      eyeIcon.innerHTML = `
         <path d="M23.444,10.239C21.905,8.062,17.708,3,12,3S2.1,8.062,.555,10.24a3.058,3.058,0,0,0,0,3.52h0C2.1,15.938,6.292,21,12,21s9.905-5.062,11.445-7.24A3.058,3.058,0,0,0,23.444,10.239ZM12,17a5,5,0,1,1,5-5A5,5,0,0,1,12,17Z"></path>
       `;
     } else {
-      usdIcon.innerHTML = `
+      eyeIcon.innerHTML = `
         <path d="M23.444,10.239a22.936,22.936,0,0,0-2.492-2.948l-4.021,4.021A5.026,5.026,0,0,1,17,12a5,5,0,0,1-5,5,5.026,5.026,0,0,1-.688-.069L8.055,20.188A10.286,10.286,0,0,0,12,21c5.708,0,9.905-5.062,11.445-7.24A3.058,3.058,0,0,0,23.444,10.239Z"></path>
         <path d="M12,3C6.292,3,2.1,8.062,.555,10.24a3.058,3.058,0,0,0,0,3.52h0a21.272,21.272,0,0,0,4.784,4.9l3.124-3.124a5,5,0,0,1,7.071-7.072L8.464,15.536l10.2-10.2A11.484,11.484,0,0,0,12,3Z"></path>
         <path data-color="color-2" d="M1,24a1,1,0,0,1-.707-1.707l22-22a1,1,0,0,1,1.414,1.414l-22,22A1,1,0,0,1,1,24Z"></path>
@@ -314,56 +528,137 @@ const toggleUsdIcon = (isVisible) => {
   }
 };
 
-const toggleUsdAmount = (usdCell, isVisible) => {
+let toggleInProgress = false;
+let toggleBalancesDebounce;
+
+const toggleBalances = async (isVisible) => {
+  console.log('Toggling balance visibility:', isVisible);
+  storeOriginalValues();
+
   const usdText = document.getElementById('usd-text');
+  const totalUsdEl = document.getElementById('total-usd-value');
+
   if (usdText) {
+    console.log('Updating USD text visibility:', isVisible);
     usdText.style.display = isVisible ? 'inline' : 'none';
+  }
+
+  if (isVisible) {
+    console.log('Restoring coin amounts...');
+    document.querySelectorAll('.coinname-value').forEach(el => {
+      const originalValue = el.getAttribute('data-original-value');
+      if (originalValue) {
+        el.textContent = originalValue;
+      }
+    });
+
+    console.log('Updating prices...');
+    const success = await updatePrices(true);
+    
+    if (!success) {
+      console.log('Price update failed, restoring previous USD values...');
+      document.querySelectorAll('.usd-value').forEach(el => {
+        const storedValue = el.getAttribute('data-original-value');
+        el.textContent = storedValue || '****';
+      });
+
+      ['total-usd-value', 'total-btc-value'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.textContent = el.getAttribute('data-original-value') || '****';
+        }
+      });
+    }
+
+    if (totalUsdEl) {
+      totalUsdEl.classList.add('font-extrabold');
+    }
+    if (percentageChangeEl) {
+      percentageChangeEl.style.display = 'inline';
+      percentageChangeEl.style.color = currentPercentageChangeColor;
+    }
+  } else {
+    console.log('Hiding all balance values...');
+    ['coinname-value', 'usd-value'].forEach(className => {
+      document.querySelectorAll('.' + className).forEach(el => {
+        el.textContent = '****';
+      });
+    });
+
+    ['total-usd-value', 'total-btc-value'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = '****';
+    });
+
+    const percentageChangeEl = document.querySelector('.percentage-change');
+    if (percentageChangeEl) {
+      console.log('Hiding percentage change element');
+      percentageChangeEl.style.display = 'none';
+    }
+
+    if (totalUsdEl) {
+      totalUsdEl.classList.remove('font-extrabold');
+    }
   }
 };
 
-const loadUsdAmountVisibility = async () => {
-  const usdAmountVisible = localStorage.getItem('usdAmountVisible') === 'true';
-  toggleUsdIcon(usdAmountVisible);
-
-  const usdValueElements = document.getElementsByClassName('usd-value');
-  for (const usdValueElement of usdValueElements) {
-    toggleUsdAmount(usdValueElement, usdAmountVisible);
+const toggleBalancesDebounced = () => {
+  if (toggleBalancesDebounce) {
+    clearTimeout(toggleBalancesDebounce);
   }
 
-  const totalUsdValueElement = document.getElementById('total-usd-value');
-  if (!usdAmountVisible && totalUsdValueElement) {
-    totalUsdValueElement.textContent = "*****";
-    document.getElementById('total-btc-value').textContent = "****";
-  } else if (usdAmountVisible) {
-    updatePrices();
-  }
+  toggleBalancesDebounce = setTimeout(() => {
+    toggleInProgress = false;
+    toggleBalances(localStorage.getItem('balancesVisible') === 'true');
+  }, 500);
+};
+
+const loadBalanceVisibility = async () => {
+  console.log('Loading balance visibility...');
+  const balancesVisible = localStorage.getItem('balancesVisible') === 'true';
+  toggleIcon(balancesVisible);
+  await toggleBalancesDebounced();
 };
 
 window.onload = async () => {
-  const hideUsdAmountToggle = document.getElementById('hide-usd-amount-toggle');
-  let usdAmountVisible = localStorage.getItem('usdAmountVisible') === 'true';
+  console.log('Window loaded, initializing price visualization...');
+  storeOriginalValues();
 
-  hideUsdAmountToggle?.addEventListener('click', () => {
-    usdAmountVisible = !usdAmountVisible;
-    localStorage.setItem('usdAmountVisible', usdAmountVisible);
-    toggleUsdIcon(usdAmountVisible);
-    
-    const usdValueElements = document.getElementsByClassName('usd-value');
-    for (const usdValueElement of usdValueElements) {
-      toggleUsdAmount(usdValueElement, usdAmountVisible);
+  if (localStorage.getItem('balancesVisible') === null) {
+    console.log('Balances visibility not set, setting to true');
+    localStorage.setItem('balancesVisible', 'true');
+  }
+
+  const hideBalancesToggle = document.getElementById('hide-usd-amount-toggle');
+  hideBalancesToggle?.addEventListener('click', async () => {
+    if (toggleInProgress) {
+      console.log('Toggle already in progress, skipping...');
+      return;
     }
-
-    if (usdAmountVisible) {
-      updatePrices();
-    } else {
-      document.querySelectorAll('.usd-value').forEach(el => el.textContent = '******');
-      document.getElementById('total-usd-value').textContent = '*****';
-      document.getElementById('total-btc-value').textContent = '****';
+    
+    try {
+      toggleInProgress = true;
+      console.log('Toggling balance visibility...');
+      const balancesVisible = localStorage.getItem('balancesVisible') === 'true';
+      const newVisibility = !balancesVisible;
+      
+      localStorage.setItem('balancesVisible', newVisibility);
+      toggleIcon(newVisibility);
+      await toggleBalancesDebounced();
+    } finally {
+      toggleInProgress = false;
     }
   });
 
-  await loadUsdAmountVisibility();
-  setInterval(updatePrices, 300000);
+  await loadBalanceVisibility();
+  
+  console.log(`Setting up periodic price updates every ${PRICE_UPDATE_INTERVAL / 1000} seconds...`);
+  setInterval(async () => {
+    if (localStorage.getItem('balancesVisible') === 'true' && !toggleInProgress && !isUpdating) {
+      console.log('Running periodic price update...');
+      await updatePrices();
+    }
+  }, PRICE_UPDATE_INTERVAL);
 };
 </script>
 </body>
