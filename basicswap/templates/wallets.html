@@ -214,7 +214,7 @@ const api = {
   cache: {
     data: null,
     timestamp: null,
-    expirationTime: 5 * 60 * 1000,
+    expirationTime: 10 * 60 * 1000, // 10 minutes
     
     isValid() {
       console.log('Checking cache validity...');
@@ -325,7 +325,7 @@ function initializePercentageTooltip() {
 const PRICE_UPDATE_INTERVAL = 300000;
 let isUpdating = false;
 let previousTotalUsd = null;
-let currentPercentageChangeColor = 'white';
+let currentPercentageChangeColor = 'yellow';
 let percentageChangeEl = null;
 let currentPercentageChange = null;
 
@@ -374,8 +374,10 @@ async function updatePrices(forceUpdate = false) {
     isUpdating = true;
 
     if (forceUpdate) {
-      console.log('Clearing cache due to force update');
+      console.log('Clearing price-related data from cache and localStorage');
       api.cache.clear();
+      const keys = Object.keys(localStorage).filter(key => key.endsWith('-usd') || key === 'total-usd' || key === 'total-btc');
+      keys.forEach(key => localStorage.removeItem(key));
     }
 
     const response = await fetchLatestPrices();
@@ -391,6 +393,7 @@ async function updatePrices(forceUpdate = false) {
     }
 
     let total = 0;
+    let hasMissingPrices = false;
     const updates = [];
 
     console.log('Updating individual coin values...');
@@ -402,16 +405,23 @@ async function updatePrices(forceUpdate = false) {
       const amount = parseFloat(amountStr.replace(/[^0-9.-]+/g, ''));
       const coinId = coinNameToSymbol[coinName];
       const price = response?.[coinId]?.usd;
-      
+
+      let usdValue;
       if (price && !isNaN(amount)) {
-        const usdValue = (amount * price).toFixed(2);
-        const usdEl = el.closest('.flex').nextElementSibling?.querySelector('.usd-value');
-        if (usdEl) {
-          updates.push([usdEl, `$${usdValue}`]);
-          total += parseFloat(usdValue);
-        }
+        usdValue = (amount * price).toFixed(2);
+        total += parseFloat(usdValue);
+        localStorage.setItem(`${coinId}-usd`, usdValue);
       } else {
+        // Use cached price if available
+        const cachedPrice = api.cache.get()?.[coinId]?.usd || localStorage.getItem(`${coinId}-usd`);
+        usdValue = cachedPrice ? (amount * cachedPrice).toFixed(2) : '****';
+        hasMissingPrices = true;
         console.log(`Could not find price for coin: ${coinName}`);
+      }
+
+      const usdEl = el.closest('.flex').nextElementSibling?.querySelector('.usd-value');
+      if (usdEl) {
+        updates.push([usdEl, usdValue]);
       }
     });
 
@@ -421,80 +431,74 @@ async function updatePrices(forceUpdate = false) {
       el.setAttribute('data-original-value', value);
     });
 
-    if (total > 0) {
-      const totalUsdEl = document.getElementById('total-usd-value');
-      if (totalUsdEl) {
-        const totalText = `$${total.toFixed(2)}`;
-        totalUsdEl.textContent = totalText;
-        totalUsdEl.setAttribute('data-original-value', totalText);
-
-        let percentageChangeEl = document.querySelector('.percentage-change');
-        if (!percentageChangeEl) {
-          console.log('Creating percentage change elements...');
-          const tooltipId = 'tooltip-percentage';
-          
-          const tooltip = document.createElement('div');
-          tooltip.id = tooltipId;
-          tooltip.role = 'tooltip';
-          tooltip.className = 'inline-block absolute invisible z-50 py-2 px-3 text-sm font-medium text-white bg-blue-500 dark:bg-gray-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip';
-          tooltip.innerHTML = `
-            Price change in the last 5 minutes<br>
-            <span style="color: rgb(34, 197, 94);">▲ Green:</span><span> Price increased</span><br>
-            <span style="color: rgb(239, 68, 68);">▼ Red:</span><span> Price decreased</span><br>
-            <span style="color: white;">→ White:</span><span> No change</span>
-            <div class="tooltip-arrow" data-popper-arrow></div>
-          `;
-          document.body.appendChild(tooltip);
-
-          percentageChangeEl = document.createElement('span');
-          percentageChangeEl.setAttribute('data-tooltip-target', tooltipId);
-          percentageChangeEl.className = 'ml-2 text-base dark:bg-gray-500 bg-blue-500 percentage-change px-2 py-1 rounded-full cursor-help';
-          totalUsdEl.parentNode.appendChild(percentageChangeEl);
-          
-          console.log('Initializing tooltip...');
-          initializePercentageTooltip();
-        }
-
-        let percentageChange = 0;
-        let percentageChangeIcon = '→';
-        let currentPercentageChangeColor = 'white';
-
-        percentageChangeEl.textContent = `${percentageChangeIcon} ${percentageChange.toFixed(2)}%`;
-        percentageChangeEl.style.color = currentPercentageChangeColor;
-        percentageChangeEl.style.display = localStorage.getItem('balancesVisible') === 'true' ? 'inline' : 'none';
-        console.log(`Displaying percentage change in total USD: ${percentageChangeEl.textContent}`);
-      } else {
-        console.log('Total USD element not found, skipping percentage change display');
-      }
-
-      const btcPrice = response?.bitcoin?.usd;
-      if (btcPrice) {
-        const btcTotal = total / btcPrice;
-        const totalBtcEl = document.getElementById('total-btc-value');
-        if (totalBtcEl) {
-          const btcText = `~ ${btcTotal.toFixed(8)} BTC`;
-          totalBtcEl.textContent = btcText;
-          totalBtcEl.setAttribute('data-original-value', btcText);
-        } else {
-          console.log('Total BTC element not found');
-        }
-      } else {
-        console.log('Could not find BTC price');
-      }
+    const totalUsdEl = document.getElementById('total-usd-value');
+    if (totalUsdEl) {
+      const totalText = `$${total.toFixed(2)}`;
+      totalUsdEl.textContent = totalText;
+      totalUsdEl.setAttribute('data-original-value', totalText);
+      localStorage.setItem('total-usd', total);
     } else {
-      console.log('Total value is 0, skipping update');
-      const existingPercentageChangeEl = document.querySelector('.percentage-change');
-      if (existingPercentageChangeEl) {
-        console.log('Removing existing percentage change element');
-        existingPercentageChangeEl.remove();
-      }
+      console.log('Total USD element not found, skipping total USD update');
     }
 
+    const btcPrice = response?.bitcoin?.usd;
+    if (btcPrice) {
+      const btcTotal = total / btcPrice;
+      const totalBtcEl = document.getElementById('total-btc-value');
+      if (totalBtcEl) {
+        const btcText = `~ ${btcTotal.toFixed(8)} BTC`;
+        totalBtcEl.textContent = btcText;
+        totalBtcEl.setAttribute('data-original-value', btcText);
+        localStorage.setItem('total-btc', btcTotal);
+      } else {
+        console.log('Total BTC element not found, skipping total BTC update');
+      }
+    } else {
+      console.log('Could not find BTC price');
+    }
+
+    let percentageChangeEl = document.querySelector('.percentage-change');
+    if (!percentageChangeEl) {
+      console.log('Creating percentage change elements...');
+      const tooltipId = 'tooltip-percentage';
+      
+      const tooltip = document.createElement('div');
+      tooltip.id = tooltipId;
+      tooltip.role = 'tooltip';
+      tooltip.className = 'inline-block absolute invisible z-50 py-2 px-3 text-sm font-medium text-white bg-gray-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip';
+      tooltip.innerHTML = `
+        Price change in the last 10 minutes<br>
+        <span style="color: rgb(34, 197, 94);">▲ Green:</span><span> Price increased</span><br>
+        <span style="color: rgb(239, 68, 68);">▼ Red:</span><span> Price decreased</span><br>
+        <span style="color: white;">→ White:</span><span> No change</span>
+      `;
+      document.body.appendChild(tooltip);
+
+      percentageChangeEl = document.createElement('span');
+      percentageChangeEl.setAttribute('data-tooltip-target', tooltipId);
+      percentageChangeEl.className = 'ml-2 text-base bg-gray-500 percentage-change px-2 py-1 rounded-full cursor-help';
+      totalUsdEl?.parentNode?.appendChild(percentageChangeEl);
+      
+      console.log('Initializing tooltip...');
+      initializePercentageTooltip();
+    }
+
+    let percentageChange = 0;
+    let percentageChangeIcon = '→';
+    let currentPercentageChangeColor = 'white';
+
+    percentageChangeEl.textContent = `${percentageChangeIcon} 0.00%`;
+    percentageChangeEl.style.color = currentPercentageChangeColor;
+    percentageChangeEl.style.display = localStorage.getItem('balancesVisible') === 'true' ? 'inline' : 'none';
+    console.log(`Displaying percentage change in total USD: ${percentageChangeEl.textContent}`);
+
     console.log('Price update completed successfully');
-    return true;
+    return !hasMissingPrices;
   } catch (error) {
     console.error('Price update failed:', error);
-    api.cache.clear();
+    // Only clear price-related data from localStorage
+    const keys = Object.keys(localStorage).filter(key => key.endsWith('-usd') || key === 'total-usd' || key === 'total-btc');
+    keys.forEach(key => localStorage.removeItem(key));
     return false;
   } finally {
     isUpdating = false;

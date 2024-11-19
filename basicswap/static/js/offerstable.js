@@ -698,7 +698,7 @@ function createTakerAmountColumn(offer, coinTo, coinFrom) {
                 <a data-tooltip-target="tooltip-wallet${escapeHtml(offer.offer_id)}" href="/wallet/${escapeHtml(fromSymbol)}" class="items-center monospace">
                     <div class="pr-2">        
                         <div class="text-sm font-semibold">${fromAmount.toFixed(4)}</div>          
-                        <div class="text-sm text-gray-500 dark:text-gray-400">${coinFrom}</div>
+                        <div class="text-sm text-gray-500 dark:text-gray-400">${coinTo}</div>
                     </div>
                 </a>
             </div>
@@ -742,7 +742,7 @@ function createOrderbookColumn(offer, coinFrom, coinTo) {
                 <a data-tooltip-target="tooltip-wallet-maker${escapeHtml(offer.offer_id)}" href="/wallet/${escapeHtml(toSymbol)}" class="items-center monospace">
                     <div class="pr-2">        
                         <div class="text-sm font-semibold">${toAmount.toFixed(4)}</div>           
-                        <div class="text-sm text-gray-500 dark:text-gray-400">${coinTo}</div>
+                        <div class="text-sm text-gray-500 dark:text-gray-400">${coinFrom}</div>
                     </div>
                 </a>
             </div>
