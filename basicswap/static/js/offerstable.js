@@ -691,11 +691,11 @@ function createDetailsColumn(offer) {
 
 function createTakerAmountColumn(offer, coinTo, coinFrom) {
     const fromAmount = parseFloat(offer.amount_to);
-    const fromSymbol = getCoinSymbol(coinFrom);
+    const toSymbol = getCoinSymbol(coinTo);
     return `
         <td class="py-0">
             <div class="py-3 px-4 text-left">
-                <a data-tooltip-target="tooltip-wallet${escapeHtml(offer.offer_id)}" href="/wallet/${escapeHtml(fromSymbol)}" class="items-center monospace">
+                <a data-tooltip-target="tooltip-wallet${escapeHtml(offer.offer_id)}" href="/wallet/${escapeHtml(toSymbol)}" class="items-center monospace">
                     <div class="pr-2">        
                         <div class="text-sm font-semibold">${fromAmount.toFixed(4)}</div>          
                         <div class="text-sm text-gray-500 dark:text-gray-400">${coinTo}</div>
@@ -735,11 +735,11 @@ function createSwapColumn(offer, coinFromDisplay, coinToDisplay, coinFromSymbol,
 
 function createOrderbookColumn(offer, coinFrom, coinTo) {
     const toAmount = parseFloat(offer.amount_from);
-    const toSymbol = getCoinSymbol(coinTo);
+    const fromSymbol = getCoinSymbol(coinFrom);
     return `
         <td class="p-0">
             <div class="py-3 px-4 text-right">
-                <a data-tooltip-target="tooltip-wallet-maker${escapeHtml(offer.offer_id)}" href="/wallet/${escapeHtml(toSymbol)}" class="items-center monospace">
+                <a data-tooltip-target="tooltip-wallet-maker${escapeHtml(offer.offer_id)}" href="/wallet/${escapeHtml(fromSymbol)}" class="items-center monospace">
                     <div class="pr-2">        
                         <div class="text-sm font-semibold">${toAmount.toFixed(4)}</div>           
                         <div class="text-sm text-gray-500 dark:text-gray-400">${coinFrom}</div>
