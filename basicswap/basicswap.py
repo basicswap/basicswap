@@ -93,6 +93,7 @@ from .db import (
     CURRENT_DB_VERSION,
     EventLog,
     firstOrNone,
+    getOrderByStr,
     KnownIdentity,
     MessageLink,
     Notification,
@@ -936,13 +937,10 @@ class BasicSwap(BaseApp):
     def start(self):
         import platform
 
-        self.log.info(
-            "Starting BasicSwap %s, database v%d\n\n", __version__, self.db_version
-        )
+        self.log.info(f"Starting BasicSwap {__version__}, database v{self.db_version}\n\n")
         self.log.info(f"Python version: {platform.python_version()}")
         self.log.info(f"SQLite version: {sqlite3.sqlite_version}")
-
-        self.log.info("Timezone offset: %d (%s)", time.timezone, time.tzname[0])
+        self.log.info(f"Timezone offset: {time.timezone} ({time.tzname[0]})")
 
         upgradeDatabase(self, self.db_version)
         upgradeDatabaseData(self, self.db_data_version)
@@ -1322,8 +1320,8 @@ class BasicSwap(BaseApp):
 
             coin_id = int(coin_type)
             info_type = 1  # wallet
-            query_str = f"DELETE FROM wallets WHERE coin_id = {coin_id} AND balance_type = {info_type}"
-            cursor.execute(query_str)
+            query_str = "DELETE FROM wallets WHERE coin_id = ? AND balance_type = ?"
+            cursor.execute(query_str, (coin_id, info_type))
         finally:
             self.closeDB(cursor)
 
@@ -1693,7 +1691,8 @@ class BasicSwap(BaseApp):
             )
 
             use_cursor.execute(
-                f"DELETE FROM notifications WHERE record_id NOT IN (SELECT record_id FROM notifications WHERE active_ind=1 ORDER BY created_at ASC LIMIT {self._keep_notifications})"
+                "DELETE FROM notifications WHERE record_id NOT IN (SELECT record_id FROM notifications WHERE active_ind=1 ORDER BY created_at ASC LIMIT ?)",
+                (self._keep_notifications,),
             )
 
             if show_event:
@@ -1709,7 +1708,8 @@ class BasicSwap(BaseApp):
     def buildNotificationsCache(self, cursor):
         self._notifications_cache.clear()
         q = cursor.execute(
-            f"SELECT created_at, event_type, event_data FROM notifications WHERE active_ind = 1 ORDER BY created_at ASC LIMIT {self._show_notifications}"
+            "SELECT created_at, event_type, event_data FROM notifications WHERE active_ind = 1 ORDER BY created_at ASC LIMIT ?",
+            (self._keep_notifications,),
         )
         for entry in q:
             self._notifications_cache[entry[0]] = (
@@ -1810,30 +1810,32 @@ class BasicSwap(BaseApp):
         try:
             cursor = self.openDB()
 
-            query_str = (
+            query_str: str = (
                 "SELECT address, label, num_sent_bids_successful, num_recv_bids_successful, "
                 + "       num_sent_bids_rejected, num_recv_bids_rejected, num_sent_bids_failed, num_recv_bids_failed, "
                 + "       automation_override, visibility_override, note "
                 + " FROM knownidentities "
                 + " WHERE active_ind = 1 "
             )
+            query_data: dict = {}
 
             address = filters.get("address", None)
             if address is not None:
-                query_str += f' AND address = "{address}" '
+                query_str += " AND address = :address "
+                query_data["address"] = address
 
-            sort_dir = filters.get("sort_dir", "DESC").upper()
-            sort_by = filters.get("sort_by", "created_at")
-            query_str += f" ORDER BY {sort_by} {sort_dir}"
+            query_str += getOrderByStr(filters)
 
             limit = filters.get("limit", None)
             if limit is not None:
-                query_str += f" LIMIT {limit}"
+                query_str += " LIMIT :limit"
+                query_data["limit"] = limit
             offset = filters.get("offset", None)
             if offset is not None:
-                query_str += f" OFFSET {offset}"
+                query_str += " OFFSET :offset"
+                query_data["offset"] = offset
 
-            q = cursor.execute(query_str)
+            q = cursor.execute(query_str, query_data)
             rv = []
             for row in q:
                 identity = {
@@ -2821,9 +2823,12 @@ class BasicSwap(BaseApp):
 
     def countBidEvents(self, bid, event_type, cursor):
         q = cursor.execute(
-            "SELECT COUNT(*) FROM eventlog WHERE linked_type = {} AND linked_id = x'{}' AND event_type = {}".format(
-                int(Concepts.BID), bid.bid_id.hex(), int(event_type)
-            )
+            "SELECT COUNT(*) FROM eventlog WHERE linked_type = :linked_type AND linked_id = :linked_id AND event_type = :event_type",
+            {
+                "linked_type": int(Concepts.BID),
+                "linked_id": bid.bid_id,
+                "event_type": int(event_type),
+            },
         ).fetchone()
         return q[0]
 
@@ -3212,20 +3217,20 @@ class BasicSwap(BaseApp):
     def list_bid_events(self, bid_id: bytes, cursor):
         query_str = (
             "SELECT created_at, event_type, event_msg FROM eventlog "
-            + "WHERE active_ind = 1 AND linked_type = {} AND linked_id = x'{}' ".format(
-                Concepts.BID, bid_id.hex()
-            )
+            + "WHERE active_ind = 1 AND linked_type = :linked_type AND linked_id = :linked_id "
         )
-        q = cursor.execute(query_str)
+        q = cursor.execute(
+            query_str, {"linked_type": int(Concepts.BID), "linked_id": bid_id}
+        )
         events = []
         for row in q:
             events.append({"at": row[0], "desc": describeEventEntry(row[1], row[2])})
 
         query_str = (
             "SELECT created_at, trigger_at FROM actions "
-            + "WHERE active_ind = 1 AND linked_id = x'{}' ".format(bid_id.hex())
+            + "WHERE active_ind = 1 AND linked_id = :linked_id "
         )
-        q = cursor.execute(query_str)
+        q = cursor.execute(query_str, {"linked_id": bid_id})
         for row in q:
             events.append(
                 {
@@ -7183,21 +7188,23 @@ class BasicSwap(BaseApp):
 
     def getCompletedAndActiveBidsValue(self, offer, cursor):
         bids = []
-        total_value = 0
+        total_value: int = 0
+
         q = cursor.execute(
             """SELECT bid_id, amount, state FROM bids
-               JOIN bidstates ON bidstates.state_id = bids.state AND (bidstates.state_id = {1} OR bidstates.in_progress > 0)
-               WHERE bids.active_ind = 1 AND bids.offer_id = x\'{0}\'
+               JOIN bidstates ON bidstates.state_id = bids.state AND (bidstates.state_id = :state_id OR bidstates.in_progress > 0)
+               WHERE bids.active_ind = 1 AND bids.offer_id = :offer_id
                UNION
                SELECT bid_id, amount, state FROM bids
-               JOIN actions ON actions.linked_id = bids.bid_id AND actions.active_ind = 1 AND (actions.action_type = {2} OR actions.action_type = {3})
-               WHERE bids.active_ind = 1 AND bids.offer_id = x\'{0}\'
-            """.format(
-                offer.offer_id.hex(),
-                BidStates.SWAP_COMPLETED,
-                ActionTypes.ACCEPT_XMR_BID,
-                ActionTypes.ACCEPT_BID,
-            )
+               JOIN actions ON actions.linked_id = bids.bid_id AND actions.active_ind = 1 AND (actions.action_type = :action_type_acc_bid OR actions.action_type = :action_type_acc_adp_bid)
+               WHERE bids.active_ind = 1 AND bids.offer_id = :offer_id
+            """,
+            {
+                "state_id": int(BidStates.SWAP_COMPLETED),
+                "offer_id": offer.offer_id,
+                "action_type_acc_bid": int(ActionTypes.ACCEPT_BID),
+                "action_type_acc_adp_bid": int(ActionTypes.ACCEPT_XMR_BID),
+            },
         )
         for row in q:
             bid_id, amount, state = row
@@ -9214,9 +9221,12 @@ class BasicSwap(BaseApp):
             cursor = self.openDB()
             try:
                 q = cursor.execute(
-                    "SELECT COUNT(*) FROM xmr_split_data WHERE bid_id = x'{}' AND msg_type = {} AND msg_sequence = {}".format(
-                        msg_data.msg_id.hex(), msg_data.msg_type, msg_data.sequence
-                    )
+                    "SELECT COUNT(*) FROM xmr_split_data WHERE bid_id = :bid_id AND msg_type = :msg_type AND msg_sequence = :msg_sequence",
+                    {
+                        "bid_id": msg_data.msg_id,
+                        "msg_type": msg_data.msg_type,
+                        "msg_sequence": msg_data.sequence,
+                    },
                 ).fetchone()
                 num_exists = q[0]
                 if num_exists > 0:
@@ -10120,37 +10130,39 @@ class BasicSwap(BaseApp):
             num_watched_outputs += len(v["watched_outputs"])
 
         now: int = self.getTime()
-        q_bids_str = """SELECT
-                        COUNT(CASE WHEN b.was_sent THEN 1 ELSE NULL END) AS count_sent,
-                        COUNT(CASE WHEN b.was_sent AND (s.in_progress OR (s.swap_ended = 0 AND b.expire_at > {} AND o.expire_at > {})) THEN 1 ELSE NULL END) AS count_sent_active,
-                        COUNT(CASE WHEN b.was_received THEN 1 ELSE NULL END) AS count_received,
-                        COUNT(CASE WHEN b.was_received AND b.state = {} AND b.expire_at > {} AND o.expire_at > {} THEN 1 ELSE NULL END) AS count_available,
-                        COUNT(CASE WHEN b.was_received AND (s.in_progress OR (s.swap_ended = 0 AND b.expire_at > {} AND o.expire_at > {})) THEN 1 ELSE NULL END) AS count_recv_active
-                        FROM bids b
-                        JOIN offers o ON b.offer_id = o.offer_id
-                        JOIN bidstates s ON b.state = s.state_id
-                        WHERE b.active_ind = 1""".format(
-            now, now, BidStates.BID_RECEIVED, now, now, now, now
+        q_bids_str: str = (
+            """SELECT
+               COUNT(CASE WHEN b.was_sent THEN 1 ELSE NULL END) AS count_sent,
+               COUNT(CASE WHEN b.was_sent AND (s.in_progress OR (s.swap_ended = 0 AND b.expire_at > :now AND o.expire_at > :now)) THEN 1 ELSE NULL END) AS count_sent_active,
+               COUNT(CASE WHEN b.was_received THEN 1 ELSE NULL END) AS count_received,
+               COUNT(CASE WHEN b.was_received AND b.state = :received_state AND b.expire_at > :now AND o.expire_at > :now THEN 1 ELSE NULL END) AS count_available,
+               COUNT(CASE WHEN b.was_received AND (s.in_progress OR (s.swap_ended = 0 AND b.expire_at > :now AND o.expire_at > :now)) THEN 1 ELSE NULL END) AS count_recv_active
+               FROM bids b
+               JOIN offers o ON b.offer_id = o.offer_id
+               JOIN bidstates s ON b.state = s.state_id
+               WHERE b.active_ind = 1"""
         )
 
-        q_offers_str = """SELECT
-                          COUNT(CASE WHEN expire_at > {} THEN 1 ELSE NULL END) AS count_active,
-                          COUNT(CASE WHEN was_sent THEN 1 ELSE NULL END) AS count_sent,
-                          COUNT(CASE WHEN was_sent AND expire_at > {} THEN 1 ELSE NULL END) AS count_sent_active
-                          FROM offers WHERE active_ind = 1""".format(
-            now, now
+        q_offers_str: str = (
+            """SELECT
+               COUNT(CASE WHEN expire_at > :now THEN 1 ELSE NULL END) AS count_active,
+               COUNT(CASE WHEN was_sent THEN 1 ELSE NULL END) AS count_sent,
+               COUNT(CASE WHEN was_sent AND expire_at > :now THEN 1 ELSE NULL END) AS count_sent_active
+               FROM offers WHERE active_ind = 1"""
         )
 
         try:
             cursor = self.openDB()
-            q = cursor.execute(q_bids_str).fetchone()
+            q = cursor.execute(
+                q_bids_str, {"now": now, "received_state": int(BidStates.BID_RECEIVED)}
+            ).fetchone()
             bids_sent = q[0]
             bids_sent_active = q[1]
             bids_received = q[2]
             bids_available = q[3]
             bids_recv_active = q[4]
 
-            q = cursor.execute(q_offers_str).fetchone()
+            q = cursor.execute(q_offers_str, {"now": now}).fetchone()
             num_offers = q[0]
             num_sent_offers = q[1]
             num_sent_active_offers = q[2]
@@ -10257,8 +10269,8 @@ class BasicSwap(BaseApp):
                 ),
                 cursor,
             )
-            query_str = f"DELETE FROM wallets WHERE (coin_id = {coin_id} AND balance_type = {info_type}) AND record_id NOT IN (SELECT record_id FROM wallets WHERE coin_id = {coin_id} AND balance_type = {info_type} ORDER BY created_at DESC LIMIT 3 )"
-            cursor.execute(query_str)
+            query_str = "DELETE FROM wallets WHERE (coin_id = :coin_id AND balance_type = :info_type) AND record_id NOT IN (SELECT record_id FROM wallets WHERE coin_id = :coin_id AND balance_type = :info_type ORDER BY created_at DESC LIMIT 3 )"
+            cursor.execute(query_str, {"coin_id": coin_id, "info_type": info_type})
             self.commitDB()
         except Exception as e:
             self.log.error(f"addWalletInfoRecord {e}")
@@ -10326,15 +10338,15 @@ class BasicSwap(BaseApp):
         rv = {}
         try:
             cursor = self.openDB()
+            query_data: dict = {}
             where_str = ""
             if opts is not None and "coin_id" in opts:
-                where_str = "WHERE coin_id = {}".format(opts["coin_id"])
+                where_str = "WHERE coin_id = :coin_id"
+                query_data["coin_id"] = opts["coin_id"]
             inner_str = f"SELECT coin_id, balance_type, MAX(created_at) as max_created_at FROM wallets {where_str} GROUP BY coin_id, balance_type"
-            query_str = "SELECT a.coin_id, a.balance_type, wallet_data, created_at FROM wallets a, ({}) b WHERE a.coin_id = b.coin_id AND a.balance_type = b.balance_type AND a.created_at = b.max_created_at".format(
-                inner_str
-            )
+            query_str = f"SELECT a.coin_id, a.balance_type, wallet_data, created_at FROM wallets a, ({inner_str}) b WHERE a.coin_id = b.coin_id AND a.balance_type = b.balance_type AND a.created_at = b.max_created_at"
 
-            q = cursor.execute(query_str)
+            q = cursor.execute(query_str, query_data)
             for row in q:
                 coin_id = row[0]
 
@@ -10350,10 +10362,10 @@ class BasicSwap(BaseApp):
                     )
 
                     # Ensure the latest addresses are displayed
+                    coin_name: str = chainparams[coin_id]["name"]
                     q = cursor.execute(
-                        'SELECT key, value FROM kv_string WHERE key = "receive_addr_{0}" OR key = "stealth_addr_{0}"'.format(
-                            chainparams[coin_id]["name"]
-                        )
+                        "SELECT key, value FROM kv_string WHERE key = ? OR key = ?",
+                        (f"receive_addr_{coin_name}", f"stealth_addr_{coin_name}"),
                     )
                     for row in q:
                         if row[0].startswith("stealth"):
@@ -10388,18 +10400,13 @@ class BasicSwap(BaseApp):
     def countAcceptedBids(self, offer_id: bytes = None) -> int:
         cursor = self.openDB()
         try:
+            query: str = "SELECT COUNT(*) FROM bids WHERE state >= :state_ind"
+            query_data: dict = {"state_ind": int(BidStates.BID_ACCEPTED)}
             if offer_id:
-                q = cursor.execute(
-                    "SELECT COUNT(*) FROM bids WHERE state >= {} AND offer_id = x'{}'".format(
-                        BidStates.BID_ACCEPTED, offer_id.hex()
-                    )
-                ).fetchone()
-            else:
-                q = cursor.execute(
-                    "SELECT COUNT(*) FROM bids WHERE state >= {}".format(
-                        BidStates.BID_ACCEPTED
-                    )
-                ).fetchone()
+                query += " AND offer_id = :offer_id"
+                query_data["offer_id":offer_id]
+
+            q = cursor.execute(query, query_data).fetchone()
             return q[0]
         finally:
             self.closeDB(cursor, commit=False)
@@ -10410,47 +10417,53 @@ class BasicSwap(BaseApp):
             rv = []
             now: int = self.getTime()
 
-            query_suffix = ""
+            query_suffix: str = ""
+            query_data: dict = {"now": now}
 
             if sent:
                 query_suffix += " AND was_sent = 1"
 
                 active_state = filters.get("active", "any")
                 if active_state == "active":
-                    query_suffix += f" AND (expire_at > {now} AND active_ind = 1)"
+                    query_suffix += " AND (expire_at > :now AND active_ind = 1)"
                 elif active_state == "expired":
-                    query_suffix += f" AND expire_at <= {now}"
+                    query_suffix += " AND expire_at <= :now"
                 elif active_state == "revoked":
                     query_suffix += " AND active_ind != 1"
             else:
-                query_suffix += f" AND (expire_at > {now} AND active_ind = 1)"
+                query_suffix += " AND (expire_at > :now AND active_ind = 1)"
 
             filter_offer_id = filters.get("offer_id", None)
             if filter_offer_id is not None:
-                query_suffix += f" AND offer_id = x'{filter_offer_id.hex()}'"
+                query_suffix += " AND offer_id = :filter_offer_id"
+                query_data["filter_offer_id"] = filter_offer_id
             filter_coin_from = filters.get("coin_from", None)
             if filter_coin_from and filter_coin_from > -1:
-                query_suffix += f" AND coin_from = {int(filter_coin_from)}"
+                query_suffix += " AND coin_from = :filter_coin_from"
+                query_data["filter_coin_from"] = int(filter_coin_from)
             filter_coin_to = filters.get("coin_to", None)
             if filter_coin_to and filter_coin_to > -1:
-                query_suffix += f" AND coin_to = {int(filter_coin_to)}"
+                query_suffix += " AND coin_to = :filter_coin_to"
+                query_data["filter_coin_to"] = int(filter_coin_to)
 
             filter_include_sent = filters.get("include_sent", None)
             if filter_include_sent is not None and filter_include_sent is not True:
                 query_suffix += " AND was_sent = 0"
 
-            order_dir = filters.get("sort_dir", "desc")
-            order_by = filters.get("sort_by", "created_at")
-            query_suffix += f" ORDER BY {order_by} {order_dir.upper()}"
+            query_suffix += getOrderByStr(filters)
 
             limit = filters.get("limit", None)
             if limit is not None:
-                query_suffix += f" LIMIT {limit}"
+                query_suffix += " LIMIT :limit"
+                query_data["limit"] = limit
             offset = filters.get("offset", None)
             if offset is not None:
-                query_suffix += f" OFFSET {offset}"
+                query_suffix += " OFFSET :offset"
+                query_data["offset"] = offset
 
-            q = self.query(Offer, cursor, query_suffix=query_suffix)
+            q = self.query(
+                Offer, cursor, query_suffix=query_suffix, extra_query_data=query_data
+            )
             for row in q:
                 offer = row
                 # Show offers for enabled coins only
@@ -10465,14 +10478,14 @@ class BasicSwap(BaseApp):
             self.closeDB(cursor, commit=False)
 
     def activeBidsQueryStr(
-        self, now: int, offer_table: str = "offers", bids_table: str = "bids"
+        self, offer_table: str = "offers", bids_table: str = "bids"
     ) -> str:
-        offers_inset = (
-            f" AND {offer_table}.expire_at > {now}" if offer_table != "" else ""
-        )
+        offers_inset: str = ""
+        if offer_table != "":
+            offers_inset = f" AND {offer_table}.expire_at > :now"
 
         inactive_states_str = ", ".join([str(int(s)) for s in inactive_states])
-        return f" ({bids_table}.state NOT IN ({inactive_states_str}) AND ({bids_table}.state > {BidStates.BID_RECEIVED} OR ({bids_table}.expire_at > {now}{offers_inset}))) "
+        return f" ({bids_table}.state NOT IN ({inactive_states_str}) AND ({bids_table}.state > {BidStates.BID_RECEIVED} OR ({bids_table}.expire_at > :now{offers_inset}))) "
 
     def listBids(
         self,
@@ -10486,7 +10499,15 @@ class BasicSwap(BaseApp):
             rv = []
             now: int = self.getTime()
 
-            query_str = (
+            query_data: dict = {
+                "now": now,
+                "ads_swap": SwapTypes.XMR_SWAP,
+                "itx_type": TxTypes.ITX,
+                "ptx_type": TxTypes.PTX,
+                "al_type": TxTypes.XMR_SWAP_A_LOCK,
+                "bl_type": TxTypes.XMR_SWAP_B_LOCK,
+            }
+            query_str: str = (
                 "SELECT "
                 + "bids.created_at, bids.expire_at, bids.bid_id, bids.offer_id, bids.amount, bids.state, bids.was_received, "
                 + "tx1.state, tx2.state, offers.coin_from, bids.rate, bids.bid_addr, offers.bid_reversed, bids.amount_to, offers.coin_to "
@@ -10499,9 +10520,11 @@ class BasicSwap(BaseApp):
             query_str += "WHERE bids.active_ind = 1 "
             filter_bid_id = filters.get("bid_id", None)
             if filter_bid_id is not None:
-                query_str += "AND bids.bid_id = x'{}' ".format(filter_bid_id.hex())
+                query_str += "AND bids.bid_id = :filter_bid_id "
+                query_data["filter_bid_id"] = filter_bid_id
             if offer_id is not None:
-                query_str += "AND bids.offer_id = x'{}' ".format(offer_id.hex())
+                query_str += "AND bids.offer_id = :filter_offer_id "
+                query_data["filter_offer_id"] = offer_id
             elif sent:
                 query_str += "AND bids.was_sent = 1 "
             else:
@@ -10509,41 +10532,31 @@ class BasicSwap(BaseApp):
 
             bid_state_ind = filters.get("bid_state_ind", -1)
             if bid_state_ind != -1:
-                query_str += "AND bids.state = {} ".format(bid_state_ind)
+                query_str += "AND bids.state = :bid_state_ind "
+                query_data["bid_state_ind"] = bid_state_ind
 
             with_available_or_active = filters.get("with_available_or_active", False)
             with_expired = filters.get("with_expired", True)
             if with_available_or_active:
-                query_str += " AND " + self.activeBidsQueryStr(now)
+                query_str += " AND " + self.activeBidsQueryStr()
             else:
                 if with_expired is not True:
                     query_str += (
-                        "AND bids.expire_at > {} AND offers.expire_at > {} ".format(
-                            now, now
-                        )
+                        "AND bids.expire_at > :now AND offers.expire_at > :now "
                     )
 
-            sort_dir = filters.get("sort_dir", "DESC").upper()
-            sort_by = filters.get("sort_by", "created_at")
-            query_str += f" ORDER BY bids.{sort_by} {sort_dir}"
+            query_str += getOrderByStr(filters, table_name="bids")
 
             limit = filters.get("limit", None)
             if limit is not None:
-                query_str += f" LIMIT {limit}"
+                query_str += " LIMIT :limit"
+                query_data["limit"] = limit
             offset = filters.get("offset", None)
             if offset is not None:
-                query_str += f" OFFSET {offset}"
+                query_str += " OFFSET :offset"
+                query_data["offset"] = offset
 
-            q = cursor.execute(
-                query_str,
-                {
-                    "ads_swap": SwapTypes.XMR_SWAP,
-                    "itx_type": TxTypes.ITX,
-                    "ptx_type": TxTypes.PTX,
-                    "al_type": TxTypes.XMR_SWAP_A_LOCK,
-                    "bl_type": TxTypes.XMR_SWAP_B_LOCK,
-                },
-            )
+            q = cursor.execute(query_str, query_data)
             for row in q:
                 result = [x for x in row]
                 coin_from = result[9]
@@ -10604,9 +10617,10 @@ class BasicSwap(BaseApp):
             self.mxDB.release()
 
     def listAllSMSGAddresses(self, filters={}, cursor=None):
-        query_str = "SELECT addr_id, addr, use_type, active_ind, created_at, note, pubkey FROM smsgaddresses"
-        query_str += " WHERE 1 = 1 "
-        query_data = {}
+        query_str: str = (
+            "SELECT addr_id, addr, use_type, active_ind, created_at, note, pubkey FROM smsgaddresses WHERE 1=1 "
+        )
+        query_data: dict = {}
 
         if filters.get("exclude_inactive", True) is True:
             query_str += " AND active_ind = :active_ind "
@@ -10621,15 +10635,15 @@ class BasicSwap(BaseApp):
             query_str += " AND use_type = :addr_type "
             query_data["addr_type"] = filters["addr_type"]
 
-        sort_dir = filters.get("sort_dir", "DESC").upper()
-        sort_by = filters.get("sort_by", "created_at")
-        query_str += f" ORDER BY {sort_by} {sort_dir}"
+        query_str += getOrderByStr(filters)
         limit = filters.get("limit", None)
         if limit is not None:
-            query_str += f" LIMIT {limit}"
+            query_str += " LIMIT :limit"
+            query_data["limit"] = limit
         offset = filters.get("offset", None)
         if offset is not None:
-            query_str += f" OFFSET {offset}"
+            query_str += " OFFSET :offset"
+            query_data["offset"] = offset
 
         try:
             use_cursor = self.openDB(cursor)
@@ -10666,9 +10680,8 @@ class BasicSwap(BaseApp):
             cursor = self.openDB()
             rv = []
             q = cursor.execute(
-                "SELECT sa.addr, ki.label FROM smsgaddresses AS sa LEFT JOIN knownidentities AS ki ON sa.addr = ki.address WHERE sa.use_type = {} AND sa.active_ind = 1 ORDER BY sa.addr_id DESC".format(
-                    use_type
-                )
+                "SELECT sa.addr, ki.label FROM smsgaddresses AS sa LEFT JOIN knownidentities AS ki ON sa.addr = ki.address WHERE sa.use_type = ? AND sa.active_ind = 1 ORDER BY sa.addr_id DESC",
+                (use_type,),
             )
             for row in q:
                 rv.append((row[0], row[1]))
@@ -10681,25 +10694,29 @@ class BasicSwap(BaseApp):
             cursor = self.openDB()
             rv = []
 
-            query_str = "SELECT strats.record_id, strats.label, strats.type_ind FROM automationstrategies AS strats"
+            query_str: str = (
+                "SELECT strats.record_id, strats.label, strats.type_ind FROM automationstrategies AS strats"
+            )
             query_str += " WHERE strats.active_ind = 1 "
+            query_data: dict = {}
 
             type_ind = filters.get("type_ind", None)
             if type_ind is not None:
-                query_str += f" AND strats.type_ind = {type_ind} "
+                query_str += " AND strats.type_ind = :type_ind "
+                query_data["type_ind"] = type_ind
 
-            sort_dir = filters.get("sort_dir", "DESC").upper()
-            sort_by = filters.get("sort_by", "created_at")
-            query_str += f" ORDER BY strats.{sort_by} {sort_dir}"
+            query_str += getOrderByStr(filters, table_name="strats")
 
             limit = filters.get("limit", None)
             if limit is not None:
-                query_str += f" LIMIT {limit}"
+                query_str += " LIMIT :limit"
+                query_data["limit"] = limit
             offset = filters.get("offset", None)
             if offset is not None:
-                query_str += f" OFFSET {offset}"
+                query_str += " OFFSET :offset"
+                query_data["offset"] = offset
 
-            q = cursor.execute(query_str)
+            q = cursor.execute(query_str, query_data)
             for row in q:
                 rv.append(row)
             return rv
@@ -10733,11 +10750,10 @@ class BasicSwap(BaseApp):
             query_str = (
                 "SELECT links.strategy_id, strats.label FROM automationlinks links"
                 + " LEFT JOIN automationstrategies strats ON strats.record_id = links.strategy_id"
-                + " WHERE links.linked_type = {} AND links.linked_id = x'{}' AND links.active_ind = 1".format(
-                    int(linked_type), linked_id.hex()
-                )
+                + " WHERE links.linked_type = :linked_type AND links.linked_id = :linked_id AND links.active_ind = 1"
             )
-            q = cursor.execute(query_str).fetchone()
+            query_data: dict = {"linked_type": int(linked_type), "linked_id": linked_id}
+            q = cursor.execute(query_str, query_data).fetchone()
             return q
         finally:
             self.closeDB(cursor, commit=False)

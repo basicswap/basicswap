@@ -14,14 +14,16 @@ def remove_expired_data(self, time_offset: int = 0):
     try:
         cursor = self.openDB()
 
-        active_bids_insert = self.activeBidsQueryStr(now, "", "b2")
+        active_bids_insert: str = self.activeBidsQueryStr("", "b2")
         query_str = f"""
                     SELECT o.offer_id FROM offers o
                     WHERE o.expire_at <= :expired_at AND 0 = (SELECT COUNT(*) FROM bids b2 WHERE b2.offer_id = o.offer_id AND {active_bids_insert})
                     """
         num_offers = 0
         num_bids = 0
-        offer_rows = cursor.execute(query_str, {"expired_at": now - time_offset})
+        offer_rows = cursor.execute(
+            query_str, {"now": now, "expired_at": now - time_offset}
+        )
         for offer_row in offer_rows:
             num_offers += 1
             bid_rows = cursor.execute(

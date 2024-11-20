@@ -39,6 +39,35 @@ def firstOrNone(gen):
     return all_rows[0] if len(all_rows) > 0 else None
 
 
+def validColumnName(name: str) -> bool:
+    if not isinstance(name, str):
+        return False
+    if len(name) < 1:
+        return False
+    # First character must be alpha
+    if not name[0].isalpha():
+        return False
+    # Rest can be alphanumeric or underscores
+    for c in name[1:]:
+        if not c.isalnum() and c != "_":
+            return False
+    return True
+
+
+def getOrderByStr(
+    filters: dict, default_sort_by: str = "created_at", table_name: str = ""
+):
+    sort_by = filters.get("sort_by", default_sort_by)
+    if not validColumnName(sort_by):
+        raise ValueError("Invalid sort by")
+    if table_name != "":
+        sort_by = table_name + "." + sort_by
+    sort_dir = filters.get("sort_dir", "DESC").upper()
+    if sort_dir not in ("ASC", "DESC"):
+        raise ValueError("Invalid sort dir")
+    return f" ORDER BY {sort_by} {sort_dir}"
+
+
 def pack_state(new_state: int, now: int) -> bytes:
     return int(new_state).to_bytes(4, "little") + now.to_bytes(8, "little")
 
@@ -851,6 +880,8 @@ class DBMethods:
         if upsert:
             query += " ON CONFLICT DO UPDATE SET "
             for i, key in enumerate(values):
+                if not validColumnName(key):
+                    raise ValueError(f"Invalid column: {key}")
                 if i > 0:
                     query += ", "
                 query += f"{key}=:{key}"
@@ -858,7 +889,13 @@ class DBMethods:
         cursor.execute(query, values)
 
     def query(
-        self, table_class, cursor, constraints={}, order_by={}, query_suffix=None
+        self,
+        table_class,
+        cursor,
+        constraints={},
+        order_by={},
+        query_suffix=None,
+        extra_query_data={},
     ):
         if cursor is None:
             raise ValueError("Cursor is null")
@@ -883,16 +920,25 @@ class DBMethods:
 
         query += f" FROM {table_name} WHERE 1=1 "
 
-        for ck, cv in constraints.items():
+        for ck in constraints:
+            if not validColumnName(ck):
+                raise ValueError(f"Invalid constraint column: {ck}")
             query += f" AND {ck} = :{ck} "
 
         for order_col, order_dir in order_by.items():
-            query += f" ORDER BY {order_col} {order_dir.upper()}"
+            if validColumnName(order_col) is False:
+                raise ValueError(f"Invalid sort by: {order_col}")
+            order_dir = order_dir.upper()
+            if order_dir not in ("ASC", "DESC"):
+                raise ValueError(f"Invalid sort dir: {order_dir}")
+            query += f" ORDER BY {order_col} {order_dir}"
 
         if query_suffix:
             query += query_suffix
 
-        rows = cursor.execute(query, constraints)
+        query_data = constraints.copy()
+        query_data.update(extra_query_data)
+        rows = cursor.execute(query, query_data)
         for row in rows:
             obj = table_class()
             for i, column_info in enumerate(columns):
