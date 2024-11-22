@@ -6767,9 +6767,9 @@ class BasicSwap(BaseApp):
             cursor = self.openDB()
 
             query = "SELECT action_type, linked_id FROM actions WHERE active_ind = 1 AND trigger_at <= :now"
-            q = cursor.execute(query, {"now": now})
+            rows = cursor.execute(query, {"now": now}).fetchall()
 
-            for row in q:
+            for row in rows:
                 action_type, linked_id = row
                 accepting_bid: bool = False
                 try:
@@ -6801,7 +6801,7 @@ class BasicSwap(BaseApp):
                         accepting_bid = True
                         self.acceptADSReverseBid(linked_id, cursor)
                     else:
-                        self.log.warning("Unknown event type: %d", action_type)
+                        self.log.warning(f"Unknown event type: {action_type}")
                 except Exception as ex:
                     err_msg = f"checkQueuedActions failed: {ex}"
                     self.logException(err_msg)
@@ -7059,7 +7059,7 @@ class BasicSwap(BaseApp):
                 rv = cursor.execute(
                     query_str,
                     {"addr": msg["to"], "use_type": int(AddressTypes.RECV_OFFER)},
-                )[0]
+                ).fetchone()
                 if rv[0] < 1:
                     raise ValueError("Offer received on incorrect address")
 
@@ -10363,18 +10363,20 @@ class BasicSwap(BaseApp):
 
                     # Ensure the latest addresses are displayed
                     coin_name: str = chainparams[coin_id]["name"]
-                    q = cursor.execute(
+                    c2 = self.getNewDBCursor()
+                    q2 = c2.execute(
                         "SELECT key, value FROM kv_string WHERE key = ? OR key = ?",
                         (f"receive_addr_{coin_name}", f"stealth_addr_{coin_name}"),
                     )
-                    for row in q:
-                        if row[0].startswith("stealth"):
+                    for row2 in q2:
+                        if row2[0].startswith("stealth"):
                             if coin_id == Coins.LTC:
-                                wallet_data["mweb_address"] = row[1]
+                                wallet_data["mweb_address"] = row2[1]
                             else:
-                                wallet_data["stealth_address"] = row[1]
+                                wallet_data["stealth_address"] = row2[1]
                         else:
-                            wallet_data["deposit_address"] = row[1]
+                            wallet_data["deposit_address"] = row2[1]
+                    c2.close()
 
                 if coin_id in rv:
                     rv[coin_id].update(wallet_data)

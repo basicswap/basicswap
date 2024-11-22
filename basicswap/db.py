@@ -737,6 +737,10 @@ class DBMethods:
         self._db_con = sqlite3.connect(self.sqlite_file)
         return self._db_con.cursor()
 
+    def getNewDBCursor(self):
+        assert self.mxDB.locked()
+        return self._db_con.cursor()
+
     def commitDB(self):
         assert self.mxDB.locked()
         self._db_con.commit()
@@ -751,6 +755,7 @@ class DBMethods:
         if commit:
             self._db_con.commit()
 
+        cursor.close()
         self._db_con.close()
         self.mxDB.release()
 
