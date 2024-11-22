@@ -7,14 +7,104 @@ const itemsPerPage = 100;
 let lastAppliedFilters = {};
 
 const CACHE_KEY = 'latestPricesCache';
-const CACHE_DURATION = 10 * 60 * 1000; // 10 min
-const MIN_REFRESH_INTERVAL = 30; // 30 sec
+
+const MIN_REFRESH_INTERVAL = 60; // 60 sec
+
+const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes 
+const FALLBACK_CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 
 let jsonData = [];
 let originalJsonData = [];
 let isInitialLoad = true;
 let tableRateModule;
 const isSentOffers = window.offersTableConfig.isSentOffers;
+
+let currentSortColumn = 0;
+let currentSortDirection = 'desc';
+
+const offerCache = {
+    set: (key, value, customTtl = null) => {
+        const item = {
+            value: value,
+            timestamp: Date.now(),
+            expiresAt: Date.now() + (customTtl || CACHE_DURATION)
+        };
+        localStorage.setItem(key, JSON.stringify(item));
+        console.log(`🟢 Cache set for ${key}, expires in ${(customTtl || CACHE_DURATION) / 1000} seconds`);
+        console.log('Cached data:', {
+            key: key,
+            expiresIn: (customTtl || CACHE_DURATION) / 1000,
+            dataSize: typeof value === 'object' ? Object.keys(value).length : 'not an object'
+        });
+    },
+    
+    get: (key) => {
+        const itemStr = localStorage.getItem(key);
+        if (!itemStr) {
+            console.log(`🔴 No cache found for ${key}`);
+            return null;
+        }
+        try {
+            const item = JSON.parse(itemStr);
+            const now = Date.now();
+            if (now < item.expiresAt) {
+                const remainingTime = (item.expiresAt - now) / 1000;
+                console.log(`🟢 Cache hit for ${key}, ${remainingTime.toFixed(1)} seconds remaining`);
+                return {
+                    value: item.value,
+                    remainingTime: item.expiresAt - now
+                };
+            } else {
+                console.log(`🟡 Cache expired for ${key}`);
+                localStorage.removeItem(key);
+            }
+        } catch (e) {
+            console.error('❌ Error parsing cache item:', e);
+            localStorage.removeItem(key);
+        }
+        return null;
+    },
+    
+    isValid: (key) => {
+        const result = offerCache.get(key) !== null;
+        console.log(`🔍 Cache validity check for ${key}: ${result ? 'valid' : 'invalid'}`);
+        return result;
+    },
+    
+    clear: () => {
+        let clearedItems = [];
+        Object.keys(localStorage).forEach(key => {
+            if (key.startsWith('offers_') || key.startsWith('prices_')) {
+                clearedItems.push(key);
+                localStorage.removeItem(key);
+            }
+        });
+        console.log(`🧹 Cache cleared: ${clearedItems.length} items removed`);
+        if (clearedItems.length > 0) {
+            console.log('Cleared items:', clearedItems);
+        }
+    },
+
+    debug: () => {
+        const cacheItems = {};
+        Object.keys(localStorage).forEach(key => {
+            if (key.startsWith('offers_') || key.startsWith('prices_')) {
+                try {
+                    const item = JSON.parse(localStorage.getItem(key));
+                    cacheItems[key] = {
+                        expiresIn: ((item.expiresAt - Date.now()) / 1000).toFixed(1) + ' seconds',
+                        dataSize: typeof item.value === 'object' ? Object.keys(item.value).length : 'not an object'
+                    };
+                } catch (e) {
+                    cacheItems[key] = 'invalid cache item';
+                }
+            }
+        });
+        console.log('📊 Current cache status:', cacheItems);
+        return cacheItems;
+    }
+};
+
 
 const coinNameToSymbol = {
     'Bitcoin': 'bitcoin',
@@ -189,6 +279,47 @@ window.tableRateModule = {
     }
 };
 
+document.querySelectorAll('th[data-sortable="true"]').forEach(header => {
+    header.addEventListener('click', () => {
+        const columnIndex = parseInt(header.getAttribute('data-column-index'));
+        
+        if (currentSortColumn === columnIndex) {
+            currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+
+            currentSortColumn = columnIndex;
+            currentSortDirection = 'desc';
+        }
+
+        document.querySelectorAll('.sort-icon').forEach(icon => {
+            icon.classList.remove('text-blue-500');
+            icon.textContent = '↓';
+        });
+
+        const sortIcon = document.getElementById(`sort-icon-${columnIndex}`);
+        if (sortIcon) {
+            sortIcon.textContent = currentSortDirection === 'asc' ? '↑' : '↓';
+            sortIcon.classList.add('text-blue-500');
+        }
+
+        document.querySelectorAll('th[data-sortable="true"]').forEach(th => {
+            const thColumnIndex = parseInt(th.getAttribute('data-column-index'));
+            if (thColumnIndex === columnIndex) {
+                th.classList.add('text-blue-500');
+            } else {
+                th.classList.remove('text-blue-500');
+            }
+        });
+
+        localStorage.setItem('tableSortColumn', currentSortColumn);
+        localStorage.setItem('tableSortDirection', currentSortDirection);
+        
+        applyFilters();
+    });
+
+    header.classList.add('cursor-pointer', 'hover:bg-gray-100', 'dark:hover:bg-gray-700');
+});
+
 function makePostRequest(url, headers = {}) {
     return new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
@@ -222,6 +353,16 @@ function makePostRequest(url, headers = {}) {
             headers: headers
         }));
     });
+}
+
+function loadSortPreferences() {
+    const savedColumn = localStorage.getItem('tableSortColumn');
+    const savedDirection = localStorage.getItem('tableSortDirection');
+    
+    if (savedColumn !== null) {
+        currentSortColumn = parseInt(savedColumn);
+        currentSortDirection = savedDirection || 'desc';
+    }
 }
 
 function escapeHtml(unsafe) {
@@ -441,8 +582,18 @@ function setRefreshButtonLoading(isLoading) {
 
     refreshButton.disabled = isLoading;
     refreshIcon.classList.toggle('animate-spin', isLoading);
-    refreshText.textContent = isLoading ? 'Refresh' : 'Refresh';
+    refreshText.textContent = isLoading ? 'Refreshing...' : 'Refresh';
+    
+    // Add visual feedback
+    if (isLoading) {
+        refreshButton.classList.add('opacity-75');
+        refreshButton.classList.add('cursor-wait');
+    } else {
+        refreshButton.classList.remove('opacity-75');
+        refreshButton.classList.remove('cursor-wait');
+    }
 }
+
 
 function initializeFlowbiteTooltips() {
     if (typeof Tooltip === 'undefined') {
@@ -596,64 +747,66 @@ function updatePaginationControls(totalPages) {
     totalPagesSpan.textContent = totalPages;
 }
 
-function checkExpiredAndFetchNew() {
+async function checkExpiredAndFetchNew() {
     if (isSentOffers) return Promise.resolve();
     
     console.log('Starting checkExpiredAndFetchNew');
+    const OFFERS_CACHE_KEY = 'offers_received';
     
-    return fetch('/json/offers')
-        .then(response => response.json())
-        .then(data => {
-            let newListings = Array.isArray(data) ? data : Object.values(data);
+    try {
+        const response = await fetch('/json/offers');
+        const data = await response.json();
+        let newListings = Array.isArray(data) ? data : Object.values(data);
 
-            newListings = newListings.map(offer => ({
-                ...offer,
-                offer_id: String(offer.offer_id || ''),
-                swap_type: String(offer.swap_type || 'N/A'),
-                addr_from: String(offer.addr_from || ''),
-                coin_from: String(offer.coin_from || ''),
-                coin_to: String(offer.coin_to || ''),
-                amount_from: String(offer.amount_from || '0'),
-                amount_to: String(offer.amount_to || '0'),
-                rate: String(offer.rate || '0'),
-                created_at: Number(offer.created_at || 0),
-                expire_at: Number(offer.expire_at || 0),
-                is_own_offer: Boolean(offer.is_own_offer),
-                amount_negotiable: Boolean(offer.amount_negotiable),
-                unique_id: `${offer.offer_id}_${offer.created_at}_${offer.coin_from}_${offer.coin_to}`
-            }));
+        newListings = newListings.map(offer => ({
+            ...offer,
+            offer_id: String(offer.offer_id || ''),
+            swap_type: String(offer.swap_type || 'N/A'),
+            addr_from: String(offer.addr_from || ''),
+            coin_from: String(offer.coin_from || ''),
+            coin_to: String(offer.coin_to || ''),
+            amount_from: String(offer.amount_from || '0'),
+            amount_to: String(offer.amount_to || '0'),
+            rate: String(offer.rate || '0'),
+            created_at: Number(offer.created_at || 0),
+            expire_at: Number(offer.expire_at || 0),
+            is_own_offer: Boolean(offer.is_own_offer),
+            amount_negotiable: Boolean(offer.amount_negotiable),
+            unique_id: `${offer.offer_id}_${offer.created_at}_${offer.coin_from}_${offer.coin_to}`
+        }));
 
-            newListings = newListings.filter(offer => !isOfferExpired(offer));
-            originalJsonData = newListings;
+        newListings = newListings.filter(offer => !isOfferExpired(offer));
+        originalJsonData = newListings;
 
-            const currentFilters = new FormData(filterForm);
-            const hasActiveFilters = currentFilters.get('coin_to') !== 'any' || 
-                                   currentFilters.get('coin_from') !== 'any';
-            
-            if (hasActiveFilters) {
-                jsonData = filterAndSortData();
-            } else {
-                jsonData = [...newListings];
-            }
+        cache.set(OFFERS_CACHE_KEY, newListings, CACHE_DURATION);
 
-            updateOffersTable();
-            updateJsonView();
-            updatePaginationInfo();
-            
-            if (jsonData.length === 0) {
-                handleNoOffersScenario();
-            }
+        const currentFilters = new FormData(filterForm);
+        const hasActiveFilters = currentFilters.get('coin_to') !== 'any' || 
+                               currentFilters.get('coin_from') !== 'any';
+        
+        if (hasActiveFilters) {
+            jsonData = filterAndSortData();
+        } else {
+            jsonData = [...newListings];
+        }
 
-            nextRefreshCountdown = getTimeUntilNextExpiration();
-            console.log(`Next refresh in ${nextRefreshCountdown} seconds`);
-            
-            return jsonData.length;
-        })
-        .catch(error => {
-            console.error('Error fetching new listings:', error);
-            nextRefreshCountdown = 60;
-            return Promise.reject(error);
-        });
+        updateOffersTable();
+        updateJsonView();
+        updatePaginationInfo();
+        
+        if (jsonData.length === 0) {
+            handleNoOffersScenario();
+        }
+
+        nextRefreshCountdown = getTimeUntilNextExpiration();
+        console.log(`Next refresh in ${nextRefreshCountdown} seconds`);
+        
+        return jsonData.length;
+    } catch (error) {
+        console.error('Error fetching new listings:', error);
+        nextRefreshCountdown = 60;
+        return Promise.reject(error);
+    }
 }
 
 function createTimeColumn(offer, postedTime, expiresIn) {
@@ -1119,33 +1272,30 @@ function clearFilters() {
 }
 
 async function fetchLatestPrices() {
-    const MAX_RETRIES = 3;
-    const BASE_DELAY = 1000;
+    const PRICES_CACHE_KEY = 'prices_coingecko';
+    const cachedData = offerCache.get(PRICES_CACHE_KEY);
     
-    const cachedData = getCachedPrices();
     if (cachedData) {
-        latestPrices = cachedData;
-        return cachedData;
+        latestPrices = cachedData.value;
+        return cachedData.value;
     }
 
     const url = 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,bitcoin-cash,dash,dogecoin,decred,litecoin,particl,pivx,monero,zano,wownero,zcoin&vs_currencies=USD,BTC';
     
-    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-        try {
-            const data = await makePostRequest(url);
-            if (data && Object.keys(data).length > 0) {
-                latestPrices = data;
-                setCachedPrices(data);
-                // Store as fallback values with 24h expiry
-                Object.entries(data).forEach(([coin, prices]) => {
-                    tableRateModule.setFallbackValue(coin, prices.usd);
-                });
-                return data;
-            }
-        } catch (error) {
-            const delay = Math.min(BASE_DELAY * Math.pow(2, attempt), 10000);
-            await new Promise(resolve => setTimeout(resolve, delay));
+    try {
+        const data = await makePostRequest(url);
+        if (data && Object.keys(data).length > 0) {
+            latestPrices = data;
+            offerCache.set(PRICES_CACHE_KEY, data, CACHE_DURATION);
+
+            Object.entries(data).forEach(([coin, prices]) => {
+                tableRateModule.setFallbackValue(coin, prices.usd);
+            });
+            return data;
         }
+    } catch (error) {
+        console.error('Error fetching prices:', error);
+        return getFallbackPrices();
     }
 
     return getFallbackPrices();
@@ -1167,11 +1317,28 @@ function getFallbackPrices() {
 }
 
 async function fetchOffers(manualRefresh = false) {
-    return new Promise((resolve, reject) => {
+    setRefreshButtonLoading(true);
+    const OFFERS_CACHE_KEY = `offers_${isSentOffers ? 'sent' : 'received'}`;
+    
+    if (!manualRefresh) {
+        const cachedData = offerCache.get(OFFERS_CACHE_KEY);
+        if (cachedData) {
+            console.log('Using cached offers data');
+            jsonData = cachedData.value;
+            originalJsonData = [...cachedData.value];
+            updateOffersTable();
+            updateJsonView();
+            updatePaginationInfo();
+            setRefreshButtonLoading(false);
+            return;
+        }
+    }
+
+    try {
         const endpoint = isSentOffers ? '/json/sentoffers' : '/json/offers';
         console.log(`[Debug] Fetching from endpoint: ${endpoint}`);
         
-        fetch(endpoint, {
+        const response = await fetch(endpoint, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1180,55 +1347,54 @@ async function fetchOffers(manualRefresh = false) {
                 with_extra_info: true,
                 limit: 1000
             })
-        })
-        .then(response => response.json())
-        .then(data => {
-            console.log('[Debug] Raw data received:', data);
-            
-            let newData = Array.isArray(data) ? data : Object.values(data);
-            
-            newData = newData.map(offer => ({
-                ...offer,
-                offer_id: String(offer.offer_id || ''),
-                swap_type: String(offer.swap_type || 'N/A'),
-                addr_from: String(offer.addr_from || ''),
-                coin_from: String(offer.coin_from || ''),
-                coin_to: String(offer.coin_to || ''),
-                amount_from: String(offer.amount_from || '0'),
-                amount_to: String(offer.amount_to || '0'),
-                rate: String(offer.rate || '0'),
-                created_at: Number(offer.created_at || 0),
-                expire_at: Number(offer.expire_at || 0),
-                is_own_offer: Boolean(offer.is_own_offer),
-                amount_negotiable: Boolean(offer.amount_negotiable),
-                is_revoked: Boolean(offer.is_revoked),
-                unique_id: `${offer.offer_id}_${offer.created_at}_${offer.coin_from}_${offer.coin_to}`
-            }));
-            
-            if (isInitialLoad || manualRefresh) {
-                jsonData = newData;
-                originalJsonData = [...newData];
-            } else {
-                const mergedData = mergeSentOffers(jsonData, newData);
-                jsonData = mergedData;
-                originalJsonData = [...mergedData];
-            }
-
-            if (newEntriesCountSpan) {
-                newEntriesCountSpan.textContent = jsonData.length;
-            }
-
-            updateOffersTable();
-            updateJsonView();
-            updatePaginationInfo();
-            
-            resolve();
-        })
-        .catch(error => {
-            console.error('[Debug] Error fetching offers:', error);
-            reject(error);
         });
-    });
+        
+        const data = await response.json();
+        let newData = Array.isArray(data) ? data : Object.values(data);
+        
+        newData = newData.map(offer => ({
+            ...offer,
+            offer_id: String(offer.offer_id || ''),
+            swap_type: String(offer.swap_type || 'N/A'),
+            addr_from: String(offer.addr_from || ''),
+            coin_from: String(offer.coin_from || ''),
+            coin_to: String(offer.coin_to || ''),
+            amount_from: String(offer.amount_from || '0'),
+            amount_to: String(offer.amount_to || '0'),
+            rate: String(offer.rate || '0'),
+            created_at: Number(offer.created_at || 0),
+            expire_at: Number(offer.expire_at || 0),
+            is_own_offer: Boolean(offer.is_own_offer),
+            amount_negotiable: Boolean(offer.amount_negotiable),
+            is_revoked: Boolean(offer.is_revoked),
+            unique_id: `${offer.offer_id}_${offer.created_at}_${offer.coin_from}_${offer.coin_to}`
+        }));
+
+        if (isInitialLoad || manualRefresh) {
+            jsonData = newData;
+            originalJsonData = [...newData];
+        } else {
+            const mergedData = mergeSentOffers(jsonData, newData);
+            jsonData = mergedData;
+            originalJsonData = [...mergedData];
+        }
+
+        // Cache the new data
+        offerCache.set(OFFERS_CACHE_KEY, jsonData, CACHE_DURATION);
+
+        if (newEntriesCountSpan) {
+            newEntriesCountSpan.textContent = jsonData.length;
+        }
+
+        updateOffersTable();
+        updateJsonView();
+        updatePaginationInfo();
+        
+    } catch (error) {
+        console.error('[Debug] Error fetching offers:', error);
+    } finally {
+        setRefreshButtonLoading(false);
+    }
 }
 
 function mergeSentOffers(existingOffers, newOffers) {
@@ -1318,7 +1484,51 @@ function filterAndSortData() {
 
         return true;
     });
+
+    if (currentSortColumn !== null) {
+        filteredData.sort((a, b) => {
+            let comparison = 0;
+            
+            switch(currentSortColumn) {
+                case 0: // Time
+                    comparison = a.created_at - b.created_at;
+                    break;
+                case 5: // Rate
+                    comparison = parseFloat(a.rate) - parseFloat(b.rate);
+                    break;
+                case 6: // Market +/-
+                    // Calculate market differences for comparison
+                    const aFromSymbol = getCoinSymbolLowercase(a.coin_from);
+                    const aToSymbol = getCoinSymbolLowercase(a.coin_to);
+                    const bFromSymbol = getCoinSymbolLowercase(b.coin_from);
+                    const bToSymbol = getCoinSymbolLowercase(b.coin_to);
+                    
+                    const aFromPrice = latestPrices[aFromSymbol]?.usd || 0;
+                    const aToPrice = latestPrices[aToSymbol]?.usd || 0;
+                    const bFromPrice = latestPrices[bFromSymbol]?.usd || 0;
+                    const bToPrice = latestPrices[bToSymbol]?.usd || 0;
+                    
+                    const aMarketRate = aToPrice / aFromPrice;
+                    const bMarketRate = bToPrice / bFromPrice;
+                    
+                    const aOfferedRate = parseFloat(a.rate);
+                    const bOfferedRate = parseFloat(b.rate);
+                    
+                    const aPercentDiff = ((aOfferedRate - aMarketRate) / aMarketRate) * 100;
+                    const bPercentDiff = ((bOfferedRate - bMarketRate) / bMarketRate) * 100;
+                    
+                    comparison = aPercentDiff - bPercentDiff;
+                    break;
+                case 7: // Trade
+                    comparison = a.offer_id.localeCompare(b.offer_id);
+                    break;
+            }
+            
+            return currentSortDirection === 'desc' ? -comparison : comparison;
+        });
+    }
     
+    console.log(`[Debug] Filtered data length: ${filteredData.length}`);
     return filteredData;
 }
 
@@ -1675,11 +1885,13 @@ document.addEventListener('DOMContentLoaded', () => {
         updateCoinFilterImages();
     });
 
-    document.getElementById('refreshOffers').addEventListener('click', () => {
-        console.log('Refresh button clicked');
-        fetchOffers(true);
-    });
-
+document.getElementById('refreshOffers').addEventListener('click', () => {
+    console.log('🔄 Refresh button clicked');
+    console.log('Clearing cache before refresh...');
+    offerCache.clear();
+    console.log('Fetching fresh data...');
+    fetchOffers(true);
+});
     toggleButton.addEventListener('click', () => {
         tableView.classList.toggle('hidden');
         jsonView.classList.toggle('hidden');
