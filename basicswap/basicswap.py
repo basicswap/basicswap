@@ -10363,11 +10363,11 @@ class BasicSwap(BaseApp):
 
                     # Ensure the latest addresses are displayed
                     coin_name: str = chainparams[coin_id]["name"]
-                    q = cursor.execute(
+                    qi = cursor.execute(
                         "SELECT key, value FROM kv_string WHERE key = ? OR key = ?",
                         (f"receive_addr_{coin_name}", f"stealth_addr_{coin_name}"),
                     )
-                    for row in q:
+                    for row in qi:
                         if row[0].startswith("stealth"):
                             if coin_id == Coins.LTC:
                                 wallet_data["mweb_address"] = row[1]
