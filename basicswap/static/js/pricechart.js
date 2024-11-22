@@ -28,7 +28,7 @@ const config = {
     }
   },
   showVolume: false,
-  cacheTTL: 10 * 60 * 1000, // 10 minutes in milliseconds
+  cacheTTL: 5 * 60 * 1000, // 5 minutes in milliseconds
   specialCoins: [''],
   resolutions: {
     year: { days: 365, interval: 'month' },

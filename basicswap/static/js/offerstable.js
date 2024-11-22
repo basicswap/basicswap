@@ -10,7 +10,7 @@ const CACHE_KEY = 'latestPricesCache';
 
 const MIN_REFRESH_INTERVAL = 60; // 60 sec
 
-const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes 
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes 
 const FALLBACK_CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 
 let jsonData = [];
