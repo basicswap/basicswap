@@ -115,9 +115,11 @@ def page_automation_strategy(self, url_split, post_string):
             show_edit_form = True
         if have_data_entry(form_data, "apply"):
             try:
-                data = json.loads(get_data_entry_or(form_data, "data", ""))
-                note = get_data_entry_or(form_data, "note", "")
-                swap_client.updateAutomationStrategy(strategy_id, data, note)
+                data = {
+                    "data": json.loads(get_data_entry_or(form_data, "data", "")),
+                    "note": get_data_entry_or(form_data, "note", ""),
+                }
+                swap_client.updateAutomationStrategy(strategy_id, data)
                 messages.append("Updated")
             except Exception as e:
                 err_messages.append(str(e))

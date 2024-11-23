@@ -551,7 +551,7 @@ class AutomationStrategy(Table):
     label = Column("string")
     type_ind = Column("integer")
     only_known_identities = Column("integer")
-    num_concurrent = Column("integer")
+    num_concurrent = Column("integer")  # Deprecated, use data["max_concurrent"]
     data = Column("blob")
 
     note = Column("string")

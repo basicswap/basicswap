@@ -718,6 +718,8 @@ def js_automationstrategies(self, url_split, post_string: str, is_json: bool) ->
         "sort_dir": "desc",
     }
 
+    strat_id = int(url_split[3]) if len(url_split) > 3 else None
+
     if post_string != "":
         post_data = getFormData(post_string, is_json)
 
@@ -738,15 +740,36 @@ def js_automationstrategies(self, url_split, post_string: str, is_json: bool) ->
                 filters["limit"] > 0 and filters["limit"] <= PAGE_LIMIT
             ), "Invalid limit"
 
-    if len(url_split) > 3:
-        strat_id = int(url_split[3])
+        set_data = {}
+        if have_data_entry(post_data, "set_label"):
+            set_data["label"] = get_data_entry(post_data, "set_label")
+        if have_data_entry(post_data, "set_data"):
+            set_data["data"] = json.loads(get_data_entry(post_data, "set_data"))
+        if have_data_entry(post_data, "set_note"):
+            set_data["note"] = get_data_entry(post_data, "set_note")
+        if have_data_entry(post_data, "set_only_known_identities"):
+            set_data["only_known_identities"] = get_data_entry(
+                post_data, "set_only_known_identities"
+            )
+
+        if have_data_entry(post_data, "set_max_concurrent_bids"):
+            if "data" in set_data:
+                raise ValueError("set_max_concurrent_bids can't be used with set_data")
+            set_data["set_max_concurrent_bids"] = int(
+                get_data_entry(post_data, "set_max_concurrent_bids")
+            )
+
+        if set_data:
+            ensure(strat_id is not None, "Must specify a strategy to modify")
+            swap_client.updateAutomationStrategy(strat_id, set_data)
+
+    if strat_id is not None:
         strat_data = swap_client.getAutomationStrategy(strat_id)
         rv = {
             "record_id": strat_data.record_id,
             "label": strat_data.label,
             "type_ind": strat_data.type_ind,
             "only_known_identities": strat_data.only_known_identities,
-            "num_concurrent": strat_data.num_concurrent,
             "data": json.loads(strat_data.data.decode("utf-8")),
             "note": "" if strat_data.note is None else strat_data.note,
         }

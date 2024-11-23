@@ -131,14 +131,29 @@ def clear_offers(delay_event, node_id) -> None:
     raise ValueError("clear_offers failed")
 
 
-def wait_for_offers(delay_event, node_id, num_offers) -> None:
+def wait_for_offers(delay_event, node_id, num_offers, offer_id=None) -> None:
     logging.info(f"Waiting for {num_offers} offers on node {node_id}")
     for i in range(20):
         delay_event.wait(1)
-        offers = read_json_api(UI_PORT + node_id, "offers")
+        offers = read_json_api(
+            UI_PORT + node_id, "offers" if offer_id is None else f"offers/{offer_id}"
+        )
         if len(offers) >= num_offers:
             return
     raise ValueError("wait_for_offers failed")
+
+
+def wait_for_bids(delay_event, node_id, num_bids, offer_id=None) -> None:
+    logging.info(f"Waiting for {num_bids} bids on node {node_id}")
+    for i in range(20):
+        delay_event.wait(1)
+        if offer_id is not None:
+            bids = read_json_api(UI_PORT + node_id, "bids", {"offer_id": offer_id})
+        else:
+            bids = read_json_api(UI_PORT + node_id, "bids")
+        if len(bids) >= num_bids:
+            return bids
+    raise ValueError("wait_for_bids failed")
 
 
 def delete_file(filepath: str) -> None:
@@ -880,6 +895,126 @@ class Test(unittest.TestCase):
         assert math.isclose(float(bid["bid_rate"]), 0.05)
         assert math.isclose(float(bid["amt_from"]), 21.0)
         assert bid["addr_from"] == addr_bid_from
+
+    def test_auto_accept(self):
+
+        waitForServer(self.delay_event, UI_PORT + 0)
+        waitForServer(self.delay_event, UI_PORT + 1)
+
+        logging.info("Reset test")
+        clear_offers(self.delay_event, 0)
+        delete_file(self.node0_statefile)
+        delete_file(self.node1_statefile)
+        wait_for_offers(self.delay_event, 1, 0)
+
+        logging.info("Prepare node 2 balance")
+        node2_xmr_wallet = read_json_api(UI_PORT + 2, "wallets/xmr")
+        node2_xmr_wallet_balance = float(node2_xmr_wallet["balance"])
+        expect_balance = 300.0
+        if node2_xmr_wallet_balance < expect_balance:
+            post_json = {
+                "value": expect_balance,
+                "address": node2_xmr_wallet["deposit_address"],
+                "sweepall": False,
+            }
+            json_rv = read_json_api(UI_PORT + 1, "wallets/xmr/withdraw", post_json)
+            assert len(json_rv["txid"]) == 64
+            wait_for_balance(
+                self.delay_event,
+                f"http://127.0.0.1:{UI_PORT + 2}/json/wallets/xmr",
+                "balance",
+                expect_balance,
+            )
+
+        # Try post bids at the same time
+        from multiprocessing import Process
+
+        def postBid(node_from, offer_id, amount):
+            post_json = {"offer_id": offer_id, "amount_from": amount}
+            read_json_api(UI_PORT + node_from, "bids/new", post_json)
+
+        def test_bid_pair(amount_1, amount_2, expect_inactive, delay_event):
+            logging.debug(f"test_bid_pair {amount_1} {amount_2}, {expect_inactive}")
+
+            wait_for_balance(
+                self.delay_event,
+                f"http://127.0.0.1:{UI_PORT + 2}/json/wallets/xmr",
+                "balance",
+                100.0,
+            )
+
+            offer_json = {
+                "coin_from": "btc",
+                "coin_to": "xmr",
+                "amt_from": 10.0,
+                "amt_to": 100.0,
+                "amt_var": True,
+                "lockseconds": 3600,
+                "automation_strat_id": 1,
+            }
+            offer_id = read_json_api(UI_PORT + 0, "offers/new", offer_json)["offer_id"]
+            logging.debug(f"offer_id {offer_id}")
+
+            wait_for_offers(self.delay_event, 1, 1, offer_id)
+            wait_for_offers(self.delay_event, 2, 1, offer_id)
+
+            pbid1 = Process(target=postBid, args=(1, offer_id, amount_1))
+            pbid2 = Process(target=postBid, args=(2, offer_id, amount_2))
+
+            pbid1.start()
+            pbid2.start()
+            pbid1.join()
+            pbid2.join()
+
+            for i in range(5):
+                logging.info("Waiting for bids to settle")
+
+                delay_event.wait(8)
+                bids = wait_for_bids(self.delay_event, 0, 2, offer_id)
+
+                if any(bid["bid_state"] == "Receiving" for bid in bids):
+                    continue
+                break
+
+            num_received_state = 0
+            for bid in bids:
+                if bid["bid_state"] == "Received":
+                    num_received_state += 1
+            assert num_received_state == expect_inactive
+
+        # Bids with a combined value less than the offer value should both be accepted
+        test_bid_pair(1.1, 1.2, 0, self.delay_event)
+
+        # Only one bid of bids with a combined value greater than the offer value should be accepted
+        test_bid_pair(1.1, 9.2, 1, self.delay_event)
+
+        logging.debug("Change max_concurrent_bids to 1")
+        try:
+            json_rv = read_json_api(UI_PORT + 0, "automationstrategies/1")
+            assert json_rv["data"]["max_concurrent_bids"] == 5
+
+            data = json_rv["data"]
+            data["max_concurrent_bids"] = 1
+            post_json = {
+                "set_label": "changed",
+                "set_note": "changed",
+                "set_data": json.dumps(data),
+            }
+            json_rv = read_json_api(UI_PORT + 0, "automationstrategies/1", post_json)
+            assert json_rv["data"]["max_concurrent_bids"] == 1
+            assert json_rv["label"] == "changed"
+            assert json_rv["note"] == "changed"
+
+            # Only one bid should be active
+            test_bid_pair(1.1, 1.2, 1, self.delay_event)
+
+        finally:
+            logging.debug("Reset max_concurrent_bids")
+            post_json = {
+                "set_max_concurrent_bids": 5,
+            }
+            json_rv = read_json_api(UI_PORT + 0, "automationstrategies/1", post_json)
+            assert json_rv["data"]["max_concurrent_bids"] == 5
 
 
 if __name__ == "__main__":

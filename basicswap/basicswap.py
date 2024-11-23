@@ -937,7 +937,9 @@ class BasicSwap(BaseApp):
     def start(self):
         import platform
 
-        self.log.info(f"Starting BasicSwap {__version__}, database v{self.db_version}\n\n")
+        self.log.info(
+            f"Starting BasicSwap {__version__}, database v{self.db_version}\n\n"
+        )
         self.log.info(f"Python version: {platform.python_version()}")
         self.log.info(f"SQLite version: {sqlite3.sqlite_version}")
         self.log.info(f"Timezone offset: {time.timezone} ({time.tzname[0]})")
@@ -7308,6 +7310,9 @@ class BasicSwap(BaseApp):
                 if active_bid[2] != BidStates.SWAP_COMPLETED:
                     num_not_completed += 1
             max_concurrent_bids = opts.get("max_concurrent_bids", 1)
+            self.log.debug(
+                f"active_bids {num_not_completed}, max_concurrent_bids {max_concurrent_bids}"
+            )
             if num_not_completed >= max_concurrent_bids:
                 raise AutomationConstraint(
                     "Already have {} bids to complete".format(num_not_completed)
@@ -10524,6 +10529,7 @@ class BasicSwap(BaseApp):
             if filter_bid_id is not None:
                 query_str += "AND bids.bid_id = :filter_bid_id "
                 query_data["filter_bid_id"] = filter_bid_id
+
             if offer_id is not None:
                 query_str += "AND bids.offer_id = :filter_offer_id "
                 query_data["filter_offer_id"] = offer_id
@@ -10734,14 +10740,37 @@ class BasicSwap(BaseApp):
         finally:
             self.closeDB(cursor, commit=False)
 
-    def updateAutomationStrategy(self, strategy_id: int, data, note: str) -> None:
+    def updateAutomationStrategy(self, strategy_id: int, data: dict) -> None:
+        self.log.debug(f"updateAutomationStrategy {strategy_id}")
         try:
             cursor = self.openDB()
             strategy = firstOrNone(
                 self.query(AutomationStrategy, cursor, {"record_id": strategy_id})
             )
-            strategy.data = json.dumps(data).encode("utf-8")
-            strategy.note = note
+            if "data" in data:
+                strategy.data = json.dumps(data["data"]).encode("utf-8")
+                self.log.debug("data {}".format(data["data"]))
+            if "note" in data:
+                strategy.note = data["note"]
+            if "label" in data:
+                strategy.label = data["label"]
+            if "only_known_identities" in data:
+                strategy.only_known_identities = int(data["only_known_identities"])
+
+            if "set_max_concurrent_bids" in data:
+                new_max_concurrent_bids = data["set_max_concurrent_bids"]
+                ensure(
+                    isinstance(new_max_concurrent_bids, int),
+                    "set_max_concurrent_bids must be an integer",
+                )
+                strategy_data = (
+                    {}
+                    if strategy.data is None
+                    else json.loads(strategy.data.decode("utf-8"))
+                )
+                strategy_data["max_concurrent_bids"] = new_max_concurrent_bids
+                strategy.data = json.dumps(strategy_data).encode("utf-8")
+
             self.updateDB(strategy, cursor, ["record_id"])
         finally:
             self.closeDB(cursor)
