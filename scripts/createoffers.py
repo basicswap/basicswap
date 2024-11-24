@@ -374,6 +374,20 @@ def main():
                 wallet_from = read_json_api_wallet(
                     "wallets/{}".format(coin_from_data["ticker"])
                 )
+                coin_ticker = coin_from_data["ticker"]
+                if coin_ticker=="PART" and "variant" in coin_from_data:
+                    coin_variant = coin_from_data["variant"]
+                    if coin_variant == "Anon":
+                        coin_from_data_name = "PART_ANON"
+                        wallet_balance: float = float(wallet_from["anon_balance"])
+                    elif coin_variant == "Blind":
+                        coin_from_data_name = "PART_BLIND"
+                        wallet_balance: float = float(wallet_from["blind_balance"])
+                    else:
+                        raise ValueError(f"{coin_ticker} variant {coin_variant} not handled")
+                else:
+                    coin_from_data_name = coin_ticker
+                    wallet_balance: float = float(wallet_from["balance"])
 
                 for offer in sent_offers:
                     created_offers = script_state.get("offers", {})
@@ -390,7 +404,7 @@ def main():
                         None,
                     ):
                         offers_found += 1
-                        if float(wallet_from["balance"]) <= float(
+                        if wallet_balance <= float(
                             offer_template["min_coin_from_amt"]
                         ):
                             offer_id = offer["offer_id"]
@@ -409,7 +423,7 @@ def main():
                 min_offer_amount: float = offer_template.get(
                     "amount_step", max_offer_amount
                 )
-                wallet_balance: float = float(wallet_from["balance"])
+                
                 min_wallet_from_amount: float = float(
                     offer_template["min_coin_from_amt"]
                 )
@@ -471,7 +485,7 @@ def main():
                     "addr_from": (
                         -1 if template_from_addr == "auto" else template_from_addr
                     ),
-                    "coin_from": coin_from_data["ticker"],
+                    "coin_from": coin_from_data_name,
                     "coin_to": coin_to_data["ticker"],
                     "amt_from": offer_amount,
                     "amt_var": offer_template["amount_variable"],
