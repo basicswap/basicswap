@@ -436,6 +436,7 @@ def runClient(fp, data_dir, chain, start_only_coins):
 
         signal.signal(signal.SIGINT, signal_handler)
         signal.signal(signal.SIGTERM, signal_handler)
+        signal.signal(signal.SIGHUP, signal_handler)
 
         if len(start_only_coins) > 0:
             logger.info(
