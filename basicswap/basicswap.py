@@ -7010,7 +7010,9 @@ class BasicSwap(BaseApp):
             offer_data.swap_type, coin_from, coin_to, offer_data.time_valid
         )
 
-        ensure(msg["sent"] + offer_data.time_valid >= now, "Offer expired")
+        if msg["sent"] + offer_data.time_valid >= now:
+            self.log.debug("Ignoring expired offer.")
+            return
 
         offer_rate: int = ci_from.make_int(
             offer_data.amount_to / offer_data.amount_from, r=1
