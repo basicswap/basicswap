@@ -6998,7 +6998,7 @@ class BasicSwap(BaseApp):
             offer_data.swap_type, coin_from, coin_to, offer_data.time_valid
         )
 
-        if msg["sent"] + offer_data.time_valid >= now:
+        if msg["sent"] + offer_data.time_valid < now:
             self.log.debug("Ignoring expired offer.")
             return
 
