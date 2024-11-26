@@ -900,6 +900,7 @@ class Test(unittest.TestCase):
 
         waitForServer(self.delay_event, UI_PORT + 0)
         waitForServer(self.delay_event, UI_PORT + 1)
+        waitForServer(self.delay_event, UI_PORT + 2)
 
         logging.info("Reset test")
         clear_offers(self.delay_event, 0)
@@ -926,6 +927,13 @@ class Test(unittest.TestCase):
                 expect_balance,
             )
 
+        inactive_states = (
+            "Received",
+            "Completed",
+            "Auto accept failed",
+            "Auto accept delay",
+        )
+
         # Try post bids at the same time
         from multiprocessing import Process
 
@@ -933,8 +941,12 @@ class Test(unittest.TestCase):
             post_json = {"offer_id": offer_id, "amount_from": amount}
             read_json_api(UI_PORT + node_from, "bids/new", post_json)
 
-        def test_bid_pair(amount_1, amount_2, expect_inactive, delay_event):
-            logging.debug(f"test_bid_pair {amount_1} {amount_2}, {expect_inactive}")
+        def test_bid_pair(
+            amount_1, amount_2, max_active, delay_event, final_completed=None
+        ):
+            logging.debug(
+                f"test_bid_pair {amount_1} {amount_2}, {max_active}, {final_completed}"
+            )
 
             wait_for_balance(
                 self.delay_event,
@@ -966,6 +978,31 @@ class Test(unittest.TestCase):
             pbid1.join()
             pbid2.join()
 
+            if final_completed is not None:
+                # bids should complete
+
+                logging.info("Waiting for bids to settle")
+                for i in range(50):
+
+                    delay_event.wait(5)
+                    bids = wait_for_bids(self.delay_event, 0, 2, offer_id)
+
+                    if any(bid["bid_state"] == "Receiving" for bid in bids):
+                        continue
+
+                    logging.info(f"[rm] bids {bids}")
+                    num_active_state = 0
+                    num_completed = 0
+                    for bid in bids:
+                        if bid["bid_state"] == "Completed":
+                            num_completed += 1
+                        if bid["bid_state"] not in inactive_states:
+                            num_active_state += 1
+                    assert num_active_state <= max_active
+                    if num_completed == final_completed:
+                        return
+                raise ValueError(f"Failed to complete {num_completed} bids {bids}")
+
             for i in range(5):
                 logging.info("Waiting for bids to settle")
 
@@ -974,16 +1011,18 @@ class Test(unittest.TestCase):
 
                 if any(bid["bid_state"] == "Receiving" for bid in bids):
                     continue
+
+                logging.info(f"[rm] bids {bids}")
                 break
 
-            num_received_state = 0
+            num_active_state = 0
             for bid in bids:
-                if bid["bid_state"] == "Received":
-                    num_received_state += 1
-            assert num_received_state == expect_inactive
+                if bid["bid_state"] not in inactive_states:
+                    num_active_state += 1
+            assert num_active_state == max_active
 
         # Bids with a combined value less than the offer value should both be accepted
-        test_bid_pair(1.1, 1.2, 0, self.delay_event)
+        test_bid_pair(1.1, 1.2, 2, self.delay_event)
 
         # Only one bid of bids with a combined value greater than the offer value should be accepted
         test_bid_pair(1.1, 9.2, 1, self.delay_event)
@@ -1006,7 +1045,7 @@ class Test(unittest.TestCase):
             assert json_rv["note"] == "changed"
 
             # Only one bid should be active
-            test_bid_pair(1.1, 1.2, 1, self.delay_event)
+            test_bid_pair(1.1, 1.2, 1, self.delay_event, 2)
 
         finally:
             logging.debug("Reset max_concurrent_bids")

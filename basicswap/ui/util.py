@@ -20,6 +20,7 @@ from basicswap.basicswap_util import (
     ActionTypes,
     BidStates,
     DebugTypes,
+    canAcceptBidState,
     getLastBidState,
     strBidState,
     strTxState,
@@ -258,7 +259,7 @@ def describeBid(
         if bid.state == BidStates.BID_RECEIVING:
             # Offerer receiving bid from bidder
             state_description = "Waiting for bid to be fully received"
-        elif bid.state == BidStates.BID_RECEIVED:
+        elif canAcceptBidState(bid.state):
             # Offerer received bid from bidder
             # TODO: Manual vs automatic
             state_description = "Bid must be accepted"
@@ -270,7 +271,7 @@ def describeBid(
             )
         elif bid.state == BidStates.SWAP_DELAYING:
             last_state = getLastBidState(bid.states)
-            if last_state == BidStates.BID_RECEIVED:
+            if canAcceptBidState(last_state):
                 state_description = "Delaying before accepting bid"
             elif last_state == BidStates.BID_RECEIVING_ACC:
                 state_description = "Delaying before responding to accepted bid"

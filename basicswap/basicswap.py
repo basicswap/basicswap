@@ -35,6 +35,7 @@ from .rpc_xmr import make_xmr_rpc2_func
 from .ui.util import getCoinName, known_chart_coins
 from .util import (
     AutomationConstraint,
+    AutomationConstraintTemporary,
     LockedCoinError,
     TemporaryError,
     InactiveCoin,
@@ -125,25 +126,26 @@ from .basicswap_util import (
     AutomationOverrideOptions,
     BidStates,
     DebugTypes,
-    describeEventEntry,
     EventLogTypes,
-    getLastBidState,
-    getOfferProofOfFundsHash,
-    getVoutByAddress,
-    getVoutByScriptPubKey,
-    inactive_states,
-    isActiveBidState,
     KeyTypes,
     MessageTypes,
     NotificationTypes as NT,
     OfferStates,
-    strBidState,
     SwapTypes,
     TxLockTypes,
     TxStates,
     TxTypes,
     VisibilityOverrideOptions,
     XmrSplitMsgTypes,
+    canAcceptBidState,
+    describeEventEntry,
+    getLastBidState,
+    getOfferProofOfFundsHash,
+    getVoutByAddress,
+    getVoutByScriptPubKey,
+    inactive_states,
+    isActiveBidState,
+    strBidState,
 )
 from basicswap.db_util import (
     remove_expired_data,
@@ -307,8 +309,12 @@ class BasicSwap(BaseApp):
         self.check_watched_seconds = self.get_int_setting(
             "check_watched_seconds", 60, 1, 10 * 60
         )
-        self.check_xmr_swaps_seconds = self.get_int_setting(
-            "check_xmr_swaps_seconds", 20, 1, 10 * 60
+        self.check_split_messages_seconds = self.get_int_setting(
+            "check_split_messages_seconds", 20, 1, 10 * 60
+        )
+        # Retry auto accept for bids at BID_AACCEPT_DELAY, also updates when bids complete
+        self.check_delayed_auto_accept_seconds = self.get_int_setting(
+            "check_delayed_auto_accept_seconds", 60, 1, 20 * 60
         )
         self.startup_tries = self.get_int_setting(
             "startup_tries", 21, 1, 100
@@ -321,7 +327,8 @@ class BasicSwap(BaseApp):
         self._last_checked_progress = 0
         self._last_checked_smsg = 0
         self._last_checked_watched = 0
-        self._last_checked_xmr_swaps = 0
+        self._last_checked_split_messages = 0
+        self._last_checked_delayed_auto_accept = 0
         self._possibly_revoked_offers = collections.deque(
             [], maxlen=48
         )  # TODO: improve
@@ -409,7 +416,6 @@ class BasicSwap(BaseApp):
             bytes.fromhex(self.network_pubkey),
         )
 
-        self.db_echo: bool = self.settings.get("db_echo", False)
         self.sqlite_file: str = os.path.join(
             self.data_dir,
             "db{}.sqlite".format("" if self.chain == "mainnet" else ("_" + self.chain)),
@@ -3229,7 +3235,7 @@ class BasicSwap(BaseApp):
             now: int = self.getTime()
             ensure(bid.expire_at > now, "Bid expired")
             ensure(
-                bid.state in (BidStates.BID_RECEIVED,),
+                canAcceptBidState(bid.state),
                 "Wrong bid state: {}".format(BidStates(bid.state).name),
             )
 
@@ -3688,7 +3694,7 @@ class BasicSwap(BaseApp):
                 last_bid_state = getLastBidState(bid.states)
 
             ensure(
-                last_bid_state == BidStates.BID_RECEIVED,
+                canAcceptBidState(last_bid_state),
                 "Wrong bid state: {}".format(str(BidStates(last_bid_state))),
             )
 
@@ -3990,7 +3996,7 @@ class BasicSwap(BaseApp):
                 last_bid_state = getLastBidState(bid.states)
 
             ensure(
-                last_bid_state == BidStates.BID_RECEIVED,
+                canAcceptBidState(last_bid_state),
                 "Wrong bid state: {}".format(str(BidStates(last_bid_state))),
             )
 
@@ -6790,12 +6796,12 @@ class BasicSwap(BaseApp):
                             if (
                                 bid
                                 and bid.state == BidStates.SWAP_DELAYING
-                                and last_state == BidStates.BID_RECEIVED
+                                and canAcceptBidState(last_state)
                             ):
                                 new_state = (
                                     BidStates.BID_ERROR
                                     if offer.bid_reversed
-                                    else BidStates.BID_RECEIVED
+                                    else last_state
                                 )
                                 bid.setState(new_state)
                                 self.saveBidInSession(bid_id, bid, cursor)
@@ -6819,7 +6825,8 @@ class BasicSwap(BaseApp):
         if reload_in_progress:
             self.loadFromDB()
 
-    def checkXmrSwaps(self) -> None:
+    def checkSplitMessages(self) -> None:
+        # Combines split data messages
         now: int = self.getTime()
         ttl_xmr_split_messages = 60 * 60
         bid_cursor = None
@@ -6928,6 +6935,27 @@ class BasicSwap(BaseApp):
             )
         finally:
             self.closeDBCursor(bid_cursor)
+            self.closeDB(cursor)
+
+    def checkDelayedAutoAccept(self) -> None:
+        bids_cursor = None
+        try:
+            cursor = self.openDB()
+            bids_cursor = self.getNewDBCursor()
+            for bid in self.query(
+                Bid, bids_cursor, {"state": int(BidStates.BID_AACCEPT_DELAY)}
+            ):
+                offer = self.getOffer(bid.offer_id, cursor=cursor)
+                if self.shouldAutoAcceptBid(offer, bid, cursor=cursor):
+                    delay = self.get_delay_event_seconds()
+                    self.log.info(
+                        "Auto accepting bid %s in %d seconds", bid.bid_id.hex(), delay
+                    )
+                    self.createActionInSession(
+                        delay, ActionTypes.ACCEPT_BID, bid.bid_id, cursor
+                    )
+        finally:
+            self.closeDBCursor(bids_cursor)
             self.closeDB(cursor)
 
     def processOffer(self, msg) -> None:
@@ -7222,6 +7250,10 @@ class BasicSwap(BaseApp):
         try:
             use_cursor = self.openDB(cursor)
 
+            if self.countQueuedActions(use_cursor, bid.bid_id, ActionTypes.ACCEPT_BID):
+                # Bid is already queued to be accepted
+                return False
+
             link = self.queryOne(
                 AutomationLink,
                 use_cursor,
@@ -7249,6 +7281,12 @@ class BasicSwap(BaseApp):
                 bid_rate = options.get("bid_rate")
 
             self.log.debug("Evaluating against strategy {}".format(strategy.record_id))
+
+            now: int = self.getTime()
+            if bid.expire_at < now:
+                raise AutomationConstraint(
+                    "Bid expired"
+                )  # State will be set to expired in expireBidsAndOffers
 
             if not offer.amount_negotiable:
                 if bid_amount != offer.amount_from:
@@ -7287,7 +7325,7 @@ class BasicSwap(BaseApp):
                 f"active_bids {num_not_completed}, max_concurrent_bids {max_concurrent_bids}"
             )
             if num_not_completed >= max_concurrent_bids:
-                raise AutomationConstraint(
+                raise AutomationConstraintTemporary(
                     "Already have {} bids to complete".format(num_not_completed)
                 )
 
@@ -7295,6 +7333,15 @@ class BasicSwap(BaseApp):
                 KnownIdentity, use_cursor, {"address": bid.bid_addr}
             )
             self.evaluateKnownIdentityForAutoAccept(strategy, identity_stats)
+
+            # Ensure the coin from wallet has sufficient balance for multiple bids
+            bids_active_if_accepted: int = num_not_completed + 1
+
+            ci_from = self.ci(offer.coin_from)
+            try:
+                ci_from.ensureFunds(bids_active_if_accepted * bid_amount)
+            except Exception as e:  # noqa: F841
+                raise AutomationConstraintTemporary("Balance too low")
 
             self.logEvent(
                 Concepts.BID,
@@ -7305,7 +7352,7 @@ class BasicSwap(BaseApp):
             )
 
             return True
-        except AutomationConstraint as e:
+        except (AutomationConstraint, AutomationConstraintTemporary) as e:
             self.log.info(
                 "Not auto accepting bid {}, {}".format(bid.bid_id.hex(), str(e))
             )
@@ -7317,6 +7364,19 @@ class BasicSwap(BaseApp):
                     str(e),
                     use_cursor,
                 )
+
+            if isinstance(e, AutomationConstraintTemporary):
+                bid.setState(BidStates.BID_AACCEPT_DELAY)
+            else:
+                bid.setState(BidStates.BID_AACCEPT_FAIL)
+            self.updateDB(
+                bid,
+                use_cursor,
+                [
+                    "bid_id",
+                ],
+            )
+
             return False
         except Exception as e:
             self.logException(f"shouldAutoAcceptBid {e}")
@@ -9589,18 +9649,20 @@ class BasicSwap(BaseApp):
             cursor = self.openDB()
 
             if check_records:
-                query = """SELECT 1, bid_id, expire_at FROM bids WHERE active_ind = 1 AND state IN (:bid_received, :bid_sent) AND expire_at <= :check_time
+                query = """SELECT 1, bid_id, expire_at FROM bids WHERE active_ind = 1 AND state IN (:bid_received, :bid_sent, :bid_aad, :bid_aaf) AND expire_at <= :check_time
                            UNION ALL
                            SELECT 2, offer_id, expire_at FROM offers WHERE active_ind = 1 AND state IN (:offer_received, :offer_sent) AND expire_at <= :check_time
                 """
                 q = cursor.execute(
                     query,
                     {
-                        "bid_received": int(BidStates.BID_RECEIVED),
                         "offer_received": int(OfferStates.OFFER_RECEIVED),
-                        "bid_sent": int(BidStates.BID_SENT),
                         "offer_sent": int(OfferStates.OFFER_SENT),
                         "check_time": now + self.check_expiring_bids_offers_seconds,
+                        "bid_sent": int(BidStates.BID_SENT),
+                        "bid_received": int(BidStates.BID_RECEIVED),
+                        "bid_aad": int(BidStates.BID_AACCEPT_DELAY),
+                        "bid_aaf": int(BidStates.BID_AACCEPT_FAIL),
                     },
                 )
                 for entry in q:
@@ -9618,13 +9680,15 @@ class BasicSwap(BaseApp):
                             offers_to_expire.add(record_id)
 
             for bid_id in bids_to_expire:
-                query = "SELECT expire_at, states FROM bids WHERE bid_id = :bid_id AND active_ind = 1 AND state IN (:bid_received, :bid_sent)"
+                query = "SELECT expire_at, states FROM bids WHERE bid_id = :bid_id AND active_ind = 1 AND state IN (:bid_received, :bid_sent, :bid_aad, :bid_aaf)"
                 rows = cursor.execute(
                     query,
                     {
                         "bid_id": bid_id,
                         "bid_received": int(BidStates.BID_RECEIVED),
                         "bid_sent": int(BidStates.BID_SENT),
+                        "bid_aad": int(BidStates.BID_AACCEPT_DELAY),
+                        "bid_aaf": int(BidStates.BID_AACCEPT_FAIL),
                     },
                 ).fetchall()
                 if len(rows) > 0:
@@ -9699,8 +9763,8 @@ class BasicSwap(BaseApp):
             now: int = self.getTime()
             self.expireBidsAndOffers(now)
 
+            to_remove = []
             if now - self._last_checked_progress >= self.check_progress_seconds:
-                to_remove = []
                 for bid_id, v in self.swaps_in_progress.items():
                     try:
                         if self.checkBidState(bid_id, v[0], v[1]) is True:
@@ -9748,9 +9812,20 @@ class BasicSwap(BaseApp):
                 self.checkQueuedActions()
                 self._last_checked_actions = now
 
-            if now - self._last_checked_xmr_swaps >= self.check_xmr_swaps_seconds:
-                self.checkXmrSwaps()
-                self._last_checked_xmr_swaps = now
+            if (
+                now - self._last_checked_split_messages
+                >= self.check_split_messages_seconds
+            ):
+                self.checkSplitMessages()
+                self._last_checked_split_messages = now
+
+            if (
+                len(to_remove) > 0
+                or now - self._last_checked_delayed_auto_accept
+                >= self.check_delayed_auto_accept_seconds
+            ):
+                self.checkDelayedAutoAccept()
+                self._last_checked_delayed_auto_accept = now
 
         except Exception as ex:
             self.logException(f"update {ex}")
@@ -10113,7 +10188,7 @@ class BasicSwap(BaseApp):
                COUNT(CASE WHEN b.was_sent THEN 1 ELSE NULL END) AS count_sent,
                COUNT(CASE WHEN b.was_sent AND (s.in_progress OR (s.swap_ended = 0 AND b.expire_at > :now AND o.expire_at > :now)) THEN 1 ELSE NULL END) AS count_sent_active,
                COUNT(CASE WHEN b.was_received THEN 1 ELSE NULL END) AS count_received,
-               COUNT(CASE WHEN b.was_received AND b.state = :received_state AND b.expire_at > :now AND o.expire_at > :now THEN 1 ELSE NULL END) AS count_available,
+               COUNT(CASE WHEN b.was_received AND s.can_accept AND b.expire_at > :now AND o.expire_at > :now THEN 1 ELSE NULL END) AS count_available,
                COUNT(CASE WHEN b.was_received AND (s.in_progress OR (s.swap_ended = 0 AND b.expire_at > :now AND o.expire_at > :now)) THEN 1 ELSE NULL END) AS count_recv_active
                FROM bids b
                JOIN offers o ON b.offer_id = o.offer_id
@@ -10131,9 +10206,7 @@ class BasicSwap(BaseApp):
 
         try:
             cursor = self.openDB()
-            q = cursor.execute(
-                q_bids_str, {"now": now, "received_state": int(BidStates.BID_RECEIVED)}
-            ).fetchone()
+            q = cursor.execute(q_bids_str, {"now": now}).fetchone()
             bids_sent = q[0]
             bids_sent_active = q[1]
             bids_received = q[2]

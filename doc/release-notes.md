@@ -9,7 +9,6 @@
 - Incoming expired offers no longer raise an error.
 
 
-
 0.13.2
 ==============
 
