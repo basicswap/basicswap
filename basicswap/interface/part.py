@@ -166,7 +166,13 @@ class PARTInterface(BTCInterface):
 
     def getUnspentsByAddr(self):
         unspent_addr = dict()
-        unspent = self.rpc_wallet("listunspent")
+        balance_type = self.balance_type()
+        if balance_type == BalanceTypes.PLAIN:
+            unspent = self.rpc_wallet("listunspent")
+        elif balance_type == BalanceTypes.BLIND:
+            unspent = self.rpc_wallet("listunspentblind")
+        else:
+            raise ValueError(f"getUnspentsByAddr not implemented for {balance_type} type")
         for u in unspent:
             if u["spendable"] is not True:
                 continue
