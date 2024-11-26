@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2021-2024 tecnovert
+# Copyright (c) 2024 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -106,6 +107,8 @@ class BidStates(IntEnum):
     BID_REQUEST_SENT = 29
     BID_REQUEST_ACCEPTED = 30
     BID_EXPIRED = 31
+    BID_AACCEPT_DELAY = 32
+    BID_AACCEPT_FAIL = 33
 
 
 class TxStates(IntEnum):
@@ -330,6 +333,10 @@ def strBidState(state):
         return "Unknown bid state"
     if state == BidStates.BID_EXPIRED:
         return "Expired"
+    if state == BidStates.BID_AACCEPT_DELAY:
+        return "Auto accept delay"
+    if state == BidStates.BID_AACCEPT_FAIL:
+        return "Auto accept failed"
     return "Unknown" + " " + str(state)
 
 
@@ -537,6 +544,14 @@ inactive_states = [
     BidStates.BID_ABANDONED,
     BidStates.BID_EXPIRED,
 ]
+
+
+def canAcceptBidState(state):
+    return state in (
+        BidStates.BID_RECEIVED,
+        BidStates.BID_AACCEPT_DELAY,
+        BidStates.BID_AACCEPT_FAIL,
+    )
 
 
 def isActiveBidState(state):

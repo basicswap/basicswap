@@ -18,12 +18,30 @@ from .db import (
 
 from .basicswap_util import (
     BidStates,
+    canAcceptBidState,
     isActiveBidState,
     isErrorBidState,
     isFailingBidState,
     isFinalBidState,
     strBidState,
 )
+
+
+def addBidState(self, state, now, cursor):
+    self.add(
+        BidState(
+            active_ind=1,
+            state_id=int(state),
+            in_progress=isActiveBidState(state),
+            in_error=isErrorBidState(state),
+            swap_failed=isFailingBidState(state),
+            swap_ended=isFinalBidState(state),
+            can_accept=canAcceptBidState(state),
+            label=strBidState(state),
+            created_at=now,
+        ),
+        cursor,
+    )
 
 
 def upgradeDatabaseData(self, data_version):
@@ -69,19 +87,7 @@ def upgradeDatabaseData(self, data_version):
             )
 
             for state in BidStates:
-                self.add(
-                    BidState(
-                        active_ind=1,
-                        state_id=int(state),
-                        in_progress=isActiveBidState(state),
-                        in_error=isErrorBidState(state),
-                        swap_failed=isFailingBidState(state),
-                        swap_ended=isFinalBidState(state),
-                        label=strBidState(state),
-                        created_at=now,
-                    ),
-                    cursor,
-                )
+                addBidState(self, state, now, cursor)
 
         if data_version > 0 and data_version < 2:
             for state in (
@@ -117,19 +123,15 @@ def upgradeDatabaseData(self, data_version):
                 BidStates.BID_REQUEST_SENT,
                 BidStates.BID_REQUEST_ACCEPTED,
             ):
-                self.add(
-                    BidState(
-                        active_ind=1,
-                        state_id=int(state),
-                        in_progress=isActiveBidState(state),
-                        in_error=isErrorBidState(state),
-                        swap_failed=isFailingBidState(state),
-                        swap_ended=isFinalBidState(state),
-                        label=strBidState(state),
-                        created_at=now,
-                    ),
-                    cursor,
-                )
+                addBidState(self, state, now, cursor)
+
+        if data_version > 0 and data_version < 5:
+            for state in (
+                BidStates.BID_EXPIRED,
+                BidStates.BID_AACCEPT_DELAY,
+                BidStates.BID_AACCEPT_FAIL,
+            ):
+                addBidState(self, state, now, cursor)
 
         self.db_data_version = CURRENT_DB_DATA_VERSION
         self.setIntKV("db_data_version", self.db_data_version, cursor)
@@ -405,10 +407,13 @@ def upgradeDatabase(self, db_version):
                         PRIMARY KEY (record_id))"""
                 )
                 cursor.execute("ALTER TABLE bids ADD COLUMN pkhash_buyer_to BLOB")
+            elif current_version == 24:
+                db_version += 1
+                cursor.execute("ALTER TABLE bidstates ADD COLUMN can_accept INTEGER")
             if current_version != db_version:
                 self.db_version = db_version
                 self.setIntKV("db_version", db_version, cursor)
-                cursor = self.commitDB()
+                self.commitDB()
                 self.log.info("Upgraded database to version {}".format(self.db_version))
                 continue
         except Exception as e:

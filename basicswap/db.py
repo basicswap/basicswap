@@ -13,8 +13,8 @@ from enum import IntEnum, auto
 from typing import Optional
 
 
-CURRENT_DB_VERSION = 24
-CURRENT_DB_DATA_VERSION = 4
+CURRENT_DB_VERSION = 25
+CURRENT_DB_DATA_VERSION = 5
 
 
 class Concepts(IntEnum):
@@ -601,6 +601,7 @@ class BidState(Table):
     in_error = Column("integer")
     swap_failed = Column("integer")
     swap_ended = Column("integer")
+    can_accept = Column("integer")
 
     note = Column("string")
     created_at = Column("integer")
@@ -751,7 +752,6 @@ class DBMethods:
 
     def closeDBCursor(self, cursor):
         assert self.mxDB.locked()
-
         if cursor:
             cursor.close()
 

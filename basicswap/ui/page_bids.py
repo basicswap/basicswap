@@ -25,6 +25,7 @@ from basicswap.basicswap_util import (
     BidStates,
     SwapTypes,
     DebugTypes,
+    canAcceptBidState,
     strTxState,
     strBidState,
 )
@@ -124,7 +125,7 @@ def page_bid(self, url_split, post_string):
 
     if len(data["addr_from_label"]) > 0:
         data["addr_from_label"] = "(" + data["addr_from_label"] + ")"
-    data["can_accept_bid"] = True if bid.state == BidStates.BID_RECEIVED else False
+    data["can_accept_bid"] = True if canAcceptBidState(bid.state) else False
 
     if swap_client.debug_ui:
         data["bid_actions"] = [
