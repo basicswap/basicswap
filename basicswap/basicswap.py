@@ -92,7 +92,6 @@ from .db import (
     create_db,
     CURRENT_DB_VERSION,
     EventLog,
-    firstOrNone,
     getOrderByStr,
     KnownIdentity,
     MessageLink,
@@ -1316,9 +1315,7 @@ class BasicSwap(BaseApp):
             self.closeDB(cursor)
 
     def updateIdentityBidState(self, cursor, address: str, bid) -> None:
-        identity_stats = firstOrNone(
-            self.query(KnownIdentity, cursor, {"address": address})
-        )
+        identity_stats = self.queryOne(KnownIdentity, cursor, {"address": address})
         if not identity_stats:
             identity_stats = KnownIdentity(
                 active_ind=1, address=address, created_at=self.getTime()
@@ -1357,17 +1354,15 @@ class BasicSwap(BaseApp):
     ) -> Optional[bytes]:
         try:
             use_cursor = self.openDB(cursor)
-            tx = firstOrNone(
-                self.query(
-                    PrefundedTx,
-                    use_cursor,
-                    {
-                        "linked_type": linked_type,
-                        "linked_id": linked_id,
-                        "tx_type": tx_type,
-                        "used_by": None,
-                    },
-                )
+            tx = self.queryOne(
+                PrefundedTx,
+                use_cursor,
+                {
+                    "linked_type": linked_type,
+                    "linked_id": linked_id,
+                    "tx_type": tx_type,
+                    "used_by": None,
+                },
             )
             if tx is None:
                 return None
@@ -1398,7 +1393,7 @@ class BasicSwap(BaseApp):
         ci_to = self.ci(offer.coin_from if reverse_bid else offer.coin_to)
 
         if offer.swap_type == SwapTypes.XMR_SWAP:
-            xmr_swap = firstOrNone(self.query(XmrSwap, cursor, {"bid_id": bid.bid_id}))
+            xmr_swap = self.queryOne(XmrSwap, cursor, {"bid_id": bid.bid_id})
             self.watchXmrSwap(bid, offer, xmr_swap, cursor)
             if (
                 ci_to.watch_blocks_for_scripts()
@@ -1556,9 +1551,11 @@ class BasicSwap(BaseApp):
             return
         self.log.info("Loading data from db")
         self.swaps_in_progress.clear()
+        bid_cursor = None
         try:
             cursor = self.openDB()
-            for bid in self.query(Bid, cursor):
+            bid_cursor = self.getNewDBCursor()
+            for bid in self.query(Bid, bid_cursor):
                 if bid.in_progress == 1 or (
                     bid.state
                     and bid.state > BidStates.BID_RECEIVED
@@ -1571,14 +1568,15 @@ class BasicSwap(BaseApp):
                         try:
                             bid.setState(BidStates.BID_ERROR, "Failed to activate")
 
-                            offer = firstOrNone(
-                                self.query(Offer, cursor, {"offer_id": bid.offer_id})
+                            offer = self.queryOne(
+                                Offer, cursor, {"offer_id": bid.offer_id}
                             )
                             self.deactivateBid(cursor, offer, bid)
                         except Exception as ex:
                             self.logException(f"Further error deactivating: {ex}")
             self.buildNotificationsCache(cursor)
         finally:
+            self.closeDBCursor(bid_cursor)
             self.closeDB(cursor)
 
     def getActiveBidMsgValidTime(self) -> int:
@@ -2172,7 +2170,7 @@ class BasicSwap(BaseApp):
 
         cursor = self.openDB()
         try:
-            offer = firstOrNone(self.query(Offer, cursor, {"offer_id": offer_id}))
+            offer = self.queryOne(Offer, cursor, {"offer_id": offer_id})
 
             if (
                 offer.security_token is not None
@@ -2206,7 +2204,7 @@ class BasicSwap(BaseApp):
         self.log.info("Archiving offer %s", offer_id.hex())
         cursor = self.openDB()
         try:
-            offer = firstOrNone(self.query(Offer, cursor, {"offer_id": offer_id}))
+            offer = self.queryOne(Offer, cursor, {"offer_id": offer_id})
 
             if offer.active_ind != 1:
                 raise ValueError("Offer is not active")
@@ -2226,19 +2224,17 @@ class BasicSwap(BaseApp):
         self.log.info("Editing offer %s", offer_id.hex())
         cursor = self.openDB()
         try:
-            offer = firstOrNone(self.query(Offer, cursor, {"offer_id": offer_id}))
+            offer = self.queryOne(Offer, cursor, {"offer_id": offer_id})
             ensure(offer, f"Offer not found: {offer_id.hex()}.")
             if "automation_strat_id" in data:
                 new_automation_strat_id = data["automation_strat_id"]
-                link = firstOrNone(
-                    self.query(
-                        Offer,
-                        cursor,
-                        {
-                            "linked_type": int(Concepts.OFFER),
-                            "linked_id": offer.offer_id,
-                        },
-                    )
+                link = self.queryOne(
+                    Offer,
+                    cursor,
+                    {
+                        "linked_type": int(Concepts.OFFER),
+                        "linked_id": offer.offer_id,
+                    },
                 )
                 if not link:
                     if new_automation_strat_id > 0:
@@ -2414,12 +2410,10 @@ class BasicSwap(BaseApp):
         try:
             use_cursor = self.openDB(cursor)
 
-            record = firstOrNone(
-                self.query(
-                    PooledAddress,
-                    use_cursor,
-                    {"coin_type": int(coin_type), "bid_id": None},
-                )
+            record = self.queryOne(
+                PooledAddress,
+                use_cursor,
+                {"coin_type": int(coin_type), "bid_id": None},
             )
             if not record:
                 address = self.getReceiveAddressForCoin(coin_type)
@@ -2445,12 +2439,10 @@ class BasicSwap(BaseApp):
         try:
             cursor = self.openDB()
             try:
-                record = firstOrNone(
-                    self.query(
-                        PooledAddress,
-                        cursor,
-                        {"tx_type": int(tx_type), "bid_id": bid_id},
-                    )
+                record = self.queryOne(
+                    PooledAddress,
+                    cursor,
+                    {"tx_type": int(tx_type), "bid_id": bid_id},
                 )
                 self.log.debug("Returning address to pool addr {}".format(record.addr))
 
@@ -3077,7 +3069,7 @@ class BasicSwap(BaseApp):
     def getOffer(self, offer_id: bytes, cursor=None):
         try:
             use_cursor = self.openDB(cursor)
-            return firstOrNone(self.query(Offer, use_cursor, {"offer_id": offer_id}))
+            return self.queryOne(Offer, use_cursor, {"offer_id": offer_id})
         finally:
             if cursor is None:
                 self.closeDB(use_cursor, commit=False)
@@ -3108,10 +3100,10 @@ class BasicSwap(BaseApp):
                 bid.txns[stx.tx_type] = stx
 
     def getXmrBidFromSession(self, cursor, bid_id: bytes):
-        bid = firstOrNone(self.query(Bid, cursor, {"bid_id": bid_id}))
+        bid = self.queryOne(Bid, cursor, {"bid_id": bid_id})
         xmr_swap = None
         if bid:
-            xmr_swap = firstOrNone(self.query(XmrSwap, cursor, {"bid_id": bid_id}))
+            xmr_swap = self.queryOne(XmrSwap, cursor, {"bid_id": bid_id})
             self.loadBidTxns(bid, cursor)
         return bid, xmr_swap
 
@@ -3123,12 +3115,10 @@ class BasicSwap(BaseApp):
             self.closeDB(cursor, commit=False)
 
     def getXmrOfferFromSession(self, cursor, offer_id: bytes):
-        offer = firstOrNone(self.query(Offer, cursor, {"offer_id": offer_id}))
+        offer = self.queryOne(Offer, cursor, {"offer_id": offer_id})
         xmr_offer = None
         if offer:
-            xmr_offer = firstOrNone(
-                self.query(XmrOffer, cursor, {"offer_id": offer_id})
-            )
+            xmr_offer = self.queryOne(XmrOffer, cursor, {"offer_id": offer_id})
         return offer, xmr_offer
 
     def getXmrOffer(self, offer_id: bytes, cursor=None):
@@ -3142,7 +3132,7 @@ class BasicSwap(BaseApp):
     def getBid(self, bid_id: bytes, cursor=None, with_txns=True):
         try:
             use_cursor = self.openDB(cursor)
-            bid = firstOrNone(self.query(Bid, use_cursor, {"bid_id": bid_id}))
+            bid = self.queryOne(Bid, use_cursor, {"bid_id": bid_id})
             if bid and with_txns:
                 self.loadBidTxns(bid, use_cursor)
             return bid
@@ -3153,12 +3143,10 @@ class BasicSwap(BaseApp):
     def getBidAndOffer(self, bid_id: bytes, cursor=None, with_txns=True):
         try:
             use_cursor = self.openDB(cursor)
-            bid = firstOrNone(self.query(Bid, use_cursor, {"bid_id": bid_id}))
+            bid = self.queryOne(Bid, use_cursor, {"bid_id": bid_id})
             offer = None
             if bid:
-                offer = firstOrNone(
-                    self.query(Offer, use_cursor, {"offer_id": bid.offer_id})
-                )
+                offer = self.queryOne(Offer, use_cursor, {"offer_id": bid.offer_id})
                 if with_txns:
                     self.loadBidTxns(bid, use_cursor)
             return bid, offer
@@ -3174,17 +3162,13 @@ class BasicSwap(BaseApp):
             xmr_offer = None
             events = []
 
-            bid = firstOrNone(self.query(Bid, cursor, {"bid_id": bid_id}))
+            bid = self.queryOne(Bid, cursor, {"bid_id": bid_id})
             if bid:
-                offer = firstOrNone(
-                    self.query(Offer, cursor, {"offer_id": bid.offer_id})
-                )
+                offer = self.queryOne(Offer, cursor, {"offer_id": bid.offer_id})
                 if offer and offer.swap_type == SwapTypes.XMR_SWAP:
-                    xmr_swap = firstOrNone(
-                        self.query(XmrSwap, cursor, {"bid_id": bid.bid_id})
-                    )
-                    xmr_offer = firstOrNone(
-                        self.query(XmrOffer, cursor, {"offer_id": bid.offer_id})
+                    xmr_swap = self.queryOne(XmrSwap, cursor, {"bid_id": bid.bid_id})
+                    xmr_offer = self.queryOne(
+                        XmrOffer, cursor, {"offer_id": bid.offer_id}
                     )
                 self.loadBidTxns(bid, cursor)
                 if list_events:
@@ -3197,9 +3181,7 @@ class BasicSwap(BaseApp):
     def getIdentity(self, address: str):
         try:
             cursor = self.openDB()
-            identity = firstOrNone(
-                self.query(KnownIdentity, cursor, {"address": address})
-            )
+            identity = self.queryOne(KnownIdentity, cursor, {"address": address})
             return identity
         finally:
             self.closeDB(cursor, commit=False)
@@ -4998,14 +4980,12 @@ class BasicSwap(BaseApp):
         try:
             cursor = self.openDB()
 
-            xmr_offer = firstOrNone(
-                self.query(XmrOffer, cursor, {"offer_id": offer.offer_id})
-            )
+            xmr_offer = self.queryOne(XmrOffer, cursor, {"offer_id": offer.offer_id})
             ensure(
                 xmr_offer,
                 "Adaptor-sig offer not found: {}.".format(offer.offer_id.hex()),
             )
-            xmr_swap = firstOrNone(self.query(XmrSwap, cursor, {"bid_id": bid.bid_id}))
+            xmr_swap = self.queryOne(XmrSwap, cursor, {"bid_id": bid.bid_id})
             ensure(xmr_swap, "Adaptor-sig swap not found: {}.".format(bid.bid_id.hex()))
 
             if TxTypes.XMR_SWAP_A_LOCK_REFUND in bid.txns:
@@ -6842,10 +6822,14 @@ class BasicSwap(BaseApp):
     def checkXmrSwaps(self) -> None:
         now: int = self.getTime()
         ttl_xmr_split_messages = 60 * 60
+        bid_cursor = None
         try:
             cursor = self.openDB()
-            q = self.query(Bid, cursor, {"state": int(BidStates.BID_RECEIVING)})
-            for bid in q:
+            bid_cursor = self.getNewDBCursor()
+            q_bids = self.query(
+                Bid, bid_cursor, {"state": int(BidStates.BID_RECEIVING)}
+            )
+            for bid in q_bids:
                 q = cursor.execute(
                     "SELECT COUNT(*) FROM xmr_split_data WHERE bid_id = :bid_id AND msg_type = :msg_type",
                     {"bid_id": bid.bid_id, "msg_type": int(XmrSplitMsgTypes.BID)},
@@ -6887,8 +6871,10 @@ class BasicSwap(BaseApp):
                         ],
                     )
 
-            q = self.query(Bid, cursor, {"state": int(BidStates.BID_RECEIVING_ACC)})
-            for bid in q:
+            q_bids = self.query(
+                Bid, bid_cursor, {"state": int(BidStates.BID_RECEIVING_ACC)}
+            )
+            for bid in q_bids:
                 q = cursor.execute(
                     "SELECT COUNT(*) FROM xmr_split_data WHERE bid_id = :bid_id AND msg_type = :msg_type",
                     {
@@ -6941,6 +6927,7 @@ class BasicSwap(BaseApp):
                 {"ttl": ttl_xmr_split_messages, "now": now},
             )
         finally:
+            self.closeDBCursor(bid_cursor)
             self.closeDB(cursor)
 
     def processOffer(self, msg) -> None:
@@ -7235,26 +7222,22 @@ class BasicSwap(BaseApp):
         try:
             use_cursor = self.openDB(cursor)
 
-            link = firstOrNone(
-                self.query(
-                    AutomationLink,
-                    use_cursor,
-                    {
-                        "active_ind": 1,
-                        "linked_type": int(Concepts.OFFER),
-                        "linked_id": offer.offer_id,
-                    },
-                )
+            link = self.queryOne(
+                AutomationLink,
+                use_cursor,
+                {
+                    "active_ind": 1,
+                    "linked_type": int(Concepts.OFFER),
+                    "linked_id": offer.offer_id,
+                },
             )
             if link is None:
                 return False
 
-            strategy = firstOrNone(
-                self.query(
-                    AutomationStrategy,
-                    use_cursor,
-                    {"active_ind": 1, "record_id": link.strategy_id},
-                )
+            strategy = self.queryOne(
+                AutomationStrategy,
+                use_cursor,
+                {"active_ind": 1, "record_id": link.strategy_id},
             )
             opts = json.loads(strategy.data.decode("utf-8"))
 
@@ -7308,8 +7291,8 @@ class BasicSwap(BaseApp):
                     "Already have {} bids to complete".format(num_not_completed)
                 )
 
-            identity_stats = firstOrNone(
-                self.query(KnownIdentity, use_cursor, {"address": bid.bid_addr})
+            identity_stats = self.queryOne(
+                KnownIdentity, use_cursor, {"address": bid.bid_addr}
             )
             self.evaluateKnownIdentityForAutoAccept(strategy, identity_stats)
 
@@ -7583,7 +7566,7 @@ class BasicSwap(BaseApp):
         ensure(offer, "Offer not found: {}.".format(bid.offer_id.hex()))
 
         ensure(xmr_offer, "Adaptor-sig offer not found: {}.".format(bid.offer_id.hex()))
-        xmr_swap = firstOrNone(self.query(XmrSwap, cursor, {"bid_id": bid.bid_id}))
+        xmr_swap = self.queryOne(XmrSwap, cursor, {"bid_id": bid.bid_id})
         ensure(xmr_swap, "Adaptor-sig swap not found: {}.".format(bid.bid_id.hex()))
 
         reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
@@ -7681,7 +7664,7 @@ class BasicSwap(BaseApp):
         offer, xmr_offer = self.getXmrOffer(bid.offer_id, cursor=cursor)
         ensure(offer, "Offer not found: {}.".format(bid.offer_id.hex()))
         ensure(xmr_offer, "Adaptor-sig offer not found: {}.".format(bid.offer_id.hex()))
-        xmr_swap = firstOrNone(self.query(XmrSwap, cursor, {"bid_id": bid.bid_id}))
+        xmr_swap = self.queryOne(XmrSwap, cursor, {"bid_id": bid.bid_id})
         ensure(xmr_swap, "Adaptor-sig swap not found: {}.".format(bid.bid_id.hex()))
 
         reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
@@ -10724,9 +10707,7 @@ class BasicSwap(BaseApp):
     def getAutomationStrategy(self, strategy_id: int):
         try:
             cursor = self.openDB()
-            return firstOrNone(
-                self.query(AutomationStrategy, cursor, {"record_id": strategy_id})
-            )
+            return self.queryOne(AutomationStrategy, cursor, {"record_id": strategy_id})
         finally:
             self.closeDB(cursor, commit=False)
 
@@ -10734,8 +10715,8 @@ class BasicSwap(BaseApp):
         self.log.debug(f"updateAutomationStrategy {strategy_id}")
         try:
             cursor = self.openDB()
-            strategy = firstOrNone(
-                self.query(AutomationStrategy, cursor, {"record_id": strategy_id})
+            strategy = self.queryOne(
+                AutomationStrategy, cursor, {"record_id": strategy_id}
             )
             if "data" in data:
                 strategy.data = json.dumps(data["data"]).encode("utf-8")
@@ -11062,7 +11043,7 @@ class BasicSwap(BaseApp):
         try:
             rv = []
             for a in addresses:
-                v = firstOrNone(self.query(KnownIdentity, cursor, {"address": a}))
+                v = self.queryOne(KnownIdentity, cursor, {"address": a})
                 rv.append("" if (not v or not v.label) else v.label)
             return rv
         finally:

@@ -749,6 +749,12 @@ class DBMethods:
         assert self.mxDB.locked()
         self._db_con.rollback()
 
+    def closeDBCursor(self, cursor):
+        assert self.mxDB.locked()
+
+        if cursor:
+            cursor.close()
+
     def closeDB(self, cursor, commit=True):
         assert self.mxDB.locked()
 
@@ -954,6 +960,26 @@ class DBMethods:
                         value = False if row[i] == 0 else True
                 setattr(obj, colname, value)
             yield obj
+
+    def queryOne(
+        self,
+        table_class,
+        cursor,
+        constraints={},
+        order_by={},
+        query_suffix=None,
+        extra_query_data={},
+    ):
+        return firstOrNone(
+            self.query(
+                table_class,
+                cursor,
+                constraints,
+                order_by,
+                query_suffix,
+                extra_query_data,
+            )
+        )
 
     def updateDB(self, obj, cursor, constraints=[]):
         if cursor is None:
