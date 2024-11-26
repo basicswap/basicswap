@@ -974,7 +974,7 @@ class PARTInterfaceBlind(PARTInterface):
         return bytes.fromhex(lock_refund_swipe_tx_hex)
 
     def getSpendableBalance(self) -> int:
-        raise ValueError("getUnspentsByAddr is used to get the Blind balances")
+        return self.make_int(self.rpc_wallet("getbalances")["mine"]["blind_trusted"])
 
     def publishBLockTx(
         self,
