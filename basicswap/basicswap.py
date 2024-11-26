@@ -9649,7 +9649,7 @@ class BasicSwap(BaseApp):
             cursor = self.openDB()
 
             if check_records:
-                query = """SELECT 1, bid_id, expire_at FROM bids WHERE active_ind = 1 AND state IN (:bid_received, :bid_sent, :bid_aad, :bid_aaf) AND expire_at <= :check_time
+                query = """SELECT 1, bid_id, expire_at FROM bids WHERE active_ind = 1 AND state IN (:bid_received, :bid_sent, :bid_aad, :bid_aaf, :bid_req_sent) AND expire_at <= :check_time
                            UNION ALL
                            SELECT 2, offer_id, expire_at FROM offers WHERE active_ind = 1 AND state IN (:offer_received, :offer_sent) AND expire_at <= :check_time
                 """
@@ -9663,6 +9663,7 @@ class BasicSwap(BaseApp):
                         "bid_received": int(BidStates.BID_RECEIVED),
                         "bid_aad": int(BidStates.BID_AACCEPT_DELAY),
                         "bid_aaf": int(BidStates.BID_AACCEPT_FAIL),
+                        "bid_req_sent": int(BidStates.BID_REQUEST_SENT),
                     },
                 )
                 for entry in q:
@@ -9680,7 +9681,7 @@ class BasicSwap(BaseApp):
                             offers_to_expire.add(record_id)
 
             for bid_id in bids_to_expire:
-                query = "SELECT expire_at, states FROM bids WHERE bid_id = :bid_id AND active_ind = 1 AND state IN (:bid_received, :bid_sent, :bid_aad, :bid_aaf)"
+                query = "SELECT expire_at, states FROM bids WHERE bid_id = :bid_id AND active_ind = 1 AND state IN (:bid_received, :bid_sent, :bid_aad, :bid_aaf, :bid_req_sent)"
                 rows = cursor.execute(
                     query,
                     {
@@ -9689,6 +9690,7 @@ class BasicSwap(BaseApp):
                         "bid_sent": int(BidStates.BID_SENT),
                         "bid_aad": int(BidStates.BID_AACCEPT_DELAY),
                         "bid_aaf": int(BidStates.BID_AACCEPT_FAIL),
+                        "bid_req_sent": int(BidStates.BID_REQUEST_SENT),
                     },
                 ).fetchall()
                 if len(rows) > 0:
