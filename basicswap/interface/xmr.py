@@ -114,7 +114,9 @@ class XMRInterface(CoinInterface):
                     log_str: str = ""
                     have_cc_tor_opt = "use_tor" in chain_client_settings
                     if have_cc_tor_opt and chain_client_settings["use_tor"] is False:
-                        log_str = f" bypassing proxy (use_tor false for {self.coin_name()})"
+                        log_str = (
+                            f" bypassing proxy (use_tor false for {self.coin_name()})"
+                        )
                     elif have_cc_tor_opt is False and is_private_ip_address(rpchost):
                         log_str = " bypassing proxy (private ip address)"
                     else:
@@ -196,7 +198,7 @@ class XMRInterface(CoinInterface):
                 self.rpc_wallet("store")
                 self.rpc_wallet("close_wallet")
                 self._log.debug(f"Attempt to save and close {self.coin_name()} wallet")
-            except Exception as e:
+            except Exception as e:  # noqa: F841
                 pass
 
             self.rpc_wallet("open_wallet", params)

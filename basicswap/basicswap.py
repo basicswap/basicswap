@@ -1002,8 +1002,10 @@ class BasicSwap(BaseApp):
                 elif c in (Coins.XMR, Coins.WOW):
                     try:
                         ci.ensureWalletExists()
-                    except Exception as e:
-                        self.log.warning("Can't open %s wallet, could be locked.", ci.coin_name())
+                    except Exception as e:  # noqa: F841
+                        self.log.warning(
+                            "Can't open %s wallet, could be locked.", ci.coin_name()
+                        )
                         continue
                 elif c == Coins.LTC:
                     ci_mweb = self.ci(Coins.LTC_MWEB)

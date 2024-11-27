@@ -375,7 +375,7 @@ def main():
                     "wallets/{}".format(coin_from_data["ticker"])
                 )
                 coin_ticker = coin_from_data["ticker"]
-                if coin_ticker=="PART" and "variant" in coin_from_data:
+                if coin_ticker == "PART" and "variant" in coin_from_data:
                     coin_variant = coin_from_data["variant"]
                     if coin_variant == "Anon":
                         coin_from_data_name = "PART_ANON"
@@ -384,7 +384,9 @@ def main():
                         coin_from_data_name = "PART_BLIND"
                         wallet_balance: float = float(wallet_from["blind_balance"])
                     else:
-                        raise ValueError(f"{coin_ticker} variant {coin_variant} not handled")
+                        raise ValueError(
+                            f"{coin_ticker} variant {coin_variant} not handled"
+                        )
                 else:
                     coin_from_data_name = coin_ticker
                     wallet_balance: float = float(wallet_from["balance"])
@@ -404,9 +406,7 @@ def main():
                         None,
                     ):
                         offers_found += 1
-                        if wallet_balance <= float(
-                            offer_template["min_coin_from_amt"]
-                        ):
+                        if wallet_balance <= float(offer_template["min_coin_from_amt"]):
                             offer_id = offer["offer_id"]
                             print(
                                 "Revoking offer {}, wallet from balance below minimum".format(
@@ -423,7 +423,7 @@ def main():
                 min_offer_amount: float = offer_template.get(
                     "amount_step", max_offer_amount
                 )
-                
+
                 min_wallet_from_amount: float = float(
                     offer_template["min_coin_from_amt"]
                 )
