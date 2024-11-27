@@ -999,6 +999,12 @@ class BasicSwap(BaseApp):
                     except Exception as e:
                         self.log.error("Sanity checks failed: %s", str(e))
 
+                elif c in (Coins.XMR, Coins.WOW):
+                    try:
+                        ci.ensureWalletExists()
+                    except Exception as e:
+                        self.log.warning("Can't open %s wallet, could be locked.", ci.coin_name())
+                        continue
                 elif c == Coins.LTC:
                     ci_mweb = self.ci(Coins.LTC_MWEB)
                     is_encrypted, _ = self.getLockedState()
