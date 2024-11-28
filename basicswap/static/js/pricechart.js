@@ -28,7 +28,7 @@ const config = {
     }
   },
   showVolume: false,
-  cacheTTL: 5 * 60 * 1000, // 5 minutes in milliseconds
+  cacheTTL: 5 * 60 * 1000, // 5 minutes
   specialCoins: [''],
   resolutions: {
     year: { days: 365, interval: 'month' },
@@ -126,57 +126,53 @@ const api = {
     }));
   },
   
-  fetchCoinGeckoDataXHR: async () => {
-    const cacheKey = 'coinGeckoOneLiner';
-    let cachedData = cache.get(cacheKey);
+    fetchCoinGeckoDataXHR: async () => {
+        const cacheKey = 'coinGeckoOneLiner';
+        let cachedData = cache.get(cacheKey);
 
-    if (cachedData) {
-      console.log('Using cached CoinGecko data');
-      return cachedData.value;
-    }
+        if (cachedData) {
+            console.log('Using cached CoinGecko data');
+            return cachedData.value;
+        }
 
-    const coinIds = config.coins
-      .filter(coin => coin.usesCoinGecko)
-      .map(coin => coin.name)
-      .join(',');
-    const url = `${config.apiEndpoints.coinGecko}/simple/price?ids=${coinIds}&vs_currencies=usd,btc&include_24hr_vol=true&include_24hr_change=true`;
-    
-    console.log(`Fetching data for multiple coins from CoinGecko: ${url}`);
-    
-    try {
-      const data = await api.makePostRequest(url);
-      console.log(`Raw CoinGecko data:`, data);
-      
-      if (typeof data !== 'object' || data === null) {
-        throw new AppError(`Invalid data structure received from CoinGecko`);
-      }
-      
-      const transformedData = Object.entries(data).map(([id, values]) => {
-        const coinConfig = config.coins.find(coin => coin.name === id);
-        return {
-          id,
-          symbol: coinConfig?.symbol.toLowerCase() || id,
-          current_price: values.usd,
-          price_btc: values.btc,
-          total_volume: values.usd_24h_vol,
-          price_change_percentage_24h: values.usd_24h_change,
-          displayName: coinConfig?.displayName || coinConfig?.symbol || id
-        };
-      });
-      
-      console.log(`Transformed CoinGecko data:`, transformedData);
+        const coinIds = config.coins
+            .filter(coin => coin.usesCoinGecko)
+            .map(coin => coin.name)
+            .join(',');
+        const url = `${config.apiEndpoints.coinGecko}/simple/price?ids=${coinIds}&vs_currencies=usd,btc&include_24hr_vol=true&include_24hr_change=true`;
+        
+        console.log(`Fetching data for multiple coins from CoinGecko: ${url}`);
+        
+        try {
+            const data = await api.makePostRequest(url);
+            console.log(`Raw CoinGecko data:`, data);
+            
+            if (typeof data !== 'object' || data === null) {
+                throw new AppError(`Invalid data structure received from CoinGecko`);
+            }
+            
+            const transformedData = {};
+            Object.entries(data).forEach(([id, values]) => {
+                const coinConfig = config.coins.find(coin => coin.name === id);
+                const symbol = coinConfig?.symbol.toLowerCase() || id;
+                transformedData[symbol] = {
+                    current_price: values.usd,
+                    price_btc: values.btc,
+                    total_volume: values.usd_24h_vol,
+                    price_change_percentage_24h: values.usd_24h_change,
+                    displayName: coinConfig?.displayName || coinConfig?.symbol || id
+                };
+            });
+            
+            console.log(`Transformed CoinGecko data:`, transformedData);
+            cache.set(cacheKey, transformedData);
+            return transformedData;
+        } catch (error) {
+            console.error(`Error fetching CoinGecko data:`, error);
+            return { error: error.message };
+        }
+    },
 
-      cache.set(cacheKey, transformedData);
-
-      return transformedData;
-    } catch (error) {
-      console.error(`Error fetching CoinGecko data:`, error);
-      return {
-        error: error.message
-      };
-    }
-  },
-  
   fetchHistoricalDataXHR: async (coinSymbols) => {
     if (!Array.isArray(coinSymbols)) {
       coinSymbols = [coinSymbols];
@@ -237,7 +233,7 @@ const api = {
 
     console.log('Final results object:', JSON.stringify(results, null, 2));
     return results;
-  },
+  }
 };
 
 // Cache
@@ -290,49 +286,60 @@ const cache = {
 
 // UI
 const ui = {
-  displayCoinData: (coin, data) => {
+displayCoinData: (coin, data) => {
     const coinConfig = config.coins.find(c => c.symbol === coin);
     let priceUSD, priceBTC, priceChange1d, volume24h;
     const updateUI = (isError = false) => {
-      const priceUsdElement = document.querySelector(`#${coin.toLowerCase()}-price-usd`);
-      const volumeDiv = document.querySelector(`#${coin.toLowerCase()}-volume-div`);
-      const volumeElement = document.querySelector(`#${coin.toLowerCase()}-volume-24h`);
-      const btcPriceDiv = document.querySelector(`#${coin.toLowerCase()}-btc-price-div`);
-      const priceBtcElement = document.querySelector(`#${coin.toLowerCase()}-price-btc`);
-      if (priceUsdElement) {
-        priceUsdElement.textContent = isError ? 'N/A' : `$ ${ui.formatPrice(coin, priceUSD)}`;
-      }
-      if (volumeDiv && volumeElement) {
-        volumeElement.textContent = isError ? 'N/A' : `${utils.formatNumber(volume24h, 0)} USD`;
-        volumeDiv.style.display = volumeToggle.isVisible ? 'flex' : 'none';
-      }
-      if (btcPriceDiv && priceBtcElement && coin !== 'BTC') {
-        priceBtcElement.textContent = isError ? 'N/A' : `${priceBTC.toFixed(8)} BTC`;
-        btcPriceDiv.style.display = 'flex';
-      }
-      ui.updatePriceChangeContainer(coin, isError ? null : priceChange1d);
+        const priceUsdElement = document.querySelector(`#${coin.toLowerCase()}-price-usd`);
+        const volumeDiv = document.querySelector(`#${coin.toLowerCase()}-volume-div`);
+        const volumeElement = document.querySelector(`#${coin.toLowerCase()}-volume-24h`);
+        const btcPriceDiv = document.querySelector(`#${coin.toLowerCase()}-btc-price-div`);
+        const priceBtcElement = document.querySelector(`#${coin.toLowerCase()}-price-btc`);
+        
+        if (priceUsdElement) {
+            priceUsdElement.textContent = isError ? 'N/A' : `$ ${ui.formatPrice(coin, priceUSD)}`;
+        }
+        
+        if (volumeDiv && volumeElement) {
+            volumeElement.textContent = isError ? 'N/A' : `${utils.formatNumber(volume24h, 0)} USD`;
+            volumeDiv.style.display = volumeToggle.isVisible ? 'flex' : 'none';
+        }
+        
+        if (btcPriceDiv && priceBtcElement) {
+            if (coin === 'BTC') {
+                btcPriceDiv.style.display = 'none';
+            } else {
+                priceBtcElement.textContent = isError ? 'N/A' : `${priceBTC.toFixed(8)} BTC`;
+                btcPriceDiv.style.display = 'flex';
+            }
+        }
+        
+        ui.updatePriceChangeContainer(coin, isError ? null : priceChange1d);
     };
+    
     try {
-      if (data.error) {
-        throw new Error(data.error);
-      }
-      if (!data || !data.current_price) {
-        throw new Error(`Invalid CoinGecko data structure for ${coin}`);
-      }
-      priceUSD = data.current_price;
-      priceBTC = data.current_price / app.btcPriceUSD;
-      priceChange1d = data.price_change_percentage_24h;
-      volume24h = data.total_volume;
-      
-      if (isNaN(priceUSD) || isNaN(priceBTC) || isNaN(volume24h)) {
-        throw new Error(`Invalid numeric values in data for ${coin}`);
-      }
-      updateUI(false);
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        if (!data || !data.current_price) {
+            throw new Error(`Invalid CoinGecko data structure for ${coin}`);
+        }
+        
+        priceUSD = data.current_price;
+        priceBTC = coin === 'BTC' ? 1 : data.price_btc || (data.current_price / app.btcPriceUSD);
+        priceChange1d = data.price_change_percentage_24h;
+        volume24h = data.total_volume;
+        
+        if (isNaN(priceUSD) || isNaN(priceBTC) || isNaN(volume24h)) {
+            throw new Error(`Invalid numeric values in data for ${coin}`);
+        }
+        
+        updateUI(false);
     } catch (error) {
-      console.error(`Error displaying data for ${coin}:`, error.message);
-      updateUI(true);
+        console.error(`Error displaying data for ${coin}:`, error.message);
+        updateUI(true);
     }
-  },
+},
   
   showLoader: () => {
     const loader = document.getElementById('loader');
@@ -511,6 +518,11 @@ initChart: () => {
     gradient.addColorStop(0, 'rgba(77, 132, 240, 0.2)');
     gradient.addColorStop(1, 'rgba(77, 132, 240, 0)');
 
+    const formatTime = (date) => {
+        const hours = date.getHours().toString().padStart(2, '0');
+        return `${hours}:00`;
+    };
+
     chartModule.chart = new Chart(ctx, {
       type: 'line',
       data: {
@@ -536,20 +548,37 @@ initChart: () => {
           x: {
             type: 'time',
             time: {
-              unit: 'day',
+              unit: 'hour',
               displayFormats: {
-                hour: 'ha',
-                day: 'MMM d'
+                hour: 'HH:00',
+                day: 'MMM d',
+                month: 'MMM yyyy'
               }
             },
             ticks: {
               source: 'data',
-              maxTicksLimit: 10,
+              maxTicksLimit: 12,
               font: {
                 size: 12,
                 family: "'Inter', sans-serif"
               },
-              color: 'rgba(156, 163, 175, 1)'
+              color: 'rgba(156, 163, 175, 1)',
+              callback: function(value) {
+                const date = new Date(value);
+                if (config.currentResolution === 'day') {
+                  return formatTime(date);
+                } else if (config.currentResolution === 'year') {
+                  return date.toLocaleDateString('en-US', {
+                    month: 'short',
+                    year: 'numeric'
+                  });
+                } else {
+                  return date.toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric'
+                  });
+                }
+              }
             },
             grid: {
               display: false
@@ -588,15 +617,23 @@ initChart: () => {
             callbacks: {
               title: (tooltipItems) => {
                 const date = new Date(tooltipItems[0].parsed.x);
-                return date.toLocaleString('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                  year: 'numeric',
-                  hour: 'numeric',
-                  minute: 'numeric',
-                  hour12: true,
-                  timeZone: 'UTC'
-                });
+                if (config.currentResolution === 'day') {
+                  return `${date.toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric'
+                  })} ${formatTime(date)}`;
+                } else if (config.currentResolution === 'year') {
+                  return date.toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric'
+                  });
+                } else {
+                  return date.toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric'
+                  });
+                }
               },
               label: (item) => {
                 const value = item.parsed.y;
@@ -616,7 +653,6 @@ initChart: () => {
             borderWidth: 1,
             radius: 2,
             hoverRadius: 4,
-            hoverRadius: 4,
             hitRadius: 6,
             hoverBorderWidth: 2
           },
@@ -632,10 +668,8 @@ initChart: () => {
 
     console.log('Chart initialized:', chartModule.chart);
   },
-
-  prepareChartData: (coinSymbol, data) => {
-    console.log(`Preparing chart data for ${coinSymbol}:`, JSON.stringify(data, null, 2));
-    
+  
+prepareChartData: (coinSymbol, data) => {
     if (!data) {
       console.error(`No data received for ${coinSymbol}`);
       return [];
@@ -644,7 +678,44 @@ initChart: () => {
     try {
       let preparedData;
 
-      if (data.Data && Array.isArray(data.Data)) {
+      if (coinSymbol === 'WOW' && Array.isArray(data)) {
+        const endTime = new Date(data[data.length - 1][0]);
+        // Convert to local time
+        endTime.setMinutes(0, 0, 0);
+        const endUnix = endTime.getTime();
+        const startUnix = endUnix - (24 * 3600000);
+        
+        const hourlyPoints = [];
+        
+        for (let hourUnix = startUnix; hourUnix <= endUnix; hourUnix += 3600000) {
+          const targetHour = new Date(hourUnix);
+          targetHour.setMinutes(0, 0, 0);
+          
+          const closestPoint = data.reduce((prev, curr) => {
+            const prevTime = new Date(prev[0]);
+            const currTime = new Date(curr[0]);
+            const prevDiff = Math.abs(prevTime - targetHour);
+            const currDiff = Math.abs(currTime - targetHour);
+            return currDiff < prevDiff ? curr : prev;
+          });
+
+          hourlyPoints.push({
+            x: targetHour,
+            y: closestPoint[1]
+          });
+        }
+
+        const lastTime = new Date(data[data.length - 1][0]);
+        if (lastTime.getMinutes() !== 0) {
+          hourlyPoints.push({
+            x: lastTime,
+            y: data[data.length - 1][1]
+          });
+        }
+
+        preparedData = hourlyPoints;
+
+      } else if (data.Data && Array.isArray(data.Data)) {
         preparedData = data.Data.map(d => ({
           x: new Date(d.time * 1000),
           y: d.close
@@ -663,8 +734,7 @@ initChart: () => {
         console.error(`Unexpected data structure for ${coinSymbol}:`, data);
         return [];
       }
-      
-      console.log(`Prepared data for ${coinSymbol}:`, preparedData.slice(0, 5));
+
       return preparedData;
     } catch (error) {
       console.error(`Error preparing chart data for ${coinSymbol}:`, error);
@@ -837,8 +907,8 @@ const app = {
     disabled: 'Auto-refresh: disabled',
     justRefreshed: 'Just refreshed',
   },
-  cacheTTL: 15 * 60 * 1000, // 15 minutes in milliseconds
-  minimumRefreshInterval: 60 * 1000, // 1 minute in milliseconds
+  cacheTTL: 5 * 60 * 1000, // 5 minutes
+  minimumRefreshInterval: 60 * 1000, // 1 minute
 
   init: () => {
     console.log('Initializing app...');
@@ -889,31 +959,32 @@ const app = {
   }
 },
   
-  loadAllCoinData: async () => {
-    console.log('Loading data for all coins...');
-    try {
-      const allCoinData = await api.fetchCoinGeckoDataXHR();
-      if (allCoinData.error) {
-        throw new Error(allCoinData.error);
-      }
-      
-      for (const coin of config.coins) {
-        const coinData = allCoinData.find(data => data.symbol.toUpperCase() === coin.symbol);
-        if (coinData) {
-          coinData.displayName = coin.displayName || coin.symbol;
-          ui.displayCoinData(coin.symbol, coinData);
-          const cacheKey = `coinData_${coin.symbol}`;
-          cache.set(cacheKey, coinData);
-        } else {
-          console.error(`No data found for ${coin.symbol}`);
+    loadAllCoinData: async () => {
+        console.log('Loading data for all coins...');
+        try {
+            const allCoinData = await api.fetchCoinGeckoDataXHR();
+            if (allCoinData.error) {
+                throw new Error(allCoinData.error);
+            }
+
+            for (const coin of config.coins) {
+                const coinData = allCoinData[coin.symbol.toLowerCase()];
+                if (coinData) {
+                    coinData.displayName = coin.displayName || coin.symbol;
+                    ui.displayCoinData(coin.symbol, coinData);
+                    const cacheKey = `coinData_${coin.symbol}`;
+                    cache.set(cacheKey, coinData);
+                } else {
+                    console.warn(`No data found for ${coin.symbol}`);
+                }
+            }
+        } catch (error) {
+            console.error('Error loading all coin data:', error);
+            ui.displayErrorMessage('Failed to load coin data. Please try refreshing the page.');
+        } finally {
+            console.log('All coin data loaded');
         }
-      }
-    } catch (error) {
-      console.error('Error loading all coin data:', error);
-      ui.displayErrorMessage('Failed to load coin data. Please try refreshing the page.');
-    }
-    console.log('All coin data loaded');
-  },
+    },
   
   loadCoinData: async (coin) => {
     console.log(`Loading data for ${coin.symbol}...`);
@@ -1021,7 +1092,6 @@ const app = {
           }
         } catch (error) {
           console.error(`Error parsing cached item ${key}:`, error);
-          // Remove corrupted cache item
           localStorage.removeItem(key);
         }
       }
@@ -1047,40 +1117,65 @@ const app = {
     app.updateNextRefreshTime();
   },
   
-  refreshAllData: async () => {
-    if (app.isRefreshing) {
-      console.log('Refresh already in progress, skipping...');
-      return;
-    }
+    refreshAllData: async () => {
+        if (app.isRefreshing) {
+            console.log('Refresh already in progress, skipping...');
+            return;
+        }
 
-    console.log('Refreshing all data...');
-    app.isRefreshing = true;
-    ui.showLoader();
-    chartModule.showChartLoader();
-    try {
-      cache.clear();
-      await app.updateBTCPrice();
-      await app.loadAllCoinData();
-      if (chartModule.currentCoin) {
-        await chartModule.updateChart(chartModule.currentCoin, true);
-      }
-      
-      app.lastRefreshedTime = new Date();
-      localStorage.setItem('lastRefreshedTime', app.lastRefreshedTime.getTime().toString());
-      ui.updateLastRefreshedTime();
-      console.log('All data refreshed successfully');
-    } catch (error) {
-      console.error('Error refreshing all data:', error);
-      ui.displayErrorMessage('Failed to refresh all data. Please try again.');
-    } finally {
-      ui.hideLoader();
-      chartModule.hideChartLoader();
-      app.isRefreshing = false;
-      if (app.isAutoRefreshEnabled) {
-        app.scheduleNextRefresh();
-      }
-    }
-  },
+        console.log('Refreshing all data...');
+        app.isRefreshing = true;
+        ui.showLoader();
+        chartModule.showChartLoader();
+        
+        try {
+
+            cache.clear();
+            
+            await app.updateBTCPrice();
+            
+            const allCoinData = await api.fetchCoinGeckoDataXHR();
+            if (allCoinData.error) {
+                throw new Error(allCoinData.error);
+            }
+            
+            for (const coin of config.coins) {
+                const symbol = coin.symbol.toLowerCase();
+                const coinData = allCoinData[symbol];
+                if (coinData) {
+                    coinData.displayName = coin.displayName || coin.symbol;
+
+                    ui.displayCoinData(coin.symbol, coinData);
+
+                    const cacheKey = `coinData_${coin.symbol}`;
+                    cache.set(cacheKey, coinData);
+                } else {
+                    console.error(`No data found for ${coin.symbol}`);
+                }
+            }
+            
+            if (chartModule.currentCoin) {
+                await chartModule.updateChart(chartModule.currentCoin, true);
+            }
+            
+            app.lastRefreshedTime = new Date();
+            localStorage.setItem('lastRefreshedTime', app.lastRefreshedTime.getTime().toString());
+            ui.updateLastRefreshedTime();
+            
+            console.log('All data refreshed successfully');
+            
+        } catch (error) {
+            console.error('Error refreshing all data:', error);
+            ui.displayErrorMessage('Failed to refresh all data. Please try again.');
+        } finally {
+            ui.hideLoader();
+            chartModule.hideChartLoader();
+            app.isRefreshing = false;
+            if (app.isAutoRefreshEnabled) {
+                app.scheduleNextRefresh();
+            }
+        }
+    },
   
   updateNextRefreshTime: () => {
     console.log('Updating next refresh time display');
@@ -1173,25 +1268,26 @@ const app = {
     }
   },
   
-  updateBTCPrice: async () => {
-    console.log('Updating BTC price...');
-    try {
-      const btcData = await api.fetchCoinGeckoDataXHR('bitcoin');
-      if (btcData.error) {
-        console.error('Error fetching BTC price:', btcData.error);
-        app.btcPriceUSD = 0;
-      } else if (btcData[0] && btcData[0].current_price) {
-        app.btcPriceUSD = btcData[0].current_price;
-      } else {
-        console.error('Unexpected BTC data structure:', btcData);
-        app.btcPriceUSD = 0;
-      }
-    } catch (error) {
-      console.error('Error fetching BTC price:', error);
-      app.btcPriceUSD = 0;
-    }
-    console.log('Current BTC price:', app.btcPriceUSD);
-  },
+    updateBTCPrice: async () => {
+        console.log('Updating BTC price...');
+        try {
+            const priceData = await api.fetchCoinGeckoDataXHR();
+            if (priceData.error) {
+                console.error('Error fetching BTC price:', priceData.error);
+                app.btcPriceUSD = 0;
+            } else if (priceData.btc && priceData.btc.current_price) {
+
+                app.btcPriceUSD = priceData.btc.current_price;
+            } else {
+                console.error('Unexpected BTC data structure:', priceData);
+                app.btcPriceUSD = 0;
+            }
+        } catch (error) {
+            console.error('Error fetching BTC price:', error);
+            app.btcPriceUSD = 0;
+        }
+        console.log('Current BTC price:', app.btcPriceUSD);
+    },
   
 sortTable: (columnIndex) => {
   console.log(`Sorting column: ${columnIndex}`);
