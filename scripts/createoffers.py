@@ -133,8 +133,6 @@ def readConfig(args, known_coins):
         config["offers"] = []
     if "bids" not in config:
         config["bids"] = []
-    if "stealthex" not in config:
-        config["stealthex"] = []
 
     if "min_seconds_between_offers" not in config:
         config["min_seconds_between_offers"] = 60
@@ -237,15 +235,6 @@ def readConfig(args, known_coins):
         bid_template["coin_to"] = findCoin(bid_template["coin_to"], known_coins)
     config["num_enabled_bids"] = num_enabled
 
-    num_enabled = 0
-    stealthex_swaps = config["stealthex"]
-    for i, swap in enumerate(stealthex_swaps):
-        num_enabled += 1 if swap.get("enabled", True) else 0
-        if swap.get("enabled", True) is False:
-            continue
-        swap["coin_from"] = findCoin(swap["coin_from"], known_coins)
-    config["num_enabled_swaps"] = num_enabled
-
     if num_changes > 0:
         shutil.copyfile(config_path, config_path + ".last")
         with open(config_path, "w") as fp:
@@ -340,9 +329,6 @@ def main():
         random.shuffle(offer_templates)
 
         bid_templates = config["bids"]
-        random.shuffle(bid_templates)
-
-        stealthex_swaps = config["stealthex"]
         random.shuffle(bid_templates)
 
         # override wallet api calls for testing
@@ -822,110 +808,6 @@ def main():
                     )
                     write_state(args.statefile, script_state)
                     break  # Create max one bid per iteration
-
-            if args.debug and len(stealthex_swaps) > 0:
-                print(
-                    "Processing {} stealthex template{}".format(
-                        config["num_enabled_swaps"],
-                        "s" if config["num_enabled_swaps"] != 1 else "",
-                    )
-                )
-            for stealthex_swap in stealthex_swaps:
-                if stealthex_swap.get("enabled", True) is False:
-                    continue
-                coin_from_data = coins_map[stealthex_swap["coin_from"]]
-
-                wallet_from = read_json_api_wallet(
-                    "wallets/{}".format(coin_from_data["ticker"])
-                )
-
-                current_balance = float(wallet_from["balance"])
-
-                min_balance_from = float(stealthex_swap["min_balance_from"])
-                min_swap_amount = float(stealthex_swap["min_amount_tx"])
-                max_swap_amount = float(stealthex_swap["max_amount_tx"])
-
-                # TODO: Check range limits
-
-                if current_balance >= min_balance_from + min_swap_amount:
-                    swap_amount = max_swap_amount
-                    if current_balance - swap_amount < min_balance_from:
-                        swap_amount = max(
-                            min_swap_amount, current_balance - min_balance_from
-                        )
-
-                    estimate_url = "https://api.stealthex.io/api/v2/estimate/{}/{}?amount={}&api_key={}&fixed=true".format(
-                        coin_from_data["ticker"].lower(),
-                        stealthex_swap["coin_to"].lower(),
-                        swap_amount,
-                        stealthex_swap["api_key"],
-                    )
-                    if args.debug:
-                        print(f"Estimate URL: {estimate_url}")
-                    estimate_response = json.loads(post_req(estimate_url))
-
-                    amount_to = float(estimate_response["estimated_amount"])
-                    rate = swap_amount / amount_to
-                    min_rate = float(stealthex_swap["min_rate"])
-                    if rate < min_rate:
-                        if args.debug:
-                            print(
-                                "Stealthex rate {} below minimum {} for {} to {}".format(
-                                    rate,
-                                    min_rate,
-                                    coin_from_data["ticker"],
-                                    stealthex_swap["coin_to"],
-                                )
-                            )
-                        continue
-
-                    exchange_url = (
-                        "https://api.stealthex.io/api/v2/exchange?api_key={}".format(
-                            stealthex_swap["api_key"]
-                        )
-                    )
-
-                    address_to = stealthex_swap.get("receive_address", "auto")
-                    if address_to == "auto":
-                        address_to = read_json_api(
-                            "wallets/{}/nextdepositaddr".format(
-                                stealthex_swap["coin_to"]
-                            )
-                        )
-
-                    address_refund = stealthex_swap.get("refund_address", "auto")
-                    if address_refund == "auto":
-                        address_refund = read_json_api(
-                            "wallets/{}/nextdepositaddr".format(
-                                coin_from_data["ticker"]
-                            )
-                        )
-
-                    exchange_data = {
-                        "currency_from": coin_from_data["ticker"].lower(),
-                        "currency_to": stealthex_swap["coin_to"].lower(),
-                        "address_to": address_to,
-                        "amount_from": swap_amount,
-                        "fixed": True,
-                        # 'extra_id_to':
-                        # 'referral':
-                        "refund_address": address_refund,
-                        # 'refund_extra_id':
-                        "rate_id": estimate_response["rate_id"],
-                    }
-
-                    if args.debug:
-                        print(f"Exchange URL: {estimate_url}")
-                        print(f"Exchange data: {exchange_data}")
-
-                    exchange_response = json.loads(
-                        post_req(exchange_url, exchange_data)
-                    )
-
-                    if "Error" in exchange_response:
-                        raise ValueError("Exchange error " + exchange_response)
-
-                    raise ValueError("TODO")
 
         except Exception as e:
             print(f"Error: {e}.")

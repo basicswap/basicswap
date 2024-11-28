@@ -284,19 +284,6 @@ class Test(unittest.TestCase):
                     "min_coin_to_balance": -1,
                 },
             ],
-            "stealthex": [
-                {
-                    "coin_from": "XMR",
-                    "coin_to": "BTC",
-                    "min_balance_from": 1,
-                    "min_amount_tx": 1,
-                    "max_amount_tx": 5,
-                    "min_rate": 0.01,
-                    "refund_address": "auto",
-                    "receive_address": "auto",
-                    "api_key": "API_KEY_HERE",
-                }
-            ],
         }
         with open(self.node0_configfile, "w") as fp:
             json.dump(node0_test_config, fp, indent=4)
@@ -305,12 +292,10 @@ class Test(unittest.TestCase):
         rv_stdout = result.stdout.decode().split("\n")
         assert count_lines_with(rv_stdout, "Processing 1 offer template") == 1
         assert count_lines_with(rv_stdout, "Processing 1 bid template") == 1
-        assert count_lines_with(rv_stdout, "Processing 1 stealthex template") == 1
 
         # Test that disabled templates are not processed
         node0_test_config["offers"][0]["enabled"] = False
         node0_test_config["bids"][0]["enabled"] = False
-        node0_test_config["stealthex"][0]["enabled"] = False
         with open(self.node0_configfile, "w") as fp:
             json.dump(node0_test_config, fp, indent=4)
 
@@ -318,7 +303,6 @@ class Test(unittest.TestCase):
         rv_stdout = result.stdout.decode().split("\n")
         assert count_lines_with(rv_stdout, "Processing 0 offer templates") == 1
         assert count_lines_with(rv_stdout, "Processing 0 bid templates") == 1
-        assert count_lines_with(rv_stdout, "Processing 0 stealthex templates") == 1
 
     def test_offers(self):
 
@@ -582,30 +566,6 @@ class Test(unittest.TestCase):
         rv_stdout = result.stdout.decode().split("\n")
         assert len(get_possible_bids(get_possible_bids(rv_stdout))) == 0
         assert count_lines_with(rv_stdout, "too many failed bids") == 1
-
-        """
-        TODO
-        node0_test1_config['stealthex'] = [
-            {
-                'coin_from': 'XMR',
-                'coin_to': 'BTC',
-                'min_balance_from': 1,
-                'min_amount_tx': 1,
-                'max_amount_tx': 5,
-                'min_rate': 0.01,
-                'refund_address': 'auto',
-                'receive_address': 'auto',
-                'api_key': 'API_KEY_HERE'
-            }
-        ]
-        node0_test1_config['wallet_port_override'] = 12699
-        node0_test1_config['test_mode'] = True
-        with open(self.node0_configfile, 'w') as fp:
-            json.dump(node0_test1_config, fp, indent=4)
-
-        result = subprocess.run(self.node0_args, stdout=subprocess.PIPE)
-        rv_stdout = result.stdout.decode().split('\n')
-        """
 
     def test_offer_amount_step(self):
         waitForServer(self.delay_event, UI_PORT + 0)
@@ -981,7 +941,7 @@ class Test(unittest.TestCase):
             if final_completed is not None:
                 # bids should complete
 
-                logging.info("Waiting for bids to settle")
+                logging.info("Waiting for bids to complete")
                 for i in range(50):
 
                     delay_event.wait(5)
@@ -990,7 +950,6 @@ class Test(unittest.TestCase):
                     if any(bid["bid_state"] == "Receiving" for bid in bids):
                         continue
 
-                    logging.info(f"[rm] bids {bids}")
                     num_active_state = 0
                     num_completed = 0
                     for bid in bids:
@@ -1012,7 +971,6 @@ class Test(unittest.TestCase):
                 if any(bid["bid_state"] == "Receiving" for bid in bids):
                     continue
 
-                logging.info(f"[rm] bids {bids}")
                 break
 
             num_active_state = 0
@@ -1021,13 +979,17 @@ class Test(unittest.TestCase):
                     num_active_state += 1
             assert num_active_state == max_active
 
-        # Bids with a combined value less than the offer value should both be accepted
+        logging.info(
+            "Bids with a combined value less than the offer value should both be accepted"
+        )
         test_bid_pair(1.1, 1.2, 2, self.delay_event)
 
-        # Only one bid of bids with a combined value greater than the offer value should be accepted
+        logging.info(
+            "Only one bid of bids with a combined value greater than the offer value should be accepted"
+        )
         test_bid_pair(1.1, 9.2, 1, self.delay_event)
 
-        logging.debug("Change max_concurrent_bids to 1")
+        logging.debug("Change max_concurrent_bids to 1. Only one bid should be active")
         try:
             json_rv = read_json_api(UI_PORT + 0, "automationstrategies/1")
             assert json_rv["data"]["max_concurrent_bids"] == 5
