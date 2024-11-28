@@ -53,6 +53,9 @@ PARTICL_LINUX_EXTRA = os.getenv("PARTICL_LINUX_EXTRA", "nousb")
 LITECOIN_VERSION = os.getenv("LITECOIN_VERSION", "0.21.3")
 LITECOIN_VERSION_TAG = os.getenv("LITECOIN_VERSION_TAG", "")
 
+DOGECOIN_VERSION = os.getenv("DOGECOIN_VERSION", "1.14.7")
+DOGECOIN_VERSION_TAG = os.getenv("DOGECOIN_VERSION_TAG", "")
+
 BITCOIN_VERSION = os.getenv("BITCOIN_VERSION", "26.0")
 BITCOIN_VERSION_TAG = os.getenv("BITCOIN_VERSION_TAG", "")
 
@@ -100,6 +103,7 @@ known_coins = {
     "bitcoin": (BITCOIN_VERSION, BITCOIN_VERSION_TAG, ("laanwj",)),
     "bitcoincash": (BITCOINCASH_VERSION, BITCOINCASH_VERSION_TAG, ("Calin_Culianu",)),
     "litecoin": (LITECOIN_VERSION, LITECOIN_VERSION_TAG, ("davidburkett38",)),
+    "dogecoin": (DOGECOIN_VERSION, DOGECOIN_VERSION_TAG, ("patricklodder",)),
     "decred": (DCR_VERSION, DCR_VERSION_TAG, ("decred_release",)),
     "namecoin": ("0.18.0", "", ("JeremyRand",)),
     "monero": (MONERO_VERSION, MONERO_VERSION_TAG, ("binaryfate",)),
@@ -123,6 +127,8 @@ expected_key_ids = {
     "binaryfate": ("F0AF4D462A0BDF92",),
     "wowario": ("793504B449C69220",),
     "davidburkett38": ("3620E9D387E55666",),
+    "xanimo": ("6E8F17C1B1BCDCBE",),
+    "patricklodder": ("2D3A345B98D0DC1F",),
     "fuzzbawls": ("C1ABA64407731FD9",),
     "pasta": ("52527BEDABE87984",),
     "reuben": ("1290A1D0FA7EE109",),
@@ -196,6 +202,12 @@ LTC_RPC_PORT = int(os.getenv("LTC_RPC_PORT", 19895))
 LTC_ONION_PORT = int(os.getenv("LTC_ONION_PORT", 9333))
 LTC_RPC_USER = os.getenv("LTC_RPC_USER", "")
 LTC_RPC_PWD = os.getenv("LTC_RPC_PWD", "")
+
+DOGE_RPC_HOST = os.getenv("DOGE_RPC_HOST", "127.0.0.1")
+DOGE_RPC_PORT = int(os.getenv("DOGE_RPC_PORT", 42069))
+DOGE_ONION_PORT = int(os.getenv("DOGE_ONION_PORT", 6969))
+DOGE_RPC_USER = os.getenv("DOGE_RPC_USER", "")
+DOGE_RPC_PWD = os.getenv("DOGE_RPC_PWD", "")
 
 BTC_RPC_HOST = os.getenv("BTC_RPC_HOST", "127.0.0.1")
 BTC_RPC_PORT = int(os.getenv("BTC_RPC_PORT", 19996))
@@ -802,6 +814,17 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
                 "https://raw.githubusercontent.com/litecoin-project/gitian.sigs.ltc/master/%s-%s/%s/%s"
                 % (version, os_dir_name, signing_key_name, assert_filename)
             )
+        elif coin == "dogecoin":
+            release_url = "https://github.com/dogecoin/dogecoin/releases/download/v{}/{}".format(
+                version + version_tag, release_filename
+            )
+            assert_filename = "{}-{}-{}-build.assert".format(
+                coin, os_name, ".".join(version.split(".")[:2])
+            )
+            assert_url = (
+                "https://raw.githubusercontent.com/dogecoin/gitian.sigs/master/%s-%s/%s/%s"
+                % (version, os_dir_name, signing_key_name, assert_filename)
+            )
         elif coin == "bitcoin":
             release_url = "https://bitcoincore.org/bin/bitcoin-core-{}/{}".format(
                 version, release_filename
@@ -1276,6 +1299,14 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
                         LTC_RPC_USER, salt, password_to_hmac(salt, LTC_RPC_PWD)
                     )
                 )
+        elif coin == "dogecoin":
+            fp.write("prune=4000\n")
+            if DOGE_RPC_USER != "":
+                fp.write(
+                    "rpcauth={}:{}${}\n".format(
+                        DOGE_RPC_USER, salt, password_to_hmac(salt, DOGE_RPC_PWD)
+                    )
+                )
         elif coin == "bitcoin":
             fp.write("deprecatedrpc=create_bdb\n")
             fp.write("prune=2000\n")
@@ -1485,6 +1516,8 @@ def modify_tor_config(
             default_onionport = PART_ONION_PORT
         elif coin == "litecoin":
             default_onionport = LTC_ONION_PORT
+        elif coin == "dogecoin":
+            default_onionport = DOGE_ONION_PORT
         elif coin in ("decred",):
             pass
         else:
@@ -1697,6 +1730,7 @@ def initialise_wallets(
                 Coins.PART,
                 Coins.BTC,
                 Coins.LTC,
+                Coins.DOGE,
                 Coins.DCR,
                 Coins.DASH,
             )
@@ -1803,7 +1837,7 @@ def initialise_wallets(
                             "Creating wallet.dat for {}.".format(getCoinName(c))
                         )
 
-                        if c in (Coins.BTC, Coins.LTC, Coins.DASH):
+                        if c in (Coins.BTC, Coins.LTC, Coins.DOGE, Coins.DASH):
                             # wallet_name, disable_private_keys, blank, passphrase, avoid_reuse, descriptors
                             swap_client.callcoinrpc(
                                 c,
@@ -2256,6 +2290,20 @@ def main():
             "core_version_group": 21,
             "min_relay_fee": 0.00001,
         },
+        "dogecoin": {
+            "connection_type": "rpc",
+            "manage_daemon": shouldManageDaemon("DOGE"),
+            "rpchost": DOGE_RPC_HOST,
+            "rpcport": DOGE_RPC_PORT + port_offset,
+            "onionport": DOGE_ONION_PORT + port_offset,
+            "datadir": os.getenv("DOGE_DATA_DIR", os.path.join(data_dir, "dogecoin")),
+            "bindir": os.path.join(bin_dir, "dogecoin"),
+            "use_segwit": True,
+            "blocks_confirmed": 2,
+            "conf_target": 2,
+            "core_version_group": 21,  # TODO ofrnxmr
+            "min_relay_fee": 0.00001,
+        },
         "decred": {
             "connection_type": "rpc",
             "manage_daemon": shouldManageDaemon("DCR"),
@@ -2403,6 +2451,9 @@ def main():
     if LTC_RPC_USER != "":
         chainclients["litecoin"]["rpcuser"] = LTC_RPC_USER
         chainclients["litecoin"]["rpcpassword"] = LTC_RPC_PWD
+    if DOGE_RPC_USER != "":
+        chainclients["dogecoin"]["rpcuser"] = DOGE_RPC_USER
+        chainclients["dogecoin"]["rpcpassword"] = DOGE_RPC_PWD
     if BTC_RPC_USER != "":
         chainclients["bitcoin"]["rpcuser"] = BTC_RPC_USER
         chainclients["bitcoin"]["rpcpassword"] = BTC_RPC_PWD
