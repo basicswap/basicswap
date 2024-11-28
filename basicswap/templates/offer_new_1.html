@@ -117,6 +117,102 @@
     </div>
   </div>
 </div>
+<script>
+function handleNewOfferAddress() {
+    const selectElement = document.querySelector('select[name="addr_from"]');
+    const STORAGE_KEY = 'lastUsedAddressNewOffer';
+    const form = selectElement?.closest('form');
+    
+    if (!selectElement || !form) return;
+
+    function loadInitialAddress() {
+        const savedAddressJSON = localStorage.getItem(STORAGE_KEY);
+        
+        if (savedAddressJSON) {
+            try {
+                const savedAddress = JSON.parse(savedAddressJSON);
+                const optionExists = Array.from(selectElement.options).some(
+                    option => option.value === savedAddress.value
+                );
+                
+                if (optionExists) {
+                    selectElement.value = savedAddress.value;
+                } else {
+                    selectFirstAddress();
+                }
+            } catch (e) {
+                selectFirstAddress();
+            }
+        } else {
+            selectFirstAddress();
+        }
+    }
+
+    function selectFirstAddress() {
+        if (selectElement.options.length > 1) {
+            const firstOption = selectElement.options[1];
+            if (firstOption) {
+                selectElement.value = firstOption.value;
+                saveAddress(firstOption.value, firstOption.text);
+            }
+        }
+    }
+
+    function saveAddress(value, text) {
+        const addressData = {
+            value: value,
+            text: text
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(addressData));
+    }
+
+    form.addEventListener('submit', async (e) => {
+        if (selectElement.value === '-1') {
+            e.preventDefault();
+            
+            try {
+                const formData = new FormData(form);
+                const response = await fetch(form.action, {
+                    method: form.method,
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    setTimeout(() => {
+                        const newAddress = selectElement.options[1];
+                        if (newAddress) {
+                            selectElement.value = newAddress.value;
+                            saveAddress(newAddress.value, newAddress.text);
+                        }
+                        form.submit();
+                    }, 100);
+                }
+            } catch (error) {
+                console.error('Error submitting form:', error);
+                form.submit();
+            }
+        }
+    });
+
+    selectElement.addEventListener('change', (event) => {
+        const selectedValue = event.target.value;
+        const selectedText = event.target.selectedOptions[0].text;
+        
+        if (selectedValue !== '-1') {
+            saveAddress(selectedValue, selectedText);
+        }
+    });
+
+    loadInitialAddress();
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', handleNewOfferAddress);
+} else {
+    handleNewOfferAddress();
+}
+</script>
+
           <div class="py-0 border-b items-center justify-between -mx-4 mb-6 pb-3 border-gray-400 border-opacity-20">
             <div class="w-full md:w-10/12">
               <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
