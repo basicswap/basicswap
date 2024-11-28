@@ -153,7 +153,8 @@ const coinNameToDisplayName = {
 const coinIdToName = {
     1: 'particl', 2: 'bitcoin', 3: 'litecoin', 4: 'decred',
     6: 'monero', 7: 'particl blind', 8: 'particl anon',
-    9: 'wownero', 11: 'pivx', 13: 'firo', 17: 'bitcoincash'
+    9: 'wownero', 11: 'pivx', 13: 'firo', 17: 'bitcoincash',
+    18: 'dogecoin'
 };
 
 const toggleButton = document.getElementById('toggleView');
@@ -453,7 +454,7 @@ function getCoinSymbol(fullName) {
         'Particl': 'PART', 'Particl Blind': 'PART', 'Particl Anon': 'PART',
         'PIVX': 'PIVX', 'Firo': 'FIRO', 'Zcoin': 'FIRO',
         'Dash': 'DASH', 'Decred': 'DCR', 'Wownero': 'WOW',
-        'Bitcoin Cash': 'BCH'
+        'Bitcoin Cash': 'BCH', 'Dogecoin': 'DOGE'
     };
     return symbolMap[fullName] || fullName;
 }
