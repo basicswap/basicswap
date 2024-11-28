@@ -33,7 +33,7 @@ from basicswap.basicswap_util import (
 
 from basicswap.protocols.xmr_swap_1 import getChainBSplitKey, getChainBRemoteSplitKey
 
-PAGE_LIMIT = 25
+PAGE_LIMIT = 1000
 invalid_coins_from = []
 known_chart_coins = [
     "BTC",
