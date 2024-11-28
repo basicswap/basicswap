@@ -103,12 +103,13 @@ class Test(XmrTestBase):
 
         waitForNumBids(self.delay_event, 12700, 1)
 
-        for i in range(10):
+        for i in range(16):
             bids = read_json_api(12700, "bids")
             bid = bids[0]
             if bid["bid_state"] == "Received":
                 break
-            self.delay_event.wait(1)
+            self.delay_event.wait(2)
+        assert bid["bid_state"] == "Received"
         assert bid["expire_at"] == bid["created_at"] + data["validmins"] * 60
 
         data = {"accept": True}

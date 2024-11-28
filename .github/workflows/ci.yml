@@ -1,0 +1,58 @@
+name: ci
+
+on: [push, pull_request]
+
+env:
+  BIN_DIR: /tmp/cached_bin
+  TEST_RELOAD_PATH: /tmp/test_basicswap1
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.12"]
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v3
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 codespell pytest
+        pip install -r requirements.txt --require-hashes
+    - name: Install
+      run: |
+        pip install .
+    - name: Running flake8
+      run: |
+        flake8 --ignore=E203,E501,W503 --exclude=basicswap/contrib,basicswap/interface/contrib,.eggs,.tox,bin/install_certifi.py
+    - name: Running codespell
+      run: |
+        codespell --check-filenames --disable-colors --quiet-level=7 --ignore-words=tests/lint/spelling.ignore-words.txt -S .git,.eggs,.tox,pgp,*.pyc,*basicswap/contrib,*basicswap/interface/contrib,*mnemonics.py,bin/install_certifi.py,*basicswap/static
+    - name: Running test_other
+      run: |
+        pytest tests/basicswap/test_other.py
+    - name: Cache coin cores
+      id: cache-cores
+      uses: actions/cache@v3
+      env:
+        cache-name: cache-cores
+      with:
+        path: "$BIN_DIR"
+        key: python bin/basicswap-prepare.py --version --withcoins=bitcoin,monero
+
+    - if: ${{ steps.cache-yarn.outputs.cache-hit != 'true' }}
+      name: Running basicswap-prepare
+      run: |
+        basicswap-prepare --bindir="$BIN_DIR" --preparebinonly --withcoins=particl,bitcoin,monero
+    - name: Running test_encrypted_xmr_reload
+      run: |
+        export PYTHONPATH=$(pwd)
+        export TEST_PATH=${TEST_RELOAD_PATH}
+        mkdir -p ${TEST_RELOAD_PATH}/bin
+        cp -r $BIN_DIR/* ${TEST_RELOAD_PATH}/bin/
+        pytest tests/basicswap/extended/test_encrypted_xmr_reload.py
+
