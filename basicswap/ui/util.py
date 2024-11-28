@@ -51,6 +51,7 @@ known_chart_coins = [
     "BCH",
 ]
 
+
 def tickerToCoinId(ticker):
     search_str = ticker.upper()
     for c in Coins:
