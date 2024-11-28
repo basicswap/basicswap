@@ -64,7 +64,7 @@
        <h4 class="text-xl font-bold dark:text-white">{{ w.name }}
         <span class="inline-block font-medium text-xs text-gray-500 dark:text-white">({{ w.ticker }})</span>
        </h4>
-       <p class="text-xs text-gray-500 dark:text-gray-200">Version: {{ w.version }} {% if w.updating %} <span class="inline-block py-1 px-2 rounded-full bg-blue-100 text-xs text-black-500 dark:bg-gray-700 dark:hover:bg-gray-700">Updating..</span></p>
+       <p class="text-xs text-gray-500 dark:text-gray-200">Version: {{ w.version }} {% if w.updating %} <span class="hidden inline-block py-1 px-2 rounded-full bg-blue-100 text-xs text-black-500 dark:bg-gray-700 dark:hover:bg-gray-700">Updating..</span></p>
        {% endif %}
       </div>
       <div class="p-6 bg-coolGray-100 dark:bg-gray-600">
@@ -207,23 +207,17 @@
 {% include 'footer.html' %}
 
 <script>
-// Config
 const CONFIG = {
   MAX_RETRIES: 3,
   BASE_DELAY: 1000,
-  CACHE_EXPIRATION: 5 * 60 * 1000, // 5 minutes
-  PRICE_UPDATE_INTERVAL: 5 * 60 * 1000, // 5 minutes
+  CACHE_EXPIRATION: 5 * 60 * 1000,
+  PRICE_UPDATE_INTERVAL: 5 * 60 * 1000,
   API_TIMEOUT: 30000,
   DEBOUNCE_DELAY: 500,
-  CACHE_MIN_INTERVAL: 60 * 1000, // Minimum 1 minute between API calls
-  MAX_PERCENTAGE_CHANGE: 50, // Max reasonable percentage change (50%)
-  MIN_VALUE_FOR_PERCENTAGE: 0.01 // Minimum value to calculate percentage changes
+  CACHE_MIN_INTERVAL: 60 * 1000
 };
 
 const STATE_KEYS = {
-  PERCENTAGE_CHANGE: 'last-percentage-change',
-  PERCENTAGE_COLOR: 'percentage-change-color',
-  PERCENTAGE_ICON: 'percentage-change-icon',
   LAST_UPDATE: 'last-update-time',
   PREVIOUS_TOTAL: 'previous-total-usd',
   CURRENT_TOTAL: 'current-total-usd',
@@ -259,65 +253,46 @@ const SHORT_NAMES = {
   'Bitcoin Cash': 'BCH'
 };
 
-// Cache
 class Cache {
   constructor(expirationTime) {
-    console.log(`Initializing cache with ${expirationTime/1000} seconds expiration time`);
     this.data = null;
     this.timestamp = null;
     this.expirationTime = expirationTime;
   }
 
   isValid() {
-    console.log('Checking cache validity...');
-    const isValid = Boolean(
+    return Boolean(
       this.data && 
       this.timestamp &&
       (Date.now() - this.timestamp < this.expirationTime)
     );
-    console.log(`Cache validity check result: ${isValid}`);
-    if (this.timestamp) {
-      const age = (Date.now() - this.timestamp) / 1000;
-      console.log(`Cache age: ${age.toFixed(1)} seconds`);
-    }
-    return isValid;
   }
 
   set(data) {
-    console.log('Updating cache with new data');
     this.data = data;
     this.timestamp = Date.now();
-    console.log('Cache updated successfully');
   }
 
   get() {
-    console.log('Attempting to retrieve data from cache');
     if (this.isValid()) {
-      console.log('Returning valid cached data');
       return this.data;
     }
-    console.log('No valid cached data available');
     return null;
   }
 
   clear() {
-    console.log('Clearing cache data');
     this.data = null;
     this.timestamp = null;
-    console.log('Cache cleared successfully');
   }
 }
 
-// API
 class ApiClient {
   constructor() {
-    console.log('Initializing API client');
     this.cache = new Cache(CONFIG.CACHE_EXPIRATION);
     this.lastFetchTime = 0;
   }
 
   makeRequest(url, headers = {}) {
-    console.log(`Making API request to: ${url}`);
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', '/json/readurl');
@@ -325,38 +300,30 @@ class ApiClient {
       xhr.timeout = CONFIG.API_TIMEOUT;
 
       xhr.ontimeout = () => {
-        console.error('API request timed out');
         reject(new Error('Request timed out'));
       };
       
       xhr.onload = () => {
         if (xhr.status === 200) {
-          console.log('Received 200 response from API');
           try {
             const response = JSON.parse(xhr.responseText);
             if (response.Error) {
-              console.error('Error in API response:', response.Error);
               reject(new Error(response.Error));
             } else {
-              console.log('Successfully parsed API response');
               resolve(response);
             }
           } catch (error) {
-            console.error('Failed to parse API response:', error);
             reject(new Error(`Invalid JSON response: ${error.message}`));
           }
         } else {
-          console.error(`API request failed with status: ${xhr.status}`);
           reject(new Error(`HTTP Error: ${xhr.status} ${xhr.statusText}`));
         }
       };
 
       xhr.onerror = () => {
-        console.error('Network error occurred during API request');
         reject(new Error('Network error occurred'));
       };
       
-      console.log('Sending API request...');
       xhr.send(JSON.stringify({ url, headers }));
     });
   }
@@ -366,10 +333,8 @@ class ApiClient {
     const timeSinceLastFetch = now - this.lastFetchTime;
 
     if (!forceUpdate && timeSinceLastFetch < CONFIG.CACHE_MIN_INTERVAL) {
-      console.log(`Skipping API call - only ${(timeSinceLastFetch/1000).toFixed(1)}s since last fetch`);
       const cachedData = this.cache.get();
       if (cachedData) {
-        console.log('Using recent cached data');
         return cachedData;
       }
     }
@@ -377,21 +342,17 @@ class ApiClient {
     let lastError = null;
     for (let attempt = 0; attempt < CONFIG.MAX_RETRIES; attempt++) {
       try {
-        console.log(`Attempting to fetch fresh prices (attempt ${attempt + 1}/${CONFIG.MAX_RETRIES})`);
         const prices = await this.makeRequest(
           'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,bitcoin-cash,dash,dogecoin,decred,litecoin,particl,pivx,monero,zano,wownero,zcoin&vs_currencies=USD,BTC'
         );
-        console.log('Successfully fetched new prices, updating cache');
         this.cache.set(prices);
         this.lastFetchTime = now;
         return prices;
       } catch (error) {
         lastError = error;
-        console.error(`Price fetch attempt ${attempt + 1} failed:`, error);
         
         if (attempt < CONFIG.MAX_RETRIES - 1) {
           const delay = Math.min(CONFIG.BASE_DELAY * Math.pow(2, attempt), 10000);
-          console.log(`Waiting ${delay/1000} seconds before next retry...`);
           await new Promise(resolve => setTimeout(resolve, delay));
         }
       }
@@ -399,18 +360,15 @@ class ApiClient {
 
     const cachedData = this.cache.get();
     if (cachedData) {
-      console.log('Using cached data after all fetch attempts failed');
       return cachedData;
     }
     
-    console.error('All fetch attempts failed and no cache available');
     throw lastError || new Error('Failed to fetch prices');
   }
 }
 
 class UiManager {
   constructor() {
-    console.log('Initializing UI Manager');
     this.api = new ApiClient();
     this.toggleInProgress = false;
     this.toggleDebounceTimer = null;
@@ -423,7 +381,6 @@ class UiManager {
   }
 
   storeOriginalValues() {
-    console.log('Storing original coin values');
     document.querySelectorAll('.coinname-value').forEach(el => {
       const coinName = el.getAttribute('data-coinname');
       const value = el.textContent?.trim() || '';
@@ -453,61 +410,9 @@ class UiManager {
     });
   }
 
-  calculatePercentageChange(oldValue, newValue) {
-    if (!oldValue && !newValue) return 0;
-    
-    oldValue = parseFloat(oldValue);
-    newValue = parseFloat(newValue);
-    
-    if (isNaN(oldValue) || isNaN(newValue)) {
-      console.log('Invalid values for percentage calculation');
-      return 0;
-    }
-    
-    if (oldValue === 0 && newValue === 0) return 0;
-    if (oldValue === 0) return 100;
-    
-    const change = ((newValue - oldValue) / oldValue) * 100;
-
-    if (Math.abs(change) > CONFIG.MAX_PERCENTAGE_CHANGE) {
-      console.log(`Capping extreme percentage change: ${change}%`);
-      return change > 0 ? CONFIG.MAX_PERCENTAGE_CHANGE : -CONFIG.MAX_PERCENTAGE_CHANGE;
-    }
-
-    return change;
-  }
-
-getPercentageChangeDisplay(percentageChange) {
-  let icon, iconColor, text;
-  const textColor = 'white';
-
-  if (percentageChange > 0) {
-    icon = '▲';
-    iconColor = 'rgb(34, 197, 94)';
-    text = `${Math.abs(percentageChange).toFixed(2)}%`;
-  } else if (percentageChange < 0) {
-    icon = '▼';
-    iconColor = 'rgb(239, 68, 68)';
-    text = `${Math.abs(percentageChange).toFixed(2)}%`;
-  } else {
-    icon = '→';
-    iconColor = 'white';
-    text = `0.00%`;
-  }
-
-  return {
-    icon,
-    color: textColor,
-    text: `<span style="color: ${iconColor}">${icon}</span> ${text}`,
-    useHTML: true
-  };
-}
-
   async updatePrices(forceUpdate = false) {
-    console.log(`Starting price update (force update: ${forceUpdate})`);
     try {
       const prices = await this.api.fetchPrices(forceUpdate);
-      const previousTotal = parseFloat(localStorage.getItem(STATE_KEYS.PREVIOUS_TOTAL) || '0');
       let newTotal = 0;
 
       const currentTime = Date.now();
@@ -559,12 +464,10 @@ getPercentageChangeDisplay(percentageChange) {
         }
       });
 
-      const percentageChange = this.calculatePercentageChange(previousTotal, newTotal);
-      this.updateTotalValues(newTotal, prices?.bitcoin?.usd, percentageChange);
+      this.updateTotalValues(newTotal, prices?.bitcoin?.usd);
 
       localStorage.setItem(STATE_KEYS.PREVIOUS_TOTAL, localStorage.getItem(STATE_KEYS.CURRENT_TOTAL) || '0');
       localStorage.setItem(STATE_KEYS.CURRENT_TOTAL, newTotal.toString());
-      localStorage.setItem(STATE_KEYS.PERCENTAGE_CHANGE, percentageChange.toString());
 
       return true;
     } catch (error) {
@@ -573,7 +476,7 @@ getPercentageChangeDisplay(percentageChange) {
     }
   }
   
-  updateTotalValues(totalUsd, btcPrice, percentageChange) {
+  updateTotalValues(totalUsd, btcPrice) {
     const totalUsdEl = document.getElementById('total-usd-value');
     if (totalUsdEl) {
       totalUsdEl.textContent = `$${totalUsd.toFixed(2)}`;
@@ -589,21 +492,7 @@ getPercentageChangeDisplay(percentageChange) {
         totalBtcEl.setAttribute('data-original-value', btcTotal.toString());
       }
     }
-
-    let percentageChangeEl = document.querySelector('.percentage-change');
-    if (!percentageChangeEl) {
-      percentageChangeEl = this.createPercentageChangeElement();
-    }
-  
-   if (percentageChangeEl) {
-   const { color, text, useHTML } = this.getPercentageChangeDisplay(percentageChange);
-   if (useHTML) {
-     percentageChangeEl.innerHTML = text;
-   }
-   percentageChangeEl.style.color = color;
-   percentageChangeEl.style.display = 'inline';
   }
- }
 
   async toggleBalances() {
     if (this.toggleInProgress) return;
@@ -647,7 +536,7 @@ getPercentageChangeDisplay(percentageChange) {
     }
   }
 
-showBalances() {
+  showBalances() {
     const usdText = document.getElementById('usd-text');
     if (usdText) {
       usdText.style.display = 'inline';
@@ -660,10 +549,10 @@ showBalances() {
       }
     });
 
-    document.querySelectorAll('.usd-value').forEach(el => {
+document.querySelectorAll('.usd-value').forEach(el => {
       const storedValue = el.getAttribute('data-original-value');
       if (storedValue) {
-        el.textContent = `($${parseFloat(storedValue).toFixed(2)} USD)`;
+        el.textContent = `$${parseFloat(storedValue).toFixed(2)} USD`;
         el.style.color = 'white';
       }
     });
@@ -680,18 +569,9 @@ showBalances() {
         }
       }
     });
-
-    const percentageChangeEl = document.querySelector('.percentage-change');
-    if (percentageChangeEl) {
-      const storedPercentage = parseFloat(localStorage.getItem(STATE_KEYS.PERCENTAGE_CHANGE) || '0');
-      const { text } = this.getPercentageChangeDisplay(storedPercentage);
-      percentageChangeEl.innerHTML = text;
-      percentageChangeEl.style.display = 'inline';
-    }
   }
 
   hideBalances() {
-    console.log('Hiding balances');
     const usdText = document.getElementById('usd-text');
     if (usdText) {
       usdText.style.display = 'none';
@@ -708,53 +588,13 @@ showBalances() {
       }
     });
 
-    const percentageChangeEl = document.querySelector('.percentage-change');
-    if (percentageChangeEl) {
-      percentageChangeEl.textContent = '****';
-      percentageChangeEl.style.display = 'none';
-    }
-
     const totalUsdEl = document.getElementById('total-usd-value');
     if (totalUsdEl) {
       totalUsdEl.classList.remove('font-extrabold');
     }
   }
 
-createPercentageChangeElement() {
-  const totalUsdEl = document.getElementById('total-usd-value');
-  if (totalUsdEl) {
-    const percentageChangeEl = document.createElement('span');
-    percentageChangeEl.className = 'ml-2 text-base percentage-change cursor-help';
-    totalUsdEl.parentNode.appendChild(percentageChangeEl);
-    
-    const tooltipId = 'tooltip-percentage';
-    percentageChangeEl.setAttribute('data-tooltip-target', tooltipId);
-    
-    if (!document.getElementById(tooltipId)) {
-      const tooltip = document.createElement('div');
-      tooltip.id = tooltipId;
-      tooltip.role = 'tooltip';
-      tooltip.className = 'inline-block absolute invisible z-50 py-2 px-3 text-sm font-medium text-white bg-gray-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip';
-      tooltip.innerHTML = `
-        Price change since last update<br>
-        <span style="color: rgb(34, 197, 94);">▲ Green:</span><span> Price increased</span><br>
-        <span style="color: rgb(239, 68, 68);">▼ Red:</span><span> Price decreased</span><br>
-        <span style="color: white;">→ White:</span><span> No change</span>
-      `;
-      document.body.appendChild(tooltip);
-      
-      if (typeof Tooltip !== 'undefined') {
-        new Tooltip(tooltip, percentageChangeEl);
-      }
-    }
-    
-    return percentageChangeEl;
-  }
-  return null;
-}
-
   async initialize() {
-    console.log('Initializing UI Manager...');
     this.storeOriginalValues();
     
     if (localStorage.getItem('balancesVisible') === null) {
@@ -789,27 +629,20 @@ createPercentageChangeElement() {
   }
 }
 
-// Cleanup
 window.addEventListener('beforeunload', () => {
-  console.log('Page unloading, cleaning up...');
   const uiManager = window.uiManager;
   if (uiManager?.priceUpdateInterval) {
     clearInterval(uiManager.priceUpdateInterval);
-    console.log('Cleared price update interval');
   }
 });
 
-// Initialize
 window.addEventListener('load', () => {
-  console.log('Page loaded, starting application initialization');
   const uiManager = new UiManager();
-  window.uiManager = uiManager; // Store reference for cleanup
+  window.uiManager = uiManager;
   uiManager.initialize().catch(error => {
     console.error('Failed to initialize application:', error);
   });
 });
-
-console.log('Loaded..');
 </script>
 </body>
 </html>
