@@ -12,7 +12,7 @@ let filterTimeout = null;
 
 // Time Constants
 const MIN_REFRESH_INTERVAL = 60; // 60 sec
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes 
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 const FALLBACK_CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 
 // Application Constants
@@ -67,7 +67,8 @@ const coinNameToDisplayName = {
 const coinIdToName = {
     1: 'particl', 2: 'bitcoin', 3: 'litecoin', 4: 'decred',
     6: 'monero', 7: 'particl blind', 8: 'particl anon',
-    9: 'wownero', 11: 'pivx', 13: 'firo', 17: 'bitcoincash'
+    9: 'wownero', 11: 'pivx', 13: 'firo', 17: 'bitcoincash',
+    18: 'dogecoin'
 };
 
 // DOM ELEMENT REFERENCES
@@ -92,7 +93,7 @@ const WebSocketManager = {
     reconnectDelay: 5000,
     maxQueueSize: 1000,
     isIntentionallyClosed: false,
-    
+
     connectionState: {
         isConnecting: false,
         lastConnectAttempt: null,
@@ -271,7 +272,7 @@ const WebSocketManager = {
         try {
             const response = await fetch(endpoint);
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-            
+
             const newData = await response.json();
             const fetchedOffers = Array.isArray(newData) ? newData : Object.values(newData);
 
@@ -300,7 +301,7 @@ const WebSocketManager = {
         this.reconnectAttempts++;
         if (this.reconnectAttempts <= this.maxReconnectAttempts) {
             console.log(`🔄 Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
-            
+
             const delay = Math.min(
                 this.reconnectDelay * Math.pow(1.5, this.reconnectAttempts - 1),
                 30000
@@ -324,11 +325,11 @@ const WebSocketManager = {
 
     cleanup() {
         console.log('🧹 Cleaning up WebSocket resources');
-        
+
         clearTimeout(this.debounceTimeout);
         clearTimeout(this.reconnectTimeout);
         clearTimeout(this.connectionState.connectTimeout);
-        
+
         this.messageQueue = [];
         this.processingQueue = false;
         this.connectionState.isConnecting = false;
@@ -365,7 +366,7 @@ const CacheManager = {
     set: function(key, value, customTtl = null) {
         try {
             this.cleanup();
-            
+
             const item = {
                 value: value,
                 timestamp: Date.now(),
@@ -396,7 +397,7 @@ const CacheManager = {
             return false;
         }
     },
-    
+
     get: function(key) {
         try {
             const itemStr = localStorage.getItem(key);
@@ -404,14 +405,14 @@ const CacheManager = {
 
             const item = JSON.parse(itemStr);
             const now = Date.now();
-            
+
             if (now < item.expiresAt) {
                 return {
                     value: item.value,
                     remainingTime: item.expiresAt - now
                 };
             }
-            
+
             localStorage.removeItem(key);
         } catch (error) {
             localStorage.removeItem(key);
@@ -433,7 +434,7 @@ const CacheManager = {
                 const itemStr = localStorage.getItem(key);
                 const size = new Blob([itemStr]).size;
                 const item = JSON.parse(itemStr);
-                
+
                 if (now >= item.expiresAt) {
                     localStorage.removeItem(key);
                     continue;
@@ -445,7 +446,7 @@ const CacheManager = {
                     expiresAt: item.expiresAt,
                     timestamp: item.timestamp
                 });
-                
+
                 totalSize += size;
                 itemCount++;
             } catch (error) {
@@ -455,7 +456,7 @@ const CacheManager = {
 
         if (aggressive || totalSize > this.maxSize || itemCount > this.maxItems) {
             items.sort((a, b) => b.timestamp - a.timestamp);
-            
+
             while ((totalSize > this.maxSize || itemCount > this.maxItems) && items.length > 0) {
                 const item = items.pop();
                 localStorage.removeItem(item.key);
@@ -473,7 +474,7 @@ const CacheManager = {
                 keys.push(key);
             }
         }
-        
+
         keys.forEach(key => localStorage.removeItem(key));
     },
 
@@ -491,10 +492,10 @@ const CacheManager = {
                 const itemStr = localStorage.getItem(key);
                 const size = new Blob([itemStr]).size;
                 const item = JSON.parse(itemStr);
-                
+
                 totalSize += size;
                 itemCount++;
-                
+
                 if (now >= item.expiresAt) {
                     expiredCount++;
                 }
@@ -528,7 +529,7 @@ window.tableRateModule = {
         'Bitcoin Cash': 'BCH',
         'Dogecoin': 'DOGE'
     },
-    
+
     cache: {},
     processedOffers: new Set(),
 
@@ -564,7 +565,7 @@ window.tableRateModule = {
         this.processedOffers.add(offerId);
         return true;
     },
-    
+
     formatUSD(value) {
         if (Math.abs(value) < 0.000001) {
             return value.toExponential(8) + ' USD';
@@ -654,23 +655,23 @@ async function initializePriceData() {
     while (retryCount < PRICE_INIT_RETRIES) {
         try {
             prices = await fetchLatestPrices();
-            
+
             if (prices && Object.keys(prices).length > 0) {
                 console.log('Successfully fetched initial price data');
                 latestPrices = prices;
                 CacheManager.set(PRICES_CACHE_KEY, prices, CACHE_DURATION);
                 return true;
             }
-            
+
             retryCount++;
-            
+
             if (retryCount < PRICE_INIT_RETRIES) {
                 await new Promise(resolve => setTimeout(resolve, PRICE_INIT_RETRY_DELAY));
             }
         } catch (error) {
             console.error(`Error fetching prices (attempt ${retryCount + 1}):`, error);
             retryCount++;
-            
+
             if (retryCount < PRICE_INIT_RETRIES) {
                 await new Promise(resolve => setTimeout(resolve, PRICE_INIT_RETRY_DELAY));
             }
@@ -706,7 +707,7 @@ function checkOfferAgainstFilters(offer, filters) {
         const currentTime = Math.floor(Date.now() / 1000);
         const isExpired = offer.expire_at <= currentTime;
         const isRevoked = Boolean(offer.is_revoked);
-        
+
         switch (filters.status) {
             case 'active':
                 return !isExpired && !isRevoked;
@@ -726,7 +727,7 @@ function initializeFlowbiteTooltips() {
         //console.warn('Tooltip is not defined. Make sure the required library is loaded.');
         return;
     }
-    
+
     const tooltipElements = document.querySelectorAll('[data-tooltip-target]');
     tooltipElements.forEach((el) => {
         const tooltipId = el.getAttribute('data-tooltip-target');
@@ -740,10 +741,10 @@ function initializeFlowbiteTooltips() {
 // DATA PROCESSING FUNCTIONS
 async function checkExpiredAndFetchNew() {
     if (isSentOffers) return Promise.resolve();
-    
+
     console.log('Starting checkExpiredAndFetchNew');
     const OFFERS_CACHE_KEY = 'offers_received';
-    
+
     try {
         const response = await fetch('/json/offers');
         const data = await response.json();
@@ -772,9 +773,9 @@ async function checkExpiredAndFetchNew() {
         CacheManager.set(OFFERS_CACHE_KEY, newListings, CACHE_DURATION);
 
         const currentFilters = new FormData(filterForm);
-        const hasActiveFilters = currentFilters.get('coin_to') !== 'any' || 
+        const hasActiveFilters = currentFilters.get('coin_to') !== 'any' ||
                                currentFilters.get('coin_from') !== 'any';
-        
+
         if (hasActiveFilters) {
             jsonData = filterAndSortData();
         } else {
@@ -784,7 +785,7 @@ async function checkExpiredAndFetchNew() {
         updateOffersTable();
         updateJsonView();
         updatePaginationInfo();
-        
+
         if (jsonData.length === 0) {
             handleNoOffersScenario();
         }
@@ -810,7 +811,7 @@ function getValidOffers() {
 
 function filterAndSortData() {
     //console.log('[Debug] Starting filter with data length:', originalJsonData.length);
-    
+
     const formData = new FormData(filterForm);
     const filters = Object.fromEntries(formData);
     //console.log('[Debug] Active filters:', filters);
@@ -831,13 +832,13 @@ function filterAndSortData() {
 
         const coinFrom = (offer.coin_from || '').toLowerCase();
         const coinTo = (offer.coin_to || '').toLowerCase();
-        
+
         if (filters.coin_to !== 'any') {
             if (!coinMatches(coinTo, filters.coin_to)) {
                 return false;
             }
         }
-        
+
         if (filters.coin_from !== 'any') {
             if (!coinMatches(coinFrom, filters.coin_from)) {
                 return false;
@@ -848,7 +849,7 @@ function filterAndSortData() {
             const currentTime = Math.floor(Date.now() / 1000);
             const isExpired = offer.expire_at <= currentTime;
             const isRevoked = Boolean(offer.is_revoked);
-            
+
             switch (filters.status) {
                 case 'active':
                     return !isExpired && !isRevoked;
@@ -867,7 +868,7 @@ function filterAndSortData() {
     if (currentSortColumn !== null) {
         filteredData.sort((a, b) => {
             let comparison = 0;
-            
+
             switch(currentSortColumn) {
                 case 0: // Time
                     comparison = a.created_at - b.created_at;
@@ -880,32 +881,32 @@ function filterAndSortData() {
                     const aToSymbol = getCoinSymbolLowercase(a.coin_to);
                     const bFromSymbol = getCoinSymbolLowercase(b.coin_from);
                     const bToSymbol = getCoinSymbolLowercase(b.coin_to);
-                    
+
                     const aFromPrice = latestPrices[aFromSymbol]?.usd || 0;
                     const aToPrice = latestPrices[aToSymbol]?.usd || 0;
                     const bFromPrice = latestPrices[bFromSymbol]?.usd || 0;
                     const bToPrice = latestPrices[bToSymbol]?.usd || 0;
-                    
+
                     const aMarketRate = aToPrice / aFromPrice;
                     const bMarketRate = bToPrice / bFromPrice;
-                    
+
                     const aOfferedRate = parseFloat(a.rate);
                     const bOfferedRate = parseFloat(b.rate);
-                    
+
                     const aPercentDiff = ((aOfferedRate - aMarketRate) / aMarketRate) * 100;
                     const bPercentDiff = ((bOfferedRate - bMarketRate) / bMarketRate) * 100;
-                    
+
                     comparison = aPercentDiff - bPercentDiff;
                     break;
                 case 7: // Trade
                     comparison = a.offer_id.localeCompare(b.offer_id);
                     break;
             }
-            
+
             return currentSortDirection === 'desc' ? -comparison : comparison;
         });
     }
-    
+
     //console.log(`[Debug] Filtered data length: ${filteredData.length}`);
     return filteredData;
 }
@@ -1008,7 +1009,7 @@ async function fetchLatestPrices() {
     }
 
     const url = `${config.apiEndpoints.coinGecko}/simple/price?ids=bitcoin,bitcoin-cash,dash,dogecoin,decred,litecoin,particl,pivx,monero,zano,wownero,zcoin&vs_currencies=USD,BTC&api_key=${config.apiKeys.coinGecko}`;
-    
+
     try {
         console.log('Fetching fresh price data...');
         const response = await fetch('/json/readurl', {
@@ -1030,7 +1031,7 @@ async function fetchLatestPrices() {
         if (data.Error) {
             throw new Error(data.Error);
         }
-        
+
         if (data && Object.keys(data).length > 0) {
             console.log('✅ Fresh price data received');
 
@@ -1041,7 +1042,7 @@ async function fetchLatestPrices() {
             Object.entries(data).forEach(([coin, prices]) => {
                 tableRateModule.setFallbackValue(coin, prices.usd);
             });
-            
+
             return data;
         } else {
             //console.warn('Received empty price data');
@@ -1063,19 +1064,19 @@ async function fetchOffers(manualRefresh = false) {
   refreshIcon.classList.add('animate-spin');
   refreshText.textContent = 'Refreshing...';
   refreshButton.classList.add('opacity-75', 'cursor-wait');
-  
+
   try {
     const endpoint = isSentOffers ? '/json/sentoffers' : '/json/offers';
     const response = await fetch(endpoint);
     const data = await response.json();
-    
+
     jsonData = formatInitialData(data);
     originalJsonData = [...jsonData];
 
     await updateOffersTable();
     updateJsonView();
     updatePaginationInfo();
-    
+
   } catch (error) {
     //console.error('[Debug] Error fetching offers:', error);
     ui.displayErrorMessage('Failed to fetch offers. Please try again later.');
@@ -1110,12 +1111,12 @@ function formatInitialData(data) {
 function updateConnectionStatus(status) {
     const dot = document.getElementById('status-dot');
     const text = document.getElementById('status-text');
-    
+
     if (!dot || !text) {
         //console.warn('Status indicators not found in DOM');
         return;
     }
-    
+
     switch(status) {
         case 'connected':
             dot.className = 'w-2.5 h-2.5 rounded-full bg-green-500 mr-2';
@@ -1149,10 +1150,10 @@ function updateRowTimes() {
 
             const newPostedTime = formatTime(offer.created_at, true);
             const newExpiresIn = formatTimeLeft(offer.expire_at);
-            
+
             const postedElement = row.querySelector('.text-xs:first-child');
             const expiresElement = row.querySelector('.text-xs:last-child');
-            
+
             if (postedElement && postedElement.textContent !== `Posted: ${newPostedTime}`) {
                 postedElement.textContent = `Posted: ${newPostedTime}`;
             }
@@ -1185,14 +1186,14 @@ function updatePaginationInfo() {
 
     const showPrev = currentPage > 1;
     const showNext = currentPage < totalPages && totalItems > 0;
-    
+
     prevPageButton.style.display = showPrev ? 'inline-flex' : 'none';
     nextPageButton.style.display = showNext ? 'inline-flex' : 'none';
 
     if (lastRefreshTime) {
         lastRefreshTimeSpan.textContent = new Date(lastRefreshTime).toLocaleTimeString();
     }
-    
+
     if (newEntriesCountSpan) {
         newEntriesCountSpan.textContent = totalItems;
     }
@@ -1228,13 +1229,13 @@ function updateProfitLoss(row, fromCoin, toCoin, fromAmount, toAmount, isOwnOffe
             }
 
             const formattedPercentDiff = percentDiff.toFixed(2);
-            const percentDiffDisplay = formattedPercentDiff === "0.00" ? "0.00" : 
+            const percentDiffDisplay = formattedPercentDiff === "0.00" ? "0.00" :
                                      (percentDiff > 0 ? `+${formattedPercentDiff}` : formattedPercentDiff);
 
             const colorClass = getProfitColorClass(percentDiff);
             profitLossElement.textContent = `${percentDiffDisplay}%`;
             profitLossElement.className = `profit-loss text-lg font-bold ${colorClass}`;
-            
+
             const tooltipId = `percentage-tooltip-${row.getAttribute('data-offer-id')}`;
             const tooltipElement = document.getElementById(tooltipId);
             if (tooltipElement) {
@@ -1288,15 +1289,15 @@ function updateClearFiltersButton() {
 function handleNoOffersScenario() {
     const formData = new FormData(filterForm);
     const filters = Object.fromEntries(formData);
-    const hasActiveFilters = filters.coin_to !== 'any' || 
+    const hasActiveFilters = filters.coin_to !== 'any' ||
                             filters.coin_from !== 'any' ||
                             (filters.status && filters.status !== 'any');
-    
+
     if (hasActiveFilters) {
         offersBody.innerHTML = `
             <tr>
                 <td colspan="8" class="text-center py-4 text-gray-500 dark:text-white">
-                    No offers match the selected filters. Try different filter options or 
+                    No offers match the selected filters. Try different filter options or
                     <button onclick="clearFilters()" class="text-blue-500 hover:text-blue-700 bold">clear filters</button>
                 </td>
             </tr>`;
@@ -1315,11 +1316,11 @@ function handleNoOffersScenario() {
 
 async function updateOffersTable() {
     //console.log('[Debug] Starting updateOffersTable function');
-    
+
     try {
         const PRICES_CACHE_KEY = 'prices_coingecko';
         const cachedPrices = CacheManager.get(PRICES_CACHE_KEY);
-        
+
         if (!cachedPrices || !cachedPrices.remainingTime || cachedPrices.remainingTime < 60000) {
             console.log('Fetching fresh price data...');
             const priceData = await fetchLatestPrices();
@@ -1372,7 +1373,7 @@ async function updateOffersTable() {
             initializeFlowbiteTooltips();
             updateRowTimes();
             updatePaginationControls(totalPages);
-            
+
             if (tableRateModule?.initializeTable) {
                 tableRateModule.initializeTable();
             }
@@ -1420,7 +1421,7 @@ function createTableRow(offer, isSentOffers) {
 
     const postedTime = formatTime(offer.created_at, true);
     const expiresIn = formatTime(offer.expire_at);
-    
+
     const currentTime = Math.floor(Date.now() / 1000);
     const isActuallyExpired = currentTime > offer.expire_at;
 
@@ -1494,8 +1495,8 @@ function createTakerAmountColumn(offer, coinTo, coinFrom) {
         <td class="py-0">
             <div class="py-3 px-4 text-left">
                 <a data-tooltip-target="tooltip-wallet${escapeHtml(offer.offer_id)}" href="/wallet/${escapeHtml(toSymbol)}" class="items-center monospace">
-                    <div class="pr-2">        
-                        <div class="text-sm font-semibold">${fromAmount.toFixed(4)}</div>          
+                    <div class="pr-2">
+                        <div class="text-sm font-semibold">${fromAmount.toFixed(4)}</div>
                         <div class="text-sm text-gray-500 dark:text-gray-400">${coinTo}</div>
                     </div>
                 </a>
@@ -1538,8 +1539,8 @@ function createOrderbookColumn(offer, coinFrom, coinTo) {
         <td class="p-0">
             <div class="py-3 px-4 text-right">
                 <a data-tooltip-target="tooltip-wallet-maker${escapeHtml(offer.offer_id)}" href="/wallet/${escapeHtml(fromSymbol)}" class="items-center monospace">
-                    <div class="pr-2">        
-                        <div class="text-sm font-semibold">${toAmount.toFixed(4)}</div>           
+                    <div class="pr-2">
+                        <div class="text-sm font-semibold">${toAmount.toFixed(4)}</div>
                         <div class="text-sm text-gray-500 dark:text-gray-400">${coinFrom}</div>
                     </div>
                 </a>
@@ -1553,7 +1554,7 @@ function createRateColumn(offer, coinFrom, coinTo) {
     const inverseRate = 1 / rate;
     const fromSymbol = getCoinSymbol(coinFrom);
     const toSymbol = getCoinSymbol(coinTo);
-    
+
     const getPriceKey = (coin) => {
         const lowerCoin = coin.toLowerCase();
         if (lowerCoin === 'firo' || lowerCoin === 'zcoin') {
@@ -1605,9 +1606,9 @@ function createPercentageColumn(offer) {
 function createActionColumn(offer, isActuallyExpired = false) {
     const isRevoked = Boolean(offer.is_revoked);
     const isTreatedAsSentOffer = offer.is_own_offer;
-    
+
     let buttonClass, buttonText;
-    
+
     if (isRevoked) {
         buttonClass = 'bg-red-500 text-white hover:bg-red-600 transition duration-200';
         buttonText = 'Revoked';
@@ -1640,7 +1641,7 @@ function createTooltips(offer, treatAsSentOffer, coinFrom, coinTo, fromAmount, t
     const fromSymbol = getCoinSymbolLowercase(coinFrom);
     const toSymbol = getCoinSymbolLowercase(coinTo);
     const uniqueId = `${offer.offer_id}_${offer.created_at}`;
-    
+
     const fromPriceUSD = latestPrices[fromSymbol]?.usd || 0;
     const toPriceUSD = latestPrices[toSymbol]?.usd || 0;
     const rateInUSD = rate * toPriceUSD;
@@ -1689,19 +1690,19 @@ function createTooltips(offer, treatAsSentOffer, coinFrom, coinTo, fromAmount, t
             </div>
             <div class="tooltip-arrow" data-popper-arrow></div>
         </div>
-        
+
         <div id="tooltip-recipient-${uniqueId}" role="tooltip" class="inline-block absolute invisible z-50 py-2 px-3 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
             <div class="active-revoked-expired"><span class="bold monospace">${offer.addr_from}</span></div>
             <div class="tooltip-arrow" data-popper-arrow></div>
         </div>
-       
+
         <div id="tooltip-wallet-${uniqueId}" role="tooltip" class="inline-block absolute invisible z-50 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
             <div class="active-revoked-expired">
                 <span class="bold">${treatAsSentOffer ? 'My' : ''} ${coinTo} Wallet</span>
             </div>
             <div class="tooltip-arrow pl-1" data-popper-arrow></div>
         </div>
-        
+
         <div id="tooltip-offer-${uniqueId}" role="tooltip" class="inline-block absolute z-50 py-2 px-3 text-sm font-medium text-white ${isRevoked ? 'bg-red-500' : (offer.is_own_offer ? 'bg-gray-300' : 'bg-green-700')} rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
             <div class="active-revoked-expired">
                 <span class="bold">
@@ -1710,14 +1711,14 @@ function createTooltips(offer, treatAsSentOffer, coinFrom, coinTo, fromAmount, t
             </div>
             <div class="tooltip-arrow pr-6" data-popper-arrow></div>
         </div>
-        
+
         <div id="tooltip-wallet-maker-${uniqueId}" role="tooltip" class="inline-block absolute invisible z-50 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
             <div class="active-revoked-expired">
                 <span class="bold">${treatAsSentOffer ? 'My' : ''} ${coinFrom} Wallet</span>
             </div>
             <div class="tooltip-arrow pl-1" data-popper-arrow></div>
         </div>
-        
+
         <div id="tooltip-rate-${uniqueId}" role="tooltip" class="inline-block absolute invisible z-50 py-2 px-3 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
             <div class="tooltip-content">
                 ${combinedRateTooltip}
@@ -1766,7 +1767,7 @@ function createTooltipContent(isSentOffers, coinFrom, coinTo, fromAmount, toAmou
     const marketRate = fromPriceUSD / toPriceUSD;
     const offerRate = toAmount / fromAmount;
     let percentDiff;
-    
+
     if (isSentOffers || isOwnOffer) {
         percentDiff = ((toValueUSD / fromValueUSD) - 1) * 100;
     } else {
@@ -1774,7 +1775,7 @@ function createTooltipContent(isSentOffers, coinFrom, coinTo, fromAmount, toAmou
     }
 
     const formattedPercentDiff = percentDiff.toFixed(2);
-    const percentDiffDisplay = formattedPercentDiff === "0.00" ? "0.00" : 
+    const percentDiffDisplay = formattedPercentDiff === "0.00" ? "0.00" :
                              (percentDiff > 0 ? `+${formattedPercentDiff}` : formattedPercentDiff);
 
     const profitLabel = (isSentOffers || isOwnOffer) ? "Max Profit" : "Max Loss";
@@ -1787,8 +1788,8 @@ function createTooltipContent(isSentOffers, coinFrom, coinTo, fromAmount, toAmou
         <p class="mt-1">Percentage difference: ${percentDiffDisplay}%</p>
         <p>${profitLabel}: ${profitUSD > 0 ? '' : '-'}$${Math.abs(profitUSD).toFixed(2)} USD</p>
         <p class="font-bold mt-2">Calculation:</p>
-        <p>Percentage = ${(isSentOffers || isOwnOffer) ? 
-            "((To Amount in USD / From Amount in USD) - 1) * 100" : 
+        <p>Percentage = ${(isSentOffers || isOwnOffer) ?
+            "((To Amount in USD / From Amount in USD) - 1) * 100" :
             "((From Amount in USD / To Amount in USD) - 1) * 100"}</p>
         <p>USD ${profitLabel} = To Amount in USD - From Amount in USD</p>
         <p class="font-bold mt-1">Interpretation:</p>
@@ -1799,8 +1800,8 @@ function createTooltipContent(isSentOffers, coinFrom, coinTo, fromAmount, toAmou
             <p><span class="text-green-500">Positive percentage:</span> You're buying below market rate (savings)</p>
             <p><span class="text-red-500">Negative percentage:</span> You're buying above market rate (premium)</p>
         `}
-        <p class="mt-1"><strong>Note:</strong> ${(isSentOffers || isOwnOffer) ? 
-            "As a seller, a positive percentage means <br/> you're selling for more than the current market value." : 
+        <p class="mt-1"><strong>Note:</strong> ${(isSentOffers || isOwnOffer) ?
+            "As a seller, a positive percentage means <br/> you're selling for more than the current market value." :
             "As a buyer, a positive percentage indicates </br> potential savings compared to current market rates."}</p>
         <p class="mt-1"><strong>Market Rate:</strong> 1 ${coinFrom} = ${marketRate.toFixed(8)} ${coinTo}</p>
         <p><strong>Offer Rate:</strong> 1 ${coinFrom} = ${offerRate.toFixed(8)} ${coinTo}</p>
@@ -1810,7 +1811,7 @@ function createTooltipContent(isSentOffers, coinFrom, coinTo, fromAmount, toAmou
 function createCombinedRateTooltip(offer, coinFrom, coinTo, isSentOffers, treatAsSentOffer) {
     const rate = parseFloat(offer.rate);
     const inverseRate = 1 / rate;
-    
+
     const getPriceKey = (coin) => {
         const lowerCoin = coin.toLowerCase();
         if (lowerCoin === 'firo' || lowerCoin === 'zcoin') {
@@ -1824,16 +1825,16 @@ function createCombinedRateTooltip(offer, coinFrom, coinTo, isSentOffers, treatA
 
     const fromSymbol = getPriceKey(coinFrom);
     const toSymbol = getPriceKey(coinTo);
-    
+
     const fromPriceUSD = latestPrices[fromSymbol]?.usd || 0;
     const toPriceUSD = latestPrices[toSymbol]?.usd || 0;
     const rateInUSD = rate * toPriceUSD;
 
     const marketRate = fromPriceUSD / toPriceUSD;
-    
+
     const percentDiff = ((rate - marketRate) / marketRate) * 100;
     const formattedPercentDiff = percentDiff.toFixed(2);
-    const percentDiffDisplay = formattedPercentDiff === "0.00" ? "0.00" : 
+    const percentDiffDisplay = formattedPercentDiff === "0.00" ? "0.00" :
                             (percentDiff > 0 ? `+${formattedPercentDiff}` : formattedPercentDiff);
     const aboveOrBelow = percentDiff > 0 ? "above" : percentDiff < 0 ? "below" : "at";
 
@@ -1916,14 +1917,14 @@ function hasActiveFilters() {
         coin_from: formData.get('coin_from'),
         status: formData.get('status')
     };
-    
+
     //console.log('Current filters:', filters);
-    const hasFilters = 
-        filters.coin_to !== 'any' || 
-        filters.coin_from !== 'any' || 
-        (filters.status && filters.status !== 'any');                     
+    const hasFilters =
+        filters.coin_to !== 'any' ||
+        filters.coin_from !== 'any' ||
+        (filters.status && filters.status !== 'any');
     //console.log('Has active filters:', hasFilters);
-    
+
     return hasFilters;
 }
 
@@ -1966,13 +1967,13 @@ function getCoinSymbolLowercase(coin) {
 
 function coinMatches(offerCoin, filterCoin) {
     if (!offerCoin || !filterCoin) return false;
-    
+
     offerCoin = offerCoin.toLowerCase();
     filterCoin = filterCoin.toLowerCase();
-    
+
     if (offerCoin === filterCoin) return true;
 
-    if ((offerCoin === 'firo' || offerCoin === 'zcoin') && 
+    if ((offerCoin === 'firo' || offerCoin === 'zcoin') &&
         (filterCoin === 'firo' || filterCoin === 'zcoin')) {
         return true;
     }
@@ -1990,7 +1991,7 @@ function coinMatches(offerCoin, filterCoin) {
     if (particlVariants.includes(filterCoin)) {
         return offerCoin === filterCoin;
     }
-    
+
     return false;
 }
 
@@ -2020,7 +2021,7 @@ function getTimeUntilNextExpiration() {
         const timeUntilExpiration = offer.expire_at - currentTime;
         return timeUntilExpiration > 0 && timeUntilExpiration < earliest ? timeUntilExpiration : earliest;
     }, Infinity);
-    
+
     return Math.max(MIN_REFRESH_INTERVAL, Math.min(nextExpiration, 300));
 }
 
@@ -2031,7 +2032,7 @@ function calculateInverseRate(rate) {
 function formatTime(timestamp, addAgoSuffix = false) {
     const now = Math.floor(Date.now() / 1000);
     const diff = Math.abs(now - timestamp);
-    
+
     let timeString;
     if (diff < 60) {
         timeString = `${diff} seconds`;
@@ -2069,7 +2070,7 @@ function getCoinSymbol(fullName) {
         'Particl': 'PART', 'Particl Blind': 'PART', 'Particl Anon': 'PART',
         'PIVX': 'PIVX', 'Firo': 'FIRO', 'Zcoin': 'FIRO',
         'Dash': 'DASH', 'Decred': 'DCR', 'Wownero': 'WOW',
-        'Bitcoin Cash': 'BCH'
+        'Bitcoin Cash': 'BCH', 'Dogecoin': 'DOGE'
     };
     return symbolMap[fullName] || fullName;
 }
@@ -2079,7 +2080,7 @@ function getCoinSymbol(fullName) {
 document.querySelectorAll('th[data-sortable="true"]').forEach(header => {
     header.addEventListener('click', () => {
         const columnIndex = parseInt(header.getAttribute('data-column-index'));
-        
+
         if (currentSortColumn === columnIndex) {
             currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
         } else {
@@ -2110,7 +2111,7 @@ document.querySelectorAll('th[data-sortable="true"]').forEach(header => {
 
         localStorage.setItem('tableSortColumn', currentSortColumn);
         localStorage.setItem('tableSortDirection', currentSortDirection);
-        
+
         applyFilters();
     });
 
@@ -2119,19 +2120,19 @@ document.querySelectorAll('th[data-sortable="true"]').forEach(header => {
 
 const eventListeners = {
     listeners: [],
-    
+
     add(element, eventType, handler, options = false) {
         element.addEventListener(eventType, handler, options);
         this.listeners.push({ element, eventType, handler, options });
         // console.log(`Added ${eventType} listener to`, element);
     },
-    
+
     addWindowListener(eventType, handler, options = false) {
         window.addEventListener(eventType, handler, options);
         this.listeners.push({ element: window, eventType, handler, options });
         // console.log(`Added ${eventType} window listener`);
     },
-    
+
     removeAll() {
         console.log('Removing all event listeners...');
         this.listeners.forEach(({ element, eventType, handler, options }) => {
@@ -2140,7 +2141,7 @@ const eventListeners = {
         });
         this.listeners = [];
     },
-    
+
     removeByElement(element) {
         const remainingListeners = [];
         this.listeners = this.listeners.filter(listener => {
@@ -2162,29 +2163,29 @@ const eventListeners = {
 const timerManager = {
     intervals: [],
     timeouts: [],
-    
+
     addInterval(callback, delay) {
         const intervalId = setInterval(callback, delay);
         this.intervals.push(intervalId);
         return intervalId;
     },
-    
+
     addTimeout(callback, delay) {
         const timeoutId = setTimeout(callback, delay);
         this.timeouts.push(timeoutId);
         return timeoutId;
     },
-    
+
     clearAllIntervals() {
         this.intervals.forEach(clearInterval);
         this.intervals = [];
     },
-    
+
     clearAllTimeouts() {
         this.timeouts.forEach(clearTimeout);
         this.timeouts = [];
     },
-    
+
     clearAll() {
         this.clearAllIntervals();
         this.clearAllTimeouts();
@@ -2256,7 +2257,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     eventListeners.add(document.getElementById('refreshOffers'), 'click', async () => {
     console.log('Manual refresh initiated');
-    
+
     const refreshButton = document.getElementById('refreshOffers');
     const refreshIcon = document.getElementById('refreshIcon');
     const refreshText = document.getElementById('refreshText');
@@ -2279,13 +2280,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         jsonData = formatInitialData(processedNewData);
         originalJsonData = [...jsonData];
-        
+
         await updateOffersTable();
         updateJsonView();
         updatePaginationInfo();
-        
+
         console.log('✅ Manual refresh completed successfully');
-        
+
     } catch (error) {
         console.error('❌ Error during manual refresh:', error);
         ui.displayErrorMessage('Failed to refresh offers. Please try again later.');
