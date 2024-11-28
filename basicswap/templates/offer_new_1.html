@@ -94,29 +94,125 @@
               </div>
             </div>
           </div>
-          <div class="py-0 border-b items-center justify-between -mx-4 mb-6 pb-3 border-gray-400 border-opacity-20">
-            <div class="w-full md:w-10/12">
-              <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
-                <div class="w-full md:w-1/3 p-6">
-                  <p class="text-sm text-coolGray-800 dark:text-white font-semibold">Select Address</p>
-                </div>
-                <div class="w-full md:flex-1 p-3">
-                  <div class="relative">
-                    {{ input_down_arrow_offer_svg | safe }}
-                    <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-                    {{ select_address_svg | safe }}
-                  </div>
-                  <select class="hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="addr_from">
-                    {% for a in addrs %}
-                    <option{% if data.addr_from==a[0] %} selected{% endif %} value="{{ a[0] }}">{{ a[0] }} {{ a[1] }}</option>
-                    {% endfor %}
-                    <option{% if data.addr_from=="-1" %} selected{% endif %} value="-1">New Address</option>
-                  </select>
-                  </div>
-                </div>
-              </div>
-            </div>
+<div class="py-0 border-b items-center justify-between -mx-4 mb-6 pb-3 border-gray-400 border-opacity-20">
+  <div class="w-full md:w-10/12">
+    <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
+      <div class="w-full md:w-1/3 p-6">
+        <p class="text-sm text-coolGray-800 dark:text-white font-semibold">Select Address</p>
+      </div>
+      <div class="w-full md:flex-1 p-3">
+        <div class="relative">
+          {{ input_down_arrow_offer_svg | safe }}
+          <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
+          {{ select_address_svg | safe }}
           </div>
+          <select class="hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="addr_from">
+            <option{% if data.addr_from=="-1" %} selected{% endif %} value="-1">New Address</option>
+            {% for a in addrs %}
+            <option{% if data.addr_from==a[0] %} selected{% endif %} value="{{ a[0] }}">{{ a[0] }} {{ a[1] }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+function handleNewOfferAddress() {
+    const selectElement = document.querySelector('select[name="addr_from"]');
+    const STORAGE_KEY = 'lastUsedAddressNewOffer';
+    const form = selectElement?.closest('form');
+    
+    if (!selectElement || !form) return;
+
+    function loadInitialAddress() {
+        const savedAddressJSON = localStorage.getItem(STORAGE_KEY);
+        
+        if (savedAddressJSON) {
+            try {
+                const savedAddress = JSON.parse(savedAddressJSON);
+                const optionExists = Array.from(selectElement.options).some(
+                    option => option.value === savedAddress.value
+                );
+                
+                if (optionExists) {
+                    selectElement.value = savedAddress.value;
+                } else {
+                    selectFirstAddress();
+                }
+            } catch (e) {
+                selectFirstAddress();
+            }
+        } else {
+            selectFirstAddress();
+        }
+    }
+
+    function selectFirstAddress() {
+        if (selectElement.options.length > 1) {
+            const firstOption = selectElement.options[1];
+            if (firstOption) {
+                selectElement.value = firstOption.value;
+                saveAddress(firstOption.value, firstOption.text);
+            }
+        }
+    }
+
+    function saveAddress(value, text) {
+        const addressData = {
+            value: value,
+            text: text
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(addressData));
+    }
+
+    form.addEventListener('submit', async (e) => {
+        if (selectElement.value === '-1') {
+            e.preventDefault();
+            
+            try {
+                const formData = new FormData(form);
+                const response = await fetch(form.action, {
+                    method: form.method,
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    setTimeout(() => {
+                        const newAddress = selectElement.options[1];
+                        if (newAddress) {
+                            selectElement.value = newAddress.value;
+                            saveAddress(newAddress.value, newAddress.text);
+                        }
+                        form.submit();
+                    }, 100);
+                }
+            } catch (error) {
+                console.error('Error submitting form:', error);
+                form.submit();
+            }
+        }
+    });
+
+    selectElement.addEventListener('change', (event) => {
+        const selectedValue = event.target.value;
+        const selectedText = event.target.selectedOptions[0].text;
+        
+        if (selectedValue !== '-1') {
+            saveAddress(selectedValue, selectedText);
+        }
+    });
+
+    loadInitialAddress();
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', handleNewOfferAddress);
+} else {
+    handleNewOfferAddress();
+}
+</script>
+
           <div class="py-0 border-b items-center justify-between -mx-4 mb-6 pb-3 border-gray-400 border-opacity-20">
             <div class="w-full md:w-10/12">
               <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
