@@ -3,7 +3,7 @@ let lastRefreshTime = null;
 let newEntriesCount = 0;
 let nextRefreshCountdown = 60;
 let currentPage = 1;
-const itemsPerPage = 100;
+const itemsPerPage = 50;
 let lastAppliedFilters = {};
 
 const CACHE_KEY = 'latestPricesCache';
@@ -21,6 +21,9 @@ const isSentOffers = window.offersTableConfig.isSentOffers;
 
 let currentSortColumn = 0;
 let currentSortDirection = 'desc';
+
+const PRICE_INIT_RETRIES = 3;
+const PRICE_INIT_RETRY_DELAY = 2000;
 
 const offerCache = {
     set: (key, value, customTtl = null) => {
@@ -104,7 +107,6 @@ const offerCache = {
         return cacheItems;
     }
 };
-
 
 const coinNameToSymbol = {
     'Bitcoin': 'bitcoin',
@@ -353,6 +355,51 @@ function makePostRequest(url, headers = {}) {
             headers: headers
         }));
     });
+}
+
+async function initializePriceData() {
+    console.log('Initializing price data...');
+    let retryCount = 0;
+    let prices = null;
+
+    while (retryCount < PRICE_INIT_RETRIES) {
+        try {
+            prices = await fetchLatestPrices();
+            
+            if (prices && Object.keys(prices).length > 0) {
+                console.log('Successfully fetched initial price data:', prices);
+                latestPrices = prices;
+
+                const PRICES_CACHE_KEY = 'prices_coingecko';
+                offerCache.set(PRICES_CACHE_KEY, prices, CACHE_DURATION);
+                
+                return true;
+            }
+            
+            console.warn(`Attempt ${retryCount + 1}: Price data incomplete, retrying...`);
+            retryCount++;
+            
+            if (retryCount < PRICE_INIT_RETRIES) {
+                await new Promise(resolve => setTimeout(resolve, PRICE_INIT_RETRY_DELAY));
+            }
+        } catch (error) {
+            console.error(`Error fetching prices (attempt ${retryCount + 1}):`, error);
+            retryCount++;
+            
+            if (retryCount < PRICE_INIT_RETRIES) {
+                await new Promise(resolve => setTimeout(resolve, PRICE_INIT_RETRY_DELAY));
+            }
+        }
+    }
+
+    const fallbackPrices = getFallbackPrices();
+    if (fallbackPrices && Object.keys(fallbackPrices).length > 0) {
+        console.log('Using fallback prices:', fallbackPrices);
+        latestPrices = fallbackPrices;
+        return true;
+    }
+
+    return false;
 }
 
 function loadSortPreferences() {
@@ -778,7 +825,7 @@ async function checkExpiredAndFetchNew() {
         newListings = newListings.filter(offer => !isOfferExpired(offer));
         originalJsonData = newListings;
 
-        cache.set(OFFERS_CACHE_KEY, newListings, CACHE_DURATION);
+        offerCache.set(OFFERS_CACHE_KEY, newListings, CACHE_DURATION);
 
         const currentFilters = new FormData(filterForm);
         const hasActiveFilters = currentFilters.get('coin_to') !== 'any' || 
@@ -1320,13 +1367,22 @@ async function fetchOffers(manualRefresh = false) {
     setRefreshButtonLoading(true);
     const OFFERS_CACHE_KEY = `offers_${isSentOffers ? 'sent' : 'received'}`;
     
+    if (!latestPrices || Object.keys(latestPrices).length === 0) {
+        console.log('No price data available, initializing...');
+        const priceInitSuccess = await initializePriceData();
+        if (!priceInitSuccess) {
+            console.error('Failed to initialize price data');
+            ui.displayErrorMessage('Unable to load cryptocurrency prices. Some features may be limited.');
+        }
+    }
+
     if (!manualRefresh) {
         const cachedData = offerCache.get(OFFERS_CACHE_KEY);
         if (cachedData) {
             console.log('Using cached offers data');
             jsonData = cachedData.value;
             originalJsonData = [...cachedData.value];
-            updateOffersTable();
+            await updateOffersTable();
             updateJsonView();
             updatePaginationInfo();
             setRefreshButtonLoading(false);
@@ -1338,20 +1394,10 @@ async function fetchOffers(manualRefresh = false) {
         const endpoint = isSentOffers ? '/json/sentoffers' : '/json/offers';
         console.log(`[Debug] Fetching from endpoint: ${endpoint}`);
         
-        const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                with_extra_info: true,
-                limit: 1000
-            })
-        });
-        
+        const response = await fetch(endpoint);
         const data = await response.json();
-        let newData = Array.isArray(data) ? data : Object.values(data);
         
+        let newData = Array.isArray(data) ? data : Object.values(data);
         newData = newData.map(offer => ({
             ...offer,
             offer_id: String(offer.offer_id || ''),
@@ -1379,19 +1425,19 @@ async function fetchOffers(manualRefresh = false) {
             originalJsonData = [...mergedData];
         }
 
-        // Cache the new data
         offerCache.set(OFFERS_CACHE_KEY, jsonData, CACHE_DURATION);
 
         if (newEntriesCountSpan) {
             newEntriesCountSpan.textContent = jsonData.length;
         }
 
-        updateOffersTable();
+        await updateOffersTable();
         updateJsonView();
         updatePaginationInfo();
         
     } catch (error) {
         console.error('[Debug] Error fetching offers:', error);
+        ui.displayErrorMessage('Failed to fetch offers. Please try again later.');
     } finally {
         setRefreshButtonLoading(false);
     }
@@ -1532,48 +1578,55 @@ function filterAndSortData() {
     return filteredData;
 }
 
-async function calculateProfitLoss(fromCoin, toCoin, fromAmount, toAmount, isOwnOffer) {
-    console.log(`Calculating profit/loss for ${fromAmount} ${fromCoin} to ${toAmount} ${toCoin}, isOwnOffer: ${isOwnOffer}`);
+function calculateProfitLoss(fromCoin, toCoin, fromAmount, toAmount, isOwnOffer) {
+    return new Promise((resolve) => {
+        console.log(`Calculating profit/loss for ${fromAmount} ${fromCoin} to ${toAmount} ${toCoin}, isOwnOffer: ${isOwnOffer}`);
 
-    if (!latestPrices) {
-        console.error('Latest prices not available. Unable to calculate profit/loss.');
-        return null;
-    }
-
-    const getPriceKey = (coin) => {
-        const lowerCoin = coin.toLowerCase();
-        if (lowerCoin === 'firo' || lowerCoin === 'zcoin') {
-            return 'zcoin';
+        if (!latestPrices) {
+            console.error('Latest prices not available. Unable to calculate profit/loss.');
+            resolve(null);
+            return;
         }
-        if (lowerCoin === 'bitcoin cash') {
-            return 'bitcoin-cash';
+
+        const getPriceKey = (coin) => {
+            const lowerCoin = coin.toLowerCase();
+            if (lowerCoin === 'firo' || lowerCoin === 'zcoin') {
+                return 'zcoin';
+            }
+            if (lowerCoin === 'bitcoin cash') {
+                return 'bitcoin-cash';
+            }
+            if (lowerCoin === 'particl anon' || lowerCoin === 'particl blind') {
+                return 'particl';
+            }
+            return coinNameToSymbol[coin] || lowerCoin;
+        };
+
+        const fromSymbol = getPriceKey(fromCoin);
+        const toSymbol = getPriceKey(toCoin);
+
+        const fromPriceUSD = latestPrices[fromSymbol]?.usd;
+        const toPriceUSD = latestPrices[toSymbol]?.usd;
+
+        if (!fromPriceUSD || !toPriceUSD) {
+            console.warn(`Price data missing for ${fromSymbol} (${fromPriceUSD}) or ${toSymbol} (${toPriceUSD})`);
+            resolve(null);
+            return;
         }
-        return coinNameToSymbol[coin] || lowerCoin;
-    };
 
-    const fromSymbol = getPriceKey(fromCoin);
-    const toSymbol = getPriceKey(toCoin);
+        const fromValueUSD = fromAmount * fromPriceUSD;
+        const toValueUSD = toAmount * toPriceUSD;
 
-    const fromPriceUSD = latestPrices[fromSymbol]?.usd;
-    const toPriceUSD = latestPrices[toSymbol]?.usd;
+        let percentDiff;
+        if (isOwnOffer) {
+            percentDiff = ((toValueUSD / fromValueUSD) - 1) * 100;
+        } else {
+            percentDiff = ((fromValueUSD / toValueUSD) - 1) * 100;
+        }
 
-    if (!fromPriceUSD || !toPriceUSD) {
-        console.error(`Price data missing for ${fromSymbol} or ${toSymbol}`);
-        return null;
-    }
-
-    const fromValueUSD = fromAmount * fromPriceUSD;
-    const toValueUSD = toAmount * toPriceUSD;
-
-    let percentDiff;
-    if (isOwnOffer) {
-        percentDiff = ((toValueUSD / fromValueUSD) - 1) * 100;
-    } else {
-        percentDiff = ((fromValueUSD / toValueUSD) - 1) * 100;
-    }
-
-    console.log(`Percent difference: ${percentDiff.toFixed(2)}%`);
-    return percentDiff;
+        console.log(`Percent difference: ${percentDiff.toFixed(2)}%`);
+        resolve(percentDiff);
+    });
 }
 
 async function getMarketRate(fromCoin, toCoin) {
@@ -1885,13 +1938,83 @@ document.addEventListener('DOMContentLoaded', () => {
         updateCoinFilterImages();
     });
 
-document.getElementById('refreshOffers').addEventListener('click', () => {
-    console.log('🔄 Refresh button clicked');
-    console.log('Clearing cache before refresh...');
-    offerCache.clear();
-    console.log('Fetching fresh data...');
-    fetchOffers(true);
+   document.getElementById('refreshOffers').addEventListener('click', async () => {
+    console.log('🔄 Smart refresh initiated');
+    setRefreshButtonLoading(true);
+
+    try {
+
+        const PRICES_CACHE_KEY = 'prices_coingecko';
+        const cachedPrices = offerCache.get(PRICES_CACHE_KEY);
+        
+        if (!cachedPrices || !cachedPrices.remainingTime || cachedPrices.remainingTime < 60000) {
+
+            console.log('Fetching fresh price data...');
+            const newPrices = await fetchLatestPrices();
+            if (newPrices) {
+                latestPrices = newPrices;
+            }
+        } else {
+            console.log('Using cached price data (still valid)');
+        }
+
+        const endpoint = isSentOffers ? '/json/sentoffers' : '/json/offers';
+        const response = await fetch(endpoint);
+        const newData = await response.json();
+
+        const processedNewData = Array.isArray(newData) ? newData : Object.values(newData);
+        const formattedNewData = processedNewData.map(offer => ({
+            ...offer,
+            offer_id: String(offer.offer_id || ''),
+            swap_type: String(offer.swap_type || 'N/A'),
+            addr_from: String(offer.addr_from || ''),
+            coin_from: String(offer.coin_from || ''),
+            coin_to: String(offer.coin_to || ''),
+            amount_from: String(offer.amount_from || '0'),
+            amount_to: String(offer.amount_to || '0'),
+            rate: String(offer.rate || '0'),
+            created_at: Number(offer.created_at || 0),
+            expire_at: Number(offer.expire_at || 0),
+            is_own_offer: Boolean(offer.is_own_offer),
+            amount_negotiable: Boolean(offer.amount_negotiable),
+            is_revoked: Boolean(offer.is_revoked),
+            unique_id: `${offer.offer_id}_${offer.created_at}_${offer.coin_from}_${offer.coin_to}`
+        }));
+
+        const existingIds = new Set(jsonData.map(offer => offer.offer_id));
+        const newOffers = formattedNewData.filter(offer => !existingIds.has(offer.offer_id));
+        
+        if (newOffers.length > 0) {
+            console.log(`Found ${newOffers.length} new offers`);
+
+            jsonData = mergeSentOffers(jsonData, formattedNewData);
+            originalJsonData = [...jsonData];
+            
+            const OFFERS_CACHE_KEY = `offers_${isSentOffers ? 'sent' : 'received'}`;
+            offerCache.set(OFFERS_CACHE_KEY, jsonData, CACHE_DURATION);
+        } else {
+            console.log('No new offers found');
+        }
+
+        if (!isSentOffers) {
+            jsonData = jsonData.filter(offer => !isOfferExpired(offer));
+            originalJsonData = [...jsonData];
+        }
+
+        await updateOffersTable();
+        updateJsonView();
+        updatePaginationInfo();
+        
+        console.log('Smart refresh completed successfully');
+        
+    } catch (error) {
+        console.error('Error during smart refresh:', error);
+        ui.displayErrorMessage('Failed to refresh offers. Please try again later.');
+    } finally {
+        setRefreshButtonLoading(false);
+    }
 });
+
     toggleButton.addEventListener('click', () => {
         tableView.classList.toggle('hidden');
         jsonView.classList.toggle('hidden');
