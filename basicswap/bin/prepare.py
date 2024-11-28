@@ -1514,11 +1514,16 @@ def modify_tor_config(
             writeTorSettings(fp, coin, coin_settings, tor_control_password)
 
 
-def printVersion():
+def printVersion(with_coins):
     logger.info(f"Basicswap version: {__version__}")
 
+    if len(with_coins) < 1:
+        return
     logger.info("Core versions:")
+    with_coins_changed: bool = False if len(with_coins) == 1 and "particl" in with_coins else True
     for coin, version in known_coins.items():
+        if with_coins_changed and coin not in with_coins:
+            continue
         postfix = " (Disabled)" if coin in disabled_coins else ""
         logger.info("\t%s: %s%s%s", coin.capitalize(), version[0], version[1], postfix)
 
@@ -1957,6 +1962,7 @@ def main():
     htmlhost = "127.0.0.1"
     xmr_restore_height = DEFAULT_XMR_RESTORE_HEIGHT
     wow_restore_height = DEFAULT_WOW_RESTORE_HEIGHT
+    print_versions = False
     prepare_bin_only = False
     no_cores = False
     enable_tor = False
@@ -1983,13 +1989,13 @@ def main():
             if name[0] == "-":
                 name = name[1:]
 
-        if name == "v" or name == "version":
-            printVersion()
-            return 0
         if name == "h" or name == "help":
             printHelp()
             return 0
 
+        if name == "v" or name == "version":
+            print_versions = True
+            continue
         if name in ("mainnet", "testnet", "regtest"):
             chain = name
             continue
@@ -2094,6 +2100,10 @@ def main():
                 continue
 
         exitWithError("Unknown argument {}".format(v))
+
+    if print_versions:
+        printVersion(with_coins)
+        return 0
 
     if data_dir is None:
         data_dir = os.path.join(os.path.expanduser(cfg.BASICSWAP_DATADIR))
