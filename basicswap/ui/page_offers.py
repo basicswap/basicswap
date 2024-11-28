@@ -634,7 +634,7 @@ def page_offer(self, url_split, post_string):
             swap_client.editOffer(offer_id, change_data)
         elif b"newbid" in form_data:
             show_bid_form = True
-        elif b"sendbid" in form_data:
+        elif b"sendbid" in form_data and b"confirm" in form_data and b"formid" in form_data:
             try:
                 addr_from = form_data[b"addr_from"][0].decode("utf-8")
                 extend_data["nb_addr_from"] = addr_from
@@ -678,6 +678,8 @@ def page_offer(self, url_split, post_string):
                     self.server.swap_client.log.error(traceback.format_exc())
                 err_messages.append("Send bid failed: " + str(ex))
                 show_bid_form = True
+        elif b"sendbid" in form_data:
+            show_bid_form = True
 
     amount_to: int = offer.amount_to
     if amount_to is None:
@@ -717,6 +719,7 @@ def page_offer(self, url_split, post_string):
         "active_ind": offer.active_ind,
         "swap_type": strSwapDesc(offer.swap_type),
         "reverse": reverse_bid,
+        "form_id": get_data_entry_or(form_data, "formid", "") if form_data else ""
     }
     data.update(extend_data)
 
