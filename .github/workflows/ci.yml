@@ -2,6 +2,10 @@ name: ci
 
 on: [push, pull_request]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 env:
   BIN_DIR: /tmp/cached_bin
   TEST_RELOAD_PATH: /tmp/test_basicswap1
@@ -40,9 +44,10 @@ jobs:
       uses: actions/cache@v3
       env:
         cache-name: cache-cores
+        CACHE_KEY: $(printf $(python bin/basicswap-prepare.py --version --withcoins=bitcoin) | sha256sum | head -c 64)
       with:
         path: "$BIN_DIR"
-        key: python bin/basicswap-prepare.py --version --withcoins=bitcoin,monero
+        key: "$CACHE_KEY"
 
     - if: ${{ steps.cache-yarn.outputs.cache-hit != 'true' }}
       name: Running basicswap-prepare
@@ -55,4 +60,3 @@ jobs:
         mkdir -p ${TEST_RELOAD_PATH}/bin
         cp -r $BIN_DIR/* ${TEST_RELOAD_PATH}/bin/
         pytest tests/basicswap/extended/test_encrypted_xmr_reload.py
-
