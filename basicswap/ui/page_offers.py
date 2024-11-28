@@ -160,10 +160,16 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
             (parsed_data["amt_from"] * parsed_data["rate"]) // ci_from.COIN()
         )
 
-    page_data["amt_var"] = True if have_data_entry(form_data, "amt_var") else False
-    parsed_data["amt_var"] = page_data["amt_var"]
-    page_data["rate_var"] = True if have_data_entry(form_data, "rate_var") else False
-    parsed_data["rate_var"] = page_data["rate_var"]
+    if swap_client.debug:
+        page_data["amt_var"] = True if have_data_entry(form_data, "amt_var") else False
+        parsed_data["amt_var"] = page_data["amt_var"]
+        page_data["rate_var"] = True if have_data_entry(form_data, "rate_var") else False
+        parsed_data["rate_var"] = page_data["rate_var"]
+    else:
+        page_data["amt_var"] = True
+        page_data["rate_var"] = False
+        parsed_data["amt_var"] = True
+        parsed_data["rate_var"] = False
 
     page_data["automation_strat_id"] = int(
         get_data_entry_or(form_data, "automation_strat_id", -1)
