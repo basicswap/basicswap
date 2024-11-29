@@ -432,19 +432,10 @@ function handleBidsPageAddress() {
 
     function loadInitialAddress() {
         const savedAddressJSON = localStorage.getItem(STORAGE_KEY);
-        
         if (savedAddressJSON) {
             try {
                 const savedAddress = JSON.parse(savedAddressJSON);
-                const optionExists = Array.from(selectElement.options).some(
-                    option => option.value === savedAddress.value
-                );
-                
-                if (optionExists) {
-                    selectElement.value = savedAddress.value;
-                } else {
-                    selectFirstAddress();
-                }
+                selectElement.value = savedAddress.value;
             } catch (e) {
                 selectFirstAddress();
             }
@@ -472,12 +463,7 @@ function handleBidsPageAddress() {
     }
 
     selectElement.addEventListener('change', (event) => {
-        const selectedValue = event.target.value;
-        const selectedText = event.target.selectedOptions[0].text;
-        
-        if (selectedValue !== '-1') {
-            saveAddress(selectedValue, selectedText);
-        }
+        saveAddress(event.target.value, event.target.selectedOptions[0].text);
     });
 
     loadInitialAddress();
