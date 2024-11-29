@@ -38,6 +38,13 @@ const config = {
   currentResolution: 'year'
 };
 
+function getAPIKeys() {
+  return {
+    cryptoCompare: '{{chart_api_key}}',
+    coinGecko: '{{coingecko_api_key}}'
+  };
+}
+
 // Utils
 const utils = {
   formatNumber: (number, decimals = 2) => 
@@ -139,7 +146,7 @@ const api = {
             .filter(coin => coin.usesCoinGecko)
             .map(coin => coin.name)
             .join(',');
-        const url = `${config.apiEndpoints.coinGecko}/simple/price?ids=${coinIds}&vs_currencies=usd,btc&include_24hr_vol=true&include_24hr_change=true`;
+        const url = `${config.apiEndpoints.coinGecko}/simple/price?ids=${coinIds}&vs_currencies=usd,btc&include_24hr_vol=true&include_24hr_change=true&api_key=${config.apiKeys.coinGecko}`;
         
         console.log(`Fetching data for multiple coins from CoinGecko: ${url}`);
         
@@ -190,7 +197,7 @@ const api = {
       }
 
       if (coin === 'WOW') {
-        const url = `${config.apiEndpoints.coinGecko}/coins/wownero/market_chart?vs_currency=usd&days=1`;
+        const url = `${config.apiEndpoints.coinGecko}/coins/wownero/market_chart?vs_currency=usd&days=1&api_key=${config.apiKeys.coinGecko}`;
         console.log(`CoinGecko URL for WOW: ${url}`);
 
         try {
@@ -507,7 +514,7 @@ const chartModule = {
     }
   },
 
-initChart: () => {
+  initChart: () => {
     const ctx = document.getElementById('coin-chart').getContext('2d');
     if (!ctx) {
       logger.error('Failed to get chart context. Make sure the canvas element exists.');
@@ -517,11 +524,6 @@ initChart: () => {
     const gradient = ctx.createLinearGradient(0, 0, 0, 400);
     gradient.addColorStop(0, 'rgba(77, 132, 240, 0.2)');
     gradient.addColorStop(1, 'rgba(77, 132, 240, 0)');
-
-    const formatTime = (date) => {
-        const hours = date.getHours().toString().padStart(2, '0');
-        return `${hours}:00`;
-    };
 
     chartModule.chart = new Chart(ctx, {
       type: 'line',
@@ -550,9 +552,15 @@ initChart: () => {
             time: {
               unit: 'hour',
               displayFormats: {
-                hour: 'HH:00',
+                hour: 'h:mm a',
                 day: 'MMM d',
                 month: 'MMM yyyy'
+              },
+              tooltipFormat: 'MMM d, yyyy h:mm a'
+            },
+            adapters: {
+              date: {
+                zone: 'UTC'
               }
             },
             ticks: {
@@ -566,16 +574,24 @@ initChart: () => {
               callback: function(value) {
                 const date = new Date(value);
                 if (config.currentResolution === 'day') {
-                  return formatTime(date);
+                  // Convert to AM/PM format
+                  return date.toLocaleTimeString('en-US', {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true,
+                    timeZone: 'UTC'
+                  });
                 } else if (config.currentResolution === 'year') {
                   return date.toLocaleDateString('en-US', {
                     month: 'short',
-                    year: 'numeric'
+                    year: 'numeric',
+                    timeZone: 'UTC'
                   });
                 } else {
                   return date.toLocaleDateString('en-US', {
                     month: 'short',
-                    day: 'numeric'
+                    day: 'numeric',
+                    timeZone: 'UTC'
                   });
                 }
               }
@@ -618,48 +634,41 @@ initChart: () => {
               title: (tooltipItems) => {
                 const date = new Date(tooltipItems[0].parsed.x);
                 if (config.currentResolution === 'day') {
-                  return `${date.toLocaleDateString('en-US', {
+                  return date.toLocaleString('en-US', {
                     month: 'short',
-                    day: 'numeric'
-                  })} ${formatTime(date)}`;
+                    day: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true,
+                    timeZone: 'UTC'
+                  });
                 } else if (config.currentResolution === 'year') {
-                  return date.toLocaleDateString('en-US', {
+                  return date.toLocaleString('en-US', {
                     year: 'numeric',
                     month: 'short',
-                    day: 'numeric'
+                    day: 'numeric',
+                    timeZone: 'UTC'
                   });
                 } else {
-                  return date.toLocaleDateString('en-US', {
+                  return date.toLocaleString('en-US', {
                     month: 'short',
-                    day: 'numeric'
+                    day: 'numeric',
+                    timeZone: 'UTC'
                   });
                 }
               },
               label: (item) => {
                 const value = item.parsed.y;
-                return `${chartModule.currentCoin}: $${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}`;
+                return `${chartModule.currentCoin}: $${value.toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 8
+                })}`;
               }
             }
           },
           verticalLine: {
             lineWidth: 1,
             lineColor: 'rgba(77, 132, 240, 0.5)'
-          }
-        },
-        elements: {
-          point: {
-            backgroundColor: 'rgba(77, 132, 240, 1)',
-            borderColor: 'rgba(77, 132, 240, 1)',
-            borderWidth: 1,
-            radius: 2,
-            hoverRadius: 4,
-            hitRadius: 6,
-            hoverBorderWidth: 2
-          },
-          line: {
-            backgroundColor: gradient,
-            borderColor: 'rgba(77, 132, 240, 1)',
-            fill: true
           }
         }
       },
@@ -669,7 +678,7 @@ initChart: () => {
     console.log('Chart initialized:', chartModule.chart);
   },
   
-prepareChartData: (coinSymbol, data) => {
+  prepareChartData: (coinSymbol, data) => {
     if (!data) {
       console.error(`No data received for ${coinSymbol}`);
       return [];
@@ -680,8 +689,7 @@ prepareChartData: (coinSymbol, data) => {
 
       if (coinSymbol === 'WOW' && Array.isArray(data)) {
         const endTime = new Date(data[data.length - 1][0]);
-        // Convert to local time
-        endTime.setMinutes(0, 0, 0);
+        endTime.setUTCMinutes(0, 0, 0);
         const endUnix = endTime.getTime();
         const startUnix = endUnix - (24 * 3600000);
         
@@ -689,7 +697,7 @@ prepareChartData: (coinSymbol, data) => {
         
         for (let hourUnix = startUnix; hourUnix <= endUnix; hourUnix += 3600000) {
           const targetHour = new Date(hourUnix);
-          targetHour.setMinutes(0, 0, 0);
+          targetHour.setUTCMinutes(0, 0, 0);
           
           const closestPoint = data.reduce((prev, curr) => {
             const prevTime = new Date(prev[0]);
@@ -706,7 +714,7 @@ prepareChartData: (coinSymbol, data) => {
         }
 
         const lastTime = new Date(data[data.length - 1][0]);
-        if (lastTime.getMinutes() !== 0) {
+        if (lastTime.getUTCMinutes() !== 0) {
           hourlyPoints.push({
             x: lastTime,
             y: data[data.length - 1][1]
@@ -735,33 +743,38 @@ prepareChartData: (coinSymbol, data) => {
         return [];
       }
 
-      return preparedData;
+      return preparedData.map(point => ({
+        x: new Date(point.x).getTime(),
+        y: point.y
+      }));
     } catch (error) {
       console.error(`Error preparing chart data for ${coinSymbol}:`, error);
       return [];
     }
   },
 
-ensureHourlyData: (data) => {
-  const now = new Date();
-  const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-  const hourlyData = [];
+  ensureHourlyData: (data) => {
+    const now = new Date();
+    now.setUTCMinutes(0, 0, 0);
+    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const hourlyData = [];
 
-  for (let i = 0; i < 24; i++) {
-    const targetTime = new Date(twentyFourHoursAgo.getTime() + i * 60 * 60 * 1000);
-    const closestDataPoint = data.reduce((prev, curr) => 
-      Math.abs(curr.x - targetTime) < Math.abs(prev.x - targetTime) ? curr : prev
-    );
-    
-    hourlyData.push({
-      x: targetTime,
-      y: closestDataPoint.y
-    });
-  }
+    for (let i = 0; i < 24; i++) {
+      const targetTime = new Date(twentyFourHoursAgo.getTime() + i * 60 * 60 * 1000);
+      const closestDataPoint = data.reduce((prev, curr) => 
+        Math.abs(new Date(curr.x).getTime() - targetTime.getTime()) < 
+        Math.abs(new Date(prev.x).getTime() - targetTime.getTime()) ? curr : prev
+      );
+      
+      hourlyData.push({
+        x: targetTime.getTime(),
+        y: closestDataPoint.y
+      });
+    }
 
-  return hourlyData;
-},
-  
+    return hourlyData;
+  },
+
   updateChart: async (coinSymbol, forceRefresh = false) => {
     try {
       chartModule.showChartLoader();
@@ -797,16 +810,11 @@ ensureHourlyData: (data) => {
         chartModule.chart.data.datasets[0].data = chartData;
         chartModule.chart.data.datasets[0].label = `${coinSymbol} Price (USD)`;
 
-        // Special handling for Wownero
         if (coinSymbol === 'WOW') {
           chartModule.chart.options.scales.x.time.unit = 'hour';
           chartModule.chart.options.scales.x.ticks.maxTicksLimit = 24;
-          chartModule.chart.options.plugins.tooltip.callbacks.title = (tooltipItems) => {
-            const date = new Date(tooltipItems[0].parsed.x);
-            return date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: 'numeric', hour12: true, timeZone: 'UTC' });
-          };
         } else {
-          const resolution = config.resolutions[config.currentResolution] || config.resolutions.year;
+          const resolution = config.resolutions[config.currentResolution];
           chartModule.chart.options.scales.x.time.unit = resolution.interval === 'hourly' ? 'hour' : 'day';
           
           if (config.currentResolution === 'year' || config.currentResolution === 'sixMonths') {
@@ -814,21 +822,12 @@ ensureHourlyData: (data) => {
           }
 
           if (config.currentResolution === 'year') {
-            chartModule.chart.options.scales.x.ticks.maxTicksLimit = 12; // One tick per month
+            chartModule.chart.options.scales.x.ticks.maxTicksLimit = 12;
           } else if (config.currentResolution === 'sixMonths') {
-            chartModule.chart.options.scales.x.ticks.maxTicksLimit = 6; // One tick every month
+            chartModule.chart.options.scales.x.ticks.maxTicksLimit = 6;
           } else if (config.currentResolution === 'day') {
-            chartModule.chart.options.scales.x.ticks.maxTicksLimit = 24; // One tick every hour
+            chartModule.chart.options.scales.x.ticks.maxTicksLimit = 24;
           }
-
-          chartModule.chart.options.plugins.tooltip.callbacks.title = (tooltipItems) => {
-            const date = new Date(tooltipItems[0].parsed.x);
-            if (config.currentResolution === 'year' || config.currentResolution === 'sixMonths') {
-              return date.toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' });
-            } else if (config.currentResolution === 'day') {
-              return date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: 'numeric', hour12: true, timeZone: 'UTC' });
-            }
-          };
         }
 
         chartModule.chart.update('active');
