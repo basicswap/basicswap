@@ -8767,7 +8767,7 @@ class BasicSwap(BaseApp):
 
         try:
             chain_height = ci_to.getChainHeight()
-            lock_tx_depth = (chain_height - bid.xmr_b_lock_tx.chain_height) + 1
+            lock_tx_depth = (chain_height - bid.xmr_b_lock_tx.chain_height)
             if lock_tx_depth < ci_to.depth_spendable():
                 raise TemporaryError(
                     f"Chain B lock tx still confirming {lock_tx_depth} / {ci_to.depth_spendable()}."
