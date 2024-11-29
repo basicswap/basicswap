@@ -10285,6 +10285,9 @@ class BasicSwap(BaseApp):
                 "locked": walletinfo["locked"],
             }
 
+            if "wallet_blocks" in walletinfo:
+                rv["wallet_blocks"] = walletinfo["wallet_blocks"]
+
             if "immature_balance" in walletinfo:
                 rv["immature"] = ci.format_amount(
                     walletinfo["immature_balance"], conv_int=True
