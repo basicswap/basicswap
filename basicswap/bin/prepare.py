@@ -1520,7 +1520,9 @@ def printVersion(with_coins):
     if len(with_coins) < 1:
         return
     print("Core versions:")
-    with_coins_changed: bool = False if len(with_coins) == 1 and "particl" in with_coins else True
+    with_coins_changed: bool = (
+        False if len(with_coins) == 1 and "particl" in with_coins else True
+    )
     for coin, version in known_coins.items():
         if with_coins_changed and coin not in with_coins:
             continue

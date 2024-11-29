@@ -163,6 +163,12 @@
                         {% endif %}
                       </td>
                         </tr>
+                        {% if w.wallet_blocks %}
+                        <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
+                          <td class="py-3 px-6 bold">Wallet Blocks:</td>
+                          <td class="py-3 px-6">{{ w.wallet_blocks }}{% if w.known_block_count %} / {{ w.known_block_count }}{% endif %}</td>
+                        </tr>
+                        {% endif %}
                         <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
                           <td class="py-3 px-6 bold">Synced:</td>
                           <td class="py-3 px-6">{{ w.synced }}</td>
@@ -471,9 +477,9 @@ function copyAndShowMessage(elementId) {
    const addressElement = document.getElementById(elementId);
    if (!addressElement) return;
    const addressText = addressElement.innerText.trim();
-   
+
    if (addressText === 'Copied to clipboard') return;
-   
+
    copyToClipboard(addressText);
    addressElement.innerText = 'Copied to clipboard';
    const originalWidth = addressElement.offsetWidth;

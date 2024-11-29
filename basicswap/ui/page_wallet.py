@@ -38,6 +38,9 @@ def format_wallet_data(swap_client, ci, w):
         "havedata": True,
     }
 
+    if "wallet_blocks" in w:
+        wf["wallet_blocks"] = w["wallet_blocks"]
+
     if w.get("bootstrapping", False) is True:
         wf["bootstrapping"] = True
     if "known_block_count" in w:

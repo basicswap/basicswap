@@ -292,6 +292,7 @@ class XMRInterface(CoinInterface):
             rv = {}
             balance_info = self.rpc_wallet("get_balance")
 
+            rv["wallet_blocks"] = self.rpc_wallet("get_height")["height"]
             rv["balance"] = self.format_amount(balance_info["unlocked_balance"])
             rv["unconfirmed_balance"] = self.format_amount(
                 balance_info["balance"] - balance_info["unlocked_balance"]

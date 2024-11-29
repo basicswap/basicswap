@@ -8,7 +8,7 @@ concurrency:
 
 env:
   BIN_DIR: /tmp/cached_bin
-  TEST_RELOAD_PATH: /tmp/test_basicswap1
+  TEST_RELOAD_PATH: /tmp/test_basicswap
 
 jobs:
   ci:
@@ -46,8 +46,8 @@ jobs:
         cache-name: cache-cores
         CACHE_KEY: $(printf $(python bin/basicswap-prepare.py --version --withcoins=bitcoin) | sha256sum | head -c 64)
       with:
-        path: "$BIN_DIR"
-        key: "$CACHE_KEY"
+        path: $BIN_DIR
+        key: $CACHE_KEY
 
     - if: ${{ steps.cache-yarn.outputs.cache-hit != 'true' }}
       name: Running basicswap-prepare
@@ -57,6 +57,6 @@ jobs:
       run: |
         export PYTHONPATH=$(pwd)
         export TEST_PATH=${TEST_RELOAD_PATH}
-        mkdir -p ${TEST_RELOAD_PATH}/bin
-        cp -r $BIN_DIR/* ${TEST_RELOAD_PATH}/bin/
+        mkdir -p ${TEST_PATH}/bin
+        cp -r $BIN_DIR/* ${TEST_PATH}/bin/
         pytest tests/basicswap/extended/test_encrypted_xmr_reload.py
