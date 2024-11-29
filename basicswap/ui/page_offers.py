@@ -163,7 +163,9 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
     if swap_client.debug:
         page_data["amt_var"] = True if have_data_entry(form_data, "amt_var") else False
         parsed_data["amt_var"] = page_data["amt_var"]
-        page_data["rate_var"] = True if have_data_entry(form_data, "rate_var") else False
+        page_data["rate_var"] = (
+            True if have_data_entry(form_data, "rate_var") else False
+        )
         parsed_data["rate_var"] = page_data["rate_var"]
     else:
         page_data["amt_var"] = True
@@ -634,7 +636,11 @@ def page_offer(self, url_split, post_string):
             swap_client.editOffer(offer_id, change_data)
         elif b"newbid" in form_data:
             show_bid_form = True
-        elif b"sendbid" in form_data and b"confirm" in form_data and b"formid" in form_data:
+        elif (
+            b"sendbid" in form_data
+            and b"confirm" in form_data
+            and b"formid" in form_data
+        ):
             try:
                 addr_from = form_data[b"addr_from"][0].decode("utf-8")
                 extend_data["nb_addr_from"] = addr_from
@@ -719,7 +725,7 @@ def page_offer(self, url_split, post_string):
         "active_ind": offer.active_ind,
         "swap_type": strSwapDesc(offer.swap_type),
         "reverse": reverse_bid,
-        "form_id": get_data_entry_or(form_data, "formid", "") if form_data else ""
+        "form_id": get_data_entry_or(form_data, "formid", "") if form_data else "",
     }
     data.update(extend_data)
 

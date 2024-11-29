@@ -8770,7 +8770,7 @@ class BasicSwap(BaseApp):
             lock_tx_depth = (chain_height - bid.xmr_b_lock_tx.chain_height) + 1
             if lock_tx_depth < ci_to.depth_spendable():
                 raise TemporaryError(
-                    f"Chain B lock tx depth {lock_tx_depth} < required for spending."
+                    f"Chain B lock tx still confirming {lock_tx_depth} / {ci_to.depth_spendable()}."
                 )
 
             if TxTypes.BCH_MERCY in bid.txns:
@@ -8857,9 +8857,7 @@ class BasicSwap(BaseApp):
             ):
                 delay = self.get_delay_retry_seconds()
                 self.log.info(
-                    "Retrying sending adaptor-sig swap chain B spend tx for bid %s in %d seconds",
-                    bid_id.hex(),
-                    delay,
+                    f"Retrying sending adaptor-sig swap chain B spend tx for bid {bid_id.hex()} in {delay} seconds"
                 )
                 self.createActionInSession(
                     delay, ActionTypes.REDEEM_XMR_SWAP_LOCK_TX_B, bid_id, cursor
