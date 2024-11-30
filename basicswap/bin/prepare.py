@@ -572,8 +572,10 @@ def extractCore(coin, version_data, settings, bin_dir, release_path, extra_opts=
                         )
         return
 
-    dir_name = "dashcore" if coin == "dash" else coin
-    dir_name = "bitcoin-cash-node" if coin == "bitcoincash" else coin
+    dir_name = {
+        "dash": "dashcore",
+        "bitcoincash": "bitcoin-cash-node",
+    }.get(coin, coin)
     if coin == "decred":
         bins = ["dcrd", "dcrwallet"]
     elif coin == "bitcoincash":
