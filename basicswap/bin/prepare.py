@@ -53,14 +53,8 @@ PARTICL_LINUX_EXTRA = os.getenv("PARTICL_LINUX_EXTRA", "nousb")
 LITECOIN_VERSION = os.getenv("LITECOIN_VERSION", "0.21.3")
 LITECOIN_VERSION_TAG = os.getenv("LITECOIN_VERSION_TAG", "")
 
-DOGECOIN_VERSION = os.getenv("DOGECOIN_VERSION", "1.14.7")
-DOGECOIN_VERSION_TAG = os.getenv("DOGECOIN_VERSION_TAG", "")
-
 BITCOIN_VERSION = os.getenv("BITCOIN_VERSION", "26.0")
 BITCOIN_VERSION_TAG = os.getenv("BITCOIN_VERSION_TAG", "")
-
-BITCOINCASH_VERSION = os.getenv("BITCOINCASH_VERSION", "27.1.0")
-BITCOINCASH_VERSION_TAG = os.getenv("BITCOINCASH_VERSION_TAG", "")
 
 MONERO_VERSION = os.getenv("MONERO_VERSION", "0.18.3.4")
 MONERO_VERSION_TAG = os.getenv("MONERO_VERSION_TAG", "")
@@ -89,6 +83,12 @@ NAV_VERSION_TAG = os.getenv("NAV_VERSION_TAG", "")
 DCR_VERSION = os.getenv("DCR_VERSION", "1.8.1")
 DCR_VERSION_TAG = os.getenv("DCR_VERSION_TAG", "")
 
+BITCOINCASH_VERSION = os.getenv("BITCOINCASH_VERSION", "27.1.0")
+BITCOINCASH_VERSION_TAG = os.getenv("BITCOINCASH_VERSION_TAG", "")
+
+DOGECOIN_VERSION = os.getenv("DOGECOIN_VERSION", "1.14.7")
+DOGECOIN_VERSION_TAG = os.getenv("DOGECOIN_VERSION_TAG", "")
+
 GUIX_SSL_CERT_DIR = None
 
 ADD_PUBKEY_URL = os.getenv("ADD_PUBKEY_URL", "")
@@ -101,9 +101,7 @@ SKIP_GPG_VALIDATION = toBool(os.getenv("SKIP_GPG_VALIDATION", "false"))
 known_coins = {
     "particl": (PARTICL_VERSION, PARTICL_VERSION_TAG, ("tecnovert",)),
     "bitcoin": (BITCOIN_VERSION, BITCOIN_VERSION_TAG, ("laanwj",)),
-    "bitcoincash": (BITCOINCASH_VERSION, BITCOINCASH_VERSION_TAG, ("Calin_Culianu",)),
     "litecoin": (LITECOIN_VERSION, LITECOIN_VERSION_TAG, ("davidburkett38",)),
-    "dogecoin": (DOGECOIN_VERSION, DOGECOIN_VERSION_TAG, ("patricklodder",)),
     "decred": (DCR_VERSION, DCR_VERSION_TAG, ("decred_release",)),
     "namecoin": ("0.18.0", "", ("JeremyRand",)),
     "monero": (MONERO_VERSION, MONERO_VERSION_TAG, ("binaryfate",)),
@@ -112,6 +110,8 @@ known_coins = {
     "dash": (DASH_VERSION, DASH_VERSION_TAG, ("pasta",)),
     "firo": (FIRO_VERSION, FIRO_VERSION_TAG, ("reuben",)),
     "navcoin": (NAV_VERSION, NAV_VERSION_TAG, ("nav_builder",)),
+    "bitcoincash": (BITCOINCASH_VERSION, BITCOINCASH_VERSION_TAG, ("Calin_Culianu",)),
+    "dogecoin": (DOGECOIN_VERSION, DOGECOIN_VERSION_TAG, ("patricklodder",)),
 }
 
 disabled_coins = [
@@ -203,24 +203,11 @@ LTC_ONION_PORT = int(os.getenv("LTC_ONION_PORT", 9333))
 LTC_RPC_USER = os.getenv("LTC_RPC_USER", "")
 LTC_RPC_PWD = os.getenv("LTC_RPC_PWD", "")
 
-DOGE_RPC_HOST = os.getenv("DOGE_RPC_HOST", "127.0.0.1")
-DOGE_RPC_PORT = int(os.getenv("DOGE_RPC_PORT", 42069))
-DOGE_ONION_PORT = int(os.getenv("DOGE_ONION_PORT", 6969))
-DOGE_RPC_USER = os.getenv("DOGE_RPC_USER", "")
-DOGE_RPC_PWD = os.getenv("DOGE_RPC_PWD", "")
-
 BTC_RPC_HOST = os.getenv("BTC_RPC_HOST", "127.0.0.1")
 BTC_RPC_PORT = int(os.getenv("BTC_RPC_PORT", 19996))
 BTC_ONION_PORT = int(os.getenv("BTC_ONION_PORT", 8334))
 BTC_RPC_USER = os.getenv("BTC_RPC_USER", "")
 BTC_RPC_PWD = os.getenv("BTC_RPC_PWD", "")
-
-BCH_RPC_HOST = os.getenv("BCH_RPC_HOST", "127.0.0.1")
-BCH_RPC_PORT = int(os.getenv("BCH_RPC_PORT", 19997))
-BCH_ONION_PORT = int(os.getenv("BCH_ONION_PORT", 8335))
-BCH_PORT = int(os.getenv("BCH_PORT", 19798))
-BCH_RPC_USER = os.getenv("BCH_RPC_USER", "")
-BCH_RPC_PWD = os.getenv("BCH_RPC_PWD", "")
 
 DCR_RPC_HOST = os.getenv("DCR_RPC_HOST", "127.0.0.1")
 DCR_RPC_PORT = int(os.getenv("DCR_RPC_PORT", 9109))
@@ -258,6 +245,19 @@ NAV_RPC_PORT = int(os.getenv("NAV_RPC_PORT", 44444))
 NAV_ONION_PORT = int(os.getenv("NAV_ONION_PORT", 8334))  # TODO?
 NAV_RPC_USER = os.getenv("NAV_RPC_USER", "")
 NAV_RPC_PWD = os.getenv("NAV_RPC_PWD", "")
+
+BCH_RPC_HOST = os.getenv("BCH_RPC_HOST", "127.0.0.1")
+BCH_RPC_PORT = int(os.getenv("BCH_RPC_PORT", 19997))
+BCH_ONION_PORT = int(os.getenv("BCH_ONION_PORT", 8335))
+BCH_PORT = int(os.getenv("BCH_PORT", 19798))
+BCH_RPC_USER = os.getenv("BCH_RPC_USER", "")
+BCH_RPC_PWD = os.getenv("BCH_RPC_PWD", "")
+
+DOGE_RPC_HOST = os.getenv("DOGE_RPC_HOST", "127.0.0.1")
+DOGE_RPC_PORT = int(os.getenv("DOGE_RPC_PORT", 42069))
+DOGE_ONION_PORT = int(os.getenv("DOGE_ONION_PORT", 6969))
+DOGE_RPC_USER = os.getenv("DOGE_RPC_USER", "")
+DOGE_RPC_PWD = os.getenv("DOGE_RPC_PWD", "")
 
 TOR_PROXY_HOST = os.getenv("TOR_PROXY_HOST", "127.0.0.1")
 TOR_PROXY_PORT = int(os.getenv("TOR_PROXY_PORT", 9050))
@@ -1250,7 +1250,7 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
                 fp.write(chainname + "=1\n")
             else:
                 fp.write(chain + "=1\n")
-            if coin not in ("firo", "navcoin"):
+            if coin not in ("firo", "navcoin", "dogecoin"):
                 if chain == "testnet":
                     fp.write("[test]\n\n")
                 elif chain == "regtest":
@@ -1730,7 +1730,6 @@ def initialise_wallets(
                 Coins.PART,
                 Coins.BTC,
                 Coins.LTC,
-                Coins.DOGE,
                 Coins.DCR,
                 Coins.DASH,
             )
@@ -2298,10 +2297,11 @@ def main():
             "onionport": DOGE_ONION_PORT + port_offset,
             "datadir": os.getenv("DOGE_DATA_DIR", os.path.join(data_dir, "dogecoin")),
             "bindir": os.path.join(bin_dir, "dogecoin"),
-            "use_segwit": True,
+            "use_segwit": False,
+            "use_csv": False,
             "blocks_confirmed": 2,
             "conf_target": 2,
-            "core_version_group": 21,  # TODO ofrnxmr
+            "core_version_group": 14,
             "min_relay_fee": 0.00001,
         },
         "decred": {
