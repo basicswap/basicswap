@@ -65,6 +65,12 @@ BasicSwap is compatible with the following digital assets.
    </td>
   </tr>
   <tr>
+   <td>Bitcoin Cash
+   </td>
+   <td>BCH
+   </td>
+  </tr>
+  <tr>
    <td>Dash
    </td>
    <td>DASH
