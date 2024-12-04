@@ -36,6 +36,10 @@ LITECOIND = os.getenv("LITECOIND", "litecoind" + bin_suffix)
 LITECOIN_CLI = os.getenv("LITECOIN_CLI", "litecoin-cli" + bin_suffix)
 LITECOIN_TX = os.getenv("LITECOIN_TX", "litecoin-tx" + bin_suffix)
 
+DOGECOIND = os.getenv("DOGECOIND", "dogecoind" + bin_suffix)
+DOGECOIN_CLI = os.getenv("DOGECOIN_CLI", "dogecoin-cli" + bin_suffix)
+DOGECOIN_TX = os.getenv("DOGECOIN_TX", "dogecoin-tx" + bin_suffix)
+
 NAMECOIN_BINDIR = os.path.expanduser(
     os.getenv("NAMECOIN_BINDIR", os.path.join(DEFAULT_TEST_BINDIR, "namecoin"))
 )

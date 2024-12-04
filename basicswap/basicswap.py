@@ -822,6 +822,10 @@ class BasicSwap(BaseApp):
                 self.coin_clients[coin], self.chain, self
             )
             return interface
+        elif coin == Coins.DOGE:
+            from .interface.doge import DOGEInterface
+
+            return DOGEInterface(self.coin_clients[coin], self.chain, self)
         elif coin == Coins.DCR:
             from .interface.dcr import DCRInterface
 
@@ -882,6 +886,7 @@ class BasicSwap(BaseApp):
             if cc["name"] in (
                 "bitcoin",
                 "litecoin",
+                "dogecoin",
                 "namecoin",
                 "dash",
                 "firo",
