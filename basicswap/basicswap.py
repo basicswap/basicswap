@@ -355,7 +355,13 @@ class BasicSwap(BaseApp):
 
         # TODO: Set dynamically
         self.balance_only_coins = (Coins.LTC_MWEB,)
-        self.scriptless_coins = (Coins.XMR, Coins.WOW, Coins.PART_ANON, Coins.FIRO, Coins.DOGE)
+        self.scriptless_coins = (
+            Coins.XMR,
+            Coins.WOW,
+            Coins.PART_ANON,
+            Coins.FIRO,
+            Coins.DOGE,
+        )
         self.adaptor_swap_only_coins = self.scriptless_coins + (
             Coins.PART_BLIND,
             Coins.BCH,

@@ -86,7 +86,7 @@ DCR_VERSION_TAG = os.getenv("DCR_VERSION_TAG", "")
 BITCOINCASH_VERSION = os.getenv("BITCOINCASH_VERSION", "27.1.0")
 BITCOINCASH_VERSION_TAG = os.getenv("BITCOINCASH_VERSION_TAG", "")
 
-DOGECOIN_VERSION = os.getenv("DOGECOIN_VERSION", "1.14.7")
+DOGECOIN_VERSION = os.getenv("DOGECOIN_VERSION", "23.2.1")
 DOGECOIN_VERSION_TAG = os.getenv("DOGECOIN_VERSION_TAG", "")
 
 GUIX_SSL_CERT_DIR = None
@@ -111,7 +111,7 @@ known_coins = {
     "firo": (FIRO_VERSION, FIRO_VERSION_TAG, ("reuben",)),
     "navcoin": (NAV_VERSION, NAV_VERSION_TAG, ("nav_builder",)),
     "bitcoincash": (BITCOINCASH_VERSION, BITCOINCASH_VERSION_TAG, ("Calin_Culianu",)),
-    "dogecoin": (DOGECOIN_VERSION, DOGECOIN_VERSION_TAG, ("patricklodder",)),
+    "dogecoin": (DOGECOIN_VERSION, DOGECOIN_VERSION_TAG, ("tecnovert",)),
 }
 
 disabled_coins = [
@@ -815,16 +815,14 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
                 % (version, os_dir_name, signing_key_name, assert_filename)
             )
         elif coin == "dogecoin":
-            release_url = "https://github.com/dogecoin/dogecoin/releases/download/v{}/{}".format(
-                version + version_tag, release_filename
+            release_url = (
+                "https://github.com/tecnovert/dogecoin/releases/download/v{}/{}".format(
+                    version + version_tag, release_filename
+                )
             )
-            assert_filename = "{}-{}-{}-build.assert".format(
-                coin, os_name, ".".join(version.split(".")[:2])
-            )
-            assert_url = (
-                "https://raw.githubusercontent.com/dogecoin/gitian.sigs/master/%s-%s/%s/%s"
-                % (version, os_dir_name, signing_key_name, assert_filename)
-            )
+            assert_filename = "{}-{}-{}-build.assert".format(coin, os_name, version)
+            assert_url = f"https://raw.githubusercontent.com/tecnovert/guix.sigs/dogecoin/{version}/{signing_key_name}/noncodesigned.SHA256SUMS"
+
         elif coin == "bitcoin":
             release_url = "https://bitcoincore.org/bin/bitcoin-core-{}/{}".format(
                 version, release_filename
@@ -1250,7 +1248,7 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
                 fp.write(chainname + "=1\n")
             else:
                 fp.write(chain + "=1\n")
-            if coin not in ("firo", "navcoin", "dogecoin"):
+            if coin not in ("firo", "navcoin"):
                 if chain == "testnet":
                     fp.write("[test]\n\n")
                 elif chain == "regtest":
@@ -1730,6 +1728,7 @@ def initialise_wallets(
                 Coins.PART,
                 Coins.BTC,
                 Coins.LTC,
+                Coins.DOGE,
                 Coins.DCR,
                 Coins.DASH,
             )
@@ -2301,8 +2300,8 @@ def main():
             "use_csv": False,
             "blocks_confirmed": 2,
             "conf_target": 2,
-            "core_version_group": 14,
-            "min_relay_fee": 0.00001,
+            "core_version_group": 23,
+            "min_relay_fee": 0.01,  # RECOMMENDED_MIN_TX_FEE
         },
         "decred": {
             "connection_type": "rpc",

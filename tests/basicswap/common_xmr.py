@@ -44,6 +44,10 @@ from tests.basicswap.test_bch_xmr import (
     BCH_BASE_PORT,
     BCH_BASE_RPC_PORT,
 )
+from tests.basicswap.extended.test_doge import (
+    DOGE_BASE_PORT,
+    DOGE_BASE_RPC_PORT,
+)
 
 from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
 
@@ -57,9 +61,6 @@ XMR_BASE_WALLET_RPC_PORT = 29998
 FIRO_BASE_PORT = 34832
 FIRO_BASE_RPC_PORT = 35832
 FIRO_RPC_PORT_BASE = int(os.getenv("FIRO_RPC_PORT_BASE", FIRO_BASE_RPC_PORT))
-
-DOGE_BASE_PORT = 22556
-DOGE_BASE_RPC_PORT = 18442
 
 TEST_PATH = os.path.expanduser(os.getenv("TEST_PATH", "~/test_basicswap1"))
 
@@ -75,9 +76,7 @@ DECRED_RPC_PORT_BASE = int(os.getenv("DECRED_RPC_PORT_BASE", DCR_BASE_RPC_PORT))
 BITCOINCASH_RPC_PORT_BASE = int(
     os.getenv("BITCOINCASH_RPC_PORT_BASE", BCH_BASE_RPC_PORT)
 )
-DOGECOIN_RPC_PORT_BASE = int(
-    os.getenv("DOGECOIN_RPC_PORT_BASE", DOGE_BASE_RPC_PORT)
-)
+DOGECOIN_RPC_PORT_BASE = int(os.getenv("DOGECOIN_RPC_PORT_BASE", DOGE_BASE_RPC_PORT))
 
 EXTRA_CONFIG_JSON = json.loads(os.getenv("EXTRA_CONFIG_JSON", "{}"))
 
@@ -453,6 +452,7 @@ def run_prepare(
             fp.write("discover=0\n")
             fp.write("listenonion=0\n")
             fp.write("upnp=0\n")
+            fp.write("debug=1\n")
             if use_rpcauth:
                 salt = generate_salt(16)
                 rpc_user = "test_doge_" + str(node_id)

@@ -377,6 +377,9 @@ class TestFunctions(BaseTest):
         id_offerer: int = self.node_a_id
         id_bidder: int = self.node_b_id
 
+        abandon_all_swaps(test_delay_event, self.swap_clients[id_offerer])
+        abandon_all_swaps(test_delay_event, self.swap_clients[id_bidder])
+
         swap_clients = self.swap_clients
         reverse_bid: bool = swap_clients[0].is_reverse_ads_bid(coin_from, coin_to)
         ci_from = swap_clients[id_offerer].ci(coin_from)
