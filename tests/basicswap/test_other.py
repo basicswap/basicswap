@@ -185,8 +185,8 @@ class Test(unittest.TestCase):
         coin_settings = {"rpcport": 0, "rpcauth": "none"}
         coin_settings.update(REQUIRED_SETTINGS)
         ci = BTCInterface(coin_settings, "regtest")
-        vk_sign = ci.getNewSecretKey()
-        vk_encrypt = ci.getNewSecretKey()
+        vk_sign = ci.getNewRandomKey()
+        vk_encrypt = ci.getNewRandomKey()
 
         pk_sign = ci.getPubkey(vk_sign)
         pk_encrypt = ci.getPubkey(vk_encrypt)
@@ -209,7 +209,7 @@ class Test(unittest.TestCase):
         coin_settings.update(REQUIRED_SETTINGS)
         ci = BTCInterface(coin_settings, "regtest")
 
-        vk = ci.getNewSecretKey()
+        vk = ci.getNewRandomKey()
         pk = ci.getPubkey(vk)
 
         message = "test signing message"
@@ -224,7 +224,7 @@ class Test(unittest.TestCase):
         coin_settings.update(REQUIRED_SETTINGS)
         ci = BTCInterface(coin_settings, "regtest")
 
-        vk = ci.getNewSecretKey()
+        vk = ci.getNewRandomKey()
         pk = ci.getPubkey(vk)
         sig = ci.signCompact(vk, "test signing message")
         assert len(sig) == 64
@@ -239,7 +239,7 @@ class Test(unittest.TestCase):
         coin_settings.update(REQUIRED_SETTINGS)
         ci = BTCInterface(coin_settings, "regtest")
 
-        vk = ci.getNewSecretKey()
+        vk = ci.getNewRandomKey()
         pk = ci.getPubkey(vk)
         sig = ci.signRecoverable(vk, "test signing message")
         assert len(sig) == 65
@@ -264,7 +264,7 @@ class Test(unittest.TestCase):
 
         ci = XMRInterface(coin_settings, "regtest")
 
-        key = ci.getNewSecretKey()
+        key = ci.getNewRandomKey()
         proof = ci.proveDLEAG(key)
         assert ci.verifyDLEAG(proof)
 

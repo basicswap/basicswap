@@ -410,8 +410,8 @@ class Test(TestFunctions):
         fee_rate: int = 1000000
 
         # Test chain b (no-script) lock tx size
-        v = ci.getNewSecretKey()
-        s = ci.getNewSecretKey()
+        v = ci.getNewRandomKey()
+        s = ci.getNewRandomKey()
         S = ci.getPubkey(s)
         lock_tx_b_txid = ci.publishBLockTx(v, S, amount, fee_rate)
         test_delay_event.wait(1)

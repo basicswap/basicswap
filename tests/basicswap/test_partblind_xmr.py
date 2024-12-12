@@ -141,9 +141,9 @@ class Test(BaseTest):
         # fee_rate is in sats/kvB
         fee_rate: int = 1000
 
-        vkbv = ci.getNewSecretKey()
-        a = ci.getNewSecretKey()
-        b = ci.getNewSecretKey()
+        vkbv = ci.getNewRandomKey()
+        a = ci.getNewRandomKey()
+        b = ci.getNewRandomKey()
 
         A = ci.getPubkey(a)
         B = ci.getPubkey(b)
@@ -210,8 +210,8 @@ class Test(BaseTest):
         assert ci.rpc("sendrawtransaction", [lock_spend_tx.hex()]) == txid
 
         # Test chain b (no-script) lock tx size
-        v = ci.getNewSecretKey()
-        s = ci.getNewSecretKey()
+        v = ci.getNewRandomKey()
+        s = ci.getNewRandomKey()
         S = ci.getPubkey(s)
         lock_tx_b_txid = ci.publishBLockTx(v, S, amount, fee_rate)
 

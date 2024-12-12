@@ -513,8 +513,8 @@ class TestBCH(BasicSwapTest):
         # fee_rate is in sats/B
         fee_rate: int = 1
 
-        a = ci.getNewSecretKey()
-        b = ci.getNewSecretKey()
+        a = ci.getNewRandomKey()
+        b = ci.getNewRandomKey()
 
         A = ci.getPubkey(a)
         B = ci.getPubkey(b)

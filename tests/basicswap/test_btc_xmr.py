@@ -1147,8 +1147,8 @@ class BasicSwapTest(TestFunctions):
         # fee_rate is in sats/kvB
         fee_rate: int = 1000
 
-        a = ci.getNewSecretKey()
-        b = ci.getNewSecretKey()
+        a = ci.getNewRandomKey()
+        b = ci.getNewRandomKey()
 
         A = ci.getPubkey(a)
         B = ci.getPubkey(b)
@@ -1217,8 +1217,8 @@ class BasicSwapTest(TestFunctions):
         assert expect_vsize - vsize_actual < 10
 
         # Test chain b (no-script) lock tx size
-        v = ci.getNewSecretKey()
-        s = ci.getNewSecretKey()
+        v = ci.getNewRandomKey()
+        s = ci.getNewRandomKey()
         S = ci.getPubkey(s)
         lock_tx_b_txid = ci.publishBLockTx(v, S, amount, fee_rate)
 

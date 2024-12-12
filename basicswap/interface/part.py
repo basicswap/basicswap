@@ -240,7 +240,7 @@ class PARTInterfaceBlind(PARTInterface):
     def createSCLockTx(self, value: int, script: bytearray, vkbv: bytes) -> bytes:
 
         # Nonce is derived from vkbv, ephemeral_key isn't used
-        ephemeral_key = self.getNewSecretKey()
+        ephemeral_key = self.getNewRandomKey()
         ephemeral_pubkey = self.getPubkey(ephemeral_key)
         assert len(ephemeral_pubkey) == 33
         nonce = self.getScriptLockTxNonce(vkbv)
@@ -307,7 +307,7 @@ class PARTInterfaceBlind(PARTInterface):
         lock_tx_obj = self.rpc("decoderawtransaction", [tx_lock_bytes.hex()])
         assert self.getTxid(tx_lock_bytes).hex() == lock_tx_obj["txid"]
         # Nonce is derived from vkbv, ephemeral_key isn't used
-        ephemeral_key = self.getNewSecretKey()
+        ephemeral_key = self.getNewRandomKey()
         ephemeral_pubkey = self.getPubkey(ephemeral_key)
         assert len(ephemeral_pubkey) == 33
         nonce = self.getScriptLockTxNonce(vkbv)
@@ -348,7 +348,7 @@ class PARTInterfaceBlind(PARTInterface):
         dummy_witness_stack = [x.hex() for x in dummy_witness_stack]
 
         # Use a junk change pubkey to avoid adding unused keys to the wallet
-        zero_change_key = self.getNewSecretKey()
+        zero_change_key = self.getNewRandomKey()
         zero_change_pubkey = self.getPubkey(zero_change_key)
         inputs_info = {
             "0": {
@@ -428,7 +428,7 @@ class PARTInterfaceBlind(PARTInterface):
         dummy_witness_stack = [x.hex() for x in dummy_witness_stack]
 
         # Use a junk change pubkey to avoid adding unused keys to the wallet
-        zero_change_key = self.getNewSecretKey()
+        zero_change_key = self.getNewRandomKey()
         zero_change_pubkey = self.getPubkey(zero_change_key)
         inputs_info = {
             "0": {
@@ -745,7 +745,7 @@ class PARTInterfaceBlind(PARTInterface):
         dummy_witness_stack = self.getScriptLockTxDummyWitness(script_lock)
 
         # Use a junk change pubkey to avoid adding unused keys to the wallet
-        zero_change_key = self.getNewSecretKey()
+        zero_change_key = self.getNewRandomKey()
         zero_change_pubkey = self.getPubkey(zero_change_key)
         inputs_info = {
             "0": {
@@ -949,7 +949,7 @@ class PARTInterfaceBlind(PARTInterface):
         dummy_witness_stack = [x.hex() for x in dummy_witness_stack]
 
         # Use a junk change pubkey to avoid adding unused keys to the wallet
-        zero_change_key = self.getNewSecretKey()
+        zero_change_key = self.getNewRandomKey()
         zero_change_pubkey = self.getPubkey(zero_change_key)
         inputs_info = {
             "0": {
