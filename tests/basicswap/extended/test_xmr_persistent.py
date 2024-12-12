@@ -235,7 +235,13 @@ def start_processes(self):
 
     for i in range(NUM_NODES):
         self.processes.append(
-            multiprocessing.Process(target=run_thread, args=(self, i,))
+            multiprocessing.Process(
+                target=run_thread,
+                args=(
+                    self,
+                    i,
+                ),
+            )
         )
         self.processes[-1].start()
 
@@ -287,9 +293,7 @@ def start_processes(self):
         num_blocks: int = 431
         have_blocks: int = callltcrpc(0, "getblockcount")
         if have_blocks < 500:
-            logging.info(
-                "Mining %d Litecoin blocks to %s", num_blocks, self.ltc_addr
-            )
+            logging.info("Mining %d Litecoin blocks to %s", num_blocks, self.ltc_addr)
             callltcrpc(
                 0,
                 "generatetoaddress",
@@ -340,9 +344,7 @@ def start_processes(self):
                 ],
             )
 
-        self.update_thread_dcr = threading.Thread(
-            target=updateThreadDCR, args=(self,)
-        )
+        self.update_thread_dcr = threading.Thread(target=updateThreadDCR, args=(self,))
         self.update_thread_dcr.start()
 
     if "bitcoincash" in TEST_COINS_LIST:
@@ -365,20 +367,18 @@ def start_processes(self):
             )
 
     if "dogecoin" in TEST_COINS_LIST:
-        self.doge_addr = calldogerpc(
-            0, "getnewaddress", ["mining_addr"])
+        self.doge_addr = calldogerpc(0, "getnewaddress", ["mining_addr"])
         num_blocks: int = 200
         have_blocks: int = calldogerpc(0, "getblockcount")
         if have_blocks < num_blocks:
             logging.info(
                 "Mining %d Dogecoin blocks to %s",
                 num_blocks - have_blocks,
-                self.bch_addr,
+                self.doge_addr,
             )
             calldogerpc(
-                0,
-                "generatetoaddress",
-                [num_blocks - have_blocks, self.doge_addr])
+                0, "generatetoaddress", [num_blocks - have_blocks, self.doge_addr]
+            )
 
     if RESET_TEST:
         # Lower output split threshold for more stakeable outputs
@@ -410,6 +410,7 @@ def start_processes(self):
         self.delay_event.wait(1)
     logging.info("PART blocks: %d", callpartrpc(0, "getblockcount"))
     assert particl_blocks >= num_blocks
+
 
 class BaseTestWithPrepare(unittest.TestCase):
     __test__ = False
@@ -492,7 +493,6 @@ class Test(BaseTestWithPrepare):
     def test_persistent(self):
         if self.run_test_persistent is False:
             return
-        logging.info("[rm] Test::test_persistent")
 
         while not self.delay_event.is_set():
             logging.info("Looping indefinitely, ctrl+c to exit.")
