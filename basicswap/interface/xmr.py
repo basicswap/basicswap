@@ -326,7 +326,7 @@ class XMRInterface(CoinInterface):
 
         return float(self.format_amount(fee_per_k_bytes)), "get_fee_estimate"
 
-    def getNewSecretKey(self) -> bytes:
+    def getNewRandomKey(self) -> bytes:
         # Note: Returned bytes are in big endian order
         return i2b(edu.get_secret())
 

@@ -879,7 +879,7 @@ class Test(BaseTest):
 
         ci = DCRInterface(coin_settings, "mainnet")
 
-        k = ci.getNewSecretKey()
+        k = ci.getNewRandomKey()
         K = ci.getPubkey(k)
 
         pkh = ci.pkh(K)
@@ -1417,8 +1417,8 @@ class Test(BaseTest):
         # fee_rate is in sats/kvB
         fee_rate: int = 10000
 
-        a = ci.getNewSecretKey()
-        b = ci.getNewSecretKey()
+        a = ci.getNewRandomKey()
+        b = ci.getNewRandomKey()
 
         A = ci.getPubkey(a)
         B = ci.getPubkey(b)
@@ -1477,8 +1477,8 @@ class Test(BaseTest):
         assert expect_size - size_actual < 10
 
         # Test chain b (no-script) lock tx size
-        v = ci.getNewSecretKey()
-        s = ci.getNewSecretKey()
+        v = ci.getNewRandomKey()
+        s = ci.getNewRandomKey()
         S = ci.getPubkey(s)
         lock_tx_b_txid = ci.publishBLockTx(v, S, amount, fee_rate)
         test_delay_event.wait(1)
