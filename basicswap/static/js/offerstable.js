@@ -268,36 +268,149 @@ const newEntriesCountSpan = document.getElementById('newEntriesCount');
 
 const WebSocketManager = {
     ws: null,
+    messageQueue: [],
+    processingQueue: false,
+    debounceTimeout: null,
     reconnectTimeout: null,
     maxReconnectAttempts: 5,
     reconnectAttempts: 0,
     reconnectDelay: 5000,
-    lastReconnectAttempt: null,
+    maxQueueSize: 1000,
     isIntentionallyClosed: false,
+    
+    connectionState: {
+        isConnecting: false,
+        lastConnectAttempt: null,
+        connectTimeout: null,
+        lastHealthCheck: null,
+        healthCheckInterval: null
+    },
+
+    performance: {
+        messageCount: 0,
+        lastPerformanceCheck: Date.now(),
+        messagesProcessed: 0,
+        errors: 0,
+        
+        recordMessage() {
+            this.messageCount++;
+            const now = Date.now();
+            
+            if (now - this.lastPerformanceCheck > 60000) {
+                const messagesPerMinute = this.messageCount;
+                if (messagesPerMinute > 100) {
+                    console.warn(`🚨 High message volume: ${messagesPerMinute} messages/minute`);
+                }
+                
+                this.messageCount = 0;
+                this.lastPerformanceCheck = now;
+            }
+        }
+    },
 
     initialize() {
         console.log('🚀 Initializing WebSocket Manager');
+        this.setupPageVisibilityHandler();
         this.connect();
+        this.startHealthCheck();
+    },
+
+    setupPageVisibilityHandler() {
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                this.handlePageHidden();
+            } else {
+                this.handlePageVisible();
+            }
+        });
+    },
+
+    handlePageHidden() {
+        console.log('📱 Page hidden, suspending operations');
+        this.stopHealthCheck();
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            this.isIntentionallyClosed = true;
+            this.ws.close(1000, 'Page hidden');
+        }
+    },
+
+    handlePageVisible() {
+        console.log('📱 Page visible, resuming operations');
+        this.isIntentionallyClosed = false;
+        if (!this.isConnected()) {
+            this.connect();
+        }
+        this.startHealthCheck();
+    },
+
+    startHealthCheck() {
+        this.stopHealthCheck();
+        this.connectionState.healthCheckInterval = setInterval(() => {
+            this.performHealthCheck();
+        }, 30000);
+    },
+
+    stopHealthCheck() {
+        if (this.connectionState.healthCheckInterval) {
+            clearInterval(this.connectionState.healthCheckInterval);
+            this.connectionState.healthCheckInterval = null;
+        }
+    },
+
+    performHealthCheck() {
+        if (!this.isConnected()) {
+            console.warn('🏥 Health check: Connection lost, attempting reconnect');
+            this.handleReconnect();
+            return;
+        }
+
+        const now = Date.now();
+        const lastCheck = this.connectionState.lastHealthCheck;
+        if (lastCheck && (now - lastCheck) > 60000) {
+            console.warn('🏥 Health check: Connection stale, refreshing');
+            this.handleReconnect();
+            return;
+        }
+
+        this.connectionState.lastHealthCheck = now;
+        console.log('✅ Health check passed');
     },
 
     connect() {
-        this.cleanup();
-
-        const config = getWebSocketConfig();
-        const wsPort = config.port || window.ws_port || '11700';
-
-        if (!wsPort) {
-            console.error('❌ WebSocket port not configured');
+        if (this.connectionState.isConnecting || this.isIntentionallyClosed) {
             return false;
         }
 
+        this.cleanup();
+        this.connectionState.isConnecting = true;
+        this.connectionState.lastConnectAttempt = Date.now();
+
         try {
-            this.isIntentionallyClosed = false;
+            const config = getWebSocketConfig();
+            const wsPort = config.port || window.ws_port || '11700';
+
+            if (!wsPort) {
+                console.error('❌ WebSocket port not configured');
+                this.connectionState.isConnecting = false;
+                return false;
+            }
+
             this.ws = new WebSocket(`ws://${window.location.hostname}:${wsPort}`);
             this.setupEventHandlers();
+
+            // Set connection timeout
+            this.connectionState.connectTimeout = setTimeout(() => {
+                if (this.connectionState.isConnecting) {
+                    console.log('⏳ Connection attempt timed out');
+                    this.cleanup();
+                    this.handleReconnect();
+                }
+            }, 5000);
+
             return true;
         } catch (error) {
             console.error('❌ Error creating WebSocket:', error);
+            this.connectionState.isConnecting = false;
             this.handleReconnect();
             return false;
         }
@@ -308,29 +421,34 @@ const WebSocketManager = {
 
         this.ws.onopen = () => {
             console.log('🟢 WebSocket connected successfully');
+            this.connectionState.isConnecting = false;
             this.reconnectAttempts = 0;
-            this.lastReconnectAttempt = null;
+            clearTimeout(this.connectionState.connectTimeout);
+            this.connectionState.lastHealthCheck = Date.now();
             window.ws = this.ws;
             updateConnectionStatus('connected');
         };
 
         this.ws.onmessage = (event) => {
+            this.performance.recordMessage();
             try {
                 const message = JSON.parse(event.data);
-                console.log('WebSocket message received:', message);
                 this.handleMessage(message);
             } catch (error) {
                 console.error('❌ Error processing WebSocket message:', error);
+                this.performance.errors++;
             }
         };
 
         this.ws.onerror = (error) => {
             console.error('❌ WebSocket error:', error);
+            this.performance.errors++;
             updateConnectionStatus('error');
         };
 
         this.ws.onclose = (event) => {
             console.log('🔴 WebSocket closed:', event.code, event.reason);
+            this.connectionState.isConnecting = false;
             window.ws = null;
             updateConnectionStatus('disconnected');
 
@@ -340,26 +458,67 @@ const WebSocketManager = {
         };
     },
 
+    handleMessage(message) {
+        if (this.messageQueue.length >= this.maxQueueSize) {
+            console.warn('⚠️ Message queue full, dropping oldest message');
+            this.messageQueue.shift();
+        }
+
+        clearTimeout(this.debounceTimeout);
+        this.messageQueue.push(message);
+
+        this.debounceTimeout = setTimeout(() => {
+            this.processMessageQueue();
+        }, 250);
+    },
+
+    async processMessageQueue() {
+        if (this.processingQueue || this.messageQueue.length === 0) return;
+
+        this.processingQueue = true;
+        const endpoint = isSentOffers ? '/json/sentoffers' : '/json/offers';
+
+        try {
+            const response = await fetch(endpoint);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            
+            const newData = await response.json();
+            const fetchedOffers = Array.isArray(newData) ? newData : Object.values(newData);
+
+            jsonData = formatInitialData(fetchedOffers);
+            originalJsonData = [...jsonData];
+
+            // Batch update UI
+            requestAnimationFrame(() => {
+                updateOffersTable(true);
+                updateJsonView();
+                updatePaginationInfo();
+            });
+
+            this.performance.messagesProcessed += this.messageQueue.length;
+            this.messageQueue = [];
+        } catch (error) {
+            console.error('❌ Error processing message queue:', error);
+            this.performance.errors++;
+        } finally {
+            this.processingQueue = false;
+        }
+    },
+
     handleReconnect() {
         if (this.reconnectTimeout) {
             clearTimeout(this.reconnectTimeout);
-            this.reconnectTimeout = null;
         }
-
-        // Reset reconnection if too much time has passed
-        const now = Date.now();
-        if (this.lastReconnectAttempt && (now - this.lastReconnectAttempt) > 300000) { // 5 minutes
-            this.reconnectAttempts = 0;
-        }
-        this.lastReconnectAttempt = now;
 
         this.reconnectAttempts++;
         if (this.reconnectAttempts <= this.maxReconnectAttempts) {
-            console.log(`Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+            console.log(`🔄 Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
             
-            // Exponential backoff with max delay of 30 seconds
-            const delay = Math.min(this.reconnectDelay * Math.pow(1.5, this.reconnectAttempts - 1), 30000);
-            
+            const delay = Math.min(
+                this.reconnectDelay * Math.pow(1.5, this.reconnectAttempts - 1),
+                30000
+            );
+
             this.reconnectTimeout = setTimeout(() => {
                 if (!this.isIntentionallyClosed) {
                     this.connect();
@@ -376,57 +535,40 @@ const WebSocketManager = {
         }
     },
 
-    handleMessage(message) {
-        if (message.event === 'new_offer') {
-            const endpoint = isSentOffers ? '/json/sentoffers' : '/json/offers';
-            fetch(endpoint)
-                .then(response => {
-                    if (!response.ok) throw new Error('Network response was not ok');
-                    return response.json();
-                })
-                .then(newData => {
-                    const fetchedOffers = Array.isArray(newData) ? newData : Object.values(newData);
-                    console.log('📊 Fetched new offers:', fetchedOffers.length);
-                    
-                    jsonData = formatInitialData(fetchedOffers);
-                    originalJsonData = [...jsonData];
-                    
-                    updateOffersTable(true);
-                    updateJsonView();
-                    updatePaginationInfo();
-                })
-                .catch(error => {
-                    console.error('❌ Error fetching updated offers:', error);
-                });
-        }
-    },
-
     cleanup() {
-        console.log('Cleaning up WebSocket connection');
-
-        if (this.reconnectTimeout) {
-            clearTimeout(this.reconnectTimeout);
-            this.reconnectTimeout = null;
-        }
+        console.log('🧹 Cleaning up WebSocket resources');
+        
+        clearTimeout(this.debounceTimeout);
+        clearTimeout(this.reconnectTimeout);
+        clearTimeout(this.connectionState.connectTimeout);
+        
+        this.messageQueue = [];
+        this.processingQueue = false;
+        this.connectionState.isConnecting = false;
 
         if (this.ws) {
-            this.isIntentionallyClosed = true;
-
-            // Clear all event handlers
             this.ws.onopen = null;
             this.ws.onmessage = null;
             this.ws.onerror = null;
             this.ws.onclose = null;
 
             if (this.ws.readyState === WebSocket.OPEN) {
-                this.ws.close();
+                this.ws.close(1000, 'Cleanup');
             }
-
             this.ws = null;
             window.ws = null;
         }
+    },
 
-        this.reconnectAttempts = 0;
+    getStats() {
+        return {
+            messagesProcessed: this.performance.messagesProcessed,
+            errors: this.performance.errors,
+            currentQueueSize: this.messageQueue.length,
+            reconnectAttempts: this.reconnectAttempts,
+            isConnected: this.isConnected(),
+            lastHealthCheck: this.connectionState.lastHealthCheck
+        };
     },
 
     isConnected() {
@@ -436,23 +578,12 @@ const WebSocketManager = {
     disconnect() {
         this.isIntentionallyClosed = true;
         this.cleanup();
+        this.stopHealthCheck();
     }
 };
 
 function initializeWebSocket() {
     return WebSocketManager.initialize();
-}
-
-function cleanupWebSocketResources() {
-    WebSocketManager.cleanup();
-}
-
-function checkWebSocketConnection() {
-    if (!WebSocketManager.isConnected()) {
-        console.warn('WebSocket is not connected');
-        return false;
-    }
-    return true;
 }
 
 function formatInitialData(data) {
@@ -658,61 +789,32 @@ document.querySelectorAll('th[data-sortable="true"]').forEach(header => {
     header.classList.add('cursor-pointer', 'hover:bg-gray-100', 'dark:hover:bg-gray-700');
 });
 
-function makePostRequest(url, headers = {}) {
-    return new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', '/json/readurl');
-        xhr.setRequestHeader('Content-Type', 'application/json');
-        xhr.timeout = 30000;
-        xhr.ontimeout = () => reject(new Error('Request timed out'));
-        xhr.onload = () => {
-            console.log(`Response for ${url}:`, xhr.responseText);
-            if (xhr.status === 200) {
-                try {
-                    const response = JSON.parse(xhr.responseText);
-                    if (response.Error) {
-                        console.error(`API Error for ${url}:`, response.Error);
-                        reject(new Error(response.Error));
-                    } else {
-                        resolve(response);
-                    }
-                } catch (error) {
-                    console.error(`Invalid JSON response for ${url}:`, xhr.responseText);
-                    reject(new Error(`Invalid JSON response: ${error.message}`));
-                }
-            } else {
-                console.error(`HTTP Error for ${url}: ${xhr.status} ${xhr.statusText}`);
-                reject(new Error(`HTTP Error: ${xhr.status} ${xhr.statusText}`));
-            }
-        };
-        xhr.onerror = () => reject(new Error('Network error occurred'));
-        xhr.send(JSON.stringify({
-            url: url,
-            headers: headers
-        }));
-    });
-}
 
 async function initializePriceData() {
     console.log('Initializing price data...');
     let retryCount = 0;
     let prices = null;
+    
+    // Try to get cached prices first
+    const PRICES_CACHE_KEY = 'prices_coingecko';
+    const cachedPrices = CacheManager.get(PRICES_CACHE_KEY);
+    if (cachedPrices && cachedPrices.value) {
+        console.log('Using cached price data');
+        latestPrices = cachedPrices.value;
+        return true;
+    }
 
     while (retryCount < PRICE_INIT_RETRIES) {
         try {
             prices = await fetchLatestPrices();
             
             if (prices && Object.keys(prices).length > 0) {
-                console.log('Successfully fetched initial price data:', prices);
+                console.log('Successfully fetched initial price data');
                 latestPrices = prices;
-
-                const PRICES_CACHE_KEY = 'prices_coingecko';
                 CacheManager.set(PRICES_CACHE_KEY, prices, CACHE_DURATION);
-                
                 return true;
             }
             
-            console.warn(`Attempt ${retryCount + 1}: Price data incomplete, retrying...`);
             retryCount++;
             
             if (retryCount < PRICE_INIT_RETRIES) {
@@ -728,24 +830,7 @@ async function initializePriceData() {
         }
     }
 
-    const fallbackPrices = getFallbackPrices();
-    if (fallbackPrices && Object.keys(fallbackPrices).length > 0) {
-        console.log('Using fallback prices:', fallbackPrices);
-        latestPrices = fallbackPrices;
-        return true;
-    }
-
     return false;
-}
-
-function loadSortPreferences() {
-    const savedColumn = localStorage.getItem('tableSortColumn');
-    const savedDirection = localStorage.getItem('tableSortDirection');
-    
-    if (savedColumn !== null) {
-        currentSortColumn = parseInt(savedColumn);
-        currentSortDirection = savedDirection || 'desc';
-    }
 }
 
 function escapeHtml(unsafe) {
@@ -761,16 +846,26 @@ function escapeHtml(unsafe) {
         .replace(/'/g, "&#039;");
 }
 
-function formatTimeDifference(timestamp) {
+function formatTime(timestamp, addAgoSuffix = false) {
     const now = Math.floor(Date.now() / 1000);
     const diff = Math.abs(now - timestamp);
     
-    if (diff < 60) return `${diff} seconds`;
-    if (diff < 3600) return `${Math.floor(diff / 60)} minutes`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)} hours`;
-    if (diff < 2592000) return `${Math.floor(diff / 86400)} days`;
-    if (diff < 31536000) return `${Math.floor(diff / 2592000)} months`;
-    return `${Math.floor(diff / 31536000)} years`;
+    let timeString;
+    if (diff < 60) {
+        timeString = `${diff} seconds`;
+    } else if (diff < 3600) {
+        timeString = `${Math.floor(diff / 60)} minutes`;
+    } else if (diff < 86400) {
+        timeString = `${Math.floor(diff / 3600)} hours`;
+    } else if (diff < 2592000) {
+        timeString = `${Math.floor(diff / 86400)} days`;
+    } else if (diff < 31536000) {
+        timeString = `${Math.floor(diff / 2592000)} months`;
+    } else {
+        timeString = `${Math.floor(diff / 31536000)} years`;
+    }
+
+    return addAgoSuffix ? `${timeString} ago` : timeString;
 }
 
 function formatTimeAgo(timestamp) {
@@ -780,7 +875,7 @@ function formatTimeAgo(timestamp) {
 function formatTimeLeft(timestamp) {
     const now = Math.floor(Date.now() / 1000);
     if (timestamp <= now) return "Expired";
-    return formatTimeDifference(timestamp);
+    return formatTime(timestamp);
 }
 
 function getCoinSymbol(fullName) {
@@ -843,43 +938,6 @@ function coinMatches(offerCoin, filterCoin) {
     }
     
     return false;
-}
-
-function getButtonProperties(isActuallyExpired, isSentOffers, isTreatedAsSentOffer, isRevoked) {
-    if (isRevoked) {
-        return {
-            buttonClass: 'bg-red-500 text-white hover:bg-red-600 transition duration-200',
-            buttonText: 'Revoked'
-        };
-    } else if (isActuallyExpired && isSentOffers) {
-        return {
-            buttonClass: 'bg-gray-400 text-white dark:border-gray-300 text-white hover:bg-red-700 transition duration-200',
-            buttonText: 'Expired'
-        };
-    } else if (isTreatedAsSentOffer) {
-        return {
-            buttonClass: 'bg-gray-300 bold text-white bold hover:bg-green-600 transition duration-200',
-            buttonText: 'Edit'
-        };
-    } else {
-        return {
-            buttonClass: 'bg-blue-500 text-white hover:bg-green-600 transition duration-200',
-            buttonText: 'Swap'
-        };
-    }
-}
-
-function getTimerColor(offer) {
-    const now = Math.floor(Date.now() / 1000);
-    const timeLeft = offer.expire_at - now;
-
-    if (timeLeft <= 300) { // 5 min or less
-        return "#9CA3AF"; // Grey
-    } else if (timeLeft <= 1800) { // 5-30 min
-        return "#3B82F6"; // Blue
-    } else { // More than 30 min
-        return "#10B981"; // Green
-    }
 }
 
 function getProfitColorClass(percentage) {
@@ -979,24 +1037,6 @@ function updateClearFiltersButton() {
     }
 }
 
-function setRefreshButtonLoading(isLoading) {
-    const refreshButton = document.getElementById('refreshOffers');
-    const refreshIcon = document.getElementById('refreshIcon');
-    const refreshText = document.getElementById('refreshText');
-
-    refreshButton.disabled = isLoading;
-    refreshIcon.classList.toggle('animate-spin', isLoading);
-    refreshText.textContent = isLoading ? 'Refreshing...' : 'Refresh';
-
-    if (isLoading) {
-        refreshButton.classList.add('opacity-75');
-        refreshButton.classList.add('cursor-wait');
-    } else {
-        refreshButton.classList.remove('opacity-75');
-        refreshButton.classList.remove('cursor-wait');
-    }
-}
-
 function initializeFlowbiteTooltips() {
     if (typeof Tooltip === 'undefined') {
         console.warn('Tooltip is not defined. Make sure the required library is loaded.');
@@ -1011,19 +1051,6 @@ function initializeFlowbiteTooltips() {
             new Tooltip(tooltipElement, el);
         }
     });
-}
-
-function initializeFooter() {
-    if (isSentOffers) {
-        const nextRefreshContainer = document.getElementById('nextRefreshContainer');
-        if (nextRefreshContainer) {
-            nextRefreshContainer.style.display = 'none';
-        }
-
-        if (typeof nextRefreshCountdown !== 'undefined') {
-            clearInterval(nextRefreshCountdown);
-        }
-    }
 }
 
 function updateCoinFilterImages() {
@@ -1057,7 +1084,8 @@ function updateRowTimes() {
             const offer = jsonData.find(o => o.offer_id === offerId);
             if (!offer) return;
 
-            const newPostedTime = formatTimeAgo(offer.created_at);
+            // Change these to use the new formatTime function
+            const newPostedTime = formatTime(offer.created_at, true);
             const newExpiresIn = formatTimeLeft(offer.expire_at);
             
             const postedElement = row.querySelector('.text-xs:first-child');
@@ -1175,15 +1203,24 @@ async function checkExpiredAndFetchNew() {
 }
 
 function createTimeColumn(offer, postedTime, expiresIn) {
-    const timerColor = getTimerColor(offer); 
+    const now = Math.floor(Date.now() / 1000);
+    const timeLeft = offer.expire_at - now;
+
+    let strokeColor = '#10B981'; // Default green for > 30 min
+    if (timeLeft <= 300) {
+        strokeColor = '#9CA3AF'; // Grey for 5 min or less
+    } else if (timeLeft <= 1800) {
+        strokeColor = '#3B82F6'; // Blue for 5-30 min
+    }
+
     return `
         <td class="py-3 pl-6 text-xs">
             <div class="flex items-center">
                 <div class="relative" data-tooltip-target="tooltip-active${escapeHtml(offer.offer_id)}">
                     <svg alt="" class="w-5 h-5 rounded-full mr-3 cursor-pointer" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-                        <g stroke-linecap="round" stroke-width="2" fill="none" stroke="${escapeHtml(timerColor)}" stroke-linejoin="round">
+                        <g stroke-linecap="round" stroke-width="2" fill="none" stroke="${strokeColor}" stroke-linejoin="round">
                             <circle cx="12" cy="12" r="11"></circle>
-                            <polyline points="12,6 12,12 18,12" stroke="${escapeHtml(timerColor)}"></polyline>
+                            <polyline points="12,6 12,12 18,12" stroke="${strokeColor}"></polyline>
                         </g>
                     </svg>
                 </div>
@@ -1322,7 +1359,26 @@ function createPercentageColumn(offer) {
     `;
 }
 
-function createActionColumn(offer, buttonClass, buttonText) {
+function createActionColumn(offer, isActuallyExpired = false) {
+    const isRevoked = Boolean(offer.is_revoked);
+    const isTreatedAsSentOffer = offer.is_own_offer;
+    
+    let buttonClass, buttonText;
+    
+    if (isRevoked) {
+        buttonClass = 'bg-red-500 text-white hover:bg-red-600 transition duration-200';
+        buttonText = 'Revoked';
+    } else if (isActuallyExpired && isSentOffers) {
+        buttonClass = 'bg-gray-400 text-white dark:border-gray-300 text-white hover:bg-red-700 transition duration-200';
+        buttonText = 'Expired';
+    } else if (isTreatedAsSentOffer) {
+        buttonClass = 'bg-gray-300 bold text-white bold hover:bg-green-600 transition duration-200';
+        buttonText = 'Edit';
+    } else {
+        buttonClass = 'bg-blue-500 text-white hover:bg-green-600 transition duration-200';
+        buttonText = 'Swap';
+    }
+
     return `
         <td class="py-6 px-2 text-center">
             <div class="flex justify-center items-center h-full">
@@ -1651,7 +1707,25 @@ async function fetchLatestPrices() {
     
     try {
         console.log('Fetching fresh price data...');
-        const data = await makePostRequest(url);
+        const response = await fetch('/json/readurl', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                url: url,
+                headers: {}
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP Error: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        if (data.Error) {
+            throw new Error(data.Error);
+        }
         
         if (data && Object.keys(data).length > 0) {
             console.log('✅ Fresh price data received');
@@ -1673,42 +1747,22 @@ async function fetchLatestPrices() {
         }
     } catch (error) {
         console.error('❌ Error fetching prices:', error);
-
-        const fallbackPrices = getFallbackPrices();
-        if (fallbackPrices && Object.keys(fallbackPrices).length > 0) {
-            console.log('Using fallback prices');
-            latestPrices = fallbackPrices;
-            return fallbackPrices;
-        }
+        throw error;
     }
 
-    console.warn('Using existing prices or null');
     return latestPrices || null;
 }
 
-function getFallbackPrices() {
-    const fallbacks = {};
-    const coins = [
-        'bitcoin', 'bitcoin-cash', 'dash', 'dogecoin', 'decred', 
-        'litecoin', 'particl', 'pivx', 'monero', 'zano', 
-        'wownero', 'zcoin'
-    ];
-    
-    for (const coin of coins) {
-        const fallbackValue = tableRateModule.getFallbackValue(coin);
-        if (fallbackValue) {
-            fallbacks[coin] = { 
-                usd: fallbackValue,
-                last_updated: Date.now()
-            };
-        }
-    }
-    
-    return Object.keys(fallbacks).length > 0 ? fallbacks : null;
-}
-
 async function fetchOffers(manualRefresh = false) {
-  setRefreshButtonLoading(true);
+  const refreshButton = document.getElementById('refreshOffers');
+  const refreshIcon = document.getElementById('refreshIcon');
+  const refreshText = document.getElementById('refreshText');
+
+  // Start loading state
+  refreshButton.disabled = true;
+  refreshIcon.classList.add('animate-spin');
+  refreshText.textContent = 'Refreshing...';
+  refreshButton.classList.add('opacity-75', 'cursor-wait');
   
   try {
     const endpoint = isSentOffers ? '/json/sentoffers' : '/json/offers';
@@ -1726,7 +1780,10 @@ async function fetchOffers(manualRefresh = false) {
     console.error('[Debug] Error fetching offers:', error);
     ui.displayErrorMessage('Failed to fetch offers. Please try again later.');
   } finally {
-    setRefreshButtonLoading(false);
+    refreshButton.disabled = false;
+    refreshIcon.classList.remove('animate-spin');
+    refreshText.textContent = 'Refresh';
+    refreshButton.classList.remove('opacity-75', 'cursor-wait');
   }
 }
 
@@ -1971,16 +2028,11 @@ function createTableRow(offer, isSentOffers) {
     const coinFromDisplay = getDisplayName(coinFrom);
     const coinToDisplay = getDisplayName(coinTo);
 
-    const postedTime = formatTimeAgo(offer.created_at);
-    const expiresIn = formatTimeLeft(offer.expire_at);
+    const postedTime = formatTime(offer.created_at, true);
+    const expiresIn = formatTime(offer.expire_at);
     
     const currentTime = Math.floor(Date.now() / 1000);
     const isActuallyExpired = currentTime > offer.expire_at;
-
-    const isOwnOffer = offer.is_own_offer;
-    const isRevoked = Boolean(offer.is_revoked);
-
-    const { buttonClass, buttonText } = getButtonProperties(isActuallyExpired, isSentOffers, isOwnOffer, isRevoked);
 
     const fromAmount = parseFloat(offer.amount_from) || 0;
     const toAmount = parseFloat(offer.amount_to) || 0;
@@ -1993,12 +2045,12 @@ function createTableRow(offer, isSentOffers) {
         ${createOrderbookColumn(offer, coinFrom, coinTo)}
         ${createRateColumn(offer, coinFrom, coinTo)}
         ${createPercentageColumn(offer)}
-        ${createActionColumn(offer, buttonClass, buttonText)}
-        ${createTooltips(offer, isOwnOffer, coinFrom, coinTo, fromAmount, toAmount, postedTime, expiresIn, isActuallyExpired, isRevoked)}
+        ${createActionColumn(offer, isActuallyExpired)}
+        ${createTooltips(offer, offer.is_own_offer, coinFrom, coinTo, fromAmount, toAmount, postedTime, expiresIn, isActuallyExpired, Boolean(offer.is_revoked))}
     `;
 
     updateTooltipTargets(row, uniqueId);
-    updateProfitLoss(row, coinFrom, coinTo, fromAmount, toAmount, isOwnOffer);
+    updateProfitLoss(row, coinFrom, coinTo, fromAmount, toAmount, offer.is_own_offer);
 
     return row;
 }
@@ -2095,7 +2147,6 @@ async function updateOffersTable(skipPriceRefresh = false) {
                 </td>
             </tr>`;
     } finally {
-        setRefreshButtonLoading(false);
     }
 }
 
@@ -2236,7 +2287,6 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('DOM content loaded, initializing...');
     console.log('View type:', isSentOffers ? 'sent offers' : 'received offers');
 
-    initializeFooter();
     updateClearFiltersButton();
 
     setTimeout(() => {
@@ -2295,36 +2345,49 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     eventListeners.add(document.getElementById('refreshOffers'), 'click', async () => {
-        console.log('Manual refresh initiated');
-        setRefreshButtonLoading(true);
+    console.log('Manual refresh initiated');
+    
+    const refreshButton = document.getElementById('refreshOffers');
+    const refreshIcon = document.getElementById('refreshIcon');
+    const refreshText = document.getElementById('refreshText');
 
-        try {
-            const endpoint = isSentOffers ? '/json/sentoffers' : '/json/offers';
-            const response = await fetch(endpoint);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            const newData = await response.json();
+    // Start loading state
+    refreshButton.disabled = true;
+    refreshIcon.classList.add('animate-spin');
+    refreshText.textContent = 'Refreshing...';
+    refreshButton.classList.add('opacity-75', 'cursor-wait');
 
-            const processedNewData = Array.isArray(newData) ? newData : Object.values(newData);
-            console.log('Fetched offers:', processedNewData.length);
-
-            jsonData = formatInitialData(processedNewData);
-            originalJsonData = [...jsonData];
-            
-            await updateOffersTable();
-            updateJsonView();
-            updatePaginationInfo();
-            
-            console.log('✅ Manual refresh completed successfully');
-            
-        } catch (error) {
-            console.error('❌ Error during manual refresh:', error);
-            ui.displayErrorMessage('Failed to refresh offers. Please try again later.');
-        } finally {
-            setRefreshButtonLoading(false);
+    try {
+        const endpoint = isSentOffers ? '/json/sentoffers' : '/json/offers';
+        const response = await fetch(endpoint);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
-    });
+        const newData = await response.json();
+
+        const processedNewData = Array.isArray(newData) ? newData : Object.values(newData);
+        console.log('Fetched offers:', processedNewData.length);
+
+        jsonData = formatInitialData(processedNewData);
+        originalJsonData = [...jsonData];
+        
+        await updateOffersTable();
+        updateJsonView();
+        updatePaginationInfo();
+        
+        console.log('✅ Manual refresh completed successfully');
+        
+    } catch (error) {
+        console.error('❌ Error during manual refresh:', error);
+        ui.displayErrorMessage('Failed to refresh offers. Please try again later.');
+    } finally {
+        // Reset loading state
+        refreshButton.disabled = false;
+        refreshIcon.classList.remove('animate-spin');
+        refreshText.textContent = 'Refresh';
+        refreshButton.classList.remove('opacity-75', 'cursor-wait');
+    }
+});
 
     eventListeners.add(toggleButton, 'click', () => {
         tableView.classList.toggle('hidden');
@@ -2379,50 +2442,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     timerManager.addInterval(updateRowTimes, 900000);
 
-function cleanupResources() {
-    console.log('🧹 Starting resource cleanup...');
-
-    eventListeners.removeAll();
-
-    timerManager.clearAll();
-
-    WebSocketManager.disconnect();
-
-    toggleButton = null;
-    tableView = null;
-    jsonView = null;
-    filterForm = null;
-    prevPageButton = null;
-    nextPageButton = null;
-    currentPageSpan = null;
-    totalPagesSpan = null;
-    lastRefreshTimeSpan = null;
-    newEntriesCountSpan = null;
-    offersBody = null;
-    jsonContent = null;
-
-    if (filterTimeout) {
-        clearTimeout(filterTimeout);
-        filterTimeout = null;
-    }
-
-    jsonData = null;
-    originalJsonData = null;
-    latestPrices = null;
-    lastRefreshTime = null;
-
-    currentPage = 1;
-    newEntriesCount = 0;
-
-    if (typeof CacheManager !== 'undefined') {
-        CacheManager.cleanup(true);
-    }
-
-    console.log('✅ Resource cleanup completed');
-}
-
-    eventListeners.addWindowListener('beforeunload', cleanupResources);
-    eventListeners.addWindowListener('unload', cleanupResources);
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
+            console.log('Page became visible, checking WebSocket connection');
+            if (!WebSocketManager.isConnected()) {
+                WebSocketManager.connect();
+            }
+        }
+    });
 
     console.log('✅ Initialization completed');
 });
