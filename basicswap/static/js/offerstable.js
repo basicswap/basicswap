@@ -1,29 +1,20 @@
 let latestPrices = null;
 let lastRefreshTime = null;
 let newEntriesCount = 0;
-let nextRefreshCountdown = 60;
 let currentPage = 1;
-const itemsPerPage = 50;
-let lastAppliedFilters = {};
-
-const CACHE_KEY = 'latestPricesCache';
-
-const MIN_REFRESH_INTERVAL = 60; // 60 sec
-
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes 
-const FALLBACK_CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
-
 let jsonData = [];
 let originalJsonData = [];
-let isInitialLoad = true;
 let tableRateModule;
-const isSentOffers = window.offersTableConfig.isSentOffers;
-
 let currentSortColumn = 0;
 let currentSortDirection = 'desc';
 
+const itemsPerPage = 50;
+const MIN_REFRESH_INTERVAL = 60; // 60 sec
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes 
+const FALLBACK_CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 const PRICE_INIT_RETRIES = 3;
 const PRICE_INIT_RETRY_DELAY = 2000;
+const isSentOffers = window.offersTableConfig.isSentOffers;
 
 const CacheManager = {
     maxItems: 100,
@@ -213,6 +204,7 @@ const CacheManager = {
         return cacheItems;
     }
 };
+
 const coinNameToSymbol = {
     'Bitcoin': 'bitcoin',
     'Particl': 'particl',
@@ -273,15 +265,14 @@ const currentPageSpan = document.getElementById('currentPage');
 const totalPagesSpan = document.getElementById('totalPages');
 const lastRefreshTimeSpan = document.getElementById('lastRefreshTime');
 const newEntriesCountSpan = document.getElementById('newEntriesCount');
-const nextRefreshTimeSpan = document.getElementById('nextRefreshTime');
 
-// Enhanced WebSocket Manager
 const WebSocketManager = {
     ws: null,
     reconnectTimeout: null,
     maxReconnectAttempts: 5,
     reconnectAttempts: 0,
     reconnectDelay: 5000,
+    lastReconnectAttempt: null,
     isIntentionallyClosed: false,
 
     initialize() {
@@ -290,7 +281,6 @@ const WebSocketManager = {
     },
 
     connect() {
-
         this.cleanup();
 
         const config = getWebSocketConfig();
@@ -319,6 +309,7 @@ const WebSocketManager = {
         this.ws.onopen = () => {
             console.log('🟢 WebSocket connected successfully');
             this.reconnectAttempts = 0;
+            this.lastReconnectAttempt = null;
             window.ws = this.ws;
             updateConnectionStatus('connected');
         };
@@ -349,46 +340,25 @@ const WebSocketManager = {
         };
     },
 
-    handleMessage(message) {
-        if (message.event === 'new_offer') {
-            // Fetch latest data
-            const endpoint = isSentOffers ? '/json/sentoffers' : '/json/offers';
-            fetch(endpoint)
-                .then(response => {
-                    if (!response.ok) throw new Error('Network response was not ok');
-                    return response.json();
-                })
-                .then(newData => {
-                    const fetchedOffers = Array.isArray(newData) ? newData : Object.values(newData);
-                    
-                    // Update data arrays
-                    jsonData = formatInitialData(fetchedOffers);
-                    originalJsonData = [...jsonData];
-                    
-                    // Update UI
-                    console.log('Updating table with new data');
-                    updateOffersTable(true);
-                    updateJsonView();
-                    updatePaginationInfo();
-                })
-                .catch(error => {
-                    console.error('❌ Error fetching updated offers:', error);
-                });
-        }
-    },
-
     handleReconnect() {
         if (this.reconnectTimeout) {
             clearTimeout(this.reconnectTimeout);
             this.reconnectTimeout = null;
         }
 
+        // Reset reconnection if too much time has passed
+        const now = Date.now();
+        if (this.lastReconnectAttempt && (now - this.lastReconnectAttempt) > 300000) { // 5 minutes
+            this.reconnectAttempts = 0;
+        }
+        this.lastReconnectAttempt = now;
+
         this.reconnectAttempts++;
         if (this.reconnectAttempts <= this.maxReconnectAttempts) {
             console.log(`Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
             
-            // Exponential backoff
-            const delay = this.reconnectDelay * Math.pow(1.5, this.reconnectAttempts - 1);
+            // Exponential backoff with max delay of 30 seconds
+            const delay = Math.min(this.reconnectDelay * Math.pow(1.5, this.reconnectAttempts - 1), 30000);
             
             this.reconnectTimeout = setTimeout(() => {
                 if (!this.isIntentionallyClosed) {
@@ -398,6 +368,36 @@ const WebSocketManager = {
         } else {
             console.error('❌ Max reconnection attempts reached');
             updateConnectionStatus('error');
+
+            setTimeout(() => {
+                this.reconnectAttempts = 0;
+                this.connect();
+            }, 60000);
+        }
+    },
+
+    handleMessage(message) {
+        if (message.event === 'new_offer') {
+            const endpoint = isSentOffers ? '/json/sentoffers' : '/json/offers';
+            fetch(endpoint)
+                .then(response => {
+                    if (!response.ok) throw new Error('Network response was not ok');
+                    return response.json();
+                })
+                .then(newData => {
+                    const fetchedOffers = Array.isArray(newData) ? newData : Object.values(newData);
+                    console.log('📊 Fetched new offers:', fetchedOffers.length);
+                    
+                    jsonData = formatInitialData(fetchedOffers);
+                    originalJsonData = [...jsonData];
+                    
+                    updateOffersTable(true);
+                    updateJsonView();
+                    updatePaginationInfo();
+                })
+                .catch(error => {
+                    console.error('❌ Error fetching updated offers:', error);
+                });
         }
     },
 
@@ -412,6 +412,7 @@ const WebSocketManager = {
         if (this.ws) {
             this.isIntentionallyClosed = true;
 
+            // Clear all event handlers
             this.ws.onopen = null;
             this.ws.onmessage = null;
             this.ws.onerror = null;
@@ -473,70 +474,6 @@ function formatInitialData(data) {
     }));
 }
 
-function processWebSocketMessage(message) {
-    console.log('Processing message:', message);
-
-    if (message.event === 'new_offer') {
-        Promise.all([
-            fetch('/json/offers').then(r => r.json()),
-            fetch('/json/sentoffers').then(r => r.json())
-        ])
-        .then(([receivedOffers, sentOffers]) => {
-            console.log('📊 Fetched data:', {
-                receivedCount: Object.keys(receivedOffers).length,
-                sentCount: Object.keys(sentOffers).length
-            });
-
-            if (isSentOffers) {
-                const formattedSentOffers = formatInitialData(sentOffers);
-                console.log('Updating sent offers:', formattedSentOffers.length);
-                
-                jsonData = formattedSentOffers;
-                originalJsonData = [...formattedSentOffers];
-            } else {
-                const formattedReceivedOffers = formatInitialData(receivedOffers);
-                console.log('Updating received offers:', formattedReceivedOffers.length);
-                
-                jsonData = formattedReceivedOffers;
-                originalJsonData = [...formattedReceivedOffers];
-            }
-
-            updateOffersTable(true);
-            updateJsonView();
-            updatePaginationInfo();
-
-            console.log('✅ Table updated for', isSentOffers ? 'sent' : 'received', 'offers');
-        })
-        .catch(error => {
-            console.error('❌ Error fetching offers:', error);
-        });
-    }
-}
-
-function mergeOffers(existingOffers, newOffers) {
-    const offerMap = new Map();
-
-    existingOffers.forEach(offer => {
-        const key = `${offer.offer_id}_${offer.created_at}`;
-        offerMap.set(key, offer);
-    });
-
-    newOffers.forEach(offer => {
-        const key = `${offer.offer_id}_${offer.created_at}`;
-        offerMap.set(key, offer);
-    });
-
-    const mergedOffers = Array.from(offerMap.values());
-
-    console.log('🔄 Offer Merge Stats:', {
-        existingOffersCount: existingOffers.length,
-        newOffersCount: newOffers.length,
-        mergedOffersCount: mergedOffers.length
-    });
-
-    return mergedOffers;
-}
-
 function updateConnectionStatus(status) {
     const dot = document.getElementById('status-dot');
     const text = document.getElementById('status-text');
@@ -566,31 +503,6 @@ function updateConnectionStatus(status) {
             dot.className = 'w-2.5 h-2.5 rounded-full bg-gray-500 mr-2';
             text.textContent = 'Connecting...';
             text.className = 'text-sm text-gray-500';
-    }
-}
-
-function formatOffer(message) {
-    try {
-        console.log('🔄 Formatting offer:', message);
-        return {
-            offer_id: String(message.offer_id || ''),
-            swap_type: String(message.swap_type || 'N/A'),
-            addr_from: String(message.addr_from || ''),
-            coin_from: String(message.coin_from || ''),
-            coin_to: String(message.coin_to || ''),
-            amount_from: String(message.amount_from || '0'),
-            amount_to: String(message.amount_to || '0'),
-            rate: String(message.rate || '0'),
-            created_at: Number(message.created_at || 0),
-            expire_at: Number(message.expire_at || 0),
-            is_own_offer: Boolean(message.is_own_offer),
-            amount_negotiable: Boolean(message.amount_negotiable),
-            is_revoked: Boolean(message.is_revoked),
-            unique_id: `${message.offer_id}_${message.created_at || Date.now()}_${message.coin_from || ''}_${message.coin_to || ''}`
-        };
-    } catch (error) {
-        console.error('❌ Error formatting offer:', error);
-        return null;
     }
 }
 
@@ -933,25 +845,6 @@ function coinMatches(offerCoin, filterCoin) {
     return false;
 }
 
-function getCachedPrices() {
-    const cachedItem = localStorage.getItem(CACHE_KEY);
-    if (cachedItem) {
-        const { data, timestamp } = JSON.parse(cachedItem);
-        if (Date.now() - timestamp < CACHE_DURATION) {
-            return data;
-        }
-    }
-    return null;
-}
-
-function setCachedPrices(data) {
-    const cacheItem = {
-        data: data,
-        timestamp: Date.now()
-    };
-    localStorage.setItem(CACHE_KEY, JSON.stringify(cacheItem));
-}
-
 function getButtonProperties(isActuallyExpired, isSentOffers, isTreatedAsSentOffer, isRevoked) {
     if (isRevoked) {
         return {
@@ -1156,7 +1049,6 @@ function updateCoinFilterImages() {
     updateButtonImage(coinFromSelect, coinFromButton);
 }
 
-
 function updateRowTimes() {
     requestAnimationFrame(() => {
         const rows = document.querySelectorAll('[data-offer-id]');
@@ -1165,7 +1057,6 @@ function updateRowTimes() {
             const offer = jsonData.find(o => o.offer_id === offerId);
             if (!offer) return;
 
-            // Only update what's changed
             const newPostedTime = formatTimeAgo(offer.created_at);
             const newExpiresIn = formatTimeLeft(offer.expire_at);
             
@@ -1275,9 +1166,6 @@ async function checkExpiredAndFetchNew() {
             handleNoOffersScenario();
         }
 
-        nextRefreshCountdown = getTimeUntilNextExpiration();
-        console.log(`Next refresh in ${nextRefreshCountdown} seconds`);
-        
         return jsonData.length;
     } catch (error) {
         console.error('Error fetching new listings:', error);
@@ -1785,8 +1673,7 @@ async function fetchLatestPrices() {
         }
     } catch (error) {
         console.error('❌ Error fetching prices:', error);
-        
-        // Try to get fallback prices
+
         const fallbackPrices = getFallbackPrices();
         if (fallbackPrices && Object.keys(fallbackPrices).length > 0) {
             console.log('Using fallback prices');
@@ -1841,27 +1728,6 @@ async function fetchOffers(manualRefresh = false) {
   } finally {
     setRefreshButtonLoading(false);
   }
-}
-
-function mergeSentOffers(existingOffers, newOffers) {
-    console.log('[Debug] Merging offers:', {
-        existing: existingOffers.length,
-        new: newOffers.length
-    });
-
-    const offerMap = new Map();
-    existingOffers.forEach(offer => {
-        offerMap.set(offer.offer_id, offer);
-    });
-
-    newOffers.forEach(offer => {
-        offerMap.set(offer.offer_id, offer);
-    });
-    
-    const mergedOffers = Array.from(offerMap.values());
-    console.log('[Debug] After merge:', mergedOffers.length);
-    
-    return mergedOffers;
 }
 
 function getValidOffers() {
@@ -1979,7 +1845,7 @@ function filterAndSortData() {
 
 function calculateProfitLoss(fromCoin, toCoin, fromAmount, toAmount, isOwnOffer) {
     return new Promise((resolve) => {
-        console.log(`Calculating profit/loss for ${fromAmount} ${fromCoin} to ${toAmount} ${toCoin}, isOwnOffer: ${isOwnOffer}`);
+        // console.log(`Calculating profit/loss for ${fromAmount} ${fromCoin} to ${toAmount} ${toCoin}, isOwnOffer: ${isOwnOffer}`);
 
         if (!latestPrices) {
             console.error('Latest prices not available. Unable to calculate profit/loss.');
@@ -2023,7 +1889,7 @@ function calculateProfitLoss(fromCoin, toCoin, fromAmount, toAmount, isOwnOffer)
             percentDiff = ((fromValueUSD / toValueUSD) - 1) * 100;
         }
 
-        console.log(`Percent difference: ${percentDiff.toFixed(2)}%`);
+        // console.log(`Percent difference: ${percentDiff.toFixed(2)}%`);
         resolve(percentDiff);
     });
 }
@@ -2185,7 +2051,6 @@ async function updateOffersTable(skipPriceRefresh = false) {
 
         const currentOffers = new Set();
         itemsToDisplay.forEach(offer => {
-            currentOffers.add(offer.offer_id);
             const row = createTableRow(offer, isSentOffers);
             if (row) {
                 fragment.appendChild(row);
@@ -2231,49 +2096,6 @@ async function updateOffersTable(skipPriceRefresh = false) {
             </tr>`;
     } finally {
         setRefreshButtonLoading(false);
-    }
-}
-
-function handleWebSocketMessage(message) {
-    console.log('WebSocket message received:', message);
-
-    if (message.event === 'new_offer' || message.event === 'offer_expiration') {
-        // Fetch latest data
-        const endpoint = isSentOffers ? '/json/sentoffers' : '/json/offers';
-        
-        fetch(endpoint)
-            .then(response => response.json())
-            .then(newData => {
-                const fetchedOffers = Array.isArray(newData) ? newData : Object.values(newData);
-                console.log('Fetched offers:', fetchedOffers.length);
-
-                const networkOffersCount = document.getElementById('network-offers-count');
-                if (networkOffersCount && !isSentOffers) {
-                    networkOffersCount.textContent = fetchedOffers.length;
-                }
-
-                jsonData = formatInitialData(fetchedOffers);
-                originalJsonData = [...jsonData];
-
-                updateOffersTable(true);
-                updateJsonView();
-                updatePaginationInfo();
-
-                if (newEntriesCountSpan) {
-                    const filteredOffers = filterAndSortData();
-                    const displayCount = isSentOffers ? jsonData.length : filteredOffers.length;
-                    newEntriesCountSpan.textContent = displayCount;
-                    console.log('Updated listings count:', displayCount);
-                }
-
-                if (lastRefreshTimeSpan) {
-                    lastRefreshTime = Date.now();
-                    lastRefreshTimeSpan.textContent = new Date(lastRefreshTime).toLocaleTimeString();
-                }
-            })
-            .catch(error => {
-                console.error('❌ Error processing WebSocket message:', error);
-            });
     }
 }
 
@@ -2326,14 +2148,7 @@ function continueInitialization() {
     if (listingLabel) {
         listingLabel.textContent = isSentOffers ? 'Total Listings: ' : 'Network Listings: ';
     }
-    
-    function updateTimesLoop() {
-        updateRowTimes();
-        requestAnimationFrame(updateTimesLoop);
-    }
-    requestAnimationFrame(updateTimesLoop);
-    
-    setInterval(updateRowTimes, 900000);
+
     console.log('Initialization completed');
 }
 
@@ -2343,13 +2158,13 @@ const eventListeners = {
     add(element, eventType, handler, options = false) {
         element.addEventListener(eventType, handler, options);
         this.listeners.push({ element, eventType, handler, options });
-        console.log(`Added ${eventType} listener to`, element);
+        // console.log(`Added ${eventType} listener to`, element);
     },
     
     addWindowListener(eventType, handler, options = false) {
         window.addEventListener(eventType, handler, options);
         this.listeners.push({ element: window, eventType, handler, options });
-        console.log(`Added ${eventType} window listener`);
+        // console.log(`Added ${eventType} window listener`);
     },
     
     removeAll() {
@@ -2416,18 +2231,6 @@ const timerManager = {
         this.clearAllTimeouts();
     }
 };
-
-function cleanupAllResources() {
-    eventListeners.removeAll();
-
-    timerManager.clearAll();
-
-    cleanupWebSocketResources();
-
-    if (window.wsCheckInterval) {
-        clearInterval(window.wsCheckInterval);
-    }
-}
 
 document.addEventListener('DOMContentLoaded', () => {
     console.log('DOM content loaded, initializing...');
@@ -2574,12 +2377,6 @@ document.addEventListener('DOMContentLoaded', () => {
         listingLabel.textContent = isSentOffers ? 'Total Listings: ' : 'Network Listings: ';
     }
 
-    function updateTimesLoop() {
-        updateRowTimes();
-        requestAnimationFrame(updateTimesLoop);
-    }
-    requestAnimationFrame(updateTimesLoop);
-
     timerManager.addInterval(updateRowTimes, 900000);
 
 function cleanupResources() {
@@ -2601,18 +2398,12 @@ function cleanupResources() {
     totalPagesSpan = null;
     lastRefreshTimeSpan = null;
     newEntriesCountSpan = null;
-    nextRefreshTimeSpan = null;
     offersBody = null;
     jsonContent = null;
 
     if (filterTimeout) {
         clearTimeout(filterTimeout);
         filterTimeout = null;
-    }
-
-    if (typeof rafId !== 'undefined' && rafId) {
-        cancelAnimationFrame(rafId);
-        rafId = null;
     }
 
     jsonData = null;
@@ -2622,7 +2413,6 @@ function cleanupResources() {
 
     currentPage = 1;
     newEntriesCount = 0;
-    nextRefreshCountdown = 60;
 
     if (typeof CacheManager !== 'undefined') {
         CacheManager.cleanup(true);

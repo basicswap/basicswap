@@ -84,178 +84,56 @@ const logger = {
   error: (message) => console.error(`[AppError] ${new Date().toISOString()}: ${message}`)
 };
 
-// EventManager
-const eventManager = {
-  listeners: [],
-  
-  add(element, eventType, handler) {
-    if (!element) {
-      console.warn(`Attempting to add event listener to null element for ${eventType}`);
-      return;
-    }
-    
-    element.addEventListener(eventType, handler);
-    this.listeners.push({ 
-      element, 
-      eventType, 
-      handler 
-    });
-  },
-  
-  remove(element, eventType, handler) {
-    element.removeEventListener(eventType, handler);
-    this.listeners = this.listeners.filter(
-      listener => 
-        listener.element !== element || 
-        listener.eventType !== eventType || 
-        listener.handler !== handler
-    );
-  },
-  
-  removeAll() {
-    this.listeners.forEach(({ element, eventType, handler }) => {
-      try {
-        element.removeEventListener(eventType, handler);
-      } catch (error) {
-        console.warn('Error removing event listener:', error);
-      }
-    });
-    this.listeners = [];
-  },
-  
-  listenerCount() {
-    return this.listeners.length;
-  }
-};
-
-const eventTracker = {
-  listeners: [],
-  
-  add(element, eventType, handler) {
-    if (element) {
-      element.addEventListener(eventType, handler);
-      this.listeners.push({ element, eventType, handler });
-    }
-  },
-  
-  removeAll() {
-    this.listeners.forEach(({ element, eventType, handler }) => {
-      if (element) {
-        element.removeEventListener(eventType, handler);
-      }
-    });
-    this.listeners = [];
-  }
-};
-
 // API
 const api = {
-    activeRequests: new Set(),
-    maxRetries: 3,
-    retryDelay: 2000,
-    
-    abortAllRequests() {
-        this.activeRequests.forEach(xhr => {
-            try {
-                xhr.abort();
-            } catch (error) {
-                console.error('Error aborting request:', error);
+  makePostRequest: (url, headers = {}) => {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/json/readurl');
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.timeout = 30000;
+      xhr.ontimeout = () => reject(new AppError('Request timed out'));
+      xhr.onload = () => {
+        logger.log(`Response for ${url}:`, xhr.responseText);
+        if (xhr.status === 200) {
+          try {
+            const response = JSON.parse(xhr.responseText);
+            if (response.Error) {
+              logger.error(`API Error for ${url}:`, response.Error);
+              reject(new AppError(response.Error, 'APIError'));
+            } else {
+              resolve(response);
             }
-        });
-        this.activeRequests.clear();
-    },
-
-    makePostRequest: (url, headers = {}, retryCount = 0) => {
-        return new Promise((resolve, reject) => {
-            const xhr = new XMLHttpRequest();
-            api.activeRequests.add(xhr);
-
-            const timeoutId = timerManager.addTimeout(() => {
-                xhr.abort();
-                api.activeRequests.delete(xhr);
-
-                if (retryCount < api.maxRetries) {
-                    console.log(`Request timeout, retrying (${retryCount + 1}/${api.maxRetries})...`);
-                    resolve(api.makePostRequest(url, headers, retryCount + 1));
-                } else {
-                    reject(new AppError('Request timed out after all retries'));
-                }
-            }, 30000);
-
-            xhr.open('POST', '/json/readurl');
-            xhr.setRequestHeader('Content-Type', 'application/json');
-
-            xhr.onload = () => {
-                api.activeRequests.delete(xhr);
-
-                console.log(`Response for ${url}:`, xhr.responseText);
-                
-                if (xhr.status === 200) {
-                    try {
-                        const response = JSON.parse(xhr.responseText);
-                        if (response.Error) {
-                            console.error(`API Error for ${url}:`, response.Error);
-                            reject(new AppError(response.Error, 'APIError'));
-                        } else {
-                            resolve(response);
-                        }
-                    } catch (error) {
-                        console.error(`Invalid JSON response for ${url}:`, xhr.responseText);
-                        reject(new AppError(`Invalid JSON response: ${error.message}`, 'ParseError'));
-                    }
-                } else {
-                    console.error(`HTTP Error for ${url}: ${xhr.status} ${xhr.statusText}`);
-                    reject(new AppError(`HTTP Error: ${xhr.status} ${xhr.statusText}`, 'HTTPError'));
-                }
-            };
-
-            xhr.onerror = () => {
-                api.activeRequests.delete(xhr);
-
-                if (retryCount < api.maxRetries) {
-                    console.log(`Network error, retrying (${retryCount + 1}/${api.maxRetries})...`);
-                    timerManager.addTimeout(() => {
-                        resolve(api.makePostRequest(url, headers, retryCount + 1));
-                    }, api.retryDelay);
-                } else {
-                    reject(new AppError('Network error occurred after all retries', 'NetworkError'));
-                }
-            };
-
-            xhr.onabort = () => {
-                api.activeRequests.delete(xhr);
-                reject(new AppError('Request aborted', 'AbortError'));
-            };
-
-            xhr.send(JSON.stringify({
-                url: url,
-                headers: headers
-            }));
-        });
-    },
-
-    // Rest of the methods remain the same...
-    fetchCryptoCompareDataXHR: async (coin, retryCount = 0) => {
-        const url = `${config.apiEndpoints.cryptoCompare}?fsyms=${coin}&tsyms=USD,BTC&api_key=${config.apiKeys.cryptoCompare}`;
-        const headers = {
-            'User-Agent': 'Mozilla/5.0',
-            'Accept': 'application/json',
-            'Accept-Language': 'en-US,en;q=0.5',
-        };
-
-        try {
-            return await api.makePostRequest(url, headers);
-        } catch (error) {
-            if (retryCount < api.maxRetries) {
-                console.log(`Retrying CryptoCompare fetch (${retryCount + 1}/${api.maxRetries})...`);
-                await new Promise(resolve => timerManager.addTimeout(resolve, api.retryDelay));
-                return api.fetchCryptoCompareDataXHR(coin, retryCount + 1);
-            }
-            return { error: error.message };
+          } catch (error) {
+            logger.error(`Invalid JSON response for ${url}:`, xhr.responseText);
+            reject(new AppError(`Invalid JSON response: ${error.message}`, 'ParseError'));
+          }
+        } else {
+          logger.error(`HTTP Error for ${url}: ${xhr.status} ${xhr.statusText}`);
+          reject(new AppError(`HTTP Error: ${xhr.status} ${xhr.statusText}`, 'HTTPError'));
         }
-    },
-
-    fetchCoinGeckoDataXHR: async (retryCount = 0) => {
+      };
+      xhr.onerror = () => reject(new AppError('Network error occurred', 'NetworkError'));
+      xhr.send(JSON.stringify({
+        url: url,
+        headers: headers
+      }));
+    });
+  },
+  
+  fetchCryptoCompareDataXHR: (coin) => {
+    const url = `${config.apiEndpoints.cryptoCompare}?fsyms=${coin}&tsyms=USD,BTC&api_key=${config.apiKeys.cryptoCompare}`;
+    const headers = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.5',
+    };
+    return api.makePostRequest(url, headers).catch(error => ({
+      error: error.message
+    }));
+  },
+  
+    fetchCoinGeckoDataXHR: async () => {
         const cacheKey = 'coinGeckoOneLiner';
         let cachedData = cache.get(cacheKey);
 
@@ -268,94 +146,101 @@ const api = {
             .filter(coin => coin.usesCoinGecko)
             .map(coin => coin.name)
             .join(',');
-
         const url = `${config.apiEndpoints.coinGecko}/simple/price?ids=${coinIds}&vs_currencies=usd,btc&include_24hr_vol=true&include_24hr_change=true&api_key=${config.apiKeys.coinGecko}`;
+        
+        console.log(`Fetching data for multiple coins from CoinGecko: ${url}`);
         
         try {
             const data = await api.makePostRequest(url);
+            //console.log(`Raw CoinGecko data:`, data);
             
             if (typeof data !== 'object' || data === null) {
-                throw new AppError('Invalid data structure received from CoinGecko');
+                throw new AppError(`Invalid data structure received from CoinGecko`);
             }
             
             const transformedData = {};
             Object.entries(data).forEach(([id, values]) => {
                 const coinConfig = config.coins.find(coin => coin.name === id);
-                if (coinConfig) {
-                    const symbol = coinConfig.symbol.toLowerCase();
-                    transformedData[symbol] = {
-                        current_price: values.usd,
-                        price_btc: values.btc,
-                        total_volume: values.usd_24h_vol,
-                        price_change_percentage_24h: values.usd_24h_change,
-                        displayName: coinConfig.displayName || coinConfig.symbol
-                    };
-                }
+                const symbol = coinConfig?.symbol.toLowerCase() || id;
+                transformedData[symbol] = {
+                    current_price: values.usd,
+                    price_btc: values.btc,
+                    total_volume: values.usd_24h_vol,
+                    price_change_percentage_24h: values.usd_24h_change,
+                    displayName: coinConfig?.displayName || coinConfig?.symbol || id
+                };
             });
             
+            console.log(`Transformed CoinGecko data:`, transformedData);
             cache.set(cacheKey, transformedData);
             return transformedData;
         } catch (error) {
-            if (retryCount < api.maxRetries) {
-                console.log(`Retrying CoinGecko fetch (${retryCount + 1}/${api.maxRetries})...`);
-                await new Promise(resolve => timerManager.addTimeout(resolve, api.retryDelay));
-                return api.fetchCoinGeckoDataXHR(retryCount + 1);
-            }
+            console.error(`Error fetching CoinGecko data:`, error);
             return { error: error.message };
         }
     },
 
-    fetchHistoricalDataXHR: async (coinSymbols, retryCount = 0) => {
-        if (!Array.isArray(coinSymbols)) {
-            coinSymbols = [coinSymbols];
+  fetchHistoricalDataXHR: async (coinSymbols) => {
+    if (!Array.isArray(coinSymbols)) {
+      coinSymbols = [coinSymbols];
+    }
+
+    console.log(`Fetching historical data for coins: ${coinSymbols.join(', ')}`);
+
+    const results = {};
+
+    const fetchPromises = coinSymbols.map(async coin => {
+      const coinConfig = config.coins.find(c => c.symbol === coin);
+      if (!coinConfig) {
+        console.error(`Coin configuration not found for ${coin}`);
+        return;
+      }
+
+      if (coin === 'WOW') {
+        const url = `${config.apiEndpoints.coinGecko}/coins/wownero/market_chart?vs_currency=usd&days=1&api_key=${config.apiKeys.coinGecko}`;
+        console.log(`CoinGecko URL for WOW: ${url}`);
+
+        try {
+          const response = await api.makePostRequest(url);
+          if (response && response.prices) {
+            results[coin] = response.prices;
+          } else {
+            console.error(`Unexpected data structure for WOW:`, response);
+          }
+        } catch (error) {
+          console.error(`Error fetching CoinGecko data for WOW:`, error);
+        }
+      } else {
+        const resolution = config.resolutions[config.currentResolution];
+        let url;
+        if (resolution.interval === 'hourly') {
+          url = `https://min-api.cryptocompare.com/data/v2/histohour?fsym=${coin}&tsym=USD&limit=${resolution.days * 24}&api_key=${config.apiKeys.cryptoCompare}`;
+        } else {
+          url = `${config.apiEndpoints.cryptoCompareHistorical}?fsym=${coin}&tsym=USD&limit=${resolution.days}&api_key=${config.apiKeys.cryptoCompare}`;
         }
 
-        const results = {};
-        const fetchPromises = coinSymbols.map(async coin => {
-            const coinConfig = config.coins.find(c => c.symbol === coin);
-            if (!coinConfig) {
-                console.error(`Coin configuration not found for ${coin}`);
-                return;
-            }
+        console.log(`CryptoCompare URL for ${coin}: ${url}`);
 
-            try {
-                if (coin === 'WOW') {
-                    const url = `${config.apiEndpoints.coinGecko}/coins/wownero/market_chart?vs_currency=usd&days=1&api_key=${config.apiKeys.coinGecko}`;
-                    const response = await api.makePostRequest(url);
-                    if (response && response.prices) {
-                        results[coin] = response.prices;
-                    }
-                } else {
-                    const resolution = config.resolutions[config.currentResolution];
-                    const url = resolution.interval === 'hourly'
-                        ? `https://min-api.cryptocompare.com/data/v2/histohour?fsym=${coin}&tsym=USD&limit=${resolution.days * 24}&api_key=${config.apiKeys.cryptoCompare}`
-                        : `${config.apiEndpoints.cryptoCompareHistorical}?fsym=${coin}&tsym=USD&limit=${resolution.days}&api_key=${config.apiKeys.cryptoCompare}`;
+        try {
+          const response = await api.makePostRequest(url);
+          if (response.Response === "Error") {
+            console.error(`API Error for ${coin}:`, response.Message);
+          } else if (response.Data && response.Data.Data) {
+            results[coin] = response.Data;
+          } else {
+            console.error(`Unexpected data structure for ${coin}:`, response);
+          }
+        } catch (error) {
+          console.error(`Error fetching CryptoCompare data for ${coin}:`, error);
+        }
+      }
+    });
 
-                    const response = await api.makePostRequest(url);
-                    if (response.Response === "Error") {
-                        throw new Error(response.Message);
-                    }
-                    if (response.Data?.Data) {
-                        results[coin] = response.Data;
-                    }
-                }
-            } catch (error) {
-                if (retryCount < api.maxRetries) {
-                    console.log(`Retrying historical data fetch for ${coin} (${retryCount + 1}/${api.maxRetries})...`);
-                    await new Promise(resolve => timerManager.addTimeout(resolve, api.retryDelay));
-                    return api.fetchHistoricalDataXHR([coin], retryCount + 1);
-                }
-                console.error(`Error fetching historical data for ${coin}:`, error);
-            }
-        });
+    await Promise.all(fetchPromises);
 
-        await Promise.all(fetchPromises);
-        return results;
-    },
-
-    cleanup() {
-        this.abortAllRequests();
-    }
+    //console.log('Final results object:', JSON.stringify(results, null, 2));
+    return results;
+  }
 };
 
 // Cache
@@ -367,7 +252,7 @@ const cache = {
       expiresAt: Date.now() + (customTtl || app.cacheTTL)
     };
     localStorage.setItem(key, JSON.stringify(item));
-    console.log(`Cache set for ${key}, expires in ${(customTtl || app.cacheTTL) / 1000} seconds`);
+    //console.log(`Cache set for ${key}, expires in ${(customTtl || app.cacheTTL) / 1000} seconds`);
   },
   get: (key) => {
     const itemStr = localStorage.getItem(key);
@@ -630,10 +515,6 @@ const chartModule = {
   },
 
   initChart: () => {
-    if (chartModule.chart) {
-      chartModule.chart.destroy(); 
-      chartModule.chart = null;
-    }
     const ctx = document.getElementById('coin-chart').getContext('2d');
     if (!ctx) {
       logger.error('Failed to get chart context. Make sure the canvas element exists.');
@@ -1140,105 +1021,42 @@ const app = {
     console.log(`Data loaded for ${coin.symbol}`);
   },
   
-setupEventListeners: () => {
-  console.log('Setting up event listeners...');
-
-  config.coins.forEach(coin => {
-    const container = document.getElementById(`${coin.symbol.toLowerCase()}-container`);
-    if (container) {
-      const containerHandler = () => {
-        console.log(`${coin.symbol} container clicked`);
-        ui.setActiveContainer(`${coin.symbol.toLowerCase()}-container`);
-        if (chartModule.chart) {
-          if (coin.symbol === 'WOW') {
-            config.currentResolution = 'day';
-          }
-          chartModule.updateChart(coin.symbol);
-          app.updateResolutionButtons(coin.symbol);
-        }
-      };
-      
-      eventTracker.add(container, 'click', containerHandler);
-    }
-  });
-
-  const refreshAllButton = document.getElementById('refresh-all');
-  if (refreshAllButton) {
-    eventTracker.add(refreshAllButton, 'click', app.refreshAllData);
-  }
-
-  const headers = document.querySelectorAll('th');
-  headers.forEach((header, index) => {
-    const sortHandler = () => app.sortTable(index, header.classList.contains('disabled'));
-    eventTracker.add(header, 'click', sortHandler);
-  });
-
-  const closeErrorButton = document.getElementById('close-error');
-  if (closeErrorButton) {
-    eventTracker.add(closeErrorButton, 'click', ui.hideErrorMessage);
-  }
-
-  const resolutionButtons = document.querySelectorAll('.resolution-button');
-  resolutionButtons.forEach(button => {
-    const resolutionHandler = () => {
-      const resolution = button.id.split('-')[1];
-      const currentCoin = chartModule.currentCoin;
-      
-      if (currentCoin !== 'WOW' || resolution === 'day') {
-        config.currentResolution = resolution;
-        chartModule.updateChart(currentCoin, true);
-        app.updateResolutionButtons(currentCoin);
-      }
-    };
-    
-    eventTracker.add(button, 'click', resolutionHandler);
-  });
-
-  const toggleAutoRefreshButton = document.getElementById('toggle-auto-refresh');
-  if (toggleAutoRefreshButton) {
-    eventTracker.add(toggleAutoRefreshButton, 'click', app.toggleAutoRefresh);
-  }
-
-  const volumeToggleButton = document.getElementById('toggle-volume');
-  if (volumeToggleButton) {
-    eventTracker.add(volumeToggleButton, 'click', volumeToggle.toggle);
-  }
-
-  ['coin_to', 'coin_from'].forEach(selectId => {
-    const select = document.getElementById(selectId);
-    if (select) {
-      const handleSelectChange = (event) => {
-        const updateSelectedImage = (selectId) => {
-          const select = document.getElementById(selectId);
-          const button = document.getElementById(`${selectId}_button`);
-          if (!select || !button) return;
-          
-          const selectedOption = select.options[select.selectedIndex];
-          const imageURL = selectedOption?.getAttribute('data-image');
-          
-          requestAnimationFrame(() => {
-            if (imageURL) {
-              button.style.backgroundImage = `url('${imageURL}')`;
-              button.style.backgroundSize = '25px 25px';
-              button.style.backgroundPosition = 'center';
-              button.style.backgroundRepeat = 'no-repeat';
-            } else {
-              button.style.backgroundImage = 'none';
+  setupEventListeners: () => {
+    console.log('Setting up event listeners...');
+    config.coins.forEach(coin => {
+      const container = document.getElementById(`${coin.symbol.toLowerCase()}-container`);
+      if (container) {
+        container.addEventListener('click', () => {
+          console.log(`${coin.symbol} container clicked`);
+          ui.setActiveContainer(`${coin.symbol.toLowerCase()}-container`);
+          if (chartModule.chart) {
+            if (coin.symbol === 'WOW') {
+              config.currentResolution = 'day';
             }
-            button.style.minWidth = '25px';
-            button.style.minHeight = '25px';
-          });
-        };
-        
-        updateSelectedImage(event.target.id);
-      };
-      
-      eventTracker.add(select, 'change', handleSelectChange);
+            chartModule.updateChart(coin.symbol);
+            app.updateResolutionButtons(coin.symbol);
+          }
+        });
+      }
+    });     
+    
+    const refreshAllButton = document.getElementById('refresh-all');
+    if (refreshAllButton) {
+      refreshAllButton.addEventListener('click', app.refreshAllData);
     }
-  });
-  
-  console.log('Event listeners setup completed');
-},
+    
+    const headers = document.querySelectorAll('th');
+    headers.forEach((header, index) => {
+      header.addEventListener('click', () => app.sortTable(index, header.classList.contains('disabled')));
+    });
+    
+    const closeErrorButton = document.getElementById('close-error');
+    if (closeErrorButton) {
+      closeErrorButton.addEventListener('click', ui.hideErrorMessage);
+    }
+    console.log('Event listeners set up');
+  },
+
   initAutoRefresh: () => {
     console.log('Initializing auto-refresh...');
     const toggleAutoRefreshButton = document.getElementById('toggle-auto-refresh');
@@ -1626,7 +1444,7 @@ updateResolutionButtons: (coinSymbol) => {
     }
   });
 },
-
+  
   toggleAutoRefresh: () => {
     console.log('Toggling auto-refresh');
     app.isAutoRefreshEnabled = !app.isAutoRefreshEnabled;
@@ -1661,142 +1479,5 @@ resolutionButtons.forEach(button => {
     }
   });
 });
-
-function cleanupEventListeners() {
-  console.log('Cleaning up event listeners...');
-  eventTracker.removeAll();
-  console.log('Event listeners cleaned up');
-}
-
-function cleanup() {
-    console.log('🧹 Starting comprehensive cleanup...');
-
-    if (app.updateNextRefreshTimeRAF) {
-        cancelAnimationFrame(app.updateNextRefreshTimeRAF);
-        app.updateNextRefreshTimeRAF = null;
-    }
-
-    if (timerManager) {
-        timerManager.clearAllIntervals();
-        timerManager.clearAllTimeouts();
-    }
-
-    if (api && api.abortAllRequests) {
-        api.abortAllRequests();
-    }
-
-    if (chartModule.chart) {
-        try {
-            // Clear datasets first
-            if (chartModule.chart.data && chartModule.chart.data.datasets) {
-                chartModule.chart.data.datasets = [];
-                chartModule.chart.update('none');
-            }
-
-            chartModule.chart.destroy();
-
-            chartModule.chart = null;
-            chartModule.currentCoin = null;
-            chartModule.loadStartTime = 0;
-
-            const canvas = document.getElementById('coin-chart');
-            if (canvas) {
-                const ctx = canvas.getContext('2d');
-                if (ctx) {
-                    ctx.clearRect(0, 0, canvas.width, canvas.height);
-                }
-            }
-        } catch (error) {
-            console.error('Error during chart cleanup:', error);
-        }
-    }
-
-    if (eventTracker) {
-        eventTracker.removeAll();
-    }
-
-    const domElements = {
-        toggleButton: null,
-        tableView: null,
-        jsonView: null,
-        filterForm: null,
-        prevPageButton: null,
-        nextPageButton: null,
-        currentPageSpan: null,
-        totalPagesSpan: null,
-        lastRefreshTimeSpan: null,
-        newEntriesCountSpan: null,
-        nextRefreshTimeSpan: null,
-        offersBody: null,
-        jsonContent: null
-    };
-
-    Object.keys(domElements).forEach(key => {
-        if (window[key]) {
-            window[key] = null;
-        }
-    });
-
-    if (app) {
-        app.btcPriceUSD = 0;
-        app.nextRefreshTime = null;
-        app.lastRefreshedTime = null;
-        app.isRefreshing = false;
-        
-        // Clear any auto-refresh state
-        if (app.autoRefreshInterval) {
-            clearTimeout(app.autoRefreshInterval);
-            app.autoRefreshInterval = null;
-        }
-    }
-
-    if (volumeToggle) {
-        volumeToggle.isVisible = false;
-    }
-
-    try {
-        const cacheKeysToPreserve = ['volumeToggleState', 'autoRefreshEnabled'];
-        const keysToRemove = [];
-        
-        for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (!cacheKeysToPreserve.includes(key)) {
-                if (key.startsWith('coinData_') || 
-                    key.startsWith('chartData_') || 
-                    key === 'coinGeckoOneLiner' ||
-                    key === 'lastRefreshedTime' ||
-                    key === 'nextRefreshTime') {
-                    keysToRemove.push(key);
-                }
-            }
-        }
-        
-        keysToRemove.forEach(key => localStorage.removeItem(key));
-        console.log(`🗑️ Cleared ${keysToRemove.length} cache items`);
-    } catch (error) {
-        console.error('Error clearing cache:', error);
-    }
-
-    config.currentResolution = 'year';
-
-    const errorOverlay = document.getElementById('error-overlay');
-    if (errorOverlay) {
-        errorOverlay.classList.add('hidden');
-    }
-
-    const loader = document.getElementById('loader');
-    const chartLoader = document.getElementById('chart-loader');
-    if (loader) loader.classList.add('hidden');
-    if (chartLoader) chartLoader.classList.add('hidden');
-
-    document.querySelectorAll('.container-to-blur').forEach(container => {
-        container.classList.remove('blurred');
-    });
-
-    console.log('✨ Cleanup completed successfully');
-}
-
-window.addEventListener('beforeunload', cleanup);
-window.addEventListener('unload', cleanup);
 
 app.init();
