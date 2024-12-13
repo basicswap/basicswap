@@ -490,7 +490,7 @@ const WebSocketManager = {
 
             // Batch update UI
             requestAnimationFrame(() => {
-                updateOffersTable(true);
+                updateOffersTable();
                 updateJsonView();
                 updatePaginationInfo();
             });
@@ -2055,27 +2055,26 @@ function createTableRow(offer, isSentOffers) {
     return row;
 }
 
-async function updateOffersTable(skipPriceRefresh = false) {
+async function updateOffersTable() {
     console.log('[Debug] Starting updateOffersTable function');
     
     try {
-        if (!skipPriceRefresh) {
-            const PRICES_CACHE_KEY = 'prices_coingecko';
-            const cachedPrices = CacheManager.get(PRICES_CACHE_KEY);
-            
-            if (!cachedPrices || !cachedPrices.remainingTime || cachedPrices.remainingTime < 60000) {
-                console.log('Fetching fresh price data...');
-                const priceData = await fetchLatestPrices();
-                if (!priceData) {
-                    console.error('Failed to fetch latest prices');
-                } else {
-                    console.log('Latest prices fetched successfully');
-                    latestPrices = priceData;
-                }
+        // Always check prices
+        const PRICES_CACHE_KEY = 'prices_coingecko';
+        const cachedPrices = CacheManager.get(PRICES_CACHE_KEY);
+        
+        if (!cachedPrices || !cachedPrices.remainingTime || cachedPrices.remainingTime < 60000) {
+            console.log('Fetching fresh price data...');
+            const priceData = await fetchLatestPrices();
+            if (!priceData) {
+                console.error('Failed to fetch latest prices');
             } else {
-                console.log('Using cached price data (still valid)');
-                latestPrices = cachedPrices.value;
+                console.log('Latest prices fetched successfully');
+                latestPrices = priceData;
             }
+        } else {
+            console.log('Using cached price data (still valid)');
+            latestPrices = cachedPrices.value;
         }
 
         const totalOffers = originalJsonData.filter(offer => !isOfferExpired(offer));
@@ -2146,7 +2145,6 @@ async function updateOffersTable(skipPriceRefresh = false) {
                     An error occurred while updating the offers table. Please try again later.
                 </td>
             </tr>`;
-    } finally {
     }
 }
 
@@ -2171,7 +2169,7 @@ function applyFilters() {
     try {
         filterTimeout = setTimeout(() => {
             jsonData = filterAndSortData();
-            updateOffersTable(true);
+            updateOffersTable;
             updateJsonView();
             updatePaginationInfo();
             updateClearFiltersButton();
@@ -2402,7 +2400,7 @@ document.addEventListener('DOMContentLoaded', () => {
             currentPage--;
             const validOffers = getValidOffers();
             const totalPages = Math.ceil(validOffers.length / itemsPerPage);
-            updateOffersTable(true);
+            updateOffersTable;
             updatePaginationControls(totalPages);
         }
     });
@@ -2412,7 +2410,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const totalPages = Math.ceil(validOffers.length / itemsPerPage);
         if (currentPage < totalPages) {
             currentPage++;
-            updateOffersTable(true);
+            updateOffersTable;
             updatePaginationControls(totalPages);
         }
     });
