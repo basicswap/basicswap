@@ -1,210 +1,27 @@
+// GLOBAL STATE VARIABLES
 let latestPrices = null;
 let lastRefreshTime = null;
-let newEntriesCount = 0;
 let currentPage = 1;
 let jsonData = [];
 let originalJsonData = [];
-let tableRateModule;
 let currentSortColumn = 0;
 let currentSortDirection = 'desc';
+let filterTimeout = null;
 
-const itemsPerPage = 50;
+// CONFIGURATION CONSTANTS
+
+// Time Constants
 const MIN_REFRESH_INTERVAL = 60; // 60 sec
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes 
 const FALLBACK_CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+
+// Application Constants
+const itemsPerPage = 50;
 const PRICE_INIT_RETRIES = 3;
 const PRICE_INIT_RETRY_DELAY = 2000;
 const isSentOffers = window.offersTableConfig.isSentOffers;
 
-const CacheManager = {
-    maxItems: 100,
-    maxSize: 5 * 1024 * 1024,
-    
-    set: function(key, value, customTtl = null) {
-        try {
-            this.cleanup();
-            
-            const item = {
-                value: value,
-                timestamp: Date.now(),
-                expiresAt: Date.now() + (customTtl || CACHE_DURATION)
-            };
-
-            const itemSize = new Blob([JSON.stringify(item)]).size;
-
-            if (itemSize > this.maxSize) {
-                console.warn(`Cache item too large (${(itemSize/1024/1024).toFixed(2)}MB), not caching`);
-                return false;
-            }
-
-            localStorage.setItem(key, JSON.stringify(item));
-            
-            console.log(`🟢 Cache set for ${key}, expires in ${(customTtl || CACHE_DURATION) / 1000} seconds`);
-            console.log('Cached data:', {
-                key: key,
-                expiresIn: (customTtl || CACHE_DURATION) / 1000,
-                sizeKB: (itemSize / 1024).toFixed(2),
-                dataSize: typeof value === 'object' ? Object.keys(value).length : 'not an object'
-            });
-            
-            return true;
-        } catch (error) {
-            if (error.name === 'QuotaExceededError') {
-                console.warn('Storage quota exceeded, clearing old items');
-                this.cleanup(true);
-                try {
-                    localStorage.setItem(key, JSON.stringify(item));
-                    return true;
-                } catch (retryError) {
-                    console.error('❌ Still unable to store item after cleanup:', retryError);
-                    return false;
-                }
-            }
-            console.error('❌ Error setting cache:', error);
-            return false;
-        }
-    },
-    
-    get: function(key) {
-        try {
-            const itemStr = localStorage.getItem(key);
-            if (!itemStr) {
-                console.log(`🔴 No cache found for ${key}`);
-                return null;
-            }
-
-            const item = JSON.parse(itemStr);
-            const now = Date.now();
-            
-            if (now < item.expiresAt) {
-                const remainingTime = (item.expiresAt - now) / 1000;
-                console.log(`🟢 Cache hit for ${key}, ${remainingTime.toFixed(1)} seconds remaining`);
-                return {
-                    value: item.value,
-                    remainingTime: item.expiresAt - now
-                };
-            } else {
-                console.log(`🟡 Cache expired for ${key}`);
-                localStorage.removeItem(key);
-            }
-        } catch (error) {
-            console.error('❌ Error parsing cache item:', error);
-            localStorage.removeItem(key);
-        }
-        return null;
-    },
-    
-    cleanup: function(aggressive = false) {
-        const now = Date.now();
-        let totalSize = 0;
-        let itemCount = 0;
-        const items = [];
-
-        for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (key.startsWith('offers_') || key.startsWith('prices_')) {
-                try {
-                    const itemStr = localStorage.getItem(key);
-                    const size = new Blob([itemStr]).size;
-                    const item = JSON.parse(itemStr);
-                    
-                    items.push({
-                        key,
-                        size,
-                        expiresAt: item.expiresAt,
-                        timestamp: item.timestamp
-                    });
-                    
-                    totalSize += size;
-                    itemCount++;
-                } catch (error) {
-                    console.warn(`🔧 Removing invalid cache item: ${key}`);
-                    localStorage.removeItem(key);
-                }
-            }
-        }
-
-        items.forEach(item => {
-            if (now >= item.expiresAt) {
-                localStorage.removeItem(item.key);
-                totalSize -= item.size;
-                itemCount--;
-            }
-        });
-
-        if (aggressive || totalSize > this.maxSize || itemCount > this.maxItems) {
-
-            items.sort((a, b) => b.timestamp - a.timestamp);
-            
-            while ((totalSize > this.maxSize || itemCount > this.maxItems) && items.length > 0) {
-                const item = items.pop();
-                localStorage.removeItem(item.key);
-                totalSize -= item.size;
-                itemCount--;
-            }
-        }
-
-        console.log('🧹 Cache cleanup completed:', {
-            itemCount,
-            totalSizeMB: (totalSize / 1024 / 1024).toFixed(2),
-            aggressive
-        });
-    },
-    
-    isValid: function(key) {
-        const result = this.get(key) !== null;
-        console.log(`🔍 Cache validity check for ${key}: ${result ? 'valid' : 'invalid'}`);
-        return result;
-    },
-    
-    clear: function() {
-        let clearedItems = [];
-        Object.keys(localStorage).forEach(key => {
-            if (key.startsWith('offers_') || key.startsWith('prices_')) {
-                clearedItems.push(key);
-                localStorage.removeItem(key);
-            }
-        });
-        console.log(`🧹 Cache cleared: ${clearedItems.length} items removed`);
-        if (clearedItems.length > 0) {
-            console.log('Cleared items:', clearedItems);
-        }
-    },
-
-    debug: function() {
-        const cacheItems = {};
-        let totalSize = 0;
-        
-        Object.keys(localStorage).forEach(key => {
-            if (key.startsWith('offers_') || key.startsWith('prices_')) {
-                try {
-                    const itemStr = localStorage.getItem(key);
-                    const size = new Blob([itemStr]).size;
-                    const item = JSON.parse(itemStr);
-                    
-                    cacheItems[key] = {
-                        expiresIn: ((item.expiresAt - Date.now()) / 1000).toFixed(1) + ' seconds',
-                        sizeKB: (size / 1024).toFixed(2) + ' KB',
-                        dataSize: typeof item.value === 'object' ? Object.keys(item.value).length : 'not an object'
-                    };
-                    
-                    totalSize += size;
-                } catch (e) {
-                    cacheItems[key] = 'invalid cache item';
-                }
-            }
-        });
-        
-        console.log('📊 Current cache status:', {
-            items: cacheItems,
-            totalSizeMB: (totalSize / 1024 / 1024).toFixed(2),
-            itemCount: Object.keys(cacheItems).length
-        });
-        
-        return cacheItems;
-    }
-};
-
+// MAPPING OBJECTS
 const coinNameToSymbol = {
     'Bitcoin': 'bitcoin',
     'Particl': 'particl',
@@ -253,10 +70,7 @@ const coinIdToName = {
     9: 'wownero', 11: 'pivx', 13: 'firo', 17: 'bitcoincash'
 };
 
-const toggleButton = document.getElementById('toggleView');
-const tableView = document.getElementById('tableView');
-const jsonView = document.getElementById('jsonView');
-const jsonContent = document.getElementById('jsonContent');
+// DOM ELEMENT REFERENCES
 const offersBody = document.getElementById('offers-body');
 const filterForm = document.getElementById('filterForm');
 const prevPageButton = document.getElementById('prevPage');
@@ -266,6 +80,7 @@ const totalPagesSpan = document.getElementById('totalPages');
 const lastRefreshTimeSpan = document.getElementById('lastRefreshTime');
 const newEntriesCountSpan = document.getElementById('newEntriesCount');
 
+// MANAGER OBJECTS
 const WebSocketManager = {
     ws: null,
     messageQueue: [],
@@ -284,28 +99,6 @@ const WebSocketManager = {
         connectTimeout: null,
         lastHealthCheck: null,
         healthCheckInterval: null
-    },
-
-    performance: {
-        messageCount: 0,
-        lastPerformanceCheck: Date.now(),
-        messagesProcessed: 0,
-        errors: 0,
-        
-        recordMessage() {
-            this.messageCount++;
-            const now = Date.now();
-            
-            if (now - this.lastPerformanceCheck > 60000) {
-                const messagesPerMinute = this.messageCount;
-                if (messagesPerMinute > 100) {
-                    console.warn(`🚨 High message volume: ${messagesPerMinute} messages/minute`);
-                }
-                
-                this.messageCount = 0;
-                this.lastPerformanceCheck = now;
-            }
-        }
     },
 
     initialize() {
@@ -398,7 +191,6 @@ const WebSocketManager = {
             this.ws = new WebSocket(`ws://${window.location.hostname}:${wsPort}`);
             this.setupEventHandlers();
 
-            // Set connection timeout
             this.connectionState.connectTimeout = setTimeout(() => {
                 if (this.connectionState.isConnecting) {
                     console.log('⏳ Connection attempt timed out');
@@ -417,46 +209,44 @@ const WebSocketManager = {
     },
 
     setupEventHandlers() {
-        if (!this.ws) return;
+    if (!this.ws) return;
 
-        this.ws.onopen = () => {
-            console.log('🟢 WebSocket connected successfully');
-            this.connectionState.isConnecting = false;
-            this.reconnectAttempts = 0;
-            clearTimeout(this.connectionState.connectTimeout);
-            this.connectionState.lastHealthCheck = Date.now();
-            window.ws = this.ws;
-            updateConnectionStatus('connected');
-        };
+    this.ws.onopen = () => {
+        console.log('🟢 WebSocket connected successfully');
+        this.connectionState.isConnecting = false;
+        this.reconnectAttempts = 0;
+        clearTimeout(this.connectionState.connectTimeout);
+        this.connectionState.lastHealthCheck = Date.now();
+        window.ws = this.ws;
+        updateConnectionStatus('connected');
+    };
 
-        this.ws.onmessage = (event) => {
-            this.performance.recordMessage();
-            try {
-                const message = JSON.parse(event.data);
-                this.handleMessage(message);
-            } catch (error) {
-                console.error('❌ Error processing WebSocket message:', error);
-                this.performance.errors++;
-            }
-        };
-
-        this.ws.onerror = (error) => {
-            console.error('❌ WebSocket error:', error);
-            this.performance.errors++;
+    this.ws.onmessage = (event) => {
+        try {
+            const message = JSON.parse(event.data);
+            this.handleMessage(message);
+        } catch (error) {
+            console.error('❌ Error processing WebSocket message:', error);
             updateConnectionStatus('error');
-        };
+        }
+    };
 
-        this.ws.onclose = (event) => {
-            console.log('🔴 WebSocket closed:', event.code, event.reason);
-            this.connectionState.isConnecting = false;
-            window.ws = null;
-            updateConnectionStatus('disconnected');
+    this.ws.onerror = (error) => {
+        console.error('❌ WebSocket error:', error);
+        updateConnectionStatus('error');
+    };
 
-            if (!this.isIntentionallyClosed) {
-                this.handleReconnect();
-            }
-        };
-    },
+    this.ws.onclose = (event) => {
+        console.log('🔴 WebSocket closed:', event.code, event.reason);
+        this.connectionState.isConnecting = false;
+        window.ws = null;
+        updateConnectionStatus('disconnected');
+
+        if (!this.isIntentionallyClosed) {
+            this.handleReconnect();
+        }
+    };
+},
 
     handleMessage(message) {
         if (this.messageQueue.length >= this.maxQueueSize) {
@@ -488,18 +278,15 @@ const WebSocketManager = {
             jsonData = formatInitialData(fetchedOffers);
             originalJsonData = [...jsonData];
 
-            // Batch update UI
             requestAnimationFrame(() => {
                 updateOffersTable();
                 updateJsonView();
                 updatePaginationInfo();
             });
 
-            this.performance.messagesProcessed += this.messageQueue.length;
             this.messageQueue = [];
         } catch (error) {
             console.error('❌ Error processing message queue:', error);
-            this.performance.errors++;
         } finally {
             this.processingQueue = false;
         }
@@ -560,17 +347,6 @@ const WebSocketManager = {
         }
     },
 
-    getStats() {
-        return {
-            messagesProcessed: this.performance.messagesProcessed,
-            errors: this.performance.errors,
-            currentQueueSize: this.messageQueue.length,
-            reconnectAttempts: this.reconnectAttempts,
-            isConnected: this.isConnected(),
-            lastHealthCheck: this.connectionState.lastHealthCheck
-        };
-    },
-
     isConnected() {
         return this.ws && this.ws.readyState === WebSocket.OPEN;
     },
@@ -582,60 +358,158 @@ const WebSocketManager = {
     }
 };
 
-function initializeWebSocket() {
-    return WebSocketManager.initialize();
-}
+const CacheManager = {
+    maxItems: 100,
+    maxSize: 5 * 1024 * 1024, // 5MB
 
-function formatInitialData(data) {
-    return data.map(offer => ({
-        offer_id: String(offer.offer_id || ''),
-        swap_type: String(offer.swap_type || 'N/A'),
-        addr_from: String(offer.addr_from || ''),
-        coin_from: String(offer.coin_from || ''),
-        coin_to: String(offer.coin_to || ''),
-        amount_from: String(offer.amount_from || '0'),
-        amount_to: String(offer.amount_to || '0'),
-        rate: String(offer.rate || '0'),
-        created_at: Number(offer.created_at || 0),
-        expire_at: Number(offer.expire_at || 0),
-        is_own_offer: Boolean(offer.is_own_offer),
-        amount_negotiable: Boolean(offer.amount_negotiable),
-        is_revoked: Boolean(offer.is_revoked),
-        unique_id: `${offer.offer_id}_${offer.created_at}_${offer.coin_from}_${offer.coin_to}`
-    }));
-}
+    set: function(key, value, customTtl = null) {
+        try {
+            this.cleanup();
+            
+            const item = {
+                value: value,
+                timestamp: Date.now(),
+                expiresAt: Date.now() + (customTtl || CACHE_DURATION)
+            };
 
-function updateConnectionStatus(status) {
-    const dot = document.getElementById('status-dot');
-    const text = document.getElementById('status-text');
+            const itemSize = new Blob([JSON.stringify(item)]).size;
+            if (itemSize > this.maxSize) {
+                //console.error(`Cache item exceeds maximum size (${(itemSize/1024/1024).toFixed(2)}MB)`);
+                return false;
+            }
+
+            localStorage.setItem(key, JSON.stringify(item));
+            return true;
+
+        } catch (error) {
+            if (error.name === 'QuotaExceededError') {
+                this.cleanup(true); // Aggressive cleanup
+                try {
+                    localStorage.setItem(key, JSON.stringify(item));
+                    return true;
+                } catch (retryError) {
+                    //console.error('Storage quota exceeded even after cleanup');
+                    return false;
+                }
+            }
+            //console.error('Cache set error:', error);
+            return false;
+        }
+    },
     
-    if (!dot || !text) {
-        console.warn('Status indicators not found in DOM');
-        return;
+    get: function(key) {
+        try {
+            const itemStr = localStorage.getItem(key);
+            if (!itemStr) return null;
+
+            const item = JSON.parse(itemStr);
+            const now = Date.now();
+            
+            if (now < item.expiresAt) {
+                return {
+                    value: item.value,
+                    remainingTime: item.expiresAt - now
+                };
+            }
+            
+            localStorage.removeItem(key);
+        } catch (error) {
+            localStorage.removeItem(key);
+        }
+        return null;
+    },
+
+    cleanup: function(aggressive = false) {
+        const now = Date.now();
+        let totalSize = 0;
+        let itemCount = 0;
+        const items = [];
+
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (!key.startsWith('offers_') && !key.startsWith('prices_')) continue;
+
+            try {
+                const itemStr = localStorage.getItem(key);
+                const size = new Blob([itemStr]).size;
+                const item = JSON.parse(itemStr);
+                
+                if (now >= item.expiresAt) {
+                    localStorage.removeItem(key);
+                    continue;
+                }
+
+                items.push({
+                    key,
+                    size,
+                    expiresAt: item.expiresAt,
+                    timestamp: item.timestamp
+                });
+                
+                totalSize += size;
+                itemCount++;
+            } catch (error) {
+                localStorage.removeItem(key);
+            }
+        }
+
+        if (aggressive || totalSize > this.maxSize || itemCount > this.maxItems) {
+            items.sort((a, b) => b.timestamp - a.timestamp);
+            
+            while ((totalSize > this.maxSize || itemCount > this.maxItems) && items.length > 0) {
+                const item = items.pop();
+                localStorage.removeItem(item.key);
+                totalSize -= item.size;
+                itemCount--;
+            }
+        }
+    },
+
+    clear: function() {
+        const keys = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key.startsWith('offers_') || key.startsWith('prices_')) {
+                keys.push(key);
+            }
+        }
+        
+        keys.forEach(key => localStorage.removeItem(key));
+    },
+
+    getStats: function() {
+        let totalSize = 0;
+        let itemCount = 0;
+        let expiredCount = 0;
+        const now = Date.now();
+
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (!key.startsWith('offers_') && !key.startsWith('prices_')) continue;
+
+            try {
+                const itemStr = localStorage.getItem(key);
+                const size = new Blob([itemStr]).size;
+                const item = JSON.parse(itemStr);
+                
+                totalSize += size;
+                itemCount++;
+                
+                if (now >= item.expiresAt) {
+                    expiredCount++;
+                }
+            } catch (error) {
+            }
+        }
+
+        return {
+            totalSizeMB: (totalSize / 1024 / 1024).toFixed(2),
+            itemCount,
+            expiredCount,
+            utilization: ((totalSize / this.maxSize) * 100).toFixed(1) + '%'
+        };
     }
-    
-    switch(status) {
-        case 'connected':
-            dot.className = 'w-2.5 h-2.5 rounded-full bg-green-500 mr-2';
-            text.textContent = 'Connected';
-            text.className = 'text-sm text-green-500';
-            break;
-        case 'disconnected':
-            dot.className = 'w-2.5 h-2.5 rounded-full bg-red-500 mr-2';
-            text.textContent = 'Disconnected - Reconnecting...';
-            text.className = 'text-sm text-red-500';
-            break;
-        case 'error':
-            dot.className = 'w-2.5 h-2.5 rounded-full bg-yellow-500 mr-2';
-            text.textContent = 'Connection Error';
-            text.className = 'text-sm text-yellow-500';
-            break;
-        default:
-            dot.className = 'w-2.5 h-2.5 rounded-full bg-gray-500 mr-2';
-            text.textContent = 'Connecting...';
-            text.className = 'text-sm text-gray-500';
-    }
-}
+};
 
 window.tableRateModule = {
     coinNameToSymbol: {
@@ -720,7 +594,7 @@ window.tableRateModule = {
         document.querySelectorAll('.coinname-value').forEach(coinNameValue => {
             const coinFullNameOrSymbol = coinNameValue.getAttribute('data-coinname');
             if (!coinFullNameOrSymbol || coinFullNameOrSymbol === 'Unknown') {
-                console.warn('Missing or unknown coin name/symbol in data-coinname attribute');
+                //console.warn('Missing or unknown coin name/symbol in data-coinname attribute');
                 return;
             }
             coinNameValue.classList.remove('hidden');
@@ -743,59 +617,32 @@ window.tableRateModule = {
     },
 
     init() {
-        console.log('Initializing TableRateModule');
+        //console.log('Initializing TableRateModule');
         this.initializeTable();
     }
 };
 
-document.querySelectorAll('th[data-sortable="true"]').forEach(header => {
-    header.addEventListener('click', () => {
-        const columnIndex = parseInt(header.getAttribute('data-column-index'));
-        
-        if (currentSortColumn === columnIndex) {
-            currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
-        } else {
+// CORE SYSTEM FUNCTIONS
+function initializeWebSocket() {
+    return WebSocketManager.initialize();
+}
 
-            currentSortColumn = columnIndex;
-            currentSortDirection = 'desc';
-        }
-
-        document.querySelectorAll('.sort-icon').forEach(icon => {
-            icon.classList.remove('text-blue-500');
-            icon.textContent = '↓';
-        });
-
-        const sortIcon = document.getElementById(`sort-icon-${columnIndex}`);
-        if (sortIcon) {
-            sortIcon.textContent = currentSortDirection === 'asc' ? '↑' : '↓';
-            sortIcon.classList.add('text-blue-500');
-        }
-
-        document.querySelectorAll('th[data-sortable="true"]').forEach(th => {
-            const thColumnIndex = parseInt(th.getAttribute('data-column-index'));
-            if (thColumnIndex === columnIndex) {
-                th.classList.add('text-blue-500');
-            } else {
-                th.classList.remove('text-blue-500');
-            }
-        });
-
-        localStorage.setItem('tableSortColumn', currentSortColumn);
-        localStorage.setItem('tableSortDirection', currentSortDirection);
-        
-        applyFilters();
-    });
-
-    header.classList.add('cursor-pointer', 'hover:bg-gray-100', 'dark:hover:bg-gray-700');
-});
-
+function initializeTableRateModule() {
+    if (typeof window.tableRateModule !== 'undefined') {
+        tableRateModule = window.tableRateModule;
+        //console.log('tableRateModule loaded successfully');
+        return true;
+    } else {
+        //console.warn('tableRateModule not found. Waiting for it to load...');
+        return false;
+    }
+}
 
 async function initializePriceData() {
-    console.log('Initializing price data...');
+    //console.log('Initializing price data...');
     let retryCount = 0;
     let prices = null;
-    
-    // Try to get cached prices first
+
     const PRICES_CACHE_KEY = 'prices_coingecko';
     const cachedPrices = CacheManager.get(PRICES_CACHE_KEY);
     if (cachedPrices && cachedPrices.value) {
@@ -833,174 +680,19 @@ async function initializePriceData() {
     return false;
 }
 
-function escapeHtml(unsafe) {
-    if (typeof unsafe !== 'string') {
-        console.warn('escapeHtml received a non-string value:', unsafe);
-        return '';
-    }
-    return unsafe
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-}
-
-function formatTime(timestamp, addAgoSuffix = false) {
-    const now = Math.floor(Date.now() / 1000);
-    const diff = Math.abs(now - timestamp);
-    
-    let timeString;
-    if (diff < 60) {
-        timeString = `${diff} seconds`;
-    } else if (diff < 3600) {
-        timeString = `${Math.floor(diff / 60)} minutes`;
-    } else if (diff < 86400) {
-        timeString = `${Math.floor(diff / 3600)} hours`;
-    } else if (diff < 2592000) {
-        timeString = `${Math.floor(diff / 86400)} days`;
-    } else if (diff < 31536000) {
-        timeString = `${Math.floor(diff / 2592000)} months`;
-    } else {
-        timeString = `${Math.floor(diff / 31536000)} years`;
-    }
-
-    return addAgoSuffix ? `${timeString} ago` : timeString;
-}
-
-function formatTimeAgo(timestamp) {
-    return `${formatTimeDifference(timestamp)} ago`;
-}
-
-function formatTimeLeft(timestamp) {
-    const now = Math.floor(Date.now() / 1000);
-    if (timestamp <= now) return "Expired";
-    return formatTime(timestamp);
-}
-
-function getCoinSymbol(fullName) {
-    const symbolMap = {
-        'Bitcoin': 'BTC', 'Litecoin': 'LTC', 'Monero': 'XMR',
-        'Particl': 'PART', 'Particl Blind': 'PART', 'Particl Anon': 'PART',
-        'PIVX': 'PIVX', 'Firo': 'FIRO', 'Zcoin': 'FIRO',
-        'Dash': 'DASH', 'Decred': 'DCR', 'Wownero': 'WOW',
-        'Bitcoin Cash': 'BCH'
-    };
-    return symbolMap[fullName] || fullName;
-}
-
-function getDisplayName(coinName) {
-    if (coinName.toLowerCase() === 'zcoin') {
-        return 'Firo';
-    }
-    return coinNameToDisplayName[coinName] || coinName;
-}
-
-function getCoinSymbolLowercase(coin) {
-    if (typeof coin === 'string') {
-        if (coin.toLowerCase() === 'bitcoin cash') {
-            return 'bitcoin-cash';
+function continueInitialization() {
+    updateCoinFilterImages();
+    fetchOffers().then(() => {
+        applyFilters();
+        if (!isSentOffers) {
         }
-        return (coinNameToSymbol[coin] || coin).toLowerCase();
-    } else if (coin && typeof coin === 'object' && coin.symbol) {
-        return coin.symbol.toLowerCase();
-    } else {
-        console.warn('Invalid coin input:', coin);
-        return 'unknown';
+    });
+
+    const listingLabel = document.querySelector('span[data-listing-label]');
+    if (listingLabel) {
+        listingLabel.textContent = isSentOffers ? 'Total Listings: ' : 'Network Listings: ';
     }
-}
-
-function coinMatches(offerCoin, filterCoin) {
-    if (!offerCoin || !filterCoin) return false;
-    
-    offerCoin = offerCoin.toLowerCase();
-    filterCoin = filterCoin.toLowerCase();
-    
-    if (offerCoin === filterCoin) return true;
-
-    if ((offerCoin === 'firo' || offerCoin === 'zcoin') && 
-        (filterCoin === 'firo' || filterCoin === 'zcoin')) {
-        return true;
-    }
-
-    if ((offerCoin === 'bitcoincash' && filterCoin === 'bitcoin cash') ||
-        (offerCoin === 'bitcoin cash' && filterCoin === 'bitcoincash')) {
-        return true;
-    }
-
-    const particlVariants = ['particl', 'particl anon', 'particl blind'];
-    if (filterCoin === 'particl' && particlVariants.includes(offerCoin)) {
-        return true;
-    }
-
-    if (particlVariants.includes(filterCoin)) {
-        return offerCoin === filterCoin;
-    }
-    
-    return false;
-}
-
-function getProfitColorClass(percentage) {
-    const numericPercentage = parseFloat(percentage);
-    if (numericPercentage > 0) return 'text-green-500';
-    if (numericPercentage < 0) return 'text-red-500';
-    if (numericPercentage === 0) return 'text-yellow-400';
-    return 'text-white';
-}
-
-function isOfferExpired(offer) {
-    if (isSentOffers) {
-        return false;
-    }
-    const currentTime = Math.floor(Date.now() / 1000);
-    const isExpired = offer.expire_at <= currentTime;
-    if (isExpired) {
-        console.log(`Offer ${offer.offer_id} is expired. Expire time: ${offer.expire_at}, Current time: ${currentTime}`);
-    }
-    return isExpired;
-}
-
-function getTimeUntilNextExpiration() {
-    const currentTime = Math.floor(Date.now() / 1000);
-    const nextExpiration = jsonData.reduce((earliest, offer) => {
-        const timeUntilExpiration = offer.expire_at - currentTime;
-        return timeUntilExpiration > 0 && timeUntilExpiration < earliest ? timeUntilExpiration : earliest;
-    }, Infinity);
-    
-    return Math.max(MIN_REFRESH_INTERVAL, Math.min(nextExpiration, 300));
-}
-
-function calculateInverseRate(rate) {
-    return (1 / parseFloat(rate)).toFixed(8);
-}
-
-function hasActiveFilters() {
-    const formData = new FormData(filterForm);
-    const filters = {
-        coin_to: formData.get('coin_to'),
-        coin_from: formData.get('coin_from'),
-        status: formData.get('status')
-    };
-    
-    console.log('Current filters:', filters);
-
-    const hasFilters = 
-        filters.coin_to !== 'any' || 
-        filters.coin_from !== 'any' || 
-        (filters.status && filters.status !== 'any');
-                      
-    console.log('Has active filters:', hasFilters);
-    
-    return hasFilters;
-}
-
-function getActiveFilters() {
-    const formData = new FormData(filterForm);
-    return {
-        coin_to: formData.get('coin_to'),
-        coin_from: formData.get('coin_from'),
-        status: formData.get('status')
-    };
+    //console.log('Initialization completed');
 }
 
 function checkOfferAgainstFilters(offer, filters) {
@@ -1029,17 +721,9 @@ function checkOfferAgainstFilters(offer, filters) {
     return true;
 }
 
-function updateClearFiltersButton() {
-    const clearButton = document.getElementById('clearFilters');
-    if (clearButton) {
-        clearButton.classList.toggle('opacity-50', !hasActiveFilters());
-        clearButton.disabled = !hasActiveFilters();
-    }
-}
-
 function initializeFlowbiteTooltips() {
     if (typeof Tooltip === 'undefined') {
-        console.warn('Tooltip is not defined. Make sure the required library is loaded.');
+        //console.warn('Tooltip is not defined. Make sure the required library is loaded.');
         return;
     }
     
@@ -1053,27 +737,406 @@ function initializeFlowbiteTooltips() {
     });
 }
 
-function updateCoinFilterImages() {
-    const coinToSelect = document.getElementById('coin_to');
-    const coinFromSelect = document.getElementById('coin_from');
-    const coinToButton = document.getElementById('coin_to_button');
-    const coinFromButton = document.getElementById('coin_from_button');
+// DATA PROCESSING FUNCTIONS
+async function checkExpiredAndFetchNew() {
+    if (isSentOffers) return Promise.resolve();
+    
+    console.log('Starting checkExpiredAndFetchNew');
+    const OFFERS_CACHE_KEY = 'offers_received';
+    
+    try {
+        const response = await fetch('/json/offers');
+        const data = await response.json();
+        let newListings = Array.isArray(data) ? data : Object.values(data);
 
-    function updateButtonImage(select, button) {
-        const selectedOption = select.options[select.selectedIndex];
-        const imagePath = selectedOption.getAttribute('data-image');
-        if (imagePath && select.value !== 'any') {
-            button.style.backgroundImage = `url(${imagePath})`;
-            button.style.backgroundSize = 'contain';
-            button.style.backgroundRepeat = 'no-repeat';
-            button.style.backgroundPosition = 'center';
+        newListings = newListings.map(offer => ({
+            ...offer,
+            offer_id: String(offer.offer_id || ''),
+            swap_type: String(offer.swap_type || 'N/A'),
+            addr_from: String(offer.addr_from || ''),
+            coin_from: String(offer.coin_from || ''),
+            coin_to: String(offer.coin_to || ''),
+            amount_from: String(offer.amount_from || '0'),
+            amount_to: String(offer.amount_to || '0'),
+            rate: String(offer.rate || '0'),
+            created_at: Number(offer.created_at || 0),
+            expire_at: Number(offer.expire_at || 0),
+            is_own_offer: Boolean(offer.is_own_offer),
+            amount_negotiable: Boolean(offer.amount_negotiable),
+            unique_id: `${offer.offer_id}_${offer.created_at}_${offer.coin_from}_${offer.coin_to}`
+        }));
+
+        newListings = newListings.filter(offer => !isOfferExpired(offer));
+        originalJsonData = newListings;
+
+        CacheManager.set(OFFERS_CACHE_KEY, newListings, CACHE_DURATION);
+
+        const currentFilters = new FormData(filterForm);
+        const hasActiveFilters = currentFilters.get('coin_to') !== 'any' || 
+                               currentFilters.get('coin_from') !== 'any';
+        
+        if (hasActiveFilters) {
+            jsonData = filterAndSortData();
         } else {
-            button.style.backgroundImage = 'none';
+            jsonData = [...newListings];
         }
+
+        updateOffersTable();
+        updateJsonView();
+        updatePaginationInfo();
+        
+        if (jsonData.length === 0) {
+            handleNoOffersScenario();
+        }
+
+        return jsonData.length;
+    } catch (error) {
+        //console.error('Error fetching new listings:', error);
+        nextRefreshCountdown = 60;
+        return Promise.reject(error);
+    }
+}
+
+function getValidOffers() {
+    if (!jsonData) {
+        //console.warn('jsonData is undefined or null');
+        return [];
     }
 
-    updateButtonImage(coinToSelect, coinToButton);
-    updateButtonImage(coinFromSelect, coinFromButton);
+    const filteredData = filterAndSortData();
+    //console.log(`getValidOffers: Found ${filteredData.length} valid offers`);
+    return filteredData;
+}
+
+function filterAndSortData() {
+    //console.log('[Debug] Starting filter with data length:', originalJsonData.length);
+    
+    const formData = new FormData(filterForm);
+    const filters = Object.fromEntries(formData);
+    //console.log('[Debug] Active filters:', filters);
+
+    if (filters.coin_to !== 'any') {
+        filters.coin_to = coinIdToName[filters.coin_to] || filters.coin_to;
+    }
+    if (filters.coin_from !== 'any') {
+        filters.coin_from = coinIdToName[filters.coin_from] || filters.coin_from;
+    }
+
+    let filteredData = [...originalJsonData];
+
+    filteredData = filteredData.filter(offer => {
+        if (!isSentOffers && isOfferExpired(offer)) {
+            return false;
+        }
+
+        const coinFrom = (offer.coin_from || '').toLowerCase();
+        const coinTo = (offer.coin_to || '').toLowerCase();
+        
+        if (filters.coin_to !== 'any') {
+            if (!coinMatches(coinTo, filters.coin_to)) {
+                return false;
+            }
+        }
+        
+        if (filters.coin_from !== 'any') {
+            if (!coinMatches(coinFrom, filters.coin_from)) {
+                return false;
+            }
+        }
+
+        if (isSentOffers && filters.status && filters.status !== 'any') {
+            const currentTime = Math.floor(Date.now() / 1000);
+            const isExpired = offer.expire_at <= currentTime;
+            const isRevoked = Boolean(offer.is_revoked);
+            
+            switch (filters.status) {
+                case 'active':
+                    return !isExpired && !isRevoked;
+                case 'expired':
+                    return isExpired && !isRevoked;
+                case 'revoked':
+                    return isRevoked;
+                default:
+                    return true;
+            }
+        }
+
+        return true;
+    });
+
+    if (currentSortColumn !== null) {
+        filteredData.sort((a, b) => {
+            let comparison = 0;
+            
+            switch(currentSortColumn) {
+                case 0: // Time
+                    comparison = a.created_at - b.created_at;
+                    break;
+                case 5: // Rate
+                    comparison = parseFloat(a.rate) - parseFloat(b.rate);
+                    break;
+                case 6: // Market +/-
+                    const aFromSymbol = getCoinSymbolLowercase(a.coin_from);
+                    const aToSymbol = getCoinSymbolLowercase(a.coin_to);
+                    const bFromSymbol = getCoinSymbolLowercase(b.coin_from);
+                    const bToSymbol = getCoinSymbolLowercase(b.coin_to);
+                    
+                    const aFromPrice = latestPrices[aFromSymbol]?.usd || 0;
+                    const aToPrice = latestPrices[aToSymbol]?.usd || 0;
+                    const bFromPrice = latestPrices[bFromSymbol]?.usd || 0;
+                    const bToPrice = latestPrices[bToSymbol]?.usd || 0;
+                    
+                    const aMarketRate = aToPrice / aFromPrice;
+                    const bMarketRate = bToPrice / bFromPrice;
+                    
+                    const aOfferedRate = parseFloat(a.rate);
+                    const bOfferedRate = parseFloat(b.rate);
+                    
+                    const aPercentDiff = ((aOfferedRate - aMarketRate) / aMarketRate) * 100;
+                    const bPercentDiff = ((bOfferedRate - bMarketRate) / bMarketRate) * 100;
+                    
+                    comparison = aPercentDiff - bPercentDiff;
+                    break;
+                case 7: // Trade
+                    comparison = a.offer_id.localeCompare(b.offer_id);
+                    break;
+            }
+            
+            return currentSortDirection === 'desc' ? -comparison : comparison;
+        });
+    }
+    
+    //console.log(`[Debug] Filtered data length: ${filteredData.length}`);
+    return filteredData;
+}
+
+function calculateProfitLoss(fromCoin, toCoin, fromAmount, toAmount, isOwnOffer) {
+    return new Promise((resolve) => {
+        // console.log(`Calculating profit/loss for ${fromAmount} ${fromCoin} to ${toAmount} ${toCoin}, isOwnOffer: ${isOwnOffer}`);
+
+        if (!latestPrices) {
+            console.error('Latest prices not available. Unable to calculate profit/loss.');
+            resolve(null);
+            return;
+        }
+
+        const getPriceKey = (coin) => {
+            const lowerCoin = coin.toLowerCase();
+            if (lowerCoin === 'firo' || lowerCoin === 'zcoin') {
+                return 'zcoin';
+            }
+            if (lowerCoin === 'bitcoin cash') {
+                return 'bitcoin-cash';
+            }
+            if (lowerCoin === 'particl anon' || lowerCoin === 'particl blind') {
+                return 'particl';
+            }
+            return coinNameToSymbol[coin] || lowerCoin;
+        };
+
+        const fromSymbol = getPriceKey(fromCoin);
+        const toSymbol = getPriceKey(toCoin);
+
+        const fromPriceUSD = latestPrices[fromSymbol]?.usd;
+        const toPriceUSD = latestPrices[toSymbol]?.usd;
+
+        if (!fromPriceUSD || !toPriceUSD) {
+            //console.warn(`Price data missing for ${fromSymbol} (${fromPriceUSD}) or ${toSymbol} (${toPriceUSD})`);
+            resolve(null);
+            return;
+        }
+
+        const fromValueUSD = fromAmount * fromPriceUSD;
+        const toValueUSD = toAmount * toPriceUSD;
+
+        let percentDiff;
+        if (isOwnOffer) {
+            percentDiff = ((toValueUSD / fromValueUSD) - 1) * 100;
+        } else {
+            percentDiff = ((fromValueUSD / toValueUSD) - 1) * 100;
+        }
+
+        // console.log(`Percent difference: ${percentDiff.toFixed(2)}%`);
+        resolve(percentDiff);
+    });
+}
+
+async function getMarketRate(fromCoin, toCoin) {
+    return new Promise((resolve) => {
+        //console.log(`Attempting to get market rate for ${fromCoin} to ${toCoin}`);
+        if (!latestPrices) {
+            //console.warn('Latest prices object is not available');
+            resolve(null);
+            return;
+        }
+
+        const getPriceKey = (coin) => {
+            const lowerCoin = coin.toLowerCase();
+            if (lowerCoin === 'firo' || lowerCoin === 'zcoin') {
+                return 'zcoin';
+            }
+            if (lowerCoin === 'bitcoin cash') {
+                return 'bitcoin-cash';
+            }
+            return coinNameToSymbol[coin] || lowerCoin;
+        };
+
+        const fromSymbol = getPriceKey(fromCoin);
+        const toSymbol = getPriceKey(toCoin);
+
+        const fromPrice = latestPrices[fromSymbol]?.usd;
+        const toPrice = latestPrices[toSymbol]?.usd;
+        if (!fromPrice || !toPrice) {
+            //console.warn(`Missing price data for ${!fromPrice ? fromCoin : toCoin}`);
+            resolve(null);
+            return;
+        }
+        const rate = toPrice / fromPrice;
+        //console.log(`Market rate calculated: ${rate} ${toCoin}/${fromCoin}`);
+        resolve(rate);
+    });
+}
+
+async function fetchLatestPrices() {
+    const PRICES_CACHE_KEY = 'prices_coingecko';
+
+    const cachedData = CacheManager.get(PRICES_CACHE_KEY);
+    if (cachedData && cachedData.remainingTime > 60000) {
+        console.log('Using cached price data (valid for next minute)');
+        latestPrices = cachedData.value;
+        return cachedData.value;
+    }
+
+    const url = `${config.apiEndpoints.coinGecko}/simple/price?ids=bitcoin,bitcoin-cash,dash,dogecoin,decred,litecoin,particl,pivx,monero,zano,wownero,zcoin&vs_currencies=USD,BTC&api_key=${config.apiKeys.coinGecko}`;
+    
+    try {
+        console.log('Fetching fresh price data...');
+        const response = await fetch('/json/readurl', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                url: url,
+                headers: {}
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP Error: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        if (data.Error) {
+            throw new Error(data.Error);
+        }
+        
+        if (data && Object.keys(data).length > 0) {
+            console.log('✅ Fresh price data received');
+
+            latestPrices = data;
+
+            CacheManager.set(PRICES_CACHE_KEY, data, CACHE_DURATION);
+
+            Object.entries(data).forEach(([coin, prices]) => {
+                tableRateModule.setFallbackValue(coin, prices.usd);
+            });
+            
+            return data;
+        } else {
+            //console.warn('Received empty price data');
+        }
+    } catch (error) {
+        //console.error('❌ Error fetching prices:', error);
+        throw error;
+    }
+
+    return latestPrices || null;
+}
+
+async function fetchOffers(manualRefresh = false) {
+  const refreshButton = document.getElementById('refreshOffers');
+  const refreshIcon = document.getElementById('refreshIcon');
+  const refreshText = document.getElementById('refreshText');
+
+  refreshButton.disabled = true;
+  refreshIcon.classList.add('animate-spin');
+  refreshText.textContent = 'Refreshing...';
+  refreshButton.classList.add('opacity-75', 'cursor-wait');
+  
+  try {
+    const endpoint = isSentOffers ? '/json/sentoffers' : '/json/offers';
+    const response = await fetch(endpoint);
+    const data = await response.json();
+    
+    jsonData = formatInitialData(data);
+    originalJsonData = [...jsonData];
+
+    await updateOffersTable();
+    updateJsonView();
+    updatePaginationInfo();
+    
+  } catch (error) {
+    //console.error('[Debug] Error fetching offers:', error);
+    ui.displayErrorMessage('Failed to fetch offers. Please try again later.');
+  } finally {
+    refreshButton.disabled = false;
+    refreshIcon.classList.remove('animate-spin');
+    refreshText.textContent = 'Refresh';
+    refreshButton.classList.remove('opacity-75', 'cursor-wait');
+  }
+}
+
+function formatInitialData(data) {
+    return data.map(offer => ({
+        offer_id: String(offer.offer_id || ''),
+        swap_type: String(offer.swap_type || 'N/A'),
+        addr_from: String(offer.addr_from || ''),
+        coin_from: String(offer.coin_from || ''),
+        coin_to: String(offer.coin_to || ''),
+        amount_from: String(offer.amount_from || '0'),
+        amount_to: String(offer.amount_to || '0'),
+        rate: String(offer.rate || '0'),
+        created_at: Number(offer.created_at || 0),
+        expire_at: Number(offer.expire_at || 0),
+        is_own_offer: Boolean(offer.is_own_offer),
+        amount_negotiable: Boolean(offer.amount_negotiable),
+        is_revoked: Boolean(offer.is_revoked),
+        unique_id: `${offer.offer_id}_${offer.created_at}_${offer.coin_from}_${offer.coin_to}`
+    }));
+}
+
+// UI COMPONENT FUNCTIONS
+function updateConnectionStatus(status) {
+    const dot = document.getElementById('status-dot');
+    const text = document.getElementById('status-text');
+    
+    if (!dot || !text) {
+        //console.warn('Status indicators not found in DOM');
+        return;
+    }
+    
+    switch(status) {
+        case 'connected':
+            dot.className = 'w-2.5 h-2.5 rounded-full bg-green-500 mr-2';
+            text.textContent = 'Connected';
+            text.className = 'text-sm text-green-500';
+            break;
+        case 'disconnected':
+            dot.className = 'w-2.5 h-2.5 rounded-full bg-red-500 mr-2';
+            text.textContent = 'Disconnected - Reconnecting...';
+            text.className = 'text-sm text-red-500';
+            break;
+        case 'error':
+            dot.className = 'w-2.5 h-2.5 rounded-full bg-yellow-500 mr-2';
+            text.textContent = 'Connection Error';
+            text.className = 'text-sm text-yellow-500';
+            break;
+        default:
+            dot.className = 'w-2.5 h-2.5 rounded-full bg-gray-500 mr-2';
+            text.textContent = 'Connecting...';
+            text.className = 'text-sm text-gray-500';
+    }
 }
 
 function updateRowTimes() {
@@ -1084,7 +1147,6 @@ function updateRowTimes() {
             const offer = jsonData.find(o => o.offer_id === offerId);
             if (!offer) return;
 
-            // Change these to use the new formatTime function
             const newPostedTime = formatTime(offer.created_at, true);
             const newExpiresIn = formatTimeLeft(offer.expire_at);
             
@@ -1143,63 +1205,244 @@ function updatePaginationControls(totalPages) {
     totalPagesSpan.textContent = totalPages;
 }
 
-async function checkExpiredAndFetchNew() {
-    if (isSentOffers) return Promise.resolve();
+function updateProfitLoss(row, fromCoin, toCoin, fromAmount, toAmount, isOwnOffer) {
+    const profitLossElement = row.querySelector('.profit-loss');
+    if (!profitLossElement) {
+        //console.warn('Profit loss element not found in row');
+        return;
+    }
+
+    if (!fromCoin || !toCoin) {
+        //console.error(`Invalid coin names: fromCoin=${fromCoin}, toCoin=${toCoin}`);
+        profitLossElement.textContent = 'Error';
+        profitLossElement.className = 'profit-loss text-lg font-bold text-red-500';
+        return;
+    }
+
+    calculateProfitLoss(fromCoin, toCoin, fromAmount, toAmount, isOwnOffer)
+        .then(percentDiff => {
+            if (percentDiff === null) {
+                profitLossElement.textContent = 'N/A';
+                profitLossElement.className = 'profit-loss text-lg font-bold text-gray-400';
+                return;
+            }
+
+            const formattedPercentDiff = percentDiff.toFixed(2);
+            const percentDiffDisplay = formattedPercentDiff === "0.00" ? "0.00" : 
+                                     (percentDiff > 0 ? `+${formattedPercentDiff}` : formattedPercentDiff);
+
+            const colorClass = getProfitColorClass(percentDiff);
+            profitLossElement.textContent = `${percentDiffDisplay}%`;
+            profitLossElement.className = `profit-loss text-lg font-bold ${colorClass}`;
+            
+            const tooltipId = `percentage-tooltip-${row.getAttribute('data-offer-id')}`;
+            const tooltipElement = document.getElementById(tooltipId);
+            if (tooltipElement) {
+                const tooltipContent = createTooltipContent(isSentOffers || isOwnOffer, fromCoin, toCoin, fromAmount, toAmount);
+                tooltipElement.innerHTML = `
+                    <div class="tooltip-content">
+                        ${tooltipContent}
+                    </div>
+                    <div class="tooltip-arrow" data-popper-arrow></div>
+                `;
+            }
+        })
+        .catch(error => {
+            //console.error('Error in updateProfitLoss:', error);
+            profitLossElement.textContent = 'Error';
+            profitLossElement.className = 'profit-loss text-lg font-bold text-red-500';
+        });
+}
+
+function updateCoinFilterImages() {
+    const coinToSelect = document.getElementById('coin_to');
+    const coinFromSelect = document.getElementById('coin_from');
+    const coinToButton = document.getElementById('coin_to_button');
+    const coinFromButton = document.getElementById('coin_from_button');
+
+    function updateButtonImage(select, button) {
+        const selectedOption = select.options[select.selectedIndex];
+        const imagePath = selectedOption.getAttribute('data-image');
+        if (imagePath && select.value !== 'any') {
+            button.style.backgroundImage = `url(${imagePath})`;
+            button.style.backgroundSize = 'contain';
+            button.style.backgroundRepeat = 'no-repeat';
+            button.style.backgroundPosition = 'center';
+        } else {
+            button.style.backgroundImage = 'none';
+        }
+    }
+
+    updateButtonImage(coinToSelect, coinToButton);
+    updateButtonImage(coinFromSelect, coinFromButton);
+}
+
+function updateClearFiltersButton() {
+    const clearButton = document.getElementById('clearFilters');
+    if (clearButton) {
+        clearButton.classList.toggle('opacity-50', !hasActiveFilters());
+        clearButton.disabled = !hasActiveFilters();
+    }
+}
+
+function handleNoOffersScenario() {
+    const formData = new FormData(filterForm);
+    const filters = Object.fromEntries(formData);
+    const hasActiveFilters = filters.coin_to !== 'any' || 
+                            filters.coin_from !== 'any' ||
+                            (filters.status && filters.status !== 'any');
     
-    console.log('Starting checkExpiredAndFetchNew');
-    const OFFERS_CACHE_KEY = 'offers_received';
+    if (hasActiveFilters) {
+        offersBody.innerHTML = `
+            <tr>
+                <td colspan="8" class="text-center py-4 text-gray-500 dark:text-white">
+                    No offers match the selected filters. Try different filter options or 
+                    <button onclick="clearFilters()" class="text-blue-500 hover:text-blue-700 bold">clear filters</button>
+                </td>
+            </tr>`;
+    } else {
+        offersBody.innerHTML = `
+            <tr>
+                <td colspan="8" class="text-center py-4 text-gray-500 dark:text-white">
+                    No active offers available. ${!isSentOffers ? 'Refreshing data...' : ''}
+                </td>
+            </tr>`;
+        if (!isSentOffers) {
+            setTimeout(() => fetchOffers(true), 2000);
+        }
+    }
+}
+
+async function updateOffersTable() {
+    //console.log('[Debug] Starting updateOffersTable function');
     
     try {
-        const response = await fetch('/json/offers');
-        const data = await response.json();
-        let newListings = Array.isArray(data) ? data : Object.values(data);
-
-        newListings = newListings.map(offer => ({
-            ...offer,
-            offer_id: String(offer.offer_id || ''),
-            swap_type: String(offer.swap_type || 'N/A'),
-            addr_from: String(offer.addr_from || ''),
-            coin_from: String(offer.coin_from || ''),
-            coin_to: String(offer.coin_to || ''),
-            amount_from: String(offer.amount_from || '0'),
-            amount_to: String(offer.amount_to || '0'),
-            rate: String(offer.rate || '0'),
-            created_at: Number(offer.created_at || 0),
-            expire_at: Number(offer.expire_at || 0),
-            is_own_offer: Boolean(offer.is_own_offer),
-            amount_negotiable: Boolean(offer.amount_negotiable),
-            unique_id: `${offer.offer_id}_${offer.created_at}_${offer.coin_from}_${offer.coin_to}`
-        }));
-
-        newListings = newListings.filter(offer => !isOfferExpired(offer));
-        originalJsonData = newListings;
-
-        CacheManager.set(OFFERS_CACHE_KEY, newListings, CACHE_DURATION);
-
-        const currentFilters = new FormData(filterForm);
-        const hasActiveFilters = currentFilters.get('coin_to') !== 'any' || 
-                               currentFilters.get('coin_from') !== 'any';
+        const PRICES_CACHE_KEY = 'prices_coingecko';
+        const cachedPrices = CacheManager.get(PRICES_CACHE_KEY);
         
-        if (hasActiveFilters) {
-            jsonData = filterAndSortData();
+        if (!cachedPrices || !cachedPrices.remainingTime || cachedPrices.remainingTime < 60000) {
+            console.log('Fetching fresh price data...');
+            const priceData = await fetchLatestPrices();
+            if (!priceData) {
+                //console.error('Failed to fetch latest prices');
+            } else {
+                console.log('Latest prices fetched successfully');
+                latestPrices = priceData;
+            }
         } else {
-            jsonData = [...newListings];
+            console.log('Using cached price data (still valid)');
+            latestPrices = cachedPrices.value;
         }
 
-        updateOffersTable();
-        updateJsonView();
-        updatePaginationInfo();
-        
-        if (jsonData.length === 0) {
+        const totalOffers = originalJsonData.filter(offer => !isOfferExpired(offer));
+
+        const networkOffersCount = document.getElementById('network-offers-count');
+        if (networkOffersCount && !isSentOffers) {
+            networkOffersCount.textContent = totalOffers.length;
+        }
+
+        let validOffers = getValidOffers();
+        console.log('[Debug] Valid offers:', validOffers.length);
+
+        if (validOffers.length === 0) {
             handleNoOffersScenario();
+            return;
         }
 
-        return jsonData.length;
+        const totalPages = Math.max(1, Math.ceil(validOffers.length / itemsPerPage));
+        currentPage = Math.min(currentPage, totalPages);
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = Math.min(startIndex + itemsPerPage, validOffers.length);
+        const itemsToDisplay = validOffers.slice(startIndex, endIndex);
+
+        const fragment = document.createDocumentFragment();
+
+        const currentOffers = new Set();
+        itemsToDisplay.forEach(offer => {
+            const row = createTableRow(offer, isSentOffers);
+            if (row) {
+                fragment.appendChild(row);
+            }
+        });
+
+        offersBody.innerHTML = '';
+        offersBody.appendChild(fragment);
+
+        requestAnimationFrame(() => {
+            initializeFlowbiteTooltips();
+            updateRowTimes();
+            updatePaginationControls(totalPages);
+            
+            if (tableRateModule?.initializeTable) {
+                tableRateModule.initializeTable();
+            }
+        });
+
+        lastRefreshTime = Date.now();
+        if (newEntriesCountSpan) {
+            const displayCount = isSentOffers ? jsonData.length : validOffers.length;
+            newEntriesCountSpan.textContent = displayCount;
+        }
+        if (lastRefreshTimeSpan) {
+            lastRefreshTimeSpan.textContent = new Date(lastRefreshTime).toLocaleTimeString();
+        }
+
+        if (!isSentOffers) {
+            const nextUpdateTime = getTimeUntilNextExpiration() * 1000;
+            setTimeout(() => {
+                updateRowTimes();
+            }, nextUpdateTime);
+        }
+
     } catch (error) {
-        console.error('Error fetching new listings:', error);
-        nextRefreshCountdown = 60;
-        return Promise.reject(error);
+        //console.error('[Debug] Error in updateOffersTable:', error);
+        offersBody.innerHTML = `
+            <tr>
+                <td colspan="8" class="text-center py-4 text-red-500">
+                    An error occurred while updating the offers table. Please try again later.
+                </td>
+            </tr>`;
     }
+}
+
+function createTableRow(offer, isSentOffers) {
+    const row = document.createElement('tr');
+    const uniqueId = `${offer.offer_id}_${offer.created_at}`;
+    row.className = `opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600`;
+    row.setAttribute('data-offer-id', uniqueId);
+
+    const coinFrom = offer.coin_from;
+    const coinTo = offer.coin_to;
+    const coinFromSymbol = coinNameToSymbol[coinFrom] || coinFrom.toLowerCase();
+    const coinToSymbol = coinNameToSymbol[coinTo] || coinTo.toLowerCase();
+    const coinFromDisplay = getDisplayName(coinFrom);
+    const coinToDisplay = getDisplayName(coinTo);
+
+    const postedTime = formatTime(offer.created_at, true);
+    const expiresIn = formatTime(offer.expire_at);
+    
+    const currentTime = Math.floor(Date.now() / 1000);
+    const isActuallyExpired = currentTime > offer.expire_at;
+
+    const fromAmount = parseFloat(offer.amount_from) || 0;
+    const toAmount = parseFloat(offer.amount_to) || 0;
+
+    row.innerHTML = `
+        ${createTimeColumn(offer, postedTime, expiresIn)}
+        ${createDetailsColumn(offer)}
+        ${createTakerAmountColumn(offer, coinTo, coinFrom)}
+        ${createSwapColumn(offer, coinFromDisplay, coinToDisplay, coinFromSymbol, coinToSymbol)}
+        ${createOrderbookColumn(offer, coinFrom, coinTo)}
+        ${createRateColumn(offer, coinFrom, coinTo)}
+        ${createPercentageColumn(offer)}
+        ${createActionColumn(offer, isActuallyExpired)}
+        ${createTooltips(offer, offer.is_own_offer, coinFrom, coinTo, fromAmount, toAmount, postedTime, expiresIn, isActuallyExpired, Boolean(offer.is_revoked))}
+    `;
+
+    updateTooltipTargets(row, uniqueId);
+    updateProfitLoss(row, coinFrom, coinTo, fromAmount, toAmount, offer.is_own_offer);
+
+    return row;
 }
 
 function createTimeColumn(offer, postedTime, expiresIn) {
@@ -1391,55 +1634,7 @@ function createActionColumn(offer, isActuallyExpired = false) {
     `;
 }
 
-function updateProfitLoss(row, fromCoin, toCoin, fromAmount, toAmount, isOwnOffer) {
-    const profitLossElement = row.querySelector('.profit-loss');
-    if (!profitLossElement) {
-        console.warn('Profit loss element not found in row');
-        return;
-    }
-
-    if (!fromCoin || !toCoin) {
-        console.error(`Invalid coin names: fromCoin=${fromCoin}, toCoin=${toCoin}`);
-        profitLossElement.textContent = 'Error';
-        profitLossElement.className = 'profit-loss text-lg font-bold text-red-500';
-        return;
-    }
-
-    calculateProfitLoss(fromCoin, toCoin, fromAmount, toAmount, isOwnOffer)
-        .then(percentDiff => {
-            if (percentDiff === null) {
-                profitLossElement.textContent = 'N/A';
-                profitLossElement.className = 'profit-loss text-lg font-bold text-gray-400';
-                return;
-            }
-
-            const formattedPercentDiff = percentDiff.toFixed(2);
-            const percentDiffDisplay = formattedPercentDiff === "0.00" ? "0.00" : 
-                                     (percentDiff > 0 ? `+${formattedPercentDiff}` : formattedPercentDiff);
-
-            const colorClass = getProfitColorClass(percentDiff);
-            profitLossElement.textContent = `${percentDiffDisplay}%`;
-            profitLossElement.className = `profit-loss text-lg font-bold ${colorClass}`;
-            
-            const tooltipId = `percentage-tooltip-${row.getAttribute('data-offer-id')}`;
-            const tooltipElement = document.getElementById(tooltipId);
-            if (tooltipElement) {
-                const tooltipContent = createTooltipContent(isSentOffers || isOwnOffer, fromCoin, toCoin, fromAmount, toAmount);
-                tooltipElement.innerHTML = `
-                    <div class="tooltip-content">
-                        ${tooltipContent}
-                    </div>
-                    <div class="tooltip-arrow" data-popper-arrow></div>
-                `;
-            }
-        })
-        .catch(error => {
-            console.error('Error in updateProfitLoss:', error);
-            profitLossElement.textContent = 'Error';
-            profitLossElement.className = 'profit-loss text-lg font-bold text-red-500';
-        });
-}
-
+// TOOLTIP FUNCTIONS
 function createTooltips(offer, treatAsSentOffer, coinFrom, coinTo, fromAmount, toAmount, postedTime, expiresIn, isActuallyExpired, isRevoked) {
     const rate = parseFloat(offer.rate);
     const fromSymbol = getCoinSymbolLowercase(coinFrom);
@@ -1541,7 +1736,7 @@ function createTooltips(offer, treatAsSentOffer, coinFrom, coinTo, fromAmount, t
 
 function createTooltipContent(isSentOffers, coinFrom, coinTo, fromAmount, toAmount, isOwnOffer) {
     if (!coinFrom || !coinTo) {
-        console.error(`Invalid coin names: coinFrom=${coinFrom}, coinTo=${coinTo}`);
+        //console.error(`Invalid coin names: coinFrom=${coinFrom}, coinTo=${coinTo}`);
         return `<p class="font-bold mb-1">Unable to calculate profit/loss</p>
                 <p>Invalid coin data.</p>`;
     }
@@ -1678,6 +1873,28 @@ function updateTooltipTargets(row, uniqueId) {
     });
 }
 
+// FILTER FUNCTIONS
+function applyFilters() {
+    if (filterTimeout) {
+        clearTimeout(filterTimeout);
+        filterTimeout = null;
+    }
+
+    try {
+        filterTimeout = setTimeout(() => {
+            jsonData = filterAndSortData();
+            updateOffersTable();
+            updateJsonView();
+            updatePaginationInfo();
+            updateClearFiltersButton();
+            filterTimeout = null;
+        }, 250);
+    } catch (error) {
+        //console.error('Error in filter timeout:', error);
+        filterTimeout = null;
+    }
+}
+
 function clearFilters() {
     filterForm.reset();
     const statusSelect = document.getElementById('status');
@@ -1692,514 +1909,213 @@ function clearFilters() {
     updateClearFiltersButton();
 }
 
-async function fetchLatestPrices() {
-    const PRICES_CACHE_KEY = 'prices_coingecko';
-    
-    // Try to get cached prices first
-    const cachedData = CacheManager.get(PRICES_CACHE_KEY);
-    if (cachedData && cachedData.remainingTime > 60000) {
-        console.log('Using cached price data (valid for next minute)');
-        latestPrices = cachedData.value;
-        return cachedData.value;
-    }
-
-    const url = `${config.apiEndpoints.coinGecko}/simple/price?ids=bitcoin,bitcoin-cash,dash,dogecoin,decred,litecoin,particl,pivx,monero,zano,wownero,zcoin&vs_currencies=USD,BTC&api_key=${config.apiKeys.coinGecko}`;
-    
-    try {
-        console.log('Fetching fresh price data...');
-        const response = await fetch('/json/readurl', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                url: url,
-                headers: {}
-            })
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP Error: ${response.status} ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        if (data.Error) {
-            throw new Error(data.Error);
-        }
-        
-        if (data && Object.keys(data).length > 0) {
-            console.log('✅ Fresh price data received');
-            
-            // Update latest prices
-            latestPrices = data;
-            
-            // Cache the new data
-            CacheManager.set(PRICES_CACHE_KEY, data, CACHE_DURATION);
-            
-            // Update fallback values
-            Object.entries(data).forEach(([coin, prices]) => {
-                tableRateModule.setFallbackValue(coin, prices.usd);
-            });
-            
-            return data;
-        } else {
-            console.warn('Received empty price data');
-        }
-    } catch (error) {
-        console.error('❌ Error fetching prices:', error);
-        throw error;
-    }
-
-    return latestPrices || null;
-}
-
-async function fetchOffers(manualRefresh = false) {
-  const refreshButton = document.getElementById('refreshOffers');
-  const refreshIcon = document.getElementById('refreshIcon');
-  const refreshText = document.getElementById('refreshText');
-
-  // Start loading state
-  refreshButton.disabled = true;
-  refreshIcon.classList.add('animate-spin');
-  refreshText.textContent = 'Refreshing...';
-  refreshButton.classList.add('opacity-75', 'cursor-wait');
-  
-  try {
-    const endpoint = isSentOffers ? '/json/sentoffers' : '/json/offers';
-    const response = await fetch(endpoint);
-    const data = await response.json();
-    
-    jsonData = formatInitialData(data);
-    originalJsonData = [...jsonData];
-
-    await updateOffersTable();
-    updateJsonView();
-    updatePaginationInfo();
-    
-  } catch (error) {
-    console.error('[Debug] Error fetching offers:', error);
-    ui.displayErrorMessage('Failed to fetch offers. Please try again later.');
-  } finally {
-    refreshButton.disabled = false;
-    refreshIcon.classList.remove('animate-spin');
-    refreshText.textContent = 'Refresh';
-    refreshButton.classList.remove('opacity-75', 'cursor-wait');
-  }
-}
-
-function getValidOffers() {
-    if (!jsonData) {
-        console.warn('jsonData is undefined or null');
-        return [];
-    }
-
-    const filteredData = filterAndSortData();
-    console.log(`getValidOffers: Found ${filteredData.length} valid offers`);
-    return filteredData;
-}
-
-function filterAndSortData() {
-    console.log('[Debug] Starting filter with data length:', originalJsonData.length);
-    
+function hasActiveFilters() {
     const formData = new FormData(filterForm);
-    const filters = Object.fromEntries(formData);
-    console.log('[Debug] Active filters:', filters);
-
-    if (filters.coin_to !== 'any') {
-        filters.coin_to = coinIdToName[filters.coin_to] || filters.coin_to;
-    }
-    if (filters.coin_from !== 'any') {
-        filters.coin_from = coinIdToName[filters.coin_from] || filters.coin_from;
-    }
-
-    let filteredData = [...originalJsonData];
-
-    filteredData = filteredData.filter(offer => {
-        if (!isSentOffers && isOfferExpired(offer)) {
-            return false;
-        }
-
-        const coinFrom = (offer.coin_from || '').toLowerCase();
-        const coinTo = (offer.coin_to || '').toLowerCase();
-        
-        if (filters.coin_to !== 'any') {
-            if (!coinMatches(coinTo, filters.coin_to)) {
-                return false;
-            }
-        }
-        
-        if (filters.coin_from !== 'any') {
-            if (!coinMatches(coinFrom, filters.coin_from)) {
-                return false;
-            }
-        }
-
-        if (isSentOffers && filters.status && filters.status !== 'any') {
-            const currentTime = Math.floor(Date.now() / 1000);
-            const isExpired = offer.expire_at <= currentTime;
-            const isRevoked = Boolean(offer.is_revoked);
-            
-            switch (filters.status) {
-                case 'active':
-                    return !isExpired && !isRevoked;
-                case 'expired':
-                    return isExpired && !isRevoked;
-                case 'revoked':
-                    return isRevoked;
-                default:
-                    return true;
-            }
-        }
-
-        return true;
-    });
-
-    if (currentSortColumn !== null) {
-        filteredData.sort((a, b) => {
-            let comparison = 0;
-            
-            switch(currentSortColumn) {
-                case 0: // Time
-                    comparison = a.created_at - b.created_at;
-                    break;
-                case 5: // Rate
-                    comparison = parseFloat(a.rate) - parseFloat(b.rate);
-                    break;
-                case 6: // Market +/-
-                    const aFromSymbol = getCoinSymbolLowercase(a.coin_from);
-                    const aToSymbol = getCoinSymbolLowercase(a.coin_to);
-                    const bFromSymbol = getCoinSymbolLowercase(b.coin_from);
-                    const bToSymbol = getCoinSymbolLowercase(b.coin_to);
-                    
-                    const aFromPrice = latestPrices[aFromSymbol]?.usd || 0;
-                    const aToPrice = latestPrices[aToSymbol]?.usd || 0;
-                    const bFromPrice = latestPrices[bFromSymbol]?.usd || 0;
-                    const bToPrice = latestPrices[bToSymbol]?.usd || 0;
-                    
-                    const aMarketRate = aToPrice / aFromPrice;
-                    const bMarketRate = bToPrice / bFromPrice;
-                    
-                    const aOfferedRate = parseFloat(a.rate);
-                    const bOfferedRate = parseFloat(b.rate);
-                    
-                    const aPercentDiff = ((aOfferedRate - aMarketRate) / aMarketRate) * 100;
-                    const bPercentDiff = ((bOfferedRate - bMarketRate) / bMarketRate) * 100;
-                    
-                    comparison = aPercentDiff - bPercentDiff;
-                    break;
-                case 7: // Trade
-                    comparison = a.offer_id.localeCompare(b.offer_id);
-                    break;
-            }
-            
-            return currentSortDirection === 'desc' ? -comparison : comparison;
-        });
-    }
+    const filters = {
+        coin_to: formData.get('coin_to'),
+        coin_from: formData.get('coin_from'),
+        status: formData.get('status')
+    };
     
-    console.log(`[Debug] Filtered data length: ${filteredData.length}`);
-    return filteredData;
+    //console.log('Current filters:', filters);
+    const hasFilters = 
+        filters.coin_to !== 'any' || 
+        filters.coin_from !== 'any' || 
+        (filters.status && filters.status !== 'any');                     
+    //console.log('Has active filters:', hasFilters);
+    
+    return hasFilters;
 }
 
-function calculateProfitLoss(fromCoin, toCoin, fromAmount, toAmount, isOwnOffer) {
-    return new Promise((resolve) => {
-        // console.log(`Calculating profit/loss for ${fromAmount} ${fromCoin} to ${toAmount} ${toCoin}, isOwnOffer: ${isOwnOffer}`);
-
-        if (!latestPrices) {
-            console.error('Latest prices not available. Unable to calculate profit/loss.');
-            resolve(null);
-            return;
-        }
-
-        const getPriceKey = (coin) => {
-            const lowerCoin = coin.toLowerCase();
-            if (lowerCoin === 'firo' || lowerCoin === 'zcoin') {
-                return 'zcoin';
-            }
-            if (lowerCoin === 'bitcoin cash') {
-                return 'bitcoin-cash';
-            }
-            if (lowerCoin === 'particl anon' || lowerCoin === 'particl blind') {
-                return 'particl';
-            }
-            return coinNameToSymbol[coin] || lowerCoin;
-        };
-
-        const fromSymbol = getPriceKey(fromCoin);
-        const toSymbol = getPriceKey(toCoin);
-
-        const fromPriceUSD = latestPrices[fromSymbol]?.usd;
-        const toPriceUSD = latestPrices[toSymbol]?.usd;
-
-        if (!fromPriceUSD || !toPriceUSD) {
-            console.warn(`Price data missing for ${fromSymbol} (${fromPriceUSD}) or ${toSymbol} (${toPriceUSD})`);
-            resolve(null);
-            return;
-        }
-
-        const fromValueUSD = fromAmount * fromPriceUSD;
-        const toValueUSD = toAmount * toPriceUSD;
-
-        let percentDiff;
-        if (isOwnOffer) {
-            percentDiff = ((toValueUSD / fromValueUSD) - 1) * 100;
-        } else {
-            percentDiff = ((fromValueUSD / toValueUSD) - 1) * 100;
-        }
-
-        // console.log(`Percent difference: ${percentDiff.toFixed(2)}%`);
-        resolve(percentDiff);
-    });
-}
-
-async function getMarketRate(fromCoin, toCoin) {
-    return new Promise((resolve) => {
-        console.log(`Attempting to get market rate for ${fromCoin} to ${toCoin}`);
-        if (!latestPrices) {
-            console.warn('Latest prices object is not available');
-            resolve(null);
-            return;
-        }
-
-        const getPriceKey = (coin) => {
-            const lowerCoin = coin.toLowerCase();
-            if (lowerCoin === 'firo' || lowerCoin === 'zcoin') {
-                return 'zcoin';
-            }
-            if (lowerCoin === 'bitcoin cash') {
-                return 'bitcoin-cash';
-            }
-            return coinNameToSymbol[coin] || lowerCoin;
-        };
-
-        const fromSymbol = getPriceKey(fromCoin);
-        const toSymbol = getPriceKey(toCoin);
-
-        const fromPrice = latestPrices[fromSymbol]?.usd;
-        const toPrice = latestPrices[toSymbol]?.usd;
-        if (!fromPrice || !toPrice) {
-            console.warn(`Missing price data for ${!fromPrice ? fromCoin : toCoin}`);
-            resolve(null);
-            return;
-        }
-        const rate = toPrice / fromPrice;
-        console.log(`Market rate calculated: ${rate} ${toCoin}/${fromCoin}`);
-        resolve(rate);
-    });
-}
-
-function handleNoOffersScenario() {
+function getActiveFilters() {
     const formData = new FormData(filterForm);
-    const filters = Object.fromEntries(formData);
-    const hasActiveFilters = filters.coin_to !== 'any' || 
-                            filters.coin_from !== 'any' ||
-                            (filters.status && filters.status !== 'any');
-    
-    if (hasActiveFilters) {
-        offersBody.innerHTML = `
-            <tr>
-                <td colspan="8" class="text-center py-4 text-gray-500 dark:text-white">
-                    No offers match the selected filters. Try different filter options or 
-                    <button onclick="clearFilters()" class="text-blue-500 hover:text-blue-700 bold">clear filters</button>
-                </td>
-            </tr>`;
+    return {
+        coin_to: formData.get('coin_to'),
+        coin_from: formData.get('coin_from'),
+        status: formData.get('status')
+    };
+}
+
+// UTILITY FUNCTIONS
+function formatTimeLeft(timestamp) {
+    const now = Math.floor(Date.now() / 1000);
+    if (timestamp <= now) return "Expired";
+    return formatTime(timestamp);
+}
+
+function getDisplayName(coinName) {
+    if (coinName.toLowerCase() === 'zcoin') {
+        return 'Firo';
+    }
+    return coinNameToDisplayName[coinName] || coinName;
+}
+
+function getCoinSymbolLowercase(coin) {
+    if (typeof coin === 'string') {
+        if (coin.toLowerCase() === 'bitcoin cash') {
+            return 'bitcoin-cash';
+        }
+        return (coinNameToSymbol[coin] || coin).toLowerCase();
+    } else if (coin && typeof coin === 'object' && coin.symbol) {
+        return coin.symbol.toLowerCase();
     } else {
-        offersBody.innerHTML = `
-            <tr>
-                <td colspan="8" class="text-center py-4 text-gray-500 dark:text-white">
-                    No active offers available. ${!isSentOffers ? 'Refreshing data...' : ''}
-                </td>
-            </tr>`;
-        if (!isSentOffers) {
-            setTimeout(() => fetchOffers(true), 2000);
-        }
+        //console.warn('Invalid coin input:', coin);
+        return 'unknown';
     }
 }
 
-function createTableRow(offer, isSentOffers) {
-    const row = document.createElement('tr');
-    const uniqueId = `${offer.offer_id}_${offer.created_at}`;
-    row.className = `opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600`;
-    row.setAttribute('data-offer-id', uniqueId);
-
-    const coinFrom = offer.coin_from;
-    const coinTo = offer.coin_to;
-    const coinFromSymbol = coinNameToSymbol[coinFrom] || coinFrom.toLowerCase();
-    const coinToSymbol = coinNameToSymbol[coinTo] || coinTo.toLowerCase();
-    const coinFromDisplay = getDisplayName(coinFrom);
-    const coinToDisplay = getDisplayName(coinTo);
-
-    const postedTime = formatTime(offer.created_at, true);
-    const expiresIn = formatTime(offer.expire_at);
+function coinMatches(offerCoin, filterCoin) {
+    if (!offerCoin || !filterCoin) return false;
     
-    const currentTime = Math.floor(Date.now() / 1000);
-    const isActuallyExpired = currentTime > offer.expire_at;
-
-    const fromAmount = parseFloat(offer.amount_from) || 0;
-    const toAmount = parseFloat(offer.amount_to) || 0;
-
-    row.innerHTML = `
-        ${createTimeColumn(offer, postedTime, expiresIn)}
-        ${createDetailsColumn(offer)}
-        ${createTakerAmountColumn(offer, coinTo, coinFrom)}
-        ${createSwapColumn(offer, coinFromDisplay, coinToDisplay, coinFromSymbol, coinToSymbol)}
-        ${createOrderbookColumn(offer, coinFrom, coinTo)}
-        ${createRateColumn(offer, coinFrom, coinTo)}
-        ${createPercentageColumn(offer)}
-        ${createActionColumn(offer, isActuallyExpired)}
-        ${createTooltips(offer, offer.is_own_offer, coinFrom, coinTo, fromAmount, toAmount, postedTime, expiresIn, isActuallyExpired, Boolean(offer.is_revoked))}
-    `;
-
-    updateTooltipTargets(row, uniqueId);
-    updateProfitLoss(row, coinFrom, coinTo, fromAmount, toAmount, offer.is_own_offer);
-
-    return row;
-}
-
-async function updateOffersTable() {
-    console.log('[Debug] Starting updateOffersTable function');
+    offerCoin = offerCoin.toLowerCase();
+    filterCoin = filterCoin.toLowerCase();
     
-    try {
-        // Always check prices
-        const PRICES_CACHE_KEY = 'prices_coingecko';
-        const cachedPrices = CacheManager.get(PRICES_CACHE_KEY);
-        
-        if (!cachedPrices || !cachedPrices.remainingTime || cachedPrices.remainingTime < 60000) {
-            console.log('Fetching fresh price data...');
-            const priceData = await fetchLatestPrices();
-            if (!priceData) {
-                console.error('Failed to fetch latest prices');
-            } else {
-                console.log('Latest prices fetched successfully');
-                latestPrices = priceData;
-            }
-        } else {
-            console.log('Using cached price data (still valid)');
-            latestPrices = cachedPrices.value;
-        }
+    if (offerCoin === filterCoin) return true;
 
-        const totalOffers = originalJsonData.filter(offer => !isOfferExpired(offer));
-
-        const networkOffersCount = document.getElementById('network-offers-count');
-        if (networkOffersCount && !isSentOffers) {
-            networkOffersCount.textContent = totalOffers.length;
-        }
-
-        let validOffers = getValidOffers();
-        console.log('[Debug] Valid offers:', validOffers.length);
-
-        if (validOffers.length === 0) {
-            handleNoOffersScenario();
-            return;
-        }
-
-        const totalPages = Math.max(1, Math.ceil(validOffers.length / itemsPerPage));
-        currentPage = Math.min(currentPage, totalPages);
-        const startIndex = (currentPage - 1) * itemsPerPage;
-        const endIndex = Math.min(startIndex + itemsPerPage, validOffers.length);
-        const itemsToDisplay = validOffers.slice(startIndex, endIndex);
-
-        const fragment = document.createDocumentFragment();
-
-        const currentOffers = new Set();
-        itemsToDisplay.forEach(offer => {
-            const row = createTableRow(offer, isSentOffers);
-            if (row) {
-                fragment.appendChild(row);
-            }
-        });
-
-        offersBody.innerHTML = '';
-        offersBody.appendChild(fragment);
-
-        requestAnimationFrame(() => {
-            initializeFlowbiteTooltips();
-            updateRowTimes();
-            updatePaginationControls(totalPages);
-            
-            if (tableRateModule?.initializeTable) {
-                tableRateModule.initializeTable();
-            }
-        });
-
-        lastRefreshTime = Date.now();
-        if (newEntriesCountSpan) {
-            const displayCount = isSentOffers ? jsonData.length : validOffers.length;
-            newEntriesCountSpan.textContent = displayCount;
-        }
-        if (lastRefreshTimeSpan) {
-            lastRefreshTimeSpan.textContent = new Date(lastRefreshTime).toLocaleTimeString();
-        }
-
-        if (!isSentOffers) {
-            const nextUpdateTime = getTimeUntilNextExpiration() * 1000;
-            setTimeout(() => {
-                updateRowTimes();
-            }, nextUpdateTime);
-        }
-
-    } catch (error) {
-        console.error('[Debug] Error in updateOffersTable:', error);
-        offersBody.innerHTML = `
-            <tr>
-                <td colspan="8" class="text-center py-4 text-red-500">
-                    An error occurred while updating the offers table. Please try again later.
-                </td>
-            </tr>`;
-    }
-}
-
-function initializeTableRateModule() {
-    if (typeof window.tableRateModule !== 'undefined') {
-        tableRateModule = window.tableRateModule;
-        console.log('tableRateModule loaded successfully');
+    if ((offerCoin === 'firo' || offerCoin === 'zcoin') && 
+        (filterCoin === 'firo' || filterCoin === 'zcoin')) {
         return true;
-    } else {
-        console.warn('tableRateModule not found. Waiting for it to load...');
+    }
+
+    if ((offerCoin === 'bitcoincash' && filterCoin === 'bitcoin cash') ||
+        (offerCoin === 'bitcoin cash' && filterCoin === 'bitcoincash')) {
+        return true;
+    }
+
+    const particlVariants = ['particl', 'particl anon', 'particl blind'];
+    if (filterCoin === 'particl' && particlVariants.includes(offerCoin)) {
+        return true;
+    }
+
+    if (particlVariants.includes(filterCoin)) {
+        return offerCoin === filterCoin;
+    }
+    
+    return false;
+}
+
+function getProfitColorClass(percentage) {
+    const numericPercentage = parseFloat(percentage);
+    if (numericPercentage > 0) return 'text-green-500';
+    if (numericPercentage < 0) return 'text-red-500';
+    if (numericPercentage === 0) return 'text-yellow-400';
+    return 'text-white';
+}
+
+function isOfferExpired(offer) {
+    if (isSentOffers) {
         return false;
     }
+    const currentTime = Math.floor(Date.now() / 1000);
+    const isExpired = offer.expire_at <= currentTime;
+    if (isExpired) {
+        console.log(`Offer ${offer.offer_id} is expired. Expire time: ${offer.expire_at}, Current time: ${currentTime}`);
+    }
+    return isExpired;
 }
 
-let filterTimeout = null;
-function applyFilters() {
-    if (filterTimeout) {
-        clearTimeout(filterTimeout);
-        filterTimeout = null;
-    }
-
-    try {
-        filterTimeout = setTimeout(() => {
-            jsonData = filterAndSortData();
-            updateOffersTable;
-            updateJsonView();
-            updatePaginationInfo();
-            updateClearFiltersButton();
-            filterTimeout = null;
-        }, 250);
-    } catch (error) {
-        console.error('Error in filter timeout:', error);
-        filterTimeout = null;
-    }
-}
-
-function continueInitialization() {
-    if (typeof volumeToggle !== 'undefined' && volumeToggle.init) {
-        volumeToggle.init();
-    }
+function getTimeUntilNextExpiration() {
+    const currentTime = Math.floor(Date.now() / 1000);
+    const nextExpiration = jsonData.reduce((earliest, offer) => {
+        const timeUntilExpiration = offer.expire_at - currentTime;
+        return timeUntilExpiration > 0 && timeUntilExpiration < earliest ? timeUntilExpiration : earliest;
+    }, Infinity);
     
-    updateCoinFilterImages();
-    fetchOffers().then(() => {
-        applyFilters();
-        if (!isSentOffers) {
+    return Math.max(MIN_REFRESH_INTERVAL, Math.min(nextExpiration, 300));
+}
+
+function calculateInverseRate(rate) {
+    return (1 / parseFloat(rate)).toFixed(8);
+}
+
+function formatTime(timestamp, addAgoSuffix = false) {
+    const now = Math.floor(Date.now() / 1000);
+    const diff = Math.abs(now - timestamp);
+    
+    let timeString;
+    if (diff < 60) {
+        timeString = `${diff} seconds`;
+    } else if (diff < 3600) {
+        timeString = `${Math.floor(diff / 60)} minutes`;
+    } else if (diff < 86400) {
+        timeString = `${Math.floor(diff / 3600)} hours`;
+    } else if (diff < 2592000) {
+        timeString = `${Math.floor(diff / 86400)} days`;
+    } else if (diff < 31536000) {
+        timeString = `${Math.floor(diff / 2592000)} months`;
+    } else {
+        timeString = `${Math.floor(diff / 31536000)} years`;
+    }
+
+    return addAgoSuffix ? `${timeString} ago` : timeString;
+}
+
+function escapeHtml(unsafe) {
+    if (typeof unsafe !== 'string') {
+        //console.warn('escapeHtml received a non-string value:', unsafe);
+        return '';
+    }
+    return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+function getCoinSymbol(fullName) {
+    const symbolMap = {
+        'Bitcoin': 'BTC', 'Litecoin': 'LTC', 'Monero': 'XMR',
+        'Particl': 'PART', 'Particl Blind': 'PART', 'Particl Anon': 'PART',
+        'PIVX': 'PIVX', 'Firo': 'FIRO', 'Zcoin': 'FIRO',
+        'Dash': 'DASH', 'Decred': 'DCR', 'Wownero': 'WOW',
+        'Bitcoin Cash': 'BCH'
+    };
+    return symbolMap[fullName] || fullName;
+}
+
+// EVENT LISTENERS
+
+document.querySelectorAll('th[data-sortable="true"]').forEach(header => {
+    header.addEventListener('click', () => {
+        const columnIndex = parseInt(header.getAttribute('data-column-index'));
+        
+        if (currentSortColumn === columnIndex) {
+            currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+
+            currentSortColumn = columnIndex;
+            currentSortDirection = 'desc';
         }
+
+        document.querySelectorAll('.sort-icon').forEach(icon => {
+            icon.classList.remove('text-blue-500');
+            icon.textContent = '↓';
+        });
+
+        const sortIcon = document.getElementById(`sort-icon-${columnIndex}`);
+        if (sortIcon) {
+            sortIcon.textContent = currentSortDirection === 'asc' ? '↑' : '↓';
+            sortIcon.classList.add('text-blue-500');
+        }
+
+        document.querySelectorAll('th[data-sortable="true"]').forEach(th => {
+            const thColumnIndex = parseInt(th.getAttribute('data-column-index'));
+            if (thColumnIndex === columnIndex) {
+                th.classList.add('text-blue-500');
+            } else {
+                th.classList.remove('text-blue-500');
+            }
+        });
+
+        localStorage.setItem('tableSortColumn', currentSortColumn);
+        localStorage.setItem('tableSortDirection', currentSortDirection);
+        
+        applyFilters();
     });
 
-    const listingLabel = document.querySelector('span[data-listing-label]');
-    if (listingLabel) {
-        listingLabel.textContent = isSentOffers ? 'Total Listings: ' : 'Network Listings: ';
-    }
-
-    console.log('Initialization completed');
-}
+    header.classList.add('cursor-pointer', 'hover:bg-gray-100', 'dark:hover:bg-gray-700');
+});
 
 const eventListeners = {
     listeners: [],
@@ -2220,7 +2136,7 @@ const eventListeners = {
         console.log('Removing all event listeners...');
         this.listeners.forEach(({ element, eventType, handler, options }) => {
             element.removeEventListener(eventType, handler, options);
-            console.log(`Removed ${eventType} listener from`, element);
+            //console.log(`Removed ${eventType} listener from`, element);
         });
         this.listeners = [];
     },
@@ -2240,15 +2156,9 @@ const eventListeners = {
             return true;
         });
     },
-    
-    debug() {
-        console.log('📊 Current event listeners:', this.listeners.map(l => ({
-            element: l.element.tagName || 'window',
-            eventType: l.eventType
-        })));
-    }
 };
 
+// TIMER MANAGEMENT
 const timerManager = {
     intervals: [],
     timeouts: [],
@@ -2281,8 +2191,10 @@ const timerManager = {
     }
 };
 
+// INITIALIZATION AND EVENT BINDING
+
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('DOM content loaded, initializing...');
+    //console.log('DOM content loaded, initializing...');
     console.log('View type:', isSentOffers ? 'sent offers' : 'received offers');
 
     updateClearFiltersButton();
@@ -2303,7 +2215,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 clearInterval(retryInterval);
                 continueInitialization();
             } else if (retryCount >= maxRetries) {
-                console.error('❌ Failed to load tableRateModule after multiple attempts');
+                //console.error('❌ Failed to load tableRateModule after multiple attempts');
                 clearInterval(retryInterval);
                 continueInitialization();
             }
@@ -2349,7 +2261,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const refreshIcon = document.getElementById('refreshIcon');
     const refreshText = document.getElementById('refreshText');
 
-    // Start loading state
     refreshButton.disabled = true;
     refreshIcon.classList.add('animate-spin');
     refreshText.textContent = 'Refreshing...';
@@ -2379,21 +2290,12 @@ document.addEventListener('DOMContentLoaded', () => {
         console.error('❌ Error during manual refresh:', error);
         ui.displayErrorMessage('Failed to refresh offers. Please try again later.');
     } finally {
-        // Reset loading state
         refreshButton.disabled = false;
         refreshIcon.classList.remove('animate-spin');
         refreshText.textContent = 'Refresh';
         refreshButton.classList.remove('opacity-75', 'cursor-wait');
     }
 });
-
-    eventListeners.add(toggleButton, 'click', () => {
-        tableView.classList.toggle('hidden');
-        jsonView.classList.toggle('hidden');
-        toggleButton.textContent = tableView.classList.contains('hidden') 
-            ? 'Show Table View' 
-            : 'Show JSON View';
-    });
 
     eventListeners.add(prevPageButton, 'click', () => {
         if (currentPage > 1) {
@@ -2427,7 +2329,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     updateCoinFilterImages();
     fetchOffers().then(() => {
-        console.log('Initial offers fetched');
+        //console.log('Initial offers fetched');
         applyFilters();
     }).catch(error => {
         console.error('❌ Error fetching initial offers:', error);
