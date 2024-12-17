@@ -2302,7 +2302,7 @@ document.addEventListener('DOMContentLoaded', () => {
             currentPage--;
             const validOffers = getValidOffers();
             const totalPages = Math.ceil(validOffers.length / itemsPerPage);
-            updateOffersTable;
+            updateOffersTable();
             updatePaginationControls(totalPages);
         }
     });
@@ -2312,7 +2312,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const totalPages = Math.ceil(validOffers.length / itemsPerPage);
         if (currentPage < totalPages) {
             currentPage++;
-            updateOffersTable;
+            updateOffersTable();
             updatePaginationControls(totalPages);
         }
     });
