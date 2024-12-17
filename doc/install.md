@@ -204,12 +204,12 @@ It may take a few minutes to start as the coin daemons are started before the ht
 
 Add a coin (Stop basicswap first):
 
-    export SWAP_DATADIR=/Users/$USER/coinswaps
+    export SWAP_DATADIR=$HOME/coinswaps
     basicswap-prepare --usebtcfastsync --datadir=/$SWAP_DATADIR --addcoin=bitcoin
 
 
 Start after installed:
-
-    export SWAP_DATADIR=/Users/$USER/coinswaps
+    
+    export SWAP_DATADIR=$HOME/coinswaps
     . $SWAP_DATADIR/venv/bin/activate && python -V
     basicswap-run --datadir=$SWAP_DATADIR
