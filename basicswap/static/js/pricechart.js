@@ -1,4 +1,4 @@
-// Config
+// CONFIG
 const config = {
   apiKeys: getAPIKeys(),
   coins: [
@@ -45,7 +45,7 @@ function getAPIKeys() {
   };
 }
 
-// Utils
+// UTILS
 const utils = {
   formatNumber: (number, decimals = 2) => 
     number.toFixed(decimals).replace(/\B(?=(\d{3})+(?!\d))/g, ','),
@@ -69,7 +69,7 @@ const utils = {
   }
 };
 
-// Error
+// ERROR
 class AppError extends Error {
   constructor(message, type = 'AppError') {
     super(message);
@@ -77,7 +77,7 @@ class AppError extends Error {
   }
 }
 
-// Log
+// LOG
 const logger = {
   log: (message) => console.log(`[AppLog] ${new Date().toISOString()}: ${message}`),
   warn: (message) => console.warn(`[AppWarn] ${new Date().toISOString()}: ${message}`),
@@ -152,7 +152,7 @@ const api = {
         
         try {
             const data = await api.makePostRequest(url);
-            console.log(`Raw CoinGecko data:`, data);
+            //console.log(`Raw CoinGecko data:`, data);
             
             if (typeof data !== 'object' || data === null) {
                 throw new AppError(`Invalid data structure received from CoinGecko`);
@@ -171,11 +171,11 @@ const api = {
                 };
             });
             
-            console.log(`Transformed CoinGecko data:`, transformedData);
+            //console.log(`Transformed CoinGecko data:`, transformedData);
             cache.set(cacheKey, transformedData);
             return transformedData;
         } catch (error) {
-            console.error(`Error fetching CoinGecko data:`, error);
+            //console.error(`Error fetching CoinGecko data:`, error);
             return { error: error.message };
         }
     },
@@ -185,30 +185,30 @@ const api = {
       coinSymbols = [coinSymbols];
     }
 
-    console.log(`Fetching historical data for coins: ${coinSymbols.join(', ')}`);
+    //console.log(`Fetching historical data for coins: ${coinSymbols.join(', ')}`);
 
     const results = {};
 
     const fetchPromises = coinSymbols.map(async coin => {
       const coinConfig = config.coins.find(c => c.symbol === coin);
       if (!coinConfig) {
-        console.error(`Coin configuration not found for ${coin}`);
+        //console.error(`Coin configuration not found for ${coin}`);
         return;
       }
 
       if (coin === 'WOW') {
         const url = `${config.apiEndpoints.coinGecko}/coins/wownero/market_chart?vs_currency=usd&days=1&api_key=${config.apiKeys.coinGecko}`;
-        console.log(`CoinGecko URL for WOW: ${url}`);
+        //console.log(`CoinGecko URL for WOW: ${url}`);
 
         try {
           const response = await api.makePostRequest(url);
           if (response && response.prices) {
             results[coin] = response.prices;
           } else {
-            console.error(`Unexpected data structure for WOW:`, response);
+            //console.error(`Unexpected data structure for WOW:`, response);
           }
         } catch (error) {
-          console.error(`Error fetching CoinGecko data for WOW:`, error);
+          //console.error(`Error fetching CoinGecko data for WOW:`, error);
         }
       } else {
         const resolution = config.resolutions[config.currentResolution];
@@ -219,31 +219,31 @@ const api = {
           url = `${config.apiEndpoints.cryptoCompareHistorical}?fsym=${coin}&tsym=USD&limit=${resolution.days}&api_key=${config.apiKeys.cryptoCompare}`;
         }
 
-        console.log(`CryptoCompare URL for ${coin}: ${url}`);
+        //console.log(`CryptoCompare URL for ${coin}: ${url}`);
 
         try {
           const response = await api.makePostRequest(url);
           if (response.Response === "Error") {
-            console.error(`API Error for ${coin}:`, response.Message);
+            //console.error(`API Error for ${coin}:`, response.Message);
           } else if (response.Data && response.Data.Data) {
             results[coin] = response.Data;
           } else {
-            console.error(`Unexpected data structure for ${coin}:`, response);
+            //console.error(`Unexpected data structure for ${coin}:`, response);
           }
         } catch (error) {
-          console.error(`Error fetching CryptoCompare data for ${coin}:`, error);
+          //console.error(`Error fetching CryptoCompare data for ${coin}:`, error);
         }
       }
     });
 
     await Promise.all(fetchPromises);
 
-    console.log('Final results object:', JSON.stringify(results, null, 2));
+    //console.log('Final results object:', JSON.stringify(results, null, 2));
     return results;
   }
 };
 
-// Cache
+// CACHE
 const cache = {
   set: (key, value, customTtl = null) => {
     const item = {
@@ -252,7 +252,7 @@ const cache = {
       expiresAt: Date.now() + (customTtl || app.cacheTTL)
     };
     localStorage.setItem(key, JSON.stringify(item));
-    console.log(`Cache set for ${key}, expires in ${(customTtl || app.cacheTTL) / 1000} seconds`);
+    //console.log(`Cache set for ${key}, expires in ${(customTtl || app.cacheTTL) / 1000} seconds`);
   },
   get: (key) => {
     const itemStr = localStorage.getItem(key);
@@ -263,17 +263,17 @@ const cache = {
       const item = JSON.parse(itemStr);
       const now = Date.now();
       if (now < item.expiresAt) {
-        console.log(`Cache hit for ${key}, ${(item.expiresAt - now) / 1000} seconds remaining`);
+        //console.log(`Cache hit for ${key}, ${(item.expiresAt - now) / 1000} seconds remaining`);
         return {
           value: item.value,
           remainingTime: item.expiresAt - now
         };
       } else {
-        console.log(`Cache expired for ${key}`);
+        //console.log(`Cache expired for ${key}`);
         localStorage.removeItem(key);
       }
     } catch (e) {
-      console.error('Error parsing cache item:', e);
+      //console.error('Error parsing cache item:', e);
       localStorage.removeItem(key);
     }
     return null;
@@ -287,7 +287,7 @@ const cache = {
         localStorage.removeItem(key);
       }
     });
-    console.log('Cache cleared');
+    //console.log('Cache cleared');
   }
 };
 
@@ -343,7 +343,7 @@ displayCoinData: (coin, data) => {
         
         updateUI(false);
     } catch (error) {
-        console.error(`Error displaying data for ${coin}:`, error.message);
+        //console.error(`Error displaying data for ${coin}:`, error.message);
         updateUI(true);
     }
 },
@@ -488,7 +488,7 @@ displayCoinData: (coin, data) => {
   }
 };
 
-// Chart
+// CHART
 const chartModule = {
   chart: null,
   currentCoin: 'BTC',
@@ -680,7 +680,7 @@ const chartModule = {
   
   prepareChartData: (coinSymbol, data) => {
     if (!data) {
-      console.error(`No data received for ${coinSymbol}`);
+      //console.error(`No data received for ${coinSymbol}`);
       return [];
     }
 
@@ -739,7 +739,7 @@ const chartModule = {
           y: price
         }));
       } else {
-        console.error(`Unexpected data structure for ${coinSymbol}:`, data);
+        //console.error(`Unexpected data structure for ${coinSymbol}:`, data);
         return [];
       }
 
@@ -748,7 +748,7 @@ const chartModule = {
         y: point.y
       }));
     } catch (error) {
-      console.error(`Error preparing chart data for ${coinSymbol}:`, error);
+      //console.error(`Error preparing chart data for ${coinSymbol}:`, error);
       return [];
     }
   },
@@ -786,21 +786,21 @@ const chartModule = {
       
       if (cachedData && Object.keys(cachedData.value).length > 0) {
         data = cachedData.value;
-        console.log(`Using cached data for ${coinSymbol} (${config.currentResolution})`);
+        //console.log(`Using cached data for ${coinSymbol} (${config.currentResolution})`);
       } else {
-        console.log(`Fetching fresh data for ${coinSymbol} (${config.currentResolution})`);
+        //console.log(`Fetching fresh data for ${coinSymbol} (${config.currentResolution})`);
         const allData = await api.fetchHistoricalDataXHR([coinSymbol]);
         data = allData[coinSymbol];
         if (!data || Object.keys(data).length === 0) {
           throw new Error(`No data returned for ${coinSymbol}`);
         }
-        console.log(`Caching new data for ${cacheKey}`);
+        //console.log(`Caching new data for ${cacheKey}`);
         cache.set(cacheKey, data, config.cacheTTL);
         cachedData = null;
       }
 
       const chartData = chartModule.prepareChartData(coinSymbol, data);
-      console.log(`Prepared chart data for ${coinSymbol}:`, chartData.slice(0, 5));
+      //console.log(`Prepared chart data for ${coinSymbol}:`, chartData.slice(0, 5));
 
       if (chartData.length === 0) {
         throw new Error(`No valid chart data for ${coinSymbol}`);
@@ -832,7 +832,7 @@ const chartModule = {
 
         chartModule.chart.update('active');
       } else {
-        console.error('Chart object not initialized');
+        //console.error('Chart object not initialized');
         throw new Error('Chart object not initialized');
       }
 
@@ -841,7 +841,7 @@ const chartModule = {
       ui.updateLoadTimeAndCache(loadTime, cachedData);
 
     } catch (error) {
-      console.error(`Error updating chart for ${coinSymbol}:`, error);
+      //console.error(`Error updating chart for ${coinSymbol}:`, error);
       ui.displayErrorMessage(`Failed to update chart for ${coinSymbol}: ${error.message}`);
     } finally {
       chartModule.hideChartLoader();
@@ -849,14 +849,30 @@ const chartModule = {
   },
 
   showChartLoader: () => {
-    document.getElementById('chart-loader').classList.remove('hidden');
-    document.getElementById('coin-chart').classList.add('hidden');
+    const loader = document.getElementById('chart-loader');
+    const chart = document.getElementById('coin-chart');
+    
+    if (!loader || !chart) {
+      //console.warn('Chart loader or chart container elements not found');
+      return;
+    }
+    
+    loader.classList.remove('hidden');
+    chart.classList.add('hidden');
   },
   
   hideChartLoader: () => {
-    document.getElementById('chart-loader').classList.add('hidden');
-    document.getElementById('coin-chart').classList.remove('hidden');
-  }
+    const loader = document.getElementById('chart-loader');
+    const chart = document.getElementById('coin-chart');
+    
+    if (!loader || !chart) {
+      //console.warn('Chart loader or chart container elements not found');
+      return;
+    }
+    
+    loader.classList.add('hidden');
+    chart.classList.remove('hidden');    
+  },
 };
 
 Chart.register(chartModule.verticalLinePlugin);
@@ -928,7 +944,7 @@ const app = {
       chartModule.initChart();
       chartModule.showChartLoader();
     } else {
-      console.warn('Chart container not found, skipping chart initialization');
+      //console.warn('Chart container not found, skipping chart initialization');
     }
     
     console.log('Loading all coin data...');
@@ -941,13 +957,13 @@ const app = {
     }
     ui.setActiveContainer('btc-container');
     
-    console.log('Setting up event listeners and initializations...');
+    //console.log('Setting up event listeners and initializations...');
     app.setupEventListeners();
     app.initializeSelectImages();
     app.initAutoRefresh();
     
   } catch (error) {
-    console.error('Error during initialization:', error);
+    //console.error('Error during initialization:', error);
     ui.displayErrorMessage('Failed to initialize the dashboard. Please try refreshing the page.');
   } finally {
     ui.hideLoader();
@@ -959,7 +975,7 @@ const app = {
 },
   
     loadAllCoinData: async () => {
-        console.log('Loading data for all coins...');
+        //console.log('Loading data for all coins...');
         try {
             const allCoinData = await api.fetchCoinGeckoDataXHR();
             if (allCoinData.error) {
@@ -974,24 +990,24 @@ const app = {
                     const cacheKey = `coinData_${coin.symbol}`;
                     cache.set(cacheKey, coinData);
                 } else {
-                    console.warn(`No data found for ${coin.symbol}`);
+                    //console.warn(`No data found for ${coin.symbol}`);
                 }
             }
         } catch (error) {
-            console.error('Error loading all coin data:', error);
+            //console.error('Error loading all coin data:', error);
             ui.displayErrorMessage('Failed to load coin data. Please try refreshing the page.');
         } finally {
-            console.log('All coin data loaded');
+            //console.log('All coin data loaded');
         }
     },
   
   loadCoinData: async (coin) => {
-    console.log(`Loading data for ${coin.symbol}...`);
+    //console.log(`Loading data for ${coin.symbol}...`);
     const cacheKey = `coinData_${coin.symbol}`;
     let cachedData = cache.get(cacheKey);
     let data;
     if (cachedData) {
-      console.log(`Using cached data for ${coin.symbol}`);
+      //console.log(`Using cached data for ${coin.symbol}`);
       data = cachedData.value;
     } else {
       try {
@@ -1004,11 +1020,11 @@ const app = {
         if (data.error) {
           throw new Error(data.error);
         }
-        console.log(`Caching new data for ${coin.symbol}`);
+        //console.log(`Caching new data for ${coin.symbol}`);
         cache.set(cacheKey, data);
         cachedData = null;
       } catch (error) {
-        console.error(`Error fetching ${coin.symbol} data:`, error.message);
+        //console.error(`Error fetching ${coin.symbol} data:`, error.message);
         data = {
           error: error.message
         };
@@ -1018,16 +1034,16 @@ const app = {
     }
     ui.displayCoinData(coin.symbol, data);
     ui.updateLoadTimeAndCache(0, cachedData);
-    console.log(`Data loaded for ${coin.symbol}`);
+    //console.log(`Data loaded for ${coin.symbol}`);
   },
   
   setupEventListeners: () => {
-    console.log('Setting up event listeners...');
+    //console.log('Setting up event listeners...');
     config.coins.forEach(coin => {
       const container = document.getElementById(`${coin.symbol.toLowerCase()}-container`);
       if (container) {
         container.addEventListener('click', () => {
-          console.log(`${coin.symbol} container clicked`);
+          //console.log(`${coin.symbol} container clicked`);
           ui.setActiveContainer(`${coin.symbol.toLowerCase()}-container`);
           if (chartModule.chart) {
             if (coin.symbol === 'WOW') {
@@ -1054,7 +1070,7 @@ const app = {
     if (closeErrorButton) {
       closeErrorButton.addEventListener('click', ui.hideErrorMessage);
     }
-    console.log('Event listeners set up');
+    //console.log('Event listeners set up');
   },
 
   initAutoRefresh: () => {
@@ -1090,7 +1106,7 @@ const app = {
             earliestExpiration = Math.min(earliestExpiration, cachedItem.expiresAt);
           }
         } catch (error) {
-          console.error(`Error parsing cached item ${key}:`, error);
+          //console.error(`Error parsing cached item ${key}:`, error);
           localStorage.removeItem(key);
         }
       }
@@ -1149,7 +1165,7 @@ const app = {
                     const cacheKey = `coinData_${coin.symbol}`;
                     cache.set(cacheKey, coinData);
                 } else {
-                    console.error(`No data found for ${coin.symbol}`);
+                    //console.error(`No data found for ${coin.symbol}`);
                 }
             }
             
@@ -1164,7 +1180,7 @@ const app = {
             console.log('All data refreshed successfully');
             
         } catch (error) {
-            console.error('Error refreshing all data:', error);
+            //console.error('Error refreshing all data:', error);
             ui.displayErrorMessage('Failed to refresh all data. Please try again.');
         } finally {
             ui.hideLoader();
@@ -1231,7 +1247,7 @@ const app = {
   },
 
   startSpinAnimation: () => {
-    console.log('Starting spin animation on auto-refresh button');
+    //console.log('Starting spin animation on auto-refresh button');
     const svg = document.querySelector('#toggle-auto-refresh svg');
     if (svg) {
       svg.classList.add('animate-spin');
@@ -1242,7 +1258,7 @@ const app = {
   },
 
   stopSpinAnimation: () => {
-    console.log('Stopping spin animation on auto-refresh button');
+    //console.log('Stopping spin animation on auto-refresh button');
     const svg = document.querySelector('#toggle-auto-refresh svg');
     if (svg) {
       svg.classList.remove('animate-spin');
@@ -1250,7 +1266,7 @@ const app = {
   },
 
   updateLastRefreshedTime: () => {
-    console.log('Updating last refreshed time');
+    //console.log('Updating last refreshed time');
     const lastRefreshedElement = document.getElementById('last-refreshed-time');
     if (lastRefreshedElement && app.lastRefreshedTime) {
       const formattedTime = app.lastRefreshedTime.toLocaleTimeString();
@@ -1268,43 +1284,43 @@ const app = {
   },
   
     updateBTCPrice: async () => {
-        console.log('Updating BTC price...');
+        //console.log('Updating BTC price...');
         try {
             const priceData = await api.fetchCoinGeckoDataXHR();
             if (priceData.error) {
-                console.error('Error fetching BTC price:', priceData.error);
+                //console.error('Error fetching BTC price:', priceData.error);
                 app.btcPriceUSD = 0;
             } else if (priceData.btc && priceData.btc.current_price) {
 
                 app.btcPriceUSD = priceData.btc.current_price;
             } else {
-                console.error('Unexpected BTC data structure:', priceData);
+                //console.error('Unexpected BTC data structure:', priceData);
                 app.btcPriceUSD = 0;
             }
         } catch (error) {
-            console.error('Error fetching BTC price:', error);
+            //console.error('Error fetching BTC price:', error);
             app.btcPriceUSD = 0;
         }
-        console.log('Current BTC price:', app.btcPriceUSD);
+        //console.log('Current BTC price:', app.btcPriceUSD);
     },
   
 sortTable: (columnIndex) => {
-  console.log(`Sorting column: ${columnIndex}`);
+  //console.log(`Sorting column: ${columnIndex}`);
   const sortableColumns = [0, 5, 6, 7]; // 0: Time, 5: Rate, 6: Market +/-, 7: Trade
   if (!sortableColumns.includes(columnIndex)) {
-    console.log(`Column ${columnIndex} is not sortable`);
+    //console.log(`Column ${columnIndex} is not sortable`);
     return;
   }
   const table = document.querySelector('table');
   if (!table) {
-    console.error("Table not found for sorting.");
+    //console.error("Table not found for sorting.");
     return;
   }
   const rows = Array.from(table.querySelectorAll('tbody tr'));
   console.log(`Found ${rows.length} rows to sort`);
   const sortIcon = document.getElementById(`sort-icon-${columnIndex}`);
   if (!sortIcon) {
-    console.error("Sort icon not found.");
+    //console.error("Sort icon not found.");
     return;
   }
   const sortOrder = sortIcon.textContent === '↓' ? 1 : -1;
@@ -1318,7 +1334,7 @@ sortTable: (columnIndex) => {
       case 1: // Time column
         aValue = getSafeTextContent(a.querySelector('td:first-child .text-xs:first-child'));
         bValue = getSafeTextContent(b.querySelector('td:first-child .text-xs:first-child'));
-        console.log(`Comparing times: "${aValue}" vs "${bValue}"`);
+        //console.log(`Comparing times: "${aValue}" vs "${bValue}"`);
 
         const parseTime = (timeStr) => {
           const [value, unit] = timeStr.split(' ');
@@ -1337,7 +1353,7 @@ sortTable: (columnIndex) => {
       case 6: // Market +/-
         aValue = getSafeTextContent(a.cells[columnIndex]);
         bValue = getSafeTextContent(b.cells[columnIndex]);
-        console.log(`Comparing values: "${aValue}" vs "${bValue}"`);
+        //console.log(`Comparing values: "${aValue}" vs "${bValue}"`);
 
         aValue = parseFloat(aValue.replace(/[^\d.-]/g, '') || '0');
         bValue = parseFloat(bValue.replace(/[^\d.-]/g, '') || '0');
@@ -1346,8 +1362,8 @@ sortTable: (columnIndex) => {
       case 7: // Trade
         const aCell = a.cells[columnIndex];
         const bCell = b.cells[columnIndex];
-        console.log('aCell:', aCell ? aCell.outerHTML : 'null');
-        console.log('bCell:', bCell ? bCell.outerHTML : 'null');
+        //console.log('aCell:', aCell ? aCell.outerHTML : 'null');
+        //console.log('bCell:', bCell ? bCell.outerHTML : 'null');
         
         aValue = getSafeTextContent(aCell.querySelector('a')) || 
                  getSafeTextContent(aCell.querySelector('button')) || 
@@ -1359,7 +1375,7 @@ sortTable: (columnIndex) => {
         aValue = aValue.toLowerCase();
         bValue = bValue.toLowerCase();
         
-        console.log(`Comparing trade actions: "${aValue}" vs "${bValue}"`);
+        //console.log(`Comparing trade actions: "${aValue}" vs "${bValue}"`);
         
         if (aValue === bValue) return 0;
         if (aValue === "swap") return -1 * sortOrder;
@@ -1369,7 +1385,7 @@ sortTable: (columnIndex) => {
       default:
         aValue = getSafeTextContent(a.cells[columnIndex]);
         bValue = getSafeTextContent(b.cells[columnIndex]);
-        console.log(`Comparing default values: "${aValue}" vs "${bValue}"`);
+        //console.log(`Comparing default values: "${aValue}" vs "${bValue}"`);
         return aValue.localeCompare(bValue, undefined, {
           numeric: true,
           sensitivity: 'base'
@@ -1381,9 +1397,9 @@ sortTable: (columnIndex) => {
   if (tbody) {
     rows.forEach(row => tbody.appendChild(row));
   } else {
-    console.error("Table body not found.");
+    //console.error("Table body not found.");
   }
-  console.log('Sorting completed');
+  //console.log('Sorting completed');
 },
   
   initializeSelectImages: () => {
@@ -1391,7 +1407,7 @@ sortTable: (columnIndex) => {
       const select = document.getElementById(selectId);
       const button = document.getElementById(`${selectId}_button`);
       if (!select || !button) {
-        console.error(`Elements not found for ${selectId}`);
+        //console.error(`Elements not found for ${selectId}`);
         return;
       }
       const selectedOption = select.options[select.selectedIndex];
@@ -1418,7 +1434,7 @@ sortTable: (columnIndex) => {
         select.addEventListener('change', handleSelectChange);
         updateSelectedImage(selectId);
       } else {
-        console.error(`Select element not found for ${selectId}`);
+        //console.error(`Select element not found for ${selectId}`);
       }
     });
   },
@@ -1445,7 +1461,7 @@ updateResolutionButtons: (coinSymbol) => {
   });
 },
   
-  toggleAutoRefresh: () => {
+ toggleAutoRefresh: () => {
     console.log('Toggling auto-refresh');
     app.isAutoRefreshEnabled = !app.isAutoRefreshEnabled;
     localStorage.setItem('autoRefreshEnabled', app.isAutoRefreshEnabled.toString());
@@ -1480,4 +1496,12 @@ resolutionButtons.forEach(button => {
   });
 });
 
+// LOAD
 app.init();
+
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && chartModule.chart) {
+        console.log('Page became visible, reinitializing chart');
+        chartModule.updateChart(chartModule.currentCoin, true);
+    }
+});

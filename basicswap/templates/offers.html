@@ -15,6 +15,13 @@ function getAPIKeys() {
     coinGecko: '{{coingecko_api_key}}'
   };
 }
+
+function getWebSocketConfig() {
+    return {
+        port: '{{ ws_port }}',
+        fallbackPort: '11700'
+    };
+}
 </script>
 
 {% if sent_offers %}
@@ -300,13 +307,6 @@ function getAPIKeys() {
                         </button>
                       </div>
                     </div>
-                    <div class="w-full md:w-auto pt-3 px-3 hidden">
-                      <div class="relative">
-                        <button id="toggleView" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-white bg-blue-600 hover:bg-green-600 hover:border-green-600 rounded-lg transition duration-200 border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
-                          <span>Toggle JSON View</span>
-                        </button>
-                      </div>
-                    </div>
                   </div>
                 </div>
               </div>
@@ -399,12 +399,19 @@ function getAPIKeys() {
       <div class="rounded-b-md">
         <div class="w-full">
           <div class="flex flex-wrap justify-between items-center pl-6 pt-6 pr-6 border-t border-gray-100 dark:border-gray-400">
-          <div class="flex items-center">
-           <p class="text-sm font-heading dark:text-gray-400 mr-4">Last refreshed: <span id="lastRefreshTime">Never</span></p>
-           <p class="text-sm font-heading dark:text-gray-400 mr-4"><span class="ml-4" data-listing-label>Network Listings: </span><span id="newEntriesCount"></span></p>
-           <p class="text-sm font-heading dark:text-gray-400 mr-4"><span id="nextRefreshContainer" class="ml-4">Next refresh: <span id="nextRefreshTime"></span>
-         </span></p>
-        </div>
+<div class="flex items-center">
+    <div class="flex items-center mr-4">
+        <span id="status-dot" class="w-2.5 h-2.5 rounded-full bg-gray-500 mr-2"></span>
+        <span id="status-text" class="text-sm text-gray-500">Connecting...</span>
+    </div>
+    <p class="text-sm font-heading dark:text-gray-400 mr-4">
+        Last refreshed: <span id="lastRefreshTime">Never</span>
+    </p>
+    <p class="text-sm font-heading dark:text-gray-400 mr-4">
+        <span data-listing-label>Network Listings: </span>
+        <span id="newEntriesCount"></span>
+    </p>
+</div>
             <div class="flex items-center space-x-2">
               <button type="button" id="prevPage" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-green-600 rounded-lg transition duration-200 focus:ring-0 focus:outline-none">
                 {{ page_back_svg | safe }}
