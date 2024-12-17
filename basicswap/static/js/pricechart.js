@@ -849,14 +849,30 @@ const chartModule = {
   },
 
   showChartLoader: () => {
-    document.getElementById('chart-loader').classList.remove('hidden');
-    document.getElementById('coin-chart').classList.add('hidden');
+    const loader = document.getElementById('chart-loader');
+    const chart = document.getElementById('coin-chart');
+    
+    if (!loader || !chart) {
+      //console.warn('Chart loader or chart container elements not found');
+      return;
+    }
+    
+    loader.classList.remove('hidden');
+    chart.classList.add('hidden');
   },
   
   hideChartLoader: () => {
-    document.getElementById('chart-loader').classList.add('hidden');
-    document.getElementById('coin-chart').classList.remove('hidden');
-  }
+    const loader = document.getElementById('chart-loader');
+    const chart = document.getElementById('coin-chart');
+    
+    if (!loader || !chart) {
+      //console.warn('Chart loader or chart container elements not found');
+      return;
+    }
+    
+    loader.classList.add('hidden');
+    chart.classList.remove('hidden');    
+  },
 };
 
 Chart.register(chartModule.verticalLinePlugin);
