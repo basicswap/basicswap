@@ -994,6 +994,8 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
         pubkey_filename = "{}_builder.pgp".format(coin)
     elif coin in ("decred",):
         pubkey_filename = "{}_release.pgp".format(coin)
+    elif coin in ("dogecoin",):
+        pubkey_filename = "particl_{}.pgp".format(signing_key_name)
     else:
         pubkey_filename = "{}_{}.pgp".format(coin, signing_key_name)
     pubkeyurls = [
