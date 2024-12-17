@@ -1,0 +1,16 @@
+    dogecoin_core:
+        image: i_dogecoin
+        build:
+            context: dogecoin
+            dockerfile: Dockerfile
+        container_name: dogecoin_core
+        volumes:
+            - ${DATA_PATH}/dogecoin:/data
+        expose:
+            - ${DOGE_RPC_PORT}
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "3"
+        restart: unless-stopped

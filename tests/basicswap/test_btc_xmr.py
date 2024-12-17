@@ -377,6 +377,9 @@ class TestFunctions(BaseTest):
         id_offerer: int = self.node_a_id
         id_bidder: int = self.node_b_id
 
+        abandon_all_swaps(test_delay_event, self.swap_clients[id_offerer])
+        abandon_all_swaps(test_delay_event, self.swap_clients[id_bidder])
+
         swap_clients = self.swap_clients
         reverse_bid: bool = swap_clients[0].is_reverse_ads_bid(coin_from, coin_to)
         ci_from = swap_clients[id_offerer].ci(coin_from)
@@ -1144,8 +1147,8 @@ class BasicSwapTest(TestFunctions):
         # fee_rate is in sats/kvB
         fee_rate: int = 1000
 
-        a = ci.getNewSecretKey()
-        b = ci.getNewSecretKey()
+        a = ci.getNewRandomKey()
+        b = ci.getNewRandomKey()
 
         A = ci.getPubkey(a)
         B = ci.getPubkey(b)
@@ -1214,8 +1217,8 @@ class BasicSwapTest(TestFunctions):
         assert expect_vsize - vsize_actual < 10
 
         # Test chain b (no-script) lock tx size
-        v = ci.getNewSecretKey()
-        s = ci.getNewSecretKey()
+        v = ci.getNewRandomKey()
+        s = ci.getNewRandomKey()
         S = ci.getPubkey(s)
         lock_tx_b_txid = ci.publishBLockTx(v, S, amount, fee_rate)
 
