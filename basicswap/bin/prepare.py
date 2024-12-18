@@ -65,10 +65,10 @@ XMR_SITE_COMMIT = (
     "3751c0d7987a9e78324a718c32c008e2ec91b339"  # Lock hashes.txt to monero version
 )
 
-WOWNERO_VERSION = os.getenv("WOWNERO_VERSION", "0.11.1.0")
+WOWNERO_VERSION = os.getenv("WOWNERO_VERSION", "0.11.3.0")
 WOWNERO_VERSION_TAG = os.getenv("WOWNERO_VERSION_TAG", "")
 WOW_SITE_COMMIT = (
-    "97e100e1605e9f59bc8ca82a5b237d5562c8a21c"  # Lock hashes.txt to wownero version
+    "5400b3fa3e76eab2788d8e93edbb70846a62e57a"  # Lock hashes.txt to wownero version
 )
 
 PIVX_VERSION = os.getenv("PIVX_VERSION", "5.6.1")
@@ -686,31 +686,26 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
     elif coin == "wownero":
         use_file_ext = "tar.bz2" if FILE_EXT == "tar.gz" else FILE_EXT
         release_filename = "{}-{}-{}.{}".format(coin, version, BIN_ARCH, use_file_ext)
-        if os_name == "osx":
-            os_name = "mac"
 
-        architecture = "x64"
-        release_url = (
-            "https://git.wownero.com/attachments/280753b0-3af0-4a78-a248-8b925e8f4593"
+        architecture = BIN_ARCH
+        machine: str = platform.machine()
+        if USE_PLATFORM == "Darwin":
+            if "arm64" in machine:
+                architecture = "aarch64-apple-darwin11"
+            else:
+                architecture = "x86_64-apple-darwin11"
+        elif USE_PLATFORM == "Windows":
+            architecture = machine + "-w64-mingw32"
+
+        release_url = "https://codeberg.org/wownero/wownero/releases/download/v{}/wownero-{}-v{}.{}".format(
+            version, architecture, version, use_file_ext
         )
-        if "aarch64" in BIN_ARCH:
-            architecture = "armv8"
-            release_url = "https://git.wownero.com/attachments/0869ffe3-eeff-4240-a185-168ca80fa1e3"
-        elif "arm" in BIN_ARCH:
-            architecture = "armv7"  # 32bit doesn't work
-            release_url = "https://git.wownero.com/attachments/ff0c4886-3865-4670-9bc6-63dd60ded0e3"
-        elif "osx64" in BIN_ARCH:
-            release_url = "https://git.wownero.com/attachments/7e3fd17c-1bcd-442c-b82d-92a00cccffb8"
-        elif "win64" in BIN_ARCH:
-            release_url = "https://git.wownero.com/attachments/a1cf8611-1727-4b49-a8e5-1c66fe4f72a3"
-        elif "win32" in BIN_ARCH:
-            release_url = "https://git.wownero.com/attachments/007d606d-56e0-4c8a-92c1-d0974a781e80"
 
         release_path = os.path.join(bin_dir, release_filename)
         downloadRelease(release_url, release_path, extra_opts)
 
         assert_filename = "wownero-{}-hashes.txt".format(version)
-        assert_url = "https://git.wownero.com/wownero/wownero.org-website/raw/commit/{}/hashes.txt".format(
+        assert_url = "https://codeberg.org/wownero/wownero.org-website/raw/commit/{}/hashes.txt".format(
             WOW_SITE_COMMIT
         )
         assert_path = os.path.join(bin_dir, assert_filename)
@@ -995,7 +990,7 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
         )
     if coin == "wownero":
         pubkeyurls.append(
-            "https://git.wownero.com/wownero/wownero/raw/branch/master/utils/gpg_keys/wowario.asc"
+            "https://codeberg.org/wownero/wownero/raw/branch/master/utils/gpg_keys/wowario.asc"
         )
     if coin == "firo":
         pubkeyurls.append("https://firo.org/reuben.asc")
