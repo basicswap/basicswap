@@ -491,8 +491,6 @@ class BaseTestWithPrepare(unittest.TestCase):
 
 class Test(BaseTestWithPrepare):
     def test_persistent(self):
-        if self.run_test_persistent is False:
-            return
 
         while not self.delay_event.is_set():
             logging.info("Looping indefinitely, ctrl+c to exit.")
