@@ -1331,11 +1331,8 @@ class BasicSwap(BaseApp):
     def updateIdentityBidState(self, cursor, address: str, bid) -> None:
         # self.log.debug(f"Starting updateIdentityBidState for address {address}, bid {bid.bid_id.hex()}")
         offer = self.getOffer(bid.offer_id, cursor)
-        reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
-        
         # self.log.debug(f"Offer from: {offer.addr_from}, Bid from: {bid.bid_addr}, Reverse bid: {reverse_bid}")
         addresses_to_update = [offer.addr_from, bid.bid_addr]
-        
         for addr in addresses_to_update:
             # self.log.debug(f"Processing address: {addr}")
             identity_stats = self.queryOne(KnownIdentity, cursor, {"address": addr})
@@ -1346,23 +1343,23 @@ class BasicSwap(BaseApp):
                     address=addr, 
                     created_at=self.getTime()
                 )
-            
             is_offer_creator = addr == offer.addr_from
             # self.log.debug(f"Is offer creator: {is_offer_creator}, Current state: {bid.state}")
-            
             if bid.state == BidStates.SWAP_COMPLETED:
                 # self.log.debug("Processing successful swap")
                 if is_offer_creator:
                     old_value = zeroIfNone(identity_stats.num_recv_bids_successful)
-                    identity_stats.num_recv_bids_successful = old_value + 1 
+                    identity_stats.num_recv_bids_successful = old_value + 1
                     # self.log.debug(f"Updated received successful: {old_value} -> {identity_stats.num_recv_bids_successful}")
                 else:
                     old_value = zeroIfNone(identity_stats.num_sent_bids_successful)
                     identity_stats.num_sent_bids_successful = old_value + 1
                     # self.log.debug(f"Updated sent successful: {old_value} -> {identity_stats.num_sent_bids_successful}")
-            elif bid.state in (BidStates.BID_ERROR, BidStates.XMR_SWAP_FAILED_REFUNDED,
-                              BidStates.XMR_SWAP_FAILED_SWIPED, BidStates.XMR_SWAP_FAILED,
-                              BidStates.SWAP_TIMEDOUT):
+            elif bid.state in (BidStates.BID_ERROR, 
+                             BidStates.XMR_SWAP_FAILED_REFUNDED,
+                             BidStates.XMR_SWAP_FAILED_SWIPED, 
+                             BidStates.XMR_SWAP_FAILED,
+                             BidStates.SWAP_TIMEDOUT):
                 # self.log.debug(f"Processing failed swap: {bid.state}")
                 if is_offer_creator:
                     old_value = zeroIfNone(identity_stats.num_recv_bids_failed)
@@ -1382,7 +1379,6 @@ class BasicSwap(BaseApp):
                     old_value = zeroIfNone(identity_stats.num_sent_bids_rejected)
                     identity_stats.num_sent_bids_rejected = old_value + 1
                     # self.log.debug(f"Updated sent rejected: {old_value} -> {identity_stats.num_sent_bids_rejected}")
-            
             self.add(identity_stats, cursor, upsert=True)
 
     def getPreFundedTx(
