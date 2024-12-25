@@ -528,6 +528,15 @@ def page_newoffer(self, url_split, post_string):
 
     coins_from, coins_to = listAvailableCoins(swap_client, split_from=True)
 
+    addrs_from_raw = swap_client.listSMSGAddresses("offer_send_from")
+    addrs_to_raw = swap_client.listSMSGAddresses("offer_send_to")
+
+    all_addresses = swap_client.listAllSMSGAddresses({})
+    addr_notes = {addr["addr"]: addr["note"] for addr in all_addresses}
+
+    addrs_from = [(addr[0], addr_notes.get(addr[0], "")) for addr in addrs_from_raw]
+    addrs_to = [(addr[0], addr_notes.get(addr[0], "")) for addr in addrs_to_raw]
+
     automation_filters = {"type_ind": Concepts.OFFER, "sort_by": "label"}
     automation_strategies = swap_client.listAutomationStrategies(automation_filters)
 
@@ -556,8 +565,8 @@ def page_newoffer(self, url_split, post_string):
             "err_messages": err_messages,
             "coins_from": coins_from,
             "coins": coins_to,
-            "addrs": swap_client.listSMSGAddresses("offer_send_from"),
-            "addrs_to": swap_client.listSMSGAddresses("offer_send_to"),
+            "addrs": addrs_from,
+            "addrs_to": addrs_to,
             "data": page_data,
             "automation_strategies": automation_strategies,
             "summary": summary,
@@ -581,7 +590,7 @@ def page_offer(self, url_split, post_string):
     offer, xmr_offer = swap_client.getXmrOffer(offer_id)
     ensure(offer, "Unknown offer ID")
 
-    extend_data = {  # Defaults
+    extend_data = {
         "nb_validmins": 10,
     }
     messages = []
@@ -598,7 +607,6 @@ def page_offer(self, url_split, post_string):
 
     reverse_bid: bool = True if offer.bid_reversed else False
 
-    # Set defaults
     debugind = -1
     bid_amount = ci_from.format_amount(offer.amount_from)
     bid_rate = ci_to.format_amount(offer.rate)
@@ -617,7 +625,6 @@ def page_offer(self, url_split, post_string):
             except Exception as ex:
                 err_messages.append("Revoke offer failed: " + str(ex))
         elif b"repeat_offer" in form_data:
-            # Can't set the post data here as browsers will always resend the original post data when responding to redirects
             self.send_response(302)
             self.send_header("Location", "/newoffer?offer_from=" + offer_id.hex())
             self.end_headers()

@@ -356,4 +356,14 @@ select.disabled-select-enabled {
   #toggle-auto-refresh[data-enabled="true"] {
     @apply bg-green-500 hover:bg-green-600 focus:ring-green-300;
   }
+  
+  [data-popper-placement] {
+    will-change: transform;
+    transform: translateZ(0);
+}
+
+.tooltip {
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+}
 

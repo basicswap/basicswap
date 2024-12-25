@@ -1329,39 +1329,57 @@ class BasicSwap(BaseApp):
             self.closeDB(cursor)
 
     def updateIdentityBidState(self, cursor, address: str, bid) -> None:
-        identity_stats = self.queryOne(KnownIdentity, cursor, {"address": address})
-        if not identity_stats:
-            identity_stats = KnownIdentity(
-                active_ind=1, address=address, created_at=self.getTime()
-            )
-
-        if bid.state == BidStates.SWAP_COMPLETED:
-            if bid.was_sent:
-                identity_stats.num_sent_bids_successful = (
-                    zeroIfNone(identity_stats.num_sent_bids_successful) + 1
+        # self.log.debug(f"Starting updateIdentityBidState for address {address}, bid {bid.bid_id.hex()}")
+        offer = self.getOffer(bid.offer_id, cursor)
+        # self.log.debug(f"Offer from: {offer.addr_from}, Bid from: {bid.bid_addr}, Reverse bid: {reverse_bid}")
+        addresses_to_update = [offer.addr_from, bid.bid_addr]
+        for addr in addresses_to_update:
+            # self.log.debug(f"Processing address: {addr}")
+            identity_stats = self.queryOne(KnownIdentity, cursor, {"address": addr})
+            if not identity_stats:
+                # self.log.debug(f"Creating new identity record for {addr}")
+                identity_stats = KnownIdentity(
+                    active_ind=1,
+                    address=addr,
+                    created_at=self.getTime()
                 )
-            else:
-                identity_stats.num_recv_bids_successful = (
-                    zeroIfNone(identity_stats.num_recv_bids_successful) + 1
-                )
-        elif bid.state in (
-            BidStates.BID_ERROR,
-            BidStates.XMR_SWAP_FAILED_REFUNDED,
-            BidStates.XMR_SWAP_FAILED_SWIPED,
-            BidStates.XMR_SWAP_FAILED,
-            BidStates.SWAP_TIMEDOUT,
-        ):
-            if bid.was_sent:
-                identity_stats.num_sent_bids_failed = (
-                    zeroIfNone(identity_stats.num_sent_bids_failed) + 1
-                )
-            else:
-                identity_stats.num_recv_bids_failed = (
-                    zeroIfNone(identity_stats.num_recv_bids_failed) + 1
-                )
-
-        identity_stats.updated_at = self.getTime()
-        self.add(identity_stats, cursor, upsert=True)
+            is_offer_creator = addr == offer.addr_from
+            # self.log.debug(f"Is offer creator: {is_offer_creator}, Current state: {bid.state}")
+            if bid.state == BidStates.SWAP_COMPLETED:
+                # self.log.debug("Processing successful swap")
+                if is_offer_creator:
+                    old_value = zeroIfNone(identity_stats.num_recv_bids_successful)
+                    identity_stats.num_recv_bids_successful = old_value + 1
+                    # self.log.debug(f"Updated received successful: {old_value} -> {identity_stats.num_recv_bids_successful}")
+                else:
+                    old_value = zeroIfNone(identity_stats.num_sent_bids_successful)
+                    identity_stats.num_sent_bids_successful = old_value + 1
+                    # self.log.debug(f"Updated sent successful: {old_value} -> {identity_stats.num_sent_bids_successful}")
+            elif bid.state in (BidStates.BID_ERROR,
+                               BidStates.XMR_SWAP_FAILED_REFUNDED,
+                               BidStates.XMR_SWAP_FAILED_SWIPED,
+                               BidStates.XMR_SWAP_FAILED,
+                               BidStates.SWAP_TIMEDOUT):
+                # self.log.debug(f"Processing failed swap: {bid.state}")
+                if is_offer_creator:
+                    old_value = zeroIfNone(identity_stats.num_recv_bids_failed)
+                    identity_stats.num_recv_bids_failed = old_value + 1
+                    # self.log.debug(f"Updated received failed: {old_value} -> {identity_stats.num_recv_bids_failed}")
+                else:
+                    old_value = zeroIfNone(identity_stats.num_sent_bids_failed)
+                    identity_stats.num_sent_bids_failed = old_value + 1
+                    # self.log.debug(f"Updated sent failed: {old_value} -> {identity_stats.num_sent_bids_failed}")
+            elif bid.state == BidStates.BID_REJECTED:
+                # self.log.debug("Processing rejected bid")
+                if is_offer_creator:
+                    old_value = zeroIfNone(identity_stats.num_recv_bids_rejected)
+                    identity_stats.num_recv_bids_rejected = old_value + 1
+                    # self.log.debug(f"Updated received rejected: {old_value} -> {identity_stats.num_recv_bids_rejected}")
+                else:
+                    old_value = zeroIfNone(identity_stats.num_sent_bids_rejected)
+                    identity_stats.num_sent_bids_rejected = old_value + 1
+                    # self.log.debug(f"Updated sent rejected: {old_value} -> {identity_stats.num_sent_bids_rejected}")
+            self.add(identity_stats, cursor, upsert=True)
 
     def getPreFundedTx(
         self, linked_type: int, linked_id: bytes, tx_type: int, cursor=None

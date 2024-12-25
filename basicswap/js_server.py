@@ -250,6 +250,7 @@ def js_offers(self, url_split, post_string, is_json, sent=False) -> bytes:
             "is_expired": o.expire_at <= swap_client.getTime(),
             "is_own_offer": o.was_sent,
             "is_revoked": True if o.active_ind == 2 else False,
+            "is_public": o.addr_to == swap_client.network_addr or o.addr_to.strip() == "",
         }
         if with_extra_info:
             offer_data["amount_negotiable"] = o.amount_negotiable
@@ -655,16 +656,29 @@ def js_identities(self, url_split, post_string: str, is_json: bool) -> bytes:
     swap_client = self.server.swap_client
     swap_client.checkSystemStatus()
 
+    if len(url_split) > 3:
+        address = url_split[3]
+        identity = swap_client.getIdentity(address)
+        if identity:
+            return bytes(json.dumps({
+                "label": identity.label if identity.label is not None else "",
+                "note": identity.note if identity.note is not None else "",
+                "automation_override": identity.automation_override if identity.automation_override is not None else 0,
+                "num_sent_bids_successful": identity.num_sent_bids_successful if identity.num_sent_bids_successful is not None else 0,
+                "num_recv_bids_successful": identity.num_recv_bids_successful if identity.num_recv_bids_successful is not None else 0,
+                "num_sent_bids_rejected": identity.num_sent_bids_rejected if identity.num_sent_bids_rejected is not None else 0,
+                "num_recv_bids_rejected": identity.num_recv_bids_rejected if identity.num_recv_bids_rejected is not None else 0,
+                "num_sent_bids_failed": identity.num_sent_bids_failed if identity.num_sent_bids_failed is not None else 0,
+                "num_recv_bids_failed": identity.num_recv_bids_failed if identity.num_recv_bids_failed is not None else 0
+            }), "UTF-8")
+        return bytes(json.dumps({}), "UTF-8")
+
     filters = {
         "page_no": 1,
         "limit": PAGE_LIMIT,
         "sort_by": "created_at",
         "sort_dir": "desc",
     }
-
-    if len(url_split) > 3:
-        address = url_split[3]
-        filters["address"] = address
 
     if post_string != "":
         post_data = getFormData(post_string, is_json)
