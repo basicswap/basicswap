@@ -102,7 +102,7 @@ const WebSocketManager = {
     },
 
     initialize() {
-        console.log('🚀 Initializing WebSocket Manager');
+        console.log('Initializing WebSocket Manager');
         this.setupPageVisibilityHandler();
         this.connect();
         this.startHealthCheck();
@@ -152,7 +152,7 @@ const WebSocketManager = {
 
     performHealthCheck() {
         if (!this.isConnected()) {
-            console.warn('🏥 Health check: Connection lost, attempting reconnect');
+            console.warn('Health check: Connection lost, attempting reconnect');
             this.handleReconnect();
             return;
         }
@@ -160,13 +160,13 @@ const WebSocketManager = {
         const now = Date.now();
         const lastCheck = this.connectionState.lastHealthCheck;
         if (lastCheck && (now - lastCheck) > 60000) {
-            console.warn('🏥 Health check: Connection stale, refreshing');
+            console.warn('Health check: Connection stale, refreshing');
             this.handleReconnect();
             return;
         }
 
         this.connectionState.lastHealthCheck = now;
-        console.log('✅ Health check passed');
+        console.log('Health check passed');
     },
 
     connect() {
@@ -183,7 +183,7 @@ const WebSocketManager = {
             const wsPort = config.port || window.ws_port || '11700';
 
             if (!wsPort) {
-                console.error('❌ WebSocket port not configured');
+                console.error('WebSocket port not configured');
                 this.connectionState.isConnecting = false;
                 return false;
             }
@@ -201,7 +201,7 @@ const WebSocketManager = {
 
             return true;
         } catch (error) {
-            console.error('❌ Error creating WebSocket:', error);
+            console.error('Error creating WebSocket:', error);
             this.connectionState.isConnecting = false;
             this.handleReconnect();
             return false;
@@ -226,13 +226,13 @@ const WebSocketManager = {
             const message = JSON.parse(event.data);
             this.handleMessage(message);
         } catch (error) {
-            console.error('❌ Error processing WebSocket message:', error);
+            console.error('Error processing WebSocket message:', error);
             updateConnectionStatus('error');
         }
     };
 
     this.ws.onerror = (error) => {
-        console.error('❌ WebSocket error:', error);
+        console.error('WebSocket error:', error);
         updateConnectionStatus('error');
     };
 
@@ -250,7 +250,7 @@ const WebSocketManager = {
 
     handleMessage(message) {
         if (this.messageQueue.length >= this.maxQueueSize) {
-            console.warn('⚠️ Message queue full, dropping oldest message');
+            console.warn('⚠Message queue full, dropping oldest message');
             this.messageQueue.shift();
         }
 
@@ -286,7 +286,7 @@ const WebSocketManager = {
 
             this.messageQueue = [];
         } catch (error) {
-            console.error('❌ Error processing message queue:', error);
+            console.error('Error processing message queue:', error);
         } finally {
             this.processingQueue = false;
         }
@@ -299,7 +299,7 @@ const WebSocketManager = {
 
         this.reconnectAttempts++;
         if (this.reconnectAttempts <= this.maxReconnectAttempts) {
-            console.log(`🔄 Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+            console.log(`Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
             
             const delay = Math.min(
                 this.reconnectDelay * Math.pow(1.5, this.reconnectAttempts - 1),
@@ -312,7 +312,7 @@ const WebSocketManager = {
                 }
             }, delay);
         } else {
-            console.error('❌ Max reconnection attempts reached');
+            console.error('Max reconnection attempts reached');
             updateConnectionStatus('error');
 
             setTimeout(() => {
@@ -323,7 +323,7 @@ const WebSocketManager = {
     },
 
     cleanup() {
-        console.log('🧹 Cleaning up WebSocket resources');
+        console.log('Cleaning up WebSocket resources');
         
         clearTimeout(this.debounceTimeout);
         clearTimeout(this.reconnectTimeout);
@@ -723,7 +723,7 @@ function checkOfferAgainstFilters(offer, filters) {
 
 function initializeFlowbiteTooltips() {
     if (typeof Tooltip === 'undefined') {
-        //console.warn('Tooltip is not defined. Make sure the required library is loaded.');
+        console.warn('Tooltip is not defined. Make sure the required library is loaded.');
         return;
     }
     
@@ -823,6 +823,17 @@ function filterAndSortData() {
     }
 
     let filteredData = [...originalJsonData];
+
+    const sentFromFilter = filters.sent_from || 'any';
+    
+    filteredData = filteredData.filter(offer => {
+        if (sentFromFilter === 'public') {
+            return offer.is_public;
+        } else if (sentFromFilter === 'private') {
+            return !offer.is_public;
+        }
+        return true;
+    });
 
     filteredData = filteredData.filter(offer => {
         if (!isSentOffers && isOfferExpired(offer)) {
@@ -1032,7 +1043,7 @@ async function fetchLatestPrices() {
         }
         
         if (data && Object.keys(data).length > 0) {
-            console.log('✅ Fresh price data received');
+            console.log('Fresh price data received');
 
             latestPrices = data;
 
@@ -1047,7 +1058,7 @@ async function fetchLatestPrices() {
             //console.warn('Received empty price data');
         }
     } catch (error) {
-        //console.error('❌ Error fetching prices:', error);
+        //console.error('Error fetching prices:', error);
         throw error;
     }
 
@@ -1055,36 +1066,33 @@ async function fetchLatestPrices() {
 }
 
 async function fetchOffers(manualRefresh = false) {
-  const refreshButton = document.getElementById('refreshOffers');
-  const refreshIcon = document.getElementById('refreshIcon');
-  const refreshText = document.getElementById('refreshText');
+    const refreshButton = document.getElementById('refreshOffers');
+    const refreshIcon = document.getElementById('refreshIcon');
+    const refreshText = document.getElementById('refreshText');
 
-  refreshButton.disabled = true;
-  refreshIcon.classList.add('animate-spin');
-  refreshText.textContent = 'Refreshing...';
-  refreshButton.classList.add('opacity-75', 'cursor-wait');
-  
-  try {
-    const endpoint = isSentOffers ? '/json/sentoffers' : '/json/offers';
-    const response = await fetch(endpoint);
-    const data = await response.json();
-    
-    jsonData = formatInitialData(data);
-    originalJsonData = [...jsonData];
+    try {
+        refreshButton.disabled = true;
+        refreshIcon.classList.add('animate-spin');
+        refreshText.textContent = 'Refreshing...';
+        refreshButton.classList.add('opacity-75', 'cursor-wait');
+        
+        const endpoint = isSentOffers ? '/json/sentoffers' : '/json/offers';
+        const response = await fetch(endpoint);
+        const data = await response.json();
+        
+        jsonData = formatInitialData(data);
+        originalJsonData = [...jsonData];
 
-    await updateOffersTable();
-    updateJsonView();
-    updatePaginationInfo();
-    
-  } catch (error) {
-    //console.error('[Debug] Error fetching offers:', error);
-    ui.displayErrorMessage('Failed to fetch offers. Please try again later.');
-  } finally {
-    refreshButton.disabled = false;
-    refreshIcon.classList.remove('animate-spin');
-    refreshText.textContent = 'Refresh';
-    refreshButton.classList.remove('opacity-75', 'cursor-wait');
-  }
+        await updateOffersTable();
+        updateJsonView();
+        updatePaginationInfo();
+        
+    } catch (error) {
+        console.error('[Debug] Error fetching offers:', error);
+        ui.displayErrorMessage('Failed to fetch offers. Please try again later.');
+    } finally {
+        stopRefreshAnimation();
+    }
 }
 
 function formatInitialData(data) {
@@ -1092,6 +1100,7 @@ function formatInitialData(data) {
         offer_id: String(offer.offer_id || ''),
         swap_type: String(offer.swap_type || 'N/A'),
         addr_from: String(offer.addr_from || ''),
+        addr_to: String(offer.addr_to || ''),
         coin_from: String(offer.coin_from || ''),
         coin_to: String(offer.coin_to || ''),
         amount_from: String(offer.amount_from || '0'),
@@ -1102,6 +1111,7 @@ function formatInitialData(data) {
         is_own_offer: Boolean(offer.is_own_offer),
         amount_negotiable: Boolean(offer.amount_negotiable),
         is_revoked: Boolean(offer.is_revoked),
+        is_public: offer.is_public !== undefined ? Boolean(offer.is_public) : false,
         unique_id: `${offer.offer_id}_${offer.created_at}_${offer.coin_from}_${offer.coin_to}`
     }));
 }
@@ -1170,6 +1180,23 @@ function updateJsonView() {
 function updateLastRefreshTime() {
     if (lastRefreshTimeSpan) {
         lastRefreshTimeSpan.textContent = lastRefreshTime ? new Date(lastRefreshTime).toLocaleTimeString() : 'Never';
+    }
+}
+
+function stopRefreshAnimation() {
+    const refreshButton = document.getElementById('refreshOffers');
+    const refreshIcon = document.getElementById('refreshIcon');
+    const refreshText = document.getElementById('refreshText');
+
+    if (refreshButton) {
+        refreshButton.disabled = false;
+        refreshButton.classList.remove('opacity-75', 'cursor-wait');
+    }
+    if (refreshIcon) {
+        refreshIcon.classList.remove('animate-spin');
+    }
+    if (refreshText) {
+        refreshText.textContent = 'Refresh';
     }
 }
 
@@ -1280,8 +1307,18 @@ function updateCoinFilterImages() {
 function updateClearFiltersButton() {
     const clearButton = document.getElementById('clearFilters');
     if (clearButton) {
-        clearButton.classList.toggle('opacity-50', !hasActiveFilters());
-        clearButton.disabled = !hasActiveFilters();
+        const hasFilters = hasActiveFilters();
+        clearButton.classList.toggle('opacity-50', !hasFilters);
+        clearButton.disabled = !hasFilters;
+        
+        // Update button styles based on state
+        if (hasFilters) {
+            clearButton.classList.add('hover:bg-green-600', 'hover:text-white');
+            clearButton.classList.remove('cursor-not-allowed');
+        } else {
+            clearButton.classList.remove('hover:bg-green-600', 'hover:text-white');
+            clearButton.classList.add('cursor-not-allowed');
+        }
     }
 }
 
@@ -1292,30 +1329,31 @@ function handleNoOffersScenario() {
                             filters.coin_from !== 'any' ||
                             (filters.status && filters.status !== 'any');
     
+    stopRefreshAnimation();
+
     if (hasActiveFilters) {
         offersBody.innerHTML = `
             <tr>
-                <td colspan="8" class="text-center py-4 text-gray-500 dark:text-white">
-                    No offers match the selected filters. Try different filter options or 
-                    <button onclick="clearFilters()" class="text-blue-500 hover:text-blue-700 bold">clear filters</button>
+                <td colspan="9" class="text-center py-8">
+                    <div class="flex items-center justify-center text-gray-500 dark:text-white">
+                        No offers match the selected filters. Try different filter options or 
+                        <button onclick="clearFilters()" class="ml-1 text-blue-500 hover:text-blue-700 font-semibold">
+                            clear filters
+                        </button>
+                    </div>
                 </td>
             </tr>`;
     } else {
         offersBody.innerHTML = `
             <tr>
-                <td colspan="8" class="text-center py-4 text-gray-500 dark:text-white">
-                    No active offers available. ${!isSentOffers ? 'Refreshing data...' : ''}
+                <td colspan="9" class="text-center py-8 text-gray-500 dark:text-white">
+                    No active offers available.
                 </td>
             </tr>`;
-        if (!isSentOffers) {
-            setTimeout(() => fetchOffers(true), 2000);
-        }
     }
 }
 
 async function updateOffersTable() {
-    //console.log('[Debug] Starting updateOffersTable function');
-    
     try {
         const PRICES_CACHE_KEY = 'prices_coingecko';
         const cachedPrices = CacheManager.get(PRICES_CACHE_KEY);
@@ -1323,27 +1361,25 @@ async function updateOffersTable() {
         if (!cachedPrices || !cachedPrices.remainingTime || cachedPrices.remainingTime < 60000) {
             console.log('Fetching fresh price data...');
             const priceData = await fetchLatestPrices();
-            if (!priceData) {
-                //console.error('Failed to fetch latest prices');
-            } else {
-                console.log('Latest prices fetched successfully');
+            if (priceData) {
                 latestPrices = priceData;
             }
         } else {
-            console.log('Using cached price data (still valid)');
             latestPrices = cachedPrices.value;
         }
 
-        const totalOffers = originalJsonData.filter(offer => !isOfferExpired(offer));
+        const validOffers = getValidOffers();
 
-        const networkOffersCount = document.getElementById('network-offers-count');
-        if (networkOffersCount && !isSentOffers) {
-            networkOffersCount.textContent = totalOffers.length;
-        }
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = Math.min(startIndex + itemsPerPage, validOffers.length);
+        const itemsToDisplay = validOffers.slice(startIndex, endIndex);
 
-        let validOffers = getValidOffers();
-        console.log('[Debug] Valid offers:', validOffers.length);
-
+        const identityPromises = itemsToDisplay.map(offer => 
+            offer.addr_from ? getIdentityData(offer.addr_from) : Promise.resolve(null)
+        );
+        
+        const identities = await Promise.all(identityPromises);
+        
         if (validOffers.length === 0) {
             handleNoOffersScenario();
             return;
@@ -1351,15 +1387,12 @@ async function updateOffersTable() {
 
         const totalPages = Math.max(1, Math.ceil(validOffers.length / itemsPerPage));
         currentPage = Math.min(currentPage, totalPages);
-        const startIndex = (currentPage - 1) * itemsPerPage;
-        const endIndex = Math.min(startIndex + itemsPerPage, validOffers.length);
-        const itemsToDisplay = validOffers.slice(startIndex, endIndex);
 
         const fragment = document.createDocumentFragment();
 
-        const currentOffers = new Set();
-        itemsToDisplay.forEach(offer => {
-            const row = createTableRow(offer, isSentOffers);
+        itemsToDisplay.forEach((offer, index) => {
+            const identity = identities[index];
+            const row = createTableRow(offer, identity);
             if (row) {
                 fragment.appendChild(row);
             }
@@ -1380,22 +1413,14 @@ async function updateOffersTable() {
 
         lastRefreshTime = Date.now();
         if (newEntriesCountSpan) {
-            const displayCount = isSentOffers ? jsonData.length : validOffers.length;
-            newEntriesCountSpan.textContent = displayCount;
+            newEntriesCountSpan.textContent = validOffers.length;
         }
         if (lastRefreshTimeSpan) {
             lastRefreshTimeSpan.textContent = new Date(lastRefreshTime).toLocaleTimeString();
         }
 
-        if (!isSentOffers) {
-            const nextUpdateTime = getTimeUntilNextExpiration() * 1000;
-            setTimeout(() => {
-                updateRowTimes();
-            }, nextUpdateTime);
-        }
-
     } catch (error) {
-        //console.error('[Debug] Error in updateOffersTable:', error);
+        console.error('[Debug] Error in updateOffersTable:', error);
         offersBody.innerHTML = `
             <tr>
                 <td colspan="8" class="text-center py-4 text-red-500">
@@ -1405,44 +1430,122 @@ async function updateOffersTable() {
     }
 }
 
-function createTableRow(offer, isSentOffers) {
+async function getIdentityData(address) {
+    try {
+        const response = await fetch(`/json/identities/${address}`);
+        if (!response.ok) {
+            return null;
+        }
+        return await response.json();
+    } catch (error) {
+        console.error('Error fetching identity:', error);
+        return null;
+    }
+}
+
+function getIdentityInfo(address, identity) {
+    if (!identity) {
+        return {
+            displayAddr: address ? `${address.substring(0, 10)}...` : 'Unspecified',
+            fullAddress: address || '',
+            label: '',
+            note: '',
+            automationOverride: 0,
+            stats: {
+                sentBidsSuccessful: 0,
+                recvBidsSuccessful: 0,
+                sentBidsRejected: 0,
+                recvBidsRejected: 0,
+                sentBidsFailed: 0,
+                recvBidsFailed: 0
+            }
+        };
+    }
+
+    return {
+        displayAddr: address ? `${address.substring(0, 10)}...` : 'Unspecified',
+        fullAddress: address || '',
+        label: identity.label || '',
+        note: identity.note || '',
+        automationOverride: identity.automation_override || 0,
+        stats: {
+            sentBidsSuccessful: identity.num_sent_bids_successful || 0,
+            recvBidsSuccessful: identity.num_recv_bids_successful || 0,
+            sentBidsRejected: identity.num_sent_bids_rejected || 0,
+            recvBidsRejected: identity.num_recv_bids_rejected || 0,
+            sentBidsFailed: identity.num_sent_bids_failed || 0,
+            recvBidsFailed: identity.num_recv_bids_failed || 0
+        }
+    };
+}
+
+function createTableRow(offer, identity = null) {
     const row = document.createElement('tr');
     const uniqueId = `${offer.offer_id}_${offer.created_at}`;
-    row.className = `opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600`;
+    
+    row.className = 'relative opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600';
     row.setAttribute('data-offer-id', uniqueId);
 
-    const coinFrom = offer.coin_from;
-    const coinTo = offer.coin_to;
+    const {
+        coin_from: coinFrom,
+        coin_to: coinTo,
+        created_at: createdAt,
+        expire_at: expireAt,
+        amount_from: amountFrom,
+        amount_to: amountTo,
+        is_own_offer: isOwnOffer,
+        is_revoked: isRevoked,
+        is_public: isPublic
+    } = offer;
+
     const coinFromSymbol = coinNameToSymbol[coinFrom] || coinFrom.toLowerCase();
     const coinToSymbol = coinNameToSymbol[coinTo] || coinTo.toLowerCase();
     const coinFromDisplay = getDisplayName(coinFrom);
     const coinToDisplay = getDisplayName(coinTo);
-
-    const postedTime = formatTime(offer.created_at, true);
-    const expiresIn = formatTime(offer.expire_at);
+    const postedTime = formatTime(createdAt, true);
+    const expiresIn = formatTime(expireAt);
     
     const currentTime = Math.floor(Date.now() / 1000);
-    const isActuallyExpired = currentTime > offer.expire_at;
+    const isActuallyExpired = currentTime > expireAt;
+    const fromAmount = parseFloat(amountFrom) || 0;
+    const toAmount = parseFloat(amountTo) || 0;
 
-    const fromAmount = parseFloat(offer.amount_from) || 0;
-    const toAmount = parseFloat(offer.amount_to) || 0;
-
+    // Build row content
     row.innerHTML = `
+        ${!isPublic ? createPrivateIndicator() : '<td class="w-0 p-0 m-0"></td>'}
         ${createTimeColumn(offer, postedTime, expiresIn)}
-        ${createDetailsColumn(offer)}
+        ${createDetailsColumn(offer, identity)}
         ${createTakerAmountColumn(offer, coinTo, coinFrom)}
         ${createSwapColumn(offer, coinFromDisplay, coinToDisplay, coinFromSymbol, coinToSymbol)}
         ${createOrderbookColumn(offer, coinFrom, coinTo)}
         ${createRateColumn(offer, coinFrom, coinTo)}
         ${createPercentageColumn(offer)}
         ${createActionColumn(offer, isActuallyExpired)}
-        ${createTooltips(offer, offer.is_own_offer, coinFrom, coinTo, fromAmount, toAmount, postedTime, expiresIn, isActuallyExpired, Boolean(offer.is_revoked))}
+        ${createTooltips(
+            offer,
+            isOwnOffer,
+            coinFrom,
+            coinTo,
+            fromAmount,
+            toAmount,
+            postedTime,
+            expiresIn,
+            isActuallyExpired,
+            Boolean(isRevoked),
+            identity
+        )}
     `;
 
     updateTooltipTargets(row, uniqueId);
-    updateProfitLoss(row, coinFrom, coinTo, fromAmount, toAmount, offer.is_own_offer);
+    updateProfitLoss(row, coinFrom, coinTo, fromAmount, toAmount, isOwnOffer);
 
     return row;
+}
+
+function createPrivateIndicator() {
+    return `<td class="relative w-0 p-0 m-0">
+        <div class="absolute top-0 bottom-0 left-0 w-1 bg-red-700" style="min-height: 100%;"></div>
+    </td>`;
 }
 
 function createTimeColumn(offer, postedTime, expiresIn) {
@@ -1457,10 +1560,10 @@ function createTimeColumn(offer, postedTime, expiresIn) {
     }
 
     return `
-        <td class="py-3 pl-6 text-xs">
+        <td class="py-3 pl-1 pr-2 text-xs whitespace-nowrap">
             <div class="flex items-center">
                 <div class="relative" data-tooltip-target="tooltip-active${escapeHtml(offer.offer_id)}">
-                    <svg alt="" class="w-5 h-5 rounded-full mr-3 cursor-pointer" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
+                    <svg alt="" class="w-5 h-5 rounded-full mr-4 cursor-pointer" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
                         <g stroke-linecap="round" stroke-width="2" fill="none" stroke="${strokeColor}" stroke-linejoin="round">
                             <circle cx="12" cy="12" r="11"></circle>
                             <polyline points="12,6 12,12 18,12" stroke="${strokeColor}"></polyline>
@@ -1468,21 +1571,59 @@ function createTimeColumn(offer, postedTime, expiresIn) {
                     </svg>
                 </div>
                 <div class="flex flex-col hidden xl:block">
-                    <div class="text-xs"><span class="bold">Posted:</span> ${escapeHtml(postedTime)}</div>
-                    <div class="text-xs"><span class="bold">Expires in:</span> ${escapeHtml(expiresIn)}</div>
+                    <div class="text-xs whitespace-nowrap"><span class="bold">Posted:</span> ${escapeHtml(postedTime)}</div>
+                    <div class="text-xs whitespace-nowrap"><span class="bold">Expires in:</span> ${escapeHtml(expiresIn)}</div>
                 </div>
             </div>
         </td>
     `;
 }
 
-function createDetailsColumn(offer) {
+function shouldShowPublicTag(offers) {
+    return offers.some(offer => !offer.is_public);
+}
+
+function truncateText(text, maxLength = 15) {
+    if (typeof text !== 'string') return '';
+    return text.length > maxLength 
+        ? text.slice(0, maxLength) + '...' 
+        : text;
+}
+
+function createDetailsColumn(offer, identity = null) {
     const addrFrom = offer.addr_from || '';
+    const identityInfo = getIdentityInfo(addrFrom, identity);
+    
+    const showPublicPrivateTags = originalJsonData.some(o => o.is_public !== offer.is_public);
+
+    const tagClass = offer.is_public 
+        ? 'bg-green-600 dark:bg-green-600' 
+        : 'bg-red-500 dark:bg-red-500';
+    const tagText = offer.is_public ? 'Public' : 'Private';
+
+    const displayIdentifier = truncateText(
+        identityInfo.label || addrFrom || 'Unspecified'
+    );
+
+    const identifierTextClass = identityInfo.label 
+        ? 'text-white dark:text-white' 
+        : 'monospace';
+    
     return `
         <td class="py-8 px-4 text-xs text-left hidden xl:block">
-            <a data-tooltip-target="tooltip-recipient${escapeHtml(offer.offer_id)}" href="/identity/${escapeHtml(addrFrom)}">
-                <span class="bold">Recipient:</span> ${escapeHtml(addrFrom.substring(0, 10))}...
-            </a>
+            <div class="flex flex-col gap-2 relative">
+                ${showPublicPrivateTags ? `<span class="inline-flex pl-6 pr-6 py-1 justify-center text-[10px] w-1/4 font-medium text-gray-100 rounded-md ${tagClass}">${tagText}</span>
+                ` : ''}
+                
+                <a data-tooltip-target="tooltip-recipient-${escapeHtml(offer.offer_id)}" href="/identity/${escapeHtml(addrFrom)}" class="flex items-center">
+                    <svg class="w-4 h-4 mr-2 text-gray-400 dark:text-white" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                     <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"></path>
+                    </svg>
+                    <span class="${identifierTextClass} font-semibold">
+                        ${escapeHtml(displayIdentifier)}
+                    </span>
+                </a>
+            </div>
         </td>
     `;
 }
@@ -1635,12 +1776,28 @@ function createActionColumn(offer, isActuallyExpired = false) {
 }
 
 // TOOLTIP FUNCTIONS
-function createTooltips(offer, treatAsSentOffer, coinFrom, coinTo, fromAmount, toAmount, postedTime, expiresIn, isActuallyExpired, isRevoked) {
+function createTooltips(offer, treatAsSentOffer, coinFrom, coinTo, fromAmount, toAmount, postedTime, expiresIn, isActuallyExpired, isRevoked, identity = null) {
     const rate = parseFloat(offer.rate);
     const fromSymbol = getCoinSymbolLowercase(coinFrom);
     const toSymbol = getCoinSymbolLowercase(coinTo);
     const uniqueId = `${offer.offer_id}_${offer.created_at}`;
+
+    const addrFrom = offer.addr_from || '';
+    const identityInfo = getIdentityInfo(addrFrom, identity);
+
+    const totalBids = identity ? (
+        identityInfo.stats.sentBidsSuccessful + 
+        identityInfo.stats.recvBidsSuccessful + 
+        identityInfo.stats.sentBidsFailed + 
+        identityInfo.stats.recvBidsFailed + 
+        identityInfo.stats.sentBidsRejected + 
+        identityInfo.stats.recvBidsRejected
+    ) : 0;
     
+    const successRate = totalBids ? (
+        ((identityInfo.stats.sentBidsSuccessful + identityInfo.stats.recvBidsSuccessful) / totalBids) * 100
+    ).toFixed(1) : 0;
+
     const fromPriceUSD = latestPrices[fromSymbol]?.usd || 0;
     const toPriceUSD = latestPrices[toSymbol]?.usd || 0;
     const rateInUSD = rate * toPriceUSD;
@@ -1689,13 +1846,8 @@ function createTooltips(offer, treatAsSentOffer, coinFrom, coinTo, fromAmount, t
             </div>
             <div class="tooltip-arrow" data-popper-arrow></div>
         </div>
-        
-        <div id="tooltip-recipient-${uniqueId}" role="tooltip" class="inline-block absolute invisible z-50 py-2 px-3 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
-            <div class="active-revoked-expired"><span class="bold monospace">${offer.addr_from}</span></div>
-            <div class="tooltip-arrow" data-popper-arrow></div>
-        </div>
        
-        <div id="tooltip-wallet-${uniqueId}" role="tooltip" class="inline-block absolute invisible z-50 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+        <div id="tooltip-wallet-${uniqueId}" role="tooltip" class="inline-block absolute invisible z-50 py-2 px-3 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
             <div class="active-revoked-expired">
                 <span class="bold">${treatAsSentOffer ? 'My' : ''} ${coinTo} Wallet</span>
             </div>
@@ -1711,7 +1863,7 @@ function createTooltips(offer, treatAsSentOffer, coinFrom, coinTo, fromAmount, t
             <div class="tooltip-arrow pr-6" data-popper-arrow></div>
         </div>
         
-        <div id="tooltip-wallet-maker-${uniqueId}" role="tooltip" class="inline-block absolute invisible z-50 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+        <div id="tooltip-wallet-maker-${uniqueId}" role="tooltip" class="inline-block absolute invisible z-50 py-2 px-3 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
             <div class="active-revoked-expired">
                 <span class="bold">${treatAsSentOffer ? 'My' : ''} ${coinFrom} Wallet</span>
             </div>
@@ -1731,7 +1883,90 @@ function createTooltips(offer, treatAsSentOffer, coinFrom, coinTo, fromAmount, t
             </div>
             <div class="tooltip-arrow" data-popper-arrow></div>
         </div>
+
+        ${createRecipientTooltip(uniqueId, identityInfo, identity, successRate, totalBids)}
     `;
+}
+
+function createRecipientTooltip(uniqueId, identityInfo, identity, successRate, totalBids) {
+
+    const getSuccessRateColor = (rate) => {
+        if (rate >= 80) return 'text-green-600';
+        if (rate >= 60) return 'text-yellow-600';
+        return 'text-red-600';
+    };
+
+
+    const truncateText = (text, maxLength) => {
+        if (text.length <= maxLength) return text;
+        return text.substring(0, maxLength) + '...';
+    };
+
+    return `
+        <div id="tooltip-recipient-${uniqueId}" role="tooltip" 
+            class="fixed z-50 py-3 px-4 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip max-w-sm pointer-events-none">
+            <div class="identity-info space-y-2">
+                ${identityInfo.label ? `
+                    <div class="border-b border-gray-400 pb-2">
+                        <div class="text-white text-xs tracking-wide font-semibold">Label:</div>
+                        <div class="text-white">${escapeHtml(identityInfo.label)}</div>
+                    </div>
+                ` : ''}
+                
+                <div class="space-y-1">
+                    <div class="text-white text-xs tracking-wide font-semibold">Recipient Address:</div>
+                    <div class="monospace text-xs break-all bg-gray-500 p-2 rounded-md text-white">
+                        ${escapeHtml(identityInfo.fullAddress)}
+                    </div>
+                </div>
+
+                ${identityInfo.note ? `
+                    <div class="space-y-1 hidden">
+                        <div class="text-white text-xs tracking-wide font-semibold">Note:</div>
+                        <div class="text-white text-sm italic" title="${escapeHtml(identityInfo.note)}">
+                            ${escapeHtml(truncateText(identityInfo.note, 150))}
+                        </div>
+                    </div>
+                ` : ''}
+
+                ${identity ? `
+                    <div class="border-t border-gray-400 pt-2 mt-2">
+                        <div class="text-white text-xs tracking-wide font-semibold mb-2">Swap History:</div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div class="text-center p-2 bg-gray-500 rounded-md">
+                                <div class="text-lg font-bold ${getSuccessRateColor(successRate)}">${successRate}%</div>
+                                <div class="text-xs text-white">Success Rate</div>
+                            </div>
+                            <div class="text-center p-2 bg-gray-500 rounded-md">
+                                <div class="text-lg font-bold text-blue-500">${totalBids}</div>
+                                <div class="text-xs text-white">Total Trades</div>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 mt-2 text-center text-xs">
+                            <div>
+                                <div class="text-green-600 font-semibold">
+                                    ${identityInfo.stats.sentBidsSuccessful + identityInfo.stats.recvBidsSuccessful}
+                                </div>
+                                <div class="text-white">Successful</div>
+                            </div>
+                            <div>
+                                <div class="text-yellow-600 font-semibold">
+                                    ${identityInfo.stats.sentBidsRejected + identityInfo.stats.recvBidsRejected}
+                                </div>
+                                <div class="text-white">Rejected</div>
+                            </div>
+                            <div>
+                                <div class="text-red-600 font-semibold">
+                                    ${identityInfo.stats.sentBidsFailed + identityInfo.stats.recvBidsFailed}
+                                </div>
+                                <div class="text-white">Failed</div>
+                            </div>
+                        </div>
+                    </div>
+                ` : ''}
+            </div>
+            <div class="tooltip-arrow" data-popper-arrow></div>
+        </div>`;
 }
 
 function createTooltipContent(isSentOffers, coinFrom, coinTo, fromAmount, toAmount, isOwnOffer) {
@@ -1890,19 +2125,31 @@ function applyFilters() {
             filterTimeout = null;
         }, 250);
     } catch (error) {
-        //console.error('Error in filter timeout:', error);
+        console.error('Error in filter timeout:', error);
         filterTimeout = null;
     }
 }
 
 function clearFilters() {
+
     filterForm.reset();
+
+    const selectElements = filterForm.querySelectorAll('select');
+    selectElements.forEach(select => {
+        select.value = 'any';
+        // Trigger change event
+        const event = new Event('change', { bubbles: true });
+        select.dispatchEvent(event);
+    });
+
     const statusSelect = document.getElementById('status');
     if (statusSelect) {
         statusSelect.value = 'any';
     }
+
     jsonData = [...originalJsonData];
     currentPage = 1;
+
     updateOffersTable();
     updateJsonView();
     updateCoinFilterImages();
@@ -1916,26 +2163,18 @@ function hasActiveFilters() {
         coin_from: formData.get('coin_from'),
         status: formData.get('status')
     };
-    
-    //console.log('Current filters:', filters);
-    const hasFilters = 
-        filters.coin_to !== 'any' || 
-        filters.coin_from !== 'any' || 
-        (filters.status && filters.status !== 'any');                     
-    //console.log('Has active filters:', hasFilters);
-    
-    return hasFilters;
-}
 
-function getActiveFilters() {
-    const formData = new FormData(filterForm);
-    return {
-        coin_to: formData.get('coin_to'),
-        coin_from: formData.get('coin_from'),
-        status: formData.get('status')
-    };
-}
+    const selectElements = filterForm.querySelectorAll('select');
+    let hasChangedFilters = false;
+    
+    selectElements.forEach(select => {
+        if (select.value !== 'any') {
+            hasChangedFilters = true;
+        }
+    });
 
+    return hasChangedFilters;
+}
 // UTILITY FUNCTIONS
 function formatTimeLeft(timestamp) {
     const now = Math.floor(Date.now() / 1000);
@@ -2075,7 +2314,6 @@ function getCoinSymbol(fullName) {
 }
 
 // EVENT LISTENERS
-
 document.querySelectorAll('th[data-sortable="true"]').forEach(header => {
     header.addEventListener('click', () => {
         const columnIndex = parseInt(header.getAttribute('data-column-index'));
@@ -2192,12 +2430,24 @@ const timerManager = {
 };
 
 // INITIALIZATION AND EVENT BINDING
-
 document.addEventListener('DOMContentLoaded', () => {
     //console.log('DOM content loaded, initializing...');
     console.log('View type:', isSentOffers ? 'sent offers' : 'received offers');
 
     updateClearFiltersButton();
+    
+    // Add event listeners for filter controls
+    const selectElements = filterForm.querySelectorAll('select');
+    selectElements.forEach(select => {
+        select.addEventListener('change', () => {
+            updateClearFiltersButton();
+        });
+    });
+    
+    filterForm.addEventListener('change', () => {
+        applyFilters();
+        updateClearFiltersButton();
+    });
 
     setTimeout(() => {
         console.log('Starting WebSocket initialization...');
@@ -2215,7 +2465,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 clearInterval(retryInterval);
                 continueInitialization();
             } else if (retryCount >= maxRetries) {
-                //console.error('❌ Failed to load tableRateModule after multiple attempts');
+                //console.error('Failed to load tableRateModule after multiple attempts');
                 clearInterval(retryInterval);
                 continueInitialization();
             }
@@ -2255,47 +2505,47 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     eventListeners.add(document.getElementById('refreshOffers'), 'click', async () => {
-    console.log('Manual refresh initiated');
-    
-    const refreshButton = document.getElementById('refreshOffers');
-    const refreshIcon = document.getElementById('refreshIcon');
-    const refreshText = document.getElementById('refreshText');
+        console.log('Manual refresh initiated');
+        
+        const refreshButton = document.getElementById('refreshOffers');
+        const refreshIcon = document.getElementById('refreshIcon');
+        const refreshText = document.getElementById('refreshText');
 
-    refreshButton.disabled = true;
-    refreshIcon.classList.add('animate-spin');
-    refreshText.textContent = 'Refreshing...';
-    refreshButton.classList.add('opacity-75', 'cursor-wait');
+        refreshButton.disabled = true;
+        refreshIcon.classList.add('animate-spin');
+        refreshText.textContent = 'Refreshing...';
+        refreshButton.classList.add('opacity-75', 'cursor-wait');
 
-    try {
-        const endpoint = isSentOffers ? '/json/sentoffers' : '/json/offers';
-        const response = await fetch(endpoint);
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+        try {
+            const endpoint = isSentOffers ? '/json/sentoffers' : '/json/offers';
+            const response = await fetch(endpoint);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const newData = await response.json();
+
+            const processedNewData = Array.isArray(newData) ? newData : Object.values(newData);
+            console.log('Fetched offers:', processedNewData.length);
+
+            jsonData = formatInitialData(processedNewData);
+            originalJsonData = [...jsonData];
+            
+            await updateOffersTable();
+            updateJsonView();
+            updatePaginationInfo();
+            
+            console.log(' Manual refresh completed successfully');
+            
+        } catch (error) {
+            console.error('Error during manual refresh:', error);
+            ui.displayErrorMessage('Failed to refresh offers. Please try again later.');
+        } finally {
+            refreshButton.disabled = false;
+            refreshIcon.classList.remove('animate-spin');
+            refreshText.textContent = 'Refresh';
+            refreshButton.classList.remove('opacity-75', 'cursor-wait');
         }
-        const newData = await response.json();
-
-        const processedNewData = Array.isArray(newData) ? newData : Object.values(newData);
-        console.log('Fetched offers:', processedNewData.length);
-
-        jsonData = formatInitialData(processedNewData);
-        originalJsonData = [...jsonData];
-        
-        await updateOffersTable();
-        updateJsonView();
-        updatePaginationInfo();
-        
-        console.log('✅ Manual refresh completed successfully');
-        
-    } catch (error) {
-        console.error('❌ Error during manual refresh:', error);
-        ui.displayErrorMessage('Failed to refresh offers. Please try again later.');
-    } finally {
-        refreshButton.disabled = false;
-        refreshIcon.classList.remove('animate-spin');
-        refreshText.textContent = 'Refresh';
-        refreshButton.classList.remove('opacity-75', 'cursor-wait');
-    }
-});
+    });
 
     eventListeners.add(prevPageButton, 'click', () => {
         if (currentPage > 1) {
@@ -2332,7 +2582,7 @@ document.addEventListener('DOMContentLoaded', () => {
         //console.log('Initial offers fetched');
         applyFilters();
     }).catch(error => {
-        console.error('❌ Error fetching initial offers:', error);
+        console.error('Error fetching initial offers:', error);
     });
 
     const listingLabel = document.querySelector('span[data-listing-label]');
@@ -2351,7 +2601,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    console.log('✅ Initialization completed');
+    console.log('Initialization completed');
 });
 
 console.log('Offers Table Module fully initialized');
