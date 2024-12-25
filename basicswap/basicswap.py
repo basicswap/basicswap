@@ -1339,8 +1339,8 @@ class BasicSwap(BaseApp):
             if not identity_stats:
                 # self.log.debug(f"Creating new identity record for {addr}")
                 identity_stats = KnownIdentity(
-                    active_ind=1, 
-                    address=addr, 
+                    active_ind=1,
+                    address=addr,
                     created_at=self.getTime()
                 )
             is_offer_creator = addr == offer.addr_from
@@ -1355,11 +1355,11 @@ class BasicSwap(BaseApp):
                     old_value = zeroIfNone(identity_stats.num_sent_bids_successful)
                     identity_stats.num_sent_bids_successful = old_value + 1
                     # self.log.debug(f"Updated sent successful: {old_value} -> {identity_stats.num_sent_bids_successful}")
-            elif bid.state in (BidStates.BID_ERROR, 
-                             BidStates.XMR_SWAP_FAILED_REFUNDED,
-                             BidStates.XMR_SWAP_FAILED_SWIPED, 
-                             BidStates.XMR_SWAP_FAILED,
-                             BidStates.SWAP_TIMEDOUT):
+            elif bid.state in (BidStates.BID_ERROR,
+                              BidStates.XMR_SWAP_FAILED_REFUNDED,
+                              BidStates.XMR_SWAP_FAILED_SWIPED,
+                              BidStates.XMR_SWAP_FAILED,
+                              BidStates.SWAP_TIMEDOUT):
                 # self.log.debug(f"Processing failed swap: {bid.state}")
                 if is_offer_creator:
                     old_value = zeroIfNone(identity_stats.num_recv_bids_failed)
