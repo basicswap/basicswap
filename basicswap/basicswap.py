@@ -1356,10 +1356,10 @@ class BasicSwap(BaseApp):
                     identity_stats.num_sent_bids_successful = old_value + 1
                     # self.log.debug(f"Updated sent successful: {old_value} -> {identity_stats.num_sent_bids_successful}")
             elif bid.state in (BidStates.BID_ERROR,
-                              BidStates.XMR_SWAP_FAILED_REFUNDED,
-                              BidStates.XMR_SWAP_FAILED_SWIPED,
-                              BidStates.XMR_SWAP_FAILED,
-                              BidStates.SWAP_TIMEDOUT):
+                               BidStates.XMR_SWAP_FAILED_REFUNDED,
+                               BidStates.XMR_SWAP_FAILED_SWIPED,
+                               BidStates.XMR_SWAP_FAILED,
+                               BidStates.SWAP_TIMEDOUT):
                 # self.log.debug(f"Processing failed swap: {bid.state}")
                 if is_offer_creator:
                     old_value = zeroIfNone(identity_stats.num_recv_bids_failed)
