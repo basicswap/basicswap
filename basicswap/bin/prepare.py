@@ -2506,6 +2506,9 @@ def main():
         return 0
 
     if disable_coin != "":
+        if "particl" in disable_coin:
+            exitWithError("Cannot disable Particl (required for operation)")
+
         logger.info("Disabling coin: %s", disable_coin)
         settings = load_config(config_path)
 
