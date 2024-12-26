@@ -86,7 +86,7 @@
                     <select class="pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="addr_to">
                       <option{% if data.addr_to=="-1" %} selected{% endif %} value="-1">Public Network</option>
                         {% for a in addrs_to %}
-                        <option{% if data.addr_to==a[0] %} selected{% endif %} value="{{ a[0] }}">{{ a[0] }} {{ a[1] }}</option>
+                        <option{% if data.addr_to==a[0] %} selected{% endif %} value="{{ a[0] }}">{{ a[0] }} ({{ a[1] }})</option>
                         {% endfor %}
                     </select>
                   </div>
@@ -471,7 +471,7 @@ if (document.readyState === 'loading') {
     }
 
     function getRateInferred(event) {
-        event.preventDefault(); // Prevent default form submission behavior
+        event.preventDefault();
 
         const coin_from = document.getElementById('coin_from').value;
         const coin_to = document.getElementById('coin_to').value;
@@ -558,7 +558,7 @@ if (document.readyState === 'loading') {
                 return;
             } else
             if (amt_from == '' && amt_to != '') {
-                if (value_changed == 'amt_from') {  // Don't try and set a value just cleared
+                if (value_changed == 'amt_from') {
                     return;
                 }
                 params += '&rate=' + rate + '&amt_to=' + amt_to;
