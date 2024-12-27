@@ -1187,11 +1187,16 @@ class BasicSwap(BaseApp):
         if ci.isWalletLocked():
             raise LockedCoinError(Coins.PART)
 
+    def isCoinActive(self, c) -> bool:
+        if c not in chainparams:
+            return False
+        if self.coin_clients[c]["connection_type"] == "rpc":
+            return True
+        return False
+
     def activeCoins(self):
         for c in Coins:
-            if c not in chainparams:
-                continue
-            if self.coin_clients[c]["connection_type"] == "rpc":
+            if self.isCoinActive(c):
                 yield c
 
     def getListOfWalletCoins(self):
@@ -1335,9 +1340,7 @@ class BasicSwap(BaseApp):
             identity_stats = self.queryOne(KnownIdentity, cursor, {"address": addr})
             if not identity_stats:
                 identity_stats = KnownIdentity(
-                    active_ind=1,
-                    address=addr,
-                    created_at=self.getTime()
+                    active_ind=1, address=addr, created_at=self.getTime()
                 )
             is_offer_creator = addr == offer.addr_from
             if bid.state == BidStates.SWAP_COMPLETED:
@@ -1347,11 +1350,13 @@ class BasicSwap(BaseApp):
                 else:
                     old_value = zeroIfNone(identity_stats.num_sent_bids_successful)
                     identity_stats.num_sent_bids_successful = old_value + 1
-            elif bid.state in (BidStates.BID_ERROR,
-                               BidStates.XMR_SWAP_FAILED_REFUNDED,
-                               BidStates.XMR_SWAP_FAILED_SWIPED,
-                               BidStates.XMR_SWAP_FAILED,
-                               BidStates.SWAP_TIMEDOUT):
+            elif bid.state in (
+                BidStates.BID_ERROR,
+                BidStates.XMR_SWAP_FAILED_REFUNDED,
+                BidStates.XMR_SWAP_FAILED_SWIPED,
+                BidStates.XMR_SWAP_FAILED,
+                BidStates.SWAP_TIMEDOUT,
+            ):
                 if is_offer_creator:
                     old_value = zeroIfNone(identity_stats.num_recv_bids_failed)
                     identity_stats.num_recv_bids_failed = old_value + 1
@@ -8771,7 +8776,7 @@ class BasicSwap(BaseApp):
 
         try:
             chain_height = ci_to.getChainHeight()
-            lock_tx_depth = (chain_height - bid.xmr_b_lock_tx.chain_height)
+            lock_tx_depth = chain_height - bid.xmr_b_lock_tx.chain_height
             if lock_tx_depth < ci_to.depth_spendable():
                 raise TemporaryError(
                     f"Chain B lock tx still confirming {lock_tx_depth} / {ci_to.depth_spendable()}."
@@ -10416,7 +10421,7 @@ class BasicSwap(BaseApp):
             for row in q:
                 coin_id = row[0]
 
-                if self.coin_clients[coin_id]["connection_type"] != "rpc":
+                if self.isCoinActive(coin_id) is False:
                     # Skip cached info if coin was disabled
                     continue
 
