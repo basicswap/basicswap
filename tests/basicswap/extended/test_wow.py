@@ -103,7 +103,6 @@ class Test(BaseTest):
 
     @classmethod
     def prepareExtraCoins(cls):
-        pass
         num_blocks = 300
         cls.wow_addr = cls.callwownodewallet(cls, 1, "get_address")["address"]
         if callrpc_xmr(WOW_BASE_RPC_PORT + 1, "get_block_count")["count"] < num_blocks:

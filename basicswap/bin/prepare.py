@@ -56,9 +56,6 @@ LITECOIN_VERSION_TAG = os.getenv("LITECOIN_VERSION_TAG", "")
 BITCOIN_VERSION = os.getenv("BITCOIN_VERSION", "26.0")
 BITCOIN_VERSION_TAG = os.getenv("BITCOIN_VERSION_TAG", "")
 
-BITCOINCASH_VERSION = os.getenv("BITCOINCASH_VERSION", "27.1.0")
-BITCOINCASH_VERSION_TAG = os.getenv("BITCOINCASH_VERSION_TAG", "")
-
 MONERO_VERSION = os.getenv("MONERO_VERSION", "0.18.3.4")
 MONERO_VERSION_TAG = os.getenv("MONERO_VERSION_TAG", "")
 XMR_SITE_COMMIT = (
@@ -86,6 +83,12 @@ NAV_VERSION_TAG = os.getenv("NAV_VERSION_TAG", "")
 DCR_VERSION = os.getenv("DCR_VERSION", "1.8.1")
 DCR_VERSION_TAG = os.getenv("DCR_VERSION_TAG", "")
 
+BITCOINCASH_VERSION = os.getenv("BITCOINCASH_VERSION", "27.1.0")
+BITCOINCASH_VERSION_TAG = os.getenv("BITCOINCASH_VERSION_TAG", "")
+
+DOGECOIN_VERSION = os.getenv("DOGECOIN_VERSION", "23.2.1")
+DOGECOIN_VERSION_TAG = os.getenv("DOGECOIN_VERSION_TAG", "")
+
 GUIX_SSL_CERT_DIR = None
 
 ADD_PUBKEY_URL = os.getenv("ADD_PUBKEY_URL", "")
@@ -98,7 +101,6 @@ SKIP_GPG_VALIDATION = toBool(os.getenv("SKIP_GPG_VALIDATION", "false"))
 known_coins = {
     "particl": (PARTICL_VERSION, PARTICL_VERSION_TAG, ("tecnovert",)),
     "bitcoin": (BITCOIN_VERSION, BITCOIN_VERSION_TAG, ("laanwj",)),
-    "bitcoincash": (BITCOINCASH_VERSION, BITCOINCASH_VERSION_TAG, ("Calin_Culianu",)),
     "litecoin": (LITECOIN_VERSION, LITECOIN_VERSION_TAG, ("davidburkett38",)),
     "decred": (DCR_VERSION, DCR_VERSION_TAG, ("decred_release",)),
     "namecoin": ("0.18.0", "", ("JeremyRand",)),
@@ -108,6 +110,8 @@ known_coins = {
     "dash": (DASH_VERSION, DASH_VERSION_TAG, ("pasta",)),
     "firo": (FIRO_VERSION, FIRO_VERSION_TAG, ("reuben",)),
     "navcoin": (NAV_VERSION, NAV_VERSION_TAG, ("nav_builder",)),
+    "bitcoincash": (BITCOINCASH_VERSION, BITCOINCASH_VERSION_TAG, ("Calin_Culianu",)),
+    "dogecoin": (DOGECOIN_VERSION, DOGECOIN_VERSION_TAG, ("tecnovert",)),
 }
 
 disabled_coins = [
@@ -123,6 +127,8 @@ expected_key_ids = {
     "binaryfate": ("F0AF4D462A0BDF92",),
     "wowario": ("793504B449C69220",),
     "davidburkett38": ("3620E9D387E55666",),
+    "xanimo": ("6E8F17C1B1BCDCBE",),
+    "patricklodder": ("2D3A345B98D0DC1F",),
     "fuzzbawls": ("C1ABA64407731FD9",),
     "pasta": ("52527BEDABE87984",),
     "reuben": ("1290A1D0FA7EE109",),
@@ -203,13 +209,6 @@ BTC_ONION_PORT = int(os.getenv("BTC_ONION_PORT", 8334))
 BTC_RPC_USER = os.getenv("BTC_RPC_USER", "")
 BTC_RPC_PWD = os.getenv("BTC_RPC_PWD", "")
 
-BCH_RPC_HOST = os.getenv("BCH_RPC_HOST", "127.0.0.1")
-BCH_RPC_PORT = int(os.getenv("BCH_RPC_PORT", 19997))
-BCH_ONION_PORT = int(os.getenv("BCH_ONION_PORT", 8335))
-BCH_PORT = int(os.getenv("BCH_PORT", 19798))
-BCH_RPC_USER = os.getenv("BCH_RPC_USER", "")
-BCH_RPC_PWD = os.getenv("BCH_RPC_PWD", "")
-
 DCR_RPC_HOST = os.getenv("DCR_RPC_HOST", "127.0.0.1")
 DCR_RPC_PORT = int(os.getenv("DCR_RPC_PORT", 9109))
 DCR_WALLET_RPC_HOST = os.getenv("DCR_WALLET_RPC_HOST", "127.0.0.1")
@@ -246,6 +245,19 @@ NAV_RPC_PORT = int(os.getenv("NAV_RPC_PORT", 44444))
 NAV_ONION_PORT = int(os.getenv("NAV_ONION_PORT", 8334))  # TODO?
 NAV_RPC_USER = os.getenv("NAV_RPC_USER", "")
 NAV_RPC_PWD = os.getenv("NAV_RPC_PWD", "")
+
+BCH_RPC_HOST = os.getenv("BCH_RPC_HOST", "127.0.0.1")
+BCH_RPC_PORT = int(os.getenv("BCH_RPC_PORT", 19997))
+BCH_ONION_PORT = int(os.getenv("BCH_ONION_PORT", 8335))
+BCH_PORT = int(os.getenv("BCH_PORT", 19798))
+BCH_RPC_USER = os.getenv("BCH_RPC_USER", "")
+BCH_RPC_PWD = os.getenv("BCH_RPC_PWD", "")
+
+DOGE_RPC_HOST = os.getenv("DOGE_RPC_HOST", "127.0.0.1")
+DOGE_RPC_PORT = int(os.getenv("DOGE_RPC_PORT", 42069))
+DOGE_ONION_PORT = int(os.getenv("DOGE_ONION_PORT", 6969))
+DOGE_RPC_USER = os.getenv("DOGE_RPC_USER", "")
+DOGE_RPC_PWD = os.getenv("DOGE_RPC_PWD", "")
 
 TOR_PROXY_HOST = os.getenv("TOR_PROXY_HOST", "127.0.0.1")
 TOR_PROXY_PORT = int(os.getenv("TOR_PROXY_PORT", 9050))
@@ -802,6 +814,15 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
                 "https://raw.githubusercontent.com/litecoin-project/gitian.sigs.ltc/master/%s-%s/%s/%s"
                 % (version, os_dir_name, signing_key_name, assert_filename)
             )
+        elif coin == "dogecoin":
+            release_url = (
+                "https://github.com/tecnovert/dogecoin/releases/download/v{}/{}".format(
+                    version + version_tag, release_filename
+                )
+            )
+            assert_filename = "{}-{}-{}-build.assert".format(coin, os_name, version)
+            assert_url = f"https://raw.githubusercontent.com/tecnovert/guix.sigs/dogecoin/{version}/{signing_key_name}/noncodesigned.SHA256SUMS"
+
         elif coin == "bitcoin":
             release_url = "https://bitcoincore.org/bin/bitcoin-core-{}/{}".format(
                 version, release_filename
@@ -973,6 +994,8 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
         pubkey_filename = "{}_builder.pgp".format(coin)
     elif coin in ("decred",):
         pubkey_filename = "{}_release.pgp".format(coin)
+    elif coin in ("dogecoin",):
+        pubkey_filename = "particl_{}.pgp".format(signing_key_name)
     else:
         pubkey_filename = "{}_{}.pgp".format(coin, signing_key_name)
     pubkeyurls = [
@@ -1276,6 +1299,14 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
                         LTC_RPC_USER, salt, password_to_hmac(salt, LTC_RPC_PWD)
                     )
                 )
+        elif coin == "dogecoin":
+            fp.write("prune=4000\n")
+            if DOGE_RPC_USER != "":
+                fp.write(
+                    "rpcauth={}:{}${}\n".format(
+                        DOGE_RPC_USER, salt, password_to_hmac(salt, DOGE_RPC_PWD)
+                    )
+                )
         elif coin == "bitcoin":
             fp.write("deprecatedrpc=create_bdb\n")
             fp.write("prune=2000\n")
@@ -1485,6 +1516,8 @@ def modify_tor_config(
             default_onionport = PART_ONION_PORT
         elif coin == "litecoin":
             default_onionport = LTC_ONION_PORT
+        elif coin == "dogecoin":
+            default_onionport = DOGE_ONION_PORT
         elif coin in ("decred",):
             pass
         else:
@@ -1697,6 +1730,7 @@ def initialise_wallets(
                 Coins.PART,
                 Coins.BTC,
                 Coins.LTC,
+                Coins.DOGE,
                 Coins.DCR,
                 Coins.DASH,
             )
@@ -1803,7 +1837,7 @@ def initialise_wallets(
                             "Creating wallet.dat for {}.".format(getCoinName(c))
                         )
 
-                        if c in (Coins.BTC, Coins.LTC, Coins.DASH):
+                        if c in (Coins.BTC, Coins.LTC, Coins.DOGE, Coins.DASH):
                             # wallet_name, disable_private_keys, blank, passphrase, avoid_reuse, descriptors
                             swap_client.callcoinrpc(
                                 c,
@@ -2256,6 +2290,21 @@ def main():
             "core_version_group": 21,
             "min_relay_fee": 0.00001,
         },
+        "dogecoin": {
+            "connection_type": "rpc",
+            "manage_daemon": shouldManageDaemon("DOGE"),
+            "rpchost": DOGE_RPC_HOST,
+            "rpcport": DOGE_RPC_PORT + port_offset,
+            "onionport": DOGE_ONION_PORT + port_offset,
+            "datadir": os.getenv("DOGE_DATA_DIR", os.path.join(data_dir, "dogecoin")),
+            "bindir": os.path.join(bin_dir, "dogecoin"),
+            "use_segwit": False,
+            "use_csv": False,
+            "blocks_confirmed": 2,
+            "conf_target": 2,
+            "core_version_group": 23,
+            "min_relay_fee": 0.01,  # RECOMMENDED_MIN_TX_FEE
+        },
         "decred": {
             "connection_type": "rpc",
             "manage_daemon": shouldManageDaemon("DCR"),
@@ -2403,6 +2452,9 @@ def main():
     if LTC_RPC_USER != "":
         chainclients["litecoin"]["rpcuser"] = LTC_RPC_USER
         chainclients["litecoin"]["rpcpassword"] = LTC_RPC_PWD
+    if DOGE_RPC_USER != "":
+        chainclients["dogecoin"]["rpcuser"] = DOGE_RPC_USER
+        chainclients["dogecoin"]["rpcpassword"] = DOGE_RPC_PWD
     if BTC_RPC_USER != "":
         chainclients["bitcoin"]["rpcuser"] = BTC_RPC_USER
         chainclients["bitcoin"]["rpcpassword"] = BTC_RPC_PWD

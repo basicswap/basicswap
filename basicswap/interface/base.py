@@ -188,7 +188,7 @@ class Secp256k1Interface(CoinInterface, AdaptorSigInterface):
     def curve_type():
         return Curves.secp256k1
 
-    def getNewSecretKey(self) -> bytes:
+    def getNewRandomKey(self) -> bytes:
         return i2b(getSecretInt())
 
     def getPubkey(self, privkey: bytes) -> bytes:

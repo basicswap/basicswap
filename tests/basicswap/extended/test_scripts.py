@@ -147,6 +147,8 @@ def wait_for_bids(delay_event, node_id, num_bids, offer_id=None) -> None:
     logging.info(f"Waiting for {num_bids} bids on node {node_id}")
     for i in range(20):
         delay_event.wait(1)
+        if delay_event.is_set():
+            raise ValueError("Test stopped.")
         if offer_id is not None:
             bids = read_json_api(UI_PORT + node_id, "bids", {"offer_id": offer_id})
         else:

@@ -355,7 +355,13 @@ class BasicSwap(BaseApp):
 
         # TODO: Set dynamically
         self.balance_only_coins = (Coins.LTC_MWEB,)
-        self.scriptless_coins = (Coins.XMR, Coins.WOW, Coins.PART_ANON, Coins.FIRO)
+        self.scriptless_coins = (
+            Coins.XMR,
+            Coins.WOW,
+            Coins.PART_ANON,
+            Coins.FIRO,
+            Coins.DOGE,
+        )
         self.adaptor_swap_only_coins = self.scriptless_coins + (
             Coins.PART_BLIND,
             Coins.BCH,
@@ -822,6 +828,10 @@ class BasicSwap(BaseApp):
                 self.coin_clients[coin], self.chain, self
             )
             return interface
+        elif coin == Coins.DOGE:
+            from .interface.doge import DOGEInterface
+
+            return DOGEInterface(self.coin_clients[coin], self.chain, self)
         elif coin == Coins.DCR:
             from .interface.dcr import DCRInterface
 
@@ -882,6 +892,7 @@ class BasicSwap(BaseApp):
             if cc["name"] in (
                 "bitcoin",
                 "litecoin",
+                "dogecoin",
                 "namecoin",
                 "dash",
                 "firo",

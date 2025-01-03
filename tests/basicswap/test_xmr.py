@@ -1077,8 +1077,8 @@ class Test(BaseTest):
         # fee_rate is in sats/kvB
         fee_rate: int = 1000
 
-        a = ci.getNewSecretKey()
-        b = ci.getNewSecretKey()
+        a = ci.getNewRandomKey()
+        b = ci.getNewRandomKey()
 
         A = ci.getPubkey(a)
         B = ci.getPubkey(b)
@@ -1147,8 +1147,8 @@ class Test(BaseTest):
         assert expect_vsize - vsize_actual < 10
 
         # Test chain b (no-script) lock tx size
-        v = ci.getNewSecretKey()
-        s = ci.getNewSecretKey()
+        v = ci.getNewRandomKey()
+        s = ci.getNewRandomKey()
         S = ci.getPubkey(s)
         lock_tx_b_txid = ci.publishBLockTx(v, S, amount, fee_rate)
 
@@ -1176,8 +1176,8 @@ class Test(BaseTest):
         amount: int = ci.make_int(random.uniform(0.1, 2.0), r=1)
         fee_rate: int = 1000  # TODO: How to set feerate for rpc functions?
 
-        v = ci.getNewSecretKey()
-        s = ci.getNewSecretKey()
+        v = ci.getNewRandomKey()
+        s = ci.getNewRandomKey()
         S = ci.getPubkey(s)
         lock_tx_b_txid = ci.publishBLockTx(v, S, amount, fee_rate)
 
@@ -2083,8 +2083,8 @@ class Test(BaseTest):
         ci = swap_clients[1].ci(Coins.PART_ANON)
         amount: int = ci.make_int(random.uniform(0.1, 2.0), r=1)
         fee_rate: int = 1000
-        v = ci.getNewSecretKey()
-        s = ci.getNewSecretKey()
+        v = ci.getNewRandomKey()
+        s = ci.getNewRandomKey()
         S = ci.getPubkey(s)
         lock_tx_b_txid = ci.publishBLockTx(v, S, amount, fee_rate)
 
