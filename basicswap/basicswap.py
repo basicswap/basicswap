@@ -1187,7 +1187,7 @@ class BasicSwap(BaseApp):
         if ci.isWalletLocked():
             raise LockedCoinError(Coins.PART)
 
-    def isCoinActive(self, c) -> bool:
+    def isBaseCoinActive(self, c) -> bool:
         if c not in chainparams:
             return False
         if self.coin_clients[c]["connection_type"] == "rpc":
@@ -1196,7 +1196,7 @@ class BasicSwap(BaseApp):
 
     def activeCoins(self):
         for c in Coins:
-            if self.isCoinActive(c):
+            if self.isBaseCoinActive(c):
                 yield c
 
     def getListOfWalletCoins(self):
