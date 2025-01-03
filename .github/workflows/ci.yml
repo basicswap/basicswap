@@ -25,18 +25,24 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install flake8 codespell pytest
+        pip install flake8 codespell pytest djlint
         pip install -r requirements.txt --require-hashes
+        npm install -g eslint
     - name: Install
       run: |
         pip install .
-    - name: Running flake8
+    - name: Run flake8
       run: |
         flake8 --ignore=E203,E501,W503 --exclude=basicswap/contrib,basicswap/interface/contrib,.eggs,.tox,bin/install_certifi.py
-    - name: Running codespell
+    - name: Run ESLint
+      run: eslint
+    - name: Run djlint
+      run: |
+        djlint basicswap/templates/ --lint
+    - name: Run codespell
       run: |
         codespell --check-filenames --disable-colors --quiet-level=7 --ignore-words=tests/lint/spelling.ignore-words.txt -S .git,.eggs,.tox,pgp,*.pyc,*basicswap/contrib,*basicswap/interface/contrib,*mnemonics.py,bin/install_certifi.py,*basicswap/static
-    - name: Running test_other
+    - name: Run test_other
       run: |
         pytest tests/basicswap/test_other.py
     - name: Cache coin cores

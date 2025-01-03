@@ -9,6 +9,10 @@ __pycache__
 .tox
 .eggs
 *~
+.ruff_cache
+.pytest_cache
+
+node_modules
 
 # geckodriver.log
 *.log
