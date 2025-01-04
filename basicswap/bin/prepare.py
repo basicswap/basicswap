@@ -771,7 +771,7 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
         arch_name = BIN_ARCH
         if os_name == "osx" and use_guix:
             arch_name = "x86_64-apple-darwin"
-            if coin == "particl":
+            if coin in ("particl", "dogecoin"):
                 arch_name += "18"
 
         release_filename = "{}-{}-{}.{}".format(
