@@ -515,15 +515,9 @@ function set_swap_type_enabled(coin_from, coin_to, swap_type) {
 
     coin_from = String(coin_from);
     coin_to = String(coin_to);
+    
 
-    if (adaptor_sig_only_coins.indexOf(coin_from) !== -1 && adaptor_sig_only_coins.indexOf(coin_to) !== -1) {
-        swap_type.disabled = true;
-        swap_type.value = 'xmr_swap';
-        make_hidden = true;
-        swap_type.classList.add('select-disabled');
-    }
-
-    else if (adaptor_sig_only_coins.indexOf(coin_from) !== -1 || adaptor_sig_only_coins.indexOf(coin_to) !== -1) {
+    if (adaptor_sig_only_coins.indexOf(coin_from) !== -1 || adaptor_sig_only_coins.indexOf(coin_to) !== -1) {
         swap_type.disabled = true;
         swap_type.value = 'xmr_swap';
         make_hidden = true;
