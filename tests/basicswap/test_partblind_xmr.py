@@ -2,16 +2,13 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2021-2023 tecnovert
-# Copyright (c) 2024 The Basicswap developers
+# Copyright (c) 2024-2025 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-import json
 import random
 import logging
 import unittest
-from urllib import parse
-from urllib.request import urlopen
 
 from basicswap.basicswap import (
     Coins,
@@ -27,7 +24,6 @@ from basicswap.util import (
     format_amount,
 )
 from tests.basicswap.util import (
-    post_json_req,
     read_json_api,
 )
 from tests.basicswap.common import (
@@ -61,9 +57,7 @@ class Test(BaseTest):
             "subfee": False,
             "type_to": "blind",
         }
-        json_rv = json.loads(
-            post_json_req("http://127.0.0.1:1800/json/wallets/part/withdraw", post_json)
-        )
+        json_rv = read_json_api(1800, "wallets/part/withdraw", post_json)
         assert len(json_rv["txid"]) == 64
 
         logging.info("Waiting for blind balance")
@@ -388,7 +382,7 @@ class Test(BaseTest):
 
         swap_clients[1].setBidDebugInd(bid_id, DebugTypes.CREATE_INVALID_COIN_B_LOCK)
         swap_clients[0].setBidDebugInd(
-            bid_id, DebugTypes.BID_DONT_SPEND_COIN_A_LOCK_REFUND
+            bid_id, DebugTypes.BID_DONT_SPEND_COIN_A_LOCK_REFUND2
         )
 
         swap_clients[0].acceptXmrBid(bid_id)
@@ -397,7 +391,7 @@ class Test(BaseTest):
             test_delay_event,
             swap_clients[0],
             bid_id,
-            BidStates.BID_STALLED_FOR_TEST,
+            (BidStates.BID_STALLED_FOR_TEST, BidStates.XMR_SWAP_FAILED_SWIPED),
             wait_for=180,
         )
         wait_for_bid(
@@ -422,21 +416,14 @@ class Test(BaseTest):
         wait_for_none_active(test_delay_event, 1800)
         wait_for_none_active(test_delay_event, 1801)
 
-        data = parse.urlencode({"chainbkeysplit": True}).encode()
-        offerer_key = json.loads(
-            urlopen(
-                "http://127.0.0.1:1800/json/bids/{}".format(bid_id.hex()), data=data
-            ).read()
+        offerer_key = read_json_api(
+            1800, "bids/{}".format(bid_id.hex()), {"chainbkeysplit": True}
         )["splitkey"]
 
-        data = parse.urlencode(
-            {"spendchainblocktx": True, "remote_key": offerer_key}
-        ).encode()
-        redeemed_txid = json.loads(
-            urlopen(
-                "http://127.0.0.1:1801/json/bids/{}".format(bid_id.hex()), data=data
-            ).read()
-        )["txid"]
+        data = {"spendchainblocktx": True, "remote_key": offerer_key}
+        redeemed_txid = read_json_api(1801, "bids/{}".format(bid_id.hex()), data)[
+            "txid"
+        ]
         assert len(redeemed_txid) == 64
 
     def do_test_04_follower_recover_b_lock_tx(self, coin_from, coin_to):

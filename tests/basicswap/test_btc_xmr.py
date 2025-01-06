@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2021-2024 tecnovert
-# Copyright (c) 2024 The Basicswap developers
+# Copyright (c) 2024-2025 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -170,7 +170,11 @@ class TestFunctions(BaseTest):
         bid_id = swap_clients[id_bidder].postXmrBid(offer_id, offer.amount_from)
 
         wait_for_bid(
-            test_delay_event, swap_clients[id_offerer], bid_id, BidStates.BID_RECEIVED
+            test_delay_event,
+            swap_clients[id_offerer],
+            bid_id,
+            BidStates.BID_RECEIVED,
+            wait_for=(self.extra_wait_time + 40),
         )
 
         bid0 = read_json_api(1800 + id_offerer, f"bids/{bid_id.hex()}")
@@ -392,7 +396,7 @@ class TestFunctions(BaseTest):
         )
 
         swap_clients[id_follower].ci(
-            coin_from if reverse_bid else coin_to
+            coin_to if reverse_bid else coin_from
         )._altruistic = with_mercy
 
         amt_swap = ci_from.make_int(random.uniform(0.1, 2.0), r=1)
@@ -415,17 +419,10 @@ class TestFunctions(BaseTest):
             test_delay_event, swap_clients[id_offerer], bid_id, BidStates.BID_RECEIVED
         )
 
-        debug_type = (
-            DebugTypes.BID_DONT_SPEND_COIN_A_LOCK_REFUND2
-            if with_mercy
-            else DebugTypes.BID_DONT_SPEND_COIN_A_LOCK_REFUND
+        swap_clients[id_leader].setBidDebugInd(
+            bid_id, DebugTypes.BID_DONT_SPEND_COIN_A_LOCK_REFUND2
         )
-        swap_clients[id_leader].setBidDebugInd(bid_id, debug_type)
-        debug_type = (
-            DebugTypes.BID_DONT_SPEND_COIN_B_LOCK
-            if with_mercy
-            else DebugTypes.BID_STOP_AFTER_COIN_A_LOCK
-        )
+        debug_type = DebugTypes.BID_DONT_SPEND_COIN_B_LOCK
         swap_clients[id_follower].setBidDebugInd(bid_id, debug_type)
 
         swap_clients[id_leader].setBidDebugInd(
@@ -442,7 +439,7 @@ class TestFunctions(BaseTest):
         expect_state = (
             (BidStates.XMR_SWAP_NOSCRIPT_TX_REDEEMED, BidStates.SWAP_COMPLETED)
             if with_mercy
-            else BidStates.BID_STALLED_FOR_TEST
+            else (BidStates.BID_STALLED_FOR_TEST, BidStates.XMR_SWAP_FAILED_SWIPED)
         )
         wait_for_bid(
             test_delay_event,
@@ -472,6 +469,19 @@ class TestFunctions(BaseTest):
 
         wait_for_none_active(test_delay_event, 1800 + id_offerer)
         wait_for_none_active(test_delay_event, 1800 + id_bidder)
+
+        if with_mercy is False:
+            # Test manually redeeming the no-script lock tx
+            offerer_key = read_json_api(
+                1800 + id_offerer,
+                "bids/{}".format(bid_id.hex()),
+                {"chainbkeysplit": True},
+            )["splitkey"]
+            data = {"spendchainblocktx": True, "remote_key": offerer_key}
+            redeemed_txid = read_json_api(
+                1800 + id_bidder, "bids/{}".format(bid_id.hex()), data
+            )["txid"]
+            assert len(redeemed_txid) == 64
 
     def do_test_04_follower_recover_b_lock_tx(
         self, coin_from, coin_to, lock_value: int = 32
@@ -1601,7 +1611,13 @@ class BasicSwapTest(TestFunctions):
         offer = swap_clients[1].getOffer(offer_id)
         bid_id = swap_clients[1].postBid(offer_id, offer.amount_from)
 
-        wait_for_bid(test_delay_event, swap_clients[2], bid_id, BidStates.BID_RECEIVED)
+        wait_for_bid(
+            test_delay_event,
+            swap_clients[2],
+            bid_id,
+            BidStates.BID_RECEIVED,
+            wait_for=(self.extra_wait_time + 40),
+        )
         swap_clients[2].acceptBid(bid_id)
 
         wait_for_bid(
@@ -1662,7 +1678,13 @@ class BasicSwapTest(TestFunctions):
         wait_for_offer(test_delay_event, swap_clients[1], offer_id)
         bid_id = swap_clients[1].postXmrBid(offer_id, amt_swap)
         swap_clients[1].abandonBid(bid_id)
-        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.BID_ACCEPTED)
+        wait_for_bid(
+            test_delay_event,
+            swap_clients[0],
+            bid_id,
+            BidStates.BID_ACCEPTED,
+            wait_for=(self.extra_wait_time + 40),
+        )
 
         try:
             swap_clients[0].setMockTimeOffset(7200)

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2019-2024 tecnovert
-# Copyright (c) 2024 The Basicswap developers
+# Copyright (c) 2024-2025 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -10327,7 +10327,14 @@ class BasicSwap(BaseApp):
             elif coin == Coins.NAV:
                 rv["immature"] = walletinfo["immature_balance"]
             elif coin == Coins.LTC:
-                rv["mweb_address"] = self.getCachedStealthAddressForCoin(Coins.LTC_MWEB)
+                try:
+                    rv["mweb_address"] = self.getCachedStealthAddressForCoin(
+                        Coins.LTC_MWEB
+                    )
+                except Exception as e:
+                    self.log.warning(
+                        f"getCachedStealthAddressForCoin for {ci.coin_name()} failed with: {e}"
+                    )
                 rv["mweb_balance"] = walletinfo["mweb_balance"]
                 rv["mweb_pending"] = (
                     walletinfo["mweb_unconfirmed"] + walletinfo["mweb_immature"]
