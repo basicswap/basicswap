@@ -283,15 +283,15 @@ if (document.readyState === 'loading') {
                       </div>
                     </div>
                     <div class="w-full md:w-1/2 p-3">
-                      <p class="mb-1.5 font-medium text-base dark:text-white text-coolGray-800">Rate</p>
-                      <div class="relative">
-                        <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-                        {{ select_rate_svg | safe }}
-                      </div>
-                      <input class="pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" id="rate" name="rate" value="{{ data.rate }}" onchange="set_rate('rate');">
-                      </div>
-                      <div class="text-sm mt-2">
-                        <a href="" id="get_rate_inferred_button" class="mt-2 dark:text-white bold text-coolGray-800">Get Rate Inferred:</a><span class="dark:text-white" id="rate_inferred_display"></span>
+                      <p class="mb-1.5 font-medium text-base dark:text-white text-coolGray-800">Rate</p>             
+                      <div class="flex items-center gap-2">
+                        <div class="relative flex-1">
+                          <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
+                            {{ select_rate_svg | safe }}
+                          </div>
+                          <input class="pl-10 hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" id="rate" name="rate" value="{{ data.rate }}" onchange="set_rate('rate');">
+                        </div>
+                        <button type="button" id="get_rate_inferred_button" class="px-4 py-2.5 text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 rounded-md shadow-sm focus:outline-none">Get Rate Inferred</button>
                       </div>
                       <div class="flex form-check form-check-inline mt-5">
                         <div class="flex items-center h-5"> <input class="form-check-input hover:border-blue-500 w-5 h-5 form-check-input text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-1 dark:bg-gray-500 dark:border-gray-400" type="checkbox" id="rate_lock" name="rate_lock" value="rl" checked=checked> </div>
@@ -306,7 +306,6 @@ if (document.readyState === 'loading') {
               </div>
             </div>
           </div>
-
 {% if debug_mode == true %}
 <div class="py-0 border-b items-center justify-between -mx-4 mb-6 pb-3 border-gray-400 border-opacity-20">
   <div class="w-full md:w-10/12">
@@ -414,181 +413,204 @@ if (document.readyState === 'loading') {
       </div>
     </div>
   </section>
-  <script>
-    const xhr_rates = new XMLHttpRequest();
-    xhr_rates.onload = () => {
-        if (xhr_rates.status == 200) {
-            const obj = JSON.parse(xhr_rates.response);
-            inner_html = '<pre><code>' + JSON.stringify(obj, null, '  ') + '</code></pre>';
-            document.getElementById('rates_display').innerHTML = inner_html;
-        }
-    }
-    const xhr_rate = new XMLHttpRequest();
-    xhr_rate.onload = () => {
-        if (xhr_rate.status == 200) {
-            const obj = JSON.parse(xhr_rate.response);
-            if (obj.hasOwnProperty('rate')) {
-                document.getElementById('rate').value = obj['rate'];
-            } else
-            if (obj.hasOwnProperty('amount_to')) {
-                document.getElementById('amt_to').value = obj['amount_to'];
-            } else
-            if (obj.hasOwnProperty('amount_from')) {
-                document.getElementById('amt_from').value = obj['amount_from'];
-            }
-        }
-    }
-
-    function lookup_rates() {
-        const coin_from = document.getElementById('coin_from').value;
-        const coin_to = document.getElementById('coin_to').value;
-
-        if (coin_from === '-1' || coin_to === '-1') {
-            alert('Coins from and to must be set first.');
-            return;
-        }
-
-        const selectedCoin = (coin_from === '15') ? '3' : coin_from;
-
-        inner_html = '<p>Updating...</p>';
+<script>
+const xhr_rates = new XMLHttpRequest();
+xhr_rates.onload = () => {
+    if (xhr_rates.status == 200) {
+        const obj = JSON.parse(xhr_rates.response);
+        inner_html = '<pre><code>' + JSON.stringify(obj, null, '  ') + '</code></pre>';
         document.getElementById('rates_display').innerHTML = inner_html;
-        document.querySelector(".pricejsonhidden").classList.remove("hidden");
+    }
+};
 
-        const xhr_rates = new XMLHttpRequest();
-        xhr_rates.onreadystatechange = function() {
-            if (xhr_rates.readyState === XMLHttpRequest.DONE) {
-                if (xhr_rates.status === 200) {
-                    document.getElementById('rates_display').innerHTML = xhr_rates.responseText;
-                } else {
-                    console.error('Error fetching data:', xhr_rates.statusText);
-                }
-            }
-        };
+const xhr_rate = new XMLHttpRequest();
+xhr_rate.onload = () => {
+    if (xhr_rate.status == 200) {
+        const obj = JSON.parse(xhr_rate.response);
+        if (obj.hasOwnProperty('rate')) {
+            document.getElementById('rate').value = obj['rate'];
+        } else if (obj.hasOwnProperty('amount_to')) {
+            document.getElementById('amt_to').value = obj['amount_to'];
+        } else if (obj.hasOwnProperty('amount_from')) {
+            document.getElementById('amt_from').value = obj['amount_from'];
+        }
+    }
+};
 
-        xhr_rates.open('POST', '/json/rates');
-        xhr_rates.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
-        xhr_rates.send('coin_from=' + selectedCoin + '&coin_to=' + coin_to);
+function lookup_rates() {
+    const coin_from = document.getElementById('coin_from').value;
+    const coin_to = document.getElementById('coin_to').value;
+
+    if (coin_from === '-1' || coin_to === '-1') {
+        alert('Coins from and to must be set first.');
+        return;
     }
 
-    function getRateInferred(event) {
-        event.preventDefault();
+    const selectedCoin = (coin_from === '15') ? '3' : coin_from;
 
-        const coin_from = document.getElementById('coin_from').value;
-        const coin_to = document.getElementById('coin_to').value;
-        const params = 'coin_from=' + encodeURIComponent(coin_from) + '&coin_to=' + encodeURIComponent(coin_to);
+    inner_html = '<p>Updating...</p>';
+    document.getElementById('rates_display').innerHTML = inner_html;
+    document.querySelector(".pricejsonhidden").classList.remove("hidden");
 
-        const xhr_rates = new XMLHttpRequest();
-        xhr_rates.onreadystatechange = function() {
-            if (xhr_rates.readyState === XMLHttpRequest.DONE) {
-                //console.log(xhr_rates.responseText);
-                if (xhr_rates.status === 200) {
-                    try {
-                        const responseData = JSON.parse(xhr_rates.responseText);
+    const xhr_rates = new XMLHttpRequest();
+    xhr_rates.onreadystatechange = function() {
+        if (xhr_rates.readyState === XMLHttpRequest.DONE) {
+            if (xhr_rates.status === 200) {
+                document.getElementById('rates_display').innerHTML = xhr_rates.responseText;
+            } else {
+                console.error('Error fetching data:', xhr_rates.statusText);
+            }
+        }
+    };
+
+    xhr_rates.open('POST', '/json/rates');
+    xhr_rates.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+    xhr_rates.send('coin_from=' + selectedCoin + '&coin_to=' + coin_to);
+}
+
+function getRateInferred(event) {
+    event.preventDefault();
+
+    const coin_from = document.getElementById('coin_from').value;
+    const coin_to = document.getElementById('coin_to').value;
+    const params = 'coin_from=' + encodeURIComponent(coin_from) + '&coin_to=' + encodeURIComponent(coin_to);
+
+    const xhr_rates = new XMLHttpRequest();
+    xhr_rates.onreadystatechange = function() {
+        if (xhr_rates.readyState === XMLHttpRequest.DONE) {
+            if (xhr_rates.status === 200) {
+                try {
+                    const responseData = JSON.parse(xhr_rates.responseText);
+                    if (responseData.coingecko && responseData.coingecko.rate_inferred) {
                         const rateInferred = responseData.coingecko.rate_inferred;
-                        //document.getElementById('rate_inferred_display').innerText = " (" + coin_from + " to " + coin_to + "): " + rateInferred;
-                        document.getElementById('rate_inferred_display').innerText = " " + rateInferred;
-                    } catch (error) {
-                        console.error('Error parsing response:', error);
+                        document.getElementById('rate').value = rateInferred;
+                        set_rate('rate');
+                    } else {
+                        document.getElementById('rate').value = 'Error: Rate limit';
+                        console.error('Rate limit reached or invalid response format');
                     }
-                } else {
-                    console.error('Error fetching data:', xhr_rates.statusText);
+                } catch (error) {
+                    document.getElementById('rate').value = 'Error: Rate limit';
+                    console.error('Error parsing response:', error);
                 }
+            } else {
+                document.getElementById('rate').value = 'Error: Rate limit';
+                console.error('Error fetching data:', xhr_rates.statusText);
             }
-        };
+        }
+    };
 
-        xhr_rates.open('POST', '/json/rates');
-        xhr_rates.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
-        xhr_rates.send(params);
+    xhr_rates.open('POST', '/json/rates');
+    xhr_rates.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+    xhr_rates.send(params);
+}
+
+document.getElementById('get_rate_inferred_button').addEventListener('click', getRateInferred);
+
+function set_swap_type_enabled(coin_from, coin_to, swap_type) {
+    const adaptor_sig_only_coins = [
+        '6',  /* XMR */
+        '9',  /* WOW */
+        '8',  /* PART_ANON */
+        '7',  /* PART_BLIND */
+        '13', /* FIRO */
+        '17', /* BCH */
+        '18'  /* DOGE */
+    ];
+    const secret_hash_only_coins = [
+        '11', /* PIVX */
+        '12'  /* DASH */
+    ];
+
+    let make_hidden = false;
+
+    if (adaptor_sig_only_coins.includes(coin_from) || adaptor_sig_only_coins.includes(coin_to)) {
+        swap_type.disabled = true;
+        swap_type.value = 'xmr_swap';
+        make_hidden = true;
+        swap_type.classList.add('select-disabled');
+    } else if (secret_hash_only_coins.includes(coin_from) && secret_hash_only_coins.includes(coin_to)) {
+        swap_type.disabled = true;
+        swap_type.value = 'seller_first';
+        make_hidden = true;
+        swap_type.classList.add('select-disabled');
+    } else {
+        swap_type.disabled = false;
+        swap_type.classList.remove('select-disabled');
     }
 
-    document.getElementById('get_rate_inferred_button').addEventListener('click', getRateInferred);
+    let swap_type_hidden = document.getElementById('swap_type_hidden');
+    if (make_hidden) {
+        if (!swap_type_hidden) {
+            swap_type_hidden = document.createElement('input');
+            swap_type_hidden.setAttribute('id', 'swap_type_hidden');
+            swap_type_hidden.setAttribute('type', 'hidden');
+            swap_type_hidden.setAttribute('name', 'swap_type');
+            document.getElementById('form').appendChild(swap_type_hidden);
+        }
+        swap_type_hidden.setAttribute('value', swap_type.value);
+    } else if (swap_type_hidden) {
+        swap_type_hidden.parentNode.removeChild(swap_type_hidden);
+    }
+}
 
-    function set_swap_type_enabled(coin_from, coin_to, swap_type) {
-        const adaptor_sig_only_coins = ['6' /* XMR */,'9' /* WOW */, '8' /* PART_ANON */, '7' /* PART_BLIND */, '13' /* FIRO */, '17' /* BCH */];
-        const secret_hash_only_coins = ['11' /* PIVX */, '12' /* DASH */];
-        let make_hidden = false;
-        if (adaptor_sig_only_coins.includes(coin_from) || adaptor_sig_only_coins.includes(coin_to)) {
-            swap_type.disabled = true;
-            swap_type.value = 'xmr_swap';
-            make_hidden = true;
-            swap_type.classList.add('select-disabled');
-        } else
-        if (secret_hash_only_coins.includes(coin_from) && secret_hash_only_coins.includes(coin_to)) {
-            swap_type.disabled = true;
-            swap_type.value = 'seller_first';
-            make_hidden = true;
-            swap_type.classList.add('select-disabled');
+function set_rate(value_changed) {
+    const coin_from = document.getElementById('coin_from').value;
+    const coin_to = document.getElementById('coin_to').value;
+    const amt_from = document.getElementById('amt_from').value;
+    const amt_to = document.getElementById('amt_to').value;
+    const rate = document.getElementById('rate').value;
+    const lock_rate = rate == '' ? false : document.getElementById('rate_lock').checked;
+
+    if (value_changed === 'coin_from' || value_changed === 'coin_to') {
+        document.getElementById('rate').value = '';
+        return;
+    }
+
+    const swap_type = document.getElementById('swap_type');
+    set_swap_type_enabled(coin_from, coin_to, swap_type);
+
+    if (coin_from == '-1' || coin_to == '-1') {
+        return;
+    }
+
+    let params = 'coin_from=' + coin_from + '&coin_to=' + coin_to;
+
+    if (value_changed == 'rate' || (lock_rate && value_changed == 'amt_from') || (amt_to == '' && value_changed == 'amt_from')) {
+        if (rate == '' || (amt_from == '' && amt_to == '')) {
+            return;
+        } else if (amt_from == '' && amt_to != '') {
+            if (value_changed == 'amt_from') {
+                return;
+            }
+            params += '&rate=' + rate + '&amt_to=' + amt_to;
         } else {
-            swap_type.disabled = false;
-            swap_type.classList.remove('select-disabled');
+            params += '&rate=' + rate + '&amt_from=' + amt_from;
         }
-        let swap_type_hidden = document.getElementById('swap_type_hidden');
-        if (make_hidden) {
-            if (!swap_type_hidden) {
-                swap_type_hidden = document.createElement('input');
-                swap_type_hidden.setAttribute('id', 'swap_type_hidden');
-                swap_type_hidden.setAttribute('type', 'hidden');
-                swap_type_hidden.setAttribute('name', 'swap_type');
-                document.getElementById('form').appendChild(swap_type_hidden)
-            }
-            swap_type_hidden.setAttribute('value', swap_type.value);
-        } else
-        if (swap_type_hidden) {
-            swap_type_hidden.parentNode.removeChild(swap_type_hidden);
-        }
-    }
-
-    function set_rate(value_changed) {
-        const coin_from = document.getElementById('coin_from').value;
-        const coin_to = document.getElementById('coin_to').value;
-        const amt_from = document.getElementById('amt_from').value;
-        const amt_to = document.getElementById('amt_to').value;
-        const rate = document.getElementById('rate').value;
-        const lock_rate = rate == '' ? false : document.getElementById('rate_lock').checked;
-
-        const swap_type = document.getElementById('swap_type');
-        set_swap_type_enabled(coin_from, coin_to, swap_type);
-
-        if (coin_from == '-1' || coin_to == '-1') {
+    } else if (lock_rate && value_changed == 'amt_to') {
+        if (amt_to == '' || rate == '') {
             return;
         }
-        params = 'coin_from=' + coin_from + '&coin_to=' + coin_to;
-        if (value_changed == 'rate' || (lock_rate && value_changed == 'amt_from') || (amt_to == '' && value_changed == 'amt_from')) {
-            if (rate == '' || (amt_from == '' && amt_to == '')) {
-                return;
-            } else
-            if (amt_from == '' && amt_to != '') {
-                if (value_changed == 'amt_from') {
-                    return;
-                }
-                params += '&rate=' + rate + '&amt_to=' + amt_to;
-            } else {
-                params += '&rate=' + rate + '&amt_from=' + amt_from;
-            }
-        } else
-        if (lock_rate && value_changed == 'amt_to') {
-            if (amt_to == '' || rate == '') {
-                return;
-            }
-            params += '&amt_to=' + amt_to + '&rate=' + rate;
-        } else {
-            if (amt_from == '' || amt_to == '') {
-                return;
-            }
-            params += '&amt_from=' + amt_from + '&amt_to=' + amt_to;
+        params += '&amt_to=' + amt_to + '&rate=' + rate;
+    } else {
+        if (amt_from == '' || amt_to == '') {
+            return;
         }
-        xhr_rate.open('POST', '/json/rate');
-        xhr_rate.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
-        xhr_rate.send(params);
+        params += '&amt_from=' + amt_from + '&amt_to=' + amt_to;
     }
 
-    document.addEventListener("DOMContentLoaded", function() {
-        const coin_from = document.getElementById('coin_from').value;
-        const coin_to = document.getElementById('coin_to').value;
-        const swap_type = document.getElementById('swap_type');
-        set_swap_type_enabled(coin_from, coin_to, swap_type);
-    });
-  </script>
+    xhr_rate.open('POST', '/json/rate');
+    xhr_rate.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+    xhr_rate.send(params);
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+    const coin_from = document.getElementById('coin_from').value;
+    const coin_to = document.getElementById('coin_to').value;
+    const swap_type = document.getElementById('swap_type');
+    set_swap_type_enabled(coin_from, coin_to, swap_type);
+});
+</script>
 </div>
 <script src="static/js/new_offer.js"></script>
 {% include 'footer.html' %}

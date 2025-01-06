@@ -170,7 +170,7 @@ function getWebSocketConfig() {
     'PIVX': {'name': 'PIVX', 'symbol': 'PIVX', 'image': 'PIVX.png', 'show': true},
     'DASH': {'name': 'Dash', 'symbol': 'DASH', 'image': 'Dash.png', 'show': true},
     'ETH': {'name': 'Ethereum', 'symbol': 'ETH', 'image': 'Ethereum.png', 'show': false},
-    'DOGE': {'name': 'Dogecoin', 'symbol': 'DOGE', 'image': 'Doge.png', 'show': true},
+    'DOGE': {'name': 'Dogecoin', 'symbol': 'DOGE', 'image': 'Dogecoin.png', 'show': true},
     'DCR': {'name': 'Decred', 'symbol': 'DCR', 'image': 'Decred.png', 'show': true},
     'ZANO': {'name': 'Zano', 'symbol': 'ZANO', 'image': 'Zano.png', 'show': false},
     'WOW': {'name': 'Wownero', 'symbol': 'WOW', 'image': 'Wownero.png', 'show': true}
@@ -192,7 +192,7 @@ function getWebSocketConfig() {
 
   {% for coin_symbol in custom_order %}
     {% if coin_symbol in display_coins and coin_data[coin_symbol]['show'] %}
-    <div class="w-full sm:w-1/2 lg:w-1/5 p-3" id="{{ coin_symbol.lower() }}-container">
+    <div class="w-full sm:w-1/2 lg:w-1/6 p-3" id="{{ coin_symbol.lower() }}-container">
         <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-2xl dark:text-white {% if coin_symbol == 'BTC' %}active-container{% endif %}" style="min-height: 180px;">
          <div class="flex items-center">
           <img src="/static/images/coins/{{ coin_data[coin_symbol]['image'] }}" class="rounded-xl" style="width: 28px; height: 28px; object-fit: contain;" alt="{{ coin_data[coin_symbol]['name'] }}">
