@@ -508,28 +508,22 @@ function getRateInferred(event) {
 document.getElementById('get_rate_inferred_button').addEventListener('click', getRateInferred);
 
 function set_swap_type_enabled(coin_from, coin_to, swap_type) {
-    const adaptor_sig_only_coins = [
-        '6',  /* XMR */
-        '9',  /* WOW */
-        '8',  /* PART_ANON */
-        '7',  /* PART_BLIND */
-        '13', /* FIRO */
-        '17', /* BCH */
-        '18'  /* DOGE */
-    ];
-    const secret_hash_only_coins = [
-        '11', /* PIVX */
-        '12'  /* DASH */
-    ];
-
+    const adaptor_sig_only_coins = ['6' /* XMR */,'9' /* WOW */, '8' /* PART_ANON */, '7' /* PART_BLIND */, '13' /* FIRO */, '18'  /* DOGE */];
+    const secret_hash_only_coins = ['11' /* PIVX */, '12' /* DASH */];
+    
     let make_hidden = false;
 
-    if (adaptor_sig_only_coins.includes(coin_from) || adaptor_sig_only_coins.includes(coin_to)) {
+    coin_from = String(coin_from);
+    coin_to = String(coin_to);
+    
+    if (adaptor_sig_only_coins.indexOf(coin_from) !== -1 || adaptor_sig_only_coins.indexOf(coin_to) !== -1) {
         swap_type.disabled = true;
         swap_type.value = 'xmr_swap';
         make_hidden = true;
         swap_type.classList.add('select-disabled');
-    } else if (secret_hash_only_coins.includes(coin_from) && secret_hash_only_coins.includes(coin_to)) {
+    } 
+
+    else if (secret_hash_only_coins.indexOf(coin_from) !== -1 || secret_hash_only_coins.indexOf(coin_to) !== -1) {
         swap_type.disabled = true;
         swap_type.value = 'seller_first';
         make_hidden = true;
@@ -554,6 +548,23 @@ function set_swap_type_enabled(coin_from, coin_to, swap_type) {
     }
 }
 
+document.addEventListener('DOMContentLoaded', function() {
+    const coin_from = document.getElementById('coin_from');
+    const coin_to = document.getElementById('coin_to');
+    
+    if (coin_from && coin_to) {
+        coin_from.addEventListener('change', function() {
+            const swap_type = document.getElementById('swap_type');
+            set_swap_type_enabled(this.value, coin_to.value, swap_type);
+        });
+        
+        coin_to.addEventListener('change', function() {
+            const swap_type = document.getElementById('swap_type');
+            set_swap_type_enabled(coin_from.value, this.value, swap_type);
+        });
+    }
+});
+    
 function set_rate(value_changed) {
     const coin_from = document.getElementById('coin_from').value;
     const coin_to = document.getElementById('coin_to').value;
