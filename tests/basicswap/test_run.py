@@ -186,17 +186,17 @@ class Test(BaseTest):
             "identities/ppCsRro5po7Yu6kyu5XjSyr3A1PPdk9j1F",
             {"set_label": "test 1"},
         )
-        assert len(rv) == 1
-        assert rv[0]["address"] == "ppCsRro5po7Yu6kyu5XjSyr3A1PPdk9j1F"
-        assert rv[0]["label"] == "test 1"
+        assert isinstance(rv, dict)
+        assert rv["address"] == "ppCsRro5po7Yu6kyu5XjSyr3A1PPdk9j1F"
+        assert rv["label"] == "test 1"
         rv = read_json_api(
             1800,
             "identities/ppCsRro5po7Yu6kyu5XjSyr3A1PPdk9j1F",
             {"set_label": "test 2"},
         )
-        assert len(rv) == 1
-        assert rv[0]["address"] == "ppCsRro5po7Yu6kyu5XjSyr3A1PPdk9j1F"
-        assert rv[0]["label"] == "test 2"
+        assert isinstance(rv, dict)
+        assert rv["address"] == "ppCsRro5po7Yu6kyu5XjSyr3A1PPdk9j1F"
+        assert rv["label"] == "test 2"
 
         rv = read_json_api(
             1800,
@@ -210,26 +210,26 @@ class Test(BaseTest):
             "identities/ppCsRro5po7Yu6kyu5XjSyr3A1PPdk9j1F",
             {"set_note": "note 1"},
         )
-        assert len(rv) == 1
-        assert rv[0]["address"] == "ppCsRro5po7Yu6kyu5XjSyr3A1PPdk9j1F"
-        assert rv[0]["label"] == "test 2"
-        assert rv[0]["note"] == "note 1"
+        assert isinstance(rv, dict)
+        assert rv["address"] == "ppCsRro5po7Yu6kyu5XjSyr3A1PPdk9j1F"
+        assert rv["label"] == "test 2"
+        assert rv["note"] == "note 1"
 
         rv = read_json_api(
             1800,
             "identities/ppCsRro5po7Yu6kyu5XjSyr3A1PPdk9j1F",
             {"set_automation_override": 1},
         )
-        assert len(rv) == 1
-        assert rv[0]["automation_override"] == 1
+        assert isinstance(rv, dict)
+        assert rv["automation_override"] == 1
 
         rv = read_json_api(
             1800,
             "identities/ppCsRro5po7Yu6kyu5XjSyr3A1PPdk9j1F",
             {"set_visibility_override": "hide"},
         )
-        assert len(rv) == 1
-        assert rv[0]["visibility_override"] == 1
+        assert isinstance(rv, dict)
+        assert rv["visibility_override"] == 1
 
         rv = read_json_api(1800, "automationstrategies")
         assert len(rv) == 2

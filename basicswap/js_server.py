@@ -707,7 +707,10 @@ def js_identities(self, url_split, post_string: str, is_json: bool) -> bytes:
             ensure("address" in filters, "Must provide an address to modify data")
             swap_client.setIdentityData(filters, set_data)
 
-    return bytes(json.dumps(swap_client.listIdentities(filters)), "UTF-8")
+    rv = swap_client.listIdentities(filters)
+    if "address" in filters:
+        rv = {} if len(rv) < 1 else rv[0]
+    return bytes(json.dumps(rv), "UTF-8")
 
 
 def js_automationstrategies(self, url_split, post_string: str, is_json: bool) -> bytes:
