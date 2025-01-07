@@ -61,7 +61,6 @@ logger = logging.getLogger()
 
 class TestFunctions(BaseTest):
     base_rpc_port = None
-    extra_wait_time = 0
 
     node_a_id = 0
     node_b_id = 1
@@ -335,7 +334,11 @@ class TestFunctions(BaseTest):
 
         bid_id = swap_clients[id_bidder].postXmrBid(offer_id, offer.amount_from)
         wait_for_bid(
-            test_delay_event, swap_clients[id_offerer], bid_id, BidStates.BID_RECEIVED
+            test_delay_event,
+            swap_clients[id_offerer],
+            bid_id,
+            BidStates.BID_RECEIVED,
+            wait_for=(self.extra_wait_time + 40),
         )
 
         swap_clients[id_follower].setBidDebugInd(
@@ -416,7 +419,11 @@ class TestFunctions(BaseTest):
 
         bid_id = swap_clients[id_bidder].postXmrBid(offer_id, offer.amount_from)
         wait_for_bid(
-            test_delay_event, swap_clients[id_offerer], bid_id, BidStates.BID_RECEIVED
+            test_delay_event,
+            swap_clients[id_offerer],
+            bid_id,
+            BidStates.BID_RECEIVED,
+            wait_for=(self.extra_wait_time + 40),
         )
 
         swap_clients[id_leader].setBidDebugInd(
@@ -531,7 +538,11 @@ class TestFunctions(BaseTest):
 
         bid_id = swap_clients[id_bidder].postXmrBid(offer_id, offer.amount_from)
         wait_for_bid(
-            test_delay_event, swap_clients[id_offerer], bid_id, BidStates.BID_RECEIVED
+            test_delay_event,
+            swap_clients[id_offerer],
+            bid_id,
+            BidStates.BID_RECEIVED,
+            wait_for=(self.extra_wait_time + 40),
         )
 
         swap_clients[id_follower].setBidDebugInd(

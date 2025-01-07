@@ -842,22 +842,30 @@ def js_getcoinseed(self, url_split, post_string, is_json) -> bytes:
         address = ci.getAddressFromKeys(key_view, key_spend)
 
         expect_address = self.getCachedMainWalletAddress(ci)
-        rv.update({
-            "key_view": ci.encodeKey(key_view),
-            "key_spend": ci.encodeKey(key_spend),
-            "address": address,
-            "expected_address": "Unset" if expect_address is None else expect_address
-        })
+        rv.update(
+            {
+                "key_view": ci.encodeKey(key_view),
+                "key_spend": ci.encodeKey(key_spend),
+                "address": address,
+                "expected_address": (
+                    "Unset" if expect_address is None else expect_address
+                ),
+            }
+        )
     else:
         seed_key = swap_client.getWalletKey(coin, 1)
         seed_id = ci.getSeedHash(seed_key)
-        expect_seedid = swap_client.getStringKV("main_wallet_seedid_" + ci.coin_name().lower())
+        expect_seedid = swap_client.getStringKV(
+            "main_wallet_seedid_" + ci.coin_name().lower()
+        )
 
-        rv.update({
-            "seed": seed_key.hex(),
-            "seed_id": seed_id.hex(),
-            "expected_seed_id": "Unset" if expect_seedid is None else expect_seedid
-        })
+        rv.update(
+            {
+                "seed": seed_key.hex(),
+                "seed_id": seed_id.hex(),
+                "expected_seed_id": "Unset" if expect_seedid is None else expect_seedid,
+            }
+        )
 
     return bytes(
         json.dumps(rv),

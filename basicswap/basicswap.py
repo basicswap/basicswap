@@ -983,7 +983,9 @@ class BasicSwap(BaseApp):
                 thread_func = {
                     Coins.XMR: threadPollXMRChainState,
                     Coins.WOW: threadPollWOWChainState,
-                }.get(c, threadPollChainState)  # default case
+                }.get(
+                    c, threadPollChainState
+                )  # default case
 
                 t = threading.Thread(target=thread_func, args=(self, c))
                 self.threads.append(t)
@@ -2613,7 +2615,9 @@ class BasicSwap(BaseApp):
             _, is_locked = self.getLockedState()
             if is_locked is False:
                 self.log.warning(
-                    "Setting seed id for coin {} from master key.".format(ci.coin_name())
+                    "Setting seed id for coin {} from master key.".format(
+                        ci.coin_name()
+                    )
                 )
                 root_key = self.getWalletKey(c, 1)
                 self.storeSeedIDForCoin(root_key, c)

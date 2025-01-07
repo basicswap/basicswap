@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2020-2024 tecnovert
-# Copyright (c) 2024 The Basicswap developers
+# Copyright (c) 2024-2025 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -318,6 +318,7 @@ class BaseTest(unittest.TestCase):
     xmr_daemons = []
     xmr_wallet_auth = []
     restore_instance = False
+    extra_wait_time = 0
 
     start_ltc_nodes = False
     start_xmr_nodes = True
@@ -1062,6 +1063,116 @@ class Test(BaseTest):
     def notest_00_delay(self):
         test_delay_event.wait(100000)
 
+    def test_003_api(self):
+        logging.info("---------- Test API")
+
+        help_output = read_json_api(1800, "help")
+        assert "getcoinseed" in help_output["commands"]
+
+        rv = read_json_api(1800, "getcoinseed")
+        assert rv["error"] == "No post data"
+
+        rv = read_json_api(1800, "getcoinseed", {"coin": "PART"})
+        assert "seed is set from the Basicswap mnemonic" in rv["error"]
+
+        rv = read_json_api(1800, "getcoinseed", {"coin": "BTC"})
+        assert (
+            rv["seed"]
+            == "8e54a313e6df8918df6d758fafdbf127a115175fdd2238d0e908dd8093c9ac3b"
+        )
+        assert rv["seed_id"] == "3da5c0af91879e8ce97d9a843874601c08688078"
+        assert rv["seed_id"] == rv["expected_seed_id"]
+
+        rv = read_json_api(
+            1800,
+            "identities/ppCsRro5po7Yu6kyu5XjSyr3A1PPdk9j1F",
+            {"set_label": "test 1"},
+        )
+        assert isinstance(rv, dict)
+        assert rv["address"] == "ppCsRro5po7Yu6kyu5XjSyr3A1PPdk9j1F"
+        assert rv["label"] == "test 1"
+        rv = read_json_api(
+            1800,
+            "identities/ppCsRro5po7Yu6kyu5XjSyr3A1PPdk9j1F",
+            {"set_label": "test 2"},
+        )
+        assert isinstance(rv, dict)
+        assert rv["address"] == "ppCsRro5po7Yu6kyu5XjSyr3A1PPdk9j1F"
+        assert rv["label"] == "test 2"
+
+        rv = read_json_api(
+            1800,
+            "identities/pPCsRro5po7Yu6kyu5XjSyr3A1PPdk9j1F",
+            {"set_label": "test 3"},
+        )
+        assert rv["error"] == "Invalid identity address"
+
+        rv = read_json_api(
+            1800,
+            "identities/ppCsRro5po7Yu6kyu5XjSyr3A1PPdk9j1F",
+            {"set_note": "note 1"},
+        )
+        assert isinstance(rv, dict)
+        assert rv["address"] == "ppCsRro5po7Yu6kyu5XjSyr3A1PPdk9j1F"
+        assert rv["label"] == "test 2"
+        assert rv["note"] == "note 1"
+
+        rv = read_json_api(
+            1800,
+            "identities/ppCsRro5po7Yu6kyu5XjSyr3A1PPdk9j1F",
+            {"set_automation_override": 1},
+        )
+        assert isinstance(rv, dict)
+        assert rv["automation_override"] == 1
+
+        rv = read_json_api(
+            1800,
+            "identities/ppCsRro5po7Yu6kyu5XjSyr3A1PPdk9j1F",
+            {"set_visibility_override": "hide"},
+        )
+        assert isinstance(rv, dict)
+        assert rv["visibility_override"] == 1
+
+        rv = read_json_api(1800, "automationstrategies")
+        assert len(rv) == 2
+
+        rv = read_json_api(1800, "automationstrategies/1")
+        assert rv["label"] == "Accept All"
+
+        sx_addr = read_json_api(1800, "wallets/part/newstealthaddress")
+        assert (
+            callnoderpc(
+                0,
+                "getaddressinfo",
+                [
+                    sx_addr,
+                ],
+            )["isstealthaddress"]
+            is True
+        )
+
+        rv = read_json_api(1800, "wallets/part")
+        assert "locked_utxos" in rv
+
+        rv = read_json_api(
+            1800, "validateamount", {"coin": "part", "amount": 0.000000015}
+        )
+        assert "Mantissa too long" in rv["error"]
+
+        rv = read_json_api(
+            1800,
+            "validateamount",
+            {"coin": "part", "amount": 0.000000015, "method": "roundoff"},
+        )
+        assert rv == "0.00000002"
+
+        rv = read_json_api(
+            1800,
+            "validateamount",
+            {"coin": "part", "amount": 0.000000015, "method": "rounddown"},
+        )
+        assert rv == "0.00000001"
+
     def test_010_txn_size(self):
         logging.info("---------- Test {} txn_size".format(Coins.PART))
 
@@ -1332,7 +1443,13 @@ class Test(BaseTest):
 
         bid_id = swap_clients[1].postXmrBid(offer_id, offer.amount_from)
 
-        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.BID_RECEIVED)
+        wait_for_bid(
+            test_delay_event,
+            swap_clients[0],
+            bid_id,
+            BidStates.BID_RECEIVED,
+            wait_for=(self.extra_wait_time + 40),
+        )
 
         bid, xmr_swap = swap_clients[0].getXmrBid(bid_id)
         assert xmr_swap
@@ -1393,7 +1510,13 @@ class Test(BaseTest):
 
         bid_id = swap_clients[1].postXmrBid(offer_id, offer.amount_from)
 
-        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.BID_RECEIVED)
+        wait_for_bid(
+            test_delay_event,
+            swap_clients[0],
+            bid_id,
+            BidStates.BID_RECEIVED,
+            wait_for=(self.extra_wait_time + 40),
+        )
 
         bid, xmr_swap = swap_clients[0].getXmrBid(bid_id)
         assert xmr_swap
@@ -1444,7 +1567,13 @@ class Test(BaseTest):
 
         bid_id = swap_clients[1].postXmrBid(offer_id, offer.amount_from)
 
-        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.BID_RECEIVED)
+        wait_for_bid(
+            test_delay_event,
+            swap_clients[0],
+            bid_id,
+            BidStates.BID_RECEIVED,
+            wait_for=(self.extra_wait_time + 40),
+        )
 
         bid, xmr_swap = swap_clients[0].getXmrBid(bid_id)
         assert xmr_swap
@@ -1505,7 +1634,13 @@ class Test(BaseTest):
 
         bid_id = swap_clients[1].postXmrBid(offer_id, offer.amount_from)
 
-        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.BID_RECEIVED)
+        wait_for_bid(
+            test_delay_event,
+            swap_clients[0],
+            bid_id,
+            BidStates.BID_RECEIVED,
+            wait_for=(self.extra_wait_time + 40),
+        )
 
         bid, xmr_swap = swap_clients[0].getXmrBid(bid_id)
         assert xmr_swap
@@ -1562,7 +1697,13 @@ class Test(BaseTest):
         offer = swap_clients[1].getOffer(offer_id)
 
         bid_id = swap_clients[1].postXmrBid(offer_id, offer.amount_from)
-        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.BID_RECEIVED)
+        wait_for_bid(
+            test_delay_event,
+            swap_clients[0],
+            bid_id,
+            BidStates.BID_RECEIVED,
+            wait_for=(self.extra_wait_time + 40),
+        )
 
         bid, xmr_swap = swap_clients[0].getXmrBid(bid_id)
         assert xmr_swap
@@ -1613,7 +1754,13 @@ class Test(BaseTest):
 
         bid_id = swap_clients[1].postXmrBid(offer_id, offer.amount_from)
 
-        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.BID_RECEIVED)
+        wait_for_bid(
+            test_delay_event,
+            swap_clients[0],
+            bid_id,
+            BidStates.BID_RECEIVED,
+            wait_for=(self.extra_wait_time + 40),
+        )
 
         bid, xmr_swap = swap_clients[0].getXmrBid(bid_id)
         assert xmr_swap
@@ -1676,17 +1823,35 @@ class Test(BaseTest):
             SwapTypes.XMR_SWAP,
         )
 
-        wait_for_bid(test_delay_event, swap_clients[0], bid1_id, BidStates.BID_RECEIVED)
+        wait_for_bid(
+            test_delay_event,
+            swap_clients[0],
+            bid1_id,
+            BidStates.BID_RECEIVED,
+            wait_for=(self.extra_wait_time + 40),
+        )
         swap_clients[0].acceptXmrBid(bid1_id)
 
         wait_for_offer(test_delay_event, swap_clients[1], offer3_id)
         offer3 = swap_clients[1].getOffer(offer3_id)
         bid3_id = swap_clients[1].postXmrBid(offer3_id, offer3.amount_from)
 
-        wait_for_bid(test_delay_event, swap_clients[0], bid2_id, BidStates.BID_RECEIVED)
+        wait_for_bid(
+            test_delay_event,
+            swap_clients[0],
+            bid2_id,
+            BidStates.BID_RECEIVED,
+            wait_for=(self.extra_wait_time + 40),
+        )
         swap_clients[0].acceptXmrBid(bid2_id)
 
-        wait_for_bid(test_delay_event, swap_clients[0], bid3_id, BidStates.BID_RECEIVED)
+        wait_for_bid(
+            test_delay_event,
+            swap_clients[0],
+            bid3_id,
+            BidStates.BID_RECEIVED,
+            wait_for=(self.extra_wait_time + 40),
+        )
         swap_clients[0].acceptXmrBid(bid3_id)
 
         wait_for_bid(
@@ -1941,7 +2106,13 @@ class Test(BaseTest):
 
         bid_id = swap_clients[1].postXmrBid(offer_id, offer.amount_from)
 
-        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.BID_RECEIVED)
+        wait_for_bid(
+            test_delay_event,
+            swap_clients[0],
+            bid_id,
+            BidStates.BID_RECEIVED,
+            wait_for=(self.extra_wait_time + 40),
+        )
 
         bid, xmr_swap = swap_clients[0].getXmrBid(bid_id)
         assert xmr_swap
@@ -2048,7 +2219,13 @@ class Test(BaseTest):
 
         bid_id = swap_clients[1].postXmrBid(offer_id, offer.amount_from)
 
-        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.BID_RECEIVED)
+        wait_for_bid(
+            test_delay_event,
+            swap_clients[0],
+            bid_id,
+            BidStates.BID_RECEIVED,
+            wait_for=(self.extra_wait_time + 40),
+        )
 
         bid, xmr_swap = swap_clients[0].getXmrBid(bid_id)
         assert xmr_swap
@@ -2165,7 +2342,13 @@ class Test(BaseTest):
 
         bid_id = swap_clients[1].postXmrBid(offer_id, offer.amount_from)
 
-        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.BID_RECEIVED)
+        wait_for_bid(
+            test_delay_event,
+            swap_clients[0],
+            bid_id,
+            BidStates.BID_RECEIVED,
+            wait_for=(self.extra_wait_time + 40),
+        )
 
         swap_clients[0].acceptXmrBid(bid_id)
 
@@ -2207,7 +2390,13 @@ class Test(BaseTest):
         offer = swap_clients[1].getOffer(offer_id)
         bid_id = swap_clients[1].postXmrBid(offer_id, offer.amount_from)
 
-        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.BID_RECEIVED)
+        wait_for_bid(
+            test_delay_event,
+            swap_clients[0],
+            bid_id,
+            BidStates.BID_RECEIVED,
+            wait_for=(self.extra_wait_time + 40),
+        )
         swap_clients[1].setBidDebugInd(bid_id, DebugTypes.SEND_LOCKED_XMR)
         swap_clients[0].acceptXmrBid(bid_id)
 
@@ -2326,7 +2515,13 @@ class Test(BaseTest):
         offer = swap_clients[1].getOffer(offer_id)
         bid_id = swap_clients[1].postBid(offer_id, offer.amount_from)
 
-        wait_for_bid(test_delay_event, swap_clients[2], bid_id, BidStates.BID_RECEIVED)
+        wait_for_bid(
+            test_delay_event,
+            swap_clients[2],
+            bid_id,
+            BidStates.BID_RECEIVED,
+            wait_for=(self.extra_wait_time + 40),
+        )
         swap_clients[2].acceptBid(bid_id)
 
         wait_for_bid(
@@ -2381,7 +2576,13 @@ class Test(BaseTest):
         offer = swap_clients[1].getOffer(offer_id)
         bid_id = swap_clients[1].postXmrBid(offer_id, offer.amount_from)
 
-        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.BID_RECEIVED)
+        wait_for_bid(
+            test_delay_event,
+            swap_clients[0],
+            bid_id,
+            BidStates.BID_RECEIVED,
+            wait_for=(self.extra_wait_time + 40),
+        )
         swap_clients[1].setBidDebugInd(bid_id, DebugTypes.B_LOCK_TX_MISSED_SEND)
         swap_clients[0].acceptXmrBid(bid_id)
 
@@ -2426,7 +2627,13 @@ class Test(BaseTest):
         bid_id = swap_clients[1].postXmrBid(offer_id, amt_swap)
         swap_clients[1].setBidDebugInd(bid_id, DebugTypes.BID_STOP_AFTER_COIN_A_LOCK)
 
-        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.BID_RECEIVED)
+        wait_for_bid(
+            test_delay_event,
+            swap_clients[0],
+            bid_id,
+            BidStates.BID_RECEIVED,
+            wait_for=(self.extra_wait_time + 40),
+        )
         swap_clients[0].acceptXmrBid(bid_id)
 
         wait_for_bid(
