@@ -179,6 +179,7 @@ class Test(BaseTest):
             == "8e54a313e6df8918df6d758fafdbf127a115175fdd2238d0e908dd8093c9ac3b"
         )
         assert rv["seed_id"] == "3da5c0af91879e8ce97d9a843874601c08688078"
+        assert (rv["seed_id"] == rv["expected_seed_id"])
 
         rv = read_json_api(
             1800,

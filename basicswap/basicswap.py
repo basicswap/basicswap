@@ -979,13 +979,11 @@ class BasicSwap(BaseApp):
                 core_version = ci.getDaemonVersion()
                 self.log.info("%s Core version %d", ci.coin_name(), core_version)
                 self.coin_clients[c]["core_version"] = core_version
-                # thread_func = threadPollXMRChainState if c in (Coins.XMR, Coins.WOW) else threadPollChainState
-                if c == Coins.XMR:
-                    thread_func = threadPollXMRChainState
-                elif c == Coins.WOW:
-                    thread_func = threadPollWOWChainState
-                else:
-                    thread_func = threadPollChainState
+
+                thread_func = {
+                    Coins.XMR: threadPollXMRChainState,
+                    Coins.WOW: threadPollWOWChainState,
+                }.get(c, threadPollChainState)  # default case
 
                 t = threading.Thread(target=thread_func, args=(self, c))
                 self.threads.append(t)
@@ -1290,6 +1288,20 @@ class BasicSwap(BaseApp):
         finally:
             self._read_zmq_queue = True
 
+    def storeSeedIDForCoin(self, root_key, coin_type, cursor=None) -> None:
+        ci = self.ci(coin_type)
+        db_key_coin_name = ci.coin_name().lower()
+        seed_id = ci.getSeedHash(root_key)
+
+        key_str = "main_wallet_seedid_" + db_key_coin_name
+        self.setStringKV(key_str, seed_id.hex(), cursor)
+
+        if coin_type == Coins.DCR:
+            # TODO: How to force getmasterpubkey to always return the new slip44 (42) key
+            key_str = "main_wallet_seedid_alt_" + db_key_coin_name
+            legacy_root_hash = ci.getSeedHash(root_key, 20)
+            self.setStringKV(key_str, legacy_root_hash.hex(), cursor)
+
     def initialiseWallet(self, coin_type, raise_errors: bool = False) -> None:
         if coin_type == Coins.PART:
             return
@@ -1308,7 +1320,6 @@ class BasicSwap(BaseApp):
             return
 
         root_key = self.getWalletKey(coin_type, 1)
-        root_hash = ci.getSeedHash(root_key)
         try:
             ci.initialiseWallet(root_key)
         except Exception as e:
@@ -1320,18 +1331,9 @@ class BasicSwap(BaseApp):
                 self.log.error(traceback.format_exc())
             return
 
-        legacy_root_hash = None
-        if coin_type == Coins.DCR:
-            legacy_root_hash = ci.getSeedHash(root_key, 20)
         try:
             cursor = self.openDB()
-            key_str = "main_wallet_seedid_" + db_key_coin_name
-            self.setStringKV(key_str, root_hash.hex(), cursor)
-
-            if coin_type == Coins.DCR:
-                # TODO: How to force getmasterpubkey to always return the new slip44 (42) key
-                key_str = "main_wallet_seedid_alt_" + db_key_coin_name
-                self.setStringKV(key_str, legacy_root_hash.hex(), cursor)
+            self.storeSeedIDForCoin(root_key, coin_type, cursor)
 
             # Clear any saved addresses
             self.clearStringKV("receive_addr_" + db_key_coin_name, cursor)
@@ -2606,9 +2608,19 @@ class BasicSwap(BaseApp):
         expect_seedid = self.getStringKV("main_wallet_seedid_" + ci.coin_name().lower())
         if expect_seedid is None:
             self.log.warning(
-                "Can't find expected wallet seed id for coin {}".format(ci.coin_name())
+                "Can't find expected wallet seed id for coin {}.".format(ci.coin_name())
             )
-            return False
+            _, is_locked = self.getLockedState()
+            if is_locked is False:
+                self.log.warning(
+                    "Setting seed id for coin {} from master key.".format(ci.coin_name())
+                )
+                root_key = self.getWalletKey(c, 1)
+                self.storeSeedIDForCoin(root_key, c)
+            else:
+                self.log.warning("Node is locked.")
+                return False
+
         if c == Coins.BTC and len(ci.rpc("listwallets")) < 1:
             self.log.warning("Missing wallet for coin {}".format(ci.coin_name()))
             return False
