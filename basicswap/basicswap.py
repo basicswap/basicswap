@@ -1861,8 +1861,8 @@ class BasicSwap(BaseApp):
             rv = []
             for row in q:
                 identity = {
-                    "address": row[0],
-                    "label": row[1],
+                    "address": row[0] if row[0] is not None else "",
+                    "label": row[1] if row[1] is not None else "",
                     "num_sent_bids_successful": zeroIfNone(row[2]),
                     "num_recv_bids_successful": zeroIfNone(row[3]),
                     "num_sent_bids_rejected": zeroIfNone(row[4]),
