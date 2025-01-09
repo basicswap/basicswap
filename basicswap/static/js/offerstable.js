@@ -21,6 +21,14 @@ const PRICE_INIT_RETRIES = 3;
 const PRICE_INIT_RETRY_DELAY = 2000;
 const isSentOffers = window.offersTableConfig.isSentOffers;
 
+const offersConfig = {
+  apiEndpoints: {
+    coinGecko: 'https://api.coingecko.com/api/v3',
+    cryptoCompare: 'https://min-api.cryptocompare.com/data'
+  },
+  apiKeys: getAPIKeys()
+};
+
 // MAPPING OBJECTS
 const coinNameToSymbol = {
     'Bitcoin': 'bitcoin',
@@ -251,7 +259,7 @@ const WebSocketManager = {
 
     handleMessage(message) {
         if (this.messageQueue.length >= this.maxQueueSize) {
-            console.warn('⚠Message queue full, dropping oldest message');
+            console.warn('Message queue full, dropping oldest message');
             this.messageQueue.shift();
         }
 
@@ -260,7 +268,7 @@ const WebSocketManager = {
 
         this.debounceTimeout = setTimeout(() => {
             this.processMessageQueue();
-        }, 250);
+        }, 200);
     },
 
     async processMessageQueue() {
@@ -1011,6 +1019,7 @@ async function getMarketRate(fromCoin, toCoin) {
 
 async function fetchLatestPrices() {
     const PRICES_CACHE_KEY = 'prices_coingecko';
+    const apiKeys = getAPIKeys();
 
     const cachedData = CacheManager.get(PRICES_CACHE_KEY);
     if (cachedData && cachedData.remainingTime > 60000) {
@@ -1019,10 +1028,10 @@ async function fetchLatestPrices() {
         return cachedData.value;
     }
 
-    const url = `${config.apiEndpoints.coinGecko}/simple/price?ids=bitcoin,bitcoin-cash,dash,dogecoin,decred,litecoin,particl,pivx,monero,zano,wownero,zcoin&vs_currencies=USD,BTC&api_key=${config.apiKeys.coinGecko}`;
+    const url = `${offersConfig.apiEndpoints.coinGecko}/simple/price?ids=bitcoin,bitcoin-cash,dash,dogecoin,decred,litecoin,particl,pivx,monero,zano,wownero,zcoin&vs_currencies=USD,BTC&api_key=${offersConfig.apiKeys.coinGecko}`;
 
     try {
-        console.log('Fetching fresh price data...');
+        console.log('Initiating fresh price data fetch...');
         const response = await fetch('/json/readurl', {
             method: 'POST',
             headers: {
@@ -1039,31 +1048,37 @@ async function fetchLatestPrices() {
         }
 
         const data = await response.json();
+
         if (data.Error) {
+            console.error('API Error:', data.Error);
             throw new Error(data.Error);
         }
 
         if (data && Object.keys(data).length > 0) {
-            console.log('Fresh price data received');
-
+            console.log('Processing fresh price data...');
             latestPrices = data;
-
             CacheManager.set(PRICES_CACHE_KEY, data, CACHE_DURATION);
-
+            const fallbackLog = {};
             Object.entries(data).forEach(([coin, prices]) => {
                 tableRateModule.setFallbackValue(coin, prices.usd);
+                fallbackLog[coin] = prices.usd;
             });
-
+            
+            //console.log('Fallback Values Set:', fallbackLog);
+            
             return data;
         } else {
-            //console.warn('Received empty price data');
+            console.warn('No price data received');
+            return null;
         }
     } catch (error) {
-        //console.error('Error fetching prices:', error);
+        console.error('Price Fetch Error:', {
+            message: error.message,
+            name: error.name,
+            stack: error.stack
+        });
         throw error;
     }
-
-    return latestPrices || null;
 }
 
 async function fetchOffers(manualRefresh = false) {
@@ -1312,7 +1327,6 @@ function updateClearFiltersButton() {
         clearButton.classList.toggle('opacity-50', !hasFilters);
         clearButton.disabled = !hasFilters;
 
-        // Update button styles based on state
         if (hasFilters) {
             clearButton.classList.add('hover:bg-green-600', 'hover:text-white');
             clearButton.classList.remove('cursor-not-allowed');
@@ -1323,6 +1337,19 @@ function updateClearFiltersButton() {
     }
 }
 
+function cleanupRow(row) {
+    const tooltips = row.querySelectorAll('[data-tooltip-target]');
+    const count = tooltips.length;
+    tooltips.forEach(tooltip => {
+        const tooltipId = tooltip.getAttribute('data-tooltip-target');
+        const tooltipElement = document.getElementById(tooltipId);
+        if (tooltipElement) {
+            tooltipElement.remove();
+        }
+    });
+    //console.log(`Cleaned up ${count} tooltips from row`);
+}
+
 function handleNoOffersScenario() {
     const formData = new FormData(filterForm);
     const filters = Object.fromEntries(formData);
@@ -1331,6 +1358,11 @@ function handleNoOffersScenario() {
                             (filters.status && filters.status !== 'any');
 
     stopRefreshAnimation();
+
+    const existingRows = offersBody.querySelectorAll('tr');
+    existingRows.forEach(row => {
+        cleanupRow(row);
+    });
 
     if (hasActiveFilters) {
         offersBody.innerHTML = `
@@ -1355,80 +1387,96 @@ function handleNoOffersScenario() {
 }
 
 async function updateOffersTable() {
-    try {
-        const PRICES_CACHE_KEY = 'prices_coingecko';
-        const cachedPrices = CacheManager.get(PRICES_CACHE_KEY);
+   try {
+       const PRICES_CACHE_KEY = 'prices_coingecko';
+       const cachedPrices = CacheManager.get(PRICES_CACHE_KEY);
 
-        if (!cachedPrices || !cachedPrices.remainingTime || cachedPrices.remainingTime < 60000) {
-            console.log('Fetching fresh price data...');
-            const priceData = await fetchLatestPrices();
-            if (priceData) {
-                latestPrices = priceData;
-            }
-        } else {
-            latestPrices = cachedPrices.value;
-        }
+       if (!cachedPrices || !cachedPrices.remainingTime || cachedPrices.remainingTime < 60000) {
+           console.log('Fetching fresh price data...');
+           const priceData = await fetchLatestPrices();
+           if (priceData) {
+               latestPrices = priceData;
+           }
+       } else {
+           latestPrices = cachedPrices.value;
+       }
 
-        const validOffers = getValidOffers();
+       const validOffers = getValidOffers();
 
-        const startIndex = (currentPage - 1) * itemsPerPage;
-        const endIndex = Math.min(startIndex + itemsPerPage, validOffers.length);
-        const itemsToDisplay = validOffers.slice(startIndex, endIndex);
+       if (!isSentOffers) {
+           const networkOffersSpan = document.querySelector('a[href="/offers"] span.inline-flex.justify-center');
+           if (networkOffersSpan) {
+               networkOffersSpan.textContent = validOffers.length;
+           }
+       }
 
-        const identityPromises = itemsToDisplay.map(offer =>
-            offer.addr_from ? getIdentityData(offer.addr_from) : Promise.resolve(null)
-        );
+       const startIndex = (currentPage - 1) * itemsPerPage;
+       const endIndex = Math.min(startIndex + itemsPerPage, validOffers.length);
+       const itemsToDisplay = validOffers.slice(startIndex, endIndex);
 
-        const identities = await Promise.all(identityPromises);
+       const identityPromises = itemsToDisplay.map(offer =>
+           offer.addr_from ? getIdentityData(offer.addr_from) : Promise.resolve(null)
+       );
 
-        if (validOffers.length === 0) {
-            handleNoOffersScenario();
-            return;
-        }
+       const identities = await Promise.all(identityPromises);
 
-        const totalPages = Math.max(1, Math.ceil(validOffers.length / itemsPerPage));
-        currentPage = Math.min(currentPage, totalPages);
+       if (validOffers.length === 0) {
+           const existingRows = offersBody.querySelectorAll('tr');
+           existingRows.forEach(row => {
+               cleanupRow(row);
+           });
+           handleNoOffersScenario();
+           return;
+       }
 
-        const fragment = document.createDocumentFragment();
+       const totalPages = Math.max(1, Math.ceil(validOffers.length / itemsPerPage));
+       currentPage = Math.min(currentPage, totalPages);
 
-        itemsToDisplay.forEach((offer, index) => {
-            const identity = identities[index];
-            const row = createTableRow(offer, identity);
-            if (row) {
-                fragment.appendChild(row);
-            }
-        });
+       const fragment = document.createDocumentFragment();
 
-        offersBody.innerHTML = '';
-        offersBody.appendChild(fragment);
+       const existingRows = offersBody.querySelectorAll('tr');
+       existingRows.forEach(row => {
+           cleanupRow(row);
+       });
 
-        requestAnimationFrame(() => {
-            initializeFlowbiteTooltips();
-            updateRowTimes();
-            updatePaginationControls(totalPages);
+       itemsToDisplay.forEach((offer, index) => {
+           const identity = identities[index];
+           const row = createTableRow(offer, identity);
+           if (row) {
+               fragment.appendChild(row);
+           }
+       });
 
-            if (tableRateModule?.initializeTable) {
-                tableRateModule.initializeTable();
-            }
-        });
+       offersBody.textContent = '';
+       offersBody.appendChild(fragment);
 
-        lastRefreshTime = Date.now();
-        if (newEntriesCountSpan) {
-            newEntriesCountSpan.textContent = validOffers.length;
-        }
-        if (lastRefreshTimeSpan) {
-            lastRefreshTimeSpan.textContent = new Date(lastRefreshTime).toLocaleTimeString();
-        }
+       requestAnimationFrame(() => {
+           initializeFlowbiteTooltips();
+           updateRowTimes();
+           updatePaginationControls(totalPages);
 
-    } catch (error) {
-        console.error('[Debug] Error in updateOffersTable:', error);
-        offersBody.innerHTML = `
-            <tr>
-                <td colspan="8" class="text-center py-4 text-red-500">
-                    An error occurred while updating the offers table. Please try again later.
-                </td>
-            </tr>`;
-    }
+           if (tableRateModule?.initializeTable) {
+               tableRateModule.initializeTable();
+           }
+       });
+
+       lastRefreshTime = Date.now();
+       if (newEntriesCountSpan) {
+           newEntriesCountSpan.textContent = validOffers.length;
+       }
+       if (lastRefreshTimeSpan) {
+           lastRefreshTimeSpan.textContent = new Date(lastRefreshTime).toLocaleTimeString();
+       }
+
+   } catch (error) {
+       console.error('[Debug] Error in updateOffersTable:', error);
+       offersBody.innerHTML = `
+           <tr>
+               <td colspan="8" class="text-center py-4 text-red-500">
+                   An error occurred while updating the offers table. Please try again later.
+               </td>
+           </tr>`;
+   }
 }
 
 async function getIdentityData(address) {

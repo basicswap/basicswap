@@ -11,15 +11,15 @@
 <script>
 function getAPIKeys() {
   return {
-    cryptoCompare: '{{chart_api_key}}',
-    coinGecko: '{{coingecko_api_key}}'
+    cryptoCompare: "{{ chart_api_key|safe }}",
+    coinGecko: "{{ coingecko_api_key|safe }}"
   };
 }
 
 function getWebSocketConfig() {
     return {
-        port: '{{ ws_port }}',
-        fallbackPort: '11700'
+        port: "{{ ws_port|safe }}",
+        fallbackPort: "11700"
     };
 }
 </script>

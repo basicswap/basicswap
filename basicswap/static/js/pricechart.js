@@ -38,13 +38,6 @@ const config = {
   currentResolution: 'year'
 };
 
-function getAPIKeys() {
-  return {
-    cryptoCompare: '{{chart_api_key}}',
-    coinGecko: '{{coingecko_api_key}}'
-  };
-}
-
 // UTILS
 const utils = {
   formatNumber: (number, decimals = 2) => 
@@ -86,8 +79,9 @@ const logger = {
 
 // API
 const api = {
-  makePostRequest: (url, headers = {}) => {
-    return new Promise((resolve, reject) => {
+    makePostRequest: (url, headers = {}) => {
+      const apiKeys = getAPIKeys();
+      return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', '/json/readurl');
       xhr.setRequestHeader('Content-Type', 'application/json');
@@ -147,8 +141,8 @@ const api = {
             .map(coin => coin.name)
             .join(',');
         const url = `${config.apiEndpoints.coinGecko}/simple/price?ids=${coinIds}&vs_currencies=usd,btc&include_24hr_vol=true&include_24hr_change=true&api_key=${config.apiKeys.coinGecko}`;
-        
-        console.log(`Fetching data for multiple coins from CoinGecko: ${url}`);
+
+        //console.log(`Fetching data for multiple coins from CoinGecko: ${url}`);
         
         try {
             const data = await api.makePostRequest(url);
@@ -675,7 +669,7 @@ const chartModule = {
       plugins: [chartModule.verticalLinePlugin]
     });
 
-    console.log('Chart initialized:', chartModule.chart);
+    //console.log('Chart initialized:', chartModule.chart);
   },
   
   prepareChartData: (coinSymbol, data) => {
