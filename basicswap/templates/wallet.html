@@ -82,6 +82,25 @@
   </div>
 </section>
   {% else %}
+{% if w.cid == '18' %} {# DOGE #}
+<section class="py-4" id="messages_notice">
+  <div class="container px-4 mx-auto">
+    <div class="p-6 rounded-lg bg-coolGray-100 dark:bg-gray-500 shadow-sm">
+      <div class="flex items-start">
+        <svg class="w-6 h-6 text-blue-500 mt-1 mr-3 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"></path></svg>
+        <div class="flex flex-wrap -m-1">
+          <ul class="ml-4">
+            <li class="font-semibold text-lg dark:text-white mb-2">NOTICE:</li>
+            <li class="font-medium text-gray-600 dark:text-white leading-relaxed">
+              This version of DOGE Core is experimental and has been custom-built for compatibility with BasicSwap. As a result, it may not always be fully aligned with upstream changes, features unrelated to BasicSwap might not work as expected, and its code may differ from the official release.
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endif %}
   <form method="post" autocomplete="off">
     <section>
       <div class="pl-6 pr-6 pt-0 pb-0 mt-5 h-full overflow-hidden">
