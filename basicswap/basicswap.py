@@ -2121,8 +2121,15 @@ class BasicSwap(BaseApp):
                 ci_from.ensureFunds(msg_buf.amount_from)
             else:
                 proof_of_funds_hash = getOfferProofOfFundsHash(msg_buf, offer_addr)
+                ensure_balance: int = int(amount)
+                # If a prefunded txn is not used, check that the wallet balance can cover the tx fee.
+                if "prefunded_itx" not in extra_options:
+                    pi = self.pi(SwapTypes.XMR_SWAP)
+                    _ = pi.getFundedInitiateTxTemplate(ci_from, ensure_balance, False)
+                    # TODO: Save the prefunded tx so the fee can't change, complicates multiple offers at the same time.
+
                 proof_addr, proof_sig, proof_utxos = self.getProofOfFunds(
-                    coin_from_t, int(amount), proof_of_funds_hash
+                    coin_from_t, ensure_balance, proof_of_funds_hash
                 )
                 # TODO: For now proof_of_funds is just a client side check, may need to be sent with offers in future however.
 

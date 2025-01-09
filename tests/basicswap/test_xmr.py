@@ -1738,6 +1738,7 @@ class Test(BaseTest):
     def test_05_btc_xmr(self):
         logging.info("---------- Test BTC to XMR")
         swap_clients = self.swap_clients
+
         offer_id = swap_clients[0].postOffer(
             Coins.BTC,
             Coins.XMR,
@@ -1783,6 +1784,73 @@ class Test(BaseTest):
         )
 
         swap_clients[1].ci(Coins.XMR).setFeePriority(0)
+
+    def test_05b_btc_xmr_withfee(self):
+        logging.info("---------- Test BTC to XMR")
+        swap_clients = self.swap_clients
+
+        self.prepare_balance(Coins.BTC, 100.0, 1801, 1800)
+        self.prepare_balance(Coins.XMR, 20.0, 1800, 1801)
+        js_w1_before = read_json_api(1801, "wallets")
+        ci1_btc = swap_clients[1].ci(Coins.BTC)
+        btc_total = ci1_btc.make_int(js_w1_before["BTC"]["balance"]) + ci1_btc.make_int(js_w1_before["BTC"]["unconfirmed"])
+
+        try:
+            offer_id = swap_clients[1].postOffer(
+                Coins.BTC,
+                Coins.XMR,
+                btc_total,
+                0,
+                10 * COIN,
+                SwapTypes.XMR_SWAP,
+                extra_options={"amount_to": 10 * XMR_COIN}
+            )
+        except Exception as e:
+            assert "Insufficient funds" in str(e)
+        else:
+            assert False, "Should fail"
+
+        offer_id = swap_clients[1].postOffer(
+            Coins.BTC,
+            Coins.XMR,
+            btc_total - 1 * COIN,
+            0,
+            10 * COIN,
+            SwapTypes.XMR_SWAP,
+            extra_options={"amount_to": 10 * XMR_COIN}
+        )
+
+        wait_for_offer(test_delay_event, swap_clients[0], offer_id)
+        offers = swap_clients[0].listOffers(filters={"offer_id": offer_id})
+        offer = offers[0]
+
+        swap_clients[0].ci(Coins.XMR).setFeePriority(3)
+
+        bid_id = swap_clients[0].postXmrBid(offer_id, offer.amount_from)
+
+        wait_for_bid(
+            test_delay_event,
+            swap_clients[1],
+            bid_id,
+            BidStates.BID_RECEIVED,
+            wait_for=(self.extra_wait_time + 40),
+        )
+        swap_clients[1].acceptXmrBid(bid_id)
+
+        wait_for_bid(
+            test_delay_event,
+            swap_clients[1],
+            bid_id,
+            BidStates.SWAP_COMPLETED,
+            wait_for=180,
+        )
+        wait_for_bid(
+            test_delay_event,
+            swap_clients[0],
+            bid_id,
+            BidStates.SWAP_COMPLETED,
+            sent=True,
+        )
 
     def test_06_multiple_swaps(self):
         logging.info("---------- Test Multiple concurrent swaps")
