@@ -1734,6 +1734,22 @@ class BasicSwapTest(TestFunctions):
 
         amt_swap: int = ci_from.make_int(balance_from_before, r=1)
         rate_swap: int = ci_to.make_int(2.0, r=1)
+
+        try:
+            offer_id = swap_clients[id_offerer].postOffer(
+                coin_from,
+                coin_to,
+                amt_swap,
+                rate_swap,
+                amt_swap,
+                SwapTypes.XMR_SWAP,
+                auto_accept_bids=True,
+            )
+        except Exception as e:
+            assert "Insufficient funds" in str(e)
+        else:
+            assert False, "Should fail"
+        amt_swap -= ci_from.make_int(1)
         offer_id = swap_clients[id_offerer].postOffer(
             coin_from,
             coin_to,
@@ -1745,25 +1761,31 @@ class BasicSwapTest(TestFunctions):
         )
         wait_for_offer(test_delay_event, swap_clients[id_bidder], offer_id)
 
+        # First bid should work
         bid_id = swap_clients[id_bidder].postXmrBid(offer_id, amt_swap)
-
-        event = wait_for_event(
-            test_delay_event,
-            swap_clients[id_offerer],
-            Concepts.BID,
-            bid_id,
-            event_type=EventLogTypes.ERROR,
-            wait_for=60,
-        )
-        assert "Insufficient funds" in event.event_msg
-
         wait_for_bid(
             test_delay_event,
             swap_clients[id_offerer],
             bid_id,
-            BidStates.BID_RECEIVED,
-            wait_for=20,
+            (BidStates.BID_ACCEPTED, BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED),
+            wait_for=40,
         )
+
+        # Should be out of funds for second bid (over remaining offer value causes a hard auto accept fail)
+        bid_id = swap_clients[id_bidder].postXmrBid(offer_id, amt_swap)
+        wait_for_bid(
+            test_delay_event,
+            swap_clients[id_offerer],
+            bid_id,
+            BidStates.BID_AACCEPT_FAIL,
+            wait_for=40,
+        )
+        try:
+            swap_clients[id_offerer].acceptBid(bid_id)
+        except Exception as e:
+            assert "Insufficient funds" in str(e)
+        else:
+            assert False, "Should fail"
 
     def test_08_insufficient_funds_rev(self):
         tla_from = self.test_coin_from.name

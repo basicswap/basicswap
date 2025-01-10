@@ -841,7 +841,7 @@ def js_getcoinseed(self, url_split, post_string, is_json) -> bytes:
         key_spend = swap_client.getWalletKey(coin, 2, for_ed25519=True)
         address = ci.getAddressFromKeys(key_view, key_spend)
 
-        expect_address = self.getCachedMainWalletAddress(ci)
+        expect_address = swap_client.getCachedMainWalletAddress(ci)
         rv.update(
             {
                 "key_view": ci.encodeKey(key_view),

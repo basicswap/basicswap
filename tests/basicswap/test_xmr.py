@@ -1793,7 +1793,9 @@ class Test(BaseTest):
         self.prepare_balance(Coins.XMR, 20.0, 1800, 1801)
         js_w1_before = read_json_api(1801, "wallets")
         ci1_btc = swap_clients[1].ci(Coins.BTC)
-        btc_total = ci1_btc.make_int(js_w1_before["BTC"]["balance"]) + ci1_btc.make_int(js_w1_before["BTC"]["unconfirmed"])
+        btc_total = ci1_btc.make_int(js_w1_before["BTC"]["balance"]) + ci1_btc.make_int(
+            js_w1_before["BTC"]["unconfirmed"]
+        )
 
         try:
             offer_id = swap_clients[1].postOffer(
@@ -1803,7 +1805,7 @@ class Test(BaseTest):
                 0,
                 10 * COIN,
                 SwapTypes.XMR_SWAP,
-                extra_options={"amount_to": 10 * XMR_COIN}
+                extra_options={"amount_to": 10 * XMR_COIN},
             )
         except Exception as e:
             assert "Insufficient funds" in str(e)
@@ -1817,7 +1819,7 @@ class Test(BaseTest):
             0,
             10 * COIN,
             SwapTypes.XMR_SWAP,
-            extra_options={"amount_to": 10 * XMR_COIN}
+            extra_options={"amount_to": 10 * XMR_COIN},
         )
 
         wait_for_offer(test_delay_event, swap_clients[0], offer_id)

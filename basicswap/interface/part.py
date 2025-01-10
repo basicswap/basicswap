@@ -261,9 +261,7 @@ class PARTInterfaceBlind(PARTInterface):
         ]
         params = [inputs, outputs]
         rv = self.rpc_wallet("createrawparttransaction", params)
-
-        tx_bytes = bytes.fromhex(rv["hex"])
-        return tx_bytes
+        return bytes.fromhex(rv["hex"])
 
     def fundSCLockTx(self, tx_bytes: bytes, feerate: int, vkbv: bytes) -> bytes:
         feerate_str = self.format_amount(feerate)
@@ -292,7 +290,7 @@ class PARTInterfaceBlind(PARTInterface):
             "lockUnspents": True,
             "feeRate": feerate_str,
         }
-        rv = self.rpc(
+        rv = self.rpc_wallet(
             "fundrawtransactionfrom", ["blind", tx_hex, {}, outputs_info, options]
         )
         return bytes.fromhex(rv["hex"])
@@ -1162,9 +1160,43 @@ class PARTInterfaceBlind(PARTInterface):
         sub_fee: bool = False,
         lock_unspents: bool = True,
     ) -> str:
-        txn = self.rpc_wallet(
-            "createrawtransaction", [[], {addr_to: self.format_amount(amount)}]
+        # Estimate lock tx size / fee
+
+        # self.createSCLockTx
+        vkbv = self.getNewRandomKey()
+        ephemeral_key = self.getNewRandomKey()
+        ephemeral_pubkey = self.getPubkey(ephemeral_key)
+        assert len(ephemeral_pubkey) == 33
+        nonce = self.getScriptLockTxNonce(vkbv)
+        inputs = []
+        outputs = [
+            {
+                "type": "blind",
+                "amount": self.format_amount(amount),
+                "address": addr_to,
+                "nonce": nonce.hex(),
+                "data": ephemeral_pubkey.hex(),
+            }
+        ]
+        params = [inputs, outputs]
+        tx_hex = self.rpc_wallet("createrawparttransaction", params)["hex"]
+
+        # self.fundSCLockTx
+        tx_obj = self.rpc("decoderawtransaction", [tx_hex])
+
+        assert len(tx_obj["vout"]) == 1
+        txo = tx_obj["vout"][0]
+        blinded_info = self.rpc(
+            "rewindrangeproof", [txo["rangeproof"], txo["valueCommitment"], nonce.hex()]
         )
+
+        outputs_info = {
+            0: {
+                "value": blinded_info["amount"],
+                "blind": blinded_info["blind"],
+                "nonce": nonce.hex(),
+            }
+        }
 
         options = {
             "lockUnspents": lock_unspents,
@@ -1174,7 +1206,9 @@ class PARTInterfaceBlind(PARTInterface):
             options["subtractFeeFromOutputs"] = [
                 0,
             ]
-        return self.rpc_wallet("fundrawtransactionfrom", ["blind", txn, options])["hex"]
+        return self.rpc_wallet(
+            "fundrawtransactionfrom", ["blind", tx_hex, {}, outputs_info, options]
+        )["hex"]
 
 
 class PARTInterfaceAnon(PARTInterface):

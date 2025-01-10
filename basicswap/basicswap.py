@@ -140,7 +140,6 @@ from .basicswap_util import (
     canAcceptBidState,
     describeEventEntry,
     getLastBidState,
-    getOfferProofOfFundsHash,
     getVoutByAddress,
     getVoutByScriptPubKey,
     inactive_states,
@@ -2117,21 +2116,27 @@ class BasicSwap(BaseApp):
                     msg_buf.fee_rate_to
                 )  # Unused: TODO - Set priority?
 
+            ensure_balance: int = int(amount)
             if coin_from in self.scriptless_coins:
-                ci_from.ensureFunds(msg_buf.amount_from)
+                # TODO: Better tx size estimate, xmr_swap_b_lock_tx_vsize could be larger than xmr_swap_b_lock_spend_tx_vsize
+                estimated_fee: int = (
+                    msg_buf.fee_rate_from
+                    * ci_from.xmr_swap_b_lock_spend_tx_vsize()
+                    / 1000
+                )
+                ci_from.ensureFunds(msg_buf.amount_from + estimated_fee)
             else:
-                proof_of_funds_hash = getOfferProofOfFundsHash(msg_buf, offer_addr)
-                ensure_balance: int = int(amount)
                 # If a prefunded txn is not used, check that the wallet balance can cover the tx fee.
                 if "prefunded_itx" not in extra_options:
                     pi = self.pi(SwapTypes.XMR_SWAP)
                     _ = pi.getFundedInitiateTxTemplate(ci_from, ensure_balance, False)
                     # TODO: Save the prefunded tx so the fee can't change, complicates multiple offers at the same time.
 
-                proof_addr, proof_sig, proof_utxos = self.getProofOfFunds(
-                    coin_from_t, ensure_balance, proof_of_funds_hash
-                )
-                # TODO: For now proof_of_funds is just a client side check, may need to be sent with offers in future however.
+                # TODO: Send proof of funds with offer
+                # proof_of_funds_hash = getOfferProofOfFundsHash(msg_buf, offer_addr)
+                # proof_addr, proof_sig, proof_utxos = self.getProofOfFunds(
+                #     coin_from_t, ensure_balance, proof_of_funds_hash
+                # )
 
             offer_bytes = msg_buf.to_bytes()
             payload_hex = str.format("{:02x}", MessageTypes.OFFER) + offer_bytes.hex()
