@@ -89,6 +89,73 @@ const totalPagesSpan = document.getElementById('totalPages');
 const lastRefreshTimeSpan = document.getElementById('lastRefreshTime');
 const newEntriesCountSpan = document.getElementById('newEntriesCount');
 
+const ScrollOptimizer = {
+    scrollTimeout: null,
+    isScrolling: false,
+
+    init() {
+        document.body.classList.add('optimize-scroll');
+        window.addEventListener('scroll', this.handleScroll.bind(this), { passive: true });
+    },
+
+    handleScroll() {
+        if (!this.isScrolling) {
+            document.body.classList.add('is-scrolling');
+            this.isScrolling = true;
+        }
+
+        if (this.scrollTimeout) {
+            clearTimeout(this.scrollTimeout);
+        }
+
+        this.scrollTimeout = setTimeout(() => {
+            document.body.classList.remove('is-scrolling');
+            this.isScrolling = false;
+        }, 150);
+    }
+};
+
+const scrollStyles = document.createElement('style');
+scrollStyles.textContent = `
+    .optimize-scroll {
+        -webkit-font-smoothing: antialiased;
+    }
+    
+    .is-scrolling .overflow-x-auto {
+        will-change: transform;
+        pointer-events: none;
+    }
+    
+    .is-scrolling * {
+        animation: none !important;
+        transition: none !important;
+    }
+`;
+document.head.appendChild(scrollStyles);
+
+document.addEventListener('DOMContentLoaded', () => {
+    ScrollOptimizer.init();
+});
+
+let isTableRendering = false;
+const tableContainer = document.querySelector('.overflow-x-auto');
+
+function startTableRender() {
+    isTableRendering = true;
+    if (tableContainer) {
+        tableContainer.style.overflow = 'hidden';
+    }
+}
+
+function finishTableRender() {
+    isTableRendering = false;
+    setTimeout(() => {
+        if (tableContainer) {
+            tableContainer.style.overflow = 'auto';
+        }
+    }, 100);
+}
+
 // MANAGER OBJECTS
 const WebSocketManager = {
     ws: null,
@@ -1387,96 +1454,102 @@ function handleNoOffersScenario() {
 }
 
 async function updateOffersTable() {
-   try {
-       const PRICES_CACHE_KEY = 'prices_coingecko';
-       const cachedPrices = CacheManager.get(PRICES_CACHE_KEY);
+    try {
+        startTableRender();
 
-       if (!cachedPrices || !cachedPrices.remainingTime || cachedPrices.remainingTime < 60000) {
-           console.log('Fetching fresh price data...');
-           const priceData = await fetchLatestPrices();
-           if (priceData) {
-               latestPrices = priceData;
-           }
-       } else {
-           latestPrices = cachedPrices.value;
-       }
+        const PRICES_CACHE_KEY = 'prices_coingecko';
+        const cachedPrices = CacheManager.get(PRICES_CACHE_KEY);
 
-       const validOffers = getValidOffers();
+        if (!cachedPrices || !cachedPrices.remainingTime || cachedPrices.remainingTime < 60000) {
+            console.log('Fetching fresh price data...');
+            const priceData = await fetchLatestPrices();
+            if (priceData) {
+                latestPrices = priceData;
+            }
+        } else {
+            latestPrices = cachedPrices.value;
+        }
 
-       if (!isSentOffers) {
-           const networkOffersSpan = document.querySelector('a[href="/offers"] span.inline-flex.justify-center');
-           if (networkOffersSpan) {
-               networkOffersSpan.textContent = validOffers.length;
-           }
-       }
+        const validOffers = getValidOffers();
 
-       const startIndex = (currentPage - 1) * itemsPerPage;
-       const endIndex = Math.min(startIndex + itemsPerPage, validOffers.length);
-       const itemsToDisplay = validOffers.slice(startIndex, endIndex);
+        if (!isSentOffers) {
+            const networkOffersSpan = document.querySelector('a[href="/offers"] span.inline-flex.justify-center');
+            if (networkOffersSpan) {
+                networkOffersSpan.textContent = validOffers.length;
+            }
+        }
 
-       const identityPromises = itemsToDisplay.map(offer =>
-           offer.addr_from ? getIdentityData(offer.addr_from) : Promise.resolve(null)
-       );
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = Math.min(startIndex + itemsPerPage, validOffers.length);
+        const itemsToDisplay = validOffers.slice(startIndex, endIndex);
 
-       const identities = await Promise.all(identityPromises);
+        const identityPromises = itemsToDisplay.map(offer =>
+            offer.addr_from ? getIdentityData(offer.addr_from) : Promise.resolve(null)
+        );
 
-       if (validOffers.length === 0) {
-           const existingRows = offersBody.querySelectorAll('tr');
-           existingRows.forEach(row => {
-               cleanupRow(row);
-           });
-           handleNoOffersScenario();
-           return;
-       }
+        const identities = await Promise.all(identityPromises);
 
-       const totalPages = Math.max(1, Math.ceil(validOffers.length / itemsPerPage));
-       currentPage = Math.min(currentPage, totalPages);
+        if (validOffers.length === 0) {
+            const existingRows = offersBody.querySelectorAll('tr');
+            existingRows.forEach(row => {
+                cleanupRow(row);
+            });
+            handleNoOffersScenario();
+            finishTableRender();
+            return;
+        }
 
-       const fragment = document.createDocumentFragment();
+        const totalPages = Math.max(1, Math.ceil(validOffers.length / itemsPerPage));
+        currentPage = Math.min(currentPage, totalPages);
 
-       const existingRows = offersBody.querySelectorAll('tr');
-       existingRows.forEach(row => {
-           cleanupRow(row);
-       });
+        const fragment = document.createDocumentFragment();
 
-       itemsToDisplay.forEach((offer, index) => {
-           const identity = identities[index];
-           const row = createTableRow(offer, identity);
-           if (row) {
-               fragment.appendChild(row);
-           }
-       });
+        const existingRows = offersBody.querySelectorAll('tr');
+        existingRows.forEach(row => {
+            cleanupRow(row);
+        });
 
-       offersBody.textContent = '';
-       offersBody.appendChild(fragment);
+        itemsToDisplay.forEach((offer, index) => {
+            const identity = identities[index];
+            const row = createTableRow(offer, identity);
+            if (row) {
+                fragment.appendChild(row);
+            }
+        });
 
-       requestAnimationFrame(() => {
-           initializeFlowbiteTooltips();
-           updateRowTimes();
-           updatePaginationControls(totalPages);
+        offersBody.textContent = '';
+        offersBody.appendChild(fragment);
 
-           if (tableRateModule?.initializeTable) {
-               tableRateModule.initializeTable();
-           }
-       });
+        requestAnimationFrame(() => {
+            initializeFlowbiteTooltips();
+            updateRowTimes();
+            updatePaginationControls(totalPages);
 
-       lastRefreshTime = Date.now();
-       if (newEntriesCountSpan) {
-           newEntriesCountSpan.textContent = validOffers.length;
-       }
-       if (lastRefreshTimeSpan) {
-           lastRefreshTimeSpan.textContent = new Date(lastRefreshTime).toLocaleTimeString();
-       }
+            if (tableRateModule?.initializeTable) {
+                tableRateModule.initializeTable();
+            }
+            
+            finishTableRender();
+        });
 
-   } catch (error) {
-       console.error('[Debug] Error in updateOffersTable:', error);
-       offersBody.innerHTML = `
-           <tr>
-               <td colspan="8" class="text-center py-4 text-red-500">
-                   An error occurred while updating the offers table. Please try again later.
-               </td>
-           </tr>`;
-   }
+        lastRefreshTime = Date.now();
+        if (newEntriesCountSpan) {
+            newEntriesCountSpan.textContent = validOffers.length;
+        }
+        if (lastRefreshTimeSpan) {
+            lastRefreshTimeSpan.textContent = new Date(lastRefreshTime).toLocaleTimeString();
+        }
+
+    } catch (error) {
+        console.error('[Debug] Error in updateOffersTable:', error);
+        offersBody.innerHTML = `
+            <tr>
+                <td colspan="8" class="text-center py-4 text-red-500">
+                    An error occurred while updating the offers table. Please try again later.
+                </td>
+            </tr>`;
+        finishTableRender();
+    }
 }
 
 async function getIdentityData(address) {
