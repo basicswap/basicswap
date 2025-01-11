@@ -1,4 +1,3 @@
-version: '3.4'
 services:
     swapclient:
         image: i_swapclient
