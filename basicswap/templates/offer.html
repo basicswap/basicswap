@@ -477,9 +477,10 @@ if (document.readyState === 'loading') {
         <div class="relative">
             <input type="text" 
                    class="bg-gray-50 text-gray-900 appearance-none pr-28 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" 
-                   id="bid_amount_send" 
+                   id="bid_amount_send"
+                   autocomplete="off"
                    name="bid_amount_send"
-                   value="{{ data.amt_to }}"
+                   value=""
                    max="{{ data.amt_to }}"
                    onchange="validateMaxAmount(this, {{ data.amt_to }}); updateBidParams('sending');">
             <div class="absolute inset-y-0 right-3 flex items-center pointer-events-none text-gray-400 dark:text-gray-300 text-sm">
@@ -500,8 +501,9 @@ if (document.readyState === 'loading') {
             <input type="text" 
                    class="bg-gray-50 text-gray-900 appearance-none pr-28 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" 
                    id="bid_amount" 
+                   autocomplete="off"
                    name="bid_amount" 
-                   value="{{ data.bid_amount }}" 
+                   value="" 
                    max="{{ data.amt_from }}"
                    onchange="validateMaxAmount(this, {{ data.amt_from }}); updateBidParams('receiving');">
             <div class="absolute inset-y-0 right-3 flex items-center pointer-events-none text-gray-400 dark:text-gray-300 text-sm">
@@ -528,6 +530,7 @@ if (document.readyState === 'loading') {
             <input type="text" 
                    class="bg-gray-50 text-gray-900 appearance-none pr-28 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0 cursor-not-allowed" 
                    id="bid_amount_send" 
+                   autocomplete="off"
                    name="bid_amount_send"
                    value="{{ data.amt_to }}"
                    max="{{ data.amt_to }}"
@@ -551,6 +554,7 @@ if (document.readyState === 'loading') {
             <input type="text" 
                    class="bg-gray-50 text-gray-900 appearance-none pr-28 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0 cursor-not-allowed" 
                    id="bid_amount" 
+                   autocomplete="off"
                    name="bid_amount" 
                    value="{{ data.bid_amount }}" 
                    max="{{ data.amt_from }}"
