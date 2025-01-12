@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2019-2024 tecnovert
-# Copyright (c) 2024 The Basicswap developers
+# Copyright (c) 2024-2025 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -19,7 +19,7 @@ import basicswap.config as cfg
 from basicswap import __version__
 from basicswap.ui.util import getCoinName
 from basicswap.basicswap import BasicSwap
-from basicswap.chainparams import chainparams
+from basicswap.chainparams import chainparams, Coins
 from basicswap.http_server import HttpThread
 from basicswap.contrib.websocket_server import WebsocketServer
 
@@ -57,24 +57,6 @@ def signal_handler(sig, frame):
 def startDaemon(node_dir, bin_dir, daemon_bin, opts=[], extra_config={}):
     daemon_bin = os.path.expanduser(os.path.join(bin_dir, daemon_bin))
     datadir_path = os.path.expanduser(node_dir)
-
-    # Rewrite litecoin.conf for 0.21.3
-    # TODO: Remove
-    ltc_conf_path = os.path.join(datadir_path, "litecoin.conf")
-    if os.path.exists(ltc_conf_path):
-        config_to_add = ["blockfilterindex=0", "peerblockfilters=0"]
-        with open(ltc_conf_path) as fp:
-            for line in fp:
-                line = line.strip()
-                if line in config_to_add:
-                    config_to_add.remove(line)
-
-        if len(config_to_add) > 0:
-            logger.info("Rewriting litecoin.conf")
-            shutil.copyfile(ltc_conf_path, ltc_conf_path + ".last")
-            with open(ltc_conf_path, "a") as fp:
-                for line in config_to_add:
-                    fp.write(line + "\n")
 
     args = [
         daemon_bin,
@@ -247,6 +229,14 @@ def getCoreBinArgs(coin_id: int, coin_settings):
         extra_args.append("--conf=" + coin_settings["config_filename"])
     if "port" in coin_settings:
         extra_args.append("--port=" + str(int(coin_settings["port"])))
+
+    # BTC versions from v28 fail to start if the onionport is in use.
+    # As BCH may use port 8334, disable it here.
+    # When tor is enabled a bind option for the onionport will be added to bitcoin.conf.
+    # https://github.com/bitcoin/bitcoin/blob/master/doc/release-notes/release-notes-28.0.md?plain=1#L84
+    if coin_id == Coins.BTC:
+        port: int = coin_settings.get("port", 8333)
+        extra_args.append(f"--bind=0.0.0.0:{port}")
     return extra_args
 
 
