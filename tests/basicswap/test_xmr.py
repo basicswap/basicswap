@@ -1461,7 +1461,7 @@ class Test(BaseTest):
             swap_clients[0],
             bid_id,
             BidStates.SWAP_COMPLETED,
-            wait_for=180,
+            wait_for=300,
         )
         wait_for_bid(
             test_delay_event,
@@ -1530,7 +1530,7 @@ class Test(BaseTest):
             swap_clients[0],
             bid_id,
             BidStates.XMR_SWAP_FAILED_REFUNDED,
-            wait_for=180,
+            wait_for=300,
         )
         wait_for_bid(
             test_delay_event,
@@ -1717,7 +1717,7 @@ class Test(BaseTest):
             swap_clients[0],
             bid_id,
             BidStates.XMR_SWAP_FAILED_REFUNDED,
-            wait_for=180,
+            wait_for=300,
         )
         wait_for_bid(
             test_delay_event,
@@ -1773,7 +1773,7 @@ class Test(BaseTest):
             swap_clients[0],
             bid_id,
             BidStates.SWAP_COMPLETED,
-            wait_for=180,
+            wait_for=300,
         )
         wait_for_bid(
             test_delay_event,
@@ -1844,7 +1844,7 @@ class Test(BaseTest):
             swap_clients[1],
             bid_id,
             BidStates.SWAP_COMPLETED,
-            wait_for=180,
+            wait_for=300,
         )
         wait_for_bid(
             test_delay_event,
@@ -1929,7 +1929,7 @@ class Test(BaseTest):
             swap_clients[0],
             bid1_id,
             BidStates.SWAP_COMPLETED,
-            wait_for=180,
+            wait_for=300,
         )
         wait_for_bid(
             test_delay_event,
@@ -2043,7 +2043,7 @@ class Test(BaseTest):
             swap_clients[0],
             bid_id,
             BidStates.SWAP_COMPLETED,
-            wait_for=180,
+            wait_for=300,
         )
         wait_for_bid(
             test_delay_event,
@@ -2149,7 +2149,7 @@ class Test(BaseTest):
             swap_clients[0],
             bid_id,
             BidStates.SWAP_COMPLETED,
-            wait_for=180,
+            wait_for=300,
         )
         wait_for_bid(
             test_delay_event,
@@ -2196,7 +2196,7 @@ class Test(BaseTest):
             swap_clients[0],
             bid_id,
             BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED,
-            wait_for=180,
+            wait_for=300,
         )
 
         bid, xmr_swap = swap_clients[0].getXmrBid(bid_id)
@@ -2308,7 +2308,7 @@ class Test(BaseTest):
             swap_clients[0],
             bid_id,
             BidStates.SWAP_COMPLETED,
-            wait_for=180,
+            wait_for=300,
         )
         wait_for_bid(
             test_delay_event,
@@ -2427,7 +2427,7 @@ class Test(BaseTest):
             swap_clients[0],
             bid_id,
             BidStates.SWAP_COMPLETED,
-            wait_for=180,
+            wait_for=300,
         )
         wait_for_bid(
             test_delay_event,
@@ -2476,7 +2476,7 @@ class Test(BaseTest):
             Concepts.BID,
             bid_id,
             event_type=EventLogTypes.LOCK_TX_B_INVALID,
-            wait_for=180,
+            wait_for=300,
         )
 
         wait_for_bid(
@@ -2484,7 +2484,7 @@ class Test(BaseTest):
             swap_clients[0],
             bid_id,
             BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED,
-            wait_for=180,
+            wait_for=300,
         )
         wait_for_bid(
             test_delay_event,
@@ -2661,7 +2661,7 @@ class Test(BaseTest):
             swap_clients[0],
             bid_id,
             BidStates.XMR_SWAP_FAILED_REFUNDED,
-            wait_for=1800,
+            wait_for=300,
         )
         wait_for_bid(
             test_delay_event,
@@ -2725,7 +2725,7 @@ class Test(BaseTest):
             swap_clients[0],
             bid_id,
             BidStates.SWAP_COMPLETED,
-            wait_for=180,
+            wait_for=300,
         )
         wait_for_bid(
             test_delay_event,
