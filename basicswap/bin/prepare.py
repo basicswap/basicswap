@@ -50,7 +50,7 @@ PARTICL_VERSION = os.getenv("PARTICL_VERSION", "23.2.7.0")
 PARTICL_VERSION_TAG = os.getenv("PARTICL_VERSION_TAG", "")
 PARTICL_LINUX_EXTRA = os.getenv("PARTICL_LINUX_EXTRA", "nousb")
 
-LITECOIN_VERSION = os.getenv("LITECOIN_VERSION", "0.21.3")
+LITECOIN_VERSION = os.getenv("LITECOIN_VERSION", "0.21.4")
 LITECOIN_VERSION_TAG = os.getenv("LITECOIN_VERSION_TAG", "")
 
 BITCOIN_VERSION = os.getenv("BITCOIN_VERSION", "26.0")
@@ -1291,8 +1291,6 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
                 )
         elif coin == "litecoin":
             fp.write("prune=4000\n")
-            fp.write("blockfilterindex=0\n")
-            fp.write("peerblockfilters=0\n")
             if LTC_RPC_USER != "":
                 fp.write(
                     "rpcauth={}:{}${}\n".format(
