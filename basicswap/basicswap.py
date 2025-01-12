@@ -9548,6 +9548,16 @@ class BasicSwap(BaseApp):
         ensure(msg["to"] == bid.bid_addr, "Received on incorrect address")
         ensure(msg["from"] == offer.addr_from, "Sent from incorrect address")
 
+        allowed_states = [
+            BidStates.BID_REQUEST_SENT,
+        ]
+        if bid.was_sent and offer.was_sent:
+            allowed_states.append(BidStates.BID_REQUEST_ACCEPTED)
+        ensure(
+            bid.state in allowed_states,
+            "Invalid state for bid {}".format(bid.state),
+        )
+
         ci_from = self.ci(offer.coin_to)
         ci_to = self.ci(offer.coin_from)
 
