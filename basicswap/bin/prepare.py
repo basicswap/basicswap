@@ -130,7 +130,7 @@ expected_key_ids = {
     "xanimo": ("6E8F17C1B1BCDCBE",),
     "patricklodder": ("2D3A345B98D0DC1F",),
     "fuzzbawls": ("C1ABA64407731FD9",),
-    "pasta": ("52527BEDABE87984",),
+    "pasta": ("52527BEDABE87984", "E2F3D7916E722D38"),
     "reuben": ("1290A1D0FA7EE109",),
     "nav_builder": ("2782262BF6E7FADB",),
     "decred_release": ("6D897EDF518A031D",),
