@@ -1291,8 +1291,6 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
                 )
         elif coin == "litecoin":
             fp.write("prune=4000\n")
-            fp.write("blockfilterindex=0\n")
-            fp.write("peerblockfilters=0\n")
             if LTC_RPC_USER != "":
                 fp.write(
                     "rpcauth={}:{}${}\n".format(
