@@ -165,6 +165,9 @@ if not len(logger.handlers):
 
 BSX_DOCKER_MODE = toBool(os.getenv("BSX_DOCKER_MODE", "false"))
 BSX_TEST_MODE = toBool(os.getenv("BSX_TEST_MODE", "false"))
+BSX_UPDATE_UNMANAGED = toBool(
+    os.getenv("BSX_UPDATE_UNMANAGED", "true")
+)  # Disable updating unmanaged coin cores.
 UI_HTML_PORT = int(os.getenv("UI_HTML_PORT", 12700))
 UI_WS_PORT = int(os.getenv("UI_WS_PORT", 11700))
 COINS_RPCBIND_IP = os.getenv("COINS_RPCBIND_IP", "127.0.0.1")
@@ -2703,7 +2706,7 @@ def main():
                 logger.info(
                     f"{coin_name}: have {have_version}, current {current_version}."
                 )
-                if not (
+                if not BSX_UPDATE_UNMANAGED and not (
                     coin_settings.get("manage_daemon", False)
                     or coin_settings.get("manage_wallet_daemon", False)
                 ):
