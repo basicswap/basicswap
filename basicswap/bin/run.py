@@ -223,7 +223,7 @@ def getWalletBinName(coin_id: int, coin_settings, default_name: str) -> str:
     ) + (".exe" if os.name == "nt" else "")
 
 
-def getCoreBinArgs(coin_id: int, coin_settings):
+def getCoreBinArgs(coin_id: int, coin_settings, prepare=False):
     extra_args = []
     if "config_filename" in coin_settings:
         extra_args.append("--conf=" + coin_settings["config_filename"])
@@ -234,7 +234,7 @@ def getCoreBinArgs(coin_id: int, coin_settings):
     # As BCH may use port 8334, disable it here.
     # When tor is enabled a bind option for the onionport will be added to bitcoin.conf.
     # https://github.com/bitcoin/bitcoin/blob/master/doc/release-notes/release-notes-28.0.md?plain=1#L84
-    if coin_id == Coins.BTC:
+    if not prepare and coin_id == Coins.BTC:
         port: int = coin_settings.get("port", 8333)
         extra_args.append(f"--bind=0.0.0.0:{port}")
     return extra_args

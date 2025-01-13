@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2019-2024 tecnovert
-# Copyright (c) 2024 The Basicswap developers
+# Copyright (c) 2024-2025 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -23,6 +23,7 @@ import stat
 import sys
 import tarfile
 import threading
+import time
 import urllib.parse
 import zipfile
 
@@ -280,6 +281,7 @@ BITCOIN_FASTSYNC_FILE = os.getenv(
 WALLET_ENCRYPTION_PWD = os.getenv("WALLET_ENCRYPTION_PWD", "")
 
 use_tor_proxy: bool = False
+with_coins_changed: bool = False
 
 monerod_proxy_config = [
     f"proxy={TOR_PROXY_HOST}:{TOR_PROXY_PORT}",
@@ -336,6 +338,11 @@ def shouldManageDaemon(prefix: str) -> bool:
         return True
 
     return toBool(manage_daemon)
+
+
+def getKnownVersion(coin_name: str) -> str:
+    version, version_tag, _ = known_coins[coin_name]
+    return version + version_tag
 
 
 def exitWithError(error_msg: str):
@@ -1548,9 +1555,6 @@ def printVersion(with_coins):
     if len(with_coins) < 1:
         return
     print("Core versions:")
-    with_coins_changed: bool = (
-        False if len(with_coins) == 1 and "particl" in with_coins else True
-    )
     for coin, version in known_coins.items():
         if with_coins_changed and coin not in with_coins:
             continue
@@ -1667,7 +1671,7 @@ def test_particl_encryption(data_dir, settings, chain, use_tor_proxy):
             c = Coins.PART
             coin_name = "particl"
             coin_settings = settings["chainclients"][coin_name]
-            daemon_args += getCoreBinArgs(c, coin_settings)
+            daemon_args += getCoreBinArgs(c, coin_settings, prepare=True)
             extra_config = {"stdout_to_file": True}
             if coin_settings["manage_daemon"]:
                 filename: str = getCoreBinName(c, coin_settings, coin_name + "d")
@@ -1780,7 +1784,7 @@ def initialise_wallets(
                         coin_args = (
                             ["-nofindpeers", "-nostaking"] if c == Coins.PART else []
                         )
-                        coin_args += getCoreBinArgs(c, coin_settings)
+                        coin_args += getCoreBinArgs(c, coin_settings, prepare=True)
 
                         if c == Coins.FIRO:
                             coin_args += [
@@ -1978,7 +1982,7 @@ def ensure_coin_valid(coin: str, test_disabled: bool = True) -> None:
 
 
 def main():
-    global use_tor_proxy
+    global use_tor_proxy, with_coins_changed
     data_dir = None
     bin_dir = None
     port_offset = None
@@ -1989,12 +1993,12 @@ def main():
     }
     add_coin = ""
     disable_coin = ""
-    coins_changed = False
     htmlhost = "127.0.0.1"
     xmr_restore_height = DEFAULT_XMR_RESTORE_HEIGHT
     wow_restore_height = DEFAULT_WOW_RESTORE_HEIGHT
     print_versions = False
     prepare_bin_only = False
+    upgrade_cores = False
     no_cores = False
     enable_tor = False
     disable_tor = False
@@ -2032,6 +2036,9 @@ def main():
             continue
         if name == "preparebinonly":
             prepare_bin_only = True
+            continue
+        if name == "upgradecores":
+            upgrade_cores = True
             continue
         if name == "nocores":
             no_cores = True
@@ -2092,13 +2099,13 @@ def main():
                 for coin in [s.strip().lower() for s in s[1].split(",")]:
                     ensure_coin_valid(coin)
                     with_coins.add(coin)
-                coins_changed = True
+                with_coins_changed = True
                 continue
             if name in ("withoutcoin", "withoutcoins"):
                 for coin in [s.strip().lower() for s in s[1].split(",")]:
                     ensure_coin_valid(coin, test_disabled=False)
                     with_coins.discard(coin)
-                coins_changed = True
+                with_coins_changed = True
                 continue
             if name == "addcoin":
                 add_coin = s[1].strip().lower()
@@ -2244,7 +2251,8 @@ def main():
             "blocks_confirmed": 2,
             "override_feerate": 0.002,
             "conf_target": 2,
-            "core_version_group": 21,
+            "core_version_no": getKnownVersion("particl"),
+            "core_version_group": 23,
         },
         "bitcoin": {
             "connection_type": "rpc",
@@ -2257,7 +2265,8 @@ def main():
             "use_segwit": True,
             "blocks_confirmed": 1,
             "conf_target": 2,
-            "core_version_group": 22,
+            "core_version_no": getKnownVersion("bitcoin"),
+            "core_version_group": 28,
         },
         "bitcoincash": {
             "connection_type": "rpc",
@@ -2272,6 +2281,7 @@ def main():
             "use_segwit": False,
             "blocks_confirmed": 1,
             "conf_target": 2,
+            "core_version_no": getKnownVersion("bitcoincash"),
             "core_version_group": 22,
         },
         "litecoin": {
@@ -2285,7 +2295,8 @@ def main():
             "use_segwit": True,
             "blocks_confirmed": 2,
             "conf_target": 2,
-            "core_version_group": 21,
+            "core_version_no": getKnownVersion("litecoin"),
+            "core_version_group": 20,
             "min_relay_fee": 0.00001,
         },
         "dogecoin": {
@@ -2300,6 +2311,7 @@ def main():
             "use_csv": False,
             "blocks_confirmed": 2,
             "conf_target": 2,
+            "core_version_no": getKnownVersion("dogecoin"),
             "core_version_group": 23,
             "min_relay_fee": 0.01,  # RECOMMENDED_MIN_TX_FEE
         },
@@ -2320,6 +2332,7 @@ def main():
             "use_segwit": True,
             "blocks_confirmed": 2,
             "conf_target": 2,
+            "core_version_no": getKnownVersion("decred"),
             "core_type_group": "dcr",
             "config_filename": "dcrd.conf",
             "min_relay_fee": 0.00001,
@@ -2335,6 +2348,7 @@ def main():
             "use_csv": False,
             "blocks_confirmed": 1,
             "conf_target": 2,
+            "core_version_no": getKnownVersion("namecoin"),
             "core_version_group": 18,
             "chain_lookups": "local",
         },
@@ -2359,6 +2373,7 @@ def main():
             "walletrpctimeout": 120,
             "walletrpctimeoutlong": 600,
             "wallet_config_filename": "monero_wallet.conf",
+            "core_version_no": getKnownVersion("monero"),
             "core_type_group": "xmr",
         },
         "pivx": {
@@ -2373,6 +2388,7 @@ def main():
             "use_csv": False,
             "blocks_confirmed": 1,
             "conf_target": 2,
+            "core_version_no": getKnownVersion("pivx"),
             "core_version_group": 17,
         },
         "dash": {
@@ -2387,6 +2403,7 @@ def main():
             "use_csv": True,
             "blocks_confirmed": 1,
             "conf_target": 2,
+            "core_version_no": getKnownVersion("dash"),
             "core_version_group": 18,
         },
         "firo": {
@@ -2401,6 +2418,7 @@ def main():
             "use_csv": False,
             "blocks_confirmed": 1,
             "conf_target": 2,
+            "core_version_no": getKnownVersion("firo"),
             "core_version_group": 14,
             "min_relay_fee": 0.00001,
         },
@@ -2416,6 +2434,7 @@ def main():
             "use_csv": True,
             "blocks_confirmed": 1,
             "conf_target": 2,
+            "core_version_no": getKnownVersion("navcoin"),
             "core_version_group": 18,
             "chain_lookups": "local",
             "startup_tries": 40,
@@ -2440,6 +2459,7 @@ def main():
             "rpctimeout": 60,
             "walletrpctimeout": 120,
             "walletrpctimeoutlong": 300,
+            "core_version_no": getKnownVersion("wownero"),
             "core_type_group": "xmr",
         },
     }
@@ -2494,7 +2514,7 @@ def main():
 
         init_coins = settings["chainclients"].keys()
         logger.info("Active coins: %s", ", ".join(init_coins))
-        if coins_changed:
+        if with_coins_changed:
             init_coins = with_coins
             logger.info("Initialising coins: %s", ", ".join(init_coins))
         initialise_wallets(
@@ -2616,7 +2636,7 @@ def main():
         if not no_cores:
             prepareCore(add_coin, known_coins[add_coin], settings, data_dir, extra_opts)
 
-        if not prepare_bin_only:
+        if not (prepare_bin_only or upgrade_cores):
             prepareDataDir(
                 add_coin, settings, chain, particl_wallet_mnemonic, extra_opts
             )
@@ -2639,11 +2659,13 @@ def main():
         logger.info(f"Done. Coin {add_coin} successfully added.")
         return 0
 
-    logger.info("With coins: %s", ", ".join(with_coins))
+    logger.info(
+        "With coins: "
+        + (", ".join(with_coins))
+        + ("" if with_coins_changed else " (default)")
+    )
     if os.path.exists(config_path):
-        if not prepare_bin_only:
-            exitWithError("{} exists".format(config_path))
-        else:
+        if prepare_bin_only:
             with open(config_path) as fs:
                 settings = json.load(fs)
 
@@ -2651,7 +2673,82 @@ def main():
                 for c in with_coins:
                     if c not in settings["chainclients"]:
                         settings["chainclients"][c] = chainclients[c]
+        elif upgrade_cores:
+            with open(config_path) as fs:
+                settings = json.load(fs)
+
+            with_coins_start = with_coins
+            if not with_coins_changed:
+                for coin_name, coin_settings in settings["chainclients"].items():
+                    with_coins_start.add(coin_name)
+
+            with_coins = set()
+            for coin_name in with_coins_start:
+                if coin_name not in chainclients:
+                    logger.warning(f"Skipping unknown coin: {coin_name}.")
+                    continue
+                current_coin_settings = chainclients[coin_name]
+                if coin_name not in settings["chainclients"]:
+                    exitWithError(f"{coin_name} not found in basicswap.json")
+                coin_settings = settings["chainclients"][coin_name]
+
+                current_version = current_coin_settings["core_version_no"]
+                have_version = coin_settings.get("core_version_no", "")
+
+                current_version_group = current_coin_settings.get(
+                    "core_version_group", ""
+                )
+                have_version_group = coin_settings.get("core_version_group", "")
+
+                logger.info(
+                    f"{coin_name}: have {have_version}, current {current_version}."
+                )
+                if not (
+                    coin_settings.get("manage_daemon", False)
+                    or coin_settings.get("manage_wallet_daemon", False)
+                ):
+                    logger.info("  Unmanaged.")
+                elif have_version != current_version:
+                    logger.info(f"  Trying to update {coin_name}.")
+                    with_coins.add(coin_name)
+                elif have_version_group != current_version_group:
+                    logger.info(
+                        f"  Trying to update {coin_name}, version group differs."
+                    )
+                    with_coins.add(coin_name)
+
+            if len(with_coins) < 1:
+                logger.info("Nothing to do.")
+                return 0
+
+            # Run second loop to update, so all versions are logged together.
+            # Backup settings
+            old_config_path = config_path[:-5] + "_" + str(int(time.time())) + ".json"
+            with open(old_config_path, "w") as fp:
+                json.dump(settings, fp, indent=4)
+            for c in with_coins:
+                prepareCore(c, known_coins[c], settings, data_dir, extra_opts)
+                current_coin_settings = chainclients[c]
+                current_version = current_coin_settings["core_version_no"]
+                current_version_group = current_coin_settings.get(
+                    "core_version_group", ""
+                )
+                settings["chainclients"][c]["core_version_no"] = current_version
+                if current_version_group != "":
+                    settings["chainclients"][c][
+                        "core_version_group"
+                    ] = current_version_group
+                with open(config_path, "w") as fp:
+                    json.dump(settings, fp, indent=4)
+
+            logger.info("Done.")
+            return 0
+        else:
+            exitWithError(f"{config_path} exists")
     else:
+        if upgrade_cores:
+            exitWithError(f"{config_path} not found")
+
         for c in with_coins:
             withchainclients[c] = chainclients[c]
 
