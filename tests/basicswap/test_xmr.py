@@ -1503,7 +1503,7 @@ class Test(BaseTest):
             101 * COIN,
             SwapTypes.XMR_SWAP,
             lock_type=TxLockTypes.SEQUENCE_LOCK_BLOCKS,
-            lock_value=12,
+            lock_value=16,
         )
         wait_for_offer(test_delay_event, swap_clients[1], offer_id)
         offer = swap_clients[1].getOffer(offer_id)
@@ -1522,6 +1522,9 @@ class Test(BaseTest):
         assert xmr_swap
 
         swap_clients[1].setBidDebugInd(bid_id, DebugTypes.BID_STOP_AFTER_COIN_A_LOCK)
+        swap_clients[1].setBidDebugInd(
+            bid_id, DebugTypes.BID_DONT_SPEND_COIN_A_LOCK_REFUND2, False
+        )
 
         swap_clients[0].acceptXmrBid(bid_id)
 

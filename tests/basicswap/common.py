@@ -148,7 +148,7 @@ def stopDaemons(daemons):
 def wait_for_bid(
     delay_event, swap_client, bid_id, state=None, sent: bool = False, wait_for: int = 20
 ) -> None:
-    logging.info("wait_for_bid %s", bid_id.hex())
+    swap_client.log.debug(f"TEST: wait_for_bid {bid_id.hex()}")
     for i in range(wait_for):
         if delay_event.is_set():
             raise ValueError("Test stopped.")
@@ -161,6 +161,10 @@ def wait_for_bid(
         assert len(bids) < 2
         for bid in bids:
             if bid[2] == bid_id:
+                if i > 0 and i % 10 == 0:
+                    swap_client.log.debug(
+                        f"TEST: wait_for_bid {bid_id.hex()}: Bid state {bid[5]}, target {state}."
+                    )
                 if isinstance(state, (list, tuple)):
                     if bid[5] in state:
                         return
@@ -169,6 +173,11 @@ def wait_for_bid(
                 elif state is not None and state != bid[5]:
                     continue
                 return
+            else:
+                if i > 0 and i % 10 == 0:
+                    swap_client.log.debug(
+                        f"TEST: wait_for_bid {bid_id.hex()}: Bid not found."
+                    )
     raise ValueError("wait_for_bid timed out.")
 
 

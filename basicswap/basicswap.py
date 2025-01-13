@@ -5125,6 +5125,13 @@ class BasicSwap(BaseApp):
 
                     if TxTypes.XMR_SWAP_A_LOCK_REFUND_SWIPE not in bid.txns:
                         try:
+                            if self.haveDebugInd(
+                                bid.bid_id,
+                                DebugTypes.BID_DONT_SPEND_COIN_A_LOCK_REFUND2,
+                            ):
+                                raise TemporaryError(
+                                    "Debug: BID_DONT_SPEND_COIN_A_LOCK_REFUND2"
+                                )
                             txid = ci_from.publishTx(xmr_swap.a_lock_refund_swipe_tx)
                             self.logBidEvent(
                                 bid.bid_id,
@@ -6193,6 +6200,13 @@ class BasicSwap(BaseApp):
                 self.logBidEvent(
                     bid.bid_id, EventLogTypes.LOCK_TX_A_REFUND_TX_SEEN, "", use_cursor
                 )
+
+                if TxTypes.XMR_SWAP_A_LOCK_REFUND not in bid.txns:
+                    bid.txns[TxTypes.XMR_SWAP_A_LOCK_REFUND] = SwapTx(
+                        bid_id=bid.bid_id,
+                        tx_type=TxTypes.XMR_SWAP_A_LOCK_REFUND,
+                        txid=xmr_swap.a_lock_refund_tx_id,
+                    )
             else:
                 self.setBidError(
                     bid.bid_id,
@@ -8814,8 +8828,10 @@ class BasicSwap(BaseApp):
         b_fee_rate: int = xmr_offer.a_fee_rate if reverse_bid else xmr_offer.b_fee_rate
 
         try:
-            chain_height = ci_to.getChainHeight()
-            lock_tx_depth = chain_height - bid.xmr_b_lock_tx.chain_height
+            if bid.xmr_b_lock_tx is None:
+                raise TemporaryError("Chain B lock tx not found.")
+            chain_height: int = ci_to.getChainHeight()
+            lock_tx_depth: int = chain_height - bid.xmr_b_lock_tx.chain_height
             if lock_tx_depth < ci_to.depth_spendable():
                 raise TemporaryError(
                     f"Chain B lock tx still confirming {lock_tx_depth} / {ci_to.depth_spendable()}."
