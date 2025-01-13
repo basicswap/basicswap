@@ -58,6 +58,30 @@ def startDaemon(node_dir, bin_dir, daemon_bin, opts=[], extra_config={}):
     daemon_bin = os.path.expanduser(os.path.join(bin_dir, daemon_bin))
     datadir_path = os.path.expanduser(node_dir)
 
+    # Rewrite litecoin.conf
+    # TODO: Remove
+    needs_rewrite: bool = False
+    ltc_conf_path = os.path.join(datadir_path, "litecoin.conf")
+    if os.path.exists(ltc_conf_path):
+        with open(ltc_conf_path) as fp:
+            for line in fp:
+                line = line.strip()
+                if line.endswith("=onion"):
+                    needs_rewrite = True
+                    break
+        if needs_rewrite:
+            logger.info("Rewriting litecoin.conf")
+            shutil.copyfile(ltc_conf_path, ltc_conf_path + ".last")
+            with (
+                open(ltc_conf_path + ".last") as fp_from,
+                open(ltc_conf_path, "w") as fp_to,
+            ):
+                for line in fp_from:
+                    if line.strip().endswith("=onion"):
+                        fp_to.write(line.strip()[:-6] + "\n")
+                    else:
+                        fp_to.write(line)
+
     args = [
         daemon_bin,
     ]
