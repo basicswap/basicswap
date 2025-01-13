@@ -2669,13 +2669,12 @@ def main():
     )
     if os.path.exists(config_path):
         if prepare_bin_only:
-            with open(config_path) as fs:
-                settings = json.load(fs)
+            settings = load_config(config_path)
 
-                # Add temporary default config for any coins that have not been added
-                for c in with_coins:
-                    if c not in settings["chainclients"]:
-                        settings["chainclients"][c] = chainclients[c]
+            # Add temporary default config for any coins that have not been added
+            for c in with_coins:
+                if c not in settings["chainclients"]:
+                    settings["chainclients"][c] = chainclients[c]
         elif upgrade_cores:
             with open(config_path) as fs:
                 settings = json.load(fs)
