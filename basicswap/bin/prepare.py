@@ -164,6 +164,7 @@ if not len(logger.handlers):
     logger.addHandler(logging.StreamHandler(sys.stdout))
 
 BSX_DOCKER_MODE = toBool(os.getenv("BSX_DOCKER_MODE", "false"))
+BSX_LOCAL_TOR = toBool(os.getenv("BSX_LOCAL_TOR", "false"))
 BSX_TEST_MODE = toBool(os.getenv("BSX_TEST_MODE", "false"))
 BSX_UPDATE_UNMANAGED = toBool(
     os.getenv("BSX_UPDATE_UNMANAGED", "true")
@@ -267,6 +268,11 @@ TOR_PROXY_HOST = os.getenv("TOR_PROXY_HOST", "127.0.0.1")
 TOR_PROXY_PORT = int(os.getenv("TOR_PROXY_PORT", 9050))
 TOR_CONTROL_PORT = int(os.getenv("TOR_CONTROL_PORT", 9051))
 TOR_DNS_PORT = int(os.getenv("TOR_DNS_PORT", 5353))
+TOR_CONTROL_LISTEN_INTERFACE = os.getenv("TOR_CONTROL_LISTEN_INTERFACE", "127.0.0.1" if BSX_LOCAL_TOR else "0.0.0.0")
+TORRC_PROXY_HOST = os.getenv("TORRC_PROXY_HOST", "127.0.0.1" if BSX_LOCAL_TOR else "0.0.0.0")
+TORRC_CONTROL_HOST = os.getenv("TORRC_CONTROL_HOST", "127.0.0.1" if BSX_LOCAL_TOR else "0.0.0.0")
+TORRC_DNS_HOST = os.getenv("TORRC_DNS_HOST", "127.0.0.1" if BSX_LOCAL_TOR else "0.0.0.0")
+
 TEST_TOR_PROXY = toBool(
     os.getenv("TEST_TOR_PROXY", "true")
 )  # Expects a known exit node
@@ -1092,9 +1098,9 @@ def writeTorSettings(fp, coin, coin_settings, tor_control_password):
     fp.write(f"torcontrol={TOR_PROXY_HOST}:{TOR_CONTROL_PORT}\n")
 
     if coin_settings["core_version_group"] >= 21:
-        fp.write(f"bind=0.0.0.0:{onionport}=onion\n")
+        fp.write(f"bind={TOR_CONTROL_LISTEN_INTERFACE}:{onionport}=onion\n")
     else:
-        fp.write(f"bind=0.0.0.0:{onionport}\n")
+        fp.write(f"bind={TOR_CONTROL_LISTEN_INTERFACE}:{onionport}\n")
 
 
 def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
@@ -1416,9 +1422,9 @@ def write_torrc(data_dir, tor_control_password):
 
     tor_control_hash = rfc2440_hash_password(tor_control_password)
     with open(torrc_path, "w") as fp:
-        fp.write(f"SocksPort 0.0.0.0:{TOR_PROXY_PORT}\n")
-        fp.write(f"ControlPort 0.0.0.0:{TOR_CONTROL_PORT}\n")
-        fp.write(f"DNSPort 0.0.0.0:{TOR_DNS_PORT}\n")
+        fp.write(f"SocksPort {TORRC_PROXY_HOST}:{TOR_PROXY_PORT}\n")
+        fp.write(f"ControlPort {TORRC_CONTROL_HOST}:{TOR_CONTROL_PORT}\n")
+        fp.write(f"DNSPort {TORRC_DNS_HOST}:{TOR_DNS_PORT}\n")
         fp.write(f"HashedControlPassword {tor_control_hash}\n")
 
 
@@ -2669,13 +2675,12 @@ def main():
     )
     if os.path.exists(config_path):
         if prepare_bin_only:
-            with open(config_path) as fs:
-                settings = json.load(fs)
+            settings = load_config(config_path)
 
-                # Add temporary default config for any coins that have not been added
-                for c in with_coins:
-                    if c not in settings["chainclients"]:
-                        settings["chainclients"][c] = chainclients[c]
+            # Add temporary default config for any coins that have not been added
+            for c in with_coins:
+                if c not in settings["chainclients"]:
+                    settings["chainclients"][c] = chainclients[c]
         elif upgrade_cores:
             with open(config_path) as fs:
                 settings = json.load(fs)
