@@ -56,6 +56,7 @@ from .ui.page_encryption import page_changepassword, page_unlock, page_lock
 from .ui.page_identity import page_identity
 from .ui.page_smsgaddresses import page_smsgaddresses
 from .ui.page_debug import page_debug
+from .ui.page_quickswaps import page_quickswaps
 
 env = Environment(loader=PackageLoader("basicswap", "templates"))
 env.filters["formatts"] = format_timestamp
@@ -564,6 +565,8 @@ class HttpHandler(BaseHTTPRequestHandler):
                     return self.page_info(url_split, post_string)
                 if page == "rpc":
                     return self.page_rpc(url_split, post_string)
+                if page == "quickswaps":
+                    return page_quickswaps(self, url_split, post_string)
                 if page == "debug":
                     return page_debug(self, url_split, post_string)
                 if page == "explorers":
