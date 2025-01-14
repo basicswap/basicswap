@@ -6,13 +6,11 @@ def page_quickswaps(handler, url_split, post_string):
     messages = []
     err_messages = []
     form_data = handler.checkForm(post_string, "quickswaps", messages)
-
+    
     if form_data:
         try:
             pass
         except Exception as e:
-            if swap_client.debug:
-                swap_client.log.error(traceback.format_exc())
             err_messages.append(str(e))
 
     template = handler.server.env.get_template("quickswaps.html")
