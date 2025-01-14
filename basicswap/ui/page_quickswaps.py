@@ -6,7 +6,7 @@ def page_quickswaps(handler, url_split, post_string):
     messages = []
     err_messages = []
     form_data = handler.checkForm(post_string, "quickswaps", messages)
-    
+
     if form_data:
         try:
             pass
