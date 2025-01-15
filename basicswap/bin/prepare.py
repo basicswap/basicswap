@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2019-2024 tecnovert
-# Copyright (c) 2024 The Basicswap developers
+# Copyright (c) 2024-2025 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -23,6 +23,7 @@ import stat
 import sys
 import tarfile
 import threading
+import time
 import urllib.parse
 import zipfile
 
@@ -50,14 +51,11 @@ PARTICL_VERSION = os.getenv("PARTICL_VERSION", "23.2.7.0")
 PARTICL_VERSION_TAG = os.getenv("PARTICL_VERSION_TAG", "")
 PARTICL_LINUX_EXTRA = os.getenv("PARTICL_LINUX_EXTRA", "nousb")
 
-LITECOIN_VERSION = os.getenv("LITECOIN_VERSION", "0.21.3")
+LITECOIN_VERSION = os.getenv("LITECOIN_VERSION", "0.21.4")
 LITECOIN_VERSION_TAG = os.getenv("LITECOIN_VERSION_TAG", "")
 
-BITCOIN_VERSION = os.getenv("BITCOIN_VERSION", "26.0")
+BITCOIN_VERSION = os.getenv("BITCOIN_VERSION", "28.0")
 BITCOIN_VERSION_TAG = os.getenv("BITCOIN_VERSION_TAG", "")
-
-BITCOINCASH_VERSION = os.getenv("BITCOINCASH_VERSION", "27.1.0")
-BITCOINCASH_VERSION_TAG = os.getenv("BITCOINCASH_VERSION_TAG", "")
 
 MONERO_VERSION = os.getenv("MONERO_VERSION", "0.18.3.4")
 MONERO_VERSION_TAG = os.getenv("MONERO_VERSION_TAG", "")
@@ -74,7 +72,7 @@ WOW_SITE_COMMIT = (
 PIVX_VERSION = os.getenv("PIVX_VERSION", "5.6.1")
 PIVX_VERSION_TAG = os.getenv("PIVX_VERSION_TAG", "")
 
-DASH_VERSION = os.getenv("DASH_VERSION", "21.1.0")
+DASH_VERSION = os.getenv("DASH_VERSION", "22.0.0")
 DASH_VERSION_TAG = os.getenv("DASH_VERSION_TAG", "")
 
 FIRO_VERSION = os.getenv("FIRO_VERSION", "0.14.14.0")
@@ -85,6 +83,12 @@ NAV_VERSION_TAG = os.getenv("NAV_VERSION_TAG", "")
 
 DCR_VERSION = os.getenv("DCR_VERSION", "1.8.1")
 DCR_VERSION_TAG = os.getenv("DCR_VERSION_TAG", "")
+
+BITCOINCASH_VERSION = os.getenv("BITCOINCASH_VERSION", "27.1.0")
+BITCOINCASH_VERSION_TAG = os.getenv("BITCOINCASH_VERSION_TAG", "")
+
+DOGECOIN_VERSION = os.getenv("DOGECOIN_VERSION", "23.2.1")
+DOGECOIN_VERSION_TAG = os.getenv("DOGECOIN_VERSION_TAG", "")
 
 GUIX_SSL_CERT_DIR = None
 
@@ -98,7 +102,6 @@ SKIP_GPG_VALIDATION = toBool(os.getenv("SKIP_GPG_VALIDATION", "false"))
 known_coins = {
     "particl": (PARTICL_VERSION, PARTICL_VERSION_TAG, ("tecnovert",)),
     "bitcoin": (BITCOIN_VERSION, BITCOIN_VERSION_TAG, ("laanwj",)),
-    "bitcoincash": (BITCOINCASH_VERSION, BITCOINCASH_VERSION_TAG, ("Calin_Culianu",)),
     "litecoin": (LITECOIN_VERSION, LITECOIN_VERSION_TAG, ("davidburkett38",)),
     "decred": (DCR_VERSION, DCR_VERSION_TAG, ("decred_release",)),
     "namecoin": ("0.18.0", "", ("JeremyRand",)),
@@ -108,6 +111,8 @@ known_coins = {
     "dash": (DASH_VERSION, DASH_VERSION_TAG, ("pasta",)),
     "firo": (FIRO_VERSION, FIRO_VERSION_TAG, ("reuben",)),
     "navcoin": (NAV_VERSION, NAV_VERSION_TAG, ("nav_builder",)),
+    "bitcoincash": (BITCOINCASH_VERSION, BITCOINCASH_VERSION_TAG, ("Calin_Culianu",)),
+    "dogecoin": (DOGECOIN_VERSION, DOGECOIN_VERSION_TAG, ("tecnovert",)),
 }
 
 disabled_coins = [
@@ -123,8 +128,10 @@ expected_key_ids = {
     "binaryfate": ("F0AF4D462A0BDF92",),
     "wowario": ("793504B449C69220",),
     "davidburkett38": ("3620E9D387E55666",),
+    "xanimo": ("6E8F17C1B1BCDCBE",),
+    "patricklodder": ("2D3A345B98D0DC1F",),
     "fuzzbawls": ("C1ABA64407731FD9",),
-    "pasta": ("52527BEDABE87984",),
+    "pasta": ("52527BEDABE87984", "E2F3D7916E722D38"),
     "reuben": ("1290A1D0FA7EE109",),
     "nav_builder": ("2782262BF6E7FADB",),
     "decred_release": ("6D897EDF518A031D",),
@@ -157,7 +164,11 @@ if not len(logger.handlers):
     logger.addHandler(logging.StreamHandler(sys.stdout))
 
 BSX_DOCKER_MODE = toBool(os.getenv("BSX_DOCKER_MODE", "false"))
+BSX_LOCAL_TOR = toBool(os.getenv("BSX_LOCAL_TOR", "false"))
 BSX_TEST_MODE = toBool(os.getenv("BSX_TEST_MODE", "false"))
+BSX_UPDATE_UNMANAGED = toBool(
+    os.getenv("BSX_UPDATE_UNMANAGED", "true")
+)  # Disable updating unmanaged coin cores.
 UI_HTML_PORT = int(os.getenv("UI_HTML_PORT", 12700))
 UI_WS_PORT = int(os.getenv("UI_WS_PORT", 11700))
 COINS_RPCBIND_IP = os.getenv("COINS_RPCBIND_IP", "127.0.0.1")
@@ -203,13 +214,6 @@ BTC_ONION_PORT = int(os.getenv("BTC_ONION_PORT", 8334))
 BTC_RPC_USER = os.getenv("BTC_RPC_USER", "")
 BTC_RPC_PWD = os.getenv("BTC_RPC_PWD", "")
 
-BCH_RPC_HOST = os.getenv("BCH_RPC_HOST", "127.0.0.1")
-BCH_RPC_PORT = int(os.getenv("BCH_RPC_PORT", 19997))
-BCH_ONION_PORT = int(os.getenv("BCH_ONION_PORT", 8335))
-BCH_PORT = int(os.getenv("BCH_PORT", 19798))
-BCH_RPC_USER = os.getenv("BCH_RPC_USER", "")
-BCH_RPC_PWD = os.getenv("BCH_RPC_PWD", "")
-
 DCR_RPC_HOST = os.getenv("DCR_RPC_HOST", "127.0.0.1")
 DCR_RPC_PORT = int(os.getenv("DCR_RPC_PORT", 9109))
 DCR_WALLET_RPC_HOST = os.getenv("DCR_WALLET_RPC_HOST", "127.0.0.1")
@@ -247,10 +251,28 @@ NAV_ONION_PORT = int(os.getenv("NAV_ONION_PORT", 8334))  # TODO?
 NAV_RPC_USER = os.getenv("NAV_RPC_USER", "")
 NAV_RPC_PWD = os.getenv("NAV_RPC_PWD", "")
 
+BCH_RPC_HOST = os.getenv("BCH_RPC_HOST", "127.0.0.1")
+BCH_RPC_PORT = int(os.getenv("BCH_RPC_PORT", 19997))
+BCH_ONION_PORT = int(os.getenv("BCH_ONION_PORT", 8335))
+BCH_PORT = int(os.getenv("BCH_PORT", 19798))
+BCH_RPC_USER = os.getenv("BCH_RPC_USER", "")
+BCH_RPC_PWD = os.getenv("BCH_RPC_PWD", "")
+
+DOGE_RPC_HOST = os.getenv("DOGE_RPC_HOST", "127.0.0.1")
+DOGE_RPC_PORT = int(os.getenv("DOGE_RPC_PORT", 42069))
+DOGE_ONION_PORT = int(os.getenv("DOGE_ONION_PORT", 6969))
+DOGE_RPC_USER = os.getenv("DOGE_RPC_USER", "")
+DOGE_RPC_PWD = os.getenv("DOGE_RPC_PWD", "")
+
 TOR_PROXY_HOST = os.getenv("TOR_PROXY_HOST", "127.0.0.1")
 TOR_PROXY_PORT = int(os.getenv("TOR_PROXY_PORT", 9050))
 TOR_CONTROL_PORT = int(os.getenv("TOR_CONTROL_PORT", 9051))
 TOR_DNS_PORT = int(os.getenv("TOR_DNS_PORT", 5353))
+TOR_CONTROL_LISTEN_INTERFACE = os.getenv("TOR_CONTROL_LISTEN_INTERFACE", "127.0.0.1" if BSX_LOCAL_TOR else "0.0.0.0")
+TORRC_PROXY_HOST = os.getenv("TORRC_PROXY_HOST", "127.0.0.1" if BSX_LOCAL_TOR else "0.0.0.0")
+TORRC_CONTROL_HOST = os.getenv("TORRC_CONTROL_HOST", "127.0.0.1" if BSX_LOCAL_TOR else "0.0.0.0")
+TORRC_DNS_HOST = os.getenv("TORRC_DNS_HOST", "127.0.0.1" if BSX_LOCAL_TOR else "0.0.0.0")
+
 TEST_TOR_PROXY = toBool(
     os.getenv("TEST_TOR_PROXY", "true")
 )  # Expects a known exit node
@@ -268,6 +290,7 @@ BITCOIN_FASTSYNC_FILE = os.getenv(
 WALLET_ENCRYPTION_PWD = os.getenv("WALLET_ENCRYPTION_PWD", "")
 
 use_tor_proxy: bool = False
+with_coins_changed: bool = False
 
 monerod_proxy_config = [
     f"proxy={TOR_PROXY_HOST}:{TOR_PROXY_PORT}",
@@ -324,6 +347,11 @@ def shouldManageDaemon(prefix: str) -> bool:
         return True
 
     return toBool(manage_daemon)
+
+
+def getKnownVersion(coin_name: str) -> str:
+    version, version_tag, _ = known_coins[coin_name]
+    return version + version_tag
 
 
 def exitWithError(error_msg: str):
@@ -759,7 +787,7 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
         arch_name = BIN_ARCH
         if os_name == "osx" and use_guix:
             arch_name = "x86_64-apple-darwin"
-            if coin == "particl":
+            if coin in ("particl", "dogecoin"):
                 arch_name += "18"
 
         release_filename = "{}-{}-{}.{}".format(
@@ -802,6 +830,15 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
                 "https://raw.githubusercontent.com/litecoin-project/gitian.sigs.ltc/master/%s-%s/%s/%s"
                 % (version, os_dir_name, signing_key_name, assert_filename)
             )
+        elif coin == "dogecoin":
+            release_url = (
+                "https://github.com/tecnovert/dogecoin/releases/download/v{}/{}".format(
+                    version + version_tag, release_filename
+                )
+            )
+            assert_filename = "{}-{}-{}-build.assert".format(coin, os_name, version)
+            assert_url = f"https://raw.githubusercontent.com/tecnovert/guix.sigs/dogecoin/{version}/{signing_key_name}/noncodesigned.SHA256SUMS"
+
         elif coin == "bitcoin":
             release_url = "https://bitcoincore.org/bin/bitcoin-core-{}/{}".format(
                 version, release_filename
@@ -973,6 +1010,8 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
         pubkey_filename = "{}_builder.pgp".format(coin)
     elif coin in ("decred",):
         pubkey_filename = "{}_release.pgp".format(coin)
+    elif coin in ("dogecoin",):
+        pubkey_filename = "particl_{}.pgp".format(signing_key_name)
     else:
         pubkey_filename = "{}_{}.pgp".format(coin, signing_key_name)
     pubkeyurls = [
@@ -1059,9 +1098,9 @@ def writeTorSettings(fp, coin, coin_settings, tor_control_password):
     fp.write(f"torcontrol={TOR_PROXY_HOST}:{TOR_CONTROL_PORT}\n")
 
     if coin_settings["core_version_group"] >= 21:
-        fp.write(f"bind=0.0.0.0:{onionport}=onion\n")
+        fp.write(f"bind={TOR_CONTROL_LISTEN_INTERFACE}:{onionport}=onion\n")
     else:
-        fp.write(f"bind=0.0.0.0:{onionport}\n")
+        fp.write(f"bind={TOR_CONTROL_LISTEN_INTERFACE}:{onionport}\n")
 
 
 def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
@@ -1268,12 +1307,18 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
                 )
         elif coin == "litecoin":
             fp.write("prune=4000\n")
-            fp.write("blockfilterindex=0\n")
-            fp.write("peerblockfilters=0\n")
             if LTC_RPC_USER != "":
                 fp.write(
                     "rpcauth={}:{}${}\n".format(
                         LTC_RPC_USER, salt, password_to_hmac(salt, LTC_RPC_PWD)
+                    )
+                )
+        elif coin == "dogecoin":
+            fp.write("prune=4000\n")
+            if DOGE_RPC_USER != "":
+                fp.write(
+                    "rpcauth={}:{}${}\n".format(
+                        DOGE_RPC_USER, salt, password_to_hmac(salt, DOGE_RPC_PWD)
                     )
                 )
         elif coin == "bitcoin":
@@ -1377,9 +1422,9 @@ def write_torrc(data_dir, tor_control_password):
 
     tor_control_hash = rfc2440_hash_password(tor_control_password)
     with open(torrc_path, "w") as fp:
-        fp.write(f"SocksPort 0.0.0.0:{TOR_PROXY_PORT}\n")
-        fp.write(f"ControlPort 0.0.0.0:{TOR_CONTROL_PORT}\n")
-        fp.write(f"DNSPort 0.0.0.0:{TOR_DNS_PORT}\n")
+        fp.write(f"SocksPort {TORRC_PROXY_HOST}:{TOR_PROXY_PORT}\n")
+        fp.write(f"ControlPort {TORRC_CONTROL_HOST}:{TOR_CONTROL_PORT}\n")
+        fp.write(f"DNSPort {TORRC_DNS_HOST}:{TOR_DNS_PORT}\n")
         fp.write(f"HashedControlPassword {tor_control_hash}\n")
 
 
@@ -1485,6 +1530,8 @@ def modify_tor_config(
             default_onionport = PART_ONION_PORT
         elif coin == "litecoin":
             default_onionport = LTC_ONION_PORT
+        elif coin == "dogecoin":
+            default_onionport = DOGE_ONION_PORT
         elif coin in ("decred",):
             pass
         else:
@@ -1517,9 +1564,6 @@ def printVersion(with_coins):
     if len(with_coins) < 1:
         return
     print("Core versions:")
-    with_coins_changed: bool = (
-        False if len(with_coins) == 1 and "particl" in with_coins else True
-    )
     for coin, version in known_coins.items():
         if with_coins_changed and coin not in with_coins:
             continue
@@ -1636,7 +1680,7 @@ def test_particl_encryption(data_dir, settings, chain, use_tor_proxy):
             c = Coins.PART
             coin_name = "particl"
             coin_settings = settings["chainclients"][coin_name]
-            daemon_args += getCoreBinArgs(c, coin_settings)
+            daemon_args += getCoreBinArgs(c, coin_settings, prepare=True)
             extra_config = {"stdout_to_file": True}
             if coin_settings["manage_daemon"]:
                 filename: str = getCoreBinName(c, coin_settings, coin_name + "d")
@@ -1697,6 +1741,7 @@ def initialise_wallets(
                 Coins.PART,
                 Coins.BTC,
                 Coins.LTC,
+                Coins.DOGE,
                 Coins.DCR,
                 Coins.DASH,
             )
@@ -1748,7 +1793,7 @@ def initialise_wallets(
                         coin_args = (
                             ["-nofindpeers", "-nostaking"] if c == Coins.PART else []
                         )
-                        coin_args += getCoreBinArgs(c, coin_settings)
+                        coin_args += getCoreBinArgs(c, coin_settings, prepare=True)
 
                         if c == Coins.FIRO:
                             coin_args += [
@@ -1803,7 +1848,7 @@ def initialise_wallets(
                             "Creating wallet.dat for {}.".format(getCoinName(c))
                         )
 
-                        if c in (Coins.BTC, Coins.LTC, Coins.DASH):
+                        if c in (Coins.BTC, Coins.LTC, Coins.DOGE, Coins.DASH):
                             # wallet_name, disable_private_keys, blank, passphrase, avoid_reuse, descriptors
                             swap_client.callcoinrpc(
                                 c,
@@ -1946,7 +1991,7 @@ def ensure_coin_valid(coin: str, test_disabled: bool = True) -> None:
 
 
 def main():
-    global use_tor_proxy
+    global use_tor_proxy, with_coins_changed
     data_dir = None
     bin_dir = None
     port_offset = None
@@ -1957,12 +2002,12 @@ def main():
     }
     add_coin = ""
     disable_coin = ""
-    coins_changed = False
     htmlhost = "127.0.0.1"
     xmr_restore_height = DEFAULT_XMR_RESTORE_HEIGHT
     wow_restore_height = DEFAULT_WOW_RESTORE_HEIGHT
     print_versions = False
     prepare_bin_only = False
+    upgrade_cores = False
     no_cores = False
     enable_tor = False
     disable_tor = False
@@ -2000,6 +2045,9 @@ def main():
             continue
         if name == "preparebinonly":
             prepare_bin_only = True
+            continue
+        if name == "upgradecores":
+            upgrade_cores = True
             continue
         if name == "nocores":
             no_cores = True
@@ -2060,13 +2108,13 @@ def main():
                 for coin in [s.strip().lower() for s in s[1].split(",")]:
                     ensure_coin_valid(coin)
                     with_coins.add(coin)
-                coins_changed = True
+                with_coins_changed = True
                 continue
             if name in ("withoutcoin", "withoutcoins"):
                 for coin in [s.strip().lower() for s in s[1].split(",")]:
                     ensure_coin_valid(coin, test_disabled=False)
                     with_coins.discard(coin)
-                coins_changed = True
+                with_coins_changed = True
                 continue
             if name == "addcoin":
                 add_coin = s[1].strip().lower()
@@ -2212,7 +2260,8 @@ def main():
             "blocks_confirmed": 2,
             "override_feerate": 0.002,
             "conf_target": 2,
-            "core_version_group": 21,
+            "core_version_no": getKnownVersion("particl"),
+            "core_version_group": 23,
         },
         "bitcoin": {
             "connection_type": "rpc",
@@ -2225,7 +2274,8 @@ def main():
             "use_segwit": True,
             "blocks_confirmed": 1,
             "conf_target": 2,
-            "core_version_group": 22,
+            "core_version_no": getKnownVersion("bitcoin"),
+            "core_version_group": 28,
         },
         "bitcoincash": {
             "connection_type": "rpc",
@@ -2240,6 +2290,7 @@ def main():
             "use_segwit": False,
             "blocks_confirmed": 1,
             "conf_target": 2,
+            "core_version_no": getKnownVersion("bitcoincash"),
             "core_version_group": 22,
         },
         "litecoin": {
@@ -2253,8 +2304,25 @@ def main():
             "use_segwit": True,
             "blocks_confirmed": 2,
             "conf_target": 2,
-            "core_version_group": 21,
+            "core_version_no": getKnownVersion("litecoin"),
+            "core_version_group": 20,
             "min_relay_fee": 0.00001,
+        },
+        "dogecoin": {
+            "connection_type": "rpc",
+            "manage_daemon": shouldManageDaemon("DOGE"),
+            "rpchost": DOGE_RPC_HOST,
+            "rpcport": DOGE_RPC_PORT + port_offset,
+            "onionport": DOGE_ONION_PORT + port_offset,
+            "datadir": os.getenv("DOGE_DATA_DIR", os.path.join(data_dir, "dogecoin")),
+            "bindir": os.path.join(bin_dir, "dogecoin"),
+            "use_segwit": False,
+            "use_csv": False,
+            "blocks_confirmed": 2,
+            "conf_target": 2,
+            "core_version_no": getKnownVersion("dogecoin"),
+            "core_version_group": 23,
+            "min_relay_fee": 0.01,  # RECOMMENDED_MIN_TX_FEE
         },
         "decred": {
             "connection_type": "rpc",
@@ -2273,6 +2341,7 @@ def main():
             "use_segwit": True,
             "blocks_confirmed": 2,
             "conf_target": 2,
+            "core_version_no": getKnownVersion("decred"),
             "core_type_group": "dcr",
             "config_filename": "dcrd.conf",
             "min_relay_fee": 0.00001,
@@ -2288,6 +2357,7 @@ def main():
             "use_csv": False,
             "blocks_confirmed": 1,
             "conf_target": 2,
+            "core_version_no": getKnownVersion("namecoin"),
             "core_version_group": 18,
             "chain_lookups": "local",
         },
@@ -2312,6 +2382,7 @@ def main():
             "walletrpctimeout": 120,
             "walletrpctimeoutlong": 600,
             "wallet_config_filename": "monero_wallet.conf",
+            "core_version_no": getKnownVersion("monero"),
             "core_type_group": "xmr",
         },
         "pivx": {
@@ -2326,6 +2397,7 @@ def main():
             "use_csv": False,
             "blocks_confirmed": 1,
             "conf_target": 2,
+            "core_version_no": getKnownVersion("pivx"),
             "core_version_group": 17,
         },
         "dash": {
@@ -2340,6 +2412,7 @@ def main():
             "use_csv": True,
             "blocks_confirmed": 1,
             "conf_target": 2,
+            "core_version_no": getKnownVersion("dash"),
             "core_version_group": 18,
         },
         "firo": {
@@ -2354,6 +2427,7 @@ def main():
             "use_csv": False,
             "blocks_confirmed": 1,
             "conf_target": 2,
+            "core_version_no": getKnownVersion("firo"),
             "core_version_group": 14,
             "min_relay_fee": 0.00001,
         },
@@ -2369,6 +2443,7 @@ def main():
             "use_csv": True,
             "blocks_confirmed": 1,
             "conf_target": 2,
+            "core_version_no": getKnownVersion("navcoin"),
             "core_version_group": 18,
             "chain_lookups": "local",
             "startup_tries": 40,
@@ -2393,6 +2468,7 @@ def main():
             "rpctimeout": 60,
             "walletrpctimeout": 120,
             "walletrpctimeoutlong": 300,
+            "core_version_no": getKnownVersion("wownero"),
             "core_type_group": "xmr",
         },
     }
@@ -2403,6 +2479,9 @@ def main():
     if LTC_RPC_USER != "":
         chainclients["litecoin"]["rpcuser"] = LTC_RPC_USER
         chainclients["litecoin"]["rpcpassword"] = LTC_RPC_PWD
+    if DOGE_RPC_USER != "":
+        chainclients["dogecoin"]["rpcuser"] = DOGE_RPC_USER
+        chainclients["dogecoin"]["rpcpassword"] = DOGE_RPC_PWD
     if BTC_RPC_USER != "":
         chainclients["bitcoin"]["rpcuser"] = BTC_RPC_USER
         chainclients["bitcoin"]["rpcpassword"] = BTC_RPC_PWD
@@ -2444,7 +2523,7 @@ def main():
 
         init_coins = settings["chainclients"].keys()
         logger.info("Active coins: %s", ", ".join(init_coins))
-        if coins_changed:
+        if with_coins_changed:
             init_coins = with_coins
             logger.info("Initialising coins: %s", ", ".join(init_coins))
         initialise_wallets(
@@ -2501,6 +2580,9 @@ def main():
         return 0
 
     if disable_coin != "":
+        if "particl" in disable_coin:
+            exitWithError("Cannot disable Particl (required for operation)")
+
         logger.info("Disabling coin: %s", disable_coin)
         settings = load_config(config_path)
 
@@ -2563,7 +2645,7 @@ def main():
         if not no_cores:
             prepareCore(add_coin, known_coins[add_coin], settings, data_dir, extra_opts)
 
-        if not prepare_bin_only:
+        if not (prepare_bin_only or upgrade_cores):
             prepareDataDir(
                 add_coin, settings, chain, particl_wallet_mnemonic, extra_opts
             )
@@ -2586,19 +2668,95 @@ def main():
         logger.info(f"Done. Coin {add_coin} successfully added.")
         return 0
 
-    logger.info("With coins: %s", ", ".join(with_coins))
+    logger.info(
+        "With coins: "
+        + (", ".join(with_coins))
+        + ("" if with_coins_changed else " (default)")
+    )
     if os.path.exists(config_path):
-        if not prepare_bin_only:
-            exitWithError("{} exists".format(config_path))
-        else:
+        if prepare_bin_only:
+            settings = load_config(config_path)
+
+            # Add temporary default config for any coins that have not been added
+            for c in with_coins:
+                if c not in settings["chainclients"]:
+                    settings["chainclients"][c] = chainclients[c]
+        elif upgrade_cores:
             with open(config_path) as fs:
                 settings = json.load(fs)
 
-                # Add temporary default config for any coins that have not been added
-                for c in with_coins:
-                    if c not in settings["chainclients"]:
-                        settings["chainclients"][c] = chainclients[c]
+            with_coins_start = with_coins
+            if not with_coins_changed:
+                for coin_name, coin_settings in settings["chainclients"].items():
+                    with_coins_start.add(coin_name)
+
+            with_coins = set()
+            for coin_name in with_coins_start:
+                if coin_name not in chainclients:
+                    logger.warning(f"Skipping unknown coin: {coin_name}.")
+                    continue
+                current_coin_settings = chainclients[coin_name]
+                if coin_name not in settings["chainclients"]:
+                    exitWithError(f"{coin_name} not found in basicswap.json")
+                coin_settings = settings["chainclients"][coin_name]
+
+                current_version = current_coin_settings["core_version_no"]
+                have_version = coin_settings.get("core_version_no", "")
+
+                current_version_group = current_coin_settings.get(
+                    "core_version_group", ""
+                )
+                have_version_group = coin_settings.get("core_version_group", "")
+
+                logger.info(
+                    f"{coin_name}: have {have_version}, current {current_version}."
+                )
+                if not BSX_UPDATE_UNMANAGED and not (
+                    coin_settings.get("manage_daemon", False)
+                    or coin_settings.get("manage_wallet_daemon", False)
+                ):
+                    logger.info("  Unmanaged.")
+                elif have_version != current_version:
+                    logger.info(f"  Trying to update {coin_name}.")
+                    with_coins.add(coin_name)
+                elif have_version_group != current_version_group:
+                    logger.info(
+                        f"  Trying to update {coin_name}, version group differs."
+                    )
+                    with_coins.add(coin_name)
+
+            if len(with_coins) < 1:
+                logger.info("Nothing to do.")
+                return 0
+
+            # Run second loop to update, so all versions are logged together.
+            # Backup settings
+            old_config_path = config_path[:-5] + "_" + str(int(time.time())) + ".json"
+            with open(old_config_path, "w") as fp:
+                json.dump(settings, fp, indent=4)
+            for c in with_coins:
+                prepareCore(c, known_coins[c], settings, data_dir, extra_opts)
+                current_coin_settings = chainclients[c]
+                current_version = current_coin_settings["core_version_no"]
+                current_version_group = current_coin_settings.get(
+                    "core_version_group", ""
+                )
+                settings["chainclients"][c]["core_version_no"] = current_version
+                if current_version_group != "":
+                    settings["chainclients"][c][
+                        "core_version_group"
+                    ] = current_version_group
+                with open(config_path, "w") as fp:
+                    json.dump(settings, fp, indent=4)
+
+            logger.info("Done.")
+            return 0
+        else:
+            exitWithError(f"{config_path} exists")
     else:
+        if upgrade_cores:
+            exitWithError(f"{config_path} not found")
+
         for c in with_coins:
             withchainclients[c] = chainclients[c]
 

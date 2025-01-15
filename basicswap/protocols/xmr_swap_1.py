@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2020-2024 tecnovert
-# Copyright (c) 2024 The Basicswap developers
+# Copyright (c) 2024-2025 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -15,9 +15,10 @@ from basicswap.chainparams import (
     Coins,
 )
 from basicswap.basicswap_util import (
+    EventLogTypes,
     KeyTypes,
     SwapTypes,
-    EventLogTypes,
+    TxTypes,
 )
 from . import ProtocolInterface
 from basicswap.contrib.test_framework.script import CScript, CScriptOp, OP_CHECKMULTISIG
@@ -55,7 +56,7 @@ def recoverNoScriptTxnWithKey(self, bid_id: bytes, encoded_key, cursor=None):
         ensure(xmr_offer, "Adaptor-sig offer not found: {}.".format(bid.offer_id.hex()))
 
         # The no-script coin is always the follower
-        reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from)
+        reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
         ci_from = self.ci(Coins(offer.coin_from))
         ci_to = self.ci(Coins(offer.coin_to))
         ci_follower = ci_from if reverse_bid else ci_to
@@ -89,16 +90,20 @@ def recoverNoScriptTxnWithKey(self, bid_id: bytes, encoded_key, cursor=None):
         summed_pkbs = ci_follower.getPubkey(vkbs)
         if summed_pkbs != xmr_swap.pkbs:
             err_msg: str = "Summed key does not match expected wallet spend pubkey"
-            have_pk = summed_pkbs.hex()
-            expect_pk = xmr_swap.pkbs.hex()
-            self.log.error(f"{err_msg}. Got: {have_pk}, Expect: {expect_pk}")
+            self.log.error(
+                f"{err_msg}. Got: {summed_pkbs.hex()}, Expect: {xmr_swap.pkbs.hex()}"
+            )
             raise ValueError(err_msg)
 
-        if ci_follower.coin_type() in (Coins.XMR, Coins.WOW):
+        coin_to: int = ci_follower.interface_type()
+        base_coin_to: int = ci_follower.coin_type()
+        if coin_to in (Coins.XMR, Coins.WOW):
             address_to = self.getCachedMainWalletAddress(ci_follower, use_cursor)
+        elif coin_to in (Coins.PART_BLIND, Coins.PART_ANON):
+            address_to = self.getCachedStealthAddressForCoin(base_coin_to, use_cursor)
         else:
-            address_to = self.getCachedStealthAddressForCoin(
-                ci_follower.coin_type(), use_cursor
+            address_to = self.getReceiveAddressFromPool(
+                base_coin_to, bid_id, TxTypes.XMR_SWAP_B_LOCK_SPEND, use_cursor
             )
         amount = bid.amount_to
         lock_tx_vout = bid.getLockTXBVout()
@@ -145,10 +150,11 @@ def getChainBSplitKey(swap_client, bid, xmr_swap, offer):
     was_sent: bool = bid.was_received if reverse_bid else bid.was_sent
 
     key_type = KeyTypes.KBSF if was_sent else KeyTypes.KBSL
+
     return ci_follower.encodeKey(
         swap_client.getPathKey(
-            ci_leader.coin_type(),
-            ci_follower.coin_type(),
+            ci_leader.interface_type(),
+            ci_follower.interface_type(),
             bid.created_at,
             xmr_swap.contract_count,
             key_type,

@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2024 tecnovert
+# Copyright (c) 2025 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -52,6 +53,10 @@ class CoinInterface:
         self._network = network
         self._mx_wallet = threading.Lock()
         self._altruistic = True
+
+    def interface_type(self) -> int:
+        # coin_type() returns the base coin type, interface_type() returns the coin+balance type.
+        return self.coin_type()
 
     def setDefaults(self):
         self._unknown_wallet_seed = True
@@ -188,7 +193,7 @@ class Secp256k1Interface(CoinInterface, AdaptorSigInterface):
     def curve_type():
         return Curves.secp256k1
 
-    def getNewSecretKey(self) -> bytes:
+    def getNewRandomKey(self) -> bytes:
         return i2b(getSecretInt())
 
     def getPubkey(self, privkey: bytes) -> bytes:

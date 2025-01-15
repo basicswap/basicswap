@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2021-2024 tecnovert
-# Copyright (c) 2024 The Basicswap developers
+# Copyright (c) 2024-2025 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -61,7 +61,6 @@ logger = logging.getLogger()
 
 class TestFunctions(BaseTest):
     base_rpc_port = None
-    extra_wait_time = 0
 
     node_a_id = 0
     node_b_id = 1
@@ -170,7 +169,11 @@ class TestFunctions(BaseTest):
         bid_id = swap_clients[id_bidder].postXmrBid(offer_id, offer.amount_from)
 
         wait_for_bid(
-            test_delay_event, swap_clients[id_offerer], bid_id, BidStates.BID_RECEIVED
+            test_delay_event,
+            swap_clients[id_offerer],
+            bid_id,
+            BidStates.BID_RECEIVED,
+            wait_for=(self.extra_wait_time + 40),
         )
 
         bid0 = read_json_api(1800 + id_offerer, f"bids/{bid_id.hex()}")
@@ -331,7 +334,11 @@ class TestFunctions(BaseTest):
 
         bid_id = swap_clients[id_bidder].postXmrBid(offer_id, offer.amount_from)
         wait_for_bid(
-            test_delay_event, swap_clients[id_offerer], bid_id, BidStates.BID_RECEIVED
+            test_delay_event,
+            swap_clients[id_offerer],
+            bid_id,
+            BidStates.BID_RECEIVED,
+            wait_for=(self.extra_wait_time + 40),
         )
 
         swap_clients[id_follower].setBidDebugInd(
@@ -377,6 +384,9 @@ class TestFunctions(BaseTest):
         id_offerer: int = self.node_a_id
         id_bidder: int = self.node_b_id
 
+        abandon_all_swaps(test_delay_event, self.swap_clients[id_offerer])
+        abandon_all_swaps(test_delay_event, self.swap_clients[id_bidder])
+
         swap_clients = self.swap_clients
         reverse_bid: bool = swap_clients[0].is_reverse_ads_bid(coin_from, coin_to)
         ci_from = swap_clients[id_offerer].ci(coin_from)
@@ -389,7 +399,7 @@ class TestFunctions(BaseTest):
         )
 
         swap_clients[id_follower].ci(
-            coin_from if reverse_bid else coin_to
+            coin_to if reverse_bid else coin_from
         )._altruistic = with_mercy
 
         amt_swap = ci_from.make_int(random.uniform(0.1, 2.0), r=1)
@@ -409,20 +419,17 @@ class TestFunctions(BaseTest):
 
         bid_id = swap_clients[id_bidder].postXmrBid(offer_id, offer.amount_from)
         wait_for_bid(
-            test_delay_event, swap_clients[id_offerer], bid_id, BidStates.BID_RECEIVED
+            test_delay_event,
+            swap_clients[id_offerer],
+            bid_id,
+            BidStates.BID_RECEIVED,
+            wait_for=(self.extra_wait_time + 40),
         )
 
-        debug_type = (
-            DebugTypes.BID_DONT_SPEND_COIN_A_LOCK_REFUND2
-            if with_mercy
-            else DebugTypes.BID_DONT_SPEND_COIN_A_LOCK_REFUND
+        swap_clients[id_leader].setBidDebugInd(
+            bid_id, DebugTypes.BID_DONT_SPEND_COIN_A_LOCK_REFUND2
         )
-        swap_clients[id_leader].setBidDebugInd(bid_id, debug_type)
-        debug_type = (
-            DebugTypes.BID_DONT_SPEND_COIN_B_LOCK
-            if with_mercy
-            else DebugTypes.BID_STOP_AFTER_COIN_A_LOCK
-        )
+        debug_type = DebugTypes.BID_DONT_SPEND_COIN_B_LOCK
         swap_clients[id_follower].setBidDebugInd(bid_id, debug_type)
 
         swap_clients[id_leader].setBidDebugInd(
@@ -439,7 +446,7 @@ class TestFunctions(BaseTest):
         expect_state = (
             (BidStates.XMR_SWAP_NOSCRIPT_TX_REDEEMED, BidStates.SWAP_COMPLETED)
             if with_mercy
-            else BidStates.BID_STALLED_FOR_TEST
+            else (BidStates.BID_STALLED_FOR_TEST, BidStates.XMR_SWAP_FAILED_SWIPED)
         )
         wait_for_bid(
             test_delay_event,
@@ -469,6 +476,19 @@ class TestFunctions(BaseTest):
 
         wait_for_none_active(test_delay_event, 1800 + id_offerer)
         wait_for_none_active(test_delay_event, 1800 + id_bidder)
+
+        if with_mercy is False:
+            # Test manually redeeming the no-script lock tx
+            offerer_key = read_json_api(
+                1800 + id_offerer,
+                "bids/{}".format(bid_id.hex()),
+                {"chainbkeysplit": True},
+            )["splitkey"]
+            data = {"spendchainblocktx": True, "remote_key": offerer_key}
+            redeemed_txid = read_json_api(
+                1800 + id_bidder, "bids/{}".format(bid_id.hex()), data
+            )["txid"]
+            assert len(redeemed_txid) == 64
 
     def do_test_04_follower_recover_b_lock_tx(
         self, coin_from, coin_to, lock_value: int = 32
@@ -518,7 +538,11 @@ class TestFunctions(BaseTest):
 
         bid_id = swap_clients[id_bidder].postXmrBid(offer_id, offer.amount_from)
         wait_for_bid(
-            test_delay_event, swap_clients[id_offerer], bid_id, BidStates.BID_RECEIVED
+            test_delay_event,
+            swap_clients[id_offerer],
+            bid_id,
+            BidStates.BID_RECEIVED,
+            wait_for=(self.extra_wait_time + 40),
         )
 
         swap_clients[id_follower].setBidDebugInd(
@@ -1144,8 +1168,8 @@ class BasicSwapTest(TestFunctions):
         # fee_rate is in sats/kvB
         fee_rate: int = 1000
 
-        a = ci.getNewSecretKey()
-        b = ci.getNewSecretKey()
+        a = ci.getNewRandomKey()
+        b = ci.getNewRandomKey()
 
         A = ci.getPubkey(a)
         B = ci.getPubkey(b)
@@ -1214,8 +1238,8 @@ class BasicSwapTest(TestFunctions):
         assert expect_vsize - vsize_actual < 10
 
         # Test chain b (no-script) lock tx size
-        v = ci.getNewSecretKey()
-        s = ci.getNewSecretKey()
+        v = ci.getNewRandomKey()
+        s = ci.getNewRandomKey()
         S = ci.getPubkey(s)
         lock_tx_b_txid = ci.publishBLockTx(v, S, amount, fee_rate)
 
@@ -1598,7 +1622,13 @@ class BasicSwapTest(TestFunctions):
         offer = swap_clients[1].getOffer(offer_id)
         bid_id = swap_clients[1].postBid(offer_id, offer.amount_from)
 
-        wait_for_bid(test_delay_event, swap_clients[2], bid_id, BidStates.BID_RECEIVED)
+        wait_for_bid(
+            test_delay_event,
+            swap_clients[2],
+            bid_id,
+            BidStates.BID_RECEIVED,
+            wait_for=(self.extra_wait_time + 40),
+        )
         swap_clients[2].acceptBid(bid_id)
 
         wait_for_bid(
@@ -1659,7 +1689,13 @@ class BasicSwapTest(TestFunctions):
         wait_for_offer(test_delay_event, swap_clients[1], offer_id)
         bid_id = swap_clients[1].postXmrBid(offer_id, amt_swap)
         swap_clients[1].abandonBid(bid_id)
-        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.BID_ACCEPTED)
+        wait_for_bid(
+            test_delay_event,
+            swap_clients[0],
+            bid_id,
+            BidStates.BID_ACCEPTED,
+            wait_for=(self.extra_wait_time + 40),
+        )
 
         try:
             swap_clients[0].setMockTimeOffset(7200)
@@ -1698,6 +1734,22 @@ class BasicSwapTest(TestFunctions):
 
         amt_swap: int = ci_from.make_int(balance_from_before, r=1)
         rate_swap: int = ci_to.make_int(2.0, r=1)
+
+        try:
+            offer_id = swap_clients[id_offerer].postOffer(
+                coin_from,
+                coin_to,
+                amt_swap,
+                rate_swap,
+                amt_swap,
+                SwapTypes.XMR_SWAP,
+                auto_accept_bids=True,
+            )
+        except Exception as e:
+            assert "Insufficient funds" in str(e)
+        else:
+            assert False, "Should fail"
+        amt_swap -= ci_from.make_int(1)
         offer_id = swap_clients[id_offerer].postOffer(
             coin_from,
             coin_to,
@@ -1709,25 +1761,31 @@ class BasicSwapTest(TestFunctions):
         )
         wait_for_offer(test_delay_event, swap_clients[id_bidder], offer_id)
 
+        # First bid should work
         bid_id = swap_clients[id_bidder].postXmrBid(offer_id, amt_swap)
-
-        event = wait_for_event(
-            test_delay_event,
-            swap_clients[id_offerer],
-            Concepts.BID,
-            bid_id,
-            event_type=EventLogTypes.ERROR,
-            wait_for=60,
-        )
-        assert "Insufficient funds" in event.event_msg
-
         wait_for_bid(
             test_delay_event,
             swap_clients[id_offerer],
             bid_id,
-            BidStates.BID_RECEIVED,
-            wait_for=20,
+            (BidStates.BID_ACCEPTED, BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED),
+            wait_for=40,
         )
+
+        # Should be out of funds for second bid (over remaining offer value causes a hard auto accept fail)
+        bid_id = swap_clients[id_bidder].postXmrBid(offer_id, amt_swap)
+        wait_for_bid(
+            test_delay_event,
+            swap_clients[id_offerer],
+            bid_id,
+            BidStates.BID_AACCEPT_FAIL,
+            wait_for=40,
+        )
+        try:
+            swap_clients[id_offerer].acceptBid(bid_id)
+        except Exception as e:
+            assert "Insufficient funds" in str(e)
+        else:
+            assert False, "Should fail"
 
     def test_08_insufficient_funds_rev(self):
         tla_from = self.test_coin_from.name
@@ -1790,6 +1848,117 @@ class TestBTC(BasicSwapTest):
     test_coin_from = Coins.BTC
     start_ltc_nodes = False
     base_rpc_port = BTC_BASE_RPC_PORT
+
+
+    def test_003_api(self):
+        logging.info("---------- Test API")
+
+        help_output = read_json_api(1800, "help")
+        assert "getcoinseed" in help_output["commands"]
+
+        rv = read_json_api(1800, "getcoinseed")
+        assert rv["error"] == "No post data"
+
+        rv = read_json_api(1800, "getcoinseed", {"coin": "PART"})
+        assert "seed is set from the Basicswap mnemonic" in rv["error"]
+
+        rv = read_json_api(1800, "getcoinseed", {"coin": "BTC"})
+        assert (
+            rv["seed"]
+            == "8e54a313e6df8918df6d758fafdbf127a115175fdd2238d0e908dd8093c9ac3b"
+        )
+        assert rv["seed_id"] == "3da5c0af91879e8ce97d9a843874601c08688078"
+        assert rv["seed_id"] == rv["expected_seed_id"]
+
+        rv = read_json_api(
+            1800,
+            "identities/ppCsRro5po7Yu6kyu5XjSyr3A1PPdk9j1F",
+            {"set_label": "test 1"},
+        )
+        assert isinstance(rv, dict)
+        assert rv["address"] == "ppCsRro5po7Yu6kyu5XjSyr3A1PPdk9j1F"
+        assert rv["label"] == "test 1"
+        rv = read_json_api(
+            1800,
+            "identities/ppCsRro5po7Yu6kyu5XjSyr3A1PPdk9j1F",
+            {"set_label": "test 2"},
+        )
+        assert isinstance(rv, dict)
+        assert rv["address"] == "ppCsRro5po7Yu6kyu5XjSyr3A1PPdk9j1F"
+        assert rv["label"] == "test 2"
+
+        rv = read_json_api(
+            1800,
+            "identities/pPCsRro5po7Yu6kyu5XjSyr3A1PPdk9j1F",
+            {"set_label": "test 3"},
+        )
+        assert rv["error"] == "Invalid identity address"
+
+        rv = read_json_api(
+            1800,
+            "identities/ppCsRro5po7Yu6kyu5XjSyr3A1PPdk9j1F",
+            {"set_note": "note 1"},
+        )
+        assert isinstance(rv, dict)
+        assert rv["address"] == "ppCsRro5po7Yu6kyu5XjSyr3A1PPdk9j1F"
+        assert rv["label"] == "test 2"
+        assert rv["note"] == "note 1"
+
+        rv = read_json_api(
+            1800,
+            "identities/ppCsRro5po7Yu6kyu5XjSyr3A1PPdk9j1F",
+            {"set_automation_override": 1},
+        )
+        assert isinstance(rv, dict)
+        assert rv["automation_override"] == 1
+
+        rv = read_json_api(
+            1800,
+            "identities/ppCsRro5po7Yu6kyu5XjSyr3A1PPdk9j1F",
+            {"set_visibility_override": "hide"},
+        )
+        assert isinstance(rv, dict)
+        assert rv["visibility_override"] == 1
+
+        rv = read_json_api(1800, "automationstrategies")
+        assert len(rv) == 2
+
+        rv = read_json_api(1800, "automationstrategies/1")
+        assert rv["label"] == "Accept All"
+
+        sx_addr = read_json_api(1800, "wallets/part/newstealthaddress")
+        assert (
+            callnoderpc(
+                0,
+                "getaddressinfo",
+                [
+                    sx_addr,
+                ],
+            )["isstealthaddress"]
+            is True
+        )
+
+        rv = read_json_api(1800, "wallets/part")
+        assert "locked_utxos" in rv
+
+        rv = read_json_api(
+            1800, "validateamount", {"coin": "part", "amount": 0.000000015}
+        )
+        assert "Mantissa too long" in rv["error"]
+
+        rv = read_json_api(
+            1800,
+            "validateamount",
+            {"coin": "part", "amount": 0.000000015, "method": "roundoff"},
+        )
+        assert rv == "0.00000002"
+
+        rv = read_json_api(
+            1800,
+            "validateamount",
+            {"coin": "part", "amount": 0.000000015, "method": "rounddown"},
+        )
+        assert rv == "0.00000001"
 
     def test_009_wallet_encryption(self):
 

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2020-2024 tecnovert
-# Copyright (c) 2024 The Basicswap developers
+# Copyright (c) 2024-2025 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -1296,7 +1296,7 @@ class BTCInterface(Secp256k1Interface):
 
     def getWalletTransaction(self, txid: bytes):
         try:
-            return bytes.fromhex(self.rpc_wallet("gettransaction", [txid.hex()]))
+            return bytes.fromhex(self.rpc_wallet("gettransaction", [txid.hex()])["hex"])
         except Exception as e:  # noqa: F841
             # TODO: filter errors
             return None
@@ -1397,6 +1397,7 @@ class BTCInterface(Secp256k1Interface):
         cb_swap_value: int,
         b_fee: int,
         restore_height: int,
+        spend_actual_balance: bool = False,
         lock_tx_vout=None,
     ) -> bytes:
         self._log.info(
@@ -1466,7 +1467,6 @@ class BTCInterface(Secp256k1Interface):
         vout: int = -1,
     ):
         # Add watchonly address and rescan if required
-
         if not self.isAddressMine(dest_address, or_watch_only=True):
             self.importWatchOnlyAddress(dest_address, "bid")
             self._log.info("Imported watch-only addr: {}".format(dest_address))

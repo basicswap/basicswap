@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2019-2024 tecnovert
-# Copyright (c) 2024 The Basicswap developers
+# Copyright (c) 2024-2025 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -160,115 +160,6 @@ class Test(BaseTest):
 
         rv = read_json_api(1800, "rateslist?from=PART&to=BTC")
         assert len(rv) == 1
-
-    def test_003_api(self):
-        logging.info("---------- Test API")
-
-        help_output = read_json_api(1800, "help")
-        assert "getcoinseed" in help_output["commands"]
-
-        rv = read_json_api(1800, "getcoinseed")
-        assert rv["error"] == "No post data"
-
-        rv = read_json_api(1800, "getcoinseed", {"coin": "PART"})
-        assert "seed is set from the Basicswap mnemonic" in rv["error"]
-
-        rv = read_json_api(1800, "getcoinseed", {"coin": "BTC"})
-        assert (
-            rv["seed"]
-            == "8e54a313e6df8918df6d758fafdbf127a115175fdd2238d0e908dd8093c9ac3b"
-        )
-        assert rv["seed_id"] == "3da5c0af91879e8ce97d9a843874601c08688078"
-
-        rv = read_json_api(
-            1800,
-            "identities/ppCsRro5po7Yu6kyu5XjSyr3A1PPdk9j1F",
-            {"set_label": "test 1"},
-        )
-        assert len(rv) == 1
-        assert rv[0]["address"] == "ppCsRro5po7Yu6kyu5XjSyr3A1PPdk9j1F"
-        assert rv[0]["label"] == "test 1"
-        rv = read_json_api(
-            1800,
-            "identities/ppCsRro5po7Yu6kyu5XjSyr3A1PPdk9j1F",
-            {"set_label": "test 2"},
-        )
-        assert len(rv) == 1
-        assert rv[0]["address"] == "ppCsRro5po7Yu6kyu5XjSyr3A1PPdk9j1F"
-        assert rv[0]["label"] == "test 2"
-
-        rv = read_json_api(
-            1800,
-            "identities/pPCsRro5po7Yu6kyu5XjSyr3A1PPdk9j1F",
-            {"set_label": "test 3"},
-        )
-        assert rv["error"] == "Invalid identity address"
-
-        rv = read_json_api(
-            1800,
-            "identities/ppCsRro5po7Yu6kyu5XjSyr3A1PPdk9j1F",
-            {"set_note": "note 1"},
-        )
-        assert len(rv) == 1
-        assert rv[0]["address"] == "ppCsRro5po7Yu6kyu5XjSyr3A1PPdk9j1F"
-        assert rv[0]["label"] == "test 2"
-        assert rv[0]["note"] == "note 1"
-
-        rv = read_json_api(
-            1800,
-            "identities/ppCsRro5po7Yu6kyu5XjSyr3A1PPdk9j1F",
-            {"set_automation_override": 1},
-        )
-        assert len(rv) == 1
-        assert rv[0]["automation_override"] == 1
-
-        rv = read_json_api(
-            1800,
-            "identities/ppCsRro5po7Yu6kyu5XjSyr3A1PPdk9j1F",
-            {"set_visibility_override": "hide"},
-        )
-        assert len(rv) == 1
-        assert rv[0]["visibility_override"] == 1
-
-        rv = read_json_api(1800, "automationstrategies")
-        assert len(rv) == 2
-
-        rv = read_json_api(1800, "automationstrategies/1")
-        assert rv["label"] == "Accept All"
-
-        sx_addr = read_json_api(1800, "wallets/part/newstealthaddress")
-        assert (
-            callnoderpc(
-                0,
-                "getaddressinfo",
-                [
-                    sx_addr,
-                ],
-            )["isstealthaddress"]
-            is True
-        )
-
-        rv = read_json_api(1800, "wallets/part")
-        assert "locked_utxos" in rv
-
-        rv = read_json_api(
-            1800, "validateamount", {"coin": "part", "amount": 0.000000015}
-        )
-        assert "Mantissa too long" in rv["error"]
-
-        rv = read_json_api(
-            1800,
-            "validateamount",
-            {"coin": "part", "amount": 0.000000015, "method": "roundoff"},
-        )
-        assert rv == "0.00000002"
-
-        rv = read_json_api(
-            1800,
-            "validateamount",
-            {"coin": "part", "amount": 0.000000015, "method": "rounddown"},
-        )
-        assert rv == "0.00000001"
 
     def test_004_validateSwapType(self):
         logging.info("---------- Test validateSwapType")

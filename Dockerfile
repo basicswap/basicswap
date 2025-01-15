@@ -6,7 +6,7 @@ ENV LANG=C.UTF-8 \
 
 RUN apt-get update; \
     apt-get install -y --no-install-recommends \
-        python3-pip libpython3-dev gnupg pkg-config gcc libc-dev gosu tzdata;
+        python3-pip libpython3-dev gnupg pkg-config gcc libc-dev gosu tzdata cmake ninja-build;
 
 # Install requirements first so as to skip in subsequent rebuilds
 COPY ./requirements.txt requirements.txt

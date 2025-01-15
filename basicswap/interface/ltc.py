@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2020-2023 tecnovert
+# Copyright (c) 2024-2025 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -52,7 +53,6 @@ class LTCInterface(BTCInterface):
 
     def getWalletInfo(self):
         rv = super(LTCInterface, self).getWalletInfo()
-
         mweb_info = self.rpc_wallet_mweb("getwalletinfo")
         rv["mweb_balance"] = mweb_info["balance"]
         rv["mweb_unconfirmed"] = mweb_info["unconfirmed_balance"]
@@ -88,8 +88,8 @@ class LTCInterface(BTCInterface):
 
 
 class LTCInterfaceMWEB(LTCInterface):
-    @staticmethod
-    def coin_type():
+
+    def interface_type(self) -> int:
         return Coins.LTC_MWEB
 
     def __init__(self, coin_settings, network, swap_client=None):

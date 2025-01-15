@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2019-2024 tecnovert
-# Copyright (c) 2024 The Basicswap developers
+# Copyright (c) 2024-2025 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -140,7 +140,6 @@ from .basicswap_util import (
     canAcceptBidState,
     describeEventEntry,
     getLastBidState,
-    getOfferProofOfFundsHash,
     getVoutByAddress,
     getVoutByScriptPubKey,
     inactive_states,
@@ -355,7 +354,13 @@ class BasicSwap(BaseApp):
 
         # TODO: Set dynamically
         self.balance_only_coins = (Coins.LTC_MWEB,)
-        self.scriptless_coins = (Coins.XMR, Coins.WOW, Coins.PART_ANON, Coins.FIRO)
+        self.scriptless_coins = (
+            Coins.XMR,
+            Coins.WOW,
+            Coins.PART_ANON,
+            Coins.FIRO,
+            Coins.DOGE,
+        )
         self.adaptor_swap_only_coins = self.scriptless_coins + (
             Coins.PART_BLIND,
             Coins.BCH,
@@ -822,6 +827,10 @@ class BasicSwap(BaseApp):
                 self.coin_clients[coin], self.chain, self
             )
             return interface
+        elif coin == Coins.DOGE:
+            from .interface.doge import DOGEInterface
+
+            return DOGEInterface(self.coin_clients[coin], self.chain, self)
         elif coin == Coins.DCR:
             from .interface.dcr import DCRInterface
 
@@ -882,6 +891,7 @@ class BasicSwap(BaseApp):
             if cc["name"] in (
                 "bitcoin",
                 "litecoin",
+                "dogecoin",
                 "namecoin",
                 "dash",
                 "firo",
@@ -968,13 +978,13 @@ class BasicSwap(BaseApp):
                 core_version = ci.getDaemonVersion()
                 self.log.info("%s Core version %d", ci.coin_name(), core_version)
                 self.coin_clients[c]["core_version"] = core_version
-                # thread_func = threadPollXMRChainState if c in (Coins.XMR, Coins.WOW) else threadPollChainState
-                if c == Coins.XMR:
-                    thread_func = threadPollXMRChainState
-                elif c == Coins.WOW:
-                    thread_func = threadPollWOWChainState
-                else:
-                    thread_func = threadPollChainState
+
+                thread_func = {
+                    Coins.XMR: threadPollXMRChainState,
+                    Coins.WOW: threadPollWOWChainState,
+                }.get(
+                    c, threadPollChainState
+                )  # default case
 
                 t = threading.Thread(target=thread_func, args=(self, c))
                 self.threads.append(t)
@@ -1187,11 +1197,16 @@ class BasicSwap(BaseApp):
         if ci.isWalletLocked():
             raise LockedCoinError(Coins.PART)
 
+    def isBaseCoinActive(self, c) -> bool:
+        if c not in chainparams:
+            return False
+        if self.coin_clients[c]["connection_type"] == "rpc":
+            return True
+        return False
+
     def activeCoins(self):
         for c in Coins:
-            if c not in chainparams:
-                continue
-            if self.coin_clients[c]["connection_type"] == "rpc":
+            if self.isBaseCoinActive(c):
                 yield c
 
     def getListOfWalletCoins(self):
@@ -1274,6 +1289,20 @@ class BasicSwap(BaseApp):
         finally:
             self._read_zmq_queue = True
 
+    def storeSeedIDForCoin(self, root_key, coin_type, cursor=None) -> None:
+        ci = self.ci(coin_type)
+        db_key_coin_name = ci.coin_name().lower()
+        seed_id = ci.getSeedHash(root_key)
+
+        key_str = "main_wallet_seedid_" + db_key_coin_name
+        self.setStringKV(key_str, seed_id.hex(), cursor)
+
+        if coin_type == Coins.DCR:
+            # TODO: How to force getmasterpubkey to always return the new slip44 (42) key
+            key_str = "main_wallet_seedid_alt_" + db_key_coin_name
+            legacy_root_hash = ci.getSeedHash(root_key, 20)
+            self.setStringKV(key_str, legacy_root_hash.hex(), cursor)
+
     def initialiseWallet(self, coin_type, raise_errors: bool = False) -> None:
         if coin_type == Coins.PART:
             return
@@ -1292,7 +1321,6 @@ class BasicSwap(BaseApp):
             return
 
         root_key = self.getWalletKey(coin_type, 1)
-        root_hash = ci.getSeedHash(root_key)
         try:
             ci.initialiseWallet(root_key)
         except Exception as e:
@@ -1304,18 +1332,9 @@ class BasicSwap(BaseApp):
                 self.log.error(traceback.format_exc())
             return
 
-        legacy_root_hash = None
-        if coin_type == Coins.DCR:
-            legacy_root_hash = ci.getSeedHash(root_key, 20)
         try:
             cursor = self.openDB()
-            key_str = "main_wallet_seedid_" + db_key_coin_name
-            self.setStringKV(key_str, root_hash.hex(), cursor)
-
-            if coin_type == Coins.DCR:
-                # TODO: How to force getmasterpubkey to always return the new slip44 (42) key
-                key_str = "main_wallet_seedid_alt_" + db_key_coin_name
-                self.setStringKV(key_str, legacy_root_hash.hex(), cursor)
+            self.storeSeedIDForCoin(root_key, coin_type, cursor)
 
             # Clear any saved addresses
             self.clearStringKV("receive_addr_" + db_key_coin_name, cursor)
@@ -1329,39 +1348,43 @@ class BasicSwap(BaseApp):
             self.closeDB(cursor)
 
     def updateIdentityBidState(self, cursor, address: str, bid) -> None:
-        identity_stats = self.queryOne(KnownIdentity, cursor, {"address": address})
-        if not identity_stats:
-            identity_stats = KnownIdentity(
-                active_ind=1, address=address, created_at=self.getTime()
-            )
-
-        if bid.state == BidStates.SWAP_COMPLETED:
-            if bid.was_sent:
-                identity_stats.num_sent_bids_successful = (
-                    zeroIfNone(identity_stats.num_sent_bids_successful) + 1
+        offer = self.getOffer(bid.offer_id, cursor)
+        addresses_to_update = [offer.addr_from, bid.bid_addr]
+        for addr in addresses_to_update:
+            identity_stats = self.queryOne(KnownIdentity, cursor, {"address": addr})
+            if not identity_stats:
+                identity_stats = KnownIdentity(
+                    active_ind=1, address=addr, created_at=self.getTime()
                 )
-            else:
-                identity_stats.num_recv_bids_successful = (
-                    zeroIfNone(identity_stats.num_recv_bids_successful) + 1
-                )
-        elif bid.state in (
-            BidStates.BID_ERROR,
-            BidStates.XMR_SWAP_FAILED_REFUNDED,
-            BidStates.XMR_SWAP_FAILED_SWIPED,
-            BidStates.XMR_SWAP_FAILED,
-            BidStates.SWAP_TIMEDOUT,
-        ):
-            if bid.was_sent:
-                identity_stats.num_sent_bids_failed = (
-                    zeroIfNone(identity_stats.num_sent_bids_failed) + 1
-                )
-            else:
-                identity_stats.num_recv_bids_failed = (
-                    zeroIfNone(identity_stats.num_recv_bids_failed) + 1
-                )
-
-        identity_stats.updated_at = self.getTime()
-        self.add(identity_stats, cursor, upsert=True)
+            is_offer_creator = addr == offer.addr_from
+            if bid.state == BidStates.SWAP_COMPLETED:
+                if is_offer_creator:
+                    old_value = zeroIfNone(identity_stats.num_recv_bids_successful)
+                    identity_stats.num_recv_bids_successful = old_value + 1
+                else:
+                    old_value = zeroIfNone(identity_stats.num_sent_bids_successful)
+                    identity_stats.num_sent_bids_successful = old_value + 1
+            elif bid.state in (
+                BidStates.BID_ERROR,
+                BidStates.XMR_SWAP_FAILED_REFUNDED,
+                BidStates.XMR_SWAP_FAILED_SWIPED,
+                BidStates.XMR_SWAP_FAILED,
+                BidStates.SWAP_TIMEDOUT,
+            ):
+                if is_offer_creator:
+                    old_value = zeroIfNone(identity_stats.num_recv_bids_failed)
+                    identity_stats.num_recv_bids_failed = old_value + 1
+                else:
+                    old_value = zeroIfNone(identity_stats.num_sent_bids_failed)
+                    identity_stats.num_sent_bids_failed = old_value + 1
+            elif bid.state == BidStates.BID_REJECTED:
+                if is_offer_creator:
+                    old_value = zeroIfNone(identity_stats.num_recv_bids_rejected)
+                    identity_stats.num_recv_bids_rejected = old_value + 1
+                else:
+                    old_value = zeroIfNone(identity_stats.num_sent_bids_rejected)
+                    identity_stats.num_sent_bids_rejected = old_value + 1
+            self.add(identity_stats, cursor, upsert=True)
 
     def getPreFundedTx(
         self, linked_type: int, linked_id: bytes, tx_type: int, cursor=None
@@ -1841,8 +1864,8 @@ class BasicSwap(BaseApp):
             rv = []
             for row in q:
                 identity = {
-                    "address": row[0],
-                    "label": row[1],
+                    "address": row[0] if row[0] is not None else "",
+                    "label": row[1] if row[1] is not None else "",
                     "num_sent_bids_successful": zeroIfNone(row[2]),
                     "num_recv_bids_successful": zeroIfNone(row[3]),
                     "num_sent_bids_rejected": zeroIfNone(row[4]),
@@ -2093,14 +2116,27 @@ class BasicSwap(BaseApp):
                     msg_buf.fee_rate_to
                 )  # Unused: TODO - Set priority?
 
+            ensure_balance: int = int(amount)
             if coin_from in self.scriptless_coins:
-                ci_from.ensureFunds(msg_buf.amount_from)
-            else:
-                proof_of_funds_hash = getOfferProofOfFundsHash(msg_buf, offer_addr)
-                proof_addr, proof_sig, proof_utxos = self.getProofOfFunds(
-                    coin_from_t, int(amount), proof_of_funds_hash
+                # TODO: Better tx size estimate, xmr_swap_b_lock_tx_vsize could be larger than xmr_swap_b_lock_spend_tx_vsize
+                estimated_fee: int = (
+                    msg_buf.fee_rate_from
+                    * ci_from.xmr_swap_b_lock_spend_tx_vsize()
+                    / 1000
                 )
-                # TODO: For now proof_of_funds is just a client side check, may need to be sent with offers in future however.
+                ci_from.ensureFunds(msg_buf.amount_from + estimated_fee)
+            else:
+                # If a prefunded txn is not used, check that the wallet balance can cover the tx fee.
+                if "prefunded_itx" not in extra_options:
+                    pi = self.pi(SwapTypes.XMR_SWAP)
+                    _ = pi.getFundedInitiateTxTemplate(ci_from, ensure_balance, False)
+                    # TODO: Save the prefunded tx so the fee can't change, complicates multiple offers at the same time.
+
+                # TODO: Send proof of funds with offer
+                # proof_of_funds_hash = getOfferProofOfFundsHash(msg_buf, offer_addr)
+                # proof_addr, proof_sig, proof_utxos = self.getProofOfFunds(
+                #     coin_from_t, ensure_balance, proof_of_funds_hash
+                # )
 
             offer_bytes = msg_buf.to_bytes()
             payload_hex = str.format("{:02x}", MessageTypes.OFFER) + offer_bytes.hex()
@@ -2586,9 +2622,21 @@ class BasicSwap(BaseApp):
         expect_seedid = self.getStringKV("main_wallet_seedid_" + ci.coin_name().lower())
         if expect_seedid is None:
             self.log.warning(
-                "Can't find expected wallet seed id for coin {}".format(ci.coin_name())
+                "Can't find expected wallet seed id for coin {}.".format(ci.coin_name())
             )
-            return False
+            _, is_locked = self.getLockedState()
+            if is_locked is False:
+                self.log.warning(
+                    "Setting seed id for coin {} from master key.".format(
+                        ci.coin_name()
+                    )
+                )
+                root_key = self.getWalletKey(c, 1)
+                self.storeSeedIDForCoin(root_key, c)
+            else:
+                self.log.warning("Node is locked.")
+                return False
+
         if c == Coins.BTC and len(ci.rpc("listwallets")) < 1:
             self.log.warning("Missing wallet for coin {}".format(ci.coin_name()))
             return False
@@ -5077,6 +5125,13 @@ class BasicSwap(BaseApp):
 
                     if TxTypes.XMR_SWAP_A_LOCK_REFUND_SWIPE not in bid.txns:
                         try:
+                            if self.haveDebugInd(
+                                bid.bid_id,
+                                DebugTypes.BID_DONT_SPEND_COIN_A_LOCK_REFUND2,
+                            ):
+                                raise TemporaryError(
+                                    "Debug: BID_DONT_SPEND_COIN_A_LOCK_REFUND2"
+                                )
                             txid = ci_from.publishTx(xmr_swap.a_lock_refund_swipe_tx)
                             self.logBidEvent(
                                 bid.bid_id,
@@ -6145,6 +6200,13 @@ class BasicSwap(BaseApp):
                 self.logBidEvent(
                     bid.bid_id, EventLogTypes.LOCK_TX_A_REFUND_TX_SEEN, "", use_cursor
                 )
+
+                if TxTypes.XMR_SWAP_A_LOCK_REFUND not in bid.txns:
+                    bid.txns[TxTypes.XMR_SWAP_A_LOCK_REFUND] = SwapTx(
+                        bid_id=bid.bid_id,
+                        tx_type=TxTypes.XMR_SWAP_A_LOCK_REFUND,
+                        txid=xmr_swap.a_lock_refund_tx_id,
+                    )
             else:
                 self.setBidError(
                     bid.bid_id,
@@ -8766,8 +8828,10 @@ class BasicSwap(BaseApp):
         b_fee_rate: int = xmr_offer.a_fee_rate if reverse_bid else xmr_offer.b_fee_rate
 
         try:
-            chain_height = ci_to.getChainHeight()
-            lock_tx_depth = (chain_height - bid.xmr_b_lock_tx.chain_height)
+            if bid.xmr_b_lock_tx is None:
+                raise TemporaryError("Chain B lock tx not found.")
+            chain_height: int = ci_to.getChainHeight()
+            lock_tx_depth: int = chain_height - bid.xmr_b_lock_tx.chain_height
             if lock_tx_depth < ci_to.depth_spendable():
                 raise TemporaryError(
                     f"Chain B lock tx still confirming {lock_tx_depth} / {ci_to.depth_spendable()}."
@@ -9499,6 +9563,16 @@ class BasicSwap(BaseApp):
 
         ensure(msg["to"] == bid.bid_addr, "Received on incorrect address")
         ensure(msg["from"] == offer.addr_from, "Sent from incorrect address")
+
+        allowed_states = [
+            BidStates.BID_REQUEST_SENT,
+        ]
+        if bid.was_sent and offer.was_sent:
+            allowed_states.append(BidStates.BID_REQUEST_ACCEPTED)
+        ensure(
+            bid.state in allowed_states,
+            "Invalid state for bid {}".format(bid.state),
+        )
 
         ci_from = self.ci(offer.coin_to)
         ci_to = self.ci(offer.coin_from)
@@ -10307,7 +10381,14 @@ class BasicSwap(BaseApp):
             elif coin == Coins.NAV:
                 rv["immature"] = walletinfo["immature_balance"]
             elif coin == Coins.LTC:
-                rv["mweb_address"] = self.getCachedStealthAddressForCoin(Coins.LTC_MWEB)
+                try:
+                    rv["mweb_address"] = self.getCachedStealthAddressForCoin(
+                        Coins.LTC_MWEB
+                    )
+                except Exception as e:
+                    self.log.warning(
+                        f"getCachedStealthAddressForCoin for {ci.coin_name()} failed with: {e}"
+                    )
                 rv["mweb_balance"] = walletinfo["mweb_balance"]
                 rv["mweb_pending"] = (
                     walletinfo["mweb_unconfirmed"] + walletinfo["mweb_immature"]
@@ -10412,7 +10493,7 @@ class BasicSwap(BaseApp):
             for row in q:
                 coin_id = row[0]
 
-                if self.coin_clients[coin_id]["connection_type"] != "rpc":
+                if self.isCoinActive(coin_id) is False:
                     # Skip cached info if coin was disabled
                     continue
 

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2020-2024 tecnovert
+# Copyright (c) 2024-2025 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -250,6 +251,8 @@ def js_offers(self, url_split, post_string, is_json, sent=False) -> bytes:
             "is_expired": o.expire_at <= swap_client.getTime(),
             "is_own_offer": o.was_sent,
             "is_revoked": True if o.active_ind == 2 else False,
+            "is_public": o.addr_to == swap_client.network_addr
+            or o.addr_to.strip() == "",
         }
         if with_extra_info:
             offer_data["amount_negotiable"] = o.amount_negotiable
@@ -704,7 +707,10 @@ def js_identities(self, url_split, post_string: str, is_json: bool) -> bytes:
             ensure("address" in filters, "Must provide an address to modify data")
             swap_client.setIdentityData(filters, set_data)
 
-    return bytes(json.dumps(swap_client.listIdentities(filters)), "UTF-8")
+    rv = swap_client.listIdentities(filters)
+    if "address" in filters:
+        rv = {} if len(rv) < 1 else rv[0]
+    return bytes(json.dumps(rv), "UTF-8")
 
 
 def js_automationstrategies(self, url_split, post_string: str, is_json: bool) -> bytes:
@@ -829,28 +835,40 @@ def js_getcoinseed(self, url_split, post_string, is_json) -> bytes:
         raise ValueError("Particl wallet seed is set from the Basicswap mnemonic.")
 
     ci = swap_client.ci(coin)
+    rv = {"coin": ci.ticker()}
     if coin in (Coins.XMR, Coins.WOW):
         key_view = swap_client.getWalletKey(coin, 1, for_ed25519=True)
         key_spend = swap_client.getWalletKey(coin, 2, for_ed25519=True)
         address = ci.getAddressFromKeys(key_view, key_spend)
-        return bytes(
-            json.dumps(
-                {
-                    "coin": ci.ticker(),
-                    "key_view": ci.encodeKey(key_view),
-                    "key_spend": ci.encodeKey(key_spend),
-                    "address": address,
-                }
-            ),
-            "UTF-8",
+
+        expect_address = swap_client.getCachedMainWalletAddress(ci)
+        rv.update(
+            {
+                "key_view": ci.encodeKey(key_view),
+                "key_spend": ci.encodeKey(key_spend),
+                "address": address,
+                "expected_address": (
+                    "Unset" if expect_address is None else expect_address
+                ),
+            }
+        )
+    else:
+        seed_key = swap_client.getWalletKey(coin, 1)
+        seed_id = ci.getSeedHash(seed_key)
+        expect_seedid = swap_client.getStringKV(
+            "main_wallet_seedid_" + ci.coin_name().lower()
         )
 
-    seed_key = swap_client.getWalletKey(coin, 1)
-    seed_id = ci.getSeedHash(seed_key)
+        rv.update(
+            {
+                "seed": seed_key.hex(),
+                "seed_id": seed_id.hex(),
+                "expected_seed_id": "Unset" if expect_seedid is None else expect_seedid,
+            }
+        )
+
     return bytes(
-        json.dumps(
-            {"coin": ci.ticker(), "seed": seed_key.hex(), "seed_id": seed_id.hex()}
-        ),
+        json.dumps(rv),
         "UTF-8",
     )
 

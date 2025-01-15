@@ -11,9 +11,16 @@
 <script>
 function getAPIKeys() {
   return {
-    cryptoCompare: '{{chart_api_key}}',
-    coinGecko: '{{coingecko_api_key}}'
+    cryptoCompare: "{{ chart_api_key|safe }}",
+    coinGecko: "{{ coingecko_api_key|safe }}"
   };
+}
+
+function getWebSocketConfig() {
+    return {
+        port: "{{ ws_port|safe }}",
+        fallbackPort: "11700"
+    };
 }
 </script>
 
@@ -163,7 +170,7 @@ function getAPIKeys() {
     'PIVX': {'name': 'PIVX', 'symbol': 'PIVX', 'image': 'PIVX.png', 'show': true},
     'DASH': {'name': 'Dash', 'symbol': 'DASH', 'image': 'Dash.png', 'show': true},
     'ETH': {'name': 'Ethereum', 'symbol': 'ETH', 'image': 'Ethereum.png', 'show': false},
-    'DOGE': {'name': 'Dogecoin', 'symbol': 'DOGE', 'image': 'Doge.png', 'show': false},
+    'DOGE': {'name': 'Dogecoin', 'symbol': 'DOGE', 'image': 'Dogecoin.png', 'show': true},
     'DCR': {'name': 'Decred', 'symbol': 'DCR', 'image': 'Decred.png', 'show': true},
     'ZANO': {'name': 'Zano', 'symbol': 'ZANO', 'image': 'Zano.png', 'show': false},
     'WOW': {'name': 'Wownero', 'symbol': 'WOW', 'image': 'Wownero.png', 'show': true}
@@ -185,7 +192,7 @@ function getAPIKeys() {
 
   {% for coin_symbol in custom_order %}
     {% if coin_symbol in display_coins and coin_data[coin_symbol]['show'] %}
-    <div class="w-full sm:w-1/2 lg:w-1/5 p-3" id="{{ coin_symbol.lower() }}-container">
+    <div class="w-full sm:w-1/2 lg:w-1/6 p-3" id="{{ coin_symbol.lower() }}-container">
         <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-2xl dark:text-white {% if coin_symbol == 'BTC' %}active-container{% endif %}" style="min-height: 180px;">
          <div class="flex items-center">
           <img src="/static/images/coins/{{ coin_data[coin_symbol]['image'] }}" class="rounded-xl" style="width: 28px; height: 28px; object-fit: contain;" alt="{{ coin_data[coin_symbol]['name'] }}">
@@ -283,6 +290,18 @@ function getAPIKeys() {
                         {% endif %}
                       </div>
                     </div>
+                    <div class="pt-3 px-3 md:w-auto hover-container">
+                    <div class="flex">
+                     <div class="relative">
+                       {{ input_arrow_down_svg | safe }}
+                       <select name="sent_from" id="sent_from" class="bg-gray-50 text-gray-900 appearance-none pr-10 pl-5 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none block w-full p-2.5 focus:ring-0">
+                        <option value="any" {% if not filters.sent_from %} selected{% endif %}>All Offers</option>
+                        <option value="public" {% if filters.sent_from == 'public' %} selected{% endif %}>Public</option>
+                        <option value="private" {% if filters.sent_from == 'private' %} selected{% endif %}>Private</option>
+                       </select>
+                        </div>
+                      </div>
+                     </div>
                     <div class="w-full md:w-auto pt-3 px-3">
                       <div class="relative">
                         <button type="button" id="clearFilters" class="transition-opacity duration-200 flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm hover:text-white dark:text-white dark:bg-gray-500 bg-coolGray-200 hover:bg-green-600 hover:border-green-600 rounded-lg transition duration-200 border border-coolGray-200 dark:border-gray-400 rounded-md shadow-button focus:ring-0 focus:outline-none" disabled>
@@ -297,13 +316,6 @@ function getAPIKeys() {
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                           </svg>
                           <span id="refreshText">Refresh</span>
-                        </button>
-                      </div>
-                    </div>
-                    <div class="w-full md:w-auto pt-3 px-3 hidden">
-                      <div class="relative">
-                        <button id="toggleView" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-white bg-blue-600 hover:bg-green-600 hover:border-green-600 rounded-lg transition duration-200 border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
-                          <span>Toggle JSON View</span>
                         </button>
                       </div>
                     </div>
@@ -322,15 +334,20 @@ function getAPIKeys() {
   <div id="jsonView" class="hidden mb-4">
     <pre id="jsonContent" class="bg-gray-100 p-4 rounded overflow-auto" style="max-height: 300px;"></pre>
   </div>
-  <div class="container mt-5 mx-auto">
+  <div class="container mt-5 mx-auto px-4">
     <div class="pt-0 pb-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
       <div class="px-0">
-        <div class="w-auto mt-6 pb-6 overflow-x-auto">
+        <div class="w-auto mt-6 overflow-x-auto">
           <table class="w-full min-w-max">
             <thead class="uppercase">
               <tr>
                 <th class="p-0" data-sortable="true" data-column-index="0">
                   <div class="py-3 pl-4 justify-center rounded-tl-xl bg-coolGray-200 dark:bg-gray-600">
+                    <span class="text-sm mr-1 text-gray-600 dark:text-gray-300 font-semibold"></span>
+                  </div>
+                </th>
+                <th class="p-0" data-sortable="true" data-column-index="0">
+                  <div class="py-3 pl-4 justify-center bg-coolGray-200 dark:bg-gray-600">
                     <span class="text-sm mr-1 text-gray-600 dark:text-gray-300 font-semibold">Time</span>
                      <span class="sort-icon ml-1 text-gray-600 dark:text-gray-400" id="sort-icon-0">↓</span>
                   </div>
@@ -400,11 +417,18 @@ function getAPIKeys() {
         <div class="w-full">
           <div class="flex flex-wrap justify-between items-center pl-6 pt-6 pr-6 border-t border-gray-100 dark:border-gray-400">
           <div class="flex items-center">
-           <p class="text-sm font-heading dark:text-gray-400 mr-4">Last refreshed: <span id="lastRefreshTime">Never</span></p>
-           <p class="text-sm font-heading dark:text-gray-400 mr-4"><span class="ml-4" data-listing-label>Network Listings: </span><span id="newEntriesCount"></span></p>
-           <p class="text-sm font-heading dark:text-gray-400 mr-4"><span id="nextRefreshContainer" class="ml-4">Next refresh: <span id="nextRefreshTime"></span>
-         </span></p>
-        </div>
+           <div class="flex items-center mr-4">
+            <span id="status-dot" class="w-2.5 h-2.5 rounded-full bg-gray-500 mr-2"></span>
+            <span id="status-text" class="text-sm text-gray-500">Connecting...</span>
+           </div>
+             <p class="text-sm font-heading dark:text-gray-400 mr-4">
+              Last refreshed: <span id="lastRefreshTime">Never</span>
+             </p>
+             <p class="text-sm font-heading dark:text-gray-400 mr-4">
+             <span data-listing-label>Network Listings: </span>
+             <span id="newEntriesCount"></span>
+             </p>
+           </div>
             <div class="flex items-center space-x-2">
               <button type="button" id="prevPage" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-green-600 rounded-lg transition duration-200 focus:ring-0 focus:outline-none">
                 {{ page_back_svg | safe }}
