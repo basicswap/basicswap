@@ -1849,7 +1849,6 @@ class TestBTC(BasicSwapTest):
     start_ltc_nodes = False
     base_rpc_port = BTC_BASE_RPC_PORT
 
-
     def test_003_api(self):
         logging.info("---------- Test API")
 
