@@ -155,69 +155,72 @@ const newEntriesCountSpan = document.getElementById('newEntriesCount');
 const ScrollOptimizer = {
     scrollTimeout: null,
     isScrolling: false,
+    tooltipCache: new WeakMap(),
 
     init() {
-        document.body.classList.add('optimize-scroll');
         window.addEventListener('scroll', this.handleScroll.bind(this), { passive: true });
+
+        document.body.addEventListener('mouseenter', this.handleTooltipEnter.bind(this), true);
+        document.body.addEventListener('mouseleave', this.handleTooltipLeave.bind(this), true);
     },
 
     handleScroll() {
-        if (!this.isScrolling) {
-            document.body.classList.add('is-scrolling');
-            this.isScrolling = true;
-        }
-
         if (this.scrollTimeout) {
-            clearTimeout(this.scrollTimeout);
+            window.cancelAnimationFrame(this.scrollTimeout);
         }
 
-        this.scrollTimeout = setTimeout(() => {
+        if (!this.isScrolling) {
+            requestAnimationFrame(() => {
+                document.body.classList.add('is-scrolling');
+                this.isScrolling = true;
+            });
+        }
+
+        this.scrollTimeout = window.requestAnimationFrame(() => {
             document.body.classList.remove('is-scrolling');
             this.isScrolling = false;
-        }, 150);
+        });
+    },
+
+    handleTooltipEnter(e) {
+        const tooltipTrigger = e.target.closest('[data-tooltip-target]');
+        if (!tooltipTrigger) return;
+
+        const tooltipId = tooltipTrigger.getAttribute('data-tooltip-target');
+        let tooltip = this.tooltipCache.get(tooltipTrigger);
+        
+        if (!tooltip) {
+            tooltip = document.getElementById(tooltipId);
+            if (tooltip) {
+                this.tooltipCache.set(tooltipTrigger, tooltip);
+            }
+        }
+
+        if (tooltip) {
+            tooltip.classList.remove('invisible', 'opacity-0');
+        }
+    },
+
+    handleTooltipLeave(e) {
+        const tooltipTrigger = e.target.closest('[data-tooltip-target]');
+        if (!tooltipTrigger) return;
+
+        const tooltip = this.tooltipCache.get(tooltipTrigger);
+        if (tooltip) {
+            tooltip.classList.add('invisible', 'opacity-0');
+        }
+    },
+
+    cleanup() {
+        if (this.scrollTimeout) {
+            window.cancelAnimationFrame(this.scrollTimeout);
+        }
+        window.removeEventListener('scroll', this.handleScroll);
+        document.body.removeEventListener('mouseenter', this.handleTooltipEnter);
+        document.body.removeEventListener('mouseleave', this.handleTooltipLeave);
+        this.tooltipCache = null;
     }
 };
-
-const scrollStyles = document.createElement('style');
-scrollStyles.textContent = `
-    .optimize-scroll {
-        -webkit-font-smoothing: antialiased;
-    }
-    
-    .is-scrolling .overflow-x-auto {
-        will-change: transform;
-        pointer-events: none;
-    }
-    
-    .is-scrolling * {
-        animation: none !important;
-        transition: none !important;
-    }
-`;
-document.head.appendChild(scrollStyles);
-
-document.addEventListener('DOMContentLoaded', () => {
-    ScrollOptimizer.init();
-});
-
-let isTableRendering = false;
-const tableContainer = document.querySelector('.overflow-x-auto');
-
-function startTableRender() {
-    isTableRendering = true;
-    if (tableContainer) {
-        tableContainer.style.overflow = 'hidden';
-    }
-}
-
-function finishTableRender() {
-    isTableRendering = false;
-    setTimeout(() => {
-        if (tableContainer) {
-            tableContainer.style.overflow = 'auto';
-        }
-    }, 100);
-}
 
 // MANAGER OBJECTS
 const WebSocketManager = {
@@ -1647,7 +1650,6 @@ function handleNoOffersScenario() {
 
 async function updateOffersTable() {
     try {
-        startTableRender();
 
         const PRICES_CACHE_KEY = 'prices_coingecko';
         const cachedPrices = CacheManager.get(PRICES_CACHE_KEY);
@@ -1709,8 +1711,7 @@ async function updateOffersTable() {
             if (tableRateModule?.initializeTable) {
                 tableRateModule.initializeTable();
             }
-            
-            finishTableRender();
+
         });
 
         lastRefreshTime = Date.now();
@@ -1719,7 +1720,6 @@ async function updateOffersTable() {
     } catch (error) {
         console.error('[Debug] Error in updateOffersTable:', error);
         handleTableError();
-        finishTableRender();
     }
 }
 
