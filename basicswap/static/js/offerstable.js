@@ -1,3 +1,66 @@
+const EventManager = {
+    listeners: new Map(),
+
+    add(element, type, handler, options = false) {
+        if (!this.listeners.has(element)) {
+            this.listeners.set(element, new Map());
+        }
+        
+        const elementListeners = this.listeners.get(element);
+        if (!elementListeners.has(type)) {
+            elementListeners.set(type, new Set());
+        }
+        
+        const handlerInfo = { handler, options };
+        elementListeners.get(type).add(handlerInfo);
+        element.addEventListener(type, handler, options);
+        
+        return handlerInfo;
+    },
+
+    remove(element, type, handler, options = false) {
+        const elementListeners = this.listeners.get(element);
+        if (!elementListeners) return;
+
+        const typeListeners = elementListeners.get(type);
+        if (!typeListeners) return;
+
+        typeListeners.forEach(info => {
+            if (info.handler === handler) {
+                element.removeEventListener(type, handler, options);
+                typeListeners.delete(info);
+            }
+        });
+
+        if (typeListeners.size === 0) {
+            elementListeners.delete(type);
+        }
+        if (elementListeners.size === 0) {
+            this.listeners.delete(element);
+        }
+    },
+
+    removeAll(element) {
+        const elementListeners = this.listeners.get(element);
+        if (!elementListeners) return;
+
+        elementListeners.forEach((typeListeners, type) => {
+            typeListeners.forEach(info => {
+                element.removeEventListener(type, info.handler, info.options);
+            });
+        });
+
+        this.listeners.delete(element);
+    },
+
+    clearAll() {
+        this.listeners.forEach((elementListeners, element) => {
+            this.removeAll(element);
+        });
+        this.listeners.clear();
+    }
+};
+
 // GLOBAL STATE VARIABLES
 let latestPrices = null;
 let lastRefreshTime = null;
@@ -92,69 +155,72 @@ const newEntriesCountSpan = document.getElementById('newEntriesCount');
 const ScrollOptimizer = {
     scrollTimeout: null,
     isScrolling: false,
+    tooltipCache: new WeakMap(),
 
     init() {
-        document.body.classList.add('optimize-scroll');
         window.addEventListener('scroll', this.handleScroll.bind(this), { passive: true });
+
+        document.body.addEventListener('mouseenter', this.handleTooltipEnter.bind(this), true);
+        document.body.addEventListener('mouseleave', this.handleTooltipLeave.bind(this), true);
     },
 
     handleScroll() {
-        if (!this.isScrolling) {
-            document.body.classList.add('is-scrolling');
-            this.isScrolling = true;
-        }
-
         if (this.scrollTimeout) {
-            clearTimeout(this.scrollTimeout);
+            window.cancelAnimationFrame(this.scrollTimeout);
         }
 
-        this.scrollTimeout = setTimeout(() => {
+        if (!this.isScrolling) {
+            requestAnimationFrame(() => {
+                document.body.classList.add('is-scrolling');
+                this.isScrolling = true;
+            });
+        }
+
+        this.scrollTimeout = window.requestAnimationFrame(() => {
             document.body.classList.remove('is-scrolling');
             this.isScrolling = false;
-        }, 150);
+        });
+    },
+
+    handleTooltipEnter(e) {
+        const tooltipTrigger = e.target.closest('[data-tooltip-target]');
+        if (!tooltipTrigger) return;
+
+        const tooltipId = tooltipTrigger.getAttribute('data-tooltip-target');
+        let tooltip = this.tooltipCache.get(tooltipTrigger);
+        
+        if (!tooltip) {
+            tooltip = document.getElementById(tooltipId);
+            if (tooltip) {
+                this.tooltipCache.set(tooltipTrigger, tooltip);
+            }
+        }
+
+        if (tooltip) {
+            tooltip.classList.remove('invisible', 'opacity-0');
+        }
+    },
+
+    handleTooltipLeave(e) {
+        const tooltipTrigger = e.target.closest('[data-tooltip-target]');
+        if (!tooltipTrigger) return;
+
+        const tooltip = this.tooltipCache.get(tooltipTrigger);
+        if (tooltip) {
+            tooltip.classList.add('invisible', 'opacity-0');
+        }
+    },
+
+    cleanup() {
+        if (this.scrollTimeout) {
+            window.cancelAnimationFrame(this.scrollTimeout);
+        }
+        window.removeEventListener('scroll', this.handleScroll);
+        document.body.removeEventListener('mouseenter', this.handleTooltipEnter);
+        document.body.removeEventListener('mouseleave', this.handleTooltipLeave);
+        this.tooltipCache = null;
     }
 };
-
-const scrollStyles = document.createElement('style');
-scrollStyles.textContent = `
-    .optimize-scroll {
-        -webkit-font-smoothing: antialiased;
-    }
-    
-    .is-scrolling .overflow-x-auto {
-        will-change: transform;
-        pointer-events: none;
-    }
-    
-    .is-scrolling * {
-        animation: none !important;
-        transition: none !important;
-    }
-`;
-document.head.appendChild(scrollStyles);
-
-document.addEventListener('DOMContentLoaded', () => {
-    ScrollOptimizer.init();
-});
-
-let isTableRendering = false;
-const tableContainer = document.querySelector('.overflow-x-auto');
-
-function startTableRender() {
-    isTableRendering = true;
-    if (tableContainer) {
-        tableContainer.style.overflow = 'hidden';
-    }
-}
-
-function finishTableRender() {
-    isTableRendering = false;
-    setTimeout(() => {
-        if (tableContainer) {
-            tableContainer.style.overflow = 'auto';
-        }
-    }, 100);
-}
 
 // MANAGER OBJECTS
 const WebSocketManager = {
@@ -168,6 +234,7 @@ const WebSocketManager = {
     reconnectDelay: 5000,
     maxQueueSize: 1000,
     isIntentionallyClosed: false,
+    handlers: {},
 
     connectionState: {
         isConnecting: false,
@@ -185,13 +252,15 @@ const WebSocketManager = {
     },
 
     setupPageVisibilityHandler() {
-        document.addEventListener('visibilitychange', () => {
+        this.handlers.visibilityChange = () => {
             if (document.hidden) {
                 this.handlePageHidden();
             } else {
                 this.handlePageVisible();
             }
-        });
+        };
+        
+        document.addEventListener('visibilitychange', this.handlers.visibilityChange);
     },
 
     handlePageHidden() {
@@ -285,44 +354,49 @@ const WebSocketManager = {
     },
 
     setupEventHandlers() {
-    if (!this.ws) return;
+        if (!this.ws) return;
 
-    this.ws.onopen = () => {
-        console.log('🟢 WebSocket connected successfully');
-        this.connectionState.isConnecting = false;
-        this.reconnectAttempts = 0;
-        clearTimeout(this.connectionState.connectTimeout);
-        this.connectionState.lastHealthCheck = Date.now();
-        window.ws = this.ws;
-        updateConnectionStatus('connected');
-    };
+        this.handlers.open = () => {
+            console.log('🟢 WebSocket connected successfully');
+            this.connectionState.isConnecting = false;
+            this.reconnectAttempts = 0;
+            clearTimeout(this.connectionState.connectTimeout);
+            this.connectionState.lastHealthCheck = Date.now();
+            window.ws = this.ws;
+            updateConnectionStatus('connected');
+        };
 
-    this.ws.onmessage = (event) => {
-        try {
-            const message = JSON.parse(event.data);
-            this.handleMessage(message);
-        } catch (error) {
-            console.error('Error processing WebSocket message:', error);
+        this.handlers.message = (event) => {
+            try {
+                const message = JSON.parse(event.data);
+                this.handleMessage(message);
+            } catch (error) {
+                console.error('Error processing WebSocket message:', error);
+                updateConnectionStatus('error');
+            }
+        };
+
+        this.handlers.error = (error) => {
+            console.error('WebSocket error:', error);
             updateConnectionStatus('error');
-        }
-    };
+        };
 
-    this.ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
-        updateConnectionStatus('error');
-    };
+        this.handlers.close = (event) => {
+            console.log('🔴 WebSocket closed:', event.code, event.reason);
+            this.connectionState.isConnecting = false;
+            window.ws = null;
+            updateConnectionStatus('disconnected');
 
-    this.ws.onclose = (event) => {
-        console.log('🔴 WebSocket closed:', event.code, event.reason);
-        this.connectionState.isConnecting = false;
-        window.ws = null;
-        updateConnectionStatus('disconnected');
+            if (!this.isIntentionallyClosed) {
+                this.handleReconnect();
+            }
+        };
 
-        if (!this.isIntentionallyClosed) {
-            this.handleReconnect();
-        }
-    };
-},
+        this.ws.onopen = this.handlers.open;
+        this.ws.onmessage = this.handlers.message;
+        this.ws.onerror = this.handlers.error;
+        this.ws.onclose = this.handlers.close;
+    },
 
     handleMessage(message) {
         if (this.messageQueue.length >= this.maxQueueSize) {
@@ -330,7 +404,10 @@ const WebSocketManager = {
             this.messageQueue.shift();
         }
 
-        clearTimeout(this.debounceTimeout);
+        if (this.debounceTimeout) {
+            clearTimeout(this.debounceTimeout);
+        }
+
         this.messageQueue.push(message);
 
         this.debounceTimeout = setTimeout(() => {
@@ -404,6 +481,7 @@ const WebSocketManager = {
         clearTimeout(this.debounceTimeout);
         clearTimeout(this.reconnectTimeout);
         clearTimeout(this.connectionState.connectTimeout);
+        this.stopHealthCheck();
 
         this.messageQueue = [];
         this.processingQueue = false;
@@ -418,21 +496,30 @@ const WebSocketManager = {
             if (this.ws.readyState === WebSocket.OPEN) {
                 this.ws.close(1000, 'Cleanup');
             }
+
             this.ws = null;
             window.ws = null;
         }
-    },
 
-    isConnected() {
-        return this.ws && this.ws.readyState === WebSocket.OPEN;
+        if (this.handlers.visibilityChange) {
+            document.removeEventListener('visibilitychange', this.handlers.visibilityChange);
+        }
+
+        this.handlers = {};
     },
 
     disconnect() {
         this.isIntentionallyClosed = true;
         this.cleanup();
         this.stopHealthCheck();
+    },
+
+    isConnected() {
+        return this.ws && this.ws.readyState === WebSocket.OPEN;
     }
 };
+
+window.WebSocketManager = WebSocketManager;
 
 const CacheManager = {
     maxItems: 100,
@@ -584,6 +671,76 @@ const CacheManager = {
             expiredCount,
             utilization: ((totalSize / this.maxSize) * 100).toFixed(1) + '%'
         };
+    }
+};
+
+// Identity cache management
+const IdentityManager = {
+    cache: new Map(),
+    pendingRequests: new Map(),
+    retryDelay: 2000,
+    maxRetries: 3,
+    cacheTimeout: 5 * 60 * 1000, // 5 minutes
+
+    async getIdentityData(address) {
+
+        const cachedData = this.getCachedIdentity(address);
+        if (cachedData) {
+            return cachedData;
+        }
+
+        if (this.pendingRequests.has(address)) {
+            return this.pendingRequests.get(address);
+        }
+
+        const request = this.fetchWithRetry(address);
+        this.pendingRequests.set(address, request);
+
+        try {
+            const data = await request;
+            this.cache.set(address, {
+                data,
+                timestamp: Date.now()
+            });
+            return data;
+        } finally {
+            this.pendingRequests.delete(address);
+        }
+    },
+
+    getCachedIdentity(address) {
+        const cached = this.cache.get(address);
+        if (cached && (Date.now() - cached.timestamp) < this.cacheTimeout) {
+            return cached.data;
+        }
+        return null;
+    },
+
+    async fetchWithRetry(address, attempt = 1) {
+        try {
+            const response = await fetch(`/json/identities/${address}`, {
+                signal: AbortSignal.timeout(5000)
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            return await response.json();
+        } catch (error) {
+            if (attempt >= this.maxRetries) {
+                console.warn(`Failed to fetch identity for ${address} after ${attempt} attempts`);
+                return null;
+            }
+
+            await new Promise(resolve => setTimeout(resolve, this.retryDelay * attempt));
+            return this.fetchWithRetry(address, attempt + 1);
+        }
+    },
+
+    clearCache() {
+        this.cache.clear();
+        this.pendingRequests.clear();
     }
 };
 
@@ -997,10 +1154,8 @@ function filterAndSortData() {
     return filteredData;
 }
 
-function calculateProfitLoss(fromCoin, toCoin, fromAmount, toAmount, isOwnOffer) {
+async function calculateProfitLoss(fromCoin, toCoin, fromAmount, toAmount, isOwnOffer) {
     return new Promise((resolve) => {
-        // console.log(`Calculating profit/loss for ${fromAmount} ${fromCoin} to ${toAmount} ${toCoin}, isOwnOffer: ${isOwnOffer}`);
-
         if (!latestPrices) {
             console.error('Latest prices not available. Unable to calculate profit/loss.');
             resolve(null);
@@ -1027,8 +1182,8 @@ function calculateProfitLoss(fromCoin, toCoin, fromAmount, toAmount, isOwnOffer)
         const fromPriceUSD = latestPrices[fromSymbol]?.usd;
         const toPriceUSD = latestPrices[toSymbol]?.usd;
 
-        if (!fromPriceUSD || !toPriceUSD) {
-            //console.warn(`Price data missing for ${fromSymbol} (${fromPriceUSD}) or ${toSymbol} (${toPriceUSD})`);
+        if (fromPriceUSD === null || toPriceUSD === null || 
+            fromPriceUSD === undefined || toPriceUSD === undefined) {
             resolve(null);
             return;
         }
@@ -1043,7 +1198,6 @@ function calculateProfitLoss(fromCoin, toCoin, fromAmount, toAmount, isOwnOffer)
             percentDiff = ((fromValueUSD / toValueUSD) - 1) * 100;
         }
 
-        // console.log(`Percent difference: ${percentDiff.toFixed(2)}%`);
         resolve(percentDiff);
     });
 }
@@ -1084,68 +1238,113 @@ async function getMarketRate(fromCoin, toCoin) {
     });
 }
 
+function getEmptyPriceData() {
+    return {
+        'bitcoin': { usd: null, btc: null },
+        'bitcoin-cash': { usd: null, btc: null },
+        'dash': { usd: null, btc: null },
+        'dogecoin': { usd: null, btc: null },
+        'decred': { usd: null, btc: null },
+        'litecoin': { usd: null, btc: null },
+        'particl': { usd: null, btc: null },
+        'pivx': { usd: null, btc: null },
+        'monero': { usd: null, btc: null },
+        'zano': { usd: null, btc: null },
+        'wownero': { usd: null, btc: null },
+        'zcoin': { usd: null, btc: null }
+    };
+}
+
 async function fetchLatestPrices() {
     const PRICES_CACHE_KEY = 'prices_coingecko';
-    const apiKeys = getAPIKeys();
-
+    const RETRY_DELAY = 5000;
+    const MAX_RETRIES = 3;
+    
     const cachedData = CacheManager.get(PRICES_CACHE_KEY);
-    if (cachedData && cachedData.remainingTime > 60000) {
-        console.log('Using cached price data (valid for next minute)');
+    if (cachedData && cachedData.remainingTime > 30000) {
+        console.log('Using cached price data');
         latestPrices = cachedData.value;
         return cachedData.value;
     }
 
-    const url = `${offersConfig.apiEndpoints.coinGecko}/simple/price?ids=bitcoin,bitcoin-cash,dash,dogecoin,decred,litecoin,particl,pivx,monero,zano,wownero,zcoin&vs_currencies=USD,BTC&api_key=${offersConfig.apiKeys.coinGecko}`;
+    const baseUrl = `${offersConfig.apiEndpoints.coinGecko}/simple/price?ids=bitcoin,bitcoin-cash,dash,dogecoin,decred,litecoin,particl,pivx,monero,zcoin,zano,wownero&vs_currencies=USD,BTC`;
+    
+    let retryCount = 0;
+    let data = null;
 
-    try {
-        console.log('Initiating fresh price data fetch...');
-        const response = await fetch('/json/readurl', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                url: url,
-                headers: {}
-            })
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP Error: ${response.status} ${response.statusText}`);
+    while (!data && retryCount < MAX_RETRIES) {
+        if (retryCount > 0) {
+            const delay = RETRY_DELAY * Math.pow(2, retryCount - 1);
+            console.log(`Waiting ${delay}ms before retry ${retryCount + 1}...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
         }
 
-        const data = await response.json();
-
-        if (data.Error) {
-            console.error('API Error:', data.Error);
-            throw new Error(data.Error);
-        }
-
-        if (data && Object.keys(data).length > 0) {
-            console.log('Processing fresh price data...');
-            latestPrices = data;
-            CacheManager.set(PRICES_CACHE_KEY, data, CACHE_DURATION);
-            const fallbackLog = {};
-            Object.entries(data).forEach(([coin, prices]) => {
-                tableRateModule.setFallbackValue(coin, prices.usd);
-                fallbackLog[coin] = prices.usd;
+        try {
+            console.log('Attempting price fetch with API key...');
+            const urlWithKey = `${baseUrl}&api_key=${offersConfig.apiKeys.coinGecko}`;
+            
+            const response = await fetch('/json/readurl', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    url: urlWithKey,
+                    headers: {}
+                })
             });
-            
-            //console.log('Fallback Values Set:', fallbackLog);
-            
-            return data;
-        } else {
-            console.warn('No price data received');
-            return null;
+
+            const responseData = await response.json();
+
+            if (responseData.error) {
+                if (responseData.error.includes('429')) {
+                    console.log('Rate limited, retrying...');
+                } else {
+                    console.warn('Invalid price data received:', responseData);
+                }
+                retryCount++;
+                continue;
+            }
+
+            const hasValidPrices = Object.values(responseData).some(coin => 
+                coin && typeof coin === 'object' && 
+                typeof coin.usd === 'number' && 
+                !isNaN(coin.usd)
+            );
+
+            if (!hasValidPrices) {
+                console.warn('No valid price data found in response');
+                retryCount++;
+                continue;
+            }
+
+            data = responseData;
+            break;
+
+        } catch (error) {
+            console.warn('Error fetching prices:', error);
+            retryCount++;
         }
-    } catch (error) {
-        console.error('Price Fetch Error:', {
-            message: error.message,
-            name: error.name,
-            stack: error.stack
-        });
-        throw error;
     }
+
+    if (!data) {
+        console.warn('All price fetch attempts failed, using empty price data');
+        const naData = getEmptyPriceData();
+        latestPrices = naData;
+        return naData;
+    }
+
+    console.log('Successfully fetched fresh price data');
+    latestPrices = data;
+    CacheManager.set(PRICES_CACHE_KEY, data, CACHE_DURATION);
+
+    Object.entries(data).forEach(([coin, prices]) => {
+        if (prices && typeof prices.usd === 'number' && !isNaN(prices.usd)) {
+            tableRateModule.setFallbackValue(coin, prices.usd);
+        }
+    });
+    
+    return data;
 }
 
 async function fetchOffers(manualRefresh = false) {
@@ -1333,7 +1532,7 @@ function updateProfitLoss(row, fromCoin, toCoin, fromAmount, toAmount, isOwnOffe
         .then(percentDiff => {
             if (percentDiff === null) {
                 profitLossElement.textContent = 'N/A';
-                profitLossElement.className = 'profit-loss text-lg font-bold text-gray-400';
+                profitLossElement.className = 'profit-loss text-lg font-bold text-gray-300';
                 return;
             }
 
@@ -1405,8 +1604,9 @@ function updateClearFiltersButton() {
 }
 
 function cleanupRow(row) {
+    EventManager.removeAll(row);
+    
     const tooltips = row.querySelectorAll('[data-tooltip-target]');
-    const count = tooltips.length;
     tooltips.forEach(tooltip => {
         const tooltipId = tooltip.getAttribute('data-tooltip-target');
         const tooltipElement = document.getElementById(tooltipId);
@@ -1414,7 +1614,18 @@ function cleanupRow(row) {
             tooltipElement.remove();
         }
     });
-    //console.log(`Cleaned up ${count} tooltips from row`);
+}
+
+function cleanupTable() {
+    EventManager.clearAll();
+    
+    if (offersBody) {
+        const existingRows = offersBody.querySelectorAll('tr');
+        existingRows.forEach(row => {
+            cleanupRow(row);
+        });
+        offersBody.innerHTML = '';
+    }
 }
 
 function handleNoOffersScenario() {
@@ -1455,47 +1666,43 @@ function handleNoOffersScenario() {
 
 async function updateOffersTable() {
     try {
-        startTableRender();
-
         const PRICES_CACHE_KEY = 'prices_coingecko';
         const cachedPrices = CacheManager.get(PRICES_CACHE_KEY);
-
-        if (!cachedPrices || !cachedPrices.remainingTime || cachedPrices.remainingTime < 60000) {
-            console.log('Fetching fresh price data...');
-            const priceData = await fetchLatestPrices();
-            if (priceData) {
-                latestPrices = priceData;
-            }
-        } else {
-            latestPrices = cachedPrices.value;
-        }
+        latestPrices = cachedPrices?.value || getEmptyPriceData();
 
         const validOffers = getValidOffers();
-
-        if (!isSentOffers) {
-            const networkOffersSpan = document.querySelector('a[href="/offers"] span.inline-flex.justify-center');
-            if (networkOffersSpan) {
-                networkOffersSpan.textContent = validOffers.length;
-            }
-        }
-
         const startIndex = (currentPage - 1) * itemsPerPage;
         const endIndex = Math.min(startIndex + itemsPerPage, validOffers.length);
         const itemsToDisplay = validOffers.slice(startIndex, endIndex);
 
-        const identityPromises = itemsToDisplay.map(offer =>
-            offer.addr_from ? getIdentityData(offer.addr_from) : Promise.resolve(null)
-        );
+        fetchLatestPrices().then(freshPrices => {
+            if (freshPrices) {
+                latestPrices = freshPrices;
+                updateProfitLossDisplays();
+            }
+        }).catch(error => {
+            console.warn('Price fetch failed:', error);
+        });
 
-        const identities = await Promise.all(identityPromises);
+        const BATCH_SIZE = 5;
+        const identities = [];
+        
+        for (let i = 0; i < itemsToDisplay.length; i += BATCH_SIZE) {
+            const batch = itemsToDisplay.slice(i, i + BATCH_SIZE);
+            const batchPromises = batch.map(offer =>
+                offer.addr_from ? IdentityManager.getIdentityData(offer.addr_from) : Promise.resolve(null)
+            );
+            
+            const batchResults = await Promise.all(batchPromises);
+            identities.push(...batchResults);
+
+            if (i + BATCH_SIZE < itemsToDisplay.length) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+        }
 
         if (validOffers.length === 0) {
-            const existingRows = offersBody.querySelectorAll('tr');
-            existingRows.forEach(row => {
-                cleanupRow(row);
-            });
             handleNoOffersScenario();
-            finishTableRender();
             return;
         }
 
@@ -1528,41 +1735,62 @@ async function updateOffersTable() {
             if (tableRateModule?.initializeTable) {
                 tableRateModule.initializeTable();
             }
-            
-            finishTableRender();
         });
 
         lastRefreshTime = Date.now();
-        if (newEntriesCountSpan) {
-            newEntriesCountSpan.textContent = validOffers.length;
-        }
-        if (lastRefreshTimeSpan) {
-            lastRefreshTimeSpan.textContent = new Date(lastRefreshTime).toLocaleTimeString();
-        }
+        updateLastRefreshTime();
 
     } catch (error) {
         console.error('[Debug] Error in updateOffersTable:', error);
-        offersBody.innerHTML = `
-            <tr>
-                <td colspan="8" class="text-center py-4 text-red-500">
-                    An error occurred while updating the offers table. Please try again later.
-                </td>
-            </tr>`;
-        finishTableRender();
+        handleTableError();
+
+        try {
+            const cachedOffers = CacheManager.get('offers_cached');
+            if (cachedOffers?.value) {
+                console.log('Recovering with cached offers data');
+                jsonData = cachedOffers.value;
+                updateOffersTable();
+            }
+        } catch (recoveryError) {
+            console.error('Recovery attempt failed:', recoveryError);
+        }
     }
 }
 
-async function getIdentityData(address) {
-    try {
-        const response = await fetch(`/json/identities/${address}`);
-        if (!response.ok) {
-            return null;
+function updateProfitLossDisplays() {
+    const rows = document.querySelectorAll('[data-offer-id]');
+    rows.forEach(row => {
+        const offerId = row.getAttribute('data-offer-id');
+        const offer = jsonData.find(o => o.offer_id === offerId);
+        if (!offer) return;
+
+        const fromAmount = parseFloat(offer.amount_from) || 0;
+        const toAmount = parseFloat(offer.amount_to) || 0;
+        updateProfitLoss(row, offer.coin_from, offer.coin_to, fromAmount, toAmount, offer.is_own_offer);
+
+        const rateTooltipId = `tooltip-rate-${offerId}`;
+        const rateTooltip = document.getElementById(rateTooltipId);
+        if (rateTooltip) {
+            const tooltipContent = createCombinedRateTooltip(offer, offer.coin_from, offer.coin_to, offer.is_own_offer);
+            rateTooltip.innerHTML = tooltipContent;
         }
-        return await response.json();
-    } catch (error) {
-        console.error('Error fetching identity:', error);
-        return null;
-    }
+    });
+}
+
+function handleTableError() {
+    offersBody.innerHTML = `
+        <tr>
+            <td colspan="8" class="text-center py-4 text-gray-500">
+                <div class="flex flex-col items-center justify-center gap-2">
+                    <span>An error occurred while updating the table.</span>
+                    <span class="text-sm">The table will continue to function with cached data.</span>
+                </div>
+            </td>
+        </tr>`;
+}
+
+async function getIdentityData(address) {
+    return IdentityManager.getIdentityData(address);
 }
 
 function getIdentityInfo(address, identity) {
@@ -1632,7 +1860,6 @@ function createTableRow(offer, identity = null) {
     const fromAmount = parseFloat(amountFrom) || 0;
     const toAmount = parseFloat(amountTo) || 0;
 
-    // Build row content
     row.innerHTML = `
         ${!isPublic ? createPrivateIndicator() : '<td class="w-0 p-0 m-0"></td>'}
         ${createTimeColumn(offer, postedTime, expiresIn)}
@@ -1728,7 +1955,7 @@ function createDetailsColumn(offer, identity = null) {
     );
 
     const identifierTextClass = identityInfo.label
-        ? 'text-white dark:text-white'
+        ? 'dark:text-white'
         : 'monospace';
 
     return `
@@ -1741,7 +1968,7 @@ function createDetailsColumn(offer, identity = null) {
                     <svg class="w-4 h-4 mr-2 text-gray-400 dark:text-white" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
                      <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"></path>
                     </svg>
-                    <span class="${identifierTextClass} font-semibold">
+                    <span class="${identifierTextClass}">
                         ${escapeHtml(displayIdentifier)}
                     </span>
                 </a>
@@ -2093,7 +2320,6 @@ function createRecipientTooltip(uniqueId, identityInfo, identity, successRate, t
 
 function createTooltipContent(isSentOffers, coinFrom, coinTo, fromAmount, toAmount, isOwnOffer) {
     if (!coinFrom || !coinTo) {
-        //console.error(`Invalid coin names: coinFrom=${coinFrom}, coinTo=${coinTo}`);
         return `<p class="font-bold mb-1">Unable to calculate profit/loss</p>
                 <p>Invalid coin data.</p>`;
     }
@@ -2103,7 +2329,10 @@ function createTooltipContent(isSentOffers, coinFrom, coinTo, fromAmount, toAmou
 
     const getPriceKey = (coin) => {
         const lowerCoin = coin.toLowerCase();
-        return lowerCoin === 'firo' || lowerCoin === 'zcoin' ? 'zcoin' : coinNameToSymbol[coin] || lowerCoin;
+        return lowerCoin === 'firo' || lowerCoin === 'zcoin' ? 'zcoin' : 
+               lowerCoin === 'bitcoin cash' ? 'bitcoin-cash' : 
+               lowerCoin === 'particl anon' || lowerCoin === 'particl blind' ? 'particl' :
+               coinNameToSymbol[coin] || lowerCoin;
     };
 
     const fromSymbol = getPriceKey(coinFrom);
@@ -2111,9 +2340,14 @@ function createTooltipContent(isSentOffers, coinFrom, coinTo, fromAmount, toAmou
     const fromPriceUSD = latestPrices[fromSymbol]?.usd;
     const toPriceUSD = latestPrices[toSymbol]?.usd;
 
-    if (!fromPriceUSD || !toPriceUSD) {
-        return `<p class="font-bold mb-1">Unable to calculate profit/loss</p>
-                <p>Price data is missing for one or both coins.</p>`;
+    if (fromPriceUSD === null || toPriceUSD === null || 
+        fromPriceUSD === undefined || toPriceUSD === undefined) {
+        return `<p class="font-bold mb-1">Price Information Unavailable</p>
+                <p>Current market prices are temporarily unavailable.</p>
+                <p class="mt-2">You are ${isSentOffers ? 'selling' : 'buying'} ${fromAmount.toFixed(8)} ${coinFrom} 
+                for ${toAmount.toFixed(8)} ${coinTo}.</p>
+                <p class="font-bold mt-2">Note:</p>
+                <p>Profit/loss calculations will be available when price data is restored.</p>`;
     }
 
     const fromValueUSD = fromAmount * fromPriceUSD;
@@ -2164,9 +2398,9 @@ function createTooltipContent(isSentOffers, coinFrom, coinTo, fromAmount, toAmou
     `;
 }
 
-function createCombinedRateTooltip(offer, coinFrom, coinTo, isSentOffers, treatAsSentOffer) {
-    const rate = parseFloat(offer.rate);
-    const inverseRate = 1 / rate;
+function createCombinedRateTooltip(offer, coinFrom, coinTo, treatAsSentOffer) {
+    const rate = parseFloat(offer.rate) || 0;
+    const inverseRate = rate ? (1 / rate) : 0;
 
     const getPriceKey = (coin) => {
         const lowerCoin = coin.toLowerCase();
@@ -2176,25 +2410,38 @@ function createCombinedRateTooltip(offer, coinFrom, coinTo, isSentOffers, treatA
         if (lowerCoin === 'bitcoin cash') {
             return 'bitcoin-cash';
         }
+        if (lowerCoin === 'particl anon' || lowerCoin === 'particl blind') {
+            return 'particl';
+        }
         return coinNameToSymbol[coin] || lowerCoin;
     };
 
     const fromSymbol = getPriceKey(coinFrom);
     const toSymbol = getPriceKey(coinTo);
+    const fromPriceUSD = latestPrices[fromSymbol]?.usd;
+    const toPriceUSD = latestPrices[toSymbol]?.usd;
 
-    const fromPriceUSD = latestPrices[fromSymbol]?.usd || 0;
-    const toPriceUSD = latestPrices[toSymbol]?.usd || 0;
+    if (fromPriceUSD === null || toPriceUSD === null || 
+        fromPriceUSD === undefined || toPriceUSD === undefined) {
+        return `
+            <p class="font-bold mb-1">Exchange Rate Information</p>
+            <p>Market price data is temporarily unavailable.</p>
+            <p class="font-bold mt-2">Current Offer Rates:</p>
+            <p>1 ${coinFrom} = ${rate.toFixed(8)} ${coinTo}</p>
+            <p>1 ${coinTo} = ${inverseRate.toFixed(8)} ${coinFrom}</p>
+            <p class="font-bold mt-2">Note:</p>
+            <p>Market comparison will be available when price data is restored.</p>
+        `;
+    }
+
     const rateInUSD = rate * toPriceUSD;
-
     const marketRate = fromPriceUSD / toPriceUSD;
-
-    const percentDiff = ((rate - marketRate) / marketRate) * 100;
+    const percentDiff = marketRate ? ((rate - marketRate) / marketRate) * 100 : 0;
     const formattedPercentDiff = percentDiff.toFixed(2);
     const percentDiffDisplay = formattedPercentDiff === "0.00" ? "0.00" :
                             (percentDiff > 0 ? `+${formattedPercentDiff}` : formattedPercentDiff);
     const aboveOrBelow = percentDiff > 0 ? "above" : percentDiff < 0 ? "below" : "at";
-
-    const action = isSentOffers || treatAsSentOffer ? "selling" : "buying";
+    const action = treatAsSentOffer ? "selling" : "buying";
 
     return `
         <p class="font-bold mb-1">Exchange Rate Explanation:</p>
@@ -2436,46 +2683,118 @@ function getCoinSymbol(fullName) {
 }
 
 // EVENT LISTENERS
-document.querySelectorAll('th[data-sortable="true"]').forEach(header => {
-    header.addEventListener('click', () => {
-        const columnIndex = parseInt(header.getAttribute('data-column-index'));
-
-        if (currentSortColumn === columnIndex) {
-            currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
-        } else {
-
-            currentSortColumn = columnIndex;
-            currentSortDirection = 'desc';
-        }
-
-        document.querySelectorAll('.sort-icon').forEach(icon => {
-            icon.classList.remove('text-blue-500');
-            icon.textContent = '↓';
+function initializeTableEvents() {
+    const filterForm = document.getElementById('filterForm');
+    if (filterForm) {
+        EventManager.add(filterForm, 'submit', (e) => {
+            e.preventDefault();
+            applyFilters();
         });
 
-        const sortIcon = document.getElementById(`sort-icon-${columnIndex}`);
-        if (sortIcon) {
-            sortIcon.textContent = currentSortDirection === 'asc' ? '↑' : '↓';
-            sortIcon.classList.add('text-blue-500');
-        }
+        EventManager.add(filterForm, 'change', () => {
+            applyFilters();
+            updateClearFiltersButton();
+        });
+    }
 
-        document.querySelectorAll('th[data-sortable="true"]').forEach(th => {
-            const thColumnIndex = parseInt(th.getAttribute('data-column-index'));
-            if (thColumnIndex === columnIndex) {
-                th.classList.add('text-blue-500');
-            } else {
-                th.classList.remove('text-blue-500');
+    const coinToSelect = document.getElementById('coin_to');
+    const coinFromSelect = document.getElementById('coin_from');
+
+    if (coinToSelect) {
+        EventManager.add(coinToSelect, 'change', () => {
+            applyFilters();
+            updateCoinFilterImages();
+        });
+    }
+
+    if (coinFromSelect) {
+        EventManager.add(coinFromSelect, 'change', () => {
+            applyFilters();
+            updateCoinFilterImages();
+        });
+    }
+
+    const clearFiltersBtn = document.getElementById('clearFilters');
+    if (clearFiltersBtn) {
+        EventManager.add(clearFiltersBtn, 'click', () => {
+            clearFilters();
+            updateCoinFilterImages();
+        });
+    }
+
+    const refreshButton = document.getElementById('refreshOffers');
+    if (refreshButton) {
+        EventManager.add(refreshButton, 'click', async () => {
+            console.log('Manual refresh initiated');
+            const refreshIcon = document.getElementById('refreshIcon');
+            const refreshText = document.getElementById('refreshText');
+
+            refreshButton.disabled = true;
+            refreshIcon.classList.add('animate-spin');
+            refreshText.textContent = 'Refreshing...';
+            refreshButton.classList.add('opacity-75', 'cursor-wait');
+
+            try {
+                const endpoint = isSentOffers ? '/json/sentoffers' : '/json/offers';
+                const response = await fetch(endpoint);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const newData = await response.json();
+
+                const processedNewData = Array.isArray(newData) ? newData : Object.values(newData);
+                console.log('Fetched offers:', processedNewData.length);
+
+                jsonData = formatInitialData(processedNewData);
+                originalJsonData = [...jsonData];
+
+                await updateOffersTable();
+                updateJsonView();
+                updatePaginationInfo();
+
+                console.log('Manual refresh completed successfully');
+
+            } catch (error) {
+                console.error('Error during manual refresh:', error);
+                ui.displayErrorMessage('Failed to refresh offers. Please try again later.');
+            } finally {
+                refreshButton.disabled = false;
+                refreshIcon.classList.remove('animate-spin');
+                refreshText.textContent = 'Refresh';
+                refreshButton.classList.remove('opacity-75', 'cursor-wait');
             }
         });
+    }
 
-        localStorage.setItem('tableSortColumn', currentSortColumn);
-        localStorage.setItem('tableSortDirection', currentSortDirection);
-
-        applyFilters();
+    document.querySelectorAll('th[data-sortable="true"]').forEach(header => {
+        EventManager.add(header, 'click', () => {
+            const columnIndex = parseInt(header.getAttribute('data-column-index'));
+            handleTableSort(columnIndex, header);
+        });
     });
 
-    header.classList.add('cursor-pointer', 'hover:bg-gray-100', 'dark:hover:bg-gray-700');
-});
+    const prevPageButton = document.getElementById('prevPage');
+    const nextPageButton = document.getElementById('nextPage');
+
+    if (prevPageButton) {
+        EventManager.add(prevPageButton, 'click', () => {
+            if (currentPage > 1) {
+                currentPage--;
+                updateOffersTable();
+            }
+        });
+    }
+
+    if (nextPageButton) {
+        EventManager.add(nextPageButton, 'click', () => {
+            const totalPages = Math.ceil(jsonData.length / itemsPerPage);
+            if (currentPage < totalPages) {
+                currentPage++;
+                updateOffersTable();
+            }
+        });
+    }
+}
 
 const eventListeners = {
     listeners: [],
@@ -2518,6 +2837,60 @@ const eventListeners = {
     },
 };
 
+function handleTableSort(columnIndex, header) {
+    if (currentSortColumn === columnIndex) {
+        currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+        currentSortColumn = columnIndex;
+        currentSortDirection = 'desc';
+    }
+
+    document.querySelectorAll('.sort-icon').forEach(icon => {
+        icon.classList.remove('text-blue-500');
+        icon.textContent = '↓';
+    });
+
+    const sortIcon = document.getElementById(`sort-icon-${columnIndex}`);
+    if (sortIcon) {
+        sortIcon.textContent = currentSortDirection === 'asc' ? '↑' : '↓';
+        sortIcon.classList.add('text-blue-500');
+    }
+
+    document.querySelectorAll('th[data-sortable="true"]').forEach(th => {
+        if (th === header) {
+            th.classList.add('text-blue-500');
+        } else {
+            th.classList.remove('text-blue-500');
+        }
+    });
+
+    localStorage.setItem('tableSortColumn', currentSortColumn);
+    localStorage.setItem('tableSortDirection', currentSortDirection);
+
+    applyFilters();
+}
+
+function setupRowEventListeners(row, offer) {
+    const tooltipTriggers = row.querySelectorAll('[data-tooltip-target]');
+    tooltipTriggers.forEach(trigger => {
+        EventManager.add(trigger, 'mouseenter', () => {
+            const tooltipId = trigger.getAttribute('data-tooltip-target');
+            const tooltip = document.getElementById(tooltipId);
+            if (tooltip) {
+                tooltip.classList.remove('invisible', 'opacity-0');
+            }
+        });
+        
+        EventManager.add(trigger, 'mouseleave', () => {
+            const tooltipId = trigger.getAttribute('data-tooltip-target');
+            const tooltip = document.getElementById(tooltipId);
+            if (tooltip) {
+                tooltip.classList.add('invisible', 'opacity-0');
+            }
+        });
+    });
+}
+
 // TIMER MANAGEMENT
 const timerManager = {
     intervals: [],
@@ -2553,23 +2926,11 @@ const timerManager = {
 
 // INITIALIZATION AND EVENT BINDING
 document.addEventListener('DOMContentLoaded', () => {
-    //console.log('DOM content loaded, initializing...');
+    console.log('DOM content loaded, initializing...');
     console.log('View type:', isSentOffers ? 'sent offers' : 'received offers');
 
     updateClearFiltersButton();
-
-    // Add event listeners for filter controls
-    const selectElements = filterForm.querySelectorAll('select');
-    selectElements.forEach(select => {
-        select.addEventListener('change', () => {
-            updateClearFiltersButton();
-        });
-    });
-
-    filterForm.addEventListener('change', () => {
-        applyFilters();
-        updateClearFiltersButton();
-    });
+    initializeTableEvents();
 
     setTimeout(() => {
         console.log('Starting WebSocket initialization...');
@@ -2587,107 +2948,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 clearInterval(retryInterval);
                 continueInitialization();
             } else if (retryCount >= maxRetries) {
-                //console.error('Failed to load tableRateModule after multiple attempts');
                 clearInterval(retryInterval);
                 continueInitialization();
             }
         }, 1000);
     }
-
-    eventListeners.add(filterForm, 'submit', (e) => {
-        e.preventDefault();
-        applyFilters();
-    });
-
-    eventListeners.add(filterForm, 'change', applyFilters);
-
-    const coinToSelect = document.getElementById('coin_to');
-    const coinFromSelect = document.getElementById('coin_from');
-
-    eventListeners.add(coinToSelect, 'change', () => {
-        applyFilters();
-        updateCoinFilterImages();
-    });
-
-    eventListeners.add(coinFromSelect, 'change', () => {
-        applyFilters();
-        updateCoinFilterImages();
-    });
-
-    eventListeners.add(document.getElementById('clearFilters'), 'click', () => {
-        filterForm.reset();
-        const statusSelect = document.getElementById('status');
-        if (statusSelect) {
-            statusSelect.value = 'any';
-        }
-        jsonData = [...originalJsonData];
-        currentPage = 1;
-        applyFilters();
-        updateCoinFilterImages();
-    });
-
-    eventListeners.add(document.getElementById('refreshOffers'), 'click', async () => {
-        console.log('Manual refresh initiated');
-
-        const refreshButton = document.getElementById('refreshOffers');
-        const refreshIcon = document.getElementById('refreshIcon');
-        const refreshText = document.getElementById('refreshText');
-
-        refreshButton.disabled = true;
-        refreshIcon.classList.add('animate-spin');
-        refreshText.textContent = 'Refreshing...';
-        refreshButton.classList.add('opacity-75', 'cursor-wait');
-
-        try {
-            const endpoint = isSentOffers ? '/json/sentoffers' : '/json/offers';
-            const response = await fetch(endpoint);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            const newData = await response.json();
-
-            const processedNewData = Array.isArray(newData) ? newData : Object.values(newData);
-            console.log('Fetched offers:', processedNewData.length);
-
-            jsonData = formatInitialData(processedNewData);
-            originalJsonData = [...jsonData];
-
-            await updateOffersTable();
-            updateJsonView();
-            updatePaginationInfo();
-
-            console.log(' Manual refresh completed successfully');
-
-        } catch (error) {
-            console.error('Error during manual refresh:', error);
-            ui.displayErrorMessage('Failed to refresh offers. Please try again later.');
-        } finally {
-            refreshButton.disabled = false;
-            refreshIcon.classList.remove('animate-spin');
-            refreshText.textContent = 'Refresh';
-            refreshButton.classList.remove('opacity-75', 'cursor-wait');
-        }
-    });
-
-    eventListeners.add(prevPageButton, 'click', () => {
-        if (currentPage > 1) {
-            currentPage--;
-            const validOffers = getValidOffers();
-            const totalPages = Math.ceil(validOffers.length / itemsPerPage);
-            updateOffersTable();
-            updatePaginationControls(totalPages);
-        }
-    });
-
-    eventListeners.add(nextPageButton, 'click', () => {
-        const validOffers = getValidOffers();
-        const totalPages = Math.ceil(validOffers.length / itemsPerPage);
-        if (currentPage < totalPages) {
-            currentPage++;
-            updateOffersTable();
-            updatePaginationControls(totalPages);
-        }
-    });
 
     timerManager.addInterval(() => {
         if (WebSocketManager.isConnected()) {
@@ -2701,7 +2966,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     updateCoinFilterImages();
     fetchOffers().then(() => {
-        //console.log('Initial offers fetched');
         applyFilters();
     }).catch(error => {
         console.error('Error fetching initial offers:', error);
@@ -2714,7 +2978,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     timerManager.addInterval(updateRowTimes, 900000);
 
-    document.addEventListener('visibilitychange', () => {
+    EventManager.add(document, 'visibilitychange', () => {
         if (!document.hidden) {
             console.log('Page became visible, checking WebSocket connection');
             if (!WebSocketManager.isConnected()) {
@@ -2723,7 +2987,183 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    EventManager.add(window, 'beforeunload', () => {
+        cleanup();
+    });
+
     console.log('Initialization completed');
 });
+
+async function cleanup() {
+    const debug = {
+        startTime: Date.now(),
+        steps: [],
+        errors: [],
+        addStep: function(step, details = null) {
+            const timeFromStart = Date.now() - this.startTime;
+            console.log(`[Cleanup ${timeFromStart}ms] ${step}`, details || '');
+            this.steps.push({ step, time: timeFromStart, details });
+        },
+        addError: function(step, error) {
+            const timeFromStart = Date.now() - this.startTime;
+            console.error(`[Cleanup Error ${timeFromStart}ms] ${step}:`, error);
+            this.errors.push({ step, error, time: timeFromStart });
+        },
+        summarize: function() {
+            const totalTime = Date.now() - this.startTime;
+            console.group('Cleanup Summary');
+            console.log(`Total cleanup time: ${totalTime}ms`);
+            console.log('Steps completed:', this.steps.length);
+            console.log('Errors encountered:', this.errors.length);
+            
+            if (this.steps.length > 0) {
+                console.group('Steps Timeline');
+                this.steps.forEach(({step, time}) => {
+                    console.log(`${time}ms - ${step}`);
+                });
+                console.groupEnd();
+            }
+            
+            if (this.errors.length > 0) {
+                console.group('Errors');
+                this.errors.forEach(({step, error, time}) => {
+                    console.log(`${time}ms - ${step}:`, error);
+                });
+                console.groupEnd();
+            }
+            console.groupEnd();
+        }
+    };
+
+    try {
+        debug.addStep('Starting cleanup process');
+
+        debug.addStep('Clearing timers');
+        const timerCount = timerManager.intervals.length + timerManager.timeouts.length;
+        timerManager.clearAll();
+        debug.addStep('Timers cleared', `Cleaned up ${timerCount} timers`);
+
+        debug.addStep('Starting WebSocket cleanup');
+        await Promise.resolve(WebSocketManager.cleanup()).catch(error => {
+            debug.addError('WebSocket cleanup', error);
+        });
+        debug.addStep('WebSocket cleanup completed');
+
+        debug.addStep('Clearing event listeners');
+        const listenerCount = EventManager.listeners.size;
+        EventManager.clearAll();
+        debug.addStep('Event listeners cleared', `Cleaned up ${listenerCount} listeners`);
+
+        debug.addStep('Starting table cleanup');
+        const rowCount = offersBody ? offersBody.querySelectorAll('tr').length : 0;
+        cleanupTable();
+        debug.addStep('Table cleanup completed', `Cleaned up ${rowCount} rows`);
+
+        debug.addStep('Starting cache cleanup');
+        const cacheStats = CacheManager.getStats();
+        CacheManager.clear();
+        debug.addStep('Cache cleanup completed', `Cleared ${cacheStats.itemCount} cached items`);
+
+        debug.addStep('Resetting global state');
+        const globals = {
+            currentPage: currentPage,
+            dataLength: jsonData.length,
+            originalDataLength: originalJsonData.length
+        };
+        currentPage = 1;
+        jsonData = [];
+        originalJsonData = [];
+        currentSortColumn = 0;
+        currentSortDirection = 'desc';
+        filterTimeout = null;
+        latestPrices = null;
+        lastRefreshTime = null;
+        debug.addStep('Global state reset', globals);
+
+        debug.addStep('Clearing global references');
+        if (window.WebSocketManager) {
+            window.WebSocketManager = null;
+        }
+        if (window.tableRateModule) {
+            window.tableRateModule = null;
+        }
+        debug.addStep('Global references cleared');
+
+        debug.addStep('Clearing DOM references');
+        const elementRefs = [
+            'offersBody',
+            'filterForm',
+            'prevPageButton',
+            'nextPageButton',
+            'currentPageSpan',
+            'totalPagesSpan',
+            'lastRefreshTimeSpan',
+            'newEntriesCountSpan'
+        ];
+        let clearedRefs = 0;
+        elementRefs.forEach(ref => {
+            if (window[ref]) {
+                window[ref] = null;
+                clearedRefs++;
+            }
+        });
+        debug.addStep('DOM references cleared', `Cleared ${clearedRefs} references`);
+
+        debug.addStep('Clearing tooltips');
+        const tooltips = document.querySelectorAll('[role="tooltip"]');
+        const tooltipCount = tooltips.length;
+        tooltips.forEach(tooltip => tooltip.remove());
+        debug.addStep('Tooltips cleared', `Removed ${tooltipCount} tooltips`);
+
+        debug.addStep('Clearing document/window events');
+        const events = ['visibilitychange', 'beforeunload', 'scroll'];
+        events.forEach(event => {
+            document.removeEventListener(event, null);
+            window.removeEventListener(event, null);
+        });
+        debug.addStep('Document/window events cleared');
+
+        debug.addStep('Clearing localStorage items');
+        try {
+            localStorage.removeItem('tableSortColumn');
+            localStorage.removeItem('tableSortDirection');
+            debug.addStep('localStorage items cleared');
+        } catch (e) {
+            debug.addError('localStorage cleanup', e);
+        }
+
+    } catch (error) {
+        debug.addError('Main cleanup process', error);
+
+        debug.addStep('Starting failsafe cleanup');
+        try {
+            WebSocketManager.cleanup();
+            EventManager.clearAll();
+            timerManager.clearAll();
+            if (window.ws) {
+                window.ws.close();
+                window.ws = null;
+            }
+            debug.addStep('Failsafe cleanup completed');
+        } catch (criticalError) {
+            debug.addError('Critical failsafe cleanup', criticalError);
+        }
+    } finally {
+        debug.addStep('Running final cleanups');
+        if (document.body.classList.contains('optimize-scroll')) {
+            document.body.classList.remove('optimize-scroll');
+        }
+        if (document.body.classList.contains('is-scrolling')) {
+            document.body.classList.remove('is-scrolling');
+        }
+        const inlineStyles = document.querySelectorAll('style[data-dynamic]');
+        inlineStyles.forEach(style => style.remove());
+        debug.addStep('Final cleanups completed');
+
+        debug.summarize();
+    }
+}
+
+window.cleanup = cleanup;
 
 console.log('Offers Table Module fully initialized');
