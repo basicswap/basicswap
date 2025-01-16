@@ -1,3 +1,66 @@
+const EventManager = {
+    listeners: new Map(),
+
+    add(element, type, handler, options = false) {
+        if (!this.listeners.has(element)) {
+            this.listeners.set(element, new Map());
+        }
+        
+        const elementListeners = this.listeners.get(element);
+        if (!elementListeners.has(type)) {
+            elementListeners.set(type, new Set());
+        }
+        
+        const handlerInfo = { handler, options };
+        elementListeners.get(type).add(handlerInfo);
+        element.addEventListener(type, handler, options);
+        
+        return handlerInfo;
+    },
+
+    remove(element, type, handler, options = false) {
+        const elementListeners = this.listeners.get(element);
+        if (!elementListeners) return;
+
+        const typeListeners = elementListeners.get(type);
+        if (!typeListeners) return;
+
+        typeListeners.forEach(info => {
+            if (info.handler === handler) {
+                element.removeEventListener(type, handler, options);
+                typeListeners.delete(info);
+            }
+        });
+
+        if (typeListeners.size === 0) {
+            elementListeners.delete(type);
+        }
+        if (elementListeners.size === 0) {
+            this.listeners.delete(element);
+        }
+    },
+
+    removeAll(element) {
+        const elementListeners = this.listeners.get(element);
+        if (!elementListeners) return;
+
+        elementListeners.forEach((typeListeners, type) => {
+            typeListeners.forEach(info => {
+                element.removeEventListener(type, info.handler, info.options);
+            });
+        });
+
+        this.listeners.delete(element);
+    },
+
+    clearAll() {
+        this.listeners.forEach((elementListeners, element) => {
+            this.removeAll(element);
+        });
+        this.listeners.clear();
+    }
+};
+
 // GLOBAL STATE VARIABLES
 let latestPrices = null;
 let lastRefreshTime = null;
@@ -168,6 +231,7 @@ const WebSocketManager = {
     reconnectDelay: 5000,
     maxQueueSize: 1000,
     isIntentionallyClosed: false,
+    handlers: {},
 
     connectionState: {
         isConnecting: false,
@@ -185,13 +249,15 @@ const WebSocketManager = {
     },
 
     setupPageVisibilityHandler() {
-        document.addEventListener('visibilitychange', () => {
+        this.handlers.visibilityChange = () => {
             if (document.hidden) {
                 this.handlePageHidden();
             } else {
                 this.handlePageVisible();
             }
-        });
+        };
+        
+        document.addEventListener('visibilitychange', this.handlers.visibilityChange);
     },
 
     handlePageHidden() {
@@ -285,44 +351,49 @@ const WebSocketManager = {
     },
 
     setupEventHandlers() {
-    if (!this.ws) return;
+        if (!this.ws) return;
 
-    this.ws.onopen = () => {
-        console.log('🟢 WebSocket connected successfully');
-        this.connectionState.isConnecting = false;
-        this.reconnectAttempts = 0;
-        clearTimeout(this.connectionState.connectTimeout);
-        this.connectionState.lastHealthCheck = Date.now();
-        window.ws = this.ws;
-        updateConnectionStatus('connected');
-    };
+        this.handlers.open = () => {
+            console.log('🟢 WebSocket connected successfully');
+            this.connectionState.isConnecting = false;
+            this.reconnectAttempts = 0;
+            clearTimeout(this.connectionState.connectTimeout);
+            this.connectionState.lastHealthCheck = Date.now();
+            window.ws = this.ws;
+            updateConnectionStatus('connected');
+        };
 
-    this.ws.onmessage = (event) => {
-        try {
-            const message = JSON.parse(event.data);
-            this.handleMessage(message);
-        } catch (error) {
-            console.error('Error processing WebSocket message:', error);
+        this.handlers.message = (event) => {
+            try {
+                const message = JSON.parse(event.data);
+                this.handleMessage(message);
+            } catch (error) {
+                console.error('Error processing WebSocket message:', error);
+                updateConnectionStatus('error');
+            }
+        };
+
+        this.handlers.error = (error) => {
+            console.error('WebSocket error:', error);
             updateConnectionStatus('error');
-        }
-    };
+        };
 
-    this.ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
-        updateConnectionStatus('error');
-    };
+        this.handlers.close = (event) => {
+            console.log('🔴 WebSocket closed:', event.code, event.reason);
+            this.connectionState.isConnecting = false;
+            window.ws = null;
+            updateConnectionStatus('disconnected');
 
-    this.ws.onclose = (event) => {
-        console.log('🔴 WebSocket closed:', event.code, event.reason);
-        this.connectionState.isConnecting = false;
-        window.ws = null;
-        updateConnectionStatus('disconnected');
+            if (!this.isIntentionallyClosed) {
+                this.handleReconnect();
+            }
+        };
 
-        if (!this.isIntentionallyClosed) {
-            this.handleReconnect();
-        }
-    };
-},
+        this.ws.onopen = this.handlers.open;
+        this.ws.onmessage = this.handlers.message;
+        this.ws.onerror = this.handlers.error;
+        this.ws.onclose = this.handlers.close;
+    },
 
     handleMessage(message) {
         if (this.messageQueue.length >= this.maxQueueSize) {
@@ -330,7 +401,10 @@ const WebSocketManager = {
             this.messageQueue.shift();
         }
 
-        clearTimeout(this.debounceTimeout);
+        if (this.debounceTimeout) {
+            clearTimeout(this.debounceTimeout);
+        }
+
         this.messageQueue.push(message);
 
         this.debounceTimeout = setTimeout(() => {
@@ -404,6 +478,7 @@ const WebSocketManager = {
         clearTimeout(this.debounceTimeout);
         clearTimeout(this.reconnectTimeout);
         clearTimeout(this.connectionState.connectTimeout);
+        this.stopHealthCheck();
 
         this.messageQueue = [];
         this.processingQueue = false;
@@ -418,21 +493,30 @@ const WebSocketManager = {
             if (this.ws.readyState === WebSocket.OPEN) {
                 this.ws.close(1000, 'Cleanup');
             }
+
             this.ws = null;
             window.ws = null;
         }
-    },
 
-    isConnected() {
-        return this.ws && this.ws.readyState === WebSocket.OPEN;
+        if (this.handlers.visibilityChange) {
+            document.removeEventListener('visibilitychange', this.handlers.visibilityChange);
+        }
+
+        this.handlers = {};
     },
 
     disconnect() {
         this.isIntentionallyClosed = true;
         this.cleanup();
         this.stopHealthCheck();
+    },
+
+    isConnected() {
+        return this.ws && this.ws.readyState === WebSocket.OPEN;
     }
 };
+
+window.WebSocketManager = WebSocketManager;
 
 const CacheManager = {
     maxItems: 100,
@@ -1405,8 +1489,9 @@ function updateClearFiltersButton() {
 }
 
 function cleanupRow(row) {
+    EventManager.removeAll(row);
+    
     const tooltips = row.querySelectorAll('[data-tooltip-target]');
-    const count = tooltips.length;
     tooltips.forEach(tooltip => {
         const tooltipId = tooltip.getAttribute('data-tooltip-target');
         const tooltipElement = document.getElementById(tooltipId);
@@ -1414,7 +1499,18 @@ function cleanupRow(row) {
             tooltipElement.remove();
         }
     });
-    //console.log(`Cleaned up ${count} tooltips from row`);
+}
+
+function cleanupTable() {
+    EventManager.clearAll();
+    
+    if (offersBody) {
+        const existingRows = offersBody.querySelectorAll('tr');
+        existingRows.forEach(row => {
+            cleanupRow(row);
+        });
+        offersBody.innerHTML = '';
+    }
 }
 
 function handleNoOffersScenario() {
@@ -2436,46 +2532,74 @@ function getCoinSymbol(fullName) {
 }
 
 // EVENT LISTENERS
-document.querySelectorAll('th[data-sortable="true"]').forEach(header => {
-    header.addEventListener('click', () => {
-        const columnIndex = parseInt(header.getAttribute('data-column-index'));
-
-        if (currentSortColumn === columnIndex) {
-            currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
-        } else {
-
-            currentSortColumn = columnIndex;
-            currentSortDirection = 'desc';
-        }
-
-        document.querySelectorAll('.sort-icon').forEach(icon => {
-            icon.classList.remove('text-blue-500');
-            icon.textContent = '↓';
+function initializeTableEvents() {
+    const filterForm = document.getElementById('filterForm');
+    if (filterForm) {
+        EventManager.add(filterForm, 'submit', (e) => {
+            e.preventDefault();
+            applyFilters();
         });
 
-        const sortIcon = document.getElementById(`sort-icon-${columnIndex}`);
-        if (sortIcon) {
-            sortIcon.textContent = currentSortDirection === 'asc' ? '↑' : '↓';
-            sortIcon.classList.add('text-blue-500');
-        }
-
-        document.querySelectorAll('th[data-sortable="true"]').forEach(th => {
-            const thColumnIndex = parseInt(th.getAttribute('data-column-index'));
-            if (thColumnIndex === columnIndex) {
-                th.classList.add('text-blue-500');
-            } else {
-                th.classList.remove('text-blue-500');
-            }
+        EventManager.add(filterForm, 'change', () => {
+            applyFilters();
+            updateClearFiltersButton();
         });
+    }
 
-        localStorage.setItem('tableSortColumn', currentSortColumn);
-        localStorage.setItem('tableSortDirection', currentSortDirection);
+    const coinToSelect = document.getElementById('coin_to');
+    const coinFromSelect = document.getElementById('coin_from');
 
-        applyFilters();
+    if (coinToSelect) {
+        EventManager.add(coinToSelect, 'change', () => {
+            applyFilters();
+            updateCoinFilterImages();
+        });
+    }
+
+    if (coinFromSelect) {
+        EventManager.add(coinFromSelect, 'change', () => {
+            applyFilters();
+            updateCoinFilterImages();
+        });
+    }
+
+    const clearFiltersBtn = document.getElementById('clearFilters');
+    if (clearFiltersBtn) {
+        EventManager.add(clearFiltersBtn, 'click', () => {
+            clearFilters();
+            updateCoinFilterImages();
+        });
+    }
+
+    document.querySelectorAll('th[data-sortable="true"]').forEach(header => {
+        EventManager.add(header, 'click', () => {
+            const columnIndex = parseInt(header.getAttribute('data-column-index'));
+            handleTableSort(columnIndex, header);
+        });
     });
 
-    header.classList.add('cursor-pointer', 'hover:bg-gray-100', 'dark:hover:bg-gray-700');
-});
+    const prevPageButton = document.getElementById('prevPage');
+    const nextPageButton = document.getElementById('nextPage');
+
+    if (prevPageButton) {
+        EventManager.add(prevPageButton, 'click', () => {
+            if (currentPage > 1) {
+                currentPage--;
+                updateOffersTable();
+            }
+        });
+    }
+
+    if (nextPageButton) {
+        EventManager.add(nextPageButton, 'click', () => {
+            const totalPages = Math.ceil(jsonData.length / itemsPerPage);
+            if (currentPage < totalPages) {
+                currentPage++;
+                updateOffersTable();
+            }
+        });
+    }
+}
 
 const eventListeners = {
     listeners: [],
@@ -2518,6 +2642,60 @@ const eventListeners = {
     },
 };
 
+function handleTableSort(columnIndex, header) {
+    if (currentSortColumn === columnIndex) {
+        currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+        currentSortColumn = columnIndex;
+        currentSortDirection = 'desc';
+    }
+
+    document.querySelectorAll('.sort-icon').forEach(icon => {
+        icon.classList.remove('text-blue-500');
+        icon.textContent = '↓';
+    });
+
+    const sortIcon = document.getElementById(`sort-icon-${columnIndex}`);
+    if (sortIcon) {
+        sortIcon.textContent = currentSortDirection === 'asc' ? '↑' : '↓';
+        sortIcon.classList.add('text-blue-500');
+    }
+
+    document.querySelectorAll('th[data-sortable="true"]').forEach(th => {
+        if (th === header) {
+            th.classList.add('text-blue-500');
+        } else {
+            th.classList.remove('text-blue-500');
+        }
+    });
+
+    localStorage.setItem('tableSortColumn', currentSortColumn);
+    localStorage.setItem('tableSortDirection', currentSortDirection);
+
+    applyFilters();
+}
+
+function setupRowEventListeners(row, offer) {
+    const tooltipTriggers = row.querySelectorAll('[data-tooltip-target]');
+    tooltipTriggers.forEach(trigger => {
+        EventManager.add(trigger, 'mouseenter', () => {
+            const tooltipId = trigger.getAttribute('data-tooltip-target');
+            const tooltip = document.getElementById(tooltipId);
+            if (tooltip) {
+                tooltip.classList.remove('invisible', 'opacity-0');
+            }
+        });
+        
+        EventManager.add(trigger, 'mouseleave', () => {
+            const tooltipId = trigger.getAttribute('data-tooltip-target');
+            const tooltip = document.getElementById(tooltipId);
+            if (tooltip) {
+                tooltip.classList.add('invisible', 'opacity-0');
+            }
+        });
+    });
+}
+
 // TIMER MANAGEMENT
 const timerManager = {
     intervals: [],
@@ -2553,23 +2731,11 @@ const timerManager = {
 
 // INITIALIZATION AND EVENT BINDING
 document.addEventListener('DOMContentLoaded', () => {
-    //console.log('DOM content loaded, initializing...');
+    console.log('DOM content loaded, initializing...');
     console.log('View type:', isSentOffers ? 'sent offers' : 'received offers');
 
     updateClearFiltersButton();
-
-    // Add event listeners for filter controls
-    const selectElements = filterForm.querySelectorAll('select');
-    selectElements.forEach(select => {
-        select.addEventListener('change', () => {
-            updateClearFiltersButton();
-        });
-    });
-
-    filterForm.addEventListener('change', () => {
-        applyFilters();
-        updateClearFiltersButton();
-    });
+    initializeTableEvents();
 
     setTimeout(() => {
         console.log('Starting WebSocket initialization...');
@@ -2587,107 +2753,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 clearInterval(retryInterval);
                 continueInitialization();
             } else if (retryCount >= maxRetries) {
-                //console.error('Failed to load tableRateModule after multiple attempts');
                 clearInterval(retryInterval);
                 continueInitialization();
             }
         }, 1000);
     }
-
-    eventListeners.add(filterForm, 'submit', (e) => {
-        e.preventDefault();
-        applyFilters();
-    });
-
-    eventListeners.add(filterForm, 'change', applyFilters);
-
-    const coinToSelect = document.getElementById('coin_to');
-    const coinFromSelect = document.getElementById('coin_from');
-
-    eventListeners.add(coinToSelect, 'change', () => {
-        applyFilters();
-        updateCoinFilterImages();
-    });
-
-    eventListeners.add(coinFromSelect, 'change', () => {
-        applyFilters();
-        updateCoinFilterImages();
-    });
-
-    eventListeners.add(document.getElementById('clearFilters'), 'click', () => {
-        filterForm.reset();
-        const statusSelect = document.getElementById('status');
-        if (statusSelect) {
-            statusSelect.value = 'any';
-        }
-        jsonData = [...originalJsonData];
-        currentPage = 1;
-        applyFilters();
-        updateCoinFilterImages();
-    });
-
-    eventListeners.add(document.getElementById('refreshOffers'), 'click', async () => {
-        console.log('Manual refresh initiated');
-
-        const refreshButton = document.getElementById('refreshOffers');
-        const refreshIcon = document.getElementById('refreshIcon');
-        const refreshText = document.getElementById('refreshText');
-
-        refreshButton.disabled = true;
-        refreshIcon.classList.add('animate-spin');
-        refreshText.textContent = 'Refreshing...';
-        refreshButton.classList.add('opacity-75', 'cursor-wait');
-
-        try {
-            const endpoint = isSentOffers ? '/json/sentoffers' : '/json/offers';
-            const response = await fetch(endpoint);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            const newData = await response.json();
-
-            const processedNewData = Array.isArray(newData) ? newData : Object.values(newData);
-            console.log('Fetched offers:', processedNewData.length);
-
-            jsonData = formatInitialData(processedNewData);
-            originalJsonData = [...jsonData];
-
-            await updateOffersTable();
-            updateJsonView();
-            updatePaginationInfo();
-
-            console.log(' Manual refresh completed successfully');
-
-        } catch (error) {
-            console.error('Error during manual refresh:', error);
-            ui.displayErrorMessage('Failed to refresh offers. Please try again later.');
-        } finally {
-            refreshButton.disabled = false;
-            refreshIcon.classList.remove('animate-spin');
-            refreshText.textContent = 'Refresh';
-            refreshButton.classList.remove('opacity-75', 'cursor-wait');
-        }
-    });
-
-    eventListeners.add(prevPageButton, 'click', () => {
-        if (currentPage > 1) {
-            currentPage--;
-            const validOffers = getValidOffers();
-            const totalPages = Math.ceil(validOffers.length / itemsPerPage);
-            updateOffersTable();
-            updatePaginationControls(totalPages);
-        }
-    });
-
-    eventListeners.add(nextPageButton, 'click', () => {
-        const validOffers = getValidOffers();
-        const totalPages = Math.ceil(validOffers.length / itemsPerPage);
-        if (currentPage < totalPages) {
-            currentPage++;
-            updateOffersTable();
-            updatePaginationControls(totalPages);
-        }
-    });
 
     timerManager.addInterval(() => {
         if (WebSocketManager.isConnected()) {
@@ -2701,7 +2771,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     updateCoinFilterImages();
     fetchOffers().then(() => {
-        //console.log('Initial offers fetched');
         applyFilters();
     }).catch(error => {
         console.error('Error fetching initial offers:', error);
@@ -2714,7 +2783,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     timerManager.addInterval(updateRowTimes, 900000);
 
-    document.addEventListener('visibilitychange', () => {
+    EventManager.add(document, 'visibilitychange', () => {
         if (!document.hidden) {
             console.log('Page became visible, checking WebSocket connection');
             if (!WebSocketManager.isConnected()) {
@@ -2723,7 +2792,34 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    EventManager.add(window, 'beforeunload', () => {
+        cleanup();
+    });
+
     console.log('Initialization completed');
 });
 
+function cleanup() {
+    console.log('Cleaning up resources...');
+    
+    EventManager.clearAll();
+
+    WebSocketManager.cleanup();
+
+    timerManager.clearAll();
+
+    cleanupTable();
+
+    CacheManager.clear();
+
+    currentPage = 1;
+    jsonData = [];
+    originalJsonData = [];
+    currentSortColumn = 0;
+    currentSortDirection = 'desc';
+    
+    console.log('Cleanup completed');
+}
+
+window.cleanup = cleanup;
 console.log('Offers Table Module fully initialized');
