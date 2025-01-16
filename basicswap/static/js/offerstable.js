@@ -674,6 +674,76 @@ const CacheManager = {
     }
 };
 
+// Identity cache management
+const IdentityManager = {
+    cache: new Map(),
+    pendingRequests: new Map(),
+    retryDelay: 2000,
+    maxRetries: 3,
+    cacheTimeout: 5 * 60 * 1000, // 5 minutes
+
+    async getIdentityData(address) {
+
+        const cachedData = this.getCachedIdentity(address);
+        if (cachedData) {
+            return cachedData;
+        }
+
+        if (this.pendingRequests.has(address)) {
+            return this.pendingRequests.get(address);
+        }
+
+        const request = this.fetchWithRetry(address);
+        this.pendingRequests.set(address, request);
+
+        try {
+            const data = await request;
+            this.cache.set(address, {
+                data,
+                timestamp: Date.now()
+            });
+            return data;
+        } finally {
+            this.pendingRequests.delete(address);
+        }
+    },
+
+    getCachedIdentity(address) {
+        const cached = this.cache.get(address);
+        if (cached && (Date.now() - cached.timestamp) < this.cacheTimeout) {
+            return cached.data;
+        }
+        return null;
+    },
+
+    async fetchWithRetry(address, attempt = 1) {
+        try {
+            const response = await fetch(`/json/identities/${address}`, {
+                signal: AbortSignal.timeout(5000)
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            return await response.json();
+        } catch (error) {
+            if (attempt >= this.maxRetries) {
+                console.warn(`Failed to fetch identity for ${address} after ${attempt} attempts`);
+                return null;
+            }
+
+            await new Promise(resolve => setTimeout(resolve, this.retryDelay * attempt));
+            return this.fetchWithRetry(address, attempt + 1);
+        }
+    },
+
+    clearCache() {
+        this.cache.clear();
+        this.pendingRequests.clear();
+    }
+};
+
 window.tableRateModule = {
     coinNameToSymbol: {
         'Bitcoin': 'BTC',
@@ -1596,10 +1666,8 @@ function handleNoOffersScenario() {
 
 async function updateOffersTable() {
     try {
-
         const PRICES_CACHE_KEY = 'prices_coingecko';
         const cachedPrices = CacheManager.get(PRICES_CACHE_KEY);
-        
         latestPrices = cachedPrices?.value || getEmptyPriceData();
 
         const validOffers = getValidOffers();
@@ -1616,11 +1684,22 @@ async function updateOffersTable() {
             console.warn('Price fetch failed:', error);
         });
 
-        const identityPromises = itemsToDisplay.map(offer =>
-            offer.addr_from ? getIdentityData(offer.addr_from) : Promise.resolve(null)
-        );
+        const BATCH_SIZE = 5;
+        const identities = [];
+        
+        for (let i = 0; i < itemsToDisplay.length; i += BATCH_SIZE) {
+            const batch = itemsToDisplay.slice(i, i + BATCH_SIZE);
+            const batchPromises = batch.map(offer =>
+                offer.addr_from ? IdentityManager.getIdentityData(offer.addr_from) : Promise.resolve(null)
+            );
+            
+            const batchResults = await Promise.all(batchPromises);
+            identities.push(...batchResults);
 
-        const identities = await Promise.all(identityPromises);
+            if (i + BATCH_SIZE < itemsToDisplay.length) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+        }
 
         if (validOffers.length === 0) {
             handleNoOffersScenario();
@@ -1656,15 +1735,25 @@ async function updateOffersTable() {
             if (tableRateModule?.initializeTable) {
                 tableRateModule.initializeTable();
             }
-
         });
 
         lastRefreshTime = Date.now();
         updateLastRefreshTime();
-        
+
     } catch (error) {
         console.error('[Debug] Error in updateOffersTable:', error);
         handleTableError();
+
+        try {
+            const cachedOffers = CacheManager.get('offers_cached');
+            if (cachedOffers?.value) {
+                console.log('Recovering with cached offers data');
+                jsonData = cachedOffers.value;
+                updateOffersTable();
+            }
+        } catch (recoveryError) {
+            console.error('Recovery attempt failed:', recoveryError);
+        }
     }
 }
 
@@ -1701,16 +1790,7 @@ function handleTableError() {
 }
 
 async function getIdentityData(address) {
-    try {
-        const response = await fetch(`/json/identities/${address}`);
-        if (!response.ok) {
-            return null;
-        }
-        return await response.json();
-    } catch (error) {
-        console.error('Error fetching identity:', error);
-        return null;
-    }
+    return IdentityManager.getIdentityData(address);
 }
 
 function getIdentityInfo(address, identity) {
