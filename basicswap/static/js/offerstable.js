@@ -2843,27 +2843,176 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('Initialization completed');
 });
 
-function cleanup() {
-    console.log('Cleaning up resources...');
-    
-    EventManager.clearAll();
+async function cleanup() {
+    const debug = {
+        startTime: Date.now(),
+        steps: [],
+        errors: [],
+        addStep: function(step, details = null) {
+            const timeFromStart = Date.now() - this.startTime;
+            console.log(`[Cleanup ${timeFromStart}ms] ${step}`, details || '');
+            this.steps.push({ step, time: timeFromStart, details });
+        },
+        addError: function(step, error) {
+            const timeFromStart = Date.now() - this.startTime;
+            console.error(`[Cleanup Error ${timeFromStart}ms] ${step}:`, error);
+            this.errors.push({ step, error, time: timeFromStart });
+        },
+        summarize: function() {
+            const totalTime = Date.now() - this.startTime;
+            console.group('Cleanup Summary');
+            console.log(`Total cleanup time: ${totalTime}ms`);
+            console.log('Steps completed:', this.steps.length);
+            console.log('Errors encountered:', this.errors.length);
+            
+            if (this.steps.length > 0) {
+                console.group('Steps Timeline');
+                this.steps.forEach(({step, time}) => {
+                    console.log(`${time}ms - ${step}`);
+                });
+                console.groupEnd();
+            }
+            
+            if (this.errors.length > 0) {
+                console.group('Errors');
+                this.errors.forEach(({step, error, time}) => {
+                    console.log(`${time}ms - ${step}:`, error);
+                });
+                console.groupEnd();
+            }
+            console.groupEnd();
+        }
+    };
 
-    WebSocketManager.cleanup();
+    try {
+        debug.addStep('Starting cleanup process');
 
-    timerManager.clearAll();
+        debug.addStep('Clearing timers');
+        const timerCount = timerManager.intervals.length + timerManager.timeouts.length;
+        timerManager.clearAll();
+        debug.addStep('Timers cleared', `Cleaned up ${timerCount} timers`);
 
-    cleanupTable();
+        debug.addStep('Starting WebSocket cleanup');
+        await Promise.resolve(WebSocketManager.cleanup()).catch(error => {
+            debug.addError('WebSocket cleanup', error);
+        });
+        debug.addStep('WebSocket cleanup completed');
 
-    CacheManager.clear();
+        debug.addStep('Clearing event listeners');
+        const listenerCount = EventManager.listeners.size;
+        EventManager.clearAll();
+        debug.addStep('Event listeners cleared', `Cleaned up ${listenerCount} listeners`);
 
-    currentPage = 1;
-    jsonData = [];
-    originalJsonData = [];
-    currentSortColumn = 0;
-    currentSortDirection = 'desc';
-    
-    console.log('Cleanup completed');
+        debug.addStep('Starting table cleanup');
+        const rowCount = offersBody ? offersBody.querySelectorAll('tr').length : 0;
+        cleanupTable();
+        debug.addStep('Table cleanup completed', `Cleaned up ${rowCount} rows`);
+
+        debug.addStep('Starting cache cleanup');
+        const cacheStats = CacheManager.getStats();
+        CacheManager.clear();
+        debug.addStep('Cache cleanup completed', `Cleared ${cacheStats.itemCount} cached items`);
+
+        debug.addStep('Resetting global state');
+        const globals = {
+            currentPage: currentPage,
+            dataLength: jsonData.length,
+            originalDataLength: originalJsonData.length
+        };
+        currentPage = 1;
+        jsonData = [];
+        originalJsonData = [];
+        currentSortColumn = 0;
+        currentSortDirection = 'desc';
+        filterTimeout = null;
+        latestPrices = null;
+        lastRefreshTime = null;
+        debug.addStep('Global state reset', globals);
+
+        debug.addStep('Clearing global references');
+        if (window.WebSocketManager) {
+            window.WebSocketManager = null;
+        }
+        if (window.tableRateModule) {
+            window.tableRateModule = null;
+        }
+        debug.addStep('Global references cleared');
+
+        debug.addStep('Clearing DOM references');
+        const elementRefs = [
+            'offersBody',
+            'filterForm',
+            'prevPageButton',
+            'nextPageButton',
+            'currentPageSpan',
+            'totalPagesSpan',
+            'lastRefreshTimeSpan',
+            'newEntriesCountSpan'
+        ];
+        let clearedRefs = 0;
+        elementRefs.forEach(ref => {
+            if (window[ref]) {
+                window[ref] = null;
+                clearedRefs++;
+            }
+        });
+        debug.addStep('DOM references cleared', `Cleared ${clearedRefs} references`);
+
+        debug.addStep('Clearing tooltips');
+        const tooltips = document.querySelectorAll('[role="tooltip"]');
+        const tooltipCount = tooltips.length;
+        tooltips.forEach(tooltip => tooltip.remove());
+        debug.addStep('Tooltips cleared', `Removed ${tooltipCount} tooltips`);
+
+        debug.addStep('Clearing document/window events');
+        const events = ['visibilitychange', 'beforeunload', 'scroll'];
+        events.forEach(event => {
+            document.removeEventListener(event, null);
+            window.removeEventListener(event, null);
+        });
+        debug.addStep('Document/window events cleared');
+
+        debug.addStep('Clearing localStorage items');
+        try {
+            localStorage.removeItem('tableSortColumn');
+            localStorage.removeItem('tableSortDirection');
+            debug.addStep('localStorage items cleared');
+        } catch (e) {
+            debug.addError('localStorage cleanup', e);
+        }
+
+    } catch (error) {
+        debug.addError('Main cleanup process', error);
+
+        debug.addStep('Starting failsafe cleanup');
+        try {
+            WebSocketManager.cleanup();
+            EventManager.clearAll();
+            timerManager.clearAll();
+            if (window.ws) {
+                window.ws.close();
+                window.ws = null;
+            }
+            debug.addStep('Failsafe cleanup completed');
+        } catch (criticalError) {
+            debug.addError('Critical failsafe cleanup', criticalError);
+        }
+    } finally {
+        debug.addStep('Running final cleanups');
+        if (document.body.classList.contains('optimize-scroll')) {
+            document.body.classList.remove('optimize-scroll');
+        }
+        if (document.body.classList.contains('is-scrolling')) {
+            document.body.classList.remove('is-scrolling');
+        }
+        const inlineStyles = document.querySelectorAll('style[data-dynamic]');
+        inlineStyles.forEach(style => style.remove());
+        debug.addStep('Final cleanups completed');
+
+        debug.summarize();
+    }
 }
 
 window.cleanup = cleanup;
+
 console.log('Offers Table Module fully initialized');
