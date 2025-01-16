@@ -1264,7 +1264,7 @@ function getEmptyPriceData() {
 
 async function fetchLatestPrices() {
     const PRICES_CACHE_KEY = 'prices_coingecko';
-    const RETRY_DELAY = 2000;  // 2 sec
+    const RETRY_DELAY = 5000;
     const MAX_RETRIES = 3;
     
     const cachedData = CacheManager.get(PRICES_CACHE_KEY);
@@ -1651,29 +1651,22 @@ async function updateOffersTable() {
 
         const PRICES_CACHE_KEY = 'prices_coingecko';
         const cachedPrices = CacheManager.get(PRICES_CACHE_KEY);
-
-        if (!cachedPrices || !cachedPrices.remainingTime || cachedPrices.remainingTime < 80000) {
-            console.log('Fetching fresh price data...');
-            const priceData = await fetchLatestPrices();
-            if (priceData) {
-                latestPrices = priceData;
-            }
-        } else {
-            latestPrices = cachedPrices.value;
-        }
+        
+        latestPrices = cachedPrices?.value || getEmptyPriceData();
 
         const validOffers = getValidOffers();
-
-        if (!isSentOffers) {
-            const networkOffersSpan = document.querySelector('a[href="/offers"] span.inline-flex.justify-center');
-            if (networkOffersSpan) {
-                networkOffersSpan.textContent = validOffers.length;
-            }
-        }
-
         const startIndex = (currentPage - 1) * itemsPerPage;
         const endIndex = Math.min(startIndex + itemsPerPage, validOffers.length);
         const itemsToDisplay = validOffers.slice(startIndex, endIndex);
+
+        fetchLatestPrices().then(freshPrices => {
+            if (freshPrices) {
+                latestPrices = freshPrices;
+                updateProfitLossDisplays();
+            }
+        }).catch(error => {
+            console.warn('Price fetch failed:', error);
+        });
 
         const identityPromises = itemsToDisplay.map(offer =>
             offer.addr_from ? getIdentityData(offer.addr_from) : Promise.resolve(null)
@@ -1682,10 +1675,6 @@ async function updateOffersTable() {
         const identities = await Promise.all(identityPromises);
 
         if (validOffers.length === 0) {
-            const existingRows = offersBody.querySelectorAll('tr');
-            existingRows.forEach(row => {
-                cleanupRow(row);
-            });
             handleNoOffersScenario();
             finishTableRender();
             return;
@@ -1725,23 +1714,45 @@ async function updateOffersTable() {
         });
 
         lastRefreshTime = Date.now();
-        if (newEntriesCountSpan) {
-            newEntriesCountSpan.textContent = validOffers.length;
-        }
-        if (lastRefreshTimeSpan) {
-            lastRefreshTimeSpan.textContent = new Date(lastRefreshTime).toLocaleTimeString();
-        }
-
+        updateLastRefreshTime();
+        
     } catch (error) {
         console.error('[Debug] Error in updateOffersTable:', error);
-        offersBody.innerHTML = `
-            <tr>
-                <td colspan="8" class="text-center py-4 text-red-500">
-                    An error occurred while updating the offers table. Please try again later.
-                </td>
-            </tr>`;
+        handleTableError();
         finishTableRender();
     }
+}
+
+function updateProfitLossDisplays() {
+    const rows = document.querySelectorAll('[data-offer-id]');
+    rows.forEach(row => {
+        const offerId = row.getAttribute('data-offer-id');
+        const offer = jsonData.find(o => o.offer_id === offerId);
+        if (!offer) return;
+
+        const fromAmount = parseFloat(offer.amount_from) || 0;
+        const toAmount = parseFloat(offer.amount_to) || 0;
+        updateProfitLoss(row, offer.coin_from, offer.coin_to, fromAmount, toAmount, offer.is_own_offer);
+
+        const rateTooltipId = `tooltip-rate-${offerId}`;
+        const rateTooltip = document.getElementById(rateTooltipId);
+        if (rateTooltip) {
+            const tooltipContent = createCombinedRateTooltip(offer, offer.coin_from, offer.coin_to, offer.is_own_offer);
+            rateTooltip.innerHTML = tooltipContent;
+        }
+    });
+}
+
+function handleTableError() {
+    offersBody.innerHTML = `
+        <tr>
+            <td colspan="8" class="text-center py-4 text-gray-500">
+                <div class="flex flex-col items-center justify-center gap-2">
+                    <span>An error occurred while updating the table.</span>
+                    <span class="text-sm">The table will continue to function with cached data.</span>
+                </div>
+            </td>
+        </tr>`;
 }
 
 async function getIdentityData(address) {
