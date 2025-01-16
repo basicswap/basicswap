@@ -2571,6 +2571,50 @@ function initializeTableEvents() {
         });
     }
 
+    const refreshButton = document.getElementById('refreshOffers');
+    if (refreshButton) {
+        EventManager.add(refreshButton, 'click', async () => {
+            console.log('Manual refresh initiated');
+            const refreshIcon = document.getElementById('refreshIcon');
+            const refreshText = document.getElementById('refreshText');
+
+            refreshButton.disabled = true;
+            refreshIcon.classList.add('animate-spin');
+            refreshText.textContent = 'Refreshing...';
+            refreshButton.classList.add('opacity-75', 'cursor-wait');
+
+            try {
+                const endpoint = isSentOffers ? '/json/sentoffers' : '/json/offers';
+                const response = await fetch(endpoint);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const newData = await response.json();
+
+                const processedNewData = Array.isArray(newData) ? newData : Object.values(newData);
+                console.log('Fetched offers:', processedNewData.length);
+
+                jsonData = formatInitialData(processedNewData);
+                originalJsonData = [...jsonData];
+
+                await updateOffersTable();
+                updateJsonView();
+                updatePaginationInfo();
+
+                console.log('Manual refresh completed successfully');
+
+            } catch (error) {
+                console.error('Error during manual refresh:', error);
+                ui.displayErrorMessage('Failed to refresh offers. Please try again later.');
+            } finally {
+                refreshButton.disabled = false;
+                refreshIcon.classList.remove('animate-spin');
+                refreshText.textContent = 'Refresh';
+                refreshButton.classList.remove('opacity-75', 'cursor-wait');
+            }
+        });
+    }
+
     document.querySelectorAll('th[data-sortable="true"]').forEach(header => {
         EventManager.add(header, 'click', () => {
             const columnIndex = parseInt(header.getAttribute('data-column-index'));
