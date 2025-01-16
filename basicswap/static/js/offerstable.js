@@ -1182,28 +1182,19 @@ async function fetchPricesWithApiKey(baseUrl) {
             })
         });
 
-        if (!response.ok) {
-            console.log('API key fetch failed with status:', response.status);
+        const data = await response.json();
+
+        if (data.error && data.error.includes('429')) {
+            console.log('Rate limited, will retry...');
             return null;
         }
 
-        const data = await response.json();
-        console.log('Received price data:', data);
-        
-        if (data && !data.Error && Object.keys(data).length > 0) {
-            const hasValidPrices = Object.values(data).every(coin => 
-                coin && typeof coin.usd === 'number' && !isNaN(coin.usd)
-            );
-            
-            if (!hasValidPrices) {
-                //console.warn('Received invalid price data structure');
-                return null;
-            }
-            
-            return data;
+        if (!data || data.error) {
+            console.warn('Invalid price data received:', data);
+            return null;
         }
-        console.log('API key fetch returned invalid data');
-        return null;
+
+        return data;
     } catch (error) {
         console.warn('Failed to fetch prices with API key:', error);
         return null;
@@ -1229,10 +1220,25 @@ async function fetchPricesWithoutApiKey(baseUrl) {
         }
 
         const data = await response.json();
-        if (data && !data.Error && Object.keys(data).length > 0) {
-            return data;
+        console.log('Received price data (no API key):', data);
+
+        if (data.error || !data || typeof data !== 'object' || Array.isArray(data)) {
+            console.warn('Invalid price data received:', data);
+            return null;
         }
-        return null;
+
+        const hasValidPrices = Object.values(data).some(coin => 
+            coin && typeof coin === 'object' && 
+            typeof coin.usd === 'number' && 
+            !isNaN(coin.usd)
+        );
+
+        if (!hasValidPrices) {
+            console.warn('No valid price data found in response');
+            return null;
+        }
+
+        return data;
     } catch (error) {
         console.warn('Failed to fetch prices without API key:', error);
         return null;
@@ -1258,22 +1264,28 @@ function getEmptyPriceData() {
 
 async function fetchLatestPrices() {
     const PRICES_CACHE_KEY = 'prices_coingecko';
-    const RETRY_DELAY = 100000;
+    const RETRY_DELAY = 2000;  // 2 sec
     const MAX_RETRIES = 3;
-
+    
     const cachedData = CacheManager.get(PRICES_CACHE_KEY);
-    if (cachedData && cachedData.remainingTime > 80000) {
-        console.log('Using cached price data (valid for next minute)');
+    if (cachedData && cachedData.remainingTime > 30000) {
+        console.log('Using cached price data');
         latestPrices = cachedData.value;
         return cachedData.value;
     }
 
-    const baseUrl = `${offersConfig.apiEndpoints.coinGecko}/simple/price?ids=bitcoin,bitcoin-cash,dash,dogecoin,decred,litecoin,particl,pivx,monero,zano,wownero,zcoin&vs_currencies=USD,BTC`;
+    const baseUrl = `${offersConfig.apiEndpoints.coinGecko}/simple/price?ids=bitcoin,bitcoin-cash,dash,dogecoin,decred,litecoin,particl,pivx,monero,zcoin,zano,wownero&vs_currencies=USD,BTC`;
     
     let retryCount = 0;
     let data = null;
 
     while (!data && retryCount < MAX_RETRIES) {
+        if (retryCount > 0) {
+            const delay = RETRY_DELAY * Math.pow(2, retryCount - 1);
+            console.log(`Waiting ${delay}ms before retry ${retryCount + 1}...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+        }
+
         data = await fetchPricesWithApiKey(baseUrl);
 
         if (!data) {
@@ -1281,29 +1293,39 @@ async function fetchLatestPrices() {
             data = await fetchPricesWithoutApiKey(baseUrl);
         }
 
-        if (!data && retryCount < MAX_RETRIES - 1) {
-            console.log(`Attempt ${retryCount + 1} failed, waiting ${RETRY_DELAY}ms before retry...`);
-            await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+        if (!data) {
             retryCount++;
+            if (retryCount < MAX_RETRIES) {
+                console.log(`Attempt ${retryCount} failed, will retry...`);
+            }
         }
     }
 
-    if (data) {
-        console.log('Successfully fetched fresh price data');
-        latestPrices = data;
-        CacheManager.set(PRICES_CACHE_KEY, data, CACHE_DURATION);
+    if (!data) {
+        console.warn('All price fetch attempts failed, falling back to cache or N/A values');
+        const expiredCache = CacheManager.get(PRICES_CACHE_KEY);
+        if (expiredCache && expiredCache.value) {
+            console.log('Using expired cache data');
+            latestPrices = expiredCache.value;
+            return expiredCache.value;
+        }
         
-        Object.entries(data).forEach(([coin, prices]) => {
-            tableRateModule.setFallbackValue(coin, prices.usd);
-        });
-        
-        return data;
+        const naData = getEmptyPriceData();
+        latestPrices = naData;
+        return naData;
     }
 
-    console.warn('All price fetch attempts failed after retries, using N/A values');
-    const naData = getEmptyPriceData();
-    latestPrices = naData;
-    return naData;
+    console.log('Successfully fetched fresh price data');
+    latestPrices = data;
+    CacheManager.set(PRICES_CACHE_KEY, data, CACHE_DURATION);
+    
+    Object.entries(data).forEach(([coin, prices]) => {
+        if (prices && typeof prices.usd === 'number' && !isNaN(prices.usd)) {
+            tableRateModule.setFallbackValue(coin, prices.usd);
+        }
+    });
+    
+    return data;
 }
 
 async function fetchOffers(manualRefresh = false) {
