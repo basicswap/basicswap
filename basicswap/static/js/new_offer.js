@@ -1,4 +1,4 @@
-window.addEventListener('DOMContentLoaded', (event) => {
+window.addEventListener('DOMContentLoaded', () => {
   const err_msgs = document.querySelectorAll('p.error_msg');
   for (let i = 0; i < err_msgs.length; i++) {
     err_msg = err_msgs[i].innerText;

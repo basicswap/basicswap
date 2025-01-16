@@ -80,7 +80,7 @@ const logger = {
 // API
 const api = {
     makePostRequest: (url, headers = {}) => {
-      const apiKeys = getAPIKeys();
+      // unused // const apiKeys = getAPIKeys();
       return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', '/json/readurl');
@@ -202,7 +202,7 @@ const api = {
             //console.error(`Unexpected data structure for WOW:`, response);
           }
         } catch (error) {
-          //console.error(`Error fetching CoinGecko data for WOW:`, error);
+          console.error(`Error fetching CoinGecko data for WOW:`, error);
         }
       } else {
         const resolution = config.resolutions[config.currentResolution];
@@ -225,7 +225,7 @@ const api = {
             //console.error(`Unexpected data structure for ${coin}:`, response);
           }
         } catch (error) {
-          //console.error(`Error fetching CryptoCompare data for ${coin}:`, error);
+          console.error(`Error fetching CryptoCompare data for ${coin}:`, error);
         }
       }
     });
@@ -266,8 +266,8 @@ const cache = {
         //console.log(`Cache expired for ${key}`);
         localStorage.removeItem(key);
       }
-    } catch (e) {
-      //console.error('Error parsing cache item:', e);
+    } catch (error) {
+      console.error('Error parsing cache item:', error.message);
       localStorage.removeItem(key);
     }
     return null;
@@ -288,7 +288,6 @@ const cache = {
 // UI
 const ui = {
 displayCoinData: (coin, data) => {
-    const coinConfig = config.coins.find(c => c.symbol === coin);
     let priceUSD, priceBTC, priceChange1d, volume24h;
     const updateUI = (isError = false) => {
         const priceUsdElement = document.querySelector(`#${coin.toLowerCase()}-price-usd`);
@@ -337,7 +336,7 @@ displayCoinData: (coin, data) => {
 
         updateUI(false);
     } catch (error) {
-        //console.error(`Error displaying data for ${coin}:`, error.message);
+        console.error(`Error displaying data for ${coin}:`, error.message);
         updateUI(true);
     }
 },
@@ -744,6 +743,7 @@ const chartModule = {
         y: point.y
       }));
     } catch (error) {
+      console.error("An error occured:", error.message);
       return [];
     }
   },
@@ -1057,6 +1057,7 @@ const app = {
       app.initAutoRefresh();
 
     } catch (error) {
+      console.error("An error occured:", error.message);
       ui.displayErrorMessage('Failed to initialize the dashboard. Please try refreshing the page.');
     } finally {
       ui.hideLoader();
@@ -1084,6 +1085,7 @@ const app = {
         }
       }
     } catch (error) {
+      console.error("An error occured:", error.message);
       ui.displayErrorMessage('Failed to load coin data. Please try refreshing the page.');
     }
   },
@@ -1187,6 +1189,7 @@ const app = {
             earliestExpiration = Math.min(earliestExpiration, cachedItem.expiresAt);
           }
         } catch (error) {
+          console.error("An error occured:", error.message);
           localStorage.removeItem(key);
         }
       }
@@ -1252,6 +1255,7 @@ const app = {
       ui.updateLastRefreshedTime();
 
     } catch (error) {
+      console.error("An error occured:", error.message);
       ui.displayErrorMessage('Failed to refresh all data. Please try again.');
     } finally {
       ui.hideLoader();
@@ -1363,6 +1367,7 @@ const app = {
         app.btcPriceUSD = 0;
       }
     } catch (error) {
+      console.error("An error occured:", error.message);
       app.btcPriceUSD = 0;
     }
   },
