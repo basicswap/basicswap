@@ -1081,10 +1081,8 @@ function filterAndSortData() {
     return filteredData;
 }
 
-function calculateProfitLoss(fromCoin, toCoin, fromAmount, toAmount, isOwnOffer) {
+async function calculateProfitLoss(fromCoin, toCoin, fromAmount, toAmount, isOwnOffer) {
     return new Promise((resolve) => {
-        // console.log(`Calculating profit/loss for ${fromAmount} ${fromCoin} to ${toAmount} ${toCoin}, isOwnOffer: ${isOwnOffer}`);
-
         if (!latestPrices) {
             console.error('Latest prices not available. Unable to calculate profit/loss.');
             resolve(null);
@@ -1111,8 +1109,8 @@ function calculateProfitLoss(fromCoin, toCoin, fromAmount, toAmount, isOwnOffer)
         const fromPriceUSD = latestPrices[fromSymbol]?.usd;
         const toPriceUSD = latestPrices[toSymbol]?.usd;
 
-        if (!fromPriceUSD || !toPriceUSD) {
-            //console.warn(`Price data missing for ${fromSymbol} (${fromPriceUSD}) or ${toSymbol} (${toPriceUSD})`);
+        if (fromPriceUSD === null || toPriceUSD === null || 
+            fromPriceUSD === undefined || toPriceUSD === undefined) {
             resolve(null);
             return;
         }
@@ -1127,7 +1125,6 @@ function calculateProfitLoss(fromCoin, toCoin, fromAmount, toAmount, isOwnOffer)
             percentDiff = ((fromValueUSD / toValueUSD) - 1) * 100;
         }
 
-        // console.log(`Percent difference: ${percentDiff.toFixed(2)}%`);
         resolve(percentDiff);
     });
 }
@@ -1168,9 +1165,86 @@ async function getMarketRate(fromCoin, toCoin) {
     });
 }
 
+async function fetchPricesWithApiKey(baseUrl) {
+    try {
+        console.log('Attempting price fetch with API key...');
+        const apiKeys = getAPIKeys();
+        const urlWithKey = `${baseUrl}&api_key=${offersConfig.apiKeys.coinGecko}`;
+        
+        const response = await fetch('/json/readurl', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                url: urlWithKey,
+                headers: {}
+            })
+        });
+
+        if (!response.ok) {
+            return null;
+        }
+
+        const data = await response.json();
+        if (data && !data.Error && Object.keys(data).length > 0) {
+            return data;
+        }
+        return null;
+    } catch (error) {
+        console.warn('Failed to fetch prices with API key:', error);
+        return null;
+    }
+}
+
+async function fetchPricesWithoutApiKey(baseUrl) {
+    try {
+        console.log('Attempting price fetch without API key...');
+        const response = await fetch('/json/readurl', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                url: baseUrl,
+                headers: {}
+            })
+        });
+
+        if (!response.ok) {
+            return null;
+        }
+
+        const data = await response.json();
+        if (data && !data.Error && Object.keys(data).length > 0) {
+            return data;
+        }
+        return null;
+    } catch (error) {
+        console.warn('Failed to fetch prices without API key:', error);
+        return null;
+    }
+}
+
+function getEmptyPriceData() {
+    return {
+        'bitcoin': { usd: null, btc: null },
+        'bitcoin-cash': { usd: null, btc: null },
+        'dash': { usd: null, btc: null },
+        'dogecoin': { usd: null, btc: null },
+        'decred': { usd: null, btc: null },
+        'litecoin': { usd: null, btc: null },
+        'particl': { usd: null, btc: null },
+        'pivx': { usd: null, btc: null },
+        'monero': { usd: null, btc: null },
+        'zano': { usd: null, btc: null },
+        'wownero': { usd: null, btc: null },
+        'zcoin': { usd: null, btc: null }
+    };
+}
+
 async function fetchLatestPrices() {
     const PRICES_CACHE_KEY = 'prices_coingecko';
-    const apiKeys = getAPIKeys();
 
     const cachedData = CacheManager.get(PRICES_CACHE_KEY);
     if (cachedData && cachedData.remainingTime > 60000) {
@@ -1179,57 +1253,31 @@ async function fetchLatestPrices() {
         return cachedData.value;
     }
 
-    const url = `${offersConfig.apiEndpoints.coinGecko}/simple/price?ids=bitcoin,bitcoin-cash,dash,dogecoin,decred,litecoin,particl,pivx,monero,zano,wownero,zcoin&vs_currencies=USD,BTC&api_key=${offersConfig.apiKeys.coinGecko}`;
+    const baseUrl = `${offersConfig.apiEndpoints.coinGecko}/simple/price?ids=bitcoin,bitcoin-cash,dash,dogecoin,decred,litecoin,particl,pivx,monero,zano,wownero,zcoin&vs_currencies=USD,BTC`;
+    
+    let data = await fetchPricesWithApiKey(baseUrl);
 
-    try {
-        console.log('Initiating fresh price data fetch...');
-        const response = await fetch('/json/readurl', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                url: url,
-                headers: {}
-            })
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP Error: ${response.status} ${response.statusText}`);
-        }
-
-        const data = await response.json();
-
-        if (data.Error) {
-            console.error('API Error:', data.Error);
-            throw new Error(data.Error);
-        }
-
-        if (data && Object.keys(data).length > 0) {
-            console.log('Processing fresh price data...');
-            latestPrices = data;
-            CacheManager.set(PRICES_CACHE_KEY, data, CACHE_DURATION);
-            const fallbackLog = {};
-            Object.entries(data).forEach(([coin, prices]) => {
-                tableRateModule.setFallbackValue(coin, prices.usd);
-                fallbackLog[coin] = prices.usd;
-            });
-            
-            //console.log('Fallback Values Set:', fallbackLog);
-            
-            return data;
-        } else {
-            console.warn('No price data received');
-            return null;
-        }
-    } catch (error) {
-        console.error('Price Fetch Error:', {
-            message: error.message,
-            name: error.name,
-            stack: error.stack
-        });
-        throw error;
+    if (!data) {
+        data = await fetchPricesWithoutApiKey(baseUrl);
     }
+
+    if (data) {
+        console.log('Processing fresh price data...');
+        latestPrices = data;
+        CacheManager.set(PRICES_CACHE_KEY, data, CACHE_DURATION);
+        
+        // Set fallback values
+        Object.entries(data).forEach(([coin, prices]) => {
+            tableRateModule.setFallbackValue(coin, prices.usd);
+        });
+        
+        return data;
+    }
+
+    console.warn('All price fetch attempts failed, using N/A values');
+    const naData = getEmptyPriceData();
+    latestPrices = naData;
+    return naData;
 }
 
 async function fetchOffers(manualRefresh = false) {
@@ -2189,7 +2237,6 @@ function createRecipientTooltip(uniqueId, identityInfo, identity, successRate, t
 
 function createTooltipContent(isSentOffers, coinFrom, coinTo, fromAmount, toAmount, isOwnOffer) {
     if (!coinFrom || !coinTo) {
-        //console.error(`Invalid coin names: coinFrom=${coinFrom}, coinTo=${coinTo}`);
         return `<p class="font-bold mb-1">Unable to calculate profit/loss</p>
                 <p>Invalid coin data.</p>`;
     }
@@ -2199,7 +2246,10 @@ function createTooltipContent(isSentOffers, coinFrom, coinTo, fromAmount, toAmou
 
     const getPriceKey = (coin) => {
         const lowerCoin = coin.toLowerCase();
-        return lowerCoin === 'firo' || lowerCoin === 'zcoin' ? 'zcoin' : coinNameToSymbol[coin] || lowerCoin;
+        return lowerCoin === 'firo' || lowerCoin === 'zcoin' ? 'zcoin' : 
+               lowerCoin === 'bitcoin cash' ? 'bitcoin-cash' : 
+               lowerCoin === 'particl anon' || lowerCoin === 'particl blind' ? 'particl' :
+               coinNameToSymbol[coin] || lowerCoin;
     };
 
     const fromSymbol = getPriceKey(coinFrom);
@@ -2207,9 +2257,14 @@ function createTooltipContent(isSentOffers, coinFrom, coinTo, fromAmount, toAmou
     const fromPriceUSD = latestPrices[fromSymbol]?.usd;
     const toPriceUSD = latestPrices[toSymbol]?.usd;
 
-    if (!fromPriceUSD || !toPriceUSD) {
-        return `<p class="font-bold mb-1">Unable to calculate profit/loss</p>
-                <p>Price data is missing for one or both coins.</p>`;
+    if (fromPriceUSD === null || toPriceUSD === null || 
+        fromPriceUSD === undefined || toPriceUSD === undefined) {
+        return `<p class="font-bold mb-1">Price Information Unavailable</p>
+                <p>Current market prices are temporarily unavailable.</p>
+                <p class="mt-2">You are ${isSentOffers ? 'selling' : 'buying'} ${fromAmount.toFixed(8)} ${coinFrom} 
+                for ${toAmount.toFixed(8)} ${coinTo}.</p>
+                <p class="font-bold mt-2">Note:</p>
+                <p>Profit/loss calculations will be available when price data is restored.</p>`;
     }
 
     const fromValueUSD = fromAmount * fromPriceUSD;
@@ -2260,37 +2315,38 @@ function createTooltipContent(isSentOffers, coinFrom, coinTo, fromAmount, toAmou
     `;
 }
 
-function createCombinedRateTooltip(offer, coinFrom, coinTo, isSentOffers, treatAsSentOffer) {
-    const rate = parseFloat(offer.rate);
-    const inverseRate = 1 / rate;
+function createCombinedRateTooltip(offer, coinFrom, coinTo, treatAsSentOffer) {
+    const rate = parseFloat(offer.rate) || 0;
+    const inverseRate = rate ? (1 / rate) : 0;
+    const fromSymbol = getCoinSymbolLowercase(coinFrom);
+    const toSymbol = getCoinSymbolLowercase(coinTo);
 
-    const getPriceKey = (coin) => {
-        const lowerCoin = coin.toLowerCase();
-        if (lowerCoin === 'firo' || lowerCoin === 'zcoin') {
-            return 'zcoin';
-        }
-        if (lowerCoin === 'bitcoin cash') {
-            return 'bitcoin-cash';
-        }
-        return coinNameToSymbol[coin] || lowerCoin;
-    };
+    const fromPriceUSD = latestPrices[fromSymbol]?.usd;
+    const toPriceUSD = latestPrices[toSymbol]?.usd;
 
-    const fromSymbol = getPriceKey(coinFrom);
-    const toSymbol = getPriceKey(coinTo);
+    if (fromPriceUSD === null || toPriceUSD === null || 
+        fromPriceUSD === undefined || toPriceUSD === undefined) {
+        return `
+            <p class="font-bold mb-1">Exchange Rate Information</p>
+            <p>Market price data is temporarily unavailable.</p>
+            <p class="font-bold mt-2">Current Offer Rates:</p>
+            <p>1 ${coinFrom} = ${rate.toFixed(8)} ${coinTo}</p>
+            <p>1 ${coinTo} = ${inverseRate.toFixed(8)} ${coinFrom}</p>
+            <p class="font-bold mt-2">Note:</p>
+            <p>Market comparison will be available when price data is restored.</p>
+        `;
+    }
 
-    const fromPriceUSD = latestPrices[fromSymbol]?.usd || 0;
-    const toPriceUSD = latestPrices[toSymbol]?.usd || 0;
     const rateInUSD = rate * toPriceUSD;
-
     const marketRate = fromPriceUSD / toPriceUSD;
 
-    const percentDiff = ((rate - marketRate) / marketRate) * 100;
+    const percentDiff = marketRate ? ((rate - marketRate) / marketRate) * 100 : 0;
     const formattedPercentDiff = percentDiff.toFixed(2);
     const percentDiffDisplay = formattedPercentDiff === "0.00" ? "0.00" :
                             (percentDiff > 0 ? `+${formattedPercentDiff}` : formattedPercentDiff);
     const aboveOrBelow = percentDiff > 0 ? "above" : percentDiff < 0 ? "below" : "at";
 
-    const action = isSentOffers || treatAsSentOffer ? "selling" : "buying";
+    const action = treatAsSentOffer ? "selling" : "buying";
 
     return `
         <p class="font-bold mb-1">Exchange Rate Explanation:</p>
