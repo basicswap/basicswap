@@ -1188,7 +1188,18 @@ async function fetchPricesWithApiKey(baseUrl) {
         }
 
         const data = await response.json();
+        console.log('Received price data:', data);
+        
         if (data && !data.Error && Object.keys(data).length > 0) {
+            const hasValidPrices = Object.values(data).every(coin => 
+                coin && typeof coin.usd === 'number' && !isNaN(coin.usd)
+            );
+            
+            if (!hasValidPrices) {
+                //console.warn('Received invalid price data structure');
+                return null;
+            }
+            
             return data;
         }
         console.log('API key fetch returned invalid data');
@@ -1247,11 +1258,11 @@ function getEmptyPriceData() {
 
 async function fetchLatestPrices() {
     const PRICES_CACHE_KEY = 'prices_coingecko';
-    const RETRY_DELAY = 5000;
+    const RETRY_DELAY = 100000;
     const MAX_RETRIES = 3;
 
     const cachedData = CacheManager.get(PRICES_CACHE_KEY);
-    if (cachedData && cachedData.remainingTime > 60000) {
+    if (cachedData && cachedData.remainingTime > 80000) {
         console.log('Using cached price data (valid for next minute)');
         latestPrices = cachedData.value;
         return cachedData.value;
@@ -1480,7 +1491,7 @@ function updateProfitLoss(row, fromCoin, toCoin, fromAmount, toAmount, isOwnOffe
         .then(percentDiff => {
             if (percentDiff === null) {
                 profitLossElement.textContent = 'N/A';
-                profitLossElement.className = 'profit-loss text-lg font-bold text-gray-400';
+                profitLossElement.className = 'profit-loss text-lg font-bold text-gray-300';
                 return;
             }
 
@@ -1619,7 +1630,7 @@ async function updateOffersTable() {
         const PRICES_CACHE_KEY = 'prices_coingecko';
         const cachedPrices = CacheManager.get(PRICES_CACHE_KEY);
 
-        if (!cachedPrices || !cachedPrices.remainingTime || cachedPrices.remainingTime < 60000) {
+        if (!cachedPrices || !cachedPrices.remainingTime || cachedPrices.remainingTime < 80000) {
             console.log('Fetching fresh price data...');
             const priceData = await fetchLatestPrices();
             if (priceData) {
@@ -1791,7 +1802,6 @@ function createTableRow(offer, identity = null) {
     const fromAmount = parseFloat(amountFrom) || 0;
     const toAmount = parseFloat(amountTo) || 0;
 
-    // Build row content
     row.innerHTML = `
         ${!isPublic ? createPrivateIndicator() : '<td class="w-0 p-0 m-0"></td>'}
         ${createTimeColumn(offer, postedTime, expiresIn)}
@@ -1887,7 +1897,7 @@ function createDetailsColumn(offer, identity = null) {
     );
 
     const identifierTextClass = identityInfo.label
-        ? 'text-white dark:text-white'
+        ? 'dark:text-white'
         : 'monospace';
 
     return `
@@ -1900,7 +1910,7 @@ function createDetailsColumn(offer, identity = null) {
                     <svg class="w-4 h-4 mr-2 text-gray-400 dark:text-white" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
                      <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"></path>
                     </svg>
-                    <span class="${identifierTextClass} font-semibold">
+                    <span class="${identifierTextClass}">
                         ${escapeHtml(displayIdentifier)}
                     </span>
                 </a>
@@ -2333,9 +2343,23 @@ function createTooltipContent(isSentOffers, coinFrom, coinTo, fromAmount, toAmou
 function createCombinedRateTooltip(offer, coinFrom, coinTo, treatAsSentOffer) {
     const rate = parseFloat(offer.rate) || 0;
     const inverseRate = rate ? (1 / rate) : 0;
-    const fromSymbol = getCoinSymbolLowercase(coinFrom);
-    const toSymbol = getCoinSymbolLowercase(coinTo);
 
+    const getPriceKey = (coin) => {
+        const lowerCoin = coin.toLowerCase();
+        if (lowerCoin === 'firo' || lowerCoin === 'zcoin') {
+            return 'zcoin';
+        }
+        if (lowerCoin === 'bitcoin cash') {
+            return 'bitcoin-cash';
+        }
+        if (lowerCoin === 'particl anon' || lowerCoin === 'particl blind') {
+            return 'particl';
+        }
+        return coinNameToSymbol[coin] || lowerCoin;
+    };
+
+    const fromSymbol = getPriceKey(coinFrom);
+    const toSymbol = getPriceKey(coinTo);
     const fromPriceUSD = latestPrices[fromSymbol]?.usd;
     const toPriceUSD = latestPrices[toSymbol]?.usd;
 
@@ -2354,13 +2378,11 @@ function createCombinedRateTooltip(offer, coinFrom, coinTo, treatAsSentOffer) {
 
     const rateInUSD = rate * toPriceUSD;
     const marketRate = fromPriceUSD / toPriceUSD;
-
     const percentDiff = marketRate ? ((rate - marketRate) / marketRate) * 100 : 0;
     const formattedPercentDiff = percentDiff.toFixed(2);
     const percentDiffDisplay = formattedPercentDiff === "0.00" ? "0.00" :
                             (percentDiff > 0 ? `+${formattedPercentDiff}` : formattedPercentDiff);
     const aboveOrBelow = percentDiff > 0 ? "above" : percentDiff < 0 ? "below" : "at";
-
     const action = treatAsSentOffer ? "selling" : "buying";
 
     return `
