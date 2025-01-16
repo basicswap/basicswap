@@ -5,16 +5,16 @@ const EventManager = {
         if (!this.listeners.has(element)) {
             this.listeners.set(element, new Map());
         }
-        
+
         const elementListeners = this.listeners.get(element);
         if (!elementListeners.has(type)) {
             elementListeners.set(type, new Set());
         }
-        
+
         const handlerInfo = { handler, options };
         elementListeners.get(type).add(handlerInfo);
         element.addEventListener(type, handler, options);
-        
+
         return handlerInfo;
     },
 
@@ -188,7 +188,7 @@ const ScrollOptimizer = {
 
         const tooltipId = tooltipTrigger.getAttribute('data-tooltip-target');
         let tooltip = this.tooltipCache.get(tooltipTrigger);
-        
+
         if (!tooltip) {
             tooltip = document.getElementById(tooltipId);
             if (tooltip) {
@@ -259,7 +259,7 @@ const WebSocketManager = {
                 this.handlePageVisible();
             }
         };
-        
+
         document.addEventListener('visibilitychange', this.handlers.visibilityChange);
     },
 
@@ -721,11 +721,11 @@ const IdentityManager = {
             const response = await fetch(`/json/identities/${address}`, {
                 signal: AbortSignal.timeout(5000)
             });
-            
+
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            
+
             return await response.json();
         } catch (error) {
             if (attempt >= this.maxRetries) {
@@ -1182,7 +1182,7 @@ async function calculateProfitLoss(fromCoin, toCoin, fromAmount, toAmount, isOwn
         const fromPriceUSD = latestPrices[fromSymbol]?.usd;
         const toPriceUSD = latestPrices[toSymbol]?.usd;
 
-        if (fromPriceUSD === null || toPriceUSD === null || 
+        if (fromPriceUSD === null || toPriceUSD === null ||
             fromPriceUSD === undefined || toPriceUSD === undefined) {
             resolve(null);
             return;
@@ -1259,7 +1259,7 @@ async function fetchLatestPrices() {
     const PRICES_CACHE_KEY = 'prices_coingecko';
     const RETRY_DELAY = 5000;
     const MAX_RETRIES = 3;
-    
+
     const cachedData = CacheManager.get(PRICES_CACHE_KEY);
     if (cachedData && cachedData.remainingTime > 30000) {
         console.log('Using cached price data');
@@ -1268,7 +1268,7 @@ async function fetchLatestPrices() {
     }
 
     const baseUrl = `${offersConfig.apiEndpoints.coinGecko}/simple/price?ids=bitcoin,bitcoin-cash,dash,dogecoin,decred,litecoin,particl,pivx,monero,zcoin,zano,wownero&vs_currencies=USD,BTC`;
-    
+
     let retryCount = 0;
     let data = null;
 
@@ -1282,7 +1282,7 @@ async function fetchLatestPrices() {
         try {
             console.log('Attempting price fetch with API key...');
             const urlWithKey = `${baseUrl}&api_key=${offersConfig.apiKeys.coinGecko}`;
-            
+
             const response = await fetch('/json/readurl', {
                 method: 'POST',
                 headers: {
@@ -1306,9 +1306,9 @@ async function fetchLatestPrices() {
                 continue;
             }
 
-            const hasValidPrices = Object.values(responseData).some(coin => 
-                coin && typeof coin === 'object' && 
-                typeof coin.usd === 'number' && 
+            const hasValidPrices = Object.values(responseData).some(coin =>
+                coin && typeof coin === 'object' &&
+                typeof coin.usd === 'number' &&
                 !isNaN(coin.usd)
             );
 
@@ -1343,7 +1343,7 @@ async function fetchLatestPrices() {
             tableRateModule.setFallbackValue(coin, prices.usd);
         }
     });
-    
+
     return data;
 }
 
@@ -1605,7 +1605,7 @@ function updateClearFiltersButton() {
 
 function cleanupRow(row) {
     EventManager.removeAll(row);
-    
+
     const tooltips = row.querySelectorAll('[data-tooltip-target]');
     tooltips.forEach(tooltip => {
         const tooltipId = tooltip.getAttribute('data-tooltip-target');
@@ -1618,7 +1618,7 @@ function cleanupRow(row) {
 
 function cleanupTable() {
     EventManager.clearAll();
-    
+
     if (offersBody) {
         const existingRows = offersBody.querySelectorAll('tr');
         existingRows.forEach(row => {
@@ -1686,13 +1686,13 @@ async function updateOffersTable() {
 
         const BATCH_SIZE = 5;
         const identities = [];
-        
+
         for (let i = 0; i < itemsToDisplay.length; i += BATCH_SIZE) {
             const batch = itemsToDisplay.slice(i, i + BATCH_SIZE);
             const batchPromises = batch.map(offer =>
                 offer.addr_from ? IdentityManager.getIdentityData(offer.addr_from) : Promise.resolve(null)
             );
-            
+
             const batchResults = await Promise.all(batchPromises);
             identities.push(...batchResults);
 
@@ -2329,8 +2329,8 @@ function createTooltipContent(isSentOffers, coinFrom, coinTo, fromAmount, toAmou
 
     const getPriceKey = (coin) => {
         const lowerCoin = coin.toLowerCase();
-        return lowerCoin === 'firo' || lowerCoin === 'zcoin' ? 'zcoin' : 
-               lowerCoin === 'bitcoin cash' ? 'bitcoin-cash' : 
+        return lowerCoin === 'firo' || lowerCoin === 'zcoin' ? 'zcoin' :
+               lowerCoin === 'bitcoin cash' ? 'bitcoin-cash' :
                lowerCoin === 'particl anon' || lowerCoin === 'particl blind' ? 'particl' :
                coinNameToSymbol[coin] || lowerCoin;
     };
@@ -2340,7 +2340,7 @@ function createTooltipContent(isSentOffers, coinFrom, coinTo, fromAmount, toAmou
     const fromPriceUSD = latestPrices[fromSymbol]?.usd;
     const toPriceUSD = latestPrices[toSymbol]?.usd;
 
-    if (fromPriceUSD === null || toPriceUSD === null || 
+    if (fromPriceUSD === null || toPriceUSD === null ||
         fromPriceUSD === undefined || toPriceUSD === undefined) {
         return `<p class="font-bold mb-1">Price Information Unavailable</p>
                 <p>Current market prices are temporarily unavailable.</p>
@@ -2421,7 +2421,7 @@ function createCombinedRateTooltip(offer, coinFrom, coinTo, treatAsSentOffer) {
     const fromPriceUSD = latestPrices[fromSymbol]?.usd;
     const toPriceUSD = latestPrices[toSymbol]?.usd;
 
-    if (fromPriceUSD === null || toPriceUSD === null || 
+    if (fromPriceUSD === null || toPriceUSD === null ||
         fromPriceUSD === undefined || toPriceUSD === undefined) {
         return `
             <p class="font-bold mb-1">Exchange Rate Information</p>
@@ -2880,7 +2880,7 @@ function setupRowEventListeners(row, offer) {
                 tooltip.classList.remove('invisible', 'opacity-0');
             }
         });
-        
+
         EventManager.add(trigger, 'mouseleave', () => {
             const tooltipId = trigger.getAttribute('data-tooltip-target');
             const tooltip = document.getElementById(tooltipId);
@@ -3015,7 +3015,7 @@ async function cleanup() {
             console.log(`Total cleanup time: ${totalTime}ms`);
             console.log('Steps completed:', this.steps.length);
             console.log('Errors encountered:', this.errors.length);
-            
+
             if (this.steps.length > 0) {
                 console.group('Steps Timeline');
                 this.steps.forEach(({step, time}) => {
@@ -3023,7 +3023,7 @@ async function cleanup() {
                 });
                 console.groupEnd();
             }
-            
+
             if (this.errors.length > 0) {
                 console.group('Errors');
                 this.errors.forEach(({step, error, time}) => {
