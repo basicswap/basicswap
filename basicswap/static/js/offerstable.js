@@ -1183,6 +1183,7 @@ async function fetchPricesWithApiKey(baseUrl) {
         });
 
         if (!response.ok) {
+            console.log('API key fetch failed with status:', response.status);
             return null;
         }
 
@@ -1190,6 +1191,7 @@ async function fetchPricesWithApiKey(baseUrl) {
         if (data && !data.Error && Object.keys(data).length > 0) {
             return data;
         }
+        console.log('API key fetch returned invalid data');
         return null;
     } catch (error) {
         console.warn('Failed to fetch prices with API key:', error);
@@ -1245,6 +1247,8 @@ function getEmptyPriceData() {
 
 async function fetchLatestPrices() {
     const PRICES_CACHE_KEY = 'prices_coingecko';
+    const RETRY_DELAY = 5000;
+    const MAX_RETRIES = 3;
 
     const cachedData = CacheManager.get(PRICES_CACHE_KEY);
     if (cachedData && cachedData.remainingTime > 60000) {
@@ -1255,18 +1259,29 @@ async function fetchLatestPrices() {
 
     const baseUrl = `${offersConfig.apiEndpoints.coinGecko}/simple/price?ids=bitcoin,bitcoin-cash,dash,dogecoin,decred,litecoin,particl,pivx,monero,zano,wownero,zcoin&vs_currencies=USD,BTC`;
     
-    let data = await fetchPricesWithApiKey(baseUrl);
+    let retryCount = 0;
+    let data = null;
 
-    if (!data) {
-        data = await fetchPricesWithoutApiKey(baseUrl);
+    while (!data && retryCount < MAX_RETRIES) {
+        data = await fetchPricesWithApiKey(baseUrl);
+
+        if (!data) {
+            console.log('API key attempt failed, trying without API key...');
+            data = await fetchPricesWithoutApiKey(baseUrl);
+        }
+
+        if (!data && retryCount < MAX_RETRIES - 1) {
+            console.log(`Attempt ${retryCount + 1} failed, waiting ${RETRY_DELAY}ms before retry...`);
+            await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+            retryCount++;
+        }
     }
 
     if (data) {
-        console.log('Processing fresh price data...');
+        console.log('Successfully fetched fresh price data');
         latestPrices = data;
         CacheManager.set(PRICES_CACHE_KEY, data, CACHE_DURATION);
         
-        // Set fallback values
         Object.entries(data).forEach(([coin, prices]) => {
             tableRateModule.setFallbackValue(coin, prices.usd);
         });
@@ -1274,7 +1289,7 @@ async function fetchLatestPrices() {
         return data;
     }
 
-    console.warn('All price fetch attempts failed, using N/A values');
+    console.warn('All price fetch attempts failed after retries, using N/A values');
     const naData = getEmptyPriceData();
     latestPrices = naData;
     return naData;
