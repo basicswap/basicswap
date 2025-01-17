@@ -126,7 +126,7 @@ const api = {
   },
     fetchCoinGeckoDataXHR: async () => {
     const cacheKey = 'coinGeckoOneLiner';
-    const minRequestInterval = 15000;
+    const minRequestInterval = 30000;
     const currentTime = Date.now();
     const lastRequestTime = window.lastGeckoRequest || 0;
     if (currentTime - lastRequestTime < minRequestInterval) {
