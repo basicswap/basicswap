@@ -28,7 +28,7 @@ const config = {
     }
   },
   showVolume: false,
-  cacheTTL: 5 * 60 * 1000, // 5 minutes
+  cacheTTL: 10 * 60 * 1000,
   specialCoins: [''],
   resolutions: {
     year: { days: 365, interval: 'month' },
@@ -124,106 +124,143 @@ const api = {
       error: error.message
     }));
   },
-
     fetchCoinGeckoDataXHR: async () => {
-        const cacheKey = 'coinGeckoOneLiner';
+    const cacheKey = 'coinGeckoOneLiner';
+    const minRequestInterval = 30000;
+    const currentTime = Date.now();
+    const lastRequestTime = window.lastGeckoRequest || 0;
+    if (currentTime - lastRequestTime < minRequestInterval) {
+        console.log('Request too soon, using cache');
         const cachedData = cache.get(cacheKey);
-
         if (cachedData) {
-            console.log('Using cached CoinGecko data');
             return cachedData.value;
         }
-
+    }
+    window.lastGeckoRequest = currentTime;
+    const cachedData = cache.get(cacheKey);
+    if (cachedData) {
+        console.log('Using cached CoinGecko data');
+        return cachedData.value;
+    }
+    try {
+        const existingCache = localStorage.getItem(cacheKey);
+        let fallbackData = null;
+        if (existingCache) {
+            try {
+                const parsed = JSON.parse(existingCache);
+                fallbackData = parsed.value;
+            } catch (e) {
+                console.warn('Failed to parse existing cache:', e);
+            }
+        }
         const coinIds = config.coins
             .filter(coin => coin.usesCoinGecko)
             .map(coin => coin.name)
             .join(',');
         const url = `${config.apiEndpoints.coinGecko}/simple/price?ids=${coinIds}&vs_currencies=usd,btc&include_24hr_vol=true&include_24hr_change=true&api_key=${config.apiKeys.coinGecko}`;
-        //console.log(`Fetching data for multiple coins from CoinGecko: ${url}`);
-        try {
-            const data = await api.makePostRequest(url);
-            //console.log(`Raw CoinGecko data:`, data);
-            if (typeof data !== 'object' || data === null) {
-                throw new AppError(`Invalid data structure received from CoinGecko`);
+        const response = await api.makePostRequest(url, {
+            'User-Agent': 'Mozilla/5.0',
+            'Accept': 'application/json',
+            'Accept-Language': 'en-US,en;q=0.5'
+        });
+        if (typeof response !== 'object' || response === null) {
+            if (fallbackData) {
+                console.log('Using fallback data due to invalid response');
+                return fallbackData;
             }
-            const transformedData = {};
-            Object.entries(data).forEach(([id, values]) => {
-                const coinConfig = config.coins.find(coin => coin.name === id);
-                const symbol = coinConfig?.symbol.toLowerCase() || id;
-                transformedData[symbol] = {
-                    current_price: values.usd,
-                    price_btc: values.btc,
-                    total_volume: values.usd_24h_vol,
-                    price_change_percentage_24h: values.usd_24h_change,
-                    displayName: coinConfig?.displayName || coinConfig?.symbol || id
-                };
-            });
-            //console.log(`Transformed CoinGecko data:`, transformedData);
-            cache.set(cacheKey, transformedData);
-            return transformedData;
-        } catch (error) {
-            //console.error(`Error fetching CoinGecko data:`, error);
-            return { error: error.message };
+            throw new AppError(`Invalid data structure received from CoinGecko`);
         }
-    },
+        if (response.error || response.Error) {
+            if (fallbackData) {
+                console.log('Using fallback data due to API error');
+                return fallbackData;
+            }
+            throw new AppError(response.error || response.Error);
+        }
+        const transformedData = {};
+        Object.entries(response).forEach(([id, values]) => {
+            const coinConfig = config.coins.find(coin => coin.name === id);
+            const symbol = coinConfig?.symbol.toLowerCase() || id;
+            transformedData[symbol] = {
+                current_price: values.usd,
+                price_btc: values.btc,
+                total_volume: values.usd_24h_vol,
+                price_change_percentage_24h: values.usd_24h_change,
+                displayName: coinConfig?.displayName || coinConfig?.symbol || id
+            };
+        });
+        cache.set(cacheKey, transformedData);
+        return transformedData;
 
-  fetchHistoricalDataXHR: async (coinSymbols) => {
-    if (!Array.isArray(coinSymbols)) {
-      coinSymbols = [coinSymbols];
+    } catch (error) {
+        console.error(`Error fetching CoinGecko data:`, error);
+        if (cachedData) {
+            console.log('Using expired cache data due to error');
+            return cachedData.value;
+        }
+        return { error: error.message };
     }
+},
 
-    //console.log(`Fetching historical data for coins: ${coinSymbols.join(', ')}`);
-
+fetchHistoricalDataXHR: async (coinSymbols) => {
+    if (!Array.isArray(coinSymbols)) {
+        coinSymbols = [coinSymbols];
+    }
     const results = {};
-
     const fetchPromises = coinSymbols.map(async coin => {
-      const coinConfig = config.coins.find(c => c.symbol === coin);
-      if (!coinConfig) {
-        //console.error(`Coin configuration not found for ${coin}`);
-        return;
-      }
+        const coinConfig = config.coins.find(c => c.symbol === coin);
+        if (!coinConfig) return;
 
-      if (coin === 'WOW') {
-        const url = `${config.apiEndpoints.coinGecko}/coins/wownero/market_chart?vs_currency=usd&days=1&api_key=${config.apiKeys.coinGecko}`;
-        //console.log(`CoinGecko URL for WOW: ${url}`);
-
-        try {
-          const response = await api.makePostRequest(url);
-          if (response && response.prices) {
-            results[coin] = response.prices;
-          } else {
-            //console.error(`Unexpected data structure for WOW:`, response);
-          }
-        } catch (error) {
-          console.error(`Error fetching CoinGecko data for WOW:`, error);
+        const cacheKey = `historical_${coin}_${config.currentResolution}`;
+        const cachedData = cache.get(cacheKey);
+        if (cachedData) {
+            results[coin] = cachedData.value;
+            return;
         }
-      } else {
-        const resolution = config.resolutions[config.currentResolution];
-        let url;
-        if (resolution.interval === 'hourly') {
-          url = `https://min-api.cryptocompare.com/data/v2/histohour?fsym=${coin}&tsym=USD&limit=${resolution.days * 24}&api_key=${config.apiKeys.cryptoCompare}`;
+        if (coin === 'WOW') {
+            const url = `${config.apiEndpoints.coinGecko}/coins/wownero/market_chart?vs_currency=usd&days=1&api_key=${config.apiKeys.coinGecko}`;
+            try {
+                const response = await api.makePostRequest(url);
+                if (response && response.prices) {
+                    results[coin] = response.prices;
+                    cache.set(cacheKey, response.prices);
+                }
+            } catch (error) {
+                console.error(`Error fetching CoinGecko data for WOW:`, error);
+                if (cachedData) {
+                    results[coin] = cachedData.value;
+                }
+            }
         } else {
-          url = `${config.apiEndpoints.cryptoCompareHistorical}?fsym=${coin}&tsym=USD&limit=${resolution.days}&api_key=${config.apiKeys.cryptoCompare}`;
+            const resolution = config.resolutions[config.currentResolution];
+            let url;
+            if (resolution.interval === 'hourly') {
+                url = `https://min-api.cryptocompare.com/data/v2/histohour?fsym=${coin}&tsym=USD&limit=${resolution.days * 24}&api_key=${config.apiKeys.cryptoCompare}`;
+            } else {
+                url = `${config.apiEndpoints.cryptoCompareHistorical}?fsym=${coin}&tsym=USD&limit=${resolution.days}&api_key=${config.apiKeys.cryptoCompare}`;
+            }
+            try {
+                const response = await api.makePostRequest(url);
+                if (response.Response === "Error") {
+                    console.error(`API Error for ${coin}:`, response.Message);
+                    if (cachedData) {
+                        results[coin] = cachedData.value;
+                    }
+                } else if (response.Data && response.Data.Data) {
+                    results[coin] = response.Data;
+                    cache.set(cacheKey, response.Data);
+                }
+            } catch (error) {
+                console.error(`Error fetching CryptoCompare data for ${coin}:`, error);
+                if (cachedData) {
+                    results[coin] = cachedData.value;
+                }
+            }
         }
-        //console.log(`CryptoCompare URL for ${coin}: ${url}`);
-        try {
-          const response = await api.makePostRequest(url);
-          if (response.Response === "Error") {
-            //console.error(`API Error for ${coin}:`, response.Message);
-          } else if (response.Data && response.Data.Data) {
-            results[coin] = response.Data;
-          } else {
-            //console.error(`Unexpected data structure for ${coin}:`, response);
-          }
-        } catch (error) {
-          console.error(`Error fetching CryptoCompare data for ${coin}:`, error);
-        }
-      }
     });
     await Promise.all(fetchPromises);
-    //console.log('Final results object:', JSON.stringify(results, null, 2));
     return results;
-  }
+}
 };
 
 // CACHE
