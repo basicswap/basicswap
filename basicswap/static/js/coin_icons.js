@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const image = selectedOption.getAttribute('data-image') || '';
         const name = selectedOption.textContent.trim();
         select.style.backgroundImage = image ? `url(${image}?${new Date().getTime()})` : '';
-        
+
         const selectImage = select.nextElementSibling.querySelector('.select-image');
         if (selectImage) {
             selectImage.src = image;
