@@ -131,9 +131,9 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
                 parsed_data["amt_bid_min"] < 0
                 or parsed_data["amt_bid_min"] > parsed_data["amt_from"]
             ):
-                errors.append("Minimum Bid Amount out of range")
+                errors.append("Minimum Purchase Quantity out of range")
     except Exception:
-        errors.append("Minimum Bid Amount")
+        errors.append("Minimum Purchase Quantity")
 
     if have_data_entry(form_data, "rate") and not have_data_entry(form_data, "amt_to"):
         parsed_data["rate"] = ci_to.make_int(form_data["rate"], r=1)

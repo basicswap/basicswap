@@ -31,7 +31,7 @@ Create offers
             # Optional
             "enabled": Set to false to ignore offer template.
             "swap_type": Type of swap, defaults to "adaptor_sig"
-            "min_swap_amount": Sets "amt_bid_min" on the offer, minimum valid bid when offer amount is variable.
+            "min_swap_amount": Sets "amt_bid_min" on the offer, minimum purchase quantity when offer amount is variable.
             "amount_step": If set offers will be created for amount values between "amount" and "min_coin_from_amt" in decrements of "amount_step".
         },
         ...
