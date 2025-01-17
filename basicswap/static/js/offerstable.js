@@ -449,33 +449,49 @@ const CacheManager = {
         try {
             this.cleanup();
 
+            if (!value) {
+                console.warn('Attempted to cache null/undefined value for key:', key);
+                return false;
+            }
+
             const item = {
                 value: value,
                 timestamp: Date.now(),
                 expiresAt: Date.now() + (customTtl || CACHE_DURATION)
             };
 
-            const itemSize = new Blob([JSON.stringify(item)]).size;
-            if (itemSize > this.maxSize) {
-                //console.error(`Cache item exceeds maximum size (${(itemSize/1024/1024).toFixed(2)}MB)`);
+            try {
+                JSON.stringify(item);
+            } catch (e) {
+                console.error('Failed to serialize cache item:', e);
                 return false;
             }
 
-            localStorage.setItem(key, JSON.stringify(item));
-            return true;
+            const itemSize = new Blob([JSON.stringify(item)]).size;
+            if (itemSize > this.maxSize) {
+                console.warn(`Cache item exceeds maximum size (${(itemSize/1024/1024).toFixed(2)}MB)`);
+                return false;
+            }
+
+            try {
+                localStorage.setItem(key, JSON.stringify(item));
+                return true;
+            } catch (storageError) {
+                if (storageError.name === 'QuotaExceededError') {
+                    this.cleanup(true);
+                    try {
+                        localStorage.setItem(key, JSON.stringify(item));
+                        return true;
+                    } catch (retryError) {
+                        console.error('Storage quota exceeded even after cleanup:', retryError);
+                        return false;
+                    }
+                }
+                throw storageError;
+            }
 
         } catch (error) {
-            if (error.name === 'QuotaExceededError') {
-                this.cleanup(true); // Aggressive cleanup
-                try {
-                    localStorage.setItem(key, JSON.stringify(item));
-                    return true;
-                } catch (error) {
-                    console.error('Storage quota exceeded even after cleanup:', error.message);
-                    return false;
-                }
-            }
-            //console.error('Cache set error:', error);
+            console.error('Cache set error:', error);
             return false;
         }
     },
@@ -483,11 +499,26 @@ const CacheManager = {
     get: function(key) {
         try {
             const itemStr = localStorage.getItem(key);
-            if (!itemStr) return null;
+            if (!itemStr) {
+                return null;
+            }
 
-            const item = JSON.parse(itemStr);
+            let item;
+            try {
+                item = JSON.parse(itemStr);
+            } catch (parseError) {
+                console.error('Failed to parse cached item:', parseError);
+                localStorage.removeItem(key);
+                return null;
+            }
+
+            if (!item || typeof item.expiresAt !== 'number' || !item.hasOwnProperty('value')) {
+                console.warn('Invalid cache item structure for key:', key);
+                localStorage.removeItem(key);
+                return null;
+            }
+
             const now = Date.now();
-
             if (now < item.expiresAt) {
                 return {
                     value: item.value,
@@ -496,11 +527,17 @@ const CacheManager = {
             }
 
             localStorage.removeItem(key);
+            return null;
+
         } catch (error) {
-            console.error("An error occured:", error.message);
-            localStorage.removeItem(key);
+            console.error("Cache retrieval error:", error);
+            try {
+                localStorage.removeItem(key);
+            } catch (removeError) {
+                console.error("Failed to remove invalid cache entry:", removeError);
+            }
+            return null;
         }
-        return null;
     },
 
     cleanup: function(aggressive = false) {
@@ -533,7 +570,7 @@ const CacheManager = {
                 totalSize += size;
                 itemCount++;
             } catch (error) {
-                console.error("An error occured:", error.message);
+                console.error("Error processing cache item:", error);
                 localStorage.removeItem(key);
             }
         }
@@ -543,11 +580,21 @@ const CacheManager = {
 
             while ((totalSize > this.maxSize || itemCount > this.maxItems) && items.length > 0) {
                 const item = items.pop();
-                localStorage.removeItem(item.key);
-                totalSize -= item.size;
-                itemCount--;
+                try {
+                    localStorage.removeItem(item.key);
+                    totalSize -= item.size;
+                    itemCount--;
+                } catch (error) {
+                    console.error("Error removing cache item:", error);
+                }
             }
         }
+
+        return {
+            totalSize,
+            itemCount,
+            cleaned: items.length
+        };
     },
 
     clear: function() {
@@ -559,7 +606,13 @@ const CacheManager = {
             }
         }
 
-        keys.forEach(key => localStorage.removeItem(key));
+        keys.forEach(key => {
+            try {
+                localStorage.removeItem(key);
+            } catch (error) {
+                console.error("Error clearing cache item:", error);
+            }
+        });
     },
 
     getStats: function() {
@@ -584,7 +637,7 @@ const CacheManager = {
                     expiredCount++;
                 }
             } catch (error) {
-              console.error("An error occured:", error.message);
+                console.error("Error getting cache stats:", error);
             }
         }
 
@@ -596,6 +649,8 @@ const CacheManager = {
         };
     }
 };
+
+window.CacheManager = CacheManager;
 
 // Identity cache management
 const IdentityManager = {
@@ -939,13 +994,42 @@ function filterAndSortData() {
                     comparison = a.offer_id.localeCompare(b.offer_id);
                     break;
             }
-
             return currentSortDirection === 'desc' ? -comparison : comparison;
         });
     }
-
     //console.log(`[Debug] Filtered data length: ${filteredData.length}`);
     return filteredData;
+}
+
+function getPriceWithFallback(coin, latestPrices) {
+    const getPriceKey = (coin) => {
+        const lowerCoin = coin.toLowerCase();
+        if (lowerCoin === 'firo' || lowerCoin === 'zcoin') {
+            return 'zcoin';
+        }
+        if (lowerCoin === 'bitcoin cash') {
+            return 'bitcoin-cash';
+        }
+        if (lowerCoin === 'particl anon' || lowerCoin === 'particl blind') {
+            return 'particl';
+        }
+        return coinNameToSymbol[coin] || lowerCoin;
+    };
+
+    const priceKey = getPriceKey(coin);
+    const livePrice = latestPrices[priceKey]?.usd;
+    if (livePrice !== undefined && livePrice !== null) {
+        return livePrice;
+    }
+
+    if (window.tableRateModule) {
+        const fallback = window.tableRateModule.getFallbackValue(priceKey);
+        if (fallback !== null) {
+            return fallback;
+        }
+    }
+    
+    return null;
 }
 
 async function calculateProfitLoss(fromCoin, toCoin, fromAmount, toAmount, isOwnOffer) {
@@ -972,26 +1056,33 @@ async function calculateProfitLoss(fromCoin, toCoin, fromAmount, toAmount, isOwn
 
         const fromSymbol = getPriceKey(fromCoin);
         const toSymbol = getPriceKey(toCoin);
+        let fromPriceUSD = latestPrices[fromSymbol]?.usd;
+        let toPriceUSD = latestPrices[toSymbol]?.usd;
 
-        const fromPriceUSD = latestPrices[fromSymbol]?.usd;
-        const toPriceUSD = latestPrices[toSymbol]?.usd;
-
-        if (fromPriceUSD === null || toPriceUSD === null ||
-            fromPriceUSD === undefined || toPriceUSD === undefined) {
+        if (!fromPriceUSD || !toPriceUSD) {
+            fromPriceUSD = tableRateModule.getFallbackValue(fromSymbol);
+            toPriceUSD = tableRateModule.getFallbackValue(toSymbol);
+        }
+        if (!fromPriceUSD || !toPriceUSD || isNaN(fromPriceUSD) || isNaN(toPriceUSD)) {
             resolve(null);
             return;
         }
-
         const fromValueUSD = fromAmount * fromPriceUSD;
         const toValueUSD = toAmount * toPriceUSD;
-
+        if (isNaN(fromValueUSD) || isNaN(toValueUSD) || fromValueUSD === 0 || toValueUSD === 0) {
+            resolve(null);
+            return;
+        }
         let percentDiff;
         if (isOwnOffer) {
             percentDiff = ((toValueUSD / fromValueUSD) - 1) * 100;
         } else {
             percentDiff = ((fromValueUSD / toValueUSD) - 1) * 100;
         }
-
+        if (isNaN(percentDiff)) {
+            resolve(null);
+            return;
+        }
         resolve(percentDiff);
     });
 }
@@ -1015,94 +1106,75 @@ function getEmptyPriceData() {
 
 async function fetchLatestPrices() {
     const PRICES_CACHE_KEY = 'prices_coingecko';
-    const RETRY_DELAY = 5000;
-    const MAX_RETRIES = 3;
 
-    const cachedData = CacheManager.get(PRICES_CACHE_KEY);
-    if (cachedData && cachedData.remainingTime > 30000) {
-        console.log('Using cached price data');
-        latestPrices = cachedData.value;
-        return cachedData.value;
+    if (!window.isManualRefresh) {
+        const cachedData = CacheManager.get(PRICES_CACHE_KEY);
+        if (cachedData && cachedData.remainingTime > 60000) {
+            console.log('Using cached price data');
+            latestPrices = cachedData.value;
+            Object.entries(cachedData.value).forEach(([coin, prices]) => {
+                if (prices.usd) {
+                    tableRateModule.setFallbackValue(coin, prices.usd);
+                }
+            });
+            return cachedData.value;
+        }
     }
+    const url = `${offersConfig.apiEndpoints.coinGecko}/simple/price?ids=bitcoin,bitcoin-cash,dash,dogecoin,decred,litecoin,particl,pivx,monero,zano,wownero,zcoin&vs_currencies=USD,BTC&api_key=${offersConfig.apiKeys.coinGecko}`;
 
-    const baseUrl = `${offersConfig.apiEndpoints.coinGecko}/simple/price?ids=bitcoin,bitcoin-cash,dash,dogecoin,decred,litecoin,particl,pivx,monero,zcoin,zano,wownero&vs_currencies=USD,BTC`;
+    try {
+        console.log('Initiating fresh price data fetch...');
+        const response = await fetch('/json/readurl', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                url: url,
+                headers: {}
+            })
+        });
 
-    let retryCount = 0;
-    let data = null;
-
-    while (!data && retryCount < MAX_RETRIES) {
-        if (retryCount > 0) {
-            const delay = RETRY_DELAY * Math.pow(2, retryCount - 1);
-            console.log(`Waiting ${delay}ms before retry ${retryCount + 1}...`);
-            await new Promise(resolve => setTimeout(resolve, delay));
+        if (!response.ok) {
+            throw new Error(`HTTP Error: ${response.status} ${response.statusText}`);
         }
 
-        try {
-            console.log('Attempting price fetch with API key...');
-            const urlWithKey = `${baseUrl}&api_key=${offersConfig.apiKeys.coinGecko}`;
+        const data = await response.json();
 
-            const response = await fetch('/json/readurl', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    url: urlWithKey,
-                    headers: {}
-                })
+        if (data.Error) {
+            console.error('API Error:', data.Error);
+            throw new Error(data.Error);
+        }
+
+        if (data && Object.keys(data).length > 0) {
+            console.log('Processing fresh price data...');
+            latestPrices = data;
+            CacheManager.set(PRICES_CACHE_KEY, data, CACHE_DURATION);
+
+            Object.entries(data).forEach(([coin, prices]) => {
+                if (prices.usd) {
+                    tableRateModule.setFallbackValue(coin, prices.usd);
+                }
             });
 
-            const responseData = await response.json();
-
-            if (responseData.error) {
-                if (responseData.error.includes('429')) {
-                    console.log('Rate limited, retrying...');
-                } else {
-                    console.warn('Invalid price data received:', responseData);
-                }
-                retryCount++;
-                continue;
-            }
-
-            const hasValidPrices = Object.values(responseData).some(coin =>
-                coin && typeof coin === 'object' &&
-                typeof coin.usd === 'number' &&
-                !isNaN(coin.usd)
-            );
-
-            if (!hasValidPrices) {
-                console.warn('No valid price data found in response');
-                retryCount++;
-                continue;
-            }
-
-            data = responseData;
-            break;
-
-        } catch (error) {
-            console.warn('Error fetching prices:', error);
-            retryCount++;
+            return data;
+        } else {
+            console.warn('No price data received');
+            return null;
         }
+    } catch (error) {
+        console.error('Price Fetch Error:', error);
+        const fallbackPrices = {};
+        Object.keys(getEmptyPriceData()).forEach(coin => {
+            const fallbackValue = tableRateModule.getFallbackValue(coin);
+            if (fallbackValue !== null) {
+                fallbackPrices[coin] = { usd: fallbackValue, btc: null };
+            }
+        });
+        return Object.keys(fallbackPrices).length > 0 ? fallbackPrices : null;
+    } finally {
+        window.isManualRefresh = false;
     }
-
-    if (!data) {
-        console.warn('All price fetch attempts failed, using empty price data');
-        const naData = getEmptyPriceData();
-        latestPrices = naData;
-        return naData;
-    }
-
-    console.log('Successfully fetched fresh price data');
-    latestPrices = data;
-    CacheManager.set(PRICES_CACHE_KEY, data, CACHE_DURATION);
-
-    Object.entries(data).forEach(([coin, prices]) => {
-        if (prices && typeof prices.usd === 'number' && !isNaN(prices.usd)) {
-            tableRateModule.setFallbackValue(coin, prices.usd);
-        }
-    });
-
-    return data;
 }
 
 async function fetchOffers() {
@@ -1275,20 +1347,18 @@ function updatePaginationControls(totalPages) {
 function updateProfitLoss(row, fromCoin, toCoin, fromAmount, toAmount, isOwnOffer) {
     const profitLossElement = row.querySelector('.profit-loss');
     if (!profitLossElement) {
-        //console.warn('Profit loss element not found in row');
         return;
     }
 
     if (!fromCoin || !toCoin) {
-        //console.error(`Invalid coin names: fromCoin=${fromCoin}, toCoin=${toCoin}`);
-        profitLossElement.textContent = 'Error';
-        profitLossElement.className = 'profit-loss text-lg font-bold text-red-500';
+        profitLossElement.textContent = 'N/A';
+        profitLossElement.className = 'profit-loss text-lg font-bold text-gray-300';
         return;
     }
 
     calculateProfitLoss(fromCoin, toCoin, fromAmount, toAmount, isOwnOffer)
         .then(percentDiff => {
-            if (percentDiff === null) {
+            if (percentDiff === null || isNaN(percentDiff)) {
                 profitLossElement.textContent = 'N/A';
                 profitLossElement.className = 'profit-loss text-lg font-bold text-gray-300';
                 return;
@@ -1302,6 +1372,7 @@ function updateProfitLoss(row, fromCoin, toCoin, fromAmount, toAmount, isOwnOffe
             profitLossElement.textContent = `${percentDiffDisplay}%`;
             profitLossElement.className = `profit-loss text-lg font-bold ${colorClass}`;
 
+            // Update tooltip if it exists
             const tooltipId = `percentage-tooltip-${row.getAttribute('data-offer-id')}`;
             const tooltipElement = document.getElementById(tooltipId);
             if (tooltipElement) {
@@ -1316,8 +1387,8 @@ function updateProfitLoss(row, fromCoin, toCoin, fromAmount, toAmount, isOwnOffe
         })
         .catch(error => {
             console.error('Error in updateProfitLoss:', error);
-            profitLossElement.textContent = 'Error';
-            profitLossElement.className = 'profit-loss text-lg font-bold text-red-500';
+            profitLossElement.textContent = 'N/A';
+            profitLossElement.className = 'profit-loss text-lg font-bold text-gray-300';
         });
 }
 
@@ -1802,18 +1873,27 @@ function createRateColumn(offer, coinFrom, coinTo) {
         if (lowerCoin === 'bitcoin cash') {
             return 'bitcoin-cash';
         }
+        if (lowerCoin === 'particl anon' || lowerCoin === 'particl blind') {
+            return 'particl';
+        }
         return coinNameToSymbol[coin] || lowerCoin;
     };
 
-    const toPriceUSD = latestPrices[getPriceKey(coinTo)]?.usd || 0;
-    const rateInUSD = rate * toPriceUSD;
+    const toSymbolKey = getPriceKey(coinTo);
+    let toPriceUSD = latestPrices[toSymbolKey]?.usd;
+
+    if (!toPriceUSD || isNaN(toPriceUSD)) {
+        toPriceUSD = tableRateModule.getFallbackValue(toSymbolKey);
+    }
+
+    const rateInUSD = toPriceUSD && !isNaN(toPriceUSD) && !isNaN(rate) ? rate * toPriceUSD : null;
 
     return `
         <td class="py-3 semibold monospace text-xs text-right items-center rate-table-info">
             <div class="relative">
                 <div class="flex flex-col items-end pr-3" data-tooltip-target="tooltip-rate-${offer.offer_id}">
                     <span class="text-sm bold text-gray-700 dark:text-white">
-                        $${rateInUSD.toFixed(2)} USD
+                        ${rateInUSD !== null ? `$${rateInUSD.toFixed(2)} USD` : 'N/A'}
                     </span>
                     <span class="bold text-gray-700 dark:text-white">
                         ${rate.toFixed(8)} ${toSymbol}/${fromSymbol}
@@ -2443,49 +2523,76 @@ function initializeTableEvents() {
         });
     }
 
-    const refreshButton = document.getElementById('refreshOffers');
-    if (refreshButton) {
-        EventManager.add(refreshButton, 'click', async () => {
-            console.log('Manual refresh initiated');
-            const refreshIcon = document.getElementById('refreshIcon');
-            const refreshText = document.getElementById('refreshText');
+const refreshButton = document.getElementById('refreshOffers');
+if (refreshButton) {
+    EventManager.add(refreshButton, 'click', async () => {
+        console.log('Manual refresh initiated');
+        const refreshIcon = document.getElementById('refreshIcon');
+        const refreshText = document.getElementById('refreshText');
 
-            refreshButton.disabled = true;
-            refreshIcon.classList.add('animate-spin');
-            refreshText.textContent = 'Refreshing...';
-            refreshButton.classList.add('opacity-75', 'cursor-wait');
+        refreshButton.disabled = true;
+        refreshIcon.classList.add('animate-spin');
+        refreshText.textContent = 'Refreshing...';
+        refreshButton.classList.add('opacity-75', 'cursor-wait');
 
-            try {
-                const endpoint = isSentOffers ? '/json/sentoffers' : '/json/offers';
-                const response = await fetch(endpoint);
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const newData = await response.json();
-
-                const processedNewData = Array.isArray(newData) ? newData : Object.values(newData);
-                console.log('Fetched offers:', processedNewData.length);
-
-                jsonData = formatInitialData(processedNewData);
-                originalJsonData = [...jsonData];
-
-                await updateOffersTable();
-                updateJsonView();
-                updatePaginationInfo();
-
-                console.log('Manual refresh completed successfully');
-
-            } catch (error) {
-                console.error('Error during manual refresh:', error);
-                ui.displayErrorMessage('Failed to refresh offers. Please try again later.');
-            } finally {
-                refreshButton.disabled = false;
-                refreshIcon.classList.remove('animate-spin');
-                refreshText.textContent = 'Refresh';
-                refreshButton.classList.remove('opacity-75', 'cursor-wait');
+        try {
+            const PRICES_CACHE_KEY = 'prices_coingecko';
+            localStorage.removeItem(PRICES_CACHE_KEY);
+            CacheManager.clear();
+            window.isManualRefresh = true;
+            const endpoint = isSentOffers ? '/json/sentoffers' : '/json/offers';
+            const response = await fetch(endpoint);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
-        });
-    }
+            const newData = await response.json();
+            const processedNewData = Array.isArray(newData) ? newData : Object.values(newData);
+            console.log('Fetched offers:', processedNewData.length);
+
+            jsonData = formatInitialData(processedNewData);
+            originalJsonData = [...jsonData];
+
+            const url = `${offersConfig.apiEndpoints.coinGecko}/simple/price?ids=bitcoin,bitcoin-cash,dash,dogecoin,decred,litecoin,particl,pivx,monero,zano,wownero,zcoin&vs_currencies=USD,BTC&api_key=${offersConfig.apiKeys.coinGecko}`;
+            console.log('Fetching fresh prices...');
+            const priceResponse = await fetch('/json/readurl', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url: url, headers: {} })
+            });
+
+            if (priceResponse.ok) {
+                const priceData = await priceResponse.json();
+                if (priceData && Object.keys(priceData).length > 0) {
+                    console.log('Updating with fresh price data');
+                    latestPrices = priceData;
+                    CacheManager.set(PRICES_CACHE_KEY, priceData, CACHE_DURATION);
+                    Object.entries(priceData).forEach(([coin, prices]) => {
+                        if (prices.usd) {
+                            tableRateModule.setFallbackValue(coin, prices.usd);
+                        }
+                    });
+                }
+            }
+
+            await updateOffersTable();
+            updateJsonView();
+            updatePaginationInfo();
+            lastRefreshTime = Date.now();
+            updateLastRefreshTime();
+
+            console.log('Manual refresh completed successfully');
+        } catch (error) {
+            console.error('Error during manual refresh:', error);
+            ui.displayErrorMessage('Failed to refresh offers. Please try again later.');
+        } finally {
+            window.isManualRefresh = false;
+            refreshButton.disabled = false;
+            refreshIcon.classList.remove('animate-spin');
+            refreshText.textContent = 'Refresh';
+            refreshButton.classList.remove('opacity-75', 'cursor-wait');
+        }
+    });
+}
 
     document.querySelectorAll('th[data-sortable="true"]').forEach(header => {
         EventManager.add(header, 'click', () => {
@@ -2717,11 +2824,6 @@ async function cleanup() {
         const rowCount = offersBody ? offersBody.querySelectorAll('tr').length : 0;
         cleanupTable();
         debug.addStep('Table cleanup completed', `Cleaned up ${rowCount} rows`);
-
-        debug.addStep('Starting cache cleanup');
-        const cacheStats = CacheManager.getStats();
-        CacheManager.clear();
-        debug.addStep('Cache cleanup completed', `Cleared ${cacheStats.itemCount} cached items`);
 
         debug.addStep('Resetting global state');
         const globals = {
