@@ -74,7 +74,7 @@ let filterTimeout = null;
 // CONFIGURATION CONSTANTS
 
 // Time Constants
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const CACHE_DURATION = 10 * 60 * 1000;
 
 // Application Constants
 const itemsPerPage = 50;
@@ -1106,7 +1106,20 @@ function getEmptyPriceData() {
 
 async function fetchLatestPrices() {
     const PRICES_CACHE_KEY = 'prices_coingecko';
+    const minRequestInterval = 15000;
+    const currentTime = Date.now();
 
+    if (!window.isManualRefresh) {
+        const lastRequestTime = window.lastPriceRequest || 0;
+        if (currentTime - lastRequestTime < minRequestInterval) {
+            console.log('Request too soon, using cache');
+            const cachedData = CacheManager.get(PRICES_CACHE_KEY);
+            if (cachedData) {
+                return cachedData.value;
+            }
+        }
+    }
+    window.lastPriceRequest = currentTime;
     if (!window.isManualRefresh) {
         const cachedData = CacheManager.get(PRICES_CACHE_KEY);
         if (cachedData && cachedData.remainingTime > 60000) {
@@ -1120,10 +1133,11 @@ async function fetchLatestPrices() {
             return cachedData.value;
         }
     }
-    const url = `${offersConfig.apiEndpoints.coinGecko}/simple/price?ids=bitcoin,bitcoin-cash,dash,dogecoin,decred,litecoin,particl,pivx,monero,zano,wownero,zcoin&vs_currencies=USD,BTC&api_key=${offersConfig.apiKeys.coinGecko}`;
-
     try {
         console.log('Initiating fresh price data fetch...');
+        const existingCache = CacheManager.get(PRICES_CACHE_KEY, true);
+        let fallbackData = existingCache ? existingCache.value : null;
+        const url = `${offersConfig.apiEndpoints.coinGecko}/simple/price?ids=bitcoin,bitcoin-cash,dash,dogecoin,decred,litecoin,particl,pivx,monero,zano,wownero,zcoin&vs_currencies=USD,BTC&api_key=${offersConfig.apiKeys.coinGecko}`;
         const response = await fetch('/json/readurl', {
             method: 'POST',
             headers: {
@@ -1131,23 +1145,26 @@ async function fetchLatestPrices() {
             },
             body: JSON.stringify({
                 url: url,
-                headers: {}
+                headers: {
+                    'User-Agent': 'Mozilla/5.0',
+                    'Accept': 'application/json',
+                    'Accept-Language': 'en-US,en;q=0.5'
+                }
             })
         });
-
         if (!response.ok) {
             throw new Error(`HTTP Error: ${response.status} ${response.statusText}`);
         }
-
         const data = await response.json();
-
         if (data.Error) {
-            console.error('API Error:', data.Error);
+            if (fallbackData) {
+                console.log('Using fallback data due to API error');
+                return fallbackData;
+            }
             throw new Error(data.Error);
         }
-
         if (data && Object.keys(data).length > 0) {
-            console.log('Processing fresh price data...');
+            console.log('Processing fresh price data');
             latestPrices = data;
             CacheManager.set(PRICES_CACHE_KEY, data, CACHE_DURATION);
 
@@ -1156,14 +1173,27 @@ async function fetchLatestPrices() {
                     tableRateModule.setFallbackValue(coin, prices.usd);
                 }
             });
-
             return data;
-        } else {
-            console.warn('No price data received');
-            return null;
         }
+        if (fallbackData) {
+            console.log('Using fallback data due to empty response');
+            return fallbackData;
+        }
+        const fallbackPrices = {};
+        Object.keys(getEmptyPriceData()).forEach(coin => {
+            const fallbackValue = tableRateModule.getFallbackValue(coin);
+            if (fallbackValue !== null) {
+                fallbackPrices[coin] = { usd: fallbackValue, btc: null };
+            }
+        });
+        if (Object.keys(fallbackPrices).length > 0) {
+            return fallbackPrices;
+        }
+        console.warn('No price data received');
+        return null;
     } catch (error) {
         console.error('Price Fetch Error:', error);
+
         const fallbackPrices = {};
         Object.keys(getEmptyPriceData()).forEach(coin => {
             const fallbackValue = tableRateModule.getFallbackValue(coin);
@@ -2523,21 +2553,20 @@ function initializeTableEvents() {
         });
     }
 
+
 const refreshButton = document.getElementById('refreshOffers');
 if (refreshButton) {
     EventManager.add(refreshButton, 'click', async () => {
         console.log('Manual refresh initiated');
         const refreshIcon = document.getElementById('refreshIcon');
         const refreshText = document.getElementById('refreshText');
-
         refreshButton.disabled = true;
         refreshIcon.classList.add('animate-spin');
         refreshText.textContent = 'Refreshing...';
         refreshButton.classList.add('opacity-75', 'cursor-wait');
-
         try {
-            const PRICES_CACHE_KEY = 'prices_coingecko';
-            localStorage.removeItem(PRICES_CACHE_KEY);
+            const cachedPrices = CacheManager.get('prices_coingecko');
+            let previousPrices = cachedPrices ? cachedPrices.value : null;
             CacheManager.clear();
             window.isManualRefresh = true;
             const endpoint = isSentOffers ? '/json/sentoffers' : '/json/offers';
@@ -2547,43 +2576,32 @@ if (refreshButton) {
             }
             const newData = await response.json();
             const processedNewData = Array.isArray(newData) ? newData : Object.values(newData);
-            console.log('Fetched offers:', processedNewData.length);
-
             jsonData = formatInitialData(processedNewData);
             originalJsonData = [...jsonData];
-
-            const url = `${offersConfig.apiEndpoints.coinGecko}/simple/price?ids=bitcoin,bitcoin-cash,dash,dogecoin,decred,litecoin,particl,pivx,monero,zano,wownero,zcoin&vs_currencies=USD,BTC&api_key=${offersConfig.apiKeys.coinGecko}`;
-            console.log('Fetching fresh prices...');
-            const priceResponse = await fetch('/json/readurl', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url: url, headers: {} })
-            });
-
-            if (priceResponse.ok) {
-                const priceData = await priceResponse.json();
-                if (priceData && Object.keys(priceData).length > 0) {
-                    console.log('Updating with fresh price data');
-                    latestPrices = priceData;
-                    CacheManager.set(PRICES_CACHE_KEY, priceData, CACHE_DURATION);
-                    Object.entries(priceData).forEach(([coin, prices]) => {
-                        if (prices.usd) {
-                            tableRateModule.setFallbackValue(coin, prices.usd);
-                        }
-                    });
-                }
+            const priceData = await fetchLatestPrices();
+            if (!priceData && previousPrices) {
+                console.log('Using previous price data after failed refresh');
+                latestPrices = previousPrices;
+                await updateOffersTable();
+            } else if (priceData) {
+                latestPrices = priceData;
+                await updateOffersTable();
+            } else {
+                throw new Error('Unable to fetch price data');
             }
-
-            await updateOffersTable();
             updateJsonView();
             updatePaginationInfo();
             lastRefreshTime = Date.now();
             updateLastRefreshTime();
-
             console.log('Manual refresh completed successfully');
         } catch (error) {
             console.error('Error during manual refresh:', error);
-            ui.displayErrorMessage('Failed to refresh offers. Please try again later.');
+            ui.displayErrorMessage('Unable to refresh data. Previous data will be preserved.');
+            const cachedData = CacheManager.get('prices_coingecko');
+            if (cachedData?.value) {
+                latestPrices = cachedData.value;
+                await updateOffersTable();
+            }
         } finally {
             window.isManualRefresh = false;
             refreshButton.disabled = false;
