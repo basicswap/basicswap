@@ -156,7 +156,7 @@ const api = {
                     .join(',');
 
                 const url = `${config.apiEndpoints.coinGecko}/simple/price?ids=${coinIds}&vs_currencies=usd,btc&include_24hr_vol=true&include_24hr_change=true&api_key=${config.apiKeys.coinGecko}`;
-                
+
                 const response = await api.makePostRequest(url, {
                     'User-Agent': 'Mozilla/5.0',
                     'Accept': 'application/json',
@@ -283,28 +283,28 @@ const rateLimiter = {
         cryptocompare: 1000
     },
     requestQueue: {},
-    
+
     canMakeRequest: function(apiName) {
         const now = Date.now();
         const lastRequest = this.lastRequestTime[apiName] || 0;
         return (now - lastRequest) >= this.minRequestInterval[apiName];
     },
-    
+
     updateLastRequestTime: function(apiName) {
         this.lastRequestTime[apiName] = Date.now();
     },
-    
+
     getWaitTime: function(apiName) {
         const now = Date.now();
         const lastRequest = this.lastRequestTime[apiName] || 0;
         return Math.max(0, this.minRequestInterval[apiName] - (now - lastRequest));
     },
-    
+
     queueRequest: async function(apiName, requestFn) {
         if (!this.requestQueue[apiName]) {
             this.requestQueue[apiName] = Promise.resolve();
         }
-        
+
         try {
             await this.requestQueue[apiName];
             
@@ -313,11 +313,11 @@ const rateLimiter = {
                 if (waitTime > 0) {
                     await new Promise(resolve => setTimeout(resolve, waitTime));
                 }
-                
+
                 this.updateLastRequestTime(apiName);
                 return await requestFn();
             };
-            
+
             this.requestQueue[apiName] = executeRequest();
             return await this.requestQueue[apiName];
             
@@ -397,7 +397,7 @@ displayCoinData: (coin, data) => {
             if (coin === 'BTC') {
                 btcPriceDiv.style.display = 'none';
             } else {
-                priceBtcElement.textContent = isError ? 'N/A' : `${priceBTC.toFixed(8)}`;
+                priceBtcElement.textContent = isError ? 'N/A' : `${priceBTC.toFixed(8)} BTC`;
                 btcPriceDiv.style.display = 'flex';
             }
         }
@@ -419,8 +419,9 @@ displayCoinData: (coin, data) => {
         }
         updateUI(false);
     } catch (error) {
-        updateUI(true);
-    }
+    logger.error('Failed to parse cache item:', error.message);
+    localStorage.removeItem(key);
+}
 },
 
   showLoader: () => {
@@ -525,7 +526,7 @@ displayCoinData: (coin, data) => {
     if (price < 0.001) return price.toFixed(8);
     if (price < 1) return price.toFixed(4);
     if (price < 1000) return price.toFixed(2);
-    return price.toFixed(0);
+    return price.toFixed(1);
   },
 
   setActiveContainer: (containerId) => {
@@ -1002,7 +1003,6 @@ const app = {
             await chartModule.updateChart('BTC');
             app.updateResolutionButtons('BTC');
 
-
             const chartTitle = document.getElementById('chart-title');
             if (chartTitle) {
                 chartTitle.textContent = 'Price Chart (BTC)';
@@ -1210,7 +1210,7 @@ setupEventListeners: () => {
     app.isRefreshing = true;
     ui.showLoader();
     chartModule.showChartLoader();
-    
+
     try {
         ui.hideErrorMessage();
         cache.clear();
@@ -1237,13 +1237,13 @@ setupEventListeners: () => {
                 if (!coinData) {
                     throw new Error(`No data received`);
                 }
-                
+
                 coinData.displayName = coin.displayName || coin.symbol;
                 ui.displayCoinData(coin.symbol, coinData);
                 
                 const cacheKey = `coinData_${coin.symbol}`;
                 cache.set(cacheKey, coinData);
-                
+
             } catch (coinError) {
                 console.warn(`Failed to update ${coin.symbol}: ${coinError.message}`);
                 failedCoins.push(coin.symbol);
@@ -1270,7 +1270,7 @@ setupEventListeners: () => {
 
             let countdown = 5;
             ui.displayErrorMessage(`${failureMessage} (${countdown}s)`);
-            
+
             const countdownInterval = setInterval(() => {
                 countdown--;
                 if (countdown > 0) {
@@ -1468,7 +1468,7 @@ sortTable: (columnIndex) => {
           }
         };
         return (parseTime(bValue) - parseTime(aValue)) * sortOrder;
-      
+
       case 5: // Rate
       case 6: // Market +/-
         aValue = getSafeTextContent(a.cells[columnIndex]);
@@ -1478,13 +1478,13 @@ sortTable: (columnIndex) => {
         aValue = parseFloat(aValue.replace(/[^\d.-]/g, '') || '0');
         bValue = parseFloat(bValue.replace(/[^\d.-]/g, '') || '0');
         return (aValue - bValue) * sortOrder;
-      
+
       case 7: // Trade
         const aCell = a.cells[columnIndex];
         const bCell = b.cells[columnIndex];
         //console.log('aCell:', aCell ? aCell.outerHTML : 'null');
         //console.log('bCell:', bCell ? bCell.outerHTML : 'null');
-        
+
         aValue = getSafeTextContent(aCell.querySelector('a')) || 
                  getSafeTextContent(aCell.querySelector('button')) || 
                  getSafeTextContent(aCell);
@@ -1494,14 +1494,14 @@ sortTable: (columnIndex) => {
         
         aValue = aValue.toLowerCase();
         bValue = bValue.toLowerCase();
-        
+
         //console.log(`Comparing trade actions: "${aValue}" vs "${bValue}"`);
-        
+
         if (aValue === bValue) return 0;
         if (aValue === "swap") return -1 * sortOrder;
         if (bValue === "swap") return 1 * sortOrder;
         return aValue.localeCompare(bValue) * sortOrder;
-      
+
       default:
         aValue = getSafeTextContent(a.cells[columnIndex]);
         bValue = getSafeTextContent(b.cells[columnIndex]);
