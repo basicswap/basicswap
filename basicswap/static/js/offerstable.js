@@ -497,48 +497,48 @@ const CacheManager = {
     },
 
     get: function(key) {
-        try {
-            const itemStr = localStorage.getItem(key);
-            if (!itemStr) {
-                return null;
-            }
-
-            let item;
-            try {
-                item = JSON.parse(itemStr);
-            } catch (parseError) {
-                console.error('Failed to parse cached item:', parseError);
-                localStorage.removeItem(key);
-                return null;
-            }
-
-            if (!item || typeof item.expiresAt !== 'number' || !item.hasOwnProperty('value')) {
-                console.warn('Invalid cache item structure for key:', key);
-                localStorage.removeItem(key);
-                return null;
-            }
-
-            const now = Date.now();
-            if (now < item.expiresAt) {
-                return {
-                    value: item.value,
-                    remainingTime: item.expiresAt - now
-                };
-            }
-
-            localStorage.removeItem(key);
-            return null;
-
-        } catch (error) {
-            console.error("Cache retrieval error:", error);
-            try {
-                localStorage.removeItem(key);
-            } catch (removeError) {
-                console.error("Failed to remove invalid cache entry:", removeError);
-            }
+    try {
+        const itemStr = localStorage.getItem(key);
+        if (!itemStr) {
             return null;
         }
-    },
+
+        let item;
+        try {
+            item = JSON.parse(itemStr);
+        } catch (parseError) {
+            console.error('Failed to parse cached item:', parseError);
+            localStorage.removeItem(key);
+            return null;
+        }
+
+        if (!item || typeof item.expiresAt !== 'number' || !Object.prototype.hasOwnProperty.call(item, 'value')) {
+            console.warn('Invalid cache item structure for key:', key);
+            localStorage.removeItem(key);
+            return null;
+        }
+
+        const now = Date.now();
+        if (now < item.expiresAt) {
+            return {
+                value: item.value,
+                remainingTime: item.expiresAt - now
+            };
+        }
+
+        localStorage.removeItem(key);
+        return null;
+
+    } catch (error) {
+        console.error("Cache retrieval error:", error);
+        try {
+            localStorage.removeItem(key);
+        } catch (removeError) {
+            console.error("Failed to remove invalid cache entry:", removeError);
+        }
+        return null;
+    }
+},
 
     cleanup: function(aggressive = false) {
         const now = Date.now();
@@ -1001,37 +1001,6 @@ function filterAndSortData() {
     return filteredData;
 }
 
-function getPriceWithFallback(coin, latestPrices) {
-    const getPriceKey = (coin) => {
-        const lowerCoin = coin.toLowerCase();
-        if (lowerCoin === 'firo' || lowerCoin === 'zcoin') {
-            return 'zcoin';
-        }
-        if (lowerCoin === 'bitcoin cash') {
-            return 'bitcoin-cash';
-        }
-        if (lowerCoin === 'particl anon' || lowerCoin === 'particl blind') {
-            return 'particl';
-        }
-        return coinNameToSymbol[coin] || lowerCoin;
-    };
-
-    const priceKey = getPriceKey(coin);
-    const livePrice = latestPrices[priceKey]?.usd;
-    if (livePrice !== undefined && livePrice !== null) {
-        return livePrice;
-    }
-
-    if (window.tableRateModule) {
-        const fallback = window.tableRateModule.getFallbackValue(priceKey);
-        if (fallback !== null) {
-            return fallback;
-        }
-    }
-    
-    return null;
-}
-
 async function calculateProfitLoss(fromCoin, toCoin, fromAmount, toAmount, isOwnOffer) {
     return new Promise((resolve) => {
         if (!latestPrices) {
@@ -1136,7 +1105,7 @@ async function fetchLatestPrices() {
     try {
         console.log('Initiating fresh price data fetch...');
         const existingCache = CacheManager.get(PRICES_CACHE_KEY, true);
-        let fallbackData = existingCache ? existingCache.value : null;
+        const fallbackData = existingCache ? existingCache.value : null;
         const url = `${offersConfig.apiEndpoints.coinGecko}/simple/price?ids=bitcoin,bitcoin-cash,dash,dogecoin,decred,litecoin,particl,pivx,monero,zano,wownero,zcoin&vs_currencies=USD,BTC&api_key=${offersConfig.apiKeys.coinGecko}`;
         const response = await fetch('/json/readurl', {
             method: 'POST',
