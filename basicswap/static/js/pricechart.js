@@ -76,191 +76,256 @@ const logger = {
   error: (message) => console.error(`[AppError] ${new Date().toISOString()}: ${message}`)
 };
 
-// API
 const api = {
     makePostRequest: (url, headers = {}) => {
-      return new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open('POST', '/json/readurl');
-      xhr.setRequestHeader('Content-Type', 'application/json');
-      xhr.timeout = 30000;
-      xhr.ontimeout = () => reject(new AppError('Request timed out'));
-      xhr.onload = () => {
-        logger.log(`Response for ${url}:`, xhr.responseText);
-        if (xhr.status === 200) {
-          try {
-            const response = JSON.parse(xhr.responseText);
-            if (response.Error) {
-              logger.error(`API Error for ${url}:`, response.Error);
-              reject(new AppError(response.Error, 'APIError'));
-            } else {
-              resolve(response);
-            }
-          } catch (error) {
-            logger.error(`Invalid JSON response for ${url}:`, xhr.responseText);
-            reject(new AppError(`Invalid JSON response: ${error.message}`, 'ParseError'));
-          }
-        } else {
-          logger.error(`HTTP Error for ${url}: ${xhr.status} ${xhr.statusText}`);
-          reject(new AppError(`HTTP Error: ${xhr.status} ${xhr.statusText}`, 'HTTPError'));
-        }
-      };
-      xhr.onerror = () => reject(new AppError('Network error occurred', 'NetworkError'));
-      xhr.send(JSON.stringify({
-        url: url,
-        headers: headers
-      }));
-    });
-  },
-
-  fetchCryptoCompareDataXHR: (coin) => {
-    const url = `${config.apiEndpoints.cryptoCompare}?fsyms=${coin}&tsyms=USD,BTC&api_key=${config.apiKeys.cryptoCompare}`;
-    const headers = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-      'Accept-Language': 'en-US,en;q=0.5',
-    };
-    return api.makePostRequest(url, headers).catch(error => ({
-      error: error.message
-    }));
-  },
-    fetchCoinGeckoDataXHR: async () => {
-    const cacheKey = 'coinGeckoOneLiner';
-    const minRequestInterval = 30000;
-    const currentTime = Date.now();
-    const lastRequestTime = window.lastGeckoRequest || 0;
-    if (currentTime - lastRequestTime < minRequestInterval) {
-        console.log('Request too soon, using cache');
-        const cachedData = cache.get(cacheKey);
-        if (cachedData) {
-            return cachedData.value;
-        }
-    }
-    window.lastGeckoRequest = currentTime;
-    const cachedData = cache.get(cacheKey);
-    if (cachedData) {
-        console.log('Using cached CoinGecko data');
-        return cachedData.value;
-    }
-    try {
-        const existingCache = localStorage.getItem(cacheKey);
-        let fallbackData = null;
-        if (existingCache) {
-            try {
-                const parsed = JSON.parse(existingCache);
-                fallbackData = parsed.value;
-            } catch (e) {
-                console.warn('Failed to parse existing cache:', e);
-            }
-        }
-        const coinIds = config.coins
-            .filter(coin => coin.usesCoinGecko)
-            .map(coin => coin.name)
-            .join(',');
-        const url = `${config.apiEndpoints.coinGecko}/simple/price?ids=${coinIds}&vs_currencies=usd,btc&include_24hr_vol=true&include_24hr_change=true&api_key=${config.apiKeys.coinGecko}`;
-        const response = await api.makePostRequest(url, {
-            'User-Agent': 'Mozilla/5.0',
-            'Accept': 'application/json',
-            'Accept-Language': 'en-US,en;q=0.5'
-        });
-        if (typeof response !== 'object' || response === null) {
-            if (fallbackData) {
-                console.log('Using fallback data due to invalid response');
-                return fallbackData;
-            }
-            throw new AppError(`Invalid data structure received from CoinGecko`);
-        }
-        if (response.error || response.Error) {
-            if (fallbackData) {
-                console.log('Using fallback data due to API error');
-                return fallbackData;
-            }
-            throw new AppError(response.error || response.Error);
-        }
-        const transformedData = {};
-        Object.entries(response).forEach(([id, values]) => {
-            const coinConfig = config.coins.find(coin => coin.name === id);
-            const symbol = coinConfig?.symbol.toLowerCase() || id;
-            transformedData[symbol] = {
-                current_price: values.usd,
-                price_btc: values.btc,
-                total_volume: values.usd_24h_vol,
-                price_change_percentage_24h: values.usd_24h_change,
-                displayName: coinConfig?.displayName || coinConfig?.symbol || id
-            };
-        });
-        cache.set(cacheKey, transformedData);
-        return transformedData;
-
-    } catch (error) {
-        console.error(`Error fetching CoinGecko data:`, error);
-        if (cachedData) {
-            console.log('Using expired cache data due to error');
-            return cachedData.value;
-        }
-        return { error: error.message };
-    }
-},
-
-fetchHistoricalDataXHR: async (coinSymbols) => {
-    if (!Array.isArray(coinSymbols)) {
-        coinSymbols = [coinSymbols];
-    }
-    const results = {};
-    const fetchPromises = coinSymbols.map(async coin => {
-        const coinConfig = config.coins.find(c => c.symbol === coin);
-        if (!coinConfig) return;
-
-        const cacheKey = `historical_${coin}_${config.currentResolution}`;
-        const cachedData = cache.get(cacheKey);
-        if (cachedData) {
-            results[coin] = cachedData.value;
-            return;
-        }
-        if (coin === 'WOW') {
-            const url = `${config.apiEndpoints.coinGecko}/coins/wownero/market_chart?vs_currency=usd&days=1&api_key=${config.apiKeys.coinGecko}`;
-            try {
-                const response = await api.makePostRequest(url);
-                if (response && response.prices) {
-                    results[coin] = response.prices;
-                    cache.set(cacheKey, response.prices);
-                }
-            } catch (error) {
-                console.error(`Error fetching CoinGecko data for WOW:`, error);
-                if (cachedData) {
-                    results[coin] = cachedData.value;
-                }
-            }
-        } else {
-            const resolution = config.resolutions[config.currentResolution];
-            let url;
-            if (resolution.interval === 'hourly') {
-                url = `https://min-api.cryptocompare.com/data/v2/histohour?fsym=${coin}&tsym=USD&limit=${resolution.days * 24}&api_key=${config.apiKeys.cryptoCompare}`;
-            } else {
-                url = `${config.apiEndpoints.cryptoCompareHistorical}?fsym=${coin}&tsym=USD&limit=${resolution.days}&api_key=${config.apiKeys.cryptoCompare}`;
-            }
-            try {
-                const response = await api.makePostRequest(url);
-                if (response.Response === "Error") {
-                    console.error(`API Error for ${coin}:`, response.Message);
-                    if (cachedData) {
-                        results[coin] = cachedData.value;
+        return new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/json/readurl');
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.timeout = 30000;
+            xhr.ontimeout = () => reject(new AppError('Request timed out'));
+            xhr.onload = () => {
+                logger.log(`Response for ${url}:`, xhr.responseText);
+                if (xhr.status === 200) {
+                    try {
+                        const response = JSON.parse(xhr.responseText);
+                        if (response.Error) {
+                            logger.error(`API Error for ${url}:`, response.Error);
+                            reject(new AppError(response.Error, 'APIError'));
+                        } else {
+                            resolve(response);
+                        }
+                    } catch (error) {
+                        logger.error(`Invalid JSON response for ${url}:`, xhr.responseText);
+                        reject(new AppError(`Invalid JSON response: ${error.message}`, 'ParseError'));
                     }
-                } else if (response.Data && response.Data.Data) {
-                    results[coin] = response.Data;
-                    cache.set(cacheKey, response.Data);
+                } else {
+                    logger.error(`HTTP Error for ${url}: ${xhr.status} ${xhr.statusText}`);
+                    reject(new AppError(`HTTP Error: ${xhr.status} ${xhr.statusText}`, 'HTTPError'));
                 }
+            };
+            xhr.onerror = () => reject(new AppError('Network error occurred', 'NetworkError'));
+            xhr.send(JSON.stringify({
+                url: url,
+                headers: headers
+            }));
+        });
+    },
+
+    fetchCryptoCompareDataXHR: (coin) => {
+        return rateLimiter.queueRequest('cryptocompare', async () => {
+            const url = `${config.apiEndpoints.cryptoCompare}?fsyms=${coin}&tsyms=USD,BTC&api_key=${config.apiKeys.cryptoCompare}`;
+            const headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
+            };
+            try {
+                return await api.makePostRequest(url, headers);
             } catch (error) {
-                console.error(`Error fetching CryptoCompare data for ${coin}:`, error);
-                if (cachedData) {
-                    results[coin] = cachedData.value;
-                }
+                return { error: error.message };
             }
+        });
+    },
+
+    fetchCoinGeckoDataXHR: async () => {
+        const cacheKey = 'coinGeckoOneLiner';
+        const cachedData = cache.get(cacheKey);
+
+        if (cachedData) {
+            console.log('Using cached CoinGecko data');
+            return cachedData.value;
         }
-    });
-    await Promise.all(fetchPromises);
-    return results;
-}
+
+        return rateLimiter.queueRequest('coingecko', async () => {
+            try {
+                const existingCache = localStorage.getItem(cacheKey);
+                let fallbackData = null;
+                if (existingCache) {
+                    try {
+                        const parsed = JSON.parse(existingCache);
+                        fallbackData = parsed.value;
+                    } catch (e) {
+                        console.warn('Failed to parse existing cache:', e);
+                    }
+                }
+
+                const coinIds = config.coins
+                    .filter(coin => coin.usesCoinGecko)
+                    .map(coin => coin.name)
+                    .join(',');
+
+                const url = `${config.apiEndpoints.coinGecko}/simple/price?ids=${coinIds}&vs_currencies=usd,btc&include_24hr_vol=true&include_24hr_change=true&api_key=${config.apiKeys.coinGecko}`;
+                
+                const response = await api.makePostRequest(url, {
+                    'User-Agent': 'Mozilla/5.0',
+                    'Accept': 'application/json',
+                    'Accept-Language': 'en-US,en;q=0.5'
+                });
+
+                if (typeof response !== 'object' || response === null) {
+                    if (fallbackData) {
+                        console.log('Using fallback data due to invalid response');
+                        return fallbackData;
+                    }
+                    throw new AppError('Invalid data structure received from CoinGecko');
+                }
+
+                if (response.error || response.Error) {
+                    if (fallbackData) {
+                        console.log('Using fallback data due to API error');
+                        return fallbackData;
+                    }
+                    throw new AppError(response.error || response.Error);
+                }
+
+                const transformedData = {};
+                Object.entries(response).forEach(([id, values]) => {
+                    const coinConfig = config.coins.find(coin => coin.name === id);
+                    const symbol = coinConfig?.symbol.toLowerCase() || id;
+                    transformedData[symbol] = {
+                        current_price: values.usd,
+                        price_btc: values.btc,
+                        total_volume: values.usd_24h_vol,
+                        price_change_percentage_24h: values.usd_24h_change,
+                        displayName: coinConfig?.displayName || coinConfig?.symbol || id
+                    };
+                });
+
+                cache.set(cacheKey, transformedData);
+                return transformedData;
+
+            } catch (error) {
+                console.error('Error fetching CoinGecko data:', error);
+                const cachedData = cache.get(cacheKey);
+                if (cachedData) {
+                    console.log('Using expired cache data due to error');
+                    return cachedData.value;
+                }
+                return { error: error.message };
+            }
+        });
+    },
+
+    fetchHistoricalDataXHR: async (coinSymbols) => {
+        if (!Array.isArray(coinSymbols)) {
+            coinSymbols = [coinSymbols];
+        }
+
+        const results = {};
+        const fetchPromises = coinSymbols.map(async coin => {
+            const coinConfig = config.coins.find(c => c.symbol === coin);
+            if (!coinConfig) return;
+
+            const cacheKey = `historical_${coin}_${config.currentResolution}`;
+            const cachedData = cache.get(cacheKey);
+            if (cachedData) {
+                results[coin] = cachedData.value;
+                return;
+            }
+
+            if (coin === 'WOW') {
+                return rateLimiter.queueRequest('coingecko', async () => {
+                    const url = `${config.apiEndpoints.coinGecko}/coins/wownero/market_chart?vs_currency=usd&days=1&api_key=${config.apiKeys.coinGecko}`;
+                    try {
+                        const response = await api.makePostRequest(url);
+                        if (response && response.prices) {
+                            results[coin] = response.prices;
+                            cache.set(cacheKey, response.prices);
+                        }
+                    } catch (error) {
+                        console.error(`Error fetching CoinGecko data for WOW:`, error);
+                        if (cachedData) {
+                            results[coin] = cachedData.value;
+                        }
+                    }
+                });
+            } else {
+                return rateLimiter.queueRequest('cryptocompare', async () => {
+                    const resolution = config.resolutions[config.currentResolution];
+                    let url;
+                    if (resolution.interval === 'hourly') {
+                        url = `https://min-api.cryptocompare.com/data/v2/histohour?fsym=${coin}&tsym=USD&limit=${resolution.days * 24}&api_key=${config.apiKeys.cryptoCompare}`;
+                    } else {
+                        url = `${config.apiEndpoints.cryptoCompareHistorical}?fsym=${coin}&tsym=USD&limit=${resolution.days}&api_key=${config.apiKeys.cryptoCompare}`;
+                    }
+
+                    try {
+                        const response = await api.makePostRequest(url);
+                        if (response.Response === "Error") {
+                            console.error(`API Error for ${coin}:`, response.Message);
+                            if (cachedData) {
+                                results[coin] = cachedData.value;
+                            }
+                        } else if (response.Data && response.Data.Data) {
+                            results[coin] = response.Data;
+                            cache.set(cacheKey, response.Data);
+                        }
+                    } catch (error) {
+                        console.error(`Error fetching CryptoCompare data for ${coin}:`, error);
+                        if (cachedData) {
+                            results[coin] = cachedData.value;
+                        }
+                    }
+                });
+            }
+        });
+
+        await Promise.all(fetchPromises);
+        return results;
+    }
+};
+
+const rateLimiter = {
+    lastRequestTime: {},
+    minRequestInterval: {
+        coingecko: 15000,
+        cryptocompare: 1000
+    },
+    requestQueue: {},
+    
+    canMakeRequest: function(apiName) {
+        const now = Date.now();
+        const lastRequest = this.lastRequestTime[apiName] || 0;
+        return (now - lastRequest) >= this.minRequestInterval[apiName];
+    },
+    
+    updateLastRequestTime: function(apiName) {
+        this.lastRequestTime[apiName] = Date.now();
+    },
+    
+    getWaitTime: function(apiName) {
+        const now = Date.now();
+        const lastRequest = this.lastRequestTime[apiName] || 0;
+        return Math.max(0, this.minRequestInterval[apiName] - (now - lastRequest));
+    },
+    
+    queueRequest: async function(apiName, requestFn) {
+        if (!this.requestQueue[apiName]) {
+            this.requestQueue[apiName] = Promise.resolve();
+        }
+        
+        try {
+            await this.requestQueue[apiName];
+            
+            const executeRequest = async () => {
+                const waitTime = this.getWaitTime(apiName);
+                if (waitTime > 0) {
+                    await new Promise(resolve => setTimeout(resolve, waitTime));
+                }
+                
+                this.updateLastRequestTime(apiName);
+                return await requestFn();
+            };
+            
+            this.requestQueue[apiName] = executeRequest();
+            return await this.requestQueue[apiName];
+            
+        } catch (error) {
+            console.error(`Queue error for ${apiName}:`, error);
+            throw error;
+        }
+    }
 };
 
 // CACHE
@@ -918,46 +983,47 @@ const app = {
   },
 
   onLoad: async () => {
-  console.log('App onLoad event triggered');
-  ui.showLoader();
-  try {
-    volumeToggle.init();
-    await app.updateBTCPrice();
-    const chartContainer = document.getElementById('coin-chart');
-    if (chartContainer) {
-      chartModule.initChart();
-      chartModule.showChartLoader();
-    } else {
-      //console.warn('Chart container not found, skipping chart initialization');
+    console.log('App onLoad event triggered');
+    ui.showLoader();
+    try {
+        volumeToggle.init();
+        await app.updateBTCPrice();
+        const chartContainer = document.getElementById('coin-chart');
+        if (chartContainer) {
+            chartModule.initChart();
+            chartModule.showChartLoader();
+        }
+
+        console.log('Loading all coin data...');
+        await app.loadAllCoinData();
+
+        if (chartModule.chart) {
+            config.currentResolution = 'day';
+            await chartModule.updateChart('BTC');
+            app.updateResolutionButtons('BTC');
+
+
+            const chartTitle = document.getElementById('chart-title');
+            if (chartTitle) {
+                chartTitle.textContent = 'Price Chart (BTC)';
+            }
+        }
+        ui.setActiveContainer('btc-container');
+
+        app.setupEventListeners();
+        app.initializeSelectImages();
+        app.initAutoRefresh();
+
+    } catch (error) {
+        ui.displayErrorMessage('Failed to initialize the dashboard. Please try refreshing the page.');
+    } finally {
+        ui.hideLoader();
+        if (chartModule.chart) {
+            chartModule.hideChartLoader();
+        }
+        console.log('App onLoad completed');
     }
-
-    console.log('Loading all coin data...');
-    await app.loadAllCoinData();
-
-    if (chartModule.chart) {
-      config.currentResolution = 'day';
-      await chartModule.updateChart('BTC');
-      app.updateResolutionButtons('BTC');
-    }
-    ui.setActiveContainer('btc-container');
-
-    //console.log('Setting up event listeners and initializations...');
-    app.setupEventListeners();
-    app.initializeSelectImages();
-    app.initAutoRefresh();
-
-  } catch (error) {
-    //console.error('Error during initialization:', error);
-    ui.displayErrorMessage('Failed to initialize the dashboard. Please try refreshing the page.');
-  } finally {
-    ui.hideLoader();
-    if (chartModule.chart) {
-      chartModule.hideChartLoader();
-    }
-    console.log('App onLoad completed');
-  }
 },
-
     loadAllCoinData: async () => {
         //console.log('Loading data for all coins...');
         try {
@@ -1021,23 +1087,25 @@ const app = {
     //console.log(`Data loaded for ${coin.symbol}`);
   },
 
-  setupEventListeners: () => {
-    //console.log('Setting up event listeners...');
+setupEventListeners: () => {
     config.coins.forEach(coin => {
-      const container = document.getElementById(`${coin.symbol.toLowerCase()}-container`);
-      if (container) {
-        container.addEventListener('click', () => {
-          //console.log(`${coin.symbol} container clicked`);
-          ui.setActiveContainer(`${coin.symbol.toLowerCase()}-container`);
-          if (chartModule.chart) {
-            if (coin.symbol === 'WOW') {
-              config.currentResolution = 'day';
-            }
-            chartModule.updateChart(coin.symbol);
-            app.updateResolutionButtons(coin.symbol);
-          }
-        });
-      }
+        const container = document.getElementById(`${coin.symbol.toLowerCase()}-container`);
+        if (container) {
+            container.addEventListener('click', () => {
+                const chartTitle = document.getElementById('chart-title');
+                if (chartTitle) {
+                    chartTitle.textContent = `Price Chart (${coin.symbol})`;
+                }
+                ui.setActiveContainer(`${coin.symbol.toLowerCase()}-container`);
+                if (chartModule.chart) {
+                    if (coin.symbol === 'WOW') {
+                        config.currentResolution = 'day';
+                    }
+                    chartModule.updateChart(coin.symbol);
+                    app.updateResolutionButtons(coin.symbol);
+                }
+            });
+        }
     });
 
     const refreshAllButton = document.getElementById('refresh-all');
@@ -1102,79 +1170,142 @@ const app = {
     } else {
       nextRefreshTime = now + config.cacheTTL;
     }
-
     const timeUntilRefresh = nextRefreshTime - now;
     console.log(`Next refresh scheduled in ${timeUntilRefresh / 1000} seconds`);
-
     app.nextRefreshTime = nextRefreshTime;
     app.autoRefreshInterval = setTimeout(() => {
       console.log('Auto-refresh triggered');
       app.refreshAllData();
     }, timeUntilRefresh);
-
     localStorage.setItem('nextRefreshTime', app.nextRefreshTime.toString());
     app.updateNextRefreshTime();
   },
-  
-    refreshAllData: async () => {
-        if (app.isRefreshing) {
-            console.log('Refresh already in progress, skipping...');
-            return;
+  refreshAllData: async () => {
+    if (app.isRefreshing) {
+        console.log('Refresh already in progress, skipping...');
+        return;
+    }
+
+    const lastGeckoRequest = rateLimiter.lastRequestTime['coingecko'] || 0;
+    const timeSinceLastRequest = Date.now() - lastGeckoRequest;
+    if (timeSinceLastRequest < rateLimiter.minRequestInterval.coingecko) {
+        let waitTime = Math.ceil((rateLimiter.minRequestInterval.coingecko - timeSinceLastRequest) / 1000);
+
+        ui.displayErrorMessage(`Rate limit: Please wait ${waitTime} seconds before refreshing`);
+
+        const countdownInterval = setInterval(() => {
+            waitTime--;
+            if (waitTime > 0) {
+                ui.displayErrorMessage(`Rate limit: Please wait ${waitTime} seconds before refreshing`);
+            } else {
+                clearInterval(countdownInterval);
+                ui.hideErrorMessage();
+            }
+        }, 1000);
+
+        return;
+    }
+
+    console.log('Refreshing all data...');
+    app.isRefreshing = true;
+    ui.showLoader();
+    chartModule.showChartLoader();
+    
+    try {
+        ui.hideErrorMessage();
+        cache.clear();
+
+        const btcUpdateSuccess = await app.updateBTCPrice();
+        if (!btcUpdateSuccess) {
+            console.warn('BTC price update failed, continuing with cached or default value');
         }
 
-        console.log('Refreshing all data...');
-        app.isRefreshing = true;
-        ui.showLoader();
-        chartModule.showChartLoader();
-        
-        try {
+        await new Promise(resolve => setTimeout(resolve, 1000));
 
-            cache.clear();
-            
-            await app.updateBTCPrice();
-            
-            const allCoinData = await api.fetchCoinGeckoDataXHR();
-            if (allCoinData.error) {
-                throw new Error(allCoinData.error);
-            }
-            
-            for (const coin of config.coins) {
-                const symbol = coin.symbol.toLowerCase();
-                const coinData = allCoinData[symbol];
-                if (coinData) {
-                    coinData.displayName = coin.displayName || coin.symbol;
+        const allCoinData = await api.fetchCoinGeckoDataXHR();
+        if (allCoinData.error) {
+            throw new Error(`CoinGecko API Error: ${allCoinData.error}`);
+        }
 
-                    ui.displayCoinData(coin.symbol, coinData);
+        const failedCoins = [];
 
-                    const cacheKey = `coinData_${coin.symbol}`;
-                    cache.set(cacheKey, coinData);
-                } else {
-                    //console.error(`No data found for ${coin.symbol}`);
+        for (const coin of config.coins) {
+            const symbol = coin.symbol.toLowerCase();
+            const coinData = allCoinData[symbol];
+
+            try {
+                if (!coinData) {
+                    throw new Error(`No data received`);
                 }
-            }
-            
-            if (chartModule.currentCoin) {
-                await chartModule.updateChart(chartModule.currentCoin, true);
-            }
-            
-            app.lastRefreshedTime = new Date();
-            localStorage.setItem('lastRefreshedTime', app.lastRefreshedTime.getTime().toString());
-            ui.updateLastRefreshedTime();
-            
-            console.log('All data refreshed successfully');
-            
-        } catch (error) {
-            //console.error('Error refreshing all data:', error);
-            ui.displayErrorMessage('Failed to refresh all data. Please try again.');
-        } finally {
-            ui.hideLoader();
-            chartModule.hideChartLoader();
-            app.isRefreshing = false;
-            if (app.isAutoRefreshEnabled) {
-                app.scheduleNextRefresh();
+                
+                coinData.displayName = coin.displayName || coin.symbol;
+                ui.displayCoinData(coin.symbol, coinData);
+                
+                const cacheKey = `coinData_${coin.symbol}`;
+                cache.set(cacheKey, coinData);
+                
+            } catch (coinError) {
+                console.warn(`Failed to update ${coin.symbol}: ${coinError.message}`);
+                failedCoins.push(coin.symbol);
             }
         }
-    },
+
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        if (chartModule.currentCoin) {
+            try {
+                await chartModule.updateChart(chartModule.currentCoin, true);
+            } catch (chartError) {
+                console.error('Chart update failed:', chartError);
+            }
+        }
+        app.lastRefreshedTime = new Date();
+        localStorage.setItem('lastRefreshedTime', app.lastRefreshedTime.getTime().toString());
+        ui.updateLastRefreshedTime();
+        
+        if (failedCoins.length > 0) {
+            const failureMessage = failedCoins.length === config.coins.length
+                ? 'Failed to update any coin data'
+                : `Failed to update some coins: ${failedCoins.join(', ')}`;
+
+            let countdown = 5;
+            ui.displayErrorMessage(`${failureMessage} (${countdown}s)`);
+            
+            const countdownInterval = setInterval(() => {
+                countdown--;
+                if (countdown > 0) {
+                    ui.displayErrorMessage(`${failureMessage} (${countdown}s)`);
+                } else {
+                    clearInterval(countdownInterval);
+                    ui.hideErrorMessage();
+                }
+            }, 1000);
+        }
+        console.log(`Refresh completed. Failed coins: ${failedCoins.length}`);
+    } catch (error) {
+        console.error('Critical error during refresh:', error);
+        let countdown = 10;
+        ui.displayErrorMessage(`Refresh failed: ${error.message}. Please try again later. (${countdown}s)`);
+        const countdownInterval = setInterval(() => {
+            countdown--;
+            if (countdown > 0) {
+                ui.displayErrorMessage(`Refresh failed: ${error.message}. Please try again later. (${countdown}s)`);
+            } else {
+                clearInterval(countdownInterval);
+                ui.hideErrorMessage();
+            }
+        }, 1000);
+
+    } finally {
+        ui.hideLoader();
+        chartModule.hideChartLoader();
+        app.isRefreshing = false;
+
+        if (app.isAutoRefreshEnabled) {
+            app.scheduleNextRefresh();
+        }
+    }
+},
 
   updateNextRefreshTime: () => {
     console.log('Updating next refresh time display');
@@ -1266,26 +1397,32 @@ const app = {
     }
   },
 
-    updateBTCPrice: async () => {
-        //console.log('Updating BTC price...');
-        try {
-            const priceData = await api.fetchCoinGeckoDataXHR();
-            if (priceData.error) {
-                //console.error('Error fetching BTC price:', priceData.error);
-                app.btcPriceUSD = 0;
-            } else if (priceData.btc && priceData.btc.current_price) {
+updateBTCPrice: async () => {
+    console.log('Updating BTC price...');
+    try {
+        const priceData = await api.fetchCoinGeckoDataXHR();
 
-                app.btcPriceUSD = priceData.btc.current_price;
-            } else {
-                //console.error('Unexpected BTC data structure:', priceData);
-                app.btcPriceUSD = 0;
-            }
-        } catch (error) {
-            //console.error('Error fetching BTC price:', error);
-            app.btcPriceUSD = 0;
+        if (priceData.error) {
+            console.warn('API error when fetching BTC price:', priceData.error);
+            return false;
         }
-        //console.log('Current BTC price:', app.btcPriceUSD);
-    },
+
+        if (priceData.btc && typeof priceData.btc.current_price === 'number') {
+            app.btcPriceUSD = priceData.btc.current_price;
+            return true;
+        } else if (priceData.bitcoin && typeof priceData.bitcoin.usd === 'number') {
+            app.btcPriceUSD = priceData.bitcoin.usd;
+            return true;
+        }
+
+        console.warn('Unexpected BTC price data structure:', priceData);
+        return false;
+
+    } catch (error) {
+        console.error('Error fetching BTC price:', error);
+        return false;
+    }
+},
 
 sortTable: (columnIndex) => {
   //console.log(`Sorting column: ${columnIndex}`);
