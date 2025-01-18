@@ -25,9 +25,9 @@ function getWebSocketConfig() {
 </script>
 
 {% if sent_offers %}
-<div class="container mx-auto">
+<div class="lg:container mx-auto">
   <section class="p-5 mt-5">
-    <div class="flex flex-wrap items-center -m-2">
+    <div class="flex flex-wrap items-center">
       <div class="w-full md:w-1/2 p-2">
         <ul class="flex flex-wrap items-center gap-x-3 mb-2">
           <li><a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/">Home</a></li>
@@ -48,9 +48,9 @@ function getWebSocketConfig() {
 {% if sent_offers %}
   <section class="py-5">
 {% else %}
-  <section class="py-5 mt-5">
+  <section class="py-5 px-6 mt-5">
 {% endif %}
-    <div class="container px-4 mx-auto">
+    <div class="lg:container mx-auto">
       <div class="relative py-11 px-16 bg-coolGray-900 dark:bg-gray-500 rounded-md overflow-hidden">
         <img class="absolute z-10 left-4 top-4 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt="dots-red">
         <img class="absolute h-64 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" src="/static/images/elements/wave.svg" alt="wave">
@@ -59,7 +59,7 @@ function getWebSocketConfig() {
             <h2 class="mb-6 text-4xl font-bold text-white tracking-tighter">{{ page_type }}</h2>
             <p class="font-normal text-coolGray-200 dark:text-white">{{ page_type_description }}</p>
           </div>
-          <div class="rounded-full{{ page_button }} w-full md:w-1/2 p-3 p-6 container flex flex-wrap items-center justify-end items-center mx-auto">
+          <div class="rounded-full{{ page_button }} w-full md:w-1/2 p-3 p-6 lg:container flex flex-wrap items-center justify-end items-center mx-auto">
             <a id="refresh" href="/newoffer" class="rounded-full flex flex-wrap justify-center px-5 py-3 bg-blue-500 hover:bg-green-600 hover:border-green-600 font-medium text-sm text-white border border-blue-500 rounded-md focus:ring-0 focus:outline-none">{{ place_new_offer_svg | safe }}<span>Place new Offer</span></a>
           </div>
         </div>
@@ -71,11 +71,11 @@ function getWebSocketConfig() {
 
 {% if show_chart %}
 <section class="relative hidden md:block">
-  <div class="pl-6 pr-6 pt-0 pb-0 mt-5 h-full overflow-hidden">
+  <div class="px-6 py-0 mt-5 h-full overflow-hidden">
     <div class="pb-6 border-coolGray-100">
-      <div class="flex flex-wrap items-center justify-between -m-2">
+      <div class="flex flex-wrap items-center justify-between">
         <div class="w-full pt-2">
-          <div class="container px-4 mx-auto">
+          <div class="lg:container mx-auto">
             <div class="pt-6 pb-8 bg-coolGray-100 dark:bg-gray-500 rounded-xl container-to-blur">
               <div class="flex justify-between items-center mb-4 mr-10 ml-10">
                 <div class="flex items-center justify-between">
@@ -157,9 +157,9 @@ function getWebSocketConfig() {
   </div>
 </section>
 
-<section class="py-4 flex flex-wrap justify-center overflow-hidden container-to-blur">
- <div class="container px-4 mx-auto">
-  <div class="flex flex-wrap justify-center -m-3" id="coin-container">
+<section class="py-4 px-3 flex flex-wrap overflow-hidden container-to-blur">
+ <div class="lg:container mx-auto">
+  <div class="flex flex-wrap justify-center lg:justify-start xl:justify-center" id="coin-container">
 {% set coin_data = {
     'BTC': {'name': 'Bitcoin', 'symbol': 'BTC', 'image': 'Bitcoin.png', 'show': true},
     'XMR': {'name': 'Monero', 'symbol': 'XMR', 'image': 'Monero.png', 'show': true},
@@ -192,9 +192,9 @@ function getWebSocketConfig() {
 
   {% for coin_symbol in custom_order %}
     {% if coin_symbol in display_coins and coin_data[coin_symbol]['show'] %}
-    <div class="w-full sm:w-1/2 lg:w-1/6 p-3" id="{{ coin_symbol.lower() }}-container">
+    <div class="w-full sm:w-1/2 md:w-1/4 lg:w-1/5 xl:w-1/6 p-3" id="{{ coin_symbol.lower() }}-container"
         <div class="px-5 py-3 h-full bg-coolGray-100 dark:bg-gray-500 rounded-2xl dark:text-white {% if coin_symbol == 'BTC' %}active-container{% endif %}" style="min-height: 180px;">
-         <div class="flex items-center">
+         <div class="flex items-center h-10">
           <img src="/static/images/coins/{{ coin_data[coin_symbol]['image'] }}" class="rounded-xl" style="width: 28px; height: 28px; object-fit: contain;" alt="{{ coin_data[coin_symbol]['name'] }}">
           <p class="ml-1 text-black text-sm dark:text-white">
          {{ coin_data[coin_symbol]['name'] }} {% if coin_data[coin_symbol]['symbol'] != coin_data[coin_symbol]['name'] %}({{ coin_data[coin_symbol]['symbol'] }}){% endif %}
@@ -213,12 +213,13 @@ function getWebSocketConfig() {
           </div>
           {% if coin_symbol != 'BTC' %}
           <div id="{{ coin_symbol.lower() }}-btc-price-div" class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2 {% if coin_symbol == 'WOW' %}hidden{% endif %}">
-           <span class="bold mr-2">BTC:</span> <span id="{{ coin_symbol.lower() }}-price-btc"></span>
+           <span class="bold mr-2 ml-1">BTC:</span>
+           <span id="{{ coin_symbol.lower() }}-price-btc"></span>
           </div>
           {% endif %}
           <div id="{{ coin_symbol.lower() }}-volume-div" class="flex items-center text-xs text-gray-600 dark:text-gray-300 mt-2">
-           <span class="bold mr-2">VOL:</span>
-           <div id="{{ coin_symbol.lower() }}-volume-24h"></div>
+           <span class="bold mr-2 ml-1">VOL:</span>
+           <span id="{{ coin_symbol.lower() }}-volume-24h"></span>
           </div>
          </div>
         </div>
@@ -233,15 +234,15 @@ function getWebSocketConfig() {
 <script src="/static/js/pricechart.js"></script>
 
 <section>
-  <div class="pl-6 pr-6 pt-0 pb-0 mt-5 h-full overflow-hidden">
+  <div class="px-6 py-0 mt-5 h-full overflow-hidden">
     <div class="border-coolGray-100">
-      <div class="flex flex-wrap items-center justify-between -m-2">
+      <div class="flex flex-wrap items-center justify-between">
         <div class="w-full mx-auto pt-2">
           <form method="post" id="filterForm">
             <div class="flex items-center justify-center pb-4 dark:text-white">
               <div class="rounded-b-md">
                 <div class="w-full md:w-0/12">
-                  <div class="container flex flex-wrap">
+                  <div class="lg:container flex flex-wrap">
                     <div class="md:w-auto hover-container justify-center">
                       <div class="flex flex-wrap justify-center">
                         <div class="pt-3 px-3 md:w-auto hover-container">
@@ -334,10 +335,10 @@ function getWebSocketConfig() {
   <div id="jsonView" class="hidden mb-4">
     <pre id="jsonContent" class="bg-gray-100 p-4 rounded overflow-auto" style="max-height: 300px;"></pre>
   </div>
-  <div class="container mt-5 mx-auto px-4">
+  <div class="mt-5 lg:container mx-auto lg:px-0 px-6">
     <div class="pt-0 pb-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
       <div class="px-0">
-       <div class="w-auto mt-6 sm:overflow-auto">
+       <div class="w-auto mt-6 overflow-auto lg:overflow-hidden">
           <table class="w-full min-w-max">
             <thead class="uppercase">
               <tr>
