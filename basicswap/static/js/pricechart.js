@@ -141,6 +141,7 @@ const api = {
             try {
                 const existingCache = localStorage.getItem(cacheKey);
                 let fallbackData = null;
+
                 if (existingCache) {
                     try {
                         const parsed = JSON.parse(existingCache);
@@ -197,12 +198,14 @@ const api = {
 
             } catch (error) {
                 console.error('Error fetching CoinGecko data:', error);
+
                 const cachedData = cache.get(cacheKey);
                 if (cachedData) {
                     console.log('Using expired cache data due to error');
                     return cachedData.value;
                 }
-                return { error: error.message };
+
+                throw error;
             }
         });
     },
@@ -279,11 +282,12 @@ const api = {
 const rateLimiter = {
     lastRequestTime: {},
     minRequestInterval: {
-        coingecko: 15000,
-        cryptocompare: 1000
+        coingecko: 30000,
+        cryptocompare: 2000
     },
     requestQueue: {},
-
+    retryDelays: [2000, 5000, 10000],
+    
     canMakeRequest: function(apiName) {
         const now = Date.now();
         const lastRequest = this.lastRequestTime[apiName] || 0;
@@ -300,7 +304,7 @@ const rateLimiter = {
         return Math.max(0, this.minRequestInterval[apiName] - (now - lastRequest));
     },
 
-    queueRequest: async function(apiName, requestFn) {
+    queueRequest: async function(apiName, requestFn, retryCount = 0) {
         if (!this.requestQueue[apiName]) {
             this.requestQueue[apiName] = Promise.resolve();
         }
@@ -314,15 +318,31 @@ const rateLimiter = {
                     await new Promise(resolve => setTimeout(resolve, waitTime));
                 }
 
-                this.updateLastRequestTime(apiName);
-                return await requestFn();
+                try {
+                    this.updateLastRequestTime(apiName);
+                    return await requestFn();
+                } catch (error) {
+                    if (error.message.includes('429') && retryCount < this.retryDelays.length) {
+                        const delay = this.retryDelays[retryCount];
+                        console.log(`Rate limit hit, retrying in ${delay/1000} seconds...`);
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        return this.queueRequest(apiName, requestFn, retryCount + 1);
+                    }
+                    throw error;
+                }
             };
 
             this.requestQueue[apiName] = executeRequest();
             return await this.requestQueue[apiName];
             
         } catch (error) {
-            console.error(`Queue error for ${apiName}:`, error);
+            if (error.message.includes('429')) {
+                const cachedData = cache.get(`coinData_${apiName}`);
+                if (cachedData) {
+                    console.log('Rate limit reached, using cached data');
+                    return cachedData.value;
+                }
+            }
             throw error;
         }
     }
@@ -1180,132 +1200,143 @@ setupEventListeners: () => {
     localStorage.setItem('nextRefreshTime', app.nextRefreshTime.toString());
     app.updateNextRefreshTime();
   },
-  refreshAllData: async () => {
-    if (app.isRefreshing) {
-        console.log('Refresh already in progress, skipping...');
-        return;
-    }
-
-    const lastGeckoRequest = rateLimiter.lastRequestTime['coingecko'] || 0;
-    const timeSinceLastRequest = Date.now() - lastGeckoRequest;
-    if (timeSinceLastRequest < rateLimiter.minRequestInterval.coingecko) {
-        let waitTime = Math.ceil((rateLimiter.minRequestInterval.coingecko - timeSinceLastRequest) / 1000);
-
-        ui.displayErrorMessage(`Rate limit: Please wait ${waitTime} seconds before refreshing`);
-
-        const countdownInterval = setInterval(() => {
-            waitTime--;
-            if (waitTime > 0) {
-                ui.displayErrorMessage(`Rate limit: Please wait ${waitTime} seconds before refreshing`);
-            } else {
-                clearInterval(countdownInterval);
-                ui.hideErrorMessage();
-            }
-        }, 1000);
-
-        return;
-    }
-
-    console.log('Refreshing all data...');
-    app.isRefreshing = true;
-    ui.showLoader();
-    chartModule.showChartLoader();
-
-    try {
-        ui.hideErrorMessage();
-        cache.clear();
-
-        const btcUpdateSuccess = await app.updateBTCPrice();
-        if (!btcUpdateSuccess) {
-            console.warn('BTC price update failed, continuing with cached or default value');
+      refreshAllData: async () => {
+        if (app.isRefreshing) {
+            console.log('Refresh already in progress, skipping...');
+            return;
         }
 
-        await new Promise(resolve => setTimeout(resolve, 1000));
 
-        const allCoinData = await api.fetchCoinGeckoDataXHR();
-        if (allCoinData.error) {
-            throw new Error(`CoinGecko API Error: ${allCoinData.error}`);
-        }
-
-        const failedCoins = [];
-
-        for (const coin of config.coins) {
-            const symbol = coin.symbol.toLowerCase();
-            const coinData = allCoinData[symbol];
-
-            try {
-                if (!coinData) {
-                    throw new Error(`No data received`);
-                }
-
-                coinData.displayName = coin.displayName || coin.symbol;
-                ui.displayCoinData(coin.symbol, coinData);
-                
-                const cacheKey = `coinData_${coin.symbol}`;
-                cache.set(cacheKey, coinData);
-
-            } catch (coinError) {
-                console.warn(`Failed to update ${coin.symbol}: ${coinError.message}`);
-                failedCoins.push(coin.symbol);
-            }
-        }
-
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-        if (chartModule.currentCoin) {
-            try {
-                await chartModule.updateChart(chartModule.currentCoin, true);
-            } catch (chartError) {
-                console.error('Chart update failed:', chartError);
-            }
-        }
-        app.lastRefreshedTime = new Date();
-        localStorage.setItem('lastRefreshedTime', app.lastRefreshedTime.getTime().toString());
-        ui.updateLastRefreshedTime();
+        const lastGeckoRequest = rateLimiter.lastRequestTime['coingecko'] || 0;
+        const timeSinceLastRequest = Date.now() - lastGeckoRequest;
+        const waitTime = Math.max(0, rateLimiter.minRequestInterval.coingecko - timeSinceLastRequest);
         
-        if (failedCoins.length > 0) {
-            const failureMessage = failedCoins.length === config.coins.length
-                ? 'Failed to update any coin data'
-                : `Failed to update some coins: ${failedCoins.join(', ')}`;
+        if (waitTime > 0) {
+            const seconds = Math.ceil(waitTime / 1000);
+            ui.displayErrorMessage(`Rate limit: Please wait ${seconds} seconds before refreshing`);
 
-            let countdown = 5;
-            ui.displayErrorMessage(`${failureMessage} (${countdown}s)`);
 
+            let remainingTime = seconds;
             const countdownInterval = setInterval(() => {
-                countdown--;
-                if (countdown > 0) {
-                    ui.displayErrorMessage(`${failureMessage} (${countdown}s)`);
+                remainingTime--;
+                if (remainingTime > 0) {
+                    ui.displayErrorMessage(`Rate limit: Please wait ${remainingTime} seconds before refreshing`);
                 } else {
                     clearInterval(countdownInterval);
                     ui.hideErrorMessage();
                 }
             }, 1000);
+
+            return;
         }
-        console.log(`Refresh completed. Failed coins: ${failedCoins.length}`);
-    } catch (error) {
-        console.error('Critical error during refresh:', error);
-        let countdown = 10;
-        ui.displayErrorMessage(`Refresh failed: ${error.message}. Please try again later. (${countdown}s)`);
-        const countdownInterval = setInterval(() => {
-            countdown--;
-            if (countdown > 0) {
-                ui.displayErrorMessage(`Refresh failed: ${error.message}. Please try again later. (${countdown}s)`);
-            } else {
-                clearInterval(countdownInterval);
-                ui.hideErrorMessage();
+
+        console.log('Starting refresh of all data...');
+        app.isRefreshing = true;
+        ui.showLoader();
+        chartModule.showChartLoader();
+
+        try {
+            ui.hideErrorMessage();
+            cache.clear();
+
+            const btcUpdateSuccess = await app.updateBTCPrice();
+            if (!btcUpdateSuccess) {
+                console.warn('BTC price update failed, continuing with cached or default value');
             }
-        }, 1000);
 
-    } finally {
-        ui.hideLoader();
-        chartModule.hideChartLoader();
-        app.isRefreshing = false;
+            await new Promise(resolve => setTimeout(resolve, 1000));
 
-        if (app.isAutoRefreshEnabled) {
-            app.scheduleNextRefresh();
+            const allCoinData = await api.fetchCoinGeckoDataXHR();
+            if (allCoinData.error) {
+                throw new Error(`CoinGecko API Error: ${allCoinData.error}`);
+            }
+
+            const failedCoins = [];
+
+            for (const coin of config.coins) {
+                const symbol = coin.symbol.toLowerCase();
+                const coinData = allCoinData[symbol];
+
+                try {
+                    if (!coinData) {
+                        throw new Error(`No data received`);
+                    }
+
+                    coinData.displayName = coin.displayName || coin.symbol;
+                    ui.displayCoinData(coin.symbol, coinData);
+
+                    const cacheKey = `coinData_${coin.symbol}`;
+                    cache.set(cacheKey, coinData);
+
+                } catch (coinError) {
+                    console.warn(`Failed to update ${coin.symbol}: ${coinError.message}`);
+                    failedCoins.push(coin.symbol);
+                }
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            if (chartModule.currentCoin) {
+                try {
+                    await chartModule.updateChart(chartModule.currentCoin, true);
+                } catch (chartError) {
+                    console.error('Chart update failed:', chartError);
+
+                }
+            }
+
+            app.lastRefreshedTime = new Date();
+            localStorage.setItem('lastRefreshedTime', app.lastRefreshedTime.getTime().toString());
+            ui.updateLastRefreshedTime();
+
+            if (failedCoins.length > 0) {
+                const failureMessage = failedCoins.length === config.coins.length
+                    ? 'Failed to update any coin data'
+                    : `Failed to update some coins: ${failedCoins.join(', ')}`;
+
+                let countdown = 5;
+                ui.displayErrorMessage(`${failureMessage} (${countdown}s)`);
+
+                const countdownInterval = setInterval(() => {
+                    countdown--;
+                    if (countdown > 0) {
+                        ui.displayErrorMessage(`${failureMessage} (${countdown}s)`);
+                    } else {
+                        clearInterval(countdownInterval);
+                        ui.hideErrorMessage();
+                    }
+                }, 1000);
+            }
+
+            console.log(`Refresh completed. Failed coins: ${failedCoins.length}`);
+
+        } catch (error) {
+            console.error('Critical error during refresh:', error);
+
+
+            let countdown = 10;
+            ui.displayErrorMessage(`Refresh failed: ${error.message}. Please try again later. (${countdown}s)`);
+            
+            const countdownInterval = setInterval(() => {
+                countdown--;
+                if (countdown > 0) {
+                    ui.displayErrorMessage(`Refresh failed: ${error.message}. Please try again later. (${countdown}s)`);
+                } else {
+                    clearInterval(countdownInterval);
+                    ui.hideErrorMessage();
+                }
+            }, 1000);
+
+        } finally {
+            ui.hideLoader();
+            chartModule.hideChartLoader();
+            app.isRefreshing = false;
+
+            if (app.isAutoRefreshEnabled) {
+                app.scheduleNextRefresh();
+            }
         }
-    }
-},
+    },
 
   updateNextRefreshTime: () => {
     console.log('Updating next refresh time display');
