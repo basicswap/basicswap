@@ -417,7 +417,7 @@ displayCoinData: (coin, data) => {
             if (coin === 'BTC') {
                 btcPriceDiv.style.display = 'none';
             } else {
-                priceBtcElement.textContent = isError ? 'N/A' : `${priceBTC.toFixed(8)} BTC`;
+                priceBtcElement.textContent = isError ? 'N/A' : `${priceBTC.toFixed(8)}`;
                 btcPriceDiv.style.display = 'flex';
             }
         }
@@ -545,8 +545,10 @@ displayCoinData: (coin, data) => {
     if (price < 0.000001) return price.toExponential(2);
     if (price < 0.001) return price.toFixed(8);
     if (price < 1) return price.toFixed(4);
+    if (price < 10) return price.toFixed(3);
     if (price < 1000) return price.toFixed(2);
-    return price.toFixed(1);
+    if (price < 100000) return price.toFixed(1);
+    return price.toFixed(0);
   },
 
   setActiveContainer: (containerId) => {
