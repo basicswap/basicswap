@@ -77,7 +77,7 @@ let filterTimeout = null;
 const CACHE_DURATION = 10 * 60 * 1000;
 
 // Application Constants
-const itemsPerPage = 50;
+const itemsPerPage = 100;
 const isSentOffers = window.offersTableConfig.isSentOffers;
 
 const offersConfig = {
@@ -1106,7 +1106,7 @@ function getEmptyPriceData() {
 
 async function fetchLatestPrices() {
     const PRICES_CACHE_KEY = 'prices_coingecko';
-    const minRequestInterval = 30000;
+    const minRequestInterval = 60000;
     const currentTime = Date.now();
 
     if (!window.isManualRefresh) {
@@ -2553,17 +2553,51 @@ function initializeTableEvents() {
         });
     }
 
-
 const refreshButton = document.getElementById('refreshOffers');
 if (refreshButton) {
+    let lastRefreshTime = 0;
+    const REFRESH_COOLDOWN = 6000;
+    let countdownInterval;
+
     EventManager.add(refreshButton, 'click', async () => {
+        const now = Date.now();
+        if (now - lastRefreshTime < REFRESH_COOLDOWN) {
+            console.log('Refresh rate limited. Please wait before refreshing again.');
+            const startTime = now;
+            const refreshText = document.getElementById('refreshText');
+
+            refreshButton.classList.remove('bg-blue-600', 'hover:bg-green-600', 'border-blue-500', 'hover:border-green-600');
+            refreshButton.classList.add('bg-red-600', 'border-red-500', 'cursor-not-allowed');
+
+            if (countdownInterval) clearInterval(countdownInterval);
+
+            countdownInterval = setInterval(() => {
+                const currentTime = Date.now();
+                const elapsedTime = currentTime - startTime;
+                const remainingTime = Math.ceil((REFRESH_COOLDOWN - elapsedTime) / 1000);
+                
+                if (remainingTime <= 0) {
+                    clearInterval(countdownInterval);
+                    refreshText.textContent = 'Refresh';
+
+                    refreshButton.classList.remove('bg-red-600', 'border-red-500', 'cursor-not-allowed');
+                    refreshButton.classList.add('bg-blue-600', 'hover:bg-green-600', 'border-blue-500', 'hover:border-green-600');
+                } else {
+                    refreshText.textContent = `Refresh (${remainingTime}s)`;
+                }
+            }, 100);
+            return;
+        }
+
         console.log('Manual refresh initiated');
+        lastRefreshTime = now;
         const refreshIcon = document.getElementById('refreshIcon');
         const refreshText = document.getElementById('refreshText');
         refreshButton.disabled = true;
         refreshIcon.classList.add('animate-spin');
         refreshText.textContent = 'Refreshing...';
         refreshButton.classList.add('opacity-75', 'cursor-wait');
+
         try {
             const cachedPrices = CacheManager.get('prices_coingecko');
             let previousPrices = cachedPrices ? cachedPrices.value : null;
@@ -2591,12 +2625,15 @@ if (refreshButton) {
             }
             updateJsonView();
             updatePaginationInfo();
-            lastRefreshTime = Date.now();
+            lastRefreshTime = now;
             updateLastRefreshTime();
+
             console.log('Manual refresh completed successfully');
+
         } catch (error) {
             console.error('Error during manual refresh:', error);
             ui.displayErrorMessage('Unable to refresh data. Previous data will be preserved.');
+
             const cachedData = CacheManager.get('prices_coingecko');
             if (cachedData?.value) {
                 latestPrices = cachedData.value;
@@ -2608,6 +2645,13 @@ if (refreshButton) {
             refreshIcon.classList.remove('animate-spin');
             refreshText.textContent = 'Refresh';
             refreshButton.classList.remove('opacity-75', 'cursor-wait');
+
+            refreshButton.classList.remove('bg-red-600', 'border-red-500', 'cursor-not-allowed');
+            refreshButton.classList.add('bg-blue-600', 'hover:bg-green-600', 'border-blue-500', 'hover:border-green-600');
+
+            if (countdownInterval) {
+                clearInterval(countdownInterval);
+            }
         }
     });
 }
