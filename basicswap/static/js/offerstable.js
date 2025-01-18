@@ -1106,7 +1106,7 @@ function getEmptyPriceData() {
 
 async function fetchLatestPrices() {
     const PRICES_CACHE_KEY = 'prices_coingecko';
-    const minRequestInterval = 30000;
+    const minRequestInterval = 60000;
     const currentTime = Date.now();
 
     if (!window.isManualRefresh) {
