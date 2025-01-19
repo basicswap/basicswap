@@ -129,7 +129,8 @@
                             <span class="inline-block py-1 px-2 rounded-full bg-green-100 text-green-500 dark:bg-gray-500 dark:text-green-500">Pending: +{{ w.pending }} {{ w.ticker }} </span>
                           {% endif %}
                         </td>
-                        </tr> {% if w.cid == '1' %} {# PART #}
+                        </tr>
+                        {% if w.cid == '1' %} {# PART #}
                         <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
                           <td class="py-3 px-6 bold"> <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"> <img class="h-7" src="/static/images/coins/{{ w.name }}.png" alt="{{ w.name }} Blind"> </span>Blind Balance: </td>
                           <td class="py-3 px-6 bold coinname-value" data-coinname="{{ w.name }}">{{ w.blind_balance }} {{ w.ticker }} (<span class="usd-value"></span>)
@@ -147,9 +148,8 @@
                         </td>
                           <td class="usd-value"></td>
                         </tr>
-                        {% endif %}
                         {# / PART #}
-                        {% if w.cid == '3' %} {# LTC #}
+                        {% elif w.cid == '3' %} {# LTC #}
                         <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
                           <td class="py-3 px-6 bold"> <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"> <img class="h-7" src="/static/images/coins/{{ w.name }}.png" alt="{{ w.name }} MWEB"> </span>MWEB Balance: </td>
                           <td class="py-3 px-6 bold coinname-value" data-coinname="{{ w.name }}">{{ w.mweb_balance }} {{ w.ticker }} (<span class="usd-value"></span>)
@@ -379,8 +379,7 @@
       correctLevel: QRCode.CorrectLevel.L
     });
   </script>
-  {% endif %}
-  {% if w.cid == '3' %}
+  {% elif w.cid == '3' %}
   {# LTC #}
   <script>
     // Litecoin MWEB
@@ -721,9 +720,8 @@ document.addEventListener('DOMContentLoaded', function() {
                           </div>
                         </td>
                       </tr>
-                      {% endif %}
                       {# / PART #}
-                      {% if w.cid == '3' %} {# LTC #}
+                      {% elif w.cid == '3' %} {# LTC #}
                       <tr class="opacity-100 text-gray-500 dark:text-gray-100">
                         <td class="py-3 px-6 bold">Type From:</td>
                         <td class="py-3 px-6">
@@ -737,14 +735,16 @@ document.addEventListener('DOMContentLoaded', function() {
                       </tr>
                       {% endif %}
                       {# / LTC #}
+                      {% if w.cid not in '6,9' %} {# Not XMR WOW #}
                       <tr class="opacity-100 text-gray-500 dark:text-gray-100">
                         <td class="py-3 px-6 bold">Fee Rate:</td>
                         <td class="py-3 px-6">{{ w.fee_rate }}</td>
                       </tr>
                       <tr class="opacity-100 text-gray-500 dark:text-gray-100">
-                        <td class="py-3 px-6 bold">Estimate Fee:</td>
+                        <td class="py-3 px-6 bold">Fee Estimate:</td>
                         <td class="py-3 px-6"> {{ w.est_fee }} </td>
                       </tr>
+                      {% endif %}
                     </table>
                   </div>
                 </div>
