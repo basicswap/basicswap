@@ -101,17 +101,17 @@
   </div>
 </section>
 {% endif %}
-  <form method="post" autocomplete="off">
-    <section>
-      <div class="pl-6 pr-6 pt-0 pb-0 mt-5 h-full overflow-hidden">
+  <section>
+    <form method="post" autocomplete="off">
+      <div class="px-6 py-0 mt-5 h-full overflow-hidden">
         <div class="pb-6 border-coolGray-100">
           <div class="flex flex-wrap items-center justify-between -m-2">
             <div class="w-full pt-2">
               <div class="container mt-5 mx-auto">
                 <div class="pt-6 pb-8 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
                   <div class="px-6">
-                    <div class="w-full mt-6 pb-6 overflow-x-auto">
-                      <table class="w-full min-w-max text-sm">
+                    <div class="w-full pb-6 overflow-x-auto">
+                      <table class="w-full text-sm">
                         <thead class="uppercase">
                           <tr class="text-left">
                             <th class="p-0">
@@ -151,7 +151,7 @@
                         {# / PART #}
                         {% if w.cid == '3' %} {# LTC #}
                         <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
-                          <td class="py-3 px-6 bold"> <span class="pr-3 inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"> <img class="h-7" src="/static/images/coins/{{ w.name }}.png" alt="{{ w.name }} MWEB"> </span>MWEB Balance: </td>
+                          <td class="py-3 px-6 bold"> <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"> <img class="h-7" src="/static/images/coins/{{ w.name }}.png" alt="{{ w.name }} MWEB"> </span>MWEB Balance: </td>
                           <td class="py-3 px-6 bold coinname-value" data-coinname="{{ w.name }}">{{ w.mweb_balance }} {{ w.ticker }} (<span class="usd-value"></span>)
                         {% if w.mweb_pending %}
                             <span class="inline-block py-1 px-2 rounded-full bg-green-100 text-green-500 dark:bg-gray-500 dark:text-green-500">Pending: +{{ w.mweb_pending }} {{ w.ticker }} </span>
@@ -163,7 +163,7 @@
                         {% if w.locked_utxos %}
                         <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
                           <td class="py-3 px-6 bold">Locked Outputs:</td>
-                          <td id='locked_utxos' class="py-3 px-6">{{ w.locked_utxos }}</td>
+                          <td id="locked_utxos" class="py-3 px-6">{{ w.locked_utxos }}</td>
                         </tr>
                         {% endif %}
                         {# / locked_utxos #}
@@ -176,7 +176,7 @@
                           <td class="py-3 px-6">{{ w.version }}</td>
                         </tr>
                         <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
-                          <td class="py-3 px-6 bold">Blocks:</td>
+                          <td class="py-3 px-6 bold">Blockheight:</td>
                           <td class="py-3 px-6">{{ w.blocks }}
                           {% if w.known_block_count %} / {{ w.known_block_count }}
                         {% endif %}
@@ -206,10 +206,12 @@
                         </tr>
                         {% endif %}
                         {# / encrypted #}
+                        {% if w.expected_seed != true %}
                         <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
                           <td class="py-3 px-6 bold">Expected Seed:</td>
                           <td class="py-3 px-6">{{ w.expected_seed }}</td>
                         </tr>
+                        {% endif %}
                       </table>
                     </div>
                   </div>
@@ -219,14 +221,15 @@
           </div>
         </div>
       </div>
-    </section>
+    </form>
+  </section>
   {% if block_unknown_seeds and w.expected_seed != true %} {# Only show addresses if wallet seed is correct #}
-    <section class="pl-6 pr-6 pt-0 pb-0 h-full overflow-hidden">
+    <section class="px-6 py-0 h-full overflow-hidden">
       <div class="pb-6 border-coolGray-100">
         <div class="flex flex-wrap items-center justify-between -m-2">
           <div class="w-full pt-2">
             <div class="container mt-5 mx-auto">
-              <div class="pt-6 pb-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
+              <div class="py-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
                 <div class="px-6">
                   {% if w.cid != '4' %} {# DCR #}
                   <div class="flex flex-wrap justify-end">
@@ -248,75 +251,35 @@
 </section>
 <form method="post" autocomplete="off">
   <section>
-    <div class="pl-6 pr-6 pt-0 pb-0 overflow-hidden">
+    <div class="px-6 py-0 overflow-hidden">
       <div class="pb-6 border-coolGray-100">
         <div class="flex flex-wrap items-center justify-between -m-2">
           <div class="w-full pt-2">
             <div class="container mt-5 mx-auto">
               <div class="pb-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
                 <div class="px-6">
-                  <div class="container mx-auto">
-                    <div class="flex flex-wrap max-w-7xl mx-auto justify-center -m-3">
-                      {% if w.cid in '6, 9' %}
-                      {# XMR | WOW #}
-                      <div class="w-full md:w-1/2 p-3 flex justify-center items-center">
-                        <div class="h-full">
-                          <div class="flex flex-wrap -m-3">
-                            <div class="w-full p-3">
-                              <div class="mb-2 qrcode-container flex h-60 justify-center items-center">
-                                <div class="qrcode-border flex">
+                  <div class="flex flex-wrap max-w-7xl mx-auto justify-center -m-3">
+                    <div class="w-full md:w-1/2 p-3 flex justify-center items-center">
+                      <div class="h-full">
+                        <div class="flex flex-wrap -m-3">
+                          <div class="w-full p-3">
+                            <div class="mb-2 qrcode-container flex h-60 justify-center items-center">
+                              <div class="qrcode-border flex">
+                               {% if w.cid in '6, 9' %}
+                               {# XMR | WOW #}
                                   <div id="qrcode-monero-main" class="qrcode"></div>
                                 </div>
                               </div>
-                              <div class="font-normal bold text-gray-500 text-center dark:text-white mb-5">{{ w.name }} Main Address: </div>
+                              <div class="font-normal bold text-gray-500 text-center dark:text-white mb-5">Main Address: </div>
                               <div class="relative flex justify-center items-center">
                                 <div data-tooltip-target="tooltip-copy-monero-main" class="input-like-container hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full focus:ring-0" id="monero_main_address">{{ w.main_address }}</div>
                               </div>
                               <div id="tooltip-copy-monero-main" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
-                                <p>Copy to clipboard</p>
-                                <div class="tooltip-arrow" data-popper-arrow></div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      <div class="w-full md:w-1/2 p-3 flex justify-center items-center">
-                        <div class="h-full">
-                          <div class="flex flex-wrap -m-3">
-                            <div class="w-full p-3">
-                              <div class="mb-2 qrcode-container flex h-60 justify-center items-center">
-                                <div class="qrcode-border flex">
-                                  <div id="qrcode-monero-sub" class="qrcode"> </div>
-                                </div>
-                              </div>
-                              <div class="font-normal bold text-gray-500 text-center dark:text-white mb-5">{{ w.name }} Sub Address: </div>
-                              <div class="relative flex justify-center items-center">
-                                <div data-tooltip-target="tooltip-copy-monero-sub" class="input-like-container hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full focus:ring-0" id="monero_sub_address">{{ w.deposit_address }}</div>
-                              </div>
-                              <div class="opacity-100 text-gray-500 dark:text-gray-100 flex justify-center items-center">
-                                <div class="py-3 px-6 bold mt-5">
-                                  <button type="submit" class="flex justify-center py-2 px-4 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" name="newaddr_{{ w.cid }}" value="New Subaddress"> {{ circular_arrows_svg }} New {{ w.name }} Deposit Address</button>
-                                </div>
-                              </div>
-                              <div id="tooltip-copy-monero-sub" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
-                                <p>Copy to clipboard</p>
-                                <div class="tooltip-arrow" data-popper-arrow></div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      {% else %}
-                      <div class="w-full md:w-1/2 p-3 flex justify-center items-center">
-                        <div class="h-full">
-                          <div class="flex flex-wrap -m-3">
-                            <div class="w-full p-3">
-                              <div class="mb-2 qrcode-container flex h-60 justify-center items-center">
-                                <div class="qrcode-border flex">
+                               {% else %}
                                   <div id="qrcode-deposit" class="qrcode"> </div>
                                 </div>
                               </div>
-                              <div class="font-normal bold text-gray-500 text-center dark:text-white mb-5">{{ w.name }} Deposit Address: </div>
+                              <div class="font-normal bold text-gray-500 text-center dark:text-white mb-5">Deposit Address: </div>
                               <div class="relative flex justify-center items-center">
                                 <div data-tooltip-target="tooltip-copy-default" class="input-like-container hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full focus:ring-0" id="main_deposit_address">{{ w.deposit_address }}</div>
                               </div>
@@ -326,6 +289,7 @@
                                 </div>
                               </div>
                               <div id="tooltip-copy-default" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+                               {% endif %}
                                 <p>Copy to clipboard</p>
                                 <div class="tooltip-arrow" data-popper-arrow></div>
                               </div>
@@ -333,43 +297,46 @@
                           </div>
                         </div>
                       </div>
-                      {% endif %}
-                      {% if w.cid == '1' %} {# PART #}
+                     {% if w.cid in '1, 3, 6, 9' %}
+                     {# PART | LTC | XMR | WOW | #}
                       <div class="w-full md:w-1/2 p-3 flex justify-center items-center">
                         <div class="h-full">
                           <div class="flex flex-wrap -m-3">
                             <div class="w-full p-3">
                               <div class="mb-2 qrcode-container flex h-60 justify-center items-center">
                                 <div class="qrcode-border flex">
+                               {% if w.cid in '6, 9' %}
+                               {# XMR | WOW #}
+                                  <div id="qrcode-monero-sub" class="qrcode"> </div>
+                                </div>
+                              </div>
+                              <div class="font-normal bold text-gray-500 text-center dark:text-white mb-5">Subaddress: </div>
+                              <div class="relative flex justify-center items-center">
+                                <div data-tooltip-target="tooltip-copy-monero-sub" class="input-like-container hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full focus:ring-0" id="monero_sub_address">{{ w.deposit_address }}</div>
+                              </div>
+                              <div class="opacity-100 text-gray-500 dark:text-gray-100 flex justify-center items-center">
+                                <div class="py-3 px-6 bold mt-5">
+                                  <button type="submit" class="flex justify-center py-2 px-4 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" name="newaddr_{{ w.cid }}" value="New Subaddress"> {{ circular_arrows_svg }} New {{ w.name }} Deposit Address</button>
+                                </div>
+                              </div>
+                              <div id="tooltip-copy-monero-sub" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+                              {% elif w.cid == '1' %}
+                              {# PART #}
                                   <div id="qrcode-stealth" class="qrcode"> </div>
                                 </div>
                               </div>
-                              <div class="font-normal bold text-gray-500 text-center dark:text-white mb-5">{{ w.name }} Stealth Address: </div>
+                              <div class="font-normal bold text-gray-500 text-center dark:text-white mb-5">Stealth Address: </div>
                               <div class="relative flex justify-center items-center">
                                 <div data-tooltip-target="tooltip-copy-particl-stealth" class="input-like-container hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-10 focus:ring-0" id="stealth_address"> {{ w.stealth_address }}
                                 </div>
-                              </div>
                               <div id="tooltip-copy-particl-stealth" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
-                                <p>Copy to clipboard</p>
-                                <div class="tooltip-arrow" data-popper-arrow></div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      {# / PART #}
-                      {% elif w.cid == '3' %}
-                      {# LTC #}
-                      <div class="w-full md:w-1/2 p-3 flex justify-center items-center">
-                        <div class="h-full">
-                          <div class="flex flex-wrap -m-3">
-                            <div class="w-full p-3">
-                              <div class="mb-2 qrcode-container flex h-60 justify-center items-center">
-                                <div class="qrcode-border flex">
+                              {# / PART #}
+                              {% elif w.cid == '3' %}
+                              {# LTC #}
                                   <div id="qrcode-mweb" class="qrcode"> </div>
                                 </div>
                               </div>
-                              <div class="font-normal bold text-gray-500 text-center dark:text-white mb-5">{{ w.name }} MWEB Address: </div>
+                              <div class="font-normal bold text-gray-500 text-center dark:text-white mb-5">MWEB Address: </div>
                               <div class="text-center relative">
                                 <div data-tooltip-target="tooltip-copy-litecoin-mweb" class="input-like-container hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" id="stealth_address">{{ w.mweb_address }}</div>
                                 <span class="absolute inset-y-0 right-0 flex items-center pr-3 cursor-pointer" id="copyIcon"></span>
@@ -378,17 +345,19 @@
                                 <div class="py-3 px-6 bold mt-5">
                                   <button type="submit" class="flex justify-center py-2 px-4 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" name="newmwebaddr_{{ w.cid }}" value="New MWEB Address"> {{ circular_arrows_svg }} New MWEB Address </button>
                                 </div>
+                              </div>
                               <div id="tooltip-copy-litecoin-mweb" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+                              {# / LTC #}
+                              {% endif %}
                                 <p>Copy to clipboard</p>
                                 <div class="tooltip-arrow" data-popper-arrow></div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      {% endif %}
-                      {# / LTC #}
-                    </div>
+                               </div>
+                             </div>
+                           </div>
+                         </div>
+                       </div>
+                     </div>
+                    {% endif %}
                   </div>
                 </div>
               </div>
@@ -534,15 +503,15 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
   </section>
   <section>
-    <div class="pl-6 pr-6 pt-0 pb-0 h-full overflow-hidden">
+    <div class="px-6 py-0 h-full overflow-hidden">
       <div class="border-coolGray-100">
         <div class="flex flex-wrap items-center justify-between -m-2">
           <div class="w-full pt-2">
             <div class="container mt-5 mx-auto">
-              <div class="pt-6 pb-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
+              <div class="py-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
                 <div class="px-6">
-                  <div class="w-full mt-6 pb-6 overflow-x-auto">
-                    <table class="w-full min-w-max text-sm">
+                  <div class="w-full pb-6 overflow-x-auto">
+                    <table class="w-full text-sm">
                       <thead class="uppercase">
                         <tr class="text-left">
                           <th class="p-0">
@@ -554,22 +523,26 @@ document.addEventListener('DOMContentLoaded', function() {
                         </tr>
                       </thead>
                       <tr class="opacity-100 text-gray-500 dark:text-gray-100">
-                        <td class="py-4 pl-6 bold"> <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"> <img class="h-7" src="/static/images/coins/{{ w.name }}.png" alt="{{ w.name }}"> </span> {{ w.name }} Balance: </td>
+                        <td class="py-4 pl-6 bold"> <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"> <img class="h-7" src="/static/images/coins/{{ w.name }}.png" alt="{{ w.name }}"> </span>Balance: </td>
                         <td class="py-3 px-6" data-coinname="{{ w.name }}">{{ w.balance }} {{ w.ticker }} </td>
+                      </tr>
                         {% if w.cid == '3' %}
                         {# LTC #}
                       <tr class="opacity-100 text-gray-500 dark:text-gray-100">
-                        <td class="py-4 pl-6 bold w-1/4"> <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"> <img class="h-7" src="/static/images/coins/{{ w.name }}.png" alt="{{ w.name }}"> </span> {{ w.name }} MWEB Balance: </td>
+                        <td class="py-4 pl-6 bold w-1/4"> <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"> <img class="h-7" src="/static/images/coins/{{ w.name }}.png" alt="{{ w.name }}"> </span>MWEB Balance: </td>
                         <td class="py-3 px-6" data-coinname="{{ w.name }}">{{ w.mweb_balance }} {{ w.ticker }} </td>
-                        {% endif %}
-                        {% if w.cid == '1' %}
+                      </tr>
+                        {% elif w.cid == '1' %}
                         {# PART #}
                       <tr class="opacity-100 text-gray-500 dark:text-gray-100">
-                        <td class="py-4 pl-6 bold"> <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"> <img class="h-7" src="/static/images/coins/{{ w.name }}.png" alt="{{ w.name }}"> </span> {{ w.name }} Blind Balance: </td>
+                        <td class="py-4 pl-6 bold"> <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"> <img class="h-7" src="/static/images/coins/{{ w.name }}.png" alt="{{ w.name }}"> </span>Blind Balance: </td>
                         <td class="py-3 px-6" data-coinname="{{ w.name }}">{{ w.blind_balance }} {{ w.ticker }} </td>
+                      </tr>
                       <tr class="opacity-100 text-gray-500 dark:text-gray-100">
-                        <td class="py-4 pl-6 bold"> <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"> <img class="h-7" src="/static/images/coins/{{ w.name }}.png" alt="{{ w.name }}"> </span> {{ w.name }} Anon Balance: </td>
-                        <td class="py-3 px-6" data-coinname="{{ w.name }}">{{ w.anon_balance }} {{ w.ticker }} </td> {% endif %}
+                        <td class="py-4 pl-6 bold"> <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"> <img class="h-7" src="/static/images/coins/{{ w.name }}.png" alt="{{ w.name }}"> </span>Anon Balance: </td>
+                        <td class="py-3 px-6" data-coinname="{{ w.name }}">{{ w.anon_balance }} {{ w.ticker }} </td>
+                      </tr>
+                       {% endif %}
                       <tr class="opacity-100 text-gray-500 dark:text-gray-100">
                         <td class="py-4 pl-6 bold"> {{ w.name }} Address: </td>
                         <td class="py-3 px-6"> <input placeholder="{{ w.ticker }} Address" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" name="to_{{ w.cid }}" value="{{ w.wd_address }}"> </td>
@@ -700,19 +673,21 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 {% endif %}
-</div>
+    </div>
+   </div>
+  </td>
  </td>
 </tr>
 <tr class="opacity-100 text-gray-500 dark:text-gray-100">
   {% if w.cid in '6, 9' %} {# XMR | WOW #}
-  <td class="py-3 px-6 bold">Sweep All:</td>
-  <td class="py-3 px-6">
-    <input class="hover:border-blue-500 w-5 h-5 form-check-input text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-1 dark:bg-gray-500 dark:border-gray-400" type="checkbox" id="sweepall" name="sweepall_{{ w.cid }}" {% if w.wd_sweepall==true %} checked=checked{% endif %}>
+  <td class="hidden py-3 px-6 bold">Sweep All:</td>
+  <td class="hidden py-3 px-6">
+    <input class="hover:border-blue-500 w-5 h-5 form-check-input text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-1 dark:bg-gray-500 dark:border-gray-400" type="checkbox" id="sweepall" name="sweepall_{{ w.cid }}" {% if w.wd_sweepall==true %} checked="checked"{% endif %}>
   </td>
   {% else %}
   <td class="py-3 px-6 bold">Subtract Fee:</td>
   <td class="py-3 px-6">
-    <input class="hover:border-blue-500 w-5 h-5 form-check-input text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-1 dark:bg-gray-500 dark:border-gray-400" type="checkbox" name="subfee_{{ w.cid }}" {% if w.wd_subfee==true %} checked=checked{% endif %}>
+    <input class="hover:border-blue-500 w-5 h-5 form-check-input text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-1 dark:bg-gray-500 dark:border-gray-400" type="checkbox" name="subfee_{{ w.cid }}" {% if w.wd_subfee==true %} checked="checked"{% endif %}>
   </td>
   {% endif %}
   <td>
@@ -781,25 +756,23 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
   </section>
   <section>
-    <div class="pl-6 pr-6 pt-0 pb-0 h-full overflow-hidden ">
+    <div class="px-6 py-0 h-full overflow-hidden">
       <div class="pb-6 ">
         <div class="flex flex-wrap items-center justify-between -m-2">
           <div class="w-full pt-2">
             <div class="container mx-auto">
-              <div class="pt-6 pb-6 bg-coolGray-100 border-t border-gray-100 dark:border-gray-400 dark:bg-gray-500 rounded-bl-xl rounded-br-xl">
+              <div class="py-6 bg-coolGray-100 border-t border-gray-100 dark:border-gray-400 dark:bg-gray-500 rounded-bl-xl rounded-br-xl">
                 <div class="px-6">
                   <div class="flex flex-wrap justify-end">
-                    {% if w.cid not in '6, 9' %}
-                    {# !XMR | WOW #}
-                    {% if w.show_utxo_groups %}
-                    {% else %}
-                    <div class="w-full md:w-auto p-1.5"> <button type="submit" class="flex flex-wrap justify-center px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" id="showutxogroups" name="showutxogroups" value="Show UTXO Groups"> {{ utxo_groups_svg | safe }} Show UTXO Groups </button> </div>
-                    {% endif %} {% endif %}
                     {% if w.cid in '6, 9' %}
                     {# XMR | WOW #}
                     <div class="w-full md:w-auto p-1.5 ml-2"> <button type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" name="estfee_{{ w.cid }}" value="Estimate Fee">Estimate {{ w.ticker }} Fee </button> </div>
+                    {# / XMR | WOW #}
+                    {% elif w.show_utxo_groups %}
+                    {% else %}
+                    <div class="w-full md:w-auto p-1.5"> <button type="submit" class="flex flex-wrap justify-center px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" id="showutxogroups" name="showutxogroups" value="Show UTXO Groups"> {{ utxo_groups_svg | safe }} Show UTXO Groups </button> </div>
                     {% endif %}
-                    {# / XMR | WOW #} <div class="w-full md:w-auto p-1.5 ml-2"> <button type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" name="withdraw_{{ w.cid }}" value="Withdraw" onclick="return confirmWithdrawal();">{{ withdraw_svg | safe }} Withdraw {{ w.ticker }} </div>
+                    <div class="w-full md:w-auto p-1.5 mx-1"> <button type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" name="withdraw_{{ w.cid }}" value="Withdraw" onclick="return confirmWithdrawal();">{{ withdraw_svg | safe }} Withdraw {{ w.ticker }} </button></div>
                   </div>
                 </div>
               </div>
@@ -807,6 +780,7 @@ document.addEventListener('DOMContentLoaded', function() {
           </div>
         </div>
       </div>
+    </div>
   </section>
   {% if w.cid not in '6, 9' %}
   {# !XMR | WOW #}
@@ -817,15 +791,15 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
   </section>
   <section>
-    <div class="pl-6 pr-6 pt-0 pb-0 h-full overflow-hidden">
+    <div class="px-6 py-0 h-full overflow-hidden">
       <div class="border-coolGray-100">
         <div class="flex flex-wrap items-center justify-between -m-2">
           <div class="w-full pt-2">
             <div class="container mt-5 mx-auto">
               <div class="pt-6 pb-8 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
                 <div class="px-6">
-                  <div class="w-full mt-6 pb-6 overflow-x-auto">
-                    <table class="w-full min-w-max text-sm">
+                  <div class="w-full pb-6 overflow-x-auto">
+                    <table class="w-full text-sm">
                       <thead class="uppercase">
                         <tr class="text-left">
                           <th class="p-0">
@@ -855,12 +829,12 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
   </section>
   <section>
-    <div class="pl-6 pr-6 pt-0 pb-0 h-full overflow-hidden ">
+    <div class="px-6 py-0 h-full overflow-hidden ">
       <div class="pb-6 ">
         <div class="flex flex-wrap items-center justify-between -m-2">
           <div class="w-full pt-2">
             <div class="container mx-auto">
-              <div class="pt-6 pb-6 bg-coolGray-100 border-t border-gray-100 dark:border-gray-400 dark:bg-gray-500 rounded-bl-xl rounded-br-xl">
+              <div class="py-6 bg-coolGray-100 border-t border-gray-100 dark:border-gray-400 dark:bg-gray-500 rounded-bl-xl rounded-br-xl">
                 <div class="px-6">
                   <div class="flex flex-wrap justify-end"> <button type="submit" class="flex flex-wrap justify-center px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" id="closeutxogroups" name="closeutxogroups" value="Close UTXO Groups"> {{ utxo_groups_svg | safe }} Close UTXO Groups </button> </div>
                 </div>
