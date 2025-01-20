@@ -1,36 +1,37 @@
 {% include 'header.html' %}
 {% from 'style.html' import select_box_arrow_svg, select_box_class, circular_arrows_svg, circular_error_svg, circular_info_svg, cross_close_svg, breadcrumb_line_svg, withdraw_svg, utxo_groups_svg, create_utxo_svg, red_cross_close_svg, blue_cross_close_svg, circular_update_messages_svg, circular_error_messages_svg %}
 <script src="/static/js/libs//qrcode.js"></script>
-<div class="container mx-auto">
   <section class="p-5 mt-5">
+   <div class="container mx-auto">
     <div class="flex flex-wrap items-center -m-2">
       <div class="w-full md:w-1/2 p-2">
         <ul class="flex flex-wrap items-center gap-x-3 mb-2">
-          <li><a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/">Home</a></li>
+          <li><a class="flex font-medium text-md lg:text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/">Home</a></li>
           <li>{{ breadcrumb_line_svg | safe }}</li>
-          <li><a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/wallets">Wallets</a></li>
+          <li><a class="flex font-medium text-md lg:text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/wallets">Wallets</a></li>
           <li>{{ breadcrumb_line_svg | safe }}</li>
-          <li><a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/wallet/{{ w.ticker }}">{{ w.ticker }}</a></li>
+          <li><a class="flex font-medium text-md lg:text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/wallet/{{ w.ticker }}">{{ w.ticker }}</a></li>
         </ul>
       </div>
     </div>
+   </div>
   </section>
-  <section class="py-4">
-    <div class="container px-4 mx-auto">
+  <section class="py-4 px-6">
+    <div class="lg:container mx-auto">
       <div class="relative py-11 px-16 bg-coolGray-900 dark:bg-blue-500 rounded-md overflow-hidden"> <img class="absolute z-10 left-4 top-4 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt="dots-red"> <img class="absolute h-64 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" src="/static/images/elements/wave.svg" alt="wave">
         <div class="relative z-20 flex flex-wrap items-center -m-3">
           <div class="w-full md:w-1/2">
             <h2 class="text-3xl font-bold text-white"> <span class="inline-block align-middle"><img class="mr-2 h-16" src="/static/images/coins/{{ w.name }}.png" alt="{{ w.name }}"></span>({{ w.ticker }}) {{ w.name }} Wallet </h2>
           </div>
-          <div class="w-full md:w-1/2 p-3 p-6 container flex flex-wrap items-center justify-end items-center mx-auto"> <a class="rounded-full mr-5 flex flex-wrap justify-center px-5 py-3 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border dark:bg-gray-500 dark:hover:bg-gray-700 border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" id="refresh" href="/wallet/{{ w.ticker }}"> {{ circular_arrows_svg | safe }}<span>Refresh</span> </a> </div>
+          <div class="w-full md:w-1/2 p-3 p-6 container flex flex-wrap items-center justify-end items-center mx-auto"> <a class="rounded-full mr-5 flex flex-wrap justify-center px-5 py-3 bg-blue-500 hover:bg-blue-600 font-medium text-lg lg:text-sm text-white border dark:bg-gray-500 dark:hover:bg-gray-700 border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" id="refresh" href="/wallet/{{ w.ticker }}"> {{ circular_arrows_svg | safe }}<span>Refresh</span> </a> </div>
         </div>
       </div>
     </div>
   </section>
   {% include 'inc_messages.html' %}
   {% if w.updating %}
-<section class="py-4" id="messages_updating" role="alert">
-  <div class="container px-4 mx-auto">
+<section class="py-4 px-6" id="messages_updating" role="alert">
+  <div class="lg:container mx-auto">
     <div class="p-6 text-green-800 rounded-lg bg-blue-50 border border-blue-500 dark:bg-gray-500 dark:text-blue-400 rounded-md">
       <div class="flex flex-wrap justify-between items-center -m-2">
         <div class="flex-1 p-2">
@@ -39,8 +40,8 @@
             {{ circular_update_messages_svg | safe }}
             </div>
             <ul class="ml-4 mt-1">
-                <li class="font-semibold text-sm text-blue-500 error_msg"><span class="bold">UPDATING:</span></li>
-                <li class="font-medium text-sm text-blue-500">Please wait...</li>
+                <li class="font-semibold text-lg lg:text-sm text-blue-500 error_msg"><span class="bold">UPDATING:</span></li>
+                <li class="font-medium text-lg lg:text-sm text-blue-500">Please wait...</li>
             </ul>
            </div>
         </div>
@@ -56,8 +57,8 @@
   {% endif %}
   {% if w.havedata %}
   {% if w.error %}
-<section class="py-4" id="messages_error" role="alert">
-  <div class="container px-4 mx-auto">
+<section class="py-4 px-6" id="messages_error" role="alert">
+  <div class="lg:container mx-auto">
     <div class="p-6 text-green-800 rounded-lg bg-red-50 border border-red-400 dark:bg-gray-500 dark:text-red-400 rounded-md">
       <div class="flex flex-wrap justify-between items-center -m-2">
         <div class="flex-1 p-2">
@@ -66,8 +67,8 @@
               {{ circular_error_messages_svg | safe }}
             </div>
             <ul class="ml-4 mt-1">
-                <li class="font-semibold text-sm text-red-500 error_msg"><span class="bold">ERROR:</span></li>
-                <li class="font-medium text-sm text-red-500 error_msg">{{ w.error }}</li>
+                <li class="font-semibold text-lg lg:text-sm text-red-500 error_msg"><span class="bold">ERROR:</span></li>
+                <li class="font-medium text-lg lg:text-sm text-red-500 error_msg">{{ w.error }}</li>
             </ul>
       </div>
         </div>
@@ -83,8 +84,8 @@
 </section>
   {% else %}
 {% if w.cid == '18' %} {# DOGE #}
-<section class="py-4" id="messages_notice">
-  <div class="container px-4 mx-auto">
+<section class="py-4 px-6" id="messages_notice">
+  <div class="lg:container mx-auto">
     <div class="p-6 rounded-lg bg-coolGray-100 dark:bg-gray-500 shadow-sm">
       <div class="flex items-start">
         <svg class="w-6 h-6 text-blue-500 mt-1 mr-3 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"></path></svg>
@@ -107,18 +108,18 @@
         <div class="pb-6 border-coolGray-100">
           <div class="flex flex-wrap items-center justify-between -m-2">
             <div class="w-full pt-2">
-              <div class="container mt-5 mx-auto">
+              <div class="lg:container mt-5 mx-auto">
                 <div class="pt-6 pb-8 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
                   <div class="px-6">
                     <div class="w-full pb-6 overflow-x-auto">
-                      <table class="w-full text-sm">
+                      <table class="w-full text-lg lg:text-sm">
                         <thead class="uppercase">
                           <tr class="text-left">
                             <th class="p-0">
-                              <div class="py-3 px-6 rounded-tl-xl bg-coolGray-200 dark:bg-gray-600"> <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Wallet</span> </div>
+                              <div class="py-3 px-6 rounded-tl-xl bg-coolGray-200 dark:bg-gray-600"> <span class="text-md lg:text-xs text-gray-600 dark:text-gray-300 font-semibold">Wallet</span> </div>
                             </th>
                             <th class="p-0">
-                              <div class="py-3 px-6 rounded-tr-xl bg-coolGray-200 dark:bg-gray-600"> <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Details</span> </div>
+                              <div class="py-3 px-6 rounded-tr-xl bg-coolGray-200 dark:bg-gray-600"> <span class="text-md lg:text-xs text-gray-600 dark:text-gray-300 font-semibold">Details</span> </div>
                             </th>
                           </tr>
                         </thead>
@@ -228,12 +229,12 @@
       <div class="pb-6 border-coolGray-100">
         <div class="flex flex-wrap items-center justify-between -m-2">
           <div class="w-full pt-2">
-            <div class="container mt-5 mx-auto">
+            <div class="lg:container mt-5 mx-auto">
               <div class="py-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
                 <div class="px-6">
                   {% if w.cid != '4' %} {# DCR #}
                   <div class="flex flex-wrap justify-end">
-                    <div class="w-full md:w-auto p-1.5"> <input class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-white hover:text-red border border-red-500 hover:border-red-500 hover:bg-red-600 bg-red-500 rounded-md shadow-button focus:ring-0 focus:outline-none cursor-pointer" type="submit" name="reseed_{{ w.cid }}" value="Reseed wallet" onclick="return confirmReseed();"> </div>
+                    <div class="w-full md:w-auto p-1.5"> <input class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-lg lg:text-sm text-white hover:text-red border border-red-500 hover:border-red-500 hover:bg-red-600 bg-red-500 rounded-md shadow-button focus:ring-0 focus:outline-none cursor-pointer" type="submit" name="reseed_{{ w.cid }}" value="Reseed wallet" onclick="return confirmReseed();"> </div>
                   </div>
                   {% endif %}
                 </div>
@@ -245,9 +246,11 @@
     </section>
   {% else %}
 <section class="p-6">
+ <div class="lg:container mx-auto">
   <div class="flex items-center">
     <h4 class="font-semibold text-2xl text-black dark:text-white">Deposit</h4>
   </div>
+ </div>
 </section>
 <form method="post" autocomplete="off">
   <section>
@@ -255,7 +258,7 @@
       <div class="pb-6 border-coolGray-100">
         <div class="flex flex-wrap items-center justify-between -m-2">
           <div class="w-full pt-2">
-            <div class="container mt-5 mx-auto">
+            <div class="lg:container mt-5 mx-auto">
               <div class="pb-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
                 <div class="px-6">
                   <div class="flex flex-wrap max-w-7xl mx-auto justify-center -m-3">
@@ -272,23 +275,23 @@
                               </div>
                               <div class="font-normal bold text-gray-500 text-center dark:text-white mb-5">Main Address: </div>
                               <div class="relative flex justify-center items-center">
-                                <div data-tooltip-target="tooltip-copy-monero-main" class="input-like-container hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full focus:ring-0" id="monero_main_address">{{ w.main_address }}</div>
+                                <div data-tooltip-target="tooltip-copy-monero-main" class="input-like-container hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-lg lg:text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full focus:ring-0" id="monero_main_address">{{ w.main_address }}</div>
                               </div>
-                              <div id="tooltip-copy-monero-main" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+                              <div id="tooltip-copy-monero-main" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-lg lg:text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
                                {% else %}
                                   <div id="qrcode-deposit" class="qrcode"> </div>
                                 </div>
                               </div>
                               <div class="font-normal bold text-gray-500 text-center dark:text-white mb-5">Deposit Address: </div>
                               <div class="relative flex justify-center items-center">
-                                <div data-tooltip-target="tooltip-copy-default" class="input-like-container hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full focus:ring-0" id="main_deposit_address">{{ w.deposit_address }}</div>
+                                <div data-tooltip-target="tooltip-copy-default" class="input-like-container hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-lg lg:text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full focus:ring-0" id="main_deposit_address">{{ w.deposit_address }}</div>
                               </div>
                               <div class="opacity-100 text-gray-500 dark:text-gray-100 flex justify-center items-center">
                                 <div class="py-3 px-6 bold mt-5">
                                   <button type="submit" class="flex justify-center py-2 px-4 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" name="newaddr_{{ w.cid }}" value="New Deposit Address"> {{ circular_arrows_svg }} New {{ w.name }} Deposit Address </button>
                                 </div>
                               </div>
-                              <div id="tooltip-copy-default" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+                              <div id="tooltip-copy-default" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-lg lg:text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
                                {% endif %}
                                 <p>Copy to clipboard</p>
                                 <div class="tooltip-arrow" data-popper-arrow></div>
@@ -312,14 +315,14 @@
                               </div>
                               <div class="font-normal bold text-gray-500 text-center dark:text-white mb-5">Subaddress: </div>
                               <div class="relative flex justify-center items-center">
-                                <div data-tooltip-target="tooltip-copy-monero-sub" class="input-like-container hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full focus:ring-0" id="monero_sub_address">{{ w.deposit_address }}</div>
+                                <div data-tooltip-target="tooltip-copy-monero-sub" class="input-like-container hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-lg lg:text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full focus:ring-0" id="monero_sub_address">{{ w.deposit_address }}</div>
                               </div>
                               <div class="opacity-100 text-gray-500 dark:text-gray-100 flex justify-center items-center">
                                 <div class="py-3 px-6 bold mt-5">
                                   <button type="submit" class="flex justify-center py-2 px-4 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" name="newaddr_{{ w.cid }}" value="New Subaddress"> {{ circular_arrows_svg }} New {{ w.name }} Deposit Address</button>
                                 </div>
                               </div>
-                              <div id="tooltip-copy-monero-sub" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+                              <div id="tooltip-copy-monero-sub" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-lg lg:text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
                               {% elif w.cid == '1' %}
                               {# PART #}
                                   <div id="qrcode-stealth" class="qrcode"> </div>
@@ -327,9 +330,9 @@
                               </div>
                               <div class="font-normal bold text-gray-500 text-center dark:text-white mb-5">Stealth Address: </div>
                               <div class="relative flex justify-center items-center">
-                                <div data-tooltip-target="tooltip-copy-particl-stealth" class="input-like-container hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-10 focus:ring-0" id="stealth_address"> {{ w.stealth_address }}
+                                <div data-tooltip-target="tooltip-copy-particl-stealth" class="input-like-container hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-lg lg:text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-10 focus:ring-0" id="stealth_address"> {{ w.stealth_address }}
                                 </div>
-                              <div id="tooltip-copy-particl-stealth" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+                              <div id="tooltip-copy-particl-stealth" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-lg lg:text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
                               {# / PART #}
                               {% elif w.cid == '3' %}
                               {# LTC #}
@@ -338,7 +341,7 @@
                               </div>
                               <div class="font-normal bold text-gray-500 text-center dark:text-white mb-5">MWEB Address: </div>
                               <div class="text-center relative">
-                                <div data-tooltip-target="tooltip-copy-litecoin-mweb" class="input-like-container hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" id="stealth_address">{{ w.mweb_address }}</div>
+                                <div data-tooltip-target="tooltip-copy-litecoin-mweb" class="input-like-container hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-lg lg:text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" id="stealth_address">{{ w.mweb_address }}</div>
                                 <span class="absolute inset-y-0 right-0 flex items-center pr-3 cursor-pointer" id="copyIcon"></span>
                               </div>
                               <div class="opacity-100 text-gray-500 dark:text-gray-100 flex justify-center items-center">
@@ -346,7 +349,7 @@
                                   <button type="submit" class="flex justify-center py-2 px-4 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" name="newmwebaddr_{{ w.cid }}" value="New MWEB Address"> {{ circular_arrows_svg }} New MWEB Address </button>
                                 </div>
                               </div>
-                              <div id="tooltip-copy-litecoin-mweb" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+                              <div id="tooltip-copy-litecoin-mweb" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-lg lg:text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
                               {# / LTC #}
                               {% endif %}
                                 <p>Copy to clipboard</p>
@@ -497,27 +500,29 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
   <section class="p-6">
+   <div class="lg:container mx-auto">
     <div class="flex items-center">
       <h4 class="font-semibold text-2xl text-black dark:text-white">Withdraw</h4>
     </div>
-  </section>
+  </div>
+ </section>
   <section>
     <div class="px-6 py-0 h-full overflow-hidden">
       <div class="border-coolGray-100">
         <div class="flex flex-wrap items-center justify-between -m-2">
           <div class="w-full pt-2">
-            <div class="container mt-5 mx-auto">
+            <div class="lg:container mt-5 mx-auto">
               <div class="py-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
                 <div class="px-6">
                   <div class="w-full pb-6 overflow-x-auto">
-                    <table class="w-full text-sm">
+                    <table class="w-full text-lg lg:text-sm">
                       <thead class="uppercase">
                         <tr class="text-left">
                           <th class="p-0">
-                            <div class="py-3 px-6 rounded-tl-xl bg-coolGray-200 dark:bg-gray-600"> <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Options</span> </div>
+                            <div class="py-3 px-6 rounded-tl-xl bg-coolGray-200 dark:bg-gray-600"> <span class="text-md lg:text-xs text-gray-600 dark:text-gray-300 font-semibold">Options</span> </div>
                           </th>
                           <th class="p-0">
-                            <div class="py-3 px-6 rounded-tr-xl bg-coolGray-200 dark:bg-gray-600"> <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Input</span> </div>
+                            <div class="py-3 px-6 rounded-tr-xl bg-coolGray-200 dark:bg-gray-600"> <span class="text-md lg:text-xs text-gray-600 dark:text-gray-300 font-semibold">Input</span> </div>
                           </th>
                         </tr>
                       </thead>
@@ -544,18 +549,18 @@ document.addEventListener('DOMContentLoaded', function() {
                        {% endif %}
                       <tr class="opacity-100 text-gray-500 dark:text-gray-100">
                         <td class="py-4 pl-6 bold"> {{ w.name }} Address: </td>
-                        <td class="py-3 px-6"> <input placeholder="{{ w.ticker }} Address" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" name="to_{{ w.cid }}" value="{{ w.wd_address }}"> </td>
+                        <td class="py-3 px-6"> <input placeholder="{{ w.ticker }} Address" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-lg lg:text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" name="to_{{ w.cid }}" value="{{ w.wd_address }}"> </td>
                       </tr>
                       <tr class="opacity-100 text-gray-500 dark:text-gray-100">
                         <td class="py-4 pl-6 bold"> {{ w.name }} Amount:
                         <td class="py-3 px-6">
-                          <div class="flex"> <input placeholder="{{ w.ticker }} Amount" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" id="amount" name="amt_{{ w.cid }}" value="{{ w.wd_value }}">
+                          <div class="flex"> <input placeholder="{{ w.ticker }} Amount" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-lg lg:text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" id="amount" name="amt_{{ w.cid }}" value="{{ w.wd_value }}">
                             <div class="ml-2 flex">
 {% if w.cid == '1' %}
 {# PART #}
-<button type="button" class="py-1 px-2 bg-blue-500 text-white text-sm rounded-md focus:outline-none" onclick="setAmount(0.25, '{{ w.balance }}', {{ w.cid }}, '{{ w.blind_balance }}', '{{ w.anon_balance }}')">25%</button>
-<button type="button" class="ml-2 py-1 px-2 bg-blue-500 text-white text-sm rounded-md focus:outline-none" onclick="setAmount(0.5, '{{ w.balance }}', {{ w.cid }}, '{{ w.blind_balance }}', '{{ w.anon_balance }}')">50%</button>
-<button type="button" class="ml-2 py-1 px-2 bg-blue-500 text-white text-sm rounded-md focus:outline-none" onclick="setAmount(1, '{{ w.balance }}', {{ w.cid }}, '{{ w.blind_balance }}', '{{ w.anon_balance }}')">100%</button>
+<button type="button" class="hidden md:block py-1 px-2 bg-blue-500 text-white text-lg lg:text-sm rounded-md focus:outline-none" onclick="setAmount(0.25, '{{ w.balance }}', {{ w.cid }}, '{{ w.blind_balance }}', '{{ w.anon_balance }}')">25%</button>
+<button type="button" class="hidden md:block ml-2 py-1 px-2 bg-blue-500 text-white text-lg lg:text-sm rounded-md focus:outline-none" onclick="setAmount(0.5, '{{ w.balance }}', {{ w.cid }}, '{{ w.blind_balance }}', '{{ w.anon_balance }}')">50%</button>
+<button type="button" class="ml-2 py-1 px-2 bg-blue-500 text-white text-lg lg:text-sm rounded-md focus:outline-none" onclick="setAmount(1, '{{ w.balance }}', {{ w.cid }}, '{{ w.blind_balance }}', '{{ w.anon_balance }}')">100%</button>
 <script>
   function setAmount(percent, balance, cid, blindBalance, anonBalance) {
     var amountInput = document.getElementById('amount');
@@ -590,9 +595,9 @@ document.addEventListener('DOMContentLoaded', function() {
 {# / PART #}
 {% elif w.cid == '3' %}
 {# LTC #}
-<button type="button" class="py-1 px-2 bg-blue-500 text-white text-sm rounded-md focus:outline-none" onclick="setAmount(0.25, '{{ w.balance }}', {{ w.cid }}, '{{ w.mweb_balance }}')">25%</button>
-<button type="button" class="ml-2 py-1 px-2 bg-blue-500 text-white text-sm rounded-md focus:outline-none" onclick="setAmount(0.5, '{{ w.balance }}', {{ w.cid }}, '{{ w.mweb_balance }}')">50%</button>
-<button type="button" class="ml-2 py-1 px-2 bg-blue-500 text-white text-sm rounded-md focus:outline-none" onclick="setAmount(1, '{{ w.balance }}', {{ w.cid }}, '{{ w.mweb_balance }}')">100%</button>
+<button type="button" class="hidden md:block py-1 px-2 bg-blue-500 text-white text-lg lg:text-sm rounded-md focus:outline-none" onclick="setAmount(0.25, '{{ w.balance }}', {{ w.cid }}, '{{ w.mweb_balance }}')">25%</button>
+<button type="button" class="hidden md:block ml-2 py-1 px-2 bg-blue-500 text-white text-lg lg:text-sm rounded-md focus:outline-none" onclick="setAmount(0.5, '{{ w.balance }}', {{ w.cid }}, '{{ w.mweb_balance }}')">50%</button>
+<button type="button" class="ml-2 py-1 px-2 bg-blue-500 text-white text-lg lg:text-sm rounded-md focus:outline-none" onclick="setAmount(1, '{{ w.balance }}', {{ w.cid }}, '{{ w.mweb_balance }}')">100%</button>
 <script>
   function setAmount(percent, balance, cid, mwebBalance) {
     var amountInput = document.getElementById('amount');
@@ -623,9 +628,9 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 {# / LTC #}
 {% else %}
-<button type="button" class="py-1 px-2 bg-blue-500 text-white text-sm rounded-md focus:outline-none" onclick="setAmount(0.25, '{{ w.balance }}', {{ w.cid }})">25%</button>
-<button type="button" class="ml-2 py-1 px-2 bg-blue-500 text-white text-sm rounded-md focus:outline-none" onclick="setAmount(0.5, '{{ w.balance }}', {{ w.cid }})">50%</button>
-<button type="button" class="ml-2 py-1 px-2 bg-blue-500 text-white text-sm rounded-md focus:outline-none" onclick="setAmount(1, '{{ w.balance }}', {{ w.cid }})">100%</button>
+<button type="button" class="hidden md:block py-1 px-2 bg-blue-500 text-white text-lg lg:text-sm rounded-md focus:outline-none" onclick="setAmount(0.25, '{{ w.balance }}', {{ w.cid }})">25%</button>
+<button type="button" class="hidden md:block ml-2 py-1 px-2 bg-blue-500 text-white text-lg lg:text-sm rounded-md focus:outline-none" onclick="setAmount(0.5, '{{ w.balance }}', {{ w.cid }})">50%</button>
+<button type="button" class="ml-2 py-1 px-2 bg-blue-500 text-white text-lg lg:text-sm rounded-md focus:outline-none" onclick="setAmount(1, '{{ w.balance }}', {{ w.cid }})">100%</button>
 <script>
   function setAmount(percent, balance, cid) {
     var amountInput = document.getElementById('amount');
@@ -760,19 +765,19 @@ document.addEventListener('DOMContentLoaded', function() {
       <div class="pb-6 ">
         <div class="flex flex-wrap items-center justify-between -m-2">
           <div class="w-full pt-2">
-            <div class="container mx-auto">
+            <div class="lg:container mx-auto">
               <div class="py-6 bg-coolGray-100 border-t border-gray-100 dark:border-gray-400 dark:bg-gray-500 rounded-bl-xl rounded-br-xl">
                 <div class="px-6">
                   <div class="flex flex-wrap justify-end">
                     {% if w.cid in '6, 9' %}
                     {# XMR | WOW #}
-                    <div class="w-full md:w-auto p-1.5 ml-2"> <button type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" name="estfee_{{ w.cid }}" value="Estimate Fee">Estimate {{ w.ticker }} Fee </button> </div>
+                    <div class="w-full md:w-auto p-1.5 mx-1"> <button type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-lg lg:text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" name="estfee_{{ w.cid }}" value="Estimate Fee">Estimate {{ w.ticker }} Fee </button> </div>
                     {# / XMR | WOW #}
                     {% elif w.show_utxo_groups %}
                     {% else %}
-                    <div class="w-full md:w-auto p-1.5"> <button type="submit" class="flex flex-wrap justify-center px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" id="showutxogroups" name="showutxogroups" value="Show UTXO Groups"> {{ utxo_groups_svg | safe }} Show UTXO Groups </button> </div>
+                    <div class="w-full md:w-auto p-1.5 mx-1"> <button type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-lg lg:text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" id="showutxogroups" name="showutxogroups" value="Show UTXO Groups"> {{ utxo_groups_svg | safe }} Show UTXO Groups </button> </div>
                     {% endif %}
-                    <div class="w-full md:w-auto p-1.5 mx-1"> <button type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" name="withdraw_{{ w.cid }}" value="Withdraw" onclick="return confirmWithdrawal();">{{ withdraw_svg | safe }} Withdraw {{ w.ticker }} </button></div>
+                    <div class="w-full md:w-auto p-1.5 mx-1"> <button type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-lg lg:text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" name="withdraw_{{ w.cid }}" value="Withdraw" onclick="return confirmWithdrawal();">{{ withdraw_svg | safe }} Withdraw {{ w.ticker }} </button></div>
                   </div>
                 </div>
               </div>
@@ -782,41 +787,41 @@ document.addEventListener('DOMContentLoaded', function() {
       </div>
     </div>
   </section>
-  {% if w.cid not in '6, 9' %}
-  {# !XMR | WOW #}
   {% if w.show_utxo_groups %}
   <section class="p-6">
+   <div class="lg:container mx-auto">
     <div class="flex items-center">
       <h4 class="font-semibold text-2xl text-black dark:text-white">UTXO Groups</h4>
     </div>
+   </div>
   </section>
   <section>
     <div class="px-6 py-0 h-full overflow-hidden">
       <div class="border-coolGray-100">
         <div class="flex flex-wrap items-center justify-between -m-2">
           <div class="w-full pt-2">
-            <div class="container mt-5 mx-auto">
+            <div class="lg:container mt-5 mx-auto">
               <div class="pt-6 pb-8 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
                 <div class="px-6">
                   <div class="w-full pb-6 overflow-x-auto">
-                    <table class="w-full text-sm">
+                    <table class="w-full text-lg lg:text-sm">
                       <thead class="uppercase">
                         <tr class="text-left">
                           <th class="p-0">
-                            <div class="py-3 px-6 rounded-tl-xl bg-coolGray-200 dark:bg-gray-600"> <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Options</span> </div>
+                            <div class="py-3 px-6 rounded-tl-xl bg-coolGray-200 dark:bg-gray-600"> <span class="text-md lg:text-xs text-gray-600 dark:text-gray-300 font-semibold">Options</span> </div>
                           </th>
                           <th class="p-0">
-                            <div class="py-3 px-6 rounded-tr-xl bg-coolGray-200 dark:bg-gray-600"> <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold p-10"></span> </div>
+                            <div class="py-3 px-6 rounded-tr-xl bg-coolGray-200 dark:bg-gray-600"> <span class="text-md lg:text-xs text-gray-600 dark:text-gray-300 font-semibold p-10"></span> </div>
                           </th>
                         </tr>
                       </thead>
                       <tr class="opacity-100 text-gray-500 dark:text-gray-100">
                         <td class="py-3 px-6 w-1/4 bold">UTXO Groups:</td>
-                        <td class="py-3 px-6"> <textarea class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" id="tx_view" rows="10" readonly>{{ w.utxo_groups }} </textarea> </td>
+                        <td class="py-3 px-6"> <textarea class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-lg lg:text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" id="tx_view" rows="10" readonly>{{ w.utxo_groups }} </textarea> </td>
                       </tr>
                       <tr class="opacity-100 text-gray-500 dark:text-gray-100">
-                        <td class="py-3 px-6"> <button type="submit" class="flex flex-wrap justify-center px-4 py-2 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" id="create_utxo" name="create_utxo" value="Create UTXO" onclick="return confirmUTXOResize();"> {{ create_utxo_svg | safe }}Create UTXO </button> </td>
-                        <td class="py-3 px-6"> <input placeholder="Amount" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" name="utxo_value" value="{{ w.utxo_value }}"> </td>
+                        <td class="py-3 px-6"> <button type="submit" class="flex flex-wrap justify-center px-4 py-2 bg-blue-500 hover:bg-blue-600 font-medium text-lg lg:text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" id="create_utxo" name="create_utxo" value="Create UTXO" onclick="return confirmUTXOResize();"> {{ create_utxo_svg | safe }}Create UTXO </button> </td>
+                        <td class="py-3 px-6"> <input placeholder="Amount" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-lg lg:text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" name="utxo_value" value="{{ w.utxo_value }}"> </td>
                       </tr>
                     </table>
                   </div>
@@ -833,10 +838,10 @@ document.addEventListener('DOMContentLoaded', function() {
       <div class="pb-6 ">
         <div class="flex flex-wrap items-center justify-between -m-2">
           <div class="w-full pt-2">
-            <div class="container mx-auto">
+            <div class="lg:container mx-auto">
               <div class="py-6 bg-coolGray-100 border-t border-gray-100 dark:border-gray-400 dark:bg-gray-500 rounded-bl-xl rounded-br-xl">
                 <div class="px-6">
-                  <div class="flex flex-wrap justify-end"> <button type="submit" class="flex flex-wrap justify-center px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" id="closeutxogroups" name="closeutxogroups" value="Close UTXO Groups"> {{ utxo_groups_svg | safe }} Close UTXO Groups </button> </div>
+                  <div class="flex flex-wrap justify-end"> <button type="submit" class="flex flex-wrap justify-center px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-lg lg:text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" id="closeutxogroups" name="closeutxogroups" value="Close UTXO Groups"> {{ utxo_groups_svg | safe }} Close UTXO Groups </button> </div>
                 </div>
               </div>
             </div>
@@ -846,7 +851,6 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
   </section>
   {% else %}
-  {% endif %}
   {% endif %}
   {% endif %}
   {% endif %}
