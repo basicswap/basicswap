@@ -26,10 +26,10 @@ function getWebSocketConfig() {
 
 {% if sent_offers %}
 <div class="lg:container mx-auto">
-  <section class="p-5 mt-5">
-    <div class="flex flex-wrap items-center">
-      <div class="w-full md:w-1/2 p-2">
-        <ul class="flex flex-wrap items-center gap-x-3 mb-2">
+  <section class="p-3 mt-2">
+    <div class="flex items-center">
+      <div class="w-full">
+        <ul class="flex items-center gap-x-2 mb-1">
           <li><a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/">Home</a></li>
           <li>{{ breadcrumb_line_svg | safe }}</li>
           <li>
@@ -44,28 +44,28 @@ function getWebSocketConfig() {
   </section>
 </div>
 {% endif %}
- 
+
 {% if sent_offers %}
-  <section class="py-5">
+  <section class="py-3">
 {% else %}
-  <section class="py-5 px-6 mt-5">
+  <section class="py-3 px-4 mt-3">
 {% endif %}
-    <div class="lg:container mx-auto">
-      <div class="relative py-11 px-16 bg-coolGray-900 dark:bg-gray-500 rounded-md overflow-hidden">
-        <img class="absolute z-10 left-4 top-4 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt="dots-red">
-        <img class="absolute h-64 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" src="/static/images/elements/wave.svg" alt="wave">
-        <div class="relative z-20 flex flex-wrap items-center -m-3">
-          <div class="w-full md:w-1/2 p-3">
-            <h2 class="mb-6 text-4xl font-bold text-white tracking-tighter">{{ page_type }}</h2>
-            <p class="font-normal text-coolGray-200 dark:text-white">{{ page_type_description }}</p>
-          </div>
-          <div class="rounded-full{{ page_button }} w-full md:w-1/2 p-3 p-6 lg:container flex flex-wrap items-center justify-end items-center mx-auto">
-            <a id="refresh" href="/newoffer" class="rounded-full flex flex-wrap justify-center px-5 py-3 bg-blue-500 hover:bg-green-600 hover:border-green-600 font-medium text-sm text-white border border-blue-500 rounded-md focus:ring-0 focus:outline-none">{{ place_new_offer_svg | safe }}<span>Place new Offer</span></a>
-          </div>
+  <div class="lg:container mx-auto">
+    <div class="relative py-6 px-8 bg-coolGray-900 dark:bg-gray-500 rounded-md overflow-hidden">
+
+      <img class="absolute h-48 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" src="/static/images/elements/wave.svg" alt="wave">
+      <div class="relative z-20 flex flex-wrap items-center -m-2">
+        <div class="w-full md:w-1/2 p-2">
+          <h2 class="mb-3 text-3xl font-bold text-white tracking-tighter">{{ page_type }}</h2>
+          <p class="font-normal text-coolGray-200 dark:text-white">{{ page_type_description }}</p>
+        </div>
+        <div class="rounded-full{{ page_button }} w-full md:w-1/2 p-2 lg:container flex flex-wrap items-center justify-end mx-auto">
+          <a id="refresh" href="/newoffer" class="rounded-full flex flex-wrap justify-center px-4 py-2 bg-blue-500 hover:bg-green-600 hover:border-green-600 font-medium text-sm text-white border border-blue-500 rounded-md focus:ring-0 focus:outline-none">{{ place_new_offer_svg | safe }}<span>Place new Offer</span></a>
         </div>
       </div>
     </div>
-  </section>
+  </div>
+</section>
 
 {% include 'inc_messages.html' %}
 
@@ -81,45 +81,37 @@ function getWebSocketConfig() {
                 <div class="flex items-center justify-between">
                   <h2 class="text-xl font-bold dark:text-white" id="chart-title">Price Chart</h2>
                   <div class="flex items-center space-x-4">
-                  <button id="resolution-year" class="ml-5 resolution-button">1Y</button>
-                  <button id="resolution-sixMonths" class="resolution-button">6M</button>
-                  <button id="resolution-day" class="resolution-button">24H</button>
+                    <button id="resolution-year" class="ml-5 resolution-button">1Y</button>
+                    <button id="resolution-sixMonths" class="resolution-button">6M</button>
+                    <button id="resolution-day" class="resolution-button">24H</button>
                   </div>
                 </div>
                 <div class="flex items-center">
                   <span id="load-time hidden" class="mr-2 text-sm text-gray-600 dark:text-gray-300"></span>
                   <span id="last-refreshed-time hidden" class="mr-2 text-sm text-gray-600 dark:text-gray-300"></span>
                   <span id="cache-status hidden" class="mr-4 text-sm text-gray-600 dark:text-gray-300"></span>
-                  <span id="tor-status" class="mr-4 text-sm hidden {% if tor_established %}text-green-500{% else %}text-red-500{% endif %}"> Tor {% if tor_established %}ON{% else %}OFF{% endif %}
+                  <span id="tor-status" class="mr-4 text-sm hidden {% if tor_established %}text-green-500{% else %}text-red-500{% endif %}">
+                    Tor {% if tor_established %}ON{% else %}OFF{% endif %}
                     <a href="https://academy.particl.io/en/latest/basicswap-guides/basicswapguides_tor.html" target="_blank" rel="noopener noreferrer" class="underline">(?)</a>
-                  </span>       
+                  </span>
                   <span id="next-refresh-time" class="mr-4 text-sm text-gray-600 dark:text-gray-300">
                     <span id="next-refresh-label"></span>
                     <span id="next-refresh-value"></span>
                   </span>
-                  <div id="tooltip-volume" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
-                    Toggle Coin Volume
-                    <div class="tooltip-arrow" data-popper-arrow></div>
-                  </div> 
+                  <div id="tooltip-volume" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">Toggle Coin Volume</div>
                   <button id="toggle-volume" data-tooltip-target="tooltip-volume" class="text-white font-bold py-2 px-4 rounded mr-2 focus:outline-none focus:ring-0 transition-colors duration-200" title="Toggle Volume">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                       <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
                     </svg>
                   </button>
-                  <div id="tooltip-refresh" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
-                    Refresh Charts/Prices & Clear Cache
-                    <div class="tooltip-arrow" data-popper-arrow></div>
-                  </div> 
+                  <div id="tooltip-refresh" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">Refresh Charts/Prices & Clear Cache</div>
                   <button id="refresh-all" data-tooltip-target="tooltip-refresh" class="text-gray-600 dark:text-gray-400 font-bold py-2 px-4 rounded mr-2 focus:outline-none focus:ring-0 transition-colors duration-200" title="Refresh Data & Clear Cache">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                       <circle cx="12" cy="12" r="3" />
                     </svg>
                   </button>
-                  <div id="tooltip-auto" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
-                    Auto Refresh Enable/Disable
-                    <div class="tooltip-arrow" data-popper-arrow></div>
-                  </div>
+                  <div id="tooltip-auto" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">Auto Refresh Enable/Disable</div>
                   <button id="toggle-auto-refresh" data-enabled="false" data-tooltip-target="tooltip-auto" class="text-white font-bold py-2 px-4 rounded mr-2 focus:outline-none focus:ring-0 transition-colors duration-200" title="Enable Auto-Refresh">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                       <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd" />
@@ -137,18 +129,25 @@ function getWebSocketConfig() {
               </div>
             </div>
           </div>
-          
-          <div id="error-overlay" class="error-overlay hidden absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-            <div id="error-content" class="error-content bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-2xl mx-4 relative">
-              <button id="close-error" class="absolute top-3 right-3 bg-red-500 text-white rounded-full p-2 hover:bg-red-600 focus:outline-none">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div id="error-overlay" class="notice-overlay hidden absolute inset-0 bg-opacity-30 backdrop-blur-sm flex items-center justify-center">
+            <div id="error-content" class="notice-content bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-2xl mx-4 relative shadow-lg">
+              <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-400 via-blue-500 to-blue-600"></div>
+              <button id="close-error" class="absolute top-3 right-3 text-gray-400 hover:text-gray-500 dark:text-gray-500 dark:hover:text-white rounded-full p-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors focus:outline-none">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
-              <p class="text-red-600 font-semibold text-xl mb-4">Error</p>
-              <p id="error-message" class="text-gray-700 dark:text-gray-300 text-lg mb-6"></p>
-              <p class="text-sm text-gray-600 dark:text-gray-400">To review or update your Chart API Key(s), navigate to <a href="/settings" class="text-blue-500 hover:underline">Settings & Tools > Settings > General (TAB)</a>.
-              </p>
+              <div class="flex items-center gap-3 mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+                <p class="text-lg font-medium text-gray-900 dark:text-gray-100">Notice</p>
+              </div>
+              <p id="error-message" class="text-gray-600 dark:text-gray-300 text-base mb-6"></p>
+              <div class="text-sm text-gray-500 dark:text-gray-400">
+                Need to update your (API) settings?
+                <a href="/settings" class="text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 font-medium ml-1 hover:underline">Go to Settings -> General</a>
+              </div>
             </div>
           </div>
         </div>

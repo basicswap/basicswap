@@ -2014,14 +2014,12 @@ function createTooltips(offer, treatAsSentOffer, coinFrom, coinTo, fromAmount, t
                     Grey: Less than 5 minutes left or expired
                 </p>
             </div>
-            <div class="tooltip-arrow" data-popper-arrow></div>
         </div>
 
         <div id="tooltip-wallet-${uniqueId}" role="tooltip" class="inline-block absolute invisible z-50 py-2 px-3 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
             <div class="active-revoked-expired">
                 <span class="bold">${treatAsSentOffer ? 'My' : ''} ${coinTo} Wallet</span>
             </div>
-            <div class="tooltip-arrow pl-1" data-popper-arrow></div>
         </div>
 
         <div id="tooltip-offer-${uniqueId}" role="tooltip" class="inline-block absolute z-50 py-2 px-3 text-sm font-medium text-white ${isRevoked ? 'bg-red-500' : (offer.is_own_offer ? 'bg-gray-300' : 'bg-green-700')} rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
@@ -2030,28 +2028,24 @@ function createTooltips(offer, treatAsSentOffer, coinFrom, coinTo, fromAmount, t
                     ${isRevoked ? 'Offer Revoked' : (offer.is_own_offer ? 'Edit Offer' : `Buy ${coinFrom}`)}
                 </span>
             </div>
-            <div class="tooltip-arrow pr-6" data-popper-arrow></div>
         </div>
 
         <div id="tooltip-wallet-maker-${uniqueId}" role="tooltip" class="inline-block absolute invisible z-50 py-2 px-3 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
             <div class="active-revoked-expired">
                 <span class="bold">${treatAsSentOffer ? 'My' : ''} ${coinFrom} Wallet</span>
             </div>
-            <div class="tooltip-arrow pl-1" data-popper-arrow></div>
         </div>
 
         <div id="tooltip-rate-${uniqueId}" role="tooltip" class="inline-block absolute invisible z-50 py-2 px-3 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
             <div class="tooltip-content">
                 ${combinedRateTooltip}
             </div>
-            <div class="tooltip-arrow" data-popper-arrow></div>
         </div>
 
         <div id="percentage-tooltip-${uniqueId}" role="tooltip" class="inline-block absolute invisible z-50 py-2 px-3 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
             <div class="tooltip-content">
                 ${percentageTooltipContent}
             </div>
-            <div class="tooltip-arrow" data-popper-arrow></div>
         </div>
 
         ${createRecipientTooltip(uniqueId, identityInfo, identity, successRate, totalBids)}
