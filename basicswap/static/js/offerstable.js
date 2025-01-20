@@ -155,6 +155,9 @@ const WebSocketManager = {
     maxQueueSize: 1000,
     isIntentionallyClosed: false,
     handlers: {},
+    isPageHidden: document.hidden,
+    priceUpdatePaused: false,
+    lastVisibilityChange: Date.now(),
 
     connectionState: {
         isConnecting: false,
@@ -165,7 +168,6 @@ const WebSocketManager = {
     },
 
     initialize() {
-        console.log('Initializing WebSocket Manager');
         this.setupPageVisibilityHandler();
         this.connect();
         this.startHealthCheck();
@@ -179,12 +181,12 @@ const WebSocketManager = {
                 this.handlePageVisible();
             }
         };
-
         document.addEventListener('visibilitychange', this.handlers.visibilityChange);
     },
 
     handlePageHidden() {
-        console.log('📱 Page hidden, suspending operations');
+        this.isPageHidden = true;
+        this.priceUpdatePaused = true;
         this.stopHealthCheck();
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
             this.isIntentionallyClosed = true;
@@ -193,12 +195,17 @@ const WebSocketManager = {
     },
 
     handlePageVisible() {
-        console.log('📱 Page visible, resuming operations');
+        this.isPageHidden = false;
+        this.lastVisibilityChange = Date.now();
         this.isIntentionallyClosed = false;
-        if (!this.isConnected()) {
-            this.connect();
-        }
-        this.startHealthCheck();
+        
+        setTimeout(() => {
+            this.priceUpdatePaused = false;
+            if (!this.isConnected()) {
+                this.connect();
+            }
+            this.startHealthCheck();
+        }, 1000);
     },
 
     startHealthCheck() {
@@ -217,7 +224,6 @@ const WebSocketManager = {
 
     performHealthCheck() {
         if (!this.isConnected()) {
-            console.warn('Health check: Connection lost, attempting reconnect');
             this.handleReconnect();
             return;
         }
@@ -225,13 +231,11 @@ const WebSocketManager = {
         const now = Date.now();
         const lastCheck = this.connectionState.lastHealthCheck;
         if (lastCheck && (now - lastCheck) > 60000) {
-            console.warn('Health check: Connection stale, refreshing');
             this.handleReconnect();
             return;
         }
 
         this.connectionState.lastHealthCheck = now;
-        console.log('Health check passed');
     },
 
     connect() {
@@ -248,7 +252,6 @@ const WebSocketManager = {
             const wsPort = config.port || window.ws_port || '11700';
 
             if (!wsPort) {
-                console.error('WebSocket port not configured');
                 this.connectionState.isConnecting = false;
                 return false;
             }
@@ -258,7 +261,6 @@ const WebSocketManager = {
 
             this.connectionState.connectTimeout = setTimeout(() => {
                 if (this.connectionState.isConnecting) {
-                    console.log('⏳ Connection attempt timed out');
                     this.cleanup();
                     this.handleReconnect();
                 }
@@ -266,7 +268,6 @@ const WebSocketManager = {
 
             return true;
         } catch (error) {
-            console.error('Error creating WebSocket:', error);
             this.connectionState.isConnecting = false;
             this.handleReconnect();
             return false;
@@ -277,7 +278,6 @@ const WebSocketManager = {
         if (!this.ws) return;
 
         this.handlers.open = () => {
-            console.log('🟢 WebSocket connected successfully');
             this.connectionState.isConnecting = false;
             this.reconnectAttempts = 0;
             clearTimeout(this.connectionState.connectTimeout);
@@ -291,18 +291,15 @@ const WebSocketManager = {
                 const message = JSON.parse(event.data);
                 this.handleMessage(message);
             } catch (error) {
-                console.error('Error processing WebSocket message:', error);
                 updateConnectionStatus('error');
             }
         };
 
         this.handlers.error = (error) => {
-            console.error('WebSocket error:', error);
             updateConnectionStatus('error');
         };
 
         this.handlers.close = (event) => {
-            console.log('🔴 WebSocket closed:', event.code, event.reason);
             this.connectionState.isConnecting = false;
             window.ws = null;
             updateConnectionStatus('disconnected');
@@ -320,7 +317,6 @@ const WebSocketManager = {
 
     handleMessage(message) {
         if (this.messageQueue.length >= this.maxQueueSize) {
-            console.warn('Message queue full, dropping oldest message');
             this.messageQueue.shift();
         }
 
@@ -359,7 +355,6 @@ const WebSocketManager = {
 
             this.messageQueue = [];
         } catch (error) {
-            console.error('Error processing message queue:', error);
         } finally {
             this.processingQueue = false;
         }
@@ -372,8 +367,6 @@ const WebSocketManager = {
 
         this.reconnectAttempts++;
         if (this.reconnectAttempts <= this.maxReconnectAttempts) {
-            console.log(`Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
-
             const delay = Math.min(
                 this.reconnectDelay * Math.pow(1.5, this.reconnectAttempts - 1),
                 30000
@@ -385,9 +378,7 @@ const WebSocketManager = {
                 }
             }, delay);
         } else {
-            console.error('Max reconnection attempts reached');
             updateConnectionStatus('error');
-
             setTimeout(() => {
                 this.reconnectAttempts = 0;
                 this.connect();
@@ -396,8 +387,6 @@ const WebSocketManager = {
     },
 
     cleanup() {
-        console.log('Cleaning up WebSocket resources');
-
         clearTimeout(this.debounceTimeout);
         clearTimeout(this.reconnectTimeout);
         clearTimeout(this.connectionState.connectTimeout);
@@ -1074,6 +1063,11 @@ function getEmptyPriceData() {
 }
 
 async function fetchLatestPrices() {
+    if (WebSocketManager.isPageHidden || WebSocketManager.priceUpdatePaused) {
+        const cachedData = CacheManager.get('prices_coingecko');
+        return cachedData?.value || getEmptyPriceData();
+    }
+
     const PRICES_CACHE_KEY = 'prices_coingecko';
     const minRequestInterval = 60000;
     const currentTime = Date.now();
@@ -1081,7 +1075,6 @@ async function fetchLatestPrices() {
     if (!window.isManualRefresh) {
         const lastRequestTime = window.lastPriceRequest || 0;
         if (currentTime - lastRequestTime < minRequestInterval) {
-            console.log('Request too soon, using cache');
             const cachedData = CacheManager.get(PRICES_CACHE_KEY);
             if (cachedData) {
                 return cachedData.value;
@@ -1089,10 +1082,10 @@ async function fetchLatestPrices() {
         }
     }
     window.lastPriceRequest = currentTime;
+
     if (!window.isManualRefresh) {
         const cachedData = CacheManager.get(PRICES_CACHE_KEY);
         if (cachedData && cachedData.remainingTime > 60000) {
-            console.log('Using cached price data');
             latestPrices = cachedData.value;
             Object.entries(cachedData.value).forEach(([coin, prices]) => {
                 if (prices.usd) {
@@ -1102,11 +1095,12 @@ async function fetchLatestPrices() {
             return cachedData.value;
         }
     }
+
     try {
-        console.log('Initiating fresh price data fetch...');
         const existingCache = CacheManager.get(PRICES_CACHE_KEY, true);
         const fallbackData = existingCache ? existingCache.value : null;
         const url = `${offersConfig.apiEndpoints.coinGecko}/simple/price?ids=bitcoin,bitcoin-cash,dash,dogecoin,decred,litecoin,particl,pivx,monero,zano,wownero,zcoin&vs_currencies=USD,BTC&api_key=${offersConfig.apiKeys.coinGecko}`;
+        
         const response = await fetch('/json/readurl', {
             method: 'POST',
             headers: {
@@ -1121,19 +1115,21 @@ async function fetchLatestPrices() {
                 }
             })
         });
+
         if (!response.ok) {
             throw new Error(`HTTP Error: ${response.status} ${response.statusText}`);
         }
+
         const data = await response.json();
+        
         if (data.Error) {
             if (fallbackData) {
-                console.log('Using fallback data due to API error');
                 return fallbackData;
             }
             throw new Error(data.Error);
         }
+
         if (data && Object.keys(data).length > 0) {
-            console.log('Processing fresh price data');
             latestPrices = data;
             CacheManager.set(PRICES_CACHE_KEY, data, CACHE_DURATION);
 
@@ -1144,10 +1140,11 @@ async function fetchLatestPrices() {
             });
             return data;
         }
+
         if (fallbackData) {
-            console.log('Using fallback data due to empty response');
             return fallbackData;
         }
+
         const fallbackPrices = {};
         Object.keys(getEmptyPriceData()).forEach(coin => {
             const fallbackValue = tableRateModule.getFallbackValue(coin);
@@ -1155,14 +1152,13 @@ async function fetchLatestPrices() {
                 fallbackPrices[coin] = { usd: fallbackValue, btc: null };
             }
         });
+
         if (Object.keys(fallbackPrices).length > 0) {
             return fallbackPrices;
         }
-        console.warn('No price data received');
+
         return null;
     } catch (error) {
-        console.error('Price Fetch Error:', error);
-
         const fallbackPrices = {};
         Object.keys(getEmptyPriceData()).forEach(coin => {
             const fallbackValue = tableRateModule.getFallbackValue(coin);
