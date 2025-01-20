@@ -747,40 +747,24 @@ function resetForm() {
     const bidAmountInput = document.getElementById('bid_amount');
     const bidRateInput = document.getElementById('bid_rate');
     const validMinsInput = document.querySelector('input[name="validmins"]');
-    const addrFromSelect = document.querySelector('select[name="addr_from"]');
-
+    const amtVar = document.getElementById('amt_var')?.value === 'True';
     if (bidAmountSendInput) {
-        const defaultSendAmount = bidAmountSendInput.getAttribute('max');
-        bidAmountSendInput.value = defaultSendAmount;
+        bidAmountSendInput.value = amtVar ? '' : bidAmountSendInput.getAttribute('max');
     }
-
     if (bidAmountInput) {
-        const defaultReceiveAmount = bidAmountInput.getAttribute('max');
-        bidAmountInput.value = defaultReceiveAmount;
+        bidAmountInput.value = amtVar ? '' : bidAmountInput.getAttribute('max');
     }
-
     if (bidRateInput && !bidRateInput.disabled) {
         const defaultRate = document.getElementById('offer_rate')?.value || '';
         bidRateInput.value = defaultRate;
     }
-
     if (validMinsInput) {
         validMinsInput.value = "60";
     }
-
-    if (addrFromSelect) {
-        if (addrFromSelect.options.length > 1) {
-            addrFromSelect.selectedIndex = 1;
-        } else {
-            addrFromSelect.selectedIndex = 0;
-        }
-        const selectedOption = addrFromSelect.options[addrFromSelect.selectedIndex];
-        saveAddress(selectedOption.value, selectedOption.text);
+    if (!amtVar) {
+        updateBidParams('rate');
     }
-
-    updateBidParams('rate');
     updateModalValues();
-
     const errorMessages = document.querySelectorAll('.error-message');
     errorMessages.forEach(msg => msg.remove());
 
