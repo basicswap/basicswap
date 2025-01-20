@@ -47,3 +47,6 @@ allow-direct-references = true
 
 [tool.ruff]
 exclude = ["basicswap/contrib","basicswap/interface/contrib"]
+
+[tool.djlint]
+profile="jinja"
