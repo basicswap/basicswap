@@ -88,8 +88,9 @@ class LTCInterface(BTCInterface):
 
 
 class LTCInterfaceMWEB(LTCInterface):
+    @staticmethod
+    def coin_type():
 
-    def interface_type(self) -> int:
         return Coins.LTC_MWEB
 
     def __init__(self, coin_settings, network, swap_client=None):
