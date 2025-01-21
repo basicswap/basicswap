@@ -70,6 +70,11 @@ let originalJsonData = [];
 let currentSortColumn = 0;
 let currentSortDirection = 'desc';
 let filterTimeout = null;
+let userInitiatedSort = false;
+let lastSortState = {
+    column: null,
+    direction: null
+};
 
 // CONFIGURATION CONSTANTS
 
@@ -331,34 +336,43 @@ const WebSocketManager = {
         }, 200);
     },
 
-    async processMessageQueue() {
-        if (this.processingQueue || this.messageQueue.length === 0) return;
+async processMessageQueue() {
+    if (this.processingQueue || this.messageQueue.length === 0) return;
 
-        this.processingQueue = true;
-        const endpoint = isSentOffers ? '/json/sentoffers' : '/json/offers';
+    this.processingQueue = true;
+    const endpoint = isSentOffers ? '/json/sentoffers' : '/json/offers';
 
-        try {
-            const response = await fetch(endpoint);
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    try {
+        const response = await fetch(endpoint);
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
-            const newData = await response.json();
-            const fetchedOffers = Array.isArray(newData) ? newData : Object.values(newData);
+        const newData = await response.json();
+        const fetchedOffers = Array.isArray(newData) ? newData : Object.values(newData);
 
-            jsonData = formatInitialData(fetchedOffers);
-            originalJsonData = [...jsonData];
+        const prevSortColumn = currentSortColumn;
+        const prevSortDirection = currentSortDirection;
 
-            requestAnimationFrame(() => {
-                updateOffersTable();
-                updateJsonView();
-                updatePaginationInfo();
-            });
+        jsonData = formatInitialData(fetchedOffers);
+        originalJsonData = [...jsonData];
 
-            this.messageQueue = [];
-        } catch (error) {
-        } finally {
-            this.processingQueue = false;
+        if (userInitiatedSort && lastSortState.column !== null) {
+            currentSortColumn = lastSortState.column;
+            currentSortDirection = lastSortState.direction;
         }
-    },
+
+        requestAnimationFrame(() => {
+            updateOffersTable();
+            updateJsonView();
+            updatePaginationInfo();
+        });
+
+        this.messageQueue = [];
+    } catch (error) {
+        console.error('Error processing message queue:', error);
+    } finally {
+        this.processingQueue = false;
+    }
+},
 
     handleReconnect() {
         if (this.reconnectTimeout) {
@@ -875,16 +889,12 @@ function getValidOffers() {
     }
 
     const filteredData = filterAndSortData();
-    //console.log(`getValidOffers: Found ${filteredData.length} valid offers`);
     return filteredData;
 }
 
 function filterAndSortData() {
-    //console.log('[Debug] Starting filter with data length:', originalJsonData.length);
-
     const formData = new FormData(filterForm);
     const filters = Object.fromEntries(formData);
-    //console.log('[Debug] Active filters:', filters);
 
     if (filters.coin_to !== 'any') {
         filters.coin_to = coinIdToName[filters.coin_to] || filters.coin_to;
@@ -946,16 +956,24 @@ function filterAndSortData() {
         return true;
     });
 
-    if (currentSortColumn !== null) {
+    if (currentSortColumn !== null && (userInitiatedSort || lastSortState.column !== null)) {
         filteredData.sort((a, b) => {
             let comparison = 0;
+
+            const aIndex = originalJsonData.findIndex(item => item.unique_id === a.unique_id);
+            const bIndex = originalJsonData.findIndex(item => item.unique_id === b.unique_id);
 
             switch(currentSortColumn) {
                 case 0: // Time
                     comparison = a.created_at - b.created_at;
                     break;
                 case 5: // Rate
-                    comparison = parseFloat(a.rate) - parseFloat(b.rate);
+                    const aRate = parseFloat(a.rate) || 0;
+                    const bRate = parseFloat(b.rate) || 0;
+                    comparison = aRate - bRate;
+                    if (comparison === 0) {
+                        comparison = aIndex - bIndex;
+                    }
                     break;
                 case 6: // Market +/-
                     const aFromSymbol = getCoinSymbolLowercase(a.coin_from);
@@ -963,31 +981,48 @@ function filterAndSortData() {
                     const bFromSymbol = getCoinSymbolLowercase(b.coin_from);
                     const bToSymbol = getCoinSymbolLowercase(b.coin_to);
 
-                    const aFromPrice = latestPrices[aFromSymbol]?.usd || 0;
-                    const aToPrice = latestPrices[aToSymbol]?.usd || 0;
-                    const bFromPrice = latestPrices[bFromSymbol]?.usd || 0;
-                    const bToPrice = latestPrices[bToSymbol]?.usd || 0;
+                    const aFromPrice = latestPrices[aFromSymbol]?.usd || tableRateModule.getFallbackValue(aFromSymbol) || 0;
+                    const aToPrice = latestPrices[aToSymbol]?.usd || tableRateModule.getFallbackValue(aToSymbol) || 0;
+                    const bFromPrice = latestPrices[bFromSymbol]?.usd || tableRateModule.getFallbackValue(bFromSymbol) || 0;
+                    const bToPrice = latestPrices[bToSymbol]?.usd || tableRateModule.getFallbackValue(bToSymbol) || 0;
 
-                    const aMarketRate = aToPrice / aFromPrice;
-                    const bMarketRate = bToPrice / bFromPrice;
+                    const aMarketRate = aFromPrice && aToPrice ? aToPrice / aFromPrice : 0;
+                    const bMarketRate = bFromPrice && bToPrice ? bToPrice / bFromPrice : 0;
 
-                    const aOfferedRate = parseFloat(a.rate);
-                    const bOfferedRate = parseFloat(b.rate);
+                    const aOfferedRate = parseFloat(a.rate) || 0;
+                    const bOfferedRate = parseFloat(b.rate) || 0;
 
-                    const aPercentDiff = ((aOfferedRate - aMarketRate) / aMarketRate) * 100;
-                    const bPercentDiff = ((bOfferedRate - bMarketRate) / bMarketRate) * 100;
+                    const aPercentDiff = aMarketRate ? ((aOfferedRate - aMarketRate) / aMarketRate) * 100 : 0;
+                    const bPercentDiff = bMarketRate ? ((bOfferedRate - bMarketRate) / bMarketRate) * 100 : 0;
 
                     comparison = aPercentDiff - bPercentDiff;
+
+                    if (Math.abs(comparison) < 0.000001) {
+                        comparison = aIndex - bIndex;
+                    }
                     break;
                 case 7: // Trade
                     comparison = a.offer_id.localeCompare(b.offer_id);
                     break;
+                default:
+                    comparison = aIndex - bIndex;
             }
-            return currentSortDirection === 'desc' ? -comparison : comparison;
+
+            return currentSortDirection === 'asc' ? comparison : -comparison;
         });
     }
-    //console.log(`[Debug] Filtered data length: ${filteredData.length}`);
+
     return filteredData;
+}
+
+function clearSortState() {
+    userInitiatedSort = false;
+    lastSortState = {
+        column: null,
+        direction: null
+    };
+    currentSortColumn = null;
+    currentSortDirection = 'desc';
 }
 
 async function calculateProfitLoss(fromCoin, toCoin, fromAmount, toAmount, isOwnOffer) {
@@ -1494,6 +1529,11 @@ async function updateOffersTable() {
         const cachedPrices = CacheManager.get(PRICES_CACHE_KEY);
         latestPrices = cachedPrices?.value || getEmptyPriceData();
 
+        if (userInitiatedSort && lastSortState.column !== null) {
+            currentSortColumn = lastSortState.column;
+            currentSortDirection = lastSortState.direction;
+        }
+
         const validOffers = getValidOffers();
         const startIndex = (currentPage - 1) * itemsPerPage;
         const endIndex = Math.min(startIndex + itemsPerPage, validOffers.length);
@@ -1555,6 +1595,20 @@ async function updateOffersTable() {
             initializeTooltips();
             updateRowTimes();
             updatePaginationControls(totalPages);
+
+            if (userInitiatedSort && lastSortState.column !== null) {
+                const header = document.querySelector(`th[data-column-index="${lastSortState.column}"]`);
+                const sortIcon = document.getElementById(`sort-icon-${lastSortState.column}`);
+                if (header && sortIcon) {
+                    document.querySelectorAll('.sort-icon').forEach(icon => {
+                        icon.classList.remove('text-blue-500');
+                        icon.textContent = '↓';
+                    });
+                    sortIcon.textContent = lastSortState.direction === 'asc' ? '↑' : '↓';
+                    sortIcon.classList.add('text-blue-500');
+                    header.classList.add('text-blue-500');
+                }
+            }
 
             if (tableRateModule?.initializeTable) {
                 tableRateModule.initializeTable();
@@ -2312,6 +2366,7 @@ function applyFilters() {
 
 function clearFilters() {
 
+    clearSortState();
     filterForm.reset();
 
     const selectElements = filterForm.querySelectorAll('select');
@@ -2334,6 +2389,7 @@ function clearFilters() {
     updateJsonView();
     updateCoinFilterImages();
     updateClearFiltersButton();
+    
 }
 
 function hasActiveFilters() {
@@ -2646,12 +2702,19 @@ if (refreshButton) {
 }
 
 function handleTableSort(columnIndex, header) {
+    userInitiatedSort = true;
+    
     if (currentSortColumn === columnIndex) {
         currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
     } else {
         currentSortColumn = columnIndex;
         currentSortDirection = 'desc';
     }
+
+    lastSortState = {
+        column: currentSortColumn,
+        direction: currentSortDirection
+    };
 
     document.querySelectorAll('.sort-icon').forEach(icon => {
         icon.classList.remove('text-blue-500');
