@@ -162,6 +162,7 @@ LOG_LEVEL = logging.DEBUG
 logger.level = LOG_LEVEL
 if not len(logger.handlers):
     logger.addHandler(logging.StreamHandler(sys.stdout))
+logging.getLogger("gnupg").setLevel(logging.INFO)
 
 BSX_DOCKER_MODE = toBool(os.getenv("BSX_DOCKER_MODE", "false"))
 BSX_LOCAL_TOR = toBool(os.getenv("BSX_LOCAL_TOR", "false"))
@@ -288,10 +289,14 @@ TEST_ONION_LINK = toBool(os.getenv("TEST_ONION_LINK", "false"))
 
 BITCOIN_FASTSYNC_URL = os.getenv(
     "BITCOIN_FASTSYNC_URL",
-    "https://eu2.contabostorage.com/1f50a74c9dc14888a8664415dad3d020:utxosets/",
+    "https://snapshots.btcpay.tech/",
 )
 BITCOIN_FASTSYNC_FILE = os.getenv(
-    "BITCOIN_FASTSYNC_FILE", "utxo-snapshot-bitcoin-mainnet-820852.tar"
+    "BITCOIN_FASTSYNC_FILE", "utxo-snapshot-bitcoin-mainnet-867690.tar"
+)
+BITCOIN_FASTSYNC_SIG_URL = os.getenv(
+    "BITCOIN_FASTSYNC_SIG_URL",
+    None,
 )
 
 # Encrypt new wallets with this password, must match the Particl wallet password when adding coins
@@ -538,6 +543,8 @@ def ensureValidSignatureBy(result, signing_key_name):
 
     if result.key_id not in expected_key_ids[signing_key_name]:
         raise ValueError("Signature made by unexpected keyid: " + result.key_id)
+
+    logger.debug(f"Found valid signature by {signing_key_name} ({result.key_id}).")
 
 
 def extractCore(coin, version_data, settings, bin_dir, release_path, extra_opts={}):
@@ -1416,7 +1423,7 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
 
         # Double check
         if extra_opts.get("check_btc_fastsync", True):
-            check_btc_fastsync_data(base_dir, sync_file_path)
+            check_btc_fastsync_data(base_dir, BITCOIN_FASTSYNC_FILE)
 
         with tarfile.open(sync_file_path) as ft:
             ft.extractall(path=data_dir)
@@ -1961,25 +1968,32 @@ def load_config(config_path):
 
 
 def signal_handler(sig, frame):
-    logger.info("Signal %d detected" % (sig))
+    logger.info(f"Signal {sig} detected")
 
 
-def check_btc_fastsync_data(base_dir, sync_file_path):
+def check_btc_fastsync_data(base_dir, sync_filename):
+    logger.info("Validating signature for: " + sync_filename)
+
     github_pgp_url = "https://raw.githubusercontent.com/basicswap/basicswap/master/pgp"
     gitlab_pgp_url = "https://gitlab.com/particl/basicswap/-/raw/master/pgp"
-    asc_filename = BITCOIN_FASTSYNC_FILE + ".asc"
+    asc_filename = sync_filename + ".asc"
     asc_file_path = os.path.join(base_dir, asc_filename)
+    sync_file_path = os.path.join(base_dir, sync_filename)
     if not os.path.exists(asc_file_path):
-        asc_file_urls = (
+        asc_file_urls = [
             github_pgp_url + "/sigs/" + asc_filename,
             gitlab_pgp_url + "/sigs/" + asc_filename,
-        )
+        ]
+        if BITCOIN_FASTSYNC_SIG_URL:
+            asc_file_urls.append("/".join([BITCOIN_FASTSYNC_SIG_URL, asc_filename]))
         for url in asc_file_urls:
             try:
                 downloadFile(url, asc_file_path)
                 break
             except Exception as e:
                 logging.warning("Download failed: %s", str(e))
+    if not os.path.exists(asc_file_path):
+        raise ValueError("Unable to find snapshot signature file.")
     gpg = gnupg.GPG()
     pubkey_filename = "{}_{}.pgp".format("particl", "tecnovert")
     pubkeyurls = [
@@ -2251,7 +2265,7 @@ def main():
                     check_sig = True
 
             if check_sig:
-                check_btc_fastsync_data(data_dir, sync_file_path)
+                check_btc_fastsync_data(data_dir, BITCOIN_FASTSYNC_FILE)
         except Exception as e:
             logger.error(
                 f"Failed to download BTC fastsync file: {e}\nRe-running the command should resume the download or try manually downloading from {sync_file_url}"
