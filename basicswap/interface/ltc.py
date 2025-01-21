@@ -88,9 +88,8 @@ class LTCInterface(BTCInterface):
 
 
 class LTCInterfaceMWEB(LTCInterface):
-    @staticmethod
-    def coin_type():
 
+    def interface_type(self) -> int:
         return Coins.LTC_MWEB
 
     def __init__(self, coin_settings, network, swap_client=None):
@@ -138,7 +137,7 @@ class LTCInterfaceMWEB(LTCInterface):
             self.rpc_wallet("walletpassphrase", [password, 100000000])
 
         if self.getWalletSeedID() == "Not found":
-            self._sc.initialiseWallet(self.coin_type())
+            self._sc.initialiseWallet(self.interface_type())
 
             # Workaround to trigger mweb_spk_man->LoadMWEBKeychain()
             self.rpc("unloadwallet", ["mweb"])

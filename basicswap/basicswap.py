@@ -1303,16 +1303,16 @@ class BasicSwap(BaseApp):
             legacy_root_hash = ci.getSeedHash(root_key, 20)
             self.setStringKV(key_str, legacy_root_hash.hex(), cursor)
 
-    def initialiseWallet(self, coin_type, raise_errors: bool = False) -> None:
-        if coin_type == Coins.PART:
+    def initialiseWallet(self, interface_type, raise_errors: bool = False) -> None:
+        if interface_type == Coins.PART:
             return
-        ci = self.ci(coin_type)
+        ci = self.ci(interface_type)
         db_key_coin_name = ci.coin_name().lower()
         self.log.info("Initialising {} wallet.".format(ci.coin_name()))
 
-        if coin_type in (Coins.XMR, Coins.WOW):
-            key_view = self.getWalletKey(coin_type, 1, for_ed25519=True)
-            key_spend = self.getWalletKey(coin_type, 2, for_ed25519=True)
+        if interface_type in (Coins.XMR, Coins.WOW):
+            key_view = self.getWalletKey(interface_type, 1, for_ed25519=True)
+            key_spend = self.getWalletKey(interface_type, 2, for_ed25519=True)
             ci.initialiseWallet(key_view, key_spend)
             root_address = ci.getAddressFromKeys(key_view, key_spend)
 
@@ -1320,7 +1320,7 @@ class BasicSwap(BaseApp):
             self.setStringKV(key_str, root_address)
             return
 
-        root_key = self.getWalletKey(coin_type, 1)
+        root_key = self.getWalletKey(interface_type, 1)
         try:
             ci.initialiseWallet(root_key)
         except Exception as e:
@@ -1334,13 +1334,13 @@ class BasicSwap(BaseApp):
 
         try:
             cursor = self.openDB()
-            self.storeSeedIDForCoin(root_key, coin_type, cursor)
+            self.storeSeedIDForCoin(root_key, interface_type, cursor)
 
             # Clear any saved addresses
             self.clearStringKV("receive_addr_" + db_key_coin_name, cursor)
             self.clearStringKV("stealth_addr_" + db_key_coin_name, cursor)
 
-            coin_id = int(coin_type)
+            coin_id = int(interface_type)
             info_type = 1  # wallet
             query_str = "DELETE FROM wallets WHERE coin_id = ? AND balance_type = ?"
             cursor.execute(query_str, (coin_id, info_type))
