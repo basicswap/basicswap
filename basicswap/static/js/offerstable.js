@@ -851,7 +851,7 @@ function continueInitialization() {
     //console.log('Initialization completed');
 }
 
-function initializeFlowbiteTooltips() {
+function initializeTooltips() {
     if (typeof Tooltip === 'undefined') {
         console.warn('Tooltip is not defined. Make sure the required library is loaded.');
         return;
@@ -1552,7 +1552,7 @@ async function updateOffersTable() {
         offersBody.appendChild(fragment);
 
         requestAnimationFrame(() => {
-            initializeFlowbiteTooltips();
+            initializeTooltips();
             updateRowTimes();
             updatePaginationControls(totalPages);
 
