@@ -268,10 +268,18 @@ TOR_PROXY_HOST = os.getenv("TOR_PROXY_HOST", "127.0.0.1")
 TOR_PROXY_PORT = int(os.getenv("TOR_PROXY_PORT", 9050))
 TOR_CONTROL_PORT = int(os.getenv("TOR_CONTROL_PORT", 9051))
 TOR_DNS_PORT = int(os.getenv("TOR_DNS_PORT", 5353))
-TOR_CONTROL_LISTEN_INTERFACE = os.getenv("TOR_CONTROL_LISTEN_INTERFACE", "127.0.0.1" if BSX_LOCAL_TOR else "0.0.0.0")
-TORRC_PROXY_HOST = os.getenv("TORRC_PROXY_HOST", "127.0.0.1" if BSX_LOCAL_TOR else "0.0.0.0")
-TORRC_CONTROL_HOST = os.getenv("TORRC_CONTROL_HOST", "127.0.0.1" if BSX_LOCAL_TOR else "0.0.0.0")
-TORRC_DNS_HOST = os.getenv("TORRC_DNS_HOST", "127.0.0.1" if BSX_LOCAL_TOR else "0.0.0.0")
+TOR_CONTROL_LISTEN_INTERFACE = os.getenv(
+    "TOR_CONTROL_LISTEN_INTERFACE", "127.0.0.1" if BSX_LOCAL_TOR else "0.0.0.0"
+)
+TORRC_PROXY_HOST = os.getenv(
+    "TORRC_PROXY_HOST", "127.0.0.1" if BSX_LOCAL_TOR else "0.0.0.0"
+)
+TORRC_CONTROL_HOST = os.getenv(
+    "TORRC_CONTROL_HOST", "127.0.0.1" if BSX_LOCAL_TOR else "0.0.0.0"
+)
+TORRC_DNS_HOST = os.getenv(
+    "TORRC_DNS_HOST", "127.0.0.1" if BSX_LOCAL_TOR else "0.0.0.0"
+)
 
 TEST_TOR_PROXY = toBool(
     os.getenv("TEST_TOR_PROXY", "true")
@@ -1593,6 +1601,9 @@ def printHelp():
     print("--withoutcoin=           Do not prepare system to run daemon for coin.")
     print("--addcoin=               Add coin to existing setup.")
     print("--disablecoin=           Make coin inactive.")
+    print(
+        "--upgradecores           Upgrade all coin cores present in basicswap.json. Optionally use alongside --withcoin= or --withoutcoin="
+    )
     print("--preparebinonly         Don't prepare settings or datadirs.")
     print("--nocores                Don't download and extract any coin clients.")
     print("--usecontainers          Expect each core to run in a unique container.")
