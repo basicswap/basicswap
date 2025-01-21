@@ -1,43 +1,61 @@
 (function(window) {
     'use strict';
 
+    const tooltipContainer = document.createElement('div');
+    tooltipContainer.className = 'tooltip-container';
+
     const style = document.createElement('style');
     style.textContent = `
         [role="tooltip"] {
-            position: fixed;
+            position: absolute;
             z-index: 9999;
             transition: opacity 0.2s ease-in-out;
-            pointer-events: none;
+            pointer-events: auto;
             opacity: 0;
             visibility: hidden;
         }
+        
+        .tooltip-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 0;
+            overflow: visible;
+            pointer-events: none;
+            z-index: 9999;
+        }
     `;
-    document.head.appendChild(style);
 
-    function throttle(func, limit) {
-        let inThrottle;
+    function ensureContainerExists() {
+        if (!document.body.contains(tooltipContainer)) {
+            document.body.appendChild(tooltipContainer);
+        }
+    }
+
+
+    function rafThrottle(callback) {
+        let requestId = null;
+        let lastArgs = null;
+
+        const later = (context) => {
+            requestId = null;
+            callback.apply(context, lastArgs);
+        };
+
         return function(...args) {
-            if (!inThrottle) {
-                func.apply(this, args);
-                inThrottle = true;
-                setTimeout(() => inThrottle = false, limit);
+            lastArgs = args;
+            if (requestId === null) {
+                requestId = requestAnimationFrame(() => later(this));
             }
         };
     }
 
     function positionElement(targetEl, triggerEl, placement = 'top', offsetDistance = 8) {
         const triggerRect = triggerEl.getBoundingClientRect();
+        const targetRect = targetEl.getBoundingClientRect();
         let top, left;
 
-        const wasHidden = targetEl.style.visibility === 'hidden';
-        if (wasHidden) {
-            targetEl.style.visibility = 'hidden';
-            targetEl.style.opacity = '0';
-            targetEl.style.display = 'block';
-        }
-
-        const targetRect = targetEl.getBoundingClientRect();
-        
         switch (placement) {
             case 'top':
                 top = triggerRect.top - targetRect.height - offsetDistance;
@@ -69,20 +87,15 @@
         if (top + targetRect.height > viewport.height)
             top = viewport.height - targetRect.height;
 
-        targetEl.style.top = Math.round(top) + 'px';
-        targetEl.style.left = Math.round(left) + 'px';
-
-        if (wasHidden) {
-            targetEl.style.display = '';
-            targetEl.style.visibility = 'hidden';
-            targetEl.style.opacity = '0';
-        }
+        targetEl.style.transform = `translate(${Math.round(left)}px, ${Math.round(top)}px)`;
     }
 
     const tooltips = new WeakMap();
 
     class Tooltip {
         constructor(targetEl, triggerEl, options = {}) {
+            ensureContainerExists();
+
             this._targetEl = targetEl;
             this._triggerEl = triggerEl;
             this._options = {
@@ -94,13 +107,19 @@
             };
             this._visible = false;
             this._initialized = false;
+            this._hideTimeout = null;
+            this._showTimeout = null;
+
+            if (this._targetEl.parentNode !== tooltipContainer) {
+                tooltipContainer.appendChild(this._targetEl);
+            }
 
             this._targetEl.style.visibility = 'hidden';
             this._targetEl.style.opacity = '0';
 
             this._showHandler = this.show.bind(this);
-            this._hideHandler = this.hide.bind(this);
-            this._updatePosition = throttle(() => {
+            this._hideHandler = this._handleHide.bind(this);
+            this._updatePosition = rafThrottle(() => {
                 if (this._visible) {
                     positionElement(
                         this._targetEl,
@@ -109,7 +128,7 @@
                         this._options.offset
                     );
                 }
-            }, 100);
+            });
 
             this.init();
         }
@@ -118,7 +137,6 @@
             if (!this._initialized) {
                 this._setupEventListeners();
                 this._initialized = true;
-
                 positionElement(
                     this._targetEl,
                     this._triggerEl,
@@ -134,40 +152,114 @@
             this._triggerEl.addEventListener('focus', this._showHandler);
             this._triggerEl.addEventListener('blur', this._hideHandler);
 
+            this._targetEl.addEventListener('mouseenter', () => {
+                clearTimeout(this._hideTimeout);
+                clearTimeout(this._showTimeout);
+                this._visible = true;
+                this._targetEl.style.visibility = 'visible';
+                this._targetEl.style.opacity = '1';
+            });
+
+            this._targetEl.addEventListener('mouseleave', this._hideHandler);
+
             if (this._options.triggerType === 'click') {
                 this._triggerEl.addEventListener('click', this._showHandler);
             }
 
-            window.addEventListener('scroll', this._updatePosition, true);
-            window.addEventListener('resize', this._updatePosition);
+            window.addEventListener('scroll', this._updatePosition, { passive: true });
+            document.addEventListener('scroll', this._updatePosition, { passive: true, capture: true });
+            window.addEventListener('resize', this._updatePosition, { passive: true });
+
+            let rafId;
+            const smoothUpdate = () => {
+                if (this._visible) {
+                    this._updatePosition();
+                    rafId = requestAnimationFrame(smoothUpdate);
+                }
+            };
+
+            this._startSmoothUpdate = () => {
+                if (!rafId) rafId = requestAnimationFrame(smoothUpdate);
+            };
+
+            this._stopSmoothUpdate = () => {
+                if (rafId) {
+                    cancelAnimationFrame(rafId);
+                    rafId = null;
+                }
+            };
+        }
+
+        _handleHide() {
+            clearTimeout(this._hideTimeout);
+            clearTimeout(this._showTimeout);
+            
+            this._hideTimeout = setTimeout(() => {
+                if (this._visible) {
+                    this.hide();
+                }
+            }, 100);
         }
 
         show() {
-            if (!this._visible) {
-                positionElement(
-                    this._targetEl,
-                    this._triggerEl,
-                    this._options.placement,
-                    this._options.offset
-                );
+            clearTimeout(this._hideTimeout);
+            clearTimeout(this._showTimeout);
 
-                requestAnimationFrame(() => {
+            this._showTimeout = setTimeout(() => {
+                if (!this._visible) {
+                    positionElement(
+                        this._targetEl,
+                        this._triggerEl,
+                        this._options.placement,
+                        this._options.offset
+                    );
+
                     this._targetEl.style.visibility = 'visible';
                     this._targetEl.style.opacity = '1';
-                });
-
-                this._visible = true;
-                this._options.onShow();
-            }
+                    this._visible = true;
+                    this._startSmoothUpdate();
+                    this._options.onShow();
+                }
+            }, 20);
         }
 
         hide() {
-            if (this._visible) {
-                this._targetEl.style.opacity = '0';
-                this._targetEl.style.visibility = 'hidden';
-                this._visible = false;
-                this._options.onHide();
+            this._targetEl.style.opacity = '0';
+            this._targetEl.style.visibility = 'hidden';
+            this._visible = false;
+            this._stopSmoothUpdate();
+            this._options.onHide();
+        }
+
+        destroy() {
+            clearTimeout(this._hideTimeout);
+            clearTimeout(this._showTimeout);
+            this._stopSmoothUpdate();
+
+            this._triggerEl.removeEventListener('mouseenter', this._showHandler);
+            this._triggerEl.removeEventListener('mouseleave', this._hideHandler);
+            this._triggerEl.removeEventListener('focus', this._showHandler);
+            this._triggerEl.removeEventListener('blur', this._hideHandler);
+            this._targetEl.removeEventListener('mouseenter', this._showHandler);
+            this._targetEl.removeEventListener('mouseleave', this._hideHandler);
+
+            if (this._options.triggerType === 'click') {
+                this._triggerEl.removeEventListener('click', this._showHandler);
             }
+
+            window.removeEventListener('scroll', this._updatePosition);
+            document.removeEventListener('scroll', this._updatePosition, true);
+            window.removeEventListener('resize', this._updatePosition);
+
+            this._targetEl.style.visibility = '';
+            this._targetEl.style.opacity = '';
+            this._targetEl.style.transform = '';
+
+            if (this._targetEl.parentNode === tooltipContainer) {
+                document.body.appendChild(this._targetEl);
+            }
+
+            this._initialized = false;
         }
 
         toggle() {
@@ -179,7 +271,11 @@
         }
     }
 
+    document.head.appendChild(style);
+
     function initTooltips() {
+        ensureContainerExists();
+        
         document.querySelectorAll('[data-tooltip-target]').forEach(triggerEl => {
             if (tooltips.has(triggerEl)) return;
 
