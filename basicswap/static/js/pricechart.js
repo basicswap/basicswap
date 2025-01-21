@@ -903,17 +903,13 @@ const chartModule = {
     updateChart: async (coinSymbol, forceRefresh = false) => {
         try {
             const currentChartData = chartModule.chart?.data.datasets[0].data || [];
-
             if (currentChartData.length === 0) {
                 chartModule.showChartLoader();
             }
-
             chartModule.loadStartTime = Date.now();
-
             const cacheKey = `chartData_${coinSymbol}_${config.currentResolution}`;
             let cachedData = !forceRefresh ? cache.get(cacheKey) : null;
             let data;
-
             if (cachedData && Object.keys(cachedData.value).length > 0) {
                 data = cachedData.value;
                 console.log(`Using cached data for ${coinSymbol}`);
@@ -921,7 +917,6 @@ const chartModule = {
                 try {
                     const allData = await api.fetchHistoricalDataXHR([coinSymbol]);
                     data = allData[coinSymbol];
-                    
                     if (!data || Object.keys(data).length === 0) {
                         throw new Error(`No data returned for ${coinSymbol}`);
                     }
@@ -945,12 +940,10 @@ const chartModule = {
                     }
                 }
             }
-
             const chartData = chartModule.prepareChartData(coinSymbol, data);
             if (chartData.length > 0 && chartModule.chart) {
                 chartModule.chart.data.datasets[0].data = chartData;
                 chartModule.chart.data.datasets[0].label = `${coinSymbol} Price (USD)`;
-
                 if (coinSymbol === 'WOW') {
                     chartModule.chart.options.scales.x.time.unit = 'hour';
                 } else {
@@ -959,14 +952,11 @@ const chartModule = {
                         resolution.interval === 'hourly' ? 'hour' : 
                         config.currentResolution === 'year' ? 'month' : 'day';
                 }
-
                 chartModule.chart.update('active');
-
                 chartModule.currentCoin = coinSymbol;
                 const loadTime = Date.now() - chartModule.loadStartTime;
                 ui.updateLoadTimeAndCache(loadTime, cachedData);
             }
-
         } catch (error) {
             console.error(`Error updating chart for ${coinSymbol}:`, error);
             if (!(chartModule.chart?.data.datasets[0].data.length > 0)) {
@@ -977,7 +967,7 @@ const chartModule = {
             chartModule.hideChartLoader();
         }
     },
-    
+
   showChartLoader: () => {
     const loader = document.getElementById('chart-loader');
     const chart = document.getElementById('coin-chart');
