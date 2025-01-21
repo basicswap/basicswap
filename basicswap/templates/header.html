@@ -8,13 +8,18 @@
   {% endif %}
   <script src="/static/js/libs/chart.js"></script>
   <script src="/static/js/libs/chartjs-adapter-date-fns.bundle.min.js"></script>
+  
   <link type="text/css" media="all" href="/static/css/libs/flowbite.min.css" rel="stylesheet" />
   <link type="text/css" media="all" href="/static/css/libs/tailwind.min.css" rel="stylesheet">
   <link type="text/css" media="all" href="/static/css/style.css" rel="stylesheet">
-  <script src="/static/js/main.js"></script>
-  <script src="/static/js/libs/flowbite.js"></script>
 
-<script>
+  <script src="/static/js/main.js"></script>
+
+  <script src="/static/js/tabs.js"></script>
+  <script src="/static/js/dropdown.js"></script>
+  <script src="/static/js/tooltips.js"></script>
+
+ <script>
   const isDarkMode =
     localStorage.getItem('color-theme') === 'dark' ||
     (!localStorage.getItem('color-theme') &&
@@ -451,7 +456,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 <div id="tooltip-your-offers" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
                   <p><b>Total:</b> {{ summary.num_sent_offers }}</p>
-                <div class="tooltip-arrow" data-popper-arrow></div>
                 </div>
 
                   </li>
@@ -468,7 +472,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 <div id="tooltip-bids-received" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
                   <p><b>Total:</b>  {{ summary.num_recv_bids }}</p>
-                  <div class="tooltip-arrow" data-popper-arrow></div>
+                  
                 </div>
                   <li>
                     <a data-tooltip-target="tooltip-bids-sent" class="flex mr-10 items-center text-sm text-gray-400 hover:text-gray-600 dark:text-gray-100 dark:hover:text-gray-100" href="/sentbids">
@@ -476,7 +480,7 @@ document.addEventListener('DOMContentLoaded', function() {
                       <span>Bids Sent</span><span class="inline-flex justify-center items-center text-xs font-semibold ml-3 mr-2 px-2.5 py-1 font-small text-white bg-blue-500 rounded-full">{{ summary.num_sent_active_bids }}</span></a>
                 <div id="tooltip-bids-sent" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
                   <p><b>Total:</b>  {{ summary.num_sent_bids }}</p>
-                <div class="tooltip-arrow" data-popper-arrow></div>
+                
                 </div>
 
                   </li>
