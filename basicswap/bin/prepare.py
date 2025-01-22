@@ -211,6 +211,7 @@ LTC_RPC_PWD = os.getenv("LTC_RPC_PWD", "")
 
 BTC_RPC_HOST = os.getenv("BTC_RPC_HOST", "127.0.0.1")
 BTC_RPC_PORT = int(os.getenv("BTC_RPC_PORT", 19996))
+BTC_PORT = int(os.getenv("BTC_PORT", 8333))
 BTC_ONION_PORT = int(os.getenv("BTC_ONION_PORT", 8334))
 BTC_RPC_USER = os.getenv("BTC_RPC_USER", "")
 BTC_RPC_PWD = os.getenv("BTC_RPC_PWD", "")
@@ -254,8 +255,8 @@ NAV_RPC_PWD = os.getenv("NAV_RPC_PWD", "")
 
 BCH_RPC_HOST = os.getenv("BCH_RPC_HOST", "127.0.0.1")
 BCH_RPC_PORT = int(os.getenv("BCH_RPC_PORT", 19997))
-BCH_ONION_PORT = int(os.getenv("BCH_ONION_PORT", 8335))
 BCH_PORT = int(os.getenv("BCH_PORT", 19798))
+BCH_ONION_PORT = int(os.getenv("BCH_ONION_PORT", 8335))
 BCH_RPC_USER = os.getenv("BCH_RPC_USER", "")
 BCH_RPC_PWD = os.getenv("BCH_RPC_PWD", "")
 
@@ -2296,6 +2297,7 @@ def main():
             "onionport": BTC_ONION_PORT + port_offset,
             "datadir": os.getenv("BTC_DATA_DIR", os.path.join(data_dir, "bitcoin")),
             "bindir": os.path.join(bin_dir, "bitcoin"),
+            "port": BTC_PORT + port_offset,
             "use_segwit": True,
             "blocks_confirmed": 1,
             "conf_target": 2,
