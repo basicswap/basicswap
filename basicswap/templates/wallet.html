@@ -222,8 +222,7 @@
           </div>
         </div>
       </div>
-    </form>
-  </section>
+    </section>
   {% if block_unknown_seeds and w.expected_seed != true %} {# Only show addresses if wallet seed is correct #}
     <section class="px-6 py-0 h-full overflow-hidden">
       <div class="pb-6 border-coolGray-100">
@@ -244,7 +243,9 @@
         </div>
       </div>
     </section>
-  {% else %}
+  <input type="hidden" name="formid" value="{{ form_id }}">
+</form>
+{% else %}
 <section class="p-6">
  <div class="lg:container mx-auto">
   <div class="flex items-center">
