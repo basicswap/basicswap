@@ -1974,6 +1974,32 @@ class BasicSwap(BaseApp):
         if not offer.rate_negotiable:
             ensure(offer.rate == bid_rate, "Bid rate must match offer rate.")
 
+    def ensureWalletCanSend(
+        self, ci, swap_type, ensure_balance: int, estimated_fee: int, for_offer=True
+    ) -> None:
+        balance_msg: str = (
+            f"{ci.format_amount(ensure_balance)} {ci.coin_name()} with estimated fee {ci.format_amount(estimated_fee)}"
+        )
+        self.log.debug(f"Ensuring wallet can send {balance_msg}.")
+        try:
+            if ci.interface_type() in self.scriptless_coins:
+                ci.ensureFunds(ensure_balance + estimated_fee)
+            else:
+                pi = self.pi(swap_type)
+                _ = pi.getFundedInitiateTxTemplate(ci, ensure_balance, False)
+                # TODO: Save the prefunded tx so the fee can't change, complicates multiple offers at the same time.
+        except Exception as e:
+            type_str = "offer" if for_offer else "bid"
+            err_msg = f"Insufficient funds for {type_str} of {balance_msg}."
+            if self.debug:
+                self.log.error(f"ensureWalletCanSend failed {e}")
+                current_balance: int = ci.getSpendableBalance()
+                err_msg += (
+                    f" Debug: Spendable balance: {ci.format_amount(current_balance)}."
+                )
+            self.log.error(err_msg)
+            raise ValueError(err_msg)
+
     def getOfferAddressTo(self, extra_options) -> str:
         if "addr_send_to" in extra_options:
             return extra_options["addr_send_to"]
@@ -2007,24 +2033,24 @@ class BasicSwap(BaseApp):
         except Exception:
             raise ValueError("Unknown coin to type")
 
-        valid_for_seconds: int = extra_options.get("valid_for_seconds", 60 * 60)
-        amount_to: int = extra_options.get(
-            "amount_to", int((amount * rate) // ci_from.COIN())
-        )
-
-        # Recalculate the rate so it will match the bid rate
-        rate = ci_from.make_int(amount_to / amount, r=1)
-
         self.validateSwapType(coin_from_t, coin_to_t, swap_type)
-        self.validateOfferAmounts(
-            coin_from_t, coin_to_t, amount, amount_to, min_bid_amount
-        )
         self.validateOfferLockValue(
             swap_type, coin_from_t, coin_to_t, lock_type, lock_value
         )
+
+        valid_for_seconds: int = extra_options.get("valid_for_seconds", 60 * 60)
         self.validateOfferValidTime(
             swap_type, coin_from_t, coin_to_t, valid_for_seconds
         )
+
+        amount_to: int = extra_options.get(
+            "amount_to", int((amount * rate) // ci_from.COIN())
+        )
+        self.validateOfferAmounts(
+            coin_from_t, coin_to_t, amount, amount_to, min_bid_amount
+        )
+        # Recalculate the rate so it will match the bid rate
+        rate: int = ci_from.make_int(amount_to / amount, r=1)
 
         offer_addr_to = self.getOfferAddressTo(extra_options)
 
@@ -2066,8 +2092,8 @@ class BasicSwap(BaseApp):
                 )
 
             if "from_fee_override" in extra_options:
-                msg_buf.fee_rate_from = make_int(
-                    extra_options["from_fee_override"], self.ci(coin_from).exp()
+                msg_buf.fee_rate_from = ci_from.make_int(
+                    extra_options["from_fee_override"]
                 )
             else:
                 # TODO: conf_target = ci_from.settings.get('conf_target', 2)
@@ -2077,12 +2103,10 @@ class BasicSwap(BaseApp):
                 fee_rate, fee_src = self.getFeeRateForCoin(coin_from, conf_target)
                 if "from_fee_multiplier_percent" in extra_options:
                     fee_rate *= extra_options["fee_multiplier"] / 100.0
-                msg_buf.fee_rate_from = make_int(fee_rate, self.ci(coin_from).exp())
+                msg_buf.fee_rate_from = ci_from.make_int(fee_rate)
 
             if "to_fee_override" in extra_options:
-                msg_buf.fee_rate_to = make_int(
-                    extra_options["to_fee_override"], self.ci(coin_to).exp()
-                )
+                msg_buf.fee_rate_to = ci_to.make_int(extra_options["to_fee_override"])
             else:
                 # TODO: conf_target = ci_to.settings.get('conf_target', 2)
                 conf_target = 2
@@ -2091,7 +2115,7 @@ class BasicSwap(BaseApp):
                 fee_rate, fee_src = self.getFeeRateForCoin(coin_to, conf_target)
                 if "to_fee_multiplier_percent" in extra_options:
                     fee_rate *= extra_options["fee_multiplier"] / 100.0
-                msg_buf.fee_rate_to = make_int(fee_rate, self.ci(coin_to).exp())
+                msg_buf.fee_rate_to = ci_to.make_int(fee_rate)
 
             if swap_type == SwapTypes.XMR_SWAP:
                 xmr_offer = XmrOffer()
@@ -2116,27 +2140,19 @@ class BasicSwap(BaseApp):
                     msg_buf.fee_rate_to
                 )  # Unused: TODO - Set priority?
 
-            ensure_balance: int = int(amount)
-            if coin_from in self.scriptless_coins:
+            # If a prefunded txn is not used, check that the wallet balance can cover the tx fee.
+            if "prefunded_itx" not in extra_options:
                 # TODO: Better tx size estimate, xmr_swap_b_lock_tx_vsize could be larger than xmr_swap_b_lock_spend_tx_vsize
                 estimated_fee: int = (
-                    msg_buf.fee_rate_from
-                    * ci_from.xmr_swap_b_lock_spend_tx_vsize()
-                    / 1000
+                    msg_buf.fee_rate_from * ci_from.est_lock_tx_vsize() // 1000
                 )
-                ci_from.ensureFunds(msg_buf.amount_from + estimated_fee)
-            else:
-                # If a prefunded txn is not used, check that the wallet balance can cover the tx fee.
-                if "prefunded_itx" not in extra_options:
-                    pi = self.pi(SwapTypes.XMR_SWAP)
-                    _ = pi.getFundedInitiateTxTemplate(ci_from, ensure_balance, False)
-                    # TODO: Save the prefunded tx so the fee can't change, complicates multiple offers at the same time.
+                self.ensureWalletCanSend(ci_from, swap_type, int(amount), estimated_fee)
 
-                # TODO: Send proof of funds with offer
-                # proof_of_funds_hash = getOfferProofOfFundsHash(msg_buf, offer_addr)
-                # proof_addr, proof_sig, proof_utxos = self.getProofOfFunds(
-                #     coin_from_t, ensure_balance, proof_of_funds_hash
-                # )
+            # TODO: Send proof of funds with offer
+            # proof_of_funds_hash = getOfferProofOfFundsHash(msg_buf, offer_addr)
+            # proof_addr, proof_sig, proof_utxos = self.getProofOfFunds(
+            #     coin_from_t, ensure_balance, proof_of_funds_hash
+            # )
 
             offer_bytes = msg_buf.to_bytes()
             payload_hex = str.format("{:02x}", MessageTypes.OFFER) + offer_bytes.hex()
@@ -2174,6 +2190,8 @@ class BasicSwap(BaseApp):
                 was_sent=True,
                 bid_reversed=bid_reversed,
                 security_token=security_token,
+                from_feerate=msg_buf.fee_rate_from,
+                to_feerate=msg_buf.fee_rate_to,
             )
             offer.setState(OfferStates.OFFER_SENT)
 
@@ -3525,14 +3543,12 @@ class BasicSwap(BaseApp):
 
             self.checkCoinsReady(coin_from, coin_to)
 
-            balance_to: int = ci_to.getSpendableBalance()
-            ensure(
-                balance_to > amount_to,
-                "{} spendable balance is too low: {} < {}".format(
-                    ci_to.coin_name(),
-                    ci_to.format_amount(balance_to),
-                    ci_to.format_amount(amount_to),
-                ),
+            # TODO: Better tx size estimate
+            fee_rate, fee_src = self.getFeeRateForCoin(coin_to, conf_target=2)
+            fee_rate_to = ci_to.make_int(fee_rate)
+            estimated_fee: int = fee_rate_to * ci_to.est_lock_tx_vsize() // 1000
+            self.ensureWalletCanSend(
+                ci_to, offer.swap_type, int(amount_to), estimated_fee, for_offer=False
             )
 
             reverse_bid: bool = self.is_reverse_ads_bid(coin_from, coin_to)
@@ -4068,6 +4084,18 @@ class BasicSwap(BaseApp):
             coin_to = Coins(offer.coin_from)
             ci_from = self.ci(coin_from)
             ci_to = self.ci(coin_to)
+
+            # TODO: Better tx size estimate
+            fee_rate, fee_src = self.getFeeRateForCoin(coin_to, conf_target=2)
+            fee_rate_from = ci_to.make_int(fee_rate)
+            estimated_fee: int = fee_rate_from * ci_to.est_lock_tx_vsize() // 1000
+            self.ensureWalletCanSend(
+                ci_to,
+                offer.swap_type,
+                offer.amount_from,
+                estimated_fee,
+                for_offer=False,
+            )
 
             if xmr_swap.contract_count is None:
                 xmr_swap.contract_count = self.getNewContractId(use_cursor)

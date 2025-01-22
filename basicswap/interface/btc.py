@@ -218,6 +218,10 @@ class BTCInterface(Secp256k1Interface):
         return rv
 
     @staticmethod
+    def est_lock_tx_vsize() -> int:
+        return 110
+
+    @staticmethod
     def xmr_swap_a_lock_spend_tx_vsize() -> int:
         return 147
 

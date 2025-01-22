@@ -56,9 +56,9 @@ jobs:
     - name: Running test_xmr
       run: |
         export PYTHONPATH=$(pwd)
-        export PARTICL_BINDIR="$BIN_DIR/particl";
-        export BITCOIN_BINDIR="$BIN_DIR/bitcoin";
-        export XMR_BINDIR="$BIN_DIR/monero";
+        export PARTICL_BINDIR="$BIN_DIR/particl"
+        export BITCOIN_BINDIR="$BIN_DIR/bitcoin"
+        export XMR_BINDIR="$BIN_DIR/monero"
         pytest tests/basicswap/test_btc_xmr.py::TestBTC -k "test_003_api or test_02_a_leader_recover_a_lock_tx"
     - name: Running test_encrypted_xmr_reload
       run: |

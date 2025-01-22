@@ -440,7 +440,9 @@ def runClient(fp, data_dir, chain, start_only_coins):
                 swap_client.log.info(f"Starting {display_name} daemon")
 
                 filename: str = getCoreBinName(coin_id, v, c + "d")
-                extra_opts = getCoreBinArgs(coin_id, v, use_tor_proxy=swap_client.use_tor_proxy)
+                extra_opts = getCoreBinArgs(
+                    coin_id, v, use_tor_proxy=swap_client.use_tor_proxy
+                )
                 daemons.append(
                     startDaemon(v["datadir"], v["bindir"], filename, opts=extra_opts)
                 )
