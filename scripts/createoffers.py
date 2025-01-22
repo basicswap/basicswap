@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2023-2024 tecnovert
-# Copyright (c) 2024 The Basicswap developers
+# Copyright (c) 2024-2025 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -657,8 +657,8 @@ def main():
                     offer_identity = read_json_api(
                         "identities/{}".format(offer["addr_from"])
                     )
-                    if len(offer_identity) > 0:
-                        id_offer_from = offer_identity[0]
+                    if "address" in offer_identity:
+                        id_offer_from = offer_identity
                         automation_override = id_offer_from["automation_override"]
                         if automation_override == 2:
                             if args.debug:
