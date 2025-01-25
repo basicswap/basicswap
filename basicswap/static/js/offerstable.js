@@ -955,41 +955,47 @@ function filterAndSortData() {
 
    if (currentSortColumn !== null) {
        const priceCache = new Map();
+       const getPrice = coin => {
+           if (priceCache.has(coin)) return priceCache.get(coin);
+           const symbol = coin === 'Firo' || coin === 'Zcoin' ? 'zcoin' :
+                         coin === 'Bitcoin Cash' ? 'bitcoin-cash' :
+                         coin.includes('Particl') ? 'particl' :
+                         coin.toLowerCase();
+           const price = latestPrices[symbol]?.usd || 0;
+           priceCache.set(coin, price);
+           return price;
+       };
+
+       const calculateValue = offer => {
+           const fromUSD = parseFloat(offer.amount_from) * getPrice(offer.coin_from);
+           const toUSD = parseFloat(offer.amount_to) * getPrice(offer.coin_to);
+           return (isSentOffers || offer.is_own_offer) ? 
+               ((toUSD / fromUSD) - 1) * 100 :
+               ((fromUSD / toUSD) - 1) * 100;
+       };
+
        const sortValues = new Map();
-
-       if (currentSortColumn === 6) {
+       if (currentSortColumn === 5 || currentSortColumn === 6) {
            filteredData.forEach(offer => {
-               const symbol = coin => {
-                   if (coin === 'Firo' || coin === 'Zcoin') return 'zcoin';
-                   if (coin === 'Bitcoin Cash') return 'bitcoin-cash';
-                   if (coin.includes('Particl')) return 'particl';
-                   return coin.toLowerCase();
-               };
-
-               const getPrice = coin => {
-                   if (priceCache.has(coin)) return priceCache.get(coin);
-                   const price = latestPrices[symbol(coin)]?.usd || 0;
-                   priceCache.set(coin, price);
-                   return price;
-               };
-
-               const fromUSD = parseFloat(offer.amount_from) * getPrice(offer.coin_from);
-               const toUSD = parseFloat(offer.amount_to) * getPrice(offer.coin_to);
-               const percentDiff = (isSentOffers || offer.is_own_offer) ? 
-                   ((toUSD / fromUSD) - 1) * 100 :
-                   ((fromUSD / toUSD) - 1) * 100;
-               sortValues.set(offer.offer_id, percentDiff);
+               sortValues.set(offer.offer_id, calculateValue(offer));
            });
        }
 
        filteredData.sort((a, b) => {
            let comparison;
            switch(currentSortColumn) {
-               case 0: comparison = a.created_at - b.created_at; break;
-               case 5: comparison = parseFloat(a.rate) - parseFloat(b.rate); break;
-               case 6: comparison = sortValues.get(a.offer_id) - sortValues.get(b.offer_id); break;
-               case 7: comparison = a.offer_id.localeCompare(b.offer_id); break;
-               default: comparison = 0;
+               case 0: // Time
+                   comparison = a.created_at - b.created_at;
+                   break;
+               case 5: // Rate
+               case 6: // Market +/-
+                   comparison = sortValues.get(a.offer_id) - sortValues.get(b.offer_id);
+                   break;
+               case 7: // Trade
+                   comparison = a.offer_id.localeCompare(b.offer_id);
+                   break;
+               default:
+                   comparison = 0;
            }
            return currentSortDirection === 'desc' ? -comparison : comparison;
        });
