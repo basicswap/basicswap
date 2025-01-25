@@ -77,7 +77,7 @@ let filterTimeout = null;
 const CACHE_DURATION = 10 * 60 * 1000;
 
 // Application Constants
-const itemsPerPage = 100;
+const itemsPerPage = 50;
 const isSentOffers = window.offersTableConfig.isSentOffers;
 
 const offersConfig = {
@@ -141,6 +141,29 @@ const currentPageSpan = document.getElementById('currentPage');
 const totalPagesSpan = document.getElementById('totalPages');
 const lastRefreshTimeSpan = document.getElementById('lastRefreshTime');
 const newEntriesCountSpan = document.getElementById('newEntriesCount');
+
+const TooltipRegistry = {
+    activeTooltips: new Map(),
+    
+    register(triggerId, tooltip) {
+        this.unregister(triggerId);
+        this.activeTooltips.set(triggerId, tooltip);
+    },
+    
+    unregister(triggerId) {
+        const tooltip = this.activeTooltips.get(triggerId);
+        if (tooltip) {
+            tooltip.destroy();
+            this.activeTooltips.delete(triggerId);
+        }
+    },
+    
+    cleanup() {
+        this.activeTooltips.forEach((tooltip, triggerId) => {
+            this.unregister(triggerId);
+        });
+    }
+};
 
 // MANAGER OBJECTS
 const WebSocketManager = {
@@ -880,114 +903,99 @@ function getValidOffers() {
 }
 
 function filterAndSortData() {
-    //console.log('[Debug] Starting filter with data length:', originalJsonData.length);
+   const formData = new FormData(filterForm);
+   const filters = Object.fromEntries(formData);
 
-    const formData = new FormData(filterForm);
-    const filters = Object.fromEntries(formData);
-    //console.log('[Debug] Active filters:', filters);
+   localStorage.setItem('offersTableSettings', JSON.stringify({
+       coin_to: filters.coin_to,
+       coin_from: filters.coin_from, 
+       status: filters.status,
+       sent_from: filters.sent_from,
+       sortColumn: currentSortColumn,
+       sortDirection: currentSortDirection
+   }));
 
-    if (filters.coin_to !== 'any') {
-        filters.coin_to = coinIdToName[filters.coin_to] || filters.coin_to;
-    }
-    if (filters.coin_from !== 'any') {
-        filters.coin_from = coinIdToName[filters.coin_from] || filters.coin_from;
-    }
+   if (filters.coin_to !== 'any') {
+       filters.coin_to = coinIdToName[filters.coin_to] || filters.coin_to;
+   }
+   if (filters.coin_from !== 'any') {
+       filters.coin_from = coinIdToName[filters.coin_from] || filters.coin_from;
+   }
 
-    let filteredData = [...originalJsonData];
+   let filteredData = [...originalJsonData];
 
-    const sentFromFilter = filters.sent_from || 'any';
+   const sentFromFilter = filters.sent_from || 'any';
+   filteredData = filteredData.filter(offer => {
+       if (sentFromFilter === 'public') return offer.is_public;
+       if (sentFromFilter === 'private') return !offer.is_public;
+       return true;
+   });
 
-    filteredData = filteredData.filter(offer => {
-        if (sentFromFilter === 'public') {
-            return offer.is_public;
-        } else if (sentFromFilter === 'private') {
-            return !offer.is_public;
-        }
-        return true;
-    });
+   filteredData = filteredData.filter(offer => {
+       if (!isSentOffers && isOfferExpired(offer)) return false;
 
-    filteredData = filteredData.filter(offer => {
-        if (!isSentOffers && isOfferExpired(offer)) {
-            return false;
-        }
+       const coinFrom = (offer.coin_from || '').toLowerCase();
+       const coinTo = (offer.coin_to || '').toLowerCase();
 
-        const coinFrom = (offer.coin_from || '').toLowerCase();
-        const coinTo = (offer.coin_to || '').toLowerCase();
+       if (filters.coin_to !== 'any' && !coinMatches(coinTo, filters.coin_to)) return false;
+       if (filters.coin_from !== 'any' && !coinMatches(coinFrom, filters.coin_from)) return false;
 
-        if (filters.coin_to !== 'any') {
-            if (!coinMatches(coinTo, filters.coin_to)) {
-                return false;
-            }
-        }
+       if (isSentOffers && filters.status && filters.status !== 'any') {
+           const isExpired = offer.expire_at <= Math.floor(Date.now() / 1000);
+           const isRevoked = Boolean(offer.is_revoked);
 
-        if (filters.coin_from !== 'any') {
-            if (!coinMatches(coinFrom, filters.coin_from)) {
-                return false;
-            }
-        }
+           switch (filters.status) {
+               case 'active': return !isExpired && !isRevoked;
+               case 'expired': return isExpired && !isRevoked;
+               case 'revoked': return isRevoked;
+           }
+       }
+       return true;
+   });
 
-        if (isSentOffers && filters.status && filters.status !== 'any') {
-            const currentTime = Math.floor(Date.now() / 1000);
-            const isExpired = offer.expire_at <= currentTime;
-            const isRevoked = Boolean(offer.is_revoked);
+   if (currentSortColumn !== null) {
+       const priceCache = new Map();
+       const sortValues = new Map();
 
-            switch (filters.status) {
-                case 'active':
-                    return !isExpired && !isRevoked;
-                case 'expired':
-                    return isExpired && !isRevoked;
-                case 'revoked':
-                    return isRevoked;
-                default:
-                    return true;
-            }
-        }
+       if (currentSortColumn === 6) {
+           filteredData.forEach(offer => {
+               const symbol = coin => {
+                   if (coin === 'Firo' || coin === 'Zcoin') return 'zcoin';
+                   if (coin === 'Bitcoin Cash') return 'bitcoin-cash';
+                   if (coin.includes('Particl')) return 'particl';
+                   return coin.toLowerCase();
+               };
 
-        return true;
-    });
+               const getPrice = coin => {
+                   if (priceCache.has(coin)) return priceCache.get(coin);
+                   const price = latestPrices[symbol(coin)]?.usd || 0;
+                   priceCache.set(coin, price);
+                   return price;
+               };
 
-    if (currentSortColumn !== null) {
-        filteredData.sort((a, b) => {
-            let comparison = 0;
+               const fromUSD = parseFloat(offer.amount_from) * getPrice(offer.coin_from);
+               const toUSD = parseFloat(offer.amount_to) * getPrice(offer.coin_to);
+               const percentDiff = (isSentOffers || offer.is_own_offer) ? 
+                   ((toUSD / fromUSD) - 1) * 100 :
+                   ((fromUSD / toUSD) - 1) * 100;
+               sortValues.set(offer.offer_id, percentDiff);
+           });
+       }
 
-            switch(currentSortColumn) {
-                case 0: // Time
-                    comparison = a.created_at - b.created_at;
-                    break;
-                case 5: // Rate
-                    comparison = parseFloat(a.rate) - parseFloat(b.rate);
-                    break;
-                case 6: // Market +/-
-                    const aFromSymbol = getCoinSymbolLowercase(a.coin_from);
-                    const aToSymbol = getCoinSymbolLowercase(a.coin_to);
-                    const bFromSymbol = getCoinSymbolLowercase(b.coin_from);
-                    const bToSymbol = getCoinSymbolLowercase(b.coin_to);
-
-                    const aFromPrice = latestPrices[aFromSymbol]?.usd || 0;
-                    const aToPrice = latestPrices[aToSymbol]?.usd || 0;
-                    const bFromPrice = latestPrices[bFromSymbol]?.usd || 0;
-                    const bToPrice = latestPrices[bToSymbol]?.usd || 0;
-
-                    const aMarketRate = aToPrice / aFromPrice;
-                    const bMarketRate = bToPrice / bFromPrice;
-
-                    const aOfferedRate = parseFloat(a.rate);
-                    const bOfferedRate = parseFloat(b.rate);
-
-                    const aPercentDiff = ((aOfferedRate - aMarketRate) / aMarketRate) * 100;
-                    const bPercentDiff = ((bOfferedRate - bMarketRate) / bMarketRate) * 100;
-
-                    comparison = aPercentDiff - bPercentDiff;
-                    break;
-                case 7: // Trade
-                    comparison = a.offer_id.localeCompare(b.offer_id);
-                    break;
-            }
-            return currentSortDirection === 'desc' ? -comparison : comparison;
-        });
-    }
-    //console.log(`[Debug] Filtered data length: ${filteredData.length}`);
-    return filteredData;
+       filteredData.sort((a, b) => {
+           let comparison;
+           switch(currentSortColumn) {
+               case 0: comparison = a.created_at - b.created_at; break;
+               case 5: comparison = parseFloat(a.rate) - parseFloat(b.rate); break;
+               case 6: comparison = sortValues.get(a.offer_id) - sortValues.get(b.offer_id); break;
+               case 7: comparison = a.offer_id.localeCompare(b.offer_id); break;
+               default: comparison = 0;
+           }
+           return currentSortDirection === 'desc' ? -comparison : comparison;
+       });
+   }
+   
+   return filteredData;
 }
 
 async function calculateProfitLoss(fromCoin, toCoin, fromAmount, toAmount, isOwnOffer) {
@@ -1428,16 +1436,28 @@ function updateClearFiltersButton() {
 }
 
 function cleanupRow(row) {
+    const tooltipTriggers = row.querySelectorAll('[data-tooltip-trigger-id]');
+    tooltipTriggers.forEach(trigger => {
+        const triggerId = trigger.getAttribute('data-tooltip-trigger-id');
+        TooltipRegistry.unregister(triggerId);
+    });
+
     EventManager.removeAll(row);
 
-    const tooltips = row.querySelectorAll('[data-tooltip-target]');
+    const tooltips = row.querySelectorAll('[role="tooltip"]');
     tooltips.forEach(tooltip => {
-        const tooltipId = tooltip.getAttribute('data-tooltip-target');
-        const tooltipElement = document.getElementById(tooltipId);
-        if (tooltipElement) {
-            tooltipElement.remove();
+        if (tooltip && tooltip.parentNode) {
+            tooltip.parentNode.removeChild(tooltip);
         }
     });
+
+    const tooltipContainer = document.querySelector('.tooltip-container');
+    if (tooltipContainer) {
+        const containerTooltips = tooltipContainer.querySelectorAll('[role="tooltip"]');
+        containerTooltips.forEach(tooltip => {
+            tooltipContainer.removeChild(tooltip);
+        });
+    }
 }
 
 function cleanupTable() {
@@ -1490,6 +1510,8 @@ function handleNoOffersScenario() {
 
 async function updateOffersTable() {
     try {
+        TooltipRegistry.cleanup();
+
         const PRICES_CACHE_KEY = 'prices_coingecko';
         const cachedPrices = CacheManager.get(PRICES_CACHE_KEY);
         latestPrices = cachedPrices?.value || getEmptyPriceData();
@@ -1510,16 +1532,13 @@ async function updateOffersTable() {
 
         const BATCH_SIZE = 5;
         const identities = [];
-
         for (let i = 0; i < itemsToDisplay.length; i += BATCH_SIZE) {
             const batch = itemsToDisplay.slice(i, i + BATCH_SIZE);
             const batchPromises = batch.map(offer =>
                 offer.addr_from ? IdentityManager.getIdentityData(offer.addr_from) : Promise.resolve(null)
             );
-
             const batchResults = await Promise.all(batchPromises);
             identities.push(...batchResults);
-
             if (i + BATCH_SIZE < itemsToDisplay.length) {
                 await new Promise(resolve => setTimeout(resolve, 100));
             }
@@ -1533,13 +1552,12 @@ async function updateOffersTable() {
         const totalPages = Math.max(1, Math.ceil(validOffers.length / itemsPerPage));
         currentPage = Math.min(currentPage, totalPages);
 
-        const fragment = document.createDocumentFragment();
-
         const existingRows = offersBody.querySelectorAll('tr');
         existingRows.forEach(row => {
             cleanupRow(row);
         });
 
+        const fragment = document.createDocumentFragment();
         itemsToDisplay.forEach((offer, index) => {
             const identity = identities[index];
             const row = createTableRow(offer, identity);
@@ -1555,7 +1573,6 @@ async function updateOffersTable() {
             initializeTooltips();
             updateRowTimes();
             updatePaginationControls(totalPages);
-
             if (tableRateModule?.initializeTable) {
                 tableRateModule.initializeTable();
             }
@@ -1650,65 +1667,84 @@ function getIdentityInfo(address, identity) {
 }
 
 function createTableRow(offer, identity = null) {
-    const row = document.createElement('tr');
-    const uniqueId = `${offer.offer_id}_${offer.created_at}`;
+   const row = document.createElement('tr');
+   const uniqueId = `${offer.offer_id}_${offer.created_at}`;
 
-    row.className = 'relative opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600';
-    row.setAttribute('data-offer-id', uniqueId);
+   row.className = 'relative opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600';
+   row.setAttribute('data-offer-id', uniqueId);
 
-    const {
-        coin_from: coinFrom,
-        coin_to: coinTo,
-        created_at: createdAt,
-        expire_at: expireAt,
-        amount_from: amountFrom,
-        amount_to: amountTo,
-        is_own_offer: isOwnOffer,
-        is_revoked: isRevoked,
-        is_public: isPublic
-    } = offer;
+   const {
+       coin_from: coinFrom,
+       coin_to: coinTo,
+       created_at: createdAt,
+       expire_at: expireAt,
+       amount_from: amountFrom,
+       amount_to: amountTo,
+       is_own_offer: isOwnOffer,
+       is_revoked: isRevoked,
+       is_public: isPublic
+   } = offer;
 
-    const coinFromSymbol = coinNameToSymbol[coinFrom] || coinFrom.toLowerCase();
-    const coinToSymbol = coinNameToSymbol[coinTo] || coinTo.toLowerCase();
-    const coinFromDisplay = getDisplayName(coinFrom);
-    const coinToDisplay = getDisplayName(coinTo);
-    const postedTime = formatTime(createdAt, true);
-    const expiresIn = formatTime(expireAt);
+   const coinFromSymbol = coinNameToSymbol[coinFrom] || coinFrom.toLowerCase();
+   const coinToSymbol = coinNameToSymbol[coinTo] || coinTo.toLowerCase();
+   const coinFromDisplay = getDisplayName(coinFrom);
+   const coinToDisplay = getDisplayName(coinTo);
+   const postedTime = formatTime(createdAt, true);
+   const expiresIn = formatTime(expireAt);
 
-    const currentTime = Math.floor(Date.now() / 1000);
-    const isActuallyExpired = currentTime > expireAt;
-    const fromAmount = parseFloat(amountFrom) || 0;
-    const toAmount = parseFloat(amountTo) || 0;
+   const currentTime = Math.floor(Date.now() / 1000);
+   const isActuallyExpired = currentTime > expireAt;
+   const fromAmount = parseFloat(amountFrom) || 0;
+   const toAmount = parseFloat(amountTo) || 0;
 
-    row.innerHTML = `
-        ${!isPublic ? createPrivateIndicator() : '<td class="w-0 p-0 m-0"></td>'}
-        ${createTimeColumn(offer, postedTime, expiresIn)}
-        ${createDetailsColumn(offer, identity)}
-        ${createTakerAmountColumn(offer, coinTo, coinFrom)}
-        ${createSwapColumn(offer, coinFromDisplay, coinToDisplay, coinFromSymbol, coinToSymbol)}
-        ${createOrderbookColumn(offer, coinFrom, coinTo)}
-        ${createRateColumn(offer, coinFrom, coinTo)}
-        ${createPercentageColumn(offer)}
-        ${createActionColumn(offer, isActuallyExpired)}
-        ${createTooltips(
-            offer,
-            isOwnOffer,
-            coinFrom,
-            coinTo,
-            fromAmount,
-            toAmount,
-            postedTime,
-            expiresIn,
-            isActuallyExpired,
-            Boolean(isRevoked),
-            identity
-        )}
-    `;
+   row.innerHTML = `
+       ${!isPublic ? createPrivateIndicator() : '<td class="w-0 p-0 m-0"></td>'}
+       ${createTimeColumn(offer, postedTime, expiresIn)}
+       ${createDetailsColumn(offer, identity)}
+       ${createTakerAmountColumn(offer, coinTo, coinFrom)}
+       ${createSwapColumn(offer, coinFromDisplay, coinToDisplay, coinFromSymbol, coinToSymbol)}
+       ${createOrderbookColumn(offer, coinFrom, coinTo)}
+       ${createRateColumn(offer, coinFrom, coinTo)}
+       ${createPercentageColumn(offer)}
+       ${createActionColumn(offer, isActuallyExpired)}
+       ${createTooltips(
+           offer,
+           isOwnOffer,
+           coinFrom,
+           coinTo,
+           fromAmount,
+           toAmount,
+           postedTime,
+           expiresIn,
+           isActuallyExpired,
+           Boolean(isRevoked),
+           identity
+       )}
+   `;
 
-    updateTooltipTargets(row, uniqueId);
-    updateProfitLoss(row, coinFrom, coinTo, fromAmount, toAmount, isOwnOffer);
+   const tooltipTriggers = row.querySelectorAll('[data-tooltip-target]');
+   tooltipTriggers.forEach(trigger => {
 
-    return row;
+       const uniqueTriggerId = `tooltip-trigger-${uniqueId}-${Math.random().toString(36).substr(2, 9)}`;
+       trigger.setAttribute('data-tooltip-trigger-id', uniqueTriggerId);
+
+       const targetId = trigger.getAttribute('data-tooltip-target');
+       const tooltipElement = document.getElementById(targetId);
+       
+       if (tooltipElement) {
+           const tooltip = new Tooltip(tooltipElement, trigger, {
+               placement: trigger.getAttribute('data-tooltip-placement') || 'top',
+               triggerType: trigger.getAttribute('data-tooltip-trigger') || 'hover',
+               offset: 8
+           });
+           TooltipRegistry.register(uniqueTriggerId, tooltip);
+       }
+   });
+
+   updateTooltipTargets(row, uniqueId);
+   updateProfitLoss(row, coinFrom, coinTo, fromAmount, toAmount, isOwnOffer);
+
+   return row;
 }
 
 function createPrivateIndicator() {
@@ -2653,29 +2689,50 @@ function handleTableSort(columnIndex, header) {
         currentSortDirection = 'desc';
     }
 
-    document.querySelectorAll('.sort-icon').forEach(icon => {
-        icon.classList.remove('text-blue-500');
-        icon.textContent = '↓';
-    });
-
-    const sortIcon = document.getElementById(`sort-icon-${columnIndex}`);
-    if (sortIcon) {
-        sortIcon.textContent = currentSortDirection === 'asc' ? '↑' : '↓';
-        sortIcon.classList.add('text-blue-500');
-    }
+    localStorage.setItem('offersTableSettings', JSON.stringify({
+        coin_to: document.getElementById('coin_to').value,
+        coin_from: document.getElementById('coin_from').value,
+        status: document.getElementById('status')?.value || 'any',
+        sent_from: document.getElementById('sent_from').value,
+        sortColumn: currentSortColumn,
+        sortDirection: currentSortDirection
+    }));
 
     document.querySelectorAll('th[data-sortable="true"]').forEach(th => {
-        if (th === header) {
-            th.classList.add('text-blue-500');
+        const columnSpan = th.querySelector('span:not(.sort-icon)');
+        const icon = th.querySelector('.sort-icon');
+        const thisColumnIndex = parseInt(th.getAttribute('data-column-index'));
+
+        if (thisColumnIndex === columnIndex) {
+            if (columnSpan) {
+                columnSpan.classList.remove('text-gray-600', 'dark:text-gray-300');
+                columnSpan.classList.add('text-blue-500', 'dark:text-blue-500');
+            }
+            if (icon) {
+                icon.classList.remove('text-gray-600', 'dark:text-gray-400');
+                icon.classList.add('text-blue-500', 'dark:text-blue-500');
+                icon.textContent = currentSortDirection === 'asc' ? '↑' : '↓';
+            }
         } else {
-            th.classList.remove('text-blue-500');
+            if (columnSpan) {
+                columnSpan.classList.remove('text-blue-500', 'dark:text-blue-500');
+                columnSpan.classList.add('text-gray-600', 'dark:text-gray-300');
+            }
+            if (icon) {
+                icon.classList.remove('text-blue-500', 'dark:text-blue-500');
+                icon.classList.add('text-gray-600', 'dark:text-gray-400');
+                icon.textContent = '↓';
+            }
         }
     });
 
-    localStorage.setItem('tableSortColumn', currentSortColumn);
-    localStorage.setItem('tableSortDirection', currentSortDirection);
-
-    applyFilters();
+    if (window.sortTimeout) {
+        clearTimeout(window.sortTimeout);
+    }
+    
+    window.sortTimeout = setTimeout(() => {
+        applyFilters();
+    }, 100);
 }
 
 // TIMER MANAGEMENT
@@ -2713,237 +2770,266 @@ const timerManager = {
 
 // INITIALIZATION AND EVENT BINDING
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('DOM content loaded, initializing...');
-    console.log('View type:', isSentOffers ? 'sent offers' : 'received offers');
+   const saved = localStorage.getItem('offersTableSettings');
+   if (saved) {
+       const settings = JSON.parse(saved);
 
-    updateClearFiltersButton();
-    initializeTableEvents();
+       ['coin_to', 'coin_from', 'status', 'sent_from'].forEach(id => {
+           const element = document.getElementById(id);
+           if (element && settings[id]) element.value = settings[id];
+       });
 
-    setTimeout(() => {
-        console.log('Starting WebSocket initialization...');
-        WebSocketManager.initialize();
-    }, 1000);
 
-    if (initializeTableRateModule()) {
-        continueInitialization();
-    } else {
-        let retryCount = 0;
-        const maxRetries = 5;
-        const retryInterval = setInterval(() => {
-            retryCount++;
-            if (initializeTableRateModule()) {
-                clearInterval(retryInterval);
-                continueInitialization();
-            } else if (retryCount >= maxRetries) {
-                clearInterval(retryInterval);
-                continueInitialization();
-            }
-        }, 1000);
-    }
+       if (settings.sortColumn !== undefined) {
+           currentSortColumn = settings.sortColumn;
+           currentSortDirection = settings.sortDirection;
 
-    timerManager.addInterval(() => {
-        if (WebSocketManager.isConnected()) {
-            console.log('WebSocket Status: Connected');
-        }
-    }, 30000);
 
-    timerManager.addInterval(() => {
-        CacheManager.cleanup();
-    }, 300000);
+           document.querySelectorAll('.sort-icon').forEach(icon => {
+               icon.classList.remove('text-blue-500');
+               icon.textContent = '↓';
+           });
 
-    updateCoinFilterImages();
-    fetchOffers().then(() => {
-        applyFilters();
-    }).catch(error => {
-        console.error('Error fetching initial offers:', error);
-    });
+           const sortIcon = document.getElementById(`sort-icon-${currentSortColumn}`);
+           if (sortIcon) {
+               sortIcon.textContent = currentSortDirection === 'asc' ? '↑' : '↓';
+               sortIcon.classList.add('text-blue-500');
+           }
+       }
+   }
 
-    const listingLabel = document.querySelector('span[data-listing-label]');
-    if (listingLabel) {
-        listingLabel.textContent = isSentOffers ? 'Total Listings: ' : 'Network Listings: ';
-    }
+   updateClearFiltersButton();
+   initializeTableEvents();
+   initializeTooltips();
+   updateCoinFilterImages();
 
-    timerManager.addInterval(updateRowTimes, 900000);
+   setTimeout(() => {
+       WebSocketManager.initialize();
+   }, 1000);
 
-    EventManager.add(document, 'visibilitychange', () => {
-        if (!document.hidden) {
-            console.log('Page became visible, checking WebSocket connection');
-            if (!WebSocketManager.isConnected()) {
-                WebSocketManager.connect();
-            }
-        }
-    });
+   if (initializeTableRateModule()) {
+       continueInitialization();
+   } else {
+       let retryCount = 0;
+       const maxRetries = 5;
+       const retryInterval = setInterval(() => {
+           retryCount++;
+           if (initializeTableRateModule()) {
+               clearInterval(retryInterval);
+               continueInitialization();
+           } else if (retryCount >= maxRetries) {
+               clearInterval(retryInterval);
+               continueInitialization();
+           }
+       }, 1000);
+   }
 
-    EventManager.add(window, 'beforeunload', () => {
-        cleanup();
-    });
+   timerManager.addInterval(() => {
+       if (WebSocketManager.isConnected()) {
+           console.log('WebSocket Status: Connected');
+       }
+   }, 30000);
 
-    console.log('Initialization completed');
+   timerManager.addInterval(() => {
+       CacheManager.cleanup();
+   }, 300000);
+
+   timerManager.addInterval(() => {
+       const currentCount = document.querySelectorAll('[role="tooltip"]').length;
+       const containerCount = document.querySelector('.tooltip-container')?.children.length || 0;
+       const registryCount = TooltipRegistry.activeTooltips.size;
+       const detachedCount = currentCount - containerCount;
+
+       console.log(
+           `[${new Date().toLocaleTimeString()}] Snex Tooltip Stats:\n`,
+           `Total tooltips: ${currentCount}\n`,
+           `Container tooltips: ${containerCount}\n`, 
+           `Registry entries: ${registryCount}\n`,
+           `Detached tooltips: ${detachedCount}\n`,
+           `Memory risk: ${detachedCount > 100 ? 'HIGH' : '✓ None'}`
+       );
+   }, 60000);
+
+   timerManager.addInterval(updateRowTimes, 900000);
+
+   EventManager.add(document, 'visibilitychange', () => {
+       if (!document.hidden) {
+           if (!WebSocketManager.isConnected()) {
+               WebSocketManager.connect();
+           }
+       }
+   });
+
+   EventManager.add(window, 'beforeunload', () => {
+       cleanup();
+   });
+
+   updateCoinFilterImages();
+   fetchOffers().then(() => {
+       applyFilters();
+       if (!isSentOffers) {
+           return;
+       }
+   }).catch(error => {
+       console.error('Error fetching initial offers:', error);
+   });
+
+   const listingLabel = document.querySelector('span[data-listing-label]');
+   if (listingLabel) {
+       listingLabel.textContent = isSentOffers ? 'Total Listings: ' : 'Network Listings: ';
+   }
+
+   const tooltipObserver = new MutationObserver((mutations) => {
+       mutations.forEach((mutation) => {
+           if (mutation.type === 'childList') {
+               const tooltips = document.querySelectorAll('[role="tooltip"]');
+               if (tooltips.length > 100) {
+                   TooltipRegistry.cleanup();
+               }
+           }
+       });
+   });
+
+   const tooltipContainer = document.querySelector('.tooltip-container');
+   if (tooltipContainer) {
+       tooltipObserver.observe(tooltipContainer, {
+           childList: true,
+           subtree: true
+       });
+   }
 });
 
 async function cleanup() {
-    const debug = {
-        startTime: Date.now(),
-        steps: [],
-        errors: [],
-        addStep: function(step, details = null) {
-            const timeFromStart = Date.now() - this.startTime;
-            console.log(`[Cleanup ${timeFromStart}ms] ${step}`, details || '');
-            this.steps.push({ step, time: timeFromStart, details });
-        },
-        addError: function(step, error) {
-            const timeFromStart = Date.now() - this.startTime;
-            console.error(`[Cleanup Error ${timeFromStart}ms] ${step}:`, error);
-            this.errors.push({ step, error, time: timeFromStart });
-        },
-        summarize: function() {
-            const totalTime = Date.now() - this.startTime;
-            console.group('Cleanup Summary');
-            console.log(`Total cleanup time: ${totalTime}ms`);
-            console.log('Steps completed:', this.steps.length);
-            console.log('Errors encountered:', this.errors.length);
+   const debug = {
+       startTime: Date.now(),
+       steps: [],
+       errors: [],
+       addStep: function(step, details = null) {
+           const timeFromStart = Date.now() - this.startTime;
+           console.log(`[Cleanup ${timeFromStart}ms] ${step}`, details || '');
+           this.steps.push({ step, time: timeFromStart, details });
+       },
+       addError: function(step, error) {
+           const timeFromStart = Date.now() - this.startTime;
+           console.error(`[Cleanup Error ${timeFromStart}ms] ${step}:`, error);
+           this.errors.push({ step, error, time: timeFromStart });
+       },
+       summarizeLogs: function() {
+           console.log('Cleanup Summary:');
+           console.log(`Total cleanup time: ${Date.now() - this.startTime}ms`);
+           console.log(`Steps completed: ${this.steps.length}`);
+           console.log(`Errors encountered: ${this.errors.length}`);
+       }
+   };
 
-            if (this.steps.length > 0) {
-                console.group('Steps Timeline');
-                this.steps.forEach(({step, time}) => {
-                    console.log(`${time}ms - ${step}`);
-                });
-                console.groupEnd();
-            }
+   try {
+       debug.addStep('Starting cleanup process');
 
-            if (this.errors.length > 0) {
-                console.group('Errors');
-                this.errors.forEach(({step, error, time}) => {
-                    console.log(`${time}ms - ${step}:`, error);
-                });
-                console.groupEnd();
-            }
-            console.groupEnd();
-        }
-    };
+       debug.addStep('Starting tooltip cleanup');
+       TooltipRegistry.cleanup();
+       debug.addStep('Tooltip cleanup completed');
 
-    try {
-        debug.addStep('Starting cleanup process');
+       debug.addStep('Clearing timers');
+       const timerCount = timerManager.intervals.length + timerManager.timeouts.length;
+       timerManager.clearAll();
+       debug.addStep('Timers cleared', `Cleaned up ${timerCount} timers`);
 
-        debug.addStep('Clearing timers');
-        const timerCount = timerManager.intervals.length + timerManager.timeouts.length;
-        timerManager.clearAll();
-        debug.addStep('Timers cleared', `Cleaned up ${timerCount} timers`);
+       debug.addStep('Starting WebSocket cleanup');
+       await Promise.resolve(WebSocketManager.cleanup()).catch(error => {
+           debug.addError('WebSocket cleanup', error);
+       });
+       debug.addStep('WebSocket cleanup completed');
 
-        debug.addStep('Starting WebSocket cleanup');
-        await Promise.resolve(WebSocketManager.cleanup()).catch(error => {
-            debug.addError('WebSocket cleanup', error);
-        });
-        debug.addStep('WebSocket cleanup completed');
+       debug.addStep('Clearing event listeners');
+       const listenerCount = EventManager.listeners.size;
+       EventManager.clearAll();
+       debug.addStep('Event listeners cleared', `Cleaned up ${listenerCount} listeners`);
 
-        debug.addStep('Clearing event listeners');
-        const listenerCount = EventManager.listeners.size;
-        EventManager.clearAll();
-        debug.addStep('Event listeners cleared', `Cleaned up ${listenerCount} listeners`);
+       debug.addStep('Starting table cleanup');
+       const rowCount = offersBody ? offersBody.querySelectorAll('tr').length : 0;
+       cleanupTable();
+       debug.addStep('Table cleanup completed', `Cleaned up ${rowCount} rows`);
 
-        debug.addStep('Starting table cleanup');
-        const rowCount = offersBody ? offersBody.querySelectorAll('tr').length : 0;
-        cleanupTable();
-        debug.addStep('Table cleanup completed', `Cleaned up ${rowCount} rows`);
+       debug.addStep('Resetting global state');
+       const globals = {
+           currentPage: currentPage,
+           dataLength: jsonData.length,
+           originalDataLength: originalJsonData.length
+       };
+       currentPage = 1;
+       jsonData = [];
+       originalJsonData = [];
+       currentSortColumn = 0;
+       currentSortDirection = 'desc';
+       filterTimeout = null;
+       latestPrices = null;
+       lastRefreshTime = null;
+       debug.addStep('Global state reset', globals);
 
-        debug.addStep('Resetting global state');
-        const globals = {
-            currentPage: currentPage,
-            dataLength: jsonData.length,
-            originalDataLength: originalJsonData.length
-        };
-        currentPage = 1;
-        jsonData = [];
-        originalJsonData = [];
-        currentSortColumn = 0;
-        currentSortDirection = 'desc';
-        filterTimeout = null;
-        latestPrices = null;
-        lastRefreshTime = null;
-        debug.addStep('Global state reset', globals);
+       debug.addStep('Clearing global references');
+       [
+           'WebSocketManager',
+           'tableRateModule',
+           'offersBody',
+           'filterForm',
+           'prevPageButton',
+           'nextPageButton',
+           'currentPageSpan',
+           'totalPagesSpan',
+           'lastRefreshTimeSpan',
+           'newEntriesCountSpan'
+       ].forEach(ref => {
+           if (window[ref]) {
+               window[ref] = null;
+           }
+       });
+       debug.addStep('Global references cleared');
 
-        debug.addStep('Clearing global references');
-        if (window.WebSocketManager) {
-            window.WebSocketManager = null;
-        }
-        if (window.tableRateModule) {
-            window.tableRateModule = null;
-        }
-        debug.addStep('Global references cleared');
+       debug.addStep('Cleaning up tooltip containers');
+       const tooltipContainers = document.querySelectorAll('.tooltip-container');
+       tooltipContainers.forEach(container => {
+           if (container && container.parentNode) {
+               container.parentNode.removeChild(container);
+           }
+       });
+       debug.addStep('Tooltip containers cleaned up');
 
-        debug.addStep('Clearing DOM references');
-        const elementRefs = [
-            'offersBody',
-            'filterForm',
-            'prevPageButton',
-            'nextPageButton',
-            'currentPageSpan',
-            'totalPagesSpan',
-            'lastRefreshTimeSpan',
-            'newEntriesCountSpan'
-        ];
-        let clearedRefs = 0;
-        elementRefs.forEach(ref => {
-            if (window[ref]) {
-                window[ref] = null;
-                clearedRefs++;
-            }
-        });
-        debug.addStep('DOM references cleared', `Cleared ${clearedRefs} references`);
+       debug.addStep('Clearing document/window events');
+       ['visibilitychange', 'beforeunload', 'scroll'].forEach(event => {
+           document.removeEventListener(event, null);
+           window.removeEventListener(event, null);
+       });
+       debug.addStep('Document/window events cleared');
 
-        debug.addStep('Clearing tooltips');
-        const tooltips = document.querySelectorAll('[role="tooltip"]');
-        const tooltipCount = tooltips.length;
-        tooltips.forEach(tooltip => tooltip.remove());
-        debug.addStep('Tooltips cleared', `Removed ${tooltipCount} tooltips`);
+       debug.addStep('Clearing localStorage items');
+       try {
+           localStorage.removeItem('tableSortColumn');
+           localStorage.removeItem('tableSortDirection');
+           debug.addStep('localStorage items cleared');
+       } catch (e) {
+           debug.addError('localStorage cleanup', e);
+       }
 
-        debug.addStep('Clearing document/window events');
-        const events = ['visibilitychange', 'beforeunload', 'scroll'];
-        events.forEach(event => {
-            document.removeEventListener(event, null);
-            window.removeEventListener(event, null);
-        });
-        debug.addStep('Document/window events cleared');
+   } catch (error) {
+       debug.addError('Main cleanup process', error);
 
-        debug.addStep('Clearing localStorage items');
-        try {
-            localStorage.removeItem('tableSortColumn');
-            localStorage.removeItem('tableSortDirection');
-            debug.addStep('localStorage items cleared');
-        } catch (e) {
-            debug.addError('localStorage cleanup', e);
-        }
-
-    } catch (error) {
-        debug.addError('Main cleanup process', error);
-
-        debug.addStep('Starting failsafe cleanup');
-        try {
-            WebSocketManager.cleanup();
-            EventManager.clearAll();
-            timerManager.clearAll();
-            if (window.ws) {
-                window.ws.close();
-                window.ws = null;
-            }
-            debug.addStep('Failsafe cleanup completed');
-        } catch (criticalError) {
-            debug.addError('Critical failsafe cleanup', criticalError);
-        }
-    } finally {
-        debug.addStep('Running final cleanups');
-        if (document.body.classList.contains('optimize-scroll')) {
-            document.body.classList.remove('optimize-scroll');
-        }
-        if (document.body.classList.contains('is-scrolling')) {
-            document.body.classList.remove('is-scrolling');
-        }
-        const inlineStyles = document.querySelectorAll('style[data-dynamic]');
-        inlineStyles.forEach(style => style.remove());
-        debug.addStep('Final cleanups completed');
-
-        debug.summarize();
-    }
+       debug.addStep('Starting failsafe cleanup');
+       try {
+           TooltipRegistry.cleanup();
+           WebSocketManager.cleanup();
+           EventManager.clearAll();
+           timerManager.clearAll();
+           if (window.ws) {
+               window.ws.close();
+               window.ws = null;
+           }
+           debug.addStep('Failsafe cleanup completed');
+       } catch (criticalError) {
+           debug.addError('Critical failsafe cleanup', criticalError);
+       }
+   } finally {
+       debug.summarizeLogs();
+   }
 }
 
 window.cleanup = cleanup;

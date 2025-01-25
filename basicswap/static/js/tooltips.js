@@ -33,7 +33,6 @@
         }
     }
 
-
     function rafThrottle(callback) {
         let requestId = null;
         let lastArgs = null;
@@ -109,6 +108,7 @@
             this._initialized = false;
             this._hideTimeout = null;
             this._showTimeout = null;
+            this._rafId = null;
 
             if (this._targetEl.parentNode !== tooltipContainer) {
                 tooltipContainer.appendChild(this._targetEl);
@@ -119,7 +119,7 @@
 
             this._showHandler = this.show.bind(this);
             this._hideHandler = this._handleHide.bind(this);
-            this._updatePosition = rafThrottle(() => {
+            this._scrollHandler = rafThrottle(() => {
                 if (this._visible) {
                     positionElement(
                         this._targetEl,
@@ -166,28 +166,9 @@
                 this._triggerEl.addEventListener('click', this._showHandler);
             }
 
-            window.addEventListener('scroll', this._updatePosition, { passive: true });
-            document.addEventListener('scroll', this._updatePosition, { passive: true, capture: true });
-            window.addEventListener('resize', this._updatePosition, { passive: true });
-
-            let rafId;
-            const smoothUpdate = () => {
-                if (this._visible) {
-                    this._updatePosition();
-                    rafId = requestAnimationFrame(smoothUpdate);
-                }
-            };
-
-            this._startSmoothUpdate = () => {
-                if (!rafId) rafId = requestAnimationFrame(smoothUpdate);
-            };
-
-            this._stopSmoothUpdate = () => {
-                if (rafId) {
-                    cancelAnimationFrame(rafId);
-                    rafId = null;
-                }
-            };
+            window.addEventListener('scroll', this._scrollHandler, { passive: true });
+            document.addEventListener('scroll', this._scrollHandler, { passive: true, capture: true });
+            window.addEventListener('resize', this._scrollHandler, { passive: true });
         }
 
         _handleHide() {
@@ -231,10 +212,31 @@
             this._options.onHide();
         }
 
+        _startSmoothUpdate() {
+            const update = () => {
+                if (this._visible) {
+                    this._scrollHandler();
+                    this._rafId = requestAnimationFrame(update);
+                }
+            };
+            this._rafId = requestAnimationFrame(update);
+        }
+
+        _stopSmoothUpdate() {
+            if (this._rafId) {
+                cancelAnimationFrame(this._rafId);
+                this._rafId = null;
+            }
+        }
+
         destroy() {
             clearTimeout(this._hideTimeout);
             clearTimeout(this._showTimeout);
-            this._stopSmoothUpdate();
+            
+            if (this._rafId) {
+                cancelAnimationFrame(this._rafId);
+                this._rafId = null;
+            }
 
             this._triggerEl.removeEventListener('mouseenter', this._showHandler);
             this._triggerEl.removeEventListener('mouseleave', this._hideHandler);
@@ -247,19 +249,23 @@
                 this._triggerEl.removeEventListener('click', this._showHandler);
             }
 
-            window.removeEventListener('scroll', this._updatePosition);
-            document.removeEventListener('scroll', this._updatePosition, true);
-            window.removeEventListener('resize', this._updatePosition);
+            window.removeEventListener('scroll', this._scrollHandler);
+            document.removeEventListener('scroll', this._scrollHandler, true);
+            window.removeEventListener('resize', this._scrollHandler);
 
             this._targetEl.style.visibility = '';
             this._targetEl.style.opacity = '';
             this._targetEl.style.transform = '';
 
             if (this._targetEl.parentNode === tooltipContainer) {
-                document.body.appendChild(this._targetEl);
+                this._targetEl.parentNode.removeChild(this._targetEl);
             }
 
+            this._targetEl = null;
+            this._triggerEl = null;
+            this._options = null;
             this._initialized = false;
+            this._visible = false;
         }
 
         toggle() {
@@ -277,8 +283,14 @@
         ensureContainerExists();
         
         document.querySelectorAll('[data-tooltip-target]').forEach(triggerEl => {
-            if (tooltips.has(triggerEl)) return;
-
+            const oldTooltip = tooltips.get(triggerEl);
+            if (oldTooltip) {
+                oldTooltip.destroy();
+                tooltips.delete(triggerEl);
+            }
+        });
+        
+        document.querySelectorAll('[data-tooltip-target]').forEach(triggerEl => {
             const targetId = triggerEl.getAttribute('data-tooltip-target');
             const targetEl = document.getElementById(targetId);
             
