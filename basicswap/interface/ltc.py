@@ -18,7 +18,7 @@ class LTCInterface(BTCInterface):
 
     def __init__(self, coin_settings, network, swap_client=None):
         super(LTCInterface, self).__init__(coin_settings, network, swap_client)
-        self._rpc_wallet_mweb = "mweb"
+        self._rpc_wallet_mweb = coin_settings.get("mweb_wallet_name", "mweb")
         self.rpc_wallet_mweb = make_rpc_func(
             self._rpcport,
             self._rpcauth,
@@ -94,7 +94,7 @@ class LTCInterfaceMWEB(LTCInterface):
 
     def __init__(self, coin_settings, network, swap_client=None):
         super(LTCInterfaceMWEB, self).__init__(coin_settings, network, swap_client)
-        self._rpc_wallet = "mweb"
+        self._rpc_wallet = coin_settings.get("mweb_wallet_name", "mweb")
         self.rpc_wallet = make_rpc_func(
             self._rpcport, self._rpcauth, host=self._rpc_host, wallet=self._rpc_wallet
         )
@@ -128,7 +128,7 @@ class LTCInterfaceMWEB(LTCInterface):
 
         self._log.info("init_wallet - {}".format(self.ticker()))
 
-        self._log.info("Creating mweb wallet for {}.".format(self.coin_name()))
+        self._log.info(f"Creating wallet {self._rpc_wallet} for {self.coin_name()}.")
         # wallet_name, disable_private_keys, blank, passphrase, avoid_reuse, descriptors, load_on_startup
         self.rpc("createwallet", ["mweb", False, True, password, False, False, True])
 

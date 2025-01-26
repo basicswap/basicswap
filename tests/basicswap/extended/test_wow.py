@@ -189,7 +189,7 @@ class Test(BaseTest):
             "walletrpcport": WOW_BASE_WALLET_RPC_PORT + node_id,
             "walletrpcuser": "test" + str(node_id),
             "walletrpcpassword": "test_pass" + str(node_id),
-            "walletfile": "testwallet",
+            "wallet_name": "testwallet",
             "datadir": os.path.join(datadir, "xmr_" + str(node_id)),
             "bindir": WOW_BINDIR,
         }

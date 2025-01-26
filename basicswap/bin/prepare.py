@@ -33,7 +33,7 @@ import basicswap.config as cfg
 from basicswap import __version__
 from basicswap.base import getaddrinfo_tor
 from basicswap.basicswap import BasicSwap
-from basicswap.chainparams import Coins
+from basicswap.chainparams import Coins, chainparams, getCoinIdFromName
 from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
 from basicswap.ui.util import getCoinName
 from basicswap.util import toBool
@@ -361,6 +361,18 @@ def shouldManageDaemon(prefix: str) -> bool:
         return True
 
     return toBool(manage_daemon)
+
+
+def getWalletName(coin_params: str, default_name: str, prefix_override=None) -> str:
+    prefix: str = coin_params["ticker"] if prefix_override is None else prefix_override
+    env_var_name: str = prefix + "_WALLET_NAME"
+
+    if env_var_name in os.environ and coin_params.get("has_multiwallet", True) is False:
+        raise ValueError("Can't set wallet name for {}.".format(coin_params["ticker"]))
+
+    wallet_name: str = os.getenv(env_var_name, default_name)
+    assert len(wallet_name) > 0
+    return wallet_name
 
 
 def getKnownVersion(coin_name: str) -> str:
@@ -1121,6 +1133,8 @@ def writeTorSettings(fp, coin, coin_settings, tor_control_password):
 
 def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
     core_settings = settings["chainclients"][coin]
+    wallet_name = core_settings.get("wallet_name", "wallet.dat")
+    assert len(wallet_name) > 0
     data_dir = core_settings["datadir"]
     tor_control_password = extra_opts.get("tor_control_password", None)
 
@@ -1301,7 +1315,7 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
         fp.write("rpcport={}\n".format(core_settings["rpcport"]))
         fp.write("printtoconsole=0\n")
         fp.write("daemon=0\n")
-        fp.write("wallet=wallet.dat\n")
+        fp.write(f"wallet={wallet_name}\n")
 
         if tor_control_password is not None:
             writeTorSettings(fp, coin, core_settings, tor_control_password)
@@ -1771,6 +1785,7 @@ def initialise_wallets(
             ] + [c for c in with_coins if c != "particl"]
             for coin_name in start_daemons:
                 coin_settings = settings["chainclients"][coin_name]
+                wallet_name = coin_settings.get("wallet_name", "wallet.dat")
                 c = swap_client.getCoinIdFromName(coin_name)
 
                 if c == Coins.XMR:
@@ -1862,9 +1877,9 @@ def initialise_wallets(
                     swap_client.waitForDaemonRPC(c, with_wallet=False)
                     # Create wallet if it doesn't exist yet
                     wallets = swap_client.callcoinrpc(c, "listwallets")
-                    if len(wallets) < 1:
+                    if wallet_name not in wallets:
                         logger.info(
-                            "Creating wallet.dat for {}.".format(getCoinName(c))
+                            f'Creating wallet "{wallet_name}" for {getCoinName(c)}.'
                         )
 
                         if c in (Coins.BTC, Coins.LTC, Coins.DOGE, Coins.DASH):
@@ -1873,7 +1888,7 @@ def initialise_wallets(
                                 c,
                                 "createwallet",
                                 [
-                                    "wallet.dat",
+                                    wallet_name,
                                     False,
                                     True,
                                     WALLET_ENCRYPTION_PWD,
@@ -1883,7 +1898,13 @@ def initialise_wallets(
                             )
                             swap_client.ci(c).unlockWallet(WALLET_ENCRYPTION_PWD)
                         else:
-                            swap_client.callcoinrpc(c, "createwallet", ["wallet.dat"])
+                            swap_client.callcoinrpc(
+                                c,
+                                "createwallet",
+                                [
+                                    wallet_name,
+                                ],
+                            )
                             if WALLET_ENCRYPTION_PWD != "":
                                 encrypt_wallet(swap_client, c)
 
@@ -2400,7 +2421,6 @@ def main():
             "walletrpchost": XMR_WALLET_RPC_HOST,
             "walletrpcuser": XMR_WALLET_RPC_USER,
             "walletrpcpassword": XMR_WALLET_RPC_PWD,
-            "walletfile": "swap_wallet",
             "datadir": os.getenv("XMR_DATA_DIR", os.path.join(data_dir, "monero")),
             "bindir": os.path.join(bin_dir, "monero"),
             "restore_height": xmr_restore_height,
@@ -2487,7 +2507,6 @@ def main():
             "walletrpchost": WOW_WALLET_RPC_HOST,
             "walletrpcuser": WOW_WALLET_RPC_USER,
             "walletrpcpassword": WOW_WALLET_RPC_PWD,
-            "walletfile": "swap_wallet",
             "datadir": os.getenv("WOW_DATA_DIR", os.path.join(data_dir, "wownero")),
             "bindir": os.path.join(bin_dir, "wownero"),
             "restore_height": wow_restore_height,
@@ -2499,6 +2518,25 @@ def main():
             "core_type_group": "xmr",
         },
     }
+
+    for coin_name, coin_settings in chainclients.items():
+        coin_id = getCoinIdFromName(coin_name)
+        coin_params = chainparams[coin_id]
+        if coin_settings.get("core_type_group", "") == "xmr":
+            default_name = "swap_wallet"
+        else:
+            default_name = "wallet.dat"
+
+        if coin_name == "litecoin":
+            set_name: str = getWalletName(
+                coin_params, "mweb", prefix_override="LTC_MWEB"
+            )
+            if set_name != "mweb":
+                coin_settings["mweb_wallet_name"] = set_name
+
+        set_name: str = getWalletName(coin_params, default_name)
+        if set_name != default_name:
+            coin_settings["wallet_name"] = set_name
 
     if PART_RPC_USER != "":
         chainclients["particl"]["rpcuser"] = PART_RPC_USER

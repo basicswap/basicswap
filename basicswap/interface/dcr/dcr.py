@@ -277,6 +277,9 @@ class DCRInterface(Secp256k1Interface):
         self._connection_type = coin_settings["connection_type"]
         self._altruistic = coin_settings.get("altruistic", True)
 
+        if "wallet_name" in coin_settings:
+            raise ValueError(f"Invalid setting for {self.coin_name()}: wallet_name")
+
     def open_rpc(self):
         return openrpc(self._rpcport, self._rpcauth, host=self._rpc_host)
 
