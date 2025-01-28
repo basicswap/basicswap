@@ -256,7 +256,7 @@ def page_bids(self, url_split, post_string, sent=False, available=False, receive
             "received_bids": [
                 (
                     format_timestamp(b[0]),
-                    b[2].hex(), 
+                    b[2].hex(),
                     b[3].hex(),
                     strBidState(b[5]),
                     strTxState(b[7]),
