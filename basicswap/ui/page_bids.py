@@ -149,13 +149,12 @@ def page_bid(self, url_split, post_string):
     )
 
 
-def page_bids(
-    self, url_split, post_string, sent=False, available=False, received=False
-):
+def page_bids(self, url_split, post_string, sent=False, available=False, received=False):
     server = self.server
     swap_client = server.swap_client
     swap_client.checkSystemStatus()
     summary = swap_client.getSummary()
+    filter_key = "page_available_bids" if available else "page_bids"
 
     filters = {
         "page_no": 1,
@@ -169,26 +168,15 @@ def page_bids(
         filters["bid_state_ind"] = BidStates.BID_RECEIVED
         filters["with_expired"] = False
 
-    filter_prefix = (
-        "page_bids_sent"
-        if sent
-        else "page_bids_available" if available else "page_bids_received"
-    )
     messages = []
     form_data = self.checkForm(post_string, "bids", messages)
     if form_data:
         if have_data_entry(form_data, "clearfilters"):
-            swap_client.clearFilters(filter_prefix)
+            swap_client.clearFilters(filter_key)
         else:
             if have_data_entry(form_data, "sort_by"):
                 sort_by = get_data_entry(form_data, "sort_by")
-                ensure(
-                    sort_by
-                    in [
-                        "created_at",
-                    ],
-                    "Invalid sort by",
-                )
+                ensure(sort_by in ["created_at"], "Invalid sort by")
                 filters["sort_by"] = sort_by
             if have_data_entry(form_data, "sort_dir"):
                 sort_dir = get_data_entry(form_data, "sort_dir")
@@ -199,7 +187,7 @@ def page_bids(
                 if state_ind != -1:
                     try:
                         _ = BidStates(state_ind)
-                    except Exception as e:  # noqa: F841
+                    except Exception:
                         raise ValueError("Invalid state")
                 filters["bid_state_ind"] = state_ind
             if have_data_entry(form_data, "with_expired"):
@@ -208,38 +196,52 @@ def page_bids(
 
             set_pagination_filters(form_data, filters)
         if have_data_entry(form_data, "applyfilters"):
-            swap_client.setFilters(filter_prefix, filters)
+            swap_client.setFilters(filter_key, filters)
     else:
-        saved_filters = swap_client.getFilters(filter_prefix)
+        saved_filters = swap_client.getFilters(filter_key)
         if saved_filters:
             filters.update(saved_filters)
-
-    bids = swap_client.listBids(sent=sent, filters=filters)
 
     page_data = {
         "bid_states": listBidStates(),
     }
+
+    if available:
+        bids = swap_client.listBids(sent=False, filters=filters)
+        template = server.env.get_template("bids_available.html")
+        return self.render_template(
+            template,
+            {
+                "page_type_available": "Bids Available",
+                "page_type_available_description": "Bids available for you to accept.",
+                "messages": messages,
+                "filters": filters,
+                "data": page_data,
+                "summary": summary,
+                "filter_key": filter_key,
+                "bids": [
+                    (format_timestamp(b[0]), b[2].hex(), b[3].hex(),
+                     strBidState(b[5]), strTxState(b[7]),
+                     strTxState(b[8]), b[11])
+                    for b in bids
+                ],
+                "bids_count": len(bids),
+            }
+        )
+
+    sent_bids = swap_client.listBids(sent=True, filters=filters)
+    received_bids = swap_client.listBids(sent=False, filters=filters)
+
     template = server.env.get_template("bids.html")
     return self.render_template(
         template,
         {
-            "page_type_sent": "Bids Sent" if sent else "",
-            "page_type_available": "Bids Available" if available else "",
-            "page_type_received": "Received Bids" if received else "",
-            "page_type_sent_description": (
-                "All the bids you have placed on offers." if sent else ""
-            ),
-            "page_type_available_description": (
-                "Bids available for you to accept." if available else ""
-            ),
-            "page_type_received_description": (
-                "All the bids placed on your offers." if received else ""
-            ),
             "messages": messages,
             "filters": filters,
             "data": page_data,
             "summary": summary,
-            "bids": [
+            "filter_key": filter_key,
+            "sent_bids": [
                 (
                     format_timestamp(b[0]),
                     b[2].hex(),
@@ -249,8 +251,22 @@ def page_bids(
                     strTxState(b[8]),
                     b[11],
                 )
-                for b in bids
+                for b in sent_bids
             ],
-            "bids_count": len(bids),
+            "received_bids": [
+                (
+                    format_timestamp(b[0]),
+                    b[2].hex(), 
+                    b[3].hex(),
+                    strBidState(b[5]),
+                    strTxState(b[7]),
+                    strTxState(b[8]),
+                    b[11],
+                )
+                for b in received_bids
+            ],
+            "sent_bids_count": len(sent_bids),
+            "received_bids_count": len(received_bids),
+            "bids_count": len(sent_bids) + len(received_bids),
         },
     )

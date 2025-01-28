@@ -331,9 +331,6 @@ function getWebSocketConfig() {
 </section>
 
 <section>
-  <div id="jsonView" class="hidden mb-4">
-    <pre id="jsonContent" class="bg-gray-100 p-4 rounded overflow-auto" style="max-height: 300px;"></pre>
-  </div>
   <div class="mt-5 lg:container mx-auto lg:px-0 px-6">
     <div class="pt-0 pb-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
       <div class="px-0">
@@ -399,11 +396,9 @@ function getWebSocketConfig() {
                     <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Market +/-</span>
                     <span class="sort-icon ml-1 text-gray-600 dark:text-gray-400" id="sort-icon-6">↓</span>
                   </div>
-                </th>
-                <th class="p-0" data-sortable="true" data-column-index="7">
+                <th class="p-0">
                   <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 rounded-tr-xl">
                   <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Trade</span>
-                  <span class="sort-icon ml-1 text-gray-600 dark:text-gray-400" id="sort-icon-7">↓</span>
                  </div>
                </th>
               </tr>
@@ -447,6 +442,5 @@ function getWebSocketConfig() {
 </section>
 
 <input type="hidden" name="formid" value="{{ form_id }}">
-
 <script src="/static/js/offerstable.js"></script>
  {% include 'footer.html' %}
