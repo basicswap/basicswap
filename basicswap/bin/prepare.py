@@ -473,7 +473,27 @@ def downloadBytes(url) -> None:
         popConnectionParameters()
 
 
-def importPubkeyFromUrls(gpg, pubkeyurls):
+def getBasePath():
+    base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if os.path.exists(os.path.join(base_path, "basicswap", "pgp")):
+        base_path = os.path.join(base_path, "basicswap")
+    return base_path
+
+
+def importPubkey(gpg, pubkey_filename, pubkeyurls):
+    base_path = getBasePath()
+    local_path = os.path.join(base_path, "pgp", "keys", pubkey_filename)
+    if os.path.exists(local_path):
+        logger.info("Importing public key from file: " + pubkey_filename)
+        try:
+            with open(local_path, "rb") as fp:
+                rv = gpg.import_keys(fp.read())
+            for key in rv.fingerprints:
+                gpg.trust_keys(key, "TRUST_FULLY")
+            return
+        except Exception as e:
+            logging.warning(f"Import from file failed: {e}")
+
     for url in pubkeyurls:
         try:
             logger.info("Importing public key from url: " + url)
@@ -482,7 +502,7 @@ def importPubkeyFromUrls(gpg, pubkeyurls):
                 gpg.trust_keys(key, "TRUST_FULLY")
             break
         except Exception as e:
-            logging.warning("Import from url failed: %s", str(e))
+            logging.warning(f"Import from url failed: {e}")
 
 
 def testTorConnection():
@@ -1042,11 +1062,7 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
         pubkey_filename = "particl_{}.pgp".format(signing_key_name)
     else:
         pubkey_filename = "{}_{}.pgp".format(coin, signing_key_name)
-    pubkeyurls = [
-        "https://raw.githubusercontent.com/basicswap/basicswap/master/pgp/keys/"
-        + pubkey_filename,
-        "https://gitlab.com/particl/basicswap/-/raw/master/pgp/keys/" + pubkey_filename,
-    ]
+    pubkeyurls = []
     if coin == "dash":
         pubkeyurls.append(
             "https://raw.githubusercontent.com/dashpay/dash/master/contrib/gitian-keys/pasta.pgp"
@@ -1080,7 +1096,7 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
 
         if not isValidSignature(verified) and verified.username is None:
             logger.warning("Signature made by unknown key.")
-            importPubkeyFromUrls(gpg, pubkeyurls)
+            importPubkey(gpg, pubkey_filename, pubkeyurls)
             with open(assert_path, "rb") as fp:
                 verified = gpg.verify_file(fp)
     elif coin in ("navcoin"):
@@ -1089,7 +1105,7 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
 
         if not isValidSignature(verified) and verified.username is None:
             logger.warning("Signature made by unknown key.")
-            importPubkeyFromUrls(gpg, pubkeyurls)
+            importPubkey(gpg, pubkey_filename, pubkeyurls)
             with open(assert_sig_path, "rb") as fp:
                 verified = gpg.verify_file(fp)
 
@@ -1101,10 +1117,9 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
     else:
         with open(assert_sig_path, "rb") as fp:
             verified = gpg.verify_file(fp, assert_path)
-
         if not isValidSignature(verified) and verified.username is None:
             logger.warning("Signature made by unknown key.")
-            importPubkeyFromUrls(gpg, pubkeyurls)
+            importPubkey(gpg, pubkey_filename, pubkeyurls)
             with open(assert_sig_path, "rb") as fp:
                 verified = gpg.verify_file(fp, assert_path)
 
@@ -2013,34 +2028,32 @@ def signal_handler(sig, frame):
 def check_btc_fastsync_data(base_dir, sync_filename):
     logger.info("Validating signature for: " + sync_filename)
 
-    github_pgp_url = "https://raw.githubusercontent.com/basicswap/basicswap/master/pgp"
-    gitlab_pgp_url = "https://gitlab.com/particl/basicswap/-/raw/master/pgp"
     asc_filename = sync_filename + ".asc"
     asc_file_path = os.path.join(base_dir, asc_filename)
     sync_file_path = os.path.join(base_dir, sync_filename)
     if not os.path.exists(asc_file_path):
-        asc_file_urls = [
-            github_pgp_url + "/sigs/" + asc_filename,
-            gitlab_pgp_url + "/sigs/" + asc_filename,
-        ]
+        base_path = getBasePath()
+        local_path = os.path.join(base_path, "pgp", "sigs", asc_filename)
+        if os.path.exists(local_path):
+            shutil.copyfile(local_path, asc_file_path)
+
+    if not os.path.exists(asc_file_path):
+        asc_file_urls = []
         if BITCOIN_FASTSYNC_SIG_URL:
-            asc_file_urls.append("/".join([BITCOIN_FASTSYNC_SIG_URL, asc_filename]))
+            asc_file_urls.append(BITCOIN_FASTSYNC_SIG_URL)
         for url in asc_file_urls:
             try:
                 downloadFile(url, asc_file_path)
                 break
             except Exception as e:
-                logging.warning("Download failed: %s", str(e))
+                logging.warning(f"Download failed: {e}")
     if not os.path.exists(asc_file_path):
         raise ValueError("Unable to find snapshot signature file.")
     gpg = gnupg.GPG()
     pubkey_filename = "{}_{}.pgp".format("particl", "tecnovert")
-    pubkeyurls = [
-        github_pgp_url + "/keys/" + pubkey_filename,
-        gitlab_pgp_url + "/keys/" + pubkey_filename,
-    ]
+    pubkeyurls = []
     if not havePubkey(gpg, expected_key_ids["tecnovert"][0]):
-        importPubkeyFromUrls(gpg, pubkeyurls)
+        importPubkey(gpg, pubkey_filename, pubkeyurls)
     with open(asc_file_path, "rb") as fp:
         verified = gpg.verify_file(fp, sync_file_path)
 
