@@ -1,12 +1,9 @@
-<!DOCTYPE html>
-{% from 'style.html' import change_password_svg, notifications_network_offer_svg, notifications_bid_accepted_svg, notifications_unknow_event_svg, notifications_new_bid_on_offer_svg, notifications_close_svg, swap_in_progress_mobile_svg, wallet_svg, page_back_svg, order_book_svg, new_offer_svg, settings_svg, asettings_svg, cog_svg, rpc_svg, debug_svg, explorer_svg, tor_svg, smsg_svg, outputs_svg, automation_svg, shutdown_svg, notifications_svg, debug_nerd_svg, wallet_locked_svg, mobile_menu_svg, wallet_unlocked_svg, tor_purple_svg, sun_svg, moon_svg, swap_in_progress_svg, swap_in_progress_green_svg, available_bids_svg, your_offers_svg, bids_received_svg, bids_sent_svg, header_arrow_down_svg, love_svg %}
+<!DOCTYPE html> {% from 'style.html' import change_password_svg, notifications_network_offer_svg, notifications_bid_accepted_svg, notifications_unknow_event_svg, notifications_new_bid_on_offer_svg, notifications_close_svg, swap_in_progress_mobile_svg, wallet_svg, page_back_svg, order_book_svg, new_offer_svg, settings_svg, asettings_svg, cog_svg, rpc_svg, debug_svg, explorer_svg, tor_svg, smsg_svg, outputs_svg, automation_svg, shutdown_svg, notifications_svg, debug_nerd_svg, wallet_locked_svg, mobile_menu_svg, wallet_unlocked_svg, tor_purple_svg, sun_svg, moon_svg, swap_in_progress_svg, swap_in_progress_green_svg, available_bids_svg, your_offers_svg, bids_received_svg, bids_sent_svg, header_arrow_down_svg, love_svg %}
 <html lang="en">
 
 <head>
-  <meta charset="UTF-8">
-  {% if refresh %}
-  <meta http-equiv="refresh" content="{{ refresh }}">
-  {% endif %}
+  <meta charset="UTF-8"> {% if refresh %}
+  <meta http-equiv="refresh" content="{{ refresh }}"> {% endif %}
   <script src="/static/js/libs/chart.js"></script>
   <script src="/static/js/libs/chartjs-adapter-date-fns.bundle.min.js"></script>
   <link type="text/css" media="all" href="/static/css/libs/flowbite.min.css" rel="stylesheet" />
@@ -25,7 +22,7 @@
     }
     document.documentElement.classList.toggle('dark', isDarkMode);
   </script>
-
+  
   <script>
     document.addEventListener('DOMContentLoaded', function() {
       const shutdownButtons = document.querySelectorAll('.shutdown-button');
@@ -66,315 +63,207 @@
         shutdownModal.classList.add('hidden');
         document.body.style.overflow = '';
       }
-
       shutdownButtons.forEach(button => {
         button.addEventListener('click', function(e) {
           e.preventDefault();
           showShutdownModal();
         });
       });
-
       closeModalButton.addEventListener('click', hideShutdownModal);
-      
       confirmShutdownButton.addEventListener('click', function() {
         const shutdownToken = document.querySelector('.shutdown-button').getAttribute('href').split('/').pop();
         window.location.href = '/shutdown/' + shutdownToken;
       });
-
       shutdownModal.addEventListener('click', function(e) {
         if(e.target === this) {
           hideShutdownModal();
         }
       });
-
       updateShutdownButtons();
     });
   </script>
-
+  
   <link rel=icon sizes="32x32" type="image/png" href="/static/images/favicon/favicon-32.png">
   <title>(BSX) BasicSwap - v{{ version }}</title>
 </head>
 
 <body class="dark:bg-gray-700">
-
-<!-- Shutdown Modal -->
-<div id="shutdownModal" tabindex="-1" class="hidden fixed inset-0 z-50 overflow-y-auto overflow-x-hidden">
-  <div class="fixed inset-0 bg-black bg-opacity-60 transition-opacity"></div>
-  <div class="flex items-center justify-center min-h-screen p-4 relative z-10">
-    <div class="bg-white dark:bg-gray-500 rounded-lg shadow-xl max-w-md w-full">
-      <div class="p-6 text-center">
-        <svg class="mx-auto mb-4 text-gray-400 w-12 h-12 dark:text-gray-200" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 20">
-          <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 11V6m0 8h.01M19 10a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-        </svg>
-        <h3 class="mb-5 text-lg font-normal text-gray-700 dark:text-gray-300">Are you sure you want to shut down?</h3>
-        <p id="shutdownWarning" class="mb-5 text-sm text-red-500 font-bold hidden">Warning: Swaps are in progress. Please wait for swaps to complete before shutting down.</p>
-        <p class="mb-5 text-sm text-gray-500 dark:text-gray-300">This action will shut down the application. Are you sure you want to proceed?</p>
-        <button id="confirmShutdown" type="button" class="text-white bg-red-600 hover:bg-red-800 focus:ring-0 focus:outline-none focus:ring-red-300 dark:focus:ring-red-800 font-medium rounded-lg text-sm inline-flex items-center px-5 py-2.5 text-center mr-2">
-          Yes, Shut Down
-        </button>
-        <button id="closeShutdownModal" type="button" class="text-gray-500 bg-white hover:bg-gray-100 focus:ring-0 focus:outline-none focus:ring-gray-200 rounded-lg border border-gray-200 text-sm font-medium px-5 py-2.5 hover:text-gray-900 focus:z-10 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-500 dark:hover:text-white dark:hover:bg-gray-600 dark:focus:ring-gray-600">
-          Cancel
-        </button>
+  <div id="shutdownModal" tabindex="-1" class="hidden fixed inset-0 z-50 overflow-y-auto overflow-x-hidden">
+    <div class="fixed inset-0 bg-black bg-opacity-60 transition-opacity"></div>
+    <div class="flex items-center justify-center min-h-screen p-4 relative z-10">
+      <div class="bg-white dark:bg-gray-500 rounded-lg shadow-xl max-w-md w-full">
+        <div class="p-6 text-center">
+          <svg class="mx-auto mb-4 text-gray-400 w-12 h-12 dark:text-gray-200" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 20">
+            <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 11V6m0 8h.01M19 10a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /> </svg>
+          <h3 class="mb-5 text-lg font-normal text-gray-700 dark:text-gray-300">Are you sure you want to shut down?</h3>
+          <p id="shutdownWarning" class="mb-5 text-sm text-red-500 font-bold hidden">Warning: Swaps are in progress. Please wait for swaps to complete before shutting down.</p>
+          <p class="mb-5 text-sm text-gray-500 dark:text-gray-300">This action will shut down the application. Are you sure you want to proceed?</p>
+          <button id="confirmShutdown" type="button" class="text-white bg-red-600 hover:bg-red-800 focus:ring-0 focus:outline-none focus:ring-red-300 dark:focus:ring-red-800 font-medium rounded-lg text-sm inline-flex items-center px-5 py-2.5 text-center mr-2"> Yes, Shut Down </button>
+          <button id="closeShutdownModal" type="button" class="text-gray-500 bg-white hover:bg-gray-100 focus:ring-0 focus:outline-none focus:ring-gray-200 rounded-lg border border-gray-200 text-sm font-medium px-5 py-2.5 hover:text-gray-900 focus:z-10 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-500 dark:hover:text-white dark:hover:bg-gray-600 dark:focus:ring-gray-600"> Cancel </button>
+        </div>
       </div>
     </div>
   </div>
-</div>
-
-<!-- Main Navigation -->
-<section>
-  <nav class="relative bg-gray-700">
-    <div class="p-6 container flex flex-wrap items-center justify-between items-center mx-auto">
-      <a class="flex-shrink-0 mr-12 text-2xl text-white font-semibold" href="/">
-        <img class="h-10" src="/static/images/logos/basicswap-logo.svg" alt="" width="auto">
-      </a>
-      <ul class="hidden xl:flex">
-        <li>
-          <a class="flex mr-10 items-center py-3 text-gray-50 hover:text-gray-100 text-sm" href="/wallets">
-            {{ wallet_svg | safe }}
-            <span>Wallets</span>
-          </a>
-        </li>
-        <li>
-          <a class="flex mr-10 items-center py-2.5 text-gray-50 hover:text-gray-100 text-sm" href="/offers">
-            {{ order_book_svg | safe }}
-            <span>Network Order Book</span>
-            <span id="network-offers-counter" class="inline-flex justify-center items-center text-xs font-semibold ml-3 mr-2 px-2.5 py-1 font-small text-white bg-blue-500 rounded-full">{{ summary.num_network_offers }}</span>
-          </a>
-        </li>
-        <li>
-          <a class="flex rounded-full flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-green-600 hover:border-green-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" href="/newoffer">
-            {{ new_offer_svg | safe }}
-            <span>Place new Offer</span>
-          </a>
-        </li>
-      </ul>
-      <ul class="hidden xl:flex lg:justify-end lg:items-center lg:space-x-6 ml-auto">
-        <div id="dropdownNavbarLink" data-dropdown-toggle="dropdownNavbar" class="flex justify-between items-center py-2 pr-4 pl-3 w-full text-gray-50 text-sm md:border-0 md:p-0 md:w-auto text-gray-50 hover:text-gray-100">
-          {{ settings_svg | safe }} Settings & Tools {{ header_arrow_down_svg| safe }}
-        </div>
-      </ul>
-
-      <!-- Settings Dropdown -->
-      <div id="dropdownNavbar" class="hidden z-50 w-50 font-normal bg-white shadow divide-y divide-gray-100 dark:bg-gray-500 dark:divide-gray-400 dark:text-white">
-        <ul class="py-0 text-sm text-gray-700" aria-labelledby="dropdownLargeButton">
-          <li>
-            <a href="/settings" class="flex items-center block py-4 px-4 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-white">
-              <span class="sr-only">Settings</span>
-              {{ cog_svg | safe }} Settings
-            </a>
-          </li>
-          <li>
-            <a href="/changepassword" class="flex items-center block py-4 px-4 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-white">
-              <span class="sr-only">Change/Set Password</span>
-              {{ change_password_svg | safe }} Change/Set Password
-            </a>
-          </li>
-          {% if debug_mode == true %}
-          <li>
-            <a href="/rpc" class="flex items-center block py-4 px-4 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-white">
-              <span class="sr-only">RPC</span>
-              {{ rpc_svg | safe }} RPC Console
-            </a>
-          </li>
-          <li>
-            <a href="/debug" class="flex items-center block py-4 px-4 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-white">
-              <span class="sr-only">Debug</span>
-              {{ debug_svg | safe }} Debug
-            </a>
-          </li>
-          <li>
-            <a href="/explorers" class="flex items-center block py-4 px-4 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-white">
-              <span class="sr-only">Explorers</span>
-              {{ explorer_svg | safe }} Explorers
-            </a>
-          </li>
-          {% endif %}
-          {% if use_tor_proxy == true %}
-          <li>
-            <a href="/tor" class="flex items-center block py-4 px-4 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-white">
-              <span class="sr-only">Tor</span>
-              {{ tor_svg | safe }} Tor
-            </a>
-          </li>
-          {% endif %}
-          <li>
-            <a href="/smsgaddresses" class="flex items-center block py-4 px-4 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-white">
-              <span class="sr-only">Settings</span>
-              {{ smsg_svg | safe }} SMSG Addresses
-            </a>
-          </li>
-          <li>
-            <a href="/watched" class="flex items-center block py-4 px-4 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-white">
-              <span class="sr-only">Automation Strategies</span>
-              {{ outputs_svg | safe }} Watch Outputs
-              <span class="inline-flex justify-center items-center text-xs font-semibold ml-3 mr-2 px-2.5 py-1 font-small text-white bg-blue-500 rounded-full">{{ summary.num_watched_outputs }}</span>
-            </a>
-          </li>
-          {% if debug_mode == true %}
-          <li>
-            <a href="/automation" class="flex items-center block py-4 px-4 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-white">
-              <span class="sr-only">Automation Strategies</span>
-              {{ automation_svg | safe }} Automation Strategies
-            </a>
-          </li>
-          {% endif %}
+  
+  <section>
+    <nav class="relative bg-gray-700">
+      <div class="p-6 container flex flex-wrap items-center justify-between items-center mx-auto">
+        <a class="flex-shrink-0 mr-12 text-2xl text-white font-semibold" href="/"> <img class="h-10" src="/static/images/logos/basicswap-logo.svg" alt="" width="auto"></a>
+        <ul class="hidden xl:flex">
+          <li> <a class="flex mr-10 items-center py-3 text-gray-50 hover:text-gray-100 text-sm" href="/wallets">
+              {{ wallet_svg | safe }}
+               <span>Wallets</span>
+             </a> </li>
+          <li> <a class="flex mr-10 items-center py-2.5 text-gray-50 hover:text-gray-100 text-sm" href="/offers">
+    {{ order_book_svg | safe }}<span>Network Order Book</span>
+    <span id="network-offers-counter" class="inline-flex justify-center items-center text-xs font-semibold ml-3 mr-2 px-2.5 py-1 font-small text-white bg-blue-500 rounded-full">{{ summary.num_network_offers }}</span>
+  </a> </li>
+          <li> <a class="flex rounded-full flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-green-600 hover:border-green-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" href="/newoffer">
+              {{ new_offer_svg | safe }}
+              <span>Place new Offer</span>
+            </a> </li>
         </ul>
-        <div class="text-sm text-gray-700">
-          <a href="/shutdown/{{ shutdown_token }}" class="shutdown-button flex items-center block py-4 px-4 text-sm text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-gray-200 dark:hover:text-white" data-active-swaps="{{ summary.num_swapping }}">
-            {{ shutdown_svg | safe }}
-            <span class="ml-2">Shutdown</span>
-          </a>
+        <ul class="hidden xl:flex lg:justify-end lg:items-center lg:space-x-6 ml-auto">
+          <div id="dropdownNavbarLink" data-dropdown-toggle="dropdownNavbar" class="flex justify-between items-center py-2 pr-4 pl-3 w-full text-gray-50 text-sm  md:border-0 md:p-0 md:w-auto text-gray-50 hover:text-gray-100"> {{ settings_svg | safe }} Settings & Tools {{ header_arrow_down_svg| safe }} </div>
+        </ul>
+        <!-- dropdown settings & tools -->
+        <div id="dropdownNavbar" class="hidden z-50 w-50 font-normal bg-white shadow divide-y divide-gray-100 dark:bg-gray-500 dark:divide-gray-400 dark:text-white">
+          <ul class="py-0 text-sm text-gray-700" aria-labelledby="dropdownLargeButton">
+            <li>
+              <a href="/settings" class="flex items-center block py-4 px-4 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-white"> <span class="sr-only">Settings</span> {{ cog_svg | safe }} Settings</a>
+            </li>
+            <li>
+              <a href="/changepassword" class="flex items-center block py-4 px-4 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-white"> <span class="sr-only">Change/Set Password</span> {{ change_password_svg | safe }} Change/Set Password</a>
+            </li> {% if debug_mode == true %}
+            <li>
+              <a href="/rpc" class="flex items-center block py-4 px-4 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-white"> <span class="sr-only">RPC</span> {{ rpc_svg | safe }} RPC Console </a>
+            </li> {% endif %} {% if debug_mode == true %}
+            <li>
+              <a href="/debug" class="flex items-center block py-4 px-4 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-white"> <span class="sr-only">Debug</span> {{ debug_svg | safe }} Debug</a>
+            </li> {% endif %} {% if debug_mode == true %}
+            <li>
+              <a href="/explorers" class="flex items-center block py-4 px-4 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-white"> <span class="sr-only">Explorers</span> {{ explorer_svg | safe }} Explorers </a>
+            </li> {% endif %} {% if use_tor_proxy == true %}
+            <li>
+              <a href="/tor" class="flex items-center block py-4 px-4 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-white"> <span class="sr-only">Tor</span> {{ tor_svg | safe }} Tor </a>
+            </li> {% endif %}
+            <li>
+              <a href="/smsgaddresses" class="flex items-center block py-4 px-4 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-white"> <span class="sr-only">Settings</span> {{ smsg_svg | safe }} SMSG Addresses</a>
+            </li>
+            <li>
+              <a href="/watched" class="flex items-center block py-4 px-4 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-white"> <span class="sr-only">Automation Strategies</span> {{ outputs_svg | safe }} Watch Outputs <span class="inline-flex justify-center items-center text-xs font-semibold ml-3 mr-2 px-2.5 py-1 font-small text-white bg-blue-500 rounded-full">{{ summary.num_watched_outputs }}</span> </a>
+            </li> {% if debug_mode == true %}
+            <li>
+              <a href="/automation" class="flex items-center block py-4 px-4 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-white"> <span class="sr-only">Automation Strategies</span> {{ automation_svg | safe }} Automation Strategies</a>
+            </li> {% endif %} </ul>
+          <div class="text-sm text-gray-700"> <a href="/shutdown/{{ shutdown_token }}" class="shutdown-button flex items-center block py-4 px-4 text-sm text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-gray-200 dark:hover:text-white" data-active-swaps="{{ summary.num_swapping }}">
+    {{ shutdown_svg | safe }}
+    <span class="ml-2">Shutdown</span>
+</a> </div>
+        </div>
+        <!-- dropdown settings & tools -->
+        <div class="flex mr-2 items-center text-gray-50 hover:text-gray-100 text-sm ml-5">
+          <div class="flex-shrink-0 w-px h-10 bg-gray-400 dark:bg-gray-400 ml-4 mr-5"></div> {% if debug_mode == true %}
+          <!-- dev mode icons on/off -->
+          <ul class="xl:flex">
+            <li>
+              <div data-tooltip-target="tooltip-DEV" class="ml-5 flex items-center text-gray-50 hover:text-gray-100 text-sm"> {{ debug_nerd_svg | safe }} </div>
+              <div id="tooltip-DEV" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+                <p><b>Debug mode:</b> Active</p> {% if debug_ui_mode == true %}
+                <p><b>Debug UI mode:</b> Active</p> {% endif %} </div>
+            </li>
+          </ul>
+          <!-- dev mode icons on/off -->{% endif %} {% if encrypted == true %}
+          <ul class="xl:flex">
+            <li> {% if locked == true %}
+              <div data-tooltip-target="tooltip-locked-wallets" class="ml-5 flex items-center text-gray-50 hover:text-gray-100 text-sm"> {{ wallet_locked_svg | safe }}</div>
+              <div id="tooltip-locked-wallets" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+                <p><b>Wallets:</b> Locked </p>
+              </div> {% else %}
+              <a href='/lock'>
+                <div data-tooltip-target="tooltip-unlocked-wallets" class="ml-5 flex items-center text-gray-50 hover:text-gray-100 text-sm"> {{ wallet_unlocked_svg | safe }} </div>
+                <div id="tooltip-unlocked-wallets" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+                  <p><b>Wallets:</b> Unlocked </p>
+                </div>
+              </a> {% endif %} </li>
+          </ul> {% endif %} {% if use_tor_proxy == true %}
+          <!-- tor -->
+          <ul class="xl:flex ml-5">
+            <li>
+              <a href="/tor">
+                <div data-tooltip-target="tooltip-tor" class="flex items-center text-gray-50 hover:text-gray-100 text-sm"> {{ tor_purple_svg | safe }} </a>
+              </div>
+              <div id="tooltip-tor" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip"><b>Tor mode:</b> Active {% if tor_established == true %}
+                <br><b>Tor:</b> Connected {% endif %} </div>
+            </li>
+          </ul>
+          <!-- tor -->{% endif %}
+          <button data-tooltip-target="tooltip-darkmode" id="theme-toggle" type="button" class="text-gray-500 dark:text-gray-400 focus:outline-none rounded-lg text-sm ml-5"> {{ sun_svg | safe }} {{ moon_svg | safe }}
+            <div id="tooltip-darkmode" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">Dark mode</div>
+          </button>
+        </div>
+        <div class="hidden xl:block"></div>
+        <!-- mobile menu -->
+        <div class="ml-auto flex xl:hidden">
+          <button class="navbar-burger flex items-center rounded focus:outline-none"> {{ mobile_menu_svg | safe }} </button>
         </div>
       </div>
-
-      <!-- Status Icons -->
-      <div class="flex mr-2 items-center text-gray-50 hover:text-gray-100 text-sm ml-5">
-        <div class="flex-shrink-0 w-px h-10 bg-gray-400 dark:bg-gray-400 ml-4 mr-5"></div>
-        {% if debug_mode == true %}
-        <!-- Debug Mode Icons -->
-        <ul class="xl:flex">
-          <li>
-            <div data-tooltip-target="tooltip-DEV" class="ml-5 flex items-center text-gray-50 hover:text-gray-100 text-sm">
-              {{ debug_nerd_svg | safe }}
-            </div>
-            <div id="tooltip-DEV" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
-              <p><b>Debug mode:</b> Active</p>
-              {% if debug_ui_mode == true %}
-              <p><b>Debug UI mode:</b> Active</p>
-              {% endif %}
-            </div>
-          </li>
-        </ul>
-        {% endif %}
-
-        {% if encrypted == true %}
-        <ul class="xl:flex">
-          <li>
-            {% if locked == true %}
-            <div data-tooltip-target="tooltip-locked-wallets" class="ml-5 flex items-center text-gray-50 hover:text-gray-100 text-sm">
-              {{ wallet_locked_svg | safe }}
-            </div>
-            <div id="tooltip-locked-wallets" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
-              <p><b>Wallets:</b> Locked</p>
-            </div>
-            {% else %}
-            <a href='/lock'>
-              <div data-tooltip-target="tooltip-unlocked-wallets" class="ml-5 flex items-center text-gray-50 hover:text-gray-100 text-sm">
-                {{ wallet_unlocked_svg | safe }}
+      <div class="hidden xl:block py-5 px-6 bg-coolGray-100 border-gray-100 dark:border-gray-500 dark:bg-body border-b dark:border-b-2">
+        <div class="flex items-center justify-center container mx-auto">
+          <ul class="flex items-center space-x-8">
+            <li> <a data-tooltip-target="tooltip-your-offers" class="flex items-center text-sm text-gray-400 hover:text-gray-600 dark:text-gray-100 dark:hover:text-gray-100" href="/sentoffers">
+          {{ your_offers_svg | safe }}
+          <span>Your Offers</span>
+          <span id="offers-counter" class="inline-flex justify-center items-center text-xs font-semibold ml-3 px-2.5 py-1 text-white {% if summary.num_sent_active_offers > 0 %}bg-blue-500{% else %}bg-gray-400{% endif %} rounded-full">{{ summary.num_sent_active_offers }}</span>
+        </a>
+              <div id="tooltip-your-offers" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+                <p><b>Total offers:</b> {{ summary.num_sent_offers }}</p>
+                <p><b>Active offers:</b> {{ summary.num_sent_active_offers }}</p>
               </div>
-              <div id="tooltip-unlocked-wallets" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
-                <p><b>Wallets:</b> Unlocked</p>
-              </div>
-            </a>
-            {% endif %}
-          </li>
-        </ul>
-        {% endif %}
-
-        {% if use_tor_proxy == true %}
-        <!-- Tor Status -->
-        <ul class="xl:flex ml-5">
-          <li>
-            <a href="/tor">
-              <div data-tooltip-target="tooltip-tor" class="flex items-center text-gray-50 hover:text-gray-100 text-sm">
-                {{ tor_purple_svg | safe }}
-              </div>
-              <div id="tooltip-tor" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
-                <b>Tor mode:</b> Active
-                {% if tor_established == true %}
-                <br><b>Tor:</b> Connected
-                {% endif %}
-              </div>
-            </a>
-          </li>
-        </ul>
-        {% endif %}
-
-        <!-- White/Dark Toggle -->
-        <button data-tooltip-target="tooltip-darkmode" id="theme-toggle" type="button" class="text-gray-500 dark:text-gray-400 focus:outline-none rounded-lg text-sm ml-5">
-          {{ sun_svg | safe }}
-          {{ moon_svg | safe }}
-          <div id="tooltip-darkmode" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">Dark mode</div>
-        </button>
-      </div>
-
-      <div class="hidden xl:block"></div>
-
-      <!-- Mobile Menu Button -->
-      <div class="ml-auto flex xl:hidden">
-        <button class="navbar-burger flex items-center rounded focus:outline-none">
-          {{ mobile_menu_svg | safe }}
-        </button>
-      </div>
-    </div>
-
-    <!-- Secondary Navigation Bar -->
-    <div class="hidden xl:block py-5 px-6 bg-coolGray-100 border-gray-100 dark:border-gray-500 dark:bg-body border-b dark:border-b-2">
-     <div class="flex items-center justify-center container mx-auto">
-        <ul class="flex items-center space-x-8">
-          <li>
-            <a data-tooltip-target="tooltip-your-offers" class="flex items-center text-sm text-gray-400 hover:text-gray-600 dark:text-gray-100 dark:hover:text-gray-100" href="/sentoffers">
-              {{ your_offers_svg | safe }}
-              <span>Your Offers</span>
-              <span id="offers-counter" class="inline-flex justify-center items-center text-xs font-semibold ml-3 px-2.5 py-1 text-white {% if summary.num_sent_active_offers > 0 %}bg-blue-500{% else %}bg-gray-500{% endif %} rounded-full">{{ summary.num_sent_active_offers }}</span>
-            </a>
-            <div id="tooltip-your-offers" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
-              <p><b>Total offers:</b> {{ summary.num_sent_offers }}</p>
-              <p><b>Active offers:</b> {{ summary.num_sent_active_offers }}</p>
-            </div>
-          </li>
-          <li><span class="text-gray-300">|</span></li>
-          <li>
-            <a class="flex items-center text-sm text-gray-400 hover:text-gray-600 dark:text-gray-100 dark:hover:text-gray-100" href="/availablebids">
-              {{ available_bids_svg | safe }}
-              <span>Bid Requests</span>
-              <span id="bid-requests-counter" class="inline-flex justify-center items-center text-xs font-semibold ml-3 px-2.5 py-1 text-white {% if summary.num_available_bids > 0 %}bg-blue-500{% else %}bg-gray-500{% endif %} rounded-full">{{ summary.num_recv_active_bids }}</span>
-            </a>
-          </li>
-          <li><span class="text-gray-300">|</span></li>
-          <li>
-            <a href="/bids" data-tooltip-target="tooltip-bids" class="flex items-center text-sm text-gray-400 hover:text-gray-600 dark:text-gray-100 dark:hover:text-gray-100">
+            </li>
+            <li> <span class="text-gray-300">|</span> </li>
+            <li>
+              <a class="flex items-center text-sm text-gray-400 hover:text-gray-600 dark:text-gray-100 dark:hover:text-gray-100" href="/availablebids">            {{ available_bids_svg | safe }}
+            <span>Bid Requests</span>
+              
+               <span id="bid-requests-counter" class="inline-flex justify-center items-center text-xs font-semibold ml-3 px-2.5 py-1 text-white {% if summary.num_available_bids > 0 %}bg-blue-500{% else %}bg-gray-400{% endif %} rounded-full">{{ summary.num_recv_active_bids }}</span> </a>
+            </li>
+            <li> <span class="text-gray-300">|</span> </li>
+            <li>
+              <a href="/bids" data-tooltip-target="tooltip-bids" class="flex items-center text-sm text-gray-400 hover:text-gray-600 dark:text-gray-100 dark:hover:text-gray-100">
               <span class="inline-block mr-2">{{ bids_sent_svg | safe }}</span>
-              <span>Bids</span>
-              <span class="flex items-center ml-2">
-                <span id="sent-bids-counter" class="inline-flex items-center text-xs font-semibold px-2.5 py-1 text-white {% if summary.num_sent_active_bids > 0 %}bg-blue-500{% else %}bg-gray-500{% endif %} rounded-full">↑{{ summary.num_sent_active_bids }}</span>
-                <span id="recv-bids-counter" class="inline-flex items-center text-xs font-semibold ml-2 px-2.5 py-1 text-white {% if summary.num_recv_active_bids > 0 %}bg-blue-500{% else %}bg-gray-500{% endif %} rounded-full">↓{{ summary.num_recv_active_bids }}</span>
-              </span>
-            </a>
-            <div id="tooltip-bids" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
-              <p><b>Sent bids:</b> {{ summary.num_sent_bids }} ({{ summary.num_sent_active_bids }} active)</p>
-              <p><b>Received bids:</b> {{ summary.num_recv_bids }} ({{ summary.num_recv_active_bids }} active)</p>
-            </div>
-          </li>
-          <li><span class="text-gray-300">|</span></li>
-          <li>
-            <a class="flex items-center text-sm text-gray-400 hover:text-gray-600 dark:text-gray-100 dark:hover:text-gray-100" href="/active">
-              <div id="swapContainer" class="inline-flex center-spin mr-2" {% if summary.num_swapping != 0 %}style="animation: spin 2s linear infinite;"{% endif %}>
-                {% if summary.num_swapping != 0 %}
-                  {{ swap_in_progress_green_svg | safe }}
-                {% else %}
-                  {{ swap_in_progress_svg | safe }}
-                {% endif %}
+            <span>Bids</span>
+            <span class="flex items-center ml-2">
+            <span id="sent-bids-counter" class="inline-flex items-center text-xs font-semibold px-2.5 py-1 text-white {% if summary.num_sent_active_bids > 0 %}bg-blue-500{% else %}bg-gray-400{% endif %} rounded-full">↑{{ summary.num_sent_active_bids }}</span> <span id="recv-bids-counter" class="inline-flex items-center text-xs font-semibold ml-2 px-2.5 py-1 text-white {% if summary.num_recv_active_bids > 0 %}bg-blue-500{% else %}bg-gray-400{% endif %} rounded-full">↓{{ summary.num_recv_active_bids }}</span> </span>
+              </a>
+              <div id="tooltip-bids" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+                <p><b>Sent bids:</b> {{ summary.num_sent_bids }} ({{ summary.num_sent_active_bids }} active)</p>
+                <p><b>Received bids:</b> {{ summary.num_recv_bids }} ({{ summary.num_recv_active_bids }} active)</p>
               </div>
-              <span>Swaps in Progress</span>
-              <span id="swaps-counter" class="inline-flex justify-center items-center text-xs font-semibold ml-3 px-2.5 py-1 text-white {% if summary.num_swapping > 0 %}bg-blue-500{% else %}bg-gray-500{% endif %} rounded-full">{{ summary.num_swapping }}</span>
-            </a>
-          </li>
-        </ul>
+            </li>
+            <li> <span class="text-gray-300">|</span> </li>
+            <li>
+              <a class="flex items-center text-sm text-gray-400 hover:text-gray-600 dark:text-gray-100 dark:hover:text-gray-100" href="/active">
+                <div id="swapContainer" class="inline-flex center-spin mr-2" {% if summary.num_swapping !=0 %}style="animation: spin 2s linear infinite;" {% endif %}> {% if summary.num_swapping != 0 %} {{ swap_in_progress_green_svg | safe }} {% else %} {{ swap_in_progress_svg | safe }} {% endif %} </div> <span>Swaps in Progress</span> <span id="swaps-counter" class="inline-flex justify-center items-center text-xs font-semibold ml-3 px-2.5 py-1 text-white {% if summary.num_swapping > 0 %}bg-blue-500{% else %}bg-gray-400{% endif %} rounded-full">{{ summary.num_swapping }}</span> </a>
+            </li>
+          </ul>
+        </div>
       </div>
-    </div>
-    
-    <!-- Mobile Menu -->
-  <div class="hidden navbar-menu fixed top-0 left-0 bottom-0 w-3/4 lg:w-80 sm:max-w-xs z-50">
-   <div class="navbar-backdrop fixed inset-0 bg-gray-700 dark:bg-gray-600 opacity-10"></div>
-   <nav class="relative flex flex-col pt-6 pb-8 h-full w-full bg-gray-700 dark:bg-gray-600 overflow-y-auto">
+      </li>
+      </ul>
+      </div>
+      </div>
+    </nav>
+
+<div class="hidden navbar-menu fixed top-0 left-0 bottom-0 w-3/4 lg:w-80 sm:max-w-xs z-50">
+  <div class="navbar-backdrop fixed inset-0 bg-gray-700 dark:bg-gray-600 opacity-10"></div>
+  <nav class="relative flex flex-col pt-6 pb-8 h-full w-full bg-gray-700 dark:bg-gray-600 overflow-y-auto">
     <div class="flex w-full items-center px-6 pb-6 mb-6 lg:border-b border-gray-700">
       <a class="text-xl text-white font-semibold" href="/">
         <img class="h-8" src="/static/images/logos/basicswap-logo.svg" alt="" width="auto">
       </a>
     </div>
     <div class="px-4 pb-6">
-
       <!-- Main Navigation -->
       <ul class="mb-8 text-sm font-medium">
         <li>
@@ -517,7 +406,7 @@
   </nav>
 </div>
 
-{% if ws_port %}
+  </section> {% if ws_port %}
   <script>
     (function() {
       window.notificationConfig = {
@@ -572,8 +461,8 @@
         element.dataset.lastValue = safeValue;
         const displayValue = options.prefix ? (options.prefix + safeValue) : safeValue;
         element.textContent = displayValue;
-        element.classList.remove('bg-blue-500', 'bg-gray-500');
-        element.classList.add(safeValue > 0 ? 'bg-blue-500' : 'bg-gray-500');
+        element.classList.remove('bg-blue-500', 'bg-gray-400');
+        element.classList.add(safeValue > 0 ? 'bg-blue-500' : 'bg-gray-400');
         if(elementId === 'swaps-counter') {
           const swapContainer = document.getElementById('swapContainer');
           if(swapContainer) {
