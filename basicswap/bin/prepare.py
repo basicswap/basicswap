@@ -91,8 +91,6 @@ DOGECOIN_VERSION = os.getenv("DOGECOIN_VERSION", "23.2.1")
 DOGECOIN_VERSION_TAG = os.getenv("DOGECOIN_VERSION_TAG", "")
 
 GUIX_SSL_CERT_DIR = None
-
-ADD_PUBKEY_URL = os.getenv("ADD_PUBKEY_URL", "")
 OVERRIDE_DISABLED_COINS = toBool(os.getenv("OVERRIDE_DISABLED_COINS", "false"))
 
 # If SKIP_GPG_VALIDATION is set to true the script will check hashes but not signatures
@@ -1082,8 +1080,11 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
             "https://gitlab.com/bitcoin-cash-node/bitcoin-cash-node/-/raw/master/contrib/gitian-signing/pubkeys.txt"
         )
 
-    if ADD_PUBKEY_URL != "":
-        pubkeyurls.append(ADD_PUBKEY_URL + "/" + pubkey_filename)
+    coin_id = getCoinIdFromName(coin)
+    ticker: str = chainparams[coin_id]["ticker"]
+    extra_pubkey_url: str = os.getenv(f"{ticker}_ADD_PUBKEY_URL", "")
+    if extra_pubkey_url != "":
+        pubkeyurls.append(extra_pubkey_url)
 
     if coin in (
         "monero",
