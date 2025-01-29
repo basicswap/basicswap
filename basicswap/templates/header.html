@@ -14,7 +14,15 @@
   <script src="/static/js/dropdown.js"></script>
   <script src="/static/js/libs/popper.js"></script>
   <script src="/static/js/libs/tippy.js"></script>
-  
+  <script src="/static/js/tooltips.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const tooltipManager = TooltipManager.initialize();
+    tooltipManager.initializeTooltips();
+});
+</script>
+
   <script>
     const isDarkMode = localStorage.getItem('color-theme') === 'dark' || (!localStorage.getItem('color-theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
     if(!localStorage.getItem('color-theme')) {
@@ -22,7 +30,7 @@
     }
     document.documentElement.classList.toggle('dark', isDarkMode);
   </script>
-  
+
   <script>
     document.addEventListener('DOMContentLoaded', function() {
       const shutdownButtons = document.querySelectorAll('.shutdown-button');
@@ -82,7 +90,7 @@
       updateShutdownButtons();
     });
   </script>
-  
+    
   <link rel=icon sizes="32x32" type="image/png" href="/static/images/favicon/favicon-32.png">
   <title>(BSX) BasicSwap - v{{ version }}</title>
 </head>

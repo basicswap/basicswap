@@ -142,288 +142,6 @@ const totalPagesSpan = document.getElementById('totalPages');
 const lastRefreshTimeSpan = document.getElementById('lastRefreshTime');
 const newEntriesCountSpan = document.getElementById('newEntriesCount');
 
-// TOOLTIPS
-const TooltipManager = {
-    activeTooltips: new Map(),
-    sizeCheckIntervals: new Map(),
-    
-    create(element, content, options = {}) {
-        if (!element) return null;
-        
-        this.destroy(element);
-
-        const checkSize = () => {
-            const rect = element.getBoundingClientRect();
-            if (rect.width && rect.height) {
-                clearInterval(this.sizeCheckIntervals.get(element));
-                this.sizeCheckIntervals.delete(element);
-                this.createTooltip(element, content, options, rect);
-            }
-        };
-
-        this.sizeCheckIntervals.set(element, setInterval(checkSize, 50));
-        checkSize();
-        return null;
-    },
-
-    createTooltip(element, content, options, rect) {
-        const targetId = element.getAttribute('data-tooltip-target');
-        let bgClass = 'bg-gray-400';
-        let arrowColor = 'rgb(156 163 175)';
-
-        if (targetId?.includes('tooltip-offer-')) {
-            const offerId = targetId.split('tooltip-offer-')[1];
-            const [actualOfferId] = offerId.split('_');
-            const offer = jsonData.find(o => 
-                o.unique_id === offerId || 
-                o.offer_id === actualOfferId
-            );
-
-            if (offer) {
-                if (offer.is_revoked) {
-                    bgClass = 'bg-red-500';
-                    arrowColor = 'rgb(239 68 68)';
-                } else if (offer.is_own_offer) {
-                    bgClass = 'bg-gray-300';
-                    arrowColor = 'rgb(209 213 219)';
-                } else {
-                    bgClass = 'bg-green-700';
-                    arrowColor = 'rgb(21 128 61)';
-                }
-            }
-        }
-
-        const instance = tippy(element, {
-            content,
-            allowHTML: true,
-            placement: options.placement || 'top',
-            appendTo: document.body,
-            animation: false,
-            duration: 0,
-            delay: 0,
-            interactive: true,
-            arrow: false,
-            theme: '',
-            moveTransition: 'none',
-            offset: [0, 10],
-            popperOptions: {
-                strategy: 'fixed',
-                modifiers: [
-                    {
-                        name: 'preventOverflow',
-                        options: {
-                            boundary: 'viewport',
-                            padding: 10
-                        }
-                    },
-                    {
-                        name: 'flip',
-                        options: {
-                            padding: 10,
-                            fallbackPlacements: ['top', 'bottom', 'right', 'left']
-                        }
-                    }
-                ]
-            },
-            onCreate(instance) {
-                instance._originalPlacement = instance.props.placement;
-            },
-            onShow(instance) {
-                if (!document.body.contains(element)) {
-                    return false;
-                }
-
-                const rect = element.getBoundingClientRect();
-                if (!rect.width || !rect.height) {
-                    return false;
-                }
-
-                instance.setProps({
-                    placement: instance._originalPlacement
-                });
-
-                if (instance.popper.firstElementChild) {
-                    instance.popper.firstElementChild.classList.add(bgClass);
-                }
-
-                return true;
-            },
-            onMount(instance) {
-                if (instance.popper.firstElementChild) {
-                    instance.popper.firstElementChild.classList.add(bgClass);
-                }
-                const arrow = instance.popper.querySelector('.tippy-arrow');
-                if (arrow) {
-                    arrow.style.setProperty('color', arrowColor, 'important');
-                }
-            }
-        });
-
-        const id = element.getAttribute('data-tooltip-trigger-id') || 
-                  `tooltip-${Math.random().toString(36).substring(7)}`;
-        element.setAttribute('data-tooltip-trigger-id', id);
-        this.activeTooltips.set(id, instance);
-        
-        return instance;
-    },
-
-    destroy(element) {
-        if (!element) return;
-
-        if (this.sizeCheckIntervals.has(element)) {
-            clearInterval(this.sizeCheckIntervals.get(element));
-            this.sizeCheckIntervals.delete(element);
-        }
-
-        const id = element.getAttribute('data-tooltip-trigger-id');
-        if (!id) return;
-
-        const instance = this.activeTooltips.get(id);
-        if (instance?.[0]) {
-            try {
-                instance[0].destroy();
-            } catch (e) {
-                console.warn('Error destroying tooltip:', e);
-            }
-        }
-        this.activeTooltips.delete(id);
-        element.removeAttribute('data-tooltip-trigger-id');
-    },
-
-    cleanup() {
-        this.sizeCheckIntervals.forEach((interval) => clearInterval(interval));
-        this.sizeCheckIntervals.clear();
-
-        this.activeTooltips.forEach((instance, id) => {
-            if (instance?.[0]) {
-                try {
-                    instance[0].destroy();
-                } catch (e) {
-                    console.warn('Error cleaning up tooltip:', e);
-                }
-            }
-        });
-        this.activeTooltips.clear();
-
-        document.querySelectorAll('[data-tippy-root]').forEach(element => {
-            if (element.parentNode) {
-                element.parentNode.removeChild(element);
-            }
-        });
-    }
-};
-
-window.addEventListener('beforeunload', () => {
-    TooltipManager.cleanup();
-});
-
-window.addEventListener('unload', () => {
-    TooltipManager.cleanup();
-});
-
-document.addEventListener('visibilitychange', () => {
-    if (document.hidden) {
-        TooltipManager.cleanup();
-    }
-});
-
-TooltipManager.cleanup();
-
-document.head.insertAdjacentHTML('beforeend', `
-    <style>
-            [data-tippy-root] {
-            position: fixed !important;
-            z-index: 9999 !important;
-            pointer-events: none !important;
-        }
-
-        /* Base tooltip styles */
-        .tippy-box {
-            font-size: 0.875rem;
-            line-height: 1.25rem;
-            font-weight: 500;
-            border-radius: 0.5rem;
-            color: white;
-                        position: relative !important;
-            pointer-events: auto !important;
-        }
-
-        /* Content padding */
-        .tippy-content {
-            padding: 0.5rem 0.75rem !important;
-        }
-
-        /* Default gray tooltips */
-        .tippy-box .bg-gray-400 {
-            background-color: rgb(156 163 175);
-            padding: 0.5rem 0.75rem;
-        }
-        .tippy-box:has(.bg-gray-400) .tippy-arrow {
-            color: rgb(156 163 175);
-        }
-        
-        /* Red tooltips (revoked) */
-        .tippy-box .bg-red-500 {
-            background-color: rgb(239 68 68);
-            padding: 0.5rem 0.75rem;
-        }
-        .tippy-box:has(.bg-red-500) .tippy-arrow {
-            color: rgb(239 68 68);
-        }
-        
-        /* Light gray tooltips (own) */
-        .tippy-box .bg-gray-300 {
-            background-color: rgb(209 213 219);
-            padding: 0.5rem 0.75rem;
-        }
-        .tippy-box:has(.bg-gray-300) .tippy-arrow {
-            color: rgb(209 213 219);
-        }
-        
-        /* Green tooltips (buy) */
-        .tippy-box .bg-green-700 {
-            background-color: rgb(21 128 61);
-            padding: 0.5rem 0.75rem;
-        }
-        .tippy-box:has(.bg-green-700) .tippy-arrow {
-            color: rgb(21 128 61);
-        }
-
-        /* Arrow positioning and coloring */
-        .tippy-box[data-placement^='top'] > .tippy-arrow::before {
-            border-top-color: currentColor;
-        }
-
-        .tippy-box[data-placement^='bottom'] > .tippy-arrow::before {
-            border-bottom-color: currentColor;
-        }
-
-        .tippy-box[data-placement^='left'] > .tippy-arrow::before {
-            border-left-color: currentColor;
-        }
-
-        .tippy-box[data-placement^='right'] > .tippy-arrow::before {
-            border-right-color: currentColor;
-        }
-
-        /* Arrow positioning */
-        .tippy-box[data-placement^='top'] > .tippy-arrow {
-            bottom: 0;
-        }
-
-        .tippy-box[data-placement^='bottom'] > .tippy-arrow {
-            top: 0;
-        }
-
-        .tippy-box[data-placement^='left'] > .tippy-arrow {
-            right: 0;
-        }
-
-        .tippy-box[data-placement^='right'] > .tippy-arrow {
-            left: 0;
-        }
-    </style>
-`);
 
 // MANAGER OBJECTS
 const WebSocketManager = {
@@ -1133,16 +851,9 @@ function continueInitialization() {
 }
 
 function initializeTooltips() {
-    document.querySelectorAll('[data-tooltip-target]').forEach(element => {
-        const targetId = element.getAttribute('data-tooltip-target');
-        const tooltipContent = document.getElementById(targetId);
-        
-        if (tooltipContent) {
-            TooltipManager.create(element, tooltipContent.innerHTML, {
-                placement: element.getAttribute('data-tooltip-placement') || 'top'
-            });
-        }
-    });
+    if (window.TooltipManager) {
+        window.TooltipManager.initializeTooltips();
+    }
 }
 
 // DATA PROCESSING FUNCTIONS
@@ -1694,10 +1405,13 @@ function updateClearFiltersButton() {
 function cleanupRow(row) {
     const tooltipTriggers = row.querySelectorAll('[data-tooltip-trigger-id]');
     tooltipTriggers.forEach(trigger => {
-        TooltipManager.destroy(trigger);
+        if (window.TooltipManager) {
+            window.TooltipManager.destroy(trigger);
+        }
     });
     EventManager.removeAll(row);
 }
+
 
 function cleanupTable() {
     EventManager.clearAll();
@@ -1706,7 +1420,9 @@ function cleanupTable() {
         existingRows.forEach(row => cleanupRow(row));
         offersBody.innerHTML = '';
     }
-    TooltipManager.cleanup();
+    if (window.TooltipManager) {
+        window.TooltipManager.cleanup();
+    }
 }
 
 function handleNoOffersScenario() {
@@ -1814,7 +1530,7 @@ async function updateOffersTable() {
             const tooltipContent = document.getElementById(targetId);
             
             if (tooltipContent) {
-                TooltipManager.create(trigger, tooltipContent.innerHTML, {
+                window.TooltipManager.create(trigger, tooltipContent.innerHTML, {
                     placement: trigger.getAttribute('data-tooltip-placement') || 'top'
                 });
             }
@@ -1838,7 +1554,6 @@ async function updateOffersTable() {
         try {
             const cachedOffers = CacheManager.get('offers_cached');
             if (cachedOffers?.value) {
-                //console.log('Recovering with cached offers data');
                 jsonData = cachedOffers.value;
                 updateOffersTable();
             }
@@ -1847,6 +1562,7 @@ async function updateOffersTable() {
         }
     }
 }
+
 function updateProfitLossDisplays() {
     const rows = document.querySelectorAll('[data-offer-id]');
     rows.forEach(row => {
@@ -3086,136 +2802,140 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function cleanup() {
-   const debug = {
-       startTime: Date.now(),
-       steps: [],
-       errors: [],
-       addStep: function(step, details = null) {
-           const timeFromStart = Date.now() - this.startTime;
-           console.log(`[Cleanup ${timeFromStart}ms] ${step}`, details || '');
-           this.steps.push({ step, time: timeFromStart, details });
-       },
-       addError: function(step, error) {
-           const timeFromStart = Date.now() - this.startTime;
-           console.error(`[Cleanup Error ${timeFromStart}ms] ${step}:`, error);
-           this.errors.push({ step, error, time: timeFromStart });
-       },
-       summarizeLogs: function() {
-           console.log('Cleanup Summary:');
-           console.log(`Total cleanup time: ${Date.now() - this.startTime}ms`);
-           console.log(`Steps completed: ${this.steps.length}`);
-           console.log(`Errors encountered: ${this.errors.length}`);
-       }
-   };
+    const debug = {
+        startTime: Date.now(),
+        steps: [],
+        errors: [],
+        addStep: function(step, details = null) {
+            const timeFromStart = Date.now() - this.startTime;
+            console.log(`[Cleanup ${timeFromStart}ms] ${step}`, details || '');
+            this.steps.push({ step, time: timeFromStart, details });
+        },
+        addError: function(step, error) {
+            const timeFromStart = Date.now() - this.startTime;
+            console.error(`[Cleanup Error ${timeFromStart}ms] ${step}:`, error);
+            this.errors.push({ step, error, time: timeFromStart });
+        },
+        summarizeLogs: function() {
+            console.log('Cleanup Summary:');
+            console.log(`Total cleanup time: ${Date.now() - this.startTime}ms`);
+            console.log(`Steps completed: ${this.steps.length}`);
+            console.log(`Errors encountered: ${this.errors.length}`);
+        }
+    };
 
-   try {
-       debug.addStep('Starting cleanup process');
+    try {
+        debug.addStep('Starting cleanup process');
 
-       debug.addStep('Starting tooltip cleanup');
-       TooltipManager.cleanup(); 
-       debug.addStep('Tooltip cleanup completed');
+        debug.addStep('Starting tooltip cleanup');
+        if (window.TooltipManager) {
+            window.TooltipManager.cleanup();
+        }
+        debug.addStep('Tooltip cleanup completed');
 
-       debug.addStep('Clearing timers');
-       const timerCount = timerManager.intervals.length + timerManager.timeouts.length;
-       timerManager.clearAll();
-       debug.addStep('Timers cleared', `Cleaned up ${timerCount} timers`);
+        debug.addStep('Clearing timers');
+        const timerCount = timerManager.intervals.length + timerManager.timeouts.length;
+        timerManager.clearAll();
+        debug.addStep('Timers cleared', `Cleaned up ${timerCount} timers`);
 
-       debug.addStep('Starting WebSocket cleanup');
-       await Promise.resolve(WebSocketManager.cleanup()).catch(error => {
-           debug.addError('WebSocket cleanup', error);
-       });
-       debug.addStep('WebSocket cleanup completed');
+        debug.addStep('Starting WebSocket cleanup');
+        await Promise.resolve(WebSocketManager.cleanup()).catch(error => {
+            debug.addError('WebSocket cleanup', error);
+        });
+        debug.addStep('WebSocket cleanup completed');
 
-       debug.addStep('Clearing event listeners');
-       const listenerCount = EventManager.listeners.size;
-       EventManager.clearAll();
-       debug.addStep('Event listeners cleared', `Cleaned up ${listenerCount} listeners`);
+        debug.addStep('Clearing event listeners');
+        const listenerCount = EventManager.listeners.size;
+        EventManager.clearAll();
+        debug.addStep('Event listeners cleared', `Cleaned up ${listenerCount} listeners`);
 
-       debug.addStep('Starting table cleanup');
-       const rowCount = offersBody ? offersBody.querySelectorAll('tr').length : 0;
-       cleanupTable();
-       debug.addStep('Table cleanup completed', `Cleaned up ${rowCount} rows`);
+        debug.addStep('Starting table cleanup');
+        const rowCount = offersBody ? offersBody.querySelectorAll('tr').length : 0;
+        cleanupTable();
+        debug.addStep('Table cleanup completed', `Cleaned up ${rowCount} rows`);
 
-       debug.addStep('Resetting global state');
-       const globals = {
-           currentPage: currentPage,
-           dataLength: jsonData.length,
-           originalDataLength: originalJsonData.length
-       };
-       currentPage = 1;
-       jsonData = [];
-       originalJsonData = [];
-       currentSortColumn = 0;
-       currentSortDirection = 'desc';
-       filterTimeout = null;
-       latestPrices = null;
-       lastRefreshTime = null;
-       debug.addStep('Global state reset', globals);
+        debug.addStep('Resetting global state');
+        const globals = {
+            currentPage: currentPage,
+            dataLength: jsonData.length,
+            originalDataLength: originalJsonData.length
+        };
+        currentPage = 1;
+        jsonData = [];
+        originalJsonData = [];
+        currentSortColumn = 0;
+        currentSortDirection = 'desc';
+        filterTimeout = null;
+        latestPrices = null;
+        lastRefreshTime = null;
+        debug.addStep('Global state reset', globals);
 
-       debug.addStep('Clearing global references');
-       [
-           'WebSocketManager',
-           'tableRateModule',
-           'offersBody',
-           'filterForm',
-           'prevPageButton',
-           'nextPageButton',
-           'currentPageSpan',
-           'totalPagesSpan',
-           'lastRefreshTimeSpan',
-           'newEntriesCountSpan'
-       ].forEach(ref => {
-           if (window[ref]) {
-               window[ref] = null;
-           }
-       });
-       debug.addStep('Global references cleared');
+        debug.addStep('Clearing global references');
+        [
+            'WebSocketManager',
+            'tableRateModule',
+            'offersBody',
+            'filterForm',
+            'prevPageButton',
+            'nextPageButton',
+            'currentPageSpan',
+            'totalPagesSpan',
+            'lastRefreshTimeSpan',
+            'newEntriesCountSpan'
+        ].forEach(ref => {
+            if (window[ref]) {
+                window[ref] = null;
+            }
+        });
+        debug.addStep('Global references cleared');
 
-       debug.addStep('Cleaning up tooltip containers');
-       const tooltipContainers = document.querySelectorAll('.tooltip-container');
-       tooltipContainers.forEach(container => {
-           if (container && container.parentNode) {
-               container.parentNode.removeChild(container);
-           }
-       });
-       debug.addStep('Tooltip containers cleaned up');
+        debug.addStep('Cleaning up tooltip containers');
+        const tooltipContainers = document.querySelectorAll('.tooltip-container');
+        tooltipContainers.forEach(container => {
+            if (container && container.parentNode) {
+                container.parentNode.removeChild(container);
+            }
+        });
+        debug.addStep('Tooltip containers cleaned up');
 
-       debug.addStep('Clearing document/window events');
-       ['visibilitychange', 'beforeunload', 'scroll'].forEach(event => {
-           document.removeEventListener(event, null);
-           window.removeEventListener(event, null);
-       });
-       debug.addStep('Document/window events cleared');
+        debug.addStep('Clearing document/window events');
+        ['visibilitychange', 'beforeunload', 'scroll'].forEach(event => {
+            document.removeEventListener(event, null);
+            window.removeEventListener(event, null);
+        });
+        debug.addStep('Document/window events cleared');
 
-       debug.addStep('Clearing localStorage items');
-       try {
-           localStorage.removeItem('tableSortColumn');
-           localStorage.removeItem('tableSortDirection');
-           debug.addStep('localStorage items cleared');
-       } catch (e) {
-           debug.addError('localStorage cleanup', e);
-       }
+        debug.addStep('Clearing localStorage items');
+        try {
+            localStorage.removeItem('tableSortColumn');
+            localStorage.removeItem('tableSortDirection');
+            debug.addStep('localStorage items cleared');
+        } catch (e) {
+            debug.addError('localStorage cleanup', e);
+        }
 
-   } catch (error) {
-       debug.addError('Main cleanup process', error);
+    } catch (error) {
+        debug.addError('Main cleanup process', error);
 
-       debug.addStep('Starting failsafe cleanup');
-       try {
-           TooltipManager.cleanup(); 
-           WebSocketManager.cleanup();
-           EventManager.clearAll();
-           timerManager.clearAll();
-           if (window.ws) {
-               window.ws.close();
-               window.ws = null;
-           }
-           debug.addStep('Failsafe cleanup completed');
-       } catch (criticalError) {
-           debug.addError('Critical failsafe cleanup', criticalError);
-       }
-   } finally {
-       debug.summarizeLogs();
-   }
+        debug.addStep('Starting failsafe cleanup');
+        try {
+            if (window.TooltipManager) {
+                window.TooltipManager.cleanup();
+            }
+            WebSocketManager.cleanup();
+            EventManager.clearAll();
+            timerManager.clearAll();
+            if (window.ws) {
+                window.ws.close();
+                window.ws = null;
+            }
+            debug.addStep('Failsafe cleanup completed');
+        } catch (criticalError) {
+            debug.addError('Critical failsafe cleanup', criticalError);
+        }
+    } finally {
+        debug.summarizeLogs();
+    }
 }
 
 window.cleanup = cleanup;
