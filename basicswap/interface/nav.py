@@ -81,6 +81,9 @@ class NAVInterface(BTCInterface):
             self._rpcport, self._rpcauth, host=self._rpc_host
         )
 
+        if "wallet_name" in coin_settings:
+            raise ValueError(f"Invalid setting for {self.coin_name()}: wallet_name")
+
     def use_p2shp2wsh(self) -> bool:
         # p2sh-p2wsh
         return True

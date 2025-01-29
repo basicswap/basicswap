@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2019-2024 tecnovert
-# Copyright (c) 2024 The Basicswap developers
+# Copyright (c) 2024-2025 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -199,6 +199,7 @@ chainparams = {
         "message_magic": "Decred Signed Message:\n",
         "blocks_target": 60 * 5,
         "decimal_places": 8,
+        "has_multiwallet": False,
         "mainnet": {
             "rpcport": 9109,
             "pubkey_address": 0x073F,
@@ -404,6 +405,7 @@ chainparams = {
         "has_cltv": False,
         "has_csv": False,
         "has_segwit": False,
+        "has_multiwallet": False,
         "mainnet": {
             "rpcport": 8888,
             "pubkey_address": 82,
@@ -443,6 +445,7 @@ chainparams = {
         "decimal_places": 8,
         "has_csv": True,
         "has_segwit": True,
+        "has_multiwallet": False,
         "mainnet": {
             "rpcport": 44444,
             "pubkey_address": 53,
@@ -519,10 +522,13 @@ chainparams = {
         },
     },
 }
+
+name_map = {}
 ticker_map = {}
 
 
 for c, params in chainparams.items():
+    name_map[params["name"].lower()] = c
     ticker_map[params["ticker"].lower()] = c
 
 
@@ -530,4 +536,11 @@ def getCoinIdFromTicker(ticker: str) -> str:
     try:
         return ticker_map[ticker.lower()]
     except Exception:
-        raise ValueError("Unknown coin")
+        raise ValueError(f"Unknown coin {ticker}")
+
+
+def getCoinIdFromName(name: str) -> str:
+    try:
+        return name_map[name.lower()]
+    except Exception:
+        raise ValueError(f"Unknown coin {name}")

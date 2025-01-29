@@ -45,6 +45,9 @@ class FIROInterface(BTCInterface):
             self._rpcport, self._rpcauth, host=self._rpc_host
         )
 
+        if "wallet_name" in coin_settings:
+            raise ValueError(f"Invalid setting for {self.coin_name()}: wallet_name")
+
     def getExchangeName(self, exchange_name: str) -> str:
         return "zcoin"
 

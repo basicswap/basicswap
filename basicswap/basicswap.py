@@ -598,6 +598,13 @@ class BasicSwap(BaseApp):
             "chain_median_time": None,
         }
 
+        # Passthrough settings
+        for setting_name in ("wallet_name", "mweb_wallet_name"):
+            if setting_name in chain_client_settings:
+                self.coin_clients[coin][setting_name] = chain_client_settings[
+                    setting_name
+                ]
+
         if coin in (Coins.FIRO, Coins.LTC):
             if not chain_client_settings.get("min_relay_fee"):
                 chain_client_settings["min_relay_fee"] = 0.00001
@@ -842,17 +849,11 @@ class BasicSwap(BaseApp):
         elif coin == Coins.XMR:
             from .interface.xmr import XMRInterface
 
-            xmr_i = XMRInterface(self.coin_clients[coin], self.chain, self)
-            chain_client_settings = self.getChainClientSettings(coin)
-            xmr_i.setWalletFilename(chain_client_settings["walletfile"])
-            return xmr_i
+            return XMRInterface(self.coin_clients[coin], self.chain, self)
         elif coin == Coins.WOW:
             from .interface.wow import WOWInterface
 
-            wow_i = WOWInterface(self.coin_clients[coin], self.chain, self)
-            chain_client_settings = self.getChainClientSettings(coin)
-            wow_i.setWalletFilename(chain_client_settings["walletfile"])
-            return wow_i
+            return WOWInterface(self.coin_clients[coin], self.chain, self)
         elif coin == Coins.PIVX:
             from .interface.pivx import PIVXInterface
 
