@@ -1884,6 +1884,10 @@ def initialise_wallets(
 
                         if c in (Coins.BTC, Coins.LTC, Coins.DOGE, Coins.DASH):
                             # wallet_name, disable_private_keys, blank, passphrase, avoid_reuse, descriptors
+
+                            use_descriptors = coin_settings.get(
+                                "use_descriptors", False
+                            )
                             swap_client.callcoinrpc(
                                 c,
                                 "createwallet",
@@ -1893,9 +1897,22 @@ def initialise_wallets(
                                     True,
                                     WALLET_ENCRYPTION_PWD,
                                     False,
-                                    False,
+                                    use_descriptors,
                                 ],
                             )
+                            if use_descriptors:
+                                swap_client.callcoinrpc(
+                                    c,
+                                    "createwallet",
+                                    [
+                                        coin_settings["watch_wallet_name"],
+                                        True,
+                                        True,
+                                        "",
+                                        False,
+                                        use_descriptors,
+                                    ],
+                                )
                             swap_client.ci(c).unlockWallet(WALLET_ENCRYPTION_PWD)
                         else:
                             swap_client.callcoinrpc(
@@ -2537,6 +2554,17 @@ def main():
         set_name: str = getWalletName(coin_params, default_name)
         if set_name != default_name:
             coin_settings["wallet_name"] = set_name
+
+        ticker: str = coin_params["ticker"]
+        if toBool(os.getenv(ticker + "_USE_DESCRIPTORS", False)):
+
+            if coin_id not in (Coins.BTC,):
+                raise ValueError(f"Descriptor wallet unavailable for {coin_name}")
+
+            coin_settings["use_descriptors"] = True
+            coin_settings["watch_wallet_name"] = getWalletName(
+                coin_params, "bsx_watch", prefix_override=f"{ticker}_WATCH"
+            )
 
     if PART_RPC_USER != "":
         chainclients["particl"]["rpcuser"] = PART_RPC_USER

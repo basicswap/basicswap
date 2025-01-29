@@ -599,7 +599,12 @@ class BasicSwap(BaseApp):
         }
 
         # Passthrough settings
-        for setting_name in ("wallet_name", "mweb_wallet_name"):
+        for setting_name in (
+            "use_descriptors",
+            "wallet_name",
+            "watch_wallet_name",
+            "mweb_wallet_name",
+        ):
             if setting_name in chain_client_settings:
                 self.coin_clients[coin][setting_name] = chain_client_settings[
                     setting_name

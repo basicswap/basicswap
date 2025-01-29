@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2020-2024 tecnovert
-# Copyright (c) 2024 The Basicswap developers
+# Copyright (c) 2024-2025 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE.txt or http://www.opensource.org/licenses/mit-license.php.
 
@@ -14,6 +14,7 @@ from urllib.request import urlopen
 
 from .util import read_json_api
 from basicswap.rpc import callrpc
+from basicswap.util import toBool
 from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
 from basicswap.bin.prepare import downloadPIVXParams
 
@@ -43,6 +44,8 @@ PIVX_BASE_RPC_PORT = 35892
 PIVX_BASE_ZMQ_PORT = 36892
 
 PREFIX_SECRET_KEY_REGTEST = 0x2E
+
+BTC_USE_DESCRIPTORS = toBool(os.getenv("BTC_USE_DESCRIPTORS", False))
 
 
 def prepareDataDir(
