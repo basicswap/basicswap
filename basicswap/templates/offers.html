@@ -334,78 +334,78 @@ function getWebSocketConfig() {
   <div class="mt-5 lg:container mx-auto lg:px-0 px-6">
     <div class="pt-0 pb-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
       <div class="px-0">
-       <div class="w-auto mt-6 overflow-auto lg:overflow-hidden">
-          <table class="w-full min-w-max">
-            <thead class="uppercase">
-              <tr>
-                <th class="p-0" data-sortable="true" data-column-index="0">
-                  <div class="py-3 pl-4 justify-center rounded-tl-xl bg-coolGray-200 dark:bg-gray-600">
-                    <span class="text-sm mr-1 text-gray-600 dark:text-gray-300 font-semibold"></span>
-                  </div>
-                </th>
-                <th class="p-0" data-sortable="true" data-column-index="0">
-                  <div class="py-3 pl-4 justify-center bg-coolGray-200 dark:bg-gray-600">
-                    <span class="text-sm mr-1 text-gray-600 dark:text-gray-300 font-semibold">Time</span>
-                     <span class="sort-icon ml-1 text-gray-600 dark:text-gray-400" id="sort-icon-0">↓</span>
-                  </div>
-                </th>
-                <th class="p-0 hidden xl:block">
-                  <div class="py-3 px-4 text-left bg-coolGray-200 dark:bg-gray-600">
-                    <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Details</span>
-                  </div>
-                </th>
-                {% if sent_offers %}
-                <th class="p-0">
-                  <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-left">
-                    <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Max Recv</span>
-                  </div>
-                </th>
-                {% else %}
-                <th class="p-0">
-                  <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-left">
-                    <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Max Send</span>
-                  </div>
-                </th>
-                {% endif %}
-                <th class="p-0">
-                  <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-center">
-                    <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Swap</span>
-                  </div>
-                </th>
-                {% if sent_offers %}
-                <th class="p-0">
-                  <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-right">
-                    <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold pr-2">Your Liq.</span>
-                  </div>
-                </th>
-                {% else %}
-                <th class="p-0">
-                  <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-right">
-                    <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold pr-2">Max Recv</span>
-                  </div>
-                </th>
-                {% endif %}
-                <th class="p-0" data-sortable="true" data-column-index="5">
-                  <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-right flex items-center justify-end">
-                    <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Rate</span>
-                    <span class="sort-icon ml-1 text-gray-600 dark:text-gray-400" id="sort-icon-5">↓</span>
-                  </div>
-                </th>
-                <th class="p-0" data-sortable="true" data-column-index="6">
-                  <div class="py-3 bg-coolGray-200 dark:bg-gray-600 text-center flex items-center justify-center">
-                    <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Market +/-</span>
-                    <span class="sort-icon ml-1 text-gray-600 dark:text-gray-400" id="sort-icon-6">↓</span>
-                  </div>
-                <th class="p-0">
-                  <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 rounded-tr-xl">
-                  <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Trade</span>
-                 </div>
-               </th>
-              </tr>
-            </thead>
-            <tbody id="offers-body">
-            </tbody>
-          </table>
+       <div class="w-auto mt-6 overflow-hidden">
+   <table class="w-full">
+    <thead class="uppercase bg-coolGray-200 dark:bg-gray-600">
+    <tr>
+      <th class="p-0 rounded-tl-lg" data-sortable="true" data-column-index="0">
+        <div class="py-3 pl-4 justify-center bg-coolGray-200 dark:bg-gray-600 rounded-tl-xl">
+          <span class="text-sm mr-1 text-gray-600 dark:text-gray-300 font-semibold"></span>
+        </div>
+      </th>
+      <th class="p-0" data-sortable="true" data-column-index="0">
+        <div class="py-3 pl-4 justify-center bg-coolGray-200 dark:bg-gray-600">
+          <span class="text-sm mr-1 text-gray-600 dark:text-gray-300 font-semibold">Time</span>
+          <span class="sort-icon ml-1 text-gray-600 dark:text-gray-400" id="sort-icon-0">↓</span>
+        </div>
+      </th>
+      <th class="p-0 hidden xl:block">
+        <div class="py-3 px-4 text-left bg-coolGray-200 dark:bg-gray-600">
+          <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Details</span>
+        </div>
+      </th>
+      {% if sent_offers %}
+      <th class="p-0">
+        <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-left">
+          <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Max Recv</span>
+        </div>
+      </th>
+      {% else %}
+      <th class="p-0">
+        <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-left">
+          <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Max Send</span>
+        </div>
+      </th>
+      {% endif %}
+      <th class="p-0">
+        <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-center">
+          <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Swap</span>
+        </div>
+      </th>
+      {% if sent_offers %}
+      <th class="p-0">
+        <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-right">
+          <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold pr-2">Your Liq.</span>
+        </div>
+      </th>
+      {% else %}
+      <th class="p-0">
+        <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-right">
+          <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold pr-2">Max Recv</span>
+        </div>
+      </th>
+      {% endif %}
+      <th class="p-0 rounded-tr-lg" data-sortable="true" data-column-index="5">
+        <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-right flex items-center justify-end">
+          <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Rate</span>
+          <span class="sort-icon ml-1 text-gray-600 dark:text-gray-400" id="sort-icon-5">↓</span>
+        </div>
+      </th>
+      <th class="p-0" data-sortable="true" data-column-index="6">
+        <div class="py-3 bg-coolGray-200 dark:bg-gray-600 text-center flex items-center justify-center">
+          <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Market +/-</span>
+          <span class="sort-icon ml-1 text-gray-600 dark:text-gray-400" id="sort-icon-6">↓</span>
+        </div>
+      <th class="p-0 rounded-tr-lg">
+        <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 rounded-tr-lg">
+        <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Trade</span>
+       </div>
+     </th>
+    </tr>
+  </thead>
+  <tbody id="offers-body">
+  </tbody>
+</table>
         </div>
       </div>
       <div class="rounded-b-md">

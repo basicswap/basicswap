@@ -1703,27 +1703,27 @@ function createTimeColumn(offer, postedTime, expiresIn) {
     const now = Math.floor(Date.now() / 1000);
     const timeLeft = offer.expire_at - now;
 
-    let strokeColor = '#10B981'; // Default green for > 30 min
+    let strokeColor = '#10B981';
     if (timeLeft <= 300) {
-        strokeColor = '#9CA3AF'; // Grey for 5 min or less
+        strokeColor = '#9CA3AF';
     } else if (timeLeft <= 1800) {
-        strokeColor = '#3B82F6'; // Blue for 5-30 min
+        strokeColor = '#3B82F6';
     }
 
     return `
-        <td class="py-3 pl-1 pr-2 text-xs whitespace-nowrap">
-            <div class="flex items-center">
-                <div class="relative" data-tooltip-target="tooltip-active${escapeHtml(offer.offer_id)}">
-                    <svg alt="" class="w-5 h-5 rounded-full mr-4 cursor-pointer" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
+        <td class="p-2">
+            <div class="flex items-center space-x-2">
+                <div data-tooltip-target="tooltip-active${escapeHtml(offer.offer_id)}">
+                    <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                         <g stroke-linecap="round" stroke-width="2" fill="none" stroke="${strokeColor}" stroke-linejoin="round">
                             <circle cx="12" cy="12" r="11"></circle>
                             <polyline points="12,6 12,12 18,12" stroke="${strokeColor}"></polyline>
                         </g>
                     </svg>
                 </div>
-                <div class="flex flex-col hidden xl:block">
-                    <div class="text-xs whitespace-nowrap"><span class="bold">Posted:</span> ${escapeHtml(postedTime)}</div>
-                    <div class="text-xs whitespace-nowrap"><span class="bold">Expires in:</span> ${escapeHtml(expiresIn)}</div>
+                <div class="hidden xl:block">
+                    <div class="text-xs"><span class="bold">Posted:</span> ${escapeHtml(postedTime)}</div>
+                    <div class="text-xs"><span class="bold">Expires in:</span> ${escapeHtml(expiresIn)}</div>
                 </div>
             </div>
         </td>
@@ -1779,15 +1779,13 @@ function createTakerAmountColumn(offer, coinTo) {
     const fromAmount = parseFloat(offer.amount_to);
     const toSymbol = getCoinSymbol(coinTo);
     return `
-        <td class="py-0">
-            <div class="py-3 px-4 text-left">
-                <a data-tooltip-target="tooltip-wallet${escapeHtml(offer.offer_id)}" href="/wallet/${escapeHtml(toSymbol)}" class="items-center monospace">
-                    <div class="pr-2">
-                        <div class="text-sm font-semibold">${fromAmount.toFixed(4)}</div>
-                        <div class="text-sm text-gray-500 dark:text-gray-400">${coinTo}</div>
-                    </div>
-                </a>
-            </div>
+        <td class="p-2">
+            <a data-tooltip-target="tooltip-wallet${escapeHtml(offer.offer_id)}" href="/wallet/${escapeHtml(toSymbol)}">
+                <div>
+                    <div class="text-sm monospace font-semibold">${fromAmount.toFixed(4)}</div>
+                    <div class="text-sm text-gray-500 dark:text-gray-400">${coinTo}</div>
+                </div>
+            </a>
         </td>
     `;
 }
@@ -1801,18 +1799,14 @@ function createSwapColumn(offer, coinFromDisplay, coinToDisplay, coinFromSymbol,
     };
 
     return `
-        <td class="py-0 px-0 text-right text-sm">
+        <td class="py-0 px-0">
             <a data-tooltip-target="tooltip-offer${offer.offer_id}" href="/offer/${offer.offer_id}">
-                <div class="flex items-center justify-evenly monospace">
-                    <span class="inline-flex mr-3 ml-3 align-middle items-center justify-center w-18 h-20 rounded">
-                        <img class="h-12" src="/static/images/coins/${getImageFilename(coinToSymbol, coinToDisplay)}" alt="${coinToDisplay}">
-                    </span>
-                    <svg aria-hidden="true" class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                <div class="flex items-center justify-center space-x-2">
+                    <img class="h-8 w-8" src="/static/images/coins/${getImageFilename(coinToSymbol, coinToDisplay)}" alt="${coinToDisplay}">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                         <path fill-rule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd"></path>
                     </svg>
-                    <span class="inline-flex ml-3 mr-3 align-middle items-center justify-center w-18 h-20 rounded">
-                        <img class="h-12" src="/static/images/coins/${getImageFilename(coinFromSymbol, coinFromDisplay)}" alt="${coinFromDisplay}">
-                    </span>
+                    <img class="h-8 w-8" src="/static/images/coins/${getImageFilename(coinFromSymbol, coinFromDisplay)}" alt="${coinFromDisplay}">
                 </div>
             </a>
         </td>
@@ -1823,15 +1817,13 @@ function createOrderbookColumn(offer, coinFrom) {
     const toAmount = parseFloat(offer.amount_from);
     const fromSymbol = getCoinSymbol(coinFrom);
     return `
-        <td class="p-0">
-            <div class="py-3 px-4 text-right">
-                <a data-tooltip-target="tooltip-wallet-maker${escapeHtml(offer.offer_id)}" href="/wallet/${escapeHtml(fromSymbol)}" class="items-center monospace">
-                    <div class="pr-2">
-                        <div class="text-sm font-semibold">${toAmount.toFixed(4)}</div>
-                        <div class="text-sm text-gray-500 dark:text-gray-400">${coinFrom}</div>
-                    </div>
-                </a>
-            </div>
+        <td class="p-2 text-right">
+            <a data-tooltip-target="tooltip-wallet-maker${escapeHtml(offer.offer_id)}" href="/wallet/${escapeHtml(fromSymbol)}">
+                <div>
+                    <div class="text-sm monospace font-semibold">${toAmount.toFixed(4)}</div>
+                    <div class="text-sm text-gray-500 dark:text-gray-400">${coinFrom}</div>
+                </div>
+            </a>
         </td>
     `;
 }
@@ -1844,40 +1836,30 @@ function createRateColumn(offer, coinFrom, coinTo) {
 
     const getPriceKey = (coin) => {
         const lowerCoin = coin.toLowerCase();
-        if (lowerCoin === 'firo' || lowerCoin === 'zcoin') {
-            return 'zcoin';
-        }
-        if (lowerCoin === 'bitcoin cash') {
-            return 'bitcoin-cash';
-        }
-        if (lowerCoin === 'particl anon' || lowerCoin === 'particl blind') {
-            return 'particl';
-        }
+        if (lowerCoin === 'firo' || lowerCoin === 'zcoin') return 'zcoin';
+        if (lowerCoin === 'bitcoin cash') return 'bitcoin-cash';
+        if (lowerCoin === 'particl anon' || lowerCoin === 'particl blind') return 'particl';
         return coinNameToSymbol[coin] || lowerCoin;
     };
 
     const toSymbolKey = getPriceKey(coinTo);
     let toPriceUSD = latestPrices[toSymbolKey]?.usd;
-
     if (!toPriceUSD || isNaN(toPriceUSD)) {
         toPriceUSD = tableRateModule.getFallbackValue(toSymbolKey);
     }
-
     const rateInUSD = toPriceUSD && !isNaN(toPriceUSD) && !isNaN(rate) ? rate * toPriceUSD : null;
 
     return `
-        <td class="py-3 semibold monospace text-xs text-right items-center rate-table-info">
-            <div class="relative">
-                <div class="flex flex-col items-end pr-3" data-tooltip-target="tooltip-rate-${offer.offer_id}">
-                    <span class="text-sm bold text-gray-700 dark:text-white">
-                        ${rateInUSD !== null ? `$${rateInUSD.toFixed(2)} USD` : 'N/A'}
-                    </span>
-                    <span class="bold text-gray-700 dark:text-white">
-                        ${rate.toFixed(8)} ${toSymbol}/${fromSymbol}
-                    </span>
-                    <span class="semibold text-gray-400 dark:text-gray-300">
-                        ${inverseRate.toFixed(8)} ${fromSymbol}/${toSymbol}
-                    </span>
+        <td class="p-2 text-right monospace">
+            <div data-tooltip-target="tooltip-rate-${offer.offer_id}">
+                <div class="text-sm font-semibold text-gray-700 dark:text-white">
+                    ${rateInUSD !== null ? `$${rateInUSD.toFixed(2)} USD` : 'N/A'}
+                </div>
+                <div class="text-sm font-semibold text-gray-700 dark:text-white">
+                    ${rate.toFixed(8)} ${toSymbol}/${fromSymbol}
+                </div>
+                <div class="text-xs text-gray-400 dark:text-gray-300">
+                    ${inverseRate.toFixed(8)} ${fromSymbol}/${toSymbol}
                 </div>
             </div>
         </td>
@@ -1886,13 +1868,11 @@ function createRateColumn(offer, coinFrom, coinTo) {
 
 function createPercentageColumn(offer) {
     return `
-        <td class="py-3 px-2 bold text-sm text-center monospace items-center rate-table-info">
-            <div class="relative" data-tooltip-target="percentage-tooltip-${offer.offer_id}">
-                <div class="profittype">
-                    <span class="profit-loss text-lg font-bold" data-offer-id="${offer.offer_id}">
-                        Calculating...
-                    </span>
-                </div>
+        <td class="p-2 text-center">
+            <div data-tooltip-target="percentage-tooltip-${offer.offer_id}">
+                <span class="profit-loss monospace text-lg font-bold" data-offer-id="${offer.offer_id}">
+                    Calculating...
+                </span>
             </div>
         </td>
     `;
@@ -1902,30 +1882,21 @@ function createActionColumn(offer, isActuallyExpired = false) {
     const isRevoked = Boolean(offer.is_revoked);
     const isTreatedAsSentOffer = offer.is_own_offer;
 
-    let buttonClass, buttonText;
+    let buttonClass = isRevoked ? 'bg-red-500 hover:bg-red-600' :
+                     isActuallyExpired && isSentOffers ? 'bg-gray-400 hover:bg-red-700' :
+                     isTreatedAsSentOffer ? 'bg-gray-300 hover:bg-green-600' :
+                     'bg-blue-500 hover:bg-green-600';
 
-    if (isRevoked) {
-        buttonClass = 'bg-red-500 text-white hover:bg-red-600 transition duration-200';
-        buttonText = 'Revoked';
-    } else if (isActuallyExpired && isSentOffers) {
-        buttonClass = 'bg-gray-400 text-white dark:border-gray-300 text-white hover:bg-red-700 transition duration-200';
-        buttonText = 'Expired';
-    } else if (isTreatedAsSentOffer) {
-        buttonClass = 'bg-gray-300 bold text-white bold hover:bg-green-600 transition duration-200';
-        buttonText = 'Edit';
-    } else {
-        buttonClass = 'bg-blue-500 text-white hover:bg-green-600 transition duration-200';
-        buttonText = 'Swap';
-    }
+    let buttonText = isRevoked ? 'Revoked' :
+                    isActuallyExpired && isSentOffers ? 'Expired' :
+                    isTreatedAsSentOffer ? 'Edit' : 'Swap';
 
     return `
-        <td class="py-6 px-2 text-center">
-            <div class="flex justify-center items-center h-full">
-                <a class="inline-block w-20 py-1 px-2 font-medium text-center text-sm rounded-md ${buttonClass}"
-                   href="/offer/${offer.offer_id}">
-                    ${buttonText}
-                </a>
-            </div>
+        <td class="p-2 text-center">
+            <a class="inline-block w-20 py-1 px-2 font-medium text-sm text-white rounded-md transition duration-200 ${buttonClass}"
+               href="/offer/${offer.offer_id}">
+                ${buttonText}
+            </a>
         </td>
     `;
 }
