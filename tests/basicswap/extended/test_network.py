@@ -2,19 +2,20 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2020-2021 tecnovert
-# Copyright (c) 2024 The Basicswap developers
+# Copyright (c) 2024-2025 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-import os
 import json
-import time
+import logging
+import os
 import shutil
 import signal
-import logging
-import unittest
+import sys
 import threading
+import time
 import traceback
+import unittest
 
 import basicswap.config as cfg
 from basicswap.basicswap import (
@@ -150,7 +151,7 @@ def btcRpc(cmd, node_id=0):
 
 def signal_handler(sig, frame):
     global stop_test
-    logging.info("signal {} detected.".format(sig))
+    os.write(sys.stdout.fileno(), f"Signal {sig} detected.\n".encode("utf-8"))
     stop_test = True
     delay_event.set()
 

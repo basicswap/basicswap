@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2022-2023 tecnovert
-# Copyright (c) 2024 The Basicswap developers
+# Copyright (c) 2024-2025 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -11,16 +11,16 @@ basicswap]$ python tests/basicswap/extended/test_dash.py
 
 """
 
-import os
-import sys
 import json
-import time
+import logging
+import os
 import random
 import shutil
 import signal
-import logging
-import unittest
+import sys
 import threading
+import time
+import unittest
 
 import basicswap.config as cfg
 from basicswap.basicswap import (
@@ -251,7 +251,7 @@ def dashRpc(cmd, wallet=None):
 
 def signal_handler(sig, frame):
     global stop_test
-    print("signal {} detected.".format(sig))
+    os.write(sys.stdout.fileno(), f"Signal {sig} detected.\n".encode("utf-8"))
     stop_test = True
     delay_event.set()
 

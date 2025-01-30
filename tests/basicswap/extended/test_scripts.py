@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2023-2024 tecnovert
-# Copyright (c) 2024 The Basicswap developers
+# Copyright (c) 2024-2025 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -15,17 +15,18 @@ pytest -v -s tests/basicswap/extended/test_scripts.py::Test::test_bid_tracking
 
 """
 
-import os
-import sys
-import json
-import time
-import math
-import logging
-import sqlite3
-import unittest
-import threading
-import subprocess
 import http.client
+import json
+import logging
+import math
+import os
+import signal
+import sqlite3
+import subprocess
+import sys
+import threading
+import time
+import unittest
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib import parse
 
@@ -196,6 +197,11 @@ def get_possible_bids(rv_stdout):
     return bids
 
 
+def signal_handler(self, sig, frame):
+    os.write(sys.stdout.fileno(), f"Signal {sig} detected.\n".encode("utf-8"))
+    self.delay_event.set()
+
+
 class Test(unittest.TestCase):
     delay_event = threading.Event()
     thread_http = HttpThread()
@@ -203,6 +209,11 @@ class Test(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         super(Test, cls).setUpClass()
+
+        signal.signal(
+            signal.SIGINT, lambda signal, frame: signal_handler(cls, signal, frame)
+        )
+
         cls.thread_http.start()
 
         script_path = "scripts/createoffers.py"

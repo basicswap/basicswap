@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2021-2024 tecnovert
-# Copyright (c) 2024 The Basicswap developers
+# Copyright (c) 2024-2025 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -22,16 +22,16 @@ cp -r ${TEST_PATH}/bin/ ~/tmp/basicswap_bin/
 
 """
 
-import os
-import sys
 import json
-import time
+import logging
+import multiprocessing
+import os
 import random
 import signal
-import logging
-import unittest
+import sys
 import threading
-import multiprocessing
+import time
+import unittest
 from unittest.mock import patch
 
 from basicswap.rpc_xmr import (
@@ -219,7 +219,7 @@ def updateThreadDCR(cls):
 
 
 def signal_handler(self, sig, frame):
-    logging.info("signal {} detected.".format(sig))
+    os.write(sys.stdout.fileno(), f"Signal {sig} detected.\n".encode("utf-8"))
     self.delay_event.set()
 
 

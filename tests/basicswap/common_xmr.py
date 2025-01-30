@@ -6,15 +6,15 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-import os
-import sys
 import json
+import logging
+import multiprocessing
+import os
 import shutil
 import signal
-import logging
-import unittest
+import sys
 import threading
-import multiprocessing
+import unittest
 from io import StringIO
 from urllib.request import urlopen
 from unittest.mock import patch
@@ -534,7 +534,7 @@ class TestBase(unittest.TestCase):
         )
 
     def signal_handler(self, sig, frame):
-        logging.info("signal {} detected.".format(sig))
+        os.write(sys.stdout.fileno(), f"Signal {sig} detected.\n".encode("utf-8"))
         self.delay_event.set()
 
     def wait_seconds(self, seconds):

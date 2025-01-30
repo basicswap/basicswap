@@ -6,16 +6,16 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-import os
 import json
-import time
+import logging
+import os
 import random
 import shutil
 import signal
-import logging
-import unittest
-import traceback
 import threading
+import time
+import traceback
+import unittest
 
 import basicswap.config as cfg
 from basicswap.db import (
