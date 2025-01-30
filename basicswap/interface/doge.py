@@ -25,6 +25,10 @@ class DOGEInterface(BTCInterface):
         return Coins.DOGE
 
     @staticmethod
+    def est_lock_tx_vsize() -> int:
+        return 192
+
+    @staticmethod
     def xmr_swap_b_lock_spend_tx_vsize() -> int:
         return 192
 

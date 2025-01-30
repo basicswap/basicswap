@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2020-2024 tecnovert
-# Copyright (c) 2024 The Basicswap developers
+# Copyright (c) 2024-2025 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -132,6 +132,7 @@ def run_prepare(
     os.environ["BSX_TEST_MODE"] = "true"
     os.environ["PART_RPC_PORT"] = str(PARTICL_RPC_PORT_BASE)
     os.environ["BTC_RPC_PORT"] = str(BITCOIN_RPC_PORT_BASE)
+    os.environ["BTC_PORT"] = str(BITCOIN_PORT_BASE)
     os.environ["LTC_RPC_PORT"] = str(LITECOIN_RPC_PORT_BASE)
     os.environ["DCR_RPC_PORT"] = str(DECRED_RPC_PORT_BASE)
     os.environ["FIRO_RPC_PORT"] = str(FIRO_RPC_PORT_BASE)
@@ -229,8 +230,7 @@ def run_prepare(
             for line in lines:
                 if not line.startswith("prune"):
                     fp.write(line)
-            fp.write("port={}\n".format(BITCOIN_PORT_BASE + node_id + port_ofs))
-            fp.write("bind=127.0.0.1\n")
+            # fp.write("bind=127.0.0.1\n")  # Causes BTC v28 to try and bind to bind=127.0.0.1:8444, even with a bind...=onion present
             # listenonion=0 does not stop the node from trying to bind to the tor port
             # https://github.com/bitcoin/bitcoin/issues/22726
             fp.write(

@@ -212,6 +212,10 @@ class DCRInterface(Secp256k1Interface):
         return CTxOut
 
     @staticmethod
+    def est_lock_tx_vsize() -> int:
+        return 224
+
+    @staticmethod
     def xmr_swap_a_lock_spend_tx_vsize() -> int:
         return 327
 
@@ -272,6 +276,9 @@ class DCRInterface(Secp256k1Interface):
         self._use_segwit = True  # Decred is natively segwit
         self._connection_type = coin_settings["connection_type"]
         self._altruistic = coin_settings.get("altruistic", True)
+
+        if "wallet_name" in coin_settings:
+            raise ValueError(f"Invalid setting for {self.coin_name()}: wallet_name")
 
     def open_rpc(self):
         return openrpc(self._rpcport, self._rpcauth, host=self._rpc_host)

@@ -30,6 +30,9 @@ jobs:
     - name: Install
       run: |
         pip install .
+        # Print the core versions to a file for caching
+        basicswap-prepare --version --withcoins=bitcoin | tail -n +2 > core_versions.txt
+        cat core_versions.txt
     - name: Running flake8
       run: |
         flake8 --ignore=E203,E501,W503 --exclude=basicswap/contrib,basicswap/interface/contrib,.eggs,.tox,bin/install_certifi.py
@@ -44,21 +47,20 @@ jobs:
       uses: actions/cache@v3
       env:
         cache-name: cache-cores
-        CACHE_KEY: $(printf $(python bin/basicswap-prepare.py --version --withcoins=bitcoin) | sha256sum | head -c 64)
       with:
-        path: $BIN_DIR
-        key: $CACHE_KEY
+        path: /tmp/cached_bin
+        key: cores-${{ runner.os }}-${{ hashFiles('**/core_versions.txt') }}
 
-    - if: ${{ steps.cache-yarn.outputs.cache-hit != 'true' }}
+    - if: ${{ steps.cache-cores.outputs.cache-hit != 'true' }}
       name: Running basicswap-prepare
       run: |
         basicswap-prepare --bindir="$BIN_DIR" --preparebinonly --withcoins=particl,bitcoin,monero
     - name: Running test_xmr
       run: |
         export PYTHONPATH=$(pwd)
-        export PARTICL_BINDIR="$BIN_DIR/particl";
-        export BITCOIN_BINDIR="$BIN_DIR/bitcoin";
-        export XMR_BINDIR="$BIN_DIR/monero";
+        export PARTICL_BINDIR="$BIN_DIR/particl"
+        export BITCOIN_BINDIR="$BIN_DIR/bitcoin"
+        export XMR_BINDIR="$BIN_DIR/monero"
         pytest tests/basicswap/test_btc_xmr.py::TestBTC -k "test_003_api or test_02_a_leader_recover_a_lock_tx"
     - name: Running test_encrypted_xmr_reload
       run: |

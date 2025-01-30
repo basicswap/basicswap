@@ -251,7 +251,7 @@ def getCoreBinArgs(coin_id: int, coin_settings, prepare=False, use_tor_proxy=Fal
     extra_args = []
     if "config_filename" in coin_settings:
         extra_args.append("--conf=" + coin_settings["config_filename"])
-    if "port" in coin_settings:
+    if "port" in coin_settings and coin_id != Coins.BTC:
         if prepare is False and use_tor_proxy:
             if coin_id == Coins.BCH:
                 # Without this BCH (27.1) will bind to the default BTC port, even with proxy set
@@ -440,7 +440,9 @@ def runClient(fp, data_dir, chain, start_only_coins):
                 swap_client.log.info(f"Starting {display_name} daemon")
 
                 filename: str = getCoreBinName(coin_id, v, c + "d")
-                extra_opts = getCoreBinArgs(coin_id, v, use_tor_proxy=swap_client.use_tor_proxy)
+                extra_opts = getCoreBinArgs(
+                    coin_id, v, use_tor_proxy=swap_client.use_tor_proxy
+                )
                 daemons.append(
                     startDaemon(v["datadir"], v["bindir"], filename, opts=extra_opts)
                 )

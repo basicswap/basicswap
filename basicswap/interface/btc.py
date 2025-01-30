@@ -218,6 +218,10 @@ class BTCInterface(Secp256k1Interface):
         return rv
 
     @staticmethod
+    def est_lock_tx_vsize() -> int:
+        return 110
+
+    @staticmethod
     def xmr_swap_a_lock_spend_tx_vsize() -> int:
         return 147
 
@@ -262,7 +266,7 @@ class BTCInterface(Secp256k1Interface):
         self._rpcport = coin_settings["rpcport"]
         self._rpcauth = coin_settings["rpcauth"]
         self.rpc = make_rpc_func(self._rpcport, self._rpcauth, host=self._rpc_host)
-        self._rpc_wallet = "wallet.dat"
+        self._rpc_wallet = coin_settings.get("wallet_name", "wallet.dat")
         self.rpc_wallet = make_rpc_func(
             self._rpcport, self._rpcauth, host=self._rpc_host, wallet=self._rpc_wallet
         )
@@ -297,16 +301,14 @@ class BTCInterface(Secp256k1Interface):
 
         # Wallet name is "" for some LTC and PART installs on older cores
         if self._rpc_wallet not in wallets and len(wallets) > 0:
-            self._log.debug("Changing {} wallet name.".format(self.ticker()))
+            self._log.debug(f"Changing {self.ticker()} wallet name.")
             for wallet_name in wallets:
                 # Skip over other expected wallets
                 if wallet_name in ("mweb",):
                     continue
                 self._rpc_wallet = wallet_name
                 self._log.info(
-                    "Switched {} wallet name to {}.".format(
-                        self.ticker(), self._rpc_wallet
-                    )
+                    f"Switched {self.ticker()} wallet name to {self._rpc_wallet}."
                 )
                 self.rpc_wallet = make_rpc_func(
                     self._rpcport,
@@ -377,9 +379,9 @@ class BTCInterface(Secp256k1Interface):
 
         chain_synced = round(blockchaininfo["verificationprogress"], 3)
         if chain_synced < 1.0:
-            raise ValueError("{} chain isn't synced.".format(self.coin_name()))
+            raise ValueError(f"{self.coin_name()} chain isn't synced.")
 
-        self._log.debug("Finding block at time: {}".format(start_time))
+        self._log.debug(f"Finding block at time: {start_time}")
 
         rpc_conn = self.open_rpc()
         try:
@@ -393,7 +395,7 @@ class BTCInterface(Secp256k1Interface):
                 block_hash = block_header["previousblockhash"]
         finally:
             self.close_rpc(rpc_conn)
-        raise ValueError("{} wallet restore height not found.".format(self.coin_name()))
+        raise ValueError(f"{self.coin_name()} wallet restore height not found.")
 
     def getWalletSeedID(self) -> str:
         wi = self.rpc_wallet("getwalletinfo")
@@ -1802,16 +1804,20 @@ class BTCInterface(Secp256k1Interface):
     def unlockWallet(self, password: str):
         if password == "":
             return
-        self._log.info("unlockWallet - {}".format(self.ticker()))
+        self._log.info(f"unlockWallet - {self.ticker()}")
 
         if self.coin_type() == Coins.BTC:
             # Recreate wallet if none found
             # Required when encrypting an existing btc wallet, workaround is to delete the btc wallet and recreate
             wallets = self.rpc("listwallets")
             if len(wallets) < 1:
-                self._log.info("Creating wallet.dat for {}.".format(self.coin_name()))
+                self._log.info(
+                    f'Creating wallet "{self._rpc_wallet}" for {self.coin_name()}.'
+                )
                 # wallet_name, disable_private_keys, blank, passphrase, avoid_reuse, descriptors
-                self.rpc("createwallet", ["wallet.dat", False, True, "", False, False])
+                self.rpc(
+                    "createwallet", [self._rpc_wallet, False, True, "", False, False]
+                )
                 self.rpc_wallet("encryptwallet", [password])
 
         # Max timeout value, ~3 years
@@ -1819,7 +1825,7 @@ class BTCInterface(Secp256k1Interface):
         self._sc.checkWalletSeed(self.coin_type())
 
     def lockWallet(self):
-        self._log.info("lockWallet - {}".format(self.ticker()))
+        self._log.info(f"lockWallet - {self.ticker()}")
         self.rpc_wallet("walletlock")
 
     def get_p2sh_script_pubkey(self, script: bytearray) -> bytearray:

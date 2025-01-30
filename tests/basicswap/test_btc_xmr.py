@@ -10,9 +10,6 @@ import random
 import logging
 import unittest
 
-from basicswap.db import (
-    Concepts,
-)
 from basicswap.basicswap import (
     BidStates,
     Coins,
@@ -23,6 +20,9 @@ from basicswap.basicswap_util import (
     TxLockTypes,
     EventLogTypes,
 )
+from basicswap.db import (
+    Concepts,
+)
 from basicswap.util import (
     make_int,
 )
@@ -32,10 +32,10 @@ from tests.basicswap.util import (
 )
 from tests.basicswap.common import (
     abandon_all_swaps,
+    wait_for_balance,
     wait_for_bid,
     wait_for_event,
     wait_for_offer,
-    wait_for_balance,
     wait_for_unspent,
     wait_for_none_active,
     BTC_BASE_RPC_PORT,
@@ -639,6 +639,129 @@ class TestFunctions(BaseTest):
             BidStates.SWAP_COMPLETED,
             wait_for=(self.extra_wait_time + 180),
         )
+
+    def do_test_08_insufficient_funds(self, coin_from, coin_to):
+        logging.info(
+            "---------- Test {} to {} Insufficient Funds".format(
+                coin_from.name, coin_to.name
+            )
+        )
+        swap_clients = self.swap_clients
+        reverse_bid: bool = swap_clients[0].is_reverse_ads_bid(coin_from, coin_to)
+
+        id_offerer: int = self.node_c_id
+        id_bidder: int = self.node_b_id
+
+        self.prepare_balance(
+            coin_from,
+            10.0,
+            1800 + id_offerer,
+            1801 if coin_from in (Coins.XMR,) else 1800,
+        )
+        jsw = read_json_api(1800 + id_offerer, "wallets")
+        balance_from_before: float = self.getBalance(jsw, coin_from)
+        self.prepare_balance(
+            coin_to,
+            balance_from_before + 1,
+            1800 + id_bidder,
+            1801 if coin_to in (Coins.XMR,) else 1800,
+        )
+
+        swap_clients = self.swap_clients
+        ci_from = swap_clients[id_offerer].ci(coin_from)
+        ci_to = swap_clients[id_bidder].ci(coin_to)
+
+        amt_swap: int = ci_from.make_int(balance_from_before, r=1)
+        rate_swap: int = ci_to.make_int(2.0, r=1)
+
+        try:
+            offer_id = swap_clients[id_offerer].postOffer(
+                coin_from,
+                coin_to,
+                amt_swap,
+                rate_swap,
+                amt_swap,
+                SwapTypes.XMR_SWAP,
+                auto_accept_bids=True,
+            )
+        except Exception as e:
+            assert "Insufficient funds" in str(e)
+        else:
+            assert False, "Should fail"
+
+        # Test that postbid errors when offer is for the full balance
+        id_offerer_test_bid = id_bidder
+        id_bidder_test_bid = id_offerer
+        amt_swap_test_bid_to: int = ci_from.make_int(balance_from_before, r=1)
+        amt_swap_test_bid_from: int = ci_to.make_int(1.0)
+        offer_id = swap_clients[id_offerer_test_bid].postOffer(
+            coin_to,
+            coin_from,
+            amt_swap_test_bid_from,
+            0,
+            amt_swap_test_bid_from,
+            SwapTypes.XMR_SWAP,
+            extra_options={"amount_to": amt_swap_test_bid_to},
+        )
+        wait_for_offer(test_delay_event, swap_clients[id_bidder_test_bid], offer_id)
+        try:
+            bid_id = swap_clients[id_bidder_test_bid].postBid(
+                offer_id, amt_swap_test_bid_from
+            )
+        except Exception as e:
+            assert "Insufficient funds" in str(e)
+        else:
+            assert False, "Should fail"
+
+        amt_swap -= ci_from.make_int(1)
+        offer_id = swap_clients[id_offerer].postOffer(
+            coin_from,
+            coin_to,
+            amt_swap,
+            rate_swap,
+            amt_swap,
+            SwapTypes.XMR_SWAP,
+            auto_accept_bids=True,
+        )
+        wait_for_offer(test_delay_event, swap_clients[id_bidder], offer_id)
+
+        # First bid should work
+        bid_id = swap_clients[id_bidder].postXmrBid(offer_id, amt_swap)
+        wait_for_bid(
+            test_delay_event,
+            swap_clients[id_offerer],
+            bid_id,
+            (
+                (BidStates.SWAP_COMPLETED, BidStates.XMR_SWAP_NOSCRIPT_COIN_LOCKED)
+                if reverse_bid
+                else (BidStates.BID_ACCEPTED, BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED)
+            ),
+            wait_for=120,
+        )
+
+        # Should be out of funds for second bid (over remaining offer value causes a hard auto accept fail)
+        bid_id = swap_clients[id_bidder].postXmrBid(offer_id, amt_swap)
+        wait_for_bid(
+            test_delay_event,
+            swap_clients[id_offerer],
+            bid_id,
+            BidStates.BID_AACCEPT_FAIL,
+            wait_for=40,
+        )
+        event = wait_for_event(
+            test_delay_event,
+            swap_clients[id_offerer],
+            Concepts.BID,
+            bid_id,
+            event_type=EventLogTypes.AUTOMATION_CONSTRAINT,
+        )
+        assert "Over remaining offer value" in event.event_msg
+        try:
+            swap_clients[id_offerer].acceptBid(bid_id)
+        except Exception as e:
+            assert "Insufficient funds" in str(e) or "Balance too low" in str(e)
+        else:
+            assert False, "Should fail"
 
 
 class BasicSwapTest(TestFunctions):
@@ -1714,133 +1837,10 @@ class BasicSwapTest(TestFunctions):
             swap_clients[0].setMockTimeOffset(0)
 
     def test_08_insufficient_funds(self):
-        tla_from = self.test_coin_from.name
-        logging.info("---------- Test {} Insufficient Funds".format(tla_from))
-        swap_clients = self.swap_clients
-        coin_from = self.test_coin_from
-        coin_to = Coins.XMR
-
-        self.prepare_balance(coin_from, 10.0, 1802, 1800)
-
-        id_offerer: int = self.node_c_id
-        id_bidder: int = self.node_b_id
-
-        swap_clients = self.swap_clients
-        ci_from = swap_clients[id_offerer].ci(coin_from)
-        ci_to = swap_clients[id_bidder].ci(coin_to)
-
-        jsw = read_json_api(1800 + id_offerer, "wallets")
-        balance_from_before: float = self.getBalance(jsw, coin_from)
-
-        amt_swap: int = ci_from.make_int(balance_from_before, r=1)
-        rate_swap: int = ci_to.make_int(2.0, r=1)
-
-        try:
-            offer_id = swap_clients[id_offerer].postOffer(
-                coin_from,
-                coin_to,
-                amt_swap,
-                rate_swap,
-                amt_swap,
-                SwapTypes.XMR_SWAP,
-                auto_accept_bids=True,
-            )
-        except Exception as e:
-            assert "Insufficient funds" in str(e)
-        else:
-            assert False, "Should fail"
-        amt_swap -= ci_from.make_int(1)
-        offer_id = swap_clients[id_offerer].postOffer(
-            coin_from,
-            coin_to,
-            amt_swap,
-            rate_swap,
-            amt_swap,
-            SwapTypes.XMR_SWAP,
-            auto_accept_bids=True,
-        )
-        wait_for_offer(test_delay_event, swap_clients[id_bidder], offer_id)
-
-        # First bid should work
-        bid_id = swap_clients[id_bidder].postXmrBid(offer_id, amt_swap)
-        wait_for_bid(
-            test_delay_event,
-            swap_clients[id_offerer],
-            bid_id,
-            (BidStates.BID_ACCEPTED, BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED),
-            wait_for=40,
-        )
-
-        # Should be out of funds for second bid (over remaining offer value causes a hard auto accept fail)
-        bid_id = swap_clients[id_bidder].postXmrBid(offer_id, amt_swap)
-        wait_for_bid(
-            test_delay_event,
-            swap_clients[id_offerer],
-            bid_id,
-            BidStates.BID_AACCEPT_FAIL,
-            wait_for=40,
-        )
-        try:
-            swap_clients[id_offerer].acceptBid(bid_id)
-        except Exception as e:
-            assert "Insufficient funds" in str(e)
-        else:
-            assert False, "Should fail"
+        self.do_test_08_insufficient_funds(self.test_coin_from, Coins.XMR)
 
     def test_08_insufficient_funds_rev(self):
-        tla_from = self.test_coin_from.name
-        logging.info("---------- Test {} Insufficient Funds (reverse)".format(tla_from))
-        swap_clients = self.swap_clients
-        coin_from = Coins.XMR
-        coin_to = self.test_coin_from
-
-        self.prepare_balance(coin_to, 10.0, 1802, 1800)
-
-        id_offerer: int = self.node_b_id
-        id_bidder: int = self.node_c_id
-
-        swap_clients = self.swap_clients
-        ci_from = swap_clients[id_offerer].ci(coin_from)
-        ci_to = swap_clients[id_bidder].ci(coin_to)
-
-        jsw = read_json_api(1800 + id_bidder, "wallets")
-        balance_to_before: float = self.getBalance(jsw, coin_to)
-
-        amt_swap: int = ci_from.make_int(balance_to_before, r=1)
-        rate_swap: int = ci_to.make_int(1.0, r=1)
-
-        amt_swap -= 1
-        offer_id = swap_clients[id_offerer].postOffer(
-            coin_from,
-            coin_to,
-            amt_swap,
-            rate_swap,
-            amt_swap,
-            SwapTypes.XMR_SWAP,
-            auto_accept_bids=True,
-        )
-        wait_for_offer(test_delay_event, swap_clients[id_bidder], offer_id)
-
-        bid_id = swap_clients[id_bidder].postXmrBid(offer_id, amt_swap)
-
-        event = wait_for_event(
-            test_delay_event,
-            swap_clients[id_bidder],
-            Concepts.BID,
-            bid_id,
-            event_type=EventLogTypes.ERROR,
-            wait_for=60,
-        )
-        assert "Insufficient funds" in event.event_msg
-
-        wait_for_bid(
-            test_delay_event,
-            swap_clients[id_bidder],
-            bid_id,
-            BidStates.BID_ERROR,
-            sent=True,
-            wait_for=20,
-        )
+        self.do_test_08_insufficient_funds(Coins.XMR, self.test_coin_from)
 
 
 class TestBTC(BasicSwapTest):

@@ -33,7 +33,7 @@ import basicswap.config as cfg
 from basicswap import __version__
 from basicswap.base import getaddrinfo_tor
 from basicswap.basicswap import BasicSwap
-from basicswap.chainparams import Coins
+from basicswap.chainparams import Coins, chainparams, getCoinIdFromName
 from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
 from basicswap.ui.util import getCoinName
 from basicswap.util import toBool
@@ -162,6 +162,7 @@ LOG_LEVEL = logging.DEBUG
 logger.level = LOG_LEVEL
 if not len(logger.handlers):
     logger.addHandler(logging.StreamHandler(sys.stdout))
+logging.getLogger("gnupg").setLevel(logging.INFO)
 
 BSX_DOCKER_MODE = toBool(os.getenv("BSX_DOCKER_MODE", "false"))
 BSX_LOCAL_TOR = toBool(os.getenv("BSX_LOCAL_TOR", "false"))
@@ -210,6 +211,7 @@ LTC_RPC_PWD = os.getenv("LTC_RPC_PWD", "")
 
 BTC_RPC_HOST = os.getenv("BTC_RPC_HOST", "127.0.0.1")
 BTC_RPC_PORT = int(os.getenv("BTC_RPC_PORT", 19996))
+BTC_PORT = int(os.getenv("BTC_PORT", 8333))
 BTC_ONION_PORT = int(os.getenv("BTC_ONION_PORT", 8334))
 BTC_RPC_USER = os.getenv("BTC_RPC_USER", "")
 BTC_RPC_PWD = os.getenv("BTC_RPC_PWD", "")
@@ -253,8 +255,8 @@ NAV_RPC_PWD = os.getenv("NAV_RPC_PWD", "")
 
 BCH_RPC_HOST = os.getenv("BCH_RPC_HOST", "127.0.0.1")
 BCH_RPC_PORT = int(os.getenv("BCH_RPC_PORT", 19997))
-BCH_ONION_PORT = int(os.getenv("BCH_ONION_PORT", 8335))
 BCH_PORT = int(os.getenv("BCH_PORT", 19798))
+BCH_ONION_PORT = int(os.getenv("BCH_ONION_PORT", 8335))
 BCH_RPC_USER = os.getenv("BCH_RPC_USER", "")
 BCH_RPC_PWD = os.getenv("BCH_RPC_PWD", "")
 
@@ -288,10 +290,14 @@ TEST_ONION_LINK = toBool(os.getenv("TEST_ONION_LINK", "false"))
 
 BITCOIN_FASTSYNC_URL = os.getenv(
     "BITCOIN_FASTSYNC_URL",
-    "https://eu2.contabostorage.com/1f50a74c9dc14888a8664415dad3d020:utxosets/",
+    "https://snapshots.btcpay.tech/",
 )
 BITCOIN_FASTSYNC_FILE = os.getenv(
-    "BITCOIN_FASTSYNC_FILE", "utxo-snapshot-bitcoin-mainnet-820852.tar"
+    "BITCOIN_FASTSYNC_FILE", "utxo-snapshot-bitcoin-mainnet-867690.tar"
+)
+BITCOIN_FASTSYNC_SIG_URL = os.getenv(
+    "BITCOIN_FASTSYNC_SIG_URL",
+    None,
 )
 
 # Encrypt new wallets with this password, must match the Particl wallet password when adding coins
@@ -355,6 +361,18 @@ def shouldManageDaemon(prefix: str) -> bool:
         return True
 
     return toBool(manage_daemon)
+
+
+def getWalletName(coin_params: str, default_name: str, prefix_override=None) -> str:
+    prefix: str = coin_params["ticker"] if prefix_override is None else prefix_override
+    env_var_name: str = prefix + "_WALLET_NAME"
+
+    if env_var_name in os.environ and coin_params.get("has_multiwallet", True) is False:
+        raise ValueError("Can't set wallet name for {}.".format(coin_params["ticker"]))
+
+    wallet_name: str = os.getenv(env_var_name, default_name)
+    assert len(wallet_name) > 0
+    return wallet_name
 
 
 def getKnownVersion(coin_name: str) -> str:
@@ -538,6 +556,8 @@ def ensureValidSignatureBy(result, signing_key_name):
 
     if result.key_id not in expected_key_ids[signing_key_name]:
         raise ValueError("Signature made by unexpected keyid: " + result.key_id)
+
+    logger.debug(f"Found valid signature by {signing_key_name} ({result.key_id}).")
 
 
 def extractCore(coin, version_data, settings, bin_dir, release_path, extra_opts={}):
@@ -1113,6 +1133,8 @@ def writeTorSettings(fp, coin, coin_settings, tor_control_password):
 
 def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
     core_settings = settings["chainclients"][coin]
+    wallet_name = core_settings.get("wallet_name", "wallet.dat")
+    assert len(wallet_name) > 0
     data_dir = core_settings["datadir"]
     tor_control_password = extra_opts.get("tor_control_password", None)
 
@@ -1293,7 +1315,7 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
         fp.write("rpcport={}\n".format(core_settings["rpcport"]))
         fp.write("printtoconsole=0\n")
         fp.write("daemon=0\n")
-        fp.write("wallet=wallet.dat\n")
+        fp.write(f"wallet={wallet_name}\n")
 
         if tor_control_password is not None:
             writeTorSettings(fp, coin, core_settings, tor_control_password)
@@ -1416,7 +1438,7 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
 
         # Double check
         if extra_opts.get("check_btc_fastsync", True):
-            check_btc_fastsync_data(base_dir, sync_file_path)
+            check_btc_fastsync_data(base_dir, BITCOIN_FASTSYNC_FILE)
 
         with tarfile.open(sync_file_path) as ft:
             ft.extractall(path=data_dir)
@@ -1763,6 +1785,7 @@ def initialise_wallets(
             ] + [c for c in with_coins if c != "particl"]
             for coin_name in start_daemons:
                 coin_settings = settings["chainclients"][coin_name]
+                wallet_name = coin_settings.get("wallet_name", "wallet.dat")
                 c = swap_client.getCoinIdFromName(coin_name)
 
                 if c == Coins.XMR:
@@ -1854,9 +1877,9 @@ def initialise_wallets(
                     swap_client.waitForDaemonRPC(c, with_wallet=False)
                     # Create wallet if it doesn't exist yet
                     wallets = swap_client.callcoinrpc(c, "listwallets")
-                    if len(wallets) < 1:
+                    if wallet_name not in wallets:
                         logger.info(
-                            "Creating wallet.dat for {}.".format(getCoinName(c))
+                            f'Creating wallet "{wallet_name}" for {getCoinName(c)}.'
                         )
 
                         if c in (Coins.BTC, Coins.LTC, Coins.DOGE, Coins.DASH):
@@ -1865,7 +1888,7 @@ def initialise_wallets(
                                 c,
                                 "createwallet",
                                 [
-                                    "wallet.dat",
+                                    wallet_name,
                                     False,
                                     True,
                                     WALLET_ENCRYPTION_PWD,
@@ -1875,7 +1898,13 @@ def initialise_wallets(
                             )
                             swap_client.ci(c).unlockWallet(WALLET_ENCRYPTION_PWD)
                         else:
-                            swap_client.callcoinrpc(c, "createwallet", ["wallet.dat"])
+                            swap_client.callcoinrpc(
+                                c,
+                                "createwallet",
+                                [
+                                    wallet_name,
+                                ],
+                            )
                             if WALLET_ENCRYPTION_PWD != "":
                                 encrypt_wallet(swap_client, c)
 
@@ -1961,25 +1990,32 @@ def load_config(config_path):
 
 
 def signal_handler(sig, frame):
-    logger.info("Signal %d detected" % (sig))
+    logger.info(f"Signal {sig} detected")
 
 
-def check_btc_fastsync_data(base_dir, sync_file_path):
+def check_btc_fastsync_data(base_dir, sync_filename):
+    logger.info("Validating signature for: " + sync_filename)
+
     github_pgp_url = "https://raw.githubusercontent.com/basicswap/basicswap/master/pgp"
     gitlab_pgp_url = "https://gitlab.com/particl/basicswap/-/raw/master/pgp"
-    asc_filename = BITCOIN_FASTSYNC_FILE + ".asc"
+    asc_filename = sync_filename + ".asc"
     asc_file_path = os.path.join(base_dir, asc_filename)
+    sync_file_path = os.path.join(base_dir, sync_filename)
     if not os.path.exists(asc_file_path):
-        asc_file_urls = (
+        asc_file_urls = [
             github_pgp_url + "/sigs/" + asc_filename,
             gitlab_pgp_url + "/sigs/" + asc_filename,
-        )
+        ]
+        if BITCOIN_FASTSYNC_SIG_URL:
+            asc_file_urls.append("/".join([BITCOIN_FASTSYNC_SIG_URL, asc_filename]))
         for url in asc_file_urls:
             try:
                 downloadFile(url, asc_file_path)
                 break
             except Exception as e:
                 logging.warning("Download failed: %s", str(e))
+    if not os.path.exists(asc_file_path):
+        raise ValueError("Unable to find snapshot signature file.")
     gpg = gnupg.GPG()
     pubkey_filename = "{}_{}.pgp".format("particl", "tecnovert")
     pubkeyurls = [
@@ -2251,7 +2287,7 @@ def main():
                     check_sig = True
 
             if check_sig:
-                check_btc_fastsync_data(data_dir, sync_file_path)
+                check_btc_fastsync_data(data_dir, BITCOIN_FASTSYNC_FILE)
         except Exception as e:
             logger.error(
                 f"Failed to download BTC fastsync file: {e}\nRe-running the command should resume the download or try manually downloading from {sync_file_url}"
@@ -2282,6 +2318,7 @@ def main():
             "onionport": BTC_ONION_PORT + port_offset,
             "datadir": os.getenv("BTC_DATA_DIR", os.path.join(data_dir, "bitcoin")),
             "bindir": os.path.join(bin_dir, "bitcoin"),
+            "port": BTC_PORT + port_offset,
             "use_segwit": True,
             "blocks_confirmed": 1,
             "conf_target": 2,
@@ -2384,7 +2421,6 @@ def main():
             "walletrpchost": XMR_WALLET_RPC_HOST,
             "walletrpcuser": XMR_WALLET_RPC_USER,
             "walletrpcpassword": XMR_WALLET_RPC_PWD,
-            "walletfile": "swap_wallet",
             "datadir": os.getenv("XMR_DATA_DIR", os.path.join(data_dir, "monero")),
             "bindir": os.path.join(bin_dir, "monero"),
             "restore_height": xmr_restore_height,
@@ -2471,7 +2507,6 @@ def main():
             "walletrpchost": WOW_WALLET_RPC_HOST,
             "walletrpcuser": WOW_WALLET_RPC_USER,
             "walletrpcpassword": WOW_WALLET_RPC_PWD,
-            "walletfile": "swap_wallet",
             "datadir": os.getenv("WOW_DATA_DIR", os.path.join(data_dir, "wownero")),
             "bindir": os.path.join(bin_dir, "wownero"),
             "restore_height": wow_restore_height,
@@ -2483,6 +2518,25 @@ def main():
             "core_type_group": "xmr",
         },
     }
+
+    for coin_name, coin_settings in chainclients.items():
+        coin_id = getCoinIdFromName(coin_name)
+        coin_params = chainparams[coin_id]
+        if coin_settings.get("core_type_group", "") == "xmr":
+            default_name = "swap_wallet"
+        else:
+            default_name = "wallet.dat"
+
+        if coin_name == "litecoin":
+            set_name: str = getWalletName(
+                coin_params, "mweb", prefix_override="LTC_MWEB"
+            )
+            if set_name != "mweb":
+                coin_settings["mweb_wallet_name"] = set_name
+
+        set_name: str = getWalletName(coin_params, default_name)
+        if set_name != default_name:
+            coin_settings["wallet_name"] = set_name
 
     if PART_RPC_USER != "":
         chainclients["particl"]["rpcuser"] = PART_RPC_USER

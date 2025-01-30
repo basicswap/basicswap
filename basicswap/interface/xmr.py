@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2020-2024 tecnovert
-# Copyright (c) 2024 The Basicswap developers
+# Copyright (c) 2024-2025 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -72,14 +72,19 @@ class XMRInterface(CoinInterface):
         raise ValueError("Not possible")
 
     @staticmethod
+    def est_lock_tx_vsize() -> int:
+        # TODO: Estimate with ringsize
+        return 1604
+
+    @staticmethod
     def xmr_swap_b_lock_spend_tx_vsize() -> int:
         # TODO: Estimate with ringsize
         return 1604
 
     def is_transient_error(self, ex) -> bool:
-        # str_error: str = str(ex).lower()
-        # if "failed to get output distribution" in str_error:
-        #     return True
+        str_error: str = str(ex).lower()
+        if "failed to get earliest fork height" in str_error:
+            return True
         return super().is_transient_error(ex)
 
     def __init__(self, coin_settings, network, swap_client=None):
@@ -94,6 +99,7 @@ class XMRInterface(CoinInterface):
         self._log = self._sc.log if self._sc and self._sc.log else logging
         self._wallet_password = None
         self._have_checked_seed = False
+        self._wallet_filename = coin_settings.get("wallet_name", "swap_wallet")
 
         daemon_login = None
         if coin_settings.get("rpcuser", "") != "":
@@ -169,9 +175,6 @@ class XMRInterface(CoinInterface):
     def setFeePriority(self, new_priority):
         ensure(new_priority >= 0 and new_priority < 4, "Invalid fee_priority value")
         self._fee_priority = new_priority
-
-    def setWalletFilename(self, wallet_filename):
-        self._wallet_filename = wallet_filename
 
     def createWallet(self, params):
         if self._wallet_password is not None:

@@ -1,43 +1,60 @@
 {% include 'header.html' %}
 {% from 'style.html' import breadcrumb_line_svg, page_back_svg, page_forwards_svg, filter_clear_svg, filter_apply_svg, circular_arrows_svg, input_arrow_down_svg %}
+
 <div class="container mx-auto">
   <section class="p-5 mt-5">
     <div class="flex flex-wrap items-center -m-2">
       <div class="w-full md:w-1/2 p-2">
         <ul class="flex flex-wrap items-center gap-x-3 mb-2">
-          <li>
-            <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/"><p>Home</p></a>
-          </li>
-          <li> {{ breadcrumb_line_svg | safe }} </li>
-          <li> <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="#">{{ page_type_available }} {{ page_type_received }} {{ page_type_sent }}</a> </li>
-          <li> {{ breadcrumb_line_svg | safe }} </li>
+          <li><a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/"><p>Home</p></a></li>
+          <li>{{ breadcrumb_line_svg | safe }}</li>
+          <li><a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="#">Sent Bids / Received Bids</a></li>
         </ul>
       </div>
     </div>
   </section>
+
   <section class="py-4">
     <div class="container px-4 mx-auto">
       <div class="relative py-11 px-16 bg-coolGray-900 dark:bg-blue-500 rounded-md overflow-hidden">
-        <img class="absolute z-10 left-4 top-4" src="/static/images/elements/dots-red.svg" alt=""> <img class="absolute z-10 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt="">
+        <img class="absolute z-10 left-4 top-4" src="/static/images/elements/dots-red.svg" alt="">
+        <img class="absolute z-10 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt="">
         <img class="absolute h-64 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" src="/static/images/elements/wave.svg" alt="">
         <div class="relative z-20 flex flex-wrap items-center -m-3">
           <div class="w-full md:w-1/2 p-3">
-            <h2 class="mb-6 text-4xl font-bold text-white tracking-tighter">{{ page_type_available }} {{ page_type_received }} {{ page_type_sent }}</h2>
-            <p class="font-normal text-coolGray-200 dark:text-white">{{ page_type_available_description }} {{ page_type_received_description }} {{ page_type_sent_description }}</p>
+            <h2 class="mb-6 text-4xl font-bold text-white tracking-tighter">Sent Bids / Received Bids</h2>
+            <p class="font-normal text-coolGray-200 dark:text-white">View, and manage bids</p>
           </div>
-          <div class="w-full md:w-1/2 p-3 p-6 container flex flex-wrap items-center justify-end items-center mx-auto">
-            {% if refresh %}
-            <a id="refresh" href="/bid/{{ bid_id }}" class="rounded-full mr-5 flex flex-wrap justify-center px-5 py-3 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border dark:bg-gray-500 dark:hover:bg-gray-700 border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
-              {{ circular_arrows_svg | safe }}
-              <span>Refresh {{ refresh }} seconds</span>
-            </a>
-          {% endif %}
-        </div>
         </div>
       </div>
     </div>
   </section>
+
   {% include 'inc_messages.html' %}
+
+  <section>
+    <div class="pl-6 pr-6 pt-0 mt-5 h-full overflow-hidden">
+        <div class="flex flex-wrap items-center justify-between -m-2">
+          <div class="w-full pt-2">
+            <div class="mb-4 border-b pb-5 border-gray-200 dark:border-gray-500">
+              <ul class="flex flex-wrap text-sm font-medium text-center text-gray-500 dark:text-gray-400" id="myTab" data-tabs-toggle="#bidstab" role="tablist">
+                <li class="mr-2">
+                  <button class="inline-block px-4 py-3 rounded-lg hover:text-gray-900 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white focus:outline-none focus:ring-0" id="sent-tab" data-tabs-target="#sent" type="button" role="tab" aria-controls="sent" aria-selected="true">
+                    Sent Bids ({{ sent_bids_count }})
+                  </button>
+                </li>
+                <li class="mr-2">
+                  <button class="inline-block px-4 py-3 rounded-lg hover:text-gray-900 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white focus:outline-none focus:ring-0" id="received-tab" data-tabs-target="#received" type="button" role="tab" aria-controls="received" aria-selected="false">
+                    Received Bids ({{ received_bids_count }})
+                  </button>
+                </li>
+              </ul>
+            </div>
+          </div>
+      </div>
+    </div>
+  </section>
+
   <div class="pl-6 pr-6 pt-0 pb-0 mt-5 h-full overflow-hidden">
     <div class="pb-6 border-coolGray-100">
       <div class="flex flex-wrap items-center justify-between -m-2">
@@ -91,7 +108,8 @@
                         <select name="with_expired" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
                           <option value="true" {% if filters.with_expired==true %} selected{% endif %}>Include</option>
                           <option value="false" {% if filters.with_expired==false %} selected{% endif %}>Exclude</option>
-                        </select> </div>
+                        </select>
+                      </div>
                     </div>
                     <div class="w-full md:w-auto p-1.5">
                       <div class="relative">
@@ -101,120 +119,294 @@
                       </div>
                     </div>
                     <div class="w-full md:w-auto p-1.5">
-                      <div class="relative"> <button type="submit" name='applyfilters' value="Apply Filters" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-white bg-blue-600 hover:bg-green-600 hover:border-green-600 rounded-lg transition duration-200 border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
-                        {{ filter_apply_svg | safe }}
-                        <span>Apply Filters</span>
-                      </button>
-                    </div>
+                      <div class="relative">
+                        <button type="submit" name='applyfilters' value="Apply Filters" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-white bg-blue-600 hover:bg-green-600 hover:border-green-600 rounded-lg transition duration-200 border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+                          {{ filter_apply_svg | safe }}
+                          <span>Apply Filters</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
-            <div class="container mt-5 mx-auto">
-              <div class="pt-6 pb-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
-                <div class="px-6">
-                  <div class="w-full mt-6 pb-6 overflow-x-auto">
-                    <table class="w-full min-w-max">
-                      <thead class="uppercase">
-                        <tr class="text-left">
-                          <th class="p-0">
-                            <div class="py-3 px-6 rounded-tl-xl bg-coolGray-200 dark:bg-gray-600"> <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Date/Time at</span>
+
+            <div id="bidstab">
+              <div class="rounded-lg" id="sent" role="tabpanel" aria-labelledby="sent-tab">
+                <div id="sent-content">
+                  <div class="container mt-5 mx-auto">
+                    <div class="pt-6 pb-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
+                      <div class="px-6">
+                        <div class="w-full mt-6 pb-6 overflow-x-auto">
+                          <table class="w-full min-w-max">
+                            <thead class="uppercase">
+                              <tr class="text-left">
+                                <th class="p-0">
+                                  <div class="py-3 px-6 rounded-tl-xl bg-coolGray-200 dark:bg-gray-600">
+                                    <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Date/Time at</span>
+                                  </div>
+                                </th>
+                                <th class="p-0">
+                                  <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
+                                    <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Bid ID</span>
+                                  </div>
+                                </th>
+                                <th class="p-0">
+                                  <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
+                                    <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Offer ID</span>
+                                  </div>
+                                </th>
+                                <th class="p-0">
+                                  <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
+                                    <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Bid From</span>
+                                  </div>
+                                </th>
+                                <th class="p-0">
+                                  <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
+                                    <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Bid Status</span>
+                                  </div>
+                                </th>
+                                <th class="p-0">
+                                  <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
+                                    <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">ITX Status</span>
+                                  </div>
+                                </th>
+                                <th class="p-0">
+                                  <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
+                                    <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">PTX Status</span>
+                                  </div>
+                                </th>
+                                <th class="p-0">
+                                  <div class="py-3 px-6 rounded-tr-xl bg-coolGray-200 dark:bg-gray-600">
+                                    <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Details</span>
+                                  </div>
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {% for b in sent_bids %}
+                              <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
+                                <th scope="row" class="flex items-center py-7 px-46 text-gray-900 whitespace-nowrap">
+                                  <svg class="w-5 h-5 rounded-full ml-5" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
+                                    <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
+                                      <circle cx="12" cy="12" r="11"></circle>
+                                      <polyline points=" 12,6 12,12 18,12 " stroke="#6b7280"></polyline>
+                                    </g>
+                                  </svg>
+                                  <div class="pl-3">
+                                    <div class="font-semibold text-xs dark:text-white">{{ b[0] }}</div>
+                                  </div>
+                                </th>
+                                <td class="py-3 px-6 text-xs monospace"><a href=/bid/{{ b[1] }}>{{ b[1]|truncate(20, True) }}</a></td>
+                                <td class="py-3 px-6 text-xs monospace"><a href=/offer/{{ b[2] }}>{{ b[2]|truncate(20, True) }}</a></td>
+                                <td class="py-3 px-6 text-xs monospace"><a href=/identity/{{ b[6] }}>{{ b[6] }}</a></td>
+                                <td class="py-3 px-6 text-xs">{{ b[3] }}</td>
+                                <td class="py-3 px-6 text-xs">{{ b[4] }}</td>
+                                <td class="py-3 px-6 text-xs">{{ b[5] }}</td>
+                                <td class="py-3 px-6 text-xs">
+                                  <a class="inline-block w-20 py-1 px-2 font-medium text-center text-sm rounded-md bg-blue-500 text-white border border-blue-500 hover:bg-blue-600 transition duration-200" href="/bid/{{ b[1] }}">Details</a>
+                                </td>
+                              </tr>
+                              {% endfor %}
+                            </tbody>
+                          </table>
+                        </div>
+                        <div class="rounded-b-md">
+                          <div class="w-full md:w-0/12">
+                            <div class="flex flex-wrap justify-end pt-6 pr-6 border-t border-gray-100 dark:border-gray-400">
+                              {% if filters.page_no > 1 %}
+                              <div class="w-full md:w-auto p-1.5">
+                                <input type="hidden" name="filter_key" value="{{ filter_key }}">
+                                <input type="hidden" name="page_no" value="{{ filters.page_no - 1 }}">
+                                <button type="submit" name='pageback' value="Previous" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-blue-600 rounded-lg transition duration-200 focus:ring-0 focus:outline-none">
+                                  {{ page_back_svg | safe }}
+                                  <span>Previous</span>
+                                </button>
+                              </div>
+                              {% endif %}
+                              <div class="flex items-center">
+                                <div class="w-full md:w-auto p-1.5">
+                                  <p class="text-sm font-heading dark:text-white">Page: {{ filters.page_no }}</p>
+                                </div>
+                              </div>
+                              {% if sent_bids_count >= filters.limit %}
+                              <div class="w-full md:w-auto p-1.5">
+                                <input type="hidden" name="filter_key" value="{{ filter_key }}">
+                                <input type="hidden" name="page_no" value="{{ filters.page_no + 1 }}">
+                                <button type="submit" name='pageforwards' value="Next" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-blue-600 rounded-lg transition duration-200 focus:ring-0 focus:outline-none">
+                                  <span>Next</span>
+                                  {{ page_forwards_svg | safe }}
+                                </button>
+                              </div>
+                              {% endif %}
                             </div>
-                          </th>
-                          <th class="p-0">
-                            <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600"> <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Bid ID</span>
-                            </div>
-                          </th>
-                          <th class="p-0">
-                            <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600"> <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Offer ID</span>
-                            </div>
-                          </th>
-                          <th class="p-0">
-                            <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600"> <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Bid From</span>
-                            </div>
-                          </th>
-                          <th class="p-0">
-                            <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600"> <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Bid Status</span>
-                            </div>
-                          </th>
-                          <th class="p-0">
-                            <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600"> <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">ITX Status</span>
-                            </div>
-                          </th>
-                          <th class="p-0">
-                            <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600"> <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">PTX Status</span>
-                            </div>
-                          </th>
-                          <th class="p-0">
-                            <div class="py-3 px-6 rounded-tr-xl bg-coolGray-200 dark:bg-gray-600"> <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Details</span>
-                            </div>
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {% for b in bids %}
-                        <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
-                          <th scope="row" class="flex items-center py-7 px-46 text-gray-900 whitespace-nowrap"> <svg class="w-5 h-5 rounded-full ml-5" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-                              <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
-                                <circle cx="12" cy="12" r="11"></circle>
-                                <polyline points=" 12,6 12,12 18,12 " stroke="#6b7280"></polyline>
-                              </g>
-                            </svg>
-                            <div class="pl-3">
-                              <div class="font-semibold text-xs dark:text-white">{{ b[0] }}</div>
-                            </div>
-                          </th>
-                          <td class="py-3 px-6 text-xs monospace"> <a href=/bid/{{ b[1] }}>{{ b[1]|truncate(20, True) }}</a> </td>
-                          <td class="py-3 px-6 text-xs monospace"> <a href=/offer/{{ b[2] }}>{{ b[2]|truncate(20, True) }}</a> </td>
-                          <td class="py-3 px-6 text-xs monospace"> <a href=/identity/{{ b[6] }}>{{ b[6] }}</a> </td>
-                          <td class="py-3 px-6 text-xs">{{ b[3] }}</td>
-                          <td class="py-3 px-6 text-xs">{{ b[4] }}</td>
-                          <td class="py-3 px-6 text-xs">{{ b[5] }}</td>
-                          {% if page_type_received or page_type_sent %}
-                          <td class="py-3 px-6 text-xs"> <a class="inline-block w-20 py-1 px-2 font-medium text-center text-sm rounded-md bg-blue-500 text-white border border-blue-500 hover:bg-blue-600 transition duration-200 bg-blue-500 text-white hover:bg-blue-600 transition duration-200" href="/bid/{{ b[1] }}">Details</a>
-                          </td> {% elif page_type_available %}
-                          <td class="py-3 px-6 text-xs"> <a class="inline-block w-20 py-1 px-2 font-medium text-center text-sm rounded-md bg-blue-500 text-white border border-blue-500 hover:bg-blue-600 transition duration-200 bg-blue-500 text-white hover:bg-blue-600 transition duration-200" href="/bid/{{ b[1] }}">Accept</a>
-                          </td>
-                          {% endif %}
-                        </tr>
-                      </tbody>
-                      {% endfor %}
-                    </table> <input type="hidden" name="formid" value="{{ form_id }}"> <input type="hidden" name="pageno" value="{{ filters.page_no }}">
-                  </div>
-                </div>
-                <div class="rounded-b-md">
-                  <div class="w-full md:w-0/12">
-                    <div class="flex flex-wrap justify-end pt-6 pr-6 border-t border-gray-100 dark:border-gray-400">
-                      {% if filters.page_no > 1 %} <div class="w-full md:w-auto p-1.5">
-                        <button type="submit" name='pageback' value="Previous" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-blue-600 rounded-lg transition duration-200 focus:ring-0 focus:outline-none">
-                          {{ page_back_svg | safe }}
-                          <span>Previous</span>
-                        </button>
-                      </div>
-                      {% endif %}
-                      <div class="flex items-center">
-                        <div class="w-full md:w-auto p-1.5">
-                          <p class="text-sm font-heading dark:text-white">Page: {{ filters.page_no }}</p>
+                          </div>
                         </div>
                       </div>
-                      {% if bids_count > 20 %}
-                      <div class="w-full md:w-auto p-1.5"> <button type="submit" name='pageforwards' value="Next" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-blue-600 rounded-lg transition duration-200 focus:ring-0 focus:outline-none">
-                        <span>Next</span>
-                      {{ page_forwards_svg | safe }}
-                    </button>
-                  </div>
-                {% endif %}
-              </div>
+                    </div>
                   </div>
                 </div>
+              </div>
+
+              <div class="hidden rounded-lg" id="received" role="tabpanel" aria-labelledby="received-tab">
+                <div id="received-content">
+                  <div class="container mt-5 mx-auto">
+                    <div class="pt-6 pb-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
+                      <div class="px-6">
+                        <div class="w-full mt-6 pb-6 overflow-x-auto">
+                          <table class="w-full min-w-max">
+                            <thead class="uppercase">
+                              <tr class="text-left">
+                                <th class="p-0">
+                                  <div class="py-3 px-6 rounded-tl-xl bg-coolGray-200 dark:bg-gray-600">
+                                    <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Date/Time at</span>
+                                  </div>
+                                </th>
+                                <th class="p-0">
+                                  <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
+                                    <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Bid ID</span>
+                                  </div>
+                                </th>
+                                <th class="p-0">
+                                  <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
+                                    <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Offer ID</span>
+                                  </div>
+                                </th>
+                                <th class="p-0">
+                                  <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
+                                    <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Bid From</span>
+                                  </div>
+                                </th>
+                                <th class="p-0">
+                                  <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
+                                    <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Bid Status</span>
+                                  </div>
+                                </th>
+                                <th class="p-0">
+                                  <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
+                                    <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">ITX Status</span>
+                                  </div>
+                                </th>
+                                <th class="p-0">
+                                  <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
+                                    <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">PTX Status</span>
+                                  </div>
+                                </th>
+                                <th class="p-0">
+                                  <div class="py-3 px-6 rounded-tr-xl bg-coolGray-200 dark:bg-gray-600">
+                                    <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Details</span>
+                                  </div>
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {% for b in received_bids %}
+                              <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
+                                <th scope="row" class="flex items-center py-7 px-46 text-gray-900 whitespace-nowrap">
+                                  <svg class="w-5 h-5 rounded-full ml-5" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
+                                    <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
+                                      <circle cx="12" cy="12" r="11"></circle>
+                                      <polyline points=" 12,6 12,12 18,12 " stroke="#6b7280"></polyline>
+                                    </g>
+                                  </svg>
+                                  <div class="pl-3">
+                                    <div class="font-semibold text-xs dark:text-white">{{ b[0] }}</div>
+                                  </div>
+                                </th>
+                                <td class="py-3 px-6 text-xs monospace"><a href=/bid/{{ b[1] }}>{{ b[1]|truncate(20, True) }}</a></td>
+                                <td class="py-3 px-6 text-xs monospace"><a href=/offer/{{ b[2] }}>{{ b[2]|truncate(20, True) }}</a></td>
+                                <td class="py-3 px-6 text-xs monospace"><a href=/identity/{{ b[6] }}>{{ b[6] }}</a></td>
+                                <td class="py-3 px-6 text-xs">{{ b[3] }}</td>
+                                <td class="py-3 px-6 text-xs">{{ b[4] }}</td>
+                                <td class="py-3 px-6 text-xs">{{ b[5] }}</td>
+                                <td class="py-3 px-6 text-xs">
+                                  <a class="inline-block w-20 py-1 px-2 font-medium text-center text-sm rounded-md bg-blue-500 text-white border border-blue-500 hover:bg-blue-600 transition duration-200" href="/bid/{{ b[1] }}">Details</a>
+                                </td>
+                              </tr>
+                              {% endfor %}
+                            </tbody>
+                          </table>
+                        </div>
+                        <div class="rounded-b-md">
+                          <div class="w-full md:w-0/12">
+                            <div class="flex flex-wrap justify-end pt-6 pr-6 border-t border-gray-100 dark:border-gray-400">
+                              {% if filters.page_no > 1 %}
+                              <div class="w-full md:w-auto p-1.5">
+                                <input type="hidden" name="filter_key" value="{{ filter_key }}">
+                                <input type="hidden" name="page_no" value="{{ filters.page_no - 1 }}">
+                                <button type="submit" name='pageback' value="Previous" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-blue-600 rounded-lg transition duration-200 focus:ring-0 focus:outline-none">
+                                  {{ page_back_svg | safe }}
+                                  <span>Previous</span>
+                                </button>
+                              </div>
+                              {% endif %}
+                              <div class="flex items-center">
+                                <div class="w-full md:w-auto p-1.5">
+                                  <p class="text-sm font-heading dark:text-white">Page: {{ filters.page_no }}</p>
+                                </div>
+                              </div>
+                              {% if received_bids_count >= filters.limit %}
+                              <div class="w-full md:w-auto p-1.5">
+                                <input type="hidden" name="filter_key" value="{{ filter_key }}">
+                                <input type="hidden" name="page_no" value="{{ filters.page_no + 1 }}">
+                                <button type="submit" name='pageforwards' value="Next" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-blue-600 rounded-lg transition duration-200 focus:ring-0 focus:outline-none">
+                                  <span>Next</span>
+                                  {{ page_forwards_svg | safe }}
+                                </button>
+                              </div>
+                              {% endif %}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <input type="hidden" name="formid" value="{{ form_id }}">
+            <input type="hidden" name="pageno" value="{{ filters.page_no }}">
+            <input type="hidden" name="filter_key" value="page_bids">
           </form>
         </div>
       </div>
     </div>
   </div>
-  </section>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const tabs = document.querySelectorAll('#myTab button');
+  const contents = document.querySelectorAll('[role="tabpanel"]');
+  
+  function switchTab(targetId) {
+    contents.forEach(content => {
+      content.classList.add('hidden');
+    });
+    const targetContent = document.querySelector(targetId);
+    if (targetContent) {
+      targetContent.classList.remove('hidden');
+    }
+    tabs.forEach(tab => {
+      const selected = tab.dataset.tabsTarget === targetId;
+      tab.setAttribute('aria-selected', selected);
+      if (selected) {
+        tab.classList.add('bg-gray-100', 'dark:bg-gray-600', 'text-gray-900', 'dark:text-white');
+      } else {
+        tab.classList.remove('bg-gray-100', 'dark:bg-gray-600', 'text-gray-900', 'dark:text-white');
+      }
+    });
+  }
+  
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      switchTab(tab.dataset.tabsTarget);
+    });
+  });
+  
+  switchTab('#sent');
+});
+</script>
+
 {% include 'footer.html' %}
-</body>
-</html>

@@ -1,309 +1,306 @@
-(function(window) {
-    'use strict';
+class TooltipManager {
+    constructor() {
+        this.activeTooltips = new Map();
+        this.sizeCheckIntervals = new Map();
+        this.setupStyles();
+        this.setupCleanupEvents();
+    }
 
-    const tooltipContainer = document.createElement('div');
-    tooltipContainer.className = 'tooltip-container';
-
-    const style = document.createElement('style');
-    style.textContent = `
-        [role="tooltip"] {
-            position: absolute;
-            z-index: 9999;
-            transition: opacity 0.2s ease-in-out;
-            pointer-events: auto;
-            opacity: 0;
-            visibility: hidden;
+    static initialize() {
+        if (!window.TooltipManager) {
+            window.TooltipManager = new TooltipManager();
         }
+        return window.TooltipManager;
+    }
+
+    create(element, content, options = {}) {
+        if (!element) return null;
         
-        .tooltip-container {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 0;
-            overflow: visible;
-            pointer-events: none;
-            z-index: 9999;
-        }
-    `;
+        this.destroy(element);
 
-    function ensureContainerExists() {
-        if (!document.body.contains(tooltipContainer)) {
-            document.body.appendChild(tooltipContainer);
-        }
-    }
-
-
-    function rafThrottle(callback) {
-        let requestId = null;
-        let lastArgs = null;
-
-        const later = (context) => {
-            requestId = null;
-            callback.apply(context, lastArgs);
-        };
-
-        return function(...args) {
-            lastArgs = args;
-            if (requestId === null) {
-                requestId = requestAnimationFrame(() => later(this));
+        const checkSize = () => {
+            const rect = element.getBoundingClientRect();
+            if (rect.width && rect.height) {
+                clearInterval(this.sizeCheckIntervals.get(element));
+                this.sizeCheckIntervals.delete(element);
+                this.createTooltip(element, content, options, rect);
             }
         };
+
+        this.sizeCheckIntervals.set(element, setInterval(checkSize, 50));
+        checkSize();
+        return null;
     }
 
-    function positionElement(targetEl, triggerEl, placement = 'top', offsetDistance = 8) {
-        const triggerRect = triggerEl.getBoundingClientRect();
-        const targetRect = targetEl.getBoundingClientRect();
-        let top, left;
+    createTooltip(element, content, options, rect) {
+        const targetId = element.getAttribute('data-tooltip-target');
+        let bgClass = 'bg-gray-400';
+        let arrowColor = 'rgb(156 163 175)';
 
-        switch (placement) {
-            case 'top':
-                top = triggerRect.top - targetRect.height - offsetDistance;
-                left = triggerRect.left + (triggerRect.width - targetRect.width) / 2;
-                break;
-            case 'bottom':
-                top = triggerRect.bottom + offsetDistance;
-                left = triggerRect.left + (triggerRect.width - targetRect.width) / 2;
-                break;
-            case 'left':
-                top = triggerRect.top + (triggerRect.height - targetRect.height) / 2;
-                left = triggerRect.left - targetRect.width - offsetDistance;
-                break;
-            case 'right':
-                top = triggerRect.top + (triggerRect.height - targetRect.height) / 2;
-                left = triggerRect.right + offsetDistance;
-                break;
-        }
-
-        const viewport = {
-            width: window.innerWidth,
-            height: window.innerHeight
-        };
-
-        if (left < 0) left = 0;
-        if (top < 0) top = 0;
-        if (left + targetRect.width > viewport.width) 
-            left = viewport.width - targetRect.width;
-        if (top + targetRect.height > viewport.height)
-            top = viewport.height - targetRect.height;
-
-        targetEl.style.transform = `translate(${Math.round(left)}px, ${Math.round(top)}px)`;
-    }
-
-    const tooltips = new WeakMap();
-
-    class Tooltip {
-        constructor(targetEl, triggerEl, options = {}) {
-            ensureContainerExists();
-
-            this._targetEl = targetEl;
-            this._triggerEl = triggerEl;
-            this._options = {
-                placement: options.placement || 'top',
-                triggerType: options.triggerType || 'hover',
-                offset: options.offset || 8,
-                onShow: options.onShow || function() {},
-                onHide: options.onHide || function() {}
-            };
-            this._visible = false;
-            this._initialized = false;
-            this._hideTimeout = null;
-            this._showTimeout = null;
-
-            if (this._targetEl.parentNode !== tooltipContainer) {
-                tooltipContainer.appendChild(this._targetEl);
-            }
-
-            this._targetEl.style.visibility = 'hidden';
-            this._targetEl.style.opacity = '0';
-
-            this._showHandler = this.show.bind(this);
-            this._hideHandler = this._handleHide.bind(this);
-            this._updatePosition = rafThrottle(() => {
-                if (this._visible) {
-                    positionElement(
-                        this._targetEl,
-                        this._triggerEl,
-                        this._options.placement,
-                        this._options.offset
-                    );
-                }
-            });
-
-            this.init();
-        }
-
-        init() {
-            if (!this._initialized) {
-                this._setupEventListeners();
-                this._initialized = true;
-                positionElement(
-                    this._targetEl,
-                    this._triggerEl,
-                    this._options.placement,
-                    this._options.offset
+        if (targetId?.includes('tooltip-offer-')) {
+            const offerId = targetId.split('tooltip-offer-')[1];
+            const [actualOfferId] = offerId.split('_');
+            
+            if (window.jsonData) {
+                const offer = window.jsonData.find(o => 
+                    o.unique_id === offerId || 
+                    o.offer_id === actualOfferId
                 );
-            }
-        }
 
-        _setupEventListeners() {
-            this._triggerEl.addEventListener('mouseenter', this._showHandler);
-            this._triggerEl.addEventListener('mouseleave', this._hideHandler);
-            this._triggerEl.addEventListener('focus', this._showHandler);
-            this._triggerEl.addEventListener('blur', this._hideHandler);
-
-            this._targetEl.addEventListener('mouseenter', () => {
-                clearTimeout(this._hideTimeout);
-                clearTimeout(this._showTimeout);
-                this._visible = true;
-                this._targetEl.style.visibility = 'visible';
-                this._targetEl.style.opacity = '1';
-            });
-
-            this._targetEl.addEventListener('mouseleave', this._hideHandler);
-
-            if (this._options.triggerType === 'click') {
-                this._triggerEl.addEventListener('click', this._showHandler);
-            }
-
-            window.addEventListener('scroll', this._updatePosition, { passive: true });
-            document.addEventListener('scroll', this._updatePosition, { passive: true, capture: true });
-            window.addEventListener('resize', this._updatePosition, { passive: true });
-
-            let rafId;
-            const smoothUpdate = () => {
-                if (this._visible) {
-                    this._updatePosition();
-                    rafId = requestAnimationFrame(smoothUpdate);
+                if (offer) {
+                    if (offer.is_revoked) {
+                        bgClass = 'bg-red-500';
+                        arrowColor = 'rgb(239 68 68)';
+                    } else if (offer.is_own_offer) {
+                        bgClass = 'bg-gray-300';
+                        arrowColor = 'rgb(209 213 219)';
+                    } else {
+                        bgClass = 'bg-green-700';
+                        arrowColor = 'rgb(21 128 61)';
+                    }
                 }
-            };
-
-            this._startSmoothUpdate = () => {
-                if (!rafId) rafId = requestAnimationFrame(smoothUpdate);
-            };
-
-            this._stopSmoothUpdate = () => {
-                if (rafId) {
-                    cancelAnimationFrame(rafId);
-                    rafId = null;
-                }
-            };
-        }
-
-        _handleHide() {
-            clearTimeout(this._hideTimeout);
-            clearTimeout(this._showTimeout);
-            
-            this._hideTimeout = setTimeout(() => {
-                if (this._visible) {
-                    this.hide();
-                }
-            }, 100);
-        }
-
-        show() {
-            clearTimeout(this._hideTimeout);
-            clearTimeout(this._showTimeout);
-
-            this._showTimeout = setTimeout(() => {
-                if (!this._visible) {
-                    positionElement(
-                        this._targetEl,
-                        this._triggerEl,
-                        this._options.placement,
-                        this._options.offset
-                    );
-
-                    this._targetEl.style.visibility = 'visible';
-                    this._targetEl.style.opacity = '1';
-                    this._visible = true;
-                    this._startSmoothUpdate();
-                    this._options.onShow();
-                }
-            }, 20);
-        }
-
-        hide() {
-            this._targetEl.style.opacity = '0';
-            this._targetEl.style.visibility = 'hidden';
-            this._visible = false;
-            this._stopSmoothUpdate();
-            this._options.onHide();
-        }
-
-        destroy() {
-            clearTimeout(this._hideTimeout);
-            clearTimeout(this._showTimeout);
-            this._stopSmoothUpdate();
-
-            this._triggerEl.removeEventListener('mouseenter', this._showHandler);
-            this._triggerEl.removeEventListener('mouseleave', this._hideHandler);
-            this._triggerEl.removeEventListener('focus', this._showHandler);
-            this._triggerEl.removeEventListener('blur', this._hideHandler);
-            this._targetEl.removeEventListener('mouseenter', this._showHandler);
-            this._targetEl.removeEventListener('mouseleave', this._hideHandler);
-
-            if (this._options.triggerType === 'click') {
-                this._triggerEl.removeEventListener('click', this._showHandler);
-            }
-
-            window.removeEventListener('scroll', this._updatePosition);
-            document.removeEventListener('scroll', this._updatePosition, true);
-            window.removeEventListener('resize', this._updatePosition);
-
-            this._targetEl.style.visibility = '';
-            this._targetEl.style.opacity = '';
-            this._targetEl.style.transform = '';
-
-            if (this._targetEl.parentNode === tooltipContainer) {
-                document.body.appendChild(this._targetEl);
-            }
-
-            this._initialized = false;
-        }
-
-        toggle() {
-            if (this._visible) {
-                this.hide();
-            } else {
-                this.show();
             }
         }
-    }
 
-    document.head.appendChild(style);
+        const instance = tippy(element, {
+            content,
+            allowHTML: true,
+            placement: options.placement || 'top',
+            appendTo: document.body,
+            animation: false,
+            duration: 0,
+            delay: 0,
+            interactive: true,
+            arrow: false,
+            theme: '',
+            moveTransition: 'none',
+            offset: [0, 10],
+            popperOptions: {
+                strategy: 'fixed',
+                modifiers: [
+                    {
+                        name: 'preventOverflow',
+                        options: {
+                            boundary: 'viewport',
+                            padding: 10
+                        }
+                    },
+                    {
+                        name: 'flip',
+                        options: {
+                            padding: 10,
+                            fallbackPlacements: ['top', 'bottom', 'right', 'left']
+                        }
+                    }
+                ]
+            },
+            onCreate(instance) {
+                instance._originalPlacement = instance.props.placement;
+            },
+            onShow(instance) {
+                if (!document.body.contains(element)) {
+                    return false;
+                }
 
-    function initTooltips() {
-        ensureContainerExists();
-        
-        document.querySelectorAll('[data-tooltip-target]').forEach(triggerEl => {
-            if (tooltips.has(triggerEl)) return;
+                const rect = element.getBoundingClientRect();
+                if (!rect.width || !rect.height) {
+                    return false;
+                }
 
-            const targetId = triggerEl.getAttribute('data-tooltip-target');
-            const targetEl = document.getElementById(targetId);
-            
-            if (targetEl) {
-                const placement = triggerEl.getAttribute('data-tooltip-placement');
-                const triggerType = triggerEl.getAttribute('data-tooltip-trigger');
-                
-                const tooltip = new Tooltip(targetEl, triggerEl, {
-                    placement: placement || 'top',
-                    triggerType: triggerType || 'hover',
-                    offset: 8
+                instance.setProps({
+                    placement: instance._originalPlacement
                 });
 
-                tooltips.set(triggerEl, tooltip);
+                if (instance.popper.firstElementChild) {
+                    instance.popper.firstElementChild.classList.add(bgClass);
+                }
+
+                return true;
+            },
+            onMount(instance) {
+                if (instance.popper.firstElementChild) {
+                    instance.popper.firstElementChild.classList.add(bgClass);
+                }
+                const arrow = instance.popper.querySelector('.tippy-arrow');
+                if (arrow) {
+                    arrow.style.setProperty('color', arrowColor, 'important');
+                }
+            }
+        });
+
+        const id = element.getAttribute('data-tooltip-trigger-id') || 
+                  `tooltip-${Math.random().toString(36).substring(7)}`;
+        element.setAttribute('data-tooltip-trigger-id', id);
+        this.activeTooltips.set(id, instance);
+        
+        return instance;
+    }
+
+    destroy(element) {
+        if (!element) return;
+
+        if (this.sizeCheckIntervals.has(element)) {
+            clearInterval(this.sizeCheckIntervals.get(element));
+            this.sizeCheckIntervals.delete(element);
+        }
+
+        const id = element.getAttribute('data-tooltip-trigger-id');
+        if (!id) return;
+
+        const instance = this.activeTooltips.get(id);
+        if (instance?.[0]) {
+            try {
+                instance[0].destroy();
+            } catch (e) {
+                console.warn('Error destroying tooltip:', e);
+            }
+        }
+        this.activeTooltips.delete(id);
+        element.removeAttribute('data-tooltip-trigger-id');
+    }
+
+    cleanup() {
+        this.sizeCheckIntervals.forEach((interval) => clearInterval(interval));
+        this.sizeCheckIntervals.clear();
+
+        this.activeTooltips.forEach((instance, id) => {
+            if (instance?.[0]) {
+                try {
+                    instance[0].destroy();
+                } catch (e) {
+                    console.warn('Error cleaning up tooltip:', e);
+                }
+            }
+        });
+        this.activeTooltips.clear();
+
+        document.querySelectorAll('[data-tippy-root]').forEach(element => {
+            if (element.parentNode) {
+                element.parentNode.removeChild(element);
             }
         });
     }
 
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initTooltips);
-    } else {
-        initTooltips();
+    setupStyles() {
+        if (document.getElementById('tooltip-styles')) return;
+
+        document.head.insertAdjacentHTML('beforeend', `
+            <style id="tooltip-styles">
+                [data-tippy-root] {
+                    position: fixed !important;
+                    z-index: 9999 !important;
+                    pointer-events: none !important;
+                }
+
+                .tippy-box {
+                    font-size: 0.875rem;
+                    line-height: 1.25rem;
+                    font-weight: 500;
+                    border-radius: 0.5rem;
+                    color: white;
+                    position: relative !important;
+                    pointer-events: auto !important;
+                }
+
+                .tippy-content {
+                    padding: 0.5rem 0.75rem !important;
+                }
+
+                .tippy-box .bg-gray-400 {
+                    background-color: rgb(156 163 175);
+                    padding: 0.5rem 0.75rem;
+                }
+                .tippy-box:has(.bg-gray-400) .tippy-arrow {
+                    color: rgb(156 163 175);
+                }
+                
+                .tippy-box .bg-red-500 {
+                    background-color: rgb(239 68 68);
+                    padding: 0.5rem 0.75rem;
+                }
+                .tippy-box:has(.bg-red-500) .tippy-arrow {
+                    color: rgb(239 68 68);
+                }
+                
+                .tippy-box .bg-gray-300 {
+                    background-color: rgb(209 213 219);
+                    padding: 0.5rem 0.75rem;
+                }
+                .tippy-box:has(.bg-gray-300) .tippy-arrow {
+                    color: rgb(209 213 219);
+                }
+                
+                .tippy-box .bg-green-700 {
+                    background-color: rgb(21 128 61);
+                    padding: 0.5rem 0.75rem;
+                }
+                .tippy-box:has(.bg-green-700) .tippy-arrow {
+                    color: rgb(21 128 61);
+                }
+
+                .tippy-box[data-placement^='top'] > .tippy-arrow::before {
+                    border-top-color: currentColor;
+                }
+
+                .tippy-box[data-placement^='bottom'] > .tippy-arrow::before {
+                    border-bottom-color: currentColor;
+                }
+
+                .tippy-box[data-placement^='left'] > .tippy-arrow::before {
+                    border-left-color: currentColor;
+                }
+
+                .tippy-box[data-placement^='right'] > .tippy-arrow::before {
+                    border-right-color: currentColor;
+                }
+
+                .tippy-box[data-placement^='top'] > .tippy-arrow {
+                    bottom: 0;
+                }
+
+                .tippy-box[data-placement^='bottom'] > .tippy-arrow {
+                    top: 0;
+                }
+
+                .tippy-box[data-placement^='left'] > .tippy-arrow {
+                    right: 0;
+                }
+
+                .tippy-box[data-placement^='right'] > .tippy-arrow {
+                    left: 0;
+                }
+            </style>
+        `);
     }
 
-    window.Tooltip = Tooltip;
-    window.initTooltips = initTooltips;
+    setupCleanupEvents() {
+        window.addEventListener('beforeunload', () => this.cleanup());
+        window.addEventListener('unload', () => this.cleanup());
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                this.cleanup();
+            }
+        });
+    }
 
-})(window);
+    initializeTooltips(selector = '[data-tooltip-target]') {
+        document.querySelectorAll(selector).forEach(element => {
+            const targetId = element.getAttribute('data-tooltip-target');
+            const tooltipContent = document.getElementById(targetId);
+            
+            if (tooltipContent) {
+                this.create(element, tooltipContent.innerHTML, {
+                    placement: element.getAttribute('data-tooltip-placement') || 'top'
+                });
+            }
+        });
+    }
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = TooltipManager;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    TooltipManager.initialize();
+});

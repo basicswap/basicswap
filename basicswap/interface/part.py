@@ -67,6 +67,10 @@ class PARTInterface(BTCInterface):
         return 0xA0
 
     @staticmethod
+    def est_lock_tx_vsize() -> int:
+        return 138
+
+    @staticmethod
     def xmr_swap_a_lock_spend_tx_vsize() -> int:
         return 200
 
@@ -194,6 +198,10 @@ class PARTInterfaceBlind(PARTInterface):
     @staticmethod
     def balance_type():
         return BalanceTypes.BLIND
+
+    @staticmethod
+    def est_lock_tx_vsize() -> int:
+        return 980
 
     @staticmethod
     def xmr_swap_a_lock_spend_tx_vsize() -> int:
@@ -1219,6 +1227,10 @@ class PARTInterfaceAnon(PARTInterface):
     @staticmethod
     def balance_type():
         return BalanceTypes.ANON
+
+    @staticmethod
+    def est_lock_tx_vsize() -> int:
+        return 1153
 
     @staticmethod
     def xmr_swap_a_lock_spend_tx_vsize() -> int:

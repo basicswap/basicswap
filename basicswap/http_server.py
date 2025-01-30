@@ -578,10 +578,8 @@ class HttpHandler(BaseHTTPRequestHandler):
                     return page_offers(self, url_split, post_string, sent=True)
                 if page == "bid":
                     return page_bid(self, url_split, post_string)
-                if page == "receivedbids":
-                    return page_bids(self, url_split, post_string, received=True)
-                if page == "sentbids":
-                    return page_bids(self, url_split, post_string, sent=True)
+                if page == "bids":
+                    return page_bids(self, url_split, post_string)
                 if page == "availablebids":
                     return page_bids(self, url_split, post_string, available=True)
                 if page == "watched":
