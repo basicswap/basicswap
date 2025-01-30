@@ -1990,7 +1990,7 @@ def load_config(config_path):
 
 
 def signal_handler(sig, frame):
-    logger.info(f"Signal {sig} detected")
+    os.write(sys.stdout.fileno(), f"Signal {sig} detected.\n".encode("utf-8"))
 
 
 def check_btc_fastsync_data(base_dir, sync_filename):

@@ -6,14 +6,14 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-import os
-import sys
 import json
+import logging
+import os
 import shutil
 import signal
-import logging
-import traceback
 import subprocess
+import sys
+import traceback
 
 import basicswap.config as cfg
 from basicswap import __version__
@@ -24,10 +24,11 @@ from basicswap.http_server import HttpThread
 from basicswap.contrib.websocket_server import WebsocketServer
 
 
-logger = logging.getLogger()
-logger.level = logging.DEBUG
-if not len(logger.handlers):
-    logger.addHandler(logging.StreamHandler(sys.stdout))
+initial_logger = logging.getLogger()
+initial_logger.level = logging.DEBUG
+if not len(initial_logger.handlers):
+    initial_logger.addHandler(initial_logger.StreamHandler(sys.stdout))
+logger = initial_logger
 
 swap_client = None
 
@@ -48,9 +49,10 @@ def is_known_coin(coin_name: str) -> bool:
 
 
 def signal_handler(sig, frame):
-    global swap_client
-    logger.info("Signal %d detected, ending program." % (sig))
-    if swap_client is not None:
+    os.write(
+        sys.stdout.fileno(), f"Signal {sig} detected, ending program.\n".encode("utf-8")
+    )
+    if swap_client is not None and not swap_client.chainstate_delay_event.is_set():
         swap_client.stopRunning()
 
 
@@ -533,7 +535,7 @@ def runClient(fp, data_dir, chain, start_only_coins):
                 signal.CTRL_C_EVENT if os.name == "nt" else signal.SIGINT
             )
         except Exception as e:
-            swap_client.log.info("Interrupting %d, error %s", d.handle.pid, str(e))
+            swap_client.log.info(f"Interrupting {d.handle.pid}, error {e}")
     for d in daemons:
         try:
             d.handle.wait(timeout=120)
@@ -541,8 +543,8 @@ def runClient(fp, data_dir, chain, start_only_coins):
                 if fp:
                     fp.close()
             closed_pids.append(d.handle.pid)
-        except Exception as ex:
-            swap_client.log.error("Error: {}".format(ex))
+        except Exception as e:
+            swap_client.log.error(f"Error: {e}")
 
     if os.path.exists(pids_path):
         with open(pids_path) as fd:

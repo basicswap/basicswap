@@ -489,7 +489,7 @@ class BasicSwap(BaseApp):
         random.seed(secrets.randbits(128))
 
     def finalise(self):
-        self.log.info("Finalise")
+        self.log.info("Finalising")
 
         with self.mxDB:
             self.delay_event.set()
@@ -1136,9 +1136,8 @@ class BasicSwap(BaseApp):
                     self.log.error(
                         "No wallets found for coin {}.".format(ci.coin_name())
                     )
-                    self.stopRunning(
-                        1
-                    )  # systemd will try to restart the process if fail_code != 0
+                    # systemd will try to restart the process if fail_code != 0
+                    self.stopRunning(1)
 
         startup_tries = self.startup_tries
         chain_client_settings = self.getChainClientSettings(coin_type)

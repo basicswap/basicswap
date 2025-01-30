@@ -149,7 +149,9 @@ def page_bid(self, url_split, post_string):
     )
 
 
-def page_bids(self, url_split, post_string, sent=False, available=False, received=False):
+def page_bids(
+    self, url_split, post_string, sent=False, available=False, received=False
+):
     server = self.server
     swap_client = server.swap_client
     swap_client.checkSystemStatus()
@@ -220,13 +222,19 @@ def page_bids(self, url_split, post_string, sent=False, available=False, receive
                 "summary": summary,
                 "filter_key": filter_key,
                 "bids": [
-                    (format_timestamp(b[0]), b[2].hex(), b[3].hex(),
-                     strBidState(b[5]), strTxState(b[7]),
-                     strTxState(b[8]), b[11])
+                    (
+                        format_timestamp(b[0]),
+                        b[2].hex(),
+                        b[3].hex(),
+                        strBidState(b[5]),
+                        strTxState(b[7]),
+                        strTxState(b[8]),
+                        b[11],
+                    )
                     for b in bids
                 ],
                 "bids_count": len(bids),
-            }
+            },
         )
 
     sent_bids = swap_client.listBids(sent=True, filters=filters)
