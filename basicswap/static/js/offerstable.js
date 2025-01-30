@@ -1954,7 +1954,7 @@ function createTooltips(offer, treatAsSentOffer, coinFrom, coinTo, fromAmount, t
     const percentageTooltipContent = createTooltipContent(treatAsSentOffer, coinFrom, coinTo, fromAmount, toAmount);
 
     return `
-        <div id="tooltip-active-${uniqueId}" role="tooltip" class="inline-block absolute invisible z-50 py-2 px-3 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+        <div id="tooltip-active-${uniqueId}" role="tooltip" class="inline-block absolute hidden z-50 py-2 px-3 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
             <div class="active-revoked-expired">
                 <span class="bold">
                     <div class="text-xs"><span class="bold">Posted:</span> ${postedTime}</div>
@@ -1994,13 +1994,13 @@ function createTooltips(offer, treatAsSentOffer, coinFrom, coinTo, fromAmount, t
             </div>
         </div>
 
-        <div id="tooltip-wallet-${uniqueId}" role="tooltip" class="inline-block absolute invisible z-50 py-2 px-3 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+        <div id="tooltip-wallet-${uniqueId}" role="tooltip" class="inline-block absolute hidden z-50 py-2 px-3 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
             <div class="active-revoked-expired">
                 <span class="bold">${treatAsSentOffer ? 'My' : ''} ${coinTo} Wallet</span>
             </div>
         </div>
 
-        <div id="tooltip-offer-${uniqueId}" role="tooltip" class="inline-block absolute z-50 py-2 px-3 text-sm font-medium text-white ${isRevoked ? 'bg-red-500' : (offer.is_own_offer ? 'bg-gray-300' : 'bg-green-700')} rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+        <div id="tooltip-offer-${uniqueId}" role="tooltip" class="inline-block absolute hidden z-50 py-2 px-3 text-sm font-medium text-white ${isRevoked ? 'bg-red-500' : (offer.is_own_offer ? 'bg-gray-300' : 'bg-green-700')} rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
             <div class="active-revoked-expired">
                 <span class="bold">
                     ${isRevoked ? 'Offer Revoked' : (offer.is_own_offer ? 'Edit Offer' : `Buy ${coinFrom}`)}
@@ -2008,19 +2008,19 @@ function createTooltips(offer, treatAsSentOffer, coinFrom, coinTo, fromAmount, t
             </div>
         </div>
 
-        <div id="tooltip-wallet-maker-${uniqueId}" role="tooltip" class="inline-block absolute invisible z-50 py-2 px-3 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+        <div id="tooltip-wallet-maker-${uniqueId}" role="tooltip" class="inline-block absolute hidden z-50 py-2 px-3 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
             <div class="active-revoked-expired">
                 <span class="bold">${treatAsSentOffer ? 'My' : ''} ${coinFrom} Wallet</span>
             </div>
         </div>
 
-        <div id="tooltip-rate-${uniqueId}" role="tooltip" class="inline-block absolute invisible z-50 py-2 px-3 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+        <div id="tooltip-rate-${uniqueId}" role="tooltip" class="inline-block absolute hidden z-50 py-2 px-3 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
             <div class="tooltip-content">
                 ${combinedRateTooltip}
             </div>
         </div>
 
-        <div id="percentage-tooltip-${uniqueId}" role="tooltip" class="inline-block absolute invisible z-50 py-2 px-3 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+        <div id="percentage-tooltip-${uniqueId}" role="tooltip" class="inline-block absolute hidden z-50 py-2 px-3 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
             <div class="tooltip-content">
                 ${percentageTooltipContent}
             </div>
