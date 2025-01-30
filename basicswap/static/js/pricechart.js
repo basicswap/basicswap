@@ -161,7 +161,7 @@ const api = {
         const cachedData = cache.get(cacheKey);
 
         if (cachedData) {
-            console.log('Using cached CoinGecko data');
+            //console.log('Using cached CoinGecko data');
             return cachedData.value;
         }
 
@@ -194,7 +194,7 @@ const api = {
 
                 if (typeof response !== 'object' || response === null) {
                     if (fallbackData) {
-                        console.log('Using fallback data due to invalid response');
+                        //console.log('Using fallback data due to invalid response');
                         return fallbackData;
                     }
                     throw new AppError('Invalid data structure received from CoinGecko');
@@ -202,7 +202,7 @@ const api = {
 
                 if (response.error || response.Error) {
                     if (fallbackData) {
-                        console.log('Using fallback data due to API error');
+                        //console.log('Using fallback data due to API error');
                         return fallbackData;
                     }
                     throw new AppError(response.error || response.Error);
@@ -229,7 +229,7 @@ const api = {
 
                 const cachedData = cache.get(cacheKey);
                 if (cachedData) {
-                    console.log('Using expired cache data due to error');
+                    //console.log('Using expired cache data due to error');
                     return cachedData.value;
                 }
 
@@ -382,7 +382,7 @@ const rateLimiter = {
                 error.name === 'NetworkError') {
                 const cachedData = cache.get(`coinData_${apiName}`);
                 if (cachedData) {
-                    console.log('Using cached data due to request failure');
+                    //console.log('Using cached data due to request failure');
                     return cachedData.value;
                 }
             }
@@ -421,7 +421,7 @@ const cache = {
         localStorage.removeItem(key);
       }
     } catch (error) {
-      console.error('Error parsing cache item:', error.message);
+      //console.error('Error parsing cache item:', error.message);
       localStorage.removeItem(key);
     }
     return null;
@@ -912,7 +912,7 @@ const chartModule = {
             let data;
             if (cachedData && Object.keys(cachedData.value).length > 0) {
                 data = cachedData.value;
-                console.log(`Using cached data for ${coinSymbol}`);
+                //console.log(`Using cached data for ${coinSymbol}`);
             } else {
                 try {
                     const allData = await api.fetchHistoricalDataXHR([coinSymbol]);
@@ -923,7 +923,7 @@ const chartModule = {
                     cache.set(cacheKey, data, config.cacheTTL);
                 } catch (error) {
                     if (error.message.includes('429') && currentChartData.length > 0) {
-                        console.warn(`Rate limit hit for ${coinSymbol}, maintaining current chart`);
+                        //console.warn(`Rate limit hit for ${coinSymbol}, maintaining current chart`);
                         return;
                     }
                     const expiredCache = localStorage.getItem(cacheKey);
@@ -931,7 +931,7 @@ const chartModule = {
                         try {
                             const parsedCache = JSON.parse(expiredCache);
                             data = parsedCache.value;
-                            console.log(`Using expired cache data for ${coinSymbol}`);
+                            //console.log(`Using expired cache data for ${coinSymbol}`);
                         } catch (cacheError) {
                             throw error;
                         }
@@ -1042,15 +1042,15 @@ const app = {
   minimumRefreshInterval: 60 * 1000, // 1 min
 
   init: () => {
-    console.log('Initializing app...');
+    //console.log('Init');
     window.addEventListener('load', app.onLoad);
     app.loadLastRefreshedTime();
     app.updateAutoRefreshButton();
-    console.log('App initialized');
+    //console.log('App initialized');
   },
 
   onLoad: async () => {
-    console.log('App onLoad event triggered');
+    //console.log('App onLoad event triggered');
     ui.showLoader();
     try {
         volumeToggle.init();
@@ -1061,7 +1061,7 @@ const app = {
             chartModule.showChartLoader();
         }
 
-        console.log('Loading all coin data...');
+        //console.log('Loading all coin data...');
         await app.loadAllCoinData();
 
         if (chartModule.chart) {
@@ -1087,7 +1087,7 @@ const app = {
         if (chartModule.chart) {
             chartModule.hideChartLoader();
         }
-        console.log('App onLoad completed');
+        //console.log('App onLoad completed');
     }
 },
     loadAllCoinData: async () => {
@@ -1192,7 +1192,7 @@ setupEventListeners: () => {
   },
 
   initAutoRefresh: () => {
-    console.log('Initializing auto-refresh...');
+   //console.log('Initializing auto-refresh...');
     const toggleAutoRefreshButton = document.getElementById('toggle-auto-refresh');
     if (toggleAutoRefreshButton) {
       toggleAutoRefreshButton.addEventListener('click', app.toggleAutoRefresh);
@@ -1208,7 +1208,7 @@ setupEventListeners: () => {
   },
 
   scheduleNextRefresh: () => {
-    console.log('Scheduling next refresh...');
+    //console.log('Scheduling next refresh...');
     if (app.autoRefreshInterval) {
       clearTimeout(app.autoRefreshInterval);
     }
@@ -1274,7 +1274,7 @@ setupEventListeners: () => {
         return;
     }
 
-    console.log('Starting refresh of all data...');
+    //console.log('Starting refresh of all data...');
     app.isRefreshing = true;
     ui.showLoader();
     chartModule.showChartLoader();
@@ -1381,7 +1381,7 @@ setupEventListeners: () => {
 },
 
   updateNextRefreshTime: () => {
-    console.log('Updating next refresh time display');
+    //console.log('Updating next refresh time display');
     const nextRefreshSpan = document.getElementById('next-refresh-time');
     const labelElement = document.getElementById('next-refresh-label');
     const valueElement = document.getElementById('next-refresh-value');
@@ -1417,7 +1417,7 @@ setupEventListeners: () => {
   },
 
   updateAutoRefreshButton: () => {
-    console.log('Updating auto-refresh button state');
+    //console.log('Updating auto-refresh button state');
     const button = document.getElementById('toggle-auto-refresh');
     if (button) {
       if (app.isAutoRefreshEnabled) {
@@ -1462,7 +1462,7 @@ setupEventListeners: () => {
   },
 
   loadLastRefreshedTime: () => {
-    console.log('Loading last refreshed time from storage');
+    //console.log('Loading last refreshed time from storage');
     const storedTime = localStorage.getItem('lastRefreshedTime');
     if (storedTime) {
       app.lastRefreshedTime = new Date(parseInt(storedTime));
@@ -1471,7 +1471,7 @@ setupEventListeners: () => {
   },
 
 updateBTCPrice: async () => {
-    console.log('Updating BTC price...');
+    //console.log('Updating BTC price...');
     try {
         const priceData = await api.fetchCoinGeckoDataXHR();
 
