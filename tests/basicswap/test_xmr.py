@@ -83,6 +83,7 @@ from tests.basicswap.common import (
     LTC_BASE_PORT,
     LTC_BASE_RPC_PORT,
     PREFIX_SECRET_KEY_REGTEST,
+    BTC_USE_DESCRIPTORS,
 )
 from basicswap.db_util import (
     remove_expired_data,
@@ -172,6 +173,7 @@ def prepare_swapclient_dir(
                 "datadir": os.path.join(datadir, "btc_" + str(node_id)),
                 "bindir": cfg.BITCOIN_BINDIR,
                 "use_segwit": True,
+                "use_descriptors": BTC_USE_DESCRIPTORS,
             },
         },
         "check_progress_seconds": 2,
@@ -188,6 +190,9 @@ def prepare_swapclient_dir(
         "debug_ui": True,
         "restrict_unknown_seed_wallets": False,
     }
+
+    if BTC_USE_DESCRIPTORS:
+        settings["chainclients"]["bitcoin"]["watch_wallet_name"] = "bsx_watch"
 
     if Coins.XMR in with_coins:
         settings["chainclients"]["monero"] = {
@@ -474,25 +479,29 @@ class BaseTest(unittest.TestCase):
                     if os.path.exists(
                         os.path.join(cfg.BITCOIN_BINDIR, "bitcoin-wallet")
                     ):
-                        try:
-                            callrpc_cli(
-                                cfg.BITCOIN_BINDIR,
-                                data_dir,
-                                "regtest",
-                                "-wallet=wallet.dat -legacy create",
-                                "bitcoin-wallet",
-                            )
-                        except Exception as e:
-                            logging.warning(
-                                f"bitcoin-wallet create failed {e}, retrying without -legacy"
-                            )
-                            callrpc_cli(
-                                cfg.BITCOIN_BINDIR,
-                                data_dir,
-                                "regtest",
-                                "-wallet=wallet.dat create",
-                                "bitcoin-wallet",
-                            )
+                        if BTC_USE_DESCRIPTORS:
+                            # How to set blank and disable_private_keys with wallet util?
+                            pass
+                        else:
+                            try:
+                                callrpc_cli(
+                                    cfg.BITCOIN_BINDIR,
+                                    data_dir,
+                                    "regtest",
+                                    "-wallet=wallet.dat -legacy create",
+                                    "bitcoin-wallet",
+                                )
+                            except Exception as e:
+                                logging.warning(
+                                    f"bitcoin-wallet create failed {e}, retrying without -legacy"
+                                )
+                                callrpc_cli(
+                                    cfg.BITCOIN_BINDIR,
+                                    data_dir,
+                                    "regtest",
+                                    "-wallet=wallet.dat create",
+                                    "bitcoin-wallet",
+                                )
 
                 cls.btc_daemons.append(
                     startDaemon(
@@ -505,9 +514,21 @@ class BaseTest(unittest.TestCase):
                     "Started %s %d", cfg.BITCOIND, cls.part_daemons[-1].handle.pid
                 )
 
-                waitForRPC(
-                    make_rpc_func(i, base_rpc_port=BTC_BASE_RPC_PORT), test_delay_event
-                )
+                if BTC_USE_DESCRIPTORS:
+                    rpc_func = make_rpc_func(i, base_rpc_port=BTC_BASE_RPC_PORT)
+                    waitForRPC(
+                        rpc_func, test_delay_event, rpc_command="getblockchaininfo"
+                    )
+                    # wallet_name, disable_private_keys, blank, passphrase, avoid_reuse, descriptors
+                    rpc_func(
+                        "createwallet", ["wallet.dat", False, True, "", False, True]
+                    )
+                    rpc_func("createwallet", ["bsx_watch", True, True, "", False, True])
+                else:
+                    waitForRPC(
+                        make_rpc_func(i, base_rpc_port=BTC_BASE_RPC_PORT),
+                        test_delay_event,
+                    )
 
             if cls.start_ltc_nodes:
                 for i in range(NUM_LTC_NODES):
@@ -658,6 +679,11 @@ class BaseTest(unittest.TestCase):
                         xmr_ci.getMainWalletAddress(),
                     )
 
+                if BTC_USE_DESCRIPTORS:
+                    # sc.initialiseWallet(Coins.BTC)
+                    # Import a random seed to keep the existing test behaviour. BTC core rescans even with timestamp: now.
+                    sc.ci(Coins.BTC).initialiseWallet(random.randbytes(32))
+
                 t = HttpThread(sc.fp, TEST_HTTP_HOST, TEST_HTTP_PORT + i, False, sc)
                 cls.http_threads.append(t)
                 t.start()
@@ -685,6 +711,7 @@ class BaseTest(unittest.TestCase):
                     "getnewaddress",
                     ["mining_addr", "bech32"],
                     base_rpc_port=BTC_BASE_RPC_PORT,
+                    wallet="wallet.dat",
                 )
                 num_blocks = 400  # Mine enough to activate segwit
                 logging.info("Mining %d Bitcoin blocks to %s", num_blocks, cls.btc_addr)
@@ -700,6 +727,7 @@ class BaseTest(unittest.TestCase):
                     "getnewaddress",
                     ["initial addr"],
                     base_rpc_port=BTC_BASE_RPC_PORT,
+                    wallet="wallet.dat",
                 )
                 for i in range(5):
                     callnoderpc(
@@ -707,6 +735,7 @@ class BaseTest(unittest.TestCase):
                         "sendtoaddress",
                         [btc_addr1, 100],
                         base_rpc_port=BTC_BASE_RPC_PORT,
+                        wallet="wallet.dat",
                     )
 
                 # Switch addresses so wallet amounts stay constant

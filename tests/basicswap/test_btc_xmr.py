@@ -26,6 +26,7 @@ from basicswap.db import (
 from basicswap.util import (
     make_int,
 )
+from basicswap.util.extkey import ExtKeyPair
 from basicswap.interface.base import Curves
 from tests.basicswap.util import (
     read_json_api,
@@ -40,6 +41,7 @@ from tests.basicswap.common import (
     wait_for_none_active,
     BTC_BASE_RPC_PORT,
 )
+from basicswap.contrib.test_framework.descriptors import descsum_create
 from basicswap.contrib.test_framework.messages import (
     ToHex,
     FromHex,
@@ -57,6 +59,8 @@ from basicswap.contrib.test_framework.script import (
 from .test_xmr import BaseTest, test_delay_event, callnoderpc
 
 logger = logging.getLogger()
+
+test_seed = "8e54a313e6df8918df6d758fafdbf127a115175fdd2238d0e908dd8093c9ac3b"
 
 
 class TestFunctions(BaseTest):
@@ -1166,7 +1170,6 @@ class BasicSwapTest(TestFunctions):
         logging.info("---------- Test {} hdwallet".format(self.test_coin_from.name))
         ci = self.swap_clients[0].ci(self.test_coin_from)
 
-        test_seed = "8e54a313e6df8918df6d758fafdbf127a115175fdd2238d0e908dd8093c9ac3b"
         test_wif = (
             self.swap_clients[0]
             .ci(self.test_coin_from)
@@ -1178,9 +1181,34 @@ class BasicSwapTest(TestFunctions):
             "createwallet", [new_wallet_name, False, True, "", False, False]
         )
         self.callnoderpc("sethdseed", [True, test_wif], wallet=new_wallet_name)
+
+        wi = self.callnoderpc("getwalletinfo", wallet=new_wallet_name)
+        assert wi["hdseedid"] == "3da5c0af91879e8ce97d9a843874601c08688078"
+
         addr = self.callnoderpc("getnewaddress", wallet=new_wallet_name)
-        self.callnoderpc("unloadwallet", [new_wallet_name])
+        addr_info = self.callnoderpc(
+            "getaddressinfo",
+            [
+                addr,
+            ],
+            wallet=new_wallet_name,
+        )
+        assert addr_info["hdmasterfingerprint"] == "a55b7ea9"
+        assert addr_info["hdkeypath"] == "m/0'/0'/0'"
         assert addr == "bcrt1qps7hnjd866e9ynxadgseprkc2l56m00dvwargr"
+
+        addr_change = self.callnoderpc("getrawchangeaddress", wallet=new_wallet_name)
+        addr_info = self.callnoderpc(
+            "getaddressinfo",
+            [
+                addr_change,
+            ],
+            wallet=new_wallet_name,
+        )
+        assert addr_info["hdmasterfingerprint"] == "a55b7ea9"
+        assert addr_info["hdkeypath"] == "m/0'/1'/0'"
+        assert addr_change == "bcrt1qdl9ryxkqjltv42lhfnqgdjf9tagxsjpp2xak9a"
+        self.callnoderpc("unloadwallet", [new_wallet_name])
 
         self.swap_clients[0].initialiseWallet(Coins.BTC, raise_errors=True)
         assert self.swap_clients[0].checkWalletSeed(Coins.BTC) is True
@@ -1561,6 +1589,97 @@ class BasicSwapTest(TestFunctions):
         )
         assert len(tx_wallet["blockhash"]) == 64
 
+    def test_013_descriptor_wallet(self):
+        logging.info(f"---------- Test {self.test_coin_from.name} descriptor wallet")
+
+        ci = self.swap_clients[0].ci(self.test_coin_from)
+
+        ek = ExtKeyPair()
+        ek.set_seed(bytes.fromhex(test_seed))
+        ek_encoded: str = ci.encode_secret_extkey(ek.encode_v())
+        new_wallet_name = "descriptors_" + random.randbytes(10).hex()
+        new_watch_wallet_name = "watch_descriptors_" + random.randbytes(10).hex()
+        # wallet_name, disable_private_keys, blank, passphrase, avoid_reuse, descriptors
+        ci.rpc("createwallet", [new_wallet_name, False, True, "", False, True])
+        ci.rpc("createwallet", [new_watch_wallet_name, True, True, "", False, True])
+
+        desc_external = descsum_create(f"wpkh({ek_encoded}/0h/0h/*h)")
+        desc_internal = descsum_create(f"wpkh({ek_encoded}/0h/1h/*h)")
+        self.callnoderpc(
+            "importdescriptors",
+            [
+                [
+                    {
+                        "desc": desc_external,
+                        "timestamp": "now",
+                        "active": True,
+                        "range": [0, 10],
+                        "next_index": 0,
+                    },
+                    {
+                        "desc": desc_internal,
+                        "timestamp": "now",
+                        "active": True,
+                        "internal": True,
+                    },
+                ],
+            ],
+            wallet=new_wallet_name,
+        )
+
+        addr = self.callnoderpc("getnewaddress", wallet=new_wallet_name)
+        addr_info = self.callnoderpc(
+            "getaddressinfo",
+            [
+                addr,
+            ],
+            wallet=new_wallet_name,
+        )
+        assert addr_info["hdmasterfingerprint"] == "a55b7ea9"
+        assert addr_info["hdkeypath"] == "m/0h/0h/0h"
+        assert addr == "bcrt1qps7hnjd866e9ynxadgseprkc2l56m00dvwargr"
+
+        addr_change = self.callnoderpc("getrawchangeaddress", wallet=new_wallet_name)
+        addr_info = self.callnoderpc(
+            "getaddressinfo",
+            [
+                addr_change,
+            ],
+            wallet=new_wallet_name,
+        )
+        assert addr_info["hdmasterfingerprint"] == "a55b7ea9"
+        assert addr_info["hdkeypath"] == "m/0h/1h/0h"
+        assert addr_change == "bcrt1qdl9ryxkqjltv42lhfnqgdjf9tagxsjpp2xak9a"
+
+        desc_watch = descsum_create(f"addr({addr})")
+        self.callnoderpc(
+            "importdescriptors",
+            [
+                [
+                    {"desc": desc_watch, "timestamp": "now", "active": False},
+                ],
+            ],
+            wallet=new_watch_wallet_name,
+        )
+        ci.rpc_wallet("sendtoaddress", [addr, 1])
+        found: bool = False
+        for i in range(10):
+            txn_list = self.callnoderpc(
+                "listtransactions", ["*", 100, 0, True], wallet=new_watch_wallet_name
+            )
+            test_delay_event.wait(1)
+            if len(txn_list) > 0:
+                found = True
+                break
+        assert found
+
+        # Test that addresses can be generated beyond range in listdescriptors
+        for i in range(2000):
+            self.callnoderpc("getnewaddress", wallet=new_wallet_name)
+
+        self.callnoderpc("unloadwallet", [new_wallet_name])
+        self.callnoderpc("unloadwallet", [new_watch_wallet_name])
+
     def test_01_0_lock_bad_prevouts(self):
         logging.info(
             "---------- Test {} lock_bad_prevouts".format(self.test_coin_from.name)
@@ -1862,11 +1981,11 @@ class TestBTC(BasicSwapTest):
         assert "seed is set from the Basicswap mnemonic" in rv["error"]
 
         rv = read_json_api(1800, "getcoinseed", {"coin": "BTC"})
-        assert (
-            rv["seed"]
-            == "8e54a313e6df8918df6d758fafdbf127a115175fdd2238d0e908dd8093c9ac3b"
+        assert rv["seed"] == test_seed
+        assert rv["seed_id"] in (
+            "3da5c0af91879e8ce97d9a843874601c08688078",
+            "4a231080ec6f4078e543d39cc6dcf0b922c9b16b",
         )
-        assert rv["seed_id"] == "3da5c0af91879e8ce97d9a843874601c08688078"
         assert rv["seed_id"] == rv["expected_seed_id"]
 
         rv = read_json_api(

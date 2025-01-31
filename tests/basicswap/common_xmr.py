@@ -19,13 +19,10 @@ from io import StringIO
 from urllib.request import urlopen
 from unittest.mock import patch
 
-from basicswap.rpc_xmr import (
-    callrpc_xmr,
-)
+from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
+from basicswap.rpc_xmr import callrpc_xmr
 from tests.basicswap.mnemonics import mnemonics
-from tests.basicswap.util import (
-    waitForServer,
-)
+from tests.basicswap.util import waitForServer
 from tests.basicswap.common import (
     BASE_PORT,
     BASE_RPC_PORT,
@@ -35,6 +32,7 @@ from tests.basicswap.common import (
     LTC_BASE_PORT,
     LTC_BASE_RPC_PORT,
     PIVX_BASE_PORT,
+    BTC_USE_DESCRIPTORS,
 )
 from tests.basicswap.extended.test_dcr import (
     DCR_BASE_PORT,
@@ -48,8 +46,6 @@ from tests.basicswap.extended.test_doge import (
     DOGE_BASE_PORT,
     DOGE_BASE_RPC_PORT,
 )
-
-from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
 
 import basicswap.config as cfg
 import basicswap.bin.run as runSystem
@@ -133,6 +129,7 @@ def run_prepare(
     os.environ["PART_RPC_PORT"] = str(PARTICL_RPC_PORT_BASE)
     os.environ["BTC_RPC_PORT"] = str(BITCOIN_RPC_PORT_BASE)
     os.environ["BTC_PORT"] = str(BITCOIN_PORT_BASE)
+    os.environ["BTC_USE_DESCRIPTORS"] = str(BTC_USE_DESCRIPTORS)
     os.environ["LTC_RPC_PORT"] = str(LITECOIN_RPC_PORT_BASE)
     os.environ["DCR_RPC_PORT"] = str(DECRED_RPC_PORT_BASE)
     os.environ["FIRO_RPC_PORT"] = str(FIRO_RPC_PORT_BASE)
