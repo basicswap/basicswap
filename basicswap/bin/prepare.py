@@ -47,6 +47,7 @@ from basicswap.bin.run import (
     getWalletBinName,
 )
 
+
 PARTICL_VERSION = os.getenv("PARTICL_VERSION", "23.2.7.0")
 PARTICL_VERSION_TAG = os.getenv("PARTICL_VERSION_TAG", "")
 PARTICL_LINUX_EXTRA = os.getenv("PARTICL_LINUX_EXTRA", "nousb")
@@ -132,6 +133,7 @@ expected_key_ids = {
     "pasta": ("52527BEDABE87984", "E2F3D7916E722D38"),
     "reuben": ("1290A1D0FA7EE109",),
     "nav_builder": ("2782262BF6E7FADB",),
+    "nicolasdorier": ("6618763EF09186FE", "223FDA69DEBEA82D", "62FE85647DEDDA2E"),
     "decred_release": ("6D897EDF518A031D",),
     "Calin_Culianu": ("21810A542031C02C",),
 }
@@ -529,6 +531,23 @@ def havePubkey(gpg, key_id):
     return False
 
 
+def getFileHash(file_path, print_progress: bool = False) -> str:
+    h = hashlib.sha256()
+    if print_progress:
+        reporthook = make_reporthook(0, logger)
+        total_size: int = os.stat(file_path).st_size
+
+    block_num: int = 0
+    block_size: int = 1024 * 1024
+    with open(file_path, "rb") as fp:
+        while data_chunk := fp.read(block_size):
+            h.update(data_chunk)
+            block_num += 1
+            if print_progress:
+                reporthook(block_num, block_size, total_size)
+    return h.hexdigest()
+
+
 def downloadPIVXParams(output_dir):
     # util/fetch-params.sh
 
@@ -549,10 +568,8 @@ def downloadPIVXParams(output_dir):
             url = urllib.parse.urljoin(source_url, k)
             path = os.path.join(output_dir, k)
             downloadFile(url, path)
-        hasher = hashlib.sha256()
-        with open(path, "rb") as fp:
-            hasher.update(fp.read())
-        file_hash = hasher.hexdigest()
+
+        file_hash = getFileHash(path)
         logger.info("%s hash: %s", k, file_hash)
         assert file_hash == v
     finally:
@@ -1010,23 +1027,17 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
             if not os.path.exists(assert_sig_path):
                 downloadFile(assert_sig_url, assert_sig_path)
 
-    hasher = hashlib.sha256()
-    with open(release_path, "rb") as fp:
-        hasher.update(fp.read())
-    release_hash = hasher.digest()
-
-    logger.info("%s hash: %s", release_filename, release_hash.hex())
+    release_hash = getFileHash(release_path)
+    logger.info(f"{release_filename} hash: {release_hash}")
     with (
         open(assert_path, "rb", 0) as fp,
         mmap.mmap(fp.fileno(), 0, access=mmap.ACCESS_READ) as s,
     ):
-        if s.find(bytes(release_hash.hex(), "utf-8")) == -1:
+        if s.find(bytes(release_hash, "utf-8")) == -1:
             raise ValueError(
-                "Error: release hash %s not found in assert file."
-                % (release_hash.hex())
+                f"Error: Release hash {release_hash} not found in assert file."
             )
-        else:
-            logger.info("Found release hash in assert file.")
+        logger.info("Found release hash in assert file.")
 
     if SKIP_GPG_VALIDATION:
         logger.warning(
@@ -2029,36 +2040,52 @@ def signal_handler(sig, frame):
 def check_btc_fastsync_data(base_dir, sync_filename):
     logger.info("Validating signature for: " + sync_filename)
 
-    asc_filename = sync_filename + ".asc"
+    asc_filename = "utxo-snapshot-bitcoin-mainnet-hashes.asc"
     asc_file_path = os.path.join(base_dir, asc_filename)
     sync_file_path = os.path.join(base_dir, sync_filename)
-    if not os.path.exists(asc_file_path):
+
+    if BITCOIN_FASTSYNC_SIG_URL:
+        try:
+            downloadFile(BITCOIN_FASTSYNC_SIG_URL, asc_file_path)
+        except Exception as e:
+            logging.warning(f"Download failed: {e}")
+    elif not os.path.exists(asc_file_path):
         base_path = getBasePath()
         local_path = os.path.join(base_path, "pgp", "sigs", asc_filename)
         if os.path.exists(local_path):
             shutil.copyfile(local_path, asc_file_path)
+    if not os.path.exists(asc_file_path):
+        raise ValueError("Unable to find snapshot assert file.")
 
-    if not os.path.exists(asc_file_path):
-        asc_file_urls = []
-        if BITCOIN_FASTSYNC_SIG_URL:
-            asc_file_urls.append(BITCOIN_FASTSYNC_SIG_URL)
-        for url in asc_file_urls:
-            try:
-                downloadFile(url, asc_file_path)
-                break
-            except Exception as e:
-                logging.warning(f"Download failed: {e}")
-    if not os.path.exists(asc_file_path):
-        raise ValueError("Unable to find snapshot signature file.")
+    logger.info(f"Hashing {sync_filename}:")
+    utxo_snapshot_hash = getFileHash(sync_file_path, print_progress=True)
+    logger.info(f"{sync_filename} hash: {utxo_snapshot_hash}")
+    with (
+        open(asc_file_path, "rb", 0) as fp,
+        mmap.mmap(fp.fileno(), 0, access=mmap.ACCESS_READ) as s,
+    ):
+        if s.find(bytes(utxo_snapshot_hash, "utf-8")) == -1:
+            raise ValueError(
+                f"Error: Snapshot hash {utxo_snapshot_hash} not found in assert file."
+            )
+        logger.info("Found snapshot hash in assert file.")
+
     gpg = gnupg.GPG()
     pubkey_filename = "{}_{}.pgp".format("particl", "tecnovert")
     pubkeyurls = []
     if not havePubkey(gpg, expected_key_ids["tecnovert"][0]):
         importPubkey(gpg, pubkey_filename, pubkeyurls)
     with open(asc_file_path, "rb") as fp:
-        verified = gpg.verify_file(fp, sync_file_path)
-
-    ensureValidSignatureBy(verified, "tecnovert")
+        verified = gpg.verify_file(fp)
+    if isValidSignature(verified) and verified.key_id in expected_key_ids["tecnovert"]:
+        ensureValidSignatureBy(verified, "tecnovert")
+    else:
+        pubkey_filename = "nicolasdorier.asc"
+        if not havePubkey(gpg, expected_key_ids["nicolasdorier"][0]):
+            importPubkey(gpg, pubkey_filename, pubkeyurls)
+        with open(asc_file_path, "rb") as fp:
+            verified = gpg.verify_file(fp)
+        ensureValidSignatureBy(verified, "nicolasdorier")
 
 
 def ensure_coin_valid(coin: str, test_disabled: bool = True) -> None:
