@@ -1468,7 +1468,11 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
             check_btc_fastsync_data(base_dir, BITCOIN_FASTSYNC_FILE)
 
         with tarfile.open(sync_file_path) as ft:
-            ft.extractall(path=data_dir)
+            if hasattr(tarfile, "data_filter"):
+                ft.extractall(path=data_dir, filter="data")
+            else:
+                # TODO: Remove when minimum python version is >= 3.12
+                ft.extractall(path=data_dir)
 
 
 def write_torrc(data_dir, tor_control_password):
