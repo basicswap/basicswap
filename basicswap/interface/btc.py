@@ -313,11 +313,14 @@ class BTCInterface(Secp256k1Interface):
 
         # Wallet name is "" for some LTC and PART installs on older cores
         if self._rpc_wallet not in wallets and len(wallets) > 0:
-            self._log.debug(f"Changing {self.ticker()} wallet name.")
+            self._log.warning(f"Changing {self.ticker()} wallet name.")
             for wallet_name in wallets:
                 # Skip over other expected wallets
                 if wallet_name in ("mweb",):
                     continue
+
+                change_watchonly_wallet: bool = self._rpc_wallet_watch == self._rpc_wallet
+
                 self._rpc_wallet = wallet_name
                 self._log.info(
                     f"Switched {self.ticker()} wallet name to {self._rpc_wallet}."
@@ -328,6 +331,8 @@ class BTCInterface(Secp256k1Interface):
                     host=self._rpc_host,
                     wallet=self._rpc_wallet,
                 )
+                if change_watchonly_wallet:
+                    self.rpc_wallet_watch = self.rpc_wallet
                 break
 
         return len(wallets)
