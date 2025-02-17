@@ -1,16 +1,16 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2022-2024 tecnovert
+# Copyright (c) 2022-2025 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
+from hashlib import sha256 as hashlib_sha256  # hashlib is faster than pycryptodome
 from basicswap.contrib.blake256.blake256 import blake_hash
-
-from Crypto.Hash import HMAC, RIPEMD160, SHA256, SHA512  # pycryptodome
+from Crypto.Hash import HMAC, RIPEMD160, SHA512  # pycryptodome
 
 
 def sha256(data: bytes) -> bytes:
-    h = SHA256.new()
+    h = hashlib_sha256()
     h.update(data)
     return h.digest()
 

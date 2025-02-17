@@ -319,7 +319,9 @@ class BTCInterface(Secp256k1Interface):
                 if wallet_name in ("mweb",):
                     continue
 
-                change_watchonly_wallet: bool = self._rpc_wallet_watch == self._rpc_wallet
+                change_watchonly_wallet: bool = (
+                    self._rpc_wallet_watch == self._rpc_wallet
+                )
 
                 self._rpc_wallet = wallet_name
                 self._log.info(
