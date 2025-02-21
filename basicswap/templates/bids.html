@@ -1,412 +1,348 @@
 {% include 'header.html' %}
-{% from 'style.html' import breadcrumb_line_svg, page_back_svg, page_forwards_svg, filter_clear_svg, filter_apply_svg, circular_arrows_svg, input_arrow_down_svg %}
+{% from 'style.html' import breadcrumb_line_svg, page_back_svg, page_forwards_svg, filter_clear_svg, filter_apply_svg, circular_arrows_svg, input_arrow_down_svg, arrow_right_svg %}
 
 <div class="container mx-auto">
-  <section class="p-5 mt-5">
-    <div class="flex flex-wrap items-center -m-2">
-      <div class="w-full md:w-1/2 p-2">
-        <ul class="flex flex-wrap items-center gap-x-3 mb-2">
-          <li><a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/"><p>Home</p></a></li>
-          <li>{{ breadcrumb_line_svg | safe }}</li>
-          <li><a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="#">Sent Bids / Received Bids</a></li>
-        </ul>
-      </div>
+ <section class="py-3 px-4 mt-6">
+  <div class="lg:container mx-auto">
+   <div class="relative py-8 px-8 bg-coolGray-900 dark:bg-blue-500 rounded-md overflow-hidden">
+    <img class="absolute z-10 left-4 top-4" src="/static/images/elements/dots-red.svg" alt="">
+    <img class="absolute z-10 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt="">
+    <img class="absolute h-64 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" src="/static/images/elements/wave.svg" alt="">
+    <div class="relative z-20 flex flex-wrap items-center -m-3">
+     <div class="w-full md:w-1/2 p-3">
+      <h2 class="mb-3 text-2xl font-bold text-white tracking-tighter">Sent Bids / Received Bids</h2>
+      <p class="font-normal text-coolGray-200 dark:text-white">View, and manage bids.</p>
+     </div>
     </div>
-  </section>
-
-  <section class="py-4">
-    <div class="container px-4 mx-auto">
-      <div class="relative py-11 px-16 bg-coolGray-900 dark:bg-blue-500 rounded-md overflow-hidden">
-        <img class="absolute z-10 left-4 top-4" src="/static/images/elements/dots-red.svg" alt="">
-        <img class="absolute z-10 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt="">
-        <img class="absolute h-64 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" src="/static/images/elements/wave.svg" alt="">
-        <div class="relative z-20 flex flex-wrap items-center -m-3">
-          <div class="w-full md:w-1/2 p-3">
-            <h2 class="mb-6 text-4xl font-bold text-white tracking-tighter">Sent Bids / Received Bids</h2>
-            <p class="font-normal text-coolGray-200 dark:text-white">View, and manage bids</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  {% include 'inc_messages.html' %}
-
-  <section>
-    <div class="pl-6 pr-6 pt-0 mt-5 h-full overflow-hidden">
-        <div class="flex flex-wrap items-center justify-between -m-2">
-          <div class="w-full pt-2">
-            <div class="mb-4 border-b pb-5 border-gray-200 dark:border-gray-500">
-              <ul class="flex flex-wrap text-sm font-medium text-center text-gray-500 dark:text-gray-400" id="myTab" data-tabs-toggle="#bidstab" role="tablist">
-                <li class="mr-2">
-                  <button class="inline-block px-4 py-3 rounded-lg hover:text-gray-900 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white focus:outline-none focus:ring-0" id="sent-tab" data-tabs-target="#sent" type="button" role="tab" aria-controls="sent" aria-selected="true">
-                    Sent Bids ({{ sent_bids_count }})
-                  </button>
-                </li>
-                <li class="mr-2">
-                  <button class="inline-block px-4 py-3 rounded-lg hover:text-gray-900 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white focus:outline-none focus:ring-0" id="received-tab" data-tabs-target="#received" type="button" role="tab" aria-controls="received" aria-selected="false">
-                    Received Bids ({{ received_bids_count }})
-                  </button>
-                </li>
-              </ul>
-            </div>
-          </div>
-      </div>
-    </div>
-  </section>
-
-  <div class="pl-6 pr-6 pt-0 pb-0 mt-5 h-full overflow-hidden">
-    <div class="pb-6 border-coolGray-100">
-      <div class="flex flex-wrap items-center justify-between -m-2">
-        <div class="w-full mx-auto pt-2">
-          <form method="post">
-            <div class="flex items-center justify-center pb-4 dark:text-white">
-              <div class="rounded-b-md">
-                <div class="w-full md:w-0/12">
-                  <div class="flex flex-wrap justify-center -m-1.5">
-                    <div class="w-full md:w-auto p-1.5">
-                      <div class="relative">
-                        {{ input_arrow_down_svg | safe }}
-                        <select name="sort_by" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
-                          <option value="created_at" {% if filters.sort_by=='created_at' %} selected{% endif %}>Time At</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div class="w-full md:w-auto p-1.5">
-                      <div class="relative">
-                        {{ input_arrow_down_svg | safe }}
-                        <select name="sort_dir" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
-                          <option value="asc" {% if filters.sort_dir=='asc' %} selected{% endif %}>Ascending</option>
-                          <option value="desc" {% if filters.sort_dir=='desc' %} selected{% endif %}>Descending</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div class="flex items-center">
-                      <div class="w-full md:w-auto p-1.5">
-                        <p class="text-sm font-heading bold">State:</p>
-                      </div>
-                    </div>
-                    <div class="w-full md:w-auto p-1.5">
-                      <div class="relative">
-                        {{ input_arrow_down_svg | safe }}
-                        <select name="state" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
-                          <option value="-1" {% if filters.bid_state_ind==-1 %} selected{% endif %}>Any</option>
-                          {% for s in data.bid_states %}
-                          <option value="{{ s[0] }}" {% if filters.bid_state_ind==s[0] %} selected{% endif %}>{{ s[1] }}</option>
-                          {% endfor %}
-                        </select>
-                      </div>
-                    </div>
-                    <div class="flex items-center">
-                      <div class="w-full md:w-auto p-1.5">
-                        <p class="text-sm font-heading bold">Include Expired:</p>
-                      </div>
-                    </div>
-                    <div class="w-full md:w-auto p-1.5">
-                      <div class="relative">
-                        {{ input_arrow_down_svg | safe }}
-                        <select name="with_expired" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
-                          <option value="true" {% if filters.with_expired==true %} selected{% endif %}>Include</option>
-                          <option value="false" {% if filters.with_expired==false %} selected{% endif %}>Exclude</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div class="w-full md:w-auto p-1.5">
-                      <div class="relative">
-                        <button type="submit" name='clearfilters' value="Clear Filters" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm hover:text-white dark:text-white dark:bg-gray-500 bg-coolGray-200 hover:bg-green-600 hover:border-green-600 rounded-lg transition duration-200 border border-coolGray-200 dark:border-gray-400 rounded-md shadow-button focus:ring-0 focus:outline-none">
-                          <span>Clear Filters</span>
-                        </button>
-                      </div>
-                    </div>
-                    <div class="w-full md:w-auto p-1.5">
-                      <div class="relative">
-                        <button type="submit" name='applyfilters' value="Apply Filters" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-white bg-blue-600 hover:bg-green-600 hover:border-green-600 rounded-lg transition duration-200 border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
-                          {{ filter_apply_svg | safe }}
-                          <span>Apply Filters</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div id="bidstab">
-              <div class="rounded-lg" id="sent" role="tabpanel" aria-labelledby="sent-tab">
-                <div id="sent-content">
-                  <div class="container mt-5 mx-auto">
-                    <div class="pt-6 pb-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
-                      <div class="px-6">
-                        <div class="w-full mt-6 pb-6 overflow-x-auto">
-                          <table class="w-full min-w-max">
-                            <thead class="uppercase">
-                              <tr class="text-left">
-                                <th class="p-0">
-                                  <div class="py-3 px-6 rounded-tl-xl bg-coolGray-200 dark:bg-gray-600">
-                                    <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Date/Time at</span>
-                                  </div>
-                                </th>
-                                <th class="p-0">
-                                  <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
-                                    <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Bid ID</span>
-                                  </div>
-                                </th>
-                                <th class="p-0">
-                                  <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
-                                    <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Offer ID</span>
-                                  </div>
-                                </th>
-                                <th class="p-0">
-                                  <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
-                                    <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Bid From</span>
-                                  </div>
-                                </th>
-                                <th class="p-0">
-                                  <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
-                                    <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Bid Status</span>
-                                  </div>
-                                </th>
-                                <th class="p-0">
-                                  <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
-                                    <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">ITX Status</span>
-                                  </div>
-                                </th>
-                                <th class="p-0">
-                                  <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
-                                    <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">PTX Status</span>
-                                  </div>
-                                </th>
-                                <th class="p-0">
-                                  <div class="py-3 px-6 rounded-tr-xl bg-coolGray-200 dark:bg-gray-600">
-                                    <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Details</span>
-                                  </div>
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {% for b in sent_bids %}
-                              <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
-                                <th scope="row" class="flex items-center py-7 px-46 text-gray-900 whitespace-nowrap">
-                                  <svg class="w-5 h-5 rounded-full ml-5" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-                                    <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
-                                      <circle cx="12" cy="12" r="11"></circle>
-                                      <polyline points=" 12,6 12,12 18,12 " stroke="#6b7280"></polyline>
-                                    </g>
-                                  </svg>
-                                  <div class="pl-3">
-                                    <div class="font-semibold text-xs dark:text-white">{{ b[0] }}</div>
-                                  </div>
-                                </th>
-                                <td class="py-3 px-6 text-xs monospace"><a href=/bid/{{ b[1] }}>{{ b[1]|truncate(20, True) }}</a></td>
-                                <td class="py-3 px-6 text-xs monospace"><a href=/offer/{{ b[2] }}>{{ b[2]|truncate(20, True) }}</a></td>
-                                <td class="py-3 px-6 text-xs monospace"><a href=/identity/{{ b[6] }}>{{ b[6] }}</a></td>
-                                <td class="py-3 px-6 text-xs">{{ b[3] }}</td>
-                                <td class="py-3 px-6 text-xs">{{ b[4] }}</td>
-                                <td class="py-3 px-6 text-xs">{{ b[5] }}</td>
-                                <td class="py-3 px-6 text-xs">
-                                  <a class="inline-block w-20 py-1 px-2 font-medium text-center text-sm rounded-md bg-blue-500 text-white border border-blue-500 hover:bg-blue-600 transition duration-200" href="/bid/{{ b[1] }}">Details</a>
-                                </td>
-                              </tr>
-                              {% endfor %}
-                            </tbody>
-                          </table>
-                        </div>
-                        <div class="rounded-b-md">
-                          <div class="w-full md:w-0/12">
-                            <div class="flex flex-wrap justify-end pt-6 pr-6 border-t border-gray-100 dark:border-gray-400">
-                              {% if filters.page_no > 1 %}
-                              <div class="w-full md:w-auto p-1.5">
-                                <input type="hidden" name="filter_key" value="{{ filter_key }}">
-                                <input type="hidden" name="page_no" value="{{ filters.page_no - 1 }}">
-                                <button type="submit" name='pageback' value="Previous" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-blue-600 rounded-lg transition duration-200 focus:ring-0 focus:outline-none">
-                                  {{ page_back_svg | safe }}
-                                  <span>Previous</span>
-                                </button>
-                              </div>
-                              {% endif %}
-                              <div class="flex items-center">
-                                <div class="w-full md:w-auto p-1.5">
-                                  <p class="text-sm font-heading dark:text-white">Page: {{ filters.page_no }}</p>
-                                </div>
-                              </div>
-                              {% if sent_bids_count >= filters.limit %}
-                              <div class="w-full md:w-auto p-1.5">
-                                <input type="hidden" name="filter_key" value="{{ filter_key }}">
-                                <input type="hidden" name="page_no" value="{{ filters.page_no + 1 }}">
-                                <button type="submit" name='pageforwards' value="Next" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-blue-600 rounded-lg transition duration-200 focus:ring-0 focus:outline-none">
-                                  <span>Next</span>
-                                  {{ page_forwards_svg | safe }}
-                                </button>
-                              </div>
-                              {% endif %}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="hidden rounded-lg" id="received" role="tabpanel" aria-labelledby="received-tab">
-                <div id="received-content">
-                  <div class="container mt-5 mx-auto">
-                    <div class="pt-6 pb-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
-                      <div class="px-6">
-                        <div class="w-full mt-6 pb-6 overflow-x-auto">
-                          <table class="w-full min-w-max">
-                            <thead class="uppercase">
-                              <tr class="text-left">
-                                <th class="p-0">
-                                  <div class="py-3 px-6 rounded-tl-xl bg-coolGray-200 dark:bg-gray-600">
-                                    <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Date/Time at</span>
-                                  </div>
-                                </th>
-                                <th class="p-0">
-                                  <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
-                                    <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Bid ID</span>
-                                  </div>
-                                </th>
-                                <th class="p-0">
-                                  <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
-                                    <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Offer ID</span>
-                                  </div>
-                                </th>
-                                <th class="p-0">
-                                  <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
-                                    <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Bid From</span>
-                                  </div>
-                                </th>
-                                <th class="p-0">
-                                  <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
-                                    <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Bid Status</span>
-                                  </div>
-                                </th>
-                                <th class="p-0">
-                                  <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
-                                    <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">ITX Status</span>
-                                  </div>
-                                </th>
-                                <th class="p-0">
-                                  <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
-                                    <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">PTX Status</span>
-                                  </div>
-                                </th>
-                                <th class="p-0">
-                                  <div class="py-3 px-6 rounded-tr-xl bg-coolGray-200 dark:bg-gray-600">
-                                    <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Details</span>
-                                  </div>
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {% for b in received_bids %}
-                              <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
-                                <th scope="row" class="flex items-center py-7 px-46 text-gray-900 whitespace-nowrap">
-                                  <svg class="w-5 h-5 rounded-full ml-5" xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-                                    <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#6b7280" stroke-linejoin="round">
-                                      <circle cx="12" cy="12" r="11"></circle>
-                                      <polyline points=" 12,6 12,12 18,12 " stroke="#6b7280"></polyline>
-                                    </g>
-                                  </svg>
-                                  <div class="pl-3">
-                                    <div class="font-semibold text-xs dark:text-white">{{ b[0] }}</div>
-                                  </div>
-                                </th>
-                                <td class="py-3 px-6 text-xs monospace"><a href=/bid/{{ b[1] }}>{{ b[1]|truncate(20, True) }}</a></td>
-                                <td class="py-3 px-6 text-xs monospace"><a href=/offer/{{ b[2] }}>{{ b[2]|truncate(20, True) }}</a></td>
-                                <td class="py-3 px-6 text-xs monospace"><a href=/identity/{{ b[6] }}>{{ b[6] }}</a></td>
-                                <td class="py-3 px-6 text-xs">{{ b[3] }}</td>
-                                <td class="py-3 px-6 text-xs">{{ b[4] }}</td>
-                                <td class="py-3 px-6 text-xs">{{ b[5] }}</td>
-                                <td class="py-3 px-6 text-xs">
-                                  <a class="inline-block w-20 py-1 px-2 font-medium text-center text-sm rounded-md bg-blue-500 text-white border border-blue-500 hover:bg-blue-600 transition duration-200" href="/bid/{{ b[1] }}">Details</a>
-                                </td>
-                              </tr>
-                              {% endfor %}
-                            </tbody>
-                          </table>
-                        </div>
-                        <div class="rounded-b-md">
-                          <div class="w-full md:w-0/12">
-                            <div class="flex flex-wrap justify-end pt-6 pr-6 border-t border-gray-100 dark:border-gray-400">
-                              {% if filters.page_no > 1 %}
-                              <div class="w-full md:w-auto p-1.5">
-                                <input type="hidden" name="filter_key" value="{{ filter_key }}">
-                                <input type="hidden" name="page_no" value="{{ filters.page_no - 1 }}">
-                                <button type="submit" name='pageback' value="Previous" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-blue-600 rounded-lg transition duration-200 focus:ring-0 focus:outline-none">
-                                  {{ page_back_svg | safe }}
-                                  <span>Previous</span>
-                                </button>
-                              </div>
-                              {% endif %}
-                              <div class="flex items-center">
-                                <div class="w-full md:w-auto p-1.5">
-                                  <p class="text-sm font-heading dark:text-white">Page: {{ filters.page_no }}</p>
-                                </div>
-                              </div>
-                              {% if received_bids_count >= filters.limit %}
-                              <div class="w-full md:w-auto p-1.5">
-                                <input type="hidden" name="filter_key" value="{{ filter_key }}">
-                                <input type="hidden" name="page_no" value="{{ filters.page_no + 1 }}">
-                                <button type="submit" name='pageforwards' value="Next" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-blue-600 rounded-lg transition duration-200 focus:ring-0 focus:outline-none">
-                                  <span>Next</span>
-                                  {{ page_forwards_svg | safe }}
-                                </button>
-                              </div>
-                              {% endif %}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <input type="hidden" name="formid" value="{{ form_id }}">
-            <input type="hidden" name="pageno" value="{{ filters.page_no }}">
-            <input type="hidden" name="filter_key" value="page_bids">
-          </form>
-        </div>
-      </div>
-    </div>
+   </div>
   </div>
+ </section>
+
+ {% include 'inc_messages.html' %}
+
+ <section>
+  <div class="pl-6 pr-6 pt-0 mt-5 h-full overflow-hidden">
+   <div class="flex flex-wrap items-center justify-between -m-2">
+    <div class="w-full pt-2">
+     <div class="mb-4 border-b pb-5 border-gray-200 dark:border-gray-500">
+      <ul class="flex flex-wrap text-sm font-medium text-center text-gray-500 dark:text-gray-400" id="myTab" data-tabs-toggle="#bidstab" role="tablist">
+       <li class="mr-2">
+        <button class="inline-block px-4 py-3 rounded-lg hover:text-gray-900 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white focus:outline-none focus:ring-0" id="sent-tab" data-tabs-target="#sent" type="button" role="tab" aria-controls="sent" aria-selected="true">
+         Sent Bids ({{ sent_bids_count }})
+        </button>
+       </li>
+       <li class="mr-2">
+        <button class="inline-block px-4 py-3 rounded-lg hover:text-gray-900 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white focus:outline-none focus:ring-0" id="received-tab" data-tabs-target="#received" type="button" role="tab" aria-controls="received" aria-selected="false">
+         Received Bids ({{ received_bids_count }})
+        </button>
+       </li>
+      </ul>
+     </div>
+    </div>
+   </div>
+  </div>
+ </section>
+
+ <section>
+  <div class="px-6 py-0 h-full overflow-hidden">
+   <div class="pb-6 mt-6 border-coolGray-100">
+    <div class="flex flex-wrap justify-center -m-1.5">
+     <div class="w-full md:w-auto p-1.5">
+      <div class="relative">
+       <input type="text" id="searchInput" name="search"  autocomplete="off" placeholder="Search bid ID, offer ID, address or label..." class="hover:border-blue-500 dark:hover:bg-gray-50 text-gray-900 pl-4 pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none block w-96 p-2.5 focus:ring-blue-500 focus:border-blue-500 focus:ring-0 dark:focus:bg-gray-500 dark:focus:text-white">
+       <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+        <svg class="w-5 h-5 text-gray-500 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+        </svg>
+       </div>
+      </div>
+     </div>
+
+     <div class="p-1.5 md:w-auto hover-container">
+      <div class="flex">
+       <button id="coin_from_button" class="bg-gray-50 text-gray-900 appearance-none w-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-l-lg flex items-center" disabled></button>
+       <div class="relative">
+        {{ input_arrow_down_svg | safe }}
+        <select name="coin_from" id="coin_from" class="bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-r-lg outline-none block w-full p-2.5 focus:ring-0 border-l-0">
+         <option value="any" {% if filters.coin_from==-1 %} selected{% endif %}>You Send</option>
+         {% for c in coins_from %}
+         <option class="text-sm" value="{{ c[0] }}" {% if filters.coin_from==c[0] %} selected{% endif %} data-image="/static/images/coins/{{ c[1]|replace(" ", "-") }}.png">{{ c[1] }}</option>
+         {% endfor %}
+        </select>
+       </div>
+       <div class="flex items-center">
+        <div class="w-full md:w-auto p-1.5">
+         <p class="text-sm font-heading text-gray-500 dark:text-white">{{ arrow_right_svg | safe }}</p>
+        </div>
+       </div>
+       <button id="coin_to_button" class="bg-gray-50 text-gray-900 appearance-none w-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-l-lg flex items-center" disabled></button>
+       <div class="relative">
+        {{ input_arrow_down_svg | safe }}
+        <select name="coin_to" id="coin_to" class="bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-r-lg outline-none block w-full p-2.5 focus:ring-0 border-l-0">
+         <option value="any" {% if filters.coin_to==-1 %} selected{% endif %}>You Receive</option>
+         {% for c in coins %}
+         <option class="text-sm" value="{{ c[0] }}" {% if filters.coin_to==c[0] %} selected{% endif %} data-image="/static/images/coins/{{ c[1]|replace(" ", "-") }}.png">{{ c[1] }}</option>
+         {% endfor %}
+        </select>
+       </div>
+      </div>
+     </div>
+
+     <div class="w-full md:w-auto p-1.5">
+      <div class="relative">
+       {{ input_arrow_down_svg | safe }}
+       <select name="state" id="state" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
+        <option value="-1" selected="">Any State</option>
+        <optgroup label="Active States">
+         <option value="1">Sent</option>
+         <option value="2">Receiving</option>
+         <option value="3">Received</option>
+         <option value="4">Receiving accept</option>
+         <option value="5">Accepted</option>
+         <option value="6">Initiated</option>
+         <option value="7">Participating</option>
+        </optgroup>
+        <optgroup label="Completed States">
+         <option value="8">Completed</option>
+         <option value="15">Scriptless tx redeemed</option>
+         <option value="13">Script tx redeemed</option>
+        </optgroup>
+        <optgroup label="Failed States">
+         <option value="17">Failed, refunded</option>
+         <option value="18">Failed, swiped</option>
+         <option value="19">Failed</option>
+         <option value="22">Abandoned</option>
+         <option value="23">Error</option>
+         <option value="31">Expired</option>
+        </optgroup>
+        <optgroup label="Other States">
+         <option value="9">Script coin locked</option>
+         <option value="10">Script coin spend tx valid</option>
+         <option value="11">Scriptless coin locked</option>
+         <option value="12">Script coin lock released</option>
+         <option value="14">Script pre-refund tx in chain</option>
+         <option value="16">Scriptless tx recovered</option>
+         <option value="20">Delaying</option>
+         <option value="21">Timed-out</option>
+         <option value="24">Stalled (debug)</option>
+         <option value="25">Rejected</option>
+         <option value="26">Unknown bid state</option>
+         <option value="27">Exchanged script lock tx sigs msg</option>
+         <option value="28">Exchanged script lock spend tx msg</option>
+         <option value="29">Request sent</option>
+         <option value="30">Request accepted</option>
+         <option value="32">Auto accept delay</option>
+         <option value="33">Auto accept failed</option>
+        </optgroup>
+       </select>
+      </div>
+     </div> 
+     
+     <!-- todo
+     <div class="w-full md:w-auto p-1.5">
+      <div class="relative">
+       {{ input_arrow_down_svg | safe }}
+       <select name="with_expired" id="with_expired" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
+        <option value="true">Include Expired</option>
+        <option value="false">Exclude Expired</option>
+       </select>
+      </div>
+     </div>-->
+
+     <div class="w-full md:w-auto p-1.5">
+      <div class="relative">
+       <button type="button" id="clearFilters" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm hover:text-white dark:text-white dark:bg-gray-500 bg-coolGray-200 hover:bg-green-600 hover:border-green-600 rounded-lg transition duration-200 border border-coolGray-200 dark:border-gray-400 rounded-md shadow-button focus:ring-0 focus:outline-none">
+        <span>Clear Filters</span>
+       </button>
+      </div>
+     </div>
+    </div>
+   </div>
+  </div>
+ </section>
+
+ <div id="bidstab">
+  <div class="rounded-lg px-6" id="sent" role="tabpanel" aria-labelledby="sent-tab">
+   <div id="sent-content">
+    <div class="lg:container mx-auto lg:px-0 px-6">
+     <div class="pt-0 pb-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
+      <div class="px-0">
+       <div class="w-auto overflow-auto lg:overflow-hidden">
+        <table class="w-full min-w-max">
+         <thead class="uppercase">
+          <tr class="text-left">
+           <th class="p-0">
+            <div class="py-3 px-6 rounded-tl-xl bg-coolGray-200 dark:bg-gray-600">
+             <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Date/Time</span>
+            </div>
+           </th>
+           <th class="p-0">
+            <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
+             <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Details</span>
+            </div>
+           </th>
+           <th class="p-0">
+            <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
+             <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">You Send</span>
+            </div>
+           </th>
+           <th class="p-0">
+            <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
+             <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">You Receive</span>
+            </div>
+           </th>
+           <th class="p-0">
+            <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
+             <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Status</span>
+            </div>
+           </th>
+           <th class="p-0">
+            <div class="py-3 px-6 rounded-tr-xl bg-coolGray-200 dark:bg-gray-600">
+             <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Actions</span>
+            </div>
+           </th>
+          </tr>
+         </thead>
+         <tbody>
+         </tbody>
+        </table>
+       </div>
+       <div class="rounded-b-md">
+        <div class="w-full">
+         <div class="flex flex-wrap justify-between items-center pl-6 pt-6 pr-6 border-t border-gray-100 dark:border-gray-400">
+          <div class="flex items-center">
+           <div class="flex items-center mr-4">
+            <span id="status-dot-sent" class="w-2.5 h-2.5 rounded-full bg-gray-500 mr-2"></span>
+            <span id="status-text-sent" class="text-sm text-gray-500">Connecting...</span>
+           </div>
+           <p class="text-sm font-heading dark:text-gray-400">
+            Sent Bids: <span id="sentBidsCount">0</span>
+           </p>
+           {% if debug_ui_mode == true %}
+           <button id="refreshSentBids" class="ml-4 inline-flex items-center px-4 py-2.5 font-medium text-sm text-white bg-blue-600 hover:bg-green-600 hover:border-green-600 rounded-lg transition duration-200 border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+            <span id="refreshSentText">Refresh</span>
+           </button>
+           {% endif %}
+          </div>
+          <div id="pagination-controls-sent" class="flex items-center space-x-2" style="display: none;">
+           <button id="prevPageSent" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-green-600 rounded-lg transition duration-200">
+            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+            </svg>
+            Previous
+           </button>
+           <p class="text-sm font-heading dark:text-white">Page <span id="currentPageSent">1</span></p>
+           <button id="nextPageSent" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-green-600 rounded-lg transition duration-200">
+            Next
+            <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+            </svg>
+           </button>
+          </div>
+         </div>
+        </div>
+       </div>
+      </div>
+     </div>
+    </div>
+   </div>
+  </div>
+
+  <!-- Received Bids Tab -->
+  <div class="hidden rounded-lg px-6" id="received" role="tabpanel" aria-labelledby="received-tab">
+   <div id="received-content">
+    <div class="lg:container mx-auto lg:px-0">
+     <div class="pt-0 pb-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
+      <div class="px-0">
+       <div class="w-auto overflow-auto lg:overflow-hidden">
+        <table class="w-full min-w-max">
+         <thead class="uppercase">
+          <tr class="text-left">
+           <th class="p-0">
+            <div class="py-3 px-6 rounded-tl-xl bg-coolGray-200 dark:bg-gray-600">
+             <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Date/Time</span>
+            </div>
+           </th>
+           <th class="p-0">
+            <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
+             <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Details</span>
+            </div>
+           </th>
+           <th class="p-0">
+            <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
+             <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">You Send</span>
+            </div>
+           </th>
+           <th class="p-0">
+            <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
+             <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">You Receive</span>
+            </div>
+           </th>
+           <th class="p-0">
+            <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
+             <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Status</span>
+            </div>
+           </th>
+           <th class="p-0">
+            <div class="py-3 px-6 rounded-tr-xl bg-coolGray-200 dark:bg-gray-600">
+             <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Actions</span>
+            </div>
+           </th>
+          </tr>
+         </thead>
+         <tbody>
+         </tbody>
+        </table>
+       </div>
+       <div class="rounded-b-md">
+        <div class="w-full">
+         <div class="flex flex-wrap justify-between items-center pl-6 pt-6 pr-6 border-t border-gray-100 dark:border-gray-400">
+          <div class="flex items-center">
+           <div class="flex items-center mr-4">
+            <span id="status-dot-received" class="w-2.5 h-2.5 rounded-full bg-gray-500 mr-2"></span>
+            <span id="status-text-received" class="text-sm text-gray-500">Connecting...</span>
+           </div>
+           <p class="text-sm font-heading dark:text-gray-400">
+            Received Bids: <span id="receivedBidsCount">0</span>
+           </p>
+           {% if debug_ui_mode == true %}
+           <button id="refreshReceivedBids" class="ml-4 inline-flex items-center px-4 py-2.5 font-medium text-sm text-white bg-blue-600 hover:bg-green-600 hover:border-green-600 rounded-lg transition duration-200 border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+            <span id="refreshReceivedText">Refresh</span>
+           </button>
+           {% endif %}
+          </div>
+          <div id="pagination-controls-received" class="flex items-center space-x-2" style="display: none;">
+           <button id="prevPageReceived" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-green-600 rounded-lg transition duration-200">
+            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+            </svg>
+            Previous
+           </button>
+           <p class="text-sm font-heading dark:text-white">Page <span id="currentPageReceived">1</span></p>
+           <button id="nextPageReceived" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-green-600 rounded-lg transition duration-200">
+            Next
+            <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+            </svg>
+           </button>
+          </div>
+         </div>
+        </div>
+       </div>
+      </div>
+     </div>
+    </div>
+   </div>
+  </div>
+ </div>
 </div>
 
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-  const tabs = document.querySelectorAll('#myTab button');
-  const contents = document.querySelectorAll('[role="tabpanel"]');
-  
-  function switchTab(targetId) {
-    contents.forEach(content => {
-      content.classList.add('hidden');
-    });
-    const targetContent = document.querySelector(targetId);
-    if (targetContent) {
-      targetContent.classList.remove('hidden');
-    }
-    tabs.forEach(tab => {
-      const selected = tab.dataset.tabsTarget === targetId;
-      tab.setAttribute('aria-selected', selected);
-      if (selected) {
-        tab.classList.add('bg-gray-100', 'dark:bg-gray-600', 'text-gray-900', 'dark:text-white');
-      } else {
-        tab.classList.remove('bg-gray-100', 'dark:bg-gray-600', 'text-gray-900', 'dark:text-white');
-      }
-    });
-  }
-  
-  tabs.forEach(tab => {
-    tab.addEventListener('click', () => {
-      switchTab(tab.dataset.tabsTarget);
-    });
-  });
-  
-  switchTab('#sent');
-});
-</script>
+<script src="/static/js/bids_sentreceived.js"></script>
 
 {% include 'footer.html' %}

@@ -15,6 +15,7 @@ from .util import (
 )
 from .basicswap_util import (
     strBidState,
+    strTxState,
     SwapTypes,
     NotificationTypes as NT,
 )
@@ -320,18 +321,36 @@ def formatBids(swap_client, bids, filters) -> bytes:
     with_extra_info = filters.get("with_extra_info", False)
     rv = []
     for b in bids:
+        ci_from = swap_client.ci(b[9])
+        offer = swap_client.getOffer(b[3])
+        ci_to = swap_client.ci(offer.coin_to) if offer else None
+
+        amount_to = None
+        if ci_to:
+            amount_to = ci_to.format_amount(
+                (b[4] * b[10]) // ci_from.COIN()
+            )
+
         bid_data = {
             "bid_id": b[2].hex(),
             "offer_id": b[3].hex(),
             "created_at": b[0],
             "expire_at": b[1],
-            "coin_from": b[9],
-            "amount_from": swap_client.ci(b[9]).format_amount(b[4]),
+            "coin_from": ci_from.coin_name(),
+            "coin_to": ci_to.coin_name() if ci_to else "Unknown",
+            "amount_from": ci_from.format_amount(b[4]),
+            "amount_to": amount_to,
             "bid_rate": swap_client.ci(b[14]).format_amount(b[10]),
             "bid_state": strBidState(b[5]),
+            "addr_from": b[11],
+            "addr_to": offer.addr_to if offer else None
         }
+
         if with_extra_info:
-            bid_data["addr_from"] = b[11]
+            bid_data.update({
+                "tx_state_a": strTxState(b[7]),
+                "tx_state_b": strTxState(b[8])
+            })
         rv.append(bid_data)
     return bytes(json.dumps(rv), "UTF-8")
 
