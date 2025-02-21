@@ -41,7 +41,6 @@ from basicswap.util.address import (
 from basicswap.util import (
     b2i,
     i2b,
-    i2h,
     ensure,
 )
 from basicswap.basicswap_util import (
@@ -552,7 +551,9 @@ class NAVInterface(BTCInterface):
 
         if not self.isAddressMine(dest_address, or_watch_only=True):
             self.importWatchOnlyAddress(dest_address, "bid")
-            self._log.info("Imported watch-only addr: {}".format(dest_address))
+            self._log.info(
+                "Imported watch-only addr: {}".format(self._log.addr(dest_address))
+            )
             self._log.info(
                 "Rescanning {} chain from height: {}".format(
                     self.coin_name(), rescan_from
@@ -816,11 +817,14 @@ class NAVInterface(BTCInterface):
 
         tx.rehash()
         self._log.info(
-            "createSCLockRefundTx %s:\n    fee_rate, vsize, fee: %ld, %ld, %ld.",
-            i2h(tx.sha256),
-            tx_fee_rate,
-            vsize,
-            pay_fee,
+            "createSCLockRefundTx {}{}.".format(
+                self._log.id(i2b(tx.sha256)),
+                (
+                    ""
+                    if self._log.safe_logs
+                    else f":\n    fee_rate, vsize, fee: {tx_fee_rate}, {vsize}, {pay_fee}"
+                ),
+            )
         )
 
         return tx.serialize(), refund_script, tx.vout[0].nValue
@@ -871,11 +875,14 @@ class NAVInterface(BTCInterface):
 
         tx.rehash()
         self._log.info(
-            "createSCLockRefundSpendTx %s:\n    fee_rate, vsize, fee: %ld, %ld, %ld.",
-            i2h(tx.sha256),
-            tx_fee_rate,
-            vsize,
-            pay_fee,
+            "createSCLockRefundSpendTx {}{}.".format(
+                self._log.id(i2b(tx.sha256)),
+                (
+                    ""
+                    if self._log.safe_logs
+                    else f":\n    fee_rate, vsize, fee: {tx_fee_rate}, {vsize}, {pay_fee}"
+                ),
+            )
         )
 
         return tx.serialize()
@@ -928,11 +935,14 @@ class NAVInterface(BTCInterface):
 
         tx.rehash()
         self._log.info(
-            "createSCLockRefundSpendToFTx %s:\n    fee_rate, vsize, fee: %ld, %ld, %ld.",
-            i2h(tx.sha256),
-            tx_fee_rate,
-            vsize,
-            pay_fee,
+            "createSCLockRefundSpendToFTx {}{}.".format(
+                self._log.id(i2b(tx.sha256)),
+                (
+                    ""
+                    if self._log.safe_logs
+                    else f":\n    fee_rate, vsize, fee: {tx_fee_rate}, {vsize}, {pay_fee}"
+                ),
+            )
         )
 
         return tx.serialize()
@@ -975,11 +985,14 @@ class NAVInterface(BTCInterface):
 
         tx.rehash()
         self._log.info(
-            "createSCLockSpendTx %s:\n    fee_rate, vsize, fee: %ld, %ld, %ld.",
-            i2h(tx.sha256),
-            tx_fee_rate,
-            vsize,
-            pay_fee,
+            "createSCLockSpendTx {}{}.".format(
+                self._log.id(i2b(tx.sha256)),
+                (
+                    ""
+                    if self._log.safe_logs
+                    else f":\n    fee_rate, vsize, fee: {tx_fee_rate}, {vsize}, {pay_fee}"
+                ),
+            )
         )
 
         return tx.serialize()

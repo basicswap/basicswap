@@ -105,7 +105,9 @@ class FIROInterface(BTCInterface):
 
         if not self.isAddressMine(dest_address, or_watch_only=True):
             self.importWatchOnlyAddress(dest_address, "bid")
-            self._log.info("Imported watch-only addr: {}".format(dest_address))
+            self._log.info(
+                "Imported watch-only addr: {}".format(self._log.addr(dest_address))
+            )
             self._log.info(
                 "Rescanning {} chain from height: {}".format(
                     self.coin_name(), rescan_from

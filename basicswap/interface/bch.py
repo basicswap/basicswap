@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2024 The Basicswap developers
+# Copyright (c) 2024-2025 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 from typing import Union
 from basicswap.contrib.test_framework.messages import COutPoint, CTransaction, CTxIn
-from basicswap.util import b2h, b2i, ensure, i2h
+from basicswap.util import b2i, ensure, i2b
 from basicswap.util.script import decodePushData, decodeScriptNum
 from .btc import BTCInterface, ensure_op, findOutput
 from basicswap.rpc import make_rpc_func
@@ -454,11 +454,14 @@ class BCHInterface(BTCInterface):
 
         tx.rehash()
         self._log.info(
-            "createSCLockSpendTx %s:\n    fee_rate, size, fee: %ld, %ld, %ld.",
-            i2h(tx.sha256),
-            tx_fee_rate,
-            size,
-            pay_fee,
+            "createSCLockSpendTx {}{}.".format(
+                self._log.id(i2b(tx.sha256)),
+                (
+                    ""
+                    if self._log.safe_logs
+                    else f":\n    fee_rate, vsize, fee: {tx_fee_rate}, {size}, {pay_fee}"
+                ),
+            )
         )
 
         return tx.serialize_without_witness()
@@ -506,11 +509,14 @@ class BCHInterface(BTCInterface):
 
         tx.rehash()
         self._log.info(
-            "createSCLockRefundTx %s:\n    fee_rate, vsize, fee: %ld, %ld, %ld.",
-            i2h(tx.sha256),
-            tx_fee_rate,
-            vsize,
-            pay_fee,
+            "createSCLockRefundTx {}{}.".format(
+                self._log.id(i2b(tx.sha256)),
+                (
+                    ""
+                    if self._log.safe_logs
+                    else f":\n    fee_rate, vsize, fee: {tx_fee_rate}, {vsize}, {pay_fee}"
+                ),
+            )
         )
 
         return tx.serialize_without_witness(), refund_script, tx.vout[0].nValue
@@ -582,11 +588,14 @@ class BCHInterface(BTCInterface):
 
         tx.rehash()
         self._log.info(
-            "createSCLockRefundSpendToFTx %s:\n    fee_rate, vsize, fee: %ld, %ld, %ld.",
-            i2h(tx.sha256),
-            tx_fee_rate,
-            vsize,
-            pay_fee,
+            "createSCLockRefundSpendToFTx {}{}.".format(
+                self._log.id(i2b(tx.sha256)),
+                (
+                    ""
+                    if self._log.safe_logs
+                    else f":\n    fee_rate, vsize, fee: {tx_fee_rate}, {vsize}, {pay_fee}"
+                ),
+            )
         )
 
         return tx.serialize_without_witness()
@@ -780,7 +789,7 @@ class BCHInterface(BTCInterface):
 
         tx = self.loadTx(tx_bytes)
         txid = self.getTxid(tx)
-        self._log.info("Verifying lock tx: {}.".format(b2h(txid)))
+        self._log.info("Verifying lock tx: {}.".format(self._log.id(txid)))
 
         ensure(tx.nVersion == self.txVersion(), "Bad version")
         ensure(tx.nLockTime == 0, "Bad nLockTime")  # TODO match txns created by cores
@@ -835,7 +844,7 @@ class BCHInterface(BTCInterface):
 
         tx = self.loadTx(tx_bytes)
         txid = self.getTxid(tx)
-        self._log.info("Verifying lock refund tx: {}.".format(b2h(txid)))
+        self._log.info("Verifying lock refund tx: {}.".format(self._log.id(txid)))
 
         ensure(tx.nVersion == self.txVersion(), "Bad version")
         ensure(tx.nLockTime == 0, "nLockTime not 0")
@@ -881,7 +890,7 @@ class BCHInterface(BTCInterface):
         size = self.getTxSize(tx)
         vsize = size
 
-        self._log.info(
+        self._log.info_s(
             "tx amount, vsize, fee: %ld, %ld, %ld", locked_coin, vsize, fee_paid
         )
 
@@ -905,7 +914,7 @@ class BCHInterface(BTCInterface):
         #   Must have only one output sending lock refund tx value - fee to leader's address, TODO: follower shouldn't need to verify destination addr
         tx = self.loadTx(tx_bytes)
         txid = self.getTxid(tx)
-        self._log.info("Verifying lock refund spend tx: {}.".format(b2h(txid)))
+        self._log.info("Verifying lock refund spend tx: {}.".format(self._log.id(txid)))
 
         ensure(tx.nVersion == self.txVersion(), "Bad version")
         ensure(tx.nLockTime == 0, "nLockTime not 0")
@@ -947,9 +956,7 @@ class BCHInterface(BTCInterface):
         size = self.getTxSize(tx)
         vsize = size
 
-        self._log.info(
-            "tx amount, vsize, fee: %ld, %ld, %ld", tx_value, vsize, fee_paid
-        )
+        self._log.info_s(f"tx amount, vsize, fee: {tx_value}, {vsize}, {fee_paid}")
 
         return True
 
@@ -962,7 +969,7 @@ class BCHInterface(BTCInterface):
 
         tx = self.loadTx(tx_bytes)
         txid = self.getTxid(tx)
-        self._log.info("Verifying lock spend tx: {}.".format(b2h(txid)))
+        self._log.info("Verifying lock spend tx: {}.".format(self._log.id(txid)))
 
         ensure(tx.nVersion == self.txVersion(), "Bad version")
         ensure(tx.nLockTime == 0, "nLockTime not 0")
@@ -995,7 +1002,7 @@ class BCHInterface(BTCInterface):
         size = self.getTxSize(tx)
         vsize = size
 
-        self._log.info(
+        self._log.info_s(
             "tx amount, vsize, fee: %ld, %ld, %ld", tx.vout[0].nValue, vsize, fee_paid
         )
 
@@ -1115,11 +1122,14 @@ class BCHInterface(BTCInterface):
 
         tx.rehash()
         self._log.info(
-            "createMercyTx %s:\n    fee_rate, vsize, fee: %ld, %ld, %ld.",
-            i2h(tx.sha256),
-            1,
-            vsize,
-            pay_fee,
+            "createMercyTx {}{}.".format(
+                self._log.id(i2b(tx.sha256)),
+                (
+                    ""
+                    if self._log.safe_logs
+                    else f":\n    fee_rate, vsize, fee: {1}, {vsize}, {pay_fee}"
+                ),
+            )
         )
 
         txHex = tx.serialize_without_witness()

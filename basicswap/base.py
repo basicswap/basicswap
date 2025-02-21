@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2019-2024 tecnovert
-# Copyright (c) 2024 The Basicswap developers
+# Copyright (c) 2024-2025 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -27,6 +27,9 @@ from .rpc import (
 )
 from .util import (
     TemporaryError,
+)
+from .util.logging import (
+    BSXLogger,
 )
 from .chainparams import (
     Coins,
@@ -75,6 +78,7 @@ class BaseApp(DBMethods):
             self.delay_event.set()
 
     def prepareLogging(self):
+        logging.setLoggerClass(BSXLogger)
         self.log = logging.getLogger(self.log_name)
         self.log.propagate = False
 

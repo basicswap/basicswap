@@ -44,7 +44,7 @@ def addLockRefundSigs(self, xmr_swap, ci):
 
 
 def recoverNoScriptTxnWithKey(self, bid_id: bytes, encoded_key, cursor=None):
-    self.log.info(f"Manually recovering {bid_id.hex()}")
+    self.log.info(f"Manually recovering {self.log.id(bid_id)}")
     # Manually recover txn if other key is known
     try:
         use_cursor = self.openDB(cursor)
@@ -119,10 +119,7 @@ def recoverNoScriptTxnWithKey(self, bid_id: bytes, encoded_key, cursor=None):
             lock_tx_vout=lock_tx_vout,
         )
         self.log.debug(
-            "Submitted lock B spend txn %s to %s chain for bid %s",
-            txid.hex(),
-            ci_follower.coin_name(),
-            bid_id.hex(),
+            f"Submitted lock B spend txn {self.log.id(txid)} to {ci_follower.coin_name()} chain for bid {self.log.id(bid_id)}."
         )
         self.logBidEvent(
             bid.bid_id,

@@ -477,7 +477,7 @@ class PARTInterfaceBlind(PARTInterface):
     ):
         lock_tx_obj = self.rpc("decoderawtransaction", [tx_bytes.hex()])
         lock_txid_hex = lock_tx_obj["txid"]
-        self._log.info("Verifying lock tx: {}.".format(lock_txid_hex))
+        self._log.info("Verifying lock tx: {}.".format(self._log.id(lock_txid_hex)))
 
         ensure(lock_tx_obj["version"] == self.txVersion(), "Bad version")
         ensure(lock_tx_obj["locktime"] == 0, "Bad nLockTime")
@@ -541,7 +541,9 @@ class PARTInterfaceBlind(PARTInterface):
     ):
         lock_refund_tx_obj = self.rpc("decoderawtransaction", [tx_bytes.hex()])
         lock_refund_txid_hex = lock_refund_tx_obj["txid"]
-        self._log.info("Verifying lock refund tx: {}.".format(lock_refund_txid_hex))
+        self._log.info(
+            "Verifying lock refund tx: {}.".format(self._log.id(lock_refund_txid_hex))
+        )
 
         ensure(lock_refund_tx_obj["version"] == self.txVersion(), "Bad version")
         ensure(lock_refund_tx_obj["locktime"] == 0, "Bad nLockTime")
@@ -630,7 +632,9 @@ class PARTInterfaceBlind(PARTInterface):
         lock_refund_spend_tx_obj = self.rpc("decoderawtransaction", [tx_bytes.hex()])
         lock_refund_spend_txid_hex = lock_refund_spend_tx_obj["txid"]
         self._log.info(
-            "Verifying lock refund spend tx: {}.".format(lock_refund_spend_txid_hex)
+            "Verifying lock refund spend tx: {}.".format(
+                self._log.id(lock_refund_spend_txid_hex)
+            )
         )
 
         ensure(lock_refund_spend_tx_obj["version"] == self.txVersion(), "Bad version")
@@ -789,11 +793,14 @@ class PARTInterfaceBlind(PARTInterface):
         )
         actual_tx_fee_rate = pay_fee * 1000 // vsize
         self._log.info(
-            "createSCLockSpendTx %s:\n    fee_rate, vsize, fee: %ld, %ld, %ld.",
-            lock_spend_tx_obj["txid"],
-            actual_tx_fee_rate,
-            vsize,
-            pay_fee,
+            "createSCLockSpendTx {}{}.".format(
+                self._log.id(lock_spend_tx_obj["txid"]),
+                (
+                    ""
+                    if self._log.safe_logs
+                    else f":\n    fee_rate, vsize, fee: {actual_tx_fee_rate}, {vsize}, {pay_fee}"
+                ),
+            )
         )
 
         fee_info["vsize"] = vsize
@@ -808,7 +815,9 @@ class PARTInterfaceBlind(PARTInterface):
     ):
         lock_spend_tx_obj = self.rpc("decoderawtransaction", [tx_bytes.hex()])
         lock_spend_txid_hex = lock_spend_tx_obj["txid"]
-        self._log.info("Verifying lock spend tx: {}.".format(lock_spend_txid_hex))
+        self._log.info(
+            "Verifying lock spend tx: {}.".format(self._log.id(lock_spend_txid_hex))
+        )
 
         ensure(lock_spend_tx_obj["version"] == self.txVersion(), "Bad version")
         ensure(lock_spend_tx_obj["locktime"] == 0, "Bad nLockTime")

@@ -349,19 +349,19 @@ class BasicSwap(BaseApp):
         self._is_locked = None
 
         # Keep sensitive info out of the log file (WIP)
-        self.safe_logs = self.settings.get("safe_logs", False)
-        if self.safe_logs and self.debug:
+        self.log.safe_logs = self.settings.get("safe_logs", False)
+        if self.log.safe_logs and self.debug:
             raise ValueError("Safe logs mode is incompatible with debug mode")
 
-        if self.safe_logs:
+        if self.log.safe_logs:
             self.log.warning("Safe log enabled.")
             if "safe_logs_prefix" in self.settings:
-                self.safe_logs_prefix = self.settings.get["safe_logs_prefix"].encode(
+                self.log.safe_logs_prefix = self.settings["safe_logs_prefix"].encode(
                     encoding="utf-8"
                 )
             else:
                 self.log.warning('Using random "safe_logs_prefix".')
-                self.safe_logs_prefix = random.randbytes(8)
+                self.log.safe_logs_prefix = random.randbytes(8)
 
         # TODO: Set dynamically
         self.balance_only_coins = (Coins.LTC_MWEB,)
@@ -523,38 +523,17 @@ class BasicSwap(BaseApp):
 
         self.swaps_in_progress.clear()
 
-    def logID(self, concept_id: bytes, prefix: str = "") -> str:
-        if concept_id is None:
-            return prefix + "None"
-        if isinstance(concept_id, str):
-            concept_id = bytes.fromhex(concept_id)
-        if self.safe_logs:
-            return (prefix if len(prefix) > 0 else "_") + sha256(
-                self.safe_logs_prefix + concept_id
-            )[:8].hex()
-        return prefix + concept_id.hex()
-
     def logIDB(self, concept_id: bytes) -> str:
-        return self.logID(concept_id, prefix="B_")
+        return self.log.id(concept_id, prefix="B_")
 
     def logIDO(self, concept_id: bytes) -> str:
-        return self.logID(concept_id, prefix="O_")
+        return self.log.id(concept_id, prefix="O_")
 
     def logIDM(self, concept_id: bytes) -> str:
-        return self.logID(concept_id, prefix="M_")
+        return self.log.id(concept_id, prefix="M_")
 
     def logIDT(self, concept_id: bytes) -> str:
-        return self.logID(concept_id, prefix="T_")
-
-    def logAddr(self, addr: str) -> str:
-        if self.safe_logs:
-            return (
-                "A_"
-                + sha256(self.safe_logs_prefix + addr.encode(encoding="utf-8"))[
-                    :8
-                ].hex()
-            )
-        return addr
+        return self.log.id(concept_id, prefix="T_")
 
     def handleSessionErrors(self, e, cursor, tag):
         if self.debug:
@@ -1447,9 +1426,9 @@ class BasicSwap(BaseApp):
 
     def activateBid(self, cursor, bid) -> None:
         if bid.bid_id in self.swaps_in_progress:
-            self.log.debug(f"Bid {self.logID(bid.bid_id)} is already in progress")
+            self.log.debug(f"Bid {self.log.id(bid.bid_id)} is already in progress")
 
-        self.log.debug(f"Loading active bid {self.logID(bid.bid_id)}")
+        self.log.debug(f"Loading active bid {self.log.id(bid.bid_id)}")
 
         offer = self.getOffer(bid.offer_id, cursor=cursor)
         if not offer:
@@ -1546,7 +1525,7 @@ class BasicSwap(BaseApp):
 
     def deactivateBid(self, cursor, offer, bid) -> None:
         # Remove from in progress
-        self.log.debug(f"Removing bid from in-progress: {self.logID(bid.bid_id)}")
+        self.log.debug(f"Removing bid from in-progress: {self.log.id(bid.bid_id)}")
         self.swaps_in_progress.pop(bid.bid_id, None)
 
         bid.in_progress = 0
@@ -1710,7 +1689,7 @@ class BasicSwap(BaseApp):
         show_event = event_type not in self._disabled_notification_types
         if event_type == NT.OFFER_RECEIVED:
             offer_id: bytes = bytes.fromhex(event_data["offer_id"])
-            self.log.debug(f"Received new offer {self.logID(offer_id)}")
+            self.log.debug(f"Received new offer {self.log.id(offer_id)}")
             if self.ws_server and show_event:
                 event_data["event"] = "new_offer"
                 self.ws_server.send_message_to_all(json.dumps(event_data))
@@ -1719,14 +1698,14 @@ class BasicSwap(BaseApp):
             offer_type: str = event_data["type"]
             bid_id: bytes = bytes.fromhex(event_data["bid_id"])
             self.log.info(
-                f"Received valid bid {self.logID(bid_id)} for {offer_type} offer {self.logID(offer_id)}"
+                f"Received valid bid {self.log.id(bid_id)} for {offer_type} offer {self.log.id(offer_id)}"
             )
             if self.ws_server and show_event:
                 event_data["event"] = "new_bid"
                 self.ws_server.send_message_to_all(json.dumps(event_data))
         elif event_type == NT.BID_ACCEPTED:
             bid_id: bytes = bytes.fromhex(event_data["bid_id"])
-            self.log.info(f"Received valid bid accept for {self.logID(bid_id)}")
+            self.log.info(f"Received valid bid accept for {self.log.id(bid_id)}")
             if self.ws_server and show_event:
                 event_data["event"] = "bid_accepted"
                 self.ws_server.send_message_to_all(json.dumps(event_data))
@@ -2261,11 +2240,11 @@ class BasicSwap(BaseApp):
             self.add(SentOffer(offer_id=offer_id), cursor)
         finally:
             self.closeDB(cursor)
-        self.log.info(f"Sent OFFER {self.logID(offer_id)}")
+        self.log.info(f"Sent OFFER {self.log.id(offer_id)}")
         return offer_id
 
     def revokeOffer(self, offer_id, security_token=None) -> None:
-        self.log.info(f"Revoking offer {self.logID(offer_id)}")
+        self.log.info(f"Revoking offer {self.log.id(offer_id)}")
 
         cursor = self.openDB()
         try:
@@ -2296,13 +2275,13 @@ class BasicSwap(BaseApp):
                 offer.addr_from, self.network_addr, payload_hex, msg_valid
             )
             self.log.debug(
-                f"Revoked offer {self.logID(offer_id)} in msg {self.logID(msg_id)}"
+                f"Revoked offer {self.log.id(offer_id)} in msg {self.log.id(msg_id)}"
             )
         finally:
             self.closeDB(cursor, commit=False)
 
     def archiveOffer(self, offer_id) -> None:
-        self.log.info(f"Archiving offer {self.logID(offer_id)}")
+        self.log.info(f"Archiving offer {self.log.id(offer_id)}")
         cursor = self.openDB()
         try:
             offer = self.queryOne(Offer, cursor, {"offer_id": offer_id})
@@ -2322,7 +2301,7 @@ class BasicSwap(BaseApp):
             self.closeDB(cursor)
 
     def editOffer(self, offer_id, data) -> None:
-        self.log.info(f"Editing offer {self.logID(offer_id)}")
+        self.log.info(f"Editing offer {self.log.id(offer_id)}")
         cursor = self.openDB()
         try:
             offer = self.queryOne(Offer, cursor, {"offer_id": offer_id})
@@ -2504,7 +2483,7 @@ class BasicSwap(BaseApp):
 
     def getReceiveAddressFromPool(self, coin_type, bid_id: bytes, tx_type, cursor=None):
         self.log.debug(
-            f"Get address from pool bid_id {self.logID(bid_id)}, type {tx_type}, coin {coin_type}"
+            f"Get address from pool bid_id {self.log.id(bid_id)}, type {tx_type}, coin {coin_type}"
         )
         try:
             use_cursor = self.openDB(cursor)
@@ -2533,7 +2512,7 @@ class BasicSwap(BaseApp):
 
     def returnAddressToPool(self, bid_id: bytes, tx_type):
         self.log.debug(
-            f"Return address to pool bid_id {self.logID(bid_id)}, type {tx_type}"
+            f"Return address to pool bid_id {self.log.id(bid_id)}, type {tx_type}"
         )
         try:
             cursor = self.openDB()
@@ -2560,7 +2539,7 @@ class BasicSwap(BaseApp):
             self.coin_clients[coin_type]["use_segwit"]
         )
         self.log.debug(
-            f"Generated new receive address {new_addr} for {Coins(coin_type).name}"
+            f"Generated new receive address {self.log.addr(new_addr)} for {Coins(coin_type).name}"
         )
         return new_addr
 
@@ -2577,52 +2556,47 @@ class BasicSwap(BaseApp):
 
     def withdrawCoin(self, coin_type, value, addr_to, subfee: bool) -> str:
         ci = self.ci(coin_type)
-        if self.safe_logs:
-            self.log.info(f"withdrawCoin {ci.ticker()}")
-        else:
+        info_str: str = ""
+        if self.log.safe_logs is False:
             if subfee and coin_type in (Coins.XMR, Coins.WOW):
-                self.log.info(
-                    "withdrawCoin sweep all {} to {}".format(ci.ticker(), addr_to)
-                )
+                info_str = f" sweep all to {addr_to}"
             else:
-                self.log.info(
-                    "withdrawCoin {} {} to {} {}".format(
-                        value, ci.ticker(), addr_to, " subfee" if subfee else ""
-                    )
+                info_str = " {} to {}{}".format(
+                    value, addr_to, " subfee" if subfee else ""
                 )
+        self.log.info(f"withdrawCoin {ci.ticker()}{info_str}")
 
         txid = ci.withdrawCoin(value, addr_to, subfee)
-        if not self.safe_logs:
-            self.log.info(f"In txn: {txid}")
+        self.log.info_s(f"In txn: {txid}")
         return txid
 
     def withdrawLTC(self, type_from, value, addr_to, subfee: bool) -> str:
         ci = self.ci(Coins.LTC)
-        if self.safe_logs:
-            self.log.info("withdrawLTC")
-        else:
-            self.log.info(
-                "withdrawLTC {} {} to {} {}".format(
+        self.log.info(
+            "withdrawLTC{}".format(
+                ""
+                if self.log.safe_logs
+                else " {} {} to {} {}".format(
                     value, type_from, addr_to, " subfee" if subfee else ""
                 )
             )
-
+        )
         txid = ci.withdrawCoin(value, type_from, addr_to, subfee)
-        if not self.safe_logs:
-            self.log.info(f"In txn: {txid}")
+        self.log.info_s(f"In txn: {txid}")
         return txid
 
     def withdrawParticl(
         self, type_from: str, type_to: str, value, addr_to: str, subfee: bool
     ) -> str:
-        if self.safe_logs:
-            self.log.info("withdrawParticl")
-        else:
-            self.log.info(
-                "withdrawParticl {} {} to {} {} {}".format(
+        self.log.info(
+            "withdrawParticl{}".format(
+                ""
+                if self.log.safe_logs
+                else " {} {} to {} {} {}".format(
                     value, type_from, type_to, addr_to, " subfee" if subfee else ""
                 )
             )
+        )
 
         if type_from == "plain":
             type_from = "part"
@@ -2631,8 +2605,7 @@ class BasicSwap(BaseApp):
 
         ci = self.ci(Coins.PART)
         txid = ci.sendTypeTo(type_from, type_to, value, addr_to, subfee)
-        if not self.safe_logs:
-            self.log.info(f"In txn: {txid}")
+        self.log.info_s(f"In txn: {txid}")
         return txid
 
     def cacheNewAddressForCoin(self, coin_type, cursor=None):
@@ -2672,7 +2645,7 @@ class BasicSwap(BaseApp):
                 ci.setWalletSeedWarning(False)
                 return True
             msg: str = f"Wallet for coin {ci.coin_name()} not derived from swap seed."
-            if not self.safe_logs:
+            if not self.log.safe_logs:
                 msg += f"\n  Expected {expect_address}\n  Have     {wallet_address}"
             self.log.warning(msg)
             return False
@@ -2856,7 +2829,7 @@ class BasicSwap(BaseApp):
     def createActionInSession(
         self, delay: int, action_type: int, linked_id: bytes, cursor
     ) -> None:
-        self.log.debug(f"createAction {action_type} {linked_id.hex()}")
+        self.log.debug(f"createAction {action_type} {self.log.id(linked_id)}")
         now: int = self.getTime()
         action = Action(
             active_ind=1,
@@ -2912,7 +2885,7 @@ class BasicSwap(BaseApp):
     def logBidEvent(
         self, bid_id: bytes, event_type: int, event_msg: str, cursor
     ) -> None:
-        self.log.debug(f"logBidEvent {self.logID(bid_id)} {event_type}")
+        self.log.debug(f"logBidEvent {self.log.id(bid_id)} {event_type}")
         self.logEvent(Concepts.BID, bid_id, event_type, event_msg, cursor)
 
     def countBidEvents(self, bid, event_type, cursor):
@@ -3053,13 +3026,13 @@ class BasicSwap(BaseApp):
                     if test_bid_rate == offer.rate:
                         if amount != test_amount:
                             msg: str = "Reducing bid amount-from"
-                            if not self.safe_logs:
+                            if not self.log.safe_logs:
                                 msg += f" from {amount} to {test_amount} to match offer rate."
                             self.log.info(msg)
                         elif amount_to != test_amount_to:
                             # Only show on first loop iteration (amount from unchanged)
                             msg: str = "Reducing bid amount-to"
-                            if not self.safe_logs:
+                            if not self.log.safe_logs:
                                 msg += f" from {amount_to} to {test_amount_to} to match offer rate."
                             self.log.info(msg)
                         amount = test_amount
@@ -3072,7 +3045,7 @@ class BasicSwap(BaseApp):
         self, offer_id: bytes, amount: int, addr_send_from: str = None, extra_options={}
     ) -> bytes:
         # Bid to send bid.amount * bid.rate of coin_to in exchange for bid.amount of coin_from
-        self.log.debug(f"postBid for offer: {self.logID(offer_id)}")
+        self.log.debug(f"postBid for offer: {self.log.id(offer_id)}")
 
         offer = self.getOffer(offer_id)
         ensure(offer, f"Offer not found: {offer_id.hex()}.")
@@ -3171,7 +3144,7 @@ class BasicSwap(BaseApp):
 
             self.saveBidInSession(bid_id, bid, cursor)
 
-            self.log.info(f"Sent BID {self.logID(bid_id)}")
+            self.log.info(f"Sent BID {self.log.id(bid_id)}")
             return bid_id
         finally:
             self.closeDB(cursor)
@@ -3326,7 +3299,7 @@ class BasicSwap(BaseApp):
         return events
 
     def acceptBid(self, bid_id: bytes, cursor=None) -> None:
-        self.log.info(f"Accepting bid {self.logID(bid_id)}")
+        self.log.info(f"Accepting bid {self.log.id(bid_id)}")
 
         try:
             use_cursor = self.openDB(cursor)
@@ -3382,7 +3355,7 @@ class BasicSwap(BaseApp):
                 txid = bid.initiate_tx.txid
                 script = bid.initiate_tx.script
                 self.log.warning(
-                    f"Initiate txn {self.logID(txid)} already exists for bid {self.logID(bid_id)}"
+                    f"Initiate txn {self.log.id(txid)} already exists for bid {self.log.id(bid_id)}"
                 )
             else:
                 if offer.lock_type < TxLockTypes.ABS_LOCK_BLOCKS:
@@ -3433,7 +3406,7 @@ class BasicSwap(BaseApp):
 
                 txid = ci_from.publishTx(bytes.fromhex(txn))
                 self.log.debug(
-                    f"Submitted initiate txn {txid} to {ci_from.coin_name()} chain for bid {self.logID(bid_id)}",
+                    f"Submitted initiate txn {txid} to {ci_from.coin_name()} chain for bid {self.log.id(bid_id)}",
                 )
                 bid.initiate_tx = SwapTx(
                     bid_id=bid_id,
@@ -3536,8 +3509,8 @@ class BasicSwap(BaseApp):
             cursor = self.openDB()
             offer, xmr_offer = self.getXmrOffer(offer_id, cursor=cursor)
 
-            ensure(offer, f"Offer not found: {self.logID(offer_id)}.")
-            ensure(xmr_offer, f"Adaptor-sig offer not found: {self.logID(offer_id)}.")
+            ensure(offer, f"Offer not found: {self.log.id(offer_id)}.")
+            ensure(xmr_offer, f"Adaptor-sig offer not found: {self.log.id(offer_id)}.")
             ensure(
                 offer.protocol_version >= MINPROTO_VERSION_ADAPTOR_SIG,
                 "Incompatible offer protocol version",
@@ -3773,7 +3746,7 @@ class BasicSwap(BaseApp):
 
     def acceptXmrBid(self, bid_id: bytes, cursor=None) -> None:
         # MSG1F and MSG2F L -> F
-        self.log.info(f"Accepting adaptor-sig bid {self.logID(bid_id)}")
+        self.log.info(f"Accepting adaptor-sig bid {self.log.id(bid_id)}")
 
         now: int = self.getTime()
         try:
@@ -3952,7 +3925,7 @@ class BasicSwap(BaseApp):
 
             # Double check txns before sending
             self.log.debug(
-                f"Bid: {self.logID(bid_id)} - Double checking chain A lock txns are valid before sending bid accept."
+                f"Bid: {self.log.id(bid_id)} - Double checking chain A lock txns are valid before sending bid accept."
             )
             check_lock_tx_inputs = False  # TODO: check_lock_tx_inputs without txindex
             _, xmr_swap.a_lock_tx_vout = ci_from.verifySCLockTx(
@@ -4066,14 +4039,14 @@ class BasicSwap(BaseApp):
                 )
 
             # Add to swaps_in_progress only when waiting on txns
-            self.log.info(f"Sent XMR_BID_ACCEPT_LF {self.logID(bid_id)}")
+            self.log.info(f"Sent XMR_BID_ACCEPT_LF {self.log.id(bid_id)}")
             return bid_id
         finally:
             if cursor is None:
                 self.closeDB(use_cursor)
 
     def acceptADSReverseBid(self, bid_id: bytes, cursor=None) -> None:
-        self.log.info(f"Accepting reverse adaptor-sig bid {self.logID(bid_id)}")
+        self.log.info(f"Accepting reverse adaptor-sig bid {self.log.id(bid_id)}")
 
         now: int = self.getTime()
         try:
@@ -4238,21 +4211,21 @@ class BasicSwap(BaseApp):
     def abandonBid(self, bid_id: bytes) -> None:
         if not self.debug:
             self.log.error(
-                f"Can't abandon bid {self.logID(bid_id)} when not in debug mode."
+                f"Can't abandon bid {self.log.id(bid_id)} when not in debug mode."
             )
             return
 
-        self.log.info(f"Abandoning Bid {self.logID(bid_id)}")
+        self.log.info(f"Abandoning Bid {self.log.id(bid_id)}")
         self.deactivateBidForReason(bid_id, BidStates.BID_ABANDONED)
 
     def timeoutBid(self, bid_id: bytes, cursor=None) -> None:
-        self.log.info(f"Bid {self.logID(bid_id)} timed-out")
+        self.log.info(f"Bid {self.log.id(bid_id)} timed-out")
         self.deactivateBidForReason(bid_id, BidStates.SWAP_TIMEDOUT, cursor=cursor)
 
     def setBidError(
         self, bid_id: bytes, bid, error_str: str, save_bid: bool = True, xmr_swap=None
     ) -> None:
-        self.log.error(f"Bid {self.logID(bid_id)} - Error: {error_str}")
+        self.log.error(f"Bid {self.log.id(bid_id)} - Error: {error_str}")
         bid.setState(BidStates.BID_ERROR)
         bid.state_note = "error msg: " + error_str
         if save_bid:
@@ -4271,7 +4244,7 @@ class BasicSwap(BaseApp):
         else:
             addr_to = ci.encode_p2sh(initiate_script)
         self.log.debug(
-            f"Create initiate txn for coin {ci.coin_name()} to {addr_to} for bid {self.logID(bid_id)}"
+            f"Create initiate txn for coin {ci.coin_name()} to {addr_to} for bid {self.log.id(bid_id)}"
         )
 
         if prefunded_tx:
@@ -4287,7 +4260,7 @@ class BasicSwap(BaseApp):
         return txn_signed, vout
 
     def deriveParticipateScript(self, bid_id: bytes, bid, offer) -> bytearray:
-        self.log.debug(f"deriveParticipateScript for bid {self.logID(bid_id)}")
+        self.log.debug(f"deriveParticipateScript for bid {self.log.id(bid_id)}")
 
         coin_to = Coins(offer.coin_to)
         ci_to = self.ci(coin_to)
@@ -4370,7 +4343,7 @@ class BasicSwap(BaseApp):
         if bid.debug_ind == DebugTypes.MAKE_INVALID_PTX:
             amount_to -= 1
             self.log.debug(
-                f"bid {self.logID(bid_id)}: Make invalid PTx for testing: {bid.debug_ind}."
+                f"bid {self.log.id(bid_id)}: Make invalid PTx for testing: {bid.debug_ind}."
             )
             self.logBidEvent(
                 bid.bid_id,
@@ -4567,7 +4540,7 @@ class BasicSwap(BaseApp):
 
             redeem_txid = ci.getTxid(bytes.fromhex(redeem_txn))
             self.log.debug(
-                f"Have valid redeem tx {self.logID(redeem_txid)} for contract {for_txn_type} tx {self.logID(prev_txnid)}"
+                f"Have valid redeem tx {self.log.id(redeem_txid)} for contract {for_txn_type} tx {self.log.id(prev_txnid)}"
             )
         return redeem_txn
 
@@ -4723,13 +4696,13 @@ class BasicSwap(BaseApp):
             refund_txid = ci.getTxid(bytes.fromhex(refund_txn))
             prev_txid = ci.getTxid(bytes.fromhex(txn))
             self.log.debug(
-                f"Have valid refund tx {self.logID(refund_txid)} for contract tx {self.logID(prev_txid)}",
+                f"Have valid refund tx {self.log.id(refund_txid)} for contract tx {self.log.id(prev_txid)}",
             )
 
         return refund_txn
 
     def initiateTxnConfirmed(self, bid_id: bytes, bid, offer) -> None:
-        self.log.debug(f"initiateTxnConfirmed for bid {self.logID(bid_id)}")
+        self.log.debug(f"initiateTxnConfirmed for bid {self.log.id(bid_id)}")
         bid.setState(BidStates.SWAP_INITIATED)
         bid.setITxState(TxStates.TX_CONFIRMED)
 
@@ -4751,18 +4724,18 @@ class BasicSwap(BaseApp):
         if bid.was_sent:
             if bid.participate_tx is not None:
                 self.log.warning(
-                    f"Participate tx {self.logID(bid.participate_tx.txid)} already exists for bid {self.logID(bid_id)}"
+                    f"Participate tx {self.log.id(bid.participate_tx.txid)} already exists for bid {self.log.id(bid_id)}"
                 )
             else:
                 self.log.debug(
-                    f"Preparing participate txn for bid {self.logID(bid_id)}"
+                    f"Preparing participate txn for bid {self.log.id(bid_id)}"
                 )
 
                 ci_to = self.ci(offer.coin_to)
                 txn = self.createParticipateTxn(bid_id, bid, offer, participate_script)
                 txid = ci_to.publishTx(bytes.fromhex(txn))
                 self.log.debug(
-                    f"Submitted participate tx {self.logID(txid)} to {ci_to.coin_name()} chain for bid {self.logID(bid_id)}"
+                    f"Submitted participate tx {self.log.id(txid)} to {ci_to.coin_name()} chain for bid {self.log.id(bid_id)}"
                 )
                 bid.setPTxState(TxStates.TX_SENT)
                 self.logEvent(
@@ -4851,10 +4824,10 @@ class BasicSwap(BaseApp):
         )
 
     def participateTxnConfirmed(self, bid_id: bytes, bid, offer) -> None:
-        self.log.debug(f"participateTxnConfirmed for bid {self.logID(bid_id)}")
+        self.log.debug(f"participateTxnConfirmed for bid {self.log.id(bid_id)}")
 
         if bid.debug_ind == DebugTypes.DONT_CONFIRM_PTX:
-            self.log.debug(f"Not confirming PTX for debugging {self.logID(bid_id)}")
+            self.log.debug(f"Not confirming PTX for debugging {self.log.id(bid_id)}")
             return
 
         bid.setState(BidStates.SWAP_PARTICIPATING)
@@ -4866,7 +4839,7 @@ class BasicSwap(BaseApp):
             txn = self.createRedeemTxn(ci_to.coin_type(), bid)
             txid = ci_to.publishTx(bytes.fromhex(txn))
             self.log.debug(
-                f"Submitted participate redeem tx {self.logID(txid)} to {ci_to.coin_name()} chain for bid {self.logID(bid_id)}."
+                f"Submitted participate redeem tx {self.log.id(txid)} to {ci_to.coin_name()} chain for bid {self.log.id(bid_id)}."
             )
             self.logEvent(
                 Concepts.BID, bid.bid_id, EventLogTypes.PTX_REDEEM_PUBLISHED, "", None
@@ -4936,7 +4909,7 @@ class BasicSwap(BaseApp):
                 ro = self.callcoinrpc(coin_type, "getmempoolentry", [assert_txid])
                 fee = ro["fee"]
                 self.log.debug(
-                    f"Tx {self.logID(assert_txid)} found in mempool, fee {fee}"
+                    f"Tx {self.log.id(assert_txid)} found in mempool, fee {fee}"
                 )
                 # TODO: Save info
                 return None
@@ -5040,7 +5013,7 @@ class BasicSwap(BaseApp):
                 )
             if bid.xmr_b_lock_tx.txid != found_txid:
                 self.log.debug(
-                    f"Updating {ci_to.coin_name()} lock txid: {self.logID(found_txid)}"
+                    f"Updating {ci_to.coin_name()} lock txid: {self.log.id(found_txid)}"
                 )
                 bid.xmr_b_lock_tx.txid = found_txid
 
@@ -5075,7 +5048,7 @@ class BasicSwap(BaseApp):
                 if was_received:
                     if bid.debug_ind == DebugTypes.BID_DONT_SPEND_COIN_A_LOCK_REFUND:
                         self.log.debug(
-                            f"Adaptor-sig bid {self.logID(bid_id)}: Stalling bid for testing: {bid.debug_ind}."
+                            f"Adaptor-sig bid {self.log.id(bid_id)}: Stalling bid for testing: {bid.debug_ind}."
                         )
                         bid.setState(BidStates.BID_STALLED_FOR_TEST)
                         rv = True
@@ -5116,7 +5089,7 @@ class BasicSwap(BaseApp):
                             )
 
                             self.log.info(
-                                f"Submitted coin a lock refund spend tx for bid {self.logID(bid_id)}, txid {self.logID(txid_str)}"
+                                f"Submitted coin a lock refund spend tx for bid {self.log.id(bid_id)}, txid {self.log.id(txid_str)}"
                             )
                             bid.txns[TxTypes.XMR_SWAP_A_LOCK_REFUND_SPEND] = SwapTx(
                                 bid_id=bid_id,
@@ -5155,7 +5128,7 @@ class BasicSwap(BaseApp):
                                 cursor,
                             )
                             self.log.info(
-                                f"Submitted coin a lock refund swipe tx for bid {self.logID(bid_id)}"
+                                f"Submitted coin a lock refund swipe tx for bid {self.log.id(bid_id)}"
                             )
                             bid.txns[TxTypes.XMR_SWAP_A_LOCK_REFUND_SWIPE] = SwapTx(
                                 bid_id=bid_id,
@@ -5191,7 +5164,7 @@ class BasicSwap(BaseApp):
                                         txid=bytes.fromhex(txid_hex),
                                     )
                                     self.log.info(
-                                        f"Submitted mercy tx for bid {self.logID(bid_id)}, txid {self.logID(txid_hex)}"
+                                        f"Submitted mercy tx for bid {self.log.id(bid_id)}, txid {self.log.id(txid_hex)}"
                                     )
                                     self.logBidEvent(
                                         bid_id,
@@ -5201,7 +5174,7 @@ class BasicSwap(BaseApp):
                                     )
                                 else:
                                     self.log.info(
-                                        f"Not sending mercy tx for bid {self.logID(bid_id)}"
+                                        f"Not sending mercy tx for bid {self.log.id(bid_id)}"
                                     )
 
                             self.saveBidInSession(bid_id, bid, cursor, xmr_swap)
@@ -5217,7 +5190,7 @@ class BasicSwap(BaseApp):
                     found_tx = ci_to.findTxnByHash(txid_hex)
                     if found_tx is not None:
                         self.log.info(
-                            f"Found coin b lock recover tx bid {self.logID(bid_id)}"
+                            f"Found coin b lock recover tx bid {self.log.id(bid_id)}"
                         )
                         rv = True  # Remove from swaps_in_progress
                         bid.setState(BidStates.XMR_SWAP_FAILED_REFUNDED)
@@ -5248,7 +5221,7 @@ class BasicSwap(BaseApp):
                             )
 
                         self.log.info(
-                            f"Submitted coin a lock refund tx for bid {self.logID(bid_id)}"
+                            f"Submitted coin a lock refund tx for bid {self.log.id(bid_id)}"
                         )
                         self.logBidEvent(
                             bid.bid_id,
@@ -5267,7 +5240,7 @@ class BasicSwap(BaseApp):
                     except Exception as ex:
                         if ci_from.isTxExistsError(str(ex)):
                             self.log.info(
-                                f"Found coin a lock refund tx for bid {self.logID(bid_id)}"
+                                f"Found coin a lock refund tx for bid {self.log.id(bid_id)}"
                             )
                             txid = ci_from.getTxid(xmr_swap.a_lock_refund_tx)
                             if TxTypes.XMR_SWAP_A_LOCK_REFUND not in bid.txns:
@@ -5297,7 +5270,7 @@ class BasicSwap(BaseApp):
                     ):
                         delay = self.get_delay_event_seconds()
                         self.log.info(
-                            f"Recovering adaptor-sig swap chain B lock tx for bid {self.logID(bid_id)} in {delay} seconds"
+                            f"Recovering adaptor-sig swap chain B lock tx for bid {self.log.id(bid_id)} in {delay} seconds"
                         )
                         self.createActionInSession(
                             delay,
@@ -5396,7 +5369,7 @@ class BasicSwap(BaseApp):
                     if was_sent:
                         delay = self.get_delay_event_seconds()
                         self.log.info(
-                            f"Sending adaptor-sig swap chain B lock tx for bid {self.logID(bid_id)} in {delay} seconds",
+                            f"Sending adaptor-sig swap chain B lock tx for bid {self.log.id(bid_id)} in {delay} seconds",
                         )
                         self.createActionInSession(
                             delay, ActionTypes.SEND_XMR_SWAP_LOCK_TX_B, bid_id, cursor
@@ -5443,7 +5416,7 @@ class BasicSwap(BaseApp):
 
                     if bid.debug_ind == DebugTypes.BID_STOP_AFTER_COIN_B_LOCK:
                         self.log.debug(
-                            f"Adaptor-sig bid {self.logID(bid_id)}: Stalling bid for testing: {bid.debug_ind}."
+                            f"Adaptor-sig bid {self.log.id(bid_id)}: Stalling bid for testing: {bid.debug_ind}."
                         )
                         bid.setState(BidStates.BID_STALLED_FOR_TEST)
                         self.logBidEvent(
@@ -5465,12 +5438,12 @@ class BasicSwap(BaseApp):
                         if was_received:
                             if TxTypes.XMR_SWAP_A_LOCK_REFUND in bid.txns:
                                 self.log.warning(
-                                    f"Not releasing ads script coin lock tx for bid {self.logID(bid_id)}: Chain A lock refund tx already exists."
+                                    f"Not releasing ads script coin lock tx for bid {self.log.id(bid_id)}: Chain A lock refund tx already exists."
                                 )
                             else:
                                 delay = self.get_delay_event_seconds()
                                 self.log.info(
-                                    f"Releasing ads script coin lock tx for bid {self.logID(bid_id)} in {delay} seconds."
+                                    f"Releasing ads script coin lock tx for bid {self.log.id(bid_id)} in {delay} seconds."
                                 )
                                 self.createActionInSession(
                                     delay,
@@ -5507,7 +5480,7 @@ class BasicSwap(BaseApp):
                 ):
                     if self.haveDebugInd(bid_id, DebugTypes.BID_DONT_SPEND_COIN_B_LOCK):
                         self.log.debug(
-                            f"Adaptor-sig bid {self.logID(bid_id)}: Stalling bid for testing: {bid.debug_ind}."
+                            f"Adaptor-sig bid {self.log.id(bid_id)}: Stalling bid for testing: {bid.debug_ind}."
                         )
                         # If BID_STALLED_FOR_TEST is set process_XMR_SWAP_A_LOCK_tx_spend would fail
                         self.logBidEvent(
@@ -5520,7 +5493,7 @@ class BasicSwap(BaseApp):
                         bid.setState(BidStates.SWAP_DELAYING)
                         delay = self.get_delay_event_seconds()
                         self.log.info(
-                            f"Redeeming coin b lock tx for bid {self.logID(bid_id)} in {delay} seconds."
+                            f"Redeeming coin b lock tx for bid {self.log.id(bid_id)} in {delay} seconds."
                         )
                         self.createActionInSession(
                             delay,
@@ -5536,7 +5509,7 @@ class BasicSwap(BaseApp):
                 found_tx = ci_to.findTxnByHash(txid_hex)
                 if found_tx is not None:
                     self.log.info(
-                        f"Found coin b lock spend tx bid {self.logID(bid_id)}"
+                        f"Found coin b lock spend tx bid {self.log.id(bid_id)}"
                     )
                     rv = True  # Remove from swaps_in_progress
                     bid.setState(BidStates.SWAP_COMPLETED)
@@ -5580,7 +5553,7 @@ class BasicSwap(BaseApp):
         # Return True to remove bid from in-progress list
 
         state = BidStates(bid.state)
-        self.log.debug(f"checkBidState {self.logID(bid_id)} {state}")
+        self.log.debug(f"checkBidState {self.log.id(bid_id)} {state}")
 
         if offer.swap_type == SwapTypes.XMR_SWAP:
             return self.checkXmrBidState(bid_id, bid, offer)
@@ -5594,7 +5567,7 @@ class BasicSwap(BaseApp):
         # TODO: Batch calls to scantxoutset
         # TODO: timeouts
         if state == BidStates.BID_ABANDONED:
-            self.log.info(f"Deactivating abandoned bid: {self.logID(bid_id)}")
+            self.log.info(f"Deactivating abandoned bid: {self.log.id(bid_id)}")
             return True  # Mark bid for archiving
         if state == BidStates.BID_ACCEPTED:
             # Waiting for initiate txn to be confirmed in 'from' chain
@@ -5659,7 +5632,7 @@ class BasicSwap(BaseApp):
 
             if bid.initiate_tx.conf is not None:
                 self.log.debug(
-                    f"initiate_txnid {self.logID(initiate_txnid_hex)} confirms {bid.initiate_tx.conf}"
+                    f"initiate_txnid {self.log.id(initiate_txnid_hex)} confirms {bid.initiate_tx.conf}"
                 )
 
                 if (
@@ -5698,7 +5671,7 @@ class BasicSwap(BaseApp):
                 and bid.state_time + atomic_swap_1.INITIATE_TX_TIMEOUT < self.getTime()
             ):
                 self.log.info(
-                    f"Swap timed out waiting for initiate tx for bid {self.logID(bid_id)}"
+                    f"Swap timed out waiting for initiate tx for bid {self.log.id(bid_id)}"
                 )
                 bid.setState(
                     BidStates.SWAP_TIMEDOUT, "Timed out waiting for initiate tx"
@@ -5745,7 +5718,7 @@ class BasicSwap(BaseApp):
                         None if participate_txid is None else participate_txid.hex(),
                     )
                     self.log.debug(
-                        f"Found bid {self.logID(bid_id)} participate txn {self.logID(txid)} in chain {ci_to.coin_name()}."
+                        f"Found bid {self.log.id(bid_id)} participate txn {self.log.id(txid)} in chain {ci_to.coin_name()}."
                     )
                     self.addParticipateTxn(
                         bid_id, bid, coin_to, txid, index, found["height"]
@@ -5766,7 +5739,7 @@ class BasicSwap(BaseApp):
 
             if bid.participate_tx.conf is not None:
                 self.log.debug(
-                    f"participate txid {self.logID(bid.participate_tx.txid)} confirms {bid.participate_tx.conf}."
+                    f"participate txid {self.log.id(bid.participate_tx.txid)} confirms {bid.participate_tx.conf}."
                 )
                 if (
                     bid.participate_tx.conf
@@ -5790,7 +5763,7 @@ class BasicSwap(BaseApp):
             if (itx_state is None or itx_state >= TxStates.TX_REDEEMED) and (
                 ptx_state is None or ptx_state >= TxStates.TX_REDEEMED
             ):
-                self.log.info(f"Swap completed for bid {self.logID(bid_id)}")
+                self.log.info(f"Swap completed for bid {self.log.id(bid_id)}")
 
                 self.returnAddressToPool(
                     bid_id,
@@ -5827,7 +5800,7 @@ class BasicSwap(BaseApp):
             try:
                 txid = ci_from.publishTx(bid.initiate_txn_refund)
                 self.log.debug(
-                    f"Submitted initiate refund txn {self.logID(txid)} to {ci_from.coin_name()} chain for bid {self.logID(bid_id)}."
+                    f"Submitted initiate refund txn {self.log.id(txid)} to {ci_from.coin_name()} chain for bid {self.log.id(bid_id)}."
                 )
                 self.logEvent(
                     Concepts.BID,
@@ -5850,7 +5823,7 @@ class BasicSwap(BaseApp):
             try:
                 txid = ci_to.publishTx(bid.participate_txn_refund)
                 self.log.debug(
-                    f"Submitted participate refund txn {self.logID(txid)} to {ci_to.coin_name()} chain for bid {self.logID(bid_id)}."
+                    f"Submitted participate refund txn {self.log.id(txid)} to {ci_to.coin_name()} chain for bid {self.log.id(bid_id)}."
                 )
                 self.logEvent(
                     Concepts.BID,
@@ -5889,7 +5862,7 @@ class BasicSwap(BaseApp):
         self, coin_type, bid_id, txid_hex, vout, tx_type, swap_type=None
     ):
         self.log.debug(
-            f"Adding watched output {Coins(coin_type).name} bid {self.logID(bid_id)} tx {self.logID(txid_hex)} type {tx_type}"
+            f"Adding watched output {Coins(coin_type).name} bid {self.log.id(bid_id)} tx {self.log.id(txid_hex)} type {tx_type}"
         )
 
         watched = self.coin_clients[coin_type]["watched_outputs"]
@@ -5904,7 +5877,7 @@ class BasicSwap(BaseApp):
     def removeWatchedOutput(self, coin_type, bid_id: bytes, txid_hex: str) -> None:
         # Remove all for bid if txid is None
         self.log.debug(
-            f"removeWatchedOutput {Coins(coin_type).name} {self.logID(bid_id)} {self.logID(txid_hex)}"
+            f"removeWatchedOutput {Coins(coin_type).name} {self.log.id(bid_id)} {self.log.id(txid_hex)}"
         )
         old_len = len(self.coin_clients[coin_type]["watched_outputs"])
         for i in range(old_len - 1, -1, -1):
@@ -5912,14 +5885,14 @@ class BasicSwap(BaseApp):
             if wo.bid_id == bid_id and (txid_hex is None or wo.txid_hex == txid_hex):
                 del self.coin_clients[coin_type]["watched_outputs"][i]
                 self.log.debug(
-                    f"Removed watched output {Coins(coin_type).name} {self.logID(bid_id)} {self.logID(wo.txid_hex)}"
+                    f"Removed watched output {Coins(coin_type).name} {self.log.id(bid_id)} {self.log.id(wo.txid_hex)}"
                 )
 
     def addWatchedScript(
         self, coin_type, bid_id, script: bytes, tx_type, swap_type=None
     ):
         self.log.debug(
-            f"Adding watched script {Coins(coin_type).name} bid {self.logID(bid_id)} type {tx_type}."
+            f"Adding watched script {Coins(coin_type).name} bid {self.log.id(bid_id)} type {tx_type}."
         )
 
         watched = self.coin_clients[coin_type]["watched_scripts"]
@@ -5938,7 +5911,7 @@ class BasicSwap(BaseApp):
         self.log.debug(
             "removeWatchedScript {} {}{}".format(
                 Coins(coin_type).name,
-                {self.logID(bid_id)},
+                {self.log.id(bid_id)},
                 (" type " + str(tx_type)) if tx_type is not None else "",
             )
         )
@@ -5952,14 +5925,14 @@ class BasicSwap(BaseApp):
             ):
                 del self.coin_clients[coin_type]["watched_scripts"][i]
                 self.log.debug(
-                    f"Removed watched script {Coins(coin_type).name} {self.logID(bid_id)}"
+                    f"Removed watched script {Coins(coin_type).name} {self.log.id(bid_id)}"
                 )
 
     def initiateTxnSpent(
         self, bid_id: bytes, spend_txid: str, spend_n: int, spend_txn
     ) -> None:
         self.log.debug(
-            f"Bid {self.logID(bid_id)} initiate txn spent by {self.logIDT(spend_txid)} {spend_n}."
+            f"Bid {self.log.id(bid_id)} initiate txn spent by {self.logIDT(spend_txid)} {spend_n}."
         )
 
         if bid_id in self.swaps_in_progress:
@@ -5975,13 +5948,13 @@ class BasicSwap(BaseApp):
             secret = self.extractSecret(coin_from, bid, spend_in)
             if secret is None:
                 self.log.info(
-                    f"Bid {self.logID(bid_id)} initiate txn refunded by {self.logIDT(spend_txid)} {spend_n}."
+                    f"Bid {self.log.id(bid_id)} initiate txn refunded by {self.logIDT(spend_txid)} {spend_n}."
                 )
                 # TODO: Wait for depth?
                 bid.setITxState(TxStates.TX_REFUNDED)
             else:
                 self.log.info(
-                    f"Bid {self.logID(bid_id)} initiate txn redeemed by {self.logIDT(spend_txid)} {spend_n}."
+                    f"Bid {self.log.id(bid_id)} initiate txn redeemed by {self.logIDT(spend_txid)} {spend_n}."
                 )
                 # TODO: Wait for depth?
                 bid.setITxState(TxStates.TX_REDEEMED)
@@ -5993,7 +5966,7 @@ class BasicSwap(BaseApp):
         self, bid_id: bytes, spend_txid: str, spend_n: int, spend_txn
     ) -> None:
         self.log.debug(
-            f"Bid {self.logID(bid_id)} participate txn spent by {self.logIDT(spend_txid)} {spend_n}."
+            f"Bid {self.log.id(bid_id)} participate txn spent by {self.logIDT(spend_txid)} {spend_n}."
         )
 
         # TODO: More SwapTypes
@@ -6010,7 +5983,7 @@ class BasicSwap(BaseApp):
             secret = self.extractSecret(coin_to, bid, spend_in)
             if secret is None:
                 self.log.info(
-                    f"Bid {self.logID(bid_id)} participate txn refunded by {self.logIDT(spend_txid)} {spend_n}."
+                    f"Bid {self.log.id(bid_id)} participate txn refunded by {self.logIDT(spend_txid)} {spend_n}."
                 )
                 # TODO: Wait for depth?
                 bid.setPTxState(TxStates.TX_REFUNDED)
@@ -6037,7 +6010,7 @@ class BasicSwap(BaseApp):
                     else:
                         delay = self.get_short_delay_event_seconds()
                         self.log.info(
-                            f"Redeeming ITX for bid {self.logID(bid_id)} in {delay} seconds."
+                            f"Redeeming ITX for bid {self.log.id(bid_id)} in {delay} seconds."
                         )
                         self.createAction(delay, ActionTypes.REDEEM_ITX, bid_id)
                 # TODO: Wait for depth? new state SWAP_TXI_REDEEM_SENT?
@@ -6049,7 +6022,7 @@ class BasicSwap(BaseApp):
         self, bid_id: bytes, spend_txid_hex, spend_txn_hex, cursor=None
     ) -> None:
         self.log.debug(
-            f"Detected spend of Adaptor-sig swap coin a lock tx for bid {self.logID(bid_id)}"
+            f"Detected spend of Adaptor-sig swap coin a lock tx for bid {self.log.id(bid_id)}"
         )
         try:
             use_cursor = self.openDB(cursor)
@@ -6058,7 +6031,7 @@ class BasicSwap(BaseApp):
             ensure(xmr_swap, "Adaptor-sig swap not found: {}.".format(bid_id.hex()))
 
             if BidStates(bid.state) == BidStates.BID_STALLED_FOR_TEST:
-                self.log.debug(f"Bid stalled{self.logID(bid_id)}")
+                self.log.debug(f"Bid stalled{self.log.id(bid_id)}")
                 return
 
             offer, xmr_offer = self.getXmrOfferFromSession(use_cursor, bid.offer_id)
@@ -6106,7 +6079,7 @@ class BasicSwap(BaseApp):
                 else:
                     # Could already be processed if spend was detected in the mempool
                     self.log.warning(
-                        f"Coin a lock tx spend ignored due to bid state for bid {self.logID(bid_id)}."
+                        f"Coin a lock tx spend ignored due to bid state for bid {self.log.id(bid_id)}."
                     )
 
             elif spending_txid == xmr_swap.a_lock_refund_tx_id or (
@@ -6171,7 +6144,7 @@ class BasicSwap(BaseApp):
         self, bid_id: bytes, spend_txid_hex: str, spend_txn
     ) -> None:
         self.log.debug(
-            f"Detected spend of Adaptor-sig swap coin a lock refund tx for bid {self.logID(bid_id)}."
+            f"Detected spend of Adaptor-sig swap coin a lock refund tx for bid {self.log.id(bid_id)}."
         )
         try:
             cursor = self.openDB()
@@ -6207,7 +6180,7 @@ class BasicSwap(BaseApp):
                 and is_spending_lock_refund_tx
             ):
                 self.log.info(
-                    f"Found coin a lock refund spend tx, bid {self.logID(bid_id)}."
+                    f"Found coin a lock refund spend tx, bid {self.log.id(bid_id)}."
                 )
 
                 # bch txids change
@@ -6243,7 +6216,7 @@ class BasicSwap(BaseApp):
                     if bid.xmr_b_lock_tx is not None:
                         delay = self.get_delay_event_seconds()
                         self.log.info(
-                            f"Recovering adaptor-sig swap chain B lock tx for bid {self.logID(bid_id)} in {delay} seconds."
+                            f"Recovering adaptor-sig swap chain B lock tx for bid {self.log.id(bid_id)} in {delay} seconds."
                         )
                         self.createActionInSession(
                             delay,
@@ -6261,7 +6234,7 @@ class BasicSwap(BaseApp):
 
             else:
                 self.log.info(
-                    f"Coin a lock refund spent by unknown tx, bid {self.logID(bid_id)}."
+                    f"Coin a lock refund spent by unknown tx, bid {self.log.id(bid_id)}."
                 )
 
                 mercy_keyshare = None
@@ -6281,7 +6254,7 @@ class BasicSwap(BaseApp):
                             )
                         except Exception as e:
                             self.log.warning(
-                                f"Could not extract mercy output from swipe tx: {self.logID(spend_txid_hex)}, {e}."
+                                f"Could not extract mercy output from swipe tx: {self.log.id(spend_txid_hex)}, {e}."
                             )
 
                         if mercy_keyshare is None:
@@ -6289,7 +6262,7 @@ class BasicSwap(BaseApp):
                         else:
                             delay = self.get_delay_event_seconds()
                             self.log.info(
-                                f"Redeeming coin b lock tx for bid {self.logID(bid_id)} in {delay} seconds."
+                                f"Redeeming coin b lock tx for bid {self.log.id(bid_id)} in {delay} seconds."
                             )
                             self.createActionInSession(
                                 delay,
@@ -6362,19 +6335,19 @@ class BasicSwap(BaseApp):
                 )
         elif watched_script.tx_type == TxTypes.XMR_SWAP_A_LOCK:
             self.log.info(
-                f"Found chain A lock txid {self.logID(txid)} for bid: {self.logID(watched_script.bid_id)}."
+                f"Found chain A lock txid {self.log.id(txid)} for bid: {self.log.id(watched_script.bid_id)}."
             )
             bid = self.swaps_in_progress[watched_script.bid_id][0]
             if bid.xmr_a_lock_tx.txid != txid:
                 self.log.debug(
-                    f"Updating xmr_a_lock_tx from {self.logID(bid.xmr_a_lock_tx.txid)} to {txid}."
+                    f"Updating xmr_a_lock_tx from {self.log.id(bid.xmr_a_lock_tx.txid)} to {txid}."
                 )
                 bid.xmr_a_lock_tx.txid = txid
                 bid.xmr_a_lock_tx.vout = vout
             self.saveBid(watched_script.bid_id, bid)
         elif watched_script.tx_type == TxTypes.XMR_SWAP_B_LOCK:
             self.log.info(
-                f"Found chain B lock txid {self.logID(txid)} for bid: {self.logID(watched_script.bid_id)}."
+                f"Found chain B lock txid {self.log.id(txid)} for bid: {self.log.id(watched_script.bid_id)}."
             )
             bid = self.swaps_in_progress[watched_script.bid_id][0]
             bid.xmr_b_lock_tx = SwapTx(
@@ -6385,7 +6358,7 @@ class BasicSwap(BaseApp):
             )
             if bid.xmr_b_lock_tx.txid != txid:
                 self.log.debug(
-                    f"Updating xmr_b_lock_tx from {self.logID(bid.xmr_b_lock_tx.txid)} to {self.logID(txid)}."
+                    f"Updating xmr_b_lock_tx from {self.log.id(bid.xmr_b_lock_tx.txid)} to {self.log.id(txid)}."
                 )
                 bid.xmr_b_lock_tx.txid = txid
                 bid.xmr_b_lock_tx.vout = vout
@@ -6393,7 +6366,7 @@ class BasicSwap(BaseApp):
             self.saveBid(watched_script.bid_id, bid)
         else:
             self.log.warning(
-                f"Unknown found watched script tx type for bid {self.logID(watched_script.bid_id)}."
+                f"Unknown found watched script tx type for bid {self.log.id(watched_script.bid_id)}."
             )
 
         self.removeWatchedScript(
@@ -6409,11 +6382,11 @@ class BasicSwap(BaseApp):
             len(tx["vout"]) < 2 or ci.make_int(tx["vout"][vout]["value"]) != 546
         ):  # Dust limit
 
-            self.log.info(f"Found tx is not a mercy tx for bid: {self.logID(bid_id)}.")
+            self.log.info(f"Found tx is not a mercy tx for bid: {self.log.id(bid_id)}.")
             self.removeWatchedScript(coin_type, bid_id, watched_script.script)
             return
 
-        self.log.info(f"Found mercy tx for bid: {self.logID(bid_id)}.")
+        self.log.info(f"Found mercy tx for bid: {self.log.id(bid_id)}.")
 
         self.logBidEvent(
             bid_id, EventLogTypes.BCH_MERCY_TX_FOUND, txid.hex(), cursor=None
@@ -6586,7 +6559,7 @@ class BasicSwap(BaseApp):
                             if bytes.fromhex(txo["scriptPubKey"]["hex"]) == s.script:
                                 txid_bytes = bytes.fromhex(tx["txid"])
                                 self.log.debug(
-                                    f"Found script from search for bid {self.logID(s.bid_id)}: {self.logIDT(txid_bytes)} {i}."
+                                    f"Found script from search for bid {self.log.id(s.bid_id)}: {self.logIDT(txid_bytes)} {i}."
                                 )
                                 if s.tx_type == TxTypes.BCH_MERCY:
                                     self.processMercyTx(coin_type, s, txid_bytes, i, tx)
@@ -6689,7 +6662,7 @@ class BasicSwap(BaseApp):
             )
             for row in q:
                 bid_id = row[0]
-                self.log.info(f"Timing out bid {self.logID(bid_id)}.")
+                self.log.info(f"Timing out bid {self.log.id(bid_id)}.")
                 self.timeoutBid(bid_id, cursor)
 
         finally:
@@ -6816,7 +6789,7 @@ class BasicSwap(BaseApp):
                         self.receiveXmrBid(bid, cursor)
                     except Exception as ex:
                         self.log.info(
-                            f"Verify adaptor-sig bid {self.logID(bid.bid_id)} failed: {ex}"
+                            f"Verify adaptor-sig bid {self.log.id(bid.bid_id)} failed: {ex}"
                         )
                         if self.debug:
                             self.log.error(traceback.format_exc())
@@ -6834,7 +6807,7 @@ class BasicSwap(BaseApp):
                     continue
                 if bid.created_at + ttl_xmr_split_messages < now:
                     self.log.debug(
-                        f"Expiring partially received bid: {self.logID(bid.bid_id)}."
+                        f"Expiring partially received bid: {self.log.id(bid.bid_id)}."
                     )
                     bid.setState(BidStates.BID_ERROR, "Timed out")
                     self.updateDB(
@@ -6864,7 +6837,7 @@ class BasicSwap(BaseApp):
                         if self.debug:
                             self.log.error(traceback.format_exc())
                         self.log.info(
-                            f"Verify adaptor-sig bid accept {self.logID(bid.bid_id)} failed: {ex}."
+                            f"Verify adaptor-sig bid accept {self.log.id(bid.bid_id)} failed: {ex}."
                         )
                         bid.setState(
                             BidStates.BID_ERROR, "Failed accept validation: " + str(ex)
@@ -6880,7 +6853,7 @@ class BasicSwap(BaseApp):
                     continue
                 if bid.created_at + ttl_xmr_split_messages < now:
                     self.log.debug(
-                        f"Expiring partially received bid accept: {self.logID(bid.bid_id)}."
+                        f"Expiring partially received bid accept: {self.log.id(bid.bid_id)}."
                     )
                     bid.setState(BidStates.BID_ERROR, "Timed out")
                     self.updateDB(
@@ -6912,7 +6885,7 @@ class BasicSwap(BaseApp):
                 if self.shouldAutoAcceptBid(offer, bid, cursor=cursor):
                     delay = self.get_delay_event_seconds()
                     self.log.info(
-                        f"Auto accepting bid {self.logID(bid.bid_id)} in {delay} seconds."
+                        f"Auto accepting bid {self.log.id(bid.bid_id)} in {delay} seconds."
                     )
                     self.createActionInSession(
                         delay, ActionTypes.ACCEPT_BID, bid.bid_id, cursor
@@ -7118,13 +7091,13 @@ class BasicSwap(BaseApp):
 
                 # Offer may not have been received yet, or involved an inactive coin on this node.
                 self.log.debug(
-                    f"Offer not found to revoke: {self.logID(msg_data.offer_msg_id)}."
+                    f"Offer not found to revoke: {self.log.id(msg_data.offer_msg_id)}."
                 )
                 return
 
             if offer.expire_at <= now:
                 self.log.debug(
-                    f"Offer is already expired, no need to revoke: {self.logID(msg_data.offer_msg_id)}."
+                    f"Offer is already expired, no need to revoke: {self.log.id(msg_data.offer_msg_id)}."
                 )
                 return
 
@@ -7314,7 +7287,7 @@ class BasicSwap(BaseApp):
 
             return True
         except (AutomationConstraint, AutomationConstraintTemporary) as e:
-            self.log.info(f"Not auto accepting bid {self.logID(bid.bid_id)}, {e}.")
+            self.log.info(f"Not auto accepting bid {self.log.id(bid.bid_id)}, {e}.")
             if self.debug:
                 self.logEvent(
                     Concepts.BID,
@@ -7345,7 +7318,7 @@ class BasicSwap(BaseApp):
                 self.closeDB(use_cursor)
 
     def processBid(self, msg) -> None:
-        self.log.debug("Processing bid msg {}.".format(self.logID(msg["msgid"])))
+        self.log.debug("Processing bid msg {}.".format(self.log.id(msg["msgid"])))
         now: int = self.getTime()
         bid_bytes = bytes.fromhex(msg["hex"][2:-2])
         bid_data = BidMessage(init_all=False)
@@ -7450,13 +7423,13 @@ class BasicSwap(BaseApp):
         if self.shouldAutoAcceptBid(offer, bid):
             delay = self.get_delay_event_seconds()
             self.log.info(
-                f"Auto accepting bid {self.logID(bid_id)} in {delay} seconds."
+                f"Auto accepting bid {self.log.id(bid_id)} in {delay} seconds."
             )
             self.createAction(delay, ActionTypes.ACCEPT_BID, bid_id)
 
     def processBidAccept(self, msg) -> None:
         self.log.debug(
-            "Processing bid accepted msg {}".format(self.logID(msg["msgid"]))
+            "Processing bid accepted msg {}".format(self.log.id(msg["msgid"]))
         )
         now: int = self.getTime()
         bid_accept_bytes = bytes.fromhex(msg["hex"][2:-2])
@@ -7467,7 +7440,7 @@ class BasicSwap(BaseApp):
         ensure(len(bid_accept_data.initiate_txid) == 32, "Bad initiate_txid length")
         ensure(len(bid_accept_data.contract_script) < 100, "Bad contract_script length")
 
-        self.log.debug("for bid {self.logID(bid_accept_data.bid_msg_id)}.")
+        self.log.debug("for bid {self.log.id(bid_accept_data.bid_msg_id)}.")
 
         bid_id: bytes = bid_accept_data.bid_msg_id
         bid, offer = self.getBidAndOffer(bid_id)
@@ -7488,7 +7461,7 @@ class BasicSwap(BaseApp):
                 )
 
                 self.log.info(
-                    f"Received valid bid accept {self.logIDM(accept_msg_id)} for bid {self.logID(bid_id)} sent to self."
+                    f"Received valid bid accept {self.logIDM(accept_msg_id)} for bid {self.log.id(bid_id)} sent to self."
                 )
                 return
             raise ValueError("Wrong bid state: {}".format(BidStates(bid.state).name))
@@ -7581,7 +7554,7 @@ class BasicSwap(BaseApp):
         self.notify(NT.BID_ACCEPTED, {"bid_id": bid_id.hex()})
 
     def receiveXmrBid(self, bid, cursor) -> None:
-        self.log.debug(f"Receiving adaptor-sig bid {self.logID(bid.bid_id)}.")
+        self.log.debug(f"Receiving adaptor-sig bid {self.log.id(bid.bid_id)}.")
 
         offer, xmr_offer = self.getXmrOfferFromSession(cursor, bid.offer_id)
         ensure(offer, "Offer not found: {}.".format(bid.offer_id.hex()))
@@ -7667,7 +7640,7 @@ class BasicSwap(BaseApp):
             delay = self.get_delay_event_seconds()
             self.log.info(
                 "Auto accepting {}adaptor-sig bid {} in {} seconds.".format(
-                    "reverse " if reverse_bid else "", self.logID(bid.bid_id), delay
+                    "reverse " if reverse_bid else "", self.log.id(bid.bid_id), delay
                 )
             )
             self.createActionInSession(
@@ -7679,7 +7652,7 @@ class BasicSwap(BaseApp):
 
     def receiveXmrBidAccept(self, bid, cursor) -> None:
         # Follower receiving MSG1F and MSG2F
-        self.log.debug(f"Receiving adaptor-sig bid accept {self.logID(bid.bid_id)}.")
+        self.log.debug(f"Receiving adaptor-sig bid accept {self.log.id(bid.bid_id)}.")
 
         offer, xmr_offer = self.getXmrOffer(bid.offer_id, cursor=cursor)
         ensure(offer, "Offer not found: {}.".format(bid.offer_id.hex()))
@@ -7760,7 +7733,7 @@ class BasicSwap(BaseApp):
 
         delay = self.get_delay_event_seconds()
         self.log.info(
-            f"Responding to adaptor-sig bid accept {self.logID(bid.bid_id)} in {delay} seconds."
+            f"Responding to adaptor-sig bid accept {self.log.id(bid.bid_id)} in {delay} seconds."
         )
         self.createActionInSession(
             delay, ActionTypes.SIGN_XMR_SWAP_LOCK_TX_A, bid.bid_id, cursor
@@ -7769,7 +7742,7 @@ class BasicSwap(BaseApp):
     def processXmrBid(self, msg) -> None:
         # MSG1L
         self.log.debug(
-            "Processing adaptor-sig bid msg {}".format(self.logID(msg["msgid"]))
+            "Processing adaptor-sig bid msg {}".format(self.log.id(msg["msgid"]))
         )
         now: int = self.getTime()
         bid_bytes = bytes.fromhex(msg["hex"][2:-2])
@@ -7863,7 +7836,7 @@ class BasicSwap(BaseApp):
         bid.setState(BidStates.BID_RECEIVING)
 
         self.log.info(
-            f"Receiving adaptor-sig bid {self.logID(bid_id)} for offer {self.logID(bid_data.offer_msg_id)}."
+            f"Receiving adaptor-sig bid {self.log.id(bid_id)} for offer {self.log.id(bid_data.offer_msg_id)}."
         )
         self.saveBid(bid_id, bid, xmr_swap=xmr_swap)
 
@@ -7877,7 +7850,9 @@ class BasicSwap(BaseApp):
     def processXmrBidAccept(self, msg) -> None:
         # F receiving MSG1F and MSG2F
         self.log.debug(
-            "Processing adaptor-sig bid accept msg {}.".format(self.logID(msg["msgid"]))
+            "Processing adaptor-sig bid accept msg {}.".format(
+                self.log.id(msg["msgid"])
+            )
         )
 
         msg_bytes = bytes.fromhex(msg["hex"][2:-2])
@@ -7886,7 +7861,7 @@ class BasicSwap(BaseApp):
 
         ensure(len(msg_data.bid_msg_id) == 28, "Bad bid_msg_id length")
 
-        self.log.debug(f"for bid {self.logID(msg_data.bid_msg_id)}.")
+        self.log.debug(f"for bid {self.log.id(msg_data.bid_msg_id)}.")
         bid, xmr_swap = self.getXmrBid(msg_data.bid_msg_id)
         ensure(bid, "Bid not found: {}.".format(msg_data.bid_msg_id.hex()))
         ensure(
@@ -8061,7 +8036,7 @@ class BasicSwap(BaseApp):
             self.setBidError(bid.bid_id, bid, str(ex), xmr_swap=xmr_swap)
 
     def watchXmrSwap(self, bid, offer, xmr_swap, cursor=None) -> None:
-        self.log.debug(f"Adaptor-sig swap in progress, bid {self.logID(bid.bid_id)}.")
+        self.log.debug(f"Adaptor-sig swap in progress, bid {self.log.id(bid.bid_id)}.")
         self.swaps_in_progress[bid.bid_id] = (bid, offer)
 
         reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
@@ -8170,7 +8145,7 @@ class BasicSwap(BaseApp):
                 cursor=cursor,
             )
             self.log.info(
-                f"Sent XMR_BID_TXN_SIGS_FL {self.logIDM(coin_a_lock_tx_sigs_l_msg_id)} for bid {self.logID(bid_id)}."
+                f"Sent XMR_BID_TXN_SIGS_FL {self.logIDM(coin_a_lock_tx_sigs_l_msg_id)} for bid {self.log.id(bid_id)}."
             )
 
             if ci_from.watch_blocks_for_scripts() and self.isBchXmrSwap(offer):
@@ -8186,13 +8161,13 @@ class BasicSwap(BaseApp):
 
             if a_lock_tx_id:
                 self.log.debug(
-                    f"Waiting for lock tx A {self.logID(a_lock_tx_id)} to {ci_from.coin_name()} chain for bid {self.logID(bid_id)}."
+                    f"Waiting for lock tx A {self.log.id(a_lock_tx_id)} to {ci_from.coin_name()} chain for bid {self.log.id(bid_id)}."
                 )
             else:
                 find_script: bytes = ci_from.getScriptDest(xmr_swap.a_lock_tx_script)
                 self.log.debug(
                     "Waiting for lock tx A with script {} to {} chain for bid {}".format(
-                        find_script.hex(), ci_from.coin_name(), self.logID(bid_id)
+                        find_script.hex(), ci_from.coin_name(), self.log.id(bid_id)
                     )
                 )
 
@@ -8215,7 +8190,7 @@ class BasicSwap(BaseApp):
     def sendXmrBidCoinALockTx(self, bid_id: bytes, cursor) -> None:
         # Offerer/Leader. Send coin A lock tx
         self.log.debug(
-            f"Sending coin A lock tx for adaptor-sig bid {self.logID(bid_id)}."
+            f"Sending coin A lock tx for adaptor-sig bid {self.log.id(bid_id)}."
         )
 
         bid, xmr_swap = self.getXmrBidFromSession(cursor, bid_id)
@@ -8327,7 +8302,7 @@ class BasicSwap(BaseApp):
                 xmr_swap.a_lock_tx, xmr_swap.a_lock_tx_script
             )
             self.log.debug(
-                f"Submitted lock tx {self.logID(txid_hex)} to {ci_from.coin_name()} chain for bid {self.logID(bid_id)}.",
+                f"Submitted lock tx {self.log.id(txid_hex)} to {ci_from.coin_name()} chain for bid {self.log.id(bid_id)}.",
             )
 
             if bid.xmr_a_lock_tx is None:
@@ -8345,7 +8320,7 @@ class BasicSwap(BaseApp):
 
         delay = self.get_short_delay_event_seconds()
         self.log.info(
-            f"Sending lock spend tx message for bid {self.logID(bid_id)} in {delay} seconds."
+            f"Sending lock spend tx message for bid {self.log.id(bid_id)} in {delay} seconds."
         )
         self.createActionInSession(
             delay, ActionTypes.SEND_XMR_SWAP_LOCK_SPEND_MSG, bid_id, cursor
@@ -8356,7 +8331,7 @@ class BasicSwap(BaseApp):
     def sendXmrBidCoinBLockTx(self, bid_id: bytes, cursor) -> None:
         # Follower sending coin B lock tx
         self.log.debug(
-            f"Sending coin B lock tx for adaptor-sig bid {self.logID(bid_id)}."
+            f"Sending coin B lock tx for adaptor-sig bid {self.log.id(bid_id)}."
         )
 
         bid, xmr_swap = self.getXmrBidFromSession(cursor, bid_id)
@@ -8378,13 +8353,13 @@ class BasicSwap(BaseApp):
 
         if bid.xmr_b_lock_tx:
             self.log.warning(
-                f"Coin B lock tx {self.logID(bid.xmr_b_lock_tx.b_lock_tx_id)} exists for adaptor-sig bid {self.logID(bid_id)}."
+                f"Coin B lock tx {self.log.id(bid.xmr_b_lock_tx.b_lock_tx_id)} exists for adaptor-sig bid {self.log.id(bid_id)}."
             )
             return
 
         if bid.debug_ind == DebugTypes.BID_STOP_AFTER_COIN_A_LOCK:
             self.log.debug(
-                f"Adaptor-sig bid {self.logID(bid_id)}: Stalling bid for testing: {bid.debug_ind}."
+                f"Adaptor-sig bid {self.log.id(bid_id)}: Stalling bid for testing: {bid.debug_ind}."
             )
             bid.setState(BidStates.BID_STALLED_FOR_TEST)
             self.logBidEvent(
@@ -8403,7 +8378,7 @@ class BasicSwap(BaseApp):
         ):
             bid.amount_to -= int(bid.amount_to * 0.1)
             self.log.debug(
-                f"Adaptor-sig bid {self.logID(bid_id)}: Debug {bid.debug_ind} - Reducing lock b txn amount by 10%% to {ci_to.format_amount(bid.amount_to)}.",
+                f"Adaptor-sig bid {self.log.id(bid_id)}: Debug {bid.debug_ind} - Reducing lock b txn amount by 10%% to {ci_to.format_amount(bid.amount_to)}.",
             )
             self.logBidEvent(
                 bid.bid_id,
@@ -8414,7 +8389,7 @@ class BasicSwap(BaseApp):
         if bid.debug_ind == DebugTypes.SEND_LOCKED_XMR:
             unlock_time = 10000
             self.log.debug(
-                f"Adaptor-sig bid {self.logID(bid_id)}: Debug {id.debug_ind} - Sending locked XMR."
+                f"Adaptor-sig bid {self.log.id(bid_id)}: Debug {id.debug_ind} - Sending locked XMR."
             )
             self.logBidEvent(
                 bid.bid_id,
@@ -8433,7 +8408,7 @@ class BasicSwap(BaseApp):
             )
             if bid.debug_ind == DebugTypes.B_LOCK_TX_MISSED_SEND:
                 self.log.debug(
-                    f"Adaptor-sig bid {self.logID(bid_id)}: Debug {bid.debug_ind} - Losing xmr lock tx {self.logID(b_lock_tx_id)}."
+                    f"Adaptor-sig bid {self.log.id(bid_id)}: Debug {bid.debug_ind} - Losing xmr lock tx {self.log.id(b_lock_tx_id)}."
                 )
                 self.logBidEvent(
                     bid.bid_id,
@@ -8446,7 +8421,7 @@ class BasicSwap(BaseApp):
             if self.debug:
                 self.log.error(traceback.format_exc())
             error_msg = (
-                f"publishBLockTx failed for bid {self.logID(bid_id)} with error {ex}"
+                f"publishBLockTx failed for bid {self.log.id(bid_id)} with error {ex}"
             )
             num_retries = self.countBidEvents(
                 bid, EventLogTypes.FAILED_TX_B_LOCK_PUBLISH, cursor
@@ -8460,7 +8435,7 @@ class BasicSwap(BaseApp):
             ):
                 delay = self.get_delay_retry_seconds()
                 self.log.info(
-                    "Retrying sending adaptor-sig swap chain B lock tx for bid {self.logID(bid_id)} in {delay} seconds."
+                    "Retrying sending adaptor-sig swap chain B lock tx for bid {self.log.id(bid_id)} in {delay} seconds."
                 )
                 self.createActionInSession(
                     delay, ActionTypes.SEND_XMR_SWAP_LOCK_TX_B, bid_id, cursor
@@ -8479,7 +8454,7 @@ class BasicSwap(BaseApp):
             return
 
         self.log.debug(
-            f"Submitted lock txn {self.logID(bid_id)} to {ci_to.coin_name()} chain for bid {self.logID(bid_id)}."
+            f"Submitted lock txn {self.log.id(bid_id)} to {ci_to.coin_name()} chain for bid {self.log.id(bid_id)}."
         )
         bid.xmr_b_lock_tx = SwapTx(
             bid_id=bid_id,
@@ -8491,7 +8466,7 @@ class BasicSwap(BaseApp):
         self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_B_PUBLISHED, "", cursor)
         if bid.debug_ind == DebugTypes.BID_STOP_AFTER_COIN_B_LOCK:
             self.log.debug(
-                "Adaptor-sig bid {self.logID(bid_id)}: Stalling bid for testing: {bid.debug_ind}."
+                "Adaptor-sig bid {self.log.id(bid_id)}: Stalling bid for testing: {bid.debug_ind}."
             )
             bid.setState(BidStates.BID_STALLED_FOR_TEST)
             self.logBidEvent(
@@ -8504,7 +8479,7 @@ class BasicSwap(BaseApp):
 
     def sendXmrBidLockRelease(self, bid_id: bytes, cursor) -> None:
         # Leader sending lock tx a release secret (MSG5F)
-        self.log.debug(f"Sending bid secret for adaptor-sig bid {self.logID(bid_id)}.")
+        self.log.debug(f"Sending bid secret for adaptor-sig bid {self.log.id(bid_id)}.")
 
         bid, xmr_swap = self.getXmrBidFromSession(cursor, bid_id)
         ensure(bid, "Bid not found: {}.".format(bid_id.hex()))
@@ -8545,7 +8520,7 @@ class BasicSwap(BaseApp):
     def redeemXmrBidCoinALockTx(self, bid_id: bytes, cursor) -> None:
         # Follower redeeming A lock tx
         self.log.debug(
-            f"Redeeming coin A lock tx for adaptor-sig bid {self.logID(bid_id)}."
+            f"Redeeming coin A lock tx for adaptor-sig bid {self.log.id(bid_id)}."
         )
 
         bid, xmr_swap = self.getXmrBidFromSession(cursor, bid_id)
@@ -8558,7 +8533,7 @@ class BasicSwap(BaseApp):
 
         if TxTypes.XMR_SWAP_A_LOCK_REFUND in bid.txns:
             self.log.warning(
-                f"Not redeeming coin A lock tx for bid {self.logID(bid_id)}: Chain A lock refund tx already exists."
+                f"Not redeeming coin A lock tx for bid {self.log.id(bid_id)}: Chain A lock refund tx already exists."
             )
             return
 
@@ -8646,7 +8621,7 @@ class BasicSwap(BaseApp):
 
         txid = bytes.fromhex(ci_from.publishTx(xmr_swap.a_lock_spend_tx))
         self.log.debug(
-            f"Submitted lock spend txn {self.logID(txid)} to {ci_from.coin_name()} chain for bid {self.logID(bid_id)}."
+            f"Submitted lock spend txn {self.log.id(txid)} to {ci_from.coin_name()} chain for bid {self.log.id(bid_id)}."
         )
         self.logBidEvent(
             bid.bid_id, EventLogTypes.LOCK_TX_A_SPEND_TX_PUBLISHED, "", cursor
@@ -8660,7 +8635,7 @@ class BasicSwap(BaseApp):
             bid.xmr_a_lock_spend_tx.setState(TxStates.TX_NONE)
         else:
             self.log.warning(
-                f"Chain A lock TX {self.logID(bid.xmr_a_lock_spend_tx.txid)} already exists for bid {self.logID(bid_id)}."
+                f"Chain A lock TX {self.log.id(bid.xmr_a_lock_spend_tx.txid)} already exists for bid {self.log.id(bid_id)}."
             )
 
         self.saveBidInSession(bid_id, bid, cursor, xmr_swap, save_in_progress=offer)
@@ -8668,7 +8643,7 @@ class BasicSwap(BaseApp):
     def redeemXmrBidCoinBLockTx(self, bid_id: bytes, cursor) -> None:
         # Leader redeeming B lock tx
         self.log.debug(
-            f"Redeeming coin B lock tx for adaptor-sig bid {self.logID(bid_id)}."
+            f"Redeeming coin B lock tx for adaptor-sig bid {self.log.id(bid_id)}."
         )
 
         bid, xmr_swap = self.getXmrBidFromSession(cursor, bid_id)
@@ -8756,14 +8731,14 @@ class BasicSwap(BaseApp):
                 lock_tx_vout=lock_tx_vout,
             )
             self.log.debug(
-                f"Submitted lock B spend txn {self.logID(txid)} to {ci_to.coin_name()} chain for bid {self.logID(bid_id)}."
+                f"Submitted lock B spend txn {self.log.id(txid)} to {ci_to.coin_name()} chain for bid {self.log.id(bid_id)}."
             )
             self.logBidEvent(
                 bid.bid_id, EventLogTypes.LOCK_TX_B_SPEND_TX_PUBLISHED, "", cursor
             )
         except Exception as ex:
             error_msg = (
-                f"spendBLockTx failed for bid {self.logID(bid_id)} with error {ex}"
+                f"spendBLockTx failed for bid {self.log.id(bid_id)} with error {ex}"
             )
             num_retries = self.countBidEvents(
                 bid, EventLogTypes.FAILED_TX_B_SPEND, cursor
@@ -8777,7 +8752,7 @@ class BasicSwap(BaseApp):
             ):
                 delay = self.get_delay_retry_seconds()
                 self.log.info(
-                    f"Retrying sending adaptor-sig swap chain B spend tx for bid {self.logID(bid_id)} in {delay} seconds."
+                    f"Retrying sending adaptor-sig swap chain B spend tx for bid {self.log.id(bid_id)} in {delay} seconds."
                 )
                 self.createActionInSession(
                     delay, ActionTypes.REDEEM_XMR_SWAP_LOCK_TX_B, bid_id, cursor
@@ -8806,7 +8781,7 @@ class BasicSwap(BaseApp):
     def recoverXmrBidCoinBLockTx(self, bid_id: bytes, cursor) -> None:
         # Follower recovering B lock tx
         self.log.debug(
-            f"Recovering coin B lock tx for adaptor-sig bid {self.logID(bid_id)}"
+            f"Recovering coin B lock tx for adaptor-sig bid {self.log.id(bid_id)}"
         )
 
         bid, xmr_swap = self.getXmrBidFromSession(cursor, bid_id)
@@ -8868,14 +8843,14 @@ class BasicSwap(BaseApp):
                 lock_tx_vout=lock_tx_vout,
             )
             self.log.debug(
-                f"Submitted lock B refund txn {self.logID(txid)} to {ci_to.coin_name()} chain for bid {self.logID(bid_id)}."
+                f"Submitted lock B refund txn {self.log.id(txid)} to {ci_to.coin_name()} chain for bid {self.log.id(bid_id)}."
             )
             self.logBidEvent(
                 bid.bid_id, EventLogTypes.LOCK_TX_B_REFUND_TX_PUBLISHED, "", cursor
             )
         except Exception as ex:
             # TODO: Make min-conf 10?
-            error_msg = f"spendBLockTx refund failed for bid {self.logID(bid_id)} with error {ex}"
+            error_msg = f"spendBLockTx refund failed for bid {self.log.id(bid_id)} with error {ex}"
             num_retries = self.countBidEvents(
                 bid, EventLogTypes.FAILED_TX_B_REFUND, cursor
             )
@@ -8889,7 +8864,7 @@ class BasicSwap(BaseApp):
             ):
                 delay = self.get_delay_retry_seconds()
                 self.log.info(
-                    f"Retrying sending adaptor-sig swap chain B refund tx for bid {self.logID(bid_id)} in {delay} seconds."
+                    f"Retrying sending adaptor-sig swap chain B refund tx for bid {self.log.id(bid_id)} in {delay} seconds."
                 )
                 self.createActionInSession(
                     delay, ActionTypes.RECOVER_XMR_SWAP_LOCK_TX_B, bid_id, cursor
@@ -8920,7 +8895,7 @@ class BasicSwap(BaseApp):
     def sendXmrBidCoinALockSpendTxMsg(self, bid_id: bytes, cursor) -> None:
         # Send MSG4F L -> F
         self.log.debug(
-            f"Sending coin A lock spend tx msg for adaptor-sig bid {self.logID(bid_id)}."
+            f"Sending coin A lock spend tx msg for adaptor-sig bid {self.log.id(bid_id)}."
         )
 
         bid, xmr_swap = self.getXmrBidFromSession(cursor, bid_id)
@@ -8959,7 +8934,7 @@ class BasicSwap(BaseApp):
         # Leader processing MSG3L
         self.log.debug(
             "Processing xmr coin a follower lock sigs msg {}.".format(
-                self.logID(msg["msgid"])
+                self.log.id(msg["msgid"])
             )
         )
 
@@ -9085,7 +9060,7 @@ class BasicSwap(BaseApp):
 
             delay = self.get_delay_event_seconds()
             self.log.info(
-                f"Sending coin A lock tx for adaptor-sig bid {self.logID(bid_id)} in {delay} seconds."
+                f"Sending coin A lock tx for adaptor-sig bid {self.log.id(bid_id)} in {delay} seconds."
             )
             self.createAction(delay, ActionTypes.SEND_XMR_SWAP_LOCK_TX_A, bid_id)
 
@@ -9100,7 +9075,7 @@ class BasicSwap(BaseApp):
         # Follower receiving MSG4F
         self.log.debug(
             "Processing adaptor-sig bid lock spend tx msg {}.".format(
-                self.logID(msg["msgid"])
+                self.log.id(msg["msgid"])
             )
         )
 
@@ -9153,7 +9128,7 @@ class BasicSwap(BaseApp):
                 bid.setState(BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX)
             else:
                 self.log.warning(
-                    f"processXmrBidLockSpendTx bid {self.logID(bid_id)} unexpected state {bid.state}."
+                    f"processXmrBidLockSpendTx bid {self.log.id(bid_id)} unexpected state {bid.state}."
                 )
             self.saveBid(bid_id, bid, xmr_swap=xmr_swap)
         except Exception as ex:
@@ -9165,7 +9140,7 @@ class BasicSwap(BaseApp):
         self.swaps_in_progress[bid_id] = (bid, offer)
 
     def processXmrSplitMessage(self, msg) -> None:
-        self.log.debug("Processing xmr split msg {}".format(self.logID(msg["msgid"])))
+        self.log.debug("Processing xmr split msg {}".format(self.log.id(msg["msgid"])))
         now: int = self.getTime()
         msg_bytes = bytes.fromhex(msg["hex"][2:-2])
         msg_data = XmrSplitMessage(init_all=False)
@@ -9173,7 +9148,7 @@ class BasicSwap(BaseApp):
 
         # Validate data
         ensure(len(msg_data.msg_id) == 28, "Bad msg_id length")
-        self.log.debug(f"for bid {self.logID(msg_data.msg_id)}.")
+        self.log.debug(f"for bid {self.log.id(msg_data.msg_id)}.")
 
         # TODO: Wait for bid msg to arrive first
 
@@ -9213,7 +9188,7 @@ class BasicSwap(BaseApp):
     def processXmrLockReleaseMessage(self, msg) -> None:
         self.log.debug(
             "Processing adaptor-sig swap lock release msg {}.".format(
-                self.logID(msg["msgid"])
+                self.log.id(msg["msgid"])
             )
         )
 
@@ -9230,7 +9205,7 @@ class BasicSwap(BaseApp):
         ensure(xmr_swap, "Adaptor-sig swap not found: {}.".format(bid_id.hex()))
 
         if BidStates(bid.state) in (BidStates.BID_STALLED_FOR_TEST,):
-            self.log.debug(f"Bid stalled {self.logID(bid_id)}.")
+            self.log.debug(f"Bid stalled {self.log.id(bid_id)}.")
             return
 
         offer, xmr_offer = self.getXmrOffer(bid.offer_id)
@@ -9275,7 +9250,7 @@ class BasicSwap(BaseApp):
         else:
             delay = self.get_delay_event_seconds()
             self.log.info(
-                f"Redeeming coin A lock tx for adaptor-sig bid {self.logID(bid_id)} in {delay} seconds."
+                f"Redeeming coin A lock tx for adaptor-sig bid {self.log.id(bid_id)} in {delay} seconds."
             )
             self.createAction(delay, ActionTypes.REDEEM_XMR_SWAP_LOCK_TX_A, bid_id)
 
@@ -9286,7 +9261,7 @@ class BasicSwap(BaseApp):
     def processADSBidReversed(self, msg) -> None:
         self.log.debug(
             "Processing adaptor-sig reverse bid msg {}.".format(
-                self.logID(msg["msgid"])
+                self.log.id(msg["msgid"])
             )
         )
 
@@ -9369,7 +9344,7 @@ class BasicSwap(BaseApp):
         bid.setState(BidStates.BID_RECEIVED)  # BID_REQUEST_RECEIVED
 
         self.log.info(
-            f"Received reverse adaptor-sig bid {self.logID(bid_id)} for offer {self.logID(bid_data.offer_msg_id)}."
+            f"Received reverse adaptor-sig bid {self.log.id(bid_id)} for offer {self.log.id(bid_data.offer_msg_id)}."
         )
         self.saveBid(bid_id, bid, xmr_swap=xmr_swap)
 
@@ -9389,7 +9364,7 @@ class BasicSwap(BaseApp):
             if self.shouldAutoAcceptBid(offer, bid, cursor, options=options):
                 delay = self.get_delay_event_seconds()
                 self.log.info(
-                    f"Auto accepting reverse adaptor-sig bid {self.logID(bid.bid_id)} in {delay} seconds."
+                    f"Auto accepting reverse adaptor-sig bid {self.log.id(bid.bid_id)} in {delay} seconds."
                 )
                 self.createActionInSession(
                     delay, ActionTypes.ACCEPT_AS_REV_BID, bid.bid_id, cursor
@@ -9401,7 +9376,7 @@ class BasicSwap(BaseApp):
     def processADSBidReversedAccept(self, msg) -> None:
         self.log.debug(
             "Processing adaptor-sig reverse bid accept msg {}.".format(
-                self.logID(msg["msgid"])
+                self.log.id(msg["msgid"])
             )
         )
 
@@ -9465,7 +9440,7 @@ class BasicSwap(BaseApp):
         bid.setState(BidStates.BID_RECEIVING)
 
         self.log.info(
-            f"Receiving reverse adaptor-sig bid {self.logID(bid_id)} for offer {self.logID(bid.offer_id)}."
+            f"Receiving reverse adaptor-sig bid {self.log.id(bid_id)} for offer {self.log.id(bid.offer_id)}."
         )
         self.saveBid(bid_id, bid, xmr_swap=xmr_swap)
 
@@ -9707,7 +9682,7 @@ class BasicSwap(BaseApp):
                             self.log.error("checkBidState %s", traceback.format_exc())
                         if self.is_transient_error(ex):
                             self.log.warning(
-                                f"checkBidState {self.logID(bid_id)} {ex}."
+                                f"checkBidState {self.log.id(bid_id)} {ex}."
                             )
                             self.logBidEvent(
                                 bid_id,
@@ -9716,7 +9691,7 @@ class BasicSwap(BaseApp):
                                 cursor=None,
                             )
                         else:
-                            self.log.error(f"checkBidState {self.logID(bid_id)} {ex}.")
+                            self.log.error(f"checkBidState {self.log.id(bid_id)} {ex}.")
                             self.setBidError(bid_id, v[0], str(ex))
 
                 for bid_id, bid, offer in to_remove:
@@ -9764,7 +9739,7 @@ class BasicSwap(BaseApp):
             self.logException(f"update {ex}")
 
     def manualBidUpdate(self, bid_id: bytes, data) -> None:
-        self.log.info(f"Manually updating bid {self.logID(bid_id)}.")
+        self.log.info(f"Manually updating bid {self.log.id(bid_id)}.")
 
         add_bid_action = -1
         try:
@@ -9793,7 +9768,7 @@ class BasicSwap(BaseApp):
                     else:
                         bid.debug_ind = data["debug_ind"]
                         self.log.debug(
-                            f"Bid {self.logID(bid_id)} Setting debug flag: {bid.debug_ind}"
+                            f"Bid {self.log.id(bid_id)} Setting debug flag: {bid.debug_ind}"
                         )
                         has_changed = True
 
@@ -10789,7 +10764,9 @@ class BasicSwap(BaseApp):
                     "extkey", ["deriveAccount", "smsg keys", "78900"]
                 )
                 smsg_account_id = smsg_account["account"]
-                self.log.info(f"Creating smsg keys account {smsg_account_id}.")
+                self.log.info(
+                    f"Creating smsg keys account {self.log.addr(smsg_account_id)}."
+                )
                 extkey = self.callrpc("extkey")
 
                 # Disable receiving on all chains
@@ -10929,7 +10906,7 @@ class BasicSwap(BaseApp):
             if smsg_addr["receive"] != 0:
                 self.log.warning(
                     "Disabling smsg key found in core and not bsx: {}.".format(
-                        self.logAddr(smsg_addr["address"])
+                        self.log.addr(smsg_addr["address"])
                     )
                 )
                 self.callrpc("smsglocalkeys", ["recv", "-", smsg_addr["address"]])
@@ -11001,7 +10978,7 @@ class BasicSwap(BaseApp):
         xmr_swap.a_lock_refund_swipe_tx = ci.setTxSignature(spend_tx, witness_stack)
 
     def setBidDebugInd(self, bid_id: bytes, debug_ind, add_to_bid: bool = True) -> None:
-        self.log.debug(f"Bid {self.logID(bid_id)} Setting debug flag: {debug_ind}.")
+        self.log.debug(f"Bid {self.log.id(bid_id)} Setting debug flag: {debug_ind}.")
 
         self._debug_cases.append((bid_id, debug_ind))
         if add_to_bid is False:
@@ -11027,7 +11004,7 @@ class BasicSwap(BaseApp):
         return False
 
     def storeOfferRevoke(self, offer_id: bytes, sig) -> bool:
-        self.log.debug(f"Storing revoke request for offer: {self.logID(offer_id)}.")
+        self.log.debug(f"Storing revoke request for offer: {self.log.id(offer_id)}.")
         for pair in self._possibly_revoked_offers:
             if offer_id == pair[0]:
                 return False
