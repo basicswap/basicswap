@@ -142,7 +142,7 @@ def set_pagination_filters(form_data, filters):
 def get_data_with_pagination(data, filters):
     if filters.get("limit") is None:
         return data
-    
+
     offset = filters.get("offset", 0)
     limit = filters.get("limit", PAGE_LIMIT)
     return data[offset:offset + limit]
