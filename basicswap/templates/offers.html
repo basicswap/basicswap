@@ -137,7 +137,7 @@ function getWebSocketConfig() {
   </div>
 </section>
 
-<section class="py-4 px-3 flex flex-wrap overflow-hidden container-to-blur">
+<section class="py-4 px-3 flex-wrap overflow-hidden container-to-blur">
  <div class="lg:container mx-auto">
   <div class="flex flex-wrap justify-center lg:justify-start xl:justify-center" id="coin-container">
 {% set coin_data = {
@@ -335,37 +335,29 @@ function getWebSocketConfig() {
                     <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Details</span>
                   </div>
                 </th>
-                {% if sent_offers %}
                 <th class="p-0">
                   <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-left">
+                    {% if sent_offers %}
                     <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Max Recv</span>
-                  </div>
-                </th>
-                {% else %}
-                <th class="p-0">
-                  <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-left">
+                    {% else %}
                     <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Max Send</span>
+                    {% endif %}
                   </div>
                 </th>
-                {% endif %}
                 <th class="p-0">
                   <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-center">
                     <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Swap</span>
                   </div>
                 </th>
-                {% if sent_offers %}
                 <th class="p-0">
                   <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-right">
+                    {% if sent_offers %}
                     <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold pr-2">Your Liq.</span>
-                  </div>
-                </th>
-                {% else %}
-                <th class="p-0">
-                  <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-right">
+                    {% else %}
                     <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold pr-2">Max Recv</span>
+                    {% endif %}
                   </div>
                 </th>
-                {% endif %}
                 <th class="p-0" data-sortable="true" data-column-index="5">
                   <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-right flex items-center justify-end">
                     <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Rate</span>
@@ -377,6 +369,7 @@ function getWebSocketConfig() {
                     <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Market +/-</span>
                     <span class="sort-icon ml-1 text-gray-600 dark:text-gray-400" id="sort-icon-6">↓</span>
                   </div>
+                </th>
                 <th class="p-0">
                   <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 rounded-tr-xl">
                   <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Trade</span>

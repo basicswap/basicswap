@@ -200,7 +200,7 @@ const WebSocketManager = {
         this.isPageHidden = false;
         this.lastVisibilityChange = Date.now();
         this.isIntentionallyClosed = false;
-        
+
         setTimeout(() => {
             this.priceUpdatePaused = false;
             if (!this.isConnected()) {
@@ -848,7 +848,7 @@ function continueInitialization() {
         listingLabel.textContent = isSentOffers ? 'Total Listings: ' : 'Network Listings: ';
     }
     //console.log('Initialization completed');
-    
+
 }
 
 function initializeTooltips() {
@@ -875,7 +875,7 @@ function filterAndSortData() {
 
    localStorage.setItem('offersTableSettings', JSON.stringify({
        coin_to: filters.coin_to,
-       coin_from: filters.coin_from, 
+       coin_from: filters.coin_from,
        status: filters.status,
        sent_from: filters.sent_from,
        sortColumn: currentSortColumn,
@@ -936,7 +936,7 @@ function filterAndSortData() {
        const calculateValue = offer => {
            const fromUSD = parseFloat(offer.amount_from) * getPrice(offer.coin_from);
            const toUSD = parseFloat(offer.amount_to) * getPrice(offer.coin_to);
-           return (isSentOffers || offer.is_own_offer) ? 
+           return (isSentOffers || offer.is_own_offer) ?
                ((toUSD / fromUSD) - 1) * 100 :
                ((fromUSD / toUSD) - 1) * 100;
        };
@@ -967,7 +967,7 @@ function filterAndSortData() {
            return currentSortDirection === 'desc' ? -comparison : comparison;
        });
    }
-   
+
    return filteredData;
 }
 
@@ -1081,7 +1081,7 @@ async function fetchLatestPrices() {
         const existingCache = CacheManager.get(PRICES_CACHE_KEY, true);
         const fallbackData = existingCache ? existingCache.value : null;
         const url = `${offersConfig.apiEndpoints.coinGecko}/simple/price?ids=bitcoin,bitcoin-cash,dash,dogecoin,decred,litecoin,particl,pivx,monero,zano,wownero,zcoin&vs_currencies=USD,BTC&api_key=${offersConfig.apiKeys.coinGecko}`;
-        
+
         const response = await fetch('/json/readurl', {
             method: 'POST',
             headers: {
@@ -1102,7 +1102,7 @@ async function fetchLatestPrices() {
         }
 
         const data = await response.json();
-        
+
         if (data.Error) {
             if (fallbackData) {
                 return fallbackData;
@@ -1177,7 +1177,7 @@ async function fetchOffers() {
 
         const data = await offersResponse.json();
         const processedData = Array.isArray(data) ? data : Object.values(data);
-        
+
         jsonData = formatInitialData(processedData);
         originalJsonData = [...jsonData];
 
@@ -2502,7 +2502,7 @@ if (refreshButton) {
                 const currentTime = Date.now();
                 const elapsedTime = currentTime - startTime;
                 const remainingTime = Math.ceil((REFRESH_COOLDOWN - elapsedTime) / 1000);
-                
+
                 if (remainingTime <= 0) {
                     clearInterval(countdownInterval);
                     refreshText.textContent = 'Refresh';
@@ -2527,7 +2527,7 @@ if (refreshButton) {
 
         try {
             const cachedPrices = CacheManager.get('prices_coingecko');
-            let previousPrices = cachedPrices ? cachedPrices.value : null;
+            const previousPrices = cachedPrices ? cachedPrices.value : null;
             CacheManager.clear();
             window.isManualRefresh = true;
             const endpoint = isSentOffers ? '/json/sentoffers' : '/json/offers';
@@ -2660,7 +2660,7 @@ function handleTableSort(columnIndex, header) {
     if (window.sortTimeout) {
         clearTimeout(window.sortTimeout);
     }
-    
+
     window.sortTimeout = setTimeout(() => {
         applyFilters();
     }, 100);
@@ -2719,7 +2719,7 @@ function loadSavedSettings() {
     const saved = localStorage.getItem('offersTableSettings');
     if (saved) {
         const settings = JSON.parse(saved);
-        
+
         ['coin_to', 'coin_from', 'status', 'sent_from'].forEach(id => {
             const element = document.getElementById(id);
             if (element && settings[id]) element.value = settings[id];
