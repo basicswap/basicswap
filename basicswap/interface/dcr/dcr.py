@@ -27,7 +27,6 @@ from basicswap.interface.btc import (
 )
 from basicswap.util import (
     ensure,
-    b2h,
     b2i,
     i2b,
     i2h,
@@ -1130,11 +1129,14 @@ class DCRInterface(Secp256k1Interface):
         fee_info["size"] = size
 
         self._log.info(
-            "createSCLockSpendTx %s:\n    fee_rate, size, fee: %ld, %ld, %ld.",
-            tx.TxHash().hex(),
-            tx_fee_rate,
-            size,
-            pay_fee,
+            "createSCLockSpendTx {}{}.".format(
+                self._log.id(tx.TxHash()),
+                (
+                    ""
+                    if self._log.safe_logs
+                    else f":\n    fee_rate, size, fee: {tx_fee_rate}, {size}, {pay_fee}"
+                ),
+            )
         )
 
         return tx.serialize(TxSerializeType.NoWitness)
@@ -1174,11 +1176,14 @@ class DCRInterface(Secp256k1Interface):
         tx.vout[0].value = locked_coin - pay_fee
 
         self._log.info(
-            "createSCLockRefundTx %s:\n    fee_rate, size, fee: %ld, %ld, %ld.",
-            tx.TxHash().hex(),
-            tx_fee_rate,
-            size,
-            pay_fee,
+            "createSCLockRefundTx {}{}.".format(
+                self._log.id(tx.TxHash()),
+                (
+                    ""
+                    if self._log.safe_logs
+                    else f":\n    fee_rate, size, fee: {tx_fee_rate}, {size}, {pay_fee}"
+                ),
+            )
         )
 
         return tx.serialize(TxSerializeType.NoWitness), refund_script, tx.vout[0].value
@@ -1222,11 +1227,14 @@ class DCRInterface(Secp256k1Interface):
         tx.vout[0].value = locked_coin - pay_fee
 
         self._log.info(
-            "createSCLockRefundSpendTx %s:\n    fee_rate, size, fee: %ld, %ld, %ld.",
-            tx.TxHash().hex(),
-            tx_fee_rate,
-            size,
-            pay_fee,
+            "createSCLockRefundSpendTx {}{}.".format(
+                self._log.id(tx.TxHash()),
+                (
+                    ""
+                    if self._log.safe_logs
+                    else f":\n    fee_rate, size, fee: {tx_fee_rate}, {size}, {pay_fee}"
+                ),
+            )
         )
 
         return tx.serialize(TxSerializeType.NoWitness)
@@ -1251,7 +1259,7 @@ class DCRInterface(Secp256k1Interface):
 
         tx = self.loadTx(tx_bytes)
         txid = self.getTxid(tx)
-        self._log.info("Verifying lock tx: {}.".format(b2h(txid)))
+        self._log.info("Verifying lock tx: {}.".format(self._log.id(txid)))
 
         ensure(tx.version == self.txVersion(), "Bad version")
         ensure(tx.locktime == 0, "Bad locktime")
@@ -1327,7 +1335,7 @@ class DCRInterface(Secp256k1Interface):
 
         tx = self.loadTx(tx_bytes)
         txid = self.getTxid(tx)
-        self._log.info("Verifying lock spend tx: {}.".format(b2h(txid)))
+        self._log.info("Verifying lock spend tx: {}.".format(self._log.id(txid)))
 
         ensure(tx.version == self.txVersion(), "Bad version")
         ensure(tx.locktime == 0, "Bad locktime")
@@ -1397,7 +1405,7 @@ class DCRInterface(Secp256k1Interface):
 
         tx = self.loadTx(tx_bytes)
         txid = self.getTxid(tx)
-        self._log.info("Verifying lock refund tx: {}.".format(b2h(txid)))
+        self._log.info("Verifying lock refund tx: {}.".format(self._log.id(txid)))
 
         ensure(tx.version == self.txVersion(), "Bad version")
         ensure(tx.locktime == 0, "locktime not 0")
@@ -1460,7 +1468,7 @@ class DCRInterface(Secp256k1Interface):
         #   Must have only one output sending lock refund tx value - fee to leader's address, TODO: follower shouldn't need to verify destination addr
         tx = self.loadTx(tx_bytes)
         txid = self.getTxid(tx)
-        self._log.info("Verifying lock refund spend tx: {}.".format(b2h(txid)))
+        self._log.info("Verifying lock refund spend tx: {}.".format(self._log.id(txid)))
 
         ensure(tx.version == self.txVersion(), "Bad version")
         ensure(tx.locktime == 0, "locktime not 0")
@@ -1546,11 +1554,14 @@ class DCRInterface(Secp256k1Interface):
         tx.vout[0].value = locked_amount - pay_fee
 
         self._log.info(
-            "createSCLockRefundSpendToFTx %s:\n    fee_rate, size, fee: %ld, %ld, %ld.",
-            tx.TxHash().hex(),
-            tx_fee_rate,
-            size,
-            pay_fee,
+            "createSCLockRefundSpendToFTx {}{}.".format(
+                self._log.id(tx.TxHash()),
+                (
+                    ""
+                    if self._log.safe_logs
+                    else f":\n    fee_rate, size, fee: {tx_fee_rate}, {size}, {pay_fee}"
+                ),
+            )
         )
 
         return tx.serialize(TxSerializeType.NoWitness)
@@ -1719,7 +1730,7 @@ class DCRInterface(Secp256k1Interface):
         witness_bytes = 115
         size = len(tx.serialize()) + witness_bytes
         pay_fee = round(fee_rate * size / 1000)
-        self._log.info(
+        self._log.info_s(
             f"BLockSpendTx fee_rate, vsize, fee: {fee_rate}, {size}, {pay_fee}."
         )
         return pay_fee

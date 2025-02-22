@@ -21,7 +21,6 @@ from basicswap.basicswap_util import (
 from basicswap.interface.base import Secp256k1Interface
 from basicswap.util import (
     ensure,
-    b2h,
     i2b,
     b2i,
     i2h,
@@ -319,7 +318,9 @@ class BTCInterface(Secp256k1Interface):
                 if wallet_name in ("mweb",):
                     continue
 
-                change_watchonly_wallet: bool = self._rpc_wallet_watch == self._rpc_wallet
+                change_watchonly_wallet: bool = (
+                    self._rpc_wallet_watch == self._rpc_wallet
+                )
 
                 self._rpc_wallet = wallet_name
                 self._log.info(
@@ -733,11 +734,14 @@ class BTCInterface(Secp256k1Interface):
 
         tx.rehash()
         self._log.info(
-            "createSCLockRefundTx %s:\n    fee_rate, vsize, fee: %ld, %ld, %ld.",
-            i2h(tx.sha256),
-            tx_fee_rate,
-            vsize,
-            pay_fee,
+            "createSCLockRefundTx {}{}.".format(
+                self._log.id(i2b(tx.sha256)),
+                (
+                    ""
+                    if self._log.safe_logs
+                    else f":\n    fee_rate, vsize, fee: {tx_fee_rate}, {vsize}, {pay_fee}"
+                ),
+            )
         )
 
         return tx.serialize(), refund_script, tx.vout[0].nValue
@@ -788,11 +792,14 @@ class BTCInterface(Secp256k1Interface):
 
         tx.rehash()
         self._log.info(
-            "createSCLockRefundSpendTx %s:\n    fee_rate, vsize, fee: %ld, %ld, %ld.",
-            i2h(tx.sha256),
-            tx_fee_rate,
-            vsize,
-            pay_fee,
+            "createSCLockRefundSpendTx {}{}.".format(
+                self._log.id(i2b(tx.sha256)),
+                (
+                    ""
+                    if self._log.safe_logs
+                    else f":\n    fee_rate, vsize, fee: {tx_fee_rate}, {vsize}, {pay_fee}"
+                ),
+            )
         )
 
         return tx.serialize()
@@ -855,11 +862,14 @@ class BTCInterface(Secp256k1Interface):
 
         tx.rehash()
         self._log.info(
-            "createSCLockRefundSpendToFTx %s:\n    fee_rate, vsize, fee: %ld, %ld, %ld.",
-            i2h(tx.sha256),
-            tx_fee_rate,
-            vsize,
-            pay_fee,
+            "createSCLockRefundSpendToFTx {}{}.".format(
+                self._log.id(i2b(tx.sha256)),
+                (
+                    ""
+                    if self._log.safe_logs
+                    else f":\n    fee_rate, vsize, fee: {tx_fee_rate}, {vsize}, {pay_fee}"
+                ),
+            )
         )
 
         return tx.serialize()
@@ -902,11 +912,14 @@ class BTCInterface(Secp256k1Interface):
 
         tx.rehash()
         self._log.info(
-            "createSCLockSpendTx %s:\n    fee_rate, vsize, fee: %ld, %ld, %ld.",
-            i2h(tx.sha256),
-            tx_fee_rate,
-            vsize,
-            pay_fee,
+            "createSCLockSpendTx {}{}.".format(
+                self._log.id(i2b(tx.sha256)),
+                (
+                    ""
+                    if self._log.safe_logs
+                    else f":\n    fee_rate, vsize, fee: {tx_fee_rate}, {vsize}, {pay_fee}"
+                ),
+            )
         )
 
         return tx.serialize()
@@ -931,7 +944,7 @@ class BTCInterface(Secp256k1Interface):
 
         tx = self.loadTx(tx_bytes)
         txid = self.getTxid(tx)
-        self._log.info("Verifying lock tx: {}.".format(b2h(txid)))
+        self._log.info("Verifying lock tx: {}.".format(self._log.id(txid)))
 
         ensure(tx.nVersion == self.txVersion(), "Bad version")
         ensure(tx.nLockTime == 0, "Bad nLockTime")  # TODO match txns created by cores
@@ -1019,7 +1032,7 @@ class BTCInterface(Secp256k1Interface):
 
         tx = self.loadTx(tx_bytes)
         txid = self.getTxid(tx)
-        self._log.info("Verifying lock refund tx: {}.".format(b2h(txid)))
+        self._log.info("Verifying lock refund tx: {}.".format(self._log.id(txid)))
 
         ensure(tx.nVersion == self.txVersion(), "Bad version")
         ensure(tx.nLockTime == 0, "nLockTime not 0")
@@ -1058,7 +1071,7 @@ class BTCInterface(Secp256k1Interface):
         vsize = self.getTxVSize(tx, add_witness_bytes=witness_bytes)
         fee_rate_paid = fee_paid * 1000 // vsize
 
-        self._log.info(
+        self._log.info_s(
             "tx amount, vsize, feerate: %ld, %ld, %ld",
             locked_coin,
             vsize,
@@ -1087,7 +1100,7 @@ class BTCInterface(Secp256k1Interface):
         #   Must have only one output sending lock refund tx value - fee to leader's address, TODO: follower shouldn't need to verify destination addr
         tx = self.loadTx(tx_bytes)
         txid = self.getTxid(tx)
-        self._log.info("Verifying lock refund spend tx: {}.".format(b2h(txid)))
+        self._log.info("Verifying lock refund spend tx: {}.".format(self._log.id(txid)))
 
         ensure(tx.nVersion == self.txVersion(), "Bad version")
         ensure(tx.nLockTime == 0, "nLockTime not 0")
@@ -1124,7 +1137,7 @@ class BTCInterface(Secp256k1Interface):
         vsize = self.getTxVSize(tx, add_witness_bytes=witness_bytes)
         fee_rate_paid = fee_paid * 1000 // vsize
 
-        self._log.info(
+        self._log.info_s(
             "tx amount, vsize, feerate: %ld, %ld, %ld", tx_value, vsize, fee_rate_paid
         )
 
@@ -1142,7 +1155,7 @@ class BTCInterface(Secp256k1Interface):
 
         tx = self.loadTx(tx_bytes)
         txid = self.getTxid(tx)
-        self._log.info("Verifying lock spend tx: {}.".format(b2h(txid)))
+        self._log.info("Verifying lock spend tx: {}.".format(self._log.id(txid)))
 
         ensure(tx.nVersion == self.txVersion(), "Bad version")
         ensure(tx.nLockTime == 0, "nLockTime not 0")
@@ -1180,7 +1193,7 @@ class BTCInterface(Secp256k1Interface):
         vsize = self.getTxVSize(tx, add_witness_bytes=witness_bytes)
         fee_rate_paid = fee_paid * 1000 // vsize
 
-        self._log.info(
+        self._log.info_s(
             "tx amount, vsize, feerate: %ld, %ld, %ld",
             tx.vout[0].nValue,
             vsize,
@@ -1490,7 +1503,7 @@ class BTCInterface(Secp256k1Interface):
         witness_bytes = 109
         vsize = self.getTxVSize(tx, add_witness_bytes=witness_bytes)
         pay_fee = round(fee_rate * vsize / 1000)
-        self._log.info(
+        self._log.info_s(
             f"BLockSpendTx fee_rate, vsize, fee: {fee_rate}, {vsize}, {pay_fee}."
         )
         return pay_fee
@@ -1508,7 +1521,9 @@ class BTCInterface(Secp256k1Interface):
         lock_tx_vout=None,
     ) -> bytes:
         self._log.info(
-            "spendBLockTx: {} {}\n".format(chain_b_lock_txid.hex(), lock_tx_vout)
+            "spendBLockTx: {} {}\n".format(
+                self._log.id(chain_b_lock_txid), lock_tx_vout
+            )
         )
         locked_n = lock_tx_vout
 
@@ -1589,7 +1604,9 @@ class BTCInterface(Secp256k1Interface):
         # Add watchonly address and rescan if required
         if not self.isAddressMine(dest_address, or_watch_only=True):
             self.importWatchOnlyAddress(dest_address, "bid")
-            self._log.info("Imported watch-only addr: {}".format(dest_address))
+            self._log.info(
+                "Imported watch-only addr: {}".format(self._log.addr(dest_address))
+            )
             self._log.info(
                 "Rescanning {} chain from height: {}".format(
                     self.coin_name(), rescan_from

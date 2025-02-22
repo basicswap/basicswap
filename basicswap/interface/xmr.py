@@ -180,7 +180,19 @@ class XMRInterface(CoinInterface):
         if self._wallet_password is not None:
             params["password"] = self._wallet_password
         rv = self.rpc_wallet("generate_from_keys", params)
-        self._log.info("generate_from_keys %s", dumpj(rv))
+        if "address" in rv:
+            new_address: str = rv["address"]
+            is_watch_only: bool = "Watch-only" in rv.get("info", "")
+            self._log.info(
+                "Generated{} {} wallet: {}".format(
+                    " watch-only" if is_watch_only else "",
+                    self.coin_name(),
+                    self._log.addr(new_address),
+                )
+            )
+        else:
+            self._log.debug("generate_from_keys %s", dumpj(rv))
+            raise ValueError("generate_from_keys failed")
 
     def openWallet(self, filename):
         params = {"filename": filename}
@@ -406,7 +418,9 @@ class XMRInterface(CoinInterface):
                 params["priority"] = self._fee_priority
             rv = self.rpc_wallet("transfer", params)
             self._log.info(
-                "publishBLockTx %s to address_b58 %s", rv["tx_hash"], shared_addr
+                "publishBLockTx %s to address_b58 %s",
+                self._log.id(rv["tx_hash"]),
+                self._log.addr(shared_addr),
             )
             tx_hash = bytes.fromhex(rv["tx_hash"])
 

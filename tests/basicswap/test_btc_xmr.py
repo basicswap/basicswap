@@ -770,6 +770,14 @@ class TestFunctions(BaseTest):
 
 class BasicSwapTest(TestFunctions):
 
+    @classmethod
+    def setUpClass(cls):
+        super(BasicSwapTest, cls).setUpClass()
+        if False:
+            for client in cls.swap_clients:
+                client.log.safe_logs = True
+                client.log.safe_logs_prefix = b"tests"
+
     def test_001_nested_segwit(self):
         # p2sh-p2wpkh
         logging.info(
@@ -2140,6 +2148,14 @@ class TestBTC_PARTB(TestFunctions):
     test_coin_to = Coins.PART_BLIND
     start_ltc_nodes = False
     base_rpc_port = BTC_BASE_RPC_PORT
+
+    @classmethod
+    def setUpClass(cls):
+        super(TestBTC_PARTB, cls).setUpClass()
+        if False:
+            for client in cls.swap_clients:
+                client.log.safe_logs = True
+                client.log.safe_logs_prefix = b"tests"
 
     def test_01_a_full_swap(self):
         self.prepare_balance(self.test_coin_to, 100.0, 1801, 1800)
