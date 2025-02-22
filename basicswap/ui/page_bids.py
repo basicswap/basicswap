@@ -9,12 +9,14 @@ from .util import (
     PAGE_LIMIT,
     describeBid,
     get_data_entry,
-    have_data_entry,
     get_data_entry_or,
+    have_data_entry,
+    listAvailableCoins,
     listBidActions,
     listBidStates,
     listOldBidStates,
     set_pagination_filters,
+    setCoinFilter,
 )
 from basicswap.util import (
     ensure,
@@ -149,9 +151,7 @@ def page_bid(self, url_split, post_string):
     )
 
 
-def page_bids(
-    self, url_split, post_string, sent=False, available=False, received=False
-):
+def page_bids(self, url_split, post_string, sent=False, available=False, received=False):
     server = self.server
     swap_client = server.swap_client
     swap_client.checkSystemStatus()
@@ -165,6 +165,8 @@ def page_bids(
         "limit": PAGE_LIMIT,
         "sort_by": "created_at",
         "sort_dir": "desc",
+        "coin_from": -1,
+        "coin_to": -1,
     }
     if available:
         filters["bid_state_ind"] = BidStates.BID_RECEIVED
@@ -176,6 +178,9 @@ def page_bids(
         if have_data_entry(form_data, "clearfilters"):
             swap_client.clearFilters(filter_key)
         else:
+            filters["coin_from"] = setCoinFilter(form_data, "coin_from")
+            filters["coin_to"] = setCoinFilter(form_data, "coin_to")
+
             if have_data_entry(form_data, "sort_by"):
                 sort_by = get_data_entry(form_data, "sort_by")
                 ensure(sort_by in ["created_at"], "Invalid sort by")
@@ -208,6 +213,8 @@ def page_bids(
         "bid_states": listBidStates(),
     }
 
+    coins_from, coins_to = listAvailableCoins(swap_client, split_from=True)
+
     if available:
         bids = swap_client.listBids(sent=False, filters=filters)
         template = server.env.get_template("bids_available.html")
@@ -221,6 +228,8 @@ def page_bids(
                 "data": page_data,
                 "summary": summary,
                 "filter_key": filter_key,
+                "coins_from": coins_from,
+                "coins": coins_to,
                 "bids": [
                     (
                         format_timestamp(b[0]),
@@ -249,6 +258,8 @@ def page_bids(
             "data": page_data,
             "summary": summary,
             "filter_key": filter_key,
+            "coins_from": coins_from,
+            "coins": coins_to,
             "sent_bids": [
                 (
                     format_timestamp(b[0]),

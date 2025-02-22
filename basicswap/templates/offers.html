@@ -24,43 +24,24 @@ function getWebSocketConfig() {
 }
 </script>
 
-{% if sent_offers %}
-<div class="lg:container mx-auto">
-  <section class="p-3 mt-2">
-    <div class="flex items-center">
-      <div class="w-full">
-        <ul class="flex items-center gap-x-2 mb-1">
-          <li><a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/">Home</a></li>
-          <li>{{ breadcrumb_line_svg | safe }}</li>
-          <li>
-            <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="{% if page_type == 'offers' %}/offers{% elif page_type == 'sentoffers' %}/sentoffers{% endif %}">
-              {{ page_type }}
-            </a>
-          </li>
-          <li>{{ breadcrumb_line_svg | safe }}</li>
-        </ul>
-      </div>
-    </div>
-  </section>
-</div>
-{% endif %}
-
-{% if sent_offers %}
-  <section class="py-3">
-{% else %}
-  <section class="py-3 px-4 mt-3">
-{% endif %}
+ <section class="py-3 px-4 mt-6">
   <div class="lg:container mx-auto">
-    <div class="relative py-6 px-8 bg-coolGray-900 dark:bg-gray-500 rounded-md overflow-hidden">
-
-      <img class="absolute h-48 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" src="/static/images/elements/wave.svg" alt="wave">
-      <div class="relative z-20 flex flex-wrap items-center -m-2">
-        <div class="w-full md:w-1/2 p-2">
-          <h2 class="mb-3 text-3xl font-bold text-white tracking-tighter">{{ page_type }}</h2>
+    <div class="relative py-8 px-8 bg-coolGray-900 dark:bg-gray-500 rounded-md overflow-hidden">
+      <img class="absolute z-10 left-4 top-4" src="/static/images/elements/dots-red.svg" alt="">
+      <img class="absolute z-10 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt="">
+      <img class="absolute h-64 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" 
+           src="/static/images/elements/wave.svg" alt="">
+      <div class="relative z-20 flex flex-wrap items-center -m-3">
+        <div class="w-full md:w-1/2 p-3">
+          <h2 class="mb-3 text-2xl font-bold text-white tracking-tighter">{{ page_type }}</h2>
           <p class="font-normal text-coolGray-200 dark:text-white">{{ page_type_description }}</p>
         </div>
-        <div class="rounded-full{{ page_button }} w-full md:w-1/2 p-2 lg:container flex flex-wrap items-center justify-end mx-auto">
-          <a id="refresh" href="/newoffer" class="rounded-full flex flex-wrap justify-center px-4 py-2 bg-blue-500 hover:bg-green-600 hover:border-green-600 font-medium text-sm text-white border border-blue-500 rounded-md focus:ring-0 focus:outline-none">{{ place_new_offer_svg | safe }}<span>Place new Offer</span></a>
+        <div class="w-full md:w-1/2 p-3 flex justify-end items-center hidden">
+          <a id="refresh" href="/newoffer" 
+             class="rounded-full flex items-center justify-center px-4 py-2 bg-blue-500 hover:bg-green-600 hover:border-green-600 font-medium text-sm text-white border border-blue-500 rounded-md focus:ring-0 focus:outline-none">
+            {{ place_new_offer_svg | safe }}
+            <span>Place new Offer</span>
+          </a>
         </div>
       </div>
     </div>
@@ -442,5 +423,5 @@ function getWebSocketConfig() {
 </section>
 
 <input type="hidden" name="formid" value="{{ form_id }}">
-<script src="/static/js/offerstable.js"></script>
+<script src="/static/js/offers.js"></script>
  {% include 'footer.html' %}

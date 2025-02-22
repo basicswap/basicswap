@@ -122,8 +122,30 @@ def set_pagination_filters(form_data, filters):
             filters["page_no"] = 1
     elif form_data and have_data_entry(form_data, "pageforwards"):
         filters["page_no"] = int(form_data[b"pageno"][0]) + 1
-    if filters["page_no"] > 1:
-        filters["offset"] = (filters["page_no"] - 1) * PAGE_LIMIT
+
+    no_limit = False
+    if form_data:
+        if "is_json" in form_data:
+            no_limit = form_data.get("no_limit", False)
+        else:
+            no_limit = b"no_limit" in form_data
+
+    if no_limit:
+        filters["offset"] = 0
+        filters["limit"] = None
+    else:
+        if filters["page_no"] > 1:
+            filters["offset"] = (filters["page_no"] - 1) * PAGE_LIMIT
+        filters["limit"] = PAGE_LIMIT
+
+
+def get_data_with_pagination(data, filters):
+    if filters.get("limit") is None:
+        return data
+
+    offset = filters.get("offset", 0)
+    limit = filters.get("limit", PAGE_LIMIT)
+    return data[offset:offset + limit]
 
 
 def getTxIdHex(bid, tx_type, suffix):
