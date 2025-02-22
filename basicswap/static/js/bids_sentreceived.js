@@ -192,7 +192,13 @@ const safeParseInt = (value) => {
     return isNaN(parsed) ? 0 : parsed;
 };
 
-const formatAddress = (address, displayLength = 15) => {
+const formatAddress = (address, displayLength = 20) => {
+    if (!address) return '';
+    if (address.length <= displayLength) return address;
+    return `${address.slice(8, displayLength)}...`;
+};
+
+const formatAddressSMSG = (address, displayLength = 14) => {
     if (!address) return '';
     if (address.length <= displayLength) return address;
     return `${address.slice(0, displayLength)}...`;
@@ -218,17 +224,17 @@ const getTimeStrokeColor = (expireTime) => {
 const getStatusClass = (status) => {
     switch (status) {
         case 'Completed':
-            return 'bg-green-100 text-green-800 dark:bg-green-500 dark:text-white';
+            return 'bg-green-300 text-black dark:bg-green-600 dark:text-white';
         case 'Expired':
-            return 'bg-gray-100 text-gray-800 dark:bg-gray-400 dark:text-white';
-        case 'Abandoned':
-            return 'bg-red-100 text-red-800 dark:bg-red-500 dark:text-white';
+            return 'bg-gray-200 text-black dark:bg-gray-400 dark:text-white';
+        case 'Error':
+            return 'bg-red-300 text-black dark:bg-red-600 dark:text-white';
         case 'Failed':
-            return 'bg-rose-100 text-rose-800 dark:bg-rose-500 dark:text-white';
+            return 'bg-red-300 text-black dark:bg-red-600 dark:text-white';
         case 'Failed, refunded':
-            return 'bg-gray-100 text-orange-800 dark:bg-gray-400 dark:text-red-500';
+            return 'bg-gray-200 text-black dark:bg-gray-400 dark:text-red-500';
         default:
-            return 'bg-blue-100 text-blue-800 dark:bg-blue-500 dark:text-white';
+            return 'bg-blue-300 text-black dark:bg-blue-500 dark:text-white';
     }
 };
 
@@ -274,10 +280,10 @@ function hasActiveFilters() {
     const hasNonDefaultCoinTo = coinToSelect && coinToSelect.value !== 'any';
     const hasNonDefaultExpired = withExpiredSelect && withExpiredSelect.value !== 'true';
 
-    return hasNonDefaultState || 
-           hasSearchQuery || 
-           hasNonDefaultCoinFrom || 
-           hasNonDefaultCoinTo || 
+    return hasNonDefaultState ||
+           hasSearchQuery ||
+           hasNonDefaultCoinFrom ||
+           hasNonDefaultCoinTo ||
            hasNonDefaultExpired;
 }
 
@@ -305,7 +311,7 @@ function filterAndSortData(bids) {
             const coinFromSelect = document.getElementById('coin_from');
             const selectedOption = coinFromSelect?.querySelector(`option[value="${state.filters.coin_from}"]`);
             const coinName = selectedOption?.textContent.trim();
-            
+
             if (coinName) {
                 const coinToMatch = state.currentTab === 'sent' ? bid.coin_from : bid.coin_to;
                 if (!coinMatches(coinToMatch, coinName)) {
@@ -318,7 +324,7 @@ function filterAndSortData(bids) {
             const coinToSelect = document.getElementById('coin_to');
             const selectedOption = coinToSelect?.querySelector(`option[value="${state.filters.coin_to}"]`);
             const coinName = selectedOption?.textContent.trim();
-            
+
             if (coinName) {
                 const coinToMatch = state.currentTab === 'sent' ? bid.coin_to : bid.coin_from;
                 if (!coinMatches(coinToMatch, coinName)) {
@@ -334,7 +340,7 @@ function filterAndSortData(bids) {
             const identity = IdentityManager.cache.get(bid.addr_from);
             const label = identity?.data?.label || '';
             const matchesLabel = label.toLowerCase().includes(searchStr);
-            
+
             if (!(matchesBidId || matchesIdentity || matchesLabel)) {
                 return false;
             }
@@ -358,10 +364,10 @@ function updateCoinFilterImages() {
 
     function updateButtonImage(select, button) {
         if (!select || !button) return;
-        
+
         const selectedOption = select.options[select.selectedIndex];
         const imagePath = selectedOption.getAttribute('data-image');
-        
+
         if (imagePath && select.value !== 'any') {
             button.style.backgroundImage = `url(${imagePath})`;
             button.style.backgroundSize = '25px';
@@ -385,7 +391,7 @@ const updateLoadingState = (isLoading) => {
         const refreshButton = elements[`refresh${type}Bids`];
         const refreshText = refreshButton?.querySelector(`#refresh${type}Text`);
         const refreshIcon = refreshButton?.querySelector('svg');
-        
+
         if (refreshButton) {
             refreshButton.disabled = isLoading;
             if (isLoading) {
@@ -431,7 +437,7 @@ const updateConnectionStatus = (status) => {
     };
 
     const config = statusConfig[status] || statusConfig.connected;
-    
+
     ['sent', 'received'].forEach(type => {
         const dot = elements[`statusDot${type.charAt(0).toUpperCase() + type.slice(1)}`];
         const text = elements[`statusText${type.charAt(0).toUpperCase() + type.slice(1)}`];
@@ -613,12 +619,12 @@ const createTableRow = async (bid) => {
     const identity = await IdentityManager.getIdentityData(bid.addr_from);
     const uniqueId = `${bid.bid_id}_${Date.now()}`;
     const timeColor = getTimeStrokeColor(bid.expire_at);
-    
+
     return `
         <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
             <!-- Time Column -->
-            <td class="py-3 px-6">
-                <div class="flex items-center">
+            <td class="py-3 pl-6 pr-3">
+                <div class="flex items-center min-w-max">
                     <svg class="w-5 h-5 mr-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                         <g stroke-linecap="round" stroke-width="2" fill="none" stroke="${timeColor}" stroke-linejoin="round">
                             <circle cx="12" cy="12" r="11"></circle>
@@ -629,58 +635,59 @@ const createTableRow = async (bid) => {
                 </div>
             </td>
 
-
             <!-- Details Column -->
-            <td class="py-3 px-6">
+            <td class="p-3 hidden lg:flex">
                 <div class="flex flex-col">
-                    <div class="flex items-center">
-                        <span class="text-xs font-medium mr-2">${state.currentTab === 'sent' ? 'Out' : 'In'}</span>
+                    <div class="flex items-center min-w-max">
                         <div class="relative" data-tooltip-target="tooltip-identity-${uniqueId}">
-                            <a href="/identity/${bid.addr_from}" class="text-xs">
-                                ${identity?.label || formatAddress(bid.addr_from)}
+                            <a href="/identity/${bid.addr_from}" class="text-xs font-mono">
+                                <span class="mr-2">
+                                    ${state.currentTab === 'sent' ? 'Out' : 'In'}
+                                </span>
+                                ${identity?.label || formatAddressSMSG(bid.addr_from)}
                             </a>
                         </div>
                     </div>
-                    <div class="text-xs opacity-75">
-                    <a href="/bid/${bid.bid_id}">
-                        Bid: ${formatAddress(bid.bid_id)}
-                   </a>
+                    <div class="font-mono text-xs opacity-75">
+                        <a href="/offer/${bid.offer_id}">
+                            Offer: ${formatAddress(bid.offer_id)}
+                        </a>
                     </div>
                 </div>
             </td>
 
             <!-- Send Coin Column -->
-            <td class="py-3 px-6">
-                <div class="flex items-center">
-                    <img class="w-6 h-6 mr-2" 
-                         src="/static/images/coins/${bid.coin_from.replace(' ', '-')}.png" 
-                         alt="${bid.coin_from}"
+            <td class="p-3">
+                <div class="flex items-center min-w-max">
+                    <img class="w-8 h-8 mr-2"
+                         src="/static/images/coins/${state.currentTab === 'sent' ? bid.coin_to.replace(' ', '-') : bid.coin_from.replace(' ', '-')}.png"
+                         alt="${state.currentTab === 'sent' ? bid.coin_to : bid.coin_from}"
                          onerror="this.src='/static/images/coins/default.png'">
                     <div>
-                        <div class="text-sm font-medium monospace">${bid.amount_from}</div>
-                        <div class="text-xs opacity-75 monospace">${bid.coin_from}</div>
+                        <div class="text-sm font-medium monospace">${state.currentTab === 'sent' ? bid.amount_to : bid.amount_from}</div>
+                        <div class="text-xs opacity-75 monospace">${state.currentTab === 'sent' ? bid.coin_to : bid.coin_from}</div>
                     </div>
                 </div>
             </td>
 
             <!-- Receive Coin Column -->
-            <td class="py-3 px-6">
-                <div class="flex items-center">
-                    <img class="w-6 h-6 mr-2" 
-                         src="/static/images/coins/${bid.coin_to.replace(' ', '-')}.png" 
-                         alt="${bid.coin_to}"
+            <td class="p-3">
+                <div class="flex items-center min-w-max">
+                    <img class="w-8 h-8 mr-2"
+                         src="/static/images/coins/${state.currentTab === 'sent' ? bid.coin_from.replace(' ', '-') : bid.coin_to.replace(' ', '-')}.png"
+                         alt="${state.currentTab === 'sent' ? bid.coin_from : bid.coin_to}"
                          onerror="this.src='/static/images/coins/default.png'">
                     <div>
-                        <div class="text-sm font-medium monospace">${bid.amount_to}</div>
-                        <div class="text-xs opacity-75 monospace">${bid.coin_to}</div>
+                        <div class="text-sm font-medium monospace">${state.currentTab === 'sent' ? bid.amount_from : bid.amount_to}</div>
+                        <div class="text-xs opacity-75 monospace">${state.currentTab === 'sent' ? bid.coin_from : bid.coin_to}</div>
                     </div>
                 </div>
             </td>
 
             <!-- Status Column -->
-            <td class="py-3 px-6">
-                <div class="relative" data-tooltip-target="tooltip-status-${uniqueId}">
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+            <td class="p-3">
+                <div class="flex justify-center" data-tooltip-target="tooltip-status-${uniqueId}">
+                    <span class="w-full xl:w-4/5 flex bold justify-center items-center px-2.5 py-1 rounded-full text-xs font-medium
                                 ${getStatusClass(bid.bid_state)}">
                         ${bid.bid_state}
                     </span>
@@ -688,11 +695,13 @@ const createTableRow = async (bid) => {
             </td>
 
             <!-- Actions Column -->
-            <td class="py-3 px-6">
-                <a href="/bid/${bid.bid_id}" 
-                   class="inline-block w-24 py-2 px-3 text-center text-sm font-medium text-white bg-blue-500 rounded-lg hover:bg-blue-600 transition-colors">
-                    View Bid
-                </a>
+            <td class="py-3 pr-6 pl-3">
+                <div class="flex justify-center">
+                    <a href="/bid/${bid.bid_id}"
+                        class="inline-block w-24 py-2 px-3 text-center text-sm font-medium text-white bg-blue-500 rounded-lg hover:bg-blue-600 transition-colors">
+                        View Bid
+                    </a>
+                </div>
             </td>
         </tr>
 
@@ -759,12 +768,12 @@ const updateTableContent = async (type) => {
 const initializeTooltips = () => {
     if (window.TooltipManager) {
         window.TooltipManager.cleanup();
-        
+
         const tooltipTriggers = document.querySelectorAll('[data-tooltip-target]');
         tooltipTriggers.forEach(trigger => {
             const targetId = trigger.getAttribute('data-tooltip-target');
             const tooltipContent = document.getElementById(targetId);
-            
+
             if (tooltipContent) {
                 window.TooltipManager.create(trigger, tooltipContent.innerHTML, {
                     placement: trigger.getAttribute('data-tooltip-placement') || 'top',
@@ -786,7 +795,7 @@ const fetchBids = async () => {
         const endpoint = state.currentTab === 'sent' ? '/json/sentbids' : '/json/bids';
         const withExpiredSelect = document.getElementById('with_expired');
         const includeExpired = withExpiredSelect ? withExpiredSelect.value === 'true' : true;
-        
+
         console.log('Fetching bids, include expired:', includeExpired);
 
         const response = await fetch(endpoint, {
@@ -814,7 +823,7 @@ const fetchBids = async () => {
         state.filters.with_expired = includeExpired;
 
         data = filterAndSortData(data);
-        
+
         return data;
     } catch (error) {
         console.error('Error in fetchBids:', error);
@@ -827,18 +836,18 @@ const updateBidsTable = async () => {
         console.log('Already loading, skipping update');
         return;
     }
-    
+
     try {
         console.log('Starting updateBidsTable for tab:', state.currentTab);
         console.log('Current filters:', state.filters);
-        
+
         state.isLoading = true;
         updateLoadingState(true);
 
         const bids = await fetchBids();
-        
+
         console.log('Fetched bids:', bids.length);
-        
+
         const filteredBids = bids.filter(bid => {
             // State filter
             if (state.filters.state !== -1) {
@@ -860,7 +869,7 @@ const updateBidsTable = async () => {
                 const coinFromSelect = document.getElementById('coin_from');
                 const selectedOption = coinFromSelect?.querySelector(`option[value="${state.filters.coin_from}"]`);
                 const coinName = selectedOption?.textContent.trim();
-                
+
                 if (coinName) {
                     const coinToMatch = state.currentTab === 'sent' ? bid.coin_from : bid.coin_to;
                     yourCoinMatch = coinMatches(coinToMatch, coinName);
@@ -876,7 +885,7 @@ const updateBidsTable = async () => {
                 const coinToSelect = document.getElementById('coin_to');
                 const selectedOption = coinToSelect?.querySelector(`option[value="${state.filters.coin_to}"]`);
                 const coinName = selectedOption?.textContent.trim();
-                
+
                 if (coinName) {
                     const coinToMatch = state.currentTab === 'sent' ? bid.coin_to : bid.coin_from;
                     theirCoinMatch = coinMatches(coinToMatch, coinName);
@@ -896,11 +905,11 @@ const updateBidsTable = async () => {
                 const searchStr = state.filters.searchQuery.toLowerCase();
                 const matchesBidId = bid.bid_id.toLowerCase().includes(searchStr);
                 const matchesIdentity = bid.addr_from?.toLowerCase().includes(searchStr);
-                
+
                 const identity = IdentityManager.cache.get(bid.addr_from);
                 const label = identity?.data?.label || '';
                 const matchesLabel = label.toLowerCase().includes(searchStr);
-                
+
                 if (!(matchesBidId || matchesIdentity || matchesLabel)) {
                     return false;
                 }
@@ -981,7 +990,7 @@ function handleSearch(event) {
     if (searchTimeout) {
         clearTimeout(searchTimeout);
     }
-    
+
     searchTimeout = setTimeout(() => {
         state.filters.searchQuery = event.target.value.toLowerCase();
         updateBidsTable();
@@ -1114,7 +1123,7 @@ function setupFilterEventListeners() {
             if (searchTimeout) {
                 clearTimeout(searchTimeout);
             }
-            
+
             searchTimeout = setTimeout(() => {
                 state.filters.searchQuery = event.target.value.toLowerCase();
                 updateBidsTable();
@@ -1178,7 +1187,7 @@ const setupEventListeners = () => {
                 elements.tabButtons.forEach(tab => {
                     const isSelected = tab.getAttribute('data-tabs-target') === targetId;
                     tab.setAttribute('aria-selected', isSelected);
-                    
+
                     if (isSelected) {
                         tab.classList.add('bg-gray-100', 'dark:bg-gray-600', 'text-gray-900', 'dark:text-white');
                         tab.classList.remove('hover:text-gray-600', 'hover:bg-gray-50', 'dark:hover:bg-gray-500');
@@ -1263,7 +1272,7 @@ const setupEventListeners = () => {
             const stateValue = parseInt(filterElements.stateSelect.value);
 
             state.filters.state = isNaN(stateValue) ? -1 : stateValue;
-            
+
             console.log('State filter changed:', {
                 selectedValue: filterElements.stateSelect.value,
                 parsedState: state.filters.state
@@ -1275,8 +1284,8 @@ const setupEventListeners = () => {
     }
 
     [
-        filterElements.sortBySelect, 
-        filterElements.sortDirSelect, 
+        filterElements.sortBySelect,
+        filterElements.sortDirSelect,
         filterElements.withExpiredSelect
     ].forEach(element => {
         if (element) {
@@ -1299,7 +1308,7 @@ const setupEventListeners = () => {
     document.addEventListener('change', (event) => {
         const target = event.target;
         const filterForm = document.querySelector('.flex.flex-wrap.justify-center');
-        
+
         if (filterForm && filterForm.contains(target)) {
             const formData = {
                 state: filterElements.stateSelect?.value,
@@ -1347,7 +1356,7 @@ const setupRefreshButtons = () => {
         if (refreshButton) {
             refreshButton.addEventListener('click', async () => {
                 const lowerType = type.toLowerCase();
-                
+
                 if (state.isRefreshing) {
                     console.log('Already refreshing, skipping');
                     return;
@@ -1416,7 +1425,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     WebSocketManager.initialize();
     setupEventListeners();
-    setupRefreshButtons();    
+    setupRefreshButtons();
     setupFilterEventListeners();
 
     updateClearFiltersButton();

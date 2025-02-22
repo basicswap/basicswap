@@ -189,7 +189,7 @@ const formatAddress = (address, displayLength = 15) => {
 const getTimeStrokeColor = (expireTime) => {
     const now = Math.floor(Date.now() / 1000);
     const timeLeft = expireTime - now;
-    
+
     if (timeLeft <= 300) return '#9CA3AF'; // 5 minutes or less
     if (timeLeft <= 1800) return '#3B82F6'; // 30 minutes or less
     return '#10B981'; // More than 30 minutes
@@ -781,7 +781,7 @@ async function updateBidsTable(options = {}) {
         }
 
         const totalPages = Math.ceil(state.jsonData.length / PAGE_SIZE);
-        
+
         if (resetPage && state.jsonData.length > 0) {
             state.currentPage = 1;
         }
@@ -861,7 +861,7 @@ if (elements.refreshBidsButton) {
         updateLoadingState(true);
 
         await new Promise(resolve => setTimeout(resolve, 500));
-        
+
         try {
             await updateBidsTable({ resetPage: true, refreshData: true });
         } finally {

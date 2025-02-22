@@ -1,9 +1,9 @@
 {% include 'header.html' %}
 {% from 'style.html' import breadcrumb_line_svg, page_back_svg, page_forwards_svg, filter_clear_svg, filter_apply_svg, circular_arrows_svg, input_arrow_down_svg, arrow_right_svg %}
 
-<div class="container mx-auto">
+<div class="xl:container mx-auto">
  <section class="py-3 px-4 mt-6">
-  <div class="lg:container mx-auto">
+  <div class="xl:container mx-auto">
    <div class="relative py-8 px-8 bg-coolGray-900 dark:bg-blue-500 rounded-md overflow-hidden">
     <img class="absolute z-10 left-4 top-4" src="/static/images/elements/dots-red.svg" alt="">
     <img class="absolute z-10 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt="">
@@ -49,7 +49,10 @@
     <div class="flex flex-wrap justify-center -m-1.5">
      <div class="w-full md:w-auto p-1.5">
       <div class="relative">
-       <input type="text" id="searchInput" name="search"  autocomplete="off" placeholder="Search bid ID, offer ID, address or label..." class="hover:border-blue-500 dark:hover:bg-gray-50 text-gray-900 pl-4 pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none block w-96 p-2.5 focus:ring-blue-500 focus:border-blue-500 focus:ring-0 dark:focus:bg-gray-500 dark:focus:text-white">
+       <input type="text"
+           id="searchInput"
+           name="search"  autocomplete="off" placeholder="Search bid ID, offer ID, address or label..."
+           class="w-full md:w-auto hover:border-blue-500 dark:hover:bg-gray-50 text-gray-900 pl-4 pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none block w-96 p-2.5 focus:ring-blue-500 focus:border-blue-500 focus:ring-0 dark:focus:bg-gray-500 dark:focus:text-white">
        <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
         <svg class="w-5 h-5 text-gray-500 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
@@ -162,42 +165,42 @@
  </section>
 
  <div id="bidstab">
-  <div class="rounded-lg px-6" id="sent" role="tabpanel" aria-labelledby="sent-tab">
+  <div class="rounded-lg lg:px-6" id="sent" role="tabpanel" aria-labelledby="sent-tab">
    <div id="sent-content">
-    <div class="lg:container mx-auto lg:px-0 px-6">
+    <div class="xl:container mx-auto lg:px-0">
      <div class="pt-0 pb-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
       <div class="px-0">
        <div class="w-auto overflow-auto lg:overflow-hidden">
-        <table class="w-full min-w-max">
+        <table class="w-full lg:min-w-max">
          <thead class="uppercase">
           <tr class="text-left">
            <th class="p-0">
-            <div class="py-3 px-6 rounded-tl-xl bg-coolGray-200 dark:bg-gray-600">
+            <div class="py-3 pl-16 rounded-tl-xl bg-coolGray-200 dark:bg-gray-600">
              <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Date/Time</span>
             </div>
            </th>
-           <th class="p-0">
-            <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
+           <th class="p-0 hidden lg:block">
+            <div class="p-3 bg-coolGray-200 dark:bg-gray-600">
              <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Details</span>
             </div>
            </th>
            <th class="p-0">
-            <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
+            <div class="p-3 bg-coolGray-200 dark:bg-gray-600">
              <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">You Send</span>
             </div>
            </th>
            <th class="p-0">
-            <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
+            <div class="p-3 bg-coolGray-200 dark:bg-gray-600">
              <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">You Receive</span>
             </div>
            </th>
            <th class="p-0">
-            <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
+            <div class="p-3 text-center bg-coolGray-200 dark:bg-gray-600">
              <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Status</span>
             </div>
            </th>
            <th class="p-0">
-            <div class="py-3 px-6 rounded-tr-xl bg-coolGray-200 dark:bg-gray-600">
+            <div class="p-3 pr-6 text-center rounded-tr-xl bg-coolGray-200 dark:bg-gray-600">
              <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Actions</span>
             </div>
            </th>
@@ -252,42 +255,42 @@
   </div>
 
   <!-- Received Bids Tab -->
-  <div class="hidden rounded-lg px-6" id="received" role="tabpanel" aria-labelledby="received-tab">
+  <div class="hidden rounded-lg lg:px-6" id="received" role="tabpanel" aria-labelledby="received-tab">
    <div id="received-content">
-    <div class="lg:container mx-auto lg:px-0">
+    <div class="xl:container mx-auto lg:px-0">
      <div class="pt-0 pb-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
       <div class="px-0">
        <div class="w-auto overflow-auto lg:overflow-hidden">
-        <table class="w-full min-w-max">
+        <table class="w-full lg:min-w-max">
          <thead class="uppercase">
           <tr class="text-left">
            <th class="p-0">
-            <div class="py-3 px-6 rounded-tl-xl bg-coolGray-200 dark:bg-gray-600">
+            <div class="p-3 pl-16 rounded-tl-xl bg-coolGray-200 dark:bg-gray-600">
              <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Date/Time</span>
             </div>
            </th>
            <th class="p-0">
-            <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
+            <div class="p-3 bg-coolGray-200 dark:bg-gray-600">
              <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Details</span>
             </div>
            </th>
            <th class="p-0">
-            <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
+            <div class="p-3 bg-coolGray-200 dark:bg-gray-600">
              <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">You Send</span>
             </div>
            </th>
            <th class="p-0">
-            <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
+            <div class="p-3 bg-coolGray-200 dark:bg-gray-600">
              <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">You Receive</span>
             </div>
            </th>
            <th class="p-0">
-            <div class="py-3 px-6 bg-coolGray-200 dark:bg-gray-600">
+            <div class="p-3 text-center bg-coolGray-200 dark:bg-gray-600">
              <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Status</span>
             </div>
            </th>
            <th class="p-0">
-            <div class="py-3 px-6 rounded-tr-xl bg-coolGray-200 dark:bg-gray-600">
+            <div class="p-3 pr-6 text-center rounded-tr-xl bg-coolGray-200 dark:bg-gray-600">
              <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Actions</span>
             </div>
            </th>
