@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2020-2024 tecnovert
-# Copyright (c) 2024 The Basicswap developers
+# Copyright (c) 2024-2025 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -15,6 +15,7 @@ from basicswap.util import (
 from basicswap.chainparams import (
     Coins,
     chainparams,
+    getCoinIdFromTicker,
 )
 from basicswap.basicswap_util import (
     ActionTypes,
@@ -34,30 +35,6 @@ from basicswap.basicswap_util import (
 from basicswap.protocols.xmr_swap_1 import getChainBSplitKey, getChainBRemoteSplitKey
 
 PAGE_LIMIT = 1000
-invalid_coins_from = []
-known_chart_coins = [
-    "BTC",
-    "PART",
-    "XMR",
-    "LTC",
-    "FIRO",
-    "DASH",
-    "PIVX",
-    "DOGE",
-    "ETH",
-    "DCR",
-    "ZANO",
-    "WOW",
-    "BCH",
-]
-
-
-def tickerToCoinId(ticker):
-    search_str = ticker.upper()
-    for c in Coins:
-        if c.name == search_str:
-            return c.value
-    raise ValueError("Unknown coin")
 
 
 def getCoinType(coin_type_ind):
@@ -65,7 +42,7 @@ def getCoinType(coin_type_ind):
     try:
         return int(coin_type_ind)
     except Exception:
-        return tickerToCoinId(coin_type_ind)
+        return getCoinIdFromTicker(coin_type_ind)
 
 
 def validateAmountString(amount, ci):
@@ -667,12 +644,12 @@ def listAvailableCoins(swap_client, with_variants=True, split_from=False):
             continue
         if v["connection_type"] == "rpc":
             coins.append((int(k), getCoinName(k)))
-            if split_from and k not in invalid_coins_from:
+            if split_from:
                 coins_from.append(coins[-1])
             if with_variants and k == Coins.PART:
                 for v in (Coins.PART_ANON, Coins.PART_BLIND):
                     coins.append((int(v), getCoinName(v)))
-                    if split_from and v not in invalid_coins_from:
+                    if split_from:
                         coins_from.append(coins[-1])
             if with_variants and k == Coins.LTC:
                 for v in (Coins.LTC_MWEB,):

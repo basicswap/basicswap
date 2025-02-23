@@ -32,7 +32,7 @@ from .interface.part import PARTInterface, PARTInterfaceAnon, PARTInterfaceBlind
 from . import __version__
 from .rpc import escape_rpcauth
 from .rpc_xmr import make_xmr_rpc2_func
-from .ui.util import getCoinName, known_chart_coins
+from .ui.util import getCoinName
 from .util import (
     AutomationConstraint,
     AutomationConstraintTemporary,
@@ -65,6 +65,7 @@ from basicswap.util.network import is_private_ip_address
 from .chainparams import (
     Coins,
     chainparams,
+    ticker_map,
 )
 from .script import (
     OpCodes,
@@ -9894,7 +9895,7 @@ class BasicSwap(BaseApp):
                     seen_tickers = []
                     for ticker in tickers:
                         upcased_ticker = ticker.strip().upper()
-                        if upcased_ticker not in known_chart_coins:
+                        if upcased_ticker.lower() not in ticker_map:
                             raise ValueError(f"Unknown coin: {ticker}")
                         if upcased_ticker in seen_tickers:
                             raise ValueError(f"Duplicate coin: {ticker}")

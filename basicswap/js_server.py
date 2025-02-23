@@ -22,6 +22,7 @@ from .basicswap_util import (
 from .chainparams import (
     Coins,
     chainparams,
+    getCoinIdFromTicker,
 )
 from .ui.util import (
     PAGE_LIMIT,
@@ -33,7 +34,6 @@ from .ui.util import (
     get_data_entry,
     get_data_entry_or,
     have_data_entry,
-    tickerToCoinId,
     listOldBidStates,
     checkAddressesOwned,
 )
@@ -124,7 +124,7 @@ def js_wallets(self, url_split, post_string, is_json):
     swap_client.checkSystemStatus()
     if len(url_split) > 3:
         ticker_str = url_split[3]
-        coin_type = tickerToCoinId(ticker_str)
+        coin_type = getCoinIdFromTicker(ticker_str)
 
         if len(url_split) > 4:
             cmd = url_split[4]
@@ -820,7 +820,7 @@ def js_validateamount(self, url_split, post_string: str, is_json: bool) -> bytes
             f"Unknown rounding method, must be one of {valid_round_methods}"
         )
 
-    coin_type = tickerToCoinId(ticker_str)
+    coin_type = getCoinIdFromTicker(ticker_str)
     ci = swap_client.ci(coin_type)
 
     r = 0
