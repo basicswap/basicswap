@@ -396,9 +396,6 @@ const getStatusClass = (status) => {
         case 'Delaying':
         case 'Auto accept delay':
             return 'bg-blue-300 text-black dark:bg-blue-500 dark:text-white';
-        case 'Abandoned':
-        case 'Rejected':
-            return 'bg-red-300 text-black dark:bg-red-600 dark:text-white';
         default:
             return 'bg-blue-300 text-black dark:bg-blue-500 dark:text-white';
     }
