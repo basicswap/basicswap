@@ -850,7 +850,7 @@ const createTableRow = async (bid) => {
            <!-- Status Column -->
            <td class="py-3 px-6">
             <div class="relative flex justify-center" data-tooltip-target="tooltip-status-${uniqueId}">
-                <span class="px-2.5 py-1 inline-flex items-center rounded-full text-xs font-medium ${getStatusClass(bid.bid_state)}">
+                <span class="w-full lg:w-7/8 xl:w-2/3 px-2.5 py-1 inline-flex items-center justify-center rounded-full text-xs font-medium bold ${getStatusClass(bid.bid_state)}">
                 ${bid.bid_state}
                 </span>
               </div>
