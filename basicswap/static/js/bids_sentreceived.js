@@ -476,7 +476,7 @@ function filterAndSortData(bids) {
             const coinName = selectedOption?.textContent.trim();
 
             if (coinName) {
-                const coinToMatch = state.currentTab === 'sent' ? bid.coin_from : bid.coin_to;
+                const coinToMatch = state.currentTab === 'sent' ? bid.coin_to : bid.coin_from;
                 if (!coinMatches(coinToMatch, coinName)) {
                     return false;
                 }
@@ -489,7 +489,7 @@ function filterAndSortData(bids) {
             const coinName = selectedOption?.textContent.trim();
 
             if (coinName) {
-                const coinToMatch = state.currentTab === 'sent' ? bid.coin_to : bid.coin_from;
+                const coinToMatch = state.currentTab === 'sent' ? bid.coin_from : bid.coin_to;
                 if (!coinMatches(coinToMatch, coinName)) {
                     return false;
                 }
@@ -1012,7 +1012,6 @@ const updateBidsTable = async () => {
         console.log('Fetched bids:', bids.length);
 
         const filteredBids = bids.filter(bid => {
-            // State filter
             if (state.filters.state !== -1) {
                 const allowedStates = STATE_MAP[state.filters.state] || [];
                 if (allowedStates.length > 0 && !allowedStates.includes(bid.bid_state)) {
@@ -1034,7 +1033,7 @@ const updateBidsTable = async () => {
                 const coinName = selectedOption?.textContent.trim();
 
                 if (coinName) {
-                    const coinToMatch = state.currentTab === 'sent' ? bid.coin_from : bid.coin_to;
+                    const coinToMatch = state.currentTab === 'sent' ? bid.coin_to : bid.coin_from;
                     yourCoinMatch = coinMatches(coinToMatch, coinName);
                     console.log('Your Coin filtering:', {
                         filterCoin: coinName,
@@ -1050,7 +1049,7 @@ const updateBidsTable = async () => {
                 const coinName = selectedOption?.textContent.trim();
 
                 if (coinName) {
-                    const coinToMatch = state.currentTab === 'sent' ? bid.coin_to : bid.coin_from;
+                    const coinToMatch = state.currentTab === 'sent' ? bid.coin_from : bid.coin_to;
                     theirCoinMatch = coinMatches(coinToMatch, coinName);
                     console.log('Their Coin filtering:', {
                         filterCoin: coinName,
